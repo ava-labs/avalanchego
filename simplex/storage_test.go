@@ -11,10 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
+	"github.com/ava-labs/simplex"
 	"github.com/stretchr/testify/require"
 )
 
-func TestStorage(t *testing.T) {
+func TestStorageNew(t *testing.T) {
 	ctx := context.Background()
 	child := snowmantest.BuildChild(snowmantest.Genesis)
 	
@@ -81,82 +82,108 @@ func TestStorage(t *testing.T) {
 }
 
 func TestStorageRetrieve(t *testing.T) {
-	ctx := context.Background()
-	config := newEngineConfig(t, 1)
-	_, verifier := NewBLSAuth(config)
-	qc := QCDeserializer(verifier)
 	genesis := newBlock(t, newBlockConfig{})
-
+	
 	vm := &blocktest.VM{
-				LastAcceptedF: func(ctx context.Context) (ids.ID, error) {
-					return snowmantest.GenesisID, nil
-				},
-				GetBlockF: func(ctx context.Context, id ids.ID) (snowman.Block, error) {
-					if id == snowmantest.GenesisID {
-						return snowmantest.Genesis, nil
-					}
-					return nil, errors.New("unknown block")
-				},
+		LastAcceptedF: func(ctx context.Context) (ids.ID, error) {
+			return snowmantest.GenesisID, nil
+		},
+		GetBlockF: func(ctx context.Context, id ids.ID) (snowman.Block, error) {
+			if id == snowmantest.GenesisID {
+				return snowmantest.Genesis, nil
+			}
+			return nil, database.ErrNotFound
+		},
 	}
-	config.VM = vm
-	blockTracker := newBlockTracker(genesis)
 
-	_, err := newStorage(ctx, config, &qc, blockTracker)
-	require.NoError(t, err)
+	tests := []struct {
+		name     string
+		seq      uint64
+		expectedBlock *Block
+		expectedFinalization simplex.Finalization
+		expectedExists bool
+	}{
+		{
+			name:  "retrieve genesis block",
+			seq:  0,
+			expectedBlock: genesis,
+			expectedFinalization: simplex.Finalization{},
+			expectedExists: true,
+		},
+		{
+			name:     "seq not found",
+			seq:     1,
+			expectedBlock: nil,
+			expectedFinalization: simplex.Finalization{},
+			expectedExists: false,
+		},
+	}
 
-	// s.Index()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			config := newEngineConfig(t, 1)
+			_, verifier := NewBLSAuth(config)
+			qc := QCDeserializer(verifier)
+			config.VM = vm
 
-	// tests := []struct {
-	// 	name     string
-	// 	vm 		block.ChainVM
-	// 	expected bool
-	// }{
-	// 	{
-	// 		name:  "genesis block",
-	// 		vm: &blocktest.VM{
-	// 			LastAcceptedF: func(ctx context.Context) (ids.ID, error) {
-	// 				return snowmantest.GenesisID, nil
-	// 			},
-	// 			GetBlockF: func(ctx context.Context, id ids.ID) (snowman.Block, error) {
-	// 				if id == snowmantest.GenesisID {
-	// 					return snowmantest.Genesis, nil
-	// 				}
-	// 				return nil, errors.New("unknown block")
-	// 			},
-	// 		},
-	// 		expected: true,
-	// 	},
-	// 	{
-	// 		name:     "seq not found",
-	// 		vm: &blocktest.VM{
-	// 			LastAcceptedF: func(ctx context.Context) (ids.ID, error) {
-	// 				return snowmantest.GenesisID, nil
-	// 			},
-	// 			GetBlockF: func(ctx context.Context, id ids.ID) (snowman.Block, error) {
-	// 				if id == snowmantest.GenesisID {
-	// 					return snowmantest.Genesis, nil
-	// 				}
-	// 				return nil, errors.New("unknown block")
-	// 			},
-	// 		},
-	// 		expected: false,
-	// 	},
-	// 	{
-	// 		name:     "seq found",
-	// 		expected: true,
-	// 	},
-	// }
+			s, err := newStorage(ctx, config, &qc, genesis.blockTracker)
+			require.NoError(t, err)
 
-	// for _, tt := range tests {
-	// 	t.Run(tt.name, func(t *testing.T) {
+			block, finalization, exists := s.Retrieve(tt.seq)
+			if tt.expectedExists {
+				bytes, err := block.Bytes()
+				require.NoError(t, err)
 
+				genesisBytes, err := genesis.Bytes()
+				require.NoError(t, err)
 
-	// 	})
-	// }
+				require.Equal(t, genesisBytes, bytes)
+			}
 
+			require.Equal(t, tt.expectedFinalization, finalization)
+			require.Equal(t, tt.expectedExists, exists)
+		})
+	}
 }
+
 func TestStorageIndex(t *testing.T) {
 	// index genesis
 	// index a block not the next in sequence
 	// index normal
+
+	ctx := context.Background()
+	config := newEngineConfig(t, 1)
+	_, verifier := NewBLSAuth(config)
+	qc := QCDeserializer(verifier)
+		vm := &blocktest.VM{
+		LastAcceptedF: func(ctx context.Context) (ids.ID, error) {
+			return snowmantest.GenesisID, nil
+		},
+		GetBlockF: func(ctx context.Context, id ids.ID) (snowman.Block, error) {
+			if id == snowmantest.GenesisID {
+				return snowmantest.Genesis, nil
+			}
+			return nil, database.ErrNotFound
+		},
+	}
+	config.VM = vm
+	blockTracker := newBlockTracker(genesis)
+
+	s, err := newStorage(ctx, config, &qc, blockTracker)
+	require.NoError(t, err)
+
+	block, finalization, exists := s.Retrieve(tt.seq)
+	if tt.expectedExists {
+		bytes, err := block.Bytes()
+		require.NoError(t, err)
+
+		genesisBytes, err := genesis.Bytes()
+		require.NoError(t, err)
+
+		require.Equal(t, genesisBytes, bytes)
+	}
+
+	require.Equal(t, tt.expectedFinalization, finalization)
+	require.Equal(t, tt.expectedExists, exists)
 }

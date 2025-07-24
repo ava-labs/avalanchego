@@ -28,12 +28,7 @@ func newBlock(t *testing.T, config newBlockConfig) *Block {
 	if config.prev == nil {
 		block := &Block{
 			vmBlock: snowmantest.Genesis,
-			metadata: simplex.ProtocolMetadata{
-				Version: 1,
-				Epoch:   1,
-				Round:   0,
-				Seq:     0,
-			},
+			metadata: genesisMetadata,
 		}
 		bytes, err := block.Bytes()
 		require.NoError(t, err)

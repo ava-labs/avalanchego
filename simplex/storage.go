@@ -3,6 +3,8 @@ package simplex
 import (
 	"context"
 	"encoding/binary"
+	"errors"
+	"fmt"
 
 	"sync/atomic"
 
@@ -12,11 +14,18 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var _ simplex.Storage = (*Storage)(nil)
 var simplexPrefix = []byte("simplex")
-var BlockHeaderLen = 89 // TODO: import from simplex package(not currently exported)
+var errUnexpectedSeq = errors.New("unexpected sequence number")
+var genesisMetadata = simplex.ProtocolMetadata{
+				Version: 1,
+				Epoch:   1,
+				Round:   0,
+				Seq:     0,
+			}
 
 type Storage struct {
 	// height represents the number of blocks indexed in storage.
@@ -35,6 +44,8 @@ type Storage struct {
 	blockTracker *blockTracker
 	
 	vm block.ChainVM
+
+	log logging.Logger
 }
 
 // newStorage creates a new Storage instance.
@@ -62,6 +73,7 @@ func newStorage(ctx context.Context, config *Config, qcDeserializer *QCDeseriali
 		vm:           config.VM,
 		deserializer: qcDeserializer,
 		blockTracker: blockTracker,
+		log:          config.Log,
 	}
 	s.height.Store(lastAcceptedBlock.Height() + 1)
 
@@ -76,10 +88,11 @@ func (s *Storage) Height() uint64 {
 // If [seq] is not found, returns false.
 func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalization, bool) {
 	if seq == 0 {
+		fmt.Println("s.genesisBlock", s.genesisBlock)
 		return s.genesisBlock, simplex.Finalization{}, true
 	}
 
-	block, err := getBlockAtHeight(context.Background(), s.vm, seq)
+	block, err := getBlockAtHeight(context.TODO(), s.vm, seq)
 	if err != nil {
 		if err == database.ErrNotFound {
 			return nil, simplex.Finalization{}, false
@@ -99,39 +112,39 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 
 // Index indexes the finalization in the storage.
 // It stores the finalization bytes at the current height and increments the height.
-func (s *Storage) Index(block simplex.VerifiedBlock, finalization simplex.Finalization) {
-	if block.BlockHeader().ProtocolMetadata.Seq == 0 {
+func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finalization simplex.Finalization) error 	{
+	bh := block.BlockHeader()
+	if bh.Seq == 0 {
 		// This should never happen
-		return
+		s.log.Warn("attempted to index genesis block, which should not be indexed")
+		return nil
 	}
 
 	currentHeight := s.height.Load()
-	if currentHeight != block.BlockHeader().ProtocolMetadata.Seq {
-		panic("current height does not match block sequence number")
+	if currentHeight != bh.Seq {
+		return fmt.Errorf("%w: expected %d, got %d", errUnexpectedSeq, currentHeight, bh.Seq)
 	}
 	
-	s.height.Add(1)
-
+	if bh.Seq != finalization.Finalization.Seq {
+		return fmt.Errorf("%w: expected %d, got %d", errUnexpectedSeq, bh.Seq, finalization.Finalization.Seq)
+	}
+	
 	seqBuff := make([]byte, 8)
 	binary.BigEndian.PutUint64(seqBuff, currentHeight)
 
 	finalizationBytes := finalizationToBytes(finalization)
 	if err := s.db.Put(seqBuff, finalizationBytes); err != nil {
-		panic(err)
+		return fmt.Errorf("failed to store finalization: %w", err)
 	}
-
-	s.blockTracker.indexBlock(context.Background(), block.BlockHeader().Digest)
+	
+	s.height.Add(1)
+	return s.blockTracker.indexBlock(ctx, bh.Digest)
 }
 
 // getGenesisBlock returns the genesis block wrapped as a Block instance.
 func getGenesisBlock(ctx context.Context, config *Config, lastAcceptedBlock snowman.Block) (*Block, error) {
 	genesis := &Block{
-		metadata: simplex.ProtocolMetadata{
-			Version: 0,
-			Epoch:   0,
-			Seq:     0,
-			Round:   0,
-		},
+		metadata: genesisMetadata,
 	}
 
 	// set the genesis's vmBlock
@@ -203,11 +216,11 @@ func finalizationToBytes(finalization simplex.Finalization) []byte {
 // finalizationFromBytes deserialized the bytes into a simplex.Finalization.
 func finalizationFromBytes(bytes []byte, d *QCDeserializer) (simplex.Finalization, error) {
 	var finalization simplex.Finalization
-	if err := finalization.Finalization.FromBytes(bytes[:BlockHeaderLen]); err != nil {
+	if err := finalization.Finalization.FromBytes(bytes[:simplex.BlockHeaderLen]); err != nil {
 		return simplex.Finalization{}, err
 	}
 
-	qc, err := d.DeserializeQuorumCertificate(bytes[BlockHeaderLen:])
+	qc, err := d.DeserializeQuorumCertificate(bytes[simplex.BlockHeaderLen:])
 	if err != nil {
 		return simplex.Finalization{}, err
 	}
