@@ -87,7 +87,7 @@ impl HasUpdate for SmallVec<[u8; 32]> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 /// A `ValueDigest` is either a node's value or the hash of its value.
 pub enum ValueDigest<T> {
     /// The node's value.

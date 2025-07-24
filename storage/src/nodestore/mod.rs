@@ -37,8 +37,6 @@
 //! - **`RootReader`** - Interface for accessing the root node
 //! - **`HashedNodeReader`** - Interface for immutable merkle trie access
 //! - **`Parentable`** - Trait for nodestores that can have children
-//! - **`ReadInMemoryNode`** - Interface for accessing in-memory nodes
-//!
 
 pub(crate) mod alloc;
 pub(crate) mod hash;

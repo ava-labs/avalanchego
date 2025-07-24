@@ -74,8 +74,7 @@ pub enum ProofError {
     EmptyRange,
 }
 
-#[derive(Clone, Debug)]
-
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 /// A node in a proof.
 pub struct ProofNode {
     /// The key this node is at. Each byte is a nibble.

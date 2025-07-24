@@ -25,7 +25,7 @@ static NIBBLES: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15
 
 /// Path is part or all of a node's path in the trie.
 /// Each element is a nibble.
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Default)]
 pub struct Path(pub SmallVec<[u8; 64]>);
 
 impl Debug for Path {

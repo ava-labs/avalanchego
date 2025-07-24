@@ -22,6 +22,7 @@ coarsetime.workspace = true
 fastrace.workspace = true
 hex.workspace = true
 metrics.workspace = true
+nonzero_ext.workspace = true
 sha2.workspace = true
 smallvec = { workspace = true, features = ["write", "union"] }
 thiserror.workspace = true
@@ -34,7 +35,6 @@ bytemuck_derive = "1.10.0"
 enum-as-inner = "0.6.1"
 integer-encoding = "4.0.2"
 lru = "0.16.0"
-nonzero_ext = "0.3.0"
 num-traits = "0.2.19"
 semver = "1.0.26"
 triomphe = "0.1.14"
