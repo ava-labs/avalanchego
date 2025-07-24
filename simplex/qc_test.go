@@ -39,8 +39,8 @@ func TestQCDuplicateSigners(t *testing.T) {
 	// aggregate the signatures into a quorum certificate
 	signatureAggregator := SignatureAggregator{verifier: &verifier}
 	qc, err := signatureAggregator.Aggregate(signatures)
-
 	require.NoError(t, err)
+
 	err = qc.Verify(msg)
 	require.ErrorIs(t, err, errDuplicateSigner)
 }
