@@ -45,37 +45,6 @@ func TestQCDuplicateSigners(t *testing.T) {
 	require.ErrorIs(t, err, errDuplicateSigner)
 }
 
-func TestQCSignerNotInMembershipSet(t *testing.T) {
-	node1 := newEngineConfig(t, 2)
-	signer, verifier := NewBLSAuth(node1)
-
-	// nodes 1 and 2 will sign the same message
-	msg := []byte("Begin at the beginning, and go on till you come to the end: then stop")
-	sig, err := signer.Sign(msg)
-	require.NoError(t, err)
-	require.NoError(t, verifier.Verify(msg, sig, node1.Ctx.NodeID[:]))
-
-	// add a new validator, but it won't be in the membership set of the first node signer/verifier
-	node2 := newEngineConfig(t, 2)
-	node2.Ctx.ChainID = node1.Ctx.ChainID
-
-	// sign the same message with the new node
-	signer2, verifier2 := NewBLSAuth(node2)
-	sig2, err := signer2.Sign(msg)
-	require.NoError(t, err)
-	require.NoError(t, verifier2.Verify(msg, sig2, node2.Ctx.NodeID[:]))
-
-	// aggregate the signatures into a quorum certificate
-	signatureAggregator := SignatureAggregator{verifier: &verifier}
-	_, err = signatureAggregator.Aggregate(
-		[]simplex.Signature{
-			{Signer: node1.Ctx.NodeID[:], Value: sig},
-			{Signer: node2.Ctx.NodeID[:], Value: sig2},
-		},
-	)
-	require.ErrorIs(t, err, errSignerNotFound)
-}
-
 func TestQCDeserializerInvalidBytes(t *testing.T) {
 	config := newEngineConfig(t, 2)
 
@@ -175,6 +144,30 @@ func TestSignatureAggregation(t *testing.T) {
 				return sigs
 			}(),
 			expectError: errUnexpectedSigners,
+		},
+		{
+			name: "not in membership set",
+			signers: func() []simplex.Signature {
+				sigs := make([]simplex.Signature, 0, 3)
+				for i, config := range configs {
+					signer, _ := NewBLSAuth(config)
+					if i < 2 {
+						sig, err := signer.Sign(msg)
+						require.NoError(t, err)
+						sigs = append(sigs, simplex.Signature{Signer: config.Ctx.NodeID[:], Value: sig})
+					}
+				}
+
+				// add a signature from a node not in the membership set
+				newConfig := newNetworkConfigs(t, 4)
+				signer, _ := NewBLSAuth(newConfig[0])
+				sig, err := signer.Sign(msg)
+				require.NoError(t, err)
+				sigs = append(sigs, simplex.Signature{Signer: newConfig[0].Ctx.NodeID[:], Value: sig})
+
+				return sigs
+			}(),
+			expectError: errSignerNotFound,
 		},
 	}
 
