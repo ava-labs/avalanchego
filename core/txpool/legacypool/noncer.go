@@ -30,8 +30,8 @@ package legacypool
 import (
 	"sync"
 
-	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/state"
 )
 
 // noncer is a tiny virtual state database to manage the executable nonces of

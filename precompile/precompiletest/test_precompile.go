@@ -10,12 +10,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/coreth/core/extstate"
-	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/precompile/contract"
 	"github.com/ava-labs/coreth/precompile/modules"
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )

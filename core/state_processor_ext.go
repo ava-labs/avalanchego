@@ -9,10 +9,10 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/coreth/core/extstate"
-	"github.com/ava-labs/coreth/core/state"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/precompile/contract"
 	"github.com/ava-labs/coreth/precompile/modules"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/log"
 )
 

@@ -28,7 +28,7 @@
 package core
 
 import (
-	"github.com/ava-labs/coreth/core/state"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 )
