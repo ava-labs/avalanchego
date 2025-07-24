@@ -27,11 +27,7 @@ type Cache[K comparable, V any] struct {
 
 // NewCache creates a new LRU cache with the given size.
 func NewCache[K comparable, V any](size int) *Cache[K, V] {
-	return &Cache[K, V]{
-		elements: linked.NewHashmap[K, V](),
-		size:     max(size, 1),
-		onEvict:  func(K, V) {}, // no-op by default
-	}
+	return NewCacheWithOnEvict(size, func(K, V) {})
 }
 
 // NewCacheWithOnEvict creates a new LRU cache with the given size and eviction callback.
@@ -48,8 +44,7 @@ func (c *Cache[K, V]) Put(key K, value V) {
 	defer c.lock.Unlock()
 
 	if c.elements.Len() == c.size {
-		oldestKey, _, ok := c.elements.Oldest()
-		if ok {
+		if oldestKey, _, ok := c.elements.Oldest(); ok {
 			c.evict(oldestKey)
 		}
 	}
@@ -71,24 +66,22 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 func (c *Cache[K, _]) Evict(key K) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
+
 	c.evict(key)
 }
 
 func (c *Cache[K, V]) evict(key K) {
-	value, ok := c.elements.Get(key)
-	if !ok {
-		return
+	if value, ok := c.elements.Get(key); ok {
+		c.onEvict(key, value)
+		c.elements.Delete(key)
 	}
-	c.onEvict(key, value)
-	c.elements.Delete(key)
 }
 
 func (c *Cache[_, _]) Flush() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	iter := c.elements.NewIterator()
-	for iter.Next() {
+	for iter := c.elements.NewIterator(); iter.Next(); {
 		c.evict(iter.Key())
 	}
 }
