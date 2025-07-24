@@ -17,7 +17,7 @@
 // TODO: remove bitflags, we only use one bit
 use bitflags::bitflags;
 use smallvec::SmallVec;
-use std::fmt::{self, Debug};
+use std::fmt::{self, Debug, LowerHex};
 use std::iter::{FusedIterator, once};
 use std::ops::Add;
 
@@ -38,6 +38,23 @@ impl Debug for Path {
             }
         }
         Ok(())
+    }
+}
+
+impl LowerHex for Path {
+    // TODO: handle fill / alignment / etc
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        if self.0.is_empty() {
+            write!(f, "[]")
+        } else {
+            if f.alternate() {
+                write!(f, "0x")?;
+            }
+            for nib in &self.0 {
+                write!(f, "{:x}", *nib)?;
+            }
+            Ok(())
+        }
     }
 }
 
@@ -344,5 +361,12 @@ mod test {
         );
         let to_encoded = from_encoded.iter_encoded().collect::<SmallVec<[u8; 32]>>();
         assert_eq!(encode.as_ref(), to_encoded.as_ref());
+    }
+
+    #[test_case(Path::new(), "[]", "[]")]
+    #[test_case(Path::from([0x12, 0x34, 0x56, 0x78]), "12345678", "0x12345678")]
+    fn test_fmt_lower_hex(path: Path, expected: &str, expected_with_prefix: &str) {
+        assert_eq!(format!("{path:x}"), expected);
+        assert_eq!(format!("{path:#x}"), expected_with_prefix);
     }
 }

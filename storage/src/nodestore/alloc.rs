@@ -633,7 +633,7 @@ impl<'a, S: ReadableStorage> FreeListIterator<'a, S> {
     fn next_with_parent(
         &mut self,
     ) -> Option<Result<((LinearAddress, AreaIndex), FreeListParent), FileIoError>> {
-        let parent = self.parent.clone();
+        let parent = self.parent;
         let next_addr = self.next()?;
         Some(next_addr.map(|free_area| (free_area, parent)))
     }

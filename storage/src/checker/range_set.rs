@@ -9,11 +9,11 @@ use std::ops::Range;
 
 use crate::iter::write_limited_with_sep;
 use crate::nodestore::NodeStoreHeader;
-use crate::{CheckerError, LinearAddress};
+use crate::{CheckerError, LinearAddress, StoredAreaParent};
 
 const MAX_AREAS_TO_DISPLAY: usize = 10;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 // BTreeMap: range end --> range start
 // To check if a value is in the range set, we will find the range with the smallest end that is greater than or equal to the given value
 pub struct RangeSet<T>(BTreeMap<T, T>);
@@ -214,7 +214,9 @@ impl<T: Debug> IntoIterator for RangeSet<T> {
     }
 }
 
-pub(super) struct LinearAddressRangeSet {
+/// A set of disjoint ranges of linear addresses in ascending order.
+#[derive(Debug)]
+pub struct LinearAddressRangeSet {
     range_set: RangeSet<LinearAddress>,
     max_addr: LinearAddress,
     bytes_in_set: u64,
@@ -249,18 +251,21 @@ impl LinearAddressRangeSet {
         &mut self,
         addr: LinearAddress,
         size: u64,
+        parent: StoredAreaParent,
     ) -> Result<(), CheckerError> {
         let start = addr;
         let end = start.advance(size).ok_or(CheckerError::AreaOutOfBounds {
             start,
             size,
             bounds: Self::NODE_STORE_START_ADDR..self.max_addr,
+            parent,
         })?; // This can only happen due to overflow
         if addr < Self::NODE_STORE_START_ADDR || end > self.max_addr {
             return Err(CheckerError::AreaOutOfBounds {
                 start: addr,
                 size,
                 bounds: Self::NODE_STORE_START_ADDR..self.max_addr,
+                parent,
             });
         }
 
@@ -269,6 +274,7 @@ impl LinearAddressRangeSet {
                 start: addr,
                 size,
                 intersection,
+                parent,
             });
         }
         self.bytes_in_set = self
@@ -564,8 +570,12 @@ mod test_range_set {
 #[expect(clippy::unwrap_used)]
 mod test_linear_address_range_set {
 
+    use crate::{FreeListParent, TrieNodeParent};
+
     use super::*;
     use test_case::test_case;
+
+    const TEST_PARENT: StoredAreaParent = StoredAreaParent::TrieNode(TrieNodeParent::Root);
 
     #[test]
     fn test_empty() {
@@ -587,7 +597,7 @@ mod test_linear_address_range_set {
 
         let mut visited = LinearAddressRangeSet::new(0x1000).unwrap();
         visited
-            .insert_area(start_addr, size)
+            .insert_area(start_addr, size, TEST_PARENT)
             .expect("the given area should be within bounds");
 
         let visited_ranges = visited
@@ -610,11 +620,11 @@ mod test_linear_address_range_set {
 
         let mut visited = LinearAddressRangeSet::new(0x1000).unwrap();
         visited
-            .insert_area(start1_addr, size1)
+            .insert_area(start1_addr, size1, TEST_PARENT)
             .expect("the given area should be within bounds");
 
         visited
-            .insert_area(start2_addr, size2)
+            .insert_area(start2_addr, size2, TEST_PARENT)
             .expect("the given area should be within bounds");
 
         let visited_ranges = visited
@@ -635,31 +645,34 @@ mod test_linear_address_range_set {
         let end1_addr = LinearAddress::new(start1 + size1).unwrap();
         let start2_addr = LinearAddress::new(start2).unwrap();
 
+        let parent1 = StoredAreaParent::TrieNode(TrieNodeParent::Parent(start1_addr, 5));
+        let parent2 = StoredAreaParent::FreeList(FreeListParent::FreeListHead(3));
+
         let mut visited = LinearAddressRangeSet::new(0x1000).unwrap();
         visited
-            .insert_area(start1_addr, size1)
+            .insert_area(start1_addr, size1, parent1)
             .expect("the given area should be within bounds");
 
         let error = visited
-            .insert_area(start2_addr, size2)
+            .insert_area(start2_addr, size2, parent2)
             .expect_err("the given area should intersect with the first area");
 
         assert!(
-            matches!(error, CheckerError::AreaIntersects { start, size, intersection } if start == start2_addr && size == size2 && intersection == vec![start2_addr..end1_addr])
+            matches!(error, CheckerError::AreaIntersects { start, size, intersection, parent } if start == start2_addr && size == size2 && intersection == vec![start2_addr..end1_addr] && parent == parent2)
         );
 
         // try inserting in opposite order
         let mut visited2 = LinearAddressRangeSet::new(0x1000).unwrap();
         visited2
-            .insert_area(start2_addr, size2)
+            .insert_area(start2_addr, size2, parent2)
             .expect("the given area should be within bounds");
 
         let error = visited2
-            .insert_area(start1_addr, size1)
+            .insert_area(start1_addr, size1, parent1)
             .expect_err("the given area should intersect with the first area");
 
         assert!(
-            matches!(error, CheckerError::AreaIntersects { start, size, intersection } if start == start1_addr && size == size1 && intersection == vec![start2_addr..end1_addr])
+            matches!(error, CheckerError::AreaIntersects { start, size, intersection, parent } if start == start1_addr && size == size1 && intersection == vec![start2_addr..end1_addr] && parent == parent1)
         );
     }
 
@@ -679,8 +692,12 @@ mod test_linear_address_range_set {
         let db_end = LinearAddress::new(db_size).unwrap();
 
         let mut visited = LinearAddressRangeSet::new(db_size).unwrap();
-        visited.insert_area(start1_addr, size1).unwrap();
-        visited.insert_area(start2_addr, size2).unwrap();
+        visited
+            .insert_area(start1_addr, size1, TEST_PARENT)
+            .unwrap();
+        visited
+            .insert_area(start2_addr, size2, TEST_PARENT)
+            .unwrap();
 
         let complement = visited.complement().into_iter().collect::<Vec<_>>();
         assert_eq!(
@@ -701,7 +718,7 @@ mod test_linear_address_range_set {
 
         let mut visited = LinearAddressRangeSet::new(db_size).unwrap();
         visited
-            .insert_area(LinearAddress::new(start).unwrap(), size)
+            .insert_area(LinearAddress::new(start).unwrap(), size, TEST_PARENT)
             .unwrap();
         let complement = visited.complement().into_iter().collect::<Vec<_>>();
         assert_eq!(complement, vec![]);
@@ -763,7 +780,7 @@ mod test_linear_address_range_set {
             #[allow(clippy::arithmetic_side_effects)]
             let offset = i as u64 * 0x20 + 0x1000;
             range_set
-                .insert_area(LinearAddress::new(offset).unwrap(), 0x10)
+                .insert_area(LinearAddress::new(offset).unwrap(), 0x10, TEST_PARENT)
                 .unwrap();
         }
         assert_eq!(format!("{range_set}"), expected);
