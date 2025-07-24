@@ -9,13 +9,17 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/coreth/plugin/factory"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -462,6 +466,102 @@ func exportBlockRange(tb testing.TB, sourceDir string, targetDir string, startBl
 	}
 
 	r.NoError(batch.Write())
+}
+
+func TestFixRange(t *testing.T) {
+	r := require.New(t)
+
+	db, err := leveldb.New("/mnt/data/exec-run-aaron/blocks", nil, logging.NoLog{}, prometheus.NewRegistry())
+	r.NoError(err)
+	t.Cleanup(func() {
+		r.NoError(db.Close())
+	})
+
+	client, err := ethclient.Dial("https://api.avax.network/ext/bc/C/rpc")
+	r.NoError(err, "failed to connect to Ethereum client")
+
+	var (
+		startBlock = uint64(13074828)
+		endBlock   = uint64(13074967)
+	)
+	ctx := context.Background()
+	for i := startBlock; i <= endBlock; i++ {
+		blk, err := client.BlockByNumber(ctx, big.NewInt(int64(i)))
+		r.NoError(err)
+
+		blkBytes, err := rlp.EncodeToBytes(blk)
+		r.NoError(err)
+
+		decodedBlk := new(types.Block)
+		err = rlp.DecodeBytes(blkBytes, decodedBlk)
+		r.NoError(err)
+
+		r.Equal(blk.Hash(), decodedBlk.Hash())
+
+		r.NoError(db.Put(blockKey(i), blkBytes), "failed to put block %d into database", i)
+	}
+}
+
+func TestCheckRange(t *testing.T) {
+	// Create an iterator over the block source directory /mnt/data/exec-run-aaron/blocks and iterate over the
+	// block starting at 13074828
+	// Log any of the blocks that are not present up to block 50m and keep a counter of the number of missing blocks.
+	// If the number of missing blocks exceeds 1000, fail the test and exit.
+	r := require.New(t)
+	t.Log("trying to open database")
+	db, err := leveldb.New("/mnt/data/exec-run-aaron/blocks", nil, logging.NoLog{}, prometheus.NewRegistry())
+	r.NoError(err)
+	t.Cleanup(func() {
+		r.NoError(db.Close())
+	})
+
+	b, err := db.Get(blockKey(50_000_000)) // Ensure the database is accessible and contains the expected block
+	r.NoError(err)
+	r.NotNil(b)
+
+	// startBlock := uint64(13074828)
+	// startBlock := uint64(13074967)
+	startBlock := uint64(49_999_999)
+	endBlock := uint64(51_000_000)
+	currentHeight := startBlock
+	missingBlocks := uint64(0)
+	missingBlockThreshold := uint64(5)
+	iter := db.NewIteratorWithStart(blockKey(startBlock))
+	defer iter.Release()
+
+	iterCount := 0
+
+	t.Logf("iterating over blocks from %d to %d", startBlock, endBlock)
+	for iter.Next() {
+		key := iter.Key()
+		if len(key) != database.Uint64Size {
+			t.Fatalf("expected key length %d, got %d", database.Uint64Size, len(key))
+		}
+		height := binary.BigEndian.Uint64(key)
+		iterCount++
+		if iterCount%1000 == 0 {
+			t.Logf("found block at height %d", height)
+		}
+
+		if height != currentHeight {
+			t.Logf("looked for block %d, but got %d", currentHeight, height)
+			numMissingBlocks := height - currentHeight
+			missingBlocks += numMissingBlocks
+			currentHeight = height
+		} else {
+			currentHeight++
+		}
+		if height > endBlock {
+			break
+		}
+		if missingBlocks > missingBlockThreshold {
+			t.Fatalf("found %d missing blocks, which exceeds the threshold of %d", missingBlocks, missingBlockThreshold)
+		}
+	}
+	if iter.Error() != nil {
+		t.Fatalf("failed to iterate over blocks: %v", iter.Error())
+	}
+	t.Log("finished iterating over blocks")
 }
 
 type consensusMetrics struct {
