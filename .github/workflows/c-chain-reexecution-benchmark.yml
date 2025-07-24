@@ -19,6 +19,11 @@ on:
         description: 'The current state directory. Supports S3 directory/zip and local directories.'
         required: false
         default: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip
+      runner:
+        description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
+        required: false
+        default: ubuntu-latest
+
   schedule:
     - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 
@@ -27,7 +32,7 @@ jobs:
       permissions:
         id-token: write
         contents: write
-      runs-on: ubuntu-latest
+      runs-on: ${{ github.event.inputs.target-runner || 'ubuntu-latest' }}
       steps:
         - name: Configure AWS Credentials
           uses: aws-actions/configure-aws-credentials@v4
