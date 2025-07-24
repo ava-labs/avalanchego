@@ -32,7 +32,7 @@ jobs:
       permissions:
         id-token: write
         contents: write
-      runs-on: ${{ github.event.inputs.target-runner || 'ubuntu-latest' }}
+      runs-on: ${{ github.event.inputs.runner || 'ubuntu-latest' }}
       steps:
         - name: Configure AWS Credentials
           uses: aws-actions/configure-aws-credentials@v4
