@@ -77,6 +77,20 @@ impl<T, S: WritableStorage> NodeStore<T, S> {
         self.storage.write(0, &header_bytes)?;
         Ok(())
     }
+
+    /// Persist the freelist from this proposal to storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`FileIoError`] if the free list cannot be written to storage.
+    #[fastrace::trace(short_name = true)]
+    pub fn flush_freelist(&self) -> Result<(), FileIoError> {
+        // Write the free lists to storage
+        let free_list_bytes = bytemuck::bytes_of(self.header.free_lists());
+        let free_list_offset = NodeStoreHeader::free_lists_offset();
+        self.storage.write(free_list_offset, free_list_bytes)?;
+        Ok(())
+    }
 }
 
 /// Iterator that returns unpersisted nodes in depth first order.
@@ -184,19 +198,38 @@ impl<N: NodeReader + RootReader> Iterator for UnPersistedNodeIterator<'_, N> {
     }
 }
 
-impl NodeStore<Committed, FileBacked> {
-    /// Persist the freelist from this proposal to storage.
+impl<S: WritableStorage + 'static> NodeStore<Committed, S> {
+    /// Persist all the nodes of a proposal to storage.
     ///
     /// # Errors
     ///
-    /// Returns a [`FileIoError`] if the free list cannot be written to storage.
+    /// Returns a [`FileIoError`] if any node cannot be written to storage.
     #[fastrace::trace(short_name = true)]
-    pub fn flush_freelist(&self) -> Result<(), FileIoError> {
-        // Write the free lists to storage
-        let free_list_bytes = bytemuck::bytes_of(self.header.free_lists());
-        let free_list_offset = NodeStoreHeader::free_lists_offset();
-        self.storage.write(free_list_offset, free_list_bytes)?;
-        Ok(())
+    pub fn flush_nodes(&mut self) -> Result<NodeStoreHeader, FileIoError> {
+        #[cfg(feature = "io-uring")]
+        if let Some(this) = self.downcast_to_file_backed() {
+            return this.flush_nodes_io_uring();
+        }
+        self.flush_nodes_generic()
+    }
+
+    #[cfg(feature = "io-uring")]
+    #[inline]
+    fn downcast_to_file_backed(&mut self) -> Option<&mut NodeStore<Committed, FileBacked>> {
+        /*
+         * FIXME(rust-lang/rfcs#1210, rust-lang/rust#31844):
+         *
+         * This is a slight hack that exists because rust trait specialization
+         * is not yet stable. If the `io-uring` feature is enabled, we attempt to
+         * downcast `self` into a `NodeStore<Committed, FileBacked>`, and if successful,
+         * we call the specialized `flush_nodes_io_uring` method.
+         *
+         * During monomorphization, this will be completely optimized out as the
+         * type id comparison is done with constants that the compiler can resolve
+         * and use to detect dead branches.
+         */
+        let this = self as &mut dyn std::any::Any;
+        this.downcast_mut::<NodeStore<Committed, FileBacked>>()
     }
 
     /// Persist all the nodes of a proposal to storage.
@@ -204,9 +237,7 @@ impl NodeStore<Committed, FileBacked> {
     /// # Errors
     ///
     /// Returns a [`FileIoError`] if any node cannot be written to storage.
-    #[fastrace::trace(short_name = true)]
-    #[cfg(not(feature = "io-uring"))]
-    pub fn flush_nodes(&mut self) -> Result<NodeStoreHeader, FileIoError> {
+    fn flush_nodes_generic(&self) -> Result<NodeStoreHeader, FileIoError> {
         let flush_start = Instant::now();
 
         // keep arcs to the allocated nodes to add them to cache
@@ -245,7 +276,7 @@ impl NodeStore<Committed, FileBacked> {
     }
 }
 
-impl NodeStore<Committed, FileBacked> {
+impl<S: WritableStorage + 'static> NodeStore<Committed, S> {
     /// Persist the entire nodestore to storage.
     ///
     /// This method performs a complete persistence operation by:
@@ -274,7 +305,9 @@ impl NodeStore<Committed, FileBacked> {
 
         Ok(())
     }
+}
 
+impl NodeStore<Committed, FileBacked> {
     /// Persist all the nodes of a proposal to storage.
     ///
     /// # Errors
@@ -282,7 +315,7 @@ impl NodeStore<Committed, FileBacked> {
     /// Returns a [`FileIoError`] if any node cannot be written to storage.
     #[fastrace::trace(short_name = true)]
     #[cfg(feature = "io-uring")]
-    pub fn flush_nodes(&mut self) -> Result<NodeStoreHeader, FileIoError> {
+    fn flush_nodes_io_uring(&mut self) -> Result<NodeStoreHeader, FileIoError> {
         use std::pin::Pin;
 
         #[derive(Clone, Debug)]
@@ -447,11 +480,23 @@ impl NodeStore<Committed, FileBacked> {
 mod tests {
     use super::*;
     use crate::{
-        Child, HashType, LinearAddress, NodeStore, Path, SharedNode,
+        Child, HashType, ImmutableProposal, LinearAddress, NodeStore, Path, SharedNode,
         linear::memory::MemStore,
         node::{BranchNode, LeafNode, Node},
         nodestore::MutableProposal,
     };
+    use std::sync::Arc;
+
+    fn into_committed(
+        ns: NodeStore<std::sync::Arc<ImmutableProposal>, MemStore>,
+        parent: &NodeStore<Committed, MemStore>,
+    ) -> NodeStore<Committed, MemStore> {
+        ns.flush_freelist().unwrap();
+        ns.flush_header().unwrap();
+        let mut ns = ns.as_committed(parent);
+        ns.flush_nodes().unwrap();
+        ns
+    }
 
     /// Helper to create a test node store with a specific root
     fn create_test_store_with_root(root: Node) -> NodeStore<MutableProposal, MemStore> {
@@ -639,5 +684,95 @@ mod tests {
         // inner_branch should come before root_branch
         assert!(leaf3_pos < inner_branch_pos);
         assert!(inner_branch_pos < root_pos);
+    }
+
+    #[test]
+    fn test_into_committed_with_generic_storage() {
+        // Create a base committed store with MemStore
+        let mem_store = MemStore::new(vec![]);
+        let base_committed = NodeStore::new_empty_committed(mem_store.into()).unwrap();
+
+        // Create a mutable proposal from the base
+        let mut mutable_store = NodeStore::new(&base_committed).unwrap();
+
+        // Add some nodes to the mutable store
+        let leaf1 = create_leaf(&[1, 2, 3], b"value1");
+        let leaf2 = create_leaf(&[4, 5, 6], b"value2");
+        let branch = create_branch(
+            &[0],
+            Some(b"branch_value"),
+            vec![(1, leaf1.clone()), (2, leaf2.clone())],
+        );
+
+        mutable_store.mut_root().replace(branch.clone());
+
+        // Convert to immutable proposal
+        let immutable_store: NodeStore<Arc<ImmutableProposal>, _> =
+            mutable_store.try_into().unwrap();
+
+        // Commit the immutable store
+        let committed_store = into_committed(immutable_store, &base_committed);
+
+        // Verify the committed store has the expected values
+        let root = committed_store.kind.root.as_ref().unwrap();
+        let root_node = root.as_shared_node(&committed_store).unwrap();
+        assert_eq!(*root_node.partial_path(), Path::from(&[0]));
+        assert_eq!(root_node.value(), Some(&b"branch_value"[..]));
+        assert!(root_node.is_branch());
+        let root_branch = root_node.as_branch().unwrap();
+        assert_eq!(
+            root_branch.children.iter().filter(|c| c.is_some()).count(),
+            2
+        );
+
+        let child1 = root_branch.children[1].as_ref().unwrap();
+        let child1_node = child1
+            .as_maybe_persisted_node()
+            .as_shared_node(&committed_store)
+            .unwrap();
+        assert_eq!(*child1_node.partial_path(), Path::from(&[1, 2, 3]));
+        assert_eq!(child1_node.value(), Some(&b"value1"[..]));
+
+        let child2 = root_branch.children[2].as_ref().unwrap();
+        let child2_node = child2
+            .as_maybe_persisted_node()
+            .as_shared_node(&committed_store)
+            .unwrap();
+        assert_eq!(*child2_node.partial_path(), Path::from(&[4, 5, 6]));
+        assert_eq!(child2_node.value(), Some(&b"value2"[..]));
+    }
+
+    #[cfg(feature = "io-uring")]
+    #[test]
+    fn test_downcast_to_file_backed() {
+        use nonzero_ext::nonzero;
+
+        use crate::CacheReadStrategy;
+
+        {
+            let tf = tempfile::NamedTempFile::new().unwrap();
+            let path = tf.path().to_owned();
+
+            let fb = Arc::new(
+                FileBacked::new(
+                    path,
+                    nonzero!(10usize),
+                    nonzero!(10usize),
+                    false,
+                    CacheReadStrategy::WritesOnly,
+                )
+                .unwrap(),
+            );
+
+            let mut ns = NodeStore::new_empty_committed(fb.clone()).unwrap();
+
+            assert!(ns.downcast_to_file_backed().is_some());
+        }
+
+        {
+            let ms = Arc::new(MemStore::new(vec![]));
+            let mut ns = NodeStore::new_empty_committed(ms.clone()).unwrap();
+            assert!(ns.downcast_to_file_backed().is_none());
+        }
     }
 }

@@ -87,9 +87,7 @@ use crate::hashednode::hash_node;
 use crate::node::Node;
 use crate::node::persist::MaybePersistedNode;
 use crate::nodestore::alloc::AREA_SIZES;
-use crate::{
-    CacheReadStrategy, FileBacked, FileIoError, Path, ReadableStorage, SharedNode, TrieHash,
-};
+use crate::{CacheReadStrategy, FileIoError, Path, ReadableStorage, SharedNode, TrieHash};
 
 use super::linear::WritableStorage;
 
@@ -187,7 +185,7 @@ impl Parentable for Arc<ImmutableProposal> {
 impl<S> NodeStore<Arc<ImmutableProposal>, S> {
     /// When an immutable proposal commits, we need to reparent any proposal that
     /// has the committed proposal as it's parent
-    pub fn commit_reparent(&self, other: &Arc<NodeStore<Arc<ImmutableProposal>, S>>) {
+    pub fn commit_reparent(&self, other: &NodeStore<Arc<ImmutableProposal>, S>) {
         match *other.kind.parent.load() {
             NodeStoreParent::Proposed(ref parent) => {
                 if Arc::ptr_eq(&self.kind, parent) {
@@ -220,7 +218,7 @@ impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
     /// # Errors
     ///
     /// Returns a [`FileIoError`] if the parent root cannot be read.
-    pub fn new<F: Parentable>(parent: &Arc<NodeStore<F, S>>) -> Result<Self, FileIoError> {
+    pub fn new<F: Parentable>(parent: &NodeStore<F, S>) -> Result<Self, FileIoError> {
         let mut deleted = Vec::default();
         let root = if let Some(ref root) = parent.kind.root() {
             deleted.push(root.clone());
@@ -483,14 +481,14 @@ impl<S: ReadableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     }
 }
 
-impl NodeStore<Arc<ImmutableProposal>, FileBacked> {
+impl<S: WritableStorage> NodeStore<Arc<ImmutableProposal>, S> {
     /// Return a Committed version of this proposal, which doesn't have any modified nodes.
     /// This function is used during commit.
     #[must_use]
     pub fn as_committed(
         &self,
-        current_revision: Arc<NodeStore<Committed, FileBacked>>,
-    ) -> NodeStore<Committed, FileBacked> {
+        current_revision: &NodeStore<Committed, S>,
+    ) -> NodeStore<Committed, S> {
         NodeStore {
             header: current_revision.header,
             kind: Committed {
@@ -794,19 +792,17 @@ mod tests {
     fn test_reparent() {
         // create an empty base revision
         let memstore = MemStore::new(vec![]);
-        let base = NodeStore::new_empty_committed(memstore.into())
-            .unwrap()
-            .into();
+        let base = NodeStore::new_empty_committed(memstore.into()).unwrap();
 
         // create an empty r1, check that it's parent is the empty committed version
         let r1 = NodeStore::new(&base).unwrap();
-        let r1: Arc<NodeStore<Arc<ImmutableProposal>, _>> = Arc::new(r1.try_into().unwrap());
+        let r1: NodeStore<Arc<ImmutableProposal>, _> = r1.try_into().unwrap();
         let parent: DynGuard<Arc<NodeStoreParent>> = r1.kind.parent.load();
         assert!(matches!(**parent, NodeStoreParent::Committed(None)));
 
         // create an empty r2, check that it's parent is the proposed version r1
-        let r2: NodeStore<MutableProposal, _> = NodeStore::new(&r1.clone()).unwrap();
-        let r2: Arc<NodeStore<Arc<ImmutableProposal>, _>> = Arc::new(r2.try_into().unwrap());
+        let r2: NodeStore<MutableProposal, _> = NodeStore::new(&r1).unwrap();
+        let r2: NodeStore<Arc<ImmutableProposal>, _> = r2.try_into().unwrap();
         let parent: DynGuard<Arc<NodeStoreParent>> = r2.kind.parent.load();
         assert!(matches!(**parent, NodeStoreParent::Proposed(_)));
 

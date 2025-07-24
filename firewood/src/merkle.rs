@@ -1,19 +1,6 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-#![expect(
-    clippy::missing_errors_doc,
-    reason = "Found 6 occurrences after enabling the lint."
-)]
-#![expect(
-    clippy::missing_panics_doc,
-    reason = "Found 1 occurrences after enabling the lint."
-)]
-#![expect(
-    clippy::too_many_lines,
-    reason = "Found 1 occurrences after enabling the lint."
-)]
-
 use crate::proof::{Proof, ProofError, ProofNode};
 #[cfg(test)]
 use crate::range_proof::RangeProof;
@@ -26,7 +13,7 @@ use crate::v2::api::{self, FrozenRangeProof};
 use firewood_storage::{
     BranchNode, Child, FileIoError, HashType, Hashable, HashedNodeReader, ImmutableProposal,
     IntoHashType, LeafNode, MaybePersistedNode, MutableProposal, NibblesIterator, Node, NodeStore,
-    Path, ReadableStorage, SharedNode, TrieReader, ValueDigest,
+    Parentable, Path, ReadableStorage, SharedNode, TrieReader, ValueDigest,
 };
 #[cfg(test)]
 use futures::{StreamExt, TryStreamExt};
@@ -178,6 +165,10 @@ impl<T: TrieReader> Merkle<T> {
 
     /// Returns a proof that the given key has a certain value,
     /// or that the key isn't in the trie.
+    ///
+    /// ## Errors
+    ///
+    /// Returns an error if the trie is empty or an error occurs while reading from storage.
     pub fn prove(&self, key: &[u8]) -> Result<FrozenProof, ProofError> {
         let Some(root) = self.root() else {
             return Err(ProofError::Empty);
@@ -216,6 +207,7 @@ impl<T: TrieReader> Merkle<T> {
     }
 
     /// Verify a proof that a key has a certain value, or that the key isn't in the trie.
+    #[expect(clippy::missing_errors_doc)]
     pub fn verify_range_proof<V: AsRef<[u8]>>(
         &self,
         _proof: &Proof<impl Hashable>,
@@ -442,6 +434,17 @@ impl<T: HashedNodeReader> Merkle<T> {
     }
 }
 
+impl<F: Parentable, S: ReadableStorage> Merkle<NodeStore<F, S>> {
+    /// Forks the current Merkle trie into a new mutable proposal.
+    ///
+    /// ## Errors
+    ///
+    /// Returns an error if the nodestore cannot be created. See [`NodeStore::new`].
+    pub fn fork(&self) -> Result<Merkle<NodeStore<MutableProposal, S>>, FileIoError> {
+        NodeStore::new(&self.nodestore).map(Into::into)
+    }
+}
+
 impl<S: ReadableStorage> TryFrom<Merkle<NodeStore<MutableProposal, S>>>
     for Merkle<NodeStore<Arc<ImmutableProposal>, S>>
 {
@@ -453,10 +456,15 @@ impl<S: ReadableStorage> TryFrom<Merkle<NodeStore<MutableProposal, S>>>
     }
 }
 
+#[expect(clippy::missing_errors_doc)]
 impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     /// Convert a merkle backed by an `MutableProposal` into an `ImmutableProposal`
     ///
     /// This function is only used in benchmarks and tests
+    ///
+    /// ## Panics
+    ///
+    /// Panics if the conversion fails. This should only be used in tests or benchmarks.
     #[must_use]
     pub fn hash(self) -> Merkle<NodeStore<Arc<ImmutableProposal>, S>> {
         self.try_into().expect("failed to convert")
@@ -653,6 +661,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     /// Removes the value associated with the given `key` from the subtrie rooted at `node`.
     /// Returns the new root of the subtrie and the value that was removed, if any.
     /// Each element of `key` is 1 nibble.
+    #[expect(clippy::too_many_lines)]
     fn remove_helper(
         &mut self,
         mut node: Node,

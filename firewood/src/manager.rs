@@ -159,7 +159,7 @@ impl RevisionManager {
             return Err(RevisionManagerError::NotLatest);
         }
 
-        let mut committed = proposal.as_committed(current_revision);
+        let mut committed = proposal.as_committed(&current_revision);
 
         // 2. Persist delete list for this committed revision to disk for recovery
 
