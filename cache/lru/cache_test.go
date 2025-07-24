@@ -35,54 +35,54 @@ func TestCacheOnEvict(t *testing.T) {
 			cacheSize: 1,
 			operations: func(c *Cache[int, int]) {
 				// Put first item
-				c.Put(1, 1)
+				c.Put(1, 10)
 				// Put second item, should evict first
-				c.Put(2, 2)
+				c.Put(2, 20)
 			},
 			expectedEvictedKeys:   []int{1},
-			expectedEvictedValues: []int{1}, // first item evicted
+			expectedEvictedValues: []int{10}, // first item evicted
 		},
 		{
 			name:      "OnEvict on explicit Evict",
 			cacheSize: 2,
 			operations: func(c *Cache[int, int]) {
 				// Put two items
-				c.Put(1, 1)
-				c.Put(2, 2)
+				c.Put(1, 10)
+				c.Put(2, 20)
 				// Explicitly evict one
 				c.Evict(1)
 			},
 			expectedEvictedKeys:   []int{1},
-			expectedEvictedValues: []int{1}, // explicitly evicted
+			expectedEvictedValues: []int{10}, // explicitly evicted
 		},
 		{
 			name:      "OnEvict on Flush",
 			cacheSize: 2,
 			operations: func(c *Cache[int, int]) {
 				// Put two items
-				c.Put(1, 1)
-				c.Put(2, 2)
+				c.Put(1, 10)
+				c.Put(2, 20)
 				// Flush should evict both
 				c.Flush()
 			},
 			expectedEvictedKeys:   []int{1, 2},
-			expectedEvictedValues: []int{1, 2}, // both evicted in order
+			expectedEvictedValues: []int{10, 20}, // both evicted in order
 		},
 		{
 			name:      "OnEvict on multiple operations",
 			cacheSize: 2,
 			operations: func(c *Cache[int, int]) {
 				// Put three items, should evict first
-				c.Put(1, 1)
-				c.Put(2, 2)
-				c.Put(3, 3)
+				c.Put(1, 10)
+				c.Put(2, 20)
+				c.Put(3, 30)
 				// Evict one more
 				c.Evict(2)
 				// Flush remaining
 				c.Flush()
 			},
 			expectedEvictedKeys:   []int{1, 2, 3},
-			expectedEvictedValues: []int{1, 2, 3}, // evicted in order: 1 (by Put), 2 (by Evict), 3 (by Flush)
+			expectedEvictedValues: []int{10, 20, 30}, // evicted in order: 1 (by Put), 2 (by Evict), 3 (by Flush)
 		},
 	}
 

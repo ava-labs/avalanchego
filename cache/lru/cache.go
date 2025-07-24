@@ -71,10 +71,13 @@ func (c *Cache[K, _]) Evict(key K) {
 }
 
 func (c *Cache[K, V]) evict(key K) {
-	if value, ok := c.elements.Get(key); ok {
-		c.onEvict(key, value)
-		c.elements.Delete(key)
+	value, ok := c.elements.Get(key)
+	if !ok {
+		return
 	}
+
+	c.onEvict(key, value)
+	c.elements.Delete(key)
 }
 
 func (c *Cache[_, _]) Flush() {
