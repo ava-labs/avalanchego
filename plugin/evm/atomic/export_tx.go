@@ -134,7 +134,7 @@ func (utx *UnsignedExportTx) Verify(
 func (utx *UnsignedExportTx) GasUsed(fixedFee bool) (uint64, error) {
 	byteCost := calcBytesCost(len(utx.Bytes()))
 	numSigs := uint64(len(utx.Ins))
-	sigCost, err := math.Mul64(numSigs, secp256k1fx.CostPerSignature)
+	sigCost, err := math.Mul(numSigs, secp256k1fx.CostPerSignature)
 	if err != nil {
 		return 0, err
 	}
@@ -279,7 +279,7 @@ func NewExportTx(
 		avaxIns, avaxSigners, err = getSpendableAVAXWithFee(ctx, state, keys, avaxNeeded, cost, baseFee)
 	default:
 		var newAvaxNeeded uint64
-		newAvaxNeeded, err = math.Add64(avaxNeeded, ap0.AtomicTxFee)
+		newAvaxNeeded, err = math.Add(avaxNeeded, ap0.AtomicTxFee)
 		if err != nil {
 			return nil, errOverflowExport
 		}
