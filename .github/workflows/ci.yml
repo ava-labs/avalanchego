@@ -30,7 +30,7 @@ jobs:
           query: 'sum(rate(my_metric[1m]))'
           metric_name: 'Test Metric'
           workflow_name: 'C-Chain Re-Execution Benchmark'
-          job_name: 'Run C-Chain Re-Execution'
+          job_name: 'c-chain-reexecution'
 #  Unit:
 #    runs-on: ${{ matrix.os }}
 #    strategy:
