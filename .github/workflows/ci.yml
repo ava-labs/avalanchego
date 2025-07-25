@@ -27,10 +27,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/analysis
         with:
-          query: 'sum(rate(my_metric[1m]))'
-          metric_name: 'Test Metric'
+          query: 'sum by (chain) (rate(avalanche_evm_eth_chain_block_gas_used_processed[1m])) / 1e+06'
+          metric_name: 'Gas Used Rate'
+          x_axis_label: 'Time (seconds)'
+          y_axis_label: 'Gas Usage (mGAS)'
           workflow: 'c-chain-reexecution-benchmark.yml'
           job_name: 'c-chain-reexecution'
+          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
 #  Unit:
 #    runs-on: ${{ matrix.os }}
 #    strategy:
