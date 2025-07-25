@@ -80,7 +80,7 @@ thiserror = "2.0.12"
 tokio = "1.46.1"
 
 # common dev dependencies
-criterion = "0.6.0"
+criterion = "0.7.0"
 ethereum-types = "0.15.1"
 hex-literal = "1.0.0"
 pprof = "0.15.0"
