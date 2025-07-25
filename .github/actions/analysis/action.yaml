@@ -158,7 +158,6 @@ runs:
       with:
         python-version: '3.11'
         cache: 'pip'
-        cache-dependency-path: '$GITHUB_ACTION_PATH/requirements.txt'
     - name: Install Python dependencies
       shell: bash
       run: pip install -r $GITHUB_ACTION_PATH/requirements.txt
@@ -167,7 +166,7 @@ runs:
       run: |
         if [ -f $GITHUB_ACTION_PATH/metric_config.json ]; then
           echo "Generated configuration:"
-          cat $GITHUB_ACTION_PATH/metric_config.json
+          cat "$GITHUB_ACTION_PATH/metric_config.json"
         else
           echo "ERROR: $GITHUB_ACTION_PATH/metric_config.json not found"
           exit 1
