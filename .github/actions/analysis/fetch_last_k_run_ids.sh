@@ -19,14 +19,28 @@ get_baseline_run_ids() {
     local baseline_runs=()
     local found_count=0
 
-    # Get successful workflow runs and process them
-    while IFS= read -r run && [ $found_count -lt $BASELINE_COUNT ]; do
-        if [ -z "$run" ]; then
+    # Get workflow runs with proper gh CLI syntax
+    local runs_json=$(gh run list \
+        --repo "$REPO" \
+        --status completed \
+        --limit 50 \
+        --json databaseId,number,status,conclusion,jobs)
+
+    # Process each run
+    echo "$runs_json" | jq -r '.[] | @base64' | while IFS= read -r encoded_run && [ $found_count -lt $BASELINE_COUNT ]; do
+        if [ -z "$encoded_run" ]; then
             continue
         fi
 
+        local run=$(echo "$encoded_run" | base64 -d)
         local run_id=$(echo "$run" | jq -r '.databaseId')
         local run_number=$(echo "$run" | jq -r '.number')
+        local conclusion=$(echo "$run" | jq -r '.conclusion')
+
+        # Skip if not successful
+        if [ "$conclusion" != "success" ]; then
+            continue
+        fi
 
         # Explicitly exclude current run
         if [ "$run_id" = "$CURRENT_RUN_ID" ]; then
@@ -38,29 +52,16 @@ get_baseline_run_ids() {
             .jobs[]? | select(.name == $job_name and .conclusion == "success") | .name
         ')
 
-        if [ -n "$job_found" ]; then
-            baseline_runs+=("${run_id}:${run_number}")
+        if [ -n "$job_found" ] && [ "$job_found" != "null" ]; then
+            echo "${run_id}:${run_number}"
             ((found_count++))
         fi
-    done < <(gh run list \
-        --repo "$REPO" \
-        --status completed \
-        --conclusion success \
-        --limit 50 \
-        --json databaseId,number,jobs)
-
-    printf '%s\n' "${baseline_runs[@]}"
+    done
 }
 
 # Create JSON configuration
 create_config() {
     local baseline_runs=("$@")
-
-    if [ ${#baseline_runs[@]} -eq 0 ]; then
-        echo "ERROR: No baseline runs found for job '${JOB_ID}' (excluding current run ${CURRENT_RUN_ID})" >&2
-        echo "::error::No baseline runs found for job '${JOB_ID}'"
-        exit 1
-    fi
 
     # Calculate current run timing
     local current_start=$(date +%s)000  # Convert to milliseconds
@@ -68,18 +69,20 @@ create_config() {
 
     # Build baselines JSON array
     local baselines_json=""
-    local first=true
 
-    for run_info in "${baseline_runs[@]}"; do
-        IFS=':' read -r run_id run_number <<< "$run_info"
+    if [ ${#baseline_runs[@]} -gt 0 ]; then
+        local first=true
 
-        if [ "$first" = true ]; then
-            first=false
-        else
-            baselines_json+=","
-        fi
+        for run_info in "${baseline_runs[@]}"; do
+            IFS=':' read -r run_id run_number <<< "$run_info"
 
-        baselines_json+=$(cat << EOF
+            if [ "$first" = true ]; then
+                first=false
+            else
+                baselines_json+=","
+            fi
+
+            baselines_json+=$(cat << EOF
 
     {
       "start_time": 0,
@@ -94,7 +97,8 @@ create_config() {
     }
 EOF
 )
-    done
+        done
+    fi
 
     # Create complete JSON config
     cat > metric_config.json << EOF
@@ -128,12 +132,6 @@ main() {
     # Get baseline runs as array
     mapfile -t baseline_runs < <(get_baseline_run_ids)
 
-    if [ ${#baseline_runs[@]} -eq 0 ]; then
-        echo "ERROR: No baseline runs found for job '${JOB_ID}' (excluding current run ${CURRENT_RUN_ID})" >&2
-        echo "::error::No baseline runs found for job '${JOB_ID}'"
-        exit 1
-    fi
-
     if ! create_config "${baseline_runs[@]}"; then
         echo "ERROR: Failed to create configuration file" >&2
         echo "::error::Failed to create configuration file"
@@ -141,7 +139,11 @@ main() {
     fi
 
     # Success case - show what we found
-    echo "Found ${#baseline_runs[@]} baseline runs for visualization (excluding current run ${CURRENT_RUN_ID})"
+    if [ ${#baseline_runs[@]} -eq 0 ]; then
+        echo "Found 0 baseline runs for visualization (excluding current run ${CURRENT_RUN_ID})"
+    else
+        echo "Found ${#baseline_runs[@]} baseline runs for visualization (excluding current run ${CURRENT_RUN_ID})"
+    fi
 }
 
 main "$@"
