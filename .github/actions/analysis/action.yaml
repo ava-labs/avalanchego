@@ -154,7 +154,7 @@ runs:
         cache: 'pip'
     - name: Install Python dependencies
       shell: bash
-      run: pip install $GITHUB_ACTION_PATH/requirements.txt
+      run: pip install -r $GITHUB_ACTION_PATH/requirements.txt
     - name: Plot
       shell: bash
       env:
