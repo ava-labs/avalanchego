@@ -26,6 +26,8 @@ get_baseline_run_ids() {
         --limit 50 \
         --json databaseId,number,status,conclusion,jobs)
 
+    echo "runs: $runs_json"
+
     # Process each run
     echo "$runs_json" | jq -r '.[] | @base64' | while IFS= read -r encoded_run && [ $found_count -lt $BASELINE_COUNT ]; do
         if [ -z "$encoded_run" ]; then
