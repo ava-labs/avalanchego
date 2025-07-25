@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package simplex
 
 import (
@@ -6,7 +9,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-
 	"sync/atomic"
 
 	"github.com/ava-labs/simplex"
@@ -18,18 +20,21 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ simplex.Storage = (*Storage)(nil)
-var simplexPrefix = []byte("simplex")
-var errUnexpectedSeq = errors.New("unexpected sequence number")
-var errGenesisIndexed = errors.New("genesis block should not be indexed")
-var errInvalidQC = errors.New("invalid quorum certificate")
-var errMismatchedDigest = errors.New("mismatched digest in finalization")
-var genesisMetadata = simplex.ProtocolMetadata{
-	Version: 1,
-	Epoch:   1,
-	Round:   0,
-	Seq:     0,
-}
+var (
+	_               simplex.Storage = (*Storage)(nil)
+	simplexPrefix                   = []byte("simplex")
+	genesisMetadata                 = simplex.ProtocolMetadata{
+		Version: 1,
+		Epoch:   1,
+		Round:   0,
+		Seq:     0,
+	}
+
+	errUnexpectedSeq    = errors.New("unexpected sequence number")
+	errGenesisIndexed   = errors.New("genesis block should not be indexed")
+	errInvalidQC        = errors.New("invalid quorum certificate")
+	errMismatchedDigest = errors.New("mismatched digest in finalization")
+)
 
 type Storage struct {
 	// height represents the number of blocks indexed in storage.
@@ -52,8 +57,8 @@ type Storage struct {
 	log logging.Logger
 }
 
-// newStorage creates a new Storage instance.
-// It creates a new prefixed database to store finalizations according to their sequence numbers.
+// newStorage creates a new prefixed database to store
+// finalizations according to their sequence numbers.
 // The VM is assumed to be initialized before calling this function.
 func newStorage(ctx context.Context, config *Config, qcDeserializer *QCDeserializer, blockTracker *blockTracker) (*Storage, error) {
 	lastAccepted, err := config.VM.LastAccepted(ctx)
@@ -66,7 +71,7 @@ func newStorage(ctx context.Context, config *Config, qcDeserializer *QCDeseriali
 		return nil, err
 	}
 
-	genesisBlock, err := getGenesisBlock(ctx, config, lastAcceptedBlock)
+	genesisBlock, err := getGenesisBlock(ctx, config)
 	if err != nil {
 		return nil, err
 	}
@@ -128,7 +133,7 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 	}
 
 	if !bytes.Equal(bh.Digest[:], finalization.Finalization.Digest[:]) {
-		return fmt.Errorf("%w: expected %d, got %d", errMismatchedDigest , bh.Digest, finalization.Finalization.Digest)
+		return fmt.Errorf("%w: expected %d, got %d", errMismatchedDigest, bh.Digest, finalization.Finalization.Digest)
 	}
 
 	if finalization.QC == nil {
@@ -143,26 +148,26 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 		return fmt.Errorf("failed to store finalization: %w", err)
 	}
 
-	s.height.Add(1)
-	return s.blockTracker.indexBlock(ctx, bh.Digest)
+	err := s.blockTracker.indexBlock(ctx, bh.Digest)
+	if err != nil {
+		return fmt.Errorf("failed to index block: %w", err)
+	}
+
+	s.height.Add(1) // only increment height after successful indexing
+	return nil
 }
 
 // getGenesisBlock returns the genesis block wrapped as a Block instance.
-func getGenesisBlock(ctx context.Context, config *Config, lastAcceptedBlock snowman.Block) (*Block, error) {
+func getGenesisBlock(ctx context.Context, config *Config) (*Block, error) {
 	genesis := &Block{
 		metadata: genesisMetadata,
 	}
 
-	// set the genesis's vmBlock
-	if lastAcceptedBlock.Height() == 0 {
-		genesis.vmBlock = lastAcceptedBlock
-	} else {
-		snowmanGenesis, err := getBlockAtHeight(ctx, config.VM, 0)
-		if err != nil {
-			return nil, err
-		}
-		genesis.vmBlock = snowmanGenesis
+	snowmanGenesis, err := getBlockAtHeight(ctx, config.VM, 0)
+	if err != nil {
+		return nil, err
 	}
+	genesis.vmBlock = snowmanGenesis
 
 	// set the digest
 	bytes, err := genesis.Bytes()
@@ -196,12 +201,12 @@ func (s *Storage) retrieveFinalization(seq uint64) (simplex.Finalization, bool, 
 }
 
 func getBlockAtHeight(ctx context.Context, vm block.ChainVM, height uint64) (snowman.Block, error) {
-	id, err := vm.GetBlockIDAtHeight(context.Background(), height)
+	id, err := vm.GetBlockIDAtHeight(ctx, height)
 	if err != nil {
 		return nil, err
 	}
 
-	block, err := vm.GetBlock(context.Background(), id)
+	block, err := vm.GetBlock(ctx, id)
 	if err != nil {
 		return nil, err
 	}

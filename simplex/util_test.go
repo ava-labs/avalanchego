@@ -34,7 +34,7 @@ func newBlock(t *testing.T, config newBlockConfig) *Block {
 		block := &Block{
 			vmBlock: &wrappedBlock{
 				Block: snowmantest.Genesis,
-				store: newTestVM(),
+				vm:    newTestVM(),
 			},
 			metadata: genesisMetadata,
 		}
@@ -55,7 +55,7 @@ func newBlock(t *testing.T, config newBlockConfig) *Block {
 	block := &Block{
 		vmBlock: &wrappedBlock{
 			Block: vmBlock,
-			store: config.prev.vmBlock.(*wrappedBlock).store,
+			vm:    config.prev.vmBlock.(*wrappedBlock).vm,
 		},
 		blockTracker: config.prev.blockTracker,
 		metadata: simplex.ProtocolMetadata{
@@ -169,28 +169,36 @@ func newTestFinalization(t *testing.T, configs []*Config, bh simplex.BlockHeader
 	return finalization
 }
 
-type testVMStore struct {
-	blocks map[ids.ID]*snowmantest.Block
-}
-
-func newTestVM() *testVMStore {
-	store := &testVMStore{
+func newTestVM() *wrappedVM {
+	return &wrappedVM{
+		VM: &blocktest.VM{},
 		blocks: map[ids.ID]*snowmantest.Block{
 			snowmantest.Genesis.ID(): snowmantest.Genesis,
 		},
 	}
-	return store
 }
 
-func setVM(s *testVMStore) *blocktest.VM {
-	vm := &blocktest.VM{}
-	vm.LastAcceptedF = s.lastAccepted
-	vm.GetBlockF = s.getBlock
-	vm.GetBlockIDAtHeightF = s.getBlockAtHeight
-	return vm
+// wrappedBlock wraps a test block in a VM so that on Accept, it is stored in the VM's block store.
+type wrappedBlock struct {
+	*snowmantest.Block
+	vm *wrappedVM
 }
 
-func (v *testVMStore) getBlockAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
+type wrappedVM struct {
+	*blocktest.VM
+	blocks map[ids.ID]*snowmantest.Block
+}
+
+func (wb *wrappedBlock) Accept(ctx context.Context) error {
+	if err := wb.Block.Accept(ctx); err != nil {
+		return err
+	}
+
+	wb.vm.blocks[wb.ID()] = wb.Block
+	return nil
+}
+
+func (v *wrappedVM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, error) {
 	for _, block := range v.blocks {
 		if block.Height() == height {
 			return block.ID(), nil
@@ -199,7 +207,7 @@ func (v *testVMStore) getBlockAtHeight(ctx context.Context, height uint64) (ids.
 	return ids.Empty, database.ErrNotFound
 }
 
-func (v *testVMStore) getBlock(ctx context.Context, id ids.ID) (snowman.Block, error) {
+func (v *wrappedVM) GetBlock(_ context.Context, id ids.ID) (snowman.Block, error) {
 	block, exists := v.blocks[id]
 	if !exists {
 		return nil, database.ErrNotFound
@@ -207,32 +215,18 @@ func (v *testVMStore) getBlock(ctx context.Context, id ids.ID) (snowman.Block, e
 	return block, nil
 }
 
-func (v *testVMStore) lastAccepted(ctx context.Context) (ids.ID, error) {
+func (v *wrappedVM) LastAccepted(_ context.Context) (ids.ID, error) {
 	// find the block with the highest height
 	if len(v.blocks) == 0 {
 		return ids.Empty, database.ErrNotFound
 	}
 
-	lastAcceptedID := snowmantest.Genesis.ID()
+	lastAccepted := snowmantest.Genesis
 	for _, block := range v.blocks {
-		if block.Height() > v.blocks[lastAcceptedID].Height() {
-			lastAcceptedID = block.ID()
+		if block.Height() > lastAccepted.Height() {
+			lastAccepted = block
 		}
 	}
 
-	return lastAcceptedID, nil
-}
-
-type wrappedBlock struct {
-	*snowmantest.Block
-	store *testVMStore
-}
-
-func (w *wrappedBlock) Accept(ctx context.Context) error {
-	if err := w.Block.Accept(ctx); err != nil {
-		return err
-	}
-
-	w.store.blocks[w.ID()] = w.Block
-	return nil
+	return lastAccepted.ID(), nil
 }
