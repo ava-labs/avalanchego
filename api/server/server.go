@@ -288,6 +288,8 @@ func (s *server) AddAliasesWithReadLock(endpoint string, aliases ...string) erro
 
 func (s *server) Shutdown() error {
 	ctx, cancel := context.WithTimeout(context.Background(), s.shutdownTimeout)
+
+	// Close the listener here in case Serve() was never called on the server.
 	listenerErr := s.listener.Close()
 	serverErr := s.srv.Shutdown(ctx)
 	cancel()
