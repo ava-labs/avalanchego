@@ -21,6 +21,12 @@ inputs:
   y_axis_label:
     description: 'Y-axis label'
     default: ''
+  workflow_name:
+    description: 'Workflow name to search for baselines (Will use current workflow if not specified)'
+    default: ''
+  job_name:
+    description: 'Job name to search for baselines (Will use current job if not specified)'
+    default: ''
 
 runs:
   using: composite
@@ -36,7 +42,8 @@ runs:
         METRIC_NAME: ${{ inputs.metric_name }}
         X_AXIS_LABEL: ${{ inputs.x_axis_label }}
         Y_AXIS_LABEL: ${{ inputs.y_axis_label }}
-        WORKFLOW_NAME: "C-Chain Re-Execution Benchmark"
+        WORKFLOW_NAME: ${{ inputs.workflow_name || github.workflow }}
+        JOB_NAME: ${{ inputs.job_name || github.job }}
 
     - name: Show generated config
       shell: bash
