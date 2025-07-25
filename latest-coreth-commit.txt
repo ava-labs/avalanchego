@@ -4,5 +4,8 @@ e8e848b2f0b2f4f206fc319700a420d83d19685c
 
 # Notes: 
 - Coreth PR 1029 has already been synced (ahead of schedule) - see https://github.com/ava-labs/subnet-evm/pull/1631
-- Coreth PR 1034 has already been synced (ahead of schedule) - see https://github.com/ava-labs/subnet-evm/pull/1622
+- Coreth PR 1034 has already been synced (ahead of schedule) - see https://github.com/ava-labs/subnet-evm/pull/162
+- Coreth PR 1003, `scripts/update_avalanchego_version.sh` has already been synced (ahead of schedule) - see https://github.com/ava-labs/subnet-evm/pull/16512
+- Coreth PR 1064 has already been synced (ahead of schedule) - see https://github.com/ava-labs/subnet-evm/pull/1651
+- Coreth PR 1066 has already been synced (ahead of schedule) - see https://github.com/ava-labs/subnet-evm/pull/1651
 - Last PR done is currently #1034

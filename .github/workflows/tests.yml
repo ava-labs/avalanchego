@@ -24,6 +24,8 @@ jobs:
       - name: Check go.mod and go.sum are up-to-date
         run: ./scripts/run_task.sh check-go-mod-tidy
       - name: Ensure consistent avalanchego version
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./scripts/run_task.sh check-avalanchego-version
 
   unit_test:
