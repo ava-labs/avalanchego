@@ -100,9 +100,6 @@ runs:
                 // Find matching job
                 const targetJob = jobs.find(job => job.name === JOB_ID && job.conclusion === 'success');
                 if (targetJob) {
-                  // Calculate job timing for baseline
-                  const jobStart = new Date(targetJob.started_at).getTime();
-                  const jobEnd = new Date(targetJob.completed_at).getTime();
                   baselineRuns.push({
                     name: `Run ${run.run_number} (#${run.id})`,
                     labels: {

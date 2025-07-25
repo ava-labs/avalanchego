@@ -8,8 +8,8 @@ import sys
 import pandas as pd
 import plotly.graph_objects as go
 from prometheus_api_client import PrometheusConnect
-from typing import List, Dict, Optional
-from datetime import datetime
+from typing import List, Dict, Optional, Tuple
+from datetime import datetime, timedelta
 from dataclasses import dataclass
 import pytz
 
@@ -105,6 +105,67 @@ class Plot:
         result = re.sub(r'([a-zA-Z_][a-zA-Z0-9_]*)(\[[^]]+\])', add_labels_to_bare_metrics, result)
 
         return result
+
+    def detect_baseline_periods(self, query: str, labels: Dict[str, str], lookback_days: int = 7) -> TestRun:
+        self.logger.info(f"Dynamically detecting baseline periods...")
+        self.logger.info(f"Looking back {lookback_days} days for data")
+
+        now = datetime.now(tz=pytz.UTC)
+        start = now - timedelta(days=lookback_days)
+
+        actual_query = self._apply_labels_to_query(query, labels)
+        self.logger.debug(f"Query for baseline detection: {actual_query}")
+
+        try:
+            initial_results = self.prom.custom_query_range(
+                query=actual_query,
+                start_time=start,
+                end_time=now,
+                step="5m",
+            )
+
+            if not initial_results:
+                self.logger.warning("No initial results found for baseline detection")
+                return []
+
+            timestamps = []
+            for result in initial_results:
+                values = result.get('values', [])
+                for value in values:
+                    timestamp = float(value[0])
+                    timestamps.append(timestamp)
+
+            if not timestamps:
+                self.logger.warning("No timestamps found in results")
+                return []
+
+            self.logger.info(f"Found {len(timestamps)} data points in historical scan")
+
+            min_timestamp = min(timestamps)
+            max_timestamp = max(timestamps)
+
+            # Ensure we have a reasonable time range
+            if min_timestamp >= max_timestamp:
+                max_timestamp = min_timestamp + timedelta(minutes=15).total_seconds()
+
+            # Add ±15s variance
+            min_datetime = datetime.fromtimestamp(min_timestamp - 15, tz=pytz.UTC)
+            max_datetime = datetime.fromtimestamp(max_timestamp + 15, tz=pytz.UTC)
+
+            self.logger.info(f"Baseline period: {min_datetime.isoformat()} to {max_datetime.isoformat()}")
+
+            return TestRun(
+                start_time=int(min_datetime.timestamp() * 1000),
+                end_time=int(max_datetime.timestamp() * 1000),
+                name=f"Baseline 1 ({min_datetime.strftime('%m/%d %H:%M')})",
+                labels=labels
+            )
+
+        except Exception as e:
+            self.logger.error(f"Error in baseline detection: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
 
     def fetch_metric_data(self, query: str, run: TestRun) -> pd.DataFrame:
         """Fetch metric data for a specific test run."""
@@ -254,13 +315,64 @@ class Plot:
         candidate_run = TestRun(**config['candidate'])
         self.logger.info(f"Candidate: {candidate_run.name or 'Unnamed Candidate'}")
 
-        baseline_runs = [TestRun(**run_config) for run_config in config['baselines']]
+        # Check if we need dynamic baseline detection
+        baseline_runs = []
+        baselines = config['baselines']
+
+        for baseline in baselines:
+            detected_baselines = self.detect_baseline_periods(
+                query=config['query'],
+                labels=baseline['labels'],
+            )
+            baseline_runs.append(detected_baselines)
+
+
+        # if config.get('baselines') and len(config['baselines']) > 0:
+        #     first_baseline = config['baselines'][0]
+        #
+        #     # Only do dynamic detection if start_time key exists and is explicitly null
+        #     if 'start_time' in first_baseline and first_baseline['start_time'] is None:
+        #         self.logger.info("Performing dynamic baseline detection...")
+        #
+        #         # Calculate candidate duration
+        #         candidate_duration = (candidate_run.end_time - candidate_run.start_time) // 1000  # Convert to seconds
+        #         baseline_count = len(config['baselines'])
+        #
+        #         # Use labels from candidate for baseline detection
+        #         baseline_labels = candidate_run.labels.copy() if candidate_run.labels else {}
+        #         # Remove run-specific labels for baseline search
+        #         baseline_labels.pop('gh_run_id', None)
+        #         baseline_labels.pop('gh_run_attempt', None)
+        #
+        #         detected_baselines = self.detect_baseline_periods(
+        #             query=config['query'],
+        #             labels=baseline_labels,
+        #             candidate_duration=candidate_duration,
+        #             baseline_count=baseline_count
+        #         )
+        #
+        #         baseline_runs = detected_baselines
+        #     else:
+        #         # Use provided baseline configurations with candidate timing
+        #         self.logger.info("Using provided baseline configurations")
+        #         for baseline_config in config['baselines']:
+        #             # Use candidate timing for baselines that have labels but no timing
+        #             baseline_with_timing = baseline_config.copy()
+        #             if 'start_time' not in baseline_with_timing:
+        #                 baseline_with_timing['start_time'] = candidate_run.start_time
+        #             if 'end_time' not in baseline_with_timing:
+        #                 baseline_with_timing['end_time'] = candidate_run.end_time
+        #
+        #             baseline_runs.append(TestRun(**baseline_with_timing))
+
+        # Fetch candidate data
         candidate_data = self.fetch_metric_data(config['query'], candidate_run)
 
         if candidate_data.empty:
             self.logger.error("No candidate data found")
             return ""
 
+        # Fetch baseline data
         baseline_data = []
         for baseline_run in baseline_runs:
             df = self.fetch_metric_data(config['query'], baseline_run)
@@ -289,7 +401,7 @@ def load_config(config_path: str) -> dict:
         with open(config_path, 'r') as f:
             config = json.load(f)
 
-        required_fields = ['query', 'metric_name', 'candidate', 'baselines']
+        required_fields = ['query', 'metric_name', 'candidate']
         for field in required_fields:
             if field not in config:
                 raise ValueError(f"Missing required field: {field}")
@@ -298,11 +410,6 @@ def load_config(config_path: str) -> dict:
         for field in candidate_fields:
             if field not in config['candidate']:
                 raise ValueError(f"Missing candidate field: {field}")
-
-        for i, baseline in enumerate(config['baselines']):
-            for field in candidate_fields:
-                if field not in baseline:
-                    raise ValueError(f"Missing baseline[{i}] field: {field}")
 
         return config
 
@@ -348,9 +455,8 @@ Example JSON Configuration:
         """
     )
 
-    parser.add_argument('--config', help='Path to JSON configuration file', default='config.json')
-    parser.add_argument('--prometheus-url', help='Prometheus server URL',
-                        default="https://prometheus-poc.avax-dev.network")
+    parser.add_argument('--config', help='Path to JSON configuration file', required=True)
+    parser.add_argument('--prometheus-url', help='Prometheus server URL', required=True)
     parser.add_argument('--step-size', default='15s',
                         help='Prometheus query step size (default: 15s)')
     parser.add_argument('--timezone', default='US/Eastern',
