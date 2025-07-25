@@ -98,6 +98,8 @@ func TestStorageRetrieve(t *testing.T) {
 		},
 	}
 
+	// vm.
+
 	tests := []struct {
 		name                 string
 		seq                  uint64
@@ -154,33 +156,18 @@ func TestStorageRetrieve(t *testing.T) {
 
 func TestStorageIndex(t *testing.T) {
 	ctx := context.Background()
-	// index genesis
-	// index a block not the next in sequence
-	// index normal
 	genesis := newBlock(t, newBlockConfig{})
 	child1 := newBlock(t, newBlockConfig{prev: genesis})
 	newBlock(t, newBlockConfig{prev: child1})
 	child2 := newBlock(t, newBlockConfig{prev: child1})
 
-	config := newEngineConfig(t, 4)
-	_, verifier := NewBLSAuth(config)
+	configs := newNetworkConfigs(t, 4)
+	_, verifier := NewBLSAuth(configs[0])
 	qc := QCDeserializer{
 		verifier: &verifier,
 	}
 
-	vm := &blocktest.VM{
-		LastAcceptedF: func(ctx context.Context) (ids.ID, error) {
-			return snowmantest.GenesisID, nil
-		},
-		GetBlockF: func(ctx context.Context, id ids.ID) (snowman.Block, error) {
-			if id == snowmantest.GenesisID {
-				return snowmantest.Genesis, nil
-			}
-			return nil, database.ErrNotFound
-		},
-	}
-	config.VM = vm
-
+	vm := setVM(genesis.vmBlock.(*wrappedBlock).store)
 	tests := []struct {
 		name          string
 		expectedError error
@@ -208,56 +195,98 @@ func TestStorageIndex(t *testing.T) {
 			name:          "mismatched seq",
 			expectedError: errUnexpectedSeq,
 			block:         child1,
-			finalization: simplex.Finalization{
-				QC: nil, // no quorum certificate
-				Finalization: simplex.ToBeSignedFinalization{
-					BlockHeader: simplex.BlockHeader{
-						ProtocolMetadata: simplex.ProtocolMetadata{
-							Seq: 100, // seq does not match block header
-						},
-					},
-				},
-			},
+			finalization: func () simplex.Finalization {
+				f := newTestFinalization(t, configs, child1.BlockHeader())
+				f.Finalization.ProtocolMetadata.Seq = 2 // seq does not match current height
+				return f
+			}(),
 		},
 		{
 			name:          "indexing too high seq",
 			expectedError: errUnexpectedSeq,
 			block:         child2, // index child2 before child1
-			finalization: simplex.Finalization{
-				QC: nil, // no quorum certificate
-				Finalization: simplex.ToBeSignedFinalization{
-					BlockHeader: simplex.BlockHeader{
-						ProtocolMetadata: simplex.ProtocolMetadata{
-							Seq: 2, // seq does not match current height
-						},
-					},
-				},
-			},
+			finalization: newTestFinalization(t, configs, child2.BlockHeader()),
 		},
 		{
 			name:          "indexing before verifying",
 			expectedError: errDigestNotFound,
 			block:         child1,
-			finalization: simplex.Finalization{
-				QC: nil, // no quorum certificate
-				Finalization: simplex.ToBeSignedFinalization{
-					BlockHeader: child1.BlockHeader(),
-				},
-			},
+			finalization: newTestFinalization(t, configs, child1.BlockHeader()),
 		},
 	}
 
-	s, err := newStorage(ctx, config, &qc, genesis.blockTracker)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			configs[0].VM = vm
+
+			s, err := newStorage(ctx, configs[0], &qc, genesis.blockTracker)
+			require.NoError(t, err)
+
+			err = s.Index(ctx, tt.block, tt.finalization)
+			require.ErrorIs(t, err, tt.expectedError)
+
+			if tt.expectedError != errGenesisIndexed {
+				// ensure that the block is not retrievable
+				block, finalization, exists := s.Retrieve(tt.block.BlockHeader().Seq)
+				require.False(t, exists)
+				require.Nil(t, block)
+				require.Equal(t, simplex.Finalization{}, finalization)
+			}
+		})
+	}
+}
+
+// indexes 10 blocks and verifies that they can be retrieved
+func TestStorageIndexSuccess(t *testing.T) {
+	ctx := context.Background()
+	genesis := newBlock(t, newBlockConfig{})
+	configs := newNetworkConfigs(t, 4)
+
+	_, verifier := NewBLSAuth(configs[0])
+	qc := QCDeserializer{
+		verifier: &verifier,
+	}
+	
+	vm := setVM(genesis.vmBlock.(*wrappedBlock).store)
+	configs[0].VM = vm
+	
+	numBlocks := 10
+
+	s, err := newStorage(ctx, configs[0], &qc, genesis.blockTracker)
 	require.NoError(t, err)
 
-	err = s.Index(ctx, genesis, simplex.Finalization{})
-	require.ErrorIs(t, err, errGenesisIndexed)
+	prevBlock := genesis
+	finalizations := make([]simplex.Finalization, 0, numBlocks+1)
+	blocks := make([]*Block, 0, numBlocks+1)
+	finalizations = append(finalizations, simplex.Finalization{}) // genesis finalization
+	blocks = append(blocks, genesis)
+	for range numBlocks {
+		child := newBlock(t, newBlockConfig{prev: prevBlock})
 
-	err = s.Index(ctx, child1, simplex.Finalization{
-		Finalization: simplex.ToBeSignedFinalization{
-			BlockHeader: child1.BlockHeader(),
-		},
-	})
+		_, err := child.Verify(ctx)
+		require.NoError(t, err)
 
-	require.ErrorIs(t, err, errDigestNotFound) // shouldn't be able to index a block without verifing
+		finalization := newTestFinalization(t, configs, child.BlockHeader())
+		err = s.Index(ctx, child, finalization)
+		require.NoError(t, err)
+
+		prevBlock = child
+		finalizations = append(finalizations, finalization)
+		blocks = append(blocks, child)
+	}
+	
+	// perform retrieval for all blocks indexed including genesis
+	for seq := range numBlocks + 1 {
+		block, finalizationRetrieved, exists := s.Retrieve(uint64(seq))
+		require.True(t, exists)
+		bytes,err := block.Bytes()
+		require.NoError(t, err)
+		expectedBytes, err := blocks[seq].Bytes()
+		require.NoError(t, err)
+
+		require.Equal(t, expectedBytes, bytes)
+		require.Equal(t, finalizations[seq].Finalization, finalizationRetrieved.Finalization)
+	}	
 }
+
+

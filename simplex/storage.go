@@ -137,7 +137,7 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 	binary.BigEndian.PutUint64(seqBuff, currentHeight)
 
 	finalizationBytes := finalizationToBytes(finalization)
-	if err := s.db.Put(seqBuff, finalizationBytes); err != nil {
+	if err := s.db.Put(seqBuff, finalizationBytes); err != nil { // if put succeeds, but index fails, the finalization is still stored
 		return fmt.Errorf("failed to store finalization: %w", err)
 	}
 
