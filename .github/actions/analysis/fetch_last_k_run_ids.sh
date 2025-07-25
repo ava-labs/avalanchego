@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# Script to find the last k successful workflow runs with matching job names.
-# Generates a JSON config for metric visualization comparing current run against baselines.
-# Excludes current run to avoid self-comparison.
-
 set -euo pipefail
 
 # Configuration from environment or defaults
@@ -32,6 +28,9 @@ get_baseline_run_ids() {
         --limit 50 \
         --json databaseId,number,conclusion)
 
+    echo "DEBUG: Found runs for workflow '$WORKFLOW_NAME':" >&2
+    echo "$runs_json" | jq -r '.[] | "\(.number): \(.conclusion) (ID: \(.databaseId))"' >&2
+
     # Get successful runs and process them
     local successful_runs
     successful_runs=$(echo "$runs_json" | jq -r '.[] | select(.conclusion == "success") | "\(.databaseId):\(.number)"')
@@ -49,11 +48,17 @@ get_baseline_run_ids() {
 
         # Explicitly exclude current run
         if [ "$run_id" = "$CURRENT_RUN_ID" ]; then
+            echo "DEBUG: Skipping current run $run_id" >&2
             continue
         fi
 
+        echo "DEBUG: Checking jobs for run $run_id (run #$run_number)" >&2
+
         # Get jobs for this specific run
         local jobs_json=$(gh run view "$run_id" --repo "$REPO" --json jobs 2>/dev/null || echo '{"jobs":[]}')
+
+        echo "DEBUG: Jobs for run $run_id:" >&2
+        echo "$jobs_json" | jq -r '.jobs[] | "\(.name): \(.conclusion)"' >&2
 
         # Check if this run has our target job that succeeded
         local job_found=$(echo "$jobs_json" | jq -r --arg job_name "$JOB_ID" '
@@ -61,8 +66,11 @@ get_baseline_run_ids() {
         ')
 
         if [ -n "$job_found" ] && [ "$job_found" != "null" ]; then
+            echo "DEBUG: Found matching job '$job_found' in run $run_id" >&2
             baseline_runs+=("${run_id}:${run_number}")
             ((found_count++))
+        else
+            echo "DEBUG: No matching job '$JOB_ID' found in run $run_id" >&2
         fi
     done <<< "$successful_runs"
 
@@ -100,6 +108,8 @@ create_config() {
             baselines_json+=$(cat << EOF
 
     {
+      "start_time": 0,
+      "end_time": 0,
       "name": "Run ${run_number} (#${run_id})",
       "labels": {
         "gh_run_id": "${run_id}",
@@ -121,8 +131,6 @@ EOF
   "x_axis_label": "${X_AXIS_LABEL}",
   "y_axis_label": "${Y_AXIS_LABEL}",
   "candidate": {
-    "start_time": ${current_start},
-    "end_time": ${current_end},
     "name": "Current Run (#${CURRENT_RUN_ID})",
     "labels": {
       "gh_run_id": "${CURRENT_RUN_ID}",
@@ -140,6 +148,8 @@ EOF
 
 # Main execution
 main() {
+    echo "DEBUG: Looking for baselines in workflow '$WORKFLOW_NAME' with job '$JOB_ID'" >&2
+
     local baseline_runs
 
     # Get baseline runs as array
