@@ -162,6 +162,7 @@ runs:
         PROMETHEUS_ID: ${{ inputs.prometheus_username }}
         PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
       run: |
+        cd $GITHUB_ACTION_PATH
         python $GITHUB_ACTION_PATH/plot.py \
           --config $GITHUB_ACTION_PATH/metric_config.json \
           --prometheus-url "${{ inputs.prometheus_url }}" \
