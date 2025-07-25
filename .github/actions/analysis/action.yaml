@@ -1,0 +1,49 @@
+name: analysis
+author: elvis.sabanovic
+description: analysis
+
+inputs:
+  baseline_count:
+    description: 'Number of baseline runs to find'
+    default: '3'
+  monitoring_period:
+    description: 'Monitoring period in seconds'
+    default: '900'
+  query:
+    description: 'Prometheus query'
+    required: true
+  metric_name:
+    description: 'Metric name for display'
+    required: true
+  x_axis_label:
+    description: 'X-axis label'
+    default: 'Time'
+  y_axis_label:
+    description: 'Y-axis label'
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Fetch baseline run IDs
+      shell: bash
+      run: |
+        ${{ github.action_path }}/fetch_last_k_run_ids.sh
+      env:
+        BASELINE_COUNT: ${{ inputs.baseline_count }}
+        MONITORING_PERIOD: ${{ inputs.monitoring_period }}
+        QUERY: ${{ inputs.query }}
+        METRIC_NAME: ${{ inputs.metric_name }}
+        X_AXIS_LABEL: ${{ inputs.x_axis_label }}
+        Y_AXIS_LABEL: ${{ inputs.y_axis_label }}
+
+    - name: Show generated config
+      shell: bash
+      run: |
+        if [ -f metric_config.json ]; then
+          echo "Generated configuration:"
+          cat metric_config.json
+        else
+          echo "ERROR: metric_config.json not found"
+          exit 1
+        fi
