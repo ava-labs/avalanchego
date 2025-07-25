@@ -9,6 +9,7 @@ CURRENT_RUN_ID="${GITHUB_RUN_ID}"
 CURRENT_RUN_ATTEMPT="${GITHUB_RUN_ATTEMPT:-1}"
 JOB_ID="${GITHUB_JOB}"
 REPO="${GITHUB_REPOSITORY}"
+WORKFLOW_NAME="${GITHUB_WORKFLOW}"
 QUERY="${QUERY}"
 METRIC_NAME="${METRIC_NAME}"
 X_AXIS_LABEL="${X_AXIS_LABEL:-Time}"
@@ -18,26 +19,33 @@ Y_AXIS_LABEL="${Y_AXIS_LABEL:-$METRIC_NAME}"
 get_baseline_run_ids() {
     local found_count=0
 
-    # Get successful workflow runs
+    # Get successful workflow runs from the same workflow
     local runs_json=$(gh run list \
         --repo "$REPO" \
+        --workflow "$WORKFLOW_NAME" \
         --status completed \
         --limit 50 \
         --json databaseId,number,conclusion)
 
-    echo "DEBUG: runs_json content:" >&2
-    echo "$runs_json" >&2
+    echo "DEBUG: Found runs for workflow '$WORKFLOW_NAME':" >&2
+    echo "$runs_json" | jq -r '.[] | "\(.number): \(.conclusion) (ID: \(.databaseId))"' >&2
 
     # Process each successful run
     echo "$runs_json" | jq -r '.[] | select(.conclusion == "success") | "\(.databaseId):\(.number)"' | \
     while IFS=':' read -r run_id run_number && [ $found_count -lt $BASELINE_COUNT ]; do
         # Explicitly exclude current run
         if [ "$run_id" = "$CURRENT_RUN_ID" ]; then
+            echo "DEBUG: Skipping current run $run_id" >&2
             continue
         fi
 
+        echo "DEBUG: Checking jobs for run $run_id (run #$run_number)" >&2
+
         # Get jobs for this specific run
         local jobs_json=$(gh run view "$run_id" --repo "$REPO" --json jobs 2>/dev/null || echo '{"jobs":[]}')
+
+        echo "DEBUG: Jobs for run $run_id:" >&2
+        echo "$jobs_json" | jq -r '.jobs[] | "\(.name): \(.conclusion)"' >&2
 
         # Check if this run has our target job that succeeded
         local job_found=$(echo "$jobs_json" | jq -r --arg job_name "$JOB_ID" '
@@ -45,8 +53,11 @@ get_baseline_run_ids() {
         ')
 
         if [ -n "$job_found" ] && [ "$job_found" != "null" ]; then
+            echo "DEBUG: Found matching job '$job_found' in run $run_id" >&2
             echo "${run_id}:${run_number}"
             ((found_count++))
+        else
+            echo "DEBUG: No matching job '$JOB_ID' found in run $run_id" >&2
         fi
     done
 }
@@ -123,6 +134,8 @@ EOF
 
 # Main execution
 main() {
+    echo "DEBUG: Looking for baselines in workflow '$WORKFLOW_NAME' with job '$JOB_ID'" >&2
+
     local baseline_runs
 
     # Get baseline runs as array
@@ -136,9 +149,9 @@ main() {
 
     # Success case - show what we found
     if [ ${#baseline_runs[@]} -eq 0 ] || [ -z "${baseline_runs[0]}" ]; then
-        echo "Found 0 baseline runs for visualization (excluding current run ${CURRENT_RUN_ID})"
+        echo "Found 0 baseline runs for workflow '$WORKFLOW_NAME' job '$JOB_ID' (excluding current run ${CURRENT_RUN_ID})"
     else
-        echo "Found ${#baseline_runs[@]} baseline runs for visualization (excluding current run ${CURRENT_RUN_ID})"
+        echo "Found ${#baseline_runs[@]} baseline runs for workflow '$WORKFLOW_NAME' job '$JOB_ID' (excluding current run ${CURRENT_RUN_ID})"
     fi
 }
 

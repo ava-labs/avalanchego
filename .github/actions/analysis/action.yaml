@@ -36,6 +36,7 @@ runs:
         METRIC_NAME: ${{ inputs.metric_name }}
         X_AXIS_LABEL: ${{ inputs.x_axis_label }}
         Y_AXIS_LABEL: ${{ inputs.y_axis_label }}
+        WORKFLOW_NAME: "C-Chain Re-Execution Benchmark"
 
     - name: Show generated config
       shell: bash
