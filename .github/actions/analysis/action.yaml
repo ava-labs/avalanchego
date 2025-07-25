@@ -141,7 +141,7 @@ runs:
                 }
               },
               baselines: baselineRuns,
-              output_file: `metric_visualization_${CURRENT_RUN_ID}.html`
+              output_file: `${process.env.GITHUB_ACTION_PATH}/metric_visualization_${CURRENT_RUN_ID}.html`
             };
             // Write configuration file
             fs.writeFileSync(`${process.env.GITHUB_ACTION_PATH}/metric_config.json`, JSON.stringify(config, null, 2));
@@ -162,7 +162,6 @@ runs:
         PROMETHEUS_ID: ${{ inputs.prometheus_username }}
         PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
       run: |
-        cd $GITHUB_ACTION_PATH
         python $GITHUB_ACTION_PATH/plot.py \
           --config $GITHUB_ACTION_PATH/metric_config.json \
           --prometheus-url "${{ inputs.prometheus_url }}" \
