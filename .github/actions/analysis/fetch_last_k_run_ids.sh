@@ -15,9 +15,9 @@ METRIC_NAME="${METRIC_NAME}"
 X_AXIS_LABEL="${X_AXIS_LABEL:-Time}"
 Y_AXIS_LABEL="${Y_AXIS_LABEL:-$METRIC_NAME}"
 
-# Get baseline run IDs using gh CLI, excluding current run
 get_baseline_run_ids() {
     local found_count=0
+    local baseline_runs=()
 
     # Get successful workflow runs from the same workflow
     local runs_json=$(gh run list \
@@ -27,25 +27,25 @@ get_baseline_run_ids() {
         --limit 50 \
         --json databaseId,number,conclusion)
 
-    echo "DEBUG: Found runs for workflow '$WORKFLOW_NAME':" >&2
-    echo "$runs_json" | jq -r '.[] | "\(.number): \(.conclusion) (ID: \(.databaseId))"' >&2
+    local successful_runs
+    successful_runs=$(echo "$runs_json" | jq -r '.[] | select(.conclusion == "success") | "\(.databaseId):\(.number)"')
 
-    # Process each successful run
-    echo "$runs_json" | jq -r '.[] | select(.conclusion == "success") | "\(.databaseId):\(.number)"' | \
-    while IFS=':' read -r run_id run_number && [ $found_count -lt $BASELINE_COUNT ]; do
-        # Explicitly exclude current run
+    while IFS=':' read -r run_id run_number; do
+        if [ -z "$run_id" ] || [ -z "$run_number" ]; then
+            continue
+        fi
+
+        if [ $found_count -ge $BASELINE_COUNT ]; then
+            break
+        fi
+
         if [ "$run_id" = "$CURRENT_RUN_ID" ]; then
             echo "DEBUG: Skipping current run $run_id" >&2
             continue
         fi
 
-        echo "DEBUG: Checking jobs for run $run_id (run #$run_number)" >&2
-
         # Get jobs for this specific run
         local jobs_json=$(gh run view "$run_id" --repo "$REPO" --json jobs 2>/dev/null || echo '{"jobs":[]}')
-
-        echo "DEBUG: Jobs for run $run_id:" >&2
-        echo "$jobs_json" | jq -r '.jobs[] | "\(.name): \(.conclusion)"' >&2
 
         # Check if this run has our target job that succeeded
         local job_found=$(echo "$jobs_json" | jq -r --arg job_name "$JOB_ID" '
@@ -53,13 +53,12 @@ get_baseline_run_ids() {
         ')
 
         if [ -n "$job_found" ] && [ "$job_found" != "null" ]; then
-            echo "DEBUG: Found matching job '$job_found' in run $run_id" >&2
-            echo "${run_id}:${run_number}"
+            baseline_runs+=("${run_id}:${run_number}")
             ((found_count++))
         else
             echo "DEBUG: No matching job '$JOB_ID' found in run $run_id" >&2
         fi
-    done
+    done <<< "$successful_runs"
 }
 
 # Create JSON configuration
@@ -92,8 +91,6 @@ create_config() {
             baselines_json+=$(cat << EOF
 
     {
-      "start_time": 0,
-      "end_time": 0,
       "name": "Run ${run_number} (#${run_id})",
       "labels": {
         "gh_run_id": "${run_id}",
