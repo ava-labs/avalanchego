@@ -52,10 +52,23 @@ runs:
             repo: context.repo.repo,
             status: 'completed',
             conclusion: 'success',
-            per_page: 10
+            per_page: 20
           });
 
+          console.log(`DEBUG: Found ${workflow_runs.length} total successful runs`);
+
+          // Show all workflow names
+          const uniqueWorkflows = [...new Set(workflow_runs.map(run => run.name))];
+          console.log(`DEBUG: Available workflows: ${uniqueWorkflows.join(', ')}`);
+
           const workflowRuns = workflow_runs.filter(run => run.name === WORKFLOW_NAME);
+          console.log(`DEBUG: Found ${workflowRuns.length} runs for workflow '${WORKFLOW_NAME}'`);
+
+          // Show the first few runs for debugging
+          workflowRuns.slice(0, 5).forEach(run => {
+            console.log(`DEBUG: Run ${run.run_number} (ID: ${run.id})`);
+          });
+
           const baselineRuns = [];
 
           for (const run of workflowRuns) {
@@ -65,8 +78,11 @@ runs:
 
             // Exclude current run
             if (run.id.toString() === CURRENT_RUN_ID) {
+              console.log(`DEBUG: Skipping current run ${run.id}`);
               continue;
             }
+
+            console.log(`DEBUG: Checking jobs for run ${run.id} (run #${run.run_number})`);
 
             try {
               const { data: { jobs } } = await github.rest.actions.listJobsForWorkflowRun({
@@ -75,19 +91,29 @@ runs:
                 run_id: run.id
               });
 
+              console.log(`DEBUG: Found ${jobs.length} jobs in run ${run.id}`);
+              jobs.forEach(job => {
+                console.log(`DEBUG: Job: '${job.name}' - ${job.conclusion}`);
+              });
+
               // Find matching job
               const targetJob = jobs.find(job => job.name === JOB_ID && job.conclusion === 'success');
 
               if (targetJob) {
+                console.log(`DEBUG: Found matching job '${targetJob.name}' in run ${run.id}`);
                 baselineRuns.push({
                   run_id: run.id.toString(),
                   run_number: run.run_number
                 });
+              } else {
+                console.log(`DEBUG: No matching job '${JOB_ID}' found in run ${run.id}`);
               }
             } catch (error) {
-              console.log(`Failed to get jobs for run ${run.id}: ${error.message}`);
+              console.log(`DEBUG: Failed to get jobs for run ${run.id}: ${error.message}`);
             }
           }
+
+          console.log(`DEBUG: Found ${baselineRuns.length} baseline runs`);
 
           // Calculate current run timing
           const currentStart = Date.now();
