@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"net/http"
 	"os"
 	"os/exec"
@@ -316,9 +317,7 @@ func WritePrometheusSDConfig(name string, sdConfig SDConfig, withGitHubLabels bo
 }
 
 func applyGitHubLabels(sdConfig SDConfig) SDConfig {
-	for label, value := range GetGitHubLabels() {
-		sdConfig.Labels[label] = value
-	}
+	maps.Copy(sdConfig.Labels, GetGitHubLabels())
 	return sdConfig
 }
 
