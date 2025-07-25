@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/simplex"
 
 	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -22,7 +21,6 @@ import (
 
 var (
 	_               simplex.Storage = (*Storage)(nil)
-	simplexPrefix                   = []byte("simplex")
 	genesisMetadata                 = simplex.ProtocolMetadata{
 		Version: 1,
 		Epoch:   1,
@@ -41,7 +39,7 @@ type Storage struct {
 	height atomic.Uint64
 
 	// db is the underlying database used to store finalizations.
-	db database.Database
+	db database.KeyValueReaderWriterDeleter
 
 	// genesisBlock is the genesis block data. It is stored as the first block in the storage.
 	genesisBlock *Block
@@ -77,7 +75,7 @@ func newStorage(ctx context.Context, config *Config, qcDeserializer *QCDeseriali
 	}
 
 	s := &Storage{
-		db:           prefixdb.New(simplexPrefix, config.DB),
+		db:           config.DB,
 		genesisBlock: genesisBlock,
 		vm:           config.VM,
 		deserializer: qcDeserializer,

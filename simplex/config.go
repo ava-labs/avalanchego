@@ -28,7 +28,7 @@ type Config struct {
 
 	VM block.ChainVM
 
-	DB database.Database
+	DB database.KeyValueReaderWriterDeleter
 	// SignBLS is the signing function used for this node to sign messages.
 	SignBLS SignFunc
 }
