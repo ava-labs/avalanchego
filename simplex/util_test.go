@@ -4,13 +4,18 @@
 package simplex
 
 import (
+	"context"
 	"testing"
 
 	"github.com/ava-labs/simplex"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -27,13 +32,11 @@ type newBlockConfig struct {
 func newBlock(t *testing.T, config newBlockConfig) *Block {
 	if config.prev == nil {
 		block := &Block{
-			vmBlock: snowmantest.Genesis,
-			metadata: simplex.ProtocolMetadata{
-				Version: 1,
-				Epoch:   1,
-				Round:   0,
-				Seq:     0,
+			vmBlock: &wrappedBlock{
+				Block: snowmantest.Genesis,
+				store: newTestVM(),
 			},
+			metadata: genesisMetadata,
 		}
 		bytes, err := block.Bytes()
 		require.NoError(t, err)
@@ -48,9 +51,12 @@ func newBlock(t *testing.T, config newBlockConfig) *Block {
 		config.round = config.prev.metadata.Round + 1
 	}
 
-	vmBlock := snowmantest.BuildChild(config.prev.vmBlock.(*snowmantest.Block))
+	vmBlock := snowmantest.BuildChild(config.prev.vmBlock.(*wrappedBlock).Block)
 	block := &Block{
-		vmBlock:      vmBlock,
+		vmBlock: &wrappedBlock{
+			Block: vmBlock,
+			store: config.prev.vmBlock.(*wrappedBlock).store,
+		},
 		blockTracker: config.prev.blockTracker,
 		metadata: simplex.ProtocolMetadata{
 			Version: 1,
@@ -107,6 +113,7 @@ func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
 			Log:        logging.NoLog{},
 			Validators: newTestValidatorInfo(testNodes),
 			SignBLS:    node.signFunc,
+			DB:         memdb.New(),
 		}
 		configs = append(configs, config)
 	}
@@ -130,4 +137,102 @@ func generateTestNodes(t *testing.T, num uint64) []*testNode {
 		}
 	}
 	return nodes
+}
+
+// newFinalization creates a new finalization over the blockheader, by collecting a
+// quorum of signatures from the provided configs.
+func newTestFinalization(t *testing.T, configs []*Config, bh simplex.BlockHeader) simplex.Finalization {
+	quorum := simplex.Quorum(len(configs))
+	finalizedVotes := make([]*simplex.FinalizeVote, 0, quorum)
+
+	for _, config := range configs[:quorum] {
+		vote := simplex.ToBeSignedFinalization{
+			BlockHeader: bh,
+		}
+		signer, _ := NewBLSAuth(config)
+		sig, err := vote.Sign(&signer)
+		require.NoError(t, err)
+		finalizedVotes = append(finalizedVotes, &simplex.FinalizeVote{
+			Finalization: vote,
+			Signature: simplex.Signature{
+				Signer: config.Ctx.NodeID[:],
+				Value:  sig,
+			},
+		})
+	}
+
+	_, verifier := NewBLSAuth(configs[0])
+	sigAgg := &SignatureAggregator{verifier: &verifier}
+
+	finalization, err := simplex.NewFinalization(configs[0].Log, sigAgg, finalizedVotes)
+	require.NoError(t, err)
+	return finalization
+}
+
+type testVMStore struct {
+	blocks map[ids.ID]*snowmantest.Block
+}
+
+func newTestVM() *testVMStore {
+	store := &testVMStore{
+		blocks: map[ids.ID]*snowmantest.Block{
+			snowmantest.Genesis.ID(): snowmantest.Genesis,
+		},
+	}
+	return store
+}
+
+func setVM(s *testVMStore) *blocktest.VM {
+	vm := &blocktest.VM{}
+	vm.LastAcceptedF = s.lastAccepted
+	vm.GetBlockF = s.getBlock
+	vm.GetBlockIDAtHeightF = s.getBlockAtHeight
+	return vm
+}
+
+func (v *testVMStore) getBlockAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
+	for _, block := range v.blocks {
+		if block.Height() == height {
+			return block.ID(), nil
+		}
+	}
+	return ids.Empty, database.ErrNotFound
+}
+
+func (v *testVMStore) getBlock(ctx context.Context, id ids.ID) (snowman.Block, error) {
+	block, exists := v.blocks[id]
+	if !exists {
+		return nil, database.ErrNotFound
+	}
+	return block, nil
+}
+
+func (v *testVMStore) lastAccepted(ctx context.Context) (ids.ID, error) {
+	// find the block with the highest height
+	if len(v.blocks) == 0 {
+		return ids.Empty, database.ErrNotFound
+	}
+
+	lastAcceptedID := snowmantest.Genesis.ID()
+	for _, block := range v.blocks {
+		if block.Height() > v.blocks[lastAcceptedID].Height() {
+			lastAcceptedID = block.ID()
+		}
+	}
+
+	return lastAcceptedID, nil
+}
+
+type wrappedBlock struct {
+	*snowmantest.Block
+	store *testVMStore
+}
+
+func (w *wrappedBlock) Accept(ctx context.Context) error {
+	if err := w.Block.Accept(ctx); err != nil {
+		return err
+	}
+
+	w.store.blocks[w.ID()] = w.Block
+	return nil
 }
