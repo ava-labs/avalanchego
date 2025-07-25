@@ -29,6 +29,7 @@ runs:
       shell: bash
       run: $GITHUB_ACTION_PATH/fetch_last_k_run_ids.sh
       env:
+        GH_TOKEN: ${{ github.token }}
         BASELINE_COUNT: ${{ inputs.baseline_count }}
         MONITORING_PERIOD: ${{ inputs.monitoring_period }}
         QUERY: ${{ inputs.query }}
