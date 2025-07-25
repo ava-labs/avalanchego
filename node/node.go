@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -58,6 +59,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/rpcsigner"
 	"github.com/ava-labs/avalanchego/utils/dynamicip"
 	"github.com/ava-labs/avalanchego/utils/filesystem"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -134,7 +137,12 @@ func New(
 		Config:           config,
 	}
 
-	pop, err := signer.NewProofOfPossession(n.Config.StakingSigningKey)
+	n.StakingSigner, err = newStakingSigner(config.StakingSignerConfig)
+	if err != nil {
+		return nil, fmt.Errorf("problem initializing staking signer: %w", err)
+	}
+
+	pop, err := signer.NewProofOfPossession(n.StakingSigner)
 	if err != nil {
 		return nil, fmt.Errorf("problem creating proof of possession: %w", err)
 	}
@@ -284,6 +292,7 @@ type Node struct {
 
 	StakingTLSSigner crypto.Signer
 	StakingTLSCert   *staking.Certificate
+	StakingSigner    bls.Signer
 
 	// Storage for this node
 	DB database.Database
@@ -571,7 +580,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		err := n.vdrs.AddStaker(
 			constants.PrimaryNetworkID,
 			n.ID,
-			n.Config.StakingSigningKey.PublicKey(),
+			n.StakingSigner.PublicKey(),
 			dummyTxID,
 			n.Config.SybilProtectionDisabledWeight,
 		)
@@ -610,7 +619,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 	n.Config.NetworkConfig.Beacons = n.bootstrappers
 	n.Config.NetworkConfig.TLSConfig = tlsConfig
 	n.Config.NetworkConfig.TLSKey = tlsKey
-	n.Config.NetworkConfig.BLSKey = n.Config.StakingSigningKey
+	n.Config.NetworkConfig.BLSKey = n.StakingSigner
 	n.Config.NetworkConfig.TrackedSubnets = n.Config.TrackedSubnets
 	n.Config.NetworkConfig.UptimeCalculator = n.uptimeCalculator
 	n.Config.NetworkConfig.UptimeRequirement = n.Config.UptimeRequirement
@@ -1100,7 +1109,7 @@ func (n *Node) initChainManager(avaxAssetID ids.ID) error {
 			SybilProtectionEnabled:                  n.Config.SybilProtectionEnabled,
 			StakingTLSSigner:                        n.StakingTLSSigner,
 			StakingTLSCert:                          n.StakingTLSCert,
-			StakingBLSKey:                           n.Config.StakingSigningKey,
+			StakingBLSKey:                           n.StakingSigner,
 			Log:                                     n.Log,
 			LogFactory:                              n.LogFactory,
 			VMManager:                               n.VMManager,
@@ -1344,7 +1353,7 @@ func (n *Node) initInfoAPI() error {
 
 	n.Log.Info("initializing info API")
 
-	pop, err := signer.NewProofOfPossession(n.Config.StakingSigningKey)
+	pop, err := signer.NewProofOfPossession(n.StakingSigner)
 	if err != nil {
 		return fmt.Errorf("problem creating proof of possession: %w", err)
 	}
@@ -1455,7 +1464,7 @@ func (n *Node) initHealthAPI() error {
 			return "validator doesn't have a BLS key", nil
 		}
 
-		nodePK := n.Config.StakingSigningKey.PublicKey()
+		nodePK := n.StakingSigner.PublicKey()
 		if nodePK.Equals(vdrPK) {
 			return "node has the correct BLS key", nil
 		}
@@ -1617,6 +1626,50 @@ func (n *Node) initDiskTargeter(
 	)
 }
 
+// newStakingSigner returns a BLS signer based on the provided validated configuration.
+func newStakingSigner(cfg node.StakingSignerConfig) (bls.Signer, error) {
+	if cfg.EphemeralSignerEnabled {
+		signer, err := localsigner.New()
+		if err != nil {
+			return nil, fmt.Errorf("could not generate ephemeral signer: %w", err)
+		}
+
+		return signer, nil
+	}
+
+	if cfg.KeyContent != "" {
+		signerKeyContent, err := base64.StdEncoding.DecodeString(cfg.KeyContent)
+		if err != nil {
+			return nil, fmt.Errorf("unable to decode base64 content: %w", err)
+		}
+
+		signer, err := localsigner.FromBytes(signerKeyContent)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse signing key: %w", err)
+		}
+
+		return signer, nil
+	}
+
+	if cfg.RPCEndpoint != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		signer, err := rpcsigner.NewClient(ctx, cfg.RPCEndpoint)
+		if err != nil {
+			return nil, fmt.Errorf("could not create rpc signer client: %w", err)
+		}
+
+		return signer, nil
+	}
+
+	if cfg.KeyPathIsSet {
+		return localsigner.FromFile(cfg.KeyPath)
+	}
+
+	return localsigner.FromFileOrPersistNew(cfg.KeyPath)
+}
+
 // Shutdown this node
 // May be called multiple times
 // All calls to shutdownOnce.Do block until the first call returns
@@ -1650,6 +1703,11 @@ func (n *Node) shutdown() {
 		time.Sleep(n.Config.ShutdownWait)
 	}
 
+	if n.StakingSigner != nil {
+		if err := n.StakingSigner.Shutdown(); err != nil {
+			n.Log.Debug("error during staking signer shutdown", zap.Error(err))
+		}
+	}
 	if n.resourceManager != nil {
 		n.resourceManager.Shutdown()
 	}

@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -76,12 +75,18 @@ type StakingConfig struct {
 	SybilProtectionEnabled        bool            `json:"sybilProtectionEnabled"`
 	PartialSyncPrimaryNetwork     bool            `json:"partialSyncPrimaryNetwork"`
 	StakingTLSCert                tls.Certificate `json:"-"`
-	StakingSigningKey             bls.Signer      `json:"-"`
 	SybilProtectionDisabledWeight uint64          `json:"sybilProtectionDisabledWeight"`
-	// not accessed but used for logging
-	StakingKeyPath    string `json:"stakingKeyPath"`
-	StakingCertPath   string `json:"stakingCertPath"`
-	StakingSignerPath string `json:"stakingSignerPath"`
+	StakingTLSKeyPath             string          `json:"stakingTLSKeyPath"`
+	StakingTLSCertPath            string          `json:"stakingTLSCertPath"`
+	StakingSignerConfig           `json:"stakingSingerConfig"`
+}
+
+type StakingSignerConfig struct {
+	EphemeralSignerEnabled bool   `json:"ephemeralSignerEnabled"`
+	KeyContent             string `json:"signerKeyContent"`
+	KeyPath                string `json:"keyPath"`
+	RPCEndpoint            string `json:"RPCEndpoint"`
+	KeyPathIsSet           bool   `json:"keyPathIsSet"`
 }
 
 type StateSyncConfig struct {
