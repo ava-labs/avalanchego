@@ -42,8 +42,8 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	corethlog "github.com/ava-labs/coreth/plugin/evm/log"
 	"github.com/ava-labs/coreth/plugin/evm/message"
-	vmsync "github.com/ava-labs/coreth/plugin/evm/sync"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
+	vmsync "github.com/ava-labs/coreth/sync/vm"
 	"github.com/ava-labs/coreth/triedb/hashdb"
 
 	"github.com/ava-labs/libevm/core/rawdb"

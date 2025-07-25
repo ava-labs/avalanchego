@@ -11,6 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
+
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -33,8 +36,6 @@ import (
 
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ava-labs/coreth/plugin/evm/atomic"
-	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/coreth/utils"

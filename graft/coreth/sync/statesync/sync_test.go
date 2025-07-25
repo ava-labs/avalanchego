@@ -68,8 +68,13 @@ func testSync(t *testing.T, test syncTest) {
 	})
 	require.NoError(t, err, "failed to create state syncer")
 	// begin sync
-	s.Start(ctx)
+	if err := s.Start(ctx); err != nil {
+		t.Fatal(err)
+	}
+
 	waitFor(t, context.Background(), s.Wait, test.expectedError, testSyncTimeout)
+
+	// Only assert database consistency if the sync was expected to succeed.
 	if test.expectedError != nil {
 		return
 	}

@@ -1,22 +1,22 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
-package sync
+package atomic
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database/versiondb"
-	syncclient "github.com/ava-labs/coreth/sync/client"
-
 	"github.com/ava-labs/coreth/plugin/evm/atomic/state"
-	"github.com/ava-labs/coreth/plugin/evm/message"
-	"github.com/ava-labs/coreth/plugin/evm/sync"
 
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/libevm/log"
+
+	"github.com/ava-labs/coreth/plugin/evm/message"
+	syncclient "github.com/ava-labs/coreth/sync/client"
+	"github.com/ava-labs/coreth/sync/vm"
 )
 
-var _ sync.Extender = (*Extender)(nil)
+var _ vm.Extender = (*Extender)(nil)
 
 // Extender is the sync extender for the atomic VM.
 type Extender struct {

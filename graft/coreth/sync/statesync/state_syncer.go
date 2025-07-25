@@ -5,11 +5,11 @@ package statesync
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/ava-labs/coreth/core/state/snapshot"
+	synccommon "github.com/ava-labs/coreth/sync"
 	syncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
@@ -24,7 +24,7 @@ const (
 	defaultNumWorkers      = 8
 )
 
-var errWaitBeforeStart = errors.New("cannot call Wait before Start")
+var _ synccommon.Syncer = (*stateSync)(nil)
 
 type StateSyncerConfig struct {
 	Root                     common.Hash
@@ -68,7 +68,7 @@ type stateSync struct {
 	cancelFunc context.CancelFunc
 }
 
-func NewStateSyncer(config *StateSyncerConfig) (*stateSync, error) {
+func NewStateSyncer(config *StateSyncerConfig) (synccommon.Syncer, error) {
 	ss := &stateSync{
 		batchSize:       config.BatchSize,
 		db:              config.DB,
@@ -224,13 +224,14 @@ func (t *stateSync) storageTrieProducer(ctx context.Context) error {
 }
 
 func (t *stateSync) Start(ctx context.Context) error {
-	// Create a cancellable context for the sync operations
-	syncCtx, cancel := context.WithCancel(ctx)
-	t.cancelFunc = cancel
+	ctx, t.cancelFunc = context.WithCancel(ctx)
 
 	// Start the code syncer and leaf syncer.
-	eg, egCtx := errgroup.WithContext(syncCtx)
-	t.codeSyncer.start(egCtx) // start the code syncer first since the leaf syncer may add code tasks
+	eg, egCtx := errgroup.WithContext(ctx)
+	if err := t.codeSyncer.Start(egCtx); err != nil { // start the code syncer first since the leaf syncer may add code tasks
+		return err
+	}
+
 	t.syncer.Start(egCtx, defaultNumWorkers, t.onSyncFailure)
 	eg.Go(func() error {
 		if err := <-t.syncer.Done(); err != nil {
@@ -239,8 +240,8 @@ func (t *stateSync) Start(ctx context.Context) error {
 		return t.onSyncComplete()
 	})
 	eg.Go(func() error {
-		err := <-t.codeSyncer.Done()
-		return err
+		// Wait for the code syncer to complete.
+		return t.codeSyncer.Wait(egCtx)
 	})
 	eg.Go(func() error {
 		return t.storageTrieProducer(egCtx)
@@ -254,10 +255,13 @@ func (t *stateSync) Start(ctx context.Context) error {
 	return nil
 }
 
+// Wait blocks until the sync operation completes and returns any error that occurred.
+// It respects context cancellation and returns ctx.Err() if the context is cancelled.
+// This method must be called after Start() has been called.
 func (t *stateSync) Wait(ctx context.Context) error {
 	// This should only be called after Start, so we can assume cancelFunc is set.
 	if t.cancelFunc == nil {
-		return errWaitBeforeStart
+		return synccommon.ErrWaitBeforeStart
 	}
 
 	select {

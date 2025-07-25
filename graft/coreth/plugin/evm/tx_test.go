@@ -9,6 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
+
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 
 	"github.com/stretchr/testify/require"
@@ -17,8 +20,6 @@ import (
 
 	"github.com/ava-labs/coreth/core/extstate"
 	"github.com/ava-labs/coreth/params/extras"
-	"github.com/ava-labs/coreth/plugin/evm/atomic"
-	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
 	"github.com/ava-labs/coreth/utils"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"

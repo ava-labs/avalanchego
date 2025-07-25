@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
+
 	"golang.org/x/exp/slog"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -16,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/rpc"
-	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 )
 

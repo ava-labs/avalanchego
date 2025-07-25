@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/coreth/plugin/evm/message"
+	synccommon "github.com/ava-labs/coreth/sync"
 	statesyncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -24,7 +25,10 @@ const (
 	DefaultNumCodeFetchingWorkers   = 5
 )
 
-var errFailedToAddCodeHashesToQueue = errors.New("failed to add code hashes to queue")
+var (
+	errFailedToAddCodeHashesToQueue                   = errors.New("failed to add code hashes to queue")
+	_                               synccommon.Syncer = (*codeSyncer)(nil)
+)
 
 // CodeSyncerConfig defines the configuration of the code syncer
 type CodeSyncerConfig struct {
@@ -69,10 +73,10 @@ func newCodeSyncer(config CodeSyncerConfig) *codeSyncer {
 	}
 }
 
-// start the worker thread and populate the code hashes queue with active work.
-// blocks until all outstanding code requests from a previous sync have been
+// Start the worker thread and populate the code hashes queue with active work.
+// Blocks until all outstanding code requests from a previous sync have been
 // queued for fetching (or ctx is cancelled).
-func (c *codeSyncer) start(ctx context.Context) {
+func (c *codeSyncer) Start(ctx context.Context) error {
 	ctx, c.cancel = context.WithCancel(ctx)
 	c.done = ctx.Done()
 	wg := sync.WaitGroup{}
@@ -100,6 +104,25 @@ func (c *codeSyncer) start(ctx context.Context) {
 		wg.Wait()
 		c.setError(nil)
 	}()
+
+	return nil
+}
+
+// Wait blocks until the code sync operation completes and returns any error that occurred.
+// It respects context cancellation and returns ctx.Err() if the context is cancelled.
+// This method must be called after start() has been called.
+func (c *codeSyncer) Wait(ctx context.Context) error {
+	if c.cancel == nil {
+		return synccommon.ErrWaitBeforeStart
+	}
+
+	select {
+	case err := <-c.errChan:
+		return err
+	case <-ctx.Done():
+		c.cancel()
+		return ctx.Err()
+	}
 }
 
 // Clean out any codeToFetch markers from the database that are no longer needed and
@@ -252,6 +275,3 @@ func (c *codeSyncer) setError(err error) {
 		c.errChan <- err
 	})
 }
-
-// Done returns an error channel to indicate the return status of code syncing.
-func (c *codeSyncer) Done() <-chan error { return c.errChan }

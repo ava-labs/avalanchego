@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
+
 	"github.com/stretchr/testify/assert"
 )
 

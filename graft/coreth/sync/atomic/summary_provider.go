@@ -1,20 +1,21 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
-package sync
+package atomic
 
 import (
 	"fmt"
 
+	"github.com/ava-labs/coreth/plugin/evm/atomic/state"
+
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
-	"github.com/ava-labs/coreth/plugin/evm/atomic/state"
-	"github.com/ava-labs/coreth/plugin/evm/sync"
+	"github.com/ava-labs/coreth/sync/vm"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 )
 
-var _ sync.SummaryProvider = (*SummaryProvider)(nil)
+var _ vm.SummaryProvider = (*SummaryProvider)(nil)
 
 // SummaryProvider is the summary provider that provides the state summary for the atomic trie.
 type SummaryProvider struct {

@@ -59,7 +59,9 @@ func testCodeSyncer(t *testing.T, test codeSyncerTest) {
 	if test.setupCodeSyncer != nil {
 		test.setupCodeSyncer(codeSyncer)
 	}
-	codeSyncer.start(context.Background())
+	if err := codeSyncer.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
 
 	for _, codeHashes := range test.codeRequestHashes {
 		if err := codeSyncer.addCode(codeHashes); err != nil {
@@ -72,7 +74,7 @@ func testCodeSyncer(t *testing.T, test codeSyncerTest) {
 	}
 	codeSyncer.notifyAccountTrieCompleted()
 
-	err := <-codeSyncer.Done()
+	err := codeSyncer.Wait(context.Background())
 	if test.err != nil {
 		if err == nil {
 			t.Fatal(t, "expected non-nil error: %s", test.err)

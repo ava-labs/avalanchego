@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
-	vmsync "github.com/ava-labs/coreth/plugin/evm/sync"
+	vmsync "github.com/ava-labs/coreth/sync/vm"
 	"github.com/prometheus/client_golang/prometheus"
 )
 

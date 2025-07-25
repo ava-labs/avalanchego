@@ -8,13 +8,14 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
+
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/metrics"
