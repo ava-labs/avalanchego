@@ -19,6 +19,7 @@
 !core/predicate_check_test.go
 !core/state/database_test.go
 !core/state/firewood_database.go
+!core/state/database_test.go
 !core/state/snapshot/snapshot_ext.go
 !core/state/trie_prefetcher_extra_test.go
 !core/state_manager_test.go
