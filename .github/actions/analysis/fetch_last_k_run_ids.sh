@@ -16,41 +16,31 @@ Y_AXIS_LABEL="${Y_AXIS_LABEL:-$METRIC_NAME}"
 
 # Get baseline run IDs using gh CLI, excluding current run
 get_baseline_run_ids() {
-    local baseline_runs=()
     local found_count=0
 
-    # Get workflow runs with proper gh CLI syntax
+    # Get successful workflow runs
     local runs_json=$(gh run list \
         --repo "$REPO" \
         --status completed \
         --limit 50 \
-        --json databaseId,number,status,conclusion,jobs)
+        --json databaseId,number,conclusion)
 
-    echo "runs: $runs_json"
+    echo "DEBUG: runs_json content:" >&2
+    echo "$runs_json" >&2
 
-    # Process each run
-    echo "$runs_json" | jq -r '.[] | @base64' | while IFS= read -r encoded_run && [ $found_count -lt $BASELINE_COUNT ]; do
-        if [ -z "$encoded_run" ]; then
-            continue
-        fi
-
-        local run=$(echo "$encoded_run" | base64 -d)
-        local run_id=$(echo "$run" | jq -r '.databaseId')
-        local run_number=$(echo "$run" | jq -r '.number')
-        local conclusion=$(echo "$run" | jq -r '.conclusion')
-
-        # Skip if not successful
-        if [ "$conclusion" != "success" ]; then
-            continue
-        fi
-
+    # Process each successful run
+    echo "$runs_json" | jq -r '.[] | select(.conclusion == "success") | "\(.databaseId):\(.number)"' | \
+    while IFS=':' read -r run_id run_number && [ $found_count -lt $BASELINE_COUNT ]; do
         # Explicitly exclude current run
         if [ "$run_id" = "$CURRENT_RUN_ID" ]; then
             continue
         fi
 
+        # Get jobs for this specific run
+        local jobs_json=$(gh run view "$run_id" --repo "$REPO" --json jobs 2>/dev/null || echo '{"jobs":[]}')
+
         # Check if this run has our target job that succeeded
-        local job_found=$(echo "$run" | jq -r --arg job_name "$JOB_ID" '
+        local job_found=$(echo "$jobs_json" | jq -r --arg job_name "$JOB_ID" '
             .jobs[]? | select(.name == $job_name and .conclusion == "success") | .name
         ')
 
@@ -72,10 +62,14 @@ create_config() {
     # Build baselines JSON array
     local baselines_json=""
 
-    if [ ${#baseline_runs[@]} -gt 0 ]; then
+    if [ ${#baseline_runs[@]} -gt 0 ] && [ -n "${baseline_runs[0]}" ]; then
         local first=true
 
         for run_info in "${baseline_runs[@]}"; do
+            if [ -z "$run_info" ]; then
+                continue
+            fi
+
             IFS=':' read -r run_id run_number <<< "$run_info"
 
             if [ "$first" = true ]; then
@@ -141,7 +135,7 @@ main() {
     fi
 
     # Success case - show what we found
-    if [ ${#baseline_runs[@]} -eq 0 ]; then
+    if [ ${#baseline_runs[@]} -eq 0 ] || [ -z "${baseline_runs[0]}" ]; then
         echo "Found 0 baseline runs for visualization (excluding current run ${CURRENT_RUN_ID})"
     else
         echo "Found ${#baseline_runs[@]} baseline runs for visualization (excluding current run ${CURRENT_RUN_ID})"
