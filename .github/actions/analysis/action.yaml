@@ -154,8 +154,7 @@ runs:
         cache: 'pip'
     - name: Install Python dependencies
       shell: bash
-      run: |
-        pip install pandas plotly prometheus-api-client pytz
+      run: pip install $GITHUB_ACTION_PATH/requirements.txt
     - name: Plot
       shell: bash
       env:
