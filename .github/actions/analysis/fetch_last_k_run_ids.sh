@@ -49,12 +49,12 @@ get_baseline_run_ids() {
         --limit 50 \
         --json databaseId,number,jobs)
 
-    echo "${baseline_runs[@]}"
+    printf '%s\n' "${baseline_runs[@]}"
 }
 
 # Create JSON configuration
 create_config() {
-    local baseline_runs=($1)
+    local baseline_runs=("$@")
 
     if [ ${#baseline_runs[@]} -eq 0 ]; then
         echo "ERROR: No baseline runs found for job '${JOB_ID}' (excluding current run ${CURRENT_RUN_ID})" >&2
@@ -66,7 +66,37 @@ create_config() {
     local current_start=$(date +%s)000  # Convert to milliseconds
     local current_end=$((current_start + MONITORING_PERIOD * 1000))
 
-    # Start building JSON config
+    # Build baselines JSON array
+    local baselines_json=""
+    local first=true
+
+    for run_info in "${baseline_runs[@]}"; do
+        IFS=':' read -r run_id run_number <<< "$run_info"
+
+        if [ "$first" = true ]; then
+            first=false
+        else
+            baselines_json+=","
+        fi
+
+        baselines_json+=$(cat << EOF
+
+    {
+      "start_time": 0,
+      "end_time": 0,
+      "name": "Run ${run_number} (#${run_id})",
+      "labels": {
+        "gh_run_id": "${run_id}",
+        "gh_job_id": "${JOB_ID}",
+        "gh_run_attempt": "1",
+        "gh_repo": "${REPO}"
+      }
+    }
+EOF
+)
+    done
+
+    # Create complete JSON config
     cat > metric_config.json << EOF
 {
   "query": "${QUERY}",
@@ -84,36 +114,7 @@ create_config() {
       "gh_repo": "${REPO}"
     }
   },
-  "baselines": [
-EOF
-
-    # Add baseline runs
-    local first=true
-    for run_info in "${baseline_runs[@]}"; do
-        IFS=':' read -r run_id run_number <<< "$run_info"
-
-        if [ "$first" = true ]; then
-            first=false
-        else
-            echo "," >> metric_config.json
-        fi
-
-        cat >> metric_config.json << EOF
-    {
-      "start_time": 0,
-      "end_time": 0,
-      "name": "Run ${run_number} (#${run_id})",
-      "labels": {
-        "gh_run_id": "${run_id}",
-        "gh_job_id": "${JOB_ID}",
-        "gh_run_attempt": "1",
-        "gh_repo": "${REPO}"
-      }
-    }EOF
-    done
-
-    cat >> metric_config.json << EOF
-
+  "baselines": [${baselines_json}
   ],
   "output_file": "metric_visualization_${CURRENT_RUN_ID}.html"
 }
@@ -124,27 +125,23 @@ EOF
 main() {
     local baseline_runs
 
-    if ! baseline_runs=$(get_baseline_run_ids); then
-        echo "ERROR: Failed to fetch baseline runs from GitHub API" >&2
-        echo "::error::Failed to fetch baseline runs from GitHub API"
-        exit 1
-    fi
+    # Get baseline runs as array
+    mapfile -t baseline_runs < <(get_baseline_run_ids)
 
-    if [ -z "$baseline_runs" ]; then
+    if [ ${#baseline_runs[@]} -eq 0 ]; then
         echo "ERROR: No baseline runs found for job '${JOB_ID}' (excluding current run ${CURRENT_RUN_ID})" >&2
         echo "::error::No baseline runs found for job '${JOB_ID}'"
         exit 1
     fi
 
-    if ! create_config "$baseline_runs"; then
+    if ! create_config "${baseline_runs[@]}"; then
         echo "ERROR: Failed to create configuration file" >&2
         echo "::error::Failed to create configuration file"
         exit 1
     fi
 
     # Success case - show what we found
-    local baseline_count=$(echo "$baseline_runs" | wc -w)
-    echo "Found ${baseline_count} baseline runs for visualization (excluding current run ${CURRENT_RUN_ID})"
+    echo "Found ${#baseline_runs[@]} baseline runs for visualization (excluding current run ${CURRENT_RUN_ID})"
 }
 
 main "$@"
