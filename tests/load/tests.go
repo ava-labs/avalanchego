@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package load2
+package load
 
 import (
 	"context"
@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/load/c/contracts"
+	"github.com/ava-labs/avalanchego/tests/load/contracts"
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 

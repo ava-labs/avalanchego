@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/netip"
 	"os"
 	"os/exec"
@@ -926,9 +927,7 @@ func (n *Network) GetMonitoringLabels() map[string]string {
 		"is_ephemeral_node": "false",
 		"network_owner":     n.Owner,
 	}
-	for label, value := range GetGitHubLabels() {
-		labels[label] = value
-	}
+	maps.Copy(labels, GetGitHubLabels())
 	return labels
 }
 

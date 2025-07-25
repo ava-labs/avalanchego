@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/tests/load2"
+	"github.com/ava-labs/avalanchego/tests/load"
 )
 
 const (
@@ -93,13 +93,13 @@ func main() {
 		)
 	})
 
-	workers := make([]load2.Worker, len(keys))
+	workers := make([]load.Worker, len(keys))
 	for i := range len(keys) {
 		wsURI := wsURIs[i%len(wsURIs)]
 		client, err := ethclient.Dial(wsURI)
 		require.NoError(err)
 
-		workers[i] = load2.Worker{
+		workers[i] = load.Worker{
 			PrivKey: keys[i].ToECDSA(),
 			Client:  client,
 		}
@@ -108,7 +108,7 @@ func main() {
 	chainID, err := workers[0].Client.ChainID(ctx)
 	require.NoError(err)
 
-	randomTest, err := load2.NewRandomTest(
+	randomTest, err := load.NewRandomTest(
 		ctx,
 		chainID,
 		&workers[0],
@@ -116,7 +116,7 @@ func main() {
 	)
 	require.NoError(err)
 
-	generator, err := load2.NewLoadGenerator(
+	generator, err := load.NewLoadGenerator(
 		workers,
 		chainID,
 		metricsNamespace,
