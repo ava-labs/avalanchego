@@ -30,6 +30,10 @@ inputs:
   prometheus_url:
     description: 'Prometheus server URL'
     default: 'https://prometheus-poc.avax-dev.network'
+  prometheus_username:
+    required: true
+  prometheus_password:
+    required: true
   step_size:
     description: 'Prometheus query step size'
     default: '15s'
@@ -155,8 +159,8 @@ runs:
     - name: Plot
       shell: bash
       env:
-        PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
-        PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
+        PROMETHEUS_ID: ${{ inputs.prometheus_username }}
+        PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
       run: |
         python $GITHUB_ACTION_PATH/plot.py \
           --config metric_config.json \
