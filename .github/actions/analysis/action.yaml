@@ -143,7 +143,7 @@ runs:
               output_file: `metric_visualization_${CURRENT_RUN_ID}.html`
             };
             // Write configuration file
-            fs.writeFileSync('metric_config.json', JSON.stringify(config, null, 2));
+            fs.writeFileSync(`metric_config.json`, JSON.stringify(config, null, 2));
           } catch (error) {
             core.setFailed(`Failed to fetch workflow runs: ${error.message}`);
           }
@@ -155,6 +155,16 @@ runs:
     - name: Install Python dependencies
       shell: bash
       run: pip install -r $GITHUB_ACTION_PATH/requirements.txt
+    - name: Show config
+      shell: bash
+      run: |
+        if [ -f $GITHUB_ACTION_PATH/metric_config.json ]; then
+          echo "Generated configuration:"
+          cat $GITHUB_ACTION_PATH/metric_config.json
+        else
+          echo "ERROR: $GITHUB_ACTION_PATH/metric_config.json not found"
+          exit 1
+        fi
     - name: Plot
       shell: bash
       env:
@@ -162,7 +172,7 @@ runs:
         PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
       run: |
         python $GITHUB_ACTION_PATH/plot.py \
-          --config metric_config.json \
+          --config $GITHUB_ACTION_PATH/metric_config.json \
           --prometheus-url "${{ inputs.prometheus_url }}" \
           --step-size "${{ inputs.step_size }}" \
           --timezone "${{ inputs.timezone }}" \
