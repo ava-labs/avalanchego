@@ -21,11 +21,11 @@ inputs:
   y_axis_label:
     description: 'Y-axis label'
     default: ''
-  workflow_file:
-    description: 'Workflow file name (e.g., c-chain-reexecution-benchmark.yml)'
-    default: ''
+  workflow:
+    description: 'Workflow to search for baselines. Can be filename (ci.yml, c-chain-reexecution-benchmark.yml...) or workflow name. Enables cross-workflow baseline comparison.'
+    default: 'ci.yml'
   job_name:
-    description: 'Job name to search for baselines'
+    description: 'Job name to search for baselines. Uses current job if not specified.'
     default: ''
 
 runs:
@@ -43,116 +43,141 @@ runs:
           const CURRENT_RUN_ID = '${{ github.run_id }}';
           const CURRENT_RUN_ATTEMPT = '${{ github.run_attempt }}';
           const JOB_ID = '${{ inputs.job_name }}' || '${{ github.job }}';
-          const WORKFLOW_FILE = '${{ inputs.workflow_file }}';
+          const WORKFLOW = '${{ inputs.workflow }}';
           const REPO = '${{ github.repository }}';
 
           console.log(`DEBUG: Looking for ${BASELINE_COUNT} baselines`);
-          console.log(`DEBUG: Workflow file: '${WORKFLOW_FILE}'`);
+          console.log(`DEBUG: Target workflow: '${WORKFLOW}'`);
           console.log(`DEBUG: Job name: '${JOB_ID}'`);
           console.log(`DEBUG: Current run ID: ${CURRENT_RUN_ID}`);
 
-          // Get workflow runs by workflow file name
-          const { data: { workflow_runs } } = await github.rest.actions.listWorkflowRuns({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            workflow_id: WORKFLOW_FILE,
-            status: 'completed',
-            per_page: 20
-          });
+          // Determine if input is a filename (contains .yaml/.yml) or display name
+          const isWorkflowFile = WORKFLOW.includes('.yaml') || WORKFLOW.includes('.yml');
+          console.log(`DEBUG: Search strategy: ${isWorkflowFile ? 'workflow file' : 'workflow name'}`);
 
-          console.log(`DEBUG: Found ${workflow_runs.length} runs for workflow file '${WORKFLOW_FILE}'`);
+          let workflow_runs;
 
-          // Show successful runs
-          const successfulRuns = workflow_runs.filter(run => run.conclusion === 'success');
-          console.log(`DEBUG: Found ${successfulRuns.length} successful runs`);
-
-          // Show the first few runs for debugging
-          successfulRuns.slice(0, 5).forEach(run => {
-            console.log(`DEBUG: Run ${run.run_number} (ID: ${run.id}) - ${run.conclusion}`);
-          });
-
-          const baselineRuns = [];
-
-          for (const run of successfulRuns) {
-            if (baselineRuns.length >= BASELINE_COUNT) {
-              break;
-            }
-
-            // Exclude current run
-            if (run.id.toString() === CURRENT_RUN_ID) {
-              console.log(`DEBUG: Skipping current run ${run.id}`);
-              continue;
-            }
-
-            console.log(`DEBUG: Checking jobs for run ${run.id} (run #${run.run_number})`);
-
-            try {
-              const { data: { jobs } } = await github.rest.actions.listJobsForWorkflowRun({
+          try {
+            if (isWorkflowFile) {
+              // Search by workflow file
+              console.log(`DEBUG: Searching by workflow file: ${WORKFLOW}`);
+              const response = await github.rest.actions.listWorkflowRuns({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                run_id: run.id
+                workflow_id: WORKFLOW,
+                status: 'completed',
+                per_page: 20
               });
-
-              console.log(`DEBUG: Found ${jobs.length} jobs in run ${run.id}`);
-              jobs.forEach(job => {
-                console.log(`DEBUG: Job: '${job.name}' - ${job.conclusion}`);
+              workflow_runs = response.data.workflow_runs;
+            } else {
+              // Search by workflow name
+              console.log(`DEBUG: Searching by workflow name: ${WORKFLOW}`);
+              const response = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                status: 'completed',
+                per_page: 20
               });
-
-              // Find matching job
-              const targetJob = jobs.find(job => job.name === JOB_ID && job.conclusion === 'success');
-
-              if (targetJob) {
-                console.log(`DEBUG: Found matching job '${targetJob.name}' in run ${run.id}`);
-                baselineRuns.push({
-                  run_id: run.id.toString(),
-                  run_number: run.run_number
-                });
-              } else {
-                console.log(`DEBUG: No matching job '${JOB_ID}' found in run ${run.id}`);
-              }
-            } catch (error) {
-              console.log(`DEBUG: Failed to get jobs for run ${run.id}: ${error.message}`);
+              workflow_runs = response.data.workflow_runs.filter(run => run.name === WORKFLOW);
             }
+
+            console.log(`DEBUG: Found ${workflow_runs.length} runs for '${WORKFLOW}'`);
+
+            // Filter to successful runs only
+            const successfulRuns = workflow_runs.filter(run => run.conclusion === 'success');
+            console.log(`DEBUG: Found ${successfulRuns.length} successful runs`);
+
+            // Show the first few runs for debugging
+            successfulRuns.slice(0, 5).forEach(run => {
+              console.log(`DEBUG: Run ${run.run_number} (ID: ${run.id}) - ${run.conclusion}`);
+            });
+
+            const baselineRuns = [];
+
+            for (const run of successfulRuns) {
+              if (baselineRuns.length >= BASELINE_COUNT) {
+                break;
+              }
+
+              // Exclude current run
+              if (run.id.toString() === CURRENT_RUN_ID) {
+                console.log(`DEBUG: Skipping current run ${run.id}`);
+                continue;
+              }
+
+              console.log(`DEBUG: Checking jobs for run ${run.id} (run #${run.run_number})`);
+
+              try {
+                const { data: { jobs } } = await github.rest.actions.listJobsForWorkflowRun({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: run.id
+                });
+
+                console.log(`DEBUG: Found ${jobs.length} jobs in run ${run.id}`);
+                jobs.forEach(job => {
+                  console.log(`DEBUG: Job: '${job.name}' - ${job.conclusion}`);
+                });
+
+                // Find matching job
+                const targetJob = jobs.find(job => job.name === JOB_ID && job.conclusion === 'success');
+
+                if (targetJob) {
+                  console.log(`DEBUG: Found matching job '${targetJob.name}' in run ${run.id}`);
+                  baselineRuns.push({
+                    run_id: run.id.toString(),
+                    run_number: run.run_number
+                  });
+                } else {
+                  console.log(`DEBUG: No matching job '${JOB_ID}' found in run ${run.id}`);
+                }
+              } catch (error) {
+                console.log(`DEBUG: Failed to get jobs for run ${run.id}: ${error.message}`);
+              }
+            }
+
+            console.log(`DEBUG: Found ${baselineRuns.length} baseline runs`);
+
+            // Calculate current run timing
+            const currentStart = Date.now();
+            const currentEnd = currentStart + (MONITORING_PERIOD * 1000);
+
+            // Build configuration
+            const config = {
+              query: '${{ inputs.query }}',
+              metric_name: '${{ inputs.metric_name }}',
+              x_axis_label: '${{ inputs.x_axis_label }}',
+              y_axis_label: '${{ inputs.y_axis_label }}' || '${{ inputs.metric_name }}',
+              candidate: {
+                start_time: currentStart,
+                end_time: currentEnd,
+                name: `Current Run (#${CURRENT_RUN_ID})`,
+                labels: {
+                  gh_run_id: CURRENT_RUN_ID,
+                  gh_job_id: JOB_ID,
+                  gh_run_attempt: CURRENT_RUN_ATTEMPT,
+                  gh_repo: REPO
+                }
+              },
+              baselines: baselineRuns.map(run => ({
+                name: `Run ${run.run_number} (#${run.run_id})`,
+                labels: {
+                  gh_run_id: run.run_id,
+                  gh_job_id: JOB_ID,
+                  gh_run_attempt: "1",
+                  gh_repo: REPO
+                }
+              })),
+              output_file: `metric_visualization_${CURRENT_RUN_ID}.html`
+            };
+
+            // Write configuration file
+            fs.writeFileSync('metric_config.json', JSON.stringify(config, null, 2));
+            console.log('Configuration file created: metric_config.json');
+
+          } catch (error) {
+            core.setFailed(`Failed to fetch workflow runs: ${error.message}`);
           }
-
-          console.log(`DEBUG: Found ${baselineRuns.length} baseline runs`);
-
-          // Calculate current run timing
-          const currentStart = Date.now();
-          const currentEnd = currentStart + (MONITORING_PERIOD * 1000);
-
-          // Build configuration
-          const config = {
-            query: '${{ inputs.query }}',
-            metric_name: '${{ inputs.metric_name }}',
-            x_axis_label: '${{ inputs.x_axis_label }}',
-            y_axis_label: '${{ inputs.y_axis_label }}' || '${{ inputs.metric_name }}',
-            candidate: {
-              start_time: currentStart,
-              end_time: currentEnd,
-              name: `Current Run (#${CURRENT_RUN_ID})`,
-              labels: {
-                gh_run_id: CURRENT_RUN_ID,
-                gh_job_id: JOB_ID,
-                gh_run_attempt: CURRENT_RUN_ATTEMPT,
-                gh_repo: REPO
-              }
-            },
-            baselines: baselineRuns.map(run => ({
-              name: `Run ${run.run_number} (#${run.run_id})`,
-              labels: {
-                gh_run_id: run.run_id,
-                gh_job_id: JOB_ID,
-                gh_run_attempt: "1",
-                gh_repo: REPO
-              }
-            })),
-            output_file: `metric_visualization_${CURRENT_RUN_ID}.html`
-          };
-
-          // Write configuration file
-          fs.writeFileSync('metric_config.json', JSON.stringify(config, null, 2));
-          console.log('Configuration file created: metric_config.json');
 
     - name: Show generated config
       shell: bash
