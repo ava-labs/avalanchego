@@ -4,9 +4,11 @@
 package prometheus
 
 import (
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/prometheus/common/expfmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -73,21 +75,56 @@ func TestGatherer_Gather(t *testing.T) {
 	families, err := gatherer.Gather()
 	require.NoError(t, err)
 
-	familyStrings := make([]string, len(families))
-	for i := range families {
-		familyStrings[i] = families[i].String()
+	const expectedString = `
+# TYPE test_counter counter
+test_counter 12345
+# TYPE test_counter_float64 counter
+test_counter_float64 1.1
+# TYPE test_gauge gauge
+test_gauge 23456
+# TYPE test_gauge_float64 gauge
+test_gauge_float64 34567.89
+# TYPE test_histogram summary
+test_histogram{quantile="0.5"} 0
+test_histogram{quantile="0.75"} 0
+test_histogram{quantile="0.95"} 0
+test_histogram{quantile="0.99"} 0
+test_histogram{quantile="0.999"} 0
+test_histogram{quantile="0.9999"} 0
+test_histogram_sum 0
+test_histogram_count 0
+# TYPE test_meter gauge
+test_meter 9.999999e+06
+# TYPE test_resetting_timer summary
+test_resetting_timer{quantile="50"} 1e+09
+test_resetting_timer{quantile="95"} 1e+09
+test_resetting_timer{quantile="99"} 1e+09
+test_resetting_timer_sum 1e+09
+test_resetting_timer_count 1
+# TYPE test_timer summary
+test_timer{quantile="0.5"} 2.25e+07
+test_timer{quantile="0.75"} 4.8e+07
+test_timer{quantile="0.95"} 1.2e+08
+test_timer{quantile="0.99"} 1.2e+08
+test_timer{quantile="0.999"} 1.2e+08
+test_timer{quantile="0.9999"} 1.2e+08
+test_timer_sum 2.3e+08
+test_timer_count 6
+`
+	var (
+		stringReader = strings.NewReader(expectedString)
+		parser       expfmt.TextParser
+	)
+	expectedMetrics, err := parser.TextToMetricFamilies(stringReader)
+	require.NoError(t, err)
+
+	assert.Len(t, families, len(expectedMetrics))
+	for i, got := range families {
+		require.NotNil(t, *got.Name)
+
+		want := expectedMetrics[*got.Name]
+		assert.Equal(t, want, got, i)
 	}
-	want := []string{
-		`name:"test_counter" type:COUNTER metric:{counter:{value:12345}}`,
-		`name:"test_counter_float64" type:COUNTER metric:{counter:{value:1.1}}`,
-		`name:"test_gauge" type:GAUGE metric:{gauge:{value:23456}}`,
-		`name:"test_gauge_float64" type:GAUGE metric:{gauge:{value:34567.89}}`,
-		`name:"test_histogram" type:SUMMARY metric:{summary:{sample_count:0 sample_sum:0 quantile:{quantile:0.5 value:0} quantile:{quantile:0.75 value:0} quantile:{quantile:0.95 value:0} quantile:{quantile:0.99 value:0} quantile:{quantile:0.999 value:0} quantile:{quantile:0.9999 value:0}}}`,
-		`name:"test_meter" type:GAUGE metric:{gauge:{value:9.999999e+06}}`,
-		`name:"test_resetting_timer" type:SUMMARY metric:{summary:{sample_count:1 quantile:{quantile:50 value:1e+09} quantile:{quantile:95 value:1e+09} quantile:{quantile:99 value:1e+09}}}`,
-		`name:"test_timer" type:SUMMARY metric:{summary:{sample_count:6 sample_sum:2.3e+08 quantile:{quantile:0.5 value:2.25e+07} quantile:{quantile:0.75 value:4.8e+07} quantile:{quantile:0.95 value:1.2e+08} quantile:{quantile:0.99 value:1.2e+08} quantile:{quantile:0.999 value:1.2e+08} quantile:{quantile:0.9999 value:1.2e+08}}}`,
-	}
-	assert.Equal(t, want, familyStrings)
 
 	register(t, "unsupported", metrics.NewHealthcheck(nil))
 	families, err = gatherer.Gather()
