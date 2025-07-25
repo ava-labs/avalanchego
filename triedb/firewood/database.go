@@ -521,6 +521,9 @@ type reader struct {
 // Node retrieves the trie node with the given node hash. No error will be
 // returned if the node is not found.
 func (reader *reader) Node(_ common.Hash, path []byte, _ common.Hash) ([]byte, error) {
+	// TODO: remove these locks once Firewood supports concurrent reads and commits.
+	reader.db.proposalLock.RLock()
+	defer reader.db.proposalLock.RUnlock()
 	// This function relies on Firewood's internal locking to ensure concurrent reads are safe.
 	// This is safe even if a proposal is being committed concurrently.
 	start := time.Now()
