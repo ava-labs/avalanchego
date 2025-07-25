@@ -103,12 +103,7 @@ runs:
                   // Calculate job timing for baseline
                   const jobStart = new Date(targetJob.started_at).getTime();
                   const jobEnd = new Date(targetJob.completed_at).getTime();
-
                   baselineRuns.push({
-                    run_id: run.id.toString(),
-                    run_number: run.run_number,
-                    start_time: jobStart,
-                    end_time: jobEnd,
                     name: `Run ${run.run_number} (#${run.id})`,
                     labels: {
                       gh_run_id: run.id.toString(),
@@ -161,17 +156,6 @@ runs:
     - name: Install Python dependencies
       shell: bash
       run: pip install -r $GITHUB_ACTION_PATH/requirements.txt
-    - name: Show config
-      shell: bash
-      run: |
-        if [ -f $GITHUB_ACTION_PATH/metric_config.json ]; then
-          echo "Generated configuration:"
-          cat "$GITHUB_ACTION_PATH/metric_config.json"
-        else
-          echo "ERROR: $GITHUB_ACTION_PATH/metric_config.json not found"
-          exit 1
-        fi
-
     - name: Plot
       shell: bash
       env:
@@ -184,7 +168,6 @@ runs:
           --step-size "${{ inputs.step_size }}" \
           --timezone "${{ inputs.timezone }}" \
           --verbose
-
     - name: Upload visualization artifact
       uses: actions/upload-artifact@v4
       if: always()

@@ -335,8 +335,6 @@ Example JSON Configuration:
   },
   "baselines": [
     {
-      "start_time": 1753275727000,
-      "end_time": 1753276627000,
       "name": "Baseline 1",
       "labels": {
         "gh_run_id": "16475196790",
