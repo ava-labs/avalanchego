@@ -21,8 +21,8 @@ inputs:
   y_axis_label:
     description: 'Y-axis label'
     default: ''
-  workflow_name:
-    description: 'Workflow name to search for baselines'
+  workflow_file:
+    description: 'Workflow file name (e.g., c-chain-reexecution-benchmark.yml)'
     default: ''
   job_name:
     description: 'Job name to search for baselines'
@@ -43,35 +43,37 @@ runs:
           const CURRENT_RUN_ID = '${{ github.run_id }}';
           const CURRENT_RUN_ATTEMPT = '${{ github.run_attempt }}';
           const JOB_ID = '${{ inputs.job_name }}' || '${{ github.job }}';
-          const WORKFLOW_NAME = '${{ inputs.workflow_name }}' || '${{ github.workflow }}';
+          const WORKFLOW_FILE = '${{ inputs.workflow_file }}';
           const REPO = '${{ github.repository }}';
 
-          // Get workflow runs
-          const { data: { workflow_runs } } = await github.rest.actions.listWorkflowRunsForRepo({
+          console.log(`DEBUG: Looking for ${BASELINE_COUNT} baselines`);
+          console.log(`DEBUG: Workflow file: '${WORKFLOW_FILE}'`);
+          console.log(`DEBUG: Job name: '${JOB_ID}'`);
+          console.log(`DEBUG: Current run ID: ${CURRENT_RUN_ID}`);
+
+          // Get workflow runs by workflow file name
+          const { data: { workflow_runs } } = await github.rest.actions.listWorkflowRuns({
             owner: context.repo.owner,
             repo: context.repo.repo,
+            workflow_id: WORKFLOW_FILE,
             status: 'completed',
-            conclusion: 'success',
             per_page: 20
           });
 
-          console.log(`DEBUG: Found ${workflow_runs.length} total successful runs`);
+          console.log(`DEBUG: Found ${workflow_runs.length} runs for workflow file '${WORKFLOW_FILE}'`);
 
-          // Show all workflow names
-          const uniqueWorkflows = [...new Set(workflow_runs.map(run => run.name))];
-          console.log(`DEBUG: Available workflows: ${uniqueWorkflows.join(', ')}`);
-
-          const workflowRuns = workflow_runs.filter(run => run.name === WORKFLOW_NAME);
-          console.log(`DEBUG: Found ${workflowRuns.length} runs for workflow '${WORKFLOW_NAME}'`);
+          // Show successful runs
+          const successfulRuns = workflow_runs.filter(run => run.conclusion === 'success');
+          console.log(`DEBUG: Found ${successfulRuns.length} successful runs`);
 
           // Show the first few runs for debugging
-          workflowRuns.slice(0, 5).forEach(run => {
-            console.log(`DEBUG: Run ${run.run_number} (ID: ${run.id})`);
+          successfulRuns.slice(0, 5).forEach(run => {
+            console.log(`DEBUG: Run ${run.run_number} (ID: ${run.id}) - ${run.conclusion}`);
           });
 
           const baselineRuns = [];
 
-          for (const run of workflowRuns) {
+          for (const run of successfulRuns) {
             if (baselineRuns.length >= BASELINE_COUNT) {
               break;
             }
