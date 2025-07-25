@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package sync
+package vm
 
 import (
 	"context"
@@ -112,15 +112,6 @@ type Client interface {
 	ClearOngoingSummary() error
 	Shutdown() error
 	Error() error
-}
-
-// Syncer represents a step in state sync,
-// along with Start/Done methods to control
-// and monitor progress.
-// Error returns an error if any was encountered.
-type Syncer interface {
-	Start(ctx context.Context) error
-	Wait(ctx context.Context) error
 }
 
 // StateSyncEnabled returns [client.enabled], which is set in the chain's config file.

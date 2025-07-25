@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
+
 	_ "embed"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -35,7 +37,6 @@ import (
 	"github.com/ava-labs/coreth/eth/tracers"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
-	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 	customheader "github.com/ava-labs/coreth/plugin/evm/header"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
