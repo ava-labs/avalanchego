@@ -27,6 +27,15 @@ inputs:
   job_name:
     description: 'Job name to search for baselines. Uses current job if not specified.'
     default: ''
+  prometheus_url:
+    description: 'Prometheus server URL'
+    default: 'https://prometheus-poc.avax-dev.network'
+  step_size:
+    description: 'Prometheus query step size'
+    default: '15s'
+  timezone:
+    description: 'Display timezone'
+    default: 'US/Eastern'
 
 runs:
   using: composite
@@ -36,7 +45,6 @@ runs:
       with:
         script: |
           const fs = require('fs');
-
           // Configuration
           const BASELINE_COUNT = parseInt('${{ inputs.baseline_count }}');
           const MONITORING_PERIOD = parseInt('${{ inputs.monitoring_period }}');
@@ -45,22 +53,11 @@ runs:
           const JOB_ID = '${{ inputs.job_name }}' || '${{ github.job }}';
           const WORKFLOW = '${{ inputs.workflow }}';
           const REPO = '${{ github.repository }}';
-
-          console.log(`DEBUG: Looking for ${BASELINE_COUNT} baselines`);
-          console.log(`DEBUG: Target workflow: '${WORKFLOW}'`);
-          console.log(`DEBUG: Job name: '${JOB_ID}'`);
-          console.log(`DEBUG: Current run ID: ${CURRENT_RUN_ID}`);
-
-          // Determine if input is a filename (contains .yaml/.yml) or display name
           const isWorkflowFile = WORKFLOW.includes('.yaml') || WORKFLOW.includes('.yml');
-          console.log(`DEBUG: Search strategy: ${isWorkflowFile ? 'workflow file' : 'workflow name'}`);
-
           let workflow_runs;
-
           try {
             if (isWorkflowFile) {
               // Search by workflow file
-              console.log(`DEBUG: Searching by workflow file: ${WORKFLOW}`);
               const response = await github.rest.actions.listWorkflowRuns({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -71,7 +68,6 @@ runs:
               workflow_runs = response.data.workflow_runs;
             } else {
               // Search by workflow name
-              console.log(`DEBUG: Searching by workflow name: ${WORKFLOW}`);
               const response = await github.rest.actions.listWorkflowRunsForRepo({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -80,50 +76,26 @@ runs:
               });
               workflow_runs = response.data.workflow_runs.filter(run => run.name === WORKFLOW);
             }
-
-            console.log(`DEBUG: Found ${workflow_runs.length} runs for '${WORKFLOW}'`);
-
             // Filter to successful runs only
             const successfulRuns = workflow_runs.filter(run => run.conclusion === 'success');
-            console.log(`DEBUG: Found ${successfulRuns.length} successful runs`);
-
-            // Show the first few runs for debugging
-            successfulRuns.slice(0, 5).forEach(run => {
-              console.log(`DEBUG: Run ${run.run_number} (ID: ${run.id}) - ${run.conclusion}`);
-            });
-
             const baselineRuns = [];
-
             for (const run of successfulRuns) {
               if (baselineRuns.length >= BASELINE_COUNT) {
                 break;
               }
-
               // Exclude current run
               if (run.id.toString() === CURRENT_RUN_ID) {
-                console.log(`DEBUG: Skipping current run ${run.id}`);
                 continue;
               }
-
-              console.log(`DEBUG: Checking jobs for run ${run.id} (run #${run.run_number})`);
-
               try {
                 const { data: { jobs } } = await github.rest.actions.listJobsForWorkflowRun({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   run_id: run.id
                 });
-
-                console.log(`DEBUG: Found ${jobs.length} jobs in run ${run.id}`);
-                jobs.forEach(job => {
-                  console.log(`DEBUG: Job: '${job.name}' - ${job.conclusion}`);
-                });
-
                 // Find matching job
                 const targetJob = jobs.find(job => job.name === JOB_ID && job.conclusion === 'success');
-
                 if (targetJob) {
-                  console.log(`DEBUG: Found matching job '${targetJob.name}' in run ${run.id}`);
                   baselineRuns.push({
                     run_id: run.id.toString(),
                     run_number: run.run_number
@@ -135,13 +107,9 @@ runs:
                 console.log(`DEBUG: Failed to get jobs for run ${run.id}: ${error.message}`);
               }
             }
-
-            console.log(`DEBUG: Found ${baselineRuns.length} baseline runs`);
-
             // Calculate current run timing
             const currentStart = Date.now();
             const currentEnd = currentStart + (MONITORING_PERIOD * 1000);
-
             // Build configuration
             const config = {
               query: '${{ inputs.query }}',
@@ -170,22 +138,38 @@ runs:
               })),
               output_file: `metric_visualization_${CURRENT_RUN_ID}.html`
             };
-
             // Write configuration file
             fs.writeFileSync('metric_config.json', JSON.stringify(config, null, 2));
-            console.log('Configuration file created: metric_config.json');
-
           } catch (error) {
             core.setFailed(`Failed to fetch workflow runs: ${error.message}`);
           }
-
-    - name: Show generated config
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    - name: Install Python dependencies
       shell: bash
       run: |
-        if [ -f metric_config.json ]; then
-          echo "Generated configuration:"
-          cat metric_config.json
-        else
-          echo "ERROR: metric_config.json not found"
-          exit 1
-        fi
+        pip install pandas plotly prometheus-api-client pytz
+    - name: Plot
+      shell: bash
+      env:
+        PROMETHEUS_ID: ${{ secrets.PROMETHEUS_ID }}
+        PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
+      run: |
+        python $GITHUB_ACTION_PATH/plot.py \
+          --config metric_config.json \
+          --prometheus-url "${{ inputs.prometheus_url }}" \
+          --step-size "${{ inputs.step_size }}" \
+          --timezone "${{ inputs.timezone }}" \
+          --verbose
+    - name: Upload visualization artifact
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: metric-visualization-${{ github.run_id }}
+        path: |
+          metric_visualization_*.html
+          metric_config.json
+        retention-days: 30
