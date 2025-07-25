@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Script to find the last k successful workflow runs with matching job names.
+# Generates a JSON config for metric visualization comparing current run against baselines.
+# Excludes current run to avoid self-comparison.
+
 set -euo pipefail
 
 # Configuration from environment or defaults
@@ -15,6 +19,7 @@ METRIC_NAME="${METRIC_NAME}"
 X_AXIS_LABEL="${X_AXIS_LABEL:-Time}"
 Y_AXIS_LABEL="${Y_AXIS_LABEL:-$METRIC_NAME}"
 
+# Get baseline run IDs using gh CLI, excluding current run
 get_baseline_run_ids() {
     local found_count=0
     local baseline_runs=()
@@ -27,20 +32,23 @@ get_baseline_run_ids() {
         --limit 50 \
         --json databaseId,number,conclusion)
 
+    # Get successful runs and process them
     local successful_runs
     successful_runs=$(echo "$runs_json" | jq -r '.[] | select(.conclusion == "success") | "\(.databaseId):\(.number)"')
 
+    # Process each successful run
     while IFS=':' read -r run_id run_number; do
         if [ -z "$run_id" ] || [ -z "$run_number" ]; then
             continue
         fi
 
+        # Check if we've found enough baselines
         if [ $found_count -ge $BASELINE_COUNT ]; then
             break
         fi
 
+        # Explicitly exclude current run
         if [ "$run_id" = "$CURRENT_RUN_ID" ]; then
-            echo "DEBUG: Skipping current run $run_id" >&2
             continue
         fi
 
@@ -55,10 +63,11 @@ get_baseline_run_ids() {
         if [ -n "$job_found" ] && [ "$job_found" != "null" ]; then
             baseline_runs+=("${run_id}:${run_number}")
             ((found_count++))
-        else
-            echo "DEBUG: No matching job '$JOB_ID' found in run $run_id" >&2
         fi
     done <<< "$successful_runs"
+
+    # Output all found baseline runs
+    printf '%s\n' "${baseline_runs[@]}"
 }
 
 # Create JSON configuration
@@ -131,8 +140,6 @@ EOF
 
 # Main execution
 main() {
-    echo "DEBUG: Looking for baselines in workflow '$WORKFLOW_NAME' with job '$JOB_ID'" >&2
-
     local baseline_runs
 
     # Get baseline runs as array
