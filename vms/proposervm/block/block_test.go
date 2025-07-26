@@ -41,6 +41,6 @@ func TestBlockSizeLimit(t *testing.T) {
 	innerBlockBytes := bytes.Repeat([]byte{0}, 270*units.KiB)
 
 	// with the large limit, it should be able to build large blocks
-	_, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	_, err := BuildUnsigned(parentID, timestamp, pChainHeight, 0, 0, time.Time{}, innerBlockBytes)
 	require.NoError(err)
 }
