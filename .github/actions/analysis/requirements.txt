@@ -1,0 +1,4 @@
+plotly==6.2.0
+prometheus-api-client==0.6.0
+pandas==2.3.1
+pytz==2025.2
