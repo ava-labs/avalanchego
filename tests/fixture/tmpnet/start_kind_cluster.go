@@ -57,6 +57,16 @@ const (
 	chaosMeshControllerName = "chaos-controller-manager"
 	chaosMeshDashboardName  = "chaos-dashboard"
 	chaosMeshDashboardHost  = "chaos-mesh.localhost"
+
+	// MinIO constants
+	minioNamespace      = "minio"
+	minioReleaseName    = "minio"
+	minioChartRepo      = "https://charts.min.io"
+	minioChartName      = "minio/minio"
+	minioChartVersion   = "5.4.0"
+	minioDeploymentName = "minio"
+	minioConsoleHost    = "minio.localhost"
+	minioAPIHost        = "minio-api.localhost"
 )
 
 //go:embed yaml/tmpnet-rbac.yaml
@@ -70,7 +80,10 @@ func StartKindCluster(
 	startMetricsCollector bool,
 	startLogsCollector bool,
 	installChaosMesh bool,
+	installMinio bool,
 ) error {
+	defer log.Info("completed operations on local kind cluster")
+
 	configContext := KindKubeconfigContext
 
 	clusterRunning, err := isKindClusterRunning(log, configPath, configContext)
@@ -132,6 +145,12 @@ func StartKindCluster(
 	if installChaosMesh {
 		if err := deployChaosMesh(ctx, log, configPath, configContext); err != nil {
 			return fmt.Errorf("failed to deploy chaos mesh: %w", err)
+		}
+	}
+
+	if installMinio {
+		if err := deployMinio(ctx, log, configPath, configContext); err != nil {
+			return fmt.Errorf("failed to deploy minio: %w", err)
 		}
 	}
 
@@ -562,4 +581,78 @@ func waitForDeployment(ctx context.Context, log logging.Logger, configPath strin
 		)
 		return true, nil
 	})
+}
+
+// deployMinio deploys MinIO using Helm.
+func deployMinio(ctx context.Context, log logging.Logger, configPath string, configContext string) error {
+	clientset, err := GetClientset(log, configPath, configContext)
+	if err != nil {
+		return err
+	}
+
+	log.Info("checking if minio is already running")
+	_, err = clientset.AppsV1().Deployments(minioNamespace).Get(ctx, minioDeploymentName, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("failed to check minio status: %w", err)
+	} else if err == nil {
+		log.Info("minio already running")
+		return nil
+	}
+
+	log.Info("deploying minio using Helm")
+
+	// Add the helm repo for minio
+	if err := runHelmCommand(ctx, "repo", "add", "minio", minioChartRepo); err != nil {
+		return fmt.Errorf("failed to add minio helm repo: %w", err)
+	}
+	if err := runHelmCommand(ctx, "repo", "update"); err != nil {
+		return fmt.Errorf("failed to update helm repos: %w", err)
+	}
+
+	// Install MinIO with values for standalone mode and ingress
+	args := []string{
+		"install",
+		minioReleaseName,
+		minioChartName,
+		"--namespace", minioNamespace,
+		"--create-namespace",
+		"--version", minioChartVersion,
+		"--wait",
+		// MinIO configuration
+		"--set", "mode=standalone",
+		"--set", "persistence.enabled=true",
+		"--set", "persistence.storageClass=standard",
+		"--set", "persistence.size=10Gi",
+		"--set", "rootUser=minioadmin",
+		"--set", "rootPassword=minioadmin",
+		// Resource limits for local development
+		"--set", "resources.requests.memory=512Mi",
+		// MinIO API ingress configuration
+		"--set", "ingress.enabled=true",
+		"--set", "ingress.ingressClassName=nginx",
+		"--set", "ingress.hosts[0]=" + minioAPIHost,
+		// MinIO Console ingress configuration
+		"--set", "consoleIngress.enabled=true",
+		"--set", "consoleIngress.ingressClassName=nginx",
+		"--set", "consoleIngress.hosts[0]=" + minioConsoleHost,
+	}
+
+	if err := runHelmCommand(ctx, args...); err != nil {
+		return fmt.Errorf("failed to install minio: %w", err)
+	}
+
+	// Wait for MinIO to be ready
+	if err := waitForDeployment(ctx, log, configPath, configContext, minioNamespace, minioDeploymentName, "minio"); err != nil {
+		return fmt.Errorf("minio deployment failed: %w", err)
+	}
+
+	// Log access information
+	log.Info("MinIO installed successfully",
+		zap.String("consoleURL", fmt.Sprintf("http://%s:%d", minioConsoleHost, ingressNodePort)),
+		zap.String("s3Endpoint", fmt.Sprintf("http://%s:%d", minioAPIHost, ingressNodePort)),
+		zap.String("accessKey", "minioadmin"),
+		zap.String("secretKey", "minioadmin"),
+	)
+
+	return nil
 }

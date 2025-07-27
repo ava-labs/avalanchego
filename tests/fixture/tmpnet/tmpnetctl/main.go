@@ -280,6 +280,7 @@ func main() {
 		kubeconfigVars   *flags.KubeconfigVars
 		collectorVars    *flags.CollectorVars
 		installChaosMesh bool
+		installMinio     bool
 	)
 	startKindClusterCmd := &cobra.Command{
 		Use:   "start-kind-cluster",
@@ -310,12 +311,14 @@ func main() {
 				collectorVars.StartMetricsCollector,
 				collectorVars.StartLogsCollector,
 				installChaosMesh,
+				installMinio,
 			)
 		},
 	}
 	kubeconfigVars = flags.NewKubeconfigFlagSetVars(startKindClusterCmd.PersistentFlags())
 	collectorVars = flags.NewCollectorFlagSetVars(startKindClusterCmd.PersistentFlags())
 	startKindClusterCmd.PersistentFlags().BoolVar(&installChaosMesh, "install-chaos-mesh", false, "Install Chaos Mesh in the kind cluster")
+	startKindClusterCmd.PersistentFlags().BoolVar(&installMinio, "install-minio", false, "Install MinIO (S3-compatible storage) in the kind cluster")
 	rootCmd.AddCommand(startKindClusterCmd)
 
 	if err := rootCmd.Execute(); err != nil {
