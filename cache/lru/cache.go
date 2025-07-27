@@ -44,8 +44,8 @@ func (c *Cache[K, V]) Put(key K, value V) {
 	defer c.lock.Unlock()
 
 	if c.elements.Len() == c.size {
-		if oldestKey, _, ok := c.elements.Oldest(); ok {
-			c.evict(oldestKey)
+		if oldestKey, oldestValue, ok := c.elements.Oldest(); ok {
+			c.evict(oldestKey, oldestValue)
 		}
 	}
 	c.elements.Put(key, value)
@@ -67,15 +67,15 @@ func (c *Cache[K, _]) Evict(key K) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	c.evict(key)
-}
-
-func (c *Cache[K, V]) evict(key K) {
 	value, ok := c.elements.Get(key)
 	if !ok {
 		return
 	}
 
+	c.evict(key, value)
+}
+
+func (c *Cache[K, V]) evict(key K, value V) {
 	c.onEvict(key, value)
 	c.elements.Delete(key)
 }
@@ -85,7 +85,7 @@ func (c *Cache[_, _]) Flush() {
 	defer c.lock.Unlock()
 
 	for iter := c.elements.NewIterator(); iter.Next(); {
-		c.evict(iter.Key())
+		c.evict(iter.Key(), iter.Value())
 	}
 }
 
