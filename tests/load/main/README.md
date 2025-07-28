@@ -5,6 +5,8 @@ This executable utilizes the `load` package to perform a load test against an in
 ## Prerequisites
 
 Using this executable requires `nix`: to install `nix`, please refer to the AvalancheGo [flake.nix](../../../flake.nix) file for installation instructions.
+Furthermore, utilization of any monitoring features requires credentials to the
+Avalanche monitoring stack.
 
 Reading the `load` package [README.md](../README.md) is highly recommended as well,
 especially for those considering modifying this executable for their own load tests.
@@ -41,16 +43,19 @@ the state of the network.
 
 ```mermaid
 flowchart BT
+  subgraph MetricsServer[Metrics Server]
+    Metrics
+  end
 
   subgraph Generator
-    subgraph WalletA[Wallet A]
-        TestA
+    subgraph TestA[Test A]
+      WalletA[Wallet A]
     end
-    subgraph WalletB[Wallet B]
-        TestB
+    subgraph TestB[Test B]
+      WalletB[Wallet B]
     end
-    subgraph WalletC[Wallet C]
-        TestC
+    subgraph TestC[Test C]
+      WalletC[Wallet C]
     end
   end
 
@@ -60,12 +65,16 @@ flowchart BT
     NodeC
   end
 
+  WalletA --> Metrics
+  WalletB --> Metrics
+  WalletC --> Metrics
+
   WalletA --> NodeA
   WalletB --> NodeB
   WalletC --> NodeC
 ```
 
-The load test architecture consists of two main components that work together to simulate realistic blockchain usage:
+The load test architecture consists of two main components that work together to simulate realistic blockchain usage and a metrics server which exposes client-side metrics:
 
 ### Network
 
@@ -88,9 +97,18 @@ task test-load-kube-kind
 
 ### Load Generator
 
-The load generator creates exactly `n` worker wallets, where `n` matches the number of network nodes. Each worker runs in parallel for maximum throughput and executes a `RandomTest` continuously for the lifetime of the load test.
+The load generator is setup as follows:
 
-The load test also manages the deployment of the `EVMLoadSimulator` contract, which is a required dependency for the `RandomTest` operations.
+1. Deploy an instance of the `EVMLoadSimulator` contract 
+2. Create an instance of `RandomTest` which uses the deployed contract
+3. Create an instance of `LoadGenerator` with `n` workers
+4. Start the generator
+
+### Metrics Server
+
+For client-side metrics to be collected by `tmpnet` and uploaded to the Avalanche
+monitoring stack, this executable also starts a metric server which exports the registry metrics
+updated by the generator/wallets.
 
 ## Configuration
 
