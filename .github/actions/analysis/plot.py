@@ -12,6 +12,7 @@ from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 import pytz
+import structlog
 
 
 @dataclass
@@ -34,14 +35,13 @@ class Plot:
         self.prometheus_url = prometheus_url
         self.step_size = step_size
 
-        # Set up logging
-        self.logger = logging.getLogger(__name__)
+        self.logger = structlog.get_logger()
 
-        # Set up timezone for display (Prometheus stores everything in UTC internally)
         try:
             self.display_tz = pytz.timezone(timezone)
         except pytz.UnknownTimeZoneError:
-            self.logger.warning(f"Unknown timezone '{timezone}', using UTC")
+            self.logger.warning("timezone_fallback",
+                                requested=timezone, fallback="UTC")
             self.display_tz = pytz.UTC
 
         if not prometheus_auth[0] or not prometheus_auth[1]:
@@ -49,15 +49,8 @@ class Plot:
 
         self.prom = PrometheusConnect(prometheus_url, auth=prometheus_auth)
 
-        self.logger.info(f"Initialized Metric Visualizer")
-        self.logger.info(f"  Prometheus URL: {prometheus_url}")
-        self.logger.info(f"  Step size: {step_size}")
-        self.logger.info(f"  Display timezone: {timezone}")
-
+    # Prometheus stores all timestamps in UTC as Unix seconds
     def _normalize_timestamp(self, timestamp: int) -> datetime:
-        """Convert timestamp to UTC datetime object."""
-        # Prometheus stores all timestamps in UTC as Unix seconds
-        # Check if input timestamp is in milliseconds or seconds
         if timestamp > 1e10:
             # Milliseconds - convert to seconds
             return datetime.fromtimestamp(timestamp / 1000, tz=pytz.UTC)
@@ -66,18 +59,37 @@ class Plot:
             return datetime.fromtimestamp(timestamp, tz=pytz.UTC)
 
     def _format_timestamp_for_display(self, timestamp: int) -> str:
-        """Format timestamp for human-readable display."""
         utc_dt = self._normalize_timestamp(timestamp)
         display_dt = utc_dt.astimezone(self.display_tz)
         return f"{display_dt.strftime('%Y-%m-%d %H:%M:%S %Z')}"
+
+    def _sanitize_labels(self, labels: Dict) -> Dict[str, str]:
+        """Convert all label values to strings, handling booleans properly."""
+        if not labels:
+            return {}
+
+        sanitized = {}
+        for key, value in labels.items():
+            if isinstance(value, bool):
+                sanitized[key] = str(value).lower()  # Convert True/False to "true"/"false"
+            else:
+              sanitized[key] = str(value)
+        return sanitized
 
     def _apply_labels_to_query(self, base_query: str, labels: Dict[str, str] = None) -> str:
         """Apply labels to the base Prometheus query if labels are provided."""
         if not labels:
             return base_query
 
+        sanitized_labels = self._sanitize_labels(labels)
+
         # Convert labels to Prometheus label syntax
-        label_strings = [f'{key}="{value}"' for key, value in labels.items()]
+        label_strings = []
+        for key, value in sanitized_labels.items():
+            key_str = str(key).lower()
+            value_str = str(value).lower()
+            label_strings.append(f'{key_str}="{value_str}"')
+
         label_selector = ','.join(label_strings)
 
         import re
@@ -92,7 +104,6 @@ class Plot:
             else:
                 return f'{metric_name}{{{label_selector}}}'
 
-        # Apply to metrics with existing labels
         result = re.sub(r'([a-zA-Z_][a-zA-Z0-9_]*)\{([^}]*)\}', replace_with_labels, base_query)
 
         # Handle metrics without labels - look for metric names followed by [ (for range queries)
@@ -106,15 +117,11 @@ class Plot:
 
         return result
 
-    def detect_baseline_periods(self, query: str, labels: Dict[str, str], lookback_days: int = 7) -> TestRun:
-        self.logger.info(f"Dynamically detecting baseline periods...")
-        self.logger.info(f"Looking back {lookback_days} days for data")
-
+    def detect_baseline_periods(self, query: str, labels: Dict[str, str], lookback_days: int = 7) -> Optional[TestRun]:
         now = datetime.now(tz=pytz.UTC)
         start = now - timedelta(days=lookback_days)
 
         actual_query = self._apply_labels_to_query(query, labels)
-        self.logger.debug(f"Query for baseline detection: {actual_query}")
 
         try:
             initial_results = self.prom.custom_query_range(
@@ -125,8 +132,7 @@ class Plot:
             )
 
             if not initial_results:
-                self.logger.warning("No initial results found for baseline detection")
-                return []
+                return None
 
             timestamps = []
             for result in initial_results:
@@ -136,10 +142,7 @@ class Plot:
                     timestamps.append(timestamp)
 
             if not timestamps:
-                self.logger.warning("No timestamps found in results")
-                return []
-
-            self.logger.info(f"Found {len(timestamps)} data points in historical scan")
+                return None
 
             min_timestamp = min(timestamps)
             max_timestamp = max(timestamps)
@@ -152,20 +155,16 @@ class Plot:
             min_datetime = datetime.fromtimestamp(min_timestamp - 15, tz=pytz.UTC)
             max_datetime = datetime.fromtimestamp(max_timestamp + 15, tz=pytz.UTC)
 
-            self.logger.info(f"Baseline period: {min_datetime.isoformat()} to {max_datetime.isoformat()}")
-
             return TestRun(
                 start_time=int(min_datetime.timestamp() * 1000),
                 end_time=int(max_datetime.timestamp() * 1000),
-                name=f"Baseline 1 ({min_datetime.strftime('%m/%d %H:%M')})",
+                name=f"Baseline ({min_datetime.strftime('%m/%d %H:%M')})",
                 labels=labels
             )
 
         except Exception as e:
-            self.logger.error(f"Error in baseline detection: {e}")
-            import traceback
-            traceback.print_exc()
-            return []
+            self.logger.debug("baseline_detection_failed", error=str(e))
+            return None
 
     def fetch_metric_data(self, query: str, run: TestRun) -> pd.DataFrame:
         """Fetch metric data for a specific test run."""
@@ -176,16 +175,6 @@ class Plot:
 
         actual_query = self._apply_labels_to_query(query, run.labels)
 
-        run_name = run.name or (run.labels.get('gh_run_id') if run.labels else None) or "Unnamed Run"
-
-        self.logger.info(f"Fetching data for: {run_name}")
-        self.logger.info(
-            f"  Time range: {self._format_timestamp_for_display(run.start_time)} to {self._format_timestamp_for_display(run.end_time)}")
-        self.logger.info(f"  Duration: {duration}")
-        if run.labels:
-            self.logger.debug(f"  Labels: {run.labels}")
-        self.logger.debug(f"  Query: {actual_query}")
-
         try:
             result = self.prom.custom_query_range(
                 query=actual_query,
@@ -195,10 +184,8 @@ class Plot:
             )
 
             if not result:
-                self.logger.warning(f"No data found for {run_name}")
                 return pd.DataFrame(columns=['timestamp', 'value'])
 
-            # Process results - combine all series by summing values at each timestamp
             timestamp_values = {}
             for series in result:
                 for timestamp, value in series['values']:
@@ -206,24 +193,16 @@ class Plot:
                     val = float(value) if value else 0
                     timestamp_values[ts] = timestamp_values.get(ts, 0) + val
 
-            # Create DataFrame with UTC timestamps (Prometheus native format)
             data = []
             for timestamp, value in sorted(timestamp_values.items()):
                 dt = datetime.fromtimestamp(timestamp, tz=pytz.UTC)
                 data.append({'timestamp': dt, 'value': value})
 
             df = pd.DataFrame(data)
-
-            if not df.empty:
-                self.logger.info(f"  Retrieved {len(df)} data points")
-                self.logger.debug(f"  Value range: {df['value'].min():.2f} to {df['value'].max():.2f}")
-            else:
-                self.logger.warning(f"No valid data points for {run_name}")
-
             return df
 
         except Exception as e:
-            self.logger.error(f"Error fetching data for {run_name}: {e}")
+            self.logger.error("data_fetch_failed", error=str(e))
             return pd.DataFrame(columns=['timestamp', 'value'])
 
     def align_to_candidate_timeline(self, baseline_df: pd.DataFrame, candidate_df: pd.DataFrame) -> pd.DataFrame:
@@ -312,39 +291,77 @@ class Plot:
     def visualize_metrics(self, config: dict) -> str:
         """Visualize metrics based on JSON configuration."""
 
+        # 1. Initialize candidate run
         candidate_run = TestRun(**config['candidate'])
-        self.logger.info(f"Candidate: {candidate_run.name or 'Unnamed Candidate'}")
+        self.logger.info("visualization_started",
+                         metric=config['metric_name'],
+                         candidate=candidate_run.name or 'Unnamed')
 
-        # Check if we need dynamic baseline detection
+        # 2. Fetch candidate data first
+        candidate_data = self.fetch_metric_data(config['query'], candidate_run)
+        if candidate_data.empty:
+            self.logger.error("candidate_data_empty")
+            return ""
+
+        start_time = self._format_timestamp_for_display(candidate_run.start_time)
+        end_time = self._format_timestamp_for_display(candidate_run.end_time)
+        duration = self._normalize_timestamp(candidate_run.end_time) - self._normalize_timestamp(
+            candidate_run.start_time)
+
+        self.logger.info("candidate_data_loaded",
+                         name=candidate_run.name or 'Unnamed',
+                         start_time=start_time,
+                         end_time=end_time,
+                         duration=str(duration),
+                         data_points=len(candidate_data),
+                         value_min=round(candidate_data['value'].min(), 2),
+                         value_max=round(candidate_data['value'].max(), 2))
+
+        # 3. Detect and fetch baseline data
         baseline_runs = []
-        baselines = config['baselines']
+        baselines = config.get('baselines', [])
 
-        for baseline in baselines:
-            detected_baselines = self.detect_baseline_periods(
+        self.logger.info("baseline_detection_started", count=len(baselines))
+
+        for i, baseline in enumerate(baselines, 1):
+            detected_baseline = self.detect_baseline_periods(
                 query=config['query'],
                 labels=baseline['labels'],
             )
-            baseline_runs.append(detected_baselines)
+            if not detected_baseline:
+                self.logger.warning("baseline_detection_failed", baseline_index=i)
+                continue
+            baseline_runs.append(detected_baseline)
 
-        # Fetch candidate data
-        candidate_data = self.fetch_metric_data(config['query'], candidate_run)
-
-        if candidate_data.empty:
-            self.logger.error("No candidate data found")
+        if not baseline_runs:
+            self.logger.error("no_baselines_detected")
             return ""
 
-        # Fetch baseline data
+        # 4. Process baseline data
         baseline_data = []
-        for baseline_run in baseline_runs:
+        for i, baseline_run in enumerate(baseline_runs, 1):
             df = self.fetch_metric_data(config['query'], baseline_run)
-            if not df.empty:
-                aligned_df = self.align_to_candidate_timeline(df, candidate_data)
-                baseline_data.append((baseline_run, aligned_df))
+            if df.empty:
+                self.logger.warning("baseline_data_empty", baseline_index=i)
+                continue
+
+            aligned_df = self.align_to_candidate_timeline(df, candidate_data)
+            baseline_data.append((baseline_run, aligned_df))
+
+            start_time = self._format_timestamp_for_display(baseline_run.start_time)
+            self.logger.info("baseline_data_loaded",
+                             baseline_index=i,
+                             name=baseline_run.name,
+                             start_time=start_time,
+                             data_points=len(df),
+                             value_min=round(df['value'].min(), 2),
+                             value_max=round(df['value'].max(), 2))
 
         if not baseline_data:
-            self.logger.error("No baseline data found")
+            self.logger.error("no_valid_baseline_data")
             return ""
 
+        # 5. Generate visualization
         chart = self.create_metric_chart(candidate_data, candidate_run, baseline_data, config)
         html_output = chart.to_html(include_plotlyjs='cdn')
 
@@ -352,8 +369,22 @@ class Plot:
         with open(output_file, 'w') as f:
             f.write(html_output)
 
-        self.logger.info(f"Visualization saved to: {output_file}")
+        self.logger.info("visualization_completed",
+                         output_file=output_file,
+                         baselines_processed=len(baseline_data))
         return html_output
+
+
+def _convert_config_values(obj):
+    """Recursively convert boolean values to strings in configuration."""
+    if isinstance(obj, dict):
+        return {k: _convert_config_values(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_convert_config_values(item) for item in obj]
+    elif isinstance(obj, bool):
+        return str(obj).lower()  # Convert True/False to "true"/"false"
+    else:
+        return obj
 
 
 def load_config(config_path: str) -> dict:
@@ -361,6 +392,8 @@ def load_config(config_path: str) -> dict:
     try:
         with open(config_path, 'r') as f:
             config = json.load(f)
+
+        config = _convert_config_values(config)
 
         required_fields = ['query', 'metric_name', 'candidate']
         for field in required_fields:
@@ -416,32 +449,65 @@ Example JSON Configuration:
         """
     )
 
-    parser.add_argument('--config', help='Path to JSON configuration file', required=True)
-    parser.add_argument('--prometheus-url', help='Prometheus server URL', required=True)
+    parser.add_argument('--config', help='Path to JSON configuration file', default='config.json')
+    parser.add_argument('--prometheus-url', help='Prometheus server URL',
+                        default='https://prometheus-poc.avax-dev.network')
     parser.add_argument('--step-size', default='15s',
                         help='Prometheus query step size (default: 15s)')
     parser.add_argument('--timezone', default='US/Eastern',
                         help='Display timezone (default: US/Eastern)')
     parser.add_argument('--verbose', action='store_true',
-                        help='Enable verbose logging', default=True)
+                        help='Enable verbose logging', default=False)
 
     args = parser.parse_args()
+
+    if args.verbose:
+        structlog.configure(
+            processors=[
+                structlog.stdlib.filter_by_level,
+                structlog.stdlib.add_logger_name,
+                structlog.stdlib.add_log_level,
+                structlog.stdlib.PositionalArgumentsFormatter(),
+                structlog.processors.TimeStamper(fmt="iso"),
+                structlog.processors.StackInfoRenderer(),
+                structlog.processors.format_exc_info,
+                structlog.processors.JSONRenderer()
+            ],
+            context_class=dict,
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            wrapper_class=structlog.stdlib.BoundLogger,
+            cache_logger_on_first_use=True,
+        )
+    else:
+        structlog.configure(
+            processors=[
+                structlog.stdlib.filter_by_level,
+                structlog.stdlib.add_log_level,
+                structlog.stdlib.PositionalArgumentsFormatter(),
+                structlog.processors.TimeStamper(fmt="%H:%M:%S"),
+                structlog.dev.ConsoleRenderer(colors=False)
+            ],
+            context_class=dict,
+            logger_factory=structlog.stdlib.LoggerFactory(),
+            wrapper_class=structlog.stdlib.BoundLogger,
+            cache_logger_on_first_use=True,
+        )
 
     log_level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(
         level=log_level,
-        format='%(asctime)s - %(levelname)s - %(message)s',
+        format='%(message)s',
         handlers=[logging.StreamHandler(sys.stdout)]
     )
 
-    logger = logging.getLogger(__name__)
+    logger = structlog.get_logger()
 
     prometheus_username = os.getenv('PROMETHEUS_ID')
     prometheus_password = os.getenv('PROMETHEUS_PASSWORD')
 
     if not prometheus_username or not prometheus_password:
-        logger.error("Missing Prometheus credentials")
-        logger.error("Set PROMETHEUS_ID and PROMETHEUS_PASSWORD environment variables")
+        logger.error("missing_credentials",
+                     required_vars=["PROMETHEUS_ID", "PROMETHEUS_PASSWORD"])
         sys.exit(1)
 
     try:
@@ -456,14 +522,12 @@ Example JSON Configuration:
 
         result = plot.visualize_metrics(config)
 
-        if result:
-            logger.info("Metric visualization completed successfully")
-        else:
-            logger.error("Metric visualization failed")
+        if not result:
+            logger.error("visualization_failed")
             sys.exit(1)
 
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.error("application_error", error=str(e))
         if args.verbose:
             import traceback
             traceback.print_exc()

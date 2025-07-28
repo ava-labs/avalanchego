@@ -168,8 +168,7 @@ runs:
           --config $GITHUB_ACTION_PATH/metric_config.json \
           --prometheus-url "${{ inputs.prometheus_url }}" \
           --step-size "${{ inputs.step_size }}" \
-          --timezone "${{ inputs.timezone }}" \
-          --verbose
+          --timezone "${{ inputs.timezone }}"
     - name: Upload visualization artifact
       uses: actions/upload-artifact@v4
       if: always()
