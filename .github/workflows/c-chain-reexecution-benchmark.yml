@@ -61,7 +61,7 @@ jobs:
           with:
             path: ./cache
             key: ${{ runner.os }}-reexecute-cchain-range-benchmark.json
-        - name: Compare Benchmark Results
+        - name: Compare Benchmark Result
           uses: benchmark-action/github-action-benchmark@v1
           with:
             tool: 'go'
@@ -72,10 +72,12 @@ jobs:
             summary-always: true
             comment-on-alert: true
             auto-push: false
-        - name: Check git status
-          run: |
-            git status
-            git log
         - name: Push Benchmark Result
           if: github.event_name == 'schedule'
-          run: git push origin gh-pages
+          uses: benchmark-action/github-action-benchmark@v1
+          with:
+            tool: 'go'
+            output-file-path: ${{ github.workspace }}/reexecute-cchain-range-benchmark-res.txt
+            external-data-json-path: ./cache/${{ runner.os }}-reexecute-cchain-range-benchmark.json
+            github-token: ${{ secrets.GITHUB_TOKEN }}
+            auto-push: true
