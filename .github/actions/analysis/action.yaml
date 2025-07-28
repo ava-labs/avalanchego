@@ -106,7 +106,8 @@ runs:
                       gh_run_id: run.id.toString(),
                       gh_job_id: JOB_ID,
                       gh_run_attempt: "1",
-                      gh_repo: REPO
+                      gh_repo: REPO,
+                      is_ephemeral_node: false
                     }
                   });
                 }
@@ -129,15 +130,16 @@ runs:
               candidate: {
                 // start_time: currentStart,
                 // end_time: currentEnd,
-                start_time: 1753361293000,
-                end_time: 1753362193000,
+                start_time: 1753708015000,
+                end_time: 1753708915000,
                 name: `Current Run (#${CURRENT_RUN_ID})`,
                 labels: {
                   // gh_run_id: CURRENT_RUN_ID,
-                  gh_run_id: 16497290497,
+                  gh_run_id: "16569848316",
                   gh_job_id: JOB_ID,
                   gh_run_attempt: CURRENT_RUN_ATTEMPT,
-                  gh_repo: REPO
+                  gh_repo: REPO,
+                  is_ephemeral_node: false
                 }
               },
               baselines: baselineRuns,

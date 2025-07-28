@@ -326,45 +326,6 @@ class Plot:
             )
             baseline_runs.append(detected_baselines)
 
-
-        # if config.get('baselines') and len(config['baselines']) > 0:
-        #     first_baseline = config['baselines'][0]
-        #
-        #     # Only do dynamic detection if start_time key exists and is explicitly null
-        #     if 'start_time' in first_baseline and first_baseline['start_time'] is None:
-        #         self.logger.info("Performing dynamic baseline detection...")
-        #
-        #         # Calculate candidate duration
-        #         candidate_duration = (candidate_run.end_time - candidate_run.start_time) // 1000  # Convert to seconds
-        #         baseline_count = len(config['baselines'])
-        #
-        #         # Use labels from candidate for baseline detection
-        #         baseline_labels = candidate_run.labels.copy() if candidate_run.labels else {}
-        #         # Remove run-specific labels for baseline search
-        #         baseline_labels.pop('gh_run_id', None)
-        #         baseline_labels.pop('gh_run_attempt', None)
-        #
-        #         detected_baselines = self.detect_baseline_periods(
-        #             query=config['query'],
-        #             labels=baseline_labels,
-        #             candidate_duration=candidate_duration,
-        #             baseline_count=baseline_count
-        #         )
-        #
-        #         baseline_runs = detected_baselines
-        #     else:
-        #         # Use provided baseline configurations with candidate timing
-        #         self.logger.info("Using provided baseline configurations")
-        #         for baseline_config in config['baselines']:
-        #             # Use candidate timing for baselines that have labels but no timing
-        #             baseline_with_timing = baseline_config.copy()
-        #             if 'start_time' not in baseline_with_timing:
-        #                 baseline_with_timing['start_time'] = candidate_run.start_time
-        #             if 'end_time' not in baseline_with_timing:
-        #                 baseline_with_timing['end_time'] = candidate_run.end_time
-        #
-        #             baseline_runs.append(TestRun(**baseline_with_timing))
-
         # Fetch candidate data
         candidate_data = self.fetch_metric_data(config['query'], candidate_run)
 

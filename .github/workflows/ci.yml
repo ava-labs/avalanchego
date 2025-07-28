@@ -28,6 +28,7 @@ jobs:
       - uses: ./.github/actions/analysis
         with:
           query: 'sum by (chain) (rate(avalanche_evm_eth_chain_block_gas_used_processed[1m])) / 1e+06'
+          baseline_count: '2'
           metric_name: 'Gas Used Rate'
           x_axis_label: 'Time (seconds)'
           y_axis_label: 'Gas Usage (mGAS)'
