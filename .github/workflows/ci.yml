@@ -293,7 +293,7 @@ jobs:
           run: >-
             ./scripts/run_task.sh test-load-kube --
             --firewood
-            --duration 5m
+            --load-timeout=300s
             --kube-image ghcr.io/elvis339/avgo_unstable:b6f97693
           artifact_prefix: firewood-self-hosted-load-test
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
@@ -321,7 +321,7 @@ jobs:
         with:
           run: >-
             ./scripts/run_task.sh test-load-kube --
-            --duration 5m
+            --load-timeout=300s
             --kube-image avaplatform/avalanchego:latest
           artifact_prefix: self-hosted-load-test
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
