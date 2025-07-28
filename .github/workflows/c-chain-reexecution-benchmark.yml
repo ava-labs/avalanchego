@@ -1,6 +1,7 @@
 name: C-Chain Re-Execution Benchmark
 
 on:
+  pull_request:
   workflow_dispatch:
     inputs:
       start-block:
@@ -71,6 +72,10 @@ jobs:
             summary-always: true
             comment-on-alert: true
             auto-push: false
+        - name: Check git status
+          run: |
+            git status
+            git log
         - name: Push Benchmark Result
           if: github.event_name == 'schedule'
           run: git push origin gh-pages
