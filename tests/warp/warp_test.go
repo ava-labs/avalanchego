@@ -47,8 +47,8 @@ import (
 	"github.com/ava-labs/subnet-evm/predicate"
 	"github.com/ava-labs/subnet-evm/tests"
 	"github.com/ava-labs/subnet-evm/tests/utils"
+	"github.com/ava-labs/subnet-evm/tests/warp/aggregator"
 	warpBackend "github.com/ava-labs/subnet-evm/warp"
-	"github.com/ava-labs/subnet-evm/warp/aggregator"
 )
 
 const (
@@ -420,8 +420,8 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 		totalWeight += validator.Weight
 	}
 
-	log.Info("Aggregating signatures from validator set", "numValidators", len(warpValidators), "totalWeight", totalWeight)
-	apiSignatureGetter := warpBackend.NewAPIFetcher(warpAPIs)
+	ginkgo.GinkgoLogr.Info("Aggregating signatures from validator set", "numValidators", len(warpValidators), "totalWeight", totalWeight)
+	apiSignatureGetter := NewAPIFetcher(warpAPIs)
 	signatureResult, err := aggregator.New(apiSignatureGetter, warpValidators, totalWeight).AggregateSignatures(ctx, w.addressedCallUnsignedMessage, 100)
 	require.NoError(err)
 	require.Equal(signatureResult.SignatureWeight, signatureResult.TotalWeight)

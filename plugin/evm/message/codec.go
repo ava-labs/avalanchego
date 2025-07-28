@@ -38,14 +38,13 @@ func init() {
 		c.RegisterType(LeafsResponse{}),
 		c.RegisterType(CodeRequest{}),
 		c.RegisterType(CodeResponse{}),
-
-		// Warp request types
-		c.RegisterType(MessageSignatureRequest{}),
-		c.RegisterType(BlockSignatureRequest{}),
-		c.RegisterType(SignatureResponse{}),
-
-		Codec.RegisterCodec(Version, c),
 	)
+
+	// Deprecated Warp request/responde types are skipped
+	// See https://github.com/ava-labs/coreth/pull/999
+	c.SkipRegistrations(3)
+
+	Codec.RegisterCodec(Version, c)
 
 	if errs.Errored() {
 		panic(errs.Err)

@@ -8,15 +8,14 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/subnet-evm/network"
-	"github.com/ava-labs/subnet-evm/warp/aggregator"
+	warpprecompile "github.com/ava-labs/subnet-evm/precompile/contracts/warp"
 	warpValidators "github.com/ava-labs/subnet-evm/warp/validators"
 )
 
@@ -26,16 +25,15 @@ var errNoValidators = errors.New("cannot aggregate signatures from subnet with n
 type API struct {
 	chainContext                 *snow.Context
 	backend                      Backend
-	signatureGetter              aggregator.SignatureGetter
+	signatureAggregator          *acp118.SignatureAggregator
 	requirePrimaryNetworkSigners func() bool
 }
 
-func NewAPI(chainCtx *snow.Context, networkCodec codec.Manager, backend Backend, client network.SyncedNetworkClient, requirePrimaryNetworkSigners func() bool) *API {
-	signatureGetter := aggregator.NewSignatureGetter(client, networkCodec)
+func NewAPI(chainCtx *snow.Context, backend Backend, signatureAggregator *acp118.SignatureAggregator, requirePrimaryNetworkSigners func() bool) *API {
 	return &API{
 		backend:                      backend,
 		chainContext:                 chainCtx,
-		signatureGetter:              signatureGetter,
+		signatureAggregator:          signatureAggregator,
 		requirePrimaryNetworkSigners: requirePrimaryNetworkSigners,
 	}
 }
@@ -124,14 +122,23 @@ func (a *API) aggregateSignatures(ctx context.Context, unsignedMessage *warp.Uns
 		"numValidators", len(validatorSet.Validators),
 		"totalWeight", validatorSet.TotalWeight,
 	)
-
-	agg := aggregator.New(a.signatureGetter, validatorSet.Validators, validatorSet.TotalWeight)
-	signatureResult, err := agg.AggregateSignatures(ctx, unsignedMessage, quorumNum)
+	warpMessage := &warp.Message{
+		UnsignedMessage: *unsignedMessage,
+		Signature:       &warp.BitSetSignature{},
+	}
+	signedMessage, _, _, err := a.signatureAggregator.AggregateSignatures(
+		ctx,
+		warpMessage,
+		nil,
+		validatorSet.Validators,
+		quorumNum,
+		warpprecompile.WarpQuorumDenominator,
+	)
 	if err != nil {
 		return nil, err
 	}
 	// TODO: return the signature and total weight as well to the caller for more complete details
 	// Need to decide on the best UI for this and write up documentation with the potential
 	// gotchas that could impact signed messages becoming invalid.
-	return hexutil.Bytes(signatureResult.Message.Bytes()), nil
+	return hexutil.Bytes(signedMessage.Bytes()), nil
 }

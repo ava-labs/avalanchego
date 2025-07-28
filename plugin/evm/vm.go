@@ -1108,8 +1108,10 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	}
 
 	if vm.config.WarpAPIEnabled {
-		warpAPI := warp.NewAPI(vm.ctx, vm.networkCodec, vm.warpBackend, vm.Network, vm.requirePrimaryNetworkSigners)
-		if err := handler.RegisterName("warp", warpAPI); err != nil {
+		warpSDKClient := vm.Network.NewClient(p2p.SignatureRequestHandlerID)
+		signatureAggregator := acp118.NewSignatureAggregator(vm.ctx.Log, warpSDKClient)
+
+		if err := handler.RegisterName("warp", warp.NewAPI(vm.ctx, vm.warpBackend, signatureAggregator, vm.requirePrimaryNetworkSigners)); err != nil {
 			return nil, err
 		}
 		enabledAPIs = append(enabledAPIs, "warp")

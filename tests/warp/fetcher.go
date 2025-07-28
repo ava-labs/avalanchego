@@ -11,16 +11,14 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/subnet-evm/warp/aggregator"
+	warpBackend "github.com/ava-labs/subnet-evm/warp"
 )
 
-var _ aggregator.SignatureGetter = (*apiFetcher)(nil)
-
 type apiFetcher struct {
-	clients map[ids.NodeID]Client
+	clients map[ids.NodeID]warpBackend.Client
 }
 
-func NewAPIFetcher(clients map[ids.NodeID]Client) *apiFetcher {
+func NewAPIFetcher(clients map[ids.NodeID]warpBackend.Client) *apiFetcher {
 	return &apiFetcher{
 		clients: clients,
 	}

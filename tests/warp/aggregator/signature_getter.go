@@ -10,10 +10,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/subnet-evm/plugin/evm/message"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -53,35 +53,17 @@ func NewSignatureGetter(client NetworkClient, networkCodec codec.Manager) *Netwo
 // Note: this function will continue attempting to fetch the signature from [nodeID] until it receives an invalid value or [ctx] is cancelled.
 // The caller is responsible to cancel [ctx] if it no longer needs to fetch this signature.
 func (s *NetworkSignatureGetter) GetSignature(ctx context.Context, nodeID ids.NodeID, unsignedWarpMessage *avalancheWarp.UnsignedMessage) (*bls.Signature, error) {
-	var signatureReqBytes []byte
-	parsedPayload, err := payload.Parse(unsignedWarpMessage.Payload)
+	protoMsg := &sdk.SignatureRequest{Message: unsignedWarpMessage.Bytes()}
+	protoBytes, err := proto.Marshal(protoMsg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse unsigned message payload: %w", err)
-	}
-	switch p := parsedPayload.(type) {
-	case *payload.AddressedCall:
-		signatureReq := message.MessageSignatureRequest{
-			MessageID: unsignedWarpMessage.ID(),
-		}
-		signatureReqBytes, err = message.RequestToBytes(s.networkCodec, signatureReq)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal signature request: %w", err)
-		}
-	case *payload.Hash:
-		signatureReq := message.BlockSignatureRequest{
-			BlockID: p.Hash,
-		}
-		signatureReqBytes, err = message.RequestToBytes(s.networkCodec, signatureReq)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal signature request: %w", err)
-		}
+		return nil, fmt.Errorf("failed to marshal signature request: %w", err)
 	}
 
 	delay := initialRetryFetchSignatureDelay
 	timer := time.NewTimer(delay)
 	defer timer.Stop()
 	for {
-		signatureRes, err := s.client.SendSyncedAppRequest(ctx, nodeID, signatureReqBytes)
+		signatureRes, err := s.client.SendSyncedAppRequest(ctx, nodeID, protoBytes)
 		// If the client fails to retrieve a response perform an exponential backoff.
 		// Note: it is up to the caller to ensure that [ctx] is eventually cancelled
 		if err != nil {
@@ -104,11 +86,12 @@ func (s *NetworkSignatureGetter) GetSignature(ctx context.Context, nodeID ids.No
 			}
 			continue
 		}
-		var response message.SignatureResponse
-		if _, err := s.networkCodec.Unmarshal(signatureRes, &response); err != nil {
+		var response sdk.SignatureResponse
+		if err := proto.Unmarshal(signatureRes, &response); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal signature res: %w", err)
 		}
-		if response.Signature == [bls.SignatureLen]byte{} {
+
+		if len(response.Signature) == 0 {
 			return nil, fmt.Errorf("received empty signature response")
 		}
 		blsSignature, err := bls.SignatureFromBytes(response.Signature[:])
