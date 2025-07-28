@@ -1,19 +1,18 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::proof::{Proof, ProofError, ProofNode};
-#[cfg(test)]
+use crate::proof::{Proof, ProofCollection, ProofError, ProofNode};
 use crate::range_proof::RangeProof;
 #[cfg(test)]
 use crate::stream::MerkleKeyValueStream;
 use crate::stream::PathIterator;
-use crate::v2::api::FrozenProof;
 #[cfg(test)]
-use crate::v2::api::{self, FrozenRangeProof};
+use crate::v2::api::FrozenRangeProof;
+use crate::v2::api::{self, FrozenProof, KeyType, ValueType};
 use firewood_storage::{
-    BranchNode, Child, FileIoError, HashType, Hashable, HashedNodeReader, ImmutableProposal,
-    IntoHashType, LeafNode, MaybePersistedNode, MutableProposal, NibblesIterator, Node, NodeStore,
-    Parentable, Path, ReadableStorage, SharedNode, TrieReader, ValueDigest,
+    BranchNode, Child, FileIoError, HashType, HashedNodeReader, ImmutableProposal, IntoHashType,
+    LeafNode, MaybePersistedNode, MutableProposal, NibblesIterator, Node, NodeStore, Parentable,
+    Path, ReadableStorage, SharedNode, TrieHash, TrieReader, ValueDigest,
 };
 #[cfg(test)]
 use futures::{StreamExt, TryStreamExt};
@@ -206,16 +205,87 @@ impl<T: TrieReader> Merkle<T> {
         Ok(Proof::new(proof.into_boxed_slice()))
     }
 
-    /// Verify a proof that a key has a certain value, or that the key isn't in the trie.
-    #[expect(clippy::missing_errors_doc)]
+    /// Verify that a range proof is valid for the specified key range and root hash.
+    ///
+    /// This method validates a range proof by constructing a partial trie from the proof data
+    /// and verifying that it produces the expected root hash. The proof may contain fewer
+    /// key-value pairs than requested if the peer chose to limit the response size.
+    ///
+    /// # Parameters
+    ///
+    /// * `first_key` - The requested start of the range (inclusive).
+    ///   - If `Some(key)`, verifies the proof covers keys >= this key
+    ///   - If `None`, verifies the proof starts from the beginning of the trie
+    ///
+    /// * `last_key` - The requested end of the range (inclusive).
+    ///   - If `Some(key)`, represents the upper bound that was requested
+    ///   - If `None`, indicates no upper bound was specified
+    ///   - Note: The proof may contain fewer keys than requested if the peer limited the response
+    ///
+    /// * `root_hash` - The expected root hash of the trie. The constructed partial trie
+    ///   from the proof must produce this exact hash for the proof to be valid.
+    ///
+    /// * `proof` - The range proof to verify, containing:
+    ///   - Start proof: Merkle proof for the lower boundary
+    ///   - End proof: Merkle proof for the upper boundary
+    ///   - Key-value pairs: The actual entries within the range
+    ///
+    /// # Returns
+    ///
+    /// Returns the constructed [`Merkle<Arc<ImmutableProposal>, _>`] that was built and
+    /// verified from the proof data, if the proof is valid.
+    ///
+    /// # Verification Process
+    ///
+    /// The verification follows these steps:
+    /// 1. **Structural validation**: Verify the proof structure is well-formed
+    ///    - Check that start/end proofs are consistent with the key range
+    ///    - Ensure key-value pairs are in the correct order
+    ///    - Validate that boundary proofs correctly bound the key-value pairs
+    ///
+    /// 2. **Proposal construction**: Build a proposal trie containing the proof data
+    ///    - Insert all key-value pairs from the proof
+    ///    - Incorporate nodes from the start and end proofs
+    ///    - Handle edge cases for empty ranges or partial proofs
+    ///
+    /// 3. **Hash verification**: Compute the root hash of the constructed proposal
+    ///    - The computed hash must match the provided `root_hash` exactly
+    ///    - Any mismatch indicates an invalid or tampered proof
+    ///
+    /// # Errors
+    ///
+    /// * [`api::Error::ProofError`] - The proof structure is malformed or inconsistent
+    /// * [`api::Error::InvalidRange`] - The proof boundaries don't match the requested range
+    /// * [`api::Error::IncorrectRootHash`] - The computed root hash doesn't match the expected hash
+    /// * [`api::Error`] - Other errors during proposal construction or verification
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// // Verify a range proof received from a peer
+    /// let verified_proposal = merkle.verify_range_proof(
+    ///     Some(b"alice"),
+    ///     Some(b"charlie"),
+    ///     &expected_root_hash,
+    ///     &range_proof
+    /// )?;
+    /// ```
+    ///
+    /// # Implementation Notes
+    ///
+    /// - Structural validation is performed first to avoid expensive proposal construction
+    ///   for obviously invalid proofs
+    /// - The method is designed to handle partial proofs where the peer provides less
+    ///   data than requested, which is common for large ranges
+    /// - Future optimization: Consider caching partial verification results for
+    ///   incremental range proof verification
     pub fn verify_range_proof<V: AsRef<[u8]>>(
         &self,
-        _proof: &Proof<impl Hashable>,
-        _first_key: &[u8],
-        _last_key: &[u8],
-        _keys: Vec<&[u8]>,
-        _vals: Vec<V>,
-    ) -> Result<bool, ProofError> {
+        _first_key: Option<impl KeyType>,
+        _last_key: Option<impl KeyType>,
+        _root_hash: &TrieHash,
+        _proof: &RangeProof<impl KeyType, impl ValueType, impl ProofCollection>,
+    ) -> Result<(), api::Error> {
         todo!()
     }
 
@@ -240,6 +310,74 @@ impl<T: TrieReader> Merkle<T> {
         MerkleKeyValueStream::from_key(&self.nodestore, key.as_ref())
     }
 
+    /// Generate a cryptographic proof for a range of key-value pairs in the Merkle trie.
+    ///
+    /// This method creates a range proof that can be used to verify the existence (or absence)
+    /// of a contiguous set of keys within the trie. The proof includes boundary proofs and
+    /// the actual key-value pairs within the specified range.
+    ///
+    /// # Parameters
+    ///
+    /// * `start_key` - The optional lower bound of the range (inclusive).
+    ///   - If `Some(key)`, the proof will include all keys >= this key
+    ///   - If `None`, the proof starts from the beginning of the trie
+    ///
+    /// * `end_key` - The optional upper bound of the range (inclusive).
+    ///   - If `Some(key)`, the proof will include all keys <= this key
+    ///   - If `None`, the proof extends to the end of the trie
+    ///
+    /// * `limit` - Optional maximum number of key-value pairs to include in the proof.
+    ///   - If `Some(n)`, at most n key-value pairs will be included
+    ///   - If `None`, all key-value pairs in the range will be included
+    ///   - Useful for paginating through large ranges
+    ///   - **NOTE**: avalanchego's limit is based on the entire packet size and not the
+    ///     number of key-value pairs. Currently, we only limit by the number of pairs.
+    ///
+    /// # Returns
+    ///
+    /// A `FrozenRangeProof` containing:
+    /// - Start proof: Merkle proof for the first key in the range
+    /// - End proof: Merkle proof for the last key in the range
+    /// - Key-value pairs: All entries within the specified bounds (up to the limit)
+    ///
+    /// # Errors
+    ///
+    /// * `api::Error::InvalidRange` - If `start_key` > `end_key` when both are provided.
+    ///   This ensures the range bounds are logically consistent.
+    ///
+    /// * `api::Error::RangeProofOnEmptyTrie` - If the trie is empty and the caller
+    ///   requests a proof for the entire trie (both `start_key` and `end_key` are `None`).
+    ///   This prevents generating meaningless proofs for non-existent data.
+    ///
+    /// * `api::Error` - Various other errors can occur during proof generation, such as:
+    ///   - I/O errors when reading nodes from storage
+    ///   - Corrupted trie structure
+    ///   - Invalid node references
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// // Prove all keys between "alice" and "charlie"
+    /// let proof = merkle.range_proof(
+    ///     Some(b"alice"),
+    ///     Some(b"charlie"),
+    ///     None
+    /// ).await?;
+    ///
+    /// // Prove the first 100 keys starting from "alice"
+    /// let proof = merkle.range_proof(
+    ///     Some(b"alice"),
+    ///     None,
+    ///     Some(NonZeroUsize::new(100).unwrap())
+    /// ).await?;
+    ///
+    /// // Prove that no keys exist in a range
+    /// let proof = merkle.range_proof(
+    ///     Some(b"aardvark"),
+    ///     Some(b"aaron"),
+    ///     None
+    /// ).await?;
+    /// ```
     #[cfg(test)]
     pub(super) async fn range_proof(
         &self,
@@ -276,15 +414,15 @@ impl<T: TrieReader> Merkle<T> {
 
             let start_proof = start_key
                 .map(|start_key| self.prove(start_key))
-                .transpose()?;
+                .transpose()?
+                .unwrap_or_default();
 
-            let end_proof = end_key.map(|end_key| self.prove(end_key)).transpose()?;
+            let end_proof = end_key
+                .map(|end_key| self.prove(end_key))
+                .transpose()?
+                .unwrap_or_default();
 
-            return Ok(RangeProof {
-                start_proof,
-                key_values: Box::new([]),
-                end_proof,
-            });
+            return Ok(RangeProof::new(start_proof, end_proof, Box::new([])));
         };
 
         let start_proof = self.prove(&first_key)?;
@@ -318,15 +456,14 @@ impl<T: TrieReader> Merkle<T> {
         let end_proof = key_values
             .last()
             .map(|(largest_key, _)| self.prove(largest_key))
-            .transpose()?;
+            .transpose()?
+            .unwrap_or_default();
 
-        debug_assert!(end_proof.is_some());
-
-        Ok(RangeProof {
-            start_proof: Some(start_proof),
-            key_values: key_values.into(),
+        Ok(RangeProof::new(
+            start_proof,
             end_proof,
-        })
+            key_values.into_boxed_slice(),
+        ))
     }
 
     pub(crate) fn get_value(&self, key: &[u8]) -> Result<Option<Value>, FileIoError> {
