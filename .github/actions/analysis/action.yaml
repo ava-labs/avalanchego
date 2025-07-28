@@ -173,7 +173,8 @@ runs:
       if: always()
       with:
         name: metric-visualization-${{ github.run_id }}
+        # Relative paths
         path: |
-          ${{ github.action_path }}/metric_visualization_*.html
-          ${{ github.action_path }}/metric_config.json
+          .github/actions/analysis/metric_visualization_*.html
+          .github/actions/analysis/metric_config.json
         retention-days: 30
