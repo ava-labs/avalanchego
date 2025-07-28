@@ -1308,6 +1308,41 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require.Equal(1, m.unprocessedWork.Len())
 }
 
+func Test_Sync_EmptySyncRoot(t *testing.T) {
+	require := require.New(t)
+
+	db, err := merkledb.New(
+		context.Background(),
+		memdb.New(),
+		newDefaultDBConfig(),
+	)
+	require.NoError(err)
+
+	dbClient, err := NewClient(db, &ClientConfig{
+		Hasher:       merkledb.DefaultHasher,
+		BranchFactor: merkledb.BranchFactor16,
+	})
+	require.NoError(err)
+
+	ctx := context.Background()
+	syncer, err := NewManager(ManagerConfig{
+		DBClient:              dbClient,
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
+		TargetRoot:            ids.Empty,
+		SimultaneousWorkLimit: 5,
+		Log:                   logging.NoLog{},
+	}, prometheus.NewRegistry())
+	require.NoError(err)
+	require.NotNil(syncer)
+	require.NoError(syncer.Start(context.Background()))
+	require.NoError(syncer.Wait(context.Background()))
+
+	root, err := db.GetMerkleRoot(context.Background())
+	require.NoError(err)
+	require.Equal(ids.Empty, root)
+}
+
 func Test_Sync_DBError(t *testing.T) {
 	require := require.New(t)
 

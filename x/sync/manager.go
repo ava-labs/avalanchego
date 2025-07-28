@@ -391,15 +391,9 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
+	// If the target root is empty, the `FinalizeSync` method can short-circuit the sync process.
 	if targetRootID == ids.Empty {
 		defer m.finishWorkItem()
-
-		// The trie is empty after this change.
-		// Delete all the key-value pairs in the range.
-		if err := m.config.DBClient.FinalizeSync(ctx, targetRootID); err != nil {
-			m.setError(err)
-			return
-		}
 		work.start = maybe.Nothing[[]byte]()
 		m.completeWorkItem(work, maybe.Nothing[[]byte](), targetRootID)
 		return
@@ -452,13 +446,9 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 	targetRootID := m.getTargetRoot()
 
+	// If the target root is empty, the `FinalizeSync` method can short-circuit the sync process.
 	if targetRootID == ids.Empty {
 		defer m.finishWorkItem()
-
-		if err := m.config.DBClient.FinalizeSync(ctx, targetRootID); err != nil {
-			m.setError(err)
-			return
-		}
 		work.start = maybe.Nothing[[]byte]()
 		m.completeWorkItem(work, maybe.Nothing[[]byte](), targetRootID)
 		return
