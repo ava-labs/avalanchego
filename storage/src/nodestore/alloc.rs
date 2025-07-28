@@ -354,12 +354,13 @@ impl Serializable for FreeArea {
                     }
                     0x01 => {
                         // encoded `Some(_)` as 1 with the data following
-                        let addr = LinearAddress::new(reader.read_varint()?).ok_or_else(|| {
-                            Error::new(
-                                ErrorKind::InvalidData,
-                                "Option::<LinearAddress> was Some(0) which is invalid",
-                            )
-                        })?;
+                        let addr = LinearAddress::new(read_bincode_varint_u64_le(&mut reader)?)
+                            .ok_or_else(|| {
+                                Error::new(
+                                    ErrorKind::InvalidData,
+                                    "Option::<LinearAddress> was Some(0) which is invalid",
+                                )
+                            })?;
                         Ok(Self {
                             next_free_block: Some(addr),
                         })
@@ -379,7 +380,7 @@ impl Serializable for FreeArea {
             first_byte => Err(Error::new(
                 ErrorKind::InvalidData,
                 format!(
-                    "Invalid FreeArea marker, expected 0xFF (or 0x01 for old format), found {first_byte:#02x}"
+                    "Invalid FreeArea marker, expected 0xFF (or 0x01 for old format), found {first_byte:#04x}"
                 ),
             )),
         }
@@ -768,6 +769,41 @@ impl<T, S: ReadableStorage> NodeStore<T, S> {
     }
 }
 
+fn read_bincode_varint_u64_le(reader: &mut impl Read) -> std::io::Result<u64> {
+    // See https://github.com/ava-labs/firewood/issues/1146 for full details.
+    // emulate this behavior: https://github.com/bincode-org/bincode/blob/c44b5e364e7084cdbabf9f94b63a3c7f32b8fb68/src/config/int.rs#L241-L258
+
+    const SINGLE_BYTE_MAX: u8 = 250;
+    const U16_BYTE: u8 = 251;
+    const U32_BYTE: u8 = 252;
+    const U64_BYTE: u8 = 253;
+
+    match reader.read_byte()? {
+        byte @ 0..=SINGLE_BYTE_MAX => Ok(u64::from(byte)),
+        U16_BYTE => {
+            let mut buf = [0u8; 2];
+            reader.read_exact(&mut buf)?;
+            Ok(u64::from(u16::from_le_bytes(buf)))
+        }
+        U32_BYTE => {
+            let mut buf = [0u8; 4];
+            reader.read_exact(&mut buf)?;
+            Ok(u64::from(u32::from_le_bytes(buf)))
+        }
+        U64_BYTE => {
+            let mut buf = [0u8; 8];
+            reader.read_exact(&mut buf)?;
+            Ok(u64::from_le_bytes(buf))
+        }
+        byte => Err(Error::new(
+            ErrorKind::InvalidData,
+            format!(
+                "Invalid bincode varint byte, expected 0-250, 251, 252, or 253, found {byte:#04x}"
+            ),
+        )),
+    }
+}
+
 #[cfg(test)]
 #[expect(clippy::unwrap_used)]
 pub mod test_utils {
@@ -850,6 +886,11 @@ mod tests {
     #[test_case(&[0x02, 0x01, 0x00], Some((2, 0)); "none")]
     #[test_case(&[0x03, 0xff, 0x2b], Some((3, 43)); "new format")]
     #[test_case(&[0x03, 0x44, 0x55], None; "garbage")]
+    #[test_case(
+        &[0x03, 0x01, 0x01, 0xfd, 0xe0, 0xa2, 0x6d, 0x27, 0x6e, 0x00, 0x00, 0x00, 0x0d, 0x09, 0x03, 0x00],
+        Some((3, 0x6e_276d_a2e0));
+        "old format with u64 address (issue #1146)"
+    )]
     fn test_free_list_format(reader: &[u8], expected: Option<(AreaIndex, u64)>) {
         let expected =
             expected.map(|(index, addr)| (FreeArea::new(LinearAddress::new(addr)), index));
