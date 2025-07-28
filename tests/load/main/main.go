@@ -31,6 +31,7 @@ var (
 	flagVars *e2e.FlagVars
 
 	loadTimeout time.Duration
+	firewood    bool
 )
 
 func init() {
@@ -43,6 +44,12 @@ func init() {
 		"load-timeout",
 		0,
 		"the duration that the load test should run for",
+	)
+	flag.BoolVar(
+		&firewood,
+		"firewood",
+		false,
+		"use firewood for the C-Chain",
 	)
 
 	flag.Parse()
@@ -65,6 +72,17 @@ func main() {
 	network := &tmpnet.Network{
 		Nodes:         nodes,
 		PreFundedKeys: keys,
+	}
+
+	if firewood {
+		cChainConfig := make(tmpnet.ConfigMap)
+		cChainConfig["state-scheme"] = "firewood"
+		cChainConfig["snapshot-cache"] = 0
+		cChainConfig["state-sync-enabled"] = false
+		cChainConfig["pruning-enabled"] = true
+		cChainConfig["metrics-expensive-enabled"] = true
+		network.PrimaryChainConfigs = make(map[string]tmpnet.ConfigMap)
+		network.PrimaryChainConfigs["C"] = cChainConfig
 	}
 
 	e2e.NewTestEnvironment(tc, flagVars, network)
