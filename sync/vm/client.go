@@ -68,7 +68,7 @@ type ClientConfig struct {
 
 	Chain      *eth.Ethereum
 	State      *chain.State
-	ChaindDB   ethdb.Database
+	ChainDB    ethdb.Database
 	Acceptor   BlockAcceptor
 	VerDB      *versiondb.Database
 	MetadataDB database.Database
@@ -199,11 +199,11 @@ func (client *client) acceptSyncSummary(proposedSummary message.Syncable) (block
 		// sync marker will be wiped, so we do not accidentally resume progress from an incorrect version
 		// of the snapshot. (if switching between versions that come before this change and back this could
 		// lead to the snapshot not being cleaned up correctly)
-		<-snapshot.WipeSnapshot(client.ChaindDB, true)
+		<-snapshot.WipeSnapshot(client.ChainDB, true)
 		// Reset the snapshot generator here so that when state sync completes, snapshots will not attempt to read an
 		// invalid generator.
 		// Note: this must be called after WipeSnapshot is called so that we do not invalidate a partially generated snapshot.
-		snapshot.ResetSnapshotGeneration(client.ChaindDB)
+		snapshot.ResetSnapshotGeneration(client.ChainDB)
 	}
 	client.summary = proposedSummary
 
@@ -253,7 +253,7 @@ func (client *client) syncBlocks(ctx context.Context, fromHash common.Hash, from
 	// first, check for blocks already available on disk so we don't
 	// request them from peers.
 	for parentsToGet >= 0 {
-		blk := rawdb.ReadBlock(client.ChaindDB, nextHash, nextHeight)
+		blk := rawdb.ReadBlock(client.ChainDB, nextHash, nextHeight)
 		if blk != nil {
 			// block exists
 			nextHash = blk.ParentHash()
@@ -268,7 +268,7 @@ func (client *client) syncBlocks(ctx context.Context, fromHash common.Hash, from
 
 	// get any blocks we couldn't find on disk from peers and write
 	// them to disk.
-	batch := client.ChaindDB.NewBatch()
+	batch := client.ChainDB.NewBatch()
 	for i := parentsToGet - 1; i >= 0 && (nextHash != common.Hash{}); {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -298,7 +298,7 @@ func (client *client) syncStateTrie(ctx context.Context) error {
 		Client:                   client.Client,
 		Root:                     client.summary.GetBlockRoot(),
 		BatchSize:                ethdb.IdealBatchSize,
-		DB:                       client.ChaindDB,
+		DB:                       client.ChainDB,
 		MaxOutstandingCodeHashes: statesync.DefaultMaxOutstandingCodeHashes,
 		NumCodeFetchingWorkers:   statesync.DefaultNumCodeFetchingWorkers,
 		RequestSize:              client.RequestSize,
