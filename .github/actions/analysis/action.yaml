@@ -168,20 +168,12 @@ runs:
           --step-size "${{ inputs.step_size }}" \
           --timezone "${{ inputs.timezone }}" \
           --verbose
-    - name: Debug environment and list files
-      shell: bash
-      run: |
-        echo "GITHUB_ACTION_PATH: $GITHUB_ACTION_PATH"
-        echo "Available files:"
-        ls -la $GITHUB_ACTION_PATH/metric_*.* || echo "No metric files found"
-        echo "Config file contents:"
-        cat $GITHUB_ACTION_PATH/metric_config.json || echo "Config file not found"
     - name: Upload visualization artifact
       uses: actions/upload-artifact@v4
       if: always()
       with:
         name: metric-visualization-${{ github.run_id }}
         path: |
-          ${{ env.GITHUB_ACTION_PATH }}/metric_visualization_*.html
-          ${{ env.GITHUB_ACTION_PATH }}/metric_config.json
+          ${{ github.action_path }}/metric_visualization_*.html
+          ${{ github.action_path }}/metric_config.json
         retention-days: 30
