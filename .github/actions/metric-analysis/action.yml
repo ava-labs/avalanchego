@@ -1,0 +1,178 @@
+name: analysis
+author: elvis.sabanovic
+description: analysis
+
+inputs:
+  baseline_count:
+    description: 'Number of baseline runs to find'
+    default: '3'
+  monitoring_period:
+    description: 'Monitoring period in seconds'
+    default: '900'
+  query:
+    description: 'Prometheus query'
+    required: true
+  metric_name:
+    description: 'Metric name for display'
+    required: true
+  x_axis_label:
+    description: 'X-axis label'
+    default: 'Time'
+  y_axis_label:
+    description: 'Y-axis label'
+    default: ''
+  workflow:
+    description: 'Workflow to search for baselines. Can be filename (ci.yml, c-chain-reexecution-benchmark.yml...) or workflow name. Enables cross-workflow baseline comparison.'
+    default: 'ci.yml'
+  job_name:
+    description: 'Job name to search for baselines. Uses current job if not specified.'
+    default: ''
+  prometheus_url:
+    description: 'Prometheus server URL'
+    default: 'https://prometheus-poc.avax-dev.network'
+  prometheus_username:
+    required: true
+  prometheus_password:
+    required: true
+  step_size:
+    description: 'Prometheus query step size'
+    default: '15s'
+  timezone:
+    description: 'Display timezone'
+    default: 'US/Eastern'
+
+runs:
+  using: composite
+  steps:
+    - name: Generate baseline configuration
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          // Configuration
+          const BASELINE_COUNT = parseInt('${{ inputs.baseline_count }}');
+          const MONITORING_PERIOD = parseInt('${{ inputs.monitoring_period }}');
+          const CURRENT_RUN_ID = '${{ github.run_id }}';
+          const CURRENT_RUN_ATTEMPT = '${{ github.run_attempt }}';
+          const JOB_ID = '${{ inputs.job_name }}' || '${{ github.job }}';
+          const WORKFLOW = '${{ inputs.workflow }}';
+          const REPO = '${{ github.repository }}';
+          const isWorkflowFile = WORKFLOW.includes('.yaml') || WORKFLOW.includes('.yml');
+          let workflow_runs;
+          try {
+            if (isWorkflowFile) {
+              // Search by workflow file
+              const response = await github.rest.actions.listWorkflowRuns({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: WORKFLOW,
+                status: 'completed',
+                per_page: 50
+              });
+              workflow_runs = response.data.workflow_runs;
+            } else {
+              // Search by workflow name
+              const response = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                status: 'completed',
+                per_page: 50
+              });
+              workflow_runs = response.data.workflow_runs.filter(run => run.name === WORKFLOW);
+            }
+            // Filter to successful runs only
+            const successfulRuns = workflow_runs.filter(run => run.conclusion === 'success');
+            const baselineRuns = [];
+            for (const run of successfulRuns) {
+              if (baselineRuns.length >= BASELINE_COUNT) {
+                break;
+              }
+              // Exclude current run
+              if (run.id.toString() === CURRENT_RUN_ID) {
+                continue;
+              }
+              try {
+                const { data: { jobs } } = await github.rest.actions.listJobsForWorkflowRun({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: run.id
+                });
+                // Find matching job
+                const targetJob = jobs.find(job => job.name === JOB_ID && job.conclusion === 'success');
+                if (targetJob) {
+                  baselineRuns.push({
+                    name: `Run ${run.run_number} (#${run.id})`,
+                    labels: {
+                      gh_run_id: run.id.toString(),
+                      gh_job_id: JOB_ID,
+                      gh_run_attempt: "1",
+                      gh_repo: REPO,
+                      is_ephemeral_node: false
+                    }
+                  });
+                }
+              } catch (error) {
+                console.log(`ERROR: Failed to get jobs for run ${run.id}: ${error.message}`);
+              }
+            }
+            if (baselineRuns.length === 0) {
+              console.log(`ERROR: No baseline runs found for job '${JOB_ID}' in workflow '${WORKFLOW}'`);
+            }
+            // Calculate current run timing
+            const currentStart = Date.now();
+            const currentEnd = currentStart + (MONITORING_PERIOD * 1000);
+            // Build configuration
+            const config = {
+              query: '${{ inputs.query }}',
+              metric_name: '${{ inputs.metric_name }}',
+              x_axis_label: '${{ inputs.x_axis_label }}',
+              y_axis_label: '${{ inputs.y_axis_label }}' || '${{ inputs.metric_name }}',
+              candidate: {
+                start_time: currentStart,
+                end_time: currentEnd,
+                name: `Current Run (#${CURRENT_RUN_ID})`,
+                labels: {
+                  gh_run_id: CURRENT_RUN_ID,
+                  gh_job_id: JOB_ID,
+                  gh_run_attempt: CURRENT_RUN_ATTEMPT,
+                  gh_repo: REPO,
+                  is_ephemeral_node: false
+                }
+              },
+              baselines: baselineRuns,
+              output_file: `${process.env.GITHUB_ACTION_PATH}/metric_visualization_${CURRENT_RUN_ID}.html`
+            };
+            // Write configuration file
+            fs.writeFileSync(`${process.env.GITHUB_ACTION_PATH}/metric_config.json`, JSON.stringify(config, null, 2));
+          } catch (error) {
+            core.setFailed(`Failed to fetch workflow runs: ${error.message}`);
+          }
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    - name: Install Python dependencies
+      shell: bash
+      run: pip install -r $GITHUB_ACTION_PATH/requirements.txt
+    - name: Plot
+      shell: bash
+      env:
+        PROMETHEUS_ID: ${{ inputs.prometheus_username }}
+        PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
+      run: |
+        python $GITHUB_ACTION_PATH/plot.py \
+          --config $GITHUB_ACTION_PATH/metric_config.json \
+          --prometheus-url "${{ inputs.prometheus_url }}" \
+          --step-size "${{ inputs.step_size }}" \
+          --timezone "${{ inputs.timezone }}"
+    - name: Upload visualization artifact
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: metric-visualization-${{ github.run_id }}
+        # Relative paths
+        path: |
+          .github/actions/analysis/metric_visualization_*.html
+          .github/actions/analysis/metric_config.json
+        retention-days: 30
