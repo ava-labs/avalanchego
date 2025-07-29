@@ -39,6 +39,9 @@ inputs:
   timezone:
     description: 'Display timezone'
     default: 'US/Eastern'
+  github_token:
+    description: 'GitHub token'
+    default: ${{ github.token }}
 
 outputs:
   visualization_url:
@@ -98,8 +101,8 @@ runs:
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: metric-analysis-${{ github.run_id }}
+        name: metric-comparison-${{ github.run_id }}
         path: |
-          ${{ github.action_path }}/metric_visualization_*.html
-          ${{ steps.build-config.outputs.config_path }}
+          metric_visualization_*.html
+          metric_config.json
         retention-days: 14
