@@ -1076,8 +1076,8 @@ func testReissueAtomicTxHigherGasPrice(t *testing.T, scheme string) {
 				t.Fatal(err)
 			}
 
-			if err := vm.AtomicMempool.AddLocalTx(reissuanceTx1); !errors.Is(err, atomictxpool.ErrConflictingAtomicTx) {
-				t.Fatalf("Expected to fail with err: %s, but found err: %s", atomictxpool.ErrConflictingAtomicTx, err)
+			if err := vm.AtomicMempool.AddLocalTx(reissuanceTx1); !errors.Is(err, atomictxpool.ErrConflict) {
+				t.Fatalf("Expected to fail with err: %s, but found err: %s", atomictxpool.ErrConflict, err)
 			}
 
 			assert.True(t, vm.AtomicMempool.Has(importTx1.ID()))
