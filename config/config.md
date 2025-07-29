@@ -182,8 +182,6 @@ Validators must know one of their public facing IP addresses so they can enable 
 | Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--staking-port` | `AVAGO_STAKING_PORT` | int | `9651` | The port through which the network peers will connect to this node externally. Having this port accessible from the internet is required for correct node operation. |
-| `--sybil-protection-enabled` | `AVAGO_SYBIL_PROTECTION_ENABLED` | boolean | `true` | Avalanche uses Proof of Stake (PoS) as sybil resistance to make it prohibitively expensive to attack the network. If false, sybil resistance is disabled and all peers will be sampled during consensus. Note that this can not be disabled on public networks (`Fuji` and `Mainnet`). Setting this flag to `false` **does not** mean "this node is not a validator." It means that this node will sample all nodes, not just validators. **You should not set this flag to false unless you understand what you are doing.** |
-| `--sybil-protection-disabled-weight` | `AVAGO_SYBIL_PROTECTION_DISABLED_WEIGHT` | uint | `100` | Weight to provide to each peer when staking is disabled. |
 | `--staking-tls-cert-file` | `AVAGO_STAKING_TLS_CERT_FILE` | string | `$HOME/.avalanchego/staking/staker.crt` | Avalanche uses two-way authenticated TLS connections to securely connect nodes. This argument specifies the location of the TLS certificate used by the node. This flag is ignored if `--staking-tls-cert-file-content` is specified. |
 | `--staking-tls-cert-file-content` | `AVAGO_STAKING_TLS_CERT_FILE_CONTENT` | string | - | As an alternative to `--staking-tls-cert-file`, it allows specifying base64 encoded content of the TLS certificate used by the node. Note that full certificate content, with the leading and trailing header, must be base64 encoded. |
 | `--staking-tls-key-file` | `AVAGO_STAKING_TLS_KEY_FILE` | string | `$HOME/.avalanchego/staking/staker.key` | Avalanche uses two-way authenticated TLS connections to securely connect nodes. This argument specifies the location of the TLS private key used by the node. This flag is ignored if `--staking-tls-key-file-content` is specified. |
@@ -229,6 +227,15 @@ Consensus gossiping parameters.
 | `--consensus-on-accept-gossip-validator-size` | `AVAGO_CONSENSUS_ON_ACCEPT_GOSSIP_VALIDATOR_SIZE` | uint | `0` | Number of validators to gossip to each accepted container to. |
 | `--consensus-on-accept-gossip-non-validator-size` | `AVAGO_CONSENSUS_ON_ACCEPT_GOSSIP_NON_VALIDATOR_SIZE` | uint | `0` | Number of non-validators to gossip to each accepted container to. |
 | `--consensus-on-accept-gossip-peer-size` | `AVAGO_CONSENSUS_ON_ACCEPT_GOSSIP_PEER_SIZE` | uint | `10` | Number of peers to gossip to each accepted container to. |
+
+### Sybil Protection
+
+Sybil protection configuration. These settings affect how the node participates in consensus.
+
+| Flag | Env Var | Type | Default | Description |
+|------|---------------------|------|---------|-------------|
+| `--sybil-protection-enabled` | `AVAGO_SYBIL_PROTECTION_ENABLED` | boolean | `true` | Avalanche uses Proof of Stake (PoS) as sybil resistance to make it prohibitively expensive to attack the network. If false, sybil resistance is disabled and all peers will be sampled during consensus. Note that this can not be disabled on public networks (`Fuji` and `Mainnet`). Setting this flag to `false` **does not** mean "this node is not a validator." It means that this node will sample all nodes, not just validators. **You should not set this flag to false unless you understand what you are doing.** |
+| `--sybil-protection-disabled-weight` | `AVAGO_SYBIL_PROTECTION_DISABLED_WEIGHT` | uint | `100` | Weight to provide to each peer when staking is disabled. |
 
 ### Benchlist
 
