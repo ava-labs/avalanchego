@@ -42,7 +42,18 @@ func NewRandomTest(
 		return nil, err
 	}
 
-	_, tx, contract, err := contracts.DeployEVMLoadSimulator(txOpts, worker.Client)
+	_, tx, simulatorContract, err := contracts.DeployEVMLoadSimulator(txOpts, worker.Client)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := bind.WaitDeployed(ctx, worker.Client, tx); err != nil {
+		return nil, err
+	}
+
+	worker.Nonce++
+
+	_, tx, trieContract, err := contracts.DeployTrieStressTest(txOpts, worker.Client)
 	if err != nil {
 		return nil, err
 	}
@@ -74,67 +85,73 @@ func NewRandomTest(
 		},
 		{
 			Test: ReadTest{
-				Contract: contract,
+				Contract: simulatorContract,
 				Count:    count,
 			},
 			Weight: weight,
 		},
 		{
 			Test: WriteTest{
-				Contract: contract,
+				Contract: simulatorContract,
 				Count:    count,
 			},
 			Weight: weight,
 		},
 		{
 			Test: StateModificationTest{
-				Contract: contract,
+				Contract: simulatorContract,
 				Count:    count,
 			},
 			Weight: weight,
 		},
 		{
 			Test: HashingTest{
-				Contract: contract,
+				Contract: simulatorContract,
 				Count:    count,
 			},
 			Weight: weight,
 		},
 		{
 			Test: MemoryTest{
-				Contract: contract,
+				Contract: simulatorContract,
 				Count:    count,
 			},
 			Weight: weight,
 		},
 		{
 			Test: CallDepthTest{
-				Contract: contract,
+				Contract: simulatorContract,
 				Count:    count,
 			},
 			Weight: weight,
 		},
 		{
-			Test:   ContractCreationTest{Contract: contract},
+			Test:   ContractCreationTest{Contract: simulatorContract},
 			Weight: weight,
 		},
 		{
 			Test: PureComputeTest{
-				Contract:      contract,
+				Contract:      simulatorContract,
 				NumIterations: count,
 			},
 			Weight: weight,
 		},
 		{
 			Test: LargeEventTest{
-				Contract:  contract,
+				Contract:  simulatorContract,
 				NumEvents: count,
 			},
 			Weight: weight,
 		},
 		{
-			Test:   ExternalCallTest{Contract: contract},
+			Test:   ExternalCallTest{Contract: simulatorContract},
 			Weight: weight,
+		},
+		{
+			Test: TrieStressTest{
+				Contract:  trieContract,
+				NumValues: count,
+			},
 		},
 	}
 
@@ -381,6 +398,21 @@ func (e ExternalCallTest) Run(
 	wallet *Wallet,
 ) {
 	executeContractTx(tc, ctx, wallet, e.Contract.SimulateExternalCall)
+}
+
+type TrieStressTest struct {
+	Contract  *contracts.TrieStressTest
+	NumValues *big.Int
+}
+
+func (t TrieStressTest) Run(
+	tc tests.TestContext,
+	ctx context.Context,
+	wallet *Wallet,
+) {
+	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+		return t.Contract.WriteValues(txOpts, t.NumValues)
+	})
 }
 
 func executeContractTx(
