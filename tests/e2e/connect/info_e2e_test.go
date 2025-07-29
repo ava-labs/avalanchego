@@ -13,11 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/proto/pb/info/v1/infov1connect"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 
-	infov1 "github.com/ava-labs/avalanchego/proto/pb/info/v1"
+	infopb "github.com/ava-labs/avalanchego/connectproto/pb/info"
+	connectinfopb "github.com/ava-labs/avalanchego/connectproto/pb/info/infoconnect"
 )
 
 var _ = ginkgo.Describe("[Connect Info API]", func() {
@@ -25,7 +25,7 @@ var _ = ginkgo.Describe("[Connect Info API]", func() {
 		tc      = e2e.NewTestContext()
 		env     = e2e.GetEnv(tc)
 		require = require.New(tc)
-		client  infov1connect.InfoServiceClient
+		client  connectinfopb.InfoServiceClient
 		ctx     = tc.DefaultContext()
 	)
 
@@ -38,94 +38,96 @@ var _ = ginkgo.Describe("[Connect Info API]", func() {
 		require.NoError(err)
 		e2e.WaitForHealthy(tc, node)
 		uri := node.GetAccessibleURI()
-		client = infov1connect.NewInfoServiceClient(http.DefaultClient, uri)
+		client = connectinfopb.NewInfoServiceClient(http.DefaultClient, uri)
 	})
 
 	ginkgo.It("NodeVersion returns version info", func() {
-		req := connect.NewRequest(&infov1.NodeVersionRequest{})
+		req := connect.NewRequest(&infopb.GetNodeVersionRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.NodeVersion(ctx, req)
+		resp, err := client.GetNodeVersion(ctx, req)
 		require.NoError(err)
 		require.NotEmpty(resp.Msg.Version)
 	})
 
 	ginkgo.It("NodeID returns a node ID", func() {
-		req := connect.NewRequest(&infov1.NodeIDRequest{})
+		req := connect.NewRequest(&infopb.GetNodeIDRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.NodeID(ctx, req)
+		resp, err := client.GetNodeID(ctx, req)
 		require.NoError(err)
 		require.True(strings.HasPrefix(resp.Msg.NodeId, "NodeID-"))
 	})
 
 	ginkgo.It("NetworkID returns a network ID", func() {
-		req := connect.NewRequest(&infov1.NetworkIDRequest{})
+		req := connect.NewRequest(&infopb.GetNetworkIDRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.NetworkID(ctx, req)
+		resp, err := client.GetNetworkID(ctx, req)
 		require.NoError(err)
 		require.Positive(resp.Msg.NetworkId)
 	})
 
 	ginkgo.It("NetworkName returns a network name", func() {
-		req := connect.NewRequest(&infov1.NetworkNameRequest{})
+		req := connect.NewRequest(&infopb.GetNetworkNameRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.NetworkName(ctx, req)
+		resp, err := client.GetNetworkName(ctx, req)
 		require.NoError(err)
 		require.NotEmpty(resp.Msg.NetworkName)
 	})
 
 	ginkgo.It("NodeIP returns an IP", func() {
-		req := connect.NewRequest(&infov1.NodeIPRequest{})
+		req := connect.NewRequest(&infopb.GetNodeIPRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.NodeIP(ctx, req)
+		resp, err := client.GetNodeIP(ctx, req)
 		require.NoError(err)
 		require.NotEmpty(resp.Msg.Ip)
 	})
 
 	ginkgo.It("BlockchainID returns a blockchain ID for X", func() {
-		req := connect.NewRequest(&infov1.BlockchainIDRequest{Alias: "X"})
+		req := connect.NewRequest(&infopb.GetChainIDRequest{Alias: "X"})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.BlockchainID(ctx, req)
+		resp, err := client.GetChainID(ctx, req)
 		require.NoError(err)
-		require.NotEmpty(resp.Msg.BlockchainId)
+		require.NotEmpty(resp.Msg.ChainId)
 	})
 
 	ginkgo.It("Peers returns a list", func() {
-		req := connect.NewRequest(&infov1.PeersRequest{})
+		req := connect.NewRequest(&infopb.GetPeersRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.Peers(ctx, req)
+		resp, err := client.GetPeers(ctx, req)
 		require.NoError(err)
 		require.NotEmpty(resp.Msg.Peers)
 	})
 
 	ginkgo.It("IsBootstrapped returns true for X", func() {
 		tc.Eventually(func() bool {
-			req := connect.NewRequest(&infov1.IsBootstrappedRequest{Chain: "X"})
+			req := connect.NewRequest(&infopb.GetBootstrappedRequest{Chain: "X"})
 			req.Header().Set("Avalanche-API-Route", "info")
-			resp, err := client.IsBootstrapped(ctx, req)
-			return err == nil && resp.Msg.IsBootstrapped
+			resp, err := client.GetBootstrapped(ctx, req)
+			return err == nil && resp.Msg.Bootstrapped
 		}, 60*time.Second, 2*time.Second, "node should eventually bootstrap")
 	})
 
 	ginkgo.It("Upgrades returns a response", func() {
-		req := connect.NewRequest(&infov1.UpgradesRequest{})
+		req := connect.NewRequest(&infopb.GetUpgradesRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.Upgrades(ctx, req)
+		resp, err := client.GetUpgrades(ctx, req)
 		require.NoError(err)
 		require.NotNil(resp.Msg)
 	})
 
 	ginkgo.It("Uptime returns a response", func() {
-		req := connect.NewRequest(&infov1.UptimeRequest{})
+		req := connect.NewRequest(&infopb.GetUptimeRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.Uptime(ctx, req)
+		resp, err := client.GetUptime(ctx, req)
 		require.NoError(err)
 		require.NotNil(resp.Msg)
 	})
 
+	// TODO acps test
+
 	ginkgo.It("VMs returns at least avm", func() {
-		req := connect.NewRequest(&infov1.VMsRequest{})
+		req := connect.NewRequest(&infopb.GetVMsRequest{})
 		req.Header().Set("Avalanche-API-Route", "info")
-		resp, err := client.VMs(ctx, req)
+		resp, err := client.GetVMs(ctx, req)
 		require.NoError(err)
 		found := false
 		for _, v := range resp.Msg.Vms {

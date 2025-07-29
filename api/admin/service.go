@@ -59,18 +59,21 @@ type Config struct {
 type Admin struct {
 	Config
 	lock     sync.RWMutex
-	Profiler profiler.Profiler
+	profiler profiler.Profiler
 }
 
 // NewService returns a new admin API service.
 // All of the fields in [config] must be set.
-func NewService(admin *Admin) (http.Handler, error) {
+func NewService(config Config) (http.Handler, error) {
 	server := rpc.NewServer()
 	codec := json.NewCodec()
 	server.RegisterCodec(codec, "application/json")
 	server.RegisterCodec(codec, "application/json;charset=UTF-8")
 	return server, server.RegisterService(
-		admin,
+		&Admin{
+			Config:   config,
+			profiler: profiler.New(config.ProfileDir),
+		},
 		"admin",
 	)
 }
@@ -85,7 +88,7 @@ func (a *Admin) StartCPUProfiler(_ *http.Request, _ *struct{}, _ *api.EmptyReply
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	return a.Profiler.StartCPUProfiler()
+	return a.profiler.StartCPUProfiler()
 }
 
 // StopCPUProfiler stops the cpu profile
@@ -98,7 +101,7 @@ func (a *Admin) StopCPUProfiler(_ *http.Request, _ *struct{}, _ *api.EmptyReply)
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	return a.Profiler.StopCPUProfiler()
+	return a.profiler.StopCPUProfiler()
 }
 
 // MemoryProfile runs a memory profile writing to the specified file
@@ -111,7 +114,7 @@ func (a *Admin) MemoryProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) e
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	return a.Profiler.MemoryProfile()
+	return a.profiler.MemoryProfile()
 }
 
 // LockProfile runs a mutex profile writing to the specified file
@@ -124,7 +127,7 @@ func (a *Admin) LockProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) err
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
-	return a.Profiler.LockProfile()
+	return a.profiler.LockProfile()
 }
 
 // AliasArgs are the arguments for calling Alias

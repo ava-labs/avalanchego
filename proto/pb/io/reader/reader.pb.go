@@ -276,7 +276,6 @@ func file_io_reader_reader_proto_init() {
 	if File_io_reader_reader_proto != nil {
 		return
 	}
-	file_io_reader_reader_proto_msgTypes[1].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

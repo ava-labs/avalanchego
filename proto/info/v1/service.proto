@@ -1,127 +1,213 @@
 syntax = "proto3";
 package info.v1;
 
-import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/ava-labs/avalanchego/proto/pb/info/v1;infov1";
+option go_package = "github.com/ava-labs/avalanchego/connectproto/pb/info/v1;infov1";
 
-// InfoService is the API service for unprivileged info on a node
+// Serves APIs for node metadata.
 service InfoService {
-  rpc NodeVersion(NodeVersionRequest) returns (NodeVersionResponse);
-  rpc NodeID(NodeIDRequest) returns (NodeIDResponse);
-  rpc NodeIP(NodeIPRequest) returns (NodeIPResponse);
-  rpc NetworkID(NetworkIDRequest) returns (NetworkIDResponse);
-  rpc NetworkName(NetworkNameRequest) returns (NetworkNameResponse);
-  rpc BlockchainID(BlockchainIDRequest) returns (BlockchainIDResponse);
-  rpc Peers(PeersRequest) returns (PeersResponse);
-  rpc IsBootstrapped(IsBootstrappedRequest) returns (IsBootstrappedResponse);
-  rpc Upgrades(UpgradesRequest) returns (UpgradesResponse);
-  rpc Uptime(UptimeRequest) returns (UptimeResponse);
-  rpc VMs(VMsRequest) returns (VMsResponse);
+  // Returns the version this node is running.
+  rpc GetNodeVersion(GetNodeVersionRequest) returns (GetNodeVersionResponse);
+  // Returns the node id of this node.
+  rpc GetNodeID(GetNodeIDRequest) returns (GetNodeIDResponse);
+  // Returns the ip address this node.
+  rpc GetNodeIP(GetNodeIPRequest) returns (GetNodeIPResponse);
+  // Returns the network id this node is running.
+  rpc GetNetworkID(GetNetworkIDRequest) returns (GetNetworkIDResponse);
+  // Returns the network name this node is running.
+  rpc GetNetworkName(GetNetworkNameRequest) returns (GetNetworkNameResponse);
+  // Returns the chain id for an alias.
+  rpc GetChainID(GetChainIDRequest) returns (GetChainIDResponse);
+  // Returns peer metadata.
+  rpc GetPeers(GetPeersRequest) returns (GetPeersResponse);
+  // Returns if a chain is bootstrapped.
+  rpc GetBootstrapped(GetBootstrappedRequest) returns (GetBootstrappedResponse);
+  // Returns the upgrade configuration this node is running.
+  rpc GetUpgrades(GetUpgradesRequest) returns (GetUpgradesResponse);
+  // Returns the uptime of this node.
+  rpc GetUptime(GetUptimeRequest) returns (GetUptimeResponse);
+  // Returns ACP network metadata.
+  rpc GetACPs(GetACPsRequest) returns (GetACPsResponse);
+  // Returns VMs this node is running.
+  rpc GetVMs(GetVMsRequest) returns (GetVMsResponse);
 }
 
-message NodeVersionRequest {}
-message NodeVersionResponse {
+message GetNodeVersionRequest {}
+
+message GetNodeVersionResponse {
+  // Semantic version of avalanchego this node is running.
   string version = 1;
+  // Semantic version of the database this node is running.
   string database_version = 2;
+  // Plugin version this node is running.
   uint32 rpc_protocol_version = 3;
+  // Avalanchego git commit hash this node was built with.
   string git_commit = 4;
+  // VMs with the respective versions they are running.
   map<string, string> vm_versions = 5;
 }
 
-message NodeIDRequest {}
 message ProofOfPossession {
+  // BLS public key of this node.
   string public_key = 1;
-  string proof_of_possession = 2;
-}
-message NodeIDResponse {
-  string node_id = 1;
-  ProofOfPossession node_pop = 2;
+  // BLS signature over the BLS public key of this node.
+  string signature = 2;
 }
 
-message NodeIPRequest {}
-message NodeIPResponse {
+message GetNodeIDRequest {}
+message GetNodeIDResponse {
+  // Node id of this node.
+  string node_id = 1;
+  // Proves possession of the BLS public key of this node.
+  ProofOfPossession proof_of_possession = 2;
+}
+
+message GetNodeIPRequest {}
+message GetNodeIPResponse {
+  // IP address of this node.
   string ip = 1;
 }
 
-message NetworkIDRequest {}
-message NetworkIDResponse {
+message GetNetworkIDRequest {}
+message GetNetworkIDResponse {
+  // Network id this node is running.
   uint32 network_id = 1;
 }
 
-message NetworkNameRequest {}
-message NetworkNameResponse {
+message GetNetworkNameRequest {}
+message GetNetworkNameResponse {
+  // Network name this node is running.
   string network_name = 1;
 }
 
-message BlockchainIDRequest {
+message GetChainIDRequest {
+  // Alias of the chain to lookup.
   string alias = 1;
 }
-message BlockchainIDResponse {
-  string blockchain_id = 1;
+message GetChainIDResponse {
+  string chain_id = 1;
 }
 
-message PeersRequest {
+message GetPeersRequest {
+  // Optional parameter to specify peers for which metadata should be returned for.
   repeated string node_ids = 1;
 }
-message PeerInfo {
+
+// Metadata about a peer in the network.
+message Peer {
+  // IP address of this peer.
   string ip = 1;
+  // Public IP address of this peer.
   string public_ip = 2;
+  // Node id of this peer.
   string node_id = 3;
+  // Avalanchego version this peer is running.
   string version = 4;
+  // Timestamp of when this node last wrote a message to this peer.
   google.protobuf.Timestamp last_sent = 5;
+  // Timestamp of when this node last read a message from this peer.
   google.protobuf.Timestamp last_received = 6;
-  repeated string benched = 7;
-  google.protobuf.Duration observed_uptime = 8;
-  repeated string tracked_subnets = 9;
-}
-message PeersResponse {
-  uint32 num_peers = 1;
-  repeated PeerInfo peers = 2;
+  // Our observed uptime percentage of this peer on the primary network [0, 100].
+  uint32 observed_uptime = 7;
+  // Subnets this peer is tracking.
+  repeated string tracked_subnets = 8;
+  // Chain ids that this node is benching this peer on.
+  repeated string benched = 9;
 }
 
-message IsBootstrappedRequest {
-  // Alias of the chain
+message GetPeersResponse {
+  // Peers this node is connected to.
+  repeated Peer peers = 1;
+}
+
+message GetBootstrappedRequest {
+  // Chain id or an alias for a chain this node is running.
   string chain = 1;
 }
-message IsBootstrappedResponse {
-  // True iff the chain exists and is done bootstrapping
-  bool is_bootstrapped = 1;
+message GetBootstrappedResponse {
+  // True if this node is running this chain and has finished bootstrapping it.
+  bool bootstrapped = 1;
 }
 
-message UpgradesRequest {}
-message UpgradesResponse {
-  google.protobuf.Timestamp apricot_phase1_time = 1;
-  google.protobuf.Timestamp apricot_phase2_time = 2;
-  google.protobuf.Timestamp apricot_phase3_time = 3;
-  google.protobuf.Timestamp apricot_phase4_time = 4;
-  uint64 apricot_phase4_min_p_chain_height = 5;
-  google.protobuf.Timestamp apricot_phase5_time = 6;
-  google.protobuf.Timestamp apricot_phase_pre6_time = 7;
-  google.protobuf.Timestamp apricot_phase6_time = 8;
-  google.protobuf.Timestamp apricot_phase_post6_time = 9;
+message GetUpgradesRequest {}
+message GetUpgradesResponse {
+  // Starting time for the Apricot Phase 1 upgrade.
+  google.protobuf.Timestamp apricot_phase_1_time = 1;
+  // Starting time for the Apricot Phase 2 upgrade.
+  google.protobuf.Timestamp apricot_phase_2_time = 2;
+  // Starting time for the Apricot Phase 3 upgrade.
+  google.protobuf.Timestamp apricot_phase_3_time = 3;
+  // Starting time for the Apricot Phase 4 upgrade.
+  google.protobuf.Timestamp apricot_phase_4_time = 4;
+  // The minimum P-Chain block height that must be reached to activate Apricot Phase 4.
+  uint64 apricot_phase_4_min_p_chain_height = 5;
+  // Starting time for the Apricot Phase 5 upgrade.
+  google.protobuf.Timestamp apricot_phase_5_time = 6;
+  // Starting time for the Apricot Phase Pre-6 upgrade.
+  google.protobuf.Timestamp apricot_phase_pre_6_time = 7;
+  // Starting time for the Apricot Phase 6 upgrade.
+  google.protobuf.Timestamp apricot_phase_6_time = 8;
+  // Starting time for the Apricot Phase Post-6 upgrade.
+  google.protobuf.Timestamp apricot_phase_post_6_time = 9;
+  // Starting time for the Banff upgrade.
   google.protobuf.Timestamp banff_time = 10;
+  // Starting time for the Cortina upgrade.
   google.protobuf.Timestamp cortina_time = 11;
+  // The stop vertex for the Cortina X-Chain linearization.
   string cortina_x_chain_stop_vertex_id = 12;
+  // Starting time for the Durango upgrade.
   google.protobuf.Timestamp durango_time = 13;
+  // Starting time for the Etna upgrade.
   google.protobuf.Timestamp etna_time = 14;
+  // Starting time for the Fortuna upgrade.
   google.protobuf.Timestamp fortuna_time = 15;
+  // Starting time for the Granite upgrade.
   google.protobuf.Timestamp granite_time = 16;
 }
 
-message UptimeRequest {}
-message UptimeResponse {
+message GetUptimeRequest {}
+message GetUptimeResponse {
+  // The percent of network stake that thinks that this node is above the minimum uptime requirement.
   double rewarding_stake_percentage = 1;
+  // The average perceived uptime of this node weighted by stake.
+  // Note that this is different from RewardingStakePercentage, which shows
+  // the percent of the network stake that thinks this node is above the
+  // uptime requirement. Weighted average percentage is weighted by uptime,
+  // i.e if the uptime requirement is 85 and a peer reports 40 percent it will be
+  // counted (40*weight) in weighted average percentage but not in
+  // rewarding stake percentage since 40 < 85
   double weighted_average_percentage = 2;
 }
 
-message VMsRequest {}
-message VMsResponse {
+message ACP {
+  // Total network stake weight supporting this ACP.
+  uint64 support_weight = 1;
+  // Node ids that support this ACP.
+  repeated string supporters = 2;
+  // Total network stake weight objecting this ACP.
+  uint64 object_weight = 3;
+  // Node ids that object to this ACP.
+  repeated string objectors = 4;
+  // Total network stake weight that do not explicitly support or object this ACP.
+  uint64 abstain_weight = 5;
+}
+
+message GetACPsRequest {}
+message GetACPsResponse {
+  // ACPs and their network metadata.
+  map<string, ACP> acps = 1;
+}
+
+message GetVMsRequest {}
+message GetVMsResponse {
+  // VMs and their respective aliases this node is running.
   map<string, VMAliases> vms = 1;
+  // Feature extensions and their respective aliases this node is running.
   map<string, string> fxs = 2;
 }
 
 message VMAliases {
+  // Aliases for a VM.
   repeated string aliases = 1;
 }
