@@ -116,8 +116,8 @@ tasks:
   generate-load-contract-bindings:
     desc: Generates load contract bindings
     cmds:
-      - cmd: grep -lr -E '^// Code generated - DO NOT EDIT\.$' tests/load/c | xargs -r rm
-      - cmd: go generate ./tests/load/c/...
+      - cmd: grep -lr -E '^// Code generated - DO NOT EDIT\.$' tests/load | xargs -r rm
+      - cmd: go generate ./tests/load/...
 
   generate-protobuf:
     desc: Generates protobuf
@@ -317,24 +317,18 @@ tasks:
     cmds:
       - task: generate-load-contract-bindings
       - task: build
-      - cmd: go run ./tests/load/c/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
-
-  test-load2:
-    desc: Runs second iteration of load tests
-    cmds:
-      - task: build
-      - cmd: go run ./tests/load2/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
+      - cmd: go run ./tests/load/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
 
   test-load-exclusive:
     desc: Runs load tests against kube with exclusive scheduling
     cmds:
-      - cmd: go run ./tests/load/c/main --runtime=kube --kube-use-exclusive-scheduling {{.CLI_ARGS}}
+      - cmd: go run ./tests/load/main --runtime=kube --kube-use-exclusive-scheduling {{.CLI_ARGS}}
 
   test-load-kube:
     desc: Runs load tests against a kubernetes cluster
     cmds:
       - task: generate-load-contract-bindings
-      - cmd: go run ./tests/load/c/main --runtime=kube {{.CLI_ARGS}}
+      - cmd: go run ./tests/load/main --runtime=kube {{.CLI_ARGS}}
 
   test-load-kube-kind:
     desc: Runs load tests against a kind cluster
