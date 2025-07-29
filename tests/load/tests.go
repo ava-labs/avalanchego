@@ -152,6 +152,7 @@ func NewRandomTest(
 				Contract:  trieContract,
 				NumValues: count,
 			},
+			Weight: weight,
 		},
 	}
 
