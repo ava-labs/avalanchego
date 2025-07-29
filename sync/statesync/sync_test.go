@@ -27,7 +27,7 @@ import (
 	"github.com/ava-labs/subnet-evm/sync/handlers"
 	handlerstats "github.com/ava-labs/subnet-evm/sync/handlers/stats"
 	"github.com/ava-labs/subnet-evm/sync/statesync/statesynctest"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const testSyncTimeout = 30 * time.Second
@@ -65,9 +65,7 @@ func testSync(t *testing.T, test syncTest) {
 		MaxOutstandingCodeHashes: DefaultMaxOutstandingCodeHashes,
 		RequestSize:              1024,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "failed to create state syncer")
 	// begin sync
 	s.Start(ctx)
 	waitFor(t, s.Done(), test.expectedError, testSyncTimeout)
@@ -92,14 +90,7 @@ func waitFor(t *testing.T, result <-chan error, expected error, timeout time.Dur
 	t.Helper()
 	select {
 	case err := <-result:
-		if expected != nil {
-			if err == nil {
-				t.Fatalf("Expected error %s, but got nil", expected)
-			}
-			assert.Contains(t, err.Error(), expected.Error())
-		} else if err != nil {
-			t.Fatal("unexpected error waiting for sync result", err)
-		}
+		require.ErrorIs(t, err, expected, "result of sync did not match expected error")
 	case <-time.After(timeout):
 		// print a stack trace to assist with debugging
 		// if the test times out.
@@ -134,9 +125,7 @@ func TestSimpleSyncCases(t *testing.T) {
 					if index%3 == 0 {
 						codeBytes := make([]byte, 256)
 						_, err := rand.Read(codeBytes)
-						if err != nil {
-							t.Fatalf("error reading random code bytes: %v", err)
-						}
+						require.NoError(t, err, "error reading random code bytes")
 
 						codeHash := crypto.Keccak256Hash(codeBytes)
 						rawdb.WriteCode(serverDB, codeHash, codeBytes)
@@ -268,7 +257,7 @@ func TestResumeSyncAccountsTrieInterrupted(t *testing.T) {
 		GetLeafsIntercept: intercept.getLeafsIntercept,
 	})
 
-	assert.EqualValues(t, 2, intercept.numRequests)
+	require.EqualValues(t, 2, intercept.numRequests)
 
 	testSync(t, syncTest{
 		prepareForTest: func(t *testing.T) (ethdb.Database, ethdb.Database, *triedb.Database, common.Hash) {
@@ -426,26 +415,18 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 					if len(it.Key()) != len(rawdb.CodePrefix)+common.HashLength {
 						continue
 					}
-					if err := clientDB.Delete(it.Key()); err != nil {
-						t.Fatal(err)
-					}
+					require.NoError(t, clientDB.Delete(it.Key()), "failed to delete code hash %x", it.Key()[len(rawdb.CodePrefix):])
 				}
-				if err := it.Error(); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, it.Error(), "error iterating over code hashes")
 			},
 		},
 		"delete intermediate storage nodes": {
 			deleteBetweenSyncs: func(t *testing.T, root common.Hash, clientDB ethdb.Database) {
 				clientTrieDB := triedb.NewDatabase(clientDB, nil)
 				tr, err := trie.New(trie.TrieID(root), clientTrieDB)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err, "failed to create trie for root %s", root)
 				nodeIt, err := tr.NodeIterator(nil)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err, "failed to create node iterator for root %s", root)
 				it := trie.NewIterator(nodeIt)
 				accountsWithStorage := 0
 
@@ -455,9 +436,7 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 				corruptedStorageRoots := make(map[common.Hash]struct{})
 				for it.Next() {
 					var acc types.StateAccount
-					if err := rlp.DecodeBytes(it.Value, &acc); err != nil {
-						t.Fatal(err)
-					}
+					require.NoError(t, rlp.DecodeBytes(it.Value, &acc), "failed to decode account at key %x", it.Key)
 					if acc.Root == types.EmptyRootHash {
 						continue
 					}
@@ -471,23 +450,17 @@ func TestResyncNewRootAfterDeletes(t *testing.T) {
 					}
 					corruptedStorageRoots[acc.Root] = struct{}{}
 					tr, err := trie.New(trie.TrieID(acc.Root), clientTrieDB)
-					if err != nil {
-						t.Fatal(err)
-					}
+					require.NoError(t, err, "failed to create trie for root %s", acc.Root)
 					statesynctest.CorruptTrie(t, clientDB, tr, 2)
 				}
-				if err := it.Err; err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, it.Err, "error iterating over trie nodes")
 			},
 		},
 		"delete intermediate account trie nodes": {
 			deleteBetweenSyncs: func(t *testing.T, root common.Hash, clientDB ethdb.Database) {
 				clientTrieDB := triedb.NewDatabase(clientDB, nil)
 				tr, err := trie.New(trie.TrieID(root), clientTrieDB)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err, "failed to create trie for root %s", root)
 				statesynctest.CorruptTrie(t, clientDB, tr, 5)
 			},
 		},
