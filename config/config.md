@@ -2,6 +2,8 @@
 
 This document lists all available configuration options for AvalancheGo nodes. You can configure your node using either command-line flags or environment variables.
 
+> **Note:** For comparison with the previous documentation format (using individual flag headings), see the [archived version](https://gist.github.com/navillanueva/cdb9c49c411bd89a9480f05a7afbab37).
+
 ## Environment Variable Naming Convention
 
 All environment variables follow the pattern: `AVAGO_{FLAG_NAME}` where the flag name is converted to uppercase with hyphens replaced by underscores.
