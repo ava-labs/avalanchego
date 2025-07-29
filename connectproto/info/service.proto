@@ -1,9 +1,9 @@
 syntax = "proto3";
-package info.v1;
+package info;
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "github.com/ava-labs/avalanchego/connectproto/pb/info/v1;infov1";
+option go_package = "github.com/ava-labs/avalanchego/connectproto/pb/info";
 
 // Serves APIs for node metadata.
 service InfoService {
