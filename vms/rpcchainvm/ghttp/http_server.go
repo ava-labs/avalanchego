@@ -153,14 +153,12 @@ func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*httppb.H
 // HandleSimple handles http requests over http2 using a simple request response model.
 // Websockets are not supported.
 func (s *Server) HandleSimple(ctx context.Context, r *httppb.HandleSimpleHTTPRequest) (*httppb.HandleSimpleHTTPResponse, error) {
-	req, err := http.NewRequest(r.Method, r.Url, bytes.NewBuffer(r.Body))
+	req, err := http.NewRequestWithContext(ctx, r.Method, r.Url, bytes.NewBuffer(r.Body))
 	if err != nil {
 		return nil, err
 	}
 
 	grpcutils.SetHeaders(req.Header, r.RequestHeaders)
-
-	req = req.WithContext(ctx)
 	req.RequestURI = r.Url
 	req.ContentLength = int64(len(r.Body))
 
