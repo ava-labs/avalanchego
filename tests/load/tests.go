@@ -65,11 +65,13 @@ func NewRandomTest(
 		// writes, or computes) for a test that supports repeated operations.
 		// This value is arbitrary but kept constant to ensure test reproducibility.
 		count = big.NewInt(5)
+		// value specifies the amount to send in a transfer test
+		value = big.NewInt(1)
 	)
 
 	weightedTests := []WeightedTest{
 		{
-			Test:   ZeroTransferTest{},
+			Test:   TransferTest{Value: value},
 			Weight: weight,
 		},
 		{
@@ -209,9 +211,11 @@ type WeightedTest struct {
 	Weight uint64
 }
 
-type ZeroTransferTest struct{}
+type TransferTest struct {
+	Value *big.Int
+}
 
-func (ZeroTransferTest) Run(
+func (t TransferTest) Run(
 	tc tests.TestContext,
 	ctx context.Context,
 	wallet *Wallet,
@@ -232,7 +236,7 @@ func (ZeroTransferTest) Run(
 		Gas:       params.TxGas,
 		To:        &senderAddress,
 		Data:      nil,
-		Value:     common.Big0,
+		Value:     t.Value,
 	})
 	require.NoError(err)
 
