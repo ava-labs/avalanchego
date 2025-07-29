@@ -8,5 +8,5 @@ f2817601270f742d1a5cadcd74924680b07bfcbd
 - Coreth PR 1066 has already been synced (ahead of schedule) - see https://github.com/ava-labs/subnet-evm/pull/1651
 - Coreth PR 1070 has already been synced (ahead of schedule) - see https://github.com/ava-labs/subnet-evm/pull/1652
 - Coreth PR 1071 has already been synced (ahead of schedule) - see https://github.com/ava-labs/subnet-evm/pull/1653
-- Coreth PR 1071 has already been synced (ahead of schedule) - see https://github.com/ava-labs/subnet-evm/pull/1659
+- Coreth PR 1073 has already been synced (ahead of schedule) - see https://github.com/ava-labs/subnet-evm/pull/1659
 - Last PR done is currently #1052
