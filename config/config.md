@@ -137,6 +137,17 @@ A LevelDB config file must be JSON and may have these keys. Any keys not given w
 | `--log-rotater-max-age` | `AVAGO_LOG_ROTATER_MAX_AGE` | uint | `0` | The maximum number of days to retain old log files based on the timestamp encoded in their filename. 0 means retain all old log files. |
 | `--log-rotater-compress-enabled` | `AVAGO_LOG_ROTATER_COMPRESS_ENABLED` | boolean | `false` | Enables the compression of rotated log files through gzip. |
 
+### Continuous Profiling
+
+You can configure your node to continuously run memory/CPU profiles and save the most recent ones. Continuous memory/CPU profiling is enabled if `--profile-continuous-enabled` is set.
+
+| Flag | Env Var | Type | Default | Description |
+|------|---------------------|------|---------|-------------|
+| `--profile-continuous-enabled` | `AVAGO_PROFILE_CONTINUOUS_ENABLED` | boolean | `false` | Whether the app should continuously produce performance profiles. |
+| `--profile-dir` | `AVAGO_PROFILE_DIR` | string | `$HOME/.avalanchego/profiles/` | If profiling enabled, node continuously runs memory/CPU profiles and puts them at this directory. |
+| `--profile-continuous-freq` | `AVAGO_PROFILE_CONTINUOUS_FREQ` | duration | `15m` | How often a new CPU/memory profile is created. |
+| `--profile-continuous-max-files` | `AVAGO_PROFILE_CONTINUOUS_MAX_FILES` | int | `5` | Maximum number of CPU/memory profiles files to keep. |
+
 ### Network
 
 | Flag | Env Var | Type | Default | Description |
@@ -203,15 +214,6 @@ It is possible to provide parameters for Subnets. Parameters here apply to all c
 |------|---------------------|------|---------|-------------|
 | `--subnet-config-dir` | `AVAGO_SUBNET_CONFIG_DIR` | string | `$HOME/.avalanchego/configs/subnets` | Specifies the directory that contains Subnet configs, as described above. If the flag is set explicitly, the specified folder must exist, or AvalancheGo will exit with an error. This flag is ignored if `--subnet-config-content` is specified. Example: Let's say we have a Subnet with ID `p4jUwqZsA2LuSftroCd3zb4ytH8W99oXKuKVZdsty7eQ3rXD6`. We can create a config file under the default `subnet-config-dir` at `$HOME/.avalanchego/configs/subnets/p4jUwqZsA2LuSftroCd3zb4ytH8W99oXKuKVZdsty7eQ3rXD6.json`. An example config file is: `{"validatorOnly": false, "consensusParameters": {"k": 25, "alpha": 18}}`. By default, none of these directories and/or files exist. You would need to create them manually if needed. |
 | `--subnet-config-content` | `AVAGO_SUBNET_CONFIG_CONTENT` | string | - | As an alternative to `--subnet-config-dir`, it allows specifying base64 encoded parameters for a Subnet. |
-
-### ProposerVM
-
-ProposerVM configuration.
-
-| Flag | Env Var | Type | Default | Description |
-|------|---------------------|------|---------|-------------|
-| `--proposervm-use-current-height` | `AVAGO_PROPOSERVM_USE_CURRENT_HEIGHT` | boolean | `false` | Have the ProposerVM always report the last accepted P-chain block height. |
-| `--proposervm-min-block-delay` | `AVAGO_PROPOSERVM_MIN_BLOCK_DELAY` | duration | `1s` | The minimum delay to enforce when building a snowman++ block for the primary network chains and the default minimum delay for subnets. A non-default value is only suggested for non-production nodes. |
 
 ### Version
 
@@ -301,16 +303,14 @@ Snow consensus protocol parameters.
 | `--snow-max-processing` | `AVAGO_SNOW_MAX_PROCESSING` | int | `1024` | Maximum number of processing items to be considered healthy. Reports unhealthy if more than this number of items are outstanding. The value must be at least `1`. |
 | `--snow-max-time-processing` | `AVAGO_SNOW_MAX_TIME_PROCESSING` | duration | `2m` | Maximum amount of time an item should be processing and still be healthy. Reports unhealthy if there is an item processing for longer than this duration. The value must be greater than `0`. |
 
-### Continuous Profiling
+### ProposerVM
 
-You can configure your node to continuously run memory/CPU profiles and save the most recent ones. Continuous memory/CPU profiling is enabled if `--profile-continuous-enabled` is set.
+ProposerVM configuration.
 
 | Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
-| `--profile-continuous-enabled` | `AVAGO_PROFILE_CONTINUOUS_ENABLED` | boolean | `false` | Whether the app should continuously produce performance profiles. |
-| `--profile-dir` | `AVAGO_PROFILE_DIR` | string | `$HOME/.avalanchego/profiles/` | If profiling enabled, node continuously runs memory/CPU profiles and puts them at this directory. |
-| `--profile-continuous-freq` | `AVAGO_PROFILE_CONTINUOUS_FREQ` | duration | `15m` | How often a new CPU/memory profile is created. |
-| `--profile-continuous-max-files` | `AVAGO_PROFILE_CONTINUOUS_MAX_FILES` | int | `5` | Maximum number of CPU/memory profiles files to keep. |
+| `--proposervm-use-current-height` | `AVAGO_PROPOSERVM_USE_CURRENT_HEIGHT` | boolean | `false` | Have the ProposerVM always report the last accepted P-chain block height. |
+| `--proposervm-min-block-delay` | `AVAGO_PROPOSERVM_MIN_BLOCK_DELAY` | duration | `1s` | The minimum delay to enforce when building a snowman++ block for the primary network chains and the default minimum delay for subnets. A non-default value is only suggested for non-production nodes. |
 
 ### Health Checks
 
