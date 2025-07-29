@@ -12,7 +12,51 @@ For example:
 - Flag: `--api-admin-enabled`
 - Environment Variable: `AVAGO_API_ADMIN_ENABLED`
 
-## Configuration Options
+## Example Usage
+
+### Using Command-Line Flags
+
+```bash
+avalanchego --network-id=fuji --http-host=0.0.0.0 --log-level=debug
+```
+
+### Using Environment Variables
+
+```bash
+export AVAGO_NETWORK_ID=fuji
+export AVAGO_HTTP_HOST=0.0.0.0
+export AVAGO_LOG_LEVEL=debug
+avalanchego
+```
+
+### Using Config File
+
+Create a JSON config file:
+
+```json
+{
+  "network-id": "fuji",
+  "http-host": "0.0.0.0",
+  "log-level": "debug"
+}
+```
+
+Run with:
+
+```bash
+avalanchego --config-file=/path/to/config.json
+```
+
+## Configuration Precedence
+
+Configuration sources are applied in the following order (highest to lowest precedence):
+
+1. Command-line flags
+2. Environment variables
+3. Config file
+4. Default values
+
+# Configuration Options
 
 ### APIs
 
@@ -223,7 +267,7 @@ It is possible to provide parameters for Subnets. Parameters here apply to all c
 |------|---------------------|------|---------|-------------|
 | `--version` | `AVAGO_VERSION` | boolean | `false` | If this is `true`, print the version and quit. |
 
-## Advanced Options
+# Advanced Configuration Options
 
 ⚠️ **Warning**: The following options may affect the correctness of a node. Only power users should change these.
 
@@ -469,50 +513,6 @@ Nodes gossip peers to each other so that each node can have an up-to-date peer l
 |------|---------------------|------|---------|-------------|
 | `--router-health-max-drop-rate` | `AVAGO_ROUTER_HEALTH_MAX_DROP_RATE` | float | `1` | Node reports unhealthy if the router drops more than this portion of messages. |
 | `--router-health-max-outstanding-requests` | `AVAGO_ROUTER_HEALTH_MAX_OUTSTANDING_REQUESTS` | uint | `1024` | Node reports unhealthy if there are more than this many outstanding consensus requests (Get, PullQuery, etc.) over all chains. |
-
-## Example Usage
-
-### Using Command-Line Flags
-
-```bash
-avalanchego --network-id=fuji --http-host=0.0.0.0 --log-level=debug
-```
-
-### Using Environment Variables
-
-```bash
-export AVAGO_NETWORK_ID=fuji
-export AVAGO_HTTP_HOST=0.0.0.0
-export AVAGO_LOG_LEVEL=debug
-avalanchego
-```
-
-### Using Config File
-
-Create a JSON config file:
-
-```json
-{
-  "network-id": "fuji",
-  "http-host": "0.0.0.0",
-  "log-level": "debug"
-}
-```
-
-Run with:
-
-```bash
-avalanchego --config-file=/path/to/config.json
-```
-
-## Configuration Precedence
-
-Configuration sources are applied in the following order (highest to lowest precedence):
-
-1. Command-line flags
-2. Environment variables
-3. Config file
-4. Default values
 
 ## Additional Resources
 
