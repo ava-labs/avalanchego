@@ -82,12 +82,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
+	infoconnect "github.com/ava-labs/avalanchego/api/info/connect"
 	infoconnectpb "github.com/ava-labs/avalanchego/connectproto/pb/info/infoconnect"
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 	coreth "github.com/ava-labs/coreth/plugin/factory"
-	infoconnect "github.com/ava-labs/avalanchego/api/info/connect"
 )
 
 const (
