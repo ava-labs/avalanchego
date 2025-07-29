@@ -44,10 +44,10 @@ func (g *Gatherer) Gather() (mfs []*dto.MetricFamily, err error) {
 	mfs = make([]*dto.MetricFamily, 0, len(names))
 	for _, name := range names {
 		mf, err := metricFamily(g.registry, name)
-		if err != nil {
-			if errors.Is(err, errMetricSkip) {
-				continue
-			}
+		switch {
+		case errors.Is(err, errMetricSkip):
+			continue
+		case err != nil:
 			return nil, err
 		}
 		mfs = append(mfs, mf)
@@ -73,7 +73,6 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 		metrics.NilHealthcheck, metrics.NilHistogram, metrics.NilMeter,
 		metrics.NilResettingTimer, metrics.NilSample, metrics.NilTimer:
 		return nil, fmt.Errorf("%w: %q metric is nil", errMetricSkip, name)
-
 	case metrics.Counter:
 		return &dto.MetricFamily{
 			Name: &name,
@@ -114,6 +113,8 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 				},
 			}},
 		}, nil
+	case metrics.GaugeInfo:
+		return nil, fmt.Errorf("%w: %q is a %T", errMetricSkip, name, m)
 	case metrics.Histogram:
 		snapshot := m.Snapshot()
 
@@ -200,9 +201,6 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 				},
 			}},
 		}, nil
-	case metrics.GaugeInfo:
-		// TODO(qdm12) handle this somehow maybe with dto.MetricType_UNTYPED
-		return nil, fmt.Errorf("%w: %q is a %T", errMetricSkip, name, metric)
 	default:
 		return nil, fmt.Errorf("%w: metric %q type %T", errMetricTypeNotSupported, name, metric)
 	}
