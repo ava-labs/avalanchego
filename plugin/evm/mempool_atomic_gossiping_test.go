@@ -58,7 +58,7 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 
 			// try to add a conflicting tx
 			err = tvm.atomicVM.AtomicMempool.AddLocalTx(conflictingTx)
-			assert.ErrorIs(err, atomictxpool.ErrConflictingAtomicTx)
+			assert.ErrorIs(err, atomictxpool.ErrConflict)
 			has = mempool.Has(conflictingTxID)
 			assert.False(has, "conflicting tx in mempool")
 
