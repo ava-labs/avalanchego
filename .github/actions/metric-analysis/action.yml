@@ -22,7 +22,7 @@ inputs:
     default: ''
   workflow:
     description: 'Workflow to search for baselines. Can be filename (ci.yml, c-chain-reexecution-benchmark.yml...) or a workflow name. Enables cross-workflow baseline comparison.'
-    default: 'ci.yml'
+    default: 'Tests'
   job_name:
     description: 'Job name to search for baselines. Uses current job if not specified.'
     default: ''
@@ -60,23 +60,96 @@ runs:
       with:
         github-token: ${{ inputs.github_token }}
         script: |
-          const buildConfig = require('./build-config.js');
-          const result = await buildConfig({
-            inputs: {
-              query: '${{ inputs.query }}',
-              metric_name: '${{ inputs.metric_name }}',
-              x_axis_label: '${{ inputs.x_axis_label }}',
-              y_axis_label: '${{ inputs.y_axis_label }}',
-              baseline_count: '${{ inputs.baseline_count }}',
-              workflow: '${{ inputs.workflow }}'
-            },
-            github,
-            context,
-            core,
-            actionPath: process.env.GITHUB_ACTION_PATH
+          const fs = require('fs');
+          const path = require('path');
+
+          const BASELINE_COUNT = parseInt('${{ inputs.baseline_count }}');
+          const WORKFLOW = '${{ inputs.workflow }}';
+          const CURRENT_RUN_ID = context.runId.toString();
+
+          // Get current run metadata
+          const metadataFile = '/tmp/run-metadata/run_metadata.json';
+          if (!fs.existsSync(metadataFile)) {
+            throw new Error('Current run metadata not found');
+          }
+
+          const currentMetadata = JSON.parse(fs.readFileSync(metadataFile, 'utf8'));
+          console.log(`Current run job: ${currentMetadata.job_id}`);
+
+          // Get successful workflow runs
+          const { data: workflowRuns } = await github.rest.actions.listWorkflowRuns({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: WORKFLOW,
+            status: 'completed',
+            conclusion: 'success',
+            per_page: 50
           });
-          core.setOutput('baselines_found', result.baselines_found.toString());
-          core.setOutput('config_path', result.config_path);
+
+          const baselines = [];
+
+          for (const run of workflowRuns.workflow_runs) {
+            if (baselines.length >= BASELINE_COUNT) break;
+            if (run.id.toString() === CURRENT_RUN_ID) continue;
+
+            // Check for metadata artifact
+            const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: run.id
+            });
+
+            const metadataArtifact = artifacts.artifacts.find(artifact =>
+              artifact.name === `run-metadata-${currentMetadata.job_id}-${run.id}` && !artifact.expired
+            );
+
+            if (metadataArtifact) {
+              baselines.push({
+                name: `Baseline ${run.run_number} (#${run.id})`,
+                start_time: new Date(run.created_at).getTime(),
+                end_time: new Date(run.updated_at).getTime(),
+                labels: {
+                  gh_run_id: run.id.toString(),
+                  gh_job_id: currentMetadata.job_id,
+                  gh_run_attempt: "1",
+                  gh_repo: context.repo.owner + "/" + context.repo.repo,
+                  is_ephemeral_node: "false"
+                }
+              });
+
+              console.log(`Added baseline: Run ${run.run_number}`);
+            }
+          }
+
+          // Build configuration
+          const config = {
+            query: '${{ inputs.query }}',
+            metric_name: '${{ inputs.metric_name }}',
+            x_axis_label: '${{ inputs.x_axis_label }}',
+            y_axis_label: '${{ inputs.y_axis_label }}' || '${{ inputs.metric_name }}',
+            candidate: {
+              start_time: currentMetadata.start_timestamp * 1000,
+              end_time: currentMetadata.end_timestamp * 1000,
+              name: `Candidate (#${CURRENT_RUN_ID})`,
+              labels: {
+                gh_run_id: CURRENT_RUN_ID,
+                gh_job_id: currentMetadata.job_id,
+                gh_run_attempt: currentMetadata.run_attempt,
+                gh_repo: currentMetadata.repository,
+                is_ephemeral_node: "false"
+              }
+            },
+            baselines: baselines,
+            output_file: path.join(process.env.GITHUB_ACTION_PATH, `metric_visualization_${CURRENT_RUN_ID}.html`)
+          };
+
+          const configPath = path.join(process.env.GITHUB_ACTION_PATH, 'metric_config.json');
+          fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+
+          console.log(`Generated config with ${baselines.length} baselines`);
+
+          core.setOutput('baselines_found', baselines.length.toString());
+          core.setOutput('config_path', configPath);
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -101,8 +174,8 @@ runs:
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: metric-comparison-${{ github.run_id }}
+        name: metric-analysis-${{ github.run_id }}
         path: |
-          metric_visualization_*.html
-          metric_config.json
+          ${{ github.action_path }}/metric_visualization_*.html
+          ${{ steps.build-config.outputs.config_path }}
         retention-days: 14
