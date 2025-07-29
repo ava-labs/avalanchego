@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
@@ -34,10 +33,9 @@ import (
 	"github.com/ava-labs/avalanchego/subnets"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/ips"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
@@ -78,11 +76,11 @@ var (
 	errCannotTrackPrimaryNetwork              = errors.New("cannot track primary network")
 	errStakingKeyContentUnset                 = fmt.Errorf("%s key not set but %s set", StakingTLSKeyContentKey, StakingCertContentKey)
 	errStakingCertContentUnset                = fmt.Errorf("%s key set but %s not set", StakingTLSKeyContentKey, StakingCertContentKey)
-	errMissingStakingSigningKeyFile           = errors.New("missing staking signing key file")
 	errPluginDirNotADirectory                 = errors.New("plugin dir is not a directory")
 	errCannotReadDirectory                    = errors.New("cannot read directory")
 	errUnmarshalling                          = errors.New("unmarshalling failed")
 	errFileDoesNotExist                       = errors.New("file does not exist")
+	errInvalidSignerConfig                    = fmt.Errorf("only one of the following flags can be set: %s, %s, %s, %s", StakingEphemeralSignerEnabledKey, StakingSignerKeyContentKey, StakingSignerKeyPathKey, StakingRPCSignerEndpointKey)
 )
 
 func getConsensusConfig(v *viper.Viper) snowball.Parameters {
@@ -639,74 +637,15 @@ func getStakingTLSCert(v *viper.Viper) (tls.Certificate, error) {
 	}
 }
 
-func getStakingSigner(v *viper.Viper) (bls.Signer, error) {
-	if v.GetBool(StakingEphemeralSignerEnabledKey) {
-		key, err := localsigner.New()
-		if err != nil {
-			return nil, fmt.Errorf("couldn't generate ephemeral signing key: %w", err)
-		}
-		return key, nil
-	}
-
-	if v.IsSet(StakingSignerKeyContentKey) {
-		signerKeyRawContent := v.GetString(StakingSignerKeyContentKey)
-		signerKeyContent, err := base64.StdEncoding.DecodeString(signerKeyRawContent)
-		if err != nil {
-			return nil, fmt.Errorf("unable to decode base64 content: %w", err)
-		}
-		key, err := localsigner.FromBytes(signerKeyContent)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't parse signing key: %w", err)
-		}
-		return key, nil
-	}
-
-	signingKeyPath := getExpandedArg(v, StakingSignerKeyPathKey)
-	_, err := os.Stat(signingKeyPath)
-	if !errors.Is(err, fs.ErrNotExist) {
-		signingKeyBytes, err := os.ReadFile(signingKeyPath)
-		if err != nil {
-			return nil, err
-		}
-		key, err := localsigner.FromBytes(signingKeyBytes)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't parse signing key: %w", err)
-		}
-		return key, nil
-	}
-
-	if v.IsSet(StakingSignerKeyPathKey) {
-		return nil, errMissingStakingSigningKeyFile
-	}
-
-	key, err := localsigner.New()
-	if err != nil {
-		return nil, fmt.Errorf("couldn't generate new signing key: %w", err)
-	}
-
-	if err := os.MkdirAll(filepath.Dir(signingKeyPath), perms.ReadWriteExecute); err != nil {
-		return nil, fmt.Errorf("couldn't create path for signing key at %s: %w", signingKeyPath, err)
-	}
-
-	keyBytes := key.ToBytes()
-	if err := os.WriteFile(signingKeyPath, keyBytes, perms.ReadWrite); err != nil {
-		return nil, fmt.Errorf("couldn't write new signing key to %s: %w", signingKeyPath, err)
-	}
-	if err := os.Chmod(signingKeyPath, perms.ReadOnly); err != nil {
-		return nil, fmt.Errorf("couldn't restrict permissions on new signing key at %s: %w", signingKeyPath, err)
-	}
-	return key, nil
-}
-
 func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, error) {
 	config := node.StakingConfig{
 		SybilProtectionEnabled:        v.GetBool(SybilProtectionEnabledKey),
 		SybilProtectionDisabledWeight: v.GetUint64(SybilProtectionDisabledWeightKey),
 		PartialSyncPrimaryNetwork:     v.GetBool(PartialSyncPrimaryNetworkKey),
-		StakingKeyPath:                getExpandedArg(v, StakingTLSKeyPathKey),
-		StakingCertPath:               getExpandedArg(v, StakingCertPathKey),
-		StakingSignerPath:             getExpandedArg(v, StakingSignerKeyPathKey),
+		StakingTLSKeyPath:             getExpandedArg(v, StakingTLSKeyPathKey),
+		StakingTLSCertPath:            getExpandedArg(v, StakingCertPathKey),
 	}
+
 	if !config.SybilProtectionEnabled && config.SybilProtectionDisabledWeight == 0 {
 		return node.StakingConfig{}, errSybilProtectionDisabledStakerWeights
 	}
@@ -720,10 +659,12 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 	if err != nil {
 		return node.StakingConfig{}, err
 	}
-	config.StakingSigningKey, err = getStakingSigner(v)
+
+	config.StakingSignerConfig, err = getStakingSignerConfig(v)
 	if err != nil {
 		return node.StakingConfig{}, err
 	}
+
 	if networkID != constants.MainnetID && networkID != constants.FujiID {
 		config.UptimeRequirement = v.GetFloat64(UptimeRequirementKey)
 		config.MinValidatorStake = v.GetUint64(MinValidatorStakeKey)
@@ -758,6 +699,33 @@ func getStakingConfig(v *viper.Viper, networkID uint32) (node.StakingConfig, err
 		config.StakingConfig = genesis.GetStakingConfig(networkID)
 	}
 	return config, nil
+}
+
+func getStakingSignerConfig(v *viper.Viper) (node.StakingSignerConfig, error) {
+	// A maximum of one signer option can be set
+	bools := bag.Of(
+		v.GetBool(StakingEphemeralSignerEnabledKey),
+		v.IsSet(StakingSignerKeyContentKey),
+		v.IsSet(StakingSignerKeyPathKey),
+		v.IsSet(StakingRPCSignerEndpointKey),
+	)
+	if bools.Count(true) > 1 {
+		return node.StakingSignerConfig{}, errInvalidSignerConfig
+	}
+
+	var signerKeyPath string
+	// Set signerKeyPath only none of the other signer options are set
+	if !v.GetBool(StakingEphemeralSignerEnabledKey) && !v.IsSet(StakingSignerKeyContentKey) && !v.IsSet(StakingRPCSignerEndpointKey) {
+		signerKeyPath = getExpandedArg(v, StakingSignerKeyPathKey)
+	}
+
+	return node.StakingSignerConfig{
+		EphemeralSignerEnabled: v.GetBool(StakingEphemeralSignerEnabledKey),
+		KeyContent:             getExpandedArg(v, StakingSignerKeyContentKey),
+		KeyPath:                signerKeyPath,
+		RPCEndpoint:            getExpandedArg(v, StakingRPCSignerEndpointKey),
+		KeyPathIsSet:           v.IsSet(StakingSignerKeyPathKey),
+	}, nil
 }
 
 func getTxFeeConfig(v *viper.Viper, networkID uint32) genesis.TxFeeConfig {
