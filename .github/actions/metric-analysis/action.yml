@@ -22,7 +22,7 @@ inputs:
     default: ''
   workflow:
     description: 'Workflow to search for baselines. Can be filename (ci.yml, c-chain-reexecution-benchmark.yml...) or a workflow name. Enables cross-workflow baseline comparison.'
-    default: 'Tests'
+    default: 'ci.yaml'
   job_name:
     description: 'Job name to search for baselines. Uses current job if not specified.'
     default: ''
