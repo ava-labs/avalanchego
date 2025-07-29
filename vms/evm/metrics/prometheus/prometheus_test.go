@@ -8,12 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/libevm/metrics"
 	"github.com/prometheus/common/expfmt"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/evm/metrics/metricstest"
-	"github.com/ava-labs/libevm/metrics"
 )
 
 func TestGatherer_Gather(t *testing.T) {
@@ -125,18 +124,18 @@ test_timer_count 6
 	expectedMetrics, err := parser.TextToMetricFamilies(stringReader)
 	require.NoError(t, err)
 
-	assert.Len(t, families, len(expectedMetrics))
+	require.Len(t, families, len(expectedMetrics))
 	for i, got := range families {
 		require.NotNil(t, *got.Name)
 
 		want := expectedMetrics[*got.Name]
-		assert.Equal(t, want, got, i)
+		require.Equal(t, want, got, i)
 	}
 
 	register(t, "unsupported", metrics.NewHealthcheck(nil))
 	families, err = gatherer.Gather()
-	assert.ErrorIs(t, err, errMetricTypeNotSupported)
-	assert.Empty(t, families)
+	require.ErrorIs(t, err, errMetricTypeNotSupported)
+	require.Empty(t, families)
 }
 
 func registerNilMetrics(t *testing.T, register func(t *testing.T, name string, collector any)) {

@@ -6,12 +6,11 @@ package prometheus
 import (
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/libevm/metrics"
+	"github.com/prometheus/client_golang/prometheus"
 
 	dto "github.com/prometheus/client_model/go"
 )
@@ -36,10 +35,10 @@ func NewGatherer(registry Registry) *Gatherer {
 func (g *Gatherer) Gather() (mfs []*dto.MetricFamily, err error) {
 	// Gather and pre-sort the metrics to avoid random listings
 	var names []string
-	g.registry.Each(func(name string, i any) {
+	g.registry.Each(func(name string, _ any) {
 		names = append(names, name)
 	})
-	sort.Strings(names)
+	slices.Sort(names)
 
 	mfs = make([]*dto.MetricFamily, 0, len(names))
 	for _, name := range names {
@@ -133,7 +132,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 			Type: dto.MetricType_SUMMARY.Enum(),
 			Metric: []*dto.Metric{{
 				Summary: &dto.Summary{
-					SampleCount: ptrTo(uint64(snapshot.Count())), //nolint:gosec
+					SampleCount: ptrTo(uint64(snapshot.Count())),
 					SampleSum:   ptrTo(float64(snapshot.Sum())),
 					Quantile:    dtoQuantiles,
 				},
@@ -167,7 +166,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 			Type: dto.MetricType_SUMMARY.Enum(),
 			Metric: []*dto.Metric{{
 				Summary: &dto.Summary{
-					SampleCount: ptrTo(uint64(snapshot.Count())), //nolint:gosec
+					SampleCount: ptrTo(uint64(snapshot.Count())),
 					SampleSum:   ptrTo(float64(snapshot.Sum())),
 					Quantile:    dtoQuantiles,
 				},
@@ -195,7 +194,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 			Type: dto.MetricType_SUMMARY.Enum(),
 			Metric: []*dto.Metric{{
 				Summary: &dto.Summary{
-					SampleCount: ptrTo(uint64(count)), //nolint:gosec
+					SampleCount: ptrTo(uint64(count)),
 					SampleSum:   ptrTo(float64(count) * snapshot.Mean()),
 					Quantile:    dtoQuantiles,
 				},
