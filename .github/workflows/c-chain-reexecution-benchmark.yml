@@ -78,6 +78,5 @@ jobs:
           with:
             tool: 'go'
             output-file-path: ${{ github.workspace }}/reexecute-cchain-range-benchmark-res.txt
-            external-data-json-path: ./cache/${{ runner.os }}-reexecute-cchain-range-benchmark.json
             github-token: ${{ secrets.GITHUB_TOKEN }}
             auto-push: true
