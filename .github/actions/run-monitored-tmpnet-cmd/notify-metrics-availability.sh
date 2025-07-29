@@ -17,3 +17,21 @@ if [[ -n "${FILTER_BY_OWNER:-}" ]]; then
 fi
 
 echo "grafana link for shared network logs and metrics: ${metrics_url}"
+
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+  echo "metrics_url=${metrics_url}" >> $GITHUB_OUTPUT
+
+  # Save metadata for analysis
+  mkdir -p /tmp/run-metadata
+  cat > /tmp/run-metadata/run_metadata.json << EOF
+{
+  "run_id": "${GH_RUN_ID:-}",
+  "run_attempt": "${GH_RUN_ATTEMPT:-}",
+  "job_id": "${GH_JOB_ID}",
+  "metrics_url": "${metrics_url}",
+  "start_timestamp": ${from_timestamp},
+  "end_timestamp": ${to_timestamp},
+  "repository": "${GH_REPO:-}"
+}
+EOF
+fi
