@@ -36,8 +36,8 @@ To view the state of the test network, `tmpnet` will log a Grafana URL:
 [07-25|13:47:36.137] INFO tmpnet/network.go:410 metrics and logs available via grafana (collectors must be running) {"url": "https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%7C%3D%7Ce1b9dd69-5204-4c24-8b98-d3aea14c0eeb&var-filter=is_ephemeral_node%7C%3D%7Cfalse&from=1753465644564&to=now"}
 ```
 
-Clicking on this Grafana link will take you to monitoring stack where you can view 
-the state of the network.
+Clicking on this link will open the main AvalancheGo dashboard in Grafana
+filtered to display only results from the test.
 
 ## Architecture
 
@@ -65,9 +65,7 @@ flowchart BT
     NodeC
   end
 
-  WalletA --> Metrics
-  WalletB --> Metrics
-  WalletC --> Metrics
+  Generator --> Metrics
 
   WalletA --> NodeA
   WalletB --> NodeB
@@ -83,7 +81,7 @@ In addition to network creation, the executable directs `tmpnet` to create `n` p
 
 #### Kubernetes Support
 
-By default, the nodes of a network created by a load test are local processes. However, it's possible for network nodes to run within a Kubernetes cluster as pods. For example, to run a load test with nodes in a Kind cluster, execute the following:
+By default, the nodes of a network created by a load test are local processes. However, it's possible for network nodes to run within a Kubernetes cluster as pods. For example, to run a load test with nodes in a [Kind](https://kind.sigs.k8s.io/) cluster, execute the following:
 
 ```bash
 # Start nix development environment
@@ -108,7 +106,8 @@ The load generator is setup as follows:
 
 For client-side metrics to be collected by `tmpnet` and uploaded to the Avalanche
 monitoring stack, this executable also starts a metric server which exports the registry metrics
-updated by the generator/wallets.
+updated by the generator/wallets. The server is configured to be targeted by
+`tmpnet`'s metrics collector via a service discovery config.
 
 ## Configuration
 
