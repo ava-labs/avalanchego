@@ -1,4 +1,4 @@
-# AvalancheGo Configuration
+# AvalancheGo Configs and Flags
 
 This document lists all available configuration options for AvalancheGo nodes. You can configure your node using either command-line flags or environment variables.
 
