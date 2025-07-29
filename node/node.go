@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/api/info/infoconnect"
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/chains"
@@ -88,6 +87,7 @@ import (
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
 	coreth "github.com/ava-labs/coreth/plugin/factory"
+	infoconnect "github.com/ava-labs/avalanchego/api/info/connect"
 )
 
 const (
@@ -1376,7 +1376,6 @@ func (n *Node) initInfoAPI() error {
 		Log:          n.Log,
 		Validators:   n.vdrs,
 		ChainManager: n.chainManager,
-		VMManager:    n.VMManager,
 		MyIP:         n.Config.NetworkConfig.MyIPPort,
 		Networking:   n.Net,
 		Benchlist:    n.benchlistManager,

@@ -31,7 +31,7 @@ func (s *Service) GetNodeVersion(
 ) (*connect.Response[infopb.GetNodeVersionResponse], error) {
 	var jsonResponse info.GetNodeVersionReply
 	if err := s.Info.GetNodeVersion(nil, nil, &jsonResponse); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get node version: %w", err)
 	}
 
 	vmVersions := make(map[string]string)
@@ -56,7 +56,7 @@ func (s *Service) GetNodeID(
 ) (*connect.Response[infopb.GetNodeIDResponse], error) {
 	var jsonResponse info.GetNodeIDReply
 	if err := s.Info.GetNodeID(nil, nil, &jsonResponse); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get node id: %w", err)
 	}
 
 	response := &infopb.GetNodeIDResponse{
@@ -95,7 +95,7 @@ func (s *Service) GetNodeIP(
 ) (*connect.Response[infopb.GetNodeIPResponse], error) {
 	var jsonResponse info.GetNodeIPReply
 	if err := s.Info.GetNodeIP(nil, nil, &jsonResponse); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get node ip: %w", err)
 	}
 
 	response := &infopb.GetNodeIPResponse{
@@ -111,7 +111,7 @@ func (s *Service) GetNetworkID(
 ) (*connect.Response[infopb.GetNetworkIDResponse], error) {
 	var jsonResponse info.GetNetworkIDReply
 	if err := s.Info.GetNetworkID(nil, nil, &jsonResponse); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get network id: %w", err)
 	}
 
 	response := &infopb.GetNetworkIDResponse{
@@ -127,7 +127,7 @@ func (s *Service) GetNetworkName(
 ) (*connect.Response[infopb.GetNetworkNameResponse], error) {
 	var jsonResponse info.GetNetworkNameReply
 	if err := s.Info.GetNetworkName(nil, nil, &jsonResponse); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get network name: %w", err)
 	}
 
 	response := &infopb.GetNetworkNameResponse{
@@ -149,7 +149,7 @@ func (s *Service) GetChainID(
 	if err := s.Info.GetBlockchainID(nil,
 		&jsonRequest,
 		&jsonResponse); err != nil {
-		return nil, err // todo error wrapping
+		return nil, fmt.Errorf("failed to get blockchain id: %w", err)
 	}
 
 	response := &infopb.GetChainIDResponse{
@@ -163,7 +163,7 @@ func (s *Service) GetPeers(
 	_ context.Context,
 	request *connect.Request[infopb.GetPeersRequest],
 ) (*connect.Response[infopb.GetPeersResponse], error) {
-	nodeIDs := make([]ids.NodeID, 0, len(request.Msg.NodeIds))
+	nodeIDs := make([]ids.NodeID, len(request.Msg.NodeIds))
 	for _, nodeIDStr := range request.Msg.NodeIds {
 		nodeID, err := ids.NodeIDFromString(nodeIDStr)
 		if err != nil {
@@ -216,7 +216,6 @@ func (s *Service) GetBootstrapped(
 	_ context.Context,
 	request *connect.Request[infopb.GetBootstrappedRequest],
 ) (*connect.Response[infopb.GetBootstrappedResponse], error) {
-	// Use the chain from the request
 	jsonRequest := info.IsBootstrappedArgs{
 		Chain: request.Msg.Chain,
 	}

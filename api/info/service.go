@@ -73,7 +73,6 @@ type Info struct {
 	MyIP         *utils.Atomic[netip.AddrPort]
 	Networking   network.Network
 	ChainManager chains.Manager
-	VMManager    vms.Manager
 	Benchlist    benchlist.Manager
 }
 
