@@ -53,6 +53,8 @@ func NewMempool(
 	}, nil
 }
 
+// Add attempts to add tx to the mempool as a Remote transaction. It is assumed
+// the snow context lock is not held.
 func (m *Mempool) Add(tx *atomic.Tx) error {
 	m.ctx.Lock.RLock()
 	defer m.ctx.Lock.RUnlock()
@@ -60,8 +62,11 @@ func (m *Mempool) Add(tx *atomic.Tx) error {
 	return m.AddRemoteTx(tx)
 }
 
-// AddRemoteTx attempts to add [tx] to the mempool and returns an error if
-// it could not be added to the mempool.
+// AddRemoteTx attempts to add tx to the mempool as a Remote transaction.
+//
+// Remote transactions are checked for recent verification failures prior to
+// performing verification. If a Remote transaction failed verification recently
+// it will not be added to the mempool.
 func (m *Mempool) AddRemoteTx(tx *atomic.Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -85,16 +90,16 @@ func (m *Mempool) AddRemoteTx(tx *atomic.Tx) error {
 	return err
 }
 
+// AddLocalTx attempts to add tx to the mempool as a Local transaction.
+//
+// Local transactions are not checked for recent verification failures prior to
+// performing verification. Even if a Local transaction failed verification
+// recently, the mempool will attempt to re-verify it.
 func (m *Mempool) AddLocalTx(tx *atomic.Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	err := m.addTx(tx, true, false)
-	if errors.Is(err, ErrAlreadyKnown) {
-		return nil
-	}
-
-	return err
+	return m.addTx(tx, true, false)
 }
 
 // ForceAddTx forcibly adds a *atomic.Tx to the mempool and bypasses all verification.

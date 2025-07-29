@@ -8,14 +8,14 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ava-labs/coreth/plugin/evm/atomic"
-
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
 	"github.com/ava-labs/coreth/plugin/evm/client"
 	"github.com/ava-labs/libevm/log"
 )
@@ -159,9 +159,15 @@ func (service *AvaxAPI) IssueTx(r *http.Request, args *api.FormattedTx, response
 	service.vm.Ctx.Lock.Lock()
 	defer service.vm.Ctx.Lock.Unlock()
 
-	if err := service.vm.AtomicMempool.AddLocalTx(tx); err != nil {
+	err = service.vm.AtomicMempool.AddLocalTx(tx)
+	if err != nil && !errors.Is(err, txpool.ErrAlreadyKnown) {
 		return err
 	}
+
+	// If the tx was either already in the mempool or was added to the mempool,
+	// we push it to the network for inclusion. If the tx was previously added
+	// to the mempool through p2p gossip, this will ensure this node also pushes
+	// it to the network.
 	service.vm.AtomicTxPushGossiper.Add(tx)
 	return nil
 }
