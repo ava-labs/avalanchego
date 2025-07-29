@@ -1,29 +1,37 @@
 # Load Testing
 
 The `load` package provides a comprehensive framework for performing load testing 
-against an Ethereum Virtual Machine (EVM) chain. It allows for simulations of various
+against an Ethereum Virtual Machine (EVM) chain. It allows for simulation of various
 transaction scenarios to test network performance, transaction throughput, and system
 resilience under different workloads.
 
 ## Prerequisites
 
-Using the `load` package is often coupled with `tmpnet`, a package which enables temporary orchestration of an Avalanche network. It is highly recommended that developers refer to the `tmpnet` [README.md](../fixture/tmpnet/README.md) for how to create a temporary network to run load tests against.
+Using the `load` package is often coupled with `tmpnet`, a framework that
+enables orchestration of temporary AvalancheGo networks. For more details as to
+its capabilities and configuration, refer to the `tmpnet` [README.md](../fixture/tmpnet/README.md).
 
 ## Components
 
 ### Worker
 
-Workers represent an account which will be used for load testing. Each worker consists of a private key, nonce, and a network client - these values are used to create a wallet for load testing.
+Workers represent accounts which will be used for load testing. Each worker consists of a private key, nonce, and a network client - these values are used to create a wallet for load testing.
 
 ### Wallet
 
-Wallets manage account state and transaction lifecycle for a single account.
+A wallet manages account state and transaction lifecycle for a single account.
 
-The main functionality of wallets is to send transactions; wallets take signed transactions
-and send them to the network, monitoring block headers to detect transaction inclusion. A wallet
+The main function of wallets is to send transactions; wallets take signed transactions
+and send them to the network while monitoring block headers to detect transaction inclusion. A wallet
 considers a transaction successful if its execution succeeded, and returns an error otherwise. 
 Upon confirming a transaction was successful, a wallet increments its nonce by one, ensuring its account
-state is accurate.
+state matches that of the network.
+
+Wallets are not thread-safe and each account should have at most one wallet
+instance associated with it. Having multiple wallets associated with a single 
+account, or using an account outside of a wallet, can cause synchronization 
+issues. This risks a wallet's state becoming inconsistent with the network, 
+potentially leading to failed transactions.
 
 Wallets are not thread-safe and each account should have at most one wallet instance associated with it.
 
@@ -34,14 +42,14 @@ generator are as follows:
 
 - **Parallel Execution**: Runs a goroutine per wallet for concurrent test execution.
 - **Timeout Management**: Supports both overall load test timeout and a timeout per-test.
-- **Error Recovery**: Automatically recovers from test panics to ensure continuous load generation.
+- **Error Recovery**: Automatically recovers from test failures to ensure continuous load generation.
 - **Metrics**: Creates metrics during wallet initialization and tracks performance throughout execution.
 
-The generator starts a process for each wallet to execute tests asynchronously, maximizing throughput while maintaining isolation between accounts.
+The generator starts a goroutine for each wallet to execute tests asynchronously, maximizing throughput while maintaining isolation between accounts.
 
 ### Tests
 
-The `load` package performs load testing by continuously running a series of unit tests. This approach provides the following benefits:
+The `load` package performs load testing by continuously running a series of tests. This approach provides the following benefits:
 
 - **Correctness**: Each test validates transaction execution and state changes, ensuring the network behaves as expected under load
 - **Reproducibility**: Standardized test scenarios with consistent parameters enable repeatable performance measurements and regression detection
@@ -59,21 +67,22 @@ type Test interface {
 
 The `load` package provides a comprehensive suite of test types designed to stress different aspects of EVM execution. Each test targets specific performance characteristics and resource usage patterns.
 
-| Test Type         | Description                                             |
-| ----------------- | ------------------------------------------------------- |
-| ZeroTransfer      | Simple self-transfer of 0 AVAX                          |
-| Read              | Performs multiple storage reads from contract state     |
-| Write             | Sequential storage writes to new contract storage slots |
-| StateModification | Updates existing storage values or creates new ones     |
-| Hashing           | Executes Keccak256 hash operations in a loop            |
-| PureCompute       | Performs CPU-intensive mathematical computations        |
-| Memory            | Allocates and manipulates dynamic arrays                |
-| CallDepth         | Performs recursive function calls to test stack limits  |
-| ContractCreation  | Deploys new contracts during execution                  |
-| ExternalCall      | Makes calls to external contract functions              |
-| LargeEvent        | Emits events with large data payloads                   |
+| Test Type         | Description                                                     |
+| ----------------- | --------------------------------------------------------------- |
+| ZeroTransfer      | Performs self-transfer of 0 AVAX                                |
+| Read              | Performs multiple storage reads from contract state             |
+| Write             | Executes equential storage writes to new contract storage slots |
+| StateModification | Updates existing storage values or creates new ones             |
+| Hashing           | Executes Keccak256 hash operations in a loop                    |
+| PureCompute       | Performs CPU-intensive mathematical computations                |
+| Memory            | Allocates and manipulates dynamic arrays                        |
+| CallDepth         | Performs recursive function calls to test stack limits          |
+| ContractCreation  | Deploys new contracts during execution                          |
+| ExternalCall      | Makes calls to external contract functions                      |
+| LargeEvent        | Emits events with large data payloads                           |
 
-There is also a `RandomTest` which executes one of the tests above uniformly at random when called. This test is particular useful for mimicing the diverse transactions patterns seen on blockchains like the C-Chain.
+Additionally, there is a `RandomTest` which executes one of the aforementioned tests, selected uniformly at random.
+This test is particular useful for mimicking the diverse transactions patterns seen on blockchains like the C-Chain.
 
 ### Metrics
 
