@@ -227,14 +227,19 @@ func (t TransferTest) Run(
 	bigGwei := big.NewInt(params.GWei)
 	gasTipCap := new(big.Int).Mul(bigGwei, big.NewInt(1))
 	gasFeeCap := new(big.Int).Mul(bigGwei, maxFeeCap)
-	senderAddress := crypto.PubkeyToAddress(wallet.privKey.PublicKey)
+
+	// Generate non-existent account address
+	pk, err := crypto.GenerateKey()
+	require.NoError(err)
+	recipient := crypto.PubkeyToAddress(pk.PublicKey)
+
 	tx, err := types.SignNewTx(wallet.privKey, wallet.signer, &types.DynamicFeeTx{
 		ChainID:   wallet.chainID,
 		Nonce:     wallet.nonce,
 		GasTipCap: gasTipCap,
 		GasFeeCap: gasFeeCap,
 		Gas:       params.TxGas,
-		To:        &senderAddress,
+		To:        &recipient,
 		Data:      nil,
 		Value:     t.Value,
 	})
