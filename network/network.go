@@ -260,28 +260,29 @@ func NewNetwork(
 	}
 
 	peerConfig := &peer.Config{
-		ReadBufferSize:       config.PeerReadBufferSize,
-		WriteBufferSize:      config.PeerWriteBufferSize,
-		Metrics:              peerMetrics,
-		MessageCreator:       msgCreator,
-		Log:                  log,
-		InboundMsgThrottler:  inboundMsgThrottler,
-		Network:              nil, // This is set below.
-		Router:               router,
-		VersionCompatibility: version.GetCompatibility(minCompatibleTime),
-		MyNodeID:             config.MyNodeID,
-		MySubnets:            config.TrackedSubnets,
-		Beacons:              config.Beacons,
-		Validators:           config.Validators,
-		NetworkID:            config.NetworkID,
-		PingFrequency:        config.PingFrequency,
-		PongTimeout:          config.PingPongTimeout,
-		MaxClockDifference:   config.MaxClockDifference,
-		SupportedACPs:        config.SupportedACPs.List(),
-		ObjectedACPs:         config.ObjectedACPs.List(),
-		ResourceTracker:      config.ResourceTracker,
-		UptimeCalculator:     config.UptimeCalculator,
-		IPSigner:             peer.NewIPSigner(config.MyIPPort, config.TLSKey, config.BLSKey),
+		ReadBufferSize:         config.PeerReadBufferSize,
+		WriteBufferSize:        config.PeerWriteBufferSize,
+		Metrics:                peerMetrics,
+		MessageCreator:         msgCreator,
+		Log:                    log,
+		InboundMsgThrottler:    inboundMsgThrottler,
+		Network:                nil, // This is set below.
+		Router:                 router,
+		VersionCompatibility:   version.GetCompatibility(minCompatibleTime),
+		MyNodeID:               config.MyNodeID,
+		MySubnets:              config.TrackedSubnets,
+		Beacons:                config.Beacons,
+		Validators:             config.Validators,
+		NetworkID:              config.NetworkID,
+		PingFrequency:          config.PingFrequency,
+		PongTimeout:            config.PingPongTimeout,
+		MaxClockDifference:     config.MaxClockDifference,
+		SupportedACPs:          config.SupportedACPs.List(),
+		ObjectedACPs:           config.ObjectedACPs.List(),
+		ResourceTracker:        config.ResourceTracker,
+		UptimeCalculator:       config.UptimeCalculator,
+		IPSigner:               peer.NewIPSigner(config.MyIPPort, config.TLSKey, config.BLSKey),
+		ConnectToAllValidators: config.ConnectToAllValidators,
 	}
 
 	onCloseCtx, cancel := context.WithCancel(context.Background())
@@ -503,13 +504,14 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 		return true
 	}
 	_, areWeAPrimaryNetworkAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
-	return areWeAPrimaryNetworkAValidator || n.ipTracker.WantsConnection(nodeID)
+	return areWeAPrimaryNetworkAValidator || n.ipTracker.WantsConnection(nodeID) || n.config.ConnectToAllValidators
 }
 
 func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
 	_, areWeAPrimaryNetworkAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
+	trackAllSubnets := areWeAPrimaryNetworkAValidator || n.config.ConnectToAllValidators
 	for _, ip := range claimedIPPorts {
-		if err := n.track(ip, areWeAPrimaryNetworkAValidator); err != nil {
+		if err := n.track(ip, trackAllSubnets); err != nil {
 			return err
 		}
 	}
