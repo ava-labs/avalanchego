@@ -241,6 +241,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 | `database-config-file` | string | Path to database configuration file | - |
 | `use-standalone-database` | bool | Use standalone database instead of shared one | - |
 | `inspect-database` | bool | Inspect database on startup | `false` |
+| `state-scheme` | string |  EXPERIMENTAL: specifies the database scheme to store state data; can be one of `hash` or `firewood` | `hash` | 
 
 ## Transaction Indexing
 

@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
@@ -38,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
-
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core"
@@ -47,6 +47,7 @@ import (
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/plugin/evm/config"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ava-labs/subnet-evm/plugin/evm/vmerrors"
@@ -63,6 +64,8 @@ import (
 )
 
 var (
+	schemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}
+
 	testNetworkID uint32 = avagoconstants.UnitTestID
 
 	testMinGasPrice int64            = 225_000_000_000
@@ -193,6 +196,19 @@ func newVM(t *testing.T, config testVMConfig) *testVM {
 	}
 }
 
+// Firewood cannot yet be run with an empty config.
+func getConfig(scheme, otherConfig string) string {
+	innerConfig := otherConfig
+	if scheme == customrawdb.FirewoodScheme {
+		if len(innerConfig) > 0 {
+			innerConfig += ", "
+		}
+		innerConfig += fmt.Sprintf(`"state-scheme": "%s", "snapshot-cache": 0, "pruning-enabled": true, "state-sync-enabled": false`, customrawdb.FirewoodScheme)
+	}
+
+	return fmt.Sprintf(`{%s}`, innerConfig)
+}
+
 // setupGenesis sets up the genesis
 func setupGenesis(
 	t *testing.T,
@@ -281,6 +297,14 @@ func TestVMContinuousProfiler(t *testing.T) {
 }
 
 func TestVMUpgrades(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testVMUpgrades(t, scheme)
+		})
+	}
+}
+
+func testVMUpgrades(t *testing.T, scheme string) {
 	genesisTests := []struct {
 		name             string
 		genesisJSON      string
@@ -297,12 +321,14 @@ func TestVMUpgrades(t *testing.T) {
 			expectedGasPrice: big.NewInt(0),
 		},
 	}
+
 	for _, test := range genesisTests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
 			vm := newVM(t, testVMConfig{
 				genesisJSON: test.genesisJSON,
+				configJSON:  getConfig(scheme, ""),
 			}).vm
 
 			defer func() {
@@ -354,10 +380,18 @@ func issueAndAccept(t *testing.T, vm *VM) snowman.Block {
 }
 
 func TestBuildEthTxBlock(t *testing.T) {
-	// reduce block gas cost
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testBuildEthTxBlock(t, scheme)
+		})
+	}
+}
+
+func testBuildEthTxBlock(t *testing.T, scheme string) {
+	fork := upgradetest.ApricotPhase2
 	tvm := newVM(t, testVMConfig{
 		genesisJSON: genesisJSONSubnetEVM,
-		configJSON:  `{"pruning-enabled":true}`,
+		configJSON:  getConfig(scheme, `"pruning-enabled":true`),
 	})
 
 	defer func() {
@@ -444,16 +478,15 @@ func TestBuildEthTxBlock(t *testing.T) {
 
 	restartedVM := &VM{}
 	newCTX := utilstest.NewTestSnowContext(t)
-	// Use the network upgrades from the existing VM's context to ensure consistency
-	newCTX.NetworkUpgrades = tvm.vm.ctx.NetworkUpgrades
-
+	newCTX.NetworkUpgrades = upgradetest.GetConfig(fork)
+	newCTX.ChainDataDir = tvm.vm.ctx.ChainDataDir
 	if err := restartedVM.Initialize(
 		context.Background(),
 		newCTX,
 		tvm.db,
 		[]byte(genesisJSONSubnetEVM),
 		[]byte(""),
-		[]byte(`{"pruning-enabled":true}`),
+		[]byte(getConfig(scheme, `"pruning-enabled":true`)),
 		[]*commonEng.Fx{},
 		nil,
 	); err != nil {
@@ -483,11 +516,19 @@ func TestBuildEthTxBlock(t *testing.T) {
 //	    |
 //	    D
 func TestSetPreferenceRace(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testSetPreferenceRace(t, scheme)
+		})
+	}
+}
+
+func testSetPreferenceRace(t *testing.T, scheme string) {
 	// Create two VMs which will agree on block A and then
 	// build the two distinct preferred chains above
 	tvmConfig := testVMConfig{
 		genesisJSON: genesisJSONSubnetEVM,
-		configJSON:  `{"pruning-enabled":false}`,
+		configJSON:  getConfig(scheme, `"pruning-enabled":true`),
 	}
 	tvm1 := newVM(t, tvmConfig)
 	tvm2 := newVM(t, tvmConfig)
@@ -733,9 +774,17 @@ func TestSetPreferenceRace(t *testing.T) {
 // accept block C, which should be an orphaned block at this point and
 // get rejected.
 func TestReorgProtection(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testReorgProtection(t, scheme)
+		})
+	}
+}
+
+func testReorgProtection(t *testing.T, scheme string) {
 	tvmConfig := testVMConfig{
 		genesisJSON: genesisJSONSubnetEVM,
-		configJSON:  `{"pruning-enabled":false}`,
+		configJSON:  getConfig(scheme, `"pruning-enabled":false`),
 	}
 	tvm1 := newVM(t, tvmConfig)
 	tvm2 := newVM(t, tvmConfig)
@@ -911,8 +960,16 @@ func TestReorgProtection(t *testing.T) {
 //	 / \
 //	B   C
 func TestNonCanonicalAccept(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testNonCanonicalAccept(t, scheme)
+		})
+	}
+}
+func testNonCanonicalAccept(t *testing.T, scheme string) {
 	tvmConfig := testVMConfig{
 		genesisJSON: genesisJSONSubnetEVM,
+		configJSON:  getConfig(scheme, ""),
 	}
 	tvm1 := newVM(t, tvmConfig)
 	tvm2 := newVM(t, tvmConfig)
@@ -1113,8 +1170,17 @@ func TestNonCanonicalAccept(t *testing.T) {
 //	    |
 //	    D
 func TestStickyPreference(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testStickyPreference(t, scheme)
+		})
+	}
+}
+
+func testStickyPreference(t *testing.T, scheme string) {
 	tvmConfig := testVMConfig{
 		genesisJSON: genesisJSONSubnetEVM,
+		configJSON:  getConfig(scheme, ""),
 	}
 	tvm1 := newVM(t, tvmConfig)
 	tvm2 := newVM(t, tvmConfig)
@@ -1382,8 +1448,17 @@ func TestStickyPreference(t *testing.T) {
 //	    |
 //	    D
 func TestUncleBlock(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testUncleBlock(t, scheme)
+		})
+	}
+}
+
+func testUncleBlock(t *testing.T, scheme string) {
 	tvmConfig := testVMConfig{
 		genesisJSON: genesisJSONSubnetEVM,
+		configJSON:  getConfig(scheme, ""),
 	}
 	tvm1 := newVM(t, tvmConfig)
 	tvm2 := newVM(t, tvmConfig)
@@ -1572,8 +1647,17 @@ func TestUncleBlock(t *testing.T) {
 // Regression test to ensure that a VM that is not able to parse a block that
 // contains no transactions.
 func TestEmptyBlock(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testEmptyBlock(t, scheme)
+		})
+	}
+}
+
+func testEmptyBlock(t *testing.T, scheme string) {
 	tvm := newVM(t, testVMConfig{
 		genesisJSON: genesisJSONSubnetEVM,
+		configJSON:  getConfig(scheme, ""),
 	})
 
 	defer func() {
@@ -1634,8 +1718,17 @@ func TestEmptyBlock(t *testing.T) {
 //	    |
 //	    D
 func TestAcceptReorg(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testAcceptReorg(t, scheme)
+		})
+	}
+}
+
+func testAcceptReorg(t *testing.T, scheme string) {
 	tvmConfig := testVMConfig{
 		genesisJSON: genesisJSONSubnetEVM,
+		configJSON:  getConfig(scheme, ""),
 	}
 	tvm1 := newVM(t, tvmConfig)
 	tvm2 := newVM(t, tvmConfig)
@@ -1843,8 +1936,17 @@ func TestAcceptReorg(t *testing.T) {
 }
 
 func TestFutureBlock(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testFutureBlock(t, scheme)
+		})
+	}
+}
+
+func testFutureBlock(t *testing.T, scheme string) {
 	tvm := newVM(t, testVMConfig{
 		genesisJSON: genesisJSONSubnetEVM,
+		configJSON:  getConfig(scheme, ""),
 	})
 
 	defer func() {
@@ -1901,8 +2003,17 @@ func TestFutureBlock(t *testing.T) {
 }
 
 func TestLastAcceptedBlockNumberAllow(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testLastAcceptedBlockNumberAllow(t, scheme)
+		})
+	}
+}
+
+func testLastAcceptedBlockNumberAllow(t *testing.T, scheme string) {
 	tvm := newVM(t, testVMConfig{
 		genesisJSON: genesisJSONSubnetEVM,
+		configJSON:  getConfig(scheme, ""),
 	})
 
 	defer func() {
@@ -1974,8 +2085,17 @@ func TestLastAcceptedBlockNumberAllow(t *testing.T) {
 // Regression test to ensure we can build blocks if we are starting with the
 // Subnet EVM ruleset in genesis.
 func TestBuildSubnetEVMBlock(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testBuildSubnetEVMBlock(t, scheme)
+		})
+	}
+}
+
+func testBuildSubnetEVMBlock(t *testing.T, scheme string) {
 	tvm := newVM(t, testVMConfig{
 		genesisJSON: genesisJSONSubnetEVM,
+		configJSON:  getConfig(scheme, ""),
 	})
 
 	defer func() {
@@ -2057,6 +2177,14 @@ func TestBuildSubnetEVMBlock(t *testing.T) {
 }
 
 func TestBuildAllowListActivationBlock(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testBuildAllowListActivationBlock(t, scheme)
+		})
+	}
+}
+
+func testBuildAllowListActivationBlock(t *testing.T, scheme string) {
 	genesis := &core.Genesis{}
 	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
 		t.Fatal(err)
@@ -2071,6 +2199,7 @@ func TestBuildAllowListActivationBlock(t *testing.T) {
 	}
 	tvm := newVM(t, testVMConfig{
 		genesisJSON: string(genesisJSON),
+		configJSON:  getConfig(scheme, ""),
 	})
 
 	defer func() {
@@ -2589,6 +2718,14 @@ func TestFeeManagerChangeFee(t *testing.T) {
 
 // Test Allow Fee Recipients is disabled and, etherbase must be blackhole address
 func TestAllowFeeRecipientDisabled(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testAllowFeeRecipientDisabled(t, scheme)
+		})
+	}
+}
+
+func testAllowFeeRecipientDisabled(t *testing.T, scheme string) {
 	genesis := &core.Genesis{}
 	if err := genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)); err != nil {
 		t.Fatal(err)
@@ -2600,6 +2737,7 @@ func TestAllowFeeRecipientDisabled(t *testing.T) {
 	}
 	tvm := newVM(t, testVMConfig{
 		genesisJSON: string(genesisJSON),
+		configJSON:  getConfig(scheme, ""),
 	})
 
 	tvm.vm.miner.SetEtherbase(common.HexToAddress("0x0123456789")) // set non-blackhole address by force

@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/log"
 	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
@@ -341,14 +342,20 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Blo
 		}
 	}
 
-	statedb.Commit(0, false)
+	// Create the genesis block to use the block hash
+	block := types.NewBlock(head, nil, nil, nil, trie.NewStackTrie(nil))
+	triedbOpt := stateconf.WithTrieDBUpdatePayload(common.Hash{}, block.Hash())
+
+	if _, err := statedb.Commit(0, false, stateconf.WithTrieDBUpdateOpts(triedbOpt)); err != nil {
+		panic(fmt.Sprintf("unable to commit genesis block to statedb: %v", err))
+	}
 	// Commit newly generated states into disk if it's not empty.
 	if root != types.EmptyRootHash {
 		if err := triedb.Commit(root, true); err != nil {
 			panic(fmt.Sprintf("unable to commit genesis block: %v", err))
 		}
 	}
-	return types.NewBlock(head, nil, nil, nil, trie.NewStackTrie(nil))
+	return block
 }
 
 // Commit writes the block and state of a genesis specification to the database.

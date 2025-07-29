@@ -30,7 +30,9 @@ package core
 import (
 	"bytes"
 	_ "embed"
+	"fmt"
 	"math/big"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -46,9 +48,11 @@ import (
 	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
+	"github.com/ava-labs/subnet-evm/triedb/firewood"
 	"github.com/ava-labs/subnet-evm/triedb/pathdb"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/davecgh/go-spew/spew"
@@ -69,8 +73,11 @@ func TestGenesisBlockForTesting(t *testing.T) {
 }
 
 func TestSetupGenesis(t *testing.T) {
-	testSetupGenesis(t, rawdb.HashScheme)
-	testSetupGenesis(t, rawdb.PathScheme)
+	for _, scheme := range []string{rawdb.HashScheme, rawdb.PathScheme, customrawdb.FirewoodScheme} {
+		t.Run(scheme, func(t *testing.T) {
+			testSetupGenesis(t, scheme)
+		})
+	}
 }
 
 func testSetupGenesis(t *testing.T, scheme string) {
@@ -102,7 +109,7 @@ func testSetupGenesis(t *testing.T, scheme string) {
 		{
 			name: "genesis without ChainConfig",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				return setupGenesisBlock(db, triedb.NewDatabase(db, newDbConfig(scheme)), new(Genesis), common.Hash{})
+				return setupGenesisBlock(db, triedb.NewDatabase(db, newDbConfig(t, scheme)), new(Genesis), common.Hash{})
 			},
 			wantErr:    errGenesisNoConfig,
 			wantConfig: nil,
@@ -110,7 +117,7 @@ func testSetupGenesis(t *testing.T, scheme string) {
 		{
 			name: "no block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				return setupGenesisBlock(db, triedb.NewDatabase(db, newDbConfig(scheme)), nil, common.Hash{})
+				return setupGenesisBlock(db, triedb.NewDatabase(db, newDbConfig(t, scheme)), nil, common.Hash{})
 			},
 			wantErr:    ErrNoGenesis,
 			wantConfig: nil,
@@ -118,7 +125,7 @@ func testSetupGenesis(t *testing.T, scheme string) {
 		{
 			name: "custom block in DB, genesis == nil",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				tdb := triedb.NewDatabase(db, newDbConfig(scheme))
+				tdb := triedb.NewDatabase(db, newDbConfig(t, scheme))
 				customg.Commit(db, tdb)
 				return setupGenesisBlock(db, tdb, nil, common.Hash{})
 			},
@@ -128,7 +135,7 @@ func testSetupGenesis(t *testing.T, scheme string) {
 		{
 			name: "compatible config in DB",
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
-				tdb := triedb.NewDatabase(db, newDbConfig(scheme))
+				tdb := triedb.NewDatabase(db, newDbConfig(t, scheme))
 				oldcustomg.Commit(db, tdb)
 				return setupGenesisBlock(db, tdb, &customg, customghash)
 			},
@@ -140,13 +147,19 @@ func testSetupGenesis(t *testing.T, scheme string) {
 			fn: func(db ethdb.Database) (*params.ChainConfig, common.Hash, error) {
 				// Commit the 'old' genesis block with SubnetEVM transition at 90.
 				// Advance to block #4, past the SubnetEVM transition block of customg.
-				tdb := triedb.NewDatabase(db, newDbConfig(scheme))
+				tdb := triedb.NewDatabase(db, newDbConfig(t, rawdb.HashScheme))
 				genesis, err := oldcustomg.Commit(db, tdb)
 				if err != nil {
 					t.Fatal(err)
 				}
+				tdb.Close()
 
-				bc, _ := NewBlockChain(db, DefaultCacheConfigWithScheme(scheme), &oldcustomg, dummy.NewFullFaker(), vm.Config{}, genesis.Hash(), false)
+				cacheConfig := DefaultCacheConfigWithScheme(scheme)
+				cacheConfig.ChainDataDir = t.TempDir()
+				bc, err := NewBlockChain(db, cacheConfig, &oldcustomg, dummy.NewFullFaker(), vm.Config{}, genesis.Hash(), false)
+				if err != nil {
+					t.Fatal(err)
+				}
 				defer bc.Stop()
 
 				_, blocks, _, err := GenerateChainWithGenesis(&oldcustomg, dummy.NewFullFaker(), 4, 25, nil)
@@ -162,7 +175,7 @@ func testSetupGenesis(t *testing.T, scheme string) {
 				}
 
 				// This should return a compatibility error.
-				return setupGenesisBlock(db, tdb, &customg, bc.lastAccepted.Hash())
+				return setupGenesisBlock(db, bc.TrieDB(), &customg, bc.lastAccepted.Hash())
 			},
 			wantHash:   customghash,
 			wantConfig: customg.Config,
@@ -176,7 +189,7 @@ func testSetupGenesis(t *testing.T, scheme string) {
 	}
 
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s %s", test.name, scheme), func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
 			config, hash, err := test.fn(db)
 			// Check the return values.
@@ -351,11 +364,21 @@ func TestGenesisWriteUpgradesRegression(t *testing.T) {
 	require.NoError(err)
 }
 
-func newDbConfig(scheme string) *triedb.Config {
-	if scheme == rawdb.HashScheme {
+func newDbConfig(t *testing.T, scheme string) *triedb.Config {
+	switch scheme {
+	case rawdb.HashScheme:
 		return triedb.HashDefaults
+	case rawdb.PathScheme:
+		return &triedb.Config{DBOverride: pathdb.Defaults.BackendConstructor}
+	case customrawdb.FirewoodScheme:
+		fwCfg := firewood.Defaults
+		// Create a unique temporary directory for each test
+		fwCfg.FilePath = filepath.Join(t.TempDir(), "firewood_state") // matches blockchain.go
+		return &triedb.Config{DBOverride: fwCfg.BackendConstructor}
+	default:
+		t.Fatalf("unknown scheme %s", scheme)
 	}
-	return &triedb.Config{DBOverride: pathdb.Defaults.BackendConstructor}
+	return nil
 }
 
 func TestVerkleGenesisCommit(t *testing.T) {

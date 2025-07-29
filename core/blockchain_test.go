@@ -48,6 +48,9 @@ var (
 		SnapshotLimit:             256,
 		AcceptorQueueLimit:        64,
 	}
+
+	// Firewood should only be included for non-archive, snapshot disabled tests.
+	schemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}
 )
 
 func newGwei(n int64) *big.Int {
@@ -74,7 +77,7 @@ func createBlockChain(
 }
 
 func TestArchiveBlockChain(t *testing.T) {
-	createArchiveBlockChain := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error) {
+	createArchiveBlockChain := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, _ string) (*BlockChain, error) {
 		return createBlockChain(db, archiveConfig, gspec, lastAcceptedHash)
 	}
 	for _, tt := range tests {
@@ -85,7 +88,7 @@ func TestArchiveBlockChain(t *testing.T) {
 }
 
 func TestArchiveBlockChainSnapsDisabled(t *testing.T) {
-	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error) {
+	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, _ string) (*BlockChain, error) {
 		return createBlockChain(
 			db,
 			&CacheConfig{
@@ -109,7 +112,7 @@ func TestArchiveBlockChainSnapsDisabled(t *testing.T) {
 }
 
 func TestPruningBlockChain(t *testing.T) {
-	createPruningBlockChain := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error) {
+	createPruningBlockChain := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, _ string) (*BlockChain, error) {
 		return createBlockChain(db, pruningConfig, gspec, lastAcceptedHash)
 	}
 	for _, tt := range tests {
@@ -120,7 +123,15 @@ func TestPruningBlockChain(t *testing.T) {
 }
 
 func TestPruningBlockChainSnapsDisabled(t *testing.T) {
-	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testPruningBlockChainSnapsDisabled(t, scheme)
+		})
+	}
+}
+
+func testPruningBlockChainSnapsDisabled(t *testing.T, scheme string) {
+	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, dataPath string) (*BlockChain, error) {
 		return createBlockChain(
 			db,
 			&CacheConfig{
@@ -133,6 +144,8 @@ func TestPruningBlockChainSnapsDisabled(t *testing.T) {
 				StateHistory:              32,
 				SnapshotLimit:             0, // Disable snapshots
 				AcceptorQueueLimit:        64,
+				StateScheme:               scheme,
+				ChainDataDir:              dataPath,
 			},
 			gspec,
 			lastAcceptedHash,
@@ -152,7 +165,7 @@ type wrappedStateManager struct {
 func (w *wrappedStateManager) Shutdown() error { return nil }
 
 func TestPruningBlockChainUngracefulShutdown(t *testing.T) {
-	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error) {
+	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, _ string) (*BlockChain, error) {
 		blockchain, err := createBlockChain(db, pruningConfig, gspec, lastAcceptedHash)
 		if err != nil {
 			return nil, err
@@ -171,7 +184,17 @@ func TestPruningBlockChainUngracefulShutdown(t *testing.T) {
 }
 
 func TestPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T) {
-	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testPruningBlockChainUngracefulShutdownSnapsDisabled(t, scheme)
+		})
+	}
+}
+
+func testPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T, scheme string) {
+	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, dataPath string) (*BlockChain, error) {
+		// If no database path has been persisted, set the path to a temporary test directory.
+		// Otherwise, make sure not to overwrite so that it re-uses any existing database.
 		blockchain, err := createBlockChain(
 			db,
 			&CacheConfig{
@@ -184,6 +207,8 @@ func TestPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T) {
 				StateHistory:              32,
 				SnapshotLimit:             0, // Disable snapshots
 				AcceptorQueueLimit:        64,
+				StateScheme:               scheme,
+				ChainDataDir:              dataPath,
 			},
 			gspec,
 			lastAcceptedHash,
@@ -207,7 +232,7 @@ func TestPruningBlockChainUngracefulShutdownSnapsDisabled(t *testing.T) {
 func TestEnableSnapshots(t *testing.T) {
 	// Set snapshots to be disabled the first time, and then enable them on the restart
 	snapLimit := 0
-	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error) {
+	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, _ string) (*BlockChain, error) {
 		// Import the chain. This runs all block validation rules.
 		blockchain, err := createBlockChain(
 			db,
@@ -240,7 +265,7 @@ func TestEnableSnapshots(t *testing.T) {
 }
 
 func TestCorruptSnapshots(t *testing.T) {
-	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error) {
+	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, _ string) (*BlockChain, error) {
 		// Delete the snapshot block hash and state root to ensure that if we die in between writing a snapshot
 		// diff layer to disk at any point, we can still recover on restart.
 		customrawdb.DeleteSnapshotBlockHash(db)
@@ -256,7 +281,7 @@ func TestCorruptSnapshots(t *testing.T) {
 }
 
 func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
-	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error) {
+	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, _ string) (*BlockChain, error) {
 		// Import the chain. This runs all block validation rules.
 		blockchain, err := createBlockChain(db, pruningConfig, gspec, lastAcceptedHash)
 		if err != nil {
@@ -405,7 +430,28 @@ func TestRepopulateMissingTries(t *testing.T) {
 }
 
 func TestUngracefulAsyncShutdown(t *testing.T) {
-	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, commitInterval uint64) (*BlockChain, error) {
+	testUngracefulAsyncShutdown(t, rawdb.HashScheme, true)
+}
+
+// HashDB passes these tests because:
+// lastAcceptedHeight <= lastCommittedHeight + 2 * commitInterval
+// where lastCommittedHeight is the last multiple of commitInterval (so 0)
+// Firewood passes these tests because lastCommittedHeight always equals acceptorTip.
+// This means it will work as long as lastAcceptedHeight <= acceptorTip + 2 * commitInterval
+func TestUngracefulAsyncShutdownNoSnapshots(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testUngracefulAsyncShutdown(t, scheme, false)
+		})
+	}
+}
+
+func testUngracefulAsyncShutdown(t *testing.T, scheme string, snapshotEnabled bool) {
+	snapshotLimit := 0
+	if snapshotEnabled {
+		snapshotLimit = 256
+	}
+	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, dataPath string, commitInterval uint64) (*BlockChain, error) {
 		blockchain, err := createBlockChain(db, &CacheConfig{
 			TrieCleanLimit:            256,
 			TrieDirtyLimit:            256,
@@ -413,10 +459,12 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 			TriePrefetcherParallelism: 4,
 			Pruning:                   true,
 			CommitInterval:            commitInterval,
+			StateScheme:               scheme,
+			ChainDataDir:              dataPath,
 			StateHistory:              32,
-			SnapshotLimit:             256,
-			SnapshotNoBuild:           true, // Ensure the test errors if snapshot initialization fails
-			AcceptorQueueLimit:        1000, // ensure channel doesn't block
+			SnapshotLimit:             snapshotLimit,
+			SnapshotNoBuild:           snapshotEnabled, // If true, ensure that the test errors if snapshot initialization fails
+			AcceptorQueueLimit:        1000,            // ensure channel doesn't block
 		}, gspec, lastAcceptedHash)
 		if err != nil {
 			return nil, err
@@ -433,8 +481,11 @@ func TestUngracefulAsyncShutdown(t *testing.T) {
 // TestCanonicalHashMarker tests all the canonical hash markers are updated/deleted
 // correctly in case reorg is called.
 func TestCanonicalHashMarker(t *testing.T) {
-	testCanonicalHashMarker(t, rawdb.HashScheme)
-	testCanonicalHashMarker(t, rawdb.PathScheme)
+	for _, scheme := range []string{rawdb.HashScheme, rawdb.PathScheme, customrawdb.FirewoodScheme} {
+		t.Run(scheme, func(t *testing.T) {
+			testCanonicalHashMarker(t, scheme)
+		})
+	}
 }
 
 func testCanonicalHashMarker(t *testing.T, scheme string) {
@@ -491,7 +542,10 @@ func testCanonicalHashMarker(t *testing.T, scheme string) {
 		}
 
 		// Initialize test chain
-		chain, err := NewBlockChain(rawdb.NewMemoryDatabase(), DefaultCacheConfigWithScheme(scheme), gspec, engine, vm.Config{}, common.Hash{}, false)
+		db := rawdb.NewMemoryDatabase()
+		cacheConfig := DefaultCacheConfigWithScheme(scheme)
+		cacheConfig.ChainDataDir = t.TempDir()
+		chain, err := NewBlockChain(db, cacheConfig, gspec, engine, vm.Config{}, common.Hash{}, false)
 		if err != nil {
 			t.Fatalf("failed to create tester chain: %v", err)
 		}
@@ -560,7 +614,7 @@ func TestTxLookupBlockChain(t *testing.T) {
 		AcceptorQueueLimit:        64,   // ensure channel doesn't block
 		TransactionHistory:        5,
 	}
-	createTxLookupBlockChain := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error) {
+	createTxLookupBlockChain := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, _ string) (*BlockChain, error) {
 		return createBlockChain(db, cacheConf, gspec, lastAcceptedHash)
 	}
 	for _, tt := range tests {
@@ -585,7 +639,7 @@ func TestTxLookupSkipIndexingBlockChain(t *testing.T) {
 		TransactionHistory:        5,
 		SkipTxIndexing:            true,
 	}
-	createTxLookupBlockChain := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash) (*BlockChain, error) {
+	createTxLookupBlockChain := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, _ string) (*BlockChain, error) {
 		return createBlockChain(db, cacheConf, gspec, lastAcceptedHash)
 	}
 	for _, tt := range tests {

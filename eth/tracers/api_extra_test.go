@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
 	ethparams "github.com/ava-labs/libevm/params"
@@ -22,12 +23,23 @@ import (
 	"github.com/ava-labs/subnet-evm/internal/ethapi"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/stretchr/testify/require"
 )
 
+var schemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}
+
 func TestTraceBlockPrecompileActivation(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testTraceBlockPrecompileActivation(t, scheme)
+		})
+	}
+}
+
+func testTraceBlockPrecompileActivation(t *testing.T, scheme string) {
 	t.Parallel()
 
 	// Initialize test accounts
@@ -61,7 +73,7 @@ func TestTraceBlockPrecompileActivation(t *testing.T) {
 	genBlocks := 10
 	signer := types.HomesteadSigner{}
 	txHashes := make([]common.Hash, genBlocks)
-	backend := newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
+	backend := newTestBackend(t, genBlocks, genesis, scheme, func(i int, b *core.BlockGen) {
 		// Transfer from account[0] to account[1]
 		//    value: 1000 wei
 		//    fee:   0 wei
@@ -134,6 +146,14 @@ func TestTraceBlockPrecompileActivation(t *testing.T) {
 }
 
 func TestTraceTransactionPrecompileActivation(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testTraceTransactionPrecompileActivation(t, scheme)
+		})
+	}
+}
+
+func testTraceTransactionPrecompileActivation(t *testing.T, scheme string) {
 	t.Parallel()
 
 	// Initialize test accounts
@@ -167,7 +187,7 @@ func TestTraceTransactionPrecompileActivation(t *testing.T) {
 	signer := types.HomesteadSigner{}
 	blockNoTxMap := make(map[uint64]common.Hash)
 
-	backend := newTestBackend(t, 5, genesis, func(i int, b *core.BlockGen) {
+	backend := newTestBackend(t, 5, genesis, scheme, func(i int, b *core.BlockGen) {
 		// Transfer from account[0] to account[1]
 		//    value: 1000 wei
 		//    fee:   0 wei
@@ -198,6 +218,14 @@ func TestTraceTransactionPrecompileActivation(t *testing.T) {
 }
 
 func TestTraceChainPrecompileActivation(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testTraceChainPrecompileActivation(t, scheme)
+		})
+	}
+}
+
+func testTraceChainPrecompileActivation(t *testing.T, scheme string) {
 	// Initialize test accounts
 	// Note: the balances in this test have been increased compared to go-ethereum.
 	accounts := newAccounts(3)
@@ -235,7 +263,7 @@ func TestTraceChainPrecompileActivation(t *testing.T) {
 		rel   atomic.Uint32 // total rels has made
 		nonce uint64
 	)
-	backend := newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
+	backend := newTestBackend(t, genBlocks, genesis, scheme, func(i int, b *core.BlockGen) {
 		// Transfer from account[0] to account[1]
 		//    value: 1000 wei
 		//    fee:   0 wei
@@ -294,6 +322,14 @@ func TestTraceChainPrecompileActivation(t *testing.T) {
 }
 
 func TestTraceCallWithOverridesStateUpgrade(t *testing.T) {
+	for _, scheme := range schemes {
+		t.Run(scheme, func(t *testing.T) {
+			testTraceCallWithOverridesStateUpgrade(t, scheme)
+		})
+	}
+}
+
+func testTraceCallWithOverridesStateUpgrade(t *testing.T, scheme string) {
 	t.Parallel()
 
 	// Initialize test accounts
@@ -327,7 +363,7 @@ func TestTraceCallWithOverridesStateUpgrade(t *testing.T) {
 	// assumes gap is 10 sec
 	signer := types.HomesteadSigner{}
 	fastForwardTime := activateStateUpgradeTime + 10
-	backend := newTestBackend(t, genBlocks, genesis, func(i int, b *core.BlockGen) {
+	backend := newTestBackend(t, genBlocks, genesis, scheme, func(i int, b *core.BlockGen) {
 		// Transfer from account[0] to account[1]
 		//    value: 1000 wei
 		//    fee:   0 wei
