@@ -204,6 +204,15 @@ It is possible to provide parameters for Subnets. Parameters here apply to all c
 | `--subnet-config-dir` | `AVAGO_SUBNET_CONFIG_DIR` | string | `$HOME/.avalanchego/configs/subnets` | Specifies the directory that contains Subnet configs, as described above. If the flag is set explicitly, the specified folder must exist, or AvalancheGo will exit with an error. This flag is ignored if `--subnet-config-content` is specified. Example: Let's say we have a Subnet with ID `p4jUwqZsA2LuSftroCd3zb4ytH8W99oXKuKVZdsty7eQ3rXD6`. We can create a config file under the default `subnet-config-dir` at `$HOME/.avalanchego/configs/subnets/p4jUwqZsA2LuSftroCd3zb4ytH8W99oXKuKVZdsty7eQ3rXD6.json`. An example config file is: `{"validatorOnly": false, "consensusParameters": {"k": 25, "alpha": 18}}`. By default, none of these directories and/or files exist. You would need to create them manually if needed. |
 | `--subnet-config-content` | `AVAGO_SUBNET_CONFIG_CONTENT` | string | - | As an alternative to `--subnet-config-dir`, it allows specifying base64 encoded parameters for a Subnet. |
 
+### ProposerVM
+
+ProposerVM configuration.
+
+| Flag | Env Var | Type | Default | Description |
+|------|---------------------|------|---------|-------------|
+| `--proposervm-use-current-height` | `AVAGO_PROPOSERVM_USE_CURRENT_HEIGHT` | boolean | `false` | Have the ProposerVM always report the last accepted P-chain block height. |
+| `--proposervm-min-block-delay` | `AVAGO_PROPOSERVM_MIN_BLOCK_DELAY` | duration | `1s` | The minimum delay to enforce when building a snowman++ block for the primary network chains and the default minimum delay for subnets. A non-default value is only suggested for non-production nodes. |
+
 ### Version
 
 | Flag | Env Var | Type | Default | Description |
@@ -291,15 +300,6 @@ Snow consensus protocol parameters.
 | `--snow-optimal-processing` | `AVAGO_SNOW_OPTIMAL_PROCESSING` | int | `50` | Optimal number of processing items in consensus. The value must be at least `1`. |
 | `--snow-max-processing` | `AVAGO_SNOW_MAX_PROCESSING` | int | `1024` | Maximum number of processing items to be considered healthy. Reports unhealthy if more than this number of items are outstanding. The value must be at least `1`. |
 | `--snow-max-time-processing` | `AVAGO_SNOW_MAX_TIME_PROCESSING` | duration | `2m` | Maximum amount of time an item should be processing and still be healthy. Reports unhealthy if there is an item processing for longer than this duration. The value must be greater than `0`. |
-
-### ProposerVM
-
-ProposerVM configuration.
-
-| Flag | Env Var | Type | Default | Description |
-|------|---------------------|------|---------|-------------|
-| `--proposervm-use-current-height` | `AVAGO_PROPOSERVM_USE_CURRENT_HEIGHT` | boolean | `false` | Have the ProposerVM always report the last accepted P-chain block height. |
-| `--proposervm-min-block-delay` | `AVAGO_PROPOSERVM_MIN_BLOCK_DELAY` | duration | `1s` | The minimum delay to enforce when building a snowman++ block for the primary network chains and the default minimum delay for subnets. A non-default value is only suggested for non-production nodes. |
 
 ### Continuous Profiling
 
