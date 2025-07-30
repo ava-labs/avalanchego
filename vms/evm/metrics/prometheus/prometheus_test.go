@@ -126,7 +126,7 @@ test_timer_count 6
 
 	require.Len(t, families, len(expectedMetrics))
 	for i, got := range families {
-		require.NotNil(t, *got.Name)
+		require.NotNil(t, got.Name)
 
 		want := expectedMetrics[*got.Name]
 		require.Equal(t, want, got, i)
