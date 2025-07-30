@@ -150,6 +150,24 @@ runs:
 
           core.setOutput('baselines_found', baselines.length.toString());
           core.setOutput('config_path', configPath);
+    - name: Debug paths
+      shell: bash
+      run: |
+        echo "=== Debug Info ==="
+        echo "Current directory: $(pwd)"
+        echo "Action path: $GITHUB_ACTION_PATH"
+        echo "Config path: ${{ steps.build-config.outputs.config_path }}"
+        echo ""
+        echo "=== Action directory contents ==="
+        ls -la $GITHUB_ACTION_PATH/
+        echo ""
+        echo "=== Config file exists? ==="
+        if [ -f "${{ steps.build-config.outputs.config_path }}" ]; then
+          echo "✓ Config file exists"
+          echo "Config file size: $(wc -c < '${{ steps.build-config.outputs.config_path }}') bytes"
+        else
+          echo "✗ Config file missing"
+        fi
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -168,7 +186,8 @@ runs:
           --config ${{ steps.build-config.outputs.config_path }} \
           --prometheus-url "${{ inputs.prometheus_url }}" \
           --step-size "${{ inputs.step_size }}" \
-          --timezone "${{ inputs.timezone }}"
+          --timezone "${{ inputs.timezone }}" \
+          --verbose
     - name: Upload visualization artifact
       id: upload-viz
       uses: actions/upload-artifact@v4
@@ -176,6 +195,6 @@ runs:
       with:
         name: metric-analysis-${{ github.run_id }}
         path: |
-          ${{ github.action_path }}/metric_visualization_*.html
-          ${{ steps.build-config.outputs.config_path }}
+          .github/actions/analysis/metric_visualization_*.html
+          .github/actions/analysis/metric_config.json
         retention-days: 14
