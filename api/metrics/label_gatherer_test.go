@@ -32,12 +32,11 @@ func TestLabelGatherer_Gather(t *testing.T) {
 		{
 			name:        "no overlap",
 			labelName:   customLabelName,
-			wantMetrics: `
-# HELP counter help
-# TYPE counter counter
-counter{smith="morty",tag="b"} 1
-counter{smith="rick",tag="a"} 0
-`,
+			wantMetrics: "" +
+				"# HELP counter help\n" +
+				"# TYPE counter counter\n" +
+				"counter{smith=\"morty\",tag=\"b\"} 1\n" +
+				"counter{smith=\"rick\",tag=\"a\"} 0\n",
 		},
 		{
 			name:      "has overlap",
