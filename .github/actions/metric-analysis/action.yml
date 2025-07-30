@@ -146,28 +146,20 @@ runs:
           const configPath = path.join(process.env.GITHUB_ACTION_PATH, 'metric_config.json');
           fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-          console.log(`Generated config with ${baselines.length} baselines`);
+          console.log(`Plot: ${config.output_file}`)
 
           core.setOutput('baselines_found', baselines.length.toString());
           core.setOutput('config_path', configPath);
-    - name: Debug paths
+    - name: Debug after plot
       shell: bash
       run: |
-        echo "=== Debug Info ==="
-        echo "Current directory: $(pwd)"
-        echo "Action path: $GITHUB_ACTION_PATH"
-        echo "Config path: ${{ steps.build-config.outputs.config_path }}"
-        echo ""
-        echo "=== Action directory contents ==="
-        ls -la $GITHUB_ACTION_PATH/
-        echo ""
-        echo "=== Config file exists? ==="
-        if [ -f "${{ steps.build-config.outputs.config_path }}" ]; then
-          echo "✓ Config file exists"
-          echo "Config file size: $(wc -c < '${{ steps.build-config.outputs.config_path }}') bytes"
-        else
-          echo "✗ Config file missing"
-        fi
+          echo "=== Files after plot ==="
+          echo "Current directory: $(pwd)"
+          echo "Looking for HTML files:"
+          find . -name "metric_visualization_*.html" -type f 2>/dev/null || echo "No HTML files found"
+          echo ""
+          echo "All files in current directory:"
+          ls -la *.html 2>/dev/null || echo "No HTML files in current directory"
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -196,5 +188,5 @@ runs:
         name: metric-analysis-${{ github.run_id }}
         path: |
           .github/actions/analysis/metric_visualization_*.html
-          .github/actions/analysis/metric_config.json
+          ${{ steps.build-config.outputs.config_path }}
         retention-days: 14
