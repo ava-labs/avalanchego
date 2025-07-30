@@ -44,7 +44,6 @@ var (
 	ErrNoDBClientProvided            = errors.New("db client is a required field of the sync config")
 	ErrNoRangeProofClientProvided    = errors.New("range proof client is a required field of the sync config")
 	ErrNoChangeProofClientProvided   = errors.New("change proof client is a required field of the sync config")
-	ErrNoDatabaseProvided            = errors.New("sync database is a required field of the sync config")
 	ErrNoLogProvided                 = errors.New("log is a required field of the sync config")
 	ErrZeroWorkLimit                 = errors.New("simultaneous work limit must be greater than 0")
 	ErrFinishedWithUnexpectedRoot    = errors.New("finished syncing with an unexpected root")
@@ -287,7 +286,7 @@ func (m *Manager) sync(ctx context.Context) {
 		case ctx.Err() != nil:
 			return // [m.workLock] released by defer.
 		case m.config.DBClient.Error() != nil:
-			// If the proof client has an error, we can't continue.
+			// If the DB client has an error, we can't continue.
 			m.setError(m.config.DBClient.Error())
 			return
 		case m.processingWorkItems >= m.config.SimultaneousWorkLimit:
@@ -949,7 +948,7 @@ func (m *Manager) Wait(ctx context.Context) error {
 	targetRootID := m.getTargetRoot()
 	if err := m.config.DBClient.FinalizeSync(ctx, targetRootID); err != nil {
 		// This should never happen
-		return fmt.Errorf("%w: %w", ErrFinishedWithUnexpectedRoot, err)
+		return fmt.Errorf("failed to finalize sync: %w", err)
 	}
 
 	m.config.Log.Info("completed", zap.Stringer("root", targetRootID))
