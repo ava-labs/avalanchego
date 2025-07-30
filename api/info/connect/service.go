@@ -165,7 +165,7 @@ func (s *Service) GetPeers(
 	_ context.Context,
 	request *connect.Request[infopb.GetPeersRequest],
 ) (*connect.Response[infopb.GetPeersResponse], error) {
-	nodeIDs := make([]ids.NodeID, len(request.Msg.NodeIds))
+	nodeIDs := make([]ids.NodeID, 0, len(request.Msg.NodeIds))
 	for _, nodeIDStr := range request.Msg.NodeIds {
 		nodeID, err := ids.NodeIDFromString(nodeIDStr)
 		if err != nil {
@@ -220,10 +220,12 @@ func (s *Service) GetBootstrapped(
 	}
 
 	var jsonResponse info.IsBootstrappedResponse
-	if err := s.Info.IsBootstrapped(nil,
+	if err := s.Info.IsBootstrapped(
+		nil,
 		&jsonRequest,
-		&jsonResponse); err != nil {
-		return nil, err
+		&jsonResponse,
+	); err != nil {
+		return nil, fmt.Errorf("failed to get bootstrapped status: %w", err)
 	}
 
 	response := &infopb.GetBootstrappedResponse{
@@ -239,7 +241,7 @@ func (s *Service) GetUpgrades(
 ) (*connect.Response[infopb.GetUpgradesResponse], error) {
 	var config upgrade.Config
 	if err := s.Info.Upgrades(nil, nil, &config); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get upgrades: %w", err)
 	}
 
 	response := &infopb.GetUpgradesResponse{
@@ -270,7 +272,7 @@ func (s *Service) GetUptime(
 ) (*connect.Response[infopb.GetUptimeResponse], error) {
 	var jsonResponse info.UptimeResponse
 	if err := s.Info.Uptime(nil, nil, &jsonResponse); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get uptime: %w", err)
 	}
 
 	response := &infopb.GetUptimeResponse{
@@ -295,14 +297,14 @@ func (s *Service) GetACPs(
 	}
 
 	for acpNumber, acpInfo := range jsonResponse.ACPs {
-		supporters := make([]string, len(acpInfo.Supporters))
-		for s := range acpInfo.Supporters {
-			supporters = append(supporters, s.String())
+		supporters := make([]string, 0, len(acpInfo.Supporters))
+		for nodeID := range acpInfo.Supporters {
+			supporters = append(supporters, nodeID.String())
 		}
 
-		objectors := make([]string, len(acpInfo.Objectors))
-		for o := range acpInfo.Objectors {
-			objectors = append(objectors, o.String())
+		objectors := make([]string, 0, len(acpInfo.Objectors))
+		for nodeID := range acpInfo.Objectors {
+			objectors = append(objectors, nodeID.String())
 		}
 
 		acpStr := fmt.Sprintf("ACP-%d", acpNumber)
@@ -324,7 +326,7 @@ func (s *Service) GetVMs(
 ) (*connect.Response[infopb.GetVMsResponse], error) {
 	var jsonResponse info.GetVMsReply
 	if err := s.Info.GetVMs(nil, nil, &jsonResponse); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get vms: %w", err)
 	}
 
 	vms := make(map[string]*infopb.VMAliases)
