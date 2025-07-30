@@ -32,7 +32,12 @@ var _ = ginkgo.Describe("[Info]", ginkgo.Ordered, func() {
 
 	ginkgo.BeforeAll(func() {
 		network = e2e.GetEnv(tc).GetNetwork()
+		for _, n := range network.Nodes {
+			e2e.WaitForHealthy(tc, n)
+		}
+
 		node = network.Nodes[0]
+
 		nodeID = node.NodeID
 		uri := node.GetAccessibleURI()
 		client = connectinfopb.NewInfoServiceClient(
@@ -98,7 +103,7 @@ var _ = ginkgo.Describe("[Info]", ginkgo.Ordered, func() {
 		response, err := client.GetPeers(tc.DefaultContext(), request)
 		require.NoError(err)
 
-		require.NotEmpty(response.Msg.Peers)
+		require.Len(response.Msg.Peers, len(network.Nodes)-1)
 	})
 
 	ginkgo.It("serves GetBootstrapped", func() {
