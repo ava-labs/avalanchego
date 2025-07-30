@@ -93,10 +93,7 @@ func NewService(info *Info) (http.Handler, error) {
 	codec := json.NewCodec()
 	server.RegisterCodec(codec, "application/json")
 	server.RegisterCodec(codec, "application/json;charset=UTF-8")
-	return server, server.RegisterService(
-		info,
-		"info",
-	)
+	return server, server.RegisterService(info, "info")
 }
 
 // GetNodeVersionReply are the results from calling GetNodeVersion
