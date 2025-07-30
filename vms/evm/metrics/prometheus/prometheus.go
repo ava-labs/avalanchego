@@ -15,19 +15,19 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
+var (
+	_ prometheus.Gatherer = (*Gatherer)(nil)
+
+	errMetricSkip             = errors.New("metric skipped")
+	errMetricTypeNotSupported = errors.New("metric type is not supported")
+	quantiles                 = []float64{.5, .75, .95, .99, .999, .9999}
+	pvShortPercent            = []float64{50, 95, 99}
+)
+
 // Gatherer implements the [prometheus.Gatherer] interface by gathering all
 // metrics from a [Registry].
 type Gatherer struct {
 	registry Registry
-}
-
-var _ prometheus.Gatherer = (*Gatherer)(nil)
-
-// NewGatherer returns a [Gatherer] using the given registry.
-func NewGatherer(registry Registry) *Gatherer {
-	return &Gatherer{
-		registry: registry,
-	}
 }
 
 // Gather gathers metrics from the registry and converts them to
@@ -55,12 +55,12 @@ func (g *Gatherer) Gather() (mfs []*dto.MetricFamily, err error) {
 	return mfs, nil
 }
 
-var (
-	errMetricSkip             = errors.New("metric skipped")
-	errMetricTypeNotSupported = errors.New("metric type is not supported")
-)
-
-func ptrTo[T any](x T) *T { return &x }
+// NewGatherer returns a [Gatherer] using the given registry.
+func NewGatherer(registry Registry) *Gatherer {
+	return &Gatherer{
+		registry: registry,
+	}
+}
 
 func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err error) {
 	metric := registry.Get(name)
@@ -116,8 +116,6 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 		return nil, fmt.Errorf("%w: %q is a %T", errMetricSkip, name, m)
 	case metrics.Histogram:
 		snapshot := m.Snapshot()
-
-		quantiles := []float64{.5, .75, .95, .99, .999, .9999}
 		thresholds := snapshot.Percentiles(quantiles)
 		dtoQuantiles := make([]*dto.Quantile, len(quantiles))
 		for i := range thresholds {
@@ -126,7 +124,6 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 				Value:    ptrTo(thresholds[i]),
 			}
 		}
-
 		return &dto.MetricFamily{
 			Name: &name,
 			Type: dto.MetricType_SUMMARY.Enum(),
@@ -150,8 +147,6 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 		}, nil
 	case metrics.Timer:
 		snapshot := m.Snapshot()
-
-		quantiles := []float64{.5, .75, .95, .99, .999, .9999}
 		thresholds := snapshot.Percentiles(quantiles)
 		dtoQuantiles := make([]*dto.Quantile, len(quantiles))
 		for i := range thresholds {
@@ -160,7 +155,6 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 				Value:    ptrTo(thresholds[i]),
 			}
 		}
-
 		return &dto.MetricFamily{
 			Name: &name,
 			Type: dto.MetricType_SUMMARY.Enum(),
@@ -178,8 +172,6 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 		if count == 0 {
 			return nil, fmt.Errorf("%w: %q resetting timer metric count is zero", errMetricSkip, name)
 		}
-
-		pvShortPercent := []float64{50, 95, 99}
 		thresholds := snapshot.Percentiles(pvShortPercent)
 		dtoQuantiles := make([]*dto.Quantile, len(pvShortPercent))
 		for i := range pvShortPercent {
@@ -188,7 +180,6 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 				Value:    ptrTo(thresholds[i]),
 			}
 		}
-
 		return &dto.MetricFamily{
 			Name: &name,
 			Type: dto.MetricType_SUMMARY.Enum(),
@@ -204,3 +195,5 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 		return nil, fmt.Errorf("%w: metric %q type %T", errMetricTypeNotSupported, name, metric)
 	}
 }
+
+func ptrTo[T any](x T) *T { return &x }
