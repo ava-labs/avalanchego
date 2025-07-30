@@ -21,8 +21,8 @@ inputs:
     description: 'Y-axis label'
     default: ''
   workflow:
-    description: 'Workflow to search for baselines. Can be filename (ci.yml, c-chain-reexecution-benchmark.yml...) or a workflow name. Enables cross-workflow baseline comparison.'
-    default: 'ci.yaml'
+    description: 'Workflow filename'
+    default: '.github/workflows/ci.yml'
   job_name:
     description: 'Job name to search for baselines. Uses current job if not specified.'
     default: ''
@@ -43,14 +43,6 @@ inputs:
     description: 'GitHub token'
     default: ${{ github.token }}
 
-outputs:
-  visualization_url:
-    description: 'URL to the generated visualization artifact'
-    value: ${{ steps.upload-viz.outputs.artifact-url }}
-  baselines_found:
-    description: 'Number of baseline runs found'
-    value: ${{ steps.build-config.outputs.baselines_found }}
-
 runs:
   using: composite
   steps:
@@ -66,6 +58,7 @@ runs:
           const BASELINE_COUNT = parseInt('${{ inputs.baseline_count }}');
           const WORKFLOW = '${{ inputs.workflow }}';
           const CURRENT_RUN_ID = context.runId.toString();
+          const ACTION_PATH = process.env.GITHUB_ACTION_PATH;
 
           // Get current run metadata
           const metadataFile = '/tmp/run-metadata/run_metadata.json';
@@ -86,6 +79,8 @@ runs:
             per_page: 50
           });
 
+          console.log(`Found ${workflowRuns.workflow_runs.length} completed successful runs`);
+
           const baselines = [];
 
           for (const run of workflowRuns.workflow_runs) {
@@ -93,33 +88,43 @@ runs:
             if (run.id.toString() === CURRENT_RUN_ID) continue;
 
             // Check for metadata artifact
-            const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: run.id
-            });
-
-            const metadataArtifact = artifacts.artifacts.find(artifact =>
-              artifact.name === `run-metadata-${currentMetadata.job_id}-${run.id}` && !artifact.expired
-            );
-
-            if (metadataArtifact) {
-              baselines.push({
-                name: `Baseline ${run.run_number} (#${run.id})`,
-                start_time: new Date(run.created_at).getTime(),
-                end_time: new Date(run.updated_at).getTime(),
-                labels: {
-                  gh_run_id: run.id.toString(),
-                  gh_job_id: currentMetadata.job_id,
-                  gh_run_attempt: "1",
-                  gh_repo: context.repo.owner + "/" + context.repo.repo,
-                  is_ephemeral_node: "false"
-                }
+            try {
+              const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: run.id
               });
 
-              console.log(`Added baseline: Run ${run.run_number}`);
+              const metadataArtifact = artifacts.artifacts.find(artifact =>
+                artifact.name === `run-metadata-${currentMetadata.job_id}-${run.id}` && !artifact.expired
+              );
+
+              if (metadataArtifact) {
+                baselines.push({
+                  name: `Baseline ${run.run_number} (#${run.id})`,
+                  start_time: new Date(run.created_at).getTime(),
+                  end_time: new Date(run.updated_at).getTime(),
+                  labels: {
+                    gh_run_id: run.id.toString(),
+                    gh_job_id: currentMetadata.job_id,
+                    gh_run_attempt: "1",
+                    gh_repo: context.repo.owner + "/" + context.repo.repo,
+                    is_ephemeral_node: "false"
+                  }
+                });
+
+                console.log(`Added baseline: Run ${run.run_number}`);
+              }
+            } catch (error) {
+              console.log(`Error checking artifacts for run ${run.id}: ${error.message}`);
             }
           }
+
+          console.log(`Found ${baselines.length} baselines with metadata artifacts`);
+
+          // Create output file in action directory
+          const outputFile = `metric_visualization_${CURRENT_RUN_ID}.html`;
+          const outputPath = path.join(ACTION_PATH, outputFile);
 
           // Build configuration
           const config = {
@@ -140,15 +145,17 @@ runs:
               }
             },
             baselines: baselines,
-            output_file: path.join(process.env.GITHUB_ACTION_PATH, `metric_visualization_${CURRENT_RUN_ID}.html`)
+            output_file: outputPath
           };
 
-          const configPath = path.join(process.env.GITHUB_ACTION_PATH, 'metric_config.json');
+          const configPath = path.join(ACTION_PATH, 'metric_config.json');
           fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-          console.log(`Output Plot File: ${config.output_file}`)
-          core.setOutput('baselines_found', baselines.length.toString());
+          console.log(`Config written to: ${configPath}`);
+          console.log(`Plot created at: ${outputPath}`);
+
           core.setOutput('config_path', configPath);
+          core.setOutput('output_file', outputFile);
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -157,7 +164,7 @@ runs:
     - name: Install Python dependencies
       shell: bash
       run: pip install -r $GITHUB_ACTION_PATH/requirements.txt
-    - name: Plot
+    - name: Run metric analysis
       shell: bash
       env:
         PROMETHEUS_ID: ${{ inputs.prometheus_username }}
@@ -167,15 +174,27 @@ runs:
           --config ${{ steps.build-config.outputs.config_path }} \
           --prometheus-url "${{ inputs.prometheus_url }}" \
           --step-size "${{ inputs.step_size }}" \
-          --timezone "${{ inputs.timezone }}" \
-          --verbose
+          --timezone "${{ inputs.timezone }}"
+    - name: Debug after analysis
+      shell: bash
+      run: |
+        echo "=== Files in action directory after analysis ==="
+        ls -la $GITHUB_ACTION_PATH/
+        echo ""
+        echo "Expected HTML file: ${{ steps.build-config.outputs.output_file }}"
+        if [ -f "$GITHUB_ACTION_PATH/${{ steps.build-config.outputs.output_file }}" ]; then
+          echo "✓ HTML file exists"
+        else
+          echo "✗ HTML file missing"
+          echo "Looking for any HTML files:"
+          find $GITHUB_ACTION_PATH/ -name "*.html" 2>/dev/null || echo "No HTML files found"
+        fi
     - name: Upload visualization artifact
-      id: upload-viz
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: metric-analysis-${{ github.run_id }}
+        name: metric-analysis-${{ inputs.job_name }}-${{ github.run_id }}
         path: |
-          .github/actions/metric-analysis/metric_visualization_*.html
-          .github/actions/metric-analysis/metric_config.json
+          $GITHUB_ACTION_PATH/${{ steps.build-config.outputs.output_file }}
+          ${{ steps.build-config.outputs.config_path }}
         retention-days: 14

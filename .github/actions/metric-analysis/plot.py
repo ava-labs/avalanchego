@@ -453,7 +453,7 @@ Example JSON Configuration:
     parser.add_argument('--prometheus-url', help='Prometheus server URL', required=True)
     parser.add_argument('--step-size', default='15s', help='Prometheus query step size (default: 15s)')
     parser.add_argument('--timezone', default='US/Eastern', help='Display timezone (default: US/Eastern)')
-    parser.add_argument('--verbose', action='store_true', help='Enable verbose logging', default=False)
+    parser.add_argument('--verbose', action='store_true', help='Enable verbose logging', default=True)
 
     args = parser.parse_args()
 
