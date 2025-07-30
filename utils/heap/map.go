@@ -5,7 +5,6 @@ package heap
 
 import (
 	"container/heap"
-	"iter"
 
 	"github.com/ava-labs/avalanchego/utils"
 )
@@ -100,10 +99,6 @@ func (m *Map[K, V]) Fix(k K) {
 	}
 }
 
-func (m *Map[K, V]) Iterator() iter.Seq2[K, V] {
-	return m.queue.Iterator()
-}
-
 type indexedQueue[K comparable, V any] struct {
 	queue[entry[K, V]]
 	index map[K]int
@@ -129,16 +124,6 @@ func (h *indexedQueue[K, V]) Pop() any {
 
 	delete(h.index, popped.k)
 	return popped
-}
-
-func (h *indexedQueue[K, V]) Iterator() iter.Seq2[K, V] {
-	return func(yield func(K, V) bool) {
-		for e := range h.queue.Iterator() {
-			if !yield(e.k, e.v) {
-				return
-			}
-		}
-	}
 }
 
 type entry[K any, V any] struct {
