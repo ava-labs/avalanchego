@@ -95,7 +95,7 @@ type StateSyncClient interface {
 // Error returns an error if any was encountered.
 type Syncer interface {
 	Start(ctx context.Context) error
-	Done() <-chan error
+	Wait(ctx context.Context) error
 }
 
 // StateSyncEnabled returns [client.enabled], which is set in the chain's config file.
@@ -285,7 +285,7 @@ func (client *stateSyncerClient) syncStateTrie(ctx context.Context) error {
 	if err := evmSyncer.Start(ctx); err != nil {
 		return err
 	}
-	err = <-evmSyncer.Done()
+	err = evmSyncer.Wait(ctx)
 	log.Info("state sync: sync finished", "root", client.syncSummary.BlockRoot, "err", err)
 	return err
 }

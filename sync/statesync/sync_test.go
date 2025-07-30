@@ -68,7 +68,7 @@ func testSync(t *testing.T, test syncTest) {
 	require.NoError(t, err, "failed to create state syncer")
 	// begin sync
 	s.Start(ctx)
-	waitFor(t, s.Done(), test.expectedError, testSyncTimeout)
+	waitFor(t, context.Background(), s.Wait, test.expectedError, testSyncTimeout)
 	if test.expectedError != nil {
 		return
 	}
@@ -86,20 +86,21 @@ func testSyncResumes(t *testing.T, steps []syncTest, stepCallback func()) {
 }
 
 // waitFor waits for a result on the [result] channel to match [expected], or a timeout.
-func waitFor(t *testing.T, result <-chan error, expected error, timeout time.Duration) {
+func waitFor(t *testing.T, ctx context.Context, resultFunc func(context.Context) error, expected error, timeout time.Duration) {
 	t.Helper()
-	select {
-	case err := <-result:
-		require.ErrorIs(t, err, expected, "result of sync did not match expected error")
-	case <-time.After(timeout):
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	err := resultFunc(ctx)
+	if ctx.Err() != nil {
 		// print a stack trace to assist with debugging
-		// if the test times out.
 		var stackBuf bytes.Buffer
 		pprof.Lookup("goroutine").WriteTo(&stackBuf, 2)
 		t.Log(stackBuf.String())
 		// fail the test
 		t.Fatal("unexpected timeout waiting for sync result")
 	}
+
+	require.ErrorIs(t, err, expected, "result of sync did not match expected error")
 }
 
 func TestSimpleSyncCases(t *testing.T) {
@@ -504,4 +505,58 @@ func testSyncerSyncsToNewRoot(t *testing.T, deleteBetweenSyncs func(*testing.T, 
 
 		deleteBetweenSyncs(t, root1, clientDB)
 	})
+}
+
+func TestDifferentWaitContext(t *testing.T) {
+	serverDB := rawdb.NewMemoryDatabase()
+	serverTrieDB := triedb.NewDatabase(serverDB, nil)
+	// Create trie with many accounts to ensure sync takes time
+	root := statesynctest.FillAccountsWithStorage(t, serverDB, serverTrieDB, common.Hash{}, 2000)
+	clientDB := rawdb.NewMemoryDatabase()
+
+	// Track requests to show sync continues after Wait returns
+	var requestCount int64
+
+	leafsRequestHandler := handlers.NewLeafsRequestHandler(serverTrieDB, nil, message.Codec, handlerstats.NewNoopHandlerStats())
+	codeRequestHandler := handlers.NewCodeRequestHandler(serverDB, message.Codec, handlerstats.NewNoopHandlerStats())
+	mockClient := statesyncclient.NewMockClient(message.Codec, leafsRequestHandler, codeRequestHandler, nil)
+
+	// Intercept to track ongoing requests and add delay
+	mockClient.GetLeafsIntercept = func(req message.LeafsRequest, resp message.LeafsResponse) (message.LeafsResponse, error) {
+		atomic.AddInt64(&requestCount, 1)
+		// Add small delay to ensure sync is ongoing
+		time.Sleep(10 * time.Millisecond)
+		return resp, nil
+	}
+
+	s, err := NewStateSyncer(&StateSyncerConfig{
+		Client:                   mockClient,
+		Root:                     root,
+		DB:                       clientDB,
+		BatchSize:                1000,
+		NumCodeFetchingWorkers:   DefaultNumCodeFetchingWorkers,
+		MaxOutstandingCodeHashes: DefaultMaxOutstandingCodeHashes,
+		RequestSize:              1024,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create two different contexts
+	startCtx := context.Background() // Never cancelled
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer waitCancel()
+
+	// Start with one context
+	require.NoError(t, s.Start(startCtx), "failed to start state syncer")
+
+	// Wait with different context that will timeout
+	err = s.Wait(waitCtx)
+	require.ErrorIs(t, err, context.DeadlineExceeded, "Wait should return DeadlineExceeded error")
+
+	// Check if more requests were made after Wait returned
+	requestsWhenWaitReturned := atomic.LoadInt64(&requestCount)
+	time.Sleep(100 * time.Millisecond)
+	requestsAfterWait := atomic.LoadInt64(&requestCount)
+	require.Equal(t, requestsWhenWaitReturned, requestsAfterWait, "Sync should not continue after Wait returned with different context")
 }
