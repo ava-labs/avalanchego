@@ -32,10 +32,6 @@ var _ = ginkgo.Describe("[Info]", ginkgo.Ordered, func() {
 
 	ginkgo.BeforeAll(func() {
 		network = e2e.GetEnv(tc).GetNetwork()
-		for _, n := range network.Nodes {
-			e2e.WaitForHealthy(tc, n)
-		}
-
 		node = network.Nodes[0]
 
 		nodeID = node.NodeID
