@@ -1,4 +1,5 @@
 syntax = "proto3";
+
 package info;
 
 import "google/protobuf/timestamp.proto";
@@ -86,6 +87,7 @@ message GetChainIDRequest {
   string alias = 1;
 }
 message GetChainIDResponse {
+  // Chain id resolving to the alias requested.
   string chain_id = 1;
 }
 

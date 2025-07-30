@@ -171,6 +171,7 @@ func (s *Service) GetPeers(
 		if err != nil {
 			return nil, fmt.Errorf(" failed to parse node id %s: %w", nodeIDStr, err)
 		}
+
 		nodeIDs = append(nodeIDs, nodeID)
 	}
 
@@ -186,7 +187,8 @@ func (s *Service) GetPeers(
 	peers := make([]*infopb.Peer, 0, len(jsonResponse.Peers))
 	for _, peer := range jsonResponse.Peers {
 		trackedSubnetIDs := peer.TrackedSubnets.List()
-		trackedSubnets := make([]string, len(trackedSubnetIDs))
+		trackedSubnets := make([]string, 0, len(trackedSubnetIDs))
+
 		for _, subnetID := range trackedSubnetIDs {
 			trackedSubnets = append(trackedSubnets, subnetID.String())
 		}
