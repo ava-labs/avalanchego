@@ -30,8 +30,8 @@ func TestLabelGatherer_Gather(t *testing.T) {
 		expectErr   bool
 	}{
 		{
-			name:        "no overlap",
-			labelName:   customLabelName,
+			name:      "no overlap",
+			labelName: customLabelName,
 			wantMetrics: "" +
 				"# HELP counter help\n" +
 				"# TYPE counter counter\n" +
