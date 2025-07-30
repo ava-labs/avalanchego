@@ -4,7 +4,9 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+
 	"connectrpc.com/connect"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
@@ -12,21 +14,19 @@ import (
 	"github.com/ava-labs/avalanchego/api/connectclient"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
-	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 
 	infopb "github.com/ava-labs/avalanchego/connectproto/pb/info"
 	connectinfopb "github.com/ava-labs/avalanchego/connectproto/pb/info/infoconnect"
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
-var _ = ginkgo.Describe("[Info Service]", ginkgo.Ordered, func() {
-	tc := e2e.NewTestContext()
-	require := require.New(tc)
-
+var _ = ginkgo.Describe("[Info]", ginkgo.Ordered, func() {
 	var (
+		tc      = e2e.NewTestContext()
+		require = require.New(tc)
 		network *tmpnet.Network
 		node    *tmpnet.Node
-		nodeID ids.NodeID
+		nodeID  ids.NodeID
 		client  connectinfopb.InfoServiceClient
 	)
 
@@ -44,111 +44,115 @@ var _ = ginkgo.Describe("[Info Service]", ginkgo.Ordered, func() {
 		)
 	})
 
-
 	ginkgo.It("serves GetNodeVersion", func() {
-		tc.Log().Info("calling GetNodeVersion")
-		req := connect.NewRequest(&infopb.GetNodeVersionRequest{})
-		resp, err := client.GetNodeVersion(tc.DefaultContext(), req)
+		request := connect.NewRequest(&infopb.GetNodeVersionRequest{})
+		response, err := client.GetNodeVersion(tc.DefaultContext(), request)
 		require.NoError(err)
-		require.NotEmpty(resp.Msg.Version)
+
+		require.NotEmpty(response.Msg.Version)
 	})
 
 	ginkgo.It("serves GetNodeID", func() {
-		tc.Log().Info("calling GetNodeID")
-		req := connect.NewRequest(&infopb.GetNodeIDRequest{})
-		resp, err := client.GetNodeID(tc.DefaultContext(), req)
+		request := connect.NewRequest(&infopb.GetNodeIDRequest{})
+		response, err := client.GetNodeID(tc.DefaultContext(), request)
 		require.NoError(err)
 
-		gotNodeID, err := ids.NodeIDFromString(resp.Msg.NodeId)
-		require.NoError(err)
-		require.Equal(nodeID, gotNodeID)
+		require.Equal(nodeID.String(), response.Msg.NodeId)
 	})
 
 	ginkgo.It("serves GetNetworkID", func() {
-		tc.Log().Info("calling GetNetworkID")
-		req := connect.NewRequest(&infopb.GetNetworkIDRequest{})
-		resp, err := client.GetNetworkID(tc.DefaultContext(), req)
+		request := connect.NewRequest(&infopb.GetNetworkIDRequest{})
+		response, err := client.GetNetworkID(tc.DefaultContext(), request)
 		require.NoError(err)
-		require.Equal(constants.LocalID, resp.Msg.NetworkId)
+
+		require.Equal(network.GetNetworkID(), response.Msg.NetworkId)
 	})
 
 	ginkgo.It("serves GetNetworkName", func() {
-		tc.Log().Info("calling GetNetworkName")
-		req := connect.NewRequest(&infopb.GetNetworkNameRequest{})
-		resp, err := client.GetNetworkName(tc.DefaultContext(), req)
+		request := connect.NewRequest(&infopb.GetNetworkNameRequest{})
+		response, err := client.GetNetworkName(tc.DefaultContext(), request)
 		require.NoError(err)
-		require.Equal("local", resp.Msg.NetworkName)
+
+		wantNetworkName := fmt.Sprintf("network-%d", network.GetNetworkID())
+		require.Equal(wantNetworkName, response.Msg.NetworkName)
 	})
 
 	ginkgo.It("serves GetNodeIP", func() {
-		tc.Log().Info("calling GetNodeIP")
-		req := connect.NewRequest(&infopb.GetNodeIPRequest{})
-		resp, err := client.GetNodeIP(tc.DefaultContext(), req)
+		request := connect.NewRequest(&infopb.GetNodeIPRequest{})
+		response, err := client.GetNodeIP(tc.DefaultContext(), request)
 		require.NoError(err)
-		require.Equal("127.0.0.1", resp.Msg.Ip)
+
+		require.Equal(node.StakingAddress.String(), response.Msg.Ip)
 	})
 
 	ginkgo.It("serves GetChainID", func() {
-		tc.Log().Info("calling GetChainID")
-		req := connect.NewRequest(&infopb.GetChainIDRequest{Alias: "X"})
-		resp, err := client.GetChainID(tc.DefaultContext(), req)
+		request := connect.NewRequest(&infopb.GetChainIDRequest{Alias: "P"})
+		response, err := client.GetChainID(tc.DefaultContext(), request)
 		require.NoError(err)
-		// TODO
-		require.NotEmpty(resp.Msg.ChainId)
+
+		require.Equal(ids.Empty.String(), response.Msg.ChainId)
 	})
 
 	ginkgo.It("serves GetPeers", func() {
-		tc.Log().Info("calling GetPeers")
-		req := connect.NewRequest(&infopb.GetPeersRequest{})
-		resp, err := client.GetPeers(tc.DefaultContext(), req)
+		request := connect.NewRequest(&infopb.GetPeersRequest{})
+		response, err := client.GetPeers(tc.DefaultContext(), request)
 		require.NoError(err)
-		// TODO
-		require.NotEmpty(resp.Msg.Peers)
+
+		require.NotEmpty(response.Msg.Peers)
 	})
 
 	ginkgo.It("serves GetBootstrapped", func() {
-		tc.Log().Info("calling GetBootstrapped")
-		req := connect.NewRequest(&infopb.GetBootstrappedRequest{Chain: "X"})
-		//TODO
-		_, err := client.GetBootstrapped(tc.DefaultContext(), req)
+		request := connect.NewRequest(&infopb.GetBootstrappedRequest{Chain: "P"})
+		response, err := client.GetBootstrapped(tc.DefaultContext(), request)
 		require.NoError(err)
+
+		require.True(response.Msg.Bootstrapped)
 	})
 
 	ginkgo.It("serves GetUpgrades", func() {
-		tc.Log().Info("calling GetUpgrades")
-		req := connect.NewRequest(&infopb.GetUpgradesRequest{})
-		resp, err := client.GetUpgrades(tc.DefaultContext(), req)
+		request := connect.NewRequest(&infopb.GetUpgradesRequest{})
+		response, err := client.GetUpgrades(tc.DefaultContext(), request)
 		require.NoError(err)
-		require.NotNil(resp.Msg)
+
+		require.NotZero(response.Msg)
 	})
 
 	ginkgo.It("serves GetUptime", func() {
-		tc.Log().Info("calling GetUptime")
-		req := connect.NewRequest(&infopb.GetUptimeRequest{})
-		resp, err := client.GetUptime(tc.DefaultContext(), req)
+		request := connect.NewRequest(&infopb.GetUptimeRequest{})
+		response, err := client.GetUptime(tc.DefaultContext(), request)
 		require.NoError(err)
-		require.NotNil(resp.Msg)
+
+		require.NotZero(response.Msg.RewardingStakePercentage)
+		require.NotZero(response.Msg.WeightedAveragePercentage)
 	})
 
-	// TODO acps test
+	ginkgo.It("serves GetACPs", func() {
+		request := connect.NewRequest(&infopb.GetACPsRequest{})
+		response, err := client.GetACPs(tc.DefaultContext(), request)
+		require.NoError(err)
+
+		require.NotZero(response.Msg.Acps)
+	})
 
 	ginkgo.It("serves GetVMs", func() {
-		tc.Log().Info("calling GetVMs")
-		req := connect.NewRequest(&infopb.GetVMsRequest{})
-		resp, err := client.GetVMs(tc.DefaultContext(), req)
+		request := connect.NewRequest(&infopb.GetVMsRequest{})
+		response, err := client.GetVMs(tc.DefaultContext(), request)
 		require.NoError(err)
-		found := false
-		for _, v := range resp.Msg.Vms {
-			for _, alias := range v.Aliases {
-				if alias == "avm" {
-					found = true
-					break
-				}
-			}
-			if found {
-				break
-			}
+
+		gotVMAliases := make([]string, 0)
+		for _, aliases := range response.Msg.Vms {
+			gotVMAliases = append(gotVMAliases, aliases.Aliases...)
 		}
-		require.True(found)
+
+		require.ElementsMatch([]string{"avm", "evm", "platform"}, gotVMAliases)
+
+		gotFXAliases := make([]string, 0)
+		for _, alias := range response.Msg.Fxs {
+			gotFXAliases = append(gotFXAliases, alias)
+		}
+
+		require.ElementsMatch(
+			[]string{"nftfx", "propertyfx", "secp256k1fx"},
+			gotFXAliases)
 	})
 })
