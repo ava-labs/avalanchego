@@ -572,8 +572,9 @@ func (x *GetChainIDRequest) GetAlias() string {
 }
 
 type GetChainIDResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ChainId       string                 `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Chain id resolving to the alias requested.
+	ChainId       string `protobuf:"bytes,1,opt,name=chain_id,json=chainId,proto3" json:"chain_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
