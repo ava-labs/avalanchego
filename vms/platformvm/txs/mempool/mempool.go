@@ -156,8 +156,8 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 
 	// Try to evict lower gas priced txs if we do not have enough remaining gas
 	// capacity
-	if next := m.currentGas + gasUsed; next > m.gasCapacity {
-		gasToFree := next - m.gasCapacity
+	if gasCapacity := m.gasCapacity - gasUsed; m.currentGas > gasCapacity {
+		gasToFree := m.currentGas - gasCapacity
 		if err := m.tryEvictTxs(gasToFree, heapTx); err != nil {
 			return err
 		}
