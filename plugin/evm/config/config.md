@@ -193,7 +193,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
-| `metrics-expensive-enabled` | bool | Enable expensive debug-level metrics | `true` |
+| `metrics-expensive-enabled` | bool | Enable expensive debug-level metrics; this includes Firewood metrics | `true` |
 
 ## Security and Access
 

@@ -2,6 +2,7 @@
 
 ## Pending Release
 - Enable expermiental `state-scheme` flag to specify Firewood as a state database.
+- Added prometheus metrics for Firewood if it is enabled and expensive metrics are being used.
 - Add pending releases here
 
 ## [v0.7.7](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.7)
