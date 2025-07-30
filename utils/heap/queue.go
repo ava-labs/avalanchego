@@ -5,7 +5,6 @@ package heap
 
 import (
 	"container/heap"
-	"iter"
 
 	"github.com/ava-labs/avalanchego/utils"
 )
@@ -92,22 +91,4 @@ func (q *queue[T]) Pop() any {
 	q.entries = q.entries[:end]
 
 	return popped
-}
-
-func (q *queue[T]) Iterator() iter.Seq[T] {
-	return func(yield func(T) bool) {
-		qCopy := queue[T]{
-			less: q.less,
-		}
-
-		qCopy.entries = make([]T, len(q.entries))
-		copy(qCopy.entries, q.entries)
-
-		for qCopy.Len() > 0 {
-			element := heap.Pop(&qCopy).(T)
-			if !yield(element) {
-				return
-			}
-		}
-	}
 }
