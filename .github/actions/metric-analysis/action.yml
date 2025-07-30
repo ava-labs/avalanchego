@@ -187,6 +187,6 @@ runs:
       with:
         name: metric-analysis-${{ github.run_id }}
         path: |
-          .github/actions/analysis/metric_visualization_*.html
+          ${{ github.action_path }}/metric_visualization_*.html
           ${{ steps.build-config.outputs.config_path }}
         retention-days: 14
