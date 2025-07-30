@@ -139,6 +139,8 @@ test_timer_count 6
 }
 
 func registerNilMetrics(t *testing.T, register func(t *testing.T, name string, collector any)) {
+	// The NewXXX metrics functions return nil metrics types when the metrics
+	// are disabled.
 	metrics.Enabled = false
 	defer func() { metrics.Enabled = true }()
 	nilCounter := metrics.NewCounter()
