@@ -1,6 +1,6 @@
 # EVM Load Test
 
-This executable utilizes the `load` package to perform a load test against an instance of Coreth. 
+This executable utilizes the `load` package to perform a load test against an instance of the C-Chain. 
 
 ## Prerequisites
 
@@ -30,7 +30,7 @@ to starting the load test.
 
 The test will start a new Avalanche network along with deploying a set of 
 wallets which will send transactions to the network for the lifetime of the test.
-To view the state of the test network, `tmpnet` will log a Grafana URL:
+To enable viewing the state of the test network, `tmpnet` will log a Grafana URL:
 
 ```
 [07-25|13:47:36.137] INFO tmpnet/network.go:410 metrics and logs available via grafana (collectors must be running) {"url": "https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%7C%3D%7Ce1b9dd69-5204-4c24-8b98-d3aea14c0eeb&var-filter=is_ephemeral_node%7C%3D%7Cfalse&from=1753465644564&to=now"}
@@ -72,12 +72,12 @@ flowchart BT
   WalletC --> NodeC
 ```
 
-The load test architecture consists of two main components that work together to simulate realistic blockchain usage and a metrics server which exposes client-side metrics:
+The load test architecture consists of two main components that work together to simulate realistic blockchain usage and a metrics server which exposes client-side metrics.
 
 ### Network
 
 The network is created via `tmpnet`, which provisions a temporary cluster of validator nodes. The number of nodes is configurable through the `--node-count` flag (default: 5).
-In addition to network creation, the executable directs `tmpnet` to create `n` prefunded accounts for use by the load generator.
+In addition to network creation, the executable directs `tmpnet` to create a prefunded account for each worker.
 
 #### Kubernetes Support
 
@@ -87,11 +87,11 @@ By default, the nodes of a network created by a load test are local processes. H
 # Start nix development environment
 nix develop
 
-# Start load test against kind cluster
+# Start load test against Kind cluster
 task test-load-kube-kind
 ```
 
-`nix` handles the installation of any Kubernetes/Kind dependencies, making it trivial to run load tests with a kind cluster.
+`nix` handles the installation of any Kubernetes/Kind dependencies, making it trivial to run load tests with a Kind cluster.
 
 ### Load Generator
 
@@ -99,7 +99,7 @@ The load generator is setup as follows:
 
 1. Deploy an instance of the `EVMLoadSimulator` contract 
 2. Create an instance of `RandomTest` which uses the deployed contract
-3. Create an instance of `LoadGenerator` with `n` workers
+3. Create an instance of `LoadGenerator` with a worker per node
 4. Start the generator
 
 ### Metrics Server
