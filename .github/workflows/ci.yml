@@ -303,6 +303,7 @@ jobs:
       - name: Analyze Metrics
         uses: ./.github/actions/metric-analysis
         with:
+          workflow: '.github/workflows/ci.yml'
           baseline_count: '2'
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
@@ -339,6 +340,7 @@ jobs:
       - name: Analyze Metrics
         uses: ./.github/actions/metric-analysis
         with:
+          workflow: '.github/workflows/ci.yml'
           baseline_count: '2'
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
