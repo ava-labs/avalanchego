@@ -35,8 +35,8 @@ func (s *Service) GetNodeVersion(
 	}
 
 	vmVersions := make(map[string]string)
-	for id, version := range jsonResponse.VMVersions {
-		vmVersions[id] = version
+	for vmID, version := range jsonResponse.VMVersions {
+		vmVersions[vmID] = version
 	}
 
 	response := &infopb.GetNodeVersionResponse{
@@ -146,10 +146,12 @@ func (s *Service) GetChainID(
 	}
 
 	var jsonResponse info.GetBlockchainIDReply
-	if err := s.Info.GetBlockchainID(nil,
+	if err := s.Info.GetBlockchainID(
+		nil,
 		&jsonRequest,
-		&jsonResponse); err != nil {
-		return nil, fmt.Errorf("failed to get blockchain id: %w", err)
+		&jsonResponse,
+	); err != nil {
+		return nil, fmt.Errorf("failed to get chain id: %w", err)
 	}
 
 	response := &infopb.GetChainIDResponse{
@@ -167,7 +169,7 @@ func (s *Service) GetPeers(
 	for _, nodeIDStr := range request.Msg.NodeIds {
 		nodeID, err := ids.NodeIDFromString(nodeIDStr)
 		if err != nil {
-			return nil, fmt.Errorf("invalid nodeID %s: %w", nodeIDStr, err)
+			return nil, fmt.Errorf(" failed to parse node id %s: %w", nodeIDStr, err)
 		}
 		nodeIDs = append(nodeIDs, nodeID)
 	}
@@ -178,19 +180,16 @@ func (s *Service) GetPeers(
 
 	var jsonResponse info.PeersReply
 	if err := s.Info.Peers(nil, &jsonRequest, &jsonResponse); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get peers: %w", err)
 	}
 
 	peers := make([]*infopb.Peer, 0, len(jsonResponse.Peers))
 	for _, peer := range jsonResponse.Peers {
-		trackedSubnetsIDs := peer.TrackedSubnets.List()
-		trackedSubnets := make([]string, len(trackedSubnetsIDs))
-		for i, id := range trackedSubnetsIDs {
-			trackedSubnets[i] = id.String()
+		trackedSubnetIDs := peer.TrackedSubnets.List()
+		trackedSubnets := make([]string, len(trackedSubnetIDs))
+		for _, subnetID := range trackedSubnetIDs {
+			trackedSubnets = append(trackedSubnets, subnetID.String())
 		}
-
-		benched := make([]string, len(peer.Benched))
-		copy(benched, peer.Benched)
 
 		peers = append(peers, &infopb.Peer{
 			Ip:             peer.IP.String(),
