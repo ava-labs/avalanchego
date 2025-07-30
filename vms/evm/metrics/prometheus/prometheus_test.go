@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/metrics"
+	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/stretchr/testify/require"
 
@@ -25,6 +26,78 @@ func TestGatherer_Gather(t *testing.T) {
 		require.NoErrorf(t, err, "registering collector %q", name)
 	}
 
+	registerNilMetrics(t, register)
+	registerRealMetrics(t, register)
+
+	gatherer := NewGatherer(registry)
+
+	families, err := gatherer.Gather()
+	require.NoError(t, err)
+
+	expectedMetrics := expectedMetrics(t)
+	require.Len(t, families, len(expectedMetrics))
+	for i, got := range families {
+		require.NotNil(t, got.Name)
+
+		want := expectedMetrics[*got.Name]
+		require.Equal(t, want, got, i)
+	}
+
+	register(t, "unsupported", metrics.NewHealthcheck(nil))
+	families, err = gatherer.Gather()
+	require.ErrorIs(t, err, errMetricTypeNotSupported)
+	require.Empty(t, families)
+}
+
+func expectedMetrics(t *testing.T) map[string]*dto.MetricFamily {
+	const expectedString = `
+		# TYPE test_counter counter
+		test_counter 12345
+		# TYPE test_counter_float64 counter
+		test_counter_float64 1.1
+		# TYPE test_gauge gauge
+		test_gauge 23456
+		# TYPE test_gauge_float64 gauge
+		test_gauge_float64 34567.89
+		# TYPE test_histogram summary
+		test_histogram{quantile="0.5"} 0
+		test_histogram{quantile="0.75"} 0
+		test_histogram{quantile="0.95"} 0
+		test_histogram{quantile="0.99"} 0
+		test_histogram{quantile="0.999"} 0
+		test_histogram{quantile="0.9999"} 0
+		test_histogram_sum 0
+		test_histogram_count 0
+		# TYPE test_meter gauge
+		test_meter 9.999999e+06
+		# TYPE test_resetting_timer summary
+		test_resetting_timer{quantile="50"} 1e+09
+		test_resetting_timer{quantile="95"} 1e+09
+		test_resetting_timer{quantile="99"} 1e+09
+		test_resetting_timer_sum 1e+09
+		test_resetting_timer_count 1
+		# TYPE test_timer summary
+		test_timer{quantile="0.5"} 2.25e+07
+		test_timer{quantile="0.75"} 4.8e+07
+		test_timer{quantile="0.95"} 1.2e+08
+		test_timer{quantile="0.99"} 1.2e+08
+		test_timer{quantile="0.999"} 1.2e+08
+		test_timer{quantile="0.9999"} 1.2e+08
+		test_timer_sum 2.3e+08
+		test_timer_count 6
+	`
+
+	var (
+		stringReader = strings.NewReader(expectedString)
+		parser       expfmt.TextParser
+	)
+
+	expectedMetrics, err := parser.TextToMetricFamilies(stringReader)
+	require.NoError(t, err)
+	return expectedMetrics
+}
+
+func registerRealMetrics(t *testing.T, register func(t *testing.T, name string, collector any)) {
 	counter := metrics.NewCounter()
 	counter.Inc(12345)
 	register(t, "test/counter", counter)
@@ -73,69 +146,6 @@ func TestGatherer_Gather(t *testing.T) {
 
 	emptyResettingTimer.Update(time.Second) // no effect because of snapshot below
 	register(t, "test/empty_resetting_timer_snapshot", emptyResettingTimer.Snapshot())
-
-	registerNilMetrics(t, register)
-
-	gatherer := NewGatherer(registry)
-
-	families, err := gatherer.Gather()
-	require.NoError(t, err)
-
-	const expectedString = `
-# TYPE test_counter counter
-test_counter 12345
-# TYPE test_counter_float64 counter
-test_counter_float64 1.1
-# TYPE test_gauge gauge
-test_gauge 23456
-# TYPE test_gauge_float64 gauge
-test_gauge_float64 34567.89
-# TYPE test_histogram summary
-test_histogram{quantile="0.5"} 0
-test_histogram{quantile="0.75"} 0
-test_histogram{quantile="0.95"} 0
-test_histogram{quantile="0.99"} 0
-test_histogram{quantile="0.999"} 0
-test_histogram{quantile="0.9999"} 0
-test_histogram_sum 0
-test_histogram_count 0
-# TYPE test_meter gauge
-test_meter 9.999999e+06
-# TYPE test_resetting_timer summary
-test_resetting_timer{quantile="50"} 1e+09
-test_resetting_timer{quantile="95"} 1e+09
-test_resetting_timer{quantile="99"} 1e+09
-test_resetting_timer_sum 1e+09
-test_resetting_timer_count 1
-# TYPE test_timer summary
-test_timer{quantile="0.5"} 2.25e+07
-test_timer{quantile="0.75"} 4.8e+07
-test_timer{quantile="0.95"} 1.2e+08
-test_timer{quantile="0.99"} 1.2e+08
-test_timer{quantile="0.999"} 1.2e+08
-test_timer{quantile="0.9999"} 1.2e+08
-test_timer_sum 2.3e+08
-test_timer_count 6
-`
-	var (
-		stringReader = strings.NewReader(expectedString)
-		parser       expfmt.TextParser
-	)
-	expectedMetrics, err := parser.TextToMetricFamilies(stringReader)
-	require.NoError(t, err)
-
-	require.Len(t, families, len(expectedMetrics))
-	for i, got := range families {
-		require.NotNil(t, got.Name)
-
-		want := expectedMetrics[*got.Name]
-		require.Equal(t, want, got, i)
-	}
-
-	register(t, "unsupported", metrics.NewHealthcheck(nil))
-	families, err = gatherer.Gather()
-	require.ErrorIs(t, err, errMetricTypeNotSupported)
-	require.Empty(t, families)
 }
 
 func registerNilMetrics(t *testing.T, register func(t *testing.T, name string, collector any)) {
