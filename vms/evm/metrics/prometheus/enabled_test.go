@@ -17,12 +17,5 @@ import (
 
 func TestMetricsEnabledByDefault(t *testing.T) {
 	require.True(t, metrics.Enabled, "libevm/metrics.Enabled")
-
-	switch m := metrics.NewCounter().(type) {
-	case metrics.NilCounter:
-		require.Failf(t, "unexpected type", "metrics.NewCounter() got %T; want %T", m, new(metrics.StandardCounter))
-	case *metrics.StandardCounter:
-	default:
-		require.Failf(t, "unexpected type", "metrics.NewCounter() got unknown type %T", m)
-	}
+	require.IsType(t, (*metrics.StandardCounter)(nil), metrics.NewCounter(), "metrics.NewCounter() returned wrong type")
 }
