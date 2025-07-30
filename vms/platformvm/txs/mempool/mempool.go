@@ -137,7 +137,7 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 		}
 
 		// The caller should verify txs but perform overflow checks anyway
-		producedAVAX, err = math.Add64(producedAVAX, utxo.Out.Amount())
+		producedAVAX, err = math.Add(producedAVAX, utxo.Out.Amount())
 		if err != nil {
 			return fmt.Errorf("failed to add produced AVAX: %w", err)
 		}
