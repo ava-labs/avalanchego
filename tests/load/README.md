@@ -5,6 +5,10 @@ against an Ethereum Virtual Machine (EVM) chain. It allows for simulation of var
 transaction scenarios to test network performance, transaction throughput, and system
 resilience under different workloads.
 
+This package also comes with `main`, a subpackage executable which runs a load test against
+an instance of the C-Chain. For information on how to run the executable, refer to
+the `main` [README.md](./main/README.md).
+
 ## Prerequisites
 
 Using the `load` package is often coupled with `tmpnet`, a framework that
