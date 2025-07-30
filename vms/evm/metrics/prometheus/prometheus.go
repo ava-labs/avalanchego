@@ -15,8 +15,8 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
-// Gatherer implements [prometheus.Gatherer] interface by
-// gathering all metrics from the given Prometheus registry.
+// Gatherer implements the [prometheus.Gatherer] interface by gathering all
+// metrics from a [Registry].
 type Gatherer struct {
 	registry Registry
 }
