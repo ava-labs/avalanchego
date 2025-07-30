@@ -12,17 +12,19 @@ import (
 
 var metricsLock sync.Mutex
 
-// WithMetrics enables go-ethereum metrics globally for the test.
-// If the [metrics.Enabled] is already true, nothing is done.
-// Otherwise, it is set to true and is reverted to false when the test finishes.
+// WithMetrics enables [metrics.Enabled] for the test and prevents any other
+// tests with metrics from running concurrently.
+//
+// If [metrics.Enabled] is modified, its original value is restored as part of
+// the testing cleanup.
 func WithMetrics(t testing.TB) {
 	metricsLock.Lock()
 	t.Cleanup(metricsLock.Unlock)
-	if metrics.Enabled {
-		return
-	}
+	initialValue := metrics.Enabled
 	metrics.Enabled = true
+
+	// Restore the original value
 	t.Cleanup(func() {
-		metrics.Enabled = false
+		metrics.Enabled = initialValue
 	})
 }
