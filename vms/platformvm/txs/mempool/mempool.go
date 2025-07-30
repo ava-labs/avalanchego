@@ -182,7 +182,7 @@ func (m *Mempool) tryEvictTxs(gasToFree gas.Gas, txToAdd heapTx) error {
 	for _, tx := range m.minHeap.Iterator() {
 		// Try to evict lower priced txs to make room for the new tx
 		if tx.GasPrice >= txToAdd.GasPrice {
-			continue
+			break
 		}
 
 		txID := tx.Tx.TxID
