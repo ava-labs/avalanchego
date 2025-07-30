@@ -1,12 +1,14 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use super::api::{Batch, Db, DbView, Error, HashKey, KeyType, ValueType};
+use super::api::{
+    Batch, Db, DbView, Error, FrozenProof, FrozenRangeProof, HashKey, KeyType, ValueType,
+};
 use super::propose::{Proposal, ProposalBase};
 use crate::merkle::{Key, Value};
-use crate::v2::api::{FrozenProof, FrozenRangeProof};
 use async_trait::async_trait;
 use futures::Stream;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 /// An `EmptyDb` is a simple implementation of `api::Db`
@@ -69,11 +71,11 @@ impl DbView for HistoricalImpl {
         Err(Error::RangeProofOnEmptyTrie)
     }
 
-    async fn range_proof<K: KeyType, V>(
+    async fn range_proof<K: KeyType>(
         &self,
         _first_key: Option<K>,
         _last_key: Option<K>,
-        _limit: Option<usize>,
+        _limit: Option<NonZeroUsize>,
     ) -> Result<FrozenRangeProof, Error> {
         Err(Error::RangeProofOnEmptyTrie)
     }

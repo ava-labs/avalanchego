@@ -3,16 +3,14 @@
 
 use std::collections::BTreeMap;
 use std::fmt::Debug;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 use async_trait::async_trait;
 use futures::stream::Empty;
 
-use super::api::{KeyType, ValueType};
-use crate::{
-    merkle::{Key, Value},
-    v2::api::{self, FrozenProof, FrozenRangeProof},
-};
+use super::api::{self, FrozenProof, FrozenRangeProof, KeyType, ValueType};
+use crate::merkle::{Key, Value};
 
 #[derive(Clone, Debug)]
 pub(crate) enum KeyOp<V: ValueType> {
@@ -124,17 +122,24 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
 
     async fn val<K: KeyType>(&self, key: K) -> Result<Option<Value>, api::Error> {
         // see if this key is in this proposal
-        match self.delta.get(key.as_ref()) {
-            Some(change) => match change {
-                // key in proposal, check for Put or Delete
-                KeyOp::Put(val) => Ok(Some(val.clone())),
-                KeyOp::Delete => Ok(None), // key was deleted in this proposal
-            },
-            None => match &self.base {
-                // key not in this proposal, so delegate to base
-                ProposalBase::Proposal(p) => p.val(key).await,
-                ProposalBase::View(view) => view.val(key).await,
-            },
+        let key = key.as_ref();
+        let mut this = self;
+        // avoid recursion problems by looping over the proposal chain
+        loop {
+            match this.delta.get(key) {
+                Some(change) => {
+                    // key is in `this` proposal, check for Put or Delete
+                    break match change {
+                        KeyOp::Put(val) => Ok(Some(val.clone())),
+                        KeyOp::Delete => Ok(None), // key was deleted in this proposal
+                    };
+                }
+                None => match &this.base {
+                    // key not in this proposal, so delegate to base
+                    ProposalBase::Proposal(p) => this = p,
+                    ProposalBase::View(view) => break view.val(key).await,
+                },
+            }
         }
     }
 
@@ -142,11 +147,11 @@ impl<T: api::DbView + Send + Sync> api::DbView for Proposal<T> {
         todo!();
     }
 
-    async fn range_proof<KT: KeyType, VT>(
+    async fn range_proof<KT: KeyType>(
         &self,
         _first_key: Option<KT>,
         _last_key: Option<KT>,
-        _limit: Option<usize>,
+        _limit: Option<NonZeroUsize>,
     ) -> Result<FrozenRangeProof, api::Error> {
         todo!();
     }

@@ -19,6 +19,7 @@ use firewood_storage::{
 };
 use metrics::{counter, describe_counter};
 use std::io::Write;
+use std::num::NonZeroUsize;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
@@ -111,13 +112,19 @@ impl api::DbView for HistoricalRev {
         merkle.prove(key.as_ref()).map_err(api::Error::from)
     }
 
-    async fn range_proof<K: api::KeyType, V>(
+    async fn range_proof<K: api::KeyType>(
         &self,
-        _first_key: Option<K>,
-        _last_key: Option<K>,
-        _limit: Option<usize>,
+        first_key: Option<K>,
+        last_key: Option<K>,
+        limit: Option<NonZeroUsize>,
     ) -> Result<FrozenRangeProof, api::Error> {
-        todo!()
+        Merkle::from(self)
+            .range_proof(
+                first_key.as_ref().map(AsRef::as_ref),
+                last_key.as_ref().map(AsRef::as_ref),
+                limit,
+            )
+            .await
     }
 
     fn iter_option<K: KeyType>(
@@ -389,13 +396,19 @@ impl api::DbView for Proposal<'_> {
         merkle.prove(key.as_ref()).map_err(api::Error::from)
     }
 
-    async fn range_proof<K: KeyType, V>(
+    async fn range_proof<K: KeyType>(
         &self,
-        _first_key: Option<K>,
-        _last_key: Option<K>,
-        _limit: Option<usize>,
+        first_key: Option<K>,
+        last_key: Option<K>,
+        limit: Option<NonZeroUsize>,
     ) -> Result<FrozenRangeProof, api::Error> {
-        todo!()
+        Merkle::from(&self.nodestore)
+            .range_proof(
+                first_key.as_ref().map(AsRef::as_ref),
+                last_key.as_ref().map(AsRef::as_ref),
+                limit,
+            )
+            .await
     }
 
     fn iter_option<K: KeyType>(

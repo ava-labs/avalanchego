@@ -18,6 +18,7 @@ use async_trait::async_trait;
 use firewood_storage::{FileIoError, TrieHash};
 use futures::Stream;
 use std::fmt::Debug;
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
 /// A `KeyType` is something that can be xcast to a u8 reference,
@@ -29,7 +30,7 @@ impl<T> KeyType for T where T: AsRef<[u8]> + Send + Sync + Debug {}
 
 /// A `ValueType` is the same as a `KeyType`. However, these could
 /// be a different type from the `KeyType` on a given API call.
-/// For example, you might insert {key: "key", value: vec!\[0u8\]}
+/// For example, you might insert `{key: "key", value: [0u8]}`
 /// This also means that the type of all the keys for a single
 /// API call must be the same, as well as the type of all values
 /// must be the same.
@@ -261,11 +262,11 @@ pub trait DbView {
     /// * `last_key` - If None, continue to the end of the database
     /// * `limit` - The maximum number of keys in the range proof
     ///
-    async fn range_proof<K: KeyType, V: Send + Sync>(
+    async fn range_proof<K: KeyType>(
         &self,
         first_key: Option<K>,
         last_key: Option<K>,
-        limit: Option<usize>,
+        limit: Option<NonZeroUsize>,
     ) -> Result<FrozenRangeProof, Error>;
 
     /// Obtain a stream over the keys/values of this view, using an optional starting point

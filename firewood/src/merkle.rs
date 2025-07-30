@@ -6,27 +6,20 @@ mod tests;
 
 use crate::proof::{Proof, ProofCollection, ProofError, ProofNode};
 use crate::range_proof::RangeProof;
-#[cfg(test)]
-use crate::stream::MerkleKeyValueStream;
-use crate::stream::PathIterator;
-#[cfg(test)]
-use crate::v2::api::FrozenRangeProof;
-use crate::v2::api::{self, FrozenProof, KeyType, ValueType};
+use crate::stream::{MerkleKeyValueStream, PathIterator};
+use crate::v2::api::{self, FrozenProof, FrozenRangeProof, KeyType, ValueType};
 use firewood_storage::{
     BranchNode, Child, FileIoError, HashType, HashedNodeReader, ImmutableProposal, IntoHashType,
     LeafNode, MaybePersistedNode, MutableProposal, NibblesIterator, Node, NodeStore, Parentable,
     Path, ReadableStorage, SharedNode, TrieHash, TrieReader, ValueDigest,
 };
-#[cfg(test)]
 use futures::{StreamExt, TryStreamExt};
 use metrics::counter;
 use std::collections::HashSet;
 use std::fmt::{Debug, Write};
-#[cfg(test)]
 use std::future::ready;
 use std::io::Error;
 use std::iter::once;
-#[cfg(test)]
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 
@@ -299,12 +292,10 @@ impl<T: TrieReader> Merkle<T> {
         PathIterator::new(&self.nodestore, key)
     }
 
-    #[cfg(test)]
     pub(super) fn key_value_iter(&self) -> MerkleKeyValueStream<'_, T> {
         MerkleKeyValueStream::from(&self.nodestore)
     }
 
-    #[cfg(test)]
     pub(super) fn key_value_iter_from_key<K: AsRef<[u8]>>(
         &self,
         key: K,
@@ -381,7 +372,6 @@ impl<T: TrieReader> Merkle<T> {
     ///     None
     /// ).await?;
     /// ```
-    #[cfg(test)]
     pub(super) async fn range_proof(
         &self,
         start_key: Option<&[u8]>,
