@@ -26,7 +26,7 @@ const (
 
 var _ synccommon.Syncer = (*stateSync)(nil)
 
-type StateSyncerConfig struct {
+type Config struct {
 	Root                     common.Hash
 	Client                   syncclient.Client
 	DB                       ethdb.Database
@@ -68,7 +68,7 @@ type stateSync struct {
 	cancelFunc context.CancelFunc
 }
 
-func NewStateSyncer(config *StateSyncerConfig) (synccommon.Syncer, error) {
+func NewSyncer(config *Config) (synccommon.Syncer, error) {
 	ss := &stateSync{
 		batchSize:       config.BatchSize,
 		db:              config.DB,
@@ -224,6 +224,10 @@ func (t *stateSync) storageTrieProducer(ctx context.Context) error {
 }
 
 func (t *stateSync) Start(ctx context.Context) error {
+	if t.cancelFunc != nil {
+		return synccommon.ErrSyncerAlreadyStarted
+	}
+
 	ctx, t.cancelFunc = context.WithCancel(ctx)
 
 	// Start the code syncer and leaf syncer.

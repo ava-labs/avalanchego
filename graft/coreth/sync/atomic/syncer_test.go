@@ -452,6 +452,21 @@ func TestSyncerContextCancellation(t *testing.T) {
 	require.Contains(t, err.Error(), "context canceled", "error should indicate context cancellation")
 }
 
+// TestSyncer_MultipleStart verifies that the atomic syncer prevents multiple Start() calls.
+func TestSyncer_MultipleStart(t *testing.T) {
+	ctx, mockClient, atomicBackend, root := setupParallelizationTest(t, testTargetHeight)
+	config := createTestConfig(mockClient, atomicBackend, root, testTargetHeight)
+	syncer := createTestSyncer(t, config)
+
+	// First Start() call should succeed
+	err := syncer.Start(ctx)
+	require.NoError(t, err, "first Start() call should succeed")
+
+	// Second Start() call should fail with sentinel error
+	err = syncer.Start(ctx)
+	require.ErrorIs(t, err, synccommon.ErrSyncerAlreadyStarted, "should return ErrSyncerAlreadyStarted")
+}
+
 // setupParallelizationTest creates the common test infrastructure for parallelization tests.
 // It returns the context, mock client, atomic backend, and root hash for testing.
 func setupParallelizationTest(t *testing.T, targetHeight uint64) (context.Context, *syncclient.TestClient, *state.AtomicBackend, common.Hash) {

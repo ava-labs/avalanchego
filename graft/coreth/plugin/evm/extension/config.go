@@ -24,8 +24,8 @@ import (
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/message"
+	synccommon "github.com/ava-labs/coreth/sync"
 	"github.com/ava-labs/coreth/sync/handlers"
-	"github.com/ava-labs/coreth/sync/vm"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -137,10 +137,10 @@ type Config struct {
 	// SyncSummaryProvider is the sync summary provider to use
 	// for the VM to be used in syncer.
 	// It's required and should be non-nil
-	SyncSummaryProvider vm.SummaryProvider
+	SyncSummaryProvider synccommon.SummaryProvider
 	// SyncExtender can extend the syncer to handle custom sync logic.
 	// It's optional and can be nil
-	SyncExtender vm.Extender
+	SyncExtender synccommon.Extender
 	// SyncableParser is to parse summary messages from the network.
 	// It's required and should be non-nil
 	SyncableParser message.SyncableParser

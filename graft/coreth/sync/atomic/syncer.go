@@ -199,6 +199,10 @@ func newSyncer(config *Config) (*syncer, error) {
 
 // Start begins syncing the target atomic root with the configured number of worker goroutines.
 func (s *syncer) Start(ctx context.Context) error {
+	if s.cancel != nil {
+		return synccommon.ErrSyncerAlreadyStarted
+	}
+
 	ctx, s.cancel = context.WithCancel(ctx)
 	s.syncer.Start(ctx, s.numWorkers, s.onSyncFailure)
 

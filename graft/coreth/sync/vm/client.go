@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"sync"
 
+	synccommon "github.com/ava-labs/coreth/sync"
 	syncclient "github.com/ava-labs/coreth/sync/client"
+	"github.com/ava-labs/coreth/sync/statesync"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -19,7 +21,6 @@ import (
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/message"
-	"github.com/ava-labs/coreth/sync/statesync"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -27,12 +28,20 @@ import (
 	"github.com/ava-labs/libevm/log"
 )
 
-// ParentsToFetch is the number of the block parents the state syncs to.
-// The last 256 block hashes are necessary to support the BLOCKHASH opcode.
-const ParentsToFetch = 256
+const (
+	// ParentsToFetch is the number of the block parents the state syncs to.
+	// The last 256 block hashes are necessary to support the BLOCKHASH opcode.
+	ParentsToFetch = 256
+
+	atomicStateSyncOperationName = "Atomic State Sync"
+	evmStateSyncOperationName    = "EVM State Sync"
+)
 
 var stateSyncSummaryKey = []byte("stateSyncSummary")
 
+// BlockAcceptor provides a mechanism to update the last accepted block ID during state synchronization.
+// This interface is used by the state sync process to ensure the blockchain state
+// is properly updated when new blocks are synchronized from the network.
 type BlockAcceptor interface {
 	PutLastAcceptedID(ids.ID) error
 }
@@ -44,28 +53,7 @@ type EthBlockWrapper interface {
 	GetEthBlock() *types.Block
 }
 
-// Extender is an interface that allows for extending the state sync process.
-type Extender interface {
-	// Sync is called to perform any extension-specific state sync logic.
-	Sync(ctx context.Context, client syncclient.LeafClient, verdb *versiondb.Database, syncSummary message.Syncable) error
-	// OnFinishBeforeCommit is called after the state sync process has completed but before the state sync summary is committed.
-	OnFinishBeforeCommit(lastAcceptedHeight uint64, syncSummary message.Syncable) error
-	// OnFinishAfterCommit is called after the state sync process has completed and the state sync summary is committed.
-	OnFinishAfterCommit(summaryHeight uint64) error
-}
-
-// ClientConfig defines the options and dependencies needed to construct a Client
 type ClientConfig struct {
-	Enabled    bool
-	SkipResume bool
-	// Specifies the number of blocks behind the latest state summary that the chain must be
-	// in order to prefer performing state sync over falling back to the normal bootstrapping
-	// algorithm.
-	MinBlocks   uint64
-	RequestSize uint16 // number of key/value pairs to ask peers for per request
-
-	LastAcceptedHeight uint64
-
 	Chain      *eth.Ethereum
 	State      *chain.State
 	ChainDB    ethdb.Database
@@ -73,14 +61,22 @@ type ClientConfig struct {
 	VerDB      *versiondb.Database
 	MetadataDB database.Database
 
-	// Extension points
+	// Extension points.
 	Parser message.SyncableParser
+
 	// Extender is an optional extension point for the state sync process, and can be nil.
-	Extender Extender
-
-	Client syncclient.Client
-
+	Extender      synccommon.Extender
+	Client        syncclient.Client
 	StateSyncDone chan struct{}
+
+	// Specifies the number of blocks behind the latest state summary that the chain must be
+	// in order to prefer performing state sync over falling back to the normal bootstrapping
+	// algorithm.
+	MinBlocks          uint64
+	LastAcceptedHeight uint64
+	RequestSize        uint16 // number of key/value pairs to ask peers for per request
+	Enabled            bool
+	SkipResume         bool
 }
 
 type client struct {
@@ -103,12 +99,12 @@ func NewClient(config *ClientConfig) Client {
 }
 
 type Client interface {
-	// methods that implement the client side of [block.StateSyncableVM]
+	// Methods that implement the client side of [block.StateSyncableVM].
 	StateSyncEnabled(context.Context) (bool, error)
 	GetOngoingSyncStateSummary(context.Context) (block.StateSummary, error)
 	ParseStateSummary(ctx context.Context, summaryBytes []byte) (block.StateSummary, error)
 
-	// additional methods required by the evm package
+	// Additional methods required by the evm package.
 	ClearOngoingSummary() error
 	Shutdown() error
 	Error() error
@@ -157,22 +153,62 @@ func (client *client) ParseStateSummary(_ context.Context, summaryBytes []byte) 
 	return client.Parser.Parse(summaryBytes, client.acceptSyncSummary)
 }
 
-// stateSync blockingly performs the state sync for the EVM state and the atomic state
-// to [client.syncSummary]. returns an error if one occurred.
 func (client *client) stateSync(ctx context.Context) error {
 	if err := client.syncBlocks(ctx, client.summary.GetBlockHash(), client.summary.Height(), ParentsToFetch); err != nil {
 		return err
 	}
 
-	// Sync the EVM trie.
-	if err := client.syncStateTrie(ctx); err != nil {
+	// Create and register all syncers.
+	registry := NewSyncerRegistry()
+
+	if err := client.registerSyncers(ctx, registry); err != nil {
 		return err
 	}
 
-	if client.Extender != nil {
-		return client.Extender.Sync(ctx, client.Client, client.VerDB, client.summary)
+	// Run all registered syncers sequentially.
+	return registry.RunSyncerTasks(ctx, client)
+}
+
+func (client *client) registerSyncers(ctx context.Context, registry *SyncerRegistry) error {
+	// Register EVM state syncer.
+	evmSyncer, err := client.createEVMSyncer()
+	if err != nil {
+		return fmt.Errorf("failed to create EVM syncer: %w", err)
 	}
+
+	if err := registry.Register(evmStateSyncOperationName, evmSyncer); err != nil {
+		return fmt.Errorf("failed to register EVM syncer: %w", err)
+	}
+
+	// Register atomic syncer.
+	if client.Extender != nil {
+		atomicSyncer, err := client.createAtomicSyncer(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to create atomic syncer: %w", err)
+		}
+
+		if err := registry.Register(atomicStateSyncOperationName, atomicSyncer); err != nil {
+			return fmt.Errorf("failed to register atomic syncer: %w", err)
+		}
+	}
+
 	return nil
+}
+
+func (client *client) createEVMSyncer() (synccommon.Syncer, error) {
+	return statesync.NewSyncer(&statesync.Config{
+		Client:                   client.Client,
+		Root:                     client.summary.GetBlockRoot(),
+		BatchSize:                ethdb.IdealBatchSize,
+		DB:                       client.ChainDB,
+		MaxOutstandingCodeHashes: statesync.DefaultMaxOutstandingCodeHashes,
+		NumCodeFetchingWorkers:   statesync.DefaultNumCodeFetchingWorkers,
+		RequestSize:              client.RequestSize,
+	})
+}
+
+func (client *client) createAtomicSyncer(ctx context.Context) (synccommon.Syncer, error) {
+	return client.Extender.CreateSyncer(ctx, client.Client, client.VerDB, client.summary)
 }
 
 // acceptSyncSummary returns true if sync will be performed and launches the state sync process
@@ -290,28 +326,6 @@ func (client *client) syncBlocks(ctx context.Context, fromHash common.Hash, from
 	}
 	log.Info("fetched blocks from peer", "total", parentsToGet)
 	return batch.Write()
-}
-
-func (client *client) syncStateTrie(ctx context.Context) error {
-	log.Info("state sync: sync starting", "root", client.summary.GetBlockRoot())
-	evmSyncer, err := statesync.NewStateSyncer(&statesync.StateSyncerConfig{
-		Client:                   client.Client,
-		Root:                     client.summary.GetBlockRoot(),
-		BatchSize:                ethdb.IdealBatchSize,
-		DB:                       client.ChainDB,
-		MaxOutstandingCodeHashes: statesync.DefaultMaxOutstandingCodeHashes,
-		NumCodeFetchingWorkers:   statesync.DefaultNumCodeFetchingWorkers,
-		RequestSize:              client.RequestSize,
-	})
-	if err != nil {
-		return err
-	}
-	if err := evmSyncer.Start(ctx); err != nil {
-		return err
-	}
-	err = evmSyncer.Wait(ctx)
-	log.Info("state sync: sync finished", "root", client.summary.GetBlockRoot(), "err", err)
-	return err
 }
 
 func (client *client) Shutdown() error {
