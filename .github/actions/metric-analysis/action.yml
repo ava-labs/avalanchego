@@ -155,7 +155,7 @@ runs:
           console.log(`Plot created at: ${outputPath}`);
 
           core.setOutput('config_path', configPath);
-          core.setOutput('output_file', outputFile);
+          core.setOutput('output_file', outputPath);
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -193,8 +193,8 @@ runs:
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: metric-analysis-${{ inputs.job_name }}-${{ github.run_id }}
+        name: metric-analysis-${{ github.job }}-${{ github.run_id }}
         path: |
-          $GITHUB_ACTION_PATH/${{ steps.build-config.outputs.output_file }}
+          ${{ steps.build-config.outputs.output_file }}
           ${{ steps.build-config.outputs.config_path }}
         retention-days: 14
