@@ -153,6 +153,7 @@ var _ = ginkgo.Describe("[Info]", ginkgo.Ordered, func() {
 
 		require.ElementsMatch(
 			[]string{"nftfx", "propertyfx", "secp256k1fx"},
-			gotFXAliases)
+			gotFXAliases,
+		)
 	})
 })
