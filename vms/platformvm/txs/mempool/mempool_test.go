@@ -79,10 +79,6 @@ func TestMempoolOrdering(t *testing.T) {
 	require := require.New(t)
 
 	weights := gas.Dimensions{gas.Bandwidth: 1}
-	linearCodec := linearcodec.NewDefault()
-	require.NoError(linearCodec.RegisterType(&secp256k1fx.TransferOutput{}))
-	codecManager := codec.NewDefaultManager()
-	require.NoError(codecManager.RegisterCodec(0, linearCodec))
 
 	m, err := New(
 		"",
