@@ -9,14 +9,11 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/atomic/state"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/coreth/plugin/evm/message"
+	synccommon "github.com/ava-labs/coreth/sync"
 	syncclient "github.com/ava-labs/coreth/sync/client"
-	"github.com/ava-labs/coreth/sync/vm"
 )
-
-var _ vm.Extender = (*Extender)(nil)
 
 // Extender is the sync extender for the atomic VM.
 type Extender struct {
@@ -32,17 +29,14 @@ func (a *Extender) Initialize(backend *state.AtomicBackend, trie *state.AtomicTr
 	a.requestSize = requestSize
 }
 
-// Sync syncs the atomic summary with the given client and verDB.
-func (a *Extender) Sync(ctx context.Context, client syncclient.LeafClient, verDB *versiondb.Database, summary message.Syncable) error {
+// CreateSyncer creates the atomic syncer with the given client and verDB.
+func (a *Extender) CreateSyncer(ctx context.Context, client syncclient.LeafClient, verDB *versiondb.Database, summary message.Syncable) (synccommon.Syncer, error) {
 	atomicSummary, ok := summary.(*Summary)
 	if !ok {
-		return fmt.Errorf("expected *Summary, got %T", summary)
+		return nil, fmt.Errorf("expected *Summary, got %T", summary)
 	}
-	log.Info("atomic sync starting", "summary", atomicSummary)
 
-	// Use default number of workers for atomic syncing.
-	// This can be made configurable in the future.
-	config := Config{
+	return newSyncer(&Config{
 		Client:       client,
 		Database:     verDB,
 		AtomicTrie:   a.trie,
@@ -50,19 +44,7 @@ func (a *Extender) Sync(ctx context.Context, client syncclient.LeafClient, verDB
 		TargetHeight: atomicSummary.BlockNumber,
 		RequestSize:  a.requestSize,
 		NumWorkers:   defaultNumWorkers,
-	}
-	syncer, err := newSyncer(&config)
-	if err != nil {
-		return fmt.Errorf("failed to create atomic syncer: %w", err)
-	}
-	if err := syncer.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start atomic syncer: %w", err)
-	}
-
-	err = syncer.Wait(ctx)
-	log.Info("atomic sync finished", "summary", atomicSummary, "err", err)
-
-	return err
+	})
 }
 
 // OnFinishBeforeCommit implements the sync.Extender interface by marking the previously last accepted block for the shared memory cursor.

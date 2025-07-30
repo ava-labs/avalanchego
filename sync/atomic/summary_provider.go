@@ -9,13 +9,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
-	"github.com/ava-labs/coreth/sync/vm"
+	"github.com/ava-labs/coreth/sync"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 )
 
-var _ vm.SummaryProvider = (*SummaryProvider)(nil)
+var _ sync.SummaryProvider = (*SummaryProvider)(nil)
 
 // SummaryProvider is the summary provider that provides the state summary for the atomic trie.
 type SummaryProvider struct {
