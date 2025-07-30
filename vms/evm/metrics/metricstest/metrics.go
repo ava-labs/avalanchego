@@ -17,9 +17,7 @@ var metricsLock sync.Mutex
 // Otherwise, it is set to true and is reverted to false when the test finishes.
 func WithMetrics(t *testing.T) {
 	metricsLock.Lock()
-	t.Cleanup(func() {
-		metricsLock.Unlock()
-	})
+	t.Cleanup(metricsLock.Unlock)
 	if metrics.Enabled {
 		return
 	}
