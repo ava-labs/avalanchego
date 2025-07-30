@@ -23,9 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 )
-
-var avaxAssetID = ids.ID{1, 2, 3}
 
 func newAVAXInput(txID ids.ID, amount uint64) *avax.TransferableInput {
 	return &avax.TransferableInput{
@@ -33,7 +32,7 @@ func newAVAXInput(txID ids.ID, amount uint64) *avax.TransferableInput {
 			TxID: txID,
 		},
 		Asset: avax.Asset{
-			ID: avaxAssetID,
+			ID: snowtest.AVAXAssetID,
 		},
 		In: &secp256k1fx.TransferInput{
 			Amt: amount,
@@ -44,7 +43,7 @@ func newAVAXInput(txID ids.ID, amount uint64) *avax.TransferableInput {
 func newAVAXOutput(amount uint64) *avax.TransferableOutput {
 	return &avax.TransferableOutput{
 		Asset: avax.Asset{
-			ID: avaxAssetID,
+			ID: snowtest.AVAXAssetID,
 		},
 		Out: &secp256k1fx.TransferOutput{
 			Amt: amount,
@@ -89,7 +88,7 @@ func TestMempoolOrdering(t *testing.T) {
 		"",
 		weights,
 		1_000_000,
-		avaxAssetID,
+		snowtest.AVAXAssetID,
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -344,7 +343,7 @@ func TestMempoolAdd(t *testing.T) {
 				"",
 				tt.weights,
 				tt.maxGasCapacity,
-				avaxAssetID,
+				snowtest.AVAXAssetID,
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
@@ -389,7 +388,7 @@ func TestMempool_Remove(t *testing.T) {
 										TxID: ids.GenerateTestID(),
 									},
 									Asset: avax.Asset{
-										ID: avaxAssetID,
+										ID: snowtest.AVAXAssetID,
 									},
 									In: &secp256k1fx.TransferInput{
 										Amt: 1,
@@ -415,7 +414,7 @@ func TestMempool_Remove(t *testing.T) {
 										TxID: ids.GenerateTestID(),
 									},
 									Asset: avax.Asset{
-										ID: avaxAssetID,
+										ID: snowtest.AVAXAssetID,
 									},
 									In: &secp256k1fx.TransferInput{
 										Amt: 1,
@@ -440,7 +439,7 @@ func TestMempool_Remove(t *testing.T) {
 				"",
 				gas.Dimensions{1, 1, 1, 1},
 				1_000_000,
-				avaxAssetID,
+				snowtest.AVAXAssetID,
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
@@ -479,7 +478,7 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 										TxID: ids.ID{1},
 									},
 									Asset: avax.Asset{
-										ID: avaxAssetID,
+										ID: snowtest.AVAXAssetID,
 									},
 									In: &secp256k1fx.TransferInput{
 										Amt: 1,
@@ -499,7 +498,7 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 										TxID: ids.ID{2},
 									},
 									Asset: avax.Asset{
-										ID: avaxAssetID,
+										ID: snowtest.AVAXAssetID,
 									},
 									In: &secp256k1fx.TransferInput{
 										Amt: 1,
@@ -528,7 +527,7 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 										TxID: ids.ID{1},
 									},
 									Asset: avax.Asset{
-										ID: avaxAssetID,
+										ID: snowtest.AVAXAssetID,
 									},
 									In: &secp256k1fx.TransferInput{
 										Amt: 1,
@@ -548,7 +547,7 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 										TxID: ids.ID{2},
 									},
 									Asset: avax.Asset{
-										ID: avaxAssetID,
+										ID: snowtest.AVAXAssetID,
 									},
 									In: &secp256k1fx.TransferInput{
 										Amt: 1,
@@ -577,7 +576,7 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 										TxID: ids.ID{1},
 									},
 									Asset: avax.Asset{
-										ID: avaxAssetID,
+										ID: snowtest.AVAXAssetID,
 									},
 									In: &secp256k1fx.TransferInput{
 										Amt: 1,
@@ -597,7 +596,7 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 										TxID: ids.ID{3},
 									},
 									Asset: avax.Asset{
-										ID: avaxAssetID,
+										ID: snowtest.AVAXAssetID,
 									},
 									In: &secp256k1fx.TransferInput{
 										Amt: 1,
@@ -622,7 +621,7 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 				"",
 				gas.Dimensions{1, 1, 1, 1},
 				1_000_000,
-				avaxAssetID,
+				snowtest.AVAXAssetID,
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
@@ -677,7 +676,7 @@ func TestMempool_Drop(t *testing.T) {
 				"",
 				gas.Dimensions{1, 1, 1, 1},
 				1_000_000,
-				avaxAssetID,
+				snowtest.AVAXAssetID,
 				prometheus.NewRegistry(),
 			)
 			require.NoError(err)
@@ -699,7 +698,7 @@ func TestMempool_WaitForEvent(t *testing.T) {
 		"",
 		gas.Dimensions{1, 1, 1, 1},
 		1_000_000,
-		avaxAssetID,
+		snowtest.AVAXAssetID,
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
