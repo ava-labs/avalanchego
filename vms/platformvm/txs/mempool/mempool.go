@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -24,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
+	"github.com/google/btree"
 )
 
 var (
@@ -32,7 +32,7 @@ var (
 	errNoGasUsed           = errors.New("no gas used")
 )
 
-type heapTx struct {
+type meteredTx struct {
 	*txs.Tx
 	GasPrice float64
 
@@ -45,9 +45,9 @@ type Mempool struct {
 	avaxAssetID ids.ID
 
 	lock               sync.RWMutex
-	cond               *lock.Cond
-	maxHeap            heap.Map[ids.ID, heapTx]
-	minHeap            heap.Map[ids.ID, heapTx]
+	cond *lock.Cond // TODO (?)
+	tree *btree.BTreeG[meteredTx]
+	txs  map[ids.ID]meteredTx
 	consumedUTXOs      *setmap.SetMap[ids.ID, ids.ID]
 	droppedTxIDs       *lru.Cache[ids.ID, error]
 	currentGas         gas.Gas
@@ -85,12 +85,15 @@ func New(
 		weights:     weights,
 		gasCapacity: gasCapacity,
 		avaxAssetID: avaxAssetID,
-		maxHeap: heap.NewMap[ids.ID, heapTx](func(a, b heapTx) bool {
-			return a.GasPrice > b.GasPrice
+		tree: btree.NewG[meteredTx](2, func(a, b meteredTx) bool {
+			if a.GasPrice != b.GasPrice {
+				return a.GasPrice < b.GasPrice
+			}
+
+			// Break ties
+			return a.TxID.Compare(b.TxID) < 0
 		}),
-		minHeap: heap.NewMap[ids.ID, heapTx](func(a, b heapTx) bool {
-			return a.GasPrice < b.GasPrice
-		}),
+		txs: make(map[ids.ID]meteredTx),
 		consumedUTXOs:      setmap.New[ids.ID, ids.ID](),
 		droppedTxIDs:       lru.NewCache[ids.ID, error](64),
 		numTxsMetric:       numTxsMetric,
@@ -148,7 +151,7 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 		return fmt.Errorf("failed to meter tx: %w", err)
 	}
 
-	heapTx := heapTx{
+	meteredTx := meteredTx{
 		Tx:       tx,
 		gasUsed:  gasUsed,
 		GasPrice: float64(consumedAVAX-producedAVAX) / float64(gasUsed),
@@ -156,15 +159,15 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 
 	// Try to evict lower gas priced txs if we do not have enough remaining gas
 	// capacity
-	if gasCapacity := m.gasCapacity - gasUsed; m.currentGas > gasCapacity {
-		gasToFree := m.currentGas - gasCapacity
-		if err := m.tryEvictTxs(gasToFree, heapTx); err != nil {
+	if gasRemaining := m.gasCapacity - gasUsed; m.currentGas > gasRemaining {
+		gasToFree := m.currentGas - gasRemaining
+		if err := m.tryEvictTxs(gasToFree, meteredTx); err != nil {
 			return err
 		}
 	}
 
-	m.maxHeap.Push(tx.TxID, heapTx)
-	m.minHeap.Push(tx.TxID, heapTx)
+	m.tree.ReplaceOrInsert(meteredTx)
+	m.txs[tx.TxID] = meteredTx
 	m.consumedUTXOs.Put(tx.TxID, tx.InputIDs())
 	m.droppedTxIDs.Evict(tx.TxID)
 	m.currentGas += gasUsed
@@ -175,24 +178,26 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	return nil
 }
 
-func (m *Mempool) tryEvictTxs(gasToFree gas.Gas, txToAdd heapTx) error {
+func (m *Mempool) tryEvictTxs(gasToFree gas.Gas, txToAdd meteredTx) error {
 	gasFreed := gas.Gas(0)
 	toEvict := make([]ids.ID, 0)
 
-	for _, tx := range m.minHeap.Iterator() {
+	m.tree.Ascend(func(item meteredTx) bool {
 		// Try to evict lower priced txs to make room for the new tx
-		if tx.GasPrice >= txToAdd.GasPrice {
-			break
+		if item.GasPrice >= txToAdd.GasPrice {
+			return false
 		}
 
-		txID := tx.Tx.TxID
+		txID := item.Tx.TxID
 		toEvict = append(toEvict, txID)
-		gasFreed += tx.gasUsed
+		gasFreed += item.gasUsed
 
 		if gasFreed >= gasToFree {
-			break
+			return false
 		}
-	}
+
+		return true
+	})
 
 	if gasFreed < gasToFree {
 		return ErrGasCapacityExceeded
@@ -206,7 +211,7 @@ func (m *Mempool) tryEvictTxs(gasToFree gas.Gas, txToAdd heapTx) error {
 }
 
 func (m *Mempool) updateMetrics() {
-	m.numTxsMetric.Set(float64(m.maxHeap.Len()))
+	m.numTxsMetric.Set(float64(m.tree.Len()))
 	m.gasAvailableMetric.Set(float64(m.gasCapacity - m.currentGas))
 }
 
@@ -214,7 +219,7 @@ func (m *Mempool) Get(txID ids.ID) (*txs.Tx, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	tx, ok := m.maxHeap.Get(txID)
+	tx, ok := m.txs[txID]
 	if !ok {
 		return nil, false
 	}
@@ -230,15 +235,16 @@ func (m *Mempool) Remove(txID ids.ID) {
 }
 
 func (m *Mempool) remove(txID ids.ID) {
-	heapTx, ok := m.maxHeap.Remove(txID)
+	removedTx, ok := m.txs[txID]
 	if !ok {
 		return
 	}
 
-	m.minHeap.Remove(txID)
+	delete(m.txs, txID)
+	m.tree.Delete(removedTx)
 	m.consumedUTXOs.DeleteKey(txID)
 
-	m.currentGas -= heapTx.gasUsed
+	m.currentGas -= removedTx.gasUsed
 
 	m.updateMetrics()
 }
@@ -256,7 +262,7 @@ func (m *Mempool) Peek() (*txs.Tx, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	_, tx, ok := m.maxHeap.Peek()
+	tx, ok := m.tree.Max()
 	return tx.Tx, ok
 }
 
@@ -264,18 +270,16 @@ func (m *Mempool) Iterate(f func(tx *txs.Tx) bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	for _, v := range m.maxHeap.Iterator() {
-		if !f(v.Tx) {
-			return
-		}
-	}
+	m.tree.Ascend(func(item meteredTx) bool {
+		return f(item.Tx)
+	})
 }
 
 func (m *Mempool) MarkDropped(txID ids.ID, reason error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if _, ok := m.maxHeap.Get(txID); ok {
+	if _, ok := m.txs[txID]; ok {
 		return
 	}
 
@@ -294,7 +298,7 @@ func (m *Mempool) Len() int {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	return m.maxHeap.Len()
+	return m.tree.Len()
 }
 
 func (m *Mempool) meter(tx txs.UnsignedTx) (gas.Gas, error) {
@@ -306,6 +310,10 @@ func (m *Mempool) meter(tx txs.UnsignedTx) (gas.Gas, error) {
 	g, err := c.ToGas(m.weights)
 	if err != nil {
 		return 0, err
+	}
+
+	if g > m.gasCapacity {
+		return 0, ErrGasCapacityExceeded
 	}
 
 	if g == 0 {
@@ -320,7 +328,7 @@ func (m *Mempool) WaitForEvent(ctx context.Context) (common.Message, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	for m.maxHeap.Len() == 0 {
+	for m.tree.Len() == 0 {
 		if err := m.cond.Wait(ctx); err != nil {
 			return 0, err
 		}
