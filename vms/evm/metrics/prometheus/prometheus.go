@@ -35,6 +35,7 @@ type Gatherer struct {
 func (g *Gatherer) Gather() (mfs []*dto.MetricFamily, err error) {
 	// Gather and pre-sort the metrics to avoid random listings
 	var names []string
+	var errs []error
 	g.registry.Each(func(name string, _ any) {
 		names = append(names, name)
 	})
@@ -43,16 +44,17 @@ func (g *Gatherer) Gather() (mfs []*dto.MetricFamily, err error) {
 	mfs = make([]*dto.MetricFamily, 0, len(names))
 	for _, name := range names {
 		mf, err := metricFamily(g.registry, name)
+
 		switch {
 		case errors.Is(err, errMetricSkip):
 			continue
 		case err != nil:
-			return nil, err
+			errs = append(errs, err)
 		}
 		mfs = append(mfs, mf)
 	}
 
-	return mfs, nil
+	return mfs, errors.Join(errs...)
 }
 
 // NewGatherer returns a [Gatherer] using the given registry.
