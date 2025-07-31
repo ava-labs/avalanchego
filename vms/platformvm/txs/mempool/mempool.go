@@ -45,9 +45,9 @@ type Mempool struct {
 	avaxAssetID ids.ID
 
 	lock               sync.RWMutex
-	cond *lock.Cond // TODO (?)
-	tree *btree.BTreeG[meteredTx]
-	txs  map[ids.ID]meteredTx
+	cond               *lock.Cond
+	tree               *btree.BTreeG[meteredTx]
+	txs                map[ids.ID]meteredTx
 	consumedUTXOs      *setmap.SetMap[ids.ID, ids.ID]
 	droppedTxIDs       *lru.Cache[ids.ID, error]
 	currentGas         gas.Gas
@@ -93,7 +93,7 @@ func New(
 			// Break ties
 			return a.TxID.Compare(b.TxID) < 0
 		}),
-		txs: make(map[ids.ID]meteredTx),
+		txs:                make(map[ids.ID]meteredTx),
 		consumedUTXOs:      setmap.New[ids.ID, ids.ID](),
 		droppedTxIDs:       lru.NewCache[ids.ID, error](64),
 		numTxsMetric:       numTxsMetric,
