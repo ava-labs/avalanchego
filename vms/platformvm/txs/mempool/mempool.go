@@ -216,11 +216,7 @@ func (m *Mempool) Get(txID ids.ID) (*txs.Tx, bool) {
 	defer m.lock.RUnlock()
 
 	tx, ok := m.txs[txID]
-	if !ok {
-		return nil, false
-	}
-
-	return tx.Tx, true
+	return tx.Tx, ok
 }
 
 func (m *Mempool) Remove(txID ids.ID) {
