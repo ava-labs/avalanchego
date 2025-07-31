@@ -5,14 +5,14 @@ responsible disclosures. Valid reports will be eligible for a reward (terms and 
 
 ## Reporting a Vulnerability
 
-**Please do not file a public ticket** mentioning the vulnerability. To disclose a vulnerability submit it through our [Bug Bounty Program](https://hackenproof.com/avalanche).
+**Please do not file a public ticket** mentioning the vulnerability. To disclose a vulnerability submit it through our [Bug Bounty Program](https://immunefi.com/bug-bounty/avalanche/information/).
 
 Vulnerabilities must be disclosed to us privately with reasonable time to respond, and avoid compromise of other users and accounts, or loss of funds that are not your own. We do not reward spam or
 social engineering vulnerabilities.
 
 Do not test for or validate any security issues in the live Avalanche networks (Mainnet and Fuji testnet), confirm all exploits in a local private testnet.
 
-Please refer to the [Bug Bounty Page](https://hackenproof.com/avalanche) for the most up-to-date program rules and scope.
+Please refer to the [Bug Bounty Page](https://immunefi.com/bug-bounty/avalanche/information/) for the most up-to-date program rules and scope.
 
 ## Supported Versions
 

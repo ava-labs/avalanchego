@@ -31,4 +31,4 @@ Which OS you used to reveal the bug.
 **Additional context**
 Add any other context about the problem here.
 
-Avalanche Bug Bounty program can be found [here](https://hackenproof.com/avalanche/avalanche-protocol).
+Avalanche Bug Bounty program can be found [here](https://immunefi.com/bug-bounty/avalanche/information/).
