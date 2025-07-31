@@ -2,7 +2,7 @@
 
 The results package defines how to encode `PredicateResults` within the block header's `Extra` data field.
 
-For more information on the motivation for encoding the results of predicate verification within a block, see [here](../../x/warp/README.md#re-processing-historical-blocks).
+For more information on the motivation for encoding the results of predicate verification within a block, see [here](../../../vms/platformvm/warp/README.md#processing-historical-avalanche-interchain-messages).
 
 ## Serialization
 
