@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/subnet-evm/core/extstate/extstatetest"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
@@ -63,15 +62,5 @@ func TestAllowListRun(t *testing.T) {
 		Configurator: &dummyConfigurator{},
 		ConfigKey:    "dummy",
 	}
-	RunPrecompileWithAllowListTests(t, dummyModule, extstatetest.NewTestStateDB, nil)
-}
-
-func BenchmarkAllowList(b *testing.B) {
-	dummyModule := modules.Module{
-		Address:      dummyAddr,
-		Contract:     allowlist.CreateAllowListPrecompile(dummyAddr),
-		Configurator: &dummyConfigurator{},
-		ConfigKey:    "dummy",
-	}
-	BenchPrecompileWithAllowList(b, dummyModule, extstatetest.NewTestStateDB, nil)
+	RunPrecompileWithAllowListTests(t, dummyModule, nil)
 }

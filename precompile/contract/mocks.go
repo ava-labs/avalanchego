@@ -255,21 +255,6 @@ func (mr *MockStateDBMockRecorder) GetBalance(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBalance", reflect.TypeOf((*MockStateDB)(nil).GetBalance), arg0)
 }
 
-// GetLogData mocks base method.
-func (m *MockStateDB) GetLogData() ([][]common.Hash, [][]byte) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetLogData")
-	ret0, _ := ret[0].([][]common.Hash)
-	ret1, _ := ret[1].([][]byte)
-	return ret0, ret1
-}
-
-// GetLogData indicates an expected call of GetLogData.
-func (mr *MockStateDBMockRecorder) GetLogData() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLogData", reflect.TypeOf((*MockStateDB)(nil).GetLogData))
-}
-
 // GetNonce mocks base method.
 func (m *MockStateDB) GetNonce(arg0 common.Address) uint64 {
 	m.ctrl.T.Helper()
@@ -349,18 +334,6 @@ func (m *MockStateDB) SetNonce(arg0 common.Address, arg1 uint64) {
 func (mr *MockStateDBMockRecorder) SetNonce(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNonce", reflect.TypeOf((*MockStateDB)(nil).SetNonce), arg0, arg1)
-}
-
-// SetPredicateStorageSlots mocks base method.
-func (m *MockStateDB) SetPredicateStorageSlots(address common.Address, predicates [][]byte) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetPredicateStorageSlots", address, predicates)
-}
-
-// SetPredicateStorageSlots indicates an expected call of SetPredicateStorageSlots.
-func (mr *MockStateDBMockRecorder) SetPredicateStorageSlots(address, predicates any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPredicateStorageSlots", reflect.TypeOf((*MockStateDB)(nil).SetPredicateStorageSlots), address, predicates)
 }
 
 // SetState mocks base method.

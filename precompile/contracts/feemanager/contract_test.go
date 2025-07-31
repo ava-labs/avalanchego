@@ -8,9 +8,10 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/subnet-evm/commontype"
-	"github.com/ava-labs/subnet-evm/core/extstate/extstatetest"
+	"github.com/ava-labs/subnet-evm/core/extstate"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
@@ -80,12 +81,12 @@ var (
 			SuppliedGas: SetFeeConfigGasCost + FeeConfigChangedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
 
-				logsTopics, logsData := state.GetLogData()
-				assertFeeEvent(t, logsTopics, logsData, allowlisttest.TestEnabledAddr, zeroFeeConfig, testFeeConfig)
+				logs := state.Logs()
+				assertFeeEvent(t, logs, allowlisttest.TestEnabledAddr, zeroFeeConfig, testFeeConfig)
 			},
 		},
 		"set config from manager succeeds": {
@@ -100,12 +101,12 @@ var (
 			SuppliedGas: SetFeeConfigGasCost + FeeConfigChangedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
 
-				logsTopics, logsData := state.GetLogData()
-				assertFeeEvent(t, logsTopics, logsData, allowlisttest.TestManagerAddr, zeroFeeConfig, testFeeConfig)
+				logs := state.Logs()
+				assertFeeEvent(t, logs, allowlisttest.TestManagerAddr, zeroFeeConfig, testFeeConfig)
 			},
 		},
 		"set invalid config from enabled address": {
@@ -125,7 +126,7 @@ var (
 				InitialFeeConfig: &testFeeConfig,
 			},
 			ExpectedErr: "cannot be greater than maxBlockGasCost",
-			AfterHook: func(t testing.TB, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
 			},
@@ -146,19 +147,19 @@ var (
 				mbc.EXPECT().Number().Return(testBlockNumber).AnyTimes()
 				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
 			},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
 				require.EqualValues(t, testBlockNumber, lastChangedAt)
 
-				logsTopics, logsData := state.GetLogData()
-				assertFeeEvent(t, logsTopics, logsData, allowlisttest.TestAdminAddr, zeroFeeConfig, testFeeConfig)
+				logs := state.Logs()
+				assertFeeEvent(t, logs, allowlisttest.TestAdminAddr, zeroFeeConfig, testFeeConfig)
 			},
 		},
 		"get fee config from non-enabled address": {
 			Caller: allowlisttest.TestNoRoleAddr,
-			BeforeHook: func(t testing.TB, state contract.StateDB) {
+			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
 				blockContext := contract.NewMockBlockContext(gomock.NewController(t))
 				blockContext.EXPECT().Number().Return(big.NewInt(6)).Times(1)
 				allowlisttest.SetDefaultRoles(Module.Address)(t, state)
@@ -179,7 +180,7 @@ var (
 				}
 				return res
 			}(),
-			AfterHook: func(t testing.TB, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
 				require.Equal(t, testFeeConfig, feeConfig)
@@ -196,10 +197,10 @@ var (
 				return input
 			},
 			SuppliedGas: GetFeeConfigGasCost,
+			ReadOnly:    true,
 			Config: &Config{
 				InitialFeeConfig: &testFeeConfig,
 			},
-			ReadOnly: true,
 			ExpectedRes: func() []byte {
 				res, err := PackGetFeeConfigOutput(testFeeConfig)
 				if err != nil {
@@ -210,7 +211,7 @@ var (
 			SetupBlockContext: func(mbc *contract.MockBlockContext) {
 				mbc.EXPECT().Number().Return(testBlockNumber)
 			},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
 				require.Equal(t, testFeeConfig, feeConfig)
@@ -219,7 +220,7 @@ var (
 		},
 		"get last changed at from non-enabled address": {
 			Caller: allowlisttest.TestNoRoleAddr,
-			BeforeHook: func(t testing.TB, state contract.StateDB) {
+			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
 				blockContext := contract.NewMockBlockContext(gomock.NewController(t))
 				blockContext.EXPECT().Number().Return(testBlockNumber).Times(1)
 				allowlisttest.SetDefaultRoles(Module.Address)(t, state)
@@ -240,7 +241,7 @@ var (
 				}
 				return res
 			}(),
-			AfterHook: func(t testing.TB, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
 				require.Equal(t, testFeeConfig, feeConfig)
@@ -344,14 +345,14 @@ var (
 				mbc.EXPECT().Number().Return(testBlockNumber).AnyTimes()
 				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
 			},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
 				require.EqualValues(t, testBlockNumber, lastChangedAt)
 
-				logsTopics, logsData := state.GetLogData()
-				assertFeeEvent(t, logsTopics, logsData, allowlisttest.TestEnabledAddr, zeroFeeConfig, testFeeConfig)
+				logs := state.Logs()
+				assertFeeEvent(t, logs, allowlisttest.TestEnabledAddr, zeroFeeConfig, testFeeConfig)
 			},
 		},
 		// from https://github.com/ava-labs/subnet-evm/issues/487
@@ -388,14 +389,14 @@ var (
 				mbc.EXPECT().Number().Return(testBlockNumber).AnyTimes()
 				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
 			},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				feeConfig := GetStoredFeeConfig(state)
 				require.Equal(t, regressionFeeConfig, feeConfig)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
 				require.EqualValues(t, testBlockNumber, lastChangedAt)
 
-				logsTopics, logsData := state.GetLogData()
-				assertFeeEvent(t, logsTopics, logsData, allowlisttest.TestEnabledAddr, zeroFeeConfig, regressionFeeConfig)
+				logs := state.Logs()
+				assertFeeEvent(t, logs, allowlisttest.TestEnabledAddr, zeroFeeConfig, regressionFeeConfig)
 			},
 		},
 		"set config should not emit event before Durango": {
@@ -414,41 +415,37 @@ var (
 			SuppliedGas: SetFeeConfigGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
-				logsTopics, logsData := state.GetLogData()
-				require.Len(t, logsTopics, 0)
-				require.Len(t, logsData, 0)
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
+				logs := state.Logs()
+				require.Empty(t, logs)
 			},
 		},
 	}
 )
 
 func TestFeeManager(t *testing.T) {
-	allowlisttest.RunPrecompileWithAllowListTests(t, Module, extstatetest.NewTestStateDB, tests)
-}
-
-func BenchmarkFeeManager(b *testing.B) {
-	allowlisttest.BenchPrecompileWithAllowList(b, Module, extstatetest.NewTestStateDB, tests)
+	allowlisttest.RunPrecompileWithAllowListTests(t, Module, tests)
 }
 
 func assertFeeEvent(
 	t testing.TB,
-	logsTopics [][]common.Hash,
-	logsData [][]byte,
+	logs []*ethtypes.Log,
 	sender common.Address,
 	expectedOldFeeConfig commontype.FeeConfig,
 	expectedNewFeeConfig commontype.FeeConfig,
 ) {
-	require.Len(t, logsTopics, 1)
-	require.Len(t, logsData, 1)
+	require.Len(t, logs, 1)
+	log := logs[0]
+	require.Equal(
+		t,
+		[]common.Hash{
+			FeeManagerABI.Events["FeeConfigChanged"].ID,
+			common.BytesToHash(sender[:]),
+		},
+		log.Topics,
+	)
 
-	topics := logsTopics[0]
-	require.Len(t, topics, 2)
-	require.Equal(t, FeeManagerABI.Events["FeeConfigChanged"].ID, topics[0])
-	require.Equal(t, common.BytesToHash(sender[:]), topics[1])
-
-	logData := logsData[0]
-	oldFeeConfig, resFeeConfig, err := UnpackFeeConfigChangedEventData(logData)
+	oldFeeConfig, resFeeConfig, err := UnpackFeeConfigChangedEventData(log.Data)
 	require.NoError(t, err)
 	require.True(t, expectedOldFeeConfig.Equal(&oldFeeConfig), "expected %v, got %v", expectedOldFeeConfig, oldFeeConfig)
 	require.True(t, expectedNewFeeConfig.Equal(&resFeeConfig), "expected %v, got %v", expectedNewFeeConfig, resFeeConfig)

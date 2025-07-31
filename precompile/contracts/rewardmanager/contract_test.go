@@ -7,15 +7,15 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	ethtypes "github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/constants"
-	"github.com/ava-labs/subnet-evm/core/extstate/extstatetest"
+	"github.com/ava-labs/subnet-evm/core/extstate"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist/allowlisttest"
-	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/precompiletest"
 )
@@ -74,12 +74,12 @@ var (
 			SuppliedGas: AllowFeeRecipientsGasCost + FeeRecipientsAllowedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				_, isFeeRecipients := GetStoredRewardAddress(state)
 				require.True(t, isFeeRecipients)
 
-				logsTopics, logsData := state.GetLogData()
-				assertFeeRecipientsAllowed(t, logsTopics, logsData, allowlisttest.TestEnabledAddr)
+				logs := state.Logs()
+				assertFeeRecipientsAllowed(t, logs, allowlisttest.TestEnabledAddr)
 			},
 		},
 		"set fee recipients should not emit events pre-Durango": {
@@ -101,11 +101,10 @@ var (
 			SuppliedGas: AllowFeeRecipientsGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, stateDB contract.StateDB) {
+			AfterHook: func(t testing.TB, stateDB *extstate.StateDB) {
 				// Check no logs are stored in state
-				logsTopics, logsData := stateDB.GetLogData()
-				require.Len(t, logsTopics, 0)
-				require.Len(t, logsData, 0)
+				logs := stateDB.Logs()
+				require.Empty(t, logs)
 			},
 		},
 		"set reward address from enabled succeeds": {
@@ -120,13 +119,13 @@ var (
 			SuppliedGas: SetRewardAddressGasCost + RewardAddressChangedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				address, isFeeRecipients := GetStoredRewardAddress(state)
 				require.Equal(t, rewardAddress, address)
 				require.False(t, isFeeRecipients)
 
-				logsTopics, logsData := state.GetLogData()
-				assertRewardAddressChanged(t, logsTopics, logsData, allowlisttest.TestEnabledAddr, common.Address{}, rewardAddress)
+				logs := state.Logs()
+				assertRewardAddressChanged(t, logs, allowlisttest.TestEnabledAddr, common.Address{}, rewardAddress)
 			},
 		},
 		"set allow fee recipients from manager succeeds": {
@@ -141,12 +140,12 @@ var (
 			SuppliedGas: AllowFeeRecipientsGasCost + FeeRecipientsAllowedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				_, isFeeRecipients := GetStoredRewardAddress(state)
 				require.True(t, isFeeRecipients)
 
-				logsTopics, logsData := state.GetLogData()
-				assertFeeRecipientsAllowed(t, logsTopics, logsData, allowlisttest.TestManagerAddr)
+				logs := state.Logs()
+				assertFeeRecipientsAllowed(t, logs, allowlisttest.TestManagerAddr)
 			},
 		},
 		"set reward address from manager succeeds": {
@@ -161,13 +160,13 @@ var (
 			SuppliedGas: SetRewardAddressGasCost + RewardAddressChangedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				address, isFeeRecipients := GetStoredRewardAddress(state)
 				require.Equal(t, rewardAddress, address)
 				require.False(t, isFeeRecipients)
 
-				logsTopics, logsData := state.GetLogData()
-				assertRewardAddressChanged(t, logsTopics, logsData, allowlisttest.TestManagerAddr, common.Address{}, rewardAddress)
+				logs := state.Logs()
+				assertRewardAddressChanged(t, logs, allowlisttest.TestManagerAddr, common.Address{}, rewardAddress)
 			},
 		},
 		"change reward address should not emit events pre-Durango": {
@@ -189,11 +188,10 @@ var (
 			SuppliedGas: SetRewardAddressGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, stateDB contract.StateDB) {
+			AfterHook: func(t testing.TB, stateDB *extstate.StateDB) {
 				// Check no logs are stored in state
-				logsTopics, logsData := stateDB.GetLogData()
-				require.Len(t, logsTopics, 0)
-				require.Len(t, logsData, 0)
+				logs := stateDB.Logs()
+				require.Empty(t, logs)
 			},
 		},
 		"disable rewards from manager succeeds": {
@@ -208,13 +206,13 @@ var (
 			SuppliedGas: DisableRewardsGasCost + RewardsDisabledEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				address, isFeeRecipients := GetStoredRewardAddress(state)
 				require.False(t, isFeeRecipients)
 				require.Equal(t, constants.BlackholeAddr, address)
 
-				logsTopics, logsData := state.GetLogData()
-				assertRewardsDisabled(t, logsTopics, logsData, allowlisttest.TestManagerAddr)
+				logs := state.Logs()
+				assertRewardsDisabled(t, logs, allowlisttest.TestManagerAddr)
 			},
 		},
 		"disable rewards from enabled succeeds": {
@@ -229,13 +227,13 @@ var (
 			SuppliedGas: DisableRewardsGasCost + RewardsDisabledEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, state contract.StateDB) {
+			AfterHook: func(t testing.TB, state *extstate.StateDB) {
 				address, isFeeRecipients := GetStoredRewardAddress(state)
 				require.False(t, isFeeRecipients)
 				require.Equal(t, constants.BlackholeAddr, address)
 
-				logsTopics, logsData := state.GetLogData()
-				assertRewardsDisabled(t, logsTopics, logsData, allowlisttest.TestEnabledAddr)
+				logs := state.Logs()
+				assertRewardsDisabled(t, logs, allowlisttest.TestEnabledAddr)
 			},
 		},
 		"disable rewards should not emit event pre-Durango": {
@@ -257,16 +255,15 @@ var (
 			SuppliedGas: SetRewardAddressGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
-			AfterHook: func(t testing.TB, stateDB contract.StateDB) {
+			AfterHook: func(t testing.TB, stateDB *extstate.StateDB) {
 				// Check logs are not stored in state
-				topics, data := stateDB.GetLogData()
-				require.Len(t, topics, 0)
-				require.Len(t, data, 0)
+				logs := stateDB.Logs()
+				require.Empty(t, logs)
 			},
 		},
 		"get current reward address from no role succeeds": {
 			Caller: allowlisttest.TestNoRoleAddr,
-			BeforeHook: func(t testing.TB, state contract.StateDB) {
+			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
 				allowlisttest.SetDefaultRoles(Module.Address)(t, state)
 				StoreRewardAddress(state, rewardAddress)
 			},
@@ -288,7 +285,7 @@ var (
 		},
 		"get are fee recipients allowed from no role succeeds": {
 			Caller: allowlisttest.TestNoRoleAddr,
-			BeforeHook: func(t testing.TB, state contract.StateDB) {
+			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
 				allowlisttest.SetDefaultRoles(Module.Address)(t, state)
 				EnableAllowFeeRecipients(state)
 			},
@@ -435,55 +432,60 @@ var (
 )
 
 func TestRewardManagerRun(t *testing.T) {
-	allowlisttest.RunPrecompileWithAllowListTests(t, Module, extstatetest.NewTestStateDB, tests)
-}
-
-func BenchmarkRewardManager(b *testing.B) {
-	allowlisttest.BenchPrecompileWithAllowList(b, Module, extstatetest.NewTestStateDB, tests)
+	allowlisttest.RunPrecompileWithAllowListTests(t, Module, tests)
 }
 
 func assertRewardAddressChanged(
 	t testing.TB,
-	logsTopics [][]common.Hash,
-	logsData [][]byte,
+	logs []*ethtypes.Log,
 	caller,
 	oldAddress,
 	newAddress common.Address) {
-	require.Len(t, logsTopics, 1)
-	require.Len(t, logsData, 1)
-	topics := logsTopics[0]
-	require.Len(t, topics, 4)
-	require.Equal(t, RewardManagerABI.Events["RewardAddressChanged"].ID, topics[0])
-	require.Equal(t, common.BytesToHash(caller[:]), topics[1])
-	require.Equal(t, common.BytesToHash(oldAddress[:]), topics[2])
-	require.Equal(t, common.BytesToHash(newAddress[:]), topics[3])
-	require.Len(t, logsData[0], 0)
+	require.Len(t, logs, 1)
+	log := logs[0]
+	require.Equal(
+		t,
+		[]common.Hash{
+			RewardManagerABI.Events["RewardAddressChanged"].ID,
+			common.BytesToHash(caller[:]),
+			common.BytesToHash(oldAddress[:]),
+			common.BytesToHash(newAddress[:]),
+		},
+		log.Topics,
+	)
+	require.Empty(t, log.Data)
 }
 
 func assertRewardsDisabled(
 	t testing.TB,
-	logsTopics [][]common.Hash,
-	logsData [][]byte,
+	logs []*ethtypes.Log,
 	caller common.Address) {
-	require.Len(t, logsTopics, 1)
-	require.Len(t, logsData, 1)
-	topics := logsTopics[0]
-	require.Len(t, topics, 2)
-	require.Equal(t, RewardManagerABI.Events["RewardsDisabled"].ID, topics[0])
-	require.Equal(t, common.BytesToHash(caller[:]), topics[1])
-	require.Len(t, logsData[0], 0)
+	require.Len(t, logs, 1)
+	log := logs[0]
+	require.Equal(
+		t,
+		[]common.Hash{
+			RewardManagerABI.Events["RewardsDisabled"].ID,
+			common.BytesToHash(caller[:]),
+		},
+		log.Topics,
+	)
+	require.Empty(t, log.Data)
 }
 
 func assertFeeRecipientsAllowed(
 	t testing.TB,
-	logsTopics [][]common.Hash,
-	logsData [][]byte,
+	logs []*ethtypes.Log,
 	caller common.Address) {
-	require.Len(t, logsTopics, 1)
-	require.Len(t, logsData, 1)
-	topics := logsTopics[0]
-	require.Len(t, topics, 2)
-	require.Equal(t, RewardManagerABI.Events["FeeRecipientsAllowed"].ID, topics[0])
-	require.Equal(t, common.BytesToHash(caller[:]), topics[1])
-	require.Len(t, logsData[0], 0)
+	require.Len(t, logs, 1)
+	log := logs[0]
+	require.Equal(
+		t,
+		[]common.Hash{
+			RewardManagerABI.Events["FeeRecipientsAllowed"].ID,
+			common.BytesToHash(caller[:]),
+		},
+		log.Topics,
+	)
+	require.Empty(t, log.Data)
 }

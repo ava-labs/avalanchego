@@ -6,7 +6,6 @@ package allowlisttest
 import (
 	"testing"
 
-	"github.com/ava-labs/subnet-evm/core/extstate/extstatetest"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
 )
@@ -19,7 +18,7 @@ var testModule = modules.Module{
 }
 
 func TestVerifyAllowlist(t *testing.T) {
-	RunPrecompileWithAllowListTests(t, testModule, extstatetest.NewTestStateDB, nil)
+	RunPrecompileWithAllowListTests(t, testModule, nil)
 }
 
 func TestEqualAllowList(t *testing.T) {
