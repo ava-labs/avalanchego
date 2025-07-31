@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"net/http"
 	"os"
 	"os/exec"
@@ -316,9 +317,7 @@ func WritePrometheusSDConfig(name string, sdConfig SDConfig, withGitHubLabels bo
 }
 
 func applyGitHubLabels(sdConfig SDConfig) SDConfig {
-	for label, value := range GetGitHubLabels() {
-		sdConfig.Labels[label] = value
-	}
+	maps.Copy(sdConfig.Labels, GetGitHubLabels())
 	return sdConfig
 }
 

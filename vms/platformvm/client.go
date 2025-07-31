@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
 
 import (
 	"context"
+	"maps"
 	"time"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -654,11 +655,7 @@ func GetOwners(
 	}
 
 	owners := make(map[ids.ID]fx.Owner, len(subnetOwners)+len(deactivationOwners))
-	for id, owner := range subnetOwners {
-		owners[id] = owner
-	}
-	for id, owner := range deactivationOwners {
-		owners[id] = owner
-	}
+	maps.Copy(owners, subnetOwners)
+	maps.Copy(owners, deactivationOwners)
 	return owners, nil
 }

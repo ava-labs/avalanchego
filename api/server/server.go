@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -287,12 +288,15 @@ func (s *server) AddAliasesWithReadLock(endpoint string, aliases ...string) erro
 
 func (s *server) Shutdown() error {
 	ctx, cancel := context.WithTimeout(context.Background(), s.shutdownTimeout)
-	err := s.srv.Shutdown(ctx)
+
+	// Close the listener here in case Serve() was never called on the server.
+	listenerErr := s.listener.Close()
+	serverErr := s.srv.Shutdown(ctx)
 	cancel()
 
 	// If shutdown times out, make sure the server is still shutdown.
 	_ = s.srv.Close()
-	return err
+	return errors.Join(listenerErr, serverErr)
 }
 
 type readPathAdder struct {

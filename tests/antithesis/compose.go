@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package antithesis
@@ -6,6 +6,7 @@ package antithesis
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 
@@ -179,9 +180,7 @@ func newComposeProject(network *tmpnet.Network, nodeImageName string, workloadIm
 		}
 
 		// Apply configuration appropriate to a test network
-		for k, v := range tmpnet.DefaultTmpnetFlags() {
-			env[k] = v
-		}
+		maps.Copy(env, tmpnet.DefaultTmpnetFlags())
 
 		serviceName := getServiceName(i)
 

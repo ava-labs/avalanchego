@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package chains
@@ -67,8 +67,7 @@ func (vm *initializeOnLinearizeVM) Linearize(ctx context.Context, stopVertexID i
 }
 
 // linearizeOnInitializeVM transforms the proposervm's call to Initialize into a
-// call to Linearize. This enables the proposervm to provide its toEngine
-// channel to the VM that is being linearized.
+// call to Linearize.
 type linearizeOnInitializeVM struct {
 	vertex.LinearizableVMWithEngine
 	stopVertexID ids.ID

@@ -8,10 +8,11 @@
 * @StephenButtolph
 *.md @meaghanfitzgerald @StephenButtolph
 /.dockerignore @maru-ava
-/.envrc @JuanLeon2 @maru-ava
+/.envrc @joshua-kim @maru-ava
 /.github/ @joshua-kim @maru-ava
 /.github/*.md @joshua-kim @maru-ava @meaghanfitzgerald
 /.github/CODEOWNERS @StephenButtolph
+/.github/workflows/c-chain-reexecution-benchmark.yml @aaronbuchwald
 /.gitignore @joshua-kim @maru-ava @StephenButtolph
 /.golangci.yml @joshua-kim @maru-ava @StephenButtolph
 /Dockerfile @joshua-kim @maru-ava
@@ -22,7 +23,9 @@
 /network/p2p/*.md @joshua-kim @meaghanfitzgerald
 /scripts/ @joshua-kim @maru-ava
 /scripts/*.md @joshua-kim @maru-ava @meaghanfitzgerald
+/scripts/benchmark_cchain_range.sh @aaronbuchwald
 /tests/ @joshua-kim @maru-ava
 /tests/*.md @joshua-kim @maru-ava @meaghanfitzgerald
+/tests/reexecute/ @aaronbuchwald
 /x/merkledb @joshua-kim @rrazvan1
 /x/sync @joshua-kim @rrazvan1

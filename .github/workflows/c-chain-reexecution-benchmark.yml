@@ -1,6 +1,7 @@
 name: C-Chain Re-Execution Benchmark
 
 on:
+  pull_request:
   workflow_dispatch:
     inputs:
       start-block:
@@ -19,15 +20,20 @@ on:
         description: 'The current state directory. Supports S3 directory/zip and local directories.'
         required: false
         default: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip
+      runner:
+        description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
+        required: false
+        default: ubuntu-latest
+
   schedule:
-    - cron: '0 6 * * 0' # Runs every Sunday at 06:00 UTC
+    - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 
 jobs:
     c-chain-reexecution:
       permissions:
         id-token: write
         contents: write
-      runs-on: ubuntu-latest
+      runs-on: ${{ github.event.inputs.runner || 'ubuntu-latest' }}
       steps:
         - name: Configure AWS Credentials
           uses: aws-actions/configure-aws-credentials@v4
@@ -60,7 +66,7 @@ jobs:
           with:
             path: ./cache
             key: ${{ runner.os }}-reexecute-cchain-range-benchmark.json
-        - name: Compare Benchmark Results
+        - name: Compare Benchmark Result
           uses: benchmark-action/github-action-benchmark@v1
           with:
             tool: 'go'
@@ -70,3 +76,12 @@ jobs:
             github-token: ${{ secrets.GITHUB_TOKEN }}
             summary-always: true
             comment-on-alert: true
+            auto-push: false
+        - name: Push Benchmark Result
+          if: github.event_name == 'schedule'
+          uses: benchmark-action/github-action-benchmark@v1
+          with:
+            tool: 'go'
+            output-file-path: ${{ github.workspace }}/reexecute-cchain-range-benchmark-res.txt
+            github-token: ${{ secrets.GITHUB_TOKEN }}
+            auto-push: true

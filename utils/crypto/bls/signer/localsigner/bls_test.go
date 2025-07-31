@@ -1,9 +1,10 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package localsigner
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -311,4 +312,16 @@ func TestVerifyWrongMessageSignedProofOfPossession(t *testing.T) {
 
 	isValid := bls.VerifyProofOfPossession(signer.PublicKey(), wrongSig, msg)
 	require.False(isValid)
+}
+
+func TestIdempotentFromFileOrPersistNew(t *testing.T) {
+	require := require.New(t)
+	path := filepath.Join(t.TempDir(), "keyfile")
+
+	signer1, err := FromFileOrPersistNew(path)
+	require.NoError(err)
+	signer2, err := FromFileOrPersistNew(path)
+	require.NoError(err)
+
+	require.Equal(signer1.PublicKey(), signer2.PublicKey())
 }

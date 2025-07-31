@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -6,7 +6,6 @@ package executor
 import (
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 )
 
@@ -17,7 +16,6 @@ var _ block.Visitor = (*rejector)(nil)
 // being shutdown.
 type rejector struct {
 	*backend
-	toEngine        chan<- common.Message
 	addTxsToMempool bool
 }
 
@@ -86,11 +84,6 @@ func (r *rejector) rejectBlock(b block.Block, blockType string) error {
 
 	if r.Mempool.Len() == 0 {
 		return nil
-	}
-
-	select {
-	case r.toEngine <- common.PendingTxs:
-	default:
 	}
 
 	return nil
