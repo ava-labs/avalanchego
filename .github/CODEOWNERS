@@ -9,20 +9,20 @@
 *.md @meaghanfitzgerald @StephenButtolph
 /.dockerignore @maru-ava
 /.envrc @JuanLeon2 @maru-ava
-/.github/ @JuanLeon2 @maru-ava
-/.github/*.md @JuanLeon2 @maru-ava @meaghanfitzgerald
+/.github/ @joshua-kim @maru-ava
+/.github/*.md @joshua-kim @maru-ava @meaghanfitzgerald
 /.github/CODEOWNERS @StephenButtolph
-/.gitignore @JuanLeon2 @maru-ava @StephenButtolph
-/.golangci.yml @JuanLeon2 @maru-ava @StephenButtolph
-/Dockerfile @JuanLeon2 @maru-ava
-/Taskfile.yml @JuanLeon2 @maru-ava
-/flake.lock @JuanLeon2 @maru-ava
-/flake.nix @JuanLeon2 @maru-ava
+/.gitignore @joshua-kim @maru-ava @StephenButtolph
+/.golangci.yml @joshua-kim @maru-ava @StephenButtolph
+/Dockerfile @joshua-kim @maru-ava
+/Taskfile.yml @joshua-kim @maru-ava
+/flake.lock @joshua-kim @maru-ava
+/flake.nix @joshua-kim @maru-ava
 /network/p2p/ @joshua-kim
 /network/p2p/*.md @joshua-kim @meaghanfitzgerald
-/scripts/ @JuanLeon2 @maru-ava
-/scripts/*.md @JuanLeon2 @maru-ava @meaghanfitzgerald
-/tests/ @JuanLeon2 @maru-ava
-/tests/*.md @JuanLeon2 @maru-ava @meaghanfitzgerald
+/scripts/ @joshua-kim @maru-ava
+/scripts/*.md @joshua-kim @maru-ava @meaghanfitzgerald
+/tests/ @joshua-kim @maru-ava
+/tests/*.md @joshua-kim @maru-ava @meaghanfitzgerald
 /x/merkledb @joshua-kim @rrazvan1
 /x/sync @joshua-kim @rrazvan1
