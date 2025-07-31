@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/metrics"
-	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/vms/evm/metrics/metricstest"
+
+	dto "github.com/prometheus/client_model/go"
 )
 
 func TestGatherer_Gather(t *testing.T) {
