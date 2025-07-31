@@ -15,8 +15,7 @@ var metricsLock sync.Mutex
 // WithMetrics enables [metrics.Enabled] for the test and prevents any other
 // tests with metrics from running concurrently.
 //
-// If [metrics.Enabled] is modified, its original value is restored as part of
-// the testing cleanup.
+// [metrics.Enabled] is restored to its original value during testing cleanup.
 func WithMetrics(t testing.TB) {
 	metricsLock.Lock()
 	t.Cleanup(metricsLock.Unlock)
