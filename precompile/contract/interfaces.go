@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/libevm/common"
 	ethtypes "github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/holiman/uint256"
 )
@@ -21,13 +22,13 @@ type StatefulPrecompiledContract interface {
 }
 
 type StateReader interface {
-	GetState(common.Address, common.Hash) common.Hash
+	GetState(common.Address, common.Hash, ...stateconf.StateDBStateOption) common.Hash
 }
 
 // StateDB is the interface for accessing EVM state
 type StateDB interface {
-	StateReader
-	SetState(common.Address, common.Hash, common.Hash)
+	GetState(common.Address, common.Hash, ...stateconf.StateDBStateOption) common.Hash
+	SetState(common.Address, common.Hash, common.Hash, ...stateconf.StateDBStateOption)
 
 	SetNonce(common.Address, uint64)
 	GetNonce(common.Address) uint64
@@ -41,7 +42,7 @@ type StateDB interface {
 	AddLog(*ethtypes.Log)
 	GetPredicateStorageSlots(address common.Address, index int) ([]byte, bool)
 
-	GetTxHash() common.Hash
+	TxHash() common.Hash
 
 	Snapshot() int
 	RevertToSnapshot(int)

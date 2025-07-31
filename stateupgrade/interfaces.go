@@ -7,12 +7,13 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/holiman/uint256"
 )
 
 // StateDB is the interface for accessing EVM state in state upgrades
 type StateDB interface {
-	SetState(common.Address, common.Hash, common.Hash)
+	SetState(common.Address, common.Hash, common.Hash, ...stateconf.StateDBStateOption)
 	SetCode(common.Address, []byte)
 	AddBalance(common.Address, *uint256.Int)
 

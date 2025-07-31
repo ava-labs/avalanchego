@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/consensus/misc/eip4844"
 	"github.com/ava-labs/subnet-evm/core/extstate"
+	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/params"
 	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ava-labs/subnet-evm/predicate"
@@ -76,8 +77,8 @@ func (hooks) OverrideEVMResetArgs(rules params.Rules, args *vm.EVMResetArgs) *vm
 	return args
 }
 
-func wrapStateDB(rules params.Rules, db vm.StateDB) vm.StateDB {
-	return extstate.New(db.(extstate.VmStateDB))
+func wrapStateDB(rules params.Rules, statedb vm.StateDB) vm.StateDB {
+	return extstate.New(statedb.(*state.StateDB))
 }
 
 // ChainContext supports retrieving headers and consensus parameters from the
