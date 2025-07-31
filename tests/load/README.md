@@ -84,6 +84,7 @@ The `load` package provides a comprehensive suite of test types designed to stre
 | ContractCreation  | Deploys new contracts during execution                          |
 | ExternalCall      | Makes calls to external contract functions                      |
 | LargeEvent        | Emits events with large data payloads                           |
+| TrieStress        | Performs insert operations on TrieDB                            |
 
 Additionally, there is a `RandomTest` which executes one of the aforementioned tests, selected uniformly at random.
 This test is particular useful for mimicking the diverse transactions patterns seen on blockchains like the C-Chain.
