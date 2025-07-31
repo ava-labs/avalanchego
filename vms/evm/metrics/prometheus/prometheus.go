@@ -40,10 +40,7 @@ func (g *Gatherer) Gather() (mfs []*dto.MetricFamily, err error) {
 	})
 	slices.Sort(names)
 
-	var (
-		mfs = make([]*dto.MetricFamily, 0, len(names))
-		errs []error
-	)
+	var errs []error
 	for _, name := range names {
 		mf, err := metricFamily(g.registry, name)
 		switch {

@@ -32,22 +32,46 @@ func TestGatherer_Gather(t *testing.T) {
 
 	gatherer := NewGatherer(registry)
 
+	// Test successful gathering
 	families, err := gatherer.Gather()
 	require.NoError(t, err)
 
 	expectedMetrics := expectedMetrics(t)
-	require.Len(t, families, len(expectedMetrics))
-	for i, got := range families {
-		require.NotNil(t, got.Name)
 
-		want := expectedMetrics[*got.Name]
-		require.Equal(t, want, got, i)
+	require.Equal(t, len(expectedMetrics), len(families), "Expected %d metrics, got %d", len(expectedMetrics), len(families))
+
+	// Compare metrics by name since they're sorted alphabetically
+	for _, got := range families {
+		require.NotNil(t, got.Name)
+		want, exists := expectedMetrics[*got.Name]
+		require.True(t, exists, "unexpected metric: %s", *got.Name)
+		require.Equal(t, want, got, "metric: %s", *got.Name)
 	}
 
+	// Test gathering with unsupported metric type
 	register(t, "unsupported", metrics.NewHealthcheck(nil))
 	families, err = gatherer.Gather()
 	require.ErrorIs(t, err, errMetricTypeNotSupported)
-	require.Empty(t, families)
+
+	// When there's an error, we should still get the valid metrics that were gathered before the error
+	// ResettingTimer metrics reset after being read, so test_resetting_timer won't be included in
+	// subsequent Gather() calls
+	expectedMetricsWithoutResettingTimer := make(map[string]*dto.MetricFamily)
+	for name, metric := range expectedMetrics {
+		if name != "test_resetting_timer" {
+			expectedMetricsWithoutResettingTimer[name] = metric
+		}
+	}
+
+	require.Len(t, families, len(expectedMetricsWithoutResettingTimer))
+
+	// Compare metrics by name since they're sorted alphabetically
+	for _, got := range families {
+		require.NotNil(t, got.Name)
+		want, exists := expectedMetricsWithoutResettingTimer[*got.Name]
+		require.True(t, exists, "unexpected metric: %s", *got.Name)
+		require.Equal(t, want, got, "metric: %s", *got.Name)
+	}
 }
 
 func expectedMetrics(t *testing.T) map[string]*dto.MetricFamily {
