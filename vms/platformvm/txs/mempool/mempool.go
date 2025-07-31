@@ -319,7 +319,6 @@ func (m *Mempool) meter(tx txs.UnsignedTx) (gas.Gas, error) {
 	return g, nil
 }
 
-// TODO Copy a test from txmempool
 func (m *Mempool) WaitForEvent(ctx context.Context) (common.Message, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
