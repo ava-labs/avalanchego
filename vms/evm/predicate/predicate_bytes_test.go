@@ -5,10 +5,12 @@ package predicate
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils"
 )
 
 func testPackPredicate(t testing.TB, b []byte) {
@@ -42,9 +44,16 @@ func TestUnpackInvalidPredicate(t *testing.T) {
 		validPredicate := PackPredicate(utils.RandomBytes(l))
 
 		for _, padding := range paddingCases {
-			invalidPredicate := append(validPredicate, padding...)
+			invalidPredicate := make([]byte, len(validPredicate)+len(padding))
+			copy(invalidPredicate, validPredicate)
+			copy(invalidPredicate[len(validPredicate):], padding)
 			_, err := UnpackPredicate(invalidPredicate)
-			require.Error(err, "Predicate length %d, Padding length %d (0x%x)", len(validPredicate), len(padding), invalidPredicate)
+
+			// Check for either error type since different padding can cause different errors.
+			// Zero padding cases trigger ErrInvalidPadding (padding length check fails).
+			// Non-zero padding cases trigger ErrInvalidEndDelimiter (delimiter check fails).
+			require.True(errors.Is(err, ErrInvalidPadding) || errors.Is(err, ErrInvalidEndDelimiter),
+				"Predicate length %d, Padding length %d (0x%x)", len(validPredicate), len(padding), invalidPredicate)
 		}
 	}
 }
