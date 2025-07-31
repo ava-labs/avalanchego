@@ -20,6 +20,12 @@ const expectedMetrics = `
 	test_counter 12345
 	# TYPE test_counter_float64 counter
 	test_counter_float64 1.1
+	# TYPE test_empty_resetting_timer summary
+	test_empty_resetting_timer{quantile="50"} 0
+	test_empty_resetting_timer{quantile="95"} 0
+	test_empty_resetting_timer{quantile="99"} 0
+	test_empty_resetting_timer_sum 0
+	test_empty_resetting_timer_count 0
 	# TYPE test_gauge gauge
 	test_gauge 23456
 	# TYPE test_gauge_float64 gauge

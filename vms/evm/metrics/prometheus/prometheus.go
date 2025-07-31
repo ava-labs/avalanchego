@@ -170,10 +170,6 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 		}, nil
 	case metrics.ResettingTimer:
 		snapshot := m.Snapshot()
-		count := snapshot.Count()
-		if count == 0 {
-			return nil, fmt.Errorf("%w: %q resetting timer metric count is zero", errMetricSkip, name)
-		}
 		thresholds := snapshot.Percentiles(pvShortPercent)
 		dtoQuantiles := make([]*dto.Quantile, len(pvShortPercent))
 		for i := range pvShortPercent {
@@ -182,6 +178,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 				Value:    ptrTo(thresholds[i]),
 			}
 		}
+		count := snapshot.Count()
 		return &dto.MetricFamily{
 			Name: &name,
 			Type: dto.MetricType_SUMMARY.Enum(),
