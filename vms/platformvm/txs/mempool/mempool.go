@@ -319,6 +319,8 @@ func (m *Mempool) WaitForEvent(ctx context.Context) (common.Message, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
+	// TODO block until the mempool has a gas price greater than or equal to the
+	// chain's minimum gas price
 	for m.tree.Len() == 0 {
 		if err := m.cond.Wait(ctx); err != nil {
 			return 0, err
