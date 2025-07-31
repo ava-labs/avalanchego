@@ -21,7 +21,7 @@ func testPackPredicate(t testing.TB, b []byte) {
 }
 
 func FuzzPackPredicate(f *testing.F) {
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		f.Add(utils.RandomBytes(i))
 	}
 

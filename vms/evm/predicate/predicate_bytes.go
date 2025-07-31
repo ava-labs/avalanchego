@@ -15,7 +15,7 @@ import (
 // which means that its length must be a multiple of 32 (common.HashLength).
 // For messages with a length that does not comply to that, this delimiter is used to
 // append/remove padding.
-var EndByte = byte(0xff)
+const EndByte = byte(0xff)
 
 var (
 	ErrInvalidAllZeroBytes = errors.New("predicate specified invalid all zero bytes")
