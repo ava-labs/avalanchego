@@ -54,10 +54,7 @@ func (g *Gatherer) Gather() (mfs []*dto.MetricFamily, err error) {
 		}
 	}
 
-	if len(errs) > 0 {
-		return nil, errors.Join(errs...)
-	}
-	return mfs, nil
+	return mfs, errors.Join(errs...)
 }
 
 // NewGatherer returns a [Gatherer] using the given registry.
