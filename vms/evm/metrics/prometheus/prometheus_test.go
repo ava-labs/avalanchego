@@ -38,7 +38,7 @@ func TestGatherer_Gather(t *testing.T) {
 
 	expectedMetrics := expectedMetrics(t)
 
-	require.Equal(t, len(expectedMetrics), len(families), "Expected %d metrics, got %d", len(expectedMetrics), len(families))
+	require.Len(t, families, len(expectedMetrics))
 
 	// Compare metrics by name since they're sorted alphabetically
 	for _, got := range families {
