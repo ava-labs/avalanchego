@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/google/btree"
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
@@ -23,7 +24,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
-	"github.com/google/btree"
 )
 
 var (
@@ -192,11 +192,7 @@ func (m *Mempool) tryEvictTxs(gasToFree gas.Gas, txToAdd meteredTx) error {
 		toEvict = append(toEvict, txID)
 		gasFreed += item.gasUsed
 
-		if gasFreed >= gasToFree {
-			return false
-		}
-
-		return true
+		return gasFreed < gasToFree
 	})
 
 	if gasFreed < gasToFree {
