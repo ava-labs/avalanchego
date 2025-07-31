@@ -1,7 +1,7 @@
 # Load Testing
 
-The `load` package provides a comprehensive framework for performing load testing 
-against an Ethereum Virtual Machine (EVM) chain. It allows for simulation of various
+The `load` package is a framework for performing load testing 
+against an instance of the C-Chain. It allows for simulation of various
 transaction scenarios to test network performance, transaction throughput, and system
 resilience under different workloads.
 
@@ -11,7 +11,7 @@ the `main` [README.md](./main/README.md).
 
 ## Prerequisites
 
-Using the `load` package is often coupled with `tmpnet`, a framework that
+Using the `load` package has so far been coupled with `tmpnet`, a framework that
 enables orchestration of temporary AvalancheGo networks. For more details as to
 its capabilities and configuration, refer to the `tmpnet` [README.md](../fixture/tmpnet/README.md).
 
@@ -73,7 +73,7 @@ The `load` package provides a comprehensive suite of test types designed to stre
 
 | Test Type         | Description                                                     |
 | ----------------- | --------------------------------------------------------------- |
-| ZeroTransfer      | Performs self-transfer of 0 AVAX                                |
+| Transfer          | Performs self-transfer of 0 AVAX                                |
 | Read              | Performs multiple storage reads from contract state             |
 | Write             | Executes equential storage writes to new contract storage slots |
 | StateModification | Updates existing storage values or creates new ones             |
