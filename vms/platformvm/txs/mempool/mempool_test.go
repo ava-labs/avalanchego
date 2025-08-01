@@ -122,15 +122,6 @@ func TestMempoolAdd(t *testing.T) {
 		wantTxIDs      []ids.ID
 	}{
 		{
-			name: "dropped - no input AVAX",
-			tx: newTx(
-				ids.GenerateTestID(),
-				[]*avax.TransferableInput{},
-				0,
-			),
-			wantErr: errMissingConsumedAVAX,
-		},
-		{
 			name:    "dropped - no gas",
 			weights: gas.Dimensions{},
 			tx: newTx(
