@@ -120,9 +120,11 @@ temporary networks used for e2e testing by:
 
 Both methods require:
 
- - Auth credentials to be supplied as env vars:
+ - Collector config to be supplied as env vars:
+   - `PROMETHEUS_URL`
    - `PROMETHEUS_USERNAME`
    - `PROMETHEUS_PASSWORD`
+   - `LOKI_URL`
    - `LOKI_USERNAME`
    - `LOKI_PASSWORD`
  - The availability in the path of binaries for promtail and prometheus
@@ -134,6 +136,6 @@ Once started, the collectors will continue to run in the background
 until stopped by `tmpnetctl stop-metrics-collector` and `tmpnetctl stop-logs-collector`.
 
 The results of collection will be viewable at
-https://grafana-poc.avax-dev.network.
+https://avalabs.grafana.net.
 
 For more detail, see the [tmpnet docs](../fixture/tmpnet/README.md##monitoring).

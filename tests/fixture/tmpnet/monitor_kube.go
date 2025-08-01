@@ -108,13 +108,13 @@ func deployKubeCollector(
 	dynamicClient dynamic.Interface,
 	collectorConfig kubeCollectorConfig,
 ) error {
-	username, password, err := getCollectorCredentials(collectorConfig.name)
+	url, username, password, err := getCollectorConfig(collectorConfig.name)
 	if err != nil {
-		return stacktrace.Errorf("failed to get credentials for %s: %w", collectorConfig.name, err)
+		return stacktrace.Errorf("failed to get collector config for %s: %w", collectorConfig.name, err)
 	}
 
-	if err := createCredentialSecret(ctx, log, clientset, collectorConfig.secretPrefix, username, password); err != nil {
-		return stacktrace.Errorf("failed to create credential secret for %s: %w", collectorConfig.name, err)
+	if err := createCollectorConfigSecret(ctx, log, clientset, collectorConfig.secretPrefix, url, username, password); err != nil {
+		return stacktrace.Errorf("failed to create config secret for %s: %w", collectorConfig.name, err)
 	}
 
 	if err := applyManifest(ctx, log, dynamicClient, collectorConfig.manifest, monitoringNamespace); err != nil {
@@ -123,21 +123,23 @@ func deployKubeCollector(
 	return nil
 }
 
-// createCredentialSecret creates a secret with the provided username and password for a collector
-func createCredentialSecret(
+// createCollectorConfigSecret creates a secret with the provided url, username and password for a collector
+func createCollectorConfigSecret(
 	ctx context.Context,
 	log logging.Logger,
 	clientset *kubernetes.Clientset,
 	namePrefix string,
+	url string,
 	username string,
 	password string,
 ) error {
-	secretName := namePrefix + "-credentials"
+	secretName := namePrefix + "-config"
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: secretName,
 		},
 		StringData: map[string]string{
+			"url":      url,
 			"username": username,
 			"password": password,
 		},

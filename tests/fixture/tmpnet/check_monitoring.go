@@ -60,14 +60,9 @@ func waitForCount(ctx context.Context, log logging.Logger, name string, getCount
 // provided, an attempt will be made to derive selectors from env vars (GH_*) identifying
 // a github actions run.
 func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string) error {
-	username, password, err := getCollectorCredentials(promtailCmd)
+	url, username, password, err := getCollectorConfig(promtailCmd)
 	if err != nil {
 		return stacktrace.Errorf("failed to get collector credentials: %w", err)
-	}
-
-	url := getLokiURL()
-	if !strings.HasPrefix(url, "https") {
-		return stacktrace.Errorf("loki URL must be https for basic auth to be secure: %s", url)
 	}
 
 	selectors, err := getSelectors(networkUUID)
@@ -171,15 +166,13 @@ func queryLoki(
 // CheckMetricsExist checks if metrics exist for the given network. Github labels are also
 // used as filters if provided as env vars (GH_*).
 func CheckMetricsExist(ctx context.Context, log logging.Logger, networkUUID string) error {
-	username, password, err := getCollectorCredentials(prometheusCmd)
+	url, username, password, err := getCollectorConfig(prometheusCmd)
 	if err != nil {
 		return stacktrace.Errorf("failed to get collector credentials: %w", err)
 	}
 
-	url := getPrometheusURL()
-	if !strings.HasPrefix(url, "https") {
-		return stacktrace.Errorf("prometheus URL must be https for basic auth to be secure: %s", url)
-	}
+	// Base query path required by Grafana Cloud
+	url += "/prometheus"
 
 	selectors, err := getSelectors(networkUUID)
 	if err != nil {

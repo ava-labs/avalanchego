@@ -27,20 +27,18 @@ import (
 )
 
 const (
-	collectorTickerInterval = 100 * time.Millisecond
+	collectorTickerInterval = 1 * time.Second
 
 	// TODO(marun) Maybe use dynamic HTTP ports to avoid the possibility of them being already bound?
 
 	// Prometheus configuration
 	prometheusCmd            = "prometheus"
-	defaultPrometheusURL     = "https://prometheus-poc.avax-dev.network"
 	prometheusScrapeInterval = 10 * time.Second
 	prometheusListenAddress  = "127.0.0.1:9090"
 	prometheusReadinessURL   = "http://" + prometheusListenAddress + "/-/ready"
 
 	// Promtail configuration
 	promtailCmd          = "promtail"
-	defaultLokiURL       = "https://loki-poc.avax-dev.network"
 	promtailHTTPPort     = "3101"
 	promtailReadinessURL = "http://127.0.0.1:" + promtailHTTPPort + "/ready"
 
@@ -169,7 +167,7 @@ func startPrometheus(ctx context.Context, log logging.Logger) error {
 		prometheusListenAddress,
 	)
 
-	username, password, err := getCollectorCredentials(cmdName)
+	url, username, password, err := getCollectorConfig(cmdName)
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
@@ -196,11 +194,11 @@ scrape_configs:
           - '%s/*.json'
 
 remote_write:
-  - url: "%s/api/v1/write"
+  - url: "%s/api/prom/push"
     basic_auth:
       username: "%s"
       password: "%s"
-`, prometheusScrapeInterval, serviceDiscoveryDir, getPrometheusURL(), username, password)
+`, prometheusScrapeInterval, serviceDiscoveryDir, url, username, password)
 
 	err = startCollector(ctx, log, cmdName, args, config)
 	if err != nil {
@@ -215,7 +213,7 @@ func startPromtail(ctx context.Context, log logging.Logger) error {
 
 	args := fmt.Sprintf("-config.file=%s.yaml", cmdName)
 
-	username, password, err := getCollectorCredentials(cmdName)
+	url, username, password, err := getCollectorConfig(cmdName)
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
@@ -242,7 +240,7 @@ positions:
   filename: %s/positions.yaml
 
 client:
-  url: "%s/api/prom/push"
+  url: "%s/loki/api/v1/push"
   basic_auth:
     username: "%s"
     password: "%s"
@@ -252,7 +250,7 @@ scrape_configs:
     file_sd_configs:
       - files:
           - '%s/*.json'
-`, promtailHTTPPort, workingDir, getLokiURL(), username, password, serviceDiscoveryDir)
+`, promtailHTTPPort, workingDir, url, username, password, serviceDiscoveryDir)
 
 	return startCollector(ctx, log, cmdName, args, config)
 }
@@ -451,16 +449,8 @@ func clearStalePIDFile(log logging.Logger, cmdName string, pidPath string) error
 	return nil
 }
 
-func getPrometheusURL() string {
-	return GetEnvWithDefault("PROMETHEUS_URL", defaultPrometheusURL)
-}
-
-func getLokiURL() string {
-	return GetEnvWithDefault("LOKI_URL", defaultLokiURL)
-}
-
-// getCollectorCredentials retrieves the username and password for the command.
-func getCollectorCredentials(cmdName string) (string, string, error) {
+// getCollectorConfig retrieves the url, username and password for the command.
+func getCollectorConfig(cmdName string) (string, string, string, error) {
 	var baseEnvName string
 	switch cmdName {
 	case prometheusCmd:
@@ -471,6 +461,11 @@ func getCollectorCredentials(cmdName string) (string, string, error) {
 		return "", "", stacktrace.Errorf("unsupported cmd: %s", cmdName)
 	}
 
+	urlEnvVar := baseEnvName + "_URL"
+	url := GetEnvWithDefault(urlEnvVar, "")
+	if len(url) == 0 {
+		return "", "", "", fmt.Errorf("%s env var not set", urlEnvVar)
+	}
 	usernameEnvVar := baseEnvName + "_USERNAME"
 	username := GetEnvWithDefault(usernameEnvVar, "")
 	if len(username) == 0 {
@@ -481,7 +476,7 @@ func getCollectorCredentials(cmdName string) (string, string, error) {
 	if len(password) == 0 {
 		return "", "", stacktrace.Errorf("%s var not set", passwordEnvVar)
 	}
-	return username, password, nil
+	return url, username, password, nil
 }
 
 // Start a collector process. Use bash to execute the command in the background and enable

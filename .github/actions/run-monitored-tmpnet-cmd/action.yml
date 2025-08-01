@@ -15,9 +15,13 @@ inputs:
     default: ''
   artifact_prefix:
     default: ''
+  prometheus_url:
+    required: true
   prometheus_username:
     required: true
   prometheus_password:
+    required: true
+  loki_url:
     required: true
   loki_username:
     required: true
@@ -42,7 +46,7 @@ inputs:
     default: ${{ github.job }}
   grafana_dashboard_id:
     description: 'The identifier of the Grafana dashboard to use, in the format <UID>/<dashboard-name>.'
-    default: 'kBQpRdWnk/avalanche-main-dashboard'
+    default: 'makr6k7/avalanche-main-dashboard'
 
 runs:
   using: composite
@@ -64,7 +68,7 @@ runs:
         echo "Grafana: ${metrics_url}"
         echo "🔗 [View Grafana Dashboard](${metrics_url})" >> "$GITHUB_STEP_SUMMARY"
       env:
-        GRAFANA_URL: https://grafana-poc.avax-dev.network/d/${{ inputs.grafana_dashboard_id }}?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
+        GRAFANA_URL: https://avalabs.grafana.net/d/${{ inputs.grafana_dashboard_id }}?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
         FILTER_BY_OWNER: ${{ inputs.filter_by_owner }}
     - name: Warn that collection of metrics and logs will not be performed
@@ -82,8 +86,10 @@ runs:
         TMPNET_START_LOGS_COLLECTOR: ${{ inputs.loki_username != '' && inputs.runtime == 'process' }}
         TMPNET_CHECK_METRICS_COLLECTED: ${{ inputs.prometheus_username != '' }}
         TMPNET_CHECK_LOGS_COLLECTED: ${{ inputs.loki_username != '' }}
+        LOKI_URL: ${{ inputs.loki_url }}
         LOKI_USERNAME: ${{ inputs.loki_username }}
         LOKI_PASSWORD: ${{ inputs.loki_password }}
+        PROMETHEUS_URL: ${{ inputs.prometheus_url }}
         PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
         PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
         GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}

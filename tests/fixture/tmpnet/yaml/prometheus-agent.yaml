@@ -42,9 +42,9 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: prometheus-config
-  namespace: ci-monitoring
 data:
-  prometheus.yaml: |
+  # This template needs to have PROMETHEUS_URL substituted before use
+  prometheus.yaml.template: |
     global:
       # Make sure this value takes into account the network-shutdown-delay in tests/fixture/e2e/env.go
       scrape_interval: 10s     # Default is every 1 minute.
@@ -106,7 +106,7 @@ data:
           # TODO(marun) Add kube cluster identifier as a label
 
     remote_write:
-    - url: "https://prometheus-poc.avax-dev.network/api/v1/write"
+    - url: "${PROMETHEUS_URL}"
       basic_auth:
         username_file: /run/secrets/username
         password_file: /run/secrets/password
@@ -131,6 +131,26 @@ spec:
         app: prometheus-agent
     spec:
       serviceAccountName: prometheus-agent
+      # Since prometheus doesn't support env substitution, an init container is required to
+      # parameterize the config file with the prometheus URL.
+      initContainers:
+      - name: init-prometheus-config
+        image: busybox
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          sed "s|\$\{PROMETHEUS_URL\}|${PROMETHEUS_URL}" /tmp/config-template/prometheus.yaml.template > /tmp/config/prometheus.yaml
+        env:
+        - name: PROMETHEUS_URL
+          valueFrom:
+            secretKeyRef:
+              name: prometheus-config
+              key: url
+        volumeMounts:
+        - name: config-template
+          mountPath: /tmp/config-template
+        - name: config
+          mountPath: /tmp/config
       containers:
       - name: prometheus
         # Latest stable LTS, released 2025-07-14, end of support 2026-07-31
@@ -150,9 +170,14 @@ spec:
           mountPath: /run/secrets
           readOnly: true
       volumes:
-      - name: config
+      - name: config-template
         configMap:
           name: prometheus-config
+      - name: config
+        # The config path doesn't need to be persistent since the config
+        # file will be written to the volume by the init container every
+        # time the pod starts.
+        emptyDir: {}
       - name: prometheus-credentials
         secret:
           secretName: prometheus-credentials
