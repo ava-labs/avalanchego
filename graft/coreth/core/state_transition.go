@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto/kzg4844"
+	"github.com/ava-labs/libevm/log"
 	"github.com/holiman/uint256"
 )
 
@@ -482,6 +483,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// - prepare accessList(post-berlin/ApricotPhase2)
 	// - reset transient storage(eip 1153)
 	st.state.Prepare(rules, msg.From, st.evm.Context.Coinbase, msg.To, vm.ActivePrecompiles(rules), msg.AccessList)
+	snap := st.state.Snapshot() // store in case execution invalidated
 
 	var (
 		ret   []byte
@@ -502,6 +504,17 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	fee := new(uint256.Int).SetUint64(st.gasUsed())
 	fee.Mul(fee, price)
 	st.state.AddBalance(st.evm.Context.Coinbase, fee)
+
+	if err := st.evm.ExecutionInvalidated(); err != nil {
+		log.Warn(
+			"tx marked as invalidated",
+			"from", st.msg.From,
+			"nonce", st.msg.Nonce,
+			"err", err,
+		)
+		st.state.RevertToSnapshot(snap)
+		return nil, err
+	}
 
 	return &ExecutionResult{
 		UsedGas:     st.gasUsed(),
