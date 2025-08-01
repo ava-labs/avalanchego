@@ -15,9 +15,9 @@ import (
 
 func testPackPredicate(t testing.TB, b []byte) {
 	packedPredicate := PackPredicate(b)
-	unpackedPredicated, err := UnpackPredicate(packedPredicate)
+	unpackedPredicate, err := UnpackPredicate(packedPredicate)
 	require.NoError(t, err)
-	require.Equal(t, b, unpackedPredicated)
+	require.Equal(t, b, unpackedPredicate)
 }
 
 func FuzzPackPredicate(f *testing.F) {
