@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	// ensure test packages are scanned by ginkgo
+	_ "github.com/ava-labs/avalanchego/tests/e2e/api"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/banff"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/c"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/faultinjection"

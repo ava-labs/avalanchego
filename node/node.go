@@ -14,6 +14,7 @@ import (
 	"io"
 	"io/fs"
 	"net"
+	"net/http"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -21,6 +22,7 @@ import (
 	"sync"
 	"time"
 
+	"connectrpc.com/grpcreflect"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -80,6 +82,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/registry"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime"
 
+	infoconnect "github.com/ava-labs/avalanchego/api/info/connect"
+	infoconnectpb "github.com/ava-labs/avalanchego/connectproto/pb/info/infoconnect"
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
@@ -1358,31 +1362,45 @@ func (n *Node) initInfoAPI() error {
 		return fmt.Errorf("problem creating proof of possession: %w", err)
 	}
 
-	service, err := info.NewService(
-		info.Parameters{
-			Version:   version.CurrentApp,
-			NodeID:    n.ID,
-			NodePOP:   pop,
-			NetworkID: n.Config.NetworkID,
-			VMManager: n.VMManager,
-			Upgrades:  n.Config.UpgradeConfig,
-
+	infoService := &info.Info{
+		Parameters: info.Parameters{
+			Version:          version.CurrentApp,
+			NodeID:           n.ID,
+			NodePOP:          pop,
+			NetworkID:        n.Config.NetworkID,
+			VMManager:        n.VMManager,
+			Upgrades:         n.Config.UpgradeConfig,
 			TxFee:            n.Config.TxFee,
 			CreateAssetTxFee: n.Config.CreateAssetTxFee,
 		},
-		n.Log,
-		n.vdrs,
-		n.chainManager,
-		n.VMManager,
-		n.Config.NetworkConfig.MyIPPort,
-		n.Net,
-		n.benchlistManager,
-	)
+		Log:          n.Log,
+		Validators:   n.vdrs,
+		ChainManager: n.chainManager,
+		MyIP:         n.Config.NetworkConfig.MyIPPort,
+		Networking:   n.Net,
+		Benchlist:    n.benchlistManager,
+	}
+
+	infoJSONRPCHandler, err := info.NewService(infoService)
 	if err != nil {
 		return err
 	}
+
+	infoPath, infoHandler := infoconnectpb.NewInfoServiceHandler(
+		&infoconnect.Service{Info: infoService},
+	)
+
+	reflectionPath, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(infoconnectpb.InfoServiceName),
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle(reflectionPath, reflectionHandler)
+	mux.Handle(infoPath, infoHandler)
+	n.APIServer.AddHeaderRoute("info", mux)
+
 	return n.APIServer.AddRoute(
-		service,
+		infoJSONRPCHandler,
 		"info",
 		"",
 	)
