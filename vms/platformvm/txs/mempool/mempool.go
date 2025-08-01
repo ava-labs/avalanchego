@@ -321,5 +321,6 @@ func (m *Mempool) WaitForEvent(ctx context.Context) (common.Message, error) {
 			return 0, err
 		}
 	}
+
 	return common.PendingTxs, nil
 }
