@@ -28,7 +28,6 @@ import (
 
 var (
 	ErrGasCapacityExceeded = errors.New("gas capacity exceeded")
-	errMissingConsumedAVAX = errors.New("missing consumed avax")
 	errNoGasUsed           = errors.New("no gas used")
 )
 
@@ -128,10 +127,6 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 		if err != nil {
 			return fmt.Errorf("failed to add consumed AVAX: %w", err)
 		}
-	}
-
-	if consumedAVAX == 0 {
-		return errMissingConsumedAVAX
 	}
 
 	for _, utxo := range outs {
