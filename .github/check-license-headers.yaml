@@ -1,7 +1,9 @@
 [
   {
     "include": [
-      "**/**/*.rs"
+      "**/**/*.rs",
+      "**/**/*.go",
+      "**/**/*.h",
     ],
     "exclude": [
       "target/**",
@@ -17,11 +19,13 @@
       "CODEOWNERS",
       "CONTRIBUTING.md",
       "benchmark/**",
-      "ffi/**",
       "triehash/**",
       "CHANGELOG.md",
       "cliff.toml",
       "**/tests/compile_*/**",
+      "**/go.mod",
+      "**/go.mod",
+      "**/cbindgen.toml",
     ],
     "license": "./.github/license-header.txt"
   },
