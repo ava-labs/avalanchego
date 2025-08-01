@@ -39,8 +39,8 @@ const NumKeys = 5
 
 func main() {
 	logger := ago_tests.NewDefaultLogger("")
-	tc := ago_tests.NewTestContext(logger)
-	defer tc.Cleanup()
+	tc := antithesis.NewInstrumentedTestContext(logger)
+	defer tc.RecoverAndExit()
 	require := require.New(tc)
 
 	c := antithesis.NewConfigWithSubnets(
@@ -60,6 +60,9 @@ func main() {
 		},
 	)
 	ctx := ago_tests.DefaultNotifyContext(c.Duration, tc.DeferCleanup)
+
+	// Ensure contexts sourced from the test context use the notify context as their parent
+	tc.SetDefaultContextParent(ctx)
 
 	require.Len(c.ChainIDs, 1)
 	logger.Info("Starting testing",
@@ -120,11 +123,25 @@ type workload struct {
 	uris   []string
 }
 
+// newTestContext returns a test context that ensures that log output and assertions are
+// associated with this worker.
+func (w *workload) newTestContext(ctx context.Context) *ago_tests.SimpleTestContext {
+	return antithesis.NewInstrumentedTestContextWithArgs(
+		ctx,
+		w.log,
+		map[string]any{
+			"worker": w.id,
+		},
+	)
+}
+
 func (w *workload) run(ctx context.Context) {
 	timer := timerpkg.StoppedTimer()
 
-	tc := ago_tests.NewTestContext(w.log)
-	defer tc.Cleanup()
+	tc := w.newTestContext(ctx)
+	// Any assertion failure from this test context will result in process exit due to the
+	// panic being rethrown. This ensures that failures in test setup are fatal.
+	defer tc.RecoverAndRethrow()
 	require := require.New(tc)
 
 	balance, err := w.client.BalanceAt(ctx, crypto.PubkeyToAddress(w.key.PublicKey), nil)
@@ -134,20 +151,8 @@ func (w *workload) run(ctx context.Context) {
 		"balance": balance,
 	})
 
-	// TODO(marun) What should this value be?
-	txAmount := uint64(10000)
 	for {
-		// TODO(marun) Exercise a wider variety of transactions
-		recipientEthAddress := crypto.PubkeyToAddress(w.key.PublicKey)
-		err := transferFunds(ctx, w.client, w.key, recipientEthAddress, txAmount, w.log)
-		if err != nil {
-			// Log the error and continue since the problem may be
-			// transient. require.NoError is only for errors that should stop
-			// execution.
-			w.log.Info("failed to transfer funds",
-				zap.Error(err),
-			)
-		}
+		w.executeTest(ctx)
 
 		val, err := rand.Int(rand.Reader, big.NewInt(int64(time.Second)))
 		require.NoError(err, "failed to read randomness")
@@ -158,6 +163,22 @@ func (w *workload) run(ctx context.Context) {
 			return
 		case <-timer.C:
 		}
+	}
+}
+
+func (w *workload) executeTest(ctx context.Context) {
+	// TODO(marun) What should this value be?
+	txAmount := uint64(10000)
+	// TODO(marun) Exercise a wider variety of transactions
+	recipientEthAddress := crypto.PubkeyToAddress(w.key.PublicKey)
+	err := transferFunds(ctx, w.client, w.key, recipientEthAddress, txAmount, w.log)
+	if err != nil {
+		// Log the error and continue since the problem may be
+		// transient. require.NoError is only for errors that should stop
+		// execution.
+		w.log.Info("failed to transfer funds",
+			zap.Error(err),
+		)
 	}
 }
 
