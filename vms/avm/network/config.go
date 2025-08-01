@@ -72,7 +72,7 @@ type Config struct {
 	// PullGossipThrottlingPeriod is how large of a window the throttler should
 	// use.
 	PullGossipThrottlingPeriod time.Duration `json:"pull-gossip-throttling-period"`
-	// PullGossipThrottlingLimit is the number of pull querys that are allowed
+	// PullGossipThrottlingLimit is the number of pull queries that are allowed
 	// by a validator in every throttling window.
 	PullGossipThrottlingLimit int `json:"pull-gossip-throttling-limit"`
 	// ExpectedBloomFilterElements is the number of elements to expect when
