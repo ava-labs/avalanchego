@@ -35,14 +35,15 @@ func TestPrefixGatherer_Gather(t *testing.T) {
 		require.NoError(registerB.Register(counterB))
 	}
 
-	wantMetrics := "" +
-		"# HELP a_counter help\n" +
-		"# TYPE a_counter counter\n" +
-		"a_counter 0\n" +
-		"\n" +
-		"# HELP b_counter help\n" +
-		"# TYPE b_counter counter\n" +
-		"b_counter 1\n"
+	wantMetrics := `
+# HELP a_counter help
+# TYPE a_counter counter
+a_counter 0
+
+# HELP b_counter help
+# TYPE b_counter counter
+b_counter 1
+`
 
 	require.NoError(testutil.GatherAndCompare(
 		gatherer,
