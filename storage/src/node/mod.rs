@@ -314,7 +314,7 @@ impl Node {
     }
 
     /// Given a reader, return a [Node] from those bytes
-    pub fn from_reader(mut serialized: impl Read) -> Result<Self, Error> {
+    pub fn from_reader(mut serialized: &mut impl Read) -> Result<Self, Error> {
         match serialized.read_byte()? {
             255 => {
                 // this is a freed area
@@ -517,7 +517,7 @@ than 126 bytes as the length would be encoded in multiple bytes.
         assert_eq!(serialized.len(), expected_length);
         let mut cursor = Cursor::new(&serialized);
         cursor.set_position(1);
-        let deserialized = Node::from_reader(cursor).unwrap();
+        let deserialized = Node::from_reader(&mut cursor).unwrap();
 
         assert_eq!(node, deserialized);
     }

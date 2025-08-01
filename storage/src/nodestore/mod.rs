@@ -685,21 +685,8 @@ impl<T, S: ReadableStorage> NodeStore<T, S> {
             return Ok(node);
         }
 
-        debug_assert!(addr.is_aligned());
+        let (node, _) = self.read_node_with_num_bytes_from_disk(addr)?;
 
-        // saturating because there is no way we can be reading at u64::MAX
-        // and this will fail very soon afterwards
-        let actual_addr = addr.get().saturating_add(1); // skip the length byte
-
-        let _span = fastrace::local::LocalSpan::enter_with_local_parent("read_and_deserialize");
-
-        let area_stream = self.storage.stream_from(actual_addr)?;
-        let node: SharedNode = Node::from_reader(area_stream)
-            .map_err(|e| {
-                self.storage
-                    .file_io_error(e, actual_addr, Some("read_node_from_disk".to_string()))
-            })?
-            .into();
         match self.storage.cache_read_strategy() {
             CacheReadStrategy::All => {
                 self.storage.cache_node(addr, node.clone());
@@ -711,7 +698,41 @@ impl<T, S: ReadableStorage> NodeStore<T, S> {
             }
             CacheReadStrategy::WritesOnly => {}
         }
+
         Ok(node)
+    }
+
+    pub(crate) fn read_node_with_num_bytes_from_disk(
+        &self,
+        addr: LinearAddress,
+    ) -> Result<(SharedNode, u64), FileIoError> {
+        debug_assert!(addr.is_aligned());
+
+        // saturating because there is no way we can be reading at u64::MAX
+        // and this will fail very soon afterwards
+        let actual_addr = addr.get().saturating_add(1); // skip the length byte
+
+        let _span = fastrace::local::LocalSpan::enter_with_local_parent("read_and_deserialize");
+
+        let mut area_stream = self.storage.stream_from(actual_addr)?;
+        let offset_before = area_stream.offset();
+        let node: SharedNode = Node::from_reader(&mut area_stream)
+            .map_err(|e| {
+                self.storage
+                    .file_io_error(e, actual_addr, Some("read_node_from_disk".to_string()))
+            })?
+            .into();
+        let length = area_stream
+            .offset()
+            .checked_sub(offset_before)
+            .ok_or_else(|| {
+                self.file_io_error(
+                    Error::other("Reader offset went backwards"),
+                    actual_addr,
+                    Some("read_node_with_num_bytes_from_disk".to_string()),
+                )
+            })?;
+        Ok((node, length))
     }
 
     /// Returns (index, `area_size`) for the stored area at `addr`.
@@ -743,6 +764,20 @@ impl<T, S: ReadableStorage> NodeStore<T, S> {
             ))?;
 
         Ok((index, size))
+    }
+
+    pub(crate) fn physical_size(&self) -> Result<u64, FileIoError> {
+        self.storage.size()
+    }
+
+    #[cold]
+    pub(crate) fn file_io_error(
+        &self,
+        error: Error,
+        addr: u64,
+        context: Option<String>,
+    ) -> FileIoError {
+        self.storage.file_io_error(error, addr, context)
     }
 }
 

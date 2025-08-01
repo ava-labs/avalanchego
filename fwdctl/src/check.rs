@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use clap::Args;
 use firewood::v2::api;
-use firewood_storage::{CacheReadStrategy, CheckOpt, FileBacked, NodeStore};
+use firewood_storage::{CacheReadStrategy, CheckOpt, CheckerReport, FileBacked, NodeStore};
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use nonzero_ext::nonzero;
 
@@ -55,10 +55,38 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
         )
         .with_finish(ProgressFinish::WithMessage("Check Completed!".into()));
 
-    NodeStore::open(storage)?
+    let report = NodeStore::open(storage)?
         .check(CheckOpt {
             hash_check: opts.hash_check,
             progress_bar: Some(progress_bar),
         })
-        .map_err(|e| api::Error::InternalError(Box::new(e)))
+        .map_err(|e| api::Error::InternalError(Box::new(e)))?;
+
+    print_checker_report(report);
+
+    Ok(())
+}
+
+#[expect(clippy::cast_precision_loss)]
+fn print_checker_report(report: CheckerReport) {
+    println!("Raw Report: {report:?}\n");
+
+    println!("Advanced Data: ");
+    let total_trie_area_bytes = report
+        .trie_stats
+        .area_counts
+        .iter()
+        .map(|(area_size, count)| area_size.saturating_mul(*count))
+        .sum::<u64>();
+    println!(
+        "\tStorage Space Utilization: {} / {} = {:.2}%",
+        report.trie_stats.trie_bytes,
+        report.physical_bytes,
+        (report.trie_stats.trie_bytes as f64 / report.physical_bytes as f64) * 100.0
+    );
+    println!(
+        "\tInternal Fragmentation: {} / {total_trie_area_bytes} = {:.2}%",
+        report.trie_stats.trie_bytes,
+        (report.trie_stats.trie_bytes as f64 / total_trie_area_bytes as f64) * 100.0
+    );
 }

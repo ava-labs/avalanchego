@@ -14,8 +14,8 @@ pub use crate::v2::api::{Batch, BatchOp};
 use crate::manager::{RevisionManager, RevisionManagerConfig};
 use async_trait::async_trait;
 use firewood_storage::{
-    CheckOpt, Committed, FileBacked, FileIoError, HashedNodeReader, ImmutableProposal, NodeStore,
-    TrieHash,
+    CheckOpt, CheckerReport, Committed, FileBacked, FileIoError, HashedNodeReader,
+    ImmutableProposal, NodeStore, TrieHash,
 };
 use metrics::{counter, describe_counter};
 use std::io::Write;
@@ -336,7 +336,10 @@ impl Db {
     }
 
     /// Check the database for consistency
-    pub async fn check(&self, opt: CheckOpt) -> Result<(), firewood_storage::CheckerError> {
+    pub async fn check(
+        &self,
+        opt: CheckOpt,
+    ) -> Result<CheckerReport, firewood_storage::CheckerError> {
         let latest_rev_nodestore = self.manager.current_revision();
         latest_rev_nodestore.check(opt)
     }

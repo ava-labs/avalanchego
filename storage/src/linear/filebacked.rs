@@ -38,7 +38,7 @@ use metrics::counter;
 
 use crate::{CacheReadStrategy, LinearAddress, MaybePersistedNode, SharedNode};
 
-use super::{FileIoError, ReadableStorage, WritableStorage};
+use super::{FileIoError, OffsetReader, ReadableStorage, WritableStorage};
 
 /// A [`ReadableStorage`] and [`WritableStorage`] backed by a file
 pub struct FileBacked {
@@ -141,7 +141,7 @@ impl FileBacked {
 }
 
 impl ReadableStorage for FileBacked {
-    fn stream_from(&self, addr: u64) -> Result<Box<dyn Read + '_>, FileIoError> {
+    fn stream_from(&self, addr: u64) -> Result<Box<dyn OffsetReader + '_>, FileIoError> {
         counter!("firewood.read_node", "from" => "file").increment(1);
         Ok(Box::new(PredictiveReader::new(self, addr)))
     }
@@ -292,6 +292,12 @@ impl Read for PredictiveReader<'_> {
         buf[..max_to_return].copy_from_slice(&self.buffer[self.pos..self.pos + max_to_return]);
         self.pos += max_to_return;
         Ok(max_to_return)
+    }
+}
+
+impl OffsetReader for PredictiveReader<'_> {
+    fn offset(&self) -> u64 {
+        self.offset
     }
 }
 

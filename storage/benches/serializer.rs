@@ -71,7 +71,7 @@ fn manual_deserializer(b: &mut Bencher, input: &Vec<u8>) {
         .as_slice()
         .split_first()
         .expect("always has at least one byte");
-    b.iter(|| Node::from_reader(std::io::Cursor::new(input)).expect("to deserialize node"));
+    b.iter(|| Node::from_reader(&mut std::io::Cursor::new(input)).expect("to deserialize node"));
 }
 
 fn to_bytes(input: &Node) -> Vec<u8> {

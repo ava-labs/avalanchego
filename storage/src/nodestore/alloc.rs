@@ -839,7 +839,7 @@ pub mod test_utils {
         nodestore: &NodeStore<Committed, S>,
         node: &Node,
         offset: u64,
-    ) -> u64 {
+    ) -> (u64, u64) {
         #![expect(clippy::indexing_slicing)]
         let mut encoded_node = Vec::new();
         node.as_bytes(0, &mut encoded_node);
@@ -847,11 +847,14 @@ pub mod test_utils {
         let area_size_index = area_size_to_index(encoded_node_len).unwrap();
         let mut stored_area_bytes = Vec::new();
         node.as_bytes(area_size_index, &mut stored_area_bytes);
+        let bytes_written = (stored_area_bytes.len() as u64)
+            .checked_sub(1)
+            .expect("serialized node should be at least 1 byte"); // -1 for area size index
         nodestore
             .storage
             .write(offset, stored_area_bytes.as_slice())
             .unwrap();
-        AREA_SIZES[area_size_index as usize]
+        (bytes_written, AREA_SIZES[area_size_index as usize])
     }
 
     // Helper function to write a free area to the given offset.

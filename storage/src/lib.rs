@@ -40,7 +40,7 @@ pub mod logger;
 /// Macros module for defining macros used in the storage module
 pub mod macros;
 // re-export these so callers don't need to know where they are
-pub use checker::CheckOpt;
+pub use checker::{CheckOpt, CheckerReport, FreeListsStats, TrieStats};
 pub use hashednode::{Hashable, Preimage, ValueDigest, hash_node, hash_preimage};
 pub use linear::{FileIoError, ReadableStorage, WritableStorage};
 pub use node::path::{NibblesIterator, Path};

@@ -20,7 +20,7 @@
 )]
 
 use std::fmt::Debug;
-use std::io::Read;
+use std::io::{Cursor, Read};
 use std::ops::Deref;
 use std::path::PathBuf;
 
@@ -122,7 +122,7 @@ pub trait ReadableStorage: Debug + Sync + Send {
     /// # Returns
     ///
     /// A `Result` containing a boxed `Read` trait object, or an `Error` if the operation fails.
-    fn stream_from(&self, addr: u64) -> Result<Box<dyn Read + '_>, FileIoError>;
+    fn stream_from(&self, addr: u64) -> Result<Box<dyn OffsetReader + '_>, FileIoError>;
 
     /// Return the size of the underlying storage, in bytes
     fn size(&self) -> Result<u64, FileIoError>;
@@ -197,4 +197,17 @@ pub trait WritableStorage: ReadableStorage {
 
     /// Add a new entry to the freelist cache
     fn add_to_free_list_cache(&self, _addr: LinearAddress, _next: Option<LinearAddress>) {}
+}
+
+pub trait OffsetReader: Read {
+    fn offset(&self) -> u64;
+}
+
+impl<T> OffsetReader for Cursor<T>
+where
+    Cursor<T>: Read,
+{
+    fn offset(&self) -> u64 {
+        self.position()
+    }
 }

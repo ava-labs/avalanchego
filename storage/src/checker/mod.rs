@@ -5,19 +5,30 @@ mod range_set;
 pub(crate) use range_set::LinearAddressRangeSet;
 
 use crate::logger::warn;
-use crate::nodestore::alloc::{AREA_SIZES, AreaIndex, FreeAreaWithMetadata, size_from_area_index};
+use crate::nodestore::alloc::{
+    AREA_SIZES, AreaIndex, FreeAreaWithMetadata, area_size_to_index, size_from_area_index,
+};
 use crate::{
     CheckerError, Committed, HashType, HashedNodeReader, IntoHashType, LinearAddress, Node,
-    NodeReader, NodeStore, Path, RootReader, StoredAreaParent, TrieNodeParent, WritableStorage,
+    NodeStore, Path, RootReader, StoredAreaParent, TrieNodeParent, WritableStorage,
 };
 
 #[cfg(not(feature = "ethhash"))]
 use crate::hashednode::hash_node;
 
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::ops::Range;
 
 use indicatif::ProgressBar;
+
+const OS_PAGE_SIZE: u64 = 4096;
+
+#[inline]
+// return u64 since the start address may be 0
+const fn page_start(addr: LinearAddress) -> u64 {
+    addr.get() & !(OS_PAGE_SIZE - 1)
+}
 
 #[cfg(feature = "ethhash")]
 fn is_valid_key(key: &Path) -> bool {
@@ -39,10 +50,54 @@ pub struct CheckOpt {
     pub progress_bar: Option<ProgressBar>,
 }
 
+#[derive(Debug)]
+/// Report of the checker results.
+pub struct CheckerReport {
+    /// The high watermark of the database
+    pub high_watermark: u64,
+    /// The physical number of bytes in the database returned through `stat`
+    pub physical_bytes: u64,
+    /// Statistics about the trie
+    pub trie_stats: TrieStats,
+    /// Statistics about the free list
+    pub free_list_stats: FreeListsStats,
+}
+
+#[derive(Debug, Default, PartialEq)]
+/// Statistics about the trie
+pub struct TrieStats {
+    /// The total number of bytes of compressed trie nodes
+    pub trie_bytes: u64,
+    /// The number of key-value pairs stored in the trie
+    pub kv_count: u64,
+    /// The total number of bytes of for key-value pairs stored in the trie
+    pub kv_bytes: u64,
+    /// Branching factor distribution of each branch node
+    pub branching_factors: HashMap<usize, u64>,
+    /// Depth distribution of each leaf node
+    pub depths: HashMap<usize, u64>,
+    /// The distribution of area sizes in the trie
+    pub area_counts: HashMap<u64, u64>,
+    /// The stored areas whose content can fit into a smaller area
+    pub low_occupancy_area_count: u64,
+    /// The number of stored areas that span multiple pages
+    pub multi_page_area_count: u64,
+}
+
+#[derive(Debug, Default, PartialEq)]
+/// Statistics about the free list
+pub struct FreeListsStats {
+    /// The distribution of area sizes in the free lists
+    pub area_counts: HashMap<u64, u64>,
+    /// The number of stored areas that span multiple pages
+    pub multi_page_area_count: u64,
+}
+
 struct SubTrieMetadata {
     root_address: LinearAddress,
     root_hash: HashType,
     parent: TrieNodeParent,
+    depth: usize,
     path_prefix: Path,
     #[cfg(feature = "ethhash")]
     has_peers: bool,
@@ -60,9 +115,10 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     /// # Errors
     /// Returns a [`CheckerError`] if the database is inconsistent.
     // TODO: report all errors, not just the first one
-    pub fn check(&self, opt: CheckOpt) -> Result<(), CheckerError> {
+    pub fn check(&self, opt: CheckOpt) -> Result<CheckerReport, CheckerError> {
         // 1. Check the header
         let db_size = self.size();
+        let physical_bytes = self.physical_size()?;
 
         let mut visited = LinearAddressRangeSet::new(db_size)?;
 
@@ -71,7 +127,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
             progress_bar.set_length(db_size);
             progress_bar.set_message("Traversing the trie...");
         }
-        if let (Some(root), Some(root_hash)) =
+        let trie_stats = if let (Some(root), Some(root_hash)) =
             (self.root_as_maybe_persisted_node(), self.root_hash())
         {
             // the database is not empty, and has a physical address, so traverse the trie
@@ -86,17 +142,19 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                     &mut visited,
                     opt.progress_bar.as_ref(),
                     opt.hash_check,
-                )?;
+                )?
             } else {
                 return Err(CheckerError::UnpersistedRoot);
             }
-        }
+        } else {
+            TrieStats::default()
+        };
 
         // 3. check the free list - this can happen in parallel with the trie traversal
         if let Some(progress_bar) = &opt.progress_bar {
             progress_bar.set_message("Traversing free lists...");
         }
-        self.visit_freelist(&mut visited, opt.progress_bar.as_ref())?;
+        let free_list_stats = self.visit_freelist(&mut visited, opt.progress_bar.as_ref())?;
 
         // 4. check leaked areas - what are the spaces between trie nodes and free lists we have traversed?
         if let Some(progress_bar) = &opt.progress_bar {
@@ -109,7 +167,12 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         let _leaked_areas = self.split_all_leaked_ranges(leaked_ranges, opt.progress_bar.as_ref());
         // TODO: add leaked areas to the free list
 
-        Ok(())
+        Ok(CheckerReport {
+            high_watermark: db_size,
+            physical_bytes,
+            trie_stats,
+            free_list_stats,
+        })
     }
 
     fn visit_trie(
@@ -119,23 +182,28 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         visited: &mut LinearAddressRangeSet,
         progress_bar: Option<&ProgressBar>,
         hash_check: bool,
-    ) -> Result<(), CheckerError> {
+    ) -> Result<TrieStats, CheckerError> {
         let trie = SubTrieMetadata {
             root_address,
             root_hash,
             parent: TrieNodeParent::Root,
+            depth: 0,
             path_prefix: Path::new(),
             #[cfg(feature = "ethhash")]
             has_peers: false,
         };
-        self.visit_trie_helper(trie, visited, progress_bar, hash_check)
+        let mut trie_stats = TrieStats::default();
+        self.visit_trie_helper(trie, visited, &mut trie_stats, progress_bar, hash_check)?;
+        Ok(trie_stats)
     }
 
     /// Recursively traverse the trie from the given root node.
+    #[expect(clippy::too_many_lines)]
     fn visit_trie_helper(
         &self,
         subtrie: SubTrieMetadata,
         visited: &mut LinearAddressRangeSet,
+        trie_stats: &mut TrieStats,
         progress_bar: Option<&ProgressBar>,
         hash_check: bool,
     ) -> Result<(), CheckerError> {
@@ -143,6 +211,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
             root_address: subtrie_root_address,
             root_hash: subtrie_root_hash,
             parent,
+            depth,
             path_prefix,
             #[cfg(feature = "ethhash")]
             has_peers,
@@ -152,41 +221,105 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         self.check_area_aligned(subtrie_root_address, StoredAreaParent::TrieNode(parent))?;
 
         // check that the area is within bounds and does not intersect with other areas
-        let (_, area_size) = self.area_index_and_size(subtrie_root_address)?;
+        let (area_index, area_size) = self.area_index_and_size(subtrie_root_address)?;
         visited.insert_area(
             subtrie_root_address,
             area_size,
             StoredAreaParent::TrieNode(parent),
         )?;
 
-        // read the node and iterate over the children if branch node
-        let node = self.read_node(subtrie_root_address)?;
-        let mut current_node_path = path_prefix.clone();
-        current_node_path.0.extend_from_slice(node.partial_path());
-        if node.value().is_some() && !is_valid_key(&current_node_path) {
+        // update the area count
+        let area_count = trie_stats.area_counts.entry(area_size).or_insert(0);
+        *area_count = area_count.saturating_add(1);
+
+        // read the node from the disk - we avoid cache since we will never visit the same node twice
+        let (node, node_bytes) = self.read_node_with_num_bytes_from_disk(subtrie_root_address)?;
+        {
+            // collect the trie bytes
+            trie_stats.trie_bytes = trie_stats.trie_bytes.saturating_add(node_bytes);
+            // collect low occupancy area count
+            let smallest_area_index = area_size_to_index(node_bytes).map_err(|e| {
+                self.file_io_error(
+                    e,
+                    subtrie_root_address.get(),
+                    Some("area_size_to_index".to_string()),
+                )
+            })?;
+            if smallest_area_index < area_index {
+                trie_stats.low_occupancy_area_count =
+                    trie_stats.low_occupancy_area_count.saturating_add(1);
+            }
+            // collect the multi-page area count
+            if page_start(subtrie_root_address)
+                != page_start(
+                    subtrie_root_address
+                        .advance(area_size)
+                        .expect("impossible since we checked in visited.insert_area()"),
+                )
+            {
+                trie_stats.multi_page_area_count =
+                    trie_stats.multi_page_area_count.saturating_add(1);
+            }
+        }
+
+        let mut current_path_prefix = path_prefix.clone();
+        current_path_prefix.0.extend_from_slice(node.partial_path());
+        if node.value().is_some() && !is_valid_key(&current_path_prefix) {
             return Err(CheckerError::InvalidKey {
-                key: current_node_path,
+                key: current_path_prefix,
                 address: subtrie_root_address,
                 parent,
             });
         }
-        if let Node::Branch(branch) = node.as_ref() {
-            // this is an internal node, traverse the children
-            #[cfg(feature = "ethhash")]
-            let num_children = branch.children_iter().count();
-            for (nibble, (address, hash)) in branch.children_iter() {
-                let parent = TrieNodeParent::Parent(subtrie_root_address, nibble);
-                let mut child_path_prefix = current_node_path.clone();
-                child_path_prefix.0.push(nibble as u8);
-                let child_subtrie = SubTrieMetadata {
-                    root_address: address,
-                    root_hash: hash.clone(),
-                    parent,
-                    path_prefix: child_path_prefix,
-                    #[cfg(feature = "ethhash")]
-                    has_peers: num_children != 1,
-                };
-                self.visit_trie_helper(child_subtrie, visited, progress_bar, hash_check)?;
+
+        match node.as_ref() {
+            Node::Branch(branch) => {
+                let num_children = branch.children_iter().count();
+                {
+                    // collect the branching factor distribution
+                    let branching_factor_count = trie_stats
+                        .branching_factors
+                        .entry(num_children)
+                        .or_insert(0);
+                    *branching_factor_count = branching_factor_count.saturating_add(1);
+                }
+
+                // this is an internal node, traverse the children
+                for (nibble, (address, hash)) in branch.children_iter() {
+                    let parent = TrieNodeParent::Parent(subtrie_root_address, nibble);
+                    let mut child_path_prefix = current_path_prefix.clone();
+                    child_path_prefix.0.push(nibble as u8);
+                    let child_subtrie = SubTrieMetadata {
+                        root_address: address,
+                        root_hash: hash.clone(),
+                        parent,
+                        depth: depth.saturating_add(1),
+                        path_prefix: child_path_prefix,
+                        #[cfg(feature = "ethhash")]
+                        has_peers: num_children != 1,
+                    };
+                    self.visit_trie_helper(
+                        child_subtrie,
+                        visited,
+                        trie_stats,
+                        progress_bar,
+                        hash_check,
+                    )?;
+                }
+            }
+            Node::Leaf(leaf) => {
+                // collect the depth distribution
+                let depth_count = trie_stats.depths.entry(depth).or_insert(0);
+                *depth_count = depth_count.saturating_add(1);
+                // collect kv count
+                trie_stats.kv_count = trie_stats.kv_count.saturating_add(1);
+                // collect kv pair bytes - this is the minimum number of bytes needed to store the data
+                let key_bytes = current_path_prefix.0.len().div_ceil(2);
+                let value_bytes = leaf.value.len();
+                trie_stats.kv_bytes = trie_stats
+                    .kv_bytes
+                    .saturating_add(key_bytes as u64)
+                    .saturating_add(value_bytes as u64);
             }
         }
 
@@ -219,7 +352,10 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         &self,
         visited: &mut LinearAddressRangeSet,
         progress_bar: Option<&ProgressBar>,
-    ) -> Result<(), CheckerError> {
+    ) -> Result<FreeListsStats, CheckerError> {
+        let mut area_counts: HashMap<u64, u64> = HashMap::new();
+        let mut multi_page_area_count = 0u64;
+
         let mut free_list_iter = self.free_list_iter(0);
         while let Some(free_area) = free_list_iter.next_with_metadata() {
             let FreeAreaWithMetadata {
@@ -240,9 +376,26 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                 });
             }
             visited.insert_area(addr, area_size, StoredAreaParent::FreeList(parent))?;
+            {
+                // collect the free lists area distribution
+                let area_count = area_counts.entry(area_size).or_insert(0);
+                *area_count = area_count.saturating_add(1);
+                // collect the multi-page area count
+                if page_start(addr)
+                    != page_start(
+                        addr.advance(area_size)
+                            .expect("impossible since we checked in visited.insert_area()"),
+                    )
+                {
+                    multi_page_area_count = multi_page_area_count.saturating_add(1);
+                }
+            }
             update_progress_bar(progress_bar, visited);
         }
-        Ok(())
+        Ok(FreeListsStats {
+            area_counts,
+            multi_page_area_count,
+        })
     }
 
     const fn check_area_aligned(
@@ -376,6 +529,7 @@ mod test {
         high_watermark: u64,
         root_address: LinearAddress,
         root_hash: HashType,
+        stats: TrieStats,
     }
 
     /// Generate a test trie with the following structure:
@@ -393,13 +547,20 @@ mod test {
     #[expect(clippy::arithmetic_side_effects)]
     fn gen_test_trie(nodestore: &mut NodeStore<Committed, MemStore>) -> TestTrie {
         let mut high_watermark = NodeStoreHeader::SIZE;
+        let mut total_bytes_written = 0;
+        let mut area_counts: HashMap<u64, u64> = HashMap::new();
         let leaf = Node::Leaf(LeafNode {
             partial_path: Path::from_nibbles_iterator(std::iter::repeat_n([4, 5], 30).flatten()),
             value: Box::new([6, 7, 8]),
         });
         let leaf_addr = LinearAddress::new(high_watermark).unwrap();
         let leaf_hash = hash_node(&leaf, &Path::from([2, 0, 3, 1]));
-        high_watermark += test_write_new_node(nodestore, &leaf, high_watermark);
+        let (bytes_written, stored_area_size) =
+            test_write_new_node(nodestore, &leaf, high_watermark);
+        high_watermark += stored_area_size;
+        total_bytes_written += bytes_written;
+        let area_count = area_counts.entry(stored_area_size).or_insert(0);
+        *area_count = area_count.saturating_add(1);
 
         let mut branch_children = BranchNode::empty_children();
         branch_children[1] = Some(Child::AddressWithHash(leaf_addr, leaf_hash));
@@ -410,7 +571,12 @@ mod test {
         }));
         let branch_addr = LinearAddress::new(high_watermark).unwrap();
         let branch_hash = hash_node(&branch, &Path::from([2, 0]));
-        high_watermark += test_write_new_node(nodestore, &branch, high_watermark);
+        let (bytes_written, stored_area_size) =
+            test_write_new_node(nodestore, &branch, high_watermark);
+        high_watermark += stored_area_size;
+        total_bytes_written += bytes_written;
+        let area_count = area_counts.entry(stored_area_size).or_insert(0);
+        *area_count = area_count.saturating_add(1);
 
         let mut root_children = BranchNode::empty_children();
         root_children[0] = Some(Child::AddressWithHash(branch_addr, branch_hash));
@@ -421,7 +587,12 @@ mod test {
         }));
         let root_addr = LinearAddress::new(high_watermark).unwrap();
         let root_hash = hash_node(&root, &Path::new());
-        high_watermark += test_write_new_node(nodestore, &root, high_watermark);
+        let (bytes_written, stored_area_size) =
+            test_write_new_node(nodestore, &root, high_watermark);
+        high_watermark += stored_area_size;
+        total_bytes_written += bytes_written;
+        let area_count = area_counts.entry(stored_area_size).or_insert(0);
+        *area_count = area_count.saturating_add(1);
 
         // write the header
         test_write_header(
@@ -431,11 +602,23 @@ mod test {
             FreeLists::default(),
         );
 
+        let trie_stats = TrieStats {
+            trie_bytes: total_bytes_written,
+            kv_count: 1,
+            kv_bytes: 32 + 3, // 32 bytes for the key, 3 bytes for the value
+            area_counts,
+            branching_factors: HashMap::from([(1, 2)]),
+            depths: HashMap::from([(2, 1)]),
+            low_occupancy_area_count: 0,
+            multi_page_area_count: 0,
+        };
+
         TestTrie {
             nodes: vec![(leaf, leaf_addr), (branch, branch_addr), (root, root_addr)],
             high_watermark,
             root_address: root_addr,
             root_hash,
+            stats: trie_stats,
         }
     }
 
@@ -453,7 +636,7 @@ mod test {
 
         // verify that all of the space is accounted for - since there is no free area
         let mut visited = LinearAddressRangeSet::new(test_trie.high_watermark).unwrap();
-        nodestore
+        let stats = nodestore
             .visit_trie(
                 test_trie.root_address,
                 test_trie.root_hash,
@@ -464,6 +647,7 @@ mod test {
             .unwrap();
         let complement = visited.complement();
         assert_eq!(complement.into_iter().collect::<Vec<_>>(), vec![]);
+        assert_eq!(stats, test_trie.stats);
     }
 
     #[test]
@@ -532,6 +716,8 @@ mod test {
 
         // write free areas
         let mut high_watermark = NodeStoreHeader::SIZE;
+        let mut free_area_counts: HashMap<u64, u64> = HashMap::new();
+        let mut multi_page_area_count = 0u64;
         let mut freelist = FreeLists::default();
         for (area_index, area_size) in AREA_SIZES.iter().enumerate() {
             let mut next_free_block = None;
@@ -544,20 +730,32 @@ mod test {
                     high_watermark,
                 );
                 next_free_block = Some(LinearAddress::new(high_watermark).unwrap());
+                let start_addr = LinearAddress::new(high_watermark).unwrap();
+                let end_addr = start_addr.advance(*area_size).unwrap();
+                if page_start(start_addr) != page_start(end_addr) {
+                    multi_page_area_count = multi_page_area_count.saturating_add(1);
+                }
                 high_watermark += area_size;
             }
-
             freelist[area_index] = next_free_block;
+            if num_free_areas > 0 {
+                free_area_counts.insert(*area_size, num_free_areas);
+            }
         }
+        let expected_free_lists_stats = FreeListsStats {
+            area_counts: free_area_counts,
+            multi_page_area_count,
+        };
 
         // write header
         test_write_header(&mut nodestore, high_watermark, None, freelist);
 
         // test that the we traversed all the free areas
         let mut visited = LinearAddressRangeSet::new(high_watermark).unwrap();
-        nodestore.visit_freelist(&mut visited, None).unwrap();
+        let actual_free_lists_stats = nodestore.visit_freelist(&mut visited, None).unwrap();
         let complement = visited.complement();
         assert_eq!(complement.into_iter().collect::<Vec<_>>(), vec![]);
+        assert_eq!(actual_free_lists_stats, expected_free_lists_stats);
     }
 
     #[test]

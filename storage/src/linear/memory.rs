@@ -10,9 +10,9 @@
     reason = "Found 1 occurrences after enabling the lint."
 )]
 
-use super::{FileIoError, ReadableStorage, WritableStorage};
+use super::{FileIoError, OffsetReader, ReadableStorage, WritableStorage};
 use metrics::counter;
-use std::io::{Cursor, Read};
+use std::io::Cursor;
 use std::sync::Mutex;
 
 #[derive(Debug, Default)]
@@ -44,7 +44,7 @@ impl WritableStorage for MemStore {
 }
 
 impl ReadableStorage for MemStore {
-    fn stream_from(&self, addr: u64) -> Result<Box<dyn Read>, FileIoError> {
+    fn stream_from(&self, addr: u64) -> Result<Box<dyn OffsetReader>, FileIoError> {
         counter!("firewood.read_node", "from" => "memory").increment(1);
         let bytes = self
             .bytes
