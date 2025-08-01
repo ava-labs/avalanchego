@@ -34,7 +34,6 @@ test-case.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 # Regular dependencies
-aquamarine = "0.6.0"
 async-trait = "0.1.88"
 futures = "0.3.31"
 typed-builder = "0.21.0"

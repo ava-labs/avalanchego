@@ -22,7 +22,6 @@ use std::io::Write;
 use std::num::NonZeroUsize;
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 
@@ -93,10 +92,10 @@ impl DbViewSyncBytes for Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>> {
 
 #[async_trait]
 impl api::DbView for HistoricalRev {
-    type Stream<'a>
-        = MerkleKeyValueStream<'a, Self>
+    type Stream<'view>
+        = MerkleKeyValueStream<'view, Self>
     where
-        Self: 'a;
+        Self: 'view;
 
     async fn root_hash(&self) -> Result<Option<api::HashKey>, api::Error> {
         Ok(HashedNodeReader::root_hash(self))
@@ -158,16 +157,13 @@ pub struct Db {
 }
 
 #[async_trait]
-impl api::Db for Db
-where
-    for<'p> Proposal<'p>: api::Proposal,
-{
+impl api::Db for Db {
     type Historical = NodeStore<Committed, FileBacked>;
 
-    type Proposal<'p>
-        = Proposal<'p>
+    type Proposal<'db>
+        = Proposal<'db>
     where
-        Self: 'p;
+        Self: 'db;
 
     async fn revision(&self, root_hash: TrieHash) -> Result<Arc<Self::Historical>, api::Error> {
         let nodestore = self.manager.revision(root_hash)?;
@@ -183,13 +179,10 @@ where
     }
 
     #[fastrace::trace(short_name = true)]
-    async fn propose<'p, K: KeyType, V: ValueType>(
-        &'p self,
+    async fn propose<'db, K: KeyType, V: ValueType>(
+        &'db self,
         batch: api::Batch<K, V>,
-    ) -> Result<Arc<Self::Proposal<'p>>, api::Error>
-    where
-        Self: 'p,
-    {
+    ) -> Result<Self::Proposal<'db>, api::Error> {
         let parent = self.manager.current_revision();
         let proposal = NodeStore::new(&parent)?;
         let mut merkle = Merkle::from(proposal);
@@ -223,9 +216,7 @@ where
         Ok(Self::Proposal {
             nodestore: immutable,
             db: self,
-            committed: AtomicBool::new(false),
-        }
-        .into())
+        })
     }
 }
 
@@ -261,12 +252,19 @@ impl Db {
     }
 
     /// Synchronously get the root hash of the latest revision.
+    #[cfg(not(feature = "ethhash"))]
     pub fn root_hash_sync(&self) -> Result<Option<TrieHash>, api::Error> {
-        let hash = self.manager.root_hash()?;
-        #[cfg(not(feature = "ethhash"))]
-        return Ok(hash);
-        #[cfg(feature = "ethhash")]
-        return Ok(Some(hash.unwrap_or_else(firewood_storage::empty_trie_hash)));
+        self.manager.root_hash().map_err(api::Error::from)
+    }
+
+    /// Synchronously get the root hash of the latest revision.
+    #[cfg(feature = "ethhash")]
+    pub fn root_hash_sync(&self) -> Result<Option<TrieHash>, api::Error> {
+        Ok(Some(
+            self.manager
+                .root_hash()?
+                .unwrap_or_else(firewood_storage::empty_trie_hash),
+        ))
     }
 
     /// Synchronously get a revision from a root hash
@@ -283,9 +281,9 @@ impl Db {
 
     /// propose a new batch synchronously
     pub fn propose_sync<K: KeyType, V: ValueType>(
-        &'_ self,
+        &self,
         batch: Batch<K, V>,
-    ) -> Result<Arc<Proposal<'_>>, api::Error> {
+    ) -> Result<Proposal<'_>, api::Error> {
         let parent = self.manager.current_revision();
         let proposal = NodeStore::new(&parent)?;
         let mut merkle = Merkle::from(proposal);
@@ -309,11 +307,10 @@ impl Db {
 
         self.metrics.proposals.increment(1);
 
-        Ok(Arc::new(Proposal {
+        Ok(Proposal {
             nodestore: immutable,
             db: self,
-            committed: AtomicBool::new(false),
-        }))
+        })
     }
 
     /// Dump the Trie of the latest revision.
@@ -345,46 +342,38 @@ impl Db {
 
 #[derive(Debug)]
 /// A user-visible database proposal
-pub struct Proposal<'p> {
+pub struct Proposal<'db> {
     nodestore: Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>>,
-    db: &'p Db,
-    committed: AtomicBool,
+    db: &'db Db,
 }
 
 impl Proposal<'_> {
     /// Get the root hash of the proposal synchronously
-    pub fn start_commit(&self) -> Result<(), api::Error> {
-        if self
-            .committed
-            .swap(true, std::sync::atomic::Ordering::Relaxed)
-        {
-            return Err(api::Error::AlreadyCommitted);
-        }
-        Ok(())
+    #[cfg(not(feature = "ethhash"))]
+    pub fn root_hash_sync(&self) -> Result<Option<api::HashKey>, api::Error> {
+        Ok(self.nodestore.root_hash())
     }
 
     /// Get the root hash of the proposal synchronously
+    #[cfg(feature = "ethhash")]
     pub fn root_hash_sync(&self) -> Result<Option<api::HashKey>, api::Error> {
-        #[cfg(not(feature = "ethhash"))]
-        return Ok(self.nodestore.root_hash());
-        #[cfg(feature = "ethhash")]
-        return Ok(Some(
+        Ok(Some(
             self.nodestore
                 .root_hash()
                 .unwrap_or_else(firewood_storage::empty_trie_hash),
-        ));
+        ))
     }
 }
 
 #[async_trait]
 impl api::DbView for Proposal<'_> {
-    type Stream<'b>
-        = MerkleKeyValueStream<'b, NodeStore<Arc<ImmutableProposal>, FileBacked>>
+    type Stream<'view>
+        = MerkleKeyValueStream<'view, NodeStore<Arc<ImmutableProposal>, FileBacked>>
     where
-        Self: 'b;
+        Self: 'view;
 
     async fn root_hash(&self) -> Result<Option<api::HashKey>, api::Error> {
-        Ok(self.nodestore.root_hash())
+        self.root_hash_sync()
     }
 
     async fn val<K: KeyType>(&self, key: K) -> Result<Option<Value>, api::Error> {
@@ -421,27 +410,25 @@ impl api::DbView for Proposal<'_> {
 }
 
 #[async_trait]
-impl<'a> api::Proposal for Proposal<'a> {
-    type Proposal = Proposal<'a>;
+impl<'db> api::Proposal for Proposal<'db> {
+    type Proposal = Proposal<'db>;
 
     #[fastrace::trace(short_name = true)]
     async fn propose<K: KeyType, V: ValueType>(
-        self: Arc<Self>,
+        &self,
         batch: api::Batch<K, V>,
-    ) -> Result<Arc<Self::Proposal>, api::Error> {
-        Ok(self.create_proposal(batch)?.into())
+    ) -> Result<Self::Proposal, api::Error> {
+        self.create_proposal(batch)
     }
 
-    async fn commit(self: Arc<Self>) -> Result<(), api::Error> {
-        self.start_commit()?;
+    async fn commit(self) -> Result<(), api::Error> {
         Ok(self.db.manager.commit(self.nodestore.clone())?)
     }
 }
 
 impl Proposal<'_> {
     /// Commit a proposal synchronously
-    pub fn commit_sync(self: Arc<Self>) -> Result<(), api::Error> {
-        self.start_commit()?;
+    pub fn commit_sync(self) -> Result<(), api::Error> {
         Ok(self.db.manager.commit(self.nodestore.clone())?)
     }
 
@@ -449,8 +436,8 @@ impl Proposal<'_> {
     pub fn propose_sync<K: KeyType, V: ValueType>(
         &self,
         batch: api::Batch<K, V>,
-    ) -> Result<Arc<Self>, api::Error> {
-        Ok(self.create_proposal(batch)?.into())
+    ) -> Result<Self, api::Error> {
+        self.create_proposal(batch)
     }
 
     #[crate::metrics("firewood.proposal.create", "database proposal creation")]
@@ -482,7 +469,6 @@ impl Proposal<'_> {
         Ok(Self {
             nodestore: immutable,
             db: self.db,
-            committed: AtomicBool::new(false),
         })
     }
 }
@@ -490,10 +476,6 @@ impl Proposal<'_> {
 #[cfg(test)]
 mod test {
     #![expect(clippy::unwrap_used)]
-    #![expect(
-        clippy::default_trait_access,
-        reason = "Found 1 occurrences after enabling the lint."
-    )]
 
     use std::ops::{Deref, DerefMut};
     use std::path::PathBuf;
@@ -502,26 +484,9 @@ mod test {
     use rand::rng;
 
     use crate::db::Db;
-    use crate::v2::api::{Db as _, DbView as _, Error, Proposal as _};
+    use crate::v2::api::{Db as _, DbView as _, Proposal as _};
 
     use super::{BatchOp, DbConfig};
-
-    #[tokio::test]
-    async fn test_cloned_proposal_error() {
-        let db = testdb().await;
-        let proposal = db
-            .propose::<Vec<u8>, Vec<u8>>(Default::default())
-            .await
-            .unwrap();
-        let cloned = proposal.clone();
-
-        // attempt to commit the clone; this should fail
-        let result = cloned.commit().await;
-        assert!(result.is_ok());
-
-        let result = proposal.commit().await;
-        assert!(matches!(result, Err(Error::AlreadyCommitted)), "{result:?}");
-    }
 
     #[tokio::test]
     async fn test_proposal_reads() {
@@ -647,14 +612,14 @@ mod test {
             key: b"k2",
             value: b"v2",
         }];
-        let proposal2 = proposal1.clone().propose(batch2).await.unwrap();
+        let proposal2 = proposal1.propose(batch2).await.unwrap();
         assert_eq!(&*proposal2.val(b"k2").await.unwrap().unwrap(), b"v2");
 
         let batch3 = vec![BatchOp::Put {
             key: b"k3",
             value: b"v3",
         }];
-        let proposal3 = proposal2.clone().propose(batch3).await.unwrap();
+        let proposal3 = proposal2.propose(batch3).await.unwrap();
         assert_eq!(&*proposal3.val(b"k3").await.unwrap().unwrap(), b"v3");
 
         // the proposal is dropped here, but the underlying
@@ -753,7 +718,7 @@ mod test {
 
         // create two proposals, second one has a base of the first one
         let proposal1 = db.propose(batch1).await.unwrap();
-        let proposal2 = proposal1.clone().propose(batch2).await.unwrap();
+        let proposal2 = proposal1.propose(batch2).await.unwrap();
 
         // iterate over the keys and values again, checking that the values are in the correct proposal
         let mut kviter = keys.iter().zip(vals.iter());
@@ -885,13 +850,7 @@ mod test {
         let mut proposals = vec![db.propose(batches_iter.next().unwrap()).await.unwrap()];
 
         for batch in batches_iter {
-            let proposal = proposals
-                .last()
-                .unwrap()
-                .clone()
-                .propose(batch)
-                .await
-                .unwrap();
+            let proposal = proposals.last().unwrap().propose(batch).await.unwrap();
             proposals.push(proposal);
         }
 

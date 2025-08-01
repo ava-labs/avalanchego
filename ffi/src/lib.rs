@@ -22,7 +22,7 @@ use std::ops::Deref;
 use std::os::unix::ffi::OsStrExt as _;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Mutex, RwLock};
 
 use firewood::db::{
     BatchOp as DbBatchOp, Db, DbConfig, DbViewSync as _, DbViewSyncBytes, Proposal,
@@ -60,7 +60,7 @@ pub struct DatabaseHandle<'p> {
     /// List of oustanding proposals, by ID
     // Keep proposals first, as they must be dropped before the database handle is dropped due to lifetime
     // issues.
-    proposals: RwLock<HashMap<ProposalId, Arc<Proposal<'p>>>>,
+    proposals: RwLock<HashMap<ProposalId, Proposal<'p>>>,
 
     /// A single cached view to improve performance of reads while committing
     cached_view: Mutex<Option<(HashKey, Box<dyn DbViewSyncBytes>)>>,
