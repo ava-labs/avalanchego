@@ -30,6 +30,7 @@ on:
 
 jobs:
     c-chain-reexecution:
+      if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego'
       permissions:
         id-token: write
         contents: write
