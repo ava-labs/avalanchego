@@ -44,7 +44,7 @@ metadata:
   name: prometheus-config
   namespace: ci-monitoring
 data:
-  # This template needs to have PROMETHEUS_USERNAME and PROMETHEUS_PASSWORD substituted before use
+  # This template needs to have PROMETHEUS_URL, PROMETHEUS_USERNAME and PROMETHEUS_PASSWORD substituted before use
   prometheus.yaml.template: |
     global:
       # Make sure this value takes into account the network-shutdown-delay in tests/fixture/e2e/env.go
@@ -107,7 +107,7 @@ data:
           # TODO(marun) Add kube cluster identifier as a label
 
     remote_write:
-    - url: "https://prometheus-poc.avax-dev.network/api/v1/write"
+    - url: "${PROMETHEUS_URL}/api/prom/push"
       basic_auth:
         username: "${PROMETHEUS_USERNAME}"
         password: "${PROMETHEUS_PASSWORD}"
@@ -145,15 +145,20 @@ spec:
         - |
           envsubst < /tmp/config-template/prometheus.yaml.template > /tmp/config/prometheus.yaml
         env:
+        - name: PROMETHEUS_URL
+          valueFrom:
+            secretKeyRef:
+              name: prometheus-config
+              key: url
         - name: PROMETHEUS_USERNAME
           valueFrom:
             secretKeyRef:
-              name: prometheus-credentials
+              name: prometheus-config
               key: username
         - name: PROMETHEUS_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: prometheus-credentials
+              name: prometheus-config
               key: password
         volumeMounts:
         - name: config-template
