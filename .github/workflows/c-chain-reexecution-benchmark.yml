@@ -34,7 +34,18 @@ jobs:
         id-token: write
         contents: write
       runs-on: ${{ github.event.inputs.runner || 'ubuntu-latest' }}
+      container:
+        image: ${{ github.event.inputs.runner == 'ubuntu-latest' && '' || 'ghcr.io/actions/actions-runner:2.325.0' }}
       steps:
+        - name: Install ARC dependencies if required
+          shell: bash
+          if: ${{ github.event.inputs.runner != 'ubuntu-latest' }}
+          run: |
+            # xz-utils might be present on some containers. Install if not present.
+            if ! command -v xz &> /dev/null; then
+              sudo apt-get update
+              sudo apt-get install -y xz-utils
+            fi
         - name: Configure AWS Credentials
           uses: aws-actions/configure-aws-credentials@v4
           with:
