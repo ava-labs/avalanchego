@@ -1,6 +1,19 @@
+# Predicate
+
+This package contains the predicate data structure and its encoding and helper functions to unpack/pack the data structure.
+
+## Encoding
+
+A byte slice of size N is encoded as:
+
+1. Slice of N bytes
+2. Delimiter byte `0xff`
+3. Appended 0s to the nearest multiple of 32 bytes
+
+
 # Results
 
-The results package defines how to encode `PredicateResults` within the block header's `Extra` data field.
+`predicate_results.go` defines how to encode `PredicateResults` within the block header's `Extra` data field.
 
 For more information on the motivation for encoding the results of predicate verification within a block, see [here](../../../vms/platformvm/warp/README.md#processing-historical-avalanche-interchain-messages).
 
