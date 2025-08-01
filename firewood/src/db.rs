@@ -325,9 +325,7 @@ impl Db {
     pub fn dump_sync(&self, w: &mut dyn Write) -> Result<(), std::io::Error> {
         let latest_rev_nodestore = self.manager.current_revision();
         let merkle = Merkle::from(latest_rev_nodestore);
-        // TODO: This should be a stream
-        let output = merkle.dump()?;
-        write!(w, "{output}")
+        merkle.dump(w).map_err(std::io::Error::other)
     }
 
     /// Get a copy of the database metrics

@@ -1185,7 +1185,7 @@ mod tests {
 
         let immutable_merkle: Merkle<NodeStore<Arc<ImmutableProposal>, _>> =
             merkle.try_into().unwrap();
-        println!("{}", immutable_merkle.dump().unwrap());
+        println!("{}", immutable_merkle.dump_to_string().unwrap());
         merkle = immutable_merkle.fork().unwrap();
 
         let mut stream = merkle.key_value_iter();

@@ -11,6 +11,7 @@ mod triehash;
 mod unvalidated;
 
 use std::collections::HashMap;
+use std::fmt::Write;
 
 use super::*;
 use firewood_storage::{Committed, MemStore, MutableProposal, NodeStore, RootReader, TrieHash};
@@ -637,7 +638,7 @@ fn test_root_hash_simple_insertions() -> Result<(), Error> {
         ("horse", "stallion"),
         ("ddd", "ok"),
     ])
-    .dump()
+    .dump_to_string()
     .unwrap();
     Ok(())
 }
@@ -773,7 +774,7 @@ fn test_root_hash_reversed_deletions() -> Result<(), FileIoError> {
         let (new_hashes, _) = items.iter().rev().fold(
             (vec![], complete_immutable_merkle),
             |(mut new_hashes, immutable_merkle_before_removal), (k, _)| {
-                let before = immutable_merkle_before_removal.dump().unwrap();
+                let before = immutable_merkle_before_removal.dump_to_string().unwrap();
                 let mut merkle = Merkle::from(
                     NodeStore::new(immutable_merkle_before_removal.nodestore()).unwrap(),
                 );
@@ -784,7 +785,7 @@ fn test_root_hash_reversed_deletions() -> Result<(), FileIoError> {
                     immutable_merkle_after_removal.nodestore.root_hash(),
                     k,
                     before,
-                    immutable_merkle_after_removal.dump().unwrap(),
+                    immutable_merkle_after_removal.dump_to_string().unwrap(),
                 ));
                 (new_hashes, immutable_merkle_after_removal)
             },

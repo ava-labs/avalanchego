@@ -16,7 +16,7 @@ use firewood_storage::{
 use futures::{StreamExt, TryStreamExt};
 use metrics::counter;
 use std::collections::HashSet;
-use std::fmt::{Debug, Write};
+use std::fmt::Debug;
 use std::future::ready;
 use std::io::Error;
 use std::iter::once;
@@ -29,49 +29,29 @@ pub type Key = Box<[u8]>;
 /// Values are boxed u8 slices
 pub type Value = Box<[u8]>;
 
-// convert a set of nibbles into a printable string
-// panics if there is a non-nibble byte in the set
-#[cfg(not(feature = "branch_factor_256"))]
-fn nibbles_formatter<X: IntoIterator<Item = u8>>(nib: X) -> String {
-    nib.into_iter()
-        .map(|c| {
-            *b"0123456789abcdef"
-                .get(c as usize)
-                .expect("requires nibbles") as char
-        })
-        .collect::<String>()
-}
-
-#[cfg(feature = "branch_factor_256")]
-fn nibbles_formatter<X: IntoIterator<Item = u8>>(nib: X) -> String {
-    let collected: Box<[u8]> = nib.into_iter().collect();
-    hex::encode(&collected)
-}
-
 macro_rules! write_attributes {
     ($writer:ident, $node:expr, $value:expr) => {
         if !$node.partial_path.0.is_empty() {
-            write!(
-                $writer,
-                " pp={}",
-                nibbles_formatter($node.partial_path.0.clone())
-            )
-            .map_err(|e| FileIoError::from_generic_no_file(e, "write attributes"))?;
+            write!($writer, " pp={:x}", $node.partial_path)
+                .map_err(|e| FileIoError::from_generic_no_file(e, "write attributes"))?;
         }
         if !$value.is_empty() {
             match std::str::from_utf8($value) {
                 Ok(string) if string.chars().all(char::is_alphanumeric) => {
-                    write!($writer, " val={}", string)
+                    write!($writer, " val={:.6}", string)
                         .map_err(|e| FileIoError::from_generic_no_file(e, "write attributes"))?;
+                    if string.len() > 6 {
+                        $writer.write_all(b"...").map_err(|e| {
+                            FileIoError::from_generic_no_file(e, "write attributes")
+                        })?;
+                    }
                 }
                 _ => {
                     let hex = hex::encode($value);
+                    write!($writer, " val={:.6}", hex)
+                        .map_err(|e| FileIoError::from_generic_no_file(e, "write attributes"))?;
                     if hex.len() > 6 {
-                        write!($writer, " val={:.6}...", hex).map_err(|e| {
-                            FileIoError::from_generic_no_file(e, "write attributes")
-                        })?;
-                    } else {
-                        write!($writer, " val={}", hex).map_err(|e| {
+                        $writer.write_all(b"...").map_err(|e| {
                             FileIoError::from_generic_no_file(e, "write attributes")
                         })?;
                     }
@@ -478,12 +458,12 @@ impl<T: TrieReader> Merkle<T> {
 
 impl<T: HashedNodeReader> Merkle<T> {
     /// Dump a node, recursively, to a dot file
-    pub(crate) fn dump_node(
+    pub(crate) fn dump_node<W: std::io::Write + ?Sized>(
         &self,
         node: &MaybePersistedNode,
         hash: Option<&HashType>,
         seen: &mut HashSet<String>,
-        writer: &mut dyn Write,
+        writer: &mut W,
     ) -> Result<(), FileIoError> {
         writeln!(writer, "  {node}[label=\"{node}")
             .map_err(Error::other)
@@ -536,31 +516,41 @@ impl<T: HashedNodeReader> Merkle<T> {
     ///
     /// Dot files can be rendered using `dot -Tpng -o output.png input.dot`
     /// or online at <https://dreampuf.github.io/GraphvizOnline>
-    pub(crate) fn dump(&self) -> Result<String, Error> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to the output writer fails.
+    pub(crate) fn dump<W: std::io::Write + ?Sized>(&self, writer: &mut W) -> Result<(), Error> {
         let root = self.nodestore.root_as_maybe_persisted_node();
 
-        let mut result = String::new();
-        writeln!(result, "digraph Merkle {{\n  rankdir=LR;").map_err(Error::other)?;
+        writeln!(writer, "digraph Merkle {{\n  rankdir=LR;").map_err(Error::other)?;
         if let (Some(root), Some(root_hash)) = (root, self.nodestore.root_hash()) {
-            writeln!(result, " root -> {root}")
+            writeln!(writer, " root -> {root}")
                 .map_err(Error::other)
                 .map_err(|e| FileIoError::new(e, None, 0, None))
                 .map_err(Error::other)?;
             let mut seen = HashSet::new();
-            self.dump_node(
-                &root,
-                Some(&root_hash.into_hash_type()),
-                &mut seen,
-                &mut result,
-            )
-            .map_err(Error::other)?;
+            self.dump_node(&root, Some(&root_hash.into_hash_type()), &mut seen, writer)
+                .map_err(Error::other)?;
         }
-        write!(result, "}}")
+        writeln!(writer, "}}")
             .map_err(Error::other)
             .map_err(|e| FileIoError::new(e, None, 0, None))
             .map_err(Error::other)?;
 
-        Ok(result)
+        Ok(())
+    }
+    /// Dump the trie to a string (for testing or logging).
+    ///
+    /// This is a convenience function for tests that need the dot output as a string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to the string fails.
+    pub(crate) fn dump_to_string(&self) -> Result<String, Error> {
+        let mut buffer = Vec::new();
+        self.dump(&mut buffer)?;
+        String::from_utf8(buffer).map_err(Error::other)
     }
 }
 

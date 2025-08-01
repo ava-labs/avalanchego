@@ -234,7 +234,9 @@ impl RevisionManager {
 
         if crate::logger::trace_enabled() {
             let merkle = Merkle::from(committed);
-            trace!("{}", merkle.dump().expect("failed to dump merkle"));
+            if let Ok(s) = merkle.dump_to_string() {
+                trace!("{s}");
+            }
         }
 
         Ok(())
