@@ -541,6 +541,7 @@ fn fwdctl_check_empty_db() -> Result<()> {
 #[test]
 #[serial]
 fn fwdctl_check_db_with_data() -> Result<()> {
+    use rand::distr::Alphanumeric;
     use rand::rngs::StdRng;
     use rand::{Rng, SeedableRng, rng};
 
@@ -553,7 +554,8 @@ fn fwdctl_check_db_with_data() -> Result<()> {
         .unwrap_or_else(|| rng().random());
 
     eprintln!("Seed {seed}: to rerun with this data, export FIREWOOD_TEST_SEED={seed}");
-    let mut rng = StdRng::seed_from_u64(seed);
+    let rng = StdRng::seed_from_u64(seed);
+    let mut sample_iter = rng.sample_iter(Alphanumeric).map(char::from);
 
     Command::cargo_bin(PRG)?
         .arg("create")
@@ -563,8 +565,8 @@ fn fwdctl_check_db_with_data() -> Result<()> {
 
     // TODO: bulk loading data instead of inserting one by one
     for _ in 0..4 {
-        let key = format!("key_{}", rng.random::<u64>());
-        let value = format!("value_{}", rng.random::<u64>());
+        let key = sample_iter.by_ref().take(64).collect::<String>();
+        let value = sample_iter.by_ref().take(10).collect::<String>();
         Command::cargo_bin(PRG)?
             .arg("insert")
             .args([key])

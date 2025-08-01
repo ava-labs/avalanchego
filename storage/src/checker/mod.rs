@@ -19,6 +19,17 @@ use std::ops::Range;
 
 use indicatif::ProgressBar;
 
+#[cfg(feature = "ethhash")]
+fn is_valid_key(key: &Path) -> bool {
+    const VALID_ETH_KEY_SIZES: [usize; 2] = [64, 128]; // in number of nibbles - two nibbles make a byte
+    VALID_ETH_KEY_SIZES.contains(&key.0.len())
+}
+
+#[cfg(not(feature = "ethhash"))]
+fn is_valid_key(key: &Path) -> bool {
+    key.0.len() % 2 == 0
+}
+
 /// Options for the checker
 #[derive(Debug)]
 pub struct CheckOpt {
@@ -150,14 +161,22 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
 
         // read the node and iterate over the children if branch node
         let node = self.read_node(subtrie_root_address)?;
+        let mut current_node_path = path_prefix.clone();
+        current_node_path.0.extend_from_slice(node.partial_path());
+        if node.value().is_some() && !is_valid_key(&current_node_path) {
+            return Err(CheckerError::InvalidKey {
+                key: current_node_path,
+                address: subtrie_root_address,
+                parent,
+            });
+        }
         if let Node::Branch(branch) = node.as_ref() {
             // this is an internal node, traverse the children
             #[cfg(feature = "ethhash")]
             let num_children = branch.children_iter().count();
             for (nibble, (address, hash)) in branch.children_iter() {
                 let parent = TrieNodeParent::Parent(subtrie_root_address, nibble);
-                let mut child_path_prefix = path_prefix.clone();
-                child_path_prefix.0.extend_from_slice(node.partial_path());
+                let mut child_path_prefix = current_node_path.clone();
                 child_path_prefix.0.push(nibble as u8);
                 let child_subtrie = SubTrieMetadata {
                     root_address: address,
@@ -366,7 +385,7 @@ mod test {
     /// graph TD
     ///     Root["Root Node<br/>partial_path: [2]<br/>children: [0] -> Branch"]
     ///     Branch["Branch Node<br/>partial_path: [3]<br/>path: 0x203<br/>children: [1] -> Leaf"]
-    ///     Leaf["Leaf Node<br/>partial_path: [4, 5]<br/>path: 0x203145<br/>value: [6, 7, 8]"]
+    ///     Leaf["Leaf Node<br/>partial_path: [4, 5]<br/>path: 0x2031454545...45 (32 bytes)<br/>value: [6, 7, 8]"]
     ///
     ///     Root -->|"nibble 0"| Branch
     ///     Branch -->|"nibble 1"| Leaf
@@ -375,7 +394,7 @@ mod test {
     fn gen_test_trie(nodestore: &mut NodeStore<Committed, MemStore>) -> TestTrie {
         let mut high_watermark = NodeStoreHeader::SIZE;
         let leaf = Node::Leaf(LeafNode {
-            partial_path: Path::from([4, 5]),
+            partial_path: Path::from_nibbles_iterator(std::iter::repeat_n([4, 5], 30).flatten()),
             value: Box::new([6, 7, 8]),
         });
         let leaf_addr = LinearAddress::new(high_watermark).unwrap();
