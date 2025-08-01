@@ -8,13 +8,11 @@ members = [
   "storage",
   "triehash",
 ]
-exclude = [
-  "grpc-testtool",
-]
+exclude = ["grpc-testtool"]
 resolver = "2"
 
 [workspace.package]
-version = "0.0.9"
+version = "0.0.10"
 edition = "2024"
 license-file = "LICENSE.md"
 homepage = "https://avalabs.org"
@@ -56,11 +54,11 @@ cast_possible_truncation = "allow"
 
 [workspace.dependencies]
 # workspace local packages
-firewood = { path = "firewood", version = "0.0.9" }
-firewood-macros = { path = "firewood-macros", version = "0.0.9" }
-firewood-storage = { path = "storage", version = "0.0.9" }
-firewood-ffi = { path = "ffi", version = "0.0.9" }
-firewood-triehash = { path = "triehash", version = "0.0.9" }
+firewood = { path = "firewood", version = "0.0.10" }
+firewood-macros = { path = "firewood-macros", version = "0.0.10" }
+firewood-storage = { path = "storage", version = "0.0.10" }
+firewood-ffi = { path = "ffi", version = "0.0.10" }
+firewood-triehash = { path = "triehash", version = "0.0.10" }
 
 # common dependencies
 aquamarine = "0.6.0"

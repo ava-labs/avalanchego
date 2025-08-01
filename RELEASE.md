@@ -12,9 +12,9 @@ Start off by crating a new branch:
 
 ```console
 $ git fetch
-$ git switch -c release/v0.0.10 origin/main
-branch 'release/v0.0.10' set up to track 'origin/main'.
-Switched to a new branch 'release/v0.0.10'
+$ git switch -c release/v0.0.11 origin/main
+branch 'release/v0.0.11' set up to track 'origin/main'.
+Switched to a new branch 'release/v0.0.11'
 ```
 
 ## Package Version
@@ -26,7 +26,7 @@ table to define the version for all subpackages.
 
 ```toml
 [workspace.package]
-version = "0.0.7"
+version = "0.0.11"
 ```
 
 Each package inherits this version by setting `package.version.workspace = true`.
@@ -49,7 +49,7 @@ table. E.g.,:
 ```toml
 [workspace.dependencies]
 # workspace local packages
-firewood = { path = "firewood", version = "0.0.10" }
+firewood = { path = "firewood", version = "0.0.11" }
 ```
 
 This allows packages within the workspace to inherit the dependency,
@@ -77,8 +77,8 @@ the dependency versions to match.
 To build the changelog, see git-cliff.org. Short version:
 
 ```sh
-cargo install git-cliff
-git cliff --tag v0.0.10 | sed -e 's/_/\\_/g' > CHANGELOG.md
+cargo install --locked git-cliff
+git cliff --tag v0.0.11 | sed -e 's/_/\\_/g' > CHANGELOG.md
 ```
 
 ## Review
@@ -92,11 +92,11 @@ git cliff --tag v0.0.10 | sed -e 's/_/\\_/g' > CHANGELOG.md
 To trigger a release, push a tag to the main branch matching the new version,
 
 ```sh
-git tag -S v0.0.10
-git push origin v0.0.10
+git tag -S v0.0.11
+git push origin v0.0.11
 ```
 
-for `v0.0.10` for the merged version change. The CI will automatically publish a
+for `v0.0.11` for the merged version change. The CI will automatically publish a
 draft release which consists of release notes and changes (see
 [.github/workflows/release.yaml](.github/workflows/release.yaml)).
 

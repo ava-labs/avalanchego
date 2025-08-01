@@ -2,6 +2,67 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.10] - 2025-08-01
+
+### 🚀 Features
+
+- *(async-iterator)* Implement (#1096)
+- Export logs (#1070)
+- Render the commit sha in fwdctl (#1109)
+- Update proof types to be generic over mutable or immutable collections (#1121)
+- Refactor value types to use the type alias (#1122)
+- *(dumper)* Child links in hex (easy) (#1124)
+- *(deferred-allocate)* Part 3: Defer allocate (#1061)
+- *(checker)* Disable buggy ethhash checker (#1127)
+- Add `Children<T>` type alias (#1123)
+- Make NodeStore more generic (#1134)
+- *(checker)* Add progress bar (#1105)
+- *(checker)* Checker errors include reference to parent (#1085)
+- Update RangeProof structure (#1136)
+- Update range\_proof signature (#1151)
+- *(checker)* Add InvalidKey error
+- *(deferred-persist)* Part 1: unpersisted gauge (#1116)
+- *(checker)* Collect basic statistics while checking the db image (#1149)
+- *(fwdctl)* Add support for dump formats (#1161)
+- *(ffi)* Remove the Arc wrapper around Proposal (#1160)
+
+### 🐛 Bug Fixes
+
+- *(fwdctl)* Fix fwdctl with ethhash (#1091)
+- *(checker)* Fix checker with ethhash (#1130)
+- Fix broken deserialization of old FreeArea format (#1147)
+- Create metrics registration macros (#980)
+
+### 💼 Other
+
+- Cargo.toml upgrades and fixes (#1099)
+- *(deps)* Update criterion requirement from 0.6.0 to 0.7.0 (#1140)
+
+### 📚 Documentation
+
+- Update ffi/README.md to include configs, metrics, and logs (#1111)
+
+### 🎨 Styling
+
+- Remove unnecessary string in error (#1104)
+
+### 🧪 Testing
+
+- Add fuzz testing for checker, with fixes (#1118)
+- Port TestDeepPropose from go->rust (#1115)
+
+### ⚙️ Miscellaneous Tasks
+
+- Add propose-on-propose test (#1097)
+- Implement newtype for LInearAddress (#1086)
+- Refactor verifying value digests (#1119)
+- Checker test cleanups (#1131)
+- Minor cleanups and nits (#1133)
+- Add a golang install script (#1141)
+- Move all merkle tests into a subdirectory (#1150)
+- Require license header for ffi code (#1159)
+- Bump version to v0.0.10
+
 ## [0.0.9] - 2025-07-17
 
 ### 🚀 Features
