@@ -2,9 +2,7 @@ name: Metrics Change Check
 
 on:
   pull_request:
-    branches: [ main, master ]
-  push:
-    branches: [ main, master ]
+    types: [opened, synchronize, reopened]
 
 jobs:
   check-metrics-changes:
@@ -13,7 +11,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Fetch full history to compare changes
+          fetch-depth: 0 # Fetch full history to compare changes
 
       - name: Check for metric-related changes
         id: check-metrics
@@ -24,47 +22,47 @@ jobs:
           else
             BASE_COMMIT="${{ github.event.before }}"
           fi
-          
+
           # Check if Grafana dashboard was modified - exit early if so
           if git diff --name-only $BASE_COMMIT..HEAD | grep -q "benchmark/Grafana-dashboard.json"; then
             echo "benchmark/Grafana-dashboard.json was modified - skipping metrics check"
             exit 0
           fi
-          
+
           # Regex pattern to match metric-related code changes
           METRIC_REGEX_PATTERN="(counter!|gauge!|histogram!|#\\[metrics\\])"
-          
+
           # Check for metric-related changes
           METRIC_CHANGES=$(git diff $BASE_COMMIT..HEAD --unified=0 | grep -E "$METRIC_REGEX_PATTERN" || true)
-          
+
           if [ -n "$METRIC_CHANGES" ]; then
             echo "⚠️  WARNING: Found metric-related changes, but no dashboard modification:"
             echo "$METRIC_CHANGES"
           else
             echo "✅ No metric-related changes found"
           fi
-          
+
           # Set output variables for the comment step
           echo "metric_changes_found=$([ -n "$METRIC_CHANGES" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
           echo "metric_pattern=$METRIC_REGEX_PATTERN" >> $GITHUB_OUTPUT
 
       - name: Comment on PR (if applicable)
-        if: github.event_name == 'pull_request' && steps.check-metrics.outputs.metric_changes_found == 'true'
+        if: github.repository == github.event.pull_request.head.repo.full_name && steps.check-metrics.outputs.metric_changes_found == 'true'
         uses: actions/github-script@v7
         with:
           script: |
             const { execSync } = require('child_process');
-            
+
             try {
               // Get the base commit for comparison
               const baseCommit = context.payload.pull_request.base.sha;
-              
+
               // Get the metric pattern from the previous step
               const metricPattern = "${{ steps.check-metrics.outputs.metric_pattern }}";
-              
+
               // Check for metric changes
               const metricChanges = execSync(`git diff ${baseCommit}..HEAD --unified=0 | grep -E "${metricPattern}" || true`, { encoding: 'utf8' });
-              
+
               if (metricChanges.trim()) {
                 const comment = '## Metrics Change Detection ⚠️\n\n' +
                   'This PR contains changes related to metrics:\n\n' +
@@ -75,7 +73,7 @@ jobs:
                   'You may need to update `benchmark/Grafana-dashboard.json` accordingly.\n\n' +
                   '---\n' +
                   '*This check is automated to help maintain the dashboard.*';
-                
+
                 github.rest.issues.createComment({
                   issue_number: context.issue.number,
                   owner: context.repo.owner,
@@ -85,4 +83,4 @@ jobs:
               }
             } catch (error) {
               console.log('No metric changes found or error occurred:', error.message);
-            } 
+            }
