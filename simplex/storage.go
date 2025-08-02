@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 
 	"github.com/ava-labs/simplex"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -22,8 +23,8 @@ import (
 var (
 	_               simplex.Storage = (*Storage)(nil)
 	genesisMetadata                 = simplex.ProtocolMetadata{
-		Version: 1,
-		Epoch:   1,
+		Version: 0,
+		Epoch:   0,
 		Round:   0,
 		Seq:     0,
 	}
@@ -39,7 +40,7 @@ type Storage struct {
 	height atomic.Uint64
 
 	// db is the underlying database used to store finalizations.
-	db database.KeyValueReaderWriterDeleter
+	db KeyValueReaderWriter
 
 	// genesisBlock is the genesis block data. It is stored as the first block in the storage.
 	genesisBlock *Block
@@ -69,7 +70,7 @@ func newStorage(ctx context.Context, config *Config, qcDeserializer *QCDeseriali
 		return nil, err
 	}
 
-	genesisBlock, err := getGenesisBlock(ctx, config)
+	genesisBlock, err := getGenesisBlock(ctx, config, blockTracker)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +102,7 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 	block, err := getBlockAtHeight(context.TODO(), s.vm, seq)
 	if err != nil {
 		if err == database.ErrNotFound {
-			return nil, simplex.Finalization{}, false
+			s.log.Error("block not found for sequence", zap.Uint64("seq", seq), zap.Error(err))
 		}
 		return nil, simplex.Finalization{}, false
 	}
@@ -111,7 +112,13 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 		return nil, simplex.Finalization{}, false
 	}
 
-	vb := &Block{vmBlock: block, metadata: finalization.Finalization.ProtocolMetadata}
+	vb := &Block{vmBlock: block, metadata: finalization.Finalization.ProtocolMetadata, blockTracker: s.blockTracker}
+	bytes, err := vb.Bytes()
+	if err != nil {
+		s.log.Error("failed to serialize block", zap.Error(err))
+		return nil, simplex.Finalization{}, false
+	}
+	vb.digest = computeDigest(bytes)
 
 	return vb, finalization, true
 }
@@ -156,9 +163,10 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 }
 
 // getGenesisBlock returns the genesis block wrapped as a Block instance.
-func getGenesisBlock(ctx context.Context, config *Config) (*Block, error) {
+func getGenesisBlock(ctx context.Context, config *Config, blockTracker *blockTracker) (*Block, error) {
 	genesis := &Block{
-		metadata: genesisMetadata,
+		metadata:     genesisMetadata,
+		blockTracker: blockTracker,
 	}
 
 	snowmanGenesis, err := getBlockAtHeight(ctx, config.VM, 0)
@@ -185,6 +193,7 @@ func (s *Storage) retrieveFinalization(seq uint64) (simplex.Finalization, bool, 
 	finalizationBytes, err := s.db.Get(seqBuff)
 	if err != nil {
 		if err == database.ErrNotFound {
+			s.log.Error("finalization not found for sequence", zap.Uint64("seq", seq), zap.Error(err))
 			return simplex.Finalization{}, false, nil
 		}
 		return simplex.Finalization{}, false, err
