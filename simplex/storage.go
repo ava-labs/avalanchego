@@ -3,6 +3,8 @@
 
 package simplex
 
+//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+
 import (
 	"bytes"
 	"context"
@@ -199,7 +201,12 @@ func (s *Storage) retrieveFinalization(seq uint64) (simplex.Finalization, bool, 
 		return simplex.Finalization{}, false, err
 	}
 
-	finalization, err := finalizationFromBytes(finalizationBytes, s.deserializer)
+	var canotoFinalization canotoFinalization
+	if err := canotoFinalization.UnmarshalCanoto(finalizationBytes); err != nil {
+		return simplex.Finalization{}, false, err
+	}
+
+	finalization, err := canotoFinalization.finalization(s.deserializer)
 	if err != nil {
 		return simplex.Finalization{}, false, err
 	}
@@ -223,22 +230,28 @@ func getBlockAtHeight(ctx context.Context, vm block.ChainVM, height uint64) (sno
 
 // finalizationToBytes serializes the simplex.Finalization into bytes.
 func finalizationToBytes(finalization simplex.Finalization) []byte {
-	blockHeaderBytes := finalization.Finalization.Bytes()
-	qcBytes := finalization.QC.Bytes()
-	buff := make([]byte, len(blockHeaderBytes)+len(qcBytes))
-	copy(buff, blockHeaderBytes)
-	copy(buff[len(blockHeaderBytes):], qcBytes)
-	return buff
+	cFinalization := canotoFinalization{
+		Finalization: finalization.Finalization.Bytes(),
+		QC:           finalization.QC.Bytes(),
+	}
+	return cFinalization.MarshalCanoto()
+}
+
+type canotoFinalization struct {
+	Finalization []byte `canoto:"bytes,1"`
+	QC           []byte `canoto:"bytes,2"`
+
+	canotoData canotoData_canotoFinalization
 }
 
 // finalizationFromBytes deserialized the bytes into a simplex.Finalization.
-func finalizationFromBytes(bytes []byte, d *QCDeserializer) (simplex.Finalization, error) {
+func (c *canotoFinalization) finalization(d *QCDeserializer) (simplex.Finalization, error) {
 	var finalization simplex.Finalization
-	if err := finalization.Finalization.FromBytes(bytes[:simplex.BlockHeaderLen]); err != nil {
+	if err := finalization.Finalization.FromBytes(c.Finalization); err != nil {
 		return simplex.Finalization{}, err
 	}
 
-	qc, err := d.DeserializeQuorumCertificate(bytes[simplex.BlockHeaderLen:])
+	qc, err := d.DeserializeQuorumCertificate(c.QC)
 	if err != nil {
 		return simplex.Finalization{}, err
 	}
