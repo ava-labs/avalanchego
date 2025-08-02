@@ -1,7 +1,18 @@
 # Release Notes
 
 ## Pending Release
-- Enable expermiental `state-scheme` flag to specify Firewood as a state database.
+
+## [v0.7.8](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.8)
+
+This version is backwards compatible to v0.7.0. It is optional, but encouraged.
+
+### AvalancheGo Compatibility
+
+The plugin version is **updated** to 43 and is compatible with AvalancheGo version v1.13.4.
+
+### Updates
+
+- Enable experimental `state-scheme` flag to specify Firewood as a state database.
 - Added prometheus metrics for Firewood if it is enabled and expensive metrics are being used.
 - Add pending releases here
 
