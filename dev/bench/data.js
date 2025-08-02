@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1754039823977,
+  "lastUpdate": 1754126036471,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -82,6 +82,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[101,250000]",
             "value": 89.46,
+            "unit": "mgas/s",
+            "extra": "1 times\n4 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Stephen Buttolph",
+            "username": "StephenButtolph",
+            "email": "stephen@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "752e12f8b83159114caf6f15dadd32e27028d9dd",
+          "message": "Update coreth to v0.15.3-rc.5 (#4153)",
+          "timestamp": "2025-08-01T20:23:01Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/752e12f8b83159114caf6f15dadd32e27028d9dd"
+        },
+        "date": 1754126035829,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]",
+            "value": 93.09,
             "unit": "mgas/s",
             "extra": "1 times\n4 procs"
           }
