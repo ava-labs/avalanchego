@@ -8,24 +8,24 @@
 * @StephenButtolph
 *.md @meaghanfitzgerald @StephenButtolph
 /.dockerignore @maru-ava
-/.envrc @maru-ava
-/.github/ @maru-ava
-/.github/*.md @maru-ava @meaghanfitzgerald
+/.envrc @joshua-kim @maru-ava
+/.github/ @joshua-kim @maru-ava
+/.github/*.md @joshua-kim @maru-ava @meaghanfitzgerald
 /.github/CODEOWNERS @StephenButtolph
 /.github/workflows/c-chain-reexecution-benchmark.yml @aaronbuchwald
-/.gitignore @maru-ava @StephenButtolph
-/.golangci.yml @maru-ava @StephenButtolph
-/Dockerfile @maru-ava
-/Taskfile.yml @maru-ava
-/flake.lock @maru-ava
-/flake.nix @maru-ava
+/.gitignore @joshua-kim @maru-ava @StephenButtolph
+/.golangci.yml @joshua-kim @maru-ava @StephenButtolph
+/Dockerfile @joshua-kim @maru-ava
+/Taskfile.yml @joshua-kim @maru-ava
+/flake.lock @joshua-kim @maru-ava
+/flake.nix @joshua-kim @maru-ava
 /network/p2p/ @joshua-kim
 /network/p2p/*.md @joshua-kim @meaghanfitzgerald
-/scripts/ @maru-ava
-/scripts/*.md @maru-ava @meaghanfitzgerald
+/scripts/ @joshua-kim @maru-ava
+/scripts/*.md @joshua-kim @maru-ava @meaghanfitzgerald
 /scripts/benchmark_cchain_range.sh @aaronbuchwald
-/tests/ @maru-ava
-/tests/*.md @maru-ava @meaghanfitzgerald
+/tests/ @joshua-kim @maru-ava
+/tests/*.md @joshua-kim @maru-ava @meaghanfitzgerald
 /tests/reexecute/ @aaronbuchwald
 /x/merkledb @joshua-kim @rrazvan1
 /x/sync @joshua-kim @rrazvan1
