@@ -27,11 +27,14 @@ jobs:
             profile-args: "--no-default-features"
           - profile-key: debug-no-features
             profile-args: ""
+          - profile-key: debug-no-features
+            profile-args: ""
+            os: macos-latest
           - profile-key: debug-ethhash-logger
             profile-args: "--features ethhash,logger"
           - profile-key: maxperf-ethhash-logger
             profile-args: "--profile maxperf --features ethhash,logger"
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -65,7 +68,6 @@ jobs:
     # not originating from a fork.
     if: github.event_name == 'pull_request' && github.repository == github.event.pull_request.head.repo.full_name
     needs: build
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
@@ -73,8 +75,12 @@ jobs:
             profile-args: "--no-default-features"
           - profile-key: debug-no-features
             profile-args: ""
+          - profile-key: debug-no-features
+            profile-args: ""
+            os: macos-latest
           - profile-key: debug-ethhash-logger
             profile-args: "--features ethhash,logger"
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -93,7 +99,6 @@ jobs:
 
   rust-lint:
     needs: build
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
@@ -101,8 +106,12 @@ jobs:
             profile-args: "--no-default-features"
           - profile-key: debug-no-features
             profile-args: ""
+          - profile-key: debug-no-features
+            profile-args: ""
+            os: macos-latest
           - profile-key: debug-ethhash-logger
             profile-args: "--features ethhash,logger"
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -118,7 +127,6 @@ jobs:
 
   test:
     needs: build
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
@@ -126,10 +134,14 @@ jobs:
             profile-args: "--no-default-features"
           - profile-key: debug-no-features
             profile-args: ""
+          - profile-key: debug-no-features
+            profile-args: ""
+            os: macos-latest
           - profile-key: debug-ethhash-logger
             profile-args: "--features ethhash,logger"
           - profile-key: maxperf-ethhash-logger
             profile-args: "--profile maxperf --features ethhash,logger"
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -144,7 +156,7 @@ jobs:
         run: cargo test --verbose ${{ matrix.profile-args }}
 
   examples:
-    runs-on: ubuntu-latest
+    needs: build
     strategy:
       matrix:
         include:
@@ -152,10 +164,14 @@ jobs:
             profile-args: "--no-default-features"
           - profile-key: debug-no-features
             profile-args: ""
+          - profile-key: debug-no-features
+            profile-args: ""
+            os: macos-latest
           - profile-key: debug-ethhash-logger
             profile-args: "--features ethhash,logger"
           - profile-key: maxperf-ethhash-logger
             profile-args: "--profile maxperf --features ethhash,logger"
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
