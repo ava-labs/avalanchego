@@ -1,0 +1,95 @@
+--- .github/.golangci.yaml	2025-08-02 10:10:13
++++ ffi/.golangci.yaml	2025-08-02 10:10:13
+@@ -69,8 +69,6 @@
+       rules:
+         packages:
+           deny:
+-            - pkg: container/list
+-              desc: github.com/ava-labs/avalanchego/utils/linked should be used instead.
+             - pkg: github.com/golang/mock/gomock
+               desc: go.uber.org/mock/gomock should be used instead.
+             - pkg: github.com/stretchr/testify/assert
+@@ -85,29 +83,10 @@
+     forbidigo:
+       # Forbid the following identifiers (list of regexp).
+       forbid:
+-        - pattern: require\.Error$(# ErrorIs should be used instead)?
+-        - pattern: require\.ErrorContains$(# ErrorIs should be used instead)?
+-        - pattern: require\.EqualValues$(# Equal should be used instead)?
+-        - pattern: require\.NotEqualValues$(# NotEqual should be used instead)?
+         - pattern: ^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the require library should be used instead)?
+         - pattern: ^sort\.(Slice|Strings)$(# the slices package should be used instead)?
+       # Exclude godoc examples from forbidigo checks.
+       exclude-godoc-examples: false
+-    gosec:
+-      excludes:
+-        - G107 # Url provided to HTTP request as taint input https://securego.io/docs/rules/g107
+-        - G115 # TODO(marun) Enable this ruleset in a follow-up PR
+-    importas:
+-      # Do not allow unaliased imports of aliased packages.
+-      no-unaliased: false
+-      # Do not allow non-required aliases.
+-      no-extra-aliases: false
+-      # List of aliases
+-      alias:
+-        - pkg: github.com/ava-labs/avalanchego/utils/math
+-          alias: safemath
+-        - pkg: github.com/ava-labs/avalanchego/utils/json
+-          alias: avajson
+     revive:
+       rules:
+         # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
+@@ -168,17 +147,6 @@
+         # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#useless-break
+         - name: useless-break
+           disabled: false
+-    spancheck:
+-      # https://github.com/jjti/go-spancheck#checks
+-      checks:
+-        - end
+-    staticcheck:
+-      # https://staticcheck.io/docs/options#checks
+-      checks:
+-        - all
+-        - -SA6002A # Storing non-pointer values in sync.Pool allocates memory
+-        - -SA1019 # Using a deprecated function, variable, constant or field
+-        - -QF1008 # Unnecessary embedded expressions
+     tagalign:
+       align: true
+       sort: true
+@@ -186,16 +154,16 @@
+         - serialize
+       strict: true
+     testifylint:
+-    # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
+-    # Default: false
+-    enable-all: true
+-    # Disable checkers by name
+-    # (in addition to default
+-    #   suite-thelper
+-    # ).
+-    disable:
+-      - go-require
+-      - float-compare
++      # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
++      # Default: false
++      enable-all: true
++      # Disable checkers by name
++      # (in addition to default
++      #   suite-thelper
++      # ).
++      disable:
++        - go-require
++        - float-compare
+     unused:
+       # Mark all struct fields that have been written to as used.
+       # Default: true
+@@ -224,7 +192,7 @@
+         - standard
+         - default
+         - blank
+-        - prefix(github.com/ava-labs/avalanchego)
++        - prefix(github.com/ava-labs/firewood/ffi)
+         - alias
+         - dot
+       custom-order: true

@@ -1,6 +1,18 @@
 name: expected golangci.yaml diff
 
 on:
+  pull_request:
+    paths:
+      - .github/scripts/verify_golangci_yaml_changes.sh
+      - .github/workflows/expected-golangci-yaml-diff.yaml
+      - .github/.golangci.yaml.patch
+      - ffi/.golangci.yaml
+      # if updating the general CI workflow, go ahead and update the golangci.yaml
+      - .github/workflows/ci.yaml
+      # for good measure, if someone is editing the go.mod or go.sum files then
+      # they should make sure the golangci.yaml is up to date
+      - ffi/go.mod
+      - ffi/go.sum
   push:
     branches:
       - "main"
@@ -11,5 +23,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate expected golangci-lint changes
-        working-directory: .github 
-        run: ./scripts/verify_golangci_yaml_changes.sh 
+        run: .github/scripts/verify_golangci_yaml_changes.sh
