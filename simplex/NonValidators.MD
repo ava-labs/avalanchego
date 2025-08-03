@@ -5,13 +5,16 @@ The current implementation of Simplex sends messages only to validator nodes. Me
 
 **Goal**: Allow nodes not participating in consensus (non-validators) to be able to replicate and verify accepted blocks.
 
-**Standard Replication Path**: Requesting Missing Sequences
-When a validating node falls behind it will eventually receive a finalization for a `seq x` that is greater than its current known seq. A finalization for a higher sequence means the node has fallen behind, and blocks for sequences up to and including `seq x` are guaranteed to be accepted into the chain. In this case, the node will begin the replication process which involves requesting the sequences it is missing (all sequences from its last accepted seq to `x`). Eventually, the nodes will respond and the lagging node will have caught up.
-Simplex’s `HandleMessage` function will process the replication request and respond with a response.
+**Broadcasting Finalizations**
 
-```go
-func (e *Epoch) HandleMessage(msg *Message, from NodeID) error {
-```
+In order to learn about blocks that were accepted, non-validators need to receive finalizations. To accommodate this, we should expand the `Communication` implementation to also broadcast to non-validator nodes whenever the message being broadcasted is a `FinalizationMessage`. This does not require any changes to the `Simplex` protocol itself, as the `Communication` component is already an isolated component. It would be up to the `Communication` struct and `Engine` that wraps `Simplex` to maintain a list of non-validator nodes and broadcast finalization messages to them.
+
+Once a non-validator receives a finalization message for a higher sequence, it can then request the full block via the standard replication path described below.
+
+**Standard Replication Path**: Requesting Missing Sequences
+When a validating node falls behind it will eventually receive a finalization for a `seq x` that is greater than its current known seq. A finalization for a higher sequence means the node has fallen behind, and blocks for sequences up to and including `seq x` are guaranteed to be accepted into the chain. In this case, the node will begin the replication process which involves requesting the sequences it is missing (all sequences from its last accepted seq to and including `x`). Eventually, the nodes will respond and the lagging node will have caught up.
+
+Simplex currently only accepts and processes messages from validators. These messages can be normal consensus messages or replication requests/responses.
 
 `ReplicationRequests` have the following structure:
 
@@ -40,8 +43,8 @@ type QuorumRound struct {
 }
 ```
 
-Non-validators should re-use this logic and can ignore any `QuorumRound` that do not have finalizations. This main benefit of reusing the same logic is that we can take advantage of the in-memory `rounds` map which will reduce the number of times we read from storage. Secondarily, this would be a minimalistic change that won't require maintaining a separate code path.
+Non-validators should re-use this logic and can ignore any `QuorumRound` that do not have finalizations. This main benefit of reusing the same logic is that we can take advantage of the in-memory `rounds` map which will reduce the number of times we read from storage. Secondarily, this would be a minimalistic change that won't require maintaining a separate code path. In order to allow this, `Simplex` needs to be modified to accept `ReplicationRequests` from non-validator nodes.
 
-**Broadcasting Finalizations**
+**Processing Replication Responses**
 
-In order to learn about blocks that were accepted, non-validators need to receive finalizations. To accommodate this, we should expand the `Communication` implementation to also broadcast to non-validator nodes whenever the message being broadcasted is a `FinalizationMessage`. Once a non-validator receives a finalization message for a higher sequence, it can then request the full block via the standard replication path.
+When a non-validator receives a `ReplicationResponse`, it needs to verify the `QuorumRounds` by verifying the aggregated BLS signature amongst the corresponding validator set. Since different epochs can be [configured](https://github.com/ava-labs/avalanchego/pull/4124) with different validator sets, the non-validator needs to ensure it has the correct validator set for the epoch in which the `Finalization` was created. In the proposed implementation, the `Epoch` number represents the sequence of the sealing block the `Finalization` was created for. The non-validator node can follow [this proposed logic](https://github.com/ava-labs/avalanchego/pull/4124/files#diff-b9b433e0fcc085f654c562e9eaadb1e4de29b7fe6ee4bdc970280b895b3c078bR305) to verify the missing `Finalizations`:
