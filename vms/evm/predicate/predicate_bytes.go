@@ -25,7 +25,7 @@ var (
 
 // PackPredicate packs [predicate] by delimiting the actual message with [PredicateEndByte]
 // and zero padding to reach a length that is a multiple of 32.
-func PackPredicate(predicateBytes []byte) []byte {
+func Pack(bytes []byte) []byte {
 	predicateBytes = append(predicateBytes, EndByte)
 	return common.RightPadBytes(predicateBytes, (len(predicateBytes)+31)/32*32)
 }
