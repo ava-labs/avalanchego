@@ -44,9 +44,7 @@ func TestUnpackInvalid(t *testing.T) {
 		validPredicate := PackPredicate(utils.RandomBytes(l))
 
 		for _, padding := range paddingCases {
-			invalidPredicate := make([]byte, len(validPredicate)+len(padding))
-			copy(invalidPredicate, validPredicate)
-			copy(invalidPredicate[len(validPredicate):], padding)
+			invalidPredicate := slices.Concat(validPredicate, padding)
 			_, err := UnpackPredicate(invalidPredicate)
 
 			// Check for either error type since different padding can cause different errors.
