@@ -33,7 +33,7 @@ func Pack(bytes []byte) []byte {
 // UnpackPredicate unpacks a predicate by stripping right padded zeroes, checking for the delimiter,
 // ensuring there is not excess padding, and returning the original message.
 // Returns an error if it finds an incorrect encoding.
-func UnpackPredicate(paddedPredicate []byte) ([]byte, error) {
+func Unpack(paddedBytes []byte) ([]byte, error) {
 	trimmedPredicateBytes := common.TrimRightZeroes(paddedPredicate)
 	if len(trimmedPredicateBytes) == 0 {
 		return nil, fmt.Errorf("%w: 0x%x", ErrInvalidAllZeroBytes, paddedPredicate)
