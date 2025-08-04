@@ -41,6 +41,20 @@ type Block struct {
 	blockTracker *blockTracker
 }
 
+func newBlock(metadata simplex.ProtocolMetadata, vmBlock snowman.Block, blockTracker *blockTracker) (*Block, error) {
+	block := &Block{
+		metadata:     metadata,
+		vmBlock:     vmBlock,
+		blockTracker: blockTracker,
+	}
+	bytes, err := block.Bytes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize block: %w", err)
+	}
+	block.digest = computeDigest(bytes)
+	return block, nil
+}
+
 // CanotoSimplexBlock is the Canoto representation of a block
 type canotoSimplexBlock struct {
 	Metadata   []byte `canoto:"bytes,1"`

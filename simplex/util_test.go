@@ -29,7 +29,7 @@ type newBlockConfig struct {
 	round uint64
 }
 
-func newBlock(t *testing.T, config newBlockConfig) *Block {
+func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 	if config.prev == nil {
 		block := &Block{
 			vmBlock: &wrappedBlock{
