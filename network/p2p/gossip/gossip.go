@@ -528,7 +528,7 @@ func (p *PushGossiper[T]) gossip(
 	)
 }
 
-// Add enqueues new gossipables to be pushed. If a gossiable is already tracked,
+// Add enqueues new gossipables to be pushed. If a gossipable is already tracked,
 // it is not added again.
 func (p *PushGossiper[T]) Add(gossipables ...T) {
 	var (
