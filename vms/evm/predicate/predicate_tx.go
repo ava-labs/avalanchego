@@ -12,8 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-// NewPredicateTx returns a transaction with the predicateAddress/predicateBytes tuple
-// packed and added to the access list of the transaction.
+// NewTx returns a [types.DynamicFeeTx] with the predicate tuple added to the
+// access list of the transaction.
 func NewPredicateTx(
 	chainID *big.Int,
 	nonce uint64,
