@@ -14,7 +14,7 @@ import (
 
 // NewTx returns a [types.DynamicFeeTx] with the predicate tuple added to the
 // access list of the transaction.
-func NewPredicateTx(
+func NewTx(
 	chainID *big.Int,
 	nonce uint64,
 	to *common.Address,
