@@ -187,6 +187,9 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(syncer)
 
+	proofParser, ok := syncer.proofParser.(*merkleDBProofParser)
+	require.True(ok)
+
 	require.NoError(syncer.Start(context.Background()))
 	require.NoError(syncer.Wait(context.Background()))
 
@@ -195,7 +198,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 
 	// the two dbs should be in sync, so next key should be nil
 	lastKey := proof.KeyChanges[len(proof.KeyChanges)-1].Key
-	nextKey, err := syncer.findNextKey(context.Background(), lastKey, maybe.Nothing[[]byte](), proof.EndProof)
+	nextKey, err := findNextKey(context.Background(), db, lastKey, maybe.Nothing[[]byte](), proof.EndProof, proofParser.tokenSize)
 	require.NoError(err)
 	require.True(nextKey.IsNothing())
 
@@ -228,7 +231,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 		// both nibbles were 0, so move onto the next byte
 	}
 
-	nextKey, err = syncer.findNextKey(context.Background(), lastKey, maybe.Some(endPointBeforeNewKey), proof.EndProof)
+	nextKey, err = findNextKey(context.Background(), db, lastKey, maybe.Some(endPointBeforeNewKey), proof.EndProof, proofParser.tokenSize)
 	require.NoError(err)
 
 	// next key would be after the end of the range, so it returns Nothing instead
@@ -261,6 +264,8 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 		BranchFactor:          merkledb.BranchFactor16,
 	}, prometheus.NewRegistry())
 	require.NoError(err)
+	proofParser, ok := syncer.proofParser.(*merkleDBProofParser)
+	require.True(ok)
 
 	// 0x12 was "deleted" and there should be no extra node in the proof since there was nothing with a common prefix
 	noExtraNodeProof, err := db.GetProof(context.Background(), []byte{0x12})
@@ -273,11 +278,11 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	// there is now another value in the range that needs to be sync'ed
 	require.NoError(db.Put([]byte{0x13}, []byte{3}))
 
-	nextKey, err := syncer.findNextKey(context.Background(), []byte{0x12}, maybe.Some([]byte{0x20}), noExtraNodeProof.Path)
+	nextKey, err := findNextKey(context.Background(), db, []byte{0x12}, maybe.Some([]byte{0x20}), noExtraNodeProof.Path, proofParser.tokenSize)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x13}), nextKey)
 
-	nextKey, err = syncer.findNextKey(context.Background(), []byte{0x11}, maybe.Some([]byte{0x20}), extraNodeProof.Path)
+	nextKey, err = findNextKey(context.Background(), db, []byte{0x11}, maybe.Some([]byte{0x20}), extraNodeProof.Path, proofParser.tokenSize)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x13}), nextKey)
 }
@@ -311,9 +316,11 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 		BranchFactor:          merkledb.BranchFactor16,
 	}, prometheus.NewRegistry())
 	require.NoError(err)
+	proofParser, ok := syncer.proofParser.(*merkleDBProofParser)
+	require.True(ok)
 	require.NoError(db.Put([]byte{0x11, 0x15}, []byte{4}))
 
-	nextKey, err := syncer.findNextKey(context.Background(), []byte{0x11, 0x11}, maybe.Some([]byte{0x20}), proof.Path)
+	nextKey, err := findNextKey(context.Background(), db, []byte{0x11, 0x11}, maybe.Some([]byte{0x20}), proof.Path, proofParser.tokenSize)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x11, 0x15}), nextKey)
 }
@@ -348,9 +355,13 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 		BranchFactor:          merkledb.BranchFactor16,
 	}, prometheus.NewRegistry())
 	require.NoError(err)
+
+	proofParser, ok := syncer.proofParser.(*merkleDBProofParser)
+	require.True(ok)
+
 	require.NoError(db.Delete([]byte{0x12, 0xA0}))
 
-	nextKey, err := syncer.findNextKey(context.Background(), []byte{0x12}, maybe.Some([]byte{0x20}), proof.Path)
+	nextKey, err := findNextKey(context.Background(), db, []byte{0x12}, maybe.Some([]byte{0x20}), proof.Path, proofParser.tokenSize)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x12, 0xA0}), nextKey)
 }
@@ -385,6 +396,8 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 	require.NotNil(syncer)
+	proofParser, ok := syncer.proofParser.(*merkleDBProofParser)
+	require.True(ok)
 
 	require.NoError(syncer.Start(context.Background()))
 	require.NoError(syncer.Wait(context.Background()))
@@ -400,7 +413,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	require.NoError(db.Put(midPointVal, []byte{1}))
 
 	// next key at prefix of newly added point
-	nextKey, err := syncer.findNextKey(context.Background(), lastKey, maybe.Nothing[[]byte](), proof.EndProof)
+	nextKey, err := findNextKey(context.Background(), db, lastKey, maybe.Nothing[[]byte](), proof.EndProof, proofParser.tokenSize)
 	require.NoError(err)
 	require.True(nextKey.HasValue())
 
@@ -414,7 +427,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	require.NoError(err)
 
 	// next key at prefix of newly added point
-	nextKey, err = syncer.findNextKey(context.Background(), lastKey, maybe.Nothing[[]byte](), proof.EndProof)
+	nextKey, err = findNextKey(context.Background(), db, lastKey, maybe.Nothing[[]byte](), proof.EndProof, proofParser.tokenSize)
 	require.NoError(err)
 	require.True(nextKey.HasValue())
 
@@ -447,6 +460,8 @@ func TestFindNextKeyEmptyEndProof(t *testing.T) {
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 	require.NotNil(syncer)
+	proofParser, ok := syncer.proofParser.(*merkleDBProofParser)
+	require.True(ok)
 
 	for i := 0; i < 100; i++ {
 		lastReceivedKeyLen := r.Intn(16)
@@ -462,11 +477,13 @@ func TestFindNextKeyEmptyEndProof(t *testing.T) {
 			rangeEnd = maybe.Some(rangeEndBytes)
 		}
 
-		nextKey, err := syncer.findNextKey(
+		nextKey, err := findNextKey(
 			context.Background(),
+			db,
 			lastReceivedKey,
 			rangeEnd,
 			nil, /* endProof */
+			proofParser.tokenSize,
 		)
 		require.NoError(err)
 		require.Equal(maybe.Some(append(lastReceivedKey, 0)), nextKey)
@@ -516,6 +533,9 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 	require.NotNil(syncer)
+	proofParser, ok := syncer.proofParser.(*merkleDBProofParser)
+	require.True(ok)
+
 	require.NoError(syncer.Start(context.Background()))
 	require.NoError(syncer.Wait(context.Background()))
 
@@ -532,7 +552,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 	proof, err = dbToSync.GetRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key), 100)
 	require.NoError(err)
 
-	nextKey, err := syncer.findNextKey(context.Background(), proof.KeyChanges[len(proof.KeyChanges)-1].Key, maybe.Nothing[[]byte](), proof.EndProof)
+	nextKey, err := findNextKey(context.Background(), db, proof.KeyChanges[len(proof.KeyChanges)-1].Key, maybe.Nothing[[]byte](), proof.EndProof, proofParser.tokenSize)
 	require.NoError(err)
 	require.True(nextKey.HasValue())
 	require.Equal(lastKey, nextKey.Value())
@@ -738,12 +758,17 @@ func TestFindNextKeyRandom(t *testing.T) {
 			BranchFactor:          merkledb.BranchFactor16,
 		}, prometheus.NewRegistry())
 		require.NoError(err)
+		require.NotNil(syncer)
+		proofParser, ok := syncer.proofParser.(*merkleDBProofParser)
+		require.True(ok)
 
-		gotFirstDiff, err := syncer.findNextKey(
+		gotFirstDiff, err := findNextKey(
 			context.Background(),
+			localDB,
 			lastReceivedKey,
 			endKey,
 			remoteProof.EndProof,
+			proofParser.tokenSize,
 		)
 		require.NoError(err)
 
