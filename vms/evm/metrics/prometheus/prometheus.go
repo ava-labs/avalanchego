@@ -22,6 +22,7 @@ var (
 	errMetricTypeNotSupported = errors.New("metric type is not supported")
 	quantiles                 = []float64{.5, .75, .95, .99, .999, .9999}
 	pvShortPercent            = []float64{50, 95, 99}
+	helpText                  = ""
 )
 
 // Gatherer implements the [prometheus.Gatherer] interface by gathering all
@@ -77,6 +78,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 	case metrics.Counter:
 		return &dto.MetricFamily{
 			Name: &name,
+			Help: &helpText,
 			Type: dto.MetricType_COUNTER.Enum(),
 			Metric: []*dto.Metric{{
 				Counter: &dto.Counter{
@@ -87,6 +89,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 	case metrics.CounterFloat64:
 		return &dto.MetricFamily{
 			Name: &name,
+			Help: &helpText,
 			Type: dto.MetricType_COUNTER.Enum(),
 			Metric: []*dto.Metric{{
 				Counter: &dto.Counter{
@@ -97,6 +100,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 	case metrics.Gauge:
 		return &dto.MetricFamily{
 			Name: &name,
+			Help: &helpText,
 			Type: dto.MetricType_GAUGE.Enum(),
 			Metric: []*dto.Metric{{
 				Gauge: &dto.Gauge{
@@ -107,6 +111,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 	case metrics.GaugeFloat64:
 		return &dto.MetricFamily{
 			Name: &name,
+			Help: &helpText,
 			Type: dto.MetricType_GAUGE.Enum(),
 			Metric: []*dto.Metric{{
 				Gauge: &dto.Gauge{
@@ -128,6 +133,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 		}
 		return &dto.MetricFamily{
 			Name: &name,
+			Help: &helpText,
 			Type: dto.MetricType_SUMMARY.Enum(),
 			Metric: []*dto.Metric{{
 				Summary: &dto.Summary{
@@ -140,6 +146,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 	case metrics.Meter:
 		return &dto.MetricFamily{
 			Name: &name,
+			Help: &helpText,
 			Type: dto.MetricType_GAUGE.Enum(),
 			Metric: []*dto.Metric{{
 				Gauge: &dto.Gauge{
@@ -159,6 +166,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 		}
 		return &dto.MetricFamily{
 			Name: &name,
+			Help: &helpText,
 			Type: dto.MetricType_SUMMARY.Enum(),
 			Metric: []*dto.Metric{{
 				Summary: &dto.Summary{
@@ -181,6 +189,7 @@ func metricFamily(registry Registry, name string) (mf *dto.MetricFamily, err err
 		count := snapshot.Count()
 		return &dto.MetricFamily{
 			Name: &name,
+			Help: &helpText,
 			Type: dto.MetricType_SUMMARY.Enum(),
 			Metric: []*dto.Metric{{
 				Summary: &dto.Summary{

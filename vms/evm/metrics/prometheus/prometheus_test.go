@@ -16,20 +16,26 @@ import (
 )
 
 const expectedMetrics = `
+	# HELP test_counter
 	# TYPE test_counter counter
 	test_counter 12345
+	# HELP test_counter_float64
 	# TYPE test_counter_float64 counter
 	test_counter_float64 1.1
+	# HELP test_empty_resetting_timer
 	# TYPE test_empty_resetting_timer summary
 	test_empty_resetting_timer{quantile="50"} 0
 	test_empty_resetting_timer{quantile="95"} 0
 	test_empty_resetting_timer{quantile="99"} 0
 	test_empty_resetting_timer_sum 0
 	test_empty_resetting_timer_count 0
+	# HELP test_gauge
 	# TYPE test_gauge gauge
 	test_gauge 23456
+	# HELP test_gauge_float64
 	# TYPE test_gauge_float64 gauge
 	test_gauge_float64 34567.89
+	# HELP test_histogram
 	# TYPE test_histogram summary
 	test_histogram{quantile="0.5"} 0
 	test_histogram{quantile="0.75"} 0
@@ -39,14 +45,17 @@ const expectedMetrics = `
 	test_histogram{quantile="0.9999"} 0
 	test_histogram_sum 0
 	test_histogram_count 0
+	# HELP test_meter
 	# TYPE test_meter gauge
 	test_meter 9.999999e+06
+	# HELP test_resetting_timer
 	# TYPE test_resetting_timer summary
 	test_resetting_timer{quantile="50"} 1e+09
 	test_resetting_timer{quantile="95"} 1e+09
 	test_resetting_timer{quantile="99"} 1e+09
 	test_resetting_timer_sum 1e+09
 	test_resetting_timer_count 1
+	# HELP test_timer
 	# TYPE test_timer summary
 	test_timer{quantile="0.5"} 2.25e+07
 	test_timer{quantile="0.75"} 4.8e+07

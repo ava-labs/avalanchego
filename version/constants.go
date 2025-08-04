@@ -15,7 +15,7 @@ const (
 	// RPCChainVMProtocol should be bumped anytime changes are made which
 	// require the plugin vm to upgrade to latest avalanchego release to be
 	// compatible.
-	RPCChainVMProtocol uint = 42
+	RPCChainVMProtocol uint = 43
 )
 
 // These are globals that describe network upgrades and node versions
