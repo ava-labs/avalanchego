@@ -20,15 +20,21 @@ on:
         description: 'The current state directory. Supports S3 directory/zip and local directories.'
         required: false
         default: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip
+      runner:
+        description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
+        required: false
+        default: ubuntu-latest
+
   schedule:
     - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 
 jobs:
     c-chain-reexecution:
+      if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego'
       permissions:
         id-token: write
         contents: write
-      runs-on: ubuntu-latest
+      runs-on: ${{ github.event.inputs.runner || 'ubuntu-latest' }}
       steps:
         - name: Configure AWS Credentials
           uses: aws-actions/configure-aws-credentials@v4
@@ -38,12 +44,28 @@ jobs:
         - name: Set task env via GITHUB_ENV
           id: set-params
           run: |
-            {
-              echo "START_BLOCK=${{ github.event.inputs.start-block || 101 }}"
-              echo "END_BLOCK=${{ github.event.inputs.end-block || 250000 }}"
-              echo "SOURCE_BLOCK_DIR=${{ github.event.inputs.source-block-dir || 's3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip' }}"
-              echo "CURRENT_STATE_DIR=${{ github.event.inputs.current-state-dir || 's3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip' }}"
-            } >> "$GITHUB_ENV"
+            if [[ "${{ github.event_name }}" == "schedule" ]]; then
+              {
+                echo "START_BLOCK=101"
+                echo "END_BLOCK=250000"
+                echo "SOURCE_BLOCK_DIR=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip"
+                echo "CURRENT_STATE_DIR=s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip"
+              } >> "$GITHUB_ENV"
+            elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+              {
+                echo "START_BLOCK=101"
+                echo "END_BLOCK=100000"
+                echo "SOURCE_BLOCK_DIR=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip"
+                echo "CURRENT_STATE_DIR=s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip"
+              } >> "$GITHUB_ENV"
+            else
+              {
+                echo "START_BLOCK=${{ github.event.inputs.start-block }}"
+                echo "END_BLOCK=${{ github.event.inputs.end-block }}"
+                echo "SOURCE_BLOCK_DIR=${{ github.event.inputs.source-block-dir }}"
+                echo "CURRENT_STATE_DIR=${{ github.event.inputs.current-state-dir }}"
+              } >> "$GITHUB_ENV"
+            fi
         - uses: actions/checkout@v4
         - uses: ./.github/actions/setup-go-for-project
         - name: Run C-Chain Re-Execution
@@ -78,6 +100,5 @@ jobs:
           with:
             tool: 'go'
             output-file-path: ${{ github.workspace }}/reexecute-cchain-range-benchmark-res.txt
-            external-data-json-path: ./cache/${{ runner.os }}-reexecute-cchain-range-benchmark.json
             github-token: ${{ secrets.GITHUB_TOKEN }}
             auto-push: true
