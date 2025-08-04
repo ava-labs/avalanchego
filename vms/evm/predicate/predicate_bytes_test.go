@@ -20,7 +20,7 @@ func testPackPredicate(t testing.TB, b []byte) {
 	require.Equal(t, b, unpackedPredicate)
 }
 
-func FuzzPackPredicate(f *testing.F) {
+func FuzzPackUnpackEqual(f *testing.F) {
 	for i := range 100 {
 		f.Add(utils.RandomBytes(i))
 	}
