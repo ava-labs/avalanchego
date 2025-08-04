@@ -6,5 +6,7 @@
 
 # review whenever someone opens a pull request.
 
-* @ava-labs/platform-evm
+* @ava-labs/platform-evm-maintainer
+/.github/ @maru-ava @ava-labs/platform-evm-maintainer
+/triedb/firewood/ @alarso16 @ava-labs/platform-evm-maintainer
 
