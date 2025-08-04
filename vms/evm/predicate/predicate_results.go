@@ -106,7 +106,7 @@ func (r *Results) String() string {
 	sb.WriteString(fmt.Sprintf("PredicateResults: (Size = %d)", len(r.Results)))
 	for txHash, results := range r.Results {
 		for address, result := range results {
-			sb.WriteString(fmt.Sprintf("\n%s    %s: %x", txHash, address, result))
+			fmt.Fprintf(&sb, "\n%s    %s: %x", txHash, address, result)
 		}
 	}
 
