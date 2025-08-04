@@ -139,6 +139,14 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 		return fmt.Errorf("%w: expected %d, got %d", errUnexpectedSeq, currentHeight, bh.Seq)
 	}
 
+	if s.blockTracker.lastIndexed != bh.Prev {
+		s.log.Warn("attempted to index block with mismatched previous digest",
+			zap.String("expected", s.blockTracker.lastIndexed.String()),
+			zap.String("got", bh.Prev.String()))
+
+		return fmt.Errorf("%w: expected %s, got %s", errMismatchedPrevDigest, s.blockTracker.lastIndexed, bh.Prev)
+	}
+
 	if !bytes.Equal(bh.Digest[:], finalization.Finalization.Digest[:]) {
 		return fmt.Errorf("%w: expected %d, got %d", errMismatchedDigest, bh.Digest, finalization.Finalization.Digest)
 	}
