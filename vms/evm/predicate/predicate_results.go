@@ -28,7 +28,6 @@ func init() {
 	c := linearcodec.NewDefault()
 	errs := wrappers.Errs{}
 	errs.Add(
-		c.RegisterType(Results{}),
 		Codec.RegisterCodec(Version, c),
 	)
 	if errs.Errored() {
