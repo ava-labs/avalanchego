@@ -10,10 +10,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/libevm/common"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBytesToHashSlice(t *testing.T) {
@@ -57,7 +56,7 @@ func TestBytesToHashSlice(t *testing.T) {
 
 			// Calculate expected number of hashes
 			expectedNumHashes := (len(tt.input) + 31) / 32
-			require.Equal(expectedNumHashes, len(result))
+			require.Len(result, expectedNumHashes)
 
 			// Verify each hash is properly formed
 			for i, hash := range result {
@@ -116,7 +115,7 @@ func TestHashSliceToBytes(t *testing.T) {
 
 			// Verify the result has the correct length
 			expectedLength := len(tt.input) * common.HashLength
-			require.Equal(expectedLength, len(result))
+			require.Len(result, expectedLength)
 
 			// Verify each hash is properly serialized
 			for i, hash := range tt.input {
@@ -158,7 +157,7 @@ func TestBytesToHashSliceEdgeCases(t *testing.T) {
 		hashes := BytesToHashSlice(testData)
 
 		expectedNumHashes := (i + 31) / 32
-		require.Equal(expectedNumHashes, len(hashes))
+		require.Len(hashes, expectedNumHashes)
 
 		// Verify padding behavior
 		if i%32 != 0 {
@@ -234,7 +233,7 @@ func TestPackUnpackPadding(t *testing.T) {
 	testCases := []int{0, 1, 31, 32, 33, 63, 64, 65}
 
 	for _, length := range testCases {
-		t.Run(fmt.Sprintf("length_%d", length), func(t *testing.T) {
+		t.Run(fmt.Sprintf("length_%d", length), func(_ *testing.T) {
 			input := utils.RandomBytes(length)
 			packed := Pack(input)
 			unpacked, err := Unpack(packed)
@@ -291,8 +290,7 @@ func TestUnpackInvalid(t *testing.T) {
 			require := require.New(t)
 
 			_, err := Unpack(tt.input)
-			require.Error(err)
-			require.True(errors.Is(err, tt.expectedErr))
+			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
 }
