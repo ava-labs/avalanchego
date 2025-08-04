@@ -103,7 +103,7 @@ func (r *Results) Bytes() ([]byte, error) {
 func (r *Results) String() string {
 	sb := strings.Builder{}
 
-	sb.WriteString(fmt.Sprintf("PredicateResults: (Size = %d)", len(r.Results)))
+	fmt.Fprintf(&sb, "PredicateResults: (Size = %d)", len(r.Results))
 	for txHash, results := range r.Results {
 		for address, result := range results {
 			fmt.Fprintf(&sb, "\n%s    %s: %x", txHash, address, result)
