@@ -16,19 +16,19 @@ import (
 )
 
 const (
-	Version        = uint16(0)
+	version        = uint16(0)
 	MaxResultsSize = units.MiB
 )
 
-var Codec codec.Manager
+var resultsCodec codec.Manager
 
 func init() {
-	Codec = codec.NewManager(MaxResultsSize)
+	resultsCodec = codec.NewManager(MaxResultsSize)
 
 	c := linearcodec.NewDefault()
 	errs := wrappers.Errs{}
 	errs.Add(
-		Codec.RegisterCodec(Version, c),
+		resultsCodec.RegisterCodec(version, c),
 	)
 	if errs.Errored() {
 		panic(errs.Err)
@@ -60,12 +60,9 @@ func NewResultsFromMap(results map[common.Hash]TxResults) *Results {
 // ParseResults parses [b] into predicate results.
 func ParseResults(b []byte) (*Results, error) {
 	res := new(Results)
-	parsedVersion, err := Codec.Unmarshal(b, res)
+	_, err := resultsCodec.Unmarshal(b, res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal predicate results: %w", err)
-	}
-	if parsedVersion != Version {
-		return nil, fmt.Errorf("invalid version (found %d, expected %d)", parsedVersion, Version)
 	}
 	return res, nil
 }
@@ -96,7 +93,7 @@ func (r *Results) DeleteTxResults(txHash common.Hash) {
 
 // Bytes marshals the current state of predicate results
 func (r *Results) Bytes() ([]byte, error) {
-	return Codec.Marshal(Version, r)
+	return resultsCodec.Marshal(version, r)
 }
 
 func (r *Results) String() string {

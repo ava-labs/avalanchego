@@ -93,11 +93,11 @@ func TestPredicateResultsParsing(t *testing.T) {
 			predicateResults := NewResultsFromMap(test.results)
 			b, err := predicateResults.Bytes()
 			require.NoError(err)
+			require.Equal(test.expectedHex, common.Bytes2Hex(b))
 
 			parsedPredicateResults, err := ParseResults(b)
 			require.NoError(err)
 			require.Equal(predicateResults, parsedPredicateResults)
-			require.Equal(test.expectedHex, common.Bytes2Hex(b))
 		})
 	}
 }

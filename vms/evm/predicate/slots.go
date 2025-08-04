@@ -6,8 +6,6 @@ package predicate
 import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 type PredicaterExistChecker interface {
@@ -24,7 +22,7 @@ func PreparePredicateStorageSlots(rules PredicaterExistChecker, list types.Acces
 		if !rules.PredicaterExists(el.Address) {
 			continue
 		}
-		predicateStorageSlots[el.Address] = append(predicateStorageSlots[el.Address], utils.HashSliceToBytes(el.StorageKeys))
+		predicateStorageSlots[el.Address] = append(predicateStorageSlots[el.Address], HashSliceToBytes(el.StorageKeys))
 	}
 
 	return predicateStorageSlots

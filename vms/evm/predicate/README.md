@@ -1,3 +1,5 @@
+
+
 # Predicate
 
 This package contains the predicate data structure and its encoding and helper functions to unpack/pack the data structure.
@@ -11,13 +13,13 @@ A byte slice of size N is encoded as:
 3. Appended 0s to the nearest multiple of 32 bytes
 
 
-# Results
+## Results
 
 `predicate_results.go` defines how to encode `PredicateResults` within the block header's `Extra` data field.
 
 For more information on the motivation for encoding the results of predicate verification within a block, see [here](../../../vms/platformvm/warp/README.md#processing-historical-avalanche-interchain-messages).
 
-## Serialization
+### Serialization
 
 Note: PredicateResults are encoded using the AvalancheGo codec, which serializes a map by serializing the length of the map as a uint32 and then serializes each key-value pair sequentially.
 
@@ -46,9 +48,9 @@ TxPredicateResults
 
 - `txPredicateResults` is a map of precompile addresses to the corresponding byte array returned by the predicate
 
-### Examples
+#### Examples
 
-#### Empty Predicate Results Map
+##### Empty Predicate Results Map
 
 ```
 // codecID
@@ -57,7 +59,7 @@ TxPredicateResults
 0x00, 0x00, 0x00, 0x00
 ```
 
-#### Predicate Map with a Single Transaction Result
+##### Predicate Map with a Single Transaction Result
 
 ```
 // codecID
@@ -83,7 +85,7 @@ TxPredicateResults
 0x01, 0x02, 0x03
 ```
 
-#### Predicate Map with Two Transaction Results
+##### Predicate Map with Two Transaction Results
 
 ```
 // codecID
@@ -126,7 +128,7 @@ TxPredicateResults
 0x01, 0x02, 0x03
 ```
 
-### Maximum Size
+#### Maximum Size
 
 Results has a maximum size of 1MB enforced by the codec. The actual size depends on how much data the Precompile predicates may put into the results, the gas cost they charge, and the block gas limit.
 
