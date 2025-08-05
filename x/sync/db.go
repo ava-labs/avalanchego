@@ -8,8 +8,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
-
-	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 type DB interface {
@@ -27,6 +25,6 @@ type Proof interface {
 }
 
 type ProofParser interface {
-	ParseRangeProof(request *pb.SyncGetRangeProofRequest, responseBytes []byte) (Proof, error)
-	ParseChangeProof(request *pb.SyncGetChangeProofRequest, responseBytes []byte) (Proof, error)
+	RangeProof(responseBytes, rootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error)
+	ChangeProof(responseBytes, rootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error)
 }

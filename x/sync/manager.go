@@ -202,15 +202,15 @@ func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manage
 		return nil, ErrZeroWorkLimit
 	}
 
-	metrics, err := NewMetrics("sync", registerer)
-	if err != nil {
-		return nil, err
-	}
-
 	parser, err := NewClient(config.DB, &ProofParserConfig{
 		Hasher:       config.Hasher,
 		BranchFactor: config.BranchFactor,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	metrics, err := NewMetrics("sync", registerer)
 	if err != nil {
 		return nil, err
 	}
@@ -506,7 +506,7 @@ func (m *Manager) retryWork(work *workItem) {
 }
 
 // Returns an error if we should drop the response
-func (m *Manager) shouldHandleResponse(err error) error {
+func (m *Manager) shouldHandleResponse(bytesLimit uint32, responseBytes []byte, err error) error {
 	if err != nil {
 		m.metrics.RequestFailed()
 		return err
@@ -522,6 +522,10 @@ func (m *Manager) shouldHandleResponse(err error) error {
 	default:
 	}
 
+	if len(responseBytes) > int(bytesLimit) {
+		return fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), bytesLimit)
+	}
+
 	return nil
 }
 
@@ -533,11 +537,17 @@ func (m *Manager) handleRangeProofResponse(
 	responseBytes []byte,
 	err error,
 ) error {
-	if err := m.shouldHandleResponse(err); err != nil {
+	if err := m.shouldHandleResponse(request.BytesLimit, responseBytes, err); err != nil {
 		return err
 	}
 
-	rangeProof, err := m.proofParser.ParseRangeProof(request, responseBytes)
+	rangeProof, err := m.proofParser.RangeProof(
+		responseBytes,
+		request.RootHash,
+		maybeBytesToMaybe(request.StartKey),
+		maybeBytesToMaybe(request.EndKey),
+		request.KeyLimit,
+	)
 	if err != nil {
 		return err
 	}
@@ -561,55 +571,7 @@ func (m *Manager) handleRangeProofResponse(
 	return nil
 }
 
-func (m *merkleDBProofParser) ParseRangeProof(request *pb.SyncGetRangeProofRequest, responseBytes []byte) (Proof, error) {
-	if len(responseBytes) > int(request.BytesLimit) {
-		return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), request.BytesLimit)
-	}
-
-	var rangeProofProto pb.RangeProof
-	if err := proto.Unmarshal(responseBytes, &rangeProofProto); err != nil {
-		return nil, err
-	}
-
-	var merkleProof merkledb.RangeProof
-	if err := merkleProof.UnmarshalProto(&rangeProofProto); err != nil {
-		return nil, err
-	}
-
-	return &rangeProof{
-		merkleProof: &merkleProof,
-		request: &rangeProofContext{
-			rootHash: request.RootHash,
-			startKey: maybeBytesToMaybe(request.StartKey),
-			endKey:   maybeBytesToMaybe(request.EndKey),
-			keyLimit: int(request.KeyLimit),
-		},
-		db:        m.db,
-		tokenSize: m.tokenSize,
-		hasher:    m.config.Hasher,
-	}, nil
-}
-
-type rangeProofContext struct {
-	rootHash []byte
-	startKey maybe.Maybe[[]byte]
-	endKey   maybe.Maybe[[]byte]
-	keyLimit int
-}
-
-type rangeProof struct {
-	merkleProof *merkledb.RangeProof
-	request     *rangeProofContext
-	db          DB
-	tokenSize   int
-	hasher      merkledb.Hasher
-}
-
 func (p *rangeProof) Verify(ctx context.Context) error {
-	if len(p.merkleProof.KeyChanges) > p.request.keyLimit {
-		return fmt.Errorf("%w: (%d) > %d)", errTooManyKeys, len(p.merkleProof.KeyChanges), p.request.keyLimit)
-	}
-
 	return verifyRangeProof(
 		ctx,
 		p.merkleProof,
@@ -648,6 +610,46 @@ func (p *rangeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], erro
 	return largestHandledKey, nil
 }
 
+func (m *merkleDBProofParser) RangeProof(responseBytes, rootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error) {
+	var rangeProofProto pb.RangeProof
+	if err := proto.Unmarshal(responseBytes, &rangeProofProto); err != nil {
+		return nil, err
+	}
+
+	var merkleProof merkledb.RangeProof
+	if err := merkleProof.UnmarshalProto(&rangeProofProto); err != nil {
+		return nil, err
+	}
+
+	return &rangeProof{
+		merkleProof: &merkleProof,
+		request: &rangeProofContext{
+			rootHash: rootHash,
+			startKey: startKey,
+			endKey:   endKey,
+			keyLimit: int(keyLimit),
+		},
+		db:        m.db,
+		tokenSize: m.tokenSize,
+		hasher:    m.config.Hasher,
+	}, nil
+}
+
+type rangeProofContext struct {
+	rootHash []byte
+	startKey maybe.Maybe[[]byte]
+	endKey   maybe.Maybe[[]byte]
+	keyLimit int
+}
+
+type rangeProof struct {
+	merkleProof *merkledb.RangeProof
+	request     *rangeProofContext
+	db          DB
+	tokenSize   int
+	hasher      merkledb.Hasher
+}
+
 func (m *Manager) handleChangeProofResponse(
 	ctx context.Context,
 	targetRootID ids.ID,
@@ -656,11 +658,17 @@ func (m *Manager) handleChangeProofResponse(
 	responseBytes []byte,
 	err error,
 ) error {
-	if err := m.shouldHandleResponse(err); err != nil {
+	if err := m.shouldHandleResponse(request.BytesLimit, responseBytes, err); err != nil {
 		return err
 	}
 
-	proof, err := m.proofParser.ParseChangeProof(request, responseBytes)
+	proof, err := m.proofParser.ChangeProof(
+		responseBytes,
+		request.EndRootHash,
+		maybeBytesToMaybe(request.StartKey),
+		maybeBytesToMaybe(request.EndKey),
+		request.KeyLimit,
+	)
 	if err != nil {
 		return err
 	}
@@ -682,11 +690,7 @@ func (m *Manager) handleChangeProofResponse(
 	return nil
 }
 
-func (m *merkleDBProofParser) ParseChangeProof(request *pb.SyncGetChangeProofRequest, responseBytes []byte) (Proof, error) {
-	if len(responseBytes) > int(request.BytesLimit) {
-		return nil, fmt.Errorf("%w: (%d) > %d)", errTooManyBytes, len(responseBytes), request.BytesLimit)
-	}
-
+func (m *merkleDBProofParser) ChangeProof(responseBytes, endRootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error) {
 	var changeProofResp pb.SyncGetChangeProofResponse
 	if err := proto.Unmarshal(responseBytes, &changeProofResp); err != nil {
 		return nil, err
@@ -703,10 +707,10 @@ func (m *merkleDBProofParser) ParseChangeProof(request *pb.SyncGetChangeProofReq
 		return &changeProof{
 			merkleProof: &merkleChangeProof,
 			request: &changeProofContext{
-				endRootHash: request.EndRootHash,
-				startKey:    maybeBytesToMaybe(request.StartKey),
-				endKey:      maybeBytesToMaybe(request.EndKey),
-				keyLimit:    int(request.KeyLimit),
+				endRootHash: endRootHash,
+				startKey:    startKey,
+				endKey:      endKey,
+				keyLimit:    int(keyLimit),
 			},
 			db:        m.db,
 			tokenSize: m.tokenSize,
@@ -721,10 +725,10 @@ func (m *merkleDBProofParser) ParseChangeProof(request *pb.SyncGetChangeProofReq
 		return &rangeProof{
 			merkleProof: &merkleRangeProof,
 			request: &rangeProofContext{
-				rootHash: request.EndRootHash,
-				startKey: maybeBytesToMaybe(request.StartKey),
-				endKey:   maybeBytesToMaybe(request.EndKey),
-				keyLimit: int(request.KeyLimit),
+				rootHash: endRootHash,
+				startKey: startKey,
+				endKey:   endKey,
+				keyLimit: int(keyLimit),
 			},
 			db:        m.db,
 			tokenSize: m.tokenSize,
