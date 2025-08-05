@@ -8,8 +8,8 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 )
 
-type PredicaterExistChecker interface {
-	PredicaterExists(common.Address) bool
+type Precompiles interface {
+	HasPredicate(address common.Address) bool
 }
 
 // PreparePredicateStorageSlots populates the predicate storage slots of a transaction's access list
