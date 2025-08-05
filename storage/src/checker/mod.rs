@@ -402,6 +402,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                 Ok(free_area) => free_area,
                 Err(e) => {
                     errors.push(CheckerError::IO(e));
+                    free_list_iter.move_to_next_free_list();
                     continue;
                 }
             };
@@ -409,6 +410,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
             // check that the area is aligned
             if let Err(e) = self.check_area_aligned(addr, StoredAreaParent::FreeList(parent)) {
                 errors.push(e);
+                free_list_iter.move_to_next_free_list();
                 continue;
             }
 
@@ -422,6 +424,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                     expected_free_list: area_index,
                     parent,
                 });
+                free_list_iter.move_to_next_free_list();
                 continue;
             }
 
@@ -429,8 +432,10 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
             if let Err(e) = visited.insert_area(addr, area_size, StoredAreaParent::FreeList(parent))
             {
                 errors.push(e);
+                free_list_iter.move_to_next_free_list();
                 continue;
             }
+            update_progress_bar(progress_bar, visited);
 
             // collect the free list stats
             {
@@ -440,14 +445,13 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                 // collect the multi-page area count
                 if page_start(addr)
                     != page_start(
-                        addr.advance(area_size)
+                        addr.advance(area_size.saturating_sub(1))   // subtract 1 to get the last byte of the area
                             .expect("impossible since we checked in visited.insert_area()"),
                     )
                 {
                     multi_page_area_count = multi_page_area_count.saturating_add(1);
                 }
             }
-            update_progress_bar(progress_bar, visited);
         }
 
         (
@@ -582,7 +586,7 @@ mod test {
         test_write_free_area, test_write_header, test_write_new_node, test_write_zeroed_area,
     };
     use crate::nodestore::alloc::{AREA_SIZES, FreeLists};
-    use crate::{BranchNode, Child, LeafNode, NodeStore, Path, hash_node};
+    use crate::{BranchNode, Child, FreeListParent, LeafNode, NodeStore, Path, hash_node};
 
     #[derive(Debug)]
     struct TestTrie {
@@ -804,7 +808,7 @@ mod test {
                 );
                 next_free_block = Some(LinearAddress::new(high_watermark).unwrap());
                 let start_addr = LinearAddress::new(high_watermark).unwrap();
-                let end_addr = start_addr.advance(*area_size).unwrap();
+                let end_addr = start_addr.advance(*area_size - 1).unwrap();
                 if page_start(start_addr) != page_start(end_addr) {
                     multi_page_area_count = multi_page_area_count.saturating_add(1);
                 }
@@ -829,8 +833,91 @@ mod test {
             nodestore.visit_freelist(&mut visited, None);
         let complement = visited.complement();
         assert_eq!(complement.into_iter().collect::<Vec<_>>(), vec![]);
-        assert_eq!(actual_free_lists_stats, expected_free_lists_stats);
         assert_eq!(free_list_errors, vec![]);
+        assert_eq!(actual_free_lists_stats, expected_free_lists_stats);
+    }
+
+    #[test]
+    // Free list 1: 2048 bytes
+    // Free list 2: 4096 bytes
+    // ---------------------------------------------------------------------------------------------------------------------------
+    // | header | empty | free_list1_area3 | free_list1_area2 | overlap | free_list1_area1 | free_list2_area1 | free_list2_area2 |
+    // ---------------------------------------------------------------------------------------------------------------------------
+    //                                                             ^ free_list1_area1 and free_list1_area2 overlap by 16 bytes
+    //              ^ 16 empty bytes to ensure that free_list1_area1, free_list1_area2, and free_list2_area1 are page-aligned
+    fn traverse_freelist_should_skip_offspring_of_incorrect_areas() {
+        let memstore = MemStore::new(vec![]);
+        let mut nodestore = NodeStore::new_empty_committed(memstore.into()).unwrap();
+
+        let mut free_lists = FreeLists::default();
+        let mut high_watermark = NodeStoreHeader::SIZE + 16; // + 16 to create overlap
+
+        // first free list
+        let area_index1 = 9; // 2048
+        let area_size1 = AREA_SIZES[area_index1 as usize];
+        let mut next_free_block1 = None;
+
+        test_write_free_area(&nodestore, next_free_block1, area_index1, high_watermark);
+        let free_list1_area3 = LinearAddress::new(high_watermark).unwrap();
+        next_free_block1 = Some(free_list1_area3);
+        high_watermark += area_size1;
+
+        test_write_free_area(&nodestore, next_free_block1, area_index1, high_watermark);
+        let free_list1_area2 = LinearAddress::new(high_watermark).unwrap();
+        next_free_block1 = Some(free_list1_area2);
+        high_watermark += area_size1;
+
+        let intersection_end = LinearAddress::new(high_watermark).unwrap();
+        high_watermark -= 16; // create an overlap with free_list1_area2 and restore to page-aligned address
+        let intersection_start = LinearAddress::new(high_watermark).unwrap();
+        test_write_free_area(&nodestore, next_free_block1, area_index1, high_watermark);
+        let free_list1_area1 = LinearAddress::new(high_watermark).unwrap();
+        next_free_block1 = Some(free_list1_area1);
+        high_watermark += area_size1;
+
+        free_lists[area_index1 as usize] = next_free_block1;
+
+        // second free list
+        let area_index2 = 10; // 4096
+        let area_size2 = AREA_SIZES[area_index2 as usize];
+        let mut next_free_block2 = None;
+
+        test_write_free_area(&nodestore, next_free_block2, area_index2, high_watermark);
+        let free_list2_area2 = LinearAddress::new(high_watermark).unwrap();
+        next_free_block2 = Some(free_list2_area2);
+        high_watermark += area_size2;
+
+        test_write_free_area(&nodestore, next_free_block2, area_index2, high_watermark);
+        let free_list2_area1 = LinearAddress::new(high_watermark).unwrap();
+        next_free_block2 = Some(free_list2_area1);
+        high_watermark += area_size2;
+
+        free_lists[area_index2 as usize] = next_free_block2;
+
+        // write header
+        test_write_header(&mut nodestore, high_watermark, None, free_lists);
+
+        let expected_start_addr = free_lists[area_index1 as usize].unwrap();
+        let expected_end_addr = LinearAddress::new(high_watermark).unwrap();
+        let expected_free_areas = vec![expected_start_addr..expected_end_addr];
+        let expected_freelist_errors = vec![CheckerError::AreaIntersects {
+            start: free_list1_area2,
+            size: area_size1,
+            intersection: vec![intersection_start..intersection_end],
+            parent: StoredAreaParent::FreeList(FreeListParent::PrevFreeArea(free_list1_area1)),
+        }];
+        let expected_free_lists_stats = FreeListsStats {
+            area_counts: HashMap::from([(area_size1, 1), (area_size2, 2)]),
+            multi_page_area_count: 0,
+        };
+
+        // test that the we traversed all the free areas
+        let mut visited = LinearAddressRangeSet::new(high_watermark).unwrap();
+        let (actual_free_lists_stats, free_list_errors) =
+            nodestore.visit_freelist(&mut visited, None);
+        assert_eq!(visited.into_iter().collect::<Vec<_>>(), expected_free_areas);
+        assert_eq!(actual_free_lists_stats, expected_free_lists_stats);
+        assert_eq!(free_list_errors, expected_freelist_errors);
     }
 
     #[test]
