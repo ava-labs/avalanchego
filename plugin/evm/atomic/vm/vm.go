@@ -11,10 +11,10 @@ import (
 	"net/http"
 	"sync"
 
+	atomicsync "github.com/ava-labs/coreth/plugin/evm/atomic/sync"
+
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	atomicstate "github.com/ava-labs/coreth/plugin/evm/atomic/state"
-	atomicsync "github.com/ava-labs/coreth/sync/atomic"
-
 	"github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
 
 	"github.com/ava-labs/avalanchego/codec"
