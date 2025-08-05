@@ -16,7 +16,7 @@ type Precompiles interface {
 // Note: if an address is specified multiple times in the access list, each storage slot for that address is
 // appended to a slice of byte slices. Each byte slice represents a predicate, making it a slice of predicates
 // for each access list address, and every predicate in the slice goes through verification.
-func PreparePredicateStorageSlots(rules PredicaterExistChecker, list types.AccessList) map[common.Address][][]byte {
+func NewStorageSlots(rules PredicaterExistChecker, list types.AccessList) map[common.Address][][]byte {
 	predicateStorageSlots := make(map[common.Address][][]byte)
 	for _, el := range list {
 		if !rules.PredicaterExists(el.Address) {
