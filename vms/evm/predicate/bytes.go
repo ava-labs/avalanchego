@@ -58,7 +58,9 @@ func hashSliceToBytes(hashes []common.Hash) []byte {
 // message with delimiter and zero padding to reach a length that is a
 // multiple of 32. Returns a Predicate that can be stored in EVM access lists.
 func New(predicateBytes []byte) Predicate {
-	bytes := append(predicateBytes, delimiter)
+	bytes := make([]byte, len(predicateBytes)+1)
+	copy(bytes, predicateBytes)
+	bytes[len(predicateBytes)] = delimiter
 	return Predicate(common.RightPadBytes(bytes, (len(bytes)+31)/32*32))
 }
 

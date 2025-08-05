@@ -98,7 +98,7 @@ func (r *BlockResults) String() string {
 	sb := strings.Builder{}
 
 	if r.TxResults == nil {
-		fmt.Fprintf(&sb, "PredicateResults: (Size = 0)")
+		fmt.Fprint(&sb, "PredicateResults: (Size = 0)")
 		return sb.String()
 	}
 

@@ -327,7 +327,7 @@ func FuzzUnpackInvalid(f *testing.F) {
 		// Test corruption by adding non-zero bytes after the valid predicate
 		// This should always create an invalid predicate
 		corruption := bytes.Repeat([]byte{0xee}, 5)
-		invalidPredicate := Predicate(slices.Concat(validPredicate, corruption))
+		invalidPredicate := slices.Concat(validPredicate, corruption)
 		_, err := Unpack(invalidPredicate)
 
 		// Check for either error type since different padding can cause different errors.
