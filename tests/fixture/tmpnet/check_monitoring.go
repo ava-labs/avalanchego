@@ -60,7 +60,7 @@ func waitForCount(ctx context.Context, log logging.Logger, name string, getCount
 // provided, an attempt will be made to derive selectors from env vars (GH_*) identifying
 // a github actions run.
 func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string) error {
-	url, username, password, err := getCollectorConfig(promtailCmd)
+	config, err := getCollectorConfig(promtailCmd)
 	if err != nil {
 		return stacktrace.Errorf("failed to get collector credentials: %w", err)
 	}
@@ -72,7 +72,7 @@ func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string)
 	query := fmt.Sprintf("sum(count_over_time({%s}[1h]))", selectors)
 
 	log.Info("checking if logs exist",
-		zap.String("url", url),
+		zap.String("url", config.URL),
 		zap.String("query", query),
 	)
 
@@ -81,7 +81,7 @@ func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string)
 		log,
 		"logs",
 		func() (int, error) {
-			return queryLoki(ctx, url, username, password, query)
+			return queryLoki(ctx, config.URL, config.Username, config.Password, query)
 		},
 	)
 	if err != nil {
@@ -166,13 +166,13 @@ func queryLoki(
 // CheckMetricsExist checks if metrics exist for the given network. Github labels are also
 // used as filters if provided as env vars (GH_*).
 func CheckMetricsExist(ctx context.Context, log logging.Logger, networkUUID string) error {
-	url, username, password, err := getCollectorConfig(prometheusCmd)
+	config, err := getCollectorConfig(prometheusCmd)
 	if err != nil {
 		return stacktrace.Errorf("failed to get collector credentials: %w", err)
 	}
 
 	// Base query path required by Grafana Cloud
-	url += "/prometheus"
+	prometheusURL := config.URL + "/prometheus"
 
 	selectors, err := getSelectors(networkUUID)
 	if err != nil {
@@ -181,7 +181,7 @@ func CheckMetricsExist(ctx context.Context, log logging.Logger, networkUUID stri
 	query := fmt.Sprintf("count({%s})", selectors)
 
 	log.Info("checking if metrics exist",
-		zap.String("url", url),
+		zap.String("url", prometheusURL),
 		zap.String("query", query),
 	)
 
@@ -190,7 +190,7 @@ func CheckMetricsExist(ctx context.Context, log logging.Logger, networkUUID stri
 		log,
 		"metrics",
 		func() (int, error) {
-			return queryPrometheus(ctx, log, url, username, password, query)
+			return queryPrometheus(ctx, log, prometheusURL, config.Username, config.Password, query)
 		},
 	)
 }

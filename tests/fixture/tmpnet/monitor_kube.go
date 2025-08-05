@@ -108,12 +108,12 @@ func deployKubeCollector(
 	dynamicClient dynamic.Interface,
 	collectorConfig kubeCollectorConfig,
 ) error {
-	url, username, password, err := getCollectorConfig(collectorConfig.name)
+	config, err := getCollectorConfig(collectorConfig.name)
 	if err != nil {
 		return stacktrace.Errorf("failed to get collector config for %s: %w", collectorConfig.name, err)
 	}
 
-	if err := createCollectorConfigSecret(ctx, log, clientset, collectorConfig.secretPrefix, url, username, password); err != nil {
+	if err := createCollectorConfigSecret(ctx, log, clientset, collectorConfig.secretPrefix, config.URL, config.Username, config.Password); err != nil {
 		return stacktrace.Errorf("failed to create config secret for %s: %w", collectorConfig.name, err)
 	}
 

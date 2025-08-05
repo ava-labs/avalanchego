@@ -167,7 +167,7 @@ func startPrometheus(ctx context.Context, log logging.Logger) error {
 		prometheusListenAddress,
 	)
 
-	url, username, password, err := getCollectorConfig(cmdName)
+	collectorConfig, err := getCollectorConfig(cmdName)
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
@@ -198,7 +198,7 @@ remote_write:
     basic_auth:
       username: "%s"
       password: "%s"
-`, prometheusScrapeInterval, serviceDiscoveryDir, url, username, password)
+`, prometheusScrapeInterval, serviceDiscoveryDir, collectorConfig.URL, collectorConfig.Username, collectorConfig.Password)
 
 	err = startCollector(ctx, log, cmdName, args, config)
 	if err != nil {
@@ -213,7 +213,7 @@ func startPromtail(ctx context.Context, log logging.Logger) error {
 
 	args := fmt.Sprintf("-config.file=%s.yaml", cmdName)
 
-	url, username, password, err := getCollectorConfig(cmdName)
+	collectorConfig, err := getCollectorConfig(cmdName)
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
@@ -250,7 +250,7 @@ scrape_configs:
     file_sd_configs:
       - files:
           - '%s/*.json'
-`, promtailHTTPPort, workingDir, url, username, password, serviceDiscoveryDir)
+`, promtailHTTPPort, workingDir, collectorConfig.URL, collectorConfig.Username, collectorConfig.Password, serviceDiscoveryDir)
 
 	return startCollector(ctx, log, cmdName, args, config)
 }
@@ -275,6 +275,13 @@ func getServiceDiscoveryDir(cmdName string) (string, error) {
 		return "", stacktrace.Wrap(err)
 	}
 	return filepath.Join(tmpnetDir, cmdName, "file_sd_configs"), nil
+}
+
+// collectorConfig represents the configuration for a metrics/logs collector
+type collectorConfig struct {
+	URL      string
+	Username string
+	Password string
 }
 
 // SDConfig represents a Prometheus service discovery config entry.
@@ -450,7 +457,7 @@ func clearStalePIDFile(log logging.Logger, cmdName string, pidPath string) error
 }
 
 // getCollectorConfig retrieves the url, username and password for the command.
-func getCollectorConfig(cmdName string) (string, string, string, error) {
+func getCollectorConfig(cmdName string) (collectorConfig, error) {
 	var baseEnvName string
 	switch cmdName {
 	case prometheusCmd:
@@ -458,25 +465,29 @@ func getCollectorConfig(cmdName string) (string, string, string, error) {
 	case promtailCmd:
 		baseEnvName = "LOKI"
 	default:
-		return "", "", stacktrace.Errorf("unsupported cmd: %s", cmdName)
+		return collectorConfig{}, stacktrace.Errorf("unsupported cmd: %s", cmdName)
 	}
 
 	urlEnvVar := baseEnvName + "_URL"
 	url := GetEnvWithDefault(urlEnvVar, "")
 	if len(url) == 0 {
-		return "", "", "", fmt.Errorf("%s env var not set", urlEnvVar)
+		return collectorConfig{}, fmt.Errorf("%s env var not set", urlEnvVar)
 	}
 	usernameEnvVar := baseEnvName + "_USERNAME"
 	username := GetEnvWithDefault(usernameEnvVar, "")
 	if len(username) == 0 {
-		return "", "", stacktrace.Errorf("%s env var not set", usernameEnvVar)
+		return collectorConfig{}, stacktrace.Errorf("%s env var not set", usernameEnvVar)
 	}
 	passwordEnvVar := baseEnvName + "_PASSWORD"
 	password := GetEnvWithDefault(passwordEnvVar, "")
 	if len(password) == 0 {
-		return "", "", stacktrace.Errorf("%s var not set", passwordEnvVar)
+		return collectorConfig{}, stacktrace.Errorf("%s env var not set", passwordEnvVar)
 	}
-	return url, username, password, nil
+	return collectorConfig{
+		URL:      url,
+		Username: username,
+		Password: password,
+	}, nil
 }
 
 // Start a collector process. Use bash to execute the command in the background and enable
