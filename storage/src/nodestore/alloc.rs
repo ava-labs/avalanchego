@@ -771,6 +771,21 @@ impl<'a, S: ReadableStorage> FreeListsIterator<'a, S> {
             }
         }
     }
+
+    // TODO: this function will be used by the checker to ignore free areas pointed by an invalid parent free area
+    #[allow(dead_code)]
+    fn move_to_next_free_list(&mut self) {
+        let (current_free_list_id, next_free_list_head) = match self.free_lists_iter.next() {
+            Some((id, head)) => (id as AreaIndex, *head),
+            None => (NUM_AREA_SIZES as AreaIndex, None), // skip unvisited free areas in the current iterator
+        };
+        self.current_free_list_id = current_free_list_id;
+        self.free_list_iter = FreeListIterator::new(
+            self.storage,
+            next_free_list_head,
+            FreeListParent::FreeListHead(self.current_free_list_id),
+        );
+    }
 }
 
 impl<S: ReadableStorage> Iterator for FreeListsIterator<'_, S> {
@@ -973,7 +988,7 @@ mod tests {
 
     // Create two free lists and check that `free_list_iter_with_metadata` correctly returns the free areas and their parents
     #[test]
-    fn free_list_iter_with_metadata() {
+    fn free_lists_iter_with_metadata() {
         let mut rng = seeded_rng();
         let memstore = MemStore::new(vec![]);
         let mut nodestore = NodeStore::new_empty_committed(memstore.into()).unwrap();
@@ -1071,6 +1086,97 @@ mod tests {
 
             assert_eq!(next.unwrap().unwrap(), expected.unwrap());
         }
+    }
+
+    #[test]
+    fn free_lists_iter_skip_to_next_free_list() {
+        let memstore = MemStore::new(vec![]);
+        let mut nodestore = NodeStore::new_empty_committed(memstore.into()).unwrap();
+
+        let mut free_lists = FreeLists::default();
+        let mut offset = NodeStoreHeader::SIZE;
+
+        // first free list
+        let area_index1 = 3;
+        let area_size1 = AREA_SIZES[area_index1 as usize];
+        let mut next_free_block1 = None;
+
+        test_utils::test_write_free_area(&nodestore, next_free_block1, area_index1, offset);
+        let free_list1_area2 = LinearAddress::new(offset).unwrap();
+        next_free_block1 = Some(free_list1_area2);
+        offset += area_size1;
+
+        test_utils::test_write_free_area(&nodestore, next_free_block1, area_index1, offset);
+        let free_list1_area1 = LinearAddress::new(offset).unwrap();
+        next_free_block1 = Some(free_list1_area1);
+        offset += area_size1;
+
+        free_lists[area_index1 as usize] = next_free_block1;
+
+        // second free list
+        let area_index2 = 5;
+        assert_ne!(area_index1, area_index2);
+        let area_size2 = AREA_SIZES[area_index2 as usize];
+        let mut next_free_block2 = None;
+
+        test_utils::test_write_free_area(&nodestore, next_free_block2, area_index2, offset);
+        let free_list2_area2 = LinearAddress::new(offset).unwrap();
+        next_free_block2 = Some(free_list2_area2);
+        offset += area_size2;
+
+        test_utils::test_write_free_area(&nodestore, next_free_block2, area_index2, offset);
+        let free_list2_area1 = LinearAddress::new(offset).unwrap();
+        next_free_block2 = Some(free_list2_area1);
+        offset += area_size2;
+
+        free_lists[area_index2 as usize] = next_free_block2;
+
+        // write header
+        test_utils::test_write_header(&mut nodestore, offset, None, free_lists);
+
+        // test iterator
+        let mut free_list_iter = nodestore.free_list_iter(0);
+
+        // start at the first free list
+        assert_eq!(free_list_iter.current_free_list_id, 0);
+        assert_eq!(
+            free_list_iter.next_with_metadata().unwrap().unwrap(),
+            FreeAreaWithMetadata {
+                addr: free_list1_area1,
+                area_index: area_index1,
+                free_list_id: area_index1,
+                parent: FreeListParent::FreeListHead(area_index1),
+            },
+        );
+        // `next_with_metadata` moves the iterator to the first free list that is not empty
+        assert_eq!(free_list_iter.current_free_list_id, area_index1);
+        free_list_iter.move_to_next_free_list();
+        // `move_to_next_free_list` moves the iterator to the next free list
+        assert_eq!(free_list_iter.current_free_list_id, area_index1 + 1);
+        assert_eq!(
+            free_list_iter.next_with_metadata().unwrap().unwrap(),
+            FreeAreaWithMetadata {
+                addr: free_list2_area1,
+                area_index: area_index2,
+                free_list_id: area_index2,
+                parent: FreeListParent::FreeListHead(area_index2),
+            },
+        );
+        // `next_with_metadata` moves the iterator to the first free list that is not empty
+        assert_eq!(free_list_iter.current_free_list_id, area_index2);
+        free_list_iter.move_to_next_free_list();
+        // `move_to_next_free_list` moves the iterator to the next free list
+        assert_eq!(free_list_iter.current_free_list_id, area_index2 + 1);
+        assert!(free_list_iter.next_with_metadata().is_none());
+        // since no more non-empty free lists, `move_to_next_free_list` moves the iterator to the last free list
+        assert_eq!(
+            free_list_iter.current_free_list_id,
+            (NUM_AREA_SIZES - 1) as u8
+        );
+        free_list_iter.move_to_next_free_list();
+        // `move_to_next_free_list` will move the iterator beyond the last free list
+        assert_eq!(free_list_iter.current_free_list_id, NUM_AREA_SIZES as u8);
+        assert!(free_list_iter.next_with_metadata().is_none());
     }
 
     #[test]
