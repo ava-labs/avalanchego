@@ -48,8 +48,9 @@ var (
 	errInvalidBounds        = errors.New("start key is greater than end key")
 	errInvalidRootHash      = fmt.Errorf("root hash must have length %d", hashing.HashLen)
 
-	_ p2p.Handler = (*GetChangeProofHandler)(nil)
-	_ p2p.Handler = (*GetRangeProofHandler)(nil)
+	_ ProofCreator = (*merkleProofCreator)(nil)
+	_ p2p.Handler  = (*GetChangeProofHandler)(nil)
+	_ p2p.Handler  = (*GetRangeProofHandler)(nil)
 )
 
 func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
@@ -59,14 +60,24 @@ func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
 	return maybe.Nothing[[]byte]()
 }
 
-func NewGetChangeProofHandler(db DB) *GetChangeProofHandler {
-	return &GetChangeProofHandler{
+type merkleProofCreator struct {
+	db DB
+}
+
+func NewProofCreator(db DB) ProofCreator {
+	return &merkleProofCreator{
 		db: db,
 	}
 }
 
+func NewGetChangeProofHandler(db DB) *GetChangeProofHandler {
+	return &GetChangeProofHandler{
+		proofCreator: NewProofCreator(db),
+	}
+}
+
 type GetChangeProofHandler struct {
-	db DB
+	proofCreator ProofCreator
 }
 
 func (*GetChangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
@@ -95,20 +106,34 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 		end        = maybeBytesToMaybe(req.EndKey)
 	)
 
-	startRoot, err := ids.ToID(req.StartRootHash)
+	proofBytes, err := g.proofCreator.ChangeProof(
+		ctx,
+		req.StartRootHash,
+		req.EndRootHash,
+		start,
+		end,
+		int(keyLimit),
+		bytesLimit,
+	)
 	if err != nil {
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
-			Message: fmt.Sprintf("failed to parse start root hash: %s", err),
+			Message: err.Error(),
 		}
 	}
 
-	endRoot, err := ids.ToID(req.EndRootHash)
+	return proofBytes, nil
+}
+
+func (pc *merkleProofCreator) ChangeProof(ctx context.Context, startRootBytes []byte, endRootBytes []byte, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], keyLimit, byteLimit int) ([]byte, error) {
+	startRoot, err := ids.ToID(startRootBytes)
 	if err != nil {
-		return nil, &common.AppError{
-			Code:    p2p.ErrUnexpected.Code,
-			Message: fmt.Sprintf("failed to parse end root hash: %s", err),
-		}
+		return nil, fmt.Errorf("failed to parse start root hash: %w", err)
+	}
+
+	endRoot, err := ids.ToID(endRootBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse end root hash: %w", err)
 	}
 
 	// If the end root is empty, the proof will delete everything.
@@ -128,38 +153,30 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 	}
 
 	for keyLimit > 0 {
-		changeProof, err := g.db.GetChangeProof(ctx, startRoot, endRoot, start, end, int(keyLimit))
+		changeProof, err := pc.db.GetChangeProof(ctx, startRoot, endRoot, start, end, keyLimit)
 		if err != nil {
 			if !errors.Is(err, merkledb.ErrInsufficientHistory) {
 				// We should only fail to get a change proof if we have insufficient history.
 				// Other errors are unexpected.
 				// TODO define custom errors
-				return nil, &common.AppError{
-					Code:    p2p.ErrUnexpected.Code,
-					Message: fmt.Sprintf("failed to get change proof: %s", err),
-				}
+				return nil, fmt.Errorf("failed to get change proof: %w", err)
 			}
 			if errors.Is(err, merkledb.ErrNoEndRoot) {
+				// [merkledb.ErrNoEndRoot] is a special case of [merkledb.ErrInsufficientHistory].
 				// [s.db] doesn't have [endRoot] in its history.
 				// We can't generate a change/range proof. Drop this request.
-				return nil, &common.AppError{
-					Code:    p2p.ErrUnexpected.Code,
-					Message: fmt.Sprintf("failed to get change proof: %s", err),
-				}
+				return nil, fmt.Errorf("failed to get change proof: %w", err)
 			}
 
 			// [s.db] doesn't have sufficient history to generate change proof.
 			// Generate a range proof for the end root ID instead.
-			proofBytes, err := getRangeProof(
+			proofBytes, err := pc.rangeProof(
 				ctx,
-				g.db,
-				&pb.SyncGetRangeProofRequest{
-					RootHash:   req.EndRootHash,
-					StartKey:   req.StartKey,
-					EndKey:     req.EndKey,
-					KeyLimit:   req.KeyLimit,
-					BytesLimit: req.BytesLimit,
-				},
+				endRoot,
+				start,
+				end,
+				keyLimit,
+				byteLimit,
 				func(rangeProof *merkledb.RangeProof) ([]byte, error) {
 					return proto.Marshal(&pb.SyncGetChangeProofResponse{
 						Response: &pb.SyncGetChangeProofResponse_RangeProof{
@@ -169,12 +186,8 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 				},
 			)
 			if err != nil {
-				return nil, &common.AppError{
-					Code:    p2p.ErrUnexpected.Code,
-					Message: fmt.Sprintf("failed to get range proof: %s", err),
-				}
+				return nil, fmt.Errorf("failed to get range proof: %w", err)
 			}
-
 			return proofBytes, nil
 		}
 
@@ -185,34 +198,27 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 			},
 		})
 		if err != nil {
-			return nil, &common.AppError{
-				Code:    p2p.ErrUnexpected.Code,
-				Message: fmt.Sprintf("failed to marshal change proof: %s", err),
-			}
+			return nil, fmt.Errorf("failed to marshal change proof: %w", err)
 		}
 
-		if len(proofBytes) < bytesLimit {
+		if len(proofBytes) < byteLimit {
+			// The proof is small enough. Return it.
 			return proofBytes, nil
 		}
 
-		// The proof was too large. Try to shrink it.
-		keyLimit = uint32(len(changeProof.KeyChanges)) / 2
+		keyLimit = len(changeProof.KeyChanges) / 2
 	}
-
-	return nil, &common.AppError{
-		Code:    p2p.ErrUnexpected.Code,
-		Message: fmt.Sprintf("failed to generate proof: %s", ErrMinProofSizeIsTooLarge),
-	}
+	return nil, ErrMinProofSizeIsTooLarge
 }
 
 func NewGetRangeProofHandler(db DB) *GetRangeProofHandler {
 	return &GetRangeProofHandler{
-		db: db,
+		pc: NewProofCreator(db),
 	}
 }
 
 type GetRangeProofHandler struct {
-	db DB
+	pc ProofCreator
 }
 
 func (*GetRangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
@@ -237,57 +243,68 @@ func (g *GetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ t
 	req.KeyLimit = min(req.KeyLimit, maxKeyValuesLimit)
 	req.BytesLimit = min(req.BytesLimit, maxByteSizeLimit)
 
-	proofBytes, err := getRangeProof(
+	proofBytes, err := g.pc.RangeProof(
 		ctx,
-		g.db,
-		req,
-		func(rangeProof *merkledb.RangeProof) ([]byte, error) {
-			return proto.Marshal(rangeProof.ToProto())
-		},
+		req.RootHash,
+		maybeBytesToMaybe(req.StartKey),
+		maybeBytesToMaybe(req.EndKey),
+		int(req.KeyLimit),
+		int(req.BytesLimit),
 	)
 	if err != nil {
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
-			Message: fmt.Sprintf("failed to get range proof: %s", err),
+			Message: err.Error(),
 		}
 	}
 
 	return proofBytes, nil
 }
 
-// Get the range proof specified by [req].
+// Get the range proof specified.
 // If the generated proof is too large, the key limit is reduced
 // and the proof is regenerated. This process is repeated until
-// the proof is smaller than [req.BytesLimit].
+// the proof is smaller than [bytesLimit].
 // When a sufficiently small proof is generated, returns it.
 // If no sufficiently small proof can be generated, returns [ErrMinProofSizeIsTooLarge].
 // TODO improve range proof generation so we don't need to iteratively
 // reduce the key limit.
-func getRangeProof(
-	ctx context.Context,
-	db DB,
-	req *pb.SyncGetRangeProofRequest,
-	marshalFunc func(*merkledb.RangeProof) ([]byte, error),
-) ([]byte, error) {
-	root, err := ids.ToID(req.RootHash)
+func (pc *merkleProofCreator) RangeProof(ctx context.Context, rootBytes []byte, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], keyLimit, byteLimit int) ([]byte, error) {
+	root, err := ids.ToID(rootBytes)
 	if err != nil {
 		return nil, err
 	}
 
+	proofBytes, err := pc.rangeProof(
+		ctx,
+		root,
+		start,
+		end,
+		keyLimit,
+		byteLimit,
+		func(rangeProof *merkledb.RangeProof) ([]byte, error) {
+			return proto.Marshal(rangeProof.ToProto())
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get range proof: %w", err)
+	}
+	return proofBytes, nil
+}
+
+func (pc *merkleProofCreator) rangeProof(ctx context.Context, root ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], keyLimit, byteLimit int, marshalFunc func(*merkledb.RangeProof) ([]byte, error)) ([]byte, error) {
 	if root == ids.Empty {
 		// If the root is empty, we can't generate a proof.
 		// Return an empty proof.
 		return marshalFunc(&merkledb.RangeProof{})
 	}
 
-	keyLimit := int(req.KeyLimit)
-
 	for keyLimit > 0 {
-		rangeProof, err := db.GetRangeProofAtRoot(
+		rangeProof, err := pc.db.GetRangeProofAtRoot(
 			ctx,
 			root,
-			maybeBytesToMaybe(req.StartKey),
-			maybeBytesToMaybe(req.EndKey),
+			start,
+			end,
 			keyLimit,
 		)
 		if err != nil {
@@ -302,7 +319,7 @@ func getRangeProof(
 			return nil, err
 		}
 
-		if len(proofBytes) < int(req.BytesLimit) {
+		if len(proofBytes) < byteLimit {
 			return proofBytes, nil
 		}
 
