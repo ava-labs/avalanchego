@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 )
 
-// NewTx returns a [types.DynamicFeeTx] with the predicate tuple added to the
+// NewTx returns a types.DynamicFeeTx with the predicate tuple added to the
 // access list of the transaction.
 func NewTx(
 	chainID *big.Int,
@@ -27,7 +27,7 @@ func NewTx(
 ) *types.Transaction {
 	accessList = append(accessList, types.AccessTuple{
 		Address:     predicateAddress,
-		StorageKeys: BytesToHashSlice(Pack(predicateBytes)),
+		StorageKeys: bytesToHashSlice(New(predicateBytes)),
 	})
 	return types.NewTx(&types.DynamicFeeTx{
 		ChainID:    chainID,

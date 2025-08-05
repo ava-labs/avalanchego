@@ -22,7 +22,7 @@ func PreparePredicateStorageSlots(rules PredicaterExistChecker, list types.Acces
 		if !rules.PredicaterExists(el.Address) {
 			continue
 		}
-		predicateStorageSlots[el.Address] = append(predicateStorageSlots[el.Address], HashSliceToBytes(el.StorageKeys))
+		predicateStorageSlots[el.Address] = append(predicateStorageSlots[el.Address], hashSliceToBytes(el.StorageKeys))
 	}
 
 	return predicateStorageSlots

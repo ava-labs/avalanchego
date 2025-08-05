@@ -1,5 +1,3 @@
-
-
 # Predicate
 
 This package contains the predicate data structure and its encoding and helper functions to unpack/pack the data structure.
@@ -15,7 +13,7 @@ A byte slice of size N is encoded as:
 
 ## Results
 
-`predicate_results.go` defines how to encode `PredicateResults` within the block header's `Extra` data field.
+This defines how to encode `PredicateResults` within the block header's `Extra` data field.
 
 For more information on the motivation for encoding the results of predicate verification within a block, see [here](../../../vms/platformvm/warp/README.md#processing-historical-avalanche-interchain-messages).
 
@@ -24,27 +22,21 @@ For more information on the motivation for encoding the results of predicate ver
 Note: PredicateResults are encoded using the AvalancheGo codec, which serializes a map by serializing the length of the map as a uint32 and then serializes each key-value pair sequentially.
 
 PredicateResults:
-```
-+---------------------+----------------------------------+-------------------+
-|             codecID :                           uint16 |           2 bytes |
-+---------------------+----------------------------------+-------------------+
-|             results :  map[[32]byte]TxPredicateResults | 4 + size(results) |
-+---------------------+----------------------------------+-------------------+
-                                                         | 6 + size(results) |
-                                                         +-------------------+
-```
+
+| Field | Type | Size |
+|-------|------|------|
+| codecID | uint16 | 2 bytes |
+| results | map[[32]byte]TxPredicateResults | 4 + size(results) |
+| **Total** | | **6 + size(results)** |
 
 - `codecID` is the codec version used to serialize the payload and is hardcoded to `0x0000`
 - `results` is a map of transaction hashes to the corresponding `TxPredicateResults`
 
 TxPredicateResults
-```
-+--------------------+---------------------+------------------------------------+
-| txPredicateResults : map[[20]byte][]byte | 4 + size(txPredicateResults) bytes |
-+--------------------+---------------------+------------------------------------+
-                                           | 4 + size(txPredicateResults) bytes |
-                                           +------------------------------------+
-```
+
+| Field | Type | Size |
+|-------|------|------|
+| txPredicateResults | map[[20]byte][]byte | 4 + size(txPredicateResults) bytes |
 
 - `txPredicateResults` is a map of precompile addresses to the corresponding byte array returned by the predicate
 

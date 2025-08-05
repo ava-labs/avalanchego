@@ -53,7 +53,7 @@ func TestBytesToHashSlice(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			result := BytesToHashSlice(tt.input)
+			result := bytesToHashSlice(tt.input)
 
 			// Calculate expected number of hashes
 			expectedNumHashes := (len(tt.input) + 31) / 32
@@ -112,7 +112,7 @@ func TestHashSliceToBytes(t *testing.T) {
 				}
 			}
 
-			result := HashSliceToBytes(tt.input)
+			result := hashSliceToBytes(tt.input)
 
 			// Verify the result has the correct length
 			expectedLength := len(tt.input) * common.HashLength
@@ -135,11 +135,11 @@ func TestBytesToHashSliceRoundTrip(t *testing.T) {
 	// Test round-trip conversion
 	testData := utils.RandomBytes(100)
 
-	hashes := BytesToHashSlice(testData)
-	bytes := HashSliceToBytes(hashes)
+	hashes := bytesToHashSlice(testData)
+	bytes := hashSliceToBytes(hashes)
 
 	// The round-trip should preserve the original data (with padding)
-	// Since HashSliceToBytes always returns a multiple of 32 bytes,
+	// Since hashSliceToBytes always returns a multiple of 32 bytes,
 	// we need to check that the original data is preserved in the padded result
 	require.Equal(testData, bytes[:len(testData)])
 
@@ -155,7 +155,7 @@ func TestBytesToHashSliceEdgeCases(t *testing.T) {
 	// Test edge cases around 32-byte boundaries
 	for i := 30; i <= 34; i++ {
 		testData := utils.RandomBytes(i)
-		hashes := BytesToHashSlice(testData)
+		hashes := bytesToHashSlice(testData)
 
 		expectedNumHashes := (i + 31) / 32
 		require.Len(hashes, expectedNumHashes)
@@ -172,7 +172,7 @@ func TestBytesToHashSliceEdgeCases(t *testing.T) {
 	}
 }
 
-// Explicit tests for Pack/Unpack functions
+// Explicit tests for New/Unpack functions
 func TestPackUnpackBasic(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -210,14 +210,14 @@ func TestPackUnpackBasic(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			packed := Pack(tt.input)
+			packed := New(tt.input)
 			unpacked, err := Unpack(packed)
 
 			require.NoError(err)
 			require.Equal(tt.input, unpacked)
 
 			// Verify the packed result has the correct structure
-			require.Equal(tt.expected, packed[:len(tt.expected)])
+			require.Equal(tt.expected, []byte(packed)[:len(tt.expected)])
 
 			// Verify padding is all zeros
 			for i := len(tt.expected); i < len(packed); i++ {
@@ -236,7 +236,7 @@ func TestPackUnpackPadding(t *testing.T) {
 	for _, length := range testCases {
 		t.Run(fmt.Sprintf("length_%d", length), func(_ *testing.T) {
 			input := utils.RandomBytes(length)
-			packed := Pack(input)
+			packed := New(input)
 			unpacked, err := Unpack(packed)
 
 			require.NoError(err)
@@ -251,38 +251,38 @@ func TestPackUnpackPadding(t *testing.T) {
 func TestUnpackInvalid(t *testing.T) {
 	tests := []struct {
 		name        string
-		input       []byte
+		input       Predicate
 		expectedErr error
 	}{
 		{
 			name:        "empty input",
-			input:       []byte{},
-			expectedErr: ErrInvalidAllZeroBytes,
+			input:       Predicate{},
+			expectedErr: errInvalidEmptyPredicate,
 		},
 		{
 			name:        "all zeros",
-			input:       bytes.Repeat([]byte{0}, 32),
-			expectedErr: ErrInvalidAllZeroBytes,
+			input:       Predicate(bytes.Repeat([]byte{0}, 32)),
+			expectedErr: errInvalidAllZeroBytes,
 		},
 		{
 			name:        "missing delimiter",
-			input:       bytes.Repeat([]byte{0x42}, 32),
-			expectedErr: ErrInvalidEndDelimiter,
+			input:       Predicate(bytes.Repeat([]byte{0x42}, 32)),
+			expectedErr: errInvalidEndDelimiter,
 		},
 		{
 			name:        "wrong delimiter",
-			input:       append(bytes.Repeat([]byte{0x42}, 31), 0x00),
-			expectedErr: ErrInvalidEndDelimiter,
+			input:       Predicate(append(bytes.Repeat([]byte{0x42}, 31), 0x00)),
+			expectedErr: errInvalidEndDelimiter,
 		},
 		{
 			name:        "excess padding",
-			input:       append(append([]byte{0x42, 0xff}, bytes.Repeat([]byte{0}, 30)...), 0x01),
-			expectedErr: ErrInvalidPadding,
+			input:       Predicate(append(append([]byte{0x42, 0xff}, bytes.Repeat([]byte{0}, 30)...), 0x01)),
+			expectedErr: errInvalidPadding,
 		},
 		{
 			name:        "non-zero padding",
-			input:       append(append([]byte{0x42, 0xff}, bytes.Repeat([]byte{0}, 29)...), 0x01, 0x00),
-			expectedErr: ErrInvalidPadding,
+			input:       Predicate(append(append([]byte{0x42, 0xff}, bytes.Repeat([]byte{0}, 29)...), 0x01, 0x00)),
+			expectedErr: errInvalidPadding,
 		},
 	}
 
@@ -303,7 +303,7 @@ func FuzzPackUnpackRoundTrip(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, input []byte) {
-		packed := Pack(input)
+		packed := New(input)
 		unpacked, err := Unpack(packed)
 		require.NoError(t, err)
 		require.Equal(t, input, unpacked)
@@ -313,11 +313,12 @@ func FuzzPackUnpackRoundTrip(f *testing.F) {
 func FuzzUnpackInvalid(f *testing.F) {
 	// Seed with valid predicates that we'll corrupt
 	for i := range 100 {
-		validPredicate := Pack(utils.RandomBytes(i))
-		f.Add(validPredicate)
+		validPredicate := New(utils.RandomBytes(i))
+		f.Add([]byte(validPredicate))
 	}
 
-	f.Fuzz(func(t *testing.T, validPredicate []byte) {
+	f.Fuzz(func(t *testing.T, validPredicateBytes []byte) {
+		validPredicate := Predicate(validPredicateBytes)
 		// Only test if the input is actually a valid predicate
 		if _, err := Unpack(validPredicate); err != nil {
 			t.Skip("Input is not a valid predicate")
@@ -326,13 +327,13 @@ func FuzzUnpackInvalid(f *testing.F) {
 		// Test corruption by adding non-zero bytes after the valid predicate
 		// This should always create an invalid predicate
 		corruption := bytes.Repeat([]byte{0xee}, 5)
-		invalidPredicate := slices.Concat(validPredicate, corruption)
+		invalidPredicate := Predicate(slices.Concat(validPredicate, corruption))
 		_, err := Unpack(invalidPredicate)
 
 		// Check for either error type since different padding can cause different errors.
 		// Zero padding cases trigger ErrInvalidPadding (padding length check fails).
 		// Non-zero padding cases trigger ErrInvalidEndDelimiter (delimiter check fails).
-		require.True(t, errors.Is(err, ErrInvalidPadding) || errors.Is(err, ErrInvalidEndDelimiter),
+		require.True(t, errors.Is(err, errInvalidPadding) || errors.Is(err, errInvalidEndDelimiter),
 			"Expected error for corrupted predicate, got: %v", err)
 	})
 }
