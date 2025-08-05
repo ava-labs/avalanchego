@@ -6,7 +6,7 @@ This document lists all available configuration options for AvalancheGo nodes. Y
 
 ## Environment Variable Naming Convention
 
-All environment variables follow the pattern: `AVAGO_{FLAG_NAME}` where the flag name is converted to uppercase with hyphens replaced by underscores.
+All environment variables follow the pattern: \`AVAGO_{FLAG_NAME}\` where the flag name is converted to uppercase with hyphens replaced by underscores.
 
 For example:
 - Flag: `--api-admin-enabled`
@@ -101,8 +101,8 @@ Some blockchains allow the node operator to provide custom configurations for in
 | Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--chain-config-dir` | `AVAGO_CHAIN_CONFIG_DIR` | string | `$HOME/.avalanchego/configs/chains` | Specifies the directory that contains chain configs, as described [here](https://build.avax.network/docs/nodes/chain-configs). If this flag is not provided and the default directory does not exist, AvalancheGo will not exit since custom configs are optional. However, if the flag is set, the specified folder must exist, or AvalancheGo will exit with an error. This flag is ignored if `--chain-config-content` is specified. Network upgrades are passed in from the location: `chain-config-dir`/`blockchainID`/`upgrade.*`. The chain configs are passed in from the location `chain-config-dir`/`blockchainID`/`config.*`. See [here](https://build.avax.network/docs/nodes/chain-configs) for more information. |
-| `--chain-config-content` | `AVAGO_CHAIN_CONFIG_CONTENT` | string | - | As an alternative to `--chain-config-dir`, chains custom configurations can be loaded altogether from command line via `--chain-config-content` flag. Content must be base64 encoded. Example: `cchainconfig="$(echo -n '{"log-level":"trace"}' \| base64)"` `chainconfig="$(echo -n "{\"C\":{\"Config\":\"${cchainconfig}\",\"Upgrade\":null}}" \| base64)"` `avalanchego --chain-config-content "${chainconfig}"` |
-| `--chain-aliases-file` | `AVAGO_CHAIN_ALIASES_FILE` | string | `~/.avalanchego/configs/chains/aliases.json` | Path to JSON file that defines aliases for Blockchain IDs. This flag is ignored if `--chain-aliases-file-content` is specified. Example content: `{"q2aTwKuyzgs8pynF7UXBZCU7DejbZbZ6EUyHr3JQzYgwNPUPi": ["DFK"]}`. The above example aliases the Blockchain whose ID is `"q2aTwKuyzgs8pynF7UXBZCU7DejbZbZ6EUyHr3JQzYgwNPUPi"` to `"DFK"`. Chain aliases are added after adding primary network aliases and before any changes to the aliases via the admin API. This means that the first alias included for a Blockchain on a Subnet will be treated as the `"Primary Alias"` instead of the full blockchainID. The Primary Alias is used in all metrics and logs. |
+| `--chain-config-content` | `AVAGO_CHAIN_CONFIG_CONTENT` | string | - | As an alternative to `--chain-config-dir`, chains custom configurations can be loaded altogether from command line via `--chain-config-content` flag. Content must be base64 encoded. Example: \`cchainconfig="$(echo -n '\{"log-level":"trace"\}' \| base64)"\` \`chainconfig="$(echo -n "\{\"C\":\{\"Config\":\"\${cchainconfig}\",\"Upgrade\":null\}\}" \| base64)"\` \`avalanchego --chain-config-content "\${chainconfig}"\` |
+| `--chain-aliases-file` | `AVAGO_CHAIN_ALIASES_FILE` | string | `~/.avalanchego/configs/chains/aliases.json` | Path to JSON file that defines aliases for Blockchain IDs. This flag is ignored if `--chain-aliases-file-content` is specified. Example content: \`\{"q2aTwKuyzgs8pynF7UXBZCU7DejbZbZ6EUyHr3JQzYgwNPUPi": ["DFK"]\}\`. The above example aliases the Blockchain whose ID is \`"q2aTwKuyzgs8pynF7UXBZCU7DejbZbZ6EUyHr3JQzYgwNPUPi"\` to \`"DFK"\`. Chain aliases are added after adding primary network aliases and before any changes to the aliases via the admin API. This means that the first alias included for a Blockchain on a Subnet will be treated as the `"Primary Alias"` instead of the full blockchainID. The Primary Alias is used in all metrics and logs. |
 | `--chain-aliases-file-content` | `AVAGO_CHAIN_ALIASES_FILE_CONTENT` | string | - | As an alternative to `--chain-aliases-file`, it allows specifying base64 encoded aliases for Blockchains. |
 | `--chain-data-dir` | `AVAGO_CHAIN_DATA_DIR` | string | `$HOME/.avalanchego/chainData` | Chain specific data directory. |
 
@@ -110,7 +110,7 @@ Some blockchains allow the node operator to provide custom configurations for in
 
 | Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
-| `--config-file` | `AVAGO_CONFIG_FILE` | string | - | Path to a JSON file that specifies this node's configuration. Command line arguments will override arguments set in the config file. This flag is ignored if `--config-file-content` is specified. Example JSON config file: `{"log-level": "debug"}`. [Install Script](https://build.avax.network/docs/tooling/avalanche-go-installer) creates the node config file at `~/.avalanchego/configs/node.json`. No default file is created if [AvalancheGo is built from source](https://build.avax.network/docs/nodes/run-a-node/from-source), you would need to create it manually if needed. |
+| `--config-file` | `AVAGO_CONFIG_FILE` | string | - | Path to a JSON file that specifies this node's configuration. Command line arguments will override arguments set in the config file. This flag is ignored if `--config-file-content` is specified. Example JSON config file: \`\{"log-level": "debug"\}\`. [Install Script](https://build.avax.network/docs/tooling/avalanche-go-installer) creates the node config file at `~/.avalanchego/configs/node.json`. No default file is created if [AvalancheGo is built from source](https://build.avax.network/docs/nodes/run-a-node/from-source), you would need to create it manually if needed. |
 | `--config-file-content` | `AVAGO_CONFIG_FILE_CONTENT` | string | - | As an alternative to `--config-file`, it allows specifying base64 encoded config content. |
 | `--config-file-content-type` | `AVAGO_CONFIG_FILE_CONTENT_TYPE` | string | `JSON` | Specifies the format of the base64 encoded config content. JSON, TOML, YAML are among currently supported file format (see [here](https://github.com/spf13/viper#reading-config-files) for full list). |
 
@@ -175,7 +175,7 @@ A LevelDB config file must be JSON and may have these keys. Any keys not given w
 |------|---------------------|------|---------|-------------|
 | `--log-level` | `AVAGO_LOG_LEVEL` | string | `info` | The log level determines which events to log. There are 8 different levels, in order from highest priority to lowest: `off` (no logs), `fatal` (fatal errors that are not recoverable), `error` (errors that the node encounters, these errors were able to be recovered), `warn` (warnings that might be indicative of a spurious byzantine node, or potential future error), `info` (useful descriptions of node status updates), `trace` (traces container job results, useful for tracing container IDs and their outcomes), `debug` (useful when attempting to understand possible bugs in the code), `verbo` (tracks extensive amounts of information the node is processing, including message contents and binary dumps of data for extremely low level protocol analysis). When specifying a log level note that all logs with the specified priority or higher will be tracked. |
 | `--log-display-level` | `AVAGO_LOG_DISPLAY_LEVEL` | string | value of `--log-level` | The log level determines which events to display to stdout. If left blank, will default to the value provided to `--log-level`. |
-| `--log-format` | `AVAGO_LOG_FORMAT` | string | `auto` | The structure of log format. Defaults to `auto` which formats terminal-like logs, when the output is a terminal. Otherwise, should be one of `{auto, plain, colors, json}` |
+| `--log-format` | `AVAGO_LOG_FORMAT` | string | `auto` | The structure of log format. Defaults to \`auto\` which formats terminal-like logs, when the output is a terminal. Otherwise, should be one of \`{auto, plain, colors, json}\` |
 | `--log-dir` | `AVAGO_LOG_DIR` | string | `$HOME/.avalanchego/logs` | Specifies the directory in which system logs are kept. If you are running the node as a system service (ex. using the installer script) logs will also be stored in `$HOME/var/log/syslog`. |
 | `--log-disable-display-plugin-logs` | `AVAGO_LOG_DISABLE_DISPLAY_PLUGIN_LOGS` | boolean | `false` | Disables displaying plugin logs in stdout. |
 | `--log-rotater-max-size` | `AVAGO_LOG_ROTATER_MAX_SIZE` | uint | `8` | The maximum file size in megabytes of the log file before it gets rotated. |
@@ -198,7 +198,7 @@ You can configure your node to continuously run memory/CPU profiles and save the
 
 | Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
-| `--network-id` | `AVAGO_NETWORK_ID` | string | `mainnet` | The identity of the network the node should connect to. Can be one of: `--network-id=mainnet` -> Connect to Mainnet (default). `--network-id=fuji` -> Connect to the Fuji test-network. `--network-id=testnet` -> Connect to the current test-network. (Right now, this is Fuji.) `--network-id=local` -> Connect to a local test-network. `--network-id=network-{id}` -> Connect to the network with the given ID. `id` must be in the range `[0, 2^32)`. |
+| `--network-id` | `AVAGO_NETWORK_ID` | string | `mainnet` | The identity of the network the node should connect to. Can be one of: `--network-id=mainnet` -> Connect to Mainnet (default). `--network-id=fuji` -> Connect to the Fuji test-network. `--network-id=testnet` -> Connect to the current test-network. (Right now, this is Fuji.) `--network-id=local` -> Connect to a local test-network. \`--network-id=network-{id}\` -> Connect to the network with the given ID. \`id\` must be in the range \[0, 2^32\). |
 
 ### OpenTelemetry
 
@@ -207,9 +207,9 @@ AvalancheGo supports collecting and exporting [OpenTelemetry](https://openteleme
 | Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--tracing-endpoint` | `AVAGO_TRACING_ENDPOINT` | string | `localhost:4317` (gRPC) or `localhost:4318` (HTTP) | The endpoint to export trace data to. Default depends on `--tracing-exporter-type`. |
-| `--tracing-exporter-type` | `AVAGO_TRACING_EXPORTER_TYPE` | string | `disabled` | Type of exporter to use for tracing. Options are [`disabled`, `grpc`, `http`]. |
+| `--tracing-exporter-type` | `AVAGO_TRACING_EXPORTER_TYPE` | string | `disabled` | Type of exporter to use for tracing. Options are \`disabled\`, \`grpc\`, \`http\`. |
 | `--tracing-insecure` | `AVAGO_TRACING_INSECURE` | boolean | `true` | If true, don't use TLS when exporting trace data. |
-| `--tracing-sample-rate` | `AVAGO_TRACING_SAMPLE_RATE` | float | `0.1` | The fraction of traces to sample. If >= 1, always sample. If <= 0, never sample. |
+| `--tracing-sample-rate` | `AVAGO_TRACING_SAMPLE_RATE` | float | `0.1` | The fraction of traces to sample. If \>= 1, always sample. If \<= 0, never sample. |
 
 ### Partial Sync Primary Network
 
@@ -254,11 +254,11 @@ Validators must know one of their public facing IP addresses so they can enable 
 
 #### Subnet Configs
 
-It is possible to provide parameters for Subnets. Parameters here apply to all chains in the specified Subnets. Parameters must be specified with a `{subnetID}.json` config file under `--subnet-config-dir`. AvalancheGo loads configs for Subnets specified in `--track-subnets` parameter. Full reference for all configuration options for a Subnet can be found in a separate [Subnet Configs](https://build.avax.network/docs/nodes/configure/avalanche-l1-configs) document.
+It is possible to provide parameters for Subnets. Parameters here apply to all chains in the specified Subnets. Parameters must be specified with a \`{subnetID}.json\` config file under \`--subnet-config-dir\`. AvalancheGo loads configs for Subnets specified in `--track-subnets` parameter. Full reference for all configuration options for a Subnet can be found in a separate [Subnet Configs](https://build.avax.network/docs/nodes/configure/avalanche-l1-configs) document.
 
 | Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
-| `--subnet-config-dir` | `AVAGO_SUBNET_CONFIG_DIR` | string | `$HOME/.avalanchego/configs/subnets` | Specifies the directory that contains Subnet configs, as described above. If the flag is set explicitly, the specified folder must exist, or AvalancheGo will exit with an error. This flag is ignored if `--subnet-config-content` is specified. Example: Let's say we have a Subnet with ID `p4jUwqZsA2LuSftroCd3zb4ytH8W99oXKuKVZdsty7eQ3rXD6`. We can create a config file under the default `subnet-config-dir` at `$HOME/.avalanchego/configs/subnets/p4jUwqZsA2LuSftroCd3zb4ytH8W99oXKuKVZdsty7eQ3rXD6.json`. An example config file is: `{"validatorOnly": false, "consensusParameters": {"k": 25, "alpha": 18}}`. By default, none of these directories and/or files exist. You would need to create them manually if needed. |
+| `--subnet-config-dir` | `AVAGO_SUBNET_CONFIG_DIR` | string | `$HOME/.avalanchego/configs/subnets` | Specifies the directory that contains Subnet configs, as described above. If the flag is set explicitly, the specified folder must exist, or AvalancheGo will exit with an error. This flag is ignored if `--subnet-config-content` is specified. Example: Let's say we have a Subnet with ID `p4jUwqZsA2LuSftroCd3zb4ytH8W99oXKuKVZdsty7eQ3rXD6`. We can create a config file under the default `subnet-config-dir` at `$HOME/.avalanchego/configs/subnets/p4jUwqZsA2LuSftroCd3zb4ytH8W99oXKuKVZdsty7eQ3rXD6.json`. An example config file is: \`\{"validatorOnly": false, "consensusParameters": \{"k": 25, "alpha": 18\}\}\`. By default, none of these directories and/or files exist. You would need to create them manually if needed. |
 | `--subnet-config-content` | `AVAGO_SUBNET_CONFIG_CONTENT` | string | - | As an alternative to `--subnet-config-dir`, it allows specifying base64 encoded parameters for a Subnet. |
 
 ### Version
@@ -327,7 +327,7 @@ Staking economics configuration.
 | `--min-validator-stake` | `AVAGO_MIN_VALIDATOR_STAKE` | int | network dependent | The minimum stake, in nAVAX, required to validate the Primary Network. This can only be changed on a local network. Defaults to `2000000000000` (2,000 AVAX) on Mainnet. Defaults to `5000000` (.005 AVAX) on Test Net. |
 | `--max-validator-stake` | `AVAGO_MAX_VALIDATOR_STAKE` | int | network dependent | The maximum stake, in nAVAX, that can be placed on a validator on the primary network. This includes stake provided by both the validator and by delegators to the validator. This can only be changed on a local network. |
 | `--min-delegator-stake` | `AVAGO_MIN_DELEGATOR_STAKE` | int | network dependent | The minimum stake, in nAVAX, that can be delegated to a validator of the Primary Network. Defaults to `25000000000` (25 AVAX) on Mainnet. Defaults to `5000000` (.005 AVAX) on Test Net. This can only be changed on a local network. |
-| `--min-delegation-fee` | `AVAGO_MIN_DELEGATION_FEE` | int | `20000` | The minimum delegation fee that can be charged for delegation on the Primary Network, multiplied by `10,000`. Must be in the range `[0, 1000000]`. This can only be changed on a local network. |
+| `--min-delegation-fee` | `AVAGO_MIN_DELEGATION_FEE` | int | `20000` | The minimum delegation fee that can be charged for delegation on the Primary Network, multiplied by \`10,000\`. Must be in the range \[0, 1000000\]. This can only be changed on a local network. |
 | `--min-stake-duration` | `AVAGO_MIN_STAKE_DURATION` | duration | `336h` | Minimum staking duration. This can only be changed on a local network. This applies to both delegation and validation periods. |
 | `--max-stake-duration` | `AVAGO_MAX_STAKE_DURATION` | duration | `8760h` | The maximum staking duration, in hours. This can only be changed on a local network. |
 | `--stake-minting-period` | `AVAGO_STAKE_MINTING_PERIOD` | duration | `8760h` | Consumption period of the staking function, in hours. This can only be changed on a local network. |
@@ -374,7 +374,7 @@ Advanced network settings.
 | Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
 | `--network-allow-private-ips` | `AVAGO_NETWORK_ALLOW_PRIVATE_IPS` | boolean | `true` | Allows the node to connect peers with private IPs. |
-| `--network-compression-type` | `AVAGO_NETWORK_COMPRESSION_TYPE` | string | `gzip` | The type of compression to use when sending messages to peers. Must be one of [`gzip`, `zstd`, `none`]. Nodes can handle inbound `gzip` compressed messages but by default send `zstd` compressed messages. |
+| `--network-compression-type` | `AVAGO_NETWORK_COMPRESSION_TYPE` | string | `gzip` | The type of compression to use when sending messages to peers. Must be one of \`gzip\`, \`zstd\`, \`none\`. Nodes can handle inbound \`gzip\` compressed messages but by default send \`zstd\` compressed messages. |
 | `--network-initial-timeout` | `AVAGO_NETWORK_INITIAL_TIMEOUT` | duration | `5s` | Initial timeout value of the adaptive timeout manager. |
 | `--network-initial-reconnect-delay` | `AVAGO_NETWORK_INITIAL_RECONNECT_DELAY` | duration | `1s` | Initial delay duration must be waited before attempting to reconnect a peer. |
 | `--network-max-reconnect-delay` | `AVAGO_NETWORK_MAX_RECONNECT_DELAY` | duration | `1h` | Maximum delay duration must be waited before attempting to reconnect a peer. |
@@ -382,15 +382,15 @@ Advanced network settings.
 | `--network-maximum-timeout` | `AVAGO_NETWORK_MAXIMUM_TIMEOUT` | duration | `10s` | Maximum timeout value of the adaptive timeout manager. |
 | `--network-maximum-inbound-timeout` | `AVAGO_NETWORK_MAXIMUM_INBOUND_TIMEOUT` | duration | `10s` | Maximum timeout value of an inbound message. Defines duration within which an incoming message must be fulfilled. Incoming messages containing deadline higher than this value will be overridden with this value. |
 | `--network-timeout-halflife` | `AVAGO_NETWORK_TIMEOUT_HALFLIFE` | duration | `5m` | Half life used when calculating average network latency. Larger value -> less volatile network latency calculation. |
-| `--network-timeout-coefficient` | `AVAGO_NETWORK_TIMEOUT_COEFFICIENT` | float | `2` | Requests to peers will time out after [network-timeout-coefficient] * [average request latency]. |
+| `--network-timeout-coefficient` | `AVAGO_NETWORK_TIMEOUT_COEFFICIENT` | float | `2` | Requests to peers will time out after \[network-timeout-coefficient\] \* \[average request latency\]. |
 | `--network-read-handshake-timeout` | `AVAGO_NETWORK_READ_HANDSHAKE_TIMEOUT` | duration | `15s` | Timeout value for reading handshake messages. |
 | `--network-ping-timeout` | `AVAGO_NETWORK_PING_TIMEOUT` | duration | `30s` | Timeout value for Ping-Pong with a peer. |
 | `--network-ping-frequency` | `AVAGO_NETWORK_PING_FREQUENCY` | duration | `22.5s` | Frequency of pinging other peers. |
 | `--network-health-min-conn-peers` | `AVAGO_NETWORK_HEALTH_MIN_CONN_PEERS` | uint | `1` | Node will report unhealthy if connected to less than this many peers. |
 | `--network-health-max-time-since-msg-received` | `AVAGO_NETWORK_HEALTH_MAX_TIME_SINCE_MSG_RECEIVED` | duration | `1m` | Node will report unhealthy if it hasn't received a message for this amount of time. |
 | `--network-health-max-time-since-msg-sent` | `AVAGO_NETWORK_HEALTH_MAX_TIME_SINCE_MSG_SENT` | duration | `1m` | Network layer returns unhealthy if haven't sent a message for at least this much time. |
-| `--network-health-max-portion-send-queue-full` | `AVAGO_NETWORK_HEALTH_MAX_PORTION_SEND_QUEUE_FULL` | float | `0.9` | Node will report unhealthy if its send queue is more than this portion full. Must be in [0,1]. |
-| `--network-health-max-send-fail-rate` | `AVAGO_NETWORK_HEALTH_MAX_SEND_FAIL_RATE` | float | `0.25` | Node will report unhealthy if more than this portion of message sends fail. Must be in [0,1]. |
+| `--network-health-max-portion-send-queue-full` | `AVAGO_NETWORK_HEALTH_MAX_PORTION_SEND_QUEUE_FULL` | float | `0.9` | Node will report unhealthy if its send queue is more than this portion full. Must be in \[0,1\]. |
+| `--network-health-max-send-fail-rate` | `AVAGO_NETWORK_HEALTH_MAX_SEND_FAIL_RATE` | float | `0.25` | Node will report unhealthy if more than this portion of message sends fail. Must be in \[0,1\]. |
 | `--network-health-max-outstanding-request-duration` | `AVAGO_NETWORK_HEALTH_MAX_OUTSTANDING_REQUEST_DURATION` | duration | `5m` | Node reports unhealthy if there has been a request outstanding for this duration. |
 | `--network-max-clock-difference` | `AVAGO_NETWORK_MAX_CLOCK_DIFFERENCE` | duration | `1m` | Max allowed clock difference value between this node and peers. |
 | `--network-require-validator-to-connect` | `AVAGO_NETWORK_REQUIRE_VALIDATOR_TO_CONNECT` | boolean | `false` | If true, this node will only maintain a connection with another node if this node is a validator, the other node is a validator, or the other node is a beacon. |
@@ -408,14 +408,14 @@ Rate-limiting based on how much CPU usage a peer causes.
 
 | Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
-| `--throttler-inbound-cpu-validator-alloc` | `AVAGO_THROTTLER_INBOUND_CPU_VALIDATOR_ALLOC` | float | half of CPUs | Number of CPU allocated for use by validators. Value should be in range (0, total core count]. |
+| `--throttler-inbound-cpu-validator-alloc` | `AVAGO_THROTTLER_INBOUND_CPU_VALIDATOR_ALLOC` | float | half of CPUs | Number of CPU allocated for use by validators. Value should be in range \(0, total core count\]. |
 | `--throttler-inbound-cpu-max-recheck-delay` | `AVAGO_THROTTLER_INBOUND_CPU_MAX_RECHECK_DELAY` | duration | `5s` | In the CPU rate-limiter, check at least this often whether the node's CPU usage has fallen to an acceptable level. |
 | `--throttler-inbound-disk-max-recheck-delay` | `AVAGO_THROTTLER_INBOUND_DISK_MAX_RECHECK_DELAY` | duration | `5s` | In the disk-based network throttler, check at least this often whether the node's disk usage has fallen to an acceptable level. |
-| `--throttler-inbound-cpu-max-non-validator-usage` | `AVAGO_THROTTLER_INBOUND_CPU_MAX_NON_VALIDATOR_USAGE` | float | 80% of CPUs | Number of CPUs that if fully utilized, will rate limit all non-validators. Value should be in range [0, total core count]. |
-| `--throttler-inbound-cpu-max-non-validator-node-usage` | `AVAGO_THROTTLER_INBOUND_CPU_MAX_NON_VALIDATOR_NODE_USAGE` | float | CPUs / 8 | Maximum number of CPUs that a non-validator can utilize. Value should be in range [0, total core count]. |
+| `--throttler-inbound-cpu-max-non-validator-usage` | `AVAGO_THROTTLER_INBOUND_CPU_MAX_NON_VALIDATOR_USAGE` | float | 80% of CPUs | Number of CPUs that if fully utilized, will rate limit all non-validators. Value should be in range \[0, total core count\]. |
+| `--throttler-inbound-cpu-max-non-validator-node-usage` | `AVAGO_THROTTLER_INBOUND_CPU_MAX_NON_VALIDATOR_NODE_USAGE` | float | CPUs / 8 | Maximum number of CPUs that a non-validator can utilize. Value should be in range \[0, total core count\]. |
 | `--throttler-inbound-disk-validator-alloc` | `AVAGO_THROTTLER_INBOUND_DISK_VALIDATOR_ALLOC` | float | `1000 GiB/s` | Maximum number of disk reads/writes per second to allocate for use by validators. Must be > 0. |
-| `--throttler-inbound-disk-max-non-validator-usage` | `AVAGO_THROTTLER_INBOUND_DISK_MAX_NON_VALIDATOR_USAGE` | float | `1000 GiB/s` | Number of disk reads/writes per second that, if fully utilized, will rate limit all non-validators. Must be >= 0. |
-| `--throttler-inbound-disk-max-non-validator-node-usage` | `AVAGO_THROTTLER_INBOUND_DISK_MAX_NON_VALIDATOR_NODE_USAGE` | float | `1000 GiB/s` | Maximum number of disk reads/writes per second that a non-validator can utilize. Must be >= 0. |
+| `--throttler-inbound-disk-max-non-validator-usage` | `AVAGO_THROTTLER_INBOUND_DISK_MAX_NON_VALIDATOR_USAGE` | float | `1000 GiB/s` | Number of disk reads/writes per second that, if fully utilized, will rate limit all non-validators. Must be \>= 0. |
+| `--throttler-inbound-disk-max-non-validator-node-usage` | `AVAGO_THROTTLER_INBOUND_DISK_MAX_NON_VALIDATOR_NODE_USAGE` | float | `1000 GiB/s` | Maximum number of disk reads/writes per second that a non-validator can utilize. Must be \>= 0. |
 
 #### Bandwidth Based Rate-Limiting
 
@@ -486,7 +486,7 @@ Nodes gossip peers to each other so that each node can have an up-to-date peer l
 | `--system-tracker-cpu-halflife` | `AVAGO_SYSTEM_TRACKER_CPU_HALFLIFE` | duration | `15s` | Half life to use for the CPU tracker. Larger half life -> CPU usage metrics change more slowly. |
 | `--system-tracker-disk-halflife` | `AVAGO_SYSTEM_TRACKER_DISK_HALFLIFE` | duration | `1m` | Half life to use for the disk tracker. Larger half life -> disk usage metrics change more slowly. |
 | `--system-tracker-disk-required-available-space` | `AVAGO_SYSTEM_TRACKER_DISK_REQUIRED_AVAILABLE_SPACE` | uint | `536870912` | Minimum number of available bytes on disk, under which the node will shutdown. |
-| `--system-tracker-disk-warning-threshold-available-space` | `AVAGO_SYSTEM_TRACKER_DISK_WARNING_THRESHOLD_AVAILABLE_SPACE` | uint | `1073741824` | Warning threshold for the number of available bytes on disk, under which the node will be considered unhealthy. Must be >= `--system-tracker-disk-required-available-space`. |
+| `--system-tracker-disk-warning-threshold-available-space` | `AVAGO_SYSTEM_TRACKER_DISK_WARNING_THRESHOLD_AVAILABLE_SPACE` | uint | `1073741824` | Warning threshold for the number of available bytes on disk, under which the node will be considered unhealthy. Must be \>= `--system-tracker-disk-required-available-space`. |
 
 ### Plugins
 
@@ -498,7 +498,7 @@ Nodes gossip peers to each other so that each node can have an up-to-date peer l
 
 | Flag | Env Var | Type | Default | Description |
 |------|---------------------|------|---------|-------------|
-| `--vm-aliases-file` | `AVAGO_VM_ALIASES_FILE` | string | `~/.avalanchego/configs/vms/aliases.json` | Path to JSON file that defines aliases for Virtual Machine IDs. This flag is ignored if `--vm-aliases-file-content` is specified. Example content: `{"tGas3T58KzdjLHhBDMnH2TvrddhqTji5iZAMZ3RXs2NLpSnhH": ["timestampvm", "timerpc"]}`. The above example aliases the VM whose ID is `"tGas3T58KzdjLHhBDMnH2TvrddhqTji5iZAMZ3RXs2NLpSnhH"` to `"timestampvm"` and `"timerpc"`. |
+| `--vm-aliases-file` | `AVAGO_VM_ALIASES_FILE` | string | `~/.avalanchego/configs/vms/aliases.json` | Path to JSON file that defines aliases for Virtual Machine IDs. This flag is ignored if `--vm-aliases-file-content` is specified. Example content: \`\{"tGas3T58KzdjLHhBDMnH2TvrddhqTji5iZAMZ3RXs2NLpSnhH": ["timestampvm", "timerpc"]\}\`. The above example aliases the VM whose ID is \`"tGas3T58KzdjLHhBDMnH2TvrddhqTji5iZAMZ3RXs2NLpSnhH"\` to \`"timestampvm"\` and \`"timerpc"\`. |
 | `--vm-aliases-file-content` | `AVAGO_VM_ALIASES_FILE_CONTENT` | string | - | As an alternative to `--vm-aliases-file`, it allows specifying base64 encoded aliases for Virtual Machine IDs. |
 
 ### Indexing
