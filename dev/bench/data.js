@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1754299120138,
+  "lastUpdate": 1754385420154,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -166,6 +166,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[101,250000]",
             "value": 93.45,
+            "unit": "mgas/s",
+            "extra": "1 times\n4 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Galoretka",
+            "username": "Galoretka",
+            "email": "galoretochka@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "be28a8bfca69ba8d188ab5a5d2c6aeb4d03b5db8",
+          "message": "chore: fix a typo in gossip,go (#4154)\n\nSigned-off-by: Galoretka <galoretochka@gmail.com>",
+          "timestamp": "2025-08-04T19:39:41Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/be28a8bfca69ba8d188ab5a5d2c6aeb4d03b5db8"
+        },
+        "date": 1754385419690,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]",
+            "value": 92.53,
             "unit": "mgas/s",
             "extra": "1 times\n4 procs"
           }
