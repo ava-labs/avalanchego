@@ -331,10 +331,7 @@ impl Db {
     }
 
     /// Check the database for consistency
-    pub async fn check(
-        &self,
-        opt: CheckOpt,
-    ) -> Result<CheckerReport, firewood_storage::CheckerError> {
+    pub async fn check(&self, opt: CheckOpt) -> CheckerReport {
         let latest_rev_nodestore = self.manager.current_revision();
         latest_rev_nodestore.check(opt)
     }
@@ -799,15 +796,15 @@ mod test {
 
             // check the database for consistency, sometimes checking the hashes
             let hash_check = rng.borrow_mut().random();
-            if let Err(e) = db
+            let report = db
                 .check(CheckOpt {
                     hash_check,
                     progress_bar: None,
                 })
-                .await
-            {
+                .await;
+            if !report.errors.is_empty() {
                 db.dump(&mut std::io::stdout()).await.unwrap();
-                panic!("error: {e}");
+                panic!("error: {:?}", report.errors);
             }
         }
     }

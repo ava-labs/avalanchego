@@ -55,12 +55,10 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
         )
         .with_finish(ProgressFinish::WithMessage("Check Completed!".into()));
 
-    let report = NodeStore::open(storage)?
-        .check(CheckOpt {
-            hash_check: opts.hash_check,
-            progress_bar: Some(progress_bar),
-        })
-        .map_err(|e| api::Error::InternalError(Box::new(e)))?;
+    let report = NodeStore::open(storage)?.check(CheckOpt {
+        hash_check: opts.hash_check,
+        progress_bar: Some(progress_bar),
+    });
 
     print_checker_report(report);
 

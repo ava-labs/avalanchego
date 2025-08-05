@@ -285,6 +285,18 @@ pub enum CheckerError {
     IO(#[from] FileIoError),
 }
 
+impl From<CheckerError> for Vec<CheckerError> {
+    fn from(error: CheckerError) -> Self {
+        vec![error]
+    }
+}
+
+impl From<FileIoError> for Vec<CheckerError> {
+    fn from(error: FileIoError) -> Self {
+        vec![CheckerError::IO(error)]
+    }
+}
+
 #[cfg(test)]
 mod test_utils {
     use rand::rngs::StdRng;
