@@ -207,11 +207,7 @@ func NewRandomWeightedTest(
 	}, nil
 }
 
-func (r *RandomWeightedTest) Run(
-	tc tests.TestContext,
-	ctx context.Context,
-	wallet *Wallet,
-) {
+func (r *RandomWeightedTest) Run(tc tests.TestContext, wallet *Wallet) {
 	require := require.New(tc)
 
 	r.mu.Lock()
@@ -221,7 +217,7 @@ func (r *RandomWeightedTest) Run(
 	index, ok := r.weighted.Sample(uint64(sampleValue))
 	require.True(ok)
 
-	r.tests[index].Run(tc, ctx, wallet)
+	r.tests[index].Run(tc, wallet)
 }
 
 type WeightedTest struct {
@@ -233,11 +229,7 @@ type TransferTest struct {
 	Value *big.Int
 }
 
-func (t TransferTest) Run(
-	tc tests.TestContext,
-	ctx context.Context,
-	wallet *Wallet,
-) {
+func (t TransferTest) Run(tc tests.TestContext, wallet *Wallet) {
 	require := require.New(tc)
 
 	maxValue := int64(100 * 1_000_000_000 / params.TxGas)
@@ -263,7 +255,7 @@ func (t TransferTest) Run(
 	})
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(ctx, tx))
+	require.NoError(wallet.SendTx(tc.GetDefaultContextParent(), tx))
 }
 
 type ReadTest struct {
@@ -271,12 +263,8 @@ type ReadTest struct {
 	Count    *big.Int
 }
 
-func (r ReadTest) Run(
-	tc tests.TestContext,
-	ctx context.Context,
-	wallet *Wallet,
-) {
-	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+func (r ReadTest) Run(tc tests.TestContext, wallet *Wallet) {
+	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 		return r.Contract.SimulateReads(txOpts, r.Count)
 	})
 }
@@ -286,12 +274,8 @@ type WriteTest struct {
 	Count    *big.Int
 }
 
-func (w WriteTest) Run(
-	tc tests.TestContext,
-	ctx context.Context,
-	wallet *Wallet,
-) {
-	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+func (w WriteTest) Run(tc tests.TestContext, wallet *Wallet) {
+	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 		return w.Contract.SimulateRandomWrite(txOpts, w.Count)
 	})
 }
@@ -301,12 +285,8 @@ type StateModificationTest struct {
 	Count    *big.Int
 }
 
-func (s StateModificationTest) Run(
-	tc tests.TestContext,
-	ctx context.Context,
-	wallet *Wallet,
-) {
-	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+func (s StateModificationTest) Run(tc tests.TestContext, wallet *Wallet) {
+	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 		return s.Contract.SimulateModification(txOpts, s.Count)
 	})
 }
@@ -316,12 +296,8 @@ type HashingTest struct {
 	Count    *big.Int
 }
 
-func (h HashingTest) Run(
-	tc tests.TestContext,
-	ctx context.Context,
-	wallet *Wallet,
-) {
-	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+func (h HashingTest) Run(tc tests.TestContext, wallet *Wallet) {
+	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 		return h.Contract.SimulateHashing(txOpts, h.Count)
 	})
 }
@@ -331,12 +307,8 @@ type MemoryTest struct {
 	Count    *big.Int
 }
 
-func (m MemoryTest) Run(
-	tc tests.TestContext,
-	ctx context.Context,
-	wallet *Wallet,
-) {
-	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+func (m MemoryTest) Run(tc tests.TestContext, wallet *Wallet) {
+	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 		return m.Contract.SimulateMemory(txOpts, m.Count)
 	})
 }
@@ -346,12 +318,8 @@ type CallDepthTest struct {
 	Count    *big.Int
 }
 
-func (c CallDepthTest) Run(
-	tc tests.TestContext,
-	ctx context.Context,
-	wallet *Wallet,
-) {
-	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+func (c CallDepthTest) Run(tc tests.TestContext, wallet *Wallet) {
+	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 		return c.Contract.SimulateCallDepth(txOpts, c.Count)
 	})
 }
@@ -360,12 +328,8 @@ type ContractCreationTest struct {
 	Contract *contracts.EVMLoadSimulator
 }
 
-func (c ContractCreationTest) Run(
-	tc tests.TestContext,
-	ctx context.Context,
-	wallet *Wallet,
-) {
-	executeContractTx(tc, ctx, wallet, c.Contract.SimulateContractCreation)
+func (c ContractCreationTest) Run(tc tests.TestContext, wallet *Wallet) {
+	executeContractTx(tc, wallet, c.Contract.SimulateContractCreation)
 }
 
 type PureComputeTest struct {
@@ -373,12 +337,8 @@ type PureComputeTest struct {
 	NumIterations *big.Int
 }
 
-func (p PureComputeTest) Run(
-	tc tests.TestContext,
-	ctx context.Context,
-	wallet *Wallet,
-) {
-	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+func (p PureComputeTest) Run(tc tests.TestContext, wallet *Wallet) {
+	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 		return p.Contract.SimulatePureCompute(txOpts, p.NumIterations)
 	})
 }
@@ -388,12 +348,8 @@ type LargeEventTest struct {
 	NumEvents *big.Int
 }
 
-func (l LargeEventTest) Run(
-	tc tests.TestContext,
-	ctx context.Context,
-	wallet *Wallet,
-) {
-	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+func (l LargeEventTest) Run(tc tests.TestContext, wallet *Wallet) {
+	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 		return l.Contract.SimulateLargeEvent(txOpts, l.NumEvents)
 	})
 }
@@ -402,12 +358,8 @@ type ExternalCallTest struct {
 	Contract *contracts.EVMLoadSimulator
 }
 
-func (e ExternalCallTest) Run(
-	tc tests.TestContext,
-	ctx context.Context,
-	wallet *Wallet,
-) {
-	executeContractTx(tc, ctx, wallet, e.Contract.SimulateExternalCall)
+func (e ExternalCallTest) Run(tc tests.TestContext, wallet *Wallet) {
+	executeContractTx(tc, wallet, e.Contract.SimulateExternalCall)
 }
 
 type TrieStressTest struct {
@@ -415,19 +367,14 @@ type TrieStressTest struct {
 	NumValues *big.Int
 }
 
-func (t TrieStressTest) Run(
-	tc tests.TestContext,
-	ctx context.Context,
-	wallet *Wallet,
-) {
-	executeContractTx(tc, ctx, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+func (t TrieStressTest) Run(tc tests.TestContext, wallet *Wallet) {
+	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 		return t.Contract.WriteValues(txOpts, t.NumValues)
 	})
 }
 
 func executeContractTx(
 	tc tests.TestContext,
-	ctx context.Context,
 	wallet *Wallet,
 	txFunc func(*bind.TransactOpts) (*types.Transaction, error),
 ) {
@@ -439,7 +386,7 @@ func executeContractTx(
 	tx, err := txFunc(txOpts)
 	require.NoError(err)
 
-	require.NoError(wallet.SendTx(ctx, tx))
+	require.NoError(wallet.SendTx(tc.GetDefaultContextParent(), tx))
 }
 
 // newTxOpts returns transactions options for contract calls, with sending disabled
