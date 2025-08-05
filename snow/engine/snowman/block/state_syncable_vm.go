@@ -43,3 +43,23 @@ type StateSyncableVM interface {
 	// [summaryHeight].
 	GetStateSummary(ctx context.Context, summaryHeight uint64) (StateSummary, error)
 }
+
+type StateSyncableVMDisabled struct{}
+
+func (StateSyncableVMDisabled) StateSyncEnabled(context.Context) (bool, error) { return false, nil }
+
+func (StateSyncableVMDisabled) GetOngoingSyncStateSummary(context.Context) (StateSummary, error) {
+	return nil, ErrStateSyncableVMNotImplemented
+}
+
+func (StateSyncableVMDisabled) GetLastStateSummary(context.Context) (StateSummary, error) {
+	return nil, ErrStateSyncableVMNotImplemented
+}
+
+func (StateSyncableVMDisabled) ParseStateSummary(ctx context.Context, summaryBytes []byte) (StateSummary, error) {
+	return nil, ErrStateSyncableVMNotImplemented
+}
+
+func (StateSyncableVMDisabled) GetStateSummary(ctx context.Context, summaryHeight uint64) (StateSummary, error) {
+	return nil, ErrStateSyncableVMNotImplemented
+}
