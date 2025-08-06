@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	synccommon "github.com/ava-labs/coreth/sync"
+	"github.com/ava-labs/coreth/sync/blocksync"
 	syncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/sync/statesync"
 
@@ -22,18 +23,18 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 )
 
 const (
-	// ParentsToFetch is the number of the block parents the state syncs to.
+	// BlocksToFetch is the number of the block parents the state syncs to.
 	// The last 256 block hashes are necessary to support the BLOCKHASH opcode.
-	ParentsToFetch = 256
+	BlocksToFetch = 256
 
 	atomicStateSyncOperationName = "Atomic State Sync"
+	blockSyncOperationName       = "Block Sync"
 	evmStateSyncOperationName    = "EVM State Sync"
 )
 
@@ -154,10 +155,6 @@ func (client *client) ParseStateSummary(_ context.Context, summaryBytes []byte) 
 }
 
 func (client *client) stateSync(ctx context.Context) error {
-	if err := client.syncBlocks(ctx, client.summary.GetBlockHash(), client.summary.Height(), ParentsToFetch); err != nil {
-		return err
-	}
-
 	// Create and register all syncers.
 	registry := NewSyncerRegistry()
 
@@ -170,6 +167,15 @@ func (client *client) stateSync(ctx context.Context) error {
 }
 
 func (client *client) registerSyncers(ctx context.Context, registry *SyncerRegistry) error {
+	// Register block syncer.
+	syncer, err := client.createBlockSyncer(ctx, client.summary.GetBlockHash(), client.summary.Height())
+	if err != nil {
+		return fmt.Errorf("failed to create block syncer: %w", err)
+	}
+	if err := registry.Register(blockSyncOperationName, syncer); err != nil {
+		return fmt.Errorf("failed to register block syncer: %w", err)
+	}
+
 	// Register EVM state syncer.
 	evmSyncer, err := client.createEVMSyncer()
 	if err != nil {
@@ -193,6 +199,16 @@ func (client *client) registerSyncers(ctx context.Context, registry *SyncerRegis
 	}
 
 	return nil
+}
+
+func (client *client) createBlockSyncer(ctx context.Context, fromHash common.Hash, fromHeight uint64) (synccommon.Syncer, error) {
+	return blocksync.NewSyncer(&blocksync.Config{
+		ChainDB:       client.ChainDB,
+		Client:        client.Client,
+		FromHash:      fromHash,
+		FromHeight:    fromHeight,
+		BlocksToFetch: BlocksToFetch,
+	})
 }
 
 func (client *client) createEVMSyncer() (synccommon.Syncer, error) {
@@ -275,57 +291,6 @@ func (client *client) acceptSyncSummary(proposedSummary message.Syncable) (block
 		close(client.StateSyncDone)
 	}()
 	return block.StateSyncStatic, nil
-}
-
-// syncBlocks fetches (up to) [parentsToGet] blocks from peers
-// using [client] and writes them to disk.
-// the process begins with [fromHash] and it fetches parents recursively.
-// fetching starts from the first ancestor not found on disk
-func (client *client) syncBlocks(ctx context.Context, fromHash common.Hash, fromHeight uint64, parentsToGet int) error {
-	nextHash := fromHash
-	nextHeight := fromHeight
-	parentsPerRequest := uint16(32)
-
-	// first, check for blocks already available on disk so we don't
-	// request them from peers.
-	for parentsToGet >= 0 {
-		blk := rawdb.ReadBlock(client.ChainDB, nextHash, nextHeight)
-		if blk != nil {
-			// block exists
-			nextHash = blk.ParentHash()
-			nextHeight--
-			parentsToGet--
-			continue
-		}
-
-		// block was not found
-		break
-	}
-
-	// get any blocks we couldn't find on disk from peers and write
-	// them to disk.
-	batch := client.ChainDB.NewBatch()
-	for i := parentsToGet - 1; i >= 0 && (nextHash != common.Hash{}); {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		blocks, err := client.Client.GetBlocks(ctx, nextHash, nextHeight, parentsPerRequest)
-		if err != nil {
-			log.Error("could not get blocks from peer", "err", err, "nextHash", nextHash, "remaining", i+1)
-			return err
-		}
-		for _, block := range blocks {
-			rawdb.WriteBlock(batch, block)
-			rawdb.WriteCanonicalHash(batch, block.Hash(), block.NumberU64())
-
-			i--
-			nextHash = block.ParentHash()
-			nextHeight--
-		}
-		log.Info("fetching blocks from peer", "remaining", i+1, "total", parentsToGet)
-	}
-	log.Info("fetched blocks from peer", "total", parentsToGet)
-	return batch.Write()
 }
 
 func (client *client) Shutdown() error {
