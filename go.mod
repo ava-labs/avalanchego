@@ -15,9 +15,9 @@ require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/StephenButtolph/canoto v0.17.1
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.15.3-rc.1.0.20250725195542-1eac5a404f5e
+	github.com/ava-labs/coreth v0.15.3-rc.5
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60
-	github.com/ava-labs/libevm v1.13.14-0.3.0.rc.3
+	github.com/ava-labs/libevm v1.13.14-0.3.0.rc.6
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
 	github.com/compose-spec/compose-go v1.20.2
@@ -80,8 +80,6 @@ require (
 	k8s.io/client-go v0.29.0
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
-
-require github.com/kylelemons/godebug v1.1.0 // indirect
 
 require (
 	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e // indirect
@@ -148,6 +146,7 @@ require (
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
+	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect

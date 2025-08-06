@@ -1,14 +1,15 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 
 	dto "github.com/prometheus/client_model/go"
 )
@@ -34,39 +35,20 @@ func TestPrefixGatherer_Gather(t *testing.T) {
 		require.NoError(registerB.Register(counterB))
 	}
 
-	metrics, err := gatherer.Gather()
-	require.NoError(err)
-	require.Equal(
-		[]*dto.MetricFamily{
-			{
-				Name: proto.String("a_counter"),
-				Help: proto.String(counterOpts.Help),
-				Type: dto.MetricType_COUNTER.Enum(),
-				Metric: []*dto.Metric{
-					{
-						Label: []*dto.LabelPair{},
-						Counter: &dto.Counter{
-							Value: proto.Float64(0),
-						},
-					},
-				},
-			},
-			{
-				Name: proto.String("b_counter"),
-				Help: proto.String(counterOpts.Help),
-				Type: dto.MetricType_COUNTER.Enum(),
-				Metric: []*dto.Metric{
-					{
-						Label: []*dto.LabelPair{},
-						Counter: &dto.Counter{
-							Value: proto.Float64(1),
-						},
-					},
-				},
-			},
-		},
-		metrics,
-	)
+	wantMetrics := `
+# HELP a_counter help
+# TYPE a_counter counter
+a_counter 0
+
+# HELP b_counter help
+# TYPE b_counter counter
+b_counter 1
+`
+
+	require.NoError(testutil.GatherAndCompare(
+		gatherer,
+		strings.NewReader(wantMetrics),
+	))
 }
 
 func TestPrefixGatherer_Register(t *testing.T) {
