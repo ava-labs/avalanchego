@@ -206,6 +206,19 @@ mod ethhash {
     }
 
     impl HashOrRlp {
+        /// Creates a new `TrieHash` from the default value, which is the all zeros.
+        ///
+        /// ```
+        /// assert_eq!(
+        ///     firewood_storage::HashType::empty(),
+        ///     firewood_storage::HashType::from([0; 32]),
+        /// )
+        /// ```
+        #[must_use]
+        pub fn empty() -> Self {
+            TrieHash::empty().into()
+        }
+
         pub fn as_slice(&self) -> &[u8] {
             self
         }
@@ -275,6 +288,14 @@ mod ethhash {
         }
     }
 
+    impl TryFrom<&[u8]> for HashOrRlp {
+        type Error = crate::InvalidTrieHashLength;
+
+        fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+            value.try_into().map(HashOrRlp::Hash)
+        }
+    }
+
     impl AsRef<[u8]> for HashOrRlp {
         fn as_ref(&self) -> &[u8] {
             match self {
@@ -303,12 +324,6 @@ mod ethhash {
                     write!(f, "{:.*}", width, hex::encode(r))
                 }
             }
-        }
-    }
-
-    impl Default for HashOrRlp {
-        fn default() -> Self {
-            HashOrRlp::Hash(TrieHash::default())
         }
     }
 }

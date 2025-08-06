@@ -735,7 +735,7 @@ mod test {
 
         // Replace branch hash with a wrong hash
         let (leaf_addr, _) = branch.children[1].as_ref().unwrap().persist_info().unwrap();
-        branch.children[1] = Some(Child::AddressWithHash(leaf_addr, HashType::default()));
+        branch.children[1] = Some(Child::AddressWithHash(leaf_addr, HashType::empty()));
         test_write_new_node(&nodestore, branch_node, branch_addr.get());
 
         // Compute the current branch hash

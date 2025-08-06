@@ -13,8 +13,6 @@
 use std::collections::{HashMap, VecDeque};
 use std::num::NonZero;
 use std::path::PathBuf;
-#[cfg(feature = "ethhash")]
-use std::sync::OnceLock;
 use std::sync::{Arc, Mutex, RwLock};
 
 use firewood_storage::logger::{trace, warn};
@@ -22,14 +20,14 @@ use metrics::gauge;
 use typed_builder::TypedBuilder;
 
 use crate::merkle::Merkle;
-use crate::v2::api::HashKey;
+use crate::v2::api::{HashKey, OptionalHashKeyExt};
 
 pub use firewood_storage::CacheReadStrategy;
 use firewood_storage::{
     Committed, FileBacked, FileIoError, HashedNodeReader, ImmutableProposal, NodeStore, TrieHash,
 };
 
-#[derive(Clone, Debug, TypedBuilder)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, TypedBuilder)]
 /// Revision manager configuratoin
 pub struct RevisionManagerConfig {
     /// The number of historical revisions to keep in memory.
@@ -61,9 +59,6 @@ pub(crate) struct RevisionManager {
     proposals: Mutex<Vec<ProposedRevision>>,
     // committing_proposals: VecDeque<Arc<ProposedImmutable>>,
     by_hash: RwLock<HashMap<TrieHash, CommittedRevision>>,
-
-    #[cfg(feature = "ethhash")]
-    empty_hash: OnceLock<TrieHash>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -99,11 +94,9 @@ impl RevisionManager {
             by_hash: RwLock::new(Default::default()),
             proposals: Mutex::new(Default::default()),
             // committing_proposals: Default::default(),
-            #[cfg(feature = "ethhash")]
-            empty_hash: OnceLock::new(),
         };
 
-        if let Some(hash) = nodestore.root_hash().or_else(|| manager.empty_trie_hash()) {
+        if let Some(hash) = nodestore.root_hash().or_default_root_hash() {
             manager
                 .by_hash
                 .write()
@@ -123,13 +116,13 @@ impl RevisionManager {
             .read()
             .expect("poisoned lock")
             .iter()
-            .filter_map(|r| r.root_hash().or_else(|| self.empty_trie_hash()))
+            .filter_map(|r| r.root_hash().or_default_root_hash())
             .chain(
                 self.proposals
                     .lock()
                     .expect("poisoned lock")
                     .iter()
-                    .filter_map(|p| p.root_hash().or_else(|| self.empty_trie_hash())),
+                    .filter_map(|p| p.root_hash().or_default_root_hash()),
             )
             .collect()
     }
@@ -173,7 +166,7 @@ impl RevisionManager {
                 .expect("poisoned lock")
                 .pop_front()
                 .expect("must be present");
-            if let Some(oldest_hash) = oldest.root_hash().or_else(|| self.empty_trie_hash()) {
+            if let Some(oldest_hash) = oldest.root_hash().or_default_root_hash() {
                 self.by_hash
                     .write()
                     .expect("poisoned lock")
@@ -212,7 +205,7 @@ impl RevisionManager {
             .write()
             .expect("poisoned lock")
             .push_back(committed.clone());
-        if let Some(hash) = committed.root_hash().or_else(|| self.empty_trie_hash()) {
+        if let Some(hash) = committed.root_hash().or_default_root_hash() {
             self.by_hash
                 .write()
                 .expect("poisoned lock")
@@ -290,21 +283,6 @@ impl RevisionManager {
             .back()
             .expect("there is always one revision")
             .clone()
-    }
-    #[cfg(not(feature = "ethhash"))]
-    #[inline]
-    pub const fn empty_trie_hash(&self) -> Option<TrieHash> {
-        None
-    }
-
-    #[cfg(feature = "ethhash")]
-    #[inline]
-    pub fn empty_trie_hash(&self) -> Option<TrieHash> {
-        Some(
-            self.empty_hash
-                .get_or_init(firewood_storage::empty_trie_hash)
-                .clone(),
-        )
     }
 }
 

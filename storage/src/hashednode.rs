@@ -45,7 +45,7 @@ pub fn hash_node(node: &Node, path_prefix: &Path) -> HashType {
 #[must_use]
 pub fn hash_preimage(node: &Node, path_prefix: &Path) -> Box<[u8]> {
     // Key, 3 options, value digest
-    let est_len = node.partial_path().len() + path_prefix.len() + 3 + HashType::default().len();
+    let est_len = node.partial_path().len() + path_prefix.len() + 3 + HashType::empty().len();
     let mut buf = Vec::with_capacity(est_len);
     match node {
         Node::Branch(node) => {

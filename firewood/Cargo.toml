@@ -62,6 +62,7 @@ tokio = { workspace = true, features = ["rt", "sync", "macros", "rt-multi-thread
 # Regular dependencies
 hash-db = "0.16.0"
 plain_hasher = "0.2.3"
+rlp = "0.6.1"
 sha3 = "0.10.8"
 
 [[bench]]

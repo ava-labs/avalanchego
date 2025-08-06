@@ -8,14 +8,16 @@
 
 use crate::merkle::{Merkle, Value};
 use crate::stream::MerkleKeyValueStream;
-use crate::v2::api::{self, FrozenProof, FrozenRangeProof, KeyType, ValueType};
+use crate::v2::api::{
+    self, FrozenProof, FrozenRangeProof, HashKey, KeyType, OptionalHashKeyExt, ValueType,
+};
 pub use crate::v2::api::{Batch, BatchOp};
 
 use crate::manager::{RevisionManager, RevisionManagerConfig};
 use async_trait::async_trait;
 use firewood_storage::{
     CheckOpt, CheckerReport, Committed, FileBacked, FileIoError, HashedNodeReader,
-    ImmutableProposal, NodeStore, TrieHash,
+    ImmutableProposal, NodeStore,
 };
 use metrics::{counter, describe_counter};
 use std::io::Write;
@@ -97,7 +99,7 @@ impl api::DbView for HistoricalRev {
     where
         Self: 'view;
 
-    async fn root_hash(&self) -> Result<Option<api::HashKey>, api::Error> {
+    async fn root_hash(&self) -> Result<Option<HashKey>, api::Error> {
         Ok(HashedNodeReader::root_hash(self))
     }
 
@@ -165,16 +167,16 @@ impl api::Db for Db {
     where
         Self: 'db;
 
-    async fn revision(&self, root_hash: TrieHash) -> Result<Arc<Self::Historical>, api::Error> {
+    async fn revision(&self, root_hash: HashKey) -> Result<Arc<Self::Historical>, api::Error> {
         let nodestore = self.manager.revision(root_hash)?;
         Ok(nodestore)
     }
 
-    async fn root_hash(&self) -> Result<Option<TrieHash>, api::Error> {
+    async fn root_hash(&self) -> Result<Option<HashKey>, api::Error> {
         self.root_hash_sync()
     }
 
-    async fn all_hashes(&self) -> Result<Vec<TrieHash>, api::Error> {
+    async fn all_hashes(&self) -> Result<Vec<HashKey>, api::Error> {
         Ok(self.manager.all_hashes())
     }
 
@@ -227,11 +229,8 @@ impl Db {
             proposals: counter!("firewood.proposals"),
         });
         describe_counter!("firewood.proposals", "Number of proposals created");
-        let manager = RevisionManager::new(
-            db_path.as_ref().to_path_buf(),
-            cfg.truncate,
-            cfg.manager.clone(),
-        )?;
+        let manager =
+            RevisionManager::new(db_path.as_ref().to_path_buf(), cfg.truncate, cfg.manager)?;
         let db = Self { metrics, manager };
         Ok(db)
     }
@@ -242,39 +241,25 @@ impl Db {
             proposals: counter!("firewood.proposals"),
         });
         describe_counter!("firewood.proposals", "Number of proposals created");
-        let manager = RevisionManager::new(
-            db_path.as_ref().to_path_buf(),
-            cfg.truncate,
-            cfg.manager.clone(),
-        )?;
+        let manager =
+            RevisionManager::new(db_path.as_ref().to_path_buf(), cfg.truncate, cfg.manager)?;
         let db = Self { metrics, manager };
         Ok(db)
     }
 
     /// Synchronously get the root hash of the latest revision.
-    #[cfg(not(feature = "ethhash"))]
-    pub fn root_hash_sync(&self) -> Result<Option<TrieHash>, api::Error> {
-        self.manager.root_hash().map_err(api::Error::from)
-    }
-
-    /// Synchronously get the root hash of the latest revision.
-    #[cfg(feature = "ethhash")]
-    pub fn root_hash_sync(&self) -> Result<Option<TrieHash>, api::Error> {
-        Ok(Some(
-            self.manager
-                .root_hash()?
-                .unwrap_or_else(firewood_storage::empty_trie_hash),
-        ))
+    pub fn root_hash_sync(&self) -> Result<Option<HashKey>, api::Error> {
+        Ok(self.manager.root_hash()?.or_default_root_hash())
     }
 
     /// Synchronously get a revision from a root hash
-    pub fn revision_sync(&self, root_hash: TrieHash) -> Result<Arc<HistoricalRev>, api::Error> {
+    pub fn revision_sync(&self, root_hash: HashKey) -> Result<Arc<HistoricalRev>, api::Error> {
         let nodestore = self.manager.revision(root_hash)?;
         Ok(nodestore)
     }
 
     /// Synchronously get a view, either committed or proposed
-    pub fn view_sync(&self, root_hash: TrieHash) -> Result<Box<dyn DbViewSyncBytes>, api::Error> {
+    pub fn view_sync(&self, root_hash: HashKey) -> Result<Box<dyn DbViewSyncBytes>, api::Error> {
         let nodestore = self.manager.view(root_hash)?;
         Ok(nodestore)
     }
@@ -345,20 +330,9 @@ pub struct Proposal<'db> {
 }
 
 impl Proposal<'_> {
-    /// Get the root hash of the proposal synchronously
-    #[cfg(not(feature = "ethhash"))]
-    pub fn root_hash_sync(&self) -> Result<Option<api::HashKey>, api::Error> {
-        Ok(self.nodestore.root_hash())
-    }
-
-    /// Get the root hash of the proposal synchronously
-    #[cfg(feature = "ethhash")]
-    pub fn root_hash_sync(&self) -> Result<Option<api::HashKey>, api::Error> {
-        Ok(Some(
-            self.nodestore
-                .root_hash()
-                .unwrap_or_else(firewood_storage::empty_trie_hash),
-        ))
+    /// Synchronously get the root hash of the latest revision.
+    pub fn root_hash_sync(&self) -> Result<Option<HashKey>, api::Error> {
+        Ok(self.nodestore.root_hash().or_default_root_hash())
     }
 }
 

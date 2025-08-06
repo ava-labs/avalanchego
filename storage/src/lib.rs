@@ -56,8 +56,7 @@ pub use nodestore::{
 pub use linear::filebacked::FileBacked;
 pub use linear::memory::MemStore;
 pub use node::persist::MaybePersistedNode;
-
-pub use trie_hash::TrieHash;
+pub use trie_hash::{InvalidTrieHashLength, TrieHash};
 
 /// A shared node, which is just a triophe Arc of a node
 pub type SharedNode = triomphe::Arc<Node>;
@@ -66,7 +65,7 @@ pub type SharedNode = triomphe::Arc<Node>;
 /// from the storage layer. Generally, we only want to
 /// cache write operations, but for some read-heavy workloads
 /// you can enable caching of branch reads or all reads.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum CacheReadStrategy {
     /// Only cache writes (no reads will be cached)
     WritesOnly,
@@ -82,24 +81,6 @@ impl Display for CacheReadStrategy {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{self:?}")
     }
-}
-
-/// Returns the hash of an empty trie, which is the Keccak256 hash of the RLP encoding of an empty byte array.
-///
-/// This function is slow, so callers should cache the result
-#[cfg(feature = "ethhash")]
-#[must_use]
-#[expect(
-    clippy::missing_panics_doc,
-    reason = "Found 1 occurrences after enabling the lint."
-)]
-pub fn empty_trie_hash() -> TrieHash {
-    use sha3::Digest as _;
-
-    sha3::Keccak256::digest(rlp::NULL_RLP)
-        .as_slice()
-        .try_into()
-        .expect("empty trie hash is 32 bytes")
 }
 
 /// This enum encapsulates what points to the stored area.

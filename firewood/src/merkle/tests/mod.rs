@@ -458,11 +458,7 @@ fn single_key_proof() {
 
         {
             // Test that the proof is invalid when the hash is different
-            assert!(
-                proof
-                    .verify(key, Some(value), &TrieHash::default())
-                    .is_err()
-            );
+            assert!(proof.verify(key, Some(value), &TrieHash::empty()).is_err());
         }
     }
 }

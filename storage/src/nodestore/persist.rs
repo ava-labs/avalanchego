@@ -563,7 +563,7 @@ mod tests {
         for (index, child) in children {
             let shared_child = SharedNode::new(child);
             let maybe_persisted = MaybePersistedNode::from(shared_child);
-            let hash = HashType::default();
+            let hash = HashType::empty();
             branch.children[index as usize] = Some(Child::MaybePersisted(maybe_persisted, hash));
         }
 
@@ -670,21 +670,21 @@ mod tests {
             // unpersisted leaves
             Child::MaybePersisted(
                 MaybePersistedNode::from(SharedNode::new(leaves[0].clone())),
-                HashType::default(),
+                HashType::empty(),
             ),
             Child::MaybePersisted(
                 MaybePersistedNode::from(SharedNode::new(leaves[1].clone())),
-                HashType::default(),
+                HashType::empty(),
             ),
             // unpersisted branch
             Child::MaybePersisted(
                 MaybePersistedNode::from(SharedNode::new(inner_branch.clone())),
-                HashType::default(),
+                HashType::empty(),
             ),
             // persisted branch
             Child::MaybePersisted(
                 MaybePersistedNode::from(LinearAddress::new(42).unwrap()),
-                HashType::default(),
+                HashType::empty(),
             ),
         ]
         .into_iter()

@@ -238,7 +238,7 @@ fn get_from_root(
     key: &Value,
 ) -> Result<Value, String> {
     let db = db.ok_or("db should be non-null")?;
-    let requested_root = root.as_slice().try_into()?;
+    let requested_root = HashKey::try_from(root.as_slice()).map_err(|e| e.to_string())?;
     let mut cached_view = db.cached_view.lock().expect("cached_view lock is poisoned");
     let value = match cached_view.as_ref() {
         // found the cached view, use it
@@ -266,7 +266,7 @@ fn view_sync_from_root(
     root: &Value,
 ) -> Result<Box<dyn DbViewSyncBytes>, String> {
     let rev = db
-        .view_sync(root.as_slice().try_into()?)
+        .view_sync(HashKey::try_from(root.as_slice()).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
     Ok(rev)
 }

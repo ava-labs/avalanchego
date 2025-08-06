@@ -47,7 +47,7 @@ where
     V: AsRef<[u8]>,
 {
     let merkle = init_merkle(kvs.clone());
-    let firewood_hash = merkle.nodestore.root_hash().unwrap_or_default();
+    let firewood_hash = merkle.nodestore.root_hash().unwrap_or_else(TrieHash::empty);
     let eth_hash = KeccakHasher::trie_root(kvs).to_fixed_bytes().into();
     assert_eq!(firewood_hash, eth_hash);
 }
