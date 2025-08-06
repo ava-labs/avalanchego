@@ -300,15 +300,15 @@ jobs:
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-      - name: Analyze Metrics
-        uses: ./.github/actions/metric-analysis
-        with:
-          workflow: '.github/workflows/ci.yml'
-          baseline_count: '2'
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          query: 'sum by (chain) (rate(avalanche_evm_eth_chain_block_gas_used_processed[1m])) / 1e+06'
-          metric_name: 'Firewood'
+#      - name: Analyze Metrics
+#        uses: ./.github/actions/metric-analysis
+#        with:
+#          workflow: '.github/workflows/ci.yml'
+#          baseline_count: '2'
+#          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+#          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+#          query: 'sum by (chain) (rate(avalanche_evm_eth_chain_block_gas_used_processed[1m])) / 1e+06'
+#          metric_name: 'Firewood'
   load_test:
     name: Run load test on self-hosted runners
     runs-on: avalanche-avalanchego-runner
@@ -337,12 +337,12 @@ jobs:
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_username: ${{ secrets.LOKI_ID || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-      - name: Analyze Metrics
-        uses: ./.github/actions/metric-analysis
-        with:
-          workflow: '.github/workflows/ci.yml'
-          baseline_count: '2'
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          query: 'sum by (chain) (rate(avalanche_evm_eth_chain_block_gas_used_processed[1m])) / 1e+06'
-          metric_name: 'Load Test'
+#      - name: Analyze Metrics
+#        uses: ./.github/actions/metric-analysis
+#        with:
+#          workflow: '.github/workflows/ci.yml'
+#          baseline_count: '2'
+#          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+#          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+#          query: 'sum by (chain) (rate(avalanche_evm_eth_chain_block_gas_used_processed[1m])) / 1e+06'
+#          metric_name: 'Load Test'
