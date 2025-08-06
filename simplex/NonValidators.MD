@@ -48,3 +48,7 @@ Non-validators should re-use this logic and can ignore any `QuorumRound` that do
 **Processing Replication Responses**
 
 When a non-validator receives a `ReplicationResponse`, it needs to verify the `QuorumRounds` by verifying the aggregated BLS signature amongst the corresponding validator set. Since different epochs can be [configured](https://github.com/ava-labs/avalanchego/pull/4124) with different validator sets, the non-validator needs to ensure it has the correct validator set for the epoch in which the `Finalization` was created. In the proposed implementation, the `Epoch` number represents the sequence of the sealing block the `Finalization` was created for. The non-validator node can follow [this proposed logic](https://github.com/ava-labs/avalanchego/pull/4124/files#diff-b9b433e0fcc085f654c562e9eaadb1e4de29b7fe6ee4bdc970280b895b3c078bR305) to verify the missing `Finalizations`:
+
+**Bringing It All Together**
+
+Non-validators do not need to participate in consensus, so they can run a simplified version of `Simplex` that only processes `FinalizationMessages` and `ReplicationRequests/Responses`. The non-validator can maintain its own list of known validator nodes to send `ReplicationRequests` to. Whenever it receives a `FinalizationMessage` for a higher sequence than it currently knows, it can initiate the replication process by sending `ReplicationRequests` to the validators, or first syncing the correct validator set if necessary. Once it receives the `ReplicationResponses`, it can verify and store the accepted blocks.
