@@ -26,8 +26,16 @@ const OS_PAGE_SIZE: u64 = 4096;
 
 #[inline]
 // return u64 since the start address may be 0
-const fn page_start(addr: LinearAddress) -> u64 {
-    addr.get() & !(OS_PAGE_SIZE - 1)
+const fn page_number(addr: LinearAddress) -> u64 {
+    addr.get() / OS_PAGE_SIZE
+}
+
+fn extra_read_pages(addr: LinearAddress, page_size: u64) -> Option<u64> {
+    let start_page = page_number(addr);
+    let end_page = page_number(addr.advance(page_size.saturating_sub(1))?);
+    let pages_read = end_page.saturating_sub(start_page);
+    let min_pages = page_size / OS_PAGE_SIZE;
+    Some(pages_read.saturating_sub(min_pages))
 }
 
 #[cfg(feature = "ethhash")]
@@ -92,7 +100,7 @@ pub struct FreeListsStats {
     /// The distribution of area sizes in the free lists
     pub area_counts: HashMap<u64, u64>,
     /// The number of stored areas that span multiple pages
-    pub multi_page_area_count: u64,
+    pub extra_unaligned_page_read: u64,
 }
 
 struct SubTrieMetadata {
@@ -311,12 +319,9 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                     trie_stats.low_occupancy_area_count.saturating_add(1);
             }
             // collect the multi-page area count
-            if page_start(subtrie_root_address)
-                != page_start(
-                    subtrie_root_address
-                        .advance(area_size)
-                        .expect("impossible since we checked in visited.insert_area()"),
-                )
+            if extra_read_pages(subtrie_root_address, area_size)
+                .expect("impossible since we checked in visited.insert_area()")
+                > 0
             {
                 trie_stats.multi_page_area_count =
                     trie_stats.multi_page_area_count.saturating_add(1);
@@ -447,11 +452,9 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                 let area_count = area_counts.entry(area_size).or_insert(0);
                 *area_count = area_count.saturating_add(1);
                 // collect the multi-page area count
-                if page_start(addr)
-                    != page_start(
-                        addr.advance(area_size.saturating_sub(1))   // subtract 1 to get the last byte of the area
-                            .expect("impossible since we checked in visited.insert_area()"),
-                    )
+                if extra_read_pages(addr, area_size)
+                    .expect("impossible since we checked in visited.insert_area()")
+                    > 0
                 {
                     multi_page_area_count = multi_page_area_count.saturating_add(1);
                 }
@@ -461,7 +464,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         (
             FreeListsStats {
                 area_counts,
-                multi_page_area_count,
+                extra_unaligned_page_read: multi_page_area_count,
             },
             errors,
         )
@@ -812,8 +815,7 @@ mod test {
                 );
                 next_free_block = Some(LinearAddress::new(high_watermark).unwrap());
                 let start_addr = LinearAddress::new(high_watermark).unwrap();
-                let end_addr = start_addr.advance(*area_size - 1).unwrap();
-                if page_start(start_addr) != page_start(end_addr) {
+                if extra_read_pages(start_addr, *area_size).unwrap() > 0 {
                     multi_page_area_count = multi_page_area_count.saturating_add(1);
                 }
                 high_watermark += area_size;
@@ -825,7 +827,7 @@ mod test {
         }
         let expected_free_lists_stats = FreeListsStats {
             area_counts: free_area_counts,
-            multi_page_area_count,
+            extra_unaligned_page_read: multi_page_area_count,
         };
 
         // write header
@@ -843,7 +845,7 @@ mod test {
 
     #[test]
     // Free list 1: 2048 bytes
-    // Free list 2: 4096 bytes
+    // Free list 2: 8192 bytes
     // ---------------------------------------------------------------------------------------------------------------------------
     // | header | empty | free_list1_area3 | free_list1_area2 | overlap | free_list1_area1 | free_list2_area1 | free_list2_area2 |
     // ---------------------------------------------------------------------------------------------------------------------------
@@ -882,7 +884,7 @@ mod test {
         free_lists[area_index1 as usize] = next_free_block1;
 
         // second free list
-        let area_index2 = 10; // 4096
+        let area_index2 = 12; // 16384
         let area_size2 = AREA_SIZES[area_index2 as usize];
         let mut next_free_block2 = None;
 
@@ -912,7 +914,7 @@ mod test {
         }];
         let expected_free_lists_stats = FreeListsStats {
             area_counts: HashMap::from([(area_size1, 1), (area_size2, 2)]),
-            multi_page_area_count: 0,
+            extra_unaligned_page_read: 0,
         };
 
         // test that the we traversed all the free areas
