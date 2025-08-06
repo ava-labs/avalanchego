@@ -13,6 +13,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -162,47 +163,32 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
-	dbToSync, err := generateTrie(t, r, 1000)
+	numKeys := 1000
+	db, err := generateTrie(t, r, numKeys)
 	require.NoError(err)
-	syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
-	require.NoError(err)
-
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-	)
+	root, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
+	proofParser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	require.NoError(err)
+
+	// Apply all changes from the db to sync to the local db
 	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
-		TargetRoot:            syncRoot,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-		BranchFactor:          merkledb.BranchFactor16,
-	}, prometheus.NewRegistry())
+	fullProof, err := db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), numKeys)
 	require.NoError(err)
-	require.NotNil(syncer)
+	fullProofBytes, err := proto.Marshal(fullProof.ToProto())
 
-	proofParser, ok := syncer.proofParser.(*proofParser)
-	require.True(ok)
-
-	require.NoError(syncer.Start(context.Background()))
-	require.NoError(syncer.Wait(context.Background()))
-
-	proof, err := dbToSync.GetRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 500)
+	rangeProof, err := proofParser.ParseRangeProof(fullProofBytes, root[:], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), uint32(numKeys))
 	require.NoError(err)
+	require.NoError(rangeProof.Verify(ctx))
 
-	// the two dbs should be in sync, so next key should be nil
-	lastKey := proof.KeyChanges[len(proof.KeyChanges)-1].Key
-	nextKey, err := findNextKey(context.Background(), db, lastKey, maybe.Nothing[[]byte](), proof.EndProof, proofParser.tokenSize)
+	// We don't need to commit the proof, since all keys are already present
+	nextKey, err := rangeProof.FindNextKey(ctx)
 	require.NoError(err)
 	require.True(nextKey.IsNothing())
 
 	// add an extra value to sync db past the last key returned
+	lastKey := fullProof.KeyChanges[len(fullProof.KeyChanges)-1].Key
 	newKey := midPoint(maybe.Some(lastKey), maybe.Nothing[[]byte]())
 	newKeyVal := newKey.Value()
 	require.NoError(db.Put(newKeyVal, []byte{1}))
@@ -231,10 +217,13 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 		// both nibbles were 0, so move onto the next byte
 	}
 
-	nextKey, err = findNextKey(context.Background(), db, lastKey, maybe.Some(endPointBeforeNewKey), proof.EndProof, proofParser.tokenSize)
+	// Create a proof that ends at `endPointBeforeNewKey`, so the last key is still `lastKey`
+	rangeProof, err = proofParser.ParseRangeProof(fullProofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some(endPointBeforeNewKey), uint32(numKeys))
 	require.NoError(err)
 
 	// next key would be after the end of the range, so it returns Nothing instead
+	nextKey, err = rangeProof.FindNextKey(ctx)
+	require.NoError(err)
 	require.True(nextKey.IsNothing())
 }
 
@@ -250,15 +239,15 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	require.NoError(db.Put([]byte{0x10}, []byte{1}))
 	require.NoError(db.Put([]byte{0x11, 0x11}, []byte{2}))
 
-	syncRoot, err := db.GetMerkleRoot(context.Background())
+	ctx := context.Background()
+	root, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
 
-	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
 		DB:                    db,
 		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
 		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
-		TargetRoot:            syncRoot,
+		TargetRoot:            root,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
 		BranchFactor:          merkledb.BranchFactor16,
@@ -268,21 +257,31 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	require.True(ok)
 
 	// 0x12 was "deleted" and there should be no extra node in the proof since there was nothing with a common prefix
-	noExtraNodeProof, err := db.GetProof(context.Background(), []byte{0x12})
+	proof, err := db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Some([]byte{0x12}), 500)
 	require.NoError(err)
+	proofBytes, err := proto.Marshal(proof.ToProto())
+	require.NoError(err)
+	noExtraNodeProof, err := proofParser.ParseRangeProof(proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
+	require.NoError(err)
+	require.NoError(noExtraNodeProof.Verify(ctx))
 
 	// 0x11 was "deleted" and 0x11.0x11 should be in the exclusion proof
-	extraNodeProof, err := db.GetProof(context.Background(), []byte{0x11})
+	proof, err = db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Some([]byte{0x12}), 500)
 	require.NoError(err)
+	proofBytes, err = proto.Marshal(proof.ToProto())
+	require.NoError(err)
+	extraNodeProof, err := proofParser.ParseRangeProof(proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
+	require.NoError(err)
+	require.NoError(extraNodeProof.Verify(ctx))
 
 	// there is now another value in the range that needs to be sync'ed
 	require.NoError(db.Put([]byte{0x13}, []byte{3}))
 
-	nextKey, err := findNextKey(context.Background(), db, []byte{0x12}, maybe.Some([]byte{0x20}), noExtraNodeProof.Path, proofParser.tokenSize)
+	nextKey, err := noExtraNodeProof.FindNextKey(ctx)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x13}), nextKey)
 
-	nextKey, err = findNextKey(context.Background(), db, []byte{0x11}, maybe.Some([]byte{0x20}), extraNodeProof.Path, proofParser.tokenSize)
+	nextKey, err = extraNodeProof.FindNextKey(ctx)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x13}), nextKey)
 }
@@ -299,28 +298,29 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	require.NoError(db.Put([]byte{0x11}, []byte{1}))
 	require.NoError(db.Put([]byte{0x11, 0x11}, []byte{2}))
 
-	targetRoot, err := db.GetMerkleRoot(context.Background())
-	require.NoError(err)
-
-	proof, err := db.GetProof(context.Background(), []byte{0x11, 0x11})
-	require.NoError(err)
-
 	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
-		TargetRoot:            targetRoot,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-		BranchFactor:          merkledb.BranchFactor16,
-	}, prometheus.NewRegistry())
+	targetRoot, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
-	proofParser, ok := syncer.proofParser.(*proofParser)
-	require.True(ok)
+
+	// Get proof including 0x11.0x11
+	proofParser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	proof, err := db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
+	require.NoError(err)
+	proofBytes, err := proto.Marshal(proof.ToProto())
+	require.NoError(err)
+	rangeProof, err := proofParser.ParseRangeProof(proofBytes, targetRoot[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
+	require.NoError(err)
+	require.NoError(rangeProof.Verify(ctx))
+	nextKey, err := rangeProof.FindNextKey(ctx)
+	require.NoError(err)
+	require.True(nextKey.IsNothing())
+
+	// Add another key afterward
 	require.NoError(db.Put([]byte{0x11, 0x15}, []byte{4}))
 
-	nextKey, err := findNextKey(context.Background(), db, []byte{0x11, 0x11}, maybe.Some([]byte{0x20}), proof.Path, proofParser.tokenSize)
+	// Proof should still be valid
+	require.NoError(rangeProof.Verify(ctx))
+	nextKey, err = rangeProof.FindNextKey(ctx)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x11, 0x15}), nextKey)
 }
@@ -338,30 +338,24 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 	require.NoError(db.Put([]byte{0x12}, []byte{2}))
 	require.NoError(db.Put([]byte{0x12, 0xA0}, []byte{4}))
 
-	targetRoot, err := db.GetMerkleRoot(context.Background())
-	require.NoError(err)
-
-	proof, err := db.GetProof(context.Background(), []byte{0x12})
+	proofParser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
 	require.NoError(err)
 
 	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
-		TargetRoot:            targetRoot,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-		BranchFactor:          merkledb.BranchFactor16,
-	}, prometheus.NewRegistry())
+	root, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
 
-	proofParser, ok := syncer.proofParser.(*proofParser)
-	require.True(ok)
+	proof, err := db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Some([]byte{0x12}), 500)
+	require.NoError(err)
+	proofBytes, err := proto.Marshal(proof.ToProto())
+	require.NoError(err)
+	rangeProof, err := proofParser.ParseRangeProof(proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
+	require.NoError(err)
+	require.NoError(rangeProof.Verify(ctx))
 
+	// Delete the key and ensure we will request it next
 	require.NoError(db.Delete([]byte{0x12, 0xA0}))
-
-	nextKey, err := findNextKey(context.Background(), db, []byte{0x12}, maybe.Some([]byte{0x20}), proof.Path, proofParser.tokenSize)
+	nextKey, err := rangeProof.FindNextKey(ctx)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x12, 0xA0}), nextKey)
 }
@@ -372,122 +366,55 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
-	dbToSync, err := generateTrie(t, r, 1000)
-	require.NoError(err)
-	syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
-	require.NoError(err)
-
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-	)
+	db, err := generateTrie(t, r, 1000)
 	require.NoError(err)
 
 	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
-		TargetRoot:            syncRoot,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-		BranchFactor:          merkledb.BranchFactor16,
-	}, prometheus.NewRegistry())
+	root, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
-	require.NotNil(syncer)
-	proofParser, ok := syncer.proofParser.(*proofParser)
-	require.True(ok)
 
-	require.NoError(syncer.Start(context.Background()))
-	require.NoError(syncer.Wait(context.Background()))
+	proofParser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	require.NoError(err)
 
-	proof, err := dbToSync.GetRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 500)
+	proof, err := db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 500)
+	require.NoError(err)
+	proofBytes, err := proto.Marshal(proof.ToProto())
+	require.NoError(err)
+	rangeProof, err := proofParser.ParseRangeProof(proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 500)
 	require.NoError(err)
 
 	// add an extra value to local db
 	lastKey := proof.KeyChanges[len(proof.KeyChanges)-1].Key
 	midpoint := midPoint(maybe.Some(lastKey), maybe.Nothing[[]byte]())
 	midPointVal := midpoint.Value()
-
 	require.NoError(db.Put(midPointVal, []byte{1}))
 
 	// next key at prefix of newly added point
-	nextKey, err := findNextKey(context.Background(), db, lastKey, maybe.Nothing[[]byte](), proof.EndProof, proofParser.tokenSize)
+	nextKey, err := rangeProof.FindNextKey(ctx)
 	require.NoError(err)
 	require.True(nextKey.HasValue())
-
 	require.True(isPrefix(midPointVal, nextKey.Value()))
 
-	require.NoError(db.Delete(midPointVal))
-
-	require.NoError(dbToSync.Put(midPointVal, []byte{1}))
-
-	proof, err = dbToSync.GetRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Some(lastKey), 500)
+	// Create new proof with knowledge of new point
+	root, err = db.GetMerkleRoot(ctx)
+	require.NoError(err)
+	proof, err = db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Some(lastKey), 500)
+	require.NoError(err)
+	proofBytes, err = proto.Marshal(proof.ToProto())
+	require.NoError(err)
+	rangeProof, err = proofParser.ParseRangeProof(proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 500)
 	require.NoError(err)
 
+	// Remove from local db, to ensure we will request it
+	require.NoError(db.Delete(midPointVal))
+
 	// next key at prefix of newly added point
-	nextKey, err = findNextKey(context.Background(), db, lastKey, maybe.Nothing[[]byte](), proof.EndProof, proofParser.tokenSize)
+	nextKey, err = rangeProof.FindNextKey(ctx)
 	require.NoError(err)
 	require.True(nextKey.HasValue())
 
 	// deal with odd length key
 	require.True(isPrefix(midPointVal, nextKey.Value()))
-}
-
-func TestFindNextKeyEmptyEndProof(t *testing.T) {
-	require := require.New(t)
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now)) // #nosec G404
-
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-	)
-	require.NoError(err)
-
-	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
-		TargetRoot:            ids.Empty,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-		BranchFactor:          merkledb.BranchFactor16,
-	}, prometheus.NewRegistry())
-	require.NoError(err)
-	require.NotNil(syncer)
-	proofParser, ok := syncer.proofParser.(*proofParser)
-	require.True(ok)
-
-	for i := 0; i < 100; i++ {
-		lastReceivedKeyLen := r.Intn(16)
-		lastReceivedKey := make([]byte, lastReceivedKeyLen)
-		_, _ = r.Read(lastReceivedKey) // #nosec G404
-
-		rangeEndLen := r.Intn(16)
-		rangeEndBytes := make([]byte, rangeEndLen)
-		_, _ = r.Read(rangeEndBytes) // #nosec G404
-
-		rangeEnd := maybe.Nothing[[]byte]()
-		if rangeEndLen > 0 {
-			rangeEnd = maybe.Some(rangeEndBytes)
-		}
-
-		nextKey, err := findNextKey(
-			context.Background(),
-			db,
-			lastReceivedKey,
-			rangeEnd,
-			nil, /* endProof */
-			proofParser.tokenSize,
-		)
-		require.NoError(err)
-		require.Equal(maybe.Some(append(lastReceivedKey, 0)), nextKey)
-	}
 }
 
 func isPrefix(data []byte, prefix []byte) bool {
@@ -509,50 +436,34 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
-	dbToSync, err := generateTrie(t, r, 500)
-	require.NoError(err)
-	syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
-	require.NoError(err)
-
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-	)
+	db, err := generateTrie(t, r, 500)
 	require.NoError(err)
 
 	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
-		TargetRoot:            syncRoot,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-		BranchFactor:          merkledb.BranchFactor16,
-	}, prometheus.NewRegistry())
+	root, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
-	require.NotNil(syncer)
-	proofParser, ok := syncer.proofParser.(*proofParser)
-	require.True(ok)
 
-	require.NoError(syncer.Start(context.Background()))
-	require.NoError(syncer.Wait(context.Background()))
+	proofParser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	require.NoError(err)
 
-	proof, err := dbToSync.GetRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 100)
+	proof, err := db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 100)
 	require.NoError(err)
 	lastKey := proof.KeyChanges[len(proof.KeyChanges)-1].Key
 
-	// local db has a different child than remote db
+	// add a child
 	lastKey = append(lastKey, 16)
 	require.NoError(db.Put(lastKey, []byte{1}))
-
-	require.NoError(dbToSync.Put(lastKey, []byte{2}))
-
-	proof, err = dbToSync.GetRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key), 100)
+	root, err = db.GetMerkleRoot(ctx)
+	proof, err = db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key), 100)
+	require.NoError(err)
+	proofBytes, err := proto.Marshal(proof.ToProto())
+	require.NoError(err)
+	rangeProof, err := proofParser.ParseRangeProof(proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 500)
 	require.NoError(err)
 
-	nextKey, err := findNextKey(context.Background(), db, proof.KeyChanges[len(proof.KeyChanges)-1].Key, maybe.Nothing[[]byte](), proof.EndProof, proofParser.tokenSize)
+	// Change the value of the added child
+	require.NoError(db.Put(lastKey, []byte{2}))
+	nextKey, err := rangeProof.FindNextKey(ctx)
 	require.NoError(err)
 	require.True(nextKey.HasValue())
 	require.Equal(lastKey, nextKey.Value())
@@ -746,30 +657,24 @@ func TestFindNextKeyRandom(t *testing.T) {
 			}
 		}
 
-		// Get the actual value from the syncer
-		ctx := context.Background()
-		syncer, err := NewManager(ManagerConfig{
-			DB:                    localDB,
-			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(remoteDB)),
-			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(remoteDB)),
-			TargetRoot:            ids.GenerateTestID(),
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-			BranchFactor:          merkledb.BranchFactor16,
-		}, prometheus.NewRegistry())
+		root, err := remoteDB.GetMerkleRoot(context.Background())
 		require.NoError(err)
-		require.NotNil(syncer)
-		proofParser, ok := syncer.proofParser.(*proofParser)
-		require.True(ok)
 
-		gotFirstDiff, err := findNextKey(
-			context.Background(),
-			localDB,
-			lastReceivedKey,
+		// Parse the proof and find the next key to get.
+		proofParser, err := newParser(localDB, merkledb.DefaultHasher, merkledb.BranchFactor16)
+		proofBytes, err := proto.Marshal(remoteProof.ToProto())
+		require.NoError(err)
+		rangeProof, err := proofParser.ParseRangeProof(
+			proofBytes,
+			root[:],
+			startKey,
 			endKey,
-			remoteProof.EndProof,
-			proofParser.tokenSize,
+			uint32(maxProofLen+1),
 		)
+		require.NoError(err)
+		require.NoError(rangeProof.Verify(context.Background()))
+
+		gotFirstDiff, err := rangeProof.FindNextKey(context.Background())
 		require.NoError(err)
 
 		if bytes.Compare(smallestDiffKey.Bytes(), rangeEnd) >= 0 {
