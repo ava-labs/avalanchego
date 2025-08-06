@@ -187,7 +187,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(syncer)
 
-	proofParser, ok := syncer.proofParser.(*merkleDBProofParser)
+	proofParser, ok := syncer.proofParser.(*proofParser)
 	require.True(ok)
 
 	require.NoError(syncer.Start(context.Background()))
@@ -264,7 +264,7 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 		BranchFactor:          merkledb.BranchFactor16,
 	}, prometheus.NewRegistry())
 	require.NoError(err)
-	proofParser, ok := syncer.proofParser.(*merkleDBProofParser)
+	proofParser, ok := syncer.proofParser.(*proofParser)
 	require.True(ok)
 
 	// 0x12 was "deleted" and there should be no extra node in the proof since there was nothing with a common prefix
@@ -316,7 +316,7 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 		BranchFactor:          merkledb.BranchFactor16,
 	}, prometheus.NewRegistry())
 	require.NoError(err)
-	proofParser, ok := syncer.proofParser.(*merkleDBProofParser)
+	proofParser, ok := syncer.proofParser.(*proofParser)
 	require.True(ok)
 	require.NoError(db.Put([]byte{0x11, 0x15}, []byte{4}))
 
@@ -356,7 +356,7 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 
-	proofParser, ok := syncer.proofParser.(*merkleDBProofParser)
+	proofParser, ok := syncer.proofParser.(*proofParser)
 	require.True(ok)
 
 	require.NoError(db.Delete([]byte{0x12, 0xA0}))
@@ -396,7 +396,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 	require.NotNil(syncer)
-	proofParser, ok := syncer.proofParser.(*merkleDBProofParser)
+	proofParser, ok := syncer.proofParser.(*proofParser)
 	require.True(ok)
 
 	require.NoError(syncer.Start(context.Background()))
@@ -460,7 +460,7 @@ func TestFindNextKeyEmptyEndProof(t *testing.T) {
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 	require.NotNil(syncer)
-	proofParser, ok := syncer.proofParser.(*merkleDBProofParser)
+	proofParser, ok := syncer.proofParser.(*proofParser)
 	require.True(ok)
 
 	for i := 0; i < 100; i++ {
@@ -533,7 +533,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 	require.NotNil(syncer)
-	proofParser, ok := syncer.proofParser.(*merkleDBProofParser)
+	proofParser, ok := syncer.proofParser.(*proofParser)
 	require.True(ok)
 
 	require.NoError(syncer.Start(context.Background()))
@@ -759,7 +759,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		}, prometheus.NewRegistry())
 		require.NoError(err)
 		require.NotNil(syncer)
-		proofParser, ok := syncer.proofParser.(*merkleDBProofParser)
+		proofParser, ok := syncer.proofParser.(*proofParser)
 		require.True(ok)
 
 		gotFirstDiff, err := findNextKey(
