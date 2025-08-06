@@ -232,7 +232,7 @@ impl<T: TrieReader> Merkle<T> {
     ///
     /// * [`api::Error::ProofError`] - The proof structure is malformed or inconsistent
     /// * [`api::Error::InvalidRange`] - The proof boundaries don't match the requested range
-    /// * [`api::Error::IncorrectRootHash`] - The computed root hash doesn't match the expected hash
+    /// * [`api::Error::ParentNotLatest`] - The computed root hash doesn't match the expected hash
     /// * [`api::Error`] - Other errors during proposal construction or verification
     ///
     /// # Examples

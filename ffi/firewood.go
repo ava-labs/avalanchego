@@ -38,7 +38,6 @@ import (
 const (
 	RootLength       = 32
 	rootHashNotFound = "IO error: Root hash not found"
-	keyNotFound      = "key not found"
 )
 
 var (

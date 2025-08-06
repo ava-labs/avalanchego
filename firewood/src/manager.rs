@@ -63,12 +63,15 @@ pub(crate) struct RevisionManager {
 
 #[derive(Debug, thiserror::Error)]
 pub(crate) enum RevisionManagerError {
+    #[error("Revision for {provided:?} not found")]
+    RevisionNotFound { provided: HashKey },
     #[error(
-        "The proposal cannot be committed since it is not a direct child of the most recent commit"
+        "The proposal cannot be committed since it is not a direct child of the most recent commit. Proposal parent: {provided:?}, current root: {expected:?}"
     )]
-    NotLatest,
-    #[error("Revision not found")]
-    RevisionNotFound,
+    NotLatest {
+        provided: Option<HashKey>,
+        expected: Option<HashKey>,
+    },
     #[error("An IO error occurred during the commit")]
     FileIoError(#[from] FileIoError),
 }
@@ -149,7 +152,10 @@ impl RevisionManager {
         // 1. Commit check
         let current_revision = self.current_revision();
         if !proposal.parent_hash_is(current_revision.root_hash()) {
-            return Err(RevisionManagerError::NotLatest);
+            return Err(RevisionManagerError::NotLatest {
+                provided: proposal.root_hash(),
+                expected: current_revision.root_hash(),
+            });
         }
 
         let mut committed = proposal.as_committed(&current_revision);
@@ -258,7 +264,9 @@ impl RevisionManager {
             .iter()
             .find(|p| p.root_hash().as_ref() == Some(&root_hash))
             .cloned()
-            .ok_or(RevisionManagerError::RevisionNotFound)?;
+            .ok_or(RevisionManagerError::RevisionNotFound {
+                provided: root_hash,
+            })?;
 
         Ok(Box::new(proposal))
     }
@@ -269,7 +277,9 @@ impl RevisionManager {
             .expect("poisoned lock")
             .get(&root_hash)
             .cloned()
-            .ok_or(RevisionManagerError::RevisionNotFound)
+            .ok_or(RevisionManagerError::RevisionNotFound {
+                provided: root_hash,
+            })
     }
 
     pub fn root_hash(&self) -> Result<Option<HashKey>, RevisionManagerError> {

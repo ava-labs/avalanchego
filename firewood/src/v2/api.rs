@@ -130,19 +130,21 @@ pub fn vec_into_batch<K: KeyType, V: ValueType>(value: Vec<(K, V)>) -> Batch<K, 
 #[non_exhaustive]
 pub enum Error {
     /// A given hash key is not available in the database
-    #[error("Hash not found for key: {provided:?}")]
-    HashNotFound {
+    #[error("Revision for {provided:?} not found")]
+    RevisionNotFound {
         /// the provided hash key
-        provided: HashKey,
+        provided: Option<HashKey>,
     },
 
     /// Incorrect root hash for commit
-    #[error("Incorrect root hash for commit: {provided:?} != {current:?}")]
-    IncorrectRootHash {
+    #[error(
+        "The proposal cannot be committed since it is not a direct child of the most recent commit. Proposal parent: {provided:?}, current root: {expected:?}"
+    )]
+    ParentNotLatest {
         /// the provided root hash
-        provided: HashKey,
-        /// the current root hash
-        current: HashKey,
+        provided: Option<HashKey>,
+        /// the expected root hash
+        expected: Option<HashKey>,
     },
 
     /// Invalid range
@@ -182,10 +184,6 @@ pub enum Error {
     #[error("the latest revision is empty and has no root hash")]
     LatestIsEmpty,
 
-    /// This is not the latest proposal
-    #[error("commit the parents of this proposal first")]
-    NotLatest,
-
     /// Sibling already committed
     #[error("sibling already committed")]
     SiblingCommitted,
@@ -194,10 +192,6 @@ pub enum Error {
     #[error("proof error")]
     ProofError(#[from] ProofError),
 
-    /// Revision not found
-    #[error("revision not found")]
-    RevisionNotFound,
-
     /// An invalid root hash was provided
     #[error(transparent)]
     InvalidRootHash(#[from] firewood_storage::InvalidTrieHashLength),
@@ -205,10 +199,21 @@ pub enum Error {
 
 impl From<RevisionManagerError> for Error {
     fn from(err: RevisionManagerError) -> Self {
+        use RevisionManagerError::{FileIoError, NotLatest, RevisionNotFound};
         match err {
-            RevisionManagerError::FileIoError(io_err) => Error::FileIO(io_err),
-            RevisionManagerError::NotLatest => Error::NotLatest,
-            RevisionManagerError::RevisionNotFound => Error::RevisionNotFound,
+            NotLatest { provided, expected } => Self::ParentNotLatest { provided, expected },
+            RevisionNotFound { provided } => Self::RevisionNotFound {
+                provided: Some(provided),
+            },
+            FileIoError(io_err) => Self::FileIO(io_err),
+        }
+    }
+}
+
+impl From<crate::db::DbError> for Error {
+    fn from(value: crate::db::DbError) -> Self {
+        match value {
+            crate::db::DbError::FileIo(err) => Error::FileIO(err),
         }
     }
 }

@@ -23,6 +23,7 @@ const (
 	insert100Key      = "100"
 	emptyEthhashRoot  = "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
 	emptyFirewoodRoot = "0000000000000000000000000000000000000000000000000000000000000000"
+	errWrongParent    = "The proposal cannot be committed since it is not a direct child of the most recent commit. "
 )
 
 // expectedRoots contains the expected root hashes for different use cases across both default
@@ -433,7 +434,7 @@ func TestConflictingProposals(t *testing.T) {
 	// Now we ensure we cannot commit the other proposals.
 	for i := 1; i < numProposals; i++ {
 		err := proposals[i].Commit()
-		r.Contains(err.Error(), "commit the parents of this proposal first", "Commit(%d)", i)
+		r.Contains(err.Error(), errWrongParent, "Commit(%d)", i)
 	}
 
 	// After attempting to commit the other proposals, they should be completely invalid.
@@ -760,7 +761,7 @@ func TestProposeSameRoot(t *testing.T) {
 	// Attempt to commit P5. Since this isn't in the canonical chain, it should
 	// fail.
 	err = proposal5.Commit()
-	r.Contains(err.Error(), "commit the parents of this proposal first") // this error is internal to firewood
+	r.Contains(err.Error(), errWrongParent) // this error is internal to firewood
 
 	// We should be able to commit P4, since it is in the canonical chain.
 	err = proposal4.Commit()
