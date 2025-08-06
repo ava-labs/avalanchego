@@ -129,7 +129,7 @@ func TestVerifyTwice(t *testing.T) {
 	require.NoError(t, err)
 
 	// Attempt to verify the block again
-	b.vmBlock.(*snowmantest.Block).VerifyV = errors.New("should not be called again")
+	b.vmBlock.(*wrappedBlock).VerifyV = errors.New("should not be called again")
 	_, err = b.Verify(ctx)
 	require.NoError(t, err)
 }
@@ -179,13 +179,13 @@ func TestVerifyParentAccepted(t *testing.T) {
 	_, err := seq1Block.Verify(ctx)
 	require.NoError(t, err)
 	require.NoError(t, seq1Block.blockTracker.indexBlock(ctx, seq1Block.digest))
-	require.Equal(t, snowtest.Accepted, seq1Block.vmBlock.(*snowmantest.Block).Decidable.Status)
+	require.Equal(t, snowtest.Accepted, seq1Block.vmBlock.(*wrappedBlock).Decidable.Status)
 
 	// Verify the second block with the first block as its parent
 	_, err = seq2Block.Verify(ctx)
 	require.NoError(t, err)
 	require.NoError(t, seq2Block.blockTracker.indexBlock(ctx, seq2Block.digest))
-	require.Equal(t, snowtest.Accepted, seq2Block.vmBlock.(*snowmantest.Block).Decidable.Status)
+	require.Equal(t, snowtest.Accepted, seq2Block.vmBlock.(*wrappedBlock).Decidable.Status)
 
 	// ensure tracker cleans up the block
 	require.NotContains(t, genesis.blockTracker.simplexDigestsToBlock, seq1Block.digest)
@@ -215,8 +215,8 @@ func TestVerifyBlockRejectsSiblings(t *testing.T) {
 
 	// When the we index the second block, the first block should be rejected
 	require.NoError(t, genesis.blockTracker.indexBlock(ctx, genesisChild1.digest))
-	require.Equal(t, snowtest.Rejected, genesisChild0.vmBlock.(*snowmantest.Block).Decidable.Status)
-	require.Equal(t, snowtest.Accepted, genesisChild1.vmBlock.(*snowmantest.Block).Decidable.Status)
+	require.Equal(t, snowtest.Rejected, genesisChild0.vmBlock.(*wrappedBlock).Decidable.Status)
+	require.Equal(t, snowtest.Accepted, genesisChild1.vmBlock.(*wrappedBlock).Decidable.Status)
 
 	_, exists := genesis.blockTracker.getBlockByDigest(genesis.digest)
 	require.False(t, exists)
@@ -232,7 +232,7 @@ func TestVerifyInnerBlockBreaksHashChain(t *testing.T) {
 
 	// This block does not extend the genesis, however it has a valid previous
 	// digest.
-	b.vmBlock.(*snowmantest.Block).ParentV[0]++
+	b.vmBlock.(*wrappedBlock).ParentV[0]++
 
 	_, err := b.Verify(ctx)
 	require.ErrorIs(t, err, errMismatchedPrevDigest)
