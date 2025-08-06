@@ -3,7 +3,12 @@
 
 package sync
 
-import "github.com/ava-labs/avalanchego/x/merkledb"
+import (
+	"context"
+
+	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/x/merkledb"
+)
 
 type DB interface {
 	merkledb.Clearer
@@ -11,4 +16,15 @@ type DB interface {
 	merkledb.ProofGetter
 	merkledb.ChangeProofer
 	merkledb.RangeProofer
+}
+
+type Proof interface {
+	Verify(context.Context) error
+	Commit(context.Context) error
+	FindNextKey(context.Context) (maybe.Maybe[[]byte], error)
+}
+
+type ProofParser interface {
+	ParseRangeProof(responseBytes, rootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error)
+	ParseChangeProof(responseBytes, rootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error)
 }
