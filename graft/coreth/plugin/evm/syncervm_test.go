@@ -63,7 +63,7 @@ func TestSkipStateSync(t *testing.T) {
 		stateSyncMinBlocks: 300, // must be greater than [syncableInterval] to skip sync
 		syncMode:           block.StateSyncSkipped,
 	}
-	vmSetup := createSyncServerAndClientVMs(t, test, syncervm.ParentsToFetch)
+	vmSetup := createSyncServerAndClientVMs(t, test, syncervm.BlocksToFetch)
 
 	testSyncerVM(t, vmSetup, test)
 }
@@ -75,14 +75,14 @@ func TestStateSyncFromScratch(t *testing.T) {
 		stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
 		syncMode:           block.StateSyncStatic,
 	}
-	vmSetup := createSyncServerAndClientVMs(t, test, syncervm.ParentsToFetch)
+	vmSetup := createSyncServerAndClientVMs(t, test, syncervm.BlocksToFetch)
 
 	testSyncerVM(t, vmSetup, test)
 }
 
 func TestStateSyncFromScratchExceedParent(t *testing.T) {
 	rand.Seed(1)
-	numToGen := syncervm.ParentsToFetch + uint64(32)
+	numToGen := syncervm.BlocksToFetch + uint64(32)
 	test := syncTest{
 		syncableInterval:   numToGen,
 		stateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
@@ -121,7 +121,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 		},
 		expectedErr: context.Canceled,
 	}
-	vmSetup := createSyncServerAndClientVMs(t, test, syncervm.ParentsToFetch)
+	vmSetup := createSyncServerAndClientVMs(t, test, syncervm.BlocksToFetch)
 
 	// Perform sync resulting in early termination.
 	testSyncerVM(t, vmSetup, test)
@@ -274,7 +274,7 @@ func TestVMShutdownWhileSyncing(t *testing.T) {
 		},
 		expectedErr: context.Canceled,
 	}
-	vmSetup = createSyncServerAndClientVMs(t, test, syncervm.ParentsToFetch)
+	vmSetup = createSyncServerAndClientVMs(t, test, syncervm.BlocksToFetch)
 	// Perform sync resulting in early termination.
 	testSyncerVM(t, vmSetup, test)
 }
