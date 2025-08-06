@@ -451,7 +451,7 @@ mod test {
     use std::ops::{Deref, DerefMut};
     use std::path::PathBuf;
 
-    use firewood_storage::CheckOpt;
+    use firewood_storage::{CheckOpt, CheckerError};
     use rand::rng;
 
     use crate::db::Db;
@@ -776,7 +776,13 @@ mod test {
                     progress_bar: None,
                 })
                 .await;
-            if !report.errors.is_empty() {
+            if report
+                .errors
+                .iter()
+                .filter(|e| !matches!(e, CheckerError::AreaLeaks(_)))
+                .count()
+                != 0
+            {
                 db.dump(&mut std::io::stdout()).await.unwrap();
                 panic!("error: {:?}", report.errors);
             }

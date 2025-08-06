@@ -196,7 +196,7 @@ impl<T: Clone + Ord + Debug> RangeSet<T> {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = Range<&T>> {
-        self.0.iter().map(|(end, start)| Range { start, end })
+        self.into_iter()
     }
 
     pub fn is_empty(&self) -> bool {
@@ -211,6 +211,18 @@ impl<T: Debug> IntoIterator for RangeSet<T> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter().map(|(end, start)| Range { start, end })
+    }
+}
+
+impl<'a, T: Debug> IntoIterator for &'a RangeSet<T> {
+    type Item = Range<&'a T>;
+    type IntoIter = std::iter::Map<
+        std::collections::btree_map::Iter<'a, T, T>,
+        fn((&'a T, &'a T)) -> Self::Item,
+    >;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter().map(|(end, start)| Range { start, end })
     }
 }
 
@@ -318,6 +330,15 @@ impl IntoIterator for LinearAddressRangeSet {
 
     fn into_iter(self) -> Self::IntoIter {
         self.range_set.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a LinearAddressRangeSet {
+    type Item = Range<&'a LinearAddress>;
+    type IntoIter = <&'a RangeSet<LinearAddress> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&self.range_set).into_iter()
     }
 }
 

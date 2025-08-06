@@ -176,9 +176,13 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         let leaked_ranges = visited.complement();
         if !leaked_ranges.is_empty() {
             warn!("Found leaked ranges: {leaked_ranges}");
+            {
+                // TODO: add leaked areas to the free list
+                let _leaked_areas =
+                    self.split_all_leaked_ranges(&leaked_ranges, opt.progress_bar.as_ref());
+            }
+            errors.push(CheckerError::AreaLeaks(leaked_ranges));
         }
-        let _leaked_areas = self.split_all_leaked_ranges(leaked_ranges, opt.progress_bar.as_ref());
-        // TODO: add leaked areas to the free list
 
         let physical_bytes = match self.physical_size() {
             Ok(physical_bytes) => physical_bytes,
@@ -475,9 +479,9 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     }
 
     /// Wrapper around `split_into_leaked_areas` that iterates over a collection of ranges.
-    fn split_all_leaked_ranges(
+    fn split_all_leaked_ranges<'a>(
         &self,
-        leaked_ranges: impl IntoIterator<Item = Range<LinearAddress>>,
+        leaked_ranges: impl IntoIterator<Item = Range<&'a LinearAddress>>,
         progress_bar: Option<&ProgressBar>,
     ) -> impl Iterator<Item = (LinearAddress, AreaIndex)> {
         leaked_ranges
@@ -490,11 +494,11 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     /// Returns error if the last leaked area extends beyond the end of the range.
     fn split_range_into_leaked_areas(
         &self,
-        leaked_range: Range<LinearAddress>,
+        leaked_range: Range<&LinearAddress>,
         progress_bar: Option<&ProgressBar>,
     ) -> Vec<(LinearAddress, AreaIndex)> {
         let mut leaked = Vec::new();
-        let mut current_addr = leaked_range.start;
+        let mut current_addr = *leaked_range.start;
 
         // First attempt to read the valid stored areas from the leaked range
         loop {
@@ -509,7 +513,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
             let next_addr = current_addr
                 .advance(area_size)
                 .expect("address overflow is impossible");
-            match next_addr.cmp(&leaked_range.end) {
+            match next_addr.cmp(leaked_range.end) {
                 Ordering::Equal => {
                     // we have reached the end of the leaked area, done
                     leaked.push((current_addr, area_index));
@@ -543,7 +547,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                 let next_addr = current_addr
                     .advance(*area_size)
                     .expect("address overflow is impossible");
-                if next_addr <= leaked_range.end {
+                if next_addr <= *leaked_range.end {
                     leaked.push((current_addr, area_index as AreaIndex));
                     if let Some(progress_bar) = progress_bar {
                         progress_bar.inc(*area_size);
@@ -556,7 +560,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         }
 
         // we assume that all areas are aligned to `MIN_AREA_SIZE`, in which case leaked ranges can always be split into free areas perfectly
-        debug_assert!(current_addr == leaked_range.end);
+        debug_assert!(current_addr == *leaked_range.end);
         leaked
     }
 }
@@ -976,7 +980,12 @@ mod test {
         }
 
         // check the leaked areas
-        let leaked_areas: HashMap<_, _> = nodestore.split_all_leaked_ranges(leaked, None).collect();
+        let leaked_ranges = leaked
+            .iter()
+            .map(|Range { start, end }| Range { start, end });
+        let leaked_areas: HashMap<_, _> = nodestore
+            .split_all_leaked_ranges(leaked_ranges, None)
+            .collect();
 
         // assert that all leaked areas end up on the free list
         assert_eq!(leaked_areas, expected_free_areas);
@@ -1009,8 +1018,8 @@ mod test {
         test_write_zeroed_area(&nodestore, leaked_range_size, NodeStoreHeader::SIZE);
 
         // check the leaked areas
-        let leaked_range = nonzero!(NodeStoreHeader::SIZE).into()
-            ..LinearAddress::new(
+        let leaked_range = &nonzero!(NodeStoreHeader::SIZE).into()
+            ..&LinearAddress::new(
                 NodeStoreHeader::SIZE
                     .checked_add(leaked_range_size)
                     .unwrap(),
@@ -1062,7 +1071,7 @@ mod test {
 
         // check the leaked areas
         let leaked_range =
-            nonzero!(NodeStoreHeader::SIZE).into()..LinearAddress::new(high_watermark).unwrap();
+            &nonzero!(NodeStoreHeader::SIZE).into()..&LinearAddress::new(high_watermark).unwrap();
         let (leaked_areas_offsets, leaked_area_size_indices): (Vec<LinearAddress>, Vec<AreaIndex>) =
             nodestore
                 .split_range_into_leaked_areas(leaked_range, None)
