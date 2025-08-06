@@ -79,8 +79,6 @@ runs:
             per_page: 50
           });
 
-          console.log(`Found ${workflowRuns.workflow_runs.length} completed successful runs`);
-
           const baselines = [];
 
           for (const run of workflowRuns.workflow_runs) {
@@ -175,20 +173,6 @@ runs:
           --prometheus-url "${{ inputs.prometheus_url }}" \
           --step-size "${{ inputs.step_size }}" \
           --timezone "${{ inputs.timezone }}"
-    - name: Debug after analysis
-      shell: bash
-      run: |
-        echo "=== Files in action directory after analysis ==="
-        ls -la $GITHUB_ACTION_PATH/
-        echo ""
-        echo "Expected HTML file: ${{ steps.build-config.outputs.output_file }}"
-        if [ -f "$GITHUB_ACTION_PATH/${{ steps.build-config.outputs.output_file }}" ]; then
-          echo "✓ HTML file exists"
-        else
-          echo "✗ HTML file missing"
-          echo "Looking for any HTML files:"
-          find $GITHUB_ACTION_PATH/ -name "*.html" 2>/dev/null || echo "No HTML files found"
-        fi
     - name: Upload visualization artifact
       uses: actions/upload-artifact@v4
       if: always()
