@@ -21,12 +21,14 @@ import (
 )
 
 var (
-	_ ValidatorSet    = (*Validators)(nil)
-	_ ValidatorSubset = (*Validators)(nil)
-	_ NodeSampler     = (*Validators)(nil)
+	_ ValidatorSet      = (*Validators)(nil)
+	_ ValidatorSubset   = (*Validators)(nil)
+	_ NodeSampler       = (*Validators)(nil)
+	_ ConnectionHandler = (*Validators)(nil)
 )
 
 type ValidatorSet interface {
+	Len(ctx context.Context) int
 	Has(ctx context.Context, nodeID ids.NodeID) bool // TODO return error
 }
 
@@ -35,14 +37,12 @@ type ValidatorSubset interface {
 }
 
 func NewValidators(
-	peers *Peers,
 	log logging.Logger,
 	subnetID ids.ID,
 	validators validators.State,
 	maxValidatorSetStaleness time.Duration,
 ) *Validators {
 	return &Validators{
-		peers:                    peers,
 		log:                      log,
 		subnetID:                 subnetID,
 		validators:               validators,
@@ -52,17 +52,18 @@ func NewValidators(
 
 // Validators contains a set of nodes that are staking.
 type Validators struct {
-	peers                    *Peers
 	log                      logging.Logger
 	subnetID                 ids.ID
 	validators               validators.State
 	maxValidatorSetStaleness time.Duration
 
-	lock          sync.Mutex
-	validatorList []validator
-	validatorSet  set.Set[ids.NodeID]
-	totalWeight   uint64
-	lastUpdated   time.Time
+	lock                sync.RWMutex
+	peers               set.Set[ids.NodeID]
+	connectedValidators set.Set[ids.NodeID]
+	validatorList       []validator
+	validatorSet        set.Set[ids.NodeID]
+	totalWeight         uint64
+	lastUpdated         time.Time
 }
 
 type validator struct {
@@ -110,6 +111,8 @@ func (v *Validators) refresh(ctx context.Context) {
 	}
 	utils.Sort(v.validatorList)
 
+	v.connectedValidators = set.Intersect(v.validatorSet, v.peers)
+
 	v.lastUpdated = time.Now()
 }
 
@@ -133,7 +136,7 @@ func (v *Validators) Sample(ctx context.Context, limit int) []ids.NodeID {
 		}
 
 		nodeID := v.validatorList[i].nodeID
-		if !v.peers.has(nodeID) {
+		if !v.peers.Contains(nodeID) {
 			continue
 		}
 
@@ -178,5 +181,36 @@ func (v *Validators) Has(ctx context.Context, nodeID ids.NodeID) bool {
 
 	v.refresh(ctx)
 
-	return v.peers.has(nodeID) && v.validatorSet.Contains(nodeID)
+	return v.connectedValidators.Contains(nodeID)
+}
+
+// Len returns the number of connected validators.
+func (v *Validators) Len(ctx context.Context) int {
+	v.lock.Lock()
+	defer v.lock.Unlock()
+
+	v.refresh(ctx)
+
+	return v.connectedValidators.Len()
+}
+
+func (v *Validators) Connected(nodeID ids.NodeID) {
+	v.lock.Lock()
+	defer v.lock.Unlock()
+
+	v.peers.Add(nodeID)
+
+	if !v.validatorSet.Contains(nodeID) {
+		return
+	}
+
+	v.connectedValidators.Add(nodeID)
+}
+
+func (v *Validators) Disconnected(nodeID ids.NodeID) {
+	v.lock.Lock()
+	defer v.lock.Unlock()
+
+	v.peers.Remove(nodeID)
+	v.connectedValidators.Remove(nodeID)
 }
