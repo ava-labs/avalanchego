@@ -57,7 +57,7 @@ pub trait DbViewSync {
 }
 
 /// A synchronous view of the database with raw byte keys (object-safe version).
-pub trait DbViewSyncBytes: std::fmt::Debug {
+pub trait DbViewSyncBytes: std::fmt::Debug + Send + Sync {
     /// find a value synchronously using raw bytes
     fn val_sync_bytes(&self, key: &[u8]) -> Result<Option<Value>, DbError>;
 }
@@ -457,6 +457,7 @@ mod test {
 
     use firewood_storage::{CheckOpt, CheckerError};
     use rand::rng;
+    use tokio::sync::mpsc::{Receiver, Sender};
 
     use crate::db::{Db, Proposal};
     use crate::v2::api::{Db as _, DbView as _, KeyValuePairIter, Proposal as _};
@@ -882,6 +883,56 @@ mod test {
                 "Value for key {k:?} should be {v:?} but was {found:?}",
             );
         }
+    }
+
+    /// Test that reading from a proposal during commit works as expected
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_read_during_commit() {
+        use crate::db::Proposal;
+
+        const CHANNEL_CAPACITY: usize = 8;
+
+        let testdb = testdb().await;
+        let db = &testdb.db;
+
+        let (tx, mut rx): (Sender<Proposal<'_>>, Receiver<Proposal<'_>>) =
+            tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
+        let (result_tx, mut result_rx) = tokio::sync::mpsc::channel(CHANNEL_CAPACITY);
+
+        tokio_scoped::scope(|scope| {
+            // Commit task
+            scope.spawn(async move {
+                while let Some(proposal) = rx.recv().await {
+                    let result = proposal.commit().await;
+                    // send result back to the main thread, both for synchronization and stopping the
+                    // test on error
+                    result_tx.send(result).await.unwrap();
+                }
+            });
+            scope.spawn(async move {
+                // Proposal creation
+                for id in 0u32..5000 {
+                    // insert a key of length 32 and a value of length 8,
+                    // rotating between all zeroes through all 255
+                    let batch = vec![BatchOp::Put {
+                        key: [id as u8; 32],
+                        value: [id as u8; 8],
+                    }];
+                    let proposal = db.propose(batch).await.unwrap();
+                    let last_hash = proposal.root_hash().await.unwrap().unwrap();
+                    let view = db.view_sync(last_hash).unwrap();
+
+                    tx.send(proposal).await.unwrap();
+
+                    let key = [id as u8; 32];
+                    let value = view.val_sync_bytes(&key).unwrap().unwrap();
+                    assert_eq!(&*value, &[id as u8; 8]);
+                    result_rx.recv().await.unwrap().unwrap();
+                }
+                // close the channel, which will cause the commit task to exit
+                drop(tx);
+            });
+        });
     }
 
     // Testdb is a helper struct for testing the Db. Once it's dropped, the directory and file disappear
