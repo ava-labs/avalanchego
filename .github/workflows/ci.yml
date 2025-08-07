@@ -346,3 +346,7 @@ jobs:
 #          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
 #          query: 'sum by (chain) (rate(avalanche_evm_eth_chain_block_gas_used_processed[1m])) / 1e+06'
 #          metric_name: 'Load Test'
+
+
+# todo, should we save metrics on s3 or somewhere, querying prometheus is unstable
+# meaning i could come back 7 days after and just have different stuff
