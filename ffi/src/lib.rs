@@ -6,6 +6,10 @@
     unsafe_code,
     reason = "This is an FFI library, so unsafe code is expected."
 )]
+#![expect(
+    clippy::undocumented_unsafe_blocks,
+    reason = "https://github.com/ava-labs/firewood/pull/1158 will remove"
+)]
 #![cfg_attr(
     not(target_pointer_width = "64"),
     forbid(

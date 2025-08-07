@@ -24,7 +24,7 @@
 //! - Uses C-compatible representation for cross-language access
 //!
 
-use bytemuck_derive::{AnyBitPattern, NoUninit};
+use bytemuck_derive::{Pod, Zeroable};
 use std::io::{Error, ErrorKind};
 
 use super::alloc::{FreeLists, LinearAddress, area_size_hash};
@@ -32,7 +32,7 @@ use crate::logger::{debug, trace};
 
 /// Can be used by filesystem tooling such as "file" to identify
 /// the version of firewood used to create this `NodeStore` file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, NoUninit, AnyBitPattern)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Zeroable, Pod)]
 #[repr(transparent)]
 pub struct Version {
     bytes: [u8; 16],
@@ -148,7 +148,7 @@ impl Version {
 
 /// Persisted metadata for a `NodeStore`.
 /// The [`NodeStoreHeader`] is at the start of the `ReadableStorage`.
-#[derive(Copy, Debug, PartialEq, Eq, Clone)]
+#[derive(Copy, Debug, PartialEq, Eq, Clone, Zeroable, Pod)]
 #[repr(C)]
 pub struct NodeStoreHeader {
     /// Identifies the version of firewood used to create this `NodeStore`.
@@ -302,11 +302,6 @@ impl NodeStoreHeader {
         }
     }
 }
-
-#[expect(unsafe_code)]
-unsafe impl bytemuck::Zeroable for NodeStoreHeader {}
-#[expect(unsafe_code)]
-unsafe impl bytemuck::Pod for NodeStoreHeader {}
 
 #[cfg(test)]
 #[expect(clippy::unwrap_used)]

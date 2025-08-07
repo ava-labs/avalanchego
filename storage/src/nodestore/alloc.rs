@@ -166,8 +166,10 @@ pub fn area_size_to_index(n: u64) -> Result<AreaIndex, Error> {
 pub struct LinearAddress(NonZeroU64);
 
 #[expect(unsafe_code)]
+// SAFETY: `LinearAddress` is a wrapper around `NonZeroU64` which is also `ZeroableInOption`.
 unsafe impl bytemuck::ZeroableInOption for LinearAddress {}
 #[expect(unsafe_code)]
+// SAFETY: `LinearAddress` is a wrapper around `NonZeroU64` which is also `PodInOption`.
 unsafe impl bytemuck::PodInOption for LinearAddress {}
 
 impl LinearAddress {

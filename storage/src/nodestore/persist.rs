@@ -419,10 +419,10 @@ impl NodeStore<Committed, FileBacked> {
                         .build()
                         .user_data(pos as u64);
 
+                    #[expect(unsafe_code)]
                     // SAFETY: the submission_queue_entry's found buffer must not move or go out of scope
                     // until the operation has been completed. This is ensured by having a Some(offset)
                     // and not marking it None until the kernel has said it's done below.
-                    #[expect(unsafe_code)]
                     while unsafe { ring.submission().push(&submission_queue_entry) }.is_err() {
                         ring.submitter().squeue_wait().map_err(|e| {
                             self.storage.file_io_error(
