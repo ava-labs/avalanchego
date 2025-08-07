@@ -506,6 +506,11 @@ emitted. The dashboards will only be populated if prometheus and
 promtail are running locally (as per previous sections) to collect
 metrics and logs.
 
+If using a non-default grafana instance, set
+`GRAFANA_URI=https://<non-default server name>/d/<dashboard id>` as an
+env var in the shell to ensure the emitted link points to the desired
+instance.
+
 #### CI
 [Top](#table-of-contents)
 
