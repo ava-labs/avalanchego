@@ -45,8 +45,10 @@ jobs:
             ${{ inputs.duration && format('--duration {0}', inputs.duration) || '' }}
           artifact_prefix: self-hosted-load-test${{ inputs.exclusive_scheduling == 'true' && '-exclusive' || '' }}
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
           loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}

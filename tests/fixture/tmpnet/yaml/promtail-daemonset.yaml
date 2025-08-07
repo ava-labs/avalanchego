@@ -55,7 +55,7 @@ data:
       grpc_listen_port: 0
 
     clients:
-    - url: ${LOKI_URL}/loki/api/v1/push
+    - url: ${LOKI_URL}
       basic_auth:
         username: ${LOKI_USERNAME}
         password: ${LOKI_PASSWORD}

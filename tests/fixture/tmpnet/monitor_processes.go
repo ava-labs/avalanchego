@@ -277,14 +277,6 @@ func getServiceDiscoveryDir(cmdName string) (string, error) {
 	return filepath.Join(tmpnetDir, cmdName, "file_sd_configs"), nil
 }
 
-// collectorConfig represents the configuration for a metrics/logs collector
-type collectorConfig struct {
-	username string
-	password string
-	url      string
-	pushURL  string
-}
-
 // SDConfig represents a Prometheus service discovery config entry.
 //
 // file_sd_config docs: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#file_sd_config
@@ -455,6 +447,17 @@ func clearStalePIDFile(log logging.Logger, cmdName string, pidPath string) error
 		)
 	}
 	return nil
+}
+
+// collectorConfig represents the configuration for a collector of metrics or logs
+type collectorConfig struct {
+	// Credentials for basic auth
+	username string
+	password string
+	// URL to use to check collection
+	url string
+	// URL the collector will push to
+	pushURL string
 }
 
 // getCollectorConfig retrieves the url, username and password for the command.

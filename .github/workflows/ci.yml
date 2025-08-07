@@ -54,9 +54,11 @@ jobs:
           artifact_prefix: e2e
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
           loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
   e2e_post_granite:
@@ -71,9 +73,11 @@ jobs:
           artifact_prefix: e2e-post-granite
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
           loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
   e2e_kube:
@@ -88,9 +92,11 @@ jobs:
           artifact_prefix: e2e-kube
           filter_by_owner: avalanchego-e2e
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
           loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
   e2e_existing_network:
@@ -104,9 +110,11 @@ jobs:
           run: ./scripts/run_task.sh test-e2e-existing-ci
           artifact_prefix: e2e-existing-network
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
           loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
   Upgrade:
@@ -120,9 +128,11 @@ jobs:
           run: ./scripts/run_task.sh test-upgrade
           artifact_prefix: upgrade
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
           loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
   Lint:
@@ -236,9 +246,11 @@ jobs:
           run: ./scripts/run_task.sh test-load -- --load-timeout=30s
           artifact_prefix: load
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
           loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
   load_kube_kind:
@@ -253,9 +265,11 @@ jobs:
           runtime: kube
           artifact_prefix: load-kube
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
           loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
   robustness:

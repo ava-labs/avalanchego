@@ -29,6 +29,7 @@ var prometheusManifest []byte
 // This must match the namespace defined in the manifests
 const monitoringNamespace = "ci-monitoring"
 
+// Configuration for a kube-hosted collector
 type kubeCollectorConfig struct {
 	name         string
 	target       string
@@ -106,24 +107,25 @@ func deployKubeCollector(
 	log logging.Logger,
 	clientset *kubernetes.Clientset,
 	dynamicClient dynamic.Interface,
-	collectorConfig kubeCollectorConfig,
+	kubeConfig kubeCollectorConfig,
 ) error {
-	config, err := getCollectorConfig(collectorConfig.name)
+	// Source the collector url and auth creds from the environment
+	config, err := getCollectorConfig(kubeConfig.name)
 	if err != nil {
-		return stacktrace.Errorf("failed to get collector config for %s: %w", collectorConfig.name, err)
+		return stacktrace.Errorf("failed to get collector config for %s: %w", kubeConfig.name, err)
 	}
 
-	if err := createCollectorConfigSecret(ctx, log, clientset, collectorConfig.secretPrefix, config); err != nil {
-		return stacktrace.Errorf("failed to create config secret for %s: %w", collectorConfig.name, err)
+	if err := createCollectorConfigSecret(ctx, log, clientset, kubeConfig.secretPrefix, config); err != nil {
+		return stacktrace.Errorf("failed to create collector config secret for %s: %w", kubeConfig.name, err)
 	}
 
-	if err := applyManifest(ctx, log, dynamicClient, collectorConfig.manifest, monitoringNamespace); err != nil {
-		return stacktrace.Errorf("failed to apply manifest for %s: %w", collectorConfig.name, err)
+	if err := applyManifest(ctx, log, dynamicClient, kubeConfig.manifest, monitoringNamespace); err != nil {
+		return stacktrace.Errorf("failed to apply manifest for %s: %w", kubeConfig.name, err)
 	}
 	return nil
 }
 
-// createCollectorConfigSecret creates a secret with the provided urls, username and password for a collector
+// createCollectorConfigSecret creates a secret with the provided collector config
 func createCollectorConfigSecret(
 	ctx context.Context,
 	log logging.Logger,
