@@ -193,7 +193,10 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         let physical_bytes = match self.physical_size() {
             Ok(physical_bytes) => physical_bytes,
             Err(e) => {
-                errors.push(e.into());
+                errors.push(CheckerError::IO {
+                    error: e,
+                    parent: None,
+                });
                 0
             }
         };
@@ -256,8 +259,22 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         self.check_area_aligned(subtrie_root_address, StoredAreaParent::TrieNode(parent))?;
 
         // read the node from the disk - we avoid cache since we will never visit the same node twice
-        let (area_index, area_size) = self.area_index_and_size(subtrie_root_address)?;
-        let (node, node_bytes) = self.read_node_with_num_bytes_from_disk(subtrie_root_address)?;
+        let (area_index, area_size) =
+            self.area_index_and_size(subtrie_root_address)
+                .map_err(|e| {
+                    vec![CheckerError::IO {
+                        error: e,
+                        parent: Some(StoredAreaParent::TrieNode(parent)),
+                    }]
+                })?;
+        let (node, node_bytes) = self
+            .read_node_with_num_bytes_from_disk(subtrie_root_address)
+            .map_err(|e| {
+                vec![CheckerError::IO {
+                    error: e,
+                    parent: Some(StoredAreaParent::TrieNode(parent)),
+                }]
+            })?;
 
         // check if the node fits in the area, equal is not allowed due to 1-byte area size index
         if node_bytes >= area_size {
@@ -404,16 +421,18 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         let mut errors = Vec::new();
 
         let mut free_list_iter = self.free_list_iter(0);
-        while let Some(free_area) = free_list_iter.next_with_metadata() {
+        while let Some((free_area, parent)) = free_list_iter.next_with_metadata() {
             let FreeAreaWithMetadata {
                 addr,
                 area_index,
                 free_list_id,
-                parent,
             } = match free_area {
                 Ok(free_area) => free_area,
                 Err(e) => {
-                    errors.push(CheckerError::IO(e));
+                    errors.push(CheckerError::IO {
+                        error: e,
+                        parent: Some(StoredAreaParent::FreeList(parent)),
+                    });
                     free_list_iter.move_to_next_free_list();
                     continue;
                 }

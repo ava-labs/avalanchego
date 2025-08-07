@@ -278,18 +278,17 @@ pub enum CheckerError {
     /// IO error
     #[error("IO error")]
     #[derive_where(skip_inner)]
-    IO(#[from] FileIoError),
+    IO {
+        /// The error
+        error: FileIoError,
+        /// parent of the area
+        parent: Option<StoredAreaParent>,
+    },
 }
 
 impl From<CheckerError> for Vec<CheckerError> {
     fn from(error: CheckerError) -> Self {
         vec![error]
-    }
-}
-
-impl From<FileIoError> for Vec<CheckerError> {
-    fn from(error: FileIoError) -> Self {
-        vec![CheckerError::IO(error)]
     }
 }
 

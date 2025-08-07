@@ -643,10 +643,13 @@ impl<'a, S: ReadableStorage> FreeListIterator<'a, S> {
     )]
     fn next_with_parent(
         &mut self,
-    ) -> Option<Result<((LinearAddress, AreaIndex), FreeListParent), FileIoError>> {
+    ) -> Option<(
+        Result<(LinearAddress, AreaIndex), FileIoError>,
+        FreeListParent,
+    )> {
         let parent = self.parent;
         let next_addr = self.next()?;
-        Some(next_addr.map(|free_area| (free_area, parent)))
+        Some((next_addr, parent))
     }
 }
 
@@ -680,7 +683,6 @@ pub(crate) struct FreeAreaWithMetadata {
     pub addr: LinearAddress,
     pub area_index: AreaIndex,
     pub free_list_id: AreaIndex,
-    pub parent: FreeListParent,
 }
 
 pub(crate) struct FreeListsIterator<'a, S: ReadableStorage> {
@@ -721,15 +723,17 @@ impl<'a, S: ReadableStorage> FreeListsIterator<'a, S> {
 
     pub(crate) fn next_with_metadata(
         &mut self,
-    ) -> Option<Result<FreeAreaWithMetadata, FileIoError>> {
+    ) -> Option<(Result<FreeAreaWithMetadata, FileIoError>, FreeListParent)> {
         self.next_inner(FreeListIterator::next_with_parent)
-            .map(|next_with_parent| {
-                next_with_parent.map(|((addr, area_index), parent)| FreeAreaWithMetadata {
-                    addr,
-                    area_index,
-                    free_list_id: self.current_free_list_id,
+            .map(|(next, parent)| {
+                (
+                    next.map(|(addr, area_index)| FreeAreaWithMetadata {
+                        addr,
+                        area_index,
+                        free_list_id: self.current_free_list_id,
+                    }),
                     parent,
-                })
+                )
             })
     }
 
@@ -1017,33 +1021,41 @@ mod tests {
 
         // expected
         let expected_free_list1 = vec![
-            FreeAreaWithMetadata {
-                addr: free_list1_area1,
-                area_index: area_index1,
-                free_list_id: area_index1,
-                parent: FreeListParent::FreeListHead(area_index1),
-            },
-            FreeAreaWithMetadata {
-                addr: free_list1_area2,
-                area_index: area_index1,
-                free_list_id: area_index1,
-                parent: FreeListParent::PrevFreeArea(free_list1_area1),
-            },
+            (
+                FreeAreaWithMetadata {
+                    addr: free_list1_area1,
+                    area_index: area_index1,
+                    free_list_id: area_index1,
+                },
+                FreeListParent::FreeListHead(area_index1),
+            ),
+            (
+                FreeAreaWithMetadata {
+                    addr: free_list1_area2,
+                    area_index: area_index1,
+                    free_list_id: area_index1,
+                },
+                FreeListParent::PrevFreeArea(free_list1_area1),
+            ),
         ];
 
         let expected_free_list2 = vec![
-            FreeAreaWithMetadata {
-                addr: free_list2_area1,
-                area_index: area_index2,
-                free_list_id: area_index2,
-                parent: FreeListParent::FreeListHead(area_index2),
-            },
-            FreeAreaWithMetadata {
-                addr: free_list2_area2,
-                area_index: area_index2,
-                free_list_id: area_index2,
-                parent: FreeListParent::PrevFreeArea(free_list2_area1),
-            },
+            (
+                FreeAreaWithMetadata {
+                    addr: free_list2_area1,
+                    area_index: area_index2,
+                    free_list_id: area_index2,
+                },
+                FreeListParent::FreeListHead(area_index2),
+            ),
+            (
+                FreeAreaWithMetadata {
+                    addr: free_list2_area2,
+                    area_index: area_index2,
+                    free_list_id: area_index2,
+                },
+                FreeListParent::PrevFreeArea(free_list2_area1),
+            ),
         ];
 
         let mut expected_iterator = if area_index1 < area_index2 {
@@ -1054,14 +1066,14 @@ mod tests {
 
         loop {
             let next = free_list_iter.next_with_metadata();
-            let expected = expected_iterator.next();
-
-            if expected.is_none() {
+            let Some((expected, expected_parent)) = expected_iterator.next() else {
                 assert!(next.is_none());
                 break;
-            }
+            };
 
-            assert_eq!(next.unwrap().unwrap(), expected.unwrap());
+            let (next, next_parent) = next.unwrap();
+            assert_eq!(next.unwrap(), expected);
+            assert_eq!(next_parent, expected_parent);
         }
     }
 
@@ -1116,29 +1128,31 @@ mod tests {
 
         // start at the first free list
         assert_eq!(free_list_iter.current_free_list_id, 0);
+        let (next, next_parent) = free_list_iter.next_with_metadata().unwrap();
         assert_eq!(
-            free_list_iter.next_with_metadata().unwrap().unwrap(),
+            next.unwrap(),
             FreeAreaWithMetadata {
                 addr: free_list1_area1,
                 area_index: area_index1,
                 free_list_id: area_index1,
-                parent: FreeListParent::FreeListHead(area_index1),
             },
         );
+        assert_eq!(next_parent, FreeListParent::FreeListHead(area_index1));
         // `next_with_metadata` moves the iterator to the first free list that is not empty
         assert_eq!(free_list_iter.current_free_list_id, area_index1);
         free_list_iter.move_to_next_free_list();
         // `move_to_next_free_list` moves the iterator to the next free list
         assert_eq!(free_list_iter.current_free_list_id, area_index1 + 1);
+        let (next, next_parent) = free_list_iter.next_with_metadata().unwrap();
         assert_eq!(
-            free_list_iter.next_with_metadata().unwrap().unwrap(),
+            next.unwrap(),
             FreeAreaWithMetadata {
                 addr: free_list2_area1,
                 area_index: area_index2,
                 free_list_id: area_index2,
-                parent: FreeListParent::FreeListHead(area_index2),
             },
         );
+        assert_eq!(next_parent, FreeListParent::FreeListHead(area_index2));
         // `next_with_metadata` moves the iterator to the first free list that is not empty
         assert_eq!(free_list_iter.current_free_list_id, area_index2);
         free_list_iter.move_to_next_free_list();
