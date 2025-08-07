@@ -60,8 +60,8 @@ const (
 	// eth address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 	HardHatKeyStr = "56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
 
-	// grafanaURI is remote Grafana URI
-	grafanaURI = "avalabs.grafana.net"
+	// Default grafana URI used to construct metrics links. Can be overridden by setting GRAFANA_URI env var.
+	defaultGrafanaURI = "https://avalabs.grafana.net/d/makr6k7/avalanche-main-dashboard"
 )
 
 var (
@@ -1123,8 +1123,9 @@ func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string)
 	if endTime == "" {
 		endTime = "now"
 	}
+	grafanaURI := GetEnvWithDefault("GRAFANA_URI", defaultGrafanaURI)
 	return fmt.Sprintf(
-		"https://%s/d/makr6k7/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
+		"%s?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
 		grafanaURI,
 		networkUUID,
 		startTime,

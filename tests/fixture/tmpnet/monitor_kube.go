@@ -113,7 +113,7 @@ func deployKubeCollector(
 		return stacktrace.Errorf("failed to get collector config for %s: %w", collectorConfig.name, err)
 	}
 
-	if err := createCollectorConfigSecret(ctx, log, clientset, collectorConfig.secretPrefix, config.URL, config.Username, config.Password); err != nil {
+	if err := createCollectorConfigSecret(ctx, log, clientset, collectorConfig.secretPrefix, config); err != nil {
 		return stacktrace.Errorf("failed to create config secret for %s: %w", collectorConfig.name, err)
 	}
 
@@ -123,15 +123,13 @@ func deployKubeCollector(
 	return nil
 }
 
-// createCollectorConfigSecret creates a secret with the provided url, username and password for a collector
+// createCollectorConfigSecret creates a secret with the provided urls, username and password for a collector
 func createCollectorConfigSecret(
 	ctx context.Context,
 	log logging.Logger,
 	clientset *kubernetes.Clientset,
 	namePrefix string,
-	url string,
-	username string,
-	password string,
+	config collectorConfig,
 ) error {
 	secretName := namePrefix + "-config"
 	secret := &corev1.Secret{
@@ -139,9 +137,9 @@ func createCollectorConfigSecret(
 			Name: secretName,
 		},
 		StringData: map[string]string{
-			"url":      url,
-			"username": username,
-			"password": password,
+			"url":      config.pushURL,
+			"username": config.username,
+			"password": config.password,
 		},
 	}
 	_, err := clientset.CoreV1().Secrets(monitoringNamespace).Create(ctx, secret, metav1.CreateOptions{})
