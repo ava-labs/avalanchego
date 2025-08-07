@@ -177,8 +177,10 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 		}
 	}
 
-	utxoSet := tx.InputUTXOs()
-	gasPrice, _ := m.atomicTxGasPrice(tx)
+	gasPrice, err := m.atomicTxGasPrice(tx)
+	if err != nil {
+		return err
+	}
 	highestGasPrice, highestGasPriceConflictTxID, conflictingTxs, err := m.checkConflictTx(tx)
 	if err != nil {
 		return err
@@ -246,7 +248,7 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 	m.pendingTxs.Push(tx, gasPrice)
 	m.metrics.addedTxs.Inc(1)
 	m.metrics.pendingTxs.Update(int64(m.pendingTxs.Len()))
-	for utxoID := range utxoSet {
+	for utxoID := range tx.InputUTXOs() {
 		m.utxoSpenders[utxoID] = tx
 	}
 

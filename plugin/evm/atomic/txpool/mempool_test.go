@@ -6,7 +6,6 @@ package txpool
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/atomic/atomictest"
@@ -27,12 +26,7 @@ func TestMempoolAddTx(t *testing.T) {
 
 	txs := make([]*atomic.Tx, 0)
 	for i := 0; i < 3_000; i++ {
-		tx := &atomic.Tx{
-			UnsignedAtomicTx: &atomictest.TestUnsignedTx{
-				IDV: ids.GenerateTestID(),
-			},
-		}
-
+		tx := atomictest.GenerateTestImportTxWithGas(1, 1)
 		txs = append(txs, tx)
 		require.NoError(m.Add(tx))
 	}
@@ -54,29 +48,33 @@ func TestMempoolAdd(t *testing.T) {
 	)
 	require.NoError(err)
 
-	tx := &atomic.Tx{
-		UnsignedAtomicTx: &atomictest.TestUnsignedTx{
-			IDV: ids.GenerateTestID(),
-		},
-	}
-
+	tx := atomictest.GenerateTestImportTxWithGas(1, 1)
 	require.NoError(m.Add(tx))
 	err = m.Add(tx)
 	require.ErrorIs(err, ErrAlreadyKnown)
 }
 
+// Add should return an error if a tx doesn't consume any gas
+func TestMempoolAddNoGas(t *testing.T) {
+	require := require.New(t)
+
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	m, err := NewMempool(
+		NewTxs(ctx, 5_000),
+		prometheus.NewRegistry(),
+		nil,
+	)
+	require.NoError(err)
+
+	tx := atomictest.GenerateTestImportTxWithGas(0, 1)
+	err = m.Add(tx)
+	require.ErrorIs(err, ErrNoGasUsed)
+}
+
 func TestAtomicMempoolIterate(t *testing.T) {
 	txs := []*atomic.Tx{
-		{
-			UnsignedAtomicTx: &atomictest.TestUnsignedTx{
-				IDV: ids.GenerateTestID(),
-			},
-		},
-		{
-			UnsignedAtomicTx: &atomictest.TestUnsignedTx{
-				IDV: ids.GenerateTestID(),
-			},
-		},
+		atomictest.GenerateTestImportTxWithGas(1, 1),
+		atomictest.GenerateTestImportTxWithGas(1, 1),
 	}
 
 	tests := []struct {
