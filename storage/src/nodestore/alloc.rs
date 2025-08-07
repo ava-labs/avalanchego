@@ -272,20 +272,6 @@ impl From<NonZeroU64> for LinearAddress {
     }
 }
 
-/// Every item stored in the [`NodeStore`]'s `ReadableStorage`  after the
-/// `NodeStoreHeader` is a [`StoredArea`].
-///
-/// As an overview of what this looks like stored, we get something like this:
-///  - Byte 0: The index of the area size
-///  - Byte 1: 0x255 if free, otherwise the low-order bit indicates Branch or Leaf
-///  - Bytes 2..n: The actual data
-#[derive(PartialEq, Eq, Clone, Debug)]
-pub struct StoredArea<T> {
-    /// Index in [`AREA_SIZES`] of this area's size
-    area_size_index: AreaIndex,
-    area: T,
-}
-
 /// `FreeLists` is an array of `Option<LinearAddress>` for each area size.
 pub type FreeLists = [Option<LinearAddress>; AREA_SIZES.len()];
 
@@ -1166,7 +1152,7 @@ mod tests {
     }
 
     #[test]
-    fn const_expr_tests() {
+    const fn const_expr_tests() {
         // these are const expr
         let _ = const { LinearAddress::new(0) };
         let _ = const { LinearAddress::new(1).unwrap().advance(1u64) };

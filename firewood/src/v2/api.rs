@@ -220,7 +220,7 @@ impl From<crate::db::DbError> for Error {
 
 /// The database interface. The methods here operate on the most
 /// recently committed revision, and allow the creation of a new
-/// [Proposal] or a new [DbView] based on a specific historical
+/// [`Proposal`] or a new [`DbView`] based on a specific historical
 /// revision.
 #[async_trait]
 pub trait Db {
@@ -257,8 +257,8 @@ pub trait Db {
     ///
     /// # Arguments
     ///
-    /// * `data` - A batch consisting of [BatchOp::Put] and
-    ///            [BatchOp::Delete] operations to apply
+    /// * `data` - A batch consisting of [`BatchOp::Put`] and
+    ///            [`BatchOp::Delete`] operations to apply
     ///
     async fn propose<'db, K: KeyType, V: ValueType>(
         &'db self,
@@ -270,12 +270,12 @@ pub trait Db {
 
 /// A view of the database at a specific time.
 ///
-/// There are a few ways to create a [DbView]:
-/// 1. From [Db::revision] which gives you a view for a specific
+/// There are a few ways to create a [`DbView`]:
+/// 1. From [`Db::revision`] which gives you a view for a specific
 ///    historical revision
-/// 2. From [Db::propose] which is a view on top of the most recently
+/// 2. From [`Db::propose`] which is a view on top of the most recently
 ///    committed revision with changes applied; or
-/// 3. From [Proposal::propose] which is a view on top of another proposal.
+/// 3. From [`Proposal::propose`] which is a view on top of another proposal.
 #[async_trait]
 pub trait DbView {
     /// The type of a stream of key/value pairs
@@ -283,7 +283,7 @@ pub trait DbView {
     where
         Self: 'view;
 
-    /// Get the root hash for the current DbView
+    /// Get the root hash for the current [`DbView`]
     ///
     /// # Note
     ///
@@ -320,8 +320,8 @@ pub trait DbView {
     ///
     /// # Note
     ///
-    /// If you always want to start at the beginning, [DbView::iter] is easier to use
-    /// If you always provide a key, [DbView::iter_from] is easier to use
+    /// If you always want to start at the beginning, [`DbView::iter`] is easier to use
+    /// If you always provide a key, [`DbView::iter_from`] is easier to use
     ///
     #[expect(clippy::missing_errors_doc)]
     fn iter_option<K: KeyType>(&self, first_key: Option<K>) -> Result<Self::Stream<'_>, Error>;
@@ -343,13 +343,13 @@ pub trait DbView {
 /// A proposal for a new revision of the database.
 ///
 /// A proposal may be committed, which consumes the
-/// [Proposal] and return the generic type T, which
-/// is the same thing you get if you call [Db::root_hash]
+/// [`Proposal`] and return the generic type `T`, which
+/// is the same thing you get if you call [`Db::root_hash`]
 /// immediately after committing, and then call
-/// [Db::revision] with the returned revision.
+/// [`Db::revision`] with the returned revision.
 ///
 /// A proposal type must also implement everything in a
-/// [DbView], which means you can fetch values from it or
+/// [`DbView`], which means you can fetch values from it or
 /// obtain proofs.
 #[async_trait]
 pub trait Proposal: DbView + Send + Sync {
