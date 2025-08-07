@@ -153,7 +153,7 @@ func (tr *tree) dbUpdate() {
 
 func (tr *tree) createRandomBatch(numKeys int) ([][]byte, [][]byte) {
 	keys := tr.selectRandomKeys(numKeys)
-	vals := createRandomByteSlices(numKeys, valSize, tr.rand)
+	vals := createRandomByteSlices(len(keys), valSize, tr.rand)
 	return keys, vals
 }
 
