@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package router
@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/handler/handlermock"
@@ -106,8 +107,9 @@ func TestShutdown(t *testing.T) {
 
 	h, err := handler.New(
 		chainCtx,
+		&block.ChangeNotifier{},
+		noopSubscription,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -232,7 +234,8 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 
 	h, err := handler.New(
 		chainCtx,
-		nil,
+		&block.ChangeNotifier{},
+		noopSubscription,
 		nil,
 		time.Second,
 		testThreadPoolSize,
@@ -365,8 +368,9 @@ func TestShutdownTimesOut(t *testing.T) {
 
 	h, err := handler.New(
 		ctx,
+		&block.ChangeNotifier{},
+		noopSubscription,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -534,8 +538,9 @@ func TestRouterTimeout(t *testing.T) {
 
 	h, err := handler.New(
 		ctx,
+		&block.ChangeNotifier{},
+		noopSubscription,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -1066,8 +1071,9 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 
 	h, err := handler.New(
 		ctx,
+		&block.ChangeNotifier{},
+		noopSubscription,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -1232,8 +1238,9 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 
 	h, err := handler.New(
 		ctx,
+		&block.ChangeNotifier{},
+		noopSubscription,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -1484,8 +1491,9 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 
 	h, err := handler.New(
 		ctx,
+		&block.ChangeNotifier{},
+		noopSubscription,
 		vdrs,
-		nil,
 		time.Second,
 		testThreadPoolSize,
 		resourceTracker,
@@ -1602,4 +1610,9 @@ func TestHandleSimplexMessage(t *testing.T) {
 	h.EXPECT().ShouldHandle(gomock.Any()).Return(true).Times(1)
 	chainRouter.HandleInbound(context.Background(), inboundMsg)
 	require.True(t, receivedMsg)
+}
+
+func noopSubscription(ctx context.Context) (common.Message, error) {
+	<-ctx.Done()
+	return common.Message(0), ctx.Err()
 }

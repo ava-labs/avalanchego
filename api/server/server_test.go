@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package server
@@ -59,4 +59,9 @@ func TestRejectMiddleware(t *testing.T) {
 			require.Equal(tt.expectedStatusCode, w.Code)
 		})
 	}
+}
+
+func TestHTTPHeaderRouteIsCanonical(t *testing.T) {
+	wantHeaderKey := http.CanonicalHeaderKey(HTTPHeaderRoute)
+	require.Equal(t, wantHeaderKey, HTTPHeaderRoute)
 }

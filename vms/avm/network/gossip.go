@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -18,8 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
-
-	xmempool "github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
 )
 
 var (
@@ -69,7 +67,7 @@ func (g *txParser) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
 }
 
 func newGossipMempool(
-	mempool xmempool.Mempool,
+	mempool mempool.Mempool[*txs.Tx],
 	registerer prometheus.Registerer,
 	log logging.Logger,
 	txVerifier TxVerifier,
@@ -87,7 +85,7 @@ func newGossipMempool(
 }
 
 type gossipMempool struct {
-	xmempool.Mempool
+	mempool.Mempool[*txs.Tx]
 	log        logging.Logger
 	txVerifier TxVerifier
 
@@ -149,8 +147,6 @@ func (g *gossipMempool) AddWithoutVerification(tx *txs.Tx) error {
 			return true
 		})
 	}
-
-	g.Mempool.RequestBuildBlock()
 	return nil
 }
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tracedvm
@@ -39,7 +39,6 @@ func (vm *vertexVM) Initialize(
 	genesisBytes,
 	upgradeBytes,
 	configBytes []byte,
-	toEngine chan<- common.Message,
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -53,7 +52,6 @@ func (vm *vertexVM) Initialize(
 		genesisBytes,
 		upgradeBytes,
 		configBytes,
-		toEngine,
 		fxs,
 		appSender,
 	)

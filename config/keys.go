@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package config
@@ -85,6 +85,7 @@ const (
 	StakingEphemeralSignerEnabledKey                   = "staking-ephemeral-signer-enabled"
 	StakingSignerKeyPathKey                            = "staking-signer-key-file"
 	StakingSignerKeyContentKey                         = "staking-signer-key-file-content"
+	StakingRPCSignerEndpointKey                        = "staking-rpc-signer-endpoint"
 	SybilProtectionEnabledKey                          = "sybil-protection-enabled"
 	SybilProtectionDisabledWeightKey                   = "sybil-protection-disabled-weight"
 	NetworkInitialTimeoutKey                           = "network-initial-timeout"

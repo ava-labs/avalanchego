@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avm
@@ -68,7 +68,6 @@ type environment struct {
 	genesisBytes []byte
 	genesisTx    *txs.Tx
 	sharedMemory *atomic.Memory
-	issuer       chan common.Message
 	vm           *VM
 	txBuilder    *txstest.Builder
 }
@@ -129,7 +128,6 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		ctx,
 		prefixdb.New([]byte{1}, baseDB),
 		genesisBytes,
-		nil,
 		configBytes,
 		nil,
 		append(
@@ -149,13 +147,11 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	))
 
 	stopVertexID := ids.GenerateTestID()
-	issuer := make(chan common.Message, 1)
 
 	env := &environment{
 		genesisBytes: genesisBytes,
 		genesisTx:    getCreateTxFromGenesisTest(tb, genesisBytes, assetName),
 		sharedMemory: m,
-		issuer:       issuer,
 		vm:           vm,
 		txBuilder:    txstest.New(vm.parser.Codec(), vm.ctx, &vm.Config, vm.feeAssetID, vm.state),
 	}
@@ -165,7 +161,7 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		return env
 	}
 
-	require.NoError(vm.Linearize(context.Background(), stopVertexID, issuer))
+	require.NoError(vm.Linearize(context.Background(), stopVertexID))
 	if c.notBootstrapped {
 		return env
 	}
@@ -410,24 +406,24 @@ func makeCustomAssetGenesisData(tb testing.TB) map[string]AssetDefinition {
 func issueAndAccept(
 	require *require.Assertions,
 	vm *VM,
-	issuer <-chan common.Message,
 	tx *txs.Tx,
 ) {
 	txID, err := vm.issueTxFromRPC(tx)
 	require.NoError(err)
 	require.Equal(tx.ID(), txID)
 
-	buildAndAccept(require, vm, issuer, txID)
+	buildAndAccept(require, vm, txID)
 }
 
 // buildAndAccept expects the context lock not to be held
 func buildAndAccept(
 	require *require.Assertions,
 	vm *VM,
-	issuer <-chan common.Message,
 	txID ids.ID,
 ) {
-	require.Equal(common.PendingTxs, <-issuer)
+	msg, err := vm.WaitForEvent(context.Background())
+	require.NoError(err)
+	require.Equal(common.PendingTxs, msg)
 
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()

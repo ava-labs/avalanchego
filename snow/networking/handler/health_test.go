@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package handler
@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/networking/tracker"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -82,10 +83,13 @@ func TestHealthCheckSubnet(t *testing.T) {
 			)
 			require.NoError(err)
 
+			subscription, _ := createSubscriber()
+
 			handlerIntf, err := New(
 				ctx,
+				&block.ChangeNotifier{},
+				subscription,
 				vdrs,
-				nil,
 				time.Second,
 				testThreadPoolSize,
 				resourceTracker,

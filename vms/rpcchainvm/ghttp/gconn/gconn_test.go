@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gconn
@@ -61,7 +61,7 @@ func TestErrIOEOF(t *testing.T) {
 	require.Equal(io.EOF, err)
 }
 
-// ErrDeadlineExceeded tests that if a net.Conn returns an
+// TestOSErrDeadlineExceeded tests that if a net.Conn returns an
 // os.ErrDeadlineExceeded, it propagates that same error type.
 func TestOSErrDeadlineExceeded(t *testing.T) {
 	require := require.New(t)

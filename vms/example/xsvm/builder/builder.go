@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -12,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/linked"
+	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/chain"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/execute"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
@@ -27,26 +29,27 @@ var _ Builder = (*builder)(nil)
 type Builder interface {
 	SetPreference(preferred ids.ID)
 	AddTx(ctx context.Context, tx *tx.Tx) error
+	WaitForEvent(ctx context.Context) (common.Message, error)
 	BuildBlock(ctx context.Context, blockContext *smblock.Context) (chain.Block, error)
 }
 
 type builder struct {
 	chainContext *snow.Context
-	engineChan   chan<- common.Message
 	chain        chain.Chain
 
-	pendingTxs *linked.Hashmap[ids.ID, *tx.Tx]
 	preference ids.ID
+	// pendingTxsCond is awoken once there is at least one pending transaction.
+	pendingTxsCond *lock.Cond
+	pendingTxs     *linked.Hashmap[ids.ID, *tx.Tx]
 }
 
-func New(chainContext *snow.Context, engineChan chan<- common.Message, chain chain.Chain) Builder {
+func New(chainContext *snow.Context, chain chain.Chain) Builder {
 	return &builder{
-		chainContext: chainContext,
-		engineChan:   engineChan,
-		chain:        chain,
-
-		pendingTxs: linked.NewHashmap[ids.ID, *tx.Tx](),
-		preference: chain.LastAccepted(),
+		chainContext:   chainContext,
+		chain:          chain,
+		preference:     chain.LastAccepted(),
+		pendingTxsCond: lock.NewCond(&sync.Mutex{}),
+		pendingTxs:     linked.NewHashmap[ids.ID, *tx.Tx](),
 	}
 }
 
@@ -60,12 +63,26 @@ func (b *builder) AddTx(_ context.Context, newTx *tx.Tx) error {
 	if err != nil {
 		return err
 	}
+
+	b.pendingTxsCond.L.Lock()
+	defer b.pendingTxsCond.L.Unlock()
+
 	b.pendingTxs.Put(txID, newTx)
-	select {
-	case b.engineChan <- common.PendingTxs:
-	default:
-	}
+	b.pendingTxsCond.Broadcast()
 	return nil
+}
+
+func (b *builder) WaitForEvent(ctx context.Context) (common.Message, error) {
+	b.pendingTxsCond.L.Lock()
+	defer b.pendingTxsCond.L.Unlock()
+
+	for b.pendingTxs.Len() == 0 {
+		if err := b.pendingTxsCond.Wait(ctx); err != nil {
+			return 0, err
+		}
+	}
+
+	return common.PendingTxs, nil
 }
 
 func (b *builder) BuildBlock(ctx context.Context, blockContext *smblock.Context) (chain.Block, error) {
@@ -79,16 +96,6 @@ func (b *builder) BuildBlock(ctx context.Context, blockContext *smblock.Context)
 		return nil, err
 	}
 
-	defer func() {
-		if b.pendingTxs.Len() == 0 {
-			return
-		}
-		select {
-		case b.engineChan <- common.PendingTxs:
-		default:
-		}
-	}()
-
 	parentTimestamp := preferredBlk.Timestamp()
 	timestamp := time.Now().Truncate(time.Second)
 	if timestamp.Before(parentTimestamp) {
@@ -100,6 +107,9 @@ func (b *builder) BuildBlock(ctx context.Context, blockContext *smblock.Context)
 		Timestamp: timestamp.Unix(),
 		Height:    preferredBlk.Height() + 1,
 	}
+
+	b.pendingTxsCond.L.Lock()
+	defer b.pendingTxsCond.L.Unlock()
 
 	currentState := versiondb.New(preferredState)
 	for len(wipBlock.Txs) < MaxTxsPerBlock {

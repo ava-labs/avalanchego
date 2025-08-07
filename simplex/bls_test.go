@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
@@ -13,8 +13,7 @@ import (
 )
 
 func TestBLSVerifier(t *testing.T) {
-	config, err := newEngineConfig()
-	require.NoError(t, err)
+	config := newEngineConfig(t, 1)
 	signer, verifier := NewBLSAuth(config)
 	otherNodeID := ids.GenerateTestNodeID()
 
@@ -81,7 +80,7 @@ func TestBLSVerifier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err = verifier.Verify(msg, tt.sig, tt.nodeID)
+			err := verifier.Verify(msg, tt.sig, tt.nodeID)
 			require.ErrorIs(t, err, tt.expectErr)
 		})
 	}

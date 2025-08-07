@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package info
@@ -41,8 +41,8 @@ func TestClient(t *testing.T) {
 		err:    nil,
 		onCall: func() {},
 	}
-	c := &client{
-		requester: mc,
+	c := &Client{
+		Requester: mc,
 	}
 
 	{

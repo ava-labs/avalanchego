@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package syncer
@@ -577,7 +577,7 @@ func (ss *stateSyncer) sendGetAcceptedStateSummaries(ctx context.Context) {
 
 func (ss *stateSyncer) Notify(ctx context.Context, msg common.Message) error {
 	if msg != common.StateSyncDone {
-		ss.Ctx.Log.Warn("received an unexpected message from the VM",
+		ss.Ctx.Log.Info("received an unexpected message from the VM",
 			zap.Stringer("msg", msg),
 		)
 		return nil

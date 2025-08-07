@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -160,7 +160,6 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	if ctrl == nil {
 		res.blkManager = NewManager(
 			res.mempool,
-			nil,
 			metrics,
 			res.state,
 			res.backend,
@@ -170,7 +169,6 @@ func newEnvironment(t *testing.T, ctrl *gomock.Controller, f upgradetest.Fork) *
 	} else {
 		res.blkManager = NewManager(
 			res.mempool,
-			nil,
 			metrics,
 			res.mockedState,
 			res.backend,

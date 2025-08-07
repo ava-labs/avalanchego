@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package executor
@@ -1372,7 +1372,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 	blk := env.blkManager.NewBlock(statelessBlk)
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background()))
-	require.True(env.blkManager.SetPreference(statelessBlk.ID()))
+	env.blkManager.SetPreference(statelessBlk.ID())
 
 	// Should be current
 	staker, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
@@ -1405,7 +1405,7 @@ func TestAddValidatorProposalBlock(t *testing.T) {
 		blk = env.blkManager.NewBlock(statelessBlk)
 		require.NoError(blk.Verify(context.Background()))
 		require.NoError(blk.Accept(context.Background()))
-		require.True(env.blkManager.SetPreference(statelessBlk.ID()))
+		env.blkManager.SetPreference(statelessBlk.ID())
 	}
 
 	env.clk.Set(validatorEndTime)

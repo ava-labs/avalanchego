@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -157,7 +157,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	require.Equal([]*txs.Tx{tx}, blk.(*blockexecutor.Block).Block.Txs())
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background()))
-	require.True(env.blkManager.SetPreference(blk.ID()))
+	env.blkManager.SetPreference(blk.ID())
 
 	// Validator should now be current
 	staker, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
@@ -196,7 +196,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		require.NoError(blk.Accept(context.Background()))
 		require.NoError(commit.Verify(context.Background()))
 		require.NoError(commit.Accept(context.Background()))
-		require.True(env.blkManager.SetPreference(commit.ID()))
+		env.blkManager.SetPreference(commit.ID())
 
 		// Stop rewarding once our staker is rewarded
 		if staker.TxID == txID {
@@ -454,15 +454,12 @@ func TestPreviouslyDroppedTxsCannotBeReAddedToMempool(t *testing.T) {
 }
 
 func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
-	require := require.New(t)
-
 	env := newEnvironment(t, upgradetest.Latest)
 	env.ctx.Lock.Lock()
 	defer env.ctx.Lock.Unlock()
 
 	env.isBootstrapped.Set(false)
-
-	require.True(env.blkManager.SetPreference(ids.GenerateTestID())) // should not panic
+	env.blkManager.SetPreference(ids.GenerateTestID()) // should not panic
 }
 
 func TestGetNextStakerToReward(t *testing.T) {

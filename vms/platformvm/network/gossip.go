@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -67,7 +67,6 @@ func (txMarshaller) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
 
 func newGossipMempool(
 	mempool mempool.Mempool[*txs.Tx],
-	toEngine chan<- common.Message,
 	registerer prometheus.Registerer,
 	log logging.Logger,
 	txVerifier TxVerifier,
@@ -78,7 +77,6 @@ func newGossipMempool(
 	bloom, err := gossip.NewBloomFilter(registerer, "mempool_bloom_filter", minTargetElements, targetFalsePositiveProbability, resetFalsePositiveProbability)
 	return &gossipMempool{
 		Mempool:    mempool,
-		toEngine:   toEngine,
 		log:        log,
 		txVerifier: txVerifier,
 		bloom:      bloom,
@@ -87,7 +85,6 @@ func newGossipMempool(
 
 type gossipMempool struct {
 	mempool.Mempool[*txs.Tx]
-	toEngine   chan<- common.Message
 	log        logging.Logger
 	txVerifier TxVerifier
 
@@ -140,16 +137,6 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 			return true
 		})
 	}
-
-	if g.Mempool.Len() == 0 {
-		return nil
-	}
-
-	select {
-	case g.toEngine <- common.PendingTxs:
-	default:
-	}
-
 	return nil
 }
 

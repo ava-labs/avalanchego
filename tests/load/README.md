@@ -1,116 +1,102 @@
-# Load
+# Load Testing
 
-This package provides generic utilities for blockchain load testing. We break load generation down into the following components:
+The `load` package is a framework for performing load testing 
+against an instance of the C-Chain. It allows for simulation of various
+transaction scenarios to test network performance, transaction throughput, and system
+resilience under different workloads.
 
-- tx issuer(s)
-- tx listener(s)
-- tracker
-- orchestrator
+This package also comes with `main`, a subpackage executable which runs a load test against
+an instance of the C-Chain. For information on how to run the executable, refer to
+the `main` [README.md](./main/README.md).
 
-The transaction issuer(s) and listener(s) may be VM specific and provide the
-necessary injected dependencies for the orchestrator. This enables us to
-construct different load testing strategies on top of the same re-usable code.
-For example, we can re-use these components for a short burst of transactions or
-to perform gradual load testing.
+## Prerequisites
 
-## Architecture
+Using the `load` package has so far been coupled with `tmpnet`, a framework that
+enables orchestration of temporary AvalancheGo networks. For more details as to
+its capabilities and configuration, refer to the `tmpnet` [README.md](../fixture/tmpnet/README.md).
 
-```mermaid
-graph
-    O["Orchestrator"]
-    subgraph "Agent 3"
-        A3_I["Issuer 3"]
-        A3_L["Listener 3"]
-    end
-    subgraph "Agent 2"
-        A2_I["Issuer 2"]
-        A2_L["Listener 2"]
-    end
-    subgraph "Agent 1"
-        A1_I["Issuer 1"]
-        A1_L["Listener 1"]
-    end
-    T["Tracker"]
+## Components
 
-    T --> O
+### Worker
 
-    O --> A1_I
-    O --> A2_I
-    O --> A3_I
+Workers represent accounts which will be used for load testing. Each worker consists of a private key, nonce, and a network client - these values are used to create a wallet for load testing.
 
-    A1_I --> A1_L
-    A2_I --> A2_L
-    A3_I --> A3_L
+### Wallet
 
-    A1_I --> T
-    A2_I --> T
-    A3_I --> T
-    A1_L --> T
-    A2_L --> T
-    A3_L --> T
-```
+A wallet manages account state and transaction lifecycle for a single account.
 
-### Issuer
+The main function of wallets is to send transactions; wallets take signed transactions
+and send them to the network while monitoring block headers to detect transaction inclusion. A wallet
+considers a transaction successful if its execution succeeded, and returns an error otherwise. 
+Upon confirming a transaction was successful, a wallet increments its nonce by one, ensuring its account
+state matches that of the network.
 
-The issuer is responsible for generating and issuing transactions.
-It notifies the tracker of all issued transactions.
+Wallets are not thread-safe and each account should have at most one wallet
+instance associated with it. Having multiple wallets associated with a single 
+account, or using an account outside of a wallet, can cause synchronization 
+issues. This risks a wallet's state becoming inconsistent with the network, 
+potentially leading to failed transactions.
 
-### Listener
+Wallets are not thread-safe and each account should have at most one wallet instance associated with it.
 
-The listener is responsible for listening to the network and confirming
-transactions or marking them as failed. As it receives transactions, it
-notifies the tracker of the transaction status.
+### Generator
 
-### Tracker
+The generator executes multiple tests concurrently against the network. The key features of the 
+generator are as follows:
 
-The tracker is responsible for maintaining metrics for all sent txs. Since the
-tracker is used by both the issuers, listeners and the orchestrator, all methods of the
-tracker must be thread safe.
+- **Parallel Execution**: Runs a goroutine per wallet for concurrent test execution.
+- **Timeout Management**: Supports both overall load test timeout and a timeout per-test.
+- **Error Recovery**: Automatically recovers from test failures to ensure continuous load generation.
+- **Metrics**: Creates metrics during wallet initialization and tracks performance throughout execution.
 
-### Orchestrator
+The generator starts a goroutine for each wallet to execute tests asynchronously, maximizing throughput while maintaining isolation between accounts.
 
-The orchestrator supports the following modes:
+### Tests
 
-- Gradual Load: the orchestrator sends transactions at an initial rate (TPS) and
-increases that rate until hitting the maximum desired rate or until the
-orchestrator determines that it can no longer make progress.
-- Burst: for each issuer, the orchestrator sends `MinTPS` transactions at once
-  and waits for all transactions to be marked as accepted.
+The `load` package performs load testing by continuously running a series of tests. This approach provides the following benefits:
 
-Setting `MaxTPS` in the orchestrator configuration to `-1` sets the orchestrator
-in burst mode. Otherwise, the orchestator will run in gradual load mode.
+- **Correctness**: Each test validates transaction execution and state changes, ensuring the network behaves as expected under load
+- **Reproducibility**: Standardized test scenarios with consistent parameters enable repeatable performance measurements and regression detection
 
-The current TPS in the gradual orchestrator is determined by taking the
-number of transactions confirmed in a given time window (`SustainedTime`) and
-diving it by `SustainedTime` (in terms of seconds) Furthermore, the orchestator
-has `MaxAttempts` tries to try and achieve a given TPS before determining that
-the given TPS is not achievable.
+Each test must satisfy the following interface for compatibility with the load generator:
 
-Below is the pseudocode for how the orchestrator in gradual load mode determines TPS and
-for how it increases TPS:
-
-```
-currTargetTPS := current TPS we want to achieve
-maxAttempts := maximum number of attempts we have to achieve currTargetTPS
-
-txsPerIssuer := currTargetTPS / numOfIssuers
-attempts := 0
-
-for each issuer { // Async
-    send txsPerIssuer txs per second
-}
-
-for {
-    wait for SustainedTime
-
-    tps := number of accepted txs divided by the SustainedTime
-    if tps >= currTargetTPS:
-        increase currTargerTPS by step
-        iters = 0
-    else:
-        if attempts >= maxAttempts:
-            fail
-        iters += 1
+```go
+type Test interface {
+    // Run should create a signed transaction and broadcast it to the network via wallet.
+    Run(tc tests.TestContext, wallet *Wallet)
 }
 ```
+
+#### Available Test Types
+
+The `load` package provides a comprehensive suite of test types designed to stress different aspects of EVM execution. Each test targets specific performance characteristics and resource usage patterns.
+
+| Test Type         | Description                                                     |
+| ----------------- | --------------------------------------------------------------- |
+| Transfer          | Performs self-transfer of 0 AVAX                                |
+| Read              | Performs multiple storage reads from contract state             |
+| Write             | Executes equential storage writes to new contract storage slots |
+| StateModification | Updates existing storage values or creates new ones             |
+| Hashing           | Executes Keccak256 hash operations in a loop                    |
+| PureCompute       | Performs CPU-intensive mathematical computations                |
+| Memory            | Allocates and manipulates dynamic arrays                        |
+| CallDepth         | Performs recursive function calls to test stack limits          |
+| ContractCreation  | Deploys new contracts during execution                          |
+| ExternalCall      | Makes calls to external contract functions                      |
+| LargeEvent        | Emits events with large data payloads                           |
+| TrieStress        | Performs insert operations on TrieDB                            |
+
+Additionally, there is a `RandomTest` which executes one of the aforementioned tests, selected uniformly at random.
+This test is particular useful for mimicking the diverse transactions patterns seen on blockchains like the C-Chain.
+
+### Metrics
+
+The package exposes Prometheus metrics for comprehensive load test monitoring:
+
+- **`txs_issued`** (Counter): Total number of transactions submitted to the network
+- **`tx_issuance_latency`** (Histogram): Time from transaction creation to network submission
+- **`tx_confirmation_latency`** (Histogram): Time from network submission to block confirmation  
+- **`tx_total_latency`** (Histogram): End-to-end time from creation to confirmation
+
+These metrics are registered with the registry passed into the load generator during initialization and are updated via the wallets during test execution.
 

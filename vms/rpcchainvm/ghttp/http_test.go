@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ghttp
@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
@@ -92,21 +93,40 @@ func TestRequestClientArbitrarilyLongBody(t *testing.T) {
 // client
 func TestHttpResponse(t *testing.T) {
 	tests := []struct {
-		name   string
-		header http.Header
+		name            string
+		requestHeaders  http.Header
+		responseHeaders http.Header
 	}{
 		{
 			// Requests with an upgrade header do not use the "Simple*" http response
 			// apis and must be separately tested
-			name: "upgrade header specified",
-			header: http.Header{
+			name: "upgrade request header specified",
+			requestHeaders: http.Header{
 				"Upgrade": {"upgrade"},
 				"foo":     {"foo"},
 			},
+			responseHeaders: http.Header{},
 		},
 		{
-			name: "arbitrary headers",
-			header: http.Header{
+			name: "arbitrary request headers",
+			requestHeaders: http.Header{
+				"foo": {"foo"},
+			},
+			responseHeaders: http.Header{},
+		},
+		{
+			name: "response header set with upgrade request header",
+			requestHeaders: http.Header{
+				"Upgrade": {"upgrade"},
+			},
+			responseHeaders: http.Header{
+				"foo": {"foo"},
+			},
+		},
+		{
+			name:           "response header set",
+			requestHeaders: http.Header{},
+			responseHeaders: http.Header{
 				"foo": {"foo"},
 			},
 		},
@@ -116,8 +136,14 @@ func TestHttpResponse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
+			wantHandlerHeaders := http.Header{}
+			wantHandlerHeaders.Add("Bar", "bar")
+			wantHandlerHeaders.Add("Content-Type", "application/json")
 			handler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-				w.Header()["Bar"] = []string{"bar"}
+				for k, v := range wantHandlerHeaders {
+					w.Header().Set(k, v[0])
+				}
+
 				_, _ = w.Write([]byte("baz"))
 			})
 
@@ -137,23 +163,28 @@ func TestHttpResponse(t *testing.T) {
 			require.NoError(err)
 
 			recorder := &httptest.ResponseRecorder{
-				Body: bytes.NewBuffer(nil),
+				HeaderMap: maps.Clone(tt.responseHeaders),
+				Body:      bytes.NewBuffer(nil),
 			}
 
 			client := NewClient(httppb.NewHTTPClient(conn))
-			client.ServeHTTP(recorder, &http.Request{
+			request := &http.Request{
 				Body:   io.NopCloser(strings.NewReader("foo")),
-				Header: tt.header,
-			})
+				Header: tt.requestHeaders,
+			}
 
+			client.ServeHTTP(recorder, request)
+
+			wantResponseHeaders := maps.Clone(tt.responseHeaders)
+			for k, v := range wantHandlerHeaders {
+				wantResponseHeaders.Add(k, v[0])
+			}
+
+			require.Equal(wantResponseHeaders, recorder.Header())
 			require.Equal(http.StatusOK, recorder.Code)
-			require.Equal(
-				http.Header{
-					"Bar": []string{"bar"},
-				},
-				recorder.Header(),
-			)
 			require.Equal("baz", recorder.Body.String())
+
+			require.Equal(tt.requestHeaders, request.Header)
 		})
 	}
 }

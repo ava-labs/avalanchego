@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -65,13 +65,13 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 		e2e.WaitForHealthy(tc, betaNode)
 
 		tc.By("retrieving alpha node id and pop")
-		alphaNodeURI := e2e.GetLocalURI(tc, alphaNode)
+		alphaNodeURI := alphaNode.GetAccessibleURI()
 		alphaInfoClient := info.NewClient(alphaNodeURI)
 		alphaNodeID, alphaPOP, err := alphaInfoClient.GetNodeID(tc.DefaultContext())
 		require.NoError(err)
 
 		tc.By("retrieving beta node id and pop")
-		betaNodeURI := e2e.GetLocalURI(tc, betaNode)
+		betaNodeURI := betaNode.GetAccessibleURI()
 		betaInfoClient := info.NewClient(betaNodeURI)
 		betaNodeID, betaPOP, err := betaInfoClient.GetNodeID(tc.DefaultContext())
 		require.NoError(err)
@@ -319,7 +319,7 @@ var _ = ginkgo.Describe("[Staking Rewards]", func() {
 // TODO(marun) Enable GetConfig to return *node.Config directly. Currently, due
 // to a circular dependency issue, a map-based equivalent is used for which
 // manual unmarshaling is required.
-func getRewardConfig(tc tests.TestContext, client admin.Client) reward.Config {
+func getRewardConfig(tc tests.TestContext, client *admin.Client) reward.Config {
 	require := require.New(tc)
 
 	rawNodeConfigMap, err := client.GetConfig(tc.DefaultContext())
