@@ -11,8 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// txEntry is used to track the [gasPrice] transactions pay to be included in
-// the mempool.
 type txEntry struct {
 	id       ids.ID
 	gasPrice uint64
@@ -20,7 +18,7 @@ type txEntry struct {
 	index    int
 }
 
-// internalTxHeap is used to track pending atomic transactions by [gasPrice]
+// internalTxHeap is used to track pending atomic transactions by gasPrice
 type internalTxHeap struct {
 	isMinHeap bool
 	items     []*txEntry
@@ -110,24 +108,24 @@ func (th *txHeap) Push(tx *atomic.Tx, gasPrice uint64) {
 	})
 }
 
-// Assumes there is non-zero items in [txHeap]
+// Assumes there is non-zero items
 func (th *txHeap) PeekMax() (*atomic.Tx, uint64) {
 	txEntry := th.maxHeap.items[0]
 	return txEntry.tx, txEntry.gasPrice
 }
 
-// Assumes there is non-zero items in [txHeap]
+// Assumes there is non-zero items
 func (th *txHeap) PeekMin() (*atomic.Tx, uint64) {
 	txEntry := th.minHeap.items[0]
 	return txEntry.tx, txEntry.gasPrice
 }
 
-// Assumes there is non-zero items in [txHeap]
+// Assumes there is non-zero items
 func (th *txHeap) PopMax() *atomic.Tx {
 	return th.Remove(th.maxHeap.items[0].id)
 }
 
-// Assumes there is non-zero items in [txHeap]
+// Assumes there is non-zero items
 func (th *txHeap) PopMin() *atomic.Tx {
 	return th.Remove(th.minHeap.items[0].id)
 }

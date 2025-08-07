@@ -72,21 +72,20 @@ func (m *Mempool) AddRemoteTx(tx *atomic.Tx) error {
 	defer m.lock.Unlock()
 
 	err := m.addTx(tx, false, false)
-	// Do not attempt to discard the tx if it was already known
-	if errors.Is(err, ErrAlreadyKnown) {
+	// If the transaction is already in the mempool, marking it as Discarded,
+	// could unexpectedly cause the transaction to have multiple statuses.
+	if err == nil || errors.Is(err, ErrAlreadyKnown) {
 		return err
 	}
 
-	if err != nil {
-		// unlike local txs, invalid remote txs are recorded as discarded
-		// so that they won't be requested again
-		txID := tx.ID()
-		m.discardedTxs.Put(tx.ID(), tx)
-		log.Debug("failed to issue remote tx to mempool",
-			"txID", txID,
-			"err", err,
-		)
-	}
+	// Unlike local txs, invalid remote txs are recorded as discarded so that
+	// they won't be requested again
+	txID := tx.ID()
+	m.discardedTxs.Put(txID, tx)
+	log.Debug("failed to issue remote tx to mempool",
+		"txID", txID,
+		"err", err,
+	)
 	return err
 }
 
@@ -102,7 +101,7 @@ func (m *Mempool) AddLocalTx(tx *atomic.Tx) error {
 	return m.addTx(tx, true, false)
 }
 
-// ForceAddTx forcibly adds a *atomic.Tx to the mempool and bypasses all verification.
+// ForceAddTx forcibly adds a tx to the mempool and bypasses all verification.
 func (m *Mempool) ForceAddTx(tx *atomic.Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -110,16 +109,17 @@ func (m *Mempool) ForceAddTx(tx *atomic.Tx) error {
 	return m.addTx(tx, true, true)
 }
 
-// checkConflictTx checks for any transactions in the mempool that spend the same input UTXOs as [tx].
-// If any conflicts are present, it returns the highest gas price of any conflicting transaction, the
-// txID of the corresponding tx and the full list of transactions that conflict with [tx].
+// checkConflictTx checks for any transactions in the mempool that spend the
+// same input UTXOs as the provided transaction. If any conflicts are present,
+// it returns the highest gas price of any conflicting transaction, the ID of
+// the corresponding tx and the full list of conflicting transactions.
 func (m *Mempool) checkConflictTx(tx *atomic.Tx) (uint64, ids.ID, []*atomic.Tx, error) {
 	utxoSet := tx.InputUTXOs()
 
 	var (
 		highestGasPrice             uint64
-		conflictingTxs              []*atomic.Tx
 		highestGasPriceConflictTxID ids.ID
+		conflictingTxs              []*atomic.Tx
 	)
 	for utxoID := range utxoSet {
 		// Get current gas price of the existing tx in the mempool
@@ -142,24 +142,28 @@ func (m *Mempool) checkConflictTx(tx *atomic.Tx) (uint64, ids.ID, []*atomic.Tx, 
 	return highestGasPrice, highestGasPriceConflictTxID, conflictingTxs, nil
 }
 
-// addTx adds [tx] to the mempool. Assumes [m.lock] is held.
-// If [force], skips conflict checks within the mempool.
+// addTx attempts to add tx to the mempool.
+//
+// Unless local, discarded transactions can not be added.
+// If force, conflict checks are skipped.
+//
+// Assumes lock is held.
 func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
+	// If the tx has already been included in the mempool, there's no need to
+	// add it again.
 	txID := tx.ID()
-	// If [txID] has already been issued or is in the currentTxs map
-	// there's no need to add it.
 	if _, exists := m.issuedTxs[txID]; exists {
-		return fmt.Errorf("%w: tx %s was issued previously", ErrAlreadyKnown, tx.ID())
+		return fmt.Errorf("%w: tx %s was issued previously", ErrAlreadyKnown, txID)
 	}
 	if _, exists := m.currentTxs[txID]; exists {
-		return fmt.Errorf("%w: tx %s is being built into a block", ErrAlreadyKnown, tx.ID())
+		return fmt.Errorf("%w: tx %s is being built into a block", ErrAlreadyKnown, txID)
 	}
-	if _, exists := m.txHeap.Get(txID); exists {
-		return fmt.Errorf("%w: tx %s is pending", ErrAlreadyKnown, tx.ID())
+	if _, exists := m.pendingTxs.Get(txID); exists {
+		return fmt.Errorf("%w: tx %s is pending", ErrAlreadyKnown, txID)
 	}
 	if !local {
 		if _, exists := m.discardedTxs.Get(txID); exists {
-			return fmt.Errorf("%w: tx %s was discarded", ErrAlreadyKnown, tx.ID())
+			return fmt.Errorf("%w: tx %s was discarded", ErrAlreadyKnown, txID)
 		}
 	}
 	if !force && m.verify != nil {
@@ -175,8 +179,8 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 		return err
 	}
 	if len(conflictingTxs) != 0 && !force {
-		// If [tx] does not have a higher fee than all of its conflicts,
-		// we refuse to issue it to the mempool.
+		// If the transaction does not have a higher fee than all of its
+		// conflicts, we refuse to add it to the mempool.
 		if highestGasPrice >= gasPrice {
 			return fmt.Errorf(
 				"%w: issued tx (%s) gas price %d <= conflict tx (%s) gas price %d (%d total conflicts in mempool)",
@@ -188,20 +192,23 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 				len(conflictingTxs),
 			)
 		}
-		// Remove any conflicting transactions from the mempool
+		// Remove all conflicting transactions from the mempool.
 		for _, conflictTx := range conflictingTxs {
 			m.removeTx(conflictTx, true)
 		}
 	}
-	// If adding this transaction would exceed the mempool's size, check if there is a lower priced
-	// transaction that can be evicted from the mempool
+	// If adding this transaction would exceed the mempool's size, check if
+	// there is a lower priced transaction that can be evicted from the mempool.
+	//
+	// Recall that the size of the mempool is denominated in transactions, so to
+	// add a new transaction we only need to evict at most one other
+	// transaction.
 	if m.length() >= m.maxSize {
-		if m.txHeap.Len() > 0 {
-			// Get the lowest price item from [txHeap]
-			minTx, minGasPrice := m.txHeap.PeekMin()
-			// If the [gasPrice] of the lowest item is >= the [gasPrice] of the
-			// submitted item, discard the submitted item (we prefer items
-			// already in the mempool).
+		if m.pendingTxs.Len() > 0 {
+			// Get the transaction with the lowest gasPrice
+			minTx, minGasPrice := m.pendingTxs.PeekMin()
+			// If the lowest gasPrice >= the gasPrice of the new transaction,
+			// Discard new transaction. (Prefer items already in the mempool).
 			if minGasPrice >= gasPrice {
 				return fmt.Errorf(
 					"%w currentMin=%d provided=%d",
@@ -214,7 +221,7 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 			m.removeTx(minTx, true)
 		} else {
 			// This could occur if we have used our entire size allowance on
-			// transactions that are currently processing.
+			// transactions that are either Current or Issued.
 			return ErrMempoolFull
 		}
 	}
@@ -224,16 +231,16 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 	// We allow the transaction to be re-issued since it may have been invalid
 	// due to an atomic UTXO not being present yet.
 	if _, has := m.discardedTxs.Get(txID); has {
-		log.Debug("Adding recently discarded transaction %s back to the mempool", txID)
+		log.Debug("Adding recently discarded transaction back to the mempool",
+			"txID", txID,
+		)
 		m.discardedTxs.Evict(txID)
 	}
 
-	// Add the transaction to the [txHeap] so we can evaluate new entries based
-	// on how their [gasPrice] compares and add to [utxoSet] to make sure we can
-	// reject conflicting transactions.
-	m.txHeap.Push(tx, gasPrice)
+	// Mark the transaction as Pending.
+	m.pendingTxs.Push(tx, gasPrice)
 	m.metrics.addedTxs.Inc(1)
-	m.metrics.pendingTxs.Update(int64(m.txHeap.Len()))
+	m.metrics.pendingTxs.Update(int64(m.pendingTxs.Len()))
 	for utxoID := range utxoSet {
 		m.utxoSpenders[utxoID] = tx
 	}
@@ -247,16 +254,18 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 	if reset {
 		log.Debug("resetting bloom filter", "reason", "reached max filled ratio")
 
-		for _, pendingTx := range m.txHeap.minHeap.items {
+		for _, pendingTx := range m.pendingTxs.minHeap.items {
 			m.bloom.Add(pendingTx.tx)
 		}
 	}
 
-	// When adding [tx] to the mempool make sure that there is an item in Pending
-	// to signal the VM to produce a block. Note: if the VM's buildStatus has already
-	// been set to something other than [dontBuild], this will be ignored and won't be
-	// reset until the engine calls BuildBlock. This case is handled in IssueCurrentTx
-	// and CancelCurrentTx.
+	// When adding a transaction to the mempool, we make sure that there is an
+	// item in Pending to signal the VM to produce a block.
+	//
+	// If the VM's buildStatus has already been set to something other than
+	// dontBuild, this will be ignored and won't be reset until the engine calls
+	// BuildBlock. This case is handled in [Txs.IssueCurrentTxs] and
+	// [Txs.CancelCurrentTxs].
 	m.addPending()
 
 	return nil

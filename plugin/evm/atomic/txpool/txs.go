@@ -19,29 +19,49 @@ const discardedTxsCacheSize = 50
 
 var ErrNoGasUsed = errors.New("no gas used")
 
+// Txs stores the transactions inside of the mempool.
+//
+// Transactions in the mempool can be in 1 of 4 statuses:
+//
+//   - Pending: Pending transactions are eligible for the block builder to
+//     attempt to include in the next block being built.
+//   - Current: Current transactions are included inside of a block currently
+//     being built.
+//   - Issued: Issued transactions were included inside of a block built by this
+//     node.
+//   - Discarded: Discarded transactions were previously in the the mempool, but
+//     were then deemed to be invalid. To prevent additional future work, these
+//     transactions may be assumed to be invalid in the future.
 type Txs struct {
 	ctx     *snow.Context
 	metrics *metrics
-	// maxSize is the maximum number of transactions allowed to be kept in mempool
+	// maxSize is the maximum number of transactions allowed to be kept in
+	// mempool.
 	maxSize int
+	// pending is a channel of length one, which the mempool ensures has an item
+	// on it as long as there is a pending transaction.
+	pending chan struct{}
 
 	lock sync.RWMutex
 
-	// currentTxs is the set of transactions about to be added to a block.
+	// pendingTxs is the collection of transactions available to be included
+	// into a block, sorted by gasPrice.
+	pendingTxs *txHeap
+	// currentTxs is the set of transactions that have been included into a
+	// block that is currently being built.
 	currentTxs map[ids.ID]*atomic.Tx
-	// issuedTxs is the set of transactions that have been issued into a new block
+	// issuedTxs is the set of transactions that have been included into a
+	// block that was previously built.
 	issuedTxs map[ids.ID]*atomic.Tx
-	// discardedTxs is an LRU Cache of transactions that have been discarded after failing
-	// verification.
-	discardedTxs *lru.Cache[ids.ID, *atomic.Tx]
-	// pending is a channel of length one, which the mempool ensures has an item on
-	// it as long as there is an unissued transaction remaining in [txs]
-	pending chan struct{}
-	// txHeap is a sorted record of all txs in the mempool by [gasPrice]
-	// NOTE: [txHeap] ONLY contains pending txs
-	txHeap *txHeap
-	// utxoSpenders maps utxoIDs to the transaction consuming them in the mempool
+
+	// utxoSpenders maps utxoIDs to the Pending, Current, or Issued transaction
+	// consuming them in the mempool. This map does not store references to
+	// Discarded transactions.
 	utxoSpenders map[ids.ID]*atomic.Tx
+
+	// discardedTxs is an LRU Cache of transactions that have been discarded
+	// after failing verification.
+	discardedTxs *lru.Cache[ids.ID, *atomic.Tx]
 }
 
 func NewTxs(ctx *snow.Context, maxSize int) *Txs {
@@ -49,35 +69,29 @@ func NewTxs(ctx *snow.Context, maxSize int) *Txs {
 		ctx:          ctx,
 		metrics:      newMetrics(),
 		maxSize:      maxSize,
+		pending:      make(chan struct{}, 1),
+		pendingTxs:   newTxHeap(maxSize),
 		currentTxs:   make(map[ids.ID]*atomic.Tx),
 		issuedTxs:    make(map[ids.ID]*atomic.Tx),
-		discardedTxs: lru.NewCache[ids.ID, *atomic.Tx](discardedTxsCacheSize),
-		pending:      make(chan struct{}, 1),
-		txHeap:       newTxHeap(maxSize),
 		utxoSpenders: make(map[ids.ID]*atomic.Tx),
+		discardedTxs: lru.NewCache[ids.ID, *atomic.Tx](discardedTxsCacheSize),
 	}
 }
 
-// PendingLen returns the number of pending transactions
+// PendingLen returns the number of pending transactions.
 func (t *Txs) PendingLen() int {
-	return t.Len()
-}
-
-// Len returns the number of transactions
-func (t *Txs) Len() int {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
 	return t.length()
 }
 
-// assumes the lock is held
+// Assumes the lock is held.
 func (t *Txs) length() int {
-	return t.txHeap.Len() + len(t.issuedTxs)
+	return t.pendingTxs.Len() + len(t.issuedTxs)
 }
 
-// atomicTxGasPrice is the [gasPrice] paid by a transaction to burn a given
-// amount of [AVAXAssetID] given the value of [gasUsed].
+// atomicTxGasPrice returns the gasPrice of a transaction in nAVAX/gas.
 func (t *Txs) atomicTxGasPrice(tx *atomic.Tx) (uint64, error) {
 	gasUsed, err := tx.GasUsed(true)
 	if err != nil {
@@ -93,53 +107,50 @@ func (t *Txs) atomicTxGasPrice(tx *atomic.Tx) (uint64, error) {
 	return burned / gasUsed, nil
 }
 
+// Iterate applies f to all Pending transactions. If f returns false, the
+// iteration stops early.
 func (t *Txs) Iterate(f func(tx *atomic.Tx) bool) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	for _, item := range t.txHeap.maxHeap.items {
+	for _, item := range t.pendingTxs.maxHeap.items {
 		if !f(item.tx) {
 			return
 		}
 	}
 }
 
-// NextTx returns a transaction to be issued from the mempool.
+// NextTx returns the highest paying Pending transaction from the mempool and
+// marks it as Current.
 func (t *Txs) NextTx() (*atomic.Tx, bool) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	// We include atomic transactions in blocks sorted by the [gasPrice] they
-	// pay.
-	if t.txHeap.Len() > 0 {
-		tx := t.txHeap.PopMax()
-		t.currentTxs[tx.ID()] = tx
-		t.metrics.pendingTxs.Update(int64(t.txHeap.Len()))
-		t.metrics.currentTxs.Update(int64(len(t.currentTxs)))
-		return tx, true
+	if t.pendingTxs.Len() == 0 {
+		return nil, false
 	}
 
-	return nil, false
+	tx := t.pendingTxs.PopMax()
+	t.currentTxs[tx.ID()] = tx
+	t.metrics.pendingTxs.Update(int64(t.pendingTxs.Len()))
+	t.metrics.currentTxs.Update(int64(len(t.currentTxs)))
+	return tx, true
 }
 
-// GetPendingTx returns the transaction [txID] and true if it is
-// currently in the [txHeap] waiting to be issued into a block.
-// Returns nil, false otherwise.
+// GetPendingTx returns the transaction if it is Pending.
 func (t *Txs) GetPendingTx(txID ids.ID) (*atomic.Tx, bool) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	return t.txHeap.Get(txID)
+	return t.pendingTxs.Get(txID)
 }
 
-// GetTx returns the transaction [txID] if it was issued
-// by this node and returns whether it was dropped and whether
-// it exists.
-func (t *Txs) GetTx(txID ids.ID) (*atomic.Tx, bool, bool) {
+// GetTx returns the transaction along with if it is Discarded.
+func (t *Txs) GetTx(txID ids.ID) (tx *atomic.Tx, discarded bool, found bool) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	if tx, ok := t.txHeap.Get(txID); ok {
+	if tx, ok := t.pendingTxs.Get(txID); ok {
 		return tx, false, true
 	}
 	if tx, ok := t.issuedTxs[txID]; ok {
@@ -148,43 +159,44 @@ func (t *Txs) GetTx(txID ids.ID) (*atomic.Tx, bool, bool) {
 	if tx, ok := t.currentTxs[txID]; ok {
 		return tx, false, true
 	}
-	if tx, exists := t.discardedTxs.Get(txID); exists {
+	if tx, ok := t.discardedTxs.Get(txID); ok {
 		return tx, true, true
 	}
-
 	return nil, false, false
 }
 
-// Has returns true if the mempool contains [txID] or it was issued.
+// Has returns true if the mempool contains the transaction in either the
+// Pending, Current, or Issued state.
 func (t *Txs) Has(txID ids.ID) bool {
 	_, dropped, found := t.GetTx(txID)
 	return found && !dropped
 }
 
-// IssueCurrentTx marks [currentTx] as issued if there is one
+// IssueCurrentTxs marks all Current transactions as Issued.
 func (t *Txs) IssueCurrentTxs() {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	for txID := range t.currentTxs {
-		t.issuedTxs[txID] = t.currentTxs[txID]
+	for txID, tx := range t.currentTxs {
+		t.issuedTxs[txID] = tx
 		delete(t.currentTxs, txID)
 	}
 	t.metrics.issuedTxs.Update(int64(len(t.issuedTxs)))
-	t.metrics.currentTxs.Update(int64(len(t.currentTxs)))
+	t.metrics.currentTxs.Update(0)
 
-	// If there are more transactions to be issued, add an item
-	// to Pending.
-	if t.txHeap.Len() > 0 {
+	// Since this function is called after the block is built, we should make
+	// sure to signal if we are willing to build another block.
+	if t.pendingTxs.Len() > 0 {
 		t.addPending()
 	}
 }
 
-// CancelCurrentTx marks the attempt to issue [txID]
-// as being aborted. This should be called after NextTx returns [txID]
-// and the transaction [txID] cannot be included in the block, but should
-// not be discarded. For example, CancelCurrentTx should be called if including
-// the transaction will put the block above the atomic tx gas limit.
+// CancelCurrentTx attempts to mark the Current transaction as Pending.
+//
+// This should be called after [Txs.NextTx] returned the transaction and it
+// couldn't be included in the block, but should not be discarded. For example,
+// CancelCurrentTx should be called if including the transaction will put the
+// block above the atomic tx gas limit.
 func (t *Txs) CancelCurrentTx(txID ids.ID) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -194,51 +206,53 @@ func (t *Txs) CancelCurrentTx(txID ids.ID) {
 	}
 }
 
-// [CancelCurrentTxs] marks the attempt to issue [currentTxs]
-// as being aborted. If this is called after a buildBlock error
-// caused by the atomic transaction, then DiscardCurrentTx should have been called
-// such that this call will have no effect and should not re-issue the invalid tx.
+// CancelCurrentTxs attempts to mark all Current transactions as Pending.
+//
+// This should be called after building a block failed due to an error unrelated
+// to the transactions.
 func (t *Txs) CancelCurrentTxs() {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	// If building a block failed, put the currentTx back in [txs]
-	// if it exists.
 	for _, tx := range t.currentTxs {
 		t.cancelTx(tx)
 	}
 
-	// If there are more transactions to be issued, add an item
-	// to Pending.
-	if t.txHeap.Len() > 0 {
+	// Since this function is called after block building has failed, we should
+	// make sure to signal if we are willing to build another block.
+	if t.pendingTxs.Len() > 0 {
 		t.addPending()
 	}
 }
 
-// cancelTx removes [tx] from current transactions and moves it back into the
-// tx heap.
-// assumes the lock is held.
+// cancelTx attempts to mark the Current transaction as Pending. If the tx can
+// not be marked as Pending, it will be Discarded.
+//
+// Assumes the lock is held.
 func (t *Txs) cancelTx(tx *atomic.Tx) {
-	// Add tx to heap sorted by gasPrice
+	txID := tx.ID()
 	gasPrice, err := t.atomicTxGasPrice(tx)
-	if err == nil {
-		t.txHeap.Push(tx, gasPrice)
-		t.metrics.pendingTxs.Update(int64(t.txHeap.Len()))
-	} else {
-		// If the err is not nil, we simply discard the transaction because it is
-		// invalid. This should never happen but we guard against the case it does.
-		log.Error("failed to calculate atomic tx gas price while canceling current tx", "err", err)
-		t.removeSpenders(tx)
-		t.discardedTxs.Put(tx.ID(), tx)
-		t.metrics.discardedTxs.Inc(1)
+	if err != nil {
+		log.Error("failed to calculate atomic tx gas price while canceling current tx",
+			"txID", txID,
+			"err", err,
+		)
+		t.discardCurrentTx(tx)
+		return
 	}
 
-	delete(t.currentTxs, tx.ID())
+	delete(t.currentTxs, txID)
 	t.metrics.currentTxs.Update(int64(len(t.currentTxs)))
+
+	t.pendingTxs.Push(tx, gasPrice)
+	t.metrics.pendingTxs.Update(int64(t.pendingTxs.Len()))
 }
 
-// DiscardCurrentTx marks a [tx] in the [currentTxs] map as invalid and aborts the attempt
-// to issue it since it failed verification.
+// DiscardCurrentTx marks the Current transaction as Discarded.
+//
+// This should be called after [Txs.NextTx] returned the transaction and it
+// failed verification. For example, DiscardCurrentTx should be called if
+// including the transaction would produce a conflict with an ancestor block.
 func (t *Txs) DiscardCurrentTx(txID ids.ID) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -248,7 +262,10 @@ func (t *Txs) DiscardCurrentTx(txID ids.ID) {
 	}
 }
 
-// DiscardCurrentTxs marks all txs in [currentTxs] as discarded.
+// DiscardCurrentTxs marks all Current transactions as Discarded.
+//
+// This should be called after building a block failed due to an error related
+// to the transactions.
 func (t *Txs) DiscardCurrentTxs() {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -258,29 +275,39 @@ func (t *Txs) DiscardCurrentTxs() {
 	}
 }
 
-// discardCurrentTx discards [tx] from the set of current transactions.
+// discardCurrentTx marks the Current transaction as Discarded.
+//
 // Assumes the lock is held.
 func (t *Txs) discardCurrentTx(tx *atomic.Tx) {
-	t.removeSpenders(tx)
-	t.discardedTxs.Put(tx.ID(), tx)
-	delete(t.currentTxs, tx.ID())
+	txID := tx.ID()
+	delete(t.currentTxs, txID)
 	t.metrics.currentTxs.Update(int64(len(t.currentTxs)))
+
+	t.removeSpenders(tx)
+
+	t.discardedTxs.Put(txID, tx)
 	t.metrics.discardedTxs.Inc(1)
 }
 
-// removeTx removes [txID] from the mempool.
-// Note: removeTx will delete all entries from [utxoSpenders] corresponding
-// to input UTXOs of [txID]. This means that when replacing a conflicting tx,
-// removeTx must be called for all conflicts before overwriting the utxoSpenders
-// map.
+// removeTx removes the transaction from the mempool. If discard is set, the
+// transaction will be kept as Discarded, otherwise it will no longer have any
+// status.
+//
+// Note: removeTx will delete all UTXO entries from utxoSpenders. This means
+// that when replacing a conflicting tx, removeTx must be called for all
+// conflicts before overwriting the utxoSpenders map.
+//
 // Assumes lock is held.
 func (t *Txs) removeTx(tx *atomic.Tx, discard bool) {
 	txID := tx.ID()
-
-	// Remove from [currentTxs], [txHeap], and [issuedTxs].
+	t.pendingTxs.Remove(txID)
 	delete(t.currentTxs, txID)
-	t.txHeap.Remove(txID)
 	delete(t.issuedTxs, txID)
+	t.metrics.pendingTxs.Update(int64(t.pendingTxs.Len()))
+	t.metrics.currentTxs.Update(int64(len(t.currentTxs)))
+	t.metrics.issuedTxs.Update(int64(len(t.issuedTxs)))
+
+	t.removeSpenders(tx)
 
 	if discard {
 		t.discardedTxs.Put(txID, tx)
@@ -288,16 +315,11 @@ func (t *Txs) removeTx(tx *atomic.Tx, discard bool) {
 	} else {
 		t.discardedTxs.Evict(txID)
 	}
-	t.metrics.pendingTxs.Update(int64(t.txHeap.Len()))
-	t.metrics.currentTxs.Update(int64(len(t.currentTxs)))
-	t.metrics.issuedTxs.Update(int64(len(t.issuedTxs)))
-
-	// Remove all entries from [utxoSpenders].
-	t.removeSpenders(tx)
 }
 
-// removeSpenders deletes the entries for all input UTXOs of [tx] from the
-// [utxoSpenders] map.
+// removeSpenders deletes the entries for all input UTXOs of the transaction
+// from the utxoSpenders map.
+//
 // Assumes the lock is held.
 func (t *Txs) removeSpenders(tx *atomic.Tx) {
 	for utxoID := range tx.InputUTXOs() {
@@ -305,8 +327,8 @@ func (t *Txs) removeSpenders(tx *atomic.Tx) {
 	}
 }
 
-// RemoveTx removes [txID] from the mempool completely.
-// Evicts [tx] from the discarded cache if present.
+// RemoveTx removes the transaction from the mempool, including removal of the
+// Discarded status.
 func (t *Txs) RemoveTx(tx *atomic.Tx) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -322,8 +344,9 @@ func (t *Txs) addPending() {
 	}
 }
 
-// SubscribePendingTxs implements the BuilderMempool interface and returns a channel
-// that signals when there is at least one pending transaction in the mempool
+// SubscribePendingTxs returns a channel that signals when there is a
+// transaction added to the mempool or when the mempool is interacted with after
+// block building finishes.
 func (t *Txs) SubscribePendingTxs() <-chan struct{} {
 	return t.pending
 }
