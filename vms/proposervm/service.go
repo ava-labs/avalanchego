@@ -12,44 +12,46 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 type ProposerAPI struct {
-	vm *VM
+	ctx *snow.Context
+	vm  VMInterface
 }
 
 func (p *ProposerAPI) GetProposedHeight(_ *http.Request, _ *struct{}, reply *api.GetHeightResponse) error {
-	p.vm.ctx.Log.Debug("API called",
+	p.ctx.Log.Debug("API called",
 		zap.String("service", "proposervm"),
 		zap.String("method", "getProposedHeight"),
 	)
-	p.vm.ctx.Lock.Lock()
-	defer p.vm.ctx.Lock.Unlock()
+	p.ctx.Lock.Lock()
+	defer p.ctx.Lock.Unlock()
 
-	reply.Height = avajson.Uint64(p.vm.lastAcceptedHeight)
+	reply.Height = avajson.Uint64(p.vm.GetLastAcceptedHeight())
 	return nil
 }
 
 // GetProposerBlockArgs is the parameters supplied to the GetProposerBlockWrapper API
 type GetProposerBlockArgs struct {
-	ProposerID ids.ID              `json:"proposerID"`
-	Encoding   formatting.Encoding `json:"encoding"`
+	ProposerBlockID ids.ID              `json:"proposerID"`
+	Encoding        formatting.Encoding `json:"encoding"`
 }
 
 func (p *ProposerAPI) GetProposerBlockWrapper(r *http.Request, args *GetProposerBlockArgs, reply *api.GetBlockResponse) error {
-	p.vm.ctx.Log.Debug("API called",
+	p.ctx.Log.Debug("API called",
 		zap.String("service", "proposervm"),
 		zap.String("method", "getProposerBlockWrapper"),
-		zap.String("proposerID", args.ProposerID.String()),
+		zap.String("proposerID", args.ProposerBlockID.String()),
 		zap.String("encoding", args.Encoding.String()),
 	)
-	p.vm.ctx.Lock.Lock()
-	defer p.vm.ctx.Lock.Unlock()
+	p.ctx.Lock.Lock()
+	defer p.ctx.Lock.Unlock()
 
-	block, err := p.vm.GetBlock(r.Context(), args.ProposerID)
+	block, err := p.vm.GetBlock(r.Context(), args.ProposerBlockID)
 	if err != nil {
 		return err
 	}
@@ -61,7 +63,7 @@ func (p *ProposerAPI) GetProposerBlockWrapper(r *http.Request, args *GetProposer
 	} else {
 		result, err = formatting.Encode(args.Encoding, block.Bytes())
 		if err != nil {
-			return fmt.Errorf("couldn't encode block %s as %s: %w", args.ProposerID, args.Encoding, err)
+			return fmt.Errorf("couldn't encode block %s as %s: %w", args.ProposerBlockID, args.Encoding, err)
 		}
 	}
 

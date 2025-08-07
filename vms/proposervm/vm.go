@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/tree"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
+	proposervmmetrics "github.com/ava-labs/avalanchego/vms/proposervm/metrics"
 )
 
 const (
@@ -53,12 +54,18 @@ var (
 	_ block.ChainVM         = (*VM)(nil)
 	_ block.BatchedChainVM  = (*VM)(nil)
 	_ block.StateSyncableVM = (*VM)(nil)
+	_ VMInterface           = (*VM)(nil)
 
 	dbPrefix = []byte("proposervm")
 )
 
 func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
 	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
+}
+
+type VMInterface interface {
+	GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error)
+	GetLastAcceptedHeight() uint64
 }
 
 type VM struct {
@@ -78,6 +85,8 @@ type VM struct {
 	ctx         *snow.Context
 	db          *versiondb.Database
 	toScheduler chan<- common.Message
+
+	metrics proposervmmetrics.Metrics
 
 	// Block ID --> Block
 	// Each element is a block that passed verification but
@@ -142,6 +151,12 @@ func (vm *VM) Initialize(
 	appSender common.AppSender,
 ) error {
 	vm.ctx = chainCtx
+	metrics, err := proposervmmetrics.New(vm.Config.Registerer)
+	if err != nil {
+		return err
+	}
+	vm.metrics = metrics
+
 	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
 	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer)
 	if err != nil {
@@ -254,7 +269,11 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 	return vm.ChainVM.Shutdown(ctx)
 }
 
-// overriddes ChainVM.CreateHandlers to expose the proposervm API path
+func (vm *VM) GetLastAcceptedHeight() uint64 {
+	return vm.lastAcceptedHeight
+}
+
+// overrides ChainVM.CreateHandlers to expose the proposervm API path
 func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
 	handlers, err := vm.ChainVM.CreateHandlers(ctx)
 	if err != nil {
@@ -264,7 +283,9 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	err = server.RegisterService(&ProposerAPI{vm}, "proposervm")
+	server.RegisterInterceptFunc(vm.metrics.InterceptRequest)
+	server.RegisterAfterFunc(vm.metrics.AfterRequest)
+	err = server.RegisterService(&ProposerAPI{ctx: vm.ctx, vm: vm}, "proposervm")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register proposervm service: %w", err)
 	}

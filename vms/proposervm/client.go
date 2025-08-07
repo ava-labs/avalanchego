@@ -43,8 +43,8 @@ func (c *client) GetProposedHeight(ctx context.Context, options ...rpc.Option) (
 func (c *client) GetProposerBlockWrapper(ctx context.Context, proposerID ids.ID, options ...rpc.Option) ([]byte, error) {
 	res := &api.FormattedBlock{}
 	if err := c.requester.SendRequest(ctx, "proposervm.getProposerBlockWrapper", &GetProposerBlockArgs{
-		ProposerID: proposerID,
-		Encoding:   formatting.Hex,
+		ProposerBlockID: proposerID,
+		Encoding:        formatting.Hex,
 	}, res, options...); err != nil {
 		return nil, err
 	}
