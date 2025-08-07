@@ -31,13 +31,10 @@ impl TestRunner for Single {
         let mut batch_id = 0;
 
         while start.elapsed().as_secs() / 60 < args.global_opts.duration_minutes {
-            let batch = inner_keys
-                .iter()
-                .map(|key| BatchOp::Put {
-                    key,
-                    value: vec![batch_id as u8],
-                })
-                .collect();
+            let batch = inner_keys.iter().map(|key| BatchOp::Put {
+                key,
+                value: vec![batch_id as u8],
+            });
             let proposal = db.propose(batch).await.expect("proposal should succeed");
             proposal.commit().await?;
 

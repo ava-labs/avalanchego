@@ -3,3 +3,6 @@
 
 /// The public API
 pub mod api;
+
+/// A batch operation and associated types
+mod batch_op;

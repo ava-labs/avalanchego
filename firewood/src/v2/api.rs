@@ -4,13 +4,15 @@
 use crate::manager::RevisionManagerError;
 use crate::merkle::{Key, Value};
 use crate::proof::{Proof, ProofError, ProofNode};
-pub use crate::range_proof::RangeProof;
 use async_trait::async_trait;
 use firewood_storage::{FileIoError, TrieHash};
 use futures::Stream;
 use std::fmt::Debug;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
+
+pub use crate::range_proof::RangeProof;
+pub use crate::v2::batch_op::{BatchOp, KeyValuePair, KeyValuePairIter, MapIntoBatch};
 
 /// A `KeyType` is something that can be xcast to a u8 reference,
 /// and can be sent and shared across threads. References with
@@ -86,45 +88,6 @@ pub type FrozenRangeProof = RangeProof<Key, Value, Box<[ProofNode]>>;
 /// A frozen proof uses an immutable collection of proof nodes.
 pub type FrozenProof = Proof<Box<[ProofNode]>>;
 
-/// A key/value pair operation. Only put (upsert) and delete are
-/// supported
-#[derive(Debug)]
-pub enum BatchOp<K: KeyType, V: ValueType> {
-    /// Upsert a key/value pair
-    Put {
-        /// the key
-        key: K,
-        /// the value
-        value: V,
-    },
-
-    /// Delete a key
-    Delete {
-        /// The key
-        key: K,
-    },
-
-    /// Delete a range of keys by prefix
-    DeleteRange {
-        /// The prefix of the keys to delete
-        prefix: K,
-    },
-}
-
-/// A list of operations to consist of a batch that
-/// can be proposed
-pub type Batch<K, V> = Vec<BatchOp<K, V>>;
-
-/// A convenience implementation to convert a vector of key/value
-/// pairs into a batch of insert operations
-#[must_use]
-pub fn vec_into_batch<K: KeyType, V: ValueType>(value: Vec<(K, V)>) -> Batch<K, V> {
-    value
-        .into_iter()
-        .map(|(key, value)| BatchOp::Put { key, value })
-        .collect()
-}
-
 /// Errors returned through the API
 #[derive(thiserror::Error, Debug)]
 #[non_exhaustive]
@@ -170,7 +133,7 @@ pub enum Error {
 
     /// Internal error
     #[error("Internal error")]
-    InternalError(Box<dyn std::error::Error + Send>),
+    InternalError(Box<dyn std::error::Error + Send + Sync>),
 
     /// Range too small
     #[error("Range too small")]
@@ -260,9 +223,9 @@ pub trait Db {
     /// * `data` - A batch consisting of [`BatchOp::Put`] and
     ///            [`BatchOp::Delete`] operations to apply
     ///
-    async fn propose<'db, K: KeyType, V: ValueType>(
+    async fn propose<'db>(
         &'db self,
-        data: Batch<K, V>,
+        data: (impl IntoIterator<IntoIter: KeyValuePairIter> + Send),
     ) -> Result<Self::Proposal<'db>, Error>
     where
         Self: 'db;
@@ -369,9 +332,9 @@ pub trait Proposal: DbView + Send + Sync {
     ///
     /// A new proposal
     ///
-    async fn propose<K: KeyType, V: ValueType>(
+    async fn propose(
         &self,
-        data: Batch<K, V>,
+        data: (impl IntoIterator<IntoIter: KeyValuePairIter> + Send),
     ) -> Result<Self::Proposal, Error>;
 }
 

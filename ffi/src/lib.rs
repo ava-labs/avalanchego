@@ -29,7 +29,7 @@ use firewood::db::{
 };
 use firewood::manager::{CacheReadStrategy, RevisionManagerConfig};
 
-use firewood::v2::api::HashKey;
+use firewood::v2::api::{HashKey, KeyValuePairIter};
 use metrics::counter;
 
 #[doc(hidden)]
@@ -322,21 +322,11 @@ pub unsafe extern "C" fn fwd_batch(
 /// * `values` - A slice of `KeyValue` structs
 ///
 /// # Returns
-fn convert_to_batch(values: &[KeyValue]) -> Vec<DbBatchOp<&[u8], &[u8]>> {
-    let mut batch = Vec::with_capacity(values.len());
-    for kv in values {
-        if kv.value.len == 0 {
-            batch.push(DbBatchOp::DeleteRange {
-                prefix: kv.key.as_slice(),
-            });
-        } else {
-            batch.push(DbBatchOp::Put {
-                key: kv.key.as_slice(),
-                value: kv.value.as_slice(),
-            });
-        }
-    }
-    batch
+fn convert_to_batch(values: &[KeyValue]) -> impl IntoIterator<Item = DbBatchOp<&[u8], &[u8]>> {
+    values
+        .iter()
+        .map(|kv| (kv.key.as_slice(), kv.value.as_slice()))
+        .map_into_batch()
 }
 
 /// Internal call for `fwd_batch` to remove error handling from the C API

@@ -12,9 +12,9 @@ use std::num::NonZeroUsize;
 use std::ops::RangeInclusive;
 use std::time::Instant;
 
-use firewood::db::{Batch, BatchOp, Db, DbConfig};
+use firewood::db::{BatchOp, Db, DbConfig};
 use firewood::manager::RevisionManagerConfig;
-use firewood::v2::api::{Db as _, DbView, Proposal as _};
+use firewood::v2::api::{Db as _, DbView, KeyType, Proposal as _, ValueType};
 use rand::{Rng, SeedableRng as _};
 use rand_distr::Alphanumeric;
 
@@ -81,7 +81,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     for _ in 0..args.number_of_batches {
         let keylen = rng.random_range(args.keylen.clone());
         let valuelen = rng.random_range(args.valuelen.clone());
-        let batch: Batch<Vec<u8>, Vec<u8>> = (0..keys)
+        let batch = (0..keys)
             .map(|_| {
                 (
                     rng.borrow_mut()
@@ -95,12 +95,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 )
             })
             .map(|(key, value)| BatchOp::Put { key, value })
-            .collect();
+            .collect::<Vec<_>>();
 
         let verify = get_keys_to_verify(&batch, args.read_verify_percent);
 
         #[expect(clippy::unwrap_used)]
-        let proposal = db.propose(batch).await.unwrap();
+        let proposal = db.propose(batch.clone()).await.unwrap();
         proposal.commit().await?;
         verify_keys(&db, verify).await?;
     }
@@ -114,16 +114,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn get_keys_to_verify(batch: &Batch<Vec<u8>, Vec<u8>>, pct: u16) -> HashMap<Vec<u8>, Box<[u8]>> {
+fn get_keys_to_verify<'a, K: KeyType + 'a, V: ValueType + 'a>(
+    batch: impl IntoIterator<Item = &'a BatchOp<K, V>>,
+    pct: u16,
+) -> HashMap<&'a [u8], &'a [u8]> {
     if pct == 0 {
         HashMap::new()
     } else {
         batch
-            .iter()
+            .into_iter()
             .filter(|_last_key| rand::rng().random_range(0..=100u16.saturating_sub(pct)) == 0)
             .map(|op| {
                 if let BatchOp::Put { key, value } = op {
-                    (key.clone(), value.clone().into_boxed_slice())
+                    (key.as_ref(), value.as_ref())
                 } else {
                     unreachable!()
                 }
@@ -134,13 +137,13 @@ fn get_keys_to_verify(batch: &Batch<Vec<u8>, Vec<u8>>, pct: u16) -> HashMap<Vec<
 
 async fn verify_keys(
     db: &impl firewood::v2::api::Db,
-    verify: HashMap<Vec<u8>, Box<[u8]>>,
+    verify: HashMap<&[u8], &[u8]>,
 ) -> Result<(), firewood::v2::api::Error> {
     if !verify.is_empty() {
         let hash = db.root_hash().await?.expect("root hash should exist");
         let revision = db.revision(hash).await?;
         for (key, value) in verify {
-            assert_eq!(Some(value), revision.val(key).await?);
+            assert_eq!(Some(value), revision.val(key).await?.as_deref());
         }
     }
     Ok(())

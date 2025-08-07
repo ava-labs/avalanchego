@@ -31,7 +31,7 @@ impl TestRunner for Create {
             let root = Span::root(func_path!(), SpanContext::random());
             let _guard = root.set_local_parent();
 
-            let batch = Self::generate_inserts(key * keys, args.global_opts.batch_size).collect();
+            let batch = Self::generate_inserts(key * keys, args.global_opts.batch_size);
 
             let proposal = db.propose(batch).await.expect("proposal should succeed");
             proposal.commit().await?;
