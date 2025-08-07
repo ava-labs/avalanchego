@@ -10,18 +10,13 @@ use firewood_storage::{CacheReadStrategy, CheckOpt, CheckerReport, FileBacked, N
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use nonzero_ext::nonzero;
 
+use crate::DatabasePath;
+
 // TODO: (optionally) add a fix option
 #[derive(Args)]
 pub struct Options {
-    /// The database path (if no path is provided, return an error). Defaults to firewood.
-    #[arg(
-        long,
-        required = false,
-        value_name = "DB_NAME",
-        default_value_t = String::from("firewood"),
-        help = "Name of the database"
-    )]
-    pub db: String,
+    #[command(flatten)]
+    pub database: DatabasePath,
 
     /// Whether to perform hash check
     #[arg(
@@ -34,7 +29,7 @@ pub struct Options {
 }
 
 pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
-    let db_path = PathBuf::from(&opts.db);
+    let db_path = PathBuf::from(&opts.database.dbpath);
     let node_cache_size = nonzero!(1usize);
     let free_list_cache_size = nonzero!(1usize);
 
@@ -43,6 +38,7 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
         node_cache_size,
         free_list_cache_size,
         false,
+        false,                         // don't create if missing
         CacheReadStrategy::WritesOnly, // we scan the database once - no need to cache anything
     )?;
     let storage = Arc::new(fb);

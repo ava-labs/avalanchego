@@ -18,18 +18,14 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 
+use crate::DatabasePath;
+
 type KeyFromStream = Option<Result<(Key, Value), api::Error>>;
 
 #[derive(Debug, Args)]
 pub struct Options {
-    /// The database path (if no path is provided, return an error). Defaults to firewood.
-    #[arg(
-        required = true,
-        value_name = "DB_NAME",
-        default_value_t = String::from("firewood"),
-        help = "Name of the database"
-    )]
-    pub db: String,
+    #[command(flatten)]
+    pub database: DatabasePath,
 
     /// The key to start dumping from (if no key is provided, start from the beginning).
     /// Defaults to None.
@@ -145,8 +141,8 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
         }
     }
 
-    let cfg = DbConfig::builder().truncate(false);
-    let db = Db::new(opts.db.clone(), cfg.build()).await?;
+    let cfg = DbConfig::builder().create_if_missing(false).truncate(false);
+    let db = Db::new(opts.database.dbpath.clone(), cfg.build()).await?;
     let latest_hash = db.root_hash().await?;
     let Some(latest_hash) = latest_hash else {
         println!("Database is empty");

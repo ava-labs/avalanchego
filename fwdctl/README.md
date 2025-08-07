@@ -30,10 +30,8 @@ To use
 ```sh
 # Check available options when creating a database, including the defaults.
 $ fwdctl create -h
-# Create a new, blank instance of firewood using the default name "firewood".
-$ fwdctl create firewood
-# Look inside, there are several folders representing different components of firewood, including the WAL.
-$ ls firewood
+# Create a new, blank instance of firewood using the default name "firewood.db".
+$ fwdctl create firewood.db
 ```
 
 * fwdctl get KEY

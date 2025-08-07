@@ -91,13 +91,14 @@ impl FileBacked {
         node_cache_size: NonZero<usize>,
         free_list_cache_size: NonZero<usize>,
         truncate: bool,
+        create: bool,
         cache_read_strategy: CacheReadStrategy,
     ) -> Result<Self, FileIoError> {
         let fd = OpenOptions::new()
             .read(true)
             .write(true)
             .truncate(truncate)
-            .create(true)
+            .create(create)
             .open(&path)
             .map_err(|e| FileIoError {
                 inner: e,
@@ -331,6 +332,7 @@ mod test {
             nonzero!(10usize),
             nonzero!(10usize),
             false,
+            true,
             CacheReadStrategy::WritesOnly,
         )
         .unwrap();
@@ -372,6 +374,7 @@ mod test {
             nonzero!(10usize),
             nonzero!(10usize),
             false,
+            true,
             CacheReadStrategy::WritesOnly,
         )
         .unwrap();

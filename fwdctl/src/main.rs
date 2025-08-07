@@ -3,6 +3,8 @@
 
 #![doc = include_str!("../README.md")]
 
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 use firewood::v2::api;
 
@@ -14,6 +16,20 @@ pub mod get;
 pub mod graph;
 pub mod insert;
 pub mod root;
+
+#[derive(Clone, Debug, Parser)]
+pub struct DatabasePath {
+    /// The database path. Defaults to firewood.db
+    #[arg(
+        long = "db",
+        short = 'd',
+        required = false,
+        value_name = "DB_NAME",
+        default_value_os_t = default_db_path(),
+        help = "Name of the database"
+    )]
+    pub dbpath: PathBuf,
+}
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -74,4 +90,8 @@ async fn main() -> Result<(), api::Error> {
         Commands::Graph(opts) => graph::run(opts).await,
         Commands::Check(opts) => check::run(opts).await,
     }
+}
+
+fn default_db_path() -> PathBuf {
+    PathBuf::from("firewood.db")
 }

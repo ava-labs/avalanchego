@@ -14,7 +14,7 @@ use crate::v2::api::{
     OptionalHashKeyExt,
 };
 
-use crate::manager::{RevisionManager, RevisionManagerConfig};
+use crate::manager::{ConfigManager, RevisionManager, RevisionManagerConfig};
 use async_trait::async_trait;
 use firewood_storage::{
     CheckOpt, CheckerReport, Committed, FileBacked, FileIoError, HashedNodeReader,
@@ -143,6 +143,9 @@ impl api::DbView for HistoricalRev {
 /// Database configuration.
 #[derive(Clone, TypedBuilder, Debug)]
 pub struct DbConfig {
+    /// Whether to create the DB if it doesn't exist.
+    #[builder(default = true)]
+    pub create_if_missing: bool,
     /// Whether to truncate the DB when opening it. If set, the DB will be reset and all its
     /// existing contents will be lost.
     #[builder(default = false)]
@@ -230,8 +233,12 @@ impl Db {
             proposals: counter!("firewood.proposals"),
         });
         describe_counter!("firewood.proposals", "Number of proposals created");
-        let manager =
-            RevisionManager::new(db_path.as_ref().to_path_buf(), cfg.truncate, cfg.manager)?;
+        let config_manager = ConfigManager::builder()
+            .create(cfg.create_if_missing)
+            .truncate(cfg.truncate)
+            .manager(cfg.manager)
+            .build();
+        let manager = RevisionManager::new(db_path.as_ref().to_path_buf(), config_manager)?;
         let db = Self { metrics, manager };
         Ok(db)
     }
@@ -242,8 +249,12 @@ impl Db {
             proposals: counter!("firewood.proposals"),
         });
         describe_counter!("firewood.proposals", "Number of proposals created");
-        let manager =
-            RevisionManager::new(db_path.as_ref().to_path_buf(), cfg.truncate, cfg.manager)?;
+        let config_manager = ConfigManager::builder()
+            .create(cfg.create_if_missing)
+            .truncate(cfg.truncate)
+            .manager(cfg.manager)
+            .build();
+        let manager = RevisionManager::new(db_path.as_ref().to_path_buf(), config_manager)?;
         let db = Self { metrics, manager };
         Ok(db)
     }

@@ -788,6 +788,7 @@ mod tests {
                     nonzero!(10usize),
                     nonzero!(10usize),
                     false,
+                    true,
                     CacheReadStrategy::WritesOnly,
                 )
                 .unwrap(),

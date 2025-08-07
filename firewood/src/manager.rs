@@ -45,6 +45,21 @@ pub struct RevisionManagerConfig {
     cache_read_strategy: CacheReadStrategy,
 }
 
+#[derive(Clone, Debug, TypedBuilder)]
+/// Configuration manager that contains both truncate and revision manager config
+pub struct ConfigManager {
+    /// Whether to create the DB if it doesn't exist.
+    #[builder(default = true)]
+    pub create: bool,
+    /// Whether to truncate the DB when opening it. If set, the DB will be reset and all its
+    /// existing contents will be lost.
+    #[builder(default = false)]
+    pub truncate: bool,
+    /// Revision manager configuration.
+    #[builder(default = RevisionManagerConfig::builder().build())]
+    pub manager: RevisionManagerConfig,
+}
+
 type CommittedRevision = Arc<NodeStore<Committed, FileBacked>>;
 type ProposedRevision = Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>>;
 
@@ -77,22 +92,19 @@ pub(crate) enum RevisionManagerError {
 }
 
 impl RevisionManager {
-    pub fn new(
-        filename: PathBuf,
-        truncate: bool,
-        config: RevisionManagerConfig,
-    ) -> Result<Self, FileIoError> {
+    pub fn new(filename: PathBuf, config: ConfigManager) -> Result<Self, FileIoError> {
         let fb = FileBacked::new(
             filename,
-            config.node_cache_size,
-            config.free_list_cache_size,
-            truncate,
-            config.cache_read_strategy,
+            config.manager.node_cache_size,
+            config.manager.free_list_cache_size,
+            config.truncate,
+            config.create,
+            config.manager.cache_read_strategy,
         )?;
         let storage = Arc::new(fb);
         let nodestore = Arc::new(NodeStore::open(storage.clone())?);
         let manager = Self {
-            max_revisions: config.max_revisions,
+            max_revisions: config.manager.max_revisions,
             historical: RwLock::new(VecDeque::from([nodestore.clone()])),
             by_hash: RwLock::new(Default::default()),
             proposals: Mutex::new(Default::default()),
@@ -107,7 +119,7 @@ impl RevisionManager {
                 .insert(hash, nodestore.clone());
         }
 
-        if truncate {
+        if config.truncate {
             nodestore.flush_header_with_padding()?;
         }
 
