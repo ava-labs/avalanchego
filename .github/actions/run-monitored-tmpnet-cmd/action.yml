@@ -62,8 +62,11 @@ runs:
       run: $GITHUB_ACTION_PATH/notify-metrics-availability.sh
       env:
         GRAFANA_URL: https://grafana-poc.avax-dev.network/d/${{ inputs.grafana_dashboard_id }}?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
-        GH_JOB_ID: ${{ inputs.job }}
         FILTER_BY_OWNER: ${{ inputs.filter_by_owner }}
+        GH_JOB_ID: ${{ inputs.job }}
+        GH_RUN_ID: ${{ inputs.run_id }}
+        GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
+        GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
     - name: Warn that collection of metrics and logs will not be performed
       if: (inputs.prometheus_username == '')
       shell: bash
@@ -114,3 +117,10 @@ runs:
         name: ${{ inputs.artifact_prefix }}-kind-logs
         path: /tmp/kind-logs
         if-no-files-found: error
+    - name: Upload run metadata
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: run-metadata-${{ inputs.job }}-${{ inputs.run_id }}
+        path: /tmp/run-metadata/run_metadata.json
+        retention-days: 14
