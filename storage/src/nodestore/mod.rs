@@ -44,13 +44,14 @@ pub(crate) mod header;
 pub(crate) mod persist;
 
 use crate::firewood_gauge;
+use crate::linear::OffsetReader;
 use crate::logger::trace;
 use crate::node::branch::ReadSerializable as _;
 use arc_swap::ArcSwap;
 use arc_swap::access::DynAccess;
 use smallvec::SmallVec;
 use std::fmt::Debug;
-use std::io::{Error, ErrorKind};
+use std::io::{Error, ErrorKind, Read};
 use std::sync::atomic::AtomicUsize;
 
 // Re-export types from alloc module

@@ -44,7 +44,7 @@ impl WritableStorage for MemStore {
 }
 
 impl ReadableStorage for MemStore {
-    fn stream_from(&self, addr: u64) -> Result<Box<dyn OffsetReader>, FileIoError> {
+    fn stream_from(&self, addr: u64) -> Result<impl OffsetReader, FileIoError> {
         counter!("firewood.read_node", "from" => "memory").increment(1);
         let bytes = self
             .bytes
@@ -54,7 +54,7 @@ impl ReadableStorage for MemStore {
             .unwrap_or_default()
             .to_owned();
 
-        Ok(Box::new(Cursor::new(bytes)))
+        Ok(Cursor::new(bytes))
     }
 
     fn size(&self) -> Result<u64, FileIoError> {
@@ -66,6 +66,7 @@ impl ReadableStorage for MemStore {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::io::Read;
     use test_case::test_case;
 
     #[test_case(&[(0,&[1, 2, 3])],(0,&[1, 2, 3]); "write to empty store")]
