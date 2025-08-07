@@ -242,15 +242,12 @@ impl<S: WritableStorage + 'static> NodeStore<Committed, S> {
     fn flush_nodes_generic(&self) -> Result<NodeStoreHeader, FileIoError> {
         let flush_start = Instant::now();
 
-        // keep arcs to the allocated nodes to add them to cache
+        // keep MaybePersistedNodes to add them to cache and persist them
         let mut cached_nodes = Vec::new();
-
-        // find all the unpersisted nodes
-        let unpersisted_iter = UnPersistedNodeIterator::new(self);
 
         let mut header = self.header;
         let mut allocator = NodeAllocator::new(self.storage.as_ref(), &mut header);
-        for node in unpersisted_iter {
+        for node in UnPersistedNodeIterator::new(self) {
             let shared_node = node.as_shared_node(self).expect("in memory, so no IO");
             let mut serialized = Vec::new();
             shared_node.as_bytes(0, &mut serialized);
@@ -260,7 +257,6 @@ impl<S: WritableStorage + 'static> NodeStore<Committed, S> {
             *serialized.get_mut(0).expect("byte was reserved") = area_size_index;
             self.storage
                 .write(persisted_address.get(), serialized.as_slice())?;
-            node.persist_at(persisted_address);
 
             // Decrement gauge immediately after node is written to storage
             firewood_gauge!(
@@ -269,11 +265,9 @@ impl<S: WritableStorage + 'static> NodeStore<Committed, S> {
             )
             .decrement(1.0);
 
-            // Move the arc to a vector of persisted nodes for caching
-            // we save them so we don't have to lock the cache while we write them
-            // If we ever persist out of band, we might have a race condition, so
-            // consider adding each node to the cache as we persist them
-            cached_nodes.push((persisted_address, shared_node));
+            // Allocate the node to store the address, then collect for caching and persistence
+            node.allocate_at(persisted_address);
+            cached_nodes.push(node);
         }
 
         self.storage.write_cached_nodes(cached_nodes)?;
@@ -330,12 +324,13 @@ impl NodeStore<Committed, FileBacked> {
     #[fastrace::trace(short_name = true)]
     #[cfg(feature = "io-uring")]
     fn flush_nodes_io_uring(&mut self) -> Result<NodeStoreHeader, FileIoError> {
+        use crate::LinearAddress;
         use std::pin::Pin;
 
         #[derive(Clone, Debug)]
         struct PinnedBufferEntry {
             pinned_buffer: Pin<Box<[u8]>>,
-            offset: Option<u64>,
+            node: Option<(LinearAddress, MaybePersistedNode)>,
         }
 
         /// Helper function to handle completion queue entries and check for errors
@@ -364,13 +359,15 @@ impl NodeStore<Committed, FileBacked> {
                     } else {
                         std::io::Error::from_raw_os_error(0 - entry.result())
                     };
+                    let (addr, _) = pbe.node.as_ref().expect("node should be Some");
                     return Err(storage.file_io_error(
                         error,
-                        pbe.offset.expect("offset should be Some"),
+                        addr.get(),
                         Some("write failure".to_string()),
                     ));
                 }
-                pbe.offset = None;
+                // I/O completed successfully
+                pbe.node = None;
                 completed_count = completed_count.wrapping_add(1);
             }
             Ok(completed_count)
@@ -383,12 +380,6 @@ impl NodeStore<Committed, FileBacked> {
         let mut header = self.header;
         let mut node_allocator = NodeAllocator::new(self.storage.as_ref(), &mut header);
 
-        // Collect all unpersisted nodes first to avoid mutating self while iterating
-        let unpersisted_nodes: Vec<MaybePersistedNode> = {
-            let unpersisted_iter = UnPersistedNodeIterator::new(self);
-            unpersisted_iter.collect()
-        };
-
         // Collect addresses and nodes for caching
         let mut cached_nodes = Vec::new();
 
@@ -396,13 +387,13 @@ impl NodeStore<Committed, FileBacked> {
         let mut saved_pinned_buffers = vec![
             PinnedBufferEntry {
                 pinned_buffer: Pin::new(Box::new([0; 0])),
-                offset: None,
+                node: None,
             };
             RINGSIZE
         ];
 
-        // Process each unpersisted node
-        for node in unpersisted_nodes {
+        // Process each unpersisted node directly from the iterator
+        for node in UnPersistedNodeIterator::new(self) {
             let shared_node = node.as_shared_node(self).expect("in memory, so no IO");
             let mut serialized = Vec::with_capacity(100); // TODO: better size? we can guess branches are larger
             shared_node.as_bytes(0, &mut serialized);
@@ -416,10 +407,10 @@ impl NodeStore<Committed, FileBacked> {
                 if let Some((pos, pbe)) = saved_pinned_buffers
                     .iter_mut()
                     .enumerate()
-                    .find(|(_, pbe)| pbe.offset.is_none())
+                    .find(|(_, pbe)| pbe.node.is_none())
                 {
                     pbe.pinned_buffer = std::pin::Pin::new(std::mem::take(&mut serialized));
-                    pbe.offset = Some(persisted_address.get());
+                    pbe.node = Some((persisted_address, node.clone()));
 
                     let submission_queue_entry = self
                         .storage
@@ -471,13 +462,13 @@ impl NodeStore<Committed, FileBacked> {
                 }
             }
 
-            // Mark node as persisted and collect for cache
-            node.persist_at(persisted_address);
-            cached_nodes.push((persisted_address, shared_node));
+            // Allocate the node to store the address, then collect for caching and persistence
+            node.allocate_at(persisted_address);
+            cached_nodes.push(node);
         }
         let pending = saved_pinned_buffers
             .iter()
-            .filter(|pbe| pbe.offset.is_some())
+            .filter(|pbe| pbe.node.is_some())
             .count();
         ring.submit_and_wait(pending).map_err(|e| {
             self.storage
@@ -498,9 +489,9 @@ impl NodeStore<Committed, FileBacked> {
         }
 
         debug_assert!(
-            !saved_pinned_buffers.iter().any(|pbe| pbe.offset.is_some()),
-            "Found entry with offset still set: {:?}",
-            saved_pinned_buffers.iter().find(|pbe| pbe.offset.is_some())
+            !saved_pinned_buffers.iter().any(|pbe| pbe.node.is_some()),
+            "Found entry with node still set: {:?}",
+            saved_pinned_buffers.iter().find(|pbe| pbe.node.is_some())
         );
 
         self.storage.write_cached_nodes(cached_nodes)?;

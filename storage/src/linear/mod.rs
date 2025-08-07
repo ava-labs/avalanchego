@@ -180,10 +180,10 @@ pub trait WritableStorage: ReadableStorage {
     /// The number of bytes written, or an error if the write operation fails.
     fn write(&self, offset: u64, object: &[u8]) -> Result<usize, FileIoError>;
 
-    /// Write all nodes to the cache (if any)
+    /// Write all nodes to the cache (if any) and persist them
     fn write_cached_nodes(
         &self,
-        _nodes: impl IntoIterator<Item = (LinearAddress, SharedNode)>,
+        _nodes: impl IntoIterator<Item = MaybePersistedNode>,
     ) -> Result<(), FileIoError> {
         Ok(())
     }

@@ -214,11 +214,18 @@ impl WritableStorage for FileBacked {
 
     fn write_cached_nodes(
         &self,
-        nodes: impl IntoIterator<Item = (LinearAddress, SharedNode)>,
+        nodes: impl IntoIterator<Item = MaybePersistedNode>,
     ) -> Result<(), FileIoError> {
         let mut guard = self.cache.lock().expect("poisoned lock");
-        for (addr, node) in nodes {
-            guard.put(addr, node);
+        for maybe_persisted_node in nodes {
+            // Since we know the node is in Allocated state, we can get both address and shared node
+            let (addr, shared_node) = maybe_persisted_node
+                .allocated_info()
+                .expect("node should be allocated");
+
+            guard.put(addr, shared_node);
+            // The node can now be read from the general cache, so we can delete the local copy
+            maybe_persisted_node.persist_at(addr);
         }
         Ok(())
     }

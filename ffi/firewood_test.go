@@ -9,9 +9,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -984,4 +987,74 @@ func TestGetFromRoot(t *testing.T) {
 	}
 	_, err = db.GetFromRoot(nonExistentRoot, []byte("key"))
 	r.Error(err, "GetFromRoot with non-existent root should return error")
+}
+
+func TestGetFromRootParallel(t *testing.T) {
+	r := require.New(t)
+	db := newTestDatabase(t)
+
+	key, val := []byte("key"), []byte("value")
+	allKeys, allVals := kvForTest(10000) // large number to encourage contention
+	allKeys = append(allKeys, key)
+	allVals = append(allVals, val)
+
+	// Create a proposal
+	p, err := db.Propose(allKeys, allVals)
+	r.NoError(err, "Propose key-value pairs")
+
+	root, err := p.Root()
+	r.NoError(err, "Root of proposal")
+
+	// Use multiple goroutines to stress test concurrent access
+	const numReaders = 10
+	results := make(chan error, numReaders)
+	finish := make(chan struct{})
+	wg := sync.WaitGroup{}
+
+	readLots := func(readerID int) error {
+		for j := 0; ; j++ {
+			got, err := db.GetFromRoot(root, key)
+			if err != nil {
+				return fmt.Errorf("reader %d, iteration %d: GetFromRoot error: %w", readerID, j, err)
+			}
+			if !bytes.Equal(got, val) {
+				return fmt.Errorf("reader %d, iteration %d: expected %q, got %q", readerID, j, val, got)
+			}
+
+			// Add small delays and yield to increase race chances
+			if j%100 == 0 {
+				runtime.Gosched()
+			}
+			select {
+			case <-finish:
+				return nil // Exit if finish signal received
+			default:
+			}
+		}
+	}
+
+	// Start multiple reader goroutines
+	for i := 0; i < numReaders; i++ {
+		wg.Add(1)
+		go func(readerID int) {
+			results <- readLots(readerID)
+			wg.Done()
+		}(i)
+	}
+
+	// Add small delay to let readers start
+	time.Sleep(time.Microsecond * 500)
+	t.Log("Committing proposal to allow readers to access data")
+	require.NoError(t, p.Commit(), "Commit proposal")
+	t.Log("Proposal committed, readers should now access data")
+	close(finish) // Signal readers to finish
+
+	// Wait for all readers to finish
+	wg.Wait()
+
+	// Collect all results
+	for i := 0; i < numReaders; i++ {
+		err := <-results
+		r.NoError(err, "Parallel operation failed")
+	}
 }

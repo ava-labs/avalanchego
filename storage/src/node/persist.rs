@@ -68,7 +68,9 @@ impl From<&MaybePersistedNode> for Option<LinearAddress> {
     fn from(node: &MaybePersistedNode) -> Option<LinearAddress> {
         match node.0.load().as_ref() {
             MaybePersisted::Unpersisted(_) => None,
-            MaybePersisted::Persisted(address) => Some(*address),
+            MaybePersisted::Allocated(address, _) | MaybePersisted::Persisted(address) => {
+                Some(*address)
+            }
         }
     }
 }
@@ -90,7 +92,9 @@ impl MaybePersistedNode {
     /// - `Err(FileIoError)` if there was an error reading from storage
     pub fn as_shared_node<S: NodeReader>(&self, storage: &S) -> Result<SharedNode, FileIoError> {
         match self.0.load().as_ref() {
-            MaybePersisted::Unpersisted(node) => Ok(node.clone()),
+            MaybePersisted::Allocated(_, node) | MaybePersisted::Unpersisted(node) => {
+                Ok(node.clone())
+            }
             MaybePersisted::Persisted(address) => storage.read_node(*address),
         }
     }
@@ -104,7 +108,9 @@ impl MaybePersistedNode {
     pub fn as_linear_address(&self) -> Option<LinearAddress> {
         match self.0.load().as_ref() {
             MaybePersisted::Unpersisted(_) => None,
-            MaybePersisted::Persisted(address) => Some(*address),
+            MaybePersisted::Allocated(address, _) | MaybePersisted::Persisted(address) => {
+                Some(*address)
+            }
         }
     }
 
@@ -116,7 +122,7 @@ impl MaybePersistedNode {
     #[must_use]
     pub fn unpersisted(&self) -> Option<&Self> {
         match self.0.load().as_ref() {
-            MaybePersisted::Unpersisted(_) => Some(self),
+            MaybePersisted::Allocated(_, _) | MaybePersisted::Unpersisted(_) => Some(self),
             MaybePersisted::Persisted(_) => None,
         }
     }
@@ -134,6 +140,42 @@ impl MaybePersistedNode {
     pub fn persist_at(&self, addr: LinearAddress) {
         self.0.store(Arc::new(MaybePersisted::Persisted(addr)));
     }
+
+    /// Updates the internal state to indicate this node is allocated at the specified disk address.
+    ///
+    /// This method changes the internal state of the `MaybePersistedNode` to `Allocated`,
+    /// indicating that the node has been allocated on disk but is still in memory.
+    ///
+    /// This is done atomically using the `ArcSwap` mechanism.
+    ///
+    /// # Arguments
+    ///
+    /// * `addr` - The `LinearAddress` where the node has been allocated on disk
+    pub fn allocate_at(&self, addr: LinearAddress) {
+        match self.0.load().as_ref() {
+            MaybePersisted::Unpersisted(node) | MaybePersisted::Allocated(_, node) => {
+                self.0
+                    .store(Arc::new(MaybePersisted::Allocated(addr, node.clone())));
+            }
+            MaybePersisted::Persisted(_) => {
+                unreachable!("Cannot allocate a node that is already persisted on disk");
+            }
+        }
+    }
+
+    /// Returns the address and shared node if this node is in the Allocated state.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Some((LinearAddress, SharedNode))` if the node is in the Allocated state,
+    /// otherwise `None`.
+    #[must_use]
+    pub fn allocated_info(&self) -> Option<(LinearAddress, SharedNode)> {
+        match self.0.load().as_ref() {
+            MaybePersisted::Allocated(addr, node) => Some((*addr, node.clone())),
+            _ => None,
+        }
+    }
 }
 
 /// Display the `MaybePersistedNode` as a string.
@@ -149,6 +191,7 @@ impl Display for MaybePersistedNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.0.load().as_ref() {
             MaybePersisted::Unpersisted(node) => write!(f, "M{:p}", (*node).as_ptr()),
+            MaybePersisted::Allocated(addr, node) => write!(f, "A{:p}@{addr}", (*node).as_ptr()),
             MaybePersisted::Persisted(addr) => write!(f, "{addr}"),
         }
     }
@@ -156,12 +199,14 @@ impl Display for MaybePersistedNode {
 
 /// The internal state of a `MaybePersistedNode`.
 ///
-/// This enum represents the two possible states of a `MaybePersisted`:
+/// This enum represents the three possible states of a `MaybePersisted`:
 /// - `Unpersisted(SharedNode)`: The node is currently in memory
+/// - `Allocated(LinearAddress, SharedNode)`: The node is allocated on disk but being flushed to disk
 /// - `Persisted(LinearAddress)`: The node is currently on disk at the specified address
 #[derive(Debug, PartialEq, Eq)]
 enum MaybePersisted {
     Unpersisted(SharedNode),
+    Allocated(LinearAddress, SharedNode),
     Persisted(LinearAddress),
 }
 
@@ -241,5 +286,33 @@ mod test {
         assert_eq!(triomphe::Arc::strong_count(&node), 1);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_allocated_info() {
+        let node = SharedNode::new(Node::Leaf(LeafNode {
+            partial_path: Path::new(),
+            value: vec![123].into(),
+        }));
+
+        let maybe_persisted = MaybePersistedNode::from(node.clone());
+
+        // Initially unpersisted, so allocated_info should return None
+        assert!(maybe_persisted.allocated_info().is_none());
+
+        // Allocate the node
+        let addr = LinearAddress::new(2048).unwrap();
+        maybe_persisted.allocate_at(addr);
+
+        // Now allocated_info should return Some
+        let (retrieved_addr, retrieved_node) = maybe_persisted.allocated_info().unwrap();
+        assert_eq!(retrieved_addr, addr);
+        assert_eq!(retrieved_node, node);
+
+        // Persist the node
+        maybe_persisted.persist_at(addr);
+
+        // After persisting, allocated_info should return None again
+        assert!(maybe_persisted.allocated_info().is_none());
     }
 }
