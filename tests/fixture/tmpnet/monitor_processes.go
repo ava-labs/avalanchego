@@ -193,11 +193,11 @@ scrape_configs:
           - '%s/*.json'
 
 remote_write:
-  - url: "%s/api/prom/push"
+  - url: "%s"
     basic_auth:
       username: "%s"
       password: "%s"
-`, prometheusScrapeInterval, serviceDiscoveryDir, collectorConfig.URL, collectorConfig.Username, collectorConfig.Password)
+`, prometheusScrapeInterval, serviceDiscoveryDir, collectorConfig.pushURL, collectorConfig.username, collectorConfig.password)
 
 	return startCollector(ctx, log, cmdName, args, config)
 }
@@ -235,7 +235,7 @@ positions:
   filename: %s/positions.yaml
 
 client:
-  url: "%s/loki/api/v1/push"
+  url: "%s"
   basic_auth:
     username: "%s"
     password: "%s"
@@ -245,7 +245,7 @@ scrape_configs:
     file_sd_configs:
       - files:
           - '%s/*.json'
-`, promtailHTTPPort, workingDir, collectorConfig.URL, collectorConfig.Username, collectorConfig.Password, serviceDiscoveryDir)
+`, promtailHTTPPort, workingDir, collectorConfig.pushURL, collectorConfig.username, collectorConfig.password, serviceDiscoveryDir)
 
 	return startCollector(ctx, log, cmdName, args, config)
 }
@@ -274,9 +274,10 @@ func getServiceDiscoveryDir(cmdName string) (string, error) {
 
 // collectorConfig represents the configuration for a metrics/logs collector
 type collectorConfig struct {
-	URL      string
-	Username string
-	Password string
+	username string
+	password string
+	url      string
+	pushURL  string
 }
 
 // SDConfig represents a Prometheus service discovery config entry.
@@ -460,6 +461,11 @@ func getCollectorConfig(cmdName string) (collectorConfig, error) {
 	if len(url) == 0 {
 		return collectorConfig{}, fmt.Errorf("%s env var not set", urlEnvVar)
 	}
+	pushURLEnvVar := baseEnvName + "_PUSH_URL"
+	pushURL := GetEnvWithDefault(pushURLEnvVar, "")
+	if len(pushURL) == 0 {
+		return collectorConfig{}, fmt.Errorf("%s env var not set", pushURLEnvVar)
+	}
 	usernameEnvVar := baseEnvName + "_USERNAME"
 	username := GetEnvWithDefault(usernameEnvVar, "")
 	if len(username) == 0 {
@@ -471,9 +477,10 @@ func getCollectorConfig(cmdName string) (collectorConfig, error) {
 		return collectorConfig{}, fmt.Errorf("%s env var not set", passwordEnvVar)
 	}
 	return collectorConfig{
-		URL:      url,
-		Username: username,
-		Password: password,
+		url:      url,
+		pushURL:  pushURL,
+		username: username,
+		password: password,
 	}, nil
 }
 
