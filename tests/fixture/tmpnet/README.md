@@ -331,9 +331,11 @@ nix develop
 
 # Enable collection of logs and metrics
 PROMETHEUS_URL=<url> \
+PROMETHEUS_PUSH_URL=<push url> \
 PROMETHEUS_USERNAME=<username> \
 PROMETHEUS_PASSWORD=<password> \
 LOKI_URL=<url> \
+LOKI_PUSH_URL=<push url> \
 LOKI_USERNAME=<username> \
 LOKI_PASSWORD=<password> \
 ./bin/tmpnetctl start-metrics-collector
@@ -356,6 +358,7 @@ LOKI_PASSWORD=<password> \
    - Requires:
      - Config supplied as env vars:
        - `PROMETHEUS_URL`
+       - `PROMETHEUS_PUSH_URL`
        - `PROMETHEUS_USERNAME`
        - `PROMETHEUS_PASSWORD`
      - A `prometheus` binary available in the path
@@ -366,6 +369,7 @@ LOKI_PASSWORD=<password> \
    - Requires:
      - Config supplied as env vars:
        - `LOKI_URL`
+       - `LOKI_PUSH_URL`
        - `LOKI_USERNAME`
        - `LOKI_PASSWORD`
      - A `promtail` binary available in the path
@@ -456,9 +460,11 @@ Example usage:
 
     # This configuration is mandatory
     prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+    prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
     prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
     prometheus_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
     loki_url: ${{ secrets.LOKI_URL || '' }}
+    loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
     loki_username: ${{ secrets.LOKI_USERNAME || '' }}
     loki_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
 ```
