@@ -7,7 +7,7 @@ The current implementation of Simplex sends messages only to validator nodes. Me
 
 **Broadcasting Finalizations**
 
-In order to learn about blocks that were accepted, non-validators need to receive finalizations. To accommodate this, we should expand the `Communication` implementation to also broadcast to non-validator nodes whenever the message being broadcasted is a `FinalizationMessage`. This does not require any changes to the `Simplex` protocol itself, as the `Communication` component is already an isolated component. It would be up to the `Communication` struct and `Engine` that wraps `Simplex` to maintain a list of non-validator nodes and broadcast finalization messages to them.
+In order to learn about blocks that were accepted, non-validators need to receive finalizations. To accommodate this, we should expand the `Communication` implementation to also broadcast to non-validator nodes whenever the message being broadcasted is a `Finalization`. This does not require any changes to the `Simplex` protocol itself, as the `Communication` component is already an isolated component. It would be up to the `Communication` struct and `Engine` that wraps `Simplex` to maintain a list of non-validator nodes and broadcast finalization messages to them.
 
 Once a non-validator receives a finalization message for a higher sequence, it can then request the full block via the standard replication path described below.
 
@@ -47,7 +47,9 @@ Non-validators should re-use this logic and can ignore any `QuorumRound` that do
 
 **Processing Replication Responses**
 
-When a non-validator receives a `ReplicationResponse`, it needs to verify the `QuorumRounds` by verifying the aggregated BLS signature amongst the corresponding validator set. Since different epochs can be [configured](https://github.com/ava-labs/avalanchego/pull/4124) with different validator sets, the non-validator needs to ensure it has the correct validator set for the epoch in which the `Finalization` was created. In the proposed implementation, the `Epoch` number represents the sequence of the sealing block the `Finalization` was created for. The non-validator node can follow [this proposed logic](https://github.com/ava-labs/avalanchego/pull/4124/files#diff-b9b433e0fcc085f654c562e9eaadb1e4de29b7fe6ee4bdc970280b895b3c078bR305) to verify the missing `Finalizations`:
+When a non-validator receives a `ReplicationResponse`, it needs to verify the `QuorumRounds` by verifying the aggregated BLS signature amongst the corresponding validator set. Since different epochs can be [configured](https://github.com/ava-labs/avalanchego/pull/4124) with different validator sets, the non-validator needs to ensure it has the correct validator set for the epoch in which the `Finalization` was created. In the proposed implementation, the `Epoch` number represents the sequence of the sealing block the `Finalization` was created for. Therefore, the non-validator can work backwards from each sealing block by requesting the previous sealing blocks sequence. Once the non-validator has confidently fetched each sealing block, it can grab the corresponding validator set for the epoch the finalizations are in. Then by using the correct validator set for each epoch, it can verify any finalizations in that epoch.
+
+For a more detailed explanation of how to handle epoch changes see [here](https://github.com/ava-labs/avalanchego/pull/4124/files#diff-b9b433e0fcc085f654c562e9eaadb1e4de29b7fe6ee4bdc970280b895b3c078bR305):
 
 **Bringing It All Together**
 
