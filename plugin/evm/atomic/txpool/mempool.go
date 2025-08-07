@@ -142,6 +142,11 @@ func (m *Mempool) checkConflictTx(tx *atomic.Tx) (uint64, ids.ID, []*atomic.Tx, 
 	return highestGasPrice, highestGasPriceConflictTxID, conflictingTxs, nil
 }
 
+// Assumes the lock is held.
+func (m *Mempool) length() int {
+	return m.pendingTxs.Len() + len(m.currentTxs) + len(m.issuedTxs)
+}
+
 // addTx attempts to add tx to the mempool.
 //
 // Unless local, discarded transactions can not be added.

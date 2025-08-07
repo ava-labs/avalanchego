@@ -83,12 +83,7 @@ func (t *Txs) PendingLen() int {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
-	return t.length()
-}
-
-// Assumes the lock is held.
-func (t *Txs) length() int {
-	return t.pendingTxs.Len() + len(t.issuedTxs)
+	return t.pendingTxs.Len()
 }
 
 // atomicTxGasPrice returns the gasPrice of a transaction in nAVAX/gas.

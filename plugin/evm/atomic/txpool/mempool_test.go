@@ -157,21 +157,32 @@ func TestMempoolMaxSizeHandling(t *testing.T) {
 		nil,
 	)
 	require.NoError(err)
-	// create candidate tx (we will drop before validation)
-	tx := atomictest.GenerateTestImportTx()
 
-	require.NoError(mempool.AddRemoteTx(tx))
-	require.True(mempool.Has(tx.ID()))
-	// promote tx to be issued
-	_, ok := mempool.NextTx()
+	lowFeeTx := atomictest.GenerateTestImportTxWithGas(1, 1)
+	highFeeTx := atomictest.GenerateTestImportTxWithGas(1, 2)
+
+	require.NoError(mempool.AddLocalTx(lowFeeTx))
+
+	// Mark the lowFeeTx as Current
+	tx, ok := mempool.NextTx()
 	require.True(ok)
+	require.Equal(lowFeeTx, tx)
+
+	// Because Current transactions can not be evicted, the mempool should
+	// report full.
+	err = mempool.AddLocalTx(highFeeTx)
+	require.ErrorIs(err, ErrMempoolFull)
+
+	// Mark the lowFeeTx as Issued
 	mempool.IssueCurrentTxs()
 
-	// try to add one more tx
-	tx2 := atomictest.GenerateTestImportTx()
-	err = mempool.AddRemoteTx(tx2)
+	// Issued transactions also can not be evicted.
+	err = mempool.AddLocalTx(highFeeTx)
 	require.ErrorIs(err, ErrMempoolFull)
-	require.False(mempool.Has(tx2.ID()))
+
+	// If we make space, the highFeeTx should be allowed.
+	mempool.RemoveTx(lowFeeTx)
+	require.NoError(mempool.AddLocalTx(highFeeTx))
 }
 
 // mempool will drop transaction with the lowest fee
@@ -201,4 +212,41 @@ func TestMempoolPriorityDrop(t *testing.T) {
 	require.False(mempool.Has(tx1.ID()))
 	require.False(mempool.Has(tx2.ID()))
 	require.True(mempool.Has(tx3.ID()))
+}
+
+// PendingLen should only return the number of Pending transactions, not
+// Current, Issued, or Discarded.
+func TestMempoolPendingLen(t *testing.T) {
+	require := require.New(t)
+
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	mempool, err := NewMempool(
+		NewTxs(ctx, 2),
+		prometheus.NewRegistry(),
+		nil,
+	)
+	require.NoError(err)
+
+	tx1 := atomictest.GenerateTestImportTxWithGas(1, 1)
+	tx2 := atomictest.GenerateTestImportTxWithGas(1, 2)
+
+	require.NoError(mempool.AddRemoteTx(tx1))
+	require.NoError(mempool.AddRemoteTx(tx2))
+	require.Equal(2, mempool.PendingLen())
+
+	nextTx, ok := mempool.NextTx()
+	require.True(ok)
+	require.Equal(tx2, nextTx)
+	require.Equal(1, mempool.PendingLen()) // Shouldn't include Current txs
+
+	mempool.IssueCurrentTxs()
+	require.Equal(1, mempool.PendingLen()) // Shouldn't include Issued txs
+
+	nextTx, ok = mempool.NextTx()
+	require.True(ok)
+	require.Equal(tx1, nextTx)
+	require.Zero(mempool.PendingLen()) // Still shouldn't include Current txs
+
+	mempool.DiscardCurrentTxs()
+	require.Zero(mempool.PendingLen()) // Shouldn't include Discarded txs
 }
