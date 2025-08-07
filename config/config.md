@@ -62,8 +62,8 @@ Configuration sources are applied in the following order (highest to lowest prec
 
 Configuration for various APIs exposed by the node.
 
-| Flag | Env Var | Type | Default | Description |
-|------|---------|------|---------|-------------|
+| Flag | Env Var | Type | Default | Options | Description |
+|------|---------|------|---------|---------|-------------|
 | `--api-admin-enabled` | `AVAGO_API_ADMIN_ENABLED` | bool | `false` | If set to `true`, this node will expose the Admin API. See [here](https://build.avax.network/docs/api-reference/admin-api) for more information. |
 | `--api-health-enabled` | `AVAGO_API_HEALTH_ENABLED` | bool | `true` | If set to `false`, this node will not expose the Health API. See [here](https://build.avax.network/docs/api-reference/health-api) for more information. |
 | `--index-enabled` | `AVAGO_INDEX_ENABLED` | bool | `false` | If set to `true`, this node will enable the indexer and the Index API will be available. See [here](https://build.avax.network/docs/api-reference/index-api) for more information. |
@@ -74,8 +74,8 @@ Configuration for various APIs exposed by the node.
 
 Support for [Avalanche Community Proposals](https://github.com/avalanche-foundation/ACPs).
 
-| Flag | Env Var | Type | Default | Description |
-|------|---------|------|---------|-------------|
+| Flag | Env Var | Type | Default | Options | Description |
+|------|---------|------|---------|---------|-------------|
 | `--acp-support` | `AVAGO_ACP_SUPPORT` | []int | `[]` | The `--acp-support` flag allows an AvalancheGo node to indicate support for a set of [Avalanche Community Proposals](https://github.com/avalanche-foundation/ACPs). |
 | `--acp-object` | `AVAGO_ACP_OBJECT` | []int | `[]` | The `--acp-object` flag allows an AvalancheGo node to indicate objection for a set of [Avalanche Community Proposals](https://github.com/avalanche-foundation/ACPs). |
 
@@ -83,8 +83,8 @@ Support for [Avalanche Community Proposals](https://github.com/avalanche-foundat
 
 Configuration for node bootstrapping process.
 
-| Flag | Env Var | Type | Default | Description |
-|------|---------|------|---------|-------------|
+| Flag | Env Var | Type | Default | Options | Description |
+|------|---------|------|---------|---------|-------------|
 | `--bootstrap-ancestors-max-containers-sent` | `AVAGO_BOOTSTRAP_ANCESTORS_MAX_CONTAINERS_SENT` | uint | `2000` | Max number of containers in an `Ancestors` message sent by this node. |
 | `--bootstrap-ancestors-max-containers-received` | `AVAGO_BOOTSTRAP_ANCESTORS_MAX_CONTAINERS_RECEIVED` | uint | `2000` | This node reads at most this many containers from an incoming `Ancestors` message. |
 | `--bootstrap-beacon-connection-timeout` | `AVAGO_BOOTSTRAP_BEACON_CONNECTION_TIMEOUT` | duration | `1m` | Timeout when attempting to connect to bootstrapping beacons. |
@@ -98,8 +98,8 @@ Configuration for node bootstrapping process.
 
 Some blockchains allow the node operator to provide custom configurations for individual blockchains. These custom configurations are broken down into two categories: network upgrades and optional chain configurations. AvalancheGo reads in these configurations from the chain configuration directory and passes them into the VM on initialization.
 
-| Flag | Env Var | Type | Default | Description |
-|------|---------------------|------|---------|-------------|
+| Flag | Env Var | Type | Default | Options | Description |
+|------|---------------------|------|---------|---------|-------------|
 | `--chain-config-dir` | `AVAGO_CHAIN_CONFIG_DIR` | string | `$HOME/.avalanchego/configs/chains` | Specifies the directory that contains chain configs, as described [here](https://build.avax.network/docs/nodes/chain-configs). If this flag is not provided and the default directory does not exist, AvalancheGo will not exit since custom configs are optional. However, if the flag is set, the specified folder must exist, or AvalancheGo will exit with an error. This flag is ignored if `--chain-config-content` is specified. Network upgrades are passed in from the location: `chain-config-dir`/`blockchainID`/`upgrade.*`. The chain configs are passed in from the location `chain-config-dir`/`blockchainID`/`config.*`. See [here](https://build.avax.network/docs/nodes/chain-configs) for more information. |
 | `--chain-config-content` | `AVAGO_CHAIN_CONFIG_CONTENT` | string | - | As an alternative to `--chain-config-dir`, chains custom configurations can be loaded altogether from command line via `--chain-config-content` flag. Content must be base64 encoded. Example: First, encode the chain config: `echo -n '{"log-level":"trace"}' \| base64`. This will output something like `eyJsb2ctbGV2ZWwiOiJ0cmFjZSJ9`. Then create the full config JSON and encode it: `echo -n '{"C":{"Config":"eyJsb2ctbGV2ZWwiOiJ0cmFjZSJ9","Upgrade":null}}' \| base64`. Finally run: `avalanchego --chain-config-content "eyJDIjp7IkNvbmZpZyI6ImV5SnNiMmN0YkdWMlpXd2lPaUowY21GalpTSjkiLCJVcGdyYWRlIjpudWxsfX0="` |
 | `--chain-aliases-file` | `AVAGO_CHAIN_ALIASES_FILE` | string | `~/.avalanchego/configs/chains/aliases.json` | Path to JSON file that defines aliases for Blockchain IDs. This flag is ignored if `--chain-aliases-file-content` is specified. Example content: `{"q2aTwKuyzgs8pynF7UXBZCU7DejbZbZ6EUyHr3JQzYgwNPUPi": ["DFK"]}`. The above example aliases the Blockchain whose ID is `"q2aTwKuyzgs8pynF7UXBZCU7DejbZbZ6EUyHr3JQzYgwNPUPi"` to `"DFK"`. Chain aliases are added after adding primary network aliases and before any changes to the aliases via the admin API. This means that the first alias included for a Blockchain on a Subnet will be treated as the `"Primary Alias"` instead of the full blockchainID. The Primary Alias is used in all metrics and logs. |
@@ -108,29 +108,29 @@ Some blockchains allow the node operator to provide custom configurations for in
 
 ### Config File
 
-| Flag | Env Var | Type | Default | Description |
-|------|---------------------|------|---------|-------------|
+| Flag | Env Var | Type | Default | Options | Description |
+|------|---------------------|------|---------|---------|-------------|
 | `--config-file` | `AVAGO_CONFIG_FILE` | string | - | Path to a JSON file that specifies this node's configuration. Command line arguments will override arguments set in the config file. This flag is ignored if `--config-file-content` is specified. Example JSON config file: `{"log-level": "debug"}`. [Install Script](https://build.avax.network/docs/tooling/avalanche-go-installer) creates the node config file at `~/.avalanchego/configs/node.json`. No default file is created if [AvalancheGo is built from source](https://build.avax.network/docs/nodes/run-a-node/from-source), you would need to create it manually if needed. |
 | `--config-file-content` | `AVAGO_CONFIG_FILE_CONTENT` | string | - | As an alternative to `--config-file`, it allows specifying base64 encoded config content. |
 | `--config-file-content-type` | `AVAGO_CONFIG_FILE_CONTENT_TYPE` | string | `JSON` | Specifies the format of the base64 encoded config content. JSON, TOML, YAML are among currently supported file format (see [here](https://github.com/spf13/viper#reading-config-files) for full list). |
 
 ### Data Directory
 
-| Flag | Env Var | Type | Default | Description |
-|------|---------------------|------|---------|-------------|
+| Flag | Env Var | Type | Default | Options | Description |
+|------|---------------------|------|---------|---------|-------------|
 | `--data-dir` | `AVAGO_DATA_DIR` | string | `$HOME/.avalanchego` | Sets the base data directory where default sub-directories will be placed unless otherwise specified. |
 
 ### Database
 
-| Flag | Env Var | Type | Default | Description |
-|------|---------------------|------|---------|-------------|
+| Flag | Env Var | Type | Default | Options | Description |
+|------|---------------------|------|---------|---------|-------------|
 | `--db-dir` | `AVAGO_DB_DIR` | string | `$HOME/.avalanchego/db` | Specifies the directory to which the database is persisted. |
 | `--db-type` | `AVAGO_DB_TYPE` | string | `leveldb` | Specifies the type of database to use. Must be one of `leveldb`, `memdb`, or `pebbledb`. `memdb` is an in-memory, non-persisted database. Note: `memdb` stores everything in memory. So if you have a 900 GiB LevelDB instance, then using `memdb` you'd need 900 GiB of RAM. `memdb` is useful for fast one-off testing, not for running an actual node (on Fuji or Mainnet). Also note that `memdb` doesn't persist after restart. So any time you restart the node it would start syncing from scratch. |
 
 #### Database Config
 
-| Flag | Env Var | Type | Default | Description |
-|------|---------------------|------|---------|-------------|
+| Flag | Env Var | Type | Default | Options | Description |
+|------|---------------------|------|---------|---------|-------------|
 | `--db-config-file` | `AVAGO_DB_CONFIG_FILE` | string | - | Path to the database config file. Ignored if `--db-config-file-content` is specified. |
 | `--db-config-file-content` | `AVAGO_DB_CONFIG_FILE_CONTENT` | string | - | As an alternative to `--db-config-file`, it allows specifying base64 encoded database config content. |
 
@@ -138,21 +138,21 @@ A LevelDB config file must be JSON and may have these keys. Any keys not given w
 
 ### File Descriptor Limit
 
-| Flag | Env Var | Type | Default | Description |
-|------|---------------------|------|---------|-------------|
+| Flag | Env Var | Type | Default | Options | Description |
+|------|---------------------|------|---------|---------|-------------|
 | `--fd-limit` | `AVAGO_FD_LIMIT` | int | `32768` | Attempts to raise the process file descriptor limit to at least this value and error if the value is above the system max. |
 
 ### Genesis
 
-| Flag | Env Var | Type | Default | Description |
-|------|---------------------|------|---------|-------------|
+| Flag | Env Var | Type | Default | Options | Description |
+|------|---------------------|------|---------|---------|-------------|
 | `--genesis-file` | `AVAGO_GENESIS_FILE` | string | - | Path to a JSON file containing the genesis data to use. Ignored when running standard networks (Mainnet, Fuji Testnet), or when `--genesis-file-content` is specified. If not given, uses default genesis data. See the documentation for the genesis JSON format [here](../genesis/README.md) and an example for a local network [here](../genesis/genesis_local.json). |
 | `--genesis-file-content` | `AVAGO_GENESIS_FILE_CONTENT` | string | - | As an alternative to `--genesis-file`, it allows specifying base64 encoded genesis data to use. |
 
 ### HTTP Server
 
-| Flag | Env Var | Type | Default | Description |
-|------|---------------------|------|---------|-------------|
+| Flag | Env Var | Type | Default | Options | Description |
+|------|---------------------|------|---------|---------|-------------|
 | `--http-allowed-hosts` | `AVAGO_HTTP_ALLOWED_HOSTS` | string | `localhost` | List of acceptable host names in API requests. Provide the wildcard (`'*'`) to accept requests from all hosts. API requests where the `Host` field is empty or an IP address will always be accepted. An API call whose HTTP `Host` field isn't acceptable will receive a 403 error code. |
 | `--http-allowed-origins` | `AVAGO_HTTP_ALLOWED_ORIGINS` | string | `*` | Origins to allow on the HTTP port. Example: `"https://*.avax.network https://*.avax-test.network"` |
 | `--http-host` | `AVAGO_HTTP_HOST` | string | `127.0.0.1` | The address that HTTP APIs listen on. This means that by default, your node can only handle API calls made from the same machine. To allow API calls from other machines, use `--http-host=`. You can also enter domain names as parameter. |
@@ -171,11 +171,11 @@ A LevelDB config file must be JSON and may have these keys. Any keys not given w
 
 ### Logging
 
-| Flag | Env Var | Type | Default | Description |
-|------|---------------------|------|---------|-------------|
-| `--log-level` | `AVAGO_LOG_LEVEL` | string | `info` | The log level determines which events to log. There are 8 different levels, in order from highest priority to lowest: `off` (no logs), `fatal` (fatal errors that are not recoverable), `error` (errors that the node encounters, these errors were able to be recovered), `warn` (warnings that might be indicative of a spurious byzantine node, or potential future error), `info` (useful descriptions of node status updates), `trace` (traces container job results, useful for tracing container IDs and their outcomes), `debug` (useful when attempting to understand possible bugs in the code), `verbo` (tracks extensive amounts of information the node is processing, including message contents and binary dumps of data for extremely low level protocol analysis). When specifying a log level note that all logs with the specified priority or higher will be tracked. |
+| Flag | Env Var | Type | Default | Options | Description |
+|------|---------------------|------|---------|---------|-------------|
+| `--log-level` | `AVAGO_LOG_LEVEL` | string | `info` | • `off` - No logs<br>• `fatal` - Fatal errors that are not recoverable<br>• `error` - Errors that the node encounters, these errors were able to be recovered<br>• `warn` - Warnings that might be indicative of a spurious byzantine node, or potential future error<br>• `info` - Useful descriptions of node status updates<br>• `trace` - Traces container job results, useful for tracing container IDs and their outcomes<br>• `debug` - Useful when attempting to understand possible bugs in the code<br>• `verbo` - Tracks extensive amounts of information the node is processing, including message contents and binary dumps of data for extremely low level protocol analysis | The log level determines which events to log. When specifying a log level note that all logs with the specified priority or higher will be tracked. |
 | `--log-display-level` | `AVAGO_LOG_DISPLAY_LEVEL` | string | value of `--log-level` | The log level determines which events to display to stdout. If left blank, will default to the value provided to `--log-level`. |
-| `--log-format` | `AVAGO_LOG_FORMAT` | string | `auto` | The structure of log format. Defaults to \`auto\` which formats terminal-like logs, when the output is a terminal. Otherwise, should be one of `auto`, `plain`, `colors`, `json` |
+| `--log-format` | `AVAGO_LOG_FORMAT` | string | `auto` | `auto`, `plain`, `colors`, `json` | The structure of log format. Defaults to `auto` which formats terminal-like logs, when the output is a terminal. Otherwise, should be one of the listed options. |
 | `--log-dir` | `AVAGO_LOG_DIR` | string | `$HOME/.avalanchego/logs` | Specifies the directory in which system logs are kept. If you are running the node as a system service (ex. using the installer script) logs will also be stored in `$HOME/var/log/syslog`. |
 | `--log-disable-display-plugin-logs` | `AVAGO_LOG_DISABLE_DISPLAY_PLUGIN_LOGS` | boolean | `false` | Disables displaying plugin logs in stdout. |
 | `--log-rotater-max-size` | `AVAGO_LOG_ROTATER_MAX_SIZE` | uint | `8` | The maximum file size in megabytes of the log file before it gets rotated. |
@@ -187,8 +187,8 @@ A LevelDB config file must be JSON and may have these keys. Any keys not given w
 
 You can configure your node to continuously run memory/CPU profiles and save the most recent ones. Continuous memory/CPU profiling is enabled if `--profile-continuous-enabled` is set.
 
-| Flag | Env Var | Type | Default | Description |
-|------|---------------------|------|---------|-------------|
+| Flag | Env Var | Type | Default | Options | Description |
+|------|---------------------|------|---------|---------|-------------|
 | `--profile-continuous-enabled` | `AVAGO_PROFILE_CONTINUOUS_ENABLED` | boolean | `false` | Whether the app should continuously produce performance profiles. |
 | `--profile-dir` | `AVAGO_PROFILE_DIR` | string | `$HOME/.avalanchego/profiles/` | If profiling enabled, node continuously runs memory/CPU profiles and puts them at this directory. |
 | `--profile-continuous-freq` | `AVAGO_PROFILE_CONTINUOUS_FREQ` | duration | `15m` | How often a new CPU/memory profile is created. |
@@ -196,8 +196,8 @@ You can configure your node to continuously run memory/CPU profiles and save the
 
 ### Network
 
-| Flag | Env Var | Type | Default | Description |
-|------|---------------------|------|---------|-------------|
+| Flag | Env Var | Type | Default | Options | Description |
+|------|---------------------|------|---------|---------|-------------|
 | `--network-id` | `AVAGO_NETWORK_ID` | string | `mainnet` | The identity of the network the node should connect to. Can be one of: `--network-id=mainnet` -> Connect to Mainnet (default). `--network-id=fuji` -> Connect to the Fuji test-network. `--network-id=testnet` -> Connect to the current test-network. (Right now, this is Fuji.) `--network-id=local` -> Connect to a local test-network. `--network-id=network-[id]` -> Connect to the network with the given ID. `id` must be in the range \[0, 2^32\). |
 
 ### OpenTelemetry
