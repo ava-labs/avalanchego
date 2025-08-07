@@ -107,7 +107,7 @@ data:
           # TODO(marun) Add kube cluster identifier as a label
 
     remote_write:
-    - url: "${PROMETHEUS_URL}/api/prom/push"
+    - url: "${PROMETHEUS_URL}"
       basic_auth:
         username: "${PROMETHEUS_USERNAME}"
         password: "${PROMETHEUS_PASSWORD}"
