@@ -87,8 +87,7 @@ func (s *blockSyncer) Wait(ctx context.Context) error {
 		return err
 	case <-ctx.Done():
 		s.cancel()
-		<-s.err // wait for the syncer to finish
-		return ctx.Err()
+		return <-s.err
 	}
 }
 

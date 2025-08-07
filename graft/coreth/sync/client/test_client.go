@@ -119,6 +119,11 @@ func (ml *TestClient) GetBlocks(ctx context.Context, blockHash common.Hash, heig
 	if err != nil {
 		return nil, err
 	}
+	// Actual client retries until the context is canceled.
+	if response == nil {
+		<-ctx.Done()
+		return nil, ctx.Err()
+	}
 
 	client := &client{blockParser: newTestBlockParser()} // Hack to avoid duplicate code
 	blocksRes, numBlocks, err := client.parseBlocks(ml.codec, request, response)
