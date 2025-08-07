@@ -207,6 +207,21 @@ pub enum CheckerError {
         parent: StoredAreaParent,
     },
 
+    /// Node is larger than the area it is stored in
+    #[error(
+        "stored area at {area_start:#x} with size {area_size} (parent: {parent:#x}) stores a node of size {node_bytes}"
+    )]
+    NodeLargerThanArea {
+        /// Address of the area
+        area_start: LinearAddress,
+        /// Size of the area
+        area_size: u64,
+        /// Size of the node
+        node_bytes: u64,
+        /// The parent of the area
+        parent: TrieNodeParent,
+    },
+
     /// Freelist area size does not match
     #[error(
         "Free area {address:#x} of size {size} (parent: {parent:#x}) is found in free list {actual_free_list} but it should be in freelist {expected_free_list}"

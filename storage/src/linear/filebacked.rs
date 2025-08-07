@@ -297,7 +297,7 @@ impl Read for PredictiveReader<'_> {
 
 impl OffsetReader for PredictiveReader<'_> {
     fn offset(&self) -> u64 {
-        self.offset
+        self.offset - self.len as u64 + self.pos as u64
     }
 }
 
