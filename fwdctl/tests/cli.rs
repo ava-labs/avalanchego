@@ -566,20 +566,8 @@ fn fwdctl_check_empty_db() -> Result<()> {
 #[test]
 #[serial]
 fn fwdctl_check_db_with_data() -> Result<()> {
-    use rand::distr::Alphanumeric;
-    use rand::rngs::StdRng;
-    use rand::{Rng, SeedableRng, rng};
-
-    let seed = std::env::var("FIREWOOD_TEST_SEED")
-        .ok()
-        .map_or_else(
-            || None,
-            |s| Some(str::parse(&s).expect("couldn't parse FIREWOOD_TEST_SEED; must be a u64")),
-        )
-        .unwrap_or_else(|| rng().random());
-
-    eprintln!("Seed {seed}: to rerun with this data, export FIREWOOD_TEST_SEED={seed}");
-    let rng = StdRng::seed_from_u64(seed);
+    use rand::{Rng, distr::Alphanumeric};
+    let rng = firewood_storage::SeededRng::from_env_or_random();
     let mut sample_iter = rng.sample_iter(Alphanumeric).map(char::from);
 
     Command::cargo_bin(PRG)?

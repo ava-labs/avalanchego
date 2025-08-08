@@ -29,6 +29,8 @@ mod iter;
 mod linear;
 mod node;
 mod nodestore;
+#[cfg(any(test, feature = "test_utils"))]
+mod test_utils;
 mod trie_hash;
 
 use crate::nodestore::AreaIndex;
@@ -56,6 +58,8 @@ pub use nodestore::{
 pub use linear::filebacked::FileBacked;
 pub use linear::memory::MemStore;
 pub use node::persist::MaybePersistedNode;
+#[cfg(any(test, feature = "test_utils"))]
+pub use test_utils::SeededRng;
 pub use trie_hash::{InvalidTrieHashLength, TrieHash};
 
 /// A shared node, which is just a triophe Arc of a node
@@ -289,26 +293,5 @@ pub enum CheckerError {
 impl From<CheckerError> for Vec<CheckerError> {
     fn from(error: CheckerError) -> Self {
         vec![error]
-    }
-}
-
-#[cfg(test)]
-mod test_utils {
-    use rand::rngs::StdRng;
-    use rand::{Rng, SeedableRng, rng};
-
-    pub fn seeded_rng() -> StdRng {
-        let seed = std::env::var("FIREWOOD_STORAGE_TEST_SEED")
-            .ok()
-            .map_or_else(
-                || rng().random(),
-                |s| {
-                    str::parse(&s)
-                        .expect("couldn't parse FIREWOOD_STORAGE_TEST_SEED; must be a u64")
-                },
-            );
-
-        eprintln!("Seed {seed}: to rerun with this data, export FIREWOOD_STORAGE_TEST_SEED={seed}");
-        StdRng::seed_from_u64(seed)
     }
 }

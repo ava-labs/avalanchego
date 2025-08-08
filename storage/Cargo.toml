@@ -26,6 +26,7 @@ metrics.workspace = true
 nonzero_ext.workspace = true
 sha2.workspace = true
 smallvec = { workspace = true, features = ["write", "union"] }
+rand = { workspace = true, optional = true }
 thiserror.workspace = true
 # Regular dependencies
 arc-swap = "1.7.1"
@@ -60,6 +61,7 @@ logger = ["log"]
 branch_factor_256 = []
 io-uring = ["dep:io-uring"]
 ethhash = ["dep:rlp", "dep:sha3", "dep:bytes"]
+test_utils = ["dep:rand"]
 
 [[bench]]
 name = "serializer"

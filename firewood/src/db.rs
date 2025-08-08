@@ -467,7 +467,6 @@ mod test {
     use std::path::PathBuf;
 
     use firewood_storage::{CheckOpt, CheckerError};
-    use rand::rng;
     use tokio::sync::mpsc::{Receiver, Sender};
 
     use crate::db::{Db, Proposal};
@@ -776,21 +775,9 @@ mod test {
 
     #[tokio::test]
     async fn fuzz_checker() {
-        use rand::rngs::StdRng;
-        use rand::{Rng, SeedableRng};
-
         let _ = env_logger::Builder::new().is_test(true).try_init();
 
-        let seed = std::env::var("FIREWOOD_TEST_SEED")
-            .ok()
-            .map_or_else(
-                || None,
-                |s| Some(str::parse(&s).expect("couldn't parse FIREWOOD_TEST_SEED; must be a u64")),
-            )
-            .unwrap_or_else(|| rng().random());
-
-        eprintln!("Seed {seed}: to rerun with this data, export FIREWOOD_TEST_SEED={seed}");
-        let rng = std::cell::RefCell::new(StdRng::seed_from_u64(seed));
+        let rng = firewood_storage::SeededRng::from_env_or_random();
 
         let db = testdb().await;
 
@@ -798,16 +785,16 @@ mod test {
         for _ in 0..50 {
             // create a batch of 10 random key-value pairs
             let batch = (0..10).fold(vec![], |mut batch, _| {
-                let key: [u8; 32] = rng.borrow_mut().random();
-                let value: [u8; 8] = rng.borrow_mut().random();
+                let key: [u8; 32] = rng.random();
+                let value: [u8; 8] = rng.random();
                 batch.push(BatchOp::Put {
                     key: key.to_vec(),
                     value,
                 });
-                if rng.borrow_mut().random_range(0..5) == 0 {
-                    let addon: [u8; 32] = rng.borrow_mut().random();
+                if rng.random_range(0..5) == 0 {
+                    let addon: [u8; 32] = rng.random();
                     let key = [key, addon].concat();
-                    let value: [u8; 8] = rng.borrow_mut().random();
+                    let value: [u8; 8] = rng.random();
                     batch.push(BatchOp::Put { key, value });
                 }
                 batch
@@ -816,7 +803,7 @@ mod test {
             proposal.commit().await.unwrap();
 
             // check the database for consistency, sometimes checking the hashes
-            let hash_check = rng.borrow_mut().random();
+            let hash_check = rng.random();
             let report = db
                 .check(CheckOpt {
                     hash_check,

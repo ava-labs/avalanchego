@@ -15,15 +15,9 @@ use std::fmt::Write;
 
 use super::*;
 use firewood_storage::{Committed, MemStore, MutableProposal, NodeStore, RootReader, TrieHash};
-use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng, rng};
 
 // Returns n random key-value pairs.
-fn generate_random_kvs(seed: u64, n: usize) -> Vec<(Vec<u8>, Vec<u8>)> {
-    eprintln!("Seed {seed}: to rerun with this data, export FIREWOOD_TEST_SEED={seed}");
-
-    let mut rng = StdRng::seed_from_u64(seed);
-
+fn generate_random_kvs(rng: &firewood_storage::SeededRng, n: usize) -> Vec<(Vec<u8>, Vec<u8>)> {
     let mut kvs: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
     for _ in 0..n {
         let key_len = rng.random_range(1..=4096);
@@ -116,7 +110,10 @@ where
 // generate pseudorandom data, but prefix it with some known data
 // The number of fixed data points is 100; you specify how much random data you want
 #[expect(clippy::arithmetic_side_effects)]
-fn fixed_and_pseudorandom_data(random_count: u32) -> HashMap<[u8; 32], [u8; 20]> {
+fn fixed_and_pseudorandom_data(
+    rng: &firewood_storage::SeededRng,
+    random_count: u32,
+) -> HashMap<[u8; 32], [u8; 20]> {
     let mut items = HashMap::new();
     for i in 0..100_u32 {
         let mut key: [u8; 32] = [0; 32];
@@ -134,23 +131,9 @@ fn fixed_and_pseudorandom_data(random_count: u32) -> HashMap<[u8; 32], [u8; 20]>
         items.insert(more_key, value);
     }
 
-    // read FIREWOOD_TEST_SEED from the environment. If it's there, parse it into a u64.
-    let seed = std::env::var("FIREWOOD_TEST_SEED")
-        .ok()
-        .map_or_else(
-            || None,
-            |s| Some(str::parse(&s).expect("couldn't parse FIREWOOD_TEST_SEED; must be a u64")),
-        )
-        .unwrap_or_else(|| rng().random());
-
-    // the test framework will only render this in verbose mode or if the test fails
-    // to re-run the test when it fails, just specify the seed instead of randomly
-    // selecting one
-    eprintln!("Seed {seed}: to rerun with this data, export FIREWOOD_TEST_SEED={seed}");
-    let mut r = StdRng::seed_from_u64(seed);
     for _ in 0..random_count {
-        let key = r.random::<[u8; 32]>();
-        let val = r.random::<[u8; 20]>();
+        let key = rng.random::<[u8; 32]>();
+        let val = rng.random::<[u8; 20]>();
         items.insert(key, val);
     }
     items
@@ -424,15 +407,9 @@ fn single_key_proof() {
 
     let mut merkle = create_in_memory_merkle();
 
-    let seed = std::env::var("FIREWOOD_TEST_SEED")
-        .ok()
-        .map_or_else(
-            || None,
-            |s| Some(str::parse(&s).expect("couldn't parse FIREWOOD_TEST_SEED; must be a u64")),
-        )
-        .unwrap_or_else(|| rng().random());
+    let rng = firewood_storage::SeededRng::from_env_or_random();
 
-    let kvs = generate_random_kvs(seed, TEST_SIZE);
+    let kvs = generate_random_kvs(&rng, TEST_SIZE);
 
     for (key, val) in &kvs {
         merkle.insert(key, val.clone().into_boxed_slice()).unwrap();
@@ -641,22 +618,19 @@ fn test_root_hash_simple_insertions() -> Result<(), Error> {
 
 #[test]
 fn test_root_hash_fuzz_insertions() -> Result<(), FileIoError> {
-    use rand::rngs::StdRng;
-    use rand::{Rng, SeedableRng};
-    let rng = std::cell::RefCell::new(StdRng::seed_from_u64(42));
+    let rng = firewood_storage::SeededRng::from_option(Some(42));
     let max_len0 = 8;
     let max_len1 = 4;
     let keygen = || {
         let (len0, len1): (usize, usize) = {
-            let mut rng = rng.borrow_mut();
             (
                 rng.random_range(1..=max_len0),
                 rng.random_range(1..=max_len1),
             )
         };
         let key: Vec<u8> = (0..len0)
-            .map(|_| rng.borrow_mut().random_range(0..2))
-            .chain((0..len1).map(|_| rng.borrow_mut().random()))
+            .map(|_| rng.random_range(0..2))
+            .chain((0..len1).map(|_| rng.random()))
             .collect();
         key
     };
@@ -666,7 +640,7 @@ fn test_root_hash_fuzz_insertions() -> Result<(), FileIoError> {
         let mut items = Vec::new();
 
         for _ in 0..100 {
-            let val: Vec<u8> = (0..256).map(|_| rng.borrow_mut().random()).collect();
+            let val: Vec<u8> = (0..256).map(|_| rng.random()).collect();
             items.push((keygen(), val));
         }
 
@@ -709,35 +683,22 @@ fn test_delete_some() {
 
 #[test]
 fn test_root_hash_reversed_deletions() -> Result<(), FileIoError> {
-    use rand::rngs::StdRng;
-    use rand::{Rng, SeedableRng};
-
     let _ = env_logger::Builder::new().is_test(true).try_init();
 
-    let seed = std::env::var("FIREWOOD_TEST_SEED")
-        .ok()
-        .map_or_else(
-            || None,
-            |s| Some(str::parse(&s).expect("couldn't parse FIREWOOD_TEST_SEED; must be a u64")),
-        )
-        .unwrap_or_else(|| rng().random());
-
-    eprintln!("Seed {seed}: to rerun with this data, export FIREWOOD_TEST_SEED={seed}");
-    let rng = std::cell::RefCell::new(StdRng::seed_from_u64(seed));
+    let rng = firewood_storage::SeededRng::from_env_or_random();
 
     let max_len0 = 8;
     let max_len1 = 4;
     let keygen = || {
         let (len0, len1): (usize, usize) = {
-            let mut rng = rng.borrow_mut();
             (
                 rng.random_range(1..=max_len0),
                 rng.random_range(1..=max_len1),
             )
         };
         (0..len0)
-            .map(|_| rng.borrow_mut().random_range(0..2))
-            .chain((0..len1).map(|_| rng.borrow_mut().random()))
+            .map(|_| rng.random_range(0..2))
+            .chain((0..len1).map(|_| rng.random()))
             .collect()
     };
 
@@ -745,7 +706,7 @@ fn test_root_hash_reversed_deletions() -> Result<(), FileIoError> {
         let mut items: Vec<(Key, Value)> = (0..10)
             .map(|_| keygen())
             .map(|key| {
-                let val = (0..8).map(|_| rng.borrow_mut().random()).collect();
+                let val = (0..8).map(|_| rng.random()).collect();
                 (key, val)
             })
             .collect();

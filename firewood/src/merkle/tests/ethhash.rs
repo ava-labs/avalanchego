@@ -124,23 +124,20 @@ fn make_key(hex_str: &str) -> Key {
 #[test]
 #[ignore = "broken tests not yet validated"]
 fn test_root_hash_random_deletions() {
-    use rand::rngs::StdRng;
     use rand::seq::SliceRandom;
-    use rand::{Rng, SeedableRng};
-    let rng = std::cell::RefCell::new(StdRng::seed_from_u64(42));
+    let rng = firewood_storage::SeededRng::from_option(Some(42));
     let max_len0 = 8;
     let max_len1 = 4;
     let keygen = || {
         let (len0, len1): (usize, usize) = {
-            let mut rng = rng.borrow_mut();
             (
                 rng.random_range(1..=max_len0),
                 rng.random_range(1..=max_len1),
             )
         };
         (0..len0)
-            .map(|_| rng.borrow_mut().random_range(0..2))
-            .chain((0..len1).map(|_| rng.borrow_mut().random()))
+            .map(|_| rng.random_range(0..2))
+            .chain((0..len1).map(|_| rng.random()))
             .collect()
     };
 
@@ -148,13 +145,13 @@ fn test_root_hash_random_deletions() {
         let mut items = std::collections::HashMap::<Key, Value>::new();
 
         for _ in 0..10 {
-            let val = (0..8).map(|_| rng.borrow_mut().random()).collect();
+            let val = (0..8).map(|_| rng.random()).collect();
             items.insert(keygen(), val);
         }
 
         let mut items_ordered: Vec<_> = items.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
         items_ordered.sort_unstable();
-        items_ordered.shuffle(&mut *rng.borrow_mut());
+        items_ordered.shuffle(&mut &rng);
 
         let mut committed_merkle = init_merkle(&items);
 

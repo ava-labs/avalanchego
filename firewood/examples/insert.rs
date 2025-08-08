@@ -5,7 +5,6 @@
 // insert some random keys using the front-end API.
 
 use clap::Parser;
-use std::borrow::BorrowMut as _;
 use std::collections::HashMap;
 use std::error::Error;
 use std::num::NonZeroUsize;
@@ -15,8 +14,7 @@ use std::time::Instant;
 use firewood::db::{BatchOp, Db, DbConfig};
 use firewood::manager::RevisionManagerConfig;
 use firewood::v2::api::{Db as _, DbView, KeyType, Proposal as _, ValueType};
-use rand::{Rng, SeedableRng as _};
-use rand_distr::Alphanumeric;
+use rand::{Rng, distr::Alphanumeric};
 
 #[derive(Parser, Debug)]
 struct Args {
@@ -72,11 +70,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let keys = args.batch_size;
     let start = Instant::now();
 
-    let mut rng = if let Some(seed) = args.seed {
-        rand::rngs::StdRng::seed_from_u64(seed)
-    } else {
-        rand::rngs::StdRng::from_os_rng()
-    };
+    let rng = &firewood_storage::SeededRng::from_option(args.seed);
 
     for _ in 0..args.number_of_batches {
         let keylen = rng.random_range(args.keylen.clone());
@@ -84,12 +78,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let batch = (0..keys)
             .map(|_| {
                 (
-                    rng.borrow_mut()
-                        .sample_iter(&Alphanumeric)
+                    rng.sample_iter(&Alphanumeric)
                         .take(keylen)
                         .collect::<Vec<u8>>(),
-                    rng.borrow_mut()
-                        .sample_iter(&Alphanumeric)
+                    rng.sample_iter(&Alphanumeric)
                         .take(valuelen)
                         .collect::<Vec<u8>>(),
                 )
@@ -97,7 +89,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             .map(|(key, value)| BatchOp::Put { key, value })
             .collect::<Vec<_>>();
 
-        let verify = get_keys_to_verify(&batch, args.read_verify_percent);
+        let verify = get_keys_to_verify(rng, &batch, args.read_verify_percent);
 
         #[expect(clippy::unwrap_used)]
         let proposal = db.propose(batch.clone()).await.unwrap();
@@ -115,6 +107,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn get_keys_to_verify<'a, K: KeyType + 'a, V: ValueType + 'a>(
+    rng: &firewood_storage::SeededRng,
     batch: impl IntoIterator<Item = &'a BatchOp<K, V>>,
     pct: u16,
 ) -> HashMap<&'a [u8], &'a [u8]> {
@@ -123,7 +116,7 @@ fn get_keys_to_verify<'a, K: KeyType + 'a, V: ValueType + 'a>(
     } else {
         batch
             .into_iter()
-            .filter(|_last_key| rand::rng().random_range(0..=100u16.saturating_sub(pct)) == 0)
+            .filter(|_last_key| rng.random_range(0..=100u16.saturating_sub(pct)) == 0)
             .map(|op| {
                 if let BatchOp::Put { key, value } = op {
                     (key.as_ref(), value.as_ref())

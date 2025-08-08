@@ -30,7 +30,6 @@ firewood-macros.workspace = true
 hex.workspace = true
 metrics.workspace = true
 sha2.workspace = true
-test-case.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 # Regular dependencies
@@ -43,8 +42,8 @@ default = []
 nightly = []
 io-uring = ["firewood-storage/io-uring"]
 logger = ["firewood-storage/logger"]
-branch_factor_256 = [ "firewood-storage/branch_factor_256" ]
-ethhash = [ "firewood-storage/ethhash" ]
+branch_factor_256 = ["firewood-storage/branch_factor_256"]
+ethhash = ["firewood-storage/ethhash"]
 
 [dev-dependencies]
 # Workspace dependencies
@@ -52,12 +51,13 @@ clap = { workspace = true, features = ['derive'] }
 criterion = { workspace = true, features = ["async_tokio"] }
 env_logger.workspace = true
 ethereum-types.workspace = true
+firewood-storage = { workspace = true, features = ["test_utils"] }
 firewood-triehash.workspace = true
 hex-literal.workspace = true
 pprof = { workspace = true, features = ["flamegraph"] }
 rand.workspace = true
-rand_distr.workspace = true
 tempfile.workspace = true
+test-case.workspace = true
 tokio = { workspace = true, features = ["rt", "sync", "macros", "rt-multi-thread"] }
 # Regular dependencies
 hash-db = "0.16.0"

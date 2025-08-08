@@ -813,9 +813,7 @@ mod test {
 
     #[test]
     fn traverse_correct_freelist() {
-        use rand::Rng;
-
-        let mut rng = crate::test_utils::seeded_rng();
+        let rng = crate::SeededRng::from_env_or_random();
 
         let memstore = MemStore::new(vec![]);
         let mut nodestore = NodeStore::new_empty_committed(memstore.into()).unwrap();
@@ -952,10 +950,9 @@ mod test {
     // This test creates a linear set of free areas and free them.
     // When traversing it should break consecutive areas.
     fn split_correct_range_into_leaked_areas() {
-        use rand::Rng;
         use rand::seq::IteratorRandom;
 
-        let mut rng = crate::test_utils::seeded_rng();
+        let mut rng = crate::SeededRng::from_env_or_random();
 
         let memstore = MemStore::new(vec![]);
         let mut nodestore = NodeStore::new_empty_committed(memstore.into()).unwrap();

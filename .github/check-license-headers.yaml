@@ -22,6 +22,7 @@
       "triehash/**",
       "CHANGELOG.md",
       "cliff.toml",
+      "clippy.toml",
       "**/tests/compile_*/**",
       "**/go.mod",
       "**/go.mod",
@@ -48,6 +49,7 @@
       "triehash/**",
       "CHANGELOG.md",
       "cliff.toml",
+      "clippy.toml",
       "**/tests/compile_*/**",
     ],
   }

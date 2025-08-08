@@ -897,8 +897,6 @@ pub mod test_utils {
 mod tests {
     use super::*;
     use crate::linear::memory::MemStore;
-    use crate::test_utils::seeded_rng;
-    use rand::Rng;
     use rand::seq::IteratorRandom;
     use test_case::test_case;
 
@@ -922,7 +920,7 @@ mod tests {
     #[test]
     // Create a random free list and test that `FreeListIterator` is able to traverse all the free areas
     fn free_list_iterator() {
-        let mut rng = seeded_rng();
+        let mut rng = crate::SeededRng::from_env_or_random();
         let memstore = MemStore::new(vec![]);
         let nodestore = NodeStore::new_empty_committed(memstore.into()).unwrap();
 
@@ -969,8 +967,8 @@ mod tests {
 
     // Create two free lists and check that `free_list_iter_with_metadata` correctly returns the free areas and their parents
     #[test]
-    fn free_lists_iter_with_metadata() {
-        let mut rng = seeded_rng();
+    fn free_list_iter_with_metadata() {
+        let rng = crate::SeededRng::from_env_or_random();
         let memstore = MemStore::new(vec![]);
         let mut nodestore = NodeStore::new_empty_committed(memstore.into()).unwrap();
 

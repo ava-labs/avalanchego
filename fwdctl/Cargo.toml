@@ -43,6 +43,7 @@ logger = ["firewood/logger"]
 
 [dev-dependencies]
 # Workspace dependencies
+firewood-storage = { workspace = true, features = ["test_utils"] }
 rand.workspace = true
 # Regular dependencies
 anyhow = "1.0.98"

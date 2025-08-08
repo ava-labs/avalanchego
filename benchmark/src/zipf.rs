@@ -50,9 +50,11 @@ impl TestRunner for Zipf {
         let start = Instant::now();
         let mut batch_id = 0;
 
+        let rng = firewood_storage::SeededRng::from_env_or_random();
         while start.elapsed().as_secs() / 60 < args.global_opts.duration_minutes {
             let batch: Vec<BatchOp<_, _>> =
-                generate_updates(batch_id, args.global_opts.batch_size as usize, zipf).collect();
+                generate_updates(&rng, batch_id, args.global_opts.batch_size as usize, zipf)
+                    .collect();
             if log::log_enabled!(log::Level::Debug) {
                 let mut distinct = HashSet::new();
                 for op in &batch {
@@ -85,12 +87,12 @@ impl TestRunner for Zipf {
     }
 }
 fn generate_updates(
+    rng: &firewood_storage::SeededRng,
     batch_id: u32,
     batch_size: usize,
     zipf: rand_distr::Zipf<f64>,
 ) -> impl Iterator<Item = BatchOp<Vec<u8>, Vec<u8>>> {
     let hash_of_batch_id = Sha256::digest(batch_id.to_ne_bytes()).to_vec();
-    let rng = rand::rng();
     zipf.sample_iter(rng)
         .take(batch_size)
         .map(|inner_key| {

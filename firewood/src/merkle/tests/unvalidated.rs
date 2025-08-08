@@ -160,7 +160,8 @@ fn two_key_proof_without_shared_path() {
 #[test]
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
 fn test_proof() {
-    let set = fixed_and_pseudorandom_data(500);
+    let rng = firewood_storage::SeededRng::from_env_or_random();
+    let set = fixed_and_pseudorandom_data(&rng, 500);
     let mut items = set.iter().collect::<Vec<_>>();
     items.sort_unstable();
     let merkle = init_merkle(items.clone());
@@ -220,7 +221,8 @@ fn test_proof_end_with_branch() {
 #[test]
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
 fn test_bad_proof() {
-    let set = fixed_and_pseudorandom_data(800);
+    let rng = firewood_storage::SeededRng::from_env_or_random();
+    let set = fixed_and_pseudorandom_data(&rng, 800);
     let mut items = set.iter().collect::<Vec<_>>();
     items.sort_unstable();
     let merkle = init_merkle(items.clone());
@@ -273,14 +275,16 @@ fn test_empty_tree_proof() {
 // The test cases are generated randomly.
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
 fn test_range_proof() {
-    let set = fixed_and_pseudorandom_data(4096);
+    let rng = firewood_storage::SeededRng::from_env_or_random();
+
+    let set = fixed_and_pseudorandom_data(&rng, 4096);
     let mut items = set.iter().collect::<Vec<_>>();
     items.sort_unstable();
     let merkle = init_merkle(items.clone());
 
     for _ in 0..10 {
-        let start = rand::rng().random_range(0..items.len());
-        let end = rand::rng().random_range(0..items.len() - start) + start - 1;
+        let start = rng.random_range(0..items.len());
+        let end = rng.random_range(0..items.len() - start) + start - 1;
 
         if end <= start {
             continue;
@@ -314,14 +318,16 @@ fn test_range_proof() {
 // The prover is expected to detect the error.
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
 fn test_bad_range_proof() {
-    let set = fixed_and_pseudorandom_data(4096);
+    let rng = firewood_storage::SeededRng::from_env_or_random();
+
+    let set = fixed_and_pseudorandom_data(&rng, 4096);
     let mut items = set.iter().collect::<Vec<_>>();
     items.sort_unstable();
     let merkle = init_merkle(items.clone());
 
     for _ in 0..10 {
-        let start = rand::rng().random_range(0..items.len());
-        let end = rand::rng().random_range(0..items.len() - start) + start - 1;
+        let start = rng.random_range(0..items.len());
+        let end = rng.random_range(0..items.len() - start) + start - 1;
 
         if end <= start {
             continue;
@@ -339,16 +345,16 @@ fn test_bad_range_proof() {
             vals.push(*item.1);
         }
 
-        let test_case: u32 = rand::rng().random_range(0..6);
-        let index = rand::rng().random_range(0..end - start);
+        let test_case: u32 = rng.random_range(0..6);
+        let index = rng.random_range(0..end - start);
         match test_case {
             0 => {
                 // Modified key
-                keys[index] = rand::rng().random::<[u8; 32]>(); // In theory it can't be same
+                keys[index] = rng.random::<[u8; 32]>(); // In theory it can't be same
             }
             1 => {
                 // Modified val
-                vals[index] = rand::rng().random::<[u8; 20]>(); // In theory it can't be same
+                vals[index] = rng.random::<[u8; 20]>(); // In theory it can't be same
             }
             2 => {
                 // Gapped entry slice
@@ -360,8 +366,8 @@ fn test_bad_range_proof() {
             }
             3 => {
                 // Out of order
-                let index_1 = rand::rng().random_range(0..end - start);
-                let index_2 = rand::rng().random_range(0..end - start);
+                let index_1 = rng.random_range(0..end - start);
+                let index_2 = rng.random_range(0..end - start);
                 if index_1 == index_2 {
                     continue;
                 }
@@ -410,14 +416,16 @@ fn test_bad_range_proof() {
 // The test cases are generated randomly.
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
 fn test_range_proof_with_non_existent_proof() {
-    let set = fixed_and_pseudorandom_data(4096);
+    let rng = firewood_storage::SeededRng::from_env_or_random();
+
+    let set = fixed_and_pseudorandom_data(&rng, 4096);
     let mut items = set.iter().collect::<Vec<_>>();
     items.sort_unstable();
     let merkle = init_merkle(items.clone());
 
     for _ in 0..10 {
-        let start = rand::rng().random_range(0..items.len());
-        let end = rand::rng().random_range(0..items.len() - start) + start - 1;
+        let start = rng.random_range(0..items.len());
+        let end = rng.random_range(0..items.len() - start) + start - 1;
 
         if end <= start {
             continue;
@@ -486,7 +494,9 @@ fn test_range_proof_with_non_existent_proof() {
 // - There exists a gap between the last element and the right edge proof
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
 fn test_range_proof_with_invalid_non_existent_proof() {
-    let set = fixed_and_pseudorandom_data(4096);
+    let rng = firewood_storage::SeededRng::from_env_or_random();
+
+    let set = fixed_and_pseudorandom_data(&rng, 4096);
     let mut items = set.iter().collect::<Vec<_>>();
     items.sort_unstable();
     let merkle = init_merkle(items.clone());
@@ -556,7 +566,9 @@ fn test_range_proof_with_invalid_non_existent_proof() {
 // non-existent one.
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
 fn test_one_element_range_proof() {
-    let set = fixed_and_pseudorandom_data(4096);
+    let rng = firewood_storage::SeededRng::from_env_or_random();
+
+    let set = fixed_and_pseudorandom_data(&rng, 4096);
     let mut items = set.iter().collect::<Vec<_>>();
     items.sort_unstable();
     let merkle = init_merkle(items.clone());
@@ -650,8 +662,8 @@ fn test_one_element_range_proof() {
         .unwrap();
 
     // Test the mini trie with only a single element.
-    let key = rand::rng().random::<[u8; 32]>();
-    let val = rand::rng().random::<[u8; 20]>();
+    let key = rng.random::<[u8; 32]>();
+    let val = rng.random::<[u8; 20]>();
     let merkle_mini = init_merkle(vec![(key, val)]);
 
     let first = &[0; 32];
@@ -678,7 +690,9 @@ fn test_one_element_range_proof() {
 // The edge proofs can be nil.
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
 fn test_all_elements_proof() {
-    let set = fixed_and_pseudorandom_data(4096);
+    let rng = firewood_storage::SeededRng::from_env_or_random();
+
+    let set = fixed_and_pseudorandom_data(&rng, 4096);
     let mut items = set.iter().collect::<Vec<_>>();
     items.sort_unstable();
     let merkle = init_merkle(items.clone());
@@ -754,7 +768,9 @@ fn test_all_elements_proof() {
 // be a non-existent proof.
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
 fn test_empty_range_proof() {
-    let set = fixed_and_pseudorandom_data(4096);
+    let rng = firewood_storage::SeededRng::from_env_or_random();
+
+    let set = fixed_and_pseudorandom_data(&rng, 4096);
     let mut items = set.iter().collect::<Vec<_>>();
     items.sort_unstable();
     let merkle = init_merkle(items.clone());
@@ -840,7 +856,9 @@ fn test_gapped_range_proof() {
 // Tests the element is not in the range covered by proofs.
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
 fn test_same_side_proof() {
-    let set = fixed_and_pseudorandom_data(4096);
+    let rng = firewood_storage::SeededRng::from_env_or_random();
+
+    let set = fixed_and_pseudorandom_data(&rng, 4096);
     let mut items = set.iter().collect::<Vec<_>>();
     items.sort_unstable();
     let merkle = init_merkle(items.clone());
@@ -894,11 +912,13 @@ fn test_same_side_proof() {
 // Tests the range starts from zero.
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
 fn test_single_side_range_proof() {
+    let rng = firewood_storage::SeededRng::from_env_or_random();
+
     for _ in 0..10 {
         let mut set = HashMap::new();
         for _ in 0..4096_u32 {
-            let key = rand::rng().random::<[u8; 32]>();
-            let val = rand::rng().random::<[u8; 20]>();
+            let key = rng.random::<[u8; 32]>();
+            let val = rng.random::<[u8; 20]>();
             set.insert(key, val);
         }
         let mut items = set.iter().collect::<Vec<_>>();
@@ -933,11 +953,13 @@ fn test_single_side_range_proof() {
 // Tests the range ends with 0xffff...fff.
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
 fn test_reverse_single_side_range_proof() {
+    let rng = firewood_storage::SeededRng::from_env_or_random();
+
     for _ in 0..10 {
         let mut set = HashMap::new();
         for _ in 0..1024_u32 {
-            let key = rand::rng().random::<[u8; 32]>();
-            let val = rand::rng().random::<[u8; 20]>();
+            let key = rng.random::<[u8; 32]>();
+            let val = rng.random::<[u8; 20]>();
             set.insert(key, val);
         }
         let mut items = set.iter().collect::<Vec<_>>();
@@ -973,11 +995,13 @@ fn test_reverse_single_side_range_proof() {
 // Tests the range starts with zero and ends with 0xffff...fff.
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
 fn test_both_sides_range_proof() {
+    let rng = firewood_storage::SeededRng::from_env_or_random();
+
     for _ in 0..10 {
         let mut set = HashMap::new();
         for _ in 0..4096_u32 {
-            let key = rand::rng().random::<[u8; 32]>();
-            let val = rand::rng().random::<[u8; 20]>();
+            let key = rng.random::<[u8; 32]>();
+            let val = rng.random::<[u8; 20]>();
             set.insert(key, val);
         }
         let mut items = set.iter().collect::<Vec<_>>();
@@ -1010,7 +1034,9 @@ fn test_both_sides_range_proof() {
 // noop technically, but practically should be rejected.
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
 fn test_empty_value_range_proof() {
-    let set = fixed_and_pseudorandom_data(512);
+    let rng = firewood_storage::SeededRng::from_env_or_random();
+
+    let set = fixed_and_pseudorandom_data(&rng, 512);
     let mut items = set.iter().collect::<Vec<_>>();
     items.sort_unstable();
     let merkle = init_merkle(items.clone());
@@ -1056,7 +1082,9 @@ fn test_empty_value_range_proof() {
 // practically should be rejected.
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
 fn test_all_elements_empty_value_range_proof() {
-    let set = fixed_and_pseudorandom_data(512);
+    let rng = firewood_storage::SeededRng::from_env_or_random();
+
+    let set = fixed_and_pseudorandom_data(&rng, 512);
     let mut items = set.iter().collect::<Vec<_>>();
     items.sort_unstable();
     let merkle = init_merkle(items.clone());
