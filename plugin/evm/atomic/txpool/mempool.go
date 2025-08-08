@@ -264,6 +264,12 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 		for _, pendingTx := range m.pendingTxs.minHeap.items {
 			m.bloom.Add(pendingTx.tx)
 		}
+		// Current transactions must be added to the bloom filter as well
+		// because they could be added back into the pending set without going
+		// through addTx again.
+		for _, currentTx := range m.currentTxs {
+			m.bloom.Add(currentTx)
+		}
 	}
 
 	// When adding a transaction to the mempool, we make sure that there is an

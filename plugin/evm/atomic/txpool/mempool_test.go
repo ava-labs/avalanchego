@@ -4,11 +4,14 @@
 package txpool
 
 import (
+	"math"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/atomic/atomictest"
+	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 )
@@ -69,6 +72,50 @@ func TestMempoolAddNoGas(t *testing.T) {
 	tx := atomictest.GenerateTestImportTxWithGas(0, 1)
 	err = m.Add(tx)
 	require.ErrorIs(err, ErrNoGasUsed)
+}
+
+// Add should return an error if a tx doesn't consume any gas
+func TestMempoolAddBloomReset(t *testing.T) {
+	require := require.New(t)
+
+	ctx := snowtest.Context(t, snowtest.CChainID)
+	m, err := NewMempool(
+		NewTxs(ctx, 2),
+		prometheus.NewRegistry(),
+		nil,
+	)
+	require.NoError(err)
+
+	maxFeeTx := atomictest.GenerateTestImportTxWithGas(1, math.MaxUint64)
+	require.NoError(m.Add(maxFeeTx))
+
+	// Mark maxFeeTx as Current
+	tx, ok := m.NextTx()
+	require.True(ok)
+	require.Equal(maxFeeTx, tx)
+
+	numHashes, numEntries := bloom.OptimalParameters(
+		config.TxGossipBloomMinTargetElements,
+		config.TxGossipBloomTargetFalsePositiveRate,
+	)
+	txsToAdd := bloom.EstimateCount(
+		numHashes,
+		numEntries,
+		config.TxGossipBloomResetFalsePositiveRate,
+	)
+	for fee := range txsToAdd {
+		// Keep increasing the fee to evict older transactions
+		tx := atomictest.GenerateTestImportTxWithGas(1, uint64(fee))
+		require.NoError(m.Add(tx))
+	}
+
+	// Mark maxFeeTx as Pending
+	m.CancelCurrentTxs()
+
+	m.Iterate(func(tx *atomic.Tx) bool {
+		require.True(m.bloom.Has(tx))
+		return true // Iterate over the whole mempool
+	})
 }
 
 func TestAtomicMempoolIterate(t *testing.T) {
