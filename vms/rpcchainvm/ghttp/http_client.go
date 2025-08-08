@@ -50,7 +50,7 @@ func (c *Client) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Wrap [w] with a lock to ensure that it is accessed in a thread-safe manner.
 	w = gresponsewriter.NewLockedWriter(w)
 
-	serverListener, err := grpcutils.NewListener(r.Context())
+	serverListener, err := grpcutils.NewListener()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

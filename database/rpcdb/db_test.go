@@ -31,7 +31,7 @@ func setupDB(t testing.TB) *testDatabase {
 		server: memdb.New(),
 	}
 
-	listener, err := grpcutils.NewListener(context.Background())
+	listener, err := grpcutils.NewListener()
 	require.NoError(err)
 	serverCloser := grpcutils.ServerCloser{}
 

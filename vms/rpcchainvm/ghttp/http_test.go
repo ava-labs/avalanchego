@@ -5,7 +5,6 @@ package ghttp
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -148,7 +147,7 @@ func TestHttpResponse(t *testing.T) {
 				_, _ = w.Write([]byte("baz"))
 			})
 
-			listener, err := grpcutils.NewListener(context.Background())
+			listener, err := grpcutils.NewListener()
 			require.NoError(err)
 			server := grpc.NewServer()
 			httppb.RegisterHTTPServer(server, NewServer(handler))

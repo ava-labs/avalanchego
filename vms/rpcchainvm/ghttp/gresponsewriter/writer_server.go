@@ -83,7 +83,7 @@ func (s *Server) Flush(context.Context, *emptypb.Empty) (*emptypb.Empty, error) 
 }
 
 func (s *Server) Hijack(
-	ctx context.Context,
+	_ context.Context,
 	_ *emptypb.Empty,
 ) (*responsewriterpb.HijackResponse, error) {
 	hijacker, ok := s.writer.(http.Hijacker)
@@ -95,7 +95,7 @@ func (s *Server) Hijack(
 		return nil, err
 	}
 
-	serverListener, err := grpcutils.NewListener(ctx)
+	serverListener, err := grpcutils.NewListener()
 	if err != nil {
 		return nil, err
 	}

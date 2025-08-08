@@ -4,7 +4,6 @@
 package gsharedmemory
 
 import (
-	"context"
 	"io"
 	"testing"
 
@@ -34,18 +33,8 @@ func TestInterface(t *testing.T) {
 
 		m := atomic.NewMemory(memoryDB)
 
-		sm0, conn0 := wrapSharedMemory(
-			t,
-			context.Background(),
-			m.NewSharedMemory(chainID0),
-			baseDB,
-		)
-		sm1, conn1 := wrapSharedMemory(
-			t,
-			context.Background(),
-			m.NewSharedMemory(chainID1),
-			baseDB,
-		)
+		sm0, conn0 := wrapSharedMemory(t, m.NewSharedMemory(chainID0), baseDB)
+		sm1, conn1 := wrapSharedMemory(t, m.NewSharedMemory(chainID1), baseDB)
 
 		test(t, chainID0, chainID1, sm0, sm1, testDB)
 
@@ -54,15 +43,10 @@ func TestInterface(t *testing.T) {
 	}
 }
 
-func wrapSharedMemory(
-	t *testing.T,
-	ctx context.Context,
-	sm atomic.SharedMemory,
-	db database.Database,
-) (atomic.SharedMemory, io.Closer) {
+func wrapSharedMemory(t *testing.T, sm atomic.SharedMemory, db database.Database) (atomic.SharedMemory, io.Closer) {
 	require := require.New(t)
 
-	listener, err := grpcutils.NewListener(ctx)
+	listener, err := grpcutils.NewListener()
 	require.NoError(err)
 	serverCloser := grpcutils.ServerCloser{}
 

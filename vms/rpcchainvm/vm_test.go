@@ -181,7 +181,7 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			vm := blockmock.NewChainVM(ctrl)
 
-			listener, err := grpcutils.NewListener(context.Background())
+			listener, err := grpcutils.NewListener()
 			require.NoError(err)
 
 			require.NoError(os.Setenv(runtime.EngineAddressKey, listener.Addr().String()))

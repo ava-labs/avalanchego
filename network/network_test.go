@@ -206,11 +206,7 @@ func newMessageCreator(t *testing.T) message.Creator {
 	return mc
 }
 
-func newFullyConnectedTestNetwork(
-	t *testing.T,
-	ctx context.Context,
-	handlers []router.InboundHandler,
-) ([]ids.NodeID, []*network, *errgroup.Group) {
+func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []*network, *errgroup.Group) {
 	require := require.New(t)
 
 	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers))
@@ -285,7 +281,7 @@ func newFullyConnectedTestNetwork(
 		if i != 0 {
 			config := configs[0]
 			net.ManuallyTrack(
-				ctx,
+				context.Background(),
 				config.MyNodeID,
 				config.MyIPPort.Get(),
 			)
@@ -297,7 +293,7 @@ func newFullyConnectedTestNetwork(
 		}
 
 		eg.Go(func() error {
-			return net.Dispatch(ctx)
+			return net.Dispatch(context.Background())
 		})
 	}
 
@@ -310,11 +306,7 @@ func newFullyConnectedTestNetwork(
 
 func TestNewNetwork(t *testing.T) {
 	require := require.New(t)
-	_, networks, eg := newFullyConnectedTestNetwork(
-		t,
-		context.Background(),
-		[]router.InboundHandler{nil, nil, nil},
-	)
+	_, networks, eg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil, nil, nil})
 	for _, net := range networks {
 		net.StartClose()
 	}
@@ -327,14 +319,11 @@ func TestIngressConnCount(t *testing.T) {
 	emptyHandler := func(context.Context, message.InboundMessage) {}
 
 	_, networks, eg := newFullyConnectedTestNetwork(
-		t,
-		context.Background(),
-		[]router.InboundHandler{
+		t, []router.InboundHandler{
 			router.InboundHandlerFunc(emptyHandler),
 			router.InboundHandlerFunc(emptyHandler),
 			router.InboundHandlerFunc(emptyHandler),
-		},
-	)
+		})
 
 	for _, net := range networks {
 		net.config.NoIngressValidatorConnectionGracePeriod = 0
@@ -381,7 +370,6 @@ func TestSend(t *testing.T) {
 	received := make(chan message.InboundMessage)
 	nodeIDs, networks, eg := newFullyConnectedTestNetwork(
 		t,
-		context.Background(),
 		[]router.InboundHandler{
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
 				require.FailNow("unexpected message received")
@@ -427,7 +415,6 @@ func TestSendWithFilter(t *testing.T) {
 	received := make(chan message.InboundMessage)
 	nodeIDs, networks, eg := newFullyConnectedTestNetwork(
 		t,
-		context.Background(),
 		[]router.InboundHandler{
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
 				require.FailNow("unexpected message received")
@@ -472,11 +459,7 @@ func TestSendWithFilter(t *testing.T) {
 func TestTrackVerifiesSignatures(t *testing.T) {
 	require := require.New(t)
 
-	_, networks, eg := newFullyConnectedTestNetwork(
-		t,
-		context.Background(),
-		[]router.InboundHandler{nil},
-	)
+	_, networks, eg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
 
 	network := networks[0]
 
@@ -696,11 +679,7 @@ func TestDialDeletesNonValidators(t *testing.T) {
 func TestDialContext(t *testing.T) {
 	require := require.New(t)
 
-	_, networks, eg := newFullyConnectedTestNetwork(
-		t,
-		context.Background(),
-		[]router.InboundHandler{nil},
-	)
+	_, networks, eg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
 	dialer := newTestDialer()
 	network := networks[0]
 	network.dialer = dialer
@@ -856,7 +835,6 @@ func TestGetAllPeers(t *testing.T) {
 	// Create a network of validators
 	nodeIDs, networks, eg := newFullyConnectedTestNetwork(
 		t,
-		context.Background(),
 		[]router.InboundHandler{
 			nil, nil, nil,
 		},

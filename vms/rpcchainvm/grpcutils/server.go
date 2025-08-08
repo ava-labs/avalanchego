@@ -89,8 +89,8 @@ func WithStreamInterceptor(streamInterceptor grpc.StreamServerInterceptor) Serve
 
 // NewListener returns a TCP listener listening against the next available port
 // on the system bound to localhost.
-func NewListener(ctx context.Context) (net.Listener, error) {
-	return (&net.ListenConfig{}).Listen(ctx, "tcp", "127.0.0.1:")
+func NewListener() (net.Listener, error) {
+	return (&net.ListenConfig{}).Listen(context.Background(), "tcp", "127.0.0.1:")
 }
 
 // Serve will start a gRPC server and block until it errors or is shutdown.

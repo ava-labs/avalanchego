@@ -279,7 +279,7 @@ func buildClientHelper(
 		),
 	)
 
-	listener, err := grpcutils.NewListener(ctx)
+	listener, err := grpcutils.NewListener()
 	require.NoError(err)
 
 	status, stopper, err := subprocess.Bootstrap(

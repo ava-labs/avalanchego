@@ -42,7 +42,7 @@ func TestDialOptsSmoke(t *testing.T) {
 func TestWaitForReady(t *testing.T) {
 	require := require.New(t)
 
-	listener, err := NewListener(context.Background())
+	listener, err := NewListener()
 	require.NoError(err)
 	defer listener.Close()
 
@@ -62,7 +62,7 @@ func TestWaitForReady(t *testing.T) {
 	db := rpcdb.NewClient(pb.NewDatabaseClient(conn))
 	require.NoError(db.Put([]byte("foo"), []byte("bar")))
 
-	noWaitListener, err := NewListener(context.Background())
+	noWaitListener, err := NewListener()
 	require.NoError(err)
 	// close listener causes RPC to fail fast.
 	// The client would timeout otherwise.
@@ -87,7 +87,7 @@ func TestWaitForReady(t *testing.T) {
 func TestWaitForReadyCallOption(t *testing.T) {
 	require := require.New(t)
 
-	listener, err := NewListener(context.Background())
+	listener, err := NewListener()
 	require.NoError(err)
 	conn, err := Dial(listener.Addr().String())
 	require.NoError(err)

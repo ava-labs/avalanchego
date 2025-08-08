@@ -50,7 +50,7 @@ func (f *factory) New(log logging.Logger) (interface{}, error) {
 	}
 
 	// TODO update interface to accept context
-	listener, err := grpcutils.NewListener(context.TODO())
+	listener, err := grpcutils.NewListener()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create listener: %w", err)
 	}
