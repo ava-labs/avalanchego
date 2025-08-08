@@ -263,8 +263,12 @@ func lastAcceptedBlockPostStateSummaryAcceptTestPlugin(t *testing.T, loadExpecta
 	return ssVM
 }
 
-func buildClientHelper(require *require.Assertions, testKey string) *VMClient {
-	process := helperProcess(testKey)
+func buildClientHelper(
+	ctx context.Context,
+	require *require.Assertions,
+	testKey string,
+) *VMClient {
+	process := helperProcess(ctx, testKey)
 
 	log := logging.NewLogger(
 		testKey,
@@ -302,7 +306,7 @@ func TestStateSyncEnabled(t *testing.T) {
 	testKey := stateSyncEnabledTestKey
 
 	// Create and start the plugin
-	vm := buildClientHelper(require, testKey)
+	vm := buildClientHelper(context.Background(), require, testKey)
 	defer vm.runtime.Stop(context.Background())
 
 	// test state sync not implemented
@@ -333,7 +337,7 @@ func TestGetOngoingSyncStateSummary(t *testing.T) {
 	testKey := getOngoingSyncStateSummaryTestKey
 
 	// Create and start the plugin
-	vm := buildClientHelper(require, testKey)
+	vm := buildClientHelper(context.Background(), require, testKey)
 	defer vm.runtime.Stop(context.Background())
 
 	// test unimplemented case; this is just a guard
@@ -358,7 +362,7 @@ func TestGetLastStateSummary(t *testing.T) {
 	testKey := getLastStateSummaryTestKey
 
 	// Create and start the plugin
-	vm := buildClientHelper(require, testKey)
+	vm := buildClientHelper(context.Background(), require, testKey)
 	defer vm.runtime.Stop(context.Background())
 
 	// test unimplemented case; this is just a guard
@@ -383,7 +387,7 @@ func TestParseStateSummary(t *testing.T) {
 	testKey := parseStateSummaryTestKey
 
 	// Create and start the plugin
-	vm := buildClientHelper(require, testKey)
+	vm := buildClientHelper(context.Background(), require, testKey)
 	defer vm.runtime.Stop(context.Background())
 
 	// test unimplemented case; this is just a guard
@@ -412,7 +416,7 @@ func TestGetStateSummary(t *testing.T) {
 	testKey := getStateSummaryTestKey
 
 	// Create and start the plugin
-	vm := buildClientHelper(require, testKey)
+	vm := buildClientHelper(context.Background(), require, testKey)
 	defer vm.runtime.Stop(context.Background())
 
 	// test unimplemented case; this is just a guard
@@ -437,7 +441,7 @@ func TestAcceptStateSummary(t *testing.T) {
 	testKey := acceptStateSummaryTestKey
 
 	// Create and start the plugin
-	vm := buildClientHelper(require, testKey)
+	vm := buildClientHelper(context.Background(), require, testKey)
 	defer vm.runtime.Stop(context.Background())
 
 	// retrieve the summary first
@@ -467,7 +471,7 @@ func TestLastAcceptedBlockPostStateSummaryAccept(t *testing.T) {
 	testKey := lastAcceptedBlockPostStateSummaryAcceptTestKey
 
 	// Create and start the plugin
-	vm := buildClientHelper(require, testKey)
+	vm := buildClientHelper(context.Background(), require, testKey)
 	defer vm.runtime.Stop(context.Background())
 
 	// Step 1: initialize VM and check initial LastAcceptedBlock

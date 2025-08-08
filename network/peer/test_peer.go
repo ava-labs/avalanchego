@@ -70,7 +70,7 @@ func StartTestPeer(
 		prometheus.NewCounter(prometheus.CounterOpts{}),
 	)
 
-	peerID, conn, cert, err := clientUpgrader.Upgrade(conn)
+	peerID, conn, cert, err := clientUpgrader.Upgrade(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
@@ -106,6 +106,7 @@ func StartTestPeer(
 	}
 
 	peer := Start(
+		ctx,
 		&Config{
 			Metrics:              metrics,
 			MessageCreator:       mc,

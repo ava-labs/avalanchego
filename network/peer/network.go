@@ -4,6 +4,8 @@
 package peer
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -22,13 +24,13 @@ type Network interface {
 
 	// Track allows the peer to notify the network of potential new peers to
 	// connect to.
-	Track(ips []*ips.ClaimedIPPort) error
+	Track(ctx context.Context, ips []*ips.ClaimedIPPort) error
 
 	// Disconnected is called when the peer finishes shutting down. It is not
 	// guaranteed that [Connected] was called for the provided peer. However, it
 	// is guaranteed that [Connected] will not be called after [Disconnected]
 	// for a given [Peer] object.
-	Disconnected(peerID ids.NodeID)
+	Disconnected(ctx context.Context, peerID ids.NodeID)
 
 	// KnownPeers returns the bloom filter of the known peers.
 	KnownPeers() (bloomFilter []byte, salt []byte)

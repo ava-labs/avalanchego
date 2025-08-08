@@ -565,7 +565,7 @@ func collectRegistry(tb testing.TB, log logging.Logger, name string, gatherer pr
 	logger := tests.NewDefaultLogger("prometheus")
 	r.NoError(tmpnet.StartPrometheus(startPromCtx, logger))
 
-	server, err := tests.NewPrometheusServer(gatherer)
+	server, err := tests.NewPrometheusServer(ctx, gatherer)
 	r.NoError(err)
 
 	var sdConfigFilePath string
