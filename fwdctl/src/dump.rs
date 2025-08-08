@@ -1,11 +1,5 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
-
-#![expect(
-    clippy::doc_link_with_quotes,
-    reason = "Found 1 occurrences after enabling the lint."
-)]
-
 use clap::Args;
 use firewood::db::{Db, DbConfig};
 use firewood::merkle::{Key, Value};
@@ -21,6 +15,14 @@ use std::path::PathBuf;
 use crate::DatabasePath;
 
 type KeyFromStream = Option<Result<(Key, Value), api::Error>>;
+
+#[derive(Debug, clap::ValueEnum, Clone, PartialEq)]
+pub enum OutputFormat {
+    Csv,
+    Json,
+    Stdout,
+    Dot,
+}
 
 #[derive(Debug, Args)]
 pub struct Options {
@@ -87,18 +89,17 @@ pub struct Options {
     pub max_key_count: Option<u32>,
 
     /// The output format of database dump.
-    /// Possible Values: ["csv", "json", "stdout", "dot"].
     /// Defaults to "stdout"
     #[arg(
         short = 'o',
         long,
         required = false,
         value_name = "OUTPUT_FORMAT",
-        value_parser = ["csv", "json", "stdout", "dot"],
-        default_value = "stdout",
+        value_enum,
+        default_value_t = OutputFormat::Stdout,
         help = "Output format of database dump, default to stdout. CSV, JSON, and DOT formats are available."
     )]
-    pub output_format: String,
+    pub output_format: OutputFormat,
 
     /// The output file name of database dump.
     /// Output format must be set when the file name is set.
@@ -120,7 +121,7 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
     log::debug!("dump database {opts:?}");
 
     // Check if dot format is used with unsupported options
-    if opts.output_format == "dot" {
+    if opts.output_format == OutputFormat::Dot {
         if opts.start_key.is_some() || opts.start_key_hex.is_some() {
             return Err(api::Error::InternalError(Box::new(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -311,9 +312,15 @@ fn create_output_handler(
 ) -> Result<Option<Box<dyn OutputHandler + Send + Sync>>, Box<dyn Error>> {
     let hex = opts.hex;
     let mut file_name = opts.output_file_name.clone();
-    file_name.set_extension(opts.output_format.as_str());
-    match opts.output_format.as_str() {
-        "csv" => {
+    let extension = match opts.output_format {
+        OutputFormat::Csv => "csv",
+        OutputFormat::Json => "json",
+        OutputFormat::Stdout => "txt",
+        OutputFormat::Dot => "dot",
+    };
+    file_name.set_extension(extension);
+    match opts.output_format {
+        OutputFormat::Csv => {
             println!("Dumping to {}", file_name.display());
             let file = File::create(file_name)?;
             Ok(Some(Box::new(CsvOutputHandler {
@@ -321,7 +328,7 @@ fn create_output_handler(
                 hex,
             })))
         }
-        "json" => {
+        OutputFormat::Json => {
             println!("Dumping to {}", file_name.display());
             let file = File::create(file_name)?;
             Ok(Some(Box::new(JsonOutputHandler {
@@ -330,8 +337,8 @@ fn create_output_handler(
                 is_first: true,
             })))
         }
-        "stdout" => Ok(Some(Box::new(StdoutOutputHandler { hex }))),
-        "dot" => {
+        OutputFormat::Stdout => Ok(Some(Box::new(StdoutOutputHandler { hex }))),
+        OutputFormat::Dot => {
             println!("Dumping to {}", file_name.display());
             let file = File::create(file_name)?;
             let mut writer = BufWriter::new(file);
@@ -339,6 +346,5 @@ fn create_output_handler(
             db.dump_sync(&mut writer)?;
             Ok(None)
         }
-        _ => unreachable!(),
     }
 }
