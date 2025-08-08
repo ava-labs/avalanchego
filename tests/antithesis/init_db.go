@@ -50,7 +50,7 @@ func initBootstrapDB(network *tmpnet.Network, destPath string) error {
 		return fmt.Errorf("failed to create db path %q: %w", destPath, err)
 	}
 	// TODO(marun) Replace with os.CopyFS once we upgrade to Go 1.23
-	cmd := exec.Command("cp", "-r", sourcePath, destPath)
+	cmd := exec.CommandContext(ctx, "cp", "-r", sourcePath, destPath)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to copy bootstrap db from %q to %q: %w", sourcePath, destPath, err)
 	}
