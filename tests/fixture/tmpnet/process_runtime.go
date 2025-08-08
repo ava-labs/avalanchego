@@ -105,7 +105,12 @@ func (p *ProcessRuntime) Start(ctx context.Context) error {
 	runtimeConfig := p.getRuntimeConfig()
 
 	// Attempt to check for rpc version compatibility
-	if err := checkVMBinaries(log, p.node.network.Subnets, runtimeConfig); err != nil {
+	if err := checkVMBinaries(
+		ctx,
+		log,
+		p.node.network.Subnets,
+		runtimeConfig,
+	); err != nil {
 		return err
 	}
 
@@ -120,7 +125,12 @@ func (p *ProcessRuntime) Start(ctx context.Context) error {
 	}
 
 	// All arguments are provided in the flags file
-	cmd := exec.Command(runtimeConfig.AvalancheGoPath, "--config-file", p.node.GetFlagsPath()) // #nosec G204
+	cmd := exec.CommandContext(
+		ctx,
+		runtimeConfig.AvalancheGoPath,
+		"--config-file",
+		p.node.GetFlagsPath(),
+	) // #nosec G204
 	// Ensure process is detached from the parent process so that an error in the parent will not affect the child
 	configureDetachedProcess(cmd)
 
