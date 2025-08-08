@@ -206,7 +206,11 @@ func newMessageCreator(t *testing.T) message.Creator {
 	return mc
 }
 
-func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler) ([]ids.NodeID, []*network, *errgroup.Group) {
+func newFullyConnectedTestNetwork(
+	t *testing.T,
+	ctx context.Context,
+	handlers []router.InboundHandler,
+) ([]ids.NodeID, []*network, *errgroup.Group) {
 	require := require.New(t)
 
 	dialer, listeners, nodeIDs, configs := newTestNetwork(t, len(handlers))
@@ -280,7 +284,11 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.Get())
+			net.ManuallyTrack(
+				ctx,
+				config.MyNodeID,
+				config.MyIPPort.Get(),
+			)
 			// Wait until the node is connected to the first node.
 			// This forces nodes to connect to each other in a deterministic order.
 			require.Eventually(func() bool {
@@ -288,7 +296,9 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 			}, 10*time.Second, time.Millisecond)
 		}
 
-		eg.Go(net.Dispatch)
+		eg.Go(func() error {
+			return net.Dispatch(ctx)
+		})
 	}
 
 	if len(networks) > 1 {
@@ -300,7 +310,11 @@ func newFullyConnectedTestNetwork(t *testing.T, handlers []router.InboundHandler
 
 func TestNewNetwork(t *testing.T) {
 	require := require.New(t)
-	_, networks, eg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil, nil, nil})
+	_, networks, eg := newFullyConnectedTestNetwork(
+		t,
+		context.Background(),
+		[]router.InboundHandler{nil, nil, nil},
+	)
 	for _, net := range networks {
 		net.StartClose()
 	}
@@ -313,11 +327,14 @@ func TestIngressConnCount(t *testing.T) {
 	emptyHandler := func(context.Context, message.InboundMessage) {}
 
 	_, networks, eg := newFullyConnectedTestNetwork(
-		t, []router.InboundHandler{
+		t,
+		context.Background(),
+		[]router.InboundHandler{
 			router.InboundHandlerFunc(emptyHandler),
 			router.InboundHandlerFunc(emptyHandler),
 			router.InboundHandlerFunc(emptyHandler),
-		})
+		},
+	)
 
 	for _, net := range networks {
 		net.config.NoIngressValidatorConnectionGracePeriod = 0
@@ -364,6 +381,7 @@ func TestSend(t *testing.T) {
 	received := make(chan message.InboundMessage)
 	nodeIDs, networks, eg := newFullyConnectedTestNetwork(
 		t,
+		context.Background(),
 		[]router.InboundHandler{
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
 				require.FailNow("unexpected message received")
@@ -409,6 +427,7 @@ func TestSendWithFilter(t *testing.T) {
 	received := make(chan message.InboundMessage)
 	nodeIDs, networks, eg := newFullyConnectedTestNetwork(
 		t,
+		context.Background(),
 		[]router.InboundHandler{
 			router.InboundHandlerFunc(func(context.Context, message.InboundMessage) {
 				require.FailNow("unexpected message received")
@@ -453,7 +472,11 @@ func TestSendWithFilter(t *testing.T) {
 func TestTrackVerifiesSignatures(t *testing.T) {
 	require := require.New(t)
 
-	_, networks, eg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
+	_, networks, eg := newFullyConnectedTestNetwork(
+		t,
+		context.Background(),
+		[]router.InboundHandler{nil},
+	)
 
 	network := networks[0]
 
@@ -469,17 +492,19 @@ func TestTrackVerifiesSignatures(t *testing.T) {
 	stakingCert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
 	require.NoError(err)
 
-	err = network.Track([]*ips.ClaimedIPPort{
-		ips.NewClaimedIPPort(
-			stakingCert,
-			netip.AddrPortFrom(
-				netip.AddrFrom4([4]byte{123, 132, 123, 123}),
-				10000,
+	err = network.Track(
+		context.Background(),
+		[]*ips.ClaimedIPPort{
+			ips.NewClaimedIPPort(
+				stakingCert,
+				netip.AddrPortFrom(
+					netip.AddrFrom4([4]byte{123, 132, 123, 123}),
+					10000,
+				),
+				1000, // timestamp
+				nil,  // signature
 			),
-			1000, // timestamp
-			nil,  // signature
-		),
-	})
+		})
 	// The signature is wrong so this peer tracking info isn't useful.
 	require.ErrorIs(err, staking.ErrECDSAVerificationFailure)
 
@@ -539,10 +564,14 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.Get())
+			net.ManuallyTrack(context.Background(),
+				config.MyNodeID,
+				config.MyIPPort.Get())
 		}
 
-		eg.Go(net.Dispatch)
+		eg.Go(func() error {
+			return net.Dispatch(context.Background())
+		})
 	}
 
 	network := networks[1].(*network)
@@ -619,17 +648,22 @@ func TestDialDeletesNonValidators(t *testing.T) {
 			stakingCert, err := staking.ParseCertificate(config.TLSConfig.Certificates[0].Leaf.Raw)
 			require.NoError(err)
 
-			require.NoError(net.Track([]*ips.ClaimedIPPort{
-				ips.NewClaimedIPPort(
-					stakingCert,
-					ip.AddrPort,
-					ip.Timestamp,
-					ip.TLSSignature,
-				),
-			}))
+			require.NoError(net.Track(
+				context.Background(),
+				[]*ips.ClaimedIPPort{
+					ips.NewClaimedIPPort(
+						stakingCert,
+						ip.AddrPort,
+						ip.Timestamp,
+						ip.TLSSignature,
+					),
+				},
+			))
 		}
 
-		eg.Go(net.Dispatch)
+		eg.Go(func() error {
+			return net.Dispatch(context.Background())
+		})
 	}
 
 	// Give the dialer time to run one iteration. This is racy, but should ony
@@ -662,7 +696,11 @@ func TestDialDeletesNonValidators(t *testing.T) {
 func TestDialContext(t *testing.T) {
 	require := require.New(t)
 
-	_, networks, eg := newFullyConnectedTestNetwork(t, []router.InboundHandler{nil})
+	_, networks, eg := newFullyConnectedTestNetwork(
+		t,
+		context.Background(),
+		[]router.InboundHandler{nil},
+	)
 	dialer := newTestDialer()
 	network := networks[0]
 	network.dialer = dialer
@@ -682,12 +720,12 @@ func TestDialContext(t *testing.T) {
 		}
 	)
 
-	network.ManuallyTrack(neverDialedNodeID, neverDialedIP)
-	network.ManuallyTrack(dialedNodeID, dialedIP)
+	network.ManuallyTrack(context.Background(), neverDialedNodeID, neverDialedIP)
+	network.ManuallyTrack(context.Background(), dialedNodeID, dialedIP)
 
 	// Sanity check that when a non-cancelled context is given,
 	// we actually dial the peer.
-	network.dial(dialedNodeID, dialedTrackedIP)
+	network.dial(context.Background(), dialedNodeID, dialedTrackedIP)
 
 	gotDialedIPConn := make(chan struct{})
 	go func() {
@@ -699,7 +737,7 @@ func TestDialContext(t *testing.T) {
 	// Asset that when [n.onCloseCtx] is cancelled, dial returns immediately.
 	// That is, [neverDialedListener] doesn't accept a connection.
 	network.onCloseCtxCancel()
-	network.dial(neverDialedNodeID, neverDialedTrackedIP)
+	network.dial(context.Background(), neverDialedNodeID, neverDialedTrackedIP)
 
 	gotNeverDialedIPConn := make(chan struct{})
 	go func() {
@@ -759,10 +797,16 @@ func TestAllowConnectionAsAValidator(t *testing.T) {
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			net.ManuallyTrack(config.MyNodeID, config.MyIPPort.Get())
+			net.ManuallyTrack(
+				context.Background(),
+				config.MyNodeID,
+				config.MyIPPort.Get(),
+			)
 		}
 
-		eg.Go(net.Dispatch)
+		eg.Go(func() error {
+			return net.Dispatch(context.Background())
+		})
 	}
 
 	network := networks[1].(*network)
@@ -812,14 +856,21 @@ func TestGetAllPeers(t *testing.T) {
 	// Create a network of validators
 	nodeIDs, networks, eg := newFullyConnectedTestNetwork(
 		t,
+		context.Background(),
 		[]router.InboundHandler{
 			nil, nil, nil,
 		},
 	)
 
 	// Connect the non-validator peer to the validator network
-	nonValidatorNetwork.ManuallyTrack(networks[0].config.MyNodeID, networks[0].config.MyIPPort.Get())
-	eg.Go(nonValidatorNetwork.Dispatch)
+	nonValidatorNetwork.ManuallyTrack(
+		context.Background(),
+		networks[0].config.MyNodeID,
+		networks[0].config.MyIPPort.Get(),
+	)
+	eg.Go(func() error {
+		return nonValidatorNetwork.Dispatch(context.Background())
+	})
 
 	{
 		// The non-validator peer should be able to get all the peers in the network

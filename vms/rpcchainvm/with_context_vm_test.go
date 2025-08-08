@@ -94,7 +94,7 @@ func TestContextVMSummary(t *testing.T) {
 	testKey := contextTestKey
 
 	// Create and start the plugin
-	vm := buildClientHelper(require, testKey)
+	vm := buildClientHelper(context.Background(), require, testKey)
 	defer vm.runtime.Stop(context.Background())
 
 	ctx := snowtest.Context(t, snowtest.CChainID)

@@ -83,7 +83,7 @@ func Serve(ctx context.Context, vm block.ChainVM, opts ...grpcutils.ServerOption
 
 	client := gruntime.NewClient(runtimepb.NewRuntimeClient(clientConn))
 
-	listener, err := grpcutils.NewListener()
+	listener, err := grpcutils.NewListener(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to create new listener: %w", err)
 	}

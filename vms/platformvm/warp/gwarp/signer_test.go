@@ -4,6 +4,7 @@
 package gwarp
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,7 +28,7 @@ type testSigner struct {
 	chainID   ids.ID
 }
 
-func setupSigner(t testing.TB) *testSigner {
+func setupSigner(t testing.TB, ctx context.Context) *testSigner {
 	require := require.New(t)
 
 	sk, err := localsigner.New()
@@ -42,7 +43,7 @@ func setupSigner(t testing.TB) *testSigner {
 		chainID:   chainID,
 	}
 
-	listener, err := grpcutils.NewListener()
+	listener, err := grpcutils.NewListener(ctx)
 	require.NoError(err)
 	serverCloser := grpcutils.ServerCloser{}
 
@@ -69,7 +70,7 @@ func setupSigner(t testing.TB) *testSigner {
 func TestInterface(t *testing.T) {
 	for name, test := range signertest.SignerTests {
 		t.Run(name, func(t *testing.T) {
-			s := setupSigner(t)
+			s := setupSigner(t, context.Background())
 			test(t, s.client, s.sk, s.networkID, s.chainID)
 		})
 	}

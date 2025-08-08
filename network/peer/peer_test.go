@@ -128,9 +128,15 @@ func newRawTestPeer(t *testing.T, config *Config) *rawTestPeer {
 	}
 }
 
-func startTestPeer(self *rawTestPeer, peer *rawTestPeer, conn net.Conn) *testPeer {
+func startTestPeer(
+	ctx context.Context,
+	self *rawTestPeer,
+	peer *rawTestPeer,
+	conn net.Conn,
+) *testPeer {
 	return &testPeer{
 		Peer: Start(
+			ctx,
 			self.config,
 			conn,
 			peer.cert,
@@ -147,10 +153,14 @@ func startTestPeer(self *rawTestPeer, peer *rawTestPeer, conn net.Conn) *testPee
 	}
 }
 
-func startTestPeers(rawPeer0 *rawTestPeer, rawPeer1 *rawTestPeer) (*testPeer, *testPeer) {
+func startTestPeers(
+	ctx context.Context,
+	rawPeer0 *rawTestPeer,
+	rawPeer1 *rawTestPeer,
+) (*testPeer, *testPeer) {
 	conn0, conn1 := net.Pipe()
-	peer0 := startTestPeer(rawPeer0, rawPeer1, conn0)
-	peer1 := startTestPeer(rawPeer1, rawPeer0, conn1)
+	peer0 := startTestPeer(ctx, rawPeer0, rawPeer1, conn0)
+	peer1 := startTestPeer(ctx, rawPeer1, rawPeer0, conn1)
 	return peer0, peer1
 }
 
@@ -182,10 +192,10 @@ func TestReady(t *testing.T) {
 
 	conn0, conn1 := net.Pipe()
 
-	peer0 := startTestPeer(rawPeer0, rawPeer1, conn0)
+	peer0 := startTestPeer(context.Background(), rawPeer0, rawPeer1, conn0)
 	require.False(peer0.Ready())
 
-	peer1 := startTestPeer(rawPeer1, rawPeer0, conn1)
+	peer1 := startTestPeer(context.Background(), rawPeer1, rawPeer0, conn1)
 	awaitReady(t, peer0, peer1)
 
 	peer0.StartClose()
@@ -202,7 +212,7 @@ func TestSend(t *testing.T) {
 	rawPeer0 := newRawTestPeer(t, config0)
 	rawPeer1 := newRawTestPeer(t, config1)
 
-	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
+	peer0, peer1 := startTestPeers(context.Background(), rawPeer0, rawPeer1)
 	awaitReady(t, peer0, peer1)
 
 	outboundGetMsg, err := config0.MessageCreator.Get(ids.Empty, 1, time.Second, ids.Empty)
@@ -229,7 +239,7 @@ func TestPingUptimes(t *testing.T) {
 
 	require := require.New(t)
 
-	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
+	peer0, peer1 := startTestPeers(context.Background(), rawPeer0, rawPeer1)
 	awaitReady(t, peer0, peer1)
 	defer func() {
 		peer1.StartClose()
@@ -295,7 +305,7 @@ func TestTrackedSubnets(t *testing.T) {
 			require := require.New(t)
 
 			rawPeer0.config.MySubnets = set.Of(test.trackedSubnets...)
-			peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
+			peer0, peer1 := startTestPeers(context.Background(), rawPeer0, rawPeer1)
 			if test.shouldDisconnect {
 				require.NoError(peer0.AwaitClosed(context.Background()))
 				require.NoError(peer1.AwaitClosed(context.Background()))
@@ -348,7 +358,7 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 		1,
 	))
 
-	peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
+	peer0, peer1 := startTestPeers(context.Background(), rawPeer0, rawPeer1)
 
 	// Because peer1 thinks that peer0 is using the wrong BLS key, they should
 	// disconnect from each other.

@@ -24,14 +24,14 @@ type testDatabase struct {
 	server *memdb.Database
 }
 
-func setupDB(t testing.TB) *testDatabase {
+func setupDB(t testing.TB, ctx context.Context) *testDatabase {
 	require := require.New(t)
 
 	db := &testDatabase{
 		server: memdb.New(),
 	}
 
-	listener, err := grpcutils.NewListener()
+	listener, err := grpcutils.NewListener(ctx)
 	require.NoError(err)
 	serverCloser := grpcutils.ServerCloser{}
 
@@ -58,24 +58,24 @@ func setupDB(t testing.TB) *testDatabase {
 func TestInterface(t *testing.T) {
 	for name, test := range dbtest.Tests {
 		t.Run(name, func(t *testing.T) {
-			db := setupDB(t)
+			db := setupDB(t, context.Background())
 			test(t, db.client)
 		})
 	}
 }
 
 func FuzzKeyValue(f *testing.F) {
-	db := setupDB(f)
+	db := setupDB(f, context.Background())
 	dbtest.FuzzKeyValue(f, db.client)
 }
 
 func FuzzNewIteratorWithPrefix(f *testing.F) {
-	db := setupDB(f)
+	db := setupDB(f, context.Background())
 	dbtest.FuzzNewIteratorWithPrefix(f, db.client)
 }
 
 func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
-	db := setupDB(f)
+	db := setupDB(f, context.Background())
 	dbtest.FuzzNewIteratorWithStartAndPrefix(f, db.client)
 }
 
@@ -84,7 +84,7 @@ func BenchmarkInterface(b *testing.B) {
 		keys, values := dbtest.SetupBenchmark(b, size[0], size[1], size[2])
 		for name, bench := range dbtest.Benchmarks {
 			b.Run(fmt.Sprintf("rpcdb_%d_pairs_%d_keys_%d_values_%s", size[0], size[1], size[2], name), func(b *testing.B) {
-				db := setupDB(b)
+				db := setupDB(b, context.Background())
 				bench(b, db.client, keys, values)
 			})
 		}
@@ -101,14 +101,14 @@ func TestHealthCheck(t *testing.T) {
 	}{
 		{
 			name:         "healthcheck success",
-			testDatabase: setupDB(t),
+			testDatabase: setupDB(t, context.Background()),
 			testFn: func(_ *corruptabledb.Database) error {
 				return nil
 			},
 		},
 		{
 			name:         "healthcheck failed db closed",
-			testDatabase: setupDB(t),
+			testDatabase: setupDB(t, context.Background()),
 			testFn: func(db *corruptabledb.Database) error {
 				return db.Close()
 			},
@@ -120,7 +120,7 @@ func TestHealthCheck(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			require := require.New(t)
 
-			baseDB := setupDB(t)
+			baseDB := setupDB(t, context.Background())
 			db := corruptabledb.New(baseDB.server, logging.NoLog{})
 			defer db.Close()
 			require.NoError(scenario.testFn(db))

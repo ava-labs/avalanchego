@@ -49,7 +49,8 @@ func (f *factory) New(log logging.Logger) (interface{}, error) {
 		Log:              log,
 	}
 
-	listener, err := grpcutils.NewListener()
+	// TODO update interface to accept context
+	listener, err := grpcutils.NewListener(context.TODO())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create listener: %w", err)
 	}
@@ -57,7 +58,7 @@ func (f *factory) New(log logging.Logger) (interface{}, error) {
 	status, stopper, err := subprocess.Bootstrap(
 		context.TODO(),
 		listener,
-		subprocess.NewCmd(f.path),
+		subprocess.NewCmd(context.TODO(), f.path),
 		config,
 	)
 	if err != nil {

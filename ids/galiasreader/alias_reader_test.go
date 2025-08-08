@@ -4,6 +4,7 @@
 package galiasreader
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -20,7 +21,7 @@ func TestInterface(t *testing.T) {
 		t.Run(test.Name, func(t *testing.T) {
 			require := require.New(t)
 
-			listener, err := grpcutils.NewListener()
+			listener, err := grpcutils.NewListener(context.Background())
 			require.NoError(err)
 			defer listener.Close()
 			serverCloser := grpcutils.ServerCloser{}

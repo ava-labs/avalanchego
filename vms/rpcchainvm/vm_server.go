@@ -326,7 +326,7 @@ func (vm *VMServer) CreateHandlers(ctx context.Context, _ *emptypb.Empty) (*vmpb
 	}
 	resp := &vmpb.CreateHandlersResponse{}
 	for prefix, handler := range handlers {
-		serverListener, err := grpcutils.NewListener()
+		serverListener, err := grpcutils.NewListener(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -355,7 +355,7 @@ func (vm *VMServer) NewHTTPHandler(ctx context.Context, _ *emptypb.Empty) (*vmpb
 		return &vmpb.NewHTTPHandlerResponse{}, nil
 	}
 
-	serverListener, err := grpcutils.NewListener()
+	serverListener, err := grpcutils.NewListener(ctx)
 	if err != nil {
 		return nil, err
 	}

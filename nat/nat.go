@@ -4,6 +4,7 @@
 package nat
 
 import (
+	"context"
 	"net/netip"
 	"sync"
 	"time"
@@ -33,7 +34,7 @@ type Router interface {
 }
 
 // GetRouter returns a router on the current network.
-func GetRouter() Router {
+func GetRouter(ctx context.Context) Router {
 	if r := getUPnPRouter(); r != nil {
 		return r
 	}
@@ -41,7 +42,7 @@ func GetRouter() Router {
 		return r
 	}
 
-	return NewNoRouter()
+	return NewNoRouter(ctx)
 }
 
 // Mapper attempts to open a set of ports on a router

@@ -154,7 +154,7 @@ func (vm *VMClient) Initialize(
 	}
 
 	// Initialize the database
-	dbServerListener, err := grpcutils.NewListener()
+	dbServerListener, err := grpcutils.NewListener(ctx)
 	if err != nil {
 		return err
 	}
@@ -171,7 +171,7 @@ func (vm *VMClient) Initialize(
 	vm.validatorStateServer = gvalidators.NewServer(chainCtx.ValidatorState)
 	vm.warpSignerServer = gwarp.NewServer(chainCtx.WarpSigner)
 
-	serverListener, err := grpcutils.NewListener()
+	serverListener, err := grpcutils.NewListener(ctx)
 	if err != nil {
 		return err
 	}

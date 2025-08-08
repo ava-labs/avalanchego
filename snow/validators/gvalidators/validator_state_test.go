@@ -29,7 +29,11 @@ type testState struct {
 	server *validatorsmock.State
 }
 
-func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
+func setupState(
+	t testing.TB,
+	ctx context.Context,
+	ctrl *gomock.Controller,
+) *testState {
 	require := require.New(t)
 
 	t.Helper()
@@ -38,7 +42,7 @@ func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
 		server: validatorsmock.NewState(ctrl),
 	}
 
-	listener, err := grpcutils.NewListener()
+	listener, err := grpcutils.NewListener(ctx)
 	require.NoError(err)
 	serverCloser := grpcutils.ServerCloser{}
 
@@ -66,7 +70,7 @@ func TestGetMinimumHeight(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := setupState(t, ctrl)
+	state := setupState(t, context.Background(), ctrl)
 
 	// Happy path
 	expectedHeight := uint64(1337)
@@ -88,7 +92,7 @@ func TestGetCurrentHeight(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := setupState(t, ctrl)
+	state := setupState(t, context.Background(), ctrl)
 
 	// Happy path
 	expectedHeight := uint64(1337)
@@ -110,7 +114,7 @@ func TestGetSubnetID(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := setupState(t, ctrl)
+	state := setupState(t, context.Background(), ctrl)
 
 	// Happy path
 	chainID := ids.GenerateTestID()
@@ -133,7 +137,7 @@ func TestGetValidatorSet(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	state := setupState(t, ctrl)
+	state := setupState(t, context.Background(), ctrl)
 
 	// Happy path
 	sk0, err := localsigner.New()
@@ -206,7 +210,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 func benchmarkGetValidatorSet(b *testing.B, vs map[ids.NodeID]*validators.GetValidatorOutput) {
 	require := require.New(b)
 	ctrl := gomock.NewController(b)
-	state := setupState(b, ctrl)
+	state := setupState(b, context.Background(), ctrl)
 
 	height := uint64(1337)
 	subnetID := ids.GenerateTestID()
