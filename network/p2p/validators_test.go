@@ -11,12 +11,11 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -169,44 +168,49 @@ func TestValidatorsSample(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 			subnetID := ids.GenerateTestID()
-			ctrl := gomock.NewController(t)
-			mockValidators := validatorsmock.NewState(ctrl)
 
-			calls := make([]any, 0)
-			for _, call := range tt.calls {
-				calls = append(calls, mockValidators.EXPECT().
-					GetCurrentHeight(gomock.Any()).Return(call.height, call.getCurrentHeightErr))
-
-				if call.getCurrentHeightErr != nil {
-					continue
-				}
-
-				validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, 0)
-				for _, validator := range call.validators {
-					validatorSet[validator] = &validators.GetValidatorOutput{
-						NodeID: validator,
-						Weight: 1,
-					}
-				}
-
-				calls = append(calls,
-					mockValidators.EXPECT().
-						GetValidatorSet(gomock.Any(), gomock.Any(), subnetID).
-						Return(validatorSet, call.getValidatorSetErr))
-			}
-			gomock.InOrder(calls...)
-
-			network, err := NewNetwork(logging.NoLog{}, &enginetest.SenderStub{}, prometheus.NewRegistry(), "")
+			validatorState := &validatorstest.State{}
+			network, err := NewNetwork(
+				logging.NoLog{},
+				&enginetest.SenderStub{},
+				validatorState,
+				subnetID,
+				time.Second,
+				prometheus.NewRegistry(),
+				"",
+			)
 			require.NoError(err)
 
 			ctx := context.Background()
 			require.NoError(network.Connected(ctx, nodeID1, nil))
 			require.NoError(network.Connected(ctx, nodeID2, nil))
 
-			v := NewValidators(network.Peers, network.log, subnetID, mockValidators, tt.maxStaleness)
 			for _, call := range tt.calls {
-				v.lastUpdated = call.time
-				sampled := v.Sample(ctx, call.limit)
+				network.Validators.lastUpdated = call.time
+				validatorState.GetCurrentHeightF = func(context.Context) (
+					uint64,
+					error,
+				) {
+					return call.height, call.getCurrentHeightErr
+				}
+				validatorState.GetValidatorSetF = func(
+					context.Context,
+					uint64,
+					ids.ID,
+				) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+					validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput)
+
+					for _, nodeID := range call.validators {
+						validatorSet[nodeID] = &validators.GetValidatorOutput{
+							NodeID: nodeID,
+							Weight: 1,
+						}
+					}
+
+					return validatorSet, call.getValidatorSetErr
+				}
+
+				sampled := network.Validators.Sample(ctx, call.limit)
 				require.LessOrEqual(len(sampled), call.limit)
 				require.Subset(call.expected, sampled)
 			}
@@ -325,7 +329,6 @@ func TestValidatorsTop(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
-			ctrl := gomock.NewController(t)
 
 			validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, 0)
 			for _, validator := range test.validators {
@@ -335,21 +338,33 @@ func TestValidatorsTop(t *testing.T) {
 				}
 			}
 
-			subnetID := ids.GenerateTestID()
-			mockValidators := validatorsmock.NewState(ctrl)
-
-			mockValidators.EXPECT().GetCurrentHeight(gomock.Any()).Return(uint64(1), nil)
-			mockValidators.EXPECT().GetValidatorSet(gomock.Any(), uint64(1), subnetID).Return(validatorSet, nil)
-
-			network, err := NewNetwork(logging.NoLog{}, &enginetest.SenderStub{}, prometheus.NewRegistry(), "")
+			network, err := NewNetwork(
+				logging.NoLog{},
+				&enginetest.SenderStub{},
+				&validatorstest.State{
+					GetCurrentHeightF: func(context.Context) (uint64, error) {
+						return 0, nil
+					},
+					GetValidatorSetF: func(
+						context.Context,
+						uint64,
+						ids.ID,
+					) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+						return validatorSet, nil
+					},
+				},
+				ids.Empty,
+				time.Second,
+				prometheus.NewRegistry(),
+				"",
+			)
 			require.NoError(err)
 
 			ctx := context.Background()
 			require.NoError(network.Connected(ctx, nodeID1, nil))
 			require.NoError(network.Connected(ctx, nodeID2, nil))
 
-			v := NewValidators(network.Peers, network.log, subnetID, mockValidators, time.Second)
-			nodeIDs := v.Top(ctx, test.percentage)
+			nodeIDs := network.Validators.Top(ctx, test.percentage)
 			require.Equal(test.expected, nodeIDs)
 		})
 	}

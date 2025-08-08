@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -113,7 +112,15 @@ func TestGossiperGossip(t *testing.T) {
 			responseSender := &enginetest.SenderStub{
 				SentAppResponse: make(chan []byte, 1),
 			}
-			responseNetwork, err := p2p.NewNetwork(logging.NoLog{}, responseSender, prometheus.NewRegistry(), "")
+			responseNetwork, err := p2p.NewNetwork(
+				logging.NoLog{},
+				responseSender,
+				&validatorstest.State{},
+				ids.Empty,
+				time.Second,
+				prometheus.NewRegistry(),
+				"",
+			)
 			require.NoError(err)
 
 			responseBloom, err := NewBloomFilter(prometheus.NewRegistry(), "", 1000, 0.01, 0.05)
@@ -149,9 +156,17 @@ func TestGossiperGossip(t *testing.T) {
 				SentAppRequest: make(chan []byte, 1),
 			}
 
-			requestNetwork, err := p2p.NewNetwork(logging.NoLog{}, requestSender, prometheus.NewRegistry(), "")
+			requestNetwork, err := p2p.NewNetwork(
+				logging.NoLog{},
+				requestSender,
+				&validatorstest.State{},
+				ids.Empty,
+				time.Second,
+				prometheus.NewRegistry(),
+				"",
+			)
 			require.NoError(err)
-			require.NoError(requestNetwork.Connected(context.Background(), ids.EmptyNodeID, nil))
+			require.NoError(requestNetwork.Connected(ctx, ids.EmptyNodeID, nil))
 
 			bloom, err := NewBloomFilter(prometheus.NewRegistry(), "", 1000, 0.01, 0.05)
 			require.NoError(err)
@@ -529,25 +544,25 @@ func TestPushGossiper(t *testing.T) {
 			network, err := p2p.NewNetwork(
 				logging.NoLog{},
 				sender,
+				&validatorstest.State{
+					GetCurrentHeightF: func(context.Context) (uint64, error) {
+						return 1, nil
+					},
+					GetValidatorSetF: func(
+						context.Context,
+						uint64,
+						ids.ID,
+					) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+						return nil, nil
+					},
+				},
+				ids.Empty,
+				time.Second,
 				prometheus.NewRegistry(),
 				"",
 			)
 			require.NoError(err)
 			client := network.NewClient(0)
-			validators := p2p.NewValidators(
-				&p2p.Peers{},
-				logging.NoLog{},
-				constants.PrimaryNetworkID,
-				&validatorstest.State{
-					GetCurrentHeightF: func(context.Context) (uint64, error) {
-						return 1, nil
-					},
-					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-						return nil, nil
-					},
-				},
-				time.Hour,
-			)
 			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
 			require.NoError(err)
 			marshaller := testMarshaller{}
@@ -560,7 +575,7 @@ func TestPushGossiper(t *testing.T) {
 			gossiper, err := NewPushGossiper[*testTx](
 				marshaller,
 				FullSet[*testTx]{},
-				validators,
+				network.Validators,
 				client,
 				metrics,
 				BranchingFactor{
@@ -619,6 +634,10 @@ func TestPushGossiper(t *testing.T) {
 
 type testValidatorSet struct {
 	validators set.Set[ids.NodeID]
+}
+
+func (t testValidatorSet) Len(context.Context) int {
+	return len(t.validators)
 }
 
 func (t testValidatorSet) Has(_ context.Context, nodeID ids.NodeID) bool {

@@ -5,6 +5,7 @@ package network
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -53,22 +54,23 @@ func New(
 	registerer prometheus.Registerer,
 	config config.Network,
 ) (*Network, error) {
-	p2pNetwork, err := p2p.NewNetwork(log, appSender, registerer, "p2p")
+	p2pNetwork, err := p2p.NewNetwork(
+		log,
+		appSender,
+		vdrs,
+		subnetID,
+		config.MaxValidatorSetStaleness,
+		registerer,
+		"p2p",
+	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to initialize p2p network: %w", err)
 	}
 
 	marshaller := txMarshaller{}
-	validators := p2p.NewValidators(
-		p2pNetwork.Peers,
-		log,
-		subnetID,
-		vdrs,
-		config.MaxValidatorSetStaleness,
-	)
 	txGossipClient := p2pNetwork.NewClient(
 		p2p.TxGossipHandlerID,
-		p2p.WithValidatorSampling(validators),
+		p2p.WithValidatorSampling(p2pNetwork.Validators),
 	)
 	txGossipMetrics, err := gossip.NewMetrics(registerer, "tx")
 	if err != nil {
@@ -91,7 +93,7 @@ func New(
 	txPushGossiper, err := gossip.NewPushGossiper[*txs.Tx](
 		marshaller,
 		gossipMempool,
-		validators,
+		p2pNetwork.Validators,
 		txGossipClient,
 		txGossipMetrics,
 		gossip.BranchingFactor{
@@ -124,38 +126,24 @@ func New(
 	txPullGossiper = gossip.ValidatorGossiper{
 		Gossiper:   txPullGossiper,
 		NodeID:     nodeID,
-		Validators: validators,
+		Validators: p2pNetwork.Validators,
 	}
 
-	handler := gossip.NewHandler[*txs.Tx](
+	handler := p2p.NewHandler(
 		log,
-		marshaller,
-		gossipMempool,
-		txGossipMetrics,
-		config.TargetGossipSize,
-	)
-
-	validatorHandler := p2p.NewValidatorHandler(
-		p2p.NewThrottlerHandler(
-			handler,
-			p2p.NewSlidingWindowThrottler(
-				config.PullGossipThrottlingPeriod,
-				config.PullGossipThrottlingLimit,
-			),
+		gossip.NewHandler[*txs.Tx](
 			log,
+			marshaller,
+			gossipMempool,
+			txGossipMetrics,
+			config.TargetGossipSize,
 		),
-		validators,
-		log,
+		p2pNetwork.Validators,
+		config.PullGossipThrottlingPeriod,
+		config.PullGossipRequestsPerValidator,
 	)
 
-	// We allow pushing txs between all peers, but only serve gossip requests
-	// from validators
-	txGossipHandler := txGossipHandler{
-		appGossipHandler:  handler,
-		appRequestHandler: validatorHandler,
-	}
-
-	if err := p2pNetwork.AddHandler(p2p.TxGossipHandlerID, txGossipHandler); err != nil {
+	if err := p2pNetwork.AddHandler(p2p.TxGossipHandlerID, handler); err != nil {
 		return nil, err
 	}
 

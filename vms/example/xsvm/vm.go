@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"connectrpc.com/grpcreflect"
 	"github.com/gorilla/rpc/v2"
@@ -74,6 +75,9 @@ func (vm *VM) Initialize(
 	vm.Network, err = p2p.NewNetwork(
 		chainContext.Log,
 		appSender,
+		chainContext.ValidatorState,
+		ids.Empty,
+		time.Second,
 		metrics,
 		"",
 	)

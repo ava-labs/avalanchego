@@ -21,9 +21,9 @@ var DefaultConfig = Config{
 	PushGossipMaxRegossipFrequency:              30 * time.Second,
 	PushGossipFrequency:                         500 * time.Millisecond,
 	PullGossipPollSize:                          1,
-	PullGossipFrequency:                         1500 * time.Millisecond,
-	PullGossipThrottlingPeriod:                  10 * time.Second,
-	PullGossipThrottlingLimit:                   2,
+	PullGossipFrequency:                         time.Second,
+	PullGossipThrottlingPeriod:                  time.Hour,
+	PullGossipRequestsPerValidator:              3600,
 	ExpectedBloomFilterElements:                 8 * 1024,
 	ExpectedBloomFilterFalsePositiveProbability: .01,
 	MaxBloomFilterFalsePositiveProbability:      .05,
@@ -72,9 +72,9 @@ type Config struct {
 	// PullGossipThrottlingPeriod is how large of a window the throttler should
 	// use.
 	PullGossipThrottlingPeriod time.Duration `json:"pull-gossip-throttling-period"`
-	// PullGossipThrottlingLimit is the number of pull queries that are allowed
-	// by a validator in every throttling window.
-	PullGossipThrottlingLimit int `json:"pull-gossip-throttling-limit"`
+	// PullGossipRequestsPerValidator is the number of pull gossip requests that
+	// a validator is expected to make in a throttling period.
+	PullGossipRequestsPerValidator int `json:"pull-gossip-requests-per-validator"`
 	// ExpectedBloomFilterElements is the number of elements to expect when
 	// creating a new bloom filter. The larger this number is, the larger the
 	// bloom filter will be.

@@ -5,6 +5,7 @@ package p2p
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"go.uber.org/zap"
@@ -27,6 +28,7 @@ var (
 	_ Handler = (*NoOpHandler)(nil)
 	_ Handler = (*TestHandler)(nil)
 	_ Handler = (*ValidatorHandler)(nil)
+	_ Handler = (*throttleValidatorAppRequestHandler)(nil)
 )
 
 // Handler is the server-side logic for virtual machine application protocols.
@@ -55,6 +57,106 @@ func (NoOpHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
 
 func (NoOpHandler) AppRequest(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
 	return nil, nil
+}
+
+type throttleValidatorAppRequestHandler struct {
+	appGossipHandler  Handler
+	appRequestHandler Handler
+}
+
+func (t throttleValidatorAppRequestHandler) AppGossip(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	gossipBytes []byte,
+) {
+	t.appGossipHandler.AppGossip(ctx, nodeID, gossipBytes)
+}
+
+func (t throttleValidatorAppRequestHandler) AppRequest(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	deadline time.Time,
+	requestBytes []byte,
+) ([]byte, *common.AppError) {
+	return t.appRequestHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
+}
+
+type dynamicThrottlerHandler struct {
+	Handler         *ThrottlerHandler
+	Throttler       *SlidingWindowThrottler
+	ValidatorSet    ValidatorSet
+	RequestsPerPeer float64
+
+	prevNumConnectedValidators int
+}
+
+func (d *dynamicThrottlerHandler) AppGossip(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	gossipBytes []byte,
+) {
+	d.checkUpdateThrottlingLimit(ctx)
+
+	d.Handler.AppGossip(ctx, nodeID, gossipBytes)
+}
+
+func (d *dynamicThrottlerHandler) AppRequest(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	deadline time.Time,
+	requestBytes []byte,
+) ([]byte, *common.AppError) {
+	d.checkUpdateThrottlingLimit(ctx)
+
+	return d.Handler.AppRequest(ctx, nodeID, deadline, requestBytes)
+}
+
+func (d *dynamicThrottlerHandler) checkUpdateThrottlingLimit(ctx context.Context) {
+	numValidators := d.ValidatorSet.Len(ctx)
+
+	if numValidators == d.prevNumConnectedValidators {
+		return
+	}
+
+	d.prevNumConnectedValidators = numValidators
+
+	n := float64(numValidators)
+
+	// guaranteed to not overflow an int
+	expectedSamples := d.RequestsPerPeer / n
+	variance := d.RequestsPerPeer * (n - 1) / (n * n)
+	stdDeviation := math.Sqrt(variance)
+
+	limit := int(expectedSamples + 4*stdDeviation)
+	d.Throttler.setLimit(limit)
+}
+
+// NewHandler wraps a handler with defaults.
+// Period is the throttling evaluation period during which this node is
+// expecting each peer to make requestsPerPeer requests to the network. The
+// throttling limit is dynamically updated to be inversely proportional to the
+// number of connected network validators.
+func NewHandler(
+	log logging.Logger,
+	handler Handler,
+	validatorSet ValidatorSet,
+	period time.Duration,
+	requestsPerPeer int,
+) Handler {
+	// Throttling limit will be initialized when a request is handled
+	throttler := NewSlidingWindowThrottler(period, 0)
+
+	throttlerHandler := &dynamicThrottlerHandler{
+		Handler:         NewThrottlerHandler(handler, throttler, log),
+		Throttler:       throttler,
+		ValidatorSet:    validatorSet,
+		RequestsPerPeer: float64(requestsPerPeer),
+	}
+
+	return throttleValidatorAppRequestHandler{
+		appGossipHandler:  handler,
+		appRequestHandler: NewValidatorHandler(throttlerHandler, validatorSet, log),
+	}
 }
 
 func NewValidatorHandler(

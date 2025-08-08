@@ -101,3 +101,10 @@ func (s *SlidingWindowThrottler) rotate(t time.Time) {
 		hits:  make(map[ids.NodeID]float64),
 	}
 }
+
+func (s *SlidingWindowThrottler) setLimit(limit int) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.limit = float64(limit)
+}
