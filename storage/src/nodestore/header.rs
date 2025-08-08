@@ -27,7 +27,8 @@
 use bytemuck_derive::{Pod, Zeroable};
 use std::io::{Error, ErrorKind};
 
-use super::alloc::{FreeLists, LinearAddress, area_size_hash};
+use super::alloc::FreeLists;
+use super::primitives::{LinearAddress, area_size_hash};
 use crate::logger::{debug, trace};
 
 /// Can be used by filesystem tooling such as "file" to identify

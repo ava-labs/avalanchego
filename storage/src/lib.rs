@@ -33,8 +33,6 @@ mod nodestore;
 mod test_utils;
 mod trie_hash;
 
-use crate::nodestore::AreaIndex;
-
 /// Logger module for handling logging functionality
 pub mod logger;
 
@@ -51,8 +49,8 @@ pub use node::{
     branch::{HashType, IntoHashType},
 };
 pub use nodestore::{
-    Committed, HashedNodeReader, ImmutableProposal, LinearAddress, MutableProposal, NodeReader,
-    NodeStore, Parentable, RootReader, TrieReader,
+    AreaIndex, Committed, HashedNodeReader, ImmutableProposal, LinearAddress, MutableProposal,
+    NodeReader, NodeStore, Parentable, RootReader, TrieReader,
 };
 
 pub use linear::filebacked::FileBacked;
@@ -246,7 +244,7 @@ pub enum CheckerError {
     /// The start address of a stored area is not a multiple of 16
     #[error(
         "The start address of a stored area (parent: {parent:#x}) is not a multiple of {}: {address:#x}",
-        nodestore::alloc::LinearAddress::MIN_AREA_SIZE
+        nodestore::primitives::AreaIndex::MIN_AREA_SIZE
     )]
     AreaMisaligned {
         /// The start address of the stored area

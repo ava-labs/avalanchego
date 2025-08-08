@@ -19,6 +19,7 @@
 )]
 
 use crate::node::branch::ReadSerializable;
+use crate::nodestore::AreaIndex;
 use crate::{HashType, LinearAddress, Path, SharedNode};
 use bitfield::bitfield;
 use branch::Serializable as _;
@@ -220,7 +221,7 @@ impl Node {
     /// we always have one of those, we include it as a parameter for serialization.
     ///
     /// TODO: We could pack two bytes of the partial path into one and handle the odd byte length
-    pub fn as_bytes<T: ExtendableBytes>(&self, prefix: u8, encoded: &mut T) {
+    pub fn as_bytes<T: ExtendableBytes>(&self, prefix: AreaIndex, encoded: &mut T) {
         match self {
             Node::Branch(b) => {
                 let child_iter = b
@@ -250,7 +251,7 @@ impl Node {
                 // create an output stack item, which can overflow to memory for very large branch nodes
                 const OPTIMIZE_BRANCHES_FOR_SIZE: usize = 1024;
                 encoded.reserve(OPTIMIZE_BRANCHES_FOR_SIZE);
-                encoded.push(prefix);
+                encoded.push(prefix.get());
                 encoded.push(first_byte.0);
                 #[cfg(feature = "branch_factor_256")]
                 encoded.push((childcount % BranchNode::MAX_CHILDREN) as u8);
@@ -297,7 +298,7 @@ impl Node {
 
                 const OPTIMIZE_LEAVES_FOR_SIZE: usize = 128;
                 encoded.reserve(OPTIMIZE_LEAVES_FOR_SIZE);
-                encoded.push(prefix);
+                encoded.push(prefix.get());
                 encoded.push(first_byte.0);
 
                 // encode the partial path, including the length if it didn't fit above
@@ -449,6 +450,7 @@ mod test {
     #![expect(clippy::unwrap_used)]
 
     use crate::node::{BranchNode, LeafNode, Node};
+    use crate::nodestore::AreaIndex;
     use crate::{Child, LinearAddress, NibblesIterator, Path};
     use test_case::test_case;
 
@@ -512,7 +514,7 @@ than 126 bytes as the length would be encoded in multiple bytes.
         use std::io::Cursor;
 
         let mut serialized = Vec::new();
-        node.as_bytes(0, &mut serialized);
+        node.as_bytes(AreaIndex::MIN, &mut serialized);
         #[cfg(not(any(feature = "branch_factor_256", feature = "ethhash")))]
         assert_eq!(serialized.len(), expected_length);
         let mut cursor = Cursor::new(&serialized);

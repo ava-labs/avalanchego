@@ -42,6 +42,7 @@ pub(crate) mod alloc;
 pub(crate) mod hash;
 pub(crate) mod header;
 pub(crate) mod persist;
+pub(crate) mod primitives;
 
 use crate::firewood_gauge;
 use crate::linear::OffsetReader;
@@ -55,7 +56,8 @@ use std::io::{Error, ErrorKind, Read};
 use std::sync::atomic::AtomicUsize;
 
 // Re-export types from alloc module
-pub use alloc::{AreaIndex, LinearAddress, NodeAllocator};
+pub use alloc::NodeAllocator;
+pub use primitives::{AreaIndex, LinearAddress};
 
 // Re-export types from header module
 pub use header::NodeStoreHeader;
@@ -89,7 +91,6 @@ use std::sync::Arc;
 use crate::hashednode::hash_node;
 use crate::node::Node;
 use crate::node::persist::MaybePersistedNode;
-use crate::nodestore::alloc::AREA_SIZES;
 use crate::{CacheReadStrategy, FileIoError, Path, ReadableStorage, SharedNode, TrieHash};
 
 use super::linear::WritableStorage;
@@ -670,6 +671,33 @@ where
     }
 }
 
+// TODO: return only the index since we can easily get the size from the index
+fn area_index_and_size<S: ReadableStorage>(
+    storage: &S,
+    addr: LinearAddress,
+) -> Result<(AreaIndex, u64), FileIoError> {
+    let mut area_stream = storage.stream_from(addr.get())?;
+
+    let index: AreaIndex = AreaIndex::new(area_stream.read_byte().map_err(|e| {
+        storage.file_io_error(
+            Error::new(ErrorKind::InvalidData, e),
+            addr.get(),
+            Some("area_index_and_size".to_string()),
+        )
+    })?)
+    .ok_or_else(|| {
+        storage.file_io_error(
+            Error::new(ErrorKind::InvalidData, "invalid area index"),
+            addr.get(),
+            Some("area_index_and_size".to_string()),
+        )
+    })?;
+
+    let size = index.size();
+
+    Ok((index, size))
+}
+
 impl<T, S: ReadableStorage> NodeStore<T, S> {
     /// Read a [Node] from the provided [`LinearAddress`].
     /// `addr` is the address of a `StoredArea` in the `ReadableStorage`.
@@ -746,25 +774,7 @@ impl<T, S: ReadableStorage> NodeStore<T, S> {
         &self,
         addr: LinearAddress,
     ) -> Result<(AreaIndex, u64), FileIoError> {
-        let mut area_stream = self.storage.stream_from(addr.get())?;
-
-        let index: AreaIndex = area_stream.read_byte().map_err(|e| {
-            self.storage.file_io_error(
-                Error::new(ErrorKind::InvalidData, e),
-                addr.get(),
-                Some("area_index_and_size".to_string()),
-            )
-        })?;
-
-        let size = *AREA_SIZES
-            .get(index as usize)
-            .ok_or(self.storage.file_io_error(
-                Error::other(format!("Invalid area size index {index}")),
-                addr.get(),
-                Some("area_index_and_size".to_string()),
-            ))?;
-
-        Ok((index, size))
+        area_index_and_size(self.storage.as_ref(), addr)
     }
 
     pub(crate) fn physical_size(&self) -> Result<u64, FileIoError> {
@@ -847,41 +857,41 @@ mod tests {
     use arc_swap::access::DynGuard;
 
     use super::*;
-    use alloc::{AREA_SIZES, area_size_to_index};
+    use primitives::area_size_iter;
 
     #[test]
     fn area_sizes_aligned() {
-        for area_size in &AREA_SIZES {
-            assert_eq!(area_size % LinearAddress::MIN_AREA_SIZE, 0);
+        for (_, area_size) in area_size_iter() {
+            assert_eq!(area_size % AreaIndex::MIN_AREA_SIZE, 0);
         }
     }
 
     #[test]
     fn test_area_size_to_index() {
         // TODO: rustify using: for size in AREA_SIZES
-        for (i, &area_size) in AREA_SIZES.iter().enumerate() {
+        for (i, area_size) in area_size_iter() {
             // area size is at top of range
-            assert_eq!(area_size_to_index(area_size).unwrap(), i as AreaIndex);
+            assert_eq!(AreaIndex::from_size(area_size).unwrap(), i);
 
-            if i > 0 {
+            if i > AreaIndex::MIN {
                 // 1 less than top of range stays in range
-                assert_eq!(area_size_to_index(area_size - 1).unwrap(), i as AreaIndex);
+                assert_eq!(AreaIndex::from_size(area_size - 1).unwrap(), i);
             }
 
-            if i < LinearAddress::num_area_sizes() - 1 {
+            if i < AreaIndex::MAX {
                 // 1 more than top of range goes to next range
                 assert_eq!(
-                    area_size_to_index(area_size + 1).unwrap(),
-                    (i + 1) as AreaIndex
+                    AreaIndex::from_size(area_size + 1).unwrap(),
+                    AreaIndex::try_from(i.as_usize() + 1).unwrap()
                 );
             }
         }
 
-        for i in 0..=LinearAddress::MIN_AREA_SIZE {
-            assert_eq!(area_size_to_index(i).unwrap(), 0);
+        for i in 0..=AreaIndex::MIN_AREA_SIZE {
+            assert_eq!(AreaIndex::from_size(i).unwrap(), AreaIndex::MIN);
         }
 
-        assert!(area_size_to_index(LinearAddress::MAX_AREA_SIZE + 1).is_err());
+        assert!(AreaIndex::from_size(AreaIndex::MAX_AREA_SIZE + 1).is_err());
     }
 
     #[test]
@@ -922,7 +932,7 @@ mod tests {
         let memstore = MemStore::new(vec![]);
         let mut node_store = NodeStore::new_empty_proposal(memstore.into());
 
-        let huge_value = vec![0u8; *AREA_SIZES.last().unwrap() as usize];
+        let huge_value = vec![0u8; AreaIndex::MAX_AREA_SIZE as usize];
 
         let giant_leaf = Node::Leaf(LeafNode {
             partial_path: Path::from([0, 1, 2]),

@@ -32,6 +32,7 @@
 use std::iter::FusedIterator;
 
 use crate::linear::FileIoError;
+use crate::nodestore::AreaIndex;
 use crate::{firewood_counter, firewood_gauge};
 use coarsetime::Instant;
 
@@ -250,11 +251,11 @@ impl<S: WritableStorage + 'static> NodeStore<Committed, S> {
         for node in UnPersistedNodeIterator::new(self) {
             let shared_node = node.as_shared_node(self).expect("in memory, so no IO");
             let mut serialized = Vec::new();
-            shared_node.as_bytes(0, &mut serialized);
+            shared_node.as_bytes(AreaIndex::MIN, &mut serialized);
 
             let (persisted_address, area_size_index) =
                 allocator.allocate_node(serialized.as_slice())?;
-            *serialized.get_mut(0).expect("byte was reserved") = area_size_index;
+            *serialized.get_mut(0).expect("byte was reserved") = area_size_index.get();
             self.storage
                 .write(persisted_address.get(), serialized.as_slice())?;
 
@@ -396,10 +397,10 @@ impl NodeStore<Committed, FileBacked> {
         for node in UnPersistedNodeIterator::new(self) {
             let shared_node = node.as_shared_node(self).expect("in memory, so no IO");
             let mut serialized = Vec::with_capacity(100); // TODO: better size? we can guess branches are larger
-            shared_node.as_bytes(0, &mut serialized);
+            shared_node.as_bytes(AreaIndex::MIN, &mut serialized);
             let (persisted_address, area_size_index) =
                 node_allocator.allocate_node(serialized.as_slice())?;
-            *serialized.get_mut(0).expect("byte was reserved") = area_size_index;
+            *serialized.get_mut(0).expect("byte was reserved") = area_size_index.get();
             let mut serialized = serialized.into_boxed_slice();
 
             loop {
