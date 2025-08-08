@@ -206,7 +206,7 @@ func TestMempoolMaxSizeHandling(t *testing.T) {
 	lowFeeTx := atomictest.GenerateTestImportTxWithGas(1, 1)
 	highFeeTx := atomictest.GenerateTestImportTxWithGas(1, 2)
 
-	require.NoError(mempool.AddLocalTx(lowFeeTx))
+	require.NoError(mempool.Add(lowFeeTx))
 
 	// Mark the lowFeeTx as Current
 	tx, ok := mempool.NextTx()
@@ -215,19 +215,19 @@ func TestMempoolMaxSizeHandling(t *testing.T) {
 
 	// Because Current transactions can not be evicted, the mempool should
 	// report full.
-	err = mempool.AddLocalTx(highFeeTx)
+	err = mempool.Add(highFeeTx)
 	require.ErrorIs(err, ErrMempoolFull)
 
 	// Mark the lowFeeTx as Issued
 	mempool.IssueCurrentTxs()
 
 	// Issued transactions also can not be evicted.
-	err = mempool.AddLocalTx(highFeeTx)
+	err = mempool.Add(highFeeTx)
 	require.ErrorIs(err, ErrMempoolFull)
 
 	// If we make space, the highFeeTx should be allowed.
 	mempool.RemoveTx(lowFeeTx)
-	require.NoError(mempool.AddLocalTx(highFeeTx))
+	require.NoError(mempool.Add(highFeeTx))
 }
 
 // mempool will drop transaction with the lowest fee
