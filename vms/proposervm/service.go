@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -13,14 +14,20 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
 
+type ProposerVMServer interface {
+	GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error)
+	GetLastAcceptedHeight() uint64
+}
+
 type ProposerAPI struct {
 	ctx *snow.Context
-	vm  VMInterface
+	vm  ProposerVMServer
 }
 
 func (p *ProposerAPI) GetProposedHeight(_ *http.Request, _ *struct{}, reply *api.GetHeightResponse) error {

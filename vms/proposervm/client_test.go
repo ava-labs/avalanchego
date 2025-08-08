@@ -2,7 +2,7 @@ package proposervm
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/api"
@@ -51,8 +51,6 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestGetProposedHeight(t *testing.T) {
-	require := require.New(t)
-
 	tests := []struct {
 		name         string
 		mockResponse *api.GetHeightResponse
@@ -66,19 +64,20 @@ func TestGetProposedHeight(t *testing.T) {
 		{
 			name:         "error",
 			mockResponse: nil,
-			mockError:    fmt.Errorf("error"),
+			mockError:    errors.New("test error"),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
 			mc := NewMockClient(test.mockResponse, test.mockError)
 			c := &client{requester: mc}
 
 			height, err := c.GetProposedHeight(context.Background(), nil)
 			if test.mockError != nil {
-				require.Error(err)
+				require.ErrorIs(err, test.mockError)
 				return
 			}
 			require.NoError(err)
@@ -88,8 +87,6 @@ func TestGetProposedHeight(t *testing.T) {
 }
 
 func TestGetProposerBlockWrapper(t *testing.T) {
-	require := require.New(t)
-
 	tests := []struct {
 		name         string
 		mockResponse *api.FormattedBlock
@@ -103,19 +100,20 @@ func TestGetProposerBlockWrapper(t *testing.T) {
 		{
 			name:         "error",
 			mockResponse: nil,
-			mockError:    fmt.Errorf("error"),
+			mockError:    errors.New("error"),
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 
 			mc := NewMockClient(test.mockResponse, test.mockError)
 			c := &client{requester: mc}
 
 			block, err := c.GetProposerBlockWrapper(context.Background(), ids.GenerateTestID())
 			if test.mockError != nil {
-				require.Error(err)
+				require.ErrorIs(err, test.mockError)
 				return
 			}
 			require.NoError(err)

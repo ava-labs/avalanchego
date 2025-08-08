@@ -53,18 +53,13 @@ var (
 	_ block.ChainVM         = (*VM)(nil)
 	_ block.BatchedChainVM  = (*VM)(nil)
 	_ block.StateSyncableVM = (*VM)(nil)
-	_ VMInterface           = (*VM)(nil)
+	_ ProposerVMServer      = (*VM)(nil)
 
 	dbPrefix = []byte("proposervm")
 )
 
 func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
 	return ids.IDLen + len(blk.Bytes()) + constants.PointerOverhead
-}
-
-type VMInterface interface {
-	GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error)
-	GetLastAcceptedHeight() uint64
 }
 
 type VM struct {

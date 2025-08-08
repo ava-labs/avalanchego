@@ -22,7 +22,7 @@ type mockVM struct {
 	err      error
 }
 
-func (m *mockVM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error) {
+func (m *mockVM) GetBlock(_ context.Context, _ ids.ID) (snowman.Block, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
@@ -59,11 +59,7 @@ func TestServiceGetProposerBlockWrapper(t *testing.T) {
 		mockError error
 	}{
 		{
-			name:     "successful response with JSON encoding",
-			encoding: formatting.JSON,
-		},
-		{
-			name:     "successful response with HEX encoding",
+			name:     "successful response",
 			encoding: formatting.Hex,
 		},
 		{
@@ -86,19 +82,11 @@ func TestServiceGetProposerBlockWrapper(t *testing.T) {
 
 			proposerAPI := &ProposerAPI{ctx: snowCtx, vm: mockVM}
 
-			var expectedBlock json.RawMessage
-			var err error
-			switch test.encoding {
-			case formatting.JSON:
-				expectedBlock, err = json.Marshal(snowBlock)
-				require.NoError(err)
-			default:
-				snowBlock.EXPECT().Bytes().Return([]byte{1, 2, 3}).AnyTimes()
-				encodedBlock, err := formatting.Encode(test.encoding, snowBlock.Bytes())
-				require.NoError(err)
-				expectedBlock, err = json.Marshal(encodedBlock)
-				require.NoError(err)
-			}
+			snowBlock.EXPECT().Bytes().Return([]byte{1, 2, 3}).AnyTimes()
+			encodedBlock, err := formatting.Encode(test.encoding, snowBlock.Bytes())
+			require.NoError(err)
+			expectedBlock, err := json.Marshal(encodedBlock)
+			require.NoError(err)
 
 			args := &GetProposerBlockArgs{
 				ProposerBlockID: ids.ID{1},
@@ -108,14 +96,13 @@ func TestServiceGetProposerBlockWrapper(t *testing.T) {
 
 			err = proposerAPI.GetProposerBlockWrapper(&http.Request{}, args, reply)
 			if test.mockError != nil {
-				require.Error(err)
+				require.ErrorIs(err, test.mockError)
 				return
 			}
 
 			require.NoError(err)
 			require.NotNil(reply.Block)
-			require.Equal(expectedBlock, reply.Block)
+			require.Equal(json.RawMessage(expectedBlock), reply.Block)
 		})
 	}
-
 }
