@@ -7,14 +7,15 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
+
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmanmock"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 )
 
 type mockVM struct {
@@ -59,7 +60,11 @@ func TestServiceGetProposerBlockWrapper(t *testing.T) {
 		mockError error
 	}{
 		{
-			name:     "successful response",
+			name:     "successful response with JSON encoding",
+			encoding: formatting.JSON,
+		},
+		{
+			name:     "successful response with HEX encoding",
 			encoding: formatting.Hex,
 		},
 		{
@@ -82,11 +87,18 @@ func TestServiceGetProposerBlockWrapper(t *testing.T) {
 
 			proposerAPI := &ProposerAPI{ctx: snowCtx, vm: mockVM}
 
-			snowBlock.EXPECT().Bytes().Return([]byte{1, 2, 3}).AnyTimes()
-			encodedBlock, err := formatting.Encode(test.encoding, snowBlock.Bytes())
-			require.NoError(err)
-			expectedBlock, err := json.Marshal(encodedBlock)
-			require.NoError(err)
+			var expectedBlock json.RawMessage
+			var err error
+			switch test.encoding {
+			case formatting.JSON:
+				expectedBlock = json.RawMessage(`{}`)
+			default:
+				snowBlock.EXPECT().Bytes().Return([]byte{1, 2, 3}).AnyTimes()
+				encodedBlock, err := formatting.Encode(test.encoding, snowBlock.Bytes())
+				require.NoError(err)
+				expectedBlock, err = json.Marshal(encodedBlock)
+				require.NoError(err)
+			}
 
 			args := &GetProposerBlockArgs{
 				ProposerBlockID: ids.ID{1},
@@ -102,7 +114,7 @@ func TestServiceGetProposerBlockWrapper(t *testing.T) {
 
 			require.NoError(err)
 			require.NotNil(reply.Block)
-			require.Equal(json.RawMessage(expectedBlock), reply.Block)
+			require.JSONEq(string(expectedBlock), string(reply.Block))
 		})
 	}
 }
