@@ -1031,10 +1031,12 @@ func checkVMBinaries(
 		return nil
 	}
 
-	avalanchegoRPCVersion, err := getRPCVersion(ctx,
+	avalanchegoRPCVersion, err := getRPCVersion(
+		ctx,
 		log,
 		config.AvalancheGoPath,
-		"--version-json")
+		"--version-json",
+	)
 	if err != nil {
 		log.Warn("unable to check rpcchainvm version for avalanchego", zap.Error(err))
 		return nil

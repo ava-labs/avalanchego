@@ -547,9 +547,11 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 	for i, net := range networks {
 		if i != 0 {
 			config := configs[0]
-			net.ManuallyTrack(context.Background(),
+			net.ManuallyTrack(
+				context.Background(),
 				config.MyNodeID,
-				config.MyIPPort.Get())
+				config.MyIPPort.Get(),
+			)
 		}
 
 		eg.Go(func() error {
