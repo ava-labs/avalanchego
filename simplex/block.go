@@ -44,7 +44,7 @@ type Block struct {
 func newBlock(metadata simplex.ProtocolMetadata, vmBlock snowman.Block, blockTracker *blockTracker) (*Block, error) {
 	block := &Block{
 		metadata:     metadata,
-		vmBlock:     vmBlock,
+		vmBlock:      vmBlock,
 		blockTracker: blockTracker,
 	}
 	bytes, err := block.Bytes()
