@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1754644608967,
+  "lastUpdate": 1754730795211,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -278,6 +278,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[101,250000]",
             "value": 92.83,
+            "unit": "mgas/s",
+            "extra": "1 times\n4 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "rodrigo",
+            "username": "RodrigoVillar",
+            "email": "77309055+RodrigoVillar@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "3b0f8d4f3859a1948062278e71f640f7534aa844",
+          "message": "refactor(load): remove context from test interface (#4157)",
+          "timestamp": "2025-08-06T00:14:38Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/3b0f8d4f3859a1948062278e71f640f7534aa844"
+        },
+        "date": 1754730794602,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]",
+            "value": 92.51,
             "unit": "mgas/s",
             "extra": "1 times\n4 procs"
           }
