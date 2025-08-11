@@ -725,7 +725,7 @@ func (n *network) track(ip *ips.ClaimedIPPort, trackAllSubnets bool) error {
 	n.peersLock.Lock()
 	defer n.peersLock.Unlock()
 
-	if !n.ipTracker.AddIP(ip) && !n.config.ConnectToAllValidators {
+	if !n.ipTracker.AddIP(ip) {
 		return nil
 	}
 
