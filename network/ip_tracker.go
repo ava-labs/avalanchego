@@ -44,6 +44,7 @@ func newIPTracker(
 	trackedSubnets set.Set[ids.ID],
 	log logging.Logger,
 	registerer prometheus.Registerer,
+	connectToAllValidators bool,
 ) (*ipTracker, error) {
 	bloomMetrics, err := bloom.NewMetrics("ip_bloom", registerer)
 	if err != nil {
@@ -64,11 +65,12 @@ func newIPTracker(
 			Name: "tracked_subnets",
 			Help: "number of subnets this node is monitoring",
 		}),
-		bloomMetrics:   bloomMetrics,
-		tracked:        make(map[ids.NodeID]*trackedNode),
-		bloomAdditions: make(map[ids.NodeID]int),
-		connected:      make(map[ids.NodeID]*connectedNode),
-		subnet:         make(map[ids.ID]*gossipableSubnet),
+		bloomMetrics:           bloomMetrics,
+		tracked:                make(map[ids.NodeID]*trackedNode),
+		bloomAdditions:         make(map[ids.NodeID]int),
+		connected:              make(map[ids.NodeID]*connectedNode),
+		subnet:                 make(map[ids.ID]*gossipableSubnet),
+		connectToAllValidators: connectToAllValidators,
 	}
 	err = errors.Join(
 		registerer.Register(tracker.numTrackedPeers),
@@ -230,6 +232,8 @@ type ipTracker struct {
 	connected map[ids.NodeID]*connectedNode
 	// subnet tracks all the subnets that have at least one gossipable ID.
 	subnet map[ids.ID]*gossipableSubnet
+
+	connectToAllValidators bool
 }
 
 // ManuallyTrack marks the provided nodeID as being desirable to connect to.
@@ -270,6 +274,10 @@ func (i *ipTracker) ManuallyGossip(subnetID ids.ID, nodeID ids.NodeID) {
 func (i *ipTracker) WantsConnection(nodeID ids.NodeID) bool {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
+
+	if i.connectToAllValidators {
+		return true
+	}
 
 	node, ok := i.tracked[nodeID]
 	return ok && node.wantsConnection()
@@ -320,7 +328,7 @@ func (i *ipTracker) AddIP(ip *ips.ClaimedIPPort) bool {
 	if connectedNode, ok := i.connected[ip.NodeID]; ok {
 		i.setGossipableIP(trackedNode.ip, connectedNode.trackedSubnets)
 	}
-	return trackedNode.wantsConnection()
+	return trackedNode.wantsConnection() || i.connectToAllValidators
 }
 
 // GetIP returns the most recent IP of the provided nodeID. Returns true if all
@@ -428,7 +436,7 @@ func (i *ipTracker) addTrackableID(nodeID ids.NodeID, subnetID *ids.ID) {
 		nodeTracker.manuallyTracked = true
 	} else {
 		nodeTracker.validatedSubnets.Add(*subnetID)
-		if *subnetID == constants.PrimaryNetworkID || i.trackedSubnets.Contains(*subnetID) {
+		if *subnetID == constants.PrimaryNetworkID || i.trackedSubnets.Contains(*subnetID) || i.connectToAllValidators {
 			nodeTracker.trackedSubnets.Add(*subnetID)
 		}
 	}

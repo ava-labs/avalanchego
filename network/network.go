@@ -242,7 +242,7 @@ func NewNetwork(
 		return nil, fmt.Errorf("initializing network metrics failed with: %w", err)
 	}
 
-	ipTracker, err := newIPTracker(config.TrackedSubnets, log, metricsRegisterer)
+	ipTracker, err := newIPTracker(config.TrackedSubnets, log, metricsRegisterer, config.ConnectToAllValidators)
 	if err != nil {
 		return nil, fmt.Errorf("initializing ip tracker failed with: %w", err)
 	}
