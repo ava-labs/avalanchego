@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package admin
@@ -12,10 +12,10 @@ import (
 var _ database.KeyValueReader = (*KeyValueReader)(nil)
 
 type KeyValueReader struct {
-	client Client
+	client *Client
 }
 
-func NewKeyValueReader(client Client) *KeyValueReader {
+func NewKeyValueReader(client *Client) *KeyValueReader {
 	return &KeyValueReader{
 		client: client,
 	}

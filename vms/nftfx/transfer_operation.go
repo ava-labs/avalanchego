@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package nftfx
@@ -31,10 +31,9 @@ func (op *TransferOperation) Outs() []verify.State {
 }
 
 func (op *TransferOperation) Verify() error {
-	switch {
-	case op == nil:
+	if op == nil {
 		return errNilTransferOperation
-	default:
-		return verify.All(&op.Input, &op.Output)
 	}
+
+	return verify.All(&op.Input, &op.Output)
 }

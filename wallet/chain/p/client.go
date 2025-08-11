@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -16,7 +16,7 @@ import (
 var _ wallet.Client = (*Client)(nil)
 
 func NewClient(
-	c platformvm.Client,
+	c *platformvm.Client,
 	b wallet.Backend,
 ) *Client {
 	return &Client{
@@ -26,7 +26,7 @@ func NewClient(
 }
 
 type Client struct {
-	client  platformvm.Client
+	client  *platformvm.Client
 	backend wallet.Backend
 }
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -148,7 +148,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 
 	res.blkManager = blockexecutor.NewManager(
 		res.mempool,
-		nil,
 		metrics,
 		res.state,
 		&res.backend,
@@ -163,7 +162,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		res.backend.Ctx.ValidatorState,
 		txVerifier,
 		res.mempool,
-		nil,
 		res.backend.Config.PartialSyncPrimaryNetwork,
 		res.sender,
 		&res.ctx.Lock,
@@ -176,11 +174,9 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 
 	res.Builder = New(
 		res.mempool,
-		nil,
 		&res.backend,
 		res.blkManager,
 	)
-	res.Builder.StartBlockTimer()
 
 	res.blkManager.SetPreference(genesisID)
 	addSubnet(t, res)
@@ -188,8 +184,6 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 	t.Cleanup(func() {
 		res.ctx.Lock.Lock()
 		defer res.ctx.Lock.Unlock()
-
-		res.Builder.ShutdownBlockTimer()
 
 		if res.uptimes.StartedTracking() {
 			validatorIDs := res.config.Validators.GetValidatorIDs(constants.PrimaryNetworkID)

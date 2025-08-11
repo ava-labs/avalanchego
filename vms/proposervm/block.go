@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -444,37 +444,6 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPostDurango(
 		zap.Uint64("slot", currentSlot),
 		zap.Stringer("expectedProposer", expectedProposerID),
 	)
-
-	// We need to reschedule the block builder to the next time we can try to
-	// build a block.
-	//
-	// TODO: After Durango activates, restructure this logic to separate
-	// updating the scheduler from verifying the proposerID.
-	nextStartTime, err := p.vm.getPostDurangoSlotTime(
-		ctx,
-		parentHeight+1,
-		parentPChainHeight,
-		currentSlot+1, // We know we aren't the proposer for the current slot
-		parentTimestamp,
-	)
-	if err != nil {
-		p.vm.ctx.Log.Error("failed to reset block builder scheduler",
-			zap.String("reason", "failed to calculate expected proposer"),
-			zap.Stringer("parentID", parentID),
-			zap.Error(err),
-		)
-		return false, err
-	}
-
-	// report the build slot to the metrics.
-	p.vm.proposerBuildSlotGauge.Set(float64(proposer.TimeToSlot(parentTimestamp, nextStartTime)))
-
-	// set the scheduler to let us know when the next block need to be built.
-	p.vm.Scheduler.SetBuildBlockTime(nextStartTime)
-
-	// In case the inner VM only issued one pendingTxs message, we should
-	// attempt to re-handle that once it is our turn to build the block.
-	p.vm.notifyInnerBlockReady()
 	return false, fmt.Errorf("%w: slot %d expects %s", errUnexpectedProposer, currentSlot, expectedProposerID)
 }
 
@@ -516,9 +485,5 @@ func (p *postForkCommonComponents) shouldBuildSignedBlockPreDurango(
 		zap.Duration("minDelay", minDelay),
 		zap.Time("blockTimestamp", newTimestamp),
 	)
-
-	// In case the inner VM only issued one pendingTxs message, we should
-	// attempt to re-handle that once it is our turn to build the block.
-	p.vm.notifyInnerBlockReady()
 	return false, fmt.Errorf("%w: delay %s < minDelay %s", errProposerWindowNotStarted, delay, minDelay)
 }

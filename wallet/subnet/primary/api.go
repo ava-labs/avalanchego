@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package primary
@@ -8,10 +8,10 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/coreth/ethclient"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/client"
 
 	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -39,11 +39,9 @@ const (
 	fetchLimit = 1024
 )
 
-// TODO: Refactor UTXOClient definition to allow the client implementations to
-// perform their own assertions.
 var (
-	_ UTXOClient = platformvm.Client(nil)
-	_ UTXOClient = avm.Client(nil)
+	_ UTXOClient = (*platformvm.Client)(nil)
+	_ UTXOClient = (*avm.Client)(nil)
 )
 
 type UTXOClient interface {
@@ -59,9 +57,9 @@ type UTXOClient interface {
 }
 
 type AVAXState struct {
-	PClient platformvm.Client
+	PClient *platformvm.Client
 	PCTX    *pbuilder.Context
-	XClient avm.Client
+	XClient *avm.Client
 	XCTX    *xbuilder.Context
 	CClient client.Client
 	CCTX    *c.Context
@@ -151,7 +149,7 @@ func FetchPState(
 	uri string,
 	addrs set.Set[ids.ShortID],
 ) (
-	platformvm.Client,
+	*platformvm.Client,
 	*pbuilder.Context,
 	walletcommon.UTXOs,
 	error,

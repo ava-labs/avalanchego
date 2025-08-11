@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package avax
@@ -84,12 +84,11 @@ func UTXOIDFromString(s string) (*UTXOID, error) {
 }
 
 func (utxo *UTXOID) Verify() error {
-	switch {
-	case utxo == nil:
+	if utxo == nil {
 		return errNilUTXOID
-	default:
-		return nil
 	}
+
+	return nil
 }
 
 func (utxo *UTXOID) Compare(other *UTXOID) int {

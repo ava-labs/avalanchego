@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -6,6 +6,7 @@ package snowman
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -656,6 +657,9 @@ func (e *Engine) buildBlocks(ctx context.Context) error {
 			return nil
 		}
 		e.numBuilt.Inc()
+
+		blockTimeSkew := time.Since(blk.Timestamp())
+		e.blockTimeSkew.Add(float64(blockTimeSkew))
 
 		// The newly created block should be built on top of the preferred block.
 		// Otherwise, the new block doesn't have the best chance of being confirmed.

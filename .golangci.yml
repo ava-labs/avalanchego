@@ -1,7 +1,6 @@
 # https://golangci-lint.run/usage/configuration/
+version: "2"
 run:
-  timeout: 10m
-
   # If set we pass it to "go list -mod={option}". From "go help modules":
   # If invoked with -mod=readonly, the go command is disallowed from the implicit
   # automatic updating of go.mod described above. Instead, it fails when any changes
@@ -22,49 +21,31 @@ run:
 
 issues:
   # Make issues output unique by line.
-  # Default: true
   uniq-by-line: false
 
   # Maximum issues count per one linter.
-  # Set to 0 to disable.
-  # Default: 50
   max-issues-per-linter: 0
 
   # Maximum count of issues with the same text.
-  # Set to 0 to disable.
-  # Default: 3
   max-same-issues: 0
 
-  # Enables skipping of directories:
-  # - vendor$, third_party$, testdata$, examples$, Godeps$, builtin$
-  # Default: true
-  exclude-dirs-use-default: false
-
 linters:
-  disable-all: true
+  default: none
   enable:
     - asciicheck
     - bodyclose
     - copyloopvar
     - depguard
-    - dupword
     - errcheck
     - errorlint
     - forbidigo
-    - gci
     - goconst
     - gocritic
-    # - goerr113
-    - gofmt
-    - gofumpt
-    # - gomnd
     - goprintffuncname
     - gosec
-    - gosimple
     - govet
     - importas
     - ineffassign
-    # - lll
     - misspell
     - nakedret
     - nilerr
@@ -76,133 +57,135 @@ linters:
     - revive
     - spancheck
     - staticcheck
-    - stylecheck
     - tagalign
     - testifylint
-    - typecheck
     - unconvert
     - unparam
     - unused
     - usestdlibvars
     - whitespace
-
-linters-settings:
-  depguard:
-    rules:
-      packages:
-        deny:
-          - pkg: "container/list"
-            desc: github.com/ava-labs/avalanchego/utils/linked should be used instead.
-          - pkg: "github.com/golang/mock/gomock"
-            desc: go.uber.org/mock/gomock should be used instead.
-          - pkg: "github.com/stretchr/testify/assert"
-            desc: github.com/stretchr/testify/require should be used instead.
-          - pkg: "io/ioutil"
-            desc: io/ioutil is deprecated. Use package io or os instead.
-  errorlint:
-    # Check for plain type assertions and type switches.
-    asserts: false
-    # Check for plain error comparisons.
-    comparison: false
-  forbidigo:
-    # Forbid the following identifiers (list of regexp).
-    forbid:
-      - 'require\.Error$(# ErrorIs should be used instead)?'
-      - 'require\.ErrorContains$(# ErrorIs should be used instead)?'
-      - 'require\.EqualValues$(# Equal should be used instead)?'
-      - 'require\.NotEqualValues$(# NotEqual should be used instead)?'
-      - '^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the require library should be used instead)?'
-      - '^sort\.(Slice|Strings)$(# the slices package should be used instead)?'
-    # Exclude godoc examples from forbidigo checks.
-    exclude_godoc_examples: false
-  gci:
-    sections:
-      - standard
-      - default
-      - blank
-      - prefix(github.com/ava-labs/avalanchego)
-      - alias
-      - dot
-    skip-generated: true
-    custom-order: true
-  gosec:
-    excludes:
-      - G107 # Url provided to HTTP request as taint input https://securego.io/docs/rules/g107
-      - G115 # TODO(marun) Enable this ruleset in a follow-up PR
-  importas:
-    # Do not allow unaliased imports of aliased packages.
-    no-unaliased: false
-    # Do not allow non-required aliases.
-    no-extra-aliases: false
-    # List of aliases
-    alias:
-      - pkg: github.com/ava-labs/avalanchego/utils/math
-        alias: safemath
-      - pkg: github.com/ava-labs/avalanchego/utils/json
-        alias: avajson
-  revive:
-    rules:
-      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
-      - name: bool-literal-in-expr
-        disabled: false
-      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#early-return
-      - name: early-return
-        disabled: false
-      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-lines
-      - name: empty-lines
-        disabled: false
-      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#string-format
-      - name: string-format
-        disabled: false
-        arguments:
-        - ["b.Logf[0]", "/.*%.*/", "no format directive, use b.Log instead"]
-        - ["fmt.Errorf[0]", "/.*%.*/", "no format directive, use errors.New instead"]
-        - ["fmt.Fprintf[1]", "/.*%.*/", "no format directive, use fmt.Fprint instead"]
-        - ["fmt.Printf[0]", "/.*%.*/", "no format directive, use fmt.Print instead"]
-        - ["fmt.Sprintf[0]", "/.*%.*/", "no format directive, use fmt.Sprint instead"]
-        - ["log.Fatalf[0]", "/.*%.*/", "no format directive, use log.Fatal instead"]
-        - ["log.Printf[0]", "/.*%.*/", "no format directive, use log.Print instead"]
-        - ["t.Logf[0]", "/.*%.*/", "no format directive, use t.Log instead"]
-      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#struct-tag
-      - name: struct-tag
-        disabled: false
-      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unexported-naming
-      - name: unexported-naming
-        disabled: false
-      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unhandled-error
-      - name: unhandled-error
-        # prefer the errcheck linter since it can be disabled directly with nolint directive
-        # but revive's disable directive (e.g. //revive:disable:unhandled-error) is not
-        # supported when run under golangci_lint
-        disabled: true
-      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-parameter
-      - name: unused-parameter
-        disabled: false
-      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-receiver
-      - name: unused-receiver
-        disabled: false
-      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#useless-break
-      - name: useless-break
-        disabled: false
-  spancheck:
-    # https://github.com/jjti/go-spancheck#checks
-    checks:
-      - end
-      # - record-error # check that `span.RecordError(err)` is called when an error is returned
-      # - set-status   # check that `span.SetStatus(codes.Error, msg)` is called when an error is returned
-  staticcheck:
-    # https://staticcheck.io/docs/options#checks
-    checks:
-      - "all"
-      - "-SA6002" # Storing non-pointer values in sync.Pool allocates memory
-      - "-SA1019" # Using a deprecated function, variable, constant or field
-  tagalign:
-    align: true
-    sort: true
-    strict: true
-    order:
-      - serialize
-  testifylint:
+  settings:
+    depguard:
+      rules:
+        packages:
+          deny:
+            - pkg: container/list
+              desc: github.com/ava-labs/avalanchego/utils/linked should be used instead.
+            - pkg: github.com/golang/mock/gomock
+              desc: go.uber.org/mock/gomock should be used instead.
+            - pkg: github.com/stretchr/testify/assert
+              desc: github.com/stretchr/testify/require should be used instead.
+            - pkg: io/ioutil
+              desc: io/ioutil is deprecated. Use package io or os instead.
+    errorlint:
+      # Check for plain type assertions and type switches.
+      asserts: false
+      # Check for plain error comparisons.
+      comparison: false
+    forbidigo:
+      # Forbid the following identifiers (list of regexp).
+      forbid:
+        - pattern: require\.Error$(# ErrorIs should be used instead)?
+        - pattern: require\.ErrorContains$(# ErrorIs should be used instead)?
+        - pattern: require\.EqualValues$(# Equal should be used instead)?
+        - pattern: require\.NotEqualValues$(# NotEqual should be used instead)?
+        - pattern: ^(t|b|tb|f)\.(Fatal|Fatalf|Error|Errorf)$(# the require library should be used instead)?
+        - pattern: ^sort\.(Slice|Strings)$(# the slices package should be used instead)?
+      # Exclude godoc examples from forbidigo checks.
+      exclude-godoc-examples: false
+    gosec:
+      excludes:
+        - G107 # Url provided to HTTP request as taint input https://securego.io/docs/rules/g107
+        - G115 # TODO(marun) Enable this ruleset in a follow-up PR
+    importas:
+      # Do not allow unaliased imports of aliased packages.
+      no-unaliased: false
+      # Do not allow non-required aliases.
+      no-extra-aliases: false
+      # List of aliases
+      alias:
+        - pkg: github.com/ava-labs/avalanchego/utils/math
+          alias: safemath
+        - pkg: github.com/ava-labs/avalanchego/utils/json
+          alias: avajson
+    revive:
+      rules:
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
+        - name: bool-literal-in-expr
+          disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#early-return
+        - name: early-return
+          disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-lines
+        - name: empty-lines
+          disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#string-format
+        - name: string-format
+          disabled: false
+          arguments:
+            - - b.Logf[0]
+              - /.*%.*/
+              - no format directive, use b.Log instead
+            - - fmt.Errorf[0]
+              - /.*%.*/
+              - no format directive, use errors.New instead
+            - - fmt.Fprintf[1]
+              - /.*%.*/
+              - no format directive, use fmt.Fprint instead
+            - - fmt.Printf[0]
+              - /.*%.*/
+              - no format directive, use fmt.Print instead
+            - - fmt.Sprintf[0]
+              - /.*%.*/
+              - no format directive, use fmt.Sprint instead
+            - - log.Fatalf[0]
+              - /.*%.*/
+              - no format directive, use log.Fatal instead
+            - - log.Printf[0]
+              - /.*%.*/
+              - no format directive, use log.Print instead
+            - - t.Logf[0]
+              - /.*%.*/
+              - no format directive, use t.Log instead
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#struct-tag
+        - name: struct-tag
+          disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unexported-naming
+        - name: unexported-naming
+          disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unhandled-error
+        - name: unhandled-error
+          # prefer the errcheck linter since it can be disabled directly with nolint directive
+          # but revive's disable directive (e.g. //revive:disable:unhandled-error) is not
+          # supported when run under golangci_lint
+          disabled: true
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-parameter
+        - name: unused-parameter
+          disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#unused-receiver
+        - name: unused-receiver
+          disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#useless-break
+        - name: useless-break
+          disabled: false
+    spancheck:
+      # https://github.com/jjti/go-spancheck#checks
+      checks:
+        - end
+    staticcheck:
+      # https://staticcheck.io/docs/options#checks
+      checks:
+        - all
+        - -SA6002A # Storing non-pointer values in sync.Pool allocates memory
+        - -SA1019 # Using a deprecated function, variable, constant or field
+        - -QF1008 # Unnecessary embedded expressions
+    tagalign:
+      align: true
+      sort: true
+      order:
+        - serialize
+      strict: true
+    testifylint:
     # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
     # Default: false
     enable-all: true
@@ -213,13 +196,37 @@ linters-settings:
     disable:
       - go-require
       - float-compare
-  unused:
-    # Mark all struct fields that have been written to as used.
-    # Default: true
-    field-writes-are-uses: false
-    # Treat IncDec statement (e.g. `i++` or `i--`) as both read and write operation instead of just write.
-    # Default: false
-    post-statements-are-reads: true
-    # Mark all local variables as used.
-    # default: true
-    local-variables-are-used: false
+    unused:
+      # Mark all struct fields that have been written to as used.
+      # Default: true
+      field-writes-are-uses: false
+      # Treat IncDec statement (e.g. `i++` or `i--`) as both read and write operation instead of just write.
+      # Default: false
+      post-statements-are-reads: true
+      # Mark all local variables as used.
+      # default: true
+      local-variables-are-used: false
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - blank
+        - prefix(github.com/ava-labs/avalanchego)
+        - alias
+        - dot
+      custom-order: true
+  exclusions:
+    generated: lax

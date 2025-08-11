@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package snowman
@@ -538,7 +538,7 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 
 	metrics := gatherCounterGauge(t, registerer)
 	require.Zero(metrics["polls_failed"])
-	require.Equal(float64(1), metrics["polls_successful"])
+	require.InDelta(float64(1), metrics["polls_successful"], 0)
 
 	// The second poll will do nothing
 	require.NoError(sm.RecordPoll(context.Background(), votes))
@@ -546,8 +546,8 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	require.Equal(2, sm.NumProcessing())
 
 	metrics = gatherCounterGauge(t, registerer)
-	require.Equal(float64(1), metrics["polls_failed"])
-	require.Equal(float64(1), metrics["polls_successful"])
+	require.InDelta(float64(1), metrics["polls_failed"], 0)
+	require.InDelta(float64(1), metrics["polls_successful"], 0)
 }
 
 func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {

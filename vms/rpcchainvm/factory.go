@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package rpcchainvm
@@ -6,6 +6,8 @@ package rpcchainvm
 import (
 	"context"
 	"fmt"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -64,10 +66,11 @@ func (f *factory) New(log logging.Logger) (interface{}, error) {
 
 	clientConn, err := grpcutils.Dial(status.Addr)
 	if err != nil {
+		log.Error("failed to dial VM gRPC service", zap.Error(err))
 		return nil, err
 	}
 
 	f.processTracker.TrackProcess(status.Pid)
 	f.runtimeTracker.TrackRuntime(stopper)
-	return NewClient(clientConn, stopper, status.Pid, f.processTracker, f.metricsGatherer), nil
+	return NewClient(clientConn, stopper, status.Pid, f.processTracker, f.metricsGatherer, log), nil
 }

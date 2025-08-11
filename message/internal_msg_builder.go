@@ -1,7 +1,7 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-//nolint:stylecheck // proto generates interfaces that fail linting
+//nolint:staticcheck // proto generates interfaces that fail linting
 package message
 
 import (

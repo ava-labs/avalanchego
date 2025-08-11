@@ -10,9 +10,6 @@ for file in .github/workflows/*.{yml,yaml}; do
   # Skip if no matches found (in case one of the extensions doesn't exist)
   [[ -f "$file" ]] || continue
 
-  # Skip build-win-release due to not having an easy way to test go-task on windows
-  [[ "$file" == *build-win-release.yml ]] && continue
-
   # Search for scripts/* except for scripts/run_task.sh
   MATCHES=$(grep -H -n -P "scripts/(?!run_task\.sh)" "$file" || true)
   if [[ -n "${MATCHES}" ]]; then

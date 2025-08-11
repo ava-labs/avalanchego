@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -185,8 +185,10 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		var (
 			networkID           = env.GetNetwork().GetNetworkID()
 			genesisPeerMessages = buffer.NewUnboundedBlockingDeque[p2pmessage.InboundMessage](1)
-			stakingAddress      = e2e.GetLocalStakingAddress(tc, subnetGenesisNode)
 		)
+		stakingAddress, cancel, err := subnetGenesisNode.GetAccessibleStakingAddress(tc.DefaultContext())
+		require.NoError(err)
+		tc.DeferCleanup(cancel)
 		genesisPeer, err := peer.StartTestPeer(
 			tc.DefaultContext(),
 			stakingAddress,
@@ -202,7 +204,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		)
 		require.NoError(err)
 
-		subnetGenesisNodeURI := e2e.GetLocalURI(tc, subnetGenesisNode)
+		subnetGenesisNodeURI := subnetGenesisNode.GetAccessibleURI()
 
 		address := []byte{}
 		tc.By("issuing a ConvertSubnetToL1Tx", func() {

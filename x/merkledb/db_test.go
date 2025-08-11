@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"maps"
 	"math/rand"
 	"slices"
 	"strconv"
@@ -999,9 +1000,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				continue
 			}
 
-			for key, value := range uncommittedKeyValues {
-				values[key] = value
-			}
+			maps.Copy(values, uncommittedKeyValues)
 			clear(uncommittedKeyValues)
 
 			for key := range uncommittedDeletes {

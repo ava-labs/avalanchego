@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package mempool
@@ -40,7 +40,6 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	case *txs.RewardValidatorTx:
 		return ErrCantIssueRewardValidatorTx
 	default:
+		return m.Mempool.Add(tx)
 	}
-
-	return m.Mempool.Add(tx)
 }

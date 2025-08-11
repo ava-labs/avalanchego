@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -6,12 +6,8 @@ package tmpnet
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"go.uber.org/zap"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 
@@ -40,8 +36,8 @@ type kubeCollectorConfig struct {
 	manifest     []byte
 }
 
-// DeployKubeCollectors deploys collectors of logs and metrics to a Kubernetes cluster.
-func DeployKubeCollectors(
+// deployKubeCollectors deploys collectors of logs and metrics to a Kubernetes cluster.
+func deployKubeCollectors(
 	ctx context.Context,
 	log logging.Logger,
 	configPath string,
@@ -49,7 +45,7 @@ func DeployKubeCollectors(
 	startMetricsCollector bool,
 	startLogsCollector bool,
 ) error {
-	if !(startMetricsCollector || startLogsCollector) {
+	if !startMetricsCollector && !startLogsCollector {
 		// Nothing to do
 		return nil
 	}
@@ -121,7 +117,7 @@ func deployKubeCollector(
 		return fmt.Errorf("failed to create credential secret for %s: %w", collectorConfig.name, err)
 	}
 
-	if err := applyManifest(ctx, log, dynamicClient, collectorConfig.manifest); err != nil {
+	if err := applyManifest(ctx, log, dynamicClient, collectorConfig.manifest, monitoringNamespace); err != nil {
 		return fmt.Errorf("failed to apply manifest for %s: %w", collectorConfig.name, err)
 	}
 	return nil
@@ -162,66 +158,6 @@ func createCredentialSecret(
 		zap.String("namespace", monitoringNamespace),
 		zap.String("name", secretName),
 	)
-
-	return nil
-}
-
-// applyManifest creates the resources defined by the provided manifest in a manner similar to `kubectl apply -f`
-func applyManifest(
-	ctx context.Context,
-	log logging.Logger,
-	dynamicClient dynamic.Interface,
-	manifest []byte,
-) error {
-	// Split the manifest into individual resources
-	decoder := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
-	documents := strings.Split(string(manifest), "\n---\n")
-
-	for _, doc := range documents {
-		doc := strings.TrimSpace(doc)
-		if strings.TrimSpace(doc) == "" || strings.HasPrefix(doc, "#") {
-			continue
-		}
-
-		obj := &unstructured.Unstructured{}
-		_, gvk, err := decoder.Decode([]byte(doc), nil, obj)
-		if err != nil {
-			return fmt.Errorf("failed to decode manifest: %w", err)
-		}
-
-		gvr := schema.GroupVersionResource{
-			Group:    gvk.Group,
-			Version:  gvk.Version,
-			Resource: strings.ToLower(gvk.Kind) + "s",
-		}
-
-		var resourceInterface dynamic.ResourceInterface
-		if strings.HasPrefix(gvk.Kind, "Cluster") || gvk.Kind == "Namespace" {
-			resourceInterface = dynamicClient.Resource(gvr)
-		} else {
-			resourceInterface = dynamicClient.Resource(gvr).Namespace(monitoringNamespace)
-		}
-
-		_, err = resourceInterface.Create(ctx, obj, metav1.CreateOptions{})
-		if err != nil {
-			if apierrors.IsAlreadyExists(err) {
-				log.Info("resource already exists",
-					zap.String("kind", gvk.Kind),
-					zap.String("namespace", monitoringNamespace),
-					zap.String("name", obj.GetName()),
-				)
-				continue
-			}
-			return fmt.Errorf("failed to create %s %s/%s: %w", gvk.Kind, monitoringNamespace, obj.GetName(), err)
-		}
-		log.Info("created resource",
-			zap.String("kind", gvk.Kind),
-			zap.String("namespace", monitoringNamespace),
-			zap.String("name", obj.GetName()),
-		)
-	}
-
-	// TODO(marun) Check that the resources are running and healthy
 
 	return nil
 }

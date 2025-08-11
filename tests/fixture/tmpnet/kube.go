@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -6,6 +6,7 @@ package tmpnet
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -17,8 +18,13 @@ import (
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer/yaml"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/portforward"
@@ -383,4 +389,75 @@ func GetClientset(log logging.Logger, path string, context string) (*kubernetes.
 		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}
 	return clientset, nil
+}
+
+// applyManifest creates or updates the resources defined by the provided manifest using server-side apply.
+// If namespace is empty, the namespace from the manifest will be used for namespaced resources.
+func applyManifest(
+	ctx context.Context,
+	log logging.Logger,
+	dynamicClient dynamic.Interface,
+	manifest []byte,
+	namespace string,
+) error {
+	// Split the manifest into individual resources
+	decoder := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
+	documents := strings.Split(string(manifest), "\n---\n")
+
+	for _, doc := range documents {
+		doc := strings.TrimSpace(doc)
+		if strings.TrimSpace(doc) == "" || strings.HasPrefix(doc, "#") {
+			continue
+		}
+
+		obj := &unstructured.Unstructured{}
+		_, gvk, err := decoder.Decode([]byte(doc), nil, obj)
+		if err != nil {
+			return fmt.Errorf("failed to decode manifest: %w", err)
+		}
+
+		gvr := schema.GroupVersionResource{
+			Group:    gvk.Group,
+			Version:  gvk.Version,
+			Resource: strings.ToLower(gvk.Kind) + "s",
+		}
+
+		// Determine namespace for the resource
+		resourceNamespace := namespace
+		if resourceNamespace == "" {
+			// Use namespace from the manifest if not provided
+			resourceNamespace = obj.GetNamespace()
+		}
+
+		var resourceInterface dynamic.ResourceInterface
+		if strings.HasPrefix(gvk.Kind, "Cluster") || gvk.Kind == "Namespace" {
+			resourceInterface = dynamicClient.Resource(gvr)
+		} else {
+			resourceInterface = dynamicClient.Resource(gvr).Namespace(resourceNamespace)
+		}
+
+		// Convert object to JSON for server-side apply
+		data, err := json.Marshal(obj)
+		if err != nil {
+			return fmt.Errorf("failed to marshal object to JSON: %w", err)
+		}
+
+		// Use server-side apply to create or update the resource
+		_, err = resourceInterface.Patch(ctx, obj.GetName(), types.ApplyPatchType, data, metav1.PatchOptions{
+			FieldManager: "tmpnet-apply",
+			Force:        ptr.To(true),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to apply %s %s/%s: %w", gvk.Kind, resourceNamespace, obj.GetName(), err)
+		}
+		log.Info("applied resource",
+			zap.String("kind", gvk.Kind),
+			zap.String("namespace", resourceNamespace),
+			zap.String("name", obj.GetName()),
+		)
+	}
+
+	// TODO(marun) Check that the resources are running and healthy
+
+	return nil
 }
