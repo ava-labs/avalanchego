@@ -9,22 +9,7 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "daily"
-    ignore:
-      - dependency-name: "github.com/ava-labs/avalanchego" # manually updated
-      - dependency-name: "github.com/ava-labs/libevm" # manually updated
-      - dependency-name: "github.com/VictoriaMetrics/fastcache" # geth dependency
-      - dependency-name: "github.com/davecgh/go-spew" # geth dependency
-      - dependency-name: "ithub.com/deckarep/golang-set/v2" # geth dependency
-      - dependency-name: "github.com/hashicorp/go-bexpr" # geth dependency
-      - dependency-name: "github.com/holiman/billy" # geth dependency
-      - dependency-name: "github.com/holiman/bloomfilter/v2" # geth dependency
-      - dependency-name: "github.com/holiman/uint256" # geth dependency
-      - dependency-name: "github.com/mattn/go-colorable" # geth dependency
-      - dependency-name: "github.com/mattn/go-isatty" # geth dependency
-      - dependency-name: "github.com/tyler-smith/go-bip39" # geth dependency
-      - dependency-name: "github.com/urfave/cli/v2" # geth dependency
-      - dependency-name: "golang.org/x/time" # geth dependency
-      - dependency-name: "gopkg.in/natefinch/lumberjack.v2" # geth dependency
+    open-pull-requests-limit: 0 # Disable non-security version updates
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
