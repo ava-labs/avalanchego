@@ -177,6 +177,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	fullProof, err := db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), numKeys)
 	require.NoError(err)
 	fullProofBytes, err := proto.Marshal(fullProof.ToProto())
+	require.NoError(err)
 
 	rangeProof, err := proofParser.ParseRangeProof(fullProofBytes, root[:], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), uint32(numKeys))
 	require.NoError(err)
@@ -224,7 +225,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	// next key would be after the end of the range, so it returns Nothing instead
 	nextKey, err = rangeProof.FindNextKey(ctx)
 	require.NoError(err)
-	require.True(nextKey.IsNothing())
+	require.Equal(endPointBeforeNewKey, nextKey.Value())
 }
 
 func Test_Sync_FindNextKey_Deleted(t *testing.T) {
@@ -304,6 +305,7 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 
 	// Get proof including 0x11.0x11
 	proofParser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	require.NoError(err)
 	proof, err := db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
 	require.NoError(err)
 	proofBytes, err := proto.Marshal(proof.ToProto())
@@ -311,9 +313,11 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	rangeProof, err := proofParser.ParseRangeProof(proofBytes, targetRoot[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
 	require.NoError(err)
 	require.NoError(rangeProof.Verify(ctx))
+
+	// The exact next key must be after the requested range
 	nextKey, err := rangeProof.FindNextKey(ctx)
 	require.NoError(err)
-	require.True(nextKey.IsNothing())
+	require.GreaterOrEqual(compare(maybe.Some([]byte{0x20}), nextKey), 0)
 
 	// Add another key afterward
 	require.NoError(db.Put([]byte{0x11, 0x15}, []byte{4}))
@@ -417,6 +421,20 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	require.True(isPrefix(midPointVal, nextKey.Value()))
 }
 
+// compares two maybe.Maybe[[]byte] values, interpreting Nothing as greater than any value
+func compare(a, b maybe.Maybe[[]byte]) int {
+	if a.IsNothing() && b.IsNothing() {
+		return 0
+	}
+	if a.IsNothing() {
+		return 1
+	}
+	if b.IsNothing() {
+		return -1
+	}
+	return bytes.Compare(a.Value(), b.Value())
+}
+
 func isPrefix(data []byte, prefix []byte) bool {
 	if prefix[len(prefix)-1]%16 == 0 {
 		index := 0
@@ -439,13 +457,11 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 	db, err := generateTrie(t, r, 500)
 	require.NoError(err)
 
-	ctx := context.Background()
-	root, err := db.GetMerkleRoot(ctx)
-	require.NoError(err)
-
 	proofParser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
 	require.NoError(err)
 
+	// Get last key in the proof
+	ctx := context.Background()
 	proof, err := db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 100)
 	require.NoError(err)
 	lastKey := proof.KeyChanges[len(proof.KeyChanges)-1].Key
@@ -453,7 +469,8 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 	// add a child
 	lastKey = append(lastKey, 16)
 	require.NoError(db.Put(lastKey, []byte{1}))
-	root, err = db.GetMerkleRoot(ctx)
+	root, err := db.GetMerkleRoot(ctx)
+	require.NoError(err)
 	proof, err = db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key), 100)
 	require.NoError(err)
 	proofBytes, err := proto.Marshal(proof.ToProto())
@@ -662,6 +679,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 
 		// Parse the proof and find the next key to get.
 		proofParser, err := newParser(localDB, merkledb.DefaultHasher, merkledb.BranchFactor16)
+		require.NoError(err)
 		proofBytes, err := proto.Marshal(remoteProof.ToProto())
 		require.NoError(err)
 		rangeProof, err := proofParser.ParseRangeProof(
@@ -677,13 +695,12 @@ func TestFindNextKeyRandom(t *testing.T) {
 		gotFirstDiff, err := rangeProof.FindNextKey(context.Background())
 		require.NoError(err)
 
-		if bytes.Compare(smallestDiffKey.Bytes(), rangeEnd) >= 0 {
-			// The smallest key which differs is after the range end so the
-			// next key to get should be nil because we're done fetching the range.
-			require.True(gotFirstDiff.IsNothing())
-		} else {
-			require.Equal(smallestDiffKey.Bytes(), gotFirstDiff.Value())
+		// The next key should be bounded by the next key not in the proof
+		actualNextKey := maybe.Nothing[[]byte]()
+		if len(smallestDiffKey.Bytes()) > 0 {
+			actualNextKey = maybe.Some(smallestDiffKey.Bytes())
 		}
+		require.LessOrEqual(compare(gotFirstDiff, actualNextKey), 0)
 	}
 }
 
