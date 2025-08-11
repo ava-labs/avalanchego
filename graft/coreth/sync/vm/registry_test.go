@@ -7,58 +7,27 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
-	synccommon "github.com/ava-labs/coreth/sync"
 	"github.com/stretchr/testify/require"
 )
 
 // mockSyncer implements synccommon.Syncer for testing.
 type mockSyncer struct {
-	name           string
-	startDelay     time.Duration
-	waitDelay      time.Duration
-	startError     error
-	waitError      error
-	startCalled    bool
-	waitCalled     bool
-	startCallCount int
-	waitCallCount  int
-	started        bool // Track if already started
+	name      string
+	syncError error
+	started   bool // Track if already started
 }
 
-func newMockSyncer(name string, startDelay, waitDelay time.Duration, startError, waitError error) *mockSyncer {
+func newMockSyncer(name string, syncError error) *mockSyncer {
 	return &mockSyncer{
-		name:       name,
-		startDelay: startDelay,
-		waitDelay:  waitDelay,
-		startError: startError,
-		waitError:  waitError,
+		name:      name,
+		syncError: syncError,
 	}
 }
 
-func (m *mockSyncer) Start(ctx context.Context) error {
-	if m.started {
-		return synccommon.ErrSyncerAlreadyStarted
-	}
-
+func (m *mockSyncer) Sync(ctx context.Context) error {
 	m.started = true
-	m.startCalled = true
-	m.startCallCount++
-	if m.startDelay > 0 {
-		time.Sleep(m.startDelay)
-	}
-	return m.startError
-}
-
-func (m *mockSyncer) Wait(ctx context.Context) error {
-	m.waitCalled = true
-	m.waitCallCount++
-	if m.waitDelay > 0 {
-		time.Sleep(m.waitDelay)
-	}
-
-	return m.waitError
+	return m.syncError
 }
 
 func TestNewSyncerRegistry(t *testing.T) {
@@ -83,8 +52,8 @@ func TestSyncerRegistry_Register(t *testing.T) {
 				name   string
 				syncer *mockSyncer
 			}{
-				{"Syncer1", newMockSyncer("TestSyncer1", 0, 0, nil, nil)},
-				{"Syncer2", newMockSyncer("TestSyncer2", 0, 0, nil, nil)},
+				{"Syncer1", newMockSyncer("TestSyncer1", nil)},
+				{"Syncer2", newMockSyncer("TestSyncer2", nil)},
 			},
 			expectedError: "",
 			expectedCount: 2,
@@ -95,8 +64,8 @@ func TestSyncerRegistry_Register(t *testing.T) {
 				name   string
 				syncer *mockSyncer
 			}{
-				{"Syncer1", newMockSyncer("Syncer1", 0, 0, nil, nil)},
-				{"Syncer1", newMockSyncer("Syncer1", 0, 0, nil, nil)},
+				{"Syncer1", newMockSyncer("Syncer1", nil)},
+				{"Syncer1", newMockSyncer("Syncer1", nil)},
 			},
 			expectedError: "syncer with name 'Syncer1' is already registered",
 			expectedCount: 1,
@@ -107,9 +76,9 @@ func TestSyncerRegistry_Register(t *testing.T) {
 				name   string
 				syncer *mockSyncer
 			}{
-				{"Syncer1", newMockSyncer("Syncer1", 0, 0, nil, nil)},
-				{"Syncer2", newMockSyncer("Syncer2", 0, 0, nil, nil)},
-				{"Syncer3", newMockSyncer("Syncer3", 0, 0, nil, nil)},
+				{"Syncer1", newMockSyncer("Syncer1", nil)},
+				{"Syncer2", newMockSyncer("Syncer2", nil)},
+				{"Syncer3", newMockSyncer("Syncer3", nil)},
 			},
 			expectedCount: 3,
 		},
@@ -155,11 +124,8 @@ func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
 	tests := []struct {
 		name    string
 		syncers []struct {
-			name       string
-			startDelay time.Duration
-			waitDelay  time.Duration
-			startError error
-			waitError  error
+			name      string
+			syncError error
 		}
 		expectedError string
 		assertState   func(t *testing.T, mockSyncers []*mockSyncer, expectedError string)
@@ -167,64 +133,32 @@ func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
 		{
 			name: "successful execution",
 			syncers: []struct {
-				name       string
-				startDelay time.Duration
-				waitDelay  time.Duration
-				startError error
-				waitError  error
+				name      string
+				syncError error
 			}{
-				{"Syncer1", 0, 0, nil, nil},
-				{"Syncer2", 0, 0, nil, nil},
+				{"Syncer1", nil},
+				{"Syncer2", nil},
 			},
 			assertState: func(t *testing.T, mockSyncers []*mockSyncer, expectedError string) {
 				for i, mockSyncer := range mockSyncers {
-					require.True(t, mockSyncer.startCalled, "Syncer %d should have been started", i)
-					require.True(t, mockSyncer.waitCalled, "Syncer %d should have been waited on", i)
+					require.True(t, mockSyncer.started, "Syncer %d should have been started", i)
 				}
 			},
-		},
-		{
-			name: "start error stops execution",
-			syncers: []struct {
-				name       string
-				startDelay time.Duration
-				waitDelay  time.Duration
-				startError error
-				waitError  error
-			}{
-				{"Syncer1", 0, 0, errors.New("start failed"), nil},
-				{"Syncer2", 0, 0, nil, nil},
-			},
-			expectedError: "failed to start Syncer1",
-			assertState: func(t *testing.T, mockSyncers []*mockSyncer, expectedError string) {
-				// First syncer should be started but not waited on.
-				require.True(t, mockSyncers[0].startCalled, "First syncer should have been started")
-				require.False(t, mockSyncers[0].waitCalled, "First syncer should not have been waited on due to start error")
-				// Second syncer should not be started.
-				require.False(t, mockSyncers[1].startCalled, "Second syncer should not have been started")
-				require.False(t, mockSyncers[1].waitCalled, "Second syncer should not have been waited on")
-			},
-		},
-		{
+		}, {
 			name: "wait error stops execution",
 			syncers: []struct {
-				name       string
-				startDelay time.Duration
-				waitDelay  time.Duration
-				startError error
-				waitError  error
+				name      string
+				syncError error
 			}{
-				{"Syncer1", 0, 0, nil, errors.New("wait failed")},
-				{"Syncer2", 0, 0, nil, nil},
+				{"Syncer1", errors.New("wait failed")},
+				{"Syncer2", nil},
 			},
 			expectedError: "Syncer1 failed",
 			assertState: func(t *testing.T, mockSyncers []*mockSyncer, expectedError string) {
 				// First syncer should be started and waited on (but wait failed).
-				require.True(t, mockSyncers[0].startCalled, "First syncer should have been started")
-				require.True(t, mockSyncers[0].waitCalled, "First syncer should have been waited on")
+				require.True(t, mockSyncers[0].started, "First syncer should have been started")
 				// Second syncer should not be started.
-				require.False(t, mockSyncers[1].startCalled, "Second syncer should not have been started")
-				require.False(t, mockSyncers[1].waitCalled, "Second syncer should not have been waited on")
+				require.False(t, mockSyncers[1].started, "Second syncer should not have been started")
 			},
 		},
 	}
@@ -238,10 +172,7 @@ func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
 			for i, syncerConfig := range tt.syncers {
 				mockSyncer := newMockSyncer(
 					syncerConfig.name,
-					syncerConfig.startDelay,
-					syncerConfig.waitDelay,
-					syncerConfig.startError,
-					syncerConfig.waitError,
+					syncerConfig.syncError,
 				)
 				mockSyncers[i] = mockSyncer
 				require.NoError(t, registry.Register(syncerConfig.name, mockSyncer))

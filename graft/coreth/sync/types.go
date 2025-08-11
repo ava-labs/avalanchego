@@ -5,7 +5,6 @@ package sync
 
 import (
 	"context"
-	"errors"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -14,24 +13,12 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 )
 
-var (
-	// ErrWaitBeforeStart is returned when Wait() is called before Start().
-	ErrWaitBeforeStart = errors.New("Wait() called before Start() - call Start() first")
-	// ErrSyncerAlreadyStarted is returned when Start() is called on a syncer that has already been started.
-	ErrSyncerAlreadyStarted = errors.New("syncer already started")
-)
-
 // Syncer is the common interface for all sync operations.
 // This provides a unified interface for atomic state sync and state trie sync.
 type Syncer interface {
-	// Start begins the sync operation.
+	// Completes the full sync operation, returning any errors encountered.
 	// The sync will respect context cancellation.
-	Start(ctx context.Context) error
-
-	// Wait blocks until the sync operation completes or fails.
-	// Returns the final error (nil if successful).
-	// The sync will respect context cancellation.
-	Wait(ctx context.Context) error
+	Sync(ctx context.Context) error
 }
 
 // SummaryProvider is an interface for providing state summaries.
