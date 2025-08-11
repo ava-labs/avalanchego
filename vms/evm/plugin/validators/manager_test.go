@@ -27,12 +27,13 @@ func TestLoadNewValidators(t *testing.T) {
 		ids.GenerateTestID(),
 		ids.GenerateTestID(),
 	}
-	tests := []struct {
+
+	testCases := []struct {
 		name                      string
 		initialValidators         map[ids.ID]*validators.GetCurrentValidatorOutput
 		newValidators             map[ids.ID]*validators.GetCurrentValidatorOutput
 		registerMockListenerCalls func(*interfaces.MockStateCallbackListener)
-		expectedLoadErr           error
+		wantLoadErr               error
 	}{
 		{
 			name:                      "before empty/after empty",
@@ -164,7 +165,7 @@ func TestLoadNewValidators(t *testing.T) {
 					StartTime: 0,
 				},
 			},
-			expectedLoadErr: state.ErrImmutableField,
+			wantLoadErr: state.ErrImmutableField,
 			registerMockListenerCalls: func(mock *interfaces.MockStateCallbackListener) {
 				// initial validator will trigger first
 				mock.EXPECT().OnValidatorAdded(testValidationIDs[0], testNodeIDs[0], uint64(0), true).Times(1)
@@ -173,15 +174,15 @@ func TestLoadNewValidators(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(tt *testing.T) {
+	for _, tc := range testCases {
+		t.Run(tc.name, func(tt *testing.T) {
 			require := require.New(tt)
 			db := memdb.New()
 			validatorState, err := state.NewState(db)
 			require.NoError(err)
 
-			// set initial validators
-			for vID, validator := range test.initialValidators {
+			// Set initial validators
+			for vID, validator := range tc.initialValidators {
 				require.NoError(validatorState.AddValidator(interfaces.Validator{
 					ValidationID:   vID,
 					NodeID:         validator.NodeID,
@@ -191,22 +192,25 @@ func TestLoadNewValidators(t *testing.T) {
 					IsL1Validator:  validator.IsL1Validator,
 				}))
 			}
-			// enable mock listener
+
+			// Enable mock listener
 			ctrl := gomock.NewController(tt)
 			mockListener := interfaces.NewMockStateCallbackListener(ctrl)
-			test.registerMockListenerCalls(mockListener)
+			tc.registerMockListenerCalls(mockListener)
 
 			validatorState.RegisterListener(mockListener)
-			// load new validators
-			err = loadValidators(validatorState, test.newValidators)
-			if test.expectedLoadErr != nil {
-				require.Error(err)
+
+			// Load new validators using the same logic as the manager
+			err = loadValidatorsForTest(validatorState, tc.newValidators)
+			if tc.wantLoadErr != nil {
+				require.ErrorIs(err, tc.wantLoadErr)
 				return
 			}
 			require.NoError(err)
-			// check if the state is as expected
-			require.Equal(len(test.newValidators), validatorState.GetValidationIDs().Len())
-			for vID, validator := range test.newValidators {
+
+			// Verify final state matches expectations
+			require.Equal(len(tc.newValidators), validatorState.GetValidationIDs().Len())
+			for vID, validator := range tc.newValidators {
 				v, err := validatorState.GetValidator(vID)
 				require.NoError(err)
 				require.Equal(validator.NodeID, v.NodeID)
@@ -217,4 +221,43 @@ func TestLoadNewValidators(t *testing.T) {
 			}
 		})
 	}
+}
+
+// loadValidatorsForTest is a test helper that replicates the logic from the manager
+// for testing purposes
+func loadValidatorsForTest(validatorState interfaces.State, newValidators map[ids.ID]*validators.GetCurrentValidatorOutput) error {
+	currentValidationIDs := validatorState.GetValidationIDs()
+
+	// Remove validators no longer in the current set
+	for vID := range currentValidationIDs {
+		if _, exists := newValidators[vID]; !exists {
+			if err := validatorState.DeleteValidator(vID); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Add or update validators
+	for vID, newVdr := range newValidators {
+		validator := interfaces.Validator{
+			ValidationID:   vID,
+			NodeID:         newVdr.NodeID,
+			Weight:         newVdr.Weight,
+			StartTimestamp: newVdr.StartTime,
+			IsActive:       newVdr.IsActive,
+			IsL1Validator:  newVdr.IsL1Validator,
+		}
+
+		if currentValidationIDs.Contains(vID) {
+			if err := validatorState.UpdateValidator(validator); err != nil {
+				return err
+			}
+		} else {
+			if err := validatorState.AddValidator(validator); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
 }

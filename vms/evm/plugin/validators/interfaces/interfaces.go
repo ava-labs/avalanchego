@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/uptime"
 
-	avalancheuptime "github.com/ava-labs/avalanchego/snow/uptime"
 	stateinterfaces "github.com/ava-labs/avalanchego/vms/evm/plugin/validators/state/interfaces"
 )
 
@@ -23,10 +23,12 @@ type ValidatorReader interface {
 
 type Manager interface {
 	stateinterfaces.StateReader
-	avalancheuptime.Manager
 	// Initialize initializes the validator manager
 	// by syncing the validator state with the current validator set
 	// and starting the uptime tracking.
+	uptime.Manager
+
+	// Lifecycle management
 	Initialize(ctx context.Context) error
 	// Shutdown stops the uptime tracking and writes the validator state to the database.
 	Shutdown() error

@@ -64,27 +64,30 @@ func NewManager(
 func (m *manager) Initialize(ctx context.Context) error {
 	// sync validators first
 	if err := m.sync(ctx); err != nil {
-		return fmt.Errorf("failed to update validators: %w", err)
+		return fmt.Errorf("failed to sync validators: %w", err)
 	}
+
 	vdrIDs := m.State.GetNodeIDs().List()
 	// Then start tracking with updated validators
 	// StartTracking initializes the uptime tracking with the known validators
 	// and update their uptime to account for the time we were being offline.
 	if err := m.PausableManager.StartTracking(vdrIDs); err != nil {
-		return fmt.Errorf("failed to start tracking uptime: %w", err)
+		return fmt.Errorf("failed to start uptime tracking: %w", err)
 	}
+
 	return nil
 }
 
-// Shutdown stops the uptime tracking and writes the validator state to the database.
+// Shutdown stops uptime tracking and persists validator state
 func (m *manager) Shutdown() error {
 	vdrIDs := m.State.GetNodeIDs().List()
 	if err := m.PausableManager.StopTracking(vdrIDs); err != nil {
-		return fmt.Errorf("failed to stop tracking uptime: %w", err)
+		return fmt.Errorf("failed to stop uptime tracking: %w", err)
 	}
 	if err := m.State.WriteState(); err != nil {
-		return fmt.Errorf("failed to write validator: %w", err)
+		return fmt.Errorf("failed to write validator state: %w", err)
 	}
+
 	return nil
 }
 
@@ -112,60 +115,64 @@ func (m *manager) DispatchSync(ctx context.Context, lock sync.Locker) {
 // and writes the state to the database.
 // sync is not safe to call concurrently and should be called with the VM locked.
 func (m *manager) sync(ctx context.Context) error {
-	now := time.Now()
-	log.Debug("performing validator sync")
-	// get current validator set
+	start := time.Now()
+	log.Debug("starting validator sync")
+
+	// Get current validator set from P-Chain
 	currentValidatorSet, _, err := m.chainCtx.ValidatorState.GetCurrentValidatorSet(ctx, m.chainCtx.SubnetID)
 	if err != nil {
 		return fmt.Errorf("failed to get current validator set: %w", err)
 	}
 
-	// load the current validator set into the validator state
-	if err := loadValidators(m.State, currentValidatorSet); err != nil {
-		return fmt.Errorf("failed to load current validators: %w", err)
+	// Update local validator state
+	if err := m.updateValidatorState(currentValidatorSet); err != nil {
+		return fmt.Errorf("failed to update validator state: %w", err)
 	}
 
-	// write validators to the database
+	// Persist changes
 	if err := m.State.WriteState(); err != nil {
 		return fmt.Errorf("failed to write validator state: %w", err)
 	}
 
 	// TODO: add metrics
-	log.Debug("validator sync complete", "duration", time.Since(now))
+	log.Debug("validator sync complete", "duration", time.Since(start))
 	return nil
 }
 
-// loadValidators loads the [validators] into the validator state [validatorState]
-func loadValidators(validatorState stateinterfaces.State, newValidators map[ids.ID]*validators.GetCurrentValidatorOutput) error {
-	currentValidationIDs := validatorState.GetValidationIDs()
-	// first check if we need to delete any existing validators
+// updateValidatorState updates the local validator state to match the current validator set
+func (m *manager) updateValidatorState(newValidators map[ids.ID]*validators.GetCurrentValidatorOutput) error {
+	currentValidationIDs := m.State.GetValidationIDs()
+
+	// Remove validators no longer in the current set
 	for vID := range currentValidationIDs {
-		// if the validator is not in the new set of validators
-		// delete the validator
 		if _, exists := newValidators[vID]; !exists {
-			validatorState.DeleteValidator(vID)
+			if err := m.State.DeleteValidator(vID); err != nil {
+				return fmt.Errorf("failed to delete validator %s: %w", vID, err)
+			}
 		}
 	}
 
-	// then load the new validators
-	for newVID, newVdr := range newValidators {
-		currentVdr := stateinterfaces.Validator{
-			ValidationID:   newVID,
+	// Add or update validators
+	for vID, newVdr := range newValidators {
+		validator := stateinterfaces.Validator{
+			ValidationID:   vID,
 			NodeID:         newVdr.NodeID,
 			Weight:         newVdr.Weight,
 			StartTimestamp: newVdr.StartTime,
 			IsActive:       newVdr.IsActive,
 			IsL1Validator:  newVdr.IsL1Validator,
 		}
-		if currentValidationIDs.Contains(newVID) {
-			if err := validatorState.UpdateValidator(currentVdr); err != nil {
-				return err
+
+		if currentValidationIDs.Contains(vID) {
+			if err := m.State.UpdateValidator(validator); err != nil {
+				return fmt.Errorf("failed to update validator %s: %w", vID, err)
 			}
 		} else {
-			if err := validatorState.AddValidator(currentVdr); err != nil {
-				return err
+			if err := m.State.AddValidator(validator); err != nil {
+				return fmt.Errorf("failed to add validator %s: %w", vID, err)
 			}
 		}
 	}
+
 	return nil
 }

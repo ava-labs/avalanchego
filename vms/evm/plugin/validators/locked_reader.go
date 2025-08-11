@@ -42,12 +42,12 @@ func (l *lockedReader) GetValidatorAndUptime(validationID ids.ID) (stateinterfac
 
 	vdr, err := l.manager.GetValidator(validationID)
 	if err != nil {
-		return stateinterfaces.Validator{}, 0, time.Time{}, fmt.Errorf("failed to get validator: %w", err)
+		return stateinterfaces.Validator{}, 0, time.Time{}, fmt.Errorf("failed to get validator %s: %w", validationID, err)
 	}
 
 	uptime, lastUpdated, err := l.manager.CalculateUptime(vdr.NodeID)
 	if err != nil {
-		return stateinterfaces.Validator{}, 0, time.Time{}, fmt.Errorf("failed to get uptime: %w", err)
+		return stateinterfaces.Validator{}, 0, time.Time{}, fmt.Errorf("failed to calculate uptime for validator %s: %w", validationID, err)
 	}
 
 	return vdr, uptime, lastUpdated, nil
