@@ -17,7 +17,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 
-	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	synccommon "github.com/ava-labs/coreth/sync"
 	syncclient "github.com/ava-labs/coreth/sync/client"
@@ -26,9 +25,10 @@ import (
 )
 
 const (
-	minNumWorkers     = 1
-	maxNumWorkers     = 64
-	defaultNumWorkers = 8 // TODO: Dynamic worker count discovery will be implemented in a future PR.
+	minNumWorkers      = 1
+	maxNumWorkers      = 64
+	defaultNumWorkers  = 8 // TODO: Dynamic worker count discovery will be implemented in a future PR.
+	defaultRequestSize = 1024
 
 	minRequestSize = 1
 	maxRequestSize = 1024 // Matches [maxLeavesLimit] in sync/handlers/leafs_request.go
@@ -103,7 +103,7 @@ func (c *Config) Validate() error {
 
 	// Set default RequestSize if not specified.
 	if c.RequestSize == 0 {
-		c.RequestSize = config.DefaultStateSyncRequestSize
+		c.RequestSize = defaultRequestSize
 	}
 	if c.RequestSize < minRequestSize || c.RequestSize > maxRequestSize {
 		return fmt.Errorf("%w: %d (must be between %d and %d)", errInvalidRequestSize, c.RequestSize, minRequestSize, maxRequestSize)

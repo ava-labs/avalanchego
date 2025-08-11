@@ -48,7 +48,6 @@ import (
 	"github.com/ava-labs/coreth/eth/filters"
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
@@ -337,42 +336,6 @@ func addUTXO(sharedMemory *avalancheatomic.Memory, ctx *snow.Context, txID ids.I
 	}
 
 	return utxo, nil
-}
-
-func TestVMConfig(t *testing.T) {
-	txFeeCap := float64(11)
-	enabledEthAPIs := []string{"debug"}
-	vm := newVM(t, testVMConfig{
-		configJSON: fmt.Sprintf(`{"rpc-tx-fee-cap": %g,"eth-apis": [%q]}`, txFeeCap, enabledEthAPIs[0]),
-	}).vm
-	require.Equal(t, vm.config.RPCTxFeeCap, txFeeCap, "Tx Fee Cap should be set")
-	require.Equal(t, vm.config.EthAPIs(), enabledEthAPIs, "EnabledEthAPIs should be set")
-	require.NoError(t, vm.Shutdown(context.Background()))
-}
-
-func TestVMConfigDefaults(t *testing.T) {
-	txFeeCap := float64(11)
-	enabledEthAPIs := []string{"debug"}
-	vm := newVM(t, testVMConfig{
-		configJSON: fmt.Sprintf(`{"rpc-tx-fee-cap": %g,"eth-apis": [%q]}`, txFeeCap, enabledEthAPIs[0]),
-	}).vm
-
-	var vmConfig config.Config
-	vmConfig.SetDefaults(defaultTxPoolConfig)
-	vmConfig.RPCTxFeeCap = txFeeCap
-	vmConfig.EnabledEthAPIs = enabledEthAPIs
-	require.Equal(t, vmConfig, vm.config, "VM Config should match default with overrides")
-	require.NoError(t, vm.Shutdown(context.Background()))
-}
-
-func TestVMNilConfig(t *testing.T) {
-	vm := newVM(t, testVMConfig{}).vm
-
-	// VM Config should match defaults if no config is passed in
-	var vmConfig config.Config
-	vmConfig.SetDefaults(defaultTxPoolConfig)
-	require.Equal(t, vmConfig, vm.config, "VM Config should match default config")
-	require.NoError(t, vm.Shutdown(context.Background()))
 }
 
 func TestVMContinuousProfiler(t *testing.T) {
@@ -1813,6 +1776,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 		})
 	}
 }
+
 func testNonCanonicalAccept(t *testing.T, scheme string) {
 	importAmount := uint64(1000000000)
 	fork := upgradetest.NoUpgrades
