@@ -9,27 +9,18 @@ updates:
     directory: "/" # Location of package manifests
     schedule:
       interval: "daily"
-    ignore:
-      - dependency-name: "github.com/ava-labs/avalanchego" # manually updated
-      - dependency-name: "github.com/ava-labs/libevm" # manually updated
-      - dependency-name: "github.com/VictoriaMetrics/fastcache" # geth dependency
-      - dependency-name: "github.com/hashicorp/go-bexpr" # geth dependency
-      - dependency-name: "github.com/holiman/*" # geth dependency
-      - dependency-name: "github.com/holiman/billy" # geth dependency
-      - dependency-name: "github.com/holiman/bloomfilter/v2" # geth dependency
-      - dependency-name: "github.com/holiman/uint256" # geth dependency
-      - dependency-name: "github.com/mattn/go-colorable" # geth dependency
-      - dependency-name: "github.com/mattn/go-isatty" # geth dependency
-      - dependency-name: "github.com/tyler-smith/go-bip39" # geth dependency
-      - dependency-name: "github.com/urfave/cli/v2" # geth dependency
-      - dependency-name: "golang.org/x/time" # geth dependency
-      - dependency-name: "gopkg.in/natefinch/lumberjack.v2" # geth dependency
+    open-pull-requests-limit: 0 # Disable non-security version updates
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
-      interval: weekly
+      interval: "weekly"
     ignore:
       - dependency-name: "ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd" # manually updated
       - dependency-name: "golangci/golangci-lint-action"
         versions:
           - ">=7.0.0" # versions from 7.0.0 only support golangci-lint v2.x.x
+  - package-ecosystem: "npm"
+    directory: "/contracts"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 0 # Disable non-security version updates
