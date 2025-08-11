@@ -36,10 +36,13 @@ jobs:
         contents: write
       runs-on: ${{ github.event.inputs.runner || 'ubuntu-latest' }}
       container:
-        image: ${{ runner.name != 'GitHub Actions' && 'ghcr.io/actions/actions-runner:2.325.0' || '' }}
+        image: |
+          ${{ (github.event.inputs.runner != '' && github.event.inputs.runner != 'ubuntu-latest')
+          && 'ghcr.io/actions/actions-runner:2.325.0'
+          || '' }}
       steps:
         - name: Install ARC Dependencies if Required
-          if: ${{ runner.name != 'GitHub Actions' }}
+          if: ${{ github.event.inputs.runner != '' && github.event.inputs.runner != 'ubuntu-latest' }}
           run: |
             # xz-utils might be present on some containers. Install if not present.
             if ! command -v xz &> /dev/null; then
