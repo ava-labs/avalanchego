@@ -12,11 +12,10 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/log"
 	"golang.org/x/sync/errgroup"
 )
 
-var errFailedToFetchLeafs = errors.New("failed to fetch leafs")
+var ErrFailedToFetchLeafs = errors.New("failed to fetch leafs")
 
 // LeafSyncTask represents a complete task to be completed by the leaf syncer.
 // Note: each LeafSyncTask is processed on its own goroutine and there will
@@ -34,11 +33,16 @@ type LeafSyncTask interface {
 	OnFinish(ctx context.Context) error // Callback when there are no more leaves in the trie to sync or when we reach End()
 }
 
+type LeafSyncerConfig struct {
+	RequestSize uint16 // Number of leafs to request from a peer at a time
+	NumWorkers  int    // Number of workers to process leaf sync tasks
+	OnFailure   func() // Callback for handling errors during sync
+}
+
 type CallbackLeafSyncer struct {
-	client      LeafClient
-	done        chan error
-	tasks       <-chan LeafSyncTask
-	requestSize uint16
+	config *LeafSyncerConfig
+	client LeafClient
+	tasks  <-chan LeafSyncTask
 }
 
 type LeafClient interface {
@@ -48,12 +52,11 @@ type LeafClient interface {
 }
 
 // NewCallbackLeafSyncer creates a new syncer object to perform leaf sync of tries.
-func NewCallbackLeafSyncer(client LeafClient, tasks <-chan LeafSyncTask, requestSize uint16) *CallbackLeafSyncer {
+func NewCallbackLeafSyncer(client LeafClient, tasks <-chan LeafSyncTask, config *LeafSyncerConfig) *CallbackLeafSyncer {
 	return &CallbackLeafSyncer{
-		client:      client,
-		done:        make(chan error),
-		tasks:       tasks,
-		requestSize: requestSize,
+		config: config,
+		client: client,
+		tasks:  tasks,
 	}
 }
 
@@ -99,11 +102,11 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 			Root:     root,
 			Account:  task.Account(),
 			Start:    start,
-			Limit:    c.requestSize,
+			Limit:    c.config.RequestSize,
 			NodeType: task.NodeType(),
 		})
 		if err != nil {
-			return fmt.Errorf("%s: %w", errFailedToFetchLeafs, err)
+			return fmt.Errorf("%w: %w", ErrFailedToFetchLeafs, err)
 		}
 
 		// resize [leafsResponse.Keys] and [leafsResponse.Vals] in case
@@ -146,26 +149,18 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 
 // Start launches [numWorkers] worker goroutines to process LeafSyncTasks from [c.tasks].
 // onFailure is called if the sync completes with an error.
-func (c *CallbackLeafSyncer) Start(ctx context.Context, numWorkers int, onFailure func(error) error) {
+func (c *CallbackLeafSyncer) Sync(ctx context.Context) error {
 	// Start the worker threads with the desired context.
 	eg, egCtx := errgroup.WithContext(ctx)
-	for i := 0; i < numWorkers; i++ {
+	for i := 0; i < c.config.NumWorkers; i++ {
 		eg.Go(func() error {
 			return c.workerLoop(egCtx)
 		})
 	}
 
-	go func() {
-		err := eg.Wait()
-		if err != nil {
-			if err := onFailure(err); err != nil {
-				log.Error("error handling onFailure callback", "err", err)
-			}
-		}
-		c.done <- err
-		close(c.done)
-	}()
+	err := eg.Wait()
+	if err != nil {
+		c.config.OnFailure()
+	}
+	return err
 }
-
-// Done returns a channel which produces any error that occurred during syncing or nil on success.
-func (c *CallbackLeafSyncer) Done() <-chan error { return c.done }

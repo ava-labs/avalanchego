@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/message"
-	synccommon "github.com/ava-labs/coreth/sync"
 	syncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/coreth/sync/handlers"
 	handlerstats "github.com/ava-labs/coreth/sync/handlers/stats"
@@ -67,30 +66,6 @@ func TestConfigValidation(t *testing.T) {
 			require.ErrorIs(t, err, tt.wantErr)
 		})
 	}
-}
-
-func TestWaitBeforeStart(t *testing.T) {
-	env := newTestEnvironment(t, 10)
-
-	syncer, err := env.createSyncer(5, 3)
-	require.NoError(t, err)
-	require.NotNil(t, syncer)
-
-	err = syncer.Wait(context.Background())
-	require.ErrorIs(t, err, synccommon.ErrWaitBeforeStart)
-}
-
-func TestDuplicateStart(t *testing.T) {
-	env := newTestEnvironment(t, 10)
-
-	syncer, err := env.createSyncer(5, 3)
-	require.NoError(t, err)
-	require.NotNil(t, syncer)
-
-	require.NoError(t, syncer.Start(context.Background()))
-
-	err = syncer.Start(context.Background())
-	require.ErrorIs(t, err, synccommon.ErrSyncerAlreadyStarted)
 }
 
 func TestBlockSyncer_ParameterizedTests(t *testing.T) {
@@ -173,9 +148,7 @@ func TestBlockSyncer_ParameterizedTests(t *testing.T) {
 			syncer, err := env.createSyncer(tt.fromHeight, tt.blocksToFetch)
 			require.NoError(t, err)
 
-			ctx := context.Background()
-			require.NoError(t, syncer.Start(ctx))
-			require.NoError(t, syncer.Wait(ctx))
+			require.NoError(t, syncer.Sync(context.Background()))
 
 			env.verifyBlocksInDB(t, tt.expectedBlocks)
 
@@ -189,17 +162,13 @@ func TestBlockSyncer_ParameterizedTests(t *testing.T) {
 
 func TestBlockSyncer_ContextCancellation(t *testing.T) {
 	env := newTestEnvironment(t, 10)
-
 	syncer, err := env.createSyncer(5, 3)
 	require.NoError(t, err)
 
+	// Immediately cancel the context to simulate cancellation.
 	ctx, cancel := context.WithCancel(context.Background())
-	require.NoError(t, syncer.Start(ctx))
-
-	// Cancel context immediately
 	cancel()
-
-	err = syncer.Wait(ctx)
+	err = syncer.Sync(ctx)
 	require.ErrorIs(t, err, context.Canceled)
 }
 

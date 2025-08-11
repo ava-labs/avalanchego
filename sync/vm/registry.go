@@ -52,22 +52,11 @@ func (r *SyncerRegistry) RunSyncerTasks(ctx context.Context, client *client) err
 	for _, task := range r.syncers {
 		log.Info("starting syncer", "name", task.name, "summary", client.summary)
 
-		// Start syncer.
-		if err := task.syncer.Start(ctx); err != nil {
-			log.Info("failed to start", "name", task.name, "summary", client.summary, "err", err)
-			return fmt.Errorf("failed to start %s: %w", task.name, err)
-		}
-
-		// Wait for completion.
-		err := task.syncer.Wait(ctx)
-
-		// Log completion immediately.
-		if err != nil {
+		if err := task.syncer.Sync(ctx); err != nil {
 			log.Error("failed to complete", "name", task.name, "summary", client.summary, "err", err)
 			return fmt.Errorf("%s failed: %w", task.name, err)
-		} else {
-			log.Info("completed successfully", "name", task.name, "summary", client.summary)
 		}
+		log.Info("completed successfully", "name", task.name, "summary", client.summary)
 	}
 
 	return nil
