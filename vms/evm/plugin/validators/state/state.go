@@ -4,6 +4,7 @@
 package state
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -19,8 +20,8 @@ var _ uptime.State = (*state)(nil)
 type dbUpdateStatus bool
 
 var (
-	ErrAlreadyExists  = fmt.Errorf("validator already exists")
-	ErrImmutableField = fmt.Errorf("immutable field cannot be updated")
+	ErrAlreadyExists  = errors.New("validator already exists")
+	ErrImmutableField = errors.New("immutable field cannot be updated")
 )
 
 const (
