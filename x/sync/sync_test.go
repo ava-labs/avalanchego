@@ -69,7 +69,7 @@ func Test_Completion(t *testing.T) {
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
-	parser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	parser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor4)
 	require.NoError(err)
 
 	ctx := context.Background()

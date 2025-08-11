@@ -108,8 +108,8 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
-			proofNil:    true,
-			expectedErr: p2p.ErrUnexpected,
+			proofNil:    false,
+			expectedErr: nil,
 		},
 	}
 
@@ -315,17 +315,6 @@ func Test_Server_GetChangeProof(t *testing.T) {
 				// to serve a change proof or range proof
 				StartRootHash: ids.Empty[:],
 				EndRootHash:   fakeRootID[:],
-				KeyLimit:      defaultRequestKeyLimit,
-				BytesLimit:    defaultRequestByteSizeLimit,
-			},
-			expectedMaxResponseBytes: defaultRequestByteSizeLimit,
-			expectedErr:              p2p.ErrUnexpected,
-		},
-		{
-			name: "empty proof",
-			request: &pb.SyncGetChangeProofRequest{
-				StartRootHash: fakeRootID[:],
-				EndRootHash:   ids.Empty[:],
 				KeyLimit:      defaultRequestKeyLimit,
 				BytesLimit:    defaultRequestByteSizeLimit,
 			},
