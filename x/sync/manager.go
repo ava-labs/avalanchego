@@ -46,10 +46,9 @@ var (
 	ErrAlreadyClosed                 = errors.New("Manager is closed")
 	ErrNoRangeProofClientProvided    = errors.New("range proof client is a required field of the sync config")
 	ErrNoChangeProofClientProvided   = errors.New("change proof client is a required field of the sync config")
-	ErrNoDatabaseProvided            = errors.New("sync database is a required field of the sync config")
+	ErrNoParserProvided              = errors.New("proof parser is a required field of the sync config")
 	ErrNoLogProvided                 = errors.New("log is a required field of the sync config")
 	ErrZeroWorkLimit                 = errors.New("simultaneous work limit must be greater than 0")
-	ErrFinishedWithUnexpectedRoot    = errors.New("finished syncing with an unexpected root")
 	errInvalidRangeProof             = errors.New("failed to verify range proof")
 	errInvalidChangeProof            = errors.New("failed to verify change proof")
 	errTooManyKeys                   = errors.New("response contains more than requested keys")
@@ -143,9 +142,6 @@ type Manager struct {
 	// [workLock] must be held while accessing [processedWork].
 	processedWork *workHeap
 
-	// Used to create the proofs from network responses.
-	proofParser ProofParser
-
 	// When this is closed:
 	// - [closed] is true.
 	// - [cancelCtx] was called.
@@ -170,16 +166,13 @@ type Manager struct {
 
 // TODO remove non-config values out of this struct
 type ManagerConfig struct {
-	DB                    DB
+	Parser                ProofParser
 	RangeProofClient      *p2p.Client
 	ChangeProofClient     *p2p.Client
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
-	BranchFactor          merkledb.BranchFactor
 	StateSyncNodes        []ids.NodeID
-	// If not specified, [merkledb.DefaultHasher] will be used.
-	Hasher merkledb.Hasher
 }
 
 func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manager, error) {
@@ -188,17 +181,12 @@ func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manage
 		return nil, ErrNoRangeProofClientProvided
 	case config.ChangeProofClient == nil:
 		return nil, ErrNoChangeProofClientProvided
-	case config.DB == nil:
-		return nil, ErrNoDatabaseProvided
+	case config.Parser == nil:
+		return nil, ErrNoParserProvided
 	case config.Log == nil:
 		return nil, ErrNoLogProvided
 	case config.SimultaneousWorkLimit == 0:
 		return nil, ErrZeroWorkLimit
-	}
-
-	parser, err := newParser(config.DB, config.Hasher, config.BranchFactor)
-	if err != nil {
-		return nil, err
 	}
 
 	metrics, err := NewMetrics("sync", registerer)
@@ -207,7 +195,6 @@ func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manage
 	}
 
 	m := &Manager{
-		proofParser:     parser,
 		config:          config,
 		doneChan:        make(chan struct{}),
 		unprocessedWork: newWorkHeap(),
@@ -358,20 +345,6 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	if targetRootID == ids.Empty {
-		defer m.finishWorkItem()
-
-		// The trie is empty after this change.
-		// Delete all the key-value pairs in the range.
-		if err := m.config.DB.Clear(); err != nil {
-			m.setError(err)
-			return
-		}
-		work.start = maybe.Nothing[[]byte]()
-		m.completeWorkItem(work, maybe.Nothing[[]byte](), targetRootID)
-		return
-	}
-
 	request := &pb.SyncGetChangeProofRequest{
 		StartRootHash: work.localRootID[:],
 		EndRootHash:   targetRootID[:],
@@ -418,18 +391,6 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 // Assumes [m.workLock] is not held.
 func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 	targetRootID := m.getTargetRoot()
-
-	if targetRootID == ids.Empty {
-		defer m.finishWorkItem()
-
-		if err := m.config.DB.Clear(); err != nil {
-			m.setError(err)
-			return
-		}
-		work.start = maybe.Nothing[[]byte]()
-		m.completeWorkItem(work, maybe.Nothing[[]byte](), targetRootID)
-		return
-	}
 
 	request := &pb.SyncGetRangeProofRequest{
 		RootHash: targetRootID[:],
@@ -532,7 +493,7 @@ func (m *Manager) handleRangeProofResponse(
 		return err
 	}
 
-	rangeProof, err := m.proofParser.ParseRangeProof(
+	rangeProof, err := m.config.Parser.ParseRangeProof(
 		responseBytes,
 		request.RootHash,
 		maybeBytesToMaybe(request.StartKey),
@@ -604,6 +565,11 @@ type rangeProof struct {
 }
 
 func (r *rangeProof) Verify(ctx context.Context) error {
+	// Database is empty, no proof is needed.
+	if bytes.Equal(r.request.rootHash, ids.Empty[:]) {
+		return nil
+	}
+
 	return verifyRangeProof(
 		ctx,
 		r.merkleProof,
@@ -617,12 +583,22 @@ func (r *rangeProof) Verify(ctx context.Context) error {
 }
 
 func (r *rangeProof) Commit(ctx context.Context) error {
+	// If the root is empty, we clear the database of all values.
+	if bytes.Equal(r.request.rootHash, ids.Empty[:]) {
+		return r.db.Clear()
+	}
+
 	// Range proofs must always be committed, even if no key changes are present.
 	// This is because it may have been provided instead of a change proof, and the keys were deleted.
 	return r.db.CommitRangeProof(ctx, r.request.startKey, r.request.endKey, r.merkleProof)
 }
 
 func (r *rangeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], error) {
+	// If we wanted the empty root, we don't need to fetch any keys.
+	if bytes.Equal(r.request.rootHash, ids.Empty[:]) {
+		return maybe.Nothing[[]byte](), nil
+	}
+
 	// Find the next key to fetch.
 	// This will return Nothing if there are no more keys to fetch in the range `largestHandledKey` to `r.request.endKey`.
 	nextKey, err := findNextKey(ctx, r.db, r.merkleProof.KeyChanges, r.request.endKey, r.merkleProof.EndProof, r.tokenSize)
@@ -650,7 +626,7 @@ func (m *Manager) handleChangeProofResponse(
 		return err
 	}
 
-	proof, err := m.proofParser.ParseChangeProof(
+	proof, err := m.config.Parser.ParseChangeProof(
 		responseBytes,
 		request.EndRootHash,
 		maybeBytesToMaybe(request.StartKey),
@@ -739,6 +715,11 @@ type changeProof struct {
 }
 
 func (c *changeProof) Verify(ctx context.Context) error {
+	// If the database is empty, we don't need to verify a change proof.
+	if bytes.Equal(c.request.rootHash, ids.Empty[:]) {
+		return nil
+	}
+
 	// Ensure the response does not contain more than the requested number of leaves
 	// and the start and end roots match the requested roots.
 	if len(c.merkleProof.KeyChanges) > c.request.keyLimit {
@@ -762,6 +743,11 @@ func (c *changeProof) Verify(ctx context.Context) error {
 }
 
 func (c *changeProof) Commit(ctx context.Context) error {
+	// If the root is empty, we clear the database.
+	if bytes.Equal(c.request.rootHash, ids.Empty[:]) {
+		return c.db.Clear()
+	}
+
 	if len(c.merkleProof.KeyChanges) == 0 {
 		return nil
 	}
@@ -769,6 +755,11 @@ func (c *changeProof) Commit(ctx context.Context) error {
 }
 
 func (c *changeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], error) { // Find the next key to fetch.
+	// If we wanted the empty root, we don't need to fetch any keys.
+	if bytes.Equal(c.request.rootHash, ids.Empty[:]) {
+		return maybe.Nothing[[]byte](), nil
+	}
+
 	// This will return Nothing if there are no more keys to fetch in the range `largestHandledKey` to `c.request.endKey`.
 	nextKey, err := findNextKey(ctx, c.db, c.merkleProof.KeyChanges, c.request.endKey, c.merkleProof.EndProof, c.tokenSize)
 	if err != nil {
@@ -983,17 +974,7 @@ func (m *Manager) Wait(ctx context.Context) error {
 		return err
 	}
 
-	root, err := m.config.DB.GetMerkleRoot(ctx)
-	if err != nil {
-		return err
-	}
-
-	if targetRootID := m.getTargetRoot(); targetRootID != root {
-		// This should never happen.
-		return fmt.Errorf("%w: expected %s, got %s", ErrFinishedWithUnexpectedRoot, targetRootID, root)
-	}
-
-	m.config.Log.Info("completed", zap.Stringer("root", root))
+	m.config.Log.Info("completed", zap.Stringer("root", m.getTargetRoot()))
 	return nil
 }
 

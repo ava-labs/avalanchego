@@ -36,15 +36,15 @@ func Test_Creation(t *testing.T) {
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
-
+	parser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	require.NoError(err)
 	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
+		Parser:                parser,
 		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
 		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		BranchFactor:          merkledb.BranchFactor16,
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -69,16 +69,17 @@ func Test_Completion(t *testing.T) {
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
+	parser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	require.NoError(err)
 
 	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
+		Parser:                parser,
 		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(emptyDB)),
 		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(emptyDB)),
 		TargetRoot:            emptyRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		BranchFactor:          merkledb.BranchFactor16,
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -244,25 +245,15 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	root, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
 
-	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
-		TargetRoot:            root,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-		BranchFactor:          merkledb.BranchFactor16,
-	}, prometheus.NewRegistry())
+	parser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
 	require.NoError(err)
-	proofParser, ok := syncer.proofParser.(*proofParser)
-	require.True(ok)
 
 	// 0x12 was "deleted" and there should be no extra node in the proof since there was nothing with a common prefix
 	proof, err := db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Some([]byte{0x12}), 500)
 	require.NoError(err)
 	proofBytes, err := proto.Marshal(proof.ToProto())
 	require.NoError(err)
-	noExtraNodeProof, err := proofParser.ParseRangeProof(proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
+	noExtraNodeProof, err := parser.ParseRangeProof(proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
 	require.NoError(err)
 	require.NoError(noExtraNodeProof.Verify(ctx))
 
@@ -271,7 +262,7 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	require.NoError(err)
 	proofBytes, err = proto.Marshal(proof.ToProto())
 	require.NoError(err)
-	extraNodeProof, err := proofParser.ParseRangeProof(proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
+	extraNodeProof, err := parser.ParseRangeProof(proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
 	require.NoError(err)
 	require.NoError(extraNodeProof.Verify(ctx))
 
@@ -887,6 +878,9 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			)
 			require.NoError(err)
 
+			parser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+			require.NoError(err)
+
 			var (
 				rangeProofClient  *p2p.Client
 				changeProofClient *p2p.Client
@@ -905,15 +899,13 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			}
 
 			syncer, err := NewManager(ManagerConfig{
-				DB:                    db,
+				Parser:                parser,
 				RangeProofClient:      rangeProofClient,
 				ChangeProofClient:     changeProofClient,
 				TargetRoot:            syncRoot,
 				SimultaneousWorkLimit: 5,
 				Log:                   logging.NoLog{},
-				BranchFactor:          merkledb.BranchFactor16,
 			}, prometheus.NewRegistry())
-
 			require.NoError(err)
 			require.NotNil(syncer)
 
@@ -974,16 +966,17 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
+	parser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	require.NoError(err)
 
 	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
+		Parser:                parser,
 		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
 		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		BranchFactor:          merkledb.BranchFactor16,
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -1004,13 +997,12 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	syncer.Close()
 
 	newSyncer, err := NewManager(ManagerConfig{
-		DB:                    db,
+		Parser:                parser,
 		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
 		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		BranchFactor:          merkledb.BranchFactor16,
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 	require.NotNil(newSyncer)
@@ -1072,6 +1064,9 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	)
 	require.NoError(err)
 
+	parser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	require.NoError(err)
+
 	// Only let one response go through until we update the root.
 	updatedRootChan := make(chan struct{}, 1)
 	updatedRootChan <- struct{}{}
@@ -1088,13 +1083,12 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	})
 
 	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
+		Parser:                parser,
 		RangeProofClient:      rangeProofClient,
 		ChangeProofClient:     changeProofClient,
 		TargetRoot:            firstSyncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		BranchFactor:          merkledb.BranchFactor16,
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 	require.NotNil(syncer)
@@ -1133,15 +1127,17 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
+	parser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	require.NoError(err)
+
 	ctx := context.Background()
 	m, err := NewManager(ManagerConfig{
-		DB:                    db,
+		Parser:                parser,
 		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
 		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
 		TargetRoot:            ids.Empty,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
-		BranchFactor:          merkledb.BranchFactor16,
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 

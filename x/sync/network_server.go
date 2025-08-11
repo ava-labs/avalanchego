@@ -111,6 +111,22 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 		}
 	}
 
+	// If the end root is empty, the proof will delete everything.
+	if endRoot == ids.Empty {
+		proofBytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
+			Response: &pb.SyncGetChangeProofResponse_ChangeProof{
+				ChangeProof: (&merkledb.ChangeProof{}).ToProto(),
+			},
+		})
+		if err != nil {
+			return nil, &common.AppError{
+				Code:    p2p.ErrUnexpected.Code,
+				Message: fmt.Sprintf("failed to marshal empty change proof: %s", err),
+			}
+		}
+		return proofBytes, nil
+	}
+
 	for keyLimit > 0 {
 		changeProof, err := g.db.GetChangeProof(ctx, startRoot, endRoot, start, end, int(keyLimit))
 		if err != nil {
@@ -258,6 +274,12 @@ func getRangeProof(
 		return nil, err
 	}
 
+	if root == ids.Empty {
+		// If the root is empty, we can't generate a proof.
+		// Return an empty proof.
+		return marshalFunc(&merkledb.RangeProof{})
+	}
+
 	keyLimit := int(req.KeyLimit)
 
 	for keyLimit > 0 {
@@ -301,8 +323,6 @@ func validateChangeProofRequest(req *pb.SyncGetChangeProofRequest) error {
 		return errInvalidStartRootHash
 	case len(req.EndRootHash) != hashing.HashLen:
 		return errInvalidEndRootHash
-	case bytes.Equal(req.EndRootHash, ids.Empty[:]):
-		return merkledb.ErrEmptyProof
 	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
 		return errInvalidStartKey
 	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
@@ -324,8 +344,6 @@ func validateRangeProofRequest(req *pb.SyncGetRangeProofRequest) error {
 		return errInvalidKeyLimit
 	case len(req.RootHash) != ids.IDLen:
 		return errInvalidRootHash
-	case bytes.Equal(req.RootHash, ids.Empty[:]):
-		return merkledb.ErrEmptyProof
 	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
 		return errInvalidStartKey
 	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
