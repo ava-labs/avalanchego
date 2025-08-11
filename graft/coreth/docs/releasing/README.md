@@ -35,7 +35,7 @@ export VERSION=v0.15.0
 1. Create a pull request (PR) from your branch targeting master, for example using [`gh`](https://cli.github.com/):
 
     ```bash
-    gh pr create --repo github.com/ava-labs/subnet-evm --base master --title "chore: release $VERSION_RC"
+    gh pr create --repo github.com/ava-labs/coreth --base master --title "chore: release $VERSION_RC"
     ```
 
 1. Wait for the PR checks to pass with
@@ -83,7 +83,7 @@ Following the previous example in the [Release candidate section](#release-candi
     ```
 
 1. Create a new release on Github, either using:
-    - the [Github web interface](https://github.com/ava-labs/subnet-evm/releases/new)
+    - the [Github web interface](https://github.com/ava-labs/coreth/releases/new)
         1. In the "Choose a tag" box, select the tag previously created `$VERSION` (`v0.15.0`)
         1. Pick the previous tag, for example as `v0.14.0`.
         1. Set the "Release title" to `$VERSION` (`v0.15.0`)
