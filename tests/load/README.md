@@ -63,7 +63,7 @@ Each test must satisfy the following interface for compatibility with the load g
 ```go
 type Test interface {
     // Run should create a signed transaction and broadcast it to the network via wallet.
-    Run(tc tests.TestContext, ctx context.Context, wallet *Wallet)
+    Run(tc tests.TestContext, wallet *Wallet)
 }
 ```
 
