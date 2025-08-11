@@ -11,10 +11,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/vms/evm/plugin/validators/state"
 	"github.com/ava-labs/avalanchego/vms/evm/plugin/validators/state/interfaces"
-
-	avagovalidators "github.com/ava-labs/avalanchego/snow/validators"
 )
 
 func TestLoadNewValidators(t *testing.T) {
@@ -30,21 +29,21 @@ func TestLoadNewValidators(t *testing.T) {
 	}
 	tests := []struct {
 		name                      string
-		initialValidators         map[ids.ID]*avagovalidators.GetCurrentValidatorOutput
-		newValidators             map[ids.ID]*avagovalidators.GetCurrentValidatorOutput
+		initialValidators         map[ids.ID]*validators.GetCurrentValidatorOutput
+		newValidators             map[ids.ID]*validators.GetCurrentValidatorOutput
 		registerMockListenerCalls func(*interfaces.MockStateCallbackListener)
 		expectedLoadErr           error
 	}{
 		{
 			name:                      "before empty/after empty",
-			initialValidators:         map[ids.ID]*avagovalidators.GetCurrentValidatorOutput{},
-			newValidators:             map[ids.ID]*avagovalidators.GetCurrentValidatorOutput{},
+			initialValidators:         map[ids.ID]*validators.GetCurrentValidatorOutput{},
+			newValidators:             map[ids.ID]*validators.GetCurrentValidatorOutput{},
 			registerMockListenerCalls: func(*interfaces.MockStateCallbackListener) {},
 		},
 		{
 			name:              "before empty/after one",
-			initialValidators: map[ids.ID]*avagovalidators.GetCurrentValidatorOutput{},
-			newValidators: map[ids.ID]*avagovalidators.GetCurrentValidatorOutput{
+			initialValidators: map[ids.ID]*validators.GetCurrentValidatorOutput{},
+			newValidators: map[ids.ID]*validators.GetCurrentValidatorOutput{
 				testValidationIDs[0]: {
 					NodeID:    testNodeIDs[0],
 					IsActive:  true,
@@ -57,14 +56,14 @@ func TestLoadNewValidators(t *testing.T) {
 		},
 		{
 			name: "before one/after empty",
-			initialValidators: map[ids.ID]*avagovalidators.GetCurrentValidatorOutput{
+			initialValidators: map[ids.ID]*validators.GetCurrentValidatorOutput{
 				testValidationIDs[0]: {
 					NodeID:    testNodeIDs[0],
 					IsActive:  true,
 					StartTime: 0,
 				},
 			},
-			newValidators: map[ids.ID]*avagovalidators.GetCurrentValidatorOutput{},
+			newValidators: map[ids.ID]*validators.GetCurrentValidatorOutput{},
 			registerMockListenerCalls: func(mock *interfaces.MockStateCallbackListener) {
 				// initial validator will trigger first
 				mock.EXPECT().OnValidatorAdded(testValidationIDs[0], testNodeIDs[0], uint64(0), true).Times(1)
@@ -74,14 +73,14 @@ func TestLoadNewValidators(t *testing.T) {
 		},
 		{
 			name: "no change",
-			initialValidators: map[ids.ID]*avagovalidators.GetCurrentValidatorOutput{
+			initialValidators: map[ids.ID]*validators.GetCurrentValidatorOutput{
 				testValidationIDs[0]: {
 					NodeID:    testNodeIDs[0],
 					IsActive:  true,
 					StartTime: 0,
 				},
 			},
-			newValidators: map[ids.ID]*avagovalidators.GetCurrentValidatorOutput{
+			newValidators: map[ids.ID]*validators.GetCurrentValidatorOutput{
 				testValidationIDs[0]: {
 					NodeID:    testNodeIDs[0],
 					IsActive:  true,
@@ -94,7 +93,7 @@ func TestLoadNewValidators(t *testing.T) {
 		},
 		{
 			name: "status and weight change and new one",
-			initialValidators: map[ids.ID]*avagovalidators.GetCurrentValidatorOutput{
+			initialValidators: map[ids.ID]*validators.GetCurrentValidatorOutput{
 				testValidationIDs[0]: {
 					NodeID:    testNodeIDs[0],
 					IsActive:  true,
@@ -102,7 +101,7 @@ func TestLoadNewValidators(t *testing.T) {
 					Weight:    1,
 				},
 			},
-			newValidators: map[ids.ID]*avagovalidators.GetCurrentValidatorOutput{
+			newValidators: map[ids.ID]*validators.GetCurrentValidatorOutput{
 				testValidationIDs[0]: {
 					NodeID:    testNodeIDs[0],
 					IsActive:  false,
@@ -126,14 +125,14 @@ func TestLoadNewValidators(t *testing.T) {
 		},
 		{
 			name: "renew validation ID",
-			initialValidators: map[ids.ID]*avagovalidators.GetCurrentValidatorOutput{
+			initialValidators: map[ids.ID]*validators.GetCurrentValidatorOutput{
 				testValidationIDs[0]: {
 					NodeID:    testNodeIDs[0],
 					IsActive:  true,
 					StartTime: 0,
 				},
 			},
-			newValidators: map[ids.ID]*avagovalidators.GetCurrentValidatorOutput{
+			newValidators: map[ids.ID]*validators.GetCurrentValidatorOutput{
 				testValidationIDs[1]: {
 					NodeID:    testNodeIDs[0],
 					IsActive:  true,
@@ -151,14 +150,14 @@ func TestLoadNewValidators(t *testing.T) {
 		},
 		{
 			name: "renew node ID",
-			initialValidators: map[ids.ID]*avagovalidators.GetCurrentValidatorOutput{
+			initialValidators: map[ids.ID]*validators.GetCurrentValidatorOutput{
 				testValidationIDs[0]: {
 					NodeID:    testNodeIDs[0],
 					IsActive:  true,
 					StartTime: 0,
 				},
 			},
-			newValidators: map[ids.ID]*avagovalidators.GetCurrentValidatorOutput{
+			newValidators: map[ids.ID]*validators.GetCurrentValidatorOutput{
 				testValidationIDs[0]: {
 					NodeID:    testNodeIDs[1],
 					IsActive:  true,

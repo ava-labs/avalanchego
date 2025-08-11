@@ -14,12 +14,12 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/evm/plugin/validators/state"
 	"github.com/ava-labs/avalanchego/vms/evm/plugin/validators/uptime"
 
 	avalancheuptime "github.com/ava-labs/avalanchego/snow/uptime"
-	avalanchevalidators "github.com/ava-labs/avalanchego/snow/validators"
-	validators "github.com/ava-labs/avalanchego/vms/evm/plugin/validators/state"
 	stateinterfaces "github.com/ava-labs/avalanchego/vms/evm/plugin/validators/state/interfaces"
 	uptimeinterfaces "github.com/ava-labs/avalanchego/vms/evm/plugin/validators/uptime/interfaces"
 )
@@ -42,7 +42,7 @@ func NewManager(
 	db database.Database,
 	clock *mockable.Clock,
 ) (*manager, error) {
-	validatorState, err := validators.NewState(db)
+	validatorState, err := state.NewState(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize validator state: %w", err)
 	}
@@ -66,11 +66,11 @@ func (m *manager) Initialize(ctx context.Context) error {
 	if err := m.sync(ctx); err != nil {
 		return fmt.Errorf("failed to update validators: %w", err)
 	}
-	vdrIDs := m.GetNodeIDs().List()
+	vdrIDs := m.State.GetNodeIDs().List()
 	// Then start tracking with updated validators
 	// StartTracking initializes the uptime tracking with the known validators
 	// and update their uptime to account for the time we were being offline.
-	if err := m.StartTracking(vdrIDs); err != nil {
+	if err := m.PausableManager.StartTracking(vdrIDs); err != nil {
 		return fmt.Errorf("failed to start tracking uptime: %w", err)
 	}
 	return nil
@@ -78,11 +78,11 @@ func (m *manager) Initialize(ctx context.Context) error {
 
 // Shutdown stops the uptime tracking and writes the validator state to the database.
 func (m *manager) Shutdown() error {
-	vdrIDs := m.GetNodeIDs().List()
-	if err := m.StopTracking(vdrIDs); err != nil {
+	vdrIDs := m.State.GetNodeIDs().List()
+	if err := m.PausableManager.StopTracking(vdrIDs); err != nil {
 		return fmt.Errorf("failed to stop tracking uptime: %w", err)
 	}
-	if err := m.WriteState(); err != nil {
+	if err := m.State.WriteState(); err != nil {
 		return fmt.Errorf("failed to write validator: %w", err)
 	}
 	return nil
@@ -136,7 +136,7 @@ func (m *manager) sync(ctx context.Context) error {
 }
 
 // loadValidators loads the [validators] into the validator state [validatorState]
-func loadValidators(validatorState stateinterfaces.State, newValidators map[ids.ID]*avalanchevalidators.GetCurrentValidatorOutput) error {
+func loadValidators(validatorState stateinterfaces.State, newValidators map[ids.ID]*validators.GetCurrentValidatorOutput) error {
 	currentValidationIDs := validatorState.GetValidationIDs()
 	// first check if we need to delete any existing validators
 	for vID := range currentValidationIDs {
