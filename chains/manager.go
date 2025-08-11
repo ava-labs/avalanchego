@@ -1569,3 +1569,276 @@ func (m *manager) getOrMakeVMGatherer(vmID ids.ID) (metrics.MultiGatherer, error
 	m.vmGatherer[vmID] = vmGatherer
 	return vmGatherer, nil
 }
+
+func (m *manager) createSimplexChain(
+	ctx *snow.ConsensusContext,
+	genesisData []byte,
+	vdrs validators.Manager,
+	beacons validators.Manager,
+	vm block.ChainVM,
+	fxs []*common.Fx,
+	sb subnets.Subnet,
+) (*chain, error) {
+	ctx.State.Set(snow.EngineState{
+		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+		State: snow.Initializing,
+	})
+
+	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
+	vm, msgChan, err := m.createChainVM(ctx, vm, genesisData, primaryAlias, sb, fxs)
+
+	connectedBeacons := tracker.NewPeers()
+	bootstrapWeight, err := beacons.TotalWeight(ctx.SubnetID)
+	if err != nil {
+		return nil, fmt.Errorf("error while fetching weight for subnet %s: %w", ctx.SubnetID, err)
+	}
+	startupTracker := tracker.NewStartup(connectedBeacons, (3*bootstrapWeight+3)/4)
+	beacons.RegisterSetCallbackListener(ctx.SubnetID, startupTracker)
+
+	h, err := m.createChainHandler(
+		ctx,
+		vdrs,
+		msgChan,
+		sb,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
+	}
+
+	return &chain{
+		Name:    primaryAlias,
+		Context: ctx,
+		VM:      vm,
+		Handler: h,
+	}, nil
+}
+
+
+func (m *manager) createChainHandler(ctx *snow.ConsensusContext, vdrs validators.Manager, msgChan chan common.Message, sb subnets.Subnet, primaryAlias string) (handler.Handler, error) {
+	stakeReg, err := metrics.MakeAndRegister(
+		m.stakeGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	connectedValidators, err := tracker.NewMeteredPeers(stakeReg)
+	if err != nil {
+		return nil, fmt.Errorf("error creating peer tracker: %w", err)
+	}
+	vdrs.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
+
+	var halter common.Halter
+
+	p2pReg, err := metrics.MakeAndRegister(
+		m.p2pGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	peerTracker, err := p2p.NewPeerTracker(
+		ctx.Log,
+		"peer_tracker",
+		p2pReg,
+		set.Of(ctx.NodeID),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating peer tracker: %w", err)
+	}
+
+	handlerReg, err := metrics.MakeAndRegister(
+		m.handlerGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+	
+	simplexEngine, err := m.createSimplexEngine()
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create simplex instance: %w", err)
+	}
+
+	// Asynchronously passes messages from the network to the consensus engine
+	h, err := handler.New(
+		ctx,
+		vdrs,
+		msgChan,
+		m.FrontierPollFrequency,
+		m.ConsensusAppConcurrency,
+		m.ResourceTracker,
+		sb,
+		connectedValidators,
+		peerTracker,
+		handlerReg,
+		halter.Halt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize message handler: %w", err)
+	}
+
+	h.SetEngineManager(&handler.EngineManager{
+		Avalanche: nil,
+		Snowman: nil,
+		Simplex: &handler.Engine{
+			Consensus:    simplexEngine,
+		},
+	})
+
+	return h, nil
+}
+
+func (m *manager) createChainVM(ctx *snow.ConsensusContext, vm block.ChainVM, genesisData []byte, primaryAlias string, sb subnets.Subnet, fxs []*common.Fx) (block.ChainVM, chan common.Message, error) {
+	meterDBReg, err := metrics.MakeAndRegister(
+		m.MeterDBMetrics,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	meterDB, err := meterdb.New(meterDBReg, m.DB)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	prefixDB := prefixdb.New(ctx.ChainID[:], meterDB)
+	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
+
+	// Passes messages from the consensus engine to the network
+	messageSender, err := m.createChainSender(
+		ctx,
+		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+		sb,
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
+
+	if m.TracingEnabled {
+		vm = tracedvm.NewBlockVM(vm, primaryAlias, m.Tracer)
+	}
+
+	proposerVM, err := m.createProposeVM(ctx, primaryAlias, vm)
+	if err != nil {
+		return nil, nil, fmt.Errorf("couldn't create proposer vm: %w", err)
+	}
+	vm = proposerVM
+
+	if m.MeterVMEnabled {
+		meterchainvmReg, err := metrics.MakeAndRegister(
+			m.meterChainVMGatherer,
+			primaryAlias,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		vm = metervm.NewBlockVM(vm, meterchainvmReg)
+	}
+	if m.TracingEnabled {
+		vm = tracedvm.NewBlockVM(vm, "proposervm", m.Tracer)
+	}
+
+	// The channel through which a VM may send messages to the consensus engine
+	// VM uses this channel to notify engine that a block is ready to be made
+	msgChan := make(chan common.Message, defaultChannelSize)
+	// Initialize the ProposerVM and the vm wrapped inside it
+	chainConfig, err := m.getChainConfig(ctx.ChainID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error while fetching chain config: %w", err)
+	}
+	err = vm.Initialize(
+		context.TODO(),
+		ctx.Context,
+		vmDB,
+		genesisData,
+		chainConfig.Upgrade,
+		chainConfig.Config,
+		msgChan,
+		fxs,
+		messageSender,
+	)
+
+	return vm, msgChan, err
+}
+
+func (m *manager) createChainSender(
+	ctx *snow.ConsensusContext,
+	chainType p2ppb.EngineType,
+	sb subnets.Subnet,
+) (common.Sender, error) {
+	s, err := sender.New(
+		ctx,
+		m.MsgCreator,
+		m.Net,
+		m.ManagerConfig.Router,
+		m.TimeoutManager,
+		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+		sb,
+		ctx.Registerer,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
+	}
+	if m.TracingEnabled {
+		s = sender.Trace(s, m.Tracer)
+	}
+
+	return s, nil
+}
+
+func (m *manager) createSimplexEngine() (common.Engine, error) {
+	simplexEngine := simplex.NewEngine(nil, nil)
+
+	var engine common.Engine
+	engine = simplexEngine
+
+	if m.TracingEnabled {
+		engine = common.TraceEngine(engine, m.Tracer)
+	}
+
+	return engine, nil
+}
+
+func (m *manager) createProposeVM(ctx *snow.ConsensusContext, primaryAlias string, vm block.ChainVM) (block.ChainVM, error) {
+	var (
+		// A default subnet configuration will be present if explicit configuration is not provided
+		subnetCfg           = m.SubnetConfigs[ctx.SubnetID]
+		minBlockDelay       = subnetCfg.ProposerMinBlockDelay
+		numHistoricalBlocks = subnetCfg.ProposerNumHistoricalBlocks
+	)
+	m.Log.Info("creating proposervm wrapper",
+		zap.Time("activationTime", m.Upgrades.ApricotPhase4Time),
+		zap.Uint64("minPChainHeight", m.Upgrades.ApricotPhase4MinPChainHeight),
+		zap.Duration("minBlockDelay", minBlockDelay),
+		zap.Uint64("numHistoricalBlocks", numHistoricalBlocks),
+	)
+
+	proposervmReg, err := metrics.MakeAndRegister(
+		m.proposervmGatherer,
+		primaryAlias,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	proposerVM := proposervm.New(
+		vm,
+		proposervm.Config{
+			Upgrades:            m.Upgrades,
+			MinBlkDelay:         minBlockDelay,
+			NumHistoricalBlocks: numHistoricalBlocks,
+			StakingLeafSigner:   m.StakingTLSSigner,
+			StakingCertLeaf:     m.StakingTLSCert,
+			Registerer:          proposervmReg,
+		},
+	)
+
+	return proposerVM, nil
+}

@@ -97,6 +97,10 @@ func (s *Storage) Height() uint64 {
 // Retrieve returns the block and finalization at [seq].
 // If [seq] is not found, returns false.
 func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalization, bool) {
+	return s.retrieve(seq)
+}
+
+func (s *Storage) retrieve(seq uint64) (*Block, simplex.Finalization, bool) {
 	if seq == 0 {
 		return s.genesisBlock, simplex.Finalization{}, true
 	}
