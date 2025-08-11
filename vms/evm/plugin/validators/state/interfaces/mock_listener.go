@@ -10,9 +10,10 @@
 package interfaces
 
 import (
+	reflect "reflect"
+
 	ids "github.com/ava-labs/avalanchego/ids"
 	gomock "go.uber.org/mock/gomock"
-	reflect "reflect"
 )
 
 // MockStateCallbackListener is a mock of StateCallbackListener interface.
