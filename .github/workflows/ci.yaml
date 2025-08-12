@@ -21,6 +21,8 @@ jobs:
     # the matrix here and later jobs must re-specify the full matrix, a subset, or declare a single
     # shared-key to read the cache.
     strategy:
+      # do not cancel concurrent jobs if one fails for exhaustive failure reasons
+      fail-fast: false
       matrix:
         include:
           - profile-key: debug-no-default-features
@@ -94,6 +96,8 @@ jobs:
   rust-lint:
     needs: build
     strategy:
+      # do not cancel concurrent jobs if one fails for exhaustive failure reasons
+      fail-fast: false
       matrix:
         include:
           - profile-key: debug-no-default-features
@@ -119,6 +123,8 @@ jobs:
   test:
     needs: build
     strategy:
+      # do not cancel concurrent jobs if one fails for exhaustive failure reasons
+      fail-fast: false
       matrix:
         include:
           - profile-key: debug-no-default-features
