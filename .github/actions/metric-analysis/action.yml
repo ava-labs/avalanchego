@@ -55,106 +55,81 @@ runs:
           const fs = require('fs');
           const path = require('path');
 
-          // Get job names from the needs context
-          const JOB_NAMES = Object.keys(context.needs || {});
-          if (JOB_NAMES.length === 0) {
-            throw new Error('No jobs found in needs context. Make sure this job has a needs: [] declaration.');
-          }
-
           const CURRENT_RUN_ID = context.runId.toString();
           const ACTION_PATH = process.env.GITHUB_ACTION_PATH;
 
-          console.log(`Correlating jobs from needs: ${JOB_NAMES.join(', ')}`);
+          console.log('=== DEBUG INFO ===');
+          console.log('Current run ID:', CURRENT_RUN_ID);
+          console.log('Available context keys:', Object.keys(context || {}));
+          console.log('Needs context:', JSON.stringify(context.needs || {}, null, 2));
 
-          // Parse and validate queries input
-          let queries;
-          try {
-            const queriesInput = `${{ inputs.queries }}`;
-            queries = JSON.parse(queriesInput);
-
-            // Strong validation
-            if (!Array.isArray(queries)) {
-              throw new Error('queries must be an array');
-            }
-
-            if (queries.length === 0) {
-              throw new Error('queries array cannot be empty');
-            }
-
-            // Validate each query object
-            queries.forEach((query, index) => {
-              if (typeof query !== 'object' || query === null) {
-                throw new Error(`Query ${index}: must be an object`);
-              }
-
-              // Required fields
-              if (!query.query || typeof query.query !== 'string') {
-                throw new Error(`Query ${index}: 'query' field is required and must be a string`);
-              }
-
-              if (!query.metric_name || typeof query.metric_name !== 'string') {
-                throw new Error(`Query ${index}: 'metric_name' field is required and must be a string`);
-              }
-
-              // Optional fields validation
-              if (query.y_axis_label && typeof query.y_axis_label !== 'string') {
-                throw new Error(`Query ${index}: 'y_axis_label' must be a string if provided`);
-              }
-
-              // Check for unknown fields
-              const allowedFields = ['query', 'metric_name', 'y_axis_label'];
-              const providedFields = Object.keys(query);
-              const unknownFields = providedFields.filter(field => !allowedFields.includes(field));
-
-              if (unknownFields.length > 0) {
-                console.log(`Query ${index}: Unknown fields detected: ${unknownFields.join(', ')}. Allowed fields: ${allowedFields.join(', ')}`);
-              }
-            });
-
-            console.log(`✓ Validated ${queries.length} queries successfully`);
-
-          } catch (error) {
-            console.error('Queries validation failed:', error.message);
-            throw new Error(`Invalid queries format: ${error.message}`);
-          }
-
-          // Get precise job timings from GitHub Jobs API
-          console.log('Fetching job timings from GitHub API...');
+          // Since context.needs might be empty in composite actions,
+          // let's get the jobs directly from the API
+          console.log('Fetching jobs from GitHub API...');
           const { data: workflowJobs } = await github.rest.actions.listJobsForWorkflowRun({
             owner: context.repo.owner,
             repo: context.repo.repo,
             run_id: CURRENT_RUN_ID
           });
 
+          // Find the specific jobs we need
+          const targetJobNames = ['load_test', 'firewood_load_test'];
+          const foundJobs = workflowJobs.jobs.filter(job =>
+            targetJobNames.some(targetName => job.name.includes(targetName) || job.name === targetName)
+          );
+
+          console.log('All jobs in workflow:');
+          workflowJobs.jobs.forEach(job => {
+            console.log(`- ${job.name} (${job.conclusion})`);
+          });
+
+          console.log('Found target jobs:');
+          foundJobs.forEach(job => {
+            console.log(`- ${job.name} (${job.conclusion}) - ${job.started_at} to ${job.completed_at}`);
+          });
+
+          if (foundJobs.length === 0) {
+            throw new Error(`No target jobs found. Available jobs: ${workflowJobs.jobs.map(j => j.name).join(', ')}`);
+          }
+
+          // Parse queries input
+          let queries;
+          try {
+            const queriesInput = `${{ inputs.queries }}`;
+            queries = JSON.parse(queriesInput);
+            console.log(`✓ Parsed ${queries.length} queries successfully`);
+          } catch (error) {
+            console.log(`Failed to parse queries, error: ${error.message}`);
+            throw new Error(`Invalid queries format: ${error.message}`);
+          }
+
           const correlationRuns = [];
 
-          // Process each job from needs context
-          for (const jobName of JOB_NAMES) {
-            const jobData = workflowJobs.jobs.find(job => job.name === jobName);
-
-            if (jobData && jobData.started_at && jobData.completed_at) {
+          // Process each found job
+          for (const job of foundJobs) {
+            if (job.conclusion === 'success' && job.started_at && job.completed_at) {
               correlationRuns.push({
-                job_name: jobName,
-                name: jobName,
+                job_name: job.name,
+                name: job.name,
                 labels: {
                   gh_run_id: CURRENT_RUN_ID,
-                  gh_job_id: jobName,
+                  gh_job_id: job.name,
                   gh_run_attempt: "1",
                   gh_repo: context.repo.owner + "/" + context.repo.repo,
                   is_ephemeral_node: "false"
                 },
-                start_time: new Date(jobData.started_at).getTime(),
-                end_time: new Date(jobData.completed_at).getTime()
+                start_time: new Date(job.started_at).getTime(),
+                end_time: new Date(job.completed_at).getTime()
               });
 
-              console.log(`Added job: ${jobName} (${jobData.started_at} to ${jobData.completed_at})`);
+              console.log(`✓ Added job: ${job.name} (${job.started_at} to ${job.completed_at})`);
             } else {
-              console.log(`Warning: Could not find timing data for job ${jobName}`);
+              console.log(`⚠ Skipped job: ${job.name} (conclusion: ${job.conclusion})`);
             }
           }
 
           if (correlationRuns.length === 0) {
-            throw new Error(`No valid job timing found for any jobs in needs: [${JOB_NAMES.join(', ')}]`);
+            throw new Error(`No successful jobs found for correlation`);
           }
 
           // Create output file path
@@ -173,12 +148,12 @@ runs:
           const configPath = path.join(ACTION_PATH, 'correlation_config.json');
           fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-          console.log(`Correlation config written to: ${configPath}`);
-          console.log(`Total jobs for correlation: ${correlationRuns.length}`);
+          console.log(`✓ Correlation config written to: ${configPath}`);
+          console.log(`✓ Total jobs for correlation: ${correlationRuns.length}`);
 
           core.setOutput('config_path', configPath);
           core.setOutput('output_file', outputPath);
-          core.setOutput('jobs_correlated', JOB_NAMES.join(','));
+          core.setOutput('jobs_correlated', correlationRuns.map(r => r.job_name).join(','));
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
