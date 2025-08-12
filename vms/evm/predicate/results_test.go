@@ -143,31 +143,6 @@ func TestBlockResultsGetSet(t *testing.T) {
 	require.Empty(result)
 }
 
-func TestBlockResultsDelete(t *testing.T) {
-	require := require.New(t)
-
-	predicateResults := BlockResults{}
-
-	txHash := common.Hash{1}
-	addr := common.Address{2}
-	predicateResult := []byte{1, 2, 3}
-	txPredicateResults := map[common.Address][]byte{
-		addr: predicateResult,
-	}
-
-	// Set up some results
-	predicateResults.Set(txHash, txPredicateResults)
-	result, ok := predicateResults.Get(txHash, addr)
-	require.True(ok)
-	require.Equal(predicateResult, result)
-
-	// Test Delete
-	predicateResults.Delete(txHash)
-	result, ok = predicateResults.Get(txHash, addr)
-	require.False(ok)
-	require.Empty(result)
-}
-
 func TestBlockResultsZeroValue(t *testing.T) {
 	require := require.New(t)
 

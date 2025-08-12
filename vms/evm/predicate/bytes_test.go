@@ -56,7 +56,7 @@ func TestBytesToHashSlice(t *testing.T) {
 			result := bytesToHashSlice(tt.input)
 
 			// Calculate expected number of hashes
-			expectedNumHashes := (len(tt.input) + 31) / 32
+			expectedNumHashes := roundUpTo32(len(tt.input)) / common.HashLength
 			require.Len(result, expectedNumHashes)
 
 			// Verify each hash is properly formed
@@ -157,7 +157,7 @@ func TestBytesToHashSliceEdgeCases(t *testing.T) {
 		testData := utils.RandomBytes(i)
 		hashes := bytesToHashSlice(testData)
 
-		expectedNumHashes := (i + 31) / 32
+		expectedNumHashes := roundUpTo32(i) / common.HashLength
 		require.Len(hashes, expectedNumHashes)
 
 		// Verify padding behavior
@@ -257,32 +257,32 @@ func TestUnpackInvalid(t *testing.T) {
 		{
 			name:        "empty input",
 			input:       Predicate{},
-			expectedErr: errInvalidEmptyPredicate,
+			expectedErr: errEmptyPredicate,
 		},
 		{
 			name:        "all zeros",
 			input:       Predicate(bytes.Repeat([]byte{0}, 32)),
-			expectedErr: errInvalidAllZeroBytes,
+			expectedErr: errAllZeroBytes,
 		},
 		{
 			name:        "missing delimiter",
 			input:       Predicate(bytes.Repeat([]byte{0x42}, 32)),
-			expectedErr: errInvalidEndDelimiter,
+			expectedErr: errWrongEndDelimiter,
 		},
 		{
 			name:        "wrong delimiter",
 			input:       Predicate(append(bytes.Repeat([]byte{0x42}, 31), 0x00)),
-			expectedErr: errInvalidEndDelimiter,
+			expectedErr: errWrongEndDelimiter,
 		},
 		{
 			name:        "excess padding",
 			input:       Predicate(append(append([]byte{0x42, 0xff}, bytes.Repeat([]byte{0}, 30)...), 0x01)),
-			expectedErr: errInvalidPadding,
+			expectedErr: errExcessPadding,
 		},
 		{
 			name:        "non-zero padding",
 			input:       Predicate(append(append([]byte{0x42, 0xff}, bytes.Repeat([]byte{0}, 29)...), 0x01, 0x00)),
-			expectedErr: errInvalidPadding,
+			expectedErr: errExcessPadding,
 		},
 	}
 
@@ -328,7 +328,7 @@ func FuzzUnpackInvalid(f *testing.F) {
 		// Check for either error type since different padding can cause different errors.
 		// Zero padding cases trigger ErrInvalidPadding (padding length check fails).
 		// Non-zero padding cases trigger ErrInvalidEndDelimiter (delimiter check fails).
-		require.True(t, errors.Is(err, errInvalidPadding) || errors.Is(err, errInvalidEndDelimiter),
+		require.True(t, errors.Is(err, errExcessPadding) || errors.Is(err, errWrongEndDelimiter),
 			"Expected error for corrupted predicate, got: %v", err)
 	})
 }

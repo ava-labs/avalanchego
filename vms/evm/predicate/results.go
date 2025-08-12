@@ -71,11 +71,6 @@ func (r *BlockResults) Set(txHash common.Hash, txResults PrecompileResults) {
 	r.TxResults[txHash] = txResults
 }
 
-// Delete deletes the predicate results for the given txHash.
-func (r *BlockResults) Delete(txHash common.Hash) {
-	delete(r.TxResults, txHash)
-}
-
 // Bytes marshals the current state of predicate results
 func (r *BlockResults) Bytes() ([]byte, error) {
 	return resultsCodec.Marshal(version, r)
