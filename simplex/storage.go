@@ -42,7 +42,7 @@ type Storage struct {
 	height atomic.Uint64
 
 	// db is the underlying database used to store finalizations.
-	db KeyValueReaderWriter
+	db database.KeyValueReaderWriter
 
 	// genesisBlock is the genesis block data. It is stored as the first block in the storage.
 	genesisBlock *Block
