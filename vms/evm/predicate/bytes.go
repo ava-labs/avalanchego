@@ -22,10 +22,10 @@ type Predicate []byte
 const delimiter = 0xff
 
 var (
-	errInvalidEmptyPredicate = errors.New("predicate specified invalid empty predicate")
-	errInvalidAllZeroBytes   = errors.New("predicate specified invalid all zero bytes")
-	errInvalidPadding        = errors.New("predicate specified invalid padding")
-	errInvalidEndDelimiter   = errors.New("invalid end delimiter")
+	errEmptyPredicate = errors.New("predicate specified empty predicate")
+	errAllZeroBytes   = errors.New("predicate specified all zero bytes")
+	errExcessPadding        = errors.New("predicate specified excess padding")
+	errWrongEndDelimiter   = errors.New("wrong end delimiter")
 )
 
 // bytesToHashSlice packs [b] into a slice of hash values with zero padding
