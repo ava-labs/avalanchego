@@ -5,7 +5,6 @@ package predicate
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/ava-labs/libevm/common"
 

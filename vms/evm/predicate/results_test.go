@@ -178,7 +178,7 @@ func TestBlockResultsZeroValue(t *testing.T) {
 	result, ok := results.Get(common.Hash{1}, common.Address{2})
 	require.False(ok)
 	require.Empty(result)
-	require.Equal("PredicateResults: (Size = 0)", results.String())
+	require.Equal(len(results.TxResults), 0)
 
 	// Should be able to set results without panicking
 	results.Set(common.Hash{1}, PrecompileResults{
@@ -189,5 +189,5 @@ func TestBlockResultsZeroValue(t *testing.T) {
 	result, ok = results.Get(common.Hash{1}, common.Address{2})
 	require.True(ok)
 	require.Equal([]byte{1, 2, 3}, result)
-	require.Contains(results.String(), "Size = 1")
+	require.Equal(len(results.TxResults), 1)
 }
