@@ -30,7 +30,7 @@ on:
 
 jobs:
   c-chain-reexecution-arc: # PR smoke test + scheduled run + manual workflow
-    if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego')
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego' }}
     permissions:
       id-token: write
       contents: write
@@ -39,7 +39,6 @@ jobs:
       image: ghcr.io/actions/actions-runner:2.325.0
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
       - name: Set task parameters
         id: set-params
         run: |
@@ -95,7 +94,6 @@ jobs:
     runs-on: 'ubuntu-latest'
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
