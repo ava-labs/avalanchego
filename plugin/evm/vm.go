@@ -570,8 +570,8 @@ func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte, a
 		configExtra.Override(overrides)
 	}
 
-	if err := configExtra.Verify(); err != nil {
-		return nil, fmt.Errorf("invalid chain config: %w", err)
+	if err := g.Verify(); err != nil {
+		return nil, fmt.Errorf("failed to verify genesis: %w", err)
 	}
 
 	// Align all the Ethereum upgrades to the Avalanche upgrades

@@ -966,6 +966,7 @@ func TestNonCanonicalAccept(t *testing.T) {
 		})
 	}
 }
+
 func testNonCanonicalAccept(t *testing.T, scheme string) {
 	tvmConfig := testVMConfig{
 		genesisJSON: genesisJSONSubnetEVM,
@@ -3708,4 +3709,28 @@ func TestWaitForEvent(t *testing.T) {
 			tvm.Shutdown(context.Background())
 		})
 	}
+}
+
+func TestGenesisGasLimit(t *testing.T) {
+	ctx, db, genesisBytes, _ := setupGenesis(t, upgradetest.Granite)
+	genesis := &core.Genesis{}
+	require.NoError(t, genesis.UnmarshalJSON(genesisBytes))
+	// change the gas limit in the genesis to be different from the fee config
+	genesis.GasLimit = params.GetExtra(genesis.Config).FeeConfig.GasLimit.Uint64() - 1
+	genesisBytes, err := genesis.MarshalJSON()
+	require.NoError(t, err)
+
+	vm := &VM{}
+	err = vm.Initialize(context.Background(), ctx, db, genesisBytes, []byte{}, []byte{}, []*commonEng.Fx{}, &enginetest.Sender{})
+	// This should fail because the gas limit is different from the fee config
+	require.ErrorContains(t, err, "failed to verify genesis")
+
+	// This should succeed because the gas limit is the same as the fee config
+	genesis.GasLimit = params.GetExtra(genesis.Config).FeeConfig.GasLimit.Uint64()
+	genesisBytes, err = genesis.MarshalJSON()
+	require.NoError(t, err)
+	ctx.Metrics = metrics.NewPrefixGatherer()
+
+	require.NoError(t, vm.Initialize(context.Background(), ctx, db, genesisBytes, []byte{}, []byte{}, []*commonEng.Fx{}, &enginetest.Sender{}))
+	require.NoError(t, vm.Shutdown(context.Background()))
 }
