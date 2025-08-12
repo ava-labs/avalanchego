@@ -61,15 +61,7 @@ func ParseBlockResults(b []byte) (BlockResults, error) {
 // Get returns the byte array results for txHash from precompile address if available.
 // Returns (nil, false) if the txHash or address is not found.
 func (r *BlockResults) Get(txHash common.Hash, address common.Address) ([]byte, bool) {
-	if r.TxResults == nil {
-		return nil, false
-	}
-	txResults, ok := r.TxResults[txHash]
-	if !ok {
-		return nil, false
-	}
-
-	result, ok := txResults[address]
+	result, ok := r.TxResults[txHash][address]
 	return result, ok
 }
 
