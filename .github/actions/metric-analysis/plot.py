@@ -7,6 +7,7 @@ import os
 import sys
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from prometheus_api_client import PrometheusConnect
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
@@ -20,12 +21,31 @@ class TestRun:
     """Represents a single test run."""
     start_time: int  # Unix timestamp (milliseconds)
     end_time: int  # Unix timestamp (milliseconds)
-    name: Optional[str] = None
-    labels: Optional[Dict[str, str]] = None
+    name: str
+    labels: Dict[str, str]
+    job_name: Optional[str] = None
 
 
-class Plot:
-    """Prometheus metrics visualization tool."""
+@dataclass
+class QueryConfig:
+    """Configuration for a single query."""
+    query: str
+    metric_name: str
+    y_axis_label: str
+    x_axis_label: Optional[str] = None
+
+
+@dataclass
+class PlotConfig:
+    """Configuration for the plot."""
+    queries: List[QueryConfig]
+    runs: List[TestRun]
+    dashboard_title: str
+    output_file: str
+
+
+class MultiPlot:
+    """Multi-metric Prometheus visualization tool."""
 
     def __init__(self, prometheus_url: str, prometheus_auth: tuple,
                  step_size: str = '15s', timezone: str = 'UTC'):
@@ -51,20 +71,13 @@ class Plot:
         else:
             return datetime.fromtimestamp(timestamp, tz=pytz.UTC)
 
-    def _format_timestamp_for_display(self, timestamp: int) -> str:
-        """Format timestamp for display in the configured timezone."""
-        utc_dt = self._normalize_timestamp(timestamp)
-        display_dt = utc_dt.astimezone(self.display_tz)
-        return f"{display_dt.strftime('%Y-%m-%d %H:%M:%S %Z')}"
-
-    def _sanitize_labels(self, labels: Dict) -> Dict[str, str]:
+    def _sanitize_labels(self, labels: Dict[str, str]) -> Dict[str, str]:
         """Convert all label values to strings."""
         if not labels:
             return {}
-
         return {k: str(v).lower() if isinstance(v, bool) else str(v) for k, v in labels.items()}
 
-    def _apply_labels_to_query(self, base_query: str, labels: Dict[str, str] = None) -> str:
+    def _apply_labels_to_query(self, base_query: str, labels: Dict[str, str]) -> str:
         """Apply labels to the Prometheus query."""
         if not labels:
             return base_query
@@ -111,7 +124,7 @@ class Plot:
             )
 
             if not result:
-                self.logger.warning("no_prometheus_data", run_name=run.name)
+                self.logger.warning("no_prometheus_data", run_name=run.name, query=query)
                 return pd.DataFrame(columns=['timestamp', 'value'])
 
             # Aggregate data points
@@ -131,78 +144,113 @@ class Plot:
             df = pd.DataFrame(data)
             self.logger.info("data_fetched",
                              run_name=run.name,
+                             query=query,
                              data_points=len(df),
                              value_range=f"{df['value'].min():.2f} - {df['value'].max():.2f}" if not df.empty else "empty")
             return df
 
         except Exception as e:
-            self.logger.error("data_fetch_failed", run_name=run.name, error=str(e))
+            self.logger.error("data_fetch_failed", run_name=run.name, query=query, error=str(e))
             return pd.DataFrame(columns=['timestamp', 'value'])
 
-    def align_to_candidate_timeline(self, baseline_df: pd.DataFrame, candidate_df: pd.DataFrame) -> pd.DataFrame:
-        """Align baseline timestamps to candidate timeline for comparison."""
-        if baseline_df.empty or candidate_df.empty:
-            return baseline_df
+    def align_to_reference_timeline(self, data_df: pd.DataFrame, reference_df: pd.DataFrame) -> pd.DataFrame:
+        """Align data timestamps to reference timeline for comparison."""
+        if data_df.empty or reference_df.empty:
+            return data_df
 
-        baseline_start = baseline_df['timestamp'].min()
-        candidate_start = candidate_df['timestamp'].min()
+        data_start = data_df['timestamp'].min()
+        reference_start = reference_df['timestamp'].min()
 
-        aligned_df = baseline_df.copy()
-        time_offset = (baseline_df['timestamp'] - baseline_start).dt.total_seconds()
-        aligned_df['timestamp'] = candidate_start + pd.to_timedelta(time_offset, unit='s')
+        aligned_df = data_df.copy()
+        time_offset = (data_df['timestamp'] - data_start).dt.total_seconds()
+        aligned_df['timestamp'] = reference_start + pd.to_timedelta(time_offset, unit='s')
 
         return aligned_df.sort_values('timestamp').reset_index(drop=True)
 
-    def create_metric_chart(self, candidate_data: pd.DataFrame, candidate_run: TestRun,
-                            baseline_data: List[Tuple[TestRun, pd.DataFrame]], config: dict) -> go.Figure:
-        """Create the interactive visualization chart."""
-        fig = go.Figure()
+    def create_subplot_chart(self, fig, row: int, col: int, query_config: QueryConfig,
+                             datasets: List[Tuple[TestRun, pd.DataFrame]]) -> None:
+        """Add a single metric chart to the subplot figure."""
         colors = ['#2E86AB', '#A23B72', '#F18F01', '#C73E1D', '#4CAF50', '#9C27B0', '#FF9800']
 
-        # Add baseline traces
-        for i, (baseline_run, df) in enumerate(baseline_data):
+        # Get reference dataset for alignment (first non-empty dataset)
+        reference_df = None
+        for run, df in datasets:
+            if not df.empty:
+                reference_df = df
+                break
+
+        if reference_df is None:
+            self.logger.warning("no_reference_data", metric=query_config.metric_name)
+            return
+
+        for i, (run, df) in enumerate(datasets):
             if df.empty:
                 continue
 
             color = colors[i % len(colors)]
-            run_name = baseline_run.name or f"Baseline {i + 1}"
+            run_name = run.name
 
-            fig.add_trace(go.Scatter(
-                x=df['timestamp'],
-                y=df['value'],
-                mode='lines+markers',
-                name=f'Baseline: {run_name}',
-                line=dict(color=color, width=2),
-                marker=dict(size=4),
-                hovertemplate=f'<b>{run_name}</b><br>Time: %{{x}}<br>Value: %{{y:.2f}}<extra></extra>'
-            ))
+            # Align data to reference timeline
+            aligned_df = self.align_to_reference_timeline(df, reference_df)
 
-        # Add candidate trace
-        if not candidate_data.empty:
-            candidate_name = candidate_run.name or "Candidate"
-            fig.add_trace(go.Scatter(
-                x=candidate_data['timestamp'],
-                y=candidate_data['value'],
-                mode='lines+markers',
-                name=f'Candidate: {candidate_name}',
-                line=dict(color='#E53E3E', width=3),
-                marker=dict(size=6),
-                hovertemplate=f'<b>{candidate_name}</b><br>Time: %{{x}}<br>Value: %{{y:.2f}}<extra></extra>'
-            ))
+            fig.add_trace(
+                go.Scatter(
+                    x=aligned_df['timestamp'],
+                    y=aligned_df['value'],
+                    mode='lines+markers',
+                    name=f'{run_name}',
+                    line=dict(color=color, width=2),
+                    marker=dict(size=4),
+                    hovertemplate=f'<b>{run_name}</b><br>Time: %{{x}}<br>Value: %{{y:.2f}}<extra></extra>',
+                    legendgroup=f'run_{i}',
+                    showlegend=(row == 1 and col == 1)  # Only show legend on first chart
+                ),
+                row=row, col=col
+            )
 
-        # Layout
+        # Update y-axis title for this subplot
+        fig.update_yaxes(title_text=query_config.y_axis_label, row=row, col=col)
+
+    def create_multi_metric_chart(self, plot_config: PlotConfig) -> go.Figure:
+        """Create multi-metric visualization with subplots."""
+        num_queries = len(plot_config.queries)
+        subplot_titles = [q.metric_name for q in plot_config.queries]
+
+        fig = make_subplots(
+            rows=num_queries,
+            cols=1,
+            subplot_titles=subplot_titles,
+            vertical_spacing=0.08,
+            shared_xaxes=True
+        )
+
+        # Fetch data for all metrics and all runs
+        for i, query_config in enumerate(plot_config.queries):
+            query_datasets = []
+
+            for run in plot_config.runs:
+                df = self.fetch_metric_data(query_config.query, run)
+                query_datasets.append((run, df))
+
+            self.create_subplot_chart(fig, i + 1, 1, query_config, query_datasets)
+
+        # Update layout
         fig.update_layout(
-            title=f'<b>{config["metric_name"]} - Metric Visualization</b>',
-            xaxis_title=config.get('x_axis_label', 'Time'),
-            yaxis_title=config.get('y_axis_label', config['metric_name']),
+            title=f'<b>{plot_config.dashboard_title}</b>',
             hovermode='x unified',
             template='plotly_white',
             width=1200,
-            height=700,
+            height=400 * num_queries,
             showlegend=True
         )
 
-        # Add time range selector
+        # Update x-axis title only on the bottom chart
+        # Use the x_axis_label from the last query if available, otherwise default
+        last_query = plot_config.queries[-1]
+        x_axis_title = last_query.x_axis_label if last_query.x_axis_label else 'Time'
+        fig.update_xaxes(title_text=x_axis_title, row=num_queries, col=1)
+
+        # Add time range selector to bottom chart
         fig.update_xaxes(
             rangeslider_visible=True,
             rangeselector=dict(
@@ -212,73 +260,92 @@ class Plot:
                     dict(count=10, label="10m", step="minute", stepmode="backward"),
                     dict(step="all")
                 ]
-            )
+            ),
+            row=num_queries, col=1
         )
 
         return fig
 
-    def visualize_metrics(self, config: dict) -> str:
-        """Main visualization method."""
+    def visualize_multiple_metrics(self, config_dict: dict) -> str:
+        """Main multi-metric visualization method."""
 
-        # 1. Initialize candidate run
-        candidate_run = TestRun(**config['candidate'])
-        self.logger.info("starting_visualization",
-                         metric=config['metric_name'],
-                         candidate=candidate_run.name)
+        # Parse configuration into strongly typed objects
+        plot_config = self._parse_config(config_dict)
 
-        # 2. Fetch candidate data
-        candidate_data = self.fetch_metric_data(config['query'], candidate_run)
-        if candidate_data.empty:
-            self.logger.error("no_candidate_data")
-            return ""
+        self.logger.info("starting_multi_visualization",
+                         num_metrics=len(plot_config.queries),
+                         num_runs=len(plot_config.runs),
+                         metrics=[q.metric_name for q in plot_config.queries])
 
-        # 3. Process baselines - use provided timing instead of detection
-        baselines = config.get('baselines', [])
-
-        baseline_data = []
-        for i, baseline_config in enumerate(baselines, 1):
-            # Create TestRun directly from config (already has timing and labels)
-            baseline_run = TestRun(**baseline_config)
-
-            self.logger.info("processing_baseline",
-                             index=i,
-                             name=baseline_run.name,
-                             start_time=self._format_timestamp_for_display(baseline_run.start_time),
-                             end_time=self._format_timestamp_for_display(baseline_run.end_time))
-
-            df = self.fetch_metric_data(config['query'], baseline_run)
-            if df.empty:
-                self.logger.warning("baseline_data_empty", index=i, name=baseline_run.name)
-                continue
-
-            aligned_df = self.align_to_candidate_timeline(df, candidate_data)
-            baseline_data.append((baseline_run, aligned_df))
-
-        if not baseline_data:
-            self.logger.error("no_valid_baselines")
-            return ""
-
-        # 4. Generate visualization
-        chart = self.create_metric_chart(candidate_data, candidate_run, baseline_data, config)
+        # Generate visualization
+        chart = self.create_multi_metric_chart(plot_config)
         html_output = chart.to_html(include_plotlyjs='cdn')
 
-        # 5. Write output file
-        output_file = config.get('output_file', 'metric_visualization.html')
-
+        # Write output file
         try:
-            with open(output_file, 'w') as f:
+            with open(plot_config.output_file, 'w') as f:
                 f.write(html_output)
 
-            self.logger.info("visualization_completed",
-                             output_file=output_file,
-                             baselines_processed=len(baseline_data))
+            self.logger.info("multi_visualization_completed",
+                             output_file=plot_config.output_file,
+                             metrics_processed=len(plot_config.queries),
+                             runs_processed=len(plot_config.runs))
 
-            print(f"Visualization saved to: {output_file}")
+            print(f"Multi-metric visualization saved to: {plot_config.output_file}")
             return html_output
 
         except Exception as e:
-            self.logger.error("file_write_failed", output_file=output_file, error=str(e))
+            self.logger.error("file_write_failed", output_file=plot_config.output_file, error=str(e))
             return ""
+
+    def _parse_config(self, config_dict: dict) -> PlotConfig:
+        """Parse configuration dictionary into strongly typed objects."""
+
+        # Parse queries
+        queries = []
+        for i, query_item in enumerate(config_dict['queries']):
+            if not isinstance(query_item, dict):
+                raise ValueError(f"Query {i} must be an object")
+
+            required_fields = ['query', 'metric_name', 'y_axis_label']
+            for field in required_fields:
+                if field not in query_item:
+                    raise ValueError(f"Missing required field '{field}' in query {i}")
+
+            query_config = QueryConfig(
+                query=query_item['query'],
+                metric_name=query_item['metric_name'],
+                y_axis_label=query_item['y_axis_label'],
+                x_axis_label=query_item.get('x_axis_label')
+            )
+            queries.append(query_config)
+
+        # Parse runs
+        runs = []
+        for i, run_item in enumerate(config_dict['runs']):
+            if not isinstance(run_item, dict):
+                raise ValueError(f"Run {i} must be an object")
+
+            required_fields = ['start_time', 'end_time', 'name', 'labels']
+            for field in required_fields:
+                if field not in run_item:
+                    raise ValueError(f"Missing required field '{field}' in run {i}")
+
+            test_run = TestRun(
+                start_time=run_item['start_time'],
+                end_time=run_item['end_time'],
+                name=run_item['name'],
+                labels=run_item['labels'],
+                job_name=run_item.get('job_name')
+            )
+            runs.append(test_run)
+
+        return PlotConfig(
+            queries=queries,
+            runs=runs,
+            dashboard_title=config_dict.get('dashboard_title', 'Multi-Metric Analysis'),
+            output_file=config_dict.get('output_file', 'multi_metric_visualization.html')
+        )
 
 
 def load_config(config_path: str) -> dict:
@@ -287,29 +354,17 @@ def load_config(config_path: str) -> dict:
         with open(config_path, 'r') as f:
             config = json.load(f)
 
-        # Convert boolean values to strings
-        def convert_values(obj):
-            if isinstance(obj, dict):
-                return {k: convert_values(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
-                return [convert_values(item) for item in obj]
-            elif isinstance(obj, bool):
-                return str(obj).lower()
-            else:
-                return obj
-
-        config = convert_values(config)
-
-        # Validate required fields
-        required_fields = ['query', 'metric_name', 'candidate']
+        # Validate required top-level fields
+        required_fields = ['queries', 'runs']
         for field in required_fields:
             if field not in config:
                 raise ValueError(f"Missing required field: {field}")
 
-        candidate_fields = ['start_time', 'end_time']
-        for field in candidate_fields:
-            if field not in config['candidate']:
-                raise ValueError(f"Missing candidate field: {field}")
+        if not isinstance(config['queries'], list) or len(config['queries']) == 0:
+            raise ValueError("queries must be a non-empty array")
+
+        if not isinstance(config['runs'], list) or len(config['runs']) == 0:
+            raise ValueError("runs must be a non-empty array")
 
         return config
 
@@ -320,7 +375,7 @@ def load_config(config_path: str) -> dict:
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Prometheus metrics visualization tool')
+    parser = argparse.ArgumentParser(description='Prometheus visualization tool')
     parser.add_argument('--config', help='Path to JSON configuration file', required=True)
     parser.add_argument('--prometheus-url', help='Prometheus server URL', required=True)
     parser.add_argument('--step-size', default='15s', help='Prometheus query step size')
@@ -378,14 +433,14 @@ def main():
         # Load config and run visualization
         config = load_config(args.config)
 
-        plot = Plot(
+        plot = MultiPlot(
             prometheus_url=args.prometheus_url,
             prometheus_auth=(prometheus_username, prometheus_password),
             step_size=args.step_size,
             timezone=args.timezone
         )
 
-        result = plot.visualize_metrics(config)
+        result = plot.visualize_multiple_metrics(config)
 
         if not result:
             logger.error("visualization_failed")

@@ -1,16 +1,30 @@
-name: Metric Correlation Analysis
-description: Correlate metrics across multiple jobs/runs for performance comparison
+name: Metric Analysis
+description: Analyze and compare metrics across multiple jobs/runs for performance evaluation
 
 inputs:
+  job_names:
+    description: 'Comma-separated list of job names to analyze (e.g., "e2e_kube,load_test")'
+    required: true
   queries:
-    description: 'Array of query objects with query, metric_name, and optional y_axis_label'
+    description: |
+      Array of query objects for metric analysis.
+
+      Each query object must have:
+      - query (required, string): Prometheus query expression
+      - metric_name (required, string): Display name for the metric
+      - y_axis_label (required, string): Y-axis label for the chart
+      - x_axis_label (optional, string): X-axis label (defaults to 'Time')
+
+      Example:
+        queries:
+          - query: "rate(http_requests_total[5m])"
+            metric_name: "HTTP Request Rate"
+            y_axis_label: "Requests/sec"
+            x_axis_label: "Time"
     required: true
   dashboard_title:
-    description: 'Title for the correlation dashboard'
-    default: 'Metric Correlation Analysis'
-  x_axis_label:
-    description: 'X-axis label'
-    default: 'Time'
+    description: 'Title for the analysis dashboard'
+    default: 'Metric Analysis'
   prometheus_url:
     description: 'Prometheus server URL'
     default: 'https://prometheus-poc.avax-dev.network'
@@ -31,7 +45,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Build correlation configuration
+    - name: Build configuration
       id: build-config
       uses: actions/github-script@v7
       with:
@@ -43,66 +57,58 @@ runs:
           const CURRENT_RUN_ID = context.runId.toString();
           const ACTION_PATH = process.env.GITHUB_ACTION_PATH;
 
-          console.log('=== DEBUG INFO ===');
-          console.log('Current run ID:', CURRENT_RUN_ID);
+          // Parse job names from input
+          const targetJobNames = '${{ inputs.job_names }}'.split(',').map(name => name.trim());
+          console.log('Target jobs:', targetJobNames.join(', '));
 
           // Get jobs from GitHub API
-          console.log('Fetching jobs from GitHub API...');
           const { data: workflowJobs } = await github.rest.actions.listJobsForWorkflowRun({
             owner: context.repo.owner,
             repo: context.repo.repo,
             run_id: CURRENT_RUN_ID
           });
 
-          // Find jobs by their display names (not job keys)
-          const foundJobs = workflowJobs.jobs.filter(job =>
-            job.name.includes('firewood load test') || job.name.includes('Run load test on self-hosted runners')
-          );
+          // Find jobs by matching display names with target job names
+          const foundJobs = [];
+          for (const targetName of targetJobNames) {
+            const job = workflowJobs.jobs.find(job =>
+              job.name.toLowerCase().includes(targetName.toLowerCase().replace('_', ' '))
+            );
+            if (job) {
+              foundJobs.push({ ...job, job_key: targetName }); // Store the original job key
+            }
+          }
 
-          console.log('All jobs in workflow:');
-          workflowJobs.jobs.forEach(job => {
-            console.log(`- ${job.name} (${job.conclusion})`);
-          });
-
-          console.log('Found target jobs:');
+          console.log('Found jobs:');
           foundJobs.forEach(job => {
-            console.log(`- ${job.name} (${job.conclusion}) - ${job.started_at} to ${job.completed_at}`);
+            console.log(`- ${job.name} -> ${job.job_key} (conclusion: ${job.conclusion})`);
           });
 
           if (foundJobs.length === 0) {
-            throw new Error(`No target jobs found. Available jobs: ${workflowJobs.jobs.map(j => j.name).join(', ')}`);
+            console.log('Available jobs in workflow:');
+            workflowJobs.jobs.forEach(job => console.log(`- ${job.name}`));
+            throw new Error(`No target jobs found. Looking for: ${targetJobNames.join(', ')}`);
           }
 
-          // Parse queries input
+          // Parse queries
           let queries;
           try {
-            const queriesInput = `${{ inputs.queries }}`;
-            queries = JSON.parse(queriesInput);
-            console.log(`✓ Parsed ${queries.length} queries successfully`);
+            queries = JSON.parse(`${{ inputs.queries }}`);
+            console.log(`✓ Parsed ${queries.length} queries`);
           } catch (error) {
-            console.log(`Failed to parse queries, error: ${error.message}`);
             throw new Error(`Invalid queries format: ${error.message}`);
           }
 
-          const correlationRuns = [];
-
-          // Process each found job
+          // Build runs from successful jobs
+          const runs = [];
           for (const job of foundJobs) {
             if (job.conclusion === 'success' && job.started_at && job.completed_at) {
-              // Create a cleaner name for the correlation
-              let cleanName = job.name;
-              if (job.name.includes('firewood')) {
-                cleanName = 'Firewood Load Test';
-              } else if (job.name.includes('Run load test on self-hosted runners')) {
-                cleanName = 'Standard Load Test';
-              }
-
-              correlationRuns.push({
+              runs.push({
                 job_name: job.name,
-                name: cleanName,
+                name: job.name,
                 labels: {
                   gh_run_id: CURRENT_RUN_ID,
-                  gh_job_id: job.name,
+                  gh_job_id: job.job_key
                   gh_run_attempt: "1",
                   gh_repo: context.repo.owner + "/" + context.repo.repo,
                   is_ephemeral_node: "false"
@@ -110,39 +116,31 @@ runs:
                 start_time: new Date(job.started_at).getTime(),
                 end_time: new Date(job.completed_at).getTime()
               });
-
-              console.log(`✓ Added job: ${cleanName} (${job.started_at} to ${job.completed_at})`);
+              console.log(`Added: ${job.name} (Job Key: ${job.job_key})`);
             } else {
-              console.log(`⚠ Skipped job: ${job.name} (conclusion: ${job.conclusion})`);
+              console.log(`Skipped: ${job.name} (${job.conclusion})`);
             }
           }
 
-          if (correlationRuns.length === 0) {
-            throw new Error(`No successful jobs found for correlation`);
+          if (runs.length === 0) {
+            throw new Error('No successful jobs found for analysis');
           }
 
-          // Create output file path
-          const outputFile = `correlation_analysis_${CURRENT_RUN_ID}.html`;
-          const outputPath = path.join(ACTION_PATH, outputFile);
-
-          // Build configuration for multi_plot.py
+          // Build config
+          const outputFile = `metric_analysis_${CURRENT_RUN_ID}.html`;
           const config = {
             queries: queries,
+            runs: runs,
             dashboard_title: '${{ inputs.dashboard_title }}',
-            x_axis_label: '${{ inputs.x_axis_label }}',
-            correlation_runs: correlationRuns,
-            output_file: outputPath
+            output_file: path.join(ACTION_PATH, outputFile)
           };
 
-          const configPath = path.join(ACTION_PATH, 'correlation_config.json');
+          const configPath = path.join(ACTION_PATH, 'analysis_config.json');
           fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-          console.log(`✓ Correlation config written to: ${configPath}`);
-          console.log(`✓ Total jobs for correlation: ${correlationRuns.length}`);
-
           core.setOutput('config_path', configPath);
-          core.setOutput('output_file', outputPath);
-          core.setOutput('jobs_correlated', correlationRuns.map(r => r.name).join(','));
+          core.setOutput('output_file', config.output_file);
+          core.setOutput('jobs_analyzed', runs.map(r => r.name).join(','));
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -151,7 +149,7 @@ runs:
     - name: Install Python dependencies
       shell: bash
       run: pip install -r $GITHUB_ACTION_PATH/requirements.txt
-    - name: Run correlation analysis
+    - name: Run metric analysis
       shell: bash
       env:
         PROMETHEUS_ID: ${{ inputs.prometheus_username }}
@@ -163,17 +161,12 @@ runs:
           --step-size "${{ inputs.step_size }}" \
           --timezone "${{ inputs.timezone }}" \
           --verbose
-    - name: Upload correlation artifact
+    - name: Upload analysis artifact
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: metric-correlation-${{ github.run_id }}
+        name: metric-analysis-${{ github.run_id }}
         path: |
           ${{ steps.build-config.outputs.output_file }}
           ${{ steps.build-config.outputs.config_path }}
-        retention-days: 14
-    - name: Log correlation summary
-      shell: bash
-      run: |
-        echo "::notice::Correlation analysis completed for jobs: ${{ steps.build-config.outputs.jobs_correlated }}"
-        echo "::notice::Visualization available in artifact: metric-correlation-${{ github.run_id }}"
+        retention-days: 7
