@@ -83,6 +83,9 @@ jobs:
           prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           push: ${{ github.event_name == 'schedule' }}
+          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: 'us-east-2'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   c-chain-reexecution-pr-gh-runner: # Smoke test on GitHub hosted runner
     if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego'}}
@@ -102,3 +105,6 @@ jobs:
           current-state-dir: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip
           prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: 'us-east-2'
+          github-token: ${{ secrets.GITHUB_TOKEN }}

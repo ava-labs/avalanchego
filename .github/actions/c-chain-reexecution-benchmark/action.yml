@@ -21,11 +21,9 @@ inputs:
   aws-role:
     description: 'AWS role to assume for S3 access.'
     required: true
-    default: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
   aws-region:
     description: 'AWS region to use for S3 access.'
     required: true
-    default: 'us-east-2'
   prometheus-username:
     description: 'The username for the Prometheus instance.'
     required: false
@@ -45,7 +43,6 @@ inputs:
   github-token:
     description: 'GitHub token provided to GitHub Action Benchmark.'
     required: true
-    default: ${{ secrets.GITHUB_TOKEN }}
   push:
     description: 'Whether to push the benchmark result to GitHub.'
     required: false
