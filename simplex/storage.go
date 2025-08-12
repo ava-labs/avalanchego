@@ -130,28 +130,35 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finalization simplex.Finalization) error {
 	bh := block.BlockHeader()
 	if bh.Seq == 0 {
-		s.log.Warn("attempted to index genesis block, which should not be indexed")
+		s.log.Error("attempted to index genesis block")
 		return errGenesisIndexed
 	}
 
 	currentHeight := s.height.Load()
 	if currentHeight != bh.Seq {
+		s.log.Error("attempted to index block with mismatched sequence number",
+			zap.Uint64("expected", currentHeight),
+			zap.Uint64("got", bh.Seq))
 		return fmt.Errorf("%w: expected %d, got %d", errUnexpectedSeq, currentHeight, bh.Seq)
 	}
 
 	if s.blockTracker.lastIndexed != bh.Prev {
-		s.log.Warn("attempted to index block with mismatched previous digest",
-			zap.String("expected", s.blockTracker.lastIndexed.String()),
-			zap.String("got", bh.Prev.String()))
+		s.log.Error("attempted to index block with mismatched previous digest",
+			zap.Stringer("expected", s.blockTracker.lastIndexed),
+			zap.Stringer("got", bh.Prev))
 
 		return fmt.Errorf("%w: expected %s, got %s", errMismatchedPrevDigest, s.blockTracker.lastIndexed, bh.Prev)
 	}
 
 	if !bytes.Equal(bh.Digest[:], finalization.Finalization.Digest[:]) {
+		s.log.Error("attempted to index block with mismatched digest",
+			zap.Stringer("expected", bh.Digest),
+			zap.Stringer("got", finalization.Finalization.Digest))
 		return fmt.Errorf("%w: expected %d, got %d", errMismatchedDigest, bh.Digest, finalization.Finalization.Digest)
 	}
 
 	if finalization.QC == nil {
+		s.log.Error("attempted to index block with no quorum certificate", zap.Stringer("blockID", bh.Digest))
 		return errInvalidQC
 	}
 
@@ -174,16 +181,16 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 
 // getGenesisBlock returns the genesis block wrapped as a Block instance.
 func getGenesisBlock(ctx context.Context, config *Config, blockTracker *blockTracker) (*Block, error) {
-	genesis := &Block{
-		metadata:     genesisMetadata,
-		blockTracker: blockTracker,
-	}
-
 	snowmanGenesis, err := getBlockAtHeight(ctx, config.VM, 0)
 	if err != nil {
 		return nil, err
 	}
-	genesis.vmBlock = snowmanGenesis
+
+	genesis := &Block{
+		metadata:     genesisMetadata,
+		blockTracker: blockTracker,
+		vmBlock:      snowmanGenesis,
+	}
 
 	// set the digest
 	bytes, err := genesis.Bytes()
@@ -203,9 +210,9 @@ func (s *Storage) retrieveFinalization(seq uint64) (simplex.Finalization, bool, 
 	finalizationBytes, err := s.db.Get(seqBuff)
 	if err != nil {
 		if err == database.ErrNotFound {
-			s.log.Error("finalization not found for sequence", zap.Uint64("seq", seq), zap.Error(err))
 			return simplex.Finalization{}, false, nil
 		}
+		s.log.Error("failed to retrieve finalization", zap.Uint64("seq", seq), zap.Error(err))
 		return simplex.Finalization{}, false, err
 	}
 
@@ -214,7 +221,7 @@ func (s *Storage) retrieveFinalization(seq uint64) (simplex.Finalization, bool, 
 		return simplex.Finalization{}, false, err
 	}
 
-	finalization, err := canotoFinalization.finalization(s.deserializer)
+	finalization, err := canotoFinalization.toFinalization(s.deserializer)
 	if err != nil {
 		return simplex.Finalization{}, false, err
 	}
@@ -228,12 +235,7 @@ func getBlockAtHeight(ctx context.Context, vm block.ChainVM, height uint64) (sno
 		return nil, err
 	}
 
-	block, err := vm.GetBlock(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	return block, nil
+	return vm.GetBlock(ctx, id)
 }
 
 // finalizationToBytes serializes the simplex.Finalization into bytes.
@@ -253,7 +255,7 @@ type canotoFinalization struct {
 }
 
 // finalizationFromBytes deserialized the bytes into a simplex.Finalization.
-func (c *canotoFinalization) finalization(d *QCDeserializer) (simplex.Finalization, error) {
+func (c *canotoFinalization) toFinalization(d *QCDeserializer) (simplex.Finalization, error) {
 	var finalization simplex.Finalization
 	if err := finalization.Finalization.FromBytes(c.Finalization); err != nil {
 		return simplex.Finalization{}, err
