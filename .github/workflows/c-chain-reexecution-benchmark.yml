@@ -82,7 +82,7 @@ jobs:
           current-state-dir: ${{ steps.set-params.outputs.current-state-dir }}
           prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          push: ${{ github.event_name == 'schedule' }}
+          push-github-action-benchmark: ${{ github.event_name == 'schedule' }}
           aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: 'us-east-2'
           github-token: ${{ secrets.GITHUB_TOKEN }}

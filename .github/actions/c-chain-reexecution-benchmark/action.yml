@@ -43,7 +43,7 @@ inputs:
   github-token:
     description: 'GitHub token provided to GitHub Action Benchmark.'
     required: true
-  push:
+  push-github-action-benchmark:
     description: 'Whether to push the benchmark result to GitHub.'
     required: false
     default: false
@@ -95,10 +95,10 @@ runs:
         auto-push: false
 
     - name: Push Benchmark Result
-      if: ${{ inputs.push }}
+      if: ${{ inputs.push-github-action-benchmark }}
       uses: benchmark-action/github-action-benchmark@v1
       with:
         tool: 'go'
         output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
         github-token: ${{ inputs.github-token }}
-        auto-push: true
+        auto-push: ${{ inputs.push-github-action-benchmark }}
