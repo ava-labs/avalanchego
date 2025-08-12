@@ -6,6 +6,7 @@ package predicate
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 )
@@ -14,38 +15,33 @@ func TestBlockResultsParsing(t *testing.T) {
 	tests := []struct {
 		name    string
 		results map[common.Hash]PrecompileResults
-		wantHex string
 	}{
 		{
 			name:    "empty",
 			results: make(map[common.Hash]PrecompileResults),
-			wantHex: "000000000000",
 		},
 		{
 			name: "single tx no results",
 			results: map[common.Hash]PrecompileResults{
 				{1}: {},
 			},
-			wantHex: "000000000001010000000000000000000000000000000000000000000000000000000000000000000000",
 		},
 		{
 			name: "single tx single result",
 			results: map[common.Hash]PrecompileResults{
-				{1}: map[common.Address][]byte{
-					{2}: {1, 2, 3},
+				{1}: map[common.Address]set.Bits{
+					{2}: set.NewBits(1, 2, 3),
 				},
 			},
-			wantHex: "000000000001010000000000000000000000000000000000000000000000000000000000000000000001020000000000000000000000000000000000000000000003010203",
 		},
 		{
 			name: "single tx multiple results",
 			results: map[common.Hash]PrecompileResults{
-				{1}: map[common.Address][]byte{
-					{2}: {1, 2, 3},
-					{3}: {1, 2, 3},
+				{1}: map[common.Address]set.Bits{
+					{2}: set.NewBits(1, 2, 3),
+					{3}: set.NewBits(1, 2, 3),
 				},
 			},
-			wantHex: "000000000001010000000000000000000000000000000000000000000000000000000000000000000002020000000000000000000000000000000000000000000003010203030000000000000000000000000000000000000000000003010203",
 		},
 		{
 			name: "multiple txs no result",
@@ -53,47 +49,43 @@ func TestBlockResultsParsing(t *testing.T) {
 				{1}: {},
 				{2}: {},
 			},
-			wantHex: "000000000002010000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000000000",
 		},
 		{
 			name: "multiple txs single result",
 			results: map[common.Hash]PrecompileResults{
-				{1}: map[common.Address][]byte{
-					{2}: {1, 2, 3},
+				{1}: map[common.Address]set.Bits{
+					{2}: set.NewBits(1, 2, 3),
 				},
-				{2}: map[common.Address][]byte{
-					{3}: {3, 2, 1},
+				{2}: map[common.Address]set.Bits{
+					{3}: set.NewBits(3, 2, 1),
 				},
 			},
-			wantHex: "000000000002010000000000000000000000000000000000000000000000000000000000000000000001020000000000000000000000000000000000000000000003010203020000000000000000000000000000000000000000000000000000000000000000000001030000000000000000000000000000000000000000000003030201",
 		},
 		{
 			name: "multiple txs multiple results",
 			results: map[common.Hash]PrecompileResults{
-				{1}: map[common.Address][]byte{
-					{2}: {1, 2, 3},
-					{3}: {3, 2, 1},
+				{1}: map[common.Address]set.Bits{
+					{2}: set.NewBits(1, 2, 3),
+					{3}: set.NewBits(3, 2, 1),
 				},
-				{2}: map[common.Address][]byte{
-					{2}: {1, 2, 3},
-					{3}: {3, 2, 1},
+				{2}: map[common.Address]set.Bits{
+					{2}: set.NewBits(1, 2, 3),
+					{3}: set.NewBits(3, 2, 1),
 				},
 			},
-			wantHex: "000000000002010000000000000000000000000000000000000000000000000000000000000000000002020000000000000000000000000000000000000000000003010203030000000000000000000000000000000000000000000003030201020000000000000000000000000000000000000000000000000000000000000000000002020000000000000000000000000000000000000000000003010203030000000000000000000000000000000000000000000003030201",
 		},
 		{
 			name: "multiple txs mixed results",
 			results: map[common.Hash]PrecompileResults{
-				{1}: map[common.Address][]byte{
-					{2}: {1, 2, 3},
+				{1}: map[common.Address]set.Bits{
+					{2}: set.NewBits(1, 2, 3),
 				},
-				{2}: map[common.Address][]byte{
-					{2}: {1, 2, 3},
-					{3}: {3, 2, 1},
+				{2}: map[common.Address]set.Bits{
+					{2}: set.NewBits(1, 2, 3),
+					{3}: set.NewBits(3, 2, 1),
 				},
 				{3}: {},
 			},
-			wantHex: "000000000003010000000000000000000000000000000000000000000000000000000000000000000001020000000000000000000000000000000000000000000003010203020000000000000000000000000000000000000000000000000000000000000000000002020000000000000000000000000000000000000000000003010203030000000000000000000000000000000000000000000003030201030000000000000000000000000000000000000000000000000000000000000000000000",
 		},
 	}
 
@@ -103,7 +95,7 @@ func TestBlockResultsParsing(t *testing.T) {
 			predicateResults := BlockResults{TxResults: tt.results}
 			b, err := predicateResults.Bytes()
 			require.NoError(err)
-			require.Equal(tt.wantHex, common.Bytes2Hex(b))
+			require.Equal(expectedHexFromResults(tt.results), common.Bytes2Hex(b))
 
 			parsedPredicateResults, err := ParseBlockResults(b)
 			require.NoError(err)
@@ -120,8 +112,8 @@ func TestBlockResultsGetSet(t *testing.T) {
 
 	txHash := common.Hash{1}
 	addr := common.Address{2}
-	predicateResult := []byte{1, 2, 3}
-	txPredicateResults := map[common.Address][]byte{
+	predicateResult := set.NewBits(1, 2, 3)
+	txPredicateResults := map[common.Address]set.Bits{
 		addr: predicateResult,
 	}
 
@@ -157,12 +149,28 @@ func TestBlockResultsZeroValue(t *testing.T) {
 
 	// Should be able to set results without panicking
 	results.Set(common.Hash{1}, PrecompileResults{
-		common.Address{2}: {1, 2, 3},
+		common.Address{2}: set.NewBits(1, 2, 3),
 	})
 
 	// Should now return the results
 	result, ok = results.Get(common.Hash{1}, common.Address{2})
 	require.True(ok)
-	require.Equal([]byte{1, 2, 3}, result)
+	require.Equal(set.NewBits(1, 2, 3), result)
 	require.Equal(len(results.TxResults), 1)
+}
+
+// expectedHexFromResults deterministically computes the expected hex encoding
+// for the given results using the same on-wire representation as production
+// code (i.e., []byte values for bitsets).
+func expectedHexFromResults(results map[common.Hash]PrecompileResults) string {
+	wire := encodedBlockResults{TxResults: make(map[common.Hash]encodedPrecompileResults, len(results))}
+	for txHash, addrToBits := range results {
+		enc := make(encodedPrecompileResults, len(addrToBits))
+		for addr, bits := range addrToBits {
+			enc[addr] = bits.Bytes()
+		}
+		wire.TxResults[txHash] = enc
+	}
+	b, _ := resultsCodec.Marshal(version, &wire)
+	return common.Bytes2Hex(b)
 }

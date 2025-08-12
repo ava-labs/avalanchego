@@ -71,6 +71,9 @@ func New(predicateBytes []byte) Predicate {
 // ensuring there is not excess padding, and returning the original message.
 // Returns an error if it finds an incorrect encoding.
 func Unpack(predicate Predicate) ([]byte, error) {
+	if len(predicate) == 0 {
+		return nil, errEmptyPredicate
+	}
 	trimmedBytes := common.TrimRightZeroes(predicate)
 	if len(trimmedBytes) == 0 {
 		return nil, fmt.Errorf("%w: 0x%x", errAllZeroBytes, predicate)
