@@ -8,7 +8,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 )
 
-type Precompiles interface {
+type Predicates interface {
 	HasPredicate(address common.Address) bool
 }
 
