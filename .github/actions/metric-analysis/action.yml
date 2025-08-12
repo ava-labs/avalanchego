@@ -167,7 +167,7 @@ runs:
         PROMETHEUS_ID: ${{ inputs.prometheus_username }}
         PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
       run: |
-        python $GITHUB_ACTION_PATH/multi_plot.py \
+        python $GITHUB_ACTION_PATH/plot.py \
           --config ${{ steps.build-config.outputs.config_path }} \
           --prometheus-url "${{ inputs.prometheus_url }}" \
           --step-size "${{ inputs.step_size }}" \
