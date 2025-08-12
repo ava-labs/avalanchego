@@ -1,31 +1,16 @@
-name: Metric Analysis
-description: Analyze Prometheus metrics
+name: Metric Correlation Analysis
+description: Correlate metrics across multiple jobs/runs for performance comparison
 
 inputs:
-  baseline_count:
-    description: 'Number of baseline runs to find'
-    default: '3'
-  monitoring_period:
-    description: 'Monitoring period in seconds'
-    default: '900'
-  query:
-    description: 'Prometheus query'
+  queries:
+    description: 'Array of query objects with query, metric_name, and optional y_axis_label'
     required: true
-  metric_name:
-    description: 'Metric name for display'
-    required: true
+  dashboard_title:
+    description: 'Title for the correlation dashboard'
+    default: 'Metric Correlation Analysis'
   x_axis_label:
     description: 'X-axis label'
     default: 'Time'
-  y_axis_label:
-    description: 'Y-axis label'
-    default: ''
-  workflow:
-    description: 'Workflow filename'
-    default: '.github/workflows/ci.yml'
-  job_name:
-    description: 'Job name to search for baselines. Uses current job if not specified.'
-    default: ''
   prometheus_url:
     description: 'Prometheus server URL'
     default: 'https://prometheus-poc.avax-dev.network'
@@ -46,7 +31,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Build baseline configuration
+    - name: Build configuration
       id: build-config
       uses: actions/github-script@v7
       with:
@@ -55,105 +40,93 @@ runs:
           const fs = require('fs');
           const path = require('path');
 
-          const BASELINE_COUNT = parseInt('${{ inputs.baseline_count }}');
-          const WORKFLOW = '${{ inputs.workflow }}';
+          // Get job names from the needs context
+          const JOB_NAMES = Object.keys(context.needs || {});
+          if (JOB_NAMES.length === 0) {
+            throw new Error('No jobs found in needs context. Make sure this job has a needs: [] declaration.');
+          }
+
           const CURRENT_RUN_ID = context.runId.toString();
           const ACTION_PATH = process.env.GITHUB_ACTION_PATH;
 
-          // Get current run metadata
-          const metadataFile = '/tmp/run-metadata/run_metadata.json';
-          if (!fs.existsSync(metadataFile)) {
-            throw new Error('Current run metadata not found');
+          console.log(`Correlating jobs from needs: ${JOB_NAMES.join(', ')}`);
+
+          // Parse queries input - GitHub Actions will convert YAML array to JSON string
+          let queries;
+          try {
+            const queriesInput = `${{ inputs.queries }}`;
+            if (queriesInput.startsWith('[') && queriesInput.endsWith(']')) {
+              queries = JSON.parse(queriesInput);
+            } else {
+              queries = JSON.parse(queriesInput);
+            }
+            console.log(`Found ${queries.length} queries to analyze`);
+          } catch (error) {
+            console.log(`Failed to parse queries, error: ${error.message}`);
+            throw new Error(`Invalid queries format. Expected array of objects with query and metric_name fields.`);
           }
 
-          const currentMetadata = JSON.parse(fs.readFileSync(metadataFile, 'utf8'));
-          console.log(`Current run job: ${currentMetadata.job_id}`);
-
-          // Get successful workflow runs
-          const { data: workflowRuns } = await github.rest.actions.listWorkflowRuns({
+          // Get precise job timings from GitHub Jobs API
+          console.log('Fetching job timings from GitHub API...');
+          const { data: workflowJobs } = await github.rest.actions.listJobsForWorkflowRun({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            workflow_id: WORKFLOW,
-            status: 'completed',
-            conclusion: 'success',
-            per_page: 50
+            run_id: CURRENT_RUN_ID
           });
 
-          const baselines = [];
+          const correlationRuns = [];
 
-          for (const run of workflowRuns.workflow_runs) {
-            if (baselines.length >= BASELINE_COUNT) break;
-            if (run.id.toString() === CURRENT_RUN_ID) continue;
+          // Process each job from needs context
+          for (const jobName of JOB_NAMES) {
+            const jobData = workflowJobs.jobs.find(job => job.name === jobName);
 
-            // Check for metadata artifact
-            try {
-              const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                run_id: run.id
+            if (jobData && jobData.started_at && jobData.completed_at) {
+              correlationRuns.push({
+                job_name: jobName,
+                name: jobName,
+                labels: {
+                  gh_run_id: CURRENT_RUN_ID,
+                  gh_job_id: jobName,
+                  gh_run_attempt: "1",
+                  gh_repo: context.repo.owner + "/" + context.repo.repo,
+                  is_ephemeral_node: "false"
+                },
+                start_time: new Date(jobData.started_at).getTime(),
+                end_time: new Date(jobData.completed_at).getTime()
               });
 
-              const metadataArtifact = artifacts.artifacts.find(artifact =>
-                artifact.name === `run-metadata-${currentMetadata.job_id}-${run.id}` && !artifact.expired
-              );
-
-              if (metadataArtifact) {
-                baselines.push({
-                  name: `Baseline ${run.run_number} (#${run.id})`,
-                  start_time: new Date(run.created_at).getTime(),
-                  end_time: new Date(run.updated_at).getTime(),
-                  labels: {
-                    gh_run_id: run.id.toString(),
-                    gh_job_id: currentMetadata.job_id,
-                    gh_run_attempt: "1",
-                    gh_repo: context.repo.owner + "/" + context.repo.repo,
-                    is_ephemeral_node: "false"
-                  }
-                });
-
-                console.log(`Added baseline: Run ${run.run_number}`);
-              }
-            } catch (error) {
-              console.log(`Error checking artifacts for run ${run.id}: ${error.message}`);
+              console.log(`Added job: ${jobName} (${jobData.started_at} to ${jobData.completed_at})`);
+            } else {
+              console.log(`Warning: Could not find timing data for job ${jobName}`);
             }
           }
 
-          console.log(`Found ${baselines.length} baselines with metadata artifacts`);
+          if (correlationRuns.length === 0) {
+            throw new Error(`No valid job timing found for any jobs in needs: [${JOB_NAMES.join(', ')}]`);
+          }
 
-          // Create output file in action directory
-          const outputFile = `metric_visualization_${CURRENT_RUN_ID}.html`;
+          // Create output file path
+          const outputFile = `correlation_analysis_${CURRENT_RUN_ID}.html`;
           const outputPath = path.join(ACTION_PATH, outputFile);
 
-          // Build configuration
+          // Build configuration for multi_plot.py
           const config = {
-            query: '${{ inputs.query }}',
-            metric_name: '${{ inputs.metric_name }}',
+            queries: queries,
+            dashboard_title: '${{ inputs.dashboard_title }}',
             x_axis_label: '${{ inputs.x_axis_label }}',
-            y_axis_label: '${{ inputs.y_axis_label }}' || '${{ inputs.metric_name }}',
-            candidate: {
-              start_time: currentMetadata.start_timestamp * 1000,
-              end_time: currentMetadata.end_timestamp * 1000,
-              name: `Candidate (#${CURRENT_RUN_ID})`,
-              labels: {
-                gh_run_id: CURRENT_RUN_ID,
-                gh_job_id: currentMetadata.job_id,
-                gh_run_attempt: currentMetadata.run_attempt,
-                gh_repo: currentMetadata.repository,
-                is_ephemeral_node: "false"
-              }
-            },
-            baselines: baselines,
+            correlation_runs: correlationRuns,
             output_file: outputPath
           };
 
-          const configPath = path.join(ACTION_PATH, 'metric_config.json');
+          const configPath = path.join(ACTION_PATH, 'correlation_config.json');
           fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-          console.log(`Config written to: ${configPath}`);
-          console.log(`Plot created at: ${outputPath}`);
+          console.log(`Correlation config written to: ${configPath}`);
+          console.log(`Total jobs for correlation: ${correlationRuns.length}`);
 
           core.setOutput('config_path', configPath);
           core.setOutput('output_file', outputPath);
+          core.setOutput('jobs_correlated', JOB_NAMES.join(','));
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
@@ -162,23 +135,29 @@ runs:
     - name: Install Python dependencies
       shell: bash
       run: pip install -r $GITHUB_ACTION_PATH/requirements.txt
-    - name: Run metric analysis
+    - name: Run correlation analysis
       shell: bash
       env:
         PROMETHEUS_ID: ${{ inputs.prometheus_username }}
         PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
       run: |
-        python $GITHUB_ACTION_PATH/plot.py \
+        python $GITHUB_ACTION_PATH/multi_plot.py \
           --config ${{ steps.build-config.outputs.config_path }} \
           --prometheus-url "${{ inputs.prometheus_url }}" \
           --step-size "${{ inputs.step_size }}" \
-          --timezone "${{ inputs.timezone }}"
-    - name: Upload visualization artifact
+          --timezone "${{ inputs.timezone }}" \
+          --verbose
+    - name: Upload correlation artifact
       uses: actions/upload-artifact@v4
       if: always()
       with:
-        name: metric-analysis-${{ github.job }}-${{ github.run_id }}
+        name: metric-correlation-${{ github.run_id }}
         path: |
           ${{ steps.build-config.outputs.output_file }}
           ${{ steps.build-config.outputs.config_path }}
         retention-days: 14
+    - name: Log correlation summary
+      shell: bash
+      run: |
+        echo "::notice::Correlation analysis completed for jobs: ${{ steps.build-config.outputs.jobs_correlated }}"
+        echo "::notice::Visualization available in artifact: metric-correlation-${{ github.run_id }}"
