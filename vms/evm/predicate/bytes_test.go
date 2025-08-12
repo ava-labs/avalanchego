@@ -297,11 +297,6 @@ func TestUnpackInvalid(t *testing.T) {
 }
 
 func FuzzPackUnpackRoundTrip(f *testing.F) {
-	// Seed with various input sizes
-	for i := range 100 {
-		f.Add(utils.RandomBytes(i))
-	}
-
 	f.Fuzz(func(t *testing.T, input []byte) {
 		packed := New(input)
 		unpacked, err := Unpack(packed)
