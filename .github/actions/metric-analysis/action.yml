@@ -120,7 +120,7 @@ runs:
                 name: job.name,
                 labels: {
                   gh_run_id: CURRENT_RUN_ID,
-                  gh_job_id: job.job_key
+                  gh_job_id: job.job_key,
                   gh_run_attempt: "1",
                   gh_repo: context.repo.owner + "/" + context.repo.repo,
                   is_ephemeral_node: "false"
