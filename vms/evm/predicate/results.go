@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	version        = uint16(0)
+	version        = 0
 	maxResultsSize = units.MiB
 )
 
