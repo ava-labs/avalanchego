@@ -14,7 +14,7 @@ jobs:
   push:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: bufbuild/buf-action@dfda68eacb65895184c76b9ae522b977636a2c47 #v1.1.4
         with:
           input: "proto"

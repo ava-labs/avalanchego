@@ -27,7 +27,7 @@ jobs:
       matrix:
         os: [macos-14, ubuntu-22.04, ubuntu-24.04, custom-arm64-jammy, custom-arm64-noble]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: test-unit
         shell: bash
@@ -37,7 +37,7 @@ jobs:
   Fuzz:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: test-fuzz
         shell: bash
@@ -45,7 +45,7 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
@@ -60,7 +60,7 @@ jobs:
   e2e_post_granite:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
@@ -75,7 +75,7 @@ jobs:
   e2e_kube:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -90,7 +90,7 @@ jobs:
   e2e_existing_network:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: Run e2e tests with existing network
         uses: ./.github/actions/run-monitored-tmpnet-cmd
@@ -104,7 +104,7 @@ jobs:
   Upgrade:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
@@ -118,7 +118,7 @@ jobs:
   Lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/install-nix
       - name: Runs all lint checks
@@ -128,7 +128,7 @@ jobs:
     name: Protobuf Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: bufbuild/buf-action@dfda68eacb65895184c76b9ae522b977636a2c47 #v1.1.4
         with:
           input: "proto"
@@ -145,7 +145,7 @@ jobs:
     name: Markdown Links Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 #v1.2.5
         with:
           fail_level: any
@@ -153,7 +153,7 @@ jobs:
     name: Up-to-date protobuf
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       # Use the dev shell instead of bufbuild/buf-action to ensure the dev shell provides the expected versions
       - uses: ./.github/actions/install-nix
@@ -163,7 +163,7 @@ jobs:
     name: Up-to-date mocks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
         run: ./scripts/run_task.sh check-generate-mocks
@@ -171,7 +171,7 @@ jobs:
     name: Up-to-date canoto
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
         run: ./scripts/run_task.sh check-generate-canoto
@@ -179,7 +179,7 @@ jobs:
     name: Up-to-date contract bindings
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/install-nix
       - shell: nix develop --command bash -x {0}
@@ -188,7 +188,7 @@ jobs:
     name: Up-to-date go.mod and go.sum
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
         run: ./scripts/run_task.sh check-go-mod-tidy
@@ -196,7 +196,7 @@ jobs:
     name: Image build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install qemu (required for cross-platform builds)
         run: |
           sudo apt update
@@ -208,7 +208,7 @@ jobs:
     name: Build Antithesis avalanchego images
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: Check image build for avalanchego test setup
         shell: bash
@@ -217,7 +217,7 @@ jobs:
     name: Build Antithesis xsvm images
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - name: Check image build for xsvm test setup
         shell: bash
@@ -226,7 +226,7 @@ jobs:
     name: Run bootstrap monitor e2e tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/install-nix
       - name: Run e2e tests
@@ -236,7 +236,7 @@ jobs:
     name: Run process-based load test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -250,7 +250,7 @@ jobs:
     name: Run load test on kind cluster
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -264,7 +264,7 @@ jobs:
   robustness:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/install-nix
         # TODO(marun) Extend testing of robustness beyond deploying a suitable test environment

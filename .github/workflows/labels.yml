@@ -18,7 +18,7 @@ jobs:
       issues: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: crazy-max/ghaction-github-labeler@31674a3852a9074f2086abcf1c53839d466a47e7 #v5.2.0
         with:
           dry-run: ${{ github.event_name == 'pull_request' }}

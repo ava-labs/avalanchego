@@ -66,7 +66,7 @@ jobs:
                 echo "CURRENT_STATE_DIR=${{ github.event.inputs.current-state-dir }}"
               } >> "$GITHUB_ENV"
             fi
-        - uses: actions/checkout@v4
+        - uses: actions/checkout@v5
         - uses: ./.github/actions/setup-go-for-project
         - name: Run C-Chain Re-Execution
           uses: ./.github/actions/run-monitored-tmpnet-cmd
