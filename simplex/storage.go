@@ -95,34 +95,35 @@ func (s *Storage) Height() uint64 {
 }
 
 // Retrieve returns the block and finalization at [seq].
-// If [seq] is not found, returns false.
-func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalization, bool) {
+// If [seq] is not found, returns simplex.ErrBlockNotFound.
+func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalization, error) {
 	if seq == 0 {
-		return s.genesisBlock, simplex.Finalization{}, true
+		return s.genesisBlock, simplex.Finalization{}, nil
 	}
 
 	block, err := getBlockAtHeight(context.TODO(), s.vm, seq)
 	if err != nil {
 		if err == database.ErrNotFound {
 			s.log.Error("block not found for sequence", zap.Uint64("seq", seq), zap.Error(err))
+			return nil, simplex.Finalization{}, simplex.ErrBlockNotFound
 		}
-		return nil, simplex.Finalization{}, false
+		return nil, simplex.Finalization{}, err
 	}
 
-	finalization, found, err := s.retrieveFinalization(seq)
-	if !found || err != nil {
-		return nil, simplex.Finalization{}, false
+	finalization, err := s.retrieveFinalization(seq)
+	if err != nil {
+		return nil, simplex.Finalization{}, err
 	}
 
 	vb := &Block{vmBlock: block, metadata: finalization.Finalization.ProtocolMetadata, blockTracker: s.blockTracker}
 	bytes, err := vb.Bytes()
 	if err != nil {
 		s.log.Error("failed to serialize block", zap.Error(err))
-		return nil, simplex.Finalization{}, false
+		return nil, simplex.Finalization{}, err
 	}
 	vb.digest = computeDigest(bytes)
 
-	return vb, finalization, true
+	return vb, finalization, nil
 }
 
 // Index indexes the finalization in the storage.
@@ -204,29 +205,29 @@ func getGenesisBlock(ctx context.Context, config *Config, blockTracker *blockTra
 
 // retrieveFinalization retrieves the finalization at [seq].
 // If the finalization is not found, it returns false.
-func (s *Storage) retrieveFinalization(seq uint64) (simplex.Finalization, bool, error) {
+func (s *Storage) retrieveFinalization(seq uint64) (simplex.Finalization, error) {
 	seqBuff := make([]byte, 8)
 	binary.BigEndian.PutUint64(seqBuff, seq)
 	finalizationBytes, err := s.db.Get(seqBuff)
 	if err != nil {
 		if err == database.ErrNotFound {
-			return simplex.Finalization{}, false, nil
+			return simplex.Finalization{}, simplex.ErrBlockNotFound
 		}
 		s.log.Error("failed to retrieve finalization", zap.Uint64("seq", seq), zap.Error(err))
-		return simplex.Finalization{}, false, err
+		return simplex.Finalization{}, err
 	}
 
 	var canotoFinalization canotoFinalization
 	if err := canotoFinalization.UnmarshalCanoto(finalizationBytes); err != nil {
-		return simplex.Finalization{}, false, err
+		return simplex.Finalization{}, err
 	}
 
 	finalization, err := canotoFinalization.toFinalization(s.deserializer)
 	if err != nil {
-		return simplex.Finalization{}, false, err
+		return simplex.Finalization{}, err
 	}
 
-	return finalization, true, nil
+	return finalization, nil
 }
 
 func getBlockAtHeight(ctx context.Context, vm block.ChainVM, height uint64) (snowman.Block, error) {
