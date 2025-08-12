@@ -99,7 +99,7 @@ jobs:
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
-          start-block: 100
+          start-block: 101
           end-block: 250000
           source-block-dir: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip
           current-state-dir: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip
