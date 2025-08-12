@@ -38,6 +38,8 @@ jobs:
     container:
       image: ghcr.io/actions/actions-runner:2.325.0
     steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
       - name: Set task parameters
         id: set-params
         run: |
@@ -89,6 +91,8 @@ jobs:
       contents: write
     runs-on: 'ubuntu-latest'
     steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:

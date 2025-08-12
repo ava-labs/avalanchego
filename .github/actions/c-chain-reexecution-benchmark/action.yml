@@ -69,8 +69,6 @@ runs:
       with:
         role-to-assume: ${{ inputs.aws-role }}
         aws-region: ${{ inputs.aws-region }}
-    - uses: actions/checkout@v4
-    - uses: ./.github/actions/setup-go-for-project
     - name: Run C-Chain Re-Execution
       uses: ./.github/actions/run-monitored-tmpnet-cmd
       with:
