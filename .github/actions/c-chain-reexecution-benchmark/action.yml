@@ -52,6 +52,7 @@ runs:
   using: composite
   steps:
     - name: Set task env
+      shell: bash
       run: |
         {
           echo "EXECUTION_DATA_DIR=${{ inputs.workspace }}/reexecution-data"
