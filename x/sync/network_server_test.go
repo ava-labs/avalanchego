@@ -115,7 +115,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := NewGetRangeProofHandler(smallTrieDB)
+			handler := NewGetRangeProofHandler(newProofCreator(smallTrieDB))
 			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)
 			responseBytes, err := handler.AppRequest(context.Background(), test.nodeID, time.Time{}, requestBytes)
@@ -325,7 +325,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := NewGetChangeProofHandler(serverDB)
+			handler := NewGetChangeProofHandler(newProofCreator(serverDB))
 
 			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)
