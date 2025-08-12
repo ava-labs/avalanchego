@@ -93,21 +93,3 @@ func (r *BlockResults) Delete(txHash common.Hash) {
 func (r *BlockResults) Bytes() ([]byte, error) {
 	return resultsCodec.Marshal(version, r)
 }
-
-func (r *BlockResults) String() string {
-	sb := strings.Builder{}
-
-	if r.TxResults == nil {
-		fmt.Fprint(&sb, "PredicateResults: (Size = 0)")
-		return sb.String()
-	}
-
-	fmt.Fprintf(&sb, "PredicateResults: (Size = %d)", len(r.TxResults))
-	for txHash, results := range r.TxResults {
-		for address, result := range results {
-			fmt.Fprintf(&sb, "\n%s    %s: %x", txHash, address, result)
-		}
-	}
-
-	return sb.String()
-}
