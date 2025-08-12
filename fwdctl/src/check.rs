@@ -65,6 +65,12 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
 fn print_checker_report(report: CheckerReport) {
     println!("Raw Report: {report:?}\n");
 
+    println!("Errors ({}): ", report.errors.len());
+    for error in report.errors {
+        println!("\t{error}");
+    }
+    println!();
+
     println!("Advanced Data: ");
     let total_trie_area_bytes = report
         .trie_stats
@@ -73,14 +79,46 @@ fn print_checker_report(report: CheckerReport) {
         .map(|(area_size, count)| area_size.saturating_mul(*count))
         .sum::<u64>();
     println!(
-        "\tStorage Space Utilization: {} / {} = {:.2}%",
-        report.trie_stats.trie_bytes,
+        "\tStorage Overhead: {} / {} = {:.2}x",
         report.high_watermark,
-        (report.trie_stats.trie_bytes as f64 / report.high_watermark as f64) * 100.0
+        report.trie_stats.kv_bytes,
+        (report.high_watermark as f64 / report.trie_stats.kv_bytes as f64)
     );
     println!(
-        "\tInternal Fragmentation: {} / {total_trie_area_bytes} = {:.2}%",
+        "\tInternal Fragmentation: 1 - ({} / {total_trie_area_bytes}) = {:.2}%",
         report.trie_stats.trie_bytes,
-        (report.trie_stats.trie_bytes as f64 / total_trie_area_bytes as f64) * 100.0
+        (1f64 - (report.trie_stats.trie_bytes as f64 / total_trie_area_bytes as f64)) * 100.0
+    );
+    println!(
+        "\tTrie Area Size Distribution: {:?}",
+        report.trie_stats.area_counts
+    );
+    println!(
+        "\tFree List Area Size Distribution: {:?}",
+        report.free_list_stats.area_counts
+    );
+    println!(
+        "\tBranching Factor Distribution: {:?}",
+        report.trie_stats.branching_factors
+    );
+    println!("\tDepth Distribution: {:?}", report.trie_stats.depths);
+    let total_trie_area_count = report.trie_stats.area_counts.values().sum::<u64>();
+    println!(
+        "\tLow Occupancy Rate: {} / {total_trie_area_count} = {:.2}%",
+        report.trie_stats.low_occupancy_area_count,
+        (report.trie_stats.low_occupancy_area_count as f64 / total_trie_area_count as f64) * 100.0
+    );
+    println!(
+        "\tTrie Extra Unaligned Page Read Rate: {} / {total_trie_area_count} = {:.2}%",
+        report.trie_stats.extra_unaligned_page_read,
+        (report.trie_stats.extra_unaligned_page_read as f64 / total_trie_area_count as f64) * 100.0
+    );
+    let total_free_list_area_count = report.free_list_stats.area_counts.values().sum::<u64>();
+    println!(
+        "\tFree List Extra Unaligned Page Read Rate: {} / {total_free_list_area_count} = {:.2}%",
+        report.free_list_stats.extra_unaligned_page_read,
+        (report.free_list_stats.extra_unaligned_page_read as f64
+            / total_free_list_area_count as f64)
+            * 100.0
     );
 }

@@ -584,9 +584,7 @@ pub mod test_utils {
         let area_size_index = AreaIndex::from_size(encoded_node_len).unwrap();
         let mut stored_area_bytes = Vec::new();
         node.as_bytes(area_size_index, &mut stored_area_bytes);
-        let bytes_written = (stored_area_bytes.len() as u64)
-            .checked_sub(1)
-            .expect("serialized node should be at least 1 byte"); // -1 for area size index
+        let bytes_written = stored_area_bytes.len() as u64;
         nodestore
             .storage
             .write(offset, stored_area_bytes.as_slice())
