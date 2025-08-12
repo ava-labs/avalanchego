@@ -143,16 +143,14 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 		return fmt.Errorf("%w: expected %d, got %d", errUnexpectedSeq, currentHeight, bh.Seq)
 	}
 
-	s.blockTracker.lock.Lock()
+	// no need to lock the blockTracker, since Index should not be called concurrently
 	if s.blockTracker.lastIndexed != bh.Prev {
-		s.blockTracker.lock.Unlock()
 		s.log.Error("attempted to index block with mismatched previous digest",
 			zap.Stringer("expected", s.blockTracker.lastIndexed),
 			zap.Stringer("got", bh.Prev))
 
 		return fmt.Errorf("%w: expected %s, got %s", errMismatchedPrevDigest, s.blockTracker.lastIndexed, bh.Prev)
 	}
-	s.blockTracker.lock.Unlock()
 
 	if !bytes.Equal(bh.Digest[:], finalization.Finalization.Digest[:]) {
 		s.log.Error("attempted to index block with mismatched digest",
