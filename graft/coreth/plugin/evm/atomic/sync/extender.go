@@ -36,11 +36,7 @@ func (a *Extender) CreateSyncer(ctx context.Context, client syncclient.LeafClien
 		return nil, fmt.Errorf("expected *Summary, got %T", summary)
 	}
 
-	return newSyncer(&Config{
-		Client:       client,
-		Database:     verDB,
-		AtomicTrie:   a.trie,
-		TargetRoot:   atomicSummary.AtomicRoot,
+	return newSyncer(client, verDB, a.trie, atomicSummary.AtomicRoot, &Config{
 		TargetHeight: atomicSummary.BlockNumber,
 		RequestSize:  a.requestSize,
 		NumWorkers:   defaultNumWorkers,

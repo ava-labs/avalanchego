@@ -29,6 +29,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testRequestSize = 1024
+
 var errInterrupted = errors.New("interrupted sync")
 
 type syncTest struct {
@@ -53,14 +55,9 @@ func testSync(t *testing.T, test syncTest) {
 	mockClient.GetLeafsIntercept = test.GetLeafsIntercept
 	mockClient.GetCodeIntercept = test.GetCodeIntercept
 
-	s, err := NewSyncer(&Config{
-		Root:                     root,
-		Client:                   mockClient,
-		DB:                       clientDB,
-		BatchSize:                1000, // Use a lower batch size in order to get test coverage of batches being written early.
-		MaxOutstandingCodeHashes: DefaultMaxOutstandingCodeHashes,
-		NumCodeFetchingWorkers:   DefaultNumCodeFetchingWorkers,
-		RequestSize:              1024,
+	s, err := NewSyncer(mockClient, clientDB, root, Config{
+		BatchSize:   1000, // Use a lower batch size in order to get test coverage of batches being written early.
+		RequestSize: testRequestSize,
 	})
 	require.NoError(t, err, "failed to create state syncer")
 
