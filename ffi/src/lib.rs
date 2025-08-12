@@ -1,6 +1,14 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+// HINT WHEN REFERENCING TYPES OUTSIDE THIS LIBRARY:
+// - Anything that is outside the crate must be included as a `type` alias (not just
+//   a `use`) in order for cbindgen to generate an opaque forward declaration. The type
+//   alias can have a doc comment which will be included in the generated header file.
+// - The value must be boxed, or otherwise used via a pointer. This is because only
+//   a forward declaration is generated and callers will be unable to instantiate the
+//   type without a complete definition.
+
 #![doc = include_str!("../README.md")]
 #![expect(
     unsafe_code,
@@ -18,26 +26,23 @@
     )
 )]
 
+mod metrics_setup;
+mod value;
+
 use std::collections::HashMap;
-use std::ffi::{CStr, CString, OsStr, c_char};
+use std::ffi::{CStr, CString, c_char};
 use std::fmt::{self, Display, Formatter};
 use std::ops::Deref;
-#[cfg(unix)]
-use std::os::unix::ffi::OsStrExt as _;
-use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Mutex, RwLock};
 
-use firewood::db::{
-    BatchOp as DbBatchOp, Db, DbConfig, DbViewSync as _, DbViewSyncBytes, Proposal,
-};
+use firewood::db::{Db, DbConfig, DbViewSync as _, DbViewSyncBytes, Proposal};
 use firewood::manager::{CacheReadStrategy, RevisionManagerConfig};
 
 use firewood::v2::api::{HashKey, KeyValuePairIter};
 use metrics::counter;
 
-#[doc(hidden)]
-mod metrics_setup;
+pub use crate::value::*;
 
 #[cfg(unix)]
 #[global_allocator]
@@ -105,7 +110,7 @@ impl Deref for DatabaseHandle<'_> {
 /// # Arguments
 ///
 /// * `db` - The database handle returned by `open_db`
-/// * `key` - The key to look up, in `Value` form
+/// * `key` - The key to look up, in `BorrowedBytes` form
 ///
 /// # Returns
 ///
@@ -123,14 +128,17 @@ impl Deref for DatabaseHandle<'_> {
 ///  * call `free_value` to free the memory associated with the returned `Value`
 ///
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_get_latest(db: Option<&DatabaseHandle<'_>>, key: Value) -> Value {
+pub unsafe extern "C" fn fwd_get_latest(
+    db: Option<&DatabaseHandle<'_>>,
+    key: BorrowedBytes<'_>,
+) -> Value {
     get_latest(db, &key).unwrap_or_else(Into::into)
 }
 
 /// This function is not exposed to the C API.
 /// Internal call for `fwd_get_latest` to remove error handling from the C API
 #[doc(hidden)]
-fn get_latest(db: Option<&DatabaseHandle<'_>>, key: &Value) -> Result<Value, String> {
+fn get_latest(db: Option<&DatabaseHandle<'_>>, key: &[u8]) -> Result<Value, String> {
     let db = db.ok_or("db should be non-null")?;
     // Find root hash.
     // Matches `hash` function but we use the TrieHash type here
@@ -143,7 +151,7 @@ fn get_latest(db: Option<&DatabaseHandle<'_>>, key: &Value) -> Result<Value, Str
 
     // Get value associated with key.
     let value = rev
-        .val_sync_bytes(key.as_slice())
+        .val_sync_bytes(key)
         .map_err(|e| e.to_string())?
         .ok_or("")?;
     Ok(value.into())
@@ -155,7 +163,7 @@ fn get_latest(db: Option<&DatabaseHandle<'_>>, key: &Value) -> Result<Value, Str
 ///
 /// * `db` - The database handle returned by `open_db`
 /// * `id` - The ID of the proposal to get the value from
-/// * `key` - The key to look up, in `Value` form
+/// * `key` - The key to look up, in `BorrowedBytes` form
 ///
 /// # Returns
 ///
@@ -173,7 +181,7 @@ fn get_latest(db: Option<&DatabaseHandle<'_>>, key: &Value) -> Result<Value, Str
 pub unsafe extern "C" fn fwd_get_from_proposal(
     db: Option<&DatabaseHandle<'_>>,
     id: ProposalId,
-    key: Value,
+    key: BorrowedBytes<'_>,
 ) -> Value {
     get_from_proposal(db, id, &key).unwrap_or_else(Into::into)
 }
@@ -184,7 +192,7 @@ pub unsafe extern "C" fn fwd_get_from_proposal(
 fn get_from_proposal(
     db: Option<&DatabaseHandle<'_>>,
     id: ProposalId,
-    key: &Value,
+    key: &[u8],
 ) -> Result<Value, String> {
     let db = db.ok_or("db should be non-null")?;
     // Get proposal from ID.
@@ -196,7 +204,7 @@ fn get_from_proposal(
 
     // Get value associated with key.
     let value = proposal
-        .val_sync(key.as_slice())
+        .val_sync(key)
         .map_err(|e| e.to_string())?
         .ok_or("")?;
     Ok(value.into())
@@ -209,8 +217,8 @@ fn get_from_proposal(
 /// # Arguments
 ///
 /// * `db` - The database handle returned by `open_db`
-/// * `root` - The root hash to look up, in `Value` form
-/// * `key` - The key to look up, in `Value` form
+/// * `root` - The root hash to look up, in `BorrowedBytes` form
+/// * `key` - The key to look up, in `BorrowedBytes` form
 ///
 /// # Returns
 ///
@@ -228,8 +236,8 @@ fn get_from_proposal(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_get_from_root(
     db: Option<&DatabaseHandle<'_>>,
-    root: Value,
-    key: Value,
+    root: BorrowedBytes<'_>,
+    key: BorrowedBytes<'_>,
 ) -> Value {
     get_from_root(db, &root, &key).unwrap_or_else(Into::into)
 }
@@ -238,24 +246,24 @@ pub unsafe extern "C" fn fwd_get_from_root(
 #[doc(hidden)]
 fn get_from_root(
     db: Option<&DatabaseHandle<'_>>,
-    root: &Value,
-    key: &Value,
+    root: &[u8],
+    key: &[u8],
 ) -> Result<Value, String> {
     let db = db.ok_or("db should be non-null")?;
-    let requested_root = HashKey::try_from(root.as_slice()).map_err(|e| e.to_string())?;
+    let requested_root = HashKey::try_from(root).map_err(|e| e.to_string())?;
     let mut cached_view = db.cached_view.lock().expect("cached_view lock is poisoned");
     let value = match cached_view.as_ref() {
         // found the cached view, use it
         Some((root_hash, view)) if root_hash == &requested_root => {
             counter!("firewood.ffi.cached_view.hit").increment(1);
-            view.val_sync_bytes(key.as_slice())
+            view.val_sync_bytes(key)
         }
         // If what was there didn't match the requested root, we need a new view, so we
         // update the cache
         _ => {
             counter!("firewood.ffi.cached_view.miss").increment(1);
             let rev = view_sync_from_root(db, root)?;
-            let result = rev.val_sync_bytes(key.as_slice());
+            let result = rev.val_sync_bytes(key);
             *cached_view = Some((requested_root.clone(), rev));
             result
         }
@@ -267,19 +275,12 @@ fn get_from_root(
 }
 fn view_sync_from_root(
     db: &DatabaseHandle<'_>,
-    root: &Value,
+    root: &[u8],
 ) -> Result<Box<dyn DbViewSyncBytes>, String> {
     let rev = db
-        .view_sync(HashKey::try_from(root.as_slice()).map_err(|e| e.to_string())?)
+        .view_sync(HashKey::try_from(root).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
     Ok(rev)
-}
-
-/// A `KeyValue` represents a key-value pair, passed to the FFI.
-#[repr(C)]
-pub struct KeyValue {
-    key: Value,
-    value: Value,
 }
 
 /// Puts the given key-value pairs into the database.
@@ -287,8 +288,7 @@ pub struct KeyValue {
 /// # Arguments
 ///
 /// * `db` - The database handle returned by `open_db`
-/// * `nkeys` - The number of key-value pairs to put
-/// * `values` - A pointer to an array of `KeyValue` structs
+/// * `values` - A `BorrowedKeyValuePairs` struct containing the key-value pairs to put.
 ///
 /// # Returns
 ///
@@ -313,40 +313,19 @@ pub struct KeyValue {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_batch(
     db: Option<&DatabaseHandle<'_>>,
-    nkeys: usize,
-    values: Option<&KeyValue>,
+    values: BorrowedKeyValuePairs,
 ) -> Value {
-    batch(db, nkeys, values).unwrap_or_else(Into::into)
-}
-
-/// Converts a slice of `KeyValue` structs to a vector of `DbBatchOp` structs.
-///
-/// # Arguments
-///
-/// * `values` - A slice of `KeyValue` structs
-///
-/// # Returns
-fn convert_to_batch(values: &[KeyValue]) -> impl IntoIterator<Item = DbBatchOp<&[u8], &[u8]>> {
-    values
-        .iter()
-        .map(|kv| (kv.key.as_slice(), kv.value.as_slice()))
-        .map_into_batch()
+    batch(db, &values).unwrap_or_else(Into::into)
 }
 
 /// Internal call for `fwd_batch` to remove error handling from the C API
 #[doc(hidden)]
-fn batch(
-    db: Option<&DatabaseHandle<'_>>,
-    nkeys: usize,
-    values: Option<&KeyValue>,
-) -> Result<Value, String> {
+fn batch(db: Option<&DatabaseHandle<'_>>, values: &[KeyValuePair<'_>]) -> Result<Value, String> {
     let db = db.ok_or("db should be non-null")?;
-    let values = values.ok_or("key-value slice is null")?;
     let start = coarsetime::Instant::now();
 
     // Create a batch of operations to perform.
-    let key_value_ref = unsafe { std::slice::from_raw_parts(values, nkeys) };
-    let batch = convert_to_batch(key_value_ref);
+    let batch = values.iter().map_into_batch();
 
     // Propose the batch of operations.
     let proposal = db.propose_sync(batch).map_err(|e| e.to_string())?;
@@ -377,8 +356,7 @@ fn batch(
 /// # Arguments
 ///
 /// * `db` - The database handle returned by `open_db`
-/// * `nkeys` - The number of key-value pairs to put
-/// * `values` - A pointer to an array of `KeyValue` structs
+/// * `values` - A `BorrowedKeyValuePairs` struct containing the key-value pairs to put.
 ///
 /// # Returns
 ///
@@ -397,26 +375,22 @@ fn batch(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_propose_on_db<'p>(
     db: Option<&'p DatabaseHandle<'p>>,
-    nkeys: usize,
-    values: Option<&KeyValue>,
+    values: BorrowedKeyValuePairs<'_>,
 ) -> Value {
     // Note: the id is guaranteed to be non-zero
     // because we use an atomic counter that starts at 1.
-    propose_on_db(db, nkeys, values).unwrap_or_else(Into::into)
+    propose_on_db(db, &values).unwrap_or_else(Into::into)
 }
 
 /// Internal call for `fwd_propose_on_db` to remove error handling from the C API
 #[doc(hidden)]
 fn propose_on_db<'p>(
     db: Option<&'p DatabaseHandle<'p>>,
-    nkeys: usize,
-    values: Option<&KeyValue>,
+    values: &[KeyValuePair<'_>],
 ) -> Result<Value, String> {
     let db = db.ok_or("db should be non-null")?;
-    let values = values.ok_or("key-value slice is null")?;
     // Create a batch of operations to perform.
-    let key_value_ref = unsafe { std::slice::from_raw_parts(values, nkeys) };
-    let batch = convert_to_batch(key_value_ref);
+    let batch = values.iter().map_into_batch();
 
     // Propose the batch of operations.
     let proposal = db.propose_sync(batch).map_err(|e| e.to_string())?;
@@ -443,8 +417,7 @@ fn propose_on_db<'p>(
 ///
 /// * `db` - The database handle returned by `open_db`
 /// * `proposal_id` - The ID of the proposal to propose on
-/// * `nkeys` - The number of key-value pairs to put
-/// * `values` - A pointer to an array of `KeyValue` structs
+/// * `values` - A `BorrowedKeyValuePairs` struct containing the key-value pairs to put.
 ///
 /// # Returns
 ///
@@ -464,12 +437,11 @@ fn propose_on_db<'p>(
 pub unsafe extern "C" fn fwd_propose_on_proposal(
     db: Option<&DatabaseHandle<'_>>,
     proposal_id: ProposalId,
-    nkeys: usize,
-    values: Option<&KeyValue>,
+    values: BorrowedKeyValuePairs<'_>,
 ) -> Value {
     // Note: the id is guaranteed to be non-zero
     // because we use an atomic counter that starts at 1.
-    propose_on_proposal(db, proposal_id, nkeys, values).unwrap_or_else(Into::into)
+    propose_on_proposal(db, proposal_id, &values).unwrap_or_else(Into::into)
 }
 
 /// Internal call for `fwd_propose_on_proposal` to remove error handling from the C API
@@ -477,14 +449,11 @@ pub unsafe extern "C" fn fwd_propose_on_proposal(
 fn propose_on_proposal(
     db: Option<&DatabaseHandle<'_>>,
     proposal_id: ProposalId,
-    nkeys: usize,
-    values: Option<&KeyValue>,
+    values: &[KeyValuePair<'_>],
 ) -> Result<Value, String> {
     let db = db.ok_or("db should be non-null")?;
-    let values = values.ok_or("key-value slice is null")?;
     // Create a batch of operations to perform.
-    let key_value_ref = unsafe { std::slice::from_raw_parts(values, nkeys) };
-    let batch = convert_to_batch(key_value_ref);
+    let batch = values.iter().map_into_batch();
 
     // Get proposal from ID.
     // We need write access to add the proposal after we create it.
@@ -670,7 +639,8 @@ impl Value {
     #[must_use]
     pub const fn as_slice(&self) -> &[u8] {
         if let Some(data) = self.data {
-            // SAFETY: We assume that the data is valid and the length is correct.
+            // SAFETY: We must assume that if non-null, the C caller provided valid pointer
+            // and length, otherwise caller assumes responsibility for undefined behavior.
             unsafe { std::slice::from_raw_parts(data.as_ptr(), self.len) }
         } else {
             &[]
@@ -868,8 +838,8 @@ pub extern "C" fn fwd_gather() -> Value {
 /// * `truncate` - Whether to truncate the database file if it exists.
 ///   Returns an error if the value is not 0, 1, or 2.
 #[repr(C)]
-pub struct CreateOrOpenArgs {
-    path: *const std::ffi::c_char,
+pub struct CreateOrOpenArgs<'a> {
+    path: BorrowedBytes<'a>,
     cache_size: usize,
     free_list_cache_size: usize,
     revisions: usize,
@@ -912,7 +882,13 @@ unsafe fn open_db(args: &CreateOrOpenArgs) -> Result<Db, String> {
         )?)
         .build();
 
-    let path = to_path(args.path).ok_or("database path is empty")?;
+    if args.path.is_empty() {
+        return Err("path should not be empty".to_string());
+    }
+    let path = args
+        .path
+        .as_str()
+        .map_err(|e| format!("Invalid database path: {e}"))?;
     Db::new_sync(path, cfg).map_err(|e| e.to_string())
 }
 
@@ -922,9 +898,9 @@ unsafe fn open_db(args: &CreateOrOpenArgs) -> Result<Db, String> {
 ///   default, this is set to /tmp/firewood-log.txt
 /// * `filter_level` - The filter level for logs. By default, this is set to info.
 #[repr(C)]
-pub struct LogArgs {
-    path: *const std::ffi::c_char,
-    filter_level: *const std::ffi::c_char,
+pub struct LogArgs<'a> {
+    path: BorrowedBytes<'a>,
+    filter_level: BorrowedBytes<'a>,
 }
 
 /// Start logs for this process.
@@ -938,11 +914,8 @@ pub struct LogArgs {
 /// A `Value` containing {0, null} if the global logger was initialized.
 /// A `Value` containing {0, "error message"} if an error occurs.
 #[unsafe(no_mangle)]
-pub extern "C" fn fwd_start_logs(args: Option<&LogArgs>) -> Value {
-    match args {
-        Some(log_args) => start_logs(log_args).map_or_else(Into::into, Into::into),
-        None => String::from("failed to provide args").into(),
-    }
+pub extern "C" fn fwd_start_logs(args: LogArgs<'_>) -> Value {
+    start_logs(&args).map_or_else(Into::into, Into::into)
 }
 
 #[cfg(feature = "logger")]
@@ -952,22 +925,29 @@ fn start_logs(log_args: &LogArgs) -> Result<(), String> {
     use std::fs::OpenOptions;
     use std::path::Path;
 
-    let log_path =
-        to_path(log_args.path).unwrap_or(Path::join(&std::env::temp_dir(), "firewood-log.txt"));
+    let log_path = log_args
+        .path
+        .as_str()
+        .map_err(|e| format!("Invalid log path: {e}"))?;
+    let log_path = if log_path.is_empty() {
+        std::borrow::Cow::Owned(std::env::temp_dir().join("firewood-log.txt"))
+    } else {
+        std::borrow::Cow::Borrowed(std::path::Path::new(log_path))
+    };
 
     let log_dir = log_path.parent().unwrap_or_else(|| Path::new("."));
     std::fs::create_dir_all(log_dir).map_err(|e| e.to_string())?;
 
-    let level_str = if log_args.filter_level.is_null() {
+    let level = if log_args.filter_level.is_empty() {
         "info"
     } else {
-        unsafe { CStr::from_ptr(log_args.filter_level) }
-            .to_str()
-            .map_err(|e| e.to_string())?
-    };
-    let level = level_str
-        .parse::<log::LevelFilter>()
-        .map_err(|e| e.to_string())?;
+        log_args
+            .filter_level
+            .as_str()
+            .map_err(|e| format!("Invalid log level: {e}"))?
+    }
+    .parse::<log::LevelFilter>()
+    .map_err(|e| format!("failed to parse log level: {e}"))?;
 
     let file = OpenOptions::new()
         .create(true)
@@ -989,20 +969,6 @@ fn start_logs(log_args: &LogArgs) -> Result<(), String> {
 #[doc(hidden)]
 fn start_logs(_log_args: &LogArgs) -> Result<(), String> {
     Err(String::from("logger feature is disabled"))
-}
-
-/// Helper function to convert C String pointers to a path
-/// Returns None if the pointer is null or if the string is empty
-#[doc(hidden)]
-fn to_path(cstr: *const std::ffi::c_char) -> Option<PathBuf> {
-    if cstr.is_null() {
-        return None;
-    }
-
-    let cstr = unsafe { CStr::from_ptr(cstr) };
-    let osstr = OsStr::from_bytes(cstr.to_bytes());
-
-    (!osstr.is_empty()).then(|| PathBuf::from(osstr))
 }
 
 #[doc(hidden)]

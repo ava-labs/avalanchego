@@ -29,8 +29,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
-	"unsafe"
 )
 
 // These constants are used to identify errors returned by the Firewood Rust FFI.
@@ -105,17 +105,17 @@ func New(filePath string, conf *Config) (*Database, error) {
 		return nil, fmt.Errorf("%T.FreeListCacheEntries must be >= 1", conf)
 	}
 
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
+
 	args := C.struct_CreateOrOpenArgs{
-		path:                 C.CString(filePath),
+		path:                 newBorrowedBytes([]byte(filePath), &pinner),
 		cache_size:           C.size_t(conf.NodeCacheEntries),
 		free_list_cache_size: C.size_t(conf.FreeListCacheEntries),
 		revisions:            C.size_t(conf.Revisions),
 		strategy:             C.uint8_t(conf.ReadCacheStrategy),
 		truncate:             C.bool(conf.Truncate),
 	}
-	// Defer freeing the C string allocated to the heap on the other side
-	// of the FFI boundary.
-	defer C.free(unsafe.Pointer(args.path))
 
 	dbResult := C.fwd_open_db(args)
 	db, err := databaseFromResult(&dbResult)
@@ -136,14 +136,15 @@ func (db *Database) Update(keys, vals [][]byte) ([]byte, error) {
 		return nil, errDBClosed
 	}
 
-	ffiOps, cleanup := createOps(keys, vals)
-	defer cleanup()
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
 
-	hash := C.fwd_batch(
-		db.handle,
-		C.size_t(len(ffiOps)),
-		unsafe.SliceData(ffiOps), // implicitly pinned
-	)
+	kvp, err := newKeyValuePairs(keys, vals, &pinner)
+	if err != nil {
+		return nil, err
+	}
+
+	hash := C.fwd_batch(db.handle, kvp)
 	return bytesFromValue(&hash)
 }
 
@@ -152,14 +153,15 @@ func (db *Database) Propose(keys, vals [][]byte) (*Proposal, error) {
 		return nil, errDBClosed
 	}
 
-	ffiOps, cleanup := createOps(keys, vals)
-	defer cleanup()
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
 
-	val := C.fwd_propose_on_db(
-		db.handle,
-		C.size_t(len(ffiOps)),
-		unsafe.SliceData(ffiOps), // implicitly pinned
-	)
+	kvp, err := newKeyValuePairs(keys, vals, &pinner)
+	if err != nil {
+		return nil, err
+	}
+
+	val := C.fwd_propose_on_db(db.handle, kvp)
 	return newProposal(db.handle, &val)
 }
 
@@ -170,9 +172,10 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 		return nil, errDBClosed
 	}
 
-	values, cleanup := newValueFactory()
-	defer cleanup()
-	val := C.fwd_get_latest(db.handle, values.from(key))
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
+
+	val := C.fwd_get_latest(db.handle, newBorrowedBytes(key, &pinner))
 	bytes, err := bytesFromValue(&val)
 
 	// If the root hash is not found, return nil.
@@ -196,9 +199,14 @@ func (db *Database) GetFromRoot(root, key []byte) ([]byte, error) {
 		return nil, nil
 	}
 
-	values, cleanup := newValueFactory()
-	defer cleanup()
-	val := C.fwd_get_from_root(db.handle, values.from(root), values.from(key))
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
+
+	val := C.fwd_get_from_root(
+		db.handle,
+		newBorrowedBytes(root, &pinner),
+		newBorrowedBytes(key, &pinner),
+	)
 
 	return bytesFromValue(&val)
 }

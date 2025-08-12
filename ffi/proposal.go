@@ -12,7 +12,7 @@ import "C"
 
 import (
 	"errors"
-	"unsafe"
+	"runtime"
 )
 
 var errDroppedProposal = errors.New("proposal already dropped")
@@ -83,11 +83,12 @@ func (p *Proposal) Get(key []byte) ([]byte, error) {
 	if p.id == 0 {
 		return nil, errDroppedProposal
 	}
-	values, cleanup := newValueFactory()
-	defer cleanup()
+
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
 
 	// Get the value for the given key.
-	val := C.fwd_get_from_proposal(p.handle, C.uint32_t(p.id), values.from(key))
+	val := C.fwd_get_from_proposal(p.handle, C.uint32_t(p.id), newBorrowedBytes(key, &pinner))
 	return bytesFromValue(&val)
 }
 
@@ -102,14 +103,16 @@ func (p *Proposal) Propose(keys, vals [][]byte) (*Proposal, error) {
 		return nil, errDroppedProposal
 	}
 
-	ffiOps, cleanup := createOps(keys, vals)
-	defer cleanup()
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
+
+	kvp, err := newKeyValuePairs(keys, vals, &pinner)
+	if err != nil {
+		return nil, err
+	}
 
 	// Propose the keys and values.
-	val := C.fwd_propose_on_proposal(p.handle, C.uint32_t(p.id),
-		C.size_t(len(ffiOps)),
-		unsafe.SliceData(ffiOps),
-	)
+	val := C.fwd_propose_on_proposal(p.handle, C.uint32_t(p.id), kvp)
 
 	return newProposal(p.handle, &val)
 }

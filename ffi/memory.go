@@ -13,19 +13,94 @@ import "C"
 
 import (
 	"errors"
+	"fmt"
 	"runtime"
 	"unsafe"
 )
 
 var (
-	errNilStruct = errors.New("nil struct pointer cannot be freed")
-	errBadValue  = errors.New("value from cgo formatted incorrectly")
+	errNilStruct     = errors.New("nil struct pointer cannot be freed")
+	errBadValue      = errors.New("value from cgo formatted incorrectly")
+	errKeysAndValues = errors.New("keys and values must have the same length")
 )
 
-// KeyValue is a key-value pair.
-type KeyValue struct {
-	Key   []byte
-	Value []byte
+type Pinner interface {
+	Pin(ptr any)
+	Unpin()
+}
+
+// newBorrowedBytes creates a new BorrowedBytes from a Go byte slice.
+//
+// Provide a Pinner to ensure the memory is pinned while the BorrowedBytes is in use.
+func newBorrowedBytes(slice []byte, pinner Pinner) C.BorrowedBytes {
+	sliceLen := len(slice)
+	if sliceLen == 0 {
+		return C.BorrowedBytes{ptr: nil, len: 0}
+	}
+
+	ptr := unsafe.SliceData(slice)
+	if ptr == nil {
+		return C.BorrowedBytes{ptr: nil, len: 0}
+	}
+
+	pinner.Pin(ptr)
+
+	return C.BorrowedBytes{
+		ptr: (*C.uint8_t)(ptr),
+		len: C.size_t(sliceLen),
+	}
+}
+
+// newKeyValuePair creates a new KeyValuePair from Go byte slices for key and value.
+//
+// Provide a Pinner to ensure the memory is pinned while the KeyValuePair is in use.
+func newKeyValuePair(key, value []byte, pinner Pinner) C.KeyValuePair {
+	return C.KeyValuePair{
+		key:   newBorrowedBytes(key, pinner),
+		value: newBorrowedBytes(value, pinner),
+	}
+}
+
+// newBorrowedKeyValuePairs creates a new BorrowedKeyValuePairs from a slice of KeyValuePair.
+//
+// Provide a Pinner to ensure the memory is pinned while the BorrowedKeyValuePairs is
+// in use.
+func newBorrowedKeyValuePairs(pairs []C.KeyValuePair, pinner Pinner) C.BorrowedKeyValuePairs {
+	sliceLen := len(pairs)
+	if sliceLen == 0 {
+		return C.BorrowedKeyValuePairs{ptr: nil, len: 0}
+	}
+
+	ptr := unsafe.SliceData(pairs)
+	if ptr == nil {
+		return C.BorrowedKeyValuePairs{ptr: nil, len: 0}
+	}
+
+	pinner.Pin(ptr)
+
+	return C.BorrowedKeyValuePairs{
+		ptr: ptr,
+		len: C.size_t(sliceLen),
+	}
+}
+
+// newKeyValuePairs creates a new BorrowedKeyValuePairs from slices of keys and values.
+//
+// The keys and values must have the same length.
+//
+// Provide a Pinner to ensure the memory is pinned while the BorrowedKeyValuePairs is
+// in use.
+func newKeyValuePairs(keys, vals [][]byte, pinner Pinner) (C.BorrowedKeyValuePairs, error) {
+	if len(keys) != len(vals) {
+		return C.BorrowedKeyValuePairs{}, fmt.Errorf("%w: %d != %d", errKeysAndValues, len(keys), len(vals))
+	}
+
+	pairs := make([]C.KeyValuePair, len(keys))
+	for i := range keys {
+		pairs[i] = newKeyValuePair(keys[i], vals[i], pinner)
+	}
+
+	return newBorrowedKeyValuePairs(pairs, pinner), nil
 }
 
 // hashAndIDFromValue converts the cgo `Value` payload into:
@@ -159,45 +234,4 @@ func databaseFromResult(result *C.struct_DatabaseCreationResult) (*C.DatabaseHan
 		return nil, errors.New(errStr)
 	}
 	return result.db, nil
-}
-
-// newValueFactory returns a factory for converting byte slices into cgo `Value`
-// structs that can be passed as arguments to cgo functions. The returned
-// cleanup function MUST be called when the constructed values are no longer
-// required, after which they can no longer be used as cgo arguments.
-func newValueFactory() (*valueFactory, func()) {
-	f := new(valueFactory)
-	return f, func() { f.pin.Unpin() }
-}
-
-type valueFactory struct {
-	pin runtime.Pinner
-}
-
-func (f *valueFactory) from(data []byte) C.struct_Value {
-	if len(data) == 0 {
-		return C.struct_Value{0, nil}
-	}
-	ptr := (*C.uchar)(unsafe.SliceData(data))
-	f.pin.Pin(ptr)
-	return C.struct_Value{C.size_t(len(data)), ptr}
-}
-
-// createOps creates a slice of cgo `KeyValue` structs from the given keys and
-// values and pins the memory of the underlying byte slices to prevent
-// garbage collection while the cgo function is using them. The returned cleanup
-// function MUST be called when the constructed values are no longer required,
-// after which they can no longer be used as cgo arguments.
-func createOps(keys, vals [][]byte) ([]C.struct_KeyValue, func()) {
-	values, cleanup := newValueFactory()
-
-	ffiOps := make([]C.struct_KeyValue, len(keys))
-	for i := range keys {
-		ffiOps[i] = C.struct_KeyValue{
-			key:   values.from(keys[i]),
-			value: values.from(vals[i]),
-		}
-	}
-
-	return ffiOps, cleanup
 }

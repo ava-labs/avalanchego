@@ -13,6 +13,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"runtime"
 )
 
 var (
@@ -39,12 +40,18 @@ func newRevision(handle *C.DatabaseHandle, root []byte) (*Revision, error) {
 		return nil, errInvalidRootLength
 	}
 
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
+
 	// Attempt to get any value from the root.
 	// This will verify that the root is valid and accessible.
 	// If the root is not valid, this will return an error.
-	values, cleanup := newValueFactory()
-	defer cleanup()
-	val := C.fwd_get_from_root(handle, values.from(root), values.from([]byte{}))
+
+	val := C.fwd_get_from_root(
+		handle,
+		newBorrowedBytes(root, &pinner),
+		newBorrowedBytes(nil, &pinner),
+	)
 	_, err := bytesFromValue(&val)
 	if err != nil {
 		// Any error from this function indicates that the root is inaccessible.
@@ -66,10 +73,14 @@ func (r *Revision) Get(key []byte) ([]byte, error) {
 		return nil, errRevisionNotFound
 	}
 
-	values, cleanup := newValueFactory()
-	defer cleanup()
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
 
-	val := C.fwd_get_from_root(r.handle, values.from(r.root), values.from(key))
+	val := C.fwd_get_from_root(
+		r.handle,
+		newBorrowedBytes(r.root, &pinner),
+		newBorrowedBytes(key, &pinner),
+	)
 	value, err := bytesFromValue(&val)
 	if err != nil {
 		// Any error from this function indicates that the revision is inaccessible.

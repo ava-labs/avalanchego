@@ -10,8 +10,8 @@ package ffi
 import "C"
 
 import (
+	"runtime"
 	"strings"
-	"unsafe"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/expfmt"
@@ -85,15 +85,12 @@ type LogConfig struct {
 // This function only needs to be called once.
 // An error is returned if this method is called a second time.
 func StartLogs(config *LogConfig) error {
-	args := &C.struct_LogArgs{}
-	if config.Path != "" {
-		args.path = C.CString(config.Path)
-		defer C.free(unsafe.Pointer(args.path))
-	}
-	if config.FilterLevel != "" {
-		args.filter_level = C.CString(config.FilterLevel)
-		defer C.free(unsafe.Pointer(args.filter_level))
-	}
-	result := C.fwd_start_logs(args)
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
+
+	result := C.fwd_start_logs(C.struct_LogArgs{
+		path:         newBorrowedBytes([]byte(config.Path), &pinner),
+		filter_level: newBorrowedBytes([]byte(config.FilterLevel), &pinner),
+	})
 	return errorFromValue(&result)
 }

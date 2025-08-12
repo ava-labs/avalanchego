@@ -40,12 +40,88 @@ typedef struct Value {
 } Value;
 
 /**
+ * A borrowed byte slice. Used to represent data that was passed in from C
+ * callers and will not be freed or retained by Rust code.
+ */
+typedef struct BorrowedSlice_u8 {
+  /**
+   * A pointer to the slice of bytes. This can be null if the slice is empty.
+   *
+   * If the pointer is not null, it must point to a valid slice of `len`
+   * elements sized and aligned for `T`.
+   *
+   * As a note, [`NonNull`] is not appropriate here because [`NonNull`] pointer
+   * provenance requires mutable access to the pointer, which is not an invariant
+   * we want to enforce here. We want (and require) the pointer to be immutable.
+   *
+   * [`NonNull`]: std::ptr::NonNull
+   */
+  const uint8_t *ptr;
+  /**
+   * The length of the slice. It is ignored if the pointer is null; however,
+   * if the pointer is not null, it must be equal to the number of elements
+   * pointed to by `ptr`.
+   */
+  size_t len;
+} BorrowedSlice_u8;
+
+/**
+ * A type alias for a borrowed byte slice.
+ *
+ * C callers can use this to pass in a byte slice that will not be freed by Rust
+ * code.
+ *
+ * C callers must ensure that the pointer, if not null, points to a valid slice
+ * of bytes of length `len`. C callers must also ensure that the slice is valid
+ * for the duration of the C function call that was passed this slice.
+ */
+typedef struct BorrowedSlice_u8 BorrowedBytes;
+
+/**
  * A `KeyValue` represents a key-value pair, passed to the FFI.
  */
-typedef struct KeyValue {
-  struct Value key;
-  struct Value value;
-} KeyValue;
+typedef struct KeyValuePair {
+  BorrowedBytes key;
+  BorrowedBytes value;
+} KeyValuePair;
+
+/**
+ * A borrowed byte slice. Used to represent data that was passed in from C
+ * callers and will not be freed or retained by Rust code.
+ */
+typedef struct BorrowedSlice_KeyValuePair {
+  /**
+   * A pointer to the slice of bytes. This can be null if the slice is empty.
+   *
+   * If the pointer is not null, it must point to a valid slice of `len`
+   * elements sized and aligned for `T`.
+   *
+   * As a note, [`NonNull`] is not appropriate here because [`NonNull`] pointer
+   * provenance requires mutable access to the pointer, which is not an invariant
+   * we want to enforce here. We want (and require) the pointer to be immutable.
+   *
+   * [`NonNull`]: std::ptr::NonNull
+   */
+  const struct KeyValuePair *ptr;
+  /**
+   * The length of the slice. It is ignored if the pointer is null; however,
+   * if the pointer is not null, it must be equal to the number of elements
+   * pointed to by `ptr`.
+   */
+  size_t len;
+} BorrowedSlice_KeyValuePair;
+
+/**
+ * A type alias for a borrowed slice of [`KeyValuePair`]s.
+ *
+ * C callers can use this to pass in a slice of key-value pairs that will not
+ * be freed by Rust code.
+ *
+ * C callers must ensure that the pointer, if not null, points to a valid slice
+ * of key-value pairs of length `len`. C callers must also ensure that the slice
+ * is valid for the duration of the C function call that was passed this slice.
+ */
+typedef struct BorrowedSlice_KeyValuePair BorrowedKeyValuePairs;
 
 /**
  * Struct returned by `fwd_create_db` and `fwd_open_db`
@@ -71,7 +147,7 @@ typedef uint32_t ProposalId;
  *   Returns an error if the value is not 0, 1, or 2.
  */
 typedef struct CreateOrOpenArgs {
-  const char *path;
+  BorrowedBytes path;
   size_t cache_size;
   size_t free_list_cache_size;
   size_t revisions;
@@ -87,8 +163,8 @@ typedef struct CreateOrOpenArgs {
  * * `filter_level` - The filter level for logs. By default, this is set to info.
  */
 typedef struct LogArgs {
-  const char *path;
-  const char *filter_level;
+  BorrowedBytes path;
+  BorrowedBytes filter_level;
 } LogArgs;
 
 /**
@@ -97,8 +173,7 @@ typedef struct LogArgs {
  * # Arguments
  *
  * * `db` - The database handle returned by `open_db`
- * * `nkeys` - The number of key-value pairs to put
- * * `values` - A pointer to an array of `KeyValue` structs
+ * * `values` - A `BorrowedKeyValuePairs` struct containing the key-value pairs to put.
  *
  * # Returns
  *
@@ -122,8 +197,7 @@ typedef struct LogArgs {
  *
  */
 struct Value fwd_batch(const struct DatabaseHandle *db,
-                       size_t nkeys,
-                       const struct KeyValue *values);
+                       BorrowedKeyValuePairs values);
 
 /**
  * Close and free the memory for a database handle
@@ -240,7 +314,7 @@ struct Value fwd_gather(void);
  *
  * * `db` - The database handle returned by `open_db`
  * * `id` - The ID of the proposal to get the value from
- * * `key` - The key to look up, in `Value` form
+ * * `key` - The key to look up, in `BorrowedBytes` form
  *
  * # Returns
  *
@@ -257,7 +331,7 @@ struct Value fwd_gather(void);
  */
 struct Value fwd_get_from_proposal(const struct DatabaseHandle *db,
                                    ProposalId id,
-                                   struct Value key);
+                                   BorrowedBytes key);
 
 /**
  * Gets a value assoicated with the given root hash and key.
@@ -267,8 +341,8 @@ struct Value fwd_get_from_proposal(const struct DatabaseHandle *db,
  * # Arguments
  *
  * * `db` - The database handle returned by `open_db`
- * * `root` - The root hash to look up, in `Value` form
- * * `key` - The key to look up, in `Value` form
+ * * `root` - The root hash to look up, in `BorrowedBytes` form
+ * * `key` - The key to look up, in `BorrowedBytes` form
  *
  * # Returns
  *
@@ -285,8 +359,8 @@ struct Value fwd_get_from_proposal(const struct DatabaseHandle *db,
  *
  */
 struct Value fwd_get_from_root(const struct DatabaseHandle *db,
-                               struct Value root,
-                               struct Value key);
+                               BorrowedBytes root,
+                               BorrowedBytes key);
 
 /**
  * Gets the value associated with the given key from the database.
@@ -294,7 +368,7 @@ struct Value fwd_get_from_root(const struct DatabaseHandle *db,
  * # Arguments
  *
  * * `db` - The database handle returned by `open_db`
- * * `key` - The key to look up, in `Value` form
+ * * `key` - The key to look up, in `BorrowedBytes` form
  *
  * # Returns
  *
@@ -312,7 +386,7 @@ struct Value fwd_get_from_root(const struct DatabaseHandle *db,
  *  * call `free_value` to free the memory associated with the returned `Value`
  *
  */
-struct Value fwd_get_latest(const struct DatabaseHandle *db, struct Value key);
+struct Value fwd_get_latest(const struct DatabaseHandle *db, BorrowedBytes key);
 
 /**
  * Open a database with the given cache size and maximum number of revisions
@@ -341,8 +415,7 @@ struct DatabaseCreationResult fwd_open_db(struct CreateOrOpenArgs args);
  * # Arguments
  *
  * * `db` - The database handle returned by `open_db`
- * * `nkeys` - The number of key-value pairs to put
- * * `values` - A pointer to an array of `KeyValue` structs
+ * * `values` - A `BorrowedKeyValuePairs` struct containing the key-value pairs to put.
  *
  * # Returns
  *
@@ -360,8 +433,7 @@ struct DatabaseCreationResult fwd_open_db(struct CreateOrOpenArgs args);
  *
  */
 struct Value fwd_propose_on_db(const struct DatabaseHandle *db,
-                               size_t nkeys,
-                               const struct KeyValue *values);
+                               BorrowedKeyValuePairs values);
 
 /**
  * Proposes a batch of operations to the database on top of an existing proposal.
@@ -370,8 +442,7 @@ struct Value fwd_propose_on_db(const struct DatabaseHandle *db,
  *
  * * `db` - The database handle returned by `open_db`
  * * `proposal_id` - The ID of the proposal to propose on
- * * `nkeys` - The number of key-value pairs to put
- * * `values` - A pointer to an array of `KeyValue` structs
+ * * `values` - A `BorrowedKeyValuePairs` struct containing the key-value pairs to put.
  *
  * # Returns
  *
@@ -390,8 +461,7 @@ struct Value fwd_propose_on_db(const struct DatabaseHandle *db,
  */
 struct Value fwd_propose_on_proposal(const struct DatabaseHandle *db,
                                      ProposalId proposal_id,
-                                     size_t nkeys,
-                                     const struct KeyValue *values);
+                                     BorrowedKeyValuePairs values);
 
 /**
  * Get the root hash of the latest version of the database
@@ -427,7 +497,7 @@ struct Value fwd_root_hash(const struct DatabaseHandle *db);
  * A `Value` containing {0, null} if the global logger was initialized.
  * A `Value` containing {0, "error message"} if an error occurs.
  */
-struct Value fwd_start_logs(const struct LogArgs *args);
+struct Value fwd_start_logs(struct LogArgs args);
 
 /**
  * Start metrics recorder for this process.
