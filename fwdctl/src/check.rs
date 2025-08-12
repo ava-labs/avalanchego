@@ -75,8 +75,8 @@ fn print_checker_report(report: CheckerReport) {
     println!(
         "\tStorage Space Utilization: {} / {} = {:.2}%",
         report.trie_stats.trie_bytes,
-        report.physical_bytes,
-        (report.trie_stats.trie_bytes as f64 / report.physical_bytes as f64) * 100.0
+        report.high_watermark,
+        (report.trie_stats.trie_bytes as f64 / report.high_watermark as f64) * 100.0
     );
     println!(
         "\tInternal Fragmentation: {} / {total_trie_area_bytes} = {:.2}%",

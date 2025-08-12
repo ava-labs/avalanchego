@@ -64,8 +64,6 @@ pub struct CheckerReport {
     pub errors: Vec<CheckerError>,
     /// The high watermark of the database
     pub high_watermark: u64,
-    /// The physical number of bytes in the database returned through `stat`
-    pub physical_bytes: u64,
     /// Statistics about the trie
     pub trie_stats: TrieStats,
     /// Statistics about the free list
@@ -131,7 +129,6 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                 return CheckerReport {
                     errors: vec![e],
                     high_watermark: db_size,
-                    physical_bytes: 0,
                     trie_stats: TrieStats::default(),
                     free_list_stats: FreeListsStats::default(),
                 };
@@ -189,21 +186,9 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
             errors.push(CheckerError::AreaLeaks(leaked_ranges));
         }
 
-        let physical_bytes = match self.physical_size() {
-            Ok(physical_bytes) => physical_bytes,
-            Err(e) => {
-                errors.push(CheckerError::IO {
-                    error: e,
-                    parent: None,
-                });
-                0
-            }
-        };
-
         CheckerReport {
             errors,
             high_watermark: db_size,
-            physical_bytes,
             trie_stats,
             free_list_stats,
         }
@@ -263,7 +248,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                 .map_err(|e| {
                     vec![CheckerError::IO {
                         error: e,
-                        parent: Some(StoredAreaParent::TrieNode(parent)),
+                        parent: StoredAreaParent::TrieNode(parent),
                     }]
                 })?;
         let (node, node_bytes) = self
@@ -271,7 +256,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
             .map_err(|e| {
                 vec![CheckerError::IO {
                     error: e,
-                    parent: Some(StoredAreaParent::TrieNode(parent)),
+                    parent: StoredAreaParent::TrieNode(parent),
                 }]
             })?;
 
@@ -430,7 +415,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                 Err(e) => {
                     errors.push(CheckerError::IO {
                         error: e,
-                        parent: Some(StoredAreaParent::FreeList(parent)),
+                        parent: StoredAreaParent::FreeList(parent),
                     });
                     free_list_iter.move_to_next_free_list();
                     continue;

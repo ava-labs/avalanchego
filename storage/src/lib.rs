@@ -284,7 +284,7 @@ pub enum CheckerError {
         /// The error
         error: FileIoError,
         /// parent of the area
-        parent: Option<StoredAreaParent>,
+        parent: StoredAreaParent,
     },
 }
 

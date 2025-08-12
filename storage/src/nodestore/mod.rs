@@ -755,7 +755,7 @@ impl<T, S: ReadableStorage> NodeStore<T, S> {
             .offset()
             .checked_sub(offset_before)
             .ok_or_else(|| {
-                self.file_io_error(
+                self.storage.file_io_error(
                     Error::other("Reader offset went backwards"),
                     actual_addr,
                     Some("read_node_with_num_bytes_from_disk".to_string()),
@@ -775,20 +775,6 @@ impl<T, S: ReadableStorage> NodeStore<T, S> {
         addr: LinearAddress,
     ) -> Result<(AreaIndex, u64), FileIoError> {
         area_index_and_size(self.storage.as_ref(), addr)
-    }
-
-    pub(crate) fn physical_size(&self) -> Result<u64, FileIoError> {
-        self.storage.size()
-    }
-
-    #[cold]
-    pub(crate) fn file_io_error(
-        &self,
-        error: Error,
-        addr: u64,
-        context: Option<String>,
-    ) -> FileIoError {
-        self.storage.file_io_error(error, addr, context)
     }
 }
 
