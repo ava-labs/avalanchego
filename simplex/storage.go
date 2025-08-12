@@ -223,12 +223,7 @@ func (s *Storage) retrieveFinalization(seq uint64) (simplex.Finalization, error)
 		return simplex.Finalization{}, err
 	}
 
-	finalization, err := canotoFinalization.toFinalization(s.deserializer)
-	if err != nil {
-		return simplex.Finalization{}, err
-	}
-
-	return finalization, nil
+	return canotoFinalization.toFinalization(s.deserializer)
 }
 
 func getBlockAtHeight(ctx context.Context, vm block.ChainVM, height uint64) (snowman.Block, error) {
