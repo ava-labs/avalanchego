@@ -3,22 +3,7 @@ description: Correlate metrics across multiple jobs/runs for performance compari
 
 inputs:
   queries:
-    description: |
-      Array of query objects for correlation analysis.
-
-      Each query object must have:
-      - query (required, string): Prometheus query expression
-      - metric_name (required, string): Display name for the metric
-      - y_axis_label (optional, string): Y-axis label for the chart
-
-      Example:
-        queries:
-          - query: "rate(http_requests_total[5m])"
-            metric_name: "HTTP Request Rate"
-            y_axis_label: "Requests/sec"
-          - query: "avg(cpu_usage_percent)"
-            metric_name: "CPU Usage"
-            y_axis_label: "Percentage"
+    description: 'Array of query objects with query, metric_name, and optional y_axis_label'
     required: true
   dashboard_title:
     description: 'Title for the correlation dashboard'
@@ -60,11 +45,8 @@ runs:
 
           console.log('=== DEBUG INFO ===');
           console.log('Current run ID:', CURRENT_RUN_ID);
-          console.log('Available context keys:', Object.keys(context || {}));
-          console.log('Needs context:', JSON.stringify(context.needs || {}, null, 2));
 
-          // Since context.needs might be empty in composite actions,
-          // let's get the jobs directly from the API
+          // Get jobs from GitHub API
           console.log('Fetching jobs from GitHub API...');
           const { data: workflowJobs } = await github.rest.actions.listJobsForWorkflowRun({
             owner: context.repo.owner,
@@ -72,10 +54,9 @@ runs:
             run_id: CURRENT_RUN_ID
           });
 
-          // Find the specific jobs we need
-          const targetJobNames = ['load_test', 'firewood_load_test'];
+          // Find jobs by their display names (not job keys)
           const foundJobs = workflowJobs.jobs.filter(job =>
-            targetJobNames.some(targetName => job.name.includes(targetName) || job.name === targetName)
+            job.name.includes('firewood load test') || job.name.includes('Run load test on self-hosted runners')
           );
 
           console.log('All jobs in workflow:');
@@ -108,9 +89,17 @@ runs:
           // Process each found job
           for (const job of foundJobs) {
             if (job.conclusion === 'success' && job.started_at && job.completed_at) {
+              // Create a cleaner name for the correlation
+              let cleanName = job.name;
+              if (job.name.includes('firewood')) {
+                cleanName = 'Firewood Load Test';
+              } else if (job.name.includes('Run load test on self-hosted runners')) {
+                cleanName = 'Standard Load Test';
+              }
+
               correlationRuns.push({
                 job_name: job.name,
-                name: job.name,
+                name: cleanName,
                 labels: {
                   gh_run_id: CURRENT_RUN_ID,
                   gh_job_id: job.name,
@@ -122,7 +111,7 @@ runs:
                 end_time: new Date(job.completed_at).getTime()
               });
 
-              console.log(`✓ Added job: ${job.name} (${job.started_at} to ${job.completed_at})`);
+              console.log(`✓ Added job: ${cleanName} (${job.started_at} to ${job.completed_at})`);
             } else {
               console.log(`⚠ Skipped job: ${job.name} (conclusion: ${job.conclusion})`);
             }
@@ -153,7 +142,7 @@ runs:
 
           core.setOutput('config_path', configPath);
           core.setOutput('output_file', outputPath);
-          core.setOutput('jobs_correlated', correlationRuns.map(r => r.job_name).join(','));
+          core.setOutput('jobs_correlated', correlationRuns.map(r => r.name).join(','));
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
