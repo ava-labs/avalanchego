@@ -48,7 +48,7 @@ var (
 	errInvalidBounds        = errors.New("start key is greater than end key")
 	errInvalidRootHash      = fmt.Errorf("root hash must have length %d", hashing.HashLen)
 
-	_ ProofCreator = (*merkleProofCreator)(nil)
+	_ ProofCreator = (*proofCreator)(nil)
 	_ p2p.Handler  = (*GetChangeProofHandler)(nil)
 	_ p2p.Handler  = (*GetRangeProofHandler)(nil)
 )
@@ -60,19 +60,19 @@ func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
 	return maybe.Nothing[[]byte]()
 }
 
-type merkleProofCreator struct {
+type proofCreator struct {
 	db DB
 }
 
-func NewProofCreator(db DB) ProofCreator {
-	return &merkleProofCreator{
+func newProofCreator(db DB) ProofCreator {
+	return &proofCreator{
 		db: db,
 	}
 }
 
-func NewGetChangeProofHandler(db DB) *GetChangeProofHandler {
+func NewGetChangeProofHandler(proofCreator ProofCreator) *GetChangeProofHandler {
 	return &GetChangeProofHandler{
-		proofCreator: NewProofCreator(db),
+		proofCreator: proofCreator,
 	}
 }
 
@@ -125,7 +125,7 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 	return proofBytes, nil
 }
 
-func (pc *merkleProofCreator) ChangeProof(ctx context.Context, startRootBytes []byte, endRootBytes []byte, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], keyLimit, byteLimit int) ([]byte, error) {
+func (pc *proofCreator) ChangeProof(ctx context.Context, startRootBytes []byte, endRootBytes []byte, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], keyLimit, byteLimit int) ([]byte, error) {
 	startRoot, err := ids.ToID(startRootBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse start root hash: %w", err)
@@ -211,9 +211,9 @@ func (pc *merkleProofCreator) ChangeProof(ctx context.Context, startRootBytes []
 	return nil, ErrMinProofSizeIsTooLarge
 }
 
-func NewGetRangeProofHandler(db DB) *GetRangeProofHandler {
+func NewGetRangeProofHandler(proofCreator ProofCreator) *GetRangeProofHandler {
 	return &GetRangeProofHandler{
-		pc: NewProofCreator(db),
+		pc: proofCreator,
 	}
 }
 
@@ -269,7 +269,7 @@ func (g *GetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ t
 // If no sufficiently small proof can be generated, returns [ErrMinProofSizeIsTooLarge].
 // TODO improve range proof generation so we don't need to iteratively
 // reduce the key limit.
-func (pc *merkleProofCreator) RangeProof(ctx context.Context, rootBytes []byte, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], keyLimit, byteLimit int) ([]byte, error) {
+func (pc *proofCreator) RangeProof(ctx context.Context, rootBytes []byte, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], keyLimit, byteLimit int) ([]byte, error) {
 	root, err := ids.ToID(rootBytes)
 	if err != nil {
 		return nil, err
@@ -292,7 +292,7 @@ func (pc *merkleProofCreator) RangeProof(ctx context.Context, rootBytes []byte, 
 	return proofBytes, nil
 }
 
-func (pc *merkleProofCreator) rangeProof(ctx context.Context, root ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], keyLimit, byteLimit int, marshalFunc func(*merkledb.RangeProof) ([]byte, error)) ([]byte, error) {
+func (pc *proofCreator) rangeProof(ctx context.Context, root ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], keyLimit, byteLimit int, marshalFunc func(*merkledb.RangeProof) ([]byte, error)) ([]byte, error) {
 	if root == ids.Empty {
 		// If the root is empty, we can't generate a proof.
 		// Return an empty proof.
