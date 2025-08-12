@@ -49,21 +49,21 @@ jobs:
               echo "end-block=34000000"
               echo "source-block-dir=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-50m-ldb.zip"
               echo "current-state-dir=s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-33m/"
-            } >> $GITHUB_OUTPUT
+            } >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             {
               echo "start-block=101"
               echo "end-block=250000"
               echo "source-block-dir=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip"
               echo "current-state-dir=s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip"
-            } >> $GITHUB_OUTPUT
+            } >> "$GITHUB_OUTPUT"
           else
             {
               echo "start-block=${{ github.event.inputs.start-block }}"
               echo "end-block=${{ github.event.inputs.end-block }}"
               echo "source-block-dir=${{ github.event.inputs.source-block-dir }}"
               echo "current-state-dir=${{ github.event.inputs.current-state-dir }}"
-            } >> $GITHUB_OUTPUT
+            } >> "$GITHUB_OUTPUT"
           fi
       - name: Install ARC Dependencies
         shell: bash
