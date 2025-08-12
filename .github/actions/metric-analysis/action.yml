@@ -3,7 +3,22 @@ description: Correlate metrics across multiple jobs/runs for performance compari
 
 inputs:
   queries:
-    description: 'Array of query objects with query, metric_name, and optional y_axis_label'
+    description: |
+      Array of query objects for correlation analysis.
+
+      Each query object must have:
+      - query (required, string): Prometheus query expression
+      - metric_name (required, string): Display name for the metric
+      - y_axis_label (optional, string): Y-axis label for the chart
+
+      Example:
+        queries:
+          - query: "rate(http_requests_total[5m])"
+            metric_name: "HTTP Request Rate"
+            y_axis_label: "Requests/sec"
+          - query: "avg(cpu_usage_percent)"
+            metric_name: "CPU Usage"
+            y_axis_label: "Percentage"
     required: true
   dashboard_title:
     description: 'Title for the correlation dashboard'
@@ -31,7 +46,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Build configuration
+    - name: Build correlation configuration
       id: build-config
       uses: actions/github-script@v7
       with:
@@ -51,19 +66,56 @@ runs:
 
           console.log(`Correlating jobs from needs: ${JOB_NAMES.join(', ')}`);
 
-          // Parse queries input - GitHub Actions will convert YAML array to JSON string
+          // Parse and validate queries input
           let queries;
           try {
             const queriesInput = `${{ inputs.queries }}`;
-            if (queriesInput.startsWith('[') && queriesInput.endsWith(']')) {
-              queries = JSON.parse(queriesInput);
-            } else {
-              queries = JSON.parse(queriesInput);
+            queries = JSON.parse(queriesInput);
+
+            // Strong validation
+            if (!Array.isArray(queries)) {
+              throw new Error('queries must be an array');
             }
-            console.log(`Found ${queries.length} queries to analyze`);
+
+            if (queries.length === 0) {
+              throw new Error('queries array cannot be empty');
+            }
+
+            // Validate each query object
+            queries.forEach((query, index) => {
+              if (typeof query !== 'object' || query === null) {
+                throw new Error(`Query ${index}: must be an object`);
+              }
+
+              // Required fields
+              if (!query.query || typeof query.query !== 'string') {
+                throw new Error(`Query ${index}: 'query' field is required and must be a string`);
+              }
+
+              if (!query.metric_name || typeof query.metric_name !== 'string') {
+                throw new Error(`Query ${index}: 'metric_name' field is required and must be a string`);
+              }
+
+              // Optional fields validation
+              if (query.y_axis_label && typeof query.y_axis_label !== 'string') {
+                throw new Error(`Query ${index}: 'y_axis_label' must be a string if provided`);
+              }
+
+              // Check for unknown fields
+              const allowedFields = ['query', 'metric_name', 'y_axis_label'];
+              const providedFields = Object.keys(query);
+              const unknownFields = providedFields.filter(field => !allowedFields.includes(field));
+
+              if (unknownFields.length > 0) {
+                console.log(`Query ${index}: Unknown fields detected: ${unknownFields.join(', ')}. Allowed fields: ${allowedFields.join(', ')}`);
+              }
+            });
+
+            console.log(`✓ Validated ${queries.length} queries successfully`);
+
           } catch (error) {
-            console.log(`Failed to parse queries, error: ${error.message}`);
-            throw new Error(`Invalid queries format. Expected array of objects with query and metric_name fields.`);
+            console.error('Queries validation failed:', error.message);
+            throw new Error(`Invalid queries format: ${error.message}`);
           }
 
           // Get precise job timings from GitHub Jobs API
