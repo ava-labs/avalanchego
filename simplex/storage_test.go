@@ -59,6 +59,9 @@ func TestStorageNew(t *testing.T) {
 
 func TestStorageRetrieve(t *testing.T) {
 	genesis := newBlock(t, newBlockConfig{})
+	genesisBytes, err := genesis.Bytes()
+	require.NoError(t, err)
+
 	vm := newTestVM()
 	ctx := context.Background()
 	config := newEngineConfig(t, 4)
@@ -72,22 +75,24 @@ func TestStorageRetrieve(t *testing.T) {
 		name                 string
 		seq                  uint64
 		expectedBlock        *Block
+		expectedBytes        []byte
 		expectedFinalization simplex.Finalization
-		expectedExists       bool
+		expectedErr          error
 	}{
 		{
 			name:                 "retrieve genesis block",
 			seq:                  0,
 			expectedBlock:        genesis,
+			expectedBytes:        genesisBytes,
 			expectedFinalization: simplex.Finalization{},
-			expectedExists:       true,
+			expectedErr:          nil,
 		},
 		{
 			name:                 "seq not found",
 			seq:                  1,
 			expectedBlock:        nil,
 			expectedFinalization: simplex.Finalization{},
-			expectedExists:       false,
+			expectedErr:          simplex.ErrBlockNotFound,
 		},
 	}
 
@@ -96,19 +101,16 @@ func TestStorageRetrieve(t *testing.T) {
 			s, err := newStorage(ctx, config, &qc, genesis.blockTracker)
 			require.NoError(t, err)
 
-			block, finalization, exists := s.Retrieve(tt.seq)
-			if tt.expectedExists {
+			block, finalization, err := s.Retrieve(tt.seq)
+			if tt.expectedErr == nil {
 				bytes, err := block.Bytes()
 				require.NoError(t, err)
 
-				genesisBytes, err := genesis.Bytes()
-				require.NoError(t, err)
-
-				require.Equal(t, genesisBytes, bytes)
+				require.Equal(t, tt.expectedBytes, bytes)
 			}
 
 			require.Equal(t, tt.expectedFinalization, finalization)
-			require.Equal(t, tt.expectedExists, exists)
+			require.Equal(t, tt.expectedErr, err)
 		})
 	}
 }
@@ -184,8 +186,8 @@ func TestStorageIndexFails(t *testing.T) {
 
 			if tt.expectedError != errGenesisIndexed {
 				// ensure that the block is not retrievable
-				block, finalization, exists := s.Retrieve(tt.block.BlockHeader().Seq)
-				require.False(t, exists)
+				block, finalization, err := s.Retrieve(tt.block.BlockHeader().Seq)
+				require.ErrorIs(t, err, simplex.ErrBlockNotFound)
 				require.Nil(t, block)
 				require.Equal(t, simplex.Finalization{}, finalization)
 			}
@@ -267,8 +269,8 @@ func TestStorageIndexSuccess(t *testing.T) {
 	}
 
 	for i := 0; i <= numBlocks; i++ {
-		gotBlock, gotFin, exists := s.Retrieve(uint64(i))
-		require.True(t, exists)
+		gotBlock, gotFin, err := s.Retrieve(uint64(i))
+		require.NoError(t, err)
 
 		expectedBytes, err := blocks[i].Bytes()
 		require.NoError(t, err)
