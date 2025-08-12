@@ -54,9 +54,8 @@ func hashSliceToBytes(hashes []common.Hash) []byte {
 	return bytes
 }
 
-// New creates a Predicate from predicate bytes by delimiting the actual
-// message with delimiter and zero padding to reach a length that is a
-// multiple of 32. Returns a Predicate that can be stored in EVM access lists.
+// New returns a Predicate from b by appending a delimiter and zero-padding
+// until the length is a multiple of 32.
 func New(predicateBytes []byte) Predicate {
 	bytes := make([]byte, len(predicateBytes)+1)
 	copy(bytes, predicateBytes)
