@@ -87,6 +87,11 @@ func Test_Completion(t *testing.T) {
 	require.NoError(syncer.Start(context.Background()))
 	require.NoError(syncer.Wait(context.Background()))
 
+	// Ensure the database is in the expected state
+	gotRoot, err := db.GetMerkleRoot(context.Background())
+	require.NoError(err)
+	require.Equal(emptyRoot, gotRoot)
+
 	syncer.workLock.Lock()
 	require.Zero(syncer.unprocessedWork.Len())
 	require.Equal(1, syncer.processedWork.Len())
@@ -410,20 +415,6 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 
 	// deal with odd length key
 	require.True(isPrefix(midPointVal, nextKey.Value()))
-}
-
-// compares two maybe.Maybe[[]byte] values, interpreting Nothing as greater than any value
-func compare(a, b maybe.Maybe[[]byte]) int {
-	if a.IsNothing() && b.IsNothing() {
-		return 0
-	}
-	if a.IsNothing() {
-		return 1
-	}
-	if b.IsNothing() {
-		return -1
-	}
-	return bytes.Compare(a.Value(), b.Value())
 }
 
 func isPrefix(data []byte, prefix []byte) bool {

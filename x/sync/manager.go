@@ -784,7 +784,6 @@ func (c *changeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], err
 //
 // [endProof] is the end proof of the last proof received.
 //
-// Invariant: [lastReceivedKey] < [rangeEnd].
 // If [rangeEnd] is Nothing it's considered > [lastReceivedKey].
 func findNextKey(
 	ctx context.Context,
@@ -797,7 +796,13 @@ func findNextKey(
 	lastReceivedKey := rangeEnd.Value()
 	if len(keyChanges) > 0 {
 		lastReceivedKey = keyChanges[len(keyChanges)-1].Key
+
+		// If the proof provides keys after the range end, we can return that the range was complete.
+		if compare(maybe.Some(lastReceivedKey), rangeEnd) > 0 {
+			return maybe.Nothing[[]byte](), nil
+		}
 	}
+
 	if len(endProof) == 0 {
 		// We try to find the next key to fetch by looking at the end proof.
 		// If the end proof is empty, we have no information to use.
@@ -948,6 +953,20 @@ func findNextKey(
 
 	// the nextKey is within the open range (lastReceivedKey, rangeEnd), so return it
 	return nextKey, nil
+}
+
+// compares two maybe.Maybe[[]byte] values, interpreting Nothing as greater than any value
+func compare(a, b maybe.Maybe[[]byte]) int {
+	if a.IsNothing() && b.IsNothing() {
+		return 0
+	}
+	if a.IsNothing() {
+		return 1
+	}
+	if b.IsNothing() {
+		return -1
+	}
+	return bytes.Compare(a.Value(), b.Value())
 }
 
 func (m *Manager) Error() error {
