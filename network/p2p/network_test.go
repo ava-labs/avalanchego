@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
-	"github.com/ava-labs/avalanchego/utils/bag"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
@@ -922,12 +921,12 @@ func TestNetworkConnectedValidators_ConnectAndDisconnect(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			if b := bag.Of(
+			if s := set.Of(
 				len(tt.validators),
 				len(tt.connectedPeers),
 				len(tt.disconnectedPeers),
 				len(tt.wantConnectedValidators),
-			); b.Len() != 1 {
+			); s.Len() != 1 {
 				require.Fail("tests vectors must be of same length")
 			}
 
