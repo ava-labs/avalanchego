@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"math"
 	"math/rand"
 	"testing"
 
@@ -35,7 +34,6 @@ const (
 	testCommitInterval = 1024
 	testTargetHeight   = 100
 	testNumWorkers     = 4
-	testRequestSize    = defaultRequestSize
 )
 
 type atomicSyncTestCheckpoint struct {
@@ -43,180 +41,6 @@ type atomicSyncTestCheckpoint struct {
 	leafCutoff              int         // Number of leafs to sync before cutting off responses
 	targetRoot              common.Hash // Root of trie to resume syncing from after stopping
 	targetHeight            uint64      // Height to sync to after stopping
-}
-
-// TestConfigValidation is a parameterized test that covers all config validation scenarios.
-func TestConfigValidation(t *testing.T) {
-	_, mockClient, atomicBackend, root := setupParallelizationTest(t, 100)
-	clientDB := versiondb.New(memdb.New())
-
-	// Create a valid base config
-	validConfig := Config{
-		Client:       mockClient,
-		Database:     clientDB,
-		AtomicTrie:   atomicBackend.AtomicTrie(),
-		TargetRoot:   root,
-		TargetHeight: 100,
-		RequestSize:  defaultRequestSize,
-		NumWorkers:   defaultNumWorkers,
-	}
-
-	tests := []struct {
-		name             string
-		configModifyFunc func(*Config)
-		expectedErr      error
-		description      string
-	}{
-		// Basic validation tests
-		{
-			name:             "valid config",
-			configModifyFunc: func(c *Config) {}, // No modification for valid case.
-			expectedErr:      nil,
-			description:      "should accept valid configuration",
-		},
-		{
-			name:             "nil client",
-			configModifyFunc: func(c *Config) { c.Client = nil },
-			expectedErr:      errNilClient,
-			description:      "should reject nil client",
-		},
-		{
-			name:             "nil database",
-			configModifyFunc: func(c *Config) { c.Database = nil },
-			expectedErr:      errNilDatabase,
-			description:      "should reject nil database",
-		},
-		{
-			name:             "nil atomic trie",
-			configModifyFunc: func(c *Config) { c.AtomicTrie = nil },
-			expectedErr:      errNilAtomicTrie,
-			description:      "should reject nil atomic trie",
-		},
-		{
-			name:             "empty target root",
-			configModifyFunc: func(c *Config) { c.TargetRoot = common.Hash{} },
-			expectedErr:      errEmptyTargetRoot,
-			description:      "should reject empty target root",
-		},
-		{
-			name:             "zero target height",
-			configModifyFunc: func(c *Config) { c.TargetHeight = 0 },
-			expectedErr:      errInvalidTargetHeight,
-			description:      "should reject zero target height",
-		},
-		{
-			name:             "request size too small",
-			configModifyFunc: func(c *Config) { c.RequestSize = 0 }, // This will be set to default, so no error
-			expectedErr:      nil,
-			description:      "should use default request size when zero",
-		},
-		{
-			name:             "request size too large",
-			configModifyFunc: func(c *Config) { c.RequestSize = maxRequestSize + 1 },
-			expectedErr:      errInvalidRequestSize,
-			description:      "should reject request size above maximum",
-		},
-		{
-			name:             "zero request size (should use default)",
-			configModifyFunc: func(c *Config) { c.RequestSize = 0 },
-			expectedErr:      nil,
-			description:      "should use default request size when zero",
-		},
-		{
-			name:             "num workers too few",
-			configModifyFunc: func(c *Config) { c.NumWorkers = 0 }, // This will be set to default, so no error
-			expectedErr:      nil,
-			description:      "should use default num workers when zero",
-		},
-		{
-			name:             "num workers too many",
-			configModifyFunc: func(c *Config) { c.NumWorkers = maxNumWorkers + 1 },
-			expectedErr:      errTooManyWorkers,
-			description:      "should reject num workers above maximum",
-		},
-		{
-			name:             "zero num workers (should use default)",
-			configModifyFunc: func(c *Config) { c.NumWorkers = 0 },
-			expectedErr:      nil,
-			description:      "should use default num workers when zero",
-		},
-		// Boundary tests
-		{
-			name:             "minimum valid request size",
-			configModifyFunc: func(c *Config) { c.RequestSize = minRequestSize },
-			expectedErr:      nil,
-			description:      "should accept minimum valid request size",
-		},
-		{
-			name:             "maximum valid request size",
-			configModifyFunc: func(c *Config) { c.RequestSize = maxRequestSize },
-			expectedErr:      nil,
-			description:      "should accept maximum valid request size",
-		},
-		{
-			name:             "minimum valid num workers",
-			configModifyFunc: func(c *Config) { c.NumWorkers = minNumWorkers },
-			expectedErr:      nil,
-			description:      "should accept minimum valid num workers",
-		},
-		{
-			name:             "maximum valid num workers",
-			configModifyFunc: func(c *Config) { c.NumWorkers = maxNumWorkers },
-			expectedErr:      nil,
-			description:      "should accept maximum valid num workers",
-		},
-		// Edge cases
-		{
-			name:             "target height one",
-			configModifyFunc: func(c *Config) { c.TargetHeight = 1 },
-			expectedErr:      nil,
-			description:      "should accept target height of 1",
-		},
-		{
-			name:             "target height max uint64",
-			configModifyFunc: func(c *Config) { c.TargetHeight = math.MaxUint64 },
-			expectedErr:      nil,
-			description:      "should accept maximum target height",
-		},
-		{
-			name:             "request size exactly at bounds",
-			configModifyFunc: func(c *Config) { c.RequestSize = minRequestSize },
-			expectedErr:      nil,
-			description:      "should accept request size at minimum bound",
-		},
-		{
-			name:             "num workers exactly at bounds",
-			configModifyFunc: func(c *Config) { c.NumWorkers = minNumWorkers },
-			expectedErr:      nil,
-			description:      "should accept num workers at minimum bound",
-		},
-		{
-			name:             "negative num workers",
-			configModifyFunc: func(c *Config) { c.NumWorkers = -1 },
-			expectedErr:      errTooFewWorkers,
-			description:      "should reject negative num workers",
-		},
-		{
-			name:             "request size overflow",
-			configModifyFunc: func(c *Config) { c.RequestSize = math.MaxUint16 },
-			expectedErr:      errInvalidRequestSize,
-			description:      "should reject request size that exceeds max allowed",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Create a copy of the valid config
-			config := validConfig
-
-			// Apply the modification
-			tt.configModifyFunc(&config)
-
-			// Test validation
-			err := config.Validate()
-			require.ErrorIs(t, err, tt.expectedErr, tt.description)
-		})
-	}
 }
 
 // TestSyncerScenarios is a parameterized test that covers basic syncing scenarios with different worker configurations.
@@ -376,17 +200,17 @@ func TestSyncerParallelizationScenarios(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ctx, mockClient, atomicBackend, root := setupParallelizationTest(t, tt.targetHeight)
-			runParallelizationTest(t, ctx, mockClient, atomicBackend, root, tt.targetHeight, tt.numWorkers, tt.useDefaultWorkers)
+			ctx, mockClient, atomicBackend, clientDB, root := setupParallelizationTest(t, tt.targetHeight)
+			runParallelizationTest(t, ctx, mockClient, clientDB, atomicBackend, root, tt.targetHeight, tt.numWorkers, tt.useDefaultWorkers)
 		})
 	}
 }
 
 // TestSyncerContextCancellation verifies that the syncer properly handles context cancellation.
 func TestSyncerContextCancellation(t *testing.T) {
-	ctx, mockClient, atomicBackend, root := setupParallelizationTest(t, testTargetHeight)
-	config := createTestConfig(mockClient, atomicBackend, root, testTargetHeight)
-	syncer := createTestSyncer(t, config)
+	ctx, mockClient, atomicBackend, clientDB, root := setupParallelizationTest(t, testTargetHeight)
+	config := createTestConfig(testTargetHeight)
+	syncer := createTestSyncer(t, mockClient, clientDB, atomicBackend, root, config)
 
 	// Immediately cancel the context to simulate cancellation.
 	ctx, cancel := context.WithCancel(ctx)
@@ -396,20 +220,20 @@ func TestSyncerContextCancellation(t *testing.T) {
 }
 
 // setupParallelizationTest creates the common test infrastructure for parallelization tests.
-// It returns the context, mock client, atomic backend, and root hash for testing.
-func setupParallelizationTest(t *testing.T, targetHeight uint64) (context.Context, *syncclient.TestClient, *state.AtomicBackend, common.Hash) {
+// It returns the context, mock client, atomic backend, client DB, and root hash for testing.
+func setupParallelizationTest(t *testing.T, targetHeight uint64) (context.Context, *syncclient.TestClient, *state.AtomicBackend, *versiondb.Database, common.Hash) {
 	// Create a simple test trie with some data.
 	serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 	root, _, _ := statesynctest.GenerateTrie(t, serverTrieDB, int(targetHeight), state.TrieKeyLength)
 
-	ctx, mockClient, atomicBackend, _ := setupTestInfrastructure(t, serverTrieDB)
+	ctx, mockClient, atomicBackend, clientDB := setupTestInfrastructure(t, serverTrieDB)
 
-	return ctx, mockClient, atomicBackend, root
+	return ctx, mockClient, atomicBackend, clientDB, root
 }
 
 // runParallelizationTest executes a parallelization test with the given parameters.
-func runParallelizationTest(t *testing.T, ctx context.Context, mockClient *syncclient.TestClient, atomicBackend *state.AtomicBackend, root common.Hash, targetHeight uint64, numWorkers int, useDefaultWorkers bool) {
-	config := createTestConfig(mockClient, atomicBackend, root, targetHeight)
+func runParallelizationTest(t *testing.T, ctx context.Context, mockClient *syncclient.TestClient, clientDB *versiondb.Database, atomicBackend *state.AtomicBackend, root common.Hash, targetHeight uint64, numWorkers int, useDefaultWorkers bool) {
+	config := createTestConfig(targetHeight)
 
 	// Set worker count based on test type
 	if useDefaultWorkers {
@@ -418,7 +242,8 @@ func runParallelizationTest(t *testing.T, ctx context.Context, mockClient *syncc
 		config.NumWorkers = numWorkers
 	}
 
-	syncer := createTestSyncer(t, config)
+	syncer := createTestSyncer(t, mockClient, clientDB, atomicBackend, root, config)
+
 	workerType := "default workers"
 	if !useDefaultWorkers {
 		workerType = fmt.Sprintf("%d workers", numWorkers)
@@ -440,15 +265,11 @@ func testSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight uint64
 	for i, checkpoint := range checkpoints {
 		// Create syncer targeting the current [syncTrie].
 		syncerConfig := Config{
-			Client:       mockClient,
-			Database:     clientDB,
-			AtomicTrie:   atomicBackend.AtomicTrie(),
-			TargetRoot:   targetRoot,
 			TargetHeight: targetHeight,
 			RequestSize:  defaultRequestSize,
 			NumWorkers:   numWorkers,
 		}
-		syncer, err := newSyncer(&syncerConfig)
+		syncer, err := newSyncer(mockClient, clientDB, atomicBackend.AtomicTrie(), targetRoot, &syncerConfig)
 		require.NoError(t, err, "could not create syncer")
 		mockClient.GetLeafsIntercept = func(_ message.LeafsRequest, leafsResponse message.LeafsResponse) (message.LeafsResponse, error) {
 			// If this request exceeds the desired number of leaves, intercept the request with an error
@@ -472,15 +293,11 @@ func testSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight uint64
 
 	// Create syncer targeting the current [targetRoot].
 	syncerConfig := Config{
-		Client:       mockClient,
-		Database:     clientDB,
-		AtomicTrie:   atomicBackend.AtomicTrie(),
-		TargetRoot:   targetRoot,
 		TargetHeight: targetHeight,
 		RequestSize:  defaultRequestSize,
 		NumWorkers:   numWorkers,
 	}
-	syncer, err := newSyncer(&syncerConfig)
+	syncer, err := newSyncer(mockClient, clientDB, atomicBackend.AtomicTrie(), targetRoot, &syncerConfig)
 	require.NoError(t, err, "could not create syncer")
 	mockClient.GetLeafsIntercept = func(_ message.LeafsRequest, leafsResponse message.LeafsResponse) (message.LeafsResponse, error) {
 		// Increment the number of leaves and return the original response
@@ -561,21 +378,17 @@ func setupTestInfrastructure(t *testing.T, serverTrieDB *triedb.Database) (conte
 }
 
 // createTestConfig creates a test configuration with default values.
-func createTestConfig(mockClient *syncclient.TestClient, atomicBackend *state.AtomicBackend, root common.Hash, targetHeight uint64) Config {
+func createTestConfig(targetHeight uint64) Config {
 	return Config{
-		Client:       mockClient,
-		Database:     versiondb.New(memdb.New()),
-		AtomicTrie:   atomicBackend.AtomicTrie(),
-		TargetRoot:   root,
 		TargetHeight: targetHeight,
-		RequestSize:  testRequestSize,
+		RequestSize:  defaultRequestSize,
 		NumWorkers:   0, // Will use default
 	}
 }
 
 // createTestSyncer creates a test syncer with the given configuration.
-func createTestSyncer(t *testing.T, config Config) *syncer {
-	syncer, err := newSyncer(&config)
+func createTestSyncer(t *testing.T, mockClient *syncclient.TestClient, clientDB *versiondb.Database, atomicBackend *state.AtomicBackend, targetRoot common.Hash, config Config) *syncer {
+	syncer, err := newSyncer(mockClient, clientDB, atomicBackend.AtomicTrie(), targetRoot, &config)
 	require.NoError(t, err, "could not create syncer")
 	return syncer
 }

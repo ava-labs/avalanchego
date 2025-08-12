@@ -25,8 +25,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const testOutstandingCodeHashes = 10
-
 type codeSyncerTest struct {
 	clientDB          ethdb.Database
 	setupCodeSyncer   func(*codeSyncer)
@@ -58,10 +56,9 @@ func testCodeSyncer(t *testing.T, test codeSyncerTest) {
 	}
 
 	codeSyncer, err := newCodeSyncer(
-		clientDB,
 		mockClient,
-		testOutstandingCodeHashes,
-		DefaultNumCodeFetchingWorkers,
+		clientDB,
+		NewDefaultConfig(testRequestSize),
 	)
 	require.NoError(t, err)
 	if test.setupCodeSyncer != nil {

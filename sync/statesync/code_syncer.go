@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	DefaultMaxOutstandingCodeHashes = 5000
-	DefaultNumCodeFetchingWorkers   = 5
+	defaultMaxOutstandingCodeHashes = 5000
+	defaultNumCodeFetchingWorkers   = 5
 )
 
 var (
@@ -31,28 +31,12 @@ var (
 	errFailedToAddCodeHashesToQueue = errors.New("failed to add code hashes to queue")
 )
 
-// CodeSyncerConfig defines the configuration of the code syncer
-type CodeSyncerConfig struct {
-	// Maximum number of outstanding code hashes in the queue before the code syncer should block.
-	MaxOutstandingCodeHashes int
-	// Number of worker threads to fetch code from the network
-	NumCodeFetchingWorkers int
-
-	// Client for fetching code from the network
-	Client statesyncclient.Client
-
-	// Database for the code syncer to use.
-	DB ethdb.Database
-}
-
 // codeSyncer syncs code bytes from the network in a seprate thread.
 // Tracks outstanding requests in the DB, so that it will still fulfill them if interrupted.
 type codeSyncer struct {
-	db                       ethdb.Database
-	client                   statesyncclient.Client
-	maxOutstandingCodeHashes int
-	numCodeFetchingWorkers   int
-
+	db                    ethdb.Database
+	client                statesyncclient.Client
+	config                Config
 	lock                  sync.Mutex
 	outstandingCodeHashes set.Set[common.Hash] // Set of code hashes that we need to fetch from the network.
 	dbCodeHashes          []common.Hash        // List of code hashes stored in the database.
@@ -62,19 +46,21 @@ type codeSyncer struct {
 }
 
 // newCodeSyncer returns a code syncer that will sync code bytes from the network in a separate thread.
-func newCodeSyncer(db ethdb.Database, client statesyncclient.Client, maxOutstandingCodeHashes, numCodeFetchingWorkers int) (*codeSyncer, error) {
+func newCodeSyncer(client statesyncclient.Client, db ethdb.Database, config Config) (*codeSyncer, error) {
+	cfg := config.WithUnsetDefaults()
+
 	dbCodeHashes, err := getCodeToFetchFromDB(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to add code hashes to queue: %w", err)
 	}
+
 	return &codeSyncer{
-		db:                       db,
-		client:                   client,
-		dbCodeHashes:             dbCodeHashes,
-		maxOutstandingCodeHashes: maxOutstandingCodeHashes,
-		numCodeFetchingWorkers:   numCodeFetchingWorkers,
-		codeHashes:               make(chan common.Hash, maxOutstandingCodeHashes),
-		open:                     make(chan struct{}),
+		db:           db,
+		client:       client,
+		config:       cfg,
+		dbCodeHashes: dbCodeHashes,
+		codeHashes:   make(chan common.Hash, cfg.MaxOutstandingCodeHashes),
+		open:         make(chan struct{}),
 	}, nil
 }
 
@@ -86,7 +72,7 @@ func (c *codeSyncer) Sync(ctx context.Context) error {
 	c.done = egCtx.Done()
 
 	// Start NumCodeFetchingWorkers threads to fetch code from the network.
-	for i := 0; i < c.numCodeFetchingWorkers; i++ {
+	for i := 0; i < c.config.NumCodeFetchingWorkers; i++ {
 		eg.Go(func() error { return c.work(egCtx) })
 	}
 
@@ -111,6 +97,7 @@ func getCodeToFetchFromDB(db ethdb.Database) ([]common.Hash, error) {
 	for it.Next() {
 		codeHash := common.BytesToHash(it.Key()[len(customrawdb.CodeToFetchPrefix):])
 		// If we already have the codeHash, delete the marker from the database and continue
+
 		if rawdb.HasCode(db, codeHash) {
 			customrawdb.DeleteCodeToFetch(batch, codeHash)
 			// Write the batch to disk if it has reached the ideal batch size.

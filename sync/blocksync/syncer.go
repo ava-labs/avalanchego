@@ -5,7 +5,6 @@ package blocksync
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	synccommon "github.com/ava-labs/coreth/sync"
@@ -18,44 +17,24 @@ import (
 
 const blocksPerRequest = 32
 
-var (
-	_ synccommon.Syncer = (*blockSyncer)(nil)
-
-	errNilClient       = errors.New("Client cannot be nil")
-	errNilDatabase     = errors.New("Database cannot be nil")
-	errInvalidFromHash = errors.New("FromHash cannot be empty")
-)
+var _ synccommon.Syncer = (*blockSyncer)(nil)
 
 type Config struct {
-	ChainDB       ethdb.Database
-	Client        statesyncclient.Client
 	FromHash      common.Hash // `FromHash` is the most recent
 	FromHeight    uint64
 	BlocksToFetch uint64 // Includes the `FromHash` block
 }
 
-func (c *Config) Validate() error {
-	if c.ChainDB == nil {
-		return errNilDatabase
-	}
-	if c.Client == nil {
-		return errNilClient
-	}
-	if c.FromHash == (common.Hash{}) {
-		return errInvalidFromHash
-	}
-	return nil
-}
-
 type blockSyncer struct {
-	config *Config
+	db     ethdb.Database
+	client statesyncclient.Client
+	config Config
 }
 
-func NewSyncer(config *Config) (*blockSyncer, error) {
-	if err := config.Validate(); err != nil {
-		return nil, err
-	}
+func NewSyncer(client statesyncclient.Client, db ethdb.Database, config Config) (*blockSyncer, error) {
 	return &blockSyncer{
+		client: client,
+		db:     db,
 		config: config,
 	}, nil
 }
@@ -77,7 +56,7 @@ func (s *blockSyncer) Sync(ctx context.Context) error {
 	// first, check for blocks already available on disk so we don't
 	// request them from peers.
 	for blocksToFetch > 0 {
-		blk := rawdb.ReadBlock(s.config.ChainDB, nextHash, nextHeight)
+		blk := rawdb.ReadBlock(s.db, nextHash, nextHeight)
 		if blk == nil {
 			// block was not found
 			break
@@ -91,10 +70,10 @@ func (s *blockSyncer) Sync(ctx context.Context) error {
 
 	// get any blocks we couldn't find on disk from peers and write
 	// them to disk.
-	batch := s.config.ChainDB.NewBatch()
+	batch := s.db.NewBatch()
 	for fetched := uint64(0); fetched < blocksToFetch && (nextHash != common.Hash{}); {
 		log.Info("fetching blocks from peer", "fetched", fetched, "total", blocksToFetch)
-		blocks, err := s.config.Client.GetBlocks(ctx, nextHash, nextHeight, blocksPerRequest)
+		blocks, err := s.client.GetBlocks(ctx, nextHash, nextHeight, blocksPerRequest)
 		if err != nil {
 			return fmt.Errorf("could not get blocks from peer: err: %w, nextHash: %s, fetched: %d", err, nextHash, fetched)
 		}
