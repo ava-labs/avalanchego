@@ -7,7 +7,7 @@ inputs:
     required: true
   queries:
     description: |
-      Array of query objects for metric analysis.
+      JSON array of query objects for metric analysis.
 
       Each query object must have:
       - query (required, string): Prometheus query expression
@@ -15,12 +15,24 @@ inputs:
       - y_axis_label (required, string): Y-axis label for the chart
       - x_axis_label (optional, string): X-axis label (defaults to 'Time')
 
+      NOTE: When using quotes in Prometheus queries (e.g., {chain="C"}),
+      you must escape them as \\\" in the JSON string.
+
       Example:
-        queries:
-          - query: "rate(http_requests_total[5m])"
-            metric_name: "HTTP Request Rate"
-            y_axis_label: "Requests/sec"
-            x_axis_label: "Time"
+        queries: |
+          [
+            {
+              "query": "rate(http_requests_total[5m])",
+              "metric_name": "HTTP Request Rate",
+              "y_axis_label": "Requests/sec",
+              "x_axis_label": "Time"
+            },
+            {
+              "query": "sum(rate(metric{label=\\\"value\\\"}[1m]))",
+              "metric_name": "Example with Escaped Quotes",
+              "y_axis_label": "Rate"
+            }
+          ]
     required: true
   dashboard_title:
     description: 'Title for the analysis dashboard'
