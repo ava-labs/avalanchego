@@ -24,8 +24,7 @@ func init() {
 	resultsCodec = codec.NewManager(maxResultsSize)
 
 	c := linearcodec.NewDefault()
-	err := resultsCodec.RegisterCodec(version, c)
-	if err != nil {
+	if err := resultsCodec.RegisterCodec(version, c); err != nil {
 		panic(err)
 	}
 }
