@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1754990091053,
+  "lastUpdate": 1755023195087,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -392,6 +392,32 @@ window.BENCHMARK_DATA = {
             "value": 92.05,
             "unit": "mgas/s",
             "extra": "1 times\n4 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "ava-labs",
+            "username": "ava-labs"
+          },
+          "committer": {
+            "name": "ava-labs",
+            "username": "ava-labs"
+          },
+          "id": "7913049391ea81d4e608f61364467c2ab6b12bb8",
+          "message": "Add conditional setup to support C-Chain re-execution on ARC",
+          "timestamp": "2025-08-11T21:25:53Z",
+          "url": "https://github.com/ava-labs/avalanchego/pull/4165/commits/7913049391ea81d4e608f61364467c2ab6b12bb8"
+        },
+        "date": 1755023194691,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]",
+            "value": 110.9,
+            "unit": "mgas/s",
+            "extra": "1 times\n32 procs"
           }
         ]
       }
