@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/snow"
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
@@ -170,55 +169,80 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 	assert.Equal(t, signedTx1.Hash(), txs[0].Hash())
 }
 
-func TestNetworkUpgradesOverriden(t *testing.T) {
-	var genesis core.Genesis
-	if err := json.Unmarshal([]byte(genesisJSONPreSubnetEVM), &genesis); err != nil {
-		t.Fatalf("could not unmarshal genesis bytes: %s", err)
-	}
-	genesisBytes, err := json.Marshal(&genesis)
-	if err != nil {
-		t.Fatalf("could not unmarshal genesis bytes: %s", err)
-	}
+func TestNetworkUpgradesOverridden(t *testing.T) {
+	fork := upgradetest.Granite
+	chainConfig := forkToChainConfig[fork]
+	genesis := &core.Genesis{}
+	require.NoError(t, json.Unmarshal([]byte(toGenesisJSON(chainConfig)), genesis))
+	// Set the genesis timestamp to before the Durango activation time
+	genesis.Timestamp = uint64(upgrade.InitiallyActiveTime.Unix() - 1)
+	genesisJSON, err := genesis.MarshalJSON()
+	require.NoError(t, err)
+	tvm := newVM(t, testVMConfig{
+		fork:        &fork,
+		genesisJSON: string(genesisJSON),
+	})
 
-	upgradeBytesJSON := `{
-			"networkUpgradeOverrides": {
-				"subnetEVMTimestamp": 2,
-				"durangoTimestamp": 1607144402
-			}
-		}`
+	// verify initial state
+	require.True(t, tvm.vm.chainConfigExtra().IsGranite(uint64(upgrade.InitiallyActiveTime.Unix())))
+	require.True(t, tvm.vm.currentRules().IsSubnetEVM)
+	require.False(t, tvm.vm.currentRules().IsGranite)
 
-	vm := &VM{}
-	ctx, dbManager, _, _ := setupGenesis(t, upgradetest.Latest)
-	appSender := &enginetest.Sender{T: t}
-	appSender.CantSendAppGossip = true
-	appSender.SendAppGossipF = func(context.Context, commonEng.SendConfig, []byte) error { return nil }
-	err = vm.Initialize(
-		context.Background(),
-		ctx,
-		dbManager,
-		genesisBytes,
-		[]byte(upgradeBytesJSON),
-		nil,
-		[]*commonEng.Fx{},
-		appSender,
-	)
-	require.NoError(t, err, "error initializing GenesisVM")
-
-	require.NoError(t, vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(t, vm.SetState(context.Background(), snow.NormalOp))
-
-	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
+	// restart the vm with overrides
+	graniteTimestamp := uint64(upgrade.InitiallyActiveTime.Unix()) + 1
+	upgradeBytesJSON := fmt.Sprintf(`{
+		"networkUpgradeOverrides": {
+			"graniteTimestamp": %d
 		}
-	}()
+	}`, graniteTimestamp)
+
+	restartedTVM, err := restartVM(tvm, testVMConfig{
+		fork:        &fork,
+		upgradeJSON: upgradeBytesJSON,
+		genesisJSON: tvm.config.genesisJSON,
+	})
+	require.NoError(t, err)
+	restartedVM := restartedTVM.vm
+	// verify upgrade overrides
+	require.False(t, restartedVM.chainConfigExtra().IsGranite(uint64(upgrade.InitiallyActiveTime.Unix())))
+	require.True(t, restartedVM.chainConfigExtra().IsGranite(graniteTimestamp))
+	require.False(t, restartedVM.currentRules().IsGranite)
+
+	// Activate Durango
+	restartedVM.clock.Set(time.Unix(int64(graniteTimestamp), 0))
+	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
+	restartedVM.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
+
+	// Submit a successful transaction
+	tx0 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
+	signedTx0, err := types.SignTx(tx0, types.NewEIP155Signer(restartedVM.chainConfig.ChainID), testKeys[0].ToECDSA())
+	assert.NoError(t, err)
+	errs := restartedVM.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
+	if err := errs[0]; err != nil {
+		t.Fatalf("Failed to add tx at index: %s", err)
+	}
+
+	blk := issueAndAccept(t, restartedVM)
+	require.NotNil(t, blk)
+	require.EqualValues(t, 1, blk.Height())
 
 	// verify upgrade overrides
-	require.False(t, vm.chainConfigExtra().IsSubnetEVM(0))
-	require.True(t, vm.chainConfigExtra().IsSubnetEVM(2))
-	require.False(t, vm.chainConfigExtra().IsDurango(0))
-	require.False(t, vm.chainConfigExtra().IsDurango(uint64(upgrade.InitiallyActiveTime.Unix())))
-	require.True(t, vm.chainConfigExtra().IsDurango(1607144402))
+	require.True(t, restartedVM.currentRules().IsDurango)
+
+	// Test Case 2: Set Granite override after Granite activation
+	newGraniteTimestamp := graniteTimestamp + 1
+	newUpgradeBytesJSON := fmt.Sprintf(`{
+		"networkUpgradeOverrides": {
+			"graniteTimestamp": %d
+		}
+	}`, newGraniteTimestamp)
+
+	_, err = restartVM(restartedTVM, testVMConfig{
+		fork:        &fork,
+		upgradeJSON: newUpgradeBytesJSON,
+		genesisJSON: tvm.config.genesisJSON,
+	})
+	require.ErrorContains(t, err, "mismatching Granite fork block timestamp")
 }
 
 func mustMarshal(t *testing.T, v interface{}) string {
@@ -336,7 +360,7 @@ func TestVMStateUpgrade(t *testing.T) {
 	require.Equal(t, state.GetState(newAccount, storageKey), newAccountUpgrade.Storage[storageKey])
 }
 
-func TestVMEupgradeActivatesCancun(t *testing.T) {
+func TestVMEtnaActivatesCancun(t *testing.T) {
 	tests := []struct {
 		name        string
 		genesisJSON string

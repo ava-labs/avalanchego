@@ -240,7 +240,7 @@ curl -X POST --data '{
     "avalancheRules": {
       "IsSubnetEVM": true,
       "IsDurango": true,
-      "IsEUpgrade": true
+      "IsEtna": true
     },
     "precompiles": {
       "contractNativeMinterConfig": {

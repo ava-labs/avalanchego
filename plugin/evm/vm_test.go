@@ -140,6 +140,7 @@ type testVM struct {
 	db           *prefixdb.Database
 	atomicMemory *atomic.Memory
 	appSender    *enginetest.Sender
+	config       testVMConfig
 }
 
 func newVM(t *testing.T, config testVMConfig) *testVM {
@@ -193,6 +194,7 @@ func newVM(t *testing.T, config testVMConfig) *testVM {
 		db:           prefixedDB,
 		atomicMemory: atomicMemory,
 		appSender:    appSender,
+		config:       config,
 	}
 }
 
@@ -3422,8 +3424,11 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	require.ErrorIs(t, errs[0], txpool.ErrUnderpriced) // should fail because mempool expects higher fee
 
 	// restart vm and try again
-	restartedVM, err := restartVM(tvm.vm, tvm.db, genesisJSON, tvm.appSender, true)
+	restartedTVM, err := restartVM(tvm, testVMConfig{
+		genesisJSON: string(genesisJSON),
+	})
 	require.NoError(t, err)
+	restartedVM := restartedTVM.vm
 
 	// it still should fail
 	errs = restartedVM.txPool.AddRemotesSync([]*types.Transaction{signedTx})
@@ -3495,7 +3500,10 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 
 	// Regression: Mempool should see the new config after restart
-	restartedVM, err = restartVM(restartedVM, tvm.db, genesisJSON, tvm.appSender, true)
+	restartedTVM, err = restartVM(restartedTVM, testVMConfig{
+		genesisJSON: string(genesisJSON),
+	})
+	restartedVM = restartedTVM.vm
 	require.NoError(t, err)
 	newTxPoolHeadChan = make(chan core.NewTxPoolReorgEvent, 1)
 	restartedVM.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
@@ -3510,16 +3518,18 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 }
 
-func restartVM(vm *VM, sharedDB database.Database, genesisBytes []byte, appSender commonEng.AppSender, finishBootstrapping bool) (*VM, error) {
-	vm.Shutdown(context.Background())
+func restartVM(tvm *testVM, tvmConfig testVMConfig) (*testVM, error) {
+	if err := tvm.vm.Shutdown(context.Background()); err != nil {
+		return nil, err
+	}
 	restartedVM := &VM{}
-	vm.ctx.Metrics = metrics.NewPrefixGatherer()
-	err := restartedVM.Initialize(context.Background(), vm.ctx, sharedDB, genesisBytes, nil, nil, []*commonEng.Fx{}, appSender)
+	tvm.vm.ctx.Metrics = metrics.NewPrefixGatherer()
+	err := restartedVM.Initialize(context.Background(), tvm.vm.ctx, tvm.db, []byte(tvmConfig.genesisJSON), []byte(tvmConfig.upgradeJSON), []byte(tvmConfig.configJSON), []*commonEng.Fx{}, tvm.appSender)
 	if err != nil {
 		return nil, err
 	}
 
-	if finishBootstrapping {
+	if !tvmConfig.isSyncing {
 		err = restartedVM.SetState(context.Background(), snow.Bootstrapping)
 		if err != nil {
 			return nil, err
@@ -3529,7 +3539,13 @@ func restartVM(vm *VM, sharedDB database.Database, genesisBytes []byte, appSende
 			return nil, err
 		}
 	}
-	return restartedVM, nil
+	return &testVM{
+		vm:           restartedVM,
+		db:           tvm.db,
+		atomicMemory: tvm.atomicMemory,
+		appSender:    tvm.appSender,
+		config:       tvmConfig,
+	}, nil
 }
 
 func TestWaitForEvent(t *testing.T) {
