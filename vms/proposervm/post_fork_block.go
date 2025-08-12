@@ -170,6 +170,18 @@ func (b *postForkBlock) pChainHeight(context.Context) (uint64, error) {
 	return b.PChainHeight(), nil
 }
 
+func (b *postForkBlock) pChainEpochHeight(context.Context) (uint64, error) {
+	return b.PChainEpochHeight(), nil
+}
+
+func (b *postForkBlock) epochNumber(context.Context) (uint64, error) {
+	return b.EpochNumber(), nil
+}
+
+func (b *postForkBlock) epochStartTime(context.Context) (time.Time, error) {
+	return b.EpochStartTime(), nil
+}
+
 func (b *postForkBlock) getStatelessBlk() block.Block {
 	return b.SignedBlock
 }
