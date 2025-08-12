@@ -335,7 +335,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Metric analysis
-        uses: ./.github/actions/metrics-analysis
+        uses: ./.github/actions/metric-analysis
         with:
           queries:
             - query: 'sum by (chain) (rate(avalanche_evm_eth_chain_block_gas_used_processed[1m])) / 1e+06'
