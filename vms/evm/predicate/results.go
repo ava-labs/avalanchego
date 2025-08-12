@@ -75,9 +75,6 @@ func (r *BlockResults) Set(txHash common.Hash, txResults PrecompileResults) {
 
 // Delete deletes the predicate results for the given txHash.
 func (r *BlockResults) Delete(txHash common.Hash) {
-	if r.TxResults == nil {
-		return
-	}
 	delete(r.TxResults, txHash)
 }
 
