@@ -582,11 +582,10 @@ impl<S: ReadableStorage> TryFrom<NodeStore<MutableProposal, S>>
 
         // Hashes the trie and returns the address of the new root.
         #[cfg(feature = "ethhash")]
-        let (root, root_hash, unwritten_count) =
-            nodestore.hash_helper(root, &mut Path::new(), None)?;
+        let (root, root_hash, unwritten_count) = nodestore.hash_helper(root)?;
         #[cfg(not(feature = "ethhash"))]
         let (root, root_hash, unwritten_count) =
-            NodeStore::<MutableProposal, S>::hash_helper(root, &mut Path::new())?;
+            NodeStore::<MutableProposal, S>::hash_helper(root)?;
 
         let immutable_proposal =
             Arc::into_inner(nodestore.kind).expect("no other references to the proposal");

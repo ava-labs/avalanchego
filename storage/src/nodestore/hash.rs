@@ -15,8 +15,51 @@ use crate::node::Node;
 use crate::{Child, HashType, MaybePersistedNode, NodeStore, Path, ReadableStorage, SharedNode};
 
 use super::NodeReader;
-#[cfg(feature = "ethhash")]
-use std::ops::Deref;
+
+use std::ops::{Deref, DerefMut};
+
+/// Wrapper around a path that makes sure we truncate what gets extended to the path after it goes out of scope
+/// This allows the same memory space to be reused for different path prefixes
+#[derive(Debug)]
+struct PathGuard<'a> {
+    path: &'a mut Path,
+    original_length: usize,
+}
+
+impl<'a> PathGuard<'a> {
+    fn new(path: &'a mut PathGuard<'_>) -> Self {
+        Self {
+            original_length: path.0.len(),
+            path: &mut path.path,
+        }
+    }
+
+    fn from_path(path: &'a mut Path) -> Self {
+        Self {
+            original_length: path.0.len(),
+            path,
+        }
+    }
+}
+
+impl Drop for PathGuard<'_> {
+    fn drop(&mut self) {
+        self.path.0.truncate(self.original_length);
+    }
+}
+
+impl Deref for PathGuard<'_> {
+    type Target = Path;
+    fn deref(&self) -> &Self::Target {
+        self.path
+    }
+}
+
+impl DerefMut for PathGuard<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.path
+    }
+}
 
 /// Classified children for ethereum hash processing
 #[cfg(feature = "ethhash")]
@@ -70,13 +113,28 @@ where
         )
     }
 
-    /// Hashes `node`, which is at the given `path_prefix`, and its children recursively.
-    /// The function appends to `path_prefix` and then truncate it back to the original length - we only reuse the memory space to avoid allocations
+    /// Hashes the given `node` and the subtree rooted at it.
     /// Returns the hashed node and its hash.
     pub(super) fn hash_helper(
         #[cfg(feature = "ethhash")] &self,
+        node: Node,
+    ) -> Result<(MaybePersistedNode, HashType, usize), FileIoError> {
+        let mut root_path = Path::new();
+        #[cfg(not(feature = "ethhash"))]
+        let res = Self::hash_helper_inner(node, PathGuard::from_path(&mut root_path))?;
+        #[cfg(feature = "ethhash")]
+        let res = self.hash_helper_inner(node, PathGuard::from_path(&mut root_path), None)?;
+        Ok(res)
+    }
+
+    /// Recursive helper that hashes the given `node` and the subtree rooted at it.
+    /// This function takes a mut `node` to update the hash in place.
+    /// The `path_prefix` is also mut because we will extend it to the path of the child we are hashing in recursive calls - it will be restored after the recursive call returns.
+    /// The `num_siblings` is the number of children of the parent node, which includes this node.
+    fn hash_helper_inner(
+        #[cfg(feature = "ethhash")] &self,
         mut node: Node,
-        path_prefix: &mut Path,
+        mut path_prefix: PathGuard<'_>,
         #[cfg(feature = "ethhash")] fake_root_extra_nibble: Option<u8>,
     ) -> Result<(MaybePersistedNode, HashType, usize), FileIoError> {
         // If this is a branch, find all unhashed children and recursively hash them.
@@ -94,28 +152,27 @@ where
                     mut hashed,
                 } = self.ethhash_classify_children(&mut b.children);
                 trace!("hashed {hashed:?} unhashed {unhashed:?}");
-                if hashed.len() == 1 {
-                    // we were left with one hashed node that must be rehashed
-                    let (invalidated_node_idx, (invalidated_node, invalidated_hash)) =
-                        hashed.first_mut().expect("hashed is not empty");
+                // we were left with one hashed node that must be rehashed
+                if let [(child_idx, (child_node, child_hash))] = &mut hashed[..] {
                     // Extract the address from the MaybePersistedNode
-                    let addr: crate::LinearAddress = invalidated_node
+                    let addr: crate::LinearAddress = child_node
                         .as_linear_address()
                         .expect("hashed node should be persisted");
                     let mut hashable_node = self.read_node(addr)?.deref().clone();
-                    let original_length = path_prefix.len();
-                    path_prefix.0.extend(b.partial_path.0.iter().copied());
-                    if unhashed.is_empty() {
-                        hashable_node.update_partial_path(Path::from_nibbles_iterator(
-                            std::iter::once(*invalidated_node_idx as u8)
-                                .chain(hashable_node.partial_path().0.iter().copied()),
-                        ));
-                    } else {
-                        path_prefix.0.push(*invalidated_node_idx as u8);
-                    }
-                    let hash = hash_node(&hashable_node, path_prefix);
-                    path_prefix.0.truncate(original_length);
-                    **invalidated_hash = hash;
+                    let hash = {
+                        let mut path_guard = PathGuard::new(&mut path_prefix);
+                        path_guard.0.extend(b.partial_path.0.iter().copied());
+                        if unhashed.is_empty() {
+                            hashable_node.update_partial_path(Path::from_nibbles_iterator(
+                                std::iter::once(*child_idx as u8)
+                                    .chain(hashable_node.partial_path().0.iter().copied()),
+                            ));
+                        } else {
+                            path_guard.0.push(*child_idx as u8);
+                        }
+                        hash_node(&hashable_node, &path_guard)
+                    };
+                    **child_hash = hash;
                 }
                 // handle the single-child case for an account special below
                 if hashed.is_empty() && unhashed.len() == 1 {
@@ -148,30 +205,31 @@ where
                 let child_node = std::mem::take(child_node);
 
                 // Hash this child and update
-                // we extend and truncate path_prefix to reduce memory allocations
-                let original_length = path_prefix.len();
-                path_prefix.0.extend(b.partial_path.0.iter().copied());
-                #[cfg(feature = "ethhash")]
-                if make_fake_root.is_none() {
-                    // we don't push the nibble there is only one unhashed child and
-                    // we're on an account
-                    path_prefix.0.push(nibble as u8);
-                }
-                #[cfg(not(feature = "ethhash"))]
-                path_prefix.0.push(nibble as u8);
+                let (child_node, child_hash, child_count) = {
+                    // we extend and truncate path_prefix to reduce memory allocations]
+                    let mut child_path_prefix = PathGuard::new(&mut path_prefix);
+                    child_path_prefix.0.extend(b.partial_path.0.iter().copied());
+                    #[cfg(feature = "ethhash")]
+                    if make_fake_root.is_none() {
+                        // we don't push the nibble there is only one unhashed child and
+                        // we're on an account
+                        child_path_prefix.0.push(nibble as u8);
+                    }
+                    #[cfg(not(feature = "ethhash"))]
+                    child_path_prefix.0.push(nibble as u8);
+                    #[cfg(feature = "ethhash")]
+                    let (child_node, child_hash, child_count) =
+                        self.hash_helper_inner(child_node, child_path_prefix, make_fake_root)?;
+                    #[cfg(not(feature = "ethhash"))]
+                    let (child_node, child_hash, child_count) =
+                        Self::hash_helper_inner(child_node, child_path_prefix)?;
 
-                #[cfg(feature = "ethhash")]
-                let (child_node, child_hash, child_count) =
-                    self.hash_helper(child_node, path_prefix, make_fake_root)?;
-                #[cfg(not(feature = "ethhash"))]
-                let (child_node, child_hash, child_count) =
-                    Self::hash_helper(child_node, path_prefix)?;
+                    (child_node, child_hash, child_count)
+                };
 
                 nodes_processed = nodes_processed.saturating_add(child_count);
-
                 *child = Some(Child::MaybePersisted(child_node, child_hash));
                 trace!("child now {child:?}");
-                path_prefix.0.truncate(original_length);
             }
         }
         // At this point, we either have a leaf or a branch with all children hashed.
@@ -187,13 +245,13 @@ where
                 std::iter::once(nibble).chain(fake_root.partial_path().0.iter().copied()),
             ));
             trace!("new node: {fake_root:?}");
-            hash_node(&fake_root, path_prefix)
+            hash_node(&fake_root, &path_prefix)
         } else {
-            hash_node(&node, path_prefix)
+            hash_node(&node, &path_prefix)
         };
 
         #[cfg(not(feature = "ethhash"))]
-        let hash = hash_node(&node, path_prefix);
+        let hash = hash_node(&node, &path_prefix);
 
         Ok((SharedNode::new(node).into(), hash, nodes_processed))
     }
