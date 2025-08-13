@@ -287,13 +287,10 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 
 	// When adding a transaction to the mempool, we make sure that there is an
 	// item in Pending to signal the VM to produce a block.
-	//
-	// If the VM's buildStatus has already been set to something other than
-	// dontBuild, this will be ignored and won't be reset until the engine calls
-	// BuildBlock. This case is handled in [Txs.IssueCurrentTxs] and
-	// [Txs.CancelCurrentTxs].
-	m.addPending()
-
+	select {
+	case m.pending <- struct{}{}:
+	default:
+	}
 	return nil
 }
 

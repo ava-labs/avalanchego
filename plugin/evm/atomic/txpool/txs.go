@@ -38,8 +38,8 @@ type Txs struct {
 	// maxSize is the maximum number of transactions allowed to be kept in
 	// mempool.
 	maxSize int
-	// pending is a channel of length one, which the mempool ensures has an item
-	// on it as long as there is a pending transaction.
+	// pending is a channel of length one, which the mempool uses to awake the
+	// block builder when a new transaction is added.
 	pending chan struct{}
 
 	lock sync.RWMutex
@@ -178,12 +178,6 @@ func (t *Txs) IssueCurrentTxs() {
 	}
 	t.metrics.issuedTxs.Update(int64(len(t.issuedTxs)))
 	t.metrics.currentTxs.Update(0)
-
-	// Since this function is called after the block is built, we should make
-	// sure to signal if we are willing to build another block.
-	if t.pendingTxs.Len() > 0 {
-		t.addPending()
-	}
 }
 
 // CancelCurrentTx attempts to mark the Current transaction as Pending.
@@ -211,12 +205,6 @@ func (t *Txs) CancelCurrentTxs() {
 
 	for _, tx := range t.currentTxs {
 		t.cancelTx(tx)
-	}
-
-	// Since this function is called after block building has failed, we should
-	// make sure to signal if we are willing to build another block.
-	if t.pendingTxs.Len() > 0 {
-		t.addPending()
 	}
 }
 
@@ -331,17 +319,8 @@ func (t *Txs) RemoveTx(tx *atomic.Tx) {
 	t.removeTx(tx, false)
 }
 
-// addPending makes sure that an item is in the Pending channel.
-func (t *Txs) addPending() {
-	select {
-	case t.pending <- struct{}{}:
-	default:
-	}
-}
-
 // SubscribePendingTxs returns a channel that signals when there is a
-// transaction added to the mempool or when the mempool is interacted with after
-// block building finishes.
+// transaction added to the mempool.
 func (t *Txs) SubscribePendingTxs() <-chan struct{} {
 	return t.pending
 }
