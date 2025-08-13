@@ -6,9 +6,10 @@ package predicate
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestBlockResultsParsing(t *testing.T) {
@@ -145,7 +146,7 @@ func TestBlockResultsZeroValue(t *testing.T) {
 	result, ok := results.Get(common.Hash{1}, common.Address{2})
 	require.False(ok)
 	require.Empty(result)
-	require.Equal(len(results.TxResults), 0)
+	require.Empty(results.TxResults)
 
 	// Should be able to set results without panicking
 	results.Set(common.Hash{1}, PrecompileResults{
@@ -156,7 +157,7 @@ func TestBlockResultsZeroValue(t *testing.T) {
 	result, ok = results.Get(common.Hash{1}, common.Address{2})
 	require.True(ok)
 	require.Equal(set.NewBits(1, 2, 3), result)
-	require.Equal(len(results.TxResults), 1)
+	require.Equal(1, len(results.TxResults))
 }
 
 // expectedHexFromResults deterministically computes the expected hex encoding

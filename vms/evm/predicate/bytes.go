@@ -70,22 +70,22 @@ func New(b []byte) Predicate {
 // Unpack unpacks a predicate by stripping right padded zeroes, checking for the delimiter,
 // ensuring there is not excess padding, and returning the original message.
 // Returns an error if it finds an incorrect encoding.
-func Unpack(predicate Predicate) ([]byte, error) {
-	if len(predicate) == 0 {
+func Unpack(p Predicate) ([]byte, error) {
+	if len(p) == 0 {
 		return nil, errEmptyPredicate
 	}
-	trimmedBytes := common.TrimRightZeroes(predicate)
-	if len(trimmedBytes) == 0 {
-		return nil, fmt.Errorf("%w: 0x%x", errAllZeroBytes, predicate)
+	trim := common.TrimRightZeroes(p)
+	if len(trim) == 0 {
+		return nil, fmt.Errorf("%w: length (%d)", errAllZeroBytes, len(p))
 	}
 
-	if expectedPaddedLength := roundUpTo32(len(trimmedBytes)); expectedPaddedLength != len(predicate) {
-		return nil, fmt.Errorf("%w: got length (%d), expected length (%d)", errExcessPadding, len(predicate), expectedPaddedLength)
+	if paddedLength := roundUpTo32(len(trim)); paddedLength != len(p) {
+		return nil, fmt.Errorf("%w: got length (%d), expected length (%d)", errExcessPadding, len(p), paddedLength)
 	}
 
-	if trimmedBytes[len(trimmedBytes)-1] != delimiter {
+	if trim[len(trim)-1] != delimiter {
 		return nil, errWrongEndDelimiter
 	}
 
-	return trimmedBytes[:len(trimmedBytes)-1], nil
+	return trim[:len(trim)-1], nil
 }

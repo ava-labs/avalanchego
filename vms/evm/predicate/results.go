@@ -67,11 +67,11 @@ func (r *BlockResults) Get(txHash common.Hash, address common.Address) (set.Bits
 }
 
 // Set sets the predicate results for the given txHash. Overrides results if present.
-func (b *BlockResults) Set(txHash common.Hash, txResults PrecompileResults) {
-	if b.TxResults == nil {
-		b.TxResults = make(map[common.Hash]PrecompileResults)
+func (r *BlockResults) Set(txHash common.Hash, txResults PrecompileResults) {
+	if r.TxResults == nil {
+		r.TxResults = make(map[common.Hash]PrecompileResults)
 	}
-	b.TxResults[txHash] = txResults
+	r.TxResults[txHash] = txResults
 }
 
 // Bytes marshals the current state of predicate results
