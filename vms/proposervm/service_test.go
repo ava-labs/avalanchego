@@ -1,21 +1,25 @@
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package proposervm
 
 import (
-	"context"
+	"crypto"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmanmock"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
+	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 type mockVM struct {
@@ -23,12 +27,12 @@ type mockVM struct {
 	err      error
 }
 
-func (m *mockVM) GetBlock(_ context.Context, _ ids.ID) (snowman.Block, error) {
+func (m *mockVM) GetStatelessSignedBlock(_ ids.ID) (statelessblock.SignedBlock, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
 
-	return m.response.(snowman.Block), nil
+	return m.response.(statelessblock.SignedBlock), nil
 }
 
 func (m *mockVM) GetLastAcceptedHeight() uint64 {
@@ -77,24 +81,22 @@ func TestServiceGetProposerBlockWrapper(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			snowBlock := snowmanmock.NewBlock(gomock.NewController(t))
-			snowCtx := snowtest.Context(t, snowtest.CChainID)
-
+			signedBlock := createSignedBlock(t)
 			mockVM := &mockVM{
-				response: snowBlock,
+				response: signedBlock,
 				err:      test.mockError,
 			}
 
-			proposerAPI := &ProposerAPI{ctx: snowCtx, vm: mockVM}
+			proposerAPI := &ProposerAPI{ctx: snowtest.Context(t, snowtest.CChainID), vm: mockVM}
 
 			var expectedBlock json.RawMessage
 			var err error
 			switch test.encoding {
 			case formatting.JSON:
-				expectedBlock = json.RawMessage(`{}`)
+				expectedBlock, err = json.Marshal(signedBlock)
+				require.NoError(err)
 			default:
-				snowBlock.EXPECT().Bytes().Return([]byte{1, 2, 3}).AnyTimes()
-				encodedBlock, err := formatting.Encode(test.encoding, snowBlock.Bytes())
+				encodedBlock, err := formatting.Encode(test.encoding, signedBlock.Bytes())
 				require.NoError(err)
 				expectedBlock, err = json.Marshal(encodedBlock)
 				require.NoError(err)
@@ -117,4 +119,38 @@ func TestServiceGetProposerBlockWrapper(t *testing.T) {
 			require.JSONEq(string(expectedBlock), string(reply.Block))
 		})
 	}
+}
+
+func createSignedBlock(t *testing.T) statelessblock.SignedBlock {
+	parentID := ids.ID{1}
+	timestamp := time.Unix(123, 0)
+	pChainHeight := uint64(2)
+	pChainEpochHeight := uint64(2)
+	epochNumber := uint64(0)
+	epochStartTime := time.Unix(123, 0)
+	innerBlockBytes := []byte{3}
+	chainID := ids.ID{4}
+
+	tlsCert, err := staking.NewTLSCert()
+	require.NoError(t, err)
+
+	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
+	require.NoError(t, err)
+	key := tlsCert.PrivateKey.(crypto.Signer)
+
+	signedBlock, err := block.Build(
+		parentID,
+		timestamp,
+		pChainHeight,
+		pChainEpochHeight,
+		epochNumber,
+		epochStartTime,
+		cert,
+		innerBlockBytes,
+		chainID,
+		key,
+	)
+	require.NoError(t, err)
+
+	return signedBlock
 }

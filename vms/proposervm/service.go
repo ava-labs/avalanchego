@@ -1,10 +1,9 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,14 +13,14 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/utils/formatting"
+	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 type ProposerVMServer interface {
-	GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error)
+	GetStatelessSignedBlock(blkID ids.ID) (statelessblock.SignedBlock, error)
 	GetLastAcceptedHeight() uint64
 }
 
@@ -58,7 +57,7 @@ func (p *ProposerAPI) GetProposerBlockWrapper(r *http.Request, args *GetProposer
 	p.ctx.Lock.Lock()
 	defer p.ctx.Lock.Unlock()
 
-	block, err := p.vm.GetBlock(r.Context(), args.ProposerBlockID)
+	block, err := p.vm.GetStatelessSignedBlock(args.ProposerBlockID)
 	if err != nil {
 		return err
 	}
