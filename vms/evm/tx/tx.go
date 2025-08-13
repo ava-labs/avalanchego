@@ -1,11 +1,12 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package predicate
+package tx
 
 import (
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 )
@@ -25,9 +26,18 @@ func NewTx(
 	predicateAddress common.Address,
 	predicateBytes []byte,
 ) *types.Transaction {
+	// Convert predicate bytes to storage keys for access list
+	predicateData := predicate.New(predicateBytes)
+	numHashes := predicate.RoundUpTo32(len(predicateData)) / common.HashLength
+	storageKeys := make([]common.Hash, numHashes)
+	for i := range storageKeys {
+		start := i * common.HashLength
+		copy(storageKeys[i][:], predicateData[start:])
+	}
+
 	accessList = append(accessList, types.AccessTuple{
 		Address:     predicateAddress,
-		StorageKeys: bytesToHashSlice(New(predicateBytes)),
+		StorageKeys: storageKeys,
 	})
 	return types.NewTx(&types.DynamicFeeTx{
 		ChainID:    chainID,

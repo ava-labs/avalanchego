@@ -56,6 +56,7 @@ func ParseBlockResults(b []byte) (BlockResults, error) {
 		}
 		out.TxResults[txHash] = decoded
 	}
+
 	return out, nil
 }
 
@@ -86,6 +87,7 @@ func (r *BlockResults) Bytes() ([]byte, error) {
 		}
 		wire.TxResults[txHash] = enc
 	}
+
 	return resultsCodec.Marshal(version, &wire)
 }
 
