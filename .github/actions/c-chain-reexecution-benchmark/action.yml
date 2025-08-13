@@ -121,7 +121,9 @@ runs:
           echo "Destination S3 path '${{ inputs.push-post-state }}' already exists. Exiting."
           exit 1
         fi
+
+        echo "Validated S3 push post state URI: '${{ inputs.push-post-state }}'"
     - name: Copy Post-State to S3
       if: ${{ inputs.push-post-state != '' }}
       shell: nix develop --command bash -x {0}
-      run: ./scripts/run_task.sh export-dir-to-s3 LOCAL_SRC=${{ env.CURRENT_STATE_DIR }} S3_DEST=${{ inputs.push-post-state }}
+      run: ./scripts/run_task.sh export-dir-to-s3 LOCAL_SRC=${{ env.EXECUTION_DATA_DIR }}/current-state S3_DEST=${{ inputs.push-post-state }}
