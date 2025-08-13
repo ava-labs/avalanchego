@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/holiman/uint256"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -47,7 +48,7 @@ func TestTxHeap(t *testing.T) {
 		assert.Zero(t, h.Len())
 
 		assert := assert.New(t)
-		h.Push(tx0, 5)
+		h.Push(tx0, *uint256.NewInt(5))
 		assert.True(h.Has(id0))
 		gTx0, gHas0 := h.Get(id0)
 		assert.Equal(tx0, gTx0)
@@ -55,7 +56,7 @@ func TestTxHeap(t *testing.T) {
 		h.Remove(id0)
 		assert.False(h.Has(id0))
 		assert.Zero(h.Len())
-		h.Push(tx0, 5)
+		h.Push(tx0, *uint256.NewInt(5))
 		assert.True(h.Has(id0))
 		assert.Equal(1, h.Len())
 	})
@@ -65,13 +66,13 @@ func TestTxHeap(t *testing.T) {
 		assert.Zero(t, h.Len())
 
 		assert := assert.New(t)
-		h.Push(tx1, 10)
+		h.Push(tx1, *uint256.NewInt(10))
 		assert.True(h.Has(id1))
 		gTx1, gHas1 := h.Get(id1)
 		assert.Equal(tx1, gTx1)
 		assert.True(gHas1)
 
-		h.Push(tx2, 2)
+		h.Push(tx2, *uint256.NewInt(2))
 		assert.True(h.Has(id2))
 		gTx2, gHas2 := h.Get(id2)
 		assert.Equal(tx2, gTx2)
@@ -118,27 +119,27 @@ func TestTxHeap(t *testing.T) {
 		h := newTxHeap(3)
 		assert.Zero(t, h.Len())
 
-		h.Push(tx0, 5)
-		h.Push(tx1, 10)
-		h.Push(tx2, 2)
+		h.Push(tx0, *uint256.NewInt(5))
+		h.Push(tx1, *uint256.NewInt(10))
+		h.Push(tx2, *uint256.NewInt(2))
 		verifyRemovalOrder(t, h)
 	})
 	t.Run("drop (alt order)", func(t *testing.T) {
 		h := newTxHeap(3)
 		assert.Zero(t, h.Len())
 
-		h.Push(tx0, 5)
-		h.Push(tx2, 2)
-		h.Push(tx1, 10)
+		h.Push(tx0, *uint256.NewInt(5))
+		h.Push(tx2, *uint256.NewInt(2))
+		h.Push(tx1, *uint256.NewInt(10))
 		verifyRemovalOrder(t, h)
 	})
 	t.Run("drop (alt order 2)", func(t *testing.T) {
 		h := newTxHeap(3)
 		assert.Zero(t, h.Len())
 
-		h.Push(tx2, 2)
-		h.Push(tx0, 5)
-		h.Push(tx1, 10)
+		h.Push(tx2, *uint256.NewInt(2))
+		h.Push(tx0, *uint256.NewInt(5))
+		h.Push(tx1, *uint256.NewInt(10))
 		verifyRemovalOrder(t, h)
 	})
 }

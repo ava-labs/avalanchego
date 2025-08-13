@@ -40,6 +40,7 @@ var (
 	ErrNilTx          = errors.New("tx is nil")
 	errNoValueOutput  = errors.New("output has no value")
 	ErrNoValueInput   = errors.New("input has no value")
+	ErrNoGasUsed      = errors.New("no gas used")
 	errNilOutput      = errors.New("nil output")
 	errNilInput       = errors.New("nil input")
 	errEmptyAssetID   = errors.New("empty asset ID is not valid")
@@ -286,6 +287,37 @@ func (ins *innerSortInputsAndSigners) Swap(i, j int) {
 // SortEVMInputsAndSigners sorts the list of EVMInputs based on the addresses and assetIDs
 func SortEVMInputsAndSigners(inputs []EVMInput, signers [][]*secp256k1.PrivateKey) {
 	sort.Sort(&innerSortInputsAndSigners{inputs: inputs, signers: signers})
+}
+
+// EffectiveGasPrice returns the price per gas that the transaction is paying
+// denominated in aAVAX/gas.
+//
+// The result is rounded down to the nearest aAVAX/gas.
+func EffectiveGasPrice(
+	tx UnsignedTx,
+	avaxAssetID ids.ID,
+	isApricotPhase5 bool,
+) (uint256.Int, error) {
+	gasUsed, err := tx.GasUsed(isApricotPhase5)
+	if err != nil {
+		return uint256.Int{}, err
+	}
+	if gasUsed == 0 {
+		return uint256.Int{}, ErrNoGasUsed
+	}
+	burned, err := tx.Burned(avaxAssetID)
+	if err != nil {
+		return uint256.Int{}, err
+	}
+
+	var bigGasUsed uint256.Int
+	bigGasUsed.SetUint64(gasUsed)
+
+	var gasPrice uint256.Int // gasPrice = burned * x2cRate / gasUsed
+	gasPrice.SetUint64(burned)
+	gasPrice.Mul(&gasPrice, X2CRate)
+	gasPrice.Div(&gasPrice, &bigGasUsed)
+	return gasPrice, nil
 }
 
 // calculates the amount of AVAX that must be burned by an atomic transaction

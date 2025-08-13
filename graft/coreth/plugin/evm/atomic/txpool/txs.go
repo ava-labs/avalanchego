@@ -4,7 +4,6 @@
 package txpool
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
@@ -16,8 +15,6 @@ import (
 )
 
 const discardedTxsCacheSize = 50
-
-var ErrNoGasUsed = errors.New("no gas used")
 
 // Txs stores the transactions inside of the mempool.
 //
@@ -84,22 +81,6 @@ func (t *Txs) PendingLen() int {
 	defer t.lock.RUnlock()
 
 	return t.pendingTxs.Len()
-}
-
-// atomicTxGasPrice returns the gasPrice of a transaction in nAVAX/gas.
-func (t *Txs) atomicTxGasPrice(tx *atomic.Tx) (uint64, error) {
-	gasUsed, err := tx.GasUsed(true)
-	if err != nil {
-		return 0, err
-	}
-	if gasUsed == 0 {
-		return 0, ErrNoGasUsed
-	}
-	burned, err := tx.Burned(t.ctx.AVAXAssetID)
-	if err != nil {
-		return 0, err
-	}
-	return burned / gasUsed, nil
 }
 
 // Iterate applies f to all Pending transactions. If f returns false, the
@@ -214,7 +195,9 @@ func (t *Txs) CancelCurrentTxs() {
 // Assumes the lock is held.
 func (t *Txs) cancelTx(tx *atomic.Tx) {
 	txID := tx.ID()
-	gasPrice, err := t.atomicTxGasPrice(tx)
+	gasPrice, err := atomic.EffectiveGasPrice(tx, t.ctx.AVAXAssetID, true)
+	// Should never error to calculate the gas price of a transaction already in
+	// the mempool
 	if err != nil {
 		log.Error("failed to calculate atomic tx gas price while canceling current tx",
 			"txID", txID,
