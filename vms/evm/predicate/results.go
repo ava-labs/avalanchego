@@ -21,21 +21,8 @@ const (
 
 var resultsCodec codec.Manager
 
-func init() {
-	resultsCodec = codec.NewManager(maxResultsSize)
-
-	c := linearcodec.NewDefault()
-	if err := resultsCodec.RegisterCodec(version, c); err != nil {
-		panic(err)
-	}
-}
-
 // PrecompileResults is a map of results for each precompile address to the resulting bitset.
 type PrecompileResults map[common.Address]set.Bits
-
-// encodedPrecompileResults is the on-wire representation of PrecompileResults,
-// which encodes the bitset as compact bytes.
-type encodedPrecompileResults map[common.Address][]byte
 
 // BlockResults encodes the precompile predicate results included in a block on a per transaction basis.
 // BlockResults is not thread-safe.
@@ -43,16 +30,13 @@ type BlockResults struct {
 	TxResults map[common.Hash]PrecompileResults `serialize:"true"`
 }
 
+// encodedPrecompileResults is the on-wire representation of PrecompileResults,
+// which encodes the bitset as compact bytes.
+type encodedPrecompileResults map[common.Address][]byte
+
 // encodedBlockResults is the on-wire representation of BlockResults.
 type encodedBlockResults struct {
 	TxResults map[common.Hash]encodedPrecompileResults `serialize:"true"`
-}
-
-// NewBlockResults returns an empty predicate results.
-func NewBlockResults() BlockResults {
-	return BlockResults{
-		TxResults: make(map[common.Hash]PrecompileResults),
-	}
 }
 
 // ParseBlockResults parses bytes into predicate results.
@@ -83,11 +67,11 @@ func (r *BlockResults) Get(txHash common.Hash, address common.Address) (set.Bits
 }
 
 // Set sets the predicate results for the given txHash. Overrides results if present.
-func (r *BlockResults) Set(txHash common.Hash, txResults PrecompileResults) {
-	if r.TxResults == nil {
-		r.TxResults = make(map[common.Hash]PrecompileResults)
+func (b *BlockResults) Set(txHash common.Hash, txResults PrecompileResults) {
+	if b.TxResults == nil {
+		b.TxResults = make(map[common.Hash]PrecompileResults)
 	}
-	r.TxResults[txHash] = txResults
+	b.TxResults[txHash] = txResults
 }
 
 // Bytes marshals the current state of predicate results
@@ -103,4 +87,13 @@ func (r *BlockResults) Bytes() ([]byte, error) {
 		wire.TxResults[txHash] = enc
 	}
 	return resultsCodec.Marshal(version, &wire)
+}
+
+func init() {
+	resultsCodec = codec.NewManager(maxResultsSize)
+
+	c := linearcodec.NewDefault()
+	if err := resultsCodec.RegisterCodec(version, c); err != nil {
+		panic(err)
+	}
 }

@@ -5,9 +5,7 @@ package predicate
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
-	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -172,8 +170,7 @@ func TestBytesToHashSliceEdgeCases(t *testing.T) {
 	}
 }
 
-// Explicit tests for New/Unpack functions
-func TestPackUnpackBasic(t *testing.T) {
+func TestPackUnpack(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    []byte
@@ -296,7 +293,7 @@ func TestUnpackInvalid(t *testing.T) {
 	}
 }
 
-func FuzzPackUnpackRoundTrip(f *testing.F) {
+func FuzzPackUnpack(f *testing.F) {
 	f.Fuzz(func(t *testing.T, input []byte) {
 		packed := New(input)
 		unpacked, err := Unpack(packed)
@@ -305,30 +302,20 @@ func FuzzPackUnpackRoundTrip(f *testing.F) {
 	})
 }
 
-func FuzzUnpackInvalid(f *testing.F) {
-	// Seed with valid predicates that we'll corrupt
+func FuzzUnpackPackEqual(f *testing.F) {
+	// Seed with valid predicates
 	for i := range 100 {
 		validPredicate := New(utils.RandomBytes(i))
 		f.Add([]byte(validPredicate))
 	}
 
-	f.Fuzz(func(t *testing.T, validPredicateBytes []byte) {
-		validPredicate := Predicate(validPredicateBytes)
-		// Only test if the input is actually a valid predicate
-		if _, err := Unpack(validPredicate); err != nil {
-			t.Skip("Input is not a valid predicate")
+	f.Fuzz(func(t *testing.T, original []byte) {
+		unpacked, err := Unpack(original)
+		if err != nil {
+			t.Skip("invalid predicate")
 		}
 
-		// Test corruption by adding non-zero bytes after the valid predicate
-		// This should always create an invalid predicate
-		corruption := bytes.Repeat([]byte{0xee}, 5)
-		invalidPredicate := slices.Concat(validPredicate, corruption)
-		_, err := Unpack(invalidPredicate)
-
-		// Check for either error type since different padding can cause different errors.
-		// Zero padding cases trigger ErrInvalidPadding (padding length check fails).
-		// Non-zero padding cases trigger ErrInvalidEndDelimiter (delimiter check fails).
-		require.True(t, errors.Is(err, errExcessPadding) || errors.Is(err, errWrongEndDelimiter),
-			"Expected error for corrupted predicate, got: %v", err)
+		packed := New(unpacked)
+		require.Equal(t, original, []byte(packed))
 	})
 }

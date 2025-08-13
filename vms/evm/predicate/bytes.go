@@ -10,10 +10,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 )
 
-// Predicate represents a packed predicate that can be stored in EVM access lists.
-// It contains the original predicate bytes with padding and delimiter for storage.
-type Predicate []byte
-
 // delimiter is used as a delimiter for the bytes packed into a precompile predicate.
 // Precompile predicates are encoded in the Access List of transactions in the access tuples
 // which means that its length must be a multiple of 32 (common.HashLength).
@@ -58,12 +54,16 @@ func roundUpTo32(x int) int {
 	return (x + 31) / 32 * 32
 }
 
+// Predicate represents a packed predicate that can be stored in EVM access lists.
+// It contains the original predicate bytes with padding and delimiter for storage.
+type Predicate []byte
+
 // New returns a Predicate from b by appending a delimiter and zero-padding
 // until the length is a multiple of 32.
-func New(predicateBytes []byte) Predicate {
-	bytes := make([]byte, len(predicateBytes)+1)
-	copy(bytes, predicateBytes)
-	bytes[len(predicateBytes)] = delimiter
+func New(b []byte) Predicate {
+	bytes := make([]byte, len(b)+1)
+	copy(bytes, b)
+	bytes[len(b)] = delimiter
 	return Predicate(common.RightPadBytes(bytes, roundUpTo32(len(bytes))))
 }
 
