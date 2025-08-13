@@ -4,11 +4,18 @@
 package main
 
 import (
+	"context"
 	"flag"
+	"fmt"
+	"math"
+	"math/big"
 	"math/rand"
 	"os"
 	"time"
 
+	"github.com/ava-labs/libevm/accounts/abi/bind"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -17,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/tests/load"
+	"github.com/ava-labs/avalanchego/tests/load/contracts"
 )
 
 const (
@@ -108,11 +116,15 @@ func main() {
 	chainID, err := workers[0].Client.ChainID(ctx)
 	require.NoError(err)
 
+	tokenContract, err := newTokenContract(ctx, chainID, &workers[0], workers[1:])
+	require.NoError(err)
+
 	randomTest, err := load.NewRandomTest(
 		ctx,
 		chainID,
 		&workers[0],
 		rand.NewSource(time.Now().UnixMilli()),
+		tokenContract,
 	)
 	require.NoError(err)
 
@@ -126,4 +138,56 @@ func main() {
 	require.NoError(err)
 
 	generator.Run(ctx, log, loadTimeout, testTimeout)
+}
+
+// newTokenContract deploys an instance of an ERC20 token and distributes the
+// token supply evenly between the deployer and the recipients
+func newTokenContract(
+	ctx context.Context,
+	chainID *big.Int,
+	deployer *load.Worker,
+	recipients []load.Worker,
+) (*contracts.ERC20, error) {
+	client := deployer.Client
+	txOpts, err := bind.NewKeyedTransactorWithChainID(deployer.PrivKey, chainID)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		totalRecipients = float64(len(recipients) + 1)
+		recipientAmount = big.NewInt(int64(math.Pow10(18)))
+		totalSupply     = big.NewInt(int64(totalRecipients * math.Pow10(18)))
+	)
+
+	_, tx, contract, err := contracts.DeployERC20(txOpts, client, totalSupply)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := bind.WaitDeployed(ctx, client, tx); err != nil {
+		return nil, err
+	}
+
+	deployer.Nonce++
+
+	for _, recipient := range recipients {
+		tx, err := contract.Transfer(txOpts, crypto.PubkeyToAddress(recipient.PrivKey.PublicKey), recipientAmount)
+		if err != nil {
+			return nil, err
+		}
+
+		receipt, err := bind.WaitMined(ctx, client, tx)
+		if err != nil {
+			return nil, err
+		}
+
+		deployer.Nonce++
+
+		if receipt.Status != types.ReceiptStatusSuccessful {
+			return nil, fmt.Errorf("tx failed with status: %d", receipt.Status)
+		}
+	}
+
+	return contract, nil
 }

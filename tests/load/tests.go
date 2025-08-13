@@ -6,6 +6,7 @@ package load
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -24,7 +25,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
-var maxFeeCap = big.NewInt(300000000000)
+var (
+	ErrInsufficientFundsForDistribution = errors.New("insufficient funds for distribution")
+
+	maxFeeCap = big.NewInt(300000000000)
+)
 
 // NewRandomTest creates a RandomWeightedTest containing a collection of EVM
 // load testing scenarios.
@@ -36,6 +41,7 @@ func NewRandomTest(
 	chainID *big.Int,
 	worker *Worker,
 	source rand.Source,
+	tokenContract *contracts.ERC20,
 ) (*RandomWeightedTest, error) {
 	txOpts, err := bind.NewKeyedTransactorWithChainID(worker.PrivKey, chainID)
 	if err != nil {
@@ -153,6 +159,13 @@ func NewRandomTest(
 			Test: TrieStressTest{
 				Contract:  trieContract,
 				NumValues: count,
+			},
+			Weight: weight,
+		},
+		{
+			Test: ERC20Test{
+				Contract: tokenContract,
+				Value:    value,
 			},
 			Weight: weight,
 		},
@@ -370,6 +383,24 @@ type TrieStressTest struct {
 func (t TrieStressTest) Run(tc tests.TestContext, wallet *Wallet) {
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
 		return t.Contract.WriteValues(txOpts, t.NumValues)
+	})
+}
+
+type ERC20Test struct {
+	Contract *contracts.ERC20
+	Value    *big.Int
+}
+
+func (e ERC20Test) Run(tc tests.TestContext, wallet *Wallet) {
+	require := require.New(tc)
+
+	// Generate non-existent account address
+	pk, err := crypto.GenerateKey()
+	require.NoError(err)
+	recipient := crypto.PubkeyToAddress(pk.PublicKey)
+
+	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
+		return e.Contract.Transfer(txOpts, recipient, e.Value)
 	})
 }
 
