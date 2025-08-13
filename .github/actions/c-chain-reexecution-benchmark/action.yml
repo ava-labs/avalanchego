@@ -106,6 +106,21 @@ runs:
 
     - uses: ./.github/actions/install-nix
       if: ${{ inputs.push-post-state != '' }}
+    - name: Validate S3 Path to Push Post-State
+      if: ${{ inputs.push-post-state != '' }}
+      shell: bash
+      run: |
+        # Validate the S3 path format using a single regular expression.
+        if ! [[ "${{ inputs.push-post-state }}" =~ ^s3://[^/]+/([^/]+/)$ ]]; then
+          echo "Error: Invalid S3 path format."
+          echo "Expected format: s3://<bucket-name>/<directory-name>/"
+          exit 1
+        fi
+
+        if aws s3 ls "${{ inputs.push-post-state }}" | grep -q .; then
+          echo "Destination S3 path '${{ inputs.push-post-state }}' already exists. Exiting."
+          exit 1
+        fi
     - name: Copy Post-State to S3
       if: ${{ inputs.push-post-state != '' }}
       shell: nix develop --command bash -x {0}
