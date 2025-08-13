@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -231,7 +231,6 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				snowCtx.ValidatorState,
 				tt.txVerifier,
 				tt.mempool,
-				nil,
 				false,
 				tt.appSenderFunc(ctrl),
 				nil,

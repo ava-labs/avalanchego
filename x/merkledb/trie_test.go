@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package merkledb
@@ -7,10 +7,10 @@ import (
 	"context"
 	"math/rand"
 	"strconv"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -1226,18 +1226,16 @@ func Test_Trie_ConcurrentNewViewAndCommit(t *testing.T) {
 	)
 	require.NoError(err)
 
-	var wg sync.WaitGroup
-	defer wg.Wait()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		require.NoError(newTrie.CommitToDB(context.Background()))
-	}()
+	eg := errgroup.Group{}
+	eg.Go(func() error {
+		return newTrie.CommitToDB(context.Background())
+	})
 
 	view, err := newTrie.NewView(context.Background(), ViewChanges{})
 	require.NoError(err)
 	require.NotNil(view)
+
+	require.NoError(eg.Wait())
 }
 
 // Returns the path of the only child of this node.

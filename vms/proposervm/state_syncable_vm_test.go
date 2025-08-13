@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -46,7 +46,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 
 	// load innerVM expectations
 	innerVM.InitializeF = func(context.Context, *snow.Context, database.Database,
-		[]byte, []byte, []byte, chan<- common.Message,
+		[]byte, []byte, []byte,
 		[]*common.Fx, common.AppSender,
 	) error {
 		return nil
@@ -82,7 +82,6 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		ctx,
 		prefixdb.New([]byte{}, memdb.New()),
 		snowmantest.GenesisBytes,
-		nil,
 		nil,
 		nil,
 		nil,

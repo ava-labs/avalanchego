@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -36,8 +36,8 @@ type kubeCollectorConfig struct {
 	manifest     []byte
 }
 
-// DeployKubeCollectors deploys collectors of logs and metrics to a Kubernetes cluster.
-func DeployKubeCollectors(
+// deployKubeCollectors deploys collectors of logs and metrics to a Kubernetes cluster.
+func deployKubeCollectors(
 	ctx context.Context,
 	log logging.Logger,
 	configPath string,
@@ -45,7 +45,7 @@ func DeployKubeCollectors(
 	startMetricsCollector bool,
 	startLogsCollector bool,
 ) error {
-	if !(startMetricsCollector || startLogsCollector) {
+	if !startMetricsCollector && !startLogsCollector {
 		// Nothing to do
 		return nil
 	}

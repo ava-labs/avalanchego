@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package gconn
@@ -6,8 +6,10 @@ package gconn
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net"
+	"os"
 	"time"
 
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -48,7 +50,14 @@ func (c *Client) Read(p []byte) (int, error) {
 	copy(p, resp.Read)
 
 	if resp.Error != nil {
-		err = errors.New(*resp.Error)
+		switch resp.Error.ErrorCode {
+		case connpb.ErrorCode_ERROR_CODE_EOF:
+			err = io.EOF
+		case connpb.ErrorCode_ERROR_CODE_OS_ERR_DEADLINE_EXCEEDED:
+			err = fmt.Errorf("%w: %s", os.ErrDeadlineExceeded, resp.Error.Message)
+		default:
+			err = errors.New(resp.Error.Message)
+		}
 	}
 	return len(resp.Read), err
 }

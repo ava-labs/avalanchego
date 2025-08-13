@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package server
@@ -17,39 +17,27 @@ import (
 func TestRejectMiddleware(t *testing.T) {
 	type test struct {
 		name               string
-		handlerFunc        func(*require.Assertions) http.Handler
+		handler            http.Handler
 		state              snow.State
 		expectedStatusCode int
 	}
 
 	tests := []test{
 		{
-			name: "chain is state syncing",
-			handlerFunc: func(require *require.Assertions) http.Handler {
-				return http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-					require.Fail("shouldn't have called handler")
-				})
-			},
+			name:               "chain is state syncing",
 			state:              snow.StateSyncing,
 			expectedStatusCode: http.StatusServiceUnavailable,
 		},
 		{
-			name: "chain is bootstrapping",
-			handlerFunc: func(require *require.Assertions) http.Handler {
-				return http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
-					require.Fail("shouldn't have called handler")
-				})
-			},
+			name:               "chain is bootstrapping",
 			state:              snow.Bootstrapping,
 			expectedStatusCode: http.StatusServiceUnavailable,
 		},
 		{
 			name: "chain is done bootstrapping",
-			handlerFunc: func(*require.Assertions) http.Handler {
-				return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-					w.WriteHeader(http.StatusTeapot)
-				})
-			},
+			handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusTeapot)
+			}),
 			state:              snow.NormalOp,
 			expectedStatusCode: http.StatusTeapot,
 		},
@@ -65,10 +53,15 @@ func TestRejectMiddleware(t *testing.T) {
 				State: tt.state,
 			})
 
-			middleware := rejectMiddleware(tt.handlerFunc(require), ctx)
+			middleware := rejectMiddleware(tt.handler, ctx)
 			w := httptest.NewRecorder()
 			middleware.ServeHTTP(w, nil)
 			require.Equal(tt.expectedStatusCode, w.Code)
 		})
 	}
+}
+
+func TestHTTPHeaderRouteIsCanonical(t *testing.T) {
+	wantHeaderKey := http.CanonicalHeaderKey(HTTPHeaderRoute)
+	require.Equal(t, wantHeaderKey, HTTPHeaderRoute)
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tracker
@@ -71,7 +71,7 @@ func TestCPUTracker(t *testing.T) {
 
 	cumulative := cpuTracker.TotalUsage()
 	sum := node1Utilization + node2Utilization
-	require.Equal(sum, cumulative)
+	require.InDelta(sum, cumulative, 0)
 
 	mockUser.EXPECT().CPUUsage().Return(.5).Times(3)
 

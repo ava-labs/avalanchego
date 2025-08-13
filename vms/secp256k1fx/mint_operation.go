@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -32,10 +32,9 @@ func (op *MintOperation) Outs() []verify.State {
 }
 
 func (op *MintOperation) Verify() error {
-	switch {
-	case op == nil:
+	if op == nil {
 		return errNilMintOperation
-	default:
-		return verify.All(&op.MintInput, &op.MintOutput, &op.TransferOutput)
 	}
+
+	return verify.All(&op.MintInput, &op.MintOutput, &op.TransferOutput)
 }

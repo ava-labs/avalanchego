@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package enginetest
@@ -20,19 +20,19 @@ import (
 )
 
 var (
-	errInitialize         = errors.New("unexpectedly called Initialize")
-	errSetState           = errors.New("unexpectedly called SetState")
-	errShutdown           = errors.New("unexpectedly called Shutdown")
-	errCreateHandlers     = errors.New("unexpectedly called CreateHandlers")
-	errCreateHTTP2Handler = errors.New("unexpectedly called CreateHTTP2Handler")
-	errHealthCheck        = errors.New("unexpectedly called HealthCheck")
-	errConnected          = errors.New("unexpectedly called Connected")
-	errDisconnected       = errors.New("unexpectedly called Disconnected")
-	errVersion            = errors.New("unexpectedly called Version")
-	errAppRequest         = errors.New("unexpectedly called AppRequest")
-	errAppResponse        = errors.New("unexpectedly called AppResponse")
-	errAppRequestFailed   = errors.New("unexpectedly called AppRequestFailed")
-	errAppGossip          = errors.New("unexpectedly called AppGossip")
+	errInitialize       = errors.New("unexpectedly called Initialize")
+	errSetState         = errors.New("unexpectedly called SetState")
+	errShutdown         = errors.New("unexpectedly called Shutdown")
+	errCreateHandlers   = errors.New("unexpectedly called CreateHandlers")
+	errNewHTTPHandler   = errors.New("unexpectedly called NewHTTPHandler")
+	errHealthCheck      = errors.New("unexpectedly called HealthCheck")
+	errConnected        = errors.New("unexpectedly called Connected")
+	errDisconnected     = errors.New("unexpectedly called Disconnected")
+	errVersion          = errors.New("unexpectedly called Version")
+	errAppRequest       = errors.New("unexpectedly called AppRequest")
+	errAppResponse      = errors.New("unexpectedly called AppResponse")
+	errAppRequestFailed = errors.New("unexpectedly called AppRequestFailed")
+	errAppGossip        = errors.New("unexpectedly called AppGossip")
 
 	_ common.VM = (*VM)(nil)
 )
@@ -42,23 +42,32 @@ type VM struct {
 	T *testing.T
 
 	CantInitialize, CantSetState,
-	CantShutdown, CantCreateHandlers, CantCreateHTTP2Handler,
+	CantShutdown, CantCreateHandlers, CantNewHTTPHandler,
 	CantHealthCheck, CantConnected, CantDisconnected, CantVersion,
 	CantAppRequest, CantAppResponse, CantAppGossip, CantAppRequestFailed bool
 
-	InitializeF         func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, msgChan chan<- common.Message, fxs []*common.Fx, appSender common.AppSender) error
-	SetStateF           func(ctx context.Context, state snow.State) error
-	ShutdownF           func(context.Context) error
-	CreateHandlersF     func(context.Context) (map[string]http.Handler, error)
-	CreateHTTP2HandlerF func(context.Context) (http.Handler, error)
-	ConnectedF          func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
-	DisconnectedF       func(ctx context.Context, nodeID ids.NodeID) error
-	HealthCheckF        func(context.Context) (interface{}, error)
-	AppRequestF         func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
-	AppResponseF        func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
-	AppGossipF          func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
-	AppRequestFailedF   func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error
-	VersionF            func(context.Context) (string, error)
+	InitializeF       func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, fxs []*common.Fx, appSender common.AppSender) error
+	SetStateF         func(ctx context.Context, state snow.State) error
+	ShutdownF         func(context.Context) error
+	CreateHandlersF   func(context.Context) (map[string]http.Handler, error)
+	NewHTTPHandlerF   func(context.Context) (http.Handler, error)
+	ConnectedF        func(ctx context.Context, nodeID ids.NodeID, nodeVersion *version.Application) error
+	DisconnectedF     func(ctx context.Context, nodeID ids.NodeID) error
+	HealthCheckF      func(context.Context) (interface{}, error)
+	AppRequestF       func(ctx context.Context, nodeID ids.NodeID, requestID uint32, deadline time.Time, msg []byte) error
+	AppResponseF      func(ctx context.Context, nodeID ids.NodeID, requestID uint32, msg []byte) error
+	AppGossipF        func(ctx context.Context, nodeID ids.NodeID, msg []byte) error
+	AppRequestFailedF func(ctx context.Context, nodeID ids.NodeID, requestID uint32, appErr *common.AppError) error
+	VersionF          func(context.Context) (string, error)
+	WaitForEventF     common.Subscription
+}
+
+func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
+	if vm.WaitForEventF != nil {
+		return vm.WaitForEventF(ctx)
+	}
+	<-ctx.Done()
+	return 0, ctx.Err()
 }
 
 func (vm *VM) Default(cant bool) {
@@ -66,6 +75,7 @@ func (vm *VM) Default(cant bool) {
 	vm.CantSetState = cant
 	vm.CantShutdown = cant
 	vm.CantCreateHandlers = cant
+	vm.CantNewHTTPHandler = cant
 	vm.CantHealthCheck = cant
 	vm.CantAppRequest = cant
 	vm.CantAppRequestFailed = cant
@@ -83,7 +93,6 @@ func (vm *VM) Initialize(
 	genesisBytes,
 	upgradeBytes,
 	configBytes []byte,
-	msgChan chan<- common.Message,
 	fxs []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -95,7 +104,6 @@ func (vm *VM) Initialize(
 			genesisBytes,
 			upgradeBytes,
 			configBytes,
-			msgChan,
 			fxs,
 			appSender,
 		)
@@ -134,7 +142,7 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 
 func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
 	if vm.CreateHandlersF != nil {
-		return vm.CreateHandlersF(ctx)
+		return vm.CreateHandlers(ctx)
 	}
 	if vm.CantCreateHandlers && vm.T != nil {
 		require.FailNow(vm.T, errCreateHandlers.Error())
@@ -142,14 +150,13 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	return nil, nil
 }
 
-func (vm *VM) CreateHTTP2Handler(ctx context.Context) (http.Handler, error) {
-	if vm.CreateHandlersF != nil {
-		return vm.CreateHTTP2HandlerF(ctx)
+func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
+	if vm.NewHTTPHandlerF != nil {
+		return vm.NewHTTPHandlerF(ctx)
 	}
-	if vm.CantCreateHTTP2Handler && vm.T != nil {
-		require.FailNow(vm.T, errCreateHTTP2Handler.Error())
+	if vm.CantNewHTTPHandler && vm.T != nil {
+		require.FailNow(vm.T, errNewHTTPHandler.Error())
 	}
-
 	return nil, nil
 }
 

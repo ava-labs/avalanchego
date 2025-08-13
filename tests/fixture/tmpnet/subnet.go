@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tmpnet
@@ -252,7 +252,7 @@ func (s *Subnet) HasChainConfig() bool {
 func WaitForActiveValidators(
 	ctx context.Context,
 	log logging.Logger,
-	pChainClient platformvm.Client,
+	pChainClient *platformvm.Client,
 	subnet *Subnet,
 ) error {
 	ticker := time.NewTicker(DefaultPollingInterval)

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package greader
@@ -30,8 +30,14 @@ func (s *Server) Read(_ context.Context, req *readerpb.ReadRequest) (*readerpb.R
 		Read: buf[:n],
 	}
 	if err != nil {
-		errStr := err.Error()
-		resp.Error = &errStr
+		resp.Error = &readerpb.Error{
+			Message: err.Error(),
+		}
+
+		// Sentinel errors must be special-cased through an error code
+		if err == io.EOF {
+			resp.Error.ErrorCode = readerpb.ErrorCode_ERROR_CODE_EOF
+		}
 	}
 	return resp, nil
 }

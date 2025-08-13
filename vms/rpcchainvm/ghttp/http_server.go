@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ghttp
@@ -153,18 +153,17 @@ func (s *Server) Handle(ctx context.Context, req *httppb.HTTPRequest) (*httppb.H
 // HandleSimple handles http requests over http2 using a simple request response model.
 // Websockets are not supported.
 func (s *Server) HandleSimple(ctx context.Context, r *httppb.HandleSimpleHTTPRequest) (*httppb.HandleSimpleHTTPResponse, error) {
-	req, err := http.NewRequest(r.Method, r.Url, bytes.NewBuffer(r.Body))
+	req, err := http.NewRequestWithContext(ctx, r.Method, r.Url, bytes.NewBuffer(r.Body))
 	if err != nil {
 		return nil, err
 	}
 
-	grpcutils.SetHeaders(req.Header, r.Headers)
-
-	req = req.WithContext(ctx)
+	grpcutils.SetHeaders(req.Header, r.RequestHeaders)
 	req.RequestURI = r.Url
 	req.ContentLength = int64(len(r.Body))
 
 	w := newResponseWriter()
+	grpcutils.SetHeaders(w.Header(), r.ResponseHeaders)
 	s.handler.ServeHTTP(w, req)
 
 	resp := &httppb.HandleSimpleHTTPResponse{

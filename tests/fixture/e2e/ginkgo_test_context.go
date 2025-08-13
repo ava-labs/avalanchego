@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package e2e
@@ -15,6 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 )
+
+var _ tests.TestContext = (*GinkgoTestContext)(nil)
 
 type ginkgoWriteCloser struct{}
 
@@ -113,6 +115,10 @@ func (tc *GinkgoTestContext) DefaultContext() context.Context {
 // Helper simplifying use via an option of a timed context configured with the default timeout.
 func (tc *GinkgoTestContext) WithDefaultContext() common.Option {
 	return tests.WithDefaultContext(tc)
+}
+
+func (*GinkgoTestContext) GetDefaultContextParent() context.Context {
+	return context.Background()
 }
 
 // Re-implementation of testify/require.Eventually that is compatible with ginkgo. testify's

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -36,10 +36,9 @@ func (cr *Credential) MarshalJSON() ([]byte, error) {
 }
 
 func (cr *Credential) Verify() error {
-	switch {
-	case cr == nil:
+	if cr == nil {
 		return ErrNilCredential
-	default:
-		return nil
 	}
+
+	return nil
 }

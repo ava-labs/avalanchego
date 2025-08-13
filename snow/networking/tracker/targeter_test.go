@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tracker
@@ -39,8 +39,8 @@ func TestNewTargeter(t *testing.T) {
 	targeter := targeterIntf.(*targeter)
 	require.Equal(vdrs, targeter.vdrs)
 	require.Equal(tracker, targeter.tracker)
-	require.Equal(config.MaxNonVdrUsage, targeter.maxNonVdrUsage)
-	require.Equal(config.MaxNonVdrNodeUsage, targeter.maxNonVdrNodeUsage)
+	require.InDelta(config.MaxNonVdrUsage, targeter.maxNonVdrUsage, 0)
+	require.InDelta(config.MaxNonVdrNodeUsage, targeter.maxNonVdrNodeUsage, 0)
 }
 
 func TestTarget(t *testing.T) {
@@ -123,7 +123,7 @@ func TestTarget(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			tt.setup()
 			target := targeter.TargetUsage(tt.nodeID)
-			require.Equal(t, tt.expectedTarget, target)
+			require.InDelta(t, tt.expectedTarget, target, 0)
 		})
 	}
 }
