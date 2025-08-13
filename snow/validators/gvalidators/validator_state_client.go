@@ -6,15 +6,21 @@ package gvalidators
 import (
 	"context"
 	"errors"
+	"maps"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/validatorstate"
 )
+
+const validatorSetsCacheSize = 128
 
 var (
 	_                             validators.State = (*Client)(nil)
@@ -23,10 +29,18 @@ var (
 
 type Client struct {
 	client pb.ValidatorStateClient
+
+	// Maps caches for each subnet.
+	// Key: Subnet ID
+	// Value: cache mapping height -> validator set map
+	caches map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]
 }
 
 func NewClient(client pb.ValidatorStateClient) *Client {
-	return &Client{client: client}
+	return &Client{
+		client: client,
+		caches: make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
+	}
 }
 
 func (c *Client) GetMinimumHeight(ctx context.Context) (uint64, error) {
@@ -60,6 +74,12 @@ func (c *Client) GetValidatorSet(
 	height uint64,
 	subnetID ids.ID,
 ) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	validatorSetsCache := c.getValidatorSetCache(subnetID)
+
+	if validatorSet, ok := validatorSetsCache.Get(height); ok {
+		return maps.Clone(validatorSet), nil
+	}
+
 	resp, err := c.client.GetValidatorSet(ctx, &pb.GetValidatorSetRequest{
 		Height:   height,
 		SubnetId: subnetID[:],
@@ -92,6 +112,10 @@ func (c *Client) GetValidatorSet(
 			Weight:    validator.Weight,
 		}
 	}
+
+	// cache the validator set
+	validatorSetsCache.Put(height, maps.Clone(vdrs))
+
 	return vdrs, nil
 }
 
@@ -141,4 +165,20 @@ func (c *Client) GetCurrentValidatorSet(
 		}
 	}
 	return vdrs, resp.GetCurrentHeight(), nil
+}
+
+func (c *Client) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput] {
+	// Don't cache the primary network
+	if subnetID != constants.PrimaryNetworkID {
+		return &cache.Empty[uint64, map[ids.NodeID]*validators.GetValidatorOutput]{}
+	}
+
+	validatorSetsCache, exists := c.caches[subnetID]
+	if exists {
+		return validatorSetsCache
+	}
+
+	validatorSetsCache = lru.NewCache[uint64, map[ids.NodeID]*validators.GetValidatorOutput](validatorSetsCacheSize)
+	c.caches[subnetID] = validatorSetsCache
+	return validatorSetsCache
 }
