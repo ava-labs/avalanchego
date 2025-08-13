@@ -3,7 +3,7 @@ description: Analyze and compare metrics across multiple jobs/runs for performan
 
 inputs:
   job_names:
-    description: 'Comma-separated list of job names to analyze (e.g., "e2e_kube,load_test")'
+    description: 'Comma-separated list of job names to analyze (e.g., "Run load test on self-hosted runners,Run firewood load test on self-hosted runners")'
     required: true
   queries:
     description: |
@@ -68,243 +68,82 @@ runs:
 
           const CURRENT_RUN_ID = context.runId.toString();
           const ACTION_PATH = process.env.GITHUB_ACTION_PATH;
+          const targetJobNames = '${{ inputs.job_names }}'.split(',').map(name => name.trim());
 
-          console.log('=== METRIC ANALYSIS DEBUG INFO ===');
-          console.log(`Current Run ID: ${CURRENT_RUN_ID}`);
-          console.log(`Action Path: ${ACTION_PATH}`);
-          console.log(`Repository: ${context.repo.owner}/${context.repo.repo}`);
-          console.log(`Run Attempt: ${context.runAttempt || 'unknown'}`);
-
-          // Parse job names from input (these should be job keys like 'firewood_load_test')
-          const targetJobKeys = '${{ inputs.job_names }}'.split(',').map(name => name.trim());
-          console.log(`\n=== TARGET JOB KEYS ===`);
-          console.log(`Input job_names: "${{ inputs.job_names }}"`);
-          console.log(`Parsed target job keys: [${targetJobKeys.map(k => `"${k}"`).join(', ')}]`);
-
-          // Get jobs from GitHub API
-          console.log(`\n=== FETCHING WORKFLOW JOBS ===`);
+          // Get workflow jobs and artifacts
           const { data: workflowJobs } = await github.rest.actions.listJobsForWorkflowRun({
             owner: context.repo.owner,
             repo: context.repo.repo,
             run_id: CURRENT_RUN_ID
           });
 
-          console.log(`Found ${workflowJobs.jobs.length} jobs in workflow run:`);
-          workflowJobs.jobs.forEach((job, index) => {
-            console.log(`  ${index + 1}. Job ID: ${job.id}`);
-            console.log(`     Name: "${job.name}"`);
-            console.log(`     Status: ${job.status}`);
-            console.log(`     Conclusion: ${job.conclusion}`);
-            console.log(`     Started: ${job.started_at || 'not started'}`);
-            console.log(`     Completed: ${job.completed_at || 'not completed'}`);
-            console.log(`     Runner: ${job.runner_name || 'unknown'}`);
-            console.log('');
-          });
-
-          // Get artifacts to verify which jobs have monitoring metadata
-          console.log(`=== FETCHING WORKFLOW ARTIFACTS ===`);
           const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
             owner: context.repo.owner,
             repo: context.repo.repo,
             run_id: CURRENT_RUN_ID
           });
 
-          console.log(`Found ${artifacts.artifacts.length} artifacts:`);
-          artifacts.artifacts.forEach((artifact, index) => {
-            console.log(`  ${index + 1}. "${artifact.name}" (${artifact.size_in_bytes} bytes)`);
-          });
-
-          // Check for run metadata artifacts for each target job key
-          console.log(`\n=== CHECKING FOR RUN METADATA ARTIFACTS ===`);
-          const metadataArtifacts = new Map();
-          for (const jobKey of targetJobKeys) {
-            const expectedArtifactName = `run-metadata-${jobKey}-${CURRENT_RUN_ID}`;
-            const metadataArtifact = artifacts.artifacts.find(artifact =>
-              artifact.name === expectedArtifactName
-            );
-
-            if (metadataArtifact) {
-              metadataArtifacts.set(jobKey, metadataArtifact);
-              console.log(`✓ Found metadata for job key "${jobKey}": ${metadataArtifact.name}`);
-            } else {
-              console.log(`✗ Missing metadata for job key "${jobKey}": expected "${expectedArtifactName}"`);
+          // Extract job keys from metadata artifacts
+          const jobKeyMap = new Map(); // job name -> job key
+          for (const artifact of artifacts.artifacts) {
+            const match = artifact.name.match(/^run-metadata-(.+)-\d+$/);
+            if (match) {
+              const jobKey = match[1];
+              // Find the job that created this metadata
+              const job = workflowJobs.jobs.find(j =>
+                j.conclusion === 'success' || j.conclusion === 'failure'
+              );
+              if (job) {
+                jobKeyMap.set(job.name, jobKey);
+              }
             }
           }
 
-          console.log(`\nMetadata artifacts found: ${metadataArtifacts.size}/${targetJobKeys.length}`);
-
-          // Find jobs by job key using context.job from the workflow
-          console.log(`\n=== MATCHING JOBS TO TARGET KEYS ===`);
+          // Match jobs by name and get their job keys
           const foundJobs = [];
-
-          for (const targetJobKey of targetJobKeys) {
-            console.log(`\nLooking for job with key: "${targetJobKey}"`);
-
-            // The job key corresponds to the YAML key in the workflow
-            // Unfortunately, GitHub API doesn't directly expose the job key, only the display name
-            // We need to use heuristics or rely on the metadata artifact existence
-
-            let matchedJob = null;
-
-            // Strategy 1: Try exact match with job name (if job name equals job key)
-            matchedJob = workflowJobs.jobs.find(job => job.name === targetJobKey);
+          for (const targetJobName of targetJobNames) {
+            const matchedJob = workflowJobs.jobs.find(job => job.name === targetJobName);
             if (matchedJob) {
-              console.log(`  ✓ Strategy 1 (exact name match): Found "${matchedJob.name}"`);
-            } else {
-              console.log(`  ✗ Strategy 1 (exact name match): No job with name "${targetJobKey}"`);
-            }
-
-            // Strategy 2: Try fuzzy matching (convert underscores to spaces)
-            if (!matchedJob) {
-              const fuzzyName = targetJobKey.replace(/_/g, ' ');
-              matchedJob = workflowJobs.jobs.find(job =>
-                job.name.toLowerCase().includes(fuzzyName.toLowerCase())
-              );
-              if (matchedJob) {
-                console.log(`  ✓ Strategy 2 (fuzzy match): Found "${matchedJob.name}" for "${fuzzyName}"`);
-              } else {
-                console.log(`  ✗ Strategy 2 (fuzzy match): No job containing "${fuzzyName}"`);
-              }
-            }
-
-            // Strategy 3: If we have metadata artifact, find the most likely job
-            if (!matchedJob && metadataArtifacts.has(targetJobKey)) {
-              console.log(`  → Strategy 3: Metadata exists, trying to infer job...`);
-
-              // Look for jobs that could have created this metadata
-              // Usually these are jobs that ran the run-monitored-tmpnet-cmd action
-              const candidateJobs = workflowJobs.jobs.filter(job =>
-                job.conclusion === 'success' || job.conclusion === 'failure'
-              );
-
-              if (candidateJobs.length === 1) {
-                matchedJob = candidateJobs[0];
-                console.log(`  ✓ Strategy 3 (single candidate): Assuming "${matchedJob.name}"`);
-              } else if (candidateJobs.length > 1) {
-                // Try to find the most likely candidate based on naming similarity
-                const bestCandidate = candidateJobs.find(job => {
-                  const jobWords = job.name.toLowerCase().split(/[\s_-]+/);
-                  const keyWords = targetJobKey.toLowerCase().split(/[_-]+/);
-                  return keyWords.some(keyWord => jobWords.includes(keyWord));
-                });
-
-                if (bestCandidate) {
-                  matchedJob = bestCandidate;
-                  console.log(`  ✓ Strategy 3 (best candidate): Found "${matchedJob.name}"`);
-                } else {
-                  console.log(`  ✗ Strategy 3: Multiple candidates, can't determine best match`);
-                  console.log(`    Candidates: ${candidateJobs.map(j => `"${j.name}"`).join(', ')}`);
-                }
-              }
-            }
-
-            if (matchedJob) {
+              const jobKey = jobKeyMap.get(matchedJob.name);
               foundJobs.push({
                 ...matchedJob,
-                job_key: targetJobKey,
-                has_metadata: metadataArtifacts.has(targetJobKey)
+                job_key: jobKey || matchedJob.name // fallback to name if no job key found
               });
-              console.log(`  → MATCHED: "${matchedJob.name}" -> job_key: "${targetJobKey}"`);
-            } else {
-              console.log(`  → NOT FOUND: No job found for job_key: "${targetJobKey}"`);
             }
           }
 
-          console.log(`\n=== MATCHED JOBS SUMMARY ===`);
-          console.log(`Successfully matched: ${foundJobs.length}/${targetJobKeys.length} jobs`);
-          foundJobs.forEach((job, index) => {
-            console.log(`  ${index + 1}. "${job.name}"`);
-            console.log(`     Job Key: ${job.job_key}`);
-            console.log(`     Status: ${job.status}`);
-            console.log(`     Conclusion: ${job.conclusion}`);
-            console.log(`     Has Metadata: ${job.has_metadata ? '✓' : '✗'}`);
-            console.log(`     Started: ${job.started_at || 'not started'}`);
-            console.log(`     Completed: ${job.completed_at || 'not completed'}`);
-            console.log('');
-          });
-
           if (foundJobs.length === 0) {
-            console.log(`\n=== ERROR: NO JOBS FOUND ===`);
-            console.log(`Target job keys: [${targetJobKeys.map(k => `"${k}"`).join(', ')}]`);
-            console.log(`Available job names in workflow:`);
-            workflowJobs.jobs.forEach(job => console.log(`  - "${job.name}"`));
-            console.log(`\nTroubleshooting tips:`);
-            console.log(`1. Verify job keys match the YAML keys in your workflow file`);
-            console.log(`2. Check if jobs ran with the run-monitored-tmpnet-cmd action`);
-            console.log(`3. Ensure jobs completed (success or failure) before running analysis`);
-            throw new Error(`No target jobs found. Looking for job keys: ${targetJobKeys.join(', ')}`);
+            const availableJobs = workflowJobs.jobs.map(job => `"${job.name}"`).join(', ');
+            throw new Error(`No jobs found. Available jobs: ${availableJobs}`);
           }
 
-          // Parse queries
-          console.log(`\n=== PARSING QUERIES ===`);
-          let queries;
-          try {
-            const queriesInput = `${{ inputs.queries }}`;
-            console.log(`Raw queries input length: ${queriesInput.length} characters`);
-            console.log(`First 200 chars: ${queriesInput.substring(0, 200)}${queriesInput.length > 200 ? '...' : ''}`);
-
-            queries = JSON.parse(queriesInput);
-            console.log(`✓ Successfully parsed ${queries.length} queries`);
-            queries.forEach((query, index) => {
-              console.log(`  ${index + 1}. ${query.metric_name || 'Unnamed'}: ${query.query.substring(0, 50)}${query.query.length > 50 ? '...' : ''}`);
-            });
-          } catch (error) {
-            console.log(`✗ Failed to parse queries: ${error.message}`);
-            throw new Error(`Invalid queries format: ${error.message}`);
-          }
-
-          // Build runs from jobs
-          console.log(`\n=== BUILDING RUNS CONFIGURATION ===`);
+          // Parse queries and build runs
+          const queries = JSON.parse(`${{ inputs.queries }}`);
           const runs = [];
-          for (const job of foundJobs) {
-            console.log(`\nProcessing job: "${job.name}" (${job.job_key})`);
-            console.log(`  Status: ${job.status}, Conclusion: ${job.conclusion}`);
-            console.log(`  Started: ${job.started_at}`);
-            console.log(`  Completed: ${job.completed_at}`);
-            console.log(`  Has metadata: ${job.has_metadata}`);
 
+          for (const job of foundJobs) {
             if (job.conclusion === 'success' && job.started_at && job.completed_at) {
-              const runConfig = {
+              runs.push({
                 job_name: job.name,
                 name: job.name,
                 labels: {
                   gh_run_id: CURRENT_RUN_ID,
-                  gh_job_id: job.job_key,  // This is crucial - use the job key for metric matching
+                  gh_job_id: job.job_key,
                   gh_run_attempt: context.runAttempt?.toString() || "1",
                   gh_repo: context.repo.owner + "/" + context.repo.repo,
                   is_ephemeral_node: "false"
                 },
                 start_time: new Date(job.started_at).getTime(),
                 end_time: new Date(job.completed_at).getTime()
-              };
-
-              runs.push(runConfig);
-              console.log(`  ✓ Added to analysis`);
-              console.log(`    Labels: ${JSON.stringify(runConfig.labels, null, 6)}`);
-              console.log(`    Time range: ${new Date(runConfig.start_time).toISOString()} to ${new Date(runConfig.end_time).toISOString()}`);
-            } else {
-              console.log(`  ✗ Skipped: ${!job.conclusion || job.conclusion !== 'success' ? 'not successful' : ''} ${!job.started_at ? 'no start time' : ''} ${!job.completed_at ? 'no end time' : ''}`);
+              });
             }
           }
 
-          console.log(`\n=== FINAL CONFIGURATION ===`);
-          console.log(`Jobs processed: ${foundJobs.length}`);
-          console.log(`Runs for analysis: ${runs.length}`);
-
           if (runs.length === 0) {
-            console.log(`\n=== ERROR: NO SUCCESSFUL RUNS ===`);
-            console.log(`All matched jobs were filtered out. Reasons:`);
-            foundJobs.forEach(job => {
-              const reasons = [];
-              if (job.conclusion !== 'success') reasons.push(`conclusion: ${job.conclusion}`);
-              if (!job.started_at) reasons.push('no start time');
-              if (!job.completed_at) reasons.push('no end time');
-              console.log(`  - "${job.name}": ${reasons.join(', ')}`);
-            });
             throw new Error('No successful jobs found for analysis');
           }
 
-          // Build final config
+          // Write configuration
           const outputFile = `metric_analysis_${CURRENT_RUN_ID}.html`;
           const config = {
             queries: queries,
@@ -314,26 +153,11 @@ runs:
           };
 
           const configPath = path.join(ACTION_PATH, 'analysis_config.json');
-
-          console.log(`\nWriting config to: ${configPath}`);
-          console.log(`Output file will be: ${config.output_file}`);
-
-          // Write config with pretty printing for debugging
           fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
-
-          console.log(`✓ Configuration written successfully`);
-          console.log(`\n=== SUMMARY ===`);
-          console.log(`- Target job keys: ${targetJobKeys.length}`);
-          console.log(`- Jobs found: ${foundJobs.length}`);
-          console.log(`- Jobs with metadata: ${foundJobs.filter(j => j.has_metadata).length}`);
-          console.log(`- Successful runs: ${runs.length}`);
-          console.log(`- Queries to execute: ${queries.length}`);
 
           core.setOutput('config_path', configPath);
           core.setOutput('output_file', config.output_file);
           core.setOutput('jobs_analyzed', runs.map(r => r.name).join(','));
-          core.setOutput('jobs_found', foundJobs.length.toString());
-          core.setOutput('jobs_with_metadata', foundJobs.filter(j => j.has_metadata).length.toString());
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
