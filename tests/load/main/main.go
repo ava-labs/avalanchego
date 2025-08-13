@@ -7,7 +7,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"math"
 	"math/big"
 	"math/rand"
 	"os"
@@ -155,9 +154,10 @@ func newTokenContract(
 	}
 
 	var (
-		totalRecipients = float64(len(recipients) + 1)
-		recipientAmount = big.NewInt(int64(math.Pow10(18)))
-		totalSupply     = big.NewInt(int64(totalRecipients * math.Pow10(18)))
+		totalRecipients = int64(len(recipients) + 1)
+		// assumes that token has 18 decimals
+		recipientAmount = big.NewInt(1e18)
+		totalSupply     = big.NewInt(totalRecipients * 1e18)
 	)
 
 	_, tx, contract, err := contracts.DeployERC20(txOpts, client, totalSupply)
