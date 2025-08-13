@@ -102,9 +102,9 @@ func (s *SlidingWindowThrottler) rotate(t time.Time) {
 	}
 }
 
-func (s *SlidingWindowThrottler) setLimit(limit int) {
+func (s *SlidingWindowThrottler) setLimit(limit float64) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	s.limit = float64(limit)
+	s.limit = limit
 }
