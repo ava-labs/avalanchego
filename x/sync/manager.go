@@ -798,7 +798,7 @@ func findNextKey(
 		lastReceivedKey = keyChanges[len(keyChanges)-1].Key
 
 		// If the proof provides keys after the range end, we can return that the range was complete.
-		if compare(maybe.Some(lastReceivedKey), rangeEnd) > 0 {
+		if compareKeys(maybe.Some(lastReceivedKey), rangeEnd) > 0 {
 			return maybe.Nothing[[]byte](), nil
 		}
 	}
@@ -956,7 +956,7 @@ func findNextKey(
 }
 
 // compares two maybe.Maybe[[]byte] values, interpreting Nothing as greater than any value
-func compare(a, b maybe.Maybe[[]byte]) int {
+func compareKeys(a, b maybe.Maybe[[]byte]) int {
 	if a.IsNothing() && b.IsNothing() {
 		return 0
 	}
@@ -1066,7 +1066,7 @@ func (m *Manager) setError(err error) {
 //
 // Assumes [m.workLock] is not held.
 func (m *Manager) completeWorkItem(work *workItem, nextKey maybe.Maybe[[]byte], rootID ids.ID) {
-	if !maybe.Equal(nextKey, work.end, bytes.Equal) && !nextKey.IsNothing() {
+	if compareKeys(work.end, nextKey) == 1 && !nextKey.IsNothing() {
 		// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
 		m.enqueueWork(newWorkItem(work.localRootID, nextKey, work.end, work.priority, time.Now()))
 	}

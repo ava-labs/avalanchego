@@ -313,7 +313,7 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	// The exact next key must be after the requested range
 	nextKey, err := rangeProof.FindNextKey(ctx)
 	require.NoError(err)
-	require.GreaterOrEqual(compare(maybe.Some([]byte{0x20}), nextKey), 0)
+	require.GreaterOrEqual(compareKeys(maybe.Some([]byte{0x20}), nextKey), 0)
 
 	// Add another key afterward
 	require.NoError(db.Put([]byte{0x11, 0x15}, []byte{4}))
@@ -682,7 +682,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		if len(smallestDiffKey.Bytes()) > 0 {
 			actualNextKey = maybe.Some(smallestDiffKey.Bytes())
 		}
-		require.LessOrEqual(compare(gotFirstDiff, actualNextKey), 0)
+		require.LessOrEqual(compareKeys(gotFirstDiff, actualNextKey), 0)
 	}
 }
 
