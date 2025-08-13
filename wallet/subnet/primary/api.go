@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package primary
@@ -8,10 +8,10 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/coreth/ethclient"
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/client"
 
 	"github.com/ava-labs/avalanchego/api/info"
-	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"

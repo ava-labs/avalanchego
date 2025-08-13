@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tests
@@ -30,6 +30,9 @@ type TestContext interface {
 	ContextWithTimeout(duration time.Duration) context.Context
 	DefaultContext() context.Context
 	WithDefaultContext() common.Option
+
+	// The parent context to use as the parent of default contexts
+	GetDefaultContextParent() context.Context
 
 	// Ensures compatibility with require.Eventually
 	Eventually(condition func() bool, waitFor time.Duration, tick time.Duration, msg string)
