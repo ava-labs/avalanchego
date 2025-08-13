@@ -250,9 +250,7 @@ func TestNewDynamicThrottlerHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			if len(tt.validatorSets) != len(tt.requests) {
-				require.Fail("test vectors must be of same length")
-			}
+			require.Len(tt.validatorSets, len(tt.requests))
 
 			validatorSet := &testValidatorSet{}
 			handler := NewDynamicThrottlerHandler(
