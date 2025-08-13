@@ -13,6 +13,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNewTxWithoutPredicate(t *testing.T) {
+	require := require.New(t)
+
+	// Test creating a transaction without any predicate options
+	tx := NewTx(
+		big.NewInt(1),           // chainID
+		0,                       // nonce
+		nil,                     // to
+		21000,                   // gas
+		big.NewInt(20000000000), // gasFeeCap
+		big.NewInt(1000000000),  // gasTipCap
+		big.NewInt(0),           // value
+		[]byte{},                // data
+		types.AccessList{},      // accessList
+		// No options provided
+	)
+
+	// Verify transaction was created
+	require.NotNil(tx)
+
+	// Extract access list from transaction
+	accessList := tx.AccessList()
+	require.Len(accessList, 0) // No predicate, so no access list entries
+}
 func TestNewTxWithPredicate(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -68,7 +92,7 @@ func TestNewTxWithPredicate(t *testing.T) {
 				tt.predicateBytes[i] = byte(i + 1)
 			}
 
-			// Create transaction with predicate
+			// Create transaction with predicate using functional options
 			tx := NewTx(
 				big.NewInt(1),           // chainID
 				0,                       // nonce
@@ -79,8 +103,7 @@ func TestNewTxWithPredicate(t *testing.T) {
 				big.NewInt(0),           // value
 				[]byte{},                // data
 				types.AccessList{},      // accessList
-				tt.predicateAddress,     // predicateAddress
-				tt.predicateBytes,       // predicateBytes
+				WithPredicate(tt.predicateAddress, tt.predicateBytes),
 			)
 
 			// Verify transaction was created
@@ -139,8 +162,7 @@ func TestNewTxWithExistingAccessList(t *testing.T) {
 		big.NewInt(0),           // value
 		[]byte{},                // data
 		existingAccessList,      // accessList
-		predicateAddress,        // predicateAddress
-		predicateBytes,          // predicateBytes
+		WithPredicate(predicateAddress, predicateBytes),
 	)
 
 	// Verify transaction was created
@@ -211,8 +233,7 @@ func TestNewTxPredicateEncoding(t *testing.T) {
 				big.NewInt(0),           // value
 				[]byte{},                // data
 				types.AccessList{},      // accessList
-				common.Address{},        // predicateAddress
-				tc.predicateBytes,       // predicateBytes
+				WithPredicate(common.Address{}, tc.predicateBytes),
 			)
 
 			accessList := tx.AccessList()
