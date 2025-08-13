@@ -157,7 +157,7 @@ func TestBlockResultsZeroValue(t *testing.T) {
 	result, ok = results.Get(common.Hash{1}, common.Address{2})
 	require.True(ok)
 	require.Equal(set.NewBits(1, 2, 3), result)
-	require.Equal(1, len(results.TxResults))
+	require.Len(results.TxResults, 1)
 }
 
 func TestBlockResultsNilResultsBytes(t *testing.T) {

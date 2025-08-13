@@ -7,10 +7,11 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 )
 
 func TestNewTxWithoutPredicate(t *testing.T) {
@@ -35,8 +36,9 @@ func TestNewTxWithoutPredicate(t *testing.T) {
 
 	// Extract access list from transaction
 	accessList := tx.AccessList()
-	require.Len(accessList, 0) // No predicate, so no access list entries
+	require.Empty(accessList) // No predicate, so no access list entries
 }
+
 func TestNewTxWithPredicate(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -217,7 +219,7 @@ func TestNewTxPredicateEncoding(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(_ *testing.T) {
 			// Initialize predicate bytes with deterministic values
 			for i := range tc.predicateBytes {
 				tc.predicateBytes[i] = byte(i + 1)
