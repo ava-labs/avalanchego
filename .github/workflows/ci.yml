@@ -338,7 +338,17 @@ jobs:
       - name: Metric analysis
         uses: ./.github/actions/metric-analysis
         with:
-          job_names: "Run firewood load test on self-hosted runners,Run load test on self-hosted runners"
+          jobs: |
+            [
+              {
+                "name": "Run load test on self-hosted runners",
+                "key": "load_test"
+              },
+              {
+                "name": "Run firewood load test on self-hosted runners",
+                "key": "firewood_load_test"
+              }
+            ]
           queries: |
             [
               {

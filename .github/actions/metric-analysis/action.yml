@@ -2,8 +2,26 @@ name: Metric Analysis
 description: Analyze and compare metrics across multiple jobs/runs for performance evaluation
 
 inputs:
-  job_names:
-    description: 'Comma-separated list of job names to analyze (e.g., "Run load test on self-hosted runners,Run firewood load test on self-hosted runners")'
+  jobs:
+    description: |
+      JSON array of job objects to analyze.
+
+      Each job object must have:
+      - name (required, string): Exact job name as shown in GitHub Actions
+      - key (required, string): Job key used in workflow YAML and monitoring
+
+      Example:
+        jobs: |
+          [
+            {
+              "name": "Run load test on self-hosted runners",
+              "key": "load_test"
+            },
+            {
+              "name": "Run firewood load test on self-hosted runners",
+              "key": "firewood_load_test"
+            }
+          ]
     required: true
   queries:
     description: |
@@ -68,46 +86,25 @@ runs:
 
           const CURRENT_RUN_ID = context.runId.toString();
           const ACTION_PATH = process.env.GITHUB_ACTION_PATH;
-          const targetJobNames = '${{ inputs.job_names }}'.split(',').map(name => name.trim());
 
-          // Get workflow jobs and artifacts
+          // Parse job specifications
+          const targetJobs = JSON.parse(`${{ inputs.jobs }}`);
+
+          // Get workflow jobs
           const { data: workflowJobs } = await github.rest.actions.listJobsForWorkflowRun({
             owner: context.repo.owner,
             repo: context.repo.repo,
             run_id: CURRENT_RUN_ID
           });
 
-          const { data: artifacts } = await github.rest.actions.listWorkflowRunArtifacts({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            run_id: CURRENT_RUN_ID
-          });
-
-          // Extract job keys from metadata artifacts
-          const jobKeyMap = new Map(); // job name -> job key
-          for (const artifact of artifacts.artifacts) {
-            const match = artifact.name.match(/^run-metadata-(.+)-\d+$/);
-            if (match) {
-              const jobKey = match[1];
-              // Find the job that created this metadata
-              const job = workflowJobs.jobs.find(j =>
-                j.conclusion === 'success' || j.conclusion === 'failure'
-              );
-              if (job) {
-                jobKeyMap.set(job.name, jobKey);
-              }
-            }
-          }
-
-          // Match jobs by name and get their job keys
+          // Simple exact matching by job name
           const foundJobs = [];
-          for (const targetJobName of targetJobNames) {
-            const matchedJob = workflowJobs.jobs.find(job => job.name === targetJobName);
+          for (const targetJob of targetJobs) {
+            const matchedJob = workflowJobs.jobs.find(job => job.name === targetJob.name);
             if (matchedJob) {
-              const jobKey = jobKeyMap.get(matchedJob.name);
               foundJobs.push({
                 ...matchedJob,
-                job_key: jobKey || matchedJob.name // fallback to name if no job key found
+                job_key: targetJob.key
               });
             }
           }
@@ -128,7 +125,7 @@ runs:
                 name: job.name,
                 labels: {
                   gh_run_id: CURRENT_RUN_ID,
-                  gh_job_id: job.job_key,
+                  gh_job_id: job.job_key, // Use the provided job key
                   gh_run_attempt: context.runAttempt?.toString() || "1",
                   gh_repo: context.repo.owner + "/" + context.repo.repo,
                   is_ephemeral_node: "false"
