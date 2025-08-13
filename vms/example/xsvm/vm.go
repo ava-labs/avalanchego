@@ -76,7 +76,7 @@ func (vm *VM) Initialize(
 		chainContext.Log,
 		appSender,
 		chainContext.ValidatorState,
-		ids.Empty,
+		chainContext.SubnetID,
 		time.Second,
 		metrics,
 		"",
