@@ -24,7 +24,7 @@ on:
         description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
         required: false
         default: ubuntu-latest
-      push-post-state-dir:
+      push-post-state:
         description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
         default: ''
 
@@ -85,7 +85,7 @@ jobs:
           prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           push-github-action-benchmark: ${{ github.event_name == 'schedule' }}
-          aws-role: ${{ github.event.inputs.push-post-state-dir == '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-role: ${{ github.event.inputs.push-post-state == '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: 'us-east-2'
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          push-post-state-dir: ${{ github.event.inputs.push-post-state-dir }}
+          push-post-state: ${{ github.event.inputs.push-post-state }}
