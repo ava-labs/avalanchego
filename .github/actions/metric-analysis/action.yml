@@ -1,0 +1,186 @@
+name: Metric Analysis
+description: Analyze and compare metrics across multiple jobs/runs for performance evaluation
+
+inputs:
+  jobs:
+    description: |
+      JSON array of job objects to analyze.
+
+      Each job object must have:
+      - name (required, string): Exact job name as shown in GitHub Actions
+      - key (required, string): Job key used in workflow YAML and monitoring
+
+      Example:
+        jobs: |
+          [
+            {
+              "name": "Run load test on self-hosted runners",
+              "key": "load_test"
+            },
+            {
+              "name": "Run firewood load test on self-hosted runners",
+              "key": "firewood_load_test"
+            }
+          ]
+    required: true
+  queries:
+    description: |
+      JSON array of query objects for metric analysis.
+
+      Each query object must have:
+      - query (required, string): Prometheus query expression
+      - metric_name (required, string): Display name for the metric
+      - y_axis_label (required, string): Y-axis label for the chart
+      - x_axis_label (optional, string): X-axis label (defaults to 'Time')
+
+      NOTE: When using quotes in Prometheus queries (e.g., {chain="C"}),
+      you must escape them as \\\" in the JSON string.
+
+      Example:
+        queries: |
+          [
+            {
+              "query": "rate(http_requests_total[5m])",
+              "metric_name": "HTTP Request Rate",
+              "y_axis_label": "Requests/sec",
+              "x_axis_label": "Time"
+            },
+            {
+              "query": "sum(rate(metric{label=\\\"value\\\"}[1m]))",
+              "metric_name": "Example with Escaped Quotes",
+              "y_axis_label": "Rate"
+            }
+          ]
+    required: true
+  dashboard_title:
+    description: 'Title for the analysis dashboard'
+    default: 'Metric Analysis'
+  prometheus_url:
+    description: 'Prometheus server URL'
+    default: 'https://prometheus-poc.avax-dev.network'
+  prometheus_username:
+    required: true
+  prometheus_password:
+    required: true
+  step_size:
+    description: 'Prometheus query step size'
+    default: '15s'
+  timezone:
+    description: 'Display timezone'
+    default: 'US/Eastern'
+  github_token:
+    description: 'GitHub token'
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Build configuration
+      id: build-config
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github_token }}
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+
+          const CURRENT_RUN_ID = context.runId.toString();
+          const ACTION_PATH = process.env.GITHUB_ACTION_PATH;
+
+          // Parse job specifications
+          const targetJobs = JSON.parse(`${{ inputs.jobs }}`);
+
+          // Get workflow jobs
+          const { data: workflowJobs } = await github.rest.actions.listJobsForWorkflowRun({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            run_id: CURRENT_RUN_ID
+          });
+
+          // Simple exact matching by job name
+          const foundJobs = [];
+          for (const targetJob of targetJobs) {
+            const matchedJob = workflowJobs.jobs.find(job => job.name === targetJob.name);
+            if (matchedJob) {
+              foundJobs.push({
+                ...matchedJob,
+                job_key: targetJob.key
+              });
+            }
+          }
+
+          if (foundJobs.length === 0) {
+            const availableJobs = workflowJobs.jobs.map(job => `"${job.name}"`).join(', ');
+            throw new Error(`No jobs found. Available jobs: ${availableJobs}`);
+          }
+
+          // Parse queries and build runs
+          const queries = JSON.parse(`${{ inputs.queries }}`);
+          const runs = [];
+
+          for (const job of foundJobs) {
+            if (job.conclusion === 'success' && job.started_at && job.completed_at) {
+              runs.push({
+                job_name: job.name,
+                name: job.name,
+                labels: {
+                  gh_run_id: CURRENT_RUN_ID,
+                  gh_job_id: job.job_key, // Use the provided job key
+                  gh_run_attempt: context.runAttempt?.toString() || "1",
+                  gh_repo: context.repo.owner + "/" + context.repo.repo,
+                  is_ephemeral_node: "false"
+                },
+                start_time: new Date(job.started_at).getTime(),
+                end_time: new Date(job.completed_at).getTime()
+              });
+            }
+          }
+
+          if (runs.length === 0) {
+            throw new Error('No successful jobs found for analysis');
+          }
+
+          // Write configuration
+          const outputFile = `metric_analysis_${CURRENT_RUN_ID}.html`;
+          const config = {
+            queries: queries,
+            runs: runs,
+            dashboard_title: '${{ inputs.dashboard_title }}',
+            output_file: path.join(ACTION_PATH, outputFile)
+          };
+
+          const configPath = path.join(ACTION_PATH, 'analysis_config.json');
+          fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+
+          core.setOutput('config_path', configPath);
+          core.setOutput('output_file', config.output_file);
+          core.setOutput('jobs_analyzed', runs.map(r => r.name).join(','));
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+    - name: Install Python dependencies
+      shell: bash
+      run: pip install -r $GITHUB_ACTION_PATH/requirements.txt
+    - name: Run metric analysis
+      shell: bash
+      env:
+        PROMETHEUS_ID: ${{ inputs.prometheus_username }}
+        PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
+      run: |
+        python $GITHUB_ACTION_PATH/plot.py \
+          --config ${{ steps.build-config.outputs.config_path }} \
+          --prometheus-url "${{ inputs.prometheus_url }}" \
+          --step-size "${{ inputs.step_size }}" \
+          --timezone "${{ inputs.timezone }}" \
+          --verbose
+    - name: Upload analysis artifact
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: metric-analysis-${{ github.run_id }}
+        path: |
+          ${{ steps.build-config.outputs.output_file }}
+          ${{ steps.build-config.outputs.config_path }}
+        retention-days: 7
