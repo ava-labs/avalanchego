@@ -7,13 +7,14 @@ import (
 	"container/heap"
 
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
 
 type txEntry struct {
 	id       ids.ID
-	gasPrice uint64
+	gasPrice uint256.Int
 	tx       *atomic.Tx
 	index    int
 }
@@ -37,9 +38,9 @@ func (th internalTxHeap) Len() int { return len(th.items) }
 
 func (th internalTxHeap) Less(i, j int) bool {
 	if th.isMinHeap {
-		return th.items[i].gasPrice < th.items[j].gasPrice
+		return th.items[i].gasPrice.Lt(&th.items[j].gasPrice)
 	}
-	return th.items[i].gasPrice > th.items[j].gasPrice
+	return th.items[i].gasPrice.Gt(&th.items[j].gasPrice)
 }
 
 func (th internalTxHeap) Swap(i, j int) {
@@ -91,7 +92,7 @@ func newTxHeap(maxSize int) *txHeap {
 	}
 }
 
-func (th *txHeap) Push(tx *atomic.Tx, gasPrice uint64) {
+func (th *txHeap) Push(tx *atomic.Tx, gasPrice uint256.Int) {
 	txID := tx.ID()
 	oldLen := th.Len()
 	heap.Push(th.maxHeap, &txEntry{
@@ -109,13 +110,13 @@ func (th *txHeap) Push(tx *atomic.Tx, gasPrice uint64) {
 }
 
 // Assumes there is non-zero items
-func (th *txHeap) PeekMax() (*atomic.Tx, uint64) {
+func (th *txHeap) PeekMax() (*atomic.Tx, uint256.Int) {
 	txEntry := th.maxHeap.items[0]
 	return txEntry.tx, txEntry.gasPrice
 }
 
 // Assumes there is non-zero items
-func (th *txHeap) PeekMin() (*atomic.Tx, uint64) {
+func (th *txHeap) PeekMin() (*atomic.Tx, uint256.Int) {
 	txEntry := th.minHeap.items[0]
 	return txEntry.tx, txEntry.gasPrice
 }

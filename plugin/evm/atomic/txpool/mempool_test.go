@@ -71,7 +71,7 @@ func TestMempoolAddNoGas(t *testing.T) {
 
 	tx := atomictest.GenerateTestImportTxWithGas(0, 1)
 	err = m.Add(tx)
-	require.ErrorIs(err, ErrNoGasUsed)
+	require.ErrorIs(err, atomic.ErrNoGasUsed)
 }
 
 // Add should return an error if a tx doesn't consume any gas
