@@ -24,6 +24,9 @@ on:
         description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
         required: false
         default: ubuntu-latest
+      push-post-state-dir:
+        description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
+        default: ''
 
   schedule:
     - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
@@ -85,3 +88,4 @@ jobs:
           aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: 'us-east-2'
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          push-post-state-dir: ${{ github.event.inputs.push-post-state-dir }}
