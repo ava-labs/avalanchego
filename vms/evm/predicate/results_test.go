@@ -160,6 +160,27 @@ func TestBlockResultsZeroValue(t *testing.T) {
 	require.Equal(1, len(results.TxResults))
 }
 
+func TestBlockResultsNilResultsBytes(t *testing.T) {
+	require := require.New(t)
+
+	// Test that BlockResults with nil TxResults can be marshaled without panicking
+	var results BlockResults
+	require.Nil(results.TxResults)
+
+	// Should not panic and should return valid bytes
+	b, err := results.Bytes()
+	require.NoError(err)
+	require.NotNil(b)
+
+	// Should be able to parse the bytes back
+	parsedResults, err := ParseBlockResults(b)
+	require.NoError(err)
+	// Note: nil maps get converted to empty maps during marshaling/unmarshaling
+	require.Empty(parsedResults.TxResults)
+	// The original results should still be nil
+	require.Nil(results.TxResults)
+}
+
 // expectedHexFromResults deterministically computes the expected hex encoding
 // for the given results using the same on-wire representation as production
 // code (i.e., []byte values for bitsets).
