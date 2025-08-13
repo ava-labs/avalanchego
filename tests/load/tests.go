@@ -6,7 +6,6 @@ package load
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -25,11 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/sampler"
 )
 
-var (
-	ErrInsufficientFundsForDistribution = errors.New("insufficient funds for distribution")
-
-	maxFeeCap = big.NewInt(300000000000)
-)
+var maxFeeCap = big.NewInt(300000000000)
 
 // NewRandomTest creates a RandomWeightedTest containing a collection of EVM
 // load testing scenarios.

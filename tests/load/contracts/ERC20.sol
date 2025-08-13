@@ -27,7 +27,7 @@ contract ERC20 {
     uint256 _totalSupply;
 
     /**
-    @dev Initalizes token with total supply going to deployer.
+     * @dev Initalizes token with total supply going to deployer.
      */
     constructor(uint256 supply) {
         _balances[msg.sender] = supply;
