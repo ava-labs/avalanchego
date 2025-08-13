@@ -104,6 +104,8 @@ func (d *DynamicThrottlerHandler) checkUpdateThrottlingLimit(ctx context.Context
 	variance := d.requestsPerPeer * (n - 1) / (n * n)
 	stdDeviation := math.Sqrt(variance)
 
+	// Throttle anything beyond 4 standard deviations which should throttle
+	// anything beyond the 99.994 percentile of expected requests.
 	limit := expectedSamples + 4*stdDeviation
 	d.throttler.setLimit(limit)
 }
