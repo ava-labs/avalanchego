@@ -63,23 +63,23 @@ runs:
       with:
         github-token: ${{ inputs.github_token }}
         script: |
-            const fs = require('fs');
-            const path = require('path');
+          const fs = require('fs');
+          const path = require('path');
 
-            const CURRENT_RUN_ID = context.runId.toString();
-            const ACTION_PATH = process.env.GITHUB_ACTION_PATH;
+          const CURRENT_RUN_ID = context.runId.toString();
+          const ACTION_PATH = process.env.GITHUB_ACTION_PATH;
 
-            console.log('=== METRIC ANALYSIS DEBUG INFO ===');
-            console.log(`Current Run ID: ${CURRENT_RUN_ID}`);
-            console.log(`Action Path: ${ACTION_PATH}`);
-            console.log(`Repository: ${context.repo.owner}/${context.repo.repo}`);
-            console.log(`Run Attempt: ${context.runAttempt || 'unknown'}`);
+          console.log('=== METRIC ANALYSIS DEBUG INFO ===');
+          console.log(`Current Run ID: ${CURRENT_RUN_ID}`);
+          console.log(`Action Path: ${ACTION_PATH}`);
+          console.log(`Repository: ${context.repo.owner}/${context.repo.repo}`);
+          console.log(`Run Attempt: ${context.runAttempt || 'unknown'}`);
 
-            // Parse job names from input (these should be job keys like 'firewood_load_test')
-            const targetJobKeys = '${{ inputs.job_names }}'.split(',').map(name => name.trim());
-            console.log(`\n=== TARGET JOB KEYS ===`);
-            console.log(`Input job_names: "${{ inputs.job_names }}"`);
-            console.log(`Parsed target job keys: [${targetJobKeys.map(k => `"${k}"`).join(', ')}]`);
+          // Parse job names from input (these should be job keys like 'firewood_load_test')
+          const targetJobKeys = '${{ inputs.job_names }}'.split(',').map(name => name.trim());
+          console.log(`\n=== TARGET JOB KEYS ===`);
+          console.log(`Input job_names: "${{ inputs.job_names }}"`);
+          console.log(`Parsed target job keys: [${targetJobKeys.map(k => `"${k}"`).join(', ')}]`);
 
           // Get jobs from GitHub API
           console.log(`\n=== FETCHING WORKFLOW JOBS ===`);
@@ -271,69 +271,69 @@ runs:
                   gh_run_id: CURRENT_RUN_ID,
                   gh_job_id: job.job_key,  // This is crucial - use the job key for metric matching
                   gh_run_attempt: context.runAttempt?.toString() || "1",
-            gh_repo: context.repo.owner + "/" + context.repo.repo,
-            is_ephemeral_node: "false"
-          },
-            start_time: new Date(job.started_at).getTime(),
-            end_time: new Date(job.completed_at).getTime()
-            };
+                  gh_repo: context.repo.owner + "/" + context.repo.repo,
+                  is_ephemeral_node: "false"
+                },
+                start_time: new Date(job.started_at).getTime(),
+                end_time: new Date(job.completed_at).getTime()
+              };
 
-                        runs.push(runConfig);
-                        console.log(`  ✓ Added to analysis`);
-                        console.log(`    Labels: ${JSON.stringify(runConfig.labels, null, 6)}`);
-                        console.log(`    Time range: ${new Date(runConfig.start_time).toISOString()} to ${new Date(runConfig.end_time).toISOString()}`);
+              runs.push(runConfig);
+              console.log(`  ✓ Added to analysis`);
+              console.log(`    Labels: ${JSON.stringify(runConfig.labels, null, 6)}`);
+              console.log(`    Time range: ${new Date(runConfig.start_time).toISOString()} to ${new Date(runConfig.end_time).toISOString()}`);
             } else {
-                        console.log(`  ✗ Skipped: ${!job.conclusion || job.conclusion !== 'success' ? 'not successful' : ''} ${!job.started_at ? 'no start time' : ''} ${!job.completed_at ? 'no end time' : ''}`);
+              console.log(`  ✗ Skipped: ${!job.conclusion || job.conclusion !== 'success' ? 'not successful' : ''} ${!job.started_at ? 'no start time' : ''} ${!job.completed_at ? 'no end time' : ''}`);
             }
-            }
+          }
 
-            console.log(`\n=== FINAL CONFIGURATION ===`);
-            console.log(`Jobs processed: ${foundJobs.length}`);
-            console.log(`Runs for analysis: ${runs.length}`);
+          console.log(`\n=== FINAL CONFIGURATION ===`);
+          console.log(`Jobs processed: ${foundJobs.length}`);
+          console.log(`Runs for analysis: ${runs.length}`);
 
-            if (runs.length === 0) {
+          if (runs.length === 0) {
             console.log(`\n=== ERROR: NO SUCCESSFUL RUNS ===`);
-              console.log(`All matched jobs were filtered out. Reasons:`);
-              foundJobs.forEach(job => {
+            console.log(`All matched jobs were filtered out. Reasons:`);
+            foundJobs.forEach(job => {
               const reasons = [];
               if (job.conclusion !== 'success') reasons.push(`conclusion: ${job.conclusion}`);
               if (!job.started_at) reasons.push('no start time');
               if (!job.completed_at) reasons.push('no end time');
               console.log(`  - "${job.name}": ${reasons.join(', ')}`);
             });
-              throw new Error('No successful jobs found for analysis');
-            }
+            throw new Error('No successful jobs found for analysis');
+          }
 
-            // Build final config
-              const outputFile = `metric_analysis_${CURRENT_RUN_ID}.html`;
-              const config = {
+          // Build final config
+          const outputFile = `metric_analysis_${CURRENT_RUN_ID}.html`;
+          const config = {
             queries: queries,
-              runs: runs,
-              dashboard_title: '${{ inputs.dashboard_title }}',
-              output_file: path.join(ACTION_PATH, outputFile)
-            };
+            runs: runs,
+            dashboard_title: '${{ inputs.dashboard_title }}',
+            output_file: path.join(ACTION_PATH, outputFile)
+          };
 
-              const configPath = path.join(ACTION_PATH, 'analysis_config.json');
+          const configPath = path.join(ACTION_PATH, 'analysis_config.json');
 
-            console.log(`\nWriting config to: ${configPath}`);
-            console.log(`Output file will be: ${config.output_file}`);
+          console.log(`\nWriting config to: ${configPath}`);
+          console.log(`Output file will be: ${config.output_file}`);
 
-            // Write config with pretty printing for debugging
-              fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+          // Write config with pretty printing for debugging
+          fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-              console.log(`✓ Configuration written successfully`);
-              console.log(`\n=== SUMMARY ===`);
-            console.log(`- Target job keys: ${targetJobKeys.length}`);
-            console.log(`- Jobs found: ${foundJobs.length}`);
-            console.log(`- Jobs with metadata: ${foundJobs.filter(j => j.has_metadata).length}`);
-            console.log(`- Successful runs: ${runs.length}`);
-            console.log(`- Queries to execute: ${queries.length}`);
+          console.log(`✓ Configuration written successfully`);
+          console.log(`\n=== SUMMARY ===`);
+          console.log(`- Target job keys: ${targetJobKeys.length}`);
+          console.log(`- Jobs found: ${foundJobs.length}`);
+          console.log(`- Jobs with metadata: ${foundJobs.filter(j => j.has_metadata).length}`);
+          console.log(`- Successful runs: ${runs.length}`);
+          console.log(`- Queries to execute: ${queries.length}`);
 
-            core.setOutput('config_path', configPath);
-              core.setOutput('output_file', config.output_file);
-              core.setOutput('jobs_analyzed', runs.map(r => r.name).join(','));
-              core.setOutput('jobs_found', foundJobs.length.toString());
-              core.setOutput('jobs_with_metadata', foundJobs.filter(j => j.has_metadata).length.toString());
+          core.setOutput('config_path', configPath);
+          core.setOutput('output_file', config.output_file);
+          core.setOutput('jobs_analyzed', runs.map(r => r.name).join(','));
+          core.setOutput('jobs_found', foundJobs.length.toString());
+          core.setOutput('jobs_with_metadata', foundJobs.filter(j => j.has_metadata).length.toString());
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
