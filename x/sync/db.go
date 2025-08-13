@@ -44,3 +44,8 @@ type ProofParser interface {
 	ParseRangeProof(responseBytes, rootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error)
 	ParseChangeProof(responseBytes, rootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error)
 }
+
+type ProofCreator interface {
+	RangeProof(ctx context.Context, root []byte, start, end maybe.Maybe[[]byte], keyLimit, byteLimit int) ([]byte, error)
+	ChangeProof(ctx context.Context, startRoot, endRoot []byte, start, end maybe.Maybe[[]byte], keyLimit, byteLimit int) ([]byte, error)
+}
