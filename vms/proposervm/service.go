@@ -14,13 +14,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/formatting"
-	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 type ProposerVMServer interface {
-	GetStatelessSignedBlock(blkID ids.ID) (statelessblock.SignedBlock, error)
+	GetStatelessSignedBlock(blkID ids.ID) (block.SignedBlock, error)
 	GetLastAcceptedHeight() uint64
 }
 
@@ -47,7 +47,7 @@ type GetProposerBlockArgs struct {
 	Encoding        formatting.Encoding `json:"encoding"`
 }
 
-func (p *ProposerAPI) GetProposerBlockWrapper(r *http.Request, args *GetProposerBlockArgs, reply *api.GetBlockResponse) error {
+func (p *ProposerAPI) GetProposerBlockWrapper(_ *http.Request, args *GetProposerBlockArgs, reply *api.GetBlockResponse) error {
 	p.ctx.Log.Debug("API called",
 		zap.String("service", "proposervm"),
 		zap.String("method", "getProposerBlockWrapper"),

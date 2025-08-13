@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
-	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 type mockVM struct {
@@ -27,12 +26,12 @@ type mockVM struct {
 	err      error
 }
 
-func (m *mockVM) GetStatelessSignedBlock(_ ids.ID) (statelessblock.SignedBlock, error) {
+func (m *mockVM) GetStatelessSignedBlock(_ ids.ID) (block.SignedBlock, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
 
-	return m.response.(statelessblock.SignedBlock), nil
+	return m.response.(block.SignedBlock), nil
 }
 
 func (m *mockVM) GetLastAcceptedHeight() uint64 {
@@ -121,7 +120,7 @@ func TestServiceGetProposerBlockWrapper(t *testing.T) {
 	}
 }
 
-func createSignedBlock(t *testing.T) statelessblock.SignedBlock {
+func createSignedBlock(t *testing.T) block.SignedBlock {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
