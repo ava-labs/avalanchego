@@ -10,40 +10,38 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/utils"
 )
 
 func TestBytesToHashSlice(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    []byte
-		expected []common.Hash
+		name  string
+		input []byte
+		want  []common.Hash
 	}{
 		{
-			name:     "empty input",
-			input:    []byte{},
-			expected: []common.Hash{},
+			name:  "empty input",
+			input: []byte{},
+			want:  []common.Hash{},
 		},
 		{
-			name:     "exactly 32 bytes",
-			input:    utils.RandomBytes(32),
-			expected: []common.Hash{},
+			name:  "exactly 32 bytes",
+			input: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32},
+			want:  []common.Hash{},
 		},
 		{
-			name:     "less than 32 bytes",
-			input:    []byte{1, 2, 3},
-			expected: []common.Hash{},
+			name:  "less than 32 bytes",
+			input: []byte{1, 2, 3},
+			want:  []common.Hash{},
 		},
 		{
-			name:     "exactly 64 bytes",
-			input:    utils.RandomBytes(64),
-			expected: []common.Hash{},
+			name:  "exactly 64 bytes",
+			input: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64},
+			want:  []common.Hash{},
 		},
 		{
-			name:     "between 32 and 64 bytes",
-			input:    utils.RandomBytes(48),
-			expected: []common.Hash{},
+			name:  "between 32 and 64 bytes",
+			input: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48},
+			want:  []common.Hash{},
 		},
 	}
 
@@ -53,9 +51,9 @@ func TestBytesToHashSlice(t *testing.T) {
 
 			result := bytesToHashSlice(tt.input)
 
-			// Calculate expected number of hashes
-			expectedNumHashes := roundUpTo32(len(tt.input)) / common.HashLength
-			require.Len(result, expectedNumHashes)
+			// Calculate want number of hashes
+			wantNumHashes := roundUpTo32(len(tt.input)) / common.HashLength
+			require.Len(result, wantNumHashes)
 
 			// Verify each hash is properly formed
 			for i, hash := range result {
@@ -65,11 +63,11 @@ func TestBytesToHashSlice(t *testing.T) {
 					end = len(tt.input)
 				}
 
-				// Check that the hash contains the expected bytes
-				expectedBytes := make([]byte, common.HashLength)
-				copy(expectedBytes, tt.input[start:end])
+				// Check that the hash contains the want bytes
+				wantBytes := make([]byte, common.HashLength)
+				copy(wantBytes, tt.input[start:end])
 
-				require.Equal(expectedBytes, hash[:])
+				require.Equal(wantBytes, hash[:])
 			}
 		})
 	}
@@ -77,24 +75,24 @@ func TestBytesToHashSlice(t *testing.T) {
 
 func TestHashSliceToBytes(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    []common.Hash
-		expected []byte
+		name  string
+		input []common.Hash
+		want  []byte
 	}{
 		{
-			name:     "empty slice",
-			input:    []common.Hash{},
-			expected: []byte{},
+			name:  "empty slice",
+			input: []common.Hash{},
+			want:  []byte{},
 		},
 		{
-			name:     "single hash",
-			input:    []common.Hash{},
-			expected: []byte{},
+			name:  "single hash",
+			input: []common.Hash{},
+			want:  []byte{},
 		},
 		{
-			name:     "multiple hashes",
-			input:    []common.Hash{},
-			expected: []byte{},
+			name:  "multiple hashes",
+			input: []common.Hash{},
+			want:  []byte{},
 		},
 	}
 
@@ -102,19 +100,24 @@ func TestHashSliceToBytes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			// Generate random hashes for testing
+			// Generate deterministic hashes for testing
 			if len(tt.input) == 0 {
 				tt.input = make([]common.Hash, 2)
-				for i := range tt.input {
-					copy(tt.input[i][:], utils.RandomBytes(32))
+				// First hash: 1, 2, 3, ..., 32
+				for i := range tt.input[0] {
+					tt.input[0][i] = byte(i + 1)
+				}
+				// Second hash: 33, 34, 35, ..., 64
+				for i := range tt.input[1] {
+					tt.input[1][i] = byte(i + 33)
 				}
 			}
 
 			result := hashSliceToBytes(tt.input)
 
 			// Verify the result has the correct length
-			expectedLength := len(tt.input) * common.HashLength
-			require.Len(result, expectedLength)
+			wantLength := len(tt.input) * common.HashLength
+			require.Len(result, wantLength)
 
 			// Verify each hash is properly serialized
 			for i, hash := range tt.input {
@@ -130,8 +133,8 @@ func TestHashSliceToBytes(t *testing.T) {
 func TestBytesToHashSliceRoundTrip(t *testing.T) {
 	require := require.New(t)
 
-	// Test round-trip conversion
-	testData := utils.RandomBytes(100)
+	// Test round-trip conversion with deterministic data
+	testData := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100}
 
 	hashes := bytesToHashSlice(testData)
 	bytes := hashSliceToBytes(hashes)
@@ -152,54 +155,57 @@ func TestBytesToHashSliceEdgeCases(t *testing.T) {
 
 	// Test edge cases around 32-byte boundaries
 	for i := 30; i <= 34; i++ {
-		testData := utils.RandomBytes(i)
+		testData := make([]byte, i)
+		for j := range testData {
+			testData[j] = byte(j + 1)
+		}
 		hashes := bytesToHashSlice(testData)
 
-		expectedNumHashes := roundUpTo32(i) / common.HashLength
-		require.Len(hashes, expectedNumHashes)
+		wantNumHashes := roundUpTo32(i) / common.HashLength
+		require.Len(hashes, wantNumHashes)
 
 		// Verify padding behavior
 		if i%32 != 0 {
 			// Should have padding in the last hash
 			lastHash := hashes[len(hashes)-1]
 			start := (len(hashes) - 1) * 32
-			expectedBytes := make([]byte, 32)
-			copy(expectedBytes, testData[start:])
-			require.Equal(expectedBytes, lastHash[:])
+			wantBytes := make([]byte, 32)
+			copy(wantBytes, testData[start:])
+			require.Equal(wantBytes, lastHash[:])
 		}
 	}
 }
 
 func TestPackUnpack(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    []byte
-		expected []byte
+		name  string
+		input []byte
+		want  []byte
 	}{
 		{
-			name:     "empty input",
-			input:    []byte{},
-			expected: []byte{0xff},
+			name:  "empty input",
+			input: []byte{},
+			want:  []byte{0xff},
 		},
 		{
-			name:     "single byte",
-			input:    []byte{0x42},
-			expected: []byte{0x42, 0xff},
+			name:  "single byte",
+			input: []byte{0x42},
+			want:  []byte{0x42, 0xff},
 		},
 		{
-			name:     "exactly 31 bytes",
-			input:    bytes.Repeat([]byte{0xaa}, 31),
-			expected: append(bytes.Repeat([]byte{0xaa}, 31), 0xff),
+			name:  "exactly 31 bytes",
+			input: bytes.Repeat([]byte{0xaa}, 31),
+			want:  append(bytes.Repeat([]byte{0xaa}, 31), 0xff),
 		},
 		{
-			name:     "exactly 32 bytes",
-			input:    bytes.Repeat([]byte{0xbb}, 32),
-			expected: append(bytes.Repeat([]byte{0xbb}, 32), 0xff),
+			name:  "exactly 32 bytes",
+			input: bytes.Repeat([]byte{0xbb}, 32),
+			want:  append(bytes.Repeat([]byte{0xbb}, 32), 0xff),
 		},
 		{
-			name:     "exactly 63 bytes",
-			input:    bytes.Repeat([]byte{0xcc}, 63),
-			expected: append(bytes.Repeat([]byte{0xcc}, 63), 0xff),
+			name:  "exactly 63 bytes",
+			input: bytes.Repeat([]byte{0xcc}, 63),
+			want:  append(bytes.Repeat([]byte{0xcc}, 63), 0xff),
 		},
 	}
 
@@ -214,10 +220,10 @@ func TestPackUnpack(t *testing.T) {
 			require.Equal(tt.input, unpacked)
 
 			// Verify the packed result has the correct structure
-			require.Equal(tt.expected, []byte(packed)[:len(tt.expected)])
+			require.Equal(tt.want, []byte(packed)[:len(tt.want)])
 
 			// Verify padding is all zeros
-			for i := len(tt.expected); i < len(packed); i++ {
+			for i := len(tt.want); i < len(packed); i++ {
 				require.Equal(byte(0), packed[i])
 			}
 		})
@@ -232,7 +238,10 @@ func TestPackUnpackPadding(t *testing.T) {
 
 	for _, length := range testCases {
 		t.Run(fmt.Sprintf("length_%d", length), func(_ *testing.T) {
-			input := utils.RandomBytes(length)
+			input := make([]byte, length)
+			for i := range input {
+				input[i] = byte(i + 1)
+			}
 			packed := New(input)
 			unpacked, err := Unpack(packed)
 
@@ -247,39 +256,39 @@ func TestPackUnpackPadding(t *testing.T) {
 
 func TestUnpackInvalid(t *testing.T) {
 	tests := []struct {
-		name        string
-		input       Predicate
-		expectedErr error
+		name    string
+		input   Predicate
+		wantErr error
 	}{
 		{
-			name:        "empty input",
-			input:       Predicate{},
-			expectedErr: errEmptyPredicate,
+			name:    "empty input",
+			input:   Predicate{},
+			wantErr: errEmptyPredicate,
 		},
 		{
-			name:        "all zeros",
-			input:       Predicate(bytes.Repeat([]byte{0}, 32)),
-			expectedErr: errAllZeroBytes,
+			name:    "all zeros",
+			input:   Predicate(bytes.Repeat([]byte{0}, 32)),
+			wantErr: errAllZeroBytes,
 		},
 		{
-			name:        "missing delimiter",
-			input:       Predicate(bytes.Repeat([]byte{0x42}, 32)),
-			expectedErr: errWrongEndDelimiter,
+			name:    "missing delimiter",
+			input:   Predicate(bytes.Repeat([]byte{0x42}, 32)),
+			wantErr: errWrongEndDelimiter,
 		},
 		{
-			name:        "wrong delimiter",
-			input:       Predicate(append(bytes.Repeat([]byte{0x42}, 31), 0x00)),
-			expectedErr: errWrongEndDelimiter,
+			name:    "wrong delimiter",
+			input:   Predicate(append(bytes.Repeat([]byte{0x42}, 31), 0x00)),
+			wantErr: errWrongEndDelimiter,
 		},
 		{
-			name:        "excess padding",
-			input:       Predicate(append(append([]byte{0x42, 0xff}, bytes.Repeat([]byte{0}, 30)...), 0x01)),
-			expectedErr: errExcessPadding,
+			name:    "excess padding",
+			input:   Predicate(append(append([]byte{0x42, 0xff}, bytes.Repeat([]byte{0}, 30)...), 0x01)),
+			wantErr: errExcessPadding,
 		},
 		{
-			name:        "non-zero padding",
-			input:       Predicate(append(append([]byte{0x42, 0xff}, bytes.Repeat([]byte{0}, 29)...), 0x01, 0x00)),
-			expectedErr: errExcessPadding,
+			name:    "non-zero padding",
+			input:   Predicate(append(append([]byte{0x42, 0xff}, bytes.Repeat([]byte{0}, 29)...), 0x01, 0x00)),
+			wantErr: errExcessPadding,
 		},
 	}
 
@@ -288,7 +297,7 @@ func TestUnpackInvalid(t *testing.T) {
 			require := require.New(t)
 
 			_, err := Unpack(tt.input)
-			require.ErrorIs(err, tt.expectedErr)
+			require.ErrorIs(err, tt.wantErr)
 		})
 	}
 }
@@ -305,7 +314,11 @@ func FuzzPackUnpack(f *testing.F) {
 func FuzzUnpackPackEqual(f *testing.F) {
 	// Seed with valid predicates
 	for i := range 100 {
-		validPredicate := New(utils.RandomBytes(i))
+		input := make([]byte, i)
+		for j := range input {
+			input[j] = byte(j + 1)
+		}
+		validPredicate := New(input)
 		f.Add([]byte(validPredicate))
 	}
 
