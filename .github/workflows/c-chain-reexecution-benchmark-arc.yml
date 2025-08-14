@@ -44,6 +44,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Set task parameters
         id: set-params
+        shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "schedule" ]]; then
             {
