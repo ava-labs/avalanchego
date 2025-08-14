@@ -1,12 +1,21 @@
+accounts/*
+consensus/*
 core/*
 eth/*
-node/*
 internal/*
+log/*
+miner/*
+node/*
+signer/*
+tests/*
+triedb/*
 
-!internal/ethapi/api_extra_test.go
+!accounts/abi/abi_extra_test.go
+!accounts/abi/bind/bind_extra_test.go
+!consensus/dummy/*
 !core/blockchain_ext.go
-!core/blockchain_log_test.go
 !core/blockchain_ext_test.go
+!core/blockchain_log_test.go
 !core/bounded_buffer.go
 !core/coretest/*
 !core/extstate/*
@@ -14,10 +23,7 @@ internal/*
 !core/main_test.go
 !core/predicate_check.go
 !core/predicate_check_test.go
-!core/state/firewood_database.go
-!core/state/database_test.go
 !core/state/snapshot/snapshot_ext.go
-!core/state/statedb_multicoin_test.go
 !core/state_manager_test.go
 !core/state_processor_ext.go
 !eth/chain_with_final_block.go
@@ -25,3 +31,7 @@ internal/*
 !internal/ethapi/api.coreth.go
 !internal/ethapi/api.coreth_test.go
 !internal/ethapi/api_extra.go
+!internal/ethapi/api_extra_test.go
+!tests/utils/*
+!tests/warp/*
+!triedb/firewood/*
