@@ -19,13 +19,14 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
-	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	synccommon "github.com/ava-labs/coreth/sync"
 	"github.com/ava-labs/coreth/sync/handlers"
+	vmsync "github.com/ava-labs/coreth/sync/vm"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
@@ -46,7 +47,9 @@ type ExtensibleVM interface {
 	NewClient(protocol uint64, options ...p2p.ClientOption) *p2p.Client
 	// AddHandler registers a server handler for an application protocol
 	AddHandler(protocol uint64, handler p2p.Handler) error
-	// GetExtendedBlock returns the VMBlock for the given ID or an error if the block is not found
+	// SetLastAcceptedBlock sets the last accepted block
+	SetLastAcceptedBlock(lastAcceptedBlock snowman.Block) error
+	// GetExtendedBlock returns the ExtendedBlock for the given ID or an error if the block is not found
 	GetExtendedBlock(context.Context, ids.ID) (ExtendedBlock, error)
 	// LastAcceptedExtendedBlock returns the last accepted VM block
 	LastAcceptedExtendedBlock() ExtendedBlock
@@ -54,8 +57,8 @@ type ExtensibleVM interface {
 	ChainConfig() *params.ChainConfig
 	// P2PValidators returns the validators for the network
 	P2PValidators() *p2p.Validators
-	// Blockchain returns the blockchain client
-	Blockchain() *core.BlockChain
+	// Ethereum returns the Ethereum service
+	Ethereum() *eth.Ethereum
 	// Config returns the configuration for the VM
 	Config() config.Config
 	// MetricRegistry returns the metric registry for the VM
@@ -64,6 +67,8 @@ type ExtensibleVM interface {
 	ReadLastAccepted() (common.Hash, uint64, error)
 	// VersionDB returns the versioned database for the VM
 	VersionDB() *versiondb.Database
+	// SyncerClient returns the syncer client for the VM
+	SyncerClient() vmsync.Client
 }
 
 // InnerVM is the interface that must be implemented by the VM

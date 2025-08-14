@@ -32,7 +32,7 @@ var (
 )
 
 type BlockFetcher interface {
-	// GetExtendedBlock returns the VMBlock for the given ID or an error if the block is not found
+	// GetExtendedBlock returns the ExtendedBlock for the given ID or an error if the block is not found
 	GetExtendedBlock(context.Context, ids.ID) (extension.ExtendedBlock, error)
 	// LastAcceptedExtendedBlock returns the last accepted VM block
 	LastAcceptedExtendedBlock() extension.ExtendedBlock
