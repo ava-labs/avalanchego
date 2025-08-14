@@ -72,7 +72,7 @@ runs:
       with:
         # The environment varaibles set in $GITHUB_ENV should be accessible when the task is run, but do not seem to be when executed through
         # this custom action.
-        run: ./scripts/run_task.sh reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=${{ env.EXECUTION_DATA_DIR }} SOURCE_BLOCK_DIR=${{ env.SOURCE_BLOCK_DIR }} CURRENT_STATE_DIR=${{ env.CURRENT_STATE_DIR }} START_BLOCK=${{ env.START_BLOCK }} END_BLOCK=${{ env.END_BLOCK }} LABELS=${{ env.LABELS }} BENCHMARK_OUTPUT_FILE=${{ env.BENCHMARK_OUTPUT_FILE }}
+        run: ./scripts/run_task.sh reexecute-cchain-range-with-copied-data
         prometheus_push_url: ${{ inputs.prometheus-push-url }}
         prometheus_username: ${{ inputs.prometheus-username }}
         prometheus_password: ${{ inputs.prometheus-password }}
@@ -112,6 +112,7 @@ runs:
       if: ${{ inputs.push-post-state != '' }}
       shell: nix develop --command bash -x {0}
       run: |
+        set -euo pipefail
         # Validate the S3 path format using a single regular expression.
         if ! [[ "${{ inputs.push-post-state }}" =~ ^s3://[^/]+/([^/]+/)$ ]]; then
           echo "Error: Invalid S3 path format."
