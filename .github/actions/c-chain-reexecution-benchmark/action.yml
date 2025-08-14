@@ -56,7 +56,7 @@ runs:
       run: |
         {
           echo "EXECUTION_DATA_DIR=${{ inputs.workspace }}/reexecution-data"
-          echo "BENCHMARK_OUTPUT_FILE=${{ inputs.workspace }}/reexecute-cchain-range-benchmark-res.txt"
+          echo "BENCHMARK_OUTPUT_FILE=output.txt"
           echo "START_BLOCK=${{ inputs.start-block }}"
           echo "END_BLOCK=${{ inputs.end-block }}"
           echo "SOURCE_BLOCK_DIR=${{ inputs.source-block-dir }}"
