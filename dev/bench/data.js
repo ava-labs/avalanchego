@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1755076527480,
+  "lastUpdate": 1755162808135,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -446,6 +446,34 @@ window.BENCHMARK_DATA = {
             "value": 93.71,
             "unit": "mgas/s",
             "extra": "1 times\n4 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "aaronbuchwald",
+            "username": "aaronbuchwald",
+            "email": "aaron.buchwald56@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "5c72544839f3b71ca105349f4b1f43b9c0f1ebe9",
+          "message": "Move C-Chain benchmark to custom action and add ARC + GH runner triggers (#4165)",
+          "timestamp": "2025-08-13T14:34:58Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/5c72544839f3b71ca105349f4b1f43b9c0f1ebe9"
+        },
+        "date": 1755162807725,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]",
+            "value": 113.9,
+            "unit": "mgas/s",
+            "extra": "1 times\n32 procs"
           }
         ]
       }
