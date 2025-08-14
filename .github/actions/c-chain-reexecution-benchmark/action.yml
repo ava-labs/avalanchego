@@ -108,9 +108,9 @@ runs:
 
     - uses: ./.github/actions/install-nix
       if: ${{ inputs.push-post-state != '' }}
-    - name: Validate S3 Path to Push Post-State
+    - name: Push Post-State to S3 (if not exists)
       if: ${{ inputs.push-post-state != '' }}
-      shell: bash
+      shell: nix develop --command bash -x {0}
       run: |
         # Validate the S3 path format using a single regular expression.
         if ! [[ "${{ inputs.push-post-state }}" =~ ^s3://[^/]+/([^/]+/)$ ]]; then
@@ -119,13 +119,11 @@ runs:
           exit 1
         fi
 
-        if aws s3 ls "${{ inputs.push-post-state }}" | grep -q .; then
+        if s5cmd ls "${{ inputs.push-post-state }}" | grep -q .; then
           echo "Destination S3 path '${{ inputs.push-post-state }}' already exists. Exiting."
           exit 1
         fi
 
         echo "Validated S3 push post state URI: '${{ inputs.push-post-state }}'"
-    - name: Copy Post-State to S3
-      if: ${{ inputs.push-post-state != '' }}
-      shell: nix develop --command bash -x {0}
-      run: ./scripts/run_task.sh export-dir-to-s3 LOCAL_SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ S3_DST=${{ inputs.push-post-state }}
+
+        ./scripts/run_task.sh export-dir-to-s3 LOCAL_SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ S3_DST=${{ inputs.push-post-state }}
