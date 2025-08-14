@@ -27,8 +27,8 @@ import (
 )
 
 var (
-	ErrGasCapacityExceeded = errors.New("gas capacity exceeded")
-	errNoGasUsed           = errors.New("no gas used")
+	ErrNotEnoughGas = errors.New("not enough gas")
+	errNoGasUsed    = errors.New("no gas used")
 )
 
 type meteredTx struct {
@@ -40,7 +40,6 @@ type meteredTx struct {
 
 type Mempool struct {
 	weights     gas.Dimensions
-	gasCapacity gas.Gas
 	avaxAssetID ids.ID
 
 	lock               sync.RWMutex
@@ -48,9 +47,9 @@ type Mempool struct {
 	tree               *btree.BTreeG[meteredTx]
 	txs                map[ids.ID]meteredTx
 	consumedUTXOs      *setmap.SetMap[ids.ID, ids.ID]
-	droppedTxIDs       *lru.Cache[ids.ID, error]
-	currentGas         gas.Gas
-	numTxsMetric       prometheus.Gauge
+	droppedTxIDs *lru.Cache[ids.ID, error]
+	gasAvailable gas.Gas
+	numTxsMetric prometheus.Gauge
 	gasAvailableMetric prometheus.Gauge
 }
 
@@ -70,7 +69,7 @@ func New(
 	gasAvailableMetric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "gas_available",
-		Help:      "amount of remaining gas available",
+		Help: "amount of gas available",
 	})
 
 	if err := errors.Join(
@@ -82,7 +81,6 @@ func New(
 
 	m := &Mempool{
 		weights:     weights,
-		gasCapacity: gasCapacity,
 		avaxAssetID: avaxAssetID,
 		tree: btree.NewG[meteredTx](2, func(a, b meteredTx) bool {
 			if a.gasPrice != b.gasPrice {
@@ -95,6 +93,7 @@ func New(
 		txs:                make(map[ids.ID]meteredTx),
 		consumedUTXOs:      setmap.New[ids.ID, ids.ID](),
 		droppedTxIDs:       lru.NewCache[ids.ID, error](64),
+		gasAvailable: gasCapacity,
 		numTxsMetric:       numTxsMetric,
 		gasAvailableMetric: gasAvailableMetric,
 	}
@@ -118,9 +117,8 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 
 	// Try to evict lower gas priced txs if we do not have enough remaining gas
 	// capacity
-	if gasRemaining := m.gasCapacity - meteredTx.gasUsed; m.currentGas > gasRemaining {
-		gasToFree := m.currentGas - gasRemaining
-		if err := m.tryEvictTxs(gasToFree, meteredTx); err != nil {
+	if meteredTx.gasUsed > m.gasAvailable {
+		if err := m.tryEvictTxs(meteredTx); err != nil {
 			return err
 		}
 	}
@@ -129,7 +127,7 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	m.txs[meteredTx.TxID] = meteredTx
 	m.consumedUTXOs.Put(meteredTx.TxID, meteredTx.InputIDs())
 	m.droppedTxIDs.Evict(meteredTx.TxID)
-	m.currentGas += meteredTx.gasUsed
+	m.gasAvailable -= meteredTx.gasUsed
 
 	m.updateMetrics()
 	m.cond.Broadcast()
@@ -137,7 +135,8 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	return nil
 }
 
-func (m *Mempool) tryEvictTxs(gasToFree gas.Gas, txToAdd meteredTx) error {
+func (m *Mempool) tryEvictTxs(txToAdd meteredTx) error {
+	gasToFree := m.gasAvailable - txToAdd.gasUsed
 	gasFreed := gas.Gas(0)
 	toEvict := make([]ids.ID, 0)
 
@@ -155,7 +154,7 @@ func (m *Mempool) tryEvictTxs(gasToFree gas.Gas, txToAdd meteredTx) error {
 	})
 
 	if gasFreed < gasToFree {
-		return ErrGasCapacityExceeded
+		return ErrNotEnoughGas
 	}
 
 	for _, txID := range toEvict {
@@ -209,7 +208,7 @@ func (m *Mempool) meter(tx *txs.Tx) (meteredTx, error) {
 	}
 
 	if gasUsed > m.gasCapacity {
-		return meteredTx{}, ErrGasCapacityExceeded
+		return meteredTx{}, ErrNotEnoughGas
 	}
 
 	if gasUsed == 0 {

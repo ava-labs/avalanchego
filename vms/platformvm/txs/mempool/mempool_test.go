@@ -161,7 +161,7 @@ func TestMempoolAdd(t *testing.T) {
 				[]*avax.TransferableInput{newAVAXInput(ids.ID{2}, 1)},
 				0,
 			),
-			wantErr: ErrGasCapacityExceeded,
+			wantErr: ErrNotEnoughGas,
 			wantTxIDs: []ids.ID{
 				{1},
 			},
@@ -182,7 +182,7 @@ func TestMempoolAdd(t *testing.T) {
 				[]*avax.TransferableInput{newAVAXInput(ids.ID{2}, 2)},
 				0,
 			),
-			wantErr: ErrGasCapacityExceeded,
+			wantErr: ErrNotEnoughGas,
 			wantTxIDs: []ids.ID{
 				{1},
 			},
@@ -316,7 +316,7 @@ func TestMempoolAdd(t *testing.T) {
 				{1},
 				{2},
 			},
-			wantErr: ErrGasCapacityExceeded,
+			wantErr: ErrNotEnoughGas,
 		},
 	}
 
