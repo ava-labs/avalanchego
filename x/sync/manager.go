@@ -1066,7 +1066,7 @@ func (m *Manager) setError(err error) {
 //
 // Assumes [m.workLock] is not held.
 func (m *Manager) completeWorkItem(work *workItem, nextKey maybe.Maybe[[]byte], rootID ids.ID) {
-	if compareKeys(work.end, nextKey) == 1 && !nextKey.IsNothing() {
+	if compareKeys(work.end, nextKey) >= 0 && !nextKey.IsNothing() {
 		// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
 		m.enqueueWork(newWorkItem(work.localRootID, nextKey, work.end, work.priority, time.Now()))
 	}
