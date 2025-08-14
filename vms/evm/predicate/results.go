@@ -21,24 +21,6 @@ const (
 
 var resultsCodec codec.Manager
 
-// PrecompileResults is a map of results for each precompile address to the resulting bitset.
-type PrecompileResults map[common.Address]set.Bits
-
-// BlockResults encodes the precompile predicate results included in a block on a per transaction basis.
-// BlockResults is not thread-safe.
-type BlockResults struct {
-	TxResults map[common.Hash]PrecompileResults `serialize:"true"`
-}
-
-// encodedPrecompileResults is the on-wire representation of PrecompileResults,
-// which encodes the bitset as compact bytes.
-type encodedPrecompileResults map[common.Address][]byte
-
-// encodedBlockResults is the on-wire representation of BlockResults.
-type encodedBlockResults struct {
-	TxResults map[common.Hash]encodedPrecompileResults `serialize:"true"`
-}
-
 func init() {
 	resultsCodec = codec.NewManager(maxResultsSize)
 
@@ -48,17 +30,26 @@ func init() {
 	}
 }
 
+// PrecompileResults is a map of results for each precompile address to the resulting bitset.
+type PrecompileResults map[common.Address]set.Bits
+
+// BlockResults encodes the precompile predicate results included in a block on a per transaction basis.
+// BlockResults is not thread-safe.
+type BlockResults struct {
+	TxResults map[common.Hash]PrecompileResults `serialize:"true"`
+}
+
 // ParseBlockResults parses bytes into predicate results.
 func ParseBlockResults(b []byte) (BlockResults, error) {
-	var wireResults encodedBlockResults
-	_, err := resultsCodec.Unmarshal(b, &wireResults)
+	var encodedResults encodedBlockResults
+	_, err := resultsCodec.Unmarshal(b, &encodedResults)
 	if err != nil {
 		return BlockResults{}, fmt.Errorf("failed to unmarshal predicate results: %w", err)
 	}
 
-	// Convert wire representation into in-memory representation
-	out := BlockResults{TxResults: make(map[common.Hash]PrecompileResults, len(wireResults.TxResults))}
-	for txHash, addrToBytes := range wireResults.TxResults {
+	// Convert encoded representation into in-memory representation
+	out := BlockResults{TxResults: make(map[common.Hash]PrecompileResults, len(encodedResults.TxResults))}
+	for txHash, addrToBytes := range encodedResults.TxResults {
 		decoded := make(PrecompileResults, len(addrToBytes))
 		for addr, bs := range addrToBytes {
 			decoded[addr] = set.BitsFromBytes(bs)
@@ -86,16 +77,21 @@ func (b *BlockResults) Set(txHash common.Hash, txResults PrecompileResults) {
 
 // Bytes marshals the current state of predicate results
 func (b *BlockResults) Bytes() ([]byte, error) {
-	// Convert to wire representation before marshaling to avoid serializing
+	// Convert to encoded representation before marshaling to avoid serializing
 	// set.Bits directly, which is not supported by the reflect-based codec.
-	wire := encodedBlockResults{TxResults: make(map[common.Hash]encodedPrecompileResults, len(b.TxResults))}
+	encoded := encodedBlockResults{TxResults: make(map[common.Hash]map[common.Address][]byte, len(b.TxResults))}
 	for txHash, addrToBits := range b.TxResults {
-		enc := make(encodedPrecompileResults, len(addrToBits))
+		enc := make(map[common.Address][]byte, len(addrToBits))
 		for addr, bits := range addrToBits {
 			enc[addr] = bits.Bytes()
 		}
-		wire.TxResults[txHash] = enc
+		encoded.TxResults[txHash] = enc
 	}
 
-	return resultsCodec.Marshal(version, &wire)
+	return resultsCodec.Marshal(version, &encoded)
+}
+
+// encodedBlockResults is the serialized representation of BlockResults.
+type encodedBlockResults struct {
+	TxResults map[common.Hash]map[common.Address][]byte `serialize:"true"`
 }

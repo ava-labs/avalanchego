@@ -182,17 +182,17 @@ func TestBlockResultsNilResultsBytes(t *testing.T) {
 }
 
 // expectedHexFromResults deterministically computes the expected hex encoding
-// for the given results using the same on-wire representation as production
+// for the given results using the same serialized representation as production
 // code (i.e., []byte values for bitsets).
 func expectedHexFromResults(results map[common.Hash]PrecompileResults) string {
-	wire := encodedBlockResults{TxResults: make(map[common.Hash]encodedPrecompileResults, len(results))}
+	encoded := encodedBlockResults{TxResults: make(map[common.Hash]map[common.Address][]byte, len(results))}
 	for txHash, addrToBits := range results {
-		enc := make(encodedPrecompileResults, len(addrToBits))
+		enc := make(map[common.Address][]byte, len(addrToBits))
 		for addr, bits := range addrToBits {
 			enc[addr] = bits.Bytes()
 		}
-		wire.TxResults[txHash] = enc
+		encoded.TxResults[txHash] = enc
 	}
-	b, _ := resultsCodec.Marshal(version, &wire)
+	b, _ := resultsCodec.Marshal(version, &encoded)
 	return common.Bytes2Hex(b)
 }
