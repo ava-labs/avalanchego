@@ -140,7 +140,7 @@ func TestNew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			packed := new(tt.input)
+			packed := pack(tt.input)
 
 			// Verify the packed result has the correct structure
 			require.Equal(tt.want, packed[:len(tt.want)])
@@ -172,49 +172,49 @@ func TestUnpack(t *testing.T) {
 		},
 		{
 			name:    "single byte",
-			input:   new([]byte{0xbb}),
+			input:   pack([]byte{0xbb}),
 			want:    []byte{0xbb},
 			wantErr: nil,
 		},
 		{
 			name:    "31 bytes",
-			input:   new(bytes.Repeat([]byte{0xaa}, 31)),
+			input:   pack(bytes.Repeat([]byte{0xaa}, 31)),
 			want:    bytes.Repeat([]byte{0xaa}, 31),
 			wantErr: nil,
 		},
 		{
 			name:    "32 bytes",
-			input:   new(bytes.Repeat([]byte{0xdd}, 32)),
+			input:   pack(bytes.Repeat([]byte{0xdd}, 32)),
 			want:    bytes.Repeat([]byte{0xdd}, 32),
 			wantErr: nil,
 		},
 		{
 			name:    "33 bytes",
-			input:   new(bytes.Repeat([]byte{0xcc}, 33)),
+			input:   pack(bytes.Repeat([]byte{0xcc}, 33)),
 			want:    bytes.Repeat([]byte{0xcc}, 33),
 			wantErr: nil,
 		},
 		{
 			name:    "48 bytes",
-			input:   new(bytes.Repeat([]byte{0x00}, 48)),
+			input:   pack(bytes.Repeat([]byte{0x00}, 48)),
 			want:    bytes.Repeat([]byte{0x00}, 48),
 			wantErr: nil,
 		},
 		{
 			name:    "63 bytes",
-			input:   new(bytes.Repeat([]byte{0xdd}, 63)),
+			input:   pack(bytes.Repeat([]byte{0xdd}, 63)),
 			want:    bytes.Repeat([]byte{0xdd}, 63),
 			wantErr: nil,
 		},
 		{
 			name:    "64 bytes",
-			input:   new(bytes.Repeat([]byte{0x33}, 64)),
+			input:   pack(bytes.Repeat([]byte{0x33}, 64)),
 			want:    bytes.Repeat([]byte{0x33}, 64),
 			wantErr: nil,
 		},
 		{
 			name:    "65 bytes",
-			input:   new(bytes.Repeat([]byte{0xdd}, 65)),
+			input:   pack(bytes.Repeat([]byte{0xdd}, 65)),
 			want:    bytes.Repeat([]byte{0xdd}, 65),
 			wantErr: nil,
 		},
@@ -265,7 +265,7 @@ func TestUnpack(t *testing.T) {
 
 func FuzzPackUnpack(f *testing.F) {
 	f.Fuzz(func(t *testing.T, input []byte) {
-		packed := new(input)
+		packed := pack(input)
 		unpacked, err := Unpack(packed)
 		require.NoError(t, err)
 		require.Equal(t, input, unpacked)
@@ -279,7 +279,7 @@ func FuzzUnpackPackEqual(f *testing.F) {
 		for j := range input {
 			input[j] = byte(j + 1)
 		}
-		validPredicate := new(input)
+		validPredicate := pack(input)
 		f.Add(validPredicate)
 	}
 
@@ -289,7 +289,7 @@ func FuzzUnpackPackEqual(f *testing.F) {
 			t.Skip("invalid predicate")
 		}
 
-		packed := new(unpacked)
+		packed := pack(unpacked)
 		require.Equal(t, original, packed)
 	})
 }

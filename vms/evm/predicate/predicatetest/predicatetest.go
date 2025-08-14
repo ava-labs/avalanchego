@@ -15,7 +15,7 @@ import (
 // and zero-padding to a multiple of 32 bytes, then splits into 32-byte chunks
 // (common.Hash) as required by the access list storage keys.
 func NewAccessList(address common.Address, predicateBytes []byte) types.AccessList {
-	packed := new(predicateBytes)
+	packed := pack(predicateBytes)
 	numHashes := len(packed) / common.HashLength
 	storageKeys := make([]common.Hash, numHashes)
 	for i := range storageKeys {
@@ -31,7 +31,7 @@ func NewAccessList(address common.Address, predicateBytes []byte) types.AccessLi
 	}
 }
 
-func new(b []byte) []byte {
+func pack(b []byte) []byte {
 	bytes := make([]byte, len(b)+1)
 	copy(bytes, b)
 	bytes[len(b)] = 0xff

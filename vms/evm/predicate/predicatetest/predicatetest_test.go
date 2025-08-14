@@ -87,7 +87,7 @@ func TestNewAccessListWithPredicate(t *testing.T) {
 			require.Len(accessList[0].StorageKeys, tt.wantNumHashes)
 
 			// Verify the predicate data is correctly encoded in storage keys
-			predicateData := new(tt.predicateBytes)
+			predicateData := pack(tt.predicateBytes)
 			for i, storageKey := range accessList[0].StorageKeys {
 				start := i * common.HashLength
 				end := start + common.HashLength

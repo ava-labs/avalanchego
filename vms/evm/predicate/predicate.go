@@ -53,10 +53,10 @@ func RoundUpTo32(x int) int {
 	return (x + 31) / 32 * 32
 }
 
-// new returns a 32-byte aligned predicate from b by appending a delimiter and zero-padding
+// pack returns a 32-byte aligned predicate from b by appending a delimiter and zero-padding
 // until the length is a multiple of 32. 32-byte aligned predicates should not be exposed
 // outside of this package.
-func new(b []byte) []byte {
+func pack(b []byte) []byte {
 	bytes := make([]byte, len(b)+1)
 	copy(bytes, b)
 	bytes[len(b)] = delimiter
