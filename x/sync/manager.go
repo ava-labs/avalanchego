@@ -798,7 +798,7 @@ func findNextKey(
 		lastReceivedKey = keyChanges[len(keyChanges)-1].Key
 
 		// If the proof provides keys after the range end, we can return that the range was complete.
-		if compareKeys(maybe.Some(lastReceivedKey), rangeEnd) > 0 {
+		if compareKeys(maybe.Some(lastReceivedKey), rangeEnd) >= 0 {
 			return maybe.Nothing[[]byte](), nil
 		}
 	}
