@@ -87,19 +87,19 @@ type VM struct {
 	baseCodec     codec.Registry
 	AtomicMempool *txpool.Mempool
 
-	// [atomicTxRepository] maintains two indexes on accepted atomic txs.
+	// AtomicTxRepository maintains two indexes on accepted atomic txs.
 	// - txID to accepted atomic tx
 	// - block height to list of atomic txs accepted on block at that height
 	// TODO: unexport these fields
 	AtomicTxRepository *atomicstate.AtomicRepository
-	// [atomicBackend] abstracts verification and processing of atomic transactions
+	// AtomicBackend abstracts verification and processing of atomic transactions
 	AtomicBackend *atomicstate.AtomicBackend
 
 	atomicTxGossipHandler p2p.Handler
 	AtomicTxPushGossiper  *avalanchegossip.PushGossiper[*atomic.Tx]
 	AtomicTxPullGossiper  avalanchegossip.Gossiper
 
-	// [cancel] may be nil until [snow.NormalOp] starts
+	// cancel may be nil until [snow.NormalOp] starts
 	cancel     context.CancelFunc
 	shutdownWg sync.WaitGroup
 
@@ -381,7 +381,7 @@ func (vm *VM) verifyTxAtTip(tx *atomic.Tx) error {
 	if gasUsed > maxAtomicTxMempoolGas {
 		return fmt.Errorf("tx gas usage (%d) exceeds maximum allowed mempool gas usage (%d)", gasUsed, maxAtomicTxMempoolGas)
 	}
-	blockchain := vm.InnerVM.Blockchain()
+	blockchain := vm.InnerVM.Ethereum().BlockChain()
 	// Note: we fetch the current block and then the state at that block instead of the current state directly
 	// since we need the header of the current block below.
 	preferredBlock := blockchain.CurrentBlock()
@@ -403,7 +403,7 @@ func (vm *VM) verifyTxAtTip(tx *atomic.Tx) error {
 	}
 
 	// We don’t need to revert the state here in case verifyTx errors, because
-	// [preferredState] is thrown away either way.
+	// preferredState is thrown away either way.
 	return vm.verifyTx(tx, parentHeader.Hash(), nextBaseFee, preferredState, *extraRules)
 }
 
@@ -430,7 +430,7 @@ func (vm *VM) verifyTx(tx *atomic.Tx, parentHash common.Hash, baseFee *big.Int, 
 // using [rules] as the current rule set.
 func (vm *VM) verifyTxs(txs []*atomic.Tx, parentHash common.Hash, baseFee *big.Int, height uint64, rules extras.Rules) error {
 	// Ensure that the parent was verified and inserted correctly.
-	if !vm.InnerVM.Blockchain().HasBlock(parentHash, height-1) {
+	if !vm.InnerVM.Ethereum().BlockChain().HasBlock(parentHash, height-1) {
 		return errRejectedParent
 	}
 
@@ -756,7 +756,7 @@ func (vm *VM) rules(number *big.Int, time uint64) extras.Rules {
 
 // CurrentRules returns the chain rules for the current block.
 func (vm *VM) CurrentRules() extras.Rules {
-	header := vm.InnerVM.Blockchain().CurrentHeader()
+	header := vm.InnerVM.Ethereum().BlockChain().CurrentHeader()
 	return vm.rules(header.Number, header.Time)
 }
 
@@ -809,7 +809,7 @@ func (vm *VM) NewExportTx(
 	baseFee *big.Int, // fee to use post-AP3
 	keys []*secp256k1.PrivateKey, // Pay the fee and provide the tokens
 ) (*atomic.Tx, error) {
-	statedb, err := vm.InnerVM.Blockchain().State()
+	statedb, err := vm.Ethereum().BlockChain().State()
 	if err != nil {
 		return nil, err
 	}

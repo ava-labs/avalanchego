@@ -20,11 +20,9 @@ import (
 	"github.com/ava-labs/libevm/log"
 )
 
-const (
-	// Minimum amount of time to wait after building a block before attempting to build a block
-	// a second time without changing the contents of the mempool.
-	minBlockBuildingRetryDelay = 500 * time.Millisecond
-)
+// Minimum amount of time to wait after building a block before attempting to build a block
+// a second time without changing the contents of the mempool.
+const MinBlockBuildingRetryDelay = 500 * time.Millisecond
 
 type blockBuilder struct {
 	ctx *snow.Context
@@ -122,13 +120,13 @@ func (b *blockBuilder) waitForEvent(ctx context.Context) (commonEng.Message, err
 		return 0, err
 	}
 	timeSinceLastBuildTime := time.Since(lastBuildTime)
-	if b.lastBuildTime.IsZero() || timeSinceLastBuildTime >= minBlockBuildingRetryDelay {
+	if b.lastBuildTime.IsZero() || timeSinceLastBuildTime >= MinBlockBuildingRetryDelay {
 		b.ctx.Log.Debug("Last time we built a block was long enough ago, no need to wait",
 			zap.Duration("timeSinceLastBuildTime", timeSinceLastBuildTime),
 		)
 		return commonEng.PendingTxs, nil
 	}
-	timeUntilNextBuild := minBlockBuildingRetryDelay - timeSinceLastBuildTime
+	timeUntilNextBuild := MinBlockBuildingRetryDelay - timeSinceLastBuildTime
 	b.ctx.Log.Debug("Last time we built a block was too recent, waiting",
 		zap.Duration("timeUntilNextBuild", timeUntilNextBuild),
 	)

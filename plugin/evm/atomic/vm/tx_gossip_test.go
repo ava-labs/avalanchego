@@ -1,16 +1,16 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package evm
+package vm
 
 import (
 	"context"
 	"encoding/binary"
-	"math/big"
 	"sync"
 	"testing"
 	"time"
 
+	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -27,21 +27,29 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/vms/components/avax"
+	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/config"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/coreth/plugin/evm/vmtest"
 	"github.com/ava-labs/coreth/utils"
-	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/coreth/utils/utilstest"
 )
 
-func TestEthTxGossip(t *testing.T) {
+func TestAtomicTxGossip(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx, cancel := utilstest.NewTestContext(t)
+	defer cancel()
+
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	snowCtx.AVAXAssetID = ids.GenerateTestID()
 	validatorState := utils.NewTestValidatorState()
 	snowCtx.ValidatorState = validatorState
+	memory := avalancheatomic.NewMemory(memdb.New())
+	snowCtx.SharedMemory = memory.NewSharedMemory(snowCtx.ChainID)
 
 	pk, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
@@ -53,7 +61,7 @@ func TestEthTxGossip(t *testing.T) {
 	responseSender := &enginetest.SenderStub{
 		SentAppResponse: make(chan []byte, 1),
 	}
-	vm := newDefaultTestVM()
+	vm := newAtomicTestVM()
 
 	require.NoError(vm.Initialize(
 		ctx,
@@ -75,10 +83,9 @@ func TestEthTxGossip(t *testing.T) {
 	peerSender := &enginetest.SenderStub{
 		SentAppRequest: make(chan []byte, 1),
 	}
-
 	network, err := p2p.NewNetwork(logging.NoLog{}, peerSender, prometheus.NewRegistry(), "")
 	require.NoError(err)
-	client := network.NewClient(p2p.TxGossipHandlerID)
+	client := network.NewClient(p2p.AtomicTxGossipHandlerID)
 
 	// we only accept gossip requests from validators
 	requestingNodeID := ids.GenerateTestNodeID()
@@ -123,26 +130,33 @@ func TestEthTxGossip(t *testing.T) {
 		require.Empty(response.Gossip)
 		wg.Done()
 	}
-	require.NoError(client.AppRequest(ctx, set.Of(vm.ctx.NodeID), requestBytes, onResponse))
+	require.NoError(client.AppRequest(ctx, set.Of(vm.Ctx.NodeID), requestBytes, onResponse))
 	require.NoError(vm.AppRequest(ctx, requestingNodeID, 1, time.Time{}, <-peerSender.SentAppRequest))
 	require.NoError(network.AppResponse(ctx, snowCtx.NodeID, 1, <-responseSender.SentAppResponse))
-	wg.Wait()
+	utilstest.WaitGroupWithContext(t, ctx, wg)
 
 	// Issue a tx to the VM
-	tx := types.NewTransaction(0, address, big.NewInt(10), 100_000, big.NewInt(ap0.MinGasPrice), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainID), pk.ToECDSA())
+	utxo, err := addUTXO(
+		memory,
+		snowCtx,
+		ids.GenerateTestID(),
+		0,
+		snowCtx.AVAXAssetID,
+		100_000_000_000,
+		pk.Address(),
+	)
 	require.NoError(err)
-
-	errs := vm.txPool.Add([]*types.Transaction{signedTx}, true, true)
-	require.Len(errs, 1)
-	require.Nil(errs[0])
+	tx, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.clock.Unix(), vm.Ctx.XChainID, address, vmtest.InitialBaseFee, secp256k1fx.NewKeychain(pk), []*avax.UTXO{utxo})
+	require.NoError(err)
+	require.NoError(vm.AtomicMempool.AddLocalTx(tx))
 
 	// wait so we aren't throttled by the vm
-	time.Sleep(5 * time.Second)
+	utilstest.SleepWithContext(ctx, 5*time.Second)
 
-	marshaller := GossipEthTxMarshaller{}
 	// Ask the VM for new transactions. We should get the newly issued tx.
 	wg.Add(1)
+
+	marshaller := atomic.TxMarshaller{}
 	onResponse = func(_ context.Context, nodeID ids.NodeID, responseBytes []byte, err error) {
 		require.NoError(err)
 
@@ -152,33 +166,41 @@ func TestEthTxGossip(t *testing.T) {
 
 		gotTx, err := marshaller.UnmarshalGossip(response.Gossip[0])
 		require.NoError(err)
-		require.Equal(signedTx.Hash(), gotTx.Tx.Hash())
+		require.Equal(tx.ID(), gotTx.GossipID())
 
 		wg.Done()
 	}
-	require.NoError(client.AppRequest(ctx, set.Of(vm.ctx.NodeID), requestBytes, onResponse))
+	require.NoError(client.AppRequest(ctx, set.Of(vm.Ctx.NodeID), requestBytes, onResponse))
 	require.NoError(vm.AppRequest(ctx, requestingNodeID, 3, time.Time{}, <-peerSender.SentAppRequest))
 	require.NoError(network.AppResponse(ctx, snowCtx.NodeID, 3, <-responseSender.SentAppResponse))
-	wg.Wait()
+	utilstest.WaitGroupWithContext(t, ctx, wg)
 }
 
 // Tests that a tx is gossiped when it is issued
-func TestEthTxPushGossipOutbound(t *testing.T) {
+func TestAtomicTxPushGossipOutbound(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx, cancel := utilstest.NewTestContext(t)
+	defer cancel()
+
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	snowCtx.AVAXAssetID = ids.GenerateTestID()
+	validatorState := utils.NewTestValidatorState()
+	snowCtx.ValidatorState = validatorState
+	memory := avalancheatomic.NewMemory(memdb.New())
+	snowCtx.SharedMemory = memory.NewSharedMemory(snowCtx.ChainID)
+
+	pk, err := secp256k1.NewPrivateKey()
+	require.NoError(err)
+	address := pk.EthAddress()
+	genesis := vmtest.NewPrefundedGenesis(100_000_000_000_000_000, address)
+	genesisBytes, err := genesis.MarshalJSON()
+	require.NoError(err)
+
 	sender := &enginetest.SenderStub{
 		SentAppGossip: make(chan []byte, 1),
 	}
-
-	vm := newDefaultTestVM()
-
-	pk, err := secp256k1.NewPrivateKey()
-	require.NoError(err)
-	address := pk.EthAddress()
-	genesis := vmtest.NewPrefundedGenesis(100_000_000_000_000_000, address)
-	genesisBytes, err := genesis.MarshalJSON()
-	require.NoError(err)
+	vm := newAtomicTestVM()
+	vm.AtomicTxPullGossiper = gossip.NoOpGossiper{}
 
 	require.NoError(vm.Initialize(
 		ctx,
@@ -196,38 +218,47 @@ func TestEthTxPushGossipOutbound(t *testing.T) {
 		require.NoError(vm.Shutdown(ctx))
 	}()
 
-	tx := types.NewTransaction(0, address, big.NewInt(10), 100_000, big.NewInt(ap0.MinGasPrice), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainID), pk.ToECDSA())
+	// Issue a tx to the VM
+	utxo, err := addUTXO(
+		memory,
+		snowCtx,
+		ids.GenerateTestID(),
+		0,
+		snowCtx.AVAXAssetID,
+		100_000_000_000,
+		pk.Address(),
+	)
 	require.NoError(err)
-
-	// issue a tx
-	require.NoError(vm.txPool.Add([]*types.Transaction{signedTx}, true, true)[0])
-	vm.ethTxPushGossiper.Get().Add(&GossipEthTx{signedTx})
-
-	sent := <-sender.SentAppGossip
-	got := &sdk.PushGossip{}
-
-	// we should get a message that has the protocol prefix and the gossip
-	// message
-	require.Equal(byte(p2p.TxGossipHandlerID), sent[0])
-	require.NoError(proto.Unmarshal(sent[1:], got))
-
-	marshaller := GossipEthTxMarshaller{}
-	require.Len(got.Gossip, 1)
-	gossipedTx, err := marshaller.UnmarshalGossip(got.Gossip[0])
+	tx, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.clock.Unix(), vm.Ctx.XChainID, address, vmtest.InitialBaseFee, secp256k1fx.NewKeychain(pk), []*avax.UTXO{utxo})
 	require.NoError(err)
-	require.Equal(ids.ID(signedTx.Hash()), gossipedTx.GossipID())
+	require.NoError(vm.AtomicMempool.AddLocalTx(tx))
+	vm.AtomicTxPushGossiper.Add(tx)
+
+	gossipedBytes := <-sender.SentAppGossip
+	require.Equal(byte(p2p.AtomicTxGossipHandlerID), gossipedBytes[0])
+
+	outboundGossipMsg := &sdk.PushGossip{}
+	require.NoError(proto.Unmarshal(gossipedBytes[1:], outboundGossipMsg))
+	require.Len(outboundGossipMsg.Gossip, 1)
+
+	marshaller := atomic.TxMarshaller{}
+	gossipedTx, err := marshaller.UnmarshalGossip(outboundGossipMsg.Gossip[0])
+	require.NoError(err)
+	require.Equal(tx.ID(), gossipedTx.ID())
 }
 
-// Tests that a gossiped tx is added to the mempool and forwarded
-func TestEthTxPushGossipInbound(t *testing.T) {
+// Tests that a tx is gossiped when it is issued
+func TestAtomicTxPushGossipInbound(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
-	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	ctx, cancel := utilstest.NewTestContext(t)
+	defer cancel()
 
-	sender := &enginetest.Sender{}
-	vm := newDefaultTestVM()
-	vm.ethTxPullGossiper = gossip.NoOpGossiper{}
+	snowCtx := snowtest.Context(t, snowtest.CChainID)
+	snowCtx.AVAXAssetID = ids.GenerateTestID()
+	validatorState := utils.NewTestValidatorState()
+	snowCtx.ValidatorState = validatorState
+	memory := avalancheatomic.NewMemory(memdb.New())
+	snowCtx.SharedMemory = memory.NewSharedMemory(snowCtx.ChainID)
 
 	pk, err := secp256k1.NewPrivateKey()
 	require.NoError(err)
@@ -235,6 +266,10 @@ func TestEthTxPushGossipInbound(t *testing.T) {
 	genesis := vmtest.NewPrefundedGenesis(100_000_000_000_000_000, address)
 	genesisBytes, err := genesis.MarshalJSON()
 	require.NoError(err)
+
+	sender := &enginetest.Sender{}
+	vm := newAtomicTestVM()
+	vm.AtomicTxPullGossiper = gossip.NoOpGossiper{}
 
 	require.NoError(vm.Initialize(
 		ctx,
@@ -252,26 +287,33 @@ func TestEthTxPushGossipInbound(t *testing.T) {
 		require.NoError(vm.Shutdown(ctx))
 	}()
 
-	tx := types.NewTransaction(0, address, big.NewInt(10), 100_000, big.NewInt(ap0.MinGasPrice), nil)
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainID), pk.ToECDSA())
+	// issue a tx to the vm
+	utxo, err := addUTXO(
+		memory,
+		snowCtx,
+		ids.GenerateTestID(),
+		0,
+		snowCtx.AVAXAssetID,
+		100_000_000_000,
+		pk.Address(),
+	)
 	require.NoError(err)
+	tx, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.clock.Unix(), vm.Ctx.XChainID, address, vmtest.InitialBaseFee, secp256k1fx.NewKeychain(pk), []*avax.UTXO{utxo})
+	require.NoError(err)
+	require.NoError(vm.AtomicMempool.AddLocalTx(tx))
 
-	marshaller := GossipEthTxMarshaller{}
-	gossipedTx := &GossipEthTx{
-		Tx: signedTx,
-	}
-	gossipedTxBytes, err := marshaller.MarshalGossip(gossipedTx)
+	marshaller := atomic.TxMarshaller{}
+	gossipBytes, err := marshaller.MarshalGossip(tx)
 	require.NoError(err)
 
 	inboundGossip := &sdk.PushGossip{
-		Gossip: [][]byte{gossipedTxBytes},
+		Gossip: [][]byte{gossipBytes},
 	}
-
 	inboundGossipBytes, err := proto.Marshal(inboundGossip)
 	require.NoError(err)
 
-	inboundGossipMsg := append(binary.AppendUvarint(nil, p2p.TxGossipHandlerID), inboundGossipBytes...)
-	require.NoError(vm.AppGossip(ctx, ids.EmptyNodeID, inboundGossipMsg))
+	inboundGossipMsg := append(binary.AppendUvarint(nil, p2p.AtomicTxGossipHandlerID), inboundGossipBytes...)
 
-	require.True(vm.txPool.Has(signedTx.Hash()))
+	require.NoError(vm.AppGossip(ctx, ids.EmptyNodeID, inboundGossipMsg))
+	require.True(vm.AtomicMempool.Has(tx.ID()))
 }

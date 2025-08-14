@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
-	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
@@ -65,8 +65,8 @@ func (vm *VM) ChainConfig() *params.ChainConfig {
 	return vm.chainConfig
 }
 
-func (vm *VM) Blockchain() *core.BlockChain {
-	return vm.blockChain
+func (vm *VM) Ethereum() *eth.Ethereum {
+	return vm.eth
 }
 
 func (vm *VM) Config() config.Config {
