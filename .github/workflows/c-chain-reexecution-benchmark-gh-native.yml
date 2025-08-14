@@ -92,6 +92,8 @@ jobs:
           end-block: ${{ matrix.end-block }}
           block-dir-src: ${{ matrix.block-dir-src }}
           current-state-dir-src: ${{ matrix.current-state-dir-src }}
+          prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus-push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           push-github-action-benchmark: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master') }}
