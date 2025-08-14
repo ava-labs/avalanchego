@@ -257,13 +257,8 @@ func TestUnpack(t *testing.T) {
 
 			unpacked, err := Unpack(tt.input)
 
-			if tt.wantErr != nil {
-				require.ErrorIs(err, tt.wantErr)
-				require.Nil(unpacked)
-			} else {
-				require.NoError(err)
-				require.Equal(tt.want, unpacked)
-			}
+			require.ErrorIs(err, tt.wantErr)
+			require.Equal(tt.want, unpacked)
 		})
 	}
 }
