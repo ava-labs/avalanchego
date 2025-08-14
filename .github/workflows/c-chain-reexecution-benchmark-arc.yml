@@ -56,7 +56,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             {
               echo "start-block=101"
-              echo "end-block=1000"
+              echo "end-block=250000"
               echo "source-block-dir=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip"
               echo "current-state-dir=s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip"
             } >> "$GITHUB_OUTPUT"
@@ -86,7 +86,7 @@ jobs:
           prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           push-github-action-benchmark: ${{ github.event_name == 'schedule' }}
-          aws-role: ${{ secrets.AWS_S3_RW_ROLE }}
+          aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: 'us-east-2'
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          push-post-state: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-1k/
+          push-post-state: ${{ github.event.inputs.push-post-state }}
