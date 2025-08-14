@@ -288,7 +288,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 					},
 				}
 			}(),
-			expectedErr: pmempool.ErrGasCapacityExceeded,
+			expectedErr: pmempool.ErrNotEnoughGas,
 		},
 		{
 			name: "happy path",
