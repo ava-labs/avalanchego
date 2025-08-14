@@ -63,9 +63,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .manager(mgrcfg)
         .build();
 
-    let db = Db::new("rev_db", cfg)
-        .await
-        .expect("db initiation should succeed");
+    let db = Db::new("rev_db", cfg).expect("db initiation should succeed");
 
     let keys = args.batch_size;
     let start = Instant::now();

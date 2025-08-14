@@ -45,7 +45,6 @@ pedantic = { level = "warn", priority = -1 }
 # These lints are from pedantic but allowed. They are a bit too pedantic and
 # encourage making backwards incompatible changes.
 needless_pass_by_value = "allow"
-unused_async = "allow"
 unnecessary_wraps = "allow"
 unused_self = "allow"
 # Ignore interger casts. This is to avoid unnecessary `try_into` calls for usize

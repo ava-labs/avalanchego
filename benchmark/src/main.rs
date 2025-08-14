@@ -257,9 +257,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .manager(mgrcfg)
         .build();
 
-    let db = Db::new(args.global_opts.dbname.clone(), cfg)
-        .await
-        .expect("db initiation should succeed");
+    let db = Db::new(args.global_opts.dbname.clone(), cfg).expect("db initiation should succeed");
 
     match args.test_name {
         TestName::Create => {

@@ -228,23 +228,7 @@ impl api::Db for Db {
 
 impl Db {
     /// Create a new database instance.
-    pub async fn new<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, api::Error> {
-        let metrics = Arc::new(DbMetrics {
-            proposals: counter!("firewood.proposals"),
-        });
-        describe_counter!("firewood.proposals", "Number of proposals created");
-        let config_manager = ConfigManager::builder()
-            .create(cfg.create_if_missing)
-            .truncate(cfg.truncate)
-            .manager(cfg.manager)
-            .build();
-        let manager = RevisionManager::new(db_path.as_ref().to_path_buf(), config_manager)?;
-        let db = Self { metrics, manager };
-        Ok(db)
-    }
-
-    /// Create a new database instance with synchronous I/O.
-    pub fn new_sync<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, api::Error> {
+    pub fn new<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, api::Error> {
         let metrics = Arc::new(DbMetrics {
             proposals: counter!("firewood.proposals"),
         });
@@ -311,12 +295,7 @@ impl Db {
     }
 
     /// Dump the Trie of the latest revision.
-    pub async fn dump(&self, w: &mut dyn Write) -> Result<(), std::io::Error> {
-        self.dump_sync(w)
-    }
-
-    /// Dump the Trie of the latest revision, synchronously.
-    pub fn dump_sync(&self, w: &mut dyn Write) -> Result<(), std::io::Error> {
+    pub fn dump(&self, w: &mut dyn Write) -> Result<(), std::io::Error> {
         let latest_rev_nodestore = self.manager.current_revision();
         let merkle = Merkle::from(latest_rev_nodestore);
         merkle.dump(w).map_err(std::io::Error::other)
@@ -328,7 +307,7 @@ impl Db {
     }
 
     /// Check the database for consistency
-    pub async fn check(&self, opt: CheckOpt) -> CheckerReport {
+    pub fn check(&self, opt: CheckOpt) -> CheckerReport {
         let latest_rev_nodestore = self.manager.current_revision();
         latest_rev_nodestore.check(opt)
     }
@@ -512,7 +491,7 @@ mod test {
 
     #[tokio::test]
     async fn test_proposal_reads() {
-        let db = testdb().await;
+        let db = testdb();
         let batch = vec![BatchOp::Put {
             key: b"k",
             value: b"v",
@@ -537,7 +516,7 @@ mod test {
 
     #[tokio::test]
     async fn reopen_test() {
-        let db = testdb().await;
+        let db = testdb();
         let initial_root = db.root_hash().await.unwrap();
         let batch = vec![
             BatchOp::Put {
@@ -553,13 +532,13 @@ mod test {
         proposal.commit().await.unwrap();
         println!("{:?}", db.root_hash().await.unwrap().unwrap());
 
-        let db = db.reopen().await;
+        let db = db.reopen();
         println!("{:?}", db.root_hash().await.unwrap().unwrap());
         let committed = db.root_hash().await.unwrap().unwrap();
         let historical = db.revision(committed).await.unwrap();
         assert_eq!(&*historical.val(b"a").await.unwrap().unwrap(), b"1");
 
-        let db = db.replace().await;
+        let db = db.replace();
         println!("{:?}", db.root_hash().await.unwrap());
         assert!(db.root_hash().await.unwrap() == initial_root);
     }
@@ -570,7 +549,7 @@ mod test {
     // R1 --> P2 - will get dropped
     //    \-> P3 - will get orphaned, but it's still known
     async fn test_proposal_scope_historic() {
-        let db = testdb().await;
+        let db = testdb();
         let batch1 = vec![BatchOp::Put {
             key: b"k1",
             value: b"v1",
@@ -622,7 +601,7 @@ mod test {
     //   \-> P2 - will get dropped
     //    \-> P3 - will get orphaned, but it's still known
     async fn test_proposal_scope_orphan() {
-        let db = testdb().await;
+        let db = testdb();
         let batch1 = vec![BatchOp::Put {
             key: b"k1",
             value: b"v1",
@@ -673,7 +652,7 @@ mod test {
 
     #[tokio::test]
     async fn test_view_sync() {
-        let db = testdb().await;
+        let db = testdb();
 
         // Create and commit some data to get a historical revision
         let batch = vec![BatchOp::Put {
@@ -718,7 +697,7 @@ mod test {
         // number of keys and values to create for this test
         const N: usize = 20;
 
-        let db = testdb().await;
+        let db = testdb();
 
         // create N keys and values like (key0, value0)..(keyN, valueN)
         let (keys, vals): (Vec<_>, Vec<_>) = (0..N)
@@ -779,7 +758,7 @@ mod test {
 
         let rng = firewood_storage::SeededRng::from_env_or_random();
 
-        let db = testdb().await;
+        let db = testdb();
 
         // takes about 0.3s on a mac to run 50 times
         for _ in 0..50 {
@@ -804,12 +783,10 @@ mod test {
 
             // check the database for consistency, sometimes checking the hashes
             let hash_check = rng.random();
-            let report = db
-                .check(CheckOpt {
-                    hash_check,
-                    progress_bar: None,
-                })
-                .await;
+            let report = db.check(CheckOpt {
+                hash_check,
+                progress_bar: None,
+            });
             if report
                 .errors
                 .iter()
@@ -817,7 +794,7 @@ mod test {
                 .count()
                 != 0
             {
-                db.dump(&mut std::io::stdout()).await.unwrap();
+                db.dump(&mut std::io::stdout()).unwrap();
                 panic!("error: {:?}", report.errors);
             }
         }
@@ -828,7 +805,7 @@ mod test {
         const NUM_KEYS: NonZeroUsize = const { NonZeroUsize::new(2).unwrap() };
         const NUM_PROPOSALS: usize = 100;
 
-        let db = testdb().await;
+        let db = testdb();
 
         let ops = (0..(NUM_KEYS.get() * NUM_PROPOSALS))
             .map(|i| (format!("key{i}"), format!("value{i}")))
@@ -890,7 +867,7 @@ mod test {
 
         const CHANNEL_CAPACITY: usize = 8;
 
-        let testdb = testdb().await;
+        let testdb = testdb();
         let db = &testdb.db;
 
         let (tx, mut rx): (Sender<Proposal<'_>>, Receiver<Proposal<'_>>) =
@@ -950,13 +927,13 @@ mod test {
         }
     }
 
-    async fn testdb() -> TestDb {
+    fn testdb() -> TestDb {
         let tmpdir = tempfile::tempdir().unwrap();
         let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
             .iter()
             .collect();
         let dbconfig = DbConfig::builder().build();
-        let db = Db::new(dbpath, dbconfig).await.unwrap();
+        let db = Db::new(dbpath, dbconfig).unwrap();
         TestDb { db, tmpdir }
     }
 
@@ -966,23 +943,23 @@ mod test {
                 .iter()
                 .collect()
         }
-        async fn reopen(self) -> Self {
+        fn reopen(self) -> Self {
             let path = self.path();
             drop(self.db);
             let dbconfig = DbConfig::builder().truncate(false).build();
 
-            let db = Db::new(path, dbconfig).await.unwrap();
+            let db = Db::new(path, dbconfig).unwrap();
             TestDb {
                 db,
                 tmpdir: self.tmpdir,
             }
         }
-        async fn replace(self) -> Self {
+        fn replace(self) -> Self {
             let path = self.path();
             drop(self.db);
             let dbconfig = DbConfig::builder().truncate(true).build();
 
-            let db = Db::new(path, dbconfig).await.unwrap();
+            let db = Db::new(path, dbconfig).unwrap();
             TestDb {
                 db,
                 tmpdir: self.tmpdir,

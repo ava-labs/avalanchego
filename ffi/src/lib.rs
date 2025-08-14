@@ -889,7 +889,7 @@ unsafe fn open_db(args: &CreateOrOpenArgs) -> Result<Db, String> {
         .path
         .as_str()
         .map_err(|e| format!("Invalid database path: {e}"))?;
-    Db::new_sync(path, cfg).map_err(|e| e.to_string())
+    Db::new(path, cfg).map_err(|e| e.to_string())
 }
 
 /// Arguments for logging

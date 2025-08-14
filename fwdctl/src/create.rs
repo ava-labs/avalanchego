@@ -49,11 +49,11 @@ pub(super) fn new(opts: &Options) -> DbConfig {
     DbConfig::builder().truncate(opts.truncate).build()
 }
 
-pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
+pub(super) fn run(opts: &Options) -> Result<(), api::Error> {
     let db_config = new(opts);
     log::debug!("database configuration parameters: \n{db_config:?}\n");
 
-    Db::new(opts.database.dbpath.clone(), db_config).await?;
+    Db::new(opts.database.dbpath.clone(), db_config)?;
     println!(
         "created firewood database in {}",
         opts.database.dbpath.display()

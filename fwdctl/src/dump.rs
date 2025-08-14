@@ -143,7 +143,7 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
     }
 
     let cfg = DbConfig::builder().create_if_missing(false).truncate(false);
-    let db = Db::new(opts.database.dbpath.clone(), cfg.build()).await?;
+    let db = Db::new(opts.database.dbpath.clone(), cfg.build())?;
     let latest_hash = db.root_hash().await?;
     let Some(latest_hash) = latest_hash else {
         println!("Database is empty");
@@ -178,7 +178,7 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
                 if (stop_key.as_ref().is_some_and(|stop_key| key >= *stop_key))
                     || key_count_exceeded(opts.max_key_count, key_count)
                 {
-                    handle_next_key(stream.next().await).await;
+                    handle_next_key(stream.next().await);
                     break;
                 }
             }
@@ -223,7 +223,7 @@ fn key_value_to_string(key: &[u8], value: &[u8], hex: bool) -> (String, String) 
     (key_str, value_str)
 }
 
-async fn handle_next_key(next_key: KeyFromStream) {
+fn handle_next_key(next_key: KeyFromStream) {
     match next_key {
         Some(Ok((key, _))) => {
             println!(
@@ -343,7 +343,7 @@ fn create_output_handler(
             let file = File::create(file_name)?;
             let mut writer = BufWriter::new(file);
             // For dot format, we generate the output immediately since it doesn't use streaming
-            db.dump_sync(&mut writer)?;
+            db.dump(&mut writer)?;
             Ok(None)
         }
     }

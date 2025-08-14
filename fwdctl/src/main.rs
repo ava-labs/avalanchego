@@ -81,14 +81,14 @@ async fn main() -> Result<(), api::Error> {
     );
 
     match &cli.command {
-        Commands::Create(opts) => create::run(opts).await,
+        Commands::Create(opts) => create::run(opts),
         Commands::Insert(opts) => insert::run(opts).await,
         Commands::Get(opts) => get::run(opts).await,
         Commands::Delete(opts) => delete::run(opts).await,
         Commands::Root(opts) => root::run(opts).await,
         Commands::Dump(opts) => dump::run(opts).await,
-        Commands::Graph(opts) => graph::run(opts).await,
-        Commands::Check(opts) => check::run(opts).await,
+        Commands::Graph(opts) => graph::run(opts),
+        Commands::Check(opts) => check::run(opts),
     }
 }
 
