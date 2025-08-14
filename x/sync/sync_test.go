@@ -228,10 +228,11 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	rangeProof, err = proofParser.ParseRangeProof(fullProofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some(endPointBeforeNewKey), uint32(numKeys))
 	require.NoError(err)
 
-	// next key would be after the end of the range, so it returns Nothing instead
+	// next key would be after the end of the range, so it return the first key afterward
+	expectedEndKey := append(endPointBeforeNewKey, 0)
 	nextKey, err = rangeProof.FindNextKey(ctx)
 	require.NoError(err)
-	require.Equal(endPointBeforeNewKey, nextKey.Value())
+	require.Equal(expectedEndKey, nextKey.Value())
 }
 
 func Test_Sync_FindNextKey_Deleted(t *testing.T) {
@@ -310,10 +311,11 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	require.NoError(err)
 	require.NoError(rangeProof.Verify(ctx))
 
-	// The exact next key must be after the requested range
+	// The exact next key must be after the requested range, since all keys were retrieved.
+	expectedNextKey := []byte{0x20, 0x00}
 	nextKey, err := rangeProof.FindNextKey(ctx)
 	require.NoError(err)
-	require.GreaterOrEqual(compareKeys(maybe.Some([]byte{0x20}), nextKey), 0)
+	require.Equal(expectedNextKey, nextKey.Value())
 
 	// Add another key afterward
 	require.NoError(db.Put([]byte{0x11, 0x15}, []byte{4}))
@@ -677,11 +679,17 @@ func TestFindNextKeyRandom(t *testing.T) {
 		gotFirstDiff, err := rangeProof.FindNextKey(context.Background())
 		require.NoError(err)
 
-		// The next key should be bounded by the next key not in the proof
 		actualNextKey := maybe.Nothing[[]byte]()
 		if len(smallestDiffKey.Bytes()) > 0 {
-			actualNextKey = maybe.Some(smallestDiffKey.Bytes())
+			keyBytes := smallestDiffKey.Bytes()
+			// If after the end range, we expect to get the next key after the range
+			if compareKeys(endKey, maybe.Some(keyBytes)) <= 0 {
+				keyBytes = append(keyBytes, 0)
+			}
+			actualNextKey = maybe.Some(keyBytes)
 		}
+
+		// Check that the next key is within the expected bounds.
 		require.LessOrEqual(compareKeys(gotFirstDiff, actualNextKey), 0)
 	}
 }

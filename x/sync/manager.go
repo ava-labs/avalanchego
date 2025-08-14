@@ -49,6 +49,7 @@ var (
 	ErrNoParserProvided              = errors.New("proof parser is a required field of the sync config")
 	ErrNoLogProvided                 = errors.New("log is a required field of the sync config")
 	ErrZeroWorkLimit                 = errors.New("simultaneous work limit must be greater than 0")
+	errEndProofRequired              = errors.New("end proof is required to find the next key")
 	errInvalidRangeProof             = errors.New("failed to verify range proof")
 	errInvalidChangeProof            = errors.New("failed to verify change proof")
 	errTooManyKeys                   = errors.New("response contains more than requested keys")
@@ -606,9 +607,11 @@ func (r *rangeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], erro
 		return maybe.Nothing[[]byte](), err
 	}
 
-	// If nextKey is Nothing because we finished the range, return the end key
-	if nextKey.IsNothing() {
-		return r.request.endKey, nil
+	// If nextKey is Nothing because we finished the range, return the next possible key
+	if nextKey.IsNothing() && r.request.endKey.HasValue() {
+		afterEndKey := r.request.endKey.Value()
+		afterEndKey = append(afterEndKey, 0)
+		return maybe.Some(afterEndKey), nil
 	}
 
 	return nextKey, nil
@@ -766,9 +769,11 @@ func (c *changeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], err
 		return maybe.Nothing[[]byte](), err
 	}
 
-	// If nextKey is Nothing because we finished the range, return the end key
-	if nextKey.IsNothing() {
-		return c.request.endKey, nil
+	// If nextKey is Nothing because we finished the range, return the next possible key
+	if nextKey.IsNothing() && c.request.endKey.HasValue() {
+		afterEndKey := c.request.endKey.Value()
+		afterEndKey = append(afterEndKey, 0)
+		return maybe.Some(afterEndKey), nil
 	}
 
 	return nextKey, nil
@@ -804,12 +809,8 @@ func findNextKey(
 	}
 
 	if len(endProof) == 0 {
-		// We try to find the next key to fetch by looking at the end proof.
-		// If the end proof is empty, we have no information to use.
-		// Start fetching from the next key after [lastReceivedKey].
-		nextKey := lastReceivedKey
-		nextKey = append(nextKey, 0)
-		return maybe.Some(nextKey), nil
+		// This should never happen, as the proof wouldn't have been verified
+		return maybe.Nothing[[]byte](), errEndProofRequired
 	}
 
 	// We want the first key larger than the [lastReceivedKey].
