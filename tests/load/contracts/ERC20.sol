@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: MIT
+// This code is a fork of OpenZeppelin's ERC-20 contract.
+// Ref: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/e8745a6a68d77c43c01e2cbe2c83a0b3d36ecc84/contracts/token/ERC20/ERC20.sol
 pragma solidity ^0.8.21;
 
 contract ERC20 {
