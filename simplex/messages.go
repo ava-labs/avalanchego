@@ -58,7 +58,7 @@ func newEmptyVote(
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_EmptyVote{
 			EmptyVote: &p2p.EmptyVote{
-				Metadata: protocolMetadataToP2P(emptyVote.Vote.ProtocolMetadata),
+				Metadata: emptyVoteMetadataToP2P(emptyVote.Vote.EmptyVoteMetadata),
 				Signature: &p2p.Signature{
 					Signer: emptyVote.Signature.Signer,
 					Value:  emptyVote.Signature.Value,
@@ -109,7 +109,7 @@ func newEmptyNotarization(
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_EmptyNotarization{
 			EmptyNotarization: &p2p.EmptyNotarization{
-				Metadata:          protocolMetadataToP2P(emptyNotarization.Vote.ProtocolMetadata),
+				Metadata:          emptyVoteMetadataToP2P(emptyNotarization.Vote.EmptyVoteMetadata),
 				QuorumCertificate: emptyNotarization.QC.Bytes(),
 			},
 		},
@@ -220,9 +220,16 @@ func quorumRoundToP2P(qr *simplex.VerifiedQuorumRound) (*p2p.QuorumRound, error)
 	}
 	if qr.EmptyNotarization != nil {
 		p2pQR.EmptyNotarization = &p2p.EmptyNotarization{
-			Metadata:          protocolMetadataToP2P(qr.EmptyNotarization.Vote.EmptyVoteMetadata),
+			Metadata:          emptyVoteMetadataToP2P(qr.EmptyNotarization.Vote.EmptyVoteMetadata),
 			QuorumCertificate: qr.EmptyNotarization.QC.Bytes(),
 		}
 	}
 	return p2pQR, nil
+}
+
+func emptyVoteMetadataToP2P(ev simplex.EmptyVoteMetadata) *p2p.EmptyVoteMetadata {
+	return &p2p.EmptyVoteMetadata{
+		Epoch: ev.Epoch,
+		Round: ev.Round,
+	}
 }

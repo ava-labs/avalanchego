@@ -129,7 +129,9 @@ func (e *Engine) p2pToSimplexMessage(msg *p2p.Simplex) (*simplex.Message, error)
 			return &simplex.Message{
 				VoteMessage: &vote,
 			}, nil
-	case msg.
+	case msg.GetEmptyVote() != nil:
+			emptyVote := msg.GetEmptyVote()
+			return 
 	default:
 		return nil, fmt.Errorf("unknown message type")
 	}

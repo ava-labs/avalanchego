@@ -120,13 +120,13 @@ func emptyNotarizationFromP2P(emptyNotarization *p2p.EmptyNotarization) (*simple
 	if emptyNotarization == nil {
 		return nil, errNilField
 	}
-
+	emptyNotarization.
 	md, err := p2pMetadataToSimplexMetadata(emptyNotarization.Metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert metadata: %w", err)
 	}
 
-	vote, err := p2pVoteToSimplexVote(emptyNotarization.Vote)
+	vote, err := p2pVoteToSimplexVote(emptyNotarization.)
 	if err != nil {
 		return nil, err
 	}
@@ -134,9 +134,8 @@ func emptyNotarizationFromP2P(emptyNotarization *p2p.EmptyNotarization) (*simple
 	return &simplex.Message{
 		EmptyNotarization: &simplex.EmptyNotarization{
 			Vote: simplex.EmptyNotarization{
-				
+				Vote: 
 			}
-			
 		},
 	}, nil
 }

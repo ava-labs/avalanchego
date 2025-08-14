@@ -18,7 +18,7 @@ import (
 )
 
 type Test interface {
-	Run(tc tests.TestContext, ctx context.Context, wallet *Wallet)
+	Run(tc tests.TestContext, wallet *Wallet)
 }
 
 type Worker struct {
@@ -99,5 +99,6 @@ func execTestWithRecovery(ctx context.Context, log logging.Logger, test Test, wa
 	defer tc.Recover()
 	contextWithTimeout, cancel := context.WithTimeout(ctx, testTimeout)
 	defer cancel()
-	test.Run(tc, contextWithTimeout, wallet)
+	tc.SetDefaultContextParent(contextWithTimeout)
+	test.Run(tc, wallet)
 }
