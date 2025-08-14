@@ -220,7 +220,7 @@ func quorumRoundToP2P(qr *simplex.VerifiedQuorumRound) (*p2p.QuorumRound, error)
 	}
 	if qr.EmptyNotarization != nil {
 		p2pQR.EmptyNotarization = &p2p.EmptyNotarization{
-			Metadata:          protocolMetadataToP2P(qr.EmptyNotarization.Vote.ProtocolMetadata),
+			Metadata:          protocolMetadataToP2P(qr.EmptyNotarization.Vote.EmptyVoteMetadata),
 			QuorumCertificate: qr.EmptyNotarization.QC.Bytes(),
 		}
 	}
