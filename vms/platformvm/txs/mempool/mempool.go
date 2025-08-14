@@ -16,14 +16,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/lock"
-	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/setmap"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
-	"github.com/ava-labs/avalanchego/vms/txs/mempool"
+	"github.com/ava-labs/avalanchego/utils/math"
 )
 
 var (
@@ -33,9 +33,9 @@ var (
 
 type meteredTx struct {
 	*txs.Tx
-	GasPrice float64
-
-	gasUsed gas.Gas
+	// gasPrice is the amount of AVAX burned per unit of gas used by this tx
+	gasPrice float64
+	gasUsed  gas.Gas
 }
 
 type Mempool struct {
@@ -85,8 +85,8 @@ func New(
 		gasCapacity: gasCapacity,
 		avaxAssetID: avaxAssetID,
 		tree: btree.NewG[meteredTx](2, func(a, b meteredTx) bool {
-			if a.GasPrice != b.GasPrice {
-				return a.GasPrice < b.GasPrice
+			if a.gasPrice != b.gasPrice {
+				return a.gasPrice < b.gasPrice
 			}
 
 			// Break ties
@@ -111,50 +111,14 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 		return mempool.ErrConflictsWithOtherTx
 	}
 
-	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx.Unsigned)
-	if err != nil {
-		return fmt.Errorf("failed to get utxos: %w", err)
-	}
-
-	consumedAVAX := uint64(0)
-	for _, utxo := range ins {
-		if utxo.AssetID() != m.avaxAssetID {
-			continue
-		}
-
-		// The caller should verify txs but perform overflow checks anyway
-		consumedAVAX, err = math.Add(consumedAVAX, utxo.In.Amount())
-		if err != nil {
-			return fmt.Errorf("failed to add consumed AVAX: %w", err)
-		}
-	}
-
-	for _, utxo := range outs {
-		if utxo.AssetID() != m.avaxAssetID {
-			continue
-		}
-
-		// The caller should verify txs but perform overflow checks anyway
-		producedAVAX, err = math.Add(producedAVAX, utxo.Out.Amount())
-		if err != nil {
-			return fmt.Errorf("failed to add produced AVAX: %w", err)
-		}
-	}
-
-	gasUsed, err := m.meter(tx.Unsigned)
+	meteredTx, err := m.meter(tx)
 	if err != nil {
 		return fmt.Errorf("failed to meter tx: %w", err)
 	}
 
-	meteredTx := meteredTx{
-		Tx:       tx,
-		gasUsed:  gasUsed,
-		GasPrice: float64(consumedAVAX-producedAVAX) / float64(gasUsed),
-	}
-
 	// Try to evict lower gas priced txs if we do not have enough remaining gas
 	// capacity
-	if gasRemaining := m.gasCapacity - gasUsed; m.currentGas > gasRemaining {
+	if gasRemaining := m.gasCapacity - meteredTx.gasUsed; m.currentGas > gasRemaining {
 		gasToFree := m.currentGas - gasRemaining
 		if err := m.tryEvictTxs(gasToFree, meteredTx); err != nil {
 			return err
@@ -162,10 +126,10 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	}
 
 	m.tree.ReplaceOrInsert(meteredTx)
-	m.txs[tx.TxID] = meteredTx
-	m.consumedUTXOs.Put(tx.TxID, tx.InputIDs())
-	m.droppedTxIDs.Evict(tx.TxID)
-	m.currentGas += gasUsed
+	m.txs[meteredTx.TxID] = meteredTx
+	m.consumedUTXOs.Put(meteredTx.TxID, meteredTx.InputIDs())
+	m.droppedTxIDs.Evict(meteredTx.TxID)
+	m.currentGas += meteredTx.gasUsed
 
 	m.updateMetrics()
 	m.cond.Broadcast()
@@ -179,7 +143,7 @@ func (m *Mempool) tryEvictTxs(gasToFree gas.Gas, txToAdd meteredTx) error {
 
 	m.tree.Ascend(func(item meteredTx) bool {
 		// Try to evict lower priced txs to make room for the new tx
-		if item.GasPrice >= txToAdd.GasPrice {
+		if item.gasPrice >= txToAdd.gasPrice {
 			return false
 		}
 
@@ -199,6 +163,64 @@ func (m *Mempool) tryEvictTxs(gasToFree gas.Gas, txToAdd meteredTx) error {
 	}
 
 	return nil
+}
+
+func (m *Mempool) meter(tx *txs.Tx) (meteredTx, error) {
+	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx.Unsigned)
+	if err != nil {
+		return meteredTx{}, fmt.Errorf("failed to get utxos: %w", err)
+	}
+
+	consumedAVAX := uint64(0)
+	for _, utxo := range ins {
+		if utxo.AssetID() != m.avaxAssetID {
+			continue
+		}
+
+		// The caller should verify txs but perform overflow checks anyway
+		consumedAVAX, err = math.Add(consumedAVAX, utxo.In.Amount())
+		if err != nil {
+			return meteredTx{}, fmt.Errorf("failed to add consumed AVAX: %w",
+				err)
+		}
+	}
+
+	for _, utxo := range outs {
+		if utxo.AssetID() != m.avaxAssetID {
+			continue
+		}
+
+		// The caller should verify txs but perform overflow checks anyway
+		producedAVAX, err = math.Add(producedAVAX, utxo.Out.Amount())
+		if err != nil {
+			return meteredTx{}, fmt.Errorf("failed to add produced AVAX: %w",
+				err)
+		}
+	}
+
+	c, err := fee.TxComplexity(tx.Unsigned)
+	if err != nil {
+		return meteredTx{}, err
+	}
+
+	gasUsed, err := c.ToGas(m.weights)
+	if err != nil {
+		return meteredTx{}, err
+	}
+
+	if gasUsed > m.gasCapacity {
+		return meteredTx{}, ErrGasCapacityExceeded
+	}
+
+	if gasUsed == 0 {
+		return meteredTx{}, errNoGasUsed
+	}
+
+	return meteredTx{
+		Tx:       tx,
+		gasUsed:  gasUsed,
+		gasPrice: float64(consumedAVAX-producedAVAX) / float64(gasUsed),
+	}, nil
 }
 
 func (m *Mempool) updateMetrics() {
@@ -286,28 +308,6 @@ func (m *Mempool) Len() int {
 	defer m.lock.RUnlock()
 
 	return m.tree.Len()
-}
-
-func (m *Mempool) meter(tx txs.UnsignedTx) (gas.Gas, error) {
-	c, err := fee.TxComplexity(tx)
-	if err != nil {
-		return 0, err
-	}
-
-	g, err := c.ToGas(m.weights)
-	if err != nil {
-		return 0, err
-	}
-
-	if g > m.gasCapacity {
-		return 0, ErrGasCapacityExceeded
-	}
-
-	if g == 0 {
-		return 0, errNoGasUsed
-	}
-
-	return g, nil
 }
 
 func (m *Mempool) WaitForEvent(ctx context.Context) (common.Message, error) {
