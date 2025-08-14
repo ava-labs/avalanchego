@@ -454,7 +454,7 @@ var bindTests = []struct {
 		 "math/big"
 		 "github.com/ava-labs/libevm/common"
 		 "github.com/ava-labs/libevm/core/rawdb"
-		 "github.com/ava-labs/subnet-evm/core/state"
+		 "github.com/ava-labs/libevm/core/state"
 		 "github.com/ava-labs/subnet-evm/core/extstate"
 		 "github.com/ava-labs/subnet-evm/precompile/allowlist"
 		`,

@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
@@ -51,7 +52,7 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/ava-labs/subnet-evm/consensus/misc/eip4844"
 	"github.com/ava-labs/subnet-evm/core"
-	"github.com/ava-labs/subnet-evm/core/state"
+	"github.com/ava-labs/subnet-evm/core/extstate"
 	"github.com/ava-labs/subnet-evm/core/state/snapshot"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
@@ -488,7 +489,7 @@ func MakePreState(db ethdb.Database, accounts types.GenesisAlloc, snapshotter bo
 	}
 
 	triedb := triedb.NewDatabase(db, tconf)
-	sdb := state.NewDatabaseWithNodeDB(db, triedb)
+	sdb := extstate.NewDatabaseWithNodeDB(db, triedb)
 	statedb, _ := state.New(types.EmptyRootHash, sdb, nil)
 	for addr, a := range accounts {
 		statedb.SetCode(addr, a.Code)

@@ -33,6 +33,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/ethdb"
@@ -41,7 +42,7 @@ import (
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/consensus/misc/eip4844"
 	"github.com/ava-labs/subnet-evm/constants"
-	"github.com/ava-labs/subnet-evm/core/state"
+	"github.com/ava-labs/subnet-evm/core/extstate"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/holiman/uint256"
@@ -320,7 +321,7 @@ func GenerateChain(config *params.ChainConfig, parent *types.Block, engine conse
 	defer triedb.Close()
 
 	for i := 0; i < n; i++ {
-		statedb, err := state.New(parent.Root(), state.NewDatabaseWithNodeDB(db, triedb), nil)
+		statedb, err := state.New(parent.Root(), extstate.NewDatabaseWithNodeDB(db, triedb), nil)
 		if err != nil {
 			return nil, nil, err
 		}

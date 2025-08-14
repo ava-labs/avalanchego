@@ -1,6 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
-package state
+
+package extstate
 
 import (
 	"encoding/binary"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/libevm/stateconf"
@@ -59,9 +61,9 @@ type fuzzState struct {
 }
 type merkleTrie struct {
 	name             string
-	ethDatabase      Database
-	accountTrie      Trie
-	openStorageTries map[common.Address]Trie
+	ethDatabase      state.Database
+	accountTrie      state.Trie
+	openStorageTries map[common.Address]state.Trie
 	lastRoot         common.Hash
 }
 
@@ -101,14 +103,14 @@ func newFuzzState(t *testing.T) *fuzzState {
 				name:             "hash",
 				ethDatabase:      hashState,
 				accountTrie:      hashTr,
-				openStorageTries: make(map[common.Address]Trie),
+				openStorageTries: make(map[common.Address]state.Trie),
 				lastRoot:         ethRoot,
 			},
 			&merkleTrie{
 				name:             "firewood",
 				ethDatabase:      firewoodState,
 				accountTrie:      fwTr,
-				openStorageTries: make(map[common.Address]Trie),
+				openStorageTries: make(map[common.Address]state.Trie),
 				lastRoot:         ethRoot,
 			},
 		},
@@ -156,7 +158,7 @@ func (fs *fuzzState) commit() {
 			fs.require.NoError(tr.ethDatabase.TrieDB().Update(updatedRoot, tr.lastRoot, fs.blockNumber, mergedNodeSet, nil), "failed to update triedb in %s", tr.name)
 			tr.lastRoot = updatedRoot
 		}
-		tr.openStorageTries = make(map[common.Address]Trie)
+		tr.openStorageTries = make(map[common.Address]state.Trie)
 		fs.require.NoError(tr.ethDatabase.TrieDB().Commit(updatedRoot, true),
 			"failed to commit %s: expected hashdb root %s", tr.name, fs.merkleTries[0].lastRoot.Hex())
 		tr.accountTrie, err = tr.ethDatabase.OpenTrie(tr.lastRoot)
@@ -240,7 +242,7 @@ func (fs *fuzzState) deleteAccount(accountIndex int) {
 // If we attempt to commit the storage tries after each operation, then attempting to re-open the storage trie
 // with an updated storage trie root from ethDatabase will fail since the storage trie root will not have been
 // persisted yet - leading to a missing trie node error.
-func (fs *fuzzState) openStorageTrie(addr common.Address, tr *merkleTrie) Trie {
+func (fs *fuzzState) openStorageTrie(addr common.Address, tr *merkleTrie) state.Trie {
 	storageTrie, ok := tr.openStorageTries[addr]
 	if ok {
 		return storageTrie

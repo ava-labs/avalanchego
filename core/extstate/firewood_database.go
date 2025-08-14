@@ -1,33 +1,34 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package state
+package extstate
 
 import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/subnet-evm/triedb/firewood"
 )
 
 var (
-	_ Database = (*firewoodAccessorDb)(nil)
-	_ Trie     = (*firewood.AccountTrie)(nil)
-	_ Trie     = (*firewood.StorageTrie)(nil)
+	_ state.Database = (*firewoodAccessorDb)(nil)
+	_ state.Trie     = (*firewood.AccountTrie)(nil)
+	_ state.Trie     = (*firewood.StorageTrie)(nil)
 )
 
 type firewoodAccessorDb struct {
-	Database
+	state.Database
 	fw *firewood.Database
 }
 
 // OpenTrie opens the main account trie.
-func (db *firewoodAccessorDb) OpenTrie(root common.Hash) (Trie, error) {
+func (db *firewoodAccessorDb) OpenTrie(root common.Hash) (state.Trie, error) {
 	return firewood.NewAccountTrie(root, db.fw)
 }
 
 // OpenStorageTrie opens a wrapped version of the account trie.
-func (db *firewoodAccessorDb) OpenStorageTrie(stateRoot common.Hash, address common.Address, root common.Hash, self Trie) (Trie, error) {
+func (db *firewoodAccessorDb) OpenStorageTrie(stateRoot common.Hash, address common.Address, root common.Hash, self state.Trie) (state.Trie, error) {
 	accountTrie, ok := self.(*firewood.AccountTrie)
 	if !ok {
 		return nil, fmt.Errorf("Invalid account trie type: %T", self)
@@ -37,7 +38,7 @@ func (db *firewoodAccessorDb) OpenStorageTrie(stateRoot common.Hash, address com
 
 // CopyTrie returns a deep copy of the given trie.
 // It can be altered by the caller.
-func (db *firewoodAccessorDb) CopyTrie(t Trie) Trie {
+func (db *firewoodAccessorDb) CopyTrie(t state.Trie) state.Trie {
 	switch t := t.(type) {
 	case *firewood.AccountTrie:
 		return t.Copy()

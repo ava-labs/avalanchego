@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/subnet-evm/core/extstate"
-	"github.com/ava-labs/subnet-evm/core/state"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/modules"

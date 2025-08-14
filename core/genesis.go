@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
@@ -46,7 +47,7 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/ava-labs/subnet-evm/core/state"
+	"github.com/ava-labs/subnet-evm/core/extstate"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
@@ -251,7 +252,7 @@ func (g *Genesis) trieConfig() *triedb.Config {
 
 // TODO: migrate this function to "flush" for more similarity with upstream.
 func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Block {
-	statedb, err := state.New(types.EmptyRootHash, state.NewDatabaseWithNodeDB(db, triedb), nil)
+	statedb, err := state.New(types.EmptyRootHash, extstate.NewDatabaseWithNodeDB(db, triedb), nil)
 	if err != nil {
 		panic(err)
 	}

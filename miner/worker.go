@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/event"
@@ -49,7 +50,8 @@ import (
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/consensus/misc/eip4844"
 	"github.com/ava-labs/subnet-evm/core"
-	"github.com/ava-labs/subnet-evm/core/state"
+	"github.com/ava-labs/subnet-evm/core/extstate"
+
 	"github.com/ava-labs/subnet-evm/core/txpool"
 	"github.com/ava-labs/subnet-evm/params"
 	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
@@ -288,7 +290,7 @@ func (w *worker) createCurrentEnvironment(predicateContext *precompileconfig.Pre
 		return nil, fmt.Errorf("calculating gas capacity: %w", err)
 	}
 	numPrefetchers := w.chain.CacheConfig().TriePrefetcherParallelism
-	currentState.StartPrefetcher("miner", state.WithConcurrentWorkers(numPrefetchers))
+	currentState.StartPrefetcher("miner", extstate.WithConcurrentWorkers(numPrefetchers))
 	return &environment{
 		signer:           types.MakeSigner(w.chainConfig, header.Number, header.Time),
 		state:            currentState,
