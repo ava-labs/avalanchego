@@ -9,7 +9,9 @@ set -euo pipefail
 
 if [ $# -ne 2 ]; then
     echo "Usage: $0 <source_directory> <destination_directory>"
-    echo "S3 Example: $0 's3://bucket1/path1' /dest/dir"
+    echo "Import from S3 Example: $0 's3://bucket1/path1' /dest/dir"
+    echo "Import zip from S3 Example: $0 's3://bucket1/path1.zip' /dest/dir"
+    echo "Export to S3 Example: $0 '/local/path1' 's3://bucket2/path2'"
     echo "Local Example: $0 '/local/path1' /dest/dir"
     exit 1
 fi
@@ -26,19 +28,17 @@ function copy_source() {
     mkdir -p "$dest"
     
     # Check if source starts with s3://
-    if [[ "$source" == s3://* ]]; then
-        echo "Copying from S3: $source -> $dest"
+    if [[ "$source" == s3://* || "$dest" == s3://* ]]; then
         # Use s5cmd to copy from S3
         time s5cmd cp "$source" "$dest"
 
         # If we copied a zip, extract it in place
-        if [[ "$source" == *.zip ]]; then
+        if [[ "$source" == s3://* &&"$source" == *.zip ]]; then
             echo "Extracting zip file in place"
             time unzip "$dest"/*.zip -d "$dest"
             rm "$dest"/*.zip
         fi
     else
-        echo "Copying from local filesystem: $source -> $dest"
         # Use cp for local filesystem with recursive support
         if [ -d "$source" ]; then
             time cp -r "$source"/* "$dest/"
