@@ -2744,7 +2744,6 @@ type ProtocolMetadata struct {
 	// Epoch returns the epoch in which the block was proposed
 	Epoch uint64 `protobuf:"varint,2,opt,name=epoch,proto3" json:"epoch,omitempty"`
 	// Round returns the round number in which the block was proposed.
-	// Can also be an empty block.
 	Round uint64 `protobuf:"varint,3,opt,name=round,proto3" json:"round,omitempty"`
 	// Seq is the order of the block among all blocks in the blockchain.
 	// Cannot correspond to an empty block.
@@ -2820,6 +2819,60 @@ func (x *ProtocolMetadata) GetPrev() []byte {
 	return nil
 }
 
+type EmptyVoteMetadata struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Epoch returns the epoch in which the empty block was proposed
+	Epoch uint64 `protobuf:"varint,1,opt,name=epoch,proto3" json:"epoch,omitempty"`
+	// Round returns the round number in which the empty block was proposed.
+	Round         uint64 `protobuf:"varint,2,opt,name=round,proto3" json:"round,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EmptyVoteMetadata) Reset() {
+	*x = EmptyVoteMetadata{}
+	mi := &file_p2p_p2p_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EmptyVoteMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EmptyVoteMetadata) ProtoMessage() {}
+
+func (x *EmptyVoteMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_p2p_p2p_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EmptyVoteMetadata.ProtoReflect.Descriptor instead.
+func (*EmptyVoteMetadata) Descriptor() ([]byte, []int) {
+	return file_p2p_p2p_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *EmptyVoteMetadata) GetEpoch() uint64 {
+	if x != nil {
+		return x.Epoch
+	}
+	return 0
+}
+
+func (x *EmptyVoteMetadata) GetRound() uint64 {
+	if x != nil {
+		return x.Round
+	}
+	return 0
+}
+
 type BlockHeader struct {
 	state    protoimpl.MessageState `protogen:"open.v1"`
 	Metadata *ProtocolMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
@@ -2831,7 +2884,7 @@ type BlockHeader struct {
 
 func (x *BlockHeader) Reset() {
 	*x = BlockHeader{}
-	mi := &file_p2p_p2p_proto_msgTypes[31]
+	mi := &file_p2p_p2p_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2843,7 +2896,7 @@ func (x *BlockHeader) String() string {
 func (*BlockHeader) ProtoMessage() {}
 
 func (x *BlockHeader) ProtoReflect() protoreflect.Message {
-	mi := &file_p2p_p2p_proto_msgTypes[31]
+	mi := &file_p2p_p2p_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2856,7 +2909,7 @@ func (x *BlockHeader) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockHeader.ProtoReflect.Descriptor instead.
 func (*BlockHeader) Descriptor() ([]byte, []int) {
-	return file_p2p_p2p_proto_rawDescGZIP(), []int{31}
+	return file_p2p_p2p_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *BlockHeader) GetMetadata() *ProtocolMetadata {
@@ -2885,7 +2938,7 @@ type Signature struct {
 
 func (x *Signature) Reset() {
 	*x = Signature{}
-	mi := &file_p2p_p2p_proto_msgTypes[32]
+	mi := &file_p2p_p2p_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2897,7 +2950,7 @@ func (x *Signature) String() string {
 func (*Signature) ProtoMessage() {}
 
 func (x *Signature) ProtoReflect() protoreflect.Message {
-	mi := &file_p2p_p2p_proto_msgTypes[32]
+	mi := &file_p2p_p2p_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2910,7 +2963,7 @@ func (x *Signature) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Signature.ProtoReflect.Descriptor instead.
 func (*Signature) Descriptor() ([]byte, []int) {
-	return file_p2p_p2p_proto_rawDescGZIP(), []int{32}
+	return file_p2p_p2p_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *Signature) GetSigner() []byte {
@@ -2937,7 +2990,7 @@ type Vote struct {
 
 func (x *Vote) Reset() {
 	*x = Vote{}
-	mi := &file_p2p_p2p_proto_msgTypes[33]
+	mi := &file_p2p_p2p_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2949,7 +3002,7 @@ func (x *Vote) String() string {
 func (*Vote) ProtoMessage() {}
 
 func (x *Vote) ProtoReflect() protoreflect.Message {
-	mi := &file_p2p_p2p_proto_msgTypes[33]
+	mi := &file_p2p_p2p_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2962,7 +3015,7 @@ func (x *Vote) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Vote.ProtoReflect.Descriptor instead.
 func (*Vote) Descriptor() ([]byte, []int) {
-	return file_p2p_p2p_proto_rawDescGZIP(), []int{33}
+	return file_p2p_p2p_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *Vote) GetBlockHeader() *BlockHeader {
@@ -2981,7 +3034,7 @@ func (x *Vote) GetSignature() *Signature {
 
 type EmptyVote struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Metadata      *ProtocolMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Metadata      *EmptyVoteMetadata     `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
 	Signature     *Signature             `protobuf:"bytes,2,opt,name=signature,proto3" json:"signature,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -2989,7 +3042,7 @@ type EmptyVote struct {
 
 func (x *EmptyVote) Reset() {
 	*x = EmptyVote{}
-	mi := &file_p2p_p2p_proto_msgTypes[34]
+	mi := &file_p2p_p2p_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3001,7 +3054,7 @@ func (x *EmptyVote) String() string {
 func (*EmptyVote) ProtoMessage() {}
 
 func (x *EmptyVote) ProtoReflect() protoreflect.Message {
-	mi := &file_p2p_p2p_proto_msgTypes[34]
+	mi := &file_p2p_p2p_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3014,10 +3067,10 @@ func (x *EmptyVote) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EmptyVote.ProtoReflect.Descriptor instead.
 func (*EmptyVote) Descriptor() ([]byte, []int) {
-	return file_p2p_p2p_proto_rawDescGZIP(), []int{34}
+	return file_p2p_p2p_proto_rawDescGZIP(), []int{35}
 }
 
-func (x *EmptyVote) GetMetadata() *ProtocolMetadata {
+func (x *EmptyVote) GetMetadata() *EmptyVoteMetadata {
 	if x != nil {
 		return x.Metadata
 	}
@@ -3041,7 +3094,7 @@ type QuorumCertificate struct {
 
 func (x *QuorumCertificate) Reset() {
 	*x = QuorumCertificate{}
-	mi := &file_p2p_p2p_proto_msgTypes[35]
+	mi := &file_p2p_p2p_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3053,7 +3106,7 @@ func (x *QuorumCertificate) String() string {
 func (*QuorumCertificate) ProtoMessage() {}
 
 func (x *QuorumCertificate) ProtoReflect() protoreflect.Message {
-	mi := &file_p2p_p2p_proto_msgTypes[35]
+	mi := &file_p2p_p2p_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3066,7 +3119,7 @@ func (x *QuorumCertificate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuorumCertificate.ProtoReflect.Descriptor instead.
 func (*QuorumCertificate) Descriptor() ([]byte, []int) {
-	return file_p2p_p2p_proto_rawDescGZIP(), []int{35}
+	return file_p2p_p2p_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *QuorumCertificate) GetBlockHeader() *BlockHeader {
@@ -3085,7 +3138,7 @@ func (x *QuorumCertificate) GetQuorumCertificate() []byte {
 
 type EmptyNotarization struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
-	Metadata          *ProtocolMetadata      `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	Metadata          *EmptyVoteMetadata     `protobuf:"bytes,1,opt,name=metadata,proto3" json:"metadata,omitempty"`
 	QuorumCertificate []byte                 `protobuf:"bytes,2,opt,name=quorum_certificate,json=quorumCertificate,proto3" json:"quorum_certificate,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
@@ -3093,7 +3146,7 @@ type EmptyNotarization struct {
 
 func (x *EmptyNotarization) Reset() {
 	*x = EmptyNotarization{}
-	mi := &file_p2p_p2p_proto_msgTypes[36]
+	mi := &file_p2p_p2p_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3105,7 +3158,7 @@ func (x *EmptyNotarization) String() string {
 func (*EmptyNotarization) ProtoMessage() {}
 
 func (x *EmptyNotarization) ProtoReflect() protoreflect.Message {
-	mi := &file_p2p_p2p_proto_msgTypes[36]
+	mi := &file_p2p_p2p_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3118,10 +3171,10 @@ func (x *EmptyNotarization) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EmptyNotarization.ProtoReflect.Descriptor instead.
 func (*EmptyNotarization) Descriptor() ([]byte, []int) {
-	return file_p2p_p2p_proto_rawDescGZIP(), []int{36}
+	return file_p2p_p2p_proto_rawDescGZIP(), []int{37}
 }
 
-func (x *EmptyNotarization) GetMetadata() *ProtocolMetadata {
+func (x *EmptyNotarization) GetMetadata() *EmptyVoteMetadata {
 	if x != nil {
 		return x.Metadata
 	}
@@ -3145,7 +3198,7 @@ type ReplicationRequest struct {
 
 func (x *ReplicationRequest) Reset() {
 	*x = ReplicationRequest{}
-	mi := &file_p2p_p2p_proto_msgTypes[37]
+	mi := &file_p2p_p2p_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3157,7 +3210,7 @@ func (x *ReplicationRequest) String() string {
 func (*ReplicationRequest) ProtoMessage() {}
 
 func (x *ReplicationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_p2p_p2p_proto_msgTypes[37]
+	mi := &file_p2p_p2p_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3170,7 +3223,7 @@ func (x *ReplicationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplicationRequest.ProtoReflect.Descriptor instead.
 func (*ReplicationRequest) Descriptor() ([]byte, []int) {
-	return file_p2p_p2p_proto_rawDescGZIP(), []int{37}
+	return file_p2p_p2p_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *ReplicationRequest) GetSeqs() []uint64 {
@@ -3197,7 +3250,7 @@ type ReplicationResponse struct {
 
 func (x *ReplicationResponse) Reset() {
 	*x = ReplicationResponse{}
-	mi := &file_p2p_p2p_proto_msgTypes[38]
+	mi := &file_p2p_p2p_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3209,7 +3262,7 @@ func (x *ReplicationResponse) String() string {
 func (*ReplicationResponse) ProtoMessage() {}
 
 func (x *ReplicationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_p2p_p2p_proto_msgTypes[38]
+	mi := &file_p2p_p2p_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3222,7 +3275,7 @@ func (x *ReplicationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplicationResponse.ProtoReflect.Descriptor instead.
 func (*ReplicationResponse) Descriptor() ([]byte, []int) {
-	return file_p2p_p2p_proto_rawDescGZIP(), []int{38}
+	return file_p2p_p2p_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *ReplicationResponse) GetData() []*QuorumRound {
@@ -3253,7 +3306,7 @@ type QuorumRound struct {
 
 func (x *QuorumRound) Reset() {
 	*x = QuorumRound{}
-	mi := &file_p2p_p2p_proto_msgTypes[39]
+	mi := &file_p2p_p2p_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3265,7 +3318,7 @@ func (x *QuorumRound) String() string {
 func (*QuorumRound) ProtoMessage() {}
 
 func (x *QuorumRound) ProtoReflect() protoreflect.Message {
-	mi := &file_p2p_p2p_proto_msgTypes[39]
+	mi := &file_p2p_p2p_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3278,7 +3331,7 @@ func (x *QuorumRound) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use QuorumRound.ProtoReflect.Descriptor instead.
 func (*QuorumRound) Descriptor() ([]byte, []int) {
-	return file_p2p_p2p_proto_rawDescGZIP(), []int{39}
+	return file_p2p_p2p_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *QuorumRound) GetBlock() []byte {
@@ -3527,7 +3580,10 @@ const file_p2p_p2p_proto_rawDesc = "" +
 	"\x05epoch\x18\x02 \x01(\x04R\x05epoch\x12\x14\n" +
 	"\x05round\x18\x03 \x01(\x04R\x05round\x12\x10\n" +
 	"\x03seq\x18\x04 \x01(\x04R\x03seq\x12\x12\n" +
-	"\x04prev\x18\x05 \x01(\fR\x04prev\"X\n" +
+	"\x04prev\x18\x05 \x01(\fR\x04prev\"?\n" +
+	"\x11EmptyVoteMetadata\x12\x14\n" +
+	"\x05epoch\x18\x01 \x01(\x04R\x05epoch\x12\x14\n" +
+	"\x05round\x18\x02 \x01(\x04R\x05round\"X\n" +
 	"\vBlockHeader\x121\n" +
 	"\bmetadata\x18\x01 \x01(\v2\x15.p2p.ProtocolMetadataR\bmetadata\x12\x16\n" +
 	"\x06digest\x18\x02 \x01(\fR\x06digest\"9\n" +
@@ -3536,15 +3592,15 @@ const file_p2p_p2p_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\fR\x05value\"i\n" +
 	"\x04Vote\x123\n" +
 	"\fblock_header\x18\x01 \x01(\v2\x10.p2p.BlockHeaderR\vblockHeader\x12,\n" +
-	"\tsignature\x18\x02 \x01(\v2\x0e.p2p.SignatureR\tsignature\"l\n" +
-	"\tEmptyVote\x121\n" +
-	"\bmetadata\x18\x01 \x01(\v2\x15.p2p.ProtocolMetadataR\bmetadata\x12,\n" +
+	"\tsignature\x18\x02 \x01(\v2\x0e.p2p.SignatureR\tsignature\"m\n" +
+	"\tEmptyVote\x122\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x16.p2p.EmptyVoteMetadataR\bmetadata\x12,\n" +
 	"\tsignature\x18\x02 \x01(\v2\x0e.p2p.SignatureR\tsignature\"w\n" +
 	"\x11QuorumCertificate\x123\n" +
 	"\fblock_header\x18\x01 \x01(\v2\x10.p2p.BlockHeaderR\vblockHeader\x12-\n" +
-	"\x12quorum_certificate\x18\x02 \x01(\fR\x11quorumCertificate\"u\n" +
-	"\x11EmptyNotarization\x121\n" +
-	"\bmetadata\x18\x01 \x01(\v2\x15.p2p.ProtocolMetadataR\bmetadata\x12-\n" +
+	"\x12quorum_certificate\x18\x02 \x01(\fR\x11quorumCertificate\"v\n" +
+	"\x11EmptyNotarization\x122\n" +
+	"\bmetadata\x18\x01 \x01(\v2\x16.p2p.EmptyVoteMetadataR\bmetadata\x12-\n" +
 	"\x12quorum_certificate\x18\x02 \x01(\fR\x11quorumCertificate\"K\n" +
 	"\x12ReplicationRequest\x12\x12\n" +
 	"\x04seqs\x18\x01 \x03(\x04R\x04seqs\x12!\n" +
@@ -3576,7 +3632,7 @@ func file_p2p_p2p_proto_rawDescGZIP() []byte {
 }
 
 var file_p2p_p2p_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_p2p_p2p_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
+var file_p2p_p2p_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
 var file_p2p_p2p_proto_goTypes = []any{
 	(EngineType)(0),                 // 0: p2p.EngineType
 	(*Message)(nil),                 // 1: p2p.Message
@@ -3610,15 +3666,16 @@ var file_p2p_p2p_proto_goTypes = []any{
 	(*Simplex)(nil),                 // 29: p2p.Simplex
 	(*BlockProposal)(nil),           // 30: p2p.BlockProposal
 	(*ProtocolMetadata)(nil),        // 31: p2p.ProtocolMetadata
-	(*BlockHeader)(nil),             // 32: p2p.BlockHeader
-	(*Signature)(nil),               // 33: p2p.Signature
-	(*Vote)(nil),                    // 34: p2p.Vote
-	(*EmptyVote)(nil),               // 35: p2p.EmptyVote
-	(*QuorumCertificate)(nil),       // 36: p2p.QuorumCertificate
-	(*EmptyNotarization)(nil),       // 37: p2p.EmptyNotarization
-	(*ReplicationRequest)(nil),      // 38: p2p.ReplicationRequest
-	(*ReplicationResponse)(nil),     // 39: p2p.ReplicationResponse
-	(*QuorumRound)(nil),             // 40: p2p.QuorumRound
+	(*EmptyVoteMetadata)(nil),       // 32: p2p.EmptyVoteMetadata
+	(*BlockHeader)(nil),             // 33: p2p.BlockHeader
+	(*Signature)(nil),               // 34: p2p.Signature
+	(*Vote)(nil),                    // 35: p2p.Vote
+	(*EmptyVote)(nil),               // 36: p2p.EmptyVote
+	(*QuorumCertificate)(nil),       // 37: p2p.QuorumCertificate
+	(*EmptyNotarization)(nil),       // 38: p2p.EmptyNotarization
+	(*ReplicationRequest)(nil),      // 39: p2p.ReplicationRequest
+	(*ReplicationResponse)(nil),     // 40: p2p.ReplicationResponse
+	(*QuorumRound)(nil),             // 41: p2p.QuorumRound
 }
 var file_p2p_p2p_proto_depIdxs = []int32{
 	2,  // 0: p2p.Message.ping:type_name -> p2p.Ping
@@ -3652,27 +3709,27 @@ var file_p2p_p2p_proto_depIdxs = []int32{
 	7,  // 28: p2p.PeerList.claimed_ip_ports:type_name -> p2p.ClaimedIpPort
 	0,  // 29: p2p.GetAncestors.engine_type:type_name -> p2p.EngineType
 	30, // 30: p2p.Simplex.block_proposal:type_name -> p2p.BlockProposal
-	34, // 31: p2p.Simplex.vote:type_name -> p2p.Vote
-	35, // 32: p2p.Simplex.empty_vote:type_name -> p2p.EmptyVote
-	34, // 33: p2p.Simplex.finalize_vote:type_name -> p2p.Vote
-	36, // 34: p2p.Simplex.notarization:type_name -> p2p.QuorumCertificate
-	37, // 35: p2p.Simplex.empty_notarization:type_name -> p2p.EmptyNotarization
-	36, // 36: p2p.Simplex.finalization:type_name -> p2p.QuorumCertificate
-	38, // 37: p2p.Simplex.replication_request:type_name -> p2p.ReplicationRequest
-	39, // 38: p2p.Simplex.replication_response:type_name -> p2p.ReplicationResponse
-	34, // 39: p2p.BlockProposal.vote:type_name -> p2p.Vote
+	35, // 31: p2p.Simplex.vote:type_name -> p2p.Vote
+	36, // 32: p2p.Simplex.empty_vote:type_name -> p2p.EmptyVote
+	35, // 33: p2p.Simplex.finalize_vote:type_name -> p2p.Vote
+	37, // 34: p2p.Simplex.notarization:type_name -> p2p.QuorumCertificate
+	38, // 35: p2p.Simplex.empty_notarization:type_name -> p2p.EmptyNotarization
+	37, // 36: p2p.Simplex.finalization:type_name -> p2p.QuorumCertificate
+	39, // 37: p2p.Simplex.replication_request:type_name -> p2p.ReplicationRequest
+	40, // 38: p2p.Simplex.replication_response:type_name -> p2p.ReplicationResponse
+	35, // 39: p2p.BlockProposal.vote:type_name -> p2p.Vote
 	31, // 40: p2p.BlockHeader.metadata:type_name -> p2p.ProtocolMetadata
-	32, // 41: p2p.Vote.block_header:type_name -> p2p.BlockHeader
-	33, // 42: p2p.Vote.signature:type_name -> p2p.Signature
-	31, // 43: p2p.EmptyVote.metadata:type_name -> p2p.ProtocolMetadata
-	33, // 44: p2p.EmptyVote.signature:type_name -> p2p.Signature
-	32, // 45: p2p.QuorumCertificate.block_header:type_name -> p2p.BlockHeader
-	31, // 46: p2p.EmptyNotarization.metadata:type_name -> p2p.ProtocolMetadata
-	40, // 47: p2p.ReplicationResponse.data:type_name -> p2p.QuorumRound
-	40, // 48: p2p.ReplicationResponse.latest_round:type_name -> p2p.QuorumRound
-	36, // 49: p2p.QuorumRound.notarization:type_name -> p2p.QuorumCertificate
-	37, // 50: p2p.QuorumRound.empty_notarization:type_name -> p2p.EmptyNotarization
-	36, // 51: p2p.QuorumRound.finalization:type_name -> p2p.QuorumCertificate
+	33, // 41: p2p.Vote.block_header:type_name -> p2p.BlockHeader
+	34, // 42: p2p.Vote.signature:type_name -> p2p.Signature
+	32, // 43: p2p.EmptyVote.metadata:type_name -> p2p.EmptyVoteMetadata
+	34, // 44: p2p.EmptyVote.signature:type_name -> p2p.Signature
+	33, // 45: p2p.QuorumCertificate.block_header:type_name -> p2p.BlockHeader
+	32, // 46: p2p.EmptyNotarization.metadata:type_name -> p2p.EmptyVoteMetadata
+	41, // 47: p2p.ReplicationResponse.data:type_name -> p2p.QuorumRound
+	41, // 48: p2p.ReplicationResponse.latest_round:type_name -> p2p.QuorumRound
+	37, // 49: p2p.QuorumRound.notarization:type_name -> p2p.QuorumCertificate
+	38, // 50: p2p.QuorumRound.empty_notarization:type_name -> p2p.EmptyNotarization
+	37, // 51: p2p.QuorumRound.finalization:type_name -> p2p.QuorumCertificate
 	52, // [52:52] is the sub-list for method output_type
 	52, // [52:52] is the sub-list for method input_type
 	52, // [52:52] is the sub-list for extension type_name
@@ -3730,7 +3787,7 @@ func file_p2p_p2p_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_p2p_p2p_proto_rawDesc), len(file_p2p_p2p_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   40,
+			NumMessages:   41,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
