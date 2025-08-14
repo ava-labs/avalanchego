@@ -78,8 +78,6 @@ github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60 h1:EL
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60/go.mod h1:/7qKobTfbzBu7eSTVaXMTr56yTYk4j2Px6/8G+idxHo=
 github.com/ava-labs/libevm v1.13.14-0.3.0.rc.6 h1:tyM659nDOknwTeU4A0fUVsGNIU7k0v738wYN92nqs/Y=
 github.com/ava-labs/libevm v1.13.14-0.3.0.rc.6/go.mod h1:zP/DOcABRWargBmUWv1jXplyWNcfmBy9cxr0lw3LW3g=
-github.com/ava-labs/simplex v0.0.0-20250715173145-e4fe035cb9b2 h1:PZ5PMEDkTbd6NLNiwKWV8nz7QvAM+QC9Rj3/NrL9ICA=
-github.com/ava-labs/simplex v0.0.0-20250715173145-e4fe035cb9b2/go.mod h1:GVzumIo3zR23/qGRN2AdnVkIPHcKMq/D89EGWZfMGQ0=
 github.com/ava-labs/simplex v0.0.0-20250812203241-4d88466c970e h1:Rg6/KwOMfvnRZ2vWaua84467jaPvwUssrzfMzJ/dTek=
 github.com/ava-labs/simplex v0.0.0-20250812203241-4d88466c970e/go.mod h1:GVzumIo3zR23/qGRN2AdnVkIPHcKMq/D89EGWZfMGQ0=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
