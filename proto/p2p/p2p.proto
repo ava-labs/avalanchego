@@ -450,13 +450,19 @@ message ProtocolMetadata {
   // Epoch returns the epoch in which the block was proposed
   uint64 epoch = 2;
   // Round returns the round number in which the block was proposed.
-  // Can also be an empty block.
   uint64 round = 3;
   // Seq is the order of the block among all blocks in the blockchain.
   // Cannot correspond to an empty block.
   uint64 seq = 4;
   // Prev returns the digest of the previous data block
   bytes prev = 5;
+}
+
+message EmptyVoteMetadata {
+  // Epoch returns the epoch in which the empty block was proposed
+  uint64 epoch = 1;
+  // Round returns the round number in which the empty block was proposed.
+  uint64 round = 2;
 }
 
 message BlockHeader {
@@ -478,7 +484,7 @@ message Vote {
 }
 
 message EmptyVote {
-  ProtocolMetadata metadata = 1;
+  EmptyVoteMetadata metadata = 1;
   Signature signature = 2;
 }
 
@@ -488,7 +494,7 @@ message QuorumCertificate {
 }
 
 message EmptyNotarization {
-  ProtocolMetadata metadata = 1;
+  EmptyVoteMetadata metadata = 1;
   bytes quorum_certificate = 2;
 }
 
