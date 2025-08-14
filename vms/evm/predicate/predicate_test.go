@@ -7,8 +7,81 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 )
+
+type allowSet map[common.Address]bool
+
+func (a allowSet) HasPredicate(addr common.Address) bool { return a[addr] }
+
+func TestFromAccessListVectors(t *testing.T) {
+	addrA := common.Address{0xAA}
+	addrB := common.Address{0xBB}
+	addrC := common.Address{0xCC}
+
+	h1 := common.Hash{1}
+	h2 := common.Hash{2}
+	h3 := common.Hash{3}
+	h4 := common.Hash{4}
+
+	tests := []struct {
+		name  string
+		rules allowSet
+		list  types.AccessList
+		want  map[common.Address][][]common.Hash
+	}{
+		{
+			name:  "empty list",
+			rules: allowSet{addrA: true},
+			list:  types.AccessList{},
+			want:  map[common.Address][][]common.Hash{},
+		},
+		{
+			name:  "no allowed addresses",
+			rules: allowSet{addrB: true},
+			list:  types.AccessList{{Address: addrA, StorageKeys: []common.Hash{h1}}},
+			want:  map[common.Address][][]common.Hash{},
+		},
+		{
+			name:  "single tuple allowed",
+			rules: allowSet{addrA: true},
+			list:  types.AccessList{{Address: addrA, StorageKeys: []common.Hash{h1, h2}}},
+			want:  map[common.Address][][]common.Hash{addrA: {{h1, h2}}},
+		},
+		{
+			name:  "repeated address accumulates",
+			rules: allowSet{addrA: true},
+			list: types.AccessList{
+				{Address: addrA, StorageKeys: []common.Hash{h1, h2}},
+				{Address: addrA, StorageKeys: []common.Hash{h3}},
+			},
+			want: map[common.Address][][]common.Hash{addrA: {{h1, h2}, {h3}}},
+		},
+		{
+			name:  "mixed addresses filtered",
+			rules: allowSet{addrA: true, addrC: true},
+			list: types.AccessList{
+				{Address: addrA, StorageKeys: []common.Hash{h1}},
+				{Address: addrB, StorageKeys: []common.Hash{h2}},
+				{Address: addrC, StorageKeys: []common.Hash{h3, h4}},
+			},
+			want: map[common.Address][][]common.Hash{
+				addrA: {{h1}},
+				addrC: {{h3, h4}},
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			req := require.New(t)
+			got := FromAccessList(tc.rules, tc.list)
+			req.Equal(tc.want, got)
+		})
+	}
+}
 
 func TestNew(t *testing.T) {
 	tests := []struct {

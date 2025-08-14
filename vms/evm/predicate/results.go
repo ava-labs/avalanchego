@@ -61,7 +61,6 @@ func ParseBlockResults(b []byte) (BlockResults, error) {
 }
 
 // Get returns the predicate results for txHash from precompile address if available.
-// Returns (set.Bits{}, false) if the txHash or address is not found.
 func (b *BlockResults) Get(txHash common.Hash, address common.Address) (set.Bits, bool) {
 	result, ok := b.TxResults[txHash][address]
 	return result, ok
