@@ -1,6 +1,8 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use crate::v2::api::OptionalHashKeyExt;
+
 use super::*;
 use ethereum_types::H256;
 use hash_db::Hasher;
@@ -122,7 +124,6 @@ fn make_key(hex_str: &str) -> Key {
 }
 
 #[test]
-#[ignore = "broken tests not yet validated"]
 fn test_root_hash_random_deletions() {
     use rand::seq::SliceRandom;
     let rng = firewood_storage::SeededRng::from_option(Some(42));
@@ -174,7 +175,11 @@ fn test_root_hash_random_deletions() {
 
             let h: TrieHash = KeccakHasher::trie_root(&items).to_fixed_bytes().into();
 
-            let h0 = committed_merkle.nodestore().root_hash().unwrap();
+            let h0 = committed_merkle
+                .nodestore()
+                .root_hash()
+                .or_default_root_hash()
+                .unwrap();
 
             assert_eq!(h, h0);
         }
