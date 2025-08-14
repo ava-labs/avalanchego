@@ -33,7 +33,7 @@ function copy_source() {
         time s5cmd cp "$source" "$dest"
 
         # If we copied a zip, extract it in place
-        if [[ "$source" == s3://* &&"$source" == *.zip ]]; then
+        if [[ "$source" == s3://* && "$source" == *.zip ]]; then
             echo "Extracting zip file in place"
             time unzip "$dest"/*.zip -d "$dest"
             rm "$dest"/*.zip
