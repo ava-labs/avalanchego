@@ -56,6 +56,7 @@ import (
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/subnet-evm/rpc"
+	"github.com/ava-labs/subnet-evm/triedb/firewood"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/holiman/uint256"
 	"github.com/tyler-smith/go-bip39"
@@ -702,6 +703,9 @@ func (s *BlockChainAPI) GetProof(ctx context.Context, address common.Address, st
 	statedb, header, err := s.b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
 	if statedb == nil || err != nil {
 		return nil, err
+	}
+	if _, ok := statedb.Database().TrieDB().Backend().(*firewood.Database); ok {
+		return nil, errors.New("firewood database does not yet support getProof")
 	}
 	codeHash := statedb.GetCodeHash(address)
 	storageRoot := statedb.GetStorageRoot(address)
