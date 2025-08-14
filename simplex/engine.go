@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/api/health"
+	"github.com/ava-labs/avalanchego/ids"
+
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/simplex"
 	"github.com/ava-labs/simplex/wal"
@@ -24,6 +27,7 @@ type Engine struct {
 	health.Checker
 
 	epoch *simplex.Epoch
+	blockDeserializer *blockDeserializer
 }
 
 func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
@@ -85,16 +89,48 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 
 	epoch, err := simplex.NewEpoch(epochConfig)
 	if err != nil {
-		// Handle error (e.g., log it, return a zero value, etc.)
 		return nil, err
 	}
 
 	return &Engine{
 		epoch: epoch,
+		blockDeserializer: blockDeserializer,
 	}, nil
 }
 
 func (e *Engine) Start(_ context.Context, _ uint32) error {
-	// Initialize the engine, set up necessary components, etc.
 	return e.epoch.Start()
+}
+
+func (e *Engine) SimplexMessage(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
+	simplexMsg, err := e.p2pToSimplexMessage(msg)
+	if err != nil {
+		return fmt.Errorf("failed to convert p2p message to simplex message: %w", err)
+	}
+
+	return e.epoch.HandleMessage(simplexMsg, nodeID[:])
+}
+
+func (e *Engine) p2pToSimplexMessage(msg *p2p.Simplex) (*simplex.Message, error) {
+	if msg == nil {
+		return nil, fmt.Errorf("nil message")
+	}
+
+	switch {
+	case msg.GetBlockProposal() != nil :
+			return blockProposalFromP2P(context.TODO(), msg.GetBlockProposal(), e.blockDeserializer)
+	case msg.GetEmptyNotarization() != nil:
+			return emptyNotarizationFromP2P(msg.GetEmptyNotarization())
+	case msg.GetVote() != nil:
+			vote, err := p2pVoteToSimplexVote(msg.GetVote())
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert p2p vote to simplex vote: %w", err)
+			}
+			return &simplex.Message{
+				VoteMessage: &vote,
+			}, nil
+	case msg.
+	default:
+		return nil, fmt.Errorf("unknown message type")
+	}
 }

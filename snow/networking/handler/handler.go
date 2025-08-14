@@ -75,6 +75,10 @@ type Handler interface {
 	AwaitStopped(ctx context.Context) (time.Duration, error)
 }
 
+type simplexEngine interface {
+	SimplexMessage(ctx context.Context, nodeID ids.NodeID, msg *p2ppb.Simplex) error
+}
+
 // handler passes incoming messages from the network to the consensus engine.
 // (Actually, it receives the incoming messages from a ChainRouter, but same difference.)
 type handler struct {
@@ -742,8 +746,16 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			zap.String("messageOp", op),
 			zap.Stringer("message", body),
 		)
-		return nil
-	// Connection messages can be sent to the currently executing engine
+		s, ok := engine.(simplexEngine)
+		if !ok {
+			return fmt.Errorf(
+				"attempt to submit simplex message %s from %s to non-simplex engine %s",
+				op, nodeID,
+				engineType,
+			)
+		}
+
+		return s.SimplexMessage(ctx, nodeID, msg)
 	case *message.Connected:
 		err := h.peerTracker.Connected(ctx, nodeID, msg.NodeVersion)
 		if err != nil {
@@ -759,7 +771,6 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		}
 		h.p2pTracker.Disconnected(nodeID)
 		return engine.Disconnected(ctx, nodeID)
-
 	default:
 		return fmt.Errorf(
 			"attempt to submit unhandled sync msg %s from %s",
