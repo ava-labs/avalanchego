@@ -29,54 +29,45 @@ type Predicates interface {
 	HasPredicate(address common.Address) bool
 }
 
-// FromAccessList extracts predicates from a transaction's access list
-// If an address is specified multiple times in the access list, each storage slot for that address is
-// appended to a slice of byte slices. Each byte slice represents a predicate, making it a slice of predicates
-// for each access list address, and every predicate in the slice goes through verification.
-func FromAccessList(rules Predicates, list types.AccessList) map[common.Address][]Predicate {
-	predicateStorageSlots := make(map[common.Address][]Predicate)
+// FromAccessList extracts predicates from a transaction's access list.
+// If an address is specified multiple times in the access list, each set of storage
+// keys for that address is appended to a slice. Each entry represents a predicate
+// encoded as a slice of common.Hash values (32-byte chunks) exactly as stored in
+// the access list.
+func FromAccessList(rules Predicates, list types.AccessList) map[common.Address][][]common.Hash {
+	predicateStorageSlots := make(map[common.Address][][]common.Hash)
 	for _, el := range list {
 		if !rules.HasPredicate(el.Address) {
 			continue
 		}
-		predicateStorageSlots[el.Address] = append(predicateStorageSlots[el.Address], HashSliceToBytes(el.StorageKeys))
+		// Append a copy of the storage keys to avoid aliasing
+		keys := make([]common.Hash, len(el.StorageKeys))
+		copy(keys, el.StorageKeys)
+		predicateStorageSlots[el.Address] = append(predicateStorageSlots[el.Address], keys)
 	}
 
 	return predicateStorageSlots
-}
-
-// hashSliceToBytes serializes a []common.Hash into a tightly packed byte array.
-func HashSliceToBytes(hashes []common.Hash) []byte {
-	bytes := make([]byte, common.HashLength*len(hashes))
-	for i, hash := range hashes {
-		copy(bytes[i*common.HashLength:], hash[:])
-	}
-
-	return bytes
 }
 
 func RoundUpTo32(x int) int {
 	return (x + 31) / 32 * 32
 }
 
-// Predicate represents a packed predicate that can be stored in EVM access lists.
-// It contains the original predicate bytes with padding and delimiter for storage.
-type Predicate []byte
-
-// New returns a Predicate from b by appending a delimiter and zero-padding
-// until the length is a multiple of 32.
-func New(b []byte) Predicate {
+// new returns a 32-byte aligned predicate from b by appending a delimiter and zero-padding
+// until the length is a multiple of 32. 32-byte aligned predicates should not be exposed
+// outside of this package.
+func new(b []byte) []byte {
 	bytes := make([]byte, len(b)+1)
 	copy(bytes, b)
 	bytes[len(b)] = delimiter
 
-	return Predicate(common.RightPadBytes(bytes, RoundUpTo32(len(bytes))))
+	return common.RightPadBytes(bytes, RoundUpTo32(len(bytes)))
 }
 
 // Unpack unpacks a predicate by stripping right padded zeroes, checking for the delimiter,
 // ensuring there is not excess padding, and returning the original message.
 // Returns an error if it finds an incorrect encoding.
-func Unpack(p Predicate) ([]byte, error) {
+func Unpack(p []byte) ([]byte, error) {
 	if len(p) == 0 {
 		return nil, errEmptyPredicate
 	}

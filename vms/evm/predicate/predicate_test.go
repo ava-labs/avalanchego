@@ -52,10 +52,10 @@ func TestNew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			packed := New(tt.input)
+			packed := new(tt.input)
 
 			// Verify the packed result has the correct structure
-			require.Equal(tt.want, []byte(packed)[:len(tt.want)])
+			require.Equal(tt.want, packed[:len(tt.want)])
 
 			// Verify padding is all zeros
 			for i := len(tt.want); i < len(packed); i++ {
@@ -71,75 +71,93 @@ func TestNew(t *testing.T) {
 func TestUnpack(t *testing.T) {
 	tests := []struct {
 		name    string
-		input   Predicate
+		input   []byte
 		want    []byte
 		wantErr error
 	}{
 		// Valid test cases
 		{
 			name:    "empty input",
-			input:   Predicate{},
+			input:   []byte{},
 			want:    nil,
 			wantErr: errEmptyPredicate,
 		},
 		{
 			name:    "single byte",
-			input:   New([]byte{0x42}),
+			input:   new([]byte{0x42}),
 			want:    []byte{0x42},
 			wantErr: nil,
 		},
 		{
-			name:    "exactly 31 bytes",
-			input:   New(bytes.Repeat([]byte{0xaa}, 31)),
+			name:    "31 bytes",
+			input:   new(bytes.Repeat([]byte{0xaa}, 31)),
 			want:    bytes.Repeat([]byte{0xaa}, 31),
 			wantErr: nil,
 		},
 		{
-			name:    "exactly 32 bytes",
-			input:   New(bytes.Repeat([]byte{0xbb}, 32)),
+			name:    "32 bytes",
+			input:   new(bytes.Repeat([]byte{0xbb}, 32)),
 			want:    bytes.Repeat([]byte{0xbb}, 32),
 			wantErr: nil,
 		},
 		{
-			name:    "exactly 63 bytes",
-			input:   New(bytes.Repeat([]byte{0xcc}, 63)),
+			name:    "33 bytes",
+			input:   new(bytes.Repeat([]byte{0xbb}, 33)),
+			want:    bytes.Repeat([]byte{0xbb}, 33),
+			wantErr: nil,
+		},
+		{
+			name:    "48 bytes",
+			input:   new(bytes.Repeat([]byte{0xbb}, 48)),
+			want:    bytes.Repeat([]byte{0xbb}, 48),
+			wantErr: nil,
+		},
+		{
+			name:    "63 bytes",
+			input:   new(bytes.Repeat([]byte{0xcc}, 63)),
 			want:    bytes.Repeat([]byte{0xcc}, 63),
 			wantErr: nil,
 		},
 		{
-			name:    "exactly 65 bytes",
-			input:   New(bytes.Repeat([]byte{0xdd}, 65)),
+			name:    "64 bytes",
+			input:   new(bytes.Repeat([]byte{0xbb}, 64)),
+			want:    bytes.Repeat([]byte{0xbb}, 64),
+			wantErr: nil,
+		},
+		{
+			name:    "65 bytes",
+			input:   new(bytes.Repeat([]byte{0xdd}, 65)),
 			want:    bytes.Repeat([]byte{0xdd}, 65),
 			wantErr: nil,
 		},
 		// Invalid test cases
 		{
 			name:    "all zeros",
-			input:   Predicate(bytes.Repeat([]byte{0}, 32)),
+			input:   bytes.Repeat([]byte{0}, 32),
 			want:    nil,
 			wantErr: errAllZeroBytes,
 		},
 		{
 			name:    "missing delimiter",
-			input:   Predicate(bytes.Repeat([]byte{0x42}, 32)),
+			input:   bytes.Repeat([]byte{0x42}, 32),
 			want:    nil,
 			wantErr: errWrongEndDelimiter,
 		},
 		{
 			name:    "wrong delimiter",
-			input:   Predicate(append(bytes.Repeat([]byte{0x42}, 31), 0x00)),
+			input:   append(bytes.Repeat([]byte{0x42}, 31), 0x00),
 			want:    nil,
 			wantErr: errWrongEndDelimiter,
 		},
 		{
 			name:    "excess padding",
-			input:   Predicate(append(append([]byte{0x42, 0xff}, bytes.Repeat([]byte{0}, 30)...), 0x01)),
+			input:   append(append([]byte{0x42, 0xff}, bytes.Repeat([]byte{0}, 30)...), 0x01),
 			want:    nil,
 			wantErr: errExcessPadding,
 		},
 		{
 			name:    "non-zero padding",
-			input:   Predicate(append(append([]byte{0x42, 0xff}, bytes.Repeat([]byte{0}, 29)...), 0x01, 0x00)),
+			input:   append(append([]byte{0x42, 0xff}, bytes.Repeat([]byte{0}, 29)...), 0x01, 0x00),
 			want:    nil,
 			wantErr: errExcessPadding,
 		},
@@ -164,7 +182,7 @@ func TestUnpack(t *testing.T) {
 
 func FuzzPackUnpack(f *testing.F) {
 	f.Fuzz(func(t *testing.T, input []byte) {
-		packed := New(input)
+		packed := new(input)
 		unpacked, err := Unpack(packed)
 		require.NoError(t, err)
 		require.Equal(t, input, unpacked)
@@ -178,8 +196,8 @@ func FuzzUnpackPackEqual(f *testing.F) {
 		for j := range input {
 			input[j] = byte(j + 1)
 		}
-		validPredicate := New(input)
-		f.Add([]byte(validPredicate))
+		validPredicate := new(input)
+		f.Add(validPredicate)
 	}
 
 	f.Fuzz(func(t *testing.T, original []byte) {
@@ -188,7 +206,7 @@ func FuzzUnpackPackEqual(f *testing.F) {
 			t.Skip("invalid predicate")
 		}
 
-		packed := New(unpacked)
-		require.Equal(t, original, []byte(packed))
+		packed := new(unpacked)
+		require.Equal(t, original, packed)
 	})
 }

@@ -1,45 +1,28 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package tx
+package predicatetest
 
 import (
-	"math/big"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 )
 
-func TestNewTxWithoutPredicate(t *testing.T) {
+func TestNewAccessListEmptyPredicate(t *testing.T) {
 	require := require.New(t)
 
-	// Test creating a transaction without any predicate options
-	tx := NewTx(
-		big.NewInt(1),           // chainID
-		0,                       // nonce
-		nil,                     // to
-		21000,                   // gas
-		big.NewInt(20000000000), // gasFeeCap
-		big.NewInt(1000000000),  // gasTipCap
-		big.NewInt(0),           // value
-		[]byte{},                // data
-		types.AccessList{},      // accessList
-		// No options provided
-	)
+	addr := common.HexToAddress("0x1234567890123456789012345678901234567890")
+	accessList := NewAccessList(addr, []byte{})
 
-	// Verify transaction was created
-	require.NotNil(tx)
-
-	// Extract access list from transaction
-	accessList := tx.AccessList()
-	require.Empty(accessList) // No predicate, so no access list entries
+	require.Len(accessList, 1)
+	require.Equal(addr, accessList[0].Address)
+	// 0 + delimiter, padded to 32 bytes is 1 storage key
+	require.Len(accessList[0].StorageKeys, 1)
 }
 
-func TestNewTxWithPredicate(t *testing.T) {
+func TestNewAccessListWithPredicate(t *testing.T) {
 	tests := []struct {
 		name             string
 		predicateBytes   []byte
@@ -94,25 +77,7 @@ func TestNewTxWithPredicate(t *testing.T) {
 				tt.predicateBytes[i] = byte(i + 1)
 			}
 
-			// Create transaction with predicate using functional options
-			tx := NewTx(
-				big.NewInt(1),           // chainID
-				0,                       // nonce
-				nil,                     // to
-				21000,                   // gas
-				big.NewInt(20000000000), // gasFeeCap
-				big.NewInt(1000000000),  // gasTipCap
-				big.NewInt(0),           // value
-				[]byte{},                // data
-				types.AccessList{},      // accessList
-				WithPredicate(tt.predicateAddress, tt.predicateBytes),
-			)
-
-			// Verify transaction was created
-			require.NotNil(tx)
-
-			// Extract access list from transaction
-			accessList := tx.AccessList()
+			accessList := NewAccessList(tt.predicateAddress, tt.predicateBytes)
 			require.Len(accessList, 1)
 
 			// Verify predicate address is correct
@@ -122,7 +87,7 @@ func TestNewTxWithPredicate(t *testing.T) {
 			require.Len(accessList[0].StorageKeys, tt.wantNumHashes)
 
 			// Verify the predicate data is correctly encoded in storage keys
-			predicateData := predicate.New(tt.predicateBytes)
+			predicateData := new(tt.predicateBytes)
 			for i, storageKey := range accessList[0].StorageKeys {
 				start := i * common.HashLength
 				end := start + common.HashLength
@@ -140,50 +105,9 @@ func TestNewTxWithPredicate(t *testing.T) {
 	}
 }
 
-func TestNewTxWithExistingAccessList(t *testing.T) {
-	require := require.New(t)
+// Keeping a simple encoding test via total size
 
-	// Create existing access list
-	existingAccessList := types.AccessList{
-		{
-			Address:     common.HexToAddress("0x1111111111111111111111111111111111111111"),
-			StorageKeys: []common.Hash{common.HexToHash("0x1111111111111111111111111111111111111111111111111111111111111111")},
-		},
-	}
-
-	predicateAddress := common.HexToAddress("0x2222222222222222222222222222222222222222")
-	predicateBytes := []byte{0x42, 0x43, 0x44}
-
-	tx := NewTx(
-		big.NewInt(1),           // chainID
-		0,                       // nonce
-		nil,                     // to
-		21000,                   // gas
-		big.NewInt(20000000000), // gasFeeCap
-		big.NewInt(1000000000),  // gasTipCap
-		big.NewInt(0),           // value
-		[]byte{},                // data
-		existingAccessList,      // accessList
-		WithPredicate(predicateAddress, predicateBytes),
-	)
-
-	// Verify transaction was created
-	require.NotNil(tx)
-
-	// Extract access list from transaction
-	accessList := tx.AccessList()
-	require.Len(accessList, 2)
-
-	// Verify existing access list entry is preserved
-	require.Equal(existingAccessList[0].Address, accessList[0].Address)
-	require.Equal(existingAccessList[0].StorageKeys, accessList[0].StorageKeys)
-
-	// Verify predicate access list entry is added
-	require.Equal(predicateAddress, accessList[1].Address)
-	require.Len(accessList[1].StorageKeys, 1) // 3 bytes + delimiter = 4 bytes, rounded up to 32 bytes = 1 hash
-}
-
-func TestNewTxPredicateEncoding(t *testing.T) {
+func TestNewAccessListPredicateEncoding(t *testing.T) {
 	require := require.New(t)
 
 	// Test that predicate encoding follows the expected format:
@@ -225,20 +149,7 @@ func TestNewTxPredicateEncoding(t *testing.T) {
 				tc.predicateBytes[i] = byte(i + 1)
 			}
 
-			tx := NewTx(
-				big.NewInt(1),           // chainID
-				0,                       // nonce
-				nil,                     // to
-				21000,                   // gas
-				big.NewInt(20000000000), // gasFeeCap
-				big.NewInt(1000000000),  // gasTipCap
-				big.NewInt(0),           // value
-				[]byte{},                // data
-				types.AccessList{},      // accessList
-				WithPredicate(common.Address{}, tc.predicateBytes),
-			)
-
-			accessList := tx.AccessList()
+			accessList := NewAccessList(common.Address{}, tc.predicateBytes)
 			require.Len(accessList, 1)
 
 			// Calculate expected number of storage keys
