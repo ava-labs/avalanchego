@@ -23,8 +23,8 @@ func NewAccessList(address common.Address, b []byte) types.AccessList {
 
 // New constructs a predicate from raw predicate bytes.
 //
-// It packs the predicate by appending [predicate.Delimiter] and zero-padding to
-// a multiple of 32 bytes, then splits into [common.Hash]s.
+// It chunks the predicate by appending [predicate.Delimiter] and zero-padding
+// to a multiple of 32 bytes.
 func New(b []byte) predicate.Predicate {
 	numUnpaddedChunks := len(b) / common.HashLength
 	chunks := make([]common.Hash, numUnpaddedChunks+1)
