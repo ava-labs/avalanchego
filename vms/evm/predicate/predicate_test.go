@@ -37,25 +37,25 @@ func TestFromAccessList(t *testing.T) {
 		want  map[common.Address][]Predicate
 	}{
 		{
-			name:  "empty list",
+			name:  "empty_list",
 			rules: allowSet{addrA: true},
 			list:  types.AccessList{},
 			want:  map[common.Address][]Predicate{},
 		},
 		{
-			name:  "no allowed addresses",
+			name:  "no_allowed_addresses",
 			rules: allowSet{addrB: true},
 			list:  types.AccessList{{Address: addrA, StorageKeys: []common.Hash{h1}}},
 			want:  map[common.Address][]Predicate{},
 		},
 		{
-			name:  "single tuple allowed",
+			name:  "single_tuple_allowed",
 			rules: allowSet{addrA: true},
 			list:  types.AccessList{{Address: addrA, StorageKeys: []common.Hash{h1, h2}}},
 			want:  map[common.Address][]Predicate{addrA: {{h1, h2}}},
 		},
 		{
-			name:  "repeated address accumulates",
+			name:  "repeated_address_accumulates",
 			rules: allowSet{addrA: true},
 			list: types.AccessList{
 				{Address: addrA, StorageKeys: []common.Hash{h1, h2}},
@@ -64,7 +64,7 @@ func TestFromAccessList(t *testing.T) {
 			want: map[common.Address][]Predicate{addrA: {{h1, h2}, {h3}}},
 		},
 		{
-			name:  "mixed addresses filtered",
+			name:  "mixed_addresses_filtered",
 			rules: allowSet{addrA: true, addrC: true},
 			list: types.AccessList{
 				{Address: addrA, StorageKeys: []common.Hash{h1}},
@@ -96,80 +96,80 @@ func TestPredicateBytes(t *testing.T) {
 	}{
 		// Valid test cases
 		{
-			name:    "empty input",
+			name:    "empty_input",
 			input:   predicatetest.New(nil),
 			want:    []byte{},
 			wantErr: nil,
 		},
 		{
-			name:    "single byte",
+			name:    "single_byte",
 			input:   predicatetest.New([]byte{0xbb}),
 			want:    []byte{0xbb},
 			wantErr: nil,
 		},
 		{
-			name:    "31 bytes",
+			name:    "31_bytes",
 			input:   predicatetest.New(bytes.Repeat([]byte{0xaa}, 31)),
 			want:    bytes.Repeat([]byte{0xaa}, 31),
 			wantErr: nil,
 		},
 		{
-			name:    "32 bytes",
+			name:    "32_bytes",
 			input:   predicatetest.New(bytes.Repeat([]byte{0xdd}, 32)),
 			want:    bytes.Repeat([]byte{0xdd}, 32),
 			wantErr: nil,
 		},
 		{
-			name:    "33 bytes",
+			name:    "33_bytes",
 			input:   predicatetest.New(bytes.Repeat([]byte{0xcc}, 33)),
 			want:    bytes.Repeat([]byte{0xcc}, 33),
 			wantErr: nil,
 		},
 		{
-			name:    "48 bytes",
+			name:    "48_bytes",
 			input:   predicatetest.New(bytes.Repeat([]byte{0x00}, 48)),
 			want:    bytes.Repeat([]byte{0x00}, 48),
 			wantErr: nil,
 		},
 		{
-			name:    "63 bytes",
+			name:    "63_bytes",
 			input:   predicatetest.New(bytes.Repeat([]byte{0xdd}, 63)),
 			want:    bytes.Repeat([]byte{0xdd}, 63),
 			wantErr: nil,
 		},
 		{
-			name:    "64 bytes",
+			name:    "64_bytes",
 			input:   predicatetest.New(bytes.Repeat([]byte{0x33}, 64)),
 			want:    bytes.Repeat([]byte{0x33}, 64),
 			wantErr: nil,
 		},
 		{
-			name:    "65 bytes",
+			name:    "65_bytes",
 			input:   predicatetest.New(bytes.Repeat([]byte{0xdd}, 65)),
 			want:    bytes.Repeat([]byte{0xdd}, 65),
 			wantErr: nil,
 		},
 		// Invalid test cases
 		{
-			name:    "all zeros empty",
+			name:    "all_zeros_empty",
 			input:   nil,
 			want:    nil,
 			wantErr: ErrMissingDelimiter,
 		},
 		{
-			name:    "all zeros",
+			name:    "all_zeros",
 			input:   Predicate{{}},
 			want:    nil,
 			wantErr: ErrMissingDelimiter,
 		},
 		{
-			name:    "wrong delimiter",
+			name:    "wrong_delimiter",
 			input:   Predicate{{0x42}},
 			want:    nil,
 			wantErr: ErrWrongEndDelimiter,
 		},
 		{
-			name:    "wrong delimiter",
+			name:    "wrong_delimiter",
 			input:   Predicate{{Delimiter}, {}},
 			want:    nil,
 			wantErr: ErrExcessPadding,

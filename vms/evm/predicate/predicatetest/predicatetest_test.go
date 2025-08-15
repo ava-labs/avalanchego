@@ -19,28 +19,28 @@ func TestNew(t *testing.T) {
 		want  predicate.Predicate
 	}{
 		{
-			name:  "empty predicate",
+			name:  "empty_predicate",
 			input: nil,
 			want: predicate.Predicate{
 				{predicate.Delimiter},
 			},
 		},
 		{
-			name:  "single byte",
+			name:  "single_byte",
 			input: []byte{0x42},
 			want: predicate.Predicate{
 				{0x42, predicate.Delimiter},
 			},
 		},
 		{
-			name:  "31 bytes",
+			name:  "31_bytes",
 			input: make([]byte, 31),
 			want: predicate.Predicate{
 				{31: predicate.Delimiter},
 			},
 		},
 		{
-			name:  "32 bytes",
+			name:  "32_bytes",
 			input: make([]byte, 32),
 			want: predicate.Predicate{
 				{},
@@ -48,7 +48,7 @@ func TestNew(t *testing.T) {
 			},
 		},
 		{
-			name: "40 bytes",
+			name: "40_bytes",
 			input: []byte{
 				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
 				0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
