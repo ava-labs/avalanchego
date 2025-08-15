@@ -7,10 +7,11 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestNew(t *testing.T) {
