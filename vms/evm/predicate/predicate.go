@@ -44,9 +44,9 @@ func (p Predicate) Bytes() ([]byte, error) {
 		return nil, fmt.Errorf("%w: length (%d)", ErrMissingDelimiter, len(p))
 	}
 
-	expectedPredicateLen := (len(trimmed) + common.HashLength - 1) / common.HashLength
-	if expectedPredicateLen != len(p) {
-		return nil, fmt.Errorf("%w: got length (%d), expected length (%d)", ErrExcessPadding, len(p), expectedPredicateLen)
+	expectedLen := (len(trimmed) + common.HashLength - 1) / common.HashLength
+	if expectedLen != len(p) {
+		return nil, fmt.Errorf("%w: got length (%d), expected length (%d)", ErrExcessPadding, len(p), expectedLen)
 	}
 
 	delimiterIndex := len(trimmed) - 1
