@@ -6,7 +6,6 @@ package simplex
 //go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -97,6 +96,7 @@ func (s *Storage) Height() uint64 {
 // Retrieve returns the block and finalization at [seq].
 // If [seq] is not found, returns simplex.ErrBlockNotFound.
 func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalization, error) {
+	// THe genesis block doesn't have a finalization, so we need to handle it specifically.
 	if seq == 0 {
 		return s.genesisBlock, simplex.Finalization{}, nil
 	}
@@ -104,7 +104,7 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 	block, err := getBlockAtHeight(context.TODO(), s.vm, seq)
 	if err != nil {
 		if err == database.ErrNotFound {
-			s.log.Error("block not found for sequence", zap.Uint64("seq", seq), zap.Error(err))
+			s.log.Error("Block not found for sequence", zap.Uint64("seq", seq), zap.Error(err))
 			return nil, simplex.Finalization{}, simplex.ErrBlockNotFound
 		}
 		return nil, simplex.Finalization{}, err
@@ -118,7 +118,7 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 	vb := &Block{vmBlock: block, metadata: finalization.Finalization.ProtocolMetadata, blockTracker: s.blockTracker}
 	bytes, err := vb.Bytes()
 	if err != nil {
-		s.log.Error("failed to serialize block", zap.Error(err))
+		s.log.Error("Failed to serialize block", zap.Error(err))
 		return nil, simplex.Finalization{}, err
 	}
 	vb.digest = computeDigest(bytes)
@@ -131,13 +131,13 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finalization simplex.Finalization) error {
 	bh := block.BlockHeader()
 	if bh.Seq == 0 {
-		s.log.Error("attempted to index genesis block")
+		s.log.Error("Attempted to index genesis block")
 		return errGenesisIndexed
 	}
 
 	currentHeight := s.height.Load()
 	if currentHeight != bh.Seq {
-		s.log.Error("attempted to index block with mismatched sequence number",
+		s.log.Error("Attempted to index block with mismatched sequence number",
 			zap.Uint64("expected", currentHeight),
 			zap.Uint64("got", bh.Seq))
 		return fmt.Errorf("%w: expected %d, got %d", errUnexpectedSeq, currentHeight, bh.Seq)
@@ -145,22 +145,22 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 
 	// no need to lock the blockTracker, since Index should not be called concurrently
 	if s.blockTracker.lastIndexed != bh.Prev {
-		s.log.Error("attempted to index block with mismatched previous digest",
+		s.log.Error("Attempted to index block with mismatched previous digest",
 			zap.Stringer("expected", s.blockTracker.lastIndexed),
 			zap.Stringer("got", bh.Prev))
 
 		return fmt.Errorf("%w: expected %s, got %s", errMismatchedPrevDigest, s.blockTracker.lastIndexed, bh.Prev)
 	}
 
-	if !bytes.Equal(bh.Digest[:], finalization.Finalization.Digest[:]) {
-		s.log.Error("attempted to index block with mismatched digest",
+	if bh.Digest != finalization.Finalization.Digest {
+		s.log.Error("Attempted to index block with mismatched digest",
 			zap.Stringer("expected", bh.Digest),
 			zap.Stringer("got", finalization.Finalization.Digest))
 		return fmt.Errorf("%w: expected %d, got %d", errMismatchedDigest, bh.Digest, finalization.Finalization.Digest)
 	}
 
 	if finalization.QC == nil {
-		s.log.Error("attempted to index block with no quorum certificate", zap.Stringer("blockID", bh.Digest))
+		s.log.Error("Attempted to index block with no quorum certificate", zap.Stringer("blockID", bh.Digest))
 		return errInvalidQC
 	}
 
@@ -214,7 +214,7 @@ func (s *Storage) retrieveFinalization(seq uint64) (simplex.Finalization, error)
 		if err == database.ErrNotFound {
 			return simplex.Finalization{}, simplex.ErrBlockNotFound
 		}
-		s.log.Error("failed to retrieve finalization", zap.Uint64("seq", seq), zap.Error(err))
+		s.log.Debug("Failed to retrieve finalization", zap.Uint64("seq", seq), zap.Error(err))
 		return simplex.Finalization{}, err
 	}
 
