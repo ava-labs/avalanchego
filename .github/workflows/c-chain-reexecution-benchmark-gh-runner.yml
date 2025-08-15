@@ -19,6 +19,8 @@ jobs:
           end-block: 250000
           source-block-dir: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip
           current-state-dir: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip
+          prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}

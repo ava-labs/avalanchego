@@ -79,6 +79,8 @@ jobs:
           end-block: ${{ steps.set-params.outputs.end-block }}
           source-block-dir: ${{ steps.set-params.outputs.source-block-dir }}
           current-state-dir: ${{ steps.set-params.outputs.current-state-dir }}
+          prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           push-github-action-benchmark: ${{ github.event_name == 'schedule' }}
