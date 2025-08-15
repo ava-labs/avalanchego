@@ -50,7 +50,7 @@ func TestParseBlockResultsInvalid(t *testing.T) {
 				},
 				make([]byte, 1<<24), // Append the bitset
 			),
-			wantErr: codec.ErrCantUnpackVersion,
+			wantErr: codec.ErrUnmarshalTooBig,
 		},
 	}
 	for _, test := range tests {
