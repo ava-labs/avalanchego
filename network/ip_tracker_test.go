@@ -23,6 +23,7 @@ func newTestIPTracker(t *testing.T) *ipTracker {
 		nil,
 		logging.NoLog{},
 		prometheus.NewRegistry(),
+		false,
 	)
 	require.NoError(t, err)
 	return tracker
