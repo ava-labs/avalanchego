@@ -122,17 +122,21 @@ func (e *Engine) p2pToSimplexMessage(msg *p2p.Simplex) (*simplex.Message, error)
 	case msg.GetBlockProposal() != nil :
 			return blockProposalFromP2P(context.TODO(), msg.GetBlockProposal(), e.blockDeserializer)
 	case msg.GetEmptyNotarization() != nil:
-			return emptyNotarizationFromP2P(msg.GetEmptyNotarization(), e.quorumDeserializer)
+			return emptyNotarizationMessageFromP2P(msg.GetEmptyNotarization(), e.quorumDeserializer)
 	case msg.GetVote() != nil:
 			return voteFromP2P(msg.GetVote())
 	case msg.GetEmptyVote() != nil:
 			return emptyVoteFromP2P(msg.GetEmptyVote())
 	case msg.GetNotarization() != nil:
-			return notarizationFromP2P(msg.GetNotarization(), e.quorumDeserializer)
+			return notarizationMessageFromP2P(msg.GetNotarization(), e.quorumDeserializer)
 	case msg.GetFinalizeVote() != nil:
 			return finalizeVoteFromP2P(msg.GetFinalizeVote(), e.quorumDeserializer)
 	case msg.GetFinalization() != nil:
-			return finalizationFromP2P(msg.GetFinalization(), e.quorumDeserializer)
+			return finalizationMessageFromP2P(msg.GetFinalization(), e.quorumDeserializer)
+	case msg.GetReplicationRequest() != nil:
+			return replicationRequestFromP2P(msg.GetReplicationRequest()), nil
+	case msg.GetReplicationResponse() != nil:
+			return replicationResponseFromP2P(context.TODO(), msg.GetReplicationResponse(), e.blockDeserializer, e.quorumDeserializer)
 	default:
 		return nil, fmt.Errorf("unknown message type")
 	}
