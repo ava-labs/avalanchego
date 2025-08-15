@@ -35,8 +35,7 @@ type Predicate []common.Hash
 //
 // Returns an error if it finds an incorrect encoding.
 func (p Predicate) Bytes() ([]byte, error) {
-	paddedLen := common.HashLength * len(p)
-	padded := make([]byte, paddedLen)
+	padded := make([]byte, common.HashLength*len(p))
 	for i, chunk := range p {
 		copy(padded[common.HashLength*i:], chunk[:])
 	}
