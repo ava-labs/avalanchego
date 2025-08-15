@@ -14,7 +14,7 @@ import (
 // Context defines the block context that will be optionally provided by the
 // proposervm to an underlying vm.
 type Context struct {
-	// PChainHeight is the height that this block will use to verify it's state.
+	// PChainHeight is the height that this block will use to verify its state.
 	// In the proposervm, blocks verify the proposer based on the P-chain height
 	// recorded in the parent block. However, the P-chain height provided here
 	// is the P-chain height encoded into this block.
