@@ -130,11 +130,6 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 // It stores the finalization bytes at the current height and increments the height.
 func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finalization simplex.Finalization) error {
 	bh := block.BlockHeader()
-	if bh.Seq == 0 {
-		s.log.Error("Attempted to index genesis block")
-		return errGenesisIndexed
-	}
-
 	currentHeight := s.height.Load()
 	if currentHeight != bh.Seq {
 		s.log.Error("Attempted to index block with mismatched sequence number",
