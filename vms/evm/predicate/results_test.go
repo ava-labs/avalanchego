@@ -282,7 +282,7 @@ func TestBlockResultsBytes(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple txs single result",
+			name: "multiple_txs_single_result",
 			input: BlockResults{
 				{1}: {
 					{2}: set.NewBits(1, 2, 3),
@@ -329,7 +329,7 @@ func TestBlockResultsBytes(t *testing.T) {
 			},
 		},
 		{
-			name: "multiple txs multiple results",
+			name: "multiple_txs_multiple_results",
 			input: BlockResults{
 				{1}: {
 					{2}: set.NewBits(1, 2, 3),
