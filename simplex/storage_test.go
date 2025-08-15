@@ -137,7 +137,7 @@ func TestStorageIndexFails(t *testing.T) {
 	}{
 		{
 			name:          "index genesis block",
-			expectedError: errGenesisIndexed,
+			expectedError: errUnexpectedSeq,
 			block:         genesis,
 			finalization:  simplex.Finalization{},
 		},
@@ -184,7 +184,7 @@ func TestStorageIndexFails(t *testing.T) {
 			err = s.Index(ctx, tt.block, tt.finalization)
 			require.ErrorIs(t, err, tt.expectedError)
 
-			if tt.expectedError != errGenesisIndexed {
+			if tt.block.metadata.Seq != 0 {
 				// ensure that the block is not retrievable
 				block, finalization, err := s.Retrieve(tt.block.BlockHeader().Seq)
 				require.ErrorIs(t, err, simplex.ErrBlockNotFound)

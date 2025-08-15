@@ -31,7 +31,6 @@ var (
 	}
 
 	errUnexpectedSeq    = errors.New("unexpected sequence number")
-	errGenesisIndexed   = errors.New("genesis block should not be indexed")
 	errInvalidQC        = errors.New("invalid quorum certificate")
 	errMismatchedDigest = errors.New("mismatched digest in finalization")
 )
