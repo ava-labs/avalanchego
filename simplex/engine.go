@@ -28,6 +28,7 @@ type Engine struct {
 
 	epoch *simplex.Epoch
 	blockDeserializer *blockDeserializer
+	quorumDeserializer *QCDeserializer
 }
 
 func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
@@ -95,6 +96,7 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 	return &Engine{
 		epoch: epoch,
 		blockDeserializer: blockDeserializer,
+		quorumDeserializer: qcDeserializer,
 	}, nil
 }
 
@@ -120,18 +122,17 @@ func (e *Engine) p2pToSimplexMessage(msg *p2p.Simplex) (*simplex.Message, error)
 	case msg.GetBlockProposal() != nil :
 			return blockProposalFromP2P(context.TODO(), msg.GetBlockProposal(), e.blockDeserializer)
 	case msg.GetEmptyNotarization() != nil:
-			return emptyNotarizationFromP2P(msg.GetEmptyNotarization())
+			return emptyNotarizationFromP2P(msg.GetEmptyNotarization(), e.quorumDeserializer)
 	case msg.GetVote() != nil:
-			vote, err := p2pVoteToSimplexVote(msg.GetVote())
-			if err != nil {
-				return nil, fmt.Errorf("failed to convert p2p vote to simplex vote: %w", err)
-			}
-			return &simplex.Message{
-				VoteMessage: &vote,
-			}, nil
+			return voteFromP2P(msg.GetVote())
 	case msg.GetEmptyVote() != nil:
-			emptyVote := msg.GetEmptyVote()
-			return 
+			return emptyVoteFromP2P(msg.GetEmptyVote())
+	case msg.GetNotarization() != nil:
+			return notarizationFromP2P(msg.GetNotarization(), e.quorumDeserializer)
+	case msg.GetFinalizeVote() != nil:
+			return finalizeVoteFromP2P(msg.GetFinalizeVote(), e.quorumDeserializer)
+	case msg.GetFinalization() != nil:
+			return finalizationFromP2P(msg.GetFinalization(), e.quorumDeserializer)
 	default:
 		return nil, fmt.Errorf("unknown message type")
 	}

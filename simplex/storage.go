@@ -96,8 +96,21 @@ func (s *Storage) Height() uint64 {
 
 // Retrieve returns the block and finalization at [seq].
 // If [seq] is not found, returns false.
-func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalization, bool) {
-	return s.retrieve(seq)
+func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalization, error) {
+	block, finalization, found := s.retrieve(seq)
+	if !found {
+		return nil, simplex.Finalization{}, fmt.Errorf("block not found at sequence %d", seq)
+	}
+
+	if block == nil {
+		return nil, simplex.Finalization{}, fmt.Errorf("block is nil at sequence %d", seq)
+	}
+
+	if finalization.QC == nil {
+		return nil, simplex.Finalization{}, fmt.Errorf("finalization quorum certificate is nil at sequence %d", seq)
+	}
+
+	return block, finalization, nil
 }
 
 func (s *Storage) retrieve(seq uint64) (*Block, simplex.Finalization, bool) {

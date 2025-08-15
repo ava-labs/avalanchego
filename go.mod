@@ -81,14 +81,12 @@ require (
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
 
-require github.com/kisielk/godepgraph v1.0.0 // indirect
-
 require (
 	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e // indirect
 	github.com/FactomProject/btcutilecc v0.0.0-20130527213604-d3a63a5752ec // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.8 // indirect
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.9 // indirect
 	github.com/ava-labs/simplex v0.0.0-20250812203241-4d88466c970e
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.10.0 // indirect
