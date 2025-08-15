@@ -100,7 +100,7 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 		return s.genesisBlock, simplex.Finalization{}, nil
 	}
 
-	block, err := getBlockAtHeight(context.TODO(), s.vm, seq)
+	block, err := getBlock(context.TODO(), s.vm, seq)
 	if err != nil {
 		if err == database.ErrNotFound {
 			s.log.Error("Block not found for sequence", zap.Uint64("seq", seq), zap.Error(err))
@@ -177,7 +177,7 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 
 // getGenesisBlock returns the genesis block wrapped as a Block instance.
 func getGenesisBlock(ctx context.Context, config *Config, blockTracker *blockTracker) (*Block, error) {
-	snowmanGenesis, err := getBlockAtHeight(ctx, config.VM, 0)
+	snowmanGenesis, err := getBlock(ctx, config.VM, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +220,7 @@ func (s *Storage) retrieveFinalization(seq uint64) (simplex.Finalization, error)
 	return canotoFinalization.toFinalization(s.deserializer)
 }
 
-func getBlockAtHeight(ctx context.Context, vm block.ChainVM, height uint64) (snowman.Block, error) {
+func getBlock(ctx context.Context, vm block.ChainVM, height uint64) (snowman.Block, error) {
 	id, err := vm.GetBlockIDAtHeight(ctx, height)
 	if err != nil {
 		return nil, err
