@@ -57,7 +57,7 @@ function check_dst_not_exists() {
     local dst="$1"
 
     if [[ "$dst" == s3://* ]]; then
-        # Validate the S3 path format using a single regular expression.
+        # Validate the S3 path format as s3://<bucket-name>/<directory-name>/
         echo "Checking S3 path format: $dst"
         if ! [[ "$dst" =~ ^s3://[^/]+/([^/]+/)$ ]]; then
           echo "Error: Invalid S3 path format."
