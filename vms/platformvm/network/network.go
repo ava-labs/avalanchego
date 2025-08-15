@@ -53,22 +53,23 @@ func New(
 	registerer prometheus.Registerer,
 	config config.Network,
 ) (*Network, error) {
-	p2pNetwork, err := p2p.NewNetwork(log, appSender, registerer, "p2p")
+	p2pNetwork, err := p2p.NewNetwork(
+		log,
+		appSender,
+		vdrs,
+		subnetID,
+		config.MaxValidatorSetStaleness,
+		registerer,
+		"p2p",
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	marshaller := txMarshaller{}
-	validators := p2p.NewValidators(
-		p2pNetwork.Peers,
-		log,
-		subnetID,
-		vdrs,
-		config.MaxValidatorSetStaleness,
-	)
 	txGossipClient := p2pNetwork.NewClient(
 		p2p.TxGossipHandlerID,
-		p2p.WithValidatorSampling(validators),
+		p2p.WithValidatorSampling(p2pNetwork.Validators),
 	)
 	txGossipMetrics, err := gossip.NewMetrics(registerer, "tx")
 	if err != nil {
@@ -91,7 +92,7 @@ func New(
 	txPushGossiper, err := gossip.NewPushGossiper[*txs.Tx](
 		marshaller,
 		gossipMempool,
-		validators,
+		p2pNetwork.Validators,
 		txGossipClient,
 		txGossipMetrics,
 		gossip.BranchingFactor{
@@ -124,7 +125,7 @@ func New(
 	txPullGossiper = gossip.ValidatorGossiper{
 		Gossiper:   txPullGossiper,
 		NodeID:     nodeID,
-		Validators: validators,
+		Validators: p2pNetwork.Validators,
 	}
 
 	handler := gossip.NewHandler[*txs.Tx](
@@ -136,15 +137,14 @@ func New(
 	)
 
 	validatorHandler := p2p.NewValidatorHandler(
-		p2p.NewThrottlerHandler(
-			handler,
-			p2p.NewSlidingWindowThrottler(
-				config.PullGossipThrottlingPeriod,
-				config.PullGossipThrottlingLimit,
-			),
+		p2p.NewDynamicThrottlerHandler(
 			log,
+			handler,
+			p2pNetwork.Validators,
+			config.PullGossipThrottlingPeriod,
+			config.PullGossipRequestsPerValidator,
 		),
-		validators,
+		p2pNetwork.Validators,
 		log,
 	)
 

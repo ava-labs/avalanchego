@@ -196,17 +196,24 @@ func TestValidatorsSample(t *testing.T) {
 			}
 			gomock.InOrder(calls...)
 
-			network, err := NewNetwork(logging.NoLog{}, &enginetest.SenderStub{}, prometheus.NewRegistry(), "")
+			network, err := NewNetwork(
+				logging.NoLog{},
+				&enginetest.SenderStub{},
+				mockValidators,
+				subnetID,
+				time.Second,
+				prometheus.NewRegistry(),
+				"",
+			)
 			require.NoError(err)
 
 			ctx := context.Background()
 			require.NoError(network.Connected(ctx, nodeID1, nil))
 			require.NoError(network.Connected(ctx, nodeID2, nil))
 
-			v := NewValidators(network.Peers, network.log, subnetID, mockValidators, tt.maxStaleness)
 			for _, call := range tt.calls {
-				v.lastUpdated = call.time
-				sampled := v.Sample(ctx, call.limit)
+				network.Validators.lastUpdated = call.time
+				sampled := network.Validators.Sample(ctx, call.limit)
 				require.LessOrEqual(len(sampled), call.limit)
 				require.Subset(call.expected, sampled)
 			}
@@ -341,15 +348,22 @@ func TestValidatorsTop(t *testing.T) {
 			mockValidators.EXPECT().GetCurrentHeight(gomock.Any()).Return(uint64(1), nil)
 			mockValidators.EXPECT().GetValidatorSet(gomock.Any(), uint64(1), subnetID).Return(validatorSet, nil)
 
-			network, err := NewNetwork(logging.NoLog{}, &enginetest.SenderStub{}, prometheus.NewRegistry(), "")
+			network, err := NewNetwork(
+				logging.NoLog{},
+				&enginetest.SenderStub{},
+				mockValidators,
+				subnetID,
+				time.Second,
+				prometheus.NewRegistry(),
+				"",
+			)
 			require.NoError(err)
 
 			ctx := context.Background()
 			require.NoError(network.Connected(ctx, nodeID1, nil))
 			require.NoError(network.Connected(ctx, nodeID2, nil))
 
-			v := NewValidators(network.Peers, network.log, subnetID, mockValidators, time.Second)
-			nodeIDs := v.Top(ctx, test.percentage)
+			nodeIDs := network.Validators.Top(ctx, test.percentage)
 			require.Equal(test.expected, nodeIDs)
 		})
 	}

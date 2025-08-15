@@ -59,6 +59,9 @@ type clientOptions struct {
 func NewNetwork(
 	log logging.Logger,
 	sender common.AppSender,
+	validatorState validators.State,
+	subnetID ids.ID,
+	maxValidatorSetStaleness time.Duration,
 	registerer prometheus.Registerer,
 	namespace string,
 ) (*Network, error) {
@@ -90,8 +93,13 @@ func NewNetwork(
 	}
 
 	return &Network{
-		Peers:  &Peers{},
-		log:    log,
+		Peers: &Peers{},
+		Validators: &Validators{
+			log:                      log,
+			subnetID:                 subnetID,
+			validators:               validatorState,
+			maxValidatorSetStaleness: maxValidatorSetStaleness,
+		},
 		sender: sender,
 		router: newRouter(log, sender, metrics),
 	}, nil
@@ -100,9 +108,9 @@ func NewNetwork(
 // Network exposes networking state and supports building p2p application
 // protocols
 type Network struct {
-	Peers *Peers
+	Peers      *Peers
+	Validators *Validators
 
-	log    logging.Logger
 	sender common.AppSender
 
 	router *router
@@ -126,11 +134,15 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) 
 
 func (n *Network) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
 	n.Peers.add(nodeID)
+	n.Validators.connected(nodeID)
+
 	return nil
 }
 
 func (n *Network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
 	n.Peers.remove(nodeID)
+	n.Validators.disconnected(nodeID)
+
 	return nil
 }
 
@@ -179,13 +191,6 @@ func (p *Peers) remove(nodeID ids.NodeID) {
 	defer p.lock.Unlock()
 
 	p.set.Remove(nodeID)
-}
-
-func (p *Peers) has(nodeID ids.NodeID) bool {
-	p.lock.RLock()
-	defer p.lock.RUnlock()
-
-	return p.set.Contains(nodeID)
 }
 
 // Sample returns a pseudo-random sample of up to limit Peers
