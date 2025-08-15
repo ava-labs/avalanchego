@@ -100,12 +100,19 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 		return s.genesisBlock, simplex.Finalization{}, nil
 	}
 
+	if seq >= s.Height() {
+		s.log.Debug("Attempted to retrieve block at sequence number greater or equal to current height",
+			zap.Uint64("seq", seq),
+			zap.Uint64("height", s.Height()))
+		return nil, simplex.Finalization{}, simplex.ErrBlockNotFound
+	}
+
 	block, err := getBlock(context.TODO(), s.vm, seq)
 	if err != nil {
 		if err == database.ErrNotFound {
-			s.log.Error("Block not found for sequence", zap.Uint64("seq", seq), zap.Error(err))
 			return nil, simplex.Finalization{}, simplex.ErrBlockNotFound
 		}
+		s.log.Error("Error retrieving block from storage", zap.Uint64("seq", seq), zap.Error(err))
 		return nil, simplex.Finalization{}, err
 	}
 
