@@ -206,9 +206,9 @@ func FuzzBytesNewEqual(f *testing.F) {
 	})
 }
 
-type allowSet map[common.Address]bool
+type allowSet set.Set[common.Address]
 
-func (a allowSet) HasPredicate(addr common.Address) bool { return a[addr] }
+func (a allowSet) HasPredicate(addr common.Address) bool { return a.Contains(addr) }
 
 func TestFromAccessList(t *testing.T) {
 	addrA := common.Address{0xAA}
