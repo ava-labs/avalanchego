@@ -11,29 +11,30 @@ import (
 )
 
 // NewAccessList constructs a types.AccessList from raw predicate bytes for a
-// given precompile address. It packs the predicate by appending a 0xff delimiter
-// and zero-padding to a multiple of 32 bytes, then splits into 32-byte chunks
-// (common.Hash) as required by the access list storage keys.
-func NewAccessList(address common.Address, predicateBytes []byte) types.AccessList {
-	packed := pack(predicateBytes)
-	numHashes := len(packed) / common.HashLength
-	storageKeys := make([]common.Hash, numHashes)
-	for i := range storageKeys {
-		start := i * common.HashLength
-		copy(storageKeys[i][:], packed[start:])
-	}
-
+// given precompile address.
+func NewAccessList(address common.Address, b []byte) types.AccessList {
 	return types.AccessList{
 		{
 			Address:     address,
-			StorageKeys: storageKeys,
+			StorageKeys: New(b),
 		},
 	}
 }
 
-func pack(b []byte) []byte {
-	bytes := make([]byte, len(b)+1)
-	copy(bytes, b)
-	bytes[len(b)] = 0xff
-	return common.RightPadBytes(bytes, predicate.RoundUpTo32(len(bytes)))
+// New constructs a predicate from raw predicate bytes.
+//
+// It packs the predicate by appending [predicate.Delimiter] and zero-padding to
+// a multiple of 32 bytes, then splits into [common.Hash]s.
+func New(b []byte) predicate.Predicate {
+	numUnpaddedChunks := len(b) / common.HashLength
+	chunks := make([]common.Hash, numUnpaddedChunks+1)
+	// Copy over chunks that don't require padding.
+	for i := range chunks[:numUnpaddedChunks] {
+		chunks[i] = common.Hash(b[common.HashLength*i:])
+	}
+
+	// Add the delimiter and required padding to the last chunk.
+	copy(chunks[numUnpaddedChunks][:], b[common.HashLength*numUnpaddedChunks:])
+	chunks[numUnpaddedChunks][len(b)%common.HashLength] = predicate.Delimiter
+	return chunks
 }

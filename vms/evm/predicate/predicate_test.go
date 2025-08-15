@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package predicate
+package predicate_test
 
 import (
 	"bytes"
@@ -10,13 +10,17 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/vms/evm/predicate/predicatetest"
+
+	. "github.com/ava-labs/avalanchego/vms/evm/predicate"
 )
 
 type allowSet map[common.Address]bool
 
 func (a allowSet) HasPredicate(addr common.Address) bool { return a[addr] }
 
-func TestFromAccessListVectors(t *testing.T) {
+func TestFromAccessList(t *testing.T) {
 	addrA := common.Address{0xAA}
 	addrB := common.Address{0xBB}
 	addrC := common.Address{0xCC}
@@ -30,25 +34,25 @@ func TestFromAccessListVectors(t *testing.T) {
 		name  string
 		rules allowSet
 		list  types.AccessList
-		want  map[common.Address][][]common.Hash
+		want  map[common.Address][]Predicate
 	}{
 		{
 			name:  "empty list",
 			rules: allowSet{addrA: true},
 			list:  types.AccessList{},
-			want:  map[common.Address][][]common.Hash{},
+			want:  map[common.Address][]Predicate{},
 		},
 		{
 			name:  "no allowed addresses",
 			rules: allowSet{addrB: true},
 			list:  types.AccessList{{Address: addrA, StorageKeys: []common.Hash{h1}}},
-			want:  map[common.Address][][]common.Hash{},
+			want:  map[common.Address][]Predicate{},
 		},
 		{
 			name:  "single tuple allowed",
 			rules: allowSet{addrA: true},
 			list:  types.AccessList{{Address: addrA, StorageKeys: []common.Hash{h1, h2}}},
-			want:  map[common.Address][][]common.Hash{addrA: {{h1, h2}}},
+			want:  map[common.Address][]Predicate{addrA: {{h1, h2}}},
 		},
 		{
 			name:  "repeated address accumulates",
@@ -57,7 +61,7 @@ func TestFromAccessListVectors(t *testing.T) {
 				{Address: addrA, StorageKeys: []common.Hash{h1, h2}},
 				{Address: addrA, StorageKeys: []common.Hash{h3}},
 			},
-			want: map[common.Address][][]common.Hash{addrA: {{h1, h2}, {h3}}},
+			want: map[common.Address][]Predicate{addrA: {{h1, h2}, {h3}}},
 		},
 		{
 			name:  "mixed addresses filtered",
@@ -67,7 +71,7 @@ func TestFromAccessListVectors(t *testing.T) {
 				{Address: addrB, StorageKeys: []common.Hash{h2}},
 				{Address: addrC, StorageKeys: []common.Hash{h3, h4}},
 			},
-			want: map[common.Address][][]common.Hash{
+			want: map[common.Address][]Predicate{
 				addrA: {{h1}},
 				addrC: {{h3, h4}},
 			},
@@ -83,171 +87,92 @@ func TestFromAccessListVectors(t *testing.T) {
 	}
 }
 
-func TestNew(t *testing.T) {
-	tests := []struct {
-		name  string
-		input []byte
-		want  []byte
-	}{
-		{
-			name:  "empty input",
-			input: []byte{},
-			want:  []byte{0xff},
-		},
-		{
-			name:  "single byte",
-			input: []byte{0xbb},
-			want:  []byte{0xbb, 0xff},
-		},
-		{
-			name:  "31 bytes",
-			input: bytes.Repeat([]byte{0xaa}, 31),
-			want:  append(bytes.Repeat([]byte{0xaa}, 31), 0xff),
-		},
-		{
-			name:  "32 bytes",
-			input: bytes.Repeat([]byte{0xdd}, 32),
-			want:  append(bytes.Repeat([]byte{0xdd}, 32), 0xff),
-		},
-		{
-			name:  "33 bytes",
-			input: bytes.Repeat([]byte{0xcc}, 33),
-			want:  append(bytes.Repeat([]byte{0xcc}, 33), 0xff),
-		},
-		{
-			name:  "48 bytes",
-			input: bytes.Repeat([]byte{0x00}, 48),
-			want:  append(bytes.Repeat([]byte{0x00}, 48), 0xff),
-		},
-		{
-			name:  "63 bytes",
-			input: bytes.Repeat([]byte{0xdd}, 63),
-			want:  append(bytes.Repeat([]byte{0xdd}, 63), 0xff),
-		},
-		{
-			name:  "64 bytes",
-			input: bytes.Repeat([]byte{0x33}, 64),
-			want:  append(bytes.Repeat([]byte{0x33}, 64), 0xff),
-		},
-		{
-			name:  "65 bytes",
-			input: bytes.Repeat([]byte{0xdd}, 65),
-			want:  append(bytes.Repeat([]byte{0xdd}, 65), 0xff),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			packed := pack(tt.input)
-
-			// Verify the packed result has the correct structure
-			require.Equal(tt.want, packed[:len(tt.want)])
-
-			// Verify padding is all zeros
-			for i := len(tt.want); i < len(packed); i++ {
-				require.Equal(byte(0), packed[i])
-			}
-
-			// Verify packed length is a multiple of 32
-			require.Equal(0, len(packed)%32)
-		})
-	}
-}
-
-func TestUnpack(t *testing.T) {
+func TestPredicateBytes(t *testing.T) {
 	tests := []struct {
 		name    string
-		input   []byte
+		input   Predicate
 		want    []byte
 		wantErr error
 	}{
 		// Valid test cases
 		{
 			name:    "empty input",
-			input:   []byte{},
-			want:    nil,
-			wantErr: errEmptyPredicate,
+			input:   predicatetest.New(nil),
+			want:    []byte{},
+			wantErr: nil,
 		},
 		{
 			name:    "single byte",
-			input:   pack([]byte{0xbb}),
+			input:   predicatetest.New([]byte{0xbb}),
 			want:    []byte{0xbb},
 			wantErr: nil,
 		},
 		{
 			name:    "31 bytes",
-			input:   pack(bytes.Repeat([]byte{0xaa}, 31)),
+			input:   predicatetest.New(bytes.Repeat([]byte{0xaa}, 31)),
 			want:    bytes.Repeat([]byte{0xaa}, 31),
 			wantErr: nil,
 		},
 		{
 			name:    "32 bytes",
-			input:   pack(bytes.Repeat([]byte{0xdd}, 32)),
+			input:   predicatetest.New(bytes.Repeat([]byte{0xdd}, 32)),
 			want:    bytes.Repeat([]byte{0xdd}, 32),
 			wantErr: nil,
 		},
 		{
 			name:    "33 bytes",
-			input:   pack(bytes.Repeat([]byte{0xcc}, 33)),
+			input:   predicatetest.New(bytes.Repeat([]byte{0xcc}, 33)),
 			want:    bytes.Repeat([]byte{0xcc}, 33),
 			wantErr: nil,
 		},
 		{
 			name:    "48 bytes",
-			input:   pack(bytes.Repeat([]byte{0x00}, 48)),
+			input:   predicatetest.New(bytes.Repeat([]byte{0x00}, 48)),
 			want:    bytes.Repeat([]byte{0x00}, 48),
 			wantErr: nil,
 		},
 		{
 			name:    "63 bytes",
-			input:   pack(bytes.Repeat([]byte{0xdd}, 63)),
+			input:   predicatetest.New(bytes.Repeat([]byte{0xdd}, 63)),
 			want:    bytes.Repeat([]byte{0xdd}, 63),
 			wantErr: nil,
 		},
 		{
 			name:    "64 bytes",
-			input:   pack(bytes.Repeat([]byte{0x33}, 64)),
+			input:   predicatetest.New(bytes.Repeat([]byte{0x33}, 64)),
 			want:    bytes.Repeat([]byte{0x33}, 64),
 			wantErr: nil,
 		},
 		{
 			name:    "65 bytes",
-			input:   pack(bytes.Repeat([]byte{0xdd}, 65)),
+			input:   predicatetest.New(bytes.Repeat([]byte{0xdd}, 65)),
 			want:    bytes.Repeat([]byte{0xdd}, 65),
 			wantErr: nil,
 		},
 		// Invalid test cases
 		{
-			name:    "all zeros",
-			input:   bytes.Repeat([]byte{0}, 32),
+			name:    "all zeros empty",
+			input:   nil,
 			want:    nil,
-			wantErr: errAllZeroBytes,
+			wantErr: ErrMissingDelimiter,
 		},
 		{
-			name:    "missing delimiter",
-			input:   bytes.Repeat([]byte{0x42}, 32),
+			name:    "all zeros",
+			input:   Predicate{{}},
 			want:    nil,
-			wantErr: errWrongEndDelimiter,
+			wantErr: ErrMissingDelimiter,
 		},
 		{
 			name:    "wrong delimiter",
-			input:   append(bytes.Repeat([]byte{0x42}, 31), 0x00),
+			input:   Predicate{{0x42}},
 			want:    nil,
-			wantErr: errWrongEndDelimiter,
+			wantErr: ErrWrongEndDelimiter,
 		},
 		{
-			name:    "excess padding",
-			input:   append(append([]byte{0x42, 0xff}, bytes.Repeat([]byte{0}, 30)...), 0x01),
+			name:    "wrong delimiter",
+			input:   Predicate{{Delimiter}, {}},
 			want:    nil,
-			wantErr: errExcessPadding,
-		},
-		{
-			name:    "non-zero padding",
-			input:   append(append([]byte{0x42, 0xff}, bytes.Repeat([]byte{0}, 29)...), 0x01, 0x00),
-			want:    nil,
-			wantErr: errExcessPadding,
+			wantErr: ErrExcessPadding,
 		},
 	}
 
@@ -255,41 +180,18 @@ func TestUnpack(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			unpacked, err := Unpack(tt.input)
-
+			unpacked, err := tt.input.Bytes()
 			require.ErrorIs(err, tt.wantErr)
 			require.Equal(tt.want, unpacked)
 		})
 	}
 }
 
-func FuzzPackUnpack(f *testing.F) {
+func FuzzNewBytesEqual(f *testing.F) {
 	f.Fuzz(func(t *testing.T, input []byte) {
-		packed := pack(input)
-		unpacked, err := Unpack(packed)
+		packed := predicatetest.New(input)
+		unpacked, err := packed.Bytes()
 		require.NoError(t, err)
 		require.Equal(t, input, unpacked)
-	})
-}
-
-func FuzzUnpackPackEqual(f *testing.F) {
-	// Seed with valid predicates
-	for i := range 100 {
-		input := make([]byte, i)
-		for j := range input {
-			input[j] = byte(j + 1)
-		}
-		validPredicate := pack(input)
-		f.Add(validPredicate)
-	}
-
-	f.Fuzz(func(t *testing.T, original []byte) {
-		unpacked, err := Unpack(original)
-		if err != nil {
-			t.Skip("invalid predicate")
-		}
-
-		packed := pack(unpacked)
-		require.Equal(t, original, packed)
 	})
 }

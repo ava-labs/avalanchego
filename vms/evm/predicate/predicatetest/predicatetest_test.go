@@ -8,157 +8,91 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 )
 
-func TestNewAccessListEmptyPredicate(t *testing.T) {
-	require := require.New(t)
-
-	addr := common.HexToAddress("0x1234567890123456789012345678901234567890")
-	accessList := NewAccessList(addr, []byte{})
-
-	require.Len(accessList, 1)
-	require.Equal(addr, accessList[0].Address)
-	// 0 + delimiter, padded to 32 bytes is 1 storage key
-	require.Len(accessList[0].StorageKeys, 1)
-}
-
-func TestNewAccessListWithPredicate(t *testing.T) {
+func TestNew(t *testing.T) {
 	tests := []struct {
-		name             string
-		predicateBytes   []byte
-		predicateAddress common.Address
-		wantNumHashes    int
-		wantStorageKeys  []common.Hash
+		name  string
+		input []byte
+		want  predicate.Predicate
 	}{
 		{
-			name:             "empty predicate",
-			predicateBytes:   []byte{},
-			predicateAddress: common.HexToAddress("0x1234567890123456789012345678901234567890"),
-			wantNumHashes:    1, // empty + delimiter = 1 byte, rounded up to 32 bytes = 1 hash
+			name:  "empty predicate",
+			input: nil,
+			want: predicate.Predicate{
+				{predicate.Delimiter},
+			},
 		},
 		{
-			name:             "single byte predicate",
-			predicateBytes:   []byte{0x42},
-			predicateAddress: common.HexToAddress("0x1234567890123456789012345678901234567890"),
-			wantNumHashes:    1, // 1 byte + delimiter = 2 bytes, rounded up to 32 bytes = 1 hash
+			name:  "single byte",
+			input: []byte{0x42},
+			want: predicate.Predicate{
+				{0x42, predicate.Delimiter},
+			},
 		},
 		{
-			name:             "exactly 31 bytes predicate",
-			predicateBytes:   make([]byte, 31),
-			predicateAddress: common.HexToAddress("0x1234567890123456789012345678901234567890"),
-			wantNumHashes:    1, // 31 bytes + delimiter = 32 bytes = 1 hash
+			name:  "31 bytes",
+			input: make([]byte, 31),
+			want: predicate.Predicate{
+				{31: predicate.Delimiter},
+			},
 		},
 		{
-			name:             "exactly 32 bytes predicate",
-			predicateBytes:   make([]byte, 32),
-			predicateAddress: common.HexToAddress("0x1234567890123456789012345678901234567890"),
-			wantNumHashes:    2, // 32 bytes + delimiter = 33 bytes, rounded up to 64 bytes = 2 hashes
+			name:  "32 bytes",
+			input: make([]byte, 32),
+			want: predicate.Predicate{
+				{},
+				{predicate.Delimiter},
+			},
 		},
 		{
-			name:             "exactly 63 bytes predicate",
-			predicateBytes:   make([]byte, 63),
-			predicateAddress: common.HexToAddress("0x1234567890123456789012345678901234567890"),
-			wantNumHashes:    2, // 63 bytes + delimiter = 64 bytes = 2 hashes
-		},
-		{
-			name:             "exactly 64 bytes predicate",
-			predicateBytes:   make([]byte, 64),
-			predicateAddress: common.HexToAddress("0x1234567890123456789012345678901234567890"),
-			wantNumHashes:    3, // 64 bytes + delimiter = 65 bytes, rounded up to 96 bytes = 3 hashes
+			name: "40 bytes",
+			input: []byte{
+				0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+				0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+				0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
+				0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
+				0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
+			},
+			want: predicate.Predicate{
+				{
+					0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+					0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
+					0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27,
+					0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
+				},
+				{
+					0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47,
+					predicate.Delimiter,
+				},
+			},
 		},
 	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
-			// Initialize predicate bytes with deterministic values
-			for i := range tt.predicateBytes {
-				tt.predicateBytes[i] = byte(i + 1)
-			}
-
-			accessList := NewAccessList(tt.predicateAddress, tt.predicateBytes)
-			require.Len(accessList, 1)
-
-			// Verify predicate address is correct
-			require.Equal(tt.predicateAddress, accessList[0].Address)
-
-			// Verify storage keys length matches expected number of hashes
-			require.Len(accessList[0].StorageKeys, tt.wantNumHashes)
-
-			// Verify the predicate data is correctly encoded in storage keys
-			predicateData := pack(tt.predicateBytes)
-			for i, storageKey := range accessList[0].StorageKeys {
-				start := i * common.HashLength
-				end := start + common.HashLength
-				if end > len(predicateData) {
-					end = len(predicateData)
-				}
-
-				// Check that the storage key contains the expected bytes
-				wantBytes := make([]byte, common.HashLength)
-				copy(wantBytes, predicateData[start:end])
-
-				require.Equal(wantBytes, storageKey[:])
-			}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := New(test.input)
+			require.Equal(t, test.want, got)
 		})
 	}
 }
 
-// Keeping a simple encoding test via total size
+func FuzzBytesNewEqual(f *testing.F) {
+	f.Fuzz(func(t *testing.T, original []byte) {
+		var predicate predicate.Predicate
+		for i := 0; i < len(original); i += common.HashLength {
+			var key common.Hash
+			copy(key[:], original[i:])
+			predicate = append(predicate, key)
+		}
 
-func TestNewAccessListPredicateEncoding(t *testing.T) {
-	require := require.New(t)
+		unpacked, err := predicate.Bytes()
+		if err != nil {
+			t.Skip("invalid predicate")
+		}
 
-	// Test that predicate encoding follows the expected format:
-	// 1. Original bytes
-	// 2. Delimiter (0xff)
-	// 3. Zero padding to multiple of 32
-
-	testCases := []struct {
-		name           string
-		predicateBytes []byte
-		wantLength     int
-	}{
-		{
-			name:           "empty predicate",
-			predicateBytes: []byte{},
-			wantLength:     32, // 0 + 1 (delimiter) + 31 (padding) = 32
-		},
-		{
-			name:           "single byte",
-			predicateBytes: []byte{0x42},
-			wantLength:     32, // 1 + 1 (delimiter) + 30 (padding) = 32
-		},
-		{
-			name:           "31 bytes",
-			predicateBytes: make([]byte, 31),
-			wantLength:     32, // 31 + 1 (delimiter) + 0 (padding) = 32
-		},
-		{
-			name:           "32 bytes",
-			predicateBytes: make([]byte, 32),
-			wantLength:     64, // 32 + 1 (delimiter) + 31 (padding) = 64
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(_ *testing.T) {
-			// Initialize predicate bytes with deterministic values
-			for i := range tc.predicateBytes {
-				tc.predicateBytes[i] = byte(i + 1)
-			}
-
-			accessList := NewAccessList(common.Address{}, tc.predicateBytes)
-			require.Len(accessList, 1)
-
-			// Calculate expected number of storage keys
-			wantNumHashes := tc.wantLength / common.HashLength
-			require.Len(accessList[0].StorageKeys, wantNumHashes)
-
-			// Verify the total size of all storage keys equals the expected length
-			totalSize := len(accessList[0].StorageKeys) * common.HashLength
-			require.Equal(tc.wantLength, totalSize)
-		})
-	}
+		repacked := New(unpacked)
+		require.Equal(t, predicate, repacked)
+	})
 }
