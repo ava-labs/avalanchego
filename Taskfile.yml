@@ -101,7 +101,7 @@ tasks:
       LOCAL_SRC: '{{.LOCAL_SRC}}'
       S3_DST: '{{.S3_DST}}'
     cmds:
-      - cmd: s5cmd cp {{.LOCAL_SRC}} {{.S3_DST}}
+      - cmd: bash -x ./scripts/copy_dir.sh {{.LOCAL_SRC}} {{.S3_DST}}
 
   generate-mocks:
     desc: Generates testing mocks
