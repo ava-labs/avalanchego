@@ -15,5 +15,5 @@ type Request struct {
 }
 
 func (r Request) MarshalText() ([]byte, error) {
-	return []byte(fmt.Sprintf("%s:%d", r.NodeID, r.RequestID)), nil
+	return fmt.Appendf(nil, "%s:%d", r.NodeID, r.RequestID), nil
 }
