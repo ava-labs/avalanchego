@@ -227,31 +227,31 @@ func TestFromAccessList(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		rules allowSet
+		rules set.Set[common.Address]
 		list  types.AccessList
 		want  map[common.Address][]Predicate
 	}{
 		{
 			name:  "empty_list",
-			rules: allowSet{addrA: struct{}{}},
+			rules: set.Of(addrA),
 			list:  types.AccessList{},
 			want:  map[common.Address][]Predicate{},
 		},
 		{
 			name:  "no_allowed_addresses",
-			rules: allowSet{addrB: struct{}{}},
+			rules: set.Of(addrB),
 			list:  types.AccessList{{Address: addrA, StorageKeys: []common.Hash{h1}}},
 			want:  map[common.Address][]Predicate{},
 		},
 		{
 			name:  "single_tuple_allowed",
-			rules: allowSet{addrA: struct{}{}},
+			rules: set.Of(addrA),
 			list:  types.AccessList{{Address: addrA, StorageKeys: []common.Hash{h1, h2}}},
 			want:  map[common.Address][]Predicate{addrA: {{h1, h2}}},
 		},
 		{
 			name:  "repeated_address_accumulates",
-			rules: allowSet{addrA: struct{}{}},
+			rules: set.Of(addrA),
 			list: types.AccessList{
 				{Address: addrA, StorageKeys: []common.Hash{h1, h2}},
 				{Address: addrA, StorageKeys: []common.Hash{h3}},
@@ -260,7 +260,7 @@ func TestFromAccessList(t *testing.T) {
 		},
 		{
 			name:  "mixed_addresses_filtered",
-			rules: allowSet{addrA: struct{}{}, addrC: struct{}{}},
+			rules: set.Of(addrA, addrC),
 			list: types.AccessList{
 				{Address: addrA, StorageKeys: []common.Hash{h1}},
 				{Address: addrB, StorageKeys: []common.Hash{h2}},
@@ -276,7 +276,7 @@ func TestFromAccessList(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			req := require.New(t)
-			got := FromAccessList(tc.rules, tc.list)
+			got := FromAccessList(allowSet(tc.rules), tc.list)
 			req.Equal(tc.want, got)
 		})
 	}
