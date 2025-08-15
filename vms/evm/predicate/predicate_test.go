@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
@@ -208,7 +209,10 @@ func FuzzBytesNewEqual(f *testing.F) {
 
 type allowSet set.Set[common.Address]
 
-func (a allowSet) HasPredicate(addr common.Address) bool { return a.Contains(addr) }
+func (a allowSet) HasPredicate(addr common.Address) bool {
+	_, ok := a[addr]
+	return ok
+}
 
 func TestFromAccessList(t *testing.T) {
 	addrA := common.Address{0xAA}
@@ -228,25 +232,25 @@ func TestFromAccessList(t *testing.T) {
 	}{
 		{
 			name:  "empty_list",
-			rules: allowSet{addrA: true},
+			rules: allowSet{addrA: struct{}{}},
 			list:  types.AccessList{},
 			want:  map[common.Address][]Predicate{},
 		},
 		{
 			name:  "no_allowed_addresses",
-			rules: allowSet{addrB: true},
+			rules: allowSet{addrB: struct{}{}},
 			list:  types.AccessList{{Address: addrA, StorageKeys: []common.Hash{h1}}},
 			want:  map[common.Address][]Predicate{},
 		},
 		{
 			name:  "single_tuple_allowed",
-			rules: allowSet{addrA: true},
+			rules: allowSet{addrA: struct{}{}},
 			list:  types.AccessList{{Address: addrA, StorageKeys: []common.Hash{h1, h2}}},
 			want:  map[common.Address][]Predicate{addrA: {{h1, h2}}},
 		},
 		{
 			name:  "repeated_address_accumulates",
-			rules: allowSet{addrA: true},
+			rules: allowSet{addrA: struct{}{}},
 			list: types.AccessList{
 				{Address: addrA, StorageKeys: []common.Hash{h1, h2}},
 				{Address: addrA, StorageKeys: []common.Hash{h3}},
@@ -255,7 +259,7 @@ func TestFromAccessList(t *testing.T) {
 		},
 		{
 			name:  "mixed_addresses_filtered",
-			rules: allowSet{addrA: true, addrC: true},
+			rules: allowSet{addrA: struct{}{}, addrC: struct{}{}},
 			list: types.AccessList{
 				{Address: addrA, StorageKeys: []common.Hash{h1}},
 				{Address: addrB, StorageKeys: []common.Hash{h2}},

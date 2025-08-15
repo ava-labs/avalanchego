@@ -113,11 +113,11 @@ func TestParseBlockResults(t *testing.T) {
 }
 
 func TestBlockResultsGetSet(t *testing.T) {
-	type setVec struct {
+	type setArgs struct {
 		tx      common.Hash
 		results PrecompileResults
 	}
-	type getVec struct {
+	type getArgs struct {
 		tx       common.Hash
 		addr     common.Address
 		wantBits set.Bits
@@ -125,8 +125,8 @@ func TestBlockResultsGetSet(t *testing.T) {
 	}
 	type vecCase struct {
 		name    string
-		sets    []setVec
-		gets    []getVec
+		sets    []setArgs
+		gets    []getArgs
 		wantLen int
 	}
 
@@ -134,18 +134,18 @@ func TestBlockResultsGetSet(t *testing.T) {
 		{
 			name:    "zero value no sets",
 			sets:    nil,
-			gets:    []getVec{{tx: common.Hash{1}, addr: common.Address{2}, wantBits: set.Bits{}, wantOK: false}},
+			gets:    []getArgs{{tx: common.Hash{1}, addr: common.Address{2}, wantBits: set.Bits{}, wantOK: false}},
 			wantLen: 0,
 		},
 		{
 			name: "single set and get",
-			sets: []setVec{{
+			sets: []setArgs{{
 				tx: common.Hash{1},
 				results: PrecompileResults{
 					common.Address{2}: set.NewBits(1, 2, 3),
 				},
 			}},
-			gets: []getVec{{
+			gets: []getArgs{{
 				tx:       common.Hash{1},
 				addr:     common.Address{2},
 				wantBits: set.NewBits(1, 2, 3),
@@ -155,7 +155,7 @@ func TestBlockResultsGetSet(t *testing.T) {
 		},
 		{
 			name: "multiple txs and gets",
-			sets: []setVec{
+			sets: []setArgs{
 				{
 					tx: common.Hash{1},
 					results: PrecompileResults{
@@ -169,7 +169,7 @@ func TestBlockResultsGetSet(t *testing.T) {
 					},
 				},
 			},
-			gets: []getVec{
+			gets: []getArgs{
 				{tx: common.Hash{1}, addr: common.Address{2}, wantBits: set.NewBits(1, 2, 3), wantOK: true},
 				{tx: common.Hash{2}, addr: common.Address{3}, wantBits: set.NewBits(3, 2, 1), wantOK: true},
 				{tx: common.Hash{1}, addr: common.Address{3}, wantBits: set.Bits{}, wantOK: false},
@@ -178,7 +178,7 @@ func TestBlockResultsGetSet(t *testing.T) {
 		},
 		{
 			name: "overwrite with empty clears get but retains tx entry",
-			sets: []setVec{
+			sets: []setArgs{
 				{
 					tx: common.Hash{1},
 					results: PrecompileResults{
@@ -187,7 +187,7 @@ func TestBlockResultsGetSet(t *testing.T) {
 				},
 				{tx: common.Hash{1}, results: PrecompileResults{}},
 			},
-			gets: []getVec{
+			gets: []getArgs{
 				{tx: common.Hash{1}, addr: common.Address{2}, wantBits: set.Bits{}, wantOK: false},
 			},
 			wantLen: 1,
