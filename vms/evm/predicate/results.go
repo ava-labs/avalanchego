@@ -52,16 +52,16 @@ func ParseBlockResults(b []byte) (BlockResults, error) {
 	}
 
 	// Convert encoded representation into in-memory representation
-	blockResults := make(BlockResults, len(encodedResults))
+	results := make(BlockResults, len(encodedResults))
 	for txHash, addrToBytes := range encodedResults {
 		decoded := make(PrecompileResults, len(addrToBytes))
 		for addr, bs := range addrToBytes {
 			decoded[addr] = set.BitsFromBytes(bs)
 		}
-		blockResults[txHash] = decoded
+		results[txHash] = decoded
 	}
 
-	return blockResults, nil
+	return results, nil
 }
 
 // Get returns the predicate results for txHash from precompile address.
@@ -88,16 +88,16 @@ func (b *BlockResults) Set(txHash common.Hash, txResults PrecompileResults) {
 
 // Bytes marshals the predicate results.
 func (b *BlockResults) Bytes() ([]byte, error) {
-	// Convert to encoded representation before marshaling to avoid serializing
+	// Convert to results representation before marshaling to avoid serializing
 	// set.Bits directly, which is not supported by the codec.
-	encoded := make(encodedBlockResults, len(*b))
+	results := make(encodedBlockResults, len(*b))
 	for txHash, addrToBits := range *b {
-		enc := make(map[common.Address][]byte, len(addrToBits))
+		encoded := make(map[common.Address][]byte, len(addrToBits))
 		for addr, bits := range addrToBits {
-			enc[addr] = bits.Bytes()
+			encoded[addr] = bits.Bytes()
 		}
-		encoded[txHash] = enc
+		results[txHash] = encoded
 	}
 
-	return resultsCodec.Marshal(version, encoded)
+	return resultsCodec.Marshal(version, results)
 }
