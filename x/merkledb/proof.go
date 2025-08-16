@@ -787,5 +787,5 @@ func getStandaloneView(ctx context.Context, ops []database.BatchOp, size int) (*
 		return nil, err
 	}
 
-	return newView(db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
+	return newView(ctx, db, db, ViewChanges{BatchOps: ops, ConsumeBytes: true})
 }
