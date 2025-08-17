@@ -71,6 +71,7 @@ type blockEntryHeader struct {
 	Checksum   uint64
 	HeaderSize BlockHeaderSize
 	Version    uint16
+	Compressed bool
 }
 
 // MarshalBinary implements the encoding.BinaryMarshaler interface.
@@ -81,6 +82,11 @@ func (beh blockEntryHeader) MarshalBinary() ([]byte, error) {
 	binary.LittleEndian.PutUint64(buf[12:], beh.Checksum)
 	binary.LittleEndian.PutUint32(buf[20:], beh.HeaderSize)
 	binary.LittleEndian.PutUint16(buf[24:], beh.Version)
+	if beh.Compressed {
+		buf[26] = 1
+	} else {
+		buf[26] = 0
+	}
 	return buf, nil
 }
 
@@ -94,6 +100,7 @@ func (beh *blockEntryHeader) UnmarshalBinary(data []byte) error {
 	beh.Checksum = binary.LittleEndian.Uint64(data[12:])
 	beh.HeaderSize = binary.LittleEndian.Uint32(data[20:])
 	beh.Version = binary.LittleEndian.Uint16(data[24:])
+	beh.Compressed = data[26] != 0
 	return nil
 }
 
@@ -141,7 +148,7 @@ type indexFileHeader struct {
 	MaxContiguousHeight BlockHeight
 	MaxHeight           BlockHeight
 	NextWriteOffset     uint64
-	// reserve 16 bytes for future use
+	// reserve remaining 16 bytes for future use
 	Reserved [16]byte
 }
 
@@ -220,23 +227,21 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 		databaseLog = logging.NoLog{}
 	}
 
+	var err error
+	compressor, err := compression.NewZstdCompressor(math.MaxUint32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize compressor: %w", err)
+	}
+
 	s := &Database{
 		config: config,
 		log:    databaseLog,
-		fileCache: lru.NewCacheWithOnEvict[int, *os.File](config.MaxDataFiles, func(_ int, f *os.File) {
+		fileCache: lru.NewCacheWithOnEvict(config.MaxDataFiles, func(_ int, f *os.File) {
 			if f != nil {
 				f.Close()
 			}
 		}),
-	}
-
-	// Initialize compressor if compression is enabled
-	if config.CompressBlocks {
-		var err error
-		s.compressor, err = compression.NewZstdCompressor(math.MaxInt64 - 1)
-		if err != nil {
-			return nil, fmt.Errorf("failed to initialize compressor: %w", err)
-		}
+		compressor: compressor,
 	}
 
 	s.log.Info("Initializing BlockDB",
@@ -366,9 +371,9 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize Bl
 		return fmt.Errorf("failed to get index entry offset for block at height %d: %w", height, err)
 	}
 
-	// Compress block data if compression is enabled
+	// Optionally compress block data if enabled in config
 	blockToWrite := block
-	if s.compressor != nil {
+	if s.config.CompressBlocks {
 		compressed, err := s.compressor.Compress(block)
 		if err != nil {
 			s.log.Error("Failed to write block: error compressing block data",
@@ -404,8 +409,9 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize Bl
 		Height:     height,
 		Size:       blockDataLen,
 		HeaderSize: headerSize,
-		Checksum:   calculateChecksum(block), // Use original block for checksum
+		Checksum:   calculateChecksum(blockToWrite),
 		Version:    BlockEntryVersion,
+		Compressed: s.config.CompressBlocks,
 	}
 	if err := s.writeBlockAt(writeDataOffset, bh, blockToWrite); err != nil {
 		s.log.Error("Failed to write block: error writing block data",
@@ -1049,24 +1055,29 @@ func (s *Database) loadOrInitializeHeader() error {
 	}
 	s.nextDataWriteOffset.Store(s.header.NextWriteOffset)
 	s.setBlockHeights(s.header.MaxHeight, s.header.MaxContiguousHeight)
+	s.logConfigAndHeaderMismatches()
 
-	// log a warning if the config does not match the index header
+	return nil
+}
+
+func (s *Database) logConfigAndHeaderMismatches() {
+	// Some config values cannot be changed after index initialization.
+	// If they do not match the index header, log an info that
+	// the index header values will be used instead.
 	if s.config.MinimumHeight != s.header.MinHeight {
 		s.log.Info(
-			"MinimumHeight in blockdb config does not match the index header. The MinimumHeight in the index header will be used.",
+			"MinimumHeight in config does not match the index header. The MinimumHeight in the index header will be used.",
 			zap.Uint64("configMinimumHeight", s.config.MinimumHeight),
 			zap.Uint64("headerMinimumHeight", s.header.MinHeight),
 		)
 	}
 	if s.config.MaxDataFileSize != s.header.MaxDataFileSize {
 		s.log.Info(
-			"MaxDataFileSize in blockdb config does not match the index header. The MaxDataFileSize in the index header will be used.",
+			"MaxDataFileSize in config does not match the index header. The MaxDataFileSize in the index header will be used.",
 			zap.Uint64("configMaxDataFileSize", s.config.MaxDataFileSize),
 			zap.Uint64("headerMaxDataFileSize", s.header.MaxDataFileSize),
 		)
 	}
-
-	return nil
 }
 
 func (s *Database) closeFiles() {
