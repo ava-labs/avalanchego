@@ -103,14 +103,11 @@ type BlockDatabase interface {
 	// ReadBlock retrieves a block by its height.
 	ReadBlock(height uint64) ([]byte, error)
 
-	// ReadHeader retrieves only the header portion of a block by its height.
-	ReadHeader(height uint64) ([]byte, error)
-
-	// ReadBody retrieves only the body portion (excluding header) of a block by its height.
-	ReadBody(height uint64) ([]byte, error)
-
 	// HasBlock checks if a block exists at the given height.
 	HasBlock(height uint64) (bool, error)
+
+	// Inspect returns a detailed report of the block database.
+	Inspect() (string, error)
 
 	// Close closes the block database.
 	Close() error
