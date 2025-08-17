@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -182,12 +183,13 @@ type blockHeights struct {
 
 // Database stores blockchain blocks on disk and provides methods to read, and write blocks.
 type Database struct {
-	indexFile *os.File
-	config    DatabaseConfig
-	header    indexFileHeader
-	log       logging.Logger
-	closed    bool
-	fileCache *lru.Cache[int, *os.File]
+	indexFile  *os.File
+	config     DatabaseConfig
+	header     indexFileHeader
+	log        logging.Logger
+	closed     bool
+	fileCache  *lru.Cache[int, *os.File]
+	compressor compression.Compressor
 
 	// closeMu prevents the database from being closed while in use and prevents
 	// use of a closed database.
@@ -226,6 +228,15 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 				f.Close()
 			}
 		}),
+	}
+
+	// Initialize compressor if compression is enabled
+	if config.CompressBlocks {
+		var err error
+		s.compressor, err = compression.NewZstdCompressor(math.MaxInt64 - 1)
+		if err != nil {
+			return nil, fmt.Errorf("failed to initialize compressor: %w", err)
+		}
 	}
 
 	s.log.Info("Initializing BlockDB",
@@ -355,6 +366,21 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize Bl
 		return fmt.Errorf("failed to get index entry offset for block at height %d: %w", height, err)
 	}
 
+	// Compress block data if compression is enabled
+	blockToWrite := block
+	if s.compressor != nil {
+		compressed, err := s.compressor.Compress(block)
+		if err != nil {
+			s.log.Error("Failed to write block: error compressing block data",
+				zap.Uint64("height", height),
+				zap.Error(err),
+			)
+			return fmt.Errorf("failed to compress block data: %w", err)
+		}
+		blockToWrite = compressed
+		blockDataLen = uint32(len(compressed))
+	}
+
 	sizeWithDataHeader, err := safemath.Add(sizeOfBlockEntryHeader, blockDataLen)
 	if err != nil {
 		s.log.Error("Failed to write block: block size calculation overflow",
@@ -378,10 +404,10 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize Bl
 		Height:     height,
 		Size:       blockDataLen,
 		HeaderSize: headerSize,
-		Checksum:   calculateChecksum(block),
+		Checksum:   calculateChecksum(block), // Use original block for checksum
 		Version:    BlockEntryVersion,
 	}
-	if err := s.writeBlockAt(writeDataOffset, bh, block); err != nil {
+	if err := s.writeBlockAt(writeDataOffset, bh, blockToWrite); err != nil {
 		s.log.Error("Failed to write block: error writing block data",
 			zap.Uint64("height", height),
 			zap.Uint64("dataOffset", writeDataOffset),
@@ -507,6 +533,19 @@ func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
 			)
 			return nil, fmt.Errorf("failed to read block data from data file: %w", err)
 		}
+
+		// Decompress block data if compression is enabled
+		if s.compressor != nil {
+			decompressed, err := s.compressor.Decompress(blockData)
+			if err != nil {
+				s.log.Error("Failed to read block: error decompressing block data",
+					zap.Uint64("height", height),
+					zap.Error(err),
+				)
+				return nil, fmt.Errorf("failed to decompress block data: %w", err)
+			}
+			blockData = decompressed
+		}
 		return blockData, nil
 	}
 }
@@ -516,6 +555,12 @@ func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
 func (s *Database) ReadHeader(height BlockHeight) (BlockData, error) {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
+
+	// Read the full block and return the header portion
+	blockData, err := s.ReadBlock(height)
+	if err != nil {
+		return nil, err
+	}
 
 	indexEntry, err := s.readBlockIndex(height)
 	if err != nil {
@@ -528,45 +573,16 @@ func (s *Database) ReadHeader(height BlockHeight) (BlockData, error) {
 	}
 
 	// Validate header size doesn't exceed total block size
-	if indexEntry.HeaderSize > indexEntry.Size {
+	if indexEntry.HeaderSize > uint32(len(blockData)) {
 		s.log.Error("Failed to read header: header size exceeds block size",
 			zap.Uint64("height", height),
 			zap.Uint32("headerSize", indexEntry.HeaderSize),
-			zap.Uint32("blockSize", indexEntry.Size),
+			zap.Int("blockSize", len(blockData)),
 		)
-		return nil, fmt.Errorf("%w: invalid header size %d exceeds block size %d", ErrHeaderSizeTooLarge, indexEntry.HeaderSize, indexEntry.Size)
+		return nil, fmt.Errorf("%w: invalid header size %d exceeds block size %d", ErrHeaderSizeTooLarge, indexEntry.HeaderSize, len(blockData))
 	}
 
-	headerData := make([]byte, indexEntry.HeaderSize)
-
-	// loop to retry fetching the data file if it got closed between get and read.
-	// If not closed, we read the header and return.
-	for {
-		dataFile, localOffset, fileIndex, err := s.getDataFileAndOffset(indexEntry.Offset)
-		if err != nil {
-			s.log.Error("Failed to read header: failed to get data file",
-				zap.Uint64("height", height),
-				zap.Uint64("dataOffset", indexEntry.Offset),
-				zap.Error(err),
-			)
-			return nil, fmt.Errorf("failed to get data file for block header at height %d: %w", height, err)
-		}
-		_, err = dataFile.ReadAt(headerData, int64(localOffset+uint64(sizeOfBlockEntryHeader)))
-		if err != nil {
-			if errors.Is(err, os.ErrClosed) {
-				s.fileCache.Evict(fileIndex)
-				continue
-			}
-			s.log.Error("Failed to read header: failed to read header data from file",
-				zap.Uint64("height", height),
-				zap.Uint64("localOffset", localOffset),
-				zap.Uint32("headerSize", indexEntry.HeaderSize),
-				zap.Error(err),
-			)
-			return nil, fmt.Errorf("failed to read block header data from data file: %w", err)
-		}
-		return headerData, nil
-	}
+	return blockData[:indexEntry.HeaderSize], nil
 }
 
 // ReadBody retrieves only the body portion (excluding header) of a block by its height.
@@ -575,62 +591,28 @@ func (s *Database) ReadBody(height BlockHeight) (BlockData, error) {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
 
+	// Read the full block and return the body portion
+	blockData, err := s.ReadBlock(height)
+	if err != nil {
+		return nil, err
+	}
+
 	indexEntry, err := s.readBlockIndex(height)
 	if err != nil {
 		return nil, err
 	}
 
-	bodySize := indexEntry.Size - indexEntry.HeaderSize
-	bodyData := make([]byte, bodySize)
-
-	// loop to retry fetching the data file if it got closed between get and read.
-	// If not closed, we read the body and return.
-	for {
-		dataFile, localOffset, fileIndex, err := s.getDataFileAndOffset(indexEntry.Offset)
-		if err != nil {
-			s.log.Error("Failed to read body: failed to get data file",
-				zap.Uint64("height", height),
-				zap.Uint64("dataOffset", indexEntry.Offset),
-				zap.Error(err),
-			)
-			return nil, fmt.Errorf("failed to get data file for block body at height %d: %w", height, err)
-		}
-		headerOffset, err := safemath.Add(localOffset, uint64(sizeOfBlockEntryHeader))
-		if err != nil {
-			s.log.Error("Failed to read body: header offset calculation overflow",
-				zap.Uint64("height", height),
-				zap.Uint64("localOffset", localOffset),
-				zap.Error(err),
-			)
-			return nil, fmt.Errorf("calculating header offset would overflow for block at height %d: %w", height, err)
-		}
-		bodyOffset, err := safemath.Add(headerOffset, uint64(indexEntry.HeaderSize))
-		if err != nil {
-			s.log.Error("Failed to read body: body offset calculation overflow",
-				zap.Uint64("height", height),
-				zap.Uint64("headerOffset", headerOffset),
-				zap.Uint32("headerSize", indexEntry.HeaderSize),
-				zap.Error(err),
-			)
-			return nil, fmt.Errorf("calculating body offset would overflow for block at height %d: %w", height, err)
-		}
-
-		_, err = dataFile.ReadAt(bodyData, int64(bodyOffset))
-		if err != nil {
-			if errors.Is(err, os.ErrClosed) {
-				s.fileCache.Evict(fileIndex)
-				continue
-			}
-			s.log.Error("Failed to read body: failed to read body data from file",
-				zap.Uint64("height", height),
-				zap.Uint64("bodyOffset", bodyOffset),
-				zap.Uint32("bodySize", bodySize),
-				zap.Error(err),
-			)
-			return nil, fmt.Errorf("failed to read block body data from data file: %w", err)
-		}
-		return bodyData, nil
+	// Validate header size doesn't exceed total block size
+	if indexEntry.HeaderSize >= uint32(len(blockData)) {
+		s.log.Error("Failed to read body: header size exceeds or equals block size",
+			zap.Uint64("height", height),
+			zap.Uint32("headerSize", indexEntry.HeaderSize),
+			zap.Int("blockSize", len(blockData)),
+		)
+		return nil, fmt.Errorf("%w: header size %d exceeds or equals block size %d", ErrHeaderSizeTooLarge, indexEntry.HeaderSize, len(blockData))
 	}
+
+	return blockData[indexEntry.HeaderSize:], nil
 }
 
 // HasBlock checks if a block exists at the given height.
