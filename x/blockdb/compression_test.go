@@ -17,7 +17,7 @@ func checkBlockCompression(t *testing.T, db *Database, height uint64) bool {
 	require.NoError(t, err)
 
 	// Read the raw data from the data file
-	dataFile, localOffset, err := db.getDataFileAndOffset(indexEntry.Offset)
+	dataFile, localOffset, _, err := db.getDataFileAndOffset(indexEntry.Offset)
 	require.NoError(t, err)
 	blockHeaderBuf := make([]byte, sizeOfBlockEntryHeader)
 	_, err = dataFile.ReadAt(blockHeaderBuf, int64(localOffset))
@@ -38,10 +38,9 @@ func TestCompression_Enabled(t *testing.T) {
 	blockData := []byte("test block data with some repetitive content that should compress well " +
 		"test block data with some repetitive content that should compress well " +
 		"test block data with some repetitive content that should compress well")
-	headerSize := uint32(10) // First 10 bytes are header
 	height := uint64(1)
 
-	err := db.WriteBlock(height, blockData, headerSize)
+	err := db.WriteBlock(height, blockData)
 	require.NoError(t, err)
 
 	// Read the block back
@@ -54,7 +53,7 @@ func TestCompression_Enabled(t *testing.T) {
 	require.NoError(t, err)
 
 	// Read the raw compressed data from the data file
-	dataFile, localOffset, err := db.getDataFileAndOffset(indexEntry.Offset)
+	dataFile, localOffset, _, err := db.getDataFileAndOffset(indexEntry.Offset)
 	require.NoError(t, err)
 	blockHeaderBuf := make([]byte, sizeOfBlockEntryHeader)
 	_, err = dataFile.ReadAt(blockHeaderBuf, int64(localOffset))
@@ -92,9 +91,8 @@ func TestCompression_Recovery(t *testing.T) {
 	// Step 2: Write first 5 blocks with compression enabled
 	for i := range 5 {
 		height := uint64(i + 1)
-		headerSize := uint32(10 + i)
 
-		err := db.WriteBlock(height, allBlocks[i], headerSize)
+		err := db.WriteBlock(height, allBlocks[i])
 		require.NoError(t, err)
 
 		// Verify compression was used
@@ -109,9 +107,8 @@ func TestCompression_Recovery(t *testing.T) {
 	// Step 4: Write next 5 blocks with compression disabled
 	for i := range 5 {
 		height := uint64(i + 6) // Heights 6-10
-		headerSize := uint32(15 + i)
 
-		err := db.WriteBlock(height, allBlocks[i+5], headerSize)
+		err := db.WriteBlock(height, allBlocks[i+5])
 		require.NoError(t, err)
 
 		// Verify compression was not used

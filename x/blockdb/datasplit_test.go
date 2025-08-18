@@ -23,7 +23,7 @@ func TestDataSplitting(t *testing.T) {
 	blocks := make([][]byte, numBlocks)
 	for i := range numBlocks {
 		blocks[i] = fixedSizeBlock(t, 1024, uint64(i))
-		require.NoError(t, store.WriteBlock(uint64(i), blocks[i], 0))
+		require.NoError(t, store.WriteBlock(uint64(i), blocks[i]))
 	}
 
 	// Verify that multiple data files were created.
@@ -70,7 +70,7 @@ func TestDataSplitting_DeletedFile(t *testing.T) {
 	blocks := make([][]byte, numBlocks)
 	for i := range numBlocks {
 		blocks[i] = fixedSizeBlock(t, 1024, uint64(i))
-		require.NoError(t, store.WriteBlock(uint64(i), blocks[i], 0))
+		require.NoError(t, store.WriteBlock(uint64(i), blocks[i]))
 	}
 	store.Close()
 
