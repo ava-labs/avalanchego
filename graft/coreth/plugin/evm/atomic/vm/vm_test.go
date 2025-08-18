@@ -717,28 +717,9 @@ func testConflictingTransitiveAncestryWithGap(t *testing.T, scheme string) {
 	}
 
 	// Add the remote transactions, build the block, and set VM1's preference for block A
-	errs := vm.Ethereum().TxPool().AddRemotesSync([]*types.Transaction{signedTx})
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	blk1, err := vm.BuildBlock(context.Background())
+	_, err = vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
 	if err != nil {
-		t.Fatalf("Failed to build blk1: %s", err)
-	}
-
-	if err := blk1.Verify(context.Background()); err != nil {
-		t.Fatalf("blk1 failed verification due to %s", err)
-	}
-
-	if err := vm.SetPreference(context.Background(), blk1.ID()); err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to issue txs and build blk1: %s", err)
 	}
 
 	importTx1, err := vm.newImportTx(vm.Ctx.XChainID, key.Address, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{key1})
@@ -1741,23 +1722,8 @@ func testBuildApricotPhase4Block(t *testing.T, scheme string) {
 		}
 		txs[i] = signedTx
 	}
-	errs := vm.Ethereum().TxPool().AddRemotesSync(txs)
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add tx at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	blk, err = vm.BuildBlock(context.Background())
+	blk, err = vmtest.IssueTxsAndBuild(txs, vm)
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
