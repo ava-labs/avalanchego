@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package lru
@@ -21,25 +21,21 @@ type Cache[K comparable, V any] struct {
 	elements *linked.Hashmap[K, V]
 	size     int
 
-	// onEvict is called with the key and value of an entry before eviction, if set.
+	// onEvict is called with the key and value of an entry before eviction.
 	onEvict func(K, V)
 }
 
-// SetOnEvict sets a callback to be called with the key and value of an entry before eviction.
-// The onEvict callback is called while holding the cache lock.
-// Do not call any cache methods (Get, Put, Evict, Flush) from within the callback
-// as this will cause a deadlock. The callback should only be used for cleanup
-// operations like closing files or releasing resources.
-func (c *Cache[K, V]) SetOnEvict(cb func(K, V)) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	c.onEvict = cb
+// NewCache creates a new LRU cache with the given size.
+func NewCache[K comparable, V any](size int) *Cache[K, V] {
+	return NewCacheWithOnEvict(size, func(K, V) {})
 }
 
-func NewCache[K comparable, V any](size int) *Cache[K, V] {
+// NewCacheWithOnEvict creates a new LRU cache with the given size and eviction callback.
+func NewCacheWithOnEvict[K comparable, V any](size int, onEvict func(K, V)) *Cache[K, V] {
 	return &Cache[K, V]{
 		elements: linked.NewHashmap[K, V](),
 		size:     max(size, 1),
+		onEvict:  onEvict,
 	}
 }
 
@@ -48,11 +44,9 @@ func (c *Cache[K, V]) Put(key K, value V) {
 	defer c.lock.Unlock()
 
 	if c.elements.Len() == c.size {
-		oldestKey, oldestValue, found := c.elements.Oldest()
-		if c.onEvict != nil && found {
-			c.onEvict(oldestKey, oldestValue)
+		if oldestKey, oldestValue, ok := c.elements.Oldest(); ok {
+			c.evict(oldestKey, oldestValue)
 		}
-		c.elements.Delete(oldestKey)
 	}
 	c.elements.Put(key, value)
 }
@@ -72,11 +66,17 @@ func (c *Cache[K, V]) Get(key K) (V, bool) {
 func (c *Cache[K, _]) Evict(key K) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-	if c.onEvict != nil {
-		if value, found := c.elements.Get(key); found {
-			c.onEvict(key, value)
-		}
+
+	value, ok := c.elements.Get(key)
+	if !ok {
+		return
 	}
+
+	c.evict(key, value)
+}
+
+func (c *Cache[K, V]) evict(key K, value V) {
+	c.onEvict(key, value)
 	c.elements.Delete(key)
 }
 
@@ -84,15 +84,9 @@ func (c *Cache[_, _]) Flush() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	// Call onEvict for each element before clearing
-	if c.onEvict != nil {
-		iter := c.elements.NewIterator()
-		for iter.Next() {
-			c.onEvict(iter.Key(), iter.Value())
-		}
+	for iter := c.elements.NewIterator(); iter.Next(); {
+		c.evict(iter.Key(), iter.Value())
 	}
-
-	c.elements.Clear()
 }
 
 func (c *Cache[_, _]) Len() int {

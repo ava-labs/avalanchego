@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package lru
@@ -22,28 +22,84 @@ func TestCacheEviction(t *testing.T) {
 	cachetest.Eviction(t, c)
 }
 
-func TestCacheFlushWithOnEvict(t *testing.T) {
-	c := NewCache[ids.ID, int64](2)
+func TestCacheOnEvict(t *testing.T) {
+	tests := []struct {
+		name                  string
+		cacheSize             int
+		operations            func(*Cache[int, int])
+		expectedEvictedKeys   []int
+		expectedEvictedValues []int
+	}{
+		{
+			name:      "OnEvict on Put with size limit",
+			cacheSize: 1,
+			operations: func(c *Cache[int, int]) {
+				// Put first item
+				c.Put(1, 10)
+				// Put second item, should evict first
+				c.Put(2, 20)
+			},
+			expectedEvictedKeys:   []int{1},
+			expectedEvictedValues: []int{10}, // first item evicted
+		},
+		{
+			name:      "OnEvict on explicit Evict",
+			cacheSize: 2,
+			operations: func(c *Cache[int, int]) {
+				// Put two items
+				c.Put(1, 10)
+				c.Put(2, 20)
+				// Explicitly evict one
+				c.Evict(1)
+			},
+			expectedEvictedKeys:   []int{1},
+			expectedEvictedValues: []int{10}, // explicitly evicted
+		},
+		{
+			name:      "OnEvict on Flush",
+			cacheSize: 2,
+			operations: func(c *Cache[int, int]) {
+				// Put two items
+				c.Put(1, 10)
+				c.Put(2, 20)
+				// Flush should evict both
+				c.Flush()
+			},
+			expectedEvictedKeys:   []int{1, 2},
+			expectedEvictedValues: []int{10, 20}, // both evicted in order
+		},
+		{
+			name:      "OnEvict on multiple operations",
+			cacheSize: 2,
+			operations: func(c *Cache[int, int]) {
+				// Put three items, should evict first
+				c.Put(1, 10)
+				c.Put(2, 20)
+				c.Put(3, 30)
+				// Evict one more
+				c.Evict(2)
+				// Flush remaining
+				c.Flush()
+			},
+			expectedEvictedKeys:   []int{1, 2, 3},
+			expectedEvictedValues: []int{10, 20, 30}, // evicted in order: 1 (by Put), 2 (by Evict), 3 (by Flush)
+		},
+	}
 
-	evicted := make(map[ids.ID]int64)
-	c.SetOnEvict(func(key ids.ID, value int64) {
-		evicted[key] = value
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			evictedKeys := make([]int, 0)
+			evictedValues := make([]int, 0)
+			c := NewCacheWithOnEvict(tt.cacheSize, func(key, value int) {
+				evictedKeys = append(evictedKeys, key)
+				evictedValues = append(evictedValues, value)
+			})
 
-	cachetest.Eviction(t, c)
-	require.Zero(t, c.Len())
-	require.Len(t, evicted, 3)
-}
+			tt.operations(c)
 
-func TestCachePutWithOnEvict(t *testing.T) {
-	c := NewCache[ids.ID, int64](1)
-
-	evicted := make(map[ids.ID]int64)
-	c.SetOnEvict(func(key ids.ID, value int64) {
-		evicted[key] = value
-	})
-
-	cachetest.Basic(t, c)
-	require.Len(t, evicted, 1)
-	require.Equal(t, int64(1), evicted[ids.ID{1}])
+			// Validate keys and values match expected evictions
+			require.Equal(t, tt.expectedEvictedKeys, evictedKeys)
+			require.Equal(t, tt.expectedEvictedValues, evictedValues)
+		})
+	}
 }

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package antithesis
@@ -102,12 +102,12 @@ func configForNewNetwork(
 	c := &Config{
 		Duration: duration,
 	}
-	localURIs := testEnv.GetNodeURIs()
-	c.URIs = make(CSV, len(localURIs))
-	for i, nodeURI := range localURIs {
+	network := testEnv.GetNetwork()
+	uris := network.GetNodeURIs()
+	c.URIs = make(CSV, len(uris))
+	for i, nodeURI := range uris {
 		c.URIs[i] = nodeURI.URI
 	}
-	network := testEnv.GetNetwork()
 	c.ChainIDs = make(CSV, len(network.Subnets))
 	for i, subnet := range network.Subnets {
 		c.ChainIDs[i] = subnet.Chains[0].ChainID.String()
