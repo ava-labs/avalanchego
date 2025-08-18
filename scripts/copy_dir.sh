@@ -65,9 +65,28 @@ function check_dst_not_exists() {
           exit 1
         fi
 
+        # Note: S3 tooling does not provide a native way to check for an empty
+        # directory. To avoid accidental overwrites, we use a best-effort, brittle
+        # workaround that relies on the expected status code and error message
+        # from s5cmd ls.
+        # If the error message changes, this script would be expected to fail
+        # by misreporting non-existent directories as existing, which means
+        # a change in beahvior would cause the script to fail to copy rather
+        # than allow accidental overwrites.
         echo "Checking if S3 path exists: $dst"
-        if s5cmd ls "$dst" | grep -q .; then
-            echo "Destination S3 path '$dst' already exists. Exiting."
+        if ! OUTPUT=$(s5cmd ls "$dst" 2>&1); then
+            # If the command fails, check for the expected error message.
+            if [[ "$OUTPUT" == *"no object found"* ]]; then
+                echo "Verified S3 destination: '$dst' is empty"
+            else
+                echo "Error: failed to check for contents of $dst"
+                echo "$OUTPUT"
+                exit 1
+            fi
+        else
+            # Success indicates a non-empty destination, so we exit with an error.
+            echo "Cannot copy to non-empty destination: '$dst':"
+            echo "$OUTPUT"
             exit 1
         fi
     else
