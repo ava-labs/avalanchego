@@ -51,8 +51,7 @@ func TestServiceGetProposedHeight(t *testing.T) {
 	proposerAPI := &ProposerAPI{ctx: snowCtx, vm: mockVM}
 
 	reply := &api.GetHeightResponse{}
-	err := proposerAPI.GetProposedHeight(nil, nil, reply)
-	require.NoError(err)
+	require.NoError(proposerAPI.GetProposedHeight(nil, nil, reply))
 	require.Equal(mockResponse, uint64(reply.Height))
 }
 
