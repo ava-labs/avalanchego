@@ -216,28 +216,9 @@ func testBuildEthTxBlock(t *testing.T, scheme string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add tx at index %d: %s", i, err)
-		}
-	}
-
-	msg, err := vm.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	blk1, err := vm.BuildBlock(context.Background())
+	blk1, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk1.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm.SetPreference(context.Background(), blk1.ID()); err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to issue txs and build block: %s", err)
 	}
 
 	if err := blk1.Accept(context.Background()); err != nil {
@@ -258,24 +239,9 @@ func testBuildEthTxBlock(t *testing.T, scheme string) {
 		}
 		txs[i] = signedTx
 	}
-	errs = vm.txPool.AddRemotesSync(txs)
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add tx at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	blk2, err := vm.BuildBlock(context.Background())
+	blk2, err := vmtest.IssueTxsAndSetPreference(txs, vm)
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk2.Verify(context.Background()); err != nil {
-		t.Fatal(err)
+		t.Fatalf("Failed to issue txs and build block: %s", err)
 	}
 
 	if err := blk2.Accept(context.Background()); err != nil {
@@ -399,28 +365,9 @@ func testSetPreferenceRace(t *testing.T, scheme string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	errs := vm1.txPool.AddRemotesSync([]*types.Transaction{signedTx})
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add tx at index %d: %s", i, err)
-		}
-	}
-
-	msg, err := vm1.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm1BlkA, err := vm1.BuildBlock(context.Background())
+	vm1BlkA, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm1)
 	if err != nil {
 		t.Fatalf("Failed to build block with transaction: %s", err)
-	}
-
-	if err := vm1BlkA.Verify(context.Background()); err != nil {
-		t.Fatalf("Block failed verification on VM1: %s", err)
-	}
-
-	if err := vm1.SetPreference(context.Background(), vm1BlkA.ID()); err != nil {
-		t.Fatal(err)
 	}
 
 	vm2BlkA, err := vm2.ParseBlock(context.Background(), vm1BlkA.Bytes())
@@ -463,55 +410,17 @@ func testSetPreferenceRace(t *testing.T, scheme string) {
 	}
 
 	// Add the remote transactions, build the block, and set VM1's preference for block A
-	errs = vm1.txPool.AddRemotesSync(txs)
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm1.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm1BlkB, err := vm1.BuildBlock(context.Background())
+	_, err = vmtest.IssueTxsAndSetPreference(txs, vm1)
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm1BlkB.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm1.SetPreference(context.Background(), vm1BlkB.ID()); err != nil {
 		t.Fatal(err)
 	}
 
 	// Split the transactions over two blocks, and set VM2's preference to them in sequence
 	// after building each block
 	// Block C
-	errs = vm2.txPool.AddRemotesSync(txs[0:5])
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm2.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm2BlkC, err := vm2.BuildBlock(context.Background())
+	vm2BlkC, err := vmtest.IssueTxsAndSetPreference(txs[0:5], vm2)
 	if err != nil {
 		t.Fatalf("Failed to build BlkC on VM2: %s", err)
-	}
-
-	if err := vm2BlkC.Verify(context.Background()); err != nil {
-		t.Fatalf("BlkC failed verification on VM2: %s", err)
-	}
-
-	if err := vm2.SetPreference(context.Background(), vm2BlkC.ID()); err != nil {
-		t.Fatal(err)
 	}
 
 	newHead = <-newTxPoolHeadChan2
@@ -520,28 +429,9 @@ func testSetPreferenceRace(t *testing.T, scheme string) {
 	}
 
 	// Block D
-	errs = vm2.txPool.AddRemotesSync(txs[5:10])
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm2.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm2BlkD, err := vm2.BuildBlock(context.Background())
+	vm2BlkD, err := vmtest.IssueTxsAndSetPreference(txs[5:10], vm2)
 	if err != nil {
 		t.Fatalf("Failed to build BlkD on VM2: %s", err)
-	}
-
-	if err := vm2BlkD.Verify(context.Background()); err != nil {
-		t.Fatalf("BlkD failed verification on VM2: %s", err)
-	}
-
-	if err := vm2.SetPreference(context.Background(), vm2BlkD.ID()); err != nil {
-		t.Fatal(err)
 	}
 
 	// VM1 receives blkC and blkD from VM1
@@ -658,18 +548,7 @@ func testReorgProtection(t *testing.T, scheme string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	errs := vm1.txPool.AddRemotesSync([]*types.Transaction{signedTx})
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add tx at index %d: %s", i, err)
-		}
-	}
-
-	msg, err := vm1.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm1BlkA, err := vm1.BuildBlock(context.Background())
+	vm1BlkA, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm1)
 	if err != nil {
 		t.Fatalf("Failed to build block with transaction: %s", err)
 	}
@@ -722,51 +601,17 @@ func testReorgProtection(t *testing.T, scheme string) {
 	}
 
 	// Add the remote transactions, build the block, and set VM1's preference for block A
-	errs = vm1.txPool.AddRemotesSync(txs)
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm1.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm1BlkB, err := vm1.BuildBlock(context.Background())
+	vm1BlkB, err := vmtest.IssueTxsAndSetPreference(txs, vm1)
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm1BlkB.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm1.SetPreference(context.Background(), vm1BlkB.ID()); err != nil {
 		t.Fatal(err)
 	}
 
 	// Split the transactions over two blocks, and set VM2's preference to them in sequence
 	// after building each block
 	// Block C
-	errs = vm2.txPool.AddRemotesSync(txs[0:5])
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm2.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm2BlkC, err := vm2.BuildBlock(context.Background())
+	vm2BlkC, err := vmtest.IssueTxsAndBuild(txs[0:5], vm2)
 	if err != nil {
 		t.Fatalf("Failed to build BlkC on VM2: %s", err)
-	}
-
-	if err := vm2BlkC.Verify(context.Background()); err != nil {
-		t.Fatalf("Block failed verification on VM2: %s", err)
 	}
 
 	vm1BlkC, err := vm1.ParseBlock(context.Background(), vm2BlkC.Bytes())
@@ -844,24 +689,9 @@ func testNonCanonicalAccept(t *testing.T, scheme string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	errs := vm1.txPool.AddRemotesSync([]*types.Transaction{signedTx})
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add tx at index %d: %s", i, err)
-		}
-	}
-
-	msg, err := vm1.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm1BlkA, err := vm1.BuildBlock(context.Background())
+	vm1BlkA, err := vmtest.IssueTxsAndBuild([]*types.Transaction{signedTx}, vm1)
 	if err != nil {
 		t.Fatalf("Failed to build block with transaction: %s", err)
-	}
-
-	if err := vm1BlkA.Verify(context.Background()); err != nil {
-		t.Fatalf("Block failed verification on VM1: %s", err)
 	}
 
 	if _, err := vm1.GetBlockIDAtHeight(context.Background(), vm1BlkA.Height()); err != database.ErrNotFound {
@@ -925,23 +755,8 @@ func testNonCanonicalAccept(t *testing.T, scheme string) {
 	}
 
 	// Add the remote transactions, build the block, and set VM1's preference for block A
-	errs = vm1.txPool.AddRemotesSync(txs)
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm1.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm1BlkB, err := vm1.BuildBlock(context.Background())
+	vm1BlkB, err := vmtest.IssueTxsAndBuild(txs, vm1)
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm1BlkB.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -961,18 +776,7 @@ func testNonCanonicalAccept(t *testing.T, scheme string) {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
 
-	errs = vm2.txPool.AddRemotesSync(txs[0:5])
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm2.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm2BlkC, err := vm2.BuildBlock(context.Background())
+	vm2BlkC, err := vmtest.IssueTxsAndBuild(txs[0:5], vm2)
 	if err != nil {
 		t.Fatalf("Failed to build BlkC on VM2: %s", err)
 	}
@@ -1057,28 +861,9 @@ func testStickyPreference(t *testing.T, scheme string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	errs := vm1.txPool.AddRemotesSync([]*types.Transaction{signedTx})
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add tx at index %d: %s", i, err)
-		}
-	}
-
-	msg, err := vm1.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm1BlkA, err := vm1.BuildBlock(context.Background())
+	vm1BlkA, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm1)
 	if err != nil {
 		t.Fatalf("Failed to build block with transaction: %s", err)
-	}
-
-	if err := vm1BlkA.Verify(context.Background()); err != nil {
-		t.Fatalf("Block failed verification on VM1: %s", err)
-	}
-
-	if err := vm1.SetPreference(context.Background(), vm1BlkA.ID()); err != nil {
-		t.Fatal(err)
 	}
 
 	vm2BlkA, err := vm2.ParseBlock(context.Background(), vm1BlkA.Bytes())
@@ -1121,27 +906,8 @@ func testStickyPreference(t *testing.T, scheme string) {
 	}
 
 	// Add the remote transactions, build the block, and set VM1's preference for block A
-	errs = vm1.txPool.AddRemotesSync(txs)
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm1.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm1BlkB, err := vm1.BuildBlock(context.Background())
+	vm1BlkB, err := vmtest.IssueTxsAndSetPreference(txs, vm1)
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm1BlkB.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm1.SetPreference(context.Background(), vm1BlkB.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1153,28 +919,9 @@ func testStickyPreference(t *testing.T, scheme string) {
 		t.Fatalf("expected block at %d to have hash %s but got %s", blkBHeight, blkBHash.Hex(), b.Hash().Hex())
 	}
 
-	errs = vm2.txPool.AddRemotesSync(txs[0:5])
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm2.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm2BlkC, err := vm2.BuildBlock(context.Background())
+	vm2BlkC, err := vmtest.IssueTxsAndSetPreference(txs[0:5], vm2)
 	if err != nil {
 		t.Fatalf("Failed to build BlkC on VM2: %s", err)
-	}
-
-	if err := vm2BlkC.Verify(context.Background()); err != nil {
-		t.Fatalf("BlkC failed verification on VM2: %s", err)
-	}
-
-	if err := vm2.SetPreference(context.Background(), vm2BlkC.ID()); err != nil {
-		t.Fatal(err)
 	}
 
 	newHead = <-newTxPoolHeadChan2
@@ -1182,18 +929,7 @@ func testStickyPreference(t *testing.T, scheme string) {
 		t.Fatalf("Expected new block to match")
 	}
 
-	errs = vm2.txPool.AddRemotesSync(txs[5:])
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm2.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm2BlkD, err := vm2.BuildBlock(context.Background())
+	vm2BlkD, err := vmtest.IssueTxsAndBuild(txs[5:], vm2)
 	if err != nil {
 		t.Fatalf("Failed to build BlkD on VM2: %s", err)
 	}
@@ -1335,28 +1071,9 @@ func testUncleBlock(t *testing.T, scheme string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	errs := vm1.txPool.AddRemotesSync([]*types.Transaction{signedTx})
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add tx at index %d: %s", i, err)
-		}
-	}
-
-	msg, err := vm1.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm1BlkA, err := vm1.BuildBlock(context.Background())
+	vm1BlkA, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm1)
 	if err != nil {
 		t.Fatalf("Failed to build block with transaction: %s", err)
-	}
-
-	if err := vm1BlkA.Verify(context.Background()); err != nil {
-		t.Fatalf("Block failed verification on VM1: %s", err)
-	}
-
-	if err := vm1.SetPreference(context.Background(), vm1BlkA.ID()); err != nil {
-		t.Fatal(err)
 	}
 
 	vm2BlkA, err := vm2.ParseBlock(context.Background(), vm1BlkA.Bytes())
@@ -1396,52 +1113,14 @@ func testUncleBlock(t *testing.T, scheme string) {
 		txs[i] = signedTx
 	}
 
-	errs = vm1.txPool.AddRemotesSync(txs)
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm1.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm1BlkB, err := vm1.BuildBlock(context.Background())
+	vm1BlkB, err := vmtest.IssueTxsAndSetPreference(txs, vm1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1BlkB.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm1.SetPreference(context.Background(), vm1BlkB.ID()); err != nil {
-		t.Fatal(err)
-	}
-
-	errs = vm2.txPool.AddRemotesSync(txs[0:5])
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm2.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm2BlkC, err := vm2.BuildBlock(context.Background())
+	vm2BlkC, err := vmtest.IssueTxsAndSetPreference(txs[0:5], vm2)
 	if err != nil {
 		t.Fatalf("Failed to build BlkC on VM2: %s", err)
-	}
-
-	if err := vm2BlkC.Verify(context.Background()); err != nil {
-		t.Fatalf("BlkC failed verification on VM2: %s", err)
-	}
-
-	if err := vm2.SetPreference(context.Background(), vm2BlkC.ID()); err != nil {
-		t.Fatal(err)
 	}
 
 	newHead = <-newTxPoolHeadChan2
@@ -1449,18 +1128,7 @@ func testUncleBlock(t *testing.T, scheme string) {
 		t.Fatalf("Expected new block to match")
 	}
 
-	errs = vm2.txPool.AddRemotesSync(txs[5:10])
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm2.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm2BlkD, err := vm2.BuildBlock(context.Background())
+	vm2BlkD, err := vmtest.IssueTxsAndBuild(txs[5:10], vm2)
 	if err != nil {
 		t.Fatalf("Failed to build BlkD on VM2: %s", err)
 	}
@@ -1543,28 +1211,9 @@ func testAcceptReorg(t *testing.T, scheme string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	errs := vm1.txPool.AddRemotesSync([]*types.Transaction{signedTx})
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add tx at index %d: %s", i, err)
-		}
-	}
-
-	msg, err := vm1.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm1BlkA, err := vm1.BuildBlock(context.Background())
+	vm1BlkA, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm1)
 	if err != nil {
 		t.Fatalf("Failed to build block with transaction: %s", err)
-	}
-
-	if err := vm1BlkA.Verify(context.Background()); err != nil {
-		t.Fatalf("Block failed verification on VM1: %s", err)
-	}
-
-	if err := vm1.SetPreference(context.Background(), vm1BlkA.ID()); err != nil {
-		t.Fatal(err)
 	}
 
 	vm2BlkA, err := vm2.ParseBlock(context.Background(), vm1BlkA.Bytes())
@@ -1608,52 +1257,14 @@ func testAcceptReorg(t *testing.T, scheme string) {
 
 	// Add the remote transactions, build the block, and set VM1's preference
 	// for block B
-	errs = vm1.txPool.AddRemotesSync(txs)
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM1 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm1.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm1BlkB, err := vm1.BuildBlock(context.Background())
+	vm1BlkB, err := vmtest.IssueTxsAndSetPreference(txs, vm1)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := vm1BlkB.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm1.SetPreference(context.Background(), vm1BlkB.ID()); err != nil {
-		t.Fatal(err)
-	}
-
-	errs = vm2.txPool.AddRemotesSync(txs[0:5])
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm2.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm2BlkC, err := vm2.BuildBlock(context.Background())
+	vm2BlkC, err := vmtest.IssueTxsAndSetPreference(txs[0:5], vm2)
 	if err != nil {
 		t.Fatalf("Failed to build BlkC on VM2: %s", err)
-	}
-
-	if err := vm2BlkC.Verify(context.Background()); err != nil {
-		t.Fatalf("BlkC failed verification on VM2: %s", err)
-	}
-
-	if err := vm2.SetPreference(context.Background(), vm2BlkC.ID()); err != nil {
-		t.Fatal(err)
 	}
 
 	newHead = <-newTxPoolHeadChan2
@@ -1661,18 +1272,7 @@ func testAcceptReorg(t *testing.T, scheme string) {
 		t.Fatalf("Expected new block to match")
 	}
 
-	errs = vm2.txPool.AddRemotesSync(txs[5:])
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add transaction to VM2 at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm2.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	vm2BlkD, err := vm2.BuildBlock(context.Background())
+	vm2BlkD, err := vmtest.IssueTxsAndBuild(txs[5:], vm2)
 	if err != nil {
 		t.Fatalf("Failed to build BlkD on VM2: %s", err)
 	}
@@ -1748,17 +1348,7 @@ func testFutureBlock(t *testing.T, scheme string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add tx at index %d: %s", i, err)
-		}
-	}
-	msg, err := vm.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	blkA, err := vm.BuildBlock(context.Background())
+	blkA, err := vmtest.IssueTxsAndBuild([]*types.Transaction{signedTx}, vm)
 	if err != nil {
 		t.Fatalf("Failed to build block with transaction: %s", err)
 	}
@@ -1824,27 +1414,8 @@ func testBuildApricotPhase1Block(t *testing.T, scheme string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add tx at index %d: %s", i, err)
-		}
-	}
-
-	msg, err := vm.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := vm.SetPreference(context.Background(), blk.ID()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1874,23 +1445,8 @@ func testBuildApricotPhase1Block(t *testing.T, scheme string) {
 		}
 		txs[i] = signedTx
 	}
-	errs = vm.txPool.AddRemotesSync(txs)
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add tx at index %d: %s", i, err)
-		}
-	}
-
-	msg, err = vm.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	blk, err = vm.BuildBlock(context.Background())
+	blk, err = vmtest.IssueTxsAndBuild(txs, vm)
 	if err != nil {
-		t.Fatal(err)
-	}
-
-	if err := blk.Verify(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -1945,28 +1501,9 @@ func testLastAcceptedBlockNumberAllow(t *testing.T, scheme string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add tx at index %d: %s", i, err)
-		}
-	}
-
-	msg, err := vm.WaitForEvent(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
 	if err != nil {
 		t.Fatalf("Failed to build block with transaction: %s", err)
-	}
-
-	if err := blk.Verify(context.Background()); err != nil {
-		t.Fatalf("Block failed verification on VM: %s", err)
-	}
-
-	if err := vm.SetPreference(context.Background(), blk.ID()); err != nil {
-		t.Fatal(err)
 	}
 
 	blkHeight := blk.Height()
@@ -2013,20 +1550,8 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
-	for i, err := range errs {
-		if err != nil {
-			t.Fatalf("Failed to add tx at index %d: %s", i, err)
-		}
-	}
-	msg, err := vm.WaitForEvent(context.Background())
+	blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
 	require.NoError(t, err)
-	require.Equal(t, commonEng.PendingTxs, msg)
-
-	blk, err := vm.BuildBlock(context.Background())
-	require.NoError(t, err)
-	require.NoError(t, blk.Verify(context.Background()))
-	require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
 	require.NoError(t, blk.Accept(context.Background()))
 
 	require.NoError(t, vm.Shutdown(context.Background()))
@@ -2118,18 +1643,7 @@ func TestParentBeaconRootBlock(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
-			for i, err := range errs {
-				if err != nil {
-					t.Fatalf("Failed to add tx at index %d: %s", i, err)
-				}
-			}
-
-			msg, err := vm.WaitForEvent(context.Background())
-			require.NoError(t, err)
-			require.Equal(t, commonEng.PendingTxs, msg)
-
-			blk, err := vm.BuildBlock(context.Background())
+			blk, err := vmtest.IssueTxsAndBuild([]*types.Transaction{signedTx}, vm)
 			if err != nil {
 				t.Fatalf("Failed to build block with transaction: %s", err)
 			}
@@ -2242,37 +1756,20 @@ func TestBuildBlockWithInsufficientCapacity(t *testing.T) {
 		require.NoError(err)
 	}
 
-	errs := vm.txPool.AddRemotesSync([]*types.Transaction{txs[0]})
-	require.Len(errs, 1)
-	require.NoError(errs[0])
-
-	msg, err := vm.WaitForEvent(context.Background())
-	require.NoError(err)
-	require.Equal(commonEng.PendingTxs, msg)
-
-	blk2, err := vm.BuildBlock(ctx)
+	blk2, err := vmtest.IssueTxsAndBuild([]*types.Transaction{txs[0]}, vm)
 	require.NoError(err)
 
-	require.NoError(blk2.Verify(ctx))
 	require.NoError(blk2.Accept(ctx))
 
 	// Attempt to build a block consuming more than the current gas capacity
-	errs = vm.txPool.AddRemotesSync([]*types.Transaction{txs[1]})
-	require.Len(errs, 1)
-	require.NoError(errs[0])
-
-	msg, err = vm.WaitForEvent(context.Background())
-	require.NoError(err)
-	require.Equal(commonEng.PendingTxs, msg)
-
+	_, err = vmtest.IssueTxsAndBuild([]*types.Transaction{txs[1]}, vm)
 	// Expect block building to fail due to insufficient gas capacity
-	_, err = vm.BuildBlock(ctx)
 	require.ErrorIs(err, miner.ErrInsufficientGasCapacityToBuild)
 
 	// Wait to fill block capacity and retry block builiding
 	vm.clock.Set(vm.clock.Time().Add(acp176.TimeToFillCapacity * time.Second))
 
-	msg, err = vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(context.Background())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 
@@ -2327,22 +1824,13 @@ func TestBuildBlockLargeTxStarvation(t *testing.T) {
 		require.NoError(err)
 	}
 
-	errs := vm.txPool.AddRemotesSync([]*types.Transaction{maxSizeTxs[0]})
-	require.Len(errs, 1)
-	require.NoError(errs[0])
-
-	msg, err := vm.WaitForEvent(context.Background())
-	require.NoError(err)
-	require.Equal(commonEng.PendingTxs, msg)
-
-	blk2, err := vm.BuildBlock(ctx)
+	blk2, err := vmtest.IssueTxsAndBuild([]*types.Transaction{maxSizeTxs[0]}, vm)
 	require.NoError(err)
 
-	require.NoError(blk2.Verify(ctx))
 	require.NoError(blk2.Accept(ctx))
 
 	// Add a second transaction trying to consume the max guaranteed gas capacity at a higher gas price
-	errs = vm.txPool.AddRemotesSync([]*types.Transaction{maxSizeTxs[1]})
+	errs := vm.txPool.AddRemotesSync([]*types.Transaction{maxSizeTxs[1]})
 	require.Len(errs, 1)
 	require.NoError(errs[0])
 
@@ -2351,21 +1839,13 @@ func TestBuildBlockLargeTxStarvation(t *testing.T) {
 	tx := types.NewContractCreation(0, big.NewInt(0), 2_000_000, lowGasPrice, []byte{0xfe})
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), vmtest.TestKeys[1].ToECDSA())
 	require.NoError(err)
-	errs = vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
-	require.Len(errs, 1)
-	require.NoError(errs[0])
-
-	msg, err = vm.WaitForEvent(context.Background())
-	require.NoError(err)
-	require.Equal(commonEng.PendingTxs, msg)
-
-	_, err = vm.BuildBlock(ctx)
+	_, err = vmtest.IssueTxsAndBuild([]*types.Transaction{signedTx}, vm)
 	require.ErrorIs(err, miner.ErrInsufficientGasCapacityToBuild)
 
 	// Wait to fill block capacity and retry block building
 	vm.clock.Set(vm.clock.Time().Add(acp176.TimeToFillCapacity * time.Second))
 
-	msg, err = vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(context.Background())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 
@@ -2506,18 +1986,10 @@ func TestWaitForEvent(t *testing.T) {
 				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), vmtest.TestKeys[0].ToECDSA())
 				require.NoError(t, err)
 
-				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
-					require.NoError(t, err)
-				}
-
 				lastBuildBlockTime := time.Now()
 
-				blk, err := vm.BuildBlock(context.Background())
+				blk, err := vmtest.IssueTxsAndBuild([]*types.Transaction{signedTx}, vm)
 				require.NoError(t, err)
-
-				require.NoError(t, blk.Verify(context.Background()))
-
-				require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
 
 				require.NoError(t, blk.Accept(context.Background()))
 
