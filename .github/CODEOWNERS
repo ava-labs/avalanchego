@@ -12,7 +12,8 @@
 /.github/ @joshua-kim @maru-ava
 /.github/*.md @joshua-kim @maru-ava @meaghanfitzgerald
 /.github/CODEOWNERS @StephenButtolph
-/.github/workflows/c-chain-reexecution-benchmark.yml @aaronbuchwald
+/.github/actions/c-chain-reexecution-benchmark/ @aaronbuchwald
+/.github/workflows/c-chain-reexecution-benchmark* @aaronbuchwald
 /.gitignore @joshua-kim @maru-ava @StephenButtolph
 /.golangci.yml @joshua-kim @maru-ava @StephenButtolph
 /Dockerfile @joshua-kim @maru-ava
