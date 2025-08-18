@@ -36,7 +36,6 @@ const (
 var resultsCodec codec.Manager
 
 func init() {
-
 	resultsCodec = codec.NewManager(maxResultsSize)
 
 	c := linearcodec.NewDefault()
