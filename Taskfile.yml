@@ -186,6 +186,7 @@ tasks:
     vars:
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
       SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR}}'
+      CONFIG: '{{.CONFIG | default ""}}'
       START_BLOCK: '{{.START_BLOCK}}'
       END_BLOCK: '{{.END_BLOCK}}'
       LABELS: '{{.LABELS | default ""}}'
@@ -193,6 +194,7 @@ tasks:
     cmd: |
       CURRENT_STATE_DIR={{.CURRENT_STATE_DIR}} \
       SOURCE_BLOCK_DIR={{.SOURCE_BLOCK_DIR}} \
+      CONFIG={{.CONFIG}} \
       START_BLOCK={{.START_BLOCK}} \
       END_BLOCK={{.END_BLOCK}} \
       LABELS={{.LABELS}} \
@@ -205,6 +207,7 @@ tasks:
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
       SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip"}}'
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip"}}'
+      CONFIG: '{{.CONFIG | default ""}}'
       START_BLOCK: '{{.START_BLOCK | default "101"}}'
       END_BLOCK: '{{.END_BLOCK | default "250000"}}'
       LABELS: '{{.LABELS | default ""}}'
@@ -219,6 +222,7 @@ tasks:
         vars:
           SOURCE_BLOCK_DIR: '{{.EXECUTION_DATA_DIR}}/blocks'
           CURRENT_STATE_DIR: '{{.EXECUTION_DATA_DIR}}/current-state'
+          CONFIG: '{{.CONFIG}}'
           START_BLOCK: '{{.START_BLOCK}}'
           END_BLOCK: '{{.END_BLOCK}}'
           LABELS: '{{.LABELS}}'
