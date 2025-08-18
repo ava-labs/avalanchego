@@ -219,7 +219,7 @@ func TestIndexMismatchedChild(t *testing.T) {
 	genesis := newBlock(t, newBlockConfig{})
 	child1 := newBlock(t, newBlockConfig{prev: genesis})
 	child1Sibling := newBlock(t, newBlockConfig{prev: genesis})
-	child2Cousin := newBlock(t, newBlockConfig{prev: child1Sibling})
+	child2Nephew := newBlock(t, newBlockConfig{prev: child1Sibling})
 
 	configs := newNetworkConfigs(t, 4)
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
@@ -240,11 +240,11 @@ func TestIndexMismatchedChild(t *testing.T) {
 	// Index child1
 	require.NoError(t, s.Index(ctx, child1, newTestFinalization(t, configs, child1.BlockHeader())))
 
-	_, err = child2Cousin.Verify(ctx)
+	_, err = child2Nephew.Verify(ctx)
 	require.NoError(t, err)
 
-	// Attempt to index child2 before child1 is verified
-	err = s.Index(ctx, child2Cousin, newTestFinalization(t, configs, child2Cousin.BlockHeader()))
+	// Attempt to index the wrong child (child2Nephew) that has a different previous digest
+	err = s.Index(ctx, child2Nephew, newTestFinalization(t, configs, child2Nephew.BlockHeader()))
 	require.ErrorIs(t, err, errMismatchedPrevDigest)
 }
 
