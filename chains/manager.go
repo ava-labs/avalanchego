@@ -1614,7 +1614,6 @@ func (m *manager) createSimplexChain(
 	}, nil
 }
 
-
 func (m *manager) createChainHandler(ctx *snow.ConsensusContext, vdrs validators.Manager, msgChan chan common.Message, sb subnets.Subnet, primaryAlias string) (handler.Handler, error) {
 	stakeReg, err := metrics.MakeAndRegister(
 		m.stakeGatherer,
@@ -1658,7 +1657,7 @@ func (m *manager) createChainHandler(ctx *snow.ConsensusContext, vdrs validators
 	if err != nil {
 		return nil, err
 	}
-	
+
 	simplexEngine, err := m.createSimplexEngine()
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create simplex instance: %w", err)
@@ -1684,9 +1683,9 @@ func (m *manager) createChainHandler(ctx *snow.ConsensusContext, vdrs validators
 
 	h.SetEngineManager(&handler.EngineManager{
 		Avalanche: nil,
-		Snowman: nil,
+		Snowman:   nil,
 		Simplex: &handler.Engine{
-			Consensus:    simplexEngine,
+			Consensus: simplexEngine,
 		},
 	})
 

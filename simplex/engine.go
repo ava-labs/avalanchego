@@ -20,14 +20,13 @@ import (
 var _ common.Engine = (*Engine)(nil)
 var maxProposalWaitTime = time.Second * 2
 var maxRebroadcastWait = time.Second * 2
-var walLocation = "temp.txt"
 
 type Engine struct {
 	common.Handler
 	health.Checker
 
-	epoch *simplex.Epoch
-	blockDeserializer *blockDeserializer
+	epoch              *simplex.Epoch
+	blockDeserializer  *blockDeserializer
 	quorumDeserializer *QCDeserializer
 }
 
@@ -51,7 +50,7 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	wal, err := wal.New(walLocation)
+	wal, err := wal.New(config.WalLocation)
 	if err != nil {
 		return nil, err
 	}
@@ -64,28 +63,28 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 	blockTracker := newBlockTracker(lastBlock)
 
 	blockBuilder := &BlockBuilder{
-		vm: config.VM,
+		vm:           config.VM,
 		blockTracker: blockTracker,
-		log: config.Log,
+		log:          config.Log,
 	}
 
 	epochConfig := simplex.EpochConfig{
-		MaxProposalWait: maxProposalWaitTime,
-		MaxRebroadcastWait:    maxRebroadcastWait,
-		QCDeserializer: qcDeserializer,
-		Logger: config.Log,
-		ID: config.Ctx.NodeID[:], 
-		Signer: &signer,
-		Verifier: &verifier,
-		BlockDeserializer: blockDeserializer,
+		MaxProposalWait:     maxProposalWaitTime,
+		MaxRebroadcastWait:  maxRebroadcastWait,
+		QCDeserializer:      qcDeserializer,
+		Logger:              config.Log,
+		ID:                  config.Ctx.NodeID[:],
+		Signer:              &signer,
+		Verifier:            &verifier,
+		BlockDeserializer:   blockDeserializer,
 		SignatureAggregator: signatureAggregator,
-		Comm: comm,
-		Storage: storage,
-		WAL: wal,
-		BlockBuilder: blockBuilder,
-		Epoch: 0, // 0 for now, but we would get the epoch from the metadata associated with the latest block
-		StartTime: time.Now(),
-		ReplicationEnabled: true,
+		Comm:                comm,
+		Storage:             storage,
+		WAL:                 wal,
+		BlockBuilder:        blockBuilder,
+		Epoch:               0, // 0 for now, but we would get the epoch from the metadata associated with the latest block
+		StartTime:           time.Now(),
+		ReplicationEnabled:  true,
 	}
 
 	epoch, err := simplex.NewEpoch(epochConfig)
@@ -94,8 +93,8 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 	}
 
 	return &Engine{
-		epoch: epoch,
-		blockDeserializer: blockDeserializer,
+		epoch:              epoch,
+		blockDeserializer:  blockDeserializer,
 		quorumDeserializer: qcDeserializer,
 	}, nil
 }
@@ -119,24 +118,24 @@ func (e *Engine) p2pToSimplexMessage(msg *p2p.Simplex) (*simplex.Message, error)
 	}
 
 	switch {
-	case msg.GetBlockProposal() != nil :
-			return blockProposalFromP2P(context.TODO(), msg.GetBlockProposal(), e.blockDeserializer)
+	case msg.GetBlockProposal() != nil:
+		return blockProposalFromP2P(context.TODO(), msg.GetBlockProposal(), e.blockDeserializer)
 	case msg.GetEmptyNotarization() != nil:
-			return emptyNotarizationMessageFromP2P(msg.GetEmptyNotarization(), e.quorumDeserializer)
+		return emptyNotarizationMessageFromP2P(msg.GetEmptyNotarization(), e.quorumDeserializer)
 	case msg.GetVote() != nil:
-			return voteFromP2P(msg.GetVote())
+		return voteFromP2P(msg.GetVote())
 	case msg.GetEmptyVote() != nil:
-			return emptyVoteFromP2P(msg.GetEmptyVote())
+		return emptyVoteFromP2P(msg.GetEmptyVote())
 	case msg.GetNotarization() != nil:
-			return notarizationMessageFromP2P(msg.GetNotarization(), e.quorumDeserializer)
+		return notarizationMessageFromP2P(msg.GetNotarization(), e.quorumDeserializer)
 	case msg.GetFinalizeVote() != nil:
-			return finalizeVoteFromP2P(msg.GetFinalizeVote(), e.quorumDeserializer)
+		return finalizeVoteFromP2P(msg.GetFinalizeVote(), e.quorumDeserializer)
 	case msg.GetFinalization() != nil:
-			return finalizationMessageFromP2P(msg.GetFinalization(), e.quorumDeserializer)
+		return finalizationMessageFromP2P(msg.GetFinalization(), e.quorumDeserializer)
 	case msg.GetReplicationRequest() != nil:
-			return replicationRequestFromP2P(msg.GetReplicationRequest()), nil
+		return replicationRequestFromP2P(msg.GetReplicationRequest()), nil
 	case msg.GetReplicationResponse() != nil:
-			return replicationResponseFromP2P(context.TODO(), msg.GetReplicationResponse(), e.blockDeserializer, e.quorumDeserializer)
+		return replicationResponseFromP2P(context.TODO(), msg.GetReplicationResponse(), e.blockDeserializer, e.quorumDeserializer)
 	default:
 		return nil, fmt.Errorf("unknown message type")
 	}

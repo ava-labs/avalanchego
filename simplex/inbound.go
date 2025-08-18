@@ -13,8 +13,7 @@ import (
 
 var errNilField = errors.New("nil field")
 
-
-// -> MESSAGES 
+// -> MESSAGES
 func emptyNotarizationMessageFromP2P(emptyNotarization *p2p.EmptyNotarization, qcDeserializer *QCDeserializer) (*simplex.Message, error) {
 	notarization, err := emptyNotarizationFromP2P(emptyNotarization, qcDeserializer)
 	if err != nil {
@@ -146,7 +145,7 @@ func replicationResponseFromP2P(ctx context.Context, replicationResponse *p2p.Re
 	return &simplex.Message{
 		ReplicationResponse: &simplex.ReplicationResponse{
 			LatestRound: latestRound,
-			Data:         data,
+			Data:        data,
 		},
 	}, nil
 }
@@ -202,7 +201,7 @@ func p2pBlockHeaderToSimplexBlockHeader(p2pHeader *p2p.BlockHeader) (simplex.Blo
 
 	return simplex.BlockHeader{
 		ProtocolMetadata: md,
-		Digest:          digest,
+		Digest:           digest,
 	}, nil
 }
 
@@ -269,11 +268,11 @@ func notarizationFromP2P(notarization *p2p.QuorumCertificate, qcDeserializer *QC
 		return nil, fmt.Errorf("failed to convert quorum certificate: %w", err)
 	}
 
-	return  &simplex.Notarization{
-			Vote: simplex.ToBeSignedVote{
-				BlockHeader: bh,
-			},
-			QC: qc,
+	return &simplex.Notarization{
+		Vote: simplex.ToBeSignedVote{
+			BlockHeader: bh,
+		},
+		QC: qc,
 	}, nil
 }
 
@@ -289,11 +288,11 @@ func emptyNotarizationFromP2P(emptyNotarization *p2p.EmptyNotarization, qcDeseri
 	}
 
 	return &simplex.EmptyNotarization{
-			Vote: simplex.ToBeSignedEmptyVote{
-				EmptyVoteMetadata: md,
-			},
-			QC: qc,
-		}, nil
+		Vote: simplex.ToBeSignedEmptyVote{
+			EmptyVoteMetadata: md,
+		},
+		QC: qc,
+	}, nil
 }
 
 func finalizationFromP2P(finalization *p2p.QuorumCertificate, qcDeserializer *QCDeserializer) (*simplex.Finalization, error) {
@@ -314,7 +313,6 @@ func finalizationFromP2P(finalization *p2p.QuorumCertificate, qcDeserializer *QC
 		QC: qc,
 	}, nil
 }
-
 
 func quorumRoundFromP2P(ctx context.Context, qr *p2p.QuorumRound, blockDeserializer *blockDeserializer, qcDeserializer *QCDeserializer) (*simplex.QuorumRound, error) {
 	if qr == nil {
@@ -357,11 +355,10 @@ func quorumRoundFromP2P(ctx context.Context, qr *p2p.QuorumRound, blockDeseriali
 		finalization = finalize
 	}
 
-
 	return &simplex.QuorumRound{
 		Block:             block,
 		EmptyNotarization: emptyNotarization,
-		Notarization: 	notarization,
-		Finalization: 	finalization,
+		Notarization:      notarization,
+		Finalization:      finalization,
 	}, nil
 }

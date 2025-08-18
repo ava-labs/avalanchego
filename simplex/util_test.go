@@ -6,16 +6,21 @@ package simplex
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/simplex"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
+	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -104,16 +109,29 @@ func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
 
 	configs := make([]*Config, 0, numNodes)
 	for _, node := range testNodes {
+		ctrl := gomock.NewController(t)
+		sender := sendermock.NewExternalSender(ctrl)
+		mc, err := message.NewCreator(
+			prometheus.NewRegistry(),
+			constants.DefaultNetworkCompressionType,
+			10*time.Second,
+		)
+		require.NoError(t, err)
+
 		config := &Config{
 			Ctx: SimplexChainContext{
 				NodeID:    node.validator.NodeID,
 				ChainID:   chainID,
 				NetworkID: constants.UnitTestID,
 			},
-			Log:        logging.NoLog{},
-			Validators: newTestValidatorInfo(testNodes),
-			SignBLS:    node.signFunc,
-			DB:         memdb.New(),
+			Log:                logging.NoLog{},
+			Sender:             sender,
+			OutboundMsgBuilder: mc,
+			Validators:         newTestValidatorInfo(testNodes),
+			VM:                 newTestVM(),
+			DB:                 memdb.New(),
+			WalLocation:        "tempwal.txt",	
+			SignBLS:            node.signFunc,
 		}
 		configs = append(configs, config)
 	}

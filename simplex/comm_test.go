@@ -5,18 +5,14 @@ package simplex
 
 import (
 	"testing"
-	"time"
 
 	"github.com/ava-labs/simplex"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -43,26 +39,16 @@ func TestCommSendMessage(t *testing.T) {
 	config := newEngineConfig(t, 1)
 
 	destinationNodeID := ids.GenerateTestNodeID()
-	ctrl := gomock.NewController(t)
-	sender := sendermock.NewExternalSender(ctrl)
-	mc, err := message.NewCreator(
-		prometheus.NewRegistry(),
-		constants.DefaultNetworkCompressionType,
-		10*time.Second,
-	)
-	require.NoError(t, err)
-
-	config.OutboundMsgBuilder = mc
-	config.Sender = sender
 
 	comm, err := NewComm(config)
 	require.NoError(t, err)
 
-	outboundMsg, err := mc.SimplexMessage(newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage))
+	outboundMsg, err := config.OutboundMsgBuilder.SimplexMessage(newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage))
 	require.NoError(t, err)
 	expectedSendConfig := common.SendConfig{
 		NodeIDs: set.Of(destinationNodeID),
 	}
+	sender := config.Sender.(*sendermock.ExternalSender)
 	sender.EXPECT().Send(outboundMsg, expectedSendConfig, comm.subnetID, gomock.Any())
 
 	comm.Send(&testSimplexMessage, destinationNodeID[:])
@@ -72,22 +58,11 @@ func TestCommSendMessage(t *testing.T) {
 // not including the sending node.
 func TestCommBroadcast(t *testing.T) {
 	config := newEngineConfig(t, 3)
-
-	ctrl := gomock.NewController(t)
-	sender := sendermock.NewExternalSender(ctrl)
-	mc, err := message.NewCreator(
-		prometheus.NewRegistry(),
-		constants.DefaultNetworkCompressionType,
-		10*time.Second,
-	)
-	require.NoError(t, err)
-
-	config.OutboundMsgBuilder = mc
-	config.Sender = sender
+	sender := config.Sender.(*sendermock.ExternalSender)
 
 	comm, err := NewComm(config)
 	require.NoError(t, err)
-	outboundMsg, err := mc.SimplexMessage(newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage))
+	outboundMsg, err := config.OutboundMsgBuilder.SimplexMessage(newVote(config.Ctx.ChainID, testSimplexMessage.VoteMessage))
 	require.NoError(t, err)
 	nodes := make([]ids.NodeID, 0, len(comm.Nodes()))
 	for _, node := range comm.Nodes() {
@@ -109,22 +84,10 @@ func TestCommBroadcast(t *testing.T) {
 func TestCommFailsWithoutCurrentNode(t *testing.T) {
 	config := newEngineConfig(t, 3)
 
-	ctrl := gomock.NewController(t)
-	mc, err := message.NewCreator(
-		prometheus.NewRegistry(),
-		constants.DefaultNetworkCompressionType,
-		10*time.Second,
-	)
-	require.NoError(t, err)
-	sender := sendermock.NewExternalSender(ctrl)
-
-	config.OutboundMsgBuilder = mc
-	config.Sender = sender
-
 	// set the curNode to a different nodeID than the one in the config
 	vdrs := generateTestNodes(t, 3)
 	config.Validators = newTestValidatorInfo(vdrs)
 
-	_, err = NewComm(config)
+	_, err := NewComm(config)
 	require.ErrorIs(t, err, errNodeNotFound)
 }
