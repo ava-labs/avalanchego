@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -2828,10 +2828,7 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 		return innerBlock3, nil
 	}
 
-	// Attempting to build a block now errors with an unexpected error. This
-	// results in dropping the build block request, which breaks the invariant
-	// that BuildBlock will be called at least once after sending a PendingTxs
-	// message on the ToEngine channel.
+	// Attempting to build a block now errors with an unexpected error.
 	_, err = proVM.BuildBlock(context.Background())
 	require.NoError(err)
 }

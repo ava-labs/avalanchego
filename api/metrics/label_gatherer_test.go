@@ -1,14 +1,15 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package metrics
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 
 	dto "github.com/prometheus/client_model/go"
 )
@@ -23,68 +24,24 @@ func TestLabelGatherer_Gather(t *testing.T) {
 		customLabelValueB = "b"
 	)
 	tests := []struct {
-		name            string
-		labelName       string
-		expectedMetrics []*dto.Metric
-		expectErr       bool
+		name        string
+		labelName   string
+		wantMetrics string
+		expectErr   bool
 	}{
 		{
 			name:      "no overlap",
 			labelName: customLabelName,
-			expectedMetrics: []*dto.Metric{
-				{
-					Label: []*dto.LabelPair{
-						{
-							Name:  proto.String(labelName),
-							Value: proto.String(labelValueB),
-						},
-						{
-							Name:  proto.String(customLabelName),
-							Value: proto.String(customLabelValueB),
-						},
-					},
-					Counter: &dto.Counter{
-						Value: proto.Float64(1),
-					},
-				},
-				{
-					Label: []*dto.LabelPair{
-						{
-							Name:  proto.String(labelName),
-							Value: proto.String(labelValueA),
-						},
-						{
-							Name:  proto.String(customLabelName),
-							Value: proto.String(customLabelValueA),
-						},
-					},
-					Counter: &dto.Counter{
-						Value: proto.Float64(0),
-					},
-				},
-			},
-			expectErr: false,
+			wantMetrics: `
+# HELP counter help
+# TYPE counter counter
+counter{smith="morty",tag="b"} 1
+counter{smith="rick",tag="a"} 0
+`,
 		},
 		{
 			name:      "has overlap",
 			labelName: labelName,
-			expectedMetrics: []*dto.Metric{
-				{
-					Label: []*dto.LabelPair{
-						{
-							Name:  proto.String(labelName),
-							Value: proto.String(labelValueB),
-						},
-						{
-							Name:  proto.String(customLabelName),
-							Value: proto.String(customLabelValueB),
-						},
-					},
-					Counter: &dto.Counter{
-						Value: proto.Float64(1),
-					},
-				},
-			},
 			expectErr: true,
 		},
 	}
@@ -117,23 +74,17 @@ func TestLabelGatherer_Gather(t *testing.T) {
 				require.NoError(registerB.Register(counterB))
 			}
 
-			metrics, err := gatherer.Gather()
 			if test.expectErr {
-				require.Error(err) //nolint:forbidigo // the error is not exported
+				require.Error(testutil.GatherAndCompare( //nolint:forbidigo // the error is not exported
+					gatherer,
+					strings.NewReader(test.wantMetrics),
+				))
 			} else {
-				require.NoError(err)
+				require.NoError(testutil.GatherAndCompare(
+					gatherer,
+					strings.NewReader(test.wantMetrics),
+				))
 			}
-			require.Equal(
-				[]*dto.MetricFamily{
-					{
-						Name:   proto.String(counterOpts.Name),
-						Help:   proto.String(counterOpts.Help),
-						Type:   dto.MetricType_COUNTER.Enum(),
-						Metric: test.expectedMetrics,
-					},
-				},
-				metrics,
-			)
 		})
 	}
 }

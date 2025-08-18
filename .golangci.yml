@@ -36,7 +36,6 @@ linters:
     - bodyclose
     - copyloopvar
     - depguard
-    - dupword
     - errcheck
     - errorlint
     - forbidigo

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package builder
@@ -87,6 +87,13 @@ func New(
 }
 
 func (b *builder) WaitForEvent(ctx context.Context) (common.Message, error) {
+	// We shouldn't call durationToSleep until the chain is marked as no longer
+	// bootstrapping.
+	if !b.txExecutorBackend.Bootstrapped.Get() {
+		<-ctx.Done()
+		return 0, ctx.Err()
+	}
+
 	for {
 		if err := ctx.Err(); err != nil {
 			return 0, err
