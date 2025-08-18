@@ -24,12 +24,10 @@ function copy_source() {
     local source="$1"
     local dest="$2"
     
-    # Ensure destination directory exists (after validation)
-    mkdir -p "$dest"
-    
     # Check if source starts with s3://
     if [[ "$source" == s3://* || "$dest" == s3://* ]]; then
         # Use s5cmd to copy from S3
+        echo "Copying from S3: $source to $dest"
         time s5cmd cp "$source" "$dest"
 
         # If we copied a zip, extract it in place
@@ -40,6 +38,10 @@ function copy_source() {
         fi
     else
         # Use cp for local filesystem with recursive support
+        
+        # Ensure destination directory exists
+        mkdir -p "$dest"
+
         if [ -d "$source" ]; then
             time cp -r "$source"/* "$dest/"
         elif [ -f "$source" ]; then
