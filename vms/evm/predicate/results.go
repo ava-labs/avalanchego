@@ -15,13 +15,28 @@ import (
 )
 
 const (
-	version        = 0
+	version = 0
+
+	// The Results maximum size should comfortably exceed the maximum value that could happen in practice,
+	// so that a correct block builder will not attempt to build a block and fail to marshal the predicate results using the codec.
+	//
+	// We make this easy to reason about by assigning a minimum gas cost to the `PredicateGas` function of precompiles.
+	// In the case of Warp, the minimum gas cost is set to 200k gas, which can lead to at most 32 additional bytes being included in Results.
+	//
+	// The additional bytes come from the transaction hash (32 bytes), length of tx predicate results (4 bytes),
+	// the precompile address (20 bytes), length of the bytes result (4 bytes), and the additional byte in the results bitset (1 byte).
+	//
+	// This results in 200k gas contributing a maximum of 61 additional bytes to Result.
+	// For a block with a maximum gas limit of 100M, the block can include up to 500 validated predicates based contributing to the size of Result.
+	//
+	// At 61 bytes / validated predicate, this yields ~30KB, which is well short of the 1MB cap.
 	maxResultsSize = units.MiB
 )
 
 var resultsCodec codec.Manager
 
 func init() {
+
 	resultsCodec = codec.NewManager(maxResultsSize)
 
 	c := linearcodec.NewDefault()
