@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1755421831166,
+  "lastUpdate": 1755508417378,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -556,6 +556,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[101,250000]",
             "value": 113.9,
+            "unit": "mgas/s",
+            "extra": "1 times\n32 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "rodrigo",
+            "username": "RodrigoVillar",
+            "email": "77309055+RodrigoVillar@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "96f30d1b07cb081ffc617f10b9dc8e65433f895e",
+          "message": "feat(load): add token test (#4171)",
+          "timestamp": "2025-08-15T06:15:44Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/96f30d1b07cb081ffc617f10b9dc8e65433f895e"
+        },
+        "date": 1755508416981,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]",
+            "value": 113.4,
             "unit": "mgas/s",
             "extra": "1 times\n32 procs"
           }
