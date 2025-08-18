@@ -30,7 +30,7 @@ var maxFeeCap = big.NewInt(300000000000)
 // load testing scenarios.
 //
 // This function handles the setup of the tests and also assigns each test
-// an equal weight, making them equally likely to be selected during random test execution.
+// a weight based on its C-Chain frequency and computational intensity.
 func NewRandomTest(
 	ctx context.Context,
 	chainID *big.Int,
@@ -43,7 +43,7 @@ func NewRandomTest(
 		return nil, err
 	}
 
-	_, tx, simulatorContract, err := contracts.DeployEVMLoadSimulator(txOpts, worker.Client)
+	_, tx, loadSimulator, err := contracts.DeployLoadSimulator(txOpts, worker.Client)
 	if err != nil {
 		return nil, err
 	}
@@ -66,103 +66,85 @@ func NewRandomTest(
 	worker.Nonce++
 
 	var (
-		// weight determines the relative probability of each test being selected
-		// during random test execution. Currently all tests use the same weight,
-		// making them equally likely to be chosen.
-		//
-		// TODO: fine-tune individual test weights so that load is
-		// representative of C-Chain usage patterns.
-		weight = uint64(100)
-		// count specifies how many times to repeat an operation (e.g. reads,
-		// writes, or computes) for a test that supports repeated operations.
-		// This value is arbitrary but kept constant to ensure test reproducibility.
-		count = big.NewInt(5)
 		// value specifies the amount to send in a transfer test
 		value = big.NewInt(1)
+
+		// random values are written to slots to ensure that the same value isn't
+		// being written to a slot, which could reduce the expected gas used of a tx
+		writeRand  = rand.New(rand.NewSource(0)) //#nosec G404
+		modifyRand = rand.New(rand.NewSource(1)) //#nosec G404
 	)
 
 	weightedTests := []WeightedTest{
 		{
+			// minimum gas used: 21_000
 			Test:   TransferTest{Value: value},
-			Weight: weight,
+			Weight: 5,
 		},
 		{
+			// minimum gas used: 84_000
 			Test: ReadTest{
-				Contract: simulatorContract,
-				Count:    count,
+				contract: loadSimulator,
+				offset:   big.NewInt(0),
+				numSlots: big.NewInt(30),
 			},
-			Weight: weight,
+			Weight: 10,
 		},
 		{
-			Test: WriteTest{
-				Contract: simulatorContract,
-				Count:    count,
+			// minimum gas used: 242_000
+			Test: &WriteTest{
+				contract: loadSimulator,
+				numSlots: big.NewInt(10),
+				rand:     writeRand,
 			},
-			Weight: weight,
+			Weight: 10,
 		},
 		{
-			Test: StateModificationTest{
-				Contract: simulatorContract,
-				Count:    count,
+			// minimum gas used: 61_000
+			Test: &ModifyTest{
+				contract: loadSimulator,
+				numSlots: big.NewInt(8),
+				rand:     modifyRand,
 			},
-			Weight: weight,
+			Weight: 10,
 		},
 		{
-			Test: HashingTest{
-				Contract: simulatorContract,
-				Count:    count,
+			// minimum gas used: 302_100
+			Test: HashTest{
+				contract:      loadSimulator,
+				value:         value,
+				numIterations: big.NewInt(1_000),
 			},
-			Weight: weight,
+			Weight: 5,
 		},
 		{
-			Test: MemoryTest{
-				Contract: simulatorContract,
-				Count:    count,
+			// minimum gas used: 290_000
+			Test:   DeployTest{contract: loadSimulator},
+			Weight: 5,
+		},
+		{
+			// minimum gas used: 23_000
+			Test: LargeCalldataTest{
+				contract: loadSimulator,
+				calldata: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
 			},
-			Weight: weight,
+			Weight: 5,
 		},
 		{
-			Test: CallDepthTest{
-				Contract: simulatorContract,
-				Count:    count,
-			},
-			Weight: weight,
-		},
-		{
-			Test:   ContractCreationTest{Contract: simulatorContract},
-			Weight: weight,
-		},
-		{
-			Test: PureComputeTest{
-				Contract:      simulatorContract,
-				NumIterations: count,
-			},
-			Weight: weight,
-		},
-		{
-			Test: LargeEventTest{
-				Contract:  simulatorContract,
-				NumEvents: count,
-			},
-			Weight: weight,
-		},
-		{
-			Test:   ExternalCallTest{Contract: simulatorContract},
-			Weight: weight,
-		},
-		{
+			// minimum gas used: 155_900
 			Test: TrieStressTest{
 				Contract:  trieContract,
-				NumValues: count,
+				NumValues: big.NewInt(12),
 			},
-			Weight: weight,
+			Weight: 10,
 		},
 		{
+			// minimum gas used: 52_300
 			Test: ERC20Test{
 				Contract: tokenContract,
 				Value:    value,
 			},
-			Weight: weight,
+			Weight: 45,
 		},
 	}
 
@@ -267,107 +249,82 @@ func (t TransferTest) Run(tc tests.TestContext, wallet *Wallet) {
 }
 
 type ReadTest struct {
-	Contract *contracts.EVMLoadSimulator
-	Count    *big.Int
+	contract *contracts.LoadSimulator
+	offset   *big.Int
+	numSlots *big.Int
 }
 
-func (r ReadTest) Run(tc tests.TestContext, wallet *Wallet) {
+func (n ReadTest) Run(tc tests.TestContext, wallet *Wallet) {
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return r.Contract.SimulateReads(txOpts, r.Count)
+		return n.contract.Read(txOpts, n.offset, n.numSlots)
 	})
 }
 
 type WriteTest struct {
-	Contract *contracts.EVMLoadSimulator
-	Count    *big.Int
+	contract *contracts.LoadSimulator
+	numSlots *big.Int
+
+	mu   sync.Mutex
+	rand *rand.Rand
 }
 
-func (w WriteTest) Run(tc tests.TestContext, wallet *Wallet) {
+func (n *WriteTest) Run(tc tests.TestContext, wallet *Wallet) {
+	n.mu.Lock()
+	value := n.rand.Int63()
+	n.mu.Unlock()
+
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return w.Contract.SimulateRandomWrite(txOpts, w.Count)
+		return n.contract.Write(txOpts, n.numSlots, big.NewInt(value))
 	})
 }
 
-type StateModificationTest struct {
-	Contract *contracts.EVMLoadSimulator
-	Count    *big.Int
+type ModifyTest struct {
+	contract *contracts.LoadSimulator
+	numSlots *big.Int
+
+	mu   sync.Mutex
+	rand *rand.Rand
 }
 
-func (s StateModificationTest) Run(tc tests.TestContext, wallet *Wallet) {
+func (n *ModifyTest) Run(tc tests.TestContext, wallet *Wallet) {
+	n.mu.Lock()
+	value := n.rand.Int63()
+	n.mu.Unlock()
+
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return s.Contract.SimulateModification(txOpts, s.Count)
+		return n.contract.Modify(txOpts, n.numSlots, big.NewInt(value))
 	})
 }
 
-type HashingTest struct {
-	Contract *contracts.EVMLoadSimulator
-	Count    *big.Int
+type HashTest struct {
+	contract      *contracts.LoadSimulator
+	value         *big.Int
+	numIterations *big.Int
 }
 
-func (h HashingTest) Run(tc tests.TestContext, wallet *Wallet) {
+func (n HashTest) Run(tc tests.TestContext, wallet *Wallet) {
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return h.Contract.SimulateHashing(txOpts, h.Count)
+		return n.contract.Hash(txOpts, n.value, n.numIterations)
 	})
 }
 
-type MemoryTest struct {
-	Contract *contracts.EVMLoadSimulator
-	Count    *big.Int
+type DeployTest struct {
+	contract *contracts.LoadSimulator
 }
 
-func (m MemoryTest) Run(tc tests.TestContext, wallet *Wallet) {
+func (n DeployTest) Run(tc tests.TestContext, wallet *Wallet) {
+	executeContractTx(tc, wallet, n.contract.Deploy)
+}
+
+type LargeCalldataTest struct {
+	contract *contracts.LoadSimulator
+	calldata []byte
+}
+
+func (n LargeCalldataTest) Run(tc tests.TestContext, wallet *Wallet) {
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return m.Contract.SimulateMemory(txOpts, m.Count)
+		return n.contract.LargeCalldata(txOpts, n.calldata)
 	})
-}
-
-type CallDepthTest struct {
-	Contract *contracts.EVMLoadSimulator
-	Count    *big.Int
-}
-
-func (c CallDepthTest) Run(tc tests.TestContext, wallet *Wallet) {
-	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return c.Contract.SimulateCallDepth(txOpts, c.Count)
-	})
-}
-
-type ContractCreationTest struct {
-	Contract *contracts.EVMLoadSimulator
-}
-
-func (c ContractCreationTest) Run(tc tests.TestContext, wallet *Wallet) {
-	executeContractTx(tc, wallet, c.Contract.SimulateContractCreation)
-}
-
-type PureComputeTest struct {
-	Contract      *contracts.EVMLoadSimulator
-	NumIterations *big.Int
-}
-
-func (p PureComputeTest) Run(tc tests.TestContext, wallet *Wallet) {
-	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return p.Contract.SimulatePureCompute(txOpts, p.NumIterations)
-	})
-}
-
-type LargeEventTest struct {
-	Contract  *contracts.EVMLoadSimulator
-	NumEvents *big.Int
-}
-
-func (l LargeEventTest) Run(tc tests.TestContext, wallet *Wallet) {
-	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return l.Contract.SimulateLargeEvent(txOpts, l.NumEvents)
-	})
-}
-
-type ExternalCallTest struct {
-	Contract *contracts.EVMLoadSimulator
-}
-
-func (e ExternalCallTest) Run(tc tests.TestContext, wallet *Wallet) {
-	executeContractTx(tc, wallet, e.Contract.SimulateExternalCall)
 }
 
 type TrieStressTest struct {
