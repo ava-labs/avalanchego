@@ -5,62 +5,17 @@ This document lists all available configuration options for AvalancheGo nodes. Y
 > **Note:** For comparison with the previous documentation format (using individual flag headings), see the [archived version](https://gist.github.com/navillanueva/cdb9c49c411bd89a9480f05a7afbab37).
 
 <style>{`
-/* Scoped styles for this document to improve table readability */
 .config-tables {
-  max-width: 100%;
   overflow-x: auto;
 }
 .config-tables table {
-  table-layout: fixed !important;
-  width: max(100%, 1400px) !important;
   min-width: 1400px;
 }
-
-/* Column widths: Flag, Env Var, Type, Default, Description */
-.config-tables table th:nth-child(1),
-.config-tables table td:nth-child(1) { width: 12% !important; }
-.config-tables table th:nth-child(2),
-.config-tables table td:nth-child(2) { width: 18% !important; }
-.config-tables table th:nth-child(3),
-.config-tables table td:nth-child(3) { width: 8% !important; }
-.config-tables table th:nth-child(4),
-.config-tables table td:nth-child(4) { width: 10% !important; }
-.config-tables table th:nth-child(5),
-.config-tables table td:nth-child(5) { width: 52% !important; }
-
-/* Allow long inline code (flags/env vars) to wrap inside table cells */
-.config-tables table td code,
-.config-tables table th code {
-  white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
+.config-tables td:nth-child(5) { 
+  width: 50%;
 }
-
-/* Do NOT wrap in the first 4 columns; allow horizontal scroll */
-.config-tables table td:nth-child(-n+4),
-.config-tables table th:nth-child(-n+4) {
+.config-tables td:nth-child(-n+4) {
   white-space: nowrap;
-  word-break: normal;
-  overflow-wrap: normal;
-}
-.config-tables table td:nth-child(-n+4) code,
-.config-tables table th:nth-child(-n+4) code {
-  white-space: nowrap;
-  word-break: normal;
-  overflow-wrap: normal;
-}
-
-/* Fallback wrapping for other content */
-.config-tables table td,
-.config-tables table th {
-  word-break: break-word;
-  overflow-wrap: anywhere;
-}
-
-/* Keep multi-line cells aligned nicely */
-.config-tables table td,
-.config-tables table th { 
-  vertical-align: top;
 }
 `}</style>
 
