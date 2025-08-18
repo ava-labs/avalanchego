@@ -5,6 +5,7 @@ package simplex
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -18,6 +19,9 @@ import (
 )
 
 var _ common.Engine = (*Engine)(nil)
+
+var errUnknownMessageType = errors.New("unknown message type")
+var errConvertingMessage = errors.New("error converting message to simplex message")
 var maxProposalWaitTime = time.Second * 2
 var maxRebroadcastWait = time.Second * 2
 
@@ -55,12 +59,12 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 		return nil, err
 	}
 
-	lastBlock, _, found := storage.retrieve(storage.Height() - 1)
-	if !found {
-		return nil, fmt.Errorf("couldn't find last block at height %d", storage.Height()-1)
+	lastBlock, _, err := storage.Retrieve(storage.Height() - 1)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't find last block at height %d: %w", storage.Height()-1, err)
 	}
 
-	blockTracker := newBlockTracker(lastBlock)
+	blockTracker := newBlockTracker(lastBlock.(*Block))
 
 	blockBuilder := &BlockBuilder{
 		vm:           config.VM,
@@ -106,7 +110,7 @@ func (e *Engine) Start(_ context.Context, _ uint32) error {
 func (e *Engine) SimplexMessage(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
 	simplexMsg, err := e.p2pToSimplexMessage(msg)
 	if err != nil {
-		return fmt.Errorf("failed to convert p2p message to simplex message: %w", err)
+		return fmt.Errorf("%w: %w", errConvertingMessage, err)
 	}
 
 	return e.epoch.HandleMessage(simplexMsg, nodeID[:])
@@ -114,7 +118,7 @@ func (e *Engine) SimplexMessage(ctx context.Context, nodeID ids.NodeID, msg *p2p
 
 func (e *Engine) p2pToSimplexMessage(msg *p2p.Simplex) (*simplex.Message, error) {
 	if msg == nil {
-		return nil, fmt.Errorf("nil message")
+		return nil, errNilField
 	}
 
 	switch {
@@ -137,6 +141,6 @@ func (e *Engine) p2pToSimplexMessage(msg *p2p.Simplex) (*simplex.Message, error)
 	case msg.GetReplicationResponse() != nil:
 		return replicationResponseFromP2P(context.TODO(), msg.GetReplicationResponse(), e.blockDeserializer, e.quorumDeserializer)
 	default:
-		return nil, fmt.Errorf("unknown message type")
+		return nil, errUnknownMessageType
 	}
 }

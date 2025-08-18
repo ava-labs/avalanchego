@@ -125,6 +125,7 @@ func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (message.Ou
 	case msg.ReplicationRequest != nil:
 		simplexMsg = newReplicationRequest(c.chainID, msg.ReplicationRequest)
 	case msg.VerifiedReplicationResponse != nil:
+		fmt.Println("Replication request sent", msg.VerifiedReplicationResponse)
 		msg, err := newReplicationResponse(c.chainID, msg.VerifiedReplicationResponse)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create replication response: %w", err)

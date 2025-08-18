@@ -130,7 +130,7 @@ func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
 			Validators:         newTestValidatorInfo(testNodes),
 			VM:                 newTestVM(),
 			DB:                 memdb.New(),
-			WalLocation:        "tempwal.txt",	
+			WalLocation:        "tempwal.txt",
 			SignBLS:            node.signFunc,
 		}
 		configs = append(configs, config)
