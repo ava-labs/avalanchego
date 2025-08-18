@@ -4,6 +4,47 @@ This document lists all available configuration options for AvalancheGo nodes. Y
 
 > **Note:** For comparison with the previous documentation format (using individual flag headings), see the [archived version](https://gist.github.com/navillanueva/cdb9c49c411bd89a9480f05a7afbab37).
 
+<style>
+/* Scoped styles for this document to improve table readability */
+.config-tables table {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+
+/* Column widths: Flag, Env Var, Type, Default, Description */
+.config-tables table th:nth-child(1),
+.config-tables table td:nth-child(1) { width: 12% !important; }
+.config-tables table th:nth-child(2),
+.config-tables table td:nth-child(2) { width: 18% !important; }
+.config-tables table th:nth-child(3),
+.config-tables table td:nth-child(3) { width: 8% !important; }
+.config-tables table th:nth-child(4),
+.config-tables table td:nth-child(4) { width: 10% !important; }
+.config-tables table th:nth-child(5),
+.config-tables table td:nth-child(5) { width: 52% !important; }
+
+/* Allow long inline code (flags/env vars) to wrap inside table cells */
+.config-tables table td code,
+.config-tables table th code {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Fallback wrapping for other content */
+.config-tables table td,
+.config-tables table th {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Keep multi-line cells aligned nicely */
+.config-tables table td,
+.config-tables table th { 
+  vertical-align: top;
+}
+</style>
+
 ## Environment Variable Naming Convention
 
 All environment variables follow the pattern: `AVAGO_` + flag name where the flag name is converted to uppercase with hyphens replaced by underscores.
@@ -57,6 +98,8 @@ Configuration sources are applied in the following order (highest to lowest prec
 4. Default values
 
 # Configuration Options
+
+<div className="config-tables">
 
 ### APIs
 
@@ -533,3 +576,5 @@ Nodes gossip peers to each other so that each node can have an up-to-date peer l
 - [Full documentation](https://build.avax.network/docs/quick-start)
 - [Example configurations](https://github.com/ava-labs/avalanchego/tree/master/config)
 - [Network upgrade schedules](https://build.avax.network/docs/quick-start/primary-network)
+
+</div>
