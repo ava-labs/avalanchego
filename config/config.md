@@ -6,9 +6,14 @@ This document lists all available configuration options for AvalancheGo nodes. Y
 
 <style>{`
 /* Scoped styles for this document to improve table readability */
+.config-tables {
+  max-width: 100%;
+  overflow-x: auto;
+}
 .config-tables table {
   table-layout: fixed !important;
-  width: 100% !important;
+  width: max(100%, 1400px) !important;
+  min-width: 1400px;
 }
 
 /* Column widths: Flag, Env Var, Type, Default, Description */
@@ -29,6 +34,20 @@ This document lists all available configuration options for AvalancheGo nodes. Y
   white-space: normal;
   word-break: break-word;
   overflow-wrap: anywhere;
+}
+
+/* Do NOT wrap in the first 4 columns; allow horizontal scroll */
+.config-tables table td:nth-child(-n+4),
+.config-tables table th:nth-child(-n+4) {
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+.config-tables table td:nth-child(-n+4) code,
+.config-tables table th:nth-child(-n+4) code {
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 /* Fallback wrapping for other content */
