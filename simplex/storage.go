@@ -45,6 +45,9 @@ type Storage struct {
 	// genesisBlock is the genesis block data. It is stored as the first block in the storage.
 	genesisBlock *Block
 
+	// lastIndexed is the last indexed block digest.
+	lastIndexedDigest simplex.Digest
+
 	// deserializer is used to deserialize quorum certificates from bytes.
 	deserializer *QCDeserializer
 
@@ -60,16 +63,6 @@ type Storage struct {
 // finalizations according to their sequence numbers.
 // The VM is assumed to be initialized before calling this function.
 func newStorage(ctx context.Context, config *Config, qcDeserializer *QCDeserializer, blockTracker *blockTracker) (*Storage, error) {
-	lastAccepted, err := config.VM.LastAccepted(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	lastAcceptedBlock, err := config.VM.GetBlock(ctx, lastAccepted)
-	if err != nil {
-		return nil, err
-	}
-
 	genesisBlock, err := getGenesisBlock(ctx, config, blockTracker)
 	if err != nil {
 		return nil, err
@@ -83,7 +76,24 @@ func newStorage(ctx context.Context, config *Config, qcDeserializer *QCDeseriali
 		blockTracker: blockTracker,
 		log:          config.Log,
 	}
+
+	// set the initial storage height to the number of blocks indexed
+	lastAccepted, err := config.VM.LastAccepted(ctx)
+	if err != nil {
+		return nil, err
+	}
+	lastAcceptedBlock, err := config.VM.GetBlock(ctx, lastAccepted)
+	if err != nil {
+		return nil, err
+	}
 	s.height.Store(lastAcceptedBlock.Height() + 1)
+
+	// set the last accepted digest by retrieving the last accepted simplex block
+	lastAcceptedSimplexBlock, _, err := s.Retrieve(lastAcceptedBlock.Height())
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve last accepted simplex block: %w", err)
+	}
+	s.lastIndexedDigest = lastAcceptedSimplexBlock.BlockHeader().Digest
 
 	return s, nil
 }
@@ -138,12 +148,12 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 	}
 
 	// no need to lock the blockTracker, since Index should not be called concurrently
-	if s.blockTracker.lastIndexed != bh.Prev {
+	if s.lastIndexedDigest != bh.Prev {
 		s.log.Error("Attempted to index block with mismatched previous digest",
-			zap.Stringer("expected", s.blockTracker.lastIndexed),
+			zap.Stringer("expected", s.lastIndexedDigest),
 			zap.Stringer("got", bh.Prev))
 
-		return fmt.Errorf("%w: expected %s, got %s", errMismatchedPrevDigest, s.blockTracker.lastIndexed, bh.Prev)
+		return fmt.Errorf("%w: expected %s, got %s", errMismatchedPrevDigest, s.lastIndexedDigest, bh.Prev)
 	}
 
 	if bh.Digest != finalization.Finalization.Digest {
@@ -158,11 +168,8 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 		return errInvalidQC
 	}
 
-	seqBuff := make([]byte, 8)
-	binary.BigEndian.PutUint64(seqBuff, currentHeight)
-
 	finalizationBytes := finalizationToBytes(finalization)
-	if err := s.db.Put(seqBuff, finalizationBytes); err != nil {
+	if err := s.db.Put(finalizationKey(bh.Seq), finalizationBytes); err != nil {
 		return fmt.Errorf("failed to store finalization: %w", err)
 	}
 
@@ -172,7 +179,14 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 	}
 
 	s.height.Add(1) // only increment height after successful indexing
+	s.lastIndexedDigest = bh.Digest
 	return nil
+}
+
+func finalizationKey(seq uint64) []byte {
+	seqBuff := make([]byte, 8)
+	binary.BigEndian.PutUint64(seqBuff, seq)
+	return seqBuff
 }
 
 // getGenesisBlock returns the genesis block wrapped as a Block instance.

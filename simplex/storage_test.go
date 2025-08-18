@@ -10,6 +10,8 @@ import (
 	"github.com/ava-labs/simplex"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -18,16 +20,17 @@ import (
 func TestStorageNew(t *testing.T) {
 	ctx := context.Background()
 	child := snowmantest.BuildChild(snowmantest.Genesis)
-
 	tests := []struct {
 		name           string
 		vm             block.ChainVM
 		expectedHeight uint64
+		db             database.KeyValueReaderWriter
 	}{
 		{
 			name:           "last accepted is genesis",
 			vm:             newTestVM(),
 			expectedHeight: 1,
+			db:             memdb.New(),
 		},
 		{
 			name: "last accepted is not genesis",
@@ -35,6 +38,17 @@ func TestStorageNew(t *testing.T) {
 				vm := newTestVM()
 				vm.blocks[child.ID()] = child
 				return vm
+			}(),
+			db: func() database.KeyValueReaderWriter {
+				db := memdb.New()
+				finalization := newTestFinalization(t, newNetworkConfigs(t, 1), simplex.BlockHeader{
+					ProtocolMetadata: simplex.ProtocolMetadata{
+						Round: 1,
+						Seq:   1,
+					},
+				})
+				require.NoError(t, db.Put(finalizationKey(1), finalizationToBytes(finalization)))
+				return db
 			}(),
 			expectedHeight: 2,
 		},
@@ -49,7 +63,7 @@ func TestStorageNew(t *testing.T) {
 			}
 
 			config.VM = tt.vm
-
+			config.DB = tt.db
 			s, err := newStorage(ctx, config, &qc, nil)
 			require.NoError(t, err)
 			require.Equal(t, tt.expectedHeight, s.Height())
