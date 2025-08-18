@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blockdb
@@ -219,15 +219,14 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 	}
 
 	s := &Database{
-		config:    config,
-		log:       databaseLog,
-		fileCache: lru.NewCache[int, *os.File](config.MaxDataFiles),
+		config: config,
+		log:    databaseLog,
+		fileCache: lru.NewCacheWithOnEvict[int, *os.File](config.MaxDataFiles, func(_ int, f *os.File) {
+			if f != nil {
+				f.Close()
+			}
+		}),
 	}
-	s.fileCache.SetOnEvict(func(_ int, f *os.File) {
-		if f != nil {
-			f.Close()
-		}
-	})
 
 	s.log.Info("Initializing BlockDB",
 		zap.String("indexDir", config.IndexDir),

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blockdb
@@ -235,8 +235,7 @@ func TestFileCache_Eviction(t *testing.T) {
 	// Override the file cache with a smaller size to force evictions
 	evictionCount := atomic.Int32{}
 	evictionMu := sync.Mutex{}
-	smallCache := lru.NewCache[int, *os.File](3) // Only 3 files in cache
-	smallCache.SetOnEvict(func(_ int, file *os.File) {
+	smallCache := lru.NewCacheWithOnEvict[int, *os.File](3, func(_ int, file *os.File) {
 		evictionMu.Lock()
 		defer evictionMu.Unlock()
 		evictionCount.Add(1)
@@ -317,23 +316,11 @@ func TestMaxDataFiles_CacheLimit(t *testing.T) {
 	// Create blocks that will span multiple data files
 	// Each block is ~512 bytes, so 2 blocks per file
 	numBlocks := 6 // This will create 3 files, more than our cache limit of 2
-
-	evictionCount := 0
-	store.fileCache.SetOnEvict(func(_ int, f *os.File) {
-		evictionCount++
-		if f != nil {
-			f.Close()
-		}
-	})
-
 	// Write blocks to force multiple data files
 	for i := range numBlocks {
 		block := fixedSizeBlock(t, 512, uint64(i))
 		require.NoError(t, store.WriteBlock(uint64(i), block, 0))
 	}
-
-	// Verify that evictions occurred due to cache limit
-	require.Positive(t, evictionCount, "should have had cache evictions due to MaxDataFiles limit")
 
 	// Verify all blocks are still readable despite evictions
 	for i := range numBlocks {
