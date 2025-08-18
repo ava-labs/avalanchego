@@ -114,8 +114,8 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 	// If the end root is empty, the proof will delete everything.
 	if endRoot == ids.Empty {
 		proofBytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
-			Response: &pb.SyncGetChangeProofResponse_ChangeProof{
-				ChangeProof: (&merkledb.ChangeProof{}).ToProto(),
+			Response: &pb.SyncGetChangeProofResponse_RangeProof{
+				RangeProof: (&merkledb.RangeProof{}).ToProto(),
 			},
 		})
 		if err != nil {

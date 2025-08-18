@@ -607,6 +607,7 @@ func (r *rangeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], erro
 	}
 
 	// If nextKey is Nothing because we finished the range, return the end key
+	// TODO: this will force another request of [endKey, endKey], which is unnecessary.
 	if nextKey.IsNothing() {
 		return r.request.endKey, nil
 	}
@@ -767,6 +768,7 @@ func (c *changeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], err
 	}
 
 	// If nextKey is Nothing because we finished the range, return the end key
+	// TODO: this will force another request of [endKey, endKey], which is unnecessary.
 	if nextKey.IsNothing() {
 		return c.request.endKey, nil
 	}
@@ -781,6 +783,7 @@ func (c *changeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], err
 // [rangeEnd] is the end of the range that we want to fetch.
 //
 // Returns Nothing if there are no more keys to fetch in [lastReceivedKey, rangeEnd].
+// TODO: This can be improved to assess the next key outside of that range that may not be present.
 //
 // [endProof] is the end proof of the last proof received.
 //
@@ -1063,6 +1066,9 @@ func (m *Manager) setError(err error) {
 //
 // If [nextKey] is Nothing, then we've fetched all the key-value
 // pairs in the trie with root [rootID].
+//
+// TODO: add some assertions that `nextKey` work changes don't violate
+// the invariants of the work queue.
 //
 // Assumes [m.workLock] is not held.
 func (m *Manager) completeWorkItem(work *workItem, nextKey maybe.Maybe[[]byte], rootID ids.ID) {
