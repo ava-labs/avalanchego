@@ -115,6 +115,10 @@ func (p *postForkCommonComponents) getPChainEpoch(ctx context.Context, parentID 
 		if err != nil {
 			return 0, 0, time.Time{}, fmt.Errorf("failed to get P-Chain height: %w", err)
 		}
+		p.vm.ctx.Log.Info("parent sealed epoch. advancing epoch",
+			zap.Uint64("height", height),
+			zap.Uint64("epoch", epoch+1),
+		)
 		return height, epoch + 1, parentTimestamp, nil
 	}
 	// Otherwise, the parent did not seal the previous epoch, so the child should use the parent's
@@ -124,6 +128,10 @@ func (p *postForkCommonComponents) getPChainEpoch(ctx context.Context, parentID 
 	if err != nil {
 		return 0, 0, time.Time{}, fmt.Errorf("failed to get P-Chain height: %w", err)
 	}
+	p.vm.ctx.Log.Debug("parent did not seal epoch. using parent's epoch",
+		zap.Uint64("height", height),
+		zap.Uint64("epoch", epoch),
+	)
 	return height, epoch, epochStartTime, nil
 }
 

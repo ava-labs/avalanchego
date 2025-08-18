@@ -20,6 +20,8 @@ type Client interface {
 	GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error)
 	// GetProposerBlockWrapper returns the ProposerVM block wrapper
 	GetProposerBlockWrapper(ctx context.Context, proposerID ids.ID, options ...rpc.Option) ([]byte, error)
+	// GetEpoch returns the current epoch number, start time, and P-Chain height.
+	GetEpoch(ctx context.Context, options ...rpc.Option) (uint64, uint64, uint64, error)
 }
 
 type client struct {
@@ -49,4 +51,12 @@ func (c *client) GetProposerBlockWrapper(ctx context.Context, proposerID ids.ID,
 		return nil, err
 	}
 	return formatting.Decode(res.Encoding, res.Block)
+}
+
+func (c *client) GetEpoch(ctx context.Context, options ...rpc.Option) (uint64, uint64, uint64, error) {
+	res := &GetEpochResponse{}
+	if err := c.requester.SendRequest(ctx, "proposervm.getEpoch", struct{}{}, res, options...); err != nil {
+		return 0, 0, 0, err
+	}
+	return uint64(res.Number), uint64(res.StartTime), uint64(res.PChainHeight), nil
 }
