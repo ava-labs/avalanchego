@@ -15,11 +15,11 @@ on:
       source-block-dir:
         description: 'The source block directory. Supports S3 directory/zip and local directories.'
         required: false
-        default: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip
+        default: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**
       current-state-dir:
         description: 'The current state directory. Supports S3 directory/zip and local directories.'
         required: false
-        default: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip
+        default: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**
       runner:
         description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
         required: false
@@ -50,15 +50,15 @@ jobs:
             {
               echo "start-block=33000001"
               echo "end-block=34000000"
-              echo "source-block-dir=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-50m-ldb.zip"
-              echo "current-state-dir=s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-33m/"
+              echo "source-block-dir=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-50m-ldb/**"
+              echo "current-state-dir=s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-33m/**"
             } >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             {
               echo "start-block=101"
               echo "end-block=250000"
-              echo "source-block-dir=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip"
-              echo "current-state-dir=s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip"
+              echo "source-block-dir=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**"
+              echo "current-state-dir=s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"
             } >> "$GITHUB_OUTPUT"
           else
             {

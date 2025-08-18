@@ -10,10 +10,10 @@ inputs:
     default: '250000'
   source-block-dir:
     description: 'The source block directory. Supports S3 directory/zip and local directories.'
-    default: 's3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip'
+    default: 's3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**'
   current-state-dir:
     description: 'The current state directory. Supports S3 directory/zip and local directories.'
-    default: 's3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip'
+    default: 's3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**'
   aws-role:
     description: 'AWS role to assume for S3 access.'
     required: true
