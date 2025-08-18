@@ -71,7 +71,7 @@ func (s *BLSSigner) Sign(message []byte) ([]byte, error) {
 }
 
 type encodedSimplexSignedPayload struct {
-	NewtorkID uint32 `serialize:"true"`
+	NetworkID uint32 `serialize:"true"`
 	ChainID   ids.ID `serialize:"true"`
 	Message   []byte `serialize:"true"`
 }
@@ -80,7 +80,7 @@ func encodeMessageToSign(message []byte, chainID ids.ID, networkID uint32) ([]by
 	encodedSimplexMessage := encodedSimplexSignedPayload{
 		Message:   message,
 		ChainID:   chainID,
-		NewtorkID: networkID,
+		NetworkID: networkID,
 	}
 	return Codec.Marshal(CodecVersion, &encodedSimplexMessage)
 }
