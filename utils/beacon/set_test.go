@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package beacon
@@ -38,8 +38,8 @@ func TestSet(t *testing.T) {
 
 	s := NewSet()
 
-	require.Equal("", s.IDsArg())
-	require.Equal("", s.IPsArg())
+	require.Empty(s.IDsArg())
+	require.Empty(s.IPsArg())
 	require.Zero(s.Len())
 
 	require.NoError(s.Add(b0))

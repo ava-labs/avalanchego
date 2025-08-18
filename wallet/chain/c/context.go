@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package c
@@ -30,8 +30,8 @@ func NewContextFromURI(ctx context.Context, uri string) (*Context, error) {
 
 func NewContextFromClients(
 	ctx context.Context,
-	infoClient info.Client,
-	xChainClient avm.Client,
+	infoClient *info.Client,
+	xChainClient *avm.Client,
 ) (*Context, error) {
 	networkID, err := infoClient.GetNetworkID(ctx)
 	if err != nil {

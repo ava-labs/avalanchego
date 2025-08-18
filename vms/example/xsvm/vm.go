@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package xsvm
@@ -8,18 +8,17 @@ import (
 	"fmt"
 	"net/http"
 
+	"connectrpc.com/grpcreflect"
 	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/reflection"
 
+	"github.com/ava-labs/avalanchego/connectproto/pb/xsvm/xsvmconnect"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
-	"github.com/ava-labs/avalanchego/proto/pb/xsvm"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -59,7 +58,6 @@ func (vm *VM) Initialize(
 	genesisBytes []byte,
 	_ []byte,
 	_ []byte,
-	engineChan chan<- common.Message,
 	_ []*common.Fx,
 	appSender common.AppSender,
 ) error {
@@ -115,7 +113,7 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to initialize chain manager: %w", err)
 	}
 
-	vm.builder = builder.New(chainContext, engineChan, vm.chain)
+	vm.builder = builder.New(chainContext, vm.chain)
 
 	chainContext.Log.Info("initialized xsvm",
 		zap.Stringer("lastAcceptedID", vm.chain.LastAccepted()),
@@ -143,7 +141,7 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	api := api.NewServer(
+	jsonRPCAPI := api.NewServer(
 		vm.chainContext,
 		vm.genesis,
 		vm.db,
@@ -152,14 +150,22 @@ func (vm *VM) CreateHandlers(context.Context) (map[string]http.Handler, error) {
 	)
 	return map[string]http.Handler{
 		"": server,
-	}, server.RegisterService(api, constants.XSVMName)
+	}, server.RegisterService(jsonRPCAPI, constants.XSVMName)
 }
 
-func (vm *VM) CreateHTTP2Handler(context.Context) (http.Handler, error) {
-	server := grpc.NewServer()
-	server.RegisterService(&xsvm.Ping_ServiceDesc, &api.PingService{Log: vm.chainContext.Log})
-	reflection.Register(server)
-	return server, nil
+func (vm *VM) NewHTTPHandler(context.Context) (http.Handler, error) {
+	mux := http.NewServeMux()
+
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(xsvmconnect.PingName),
+	)
+	mux.Handle(reflectionPattern, reflectionHandler)
+
+	pingService := &api.PingService{Log: vm.chainContext.Log}
+	pingPath, pingHandler := xsvmconnect.NewPingHandler(pingService)
+	mux.Handle(pingPath, pingHandler)
+
+	return mux, nil
 }
 
 func (*VM) HealthCheck(context.Context) (interface{}, error) {
@@ -176,6 +182,10 @@ func (vm *VM) ParseBlock(_ context.Context, blkBytes []byte) (snowman.Block, err
 		return nil, err
 	}
 	return vm.chain.NewBlock(blk)
+}
+
+func (vm *VM) WaitForEvent(ctx context.Context) (common.Message, error) {
+	return vm.builder.WaitForEvent(ctx)
 }
 
 func (vm *VM) BuildBlock(ctx context.Context) (snowman.Block, error) {

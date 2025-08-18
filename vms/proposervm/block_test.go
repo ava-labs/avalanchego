@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package proposervm
@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer/proposermock"
-	"github.com/ava-labs/avalanchego/vms/proposervm/scheduler/schedulermock"
 )
 
 // Assert that when the underlying VM implements ChainVMWithBuildBlockContext
@@ -353,85 +352,6 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 
 		childBlk := childBlkIntf.(*postForkBlock)
 		require.Equal(ids.EmptyNodeID, childBlk.Proposer()) // unsigned block
-	}
-}
-
-// We consider cases where this node is not current proposer (may be scheduled in the next future or not).
-// We check that scheduler is called nonetheless, to be able to process innerVM block requests
-func TestPostDurangoBuildChildResetScheduler(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-
-	var (
-		thisNodeID              = ids.GenerateTestNodeID()
-		selectedProposer        = ids.GenerateTestNodeID()
-		pChainHeight     uint64 = 1337
-		parentID                = ids.GenerateTestID()
-		parentTimestamp         = time.Now().Truncate(time.Second)
-		now                     = parentTimestamp.Add(12 * time.Second)
-		parentHeight     uint64 = 1234
-	)
-
-	innerBlk := snowmanmock.NewBlock(ctrl)
-	innerBlk.EXPECT().Height().Return(parentHeight + 1).AnyTimes()
-
-	vdrState := validatorsmock.NewState(ctrl)
-	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
-
-	windower := proposermock.NewWindower(ctrl)
-	windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(selectedProposer, nil).AnyTimes() // return a proposer different from thisNode, to check whether scheduler is reset
-
-	scheduler := schedulermock.NewScheduler(ctrl)
-
-	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	require.NoError(err)
-	vm := &VM{
-		Config: Config{
-			Upgrades:          upgradetest.GetConfig(upgradetest.Latest),
-			StakingCertLeaf:   &staking.Certificate{},
-			StakingLeafSigner: pk,
-			Registerer:        prometheus.NewRegistry(),
-		},
-		ChainVM: blockmock.NewChainVM(ctrl),
-		ctx: &snow.Context{
-			NodeID:         thisNodeID,
-			ValidatorState: vdrState,
-			Log:            logging.NoLog{},
-		},
-		Windower:               windower,
-		Scheduler:              scheduler,
-		proposerBuildSlotGauge: prometheus.NewGauge(prometheus.GaugeOpts{}),
-	}
-	vm.Clock.Set(now)
-
-	blk := &postForkCommonComponents{
-		innerBlk: innerBlk,
-		vm:       vm,
-	}
-
-	delays := []time.Duration{
-		proposer.MaxLookAheadWindow - time.Minute,
-		proposer.MaxLookAheadWindow,
-		proposer.MaxLookAheadWindow + time.Minute,
-	}
-
-	for _, delay := range delays {
-		windower.EXPECT().MinDelayForProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(delay, nil).Times(1)
-
-		// we mock the scheduler setting the exact time we expect it to be reset
-		// to
-		expectedSchedulerTime := parentTimestamp.Add(delay)
-		scheduler.EXPECT().SetBuildBlockTime(expectedSchedulerTime).Times(1)
-
-		_, err = blk.buildChild(
-			context.Background(),
-			parentID,
-			parentTimestamp,
-			pChainHeight-1,
-		)
-		require.ErrorIs(err, errUnexpectedProposer)
 	}
 }
 

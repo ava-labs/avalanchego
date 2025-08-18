@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package tests
@@ -16,7 +16,8 @@ const DefaultTimeout = 2 * time.Minute
 
 // Helper simplifying use of a timed context by canceling the context with the test context.
 func ContextWithTimeout(tc TestContext, duration time.Duration) context.Context {
-	ctx, cancel := context.WithTimeout(context.Background(), duration)
+	parent := tc.GetDefaultContextParent()
+	ctx, cancel := context.WithTimeout(parent, duration)
 	tc.DeferCleanup(cancel)
 	return ctx
 }

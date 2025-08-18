@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package message
@@ -180,6 +180,10 @@ type OutboundMsgBuilder interface {
 	AppGossip(
 		chainID ids.ID,
 		msg []byte,
+	) (OutboundMessage, error)
+
+	SimplexMessage(
+		msg *p2p.Simplex,
 	) (OutboundMessage, error)
 }
 
@@ -719,6 +723,18 @@ func (b *outMsgBuilder) AppGossip(chainID ids.ID, msg []byte) (OutboundMessage, 
 					ChainId:  chainID[:],
 					AppBytes: msg,
 				},
+			},
+		},
+		b.compressionType,
+		false,
+	)
+}
+
+func (b *outMsgBuilder) SimplexMessage(msg *p2p.Simplex) (OutboundMessage, error) {
+	return b.builder.createOutbound(
+		&p2p.Message{
+			Message: &p2p.Message_Simplex{
+				Simplex: msg,
 			},
 		},
 		b.compressionType,

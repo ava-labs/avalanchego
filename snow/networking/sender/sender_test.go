@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package sender_test
@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/networking/benchlist"
 	"github.com/ava-labs/avalanchego/snow/networking/handler"
 	"github.com/ava-labs/avalanchego/snow/networking/router"
@@ -131,8 +132,9 @@ func TestTimeout(t *testing.T) {
 
 	h, err := handler.New(
 		ctx2,
+		&block.ChangeNotifier{},
+		noopSubscription,
 		vdrs,
-		nil,
 		time.Hour,
 		testThreadPoolSize,
 		resourceTracker,
@@ -389,8 +391,9 @@ func TestReliableMessages(t *testing.T) {
 
 	h, err := handler.New(
 		ctx2,
+		&block.ChangeNotifier{},
+		noopSubscription,
 		vdrs,
-		nil,
 		1,
 		testThreadPoolSize,
 		resourceTracker,
@@ -550,8 +553,9 @@ func TestReliableMessagesToMyself(t *testing.T) {
 
 			h, err := handler.New(
 				ctx2,
+				&block.ChangeNotifier{},
+				noopSubscription,
 				vdrs,
-				nil,
 				time.Second,
 				testThreadPoolSize,
 				resourceTracker,
@@ -1307,4 +1311,9 @@ func TestSender_Single_Request(t *testing.T) {
 			}
 		})
 	}
+}
+
+func noopSubscription(ctx context.Context) (common.Message, error) {
+	<-ctx.Done()
+	return common.Message(0), ctx.Err()
 }
