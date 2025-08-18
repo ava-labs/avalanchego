@@ -4,7 +4,7 @@ This document lists all available configuration options for AvalancheGo nodes. Y
 
 > **Note:** For comparison with the previous documentation format (using individual flag headings), see the [archived version](https://gist.github.com/navillanueva/cdb9c49c411bd89a9480f05a7afbab37).
 
-<style>
+<style>{`
 /* Scoped styles for this document to improve table readability */
 .config-tables table {
   table-layout: fixed !important;
@@ -43,7 +43,7 @@ This document lists all available configuration options for AvalancheGo nodes. Y
 .config-tables table th { 
   vertical-align: top;
 }
-</style>
+`}</style>
 
 ## Environment Variable Naming Convention
 
