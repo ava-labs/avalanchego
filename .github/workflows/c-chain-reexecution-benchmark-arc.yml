@@ -4,6 +4,10 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      config:
+        description: 'The config to pass to the VM for the benchmark. Specify "archive" (pre-defined config) or a full JSON blob as a string.'
+        required: false
+        default: ''
       start-block:
         description: 'The start block for the benchmark.'
         required: false
