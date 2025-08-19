@@ -36,7 +36,26 @@ on:
     - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 
 jobs:
+  define-config-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      config: ${{ steps.define-config-matrix.outputs.config }}
+    steps:
+      - name: Define config matrix
+        id: define-config-matrix
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "config=[${{ github.event.inputs.config }}]" >> "$GITHUB_OUTPUT"
+          else
+            echo 'config=["", "archive", "firewood"]' >> "$GITHUB_OUTPUT"
+          fi
+
   c-chain-reexecution-arc: # PR smoke test + scheduled run + manual workflow
+    needs: define-config-matrix
+    strategy:
+      matrix:
+        config: ${{ fromJSON(needs.define-config-matrix.outputs.config) }}
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego' }}
     permissions:
       id-token: write
@@ -83,6 +102,7 @@ jobs:
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
+          config: ${{ matrix.config }}
           start-block: ${{ steps.set-params.outputs.start-block }}
           end-block: ${{ steps.set-params.outputs.end-block }}
           source-block-dir: ${{ steps.set-params.outputs.source-block-dir }}
