@@ -40,7 +40,7 @@ pub mod logger;
 /// Macros module for defining macros used in the storage module
 pub mod macros;
 // re-export these so callers don't need to know where they are
-pub use checker::{CheckOpt, CheckerReport, FreeListsStats, TrieStats};
+pub use checker::{CheckOpt, CheckerReport, DBStats, FreeListsStats, TrieStats};
 pub use hashednode::{Hashable, Preimage, ValueDigest, hash_node, hash_preimage};
 pub use linear::{FileIoError, ReadableStorage, WritableStorage};
 pub use node::path::{NibblesIterator, Path};
@@ -286,6 +286,26 @@ pub enum CheckerError {
         /// parent of the area
         parent: StoredAreaParent,
     },
+}
+
+impl CheckerError {
+    const fn parent(&self) -> Option<StoredAreaParent> {
+        match self {
+            CheckerError::InvalidDBSize { .. }
+            | CheckerError::AreaLeaks(_)
+            | CheckerError::UnpersistedRoot => None,
+            CheckerError::AreaOutOfBounds { parent, .. }
+            | CheckerError::AreaIntersects { parent, .. }
+            | CheckerError::AreaMisaligned { parent, .. }
+            | CheckerError::IO { parent, .. } => Some(*parent),
+            CheckerError::HashMismatch { parent, .. }
+            | CheckerError::NodeLargerThanArea { parent, .. }
+            | CheckerError::InvalidKey { parent, .. } => Some(StoredAreaParent::TrieNode(*parent)),
+            CheckerError::FreelistAreaSizeMismatch { parent, .. } => {
+                Some(StoredAreaParent::FreeList(*parent))
+            }
+        }
+    }
 }
 
 impl From<CheckerError> for Vec<CheckerError> {

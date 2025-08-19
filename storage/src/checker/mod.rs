@@ -8,8 +8,9 @@ use crate::logger::warn;
 use crate::nodestore::alloc::FreeAreaWithMetadata;
 use crate::nodestore::primitives::{AreaIndex, area_size_iter};
 use crate::{
-    CheckerError, Committed, HashType, HashedNodeReader, IntoHashType, LinearAddress, Node,
-    NodeStore, Path, RootReader, StoredAreaParent, TrieNodeParent, WritableStorage,
+    CheckerError, Committed, FileIoError, HashType, HashedNodeReader, IntoHashType, LinearAddress,
+    Node, NodeStore, Path, ReadableStorage, RootReader, StoredAreaParent, TrieNodeParent,
+    WritableStorage,
 };
 
 #[cfg(not(feature = "ethhash"))]
@@ -57,11 +58,18 @@ pub struct CheckOpt {
     pub progress_bar: Option<ProgressBar>,
 }
 
-#[derive(Debug)]
 /// Report of the checker results.
+#[derive(Debug)]
 pub struct CheckerReport {
     /// Errors encountered during the check
     pub errors: Vec<CheckerError>,
+    /// Statistics about the database
+    pub db_stats: DBStats,
+}
+
+/// All statistics about the given database image
+#[derive(Debug, Default)]
+pub struct DBStats {
     /// The high watermark of the database
     pub high_watermark: u64,
     /// Statistics about the trie
@@ -70,8 +78,8 @@ pub struct CheckerReport {
     pub free_list_stats: FreeListsStats,
 }
 
-#[derive(Debug, PartialEq)]
 /// Statistics about the trie
+#[derive(Debug, PartialEq)]
 pub struct TrieStats {
     /// The total number of bytes of compressed branch nodes
     pub branch_bytes: u64,
@@ -118,8 +126,8 @@ impl Default for TrieStats {
     }
 }
 
-#[derive(Debug, PartialEq)]
 /// Statistics about the free list
+#[derive(Debug, PartialEq)]
 pub struct FreeListsStats {
     /// The distribution of area sizes in the free lists
     pub area_counts: BTreeMap<u64, u64>,
@@ -148,25 +156,23 @@ struct SubTrieMetadata {
 
 /// [`NodeStore`] checker
 #[expect(clippy::result_large_err)]
-impl<S: WritableStorage> NodeStore<Committed, S> {
+impl<S: ReadableStorage> NodeStore<Committed, S> {
     /// Go through the filebacked storage and check for any inconsistencies. It proceeds in the following steps:
     /// 1. Check the header
     /// 2. traverse the trie and check the nodes
     /// 3. check the free list
-    /// 4. check leaked areas - what are the spaces between trie nodes and free lists we have traversed?
+    /// 4. report leaked areas (areas that have not yet been visited)
     /// # Errors
     /// Returns a [`CheckerError`] if the database is inconsistent.
     pub fn check(&self, opt: CheckOpt) -> CheckerReport {
         // 1. Check the header
-        let db_size = self.size();
-        let mut visited = match LinearAddressRangeSet::new(db_size) {
+        let high_watermark = self.size();
+        let mut visited = match LinearAddressRangeSet::new(high_watermark) {
             Ok(visited) => visited,
             Err(e) => {
                 return CheckerReport {
                     errors: vec![e],
-                    high_watermark: db_size,
-                    trie_stats: TrieStats::default(),
-                    free_list_stats: FreeListsStats::default(),
+                    db_stats: DBStats::default(),
                 };
             }
         };
@@ -175,7 +181,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
 
         // 2. traverse the trie and check the nodes
         if let Some(progress_bar) = &opt.progress_bar {
-            progress_bar.set_length(db_size);
+            progress_bar.set_length(high_watermark);
             progress_bar.set_message("Traversing the trie...");
         }
         let trie_stats = self
@@ -207,26 +213,23 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
             self.visit_freelist(&mut visited, opt.progress_bar.as_ref());
         errors.extend(free_list_traverse_errors);
 
-        // 4. check leaked areas - what are the spaces between trie nodes and free lists we have traversed?
+        // 4. report leaked areas (areas that have not yet been visited)
         if let Some(progress_bar) = &opt.progress_bar {
             progress_bar.set_message("Checking leaked areas...");
         }
         let leaked_ranges = visited.complement();
         if !leaked_ranges.is_empty() {
             warn!("Found leaked ranges: {leaked_ranges}");
-            {
-                // TODO: add leaked areas to the free list
-                let _leaked_areas =
-                    self.split_all_leaked_ranges(&leaked_ranges, opt.progress_bar.as_ref());
-            }
             errors.push(CheckerError::AreaLeaks(leaked_ranges));
         }
 
         CheckerReport {
             errors,
-            high_watermark: db_size,
-            trie_stats,
-            free_list_stats,
+            db_stats: DBStats {
+                high_watermark,
+                trie_stats,
+                free_list_stats,
+            },
         }
     }
 
@@ -552,6 +555,61 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
             return Err(CheckerError::AreaMisaligned { address, parent });
         }
         Ok(())
+    }
+}
+
+/// Report of the fix operation
+#[derive(Debug)]
+pub struct FixReport {
+    /// Errors that were fixed
+    pub fixed: Vec<CheckerError>,
+    /// Errors that were not fixed, either because they are unfixable or because an IO error occurred
+    pub unfixable: Vec<(CheckerError, Option<FileIoError>)>,
+    /// Statistics about the database
+    pub db_stats: DBStats,
+}
+
+impl<S: WritableStorage> NodeStore<Committed, S> {
+    /// Check the node store and fix any errors found.
+    /// Returns a report of the fix operation.
+    pub fn check_and_fix(&self, opt: CheckOpt) -> FixReport {
+        let report = self.check(opt);
+        self.fix(report)
+    }
+
+    fn fix(&self, check_report: CheckerReport) -> FixReport {
+        let fixed = Vec::new();
+        let mut unfixable = Vec::new();
+
+        for error in check_report.errors {
+            match error.parent() {
+                Some(StoredAreaParent::TrieNode(_)) => {
+                    warn!("Fix for trie node error not yet implemented");
+                    unfixable.push((error, None));
+                }
+                Some(StoredAreaParent::FreeList(_)) => {
+                    warn!("Fix for free list error not yet implemented");
+                    unfixable.push((error, None));
+                }
+                None => {
+                    if let CheckerError::AreaLeaks(ranges) = &error {
+                        {
+                            let _leaked_areas = self.split_all_leaked_ranges(ranges, None);
+                            // TODO: add _leaked_areas to the free list
+                        }
+                        unfixable.push((error, None));
+                    } else {
+                        unfixable.push((error, None));
+                    }
+                }
+            }
+        }
+
+        FixReport {
+            fixed,
+            unfixable,
+            db_stats: check_report.db_stats,
+        }
     }
 
     /// Wrapper around `split_into_leaked_areas` that iterates over a collection of ranges.
