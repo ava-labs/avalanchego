@@ -1,7 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
-// See the file LICENSE for licensing terms.
-
-package bootstrap
+package node
 
 import (
 	"fmt"
@@ -9,7 +6,6 @@ import (
 
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/node"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/ulimit"
@@ -17,32 +13,15 @@ import (
 	nodeconfig "github.com/ava-labs/avalanchego/config/node"
 )
 
-var _ App = (*app)(nil)
-
-type App interface {
-	// Start kicks off the application and returns immediately.
-	// Start should only be called once.
-	Start()
-
-	// Stop notifies the application to exit and returns immediately.
-	// Stop should only be called after [Start].
-	// It is safe to call Stop multiple times.
-	Stop()
-
-	// ExitCode should only be called after [Start] returns. It
-	// should block until the application finishes
-	ExitCode() int
-}
-
-// app is a wrapper around a node that runs in this process
-type app struct {
-	node       *node.Node
+// Runner is a wrapper around a *Node that runs in this process
+type Runner struct {
+	node       *Node
 	log        logging.Logger
 	logFactory logging.Factory
 	exitWG     sync.WaitGroup
 }
 
-func New(config nodeconfig.Config) (App, error) {
+func NewRunner(config nodeconfig.Config) (*Runner, error) {
 	// Set the data directory permissions to be read write.
 	if err := perms.ChmodR(config.DatabaseConfig.Path, true, perms.ReadWriteExecute); err != nil {
 		return nil, fmt.Errorf("failed to restrict the permissions of the database directory with: %w", err)
@@ -68,7 +47,7 @@ func New(config nodeconfig.Config) (App, error) {
 		return nil, err
 	}
 
-	n, err := node.New(&config, logFactory, log)
+	n, err := New(&config, logFactory, log)
 	if err != nil {
 		log.Fatal("failed to initialize node", zap.Error(err))
 		log.Stop()
@@ -76,7 +55,7 @@ func New(config nodeconfig.Config) (App, error) {
 		return nil, fmt.Errorf("failed to initialize node: %w", err)
 	}
 
-	return &app{
+	return &Runner{
 		node:       n,
 		log:        log,
 		logFactory: logFactory,
@@ -85,7 +64,7 @@ func New(config nodeconfig.Config) (App, error) {
 
 // Start the business logic of the node (as opposed to config reading, etc).
 // Does not block until the node is done.
-func (a *app) Start() {
+func (a *Runner) Start() {
 	// [p.ExitCode] will block until [p.exitWG.Done] is called
 	a.exitWG.Add(1)
 	go func() {
@@ -113,13 +92,13 @@ func (a *app) Start() {
 
 // Stop attempts to shutdown the currently running node. This function will
 // block until Shutdown returns.
-func (a *app) Stop() {
+func (a *Runner) Stop() {
 	a.node.Shutdown(0)
 }
 
 // ExitCode returns the exit code that the node is reporting. This function
 // blocks until the node has been shut down.
-func (a *app) ExitCode() int {
+func (a *Runner) ExitCode() int {
 	a.exitWG.Wait()
 	return a.node.ExitCode()
 }
