@@ -29,11 +29,11 @@ const fn page_number(addr: LinearAddress) -> u64 {
     addr.get() / OS_PAGE_SIZE
 }
 
-fn extra_read_pages(addr: LinearAddress, page_size: u64) -> Option<u64> {
+fn extra_read_pages(addr: LinearAddress, bytes: u64) -> Option<u64> {
     let start_page = page_number(addr);
-    let end_page = page_number(addr.advance(page_size.saturating_sub(1))?);
+    let end_page = page_number(addr.advance(bytes.saturating_sub(1))?);
     let pages_read = end_page.saturating_sub(start_page).saturating_add(1); // Include the first page
-    let min_pages = page_size.saturating_add(OS_PAGE_SIZE - 1) / OS_PAGE_SIZE; // Round up to the nearest page
+    let min_pages = bytes.saturating_add(OS_PAGE_SIZE - 1) / OS_PAGE_SIZE; // Round up to the nearest page
     Some(pages_read.saturating_sub(min_pages))
 }
 
@@ -73,8 +73,10 @@ pub struct CheckerReport {
 #[derive(Debug, PartialEq)]
 /// Statistics about the trie
 pub struct TrieStats {
-    /// The total number of bytes of compressed trie nodes
-    pub trie_bytes: u64,
+    /// The total number of bytes of compressed branch nodes
+    pub branch_bytes: u64,
+    /// The total number of bytes of compressed leaf nodes
+    pub leaf_bytes: u64,
     /// The number of key-value pairs stored in the trie
     pub kv_count: u64,
     /// The total number of bytes of for key-value pairs stored in the trie
@@ -83,25 +85,35 @@ pub struct TrieStats {
     pub branching_factors: BTreeMap<usize, u64>,
     /// Depth distribution of each leaf node
     pub depths: BTreeMap<usize, u64>,
-    /// The distribution of area sizes in the trie
-    pub area_counts: BTreeMap<u64, u64>,
-    /// The stored areas whose content can fit into a smaller area
-    pub low_occupancy_area_count: u64,
-    /// The number of areas that require an extra page read due to not being aligned
-    pub extra_unaligned_page_read: u64,
+    /// The distribution of area sizes for branch nodes
+    pub branch_area_counts: BTreeMap<u64, u64>,
+    /// The distribution of area sizes for leaf nodes
+    pub leaf_area_counts: BTreeMap<u64, u64>,
+    /// Branches that can fit into a smaller area
+    pub low_occupancy_branch_area_count: u64,
+    /// Leaves that can fit into a smaller area
+    pub low_occupancy_leaf_area_count: u64,
+    /// The number of areas that span an extra page due to not being aligned
+    pub area_extra_unaligned_page: u64,
+    /// The number of nodes that span an extra page due to not being aligned
+    pub node_extra_unaligned_page: u64,
 }
 
 impl Default for TrieStats {
     fn default() -> Self {
         Self {
-            trie_bytes: 0,
+            branch_bytes: 0,
+            leaf_bytes: 0,
             kv_count: 0,
             kv_bytes: 0,
             branching_factors: BTreeMap::new(),
             depths: BTreeMap::new(),
-            area_counts: area_size_iter().map(|(_, size)| (size, 0)).collect(),
-            low_occupancy_area_count: 0,
-            extra_unaligned_page_read: 0,
+            branch_area_counts: area_size_iter().map(|(_, size)| (size, 0)).collect(),
+            leaf_area_counts: area_size_iter().map(|(_, size)| (size, 0)).collect(),
+            low_occupancy_branch_area_count: 0,
+            low_occupancy_leaf_area_count: 0,
+            area_extra_unaligned_page: 0,
+            node_extra_unaligned_page: 0,
         }
     }
 }
@@ -111,15 +123,15 @@ impl Default for TrieStats {
 pub struct FreeListsStats {
     /// The distribution of area sizes in the free lists
     pub area_counts: BTreeMap<u64, u64>,
-    /// The number of areas that require an extra page read due to not being aligned
-    pub extra_unaligned_page_read: u64,
+    /// The number of free areas that span an extra page due to not being aligned
+    pub area_extra_unaligned_page: u64,
 }
 
 impl Default for FreeListsStats {
     fn default() -> Self {
         Self {
             area_counts: area_size_iter().map(|(_, size)| (size, 0)).collect(),
-            extra_unaligned_page_read: 0,
+            area_extra_unaligned_page: 0,
         }
     }
 }
@@ -334,28 +346,32 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
 
         // collect trie stats
         {
-            // update the area count
-            let area_count = trie_stats
-                .area_counts
-                .get_mut(&area_size)
-                .expect("area size is initialized when trie_stats is created");
-            *area_count = area_count.saturating_add(1);
-            // collect the trie bytes
-            trie_stats.trie_bytes = trie_stats.trie_bytes.saturating_add(node_bytes);
-            // collect low occupancy area count, add 1 for the area size index byte
-            let smallest_area_index = AreaIndex::from_size(node_bytes)
-                .expect("impossible since we checked that node_bytes <= area_size");
-            if smallest_area_index < area_index {
-                trie_stats.low_occupancy_area_count =
-                    trie_stats.low_occupancy_area_count.saturating_add(1);
+            if let Some(value) = node.value() {
+                // collect kv count
+                trie_stats.kv_count = trie_stats.kv_count.saturating_add(1);
+                // collect kv pair bytes - this is the minimum number of bytes needed to store the data
+                let key_bytes = current_path_prefix.0.len().div_ceil(2);
+                let value_bytes = value.len();
+                trie_stats.kv_bytes = trie_stats
+                    .kv_bytes
+                    .saturating_add(key_bytes as u64)
+                    .saturating_add(value_bytes as u64);
             }
             // collect the number of areas that requires reading an extra page due to not being aligned
             if extra_read_pages(subtrie_root_address, area_size)
                 .expect("impossible since we checked in visited.insert_area()")
                 > 0
             {
-                trie_stats.extra_unaligned_page_read =
-                    trie_stats.extra_unaligned_page_read.saturating_add(1);
+                trie_stats.area_extra_unaligned_page =
+                    trie_stats.area_extra_unaligned_page.saturating_add(1);
+            }
+            // collect the number of nodes that requires reading an extra page due to not being aligned
+            if extra_read_pages(subtrie_root_address, node_bytes)
+                .expect("impossible since we checked in visited.insert_area()")
+                > 0
+            {
+                trie_stats.node_extra_unaligned_page =
+                    trie_stats.node_extra_unaligned_page.saturating_add(1);
             }
         }
 
@@ -365,6 +381,21 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
             Node::Branch(branch) => {
                 let num_children = branch.children_iter().count();
                 {
+                    // update the branch area count
+                    let branch_area_count = trie_stats
+                        .branch_area_counts
+                        .get_mut(&area_size)
+                        .expect("area size is initialized when trie_stats is created and we checked that node_bytes <= area_size");
+                    *branch_area_count = branch_area_count.saturating_add(1);
+                    // collect the branch bytes
+                    trie_stats.branch_bytes = trie_stats.branch_bytes.saturating_add(node_bytes);
+                    // collect low occupancy area count, add 1 for the area size index byte
+                    let smallest_area_index = AreaIndex::from_size(node_bytes)
+                        .expect("impossible since we checked that node_bytes <= area_size");
+                    if smallest_area_index < area_index {
+                        trie_stats.low_occupancy_branch_area_count =
+                            trie_stats.low_occupancy_branch_area_count.saturating_add(1);
+                    }
                     // collect the branching factor distribution
                     let branching_factor_count = trie_stats
                         .branching_factors
@@ -398,19 +429,25 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                     }
                 }
             }
-            Node::Leaf(leaf) => {
+            Node::Leaf(_) => {
+                // update the leaf area count
+                let leaf_area_count = trie_stats
+                 .leaf_area_counts
+                 .get_mut(&area_size)
+                 .expect("area size is initialized when trie_stats is created and we checked that node_bytes <= area_size");
+                *leaf_area_count = leaf_area_count.saturating_add(1);
+                // collect the leaf bytes
+                trie_stats.leaf_bytes = trie_stats.leaf_bytes.saturating_add(node_bytes);
+                // collect low occupancy area count, add 1 for the area size index byte
+                let smallest_area_index = AreaIndex::from_size(node_bytes)
+                    .expect("impossible since we checked that node_bytes <= area_size");
+                if smallest_area_index < area_index {
+                    trie_stats.low_occupancy_leaf_area_count =
+                        trie_stats.low_occupancy_leaf_area_count.saturating_add(1);
+                }
                 // collect the depth distribution
                 let depth_count = trie_stats.depths.entry(depth).or_insert(0);
                 *depth_count = depth_count.saturating_add(1);
-                // collect kv count
-                trie_stats.kv_count = trie_stats.kv_count.saturating_add(1);
-                // collect kv pair bytes - this is the minimum number of bytes needed to store the data
-                let key_bytes = current_path_prefix.0.len().div_ceil(2);
-                let value_bytes = leaf.value.len();
-                trie_stats.kv_bytes = trie_stats
-                    .kv_bytes
-                    .saturating_add(key_bytes as u64)
-                    .saturating_add(value_bytes as u64);
             }
         }
 
@@ -429,7 +466,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     ) -> (FreeListsStats, Vec<CheckerError>) {
         let mut area_counts: BTreeMap<u64, u64> =
             area_size_iter().map(|(_, size)| (size, 0)).collect();
-        let mut multi_page_area_count = 0u64;
+        let mut area_extra_unaligned_page = 0u64;
         let mut errors = Vec::new();
 
         let mut free_list_iter = self.free_list_iter(AreaIndex::MIN);
@@ -492,7 +529,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                     .expect("impossible since we checked in visited.insert_area()")
                     > 0
                 {
-                    multi_page_area_count = multi_page_area_count.saturating_add(1);
+                    area_extra_unaligned_page = area_extra_unaligned_page.saturating_add(1);
                 }
             }
         }
@@ -500,7 +537,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
         (
             FreeListsStats {
                 area_counts,
-                extra_unaligned_page_read: multi_page_area_count,
+                area_extra_unaligned_page,
             },
             errors,
         )
@@ -658,8 +695,11 @@ mod test {
     #[expect(clippy::arithmetic_side_effects)]
     fn gen_test_trie(nodestore: &mut NodeStore<Committed, MemStore>) -> TestTrie {
         let mut high_watermark = NodeStoreHeader::SIZE;
-        let mut total_bytes_written = 0;
-        let mut area_counts: BTreeMap<u64, u64> =
+        let mut total_branch_bytes_written = 0;
+        let mut total_leaf_bytes_written = 0;
+        let mut branch_area_counts: BTreeMap<u64, u64> =
+            area_size_iter().map(|(_, size)| (size, 0)).collect();
+        let mut leaf_area_counts: BTreeMap<u64, u64> =
             area_size_iter().map(|(_, size)| (size, 0)).collect();
         let leaf = Node::Leaf(LeafNode {
             partial_path: Path::from_nibbles_iterator(std::iter::repeat_n([4, 5], 30).flatten()),
@@ -670,8 +710,8 @@ mod test {
         let (bytes_written, stored_area_size) =
             test_write_new_node(nodestore, &leaf, high_watermark);
         high_watermark += stored_area_size;
-        total_bytes_written += bytes_written;
-        let area_count = area_counts.get_mut(&stored_area_size).unwrap();
+        total_leaf_bytes_written += bytes_written;
+        let area_count = leaf_area_counts.get_mut(&stored_area_size).unwrap();
         *area_count = area_count.saturating_add(1);
 
         let mut branch_children = BranchNode::empty_children();
@@ -686,8 +726,8 @@ mod test {
         let (bytes_written, stored_area_size) =
             test_write_new_node(nodestore, &branch, high_watermark);
         high_watermark += stored_area_size;
-        total_bytes_written += bytes_written;
-        let area_count = area_counts.get_mut(&stored_area_size).unwrap();
+        total_branch_bytes_written += bytes_written;
+        let area_count = branch_area_counts.get_mut(&stored_area_size).unwrap();
         *area_count = area_count.saturating_add(1);
 
         let mut root_children = BranchNode::empty_children();
@@ -702,8 +742,8 @@ mod test {
         let (bytes_written, stored_area_size) =
             test_write_new_node(nodestore, &root, high_watermark);
         high_watermark += stored_area_size;
-        total_bytes_written += bytes_written;
-        let area_count = area_counts.get_mut(&stored_area_size).unwrap();
+        total_branch_bytes_written += bytes_written;
+        let area_count = branch_area_counts.get_mut(&stored_area_size).unwrap();
         *area_count = area_count.saturating_add(1);
 
         // write the header
@@ -715,14 +755,18 @@ mod test {
         );
 
         let trie_stats = TrieStats {
-            trie_bytes: total_bytes_written,
+            branch_bytes: total_branch_bytes_written,
+            leaf_bytes: total_leaf_bytes_written,
             kv_count: 1,
             kv_bytes: 32 + 3, // 32 bytes for the key, 3 bytes for the value
-            area_counts,
+            branch_area_counts,
+            leaf_area_counts,
             branching_factors: BTreeMap::from([(1, 2)]),
             depths: BTreeMap::from([(2, 1)]),
-            low_occupancy_area_count: 0,
-            extra_unaligned_page_read: 0,
+            low_occupancy_branch_area_count: 0,
+            low_occupancy_leaf_area_count: 0,
+            area_extra_unaligned_page: 0,
+            node_extra_unaligned_page: 0,
         };
 
         TestTrie {
@@ -861,7 +905,7 @@ mod test {
         }
         let expected_free_lists_stats = FreeListsStats {
             area_counts: free_area_counts,
-            extra_unaligned_page_read,
+            area_extra_unaligned_page: extra_unaligned_page_read,
         };
 
         // write header
@@ -955,7 +999,7 @@ mod test {
         area_counts.insert(area_size2, 2);
         let expected_free_lists_stats = FreeListsStats {
             area_counts,
-            extra_unaligned_page_read: 0,
+            area_extra_unaligned_page: 0,
         };
 
         // test that the we traversed all the free areas
