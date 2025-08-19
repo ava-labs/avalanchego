@@ -23,13 +23,13 @@ func TestStorageNew(t *testing.T) {
 	tests := []struct {
 		name           string
 		vm             block.ChainVM
-		expectedHeight uint64
+		expectedBlocks uint64
 		db             database.KeyValueReaderWriter
 	}{
 		{
 			name:           "last accepted is genesis",
 			vm:             newTestVM(),
-			expectedHeight: 1,
+			expectedBlocks: 1,
 			db:             memdb.New(),
 		},
 		{
@@ -50,7 +50,7 @@ func TestStorageNew(t *testing.T) {
 				require.NoError(t, db.Put(finalizationKey(1), finalizationToBytes(finalization)))
 				return db
 			}(),
-			expectedHeight: 2,
+			expectedBlocks: 2,
 		},
 	}
 
@@ -66,7 +66,7 @@ func TestStorageNew(t *testing.T) {
 			config.DB = tt.db
 			s, err := newStorage(ctx, config, &qc, nil)
 			require.NoError(t, err)
-			require.Equal(t, tt.expectedHeight, s.Height())
+			require.Equal(t, tt.expectedBlocks, s.NumBlocks())
 		})
 	}
 }
@@ -206,8 +206,8 @@ func TestStorageIndexFails(t *testing.T) {
 				require.Equal(t, simplex.Finalization{}, finalization)
 			}
 
-			// ensure that the height is not incremented
-			require.Equal(t, uint64(1), s.Height())
+			// ensure that we haven't indexed any blocks
+			require.Equal(t, uint64(1), s.NumBlocks())
 		})
 	}
 }
@@ -300,6 +300,5 @@ func TestStorageIndexSuccess(t *testing.T) {
 		require.Equal(t, snowtest.Accepted, accepted)
 	}
 
-	// ensure that the height is correct
-	require.Equal(t, uint64(numBlocks+1), s.Height())
+	require.Equal(t, uint64(numBlocks+1), s.NumBlocks())
 }
