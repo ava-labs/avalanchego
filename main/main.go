@@ -12,8 +12,8 @@ import (
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
 
-	"github.com/ava-labs/avalanchego/app"
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/node/bootstrap"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -24,7 +24,6 @@ func main() {
 	if errors.Is(err, pflag.ErrHelp) {
 		os.Exit(0)
 	}
-
 	if err != nil {
 		fmt.Printf("couldn't configure flags: %s\n", err)
 		os.Exit(1)
@@ -58,15 +57,14 @@ func main() {
 	}
 
 	if term.IsTerminal(int(os.Stdout.Fd())) {
-		fmt.Println(app.Header)
+		fmt.Println(Header)
 	}
 
-	nodeApp, err := app.New(nodeConfig)
+	runner, err := bootstrap.New(nodeConfig)
 	if err != nil {
 		fmt.Printf("couldn't start node: %s\n", err)
 		os.Exit(1)
 	}
 
-	exitCode := app.Run(nodeApp)
-	os.Exit(exitCode)
+	os.Exit(Run(runner))
 }
