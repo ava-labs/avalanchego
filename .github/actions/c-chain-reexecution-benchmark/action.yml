@@ -88,7 +88,7 @@ runs:
     - name: Download Previous Benchmark Result
       uses: actions/cache@v4
       with:
-        path: ./cache
+        path: ./tmp
         key: ${{ inputs.external-data-json-cache-key }}
 
     - name: Compare Benchmark Result
@@ -96,7 +96,7 @@ runs:
       with:
         tool: 'go'
         output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
-        external-data-json-path: ./cache/${{ inputs.external-data-json-cache-key }}
+        external-data-json-path: ./tmp/${{ inputs.external-data-json-cache-key }}
         fail-on-alert: true
         github-token: ${{ inputs.github-token }}
         summary-always: true
