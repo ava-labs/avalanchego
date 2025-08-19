@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/ava-labs/avalanchego/node/bootstrap"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
@@ -19,22 +20,7 @@ const Header = `     _____               .__                       .__
   \____|__  /\_/  (____  /____(____  /___|  /\___  >___|  /\___  >    \\
           \/           \/          \/     \/     \/     \/     \/`
 
-type App interface {
-	// Start kicks off the application and returns immediately.
-	// Start should only be called once.
-	Start()
-
-	// Stop notifies the application to exit and returns immediately.
-	// Stop should only be called after [Start].
-	// It is safe to call Stop multiple times.
-	Stop()
-
-	// ExitCode should only be called after [Start] returns. It
-	// should block until the application finishes
-	ExitCode() int
-}
-
-func Run(app App) int {
+func Run(app bootstrap.App) int {
 	// start running the application
 	app.Start()
 
