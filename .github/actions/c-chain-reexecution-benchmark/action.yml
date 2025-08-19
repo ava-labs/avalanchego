@@ -13,10 +13,10 @@ inputs:
     default: '250000'
   source-block-dir:
     description: 'The source block directory. Supports S3 directory/zip and local directories.'
-    default: 's3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip'
+    default: 's3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**'
   current-state-dir:
     description: 'The current state directory. Supports S3 directory/zip and local directories.'
-    default: 's3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip'
+    default: 's3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**'
   aws-role:
     description: 'AWS role to assume for S3 access.'
     required: true
@@ -73,9 +73,15 @@ runs:
     - name: Run C-Chain Re-Execution
       uses: ./.github/actions/run-monitored-tmpnet-cmd
       with:
-        # The environment varaibles set in $GITHUB_ENV should be accessible when the task is run, but do not seem to be when executed through
-        # this custom action.
-        run: ./scripts/run_task.sh reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=${{ env.EXECUTION_DATA_DIR }} SOURCE_BLOCK_DIR=${{ env.SOURCE_BLOCK_DIR }} CURRENT_STATE_DIR=${{ env.CURRENT_STATE_DIR }} START_BLOCK=${{ env.START_BLOCK }} END_BLOCK=${{ env.END_BLOCK }} LABELS=${{ env.LABELS }} BENCHMARK_OUTPUT_FILE=${{ env.BENCHMARK_OUTPUT_FILE }}
+        run: |
+          ./scripts/run_task.sh reexecute-cchain-range-with-copied-data \
+            EXECUTION_DATA_DIR=${{ env.EXECUTION_DATA_DIR }} \
+            SOURCE_BLOCK_DIR=${{ env.SOURCE_BLOCK_DIR }} \
+            CURRENT_STATE_DIR=${{ env.CURRENT_STATE_DIR }} \
+            START_BLOCK=${{ env.START_BLOCK }} \
+            END_BLOCK=${{ env.END_BLOCK }} \
+            LABELS=${{ env.LABELS }} \
+            BENCHMARK_OUTPUT_FILE=${{ env.BENCHMARK_OUTPUT_FILE }}
         prometheus_push_url: ${{ inputs.prometheus-push-url }}
         prometheus_username: ${{ inputs.prometheus-username }}
         prometheus_password: ${{ inputs.prometheus-password }}
@@ -85,7 +91,7 @@ runs:
     - name: Download Previous Benchmark Result
       uses: actions/cache@v4
       with:
-        path: ./cache
+        path: ./tmp
         key: ${{ inputs.external-data-json-cache-key }}
 
     - name: Compare Benchmark Result
@@ -93,7 +99,7 @@ runs:
       with:
         tool: 'go'
         output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
-        external-data-json-path: ./cache/${{ inputs.external-data-json-cache-key }}
+        external-data-json-path: ./tmp/${{ inputs.external-data-json-cache-key }}
         fail-on-alert: true
         github-token: ${{ inputs.github-token }}
         summary-always: true
@@ -114,19 +120,4 @@ runs:
     - name: Push Post-State to S3 (if not exists)
       if: ${{ inputs.push-post-state != '' }}
       shell: nix develop --command bash -x {0}
-      run: |
-        # Validate the S3 path format using a single regular expression.
-        if ! [[ "${{ inputs.push-post-state }}" =~ ^s3://[^/]+/([^/]+/)$ ]]; then
-          echo "Error: Invalid S3 path format."
-          echo "Expected format: s3://<bucket-name>/<directory-name>/"
-          exit 1
-        fi
-
-        if s5cmd ls "${{ inputs.push-post-state }}" | grep -q .; then
-          echo "Destination S3 path '${{ inputs.push-post-state }}' already exists. Exiting."
-          exit 1
-        fi
-
-        echo "Validated S3 push post state URI: '${{ inputs.push-post-state }}'"
-
-        ./scripts/run_task.sh export-dir-to-s3 LOCAL_SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ S3_DST=${{ inputs.push-post-state }}
+      run: ./scripts/run_task.sh export-dir-to-s3 LOCAL_SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ S3_DST=${{ inputs.push-post-state }}
