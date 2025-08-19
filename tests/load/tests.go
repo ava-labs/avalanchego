@@ -112,7 +112,7 @@ func NewRandomTest(
 			// minimum gas used: 302_100
 			Test: HashTest{
 				contract:      loadSimulator,
-				value:         value,
+				value:         big.NewInt(1),
 				numIterations: big.NewInt(1_000),
 			},
 			Weight: 5,
