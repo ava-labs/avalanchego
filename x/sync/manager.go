@@ -808,11 +808,6 @@ func findNextKey(
 	lastReceivedKey := rangeEnd.Value()
 	if len(keyChanges) > 0 {
 		lastReceivedKey = keyChanges[len(keyChanges)-1].Key
-
-		// If the proof provides keys after the range end, we can return that the range was complete.
-		if compareKeys(maybe.Some(lastReceivedKey), rangeEnd) > 0 {
-			return maybe.Nothing[[]byte](), nil
-		}
 	}
 
 	if len(endProof) == 0 {
@@ -965,20 +960,6 @@ func findNextKey(
 
 	// the nextKey is within the open range (lastReceivedKey, rangeEnd), so return it
 	return nextKey, nil
-}
-
-// compares two maybe.Maybe[[]byte] values, interpreting Nothing as greater than any value
-func compareKeys(a, b maybe.Maybe[[]byte]) int {
-	if a.IsNothing() && b.IsNothing() {
-		return 0
-	}
-	if a.IsNothing() {
-		return 1
-	}
-	if b.IsNothing() {
-		return -1
-	}
-	return bytes.Compare(a.Value(), b.Value())
 }
 
 func (m *Manager) Error() error {
