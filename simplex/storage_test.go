@@ -66,7 +66,7 @@ func TestStorageNew(t *testing.T) {
 			config.DB = tt.db
 			s, err := newStorage(ctx, config, &qc, nil)
 			require.NoError(t, err)
-			require.Equal(t, tt.expectedHeight, s.Height())
+			require.Equal(t, tt.expectedHeight, s.NumBlocks())
 		})
 	}
 }
@@ -207,7 +207,7 @@ func TestStorageIndexFails(t *testing.T) {
 			}
 
 			// ensure that the height is not incremented
-			require.Equal(t, uint64(1), s.Height())
+			require.Equal(t, uint64(1), s.NumBlocks())
 		})
 	}
 }
@@ -301,5 +301,5 @@ func TestStorageIndexSuccess(t *testing.T) {
 	}
 
 	// ensure that the height is correct
-	require.Equal(t, uint64(numBlocks+1), s.Height())
+	require.Equal(t, uint64(numBlocks+1), s.NumBlocks())
 }

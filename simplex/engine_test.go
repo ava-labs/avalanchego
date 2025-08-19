@@ -12,11 +12,10 @@ import (
 	"github.com/ava-labs/simplex"
 )
 
-// -----------------------------------------------------------------------------
-// Tests
-// -----------------------------------------------------------------------------
-
-func TestSimplexEngineStart(t *testing.T) {
+// TestSimplexEngineHandlesSimplexMessages tests that the Simplex engine can handle
+// various types of Simplex messages without errors. The contents of the messages do not have
+// to be valid, as long as they can be parsed and processed by the engine.
+func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 	configs := newNetworkConfigs(t, 4)
 	ctx := context.Background()
 
@@ -24,7 +23,6 @@ func TestSimplexEngineStart(t *testing.T) {
 	engine, err := NewEngine(ctx, config)
 	require.NoError(t, err)
 
-	// ParseBlock stub
 	config.VM.(*wrappedVM).ParseBlockF = func(ctx context.Context, blkBytes []byte) (snowman.Block, error) {
 		return newTestBlock(t, newBlockConfig{round: 1}).vmBlock, nil
 	}
@@ -33,11 +31,6 @@ func TestSimplexEngineStart(t *testing.T) {
 	md := engine.epoch.Metadata()
 	require.Equal(t, uint64(1), md.Seq)
 	require.Equal(t, uint64(1), md.Round)
-
-	// Mock sender
-	// sender := config.Sender.(*sendermock.ExternalSender)
-	// // TODO: remove when simplex dependency updated
-	// sender.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 	qcBytes := buildQCBytes(t, configs)
 

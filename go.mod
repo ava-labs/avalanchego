@@ -9,6 +9,8 @@ module github.com/ava-labs/avalanchego
 //   - Consider updating the version of golangci-lint (in scripts/lint.sh).
 go 1.23.9
 
+replace github.com/ava-labs/simplex => ../Simplex
+
 require (
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/grpcreflect v1.3.0
