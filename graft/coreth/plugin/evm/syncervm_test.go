@@ -6,17 +6,16 @@ package evm
 import (
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 	"github.com/ava-labs/coreth/plugin/evm/vmtest"
 	"github.com/ava-labs/coreth/predicate"
-
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
-
-	"github.com/stretchr/testify/require"
 )
 
 func TestEVMSyncerVM(t *testing.T) {

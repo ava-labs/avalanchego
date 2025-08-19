@@ -13,10 +13,11 @@ import (
 	"math/big"
 	"sort"
 
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/holiman/uint256"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (

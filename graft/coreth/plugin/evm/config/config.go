@@ -5,6 +5,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -240,14 +241,14 @@ func (c *Config) validate(networkID uint32) error {
 	}
 
 	if !c.Pruning && c.OfflinePruning {
-		return fmt.Errorf("cannot run offline pruning while pruning is disabled")
+		return errors.New("cannot run offline pruning while pruning is disabled")
 	}
 	// If pruning is enabled, the commit interval must be non-zero so the node commits state tries every CommitInterval blocks.
 	if c.Pruning && c.CommitInterval == 0 {
-		return fmt.Errorf("cannot use commit interval of 0 with pruning enabled")
+		return errors.New("cannot use commit interval of 0 with pruning enabled")
 	}
 	if c.Pruning && c.StateHistory == 0 {
-		return fmt.Errorf("cannot use state history of 0 with pruning enabled")
+		return errors.New("cannot use state history of 0 with pruning enabled")
 	}
 
 	if c.PushGossipPercentStake < 0 || c.PushGossipPercentStake > 1 {

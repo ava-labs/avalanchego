@@ -8,9 +8,10 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
-	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
 
 	"github.com/ava-labs/coreth/plugin/evm"
+
+	atomicvm "github.com/ava-labs/coreth/plugin/evm/atomic/vm"
 )
 
 var (

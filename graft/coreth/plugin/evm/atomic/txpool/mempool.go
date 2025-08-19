@@ -9,11 +9,12 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
-	"github.com/ava-labs/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/libevm/log"
 	"github.com/holiman/uint256"
 	"github.com/prometheus/client_golang/prometheus"
+
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/coreth/plugin/evm/config"
 )
 
 var (

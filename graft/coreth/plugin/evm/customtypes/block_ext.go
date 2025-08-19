@@ -8,8 +8,9 @@ import (
 	"slices"
 
 	"github.com/ava-labs/libevm/common"
-	ethtypes "github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
+
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 // SetBlockExtra sets the [BlockBodyExtra] `extra` in the [Block] `b`.

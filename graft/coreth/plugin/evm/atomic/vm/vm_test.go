@@ -14,10 +14,8 @@ import (
 	"testing"
 	"time"
 
-	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
@@ -26,6 +24,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/trie"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/extstate"
@@ -41,12 +44,8 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/vmtest"
 	"github.com/ava-labs/coreth/utils/utilstest"
 
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/rlp"
-	"github.com/ava-labs/libevm/trie"
-
-	"github.com/stretchr/testify/require"
+	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
+	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 func newAtomicTestVM() *VM {
@@ -111,10 +110,10 @@ func addUTXOs(sharedMemory *avalancheatomic.Memory, ctx *snow.Context, utxos map
 	for addr, avaxAmount := range utxos {
 		txID, err := ids.ToID(hashing.ComputeHash256(addr.Bytes()))
 		if err != nil {
-			return fmt.Errorf("Failed to generate txID from addr: %s", err)
+			return fmt.Errorf("Failed to generate txID from addr: %w", err)
 		}
 		if _, err := addUTXO(sharedMemory, ctx, txID, 0, ctx.AVAXAssetID, avaxAmount, addr); err != nil {
-			return fmt.Errorf("Failed to add UTXO to shared memory: %s", err)
+			return fmt.Errorf("Failed to add UTXO to shared memory: %w", err)
 		}
 	}
 	return nil

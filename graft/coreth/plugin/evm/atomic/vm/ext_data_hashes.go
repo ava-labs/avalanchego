@@ -4,10 +4,11 @@
 package vm
 
 import (
-	_ "embed"
 	"encoding/json"
 
 	"github.com/ava-labs/libevm/common"
+
+	_ "embed"
 )
 
 var (

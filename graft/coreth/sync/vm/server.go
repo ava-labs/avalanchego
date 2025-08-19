@@ -4,18 +4,19 @@ package vm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/coreth/core"
-	synccommon "github.com/ava-labs/coreth/sync"
 
-	"github.com/ava-labs/libevm/log"
+	synccommon "github.com/ava-labs/coreth/sync"
 )
 
-var errProviderNotSet = fmt.Errorf("provider not set")
+var errProviderNotSet = errors.New("provider not set")
 
 type server struct {
 	chain *core.BlockChain

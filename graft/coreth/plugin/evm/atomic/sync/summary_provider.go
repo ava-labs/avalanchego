@@ -5,14 +5,12 @@ package sync
 import (
 	"fmt"
 
-	"github.com/ava-labs/coreth/plugin/evm/atomic/state"
-
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
-
-	"github.com/ava-labs/coreth/sync"
-
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+
+	"github.com/ava-labs/coreth/plugin/evm/atomic/state"
+	"github.com/ava-labs/coreth/sync"
 )
 
 var _ sync.SummaryProvider = (*SummaryProvider)(nil)

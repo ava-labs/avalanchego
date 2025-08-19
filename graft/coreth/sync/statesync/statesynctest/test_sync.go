@@ -6,10 +6,11 @@ package statesynctest
 import (
 	"testing"
 
-	"github.com/ava-labs/coreth/utils/utilstest"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/triedb"
+
+	"github.com/ava-labs/coreth/utils/utilstest"
 )
 
 // FillAccountsWithOverlappingStorage adds [numAccounts] randomly generated accounts to the secure trie at [root]

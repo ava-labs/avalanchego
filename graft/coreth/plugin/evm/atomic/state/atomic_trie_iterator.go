@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-
 	"github.com/ava-labs/libevm/trie"
 )
 

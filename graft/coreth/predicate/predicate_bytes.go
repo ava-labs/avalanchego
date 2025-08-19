@@ -4,6 +4,7 @@
 package predicate
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
@@ -17,10 +18,10 @@ import (
 var EndByte = byte(0xff)
 
 var (
-	ErrInvalidAllZeroBytes = fmt.Errorf("predicate specified invalid all zero bytes")
-	ErrInvalidPadding      = fmt.Errorf("predicate specified invalid padding")
-	ErrInvalidEndDelimiter = fmt.Errorf("invalid end delimiter")
-	ErrorInvalidExtraData  = fmt.Errorf("header extra data too short for predicate verification")
+	ErrInvalidAllZeroBytes = errors.New("predicate specified invalid all zero bytes")
+	ErrInvalidPadding      = errors.New("predicate specified invalid padding")
+	ErrInvalidEndDelimiter = errors.New("invalid end delimiter")
+	ErrorInvalidExtraData  = errors.New("header extra data too short for predicate verification")
 )
 
 // PackPredicate packs [predicate] by delimiting the actual message with [PredicateEndByte]

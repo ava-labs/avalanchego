@@ -10,18 +10,16 @@ import (
 	"errors"
 	"fmt"
 
-	atomicstate "github.com/ava-labs/coreth/plugin/evm/atomic/state"
-
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/coreth/plugin/evm/message"
+
+	atomicstate "github.com/ava-labs/coreth/plugin/evm/atomic/state"
 	synccommon "github.com/ava-labs/coreth/sync"
 	syncclient "github.com/ava-labs/coreth/sync/client"
-
-	"github.com/ava-labs/libevm/trie"
 )
 
 const (

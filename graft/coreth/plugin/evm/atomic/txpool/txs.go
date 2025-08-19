@@ -9,9 +9,9 @@ import (
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/libevm/log"
 )
 
 const discardedTxsCacheSize = 50

@@ -8,16 +8,17 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/lock"
+	"github.com/ava-labs/libevm/log"
 	"github.com/holiman/uint256"
 	"go.uber.org/zap"
 
-	"github.com/ava-labs/avalanchego/snow"
-	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/txpool"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
-	"github.com/ava-labs/libevm/log"
+
+	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 // Minimum amount of time to wait after building a block before attempting to build a block

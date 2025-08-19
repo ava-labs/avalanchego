@@ -8,8 +8,9 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/libevm/core/types"
+
+	"github.com/ava-labs/coreth/params/extras"
 )
 
 var errEstimateBaseFeeWithoutActivation = errors.New("cannot estimate base fee for chain without apricot phase 3 scheduled")

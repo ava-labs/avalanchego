@@ -10,14 +10,16 @@ import (
 	"sync"
 
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
-	"github.com/ava-labs/coreth/plugin/evm/message"
-	synccommon "github.com/ava-labs/coreth/sync"
-	statesyncclient "github.com/ava-labs/coreth/sync/client"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
+	"github.com/ava-labs/coreth/plugin/evm/message"
+
+	synccommon "github.com/ava-labs/coreth/sync"
+	statesyncclient "github.com/ava-labs/coreth/sync/client"
 )
 
 const (

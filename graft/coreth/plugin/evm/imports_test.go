@@ -18,7 +18,7 @@ func getDependencies(packageName string) (map[string]struct{}, error) {
 	cfg := &packages.Config{Mode: packages.NeedImports | packages.NeedName}
 	pkgs, err := packages.Load(cfg, packageName)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load package: %v", err)
+		return nil, fmt.Errorf("failed to load package: %w", err)
 	}
 
 	if len(pkgs) == 0 || pkgs[0].Errors != nil {

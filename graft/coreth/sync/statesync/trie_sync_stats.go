@@ -8,11 +8,12 @@ import (
 	"sync"
 	"time"
 
-	utils_math "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/metrics"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -27,7 +28,7 @@ type trieSyncStats struct {
 	lock sync.Mutex
 
 	lastUpdated time.Time
-	leafsRate   utils_math.Averager
+	leafsRate   safemath.Averager
 
 	triesRemaining   int
 	triesSynced      int
@@ -118,7 +119,7 @@ func (t *trieSyncStats) trieDone(root common.Hash) {
 func (t *trieSyncStats) updateETA(sinceUpdate time.Duration, now time.Time) time.Duration {
 	leafsRate := float64(t.leafsSinceUpdate) / sinceUpdate.Seconds()
 	if t.leafsRate == nil {
-		t.leafsRate = utils_math.NewAverager(leafsRate, leafRateHalfLife, now)
+		t.leafsRate = safemath.NewAverager(leafsRate, leafRateHalfLife, now)
 	} else {
 		t.leafsRate.Observe(leafsRate, now)
 	}

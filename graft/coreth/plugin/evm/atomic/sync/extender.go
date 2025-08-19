@@ -6,11 +6,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ava-labs/coreth/plugin/evm/atomic/state"
-
 	"github.com/ava-labs/avalanchego/database/versiondb"
 
+	"github.com/ava-labs/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/coreth/plugin/evm/message"
+
 	synccommon "github.com/ava-labs/coreth/sync"
 	syncclient "github.com/ava-labs/coreth/sync/client"
 )

@@ -6,13 +6,14 @@ package state
 import (
 	"fmt"
 
-	"github.com/ava-labs/coreth/plugin/evm/atomic"
-
-	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/log"
+
+	"github.com/ava-labs/coreth/plugin/evm/atomic"
+
+	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )
 
 // atomicState implements the AtomicState interface using

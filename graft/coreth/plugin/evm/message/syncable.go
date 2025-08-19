@@ -4,9 +4,8 @@
 package message
 
 import (
-	"github.com/ava-labs/libevm/common"
-
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/libevm/common"
 )
 
 type Syncable interface {

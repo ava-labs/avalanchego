@@ -9,10 +9,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/coreth/plugin/evm/message"
-	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/ava-labs/coreth/plugin/evm/message"
+	"github.com/ava-labs/coreth/utils"
 )
 
 var ErrFailedToFetchLeafs = errors.New("failed to fetch leafs")
@@ -138,7 +139,7 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 		}
 
 		if len(leafsResponse.Keys) == 0 {
-			return fmt.Errorf("found no keys in a response with more set to true")
+			return errors.New("found no keys in a response with more set to true")
 		}
 		// Update start to be one bit past the last returned key for the next request.
 		// Note: since more was true, this cannot cause an overflow.

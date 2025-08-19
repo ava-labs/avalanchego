@@ -8,8 +8,10 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 
-	"github.com/ava-labs/coreth/ethclient"
 	"github.com/ava-labs/libevm/core/types"
+
+	"github.com/ava-labs/coreth/ethclient"
+
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 

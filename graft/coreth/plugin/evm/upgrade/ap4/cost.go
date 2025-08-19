@@ -8,8 +8,9 @@ package ap4
 import (
 	"math"
 
-	safemath "github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/coreth/utils"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (

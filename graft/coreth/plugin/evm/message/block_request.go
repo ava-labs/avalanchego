@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-
 	"github.com/ava-labs/libevm/common"
 )
 

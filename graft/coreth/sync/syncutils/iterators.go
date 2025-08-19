@@ -4,9 +4,10 @@
 package syncutils
 
 import (
-	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
+
+	"github.com/ava-labs/coreth/core/state/snapshot"
 )
 
 var (
