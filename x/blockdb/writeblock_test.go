@@ -5,6 +5,7 @@ package blockdb
 
 import (
 	"math"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -332,17 +333,20 @@ func TestWriteBlock_Errors(t *testing.T) {
 			wantErr:    safemath.ErrOverflow,
 		},
 		{
-			name:   "writeBlockAt - data file write failure",
+			name:   "writeBlockAt - failed to get data file",
 			height: 0,
 			block:  make([]byte, 100),
 			setup: func(db *Database) {
-				// close the data file to trigger a write error in writeBlockAt
+				// Change file permissions to read-only
 				file, err := db.getOrOpenDataFile(0)
 				require.NoError(t, err)
-				require.NoError(t, file.Close())
+				filePath := file.Name()
+				file.Close()
+				err = os.Chmod(filePath, 0444)
+				require.NoError(t, err)
 			},
 			headerSize: 0,
-			wantErrMsg: "failed to write block to data file",
+			wantErrMsg: "failed to get data file for writing block",
 		},
 		{
 			name:   "writeIndexEntryAt - index file write failure",

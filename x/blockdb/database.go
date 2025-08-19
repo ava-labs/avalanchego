@@ -221,7 +221,7 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 	s := &Database{
 		config: config,
 		log:    databaseLog,
-		fileCache: lru.NewCacheWithOnEvict[int, *os.File](config.MaxDataFiles, func(_ int, f *os.File) {
+		fileCache: lru.NewCacheWithOnEvict(config.MaxDataFiles, func(_ int, f *os.File) {
 			if f != nil {
 				f.Close()
 			}
@@ -480,26 +480,32 @@ func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
 
 	// Read the complete block data
 	blockData := make(BlockData, indexEntry.Size)
-	dataFile, localOffset, err := s.getDataFileAndOffset(indexEntry.Offset)
-	if err != nil {
-		s.log.Error("Failed to read block: failed to get data file",
-			zap.Uint64("height", height),
-			zap.Uint64("dataOffset", indexEntry.Offset),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("failed to get data file for block at height %d: %w", height, err)
+	for {
+		dataFile, localOffset, fileIndex, err := s.getDataFileAndOffset(indexEntry.Offset)
+		if err != nil {
+			s.log.Error("Failed to read block: failed to get data file",
+				zap.Uint64("height", height),
+				zap.Uint64("dataOffset", indexEntry.Offset),
+				zap.Error(err),
+			)
+			return nil, fmt.Errorf("failed to get data file for block at height %d: %w", height, err)
+		}
+		_, err = dataFile.ReadAt(blockData, int64(localOffset+uint64(sizeOfBlockEntryHeader)))
+		if err != nil {
+			if errors.Is(err, os.ErrClosed) {
+				s.fileCache.Evict(fileIndex)
+				continue
+			}
+			s.log.Error("Failed to read block: failed to read block data from file",
+				zap.Uint64("height", height),
+				zap.Uint64("localOffset", localOffset),
+				zap.Uint32("blockSize", indexEntry.Size),
+				zap.Error(err),
+			)
+			return nil, fmt.Errorf("failed to read block data from data file: %w", err)
+		}
+		break
 	}
-	_, err = dataFile.ReadAt(blockData, int64(localOffset+uint64(sizeOfBlockEntryHeader)))
-	if err != nil {
-		s.log.Error("Failed to read block: failed to read block data from file",
-			zap.Uint64("height", height),
-			zap.Uint64("localOffset", localOffset),
-			zap.Uint32("blockSize", indexEntry.Size),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("failed to read block data from data file: %w", err)
-	}
-
 	return blockData, nil
 }
 
@@ -531,24 +537,31 @@ func (s *Database) ReadHeader(height BlockHeight) (BlockData, error) {
 
 	// Read only the header portion
 	headerData := make([]byte, indexEntry.HeaderSize)
-	dataFile, localOffset, err := s.getDataFileAndOffset(indexEntry.Offset)
-	if err != nil {
-		s.log.Error("Failed to read header: failed to get data file",
-			zap.Uint64("height", height),
-			zap.Uint64("dataOffset", indexEntry.Offset),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("failed to get data file for block header at height %d: %w", height, err)
-	}
-	_, err = dataFile.ReadAt(headerData, int64(localOffset+uint64(sizeOfBlockEntryHeader)))
-	if err != nil {
-		s.log.Error("Failed to read header: failed to read header data from file",
-			zap.Uint64("height", height),
-			zap.Uint64("localOffset", localOffset),
-			zap.Uint32("headerSize", indexEntry.HeaderSize),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("failed to read block header data from data file: %w", err)
+	for {
+		dataFile, localOffset, fileIndex, err := s.getDataFileAndOffset(indexEntry.Offset)
+		if err != nil {
+			s.log.Error("Failed to read header: failed to get data file",
+				zap.Uint64("height", height),
+				zap.Uint64("dataOffset", indexEntry.Offset),
+				zap.Error(err),
+			)
+			return nil, fmt.Errorf("failed to get data file for block header at height %d: %w", height, err)
+		}
+		_, err = dataFile.ReadAt(headerData, int64(localOffset+uint64(sizeOfBlockEntryHeader)))
+		if err != nil {
+			if errors.Is(err, os.ErrClosed) {
+				s.fileCache.Evict(fileIndex)
+				continue
+			}
+			s.log.Error("Failed to read header: failed to read header data from file",
+				zap.Uint64("height", height),
+				zap.Uint64("localOffset", localOffset),
+				zap.Uint32("headerSize", indexEntry.HeaderSize),
+				zap.Error(err),
+			)
+			return nil, fmt.Errorf("failed to read block header data from data file: %w", err)
+		}
+		break
 	}
 
 	return headerData, nil
@@ -567,44 +580,51 @@ func (s *Database) ReadBody(height BlockHeight) (BlockData, error) {
 
 	bodySize := indexEntry.Size - indexEntry.HeaderSize
 	bodyData := make([]byte, bodySize)
-	dataFile, localOffset, err := s.getDataFileAndOffset(indexEntry.Offset)
-	if err != nil {
-		s.log.Error("Failed to read body: failed to get data file",
-			zap.Uint64("height", height),
-			zap.Uint64("dataOffset", indexEntry.Offset),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("failed to get data file for block body at height %d: %w", height, err)
-	}
-	headerOffset, err := safemath.Add(localOffset, uint64(sizeOfBlockEntryHeader))
-	if err != nil {
-		s.log.Error("Failed to read body: header offset calculation overflow",
-			zap.Uint64("height", height),
-			zap.Uint64("localOffset", localOffset),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("calculating header offset would overflow for block at height %d: %w", height, err)
-	}
-	bodyOffset, err := safemath.Add(headerOffset, uint64(indexEntry.HeaderSize))
-	if err != nil {
-		s.log.Error("Failed to read body: body offset calculation overflow",
-			zap.Uint64("height", height),
-			zap.Uint64("headerOffset", headerOffset),
-			zap.Uint32("headerSize", indexEntry.HeaderSize),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("calculating body offset would overflow for block at height %d: %w", height, err)
-	}
+	for {
+		dataFile, localOffset, fileIndex, err := s.getDataFileAndOffset(indexEntry.Offset)
+		if err != nil {
+			s.log.Error("Failed to read body: failed to get data file",
+				zap.Uint64("height", height),
+				zap.Uint64("dataOffset", indexEntry.Offset),
+				zap.Error(err),
+			)
+			return nil, fmt.Errorf("failed to get data file for block body at height %d: %w", height, err)
+		}
+		headerOffset, err := safemath.Add(localOffset, uint64(sizeOfBlockEntryHeader))
+		if err != nil {
+			s.log.Error("Failed to read body: header offset calculation overflow",
+				zap.Uint64("height", height),
+				zap.Uint64("localOffset", localOffset),
+				zap.Error(err),
+			)
+			return nil, fmt.Errorf("calculating header offset would overflow for block at height %d: %w", height, err)
+		}
+		bodyOffset, err := safemath.Add(headerOffset, uint64(indexEntry.HeaderSize))
+		if err != nil {
+			s.log.Error("Failed to read body: body offset calculation overflow",
+				zap.Uint64("height", height),
+				zap.Uint64("headerOffset", headerOffset),
+				zap.Uint32("headerSize", indexEntry.HeaderSize),
+				zap.Error(err),
+			)
+			return nil, fmt.Errorf("calculating body offset would overflow for block at height %d: %w", height, err)
+		}
 
-	_, err = dataFile.ReadAt(bodyData, int64(bodyOffset))
-	if err != nil {
-		s.log.Error("Failed to read body: failed to read body data from file",
-			zap.Uint64("height", height),
-			zap.Uint64("bodyOffset", bodyOffset),
-			zap.Uint32("bodySize", bodySize),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("failed to read block body data from data file: %w", err)
+		_, err = dataFile.ReadAt(bodyData, int64(bodyOffset))
+		if err != nil {
+			if errors.Is(err, os.ErrClosed) {
+				s.fileCache.Evict(fileIndex)
+				continue
+			}
+			s.log.Error("Failed to read body: failed to read body data from file",
+				zap.Uint64("height", height),
+				zap.Uint64("bodyOffset", bodyOffset),
+				zap.Uint32("bodySize", bodySize),
+				zap.Error(err),
+			)
+			return nil, fmt.Errorf("failed to read block body data from data file: %w", err)
+		}
+		break
 	}
 	return bodyData, nil
 }
@@ -879,7 +899,7 @@ func (s *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEntr
 		return bh, fmt.Errorf("%w: not enough data for block header at offset %d", ErrCorrupted, offset)
 	}
 
-	dataFile, localOffset, err := s.getDataFileAndOffset(offset)
+	dataFile, localOffset, _, err := s.getDataFileAndOffset(offset)
 	if err != nil {
 		return bh, fmt.Errorf("recovery: failed to get data file for offset %d: %w", offset, err)
 	}
@@ -989,7 +1009,7 @@ func (s *Database) initializeDataFiles() error {
 	// Pre-load the data file for the next write offset.
 	nextOffset := s.nextDataWriteOffset.Load()
 	if nextOffset > 0 {
-		_, _, err := s.getDataFileAndOffset(nextOffset)
+		_, _, _, err := s.getDataFileAndOffset(nextOffset)
 		if err != nil {
 			return fmt.Errorf("failed to pre-load data file for offset %d: %w", nextOffset, err)
 		}
@@ -1121,11 +1141,6 @@ func (s *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block BlockD
 		return fmt.Errorf("failed to serialize block header: %w", err)
 	}
 
-	dataFile, localOffset, err := s.getDataFileAndOffset(offset)
-	if err != nil {
-		return fmt.Errorf("failed to get data file for writing block %d: %w", bh.Height, err)
-	}
-
 	// Allocate combined buffer for header and block data and write it to the data file
 	combinedBufSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(len(block)))
 	if err != nil {
@@ -1134,16 +1149,37 @@ func (s *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block BlockD
 	combinedBuf := make([]byte, combinedBufSize)
 	copy(combinedBuf, headerBytes)
 	copy(combinedBuf[sizeOfBlockEntryHeader:], block)
-	if _, err := dataFile.WriteAt(combinedBuf, int64(localOffset)); err != nil {
-		return fmt.Errorf("failed to write block to data file at offset %d: %w", offset, err)
-	}
+	dataWritten := false
 
-	if s.config.SyncToDisk {
-		if err := dataFile.Sync(); err != nil {
-			return fmt.Errorf("failed to sync data file after writing block %d: %w", bh.Height, err)
+	for {
+		dataFile, localOffset, fileIndex, err := s.getDataFileAndOffset(offset)
+		if err != nil {
+			return fmt.Errorf("failed to get data file for writing block %d: %w", bh.Height, err)
 		}
+
+		if !dataWritten {
+			if _, err := dataFile.WriteAt(combinedBuf, int64(localOffset)); err != nil {
+				if errors.Is(err, os.ErrClosed) {
+					// ensure the file is evicted, otherwise we'll retry forever
+					s.fileCache.Evict(fileIndex)
+					continue
+				}
+				return fmt.Errorf("failed to write block to data file at offset %d: %w", offset, err)
+			}
+			dataWritten = true
+		}
+
+		if s.config.SyncToDisk {
+			if err := dataFile.Sync(); err != nil {
+				if errors.Is(err, os.ErrClosed) {
+					s.fileCache.Evict(fileIndex)
+					continue
+				}
+				return fmt.Errorf("failed to sync data file after writing block %d: %w", bh.Height, err)
+			}
+		}
+		return nil
 	}
-	return nil
 }
 
 func (s *Database) updateBlockHeights(writtenBlockHeight BlockHeight) error {
@@ -1335,10 +1371,10 @@ func (s *Database) allocateBlockSpace(totalSize uint32) (writeDataOffset uint64,
 	}
 }
 
-func (s *Database) getDataFileAndOffset(globalOffset uint64) (*os.File, uint64, error) {
+func (s *Database) getDataFileAndOffset(globalOffset uint64) (*os.File, uint64, int, error) {
 	maxFileSize := s.header.MaxDataFileSize
 	fileIndex := int(globalOffset / maxFileSize)
 	localOffset := globalOffset % maxFileSize
 	handle, err := s.getOrOpenDataFile(fileIndex)
-	return handle, localOffset, err
+	return handle, localOffset, fileIndex, err
 }

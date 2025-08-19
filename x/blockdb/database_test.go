@@ -235,7 +235,7 @@ func TestFileCache_Eviction(t *testing.T) {
 	// Override the file cache with a smaller size to force evictions
 	evictionCount := atomic.Int32{}
 	evictionMu := sync.Mutex{}
-	smallCache := lru.NewCacheWithOnEvict[int, *os.File](3, func(_ int, file *os.File) {
+	smallCache := lru.NewCacheWithOnEvict(3, func(_ int, file *os.File) {
 		evictionMu.Lock()
 		defer evictionMu.Unlock()
 		evictionCount.Add(1)
