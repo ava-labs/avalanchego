@@ -313,6 +313,7 @@ func (i *ipTracker) ShouldVerifyIP(
 //  1. The provided IP is from a node whose connection is desired on a tracked
 //     subnet.
 //  2. This IP is newer than the most recent IP we know of for the node.
+//  3. The node is a validator and connectToAllValidators is true.
 //
 // If this IP is replacing a gossipable IP, this IP will also be marked as
 // gossipable.
@@ -328,7 +329,7 @@ func (i *ipTracker) AddIP(ip *ips.ClaimedIPPort) bool {
 	if connectedNode, ok := i.connected[ip.NodeID]; ok {
 		i.setGossipableIP(trackedNode.ip, connectedNode.trackedSubnets)
 	}
-	return trackedNode.wantsConnection() || i.connectToAllValidators
+	return trackedNode.wantsConnection() || (i.connectToAllValidators && trackedNode.validatedSubnets.Len() > 0)
 }
 
 // GetIP returns the most recent IP of the provided nodeID. Returns true if all
@@ -436,7 +437,8 @@ func (i *ipTracker) addTrackableID(nodeID ids.NodeID, subnetID *ids.ID) {
 		nodeTracker.manuallyTracked = true
 	} else {
 		nodeTracker.validatedSubnets.Add(*subnetID)
-		if *subnetID == constants.PrimaryNetworkID || i.trackedSubnets.Contains(*subnetID) || i.connectToAllValidators {
+		if *subnetID == constants.PrimaryNetworkID || i.trackedSubnets.Contains(*subnetID) ||
+			(i.connectToAllValidators && nodeTracker.validatedSubnets.Len() > 0) {
 			nodeTracker.trackedSubnets.Add(*subnetID)
 		}
 	}
