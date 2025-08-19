@@ -214,9 +214,7 @@ func getGenesisBlock(ctx context.Context, config *Config, blockTracker *blockTra
 // retrieveFinalization retrieves the finalization at [seq].
 // If the finalization is not found, it returns false.
 func (s *Storage) retrieveFinalization(seq uint64) (simplex.Finalization, error) {
-	seqBuff := make([]byte, 8)
-	binary.BigEndian.PutUint64(seqBuff, seq)
-	finalizationBytes, err := s.db.Get(seqBuff)
+	finalizationBytes, err := s.db.Get(finalizationKey(seq))
 	if err != nil {
 		if err == database.ErrNotFound {
 			return simplex.Finalization{}, simplex.ErrBlockNotFound
