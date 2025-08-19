@@ -84,49 +84,49 @@ func NewRandomTest(
 		{
 			// minimum gas used: 84_000
 			Test: ReadTest{
-				contract: loadSimulator,
-				offset:   big.NewInt(0),
-				numSlots: big.NewInt(30),
+				Contract: loadSimulator,
+				Offset:   big.NewInt(0),
+				NumSlots: big.NewInt(30),
 			},
 			Weight: 10,
 		},
 		{
 			// minimum gas used: 242_000
 			Test: &WriteTest{
-				contract: loadSimulator,
-				numSlots: big.NewInt(10),
-				rand:     writeRand,
+				Contract: loadSimulator,
+				NumSlots: big.NewInt(10),
+				Rand:     writeRand,
 			},
 			Weight: 10,
 		},
 		{
 			// minimum gas used: 61_000
 			Test: &ModifyTest{
-				contract: loadSimulator,
-				numSlots: big.NewInt(8),
-				rand:     modifyRand,
+				Contract: loadSimulator,
+				NumSlots: big.NewInt(8),
+				Rand:     modifyRand,
 			},
 			Weight: 10,
 		},
 		{
 			// minimum gas used: 302_100
 			Test: HashTest{
-				contract:      loadSimulator,
-				value:         big.NewInt(1),
-				numIterations: big.NewInt(1_000),
+				Contract:      loadSimulator,
+				Value:         big.NewInt(1),
+				NumIterations: big.NewInt(1_000),
 			},
 			Weight: 5,
 		},
 		{
 			// minimum gas used: 290_000
-			Test:   DeployTest{contract: loadSimulator},
+			Test:   DeployTest{Contract: loadSimulator},
 			Weight: 5,
 		},
 		{
 			// minimum gas used: 23_000
 			Test: LargeCalldataTest{
-				contract: loadSimulator,
-				calldata: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+				Contract: loadSimulator,
+				Calldata: []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
 			},
 			Weight: 5,
 		},
@@ -249,81 +249,81 @@ func (t TransferTest) Run(tc tests.TestContext, wallet *Wallet) {
 }
 
 type ReadTest struct {
-	contract *contracts.LoadSimulator
-	offset   *big.Int
-	numSlots *big.Int
+	Contract *contracts.LoadSimulator
+	Offset   *big.Int
+	NumSlots *big.Int
 }
 
 func (r ReadTest) Run(tc tests.TestContext, wallet *Wallet) {
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return r.contract.Read(txOpts, r.offset, r.numSlots)
+		return r.Contract.Read(txOpts, r.Offset, r.NumSlots)
 	})
 }
 
 type WriteTest struct {
-	contract *contracts.LoadSimulator
-	numSlots *big.Int
+	Contract *contracts.LoadSimulator
+	NumSlots *big.Int
 
 	mu   sync.Mutex
-	rand *rand.Rand
+	Rand *rand.Rand
 }
 
 func (w *WriteTest) Run(tc tests.TestContext, wallet *Wallet) {
 	w.mu.Lock()
-	value := w.rand.Int63()
+	value := w.Rand.Int63()
 	w.mu.Unlock()
 
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return w.contract.Write(txOpts, w.numSlots, big.NewInt(value))
+		return w.Contract.Write(txOpts, w.NumSlots, big.NewInt(value))
 	})
 }
 
 type ModifyTest struct {
-	contract *contracts.LoadSimulator
-	numSlots *big.Int
+	Contract *contracts.LoadSimulator
+	NumSlots *big.Int
 
 	mu   sync.Mutex
-	rand *rand.Rand
+	Rand *rand.Rand
 }
 
 func (m *ModifyTest) Run(tc tests.TestContext, wallet *Wallet) {
 	m.mu.Lock()
-	value := m.rand.Int63()
+	value := m.Rand.Int63()
 	m.mu.Unlock()
 
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return m.contract.Modify(txOpts, m.numSlots, big.NewInt(value))
+		return m.Contract.Modify(txOpts, m.NumSlots, big.NewInt(value))
 	})
 }
 
 type HashTest struct {
-	contract      *contracts.LoadSimulator
-	value         *big.Int
-	numIterations *big.Int
+	Contract      *contracts.LoadSimulator
+	Value         *big.Int
+	NumIterations *big.Int
 }
 
 func (h HashTest) Run(tc tests.TestContext, wallet *Wallet) {
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return h.contract.Hash(txOpts, h.value, h.numIterations)
+		return h.Contract.Hash(txOpts, h.Value, h.NumIterations)
 	})
 }
 
 type DeployTest struct {
-	contract *contracts.LoadSimulator
+	Contract *contracts.LoadSimulator
 }
 
 func (d DeployTest) Run(tc tests.TestContext, wallet *Wallet) {
-	executeContractTx(tc, wallet, d.contract.Deploy)
+	executeContractTx(tc, wallet, d.Contract.Deploy)
 }
 
 type LargeCalldataTest struct {
-	contract *contracts.LoadSimulator
-	calldata []byte
+	Contract *contracts.LoadSimulator
+	Calldata []byte
 }
 
 func (l LargeCalldataTest) Run(tc tests.TestContext, wallet *Wallet) {
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return l.contract.LargeCalldata(txOpts, l.calldata)
+		return l.Contract.LargeCalldata(txOpts, l.Calldata)
 	})
 }
 
