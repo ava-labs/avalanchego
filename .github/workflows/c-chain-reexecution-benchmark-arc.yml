@@ -47,15 +47,20 @@ jobs:
         shell: bash -x {0}
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo 'matrix={
-              "start-block": "${{ github.event.inputs.start-block }}",
-              "end-block": "${{ github.event.inputs.end-block }}",
-              "source-block-dir": "${{ github.event.inputs.source-block-dir }}",
-              "current-state-dir": "${{ github.event.inputs.current-state-dir }}",
-              "config": "${{ github.event.inputs.config }}"
-            }' >> "$GITHUB_OUTPUT"
+            echo "matrix<<EOF" >> "$GITHUB_OUTPUT"
+            printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "source-block-dir": "%s", "current-state-dir": "%s", "config": "%s" }] }' \
+              "${{ github.event.inputs.start-block }}" \
+              "${{ github.event.inputs.end-block }}" \
+              "${{ github.event.inputs.source-block-dir }}" \
+              "${{ github.event.inputs.current-state-dir }}" \
+              "${{ github.event.inputs.config }}" \
+              >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
           else
-            echo "matrix=$(jq -r .${{ github.event_name }} .github/workflows/c-chain-reexecution-benchmark-arc.json)" >> "$GITHUB_OUTPUT"
+            json_string=$(jq -r '.${{ github.event_name }}' .github/workflows/c-chain-reexecution-benchmark-arc.json)
+            echo "matrix<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$json_string" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
           fi
 
   c-chain-reexecution-arc: # PR smoke test + scheduled run + manual workflow
