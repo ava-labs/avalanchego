@@ -36,26 +36,34 @@ on:
     - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 
 jobs:
-  define-config-matrix:
+  define-matrix:
     runs-on: ubuntu-latest
     outputs:
-      config: ${{ steps.define-config-matrix.outputs.config }}
+      config: ${{ steps.define-matrix.outputs.matrix }}
     steps:
-      - name: Define config matrix
-        id: define-config-matrix
-        shell: bash
+      - uses: actions/checkout@v4
+      - name: Define Matrix
+        id: define-matrix
+        shell: bash -x {0}
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "config=[${{ github.event.inputs.config }}]" >> "$GITHUB_OUTPUT"
+            echo 'matrix={
+              "start-block": "${{ github.event.inputs.start-block }}",
+              "end-block": "${{ github.event.inputs.end-block }}",
+              "source-block-dir": "${{ github.event.inputs.source-block-dir }}",
+              "current-state-dir": "${{ github.event.inputs.current-state-dir }}",
+              "config": "${{ github.event.inputs.config }}"
+            }' >> "$GITHUB_OUTPUT"
           else
-            echo 'config=["", "archive", "firewood"]' >> "$GITHUB_OUTPUT"
+            echo "matrix=$(jq -r .${{ github.event_name }} .github/workflows/c-chain-reexecution-benchmark-arc.json)" >> "$GITHUB_OUTPUT"
           fi
 
   c-chain-reexecution-arc: # PR smoke test + scheduled run + manual workflow
     needs: define-config-matrix
     strategy:
-      matrix:
-        config: ${{ fromJSON(needs.define-config-matrix.outputs.config) }}
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
+
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego' }}
     permissions:
       id-token: write
@@ -65,32 +73,6 @@ jobs:
       image: ghcr.io/actions/actions-runner:2.325.0
     steps:
       - uses: actions/checkout@v4
-      - name: Set task parameters
-        id: set-params
-        shell: bash
-        run: |
-          if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            {
-              echo "start-block=33000001"
-              echo "end-block=34000000"
-              echo "source-block-dir=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-50m-ldb/**"
-              echo "current-state-dir=s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-33m/**"
-            } >> "$GITHUB_OUTPUT"
-          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            {
-              echo "start-block=101"
-              echo "end-block=250000"
-              echo "source-block-dir=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**"
-              echo "current-state-dir=s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"
-            } >> "$GITHUB_OUTPUT"
-          else
-            {
-              echo "start-block=${{ github.event.inputs.start-block }}"
-              echo "end-block=${{ github.event.inputs.end-block }}"
-              echo "source-block-dir=${{ github.event.inputs.source-block-dir }}"
-              echo "current-state-dir=${{ github.event.inputs.current-state-dir }}"
-            } >> "$GITHUB_OUTPUT"
-          fi
       - name: Install ARC Dependencies
         shell: bash
         run: |
@@ -103,10 +85,10 @@ jobs:
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
           config: ${{ matrix.config }}
-          start-block: ${{ steps.set-params.outputs.start-block }}
-          end-block: ${{ steps.set-params.outputs.end-block }}
-          source-block-dir: ${{ steps.set-params.outputs.source-block-dir }}
-          current-state-dir: ${{ steps.set-params.outputs.current-state-dir }}
+          start-block: ${{ matrix.start-block }}
+          end-block: ${{ matrix.end-block }}
+          source-block-dir: ${{ matrix.source-block-dir }}
+          current-state-dir: ${{ matrix.current-state-dir }}
           prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           push-github-action-benchmark: ${{ github.event_name == 'schedule' }}
