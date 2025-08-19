@@ -254,9 +254,9 @@ type ReadTest struct {
 	numSlots *big.Int
 }
 
-func (n ReadTest) Run(tc tests.TestContext, wallet *Wallet) {
+func (r ReadTest) Run(tc tests.TestContext, wallet *Wallet) {
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return n.contract.Read(txOpts, n.offset, n.numSlots)
+		return r.contract.Read(txOpts, r.offset, r.numSlots)
 	})
 }
 
@@ -268,13 +268,13 @@ type WriteTest struct {
 	rand *rand.Rand
 }
 
-func (n *WriteTest) Run(tc tests.TestContext, wallet *Wallet) {
-	n.mu.Lock()
-	value := n.rand.Int63()
-	n.mu.Unlock()
+func (w *WriteTest) Run(tc tests.TestContext, wallet *Wallet) {
+	w.mu.Lock()
+	value := w.rand.Int63()
+	w.mu.Unlock()
 
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return n.contract.Write(txOpts, n.numSlots, big.NewInt(value))
+		return w.contract.Write(txOpts, w.numSlots, big.NewInt(value))
 	})
 }
 
@@ -286,13 +286,13 @@ type ModifyTest struct {
 	rand *rand.Rand
 }
 
-func (n *ModifyTest) Run(tc tests.TestContext, wallet *Wallet) {
-	n.mu.Lock()
-	value := n.rand.Int63()
-	n.mu.Unlock()
+func (m *ModifyTest) Run(tc tests.TestContext, wallet *Wallet) {
+	m.mu.Lock()
+	value := m.rand.Int63()
+	m.mu.Unlock()
 
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return n.contract.Modify(txOpts, n.numSlots, big.NewInt(value))
+		return m.contract.Modify(txOpts, m.numSlots, big.NewInt(value))
 	})
 }
 
@@ -302,9 +302,9 @@ type HashTest struct {
 	numIterations *big.Int
 }
 
-func (n HashTest) Run(tc tests.TestContext, wallet *Wallet) {
+func (h HashTest) Run(tc tests.TestContext, wallet *Wallet) {
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return n.contract.Hash(txOpts, n.value, n.numIterations)
+		return h.contract.Hash(txOpts, h.value, h.numIterations)
 	})
 }
 
@@ -312,8 +312,8 @@ type DeployTest struct {
 	contract *contracts.LoadSimulator
 }
 
-func (n DeployTest) Run(tc tests.TestContext, wallet *Wallet) {
-	executeContractTx(tc, wallet, n.contract.Deploy)
+func (d DeployTest) Run(tc tests.TestContext, wallet *Wallet) {
+	executeContractTx(tc, wallet, d.contract.Deploy)
 }
 
 type LargeCalldataTest struct {
@@ -321,9 +321,9 @@ type LargeCalldataTest struct {
 	calldata []byte
 }
 
-func (n LargeCalldataTest) Run(tc tests.TestContext, wallet *Wallet) {
+func (l LargeCalldataTest) Run(tc tests.TestContext, wallet *Wallet) {
 	executeContractTx(tc, wallet, func(txOpts *bind.TransactOpts) (*types.Transaction, error) {
-		return n.contract.LargeCalldata(txOpts, n.calldata)
+		return l.contract.LargeCalldata(txOpts, l.calldata)
 	})
 }
 
