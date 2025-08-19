@@ -39,7 +39,7 @@ jobs:
   define-matrix:
     runs-on: ubuntu-latest
     outputs:
-      config: ${{ steps.define-matrix.outputs.matrix }}
+      matrix: ${{ steps.define-matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
       - name: Define Matrix
@@ -59,7 +59,7 @@ jobs:
           fi
 
   c-chain-reexecution-arc: # PR smoke test + scheduled run + manual workflow
-    needs: define-config-matrix
+    needs: define-matrix
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
