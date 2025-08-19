@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/message"
 	"github.com/ava-labs/avalanchego/network"
 	"github.com/ava-labs/avalanchego/network/p2p"
+	"github.com/ava-labs/avalanchego/simplex"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/bootstrap/queue"
@@ -1683,10 +1684,7 @@ func (m *manager) createChainHandler(ctx *snow.ConsensusContext, vdrs validators
 
 	h.SetEngineManager(&handler.EngineManager{
 		Avalanche: nil,
-		Snowman:   nil,
-		Simplex: &handler.Engine{
-			Consensus: simplexEngine,
-		},
+		Snowman:   simplexEngine,
 	})
 
 	return h, nil
