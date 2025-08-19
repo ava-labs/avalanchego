@@ -75,6 +75,7 @@ runs:
       with:
         run: |
           ./scripts/run_task.sh reexecute-cchain-range-with-copied-data \
+            CONFIG=${{ inputs.config }} \
             EXECUTION_DATA_DIR=${{ env.EXECUTION_DATA_DIR }} \
             SOURCE_BLOCK_DIR=${{ env.SOURCE_BLOCK_DIR }} \
             CURRENT_STATE_DIR=${{ env.CURRENT_STATE_DIR }} \
