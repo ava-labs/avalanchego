@@ -275,12 +275,8 @@ func (i *ipTracker) WantsConnection(nodeID ids.NodeID) bool {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
 
-	if i.connectToAllValidators {
-		return true
-	}
-
 	node, ok := i.tracked[nodeID]
-	return ok && node.wantsConnection()
+	return ok && (node.wantsConnection() || (i.connectToAllValidators && node.validatedSubnets.Len() > 0))
 }
 
 // ShouldVerifyIP is used as an optimization to avoid unnecessary IP
