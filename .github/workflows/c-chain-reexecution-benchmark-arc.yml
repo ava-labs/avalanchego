@@ -52,7 +52,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             {
               echo "start-block=101"
-              echo "end-block=250000"
+              echo "end-block=1000"
               echo "source-block-dir=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip"
               echo "current-state-dir=s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip"
             } >> "$GITHUB_OUTPUT"
