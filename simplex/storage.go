@@ -98,7 +98,7 @@ func newStorage(ctx context.Context, config *Config, qcDeserializer *QCDeseriali
 	return s, nil
 }
 
-func (s *Storage) Height() uint64 {
+func (s *Storage) NumBlocks() uint64 {
 	return s.height.Load()
 }
 

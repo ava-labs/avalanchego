@@ -59,9 +59,9 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 		return nil, err
 	}
 
-	lastBlock, _, err := storage.Retrieve(storage.Height() - 1)
+	lastBlock, _, err := storage.Retrieve(storage.NumBlocks() - 1)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't find last block at height %d: %w", storage.Height()-1, err)
+		return nil, fmt.Errorf("couldn't find last block at height %d: %w", storage.NumBlocks()-1, err)
 	}
 
 	blockTracker := newBlockTracker(lastBlock.(*Block))

@@ -7,9 +7,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/simplex"
 )
@@ -37,9 +35,9 @@ func TestSimplexEngineStart(t *testing.T) {
 	require.Equal(t, uint64(1), md.Round)
 
 	// Mock sender
-	sender := config.Sender.(*sendermock.ExternalSender)
-	// TODO: remove when simplex dependency updated
-	sender.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+	// sender := config.Sender.(*sendermock.ExternalSender)
+	// // TODO: remove when simplex dependency updated
+	// sender.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 
 	qcBytes := buildQCBytes(t, configs)
 
