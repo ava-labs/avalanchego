@@ -123,13 +123,10 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 		return nil, simplex.Finalization{}, err
 	}
 
-	vb := &Block{vmBlock: block, metadata: finalization.Finalization.ProtocolMetadata, blockTracker: s.blockTracker}
-	bytes, err := vb.Bytes()
+	vb, err := newBlock(finalization.Finalization.ProtocolMetadata, block, s.blockTracker)
 	if err != nil {
-		s.log.Error("Failed to serialize block", zap.Error(err))
 		return nil, simplex.Finalization{}, err
 	}
-	vb.digest = computeDigest(bytes)
 
 	return vb, finalization, nil
 }
