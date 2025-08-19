@@ -1,8 +1,8 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use std::path::PathBuf;
 use std::sync::Arc;
+use std::{collections::BTreeMap, path::PathBuf};
 
 use clap::Args;
 use firewood::v2::api;
@@ -96,32 +96,27 @@ pub(super) fn run(opts: &Options) -> Result<(), api::Error> {
     Ok(())
 }
 
+fn calculate_area_totals(area_counts: &BTreeMap<u64, u64>) -> (u64, u64) {
+    let total_area_count = area_counts.values().sum::<u64>();
+    let total_area_bytes = area_counts
+        .iter()
+        .map(|(area_size, count)| area_size.saturating_mul(*count))
+        .sum::<u64>();
+    (total_area_count, total_area_bytes)
+}
+
 #[expect(clippy::cast_precision_loss)]
 #[expect(clippy::too_many_lines)]
 fn print_stats_report(db_stats: DBStats) {
-    let total_branch_area_count = db_stats.trie_stats.branch_area_counts.values().sum::<u64>();
-    let total_leaf_area_count = db_stats.trie_stats.leaf_area_counts.values().sum::<u64>();
+    let (total_branch_area_count, total_branch_area_bytes) =
+        calculate_area_totals(&db_stats.trie_stats.branch_area_counts);
+    let (total_leaf_area_count, total_leaf_area_bytes) =
+        calculate_area_totals(&db_stats.trie_stats.leaf_area_counts);
     let total_trie_area_count = total_branch_area_count.saturating_add(total_leaf_area_count);
-    let total_branch_area_bytes = db_stats
-        .trie_stats
-        .branch_area_counts
-        .iter()
-        .map(|(area_size, count)| area_size.saturating_mul(*count))
-        .sum::<u64>();
-    let total_leaf_area_bytes = db_stats
-        .trie_stats
-        .leaf_area_counts
-        .iter()
-        .map(|(area_size, count)| area_size.saturating_mul(*count))
-        .sum::<u64>();
     let total_trie_area_bytes = total_branch_area_bytes.saturating_add(total_leaf_area_bytes);
-    let total_free_list_area_count = db_stats.free_list_stats.area_counts.values().sum::<u64>();
-    let total_free_list_area_bytes = db_stats
-        .free_list_stats
-        .area_counts
-        .iter()
-        .map(|(area_size, count)| area_size.saturating_mul(*count))
-        .sum::<u64>();
+
+    let (total_free_list_area_count, total_free_list_area_bytes) =
+        calculate_area_totals(&db_stats.free_list_stats.area_counts);
 
     // Basic stats
     println!("\nBasic Stats: ");
