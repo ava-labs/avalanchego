@@ -18,13 +18,15 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	wallet "github.com/ava-labs/avalanchego/wallet/subnet/primary"
 	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/subnet-evm/core"
-	"github.com/ava-labs/subnet-evm/plugin/evm"
 	"github.com/go-cmd/cmd"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/subnet-evm/core"
+	"github.com/ava-labs/subnet-evm/plugin/evm"
+
+	wallet "github.com/ava-labs/avalanchego/wallet/subnet/primary"
 )
 
 type SubnetSuite struct {

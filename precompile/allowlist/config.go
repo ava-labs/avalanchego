@@ -4,15 +4,17 @@
 package allowlist
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
 	"github.com/ava-labs/libevm/common"
+
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 )
 
-var ErrCannotAddManagersBeforeDurango = fmt.Errorf("cannot add managers before Durango")
+var ErrCannotAddManagersBeforeDurango = errors.New("cannot add managers before Durango")
 
 // AllowListConfig specifies the initial set of addresses with Admin or Enabled roles.
 type AllowListConfig struct {

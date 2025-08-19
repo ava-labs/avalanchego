@@ -6,8 +6,9 @@ package extras
 import (
 	"testing"
 
-	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/ava-labs/subnet-evm/utils"
 )
 
 func TestIsTimestampForked(t *testing.T) {

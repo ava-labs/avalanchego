@@ -9,8 +9,10 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/core/types"
-	ethcrypto "github.com/ava-labs/libevm/crypto"
+
 	"github.com/ava-labs/subnet-evm/ethclient"
+
+	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 
 var _ TxSequence[*types.Transaction] = (*txSequence)(nil)

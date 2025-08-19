@@ -4,15 +4,19 @@
 package extras
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
 
 	"github.com/ava-labs/avalanchego/upgrade"
-	ethparams "github.com/ava-labs/libevm/params"
+
 	"github.com/ava-labs/subnet-evm/utils"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
-var errCannotBeNil = fmt.Errorf("timestamp cannot be nil")
+var errCannotBeNil = errors.New("timestamp cannot be nil")
 
 // NetworkUpgrades contains timestamps that enable network upgrades.
 // Avalanche specific network upgrades are also included here.
@@ -218,5 +222,5 @@ func ptrToString(val *uint64) string {
 	if val == nil {
 		return "nil"
 	}
-	return fmt.Sprintf("%d", *val)
+	return strconv.FormatUint(*val, 10)
 }

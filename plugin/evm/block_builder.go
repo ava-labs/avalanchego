@@ -9,12 +9,14 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/snow"
-	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/libevm/log"
+	"github.com/holiman/uint256"
+
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/txpool"
-	"github.com/holiman/uint256"
+
+	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 const (

@@ -4,6 +4,7 @@
 package firewood
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -125,7 +126,7 @@ func New(config *Config) *Database {
 
 func validatePath(trieConfig *Config) (*ffi.Config, error) {
 	if trieConfig.FilePath == "" {
-		return nil, fmt.Errorf("firewood database file path must be set")
+		return nil, errors.New("firewood database file path must be set")
 	}
 
 	// Check that the directory exists
@@ -134,7 +135,7 @@ func validatePath(trieConfig *Config) (*ffi.Config, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			log.Info("Database directory not found, creating", "path", dir)
-			if err := os.MkdirAll(dir, 0755); err != nil {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
 				return nil, fmt.Errorf("error creating database directory: %w", err)
 			}
 		} else {
@@ -533,7 +534,7 @@ func (db *Database) getProposalHash(parentRoot common.Hash, keys, values [][]byt
 		// Propose from the database root.
 		p, err = db.fwDisk.Propose(keys, values)
 		if err != nil {
-			return common.Hash{}, fmt.Errorf("firewood: error proposing from root %s: %v", parentRoot.Hex(), err)
+			return common.Hash{}, fmt.Errorf("firewood: error proposing from root %s: %w", parentRoot.Hex(), err)
 		}
 	} else {
 		// Find any proposal with the given parent root.
@@ -547,7 +548,7 @@ func (db *Database) getProposalHash(parentRoot common.Hash, keys, values [][]byt
 
 		p, err = rootProposal.Propose(keys, values)
 		if err != nil {
-			return common.Hash{}, fmt.Errorf("firewood: error proposing from parent proposal %s: %v", parentRoot.Hex(), err)
+			return common.Hash{}, fmt.Errorf("firewood: error proposing from parent proposal %s: %w", parentRoot.Hex(), err)
 		}
 	}
 	ffiHashCount.Inc(1)

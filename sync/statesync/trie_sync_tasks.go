@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
+
 	"github.com/ava-labs/subnet-evm/sync/syncutils"
 )
 

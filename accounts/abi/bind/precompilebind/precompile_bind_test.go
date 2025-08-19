@@ -37,8 +37,9 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/subnet-evm/accounts/abi/bind"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/subnet-evm/accounts/abi/bind"
 )
 
 var bindTests = []struct {

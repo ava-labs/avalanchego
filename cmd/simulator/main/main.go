@@ -9,11 +9,13 @@ import (
 	"fmt"
 	"os"
 
-	gethlog "github.com/ava-labs/libevm/log"
+	"github.com/spf13/pflag"
+
 	"github.com/ava-labs/subnet-evm/cmd/simulator/config"
 	"github.com/ava-labs/subnet-evm/cmd/simulator/load"
 	"github.com/ava-labs/subnet-evm/log"
-	"github.com/spf13/pflag"
+
+	gethlog "github.com/ava-labs/libevm/log"
 )
 
 func main() {

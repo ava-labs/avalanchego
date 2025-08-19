@@ -18,10 +18,11 @@ import (
 	"github.com/ava-labs/libevm/libevm/stateconf"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/ava-labs/subnet-evm/triedb/firewood"
-	"github.com/ava-labs/subnet-evm/triedb/hashdb"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/subnet-evm/triedb/firewood"
+	"github.com/ava-labs/subnet-evm/triedb/hashdb"
 )
 
 const (
@@ -35,17 +36,15 @@ const (
 	maxStep
 )
 
-var (
-	stepMap = map[byte]string{
-		commit:        "commit",
-		createAccount: "createAccount",
-		updateAccount: "updateAccount",
-		deleteAccount: "deleteAccount",
-		addStorage:    "addStorage",
-		updateStorage: "updateStorage",
-		deleteStorage: "deleteStorage",
-	}
-)
+var stepMap = map[byte]string{
+	commit:        "commit",
+	createAccount: "createAccount",
+	updateAccount: "updateAccount",
+	deleteAccount: "deleteAccount",
+	addStorage:    "addStorage",
+	updateStorage: "updateStorage",
+	deleteStorage: "deleteStorage",
+}
 
 type fuzzState struct {
 	require *require.Assertions
@@ -99,14 +98,14 @@ func newFuzzState(t *testing.T) *fuzzState {
 
 	return &fuzzState{
 		merkleTries: []*merkleTrie{
-			&merkleTrie{
+			{
 				name:             "hash",
 				ethDatabase:      hashState,
 				accountTrie:      hashTr,
 				openStorageTries: make(map[common.Address]state.Trie),
 				lastRoot:         ethRoot,
 			},
-			&merkleTrie{
+			{
 				name:             "firewood",
 				ethDatabase:      firewoodState,
 				accountTrie:      fwTr,

@@ -12,9 +12,11 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
-	ethparams "github.com/ava-labs/libevm/params"
+
 	"github.com/ava-labs/subnet-evm/ethclient"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 const numTriggerTxs = 2 // Number of txs needed to activate the proposer VM fork

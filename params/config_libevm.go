@@ -7,10 +7,12 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/libevm/common"
-	ethparams "github.com/ava-labs/libevm/params"
+
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 // libevmInit would ideally be a regular init() function, but it MUST be run

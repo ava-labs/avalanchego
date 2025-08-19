@@ -6,8 +6,9 @@ package customtypes
 import (
 	"io"
 
-	ethtypes "github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
+
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 var extras = ethtypes.RegisterExtras[

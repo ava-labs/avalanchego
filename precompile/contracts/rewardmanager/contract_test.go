@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	ethtypes "github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -18,6 +17,8 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/precompiletest"
+
+	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 var (
@@ -440,7 +441,8 @@ func assertRewardAddressChanged(
 	logs []*ethtypes.Log,
 	caller,
 	oldAddress,
-	newAddress common.Address) {
+	newAddress common.Address,
+) {
 	require.Len(t, logs, 1)
 	log := logs[0]
 	require.Equal(
@@ -459,7 +461,8 @@ func assertRewardAddressChanged(
 func assertRewardsDisabled(
 	t testing.TB,
 	logs []*ethtypes.Log,
-	caller common.Address) {
+	caller common.Address,
+) {
 	require.Len(t, logs, 1)
 	log := logs[0]
 	require.Equal(
@@ -476,7 +479,8 @@ func assertRewardsDisabled(
 func assertFeeRecipientsAllowed(
 	t testing.TB,
 	logs []*ethtypes.Log,
-	caller common.Address) {
+	caller common.Address,
+) {
 	require.Len(t, logs, 1)
 	log := logs[0]
 	require.Equal(

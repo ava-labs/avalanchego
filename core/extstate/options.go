@@ -5,6 +5,7 @@ package extstate
 
 import (
 	"github.com/ava-labs/libevm/core/state"
+
 	"github.com/ava-labs/subnet-evm/utils"
 )
 

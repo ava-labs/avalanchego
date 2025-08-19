@@ -10,9 +10,10 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ava-labs/subnet-evm/utils/utilstest"
-	"github.com/stretchr/testify/require"
 )
 
 func TestVerifyStateUpgrades(t *testing.T) {

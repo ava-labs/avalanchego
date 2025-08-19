@@ -16,16 +16,18 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	ethcrypto "github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
-	ethparams "github.com/ava-labs/libevm/params"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/ava-labs/subnet-evm/cmd/simulator/config"
 	"github.com/ava-labs/subnet-evm/cmd/simulator/key"
 	"github.com/ava-labs/subnet-evm/cmd/simulator/metrics"
 	"github.com/ava-labs/subnet-evm/cmd/simulator/txs"
 	"github.com/ava-labs/subnet-evm/ethclient"
 	"github.com/ava-labs/subnet-evm/params"
-	"golang.org/x/sync/errgroup"
+
+	ethcrypto "github.com/ava-labs/libevm/crypto"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 const (

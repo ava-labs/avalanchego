@@ -7,8 +7,9 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	ethrawdb "github.com/ava-labs/libevm/core/rawdb"
 	"github.com/stretchr/testify/require"
+
+	ethrawdb "github.com/ava-labs/libevm/core/rawdb"
 )
 
 func TestClearPrefix(t *testing.T) {

@@ -4,10 +4,12 @@
 package commontype
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/ava-labs/libevm/common"
+
 	"github.com/ava-labs/subnet-evm/utils"
 )
 
@@ -63,19 +65,19 @@ var EmptyFeeConfig = FeeConfig{}
 func (f *FeeConfig) Verify() error {
 	switch {
 	case f.GasLimit == nil:
-		return fmt.Errorf("gasLimit cannot be nil")
+		return errors.New("gasLimit cannot be nil")
 	case f.MinBaseFee == nil:
-		return fmt.Errorf("minBaseFee cannot be nil")
+		return errors.New("minBaseFee cannot be nil")
 	case f.TargetGas == nil:
-		return fmt.Errorf("targetGas cannot be nil")
+		return errors.New("targetGas cannot be nil")
 	case f.BaseFeeChangeDenominator == nil:
-		return fmt.Errorf("baseFeeChangeDenominator cannot be nil")
+		return errors.New("baseFeeChangeDenominator cannot be nil")
 	case f.MinBlockGasCost == nil:
-		return fmt.Errorf("minBlockGasCost cannot be nil")
+		return errors.New("minBlockGasCost cannot be nil")
 	case f.MaxBlockGasCost == nil:
-		return fmt.Errorf("maxBlockGasCost cannot be nil")
+		return errors.New("maxBlockGasCost cannot be nil")
 	case f.BlockGasCostStep == nil:
-		return fmt.Errorf("blockGasCostStep cannot be nil")
+		return errors.New("blockGasCostStep cannot be nil")
 	}
 
 	switch {

@@ -10,9 +10,10 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/stretchr/testify/require"
 )
 
 func TestFeeInfoProvider(t *testing.T) {

@@ -11,10 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/subnet-evm/commontype"
-	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/subnet-evm/commontype"
+	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 )
 
 func pointer[T any](v T) *T { return &v }
@@ -64,7 +65,7 @@ $`,
 						{
 							BlockTimestamp: pointer(uint64(14)),
 							StateUpgradeAccounts: map[common.Address]StateUpgradeAccount{
-								common.Address{15}: {
+								{15}: {
 									Code: []byte{16},
 								},
 							},

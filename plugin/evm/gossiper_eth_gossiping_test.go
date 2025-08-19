@@ -15,17 +15,15 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
-
-	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
-
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
-
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/params"
+
+	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 func fundAddressByGenesis(addrs []common.Address) (string, error) {

@@ -5,6 +5,7 @@ package aggregator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -12,8 +13,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
-	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"google.golang.org/protobuf/proto"
+
+	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 const (
@@ -92,7 +94,7 @@ func (s *NetworkSignatureGetter) GetSignature(ctx context.Context, nodeID ids.No
 		}
 
 		if len(response.Signature) == 0 {
-			return nil, fmt.Errorf("received empty signature response")
+			return nil, errors.New("received empty signature response")
 		}
 		blsSignature, err := bls.SignatureFromBytes(response.Signature[:])
 		if err != nil {

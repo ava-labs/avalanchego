@@ -4,7 +4,6 @@
 package allowlist
 
 import (
-	_ "embed"
 	"errors"
 	"fmt"
 	"math/big"
@@ -12,6 +11,9 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
+
+	_ "embed"
+
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 )
 
@@ -92,7 +94,6 @@ func createAllowListRoleSetter(precompileAddr common.Address, role Role) contrac
 		// do not use strict mode after Durango
 		useStrictMode := !contract.IsDurangoActivated(evm)
 		modifyAddress, err := UnpackModifyAllowListInput(input, role, useStrictMode)
-
 		if err != nil {
 			return nil, remainingGas, err
 		}
@@ -203,7 +204,7 @@ func CreateAllowListFunctions(precompileAddr common.Address) []*contract.Statefu
 		} else if managerFnName, _ := ManagerRole.GetSetterFunctionName(); name == managerFnName {
 			fn = contract.NewStatefulPrecompileFunctionWithActivator(method.ID, createAllowListRoleSetter(precompileAddr, ManagerRole), contract.IsDurangoActivated)
 		} else {
-			panic(fmt.Sprintf("unexpected method name: %s", name))
+			panic("unexpected method name: " + name)
 		}
 		functions = append(functions, fn)
 	}

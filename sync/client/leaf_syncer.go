@@ -11,14 +11,13 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/log"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/subnet-evm/utils"
-	"golang.org/x/sync/errgroup"
 )
 
-var (
-	errFailedToFetchLeafs = errors.New("failed to fetch leafs")
-)
+var errFailedToFetchLeafs = errors.New("failed to fetch leafs")
 
 // LeafSyncTask represents a complete task to be completed by the leaf syncer.
 // Note: each LeafSyncTask is processed on its own goroutine and there will
@@ -103,7 +102,7 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 			Limit:   c.requestSize,
 		})
 		if err != nil {
-			return fmt.Errorf("%s: %w", errFailedToFetchLeafs, err)
+			return fmt.Errorf("%w: %w", errFailedToFetchLeafs, err)
 		}
 
 		// resize [leafsResponse.Keys] and [leafsResponse.Vals] in case
@@ -135,7 +134,7 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 		}
 
 		if len(leafsResponse.Keys) == 0 {
-			return fmt.Errorf("found no keys in a response with more set to true")
+			return errors.New("found no keys in a response with more set to true")
 		}
 		// Update start to be one bit past the last returned key for the next request.
 		// Note: since more was true, this cannot cause an overflow.

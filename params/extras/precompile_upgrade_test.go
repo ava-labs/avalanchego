@@ -8,10 +8,11 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/subnet-evm/utils"
-	"github.com/stretchr/testify/require"
 )
 
 func TestVerifyUpgradeConfig(t *testing.T) {

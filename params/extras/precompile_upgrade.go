@@ -9,10 +9,12 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
-	ethparams "github.com/ava-labs/libevm/params"
+
 	"github.com/ava-labs/subnet-evm/precompile/modules"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/utils"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 var errNoKey = errors.New("PrecompileUpgrade cannot be empty")

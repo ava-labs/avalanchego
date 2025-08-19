@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+
 	"github.com/ava-labs/subnet-evm/plugin/evm/validators/interfaces"
+
 	stateinterfaces "github.com/ava-labs/subnet-evm/plugin/evm/validators/state/interfaces"
 )
 

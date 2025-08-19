@@ -8,10 +8,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/subnet-evm/plugin/evm/validators/state"
-	"github.com/ava-labs/subnet-evm/plugin/evm/validators/state/interfaces"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+
+	"github.com/ava-labs/subnet-evm/plugin/evm/validators/state"
+	"github.com/ava-labs/subnet-evm/plugin/evm/validators/state/interfaces"
 
 	avagovalidators "github.com/ava-labs/avalanchego/snow/validators"
 )

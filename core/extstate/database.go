@@ -7,6 +7,7 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/triedb"
+
 	"github.com/ava-labs/subnet-evm/triedb/firewood"
 )
 

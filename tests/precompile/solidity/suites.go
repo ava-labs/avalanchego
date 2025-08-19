@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/subnet-evm/tests/utils"
+
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
@@ -28,7 +29,7 @@ func RegisterAsyncTests() {
 	}
 	subnetsSuite := utils.CreateSubnetsSuite(genesisFiles)
 
-	var _ = ginkgo.Describe("[Asynchronized Precompile Tests]", func() {
+	_ = ginkgo.Describe("[Asynchronized Precompile Tests]", func() {
 		// Register the ping test first
 		utils.RegisterPingTest()
 

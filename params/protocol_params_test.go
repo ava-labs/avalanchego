@@ -7,8 +7,9 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/assert"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 // TestUpstreamParamsValues detects when a params value changes upstream to prevent a subtle change

@@ -5,9 +5,7 @@ package constants
 
 import "github.com/ava-labs/libevm/common"
 
-var (
-	BlackholeAddr = common.Address{
-		1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	}
-)
+var BlackholeAddr = common.Address{
+	1, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+}

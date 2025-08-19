@@ -7,10 +7,12 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/core/types"
-	ethparams "github.com/ava-labs/libevm/params"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/params/extras"
-	"github.com/stretchr/testify/require"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestGasLimit(t *testing.T) {

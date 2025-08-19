@@ -11,23 +11,22 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ava-labs/avalanchego/ids"
-
-	"github.com/ava-labs/subnet-evm/sync/client/stats"
-
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/version"
-
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
-	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/trie"
+
 	"github.com/ava-labs/subnet-evm/network"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
+	"github.com/ava-labs/subnet-evm/sync/client/stats"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 const (
@@ -143,7 +142,7 @@ func parseLeafsResponse(codec codec.Manager, reqIntf message.Request, data []byt
 
 	// An empty response (no more keys) requires a merkle proof
 	if len(leafsResponse.Keys) == 0 && len(leafsResponse.ProofVals) == 0 {
-		return nil, 0, fmt.Errorf("empty key response must include merkle proof")
+		return nil, 0, errors.New("empty key response must include merkle proof")
 	}
 
 	var proof ethdb.Database
@@ -174,7 +173,7 @@ func parseLeafsResponse(codec codec.Manager, reqIntf message.Request, data []byt
 	// Also ensures the keys are in monotonically increasing order
 	more, err := trie.VerifyRangeProof(leafsRequest.Root, firstKey, leafsResponse.Keys, leafsResponse.Vals, proof)
 	if err != nil {
-		return nil, 0, fmt.Errorf("%s due to %w", errInvalidRangeProof, err)
+		return nil, 0, fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
 	}
 
 	// Set the [More] flag to indicate if there are more leaves to the right of the last key in the response
@@ -206,7 +205,7 @@ func (c *client) GetBlocks(ctx context.Context, hash common.Hash, height uint64,
 func (c *client) parseBlocks(codec codec.Manager, req message.Request, data []byte) (interface{}, int, error) {
 	var response message.BlockResponse
 	if _, err := codec.Unmarshal(data, &response); err != nil {
-		return nil, 0, fmt.Errorf("%s: %w", errUnmarshalResponse, err)
+		return nil, 0, fmt.Errorf("%w: %w", errUnmarshalResponse, err)
 	}
 	if len(response.Blocks) == 0 {
 		return nil, 0, errEmptyResponse
@@ -224,7 +223,7 @@ func (c *client) parseBlocks(codec codec.Manager, req message.Request, data []by
 	for i, blkBytes := range response.Blocks {
 		block, err := c.blockParser.ParseEthBlock(blkBytes)
 		if err != nil {
-			return nil, 0, fmt.Errorf("%s: %w", errUnmarshalResponse, err)
+			return nil, 0, fmt.Errorf("%w: %w", errUnmarshalResponse, err)
 		}
 
 		if block.Hash() != hash {
@@ -306,7 +305,7 @@ func (c *client) get(ctx context.Context, request message.Request, parseFn parse
 		// If the context has finished, return the context error early.
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			if lastErr != nil {
-				return nil, fmt.Errorf("request failed after %d attempts with last error %w and ctx error %s", attempt, lastErr, ctxErr)
+				return nil, fmt.Errorf("request failed after %d attempts with last error %w and ctx error %w", attempt, lastErr, ctxErr)
 			} else {
 				return nil, ctxErr
 			}

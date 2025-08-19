@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
+
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/subnet-evm/sync/handlers"
 )
@@ -143,7 +144,7 @@ type testBlockParser struct{}
 func (t *testBlockParser) ParseEthBlock(b []byte) (*types.Block, error) {
 	block := new(types.Block)
 	if err := rlp.DecodeBytes(b, block); err != nil {
-		return nil, fmt.Errorf("%s: %w", errUnmarshalResponse, err)
+		return nil, fmt.Errorf("%w: %w", errUnmarshalResponse, err)
 	}
 
 	return block, nil

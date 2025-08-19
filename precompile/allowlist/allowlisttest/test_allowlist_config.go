@@ -8,12 +8,13 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"go.uber.org/mock/gomock"
+
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/precompiletest"
 	"github.com/ava-labs/subnet-evm/utils"
-	"go.uber.org/mock/gomock"
 )
 
 // mkConfigWithAllowList creates a new config with the correct type for [module]

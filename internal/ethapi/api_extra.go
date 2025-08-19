@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
+
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/params"
@@ -191,7 +192,7 @@ func (s *BlockChainAPI) stateQueryBlockNumberAllowed(blockNumOrHash rpc.BlockNum
 	} else if blockHash, ok := blockNumOrHash.Hash(); ok {
 		block, err := s.b.BlockByHash(context.Background(), blockHash)
 		if err != nil {
-			return fmt.Errorf("failed to get block from hash: %s", err)
+			return fmt.Errorf("failed to get block from hash: %w", err)
 		} else if block == nil {
 			return fmt.Errorf("block from hash %s doesn't exist", blockHash)
 		}

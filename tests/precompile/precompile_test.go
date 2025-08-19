@@ -7,10 +7,10 @@ import (
 	"os"
 	"testing"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-
 	// Import the solidity package, so that ginkgo maps out the tests declared within the package
 	"github.com/ava-labs/subnet-evm/tests/precompile/solidity"
+
+	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 func TestE2E(t *testing.T) {

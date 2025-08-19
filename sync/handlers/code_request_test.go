@@ -13,10 +13,12 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb/memorydb"
-	ethparams "github.com/ava-labs/libevm/params"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/subnet-evm/sync/handlers/stats"
-	"github.com/stretchr/testify/assert"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestCodeRequestHandler(t *testing.T) {

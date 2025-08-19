@@ -15,9 +15,10 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/subnet-evm/utils/utilstest"
-	"github.com/stretchr/testify/assert"
 )
 
 // AssertDBConsistency checks [serverTrieDB] and [clientTrieDB] have the same EVM state trie at [root],

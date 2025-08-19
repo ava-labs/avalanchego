@@ -8,9 +8,10 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/utils"
-	"github.com/stretchr/testify/require"
 )
 
 func TestSetEthUpgrades(t *testing.T) {

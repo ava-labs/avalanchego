@@ -7,9 +7,8 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/libevm/core/types"
-
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,13 +24,16 @@ func (t *MockTrieDB) Dereference(root common.Hash) error {
 	t.LastDereference = root
 	return nil
 }
+
 func (t *MockTrieDB) Commit(root common.Hash, report bool) error {
 	t.LastCommit = root
 	return nil
 }
+
 func (t *MockTrieDB) Size() (common.StorageSize, common.StorageSize, common.StorageSize) {
 	return 0, 0, 0
 }
+
 func (t *MockTrieDB) Cap(limit common.StorageSize) error {
 	return nil
 }

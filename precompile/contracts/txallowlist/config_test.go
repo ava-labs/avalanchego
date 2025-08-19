@@ -7,11 +7,12 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"go.uber.org/mock/gomock"
+
 	"github.com/ava-labs/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/precompiletest"
 	"github.com/ava-labs/subnet-evm/utils"
-	"go.uber.org/mock/gomock"
 )
 
 func TestVerify(t *testing.T) {

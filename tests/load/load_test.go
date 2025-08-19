@@ -11,19 +11,17 @@ import (
 	"strings"
 	"testing"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-
-	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/libevm/log"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/libevm/log"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/subnet-evm/tests"
 	"github.com/ava-labs/subnet-evm/tests/utils"
+
+	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 const (

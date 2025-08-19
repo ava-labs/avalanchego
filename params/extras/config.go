@@ -12,9 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/libevm/common"
-	ethparams "github.com/ava-labs/libevm/params"
+
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/utils"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 var (
@@ -183,7 +185,7 @@ func (c *ChainConfig) Description() string {
 	if err != nil {
 		upgradeConfigBytes = []byte("cannot marshal UpgradeConfig")
 	}
-	banner += fmt.Sprintf("Upgrade Config: %s", string(upgradeConfigBytes))
+	banner += "Upgrade Config: " + string(upgradeConfigBytes)
 	banner += "\n"
 
 	feeBytes, err := json.Marshal(c.FeeConfig)

@@ -12,9 +12,11 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/ava-labs/subnet-evm/core/state/snapshot"
-	syncclient "github.com/ava-labs/subnet-evm/sync/client"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/ava-labs/subnet-evm/core/state/snapshot"
+
+	syncclient "github.com/ava-labs/subnet-evm/sync/client"
 )
 
 const (

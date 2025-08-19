@@ -8,8 +8,9 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/subnet-evm/constants"
 )
 
 func TestInsertSortedByAddress(t *testing.T) {

@@ -9,17 +9,17 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/trie/trienode"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/ava-labs/subnet-evm/utils/utilstest"
 	"github.com/holiman/uint256"
-
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/ava-labs/subnet-evm/utils/utilstest"
 )
 
 // GenerateTrie creates a trie with [numKeys] key-value pairs inside of [trieDB].

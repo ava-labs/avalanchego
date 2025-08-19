@@ -4,15 +4,16 @@
 package ethapi
 
 import (
-	"fmt"
+	"errors"
 	"math/big"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
+
+	"github.com/ava-labs/subnet-evm/rpc"
 )
 
 func TestBlockChainAPI_stateQueryBlockNumberAllowed(t *testing.T) {
@@ -86,7 +87,7 @@ func TestBlockChainAPI_stateQueryBlockNumberAllowed(t *testing.T) {
 				backend.EXPECT().LastAcceptedBlock().Return(makeBlockWithNumber(2200))
 				backend.EXPECT().
 					BlockByHash(gomock.Any(), gomock.Any()).
-					Return(nil, fmt.Errorf("test error"))
+					Return(nil, errors.New("test error"))
 				return backend
 			},
 			wantErrMessage: "failed to get block from hash: test error",

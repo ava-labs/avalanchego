@@ -18,7 +18,8 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
-	ethparams "github.com/ava-labs/libevm/params"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/internal/ethapi"
 	"github.com/ava-labs/subnet-evm/params"
@@ -26,7 +27,8 @@ import (
 	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/subnet-evm/rpc"
-	"github.com/stretchr/testify/require"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 var schemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}

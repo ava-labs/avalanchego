@@ -8,8 +8,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/subnet-evm/commontype"
 )
 
 func TestBlockGasCost(t *testing.T) {

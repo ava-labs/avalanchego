@@ -7,11 +7,11 @@ import (
 	"context"
 	"fmt"
 
-	"golang.org/x/exp/slog"
-
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+	"golang.org/x/exp/slog"
+
 	"github.com/ava-labs/subnet-evm/plugin/evm/config"
 )
 

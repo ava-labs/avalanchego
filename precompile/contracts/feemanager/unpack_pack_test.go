@@ -10,10 +10,11 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
-	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -55,6 +56,7 @@ func FuzzPackGetFeeConfigOutputEqualTest(f *testing.F) {
 func TestOldPackGetFeeConfigOutputEqual(t *testing.T) {
 	testOldPackGetFeeConfigOutputEqual(t, testFeeConfig, true)
 }
+
 func TestPackGetFeeConfigOutputPanic(t *testing.T) {
 	require.Panics(t, func() {
 		_, _ = OldPackFeeConfig(commontype.FeeConfig{})

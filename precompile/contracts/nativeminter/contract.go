@@ -4,7 +4,6 @@
 package nativeminter
 
 import (
-	_ "embed"
 	"errors"
 	"fmt"
 	"math/big"
@@ -12,9 +11,12 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
+	"github.com/holiman/uint256"
+
+	_ "embed"
+
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
-	"github.com/holiman/uint256"
 )
 
 const (

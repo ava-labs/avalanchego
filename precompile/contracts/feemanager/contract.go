@@ -4,7 +4,6 @@
 package feemanager
 
 import (
-	_ "embed"
 	"errors"
 	"fmt"
 	"math/big"
@@ -12,6 +11,9 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
+
+	_ "embed"
+
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
@@ -151,7 +153,7 @@ func StoreFeeConfig(stateDB contract.StateDB, feeConfig commontype.FeeConfig, bl
 
 	blockNumber := blockContext.Number()
 	if blockNumber == nil {
-		return fmt.Errorf("blockNumber cannot be nil")
+		return errors.New("blockNumber cannot be nil")
 	}
 	stateDB.SetState(ContractAddress, feeConfigLastChangedAtKey, common.BigToHash(blockNumber))
 	return nil
@@ -297,7 +299,6 @@ func UnpackGetFeeConfigOutput(output []byte, skipLenCheck bool) (commontype.FeeC
 	}
 	outputStruct := FeeConfigABIStruct{}
 	err := FeeManagerABI.UnpackIntoInterface(&outputStruct, "getFeeConfig", output)
-
 	if err != nil {
 		return commontype.FeeConfig{}, err
 	}

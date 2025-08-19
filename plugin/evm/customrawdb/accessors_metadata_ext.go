@@ -9,11 +9,13 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/common"
-	ethrawdb "github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
+
 	"github.com/ava-labs/subnet-evm/params"
+
+	ethrawdb "github.com/ava-labs/libevm/core/rawdb"
 )
 
 // writeCurrentTimeMarker writes a marker of the current time in the db at `key`.

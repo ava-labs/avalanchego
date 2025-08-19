@@ -10,21 +10,21 @@ import (
 	"sync/atomic"
 	"time"
 
-	ethcommon "github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/log"
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
-
 	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/log"
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/txpool"
 	"github.com/ava-labs/subnet-evm/eth"
 	"github.com/ava-labs/subnet-evm/plugin/evm/config"
+
+	ethcommon "github.com/ava-labs/libevm/common"
 )
 
 const pendingTxsBuffer = 10

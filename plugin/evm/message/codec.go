@@ -15,9 +15,7 @@ const (
 	maxMessageSize = 2*units.MiB - 64*units.KiB // Subtract 64 KiB from p2p network cap to leave room for encoding overhead from AvalancheGo
 )
 
-var (
-	Codec codec.Manager
-)
+var Codec codec.Manager
 
 func init() {
 	Codec = codec.NewManager(maxMessageSize)

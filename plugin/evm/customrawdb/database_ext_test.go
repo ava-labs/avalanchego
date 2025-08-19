@@ -7,8 +7,9 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
-	ethrawdb "github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
+
+	ethrawdb "github.com/ava-labs/libevm/core/rawdb"
 )
 
 func ExampleInspectDatabase() {

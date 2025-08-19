@@ -9,9 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var (
-	_ RequestHandler = NoopRequestHandler{}
-)
+var _ RequestHandler = NoopRequestHandler{}
 
 // RequestHandler interface handles incoming requests from peers
 // Must have methods in format of handleType(context.Context, ids.NodeID, uint32, request Type) error

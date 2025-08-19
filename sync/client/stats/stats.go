@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/libevm/metrics"
+
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 )
 
@@ -41,12 +42,12 @@ type messageMetric struct {
 
 func NewMessageMetric(name string) MessageMetric {
 	return &messageMetric{
-		requested:       metrics.GetOrRegisterCounter(fmt.Sprintf("%s_requested", name), nil),
-		succeeded:       metrics.GetOrRegisterCounter(fmt.Sprintf("%s_succeeded", name), nil),
-		failed:          metrics.GetOrRegisterCounter(fmt.Sprintf("%s_failed", name), nil),
-		invalidResponse: metrics.GetOrRegisterCounter(fmt.Sprintf("%s_invalid_response", name), nil),
-		received:        metrics.GetOrRegisterCounter(fmt.Sprintf("%s_received", name), nil),
-		requestLatency:  metrics.GetOrRegisterTimer(fmt.Sprintf("%s_request_latency", name), nil),
+		requested:       metrics.GetOrRegisterCounter(name+"_requested", nil),
+		succeeded:       metrics.GetOrRegisterCounter(name+"_succeeded", nil),
+		failed:          metrics.GetOrRegisterCounter(name+"_failed", nil),
+		invalidResponse: metrics.GetOrRegisterCounter(name+"_invalid_response", nil),
+		received:        metrics.GetOrRegisterCounter(name+"_received", nil),
+		requestLatency:  metrics.GetOrRegisterTimer(name+"_request_latency", nil),
 	}
 }
 

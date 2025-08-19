@@ -7,12 +7,13 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ava-labs/subnet-evm/warp/messages"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+
+	"github.com/ava-labs/subnet-evm/warp/messages"
+
+	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 const (

@@ -12,15 +12,16 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/libevm/log"
+
+	"github.com/ava-labs/subnet-evm/plugin/evm/validators/uptime"
+
 	avalancheuptime "github.com/ava-labs/avalanchego/snow/uptime"
 	avalanchevalidators "github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	validators "github.com/ava-labs/subnet-evm/plugin/evm/validators/state"
 	stateinterfaces "github.com/ava-labs/subnet-evm/plugin/evm/validators/state/interfaces"
-	"github.com/ava-labs/subnet-evm/plugin/evm/validators/uptime"
 	uptimeinterfaces "github.com/ava-labs/subnet-evm/plugin/evm/validators/uptime/interfaces"
-
-	"github.com/ava-labs/libevm/log"
 )
 
 const (
