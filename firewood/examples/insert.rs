@@ -91,7 +91,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         #[expect(clippy::unwrap_used)]
         let proposal = db.propose(batch.clone()).await.unwrap();
-        proposal.commit().await?;
+        proposal.commit()?;
         verify_keys(&db, verify).await?;
     }
 

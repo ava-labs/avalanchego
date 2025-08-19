@@ -33,7 +33,7 @@ impl TestRunner for TenKRandom {
                 .chain(generate_updates(low + high / 2, twenty_five_pct * 2, low))
                 .collect();
             let proposal = db.propose(batch).await.expect("proposal should succeed");
-            proposal.commit().await?;
+            proposal.commit()?;
             low += twenty_five_pct;
             high += twenty_five_pct;
         }

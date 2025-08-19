@@ -371,19 +371,18 @@ impl api::DbView for Proposal<'_> {
     }
 }
 
-#[async_trait]
 impl<'db> api::Proposal for Proposal<'db> {
     type Proposal = Proposal<'db>;
 
     #[fastrace::trace(short_name = true)]
-    async fn propose(
+    fn propose(
         &self,
-        batch: (impl IntoIterator<IntoIter: KeyValuePairIter> + Send),
+        batch: impl IntoIterator<IntoIter: KeyValuePairIter>,
     ) -> Result<Self::Proposal, api::Error> {
         self.create_proposal(batch)
     }
 
-    async fn commit(self) -> Result<(), api::Error> {
+    fn commit(self) -> Result<(), api::Error> {
         Ok(self.db.manager.commit(self.nodestore.clone())?)
     }
 }
@@ -500,7 +499,7 @@ mod test {
         assert_eq!(&*proposal.val(b"k").await.unwrap().unwrap(), b"v");
 
         assert_eq!(proposal.val(b"notfound").await.unwrap(), None);
-        proposal.commit().await.unwrap();
+        proposal.commit().unwrap();
 
         let batch = vec![BatchOp::Put {
             key: b"k",
@@ -529,7 +528,7 @@ mod test {
             },
         ];
         let proposal = db.propose(batch).await.unwrap();
-        proposal.commit().await.unwrap();
+        proposal.commit().unwrap();
         println!("{:?}", db.root_hash().await.unwrap().unwrap());
 
         let db = db.reopen();
@@ -579,7 +578,7 @@ mod test {
         drop(proposal2);
 
         // commit the first proposal
-        proposal1.commit().await.unwrap();
+        proposal1.commit().unwrap();
         // Ensure we committed the first proposal's data
         let committed = db.root_hash().await.unwrap().unwrap();
         let historical = db.revision(committed).await.unwrap();
@@ -613,14 +612,14 @@ mod test {
             key: b"k2",
             value: b"v2",
         }];
-        let proposal2 = proposal1.propose(batch2).await.unwrap();
+        let proposal2 = proposal1.propose(batch2).unwrap();
         assert_eq!(&*proposal2.val(b"k2").await.unwrap().unwrap(), b"v2");
 
         let batch3 = vec![BatchOp::Put {
             key: b"k3",
             value: b"v3",
         }];
-        let proposal3 = proposal2.propose(batch3).await.unwrap();
+        let proposal3 = proposal2.propose(batch3).unwrap();
         assert_eq!(&*proposal3.val(b"k3").await.unwrap().unwrap(), b"v3");
 
         // the proposal is dropped here, but the underlying
@@ -631,7 +630,7 @@ mod test {
         drop(proposal2);
 
         // commit the first proposal
-        proposal1.commit().await.unwrap();
+        proposal1.commit().unwrap();
         // Ensure we committed the first proposal's data
         let committed = db.root_hash().await.unwrap().unwrap();
         let historical = db.revision(committed).await.unwrap();
@@ -661,7 +660,7 @@ mod test {
         }];
         let proposal = db.propose(batch).await.unwrap();
         let historical_hash = proposal.root_hash().await.unwrap().unwrap();
-        proposal.commit().await.unwrap();
+        proposal.commit().unwrap();
 
         // Create a new proposal (uncommitted)
         let batch = vec![BatchOp::Put {
@@ -714,7 +713,7 @@ mod test {
 
         // create two proposals, second one has a base of the first one
         let proposal1 = db.propose(kviter.by_ref().take(N / 2)).await.unwrap();
-        let proposal2 = proposal1.propose(kviter).await.unwrap();
+        let proposal2 = proposal1.propose(kviter).unwrap();
 
         // iterate over the keys and values again, checking that the values are in the correct proposal
         let mut kviter = keys.iter().zip(vals.iter());
@@ -733,7 +732,7 @@ mod test {
             assert_eq!(proposal1.val(k).await.unwrap(), None);
         }
 
-        proposal1.commit().await.unwrap();
+        proposal1.commit().unwrap();
 
         // all keys are still in the second proposal (first is no longer accessible)
         for (k, v) in keys.iter().zip(vals.iter()) {
@@ -741,7 +740,7 @@ mod test {
         }
 
         // commit the second proposal
-        proposal2.commit().await.unwrap();
+        proposal2.commit().unwrap();
 
         // all keys are in the database
         let committed = db.root_hash().await.unwrap().unwrap();
@@ -779,7 +778,7 @@ mod test {
                 batch
             });
             let proposal = db.propose(batch).await.unwrap();
-            proposal.commit().await.unwrap();
+            proposal.commit().unwrap();
 
             // check the database for consistency, sometimes checking the hashes
             let hash_check = rng.random();
@@ -818,7 +817,7 @@ mod test {
                 Vec::<Proposal<'_>>::with_capacity(NUM_PROPOSALS),
                 async |mut proposals, ops| {
                     let proposal = if let Some(parent) = proposals.last() {
-                        parent.propose(ops).await.unwrap()
+                        parent.propose(ops).unwrap()
                     } else {
                         db.propose(ops).await.unwrap()
                     };
@@ -839,7 +838,7 @@ mod test {
 
         // commit the proposals
         for proposal in proposals {
-            proposal.commit().await.unwrap();
+            proposal.commit().unwrap();
         }
 
         // get the last committed revision
@@ -878,7 +877,7 @@ mod test {
             // Commit task
             scope.spawn(async move {
                 while let Some(proposal) = rx.recv().await {
-                    let result = proposal.commit().await;
+                    let result = proposal.commit();
                     // send result back to the main thread, both for synchronization and stopping the
                     // test on error
                     result_tx.send(result).await.unwrap();

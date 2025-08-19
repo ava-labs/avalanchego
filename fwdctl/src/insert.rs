@@ -32,7 +32,7 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
         value: opts.value.bytes().collect(),
     }];
     let proposal = db.propose(batch).await?;
-    proposal.commit().await?;
+    proposal.commit()?;
 
     println!("{}", opts.key);
     Ok(())

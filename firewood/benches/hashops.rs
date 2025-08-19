@@ -121,7 +121,7 @@ fn bench_db<const N: usize>(criterion: &mut Criterion) {
                         let db = firewood::db::Db::new(db_path, cfg.clone().truncate(true).build())
                             .unwrap();
 
-                        db.propose(batch_ops).await.unwrap().commit().await.unwrap();
+                        db.propose(batch_ops).await.unwrap().commit().unwrap();
                     },
                     BatchSize::SmallInput,
                 );

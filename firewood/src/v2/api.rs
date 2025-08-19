@@ -314,13 +314,13 @@ pub trait DbView {
 /// A proposal type must also implement everything in a
 /// [`DbView`], which means you can fetch values from it or
 /// obtain proofs.
-#[async_trait]
 pub trait Proposal: DbView + Send + Sync {
     /// The type of a proposal
     type Proposal: DbView + Proposal;
 
     /// Commit this revision
-    async fn commit(self) -> Result<(), Error>;
+    #[expect(clippy::missing_errors_doc)]
+    fn commit(self) -> Result<(), Error>;
 
     /// Propose a new revision on top of an existing proposal
     ///
@@ -331,10 +331,10 @@ pub trait Proposal: DbView + Send + Sync {
     /// # Return value
     ///
     /// A new proposal
-    ///
-    async fn propose(
+    #[expect(clippy::missing_errors_doc)]
+    fn propose(
         &self,
-        data: (impl IntoIterator<IntoIter: KeyValuePairIter> + Send),
+        data: impl IntoIterator<IntoIter: KeyValuePairIter>,
     ) -> Result<Self::Proposal, Error>;
 }
 

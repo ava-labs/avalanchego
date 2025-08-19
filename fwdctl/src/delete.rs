@@ -27,7 +27,7 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
         key: opts.key.clone(),
     }];
     let proposal = db.propose(batch).await?;
-    proposal.commit().await?;
+    proposal.commit()?;
 
     println!("key {} deleted successfully", opts.key);
     Ok(())
