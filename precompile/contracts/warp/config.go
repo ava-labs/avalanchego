@@ -10,12 +10,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/coreth/precompile/precompileconfig"
-	"github.com/ava-labs/coreth/predicate"
-	warpValidators "github.com/ava-labs/coreth/warp/validators"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/log"
+
+	"github.com/ava-labs/coreth/precompile/precompileconfig"
+	"github.com/ava-labs/coreth/predicate"
+
+	warpValidators "github.com/ava-labs/coreth/warp/validators"
 )
 
 const (
@@ -155,20 +157,20 @@ func (c *Config) PredicateGas(predicateBytes []byte) (uint64, error) {
 
 	unpackedPredicateBytes, err := predicate.UnpackPredicate(predicateBytes)
 	if err != nil {
-		return 0, fmt.Errorf("%w: %s", errInvalidPredicateBytes, err)
+		return 0, fmt.Errorf("%w: %w", errInvalidPredicateBytes, err)
 	}
 	warpMessage, err := warp.ParseMessage(unpackedPredicateBytes)
 	if err != nil {
-		return 0, fmt.Errorf("%w: %s", errInvalidWarpMsg, err)
+		return 0, fmt.Errorf("%w: %w", errInvalidWarpMsg, err)
 	}
 	_, err = payload.Parse(warpMessage.Payload)
 	if err != nil {
-		return 0, fmt.Errorf("%w: %s", errInvalidWarpMsgPayload, err)
+		return 0, fmt.Errorf("%w: %w", errInvalidWarpMsgPayload, err)
 	}
 
 	numSigners, err := warpMessage.Signature.NumSigners()
 	if err != nil {
-		return 0, fmt.Errorf("%w: %s", errCannotGetNumSigners, err)
+		return 0, fmt.Errorf("%w: %w", errCannotGetNumSigners, err)
 	}
 	signerGas, overflow := math.SafeMul(uint64(numSigners), GasCostPerWarpSigner)
 	if overflow {

@@ -8,6 +8,9 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
@@ -16,8 +19,6 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap4"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/coreth/utils"
-	"github.com/ava-labs/libevm/core/types"
-	"github.com/stretchr/testify/require"
 )
 
 func TestExtraPrefix(t *testing.T) {

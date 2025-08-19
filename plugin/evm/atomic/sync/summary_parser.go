@@ -6,8 +6,9 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/libevm/crypto"
+
+	"github.com/ava-labs/coreth/plugin/evm/message"
 )
 
 var _ message.SyncableParser = (*summaryParser)(nil)

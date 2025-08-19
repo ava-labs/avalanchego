@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"testing"
 
+	"go.uber.org/mock/gomock"
+
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/coreth/precompile/precompiletest"
 	"github.com/ava-labs/coreth/utils"
-	"go.uber.org/mock/gomock"
 )
 
 func TestVerify(t *testing.T) {

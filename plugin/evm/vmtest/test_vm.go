@@ -10,20 +10,22 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
-	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
-	commoneng "github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
-	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
-	"github.com/ava-labs/coreth/plugin/evm/extension"
-	"github.com/ava-labs/coreth/utils/utilstest"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
+	"github.com/ava-labs/coreth/plugin/evm/extension"
+	"github.com/ava-labs/coreth/utils/utilstest"
+
+	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
+	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
+	commoneng "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 var Schemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}

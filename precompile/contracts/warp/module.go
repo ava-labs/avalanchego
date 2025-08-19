@@ -6,11 +6,11 @@ package warp
 import (
 	"fmt"
 
+	"github.com/ava-labs/libevm/common"
+
 	"github.com/ava-labs/coreth/precompile/contract"
 	"github.com/ava-labs/coreth/precompile/modules"
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
-
-	"github.com/ava-labs/libevm/common"
 )
 
 var _ contract.Configurator = (*configurator)(nil)

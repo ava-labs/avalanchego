@@ -7,9 +7,10 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/coreth/constants"
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/coreth/constants"
 )
 
 func TestInsertSortedByAddress(t *testing.T) {

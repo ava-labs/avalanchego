@@ -6,9 +6,12 @@ package extras
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 
 	"github.com/ava-labs/avalanchego/upgrade"
+
 	"github.com/ava-labs/coreth/utils"
+
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -284,5 +287,5 @@ func ptrToString(val *uint64) string {
 	if val == nil {
 		return "nil"
 	}
-	return fmt.Sprintf("%d", *val)
+	return strconv.FormatUint(*val, 10)
 }

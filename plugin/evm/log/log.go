@@ -10,9 +10,11 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/ava-labs/coreth/log"
-	ethlog "github.com/ava-labs/libevm/log"
 	"golang.org/x/exp/slog"
+
+	"github.com/ava-labs/coreth/log"
+
+	ethlog "github.com/ava-labs/libevm/log"
 )
 
 type Logger struct {
@@ -28,7 +30,7 @@ func InitLogger(alias string, level string, jsonFormat bool, writer io.Writer) (
 
 	var handler slog.Handler
 	if jsonFormat {
-		chainStr := fmt.Sprintf("%s Chain", alias)
+		chainStr := alias + " Chain"
 		handler = log.JSONHandlerWithLevel(writer, logLevel)
 		handler = &addContext{Handler: handler, logger: chainStr}
 	} else {

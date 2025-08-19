@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/ava-labs/libevm/common"
+
 	ethcrypto "github.com/ava-labs/libevm/crypto"
 )
 

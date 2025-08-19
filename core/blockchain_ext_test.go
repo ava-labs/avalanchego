@@ -8,10 +8,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/coreth/consensus/dummy"
-	"github.com/ava-labs/coreth/core/extstate"
-	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap4"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
@@ -20,6 +16,11 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/coreth/consensus/dummy"
+	"github.com/ava-labs/coreth/core/extstate"
+	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap4"
 )
 
 var (
@@ -55,14 +56,16 @@ var (
 	}
 )
 
-type createFunc func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, dataPath string) (*BlockChain, error)
-type ChainTest struct {
-	Name     string
-	testFunc func(
-		t *testing.T,
-		create createFunc,
-	)
-}
+type (
+	createFunc func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, dataPath string) (*BlockChain, error)
+	ChainTest  struct {
+		Name     string
+		testFunc func(
+			t *testing.T,
+			create createFunc,
+		)
+	}
+)
 
 var tests = []ChainTest{
 	{

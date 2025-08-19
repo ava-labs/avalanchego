@@ -9,13 +9,15 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/log"
+
 	"github.com/ava-labs/coreth/cmd/simulator/key"
 	"github.com/ava-labs/coreth/cmd/simulator/metrics"
 	"github.com/ava-labs/coreth/cmd/simulator/txs"
 	"github.com/ava-labs/coreth/ethclient"
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/core/types"
-	"github.com/ava-labs/libevm/log"
+
 	ethparams "github.com/ava-labs/libevm/params"
 )
 

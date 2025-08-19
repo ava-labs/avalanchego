@@ -17,10 +17,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
 
-	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
-
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/vmtest"
+
+	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 // show that a txID discovered from gossip is requested to the same node only if

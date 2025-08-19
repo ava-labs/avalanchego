@@ -9,8 +9,10 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
+
+	"github.com/ava-labs/coreth/utils"
+
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -156,7 +158,7 @@ func (c *ChainConfig) Description() string {
 	if err != nil {
 		upgradeConfigBytes = []byte("cannot marshal UpgradeConfig")
 	}
-	banner += fmt.Sprintf("Upgrade Config: %s", string(upgradeConfigBytes))
+	banner += "Upgrade Config: " + string(upgradeConfigBytes)
 	banner += "\n"
 	return banner
 }

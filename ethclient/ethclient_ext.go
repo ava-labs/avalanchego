@@ -8,16 +8,18 @@ import (
 	"encoding/json"
 	"math/big"
 
-	"github.com/ava-labs/coreth/accounts/abi/bind"
-	"github.com/ava-labs/coreth/interfaces"
-	"github.com/ava-labs/coreth/rpc"
-	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
 
 	// Force-load precompiles to trigger registration
 	_ "github.com/ava-labs/coreth/precompile/registry"
+
+	"github.com/ava-labs/coreth/accounts/abi/bind"
+	"github.com/ava-labs/coreth/interfaces"
+	"github.com/ava-labs/coreth/rpc"
+
+	ethereum "github.com/ava-labs/libevm"
 )
 
 // Verify that [Client] implements required interfaces

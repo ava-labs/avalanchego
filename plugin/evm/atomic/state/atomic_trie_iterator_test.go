@@ -6,9 +6,6 @@ package state
 import (
 	"testing"
 
-	"github.com/ava-labs/coreth/plugin/evm/atomic/atomictest"
-
-	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -16,6 +13,10 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/coreth/plugin/evm/atomic/atomictest"
+
+	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )
 
 func TestIteratorCanIterate(t *testing.T) {

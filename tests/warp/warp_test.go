@@ -13,13 +13,6 @@ import (
 	"testing"
 	"time"
 
-	ginkgo "github.com/onsi/ginkgo/v2"
-
-	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/crypto"
-
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
@@ -28,8 +21,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/api"
-	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/accounts/abi/bind"
 	"github.com/ava-labs/coreth/cmd/simulator/key"
@@ -42,9 +38,11 @@ import (
 	"github.com/ava-labs/coreth/predicate"
 	"github.com/ava-labs/coreth/tests/utils"
 	"github.com/ava-labs/coreth/tests/warp/aggregator"
+
+	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	warpBackend "github.com/ava-labs/coreth/warp"
 	ethereum "github.com/ava-labs/libevm"
-	"github.com/ava-labs/libevm/core/types"
+	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
 var (
