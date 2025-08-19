@@ -36,8 +36,8 @@ var (
 )
 
 type Storage struct {
-	// height represents the number of blocks indexed in storage.
-	height atomic.Uint64
+	// numBlocks represents the number of blocks indexed in storage.
+	numBlocks atomic.Uint64
 
 	// db is the underlying database used to store finalizations.
 	db database.KeyValueReaderWriter
@@ -86,7 +86,7 @@ func newStorage(ctx context.Context, config *Config, qcDeserializer *QCDeseriali
 	if err != nil {
 		return nil, err
 	}
-	s.height.Store(lastAcceptedBlock.Height() + 1)
+	s.numBlocks.Store(lastAcceptedBlock.Height() + 1)
 
 	// set the last accepted digest by retrieving the last accepted simplex block
 	lastAcceptedSimplexBlock, _, err := s.Retrieve(lastAcceptedBlock.Height())
@@ -99,7 +99,7 @@ func newStorage(ctx context.Context, config *Config, qcDeserializer *QCDeseriali
 }
 
 func (s *Storage) Height() uint64 {
-	return s.height.Load()
+	return s.numBlocks.Load()
 }
 
 // Retrieve returns the block and finalization at [seq].
@@ -139,7 +139,7 @@ func (s *Storage) Retrieve(seq uint64) (simplex.VerifiedBlock, simplex.Finalizat
 // It stores the finalization bytes at the current height and increments the height.
 func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finalization simplex.Finalization) error {
 	bh := block.BlockHeader()
-	currentHeight := s.height.Load()
+	currentHeight := s.numBlocks.Load()
 	if currentHeight != bh.Seq {
 		s.log.Error("Attempted to index block with mismatched sequence number",
 			zap.Uint64("expected", currentHeight),
@@ -177,7 +177,7 @@ func (s *Storage) Index(ctx context.Context, block simplex.VerifiedBlock, finali
 		return fmt.Errorf("failed to index block: %w", err)
 	}
 
-	s.height.Add(1) // only increment height after successful indexing
+	s.numBlocks.Add(1) // only increment numBlocks after successful indexing
 	s.lastIndexedDigest = bh.Digest
 	return nil
 }
