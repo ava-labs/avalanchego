@@ -72,6 +72,11 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y xz-utils
           fi
+      - name: Check git status
+        shell: bash
+        run: |
+          git status
+          git diff
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
