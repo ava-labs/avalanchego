@@ -54,6 +54,7 @@ var (
 	errTooManyKeys                   = errors.New("response contains more than requested keys")
 	errTooManyBytes                  = errors.New("response contains more than requested bytes")
 	errUnexpectedChangeProofResponse = errors.New("unexpected response type")
+	errNeedDBForOperation            = errors.New("database is required for this operation")
 )
 
 type priority byte
@@ -583,6 +584,10 @@ func (r *rangeProof) Verify(ctx context.Context) error {
 }
 
 func (r *rangeProof) Commit(ctx context.Context) error {
+	if r.db == nil {
+		return errNeedDBForOperation
+	}
+
 	// If the root is empty, we clear the database of all values.
 	if bytes.Equal(r.request.rootHash, ids.Empty[:]) {
 		return r.db.Clear()
@@ -594,6 +599,10 @@ func (r *rangeProof) Commit(ctx context.Context) error {
 }
 
 func (r *rangeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], error) {
+	if r.db == nil {
+		return maybe.Nothing[[]byte](), errNeedDBForOperation
+	}
+
 	// If we wanted the empty root, we don't need to fetch any keys.
 	if bytes.Equal(r.request.rootHash, ids.Empty[:]) {
 		return maybe.Nothing[[]byte](), nil
@@ -604,12 +613,6 @@ func (r *rangeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], erro
 	nextKey, err := findNextKey(ctx, r.db, r.merkleProof.KeyChanges, r.request.endKey, r.merkleProof.EndProof, r.tokenSize)
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
-	}
-
-	// If nextKey is Nothing because we finished the range, return the end key
-	// TODO: this will force another request of [endKey, endKey], which is unnecessary.
-	if nextKey.IsNothing() {
-		return r.request.endKey, nil
 	}
 
 	return nextKey, nil
@@ -716,6 +719,10 @@ type changeProof struct {
 }
 
 func (c *changeProof) Verify(ctx context.Context) error {
+	if c.db == nil {
+		return errNeedDBForOperation
+	}
+
 	// If the database is empty, we don't need to verify a change proof.
 	if bytes.Equal(c.request.rootHash, ids.Empty[:]) {
 		return nil
@@ -744,6 +751,10 @@ func (c *changeProof) Verify(ctx context.Context) error {
 }
 
 func (c *changeProof) Commit(ctx context.Context) error {
+	if c.db == nil {
+		return errNeedDBForOperation
+	}
+
 	// If the root is empty, we clear the database.
 	if bytes.Equal(c.request.rootHash, ids.Empty[:]) {
 		return c.db.Clear()
@@ -755,7 +766,12 @@ func (c *changeProof) Commit(ctx context.Context) error {
 	return c.db.CommitChangeProof(ctx, c.merkleProof)
 }
 
-func (c *changeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], error) { // Find the next key to fetch.
+func (c *changeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], error) {
+	if c.db == nil {
+		return maybe.Nothing[[]byte](), errNeedDBForOperation
+	}
+
+	// Find the next key to fetch.
 	// If we wanted the empty root, we don't need to fetch any keys.
 	if bytes.Equal(c.request.rootHash, ids.Empty[:]) {
 		return maybe.Nothing[[]byte](), nil
@@ -765,12 +781,6 @@ func (c *changeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], err
 	nextKey, err := findNextKey(ctx, c.db, c.merkleProof.KeyChanges, c.request.endKey, c.merkleProof.EndProof, c.tokenSize)
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
-	}
-
-	// If nextKey is Nothing because we finished the range, return the end key
-	// TODO: this will force another request of [endKey, endKey], which is unnecessary.
-	if nextKey.IsNothing() {
-		return c.request.endKey, nil
 	}
 
 	return nextKey, nil
@@ -783,7 +793,6 @@ func (c *changeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], err
 // [rangeEnd] is the end of the range that we want to fetch.
 //
 // Returns Nothing if there are no more keys to fetch in [lastReceivedKey, rangeEnd].
-// TODO: This can be improved to assess the next key outside of that range that may not be present.
 //
 // [endProof] is the end proof of the last proof received.
 //
@@ -1059,20 +1068,20 @@ func (m *Manager) setError(err error) {
 }
 
 // Mark that we've fetched all the key-value pairs in the range
-// [workItem.start, largestHandledKey] for the trie with root [rootID].
+// [work.start, nextKey) for the trie with root [rootID].
 //
-// If [workItem.start] is Nothing, then we've fetched all the key-value
-// pairs up to and including [largestHandledKey].
+// If [work.start] is Nothing, then we've fetched all the key-value
+// pairs up to and including [nextKey].
 //
 // If [nextKey] is Nothing, then we've fetched all the key-value
-// pairs in the trie with root [rootID].
+// pairs in the trie with root [rootID] until [work.end].
 //
 // TODO: add some assertions that `nextKey` work changes don't violate
 // the invariants of the work queue.
 //
 // Assumes [m.workLock] is not held.
 func (m *Manager) completeWorkItem(work *workItem, nextKey maybe.Maybe[[]byte], rootID ids.ID) {
-	if compareKeys(work.end, nextKey) == 1 && !nextKey.IsNothing() {
+	if !nextKey.IsNothing() {
 		// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
 		m.enqueueWork(newWorkItem(work.localRootID, nextKey, work.end, work.priority, time.Now()))
 	}
@@ -1085,6 +1094,7 @@ func (m *Manager) completeWorkItem(work *workItem, nextKey maybe.Maybe[[]byte], 
 	stale := m.config.TargetRoot != rootID
 	if stale {
 		// the root has changed, so reinsert with high priority
+		// Use root from proof as old root.
 		m.enqueueWork(newWorkItem(rootID, work.start, nextKey, highPriority, time.Now()))
 	} else {
 		m.workLock.Lock()

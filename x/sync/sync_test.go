@@ -231,7 +231,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	// next key would be after the end of the range, so it returns Nothing instead
 	nextKey, err = rangeProof.FindNextKey(ctx)
 	require.NoError(err)
-	require.Equal(endPointBeforeNewKey, nextKey.Value())
+	require.True(nextKey.IsNothing())
 }
 
 func Test_Sync_FindNextKey_Deleted(t *testing.T) {
@@ -313,7 +313,7 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	// The exact next key must be after the requested range
 	nextKey, err := rangeProof.FindNextKey(ctx)
 	require.NoError(err)
-	require.GreaterOrEqual(compareKeys(maybe.Some([]byte{0x20}), nextKey), 0)
+	require.True(nextKey.IsNothing())
 
 	// Add another key afterward
 	require.NoError(db.Put([]byte{0x11, 0x15}, []byte{4}))
@@ -678,11 +678,13 @@ func TestFindNextKeyRandom(t *testing.T) {
 		require.NoError(err)
 
 		// The next key should be bounded by the next key not in the proof
-		actualNextKey := maybe.Nothing[[]byte]()
-		if len(smallestDiffKey.Bytes()) > 0 {
-			actualNextKey = maybe.Some(smallestDiffKey.Bytes())
+		if bytes.Compare(smallestDiffKey.Bytes(), rangeEnd) >= 0 {
+			// The smallest key which differs is after the range end so the
+			// next key to get should be nil because we're done fetching the range.
+			require.True(gotFirstDiff.IsNothing())
+		} else {
+			require.Equal(smallestDiffKey.Bytes(), gotFirstDiff.Value())
 		}
-		require.LessOrEqual(compareKeys(gotFirstDiff, actualNextKey), 0)
 	}
 }
 

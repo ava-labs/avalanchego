@@ -30,13 +30,14 @@ type Proof interface {
 	Verify(context.Context) error
 
 	// Commit applies the changes in the proof to the underlying database.
-	// Any proof should be verified before being committed.
+	// Any proof must be verified before being committed.
 	// An error is returned if the commit fails, in which case the DB may be corrupted.
 	Commit(context.Context) error
 
 	// FindNextKey returns the next key that should be requested after this proof
-	// is applied. If there are no more keys to request (so the root hash is up to date),
+	// is applied. If there are no more keys to request in the range provided,
 	// it returns Nothing.
+	// The proof must be committed first.
 	FindNextKey(context.Context) (maybe.Maybe[[]byte], error)
 }
 
