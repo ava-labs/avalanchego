@@ -1,0 +1,92 @@
+name: C-Chain Re-Execution Benchmark ARC
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      start-block:
+        description: 'The start block for the benchmark.'
+        required: false
+        default: 101
+      end-block:
+        description: 'The end block for the benchmark.'
+        required: false
+        default: 250000
+      source-block-dir:
+        description: 'The source block directory. Supports S3 directory/zip and local directories.'
+        required: false
+        default: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**
+      current-state-dir:
+        description: 'The current state directory. Supports S3 directory/zip and local directories.'
+        required: false
+        default: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**
+      runner:
+        description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
+        required: false
+        default: ubuntu-latest
+      push-post-state:
+        description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
+        default: ''
+
+  schedule:
+    - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
+
+jobs:
+  c-chain-reexecution-arc: # PR smoke test + scheduled run + manual workflow
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego' }}
+    permissions:
+      id-token: write
+      contents: write
+    runs-on: ${{ github.event.inputs.runner || 'avalanche-avalanchego-runner-2ti' }}
+    container:
+      image: ghcr.io/actions/actions-runner:2.325.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set task parameters
+        id: set-params
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            {
+              echo "start-block=33000001"
+              echo "end-block=34000000"
+              echo "source-block-dir=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-50m-ldb/**"
+              echo "current-state-dir=s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-33m/**"
+            } >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            {
+              echo "start-block=101"
+              echo "end-block=250000"
+              echo "source-block-dir=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**"
+              echo "current-state-dir=s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"
+            } >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo "start-block=${{ github.event.inputs.start-block }}"
+              echo "end-block=${{ github.event.inputs.end-block }}"
+              echo "source-block-dir=${{ github.event.inputs.source-block-dir }}"
+              echo "current-state-dir=${{ github.event.inputs.current-state-dir }}"
+            } >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install ARC Dependencies
+        shell: bash
+        run: |
+          # xz-utils might be present on some containers. Install if not present.
+          if ! command -v xz &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y xz-utils
+          fi
+      - name: Run C-Chain Re-Execution Benchmark
+        uses: ./.github/actions/c-chain-reexecution-benchmark
+        with:
+          start-block: ${{ steps.set-params.outputs.start-block }}
+          end-block: ${{ steps.set-params.outputs.end-block }}
+          source-block-dir: ${{ steps.set-params.outputs.source-block-dir }}
+          current-state-dir: ${{ steps.set-params.outputs.current-state-dir }}
+          prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          push-github-action-benchmark: ${{ github.event_name == 'schedule' }}
+          aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: 'us-east-2'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          push-post-state: ${{ github.event.inputs.push-post-state }}
