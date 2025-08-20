@@ -386,7 +386,6 @@ specified. If not given, uses default genesis data.
 
 See the documentation for the genesis JSON format [here](../genesis/README.md) and an example used for the local network genesis [here](../genesis/genesis_local.json).
 
-
 #### `--genesis-file-content` (string)
 
 As an alternative to `--genesis-file`, it allows specifying base64 encoded genesis data to use.
@@ -1348,4 +1347,3 @@ Node reports unhealthy if the router drops more than this portion of messages. D
 
 Node reports unhealthy if there are more than this many outstanding consensus requests
 (Get, PullQuery, etc.) over all chains. Defaults to `1024`.
-

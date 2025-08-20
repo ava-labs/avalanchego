@@ -31,11 +31,13 @@ func TestValid(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			name: "invalid consensus parameters",
+			name: "invalid snowball consensus parameters",
 			s: Config{
-				ConsensusParameters: snowball.Parameters{
-					K:               2,
-					AlphaPreference: 1,
+				ConsensusConfig: ConsensusConfig{
+					SnowballParams: &snowball.Parameters{
+						K:               2,
+						AlphaPreference: 1,
+					},
 				},
 			},
 			expectedErr: snowball.ErrParametersInvalid,
@@ -45,17 +47,50 @@ func TestValid(t *testing.T) {
 			s: Config{
 				AllowedNodes:        set.Of(ids.GenerateTestNodeID()),
 				ValidatorOnly:       false,
-				ConsensusParameters: validParameters,
+				ConsensusConfig:     ConsensusConfig{
+					SnowballParams: &validParameters,
+				},
 			},
 			expectedErr: errAllowedNodesWhenNotValidatorOnly,
 		},
 		{
 			name: "valid",
 			s: Config{
-				ConsensusParameters: validParameters,
-				ValidatorOnly:       false,
+				ConsensusConfig: ConsensusConfig{
+					SnowballParams: &validParameters,
+				},
+				ValidatorOnly: false,
 			},
 			expectedErr: nil,
+		},
+		{
+			name: "valid simplex parameters",
+			s: Config{
+				ConsensusConfig: ConsensusConfig{
+					SimplexParams: &SimplexParameters{
+						Enabled: true,
+					},
+				},
+				ValidatorOnly: false,
+			},
+			expectedErr: nil,
+		},
+		{
+			name: "no consensus parameters",
+			s: Config{
+				ConsensusConfig: ConsensusConfig{},
+			},
+			expectedErr: errMissingConsensusParameters,
+		},
+		{
+			name: "both consensus parameters set",
+			s: Config{
+				ConsensusConfig: ConsensusConfig{
+					SnowballParams: &validParameters,
+					SimplexParams:  &SimplexParameters{Enabled: true},
+				},
+			},
+			expectedErr: twoConfigs,
 		},
 	}
 	for _, tt := range tests {

@@ -562,6 +562,10 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			return nil, fmt.Errorf("error while creating new avalanche vm %w", err)
 		}
 	case block.ChainVM:
+		if sb.Config().ConsensusConfig.SimplexParams != nil {
+			chain, err = m.createSimplexChain()
+		}
+
 		beacons := m.Validators
 		if chainParams.ID == constants.PlatformChainID {
 			beacons = chainParams.CustomBeacons
@@ -835,7 +839,11 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("error while fetching weight for subnet %s: %w", ctx.SubnetID, err)
 	}
 
-	consensusParams := sb.Config().ConsensusParameters
+	if sb.Config().ConsensusConfig.SnowballParams == nil {
+		return nil, fmt.Errorf("snowball params not set for avalanche chain %s", ctx.SubnetID)
+	}
+
+	consensusParams := *sb.Config().ConsensusConfig.SnowballParams
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)
@@ -1061,15 +1069,14 @@ func (m *manager) createSnowmanChain(
 	fxs []*common.Fx,
 	sb subnets.Subnet,
 ) (*chain, error) {
-	ctx.Lock.Lock()
-	defer ctx.Lock.Unlock()
-
 	ctx.State.Set(snow.EngineState{
 		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
 		State: snow.Initializing,
 	})
 
 	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
+
+	
 	meterDBReg, err := metrics.MakeAndRegister(
 		m.MeterDBMetrics,
 		primaryAlias,
@@ -1228,7 +1235,12 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("error while fetching weight for subnet %s: %w", ctx.SubnetID, err)
 	}
 
-	consensusParams := sb.Config().ConsensusParameters
+
+	if sb.Config().ConsensusConfig.SnowballParams == nil {
+		return nil, fmt.Errorf("snowball params not set for snowman chain %s", ctx.SubnetID)
+	}
+
+	consensusParams := *sb.Config().ConsensusConfig.SnowballParams
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)

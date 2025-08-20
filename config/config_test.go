@@ -420,9 +420,9 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 				require.True(ok)
 
 				require.True(config.ValidatorOnly)
-				require.Equal(16, config.ConsensusParameters.AlphaConfidence)
+				require.Equal(16, config.ConsensusConfig.SnowballParams.AlphaConfidence)
 				// must still respect defaults
-				require.Equal(20, config.ConsensusParameters.K)
+				require.Equal(20, config.ConsensusConfig.SnowballParams.K)
 			},
 			expectedErr: nil,
 		},
@@ -479,7 +479,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				config, ok := given[id]
 				require.True(ok)
 				// should respect defaults
-				require.Equal(20, config.ConsensusParameters.K)
+				require.Equal(20, config.ConsensusConfig.SnowballParams.K)
 			},
 			expectedErr: nil,
 		},
@@ -520,11 +520,11 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				config, ok := given[id]
 				require.True(ok)
 				require.True(config.ValidatorOnly)
-				require.Equal(16, config.ConsensusParameters.AlphaPreference)
-				require.Equal(20, config.ConsensusParameters.AlphaConfidence)
-				require.Equal(30, config.ConsensusParameters.K)
+				require.Equal(16, config.ConsensusConfig.SnowballParams.AlphaPreference)
+				require.Equal(20, config.ConsensusConfig.SnowballParams.AlphaConfidence)
+				require.Equal(30, config.ConsensusConfig.SnowballParams.K)
 				// must still respect defaults
-				require.Equal(256, config.ConsensusParameters.MaxOutstandingItems)
+				require.Equal(256, config.ConsensusConfig.SnowballParams.MaxOutstandingItems)
 			},
 			expectedErr: nil,
 		},
