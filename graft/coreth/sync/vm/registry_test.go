@@ -13,14 +13,12 @@ import (
 
 // mockSyncer implements synccommon.Syncer for testing.
 type mockSyncer struct {
-	name      string
 	syncError error
 	started   bool // Track if already started
 }
 
-func newMockSyncer(name string, syncError error) *mockSyncer {
+func newMockSyncer(syncError error) *mockSyncer {
 	return &mockSyncer{
-		name:      name,
 		syncError: syncError,
 	}
 }
@@ -52,8 +50,8 @@ func TestSyncerRegistry_Register(t *testing.T) {
 				name   string
 				syncer *mockSyncer
 			}{
-				{"Syncer1", newMockSyncer("TestSyncer1", nil)},
-				{"Syncer2", newMockSyncer("TestSyncer2", nil)},
+				{"Syncer1", newMockSyncer(nil)},
+				{"Syncer2", newMockSyncer(nil)},
 			},
 			expectedError: "",
 			expectedCount: 2,
@@ -64,8 +62,8 @@ func TestSyncerRegistry_Register(t *testing.T) {
 				name   string
 				syncer *mockSyncer
 			}{
-				{"Syncer1", newMockSyncer("Syncer1", nil)},
-				{"Syncer1", newMockSyncer("Syncer1", nil)},
+				{"Syncer1", newMockSyncer(nil)},
+				{"Syncer1", newMockSyncer(nil)},
 			},
 			expectedError: "syncer with name 'Syncer1' is already registered",
 			expectedCount: 1,
@@ -76,9 +74,9 @@ func TestSyncerRegistry_Register(t *testing.T) {
 				name   string
 				syncer *mockSyncer
 			}{
-				{"Syncer1", newMockSyncer("Syncer1", nil)},
-				{"Syncer2", newMockSyncer("Syncer2", nil)},
-				{"Syncer3", newMockSyncer("Syncer3", nil)},
+				{"Syncer1", newMockSyncer(nil)},
+				{"Syncer2", newMockSyncer(nil)},
+				{"Syncer3", newMockSyncer(nil)},
 			},
 			expectedCount: 3,
 		},
@@ -170,10 +168,7 @@ func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
 
 			// Register syncers.
 			for i, syncerConfig := range tt.syncers {
-				mockSyncer := newMockSyncer(
-					syncerConfig.name,
-					syncerConfig.syncError,
-				)
+				mockSyncer := newMockSyncer(syncerConfig.syncError)
 				mockSyncers[i] = mockSyncer
 				require.NoError(t, registry.Register(syncerConfig.name, mockSyncer))
 			}

@@ -203,9 +203,6 @@ type VM struct {
 	// [versiondb] is the VM's current versioned database
 	versiondb *versiondb.Database
 
-	// [db] is the VM's current database
-	db database.Database
-
 	// metadataDB is used to store one off keys.
 	metadataDB database.Database
 
@@ -318,9 +315,7 @@ func (vm *VM) Initialize(
 	}
 
 	// Initialize the database
-	if err := vm.initializeDBs(db); err != nil {
-		return fmt.Errorf("failed to initialize databases: %w", err)
-	}
+	vm.initializeDBs(db)
 	if vm.config.InspectDatabase {
 		if err := vm.inspectDatabases(); err != nil {
 			return err
@@ -628,7 +623,6 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 	networkHandler := newNetworkHandler(
 		vm.blockChain,
 		vm.chaindb,
-		vm.warpBackend,
 		vm.networkCodec,
 		leafHandlers,
 		syncStats,

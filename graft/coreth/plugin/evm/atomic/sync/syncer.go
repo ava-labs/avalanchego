@@ -84,9 +84,6 @@ type syncer struct {
 	// lastHeight is the greatest height for which key / values
 	// were last inserted into the [atomicTrie]
 	lastHeight uint64
-
-	// numWorkers is the number of worker goroutines to use for syncing
-	numWorkers int
 }
 
 // addZeros adds [common.HashLenth] zeros to [height] and returns the result as []byte
@@ -119,7 +116,6 @@ func newSyncer(client syncclient.LeafClient, db *versiondb.Database, atomicTrie 
 		targetRoot:   targetRoot,
 		targetHeight: cfg.TargetHeight,
 		lastHeight:   lastCommit,
-		numWorkers:   cfg.NumWorkers,
 	}
 
 	// Create tasks channel with capacity for the number of workers.

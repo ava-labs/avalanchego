@@ -234,12 +234,12 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 	// Note: we do not add the precompile configs here because they are optional
 	// and independent, i.e. the order in which they are enabled does not impact
 	// the correctness of the chain config.
-	return checkForks(c.forkOrder(), false)
+	return checkForks(c.forkOrder())
 }
 
 // checkForks checks that forks are enabled in order and returns an error if not.
 // `blockFork` is true if the fork is a block number fork, false if it is a timestamp fork
-func checkForks(forks []fork, blockFork bool) error {
+func checkForks(forks []fork) error {
 	lastFork := fork{}
 	for _, cur := range forks {
 		if lastFork.name != "" {

@@ -12,6 +12,8 @@ import "github.com/ava-labs/libevm/metrics"
 //
 // This is necessary for a metric defined in libevm with the same name but a
 // different type to what we expect.
+//
+//nolint:unparam // to match native metrics call
 func getOrOverrideAsRegisteredCounter(name string, r metrics.Registry) metrics.Counter {
 	if r == nil {
 		r = metrics.DefaultRegistry

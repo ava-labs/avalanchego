@@ -60,24 +60,19 @@ var (
 	}
 )
 
-func defaultExtensions() (*extension.Config, error) {
+func defaultExtensions() *extension.Config {
 	return &extension.Config{
 		SyncSummaryProvider: &message.BlockSyncSummaryProvider{},
 		SyncableParser:      &message.BlockSyncSummaryParser{},
 		Clock:               &mockable.Clock{},
-	}, nil
+	}
 }
 
 // newDefaultTestVM returns a new instance of the VM with default extensions
 // This should not be called if the VM is being extended
 func newDefaultTestVM() *VM {
 	vm := &VM{}
-	exts, err := defaultExtensions()
-	if err != nil {
-		panic(err)
-	}
-
-	if err := vm.SetExtensionConfig(exts); err != nil {
+	if err := vm.SetExtensionConfig(defaultExtensions()); err != nil {
 		panic(err)
 	}
 	return vm

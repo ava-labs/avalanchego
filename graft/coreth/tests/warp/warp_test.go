@@ -169,7 +169,6 @@ type warpTest struct {
 
 	// receivingSubnet fields set in the constructor
 	receivingSubnet              *Subnet
-	receivingSubnetURIs          []string
 	receivingSubnetClients       []*ethclient.Client
 	receivingSubnetFundedKey     *ecdsa.PrivateKey
 	receivingSubnetFundedAddress common.Address
@@ -196,7 +195,6 @@ func newWarpTest(ctx context.Context, sendingSubnet *Subnet, receivingSubnet *Su
 		sendingSubnet:                sendingSubnet,
 		sendingSubnetURIs:            sendingSubnet.ValidatorURIs,
 		receivingSubnet:              receivingSubnet,
-		receivingSubnetURIs:          receivingSubnet.ValidatorURIs,
 		sendingSubnetFundedKey:       sendingSubnetFundedKey,
 		sendingSubnetFundedAddress:   crypto.PubkeyToAddress(sendingSubnetFundedKey.PublicKey),
 		receivingSubnetFundedKey:     receivingSubnetFundedKey,

@@ -17,6 +17,8 @@ import (
 
 // libevmInit would ideally be a regular init() function, but it MUST be run
 // before any calls to [params.ChainConfig.Rules]. See `config.go` for its call site.
+//
+//nolint:unparam // must return to be run
 func libevmInit() any {
 	payloads = ethparams.RegisterExtras(ethparams.Extras[*extras.ChainConfig, RulesExtra]{
 		ReuseJSONRoot: true, // Reuse the root JSON input when unmarshalling the extra payload.
