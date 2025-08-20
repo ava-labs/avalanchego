@@ -5,7 +5,6 @@
 # Notes: 
 - Last PR done in chronological order is currently #1071
 - The following PRs have already been synced 
-  - coreth PR 1059 (https://github.com/ava-labs/subnet-evm/pull/1678)
   - coreth PR 1073 (https://github.com/ava-labs/subnet-evm/pull/1659)
   - coreth PR 1077 (https://github.com/ava-labs/subnet-evm/pull/1677)
   - coreth PR 1086 (https://github.com/ava-labs/subnet-evm/pull/1671)
@@ -15,3 +14,4 @@
   - coreth PR 1117 (https://github.com/ava-labs/subnet-evm/1691)
   - coreth PR 1122 (https://github.com/ava-labs/subnet-evm/1690)
   - coreth PR 1123 (https://github.com/ava-labs/subnet-evm/1690)
+  - coreth PR 1134 (https://github.com/ava-labs/subnet-evm/1692)
