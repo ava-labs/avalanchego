@@ -572,7 +572,8 @@ func testReceiveWarpMessageWithScheme(t *testing.T, scheme string) {
 func testReceiveWarpMessage(
 	t *testing.T, vm *VM,
 	sourceChainID ids.ID,
-	msgFrom warpMsgFrom, useSigners useWarpMsgSigners,
+	msgFrom warpMsgFrom,
+	useSigners useWarpMsgSigners,
 	blockTime time.Time,
 ) {
 	require := require.New(t)
@@ -598,7 +599,8 @@ func testReceiveWarpMessage(
 		signature *bls.Signature
 		weight    uint64
 	}
-	newSigner := func(weight uint64) signer {
+	weight := uint64(50)
+	newSigner := func() signer {
 		secret, err := localsigner.New()
 		require.NoError(err)
 		sig, err := secret.Sign(unsignedMessage.Bytes())
@@ -613,12 +615,12 @@ func testReceiveWarpMessage(
 	}
 
 	primarySigners := []signer{
-		newSigner(50),
-		newSigner(50),
+		newSigner(),
+		newSigner(),
 	}
 	subnetSigners := []signer{
-		newSigner(50),
-		newSigner(50),
+		newSigner(),
+		newSigner(),
 	}
 	signers := subnetSigners
 	if useSigners == signersPrimary {

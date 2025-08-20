@@ -817,6 +817,8 @@ func benchmarkApplyToSharedMemory(b *testing.B, disk database.Database, blocks u
 
 // verifyOperations creates an iterator over the atomicTrie at [rootHash] and verifies that the all of the operations in the trie in the interval [from, to] are identical to
 // the atomic operations contained in [operationsMap] on the same interval.
+//
+//nolint:unparam // it's reasonable to provide a `from` height for this function.
 func verifyOperations(t testing.TB, atomicTrie *AtomicTrie, codec codec.Manager, rootHash common.Hash, from, to uint64, operationsMap map[uint64]map[ids.ID]*avalancheatomic.Requests) {
 	t.Helper()
 

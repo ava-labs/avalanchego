@@ -52,13 +52,13 @@ linters:
   default: none
   enable:
     - asciicheck
-    # - bodyclose
+    - bodyclose
     - copyloopvar
     # - depguard
     # - errcheck
     - errorlint
     # - forbidigo
-    # - goconst
+    - goconst
     # - gocritic
     - goprintffuncname
     # - gosec
@@ -68,7 +68,7 @@ linters:
     - misspell
     - nakedret
     # - nilerr
-    # - noctx
+    - noctx
     - nolintlint
     - perfsprint
     # - prealloc
@@ -79,8 +79,8 @@ linters:
     - tagalign
     # - testifylint
     - unconvert
-    # - unparam
-    # - unused
+    - unparam
+    - unused
     - usestdlibvars
     - whitespace
   settings:

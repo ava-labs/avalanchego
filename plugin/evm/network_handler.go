@@ -14,7 +14,6 @@ import (
 
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/handlers/stats"
-	"github.com/ava-labs/coreth/warp"
 
 	syncHandlers "github.com/ava-labs/coreth/sync/handlers"
 )
@@ -41,7 +40,6 @@ type LeafRequestTypeConfig struct {
 func newNetworkHandler(
 	provider syncHandlers.SyncDataProvider,
 	diskDB ethdb.KeyValueReader,
-	warpBackend warp.Backend,
 	networkCodec codec.Manager,
 	leafRequestHandlers LeafHandlers,
 	syncStats stats.HandlerStats,

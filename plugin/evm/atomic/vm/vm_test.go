@@ -878,7 +878,8 @@ func testReissueAtomicTx(t *testing.T, scheme string) {
 	fork := upgradetest.ApricotPhase1
 	vm := newAtomicTestVM()
 	tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-		Fork: &fork,
+		Fork:   &fork,
+		Scheme: scheme,
 	})
 	require.NoError(t, addUTXOs(tvm.AtomicMemory, vm.Ctx, map[ids.ShortID]uint64{
 		vmtest.TestShortIDAddrs[0]: 10000000,
@@ -1605,7 +1606,8 @@ func testBuildApricotPhase4Block(t *testing.T, scheme string) {
 	fork := upgradetest.ApricotPhase4
 	vm := newAtomicTestVM()
 	tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
-		Fork: &fork,
+		Fork:   &fork,
+		Scheme: scheme,
 	})
 
 	defer func() {

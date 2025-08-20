@@ -3,4 +3,4 @@
 
 package aggregator
 
-//go:generate go run go.uber.org/mock/mockgen -package=$GOPACKAGE -source=signature_getter.go -destination=mock_signature_getter.go
+//go:generate go run go.uber.org/mock/mockgen -package=$GOPACKAGE -destination=mock_signature_getter.go . SignatureGetter

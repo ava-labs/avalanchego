@@ -168,7 +168,7 @@ func checkBlockChainState(
 	originalDB ethdb.Database,
 	create createFunc,
 	checkState func(sdb *state.StateDB) error,
-) (*BlockChain, *BlockChain, *BlockChain) {
+) (*BlockChain, *BlockChain) {
 	var (
 		lastAcceptedBlock = bc.LastConsensusAcceptedBlock()
 		newDB             = rawdb.NewMemoryDatabase()
@@ -243,7 +243,7 @@ func checkBlockChainState(
 		t.Fatalf("Check state failed for restarted blockchain due to: %s", err)
 	}
 
-	return bc, newBlockChain, restartedChain
+	return newBlockChain, restartedChain
 }
 
 func InsertChainAcceptSingleBlockTest(t *testing.T, create createFunc) {
@@ -1685,7 +1685,7 @@ func ReexecBlocksTest(t *testing.T, create ReexecTestFunc) {
 		return create(db, gspec, lastAcceptedHash, dataPath, blockchain.cacheConfig.CommitInterval)
 	}
 
-	_, newChain, restartedChain := checkBlockChainState(t, blockchain, gspec, chainDB, checkCreate, checkState)
+	newChain, restartedChain := checkBlockChainState(t, blockchain, gspec, chainDB, checkCreate, checkState)
 
 	allTxs := append(foundTxs, missingTxs...)
 	for _, bc := range []*BlockChain{newChain, restartedChain} {
@@ -1817,7 +1817,7 @@ func ReexecMaxBlocksTest(t *testing.T, create ReexecTestFunc) {
 	checkCreate := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, dataPath string) (*BlockChain, error) {
 		return create(db, gspec, lastAcceptedHash, dataPath, uint64(newCommitInterval))
 	}
-	_, newChain, restartedChain := checkBlockChainState(t, blockchain, gspec, chainDB, checkCreate, checkState)
+	newChain, restartedChain := checkBlockChainState(t, blockchain, gspec, chainDB, checkCreate, checkState)
 
 	allTxs := append(foundTxs, missingTxs...)
 	for _, bc := range []*BlockChain{newChain, restartedChain} {

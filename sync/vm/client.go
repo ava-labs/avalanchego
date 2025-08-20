@@ -169,7 +169,7 @@ func (client *client) stateSync(ctx context.Context) error {
 
 func (client *client) registerSyncers(ctx context.Context, registry *SyncerRegistry) error {
 	// Register block syncer.
-	syncer, err := client.createBlockSyncer(ctx, client.summary.GetBlockHash(), client.summary.Height())
+	syncer, err := client.createBlockSyncer(client.summary.GetBlockHash(), client.summary.Height())
 	if err != nil {
 		return fmt.Errorf("failed to create block syncer: %w", err)
 	}
@@ -202,7 +202,7 @@ func (client *client) registerSyncers(ctx context.Context, registry *SyncerRegis
 	return nil
 }
 
-func (client *client) createBlockSyncer(ctx context.Context, fromHash common.Hash, fromHeight uint64) (synccommon.Syncer, error) {
+func (client *client) createBlockSyncer(fromHash common.Hash, fromHeight uint64) (synccommon.Syncer, error) {
 	return blocksync.NewSyncer(client.Client, client.ChainDB, blocksync.Config{
 		FromHash:      fromHash,
 		FromHeight:    fromHeight,
