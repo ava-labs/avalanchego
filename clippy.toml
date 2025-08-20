@@ -1,6 +1,8 @@
 # See https://doc.rust-lang.org/clippy/lint_configuration.html
 # for full configuration options.
 
+msrv = "1.85"
+
 disallowed-methods = [
   { path = "rand::rng", replacement = "firewood_storage::StdRng::from_env_or_random", reason = "use a prng with a user-defined seed instead", allow-invalid = true },
 ]
