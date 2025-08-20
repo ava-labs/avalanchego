@@ -78,8 +78,6 @@ jobs:
       id-token: write
       contents: write
     runs-on: ${{ matrix.runner }}
-    container:
-      image: ghcr.io/actions/actions-runner:2.325.0
     steps:
       - uses: actions/checkout@v4
       - name: Install ARC Dependencies
