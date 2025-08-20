@@ -66,10 +66,9 @@ var (
 		"chain":             "C",
 	}
 
-	configKey                           = "config"
-	defaultConfigKey                    = "default"
-	predefinedConfigs map[string]string = map[string]string{
-		"":               `{}`,
+	configKey         = "config"
+	defaultConfigKey  = "default"
+	predefinedConfigs = map[string]string{
 		defaultConfigKey: `{}`,
 		"archive": `{
 			"pruning-enabled": false
@@ -109,7 +108,7 @@ func TestMain(m *testing.M) {
 		predefinedConfigKeys = append(predefinedConfigKeys, k)
 	}
 	predefinedConfigOptionsStr := fmt.Sprintf("[%s]", strings.Join(predefinedConfigKeys, ", "))
-	flag.StringVar(&configNameArg, configKey, "", fmt.Sprintf("Specifies the predefined config to use for the VM. Options include %s.", predefinedConfigOptionsStr))
+	flag.StringVar(&configNameArg, configKey, defaultConfigKey, fmt.Sprintf("Specifies the predefined config to use for the VM. Options include %s.", predefinedConfigOptionsStr))
 
 	flag.Parse()
 
@@ -121,9 +120,6 @@ func TestMain(m *testing.M) {
 	maps.Copy(labels, customLabels)
 
 	// Set the config from the predefined configs and add to custom labels for the job.
-	if configNameArg == "" {
-		configNameArg = defaultConfigKey
-	}
 	predefinedConfigStr, ok := predefinedConfigs[configNameArg]
 	if !ok {
 		fmt.Fprintf(os.Stderr, "invalid config name %q. Valid options include %s.\n", configNameArg, predefinedConfigOptionsStr)

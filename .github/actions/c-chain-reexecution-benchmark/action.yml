@@ -3,7 +3,7 @@ description: 'Run C-Chain re-execution benchmark'
 
 inputs:
   config:
-    description: 'The config to pass to the VM for the benchmark. Specify "archive" (pre-defined config) or a full JSON blob as a string.'
+    description: 'The config to pass to the VM for the benchmark. See BenchmarkReexecuteRange for details.'
     default: ''
   start-block:
     description: 'The start block for the benchmark.'
