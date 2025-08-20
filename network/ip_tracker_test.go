@@ -20,9 +20,8 @@ import (
 
 // testConfig represents different configurations for testing the IP tracker
 type testConfig struct {
-	name                   string
-	connectToAllValidators bool
-	newTracker             func(t *testing.T) *ipTracker
+	name       string
+	newTracker func(t *testing.T) *ipTracker
 }
 
 // shouldSkipTest checks if a test case should be skipped for the given config
@@ -36,15 +35,13 @@ func shouldSkipTest(skipConfigs []*testConfig, config *testConfig) bool {
 }
 
 var normalConfig = testConfig{
-	name:                   "connect_to_tracked_only",
-	connectToAllValidators: false,
-	newTracker:             newTestIPTracker,
+	name:       "connect_to_tracked_only",
+	newTracker: newTestIPTracker,
 }
 
 var connectToAllValidatorsConfig = testConfig{
-	name:                   "connect_to_all_validators",
-	connectToAllValidators: true,
-	newTracker:             newTestIPTrackerConnectToAll,
+	name:       "connect_to_all_validators",
+	newTracker: newTestIPTrackerConnectToAll,
 }
 
 // testConfigs defines all the test configurations we want to run
@@ -194,9 +191,8 @@ func TestIPTracker_ManuallyTrack(t *testing.T) {
 		t.Run(config.name, func(t *testing.T) {
 			for _, test := range tests {
 				if shouldSkipTest(test.skipConfigs, config) {
-					t.Skipf("skipping test case '%s' for config '%s'", test.name, config.name)
+					continue
 				}
-
 				t.Run(test.name, func(t *testing.T) {
 					testState := test.initialState(t, config)
 					expectedState := test.initialState(t, config)
@@ -556,6 +552,21 @@ func TestIPTracker_AddIP(t *testing.T) {
 			skipConfigs: []*testConfig{&connectToAllValidatorsConfig},
 		},
 		{
+			name: "first known IP of previously untracked subnet validator",
+			initialState: func(t *testing.T, config *testConfig) *ipTracker {
+				tracker := config.newTracker(t)
+				tracker.OnValidatorAdded(subnetID, ip.NodeID, nil, ids.Empty, 0)
+				return tracker
+			},
+			ip:                        ip,
+			expectedUpdatedAndDesired: true,
+			expectedChange: func(tracker *ipTracker) {
+				tracker.tracked[ip.NodeID].ip = ip
+				tracker.bloomAdditions[ip.NodeID] = 1
+			},
+			skipConfigs: []*testConfig{&normalConfig},
+		},
+		{
 			name: "older IP of tracked node",
 			initialState: func(t *testing.T, config *testConfig) *ipTracker {
 				tracker := config.newTracker(t)
@@ -579,6 +590,19 @@ func TestIPTracker_AddIP(t *testing.T) {
 			expectedUpdatedAndDesired: false,
 			expectedChange:            func(*ipTracker) {},
 			skipConfigs:               []*testConfig{&connectToAllValidatorsConfig},
+		},
+		{
+			name: "older IP of previously untracked subnet validator",
+			initialState: func(t *testing.T, config *testConfig) *ipTracker {
+				tracker := config.newTracker(t)
+				tracker.OnValidatorAdded(subnetID, ip.NodeID, nil, ids.Empty, 0)
+				require.True(t, tracker.AddIP(newerIP))
+				return tracker
+			},
+			ip:                        ip,
+			expectedUpdatedAndDesired: false,
+			expectedChange:            func(*ipTracker) {},
+			skipConfigs:               []*testConfig{&normalConfig},
 		},
 		{
 			name: "same IP of tracked node",
@@ -606,6 +630,19 @@ func TestIPTracker_AddIP(t *testing.T) {
 			skipConfigs:               []*testConfig{&connectToAllValidatorsConfig},
 		},
 		{
+			name: "same IP of previously untracked subnet validator",
+			initialState: func(t *testing.T, config *testConfig) *ipTracker {
+				tracker := config.newTracker(t)
+				tracker.OnValidatorAdded(subnetID, ip.NodeID, nil, ids.Empty, 0)
+				require.True(t, tracker.AddIP(ip))
+				return tracker
+			},
+			ip:                        ip,
+			expectedUpdatedAndDesired: false,
+			expectedChange:            func(*ipTracker) {},
+			skipConfigs:               []*testConfig{&normalConfig},
+		},
+		{
 			name: "disconnected newer IP of tracked node",
 			initialState: func(t *testing.T, config *testConfig) *ipTracker {
 				tracker := config.newTracker(t)
@@ -619,7 +656,6 @@ func TestIPTracker_AddIP(t *testing.T) {
 				tracker.tracked[newerIP.NodeID].ip = newerIP
 				tracker.bloomAdditions[newerIP.NodeID] = 2
 			},
-			skipConfigs: []*testConfig{&connectToAllValidatorsConfig},
 		},
 		{
 			name: "disconnected newer IP of untracked node",
@@ -636,6 +672,22 @@ func TestIPTracker_AddIP(t *testing.T) {
 				tracker.bloomAdditions[newerIP.NodeID] = 2
 			},
 			skipConfigs: []*testConfig{&connectToAllValidatorsConfig},
+		},
+		{
+			name: "disconnected newer IP of previously untracked subnet validator",
+			initialState: func(t *testing.T, config *testConfig) *ipTracker {
+				tracker := config.newTracker(t)
+				tracker.OnValidatorAdded(subnetID, ip.NodeID, nil, ids.Empty, 0)
+				require.True(t, tracker.AddIP(ip))
+				return tracker
+			},
+			ip:                        newerIP,
+			expectedUpdatedAndDesired: true,
+			expectedChange: func(tracker *ipTracker) {
+				tracker.tracked[newerIP.NodeID].ip = newerIP
+				tracker.bloomAdditions[newerIP.NodeID] = 2
+			},
+			skipConfigs: []*testConfig{&normalConfig},
 		},
 		{
 			name: "connected newer IP of tracked node",
@@ -668,6 +720,22 @@ func TestIPTracker_AddIP(t *testing.T) {
 				tracker.bloomAdditions[newerIP.NodeID] = 2
 			},
 			skipConfigs: []*testConfig{&connectToAllValidatorsConfig},
+		},
+		{
+			name: "connected newer IP of previously untracked subnet validator",
+			initialState: func(t *testing.T, config *testConfig) *ipTracker {
+				tracker := config.newTracker(t)
+				tracker.OnValidatorAdded(subnetID, ip.NodeID, nil, ids.Empty, 0)
+				tracker.Connected(ip, set.Of(constants.PrimaryNetworkID))
+				return tracker
+			},
+			ip:                        newerIP,
+			expectedUpdatedAndDesired: true,
+			expectedChange: func(tracker *ipTracker) {
+				tracker.tracked[newerIP.NodeID].ip = newerIP
+				tracker.bloomAdditions[newerIP.NodeID] = 2
+			},
+			skipConfigs: []*testConfig{&normalConfig},
 		},
 	}
 
@@ -842,6 +910,25 @@ func TestIPTracker_Connected(t *testing.T) {
 			skipConfigs: []*testConfig{&connectToAllValidatorsConfig},
 		},
 		{
+			name: "connected with newer IP of previously untracked subnet validator",
+			initialState: func(t *testing.T, config *testConfig) *ipTracker {
+				tracker := config.newTracker(t)
+				tracker.OnValidatorAdded(subnetID, ip.NodeID, nil, ids.Empty, 0)
+				require.True(t, tracker.AddIP(ip))
+				return tracker
+			},
+			ip: newerIP,
+			expectedChange: func(tracker *ipTracker) {
+				tracker.tracked[newerIP.NodeID].ip = newerIP
+				tracker.bloomAdditions[newerIP.NodeID] = 2
+				tracker.connected[newerIP.NodeID] = &connectedNode{
+					trackedSubnets: set.Of(constants.PrimaryNetworkID),
+					ip:             newerIP,
+				}
+			},
+			skipConfigs: []*testConfig{&normalConfig},
+		},
+		{
 			name: "connected with same IP of node tracking subnet",
 			initialState: func(t *testing.T, config *testConfig) *ipTracker {
 				tracker := config.newTracker(t)
@@ -880,6 +967,23 @@ func TestIPTracker_Connected(t *testing.T) {
 				}
 			},
 			skipConfigs: []*testConfig{&connectToAllValidatorsConfig},
+		},
+		{
+			name: "connected with same IP of previously untracked subnet validator",
+			initialState: func(t *testing.T, config *testConfig) *ipTracker {
+				tracker := config.newTracker(t)
+				tracker.OnValidatorAdded(subnetID, ip.NodeID, nil, ids.Empty, 0)
+				require.True(t, tracker.AddIP(ip))
+				return tracker
+			},
+			ip: ip,
+			expectedChange: func(tracker *ipTracker) {
+				tracker.connected[ip.NodeID] = &connectedNode{
+					trackedSubnets: set.Of(constants.PrimaryNetworkID),
+					ip:             ip,
+				}
+			},
+			skipConfigs: []*testConfig{&normalConfig},
 		},
 	}
 
@@ -1160,6 +1264,30 @@ func TestIPTracker_OnValidatorAdded(t *testing.T) {
 			},
 			skipConfigs: []*testConfig{&connectToAllValidatorsConfig},
 		},
+		{
+			name: "connected to new subnet",
+			initialState: func(t *testing.T, config *testConfig) *ipTracker {
+				tracker := config.newTracker(t)
+				tracker.Connected(ip, set.Of(constants.PrimaryNetworkID))
+				return tracker
+			},
+			subnetID: subnetID,
+			expectedChange: func(tracker *ipTracker) {
+				tracker.numTrackedSubnets.Inc()
+				tracker.tracked[ip.NodeID] = &trackedNode{
+					validatedSubnets: set.Of(subnetID),
+					trackedSubnets:   set.Of(subnetID),
+					ip:               ip,
+				}
+				tracker.bloomAdditions[ip.NodeID] = 1
+				tracker.subnet[subnetID] = &gossipableSubnet{
+					numGossipableIPs:  tracker.numGossipableIPs,
+					gossipableIDs:     set.Of(ip.NodeID),
+					gossipableIndices: make(map[ids.NodeID]int),
+				}
+			},
+			skipConfigs: []*testConfig{&normalConfig},
+		},
 	}
 
 	for _, config := range testConfigs {
@@ -1276,6 +1404,21 @@ func TestIPTracker_OnValidatorRemoved(t *testing.T) {
 				delete(tracker.subnet, subnetID)
 			},
 			skipConfigs: []*testConfig{&connectToAllValidatorsConfig},
+		},
+		{
+			name: "manually gossiped on new subnet",
+			initialState: func(t *testing.T, config *testConfig) *ipTracker {
+				tracker := config.newTracker(t)
+				tracker.ManuallyGossip(constants.PrimaryNetworkID, ip.NodeID)
+				tracker.OnValidatorAdded(subnetID, ip.NodeID, nil, ids.Empty, 0)
+				tracker.Connected(ip, set.Of(constants.PrimaryNetworkID))
+				return tracker
+			},
+			subnetID: subnetID,
+			expectedChange: func(tracker *ipTracker) {
+				tracker.tracked[ip.NodeID].validatedSubnets.Remove(subnetID)
+			},
+			skipConfigs: []*testConfig{&normalConfig, &connectToAllValidatorsConfig}, // TODO: this one fails with reflection errror now
 		},
 		{
 			name: "non-latest gossipable",

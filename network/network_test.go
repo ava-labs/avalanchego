@@ -159,10 +159,6 @@ func newDefaultResourceTracker() tracker.ResourceTracker {
 	return tracker
 }
 
-func newTestNetworkConnectToAll(t *testing.T, count int) (*testDialer, []*testListener, []ids.NodeID, []*Config) {
-	return newTestNetworkInner(t, count, true)
-}
-
 func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.NodeID, []*Config) {
 	return newTestNetworkInner(t, count, false)
 }
