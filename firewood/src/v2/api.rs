@@ -185,7 +185,6 @@ impl From<crate::db::DbError> for Error {
 /// recently committed revision, and allow the creation of a new
 /// [`Proposal`] or a new [`DbView`] based on a specific historical
 /// revision.
-#[async_trait]
 pub trait Db {
     /// The type of a historical revision
     type Historical: DbView;
@@ -200,7 +199,8 @@ pub trait Db {
     /// # Arguments
     ///
     /// - `hash` - Identifies the revision for the view
-    async fn revision(&self, hash: TrieHash) -> Result<Arc<Self::Historical>, Error>;
+    #[expect(clippy::missing_errors_doc)]
+    fn revision(&self, hash: TrieHash) -> Result<Arc<Self::Historical>, Error>;
 
     /// Get the hash of the most recently committed version
     ///
@@ -208,10 +208,12 @@ pub trait Db {
     ///
     /// If the database is empty, this will return None, unless the ethhash feature is enabled.
     /// In that case, we return the special ethhash compatible empty trie hash.
-    async fn root_hash(&self) -> Result<Option<TrieHash>, Error>;
+    #[expect(clippy::missing_errors_doc)]
+    fn root_hash(&self) -> Result<Option<TrieHash>, Error>;
 
     /// Get all the hashes available
-    async fn all_hashes(&self) -> Result<Vec<TrieHash>, Error>;
+    #[expect(clippy::missing_errors_doc)]
+    fn all_hashes(&self) -> Result<Vec<TrieHash>, Error>;
 
     /// Propose a change to the database via a batch
     ///
@@ -220,15 +222,13 @@ pub trait Db {
     ///
     /// # Arguments
     ///
-    /// * `data` - A batch consisting of [`BatchOp::Put`] and
-    ///            [`BatchOp::Delete`] operations to apply
-    ///
-    async fn propose<'db>(
-        &'db self,
-        data: (impl IntoIterator<IntoIter: KeyValuePairIter> + Send),
-    ) -> Result<Self::Proposal<'db>, Error>
-    where
-        Self: 'db;
+    /// * `data` - A batch consisting of [`BatchOp::Put`] and [`BatchOp::Delete`]
+    ///   operations to apply
+    #[expect(clippy::missing_errors_doc)]
+    fn propose(
+        &self,
+        data: impl IntoIterator<IntoIter: KeyValuePairIter>,
+    ) -> Result<Self::Proposal<'_>, Error>;
 }
 
 /// A view of the database at a specific time.

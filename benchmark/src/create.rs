@@ -33,7 +33,7 @@ impl TestRunner for Create {
 
             let batch = Self::generate_inserts(key * keys, args.global_opts.batch_size);
 
-            let proposal = db.propose(batch).await.expect("proposal should succeed");
+            let proposal = db.propose(batch).expect("proposal should succeed");
             proposal.commit()?;
         }
         let duration = start.elapsed();

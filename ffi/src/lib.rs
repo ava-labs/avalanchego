@@ -39,7 +39,7 @@ use std::sync::{Mutex, RwLock};
 use firewood::db::{Db, DbConfig, DbViewSync as _, DbViewSyncBytes, Proposal};
 use firewood::manager::{CacheReadStrategy, RevisionManagerConfig};
 
-use firewood::v2::api::{HashKey, KeyValuePairIter};
+use firewood::v2::api::{Db as _, HashKey, KeyValuePairIter};
 use metrics::counter;
 
 pub use crate::value::*;
@@ -142,12 +142,12 @@ fn get_latest(db: Option<&DatabaseHandle<'_>>, key: &[u8]) -> Result<Value, Stri
     let db = db.ok_or("db should be non-null")?;
     // Find root hash.
     // Matches `hash` function but we use the TrieHash type here
-    let Some(root) = db.root_hash_sync().map_err(|e| e.to_string())? else {
+    let Some(root) = db.root_hash().map_err(|e| e.to_string())? else {
         return Ok(Value::default());
     };
 
     // Find revision assoicated with root.
-    let rev = db.revision_sync(root).map_err(|e| e.to_string())?;
+    let rev = db.revision(root).map_err(|e| e.to_string())?;
 
     // Get value associated with key.
     let value = rev
@@ -328,7 +328,7 @@ fn batch(db: Option<&DatabaseHandle<'_>>, values: &[KeyValuePair<'_>]) -> Result
     let batch = values.iter().map_into_batch();
 
     // Propose the batch of operations.
-    let proposal = db.propose_sync(batch).map_err(|e| e.to_string())?;
+    let proposal = db.propose(batch).map_err(|e| e.to_string())?;
     let propose_time = start.elapsed().as_millis();
     counter!("firewood.ffi.propose_ms").increment(propose_time);
 
@@ -393,7 +393,7 @@ fn propose_on_db<'p>(
     let batch = values.iter().map_into_batch();
 
     // Propose the batch of operations.
-    let proposal = db.propose_sync(batch).map_err(|e| e.to_string())?;
+    let proposal = db.propose(batch).map_err(|e| e.to_string())?;
 
     // Get the root hash of the new proposal.
     let mut root_hash: Value = match proposal.root_hash_sync().map_err(|e| e.to_string())? {
@@ -596,7 +596,7 @@ pub unsafe extern "C" fn fwd_root_hash(db: Option<&DatabaseHandle<'_>>) -> Value
 #[doc(hidden)]
 fn root_hash(db: Option<&DatabaseHandle<'_>>) -> Result<Value, String> {
     let db = db.ok_or("db should be non-null")?;
-    db.root_hash_sync()
+    db.root_hash()
         .map_err(|e| e.to_string())?
         .map(|root| Value::from(root.as_slice()))
         .map_or_else(|| Ok(Value::default()), Ok)

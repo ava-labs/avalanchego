@@ -162,7 +162,6 @@ pub struct Db {
     manager: RevisionManager,
 }
 
-#[async_trait]
 impl api::Db for Db {
     type Historical = NodeStore<Committed, FileBacked>;
 
@@ -171,24 +170,24 @@ impl api::Db for Db {
     where
         Self: 'db;
 
-    async fn revision(&self, root_hash: HashKey) -> Result<Arc<Self::Historical>, api::Error> {
+    fn revision(&self, root_hash: HashKey) -> Result<Arc<Self::Historical>, api::Error> {
         let nodestore = self.manager.revision(root_hash)?;
         Ok(nodestore)
     }
 
-    async fn root_hash(&self) -> Result<Option<HashKey>, api::Error> {
-        self.root_hash_sync()
+    fn root_hash(&self) -> Result<Option<HashKey>, api::Error> {
+        Ok(self.manager.root_hash()?.or_default_root_hash())
     }
 
-    async fn all_hashes(&self) -> Result<Vec<HashKey>, api::Error> {
+    fn all_hashes(&self) -> Result<Vec<HashKey>, api::Error> {
         Ok(self.manager.all_hashes())
     }
 
     #[fastrace::trace(short_name = true)]
-    async fn propose<'db>(
-        &'db self,
-        batch: (impl IntoIterator<IntoIter: KeyValuePairIter> + Send),
-    ) -> Result<Self::Proposal<'db>, api::Error> {
+    fn propose(
+        &self,
+        batch: impl IntoIterator<IntoIter: KeyValuePairIter>,
+    ) -> Result<Self::Proposal<'_>, api::Error> {
         let parent = self.manager.current_revision();
         let proposal = NodeStore::new(&parent)?;
         let mut merkle = Merkle::from(proposal);
@@ -243,55 +242,10 @@ impl Db {
         Ok(db)
     }
 
-    /// Synchronously get the root hash of the latest revision.
-    pub fn root_hash_sync(&self) -> Result<Option<HashKey>, api::Error> {
-        Ok(self.manager.root_hash()?.or_default_root_hash())
-    }
-
-    /// Synchronously get a revision from a root hash
-    pub fn revision_sync(&self, root_hash: HashKey) -> Result<Arc<HistoricalRev>, api::Error> {
-        let nodestore = self.manager.revision(root_hash)?;
-        Ok(nodestore)
-    }
-
     /// Synchronously get a view, either committed or proposed
     pub fn view_sync(&self, root_hash: HashKey) -> Result<Box<dyn DbViewSyncBytes>, api::Error> {
         let nodestore = self.manager.view(root_hash)?;
         Ok(nodestore)
-    }
-
-    /// propose a new batch synchronously
-    pub fn propose_sync(
-        &self,
-        batch: impl IntoIterator<IntoIter: KeyValuePairIter>,
-    ) -> Result<Proposal<'_>, api::Error> {
-        let parent = self.manager.current_revision();
-        let proposal = NodeStore::new(&parent)?;
-        let mut merkle = Merkle::from(proposal);
-        for op in batch {
-            match op.into_batch() {
-                BatchOp::Put { key, value } => {
-                    merkle.insert(key.as_ref(), value.as_ref().into())?;
-                }
-                BatchOp::Delete { key } => {
-                    merkle.remove(key.as_ref())?;
-                }
-                BatchOp::DeleteRange { prefix } => {
-                    merkle.remove_prefix(prefix.as_ref())?;
-                }
-            }
-        }
-        let nodestore = merkle.into_inner();
-        let immutable: Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>> =
-            Arc::new(nodestore.try_into()?);
-        self.manager.add_proposal(immutable.clone());
-
-        self.metrics.proposals.increment(1);
-
-        Ok(Proposal {
-            nodestore: immutable,
-            db: self,
-        })
     }
 
     /// Dump the Trie of the latest revision.
@@ -495,7 +449,7 @@ mod test {
             key: b"k",
             value: b"v",
         }];
-        let proposal = db.propose(batch).await.unwrap();
+        let proposal = db.propose(batch).unwrap();
         assert_eq!(&*proposal.val(b"k").await.unwrap().unwrap(), b"v");
 
         assert_eq!(proposal.val(b"notfound").await.unwrap(), None);
@@ -505,18 +459,18 @@ mod test {
             key: b"k",
             value: b"v2",
         }];
-        let proposal = db.propose(batch).await.unwrap();
+        let proposal = db.propose(batch).unwrap();
         assert_eq!(&*proposal.val(b"k").await.unwrap().unwrap(), b"v2");
 
-        let committed = db.root_hash().await.unwrap().unwrap();
-        let historical = db.revision(committed).await.unwrap();
+        let committed = db.root_hash().unwrap().unwrap();
+        let historical = db.revision(committed).unwrap();
         assert_eq!(&*historical.val(b"k").await.unwrap().unwrap(), b"v");
     }
 
     #[tokio::test]
     async fn reopen_test() {
         let db = testdb();
-        let initial_root = db.root_hash().await.unwrap();
+        let initial_root = db.root_hash().unwrap();
         let batch = vec![
             BatchOp::Put {
                 key: b"a",
@@ -527,19 +481,19 @@ mod test {
                 value: b"2",
             },
         ];
-        let proposal = db.propose(batch).await.unwrap();
+        let proposal = db.propose(batch).unwrap();
         proposal.commit().unwrap();
-        println!("{:?}", db.root_hash().await.unwrap().unwrap());
+        println!("{:?}", db.root_hash().unwrap().unwrap());
 
         let db = db.reopen();
-        println!("{:?}", db.root_hash().await.unwrap().unwrap());
-        let committed = db.root_hash().await.unwrap().unwrap();
-        let historical = db.revision(committed).await.unwrap();
+        println!("{:?}", db.root_hash().unwrap().unwrap());
+        let committed = db.root_hash().unwrap().unwrap();
+        let historical = db.revision(committed).unwrap();
         assert_eq!(&*historical.val(b"a").await.unwrap().unwrap(), b"1");
 
         let db = db.replace();
-        println!("{:?}", db.root_hash().await.unwrap());
-        assert!(db.root_hash().await.unwrap() == initial_root);
+        println!("{:?}", db.root_hash().unwrap());
+        assert!(db.root_hash().unwrap() == initial_root);
     }
 
     #[tokio::test]
@@ -553,39 +507,39 @@ mod test {
             key: b"k1",
             value: b"v1",
         }];
-        let proposal1 = db.propose(batch1).await.unwrap();
+        let proposal1 = db.propose(batch1).unwrap();
         assert_eq!(&*proposal1.val(b"k1").await.unwrap().unwrap(), b"v1");
 
         let batch2 = vec![BatchOp::Put {
             key: b"k2",
             value: b"v2",
         }];
-        let proposal2 = db.propose(batch2).await.unwrap();
+        let proposal2 = db.propose(batch2).unwrap();
         assert_eq!(&*proposal2.val(b"k2").await.unwrap().unwrap(), b"v2");
 
         let batch3 = vec![BatchOp::Put {
             key: b"k3",
             value: b"v3",
         }];
-        let proposal3 = db.propose(batch3).await.unwrap();
+        let proposal3 = db.propose(batch3).unwrap();
         assert_eq!(&*proposal3.val(b"k3").await.unwrap().unwrap(), b"v3");
 
         // the proposal is dropped here, but the underlying
         // nodestore is still accessible because it's referenced by the revision manager
         // The third proposal remains referenced
         let p2hash = proposal2.root_hash().await.unwrap().unwrap();
-        assert!(db.all_hashes().await.unwrap().contains(&p2hash));
+        assert!(db.all_hashes().unwrap().contains(&p2hash));
         drop(proposal2);
 
         // commit the first proposal
         proposal1.commit().unwrap();
         // Ensure we committed the first proposal's data
-        let committed = db.root_hash().await.unwrap().unwrap();
-        let historical = db.revision(committed).await.unwrap();
+        let committed = db.root_hash().unwrap().unwrap();
+        let historical = db.revision(committed).unwrap();
         assert_eq!(&*historical.val(b"k1").await.unwrap().unwrap(), b"v1");
 
         // the second proposal shouldn't be available to commit anymore
-        assert!(!db.all_hashes().await.unwrap().contains(&p2hash));
+        assert!(!db.all_hashes().unwrap().contains(&p2hash));
 
         // the third proposal should still be contained within the all_hashes list
         // would be deleted if another proposal was committed and proposal3 was dropped here
@@ -605,7 +559,7 @@ mod test {
             key: b"k1",
             value: b"v1",
         }];
-        let proposal1 = db.propose(batch1).await.unwrap();
+        let proposal1 = db.propose(batch1).unwrap();
         assert_eq!(&*proposal1.val(b"k1").await.unwrap().unwrap(), b"v1");
 
         let batch2 = vec![BatchOp::Put {
@@ -626,18 +580,18 @@ mod test {
         // nodestore is still accessible because it's referenced by the revision manager
         // The third proposal remains referenced
         let p2hash = proposal2.root_hash().await.unwrap().unwrap();
-        assert!(db.all_hashes().await.unwrap().contains(&p2hash));
+        assert!(db.all_hashes().unwrap().contains(&p2hash));
         drop(proposal2);
 
         // commit the first proposal
         proposal1.commit().unwrap();
         // Ensure we committed the first proposal's data
-        let committed = db.root_hash().await.unwrap().unwrap();
-        let historical = db.revision(committed).await.unwrap();
+        let committed = db.root_hash().unwrap().unwrap();
+        let historical = db.revision(committed).unwrap();
         assert_eq!(&*historical.val(b"k1").await.unwrap().unwrap(), b"v1");
 
         // the second proposal shouldn't be available to commit anymore
-        assert!(!db.all_hashes().await.unwrap().contains(&p2hash));
+        assert!(!db.all_hashes().unwrap().contains(&p2hash));
 
         // the third proposal should still be contained within the all_hashes list
         let hash3 = proposal3.root_hash().await.unwrap().unwrap();
@@ -658,7 +612,7 @@ mod test {
             key: b"historical_key",
             value: b"historical_value",
         }];
-        let proposal = db.propose(batch).await.unwrap();
+        let proposal = db.propose(batch).unwrap();
         let historical_hash = proposal.root_hash().await.unwrap().unwrap();
         proposal.commit().unwrap();
 
@@ -667,7 +621,7 @@ mod test {
             key: b"proposal_key",
             value: b"proposal_value",
         }];
-        let proposal = db.propose(batch).await.unwrap();
+        let proposal = db.propose(batch).unwrap();
         let proposal_hash = proposal.root_hash().await.unwrap().unwrap();
 
         // Test that view_sync can find the historical revision
@@ -712,7 +666,7 @@ mod test {
         let mut kviter = keys.iter().zip(vals.iter()).map_into_batch();
 
         // create two proposals, second one has a base of the first one
-        let proposal1 = db.propose(kviter.by_ref().take(N / 2)).await.unwrap();
+        let proposal1 = db.propose(kviter.by_ref().take(N / 2)).unwrap();
         let proposal2 = proposal1.propose(kviter).unwrap();
 
         // iterate over the keys and values again, checking that the values are in the correct proposal
@@ -743,8 +697,8 @@ mod test {
         proposal2.commit().unwrap();
 
         // all keys are in the database
-        let committed = db.root_hash().await.unwrap().unwrap();
-        let revision = db.revision(committed).await.unwrap();
+        let committed = db.root_hash().unwrap().unwrap();
+        let revision = db.revision(committed).unwrap();
 
         for (k, v) in keys.into_iter().zip(vals.into_iter()) {
             assert_eq!(revision.val(k).await.unwrap().unwrap(), v);
@@ -777,7 +731,7 @@ mod test {
                 }
                 batch
             });
-            let proposal = db.propose(batch).await.unwrap();
+            let proposal = db.propose(batch).unwrap();
             proposal.commit().unwrap();
 
             // check the database for consistency, sometimes checking the hashes
@@ -819,7 +773,7 @@ mod test {
                     let proposal = if let Some(parent) = proposals.last() {
                         parent.propose(ops).unwrap()
                     } else {
-                        db.propose(ops).await.unwrap()
+                        db.propose(ops).unwrap()
                     };
 
                     proposals.push(proposal);
@@ -842,8 +796,8 @@ mod test {
         }
 
         // get the last committed revision
-        let last_root_hash = db.root_hash().await.unwrap().unwrap();
-        let committed = db.revision(last_root_hash.clone()).await.unwrap();
+        let last_root_hash = db.root_hash().unwrap().unwrap();
+        let committed = db.revision(last_root_hash.clone()).unwrap();
 
         // the last root hash should be the same as the last proposal root hash
         assert_eq!(last_root_hash, last_proposal_root_hash);
@@ -892,7 +846,7 @@ mod test {
                         key: [id as u8; 32],
                         value: [id as u8; 8],
                     }];
-                    let proposal = db.propose(batch).await.unwrap();
+                    let proposal = db.propose(batch).unwrap();
                     let last_hash = proposal.root_hash().await.unwrap().unwrap();
                     let view = db.view_sync(last_hash).unwrap();
 

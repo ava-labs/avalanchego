@@ -144,12 +144,12 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
 
     let cfg = DbConfig::builder().create_if_missing(false).truncate(false);
     let db = Db::new(opts.database.dbpath.clone(), cfg.build())?;
-    let latest_hash = db.root_hash().await?;
+    let latest_hash = db.root_hash()?;
     let Some(latest_hash) = latest_hash else {
         println!("Database is empty");
         return Ok(());
     };
-    let latest_rev = db.revision(latest_hash).await?;
+    let latest_rev = db.revision(latest_hash)?;
 
     let Some(mut output_handler) =
         create_output_handler(opts, &db).expect("Error creating output handler")

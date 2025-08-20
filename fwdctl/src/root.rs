@@ -14,12 +14,12 @@ pub struct Options {
     pub database: DatabasePath,
 }
 
-pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
+pub(super) fn run(opts: &Options) -> Result<(), api::Error> {
     let cfg = DbConfig::builder().create_if_missing(false).truncate(false);
 
     let db = Db::new(opts.database.dbpath.clone(), cfg.build())?;
 
-    let hash = db.root_hash().await?;
+    let hash = db.root_hash()?;
 
     println!("{hash:?}");
     Ok(())

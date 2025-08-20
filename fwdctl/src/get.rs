@@ -24,14 +24,14 @@ pub(super) async fn run(opts: &Options) -> Result<(), api::Error> {
 
     let db = Db::new(opts.database.dbpath.clone(), cfg.build())?;
 
-    let hash = db.root_hash().await?;
+    let hash = db.root_hash()?;
 
     let Some(hash) = hash else {
         println!("Database is empty");
         return Ok(());
     };
 
-    let rev = db.revision(hash).await?;
+    let rev = db.revision(hash)?;
 
     match rev.val(opts.key.as_bytes()).await {
         Ok(Some(val)) => {

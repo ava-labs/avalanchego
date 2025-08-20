@@ -90,7 +90,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let verify = get_keys_to_verify(rng, &batch, args.read_verify_percent);
 
         #[expect(clippy::unwrap_used)]
-        let proposal = db.propose(batch.clone()).await.unwrap();
+        let proposal = db.propose(batch.clone()).unwrap();
         proposal.commit()?;
         verify_keys(&db, verify).await?;
     }
@@ -131,8 +131,8 @@ async fn verify_keys(
     verify: HashMap<&[u8], &[u8]>,
 ) -> Result<(), firewood::v2::api::Error> {
     if !verify.is_empty() {
-        let hash = db.root_hash().await?.expect("root hash should exist");
-        let revision = db.revision(hash).await?;
+        let hash = db.root_hash()?.expect("root hash should exist");
+        let revision = db.revision(hash)?;
         for (key, value) in verify {
             assert_eq!(Some(value), revision.val(key).await?.as_deref());
         }

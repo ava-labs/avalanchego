@@ -35,7 +35,7 @@ impl TestRunner for Single {
                 key,
                 value: vec![batch_id as u8],
             });
-            let proposal = db.propose(batch).await.expect("proposal should succeed");
+            let proposal = db.propose(batch).expect("proposal should succeed");
             proposal.commit()?;
 
             if log::log_enabled!(log::Level::Debug) && batch_id % 1000 == 999 {
