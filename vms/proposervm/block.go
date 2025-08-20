@@ -81,60 +81,31 @@ func (p *postForkCommonComponents) Height() uint64 {
 }
 
 // Calculates a block's P-Chain epoch height based on its ancestor's epoch membership
-func (p *postForkCommonComponents) nextPChainEpoch(ctx context.Context, parentID ids.ID) (block.PChainEpoch, error) {
-	parent, err := p.vm.getBlock(ctx, parentID)
-	if err != nil {
-		return block.PChainEpoch{}, err
-	}
-	return nextPChainEpochFromBlock(ctx, parent, p.vm.Upgrades.GraniteEpochDuration)
-}
-
-func nextPChainEpochFromBlock(ctx context.Context, parent Block, epochDuration time.Duration) (block.PChainEpoch, error) {
-	parentTimestamp := parent.Timestamp()
-	epoch, err := parent.pChainEpoch(ctx)
-	if err != nil {
-		return block.PChainEpoch{}, fmt.Errorf("failed to get pChainEpoch: %w", err)
-	}
-	if epoch.StartTime.IsZero() {
+func nextPChainEpoch(parentPChainHeight uint64, parentEpoch block.PChainEpoch, parentTimestamp time.Time, epochDuration time.Duration) block.PChainEpoch {
+	if parentEpoch.StartTime.IsZero() {
 		// If the parent was not assigned an epoch, then the child is the first block of
 		// the initial epoch.
-		height, err := parent.pChainHeight(ctx)
-		if err != nil {
-			return block.PChainEpoch{}, fmt.Errorf("failed to get P-Chain height: %w", err)
-		}
 		return block.PChainEpoch{
-			Height:    height,
+			Height:    parentPChainHeight,
 			Number:    0,
 			StartTime: parentTimestamp,
-		}, nil
+		}
 	}
 
-	if parentTimestamp.After(epoch.StartTime.Add(epochDuration)) {
+	if parentTimestamp.After(parentEpoch.StartTime.Add(epochDuration)) {
 		// If the parent crossed the epoch boundary, then it sealed the previous epoch. The child
 		// is the first block of the new epoch, so should use the parent's P-Chain height, increment
 		// the epoch number, and set the epoch start time to the parent's timestamp.
-		height, err := parent.pChainHeight(ctx)
-		if err != nil {
-			return block.PChainEpoch{}, fmt.Errorf("failed to get P-Chain height: %w", err)
-		}
 		return block.PChainEpoch{
-			Height:    height,
-			Number:    epoch.Number + 1,
+			Height:    parentPChainHeight,
+			Number:    parentEpoch.Number + 1,
 			StartTime: parentTimestamp,
-		}, nil
+		}
 	}
 	// Otherwise, the parent did not seal the previous epoch, so the child should use the parent's
 	// epoch information. This is true even if the child crosses the epoch boundary, since sealing
 	// blocks are considered to be part of the epoch they seal.
-	epoch, err = parent.pChainEpoch(ctx)
-	if err != nil {
-		return block.PChainEpoch{}, fmt.Errorf("failed to get P-Chain height: %w", err)
-	}
-	return block.PChainEpoch{
-		Height:    epoch.Height,
-		Number:    epoch.Number,
-		StartTime: epoch.StartTime,
-	}, nil
+	return parentEpoch
 }
 
 // Verify returns nil if:
@@ -152,6 +123,7 @@ func (p *postForkCommonComponents) Verify(
 	ctx context.Context,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
+	parentEpoch block.PChainEpoch,
 	child *postForkBlock,
 ) error {
 	if err := verifyIsNotOracleBlock(ctx, p.innerBlk); err != nil {
@@ -224,15 +196,7 @@ func (p *postForkCommonComponents) Verify(
 	var contextPChainHeight uint64
 	switch {
 	case p.vm.Upgrades.IsGraniteActivated(childTimestamp):
-		calculatedEpoch, err := p.nextPChainEpoch(ctx, child.Parent())
-		if err != nil {
-			p.vm.ctx.Log.Error("unexpected build verification failure",
-				zap.String("reason", "failed to get P-Chain epoch"),
-				zap.Stringer("parentID", child.Parent()),
-				zap.Error(err),
-			)
-			return err
-		}
+		calculatedEpoch := nextPChainEpoch(parentPChainHeight, parentEpoch, parentTimestamp, p.vm.Upgrades.GraniteEpochDuration)
 
 		epoch := child.PChainEpoch()
 		if epoch.Height != calculatedEpoch.Height {
@@ -260,6 +224,7 @@ func (p *postForkCommonComponents) buildChild(
 	parentID ids.ID,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
+	parentEpoch block.PChainEpoch,
 ) (Block, error) {
 	// Child's timestamp is the later of now and this block's timestamp
 	newTimestamp := p.vm.Time().Truncate(time.Second)
@@ -307,15 +272,7 @@ func (p *postForkCommonComponents) buildChild(
 	)
 	switch {
 	case p.vm.Upgrades.IsGraniteActivated(newTimestamp):
-		pChainEpoch, err = p.nextPChainEpoch(ctx, parentID)
-		if err != nil {
-			p.vm.ctx.Log.Error("unexpected build block failure",
-				zap.String("reason", "failed to get P-Chain epoch height"),
-				zap.Stringer("parentID", parentID),
-				zap.Error(err),
-			)
-			return nil, err
-		}
+		pChainEpoch = nextPChainEpoch(parentPChainHeight, parentEpoch, parentTimestamp, p.vm.Upgrades.GraniteEpochDuration)
 		p.vm.ctx.Log.Debug(
 			"epoch",
 			zap.Uint64("pChainHeight", pChainHeight),

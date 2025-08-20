@@ -81,10 +81,16 @@ func (b *postForkOption) verifyPostForkChild(ctx context.Context, child *postFor
 	if err != nil {
 		return err
 	}
+	parentEpoch, err := b.pChainEpoch(ctx)
+	if err != nil {
+		return err
+	}
+
 	return b.postForkCommonComponents.Verify(
 		ctx,
 		parentTimestamp,
 		parentPChainHeight,
+		parentEpoch,
 		child,
 	)
 }
@@ -105,11 +111,17 @@ func (b *postForkOption) buildChild(ctx context.Context) (Block, error) {
 		)
 		return nil, err
 	}
+	parentEpoch, err := b.pChainEpoch(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	return b.postForkCommonComponents.buildChild(
 		ctx,
 		parentID,
 		b.Timestamp(),
 		parentPChainHeight,
+		parentEpoch,
 	)
 }
 

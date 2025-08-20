@@ -31,6 +31,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer/proposermock"
+
+	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 // Assert that when the underlying VM implements ChainVMWithBuildBlockContext
@@ -48,6 +50,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 		parentTimestamp        = time.Now().Truncate(time.Second)
 		parentHeight    uint64 = 1234
 		blkID                  = ids.GenerateTestID()
+		parentEpoch            = statelessblock.PChainEpoch{}
 	)
 
 	innerBlk := snowmanmock.NewBlock(ctrl)
@@ -101,6 +104,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 		parentID,
 		parentTimestamp,
 		pChainHeight-1,
+		parentEpoch,
 	)
 	require.NoError(err)
 	require.Equal(builtBlk, gotChild.(*postForkBlock).innerBlk)
@@ -367,8 +371,8 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 		parentPChainHeght        = pChainHeight - 1
 		parentID                 = ids.GenerateTestID()
 		parentTimestamp          = time.Now().Truncate(time.Second)
+		parentEpoch              = statelessblock.PChainEpoch{}
 	)
-
 	innerParentBlock := snowmantest.Genesis
 	innerChildBlock := snowmantest.BuildChild(innerParentBlock)
 
@@ -411,6 +415,7 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 		parentID,
 		parentTimestamp,
 		parentPChainHeght,
+		parentEpoch,
 	)
 	require.NoError(err)
 	require.Equal(innerChildBlock, gotChild.(*postForkBlock).innerBlk)

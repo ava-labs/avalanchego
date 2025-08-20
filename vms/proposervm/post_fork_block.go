@@ -133,10 +133,12 @@ func (*postForkBlock) verifyPreForkChild(context.Context, *preForkBlock) error {
 func (b *postForkBlock) verifyPostForkChild(ctx context.Context, child *postForkBlock) error {
 	parentTimestamp := b.Timestamp()
 	parentPChainHeight := b.PChainHeight()
+	parentEpoch := b.PChainEpoch()
 	return b.postForkCommonComponents.Verify(
 		ctx,
 		parentTimestamp,
 		parentPChainHeight,
+		parentEpoch,
 		child,
 	)
 }
@@ -163,6 +165,7 @@ func (b *postForkBlock) buildChild(ctx context.Context) (Block, error) {
 		b.ID(),
 		b.Timestamp(),
 		b.PChainHeight(),
+		b.PChainEpoch(),
 	)
 }
 
