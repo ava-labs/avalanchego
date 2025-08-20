@@ -3,7 +3,7 @@
         "include": [
             {
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
-                "config": "default",
+                "config": "inspect-db",
                 "start-block": 101,
                 "end-block": 250000,
                 "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
@@ -11,7 +11,7 @@
             },
             {
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
-                "config": "archive",
+                "config": "inspect-db",
                 "start-block": 101,
                 "end-block": 250000,
                 "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
@@ -19,7 +19,7 @@
             },
             {
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
-                "config": "firewood",
+                "config": "inspect-db",
                 "start-block": 101,
                 "end-block": 250000,
                 "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
