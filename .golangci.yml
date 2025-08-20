@@ -119,6 +119,9 @@ linters:
         # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-lines
         - name: empty-lines
           disabled: false
+        # https://github.com/mgechev/revive/blob/HEAD/RULES_DESCRIPTIONS.md#import-alias-naming
+        - name: redundant-import-alias
+          disabled: false
         # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#string-format
         - name: string-format
           disabled: false
