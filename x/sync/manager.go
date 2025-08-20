@@ -54,7 +54,7 @@ var (
 	errTooManyKeys                   = errors.New("response contains more than requested keys")
 	errTooManyBytes                  = errors.New("response contains more than requested bytes")
 	errUnexpectedChangeProofResponse = errors.New("unexpected response type")
-	errNeedDBForOperation            = errors.New("database is required for this operation")
+	ErrNoDBProvided                  = errors.New("database is required to create a parser")
 )
 
 type priority byte
@@ -73,7 +73,10 @@ type proofParser struct {
 	tokenSize int
 }
 
-func newParser(db DB, hasher merkledb.Hasher, branchFactor merkledb.BranchFactor) (ProofParser, error) {
+func newParser(db DB, hasher merkledb.Hasher, branchFactor merkledb.BranchFactor) (*proofParser, error) {
+	if db == nil {
+		return nil, ErrNoDBProvided
+	}
 	if err := branchFactor.Valid(); err != nil {
 		return nil, err
 	}
@@ -459,7 +462,11 @@ func (m *Manager) retryWork(work *workItem) {
 }
 
 // Returns an error if we should drop the response
-func (m *Manager) shouldHandleResponse(bytesLimit uint32, responseBytes []byte, err error) error {
+func (m *Manager) shouldHandleResponse(
+	bytesLimit uint32,
+	responseBytes []byte,
+	err error,
+) error {
 	if err != nil {
 		m.metrics.RequestFailed()
 		return err
@@ -584,10 +591,6 @@ func (r *rangeProof) Verify(ctx context.Context) error {
 }
 
 func (r *rangeProof) Commit(ctx context.Context) error {
-	if r.db == nil {
-		return errNeedDBForOperation
-	}
-
 	// If the root is empty, we clear the database of all values.
 	if bytes.Equal(r.request.rootHash, ids.Empty[:]) {
 		return r.db.Clear()
@@ -599,10 +602,6 @@ func (r *rangeProof) Commit(ctx context.Context) error {
 }
 
 func (r *rangeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], error) {
-	if r.db == nil {
-		return maybe.Nothing[[]byte](), errNeedDBForOperation
-	}
-
 	// If we wanted the empty root, we don't need to fetch any keys.
 	if bytes.Equal(r.request.rootHash, ids.Empty[:]) {
 		return maybe.Nothing[[]byte](), nil
@@ -719,10 +718,6 @@ type changeProof struct {
 }
 
 func (c *changeProof) Verify(ctx context.Context) error {
-	if c.db == nil {
-		return errNeedDBForOperation
-	}
-
 	// If the database is empty, we don't need to verify a change proof.
 	if bytes.Equal(c.request.rootHash, ids.Empty[:]) {
 		return nil
@@ -751,10 +746,6 @@ func (c *changeProof) Verify(ctx context.Context) error {
 }
 
 func (c *changeProof) Commit(ctx context.Context) error {
-	if c.db == nil {
-		return errNeedDBForOperation
-	}
-
 	// If the root is empty, we clear the database.
 	if bytes.Equal(c.request.rootHash, ids.Empty[:]) {
 		return c.db.Clear()
@@ -767,10 +758,6 @@ func (c *changeProof) Commit(ctx context.Context) error {
 }
 
 func (c *changeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], error) {
-	if c.db == nil {
-		return maybe.Nothing[[]byte](), errNeedDBForOperation
-	}
-
 	// Find the next key to fetch.
 	// If we wanted the empty root, we don't need to fetch any keys.
 	if bytes.Equal(c.request.rootHash, ids.Empty[:]) {

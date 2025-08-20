@@ -48,6 +48,12 @@ func Test_Creation(t *testing.T) {
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 	require.NotNil(syncer)
+
+	rangeProof, err := db.GetRangeProof(ctx, maybe.Some([]byte{0xff}), maybe.Nothing[[]byte](), 10)
+	require.NoError(err)
+	require.NotNil(rangeProof)
+	t.Log(rangeProof)
+	t.Fatal("not implemented")
 }
 
 func Test_Completion(t *testing.T) {

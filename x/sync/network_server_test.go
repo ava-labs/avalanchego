@@ -108,8 +108,6 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				KeyLimit:   defaultRequestKeyLimit,
 				BytesLimit: defaultRequestByteSizeLimit,
 			},
-			proofNil:    false,
-			expectedErr: nil,
 		},
 	}
 
