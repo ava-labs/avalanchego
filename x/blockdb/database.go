@@ -480,6 +480,9 @@ func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
 
 	// Read the complete block data
 	blockData := make(BlockData, indexEntry.Size)
+
+	// loop to retry fetching the data file if it got closed between get and read.
+	// If not closed, we read the block and return.
 	for {
 		dataFile, localOffset, fileIndex, err := s.getDataFileAndOffset(indexEntry.Offset)
 		if err != nil {
@@ -535,8 +538,10 @@ func (s *Database) ReadHeader(height BlockHeight) (BlockData, error) {
 		return nil, fmt.Errorf("%w: invalid header size %d exceeds block size %d", ErrHeaderSizeTooLarge, indexEntry.HeaderSize, indexEntry.Size)
 	}
 
-	// Read only the header portion
 	headerData := make([]byte, indexEntry.HeaderSize)
+
+	// loop to retry fetching the data file if it got closed between get and read.
+	// If not closed, we read the header and return.
 	for {
 		dataFile, localOffset, fileIndex, err := s.getDataFileAndOffset(indexEntry.Offset)
 		if err != nil {
@@ -561,10 +566,8 @@ func (s *Database) ReadHeader(height BlockHeight) (BlockData, error) {
 			)
 			return nil, fmt.Errorf("failed to read block header data from data file: %w", err)
 		}
-		break
+		return headerData, nil
 	}
-
-	return headerData, nil
 }
 
 // ReadBody retrieves only the body portion (excluding header) of a block by its height.
@@ -580,6 +583,9 @@ func (s *Database) ReadBody(height BlockHeight) (BlockData, error) {
 
 	bodySize := indexEntry.Size - indexEntry.HeaderSize
 	bodyData := make([]byte, bodySize)
+
+	// loop to retry fetching the data file if it got closed between get and read.
+	// If not closed, we read the body and return.
 	for {
 		dataFile, localOffset, fileIndex, err := s.getDataFileAndOffset(indexEntry.Offset)
 		if err != nil {
@@ -624,9 +630,8 @@ func (s *Database) ReadBody(height BlockHeight) (BlockData, error) {
 			)
 			return nil, fmt.Errorf("failed to read block body data from data file: %w", err)
 		}
-		break
+		return bodyData, nil
 	}
-	return bodyData, nil
 }
 
 // HasBlock checks if a block exists at the given height.
@@ -1149,24 +1154,22 @@ func (s *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block BlockD
 	combinedBuf := make([]byte, combinedBufSize)
 	copy(combinedBuf, headerBytes)
 	copy(combinedBuf[sizeOfBlockEntryHeader:], block)
-	dataWritten := false
 
+	// loop to retry fetching the data file if it got closed between get and write.
+	// If not closed, we write the block and return.
 	for {
 		dataFile, localOffset, fileIndex, err := s.getDataFileAndOffset(offset)
 		if err != nil {
 			return fmt.Errorf("failed to get data file for writing block %d: %w", bh.Height, err)
 		}
 
-		if !dataWritten {
-			if _, err := dataFile.WriteAt(combinedBuf, int64(localOffset)); err != nil {
-				if errors.Is(err, os.ErrClosed) {
-					// ensure the file is evicted, otherwise we'll retry forever
-					s.fileCache.Evict(fileIndex)
-					continue
-				}
-				return fmt.Errorf("failed to write block to data file at offset %d: %w", offset, err)
+		if _, err := dataFile.WriteAt(combinedBuf, int64(localOffset)); err != nil {
+			if errors.Is(err, os.ErrClosed) {
+				// ensure the file is evicted, otherwise we'll retry forever
+				s.fileCache.Evict(fileIndex)
+				continue
 			}
-			dataWritten = true
+			return fmt.Errorf("failed to write block to data file at offset %d: %w", offset, err)
 		}
 
 		if s.config.SyncToDisk {
@@ -1178,9 +1181,8 @@ func (s *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block BlockD
 				return fmt.Errorf("failed to sync data file after writing block %d: %w", bh.Height, err)
 			}
 		}
-		break
+		return nil
 	}
-	return nil
 }
 
 func (s *Database) updateBlockHeights(writtenBlockHeight BlockHeight) error {

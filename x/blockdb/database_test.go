@@ -226,80 +226,100 @@ func TestNew_IndexFileConfigPrecedence(t *testing.T) {
 }
 
 func TestFileCache_Eviction(t *testing.T) {
-	// Create a database with a small max data file size to force multiple files
-	// each file should have enough for 2 blocks (0.5kb * 2)
-	config := DefaultConfig().WithMaxDataFileSize(1024 * 1.5)
-	store, cleanup := newTestDatabase(t, config)
-	defer cleanup()
-
-	// Override the file cache with a smaller size to force evictions
-	evictionCount := atomic.Int32{}
-	evictionMu := sync.Mutex{}
-	smallCache := lru.NewCacheWithOnEvict(3, func(_ int, file *os.File) {
-		evictionMu.Lock()
-		defer evictionMu.Unlock()
-		evictionCount.Add(1)
-		if file != nil {
-			file.Close()
-		}
-	})
-	store.fileCache = smallCache
-
-	const numBlocks = 20 // 20 blocks will create 10 files
-	const numGoroutines = 4
-	var wg sync.WaitGroup
-	var writeErrors atomic.Int32
-
-	// Thread-safe error message collection
-	var errorMu sync.Mutex
-	var errorMessages []string
-
-	// Create blocks of 0.5kb each
-	blocks := make([][]byte, numBlocks)
-	for i := range blocks {
-		blocks[i] = fixedSizeBlock(t, 512, uint64(i))
+	tests := []struct {
+		name   string
+		config DatabaseConfig
+	}{
+		{
+			name:   "data file eviction",
+			config: DefaultConfig().WithMaxDataFileSize(3),
+		},
+		// Test a condition where the data file can be closed between getting the file
+		// handler and writing/reading from it. This can happen when another process
+		// evicts the file handler between the get and write/read.
+		// To trigger this in the test, we will create a cache with a size of 1 and
+		// small max data file size to force multiple data files.
+		// When trying to write or read a block, all other file handlers will be evicted.
+		{
+			name:   "retry opening data file if its evicted",
+			config: DefaultConfig().WithMaxDataFiles(1),
+		},
 	}
 
-	// Each goroutine writes all block heights 0-(numBlocks-1)
-	for g := range numGoroutines {
-		wg.Add(1)
-		go func(goroutineID int) {
-			defer wg.Done()
-			for i := range numBlocks {
-				height := uint64((i + goroutineID) % numBlocks)
-				err := store.WriteBlock(height, blocks[height], 0)
-				if err != nil {
-					writeErrors.Add(1)
-					errorMu.Lock()
-					errorMessages = append(errorMessages, fmt.Sprintf("goroutine %d, height %d: %v", goroutineID, height, err))
-					errorMu.Unlock()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store, cleanup := newTestDatabase(t, tt.config.WithMaxDataFileSize(1024*1.5))
+			defer cleanup()
+
+			// Override the file cache with specified size
+			evictionCount := atomic.Int32{}
+			evictionMu := sync.Mutex{}
+			smallCache := lru.NewCacheWithOnEvict(tt.config.MaxDataFiles, func(_ int, file *os.File) {
+				evictionMu.Lock()
+				defer evictionMu.Unlock()
+				evictionCount.Add(1)
+				if file != nil {
+					file.Close()
+				}
+			})
+			store.fileCache = smallCache
+
+			const numGoroutines = 4
+			var wg sync.WaitGroup
+			var writeErrors atomic.Int32
+
+			// Thread-safe error message collection
+			var errorMu sync.Mutex
+			var errorMessages []string
+
+			// Create blocks of 0.5kb each
+			const numBlocks = 20 // 20 blocks will create 10 files
+			blocks := make([][]byte, numBlocks)
+			for i := range blocks {
+				blocks[i] = fixedSizeBlock(t, 512, uint64(i))
+			}
+
+			// each goroutine writes all blocks
+			for g := range numGoroutines {
+				wg.Add(1)
+				go func(goroutineID int) {
+					defer wg.Done()
+					for i := range numBlocks {
+						height := uint64((i + goroutineID) % numBlocks)
+						err := store.WriteBlock(height, blocks[height], 0)
+						if err != nil {
+							writeErrors.Add(1)
+							errorMu.Lock()
+							errorMessages = append(errorMessages, fmt.Sprintf("goroutine %d, height %d: %v", goroutineID, height, err))
+							errorMu.Unlock()
+							return
+						}
+					}
+				}(g)
+			}
+
+			wg.Wait()
+
+			// Build error message if there were errors
+			var errorMsg string
+			if writeErrors.Load() > 0 {
+				errorMsg = fmt.Sprintf("concurrent writes had %d errors:\n", writeErrors.Load())
+				for _, msg := range errorMessages {
+					errorMsg += fmt.Sprintf("  %s\n", msg)
 				}
 			}
-		}(g)
-	}
 
-	wg.Wait()
+			// Verify no write errors and we have evictions
+			require.Zero(t, writeErrors.Load(), errorMsg)
+			require.Positive(t, evictionCount.Load(), "should have had some cache evictions")
 
-	// Build error message if there were errors
-	var errorMsg string
-	if writeErrors.Load() > 0 {
-		errorMsg = fmt.Sprintf("concurrent writes had %d errors:\n", writeErrors.Load())
-		for _, msg := range errorMessages {
-			errorMsg += fmt.Sprintf("  %s\n", msg)
-		}
-	}
-
-	// Verify no write errors
-	require.Zero(t, writeErrors.Load(), errorMsg)
-
-	// Verify we had some evictions
-	require.Positive(t, evictionCount.Load(), "should have had some cache evictions")
-
-	// Verify all blocks are readable
-	for i := range numBlocks {
-		block, err := store.ReadBlock(uint64(i))
-		require.NoError(t, err, "failed to read block at height %d", i)
-		require.Equal(t, blocks[i], block, "block data mismatch at height %d", i)
+			// Verify again that all blocks are readable
+			for i := range numBlocks {
+				block, err := store.ReadBlock(uint64(i))
+				require.NoError(t, err, "failed to read block at height %d", i)
+				require.Equal(t, blocks[i], block, "block data mismatch at height %d", i)
+			}
+		})
 	}
 }
 
