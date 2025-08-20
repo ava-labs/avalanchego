@@ -7,7 +7,7 @@ on:
       config:
         description: 'The config to pass to the VM for the benchmark. See BenchmarkReexecuteRange for details.'
         required: false
-        default: ''
+        default: 'inspect-db'
       start-block:
         description: 'The start block for the benchmark.'
         required: false
