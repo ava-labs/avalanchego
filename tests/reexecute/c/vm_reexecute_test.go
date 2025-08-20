@@ -79,6 +79,9 @@ var (
 			"pruning-enabled": true,
 			"state-sync-enabled": false
 		}`,
+		"inspect-db": `{
+			"inspect-database": true,
+		}`,
 	}
 
 	configNameArg  string
