@@ -28,10 +28,10 @@ To authenticate metrics collection (enabled by default), provide the Prometheus 
 
 ## Import Blocks
 
-To import the first 200 blocks for re-execution, you can fetch the following ZIP from S3: `s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb.zip`:
+To import the first 200 blocks for re-execution, you can fetch the following directory from S3: `s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/`:
 
 ```bash
-task import-s3-to-dir SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb.zip DST=$HOME/exec-data/blocks
+task import-s3-to-dir SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/** DST=$HOME/exec-data/blocks
 ```
 
 ## Create C-Chain State Snapshot
@@ -95,7 +95,7 @@ Note: if you attempt to re-execute a second time on the same data set, it will f
 Provide the parameters explicitly that we have just used locally:
 
 ```bash
-task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-params SOURCE_BLOCK_DIR=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb.zip CURRENT_STATE_DIR=s3://avalanchego-bootstrap-testing/cchain-current-state-test/** START_BLOCK=101 END_BLOCK=10000
+task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-params SOURCE_BLOCK_DIR=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/** CURRENT_STATE_DIR=s3://avalanchego-bootstrap-testing/cchain-current-state-test/** START_BLOCK=101 END_BLOCK=10000
 ```
 
 ## Run Default C-Chain Benchmark
