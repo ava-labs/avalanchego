@@ -120,7 +120,7 @@ func TestMain(m *testing.M) {
 	}
 	maps.Copy(labels, customLabels)
 
-	// Set the config from the predefinde configs and add to custom labels for the job.
+	// Set the config from the predefined configs and add to custom labels for the job.
 	if configNameArg == "" {
 		configNameArg = defaultConfigKey
 	}
@@ -129,7 +129,7 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "invalid config name %q. Valid options include %s.\n", configNameArg, predefinedConfigOptionsStr)
 		os.Exit(1)
 	}
-	customLabels[configKey] = configNameArg
+	labels[configKey] = configNameArg
 	configBytesArg = []byte(predefinedConfigStr)
 
 	m.Run()
