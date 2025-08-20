@@ -63,7 +63,7 @@ func (p *ProposerAPI) GetEpoch(r *http.Request, _ *struct{}, reply *GetEpochResp
 		return fmt.Errorf("couldn't get epoch P-Chain height: %w", err)
 	}
 
-	reply.Number = avajson.Uint64(epoch.Epoch)
+	reply.Number = avajson.Uint64(epoch.Number)
 	reply.StartTime = avajson.Uint64(epoch.StartTime.Unix())
 	reply.PChainHeight = avajson.Uint64(epoch.Height)
 

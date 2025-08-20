@@ -222,7 +222,7 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	// prepare build of next block
 	require.NoError(builtBlk2.Verify(context.Background()))
 	require.NoError(proRemoteVM.SetPreference(context.Background(), builtBlk2.ID()))
-	require.NoError(waitForProposerWindow(proRemoteVM, builtBlk2, 0))
+	require.NoError(waitForProposerWindow(proRemoteVM, builtBlk2, builtBlk2.(*postForkBlock).PChainHeight()))
 
 	coreBlk3 := snowmantest.BuildChild(coreBlk2)
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
@@ -598,7 +598,7 @@ func TestBatchedParseBlockParallel(t *testing.T) {
 	pChainHeight := uint64(2)
 	pChainEpoch := blockbuilder.PChainEpoch{
 		Height:    uint64(2),
-		Epoch:     uint64(0),
+		Number:    uint64(0),
 		StartTime: time.Unix(123, 0),
 	}
 	chainID := ids.GenerateTestID()

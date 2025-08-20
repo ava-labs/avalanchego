@@ -47,7 +47,7 @@ func (c *client) GetEpoch(ctx context.Context, options ...rpc.Option) (block.PCh
 	}
 	return block.PChainEpoch{
 		Height:    uint64(res.PChainHeight),
-		Epoch:     uint64(res.Number),
+		Number:    uint64(res.Number),
 		StartTime: time.Unix(int64(res.StartTime), 0),
 	}, nil
 }

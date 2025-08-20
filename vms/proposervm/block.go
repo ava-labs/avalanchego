@@ -100,7 +100,7 @@ func (p *postForkCommonComponents) getPChainEpoch(ctx context.Context, parentID 
 		}
 		return block.PChainEpoch{
 			Height:    height,
-			Epoch:     0,
+			Number:    0,
 			StartTime: parentTimestamp,
 		}, nil
 	}
@@ -115,11 +115,11 @@ func (p *postForkCommonComponents) getPChainEpoch(ctx context.Context, parentID 
 		}
 		p.vm.ctx.Log.Info("parent sealed epoch. advancing epoch",
 			zap.Uint64("height", height),
-			zap.Uint64("epoch", epoch.Epoch+1),
+			zap.Uint64("epoch", epoch.Number+1),
 		)
 		return block.PChainEpoch{
 			Height:    height,
-			Epoch:     epoch.Epoch + 1,
+			Number:    epoch.Number + 1,
 			StartTime: parentTimestamp,
 		}, nil
 	}
@@ -132,11 +132,11 @@ func (p *postForkCommonComponents) getPChainEpoch(ctx context.Context, parentID 
 	}
 	p.vm.ctx.Log.Debug("parent did not seal epoch. using parent's epoch",
 		zap.Uint64("height", epoch.Height),
-		zap.Uint64("epoch", epoch.Epoch),
+		zap.Uint64("epoch", epoch.Number),
 	)
 	return block.PChainEpoch{
 		Height:    epoch.Height,
-		Epoch:     epoch.Epoch,
+		Number:    epoch.Number,
 		StartTime: epoch.StartTime,
 	}, nil
 }
@@ -236,7 +236,7 @@ func (p *postForkCommonComponents) Verify(
 				zap.Error(err),
 			)
 		}
-		if childHeight := child.PChainEpoch().Height; pChainEpoch.Epoch != childHeight {
+		if childHeight := child.PChainEpoch().Height; pChainEpoch.Height != childHeight {
 			return fmt.Errorf("epoch height mismatch: expectedEpochHeight %d != epochHeight %d", pChainEpoch.Height, childHeight)
 		}
 		contextPChainHeight = pChainEpoch.Height
@@ -320,7 +320,7 @@ func (p *postForkCommonComponents) buildChild(
 			"epoch",
 			zap.Uint64("pChainHeight", pChainHeight),
 			zap.Uint64("pChainEpochHeight", pChainEpoch.Height),
-			zap.Uint64("epochNumber", pChainEpoch.Epoch),
+			zap.Uint64("epochNumber", pChainEpoch.Number),
 			zap.Time("epochStartTime", pChainEpoch.StartTime),
 		)
 		contextPChainHeight = pChainEpoch.Height

@@ -541,7 +541,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		100,
 		statelessblock.PChainEpoch{
 			Height:    100,
-			Epoch:     10,
+			Number:    10,
 			StartTime: innerBlk.Timestamp(),
 		},
 		proVM.StakingCertLeaf,
@@ -564,7 +564,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 		200,
 		statelessblock.PChainEpoch{
 			Height:    200,
-			Epoch:     20,
+			Number:    20,
 			StartTime: innerBlk.Timestamp(),
 		},
 		proVM.StakingCertLeaf,

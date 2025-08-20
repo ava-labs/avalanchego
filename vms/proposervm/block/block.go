@@ -54,7 +54,7 @@ type statelessUnsignedBlock struct {
 
 type PChainEpoch struct {
 	Height    uint64
-	Epoch     uint64
+	Number    uint64
 	StartTime time.Time
 }
 

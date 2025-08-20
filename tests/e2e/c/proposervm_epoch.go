@@ -82,14 +82,14 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 				require.NoError(err)
 				tc.Log().Debug(
 					"epoch",
-					zap.Uint64("Epoch Number:", epoch.Epoch),
+					zap.Uint64("Epoch Number:", epoch.Number),
 					zap.Int64("Epoch Start Time:", epoch.StartTime.Unix()),
 					zap.Uint64("P-Chain Height:", epoch.Height),
 				)
 
 				txCount++
 				if txCount >= numTxs {
-					require.Greater(epoch.Epoch, initialEpoch.Epoch,
+					require.Greater(epoch.Number, initialEpoch.Number,
 						"expected epoch number to advance after issuing %d transactions, but it did not",
 						numTxs,
 					)

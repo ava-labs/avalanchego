@@ -22,7 +22,7 @@ func TestBuild(t *testing.T) {
 	pChainHeight := uint64(2)
 	pChainEpoch := PChainEpoch{
 		Height:    2,
-		Epoch:     0,
+		Number:    0,
 		StartTime: time.Unix(123, 0),
 	}
 	innerBlockBytes := []byte{3}
@@ -61,7 +61,7 @@ func TestBuildUnsigned(t *testing.T) {
 	pChainHeight := uint64(2)
 	pChainEpoch := PChainEpoch{
 		Height:    2,
-		Epoch:     0,
+		Number:    0,
 		StartTime: time.Unix(123, 0),
 	}
 	innerBlockBytes := []byte{3}
