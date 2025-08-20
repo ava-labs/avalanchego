@@ -76,7 +76,7 @@ func GetNodeURIs(nodes []*Node) []NodeURI {
 	return uris
 }
 
-// FilteredAvailableNodes filters the provided nodes by whether they are running and not ephemeral.
+// FilterAvailableNodes filters the provided nodes by whether they are running and not ephemeral.
 func FilterAvailableNodes(nodes []*Node) []*Node {
 	filteredNodes := []*Node{}
 	for _, node := range nodes {
