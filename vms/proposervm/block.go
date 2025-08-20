@@ -200,7 +200,7 @@ func (p *postForkCommonComponents) Verify(
 
 		epoch := child.PChainEpoch()
 		if epoch.Height != calculatedEpoch.Height {
-			return fmt.Errorf("epoch height mismatch: calculatedEpoch %d != epochHeight %d", calculatedEpoch.Height, epoch.Height)
+			return fmt.Errorf("epoch height mismatch: calculated epoch height %d != epoch height %d", calculatedEpoch.Height, epoch.Height)
 		}
 		contextPChainHeight = calculatedEpoch.Height
 	case p.vm.Upgrades.IsEtnaActivated(childTimestamp):

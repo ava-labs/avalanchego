@@ -553,13 +553,20 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		},
 	}
 
+	nextEpoch := nextPChainEpoch(
+		parentBlkPChainHeight,
+		block.PChainEpoch{},
+		parentBlk.Timestamp(),
+		proVM.Upgrades.GraniteEpochDuration,
+	)
+
 	{
 		// child P-Chain height must not precede parent P-Chain height
 		childSlb, err := block.Build(
 			parentBlk.ID(),
 			proVM.Time(),
 			parentBlkPChainHeight-1,
-			block.PChainEpoch{},
+			nextEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -578,7 +585,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			parentBlkPChainHeight,
-			block.PChainEpoch{},
+			nextEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -596,7 +603,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			parentBlkPChainHeight,
-			block.PChainEpoch{},
+			nextEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -615,7 +622,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			currPChainHeight,
-			block.PChainEpoch{},
+			nextEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -633,7 +640,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			currPChainHeight*2,
-			block.PChainEpoch{},
+			nextEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
