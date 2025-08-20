@@ -342,8 +342,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 				require.NoError(t, err)
 				filePath := file.Name()
 				file.Close()
-				err = os.Chmod(filePath, 0444)
-				require.NoError(t, err)
+				require.NoError(t, os.Chmod(filePath, 0o444))
 			},
 			headerSize: 0,
 			wantErrMsg: "failed to get data file for writing block",

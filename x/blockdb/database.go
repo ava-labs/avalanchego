@@ -1178,8 +1178,9 @@ func (s *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block BlockD
 				return fmt.Errorf("failed to sync data file after writing block %d: %w", bh.Height, err)
 			}
 		}
-		return nil
+		break
 	}
+	return nil
 }
 
 func (s *Database) updateBlockHeights(writtenBlockHeight BlockHeight) error {
