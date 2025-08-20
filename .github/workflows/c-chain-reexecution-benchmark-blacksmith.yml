@@ -1,4 +1,4 @@
-name: C-Chain Re-Execution Benchmark ARC
+name: C-Chain Re-Execution Benchmark Blacksmith
 
 on:
   pull_request:
@@ -59,7 +59,7 @@ jobs:
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
           else
-            json_string=$(jq -r ".\"${{ github.event_name }}\"" .github/workflows/c-chain-reexecution-benchmark-arc.json)
+            json_string=$(jq -r ".\"${{ github.event_name }}\"" .github/workflows/c-chain-reexecution-benchmark-blacksmith.json)
             {
               echo "matrix<<EOF"
               echo "$json_string"
@@ -67,7 +67,7 @@ jobs:
             } >> "$GITHUB_OUTPUT"
           fi
 
-  c-chain-reexecution-arc: # PR smoke test + scheduled run + manual workflow
+  c-chain-reexecution-blacksmith: # PR smoke test + scheduled run + manual workflow
     needs: define-matrix
     strategy:
       fail-fast: false
@@ -80,14 +80,6 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install ARC Dependencies
-        shell: bash
-        run: |
-          # xz-utils might be present on some containers. Install if not present.
-          if ! command -v xz &> /dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y xz-utils
-          fi
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
