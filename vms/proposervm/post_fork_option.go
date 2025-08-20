@@ -122,28 +122,12 @@ func (b *postForkOption) pChainHeight(ctx context.Context) (uint64, error) {
 	return parent.pChainHeight(ctx)
 }
 
-func (b *postForkOption) pChainEpochHeight(ctx context.Context) (uint64, error) {
+func (b *postForkOption) pChainEpoch(ctx context.Context) (block.PChainEpoch, error) {
 	parent, err := b.vm.getBlock(ctx, b.ParentID())
 	if err != nil {
-		return 0, err
+		return block.PChainEpoch{}, err
 	}
-	return parent.pChainEpochHeight(ctx)
-}
-
-func (b *postForkOption) epochNumber(ctx context.Context) (uint64, error) {
-	parent, err := b.vm.getBlock(ctx, b.ParentID())
-	if err != nil {
-		return 0, err
-	}
-	return parent.epochNumber(ctx)
-}
-
-func (b *postForkOption) epochStartTime(ctx context.Context) (time.Time, error) {
-	parent, err := b.vm.getBlock(ctx, b.ParentID())
-	if err != nil {
-		return time.Time{}, err
-	}
-	return parent.epochStartTime(ctx)
+	return parent.pChainEpoch(ctx)
 }
 
 func (b *postForkOption) getStatelessBlk() block.Block {

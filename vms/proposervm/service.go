@@ -4,7 +4,6 @@
 package proposervm
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -12,8 +11,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
@@ -25,56 +22,19 @@ type ProposerVMServer interface {
 }
 
 type ProposerAPI struct {
-	ctx *snow.Context
-	vm  ProposerVMServer
+	vm *VM
 }
 
 func (p *ProposerAPI) GetProposedHeight(_ *http.Request, _ *struct{}, reply *api.GetHeightResponse) error {
-	p.ctx.Log.Debug("API called",
+	p.vm.ctx.Log.Debug("API called",
 		zap.String("service", "proposervm"),
 		zap.String("method", "getProposedHeight"),
 	)
-	p.ctx.Lock.Lock()
-	defer p.ctx.Lock.Unlock()
+	p.vm.ctx.Lock.Lock()
+	defer p.vm.ctx.Lock.Unlock()
 
-	reply.Height = avajson.Uint64(p.vm.GetLastAcceptedHeight())
+	reply.Height = 0 // TODO
 	return nil
-}
-
-// GetProposerBlockArgs is the parameters supplied to the GetProposerBlockWrapper API
-type GetProposerBlockArgs struct {
-	ProposerBlockID ids.ID              `json:"proposerID"`
-	Encoding        formatting.Encoding `json:"encoding"`
-}
-
-func (p *ProposerAPI) GetProposerBlockWrapper(_ *http.Request, args *GetProposerBlockArgs, reply *api.GetBlockResponse) error {
-	p.ctx.Log.Debug("API called",
-		zap.String("service", "proposervm"),
-		zap.String("method", "getProposerBlockWrapper"),
-		zap.String("proposerID", args.ProposerBlockID.String()),
-		zap.String("encoding", args.Encoding.String()),
-	)
-	p.ctx.Lock.Lock()
-	defer p.ctx.Lock.Unlock()
-
-	block, err := p.vm.GetStatelessSignedBlock(args.ProposerBlockID)
-	if err != nil {
-		return err
-	}
-	reply.Encoding = args.Encoding
-
-	var result any
-	if args.Encoding == formatting.JSON {
-		result = block
-	} else {
-		result, err = formatting.Encode(args.Encoding, block.Bytes())
-		if err != nil {
-			return fmt.Errorf("couldn't encode block %s as %s: %w", args.ProposerBlockID, args.Encoding, err)
-		}
-	}
-
-	reply.Block, err = json.Marshal(result)
-	return err
 }
 
 type GetEpochResponse struct {
@@ -89,31 +49,23 @@ func (p *ProposerAPI) GetEpoch(r *http.Request, _ *struct{}, reply *GetEpochResp
 		zap.String("method", "getEpoch"),
 	)
 
-	lastAccepted, err := p.vm.LastAccepted(r.Context())
+	lastAccepted, err := p.vm.GetLastAccepted()
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
 	}
-	latestBlock, err := p.vm.getBlock(r.Context(), lastAccepted)
+	latestBlock, err := p.vm.getPostForkBlock(r.Context(), lastAccepted)
 	if err != nil {
 		return fmt.Errorf("couldn't get latest block: %w", err)
 	}
 
-	epochNumber, err := latestBlock.epochNumber(r.Context())
-	if err != nil {
-		return fmt.Errorf("couldn't get epoch number: %w", err)
-	}
-	epochStartTime, err := latestBlock.epochStartTime(r.Context())
-	if err != nil {
-		return fmt.Errorf("couldn't get epoch start time: %w", err)
-	}
-	epochPChainHeight, err := latestBlock.pChainEpochHeight(r.Context())
+	epoch, err := latestBlock.pChainEpoch(r.Context())
 	if err != nil {
 		return fmt.Errorf("couldn't get epoch P-Chain height: %w", err)
 	}
 
-	reply.Number = avajson.Uint64(epochNumber)
-	reply.StartTime = avajson.Uint64(epochStartTime.Unix())
-	reply.PChainHeight = avajson.Uint64(epochPChainHeight)
+	reply.Number = avajson.Uint64(epoch.Epoch)
+	reply.StartTime = avajson.Uint64(epoch.StartTime.Unix())
+	reply.PChainHeight = avajson.Uint64(epoch.Height)
 
 	return nil
 }

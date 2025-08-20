@@ -11,8 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
@@ -86,42 +84,6 @@ func TestGetProposedHeight(t *testing.T) {
 			}
 			require.NoError(err)
 			require.Equal(uint64(42), height)
-		})
-	}
-}
-
-func TestGetProposerBlockWrapper(t *testing.T) {
-	tests := []struct {
-		name         string
-		mockResponse *api.FormattedBlock
-		mockError    error
-	}{
-		{
-			name:         "success",
-			mockResponse: &api.FormattedBlock{Encoding: formatting.Hex, Block: "0x0017afa01d"},
-			mockError:    nil,
-		},
-		{
-			name:         "error",
-			mockResponse: nil,
-			mockError:    errors.New("error"),
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
-			mc := NewMockClient(test.mockResponse, test.mockError)
-			c := &client{requester: mc}
-
-			block, err := c.GetProposerBlockWrapper(context.Background(), ids.GenerateTestID())
-			if test.mockError != nil {
-				require.ErrorIs(err, test.mockError)
-				return
-			}
-			require.NoError(err)
-			require.Equal("\x00", string(block))
 		})
 	}
 }

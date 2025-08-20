@@ -6,11 +6,11 @@ package proposervm
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 var _ Client = (*client)(nil)
@@ -18,10 +18,8 @@ var _ Client = (*client)(nil)
 type Client interface {
 	// GetProposedHeight returns the current height of this node's proposer VM.
 	GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error)
-	// GetProposerBlockWrapper returns the ProposerVM block wrapper
-	GetProposerBlockWrapper(ctx context.Context, proposerID ids.ID, options ...rpc.Option) ([]byte, error)
 	// GetEpoch returns the current epoch number, start time, and P-Chain height.
-	GetEpoch(ctx context.Context, options ...rpc.Option) (uint64, uint64, uint64, error)
+	GetEpoch(ctx context.Context, options ...rpc.Option) (block.PChainEpoch, error)
 }
 
 type client struct {
@@ -42,21 +40,14 @@ func (c *client) GetProposedHeight(ctx context.Context, options ...rpc.Option) (
 	return uint64(res.Height), err
 }
 
-func (c *client) GetProposerBlockWrapper(ctx context.Context, proposerID ids.ID, options ...rpc.Option) ([]byte, error) {
-	res := &api.FormattedBlock{}
-	if err := c.requester.SendRequest(ctx, "proposervm.getProposerBlockWrapper", &GetProposerBlockArgs{
-		ProposerBlockID: proposerID,
-		Encoding:        formatting.Hex,
-	}, res, options...); err != nil {
-		return nil, err
-	}
-	return formatting.Decode(res.Encoding, res.Block)
-}
-
-func (c *client) GetEpoch(ctx context.Context, options ...rpc.Option) (uint64, uint64, uint64, error) {
+func (c *client) GetEpoch(ctx context.Context, options ...rpc.Option) (block.PChainEpoch, error) {
 	res := &GetEpochResponse{}
 	if err := c.requester.SendRequest(ctx, "proposervm.getEpoch", struct{}{}, res, options...); err != nil {
-		return 0, 0, 0, err
+		return block.PChainEpoch{}, err
 	}
-	return uint64(res.Number), uint64(res.StartTime), uint64(res.PChainHeight), nil
+	return block.PChainEpoch{
+		Height:    uint64(res.PChainHeight),
+		Epoch:     uint64(res.Number),
+		StartTime: time.Unix(int64(res.StartTime), 0),
+	}, nil
 }

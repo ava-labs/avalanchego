@@ -493,10 +493,8 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	slb, err := statelessblock.Build(
 		proVM.preferred,
 		proVM.Time(),
-		100,         // pChainHeight,
-		0,           // pChainEpochHeight,
-		0,           // epochNumber,
-		time.Time{}, // epochStartTime,
+		100,
+		statelessblock.PChainEpoch{},
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
@@ -540,10 +538,12 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	slb1, err := statelessblock.Build(
 		proVM.preferred,
 		blkTimestamp,
-		100,                  // pChainHeight,
-		100,                  // pChainEpochHeight,
-		10,                   // epochNumber,
-		innerBlk.Timestamp(), // epochStartTime,
+		100,
+		statelessblock.PChainEpoch{
+			Height:    100,
+			Epoch:     10,
+			StartTime: innerBlk.Timestamp(),
+		},
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
@@ -561,10 +561,12 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	slb2, err := statelessblock.Build(
 		proVM.preferred,
 		blkTimestamp,
-		200,                  // pChainHeight,
-		200,                  // pChainEpochHeight,
-		20,                   // epochNumber,
-		innerBlk.Timestamp(), // epochStartTime,
+		200,
+		statelessblock.PChainEpoch{
+			Height:    200,
+			Epoch:     20,
+			StartTime: innerBlk.Timestamp(),
+		},
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
@@ -637,9 +639,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 		proVM.preferred,
 		proVM.Time(),
 		pChainHeight,
-		0,           // pChainEpochHeight
-		0,           // epochNumber
-		time.Time{}, // epochStartTime
+		statelessblock.PChainEpoch{},
 		netcoreBlk.Bytes(),
 	)
 	require.NoError(err)
@@ -914,9 +914,7 @@ func TestExpiredBuildBlock(t *testing.T) {
 		snowmantest.GenesisID,
 		proVM.Time(),
 		0,
-		0,           // pChainEpochHeight
-		0,           // epochNumber
-		time.Time{}, // epochStartTime
+		statelessblock.PChainEpoch{},
 		coreBlk.Bytes(),
 	)
 	require.NoError(err)
@@ -1004,9 +1002,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		snowmantest.GenesisID,
 		coreBlk.Timestamp(),
 		0,
-		0,           // pChainEpochHeight
-		0,           // epochNumber
-		time.Time{}, // epochStartTime
+		statelessblock.PChainEpoch{},
 		coreBlk.Bytes(),
 	)
 	require.NoError(err)
@@ -1014,9 +1010,7 @@ func TestInnerBlockDeduplication(t *testing.T) {
 		snowmantest.GenesisID,
 		coreBlk.Timestamp(),
 		1,
-		0,           // pChainEpochHeight
-		0,           // epochNumber
-		time.Time{}, // epochStartTime
+		statelessblock.PChainEpoch{},
 		coreBlk.Bytes(),
 	)
 	require.NoError(err)
@@ -1173,9 +1167,7 @@ func TestInnerVMRollback(t *testing.T) {
 		snowmantest.GenesisID,
 		coreBlk.Timestamp(),
 		0,
-		0,           // pChainEpochHeight
-		0,           // epochNumber
-		time.Time{}, // epochStartTime
+		statelessblock.PChainEpoch{},
 		coreBlk.Bytes(),
 	)
 	require.NoError(err)
@@ -1280,9 +1272,7 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 		snowmantest.GenesisID,
 		proVM.Time(),
 		0,
-		0,           // pChainEpochHeight
-		0,           // epochNumber
-		time.Time{}, // epochStartTime
+		statelessblock.PChainEpoch{},
 		coreBlk0.Bytes(),
 	)
 	require.NoError(err)
@@ -1375,9 +1365,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 		snowmantest.GenesisID,
 		proVM.Time(),
 		defaultPChainHeight,
-		0,           // pChainEpochHeight
-		0,           // epochNumber
-		time.Time{}, // epochStartTime
+		statelessblock.PChainEpoch{},
 		yBlock.Bytes(),
 	)
 	require.NoError(err)
@@ -1446,9 +1434,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		aBlock.ID(),
 		aBlock.Timestamp().Add(maxSkew),
 		defaultPChainHeight,
-		0,           // pChainEpochHeight
-		0,           // epochNumber
-		time.Time{}, // epochStartTime
+		statelessblock.PChainEpoch{},
 		yBlock.Bytes(),
 	)
 	require.NoError(err)
@@ -1468,9 +1454,7 @@ func TestTooFarAdvanced(t *testing.T) {
 		aBlock.ID(),
 		aBlock.Timestamp().Add(proposer.MaxVerifyDelay),
 		defaultPChainHeight,
-		0,           // pChainEpochHeight
-		0,           // epochNumber
-		time.Time{}, // epochStartTime
+		statelessblock.PChainEpoch{},
 		yBlock.Bytes(),
 	)
 
@@ -1711,9 +1695,7 @@ func TestRejectedHeightNotIndexed(t *testing.T) {
 		snowmantest.GenesisID,
 		snowmantest.GenesisTimestamp,
 		defaultPChainHeight,
-		0,           // pChainEpochHeight
-		0,           // epochNumber
-		time.Time{}, // epochStartTime
+		statelessblock.PChainEpoch{},
 		yBlock.Bytes(),
 	)
 	require.NoError(err)
@@ -1975,16 +1957,14 @@ func TestVMInnerBlkCache(t *testing.T) {
 	// Create a block near the tip (0).
 	blkNearTipInnerBytes := []byte{1}
 	blkNearTip, err := statelessblock.Build(
-		ids.GenerateTestID(), // parent
-		time.Time{},          // timestamp
-		1,                    // pChainHeight,
-		0,                    // pChainEpochHeight
-		0,                    // epochNumber
-		time.Time{},          // epochStartTime
-		vm.StakingCertLeaf,   // cert
-		blkNearTipInnerBytes, // inner blk bytes
-		vm.ctx.ChainID,       // chain ID
-		vm.StakingLeafSigner, // key
+		ids.GenerateTestID(),         // parent
+		time.Time{},                  // timestamp
+		1,                            // pChainHeight,
+		statelessblock.PChainEpoch{}, // pChainEpoch
+		vm.StakingCertLeaf,           // cert
+		blkNearTipInnerBytes,         // inner blk bytes
+		vm.ctx.ChainID,               // chain ID
+		vm.StakingLeafSigner,         // key
 	)
 	require.NoError(err)
 
@@ -2433,9 +2413,7 @@ func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 		snowmantest.GenesisID,
 		proVM.Time(),
 		0,
-		0,           // pChainEpochHeight
-		0,           // epochNumber
-		time.Time{}, // epochStartTime
+		statelessblock.PChainEpoch{},
 		coreBlk.Bytes(),
 	)
 	require.NoError(err)
@@ -2503,9 +2481,7 @@ func TestLocalParse(t *testing.T) {
 		ids.ID{1},
 		time.Unix(123, 0),
 		uint64(42),
-		0,           // pChainEpochHeight
-		0,           // epochNumber
-		time.Time{}, // epochStartTime
+		statelessblock.PChainEpoch{},
 		cert,
 		[]byte{1, 2, 3},
 		chainID,
@@ -2823,9 +2799,7 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 		snowmantest.GenesisID,
 		snowmantest.GenesisTimestamp,
 		currentPChainHeight,
-		0,           // pChainEpochHeight
-		0,           // epochNumber
-		time.Time{}, // epochStartTime
+		statelessblock.PChainEpoch{},
 		innerBlock1.Bytes(),
 	)
 	require.NoError(err)
@@ -2845,9 +2819,7 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 		statelessBlock1.ID(),
 		statelessBlock1.Timestamp(),
 		currentPChainHeight+1,
-		0,           // pChainEpochHeight
-		0,           // epochNumber
-		time.Time{}, // epochStartTime
+		statelessblock.PChainEpoch{},
 		pTestCert,
 		innerBlock2.Bytes(),
 		ctx.ChainID,

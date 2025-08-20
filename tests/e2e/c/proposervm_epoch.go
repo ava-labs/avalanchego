@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package c
@@ -52,7 +52,7 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 			const numTxs = 7
 			txCount := 0
 
-			initialEpochNumber, _, _, err := proposerClient.GetEpoch(tc.DefaultContext())
+			initialEpoch, err := proposerClient.GetEpoch(tc.DefaultContext())
 			require.NoError(err)
 
 			for range ticker.C {
@@ -78,17 +78,18 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 				receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
 				require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
 
-				epochNumber, epochStartTime, pChainHeight, err := proposerClient.GetEpoch(tc.DefaultContext())
+				epoch, err := proposerClient.GetEpoch(tc.DefaultContext())
+				require.NoError(err)
 				tc.Log().Debug(
 					"epoch",
-					zap.Uint64("Epoch Number:", epochNumber),
-					zap.Uint64("Epoch Start Time:", epochStartTime),
-					zap.Uint64("P-Chain Height:", pChainHeight),
+					zap.Uint64("Epoch Number:", epoch.Epoch),
+					zap.Int64("Epoch Start Time:", epoch.StartTime.Unix()),
+					zap.Uint64("P-Chain Height:", epoch.Height),
 				)
 
 				txCount++
 				if txCount >= numTxs {
-					require.Greater(epochNumber, initialEpochNumber,
+					require.Greater(epoch.Epoch, initialEpoch.Epoch,
 						"expected epoch number to advance after issuing %d transactions, but it did not",
 						numTxs,
 					)
