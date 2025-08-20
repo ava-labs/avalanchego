@@ -6,7 +6,6 @@ package vm
 import (
 	"context"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -66,9 +65,12 @@ var (
 		"is_ephemeral_node": "false",
 		"chain":             "C",
 	}
-	configStrArg string
 
+	configKey                           = "config"
+	defaultConfigKey                    = "default"
 	predefinedConfigs map[string]string = map[string]string{
+		"":               `{}`,
+		defaultConfigKey: `{}`,
 		"archive": `{
 			"pruning-enabled": false
 		}`,
@@ -102,7 +104,12 @@ func TestMain(m *testing.M) {
 	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", true, "Enable metrics collection.")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
-	flag.StringVar(&configStrArg, "config", "", "Config to use for the VM.")
+	predefinedConfigKeys := make([]string, 0, len(predefinedConfigs))
+	for k := range predefinedConfigs {
+		predefinedConfigKeys = append(predefinedConfigKeys, k)
+	}
+	predefinedConfigOptionsStr := fmt.Sprintf("[%s]", strings.Join(predefinedConfigKeys, ", "))
+	flag.StringVar(&configNameArg, configKey, "", fmt.Sprintf("Specifies the predefined config to use for the VM. Options include %s.", predefinedConfigOptionsStr))
 
 	flag.Parse()
 
@@ -113,25 +120,17 @@ func TestMain(m *testing.M) {
 	}
 	maps.Copy(labels, customLabels)
 
-	if configStrArg != "" {
-		preconfiguredConfigBytes, ok := predefinedConfigs[configStrArg]
-		if ok {
-			configBytesArg = []byte(preconfiguredConfigBytes)
-			configNameArg = configStrArg
-		} else {
-			// If the configArg is not a predefined config, it must be valid JSON.
-			var config map[string]any
-			err := json.Unmarshal(configBytesArg, &config)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "failed to validate config bytes string %q: %v\n", configStrArg, err)
-				os.Exit(1)
-			}
-			configBytesArg = []byte(configStrArg)
-			configNameArg = configStrArg
-		}
-	} else {
-		configNameArg = "default"
+	// Set the config from the predefinde configs and add to custom labels for the job.
+	if configNameArg == "" {
+		configNameArg = defaultConfigKey
 	}
+	predefinedConfigStr, ok := predefinedConfigs[configNameArg]
+	if !ok {
+		fmt.Fprintf(os.Stderr, "invalid config name %q. Valid options include %s.\n", configNameArg, predefinedConfigOptionsStr)
+		os.Exit(1)
+	}
+	customLabels[configKey] = configNameArg
+	configBytesArg = []byte(predefinedConfigStr)
 
 	m.Run()
 }
