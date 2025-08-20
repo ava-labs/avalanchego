@@ -80,7 +80,7 @@ var (
 			"state-sync-enabled": false
 		}`,
 		"inspect-db": `{
-			"inspect-database": true,
+			"inspect-database": true
 		}`,
 	}
 
