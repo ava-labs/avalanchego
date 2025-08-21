@@ -40,7 +40,7 @@ type EtaTracker struct {
 // based on the percentage completed.
 //
 // The adjustment works as follows:
-//   - At 0% progress: ETA is multiplied by complexityFactor
+//   - At 0% progress: ETA is multiplied by slowdownFactor
 //   - At 100% progress: ETA is the raw estimate (no adjustment)
 //   - Between 0% and 100%: Adjustment decreases linearly with progress
 //
