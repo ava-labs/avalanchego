@@ -26,7 +26,7 @@ type EngineType int32
 
 const (
 	EngineType_ENGINE_TYPE_UNSPECIFIED EngineType = 0
-	// Only the X-Chain uses avalanche consensus
+	// Only the X-Chain uses DAG consensus
 	EngineType_ENGINE_TYPE_DAG   EngineType = 1
 	EngineType_ENGINE_TYPE_CHAIN EngineType = 2
 )
