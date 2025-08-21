@@ -1447,7 +1447,8 @@ func (m *manager) createSnowmanVMs(
 	primaryAlias string,
 	genesisData []byte,
 	messageSender common.Sender,
-	fxs []*common.Fx) (*block.ChangeNotifier, *proposervm.VM, error) {
+	fxs []*common.Fx,
+) (*block.ChangeNotifier, *proposervm.VM, error) {
 	// Initialize the ProposerVM and the vm wrapped inside it
 	chainConfig, err := m.getChainConfig(ctx.ChainID)
 	if err != nil {
