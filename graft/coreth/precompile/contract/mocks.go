@@ -14,6 +14,8 @@ import (
 	reflect "reflect"
 
 	snow "github.com/ava-labs/avalanchego/snow"
+	set "github.com/ava-labs/avalanchego/utils/set"
+	predicate "github.com/ava-labs/avalanchego/vms/evm/predicate"
 	precompileconfig "github.com/ava-labs/coreth/precompile/precompileconfig"
 	common "github.com/ava-labs/libevm/common"
 	types "github.com/ava-labs/libevm/core/types"
@@ -151,19 +153,19 @@ func (mr *MockStateDBMockRecorder) GetNonce(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNonce", reflect.TypeOf((*MockStateDB)(nil).GetNonce), arg0)
 }
 
-// GetPredicateStorageSlots mocks base method.
-func (m *MockStateDB) GetPredicateStorageSlots(address common.Address, index int) ([]byte, bool) {
+// GetPredicate mocks base method.
+func (m *MockStateDB) GetPredicate(address common.Address, index int) (predicate.Predicate, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetPredicateStorageSlots", address, index)
-	ret0, _ := ret[0].([]byte)
+	ret := m.ctrl.Call(m, "GetPredicate", address, index)
+	ret0, _ := ret[0].(predicate.Predicate)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
-// GetPredicateStorageSlots indicates an expected call of GetPredicateStorageSlots.
-func (mr *MockStateDBMockRecorder) GetPredicateStorageSlots(address, index any) *gomock.Call {
+// GetPredicate indicates an expected call of GetPredicate.
+func (mr *MockStateDBMockRecorder) GetPredicate(address, index any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPredicateStorageSlots", reflect.TypeOf((*MockStateDB)(nil).GetPredicateStorageSlots), address, index)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPredicate", reflect.TypeOf((*MockStateDB)(nil).GetPredicate), address, index)
 }
 
 // GetState mocks base method.
@@ -399,10 +401,10 @@ func (m *MockBlockContext) EXPECT() *MockBlockContextMockRecorder {
 }
 
 // GetPredicateResults mocks base method.
-func (m *MockBlockContext) GetPredicateResults(txHash common.Hash, precompileAddress common.Address) []byte {
+func (m *MockBlockContext) GetPredicateResults(txHash common.Hash, precompileAddress common.Address) set.Bits {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPredicateResults", txHash, precompileAddress)
-	ret0, _ := ret[0].([]byte)
+	ret0, _ := ret[0].(set.Bits)
 	return ret0
 }
 

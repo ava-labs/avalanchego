@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/state"
@@ -41,7 +42,7 @@ type PrecompileTest struct {
 	// If nil, Configure will not be called.
 	Config precompileconfig.Config
 	// Predicates that the precompile should have access to.
-	Predicates [][]byte
+	Predicates []predicate.Predicate
 	// SetupBlockContext sets the expected calls on MockBlockContext for the test execution.
 	SetupBlockContext func(*contract.MockBlockContext)
 	// AfterHook is called after the precompile is called.
@@ -65,7 +66,7 @@ type PrecompileRunparams struct {
 }
 
 func (test PrecompileTest) Run(t *testing.T, module modules.Module) {
-	state := newTestStateDB(t, map[common.Address][][]byte{
+	state := newTestStateDB(t, map[common.Address][]predicate.Predicate{
 		module.Address: test.Predicates,
 	})
 	runParams := test.setup(t, module, state)
@@ -148,23 +149,23 @@ func RunPrecompileTests(t *testing.T, module modules.Module, contractTests map[s
 type testStateDB struct {
 	*extstate.StateDB
 
-	predicateStorageSlots map[common.Address][][]byte
+	predicates map[common.Address][]predicate.Predicate
 }
 
-func newTestStateDB(t testing.TB, predicateStorageSlots map[common.Address][][]byte) *testStateDB {
+func newTestStateDB(t testing.TB, predicates map[common.Address][]predicate.Predicate) *testStateDB {
 	db := rawdb.NewMemoryDatabase()
 	statedb, err := state.New(common.Hash{}, state.NewDatabase(db), nil)
 	require.NoError(t, err)
 	return &testStateDB{
-		StateDB:               extstate.New(statedb),
-		predicateStorageSlots: predicateStorageSlots,
+		StateDB:    extstate.New(statedb),
+		predicates: predicates,
 	}
 }
 
-func (s *testStateDB) GetPredicateStorageSlots(address common.Address, index int) ([]byte, bool) {
-	predicates, exists := s.predicateStorageSlots[address]
-	if !exists || index >= len(predicates) {
+func (s *testStateDB) GetPredicate(address common.Address, index int) (predicate.Predicate, bool) {
+	preds := s.predicates[address]
+	if index < 0 || index >= len(preds) {
 		return nil, false
 	}
-	return predicates[index], true
+	return preds[index], true
 }

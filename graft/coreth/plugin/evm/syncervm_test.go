@@ -6,6 +6,7 @@ package evm
 import (
 	"testing"
 
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
@@ -15,14 +16,14 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 	"github.com/ava-labs/coreth/plugin/evm/vmtest"
-	"github.com/ava-labs/coreth/predicate"
 )
 
 func TestEVMSyncerVM(t *testing.T) {
 	for _, test := range vmtest.SyncerVMTests {
 		t.Run(test.Name, func(t *testing.T) {
 			genFn := func(i int, vm extension.InnerVM, gen *core.BlockGen) {
-				b, err := predicate.NewResults().Bytes()
+				br := predicate.BlockResults{}
+				b, err := br.Bytes()
 				require.NoError(t, err)
 				gen.AppendExtra(b)
 

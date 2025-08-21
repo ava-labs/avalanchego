@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
@@ -21,7 +22,6 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/atomic/atomictest"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 	"github.com/ava-labs/coreth/plugin/evm/vmtest"
-	"github.com/ava-labs/coreth/predicate"
 )
 
 func TestAtomicSyncerVM(t *testing.T) {
@@ -33,7 +33,8 @@ func TestAtomicSyncerVM(t *testing.T) {
 			genFn := func(i int, vm extension.InnerVM, gen *core.BlockGen) {
 				atomicVM, ok := vm.(*VM)
 				require.True(t, ok)
-				b, err := predicate.NewResults().Bytes()
+				br := predicate.BlockResults{}
+				b, err := br.Bytes()
 				require.NoError(t, err)
 				gen.AppendExtra(b)
 				switch i {

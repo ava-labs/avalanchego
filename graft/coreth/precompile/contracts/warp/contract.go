@@ -33,7 +33,7 @@ const (
 	SendWarpMessageGasCostPerByte uint64 = contract.LogDataGas
 
 	GasCostPerWarpSigner            uint64 = 500
-	GasCostPerWarpMessageBytes      uint64 = 100
+	GasCostPerWarpMessageChunk      uint64 = 3_200
 	GasCostPerSignatureVerification uint64 = 200_000
 )
 
