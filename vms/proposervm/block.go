@@ -118,7 +118,7 @@ func nextPChainEpoch(parentPChainHeight uint64, parentEpoch block.PChainEpoch, p
 // 7) [child]'s timestamp is within its proposer's window
 // 8) [child] has a valid signature from its proposer
 // 9) [child]'s inner block is valid
-// 10) [child] has the expected P-Chain epoch height
+// 10) [child] has the expected P-Chain epoch
 func (p *postForkCommonComponents) Verify(
 	ctx context.Context,
 	parentTimestamp time.Time,
@@ -198,11 +198,11 @@ func (p *postForkCommonComponents) Verify(
 	case p.vm.Upgrades.IsGraniteActivated(childTimestamp):
 		calculatedEpoch := nextPChainEpoch(parentPChainHeight, parentEpoch, parentTimestamp, p.vm.Upgrades.GraniteEpochDuration)
 
-		epoch := child.PChainEpoch()
-		if epoch.Height != calculatedEpoch.Height {
-			return fmt.Errorf("epoch height mismatch: calculated epoch height %d != epoch height %d", calculatedEpoch.Height, epoch.Height)
+		childEpoch := child.PChainEpoch()
+		if childEpoch != calculatedEpoch {
+			return fmt.Errorf("epoch mismatch: calculated epoch %v != epoch %v", calculatedEpoch, childEpoch)
 		}
-		contextPChainHeight = calculatedEpoch.Height
+		contextPChainHeight = childEpoch.Height
 	case p.vm.Upgrades.IsEtnaActivated(childTimestamp):
 		contextPChainHeight = childPChainHeight
 	default:

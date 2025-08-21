@@ -7,12 +7,15 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ava-labs/coreth/ethclient"
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 )
@@ -28,13 +31,10 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 
 		env := e2e.GetEnv(tc)
 		var (
-			senderKey           = env.PreFundedKey
-			senderEthAddress    = senderKey.EthAddress()
-			recipientKey        = e2e.NewPrivateKey(tc)
-			recipientEthAddress = recipientKey.EthAddress()
+			senderKey    = env.PreFundedKey
+			recipientKey = e2e.NewPrivateKey(tc)
 		)
 
-		tc.By("initializing a new eth client")
 		// Select a random node URI to use for both the eth client and
 		// the wallet to avoid having to verify that all nodes are at
 		// the same height before initializing the wallet.
@@ -44,58 +44,56 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 		proposerClient := proposervm.NewClient(nodeURI.URI, "C")
 
 		tc.By("issuing C-Chain transactions to advance the epoch", func() {
-			// Issue enough C-Chain transactions to observe the epoch advancing
-			ticker := time.NewTicker(1 * time.Second)
-			defer ticker.Stop()
-
-			// Issue enough txs to activate the proposervm form and ensure we advance the epoch (duration is 4s)
-			const numTxs = 7
-			txCount := 0
-
 			initialEpoch, err := proposerClient.GetEpoch(tc.DefaultContext())
 			require.NoError(err)
 
-			for range ticker.C {
-				acceptedNonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), senderEthAddress)
-				require.NoError(err)
-				gasPrice := e2e.SuggestGasPrice(tc, ethClient)
-				tx := types.NewTransaction(
-					acceptedNonce,
-					recipientEthAddress,
-					big.NewInt(int64(txAmount)),
-					e2e.DefaultGasLimit,
-					gasPrice,
-					nil,
-				)
+			time.Sleep(5 * time.Second)
 
-				// Sign transaction
-				cChainID, err := ethClient.ChainID(tc.DefaultContext())
-				require.NoError(err)
-				signer := types.NewEIP155Signer(cChainID)
-				signedTx, err := types.SignTx(tx, signer, senderKey.ToECDSA())
-				require.NoError(err)
+			issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), int64(txAmount))
 
-				receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
-				require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
+			epoch, err := proposerClient.GetEpoch(tc.DefaultContext())
+			require.NoError(err)
+			tc.Log().Debug(
+				"epoch",
+				zap.Uint64("Epoch Number:", epoch.Number),
+				zap.Int64("Epoch Start Time:", epoch.StartTime.Unix()),
+				zap.Uint64("P-Chain Height:", epoch.Height),
+			)
 
-				epoch, err := proposerClient.GetEpoch(tc.DefaultContext())
-				require.NoError(err)
-				tc.Log().Debug(
-					"epoch",
-					zap.Uint64("Epoch Number:", epoch.Number),
-					zap.Int64("Epoch Start Time:", epoch.StartTime.Unix()),
-					zap.Uint64("P-Chain Height:", epoch.Height),
-				)
-
-				txCount++
-				if txCount >= numTxs {
-					require.Greater(epoch.Number, initialEpoch.Number,
-						"expected epoch number to advance after issuing %d transactions, but it did not",
-						numTxs,
-					)
-					break
-				}
-			}
+			require.Greater(
+				epoch.Number,
+				initialEpoch.Number,
+				"expected epoch number to advance, but it did not",
+			)
 		})
 	})
 })
+
+func issueTransaction(
+	tc *e2e.GinkgoTestContext,
+	ethClient *ethclient.Client,
+	senderKey *secp256k1.PrivateKey,
+	recipientEthAddress common.Address,
+	txAmount int64,
+) {
+	acceptedNonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), senderKey.EthAddress())
+	require.NoError(tc, err)
+	gasPrice := e2e.SuggestGasPrice(tc, ethClient)
+	tx := types.NewTransaction(
+		acceptedNonce,
+		recipientEthAddress,
+		big.NewInt(txAmount),
+		e2e.DefaultGasLimit,
+		gasPrice,
+		nil,
+	)
+
+	cChainID, err := ethClient.ChainID(tc.DefaultContext())
+	require.NoError(tc, err)
+	signer := types.NewEIP155Signer(cChainID)
+	signedTx, err := types.SignTx(tx, signer, senderKey.ToECDSA())
+	require.NoError(tc, err)
+
+	receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
+	require.Equal(tc, types.ReceiptStatusSuccessful, receipt.Status)
+}

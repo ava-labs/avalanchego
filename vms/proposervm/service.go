@@ -48,6 +48,8 @@ func (p *ProposerAPI) GetEpoch(r *http.Request, _ *struct{}, reply *GetEpochResp
 		zap.String("service", "proposervm"),
 		zap.String("method", "getEpoch"),
 	)
+	p.vm.ctx.Lock.Lock()
+	defer p.vm.ctx.Lock.Unlock()
 
 	lastAccepted, err := p.vm.GetLastAccepted()
 	if err != nil {
