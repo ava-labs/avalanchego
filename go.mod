@@ -88,7 +88,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.9 // indirect
-	github.com/ava-labs/simplex v0.0.0-20250812203241-4d88466c970e
+	github.com/ava-labs/simplex v0.0.0-20250819180907-c9b5ae6aad19
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.10.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
