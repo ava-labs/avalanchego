@@ -25,7 +25,7 @@ type sample struct {
 	timestamp time.Time
 }
 
-// A EtaTracker tracks the ETA of a job
+// An EtaTracker tracks the ETA of a job
 type EtaTracker struct {
 	samples        []sample
 	samplePosition uint8
