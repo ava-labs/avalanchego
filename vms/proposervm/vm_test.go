@@ -138,6 +138,7 @@ func initTestProposerVM(
 				ApricotPhase4Time:            proBlkStartTime,
 				ApricotPhase4MinPChainHeight: minPChainHeight,
 				DurangoTime:                  durangoTime,
+				GraniteTime:                  mockable.MaxTime,
 			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
