@@ -24,24 +24,15 @@ type DB interface {
 // Since the `Proof` must be returned by a `ProofParser`, it has knowledge of the request
 // that generated it, which will be used when finding the next key to request.
 type Proof interface {
-	// Verify checks the validity of the proof. If the proof is invalid,
-	// an error is returned and the proof should not be committed, and
-	// should be discarded and re-requested.
-	Verify(context.Context) error
-
 	// Commit applies the changes in the proof to the underlying database.
-	// Any proof must be verified before being committed.
-	// An error is returned if the commit fails, in which case the DB may be corrupted.
-	Commit(context.Context) error
-
-	// FindNextKey returns the next key that should be requested after this proof
-	// is applied. If there are no more keys to request in the range provided,
-	// it returns Nothing.
-	// The proof must be committed first.
-	FindNextKey(context.Context) (maybe.Maybe[[]byte], error)
+	// An error is returned if the commit fails, in which case the DB may be
+	// corrupted. The byte slice returned is the next key that should be
+	// requested. If Nothing is returned, there are no more keys to request
+	// before the end key of the request.
+	Commit(context.Context) (maybe.Maybe[[]byte], error)
 }
 
 type ProofParser interface {
-	ParseRangeProof(responseBytes, rootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error)
-	ParseChangeProof(responseBytes, rootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error)
+	ParseRangeProof(ctx context.Context, responseBytes, rootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error)
+	ParseChangeProof(ctx context.Context, responseBytes, rootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error)
 }

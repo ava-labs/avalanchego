@@ -502,6 +502,7 @@ func (m *Manager) handleRangeProofResponse(
 	}
 
 	rangeProof, err := m.config.Parser.ParseRangeProof(
+		ctx,
 		responseBytes,
 		request.RootHash,
 		maybeBytesToMaybe(request.StartKey),
@@ -511,22 +512,13 @@ func (m *Manager) handleRangeProofResponse(
 	if err != nil {
 		return err
 	}
-
-	if err := rangeProof.Verify(ctx); err != nil {
-		return err
-	}
-
 	// Replace all the key-value pairs in the DB from start to end with values from the response.
-	if err := rangeProof.Commit(ctx); err != nil {
-		m.setError(err)
-		return nil
-	}
-
-	nextKey, err := rangeProof.FindNextKey(ctx)
+	nextKey, err := rangeProof.Commit(ctx)
 	if err != nil {
 		m.setError(err)
 		return nil
 	}
+
 	m.completeWorkItem(work, nextKey, targetRootID)
 	return nil
 }
@@ -539,7 +531,7 @@ type proofRequest struct {
 	keyLimit int
 }
 
-func (p *proofParser) ParseRangeProof(responseBytes, rootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error) {
+func (p *proofParser) ParseRangeProof(ctx context.Context, responseBytes, rootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error) {
 	var rangeProofProto pb.RangeProof
 	if err := proto.Unmarshal(responseBytes, &rangeProofProto); err != nil {
 		return nil, err
@@ -550,7 +542,7 @@ func (p *proofParser) ParseRangeProof(responseBytes, rootHash []byte, startKey, 
 		return nil, err
 	}
 
-	return &rangeProof{
+	proof := &rangeProof{
 		merkleProof: &merkleProof,
 		request: &proofRequest{
 			rootHash: rootHash,
@@ -561,7 +553,12 @@ func (p *proofParser) ParseRangeProof(responseBytes, rootHash []byte, startKey, 
 		db:        p.db,
 		tokenSize: p.tokenSize,
 		hasher:    p.hasher,
-	}, nil
+	}
+
+	if err := proof.verify(ctx); err != nil {
+		return nil, err
+	}
+	return proof, nil
 }
 
 type rangeProof struct {
@@ -572,7 +569,7 @@ type rangeProof struct {
 	hasher      merkledb.Hasher
 }
 
-func (r *rangeProof) Verify(ctx context.Context) error {
+func (r *rangeProof) verify(ctx context.Context) error {
 	// Database is empty, no proof is needed.
 	if bytes.Equal(r.request.rootHash, ids.Empty[:]) {
 		return nil
@@ -590,21 +587,16 @@ func (r *rangeProof) Verify(ctx context.Context) error {
 	)
 }
 
-func (r *rangeProof) Commit(ctx context.Context) error {
+func (r *rangeProof) Commit(ctx context.Context) (maybe.Maybe[[]byte], error) {
 	// If the root is empty, we clear the database of all values.
 	if bytes.Equal(r.request.rootHash, ids.Empty[:]) {
-		return r.db.Clear()
+		return maybe.Nothing[[]byte](), r.db.Clear()
 	}
 
 	// Range proofs must always be committed, even if no key changes are present.
 	// This is because it may have been provided instead of a change proof, and the keys were deleted.
-	return r.db.CommitRangeProof(ctx, r.request.startKey, r.request.endKey, r.merkleProof)
-}
-
-func (r *rangeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], error) {
-	// If we wanted the empty root, we don't need to fetch any keys.
-	if bytes.Equal(r.request.rootHash, ids.Empty[:]) {
-		return maybe.Nothing[[]byte](), nil
+	if err := r.db.CommitRangeProof(ctx, r.request.startKey, r.request.endKey, r.merkleProof); err != nil {
+		return maybe.Nothing[[]byte](), err
 	}
 
 	// Find the next key to fetch.
@@ -630,6 +622,7 @@ func (m *Manager) handleChangeProofResponse(
 	}
 
 	proof, err := m.config.Parser.ParseChangeProof(
+		ctx,
 		responseBytes,
 		request.EndRootHash,
 		maybeBytesToMaybe(request.StartKey),
@@ -637,27 +630,20 @@ func (m *Manager) handleChangeProofResponse(
 		request.KeyLimit,
 	)
 	if err != nil {
-		return err
-	}
-
-	if err := proof.Verify(ctx); err != nil {
 		return fmt.Errorf("%w: %w", errInvalidChangeProof, err)
 	}
-	if err := proof.Commit(ctx); err != nil {
-		m.setError(err)
-		return nil
-	}
-	nextKey, err := proof.FindNextKey(ctx)
+
+	nextKey, err := proof.Commit(ctx)
 	if err != nil {
 		m.setError(err)
-		return err
+		return nil
 	}
 
 	m.completeWorkItem(work, nextKey, targetRootID)
 	return nil
 }
 
-func (p *proofParser) ParseChangeProof(responseBytes, endRootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error) {
+func (p *proofParser) ParseChangeProof(ctx context.Context, responseBytes, endRootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error) {
 	var changeProofResp pb.SyncGetChangeProofResponse
 	if err := proto.Unmarshal(responseBytes, &changeProofResp); err != nil {
 		return nil, err
@@ -671,7 +657,7 @@ func (p *proofParser) ParseChangeProof(responseBytes, endRootHash []byte, startK
 			return nil, err
 		}
 
-		return &changeProof{
+		proof := &changeProof{
 			merkleProof: &merkleChangeProof,
 			request: &proofRequest{
 				rootHash: endRootHash,
@@ -681,7 +667,11 @@ func (p *proofParser) ParseChangeProof(responseBytes, endRootHash []byte, startK
 			},
 			db:        p.db,
 			tokenSize: p.tokenSize,
-		}, nil
+		}
+		if err := proof.verify(ctx); err != nil {
+			return nil, err
+		}
+		return proof, nil
 
 	case *pb.SyncGetChangeProofResponse_RangeProof:
 		var merkleRangeProof merkledb.RangeProof
@@ -689,7 +679,7 @@ func (p *proofParser) ParseChangeProof(responseBytes, endRootHash []byte, startK
 			return nil, err
 		}
 
-		return &rangeProof{
+		proof := &rangeProof{
 			merkleProof: &merkleRangeProof,
 			request: &proofRequest{
 				rootHash: endRootHash,
@@ -700,7 +690,11 @@ func (p *proofParser) ParseChangeProof(responseBytes, endRootHash []byte, startK
 			db:        p.db,
 			tokenSize: p.tokenSize,
 			hasher:    p.hasher,
-		}, nil
+		}
+		if err := proof.verify(ctx); err != nil {
+			return nil, err
+		}
+		return proof, nil
 
 	default:
 		return nil, fmt.Errorf(
@@ -717,7 +711,7 @@ type changeProof struct {
 	tokenSize   int
 }
 
-func (c *changeProof) Verify(ctx context.Context) error {
+func (c *changeProof) verify(ctx context.Context) error {
 	// If the database is empty, we don't need to verify a change proof.
 	if bytes.Equal(c.request.rootHash, ids.Empty[:]) {
 		return nil
@@ -745,23 +739,17 @@ func (c *changeProof) Verify(ctx context.Context) error {
 	)
 }
 
-func (c *changeProof) Commit(ctx context.Context) error {
+func (c *changeProof) Commit(ctx context.Context) (maybe.Maybe[[]byte], error) {
 	// If the root is empty, we clear the database.
 	if bytes.Equal(c.request.rootHash, ids.Empty[:]) {
-		return c.db.Clear()
+		return maybe.Nothing[[]byte](), c.db.Clear()
 	}
 
-	if len(c.merkleProof.KeyChanges) == 0 {
-		return nil
-	}
-	return c.db.CommitChangeProof(ctx, c.merkleProof)
-}
-
-func (c *changeProof) FindNextKey(ctx context.Context) (maybe.Maybe[[]byte], error) {
-	// Find the next key to fetch.
-	// If we wanted the empty root, we don't need to fetch any keys.
-	if bytes.Equal(c.request.rootHash, ids.Empty[:]) {
-		return maybe.Nothing[[]byte](), nil
+	// We only need to apply changes if there are any key changes to commit.
+	if len(c.merkleProof.KeyChanges) != 0 {
+		if err := c.db.CommitChangeProof(ctx, c.merkleProof); err != nil {
+			return maybe.Nothing[[]byte](), err
+		}
 	}
 
 	// This will return Nothing if there are no more keys to fetch in the range `largestHandledKey` to `c.request.endKey`.

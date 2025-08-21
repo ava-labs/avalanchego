@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -48,12 +47,6 @@ func Test_Creation(t *testing.T) {
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 	require.NotNil(syncer)
-
-	rangeProof, err := db.GetRangeProof(ctx, maybe.Some([]byte{0xff}), maybe.Nothing[[]byte](), 10)
-	require.NoError(err)
-	require.NotNil(rangeProof)
-	t.Log(rangeProof)
-	t.Fatal("not implemented")
 }
 
 func Test_Completion(t *testing.T) {
@@ -191,12 +184,11 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	fullProofBytes, err := proto.Marshal(fullProof.ToProto())
 	require.NoError(err)
 
-	rangeProof, err := proofParser.ParseRangeProof(fullProofBytes, root[:], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), uint32(numKeys))
+	rangeProof, err := proofParser.ParseRangeProof(ctx, fullProofBytes, root[:], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), uint32(numKeys))
 	require.NoError(err)
-	require.NoError(rangeProof.Verify(ctx))
 
 	// We don't need to commit the proof, since all keys are already present
-	nextKey, err := rangeProof.FindNextKey(ctx)
+	nextKey, err := rangeProof.Commit(ctx)
 	require.NoError(err)
 	require.True(nextKey.IsNothing())
 
@@ -231,60 +223,70 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	}
 
 	// Create a proof that ends at `endPointBeforeNewKey`, so the last key is still `lastKey`
-	rangeProof, err = proofParser.ParseRangeProof(fullProofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some(endPointBeforeNewKey), uint32(numKeys))
+	rangeProof, err = proofParser.ParseRangeProof(ctx, fullProofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some(endPointBeforeNewKey), uint32(numKeys))
 	require.NoError(err)
 
 	// next key would be after the end of the range, so it returns Nothing instead
-	nextKey, err = rangeProof.FindNextKey(ctx)
+	nextKey, err = rangeProof.Commit(ctx)
 	require.NoError(err)
 	require.True(nextKey.IsNothing())
 }
 
 func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	require := require.New(t)
+	ctx := context.Background()
 
-	db, err := merkledb.New(
-		context.Background(),
+	fullDB, err := merkledb.New(
+		ctx,
 		memdb.New(),
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
-	require.NoError(db.Put([]byte{0x10}, []byte{1}))
-	require.NoError(db.Put([]byte{0x11, 0x11}, []byte{2}))
+	require.NoError(fullDB.Put([]byte{0x10}, []byte{1}))
+	require.NoError(fullDB.Put([]byte{0x11, 0x11}, []byte{2}))
 
-	ctx := context.Background()
-	root, err := db.GetMerkleRoot(ctx)
+	root, err := fullDB.GetMerkleRoot(ctx)
 	require.NoError(err)
 
-	parser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	// Create empty DBs to commit to
+	db1, err := merkledb.New(ctx, memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
+	parser1, err := newParser(db1, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	require.NoError(err)
+
+	db2, err := merkledb.New(ctx, memdb.New(), newDefaultDBConfig())
+	require.NoError(err)
+	parser2, err := newParser(db2, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	require.NoError(err)
+
+	// Add 0x13 to both dbs
+	require.NoError(db1.Put([]byte{0x13}, []byte{3}))
+	require.NoError(db2.Put([]byte{0x13}, []byte{3}))
 
 	// 0x12 was "deleted" and there should be no extra node in the proof since there was nothing with a common prefix
-	proof, err := db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Some([]byte{0x12}), 500)
+	proof, err := fullDB.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Some([]byte{0x12}), 500)
 	require.NoError(err)
 	proofBytes, err := proto.Marshal(proof.ToProto())
 	require.NoError(err)
-	noExtraNodeProof, err := parser.ParseRangeProof(proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
+	noExtraNodeProof, err := parser1.ParseRangeProof(ctx, proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
 	require.NoError(err)
-	require.NoError(noExtraNodeProof.Verify(ctx))
 
-	// 0x11 was "deleted" and 0x11.0x11 should be in the exclusion proof
-	proof, err = db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Some([]byte{0x12}), 500)
-	require.NoError(err)
-	proofBytes, err = proto.Marshal(proof.ToProto())
-	require.NoError(err)
-	extraNodeProof, err := parser.ParseRangeProof(proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
-	require.NoError(err)
-	require.NoError(extraNodeProof.Verify(ctx))
-
-	// there is now another value in the range that needs to be sync'ed
-	require.NoError(db.Put([]byte{0x13}, []byte{3}))
-
-	nextKey, err := noExtraNodeProof.FindNextKey(ctx)
+	// Check the next key
+	nextKey, err := noExtraNodeProof.Commit(ctx)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x13}), nextKey)
 
-	nextKey, err = extraNodeProof.FindNextKey(ctx)
+	// 0x11 was "deleted" and 0x11.0x11 should be in the exclusion proof
+	endProof, err := fullDB.GetProof(ctx, []byte{0x11})
+	require.NoError(err)
+	proof.EndProof = endProof.Path
+	require.NoError(err)
+	proofBytes, err = proto.Marshal(proof.ToProto())
+	require.NoError(err)
+	extraNodeProof, err := parser2.ParseRangeProof(ctx, proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
+	require.NoError(err)
+
+	nextKey, err = extraNodeProof.Commit(ctx)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x13}), nextKey)
 }
@@ -312,12 +314,11 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	require.NoError(err)
 	proofBytes, err := proto.Marshal(proof.ToProto())
 	require.NoError(err)
-	rangeProof, err := proofParser.ParseRangeProof(proofBytes, targetRoot[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
+	rangeProof, err := proofParser.ParseRangeProof(ctx, proofBytes, targetRoot[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
 	require.NoError(err)
-	require.NoError(rangeProof.Verify(ctx))
 
 	// The exact next key must be after the requested range
-	nextKey, err := rangeProof.FindNextKey(ctx)
+	nextKey, err := rangeProof.Commit(ctx)
 	require.NoError(err)
 	require.True(nextKey.IsNothing())
 
@@ -325,8 +326,7 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	require.NoError(db.Put([]byte{0x11, 0x15}, []byte{4}))
 
 	// Proof should still be valid
-	require.NoError(rangeProof.Verify(ctx))
-	nextKey, err = rangeProof.FindNextKey(ctx)
+	nextKey, err = rangeProof.Commit(ctx)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x11, 0x15}), nextKey)
 }
@@ -355,13 +355,12 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 	require.NoError(err)
 	proofBytes, err := proto.Marshal(proof.ToProto())
 	require.NoError(err)
-	rangeProof, err := proofParser.ParseRangeProof(proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
+	rangeProof, err := proofParser.ParseRangeProof(ctx, proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
 	require.NoError(err)
-	require.NoError(rangeProof.Verify(ctx))
 
 	// Delete the key and ensure we will request it next
 	require.NoError(db.Delete([]byte{0x12, 0xA0}))
-	nextKey, err := rangeProof.FindNextKey(ctx)
+	nextKey, err := rangeProof.Commit(ctx)
 	require.NoError(err)
 	require.Equal(maybe.Some([]byte{0x12, 0xA0}), nextKey)
 }
@@ -386,7 +385,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	require.NoError(err)
 	proofBytes, err := proto.Marshal(proof.ToProto())
 	require.NoError(err)
-	rangeProof, err := proofParser.ParseRangeProof(proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 500)
+	rangeProof, err := proofParser.ParseRangeProof(ctx, proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 500)
 	require.NoError(err)
 
 	// add an extra value to local db
@@ -396,7 +395,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	require.NoError(db.Put(midPointVal, []byte{1}))
 
 	// next key at prefix of newly added point
-	nextKey, err := rangeProof.FindNextKey(ctx)
+	nextKey, err := rangeProof.Commit(ctx)
 	require.NoError(err)
 	require.True(nextKey.HasValue())
 	require.True(isPrefix(midPointVal, nextKey.Value()))
@@ -408,14 +407,14 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	require.NoError(err)
 	proofBytes, err = proto.Marshal(proof.ToProto())
 	require.NoError(err)
-	rangeProof, err = proofParser.ParseRangeProof(proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 500)
+	rangeProof, err = proofParser.ParseRangeProof(ctx, proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 500)
 	require.NoError(err)
 
 	// Remove from local db, to ensure we will request it
 	require.NoError(db.Delete(midPointVal))
 
 	// next key at prefix of newly added point
-	nextKey, err = rangeProof.FindNextKey(ctx)
+	nextKey, err = rangeProof.Commit(ctx)
 	require.NoError(err)
 	require.True(nextKey.HasValue())
 
@@ -463,12 +462,12 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 	require.NoError(err)
 	proofBytes, err := proto.Marshal(proof.ToProto())
 	require.NoError(err)
-	rangeProof, err := proofParser.ParseRangeProof(proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 500)
+	rangeProof, err := proofParser.ParseRangeProof(ctx, proofBytes, root[:], maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 500)
 	require.NoError(err)
 
 	// Change the value of the added child
 	require.NoError(db.Put(lastKey, []byte{2}))
-	nextKey, err := rangeProof.FindNextKey(ctx)
+	nextKey, err := rangeProof.Commit(ctx)
 	require.NoError(err)
 	require.True(nextKey.HasValue())
 	require.Equal(lastKey, nextKey.Value())
@@ -509,19 +508,27 @@ func TestFindNextKeyRandom(t *testing.T) {
 	)
 
 	// Put random keys into the databases
-	for _, db := range []database.Database{remoteDB, localDB} {
-		for i := 0; i < numKeyValues; i++ {
-			key := make([]byte, rand.Intn(maxKeyLen))
-			_, _ = rand.Read(key)
-			val := make([]byte, rand.Intn(maxValLen))
-			_, _ = rand.Read(val)
-			require.NoError(db.Put(key, val))
-		}
+	for i := 0; i < numKeyValues; i++ {
+		key := make([]byte, rand.Intn(maxKeyLen))
+		_, _ = rand.Read(key)
+		val := make([]byte, rand.Intn(maxValLen))
+		_, _ = rand.Read(val)
+		require.NoError(remoteDB.Put(key, val))
 	}
 
 	// Repeatedly generate end proofs from the remote database and compare
 	// the result of findNextKey to the expected result.
 	for proofIndex := 0; proofIndex < numProofsToTest; proofIndex++ {
+		// Put random keys in the local database
+		require.NoError(localDB.Clear())
+		for i := 0; i < numKeyValues; i++ {
+			key := make([]byte, rand.Intn(maxKeyLen))
+			_, _ = rand.Read(key)
+			val := make([]byte, rand.Intn(maxValLen))
+			_, _ = rand.Read(val)
+			require.NoError(localDB.Put(key, val))
+		}
+
 		// Generate a proof for a random key
 		var (
 			rangeStart []byte
@@ -671,6 +678,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		proofBytes, err := proto.Marshal(remoteProof.ToProto())
 		require.NoError(err)
 		rangeProof, err := proofParser.ParseRangeProof(
+			context.Background(),
 			proofBytes,
 			root[:],
 			startKey,
@@ -678,9 +686,8 @@ func TestFindNextKeyRandom(t *testing.T) {
 			uint32(maxProofLen+1),
 		)
 		require.NoError(err)
-		require.NoError(rangeProof.Verify(context.Background()))
 
-		gotFirstDiff, err := rangeProof.FindNextKey(context.Background())
+		gotFirstDiff, err := rangeProof.Commit(context.Background())
 		require.NoError(err)
 
 		// The next key should be bounded by the next key not in the proof
