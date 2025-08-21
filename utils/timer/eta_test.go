@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEtaTracker(t *testing.T) {
@@ -65,11 +65,11 @@ func TestEtaTracker(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			eta, percentComplete := tracker.AddSample(tt.completed, target, tt.timestamp)
 			// overly complex, see https://github.com/stretchr/testify/issues/1118
-			assert.EqualValues(t, tt.expectedEta, eta,
+			require.EqualValues(t, tt.expectedEta, eta,
 				"%s exp=%v, got=%v", tt.description,
 				reflect.Indirect(reflect.ValueOf(tt.expectedEta)),
 				reflect.Indirect(reflect.ValueOf(eta)))
-			assert.Equal(t, tt.expectedPercent, percentComplete, "%s exp=%v, got=%v", tt.description, tt.expectedPercent, percentComplete)
+			require.Equal(t, tt.expectedPercent, percentComplete, "%s exp=%v, got=%v", tt.description, tt.expectedPercent, percentComplete)
 		})
 	}
 }
