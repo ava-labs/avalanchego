@@ -67,7 +67,7 @@ jobs:
             } >> "$GITHUB_OUTPUT"
           fi
 
-  c-chain-reexecution-blacksmith: # PR smoke test + scheduled run + manual workflow
+  c-chain-reexecution:
     needs: define-matrix
     strategy:
       fail-fast: false
