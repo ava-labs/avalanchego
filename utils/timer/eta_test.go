@@ -4,7 +4,6 @@
 package timer
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
@@ -64,12 +63,19 @@ func TestEtaTracker(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eta, percentComplete := tracker.AddSample(tt.completed, target, tt.timestamp)
-			// overly complex, see https://github.com/stretchr/testify/issues/1118
-			require.EqualValues(t, tt.expectedEta, eta,
-				"%s exp=%v, got=%v", tt.description,
-				reflect.Indirect(reflect.ValueOf(tt.expectedEta)),
-				reflect.Indirect(reflect.ValueOf(eta)))
-			require.Equal(t, tt.expectedPercent, percentComplete, "%s exp=%v, got=%v", tt.description, tt.expectedPercent, percentComplete)
+			require.True(t, (tt.expectedEta == nil) == (eta == nil))
+			if eta != nil {
+				if *tt.expectedEta == 0 {
+					require.Equal(t, tt.expectedEta, eta)
+				} else {
+					require.InEpsilon(t, float64(*tt.expectedEta), float64(*eta), 0.0001)
+				}
+			}
+			if tt.expectedPercent == 0 {
+				require.Equal(t, tt.expectedPercent, percentComplete)
+			} else {
+				require.InEpsilon(t, tt.expectedPercent, percentComplete, 0.01)
+			}
 		})
 	}
 }

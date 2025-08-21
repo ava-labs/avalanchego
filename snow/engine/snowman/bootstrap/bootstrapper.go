@@ -643,11 +643,11 @@ func (b *Bootstrapper) process(
 					logger = b.Ctx.Log.Debug
 				}
 				logger("fetching blocks",
-						zap.Uint64("numFetchedBlocks", numFetched),
-						zap.Uint64("numTotalBlocks", totalBlocksToFetch),
-						zap.Duration("eta", *eta),
-						zap.Float64("pctComplete", progressPercentage),
-					)
+					zap.Uint64("numFetchedBlocks", numFetched),
+					zap.Uint64("numTotalBlocks", totalBlocksToFetch),
+					zap.Duration("eta", *eta),
+					zap.Float64("pctComplete", progressPercentage),
+				)
 			}
 		}
 	}
