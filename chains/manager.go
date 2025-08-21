@@ -1544,7 +1544,8 @@ func (m *manager) createSnowmanEngine(
 	vdrs validators.Manager,
 	connectedValidators tracker.Peers,
 	peerTracker *p2p.PeerTracker,
-	halter common.Halter) (*handler.Engine, error) {
+	halter common.Halter,
+) (*handler.Engine, error) {
 	bootstrapWeight, err := beacons.TotalWeight(ctx.SubnetID)
 	if err != nil {
 		return nil, fmt.Errorf("error while fetching weight for subnet %s: %w", ctx.SubnetID, err)
