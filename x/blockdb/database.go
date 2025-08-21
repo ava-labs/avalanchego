@@ -221,7 +221,7 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 	s := &Database{
 		config: config,
 		log:    databaseLog,
-		fileCache: lru.NewCacheWithOnEvict(config.MaxDataFiles, func(_ int, f *os.File) {
+		fileCache: lru.NewCacheWithOnEvict[int, *os.File](config.MaxDataFiles, func(_ int, f *os.File) {
 			if f != nil {
 				f.Close()
 			}
@@ -507,9 +507,8 @@ func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
 			)
 			return nil, fmt.Errorf("failed to read block data from data file: %w", err)
 		}
-		break
+		return blockData, nil
 	}
-	return blockData, nil
 }
 
 // ReadHeader retrieves only the header portion of a block by its height.
