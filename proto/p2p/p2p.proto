@@ -215,8 +215,8 @@ message AcceptedStateSummary {
 enum EngineType {
   ENGINE_TYPE_UNSPECIFIED = 0;
   // Only the X-Chain uses avalanche consensus
-  ENGINE_TYPE_AVALANCHE = 1;
-  ENGINE_TYPE_SNOWMAN = 2;
+  ENGINE_TYPE_DAG = 1;
+  ENGINE_TYPE_CHAIN = 2;
 }
 
 // GetAcceptedFrontier requests the accepted frontier from a peer.
