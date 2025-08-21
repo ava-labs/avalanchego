@@ -1440,7 +1440,14 @@ func (m *manager) createSnowmanPeerTracker(ctx *snow.ConsensusContext, primaryAl
 	return peerTracker, nil
 }
 
-func (m *manager) createSnowmanVMs(ctx *snow.ConsensusContext, vm block.ChainVM, db *prefixdb.Database, primaryAlias string, genesisData []byte, messageSender common.Sender, fxs []*common.Fx) (*block.ChangeNotifier, *proposervm.VM, error) {
+func (m *manager) createSnowmanVMs(
+	ctx *snow.ConsensusContext,
+	vm block.ChainVM,
+	db *prefixdb.Database,
+	primaryAlias string,
+	genesisData []byte,
+	messageSender common.Sender,
+	fxs []*common.Fx) (*block.ChangeNotifier, *proposervm.VM, error) {
 	// Initialize the ProposerVM and the vm wrapped inside it
 	chainConfig, err := m.getChainConfig(ctx.ChainID)
 	if err != nil {
@@ -1524,7 +1531,19 @@ func (m *manager) createSnowmanVMs(ctx *snow.ConsensusContext, vm block.ChainVM,
 
 // createSnowmanEngine creates a Snowman engine with the provided context, VM, and other parameters.
 // It sets up the consensus engine, bootstrapper, and state syncer.
-func (m *manager) createSnowmanEngine(ctx *snow.ConsensusContext, vm block.ChainVM, nonVerifyingParseFunc block.ParseFunc, sb subnets.Subnet, beacons validators.Manager, messageSender common.Sender, bootstrappingDB *prefixdb.Database, bootstrapFunc func(), vdrs validators.Manager, connectedValidators tracker.Peers, peerTracker *p2p.PeerTracker, halter common.Halter) (*handler.Engine, error) {
+func (m *manager) createSnowmanEngine(
+	ctx *snow.ConsensusContext,
+	vm block.ChainVM,
+	nonVerifyingParseFunc block.ParseFunc,
+	sb subnets.Subnet,
+	beacons validators.Manager,
+	messageSender common.Sender,
+	bootstrappingDB *prefixdb.Database,
+	bootstrapFunc func(),
+	vdrs validators.Manager,
+	connectedValidators tracker.Peers,
+	peerTracker *p2p.PeerTracker,
+	halter common.Halter) (*handler.Engine, error) {
 	bootstrapWeight, err := beacons.TotalWeight(ctx.SubnetID)
 	if err != nil {
 		return nil, fmt.Errorf("error while fetching weight for subnet %s: %w", ctx.SubnetID, err)
