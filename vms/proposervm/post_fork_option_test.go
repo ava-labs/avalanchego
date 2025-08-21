@@ -42,8 +42,9 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -131,8 +132,9 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -213,8 +215,9 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -298,8 +301,9 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -370,8 +374,9 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -443,8 +448,9 @@ func TestOptionTimestampValidity(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, db := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, db := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 
 	coreTestBlk := snowmantest.BuildChild(snowmantest.Genesis)
 	coreOracleBlk := &TestOptionsBlock{

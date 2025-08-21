@@ -47,8 +47,9 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -93,8 +94,9 @@ func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = mockable.MaxTime // pre Durango
+		graniteTime    = mockable.MaxTime // pre Durango
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -188,8 +190,9 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime // post Durango
+		graniteTime    = mockable.MaxTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -286,8 +289,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = mockable.MaxTime
+		graniteTime    = mockable.MaxTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -498,8 +502,9 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -664,8 +669,9 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = mockable.MaxTime
+		graniteTime    = mockable.MaxTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -845,8 +851,9 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -904,8 +911,9 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -963,8 +971,9 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1006,8 +1015,9 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1032,8 +1042,9 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1126,8 +1137,9 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 5)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 5)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()

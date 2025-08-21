@@ -35,8 +35,9 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -88,8 +89,9 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	proVM.Set(snowmantest.GenesisTimestamp)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
@@ -172,8 +174,9 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -239,8 +242,9 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	proVM.Set(snowmantest.GenesisTimestamp)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
@@ -318,8 +322,9 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	proVM.Set(snowmantest.GenesisTimestamp)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
@@ -448,8 +453,9 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()

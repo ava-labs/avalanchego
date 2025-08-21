@@ -40,8 +40,9 @@ func TestCoreVMNotRemote(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -70,8 +71,9 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 	var (
 		activationTime = mockable.MaxTime
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime, graniteTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -193,8 +195,9 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime, graniteTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -327,10 +330,11 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 		postForkTime = currentTime.Add(15 * time.Minute)
 
 		durangoTime = forkTime
+		graniteTime = forkTime
 	)
 
 	// enable ProBlks in next future
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, forkTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, forkTime, durangoTime, graniteTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -499,8 +503,9 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 	var (
 		activationTime = mockable.MaxTime
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime, graniteTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -699,8 +704,9 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime, graniteTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -790,10 +796,11 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 		postForkTime = currentTime.Add(15 * time.Minute)
 
 		durangoTime = forkTime
+		graniteTime = forkTime
 	)
 
 	// enable ProBlks in next future
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, forkTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, forkTime, durangoTime, graniteTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -923,6 +930,7 @@ func initTestRemoteProposerVM(
 	t *testing.T,
 	activationTime,
 	durangoTime time.Time,
+	graniteTime time.Time,
 ) (
 	TestRemoteProposerVM,
 	*VM,
@@ -976,6 +984,7 @@ func initTestRemoteProposerVM(
 				ApricotPhase4Time:            activationTime,
 				ApricotPhase4MinPChainHeight: 0,
 				DurangoTime:                  durangoTime,
+				GraniteTime:                  graniteTime,
 			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,

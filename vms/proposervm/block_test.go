@@ -117,8 +117,9 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = mockable.MaxTime
+		graniteTime    = mockable.MaxTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -247,8 +248,9 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = mockable.MaxTime
+		graniteTime    = mockable.MaxTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
