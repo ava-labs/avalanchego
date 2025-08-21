@@ -6,7 +6,6 @@ package warp
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/libevm/common"
@@ -14,7 +13,6 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 
 	"github.com/ava-labs/coreth/precompile/contract"
-	"github.com/ava-labs/coreth/predicate"
 )
 
 var (
@@ -61,16 +59,16 @@ func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, s
 	}
 	warpIndex := int(warpIndexInput) // This conversion is safe even if int is 32 bits because we checked above.
 	state := accessibleState.GetStateDB()
-	predicateBytes, exists := state.GetPredicateStorageSlots(ContractAddress, warpIndex)
+	pred, exists := state.GetPredicate(ContractAddress, warpIndex)
 	predicateResults := accessibleState.GetBlockContext().GetPredicateResults(state.TxHash(), ContractAddress)
-	valid := exists && !set.BitsFromBytes(predicateResults).Contains(warpIndex)
+	valid := exists && !predicateResults.Contains(warpIndex)
 	if !valid {
 		return handler.packFailed(), remainingGas, nil
 	}
 
 	// Note: we charge for the size of the message during both predicate verification and each time the message is read during
 	// EVM execution because each execution incurs an additional read cost.
-	msgBytesGas, overflow := math.SafeMul(GasCostPerWarpMessageBytes, uint64(len(predicateBytes)))
+	msgBytesGas, overflow := math.SafeMul(GasCostPerWarpMessageChunk, uint64(len(pred)))
 	if overflow {
 		return nil, 0, vm.ErrOutOfGas
 	}
@@ -79,7 +77,7 @@ func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, s
 	}
 	// Note: since the predicate is verified in advance of execution, the precompile should not
 	// hit an error during execution.
-	unpackedPredicateBytes, err := predicate.UnpackPredicate(predicateBytes)
+	unpackedPredicateBytes, err := pred.Bytes()
 	if err != nil {
 		return nil, remainingGas, fmt.Errorf("%w: %w", errInvalidPredicateBytes, err)
 	}

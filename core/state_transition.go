@@ -32,8 +32,8 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
 	cmath "github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/types"
@@ -161,7 +161,7 @@ func accessListGas(rules params.Rules, accessList types.AccessList) (uint64, err
 			}
 			gas = totalGas
 		} else {
-			predicateGas, err := predicaterContract.PredicateGas(utils.HashSliceToBytes(accessTuple.StorageKeys))
+			predicateGas, err := predicaterContract.PredicateGas(predicate.Predicate(accessTuple.StorageKeys))
 			if err != nil {
 				return 0, err
 			}

@@ -102,7 +102,7 @@ jobs:
       - name: Build AvalancheGo and update Coreth dependency
         run: ./scripts/run_task.sh build-avalanchego-with-coreth
       - name: Run e2e tests
-        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@24a051a57738e6f90d37cc6b3c221170ff2ac892
+        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@4f5acfc0485a8203bc4fedd76c73889fd12d43ca
         with:
           run: ./scripts/run_task.sh test-e2e
           run_env: AVALANCHEGO_CLONE_PATH=avalanchego
@@ -138,7 +138,7 @@ jobs:
         env:
           AVALANCHEGO_CLONE_PATH: /tmp/e2e/warp/avalanchego
       - name: Run Warp E2E Tests
-        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@24a051a57738e6f90d37cc6b3c221170ff2ac892
+        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@4f5acfc0485a8203bc4fedd76c73889fd12d43ca
         with:
           run: ./scripts/run_task.sh test-e2e-warp-ci
           run_env: AVALANCHEGO_BUILD_PATH=/tmp/e2e/warp/avalanchego/build

@@ -7,6 +7,7 @@ package precompileconfig
 import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/libevm/common"
 )
@@ -47,8 +48,8 @@ type PredicateContext struct {
 // The bitset is stored in the block, so that historical blocks can be re-verified
 // without calling VerifyPredicate.
 type Predicater interface {
-	PredicateGas(predicateBytes []byte) (uint64, error)
-	VerifyPredicate(predicateContext *PredicateContext, predicateBytes []byte) error
+	PredicateGas(pred predicate.Predicate) (uint64, error)
+	VerifyPredicate(predicateContext *PredicateContext, pred predicate.Predicate) error
 }
 
 type WarpMessageWriter interface {

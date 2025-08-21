@@ -8,6 +8,8 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/libevm/stateconf"
@@ -43,7 +45,7 @@ type StateDB interface {
 
 	AddLog(*ethtypes.Log)
 	Logs() []*ethtypes.Log
-	GetPredicateStorageSlots(address common.Address, index int) ([]byte, bool)
+	GetPredicate(address common.Address, index int) (predicate.Predicate, bool)
 
 	TxHash() common.Hash
 
@@ -69,8 +71,8 @@ type ConfigurationBlockContext interface {
 type BlockContext interface {
 	ConfigurationBlockContext
 	// GetPredicateResults returns the result of verifying the predicates of the
-	// given transaction, precompile address pair as a byte array.
-	GetPredicateResults(txHash common.Hash, precompileAddress common.Address) []byte
+	// given transaction, precompile address pair.
+	GetPredicateResults(txHash common.Hash, precompileAddress common.Address) set.Bits
 }
 
 type Configurator interface {
