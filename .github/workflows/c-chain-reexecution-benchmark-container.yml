@@ -1,4 +1,4 @@
-name: C-Chain Re-Execution Benchmark Blacksmith
+name: C-Chain Re-Execution Benchmark w/ Container
 
 on:
   pull_request:
@@ -59,7 +59,7 @@ jobs:
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
           else
-            json_string=$(jq -r ".\"${{ github.event_name }}\"" .github/workflows/c-chain-reexecution-benchmark-blacksmith.json)
+            json_string=$(jq -r ".\"${{ github.event_name }}\"" .github/workflows/c-chain-reexecution-benchmark-container.json)
             {
               echo "matrix<<EOF"
               echo "$json_string"
@@ -78,8 +78,18 @@ jobs:
       id-token: write
       contents: write
     runs-on: ${{ matrix.runner }}
+    container:
+      image: ghcr.io/actions/actions-runner:2.325.0
     steps:
       - uses: actions/checkout@v4
+      - name: Install ARC Dependencies
+        shell: bash	
+        run: |	
+          # xz-utils might be present on some containers. Install if not present.	
+          if ! command -v xz &> /dev/null; then	
+            sudo apt-get update	
+            sudo apt-get install -y xz-utils	
+          fi
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:

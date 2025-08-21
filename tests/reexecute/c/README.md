@@ -118,19 +118,24 @@ task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-dat
 
 ## CI
 
-Benchmarks are run via [c-chain-benchmark-gh-runner](../../../.github/workflows/c-chain-reexecution-benchmark-gh-runner.yml) and [c-chain-reexecution-benchmark-blacksmith](../../../.github/workflows/c-chain-reexecution-benchmark-blacksmith.yml).
+Benchmarks are run via [c-chain-benchmark-gh-native](../../../.github/workflows/c-chain-reexecution-benchmark-gh-runner.yml) and [c-chain-reexecution-benchmark-container](../../../.github/workflows/c-chain-reexecution-benchmark-container.yml).
 
-The GH runner benchmarks execute a small range on each PR to ensure that it continues to work correctly on native GitHub runners.
+To run on our GitHub [Actions Runner Controller](https://github.com/actions/actions-runner-controller) installation, we need to specify a container and add an extra installation step. Unfortunately, once the YAML has been updated to include this field at all, there is no way to populate it dynamically to skip the extra layer of containerization. To support both ARC and GH Native jobs (including Blacksmith runners) without this unnecessary layer, we separate this into two separate workflows with their own triggers.
 
-The [Blacksmith](https://www.blacksmith.sh/) workflow executes on Blacksmith's hardware, which has reverse-engineered GitHub Actions, so that the only required change is to specify the label (unlike ARC, which also requires specifying an image and differentiates it from the GH Runner workflow).
+The runner options are:
+- native GH runner options (ex. `ubuntu-latest`, more information [here](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners))
+- Actions Runner Controller labels (ex. `avalanche-avalanchego-runner-2tier`)
+- Blacksmith labels (ex. `blacksmith-4vcpu-ubuntu-2404`, more information [here](https://docs.blacksmith.sh/blacksmith-runners/overview#runner-tags))
 
-The Blacksmith workflow provides three different triggers: `manual_workflow`, `pull_request`, and `schedule`.
+Both workflows provide three triggers:
 
-Manual workflows enable developers with access to GitHub Actions to specify every input to the job to run custom configurations on the fly.
+- `manual_workflow`
+- `pull_request`
+- `schedule`
 
-`pull_request` and `schedule` run a matrix of configurations specified in [c-chain-reexecution-benchmark-blacksmith.json](../../../.github/workflows/c-chain-reexecution-benchmark-blacksmith.json) for ease of use rather than using the matrix syntax required by GitHub Actions. The GitHub Action pulls in an array of inputs to expand directly into the execution matrix. To add a new combination, simply add a new entry into the array.
+The manual workflow takes in all parameters specified by the user. To more easily specify a CI matrix and avoid GitHub's pain inducing matrix syntax, we define simple JSON files with the exact set of configs to run for each `pull_request` and `schedule` trigger. To add a new job for either of these triggers, simply define the entry in JSON and add it to run on the desired workflow.
 
-For example, to add a new Firewood benchmark to execute the block range [30m, 40m] on a daily basis, follow the instructions above to generate the Firewood state as of block height 30m, export it to S3, and add the following entry under the `schedule` include array:
+For example, to add a new Firewood benchmark to execute the block range [30m, 40m] on a daily basis, follow the instructions above to generate the Firewood state as of block height 30m, export it to S3, and add the following entry under the `schedule` include array in the [GH Native JSON file](../../../.github/workflows/c-chain-reexecution-benchmark-gh-native.json).
 
 ```json
 {
