@@ -241,9 +241,7 @@ func execute(
 		}
 
 		if now := time.Now(); now.After(timeOfNextLog) {
-			var (
-				numProcessed = totalNumberToProcess - tree.Len()
-			)
+			numProcessed := totalNumberToProcess - tree.Len()
 
 			// Use the tracked previous progress for accurate ETA calculation
 			currentProgress := numProcessed
