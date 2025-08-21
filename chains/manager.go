@@ -1080,6 +1080,16 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't initialize message sender: %w", err)
 	}
 
+	bootstrapFunc, err := m.maybeSetupPChain(ctx, vm)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't setup P Chain state: %w", err)
+	}
+
+	cn, proposerVM, err := m.createSnowmanVMs(ctx, vm, vmDB, primaryAlias, genesisData, messageSender, fxs)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create snowman VMs: %w", err)
+	}
+
 	connectedValidators, err := m.createSnowmanTrackedPeers(primaryAlias)
 	if err != nil {
 		return nil, fmt.Errorf("error creating connected validators: %w", err)
@@ -1091,18 +1101,13 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("error creating peer tracking: %w", err)
 	}
 
-	cn, proposerVM, err := m.createSnowmanVMs(ctx, vm, vmDB, primaryAlias, genesisData, messageSender, fxs)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't create snowman VMs: %w", err)
-	}
-
 	var halter common.Halter
 	h, err := m.createSnowmanHandler(ctx, cn, vdrs, sb, primaryAlias, connectedValidators, peerTracker, halter)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create snowman handler: %w", err)
 	}
 
-	engine, err := m.createSnowmanEngine(ctx, cn, proposerVM.ParseBlock, sb, beacons, messageSender, bootstrappingDB, vdrs, connectedValidators, peerTracker, halter)
+	engine, err := m.createSnowmanEngine(ctx, cn, proposerVM.ParseBlock, sb, beacons, messageSender, bootstrappingDB, bootstrapFunc, vdrs, connectedValidators, peerTracker, halter)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create snowman engine: %w", err)
 	}
@@ -1353,14 +1358,17 @@ func (m *manager) createSnowmanDBs(primaryAlias string, chainID ids.ID) (*prefix
 	return vmDB, bootstrappingDB, nil
 }
 
-func (m *manager) maybeSetupPChainState(ctx *snow.ConsensusContext, vm block.ChainVM) (bool, error) {
+// maybeSetupPChain checks if we are creating the P-Chain and
+// sets up the manager and context if so. It returns a function that
+// is called once bootstrapping is complete.
+func (m *manager) maybeSetupPChain(ctx *snow.ConsensusContext, vm block.ChainVM) (func(), error) {
 	// If [m.validatorState] is nil then we are creating the P-Chain. Since the
 	// P-Chain is the first chain to be created, we can use it to initialize
 	// required interfaces for the other chains
 	if m.validatorState == nil {
 		valState, ok := vm.(validators.State)
 		if !ok {
-			return false, fmt.Errorf("expected validators.State but got %T", vm)
+			return nil, fmt.Errorf("expected validators.State but got %T", vm)
 		}
 
 		if m.TracingEnabled {
@@ -1382,15 +1390,16 @@ func (m *manager) maybeSetupPChainState(ctx *snow.ConsensusContext, vm block.Cha
 			m.validatorState = validators.NewNoValidatorsState(m.validatorState)
 			ctx.ValidatorState = validators.NewNoValidatorsState(ctx.ValidatorState)
 		}
-
 		// Set this func only for platform
 		//
 		// The snowman bootstrapper ensures this function is only executed once, so
 		// we don't need to be concerned about closing this channel multiple times.
-		return true, nil
+		return func() {
+			close(m.unblockChainCreatorCh)
+		}, nil
 	}
 
-	return false, nil
+	return func() {}, nil
 }
 
 func (m *manager) createSnowmanTrackedPeers(primaryAlias string) (tracker.Peers, error) {
@@ -1515,20 +1524,7 @@ func (m *manager) createSnowmanVMs(ctx *snow.ConsensusContext, vm block.ChainVM,
 
 // createSnowmanEngine creates a Snowman engine with the provided context, VM, and other parameters.
 // It sets up the consensus engine, bootstrapper, and state syncer.
-// It also handles setting up the P-Chain if necessary.
-func (m *manager) createSnowmanEngine(ctx *snow.ConsensusContext, vm block.ChainVM, nonVerifyingParseFunc block.ParseFunc, sb subnets.Subnet, beacons validators.Manager, messageSender common.Sender, bootstrappingDB *prefixdb.Database, vdrs validators.Manager, connectedValidators tracker.Peers, peerTracker *p2p.PeerTracker, halter common.Halter) (*handler.Engine, error) {
-	isPChain, err := m.maybeSetupPChainState(ctx, vm)
-	if err != nil {
-		return nil, fmt.Errorf("couldn't setup P Chain state: %w", err)
-	}
-
-	var bootstrapFunc func()
-	if isPChain {
-		bootstrapFunc = func() {
-			close(m.unblockChainCreatorCh)
-		}
-	}
-
+func (m *manager) createSnowmanEngine(ctx *snow.ConsensusContext, vm block.ChainVM, nonVerifyingParseFunc block.ParseFunc, sb subnets.Subnet, beacons validators.Manager, messageSender common.Sender, bootstrappingDB *prefixdb.Database, bootstrapFunc func(), vdrs validators.Manager, connectedValidators tracker.Peers, peerTracker *p2p.PeerTracker, halter common.Halter) (*handler.Engine, error) {
 	bootstrapWeight, err := beacons.TotalWeight(ctx.SubnetID)
 	if err != nil {
 		return nil, fmt.Errorf("error while fetching weight for subnet %s: %w", ctx.SubnetID, err)
