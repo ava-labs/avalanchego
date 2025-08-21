@@ -172,7 +172,7 @@ func TestTimeout(t *testing.T) {
 		},
 	})
 	ctx2.State.Set(snow.EngineState{
-		Type:  p2ppb.EngineType_ENGINE_TYPE_DAG,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 		State: snow.Bootstrapping, // assumed bootstrap is ongoing
 	})
 
