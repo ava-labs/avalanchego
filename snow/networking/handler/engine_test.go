@@ -47,7 +47,7 @@ func TestEngineManager_Get(t *testing.T) {
 			},
 		},
 		{
-			name: "request snowman engine",
+			name: "request chain engine",
 			args: args{
 				engineType: p2p.EngineType_ENGINE_TYPE_CHAIN,
 			},
