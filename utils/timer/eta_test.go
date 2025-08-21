@@ -15,8 +15,8 @@ func TestEtaTracker(t *testing.T) {
 	now := time.Now()
 	target := uint64(1000)
 
-	thirdSampleEta := time.Duration(80 * time.Second)
-	fourthSampleEta := time.Duration(24 * time.Second)
+	thirdSampleEta := 80 * time.Second
+	fourthSampleEta := 24 * time.Second
 
 	tests := []struct {
 		name            string
@@ -63,19 +63,11 @@ func TestEtaTracker(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			eta, percentComplete := tracker.AddSample(tt.completed, target, tt.timestamp)
-			require.True(t, (tt.expectedEta == nil) == (eta == nil))
+			require.Equal(t, tt.expectedEta == nil, eta == nil)
 			if eta != nil {
-				if *tt.expectedEta == 0 {
-					require.Equal(t, tt.expectedEta, eta)
-				} else {
-					require.InEpsilon(t, float64(*tt.expectedEta), float64(*eta), 0.0001)
-				}
+				require.InDelta(t, float64(*tt.expectedEta), float64(*eta), 0.0001)
 			}
-			if tt.expectedPercent == 0 {
-				require.Equal(t, tt.expectedPercent, percentComplete)
-			} else {
-				require.InEpsilon(t, tt.expectedPercent, percentComplete, 0.01)
-			}
+			require.InDelta(t, tt.expectedPercent, percentComplete, 0.01)
 		})
 	}
 }
