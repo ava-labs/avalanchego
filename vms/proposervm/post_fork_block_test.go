@@ -748,13 +748,20 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		},
 	}
 
+	nextEpoch := nextPChainEpoch(
+		parentBlkPChainHeight,
+		block.PChainEpoch{},
+		parentBlk.Timestamp(),
+		proVM.Upgrades.GraniteEpochDuration,
+	)
+
 	{
 		// child P-Chain height must not precede parent P-Chain height
 		childSlb, err := block.BuildUnsigned(
 			parentBlk.ID(),
 			nextTime,
 			parentBlkPChainHeight-1,
-			block.PChainEpoch{},
+			nextEpoch,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -770,7 +777,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			parentBlk.ID(),
 			nextTime,
 			parentBlkPChainHeight,
-			block.PChainEpoch{},
+			nextEpoch,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -785,7 +792,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			parentBlk.ID(),
 			nextTime,
 			parentBlkPChainHeight+1,
-			block.PChainEpoch{},
+			nextEpoch,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -801,7 +808,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			parentBlk.ID(),
 			nextTime,
 			currPChainHeight,
-			block.PChainEpoch{},
+			nextEpoch,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
