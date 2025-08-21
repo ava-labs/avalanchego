@@ -638,7 +638,7 @@ func (b *Bootstrapper) process(
 			if eta != nil {
 				logger := b.Ctx.Log.Info
 				if b.restarted {
-					// lower log level for restarted bootstrapping
+					// Lower log level for restarted bootstrapping.
 					// Kept for compatibility; is this desired?
 					logger = b.Ctx.Log.Debug
 				}
