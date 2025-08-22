@@ -97,8 +97,8 @@ type Database interface {
 
 // BlockDatabase defines the interface for storing and retrieving blockchain blocks.
 type BlockDatabase interface {
-	// WriteBlock inserts a block into the store at the given height with the specified header size.
-	WriteBlock(height uint64, block []byte, headerSize uint32) error
+	// WriteBlock inserts a block into the store at the given height.
+	WriteBlock(height uint64, block []byte) error
 
 	// ReadBlock retrieves a block by its height.
 	ReadBlock(height uint64) ([]byte, error)
