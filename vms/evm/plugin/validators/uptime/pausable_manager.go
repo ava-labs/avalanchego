@@ -11,10 +11,16 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/plugin/validators/uptime/interfaces"
+	"github.com/ava-labs/avalanchego/vms/evm/plugin/validators/state"
 )
 
 var errPausedDisconnect = errors.New("paused node cannot be disconnected")
+
+type PausableManager interface {
+	uptime.Manager
+	state.StateCallbackListener
+	IsPaused(nodeID ids.NodeID) bool
+}
 
 type pausableManager struct {
 	uptime.Manager
@@ -25,7 +31,7 @@ type pausableManager struct {
 }
 
 // NewPausableManager takes an uptime.Manager and returns a PausableManager
-func NewPausableManager(manager uptime.Manager) interfaces.PausableManager {
+func NewPausableManager(manager uptime.Manager) PausableManager {
 	return &pausableManager{
 		pausedVdrs:    make(set.Set[ids.NodeID]),
 		connectedVdrs: make(set.Set[ids.NodeID]),

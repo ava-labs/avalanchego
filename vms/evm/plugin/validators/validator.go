@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/plugin/validators/uptime"
 
 	avalancheuptime "github.com/ava-labs/avalanchego/snow/uptime"
-	uptimeinterfaces "github.com/ava-labs/avalanchego/vms/evm/plugin/validators/uptime/interfaces"
 )
 
 const (
@@ -40,7 +39,7 @@ const (
 type ValidatorState struct {
 	chainCtx        *snow.Context
 	State           *state.State
-	PausableManager uptimeinterfaces.PausableManager
+	PausableManager uptime.PausableManager
 }
 
 // NewValidatorState returns a new validator state

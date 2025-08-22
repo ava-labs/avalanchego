@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
@@ -28,17 +27,21 @@ func TestLoadNewValidators(t *testing.T) {
 	}
 
 	testCases := []struct {
-		name                      string
-		initialValidators         map[ids.ID]*validators.GetCurrentValidatorOutput
-		newValidators             map[ids.ID]*validators.GetCurrentValidatorOutput
-		registerMockListenerCalls func(*state.MockStateCallbackListener)
-		wantLoadErr               error
+		name                  string
+		initialValidators     map[ids.ID]*validators.GetCurrentValidatorOutput
+		newValidators         map[ids.ID]*validators.GetCurrentValidatorOutput
+		wantLoadErr           error
+		wantAddedValidators   map[ids.ID]ids.NodeID
+		wantRemovedValidators map[ids.ID]ids.NodeID
+		wantStatusUpdates     map[ids.ID]bool
 	}{
 		{
-			name:                      "before empty/after empty",
-			initialValidators:         map[ids.ID]*validators.GetCurrentValidatorOutput{},
-			newValidators:             map[ids.ID]*validators.GetCurrentValidatorOutput{},
-			registerMockListenerCalls: func(*state.MockStateCallbackListener) {},
+			name:                  "before empty/after empty",
+			initialValidators:     map[ids.ID]*validators.GetCurrentValidatorOutput{},
+			newValidators:         map[ids.ID]*validators.GetCurrentValidatorOutput{},
+			wantAddedValidators:   map[ids.ID]ids.NodeID{},
+			wantRemovedValidators: map[ids.ID]ids.NodeID{},
+			wantStatusUpdates:     map[ids.ID]bool{},
 		},
 		{
 			name:              "before empty/after one",
@@ -50,9 +53,11 @@ func TestLoadNewValidators(t *testing.T) {
 					StartTime: 0,
 				},
 			},
-			registerMockListenerCalls: func(mock *state.MockStateCallbackListener) {
-				mock.EXPECT().OnValidatorAdded(testValidationIDs[0], testNodeIDs[0], uint64(0), true).Times(1)
+			wantAddedValidators: map[ids.ID]ids.NodeID{
+				testValidationIDs[0]: testNodeIDs[0],
 			},
+			wantRemovedValidators: map[ids.ID]ids.NodeID{},
+			wantStatusUpdates:     map[ids.ID]bool{},
 		},
 		{
 			name: "before one/after empty",
@@ -64,12 +69,13 @@ func TestLoadNewValidators(t *testing.T) {
 				},
 			},
 			newValidators: map[ids.ID]*validators.GetCurrentValidatorOutput{},
-			registerMockListenerCalls: func(mock *state.MockStateCallbackListener) {
-				// initial validator will trigger first
-				mock.EXPECT().OnValidatorAdded(testValidationIDs[0], testNodeIDs[0], uint64(0), true).Times(1)
-				// then it will be removed
-				mock.EXPECT().OnValidatorRemoved(testValidationIDs[0], testNodeIDs[0]).Times(1)
+			wantAddedValidators: map[ids.ID]ids.NodeID{
+				testValidationIDs[0]: testNodeIDs[0],
 			},
+			wantRemovedValidators: map[ids.ID]ids.NodeID{
+				testValidationIDs[0]: testNodeIDs[0],
+			},
+			wantStatusUpdates: map[ids.ID]bool{},
 		},
 		{
 			name: "no change",
@@ -87,9 +93,11 @@ func TestLoadNewValidators(t *testing.T) {
 					StartTime: 0,
 				},
 			},
-			registerMockListenerCalls: func(mock *state.MockStateCallbackListener) {
-				mock.EXPECT().OnValidatorAdded(testValidationIDs[0], testNodeIDs[0], uint64(0), true).Times(1)
+			wantAddedValidators: map[ids.ID]ids.NodeID{
+				testValidationIDs[0]: testNodeIDs[0],
 			},
+			wantRemovedValidators: map[ids.ID]ids.NodeID{},
+			wantStatusUpdates:     map[ids.ID]bool{},
 		},
 		{
 			name: "status and weight change and new one",
@@ -114,13 +122,13 @@ func TestLoadNewValidators(t *testing.T) {
 					StartTime: 0,
 				},
 			},
-			registerMockListenerCalls: func(mock *state.MockStateCallbackListener) {
-				// initial validator will trigger first
-				mock.EXPECT().OnValidatorAdded(testValidationIDs[0], testNodeIDs[0], uint64(0), true).Times(1)
-				// then it will be updated
-				mock.EXPECT().OnValidatorStatusUpdated(testValidationIDs[0], testNodeIDs[0], false).Times(1)
-				// new validator will be added
-				mock.EXPECT().OnValidatorAdded(testValidationIDs[1], testNodeIDs[1], uint64(0), true).Times(1)
+			wantAddedValidators: map[ids.ID]ids.NodeID{
+				testValidationIDs[0]: testNodeIDs[0],
+				testValidationIDs[1]: testNodeIDs[1],
+			},
+			wantRemovedValidators: map[ids.ID]ids.NodeID{},
+			wantStatusUpdates: map[ids.ID]bool{
+				testValidationIDs[0]: false,
 			},
 		},
 		{
@@ -139,14 +147,14 @@ func TestLoadNewValidators(t *testing.T) {
 					StartTime: 0,
 				},
 			},
-			registerMockListenerCalls: func(mock *state.MockStateCallbackListener) {
-				// initial validator will trigger first
-				mock.EXPECT().OnValidatorAdded(testValidationIDs[0], testNodeIDs[0], uint64(0), true).Times(1)
-				// then it will be removed
-				mock.EXPECT().OnValidatorRemoved(testValidationIDs[0], testNodeIDs[0]).Times(1)
-				// new validator will be added
-				mock.EXPECT().OnValidatorAdded(testValidationIDs[1], testNodeIDs[0], uint64(0), true).Times(1)
+			wantAddedValidators: map[ids.ID]ids.NodeID{
+				testValidationIDs[0]: testNodeIDs[0], // Initial validator
+				testValidationIDs[1]: testNodeIDs[0], // New validator
 			},
+			wantRemovedValidators: map[ids.ID]ids.NodeID{
+				testValidationIDs[0]: testNodeIDs[0], // Old validator removed
+			},
+			wantStatusUpdates: map[ids.ID]bool{},
 		},
 		{
 			name: "renew node ID",
@@ -165,11 +173,11 @@ func TestLoadNewValidators(t *testing.T) {
 				},
 			},
 			wantLoadErr: state.ErrImmutableField,
-			registerMockListenerCalls: func(mock *state.MockStateCallbackListener) {
-				// initial validator will trigger first
-				mock.EXPECT().OnValidatorAdded(testValidationIDs[0], testNodeIDs[0], uint64(0), true).Times(1)
-				// then it won't be called since we don't track the node ID changes
+			wantAddedValidators: map[ids.ID]ids.NodeID{
+				testValidationIDs[0]: testNodeIDs[0], // Only initial validator
 			},
+			wantRemovedValidators: map[ids.ID]ids.NodeID{},
+			wantStatusUpdates:     map[ids.ID]bool{},
 		},
 	}
 
@@ -192,12 +200,9 @@ func TestLoadNewValidators(t *testing.T) {
 				}))
 			}
 
-			// Enable mock listener
-			ctrl := gomock.NewController(tt)
-			mockListener := state.NewMockStateCallbackListener(ctrl)
-			tc.registerMockListenerCalls(mockListener)
-
-			validatorState.RegisterListener(mockListener)
+			// Enable test listener
+			listener := state.NewTestListener()
+			validatorState.RegisterListener(listener)
 
 			// Load new validators using the same logic as the manager
 			err = loadValidatorsForTest(validatorState, tc.newValidators)
@@ -218,6 +223,11 @@ func TestLoadNewValidators(t *testing.T) {
 				require.Equal(validator.IsActive, v.IsActive)
 				require.Equal(validator.IsL1Validator, v.IsL1Validator)
 			}
+
+			// Verify listener callbacks
+			require.Equal(tc.wantAddedValidators, listener.AddedValidators)
+			require.Equal(tc.wantRemovedValidators, listener.RemovedValidators)
+			require.Equal(tc.wantStatusUpdates, listener.StatusUpdates)
 		})
 	}
 }

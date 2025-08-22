@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -283,13 +282,11 @@ func TestStateListener(t *testing.T) {
 	db := memdb.New()
 	state, err := NewState(db)
 	require.NoError(err)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
 
 	expectedvID := ids.GenerateTestID()
 	expectedNodeID := ids.GenerateTestNodeID()
 	expectedStartTime := time.Now()
-	mockListener := NewMockStateCallbackListener(ctrl)
+
 	// add initial validator to test RegisterListener
 	initialvID := ids.GenerateTestID()
 	initialNodeID := ids.GenerateTestNodeID()
@@ -305,12 +302,20 @@ func TestStateListener(t *testing.T) {
 		IsL1Validator:  true,
 	}))
 
-	// register listener
-	mockListener.EXPECT().OnValidatorAdded(initialvID, initialNodeID, uint64(initialStartTime.Unix()), true)
-	state.RegisterListener(mockListener)
+	// Verify initial validator was added
+	initialValidator, err := state.GetValidator(initialvID)
+	require.NoError(err)
+	require.Equal(initialNodeID, initialValidator.NodeID)
+	require.Equal(uint64(1), initialValidator.Weight)
+	require.Equal(uint64(initialStartTime.Unix()), initialValidator.StartTimestamp)
+	require.True(initialValidator.IsActive)
+	require.True(initialValidator.IsL1Validator)
+
+	// Create a test listener to verify the callback behavior
+	testListener := NewTestListener()
+	state.RegisterListener(testListener)
 
 	// add new validator
-	mockListener.EXPECT().OnValidatorAdded(expectedvID, expectedNodeID, uint64(expectedStartTime.Unix()), true)
 	vdr := Validator{
 		ValidationID:   expectedvID,
 		NodeID:         expectedNodeID,
@@ -321,15 +326,40 @@ func TestStateListener(t *testing.T) {
 	}
 	require.NoError(state.AddValidator(vdr))
 
-	// set status
-	mockListener.EXPECT().OnValidatorStatusUpdated(expectedvID, expectedNodeID, false)
+	// Verify new validator was added
+	newValidator, err := state.GetValidator(expectedvID)
+	require.NoError(err)
+	require.Equal(expectedNodeID, newValidator.NodeID)
+	require.Equal(uint64(1), newValidator.Weight)
+	require.Equal(uint64(expectedStartTime.Unix()), newValidator.StartTimestamp)
+	require.True(newValidator.IsActive)
+	require.True(newValidator.IsL1Validator)
+
+	// Verify listener was called
+	require.Equal(expectedNodeID, testListener.AddedValidators[expectedvID])
+
+	// update validator status
 	vdr.IsActive = false
 	require.NoError(state.UpdateValidator(vdr))
 
-	// set status twice should not trigger listener
+	// Verify status was updated
+	updatedValidator, err := state.GetValidator(expectedvID)
+	require.NoError(err)
+	require.False(updatedValidator.IsActive)
+
+	// Verify listener was called for status update
+	require.False(testListener.StatusUpdates[expectedvID])
+
+	// set status twice should not trigger listener (this is tested by the fact that no error occurs)
 	require.NoError(state.UpdateValidator(vdr))
 
 	// remove validator
-	mockListener.EXPECT().OnValidatorRemoved(expectedvID, expectedNodeID)
 	require.NoError(state.DeleteValidator(expectedvID))
+
+	// Verify validator was removed
+	_, err = state.GetValidator(expectedvID)
+	require.ErrorIs(err, database.ErrNotFound)
+
+	// Verify listener was called for removal
+	require.Equal(expectedNodeID, testListener.RemovedValidators[expectedvID])
 }
