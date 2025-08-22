@@ -39,7 +39,7 @@ task import-s3-to-dir SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-bloc
 To execute a range of blocks [N, N+K], we need an initial current state with the last accepted block of N-1. To generate this from scratch, simply execute the range of blocks [1, N-1] (genesis is "executed" vacuously, so do not provide 0 as the start block) locally starting from an empty state:
 
 ```bash
-task reexecute-cchain-range CURRENT_STATE_DIR=$HOME/exec-data/current-state SOURCE_BLOCK_DIR=$HOME/exec-data/blocks START_BLOCK=1 END_BLOCK=100
+task reexecute-cchain-range CURRENT_STATE_DIR=$HOME/exec-data/current-state BLOCK_DIR=$HOME/exec-data/blocks START_BLOCK=1 END_BLOCK=100
 ```
 
 This initializes a `current-state` subdirectory inside of `$HOME/exec-data`, which will contain two subdirectories `chain-data-dir` and `db`.
@@ -87,7 +87,7 @@ Now that we've pushed the current-state back to S3, we can run the target range 
 First, to run the block range using our locally available data, run:
 
 ```bash
-task reexecute-cchain-range CURRENT_STATE_DIR=$HOME/exec-data/current-state SOURCE_BLOCK_DIR=$HOME/exec-data/blocks START_BLOCK=101 END_BLOCK=200
+task reexecute-cchain-range CURRENT_STATE_DIR=$HOME/exec-data/current-state BLOCK_DIR=$HOME/exec-data/blocks START_BLOCK=101 END_BLOCK=200
 ```
 
 Note: if you attempt to re-execute a second time on the same data set, it will fail because the current state has been updated to block 200.
@@ -95,7 +95,7 @@ Note: if you attempt to re-execute a second time on the same data set, it will f
 Provide the parameters explicitly that we have just used locally:
 
 ```bash
-task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-params SOURCE_BLOCK_DIR=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/** CURRENT_STATE_DIR=s3://avalanchego-bootstrap-testing/cchain-current-state-test/** START_BLOCK=101 END_BLOCK=10000
+task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-params BLOCK_DIR=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/** CURRENT_STATE_DIR=s3://avalanchego-bootstrap-testing/cchain-current-state-test/** START_BLOCK=101 END_BLOCK=10000
 ```
 
 ## Predefined Configs
