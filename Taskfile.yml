@@ -205,8 +205,8 @@ tasks:
     desc: Combines import-cchain-reexecute-range and reexecute-cchain-range
     vars:
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
-      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/"}}'
-      CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/"}}'
+      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**"}}'
+      CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"}}'
       START_BLOCK: '{{.START_BLOCK | default "101"}}'
       END_BLOCK: '{{.END_BLOCK | default "250000"}}'
       LABELS: '{{.LABELS | default ""}}'

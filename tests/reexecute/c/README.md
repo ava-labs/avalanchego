@@ -120,7 +120,7 @@ task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-dat
 
 Benchmarks are run via [c-chain-benchmark-gh-native](../../../.github/workflows/c-chain-reexecution-benchmark-gh-native.yml) and [c-chain-reexecution-benchmark-container](../../../.github/workflows/c-chain-reexecution-benchmark-container.yml).
 
-To run on our GitHub [Actions Runner Controller](https://github.com/actions/actions-runner-controller) installation, we need to specify a container and add an extra installation step. Unfortunately, once the YAML has been updated to include this field at all, there is no way to populate it dynamically to skip the extra layer of containerization. To support both ARC and GH Native jobs (including Blacksmith runners) without this unnecessary layer, we separate this into two separate workflows with their own triggers.
+To run on our GitHub [Actions Runner Controller](https://github.com/actions/actions-runner-controller) installation, we need to specify a container and add an extra installation step. Unfortunately, once the YAML has been updated to include this field at all, there is no way to dynamically decide to set it to the default and skip the extra layer of containerization. To support both ARC and GH Native jobs (including Blacksmith runners) without this unnecessary layer, we separate this into two separate workflows with their own triggers.
 
 The runner options are:
 - native GH runner options (ex. `ubuntu-latest`, more information [here](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners))
