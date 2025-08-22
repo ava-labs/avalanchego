@@ -1,5 +1,5 @@
---- .github/.golangci.yaml	2025-08-02 10:10:13
-+++ ffi/.golangci.yaml	2025-08-02 10:10:13
+--- .github/.golangci.yaml	2025-08-22 10:01:30
++++ ffi/.golangci.yaml	2025-08-22 10:01:26
 @@ -69,8 +69,6 @@
        rules:
          packages:
@@ -39,7 +39,7 @@
      revive:
        rules:
          # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
-@@ -168,17 +147,6 @@
+@@ -171,17 +150,6 @@
          # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#useless-break
          - name: useless-break
            disabled: false
@@ -57,7 +57,7 @@
      tagalign:
        align: true
        sort: true
-@@ -186,16 +154,16 @@
+@@ -189,16 +157,16 @@
          - serialize
        strict: true
      testifylint:
@@ -84,7 +84,7 @@
      unused:
        # Mark all struct fields that have been written to as used.
        # Default: true
-@@ -224,7 +192,7 @@
+@@ -227,7 +195,7 @@
          - standard
          - default
          - blank
