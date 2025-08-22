@@ -8,9 +8,9 @@ use crate::logger::warn;
 use crate::nodestore::alloc::FreeAreaWithMetadata;
 use crate::nodestore::primitives::{AreaIndex, area_size_iter};
 use crate::{
-    CheckerError, Committed, FileIoError, HashType, HashedNodeReader, IntoHashType, LinearAddress,
-    Node, NodeStore, Path, ReadableStorage, RootReader, StoredAreaParent, TrieNodeParent,
-    WritableStorage,
+    CheckerError, Committed, FileIoError, FreeListParent, HashType, HashedNodeReader, IntoHashType,
+    LinearAddress, Node, NodeStore, Path, ReadableStorage, RootReader, StoredAreaParent,
+    TrieNodeParent, WritableStorage,
 };
 
 #[cfg(not(feature = "ethhash"))]
@@ -578,7 +578,7 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
     }
 
     fn fix(&self, check_report: CheckerReport) -> FixReport {
-        let fixed = Vec::new();
+        let mut fixed = Vec::new();
         let mut unfixable = Vec::new();
 
         for error in check_report.errors {
@@ -587,10 +587,22 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
                     warn!("Fix for trie node error not yet implemented");
                     unfixable.push((error, None));
                 }
-                Some(StoredAreaParent::FreeList(_)) => {
-                    warn!("Fix for free list error not yet implemented");
-                    unfixable.push((error, None));
-                }
+                Some(StoredAreaParent::FreeList(free_list_parent)) => match free_list_parent {
+                    FreeListParent::FreeListHead(_) => {
+                        warn!("Fix for free list head error not yet implemented");
+                        unfixable.push((error, None));
+                    }
+                    FreeListParent::PrevFreeArea {
+                        area_size_idx,
+                        parent_addr,
+                    } => {
+                        if let Err(e) = self.truncate_free_list(area_size_idx, parent_addr) {
+                            unfixable.push((error, Some(e)));
+                        } else {
+                            fixed.push(error);
+                        }
+                    }
+                },
                 None => {
                     if let CheckerError::AreaLeaks(ranges) = &error {
                         {
@@ -836,6 +848,104 @@ mod test {
         }
     }
 
+    #[derive(Debug)]
+    struct TestFreelist {
+        high_watermark: u64,
+        free_ranges: Vec<Range<LinearAddress>>,
+        errors: Vec<CheckerError>,
+        stats: FreeListsStats,
+    }
+
+    // Free list 1: 2048 bytes
+    // Free list 2: 8192 bytes
+    // ---------------------------------------------------------------------------------------------------------------------------
+    // | header | empty | free_list1_area3 | free_list1_area2 | overlap | free_list1_area1 | free_list2_area1 | free_list2_area2 |
+    // ---------------------------------------------------------------------------------------------------------------------------
+    //                                                             ^ free_list1_area1 and free_list1_area2 overlap by 16 bytes
+    //              ^ 16 empty bytes to ensure that free_list1_area1, free_list1_area2, and free_list2_area1 are page-aligned
+    #[expect(clippy::arithmetic_side_effects)]
+    fn gen_test_freelist_with_overlap(
+        nodestore: &mut NodeStore<Committed, MemStore>,
+    ) -> TestFreelist {
+        const AREA_INDEX1: AreaIndex = area_index!(9); // 2048
+        const AREA_INDEX2: AreaIndex = area_index!(12); // 16384
+
+        let mut free_lists = FreeLists::default();
+        let mut high_watermark = NodeStoreHeader::SIZE + 16; // + 16 to create overlap
+
+        // first free list
+        let area_size1 = AREA_INDEX1.size();
+        let mut next_free_block1 = None;
+
+        test_write_free_area(nodestore, next_free_block1, AREA_INDEX1, high_watermark);
+        let free_list1_area3 = LinearAddress::new(high_watermark).unwrap();
+        next_free_block1 = Some(free_list1_area3);
+        high_watermark += area_size1;
+
+        test_write_free_area(nodestore, next_free_block1, AREA_INDEX1, high_watermark);
+        let free_list1_area2 = LinearAddress::new(high_watermark).unwrap();
+        next_free_block1 = Some(free_list1_area2);
+        high_watermark += area_size1;
+
+        let intersection_end = LinearAddress::new(high_watermark).unwrap();
+        high_watermark -= 16; // create an overlap with free_list1_area2 and restore to page-aligned address
+        let intersection_start = LinearAddress::new(high_watermark).unwrap();
+        test_write_free_area(nodestore, next_free_block1, AREA_INDEX1, high_watermark);
+        let free_list1_area1 = LinearAddress::new(high_watermark).unwrap();
+        next_free_block1 = Some(free_list1_area1);
+        high_watermark += area_size1;
+
+        free_lists[AREA_INDEX1.as_usize()] = next_free_block1;
+
+        // second free list
+        let area_size2 = AREA_INDEX2.size();
+        let mut next_free_block2 = None;
+
+        test_write_free_area(nodestore, next_free_block2, AREA_INDEX2, high_watermark);
+        let free_list2_area2 = LinearAddress::new(high_watermark).unwrap();
+        next_free_block2 = Some(free_list2_area2);
+        high_watermark += area_size2;
+
+        test_write_free_area(nodestore, next_free_block2, AREA_INDEX2, high_watermark);
+        let free_list2_area1 = LinearAddress::new(high_watermark).unwrap();
+        next_free_block2 = Some(free_list2_area1);
+        high_watermark += area_size2;
+
+        free_lists[AREA_INDEX2.as_usize()] = next_free_block2;
+
+        // write header
+        test_write_header(nodestore, high_watermark, None, free_lists);
+
+        let expected_start_addr = free_lists[AREA_INDEX1.as_usize()].unwrap();
+        let expected_end_addr = LinearAddress::new(high_watermark).unwrap();
+        let expected_free_areas = vec![expected_start_addr..expected_end_addr];
+        let expected_freelist_errors = vec![CheckerError::AreaIntersects {
+            start: free_list1_area2,
+            size: area_size1,
+            intersection: vec![intersection_start..intersection_end],
+            parent: StoredAreaParent::FreeList(FreeListParent::PrevFreeArea {
+                area_size_idx: AREA_INDEX1,
+                parent_addr: free_list1_area1,
+            }),
+        }];
+        let mut area_counts = area_size_iter()
+            .map(|(_, size)| (size, 0))
+            .collect::<BTreeMap<_, _>>();
+        area_counts.insert(area_size1, 1);
+        area_counts.insert(area_size2, 2);
+        let expected_free_lists_stats = FreeListsStats {
+            area_counts,
+            area_extra_unaligned_page: 0,
+        };
+
+        TestFreelist {
+            high_watermark,
+            free_ranges: expected_free_areas,
+            errors: expected_freelist_errors,
+            stats: expected_free_lists_stats,
+        }
+    }
+
     use std::collections::HashMap;
 
     #[test]
@@ -980,93 +1090,52 @@ mod test {
     }
 
     #[test]
-    // Free list 1: 2048 bytes
-    // Free list 2: 8192 bytes
-    // ---------------------------------------------------------------------------------------------------------------------------
-    // | header | empty | free_list1_area3 | free_list1_area2 | overlap | free_list1_area1 | free_list2_area1 | free_list2_area2 |
-    // ---------------------------------------------------------------------------------------------------------------------------
-    //                                                             ^ free_list1_area1 and free_list1_area2 overlap by 16 bytes
-    //              ^ 16 empty bytes to ensure that free_list1_area1, free_list1_area2, and free_list2_area1 are page-aligned
-    #[expect(clippy::arithmetic_side_effects)]
     fn traverse_freelist_should_skip_offspring_of_incorrect_areas() {
-        const AREA_INDEX1: AreaIndex = area_index!(9); // 2048
-        const AREA_INDEX2: AreaIndex = area_index!(12); // 16384
-
         let memstore = MemStore::new(vec![]);
         let mut nodestore = NodeStore::new_empty_committed(memstore.into()).unwrap();
-
-        let mut free_lists = FreeLists::default();
-        let mut high_watermark = NodeStoreHeader::SIZE + 16; // + 16 to create overlap
-
-        // first free list
-        let area_size1 = AREA_INDEX1.size();
-        let mut next_free_block1 = None;
-
-        test_write_free_area(&nodestore, next_free_block1, AREA_INDEX1, high_watermark);
-        let free_list1_area3 = LinearAddress::new(high_watermark).unwrap();
-        next_free_block1 = Some(free_list1_area3);
-        high_watermark += area_size1;
-
-        test_write_free_area(&nodestore, next_free_block1, AREA_INDEX1, high_watermark);
-        let free_list1_area2 = LinearAddress::new(high_watermark).unwrap();
-        next_free_block1 = Some(free_list1_area2);
-        high_watermark += area_size1;
-
-        let intersection_end = LinearAddress::new(high_watermark).unwrap();
-        high_watermark -= 16; // create an overlap with free_list1_area2 and restore to page-aligned address
-        let intersection_start = LinearAddress::new(high_watermark).unwrap();
-        test_write_free_area(&nodestore, next_free_block1, AREA_INDEX1, high_watermark);
-        let free_list1_area1 = LinearAddress::new(high_watermark).unwrap();
-        next_free_block1 = Some(free_list1_area1);
-        high_watermark += area_size1;
-
-        free_lists[AREA_INDEX1.as_usize()] = next_free_block1;
-
-        // second free list
-        let area_size2 = AREA_INDEX2.size();
-        let mut next_free_block2 = None;
-
-        test_write_free_area(&nodestore, next_free_block2, AREA_INDEX2, high_watermark);
-        let free_list2_area2 = LinearAddress::new(high_watermark).unwrap();
-        next_free_block2 = Some(free_list2_area2);
-        high_watermark += area_size2;
-
-        test_write_free_area(&nodestore, next_free_block2, AREA_INDEX2, high_watermark);
-        let free_list2_area1 = LinearAddress::new(high_watermark).unwrap();
-        next_free_block2 = Some(free_list2_area1);
-        high_watermark += area_size2;
-
-        free_lists[AREA_INDEX2.as_usize()] = next_free_block2;
-
-        // write header
-        test_write_header(&mut nodestore, high_watermark, None, free_lists);
-
-        let expected_start_addr = free_lists[AREA_INDEX1.as_usize()].unwrap();
-        let expected_end_addr = LinearAddress::new(high_watermark).unwrap();
-        let expected_free_areas = vec![expected_start_addr..expected_end_addr];
-        let expected_freelist_errors = vec![CheckerError::AreaIntersects {
-            start: free_list1_area2,
-            size: area_size1,
-            intersection: vec![intersection_start..intersection_end],
-            parent: StoredAreaParent::FreeList(FreeListParent::PrevFreeArea(free_list1_area1)),
-        }];
-        let mut area_counts = area_size_iter()
-            .map(|(_, size)| (size, 0))
-            .collect::<BTreeMap<_, _>>();
-        area_counts.insert(area_size1, 1);
-        area_counts.insert(area_size2, 2);
-        let expected_free_lists_stats = FreeListsStats {
-            area_counts,
-            area_extra_unaligned_page: 0,
-        };
+        let TestFreelist {
+            high_watermark,
+            free_ranges,
+            errors,
+            stats,
+        } = gen_test_freelist_with_overlap(&mut nodestore);
 
         // test that the we traversed all the free areas
         let mut visited = LinearAddressRangeSet::new(high_watermark).unwrap();
         let (actual_free_lists_stats, free_list_errors) =
             nodestore.visit_freelist(&mut visited, None);
-        assert_eq!(visited.into_iter().collect::<Vec<_>>(), expected_free_areas);
-        assert_eq!(actual_free_lists_stats, expected_free_lists_stats);
-        assert_eq!(free_list_errors, expected_freelist_errors);
+        assert_eq!(visited.into_iter().collect::<Vec<_>>(), free_ranges);
+        assert_eq!(actual_free_lists_stats, stats);
+        assert_eq!(free_list_errors, errors);
+    }
+
+    #[test]
+    fn fix_freelist_with_overlap() {
+        let memstore = MemStore::new(vec![]);
+        let mut nodestore = NodeStore::new_empty_committed(memstore.into()).unwrap();
+        let TestFreelist {
+            high_watermark,
+            free_ranges: _,
+            errors,
+            stats,
+        } = gen_test_freelist_with_overlap(&mut nodestore);
+        let expected_error_num = errors.len();
+
+        // fix the freelist
+        let fix_report = nodestore.fix(CheckerReport {
+            errors,
+            db_stats: DBStats {
+                high_watermark,
+                trie_stats: TrieStats::default(),
+                free_list_stats: stats,
+            },
+        });
+        assert_eq!(fix_report.fixed.len(), expected_error_num);
+        assert_eq!(fix_report.unfixable.len(), 0);
+
+        let mut visited = LinearAddressRangeSet::new(high_watermark).unwrap();
+        let (_, free_list_errors) = nodestore.visit_freelist(&mut visited, None);
+        assert_eq!(free_list_errors, vec![]);
     }
 
     #[test]

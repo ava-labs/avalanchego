@@ -414,7 +414,10 @@ impl<S: ReadableStorage> Iterator for FreeListIterator<'_, S> {
         };
 
         // update the next address to the next free block
-        self.parent = FreeListParent::PrevFreeArea(next_addr);
+        self.parent = FreeListParent::PrevFreeArea {
+            area_size_idx: stored_area_index,
+            parent_addr: next_addr,
+        };
         self.next_addr = free_area.next_free_block();
         Some(Ok((next_addr, stored_area_index)))
     }
@@ -520,6 +523,21 @@ impl<T, S: ReadableStorage> NodeStore<T, S> {
     // Since this is a low-level iterator, we avoid safe conversion to AreaIndex for performance
     pub(crate) fn free_list_iter(&self, start_area_index: AreaIndex) -> FreeListsIterator<'_, S> {
         FreeListsIterator::new(self.storage.as_ref(), self.freelists(), start_area_index)
+    }
+}
+
+// Functionalities use by the checker
+impl<S: WritableStorage> NodeStore<super::Committed, S> {
+    pub(crate) fn truncate_free_list(
+        &self,
+        area_size_index: AreaIndex,
+        addr: LinearAddress,
+    ) -> Result<(), FileIoError> {
+        let free_area = FreeArea::new(None);
+        let mut stored_area_bytes = Vec::new();
+        free_area.as_bytes(area_size_index, &mut stored_area_bytes);
+        self.storage.write(addr.into(), &stored_area_bytes)?;
+        Ok(())
     }
 }
 
@@ -779,7 +797,10 @@ mod tests {
                     area_index: area_index1,
                     free_list_id: area_index1,
                 },
-                FreeListParent::PrevFreeArea(free_list1_area1),
+                FreeListParent::PrevFreeArea {
+                    area_size_idx: area_index1,
+                    parent_addr: free_list1_area1,
+                },
             ),
         ];
 
@@ -798,7 +819,10 @@ mod tests {
                     area_index: area_index2,
                     free_list_id: area_index2,
                 },
-                FreeListParent::PrevFreeArea(free_list2_area1),
+                FreeListParent::PrevFreeArea {
+                    area_size_idx: area_index2,
+                    parent_addr: free_list2_area1,
+                },
             ),
         ];
 
