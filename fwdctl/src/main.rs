@@ -71,8 +71,7 @@ enum Commands {
     Check(check::Options),
 }
 
-#[tokio::main]
-async fn main() -> Result<(), api::Error> {
+fn main() -> Result<(), api::Error> {
     let cli = Cli::parse();
 
     env_logger::init_from_env(
@@ -83,10 +82,10 @@ async fn main() -> Result<(), api::Error> {
     match &cli.command {
         Commands::Create(opts) => create::run(opts),
         Commands::Insert(opts) => insert::run(opts),
-        Commands::Get(opts) => get::run(opts).await,
+        Commands::Get(opts) => get::run(opts),
         Commands::Delete(opts) => delete::run(opts),
         Commands::Root(opts) => root::run(opts),
-        Commands::Dump(opts) => dump::run(opts).await,
+        Commands::Dump(opts) => dump::run(opts),
         Commands::Graph(opts) => graph::run(opts),
         Commands::Check(opts) => check::run(opts),
     }

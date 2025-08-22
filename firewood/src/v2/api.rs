@@ -4,9 +4,7 @@
 use crate::manager::RevisionManagerError;
 use crate::merkle::{Key, Value};
 use crate::proof::{Proof, ProofError, ProofNode};
-use async_trait::async_trait;
 use firewood_storage::{FileIoError, TrieHash};
-use futures::Stream;
 use std::fmt::Debug;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
@@ -17,9 +15,9 @@ pub use crate::v2::batch_op::{BatchOp, KeyValuePair, KeyValuePairIter, MapIntoBa
 /// A `KeyType` is something that can be xcast to a u8 reference,
 /// and can be sent and shared across threads. References with
 /// lifetimes are not allowed (hence 'static)
-pub trait KeyType: AsRef<[u8]> + Send + Sync + Debug {}
+pub trait KeyType: AsRef<[u8]> + Debug {}
 
-impl<T> KeyType for T where T: AsRef<[u8]> + Send + Sync + Debug {}
+impl<T> KeyType for T where T: AsRef<[u8]> + Debug {}
 
 /// A `ValueType` is the same as a `KeyType`. However, these could
 /// be a different type from the `KeyType` on a given API call.
@@ -27,9 +25,9 @@ impl<T> KeyType for T where T: AsRef<[u8]> + Send + Sync + Debug {}
 /// This also means that the type of all the keys for a single
 /// API call must be the same, as well as the type of all values
 /// must be the same.
-pub trait ValueType: AsRef<[u8]> + Send + Sync + Debug {}
+pub trait ValueType: AsRef<[u8]> + Debug {}
 
-impl<T> ValueType for T where T: AsRef<[u8]> + Send + Sync + Debug {}
+impl<T> ValueType for T where T: AsRef<[u8]> + Debug {}
 
 /// The type and size of a single hash key
 /// These are 256-bit hashes that are used for a variety of reasons:
@@ -239,10 +237,9 @@ pub trait Db {
 /// 2. From [`Db::propose`] which is a view on top of the most recently
 ///    committed revision with changes applied; or
 /// 3. From [`Proposal::propose`] which is a view on top of another proposal.
-#[async_trait]
 pub trait DbView {
     /// The type of a stream of key/value pairs
-    type Stream<'view>: Stream<Item = Result<(Key, Value), Error>>
+    type Iter<'view>: Iterator<Item = Result<(Key, Value), Error>>
     where
         Self: 'view;
 
@@ -252,13 +249,16 @@ pub trait DbView {
     ///
     /// If the database is empty, this will return None, unless the ethhash feature is enabled.
     /// In that case, we return the special ethhash compatible empty trie hash.
-    async fn root_hash(&self) -> Result<Option<HashKey>, Error>;
+    #[expect(clippy::missing_errors_doc)]
+    fn root_hash(&self) -> Result<Option<HashKey>, Error>;
 
     /// Get the value of a specific key
-    async fn val<K: KeyType>(&self, key: K) -> Result<Option<Value>, Error>;
+    #[expect(clippy::missing_errors_doc)]
+    fn val<K: KeyType>(&self, key: K) -> Result<Option<Value>, Error>;
 
     /// Obtain a proof for a single key
-    async fn single_key_proof<K: KeyType>(&self, key: K) -> Result<FrozenProof, Error>;
+    #[expect(clippy::missing_errors_doc)]
+    fn single_key_proof<K: KeyType>(&self, key: K) -> Result<FrozenProof, Error>;
 
     /// Obtain a range proof over a set of keys
     ///
@@ -267,8 +267,8 @@ pub trait DbView {
     /// * `first_key` - If None, start at the lowest key
     /// * `last_key` - If None, continue to the end of the database
     /// * `limit` - The maximum number of keys in the range proof
-    ///
-    async fn range_proof<K: KeyType>(
+    #[expect(clippy::missing_errors_doc)]
+    fn range_proof<K: KeyType>(
         &self,
         first_key: Option<K>,
         last_key: Option<K>,
@@ -285,21 +285,122 @@ pub trait DbView {
     ///
     /// If you always want to start at the beginning, [`DbView::iter`] is easier to use
     /// If you always provide a key, [`DbView::iter_from`] is easier to use
-    ///
     #[expect(clippy::missing_errors_doc)]
-    fn iter_option<K: KeyType>(&self, first_key: Option<K>) -> Result<Self::Stream<'_>, Error>;
+    fn iter_option<K: KeyType>(&self, first_key: Option<K>) -> Result<Self::Iter<'_>, Error>;
 
     /// Obtain a stream over the keys/values of this view, starting from the beginning
     #[expect(clippy::missing_errors_doc)]
     #[expect(clippy::iter_not_returning_iterator)]
-    fn iter(&self) -> Result<Self::Stream<'_>, Error> {
+    fn iter(&self) -> Result<Self::Iter<'_>, Error> {
         self.iter_option(Option::<Key>::None)
     }
 
     /// Obtain a stream over the key/values, starting at a specific key
     #[expect(clippy::missing_errors_doc)]
-    fn iter_from<K: KeyType + 'static>(&self, first_key: K) -> Result<Self::Stream<'_>, Error> {
+    fn iter_from<K: KeyType>(&self, first_key: K) -> Result<Self::Iter<'_>, Error> {
         self.iter_option(Some(first_key))
+    }
+}
+
+/// A boxed iterator over key/value pairs.
+pub type BoxKeyValueIter<'view> = Box<dyn Iterator<Item = Result<(Key, Value), Error>> + 'view>;
+
+/// A dynamic dyspatch version of [`DbView`] that can be shared.
+pub type ArcDynDbView = Arc<dyn DynDbView>;
+
+/// A dyn-safe version of [`DbView`].
+pub trait DynDbView: Debug + Send + Sync + 'static {
+    /// Get the root hash for the current [`DynDbView`]
+    ///
+    /// # Note
+    ///
+    /// If the database is empty, this will return None, unless the ethhash feature is enabled.
+    /// In that case, we return the special ethhash compatible empty trie hash.
+    #[expect(clippy::missing_errors_doc)]
+    fn root_hash(&self) -> Result<Option<HashKey>, Error>;
+
+    /// Get the value of a specific key
+    #[expect(clippy::missing_errors_doc)]
+    fn val(&self, key: &[u8]) -> Result<Option<Value>, Error>;
+
+    /// Obtain a proof for a single key
+    #[expect(clippy::missing_errors_doc)]
+    fn single_key_proof(&self, key: &[u8]) -> Result<FrozenProof, Error>;
+
+    /// Obtain a range proof over a set of keys
+    ///
+    /// # Arguments
+    ///
+    /// * `first_key` - If None, start at the lowest key
+    /// * `last_key` - If None, continue to the end of the database
+    /// * `limit` - The maximum number of keys in the range proof
+    #[expect(clippy::missing_errors_doc)]
+    fn range_proof(
+        &self,
+        first_key: Option<&[u8]>,
+        last_key: Option<&[u8]>,
+        limit: Option<NonZeroUsize>,
+    ) -> Result<FrozenRangeProof, Error>;
+
+    /// Obtain a stream over the keys/values of this view, using an optional starting point
+    ///
+    /// # Arguments
+    ///
+    /// * `first_key` - If None, start at the lowest key
+    ///
+    /// # Note
+    ///
+    /// If you always want to start at the beginning, [`DbView::iter`] is easier to use
+    /// If you always provide a key, [`DbView::iter_from`] is easier to use
+    #[expect(clippy::missing_errors_doc)]
+    fn iter_option(&self, first_key: Option<&[u8]>) -> Result<BoxKeyValueIter<'_>, Error>;
+
+    /// Obtain a stream over the keys/values of this view, starting from the beginning
+    #[expect(clippy::missing_errors_doc)]
+    #[expect(clippy::iter_not_returning_iterator)]
+    fn iter(&self) -> Result<BoxKeyValueIter<'_>, Error> {
+        self.iter_option(None)
+    }
+
+    /// Obtain a stream over the key/values, starting at a specific key
+    #[expect(clippy::missing_errors_doc)]
+    fn iter_from(&self, first_key: &[u8]) -> Result<BoxKeyValueIter<'_>, Error> {
+        self.iter_option(Some(first_key))
+    }
+}
+
+impl<T: Debug + DbView + Send + Sync + 'static> DynDbView for T
+where
+    for<'view> T::Iter<'view>: Sized,
+{
+    fn root_hash(&self) -> Result<Option<HashKey>, Error> {
+        DbView::root_hash(self)
+    }
+
+    fn val(&self, key: &[u8]) -> Result<Option<Value>, Error> {
+        DbView::val(self, key)
+    }
+
+    fn single_key_proof(&self, key: &[u8]) -> Result<FrozenProof, Error> {
+        DbView::single_key_proof(self, key)
+    }
+
+    fn range_proof(
+        &self,
+        first_key: Option<&[u8]>,
+        last_key: Option<&[u8]>,
+        limit: Option<NonZeroUsize>,
+    ) -> Result<FrozenRangeProof, Error> {
+        DbView::range_proof(self, first_key, last_key, limit)
+    }
+
+    fn iter_option(&self, first_key: Option<&[u8]>) -> Result<BoxKeyValueIter<'_>, Error> {
+        // NOTE: `Result::map` does not work here because the compiler cannot correctly
+        // infer the unsizing operation
+        match DbView::iter_option(self, first_key) {
+            Ok(iter) => Ok(Box::new(iter)),
+            Err(e) => Err(e),
+        }
     }
 }
 
@@ -314,7 +415,7 @@ pub trait DbView {
 /// A proposal type must also implement everything in a
 /// [`DbView`], which means you can fetch values from it or
 /// obtain proofs.
-pub trait Proposal: DbView + Send + Sync {
+pub trait Proposal: DbView {
     /// The type of a proposal
     type Proposal: DbView + Proposal;
 

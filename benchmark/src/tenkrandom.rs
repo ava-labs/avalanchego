@@ -20,7 +20,7 @@ use sha2::{Digest, Sha256};
 pub struct TenKRandom;
 
 impl TestRunner for TenKRandom {
-    async fn run(&self, db: &Db, args: &Args) -> Result<(), Box<dyn Error>> {
+    fn run(&self, db: &Db, args: &Args) -> Result<(), Box<dyn Error>> {
         let mut low = 0;
         let mut high = args.global_opts.number_of_batches * args.global_opts.batch_size;
         let twenty_five_pct = args.global_opts.batch_size / 4;

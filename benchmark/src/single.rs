@@ -23,7 +23,7 @@ use std::time::Instant;
 pub struct Single;
 
 impl TestRunner for Single {
-    async fn run(&self, db: &Db, args: &crate::Args) -> Result<(), Box<dyn Error>> {
+    fn run(&self, db: &Db, args: &crate::Args) -> Result<(), Box<dyn Error>> {
         let start = Instant::now();
         let inner_keys: Vec<_> = (0..args.global_opts.batch_size)
             .map(|i| Sha256::digest(i.to_ne_bytes()))

@@ -127,6 +127,9 @@ compile_error!(
 /// Database module for Firewood.
 pub mod db;
 
+/// Iterator module, for both node and key-value streams
+pub mod iter;
+
 /// Database manager module
 pub mod manager;
 
@@ -141,9 +144,6 @@ pub use firewood_macros::metrics;
 
 /// Range proof module
 pub mod range_proof;
-
-/// Stream module, for both node and key-value streams
-pub mod stream;
 
 /// Version 2 API
 pub mod v2;

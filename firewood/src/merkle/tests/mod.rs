@@ -440,12 +440,12 @@ fn single_key_proof() {
     }
 }
 
-#[tokio::test]
-async fn empty_range_proof() {
+#[test]
+fn empty_range_proof() {
     let merkle = create_in_memory_merkle();
 
     assert!(matches!(
-        merkle.range_proof(None, None, None).await.unwrap_err(),
+        merkle.range_proof(None, None, None).unwrap_err(),
         api::Error::RangeProofOnEmptyTrie
     ));
 }

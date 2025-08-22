@@ -20,7 +20,7 @@ use metrics::gauge;
 use typed_builder::TypedBuilder;
 
 use crate::merkle::Merkle;
-use crate::v2::api::{HashKey, OptionalHashKeyExt};
+use crate::v2::api::{ArcDynDbView, HashKey, OptionalHashKeyExt};
 
 pub use firewood_storage::CacheReadStrategy;
 use firewood_storage::{
@@ -259,13 +259,10 @@ impl RevisionManager {
         self.proposals.lock().expect("poisoned lock").push(proposal);
     }
 
-    pub fn view(
-        &self,
-        root_hash: HashKey,
-    ) -> Result<Box<dyn crate::db::DbViewSyncBytes>, RevisionManagerError> {
+    pub fn view(&self, root_hash: HashKey) -> Result<ArcDynDbView, RevisionManagerError> {
         // First try to find it in committed revisions
         if let Ok(committed) = self.revision(root_hash.clone()) {
-            return Ok(Box::new(committed));
+            return Ok(committed);
         }
 
         // If not found in committed revisions, try proposals
@@ -280,7 +277,7 @@ impl RevisionManager {
                 provided: root_hash,
             })?;
 
-        Ok(Box::new(proposal))
+        Ok(proposal)
     }
 
     pub fn revision(&self, root_hash: HashKey) -> Result<CommittedRevision, RevisionManagerError> {

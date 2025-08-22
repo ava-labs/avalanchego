@@ -23,28 +23,38 @@ clap = { workspace = true, features = ['string'] }
 env_logger.workspace = true
 fastrace = { workspace = true, features = ["enable"] }
 firewood.workspace = true
+firewood-storage = { workspace = true, features = ["test_utils"] }
 hex.workspace = true
 log.workspace = true
 metrics.workspace = true
-metrics-util.workspace = true
+metrics-util = { workspace = true, optional = true }
 rand.workspace = true
 rand_distr.workspace = true
 sha2.workspace = true
-tokio = { workspace = true, features = ["rt", "sync", "macros", "rt-multi-thread"] }
 # Regular dependencies
 fastrace-opentelemetry = { version = "0.13.0" }
-metrics-exporter-prometheus = "0.17.2"
+metrics-exporter-prometheus = { version = "0.17.2", optional = true }
 opentelemetry = "0.30.0"
 opentelemetry-otlp = { version = "0.30.0", features = ["grpc-tonic"] }
 opentelemetry_sdk = "0.30.0"
 pretty-duration = "0.1.1"
-firewood-storage = { workspace = true, features = ["test_utils"] }
+
+[dependencies.tokio]
+optional = true
+version = "1.47.1"
+features = ["mio", "net", "parking_lot", "rt", "time"]
 
 [target.'cfg(unix)'.dependencies]
 tikv-jemallocator = "0.6.0"
 
 [features]
+default = ["prometheus"]
 logger = ["firewood/logger"]
+prometheus = [
+     "dep:metrics-exporter-prometheus",
+     "dep:metrics-util",
+     "dep:tokio",
+]
 
 [lints]
 workspace = true

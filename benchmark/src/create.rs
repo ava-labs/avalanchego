@@ -23,7 +23,7 @@ use crate::{Args, TestRunner};
 pub struct Create;
 
 impl TestRunner for Create {
-    async fn run(&self, db: &Db, args: &Args) -> Result<(), Box<dyn Error>> {
+    fn run(&self, db: &Db, args: &Args) -> Result<(), Box<dyn Error>> {
         let keys = args.global_opts.batch_size;
         let start = Instant::now();
 

@@ -6,18 +6,15 @@ use crate::range_proof::RangeProof;
 
 type KeyValuePairs = Vec<(Box<[u8]>, Box<[u8]>)>;
 
-#[tokio::test]
+#[test]
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
-async fn range_proof_invalid_bounds() {
+fn range_proof_invalid_bounds() {
     let merkle = create_in_memory_merkle().hash();
 
     let start_key = &[0x01];
     let end_key = &[0x00];
 
-    match merkle
-        .range_proof(Some(start_key), Some(end_key), NonZeroUsize::new(1))
-        .await
-    {
+    match merkle.range_proof(Some(start_key), Some(end_key), NonZeroUsize::new(1)) {
         Err(api::Error::InvalidRange {
             start_key: first_key,
             end_key: last_key,
@@ -27,12 +24,12 @@ async fn range_proof_invalid_bounds() {
     }
 }
 
-#[tokio::test]
+#[test]
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
-async fn full_range_proof() {
+fn full_range_proof() {
     let merkle = init_merkle((u8::MIN..=u8::MAX).map(|k| ([k], [k])));
 
-    let rangeproof = merkle.range_proof(None, None, None).await.unwrap();
+    let rangeproof = merkle.range_proof(None, None, None).unwrap();
     assert_eq!(rangeproof.key_values().len(), u8::MAX as usize + 1);
     assert_ne!(rangeproof.start_proof(), rangeproof.end_proof());
     let left_proof = merkle.prove(&[u8::MIN]).unwrap();
@@ -41,16 +38,15 @@ async fn full_range_proof() {
     assert_eq!(rangeproof.end_proof(), &right_proof);
 }
 
-#[tokio::test]
+#[test]
 #[ignore = "https://github.com/ava-labs/firewood/issues/738"]
-async fn single_value_range_proof() {
+fn single_value_range_proof() {
     const RANDOM_KEY: u8 = 42;
 
     let merkle = init_merkle((u8::MIN..=u8::MAX).map(|k| ([k], [k])));
 
     let rangeproof = merkle
         .range_proof(Some(&[RANDOM_KEY]), None, NonZeroUsize::new(1))
-        .await
         .unwrap();
     assert_eq!(rangeproof.start_proof(), rangeproof.end_proof());
     assert_eq!(rangeproof.key_values().len(), 1);

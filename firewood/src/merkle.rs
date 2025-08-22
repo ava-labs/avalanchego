@@ -4,20 +4,18 @@
 #[cfg(test)]
 mod tests;
 
+use crate::iter::{MerkleKeyValueIter, PathIterator, TryExtend};
 use crate::proof::{Proof, ProofCollection, ProofError, ProofNode};
 use crate::range_proof::RangeProof;
-use crate::stream::{MerkleKeyValueStream, PathIterator};
 use crate::v2::api::{self, FrozenProof, FrozenRangeProof, KeyType, ValueType};
 use firewood_storage::{
     BranchNode, Child, FileIoError, HashType, HashedNodeReader, ImmutableProposal, IntoHashType,
     LeafNode, MaybePersistedNode, MutableProposal, NibblesIterator, Node, NodeStore, Parentable,
     Path, ReadableStorage, SharedNode, TrieHash, TrieReader, ValueDigest,
 };
-use futures::{StreamExt, TryStreamExt};
 use metrics::counter;
 use std::collections::HashSet;
 use std::fmt::Debug;
-use std::future::ready;
 use std::io::Error;
 use std::iter::once;
 use std::num::NonZeroUsize;
@@ -272,16 +270,16 @@ impl<T: TrieReader> Merkle<T> {
         PathIterator::new(&self.nodestore, key)
     }
 
-    pub(super) fn key_value_iter(&self) -> MerkleKeyValueStream<'_, T> {
-        MerkleKeyValueStream::from(&self.nodestore)
+    pub(super) fn key_value_iter(&self) -> MerkleKeyValueIter<'_, T> {
+        MerkleKeyValueIter::from(&self.nodestore)
     }
 
     pub(super) fn key_value_iter_from_key<K: AsRef<[u8]>>(
         &self,
         key: K,
-    ) -> MerkleKeyValueStream<'_, T> {
+    ) -> MerkleKeyValueIter<'_, T> {
         // TODO danlaine: change key to &[u8]
-        MerkleKeyValueStream::from_key(&self.nodestore, key.as_ref())
+        MerkleKeyValueIter::from_key(&self.nodestore, key.as_ref())
     }
 
     /// Generate a cryptographic proof for a range of key-value pairs in the Merkle trie.
@@ -352,7 +350,7 @@ impl<T: TrieReader> Merkle<T> {
     ///     None
     /// ).await?;
     /// ```
-    pub(super) async fn range_proof(
+    pub(super) fn range_proof(
         &self,
         start_key: Option<&[u8]>,
         end_key: Option<&[u8]>,
@@ -367,14 +365,14 @@ impl<T: TrieReader> Merkle<T> {
             }
         }
 
-        let mut stream = match start_key {
+        let mut iter = match start_key {
             // TODO: fix the call-site to force the caller to do the allocation
             Some(key) => self.key_value_iter_from_key(key.to_vec().into_boxed_slice()),
             None => self.key_value_iter(),
         };
 
         // fetch the first key from the stream
-        let first_result = stream.next().await;
+        let first_result = iter.next();
 
         // transpose the Option<Result<T, E>> to Result<Option<T>, E>
         // If this is an error, the ? operator will return it
@@ -403,28 +401,22 @@ impl<T: TrieReader> Merkle<T> {
 
         let mut key_values = vec![(first_key, first_value)];
 
-        // we stop streaming if either we hit the limit or the key returned was larger
+        // we stop iterating if either we hit the limit or the key returned was larger
         // than the largest key requested
-        key_values.extend(
-            stream
-                .take(limit.unwrap_or(usize::MAX))
-                .take_while(|kv| {
-                    // no last key asked for, so keep going
-                    let Some(last_key) = end_key else {
-                        return ready(true);
-                    };
+        key_values.try_extend(iter.take(limit.unwrap_or(usize::MAX)).take_while(|kv| {
+            // no last key asked for, so keep going
+            let Some(last_key) = end_key else {
+                return true;
+            };
 
-                    // return the error if there was one
-                    let Ok(kv) = kv else {
-                        return ready(true);
-                    };
+            // return the error if there was one
+            let Ok(kv) = kv else {
+                return true;
+            };
 
-                    // keep going if the key returned is less than the last key requested
-                    ready(&*kv.0 <= last_key)
-                })
-                .try_collect::<Vec<(Key, Value)>>()
-                .await?,
-        );
+            // keep going if the key returned is less than the last key requested
+            *kv.0 <= *last_key
+        }))?;
 
         let end_proof = key_values
             .last()

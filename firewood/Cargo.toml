@@ -31,10 +31,7 @@ hex.workspace = true
 metrics.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
-tokio.workspace = true
 # Regular dependencies
-async-trait = "0.1.88"
-futures = "0.3.31"
 typed-builder = "0.21.0"
 
 [features]
@@ -48,7 +45,7 @@ ethhash = ["firewood-storage/ethhash"]
 [dev-dependencies]
 # Workspace dependencies
 clap = { workspace = true, features = ['derive'] }
-criterion = { workspace = true, features = ["async_tokio"] }
+criterion.workspace = true
 env_logger.workspace = true
 ethereum-types.workspace = true
 firewood-storage = { workspace = true, features = ["test_utils"] }
@@ -58,13 +55,11 @@ pprof = { workspace = true, features = ["flamegraph"] }
 rand.workspace = true
 tempfile.workspace = true
 test-case.workspace = true
-tokio = { workspace = true, features = ["rt", "sync", "macros", "rt-multi-thread"] }
 # Regular dependencies
 hash-db = "0.16.0"
 plain_hasher = "0.2.3"
 rlp = "0.6.1"
 sha3 = "0.10.8"
-tokio-scoped = "0.2.0"
 
 [[bench]]
 name = "hashops"

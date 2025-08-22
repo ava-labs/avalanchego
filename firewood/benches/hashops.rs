@@ -100,31 +100,30 @@ fn bench_db<const N: usize>(criterion: &mut Criterion) {
         .benchmark_group("Db")
         .sample_size(30)
         .bench_function("commit", |b| {
-            b.to_async(tokio::runtime::Runtime::new().unwrap())
-                .iter_batched(
-                    || {
-                        let batch_ops: Vec<_> =
-                            repeat_with(|| rng.sample_iter(&Alphanumeric).take(KEY_LEN).collect())
-                                .map(|key: Vec<_>| BatchOp::Put {
-                                    key,
-                                    value: vec![b'v'],
-                                })
-                                .take(N)
-                                .collect();
-                        batch_ops
-                    },
-                    |batch_ops| async {
-                        let db_path = std::env::temp_dir();
-                        let db_path = db_path.join("benchmark_db");
-                        let cfg = DbConfig::builder();
+            b.iter_batched(
+                || {
+                    let batch_ops: Vec<_> =
+                        repeat_with(|| rng.sample_iter(&Alphanumeric).take(KEY_LEN).collect())
+                            .map(|key: Vec<_>| BatchOp::Put {
+                                key,
+                                value: vec![b'v'],
+                            })
+                            .take(N)
+                            .collect();
+                    batch_ops
+                },
+                |batch_ops| {
+                    let db_path = std::env::temp_dir();
+                    let db_path = db_path.join("benchmark_db");
+                    let cfg = DbConfig::builder();
 
-                        let db = firewood::db::Db::new(db_path, cfg.clone().truncate(true).build())
-                            .unwrap();
+                    let db =
+                        firewood::db::Db::new(db_path, cfg.clone().truncate(true).build()).unwrap();
 
-                        db.propose(batch_ops).unwrap().commit().unwrap();
-                    },
-                    BatchSize::SmallInput,
-                );
+                    db.propose(batch_ops).unwrap().commit().unwrap();
+                },
+                BatchSize::SmallInput,
+            );
         });
 }
 

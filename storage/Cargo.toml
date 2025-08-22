@@ -50,7 +50,7 @@ sha3 = { version = "0.10.8", optional = true }
 
 [dev-dependencies]
 # Workspace dependencies
-criterion = { workspace = true, features = ["async_tokio", "html_reports"] }
+criterion = { workspace = true, features = ["html_reports"] }
 pprof = { workspace = true, features = ["flamegraph"] }
 rand.workspace = true
 tempfile.workspace = true

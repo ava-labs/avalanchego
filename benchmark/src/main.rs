@@ -16,16 +16,12 @@ use clap::{Parser, Subcommand, ValueEnum};
 use fastrace_opentelemetry::OpenTelemetryReporter;
 use firewood::logger::trace;
 use log::LevelFilter;
-use metrics_exporter_prometheus::PrometheusBuilder;
-use metrics_util::MetricKindMask;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::error::Error;
 use std::fmt::Display;
-use std::net::{Ipv6Addr, SocketAddr};
 use std::num::NonZeroUsize;
 use std::path::PathBuf;
-use std::time::Duration;
 
 use firewood::db::{BatchOp, Db, DbConfig};
 use firewood::manager::{CacheReadStrategy, RevisionManagerConfig};
@@ -62,6 +58,7 @@ struct GlobalOpts {
     cache_size: NonZeroUsize,
     #[arg(short, long, default_value_t = 128)]
     revisions: usize,
+    #[cfg(feature = "prometheus")]
     #[arg(
         short = 'p',
         long,
@@ -69,6 +66,7 @@ struct GlobalOpts {
         help = "Port to listen for prometheus"
     )]
     prometheus_port: u16,
+    #[cfg(feature = "prometheus")]
     #[arg(
         short = 's',
         long,
@@ -159,7 +157,7 @@ enum TestName {
 }
 
 trait TestRunner {
-    async fn run(&self, db: &Db, args: &Args) -> Result<(), Box<dyn Error>>;
+    fn run(&self, db: &Db, args: &Args) -> Result<(), Box<dyn Error>>;
 
     fn generate_inserts(
         start: u64,
@@ -185,8 +183,7 @@ trait TestRunner {
 #[cfg(unix)]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-#[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
     if args.global_opts.telemetry_server {
@@ -226,23 +223,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .init();
 
     // Manually set up prometheus
-    let builder = PrometheusBuilder::new();
-    let (prometheus_recorder, listener_future) = builder
-        .with_http_listener(SocketAddr::new(
-            Ipv6Addr::UNSPECIFIED.into(),
-            args.global_opts.prometheus_port,
-        ))
-        .idle_timeout(
-            MetricKindMask::COUNTER | MetricKindMask::HISTOGRAM,
-            Some(Duration::from_secs(10)),
-        )
-        .build()
-        .expect("unable in run prometheusbuilder");
-
-    // Clone the handle so we can dump the stats at the end
-    let prometheus_handle = prometheus_recorder.handle();
-    metrics::set_global_recorder(prometheus_recorder)?;
-    tokio::spawn(listener_future);
+    #[cfg(feature = "prometheus")]
+    let prometheus_handle = spawn_prometheus_listener(args.global_opts.prometheus_port)
+        .expect("failed to spawn prometheus listener");
 
     let mgrcfg = RevisionManagerConfig::builder()
         .node_cache_size(args.global_opts.cache_size)
@@ -262,22 +245,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
     match args.test_name {
         TestName::Create => {
             let runner = create::Create;
-            runner.run(&db, &args).await?;
+            runner.run(&db, &args)?;
         }
         TestName::TenKRandom => {
             let runner = tenkrandom::TenKRandom;
-            runner.run(&db, &args).await?;
+            runner.run(&db, &args)?;
         }
         TestName::Zipf(_) => {
             let runner = zipf::Zipf;
-            runner.run(&db, &args).await?;
+            runner.run(&db, &args)?;
         }
         TestName::Single => {
             let runner = single::Single;
-            runner.run(&db, &args).await?;
+            runner.run(&db, &args)?;
         }
     }
 
+    #[cfg(feature = "prometheus")]
     if args.global_opts.stats_dump {
         println!("{}", prometheus_handle.render());
     }
@@ -285,4 +269,41 @@ async fn main() -> Result<(), Box<dyn Error>> {
     fastrace::flush();
 
     Ok(())
+}
+
+#[cfg(feature = "prometheus")]
+fn spawn_prometheus_listener(
+    port: u16,
+) -> Result<metrics_exporter_prometheus::PrometheusHandle, Box<dyn Error>> {
+    use metrics_exporter_prometheus::PrometheusBuilder;
+    use metrics_util::MetricKindMask;
+    use std::net::{Ipv6Addr, SocketAddr};
+    use std::time::Duration;
+
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()?;
+
+    let (recorder, exporter) = {
+        // PrometheusBuilder::build requires that we be within the tokio runtime context
+        // but we don't need to actually invoke the runtime until we spawn the thread
+        let _guard = rt.enter();
+        PrometheusBuilder::new()
+            .with_http_listener(SocketAddr::new(Ipv6Addr::UNSPECIFIED.into(), port))
+            .idle_timeout(
+                MetricKindMask::COUNTER | MetricKindMask::HISTOGRAM,
+                Some(Duration::from_secs(10)),
+            )
+            .build()?
+    };
+
+    std::thread::Builder::new()
+        .name("metrics-exporter-prometheus".to_owned())
+        .spawn(move || rt.block_on(exporter))?;
+
+    let handle = recorder.handle();
+
+    metrics::set_global_recorder(recorder)?;
+
+    Ok(handle)
 }

@@ -50,8 +50,7 @@ fn string_to_range(input: &str) -> Result<RangeInclusive<usize>, Box<dyn Error +
 }
 
 /// cargo run --release --example insert
-#[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<(), Box<dyn Error>> {
+fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
 
     let mgrcfg = RevisionManagerConfig::builder()
@@ -92,7 +91,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         #[expect(clippy::unwrap_used)]
         let proposal = db.propose(batch.clone()).unwrap();
         proposal.commit()?;
-        verify_keys(&db, verify).await?;
+        verify_keys(&db, verify)?;
     }
 
     let duration = start.elapsed();
@@ -126,7 +125,7 @@ fn get_keys_to_verify<'a, K: KeyType + 'a, V: ValueType + 'a>(
     }
 }
 
-async fn verify_keys(
+fn verify_keys(
     db: &impl firewood::v2::api::Db,
     verify: HashMap<&[u8], &[u8]>,
 ) -> Result<(), firewood::v2::api::Error> {
@@ -134,7 +133,7 @@ async fn verify_keys(
         let hash = db.root_hash()?.expect("root hash should exist");
         let revision = db.revision(hash)?;
         for (key, value) in verify {
-            assert_eq!(Some(value), revision.val(key).await?.as_deref());
+            assert_eq!(Some(value), revision.val(key)?.as_deref());
         }
     }
     Ok(())
