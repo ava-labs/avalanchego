@@ -8,7 +8,6 @@ members = [
   "storage",
   "triehash",
 ]
-exclude = ["grpc-testtool"]
 resolver = "2"
 
 [workspace.package]
