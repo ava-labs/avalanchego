@@ -34,6 +34,7 @@ type Engine struct {
 	quorumDeserializer *QCDeserializer
 }
 
+// THe VM must be initialized before creating the engine
 func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 	signer, verifier := NewBLSAuth(config)
 	qcDeserializer := &QCDeserializer{

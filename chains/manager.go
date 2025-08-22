@@ -568,7 +568,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	case block.ChainVM:
 		// handle simplex engine based off parameters
 		if sb.Config().ConsensusConfig.SimplexParams != nil {
-			chain, err = m.createSimplexChain(ctx, genesisData)
+			chain, err = m.createSimplexChain(ctx, vm, sb, chainParams.GenesisData, chainFxs)
 			if err != nil {
 				return nil, fmt.Errorf("error while creating simplex chain %w", err)
 			}
@@ -583,7 +583,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		chain, err = m.createSnowmanChain(
 			ctx,
 			chainParams.GenesisData,
-			m.Validators,
 			beacons,
 			vm,
 			chainFxs,
@@ -1068,7 +1067,6 @@ func (m *manager) createAvalancheChain(
 func (m *manager) createSnowmanChain(
 	ctx *snow.ConsensusContext,
 	genesisData []byte,
-	vdrs validators.Manager,
 	beacons validators.Manager,
 	vm block.ChainVM,
 	fxs []*common.Fx,
@@ -1108,7 +1106,7 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, fmt.Errorf("error creating connected validators: %w", err)
 	}
-	vdrs.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
+	m.Validators.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
 
 	peerTracker, err := m.createSnowmanPeerTracker(ctx, primaryAlias)
 	if err != nil {
@@ -1116,12 +1114,12 @@ func (m *manager) createSnowmanChain(
 	}
 
 	var halter common.Halter
-	h, err := m.createHandler(ctx, cn, vdrs, sb, primaryAlias, connectedValidators, peerTracker, halter)
+	h, err := m.createHandler(ctx, cn, sb, primaryAlias, connectedValidators, peerTracker, halter)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create snowman handler: %w", err)
 	}
 
-	engine, err := m.createSnowmanEngine(ctx, cn, proposerVM.ParseBlock, sb, beacons, messageSender, bootstrappingDB, bootstrapFunc, vdrs, connectedValidators, peerTracker, halter)
+	engine, err := m.createSnowmanEngine(ctx, cn, proposerVM.ParseBlock, sb, beacons, messageSender, bootstrappingDB, bootstrapFunc, connectedValidators, peerTracker, halter)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create snowman engine: %w", err)
 	}
@@ -1301,7 +1299,7 @@ func (m *manager) getOrMakeVMGatherer(vmID ids.ID) (metrics.MultiGatherer, error
 	return vmGatherer, nil
 }
 
-func (m *manager) createHandler(ctx *snow.ConsensusContext, vm *block.ChangeNotifier, vdrs validators.Manager, sb subnets.Subnet, primaryAlias string, connectedValidators tracker.Peers, peerTracker *p2p.PeerTracker, halter common.Halter) (handler.Handler, error) {
+func (m *manager) createHandler(ctx *snow.ConsensusContext, vm *block.ChangeNotifier, sb subnets.Subnet, primaryAlias string, connectedValidators tracker.Peers, peerTracker *p2p.PeerTracker, halter common.Halter) (handler.Handler, error) {
 	handlerReg, err := metrics.MakeAndRegister(
 		m.handlerGatherer,
 		primaryAlias,
@@ -1315,7 +1313,7 @@ func (m *manager) createHandler(ctx *snow.ConsensusContext, vm *block.ChangeNoti
 		ctx,
 		vm,
 		vm.WaitForEvent,
-		vdrs,
+		m.Validators,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
@@ -1557,7 +1555,6 @@ func (m *manager) createSnowmanEngine(
 	messageSender common.Sender,
 	bootstrappingDB *prefixdb.Database,
 	bootstrapFunc func(),
-	vdrs validators.Manager,
 	connectedValidators tracker.Peers,
 	peerTracker *p2p.PeerTracker,
 	halter common.Halter,
@@ -1601,7 +1598,7 @@ func (m *manager) createSnowmanEngine(
 		AllGetsServer:       snowGetHandler,
 		VM:                  vm,
 		Sender:              messageSender,
-		Validators:          vdrs,
+		Validators:          m.Validators,
 		ConnectedValidators: connectedValidators,
 		Params:              *consensusParams,
 		Consensus:           consensus,
@@ -1685,7 +1682,7 @@ func simplexCtxConfig(ctx *snow.ConsensusContext) simplex.SimplexChainContext {
 		NetworkID: 	ctx.NetworkID,
 	}
 }
-func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vdrs validators.Manager, genesisData []byte) (*chain, error) {
+func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainVM, sb subnets.Subnet, genesisData []byte, fxs []*common.Fx) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()
 
@@ -1696,27 +1693,76 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vdrs validators
 
 	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 
+	messageSender, err := m.createSnowmanMessageSender(ctx, sb)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create snowman message sender: %w", err)
+	}
+
+	// initialize the VM
 	vmDB, simplexDB, err := m.createSimplexDB(primaryAlias, ctx.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create simplex DBs: %w", err)
 	}
 
+	// TODO: wrap the vm in a LOCKED VM that locks the VM interface
+	cn := &block.ChangeNotifier{
+		ChainVM: vm,
+	}
+	vm = cn
+
+	var halter common.Halter
+	connectedValidators, err := m.createSnowmanTrackedPeers(primaryAlias)
+	if err != nil {
+		return nil, fmt.Errorf("error creating connected validators: %w", err)
+	}
+	m.Validators.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
+
+	peerTracker, err := m.createSnowmanPeerTracker(ctx, primaryAlias)
+	if err != nil {
+		return nil, fmt.Errorf("error creating peer tracking: %w", err)
+	}
+
+	h, err := m.createHandler(ctx, cn, sb, primaryAlias, connectedValidators, peerTracker, halter)
+	if err != nil {
+		return nil, fmt.Errorf("error creating handler: %w", err)
+	}
+
+	chainConfig, err := m.getChainConfig(ctx.ChainID)
+	if err != nil {
+		return nil, fmt.Errorf("error while fetching chain config: %w", err)
+	}
+
+	if err := vm.Initialize(
+		context.TODO(),
+		ctx.Context,
+		vmDB,
+		genesisData,
+		chainConfig.Upgrade, 
+		chainConfig.Config, 
+		fxs, 
+		messageSender, 
+	); err != nil {
+		return nil, fmt.Errorf("couldn't initialize simplex VM: %w", err)
+	}
+
 	// we need to set initialize the VM before creating the simplex engine
 	// in order to have the genesis data available
-	config := simplex.Config{
+	config := &simplex.Config{
 		Ctx: simplexCtxConfig(ctx),
 		Log: ctx.Log,
-
 		Sender: m.Net,
 		OutboundMsgBuilder: m.MsgCreator,
-		Validators: vdrs,
+		Validators: m.Validators.GetMap(ctx.SubnetID),
 		VM: vm,
 		WalLocation: SimplexWalLocation,
 		SignBLS: m.ManagerConfig.StakingBLSKey.Sign,
-		DB: simplexDB, // prefixed database for simplex
+		DB: simplexDB, 
 	}
 
-	engine := simplex.NewEngine(context.TODO(), config)
+	engine, err := simplex.NewEngine(context.TODO(), config)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create simplex engine: %w", err)
+	}
 
 	h.SetEngineManager(&handler.EngineManager{
 		Avalanche: nil,
@@ -1727,7 +1773,17 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vdrs validators
 		},
 	})
 
-	return nil, nil
+	// Register health checks
+	if err := m.Health.RegisterHealthCheck(primaryAlias, h, ctx.SubnetID.String()); err != nil {
+		return nil, fmt.Errorf("couldn't add health check for chain %s: %w", primaryAlias, err)
+	}
+
+	return &chain{
+		Name:   primaryAlias,
+		Context: ctx,
+		VM:     vm,
+		Handler: h,
+	}, nil
 }
 
 // createSimplexDBs creates dbs for simplex. ONe is used for the VM to store blocks, 
