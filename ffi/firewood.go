@@ -222,5 +222,17 @@ func (db *Database) Root() ([]byte, error) {
 
 // Revision returns a historical revision of the database.
 func (db *Database) Revision(root []byte) (*Revision, error) {
-	return newRevision(db.handle, root)
+	if root == nil || len(root) != RootLength {
+		return nil, errInvalidRootLength
+	}
+
+	// Attempt to get any value from the root.
+	// This will verify that the root is valid and accessible.
+	// If the root is not valid, this will return an error.
+	_, err := db.GetFromRoot(root, []byte{})
+	if err != nil {
+		return nil, err
+	}
+
+	return &Revision{database: db, root: root}, nil
 }

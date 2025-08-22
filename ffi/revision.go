@@ -13,7 +13,6 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"runtime"
 )
 
 var (
@@ -22,69 +21,11 @@ var (
 )
 
 type Revision struct {
-	// handle is returned and accepted by cgo functions. It MUST be treated as
-	// an opaque value without special meaning.
-	// https://en.wikipedia.org/wiki/Blinkenlights
-	handle *C.DatabaseHandle
+	database *Database
 	// The revision root
 	root []byte
 }
 
-func newRevision(handle *C.DatabaseHandle, root []byte) (*Revision, error) {
-	if handle == nil {
-		return nil, errDBClosed
-	}
-
-	// Check that the root is the correct length.
-	if root == nil || len(root) != RootLength {
-		return nil, errInvalidRootLength
-	}
-
-	var pinner runtime.Pinner
-	defer pinner.Unpin()
-
-	// Attempt to get any value from the root.
-	// This will verify that the root is valid and accessible.
-	// If the root is not valid, this will return an error.
-
-	val := C.fwd_get_from_root(
-		handle,
-		newBorrowedBytes(root, &pinner),
-		newBorrowedBytes(nil, &pinner),
-	)
-	_, err := bytesFromValue(&val)
-	if err != nil {
-		// Any error from this function indicates that the root is inaccessible.
-		return nil, errRevisionNotFound
-	}
-
-	// All other verification of the root is done during use.
-	return &Revision{
-		handle: handle,
-		root:   root,
-	}, nil
-}
-
 func (r *Revision) Get(key []byte) ([]byte, error) {
-	if r.handle == nil {
-		return nil, errDBClosed
-	}
-	if r.root == nil {
-		return nil, errRevisionNotFound
-	}
-
-	var pinner runtime.Pinner
-	defer pinner.Unpin()
-
-	val := C.fwd_get_from_root(
-		r.handle,
-		newBorrowedBytes(r.root, &pinner),
-		newBorrowedBytes(key, &pinner),
-	)
-	value, err := bytesFromValue(&val)
-	if err != nil {
-		// Any error from this function indicates that the revision is inaccessible.
-		r.root = nil
-	}
-	return value, err
+	return r.database.GetFromRoot(r.root, key)
 }
