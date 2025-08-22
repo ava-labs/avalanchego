@@ -177,9 +177,7 @@ func (s *State) UpdateValidator(vdr Validator) error {
 		updated = true
 	}
 
-	if updated {
-		s.updatedData[vdr.ValidationID] = updatedStatus
-	}
+	s.updatedData[vdr.ValidationID] = updated
 	return nil
 }
 
