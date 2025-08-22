@@ -81,12 +81,28 @@ pub fn gather_metrics() -> Result<String, String> {
     Ok(recorder.stats())
 }
 
+/// Internal data structure for the [`TextRecorder`] containing the metrics registry and help text.
+///
+/// This structure holds:
+/// - A metrics registry that stores all counter and gauge values with atomic storage
+/// - A mutex-protected map of help text for each metric name
+///
+/// The atomic storage ensures thread-safe updates to metric values, while the mutex
+/// protects the help text map during concurrent access.
 #[derive(Debug)]
 struct TextRecorderInner {
     registry: Registry<Key, AtomicStorage>,
     help: Mutex<HashMap<String, String>>,
 }
 
+/// A metrics recorder that outputs metrics in Prometheus text exposition format.
+///
+/// This recorder implements the [`metrics::Recorder`] trait and formats all
+/// collected metrics as text in the format expected by Prometheus. It supports
+/// counters and gauges, but not histograms.
+///
+/// The recorder is thread-safe and can be shared across multiple threads.
+/// All metrics are stored in memory and can be retrieved via [`Self::stats`].
 #[derive(Debug, Clone)]
 struct TextRecorder {
     inner: Arc<TextRecorderInner>,

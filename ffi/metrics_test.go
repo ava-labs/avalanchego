@@ -40,7 +40,7 @@ func TestMetrics(t *testing.T) {
 
 	var logsDisabled bool
 	if err := StartLogs(logConfig); err != nil {
-		r.Contains(err.Error(), "logger feature is disabled")
+		r.Contains(err.Error(), "Logging is not available")
 		logsDisabled = true
 	}
 

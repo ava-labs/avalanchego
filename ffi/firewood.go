@@ -231,14 +231,3 @@ func (db *Database) Root() ([]byte, error) {
 func (db *Database) Revision(root []byte) (*Revision, error) {
 	return newRevision(db.handle, root)
 }
-
-// Close closes the database and releases all held resources.
-// Returns an error if already closed.
-func (db *Database) Close() error {
-	if db.handle == nil {
-		return errDBClosed
-	}
-	C.fwd_close_db(db.handle)
-	db.handle = nil
-	return nil
-}

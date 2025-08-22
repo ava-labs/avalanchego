@@ -23,7 +23,6 @@ crate-type = ["staticlib"]
 # Workspace dependencies
 coarsetime.workspace = true
 firewood.workspace = true
-log.workspace = true
 metrics.workspace = true
 metrics-util.workspace = true
 # Regular dependencies

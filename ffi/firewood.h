@@ -124,14 +124,6 @@ typedef struct BorrowedSlice_KeyValuePair {
 typedef struct BorrowedSlice_KeyValuePair BorrowedKeyValuePairs;
 
 /**
- * Struct returned by `fwd_create_db` and `fwd_open_db`
- */
-typedef struct DatabaseCreationResult {
-  struct DatabaseHandle *db;
-  uint8_t *error_str;
-} DatabaseCreationResult;
-
-/**
  * A Rust-owned vector of bytes that can be passed to C code.
  *
  * C callers must free this memory using the respective FFI function for the
@@ -146,6 +138,48 @@ typedef struct OwnedSlice_u8 {
  * A type alias for a rust-owned byte slice.
  */
 typedef struct OwnedSlice_u8 OwnedBytes;
+
+/**
+ * The result type returned from an FFI function that returns no value but may
+ * return an error.
+ */
+typedef enum VoidResult_Tag {
+  /**
+   * The caller provided a null pointer to the input handle.
+   */
+  VoidResult_NullHandlePointer,
+  /**
+   * The operation was successful and no error occurred.
+   */
+  VoidResult_Ok,
+  /**
+   * An error occurred and the message is returned as an [`OwnedBytes`]. Its
+   * value is guaranteed to contain only valid UTF-8.
+   *
+   * The caller must call [`fwd_free_owned_bytes`] to free the memory
+   * associated with this error.
+   *
+   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+   */
+  VoidResult_Err,
+} VoidResult_Tag;
+
+typedef struct VoidResult {
+  VoidResult_Tag tag;
+  union {
+    struct {
+      OwnedBytes err;
+    };
+  };
+} VoidResult;
+
+/**
+ * Struct returned by `fwd_create_db` and `fwd_open_db`
+ */
+typedef struct DatabaseCreationResult {
+  struct DatabaseHandle *db;
+  uint8_t *error_str;
+} DatabaseCreationResult;
 
 typedef uint32_t ProposalId;
 
@@ -172,14 +206,24 @@ typedef struct CreateOrOpenArgs {
 } CreateOrOpenArgs;
 
 /**
- * Arguments for logging
- *
- * * `path` - The file path where logs for this process are stored. By
- *   default, this is set to /tmp/firewood-log.txt
- * * `filter_level` - The filter level for logs. By default, this is set to info.
+ * Arguments for initializing logging for the Firewood FFI.
  */
 typedef struct LogArgs {
+  /**
+   * The file path where logs for this process are stored.
+   *
+   * If empty, this is set to `${TMPDIR}/firewood-log.txt`.
+   *
+   * This is required to be a valid UTF-8 string.
+   */
   BorrowedBytes path;
+  /**
+   * The filter level for logs.
+   *
+   * If empty, this is set to `info`.
+   *
+   * This is required to be a valid UTF-8 string.
+   */
   BorrowedBytes filter_level;
 } LogArgs;
 
@@ -218,23 +262,24 @@ struct Value fwd_batch(const struct DatabaseHandle *db,
 /**
  * Close and free the memory for a database handle
  *
- * # Safety
- *
- * This function uses raw pointers so it is unsafe.
- * It is the caller's responsibility to ensure that the database handle is valid.
- * Using the db after calling this function is undefined behavior
- *
  * # Arguments
  *
- * * `db` - The database handle to close, previously returned from a call to `open_db()`
+ * * `db` - The database handle to close, previously returned from a call to [`fwd_open_db`].
  *
- * # Panics
+ * # Returns
  *
- * This function panics if:
- * * `db` is `None` (null pointer)
- * * A lock is poisoned
+ * - [`VoidResult::NullHandlePointer`] if the provided database handle is null.
+ * - [`VoidResult::Ok`] if the database handle was successfully closed and freed.
+ * - [`VoidResult::Err`] if the process panics while closing the database handle.
+ *
+ * # Safety
+ *
+ * Callers must ensure that:
+ *
+ * - `db` is a valid pointer to a [`DatabaseHandle`] returned by [`fwd_open_db`].
+ * - The database handle is not used after this function is called.
  */
-void fwd_close_db(struct DatabaseHandle *db);
+struct VoidResult fwd_close_db(struct DatabaseHandle *db);
 
 /**
  * Commits a proposal to the database.
@@ -292,7 +337,7 @@ struct Value fwd_drop_proposal(const struct DatabaseHandle *db, uint32_t proposa
  * This function panics if `result` is `null`.
  *
  */
-void fwd_free_database_error_result(struct DatabaseCreationResult *result);
+struct VoidResult fwd_free_database_error_result(struct DatabaseCreationResult *result);
 
 /**
  * Consumes the [`OwnedBytes`] and frees the memory associated with it.
@@ -302,13 +347,18 @@ void fwd_free_database_error_result(struct DatabaseCreationResult *result);
  * * `bytes` - The [`OwnedBytes`] struct to free, previously returned from any
  *   function from this library.
  *
+ * # Returns
+ *
+ * - [`VoidResult::Ok`] if the memory was successfully freed.
+ * - [`VoidResult::Err`] if the process panics while freeing the memory.
+ *
  * # Safety
  *
  * The caller must ensure that the `bytes` struct is valid and that the memory
  * it points to is uniquely owned by this object. However, if `bytes.ptr` is null,
  * this function does nothing.
  */
-void fwd_free_owned_bytes(OwnedBytes bytes);
+struct VoidResult fwd_free_owned_bytes(OwnedBytes bytes);
 
 /**
  * Frees the memory associated with a `Value`.
@@ -327,7 +377,7 @@ void fwd_free_owned_bytes(OwnedBytes bytes);
  * This function panics if `value` is `null`.
  *
  */
-void fwd_free_value(struct Value *value);
+struct VoidResult fwd_free_value(struct Value *value);
 
 /**
  * Gather latest metrics for this process.
@@ -522,34 +572,47 @@ struct Value fwd_root_hash(const struct DatabaseHandle *db);
  *
  * # Arguments
  *
- * See `LogArgs`.
+ * See [`LogArgs`].
  *
  * # Returns
  *
- * A `Value` containing {0, null} if the global logger was initialized.
- * A `Value` containing {0, "error message"} if an error occurs.
+ * - [`VoidResult::Ok`] if the recorder was initialized.
+ * - [`VoidResult::Err`] if an error occurs during initialization.
+ *
+ * # Safety
+ *
+ * The caller must:
+ * * call [`fwd_free_owned_bytes`] to free the memory associated with the
+ *   returned error (if any).
  */
-struct Value fwd_start_logs(struct LogArgs args);
+struct VoidResult fwd_start_logs(struct LogArgs args);
 
 /**
  * Start metrics recorder for this process.
  *
  * # Returns
  *
- * A `Value` containing {0, null} if the metrics recorder was initialized.
- * A `Value` containing {0, "error message"} if an error occurs.
+ * - [`VoidResult::Ok`] if the recorder was initialized.
+ * - [`VoidResult::Err`] if an error occurs during initialization.
  */
-struct Value fwd_start_metrics(void);
+struct VoidResult fwd_start_metrics(void);
 
 /**
  * Start metrics recorder and exporter for this process.
+ *
+ * # Arguments
  *
  * * `metrics_port` - the port where metrics will be exposed at
  *
  * # Returns
  *
- * A `Value` containing {0, null} if the metrics recorder was initialized and
- * the exporter was started.
- * A `Value` containing {0, "error message"} if an error occurs.
+ * - [`VoidResult::Ok`] if the recorder was initialized.
+ * - [`VoidResult::Err`] if an error occurs during initialization.
+ *
+ * # Safety
+ *
+ * The caller must:
+ * * call [`fwd_free_owned_bytes`] to free the memory associated with the
+ *   returned error (if any).
  */
-struct Value fwd_start_metrics_with_exporter(uint16_t metrics_port);
+struct VoidResult fwd_start_metrics_with_exporter(uint16_t metrics_port);

@@ -28,6 +28,7 @@
 
 mod arc_cache;
 mod handle;
+mod logging;
 mod metrics_setup;
 mod value;
 
@@ -45,6 +46,7 @@ use firewood::v2::api::{self, Db as _, DbView, HashKey, KeyValuePairIter, Propos
 use metrics::counter;
 
 use crate::arc_cache::ArcCache;
+pub use crate::logging::*;
 pub use crate::value::*;
 
 #[cfg(unix)]
@@ -61,6 +63,36 @@ static ID_COUNTER: AtomicU32 = AtomicU32::new(1);
 #[doc(hidden)]
 fn next_id() -> ProposalId {
     ID_COUNTER.fetch_add(1, Ordering::Relaxed)
+}
+
+/// Invokes a closure and returns the result as a [`CResult`].
+///
+/// If the closure panics, it will return [`CResult::from_panic`] with the panic
+/// information.
+#[inline]
+fn invoke<T: CResult, V: Into<T>>(once: impl FnOnce() -> V) -> T {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(once)) {
+        Ok(result) => result.into(),
+        Err(panic) => T::from_panic(panic),
+    }
+}
+
+/// Invokes a closure that requires a handle and returns the result as a [`NullHandleResult`].
+///
+/// If the provided handle is [`None`], the function will return early with the
+/// [`NullHandleResult::null_handle_pointer_error`] result.
+///
+/// Otherwise, the closure is invoked with the handle. If the closure panics,
+/// it will be caught and returned as a [`CResult::from_panic`].
+#[inline]
+fn invoke_with_handle<H, T: NullHandleResult, V: Into<T>>(
+    handle: Option<H>,
+    once: impl FnOnce(H) -> V,
+) -> T {
+    match handle {
+        Some(handle) => invoke(move || once(handle)),
+        None => T::null_handle_pointer_error(),
+    }
 }
 
 /// A handle to the database, returned by `fwd_create_db` and `fwd_open_db`.
@@ -669,21 +701,22 @@ impl From<()> for Value {
 /// This function panics if `value` is `null`.
 ///
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_free_value(value: Option<&mut Value>) {
-    let value = value.expect("value should be non-null");
-    if let Some(data) = value.data {
-        let data_ptr = data.as_ptr();
-        // We assume that if the length is 0, then the data is a null-terminated string.
-        if value.len > 0 {
-            let recreated_box =
-                unsafe { Box::from_raw(std::slice::from_raw_parts_mut(data_ptr, value.len)) };
-            drop(recreated_box);
-        } else {
-            let raw_str = data_ptr.cast::<c_char>();
-            let cstr = unsafe { CString::from_raw(raw_str) };
-            drop(cstr);
+pub unsafe extern "C" fn fwd_free_value(value: Option<&mut Value>) -> VoidResult {
+    invoke_with_handle(value, |value| {
+        if let Some(data) = value.data {
+            let data_ptr = data.as_ptr();
+            // We assume that if the length is 0, then the data is a null-terminated string.
+            if value.len > 0 {
+                let recreated_box =
+                    unsafe { Box::from_raw(std::slice::from_raw_parts_mut(data_ptr, value.len)) };
+                drop(recreated_box);
+            } else {
+                let raw_str = data_ptr.cast::<c_char>();
+                let cstr = unsafe { CString::from_raw(raw_str) };
+                drop(cstr);
+            }
         }
-    }
+    })
 }
 
 /// Struct returned by `fwd_create_db` and `fwd_open_db`
@@ -731,44 +764,48 @@ impl From<Result<Db, String>> for DatabaseCreationResult {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_free_database_error_result(
     result: Option<&mut DatabaseCreationResult>,
-) {
-    let result = result.expect("result should be non-null");
-    // Free the error string if it exists
-    if let Some(nonnull) = result.error_str {
-        let raw_str = nonnull.cast::<c_char>().as_ptr();
-        let cstr = unsafe { CString::from_raw(raw_str) };
-        drop(cstr);
-    }
-    // Note: we don't free the db pointer as it's managed by the caller
+) -> VoidResult {
+    invoke_with_handle(result, |result| {
+        // Free the error string if it exists
+        if let Some(nonnull) = result.error_str {
+            let raw_str = nonnull.cast::<c_char>().as_ptr();
+            let cstr = unsafe { CString::from_raw(raw_str) };
+            drop(cstr);
+        }
+        // Note: we don't free the db pointer as it's managed by the caller
+    })
 }
 
 /// Start metrics recorder for this process.
 ///
 /// # Returns
 ///
-/// A `Value` containing {0, null} if the metrics recorder was initialized.
-/// A `Value` containing {0, "error message"} if an error occurs.
+/// - [`VoidResult::Ok`] if the recorder was initialized.
+/// - [`VoidResult::Err`] if an error occurs during initialization.
 #[unsafe(no_mangle)]
-pub extern "C" fn fwd_start_metrics() -> Value {
-    metrics_setup::setup_metrics()
-        .map_err(|e| e.to_string())
-        .map_or_else(Into::into, Into::into)
+pub extern "C" fn fwd_start_metrics() -> VoidResult {
+    invoke(metrics_setup::setup_metrics)
 }
 
 /// Start metrics recorder and exporter for this process.
+///
+/// # Arguments
 ///
 /// * `metrics_port` - the port where metrics will be exposed at
 ///
 /// # Returns
 ///
-/// A `Value` containing {0, null} if the metrics recorder was initialized and
-/// the exporter was started.
-/// A `Value` containing {0, "error message"} if an error occurs.
+/// - [`VoidResult::Ok`] if the recorder was initialized.
+/// - [`VoidResult::Err`] if an error occurs during initialization.
+///
+/// # Safety
+///
+/// The caller must:
+/// * call [`fwd_free_owned_bytes`] to free the memory associated with the
+///   returned error (if any).
 #[unsafe(no_mangle)]
-pub extern "C" fn fwd_start_metrics_with_exporter(metrics_port: u16) -> Value {
-    metrics_setup::setup_metrics_with_exporter(metrics_port)
-        .map_err(|e| e.to_string())
-        .map_or_else(Into::into, Into::into)
+pub extern "C" fn fwd_start_metrics_with_exporter(metrics_port: u16) -> VoidResult {
+    invoke(move || metrics_setup::setup_metrics_with_exporter(metrics_port))
 }
 
 /// Gather latest metrics for this process.
@@ -848,83 +885,25 @@ unsafe fn open_db(args: &CreateOrOpenArgs) -> Result<Db, String> {
     Db::new(path, cfg).map_err(|e| e.to_string())
 }
 
-/// Arguments for logging
-///
-/// * `path` - The file path where logs for this process are stored. By
-///   default, this is set to /tmp/firewood-log.txt
-/// * `filter_level` - The filter level for logs. By default, this is set to info.
-#[repr(C)]
-pub struct LogArgs<'a> {
-    path: BorrowedBytes<'a>,
-    filter_level: BorrowedBytes<'a>,
-}
-
 /// Start logs for this process.
 ///
 /// # Arguments
 ///
-/// See `LogArgs`.
+/// See [`LogArgs`].
 ///
 /// # Returns
 ///
-/// A `Value` containing {0, null} if the global logger was initialized.
-/// A `Value` containing {0, "error message"} if an error occurs.
+/// - [`VoidResult::Ok`] if the recorder was initialized.
+/// - [`VoidResult::Err`] if an error occurs during initialization.
+///
+/// # Safety
+///
+/// The caller must:
+/// * call [`fwd_free_owned_bytes`] to free the memory associated with the
+///   returned error (if any).
 #[unsafe(no_mangle)]
-pub extern "C" fn fwd_start_logs(args: LogArgs<'_>) -> Value {
-    start_logs(&args).map_or_else(Into::into, Into::into)
-}
-
-#[cfg(feature = "logger")]
-#[doc(hidden)]
-fn start_logs(log_args: &LogArgs) -> Result<(), String> {
-    use env_logger::Target::Pipe;
-    use std::fs::OpenOptions;
-    use std::path::Path;
-
-    let log_path = log_args
-        .path
-        .as_str()
-        .map_err(|e| format!("Invalid log path: {e}"))?;
-    let log_path = if log_path.is_empty() {
-        std::borrow::Cow::Owned(std::env::temp_dir().join("firewood-log.txt"))
-    } else {
-        std::borrow::Cow::Borrowed(std::path::Path::new(log_path))
-    };
-
-    let log_dir = log_path.parent().unwrap_or_else(|| Path::new("."));
-    std::fs::create_dir_all(log_dir).map_err(|e| e.to_string())?;
-
-    let level = if log_args.filter_level.is_empty() {
-        "info"
-    } else {
-        log_args
-            .filter_level
-            .as_str()
-            .map_err(|e| format!("Invalid log level: {e}"))?
-    }
-    .parse::<log::LevelFilter>()
-    .map_err(|e| format!("failed to parse log level: {e}"))?;
-
-    let file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(false)
-        .open(log_path)
-        .map_err(|e| e.to_string())?;
-
-    env_logger::Builder::new()
-        .filter_level(level)
-        .target(Pipe(Box::new(file)))
-        .try_init()
-        .map_err(|e| e.to_string())?;
-
-    Ok(())
-}
-
-#[cfg(not(feature = "logger"))]
-#[doc(hidden)]
-fn start_logs(_log_args: &LogArgs) -> Result<(), String> {
-    Err(String::from("logger feature is disabled"))
+pub extern "C" fn fwd_start_logs(args: LogArgs) -> VoidResult {
+    invoke(move || args.start_logging())
 }
 
 #[doc(hidden)]
@@ -959,35 +938,32 @@ fn manager_config(
 
 /// Close and free the memory for a database handle
 ///
-/// # Safety
-///
-/// This function uses raw pointers so it is unsafe.
-/// It is the caller's responsibility to ensure that the database handle is valid.
-/// Using the db after calling this function is undefined behavior
-///
 /// # Arguments
 ///
-/// * `db` - The database handle to close, previously returned from a call to `open_db()`
+/// * `db` - The database handle to close, previously returned from a call to [`fwd_open_db`].
 ///
-/// # Panics
+/// # Returns
 ///
-/// This function panics if:
-/// * `db` is `None` (null pointer)
-/// * A lock is poisoned
+/// - [`VoidResult::NullHandlePointer`] if the provided database handle is null.
+/// - [`VoidResult::Ok`] if the database handle was successfully closed and freed.
+/// - [`VoidResult::Err`] if the process panics while closing the database handle.
+///
+/// # Safety
+///
+/// Callers must ensure that:
+///
+/// - `db` is a valid pointer to a [`DatabaseHandle`] returned by [`fwd_open_db`].
+/// - The database handle is not used after this function is called.
+#[expect(clippy::missing_panics_doc, reason = "panics are captured")]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_close_db(db: Option<&mut DatabaseHandle>) {
-    let db_handle = db.expect("db should be non-null");
-
-    // Explicitly clear the downstream items. Drop will do these in order, so this
-    // code is defensive in case someone reorders the struct memebers of DatabaseHandle.
-    db_handle
-        .proposals
-        .write()
-        .expect("proposals lock is poisoned")
-        .clear();
-    db_handle.clear_cached_view();
-
-    // The database handle will be dropped automatically when db_handle goes out of scope
+pub unsafe extern "C" fn fwd_close_db(db: Option<Box<DatabaseHandle<'_>>>) -> VoidResult {
+    invoke_with_handle(db, |db| {
+        db.proposals
+            .write()
+            .expect("proposals lock is poisoned")
+            .clear();
+        db.clear_cached_view();
+    })
 }
 
 /// Consumes the [`OwnedBytes`] and frees the memory associated with it.
@@ -997,14 +973,19 @@ pub unsafe extern "C" fn fwd_close_db(db: Option<&mut DatabaseHandle>) {
 /// * `bytes` - The [`OwnedBytes`] struct to free, previously returned from any
 ///   function from this library.
 ///
+/// # Returns
+///
+/// - [`VoidResult::Ok`] if the memory was successfully freed.
+/// - [`VoidResult::Err`] if the process panics while freeing the memory.
+///
 /// # Safety
 ///
 /// The caller must ensure that the `bytes` struct is valid and that the memory
 /// it points to is uniquely owned by this object. However, if `bytes.ptr` is null,
 /// this function does nothing.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_free_owned_bytes(bytes: OwnedBytes) {
-    drop(bytes);
+pub unsafe extern "C" fn fwd_free_owned_bytes(bytes: OwnedBytes) -> VoidResult {
+    invoke(move || drop(bytes))
 }
 
 #[cfg(test)]

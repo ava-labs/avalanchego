@@ -226,8 +226,7 @@ func TestClosedDatabase(t *testing.T) {
 	r.Empty(root)
 	r.ErrorIs(err, errDBClosed)
 
-	err = db.Close()
-	r.ErrorIs(err, errDBClosed)
+	r.NoError(db.Close())
 }
 
 func keyForTest(i int) []byte {
