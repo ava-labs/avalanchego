@@ -110,5 +110,5 @@ type BlockDatabase interface {
 	Inspect() (string, error)
 
 	// Close closes the block database.
-	Close() error
+	io.Closer
 }
