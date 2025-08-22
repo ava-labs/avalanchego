@@ -344,7 +344,7 @@ func (s *State) loadFromDisk() error {
 // returns an error if the data already exists
 func (s *State) addData(vID ids.ID, data *validatorData) error {
 	if _, exists := s.data[vID]; exists {
-		return fmt.Errorf("%w, vID: %s", ErrAlreadyExists, vID)
+		return fmt.Errorf("%w, validationID: %s", ErrAlreadyExists, vID)
 	}
 	if _, exists := s.index[data.NodeID]; exists {
 		return fmt.Errorf("%w, nodeID: %s", ErrAlreadyExists, data.NodeID)
