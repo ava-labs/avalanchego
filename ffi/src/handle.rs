@@ -4,7 +4,8 @@
 use firewood::{
     db::{Db, DbConfig},
     manager::RevisionManagerConfig,
-    v2::api::{self, ArcDynDbView, Db as _, DbView, HashKey, Proposal as _},
+    merkle::Value,
+    v2::api::{self, ArcDynDbView, Db as _, DbView, HashKey, HashKeyExt, KeyType, Proposal as _},
 };
 use metrics::counter;
 
@@ -110,6 +111,35 @@ impl DatabaseHandle<'_> {
         self.db.root_hash()
     }
 
+    /// Returns a value from the database for the given key from the latest root hash.
+    ///
+    /// # Errors
+    ///
+    /// An error is returned if there was an i/o error while reading the value.
+    pub fn get_latest(&self, key: impl KeyType) -> Result<Option<Value>, api::Error> {
+        let Some(root) = self.current_root_hash()? else {
+            return Err(api::Error::RevisionNotFound {
+                provided: HashKey::default_root_hash(),
+            });
+        };
+
+        self.db.revision(root)?.val(key)
+    }
+
+    /// Returns a value from the database for the given key from the specified root hash.
+    ///
+    /// # Errors
+    ///
+    /// An error is returned if the root hash is invalid or if there was an i/o error
+    /// while reading the value.
+    pub fn get_from_root(
+        &self,
+        root: HashKey,
+        key: impl KeyType,
+    ) -> Result<Option<Box<[u8]>>, api::Error> {
+        self.get_root(root)?.val(key.as_ref())
+    }
+
     /// Creates a proposal with the given values and returns the proposal and the start time.
     ///
     /// # Errors
@@ -137,6 +167,24 @@ impl DatabaseHandle<'_> {
         counter!("firewood.ffi.batch").increment(1);
 
         Ok(hash_val)
+    }
+
+    /// Returns a value from the proposal with the given ID for the specified key.
+    ///
+    /// # Errors
+    ///
+    /// An error is returned if the proposal could not be found, or if the key is invalid.
+    pub fn get_from_proposal(
+        &self,
+        id: u32,
+        key: impl KeyType,
+    ) -> Result<Option<Value>, api::Error> {
+        self.proposals
+            .read()
+            .map_err(|_| invalid_data("proposal lock is poisoned"))?
+            .get(&id)
+            .ok_or_else(|| invalid_data("proposal not found"))?
+            .val(key.as_ref())
     }
 
     /// Commits a proposal with the given ID.

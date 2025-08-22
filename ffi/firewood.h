@@ -231,6 +231,58 @@ typedef struct Value {
   uint8_t *data;
 } Value;
 
+/**
+ * A result type returned from FFI functions that retrieve a single value.
+ */
+typedef enum ValueResult_Tag {
+  /**
+   * The caller provided a null pointer to a database handle.
+   */
+  ValueResult_NullHandlePointer,
+  /**
+   * The provided root was not found in the database.
+   */
+  ValueResult_RevisionNotFound,
+  /**
+   * The provided key was not found in the database or proposal.
+   */
+  ValueResult_None,
+  /**
+   * A value was found and is returned.
+   *
+   * The caller must call [`fwd_free_owned_bytes`] to free the memory
+   * associated with this value.
+   *
+   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+   */
+  ValueResult_Some,
+  /**
+   * An error occurred and the message is returned as an [`OwnedBytes`]. If
+   * value is guaranteed to contain only valid UTF-8.
+   *
+   * The caller must call [`fwd_free_owned_bytes`] to free the memory
+   * associated with this error.
+   *
+   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+   */
+  ValueResult_Err,
+} ValueResult_Tag;
+
+typedef struct ValueResult {
+  ValueResult_Tag tag;
+  union {
+    struct {
+      struct HashKey revision_not_found;
+    };
+    struct {
+      OwnedBytes some;
+    };
+    struct {
+      OwnedBytes err;
+    };
+  };
+} ValueResult;
+
 typedef uint32_t ProposalId;
 
 /**
@@ -472,10 +524,18 @@ struct VoidResult fwd_free_value(struct Value *value);
  *
  * # Returns
  *
- * A `Value` containing {len, bytes} representing the latest metrics for this process.
- * A `Value` containing {0, "error message"} if unable to get the latest metrics.
+ * - [`ValueResult::None`] if the gathered metrics resulted in an empty string.
+ * - [`ValueResult::Some`] the gathered metrics as an [`OwnedBytes`] (with
+ *   guaranteed to be utf-8 data, not null terminated).
+ * - [`ValueResult::Err`] if an error occurred while retrieving the value.
+ *
+ * # Safety
+ *
+ * The caller must:
+ * * call [`fwd_free_owned_bytes`] to free the memory associated with the
+ *   returned error or value.
  */
-struct Value fwd_gather(void);
+struct ValueResult fwd_gather(void);
 
 /**
  * Gets the value associated with the given key from the proposal provided.
@@ -499,9 +559,9 @@ struct Value fwd_gather(void);
  *  * call `free_value` to free the memory associated with the returned `Value`
  *
  */
-struct Value fwd_get_from_proposal(const struct DatabaseHandle *db,
-                                   ProposalId id,
-                                   BorrowedBytes key);
+struct ValueResult fwd_get_from_proposal(const struct DatabaseHandle *db,
+                                         ProposalId id,
+                                         BorrowedBytes key);
 
 /**
  * Gets a value assoicated with the given root hash and key.
@@ -510,53 +570,60 @@ struct Value fwd_get_from_proposal(const struct DatabaseHandle *db,
  *
  * # Arguments
  *
- * * `db` - The database handle returned by `open_db`
- * * `root` - The root hash to look up, in `BorrowedBytes` form
- * * `key` - The key to look up, in `BorrowedBytes` form
+ * * `db` - The database handle returned by [`fwd_open_db`]
+ * * `root` - The root hash to look up as a [`BorrowedBytes`]
+ * * `key` - The key to look up as a [`BorrowedBytes`]
  *
  * # Returns
  *
- * A `Value` containing the requested value.
- * A `Value` containing {0, "error message"} if the get failed.
+ * - [`ValueResult::NullHandlePointer`] if the provided database handle is null.
+ * - [`ValueResult::RevisionNotFound`] if no revision was found for the specified root.
+ * - [`ValueResult::None`] if the key was not found.
+ * - [`ValueResult::Some`] if the key was found with the associated value.
+ * - [`ValueResult::Err`] if an error occurred while retrieving the value.
  *
  * # Safety
  *
  * The caller must:
- * * ensure that `db` is a valid pointer returned by `open_db`
- * * ensure that `key` is a valid pointer to a `Value` struct
- * * ensure that `root` is a valid pointer to a `Value` struct
- * * call `free_value` to free the memory associated with the returned `Value`
- *
+ * * ensure that `db` is a valid pointer to a [`DatabaseHandle`]
+ * * ensure that `root` is a valid for [`BorrowedBytes`]
+ * * ensure that `key` is a valid for [`BorrowedBytes`]
+ * * call [`fwd_free_owned_bytes`] to free the memory associated [`OwnedBytes`]
+ *   returned in the result.
  */
-struct Value fwd_get_from_root(const struct DatabaseHandle *db,
-                               BorrowedBytes root,
-                               BorrowedBytes key);
+struct ValueResult fwd_get_from_root(const struct DatabaseHandle *db,
+                                     BorrowedBytes root,
+                                     BorrowedBytes key);
 
 /**
- * Gets the value associated with the given key from the database.
+ * Gets the value associated with the given key from the database for the
+ * latest revision.
  *
  * # Arguments
  *
- * * `db` - The database handle returned by `open_db`
- * * `key` - The key to look up, in `BorrowedBytes` form
+ * * `db` - The database handle returned by [`fwd_open_db`]
+ * * `key` - The key to look up as a [`BorrowedBytes`]
  *
  * # Returns
  *
- * A `Value` containing the requested value.
- * A `Value` containing {0, "error message"} if the get failed.
- * There is one error case that may be expected to be null by the caller,
- * but should be handled externally: The database has no entries - "IO error: Root hash not found"
- * This is expected behavior if the database is empty.
+ * - [`ValueResult::NullHandlePointer`] if the provided database handle is null.
+ * - [`ValueResult::RevisionNotFound`] if no revision was found for the root
+ *   (i.e., there is no current root).
+ * - [`ValueResult::None`] if the key was not found.
+ * - [`ValueResult::Some`] if the key was found with the associated value.
+ * - [`ValueResult::Err`] if an error occurred while retrieving the value.
  *
  * # Safety
  *
  * The caller must:
- *  * ensure that `db` is a valid pointer returned by `open_db`
- *  * ensure that `key` is a valid pointer to a `Value` struct
- *  * call `free_value` to free the memory associated with the returned `Value`
+ * * ensure that `db` is a valid pointer to a [`DatabaseHandle`].
+ * * ensure that `key` is valid for [`BorrowedBytes`]
+ * * call [`fwd_free_owned_bytes`] to free the memory associated with the
+ *   returned error or value.
  *
+ * [`BorrowedBytes`]: crate::value::BorrowedBytes
  */
-struct Value fwd_get_latest(const struct DatabaseHandle *db, BorrowedBytes key);
+struct ValueResult fwd_get_latest(const struct DatabaseHandle *db, BorrowedBytes key);
 
 /**
  * Open a database with the given arguments.

@@ -300,6 +300,37 @@ func getErrorFromVoidResult(result C.VoidResult) error {
 	}
 }
 
+// getValueFromValueResult converts a C.ValueResult to a byte slice or error.
+//
+// It returns nil, nil if the result is None.
+// It returns nil, errRevisionNotFound if the result is RevisionNotFound.
+// It returns a byte slice, nil if the result is Some.
+// It returns an error if the result is an error.
+func getValueFromValueResult(result C.ValueResult) ([]byte, error) {
+	switch result.tag {
+	case C.ValueResult_NullHandlePointer:
+		return nil, errDBClosed
+	case C.ValueResult_RevisionNotFound:
+		// NOTE: the result value contains the provided root hash, we could use
+		// it in the error message if needed.
+		return nil, errRevisionNotFound
+	case C.ValueResult_None:
+		return nil, nil
+	case C.ValueResult_Some:
+		ownedBytes := newOwnedBytes(*(*C.OwnedBytes)(unsafe.Pointer(&result.anon0)))
+		bytes := ownedBytes.CopiedBytes()
+		if err := ownedBytes.Free(); err != nil {
+			return nil, fmt.Errorf("%w: %w", errFreeingValue, err)
+		}
+		return bytes, nil
+	case C.ValueResult_Err:
+		err := newOwnedBytes(*(*C.OwnedBytes)(unsafe.Pointer(&result.anon0))).intoError()
+		return nil, err
+	default:
+		return nil, fmt.Errorf("unknown C.ValueResult tag: %d", result.tag)
+	}
+}
+
 // getDatabaseFromHandleResult converts a C.HandleResult to a Database or error.
 //
 // If the C.HandleResult is an error, it returns an error instead of a Database.
@@ -401,49 +432,4 @@ func errorFromValue(v *C.struct_Value) error {
 		return fmt.Errorf("%w: %w", errFreeingValue, err)
 	}
 	return errBadValue
-}
-
-// bytesFromValue converts the cgo `Value` payload to:
-//
-//	case | data    | len   | meaning
-//
-// 1.    | nil     | 0     | empty
-// 2.    | nil     | non-0 | invalid
-// 3.    | non-nil | 0     | error string
-// 4.    | non-nil | non-0 | bytes (most common)
-//
-// The value should never be nil.
-func bytesFromValue(v *C.struct_Value) ([]byte, error) {
-	// Pin the returned value to prevent it from being garbage collected.
-	defer runtime.KeepAlive(v)
-
-	if v == nil {
-		return nil, errNilStruct
-	}
-
-	// Case 4
-	if v.len != 0 && v.data != nil {
-		buf := C.GoBytes(unsafe.Pointer(v.data), C.int(v.len))
-		if err := getErrorFromVoidResult(C.fwd_free_value(v)); err != nil {
-			return nil, fmt.Errorf("%w: %w", errFreeingValue, err)
-		}
-		return buf, nil
-	}
-
-	// Case 1
-	if v.len == 0 && v.data == nil {
-		return nil, nil
-	}
-
-	// Case 3
-	if v.len == 0 {
-		errStr := C.GoString((*C.char)(unsafe.Pointer(v.data)))
-		if err := getErrorFromVoidResult(C.fwd_free_value(v)); err != nil {
-			return nil, fmt.Errorf("%w: %w", errFreeingValue, err)
-		}
-		return nil, errors.New(errStr)
-	}
-
-	// Case 2
-	return nil, errBadValue
 }

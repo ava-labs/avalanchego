@@ -129,53 +129,38 @@ impl Deref for DatabaseHandle<'_> {
     }
 }
 
-/// Gets the value associated with the given key from the database.
+/// Gets the value associated with the given key from the database for the
+/// latest revision.
 ///
 /// # Arguments
 ///
-/// * `db` - The database handle returned by `open_db`
-/// * `key` - The key to look up, in `BorrowedBytes` form
+/// * `db` - The database handle returned by [`fwd_open_db`]
+/// * `key` - The key to look up as a [`BorrowedBytes`]
 ///
 /// # Returns
 ///
-/// A `Value` containing the requested value.
-/// A `Value` containing {0, "error message"} if the get failed.
-/// There is one error case that may be expected to be null by the caller,
-/// but should be handled externally: The database has no entries - "IO error: Root hash not found"
-/// This is expected behavior if the database is empty.
+/// - [`ValueResult::NullHandlePointer`] if the provided database handle is null.
+/// - [`ValueResult::RevisionNotFound`] if no revision was found for the root
+///   (i.e., there is no current root).
+/// - [`ValueResult::None`] if the key was not found.
+/// - [`ValueResult::Some`] if the key was found with the associated value.
+/// - [`ValueResult::Err`] if an error occurred while retrieving the value.
 ///
 /// # Safety
 ///
 /// The caller must:
-///  * ensure that `db` is a valid pointer returned by `open_db`
-///  * ensure that `key` is a valid pointer to a `Value` struct
-///  * call `free_value` to free the memory associated with the returned `Value`
+/// * ensure that `db` is a valid pointer to a [`DatabaseHandle`].
+/// * ensure that `key` is valid for [`BorrowedBytes`]
+/// * call [`fwd_free_owned_bytes`] to free the memory associated with the
+///   returned error or value.
 ///
+/// [`BorrowedBytes`]: crate::value::BorrowedBytes
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_get_latest(
-    db: Option<&DatabaseHandle<'_>>,
-    key: BorrowedBytes<'_>,
-) -> Value {
-    get_latest(db, &key).unwrap_or_else(Into::into)
-}
-
-/// This function is not exposed to the C API.
-/// Internal call for `fwd_get_latest` to remove error handling from the C API
-#[doc(hidden)]
-fn get_latest(db: Option<&DatabaseHandle<'_>>, key: &[u8]) -> Result<Value, String> {
-    let db = db.ok_or("db should be non-null")?;
-    // Find root hash.
-    // Matches `hash` function but we use the TrieHash type here
-    let Some(root) = db.root_hash().map_err(|e| e.to_string())? else {
-        return Ok(Value::default());
-    };
-
-    // Find revision assoicated with root.
-    let rev = db.revision(root).map_err(|e| e.to_string())?;
-
-    // Get value associated with key.
-    let value = rev.val(key).map_err(|e| e.to_string())?.ok_or("")?;
-    Ok(value.into())
+    db: Option<&DatabaseHandle>,
+    key: BorrowedBytes,
+) -> ValueResult {
+    invoke_with_handle(db, move |db| db.get_latest(key))
 }
 
 /// Gets the value associated with the given key from the proposal provided.
@@ -203,29 +188,8 @@ pub unsafe extern "C" fn fwd_get_from_proposal(
     db: Option<&DatabaseHandle<'_>>,
     id: ProposalId,
     key: BorrowedBytes<'_>,
-) -> Value {
-    get_from_proposal(db, id, &key).unwrap_or_else(Into::into)
-}
-
-/// This function is not exposed to the C API.
-/// Internal call for `fwd_get_from_proposal` to remove error handling from the C API
-#[doc(hidden)]
-fn get_from_proposal(
-    db: Option<&DatabaseHandle<'_>>,
-    id: ProposalId,
-    key: &[u8],
-) -> Result<Value, String> {
-    let db = db.ok_or("db should be non-null")?;
-    // Get proposal from ID.
-    let proposals = db
-        .proposals
-        .read()
-        .map_err(|_| "proposal lock is poisoned")?;
-    let proposal = proposals.get(&id).ok_or("proposal not found")?;
-
-    // Get value associated with key.
-    let value = proposal.val(key).map_err(|e| e.to_string())?.ok_or("")?;
-    Ok(value.into())
+) -> ValueResult {
+    invoke_with_handle(db, move |db| db.get_from_proposal(id, key))
 }
 
 /// Gets a value assoicated with the given root hash and key.
@@ -234,44 +198,35 @@ fn get_from_proposal(
 ///
 /// # Arguments
 ///
-/// * `db` - The database handle returned by `open_db`
-/// * `root` - The root hash to look up, in `BorrowedBytes` form
-/// * `key` - The key to look up, in `BorrowedBytes` form
+/// * `db` - The database handle returned by [`fwd_open_db`]
+/// * `root` - The root hash to look up as a [`BorrowedBytes`]
+/// * `key` - The key to look up as a [`BorrowedBytes`]
 ///
 /// # Returns
 ///
-/// A `Value` containing the requested value.
-/// A `Value` containing {0, "error message"} if the get failed.
+/// - [`ValueResult::NullHandlePointer`] if the provided database handle is null.
+/// - [`ValueResult::RevisionNotFound`] if no revision was found for the specified root.
+/// - [`ValueResult::None`] if the key was not found.
+/// - [`ValueResult::Some`] if the key was found with the associated value.
+/// - [`ValueResult::Err`] if an error occurred while retrieving the value.
 ///
 /// # Safety
 ///
 /// The caller must:
-/// * ensure that `db` is a valid pointer returned by `open_db`
-/// * ensure that `key` is a valid pointer to a `Value` struct
-/// * ensure that `root` is a valid pointer to a `Value` struct
-/// * call `free_value` to free the memory associated with the returned `Value`
-///
+/// * ensure that `db` is a valid pointer to a [`DatabaseHandle`]
+/// * ensure that `root` is a valid for [`BorrowedBytes`]
+/// * ensure that `key` is a valid for [`BorrowedBytes`]
+/// * call [`fwd_free_owned_bytes`] to free the memory associated [`OwnedBytes`]
+///   returned in the result.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_get_from_root(
-    db: Option<&DatabaseHandle<'_>>,
-    root: BorrowedBytes<'_>,
-    key: BorrowedBytes<'_>,
-) -> Value {
-    get_from_root(db, &root, &key).unwrap_or_else(Into::into)
-}
-
-/// Internal call for `fwd_get_from_root` to remove error handling from the C API
-#[doc(hidden)]
-fn get_from_root(
-    db: Option<&DatabaseHandle<'_>>,
-    root: &[u8],
-    key: &[u8],
-) -> Result<Value, String> {
-    let db = db.ok_or("db should be non-null")?;
-    let requested_root = api::HashKey::try_from(root).map_err(|e| e.to_string())?;
-    let cached_view = db.get_root(requested_root).map_err(|e| e.to_string())?;
-    let value = cached_view.val(key).map_err(|e| e.to_string())?.ok_or("")?;
-    Ok(value.into())
+    db: Option<&DatabaseHandle>,
+    root: BorrowedBytes,
+    key: BorrowedBytes,
+) -> ValueResult {
+    invoke_with_handle(db, move |db| {
+        db.get_from_root(root.as_ref().try_into()?, key)
+    })
 }
 
 /// Puts the given key-value pairs into the database.
@@ -681,11 +636,19 @@ pub extern "C" fn fwd_start_metrics_with_exporter(metrics_port: u16) -> VoidResu
 ///
 /// # Returns
 ///
-/// A `Value` containing {len, bytes} representing the latest metrics for this process.
-/// A `Value` containing {0, "error message"} if unable to get the latest metrics.
+/// - [`ValueResult::None`] if the gathered metrics resulted in an empty string.
+/// - [`ValueResult::Some`] the gathered metrics as an [`OwnedBytes`] (with
+///   guaranteed to be utf-8 data, not null terminated).
+/// - [`ValueResult::Err`] if an error occurred while retrieving the value.
+///
+/// # Safety
+///
+/// The caller must:
+/// * call [`fwd_free_owned_bytes`] to free the memory associated with the
+///   returned error or value.
 #[unsafe(no_mangle)]
-pub extern "C" fn fwd_gather() -> Value {
-    metrics_setup::gather_metrics().map_or_else(Into::into, |s| s.as_bytes().into())
+pub extern "C" fn fwd_gather() -> ValueResult {
+    invoke(metrics_setup::gather_metrics)
 }
 
 /// Open a database with the given arguments.

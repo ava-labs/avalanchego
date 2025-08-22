@@ -14,4 +14,4 @@ pub use self::hash_key::HashKey;
 pub use self::kvp::KeyValuePair;
 pub use self::owned::{OwnedBytes, OwnedSlice};
 pub(crate) use self::results::{CResult, NullHandleResult};
-pub use self::results::{HandleResult, HashResult, VoidResult};
+pub use self::results::{HandleResult, HashResult, ValueResult, VoidResult};

@@ -75,6 +75,61 @@ impl<E: fmt::Display> From<Result<crate::DatabaseHandle<'static>, E>> for Handle
     }
 }
 
+/// A result type returned from FFI functions that retrieve a single value.
+#[derive(Debug)]
+#[repr(C)]
+pub enum ValueResult {
+    /// The caller provided a null pointer to a database handle.
+    NullHandlePointer,
+    /// The provided root was not found in the database.
+    RevisionNotFound(HashKey),
+    /// The provided key was not found in the database or proposal.
+    None,
+    /// A value was found and is returned.
+    ///
+    /// The caller must call [`fwd_free_owned_bytes`] to free the memory
+    /// associated with this value.
+    ///
+    /// [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+    Some(OwnedBytes),
+    /// An error occurred and the message is returned as an [`OwnedBytes`]. If
+    /// value is guaranteed to contain only valid UTF-8.
+    ///
+    /// The caller must call [`fwd_free_owned_bytes`] to free the memory
+    /// associated with this error.
+    ///
+    /// [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+    Err(OwnedBytes),
+}
+
+impl<E: fmt::Display> From<Result<String, E>> for ValueResult {
+    fn from(value: Result<String, E>) -> Self {
+        match value {
+            Ok(data) => ValueResult::Some(data.into_bytes().into()),
+            Err(err) => ValueResult::Err(err.to_string().into_bytes().into()),
+        }
+    }
+}
+
+impl From<Result<Option<Box<[u8]>>, api::Error>> for ValueResult {
+    fn from(value: Result<Option<Box<[u8]>>, api::Error>) -> Self {
+        match value {
+            Ok(None) => ValueResult::None,
+            Err(api::Error::RevisionNotFound { provided }) => ValueResult::RevisionNotFound(
+                HashKey::from(provided.unwrap_or_else(api::HashKey::empty)),
+            ),
+            Ok(Some(data)) => ValueResult::Some(data.into()),
+            Err(err) => ValueResult::Err(err.to_string().into_bytes().into()),
+        }
+    }
+}
+
+impl From<Result<Option<Box<[u8]>>, firewood::db::DbError>> for ValueResult {
+    fn from(value: Result<Option<Box<[u8]>>, firewood::db::DbError>) -> Self {
+        value.map_err(api::Error::from).into()
+    }
+}
+
 /// A result type returned from FFI functions return the database root hash. This
 /// may or may not be after a mutation.
 #[derive(Debug)]
@@ -155,6 +210,18 @@ impl CResult for VoidResult {
 }
 
 impl CResult for HandleResult {
+    fn from_err(err: impl ToString) -> Self {
+        Self::Err(err.to_string().into_bytes().into())
+    }
+}
+
+impl NullHandleResult for ValueResult {
+    fn null_handle_pointer_error() -> Self {
+        Self::NullHandlePointer
+    }
+}
+
+impl CResult for ValueResult {
     fn from_err(err: impl ToString) -> Self {
         Self::Err(err.to_string().into_bytes().into())
     }
