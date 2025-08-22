@@ -44,6 +44,7 @@ var (
 
 	ErrAlreadyStarted                = errors.New("cannot start a Manager that has already been started")
 	ErrAlreadyClosed                 = errors.New("Manager is closed")
+	ErrNoDBProvided                  = errors.New("database is required to create a parser")
 	ErrNoRangeProofClientProvided    = errors.New("range proof client is a required field of the sync config")
 	ErrNoChangeProofClientProvided   = errors.New("change proof client is a required field of the sync config")
 	ErrNoParserProvided              = errors.New("proof parser is a required field of the sync config")
@@ -54,7 +55,6 @@ var (
 	errTooManyKeys                   = errors.New("response contains more than requested keys")
 	errTooManyBytes                  = errors.New("response contains more than requested bytes")
 	errUnexpectedChangeProofResponse = errors.New("unexpected response type")
-	ErrNoDBProvided                  = errors.New("database is required to create a parser")
 )
 
 type priority byte
@@ -73,7 +73,7 @@ type proofParser struct {
 	tokenSize int
 }
 
-func newParser(db DB, hasher merkledb.Hasher, branchFactor merkledb.BranchFactor) (*proofParser, error) {
+func NewParser(db DB, hasher merkledb.Hasher, branchFactor merkledb.BranchFactor) (ProofParser, error) {
 	if db == nil {
 		return nil, ErrNoDBProvided
 	}

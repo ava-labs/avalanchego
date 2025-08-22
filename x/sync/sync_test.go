@@ -35,7 +35,7 @@ func Test_Creation(t *testing.T) {
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
-	parser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	parser, err := NewParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
 	require.NoError(err)
 	ctx := context.Background()
 	syncer, err := NewManager(ManagerConfig{
@@ -68,7 +68,7 @@ func Test_Completion(t *testing.T) {
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
-	parser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor4)
+	parser, err := NewParser(db, merkledb.DefaultHasher, merkledb.BranchFactor4)
 	require.NoError(err)
 
 	ctx := context.Background()
@@ -174,7 +174,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	root, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	proofParser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	proofParser, err := NewParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
 	require.NoError(err)
 
 	// Apply all changes from the db to sync to the local db
@@ -251,12 +251,12 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	// Create empty DBs to commit to
 	db1, err := merkledb.New(ctx, memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
-	parser1, err := newParser(db1, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	parser1, err := NewParser(db1, merkledb.DefaultHasher, merkledb.BranchFactor16)
 	require.NoError(err)
 
 	db2, err := merkledb.New(ctx, memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
-	parser2, err := newParser(db2, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	parser2, err := NewParser(db2, merkledb.DefaultHasher, merkledb.BranchFactor16)
 	require.NoError(err)
 
 	// Add 0x13 to both dbs
@@ -308,7 +308,7 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	require.NoError(err)
 
 	// Get proof including 0x11.0x11
-	proofParser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	proofParser, err := NewParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
 	require.NoError(err)
 	proof, err := db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Some([]byte{0x20}), 500)
 	require.NoError(err)
@@ -344,7 +344,7 @@ func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 	require.NoError(db.Put([]byte{0x12}, []byte{2}))
 	require.NoError(db.Put([]byte{0x12, 0xA0}, []byte{4}))
 
-	proofParser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	proofParser, err := NewParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
 	require.NoError(err)
 
 	ctx := context.Background()
@@ -378,7 +378,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	root, err := db.GetMerkleRoot(ctx)
 	require.NoError(err)
 
-	proofParser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	proofParser, err := NewParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
 	require.NoError(err)
 
 	proof, err := db.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 500)
@@ -444,7 +444,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 	db, err := generateTrie(t, r, 500)
 	require.NoError(err)
 
-	proofParser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	proofParser, err := NewParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
 	require.NoError(err)
 
 	// Get last key in the proof
@@ -673,7 +673,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		require.NoError(err)
 
 		// Parse the proof and find the next key to get.
-		proofParser, err := newParser(localDB, merkledb.DefaultHasher, merkledb.BranchFactor16)
+		proofParser, err := NewParser(localDB, merkledb.DefaultHasher, merkledb.BranchFactor16)
 		require.NoError(err)
 		proofBytes, err := proto.Marshal(remoteProof.ToProto())
 		require.NoError(err)
@@ -884,7 +884,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			)
 			require.NoError(err)
 
-			parser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+			parser, err := NewParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
 			require.NoError(err)
 
 			var (
@@ -972,7 +972,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
-	parser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	parser, err := NewParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
 	require.NoError(err)
 
 	ctx := context.Background()
@@ -1070,7 +1070,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	)
 	require.NoError(err)
 
-	parser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	parser, err := NewParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
 	require.NoError(err)
 
 	// Only let one response go through until we update the root.
@@ -1133,7 +1133,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
-	parser, err := newParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
+	parser, err := NewParser(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
 	require.NoError(err)
 
 	ctx := context.Background()
