@@ -39,13 +39,12 @@ use std::ops::Deref;
 use std::sync::RwLock;
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use firewood::db::{Db, DbConfig, Proposal};
-use firewood::manager::{CacheReadStrategy, RevisionManagerConfig};
-
+use firewood::db::{Db, Proposal};
 use firewood::v2::api::{self, Db as _, DbView, HashKey, KeyValuePairIter, Proposal as _};
 use metrics::counter;
 
 use crate::arc_cache::ArcCache;
+pub use crate::handle::*;
 pub use crate::logging::*;
 pub use crate::value::*;
 
@@ -95,7 +94,7 @@ fn invoke_with_handle<H, T: NullHandleResult, V: Into<T>>(
     }
 }
 
-/// A handle to the database, returned by `fwd_create_db` and `fwd_open_db`.
+/// A handle to the database, returned by `fwd_open_db`.
 ///
 /// These handles are passed to the other FFI functions.
 ///
@@ -719,63 +718,6 @@ pub unsafe extern "C" fn fwd_free_value(value: Option<&mut Value>) -> VoidResult
     })
 }
 
-/// Struct returned by `fwd_create_db` and `fwd_open_db`
-#[derive(Debug)]
-#[repr(C)]
-pub struct DatabaseCreationResult {
-    pub db: Option<Box<DatabaseHandle<'static>>>,
-    pub error_str: Option<std::ptr::NonNull<u8>>,
-}
-
-impl From<Result<Db, String>> for DatabaseCreationResult {
-    fn from(result: Result<Db, String>) -> Self {
-        match result {
-            Ok(db) => DatabaseCreationResult {
-                db: Some(Box::new(db.into())),
-                error_str: None,
-            },
-            Err(error_msg) => {
-                let error_cstring = CString::new(error_msg).unwrap_or_default().into_raw();
-                DatabaseCreationResult {
-                    db: None,
-                    error_str: std::ptr::NonNull::new(error_cstring.cast::<u8>()),
-                }
-            }
-        }
-    }
-}
-
-/// Frees the memory associated with a `DatabaseCreationResult`.
-/// This only needs to be called if the `error_str` field is non-null.
-///
-/// # Arguments
-///
-/// * `result` - The `DatabaseCreationResult` to free, previously returned from `fwd_create_db` or `fwd_open_db`.
-///
-/// # Safety
-///
-/// This function is unsafe because it dereferences raw pointers.
-/// The caller must ensure that `result` is a valid pointer.
-///
-/// # Panics
-///
-/// This function panics if `result` is `null`.
-///
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_free_database_error_result(
-    result: Option<&mut DatabaseCreationResult>,
-) -> VoidResult {
-    invoke_with_handle(result, |result| {
-        // Free the error string if it exists
-        if let Some(nonnull) = result.error_str {
-            let raw_str = nonnull.cast::<c_char>().as_ptr();
-            let cstr = unsafe { CString::from_raw(raw_str) };
-            drop(cstr);
-        }
-        // Note: we don't free the db pointer as it's managed by the caller
-    })
-}
-
 /// Start metrics recorder for this process.
 ///
 /// # Returns
@@ -819,70 +761,26 @@ pub extern "C" fn fwd_gather() -> Value {
     metrics_setup::gather_metrics().map_or_else(Into::into, |s| s.as_bytes().into())
 }
 
-/// Common arguments, accepted by both `fwd_create_db()` and `fwd_open_db()`.
-///
-/// * `path` - The path to the database file, which will be truncated if passed to `fwd_create_db()`
-///   otherwise should exist if passed to `fwd_open_db()`.
-/// * `cache_size` - The size of the node cache, returns an error if <= 0
-/// * `free_list_cache_size` - The size of the free list cache, returns an error if <= 0
-/// * `revisions` - The maximum number of revisions to keep; firewood currently requires this to be at least 2.
-/// * `strategy` - The cache read strategy to use, 0 for writes only,
-///   1 for branch reads, and 2 for all reads.
-/// * `truncate` - Whether to truncate the database file if it exists.
-///   Returns an error if the value is not 0, 1, or 2.
-#[repr(C)]
-pub struct CreateOrOpenArgs<'a> {
-    path: BorrowedBytes<'a>,
-    cache_size: usize,
-    free_list_cache_size: usize,
-    revisions: usize,
-    strategy: u8,
-    truncate: bool,
-}
-
-/// Open a database with the given cache size and maximum number of revisions
+/// Open a database with the given arguments.
 ///
 /// # Arguments
 ///
-/// See `CreateOrOpenArgs`.
+/// See [`DatabaseHandleArgs`].
 ///
 /// # Returns
 ///
-/// A database handle, or panics if it cannot be created
+/// - [`HandleResult::Ok`] with the database handle if successful.
+/// - [`HandleResult::Err`] if an error occurs while opening the database.
 ///
 /// # Safety
 ///
-/// This function uses raw pointers so it is unsafe.
-/// It is the caller's responsibility to ensure that path is a valid pointer to a null-terminated string.
-/// The caller must also ensure that the cache size is greater than 0 and that the number of revisions is at least 2.
-/// The caller must call `close` to free the memory associated with the returned database handle.
-///
+/// The caller must:
+/// - ensure that the database is freed with [`fwd_close_db`] when no longer needed.
+/// - ensure that the database handle is freed only after freeing or committing
+///   all proposals created on it.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_open_db(args: CreateOrOpenArgs) -> DatabaseCreationResult {
-    unsafe { open_db(&args) }.into()
-}
-
-/// Internal call for `fwd_open_db` to remove error handling from the C API
-#[doc(hidden)]
-unsafe fn open_db(args: &CreateOrOpenArgs) -> Result<Db, String> {
-    let cfg = DbConfig::builder()
-        .truncate(args.truncate)
-        .manager(manager_config(
-            args.cache_size,
-            args.free_list_cache_size,
-            args.revisions,
-            args.strategy,
-        )?)
-        .build();
-
-    if args.path.is_empty() {
-        return Err("path should not be empty".to_string());
-    }
-    let path = args
-        .path
-        .as_str()
-        .map_err(|e| format!("Invalid database path: {e}"))?;
-    Db::new(path, cfg).map_err(|e| e.to_string())
+pub unsafe extern "C" fn fwd_open_db(args: DatabaseHandleArgs) -> HandleResult {
+    invoke(move || DatabaseHandle::new(args))
 }
 
 /// Start logs for this process.
@@ -904,36 +802,6 @@ unsafe fn open_db(args: &CreateOrOpenArgs) -> Result<Db, String> {
 #[unsafe(no_mangle)]
 pub extern "C" fn fwd_start_logs(args: LogArgs) -> VoidResult {
     invoke(move || args.start_logging())
-}
-
-#[doc(hidden)]
-fn manager_config(
-    cache_size: usize,
-    free_list_cache_size: usize,
-    revisions: usize,
-    strategy: u8,
-) -> Result<RevisionManagerConfig, String> {
-    let cache_read_strategy = match strategy {
-        0 => CacheReadStrategy::WritesOnly,
-        1 => CacheReadStrategy::BranchReads,
-        2 => CacheReadStrategy::All,
-        _ => return Err("invalid cache strategy".to_string()),
-    };
-    let config = RevisionManagerConfig::builder()
-        .node_cache_size(
-            cache_size
-                .try_into()
-                .map_err(|_| "cache size should be non-zero")?,
-        )
-        .max_revisions(revisions)
-        .cache_read_strategy(cache_read_strategy)
-        .free_list_cache_size(
-            free_list_cache_size
-                .try_into()
-                .map_err(|_| "free list cache size should be non-zero")?,
-        )
-        .build();
-    Ok(config)
 }
 
 /// Close and free the memory for a database handle

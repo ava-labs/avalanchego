@@ -41,6 +41,38 @@ impl<E: fmt::Display> From<Result<(), E>> for VoidResult {
     }
 }
 
+/// The result type returned from the open or create database functions.
+#[derive(Debug)]
+#[repr(C)]
+pub enum HandleResult {
+    /// The database was opened or created successfully and the handle is
+    /// returned as an opaque pointer.
+    ///
+    /// The caller must ensure that [`fwd_close_db`] is called to free resources
+    /// associated with this handle when it is no longer needed.
+    ///
+    /// [`fwd_close_db`]: crate::fwd_close_db
+    Ok(Box<crate::DatabaseHandle<'static>>),
+
+    /// An error occurred and the message is returned as an [`OwnedBytes`]. If
+    /// value is guaranteed to contain only valid UTF-8.
+    ///
+    /// The caller must call [`fwd_free_owned_bytes`] to free the memory
+    /// associated with this error.
+    ///
+    /// [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+    Err(OwnedBytes),
+}
+
+impl<E: fmt::Display> From<Result<crate::DatabaseHandle<'static>, E>> for HandleResult {
+    fn from(value: Result<crate::DatabaseHandle<'static>, E>) -> Self {
+        match value {
+            Ok(handle) => HandleResult::Ok(Box::new(handle)),
+            Err(err) => HandleResult::Err(err.to_string().into_bytes().into()),
+        }
+    }
+}
+
 /// Helper trait to handle the different result types returned from FFI functions.
 ///
 /// Once Try trait is stable, we can use that instead of this trait:
@@ -81,6 +113,12 @@ impl NullHandleResult for VoidResult {
 }
 
 impl CResult for VoidResult {
+    fn from_err(err: impl ToString) -> Self {
+        Self::Err(err.to_string().into_bytes().into())
+    }
+}
+
+impl CResult for HandleResult {
     fn from_err(err: impl ToString) -> Self {
         Self::Err(err.to_string().into_bytes().into())
     }
