@@ -168,8 +168,8 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
-	numKeys := 1000
-	db, err := generateTrie(t, r, numKeys)
+	numKeys := 500
+	db, err := generateTrie(t, r, 2*numKeys)
 	require.NoError(err)
 	root, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
