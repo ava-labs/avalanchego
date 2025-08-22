@@ -131,6 +131,22 @@ typedef struct DatabaseCreationResult {
   uint8_t *error_str;
 } DatabaseCreationResult;
 
+/**
+ * A Rust-owned vector of bytes that can be passed to C code.
+ *
+ * C callers must free this memory using the respective FFI function for the
+ * concrete type (but not using the `free` function from the C standard library).
+ */
+typedef struct OwnedSlice_u8 {
+  uint8_t *ptr;
+  size_t len;
+} OwnedSlice_u8;
+
+/**
+ * A type alias for a rust-owned byte slice.
+ */
+typedef struct OwnedSlice_u8 OwnedBytes;
+
 typedef uint32_t ProposalId;
 
 /**
@@ -277,6 +293,22 @@ struct Value fwd_drop_proposal(const struct DatabaseHandle *db, uint32_t proposa
  *
  */
 void fwd_free_database_error_result(struct DatabaseCreationResult *result);
+
+/**
+ * Consumes the [`OwnedBytes`] and frees the memory associated with it.
+ *
+ * # Arguments
+ *
+ * * `bytes` - The [`OwnedBytes`] struct to free, previously returned from any
+ *   function from this library.
+ *
+ * # Safety
+ *
+ * The caller must ensure that the `bytes` struct is valid and that the memory
+ * it points to is uniquely owned by this object. However, if `bytes.ptr` is null,
+ * this function does nothing.
+ */
+void fwd_free_owned_bytes(OwnedBytes bytes);
 
 /**
  * Frees the memory associated with a `Value`.

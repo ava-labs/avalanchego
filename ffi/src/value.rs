@@ -4,7 +4,9 @@
 mod borrowed;
 mod display_hex;
 mod kvp;
+mod owned;
 
 pub use self::borrowed::{BorrowedBytes, BorrowedKeyValuePairs, BorrowedSlice};
 use self::display_hex::DisplayHex;
 pub use self::kvp::KeyValuePair;
+pub use self::owned::{OwnedBytes, OwnedSlice};

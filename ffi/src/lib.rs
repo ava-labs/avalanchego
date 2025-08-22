@@ -990,6 +990,23 @@ pub unsafe extern "C" fn fwd_close_db(db: Option<&mut DatabaseHandle>) {
     // The database handle will be dropped automatically when db_handle goes out of scope
 }
 
+/// Consumes the [`OwnedBytes`] and frees the memory associated with it.
+///
+/// # Arguments
+///
+/// * `bytes` - The [`OwnedBytes`] struct to free, previously returned from any
+///   function from this library.
+///
+/// # Safety
+///
+/// The caller must ensure that the `bytes` struct is valid and that the memory
+/// it points to is uniquely owned by this object. However, if `bytes.ptr` is null,
+/// this function does nothing.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fwd_free_owned_bytes(bytes: OwnedBytes) {
+    drop(bytes);
+}
+
 #[cfg(test)]
 mod tests {
     #![expect(clippy::unwrap_used)]
