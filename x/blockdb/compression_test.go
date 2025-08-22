@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package blockdb
@@ -23,8 +23,7 @@ func checkBlockCompression(t *testing.T, db *Database, height uint64) bool {
 	_, err = dataFile.ReadAt(blockHeaderBuf, int64(localOffset))
 	require.NoError(t, err)
 	var blockHeader blockEntryHeader
-	err = blockHeader.UnmarshalBinary(blockHeaderBuf)
-	require.NoError(t, err)
+	require.NoError(t, blockHeader.UnmarshalBinary(blockHeaderBuf))
 
 	return blockHeader.Compressed
 }
@@ -40,8 +39,7 @@ func TestCompression_Enabled(t *testing.T) {
 		"test block data with some repetitive content that should compress well")
 	height := uint64(1)
 
-	err := db.WriteBlock(height, blockData)
-	require.NoError(t, err)
+	require.NoError(t, db.WriteBlock(height, blockData))
 
 	// Read the block back
 	readBlock, err := db.ReadBlock(height)
@@ -59,8 +57,7 @@ func TestCompression_Enabled(t *testing.T) {
 	_, err = dataFile.ReadAt(blockHeaderBuf, int64(localOffset))
 	require.NoError(t, err)
 	var blockHeader blockEntryHeader
-	err = blockHeader.UnmarshalBinary(blockHeaderBuf)
-	require.NoError(t, err)
+	require.NoError(t, blockHeader.UnmarshalBinary(blockHeaderBuf))
 	compressedData := make([]byte, blockHeader.Size)
 	_, err = dataFile.ReadAt(compressedData, int64(localOffset+uint64(sizeOfBlockEntryHeader)))
 	require.NoError(t, err)
@@ -92,8 +89,7 @@ func TestCompression_Recovery(t *testing.T) {
 	for i := range 5 {
 		height := uint64(i + 1)
 
-		err := db.WriteBlock(height, allBlocks[i])
-		require.NoError(t, err)
+		require.NoError(t, db.WriteBlock(height, allBlocks[i]))
 
 		// Verify compression was used
 		require.True(t, checkBlockCompression(t, db, height), "Block %d should be compressed", height)
@@ -108,8 +104,7 @@ func TestCompression_Recovery(t *testing.T) {
 	for i := range 5 {
 		height := uint64(i + 6) // Heights 6-10
 
-		err := db.WriteBlock(height, allBlocks[i+5])
-		require.NoError(t, err)
+		require.NoError(t, db.WriteBlock(height, allBlocks[i+5]))
 
 		// Verify compression was not used
 		require.False(t, checkBlockCompression(t, db, height), "Block %d should not be compressed", height)
@@ -126,8 +121,7 @@ func TestCompression_Recovery(t *testing.T) {
 
 	// Step 5: Delete index file
 	indexPath := filepath.Join(dir, indexFileName)
-	err := os.Remove(indexPath)
-	require.NoError(t, err, "Failed to delete index file")
+	require.NoError(t, os.Remove(indexPath), "Failed to delete index file")
 
 	// Step 6: Open database (this should trigger recovery)
 	db, cleanup = newTestDatabase(t, config)

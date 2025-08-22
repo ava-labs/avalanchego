@@ -241,7 +241,7 @@ func TestFileCache_Eviction(t *testing.T) {
 		// small max data file size to force multiple data files.
 		// When trying to write or read a block, all other file handlers will be evicted.
 		{
-			name:   "retry opening data file if its evicted",
+			name:   "retry opening data file if it's evicted",
 			config: DefaultConfig().WithMaxDataFiles(1),
 		},
 	}

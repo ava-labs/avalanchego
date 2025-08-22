@@ -182,7 +182,7 @@ type blockHeights struct {
 	maxContiguousHeight BlockHeight
 }
 
-// Database stores blockchain blocks on disk and provides methods to read, and write blocks.
+// Database stores blockchain blocks on disk and provides methods to read and write blocks.
 type Database struct {
 	indexFile  *os.File
 	config     DatabaseConfig
@@ -729,7 +729,7 @@ func (s *Database) recover() error {
 			"(calculated: %d bytes, index header: %d bytes)",
 			ErrCorrupted, calculatedNextDataWriteOffset, nextDataWriteOffset)
 	default:
-		// The data on disk is ahead of the index. We need to recover un-indexed blocks.
+		// The data on disk is ahead of the index. We need to recover unindexed blocks.
 		if err := s.recoverUnindexedBlocks(nextDataWriteOffset, calculatedNextDataWriteOffset); err != nil {
 			return err
 		}
@@ -739,7 +739,7 @@ func (s *Database) recover() error {
 
 // recoverUnindexedBlocks scans data files from the given offset and recovers blocks that were written but not indexed.
 func (s *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error {
-	s.log.Info("Recovery: data files are ahead of index; recovering un-indexed blocks.",
+	s.log.Info("Recovery: data files are ahead of index; recovering unindexed blocks.",
 		zap.Uint64("startOffset", startOffset),
 		zap.Uint64("endOffset", endOffset),
 	)
@@ -751,7 +751,7 @@ func (s *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error {
 		bh, err := s.recoverBlockAtOffset(currentScanOffset, endOffset)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				// reach end of this file, try to read the next file
+				// Reached end of this file, try to read the next file
 				currentFileIndex := int(currentScanOffset / s.header.MaxDataFileSize)
 				nextFileIndex, err := safemath.Add(uint64(currentFileIndex), 1)
 				if err != nil {
