@@ -40,8 +40,7 @@ use std::sync::RwLock;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use firewood::db::{Db, Proposal};
-use firewood::v2::api::{self, Db as _, DbView, HashKey, KeyValuePairIter, Proposal as _};
-use metrics::counter;
+use firewood::v2::api::{self, Db as _, DbView, KeyValuePairIter, Proposal as _};
 
 use crate::arc_cache::ArcCache;
 pub use crate::handle::*;
@@ -106,7 +105,7 @@ pub struct DatabaseHandle<'p> {
     proposals: RwLock<HashMap<ProposalId, Proposal<'p>>>,
 
     /// A single cached view to improve performance of reads while committing
-    cached_view: ArcCache<HashKey, dyn api::DynDbView>,
+    cached_view: ArcCache<api::HashKey, dyn api::DynDbView>,
 
     /// The database
     db: Db,
@@ -269,7 +268,7 @@ fn get_from_root(
     key: &[u8],
 ) -> Result<Value, String> {
     let db = db.ok_or("db should be non-null")?;
-    let requested_root = HashKey::try_from(root).map_err(|e| e.to_string())?;
+    let requested_root = api::HashKey::try_from(root).map_err(|e| e.to_string())?;
     let cached_view = db.get_root(requested_root).map_err(|e| e.to_string())?;
     let value = cached_view.val(key).map_err(|e| e.to_string())?.ok_or("")?;
     Ok(value.into())
@@ -279,68 +278,30 @@ fn get_from_root(
 ///
 /// # Arguments
 ///
-/// * `db` - The database handle returned by `open_db`
-/// * `values` - A `BorrowedKeyValuePairs` struct containing the key-value pairs to put.
+/// * `db` - The database handle returned by [`fwd_open_db`]
+/// * `values` - A [`BorrowedKeyValuePairs`] containing the key-value pairs to put.
 ///
 /// # Returns
 ///
-/// The new root hash of the database, in Value form.
-/// A `Value` containing {0, "error message"} if the commit failed.
-///
-/// # Errors
-///
-/// * `"key-value pair is null"` - A `KeyValue` struct is null
-/// * `"db should be non-null"` - The database handle is null
-/// * `"couldn't get key-value pair"` - A `KeyValue` struct is null
-/// * `"proposed revision is empty"` - The proposed revision is empty
+/// - [`HashResult::NullHandlePointer`] if the provided database handle is null.
+/// - [`HashResult::None`] if the commit resulted in an empty database.
+/// - [`HashResult::Some`] if the commit was successful, containing the new root hash.
+/// - [`HashResult::Err`] if an error occurred while committing the batch.
 ///
 /// # Safety
 ///
-/// This function is unsafe because it dereferences raw pointers.
 /// The caller must:
-///  * ensure that `db` is a valid pointer returned by `open_db`
-///  * ensure that `values` is a valid pointer and that it points to an array of `KeyValue` structs of length `nkeys`.
-///  * ensure that the `Value` fields of the `KeyValue` structs are valid pointers.
-///
+/// * ensure that `db` is a valid pointer to a [`DatabaseHandle`]
+/// * ensure that `values` is valid for [`BorrowedKeyValuePairs`]
+/// * call [`fwd_free_owned_bytes`] to free the memory associated with the
+///   returned error ([`HashKey`] does not need to be freed as it is returned by
+///   value).
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_batch(
-    db: Option<&DatabaseHandle<'_>>,
-    values: BorrowedKeyValuePairs,
-) -> Value {
-    batch(db, &values).unwrap_or_else(Into::into)
-}
-
-/// Internal call for `fwd_batch` to remove error handling from the C API
-#[doc(hidden)]
-fn batch(db: Option<&DatabaseHandle<'_>>, values: &[KeyValuePair<'_>]) -> Result<Value, String> {
-    let db = db.ok_or("db should be non-null")?;
-    let start = coarsetime::Instant::now();
-
-    // Create a batch of operations to perform.
-    let batch = values.iter().map_into_batch();
-
-    // Propose the batch of operations.
-    let proposal = db.propose(batch).map_err(|e| e.to_string())?;
-    let propose_time = start.elapsed().as_millis();
-    counter!("firewood.ffi.propose_ms").increment(propose_time);
-
-    let hash_val = proposal
-        .root_hash()
-        .map_err(|e| e.to_string())?
-        .ok_or("Proposed revision is empty")?
-        .as_slice()
-        .into();
-
-    // Commit the proposal.
-    proposal.commit().map_err(|e| e.to_string())?;
-
-    // Get the root hash of the database post-commit.
-    let propose_plus_commit_time = start.elapsed().as_millis();
-    counter!("firewood.ffi.batch_ms").increment(propose_plus_commit_time);
-    counter!("firewood.ffi.commit_ms")
-        .increment(propose_plus_commit_time.saturating_sub(propose_time));
-    counter!("firewood.ffi.batch").increment(1);
-    Ok(hash_val)
+    db: Option<&DatabaseHandle>,
+    values: BorrowedKeyValuePairs<'_>,
+) -> HashResult {
+    invoke_with_handle(db, move |db| db.create_batch(values))
 }
 
 /// Proposes a batch of operations to the database.
@@ -491,35 +452,11 @@ fn propose_on_proposal(
 /// The caller must ensure that `db` is a valid pointer returned by `open_db`
 ///
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_commit(db: Option<&DatabaseHandle<'_>>, proposal_id: u32) -> Value {
-    commit(db, proposal_id).map_or_else(Into::into, Into::into)
-}
-
-/// Internal call for `fwd_commit` to remove error handling from the C API
-#[doc(hidden)]
-fn commit(db: Option<&DatabaseHandle<'_>>, proposal_id: u32) -> Result<(), String> {
-    let db = db.ok_or("db should be non-null")?;
-    let proposal = db
-        .proposals
-        .write()
-        .map_err(|_| "proposal lock is poisoned")?
-        .remove(&proposal_id)
-        .ok_or("proposal not found")?;
-
-    // Get the proposal hash and cache the view. We never cache an empty proposal.
-    let proposal_hash = proposal.root_hash();
-
-    if let Ok(Some(ref hash_key)) = proposal_hash {
-        _ = db.get_root(hash_key.clone());
-    }
-
-    // Commit the proposal
-    let result = proposal.commit().map_err(|e| e.to_string());
-
-    // Clear the cache, which will force readers after this point to find the committed root hash
-    db.clear_cached_view();
-
-    result
+pub unsafe extern "C" fn fwd_commit(
+    db: Option<&DatabaseHandle<'_>>,
+    proposal_id: u32,
+) -> HashResult {
+    invoke_with_handle(db, move |db| db.commit_proposal(proposal_id))
 }
 
 /// Drops a proposal from the database.
@@ -559,34 +496,24 @@ fn drop_proposal(db: Option<&DatabaseHandle<'_>>, proposal_id: u32) -> Result<()
 ///
 /// # Argument
 ///
-/// * `db` - The database handle returned by `open_db`
+/// * `db` - The database handle returned by [`fwd_open_db`]
 ///
 /// # Returns
 ///
-/// A `Value` containing the root hash of the database.
-/// A `Value` containing {0, "error message"} if the root hash could not be retrieved.
-/// One expected error is "IO error: Root hash not found" if the database is empty.
-/// This should be handled by the caller.
+/// - [`HashResult::NullHandlePointer`] if the provided database handle is null.
+/// - [`HashResult::None`] if the database is empty.
+/// - [`HashResult::Some`] with the root hash of the database.
+/// - [`HashResult::Err`] if an error occurred while looking up the root hash.
 ///
 /// # Safety
 ///
-/// This function is unsafe because it dereferences raw pointers.
-/// The caller must ensure that `db` is a valid pointer returned by `open_db`
-///
+/// * ensure that `db` is a valid pointer to a [`DatabaseHandle`]
+/// * call [`fwd_free_owned_bytes`] to free the memory associated with the
+///   returned error ([`HashKey`] does not need to be freed as it is returned
+///   by value).
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn fwd_root_hash(db: Option<&DatabaseHandle<'_>>) -> Value {
-    root_hash(db).unwrap_or_else(Into::into)
-}
-
-/// This function is not exposed to the C API.
-/// Internal call for `fwd_root_hash` to remove error handling from the C API
-#[doc(hidden)]
-fn root_hash(db: Option<&DatabaseHandle<'_>>) -> Result<Value, String> {
-    let db = db.ok_or("db should be non-null")?;
-    db.root_hash()
-        .map_err(|e| e.to_string())?
-        .map(|root| Value::from(root.as_slice()))
-        .map_or_else(|| Ok(Value::default()), Ok)
+pub unsafe extern "C" fn fwd_root_hash(db: Option<&DatabaseHandle>) -> HashResult {
+    invoke_with_handle(db, DatabaseHandle::current_root_hash)
 }
 
 /// A value returned by the FFI.

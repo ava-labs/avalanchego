@@ -20,24 +20,78 @@
 typedef struct DatabaseHandle DatabaseHandle;
 
 /**
- * A value returned by the FFI.
+ * A database hash key, used in FFI functions that require hashes.
+ * This type requires no allocation and can be copied freely and
+ * dropped without any additional overhead.
  *
- * This is used in several different ways, including:
- * * An C-style string.
- * * An ID for a proposal.
- * * A byte slice containing data.
- *
- * For more details on how the data may be stored, refer to the function signature
- * that returned it or the `From` implementations.
- *
- * The data stored in this struct (if `data` is not null) must be manually freed
- * by the caller using `fwd_free_value`.
- *
+ * This is useful because it is the same size as 4 words which is equivalent
+ * to 2 heap-allocated slices (pointer + length each), or 1.5 vectors (which
+ * uses an extra word for allocation capacity) and it can be passed around
+ * without needing to allocate or deallocate memory.
  */
-typedef struct Value {
+typedef struct HashKey {
+  uint8_t _0[32];
+} HashKey;
+
+/**
+ * A Rust-owned vector of bytes that can be passed to C code.
+ *
+ * C callers must free this memory using the respective FFI function for the
+ * concrete type (but not using the `free` function from the C standard library).
+ */
+typedef struct OwnedSlice_u8 {
+  uint8_t *ptr;
   size_t len;
-  uint8_t *data;
-} Value;
+} OwnedSlice_u8;
+
+/**
+ * A type alias for a rust-owned byte slice.
+ */
+typedef struct OwnedSlice_u8 OwnedBytes;
+
+/**
+ * A result type returned from FFI functions return the database root hash. This
+ * may or may not be after a mutation.
+ */
+typedef enum HashResult_Tag {
+  /**
+   * The caller provided a null pointer to a database handle.
+   */
+  HashResult_NullHandlePointer,
+  /**
+   * The proposal resulted in an empty database or the database currently has
+   * no root hash.
+   */
+  HashResult_None,
+  /**
+   * The mutation was successful and the root hash is returned, if this result
+   * was from a mutation. Otherwise, this is the current root hash of the
+   * database.
+   */
+  HashResult_Some,
+  /**
+   * An error occurred and the message is returned as an [`OwnedBytes`]. If
+   * value is guaranteed to contain only valid UTF-8.
+   *
+   * The caller must call [`fwd_free_owned_bytes`] to free the memory
+   * associated with this error.
+   *
+   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+   */
+  HashResult_Err,
+} HashResult_Tag;
+
+typedef struct HashResult {
+  HashResult_Tag tag;
+  union {
+    struct {
+      struct HashKey some;
+    };
+    struct {
+      OwnedBytes err;
+    };
+  };
+} HashResult;
 
 /**
  * A borrowed byte slice. Used to represent data that was passed in from C
@@ -124,22 +178,6 @@ typedef struct BorrowedSlice_KeyValuePair {
 typedef struct BorrowedSlice_KeyValuePair BorrowedKeyValuePairs;
 
 /**
- * A Rust-owned vector of bytes that can be passed to C code.
- *
- * C callers must free this memory using the respective FFI function for the
- * concrete type (but not using the `free` function from the C standard library).
- */
-typedef struct OwnedSlice_u8 {
-  uint8_t *ptr;
-  size_t len;
-} OwnedSlice_u8;
-
-/**
- * A type alias for a rust-owned byte slice.
- */
-typedef struct OwnedSlice_u8 OwnedBytes;
-
-/**
  * The result type returned from an FFI function that returns no value but may
  * return an error.
  */
@@ -172,6 +210,26 @@ typedef struct VoidResult {
     };
   };
 } VoidResult;
+
+/**
+ * A value returned by the FFI.
+ *
+ * This is used in several different ways, including:
+ * * An C-style string.
+ * * An ID for a proposal.
+ * * A byte slice containing data.
+ *
+ * For more details on how the data may be stored, refer to the function signature
+ * that returned it or the `From` implementations.
+ *
+ * The data stored in this struct (if `data` is not null) must be manually freed
+ * by the caller using `fwd_free_value`.
+ *
+ */
+typedef struct Value {
+  size_t len;
+  uint8_t *data;
+} Value;
 
 typedef uint32_t ProposalId;
 
@@ -288,32 +346,26 @@ typedef struct LogArgs {
  *
  * # Arguments
  *
- * * `db` - The database handle returned by `open_db`
- * * `values` - A `BorrowedKeyValuePairs` struct containing the key-value pairs to put.
+ * * `db` - The database handle returned by [`fwd_open_db`]
+ * * `values` - A [`BorrowedKeyValuePairs`] containing the key-value pairs to put.
  *
  * # Returns
  *
- * The new root hash of the database, in Value form.
- * A `Value` containing {0, "error message"} if the commit failed.
- *
- * # Errors
- *
- * * `"key-value pair is null"` - A `KeyValue` struct is null
- * * `"db should be non-null"` - The database handle is null
- * * `"couldn't get key-value pair"` - A `KeyValue` struct is null
- * * `"proposed revision is empty"` - The proposed revision is empty
+ * - [`HashResult::NullHandlePointer`] if the provided database handle is null.
+ * - [`HashResult::None`] if the commit resulted in an empty database.
+ * - [`HashResult::Some`] if the commit was successful, containing the new root hash.
+ * - [`HashResult::Err`] if an error occurred while committing the batch.
  *
  * # Safety
  *
- * This function is unsafe because it dereferences raw pointers.
  * The caller must:
- *  * ensure that `db` is a valid pointer returned by `open_db`
- *  * ensure that `values` is a valid pointer and that it points to an array of `KeyValue` structs of length `nkeys`.
- *  * ensure that the `Value` fields of the `KeyValue` structs are valid pointers.
- *
+ * * ensure that `db` is a valid pointer to a [`DatabaseHandle`]
+ * * ensure that `values` is valid for [`BorrowedKeyValuePairs`]
+ * * call [`fwd_free_owned_bytes`] to free the memory associated with the
+ *   returned error ([`HashKey`] does not need to be freed as it is returned by
+ *   value).
  */
-struct Value fwd_batch(const struct DatabaseHandle *db,
-                       BorrowedKeyValuePairs values);
+struct HashResult fwd_batch(const struct DatabaseHandle *db, BorrowedKeyValuePairs values);
 
 /**
  * Close and free the memory for a database handle
@@ -356,7 +408,7 @@ struct VoidResult fwd_close_db(struct DatabaseHandle *db);
  * The caller must ensure that `db` is a valid pointer returned by `open_db`
  *
  */
-struct Value fwd_commit(const struct DatabaseHandle *db, uint32_t proposal_id);
+struct HashResult fwd_commit(const struct DatabaseHandle *db, uint32_t proposal_id);
 
 /**
  * Drops a proposal from the database.
@@ -586,22 +638,23 @@ struct Value fwd_propose_on_proposal(const struct DatabaseHandle *db,
  *
  * # Argument
  *
- * * `db` - The database handle returned by `open_db`
+ * * `db` - The database handle returned by [`fwd_open_db`]
  *
  * # Returns
  *
- * A `Value` containing the root hash of the database.
- * A `Value` containing {0, "error message"} if the root hash could not be retrieved.
- * One expected error is "IO error: Root hash not found" if the database is empty.
- * This should be handled by the caller.
+ * - [`HashResult::NullHandlePointer`] if the provided database handle is null.
+ * - [`HashResult::None`] if the database is empty.
+ * - [`HashResult::Some`] with the root hash of the database.
+ * - [`HashResult::Err`] if an error occurred while looking up the root hash.
  *
  * # Safety
  *
- * This function is unsafe because it dereferences raw pointers.
- * The caller must ensure that `db` is a valid pointer returned by `open_db`
- *
+ * * ensure that `db` is a valid pointer to a [`DatabaseHandle`]
+ * * call [`fwd_free_owned_bytes`] to free the memory associated with the
+ *   returned error ([`HashKey`] does not need to be freed as it is returned
+ *   by value).
  */
-struct Value fwd_root_hash(const struct DatabaseHandle *db);
+struct HashResult fwd_root_hash(const struct DatabaseHandle *db);
 
 /**
  * Start logs for this process.

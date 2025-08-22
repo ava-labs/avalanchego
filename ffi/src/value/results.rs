@@ -3,7 +3,9 @@
 
 use std::fmt;
 
-use crate::OwnedBytes;
+use firewood::v2::api;
+
+use crate::{HashKey, OwnedBytes};
 
 /// The result type returned from an FFI function that returns no value but may
 /// return an error.
@@ -73,6 +75,40 @@ impl<E: fmt::Display> From<Result<crate::DatabaseHandle<'static>, E>> for Handle
     }
 }
 
+/// A result type returned from FFI functions return the database root hash. This
+/// may or may not be after a mutation.
+#[derive(Debug)]
+#[repr(C)]
+pub enum HashResult {
+    /// The caller provided a null pointer to a database handle.
+    NullHandlePointer,
+    /// The proposal resulted in an empty database or the database currently has
+    /// no root hash.
+    None,
+    /// The mutation was successful and the root hash is returned, if this result
+    /// was from a mutation. Otherwise, this is the current root hash of the
+    /// database.
+    Some(HashKey),
+    /// An error occurred and the message is returned as an [`OwnedBytes`]. If
+    /// value is guaranteed to contain only valid UTF-8.
+    ///
+    /// The caller must call [`fwd_free_owned_bytes`] to free the memory
+    /// associated with this error.
+    ///
+    /// [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+    Err(OwnedBytes),
+}
+
+impl<E: fmt::Display> From<Result<Option<api::HashKey>, E>> for HashResult {
+    fn from(value: Result<Option<api::HashKey>, E>) -> Self {
+        match value {
+            Ok(None) => HashResult::None,
+            Ok(Some(hash)) => HashResult::Some(HashKey::from(hash)),
+            Err(err) => HashResult::Err(err.to_string().into_bytes().into()),
+        }
+    }
+}
+
 /// Helper trait to handle the different result types returned from FFI functions.
 ///
 /// Once Try trait is stable, we can use that instead of this trait:
@@ -119,6 +155,18 @@ impl CResult for VoidResult {
 }
 
 impl CResult for HandleResult {
+    fn from_err(err: impl ToString) -> Self {
+        Self::Err(err.to_string().into_bytes().into())
+    }
+}
+
+impl NullHandleResult for HashResult {
+    fn null_handle_pointer_error() -> Self {
+        Self::NullHandlePointer
+    }
+}
+
+impl CResult for HashResult {
     fn from_err(err: impl ToString) -> Self {
         Self::Err(err.to_string().into_bytes().into())
     }

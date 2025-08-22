@@ -128,9 +128,7 @@ func (p *Proposal) Commit() error {
 		return errDroppedProposal
 	}
 
-	// Commit the proposal and return the hash.
-	errVal := C.fwd_commit(p.handle, C.uint32_t(p.id))
-	err := errorFromValue(&errVal)
+	_, err := getHashKeyFromHashResult(C.fwd_commit(p.handle, C.uint32_t(p.id)))
 	if err != nil {
 		// this is unrecoverable due to Rust's ownership model
 		// The underlying proposal is no longer valid.

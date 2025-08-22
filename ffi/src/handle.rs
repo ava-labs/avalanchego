@@ -4,11 +4,11 @@
 use firewood::{
     db::{Db, DbConfig},
     manager::RevisionManagerConfig,
-    v2::api::{self, ArcDynDbView, HashKey},
+    v2::api::{self, ArcDynDbView, Db as _, DbView, HashKey, Proposal as _},
 };
 use metrics::counter;
 
-use crate::{BorrowedBytes, DatabaseHandle};
+use crate::{BorrowedBytes, DatabaseHandle, KeyValuePair};
 
 /// Arguments for creating or opening a database. These are passed to [`fwd_open_db`]
 ///
@@ -99,6 +99,73 @@ impl DatabaseHandle<'_> {
         }
 
         Db::new(path, cfg).map(Self::from)
+    }
+
+    /// Returns the current root hash of the database.
+    ///
+    /// # Errors
+    ///
+    /// An error is returned if there was an i/o error while reading the root hash.
+    pub fn current_root_hash(&self) -> Result<Option<HashKey>, api::Error> {
+        self.db.root_hash()
+    }
+
+    /// Creates a proposal with the given values and returns the proposal and the start time.
+    ///
+    /// # Errors
+    ///
+    /// An error is returned if the proposal could not be created.
+    pub fn create_batch<'kvp>(
+        &self,
+        values: (impl AsRef<[KeyValuePair<'kvp>]> + 'kvp),
+    ) -> Result<Option<HashKey>, api::Error> {
+        let start = coarsetime::Instant::now();
+
+        let proposal = self.db.propose(values.as_ref())?;
+
+        let propose_time = start.elapsed().as_millis();
+        counter!("firewood.ffi.propose_ms").increment(propose_time);
+
+        let hash_val = proposal.root_hash()?;
+
+        proposal.commit()?;
+
+        let propose_plus_commit_time = start.elapsed().as_millis();
+        counter!("firewood.ffi.batch_ms").increment(propose_plus_commit_time);
+        counter!("firewood.ffi.commit_ms")
+            .increment(propose_plus_commit_time.saturating_sub(propose_time));
+        counter!("firewood.ffi.batch").increment(1);
+
+        Ok(hash_val)
+    }
+
+    /// Commits a proposal with the given ID.
+    ///
+    /// # Errors
+    ///
+    /// An error is returned if the proposal could not be committed, or if the proposal ID is invalid.
+    pub fn commit_proposal(&self, proposal_id: u32) -> Result<Option<HashKey>, String> {
+        let proposal = self
+            .proposals
+            .write()
+            .map_err(|_| "proposal lock is poisoned")?
+            .remove(&proposal_id)
+            .ok_or("proposal not found")?;
+
+        // Get the proposal hash and cache the view. We never cache an empty proposal.
+        let proposal_hash = proposal.root_hash().map_err(|e| e.to_string())?;
+
+        if let Some(ref hash_key) = proposal_hash {
+            _ = self.get_root(hash_key.clone());
+        }
+
+        // Commit the proposal
+        let result = proposal.commit().map_err(|e| e.to_string());
+
+        // Clear the cache, which will force readers after this point to find the committed root hash
+        self.clear_cached_view();
+
+        result.map(|()| proposal_hash)
     }
 
     pub(crate) fn get_root(&self, root: HashKey) -> Result<ArcDynDbView, api::Error> {
