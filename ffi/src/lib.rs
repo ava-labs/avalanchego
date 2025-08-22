@@ -26,6 +26,8 @@
     )
 )]
 
+mod arc_cache;
+mod handle;
 mod metrics_setup;
 mod value;
 
@@ -33,15 +35,16 @@ use std::collections::HashMap;
 use std::ffi::{CStr, CString, c_char};
 use std::fmt::{self, Display, Formatter};
 use std::ops::Deref;
+use std::sync::RwLock;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::{Mutex, RwLock};
 
 use firewood::db::{Db, DbConfig, Proposal};
 use firewood::manager::{CacheReadStrategy, RevisionManagerConfig};
 
-use firewood::v2::api::{ArcDynDbView, Db as _, DbView, HashKey, KeyValuePairIter, Proposal as _};
+use firewood::v2::api::{self, Db as _, DbView, HashKey, KeyValuePairIter, Proposal as _};
 use metrics::counter;
 
+use crate::arc_cache::ArcCache;
 pub use crate::value::*;
 
 #[cfg(unix)]
@@ -72,7 +75,7 @@ pub struct DatabaseHandle<'p> {
     proposals: RwLock<HashMap<ProposalId, Proposal<'p>>>,
 
     /// A single cached view to improve performance of reads while committing
-    cached_view: Mutex<Option<(HashKey, ArcDynDbView)>>,
+    cached_view: ArcCache<HashKey, dyn api::DynDbView>,
 
     /// The database
     db: Db,
@@ -83,17 +86,8 @@ impl From<Db> for DatabaseHandle<'_> {
         Self {
             db,
             proposals: RwLock::new(HashMap::new()),
-            cached_view: Mutex::new(None),
+            cached_view: ArcCache::new(),
         }
-    }
-}
-
-impl DatabaseHandle<'_> {
-    fn clear_cached_view(&self) {
-        self.cached_view
-            .lock()
-            .expect("cached_view lock is poisoned")
-            .take();
     }
 }
 
@@ -245,33 +239,9 @@ fn get_from_root(
 ) -> Result<Value, String> {
     let db = db.ok_or("db should be non-null")?;
     let requested_root = HashKey::try_from(root).map_err(|e| e.to_string())?;
-    let mut cached_view = db.cached_view.lock().expect("cached_view lock is poisoned");
-    let value = match cached_view.as_ref() {
-        // found the cached view, use it
-        Some((root_hash, view)) if root_hash == &requested_root => {
-            counter!("firewood.ffi.cached_view.hit").increment(1);
-            view.val(key)
-        }
-        // If what was there didn't match the requested root, we need a new view, so we
-        // update the cache
-        _ => {
-            counter!("firewood.ffi.cached_view.miss").increment(1);
-            let rev = view_sync_from_root(db, root)?;
-            let result = rev.val(key);
-            *cached_view = Some((requested_root.clone(), rev));
-            result
-        }
-    }
-    .map_err(|e| e.to_string())?
-    .ok_or("")?;
-
+    let cached_view = db.get_root(requested_root).map_err(|e| e.to_string())?;
+    let value = cached_view.val(key).map_err(|e| e.to_string())?.ok_or("")?;
     Ok(value.into())
-}
-fn view_sync_from_root(db: &DatabaseHandle<'_>, root: &[u8]) -> Result<ArcDynDbView, String> {
-    let rev = db
-        .view(HashKey::try_from(root).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
-    Ok(rev)
 }
 
 /// Puts the given key-value pairs into the database.
@@ -508,13 +478,8 @@ fn commit(db: Option<&DatabaseHandle<'_>>, proposal_id: u32) -> Result<(), Strin
     // Get the proposal hash and cache the view. We never cache an empty proposal.
     let proposal_hash = proposal.root_hash();
 
-    if let Ok(Some(proposal_hash)) = proposal_hash {
-        let mut guard = db.cached_view.lock().expect("cached_view lock is poisoned");
-        match db.view(proposal_hash.clone()) {
-            Ok(view) => *guard = Some((proposal_hash, view)),
-            Err(_) => *guard = None, // Clear cache on error
-        }
-        drop(guard);
+    if let Ok(Some(ref hash_key)) = proposal_hash {
+        _ = db.get_root(hash_key.clone());
     }
 
     // Commit the proposal
