@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+concurrency:
+  group: metrics-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   check-metrics-changes:
     runs-on: ubuntu-latest
@@ -30,7 +34,7 @@ jobs:
           fi
 
           # Regex pattern to match metric-related code changes
-          METRIC_REGEX_PATTERN="(counter!|gauge!|histogram!|#\\[metrics\\])"
+          METRIC_REGEX_PATTERN="(counter!|gauge!|histogram!|#\\[metrics\\])" # ci trigger
 
           # Check for metric-related changes
           METRIC_CHANGES=$(git diff $BASE_COMMIT..HEAD --unified=0 | grep -E "$METRIC_REGEX_PATTERN" || true)
@@ -44,43 +48,39 @@ jobs:
 
           # Set output variables for the comment step
           echo "metric_changes_found=$([ -n "$METRIC_CHANGES" ] && echo "true" || echo "false")" >> $GITHUB_OUTPUT
-          echo "metric_pattern=$METRIC_REGEX_PATTERN" >> $GITHUB_OUTPUT
+          echo "metric_changes<<EOF" >> $GITHUB_OUTPUT
+          echo "$METRIC_CHANGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Look for previous comment
+        if: github.repository == github.event.pull_request.head.repo.full_name && steps.check-metrics.outputs.metric_changes_found == 'true'
+        id: find-comment
+        uses: peter-evans/find-comment@v3
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: github-actions[bot]
+          body-includes: "## Metrics Change Detection ⚠️"
 
       - name: Comment on PR (if applicable)
         if: github.repository == github.event.pull_request.head.repo.full_name && steps.check-metrics.outputs.metric_changes_found == 'true'
-        uses: actions/github-script@v7
+        uses: peter-evans/create-or-update-comment@v4
         with:
-          script: |
-            const { execSync } = require('child_process');
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ## Metrics Change Detection ⚠️
 
-            try {
-              // Get the base commit for comparison
-              const baseCommit = context.payload.pull_request.base.sha;
+            This PR contains changes related to metrics:
 
-              // Get the metric pattern from the previous step
-              const metricPattern = "${{ steps.check-metrics.outputs.metric_pattern }}";
+            ```
+            ${{ steps.check-metrics.outputs.metric_changes }}
+            ```
 
-              // Check for metric changes
-              const metricChanges = execSync(`git diff ${baseCommit}..HEAD --unified=0 | grep -E "${metricPattern}" || true`, { encoding: 'utf8' });
+            However, the dashboard was not modified.
 
-              if (metricChanges.trim()) {
-                const comment = '## Metrics Change Detection ⚠️\n\n' +
-                  'This PR contains changes related to metrics:\n\n' +
-                  '```\n' +
-                  metricChanges +
-                  '\n```\n\n' +
-                  'However, the dashboard was not modified.\n\n' +
-                  'You may need to update `benchmark/Grafana-dashboard.json` accordingly.\n\n' +
-                  '---\n' +
-                  '*This check is automated to help maintain the dashboard.*';
+            You may need to update `benchmark/Grafana-dashboard.json` accordingly.
 
-                github.rest.issues.createComment({
-                  issue_number: context.issue.number,
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  body: comment
-                });
-              }
-            } catch (error) {
-              console.log('No metric changes found or error occurred:', error.message);
-            }
+            ---
+
+            *This check is automated to help maintain the dashboard.*
+          edit-mode: replace
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
