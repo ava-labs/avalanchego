@@ -49,10 +49,6 @@ func (p *pausableManager) Connect(nodeID ids.NodeID) error {
 func (p *pausableManager) Disconnect(nodeID ids.NodeID) error {
 	p.connectedVdrs.Remove(nodeID)
 	if p.Manager.IsConnected(nodeID) {
-		if p.IsPaused(nodeID) {
-			// We should never see this case
-			return errPausedDisconnect
-		}
 		return p.Manager.Disconnect(nodeID)
 	}
 	return nil
