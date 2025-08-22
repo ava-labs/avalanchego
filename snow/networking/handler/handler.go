@@ -514,7 +514,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		engineType = msg.EngineType
 	default:
 		// Note: [msg.EngineType] may have been provided by the peer as an
-		// invalid option. I.E. not one of AVALANCHE, SNOWMAN, or UNSPECIFIED.
+		// invalid option. I.E. not one of DAG, CHAIN, or UNSPECIFIED.
 		// In this case, we treat the value the same way as UNSPECIFIED.
 		//
 		// If the peer didn't request a specific engine type, we default to the
