@@ -569,7 +569,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		chain, err = m.createSnowmanChain(
 			ctx,
 			chainParams.GenesisData,
-			m.Validators,
 			beacons,
 			vm,
 			chainFxs,
@@ -1054,7 +1053,6 @@ func (m *manager) createAvalancheChain(
 func (m *manager) createSnowmanChain(
 	ctx *snow.ConsensusContext,
 	genesisData []byte,
-	vdrs validators.Manager,
 	beacons validators.Manager,
 	vm block.ChainVM,
 	fxs []*common.Fx,
@@ -1094,7 +1092,7 @@ func (m *manager) createSnowmanChain(
 	if err != nil {
 		return nil, fmt.Errorf("error creating connected validators: %w", err)
 	}
-	vdrs.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
+	m.Validators.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
 
 	peerTracker, err := m.createSnowmanPeerTracker(ctx, primaryAlias)
 	if err != nil {
@@ -1102,19 +1100,19 @@ func (m *manager) createSnowmanChain(
 	}
 
 	var halter common.Halter
-	h, err := m.createSnowmanHandler(ctx, cn, vdrs, sb, primaryAlias, connectedValidators, peerTracker, halter)
+	h, err := m.createSnowmanHandler(ctx, cn, sb, primaryAlias, connectedValidators, peerTracker, halter)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create snowman handler: %w", err)
 	}
 
-	engine, err := m.createSnowmanEngine(ctx, cn, proposerVM.ParseBlock, sb, beacons, messageSender, bootstrappingDB, bootstrapFunc, vdrs, connectedValidators, peerTracker, halter)
+	engine, err := m.createSnowmanEngine(ctx, cn, proposerVM.ParseBlock, sb, beacons, messageSender, bootstrappingDB, bootstrapFunc, connectedValidators, peerTracker, halter)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create snowman engine: %w", err)
 	}
 
 	h.SetEngineManager(&handler.EngineManager{
-		Avalanche: nil,
-		Snowman:   engine,
+		DAG:   nil,
+		Chain: engine,
 	})
 
 	// Register health checks
@@ -1285,7 +1283,7 @@ func (m *manager) getOrMakeVMGatherer(vmID ids.ID) (metrics.MultiGatherer, error
 	return vmGatherer, nil
 }
 
-func (m *manager) createSnowmanHandler(ctx *snow.ConsensusContext, vm *block.ChangeNotifier, vdrs validators.Manager, sb subnets.Subnet, primaryAlias string, connectedValidators tracker.Peers, peerTracker *p2p.PeerTracker, halter common.Halter) (handler.Handler, error) {
+func (m *manager) createSnowmanHandler(ctx *snow.ConsensusContext, vm *block.ChangeNotifier, sb subnets.Subnet, primaryAlias string, connectedValidators tracker.Peers, peerTracker *p2p.PeerTracker, halter common.Halter) (handler.Handler, error) {
 	handlerReg, err := metrics.MakeAndRegister(
 		m.handlerGatherer,
 		primaryAlias,
@@ -1299,7 +1297,7 @@ func (m *manager) createSnowmanHandler(ctx *snow.ConsensusContext, vm *block.Cha
 		ctx,
 		vm,
 		vm.WaitForEvent,
-		vdrs,
+		m.Validators,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
 		m.ResourceTracker,
@@ -1541,7 +1539,6 @@ func (m *manager) createSnowmanEngine(
 	messageSender common.Sender,
 	bootstrappingDB *prefixdb.Database,
 	bootstrapFunc func(),
-	vdrs validators.Manager,
 	connectedValidators tracker.Peers,
 	peerTracker *p2p.PeerTracker,
 	halter common.Halter,
@@ -1585,7 +1582,7 @@ func (m *manager) createSnowmanEngine(
 		AllGetsServer:       snowGetHandler,
 		VM:                  vm,
 		Sender:              messageSender,
-		Validators:          vdrs,
+		Validators:          m.Validators,
 		ConnectedValidators: connectedValidators,
 		Params:              consensusParams,
 		Consensus:           consensus,
