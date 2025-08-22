@@ -59,8 +59,7 @@ type Storage struct {
 	log logging.Logger
 }
 
-// newStorage creates a new prefixed database to store
-// finalizations according to their sequence numbers.
+// newStorage stores finalizations according to their sequence numbers.
 // The VM is assumed to be initialized before calling this function.
 func newStorage(ctx context.Context, config *Config, qcDeserializer *QCDeserializer, blockTracker *blockTracker) (*Storage, error) {
 	genesisBlock, err := getGenesisBlock(ctx, config, blockTracker)
