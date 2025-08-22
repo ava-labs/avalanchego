@@ -214,9 +214,9 @@ message AcceptedStateSummary {
 // The consensus engine that should be used when handling a consensus request.
 enum EngineType {
   ENGINE_TYPE_UNSPECIFIED = 0;
-  // Only the X-Chain uses avalanche consensus
-  ENGINE_TYPE_AVALANCHE = 1;
-  ENGINE_TYPE_SNOWMAN = 2;
+  // Only the X-Chain uses DAG consensus
+  ENGINE_TYPE_DAG = 1;
+  ENGINE_TYPE_CHAIN = 2;
 }
 
 // GetAcceptedFrontier requests the accepted frontier from a peer.
@@ -450,13 +450,19 @@ message ProtocolMetadata {
   // Epoch returns the epoch in which the block was proposed
   uint64 epoch = 2;
   // Round returns the round number in which the block was proposed.
-  // Can also be an empty block.
   uint64 round = 3;
   // Seq is the order of the block among all blocks in the blockchain.
   // Cannot correspond to an empty block.
   uint64 seq = 4;
   // Prev returns the digest of the previous data block
   bytes prev = 5;
+}
+
+message EmptyVoteMetadata {
+  // Epoch returns the epoch in which the empty block was proposed
+  uint64 epoch = 1;
+  // Round returns the round number in which the empty block was proposed.
+  uint64 round = 2;
 }
 
 message BlockHeader {
@@ -478,7 +484,7 @@ message Vote {
 }
 
 message EmptyVote {
-  ProtocolMetadata metadata = 1;
+  EmptyVoteMetadata metadata = 1;
   Signature signature = 2;
 }
 
@@ -488,7 +494,7 @@ message QuorumCertificate {
 }
 
 message EmptyNotarization {
-  ProtocolMetadata metadata = 1;
+  EmptyVoteMetadata metadata = 1;
   bytes quorum_certificate = 2;
 }
 
