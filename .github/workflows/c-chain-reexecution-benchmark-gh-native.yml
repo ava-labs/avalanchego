@@ -56,14 +56,14 @@ jobs:
                 "${{ github.event.inputs.current-state-dir }}" \
                 "${{ github.event.inputs.config }}" \
                 "${{ github.event.inputs.runner }}"
-              echo "EOF"
+              echo EOF
             } >> "$GITHUB_OUTPUT"
           else
             json_string=$(jq -r ".\"${{ github.event_name }}\"" .github/workflows/c-chain-reexecution-benchmark-gh-native.json)
             {
               echo "matrix<<EOF"
               echo "$json_string"
-              echo "EOF"
+              echo EOF
             } >> "$GITHUB_OUTPUT"
           fi
 
