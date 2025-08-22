@@ -114,6 +114,14 @@ func (m *manager) Disconnect(nodeID ids.NodeID) error {
 	return m.updateUptime(nodeID)
 }
 
+// The `CalculateUptime` method calculates a node's uptime based on its connection status,
+// connected time, and the current time. It first retrieves the node's current uptime and
+// last update time from the state, returning an error if retrieval fails. If tracking hasn’t
+// started, it assumes the node has been online since the last update, adding this duration
+// to its uptime. If the node is not connected and tracking is `active`, uptime remains
+// unchanged and returned. For connected nodes, the method ensures the connection time does
+// not predate the last update to avoid double counting. Finally, it adds the duration since
+// the last connection time to the node's uptime and returns the updated values.
 func (m *manager) CalculateUptime(nodeID ids.NodeID) (time.Duration, time.Time, error) {
 	upDuration, lastUpdated, err := m.state.GetUptime(nodeID)
 	if err != nil {

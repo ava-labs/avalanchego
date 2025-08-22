@@ -35,6 +35,17 @@ func NewPausableManager(manager uptime.Manager) interfaces.PausableManager {
 
 // Connect connects the node with the given ID to the uptime.Manager
 // If the node is paused, it will not be connected
+//
+// The AvalancheGo uptime manager records the time when a peer is connected to the tracker node.
+// When a paused/`inactive` validator is connected, the pausable uptime manager does not directly
+// invoke the `Connected` method on the AvalancheGo uptime manager, thus the connection time is not
+// directly recorded. Instead, the pausable uptime manager waits for the validator to increase its
+// continuous validation fee balance and resume operation. When the validator resumes, the tracker
+// node records the resumed time and starts tracking the uptime of the validator.
+//
+// Note: The uptime manager does not check if the connected peer is a validator or not. It records
+// the connection time assuming that a non-validator peer can become a validator whilst they're
+// connected to the uptime manager.
 func (p *pausableManager) Connect(nodeID ids.NodeID) error {
 	p.connectedVdrs.Add(nodeID)
 	if !p.IsPaused(nodeID) && !p.Manager.IsConnected(nodeID) {
@@ -46,13 +57,15 @@ func (p *pausableManager) Connect(nodeID ids.NodeID) error {
 // Disconnect disconnects the node with the given ID from the uptime.Manager
 // If the node is paused, it will not be disconnected
 // Invariant: we should never have a connected paused node that is disconnecting
+//
+// When a peer validator is disconnected, the AvalancheGo uptime manager updates the uptime of the
+// validator by adding the duration between the connection time and the disconnection time to the
+// uptime of the validator. When a validator is paused/`inactive`, the pausable uptime manager
+// handles the `inactive` peers as if they were disconnected. Thus the uptime manager assumes that
+// no paused peers can be disconnected again from the pausable uptime manager.
 func (p *pausableManager) Disconnect(nodeID ids.NodeID) error {
 	p.connectedVdrs.Remove(nodeID)
 	if p.Manager.IsConnected(nodeID) {
-		if p.IsPaused(nodeID) {
-			// We should never see this case
-			return errPausedDisconnect
-		}
 		return p.Manager.Disconnect(nodeID)
 	}
 	return nil
@@ -107,6 +120,13 @@ func (p *pausableManager) IsPaused(nodeID ids.NodeID) bool {
 
 // pause pauses uptime tracking for the node with the given ID
 // pause can disconnect the node from the uptime.Manager if it is connected.
+//
+// The pausable uptime manager can listen for validator status changes by subscribing to the state.
+// When the state invokes the `OnValidatorStatusChange` method, the pausable uptime manager pauses
+// the uptime tracking of the validator if the validator is currently `inactive`. When a validator
+// is paused, it is treated as if it is disconnected from the tracker node; thus, its uptime is
+// updated from the connection time to the pause time, and uptime manager stops tracking the
+// uptime of the validator.
 func (p *pausableManager) pause(nodeID ids.NodeID) error {
 	p.pausedVdrs.Add(nodeID)
 	if p.Manager.IsConnected(nodeID) {
@@ -121,6 +141,10 @@ func (p *pausableManager) pause(nodeID ids.NodeID) error {
 
 // resume resumes uptime tracking for the node with the given ID
 // resume can connect the node to the uptime.Manager if it was connected.
+//
+// When a paused validator peer resumes, meaning its status becomes `active`, the pausable uptime
+// manager resumes the uptime tracking of the validator. It treats the peer as if it is connected
+// to the tracker node.
 func (p *pausableManager) resume(nodeID ids.NodeID) error {
 	p.pausedVdrs.Remove(nodeID)
 	if p.connectedVdrs.Contains(nodeID) && !p.Manager.IsConnected(nodeID) {

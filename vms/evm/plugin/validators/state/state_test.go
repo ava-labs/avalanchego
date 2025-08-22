@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/avalanchego/vms/evm/plugin/validators/state/interfaces"
 )
 
 func TestState(t *testing.T) {
@@ -36,7 +35,7 @@ func TestState(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// add new validator
-	vdr := interfaces.Validator{
+	vdr := Validator{
 		ValidationID:   vID,
 		NodeID:         nodeID,
 		Weight:         1,
@@ -129,7 +128,7 @@ func TestWriteValidator(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	vID := ids.GenerateTestID()
 	startTime := time.Now()
-	require.NoError(state.AddValidator(interfaces.Validator{
+	require.NoError(state.AddValidator(Validator{
 		ValidationID:   vID,
 		NodeID:         nodeID,
 		Weight:         1,
@@ -290,14 +289,14 @@ func TestStateListener(t *testing.T) {
 	expectedvID := ids.GenerateTestID()
 	expectedNodeID := ids.GenerateTestNodeID()
 	expectedStartTime := time.Now()
-	mockListener := interfaces.NewMockStateCallbackListener(ctrl)
+	mockListener := NewMockStateCallbackListener(ctrl)
 	// add initial validator to test RegisterListener
 	initialvID := ids.GenerateTestID()
 	initialNodeID := ids.GenerateTestNodeID()
 	initialStartTime := time.Now()
 
 	// add initial validator
-	require.NoError(state.AddValidator(interfaces.Validator{
+	require.NoError(state.AddValidator(Validator{
 		ValidationID:   initialvID,
 		NodeID:         initialNodeID,
 		Weight:         1,
@@ -312,7 +311,7 @@ func TestStateListener(t *testing.T) {
 
 	// add new validator
 	mockListener.EXPECT().OnValidatorAdded(expectedvID, expectedNodeID, uint64(expectedStartTime.Unix()), true)
-	vdr := interfaces.Validator{
+	vdr := Validator{
 		ValidationID:   expectedvID,
 		NodeID:         expectedNodeID,
 		Weight:         1,

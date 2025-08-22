@@ -7,11 +7,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 
-	validatorsstateinterfaces "github.com/ava-labs/avalanchego/vms/evm/plugin/validators/state/interfaces"
+	"github.com/ava-labs/avalanchego/vms/evm/plugin/validators/state"
 )
 
 type PausableManager interface {
 	uptime.Manager
-	validatorsstateinterfaces.StateCallbackListener
+	state.StateCallbackListener
 	IsPaused(nodeID ids.NodeID) bool
 }

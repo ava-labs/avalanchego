@@ -13,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/vms/evm/plugin/validators/state"
-	"github.com/ava-labs/avalanchego/vms/evm/plugin/validators/state/interfaces"
 )
 
 func TestLoadNewValidators(t *testing.T) {
@@ -32,14 +31,14 @@ func TestLoadNewValidators(t *testing.T) {
 		name                      string
 		initialValidators         map[ids.ID]*validators.GetCurrentValidatorOutput
 		newValidators             map[ids.ID]*validators.GetCurrentValidatorOutput
-		registerMockListenerCalls func(*interfaces.MockStateCallbackListener)
+		registerMockListenerCalls func(*state.MockStateCallbackListener)
 		wantLoadErr               error
 	}{
 		{
 			name:                      "before empty/after empty",
 			initialValidators:         map[ids.ID]*validators.GetCurrentValidatorOutput{},
 			newValidators:             map[ids.ID]*validators.GetCurrentValidatorOutput{},
-			registerMockListenerCalls: func(*interfaces.MockStateCallbackListener) {},
+			registerMockListenerCalls: func(*state.MockStateCallbackListener) {},
 		},
 		{
 			name:              "before empty/after one",
@@ -51,7 +50,7 @@ func TestLoadNewValidators(t *testing.T) {
 					StartTime: 0,
 				},
 			},
-			registerMockListenerCalls: func(mock *interfaces.MockStateCallbackListener) {
+			registerMockListenerCalls: func(mock *state.MockStateCallbackListener) {
 				mock.EXPECT().OnValidatorAdded(testValidationIDs[0], testNodeIDs[0], uint64(0), true).Times(1)
 			},
 		},
@@ -65,7 +64,7 @@ func TestLoadNewValidators(t *testing.T) {
 				},
 			},
 			newValidators: map[ids.ID]*validators.GetCurrentValidatorOutput{},
-			registerMockListenerCalls: func(mock *interfaces.MockStateCallbackListener) {
+			registerMockListenerCalls: func(mock *state.MockStateCallbackListener) {
 				// initial validator will trigger first
 				mock.EXPECT().OnValidatorAdded(testValidationIDs[0], testNodeIDs[0], uint64(0), true).Times(1)
 				// then it will be removed
@@ -88,7 +87,7 @@ func TestLoadNewValidators(t *testing.T) {
 					StartTime: 0,
 				},
 			},
-			registerMockListenerCalls: func(mock *interfaces.MockStateCallbackListener) {
+			registerMockListenerCalls: func(mock *state.MockStateCallbackListener) {
 				mock.EXPECT().OnValidatorAdded(testValidationIDs[0], testNodeIDs[0], uint64(0), true).Times(1)
 			},
 		},
@@ -115,7 +114,7 @@ func TestLoadNewValidators(t *testing.T) {
 					StartTime: 0,
 				},
 			},
-			registerMockListenerCalls: func(mock *interfaces.MockStateCallbackListener) {
+			registerMockListenerCalls: func(mock *state.MockStateCallbackListener) {
 				// initial validator will trigger first
 				mock.EXPECT().OnValidatorAdded(testValidationIDs[0], testNodeIDs[0], uint64(0), true).Times(1)
 				// then it will be updated
@@ -140,7 +139,7 @@ func TestLoadNewValidators(t *testing.T) {
 					StartTime: 0,
 				},
 			},
-			registerMockListenerCalls: func(mock *interfaces.MockStateCallbackListener) {
+			registerMockListenerCalls: func(mock *state.MockStateCallbackListener) {
 				// initial validator will trigger first
 				mock.EXPECT().OnValidatorAdded(testValidationIDs[0], testNodeIDs[0], uint64(0), true).Times(1)
 				// then it will be removed
@@ -166,7 +165,7 @@ func TestLoadNewValidators(t *testing.T) {
 				},
 			},
 			wantLoadErr: state.ErrImmutableField,
-			registerMockListenerCalls: func(mock *interfaces.MockStateCallbackListener) {
+			registerMockListenerCalls: func(mock *state.MockStateCallbackListener) {
 				// initial validator will trigger first
 				mock.EXPECT().OnValidatorAdded(testValidationIDs[0], testNodeIDs[0], uint64(0), true).Times(1)
 				// then it won't be called since we don't track the node ID changes
@@ -183,7 +182,7 @@ func TestLoadNewValidators(t *testing.T) {
 
 			// Set initial validators
 			for vID, validator := range tc.initialValidators {
-				require.NoError(validatorState.AddValidator(interfaces.Validator{
+				require.NoError(validatorState.AddValidator(state.Validator{
 					ValidationID:   vID,
 					NodeID:         validator.NodeID,
 					Weight:         validator.Weight,
@@ -195,7 +194,7 @@ func TestLoadNewValidators(t *testing.T) {
 
 			// Enable mock listener
 			ctrl := gomock.NewController(tt)
-			mockListener := interfaces.NewMockStateCallbackListener(ctrl)
+			mockListener := state.NewMockStateCallbackListener(ctrl)
 			tc.registerMockListenerCalls(mockListener)
 
 			validatorState.RegisterListener(mockListener)
@@ -225,7 +224,7 @@ func TestLoadNewValidators(t *testing.T) {
 
 // loadValidatorsForTest is a test helper that replicates the logic from the manager
 // for testing purposes
-func loadValidatorsForTest(validatorState interfaces.State, newValidators map[ids.ID]*validators.GetCurrentValidatorOutput) error {
+func loadValidatorsForTest(validatorState *state.State, newValidators map[ids.ID]*validators.GetCurrentValidatorOutput) error {
 	currentValidationIDs := validatorState.GetValidationIDs()
 
 	// Remove validators no longer in the current set
@@ -239,7 +238,7 @@ func loadValidatorsForTest(validatorState interfaces.State, newValidators map[id
 
 	// Add or update validators
 	for vID, newVdr := range newValidators {
-		validator := interfaces.Validator{
+		validator := state.Validator{
 			ValidationID:   vID,
 			NodeID:         newVdr.NodeID,
 			Weight:         newVdr.Weight,
