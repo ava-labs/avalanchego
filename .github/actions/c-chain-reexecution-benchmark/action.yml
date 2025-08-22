@@ -66,8 +66,8 @@ runs:
           echo "BENCHMARK_OUTPUT_FILE=output.txt"
           echo "START_BLOCK=${{ inputs.start-block }}"
           echo "END_BLOCK=${{ inputs.end-block }}"
-          echo "BLOCK_DIR=${{ inputs.source-block-dir }}"
-          echo "CURRENT_STATE_DIR=${{ inputs.current-state-dir }}"
+          echo "BLOCK_DIR_SRC=${{ inputs.source-block-dir }}"
+          echo "CURRENT_STATE_DIR_SRC=${{ inputs.current-state-dir }}"
         } >> $GITHUB_ENV
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
@@ -82,8 +82,8 @@ runs:
           ./scripts/run_task.sh reexecute-cchain-range-with-copied-data \
             CONFIG=${{ inputs.config }} \
             EXECUTION_DATA_DIR=${{ env.EXECUTION_DATA_DIR }} \
-            BLOCK_DIR=${{ env.BLOCK_DIR }} \
-            CURRENT_STATE_DIR=${{ env.CURRENT_STATE_DIR }} \
+            BLOCK_DIR_SRC=${{ env.BLOCK_DIR_SRC }} \
+            CURRENT_STATE_DIR_SRC=${{ env.CURRENT_STATE_DIR_SRC }} \
             START_BLOCK=${{ env.START_BLOCK }} \
             END_BLOCK=${{ env.END_BLOCK }} \
             LABELS=${{ env.LABELS }} \
