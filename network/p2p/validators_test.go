@@ -369,3 +369,25 @@ func TestValidatorsTop(t *testing.T) {
 		})
 	}
 }
+
+// TestValidatorsLock tests that [validators.State] is not accessed with the
+// [Validators] lock held.
+func TestValidatorsLock(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	mockValidators := validatorsmock.NewState(ctrl)
+	subnetID := ids.GenerateTestID()
+
+	var v *Validators
+	mockValidators.EXPECT().GetCurrentHeight(gomock.Any()).DoAndReturn(func(context.Context) (uint64, error) {
+		// Assert that the validators lock is not held during calls to
+		// GetCurrentHeight.
+		require.True(t, v.lock.TryLock())
+		v.lock.Unlock()
+		return 1, nil
+	})
+	mockValidators.EXPECT().GetValidatorSet(gomock.Any(), uint64(1), subnetID).Return(nil, nil)
+
+	v = NewValidators(logging.NoLog{}, subnetID, mockValidators, time.Second)
+	_ = v.Len(context.Background())
+}

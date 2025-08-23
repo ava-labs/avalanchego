@@ -6,6 +6,7 @@ package p2p
 import (
 	"cmp"
 	"context"
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -78,29 +79,48 @@ func (v validator) Compare(other validator) int {
 	return v.nodeID.Compare(other.nodeID)
 }
 
+// getCurrentValidators must not be called with Validators.lock held to avoid a
+// potential deadlock.
+//
+// getCurrentValidators calls [validators.State] which grabs the context lock.
+// [Validators.Connected] and [Validators.Disconnected] are called with the
+// context lock.
+func (v *Validators) getCurrentValidators(ctx context.Context) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	height, err := v.validators.GetCurrentHeight(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting current height: %w", err)
+	}
+	validatorSet, err := v.validators.GetValidatorSet(ctx, height, v.subnetID)
+	if err != nil {
+		return nil, fmt.Errorf("getting validator set: %w", err)
+	}
+	delete(validatorSet, ids.EmptyNodeID) // Ignore inactive ACP-77 validators.
+	return validatorSet, nil
+}
+
+// refresh must not be called with Validators.lock held.
 func (v *Validators) refresh(ctx context.Context) {
-	if time.Since(v.lastUpdated) < v.maxValidatorSetStaleness {
+	v.lock.RLock()
+	lastUpdated := v.lastUpdated
+	v.lock.RUnlock()
+
+	if time.Since(lastUpdated) < v.maxValidatorSetStaleness {
 		return
 	}
+
+	validatorSet, err := v.getCurrentValidators(ctx)
+	if err != nil {
+		v.log.Warn("failed to get current validator set", zap.Error(err))
+		return
+	}
+
+	v.lock.Lock()
+	defer v.lock.Unlock()
 
 	// Even though validatorList may be nil, truncating will not panic.
 	v.validatorList = v.validatorList[:0]
 	v.validatorSet.Clear()
 	v.totalWeight = 0
-
-	height, err := v.validators.GetCurrentHeight(ctx)
-	if err != nil {
-		v.log.Warn("failed to get current height", zap.Error(err))
-		return
-	}
-	validatorSet, err := v.validators.GetValidatorSet(ctx, height, v.subnetID)
-	if err != nil {
-		v.log.Warn("failed to get validator set", zap.Error(err))
-		return
-	}
-
-	delete(validatorSet, ids.EmptyNodeID) // Ignore inactive ACP-77 validators.
-
 	for nodeID, vdr := range validatorSet {
 		v.validatorList = append(v.validatorList, validator{
 			nodeID: nodeID,
@@ -118,10 +138,10 @@ func (v *Validators) refresh(ctx context.Context) {
 
 // Sample returns a random sample of connected validators
 func (v *Validators) Sample(ctx context.Context, limit int) []ids.NodeID {
-	v.lock.Lock()
-	defer v.lock.Unlock()
-
 	v.refresh(ctx)
+
+	v.lock.RLock()
+	defer v.lock.RUnlock()
 
 	var (
 		uniform = sampler.NewUniform()
@@ -151,10 +171,10 @@ func (v *Validators) Sample(ctx context.Context, limit int) []ids.NodeID {
 func (v *Validators) Top(ctx context.Context, percentage float64) []ids.NodeID {
 	percentage = max(0, min(1, percentage)) // bound percentage inside [0, 1]
 
-	v.lock.Lock()
-	defer v.lock.Unlock()
-
 	v.refresh(ctx)
+
+	v.lock.RLock()
+	defer v.lock.RUnlock()
 
 	var (
 		maxSize      = int(math.Ceil(percentage * float64(len(v.validatorList))))
@@ -176,20 +196,20 @@ func (v *Validators) Top(ctx context.Context, percentage float64) []ids.NodeID {
 
 // Has returns if nodeID is a connected validator
 func (v *Validators) Has(ctx context.Context, nodeID ids.NodeID) bool {
-	v.lock.Lock()
-	defer v.lock.Unlock()
-
 	v.refresh(ctx)
+
+	v.lock.RLock()
+	defer v.lock.RUnlock()
 
 	return v.connectedValidators.Contains(nodeID)
 }
 
 // Len returns the number of connected validators.
 func (v *Validators) Len(ctx context.Context) int {
-	v.lock.Lock()
-	defer v.lock.Unlock()
-
 	v.refresh(ctx)
+
+	v.lock.RLock()
+	defer v.lock.RUnlock()
 
 	return v.connectedValidators.Len()
 }
