@@ -12,6 +12,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"sync/atomic"
 
@@ -1286,4 +1287,120 @@ func (s *Database) getDataFileAndOffset(globalOffset uint64) (*os.File, uint64, 
 	localOffset := globalOffset % maxFileSize
 	handle, err := s.getOrOpenDataFile(fileIndex)
 	return handle, localOffset, fileIndex, err
+}
+
+func (s *Database) Inspect() (string, error) {
+	s.closeMu.RLock()
+	defer s.closeMu.RUnlock()
+
+	if s.closed {
+		return "", ErrDatabaseClosed
+	}
+
+	// Get block heights information
+	heights := s.getBlockHeights()
+	maxBlockHeight := heights.maxBlockHeight
+	maxContiguousHeight := heights.maxContiguousHeight
+
+	// Get min height from header
+	minHeight := s.header.MinHeight
+
+	// Calculate total database size
+	var totalDBSize uint64
+	var indexFileSize uint64
+	var totalDataSize uint64
+
+	// Get index file size
+	if s.indexFile != nil {
+		if fileInfo, err := s.indexFile.Stat(); err == nil {
+			indexFileSize = uint64(fileInfo.Size())
+		}
+	}
+
+	// Get data files size
+	dataFiles, _, err := s.listDataFiles()
+	if err == nil {
+		for _, filePath := range dataFiles {
+			if fileInfo, err := os.Stat(filePath); err == nil {
+				totalDataSize += uint64(fileInfo.Size())
+			}
+		}
+	}
+
+	totalDBSize = indexFileSize + totalDataSize
+
+	// Count total blocks
+	totalBlocks := uint64(0)
+	if maxContiguousHeight != unsetHeight {
+		// Count blocks in contiguous range (simple calculation since it's contiguous)
+		totalBlocks = maxContiguousHeight - minHeight + 1
+
+		// Count additional blocks beyond contiguous range
+		for h := maxContiguousHeight + 1; h <= maxBlockHeight; h++ {
+			if hasBlock, err := s.HasBlock(h); err == nil && hasBlock {
+				totalBlocks++
+			}
+		}
+	}
+
+	// Calculate average block size
+	var avgBlockSize uint64
+	if totalBlocks > 0 {
+		avgBlockSize = totalDataSize / totalBlocks
+	}
+
+	// Format max block height for display
+	maxBlockHeightStr := "None"
+	if maxBlockHeight != unsetHeight {
+		maxBlockHeightStr = strconv.FormatUint(maxBlockHeight, 10)
+	}
+
+	// Format max contiguous height for display
+	maxContiguousHeightStr := "None"
+	if maxContiguousHeight != unsetHeight {
+		maxContiguousHeightStr = strconv.FormatUint(maxContiguousHeight, 10)
+	}
+
+	// Format the output
+	result := fmt.Sprintf(`BlockDB Inspection Results:
+  Min Height: %d
+  Max Block Height: %s
+  Max Contiguous Height: %s
+  Total Blocks: %d
+  Total Database Size: %s
+  Index File Size: %s
+  Data Files Size: %s
+  Number of Data Files: %d
+  Average Block Size: %s`,
+		minHeight,
+		maxBlockHeightStr,
+		maxContiguousHeightStr,
+		totalBlocks,
+		formatSize(totalDBSize),
+		formatSize(indexFileSize),
+		formatSize(totalDataSize),
+		len(dataFiles),
+		formatSize(avgBlockSize))
+
+	return result, nil
+}
+
+// formatSize formats a size in bytes to a human-readable string with appropriate units
+func formatSize(size uint64) string {
+	const (
+		kb = 1024
+		mb = kb * 1024
+		gb = mb * 1024
+	)
+
+	switch {
+	case size >= gb:
+		return fmt.Sprintf("%.2f GB", float64(size)/float64(gb))
+	case size >= mb:
+		return fmt.Sprintf("%.2f MB", float64(size)/float64(mb))
+	case size >= kb:
+		return fmt.Sprintf("%.2f KB", float64(size)/float64(kb))
+	default:
+		return fmt.Sprintf("%d bytes", size)
+	}
 }
