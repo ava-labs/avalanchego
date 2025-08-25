@@ -97,7 +97,7 @@ func emptyVoteFromP2P(emptyVote *p2p.EmptyVote) (*simplex.Message, error) {
 	}, nil
 }
 
-func finalizeVoteFromP2P(finalizeVote *p2p.Vote, qcDeserializer *QCDeserializer) (*simplex.Message, error) {
+func finalizeVoteFromP2P(finalizeVote *p2p.Vote) (*simplex.Message, error) {
 	bh, err := p2pBlockHeaderToSimplexBlockHeader(finalizeVote.BlockHeader)
 	if err != nil {
 		return nil, err

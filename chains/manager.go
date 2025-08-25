@@ -1508,13 +1508,12 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 
 // startChainCreatorNoPChain initializes the chain creator without the P-Chain
 // ONLY used for testing // todo: should delete this
-func (m *manager) startChainCreatorNoPChain() error {
+func (m *manager) startChainCreatorNoPChain() {
 	m.chainCreatorExited.Add(1)
 	go m.dispatchChainCreator()
 
 	// typically creating the pchain would unblock the chain creator channel
 	close(m.unblockChainCreatorCh)
-	return nil
 }
 
 func (m *manager) dispatchChainCreator() {

@@ -9,22 +9,25 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/api/health"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/logging"
-
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
-	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/simplex"
 	"github.com/ava-labs/simplex/wal"
+
+	"github.com/ava-labs/avalanchego/api/health"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var _ common.Engine = (*Engine)(nil)
 
-var errUnknownMessageType = errors.New("unknown message type")
-var errConvertingMessage = errors.New("error converting message to simplex message")
-var maxProposalWaitTime = time.Second * 2
-var maxRebroadcastWait = time.Second * 2
+var (
+	maxProposalWaitTime = time.Second * 2
+	maxRebroadcastWait  = time.Second * 2
+
+	errUnknownMessageType = errors.New("unknown message type")
+	errConvertingMessage  = errors.New("error converting message to simplex message")
+)
 
 type Engine struct {
 	common.Handler
@@ -112,7 +115,7 @@ func (e *Engine) Start(_ context.Context, _ uint32) error {
 	return e.epoch.Start()
 }
 
-func (e *Engine) SimplexMessage(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
+func (e *Engine) SimplexMessage(nodeID ids.NodeID, msg *p2p.Simplex) error {
 	simplexMsg, err := e.p2pToSimplexMessage(msg)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errConvertingMessage, err)
@@ -138,7 +141,7 @@ func (e *Engine) p2pToSimplexMessage(msg *p2p.Simplex) (*simplex.Message, error)
 	case msg.GetNotarization() != nil:
 		return notarizationMessageFromP2P(msg.GetNotarization(), e.quorumDeserializer)
 	case msg.GetFinalizeVote() != nil:
-		return finalizeVoteFromP2P(msg.GetFinalizeVote(), e.quorumDeserializer)
+		return finalizeVoteFromP2P(msg.GetFinalizeVote())
 	case msg.GetFinalization() != nil:
 		return finalizationMessageFromP2P(msg.GetFinalization(), e.quorumDeserializer)
 	case msg.GetReplicationRequest() != nil:
@@ -162,6 +165,6 @@ func (t *TODOBootstrapper) Start(ctx context.Context, _ uint32) error {
 	return t.Engine.Start(ctx, 0)
 }
 
-func (t *TODOBootstrapper) Clear(_ context.Context) error {
+func (_t *TODOBootstrapper) Clear(_ context.Context) error {
 	return nil
 }

@@ -4,12 +4,13 @@ import (
 	"context"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/proto/pb/p2p"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/simplex"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 )
 
 // TestSimplexEngineHandlesSimplexMessages tests that the Simplex engine can handle
@@ -23,7 +24,7 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 	engine, err := NewEngine(ctx, config)
 	require.NoError(t, err)
 
-	config.VM.(*wrappedVM).ParseBlockF = func(ctx context.Context, blkBytes []byte) (snowman.Block, error) {
+	config.VM.(*wrappedVM).ParseBlockF = func(_ context.Context, _ []byte) (snowman.Block, error) {
 		return newTestBlock(t, newBlockConfig{round: 1}).vmBlock, nil
 	}
 
@@ -47,7 +48,7 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 	}
 
 	for _, msg := range allSimplexMessages {
-		err := engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg)
+		err := engine.SimplexMessage(configs[1].Ctx.NodeID, msg)
 		require.NoError(t, err)
 	}
 }

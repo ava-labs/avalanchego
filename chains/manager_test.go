@@ -69,15 +69,16 @@ func newTimeoutManager(t *testing.T) timeout.Manager {
 func newMockVMManager(t *testing.T, log logging.Logger) vms.Manager {
 	ctrl := gomock.NewController(t)
 	vm := &blocktest.VM{}
-	vm.InitializeF = func(ctx context.Context, chainCtx *snow.Context, db database.Database, genesisBytes []byte, upgradeBytes []byte, configBytes []byte, fxs []*common.Fx, appSender common.AppSender) error {
-		log.Info("initializing mock vm")
+	vm.InitializeF = func(_ context.Context, _ *snow.Context, _ database.Database, _ []byte, _ []byte, _ []byte, _ []*common.Fx, _ common.AppSender) error {
 		return nil
 	}
 
 	vm.GetBlockIDAtHeightF = func(_ context.Context, height uint64) (ids.ID, error) {
+		require.Zero(t, height)
 		return snowmantest.GenesisID, nil
 	}
 	vm.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		require.Equal(t, snowmantest.GenesisID, blkID)
 		return snowmantest.Genesis, nil
 	}
 	vm.LastAcceptedF = func(_ context.Context) (ids.ID, error) {
@@ -181,8 +182,7 @@ func TestCreateSimplexChain(t *testing.T) {
 	chainManager, err := New(managerConfig)
 	require.NoError(t, err)
 
-	err = chainManager.(*manager).startChainCreatorNoPChain()
-	require.NoError(t, err)
+	chainManager.(*manager).startChainCreatorNoPChain()
 
 	// queue chain creation
 	chainManager.QueueChainCreation(chainParams)
