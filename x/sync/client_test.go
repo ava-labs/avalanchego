@@ -39,10 +39,10 @@ func newDefaultDBConfig() merkledb.Config {
 
 func newFlakyRangeProofHandler(
 	t *testing.T,
-	db merkledb.MerkleDB,
+	proofCreator ProofCreator,
 	modifyResponse func(response *merkledb.RangeProof),
 ) p2p.Handler {
-	handler := NewGetRangeProofHandler(db)
+	handler := NewGetRangeProofHandler(proofCreator)
 
 	c := counter{m: 2}
 	return &p2p.TestHandler{
@@ -75,10 +75,10 @@ func newFlakyRangeProofHandler(
 
 func newFlakyChangeProofHandler(
 	t *testing.T,
-	db merkledb.MerkleDB,
+	proofCreator ProofCreator,
 	modifyResponse func(response *merkledb.ChangeProof),
 ) p2p.Handler {
-	handler := NewGetChangeProofHandler(db)
+	handler := NewGetChangeProofHandler(proofCreator)
 
 	c := counter{m: 2}
 	return &p2p.TestHandler{
