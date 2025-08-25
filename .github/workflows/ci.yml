@@ -124,23 +124,6 @@ jobs:
       - name: Runs all lint checks
         shell: nix develop --command bash -x {0}
         run: ./scripts/run_task.sh lint-all-ci
-  buf-lint:
-    name: Protobuf Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: bufbuild/buf-action@dfda68eacb65895184c76b9ae522b977636a2c47 #v1.1.4
-        with:
-          input: "proto"
-          pr_comment: false
-          # Breaking changes are managed by the rpcchainvm protocol version.
-          breaking: false
-          # buf-action defaults to pushing on non-fork branch pushes
-          # which is never desirable for this job. The buf-push job is
-          # responsible for pushes.
-          push: false
-          # This version should match the version installed in the nix dev shell
-          version: 1.52.1
   links-lint:
     name: Markdown Links Lint
     runs-on: ubuntu-latest
