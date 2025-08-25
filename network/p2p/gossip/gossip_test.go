@@ -113,7 +113,12 @@ func TestGossiperGossip(t *testing.T) {
 			responseSender := &enginetest.SenderStub{
 				SentAppResponse: make(chan []byte, 1),
 			}
-			responseNetwork, err := p2p.NewNetwork(logging.NoLog{}, responseSender, prometheus.NewRegistry(), "")
+			responseNetwork, err := p2p.NewNetwork(
+				logging.NoLog{},
+				responseSender,
+				prometheus.NewRegistry(),
+				"",
+			)
 			require.NoError(err)
 
 			responseBloom, err := NewBloomFilter(prometheus.NewRegistry(), "", 1000, 0.01, 0.05)
@@ -149,7 +154,14 @@ func TestGossiperGossip(t *testing.T) {
 				SentAppRequest: make(chan []byte, 1),
 			}
 
-			requestNetwork, err := p2p.NewNetwork(logging.NoLog{}, requestSender, prometheus.NewRegistry(), "")
+			peers := &p2p.Peers{}
+			requestNetwork, err := p2p.NewNetwork(
+				logging.NoLog{},
+				requestSender,
+				prometheus.NewRegistry(),
+				"",
+				peers,
+			)
 			require.NoError(err)
 			require.NoError(requestNetwork.Connected(context.Background(), ids.EmptyNodeID, nil))
 
@@ -163,7 +175,10 @@ func TestGossiperGossip(t *testing.T) {
 				require.NoError(requestSet.Add(item))
 			}
 
-			requestClient := requestNetwork.NewClient(0x0)
+			requestClient := requestNetwork.NewClient(
+				0x0,
+				p2p.PeerSampler{Peers: peers},
+			)
 
 			require.NoError(err)
 			gossiper := NewPullGossiper[*testTx](
@@ -526,16 +541,7 @@ func TestPushGossiper(t *testing.T) {
 			sender := &enginetest.SenderStub{
 				SentAppGossip: make(chan []byte, 2),
 			}
-			network, err := p2p.NewNetwork(
-				logging.NoLog{},
-				sender,
-				prometheus.NewRegistry(),
-				"",
-			)
-			require.NoError(err)
-			client := network.NewClient(0)
 			validators := p2p.NewValidators(
-				&p2p.Peers{},
 				logging.NoLog{},
 				constants.PrimaryNetworkID,
 				&validatorstest.State{
@@ -548,6 +554,15 @@ func TestPushGossiper(t *testing.T) {
 				},
 				time.Hour,
 			)
+			network, err := p2p.NewNetwork(
+				logging.NoLog{},
+				sender,
+				prometheus.NewRegistry(),
+				"",
+				validators,
+			)
+			require.NoError(err)
+			client := network.NewClient(0, p2p.PeerSampler{Peers: &p2p.Peers{}})
 			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
 			require.NoError(err)
 			marshaller := testMarshaller{}
@@ -619,6 +634,10 @@ func TestPushGossiper(t *testing.T) {
 
 type testValidatorSet struct {
 	validators set.Set[ids.NodeID]
+}
+
+func (t testValidatorSet) Len(context.Context) int {
+	return len(t.validators)
 }
 
 func (t testValidatorSet) Has(_ context.Context, nodeID ids.NodeID) bool {
