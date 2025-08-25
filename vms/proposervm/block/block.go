@@ -35,6 +35,7 @@ type SignedBlock interface {
 	Block
 
 	PChainHeight() uint64
+	PChainEpoch() PChainEpoch
 	Timestamp() time.Time
 
 	// Proposer returns the ID of the node that proposed this block. If no node
@@ -43,16 +44,23 @@ type SignedBlock interface {
 }
 
 type statelessUnsignedBlock struct {
-	ParentID     ids.ID `serialize:"true"`
-	Timestamp    int64  `serialize:"true"`
-	PChainHeight uint64 `serialize:"true"`
-	Certificate  []byte `serialize:"true"`
-	Block        []byte `serialize:"true"`
+	ParentID     ids.ID      `serialize:"true" json:"parentID"`
+	Timestamp    int64       `serialize:"true" json:"timestamp"`
+	PChainHeight uint64      `serialize:"true" json:"pChainHeight"`
+	PChainEpoch  PChainEpoch `serialize:"true" json:"pChainEpoch"`
+	Certificate  []byte      `serialize:"true" json:"certificate"`
+	Block        []byte      `serialize:"true" json:"block"`
+}
+
+type PChainEpoch struct {
+	Height    uint64
+	Number    uint64
+	StartTime time.Time
 }
 
 type statelessBlock struct {
-	StatelessBlock statelessUnsignedBlock `serialize:"true"`
-	Signature      []byte                 `serialize:"true"`
+	StatelessBlock statelessUnsignedBlock `serialize:"true" json:"statelessBlock"`
+	Signature      []byte                 `serialize:"true" json:"signature"`
 
 	id        ids.ID
 	timestamp time.Time
@@ -125,6 +133,10 @@ func (b *statelessBlock) verify(chainID ids.ID) error {
 
 func (b *statelessBlock) PChainHeight() uint64 {
 	return b.StatelessBlock.PChainHeight
+}
+
+func (b *statelessBlock) PChainEpoch() PChainEpoch {
+	return b.StatelessBlock.PChainEpoch
 }
 
 func (b *statelessBlock) Timestamp() time.Time {
