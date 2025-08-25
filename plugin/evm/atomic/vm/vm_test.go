@@ -1931,7 +1931,7 @@ func TestWaitForEvent(t *testing.T) {
 	}{
 		{
 			name: "WaitForEvent with context cancelled returns 0",
-			testCase: func(t *testing.T, vm *VM, address common.Address, key *ecdsa.PrivateKey) {
+			testCase: func(t *testing.T, vm *VM, _ common.Address, _ *ecdsa.PrivateKey) {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
 				defer cancel()
 
@@ -1951,7 +1951,7 @@ func TestWaitForEvent(t *testing.T) {
 		},
 		{
 			name: "WaitForEvent returns when a transaction is added to the mempool",
-			testCase: func(t *testing.T, vm *VM, address common.Address, key *ecdsa.PrivateKey) {
+			testCase: func(t *testing.T, vm *VM, address common.Address, _ *ecdsa.PrivateKey) {
 				importTx, err := vm.NewImportTx(vm.Ctx.XChainID, address, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{vmtest.TestKeys[0]})
 				require.NoError(t, err)
 

@@ -65,7 +65,7 @@ func (f *BufferFIFOCache[K, V]) remove(key K) error {
 
 type NoOpFIFOCache[K comparable, V any] struct{}
 
-func (f *NoOpFIFOCache[K, V]) Put(_ K, _ V) {}
-func (f *NoOpFIFOCache[K, V]) Get(_ K) (V, bool) {
+func (*NoOpFIFOCache[K, V]) Put(_ K, _ V) {}
+func (*NoOpFIFOCache[K, V]) Get(_ K) (V, bool) {
 	return *new(V), false
 }

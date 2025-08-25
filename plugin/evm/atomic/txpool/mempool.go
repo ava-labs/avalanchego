@@ -227,27 +227,26 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 	// add a new transaction we only need to evict at most one other
 	// transaction.
 	if m.length() >= m.maxSize {
-		if m.pendingTxs.Len() > 0 {
-			// Get the transaction with the lowest gasPrice
-			minTx, minGasPrice := m.pendingTxs.PeekMin()
-			// If the new tx doesn't have a higher fee than the transaction it
-			// would replace, discard new transaction. (Prefer items already
-			// in the mempool).
-			if !gasPrice.Gt(&minGasPrice) {
-				return fmt.Errorf(
-					"%w currentMin=%d provided=%d",
-					ErrInsufficientFee,
-					minGasPrice,
-					gasPrice,
-				)
-			}
-
-			m.removeTx(minTx, true)
-		} else {
+		if m.pendingTxs.Len() == 0 {
 			// This could occur if we have used our entire size allowance on
 			// transactions that are either Current or Issued.
 			return ErrMempoolFull
 		}
+		// Get the transaction with the lowest gasPrice
+		minTx, minGasPrice := m.pendingTxs.PeekMin()
+		// If the new tx doesn't have a higher fee than the transaction it
+		// would replace, discard new transaction. (Prefer items already
+		// in the mempool).
+		if !gasPrice.Gt(&minGasPrice) {
+			return fmt.Errorf(
+				"%w currentMin=%d provided=%d",
+				ErrInsufficientFee,
+				minGasPrice,
+				gasPrice,
+			)
+		}
+
+		m.removeTx(minTx, true)
 	}
 
 	// If the transaction was recently discarded, log the event and evict from

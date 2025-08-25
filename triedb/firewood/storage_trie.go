@@ -25,7 +25,7 @@ func NewStorageTrie(accountTrie *AccountTrie, storageRoot common.Hash) (*Storage
 // Actual commit is handled by the account trie.
 // Return the old storage root as if there was no change - we don't want to use the
 // actual account trie hash and nodeset here.
-func (s *StorageTrie) Commit(collectLeaf bool) (common.Hash, *trienode.NodeSet, error) {
+func (s *StorageTrie) Commit(_ bool) (common.Hash, *trienode.NodeSet, error) {
 	return s.storageRoot, nil, nil
 }
 
@@ -36,6 +36,6 @@ func (s *StorageTrie) Hash() common.Hash {
 
 // Copy should never be called on a storage trie, as it is just a wrapper around the account trie.
 // Each storage trie should be re-opened with the account trie separately.
-func (s *StorageTrie) Copy() *StorageTrie {
+func (*StorageTrie) Copy() *StorageTrie {
 	return nil
 }

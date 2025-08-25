@@ -488,6 +488,6 @@ func TestNewBlockWithExtData(t *testing.T) {
 
 type stubHasher struct{}
 
-func (h stubHasher) Reset()                         {}
-func (h stubHasher) Update(key, value []byte) error { return nil }
-func (h stubHasher) Hash() common.Hash              { return common.Hash{} }
+func (stubHasher) Reset()                   {}
+func (stubHasher) Update(_, _ []byte) error { return nil }
+func (stubHasher) Hash() common.Hash        { return common.Hash{} }

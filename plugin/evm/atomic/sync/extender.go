@@ -3,7 +3,6 @@
 package sync
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -30,7 +29,7 @@ func (a *Extender) Initialize(backend *state.AtomicBackend, trie *state.AtomicTr
 }
 
 // CreateSyncer creates the atomic syncer with the given client and verDB.
-func (a *Extender) CreateSyncer(ctx context.Context, client syncclient.LeafClient, verDB *versiondb.Database, summary message.Syncable) (synccommon.Syncer, error) {
+func (a *Extender) CreateSyncer(client syncclient.LeafClient, verDB *versiondb.Database, summary message.Syncable) (synccommon.Syncer, error) {
 	atomicSummary, ok := summary.(*Summary)
 	if !ok {
 		return nil, fmt.Errorf("expected *Summary, got %T", summary)
@@ -44,14 +43,14 @@ func (a *Extender) CreateSyncer(ctx context.Context, client syncclient.LeafClien
 }
 
 // OnFinishBeforeCommit implements the sync.Extender interface by marking the previously last accepted block for the shared memory cursor.
-func (a *Extender) OnFinishBeforeCommit(lastAcceptedHeight uint64, Summary message.Syncable) error {
+func (a *Extender) OnFinishBeforeCommit(lastAcceptedHeight uint64, summary message.Syncable) error {
 	// Mark the previously last accepted block for the shared memory cursor, so that we will execute shared
 	// memory operations from the previously last accepted block when ApplyToSharedMemory
 	// is called.
 	if err := a.backend.MarkApplyToSharedMemoryCursor(lastAcceptedHeight); err != nil {
 		return fmt.Errorf("failed to mark apply to shared memory cursor before commit: %w", err)
 	}
-	a.backend.SetLastAccepted(Summary.GetBlockHash())
+	a.backend.SetLastAccepted(summary.GetBlockHash())
 	return nil
 }
 

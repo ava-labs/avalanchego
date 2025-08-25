@@ -121,7 +121,7 @@ func TestCodeSyncerRequestErrors(t *testing.T) {
 	testCodeSyncer(t, codeSyncerTest{
 		codeRequestHashes: [][]common.Hash{{codeHash}},
 		codeByteSlices:    [][]byte{codeBytes},
-		getCodeIntercept: func(hashes []common.Hash, codeBytes [][]byte) ([][]byte, error) {
+		getCodeIntercept: func(_ []common.Hash, _ [][]byte) ([][]byte, error) {
 			return nil, err
 		},
 		err: err,

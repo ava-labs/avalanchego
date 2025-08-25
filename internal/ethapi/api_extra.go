@@ -13,14 +13,8 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
 )
-
-// GetChainConfig returns the chain config.
-func (api *BlockChainAPI) GetChainConfig(ctx context.Context) *params.ChainConfig {
-	return api.b.ChainConfig()
-}
 
 type DetailedExecutionResult struct {
 	UsedGas    uint64        `json:"gas"`        // Total used gas but include the refunded gas
@@ -69,7 +63,7 @@ type BadBlockArgs struct {
 
 // GetBadBlocks returns a list of the last 'bad blocks' that the client has seen on the network
 // and returns them as a JSON list of block hashes.
-func (s *BlockChainAPI) GetBadBlocks(ctx context.Context) ([]*BadBlockArgs, error) {
+func (s *BlockChainAPI) GetBadBlocks() ([]*BadBlockArgs, error) {
 	var (
 		badBlocks, reasons = s.b.BadBlocks()
 		results            = make([]*BadBlockArgs, 0, len(badBlocks))

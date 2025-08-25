@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -93,32 +92,4 @@ func RegisterNodeRun() {
 		// TODO add a new node to bootstrap off of the existing node and ensure it can bootstrap all subnets
 		// created during the test
 	})
-}
-
-// RunHardhatTests runs the hardhat tests in the given [testPath] on the blockchain with [blockchainID]
-// [execPath] is the path where the test command is executed
-func RunHardhatTests(ctx context.Context, blockchainID string, execPath string, testPath string) {
-	chainURI := GetDefaultChainURI(blockchainID)
-	RunHardhatTestsCustomURI(ctx, chainURI, execPath, testPath)
-}
-
-func RunHardhatTestsCustomURI(ctx context.Context, chainURI string, execPath string, testPath string) {
-	require := require.New(ginkgo.GinkgoT())
-
-	log.Info(
-		"Executing HardHat tests on blockchain",
-		"testPath", testPath,
-		"ChainURI", chainURI,
-	)
-
-	cmd := exec.Command("npx", "hardhat", "test", testPath, "--network", "local")
-	cmd.Dir = execPath
-
-	log.Info("Sleeping to wait for test ping", "rpcURI", chainURI)
-	require.NoError(os.Setenv("RPC_URI", chainURI))
-	log.Info("Running test command", "cmd", cmd.String())
-
-	out, err := cmd.CombinedOutput()
-	fmt.Printf("\nCombined output:\n\n%s\n", string(out))
-	require.NoError(err)
 }

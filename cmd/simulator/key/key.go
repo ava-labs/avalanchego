@@ -45,7 +45,7 @@ func LoadAll(ctx context.Context, dir string) ([]*Key, error) {
 
 	var files []string
 
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(dir, func(path string, _ os.FileInfo, _ error) error {
 		if path == dir {
 			return nil
 		}
@@ -59,6 +59,9 @@ func LoadAll(ctx context.Context, dir string) ([]*Key, error) {
 
 	ks := make([]*Key, len(files))
 	for i, file := range files {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		k, err := Load(file)
 		if err != nil {
 			return nil, fmt.Errorf("could not load key at %s: %w", file, err)

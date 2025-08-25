@@ -26,7 +26,7 @@ type testNetwork struct {
 	nodesRequested []ids.NodeID
 }
 
-func (t *testNetwork) SendSyncedAppRequestAny(ctx context.Context, minVersion *version.Application, _ []byte) ([]byte, ids.NodeID, error) {
+func (t *testNetwork) SendSyncedAppRequestAny(_ context.Context, _ *version.Application, _ []byte) ([]byte, ids.NodeID, error) {
 	if len(t.response) == 0 {
 		return nil, ids.EmptyNodeID, errors.New("no tested response to return in testNetwork")
 	}
@@ -35,7 +35,7 @@ func (t *testNetwork) SendSyncedAppRequestAny(ctx context.Context, minVersion *v
 	return response, ids.EmptyNodeID, err
 }
 
-func (t *testNetwork) SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, _ []byte) ([]byte, error) {
+func (t *testNetwork) SendSyncedAppRequest(_ context.Context, nodeID ids.NodeID, _ []byte) ([]byte, error) {
 	if len(t.response) == 0 {
 		return nil, errors.New("no tested response to return in testNetwork")
 	}
@@ -68,7 +68,7 @@ func (t *testNetwork) processTest() ([]byte, error) {
 	return response, err
 }
 
-func (t *testNetwork) Gossip([]byte) error {
+func (*testNetwork) Gossip([]byte) error {
 	panic("not implemented") // we don't care about this function for this test
 }
 
@@ -87,4 +87,4 @@ func (t *testNetwork) testResponses(callback func(), responses ...[]byte) {
 	t.numCalls = 0
 }
 
-func (t *testNetwork) TrackBandwidth(ids.NodeID, float64) {}
+func (*testNetwork) TrackBandwidth(ids.NodeID, float64) {}

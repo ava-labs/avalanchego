@@ -218,12 +218,12 @@ type syncerLeafTask struct {
 }
 
 func (a *syncerLeafTask) Start() []byte                  { return addZeroes(a.syncer.lastHeight + 1) }
-func (a *syncerLeafTask) End() []byte                    { return nil }
-func (a *syncerLeafTask) NodeType() message.NodeType     { return TrieNode }
+func (_ *syncerLeafTask) End() []byte                    { return nil }
+func (_ *syncerLeafTask) NodeType() message.NodeType     { return TrieNode }
 func (a *syncerLeafTask) OnFinish(context.Context) error { return a.syncer.onFinish() }
-func (a *syncerLeafTask) OnStart() (bool, error)         { return false, nil }
+func (_ *syncerLeafTask) OnStart() (bool, error)         { return false, nil }
 func (a *syncerLeafTask) Root() common.Hash              { return a.syncer.targetRoot }
-func (a *syncerLeafTask) Account() common.Hash           { return common.Hash{} }
+func (_ *syncerLeafTask) Account() common.Hash           { return common.Hash{} }
 func (a *syncerLeafTask) OnLeafs(keys, vals [][]byte) error {
 	return a.syncer.onLeafs(keys, vals)
 }

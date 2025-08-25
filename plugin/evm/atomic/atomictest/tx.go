@@ -56,10 +56,10 @@ type TestUnsignedTx struct {
 }
 
 // GasUsed implements the UnsignedAtomicTx interface
-func (t *TestUnsignedTx) GasUsed(fixedFee bool) (uint64, error) { return t.GasUsedV, nil }
+func (t *TestUnsignedTx) GasUsed(_ bool) (uint64, error) { return t.GasUsedV, nil }
 
 // Verify implements the UnsignedAtomicTx interface
-func (t *TestUnsignedTx) Verify(ctx *snow.Context, rules extras.Rules) error { return t.VerifyV }
+func (t *TestUnsignedTx) Verify(_ *snow.Context, _ extras.Rules) error { return t.VerifyV }
 
 // AtomicOps implements the UnsignedAtomicTx interface
 func (t *TestUnsignedTx) AtomicOps() (ids.ID, *avalancheatomic.Requests, error) {
@@ -67,13 +67,13 @@ func (t *TestUnsignedTx) AtomicOps() (ids.ID, *avalancheatomic.Requests, error) 
 }
 
 // Initialize implements the UnsignedAtomicTx interface
-func (t *TestUnsignedTx) Initialize(unsignedBytes, signedBytes []byte) {}
+func (*TestUnsignedTx) Initialize(_, _ []byte) {}
 
 // ID implements the UnsignedAtomicTx interface
 func (t *TestUnsignedTx) ID() ids.ID { return t.IDV }
 
 // Burned implements the UnsignedAtomicTx interface
-func (t *TestUnsignedTx) Burned(assetID ids.ID) (uint64, error) { return t.BurnedV, nil }
+func (t *TestUnsignedTx) Burned(_ ids.ID) (uint64, error) { return t.BurnedV, nil }
 
 // Bytes implements the UnsignedAtomicTx interface
 func (t *TestUnsignedTx) Bytes() []byte { return t.UnsignedBytesV }
@@ -85,12 +85,12 @@ func (t *TestUnsignedTx) SignedBytes() []byte { return t.SignedBytesV }
 func (t *TestUnsignedTx) InputUTXOs() set.Set[ids.ID] { return t.InputUTXOsV }
 
 // Visit implements the UnsignedAtomicTx interface
-func (t *TestUnsignedTx) Visit(v atomic.Visitor) error {
+func (t *TestUnsignedTx) Visit(_ atomic.Visitor) error {
 	return t.VisitV
 }
 
 // EVMStateTransfer implements the UnsignedAtomicTx interface
-func (t *TestUnsignedTx) EVMStateTransfer(ctx *snow.Context, state atomic.StateDB) error {
+func (t *TestUnsignedTx) EVMStateTransfer(_ *snow.Context, _ atomic.StateDB) error {
 	return t.EVMStateTransferV
 }
 

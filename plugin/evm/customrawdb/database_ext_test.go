@@ -72,20 +72,20 @@ type stubDatabase struct {
 	iterator *stubIterator
 }
 
-func (s *stubDatabase) NewIterator(keyPrefix, keyStart []byte) ethdb.Iterator {
+func (s *stubDatabase) NewIterator(_, _ []byte) ethdb.Iterator {
 	return s.iterator
 }
 
 // AncientSize is used in [InspectDatabase] to determine the ancient sizes.
-func (s *stubDatabase) AncientSize(kind string) (uint64, error) {
+func (*stubDatabase) AncientSize(_ string) (uint64, error) {
 	return 0, nil
 }
 
-func (s *stubDatabase) Ancients() (uint64, error) {
+func (*stubDatabase) Ancients() (uint64, error) {
 	return 0, nil
 }
 
-func (s *stubDatabase) Tail() (uint64, error) {
+func (*stubDatabase) Tail() (uint64, error) {
 	return 0, nil
 }
 
@@ -94,11 +94,11 @@ func (s *stubDatabase) Put(key, value []byte) error {
 	return nil
 }
 
-func (s *stubDatabase) Get(key []byte) ([]byte, error) {
+func (*stubDatabase) Get(_ []byte) ([]byte, error) {
 	return nil, nil
 }
 
-func (s *stubDatabase) ReadAncients(fn func(ethdb.AncientReaderOp) error) error {
+func (*stubDatabase) ReadAncients(_ func(ethdb.AncientReaderOp) error) error {
 	return nil
 }
 
@@ -124,7 +124,7 @@ func (s *stubIterator) Next() bool {
 	return s.pos() < len(s.kvs)
 }
 
-func (s *stubIterator) Release() {}
+func (*stubIterator) Release() {}
 
 func (s *stubIterator) Key() []byte {
 	return s.kvs[s.pos()].key

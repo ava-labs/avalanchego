@@ -9,7 +9,7 @@ var _ gossip.Marshaller[*Tx] = (*TxMarshaller)(nil)
 
 type TxMarshaller struct{}
 
-func (g *TxMarshaller) MarshalGossip(tx *Tx) ([]byte, error) {
+func (_ *TxMarshaller) MarshalGossip(tx *Tx) ([]byte, error) {
 	return tx.SignedBytes(), nil
 }
 

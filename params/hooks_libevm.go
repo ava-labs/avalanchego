@@ -34,16 +34,16 @@ func GetRulesExtra(r Rules) *extras.Rules {
 	return (*extras.Rules)(rules)
 }
 
-func (r RulesExtra) CanCreateContract(ac *libevm.AddressContext, gas uint64, state libevm.StateReader) (uint64, error) {
+func (RulesExtra) CanCreateContract(_ *libevm.AddressContext, gas uint64, _ libevm.StateReader) (uint64, error) {
 	return gas, nil
 }
 
-func (r RulesExtra) CanExecuteTransaction(_ common.Address, _ *common.Address, _ libevm.StateReader) error {
+func (RulesExtra) CanExecuteTransaction(_ common.Address, _ *common.Address, _ libevm.StateReader) error {
 	return nil
 }
 
 // MinimumGasConsumption is a no-op.
-func (r RulesExtra) MinimumGasConsumption(x uint64) uint64 {
+func (RulesExtra) MinimumGasConsumption(x uint64) uint64 {
 	return (ethparams.NOOPHooks{}).MinimumGasConsumption(x)
 }
 
