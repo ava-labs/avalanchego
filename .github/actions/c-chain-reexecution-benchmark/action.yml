@@ -10,16 +10,20 @@ inputs:
     default: '250000'
   source-block-dir:
     description: 'The source block directory. Supports S3 directory/zip and local directories.'
-    default: 's3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip'
+    default: 's3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**'
   current-state-dir:
     description: 'The current state directory. Supports S3 directory/zip and local directories.'
-    default: 's3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip'
+    default: 's3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**'
   aws-role:
     description: 'AWS role to assume for S3 access.'
     required: true
   aws-region:
     description: 'AWS region to use for S3 access.'
     required: true
+  aws-role-duration-seconds:
+    description: 'The duration of the AWS role to assume for S3 access.'
+    required: true
+    default: '43200' # 12 hours
   prometheus-username:
     description: 'The username for the Prometheus instance.'
     required: true
@@ -43,6 +47,9 @@ inputs:
     description: 'Whether to push the benchmark result to GitHub.'
     required: true
     default: false
+  push-post-state:
+    description: 'S3 destination to copy the current-state directory after completing re-execution. If empty, this will be skipped.'
+    default: ''
 
 runs:
   using: composite
@@ -53,7 +60,7 @@ runs:
       run: |
         {
           echo "EXECUTION_DATA_DIR=${{ inputs.workspace }}/reexecution-data"
-          echo "BENCHMARK_OUTPUT_FILE=${{ inputs.workspace }}/reexecute-cchain-range-benchmark-res.txt"
+          echo "BENCHMARK_OUTPUT_FILE=output.txt"
           echo "START_BLOCK=${{ inputs.start-block }}"
           echo "END_BLOCK=${{ inputs.end-block }}"
           echo "SOURCE_BLOCK_DIR=${{ inputs.source-block-dir }}"
@@ -64,10 +71,19 @@ runs:
       with:
         role-to-assume: ${{ inputs.aws-role }}
         aws-region: ${{ inputs.aws-region }}
+        role-duration-seconds: ${{ inputs.aws-role-duration-seconds }}
     - name: Run C-Chain Re-Execution
       uses: ./.github/actions/run-monitored-tmpnet-cmd
       with:
-        run: ./scripts/run_task.sh reexecute-cchain-range-with-copied-data
+        run: |
+          ./scripts/run_task.sh reexecute-cchain-range-with-copied-data \
+            EXECUTION_DATA_DIR=${{ env.EXECUTION_DATA_DIR }} \
+            SOURCE_BLOCK_DIR=${{ env.SOURCE_BLOCK_DIR }} \
+            CURRENT_STATE_DIR=${{ env.CURRENT_STATE_DIR }} \
+            START_BLOCK=${{ env.START_BLOCK }} \
+            END_BLOCK=${{ env.END_BLOCK }} \
+            LABELS=${{ env.LABELS }} \
+            BENCHMARK_OUTPUT_FILE=${{ env.BENCHMARK_OUTPUT_FILE }}
         prometheus_push_url: ${{ inputs.prometheus-push-url }}
         prometheus_username: ${{ inputs.prometheus-username }}
         prometheus_password: ${{ inputs.prometheus-password }}
@@ -100,3 +116,10 @@ runs:
         output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
         github-token: ${{ inputs.github-token }}
         auto-push: ${{ inputs.push-github-action-benchmark }}
+
+    - uses: ./.github/actions/install-nix
+      if: ${{ inputs.push-post-state != '' }}
+    - name: Push Post-State to S3 (if not exists)
+      if: ${{ inputs.push-post-state != '' }}
+      shell: nix develop --command bash -x {0}
+      run: ./scripts/run_task.sh export-dir-to-s3 LOCAL_SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ S3_DST=${{ inputs.push-post-state }}
