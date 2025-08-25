@@ -196,14 +196,24 @@ func TestValidatorsSample(t *testing.T) {
 			}
 			gomock.InOrder(calls...)
 
-			network, err := NewNetwork(logging.NoLog{}, &enginetest.SenderStub{}, prometheus.NewRegistry(), "")
+			network, err := NewNetwork(
+				logging.NoLog{},
+				&enginetest.SenderStub{},
+				prometheus.NewRegistry(),
+				"",
+			)
 			require.NoError(err)
 
 			ctx := context.Background()
 			require.NoError(network.Connected(ctx, nodeID1, nil))
 			require.NoError(network.Connected(ctx, nodeID2, nil))
 
-			v := NewValidators(network.Peers, network.log, subnetID, mockValidators, tt.maxStaleness)
+			v := NewValidators(
+				logging.NoLog{},
+				subnetID,
+				mockValidators,
+				tt.maxStaleness,
+			)
 			for _, call := range tt.calls {
 				v.lastUpdated = call.time
 				sampled := v.Sample(ctx, call.limit)
@@ -341,16 +351,43 @@ func TestValidatorsTop(t *testing.T) {
 			mockValidators.EXPECT().GetCurrentHeight(gomock.Any()).Return(uint64(1), nil)
 			mockValidators.EXPECT().GetValidatorSet(gomock.Any(), uint64(1), subnetID).Return(validatorSet, nil)
 
-			network, err := NewNetwork(logging.NoLog{}, &enginetest.SenderStub{}, prometheus.NewRegistry(), "")
+			network, err := NewNetwork(
+				logging.NoLog{},
+				&enginetest.SenderStub{},
+				prometheus.NewRegistry(),
+				"",
+			)
 			require.NoError(err)
 
 			ctx := context.Background()
 			require.NoError(network.Connected(ctx, nodeID1, nil))
 			require.NoError(network.Connected(ctx, nodeID2, nil))
 
-			v := NewValidators(network.Peers, network.log, subnetID, mockValidators, time.Second)
+			v := NewValidators(logging.NoLog{}, subnetID, mockValidators, time.Second)
 			nodeIDs := v.Top(ctx, test.percentage)
 			require.Equal(test.expected, nodeIDs)
 		})
 	}
+}
+
+// TestValidatorsLock tests that [validators.State] is not accessed with the
+// [Validators] lock held.
+func TestValidatorsLock(t *testing.T) {
+	ctrl := gomock.NewController(t)
+
+	mockValidators := validatorsmock.NewState(ctrl)
+	subnetID := ids.GenerateTestID()
+
+	var v *Validators
+	mockValidators.EXPECT().GetCurrentHeight(gomock.Any()).DoAndReturn(func(context.Context) (uint64, error) {
+		// Assert that the validators lock is not held during calls to
+		// GetCurrentHeight.
+		require.True(t, v.lock.TryLock())
+		v.lock.Unlock()
+		return 1, nil
+	})
+	mockValidators.EXPECT().GetValidatorSet(gomock.Any(), uint64(1), subnetID).Return(nil, nil)
+
+	v = NewValidators(logging.NoLog{}, subnetID, mockValidators, time.Second)
+	_ = v.Len(context.Background())
 }

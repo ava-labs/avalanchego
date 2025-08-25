@@ -41,7 +41,7 @@ var (
 		PullGossipPollSize:                          1,
 		PullGossipFrequency:                         time.Second,
 		PullGossipThrottlingPeriod:                  time.Second,
-		PullGossipThrottlingLimit:                   1,
+		PullGossipRequestsPerValidator:              1,
 		ExpectedBloomFilterElements:                 10,
 		ExpectedBloomFilterFalsePositiveProbability: .1,
 		MaxBloomFilterFalsePositiveProbability:      .5,
