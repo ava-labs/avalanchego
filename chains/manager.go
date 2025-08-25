@@ -104,8 +104,7 @@ var (
 	ChainBootstrappingDBPrefix = []byte("interval_bs")
 
 	// Prefix used for simplex storage
-	SimplexDBPrefix    = []byte("simplex")
-	SimplexWalLocation = "simplex.wal"
+	SimplexDBPrefix = []byte("simplex")
 
 	errUnknownVMType           = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
 	errCreatePlatformVM        = errors.New("attempted to create a chain running the PlatformVM")
@@ -361,7 +360,6 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 		)
 		return
 	}
-	m.Log.Info("queueing chain creation")
 
 	if ok := m.chainsQueue.PushRight(chainParams); !ok {
 		m.Log.Warn("skipping chain creation",
@@ -1770,7 +1768,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		OutboundMsgBuilder: m.MsgCreator,
 		Validators:         m.Validators.GetMap(ctx.SubnetID),
 		VM:                 vm,
-		WalLocation:        SimplexWalLocation,
+		WalLocation:        getChainWALLocation(ctx.ChainDataDir, ctx.ChainID),
 		SignBLS:            m.ManagerConfig.StakingBLSKey.Sign,
 		DB:                 simplexDB,
 	}
@@ -1826,4 +1824,11 @@ func (m *manager) createSimplexDBs(primaryAlias string, chainID ids.ID) (*prefix
 	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
 	simplexDB := prefixdb.New(SimplexDBPrefix, prefixDB)
 	return vmDB, simplexDB, nil
+}
+
+func getChainWALLocation(chainDataDir string, chainID ids.ID) string {
+	return filepath.Join(
+		chainDataDir,
+		chainID.String()+".wal",
+	)
 }
