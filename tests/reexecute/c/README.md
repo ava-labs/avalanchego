@@ -154,16 +154,22 @@ For example, to add a new Firewood benchmark to execute the block range [30m, 40
 
 To triggers runs conveniently, you can use the [GitHub CLI](https://cli.github.com/manual/gh_workflow_run) to trigger workflows.
 
-To run the same workflow as above via the GitHub CLI write the desired input to a JSON file `input.json`
+Note: passing JSON to the GitHub CLI requires all key/value pairs as strings, so ensure that any number parameters are quoted as strings or you will see the error:
+
+```bash
+could not parse provided JSON: json: cannot unmarshal number into Go value of type string
+```
+
+Copy your desired parameters as JSON into a file or write it out on the command line:
 
 ```json
 {
     "runner": "blacksmith-4vcpu-ubuntu-2404",
     "config": "firewood",
-    "start-block": 30000001,
-    "end-block": 40000000,
-    "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-50m-ldb/**",
-    "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-30m/**"
+    "start-block": "100",
+    "end-block": "200",
+    "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10-ldb/**",
+    "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**"
 }
 ```
 
