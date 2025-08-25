@@ -11,6 +11,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/logging"
 
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -32,6 +33,7 @@ type Engine struct {
 	epoch              *simplex.Epoch
 	blockDeserializer  *blockDeserializer
 	quorumDeserializer *QCDeserializer
+	logger 		   logging.Logger
 }
 
 // THe VM must be initialized before creating the engine
@@ -101,10 +103,12 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 		epoch:              epoch,
 		blockDeserializer:  blockDeserializer,
 		quorumDeserializer: qcDeserializer,
+		logger: 	   config.Log,
 	}, nil
 }
 
 func (e *Engine) Start(_ context.Context, _ uint32) error {
+	e.logger.Info("Starting simplex engine")
 	return e.epoch.Start()
 }
 
@@ -144,4 +148,20 @@ func (e *Engine) p2pToSimplexMessage(msg *p2p.Simplex) (*simplex.Message, error)
 	default:
 		return nil, errUnknownMessageType
 	}
+}
+
+var _ common.BootstrapableEngine = (*TODOBootstrapper)(nil)
+
+type TODOBootstrapper struct {
+	*Engine
+	Log logging.Logger
+}
+
+func (t *TODOBootstrapper) Start(ctx context.Context, _ uint32) error {
+	t.Log.Info("Starting TODO bootstrapper - does nothing")
+	return t.Engine.Start(ctx, 0)
+}
+
+func (t *TODOBootstrapper) Clear(_ context.Context) error {
+	return nil
 }

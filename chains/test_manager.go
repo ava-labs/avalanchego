@@ -38,6 +38,9 @@ func (testManager) Shutdown() {}
 func (testManager) StartChainCreator(ChainParameters) error {
 	return nil
 }
+func (testManager) StartChainCreatorNoPChain() error {
+	return nil
+}
 
 func (testManager) IsBootstrapped(ids.ID) bool {
 	return false

@@ -152,7 +152,7 @@ type Manager interface {
 	// Starts the chain creator with the initial platform chain parameters, must
 	// be called once.
 	StartChainCreator(platformChain ChainParameters) error
-
+	StartChainCreatorNoPChain() error
 	Shutdown()
 }
 
@@ -361,6 +361,7 @@ func (m *manager) QueueChainCreation(chainParams ChainParameters) {
 		)
 		return
 	}
+	m.Log.Info("queueing chain creation")
 
 	if ok := m.chainsQueue.PushRight(chainParams); !ok {
 		m.Log.Warn("skipping chain creation",
@@ -490,10 +491,10 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	}
 
 	// Create the log and context of the chain
-	chainLog, err := m.LogFactory.MakeChain(primaryAlias)
-	if err != nil {
-		return nil, fmt.Errorf("error while creating chain's log %w", err)
-	}
+	// chainLog, err := m.LogFactory.MakeChain(primaryAlias)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("error while creating chain's log %w", err)
+	// }
 
 	ctx := &snow.ConsensusContext{
 		Context: &snow.Context{
@@ -508,7 +509,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			CChainID:    m.CChainID,
 			AVAXAssetID: m.AVAXAssetID,
 
-			Log:          chainLog,
+			Log:          m.Log, // TODO: for debugging. use chainlog instead
 			SharedMemory: m.AtomicMemory.NewSharedMemory(chainParams.ID),
 			BCLookup:     m,
 			Metrics:      metrics.NewPrefixGatherer(),
@@ -532,7 +533,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	}
 
 	// Create the chain
-	vm, err := vmFactory.New(chainLog)
+	vm, err := vmFactory.New(m.Log) // change to chainLog later
 	if err != nil {
 		return nil, fmt.Errorf("error while creating vm: %w", err)
 	}
@@ -566,14 +567,23 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			return nil, fmt.Errorf("error while creating new avalanche vm %w", err)
 		}
 	case block.ChainVM:
+		m.Log.Info("creating chainvm",
+			zap.Stringer("subnetID", chainParams.SubnetID),
+			zap.Stringer("chainID", chainParams.ID),
+			zap.Stringer("vmID", chainParams.VMID),
+		)
+
 		// handle simplex engine based off parameters
 		if sb.Config().ConsensusConfig.SimplexParams != nil {
+			m.Log.Info("creating simplex chain")
 			chain, err = m.createSimplexChain(ctx, vm, sb, chainParams.GenesisData, chainFxs)
 			if err != nil {
 				return nil, fmt.Errorf("error while creating simplex chain %w", err)
 			}
 			break
 		}
+
+		m.Log.Info("creating snowman chain")
 
 		beacons := m.Validators
 		if chainParams.ID == constants.PlatformChainID {
@@ -1087,7 +1097,7 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("error while creating snowman dbs: %w", err)
 	}
 
-	messageSender, err := m.createSnowmanMessageSender(ctx, sb)
+	messageSender, err := m.createMessageSender(ctx, sb)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't initialize message sender: %w", err)
 	}
@@ -1215,6 +1225,15 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	return nil
 }
 
+// Starts chain creation loop to process queued chains
+func (m *manager) StartChainCreatorNoPChain() error {
+	m.Log.Info("starting chain creator")
+	m.chainCreatorExited.Add(1)
+	go m.dispatchChainCreator()
+	close(m.unblockChainCreatorCh)
+	return nil
+}
+
 func (m *manager) dispatchChainCreator() {
 	defer m.chainCreatorExited.Done()
 
@@ -1234,6 +1253,7 @@ func (m *manager) dispatchChainCreator() {
 		if !ok { // queue is closed, return directly
 			return
 		}
+		m.Log.Info("creating chain")
 		m.createChain(chainParams)
 	}
 }
@@ -1326,7 +1346,7 @@ func (m *manager) createHandler(ctx *snow.ConsensusContext, vm *block.ChangeNoti
 }
 
 // createSnowmanMessageSender creates a sender that passes messages from the consensus engine to the network
-func (m *manager) createSnowmanMessageSender(ctx *snow.ConsensusContext, sb subnets.Subnet) (common.Sender, error) {
+func (m *manager) createMessageSender(ctx *snow.ConsensusContext, sb subnets.Subnet) (common.Sender, error) {
 	msgSender, err := sender.New(
 		ctx,
 		m.MsgCreator,
@@ -1693,18 +1713,18 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 
 	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
 
-	messageSender, err := m.createSnowmanMessageSender(ctx, sb)
+	messageSender, err := m.createMessageSender(ctx, sb)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create snowman message sender: %w", err)
 	}
 
 	// initialize the VM
-	vmDB, simplexDB, err := m.createSimplexDB(primaryAlias, ctx.ChainID)
+	vmDB, simplexDB, err := m.createSimplexDBs(primaryAlias, ctx.ChainID)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create simplex DBs: %w", err)
 	}
 
-	// TODO: wrap the vm in a LOCKED VM that locks the VM interface
+	// TODO: wrap the vm in a LOCKED VM that locks the VM interface methods
 	cn := &block.ChangeNotifier{
 		ChainVM: vm,
 	}
@@ -1732,6 +1752,8 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		return nil, fmt.Errorf("error while fetching chain config: %w", err)
 	}
 
+	// we need to set initialize the VM before creating the simplex engine
+	// in order to have the genesis data available
 	if err := vm.Initialize(
 		context.TODO(),
 		ctx.Context,
@@ -1745,8 +1767,6 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		return nil, fmt.Errorf("couldn't initialize simplex VM: %w", err)
 	}
 
-	// we need to set initialize the VM before creating the simplex engine
-	// in order to have the genesis data available
 	config := &simplex.Config{
 		Ctx: simplexCtxConfig(ctx),
 		Log: ctx.Log,
@@ -1764,11 +1784,15 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		return nil, fmt.Errorf("couldn't create simplex engine: %w", err)
 	}
 
+	bootstrapper := &simplex.TODOBootstrapper{
+		Log: ctx.Log,
+		Engine: engine,
+	}
+
 	h.SetEngineManager(&handler.EngineManager{
 		Avalanche: nil,
 		Snowman:   &handler.Engine{
-			StateSyncer:  nil,
-			Bootstrapper: nil,
+			Bootstrapper: bootstrapper,
 			Consensus:    engine,
 		},
 	})
@@ -1788,7 +1812,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 
 // createSimplexDBs creates dbs for simplex. ONe is used for the VM to store blocks, 
 // the other is used for simplex to store finalizations
-func (m *manager) createSimplexDB(primaryAlias string, chainID ids.ID) (*prefixdb.Database, *prefixdb.Database, error) {
+func (m *manager) createSimplexDBs(primaryAlias string, chainID ids.ID) (*prefixdb.Database, *prefixdb.Database, error) {
 	meterDBReg, err := metrics.MakeAndRegister(
 		m.MeterDBMetrics,
 		primaryAlias,
