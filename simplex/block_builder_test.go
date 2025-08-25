@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
@@ -68,7 +68,6 @@ func TestBlockBuilder(t *testing.T) {
 
 			vm.WaitForEventF = func(_ context.Context) (common.Message, error) {
 				count++
-				time.Sleep(time.Millisecond * 20)
 				return common.PendingTxs, nil
 			}
 			vm.BuildBlockF = tt.vmBlockBuildF
@@ -78,13 +77,15 @@ func TestBlockBuilder(t *testing.T) {
 				vm:           vm,
 				blockTracker: genesis.blockTracker,
 			}
-			timeoutCtx, cancelCtx := context.WithTimeout(ctx, time.Millisecond*100)
+
+			timeoutCtx, cancelCtx := context.WithTimeout(ctx, 100*time.Millisecond)
 			defer cancelCtx()
+
 			block, built := bb.BuildBlock(timeoutCtx, child.BlockHeader().ProtocolMetadata)
 			require.Equal(t, tt.shouldBuild, built)
 			if tt.expectedBlock == nil {
-				require.Nil(t, block, "Block should be nil when not built")
-				require.GreaterOrEqual(t, count, 1)
+				require.Nil(t, block)
+				require.Greater(t, count, 1)
 			} else {
 				require.Equal(t, tt.expectedBlock, block)
 			}
@@ -100,15 +101,8 @@ func TestBlockBuilderCancelContext(t *testing.T) {
 		prev: genesis,
 	})
 	vm.WaitForEventF = func(ctx context.Context) (common.Message, error) {
-		waitChan := make(chan struct{})
-		for {
-			select {
-			case <-ctx.Done():
-				return 0, ctx.Err()
-			case <-waitChan:
-				return common.PendingTxs, nil
-			}
-		}
+		<-ctx.Done()
+		return 0, ctx.Err()
 	}
 
 	bb := &BlockBuilder{
@@ -117,7 +111,7 @@ func TestBlockBuilderCancelContext(t *testing.T) {
 		blockTracker: genesis.blockTracker,
 	}
 
-	timeoutCtx, cancelCtx := context.WithTimeout(ctx, time.Second)
+	timeoutCtx, cancelCtx := context.WithTimeout(ctx, 100*time.Millisecond)
 	defer cancelCtx()
 
 	_, built := bb.BuildBlock(timeoutCtx, child.BlockHeader().ProtocolMetadata)
@@ -145,4 +139,40 @@ func TestIncomingBlock(t *testing.T) {
 
 	bb.IncomingBlock(ctx)
 	require.Equal(t, 1, count)
+}
+
+func TestBlockBuildingExponentialBackoff(t *testing.T) {
+	ctx := context.Background()
+	vm := newTestVM()
+	genesis := newTestBlock(t, newBlockConfig{})
+	child := newTestBlock(t, newBlockConfig{
+		prev: genesis,
+	})
+
+	count := 0
+	vm.WaitForEventF = func(_ context.Context) (common.Message, error) {
+		count++
+		return common.PendingTxs, nil
+	}
+
+	vm.BuildBlockF = func(_ context.Context) (snowman.Block, error) {
+		return nil, errors.New("failed to build block")
+	}
+
+	bb := &BlockBuilder{
+		log:          logging.NoLog{},
+		vm:           vm,
+		blockTracker: genesis.blockTracker,
+	}
+
+	timeoutCtx, cancelCtx := context.WithTimeout(ctx, time.Second)
+	defer cancelCtx()
+
+	block, built := bb.BuildBlock(timeoutCtx, child.BlockHeader().ProtocolMetadata)
+	require.False(t, built)
+	require.Nil(t, block)
+
+	// expected number of count increases
+	// 10, 20, 40, 80, 160, 320, 640 = 7 attempts
+	require.Equal(t, 7, count, "Should have retried multiple times due to backoff")
 }
