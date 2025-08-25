@@ -150,7 +150,7 @@ For example, to add a new Firewood benchmark to execute the block range [30m, 40
 
 ## GitHub CLI
 
-### Trigger a Single Job
+### Trigger Workflow Dispatch
 
 To triggers runs conveniently, you can use the [GitHub CLI](https://cli.github.com/manual/gh_workflow_run) to trigger workflows.
 
@@ -166,9 +166,9 @@ Copy your desired parameters as JSON into a file or write it out on the command 
 {
     "runner": "blacksmith-4vcpu-ubuntu-2404",
     "config": "firewood",
-    "start-block": "100",
+    "start-block": "101",
     "end-block": "200",
-    "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10-ldb/**",
+    "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/**",
     "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**"
 }
 ```
@@ -178,32 +178,3 @@ Then pass it to the GitHub CLI:
 ```bash
 cat input.json | gh workflow run .github/workflows/c-chain-reexecution-benchmark-gh-native.yml --json
 ```
-
-### Trigger Parallel Jobs
-
-To execute multiple runs in parallel, you can re-run this with multiple inputs or define a single array in a JSON file `input_array.json`:
-
-```json
-[
-    {
-        "start-block": "101",
-        "end-block": "200",
-        "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
-        "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"
-    },
-    {
-        "start-block": "101",
-        "end-block": "300",
-        "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
-        "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"
-    }
-]
-```
-
-Then pass the slice to the GitHub CLI, processing the array with `jq` and `xargs`:
-
-```bash
-cat input_array.json | jq -c '.[]' | xargs -p -n 1 gh workflow run .github/workflows/c-chain-reexecution-benchmark-gh-native.yml --json
-```
-
-Here the `-n 1` flag ensures each entry is processed individually and `-p` will prompt you to authorize each individual run. To execute without the prompt, simply remove the `-p` flag from the command above.
