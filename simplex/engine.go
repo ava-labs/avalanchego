@@ -33,7 +33,7 @@ type Engine struct {
 	epoch              *simplex.Epoch
 	blockDeserializer  *blockDeserializer
 	quorumDeserializer *QCDeserializer
-	logger 		   logging.Logger
+	logger             logging.Logger
 }
 
 // THe VM must be initialized before creating the engine
@@ -103,7 +103,7 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 		epoch:              epoch,
 		blockDeserializer:  blockDeserializer,
 		quorumDeserializer: qcDeserializer,
-		logger: 	   config.Log,
+		logger:             config.Log,
 	}, nil
 }
 

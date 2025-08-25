@@ -35,6 +35,7 @@ import (
 	"go.uber.org/mock/gomock"
 )
 
+// newRouter returns a mock router that mocks the call of adding a chain to the router.
 func newRouter(t *testing.T) router.Router {
 	ctrl := gomock.NewController(t)
 	r := routermock.NewRouter(ctrl)
@@ -46,11 +47,11 @@ func newTimeoutManager(t *testing.T) timeout.Manager {
 	require := require.New(t)
 
 	config := &timer.AdaptiveTimeoutConfig{
-		InitialTimeout:    2 * time.Second,
-		MinimumTimeout:    1 * time.Second,
-		MaximumTimeout:    10 * time.Second,
+		InitialTimeout:     2 * time.Second,
+		MinimumTimeout:     1 * time.Second,
+		MaximumTimeout:     10 * time.Second,
 		TimeoutCoefficient: 1.5,
-		TimeoutHalflife:   10 * time.Second,
+		TimeoutHalflife:    10 * time.Second,
 	}
 	timeoutManager, err := timeout.NewManager(
 		config,
@@ -63,6 +64,8 @@ func newTimeoutManager(t *testing.T) timeout.Manager {
 	return timeoutManager
 }
 
+// newMockVMManager returns a VM manager that always returns a mock VM with
+// only the genesis block defined.
 func newMockVMManager(t *testing.T, log logging.Logger) vms.Manager {
 	ctrl := gomock.NewController(t)
 	vm := &blocktest.VM{}
@@ -90,33 +93,38 @@ func newMockVMManager(t *testing.T, log logging.Logger) vms.Manager {
 	return manager
 }
 
-func TestCreateSimplexChain(t *testing.T) {
+func testLogger(t *testing.T) logging.Logger {
 	writeCloser := os.Stdout
 	logFormat, err := logging.ToFormat("auto", writeCloser.Fd())
 	require.NoError(t, err)
-	logger := logging.NewLogger("chain_manager_test", logging.NewWrappedCore(logging.Verbo, writeCloser, logFormat.ConsoleEncoder()))
+	return logging.NewLogger("chain_manager_test", logging.NewWrappedCore(logging.Verbo, writeCloser, logFormat.ConsoleEncoder()))
+}
 
-	nodeID := ids.GenerateTestNodeID()
-	chainParams := ChainParameters{
-		ID:        ids.GenerateTestID(),
-		SubnetID:  ids.GenerateTestID(),
-		VMID:    ids.GenerateTestID(),
-	}
-	
+func newTestSubnets(t *testing.T, subnetID ids.ID) *Subnets {
 	config := map[ids.ID]subnets.Config{
 		constants.PrimaryNetworkID: {},
-		chainParams.SubnetID: {
+		subnetID: {
 			ConsensusConfig: subnets.ConsensusConfig{
 				SimplexParams: &subnets.SimplexParameters{
 					Enabled: true,
 				},
 			},
-		},
-	}
+		}}
 
 	subnets, err := NewSubnets(ids.EmptyNodeID, config)
 	require.NoError(t, err)
+	return subnets
+}
 
+func TestCreateSimplexChain(t *testing.T) {
+	nodeID := ids.GenerateTestNodeID()
+	chainParams := ChainParameters{
+		ID:       ids.GenerateTestID(),
+		SubnetID: ids.GenerateTestID(),
+		VMID:     ids.GenerateTestID(),
+	}
+	logger := testLogger(t)
+	subnets := newTestSubnets(t, chainParams.SubnetID)
 	signer, err := localsigner.New()
 	require.NoError(t, err)
 
@@ -128,54 +136,61 @@ func TestCreateSimplexChain(t *testing.T) {
 	)
 	require.NoError(t, err)
 
+	// set the validators of the simplex chain
+	// it must include our nodeID
 	validators := validators.NewManager()
 	err = validators.AddStaker(chainParams.SubnetID, nodeID, signer.PublicKey(), ids.GenerateTestID(), 1)
 	require.NoError(t, err)
 
-	hChecker, err := health.New(logger, prometheus.DefaultRegisterer)
+	healthChecker, err := health.New(logger, prometheus.DefaultRegisterer)
 	require.NoError(t, err)
+
+	router := newRouter(t)
 	managerConfig := &ManagerConfig{
-		Metrics: metrics.NewLabelGatherer("chain"),
+		NodeID:        nodeID,
+		StakingBLSKey: signer,
+		Subnets:       subnets,
+
+		// Metrics
+		Metrics:        metrics.NewLabelGatherer("chain"),
 		MeterDBMetrics: metrics.NewLabelGatherer("dbmetrics"),
+
+		// Logging
 		Log: logger,
-		Subnets: subnets,
 		LogFactory: logging.NewFactory(logging.Config{
-			LogLevel: logging.Debug,
+			LogLevel:   logging.Debug,
 			LoggerName: "chain_logger",
 		}),
-		StakingBLSKey: signer,
-		VMManager: newMockVMManager(t, logger),
+
+		VMManager:  newMockVMManager(t, logger),
 		Validators: validators,
 
-		NodeID: nodeID,
-		// for the handler
-		FrontierPollFrequency: 1 * time.Second,
+		// For handler initialization
+		FrontierPollFrequency:   1 * time.Second,
 		ConsensusAppConcurrency: 1,
-		ResourceTracker: resourceTracker,
+		ResourceTracker:         resourceTracker,
 
-		// for health check
-		Health: hChecker,
+		// For health check
+		Health: healthChecker,
 
-		// post buildchain
+		// Register the chain with router and timeout manager
 		TimeoutManager: newTimeoutManager(t),
-		Router: newRouter(t),
-
+		Router:         router,
 	}
-	manager, err := New(managerConfig)
+
+	chainManager, err := New(managerConfig)
 	require.NoError(t, err)
 
-	err = manager.StartChainCreatorNoPChain()
+	err = chainManager.(*manager).startChainCreatorNoPChain()
 	require.NoError(t, err)
 
 	// queue chain creation
-	manager.QueueChainCreation(chainParams)
+	chainManager.QueueChainCreation(chainParams)
 
 	time.Sleep(1 * time.Second)
-	primaryAlias := manager.PrimaryAliasOrDefault(chainParams.ID)
-	
-	id, err := manager.Lookup(primaryAlias)
+	primaryAlias := chainManager.PrimaryAliasOrDefault(chainParams.ID)
+
+	id, err := chainManager.Lookup(primaryAlias)
 	require.NoError(t, err)
 	require.Equal(t, chainParams.ID, id)
-	// we should get a notification that the chain was created
-
 }

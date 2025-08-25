@@ -104,7 +104,7 @@ var (
 	ChainBootstrappingDBPrefix = []byte("interval_bs")
 
 	// Prefix used for simplex storage
-	SimplexDBPrefix = []byte("simplex")
+	SimplexDBPrefix    = []byte("simplex")
 	SimplexWalLocation = "simplex.wal"
 
 	errUnknownVMType           = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
@@ -152,7 +152,7 @@ type Manager interface {
 	// Starts the chain creator with the initial platform chain parameters, must
 	// be called once.
 	StartChainCreator(platformChain ChainParameters) error
-	StartChainCreatorNoPChain() error
+
 	Shutdown()
 }
 
@@ -1134,8 +1134,6 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("couldn't create snowman engine: %w", err)
 	}
 
-
-
 	h.SetEngineManager(&handler.EngineManager{
 		Avalanche: nil,
 		Snowman:   engine,
@@ -1225,11 +1223,13 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	return nil
 }
 
-// Starts chain creation loop to process queued chains
-func (m *manager) StartChainCreatorNoPChain() error {
-	m.Log.Info("starting chain creator")
+// startChainCreatorNoPChain initializes the chain creator without the P-Chain
+// ONLY used for testing // todo: should delete this
+func (m *manager) startChainCreatorNoPChain() error {
 	m.chainCreatorExited.Add(1)
 	go m.dispatchChainCreator()
+
+	// typically creating the pchain would unblock the chain creator channel
 	close(m.unblockChainCreatorCh)
 	return nil
 }
@@ -1696,10 +1696,10 @@ func (m *manager) createSnowmanEngine(
 
 func simplexCtxConfig(ctx *snow.ConsensusContext) simplex.SimplexChainContext {
 	return simplex.SimplexChainContext{
-		NodeID: 	ctx.NodeID,
-		ChainID: 	ctx.ChainID,
-		SubnetID: 	ctx.SubnetID,
-		NetworkID: 	ctx.NetworkID,
+		NodeID:    ctx.NodeID,
+		ChainID:   ctx.ChainID,
+		SubnetID:  ctx.SubnetID,
+		NetworkID: ctx.NetworkID,
 	}
 }
 func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainVM, sb subnets.Subnet, genesisData []byte, fxs []*common.Fx) (*chain, error) {
@@ -1759,24 +1759,24 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		ctx.Context,
 		vmDB,
 		genesisData,
-		chainConfig.Upgrade, 
-		chainConfig.Config, 
-		fxs, 
-		messageSender, 
+		chainConfig.Upgrade,
+		chainConfig.Config,
+		fxs,
+		messageSender,
 	); err != nil {
 		return nil, fmt.Errorf("couldn't initialize simplex VM: %w", err)
 	}
 
 	config := &simplex.Config{
-		Ctx: simplexCtxConfig(ctx),
-		Log: ctx.Log,
-		Sender: m.Net,
+		Ctx:                simplexCtxConfig(ctx),
+		Log:                ctx.Log,
+		Sender:             m.Net,
 		OutboundMsgBuilder: m.MsgCreator,
-		Validators: m.Validators.GetMap(ctx.SubnetID),
-		VM: vm,
-		WalLocation: SimplexWalLocation,
-		SignBLS: m.ManagerConfig.StakingBLSKey.Sign,
-		DB: simplexDB, 
+		Validators:         m.Validators.GetMap(ctx.SubnetID),
+		VM:                 vm,
+		WalLocation:        SimplexWalLocation,
+		SignBLS:            m.ManagerConfig.StakingBLSKey.Sign,
+		DB:                 simplexDB,
 	}
 
 	engine, err := simplex.NewEngine(context.TODO(), config)
@@ -1785,13 +1785,13 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 	}
 
 	bootstrapper := &simplex.TODOBootstrapper{
-		Log: ctx.Log,
+		Log:    ctx.Log,
 		Engine: engine,
 	}
 
 	h.SetEngineManager(&handler.EngineManager{
 		Avalanche: nil,
-		Snowman:   &handler.Engine{
+		Snowman: &handler.Engine{
 			Bootstrapper: bootstrapper,
 			Consensus:    engine,
 		},
@@ -1803,14 +1803,14 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 	}
 
 	return &chain{
-		Name:   primaryAlias,
+		Name:    primaryAlias,
 		Context: ctx,
-		VM:     vm,
+		VM:      vm,
 		Handler: h,
 	}, nil
 }
 
-// createSimplexDBs creates dbs for simplex. ONe is used for the VM to store blocks, 
+// createSimplexDBs creates dbs for simplex. ONe is used for the VM to store blocks,
 // the other is used for simplex to store finalizations
 func (m *manager) createSimplexDBs(primaryAlias string, chainID ids.ID) (*prefixdb.Database, *prefixdb.Database, error) {
 	meterDBReg, err := metrics.MakeAndRegister(

@@ -16,6 +16,7 @@ import (
 var errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
 var errMissingConsensusParameters = errors.New("consensus config must have either snowball or simplex parameters set")
 var twoConfigs = errors.New("subnet config must have exactly one of snowball or simplex parameters set")
+
 // Params for simplex Config
 type SimplexParameters struct {
 	Enabled bool `json:"enabled" yaml:"enabled"`
@@ -23,7 +24,7 @@ type SimplexParameters struct {
 
 type ConsensusConfig struct {
 	SnowballParams *snowball.Parameters `json:"consensusParameters,omitempty" yaml:"consensusParameters,omitempty"`
-	SimplexParams  *SimplexParameters    `json:"simplexParameters,omitempty" yaml:"simplexParameters,omitempty"`
+	SimplexParams  *SimplexParameters   `json:"simplexParameters,omitempty" yaml:"simplexParameters,omitempty"`
 }
 
 type Config struct {
@@ -34,8 +35,8 @@ type Config struct {
 	ValidatorOnly bool `json:"validatorOnly" yaml:"validatorOnly"`
 	// AllowedNodes is the set of node IDs that are explicitly allowed to connect to this Subnet when
 	// ValidatorOnly is enabled.
-	AllowedNodes        set.Set[ids.NodeID] `json:"allowedNodes"        yaml:"allowedNodes"`
-	ConsensusConfig     ConsensusConfig     `json:"consensusConfig" yaml:"consensusConfig"`
+	AllowedNodes    set.Set[ids.NodeID] `json:"allowedNodes"        yaml:"allowedNodes"`
+	ConsensusConfig ConsensusConfig     `json:"consensusConfig" yaml:"consensusConfig"`
 
 	// ProposerMinBlockDelay is the minimum delay this node will enforce when
 	// building a snowman++ block.
@@ -84,7 +85,7 @@ func (c *ConsensusConfig) Verify() error {
 			return fmt.Errorf("simplex parameters must be enabled")
 		}
 		return nil
-	} 
+	}
 
 	return errMissingConsensusParameters
 }

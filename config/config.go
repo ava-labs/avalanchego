@@ -1118,7 +1118,7 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 
 func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
 	return subnets.Config{
-		ConsensusConfig:         	 getConsensusConfig(v),
+		ConsensusConfig:             getConsensusConfig(v),
 		ValidatorOnly:               false,
 		ProposerMinBlockDelay:       v.GetDuration(ProposerVMMinBlockDelayKey),
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
