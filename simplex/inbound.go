@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package simplex
 
 import (
@@ -6,9 +9,10 @@ import (
 	"fmt"
 	"math"
 
+	"github.com/ava-labs/simplex"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
-	"github.com/ava-labs/simplex"
 )
 
 var errNilField = errors.New("nil field")

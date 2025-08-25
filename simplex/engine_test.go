@@ -1,12 +1,14 @@
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package simplex
 
 import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/simplex"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
@@ -48,8 +50,7 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 	}
 
 	for _, msg := range allSimplexMessages {
-		err := engine.SimplexMessage(configs[1].Ctx.NodeID, msg)
-		require.NoError(t, err)
+		require.NoError(t, engine.SimplexMessage(configs[1].Ctx.NodeID, msg))
 	}
 }
 

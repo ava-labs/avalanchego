@@ -1697,6 +1697,7 @@ func simplexCtxConfig(ctx *snow.ConsensusContext) simplex.SimplexChainContext {
 		NetworkID: ctx.NetworkID,
 	}
 }
+
 func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainVM, sb subnets.Subnet, genesisData []byte, fxs []*common.Fx) (*chain, error) {
 	ctx.Lock.Lock()
 	defer ctx.Lock.Unlock()

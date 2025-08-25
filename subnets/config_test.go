@@ -90,7 +90,7 @@ func TestValid(t *testing.T) {
 					SimplexParams:  &SimplexParameters{Enabled: true},
 				},
 			},
-			expectedErr: twoConfigs,
+			expectedErr: errTwoConfigs,
 		},
 	}
 	for _, tt := range tests {

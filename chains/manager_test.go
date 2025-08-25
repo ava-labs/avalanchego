@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package chains
 
 import (
@@ -5,6 +8,10 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/api/metrics"
@@ -30,9 +37,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/vmsmock"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 )
 
 // newRouter returns a mock router that mocks the call of adding a chain to the router.
@@ -66,7 +70,7 @@ func newTimeoutManager(t *testing.T) timeout.Manager {
 
 // newMockVMManager returns a VM manager that always returns a mock VM with
 // only the genesis block defined.
-func newMockVMManager(t *testing.T, log logging.Logger) vms.Manager {
+func newMockVMManager(t *testing.T) vms.Manager {
 	ctrl := gomock.NewController(t)
 	vm := &blocktest.VM{}
 	vm.InitializeF = func(_ context.Context, _ *snow.Context, _ database.Database, _ []byte, _ []byte, _ []byte, _ []*common.Fx, _ common.AppSender) error {
@@ -110,7 +114,8 @@ func newTestSubnets(t *testing.T, subnetID ids.ID) *Subnets {
 					Enabled: true,
 				},
 			},
-		}}
+		},
+	}
 
 	subnets, err := NewSubnets(ids.EmptyNodeID, config)
 	require.NoError(t, err)
@@ -140,8 +145,7 @@ func TestCreateSimplexChain(t *testing.T) {
 	// set the validators of the simplex chain
 	// it must include our nodeID
 	validators := validators.NewManager()
-	err = validators.AddStaker(chainParams.SubnetID, nodeID, signer.PublicKey(), ids.GenerateTestID(), 1)
-	require.NoError(t, err)
+	require.NoError(t, validators.AddStaker(chainParams.SubnetID, nodeID, signer.PublicKey(), ids.GenerateTestID(), 1))
 
 	healthChecker, err := health.New(logger, prometheus.DefaultRegisterer)
 	require.NoError(t, err)
@@ -163,7 +167,7 @@ func TestCreateSimplexChain(t *testing.T) {
 			LoggerName: "chain_logger",
 		}),
 
-		VMManager:  newMockVMManager(t, logger),
+		VMManager:  newMockVMManager(t),
 		Validators: validators,
 
 		// For handler initialization

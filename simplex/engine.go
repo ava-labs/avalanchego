@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package simplex
@@ -165,6 +165,6 @@ func (t *TODOBootstrapper) Start(ctx context.Context, _ uint32) error {
 	return t.Engine.Start(ctx, 0)
 }
 
-func (_t *TODOBootstrapper) Clear(_ context.Context) error {
+func (*TODOBootstrapper) Clear(_ context.Context) error {
 	return nil
 }
