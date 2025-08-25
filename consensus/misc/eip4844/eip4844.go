@@ -32,13 +32,13 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/libevm/core/types"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 var (
-	minBlobGasPrice            = big.NewInt(params.BlobTxMinBlobGasprice)
-	blobGaspriceUpdateFraction = big.NewInt(params.BlobTxBlobGaspriceUpdateFraction)
+	minBlobGasPrice            = big.NewInt(ethparams.BlobTxMinBlobGasprice)
+	blobGaspriceUpdateFraction = big.NewInt(ethparams.BlobTxBlobGaspriceUpdateFraction)
 )
 
 // VerifyEIP4844Header verifies the presence of the excessBlobGas field and that
@@ -53,11 +53,11 @@ func VerifyEIP4844Header(parent, header *types.Header) error {
 		return errors.New("header is missing blobGasUsed")
 	}
 	// Verify that the blob gas used remains within reasonable limits.
-	if *header.BlobGasUsed > params.MaxBlobGasPerBlock {
-		return fmt.Errorf("blob gas used %d exceeds maximum allowance %d", *header.BlobGasUsed, params.MaxBlobGasPerBlock)
+	if *header.BlobGasUsed > ethparams.MaxBlobGasPerBlock {
+		return fmt.Errorf("blob gas used %d exceeds maximum allowance %d", *header.BlobGasUsed, ethparams.MaxBlobGasPerBlock)
 	}
-	if *header.BlobGasUsed%params.BlobTxBlobGasPerBlob != 0 {
-		return fmt.Errorf("blob gas used %d not a multiple of blob gas per blob %d", header.BlobGasUsed, params.BlobTxBlobGasPerBlob)
+	if *header.BlobGasUsed%ethparams.BlobTxBlobGasPerBlob != 0 {
+		return fmt.Errorf("blob gas used %d not a multiple of blob gas per blob %d", header.BlobGasUsed, ethparams.BlobTxBlobGasPerBlob)
 	}
 	// Verify the excessBlobGas is correct based on the parent header
 	var (
@@ -80,10 +80,10 @@ func VerifyEIP4844Header(parent, header *types.Header) error {
 // blobs on top of the excess blob gas.
 func CalcExcessBlobGas(parentExcessBlobGas uint64, parentBlobGasUsed uint64) uint64 {
 	excessBlobGas := parentExcessBlobGas + parentBlobGasUsed
-	if excessBlobGas < params.BlobTxTargetBlobGasPerBlock {
+	if excessBlobGas < ethparams.BlobTxTargetBlobGasPerBlock {
 		return 0
 	}
-	return excessBlobGas - params.BlobTxTargetBlobGasPerBlock
+	return excessBlobGas - ethparams.BlobTxTargetBlobGasPerBlock
 }
 
 // CalcBlobFee calculates the blobfee from the header's excess blob gas field.

@@ -54,6 +54,7 @@ import (
 	"github.com/ava-labs/libevm/crypto/kzg4844"
 	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/ava-labs/libevm/log"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/holiman/billy"
 	"github.com/holiman/uint256"
@@ -585,7 +586,7 @@ func TestOpenDrops(t *testing.T) {
 	chain := &testBlockChain{
 		config:  testChainConfig,
 		basefee: uint256.NewInt(ap3.MinBaseFee),
-		blobfee: uint256.NewInt(params.BlobTxMinBlobGasprice),
+		blobfee: uint256.NewInt(ethparams.BlobTxMinBlobGasprice),
 		statedb: statedb,
 	}
 	pool := New(Config{Datadir: storage}, chain)
@@ -704,7 +705,7 @@ func TestOpenIndex(t *testing.T) {
 	chain := &testBlockChain{
 		config:  testChainConfig,
 		basefee: uint256.NewInt(ap3.MinBaseFee),
-		blobfee: uint256.NewInt(params.BlobTxMinBlobGasprice),
+		blobfee: uint256.NewInt(ethparams.BlobTxMinBlobGasprice),
 		statedb: statedb,
 	}
 	pool := New(Config{Datadir: storage}, chain)
@@ -1263,7 +1264,7 @@ func TestAdd(t *testing.T) {
 				},
 				{ // Same as above but blob fee cap equals minimum, should be accepted
 					from: "alice",
-					tx:   makeUnsignedTx(0, 1, 1, params.BlobTxMinBlobGasprice),
+					tx:   makeUnsignedTx(0, 1, 1, ethparams.BlobTxMinBlobGasprice),
 					err:  nil,
 				},
 			},
@@ -1338,7 +1339,7 @@ func BenchmarkPoolPending10GB(b *testing.B)  { benchmarkPoolPending(b, 10_000_00
 func benchmarkPoolPending(b *testing.B, datacap uint64) {
 	// Calculate the maximum number of transaction that would fit into the pool
 	// and generate a set of random accounts to seed them with.
-	capacity := datacap / params.BlobTxBlobGasPerBlob
+	capacity := datacap / ethparams.BlobTxBlobGasPerBlob
 
 	var (
 		basefee    = uint64(1050)

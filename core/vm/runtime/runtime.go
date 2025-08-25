@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 )
 
@@ -122,7 +123,7 @@ func setDefaults(cfg *Config) {
 		cfg.BaseFee = big.NewInt(ap3.InitialBaseFee)
 	}
 	if cfg.BlobBaseFee == nil {
-		cfg.BlobBaseFee = big.NewInt(params.BlobTxMinBlobGasprice)
+		cfg.BlobBaseFee = big.NewInt(ethparams.BlobTxMinBlobGasprice)
 	}
 }
 

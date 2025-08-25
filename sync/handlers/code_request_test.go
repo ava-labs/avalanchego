@@ -15,9 +15,10 @@ import (
 	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/handlers/stats/statstest"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestCodeRequestHandler(t *testing.T) {
@@ -27,10 +28,10 @@ func TestCodeRequestHandler(t *testing.T) {
 	codeHash := crypto.Keccak256Hash(codeBytes)
 	rawdb.WriteCode(database, codeHash, codeBytes)
 
-	maxSizeCodeBytes := make([]byte, params.MaxCodeSize)
+	maxSizeCodeBytes := make([]byte, ethparams.MaxCodeSize)
 	n, err := rand.Read(maxSizeCodeBytes)
 	assert.NoError(t, err)
-	assert.Equal(t, params.MaxCodeSize, n)
+	assert.Equal(t, ethparams.MaxCodeSize, n)
 	maxSizeCodeHash := crypto.Keccak256Hash(maxSizeCodeBytes)
 	rawdb.WriteCode(database, maxSizeCodeHash, maxSizeCodeBytes)
 
@@ -80,7 +81,7 @@ func TestCodeRequestHandler(t *testing.T) {
 			},
 			verifyStats: func(t *testing.T) {
 				assert.EqualValues(t, 1, testHandlerStats.CodeRequestCount)
-				assert.EqualValues(t, params.MaxCodeSize, testHandlerStats.CodeBytesReturnedSum)
+				assert.EqualValues(t, ethparams.MaxCodeSize, testHandlerStats.CodeBytesReturnedSum)
 			},
 		},
 	}

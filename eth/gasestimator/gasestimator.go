@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/log"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 // Options are the contextual parameters to execute the requested call.
@@ -68,7 +69,7 @@ func Estimate(ctx context.Context, call *core.Message, opts *Options, gasCap uin
 	)
 	// Determine the highest gas limit can be used during the estimation.
 	hi = opts.Header.GasLimit
-	if call.GasLimit >= params.TxGas {
+	if call.GasLimit >= ethparams.TxGas {
 		hi = call.GasLimit
 	}
 	// Normalize the max fee per gas the call is willing to spend.
@@ -115,9 +116,9 @@ func Estimate(ctx context.Context, call *core.Message, opts *Options, gasCap uin
 	// unused access list items). Ever so slightly wasteful, but safer overall.
 	if len(call.Data) == 0 {
 		if call.To != nil && opts.State.GetCodeSize(*call.To) == 0 {
-			failed, _, err := execute(ctx, call, opts, params.TxGas)
+			failed, _, err := execute(ctx, call, opts, ethparams.TxGas)
 			if !failed && err == nil {
-				return params.TxGas, nil, nil
+				return ethparams.TxGas, nil, nil
 			}
 		}
 	}
@@ -143,7 +144,7 @@ func Estimate(ctx context.Context, call *core.Message, opts *Options, gasCap uin
 	// There's a fairly high chance for the transaction to execute successfully
 	// with gasLimit set to the first execution's usedGas + gasRefund. Explicitly
 	// check that gas amount and use as a limit for the binary search.
-	optimisticGasLimit := (result.UsedGas + result.RefundedGas + params.CallStipend) * 64 / 63
+	optimisticGasLimit := (result.UsedGas + result.RefundedGas + ethparams.CallStipend) * 64 / 63
 	if optimisticGasLimit < hi {
 		failed, _, err = execute(ctx, call, opts, optimisticGasLimit)
 		if err != nil {

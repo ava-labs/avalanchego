@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,14 +62,14 @@ func TestTransactionIndices(t *testing.T) {
 		signer = types.LatestSigner(gspec.Config)
 	)
 	genDb, blocks, _, err := GenerateChainWithGenesis(gspec, dummy.NewFakerWithCallbacks(TestCallbacks), 128, 10, func(i int, block *BlockGen) {
-		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
+		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr1), addr2, big.NewInt(10000), ethparams.TxGas, nil, nil), signer, key1)
 		require.NoError(err)
 		block.AddTx(tx)
 	})
 	require.NoError(err)
 
 	blocks2, _, err := GenerateChain(gspec.Config, blocks[len(blocks)-1], dummy.NewFakerWithCallbacks(TestCallbacks), genDb, 10, 10, func(i int, block *BlockGen) {
-		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
+		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr1), addr2, big.NewInt(10000), ethparams.TxGas, nil, nil), signer, key1)
 		require.NoError(err)
 		block.AddTx(tx)
 	})
@@ -181,14 +182,14 @@ func TestTransactionSkipIndexing(t *testing.T) {
 		signer = types.LatestSigner(gspec.Config)
 	)
 	genDb, blocks, _, err := GenerateChainWithGenesis(gspec, dummy.NewFakerWithCallbacks(TestCallbacks), 5, 10, func(i int, block *BlockGen) {
-		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
+		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr1), addr2, big.NewInt(10000), ethparams.TxGas, nil, nil), signer, key1)
 		require.NoError(err)
 		block.AddTx(tx)
 	})
 	require.NoError(err)
 
 	blocks2, _, err := GenerateChain(gspec.Config, blocks[len(blocks)-1], dummy.NewFakerWithCallbacks(TestCallbacks), genDb, 5, 10, func(i int, block *BlockGen) {
-		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
+		tx, err := types.SignTx(types.NewTransaction(block.TxNonce(addr1), addr2, big.NewInt(10000), ethparams.TxGas, nil, nil), signer, key1)
 		require.NoError(err)
 		block.AddTx(tx)
 	})

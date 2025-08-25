@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -149,7 +150,7 @@ func applyTransaction(msg *Message, config *params.ChainConfig, gp *GasPool, sta
 	receipt.GasUsed = result.UsedGas
 
 	if tx.Type() == types.BlobTxType {
-		receipt.BlobGasUsed = uint64(len(tx.BlobHashes()) * params.BlobTxBlobGasPerBlob)
+		receipt.BlobGasUsed = uint64(len(tx.BlobHashes()) * ethparams.BlobTxBlobGasPerBlob)
 		receipt.BlobGasPrice = evm.Context.BlobBaseFee
 	}
 
@@ -188,16 +189,16 @@ func ProcessBeaconBlockRoot(beaconRoot common.Hash, vmenv *vm.EVM, statedb *stat
 	// If EIP-4788 is enabled, we need to invoke the beaconroot storage contract with
 	// the new root
 	msg := &Message{
-		From:      params.SystemAddress,
+		From:      ethparams.SystemAddress,
 		GasLimit:  30_000_000,
 		GasPrice:  common.Big0,
 		GasFeeCap: common.Big0,
 		GasTipCap: common.Big0,
-		To:        &params.BeaconRootsStorageAddress,
+		To:        &ethparams.BeaconRootsStorageAddress,
 		Data:      beaconRoot[:],
 	}
 	vmenv.Reset(NewEVMTxContext(msg), statedb)
-	statedb.AddAddressToAccessList(params.BeaconRootsStorageAddress)
+	statedb.AddAddressToAccessList(ethparams.BeaconRootsStorageAddress)
 	_, _, _ = vmenv.Call(vm.AccountRef(msg.From), *msg.To, msg.Data, 30_000_000, common.U2560)
 	statedb.Finalise(true)
 }

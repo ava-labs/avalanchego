@@ -56,6 +56,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/event"
 	"github.com/ava-labs/libevm/log"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 )
 
@@ -334,7 +335,7 @@ func (w *worker) commitBlobTransaction(env *environment, tx *types.Transaction, 
 	// isn't really a better place right now. The blob gas limit is checked at block validation time
 	// and not during execution. This means core.ApplyTransaction will not return an error if the
 	// tx has too many blobs. So we have to explicitly check it here.
-	if (env.blobs+len(sc.Blobs))*params.BlobTxBlobGasPerBlob > params.MaxBlobGasPerBlock {
+	if (env.blobs+len(sc.Blobs))*ethparams.BlobTxBlobGasPerBlob > ethparams.MaxBlobGasPerBlock {
 		return nil, errors.New("max data blobs reached")
 	}
 	receipt, err := w.applyTransaction(env, tx, coinbase)
@@ -387,20 +388,20 @@ func (w *worker) applyTransaction(env *environment, tx *types.Transaction, coinb
 func (w *worker) commitTransactions(env *environment, plainTxs, blobTxs *transactionsByPriceAndNonce, coinbase common.Address) {
 	for {
 		// If we don't have enough gas for any further transactions then we're done.
-		if env.gasPool.Gas() < params.TxGas {
-			log.Trace("Not enough gas for further transactions", "have", env.gasPool, "want", params.TxGas)
+		if env.gasPool.Gas() < ethparams.TxGas {
+			log.Trace("Not enough gas for further transactions", "have", env.gasPool, "want", ethparams.TxGas)
 			break
 		}
 		// If we don't have enough blob space for any further blob transactions,
 		// skip that list altogether
-		if !blobTxs.Empty() && env.blobs*params.BlobTxBlobGasPerBlob >= params.MaxBlobGasPerBlock {
+		if !blobTxs.Empty() && env.blobs*ethparams.BlobTxBlobGasPerBlob >= ethparams.MaxBlobGasPerBlock {
 			log.Trace("Not enough blob space for further blob transactions")
 			blobTxs.Clear()
 			// Fall though to pick up any plain txs
 		}
 		// If we don't have enough blob space for any further blob transactions,
 		// skip that list altogether
-		if !blobTxs.Empty() && env.blobs*params.BlobTxBlobGasPerBlob >= params.MaxBlobGasPerBlock {
+		if !blobTxs.Empty() && env.blobs*ethparams.BlobTxBlobGasPerBlob >= ethparams.MaxBlobGasPerBlock {
 			log.Trace("Not enough blob space for further blob transactions")
 			blobTxs.Clear()
 			// Fall though to pick up any plain txs
@@ -434,7 +435,7 @@ func (w *worker) commitTransactions(env *environment, plainTxs, blobTxs *transac
 			txs.Pop()
 			continue
 		}
-		if left := uint64(params.MaxBlobGasPerBlock - env.blobs*params.BlobTxBlobGasPerBlob); left < ltx.BlobGas {
+		if left := uint64(ethparams.MaxBlobGasPerBlock - env.blobs*ethparams.BlobTxBlobGasPerBlob); left < ltx.BlobGas {
 			log.Trace("Not enough blob gas left for transaction", "hash", ltx.Hash, "left", left, "needed", ltx.BlobGas)
 			txs.Pop()
 			continue
@@ -542,7 +543,7 @@ func (w *worker) handleResult(env *environment, block *types.Block, createdAt ti
 		logs = append(logs, receipt.Logs...)
 	}
 	fees := totalFees(block, receipts)
-	feesInEther := new(big.Float).Quo(new(big.Float).SetInt(fees), big.NewFloat(params.Ether))
+	feesInEther := new(big.Float).Quo(new(big.Float).SetInt(fees), big.NewFloat(ethparams.Ether))
 	log.Info("Commit new mining work", "number", block.Number(), "hash", hash,
 		"uncles", 0, "txs", env.tcount,
 		"gas", block.GasUsed(), "fees", feesInEther,

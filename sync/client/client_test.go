@@ -28,6 +28,7 @@ import (
 
 	clientstats "github.com/ava-labs/coreth/sync/client/stats"
 	handlerstats "github.com/ava-labs/coreth/sync/handlers/stats"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestGetCode(t *testing.T) {
@@ -74,7 +75,7 @@ func TestGetCode(t *testing.T) {
 		},
 		"code size is too large": {
 			setupRequest: func() (requestHashes []common.Hash, testResponse message.CodeResponse, expectedCode [][]byte) {
-				oversizedCode := make([]byte, params.MaxCodeSize+1)
+				oversizedCode := make([]byte, ethparams.MaxCodeSize+1)
 				codeHash := crypto.Keccak256Hash(oversizedCode)
 				return []common.Hash{codeHash}, message.CodeResponse{
 					Data: [][]byte{oversizedCode},

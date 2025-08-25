@@ -24,6 +24,7 @@ import (
 
 	syncclient "github.com/ava-labs/coreth/sync/client"
 	handlerstats "github.com/ava-labs/coreth/sync/handlers/stats"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestBlockSyncer_ParameterizedTests(t *testing.T) {
@@ -157,7 +158,7 @@ func newTestEnvironment(t *testing.T, numBlocks int) *testEnvironment {
 
 	_, blocks, _, err := core.GenerateChainWithGenesis(gspec, engine, numBlocks, 0, func(_ int, gen *core.BlockGen) {
 		// Generate a transaction to create a unique block
-		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr), addr, big.NewInt(10), params.TxGas, nil, nil), signer, key)
+		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr), addr, big.NewInt(10), ethparams.TxGas, nil, nil), signer, key)
 		gen.AddTx(tx)
 	})
 	require.NoError(t, err)

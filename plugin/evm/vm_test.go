@@ -47,6 +47,7 @@ import (
 	"github.com/ava-labs/coreth/utils"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 var (
@@ -1691,7 +1692,7 @@ func TestNoBlobsAllowed(t *testing.T) {
 			Nonce:      0,
 			GasTipCap:  uint256.NewInt(1),
 			GasFeeCap:  uint256.MustFromBig(fee),
-			Gas:        params.TxGas,
+			Gas:        ethparams.TxGas,
 			To:         vmtest.TestEthAddrs[0],
 			BlobFeeCap: uint256.NewInt(1),
 			BlobHashes: []common.Hash{{1}}, // This blob is expected to cause verification to fail
@@ -1782,7 +1783,7 @@ func TestBuildBlockLargeTxStarvation(t *testing.T) {
 	require := require.New(t)
 
 	fork := upgradetest.Fortuna
-	amount := new(big.Int).Mul(big.NewInt(params.Ether), big.NewInt(4000))
+	amount := new(big.Int).Mul(big.NewInt(ethparams.Ether), big.NewInt(4000))
 	genesis := vmtest.NewTestGenesis(vmtest.ForkToChainConfig[fork])
 	for _, addr := range vmtest.TestEthAddrs {
 		genesis.Alloc[addr] = types.Account{Balance: amount}

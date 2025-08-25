@@ -34,12 +34,12 @@ import (
 	"testing"
 
 	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/libevm/core/types"
-	"github.com/stretchr/testify/require"
-
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
+	ethparams "github.com/ava-labs/libevm/params"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFeeHistory(t *testing.T) {
@@ -95,7 +95,7 @@ func TestFeeHistory(t *testing.T) {
 				ChainID:   params.TestChainConfig.ChainID,
 				Nonce:     b.TxNonce(addr),
 				To:        &common.Address{},
-				Gas:       params.TxGas,
+				Gas:       ethparams.TxGas,
 				GasFeeCap: feeCap,
 				GasTipCap: tip,
 				Data:      []byte{},

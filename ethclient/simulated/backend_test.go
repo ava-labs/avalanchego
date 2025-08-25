@@ -36,11 +36,11 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/accounts/abi/bind"
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,7 +64,7 @@ func newTx(sim *Backend, key *ecdsa.PrivateKey) (*types.Transaction, error) {
 
 	// create a signed transaction to send
 	head, _ := client.HeaderByNumber(context.Background(), nil) // Should be child's, good enough
-	gasPrice := new(big.Int).Add(head.BaseFee, big.NewInt(params.GWei))
+	gasPrice := new(big.Int).Add(head.BaseFee, big.NewInt(ethparams.GWei))
 	addr := crypto.PubkeyToAddress(key.PublicKey)
 	chainid, _ := client.ChainID(context.Background())
 	nonce, err := client.NonceAt(context.Background(), addr, nil)
@@ -74,7 +74,7 @@ func newTx(sim *Backend, key *ecdsa.PrivateKey) (*types.Transaction, error) {
 	tx := types.NewTx(&types.DynamicFeeTx{
 		ChainID:   chainid,
 		Nonce:     nonce,
-		GasTipCap: big.NewInt(params.GWei),
+		GasTipCap: big.NewInt(ethparams.GWei),
 		GasFeeCap: gasPrice,
 		Gas:       21000,
 		To:        &addr,
@@ -277,7 +277,7 @@ func TestCommitReturnValue(t *testing.T) {
 	// Create a block in the original chain (containing a transaction to force different block hashes)
 	head, _ := client.HeaderByNumber(ctx, nil) // Should be child's, good enough
 	gasPrice := new(big.Int).Add(head.BaseFee, big.NewInt(1))
-	_tx := types.NewTransaction(0, testAddr, big.NewInt(1000), params.TxGas, gasPrice, nil)
+	_tx := types.NewTransaction(0, testAddr, big.NewInt(1000), ethparams.TxGas, gasPrice, nil)
 	tx, _ := types.SignTx(_tx, types.LatestSignerForChainID(chainid), testKey)
 	if err := client.SendTransaction(ctx, tx); err != nil {
 		t.Fatalf("sending transaction: %v", err)

@@ -32,8 +32,8 @@ import (
 	mrand "math/rand"
 	"testing"
 
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/libevm/common"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 )
 
@@ -197,7 +197,7 @@ func BenchmarkPriceHeapReinit100GB(b *testing.B) { benchmarkPriceHeapReinit(b, 1
 func benchmarkPriceHeapReinit(b *testing.B, datacap uint64) {
 	// Calculate how many unique transactions we can fit into the provided disk
 	// data cap
-	blobs := datacap / (params.BlobTxBytesPerFieldElement * params.BlobTxFieldElementsPerBlob)
+	blobs := datacap / (ethparams.BlobTxBytesPerFieldElement * ethparams.BlobTxFieldElementsPerBlob)
 
 	// Create a random set of transactions with random fees. Use a separate account
 	// for each transaction to make it worse case.
@@ -257,7 +257,7 @@ func BenchmarkPriceHeapOverflow100GB(b *testing.B) { benchmarkPriceHeapOverflow(
 func benchmarkPriceHeapOverflow(b *testing.B, datacap uint64) {
 	// Calculate how many unique transactions we can fit into the provided disk
 	// data cap
-	blobs := datacap / (params.BlobTxBytesPerFieldElement * params.BlobTxFieldElementsPerBlob)
+	blobs := datacap / (ethparams.BlobTxBytesPerFieldElement * ethparams.BlobTxFieldElementsPerBlob)
 
 	// Create a random set of transactions with random fees. Use a separate account
 	// for each transaction to make it worse case.
