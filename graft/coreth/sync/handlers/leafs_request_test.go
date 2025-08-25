@@ -46,7 +46,7 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		trieDB,
 		common.Hash{},
 		10_000,
-		func(t *testing.T, i int, acc types.StateAccount) types.StateAccount {
+		func(_ *testing.T, i int, acc types.StateAccount) types.StateAccount {
 			// set the storage trie root for two accounts
 			if i == 0 {
 				acc.Root = largeTrieRoot

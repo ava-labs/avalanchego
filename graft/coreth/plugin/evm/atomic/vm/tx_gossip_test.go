@@ -121,7 +121,7 @@ func TestAtomicTxGossip(t *testing.T) {
 
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
-	onResponse := func(_ context.Context, nodeID ids.NodeID, responseBytes []byte, err error) {
+	onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
 		require.NoError(err)
 
 		response := &sdk.PullGossipResponse{}
@@ -156,7 +156,7 @@ func TestAtomicTxGossip(t *testing.T) {
 	wg.Add(1)
 
 	marshaller := atomic.TxMarshaller{}
-	onResponse = func(_ context.Context, nodeID ids.NodeID, responseBytes []byte, err error) {
+	onResponse = func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
 		require.NoError(err)
 
 		response := &sdk.PullGossipResponse{}

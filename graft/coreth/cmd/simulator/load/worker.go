@@ -26,7 +26,7 @@ type ethereumTxWorker struct {
 
 // NewSingleAddressTxWorker creates and returns a new ethereumTxWorker that confirms transactions by checking the latest
 // nonce of [address] and assuming any transaction with a lower nonce was already accepted.
-func NewSingleAddressTxWorker(ctx context.Context, client *ethclient.Client, address common.Address) *ethereumTxWorker {
+func NewSingleAddressTxWorker(client *ethclient.Client, address common.Address) *ethereumTxWorker {
 	newHeads := make(chan *types.Header)
 	tw := &ethereumTxWorker{
 		client:   client,
@@ -39,7 +39,7 @@ func NewSingleAddressTxWorker(ctx context.Context, client *ethclient.Client, add
 
 // NewTxReceiptWorker creates and returns a new ethereumTxWorker that confirms transactions by checking for the
 // corresponding transaction receipt.
-func NewTxReceiptWorker(ctx context.Context, client *ethclient.Client) *ethereumTxWorker {
+func NewTxReceiptWorker(client *ethclient.Client) *ethereumTxWorker {
 	newHeads := make(chan *types.Header)
 	tw := &ethereumTxWorker{
 		client:   client,

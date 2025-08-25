@@ -149,7 +149,7 @@ func newTestBlockParser() *testBlockParser {
 	return &testBlockParser{}
 }
 
-func (t *testBlockParser) ParseEthBlock(b []byte) (*types.Block, error) {
+func (*testBlockParser) ParseEthBlock(b []byte) (*types.Block, error) {
 	block := new(types.Block)
 	if err := rlp.DecodeBytes(b, block); err != nil {
 		return nil, fmt.Errorf("%w: %w", errUnmarshalResponse, err)

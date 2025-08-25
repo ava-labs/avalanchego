@@ -260,7 +260,7 @@ func (c *Config) validate(networkID uint32) error {
 // deprecate returns a string of deprecation messages for the config.
 // This is used to log a message when the config is loaded and contains deprecated flags.
 // This function should be kept as a placeholder even if it is empty.
-func (c *Config) deprecate() string {
+func (*Config) deprecate() string {
 	msg := ""
 
 	return msg

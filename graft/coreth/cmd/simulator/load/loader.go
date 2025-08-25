@@ -235,7 +235,7 @@ func ExecuteLoader(ctx context.Context, config config.Config) error {
 
 	workers := make([]txs.Worker[*types.Transaction], 0, len(clients))
 	for i, client := range clients {
-		workers = append(workers, NewSingleAddressTxWorker(ctx, client, ethcrypto.PubkeyToAddress(pks[i].PublicKey)))
+		workers = append(workers, NewSingleAddressTxWorker(client, ethcrypto.PubkeyToAddress(pks[i].PublicKey)))
 	}
 	loader := New(workers, txSequences, config.BatchSize, m)
 	err = loader.Execute(ctx)

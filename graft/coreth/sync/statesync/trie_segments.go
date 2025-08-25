@@ -348,7 +348,7 @@ func (t *trieSegment) String() string {
 func (t *trieSegment) Root() common.Hash                  { return t.trie.root }
 func (t *trieSegment) Account() common.Hash               { return t.trie.account }
 func (t *trieSegment) End() []byte                        { return t.end }
-func (t *trieSegment) NodeType() message.NodeType         { return message.StateTrieNode }
+func (_ *trieSegment) NodeType() message.NodeType         { return message.StateTrieNode }
 func (t *trieSegment) OnStart() (bool, error)             { return t.trie.task.OnStart() }
 func (t *trieSegment) OnFinish(ctx context.Context) error { return t.trie.segmentFinished(ctx, t.idx) }
 

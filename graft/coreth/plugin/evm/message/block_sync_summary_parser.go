@@ -15,7 +15,7 @@ func NewBlockSyncSummaryParser() *BlockSyncSummaryParser {
 	return &BlockSyncSummaryParser{}
 }
 
-func (b *BlockSyncSummaryParser) Parse(summaryBytes []byte, acceptImpl AcceptImplFn) (Syncable, error) {
+func (*BlockSyncSummaryParser) Parse(summaryBytes []byte, acceptImpl AcceptImplFn) (Syncable, error) {
 	summary := BlockSyncSummary{}
 	if _, err := Codec.Unmarshal(summaryBytes, &summary); err != nil {
 		return nil, fmt.Errorf("failed to parse syncable summary: %w", err)

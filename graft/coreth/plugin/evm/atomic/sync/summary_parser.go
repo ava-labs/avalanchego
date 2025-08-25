@@ -19,7 +19,7 @@ func NewSummaryParser() *summaryParser {
 	return &summaryParser{}
 }
 
-func (a *summaryParser) Parse(summaryBytes []byte, acceptImpl message.AcceptImplFn) (message.Syncable, error) {
+func (*summaryParser) Parse(summaryBytes []byte, acceptImpl message.AcceptImplFn) (message.Syncable, error) {
 	summary := Summary{}
 	if _, err := message.Codec.Unmarshal(summaryBytes, &summary); err != nil {
 		return nil, fmt.Errorf("failed to parse syncable summary: %w", err)

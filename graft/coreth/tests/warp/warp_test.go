@@ -540,11 +540,11 @@ func (w *warpTest) warpLoad() {
 	ginkgo.GinkgoLogr.Info("Creating workers for each subnet...")
 	chainAWorkers := make([]txs.Worker[*types.Transaction], 0, len(chainAKeys))
 	for i := range chainAKeys {
-		chainAWorkers = append(chainAWorkers, load.NewTxReceiptWorker(ctx, w.sendingSubnetClients[i]))
+		chainAWorkers = append(chainAWorkers, load.NewTxReceiptWorker(w.sendingSubnetClients[i]))
 	}
 	chainBWorkers := make([]txs.Worker[*types.Transaction], 0, len(chainBKeys))
 	for i := range chainBKeys {
-		chainBWorkers = append(chainBWorkers, load.NewTxReceiptWorker(ctx, w.receivingSubnetClients[i]))
+		chainBWorkers = append(chainBWorkers, load.NewTxReceiptWorker(w.receivingSubnetClients[i]))
 	}
 
 	ginkgo.GinkgoLogr.Info("Subscribing to warp send events on sending subnet")

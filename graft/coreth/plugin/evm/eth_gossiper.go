@@ -141,11 +141,11 @@ func (g *GossipEthTxPool) GetFilter() ([]byte, []byte) {
 
 type GossipEthTxMarshaller struct{}
 
-func (g GossipEthTxMarshaller) MarshalGossip(tx *GossipEthTx) ([]byte, error) {
+func (GossipEthTxMarshaller) MarshalGossip(tx *GossipEthTx) ([]byte, error) {
 	return tx.Tx.MarshalBinary()
 }
 
-func (g GossipEthTxMarshaller) UnmarshalGossip(bytes []byte) (*GossipEthTx, error) {
+func (GossipEthTxMarshaller) UnmarshalGossip(bytes []byte) (*GossipEthTx, error) {
 	tx := &GossipEthTx{
 		Tx: &types.Transaction{},
 	}

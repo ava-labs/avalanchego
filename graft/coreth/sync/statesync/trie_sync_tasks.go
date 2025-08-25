@@ -51,7 +51,7 @@ func (m *mainTrieTask) IterateLeafs(seek common.Hash) ethdb.Iterator {
 }
 
 // OnStart always returns false since the main trie task cannot be skipped.
-func (m *mainTrieTask) OnStart() (bool, error) {
+func (*mainTrieTask) OnStart() (bool, error) {
 	return false, nil
 }
 

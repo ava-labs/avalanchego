@@ -65,7 +65,7 @@ func TestGetSenderNativeAssetCall(t *testing.T) {
 	auth, err := bind.NewKeyedTransactorWithChainID(key, big.NewInt(1337))
 	require.NoError(t, err, "Failed to create transactor")
 	alloc := types.GenesisAlloc{auth.From: {Balance: big.NewInt(1000000000000000000)}}
-	atApricotPhase2 := func(nodeConf *node.Config, ethConf *ethconfig.Config) {
+	atApricotPhase2 := func(_ *node.Config, ethConf *ethconfig.Config) {
 		chainConfig := *params.TestApricotPhase2Config
 		chainConfig.ChainID = big.NewInt(1337)
 		ethConf.Genesis.Config = &chainConfig

@@ -92,9 +92,7 @@ func (a *AtomicRepository) initializeHeightIndex(lastAcceptedHeight uint64) erro
 	indexHeightBytes, err := a.atomicRepoMetadataDB.Get(maxIndexedHeightKey)
 	switch err {
 	case nil:
-		break
 	case database.ErrNotFound:
-		break
 	default: // unexpected value in the database
 		return fmt.Errorf("found invalid value at max indexed height: %v", indexHeightBytes)
 	}

@@ -31,7 +31,7 @@ type SummaryProvider interface {
 // Extender is an interface that allows for extending the state sync process.
 type Extender interface {
 	// CreateSyncer creates a syncer instance for the given client, database, and summary.
-	CreateSyncer(ctx context.Context, client syncclient.LeafClient, verDB *versiondb.Database, summary message.Syncable) (Syncer, error)
+	CreateSyncer(client syncclient.LeafClient, verDB *versiondb.Database, summary message.Syncable) (Syncer, error)
 
 	// OnFinishBeforeCommit is called before committing the sync results.
 	OnFinishBeforeCommit(lastAcceptedHeight uint64, summary message.Syncable) error

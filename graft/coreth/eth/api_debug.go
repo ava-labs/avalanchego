@@ -102,7 +102,7 @@ func (api *DebugAPI) Preimage(ctx context.Context, hash common.Hash) (hexutil.By
 // and returns them as a JSON list of block hashes.
 func (api *DebugAPI) GetBadBlocks(ctx context.Context) ([]*ethapi.BadBlockArgs, error) {
 	internalAPI := ethapi.NewBlockChainAPI(api.eth.APIBackend)
-	return internalAPI.GetBadBlocks(ctx)
+	return internalAPI.GetBadBlocks()
 }
 
 // AccountRangeMaxResults is the maximum number of results to be returned per call

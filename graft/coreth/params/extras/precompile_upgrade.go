@@ -146,7 +146,7 @@ func (c *ChainConfig) GetActivePrecompileConfig(address common.Address, timestam
 
 // GetActivatingPrecompileConfigs returns all precompile upgrades configured to activate during the
 // state transition from a block with timestamp [from] to a block with timestamp [to].
-func (c *ChainConfig) GetActivatingPrecompileConfigs(address common.Address, from *uint64, to uint64, upgrades []PrecompileUpgrade) []precompileconfig.Config {
+func (*ChainConfig) GetActivatingPrecompileConfigs(address common.Address, from *uint64, to uint64, upgrades []PrecompileUpgrade) []precompileconfig.Config {
 	// Get key from address.
 	module, ok := modules.GetPrecompileModuleByAddress(address)
 	if !ok {

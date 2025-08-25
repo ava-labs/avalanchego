@@ -32,14 +32,14 @@ type ResponseHandler interface {
 
 type NoopRequestHandler struct{}
 
-func (NoopRequestHandler) HandleLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest LeafsRequest) ([]byte, error) {
+func (NoopRequestHandler) HandleLeafsRequest(_ context.Context, _ ids.NodeID, _ uint32, _ LeafsRequest) ([]byte, error) {
 	return nil, nil
 }
 
-func (NoopRequestHandler) HandleBlockRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, request BlockRequest) ([]byte, error) {
+func (NoopRequestHandler) HandleBlockRequest(_ context.Context, _ ids.NodeID, _ uint32, _ BlockRequest) ([]byte, error) {
 	return nil, nil
 }
 
-func (NoopRequestHandler) HandleCodeRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, codeRequest CodeRequest) ([]byte, error) {
+func (NoopRequestHandler) HandleCodeRequest(_ context.Context, _ ids.NodeID, _ uint32, _ CodeRequest) ([]byte, error) {
 	return nil, nil
 }
