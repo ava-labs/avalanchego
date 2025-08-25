@@ -64,9 +64,8 @@ func TestRecovery_Success(t *testing.T) {
 
 				// Write index entry for only the first block
 				indexEntry := indexEntry{
-					Offset:     0,
-					Size:       4 * 1024, // 4KB
-					HeaderSize: 0,
+					Offset: 0,
+					Size:   4 * 1024, // 4KB
 				}
 				entryBytes, err := indexEntry.MarshalBinary()
 				if err != nil {
@@ -170,7 +169,7 @@ func TestRecovery_Success(t *testing.T) {
 				// Create 4KB blocks
 				block := fixedSizeBlock(t, 4*1024, height)
 
-				require.NoError(t, store.WriteBlock(height, block, 0))
+				require.NoError(t, store.WriteBlock(height, block))
 				blocks[height] = block
 			}
 			checkDatabaseState(t, store, 8, 4)
@@ -278,11 +277,10 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				}
 				secondBlockOffset := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))
 				bh := blockEntryHeader{
-					Height:     1,
-					Checksum:   calculateChecksum(blocks[1]),
-					Size:       uint32(len(blocks[1])) + 1, // make block larger than actual
-					HeaderSize: 0,
-					Version:    BlockEntryVersion,
+					Height:   1,
+					Checksum: calculateChecksum(blocks[1]),
+					Size:     uint32(len(blocks[1])) + 1, // make block larger than actual
+					Version:  BlockEntryVersion,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -298,11 +296,10 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				}
 				secondBlockOffset := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))
 				bh := blockEntryHeader{
-					Height:     1,
-					Checksum:   0xDEADBEEF, // Wrong checksum
-					Size:       uint32(len(blocks[1])),
-					HeaderSize: 0,
-					Version:    BlockEntryVersion,
+					Height:   1,
+					Checksum: 0xDEADBEEF, // Wrong checksum
+					Size:     uint32(len(blocks[1])),
+					Version:  BlockEntryVersion,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -337,11 +334,10 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				}
 				secondBlockOffset := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))
 				bh := blockEntryHeader{
-					Height:     5, // Invalid height because its below the minimum height of 10
-					Checksum:   calculateChecksum(blocks[1]),
-					Size:       uint32(len(blocks[1])),
-					HeaderSize: 0,
-					Version:    BlockEntryVersion,
+					Height:   5, // Invalid height because its below the minimum height of 10
+					Checksum: calculateChecksum(blocks[1]),
+					Size:     uint32(len(blocks[1])),
+					Version:  BlockEntryVersion,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -393,11 +389,10 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				// Corrupt second block header version
 				secondBlockOffset := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))
 				bh := blockEntryHeader{
-					Height:     1,
-					Checksum:   calculateChecksum(blocks[1]),
-					Size:       uint32(len(blocks[1])),
-					HeaderSize: 0,
-					Version:    BlockEntryVersion + 1, // Invalid version
+					Height:   1,
+					Checksum: calculateChecksum(blocks[1]),
+					Size:     uint32(len(blocks[1])),
+					Version:  BlockEntryVersion + 1, // Invalid version
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -414,11 +409,10 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				// Corrupt second block header with invalid version
 				secondBlockOffset := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))
 				bh := blockEntryHeader{
-					Height:     1,
-					Checksum:   calculateChecksum(blocks[1]),
-					Size:       uint32(len(blocks[1])),
-					HeaderSize: 0,
-					Version:    BlockEntryVersion + 10, // version cannot be greater than current
+					Height:   1,
+					Checksum: calculateChecksum(blocks[1]),
+					Size:     uint32(len(blocks[1])),
+					Version:  BlockEntryVersion + 10, // version cannot be greater than current
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -448,7 +442,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				} else {
 					blocks[i] = randomBlock(t)
 				}
-				require.NoError(t, store.WriteBlock(height, blocks[i], 0))
+				require.NoError(t, store.WriteBlock(height, blocks[i]))
 			}
 			require.NoError(t, store.Close())
 

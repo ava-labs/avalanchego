@@ -33,6 +33,9 @@ type DatabaseConfig struct {
 
 	// SyncToDisk determines if fsync is called after each write for durability.
 	SyncToDisk bool
+
+	// CompressBlocks determines if block data should be compressed using zstd.
+	CompressBlocks bool
 }
 
 // DefaultConfig returns the default options for BlockDB.
@@ -45,6 +48,7 @@ func DefaultConfig() DatabaseConfig {
 		MaxDataFiles:       DefaultMaxDataFiles,
 		CheckpointInterval: 1024,
 		SyncToDisk:         true,
+		CompressBlocks:     false,
 	}
 }
 
@@ -94,6 +98,12 @@ func (c DatabaseConfig) WithMaxDataFiles(maxFiles int) DatabaseConfig {
 // WithCheckpointInterval returns a copy of the config with CheckpointInterval set to the given value.
 func (c DatabaseConfig) WithCheckpointInterval(interval uint64) DatabaseConfig {
 	c.CheckpointInterval = interval
+	return c
+}
+
+// WithCompressBlocks returns a copy of the config with CompressBlocks set to the given value.
+func (c DatabaseConfig) WithCompressBlocks(compress bool) DatabaseConfig {
+	c.CompressBlocks = compress
 	return c
 }
 
