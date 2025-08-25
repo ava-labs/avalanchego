@@ -404,16 +404,23 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 			expectedErr: nil,
 		},
 		"invalid consensus parameters": {
-			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"consensusParameters":{"k": 111, "alphaPreference":1234} }`,
+			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `{
+				"consensusConfig": {
+					"snowballParameters": {
+						"k": 111,
+						"alphaPreference": 1234
+					}
+				}
+			}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				require.Nil(given)
 			},
 			expectedErr: snowball.ErrParametersInvalid,
 		},
-		"correct config": {
+		"correct snowball config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"validatorOnly": true, "consensusParameters":{"alphaConfidence":16} }`,
+			givenJSON: `{"validatorOnly": true, "consensusConfig":{"snowballParameters":{"alphaConfidence":16}}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
@@ -423,6 +430,19 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 				require.Equal(16, config.ConsensusConfig.SnowballParams.AlphaConfidence)
 				// must still respect defaults
 				require.Equal(20, config.ConsensusConfig.SnowballParams.K)
+			},
+			expectedErr: nil,
+		},
+		"correct simplex config": {
+			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
+			givenJSON: `{"validatorOnly": true, "consensusConfig":{"simplexParameters":{"enabled":true}}}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+
+				require.True(config.ValidatorOnly)
+				require.True(config.ConsensusConfig.SimplexParams.Enabled)
 			},
 			expectedErr: nil,
 		},
@@ -483,6 +503,27 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 			},
 			expectedErr: nil,
 		},
+		"simplex enabled": {
+			givenJSON: `{
+				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
+					"consensusConfig": {
+						"simplexParameters": {
+							"enabled": true
+						}
+					},
+					"validatorOnly": true
+				}
+			}`,
+			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
+				require.Len(given, 1)
+				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
+				config, ok := given[id]
+				require.True(ok)
+				// should respect defaults
+				require.True(config.ConsensusConfig.SimplexParams.Enabled)
+			},
+			expectedErr: nil,
+		},
 		"default config used when subnet is not tracked": {
 			givenJSON: `{"Gmt4fuNsGJAd2PX86LBvycGaBpgCYKbuULdCLZs3SEs1Jx1LU":{"validatorOnly":true}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
@@ -493,9 +534,11 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 		"invalid consensus parameters": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"consensusParameters": {
-						"k": 111,
-						"alphaPreference": 1234
+					"consensusConfig": {
+						"snowballParameters": {
+							"k": 111,
+							"alphaPreference": 1234
+						}
 					}
 				}
 			}`,
@@ -507,10 +550,12 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 		"correct config": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"consensusParameters": {
-						"k": 30,
-						"alphaPreference": 16,
-						"alphaConfidence": 20
+					"consensusConfig": {
+						"snowballParameters": {
+							"k": 30,
+							"alphaPreference": 16,
+							"alphaConfidence": 20
+						}
 					},
 					"validatorOnly": true
 				}

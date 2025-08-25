@@ -26,8 +26,8 @@ type SimplexParameters struct {
 }
 
 type ConsensusConfig struct {
-	SnowballParams *snowball.Parameters `json:"consensusParameters,omitempty" yaml:"consensusParameters,omitempty"`
-	SimplexParams  *SimplexParameters   `json:"simplexParameters,omitempty"   yaml:"simplexParameters,omitempty"`
+	SnowballParams *snowball.Parameters `json:"snowballParameters,omitempty" yaml:"snowballParameters,omitempty"`
+	SimplexParams  *SimplexParameters   `json:"simplexParameters,omitempty"  yaml:"simplexParameters,omitempty"`
 }
 
 type Config struct {
@@ -89,6 +89,6 @@ func (c *ConsensusConfig) Verify() error {
 		}
 		return nil
 	}
-
+	
 	return errMissingConsensusParameters
 }

@@ -54,7 +54,7 @@ func TestValid(t *testing.T) {
 			expectedErr: errAllowedNodesWhenNotValidatorOnly,
 		},
 		{
-			name: "valid",
+			name: "valid snowball parameters",
 			s: Config{
 				ConsensusConfig: ConsensusConfig{
 					SnowballParams: &validParameters,
@@ -91,6 +91,15 @@ func TestValid(t *testing.T) {
 				},
 			},
 			expectedErr: errTwoConfigs,
+		},
+		{
+			name: "simplex not enabled",
+			s: Config{
+				ConsensusConfig: ConsensusConfig{
+					SimplexParams: &SimplexParameters{Enabled: false},
+				},
+			},
+			expectedErr: errSimplexNotEnabled,
 		},
 	}
 	for _, tt := range tests {

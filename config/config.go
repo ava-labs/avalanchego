@@ -417,15 +417,15 @@ func getNetworkConfig(
 	return config, nil
 }
 
-func getBenchlistConfig(v *viper.Viper, consensusParameters *snowball.Parameters) (benchlist.Config, error) {
-	if consensusParameters == nil {
+func getBenchlistConfig(v *viper.Viper, snowballParameters *snowball.Parameters) (benchlist.Config, error) {
+	if snowballParameters == nil {
 		return benchlist.Config{}, errors.New("pChain snowball parameters must be non-nil")
 	}
 	// AlphaConfidence is used here to ensure that benching can't cause a
 	// liveness failure. If AlphaPreference were used, the benchlist may grow to
 	// a point that committing would be extremely unlikely to happen.
-	alpha := consensusParameters.AlphaConfidence
-	k := consensusParameters.K
+	alpha := snowballParameters.AlphaConfidence
+	k := snowballParameters.K
 	config := benchlist.Config{
 		Threshold:              v.GetInt(BenchlistFailThresholdKey),
 		Duration:               v.GetDuration(BenchlistDurationKey),
@@ -1035,7 +1035,9 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 				return nil, err
 			}
 
-			if config.ConsensusConfig.SimplexParams == nil && config.ConsensusConfig.SnowballParams.Alpha != nil {
+			if config.ConsensusConfig.SimplexParams != nil {
+				config.ConsensusConfig.SnowballParams = nil
+			} else if config.ConsensusConfig.SnowballParams.Alpha != nil {
 				config.ConsensusConfig.SnowballParams.AlphaPreference = *config.ConsensusConfig.SnowballParams.Alpha
 				config.ConsensusConfig.SnowballParams.AlphaConfidence = config.ConsensusConfig.SnowballParams.AlphaPreference
 			}
@@ -1093,7 +1095,9 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 			return nil, fmt.Errorf("%w: %w", errUnmarshalling, err)
 		}
 
-		if config.ConsensusConfig.SimplexParams == nil && config.ConsensusConfig.SnowballParams.Alpha != nil {
+		if config.ConsensusConfig.SimplexParams != nil {
+			config.ConsensusConfig.SnowballParams = nil
+		} else if config.ConsensusConfig.SnowballParams.Alpha != nil {
 			config.ConsensusConfig.SnowballParams.AlphaPreference = *config.ConsensusConfig.SnowballParams.Alpha
 			config.ConsensusConfig.SnowballParams.AlphaConfidence = config.ConsensusConfig.SnowballParams.AlphaPreference
 		}
