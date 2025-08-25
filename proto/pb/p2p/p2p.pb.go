@@ -27,22 +27,22 @@ type EngineType int32
 
 const (
 	EngineType_ENGINE_TYPE_UNSPECIFIED EngineType = 0
-	// Only the X-Chain uses avalanche consensus
-	EngineType_ENGINE_TYPE_AVALANCHE EngineType = 1
-	EngineType_ENGINE_TYPE_SNOWMAN   EngineType = 2
+	// Only the X-Chain uses DAG consensus
+	EngineType_ENGINE_TYPE_DAG   EngineType = 1
+	EngineType_ENGINE_TYPE_CHAIN EngineType = 2
 )
 
 // Enum value maps for EngineType.
 var (
 	EngineType_name = map[int32]string{
 		0: "ENGINE_TYPE_UNSPECIFIED",
-		1: "ENGINE_TYPE_AVALANCHE",
-		2: "ENGINE_TYPE_SNOWMAN",
+		1: "ENGINE_TYPE_DAG",
+		2: "ENGINE_TYPE_CHAIN",
 	}
 	EngineType_value = map[string]int32{
 		"ENGINE_TYPE_UNSPECIFIED": 0,
-		"ENGINE_TYPE_AVALANCHE":   1,
-		"ENGINE_TYPE_SNOWMAN":     2,
+		"ENGINE_TYPE_DAG":         1,
+		"ENGINE_TYPE_CHAIN":       2,
 	}
 )
 
@@ -3613,12 +3613,12 @@ const file_p2p_p2p_proto_rawDesc = "" +
 	"\x05block\x18\x01 \x01(\fR\x05block\x12:\n" +
 	"\fnotarization\x18\x02 \x01(\v2\x16.p2p.QuorumCertificateR\fnotarization\x12E\n" +
 	"\x12empty_notarization\x18\x03 \x01(\v2\x16.p2p.EmptyNotarizationR\x11emptyNotarization\x12:\n" +
-	"\ffinalization\x18\x04 \x01(\v2\x16.p2p.QuorumCertificateR\ffinalization*]\n" +
+	"\ffinalization\x18\x04 \x01(\v2\x16.p2p.QuorumCertificateR\ffinalization*U\n" +
 	"\n" +
 	"EngineType\x12\x1b\n" +
-	"\x17ENGINE_TYPE_UNSPECIFIED\x10\x00\x12\x19\n" +
-	"\x15ENGINE_TYPE_AVALANCHE\x10\x01\x12\x17\n" +
-	"\x13ENGINE_TYPE_SNOWMAN\x10\x02B.Z,github.com/ava-labs/avalanchego/proto/pb/p2pb\x06proto3"
+	"\x17ENGINE_TYPE_UNSPECIFIED\x10\x00\x12\x13\n" +
+	"\x0fENGINE_TYPE_DAG\x10\x01\x12\x15\n" +
+	"\x11ENGINE_TYPE_CHAIN\x10\x02B.Z,github.com/ava-labs/avalanchego/proto/pb/p2pb\x06proto3"
 
 var (
 	file_p2p_p2p_proto_rawDescOnce sync.Once

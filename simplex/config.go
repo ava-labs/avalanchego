@@ -29,9 +29,9 @@ type Config struct {
 	VM block.ChainVM
 
 	DB database.KeyValueReaderWriter
-
 	// The file location where simplex will store its WAL.
 	WalLocation string
+
 	// SignBLS is the signing function used for this node to sign messages.
 	SignBLS SignFunc
 }

@@ -23,13 +23,13 @@ func TestStorageNew(t *testing.T) {
 	tests := []struct {
 		name           string
 		vm             block.ChainVM
-		expectedHeight uint64
+		expectedBlocks uint64
 		db             database.KeyValueReaderWriter
 	}{
 		{
 			name:           "last accepted is genesis",
 			vm:             newTestVM(),
-			expectedHeight: 1,
+			expectedBlocks: 1,
 			db:             memdb.New(),
 		},
 		{
@@ -50,7 +50,7 @@ func TestStorageNew(t *testing.T) {
 				require.NoError(t, db.Put(finalizationKey(1), finalizationToBytes(finalization)))
 				return db
 			}(),
-			expectedHeight: 2,
+			expectedBlocks: 2,
 		},
 	}
 
@@ -66,13 +66,13 @@ func TestStorageNew(t *testing.T) {
 			config.DB = tt.db
 			s, err := newStorage(ctx, config, &qc, nil)
 			require.NoError(t, err)
-			require.Equal(t, tt.expectedHeight, s.NumBlocks())
+			require.Equal(t, tt.expectedBlocks, s.NumBlocks())
 		})
 	}
 }
 
 func TestStorageRetrieve(t *testing.T) {
-	genesis := newTestBlock(t, newBlockConfig{})
+	genesis := newBlock(t, newBlockConfig{})
 	genesisBytes, err := genesis.Bytes()
 	require.NoError(t, err)
 
@@ -131,9 +131,9 @@ func TestStorageRetrieve(t *testing.T) {
 
 func TestStorageIndexFails(t *testing.T) {
 	ctx := context.Background()
-	genesis := newTestBlock(t, newBlockConfig{})
-	child1 := newTestBlock(t, newBlockConfig{prev: genesis})
-	child2 := newTestBlock(t, newBlockConfig{prev: child1})
+	genesis := newBlock(t, newBlockConfig{})
+	child1 := newBlock(t, newBlockConfig{prev: genesis})
+	child2 := newBlock(t, newBlockConfig{prev: child1})
 
 	configs := newNetworkConfigs(t, 4)
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
@@ -206,7 +206,7 @@ func TestStorageIndexFails(t *testing.T) {
 				require.Equal(t, simplex.Finalization{}, finalization)
 			}
 
-			// ensure that the height is not incremented
+			// ensure that we haven't indexed any blocks
 			require.Equal(t, uint64(1), s.NumBlocks())
 		})
 	}
@@ -216,10 +216,10 @@ func TestStorageIndexFails(t *testing.T) {
 // previous digest of the block being indexed.
 func TestIndexMismatchedChild(t *testing.T) {
 	ctx := context.Background()
-	genesis := newTestBlock(t, newBlockConfig{})
-	child1 := newTestBlock(t, newBlockConfig{prev: genesis})
-	child1Sibling := newTestBlock(t, newBlockConfig{prev: genesis})
-	child2Nephew := newTestBlock(t, newBlockConfig{prev: child1Sibling})
+	genesis := newBlock(t, newBlockConfig{})
+	child1 := newBlock(t, newBlockConfig{prev: genesis})
+	child1Sibling := newBlock(t, newBlockConfig{prev: genesis})
+	child2Nephew := newBlock(t, newBlockConfig{prev: child1Sibling})
 
 	configs := newNetworkConfigs(t, 4)
 	configs[0].VM = genesis.vmBlock.(*wrappedBlock).vm
@@ -251,7 +251,7 @@ func TestIndexMismatchedChild(t *testing.T) {
 // TestStorageIndexSuccess indexes 10 blocks and verifies that they can be retrieved.
 func TestStorageIndexSuccess(t *testing.T) {
 	ctx := context.Background()
-	genesis := newTestBlock(t, newBlockConfig{})
+	genesis := newBlock(t, newBlockConfig{})
 	configs := newNetworkConfigs(t, 4)
 
 	_, verifier := NewBLSAuth(configs[0])
@@ -270,7 +270,7 @@ func TestStorageIndexSuccess(t *testing.T) {
 
 	prev := genesis
 	for i := 0; i < numBlocks; i++ {
-		child := newTestBlock(t, newBlockConfig{prev: prev})
+		child := newBlock(t, newBlockConfig{prev: prev})
 		_, err := child.Verify(ctx)
 		require.NoError(t, err)
 
@@ -300,6 +300,5 @@ func TestStorageIndexSuccess(t *testing.T) {
 		require.Equal(t, snowtest.Accepted, accepted)
 	}
 
-	// ensure that the height is correct
 	require.Equal(t, uint64(numBlocks+1), s.NumBlocks())
 }

@@ -377,7 +377,7 @@ func TestMessage(t *testing.T) {
 						RequestId:   1,
 						Deadline:    1,
 						ContainerId: testID[:],
-						EngineType:  p2p.EngineType_ENGINE_TYPE_AVALANCHE,
+						EngineType:  p2p.EngineType_ENGINE_TYPE_DAG,
 					},
 				},
 			},
