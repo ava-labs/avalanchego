@@ -38,9 +38,7 @@ const (
 )
 
 var (
-	_ Proof       = (*rangeProof)(nil)
-	_ Proof       = (*changeProof)(nil)
-	_ ProofParser = (*proofParser)(nil)
+	_ ProofHandler[*rangeProofResponse, *changeProofResponse] = (*proofHandler)(nil)
 
 	ErrAlreadyStarted                = errors.New("cannot start a Manager that has already been started")
 	ErrAlreadyClosed                 = errors.New("Manager is closed")
@@ -52,6 +50,7 @@ var (
 	ErrZeroWorkLimit                 = errors.New("simultaneous work limit must be greater than 0")
 	errInvalidRangeProof             = errors.New("failed to verify range proof")
 	errInvalidChangeProof            = errors.New("failed to verify change proof")
+	errNoProofFound                  = errors.New("no proof found in change proof response")
 	errTooManyKeys                   = errors.New("response contains more than requested keys")
 	errTooManyBytes                  = errors.New("response contains more than requested bytes")
 	errUnexpectedChangeProofResponse = errors.New("unexpected response type")
@@ -67,13 +66,13 @@ const (
 	retryPriority
 )
 
-type proofParser struct {
+type proofHandler struct {
 	db        DB
 	hasher    merkledb.Hasher
 	tokenSize int
 }
 
-func NewParser(db DB, hasher merkledb.Hasher, branchFactor merkledb.BranchFactor) (ProofParser, error) {
+func NewHandler(db DB, hasher merkledb.Hasher, branchFactor merkledb.BranchFactor) (ProofHandler[*rangeProofResponse, *changeProofResponse], error) {
 	if db == nil {
 		return nil, ErrNoDBProvided
 	}
@@ -85,7 +84,7 @@ func NewParser(db DB, hasher merkledb.Hasher, branchFactor merkledb.BranchFactor
 		hasher = merkledb.DefaultHasher
 	}
 
-	return &proofParser{
+	return &proofHandler{
 		db:        db,
 		hasher:    hasher,
 		tokenSize: merkledb.BranchFactorToTokenSize[branchFactor],
@@ -170,7 +169,7 @@ type Manager struct {
 
 // TODO remove non-config values out of this struct
 type ManagerConfig struct {
-	Parser                ProofParser
+	ProofHandler          ProofHandler[*rangeProofResponse, *changeProofResponse]
 	RangeProofClient      *p2p.Client
 	ChangeProofClient     *p2p.Client
 	SimultaneousWorkLimit int
@@ -185,7 +184,7 @@ func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manage
 		return nil, ErrNoRangeProofClientProvided
 	case config.ChangeProofClient == nil:
 		return nil, ErrNoChangeProofClientProvided
-	case config.Parser == nil:
+	case config.ProofHandler == nil:
 		return nil, ErrNoParserProvided
 	case config.Log == nil:
 		return nil, ErrNoLogProvided
@@ -501,7 +500,7 @@ func (m *Manager) handleRangeProofResponse(
 		return err
 	}
 
-	rangeProof, err := m.config.Parser.ParseRangeProof(
+	rangeProof, err := m.config.ProofHandler.ParseRangeProof(
 		ctx,
 		responseBytes,
 		request.RootHash,
@@ -513,7 +512,7 @@ func (m *Manager) handleRangeProofResponse(
 		return err
 	}
 	// Replace all the key-value pairs in the DB from start to end with values from the response.
-	nextKey, err := rangeProof.Commit(ctx)
+	nextKey, err := m.config.ProofHandler.CommitRangeProof(ctx, rangeProof)
 	if err != nil {
 		m.setError(err)
 		return nil
@@ -531,7 +530,7 @@ type proofRequest struct {
 	keyLimit int
 }
 
-func (p *proofParser) ParseRangeProof(ctx context.Context, responseBytes, rootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error) {
+func (p *proofHandler) ParseRangeProof(ctx context.Context, responseBytes, rootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (*rangeProofResponse, error) {
 	var rangeProofProto pb.RangeProof
 	if err := proto.Unmarshal(responseBytes, &rangeProofProto); err != nil {
 		return nil, err
@@ -542,7 +541,7 @@ func (p *proofParser) ParseRangeProof(ctx context.Context, responseBytes, rootHa
 		return nil, err
 	}
 
-	proof := &rangeProof{
+	proof := &rangeProofResponse{
 		merkleProof: &merkleProof,
 		request: &proofRequest{
 			rootHash: rootHash,
@@ -550,58 +549,53 @@ func (p *proofParser) ParseRangeProof(ctx context.Context, responseBytes, rootHa
 			endKey:   endKey,
 			keyLimit: int(keyLimit),
 		},
-		db:        p.db,
-		tokenSize: p.tokenSize,
-		hasher:    p.hasher,
 	}
 
-	if err := proof.verify(ctx); err != nil {
+	if err := p.verifyRangeProof(ctx, proof); err != nil {
 		return nil, err
 	}
 	return proof, nil
 }
 
-type rangeProof struct {
+type rangeProofResponse struct {
 	merkleProof *merkledb.RangeProof
 	request     *proofRequest
-	db          DB
-	tokenSize   int
-	hasher      merkledb.Hasher
 }
 
-func (r *rangeProof) verify(ctx context.Context) error {
+func (p *proofHandler) verifyRangeProof(ctx context.Context, proof *rangeProofResponse) error {
 	// Database is empty, no proof is needed.
-	if bytes.Equal(r.request.rootHash, ids.Empty[:]) {
+	if bytes.Equal(proof.request.rootHash, ids.Empty[:]) {
 		return nil
 	}
 
 	return verifyRangeProof(
 		ctx,
-		r.merkleProof,
-		r.request.keyLimit,
-		r.request.startKey,
-		r.request.endKey,
-		r.request.rootHash,
-		r.tokenSize,
-		r.hasher,
+		proof.merkleProof,
+		proof.request.keyLimit,
+		proof.request.startKey,
+		proof.request.endKey,
+		proof.request.rootHash,
+		p.tokenSize,
+		p.hasher,
 	)
 }
 
-func (r *rangeProof) Commit(ctx context.Context) (maybe.Maybe[[]byte], error) {
+func (p *proofHandler) CommitRangeProof(ctx context.Context, proof *rangeProofResponse) (maybe.Maybe[[]byte], error) {
 	// If the root is empty, we clear the database of all values.
-	if bytes.Equal(r.request.rootHash, ids.Empty[:]) {
-		return maybe.Nothing[[]byte](), r.db.Clear()
+	if bytes.Equal(proof.request.rootHash, ids.Empty[:]) {
+		return maybe.Nothing[[]byte](), p.db.Clear()
 	}
 
-	// Range proofs must always be committed, even if no key changes are present.
-	// This is because it may have been provided instead of a change proof, and the keys were deleted.
-	if err := r.db.CommitRangeProof(ctx, r.request.startKey, r.request.endKey, r.merkleProof); err != nil {
-		return maybe.Nothing[[]byte](), err
+	// Since this is a response to a range proof, we don't actually have to make any changes if no keys were provided
+	if len(proof.merkleProof.KeyChanges) > 0 {
+		if err := p.db.CommitRangeProof(ctx, proof.request.startKey, proof.request.endKey, proof.merkleProof); err != nil {
+			return maybe.Nothing[[]byte](), err
+		}
 	}
 
 	// Find the next key to fetch.
 	// This will return Nothing if there are no more keys to fetch in the range `largestHandledKey` to `r.request.endKey`.
-	nextKey, err := findNextKey(ctx, r.db, r.merkleProof.KeyChanges, r.request.endKey, r.merkleProof.EndProof, r.tokenSize)
+	nextKey, err := findNextKey(ctx, p.db, proof.merkleProof.KeyChanges, proof.request.endKey, proof.merkleProof.EndProof, p.tokenSize)
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
 	}
@@ -621,7 +615,7 @@ func (m *Manager) handleChangeProofResponse(
 		return err
 	}
 
-	proof, err := m.config.Parser.ParseChangeProof(
+	proof, err := m.config.ProofHandler.ParseChangeProof(
 		ctx,
 		responseBytes,
 		request.EndRootHash,
@@ -633,7 +627,7 @@ func (m *Manager) handleChangeProofResponse(
 		return fmt.Errorf("%w: %w", errInvalidChangeProof, err)
 	}
 
-	nextKey, err := proof.Commit(ctx)
+	nextKey, err := m.config.ProofHandler.CommitChangeProof(ctx, proof)
 	if err != nil {
 		m.setError(err)
 		return nil
@@ -643,12 +637,19 @@ func (m *Manager) handleChangeProofResponse(
 	return nil
 }
 
-func (p *proofParser) ParseChangeProof(ctx context.Context, responseBytes, endRootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (Proof, error) {
+type changeProofResponse struct {
+	rangeProof  *merkledb.RangeProof
+	changeProof *merkledb.ChangeProof
+	request     *proofRequest
+}
+
+func (p *proofHandler) ParseChangeProof(ctx context.Context, responseBytes, endRootHash []byte, startKey, endKey maybe.Maybe[[]byte], keyLimit uint32) (*changeProofResponse, error) {
 	var changeProofResp pb.SyncGetChangeProofResponse
 	if err := proto.Unmarshal(responseBytes, &changeProofResp); err != nil {
 		return nil, err
 	}
 
+	var proof *changeProofResponse
 	switch changeProofResp := changeProofResp.Response.(type) {
 	case *pb.SyncGetChangeProofResponse_ChangeProof:
 		// The server had enough history to send us a change proof
@@ -657,21 +658,15 @@ func (p *proofParser) ParseChangeProof(ctx context.Context, responseBytes, endRo
 			return nil, err
 		}
 
-		proof := &changeProof{
-			merkleProof: &merkleChangeProof,
+		proof = &changeProofResponse{
+			changeProof: &merkleChangeProof,
 			request: &proofRequest{
 				rootHash: endRootHash,
 				startKey: startKey,
 				endKey:   endKey,
 				keyLimit: int(keyLimit),
 			},
-			db:        p.db,
-			tokenSize: p.tokenSize,
 		}
-		if err := proof.verify(ctx); err != nil {
-			return nil, err
-		}
-		return proof, nil
 
 	case *pb.SyncGetChangeProofResponse_RangeProof:
 		var merkleRangeProof merkledb.RangeProof
@@ -679,22 +674,15 @@ func (p *proofParser) ParseChangeProof(ctx context.Context, responseBytes, endRo
 			return nil, err
 		}
 
-		proof := &rangeProof{
-			merkleProof: &merkleRangeProof,
+		proof = &changeProofResponse{
+			rangeProof: &merkleRangeProof,
 			request: &proofRequest{
 				rootHash: endRootHash,
 				startKey: startKey,
 				endKey:   endKey,
 				keyLimit: int(keyLimit),
 			},
-			db:        p.db,
-			tokenSize: p.tokenSize,
-			hasher:    p.hasher,
 		}
-		if err := proof.verify(ctx); err != nil {
-			return nil, err
-		}
-		return proof, nil
 
 	default:
 		return nil, fmt.Errorf(
@@ -702,58 +690,91 @@ func (p *proofParser) ParseChangeProof(ctx context.Context, responseBytes, endRo
 			errUnexpectedChangeProofResponse, changeProofResp,
 		)
 	}
+
+	if err := p.verifyChangeProof(ctx, proof); err != nil {
+		return nil, err
+	}
+	return proof, nil
 }
 
-type changeProof struct {
-	merkleProof *merkledb.ChangeProof
-	request     *proofRequest
-	db          DB
-	tokenSize   int
-}
-
-func (c *changeProof) verify(ctx context.Context) error {
+func (p *proofHandler) verifyChangeProof(ctx context.Context, c *changeProofResponse) error {
 	// If the database is empty, we don't need to verify a change proof.
 	if bytes.Equal(c.request.rootHash, ids.Empty[:]) {
 		return nil
 	}
 
-	// Ensure the response does not contain more than the requested number of leaves
-	// and the start and end roots match the requested roots.
-	if len(c.merkleProof.KeyChanges) > c.request.keyLimit {
-		return fmt.Errorf(
-			"%w: (%d) > %d)",
-			errTooManyKeys, len(c.merkleProof.KeyChanges), c.request.keyLimit,
+	if c.changeProof != nil {
+		// Ensure the response does not contain more than the requested number of leaves
+		// and the start and end roots match the requested roots.
+		if len(c.changeProof.KeyChanges) > c.request.keyLimit {
+			return fmt.Errorf(
+				"%w: (%d) > %d)",
+				errTooManyKeys, len(c.changeProof.KeyChanges), c.request.keyLimit,
+			)
+		}
+
+		endRoot, err := ids.ToID(c.request.rootHash)
+		if err != nil {
+			return err
+		}
+		return p.db.VerifyChangeProof(
+			ctx,
+			c.changeProof,
+			c.request.startKey,
+			c.request.endKey,
+			endRoot,
 		)
 	}
 
-	endRoot, err := ids.ToID(c.request.rootHash)
-	if err != nil {
-		return err
+	if c.rangeProof != nil {
+		return verifyRangeProof(
+			ctx,
+			c.rangeProof,
+			c.request.keyLimit,
+			c.request.startKey,
+			c.request.endKey,
+			c.request.rootHash,
+			p.tokenSize,
+			p.hasher,
+		)
 	}
-	return c.db.VerifyChangeProof(
-		ctx,
-		c.merkleProof,
-		c.request.startKey,
-		c.request.endKey,
-		endRoot,
-	)
+
+	return errNoProofFound
 }
 
-func (c *changeProof) Commit(ctx context.Context) (maybe.Maybe[[]byte], error) {
+func (p *proofHandler) CommitChangeProof(ctx context.Context, proof *changeProofResponse) (maybe.Maybe[[]byte], error) {
 	// If the root is empty, we clear the database.
-	if bytes.Equal(c.request.rootHash, ids.Empty[:]) {
-		return maybe.Nothing[[]byte](), c.db.Clear()
+	if bytes.Equal(proof.request.rootHash, ids.Empty[:]) {
+		return maybe.Nothing[[]byte](), p.db.Clear()
 	}
 
-	// We only need to apply changes if there are any key changes to commit.
-	if len(c.merkleProof.KeyChanges) != 0 {
-		if err := c.db.CommitChangeProof(ctx, c.merkleProof); err != nil {
+	var (
+		keyChanges []merkledb.KeyChange
+		endProof   []merkledb.ProofNode
+	)
+
+	if proof.changeProof != nil {
+		keyChanges = proof.changeProof.KeyChanges
+		endProof = proof.changeProof.EndProof
+		// We only need to apply changes if there are any key changes to commit.
+		if len(proof.changeProof.KeyChanges) > 0 {
+			if err := p.db.CommitChangeProof(ctx, proof.changeProof); err != nil {
+				return maybe.Nothing[[]byte](), err
+			}
+		}
+	}
+
+	// Range proofs must always be committed, because keys might have been deleted.
+	if proof.rangeProof != nil {
+		keyChanges = proof.rangeProof.KeyChanges
+		endProof = proof.rangeProof.EndProof
+		if err := p.db.CommitRangeProof(ctx, proof.request.startKey, proof.request.endKey, proof.rangeProof); err != nil {
 			return maybe.Nothing[[]byte](), err
 		}
 	}
 
 	// This will return Nothing if there are no more keys to fetch in the range `largestHandledKey` to `c.request.endKey`.
-	nextKey, err := findNextKey(ctx, c.db, c.merkleProof.KeyChanges, c.request.endKey, c.merkleProof.EndProof, c.tokenSize)
+	nextKey, err := findNextKey(ctx, p.db, keyChanges, proof.request.endKey, endProof, p.tokenSize)
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
 	}
