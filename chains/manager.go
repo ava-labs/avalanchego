@@ -575,8 +575,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 
 		// handle simplex engine based off parameters
 		if sb.Config().ConsensusConfig.SimplexParams != nil {
-			// TODO: this could be a good breakpoint to split up the PR.
-			// Split it up into `Simplex Consensus Config` and `Simplex Create Chain` prs in that order.
 			chain, err = m.createSimplexChain(ctx, vm, sb, chainParams.GenesisData, chainFxs)
 			if err != nil {
 				return nil, fmt.Errorf("error while creating simplex chain %w", err)
@@ -857,7 +855,7 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("error while fetching weight for subnet %s: %w", ctx.SubnetID, err)
 	}
 
-	consensusParams := sb.Config().ConsensusConfig.SnowballParams
+	consensusParams := *sb.Config().ConsensusConfig.SnowballParams
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)
@@ -955,7 +953,7 @@ func (m *manager) createAvalancheChain(
 		Sender:              snowmanMessageSender,
 		Validators:          vdrs,
 		ConnectedValidators: connectedValidators,
-		Params:              *consensusParams,
+		Params:              consensusParams,
 		Consensus:           snowmanConsensus,
 	}
 	var snowmanEngine common.Engine
@@ -1250,7 +1248,7 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("error while fetching weight for subnet %s: %w", ctx.SubnetID, err)
 	}
 
-	consensusParams := sb.Config().ConsensusConfig.SnowballParams
+	consensusParams := *sb.Config().ConsensusConfig.SnowballParams
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)
@@ -1348,7 +1346,7 @@ func (m *manager) createSnowmanChain(
 		Sender:              messageSender,
 		Validators:          vdrs,
 		ConnectedValidators: connectedValidators,
-		Params:              *consensusParams,
+		Params:              consensusParams,
 		Consensus:           consensus,
 		PartialSync:         m.PartialSyncPrimaryNetwork && ctx.ChainID == constants.PlatformChainID,
 	}
@@ -1503,7 +1501,6 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	// depends on.
 	m.createChain(platformParams)
 
-	m.Log.Info("starting chain creator")
 	m.chainCreatorExited.Add(1)
 	go m.dispatchChainCreator()
 	return nil
@@ -1605,6 +1602,7 @@ func (m *manager) getOrMakeVMGatherer(vmID ids.ID) (metrics.MultiGatherer, error
 	return vmGatherer, nil
 }
 
+// createHandler creates a handler that passes messages from the network to the consensus engine
 func (m *manager) createHandler(ctx *snow.ConsensusContext, vm *block.ChangeNotifier, sb subnets.Subnet, primaryAlias string, connectedValidators tracker.Peers, peerTracker *p2p.PeerTracker, halter common.Halter) (handler.Handler, error) {
 	handlerReg, err := metrics.MakeAndRegister(
 		m.handlerGatherer,
@@ -1631,7 +1629,7 @@ func (m *manager) createHandler(ctx *snow.ConsensusContext, vm *block.ChangeNoti
 	)
 }
 
-// createSnowmanMessageSender creates a sender that passes messages from the consensus engine to the network
+// createMessageSender creates a sender that passes messages from the consensus engine to the network
 func (m *manager) createMessageSender(ctx *snow.ConsensusContext, sb subnets.Subnet) (common.Sender, error) {
 	msgSender, err := sender.New(
 		ctx,
@@ -1644,7 +1642,7 @@ func (m *manager) createMessageSender(ctx *snow.ConsensusContext, sb subnets.Sub
 		ctx.Registerer,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't initialize snowman sender: %w", err)
+		return nil, fmt.Errorf("couldn't initialize sender: %w", err)
 	}
 
 	if m.TracingEnabled {
@@ -1654,7 +1652,7 @@ func (m *manager) createMessageSender(ctx *snow.ConsensusContext, sb subnets.Sub
 	return msgSender, nil
 }
 
-func (m *manager) createSnowmanTrackedPeers(primaryAlias string) (tracker.Peers, error) {
+func (m *manager) createTrackedPeers(primaryAlias string) (tracker.Peers, error) {
 	stakeReg, err := metrics.MakeAndRegister(
 		m.stakeGatherer,
 		primaryAlias,
@@ -1669,8 +1667,8 @@ func (m *manager) createSnowmanTrackedPeers(primaryAlias string) (tracker.Peers,
 	return connectedValidators, nil
 }
 
-// createSnowmanPeerTracker creates a peer tracker for the Snowman consensus engine
-func (m *manager) createSnowmanPeerTracker(ctx *snow.ConsensusContext, primaryAlias string) (*p2p.PeerTracker, error) {
+// createPeerTracker creates a peer tracker for the Snowman consensus engine
+func (m *manager) createPeerTracker(ctx *snow.ConsensusContext, primaryAlias string) (*p2p.PeerTracker, error) {
 	p2pReg, err := metrics.MakeAndRegister(
 		m.p2pGatherer,
 		primaryAlias,
@@ -1729,13 +1727,13 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 	vm = cn
 
 	var halter common.Halter
-	connectedValidators, err := m.createSnowmanTrackedPeers(primaryAlias)
+	connectedValidators, err := m.createTrackedPeers(primaryAlias)
 	if err != nil {
 		return nil, fmt.Errorf("error creating connected validators: %w", err)
 	}
 	m.Validators.RegisterSetCallbackListener(ctx.SubnetID, connectedValidators)
 
-	peerTracker, err := m.createSnowmanPeerTracker(ctx, primaryAlias)
+	peerTracker, err := m.createPeerTracker(ctx, primaryAlias)
 	if err != nil {
 		return nil, fmt.Errorf("error creating peer tracking: %w", err)
 	}
