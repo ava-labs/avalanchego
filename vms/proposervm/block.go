@@ -82,12 +82,12 @@ func (p *postForkCommonComponents) Height() uint64 {
 
 // Calculates a block's P-Chain epoch height based on its ancestor's epoch membership
 func nextPChainEpoch(parentPChainHeight uint64, parentEpoch block.PChainEpoch, parentTimestamp time.Time, epochDuration time.Duration) block.PChainEpoch {
-	if parentEpoch.StartTime.IsZero() {
+	if parentEpoch.Number == 0 {
 		// If the parent was not assigned an epoch, then the child is the first block of
 		// the initial epoch.
 		return block.PChainEpoch{
 			Height:    parentPChainHeight,
-			Number:    0,
+			Number:    1,
 			StartTime: parentTimestamp,
 		}
 	}
