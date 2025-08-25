@@ -160,6 +160,10 @@ func newDefaultResourceTracker() tracker.ResourceTracker {
 }
 
 func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []ids.NodeID, []*Config) {
+	return newTestNetworkInner(t, count, false)
+}
+
+func newTestNetworkInner(t *testing.T, count int, connectToAllValidators bool) (*testDialer, []*testListener, []ids.NodeID, []*Config) {
 	var (
 		dialer    = newTestDialer()
 		listeners = make([]*testListener, count)
@@ -185,6 +189,7 @@ func newTestNetwork(t *testing.T, count int) (*testDialer, []*testListener, []id
 		config.MyIPPort = utils.NewAtomic(ip)
 		config.TLSKey = tlsCert.PrivateKey.(crypto.Signer)
 		config.BLSKey = blsKey
+		config.ConnectToAllValidators = connectToAllValidators
 
 		listeners[i] = listener
 		nodeIDs[i] = nodeID
@@ -566,10 +571,10 @@ func TestTrackDoesNotDialPrivateIPs(t *testing.T) {
 	require.NoError(eg.Wait())
 }
 
-func TestDialDeletesNonValidators(t *testing.T) {
+func testDialDeletesNonValidators(t *testing.T, connectToAllValidators bool) {
 	require := require.New(t)
 
-	dialer, listeners, nodeIDs, configs := newTestNetwork(t, 2)
+	dialer, listeners, nodeIDs, configs := newTestNetworkInner(t, 2, connectToAllValidators)
 
 	vdrs := validators.NewManager()
 	for _, nodeID := range nodeIDs {
@@ -655,6 +660,15 @@ func TestDialDeletesNonValidators(t *testing.T) {
 		net.StartClose()
 	}
 	require.NoError(eg.Wait())
+}
+
+func TestDialDeletesNonValidators(t *testing.T) {
+	t.Run("connectToAllValidators=false", func(t *testing.T) {
+		testDialDeletesNonValidators(t, false)
+	})
+	t.Run("connectToAllValidators=true", func(t *testing.T) {
+		testDialDeletesNonValidators(t, true)
+	})
 }
 
 // Test that cancelling the context passed into dial
