@@ -23,9 +23,10 @@ import (
 	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/coreth/network"
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/sync/client/stats"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 const (
@@ -264,7 +265,7 @@ func parseCode(codec codec.Manager, req message.Request, data []byte) (interface
 
 	totalBytes := 0
 	for i, code := range response.Data {
-		if len(code) > params.MaxCodeSize {
+		if len(code) > ethparams.MaxCodeSize {
 			return nil, 0, fmt.Errorf("%w: (hash %s) (size %d)", errMaxCodeSizeExceeded, codeRequest.Hashes[i], len(code))
 		}
 

@@ -17,11 +17,12 @@ import (
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/extstate"
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/atomic/atomictest"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 	"github.com/ava-labs/coreth/plugin/evm/vmtest"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestAtomicSyncerVM(t *testing.T) {
@@ -65,7 +66,7 @@ func TestAtomicSyncerVM(t *testing.T) {
 					includedAtomicTxs = append(includedAtomicTxs, exportTx)
 				default: // Generate simple transfer transactions.
 					pk := vmtest.TestKeys[0].ToECDSA()
-					tx := types.NewTransaction(gen.TxNonce(vmtest.TestEthAddrs[0]), vmtest.TestEthAddrs[1], common.Big1, params.TxGas, vmtest.InitialBaseFee, nil)
+					tx := types.NewTransaction(gen.TxNonce(vmtest.TestEthAddrs[0]), vmtest.TestEthAddrs[1], common.Big1, ethparams.TxGas, vmtest.InitialBaseFee, nil)
 					signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.Ethereum().BlockChain().Config().ChainID), pk)
 					require.NoError(t, err)
 					gen.AddTx(signedTx)

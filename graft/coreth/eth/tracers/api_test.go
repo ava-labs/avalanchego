@@ -54,6 +54,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/eth/tracers/logger"
 	"github.com/ava-labs/libevm/ethdb"
+	ethparams "github.com/ava-labs/libevm/params"
 	"golang.org/x/exp/slices"
 )
 
@@ -264,7 +265,7 @@ func testTraceCall(t *testing.T, scheme string) {
 			Nonce:    nonce,
 			To:       &accounts[1].addr,
 			Value:    big.NewInt(1000),
-			Gas:      params.TxGas,
+			Gas:      ethparams.TxGas,
 			GasPrice: b.BaseFee(),
 			Data:     nil}),
 			signer, accounts[0].key)
@@ -277,7 +278,7 @@ func testTraceCall(t *testing.T, scheme string) {
 				Nonce:    nonce,
 				To:       &accounts[2].addr,
 				Value:    big.NewInt(1000),
-				Gas:      params.TxGas,
+				Gas:      ethparams.TxGas,
 				GasPrice: b.BaseFee(),
 				Data:     nil}),
 				signer, accounts[0].key)
@@ -289,7 +290,7 @@ func testTraceCall(t *testing.T, scheme string) {
 				Nonce:    nonce,
 				To:       &accounts[1].addr,
 				Value:    big.NewInt(1000),
-				Gas:      params.TxGas,
+				Gas:      ethparams.TxGas,
 				GasPrice: b.BaseFee(),
 				Data:     nil}),
 				signer, accounts[0].key)
@@ -487,7 +488,7 @@ func testTraceTransaction(t *testing.T, scheme string) {
 			Nonce:    uint64(i),
 			To:       &accounts[1].addr,
 			Value:    big.NewInt(1000),
-			Gas:      params.TxGas,
+			Gas:      ethparams.TxGas,
 			GasPrice: new(big.Int).Add(b.BaseFee(), big.NewInt(int64(500*params.GWei))),
 			Data:     nil}),
 			signer, accounts[0].key)
@@ -505,7 +506,7 @@ func testTraceTransaction(t *testing.T, scheme string) {
 		t.Errorf("failed to unmarshal result %v", err)
 	}
 	expected := &logger.ExecutionResult{
-		Gas:         params.TxGas,
+		Gas:         ethparams.TxGas,
 		Failed:      false,
 		ReturnValue: "",
 		StructLogs:  []logger.StructLogRes{},
@@ -552,7 +553,7 @@ func testTraceBlock(t *testing.T, scheme string) {
 			Nonce:    uint64(i),
 			To:       &accounts[1].addr,
 			Value:    big.NewInt(1000),
-			Gas:      params.TxGas,
+			Gas:      ethparams.TxGas,
 			GasPrice: b.BaseFee(),
 			Data:     nil}),
 			signer, accounts[0].key)
@@ -657,7 +658,7 @@ func testTracingWithOverrides(t *testing.T, scheme string) {
 			Nonce:    uint64(i),
 			To:       &accounts[1].addr,
 			Value:    big.NewInt(1000),
-			Gas:      params.TxGas,
+			Gas:      ethparams.TxGas,
 			GasPrice: b.BaseFee(),
 			Data:     nil}),
 			signer, accounts[0].key)
@@ -1031,7 +1032,7 @@ func testTraceChain(t *testing.T, scheme string) {
 		//    value: 1000 wei
 		//    fee:   0 wei
 		for j := 0; j < i+1; j++ {
-			tx, _ := types.SignTx(types.NewTransaction(nonce, accounts[1].addr, big.NewInt(1000), params.TxGas, b.BaseFee(), nil), signer, accounts[0].key)
+			tx, _ := types.SignTx(types.NewTransaction(nonce, accounts[1].addr, big.NewInt(1000), ethparams.TxGas, b.BaseFee(), nil), signer, accounts[0].key)
 			b.AddTx(tx)
 			nonce += 1
 		}

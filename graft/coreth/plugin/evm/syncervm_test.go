@@ -13,9 +13,10 @@ import (
 
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 	"github.com/ava-labs/coreth/plugin/evm/vmtest"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
 
 func TestEVMSyncerVM(t *testing.T) {
@@ -27,7 +28,7 @@ func TestEVMSyncerVM(t *testing.T) {
 				require.NoError(t, err)
 				gen.AppendExtra(b)
 
-				tx := types.NewTransaction(gen.TxNonce(vmtest.TestEthAddrs[0]), vmtest.TestEthAddrs[1], common.Big1, params.TxGas, vmtest.InitialBaseFee, nil)
+				tx := types.NewTransaction(gen.TxNonce(vmtest.TestEthAddrs[0]), vmtest.TestEthAddrs[1], common.Big1, ethparams.TxGas, vmtest.InitialBaseFee, nil)
 				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.Ethereum().BlockChain().Config().ChainID), vmtest.TestKeys[0].ToECDSA())
 				require.NoError(t, err)
 				gen.AddTx(signedTx)

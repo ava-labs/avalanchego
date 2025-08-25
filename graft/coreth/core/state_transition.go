@@ -40,6 +40,7 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto/kzg4844"
 	"github.com/ava-labs/libevm/log"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/holiman/uint256"
 )
 
@@ -84,9 +85,9 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation b
 	// Set the starting gas for the raw transaction
 	var gas uint64
 	if isContractCreation && rules.IsHomestead {
-		gas = params.TxGasContractCreation
+		gas = ethparams.TxGasContractCreation
 	} else {
-		gas = params.TxGas
+		gas = ethparams.TxGas
 	}
 	dataLen := uint64(len(data))
 	// Bump the required gas by the amount of transactional data
@@ -99,9 +100,9 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation b
 			}
 		}
 		// Make sure we don't exceed uint64 for all data combinations
-		nonZeroGas := params.TxDataNonZeroGasFrontier
+		nonZeroGas := ethparams.TxDataNonZeroGasFrontier
 		if rules.IsIstanbul {
-			nonZeroGas = params.TxDataNonZeroGasEIP2028
+			nonZeroGas = ethparams.TxDataNonZeroGasEIP2028
 		}
 		if (math.MaxUint64-gas)/nonZeroGas < nz {
 			return 0, ErrGasUintOverflow
@@ -109,17 +110,17 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation b
 		gas += nz * nonZeroGas
 
 		z := dataLen - nz
-		if (math.MaxUint64-gas)/params.TxDataZeroGas < z {
+		if (math.MaxUint64-gas)/ethparams.TxDataZeroGas < z {
 			return 0, ErrGasUintOverflow
 		}
-		gas += z * params.TxDataZeroGas
+		gas += z * ethparams.TxDataZeroGas
 
 		if isContractCreation && params.GetRulesExtra(rules).IsDurango {
 			lenWords := toWordSize(dataLen)
-			if (math.MaxUint64-gas)/params.InitCodeWordGas < lenWords {
+			if (math.MaxUint64-gas)/ethparams.InitCodeWordGas < lenWords {
 				return 0, ErrGasUintOverflow
 			}
-			gas += lenWords * params.InitCodeWordGas
+			gas += lenWords * ethparams.InitCodeWordGas
 		}
 	}
 	if accessList != nil {
@@ -141,8 +142,8 @@ func accessListGas(rules params.Rules, accessList types.AccessList) (uint64, err
 	var gas uint64
 	rulesExtra := params.GetRulesExtra(rules)
 	if !rulesExtra.PredicatersExist() {
-		gas += uint64(len(accessList)) * params.TxAccessListAddressGas
-		gas += uint64(accessList.StorageKeys()) * params.TxAccessListStorageKeyGas
+		gas += uint64(len(accessList)) * ethparams.TxAccessListAddressGas
+		gas += uint64(accessList.StorageKeys()) * ethparams.TxAccessListStorageKeyGas
 		return gas, nil
 	}
 
@@ -154,7 +155,7 @@ func accessListGas(rules params.Rules, accessList types.AccessList) (uint64, err
 			// the size of access lists that could be included in a block and standard access list gas costs.
 			// Therefore, we only check for overflow when adding to [totalGas], which could include the sum of values
 			// returned by a predicate.
-			accessTupleGas := params.TxAccessListAddressGas + uint64(len(accessTuple.StorageKeys))*params.TxAccessListStorageKeyGas
+			accessTupleGas := ethparams.TxAccessListAddressGas + uint64(len(accessTuple.StorageKeys))*ethparams.TxAccessListStorageKeyGas
 			totalGas, overflow := cmath.SafeAdd(gas, accessTupleGas)
 			if overflow {
 				return 0, ErrGasUintOverflow
@@ -475,8 +476,8 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	}
 
 	// Check whether the init code size has been exceeded.
-	if rulesExtra.IsDurango && contractCreation && len(msg.Data) > params.MaxInitCodeSize {
-		return nil, fmt.Errorf("%w: code size %v limit %v", vm.ErrMaxInitCodeSizeExceeded, len(msg.Data), params.MaxInitCodeSize)
+	if rulesExtra.IsDurango && contractCreation && len(msg.Data) > ethparams.MaxInitCodeSize {
+		return nil, fmt.Errorf("%w: code size %v limit %v", vm.ErrMaxInitCodeSizeExceeded, len(msg.Data), ethparams.MaxInitCodeSize)
 	}
 
 	// Execute the preparatory steps for state transition which includes:
@@ -555,5 +556,5 @@ func (st *StateTransition) gasUsed() uint64 {
 
 // blobGasUsed returns the amount of blob gas used by the message.
 func (st *StateTransition) blobGasUsed() uint64 {
-	return uint64(len(st.msg.BlobHashes) * params.BlobTxBlobGasPerBlob)
+	return uint64(len(st.msg.BlobHashes) * ethparams.BlobTxBlobGasPerBlob)
 }
