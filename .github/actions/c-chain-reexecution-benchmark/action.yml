@@ -2,6 +2,9 @@ name: 'C-Chain Re-Execution Benchmark'
 description: 'Run C-Chain re-execution benchmark'
 
 inputs:
+  config:
+    description: 'The config to pass to the VM for the benchmark. See BenchmarkReexecuteRange for details.'
+    default: ''
   start-block:
     description: 'The start block for the benchmark.'
     default: '101'
@@ -77,6 +80,7 @@ runs:
       with:
         run: |
           ./scripts/run_task.sh reexecute-cchain-range-with-copied-data \
+            CONFIG=${{ inputs.config }} \
             EXECUTION_DATA_DIR=${{ env.EXECUTION_DATA_DIR }} \
             SOURCE_BLOCK_DIR=${{ env.SOURCE_BLOCK_DIR }} \
             CURRENT_STATE_DIR=${{ env.CURRENT_STATE_DIR }} \
