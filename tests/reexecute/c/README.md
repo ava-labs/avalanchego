@@ -39,7 +39,7 @@ task import-s3-to-dir SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-bloc
 To execute a range of blocks [N, N+K], we need an initial current state with the last accepted block of N-1. To generate this from scratch, simply execute the range of blocks [1, N-1] (genesis is "executed" vacuously, so do not provide 0 as the start block) locally starting from an empty state:
 
 ```bash
-task reexecute-cchain-range CURRENT_STATE_DIR=$HOME/exec-data/current-state SOURCE_BLOCK_DIR=$HOME/exec-data/blocks START_BLOCK=1 END_BLOCK=100
+task reexecute-cchain-range CURRENT_STATE_DIR=$HOME/exec-data/current-state BLOCK_DIR=$HOME/exec-data/blocks START_BLOCK=1 END_BLOCK=100
 ```
 
 This initializes a `current-state` subdirectory inside of `$HOME/exec-data`, which will contain two subdirectories `chain-data-dir` and `db`.
@@ -87,7 +87,7 @@ Now that we've pushed the current-state back to S3, we can run the target range 
 First, to run the block range using our locally available data, run:
 
 ```bash
-task reexecute-cchain-range CURRENT_STATE_DIR=$HOME/exec-data/current-state SOURCE_BLOCK_DIR=$HOME/exec-data/blocks START_BLOCK=101 END_BLOCK=200
+task reexecute-cchain-range CURRENT_STATE_DIR=$HOME/exec-data/current-state BLOCK_DIR=$HOME/exec-data/blocks START_BLOCK=101 END_BLOCK=200
 ```
 
 Note: if you attempt to re-execute a second time on the same data set, it will fail because the current state has been updated to block 200.
@@ -95,7 +95,7 @@ Note: if you attempt to re-execute a second time on the same data set, it will f
 Provide the parameters explicitly that we have just used locally:
 
 ```bash
-task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-params SOURCE_BLOCK_DIR=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/** CURRENT_STATE_DIR=s3://avalanchego-bootstrap-testing/cchain-current-state-test/** START_BLOCK=101 END_BLOCK=10000
+task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-params BLOCK_DIR_SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/** CURRENT_STATE_DIR_SRC=s3://avalanchego-bootstrap-testing/cchain-current-state-test/** START_BLOCK=101 END_BLOCK=10000
 ```
 
 ## Predefined Configs
@@ -120,7 +120,7 @@ task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-dat
 
 Benchmarks are run via [c-chain-benchmark-gh-native](../../../.github/workflows/c-chain-reexecution-benchmark-gh-native.yml) and [c-chain-reexecution-benchmark-container](../../../.github/workflows/c-chain-reexecution-benchmark-container.yml).
 
-To run on our GitHub [Actions Runner Controller](https://github.com/actions/actions-runner-controller) installation, we need to specify a container and add an extra installation step. Unfortunately, once the YAML has been updated to include this field at all, there is no way to populate it dynamically to skip the extra layer of containerization. To support both ARC and GH Native jobs (including Blacksmith runners) without this unnecessary layer, we separate this into two separate workflows with their own triggers.
+To run on our GitHub [Actions Runner Controller](https://github.com/actions/actions-runner-controller) installation, we need to specify a container and add an extra installation step. Unfortunately, once the YAML has been updated to include this field at all, there is no way to dynamically decide to set it to the default and skip the extra layer of containerization. To support both ARC and GH Native jobs (including Blacksmith runners) without this unnecessary layer, we separate this into two separate workflows with their own triggers.
 
 The runner options are:
 - native GH runner options (ex. `ubuntu-latest`, more information [here](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners))
