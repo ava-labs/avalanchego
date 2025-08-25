@@ -575,15 +575,14 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 
 		// handle simplex engine based off parameters
 		if sb.Config().ConsensusConfig.SimplexParams != nil {
-			m.Log.Info("creating simplex chain")
+			// TODO: this could be a good breakpoint to split up the PR.
+			// Split it up into `Simplex Consensus Config` and `Simplex Create Chain` prs in that order.
 			chain, err = m.createSimplexChain(ctx, vm, sb, chainParams.GenesisData, chainFxs)
 			if err != nil {
 				return nil, fmt.Errorf("error while creating simplex chain %w", err)
 			}
 			break
 		}
-
-		m.Log.Info("creating snowman chain")
 
 		beacons := m.Validators
 		if chainParams.ID == constants.PlatformChainID {

@@ -565,7 +565,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 		return err
 	}
 
-	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig) // TODO: maybe we can make a NoopBenchlistManager for simplex
+	n.benchlistManager = benchlist.NewManager(&n.Config.BenchlistConfig)
 
 	n.uptimeCalculator = uptime.NewLockedCalculator()
 

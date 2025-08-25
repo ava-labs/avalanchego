@@ -84,14 +84,6 @@ var (
 )
 
 func getConsensusConfig(v *viper.Viper) subnets.ConsensusConfig {
-	if v.IsSet(SimplexEnabledKey) {
-		return subnets.ConsensusConfig{
-			SimplexParams: &subnets.SimplexParameters{
-				Enabled: v.GetBool(SimplexEnabledKey),
-			},
-		}
-	}
-
 	p := &snowball.Parameters{
 		K:                     v.GetInt(SnowSampleSizeKey),
 		AlphaPreference:       v.GetInt(SnowPreferenceQuorumSizeKey),
@@ -425,15 +417,15 @@ func getNetworkConfig(
 	return config, nil
 }
 
-func getBenchlistConfig(v *viper.Viper, consensusParameters *subnets.ConsensusConfig) (benchlist.Config, error) {
-	if v.IsSet(SimplexEnabledKey) {
-		return benchlist.Config{}, fmt.Errorf("benchlist config is not supported with simplex consensus") // TODO: create noop benchlist config for simplex
+func getBenchlistConfig(v *viper.Viper, consensusParameters *snowball.Parameters) (benchlist.Config, error) {
+	if consensusParameters == nil {
+		return benchlist.Config{}, errors.New("pChain snowball parameters must be non-nil")
 	}
 	// AlphaConfidence is used here to ensure that benching can't cause a
 	// liveness failure. If AlphaPreference were used, the benchlist may grow to
 	// a point that committing would be extremely unlikely to happen.
-	alpha := consensusParameters.SnowballParams.AlphaConfidence
-	k := consensusParameters.SnowballParams.K
+	alpha := consensusParameters.AlphaConfidence
+	k := consensusParameters.K
 	config := benchlist.Config{
 		Threshold:              v.GetInt(BenchlistFailThresholdKey),
 		Duration:               v.GetDuration(BenchlistDurationKey),
@@ -1349,7 +1341,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.SubnetConfigs = subnetConfigs
 
 	// Benchlist
-	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, &primaryNetworkConfig.ConsensusConfig) // TODO: how would benchlist be configured for subnets with simplex consensus?
+	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, primaryNetworkConfig.ConsensusConfig.SnowballParams)
 	if err != nil {
 		return node.Config{}, err
 	}

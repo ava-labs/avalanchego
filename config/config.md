@@ -521,7 +521,6 @@ logs, when the output is a terminal. Otherwise, should be one of `{auto, plain, 
 
 Specifies the directory in which system logs are kept. Defaults to `"$HOME/.avalanchego/logs"`.
 If you are running the node as a system service (ex. using the installer script) logs will also be
-stored in `$HOME/var/log/syslog`.
 
 #### `--log-disable-display-plugin-logs` (boolean)
 
@@ -884,6 +883,12 @@ Fraction of time a validator must be online to receive rewards. Defaults to
 #### `--uptime-metric-freq` (duration)
 
 Frequency of renewing this node's average uptime metric. Defaults to `30s`.
+
+#### Simplex Parameters
+
+##### `simplex-enabled` (bool)
+
+Substitutes Snow’s consensus engine with Simplex’s consensus engine. Defaults to `false`.
 
 #### Snow Parameters
 
