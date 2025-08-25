@@ -98,10 +98,83 @@ Provide the parameters explicitly that we have just used locally:
 task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-params SOURCE_BLOCK_DIR=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/** CURRENT_STATE_DIR=s3://avalanchego-bootstrap-testing/cchain-current-state-test/** START_BLOCK=101 END_BLOCK=10000
 ```
 
+## Predefined Configs
+
+To support testing the VM in multiple configurations, the benchmark supports a set of pre-defined configs passed via the Task variable ex. `CONFIG=archive`.
+
+The currently supported options are: "default", "archive", and "firewood".
+
+Note: to execute a benchmark with any of these options, double check to ensure you are using a compatible database via `CURRENT_STATE_DIR`. For example, attempting to execute the VM with Firewood on a database using the default configuration will refuse to startup.
+
+This currently only supports pre-defined configs and not passing a full JSON blob in, so that we have a clear config name to use in the name of the sub-benchmark (used by GitHub Action Benchmark to separate historical results) and added as a label to exported Prometheus metrics.
+
 ## Run Default C-Chain Benchmark
 
 To re-execute with an fresh copy, use the defaults provided in [Taskfile.yaml](../../../Taskfile.yml) to execute the range [101, 250k]:
 
 ```bash
 task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-defaults
+```
+
+## CI
+
+Benchmarks are run via [c-chain-benchmark-gh-native](../../../.github/workflows/c-chain-reexecution-benchmark-gh-native.yml) and [c-chain-reexecution-benchmark-container](../../../.github/workflows/c-chain-reexecution-benchmark-container.yml).
+
+To run on our GitHub [Actions Runner Controller](https://github.com/actions/actions-runner-controller) installation, we need to specify a container and add an extra installation step. Unfortunately, once the YAML has been updated to include this field at all, there is no way to populate it dynamically to skip the extra layer of containerization. To support both ARC and GH Native jobs (including Blacksmith runners) without this unnecessary layer, we separate this into two separate workflows with their own triggers.
+
+The runner options are:
+- native GH runner options (ex. `ubuntu-latest`, more information [here](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners))
+- Actions Runner Controller labels (ex. `avalanche-avalanchego-runner-2tier`)
+- Blacksmith labels (ex. `blacksmith-4vcpu-ubuntu-2404`, more information [here](https://docs.blacksmith.sh/blacksmith-runners/overview#runner-tags))
+
+Both workflows provide three triggers:
+
+- `manual_workflow`
+- `pull_request`
+- `schedule`
+
+The manual workflow takes in all parameters specified by the user. To more easily specify a CI matrix and avoid GitHub's pain inducing matrix syntax, we define simple JSON files with the exact set of configs to run for each `pull_request` and `schedule` trigger. To add a new job for either of these triggers, simply define the entry in JSON and add it to run on the desired workflow.
+
+For example, to add a new Firewood benchmark to execute the block range [30m, 40m] on a daily basis, follow the instructions above to generate the Firewood state as of block height 30m, export it to S3, and add the following entry under the `schedule` include array in the [GH Native JSON file](../../../.github/workflows/c-chain-reexecution-benchmark-gh-native.json).
+
+```json
+{
+    "runner": "blacksmith-4vcpu-ubuntu-2404",
+    "config": "firewood",
+    "start-block": 30000001,
+    "end-block": 40000000,
+    "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-50m-ldb/**",
+    "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-30m/**"
+}
+```
+
+## GitHub CLI
+
+### Trigger Workflow Dispatch
+
+To triggers runs conveniently, you can use the [GitHub CLI](https://cli.github.com/manual/gh_workflow_run) to trigger workflows.
+
+Note: passing JSON to the GitHub CLI requires all key/value pairs as strings, so ensure that any number parameters are quoted as strings or you will see the error:
+
+```bash
+could not parse provided JSON: json: cannot unmarshal number into Go value of type string
+```
+
+Copy your desired parameters as JSON into a file or write it out on the command line:
+
+```json
+{
+    "runner": "blacksmith-4vcpu-ubuntu-2404",
+    "config": "firewood",
+    "start-block": "101",
+    "end-block": "200",
+    "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/**",
+    "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**"
+}
+```
+
+Then pass it to the GitHub CLI:
+
+```bash
+cat input.json | gh workflow run .github/workflows/c-chain-reexecution-benchmark-gh-native.yml --json
 ```
