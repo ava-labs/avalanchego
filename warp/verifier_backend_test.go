@@ -274,7 +274,7 @@ func TestUptimeSignatures(t *testing.T) {
 	database := memdb.New()
 	snowCtx := utilstest.NewTestSnowContext(t)
 
-	getUptimeMessageBytes := func(sourceAddress []byte, vID ids.ID, totalUptime uint64) ([]byte, *avalancheWarp.UnsignedMessage) {
+	getUptimeMessageBytes := func(sourceAddress []byte, vID ids.ID) ([]byte, *avalancheWarp.UnsignedMessage) {
 		uptimePayload, err := messages.NewValidatorUptime(vID, 80)
 		require.NoError(t, err)
 		addressedCall, err := payload.NewAddressedCall(sourceAddress, uptimePayload.Bytes())
@@ -316,14 +316,14 @@ func TestUptimeSignatures(t *testing.T) {
 		handler := acp118.NewCachedHandler(sigCache, warpBackend, snowCtx.WarpSigner)
 
 		// sourceAddress nonZero
-		protoBytes, _ := getUptimeMessageBytes([]byte{1, 2, 3}, ids.GenerateTestID(), 80)
+		protoBytes, _ := getUptimeMessageBytes([]byte{1, 2, 3}, ids.GenerateTestID())
 		_, appErr := handler.AppRequest(context.Background(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
 		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
 		require.Contains(t, appErr.Error(), "source address should be empty")
 
 		// not existing validationID
 		vID := ids.GenerateTestID()
-		protoBytes, _ = getUptimeMessageBytes([]byte{}, vID, 80)
+		protoBytes, _ = getUptimeMessageBytes([]byte{}, vID)
 		_, appErr = handler.AppRequest(context.Background(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
 		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
 		require.Contains(t, appErr.Error(), "failed to get validator")
@@ -339,7 +339,7 @@ func TestUptimeSignatures(t *testing.T) {
 			IsActive:       true,
 			IsL1Validator:  true,
 		}))
-		protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID, 80)
+		protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID)
 		_, appErr = handler.AppRequest(context.Background(), nodeID, time.Time{}, protoBytes)
 		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
 		require.Contains(t, appErr.Error(), "current uptime 0 is less than queried uptime 80")
@@ -347,14 +347,14 @@ func TestUptimeSignatures(t *testing.T) {
 		// uptime is less than requested (not enough)
 		require.NoError(t, validatorsManager.Connect(nodeID))
 		clk.Set(clk.Time().Add(40 * time.Second))
-		protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID, 80)
+		protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID)
 		_, appErr = handler.AppRequest(context.Background(), nodeID, time.Time{}, protoBytes)
 		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
 		require.Contains(t, appErr.Error(), "current uptime 40 is less than queried uptime 80")
 
 		// valid uptime
 		clk.Set(clk.Time().Add(40 * time.Second))
-		protoBytes, msg := getUptimeMessageBytes([]byte{}, validationID, 80)
+		protoBytes, msg := getUptimeMessageBytes([]byte{}, validationID)
 		responseBytes, appErr := handler.AppRequest(context.Background(), nodeID, time.Time{}, protoBytes)
 		require.Nil(t, appErr)
 		expectedSignature, err := snowCtx.WarpSigner.Sign(msg)

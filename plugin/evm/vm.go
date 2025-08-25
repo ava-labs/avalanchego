@@ -244,7 +244,6 @@ type VM struct {
 	warpBackend warp.Backend
 
 	// Initialize only sets these if nil so they can be overridden in tests
-	p2pValidators      *p2p.Validators
 	ethTxGossipHandler p2p.Handler
 	ethTxPushGossiper  avalancheUtils.Atomic[*gossip.PushGossiper[*GossipEthTx]]
 	ethTxPullGossiper  gossip.Gossiper
@@ -449,7 +448,6 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return fmt.Errorf("failed to create network: %w", err)
 	}
-	vm.p2pValidators = vm.Network.P2PValidators()
 
 	vm.validatorsManager, err = validators.NewManager(vm.ctx, vm.validatorsDB, &vm.clock)
 	if err != nil {
@@ -888,7 +886,7 @@ func (vm *VM) setAppRequestHandlers() {
 		},
 	)
 
-	networkHandler := newNetworkHandler(vm.blockChain, vm.chaindb, evmTrieDB, vm.warpBackend, vm.networkCodec)
+	networkHandler := newNetworkHandler(vm.blockChain, vm.chaindb, evmTrieDB, vm.networkCodec)
 	vm.Network.SetRequestHandler(networkHandler)
 }
 

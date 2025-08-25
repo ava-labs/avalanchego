@@ -58,9 +58,6 @@ func NewMetrics(reg *prometheus.Registry) *Metrics {
 }
 
 type MetricsServer struct {
-	metricsPort     string
-	metricsEndpoint string
-
 	cancel context.CancelFunc
 	stopCh chan struct{}
 }
@@ -85,10 +82,8 @@ func (m *Metrics) Serve(ctx context.Context, metricsPort string, metricsEndpoint
 
 	// Start metrics server
 	ms := &MetricsServer{
-		metricsPort:     metricsPort,
-		metricsEndpoint: metricsEndpoint,
-		stopCh:          make(chan struct{}),
-		cancel:          cancel,
+		stopCh: make(chan struct{}),
+		cancel: cancel,
 	}
 	go func() {
 		defer close(ms.stopCh)

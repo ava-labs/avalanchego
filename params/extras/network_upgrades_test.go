@@ -332,7 +332,7 @@ func TestForkOrder(t *testing.T) {
 	}
 	for _, test := range testcases {
 		t.Run(test.name, func(t *testing.T) {
-			err := checkForks(test.upgrades.forkOrder(), false)
+			err := checkForks(test.upgrades.forkOrder())
 			if test.expectedErr {
 				require.NotNil(t, err)
 			} else {

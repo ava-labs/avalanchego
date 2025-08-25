@@ -78,7 +78,6 @@ func main() {
 		log:    ago_tests.NewDefaultLogger(fmt.Sprintf("worker %d", 0)),
 		client: genesisClient,
 		key:    genesisKey,
-		uris:   c.URIs,
 	}
 
 	workloads := make([]*workload, NumKeys)
@@ -99,7 +98,6 @@ func main() {
 			log:    ago_tests.NewDefaultLogger(fmt.Sprintf("worker %d", i)),
 			client: client,
 			key:    key,
-			uris:   c.URIs,
 		}
 	}
 
@@ -119,7 +117,6 @@ type workload struct {
 	client ethclient.Client
 	log    logging.Logger
 	key    *ecdsa.PrivateKey
-	uris   []string
 }
 
 // newTestContext returns a test context that ensures that log output and assertions are

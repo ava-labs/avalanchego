@@ -14,4 +14,5 @@
   - coreth PR 1117 (https://github.com/ava-labs/subnet-evm/1691)
   - coreth PR 1122 (https://github.com/ava-labs/subnet-evm/1690)
   - coreth PR 1123 (https://github.com/ava-labs/subnet-evm/1690)
+  - coreth PR 1133 (https://github.com/ava-labs/subnet-evm/1694)
   - coreth PR 1134 (https://github.com/ava-labs/subnet-evm/1692)

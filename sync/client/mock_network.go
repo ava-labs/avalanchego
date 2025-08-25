@@ -18,9 +18,7 @@ var _ network.SyncedNetworkClient = (*mockNetwork)(nil)
 // TODO replace with gomock library
 type mockNetwork struct {
 	// captured request data
-	numCalls         uint
-	requestedVersion *version.Application
-	request          []byte
+	numCalls uint
 
 	// response mocking for RequestAny and Request calls
 	response       [][]byte
@@ -29,14 +27,12 @@ type mockNetwork struct {
 	nodesRequested []ids.NodeID
 }
 
-func (t *mockNetwork) SendSyncedAppRequestAny(ctx context.Context, minVersion *version.Application, request []byte) ([]byte, ids.NodeID, error) {
+func (t *mockNetwork) SendSyncedAppRequestAny(ctx context.Context, _ *version.Application, request []byte) ([]byte, ids.NodeID, error) {
 	if len(t.response) == 0 {
 		return nil, ids.EmptyNodeID, errors.New("no mocked response to return in mockNetwork")
 	}
 
-	t.requestedVersion = minVersion
-
-	response, err := t.processMock(request)
+	response, err := t.processMock()
 	return response, ids.EmptyNodeID, err
 }
 
@@ -47,11 +43,10 @@ func (t *mockNetwork) SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeI
 
 	t.nodesRequested = append(t.nodesRequested, nodeID)
 
-	return t.processMock(request)
+	return t.processMock()
 }
 
-func (t *mockNetwork) processMock(request []byte) ([]byte, error) {
-	t.request = request
+func (t *mockNetwork) processMock() ([]byte, error) {
 	t.numCalls++
 
 	if t.callback != nil {

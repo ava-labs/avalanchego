@@ -26,7 +26,7 @@ import (
 
 func TestValidatorState(t *testing.T) {
 	require := require.New(t)
-	ctx, dbManager, genesisBytes, _ := setupGenesis(t, upgradetest.Latest)
+	ctx, dbManager, genesisBytes := setupGenesis(t, upgradetest.Latest)
 
 	vm := &VM{}
 
