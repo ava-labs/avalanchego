@@ -163,10 +163,10 @@ func (s *State) UpdateValidator(vdr Validator) error {
 		return ErrImmutableField
 	}
 	// check if mutable fields have changed
-	updated := false
+	updated := deletedStatus
 	if data.IsActive != vdr.IsActive {
 		data.IsActive = vdr.IsActive
-		updated = true
+		updated = updatedStatus
 		for _, listener := range s.listeners {
 			listener.OnValidatorStatusUpdated(data.validationID, data.NodeID, data.IsActive)
 		}
@@ -174,7 +174,7 @@ func (s *State) UpdateValidator(vdr Validator) error {
 
 	if data.Weight != vdr.Weight {
 		data.Weight = vdr.Weight
-		updated = true
+		updated = updatedStatus
 	}
 
 	s.updatedData[vdr.ValidationID] = updated
