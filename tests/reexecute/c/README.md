@@ -120,7 +120,7 @@ task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-dat
 
 Benchmarks are run via [c-chain-benchmark-gh-native](../../../.github/workflows/c-chain-reexecution-benchmark-gh-native.yml) and [c-chain-reexecution-benchmark-container](../../../.github/workflows/c-chain-reexecution-benchmark-container.yml).
 
-To run on our GitHub [Actions Runner Controller](https://github.com/actions/actions-runner-controller) installation, we need to specify a container and add an extra installation step. Unfortunately, once the YAML has been updated to include this field at all, there is no way to dynamically decide to set it to the default and skip the extra layer of containerization. To support both ARC and GH Native jobs (including Blacksmith runners) without this unnecessary layer, we separate this into two separate workflows with their own triggers.
+To run on our GitHub [Actions Runner Controller](https://github.com/actions/actions-runner-controller) installation, we need to specify a container and add an extra installation step. Unfortunately, once the YAML has been updated to include this field at all, there is no way to populate it dynamically to skip the extra layer of containerization. To support both ARC and GH Native jobs (including Blacksmith runners) without this unnecessary layer, we separate this into two separate workflows with their own triggers.
 
 The runner options are:
 - native GH runner options (ex. `ubuntu-latest`, more information [here](https://docs.github.com/en/actions/concepts/runners/github-hosted-runners))
@@ -150,20 +150,26 @@ For example, to add a new Firewood benchmark to execute the block range [30m, 40
 
 ## GitHub CLI
 
-### Trigger a Single Job
+### Trigger Workflow Dispatch
 
 To triggers runs conveniently, you can use the [GitHub CLI](https://cli.github.com/manual/gh_workflow_run) to trigger workflows.
 
-To run the same workflow as above via the GitHub CLI write the desired input to a JSON file `input.json`
+Note: passing JSON to the GitHub CLI requires all key/value pairs as strings, so ensure that any number parameters are quoted as strings or you will see the error:
+
+```bash
+could not parse provided JSON: json: cannot unmarshal number into Go value of type string
+```
+
+Copy your desired parameters as JSON into a file or write it out on the command line:
 
 ```json
 {
     "runner": "blacksmith-4vcpu-ubuntu-2404",
     "config": "firewood",
-    "start-block": 30000001,
-    "end-block": 40000000,
-    "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-50m-ldb/**",
-    "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-30m/**"
+    "start-block": "101",
+    "end-block": "200",
+    "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/**",
+    "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**"
 }
 ```
 
@@ -172,32 +178,3 @@ Then pass it to the GitHub CLI:
 ```bash
 cat input.json | gh workflow run .github/workflows/c-chain-reexecution-benchmark-gh-native.yml --json
 ```
-
-### Trigger Parallel Jobs
-
-To execute multiple runs in parallel, you can re-run this with multiple inputs or define a single array in a JSON file `input_array.json`:
-
-```json
-[
-    {
-        "start-block": "101",
-        "end-block": "200",
-        "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
-        "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"
-    },
-    {
-        "start-block": "101",
-        "end-block": "300",
-        "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
-        "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"
-    }
-]
-```
-
-Then pass the slice to the GitHub CLI, processing the array with `jq` and `xargs`:
-
-```bash
-cat input_array.json | jq -c '.[]' | xargs -p -n 1 gh workflow run .github/workflows/c-chain-reexecution-benchmark-gh-native.yml --json
-```
-
-Here the `-n 1` flag ensures each entry is processed individually and `-p` will prompt you to authorize each individual run. To execute without the prompt, simply remove the `-p` flag from the command above.

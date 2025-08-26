@@ -49,7 +49,7 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             {
               echo "matrix<<EOF"
-              printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "source-block-dir": "%s", "current-state-dir": "%s", "config": "%s", "runner": "%s" }] }' \
+              printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "source-block-dir": "%s", "current-state-dir": "%s", "config": "%s", "runner": "%s" }] }\n' \
                 "${{ github.event.inputs.start-block }}" \
                 "${{ github.event.inputs.end-block }}" \
                 "${{ github.event.inputs.source-block-dir }}" \

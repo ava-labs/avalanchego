@@ -12,6 +12,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -103,10 +104,7 @@ func TestMain(m *testing.M) {
 	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", true, "Enable metrics collection.")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
-	predefinedConfigKeys := make([]string, 0, len(predefinedConfigs))
-	for k := range predefinedConfigs {
-		predefinedConfigKeys = append(predefinedConfigKeys, k)
-	}
+	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
 	predefinedConfigOptionsStr := fmt.Sprintf("[%s]", strings.Join(predefinedConfigKeys, ", "))
 	flag.StringVar(&configNameArg, configKey, defaultConfigKey, fmt.Sprintf("Specifies the predefined config to use for the VM. Options include %s.", predefinedConfigOptionsStr))
 
