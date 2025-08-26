@@ -5,6 +5,7 @@ package chains
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -190,11 +191,22 @@ func TestCreateSimplexChain(t *testing.T) {
 
 	// queue chain creation
 	chainManager.QueueChainCreation(chainParams)
-
-	time.Sleep(1 * time.Second)
 	primaryAlias := chainManager.PrimaryAliasOrDefault(chainParams.ID)
 
-	id, err := chainManager.Lookup(primaryAlias)
-	require.NoError(t, err)
-	require.Equal(t, chainParams.ID, id)
+	timeout := time.After(10 * time.Second)
+	for {
+		select {
+		case <-timeout:
+			require.Fail(t, "timed out waiting for chain to be created")
+		default:
+		}
+		id, err := chainManager.Lookup(primaryAlias)
+		if errors.Is(err, ids.ErrNoIDWithAlias) {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+		require.NoError(t, err)
+		require.Equal(t, chainParams.ID, id)
+		return
+	}
 }

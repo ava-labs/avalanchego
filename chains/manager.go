@@ -1504,8 +1504,8 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	return nil
 }
 
-// startChainCreatorNoPChain initializes the chain creator without the P-Chain
-// ONLY used for testing // todo: should delete this
+// startChainCreatorNoPChain is used for testing to bypass setting up the pchain
+// and unblocking the chain creator
 func (m *manager) startChainCreatorNoPChain() {
 	m.chainCreatorExited.Add(1)
 	go m.dispatchChainCreator()
