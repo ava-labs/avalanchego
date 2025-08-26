@@ -88,7 +88,7 @@ tasks:
   export-cchain-block-range:
     desc: Export range of C-Chain blocks from source to target directory.
     vars:
-      BLOCK_DIR: '{{.BLOCK_DIR}}'
+      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC}}'
       BLOCK_DIR_DST: '{{.BLOCK_DIR_DST}}'
       START_BLOCK: '{{.START_BLOCK}}'
       END_BLOCK: '{{.END_BLOCK}}'
