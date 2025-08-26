@@ -113,7 +113,7 @@ func TestCheckCompatible(t *testing.T) {
 			},
 		},
 		{
-			stored:        TestChainConfig,
+			stored:        TestApricotPhase5Config,
 			new:           TestApricotPhase4Config,
 			headBlock:     0,
 			headTimestamp: 0,
@@ -125,7 +125,7 @@ func TestCheckCompatible(t *testing.T) {
 			},
 		},
 		{
-			stored:        TestChainConfig,
+			stored:        TestApricotPhase5Config,
 			new:           TestApricotPhase4Config,
 			headBlock:     10,
 			headTimestamp: 100,

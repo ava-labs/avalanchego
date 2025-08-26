@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
+	"github.com/ava-labs/coreth/params/paramstest"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap3"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -33,24 +34,6 @@ var (
 	TestShortIDAddrs []ids.ShortID
 	InitialBaseFee   = big.NewInt(ap3.InitialBaseFee)
 	InitialFund      = new(big.Int).Mul(big.NewInt(params.Ether), big.NewInt(10))
-
-	ForkToChainConfig = map[upgradetest.Fork]*params.ChainConfig{
-		upgradetest.NoUpgrades:        params.TestLaunchConfig,
-		upgradetest.ApricotPhase1:     params.TestApricotPhase1Config,
-		upgradetest.ApricotPhase2:     params.TestApricotPhase2Config,
-		upgradetest.ApricotPhase3:     params.TestApricotPhase3Config,
-		upgradetest.ApricotPhase4:     params.TestApricotPhase4Config,
-		upgradetest.ApricotPhase5:     params.TestApricotPhase5Config,
-		upgradetest.ApricotPhasePre6:  params.TestApricotPhasePre6Config,
-		upgradetest.ApricotPhase6:     params.TestApricotPhase6Config,
-		upgradetest.ApricotPhasePost6: params.TestApricotPhasePost6Config,
-		upgradetest.Banff:             params.TestBanffChainConfig,
-		upgradetest.Cortina:           params.TestCortinaChainConfig,
-		upgradetest.Durango:           params.TestDurangoChainConfig,
-		upgradetest.Etna:              params.TestEtnaChainConfig,
-		upgradetest.Fortuna:           params.TestFortunaChainConfig,
-		upgradetest.Granite:           params.TestGraniteChainConfig,
-	}
 )
 
 func init() {
@@ -141,12 +124,12 @@ func SetupGenesis(
 	ctx.Lock.Lock()
 
 	prefixedDB := prefixdb.New([]byte{1}, baseDB)
-	genesisJSON := GenesisJSON(ForkToChainConfig[fork])
+	genesisJSON := GenesisJSON(paramstest.ForkToChainConfig[fork])
 	return ctx, prefixedDB, []byte(genesisJSON), atomicMemory
 }
 
 func ForkToRules(fork upgradetest.Fork) *extras.Rules {
-	chainConfig, ok := ForkToChainConfig[fork]
+	chainConfig, ok := paramstest.ForkToChainConfig[fork]
 	if !ok {
 		panic(fmt.Sprintf("unknown fork: %s", fork))
 	}

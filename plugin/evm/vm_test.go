@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/coreth/eth"
 	"github.com/ava-labs/coreth/miner"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/params/paramstest"
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 	"github.com/ava-labs/coreth/plugin/evm/message"
@@ -291,7 +292,7 @@ func testBuildEthTxBlock(t *testing.T, scheme string) {
 		context.Background(),
 		newCTX,
 		tvm.DB,
-		[]byte(vmtest.GenesisJSON(vmtest.ForkToChainConfig[fork])),
+		[]byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[fork])),
 		[]byte(""),
 		[]byte(conf),
 		[]*commonEng.Fx{},
@@ -1561,7 +1562,7 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, upgradetest.Latest, upgrade.UnscheduledActivationTime)
 	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, fork+1, blk.Timestamp())
 	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, fork, upgrade.InitiallyActiveTime)
-	genesis := []byte(vmtest.GenesisJSON(vmtest.ForkToChainConfig[fork]))
+	genesis := []byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[fork]))
 	err = reinitVM.Initialize(context.Background(), newCTX, tvm.DB, genesis, []byte{}, []byte{}, []*commonEng.Fx{}, tvm.AppSender)
 	require.ErrorContains(t, err, "mismatching Cancun fork timestamp in database")
 
@@ -1784,7 +1785,7 @@ func TestBuildBlockLargeTxStarvation(t *testing.T) {
 
 	fork := upgradetest.Fortuna
 	amount := new(big.Int).Mul(big.NewInt(ethparams.Ether), big.NewInt(4000))
-	genesis := vmtest.NewTestGenesis(vmtest.ForkToChainConfig[fork])
+	genesis := vmtest.NewTestGenesis(paramstest.ForkToChainConfig[fork])
 	for _, addr := range vmtest.TestEthAddrs {
 		genesis.Alloc[addr] = types.Account{Balance: amount}
 	}
