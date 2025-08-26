@@ -54,7 +54,7 @@ contract LoadSimulator {
      * Calldata Length: 4 + 32 + 32 = 68 bytes
      * Minimum Gas Used: 21_000 + (22_100 * numSlots)
      */
-    function write(uint256 numSlots, uint256 value) external returns (bool) {
+    function write(uint256 numSlots, uint256 value) external {
         assembly {
             let offset := sload(latestEmptySlot.slot)
             let newOffset := add(offset, numSlots)
@@ -67,7 +67,6 @@ contract LoadSimulator {
             }
             sstore(latestEmptySlot.slot, newOffset)
         }
-        return true;
     }
 
     /**
@@ -79,10 +78,10 @@ contract LoadSimulator {
     function modify(
         uint256 numSlots,
         uint256 newValue
-    ) external returns (bool) {
+    ) external returns (bool success) {
         assembly {
             let slotLimit := sload(latestEmptySlot.slot)
-            // if there's enough non-empty slots to overwrite
+
             if lt(numSlots, add(slotLimit, 1)) {
                 for {
                     let i := 0
@@ -91,9 +90,9 @@ contract LoadSimulator {
                 } {
                     sstore(i, newValue)
                 }
+                success := true
             }
         }
-        return true;
     }
 
     /**
