@@ -9,10 +9,12 @@ import (
 
 	"github.com/ava-labs/simplex"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 )
 
 // TestSimplexEngineHandlesSimplexMessages tests that the Simplex engine can handle
@@ -23,6 +25,7 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 	ctx := context.Background()
 
 	config := configs[0]
+	config.Sender.(*sendermock.ExternalSender).EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
 	engine, err := NewEngine(ctx, config)
 	require.NoError(t, err)
 

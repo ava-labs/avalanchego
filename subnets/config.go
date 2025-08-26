@@ -89,6 +89,6 @@ func (c *ConsensusConfig) Verify() error {
 		}
 		return nil
 	}
-	
+
 	return errMissingConsensusParameters
 }
