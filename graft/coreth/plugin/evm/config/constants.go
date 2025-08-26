@@ -16,7 +16,8 @@ const (
 	TxGossipBloomChurnMultiplier         = 3
 	PushGossipDiscardedElements          = 16_384
 	TxGossipTargetMessageSize            = 20 * units.KiB
-	TxGossipThrottlingPeriod             = 10 * time.Second
-	TxGossipThrottlingLimit              = 2
-	TxGossipPollSize                     = 1
+	TxGossipThrottlingPeriod             = time.Hour
+	// TxGossipRequestsPerPeer =  TxGossipThrottlingPeriod / Config.PullGossipFrequency
+	TxGossipRequestsPerPeer = 3600
+	TxGossipPollSize        = 1
 )

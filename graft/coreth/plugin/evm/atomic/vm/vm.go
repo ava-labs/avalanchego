@@ -263,7 +263,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	ctx, cancel := context.WithCancel(context.TODO())
 	vm.cancel = cancel
 	atomicTxGossipMarshaller := atomic.TxMarshaller{}
-	atomicTxGossipClient := vm.InnerVM.NewClient(p2p.AtomicTxGossipHandlerID, p2p.WithValidatorSampling(vm.InnerVM.P2PValidators()))
+	atomicTxGossipClient := vm.InnerVM.NewClient(p2p.AtomicTxGossipHandlerID)
 	atomicTxGossipMetrics, err := avalanchegossip.NewMetrics(vm.InnerVM.MetricRegistry(), atomicTxGossipNamespace)
 	if err != nil {
 		return fmt.Errorf("failed to initialize atomic tx gossip metrics: %w", err)
@@ -295,16 +295,21 @@ func (vm *VM) onNormalOperationsStarted() error {
 		return fmt.Errorf("failed to initialize atomic tx push gossiper: %w", err)
 	}
 
-	vm.atomicTxGossipHandler = gossip.NewTxGossipHandler[*atomic.Tx](
+	vm.atomicTxGossipHandler, err = gossip.NewTxGossipHandler[*atomic.Tx](
 		vm.Ctx.Log,
 		&atomicTxGossipMarshaller,
 		vm.AtomicMempool,
 		atomicTxGossipMetrics,
 		config.TxGossipTargetMessageSize,
 		config.TxGossipThrottlingPeriod,
-		config.TxGossipThrottlingLimit,
+		config.TxGossipRequestsPerPeer,
 		vm.InnerVM.P2PValidators(),
+		vm.MetricRegistry(),
+		"atomic_tx_gossip",
 	)
+	if err != nil {
+		return fmt.Errorf("failed to initialize atomic tx gossip handler: %w", err)
+	}
 
 	if err := vm.InnerVM.AddHandler(p2p.AtomicTxGossipHandlerID, vm.atomicTxGossipHandler); err != nil {
 		return fmt.Errorf("failed to add atomic tx gossip handler: %w", err)
