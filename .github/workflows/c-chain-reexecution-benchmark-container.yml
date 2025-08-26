@@ -83,7 +83,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install ARC Dependencies
-        shell: bash	
+        shell: bash
         run: |	
           # xz-utils might be present on some containers. Install if not present.	
           if ! command -v xz &> /dev/null; then	
