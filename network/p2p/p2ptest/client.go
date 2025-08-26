@@ -59,7 +59,12 @@ func NewClientWithPeers(
 	peerNetworks := make(map[ids.NodeID]*p2p.Network)
 	for nodeID := range peers {
 		peerSenders[nodeID] = &enginetest.Sender{}
-		peerNetwork, err := p2p.NewNetwork(logging.NoLog{}, peerSenders[nodeID], prometheus.NewRegistry(), "")
+		peerNetwork, err := p2p.NewNetwork(
+			logging.NoLog{},
+			peerSenders[nodeID],
+			prometheus.NewRegistry(),
+			"",
+		)
 		require.NoError(t, err)
 		peerNetworks[nodeID] = peerNetwork
 	}
@@ -124,5 +129,10 @@ func NewClientWithPeers(
 		require.NoError(t, peerNetworks[nodeID].AddHandler(0, peers[nodeID]))
 	}
 
-	return peerNetworks[clientNodeID].NewClient(0)
+	peerSampler := p2p.PeerSampler{Peers: &p2p.Peers{}}
+	for nodeID := range peers {
+		peerSampler.Peers.Connected(nodeID)
+	}
+
+	return peerNetworks[clientNodeID].NewClient(0, peerSampler)
 }
