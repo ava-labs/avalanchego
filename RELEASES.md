@@ -3,6 +3,7 @@
 ## Pending Release
 
 - Removed deprecated flags `coreth-admin-api-enabled`, `coreth-admin-api-dir`, `tx-regossip-frequency`, `tx-lookup-limit`. Use `admin-api-enabled`, `admin-api-dir`, `regossip-frequency`, `transaction-history` instead.
+- Enabled RPC batch limits by default, and configurable with `batch-request-limit` and `batch-max-response-size`.
 
 ## [v0.15.3](https://github.com/ava-labs/coreth/releases/tag/v0.15.3)
 
@@ -17,7 +18,6 @@
 - Disable incompatible APIs for Firewood.
 
 ## [v0.15.2](https://github.com/ava-labs/coreth/releases/tag/v0.15.2)
-
 
 ## [v0.15.1](https://github.com/ava-labs/coreth/releases/tag/v0.15.1)
 

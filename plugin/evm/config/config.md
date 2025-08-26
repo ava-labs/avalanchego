@@ -128,6 +128,7 @@ The mapping of deprecated values and their updated equivalent follows:
 |internal-private-debug          |internal-debug      |
 |internal-public-account         |internal-account    |
 |internal-private-personal       |internal-personal   |
+
 </Callout>
 
 <Callout title="Note">
@@ -187,6 +188,7 @@ Adds the following RPC calls to the `debug_*` namespace. Defaults to `false`.
 - `debug_getAccessibleState`
 
 The following RPC calls are disabled for any nodes with `state-scheme = firewood`:
+
 - `debug_storageRangeAt`
 - `debug_getModifiedAccountsByNumber`
 - `debug_getModifiedAccountsByHash`
@@ -408,6 +410,18 @@ Specifies the depth to keep accepted headers and accepted logs in the cache. Thi
 _Integer_
 
 Maximum size in bytes for HTTP request bodies. Defaults to `0` (no limit).
+
+### `batch-request-limit`
+
+_Integer_
+
+Maximum number of requests that can be batched in an RPC call. For no limit, set either this or `batch-response-max-size` to 0. Defaults to `1000`.
+
+### `batch-response-max-size`
+
+_Integer_
+
+Maximum size (in bytes) of response that can be returned from a batched RPC call. For no limit, set either this or `batch-request-limit` to 0. Defaults to `25 MB`.
 
 ## Transaction Pool
 
@@ -633,8 +647,6 @@ _Integer_
 
 Size of the snapshot disk layer clean cache (in MBs). Should be a multiple of `64`. Defaults to `256`.
 
-
-
 ### `acceptor-queue-limit`
 
 _Integer_
@@ -695,7 +707,7 @@ If `true`, clears the warp database on startup. Defaults to `false`.
 
 _Boolean_
 
-If `true`, offline pruning will run on startup and block until it completes (approximately one hour on Mainnet). This will reduce the size of the database by deleting old trie nodes. **While performing offline pruning, your node will not be able to process blocks and will be considered offline.** While ongoing, the pruning process consumes a small amount of additional disk space (for deletion markers and the bloom filter). For more information see [here.](https://build.avax.network/docs/nodes/maintain/reduce-disk-usage#disk-space-considerations)
+If `true`, offline pruning will run on startup and block until it completes (approximately one hour on Mainnet). This will reduce the size of the database by deleting old trie nodes. __While performing offline pruning, your node will not be able to process blocks and will be considered offline.__ While ongoing, the pruning process consumes a small amount of additional disk space (for deletion markers and the bloom filter). For more information see [here.](https://build.avax.network/docs/nodes/maintain/reduce-disk-usage#disk-space-considerations)
 
 Since offline pruning deletes old state data, this should not be run on nodes that need to support archival API requests.
 
