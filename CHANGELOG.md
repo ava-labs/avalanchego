@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.12] - 2025-08-26
+
+### 🚀 Features
+
+- *(async-removal)* Phase 3 - make `Db` trait sync ([#1213](https://github.com/ava-labs/firewood/pull/1213))
+- *(checker)* Fix error with free area that is not head of a free list ([#1231](https://github.com/ava-labs/firewood/pull/1231))
+- *(async-removal)* Phase 4 - Make `DbView` synchronous ([#1219](https://github.com/ava-labs/firewood/pull/1219))
+- *(ffi-refactor)* Refactor cached view (1/8) ([#1222](https://github.com/ava-labs/firewood/pull/1222))
+- *(ffi-refactor)* Add OwnedSlice and OwnedBytes (2/8) ([#1223](https://github.com/ava-labs/firewood/pull/1223))
+- *(ffi-refactor)* Introduce VoidResult and panic handlers (3/8) ([#1224](https://github.com/ava-labs/firewood/pull/1224))
+- *(ffi-refactor)* Refactor Db opening to use new Result structure (4/8) ([#1225](https://github.com/ava-labs/firewood/pull/1225))
+- *(ffi-refactor)* Refactor how hash values are returned (5/8) ([#1226](https://github.com/ava-labs/firewood/pull/1226))
+- *(ffi-refactor)* Refactor revision to use database handle (6/8) ([#1227](https://github.com/ava-labs/firewood/pull/1227))
+- *(ffi-refactor)* Add `ValueResult` type (7/8) ([#1228](https://github.com/ava-labs/firewood/pull/1228))
+
+### ⚙️ Miscellaneous Tasks
+
+- Only allocate the area needed ([#1217](https://github.com/ava-labs/firewood/pull/1217))
+- Synchronize .golangci.yaml ([#1234](https://github.com/ava-labs/firewood/pull/1234))
+- *(metrics-check)* Re-use previous comment instead of spamming new ones ([#1232](https://github.com/ava-labs/firewood/pull/1232))
+- Nuke grpc-testtool ([#1220](https://github.com/ava-labs/firewood/pull/1220))
+
 ## [0.0.11] - 2025-08-20
 
 ### 🚀 Features
