@@ -854,17 +854,6 @@ func (vm *VM) initBlockBuilding() error {
 		vm.shutdownWg.Done()
 	}()
 
-	vm.shutdownWg.Add(1)
-	go func() {
-		avalanchegossip.Every(ctx, vm.ctx.Log, ethTxPushGossiper, vm.config.PushGossipFrequency.Duration)
-		vm.shutdownWg.Done()
-	}()
-	vm.shutdownWg.Add(1)
-	go func() {
-		avalanchegossip.Every(ctx, vm.ctx.Log, vm.ethTxPullGossiper, vm.config.PullGossipFrequency.Duration)
-		vm.shutdownWg.Done()
-	}()
-
 	return nil
 }
 
