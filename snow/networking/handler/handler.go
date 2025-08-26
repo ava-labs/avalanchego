@@ -221,15 +221,12 @@ func (h *handler) SetOnStopped(onStopped func()) {
 }
 
 func (h *handler) selectStartingGear(ctx context.Context) (common.Engine, error) {
-	h.ctx.Log.Info("attempting to selecting starting gear")
 	state := h.ctx.State.Get()
-	h.ctx.Log.Info("selecting starting gear", zap.String("state", state.State.String()))
 	engines := h.engineManager.Get(state.Type)
 	if engines == nil {
 		return nil, errNoStartingGear
 	}
 	if engines.StateSyncer == nil {
-		h.ctx.Log.Info("state sync is disabled")
 		return engines.Bootstrapper, nil
 	}
 
@@ -774,6 +771,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		}
 		h.p2pTracker.Disconnected(nodeID)
 		return engine.Disconnected(ctx, nodeID)
+
 	default:
 		return fmt.Errorf(
 			"attempt to submit unhandled sync msg %s from %s",
