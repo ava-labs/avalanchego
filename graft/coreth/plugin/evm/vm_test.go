@@ -202,12 +202,6 @@ func testBuildEthTxBlock(t *testing.T, scheme string) {
 		Scheme: scheme,
 	})
 
-	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-	}()
-
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
 	vm.txPool.SubscribeNewReorgEvent(newTxPoolHeadChan)
 
@@ -283,11 +277,16 @@ func testBuildEthTxBlock(t *testing.T, scheme string) {
 		t.Fatalf("Found unexpected blkID for parent of blk2")
 	}
 
+	// Close the vm and all databases
+	if err := vm.Shutdown(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
 	restartedVM := newDefaultTestVM()
 	newCTX := snowtest.Context(t, snowtest.CChainID)
 	newCTX.NetworkUpgrades = upgradetest.GetConfig(fork)
 	newCTX.ChainDataDir = tvm.Ctx.ChainDataDir
-	conf, err := vmtest.OverrideSchemeConfig(scheme, `{"pruning-enabled":true}`)
+	conf, err := vmtest.OverrideSchemeConfig(scheme, "")
 	require.NoError(t, err)
 	if err := restartedVM.Initialize(
 		context.Background(),
@@ -311,6 +310,11 @@ func testBuildEthTxBlock(t *testing.T, scheme string) {
 	ethBlk2 := blk2.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
 	if ethBlk2Root := ethBlk2.Root(); !restartedVM.Ethereum().BlockChain().HasState(ethBlk2Root) {
 		t.Fatalf("Expected blk2 state root to not be pruned after shutdown (last accepted tip should be committed)")
+	}
+
+	// Shutdown the newest VM
+	if err := restartedVM.Shutdown(context.Background()); err != nil {
+		t.Fatal(err)
 	}
 }
 
