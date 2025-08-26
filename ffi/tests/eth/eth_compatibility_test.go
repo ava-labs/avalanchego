@@ -295,7 +295,7 @@ func (tr *merkleTriePair) deleteStorage(accountIndex int, storageIndexInput uint
 	tr.pendingFwdVals = append(tr.pendingFwdVals, []byte{})
 }
 
-func FuzzTree(f *testing.F) {
+func FuzzFirewoodTree(f *testing.F) {
 	for randSeed := range int64(5) {
 		rand := rand.New(rand.NewSource(randSeed))
 		steps := make([]byte, 32)
