@@ -356,13 +356,13 @@ impl<T: TrieReader> Merkle<T> {
         end_key: Option<&[u8]>,
         limit: Option<NonZeroUsize>,
     ) -> Result<FrozenRangeProof, api::Error> {
-        if let (Some(k1), Some(k2)) = (&start_key, &end_key) {
-            if k1 > k2 {
-                return Err(api::Error::InvalidRange {
-                    start_key: k1.to_vec().into(),
-                    end_key: k2.to_vec().into(),
-                });
-            }
+        if let (Some(k1), Some(k2)) = (&start_key, &end_key)
+            && k1 > k2
+        {
+            return Err(api::Error::InvalidRange {
+                start_key: k1.to_vec().into(),
+                end_key: k2.to_vec().into(),
+            });
         }
 
         let mut iter = match start_key {

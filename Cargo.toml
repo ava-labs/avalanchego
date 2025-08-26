@@ -17,7 +17,7 @@ license-file = "LICENSE.md"
 homepage = "https://avalabs.org"
 repository = "https://github.com/ava-labs/firewood"
 readme = "README.md"
-rust-version = "1.85.0"
+rust-version = "1.89.0"
 
 [profile.release]
 debug = true

@@ -58,10 +58,10 @@ impl<K: PartialEq, V: ?Sized> ArcCache<K, V> {
         factory: impl FnOnce(&K) -> Result<Arc<V>, E>,
     ) -> Result<Arc<V>, E> {
         let mut cache = self.lock();
-        if let Some((cached_key, value)) = cache.as_ref() {
-            if *cached_key == key {
-                return Ok(Arc::clone(value));
-            }
+        if let Some((cached_key, value)) = cache.as_ref()
+            && *cached_key == key
+        {
+            return Ok(Arc::clone(value));
         }
 
         // clear the cache before running the factory in case it fails
