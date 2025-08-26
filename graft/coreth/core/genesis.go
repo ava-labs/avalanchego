@@ -36,6 +36,7 @@ import (
 
 	"github.com/ava-labs/coreth/core/extstate"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/coreth/triedb/pathdb"
 	"github.com/ava-labs/libevm/common"
@@ -276,13 +277,32 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Blo
 	if g.Difficulty == nil {
 		head.Difficulty = ethparams.GenesisDifficulty
 	}
+	if g.ExtraData == nil {
+		head.Extra = []byte{}
+	}
 	if conf := g.Config; conf != nil {
 		num := new(big.Int).SetUint64(g.Number)
-		if params.GetExtra(conf).IsApricotPhase3(g.Timestamp) {
+		confExtra := params.GetExtra(conf)
+		if confExtra.IsApricotPhase3(g.Timestamp) {
 			if g.BaseFee != nil {
 				head.BaseFee = g.BaseFee
 			} else {
 				head.BaseFee = big.NewInt(ap3.InitialBaseFee)
+			}
+		}
+		headerExtra := customtypes.GetHeaderExtra(head)
+
+		// When Etna/Cancun is active, `BlockGasCost` and `ExtDataGasUsed` are decoded to 0 if it's nil.
+		// This is because these fields come before the other optional Cancun fields in RLP order.
+		// This only occurs with a serialized and written genesis block, and then reading it back.
+		// While this does not affect anything (because we don't use `ToBlock` to retrieve the genesis block),
+		// it's still confusing and breaking few tests. So we set it here to 0 to make it consistent.
+		if confExtra.IsEtna(g.Timestamp) {
+			if headerExtra.ExtDataGasUsed == nil {
+				headerExtra.ExtDataGasUsed = new(big.Int)
+			}
+			if headerExtra.BlockGasCost == nil {
+				headerExtra.BlockGasCost = new(big.Int)
 			}
 		}
 		if conf.IsCancun(num, g.Timestamp) {

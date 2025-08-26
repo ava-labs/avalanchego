@@ -17,25 +17,6 @@ import (
 )
 
 var (
-	TestChainConfig = &ChainConfig{
-		NetworkUpgrades: NetworkUpgrades{
-			ApricotPhase1BlockTimestamp:     utils.NewUint64(0),
-			ApricotPhase2BlockTimestamp:     utils.NewUint64(0),
-			ApricotPhase3BlockTimestamp:     utils.NewUint64(0),
-			ApricotPhase4BlockTimestamp:     utils.NewUint64(0),
-			ApricotPhase5BlockTimestamp:     utils.NewUint64(0),
-			ApricotPhasePre6BlockTimestamp:  utils.NewUint64(0),
-			ApricotPhase6BlockTimestamp:     utils.NewUint64(0),
-			ApricotPhasePost6BlockTimestamp: utils.NewUint64(0),
-			BanffBlockTimestamp:             utils.NewUint64(0),
-			CortinaBlockTimestamp:           utils.NewUint64(0),
-			DurangoBlockTimestamp:           utils.NewUint64(0),
-			EtnaTimestamp:                   utils.NewUint64(0),
-			FortunaTimestamp:                utils.NewUint64(0),
-			GraniteTimestamp:                utils.NewUint64(0),
-		},
-	}
-
 	TestLaunchConfig = &ChainConfig{}
 
 	TestApricotPhase1Config = copyAndSet(TestLaunchConfig, func(c *ChainConfig) {
@@ -93,7 +74,14 @@ var (
 	TestGraniteChainConfig = copyAndSet(TestFortunaChainConfig, func(c *ChainConfig) {
 		c.NetworkUpgrades.GraniteTimestamp = utils.NewUint64(0)
 	})
+
+	TestChainConfig = copyConfig(TestGraniteChainConfig)
 )
+
+func copyConfig(c *ChainConfig) *ChainConfig {
+	newConfig := *c
+	return &newConfig
+}
 
 func copyAndSet(c *ChainConfig, set func(*ChainConfig)) *ChainConfig {
 	newConfig := *c
