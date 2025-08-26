@@ -70,10 +70,10 @@ github.com/antithesishq/antithesis-sdk-go v0.3.8/go.mod h1:IUpT2DPAKh6i/YhSbt6Gl
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
-github.com/ava-labs/coreth v0.15.4-rc.1 h1:WO0KMn2LulySQgIyvWFLVyCMFx6Vjz24bg/cmPqkW14=
-github.com/ava-labs/coreth v0.15.4-rc.1/go.mod h1:HgxTjRSlOqiqx6u3yhHpVhzhhkA1jKKoY+sz+23Libw=
-github.com/ava-labs/firewood-go-ethhash/ffi v0.0.11 h1:V9XDirIJ0oveor+sAPuOB0WMQ+b7FoDStScMdyGlBQ4=
-github.com/ava-labs/firewood-go-ethhash/ffi v0.0.11/go.mod h1:cq89ua3iiZ5wPBALTEQS5eG8DIZcs7ov6OiL4YR1BVY=
+github.com/ava-labs/coreth v0.15.4-0.20250819182827-78b22d3f0d2d h1:zLmfNLm/KnYkqIkpTpCv11Po2s9CO1MATO9IMyv4sjg=
+github.com/ava-labs/coreth v0.15.4-0.20250819182827-78b22d3f0d2d/go.mod h1:/dq/cvL0p9yP1+IgM8uhOgh/VnyxfsDyeWdpMBG+j7g=
+github.com/ava-labs/firewood-go-ethhash/ffi v0.0.9 h1:zw0g+cUbZDsGdWx1PKmBChkpy+ixL3QgiI86DUOuXvo=
+github.com/ava-labs/firewood-go-ethhash/ffi v0.0.9/go.mod h1:cq89ua3iiZ5wPBALTEQS5eG8DIZcs7ov6OiL4YR1BVY=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60 h1:EL66gtXOAwR/4KYBjOV03LTWgkEXvLePribLlJNu4g0=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60/go.mod h1:/7qKobTfbzBu7eSTVaXMTr56yTYk4j2Px6/8G+idxHo=
 github.com/ava-labs/libevm v1.13.14-0.3.0.rc.6 h1:tyM659nDOknwTeU4A0fUVsGNIU7k0v738wYN92nqs/Y=
