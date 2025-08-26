@@ -143,8 +143,8 @@ For example, to add a new Firewood benchmark to execute the block range [30m, 40
     "config": "firewood",
     "start-block": 30000001,
     "end-block": 40000000,
-    "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-50m-ldb/**",
-    "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-30m/**"
+    "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-50m-ldb/**",
+    "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-30m/**"
 }
 ```
 
@@ -168,8 +168,8 @@ Copy your desired parameters as JSON into a file or write it out on the command 
     "config": "firewood",
     "start-block": "101",
     "end-block": "200",
-    "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/**",
-    "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**"
+    "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/**",
+    "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**"
 }
 ```
 

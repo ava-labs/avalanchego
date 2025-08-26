@@ -51,15 +51,15 @@ var (
 )
 
 var (
-	sourceBlockDirArg string
-	targetBlockDirArg string
-	targetDirArg      string
-	startBlockArg     uint64
-	endBlockArg       uint64
-	chanSizeArg       int
-	metricsEnabledArg bool
-	executionTimeout  time.Duration
-	labelsArg         string
+	blockDirArg        string
+	blockDirDstArg     string
+	currentStateDirArg string
+	startBlockArg      uint64
+	endBlockArg        uint64
+	chanSizeArg        int
+	metricsEnabledArg  bool
+	executionTimeout   time.Duration
+	labelsArg          string
 
 	labels = map[string]string{
 		"job":               "c-chain-reexecution",
@@ -88,14 +88,15 @@ var (
 
 func TestMain(m *testing.M) {
 	// Source directory must be a leveldb dir with the required blocks accessible via rawdb.ReadBlock.
-	flag.StringVar(&sourceBlockDirArg, "source-block-dir", sourceBlockDirArg, "DB directory storing executable block range.")
-	// Target block directory to write blocks into when executing TestExportBlockRange.
-	flag.StringVar(&targetBlockDirArg, "target-block-dir", targetBlockDirArg, "DB directory to write blocks into when executing TestExportBlockRange.")
+	flag.StringVar(&blockDirArg, "block-dir", blockDirArg, "DB directory storing executable block range.")
+	// Destination block directory to write blocks into when executing TestExportBlockRange.
+	flag.StringVar(&blockDirDstArg, "block-dir-dst", blockDirDstArg, "DB directory to write blocks into when executing TestExportBlockRange.")
 
-	// Target directory assumes the current-state directory contains a db directory and a chain-data-dir directory.
+	// Current state directory is expected to contain the DB passed into the VM and a chain-data-dir directory passed
+	// to the VM via *snow.Context.ChainDataDir.
 	// - db/
 	// - chain-data-dir/
-	flag.StringVar(&targetDirArg, "target-dir", targetDirArg, "Target directory for the current state including VM DB and Chain Data Directory.")
+	flag.StringVar(&currentStateDirArg, "current-state-dir", currentStateDirArg, "Target directory for the current state including VM DB and Chain Data Directory.")
 	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (exclusive).")
 	flag.Uint64Var(&endBlockArg, "end-block", 200, "End block to end execution (inclusive).")
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
@@ -132,7 +133,7 @@ func TestMain(m *testing.M) {
 func BenchmarkReexecuteRange(b *testing.B) {
 	require.Equalf(b, 1, b.N, "BenchmarkReexecuteRange expects to run a single iteration because it overwrites the input current-state, but found (b.N=%d)", b.N)
 	b.Run(fmt.Sprintf("[%d,%d]-Config-%s", startBlockArg, endBlockArg, configNameArg), func(b *testing.B) {
-		benchmarkReexecuteRange(b, sourceBlockDirArg, targetDirArg, configBytesArg, startBlockArg, endBlockArg, chanSizeArg, metricsEnabledArg)
+		benchmarkReexecuteRange(b, blockDirArg, currentStateDirArg, configBytesArg, startBlockArg, endBlockArg, chanSizeArg, metricsEnabledArg)
 	})
 }
 
@@ -164,7 +165,7 @@ func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir stri
 	)
 
 	log.Info("re-executing block range with params",
-		zap.String("source-block-dir", sourceBlockDir),
+		zap.String("block-dir", sourceBlockDir),
 		zap.String("target-db-dir", targetDBDir),
 		zap.String("chain-data-dir", chainDataDir),
 		zap.Uint64("start-block", startBlock),
@@ -468,15 +469,15 @@ func blockKey(height uint64) []byte {
 }
 
 func TestExportBlockRange(t *testing.T) {
-	exportBlockRange(t, sourceBlockDirArg, targetBlockDirArg, startBlockArg, endBlockArg, chanSizeArg)
+	exportBlockRange(t, blockDirArg, blockDirDstArg, startBlockArg, endBlockArg, chanSizeArg)
 }
 
-func exportBlockRange(tb testing.TB, sourceDir string, targetDir string, startBlock, endBlock uint64, chanSize int) {
+func exportBlockRange(tb testing.TB, blockDirSrc string, blockDirDst string, startBlock, endBlock uint64, chanSize int) {
 	r := require.New(tb)
-	blockChan, err := createBlockChanFromLevelDB(tb, sourceDir, startBlock, endBlock, chanSize)
+	blockChan, err := createBlockChanFromLevelDB(tb, blockDirSrc, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
-	db, err := leveldb.New(targetDir, nil, logging.NoLog{}, prometheus.NewRegistry())
+	db, err := leveldb.New(blockDirDst, nil, logging.NoLog{}, prometheus.NewRegistry())
 	r.NoError(err)
 	tb.Cleanup(func() {
 		r.NoError(db.Close())
