@@ -24,6 +24,8 @@ func init() {
 	err := errors.Join(
 		lc.RegisterType(&statelessBlock{}),
 		lc.RegisterType(&option{}),
+		lc.RegisterType(&statelessGraniteBlock{}),
+		lc.RegisterType(&statelessUnsignedGraniteBlock{}),
 		Codec.RegisterCodec(CodecVersion, lc),
 	)
 	if err != nil {

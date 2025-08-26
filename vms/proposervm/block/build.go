@@ -21,16 +21,29 @@ func BuildUnsigned(
 	pChainEpoch PChainEpoch,
 	blockBytes []byte,
 ) (SignedBlock, error) {
-	var block SignedBlock = &statelessBlock{
-		StatelessBlock: statelessUnsignedBlock{
-			ParentID:     parentID,
-			Timestamp:    timestamp.Unix(),
-			PChainHeight: pChainHeight,
-			PChainEpoch:  pChainEpoch,
-			Certificate:  nil,
-			Block:        blockBytes,
-		},
-		timestamp: timestamp,
+	var block SignedBlock
+	if pChainEpoch.Number == 0 {
+		block = &statelessBlock{
+			StatelessBlock: statelessUnsignedBlock{
+				ParentID:     parentID,
+				Timestamp:    timestamp.Unix(),
+				PChainHeight: pChainHeight,
+				Certificate:  nil,
+				Block:        blockBytes,
+			},
+			timestamp: timestamp,
+		}
+	} else {
+		block = &statelessGraniteBlock{
+			StatelessBlock: statelessUnsignedGraniteBlock{
+				PChainEpoch:  pChainEpoch,
+				ParentID:     parentID,
+				Timestamp:    timestamp.UnixMilli(),
+				PChainHeight: pChainHeight,
+				Certificate:  nil,
+				Block:        blockBytes,
+			},
+		}
 	}
 
 	bytes, err := Codec.Marshal(CodecVersion, &block)
@@ -51,22 +64,43 @@ func Build(
 	chainID ids.ID,
 	key crypto.Signer,
 ) (SignedBlock, error) {
-	block := &statelessBlock{
-		StatelessBlock: statelessUnsignedBlock{
-			ParentID:     parentID,
-			Timestamp:    timestamp.Unix(),
-			PChainHeight: pChainHeight,
-			PChainEpoch:  pChainEpoch,
-			Certificate:  cert.Raw,
-			Block:        blockBytes,
-		},
-		timestamp: timestamp,
-		cert:      cert,
-		proposer:  ids.NodeIDFromCert(cert),
+	var block SignedBlock
+	if pChainEpoch.Number == 0 {
+		block = &statelessBlock{
+			StatelessBlock: statelessUnsignedBlock{
+				ParentID:     parentID,
+				Timestamp:    timestamp.Unix(),
+				PChainHeight: pChainHeight,
+				Certificate:  cert.Raw,
+				Block:        blockBytes,
+			},
+			timestamp: timestamp,
+			cert:      cert,
+			proposer:  ids.NodeIDFromCert(cert),
+		}
+	} else {
+		block = &statelessGraniteBlock{
+			StatelessBlock: statelessUnsignedGraniteBlock{
+				PChainEpoch:  pChainEpoch,
+				ParentID:     parentID,
+				Timestamp:    timestamp.UnixMilli(),
+				PChainHeight: pChainHeight,
+				Certificate:  cert.Raw,
+				Block:        blockBytes,
+			},
+			timestamp: timestamp,
+			cert:      cert,
+			proposer:  ids.NodeIDFromCert(cert),
+		}
 	}
-	var blockIntf SignedBlock = block
 
-	unsignedBytesWithEmptySignature, err := Codec.Marshal(CodecVersion, &blockIntf)
+	return initializeAndSignBlock(block, chainID, parentID, key)
+}
+
+// initializeAndSignBlock handles the common initialization and signing logic
+// for both statelessBlock and statelessGraniteBlock types
+func initializeAndSignBlock(block SignedBlock, chainID, parentID ids.ID, key crypto.Signer) (SignedBlock, error) {
+	unsignedBytesWithEmptySignature, err := Codec.Marshal(CodecVersion, &block)
 	if err != nil {
 		return nil, err
 	}
@@ -77,21 +111,49 @@ func Build(
 	// prefix to get the unsigned bytes.
 	lenUnsignedBytes := len(unsignedBytesWithEmptySignature) - wrappers.IntLen
 	unsignedBytes := unsignedBytesWithEmptySignature[:lenUnsignedBytes]
-	block.id = hashing.ComputeHash256Array(unsignedBytes)
 
-	header, err := BuildHeader(chainID, parentID, block.id)
+	// Set the block ID
+	switch b := block.(type) {
+	case *statelessBlock:
+		b.id = hashing.ComputeHash256Array(unsignedBytes)
+	case *statelessGraniteBlock:
+		b.id = hashing.ComputeHash256Array(unsignedBytes)
+	}
+
+	header, err := BuildHeader(chainID, parentID, block.ID())
 	if err != nil {
 		return nil, err
 	}
 
 	headerHash := hashing.ComputeHash256(header.Bytes())
-	block.Signature, err = key.Sign(rand.Reader, headerHash, crypto.SHA256)
+	signature, err := key.Sign(rand.Reader, headerHash, crypto.SHA256)
 	if err != nil {
 		return nil, err
 	}
 
-	block.bytes, err = Codec.Marshal(CodecVersion, &blockIntf)
-	return block, err
+	// Set the signature
+	switch b := block.(type) {
+	case *statelessBlock:
+		b.Signature = signature
+	case *statelessGraniteBlock:
+		b.Signature = signature
+	}
+
+	// Marshal the final block with signature
+	finalBytes, err := Codec.Marshal(CodecVersion, &block)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the final bytes
+	switch b := block.(type) {
+	case *statelessBlock:
+		b.bytes = finalBytes
+	case *statelessGraniteBlock:
+		b.bytes = finalBytes
+	}
+
+	return block, nil
 }
 
 func BuildHeader(
