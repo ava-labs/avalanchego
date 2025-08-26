@@ -489,10 +489,10 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	}
 
 	// Create the log and context of the chain
-	// chainLog, err := m.LogFactory.MakeChain(primaryAlias)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("error while creating chain's log %w", err)
-	// }
+	chainLog, err := m.LogFactory.MakeChain(primaryAlias)
+	if err != nil {
+		return nil, fmt.Errorf("error while creating chain's log %w", err)
+	}
 
 	ctx := &snow.ConsensusContext{
 		Context: &snow.Context{
@@ -507,7 +507,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			CChainID:    m.CChainID,
 			AVAXAssetID: m.AVAXAssetID,
 
-			Log:          m.Log, // TODO: for debugging. use chainlog instead
+			Log:          chainLog,
 			SharedMemory: m.AtomicMemory.NewSharedMemory(chainParams.ID),
 			BCLookup:     m,
 			Metrics:      metrics.NewPrefixGatherer(),
@@ -531,7 +531,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 	}
 
 	// Create the chain
-	vm, err := vmFactory.New(m.Log) // change to chainLog later
+	vm, err := vmFactory.New(chainLog)
 	if err != nil {
 		return nil, fmt.Errorf("error while creating vm: %w", err)
 	}
@@ -565,12 +565,6 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 			return nil, fmt.Errorf("error while creating new avalanche vm %w", err)
 		}
 	case block.ChainVM:
-		m.Log.Info("creating chainvm",
-			zap.Stringer("subnetID", chainParams.SubnetID),
-			zap.Stringer("chainID", chainParams.ID),
-			zap.Stringer("vmID", chainParams.VMID),
-		)
-
 		// handle simplex engine based off parameters
 		if sb.Config().ConsensusConfig.SimplexParams != nil {
 			chain, err = m.createSimplexChain(ctx, vm, sb, chainParams.GenesisData, chainFxs)
@@ -1499,6 +1493,7 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	// depends on.
 	m.createChain(platformParams)
 
+	m.Log.Info("starting chain creator")
 	m.chainCreatorExited.Add(1)
 	go m.dispatchChainCreator()
 	return nil
@@ -1533,7 +1528,6 @@ func (m *manager) dispatchChainCreator() {
 		if !ok { // queue is closed, return directly
 			return
 		}
-		m.Log.Info("creating chain")
 		m.createChain(chainParams)
 	}
 }
@@ -1706,6 +1700,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 	})
 
 	primaryAlias := m.PrimaryAliasOrDefault(ctx.ChainID)
+	m.Log.Info("creating simplex chain", zap.String("chain", primaryAlias))
 
 	messageSender, err := m.createMessageSender(ctx, sb)
 	if err != nil {
