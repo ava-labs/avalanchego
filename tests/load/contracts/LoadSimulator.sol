@@ -55,7 +55,6 @@ contract LoadSimulator {
      */
     function write(uint256 numSlots, uint256 value) external returns (bool) {
         assembly {
-            // load value stored at latestEmptySlot
             let offset := sload(latestEmptySlot.slot)
             for {
                 let i := offset
@@ -80,7 +79,6 @@ contract LoadSimulator {
         uint256 newValue
     ) external returns (bool) {
         assembly {
-            // load value stored at latestEmptySlot
             let slotLimit := sload(latestEmptySlot.slot)
             // if there's enough non-empty slots to overwrite
             if lt(numSlots, add(slotLimit, 1)) {
