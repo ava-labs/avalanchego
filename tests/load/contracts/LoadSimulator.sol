@@ -37,9 +37,10 @@ contract LoadSimulator {
         uint256 numSlots
     ) external returns (uint256 sum) {
         assembly {
+            let newOffset := add(offset, numSlots)
             for {
                 let i := offset
-            } lt(i, add(offset, numSlots)) {
+            } lt(i, newOffset) {
                 i := add(i, 1)
             } {
                 sum := add(sum, sload(i))
@@ -56,14 +57,15 @@ contract LoadSimulator {
     function write(uint256 numSlots, uint256 value) external returns (bool) {
         assembly {
             let offset := sload(latestEmptySlot.slot)
+            let newOffset := add(offset, numSlots)
             for {
                 let i := offset
-            } lt(i, add(offset, numSlots)) {
+            } lt(i, newOffset) {
                 i := add(i, 1)
             } {
                 sstore(i, value)
             }
-            sstore(latestEmptySlot.slot, add(offset, numSlots))
+            sstore(latestEmptySlot.slot, newOffset)
         }
         return true;
     }
