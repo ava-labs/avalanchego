@@ -250,10 +250,7 @@ type VM struct {
 	// Used to serve BLS signatures of warp messages over RPC
 	warpBackend warp.Backend
 
-	// Initialize only sets these if nil so they can be overridden in tests
-	ethTxGossipHandler p2p.Handler
-	ethTxPushGossiper  avalancheUtils.Atomic[*avalanchegossip.PushGossiper[*GossipEthTx]]
-	ethTxPullGossiper  avalanchegossip.Gossiper
+	ethTxPushGossiper avalancheUtils.Atomic[*avalanchegossip.PushGossiper[*GossipEthTx]]
 
 	chainAlias string
 	// RPC handlers (should be stopped before closing chaindb)
@@ -808,7 +805,7 @@ func (vm *VM) initBlockBuilding() error {
 	vm.builder.awaitSubmittedTxs()
 	vm.builderLock.Unlock()
 
-	vm.ethTxGossipHandler, err = gossip.NewTxGossipHandler[*GossipEthTx](
+	ethTxGossipHandler, err := gossip.NewTxGossipHandler[*GossipEthTx](
 		vm.ctx.Log,
 		ethTxGossipMarshaller,
 		ethTxPool,
@@ -824,7 +821,7 @@ func (vm *VM) initBlockBuilding() error {
 		return fmt.Errorf("failed to initialize eth tx gossip handler: %w", err)
 	}
 
-	if err := vm.Network.AddHandler(p2p.TxGossipHandlerID, vm.ethTxGossipHandler); err != nil {
+	if err := vm.Network.AddHandler(p2p.TxGossipHandlerID, ethTxGossipHandler); err != nil {
 		return fmt.Errorf("failed to add eth tx gossip handler: %w", err)
 	}
 
@@ -837,7 +834,7 @@ func (vm *VM) initBlockBuilding() error {
 		config.TxGossipPollSize,
 	)
 
-	vm.ethTxPullGossiper = avalanchegossip.ValidatorGossiper{
+	ethTxPullGossiperWhenValidator := avalanchegossip.ValidatorGossiper{
 		Gossiper:   ethTxPullGossiper,
 		NodeID:     vm.ctx.NodeID,
 		Validators: vm.P2PValidators(),
@@ -850,7 +847,7 @@ func (vm *VM) initBlockBuilding() error {
 	}()
 	vm.shutdownWg.Add(1)
 	go func() {
-		avalanchegossip.Every(ctx, vm.ctx.Log, vm.ethTxPullGossiper, vm.config.PullGossipFrequency.Duration)
+		avalanchegossip.Every(ctx, vm.ctx.Log, ethTxPullGossiperWhenValidator, vm.config.PullGossipFrequency.Duration)
 		vm.shutdownWg.Done()
 	}()
 

@@ -238,7 +238,6 @@ func TestEthTxPushGossipInbound(t *testing.T) {
 
 	sender := &enginetest.Sender{}
 	vm := newDefaultTestVM()
-	vm.ethTxPullGossiper = gossip.NoOpGossiper{}
 
 	pk, err := secp256k1.NewPrivateKey()
 	require.NoError(err)

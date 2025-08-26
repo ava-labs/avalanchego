@@ -211,7 +211,6 @@ func TestAtomicTxPushGossipOutbound(t *testing.T) {
 		SentAppGossip: make(chan []byte, 1),
 	}
 	vm := newAtomicTestVM()
-	vm.AtomicTxPullGossiper = gossip.NoOpGossiper{}
 
 	require.NoError(vm.Initialize(
 		ctx,
@@ -280,7 +279,6 @@ func TestAtomicTxPushGossipInbound(t *testing.T) {
 
 	sender := &enginetest.Sender{}
 	vm := newAtomicTestVM()
-	vm.AtomicTxPullGossiper = gossip.NoOpGossiper{}
 
 	require.NoError(vm.Initialize(
 		ctx,
