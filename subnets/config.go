@@ -13,7 +13,22 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
+var (
+	errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
+	errMissingConsensusParameters       = errors.New("consensus config must have either snowball or simplex parameters set")
+	errSimplexNotEnabled                = errors.New("simplex parameters must be enabled")
+	errTwoConfigs                       = errors.New("subnet config must have exactly one of snowball or simplex parameters set")
+)
+
+// Params for simplex Config
+type SimplexParameters struct {
+	Enabled bool `json:"enabled" yaml:"enabled"`
+}
+
+type ConsensusConfig struct {
+	SnowballParams *snowball.Parameters `json:"snowballParameters,omitempty" yaml:"snowballParameters,omitempty"`
+	SimplexParams  *SimplexParameters   `json:"simplexParameters,omitempty"  yaml:"simplexParameters,omitempty"`
+}
 
 type Config struct {
 	// ValidatorOnly indicates that this Subnet's Chains are available to only subnet validators.
@@ -23,8 +38,8 @@ type Config struct {
 	ValidatorOnly bool `json:"validatorOnly" yaml:"validatorOnly"`
 	// AllowedNodes is the set of node IDs that are explicitly allowed to connect to this Subnet when
 	// ValidatorOnly is enabled.
-	AllowedNodes        set.Set[ids.NodeID] `json:"allowedNodes"        yaml:"allowedNodes"`
-	ConsensusParameters snowball.Parameters `json:"consensusParameters" yaml:"consensusParameters"`
+	AllowedNodes    set.Set[ids.NodeID] `json:"allowedNodes"    yaml:"allowedNodes"`
+	ConsensusConfig ConsensusConfig     `json:"consensusConfig" yaml:"consensusConfig"`
 
 	// ProposerMinBlockDelay is the minimum delay this node will enforce when
 	// building a snowman++ block.
@@ -52,11 +67,28 @@ type Config struct {
 }
 
 func (c *Config) Valid() error {
-	if err := c.ConsensusParameters.Verify(); err != nil {
+	if err := c.ConsensusConfig.Verify(); err != nil {
 		return fmt.Errorf("consensus %w", err)
 	}
 	if !c.ValidatorOnly && c.AllowedNodes.Len() > 0 {
 		return errAllowedNodesWhenNotValidatorOnly
 	}
 	return nil
+}
+
+func (c *ConsensusConfig) Verify() error {
+	if c.SnowballParams != nil {
+		if c.SimplexParams != nil {
+			return errTwoConfigs
+		}
+		return c.SnowballParams.Verify()
+	} else if c.SimplexParams != nil {
+		// rudimentary check
+		if !c.SimplexParams.Enabled {
+			return errSimplexNotEnabled
+		}
+		return nil
+	}
+
+	return errMissingConsensusParameters
 }
