@@ -186,6 +186,7 @@ tasks:
     vars:
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
       SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR}}'
+      CONFIG: '{{.CONFIG | default ""}}'
       START_BLOCK: '{{.START_BLOCK}}'
       END_BLOCK: '{{.END_BLOCK}}'
       LABELS: '{{.LABELS | default ""}}'
@@ -194,6 +195,7 @@ tasks:
     cmd: |
       CURRENT_STATE_DIR={{.CURRENT_STATE_DIR}} \
       SOURCE_BLOCK_DIR={{.SOURCE_BLOCK_DIR}} \
+      CONFIG={{.CONFIG}} \
       START_BLOCK={{.START_BLOCK}} \
       END_BLOCK={{.END_BLOCK}} \
       LABELS={{.LABELS}} \
@@ -222,6 +224,7 @@ tasks:
         vars:
           SOURCE_BLOCK_DIR: '{{.EXECUTION_DATA_DIR}}/blocks'
           CURRENT_STATE_DIR: '{{.EXECUTION_DATA_DIR}}/current-state'
+          CONFIG: '{{.CONFIG}}'
           START_BLOCK: '{{.START_BLOCK}}'
           END_BLOCK: '{{.END_BLOCK}}'
           LABELS: '{{.LABELS}}'

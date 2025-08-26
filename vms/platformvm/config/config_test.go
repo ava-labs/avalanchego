@@ -74,7 +74,7 @@ func TestConfigUnmarshal(t *testing.T) {
 				PullGossipPollSize:                          11,
 				PullGossipFrequency:                         12,
 				PullGossipThrottlingPeriod:                  13,
-				PullGossipThrottlingLimit:                   14,
+				PullGossipRequestsPerValidator:              14,
 				ExpectedBloomFilterElements:                 15,
 				ExpectedBloomFilterFalsePositiveProbability: 16,
 				MaxBloomFilterFalsePositiveProbability:      17,
