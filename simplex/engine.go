@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/simplex"
 	"github.com/ava-labs/simplex/wal"
 
-	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -31,7 +30,6 @@ var (
 
 type Engine struct {
 	common.Handler
-	health.Checker
 
 	epoch              *simplex.Epoch
 	blockDeserializer  *blockDeserializer
@@ -151,6 +149,10 @@ func (e *Engine) p2pToSimplexMessage(msg *p2p.Simplex) (*simplex.Message, error)
 	default:
 		return nil, errUnknownMessageType
 	}
+}
+
+func (*Engine) HealthCheck(_ context.Context) (interface{}, error) {
+	return nil, nil
 }
 
 var _ common.BootstrapableEngine = (*TODOBootstrapper)(nil)
