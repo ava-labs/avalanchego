@@ -5,6 +5,7 @@ package gossip
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -12,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var _ p2p.Handler = (*txGossipHandler)(nil)
@@ -23,9 +25,11 @@ func NewTxGossipHandler[T gossip.Gossipable](
 	metrics gossip.Metrics,
 	maxMessageSize int,
 	throttlingPeriod time.Duration,
-	throttlingLimit int,
+	requestsPerPeer float64,
 	validators p2p.ValidatorSet,
-) *txGossipHandler {
+	registerer prometheus.Registerer,
+	namespace string,
+) (*txGossipHandler, error) {
 	// push gossip messages can be handled from any peer
 	handler := gossip.NewHandler(
 		log,
@@ -35,14 +39,23 @@ func NewTxGossipHandler[T gossip.Gossipable](
 		maxMessageSize,
 	)
 
+	throttledHandler, err := p2p.NewDynamicThrottlerHandler(
+		log,
+		handler,
+		validators,
+		throttlingPeriod,
+		requestsPerPeer,
+		registerer,
+		namespace,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize throttler handler: %w", err)
+	}
+
 	// pull gossip requests are filtered by validators and are throttled
 	// to prevent spamming
 	validatorHandler := p2p.NewValidatorHandler(
-		p2p.NewThrottlerHandler(
-			handler,
-			p2p.NewSlidingWindowThrottler(throttlingPeriod, throttlingLimit),
-			log,
-		),
+		throttledHandler,
 		validators,
 		log,
 	)
@@ -50,7 +63,7 @@ func NewTxGossipHandler[T gossip.Gossipable](
 	return &txGossipHandler{
 		appGossipHandler:  handler,
 		appRequestHandler: validatorHandler,
-	}
+	}, nil
 }
 
 type txGossipHandler struct {
