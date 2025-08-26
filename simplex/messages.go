@@ -162,9 +162,13 @@ func newReplicationResponse(
 		qrs = append(qrs, p2pQR)
 	}
 
-	latestQR, err := quorumRoundToP2P(latestRound)
-	if err != nil {
-		return nil, err
+	var latestQR *p2p.QuorumRound
+	if latestRound != nil {
+		qr, err := quorumRoundToP2P(latestRound)
+		if err != nil {
+			return nil, err
+		}
+		latestQR = qr
 	}
 
 	return &p2p.Simplex{
