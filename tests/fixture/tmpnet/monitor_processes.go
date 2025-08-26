@@ -26,20 +26,18 @@ import (
 )
 
 const (
-	collectorTickerInterval = 100 * time.Millisecond
+	collectorTickerInterval = 1 * time.Second
 
 	// TODO(marun) Maybe use dynamic HTTP ports to avoid the possibility of them being already bound?
 
 	// Prometheus configuration
 	prometheusCmd            = "prometheus"
-	defaultPrometheusURL     = "https://prometheus-poc.avax-dev.network"
 	prometheusScrapeInterval = 10 * time.Second
 	prometheusListenAddress  = "127.0.0.1:9090"
 	prometheusReadinessURL   = "http://" + prometheusListenAddress + "/-/ready"
 
 	// Promtail configuration
 	promtailCmd          = "promtail"
-	defaultLokiURL       = "https://loki-poc.avax-dev.network"
 	promtailHTTPPort     = "3101"
 	promtailReadinessURL = "http://127.0.0.1:" + promtailHTTPPort + "/ready"
 
@@ -168,7 +166,7 @@ func startPrometheus(ctx context.Context, log logging.Logger) error {
 		prometheusListenAddress,
 	)
 
-	username, password, err := getCollectorCredentials(cmdName)
+	collectorConfig, err := getCollectorConfig(cmdName)
 	if err != nil {
 		return err
 	}
@@ -195,11 +193,11 @@ scrape_configs:
           - '%s/*.json'
 
 remote_write:
-  - url: "%s/api/v1/write"
+  - url: "%s"
     basic_auth:
       username: "%s"
       password: "%s"
-`, prometheusScrapeInterval, serviceDiscoveryDir, getPrometheusURL(), username, password)
+`, prometheusScrapeInterval, serviceDiscoveryDir, collectorConfig.pushURL, collectorConfig.username, collectorConfig.password)
 
 	return startCollector(ctx, log, cmdName, args, config)
 }
@@ -210,7 +208,7 @@ func startPromtail(ctx context.Context, log logging.Logger) error {
 
 	args := fmt.Sprintf("-config.file=%s.yaml", cmdName)
 
-	username, password, err := getCollectorCredentials(cmdName)
+	collectorConfig, err := getCollectorConfig(cmdName)
 	if err != nil {
 		return err
 	}
@@ -237,7 +235,7 @@ positions:
   filename: %s/positions.yaml
 
 client:
-  url: "%s/api/prom/push"
+  url: "%s"
   basic_auth:
     username: "%s"
     password: "%s"
@@ -247,7 +245,7 @@ scrape_configs:
     file_sd_configs:
       - files:
           - '%s/*.json'
-`, promtailHTTPPort, workingDir, getLokiURL(), username, password, serviceDiscoveryDir)
+`, promtailHTTPPort, workingDir, collectorConfig.pushURL, collectorConfig.username, collectorConfig.password, serviceDiscoveryDir)
 
 	return startCollector(ctx, log, cmdName, args, config)
 }
@@ -438,16 +436,19 @@ func clearStalePIDFile(log logging.Logger, cmdName string, pidPath string) error
 	return nil
 }
 
-func getPrometheusURL() string {
-	return GetEnvWithDefault("PROMETHEUS_URL", defaultPrometheusURL)
+// collectorConfig represents the configuration for a collector of metrics or logs
+type collectorConfig struct {
+	// Credentials for basic auth
+	username string
+	password string
+	// URL to use to check collection
+	url string
+	// URL the collector will push to
+	pushURL string
 }
 
-func getLokiURL() string {
-	return GetEnvWithDefault("LOKI_URL", defaultLokiURL)
-}
-
-// getCollectorCredentials retrieves the username and password for the command.
-func getCollectorCredentials(cmdName string) (string, string, error) {
+// getCollectorConfig retrieves the url, username and password for the command.
+func getCollectorConfig(cmdName string) (collectorConfig, error) {
 	var baseEnvName string
 	switch cmdName {
 	case prometheusCmd:
@@ -455,20 +456,35 @@ func getCollectorCredentials(cmdName string) (string, string, error) {
 	case promtailCmd:
 		baseEnvName = "LOKI"
 	default:
-		return "", "", fmt.Errorf("unsupported cmd: %s", cmdName)
+		return collectorConfig{}, fmt.Errorf("unsupported cmd: %s", cmdName)
 	}
 
+	urlEnvVar := baseEnvName + "_URL"
+	url := GetEnvWithDefault(urlEnvVar, "")
+	if len(url) == 0 {
+		return collectorConfig{}, fmt.Errorf("%s env var not set", urlEnvVar)
+	}
+	pushURLEnvVar := baseEnvName + "_PUSH_URL"
+	pushURL := GetEnvWithDefault(pushURLEnvVar, "")
+	if len(pushURL) == 0 {
+		return collectorConfig{}, fmt.Errorf("%s env var not set", pushURLEnvVar)
+	}
 	usernameEnvVar := baseEnvName + "_USERNAME"
 	username := GetEnvWithDefault(usernameEnvVar, "")
 	if len(username) == 0 {
-		return "", "", fmt.Errorf("%s env var not set", usernameEnvVar)
+		return collectorConfig{}, fmt.Errorf("%s env var not set", usernameEnvVar)
 	}
 	passwordEnvVar := baseEnvName + "_PASSWORD"
 	password := GetEnvWithDefault(passwordEnvVar, "")
 	if len(password) == 0 {
-		return "", "", fmt.Errorf("%s var not set", passwordEnvVar)
+		return collectorConfig{}, fmt.Errorf("%s env var not set", passwordEnvVar)
 	}
-	return username, password, nil
+	return collectorConfig{
+		url:      url,
+		pushURL:  pushURL,
+		username: username,
+		password: password,
+	}, nil
 }
 
 // Start a collector process. Use bash to execute the command in the background and enable
