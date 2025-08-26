@@ -19,6 +19,7 @@ set -euo pipefail
 cmd="go test -timeout=0 -v -benchtime=1x -bench=BenchmarkReexecuteRange -run=^$ github.com/ava-labs/avalanchego/tests/reexecute/c \
   --source-block-dir=\"${SOURCE_BLOCK_DIR}\" \
   --target-dir=\"${CURRENT_STATE_DIR}\" \
+  ${CONFIG:+--config=\"${CONFIG}\"} \
   --start-block=\"${START_BLOCK}\" \
   --end-block=\"${END_BLOCK}\" \
   ${LABELS:+--labels=\"${LABELS}\"} \
