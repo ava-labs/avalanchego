@@ -69,8 +69,11 @@ func NewRandomTest(
 		// value specifies the amount to send in a transfer test
 		value = big.NewInt(1)
 
-		// random values are written to slots to ensure that the same value isn't
-		// being written to a slot, which could reduce the expected gas used of a tx
+		// Random values are written to slots to ensure that the same value isn't
+		// being written to a slot, as the odds of a pRNG choosing the same value
+		// twice is practically zero. Using random values simplifies gas calculations
+		// as it removes the need to use an SLOAD operation to verify a different
+		// value is being written.
 		writeRand  = rand.New(rand.NewSource(0)) //#nosec G404
 		modifyRand = rand.New(rand.NewSource(1)) //#nosec G404
 	)
