@@ -15,7 +15,7 @@ require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/StephenButtolph/canoto v0.17.1
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.15.4-0.20250822180419-87fa386ffea9
+	github.com/ava-labs/coreth v0.15.4-rc.1.0.20250827164817-c512d57d5250
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60
 	github.com/ava-labs/libevm v1.13.14-0.3.0.rc.6
 	github.com/btcsuite/btcd/btcutil v1.1.3
@@ -87,7 +87,7 @@ require (
 	github.com/FactomProject/btcutilecc v0.0.0-20130527213604-d3a63a5752ec // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
-	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.9 // indirect
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.10 // indirect
 	github.com/ava-labs/simplex v0.0.0-20250819180907-c9b5ae6aad19
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.10.0 // indirect
