@@ -31,6 +31,10 @@ on:
       push-post-state:
         description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
         default: ''
+      timeout-minutes:
+        description: 'Timeout in minutes for the job.'
+        required: false
+        default: 30
 
   schedule:
     - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
@@ -49,13 +53,14 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             {
               echo "matrix<<EOF"
-              printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "source-block-dir": "%s", "current-state-dir": "%s", "config": "%s", "runner": "%s" }] }\n' \
+              printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "source-block-dir": "%s", "current-state-dir": "%s", "config": "%s", "runner": "%s", "timeout-minutes": "%s" }] }\n' \
                 "${{ github.event.inputs.start-block }}" \
                 "${{ github.event.inputs.end-block }}" \
                 "${{ github.event.inputs.source-block-dir }}" \
                 "${{ github.event.inputs.current-state-dir }}" \
                 "${{ github.event.inputs.config }}" \
-                "${{ github.event.inputs.runner }}"
+                "${{ github.event.inputs.runner }}" \
+                "${{ github.event.inputs.timeout-minutes }}"
               echo EOF
             } >> "$GITHUB_OUTPUT"
           else
@@ -72,7 +77,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
-    timeout-minutes: 1440
+    timeout-minutes: ${{ matrix.timeout-minutes }}
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego' }}
     permissions:
       id-token: write
