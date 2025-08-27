@@ -4,7 +4,7 @@ set -euo pipefail
 
 # This script runs the C-Chain re-execution benchmark with a single iteration.
 # It expects the following environment variables to be set:
-#   BLOCK_DIR: Path or S3 URL to the source block directory or zip.
+#   BLOCK_DIR: Path or S3 URL to the block directory or zip.
 #   CURRENT_STATE_DIR: Path or S3 URL to the current state directory or zip.
 #   START_BLOCK: The starting block height (exclusive).
 #   END_BLOCK: The ending block height (inclusive).

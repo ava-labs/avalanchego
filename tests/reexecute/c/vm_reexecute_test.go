@@ -52,6 +52,7 @@ var (
 
 var (
 	blockDirArg        string
+	blockDirSrcArg     string
 	blockDirDstArg     string
 	currentStateDirArg string
 	startBlockArg      uint64
@@ -87,16 +88,8 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	// Source directory must be a leveldb dir with the required blocks accessible via rawdb.ReadBlock.
-	flag.StringVar(&blockDirArg, "block-dir", blockDirArg, "DB directory storing executable block range.")
-	// Destination block directory to write blocks into when executing TestExportBlockRange.
-	flag.StringVar(&blockDirDstArg, "block-dir-dst", blockDirDstArg, "DB directory to write blocks into when executing TestExportBlockRange.")
-
-	// Current state directory is expected to contain the DB passed into the VM and a chain-data-dir directory passed
-	// to the VM via *snow.Context.ChainDataDir.
-	// - db/
-	// - chain-data-dir/
-	flag.StringVar(&currentStateDirArg, "current-state-dir", currentStateDirArg, "Target directory for the current state including VM DB and Chain Data Directory.")
+	flag.StringVar(&blockDirArg, "block-dir", blockDirArg, "Block DB directory to read from during re-execution.")
+	flag.StringVar(&currentStateDirArg, "current-state-dir", currentStateDirArg, "Current state directory including VM DB and Chain Data Directory for re-execution.")
 	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (exclusive).")
 	flag.Uint64Var(&endBlockArg, "end-block", 200, "End block to end execution (inclusive).")
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
@@ -108,6 +101,10 @@ func TestMain(m *testing.M) {
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
 	predefinedConfigOptionsStr := fmt.Sprintf("[%s]", strings.Join(predefinedConfigKeys, ", "))
 	flag.StringVar(&configNameArg, configKey, defaultConfigKey, fmt.Sprintf("Specifies the predefined config to use for the VM. Options include %s.", predefinedConfigOptionsStr))
+
+	// Flags specific to TestExportBlockRange.
+	flag.StringVar(&blockDirSrcArg, "block-dir-src", blockDirSrcArg, "Source block directory to copy from when running TestExportBlockRange.")
+	flag.StringVar(&blockDirDstArg, "block-dir-dst", blockDirDstArg, "Destination blockdirectory to write blocks into when executing TestExportBlockRange.")
 
 	flag.Parse()
 
@@ -137,7 +134,7 @@ func BenchmarkReexecuteRange(b *testing.B) {
 	})
 }
 
-func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir string, configBytes []byte, startBlock uint64, endBlock uint64, chanSize int, metricsEnabled bool) {
+func benchmarkReexecuteRange(b *testing.B, blockDir string, currentStateDir string, configBytes []byte, startBlock uint64, endBlock uint64, chanSize int, metricsEnabled bool) {
 	r := require.New(b)
 	ctx := context.Background()
 
@@ -160,25 +157,25 @@ func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir stri
 	log := tests.NewDefaultLogger("c-chain-reexecution")
 
 	var (
-		targetDBDir  = filepath.Join(targetDir, "db")
-		chainDataDir = filepath.Join(targetDir, "chain-data-dir")
+		vmDBDir      = filepath.Join(currentStateDir, "db")
+		chainDataDir = filepath.Join(currentStateDir, "chain-data-dir")
 	)
 
 	log.Info("re-executing block range with params",
-		zap.String("block-dir", sourceBlockDir),
-		zap.String("target-db-dir", targetDBDir),
+		zap.String("block-dir", blockDir),
+		zap.String("vm-db-dir", vmDBDir),
 		zap.String("chain-data-dir", chainDataDir),
 		zap.Uint64("start-block", startBlock),
 		zap.Uint64("end-block", endBlock),
 		zap.Int("chan-size", chanSize),
 	)
 
-	blockChan, err := createBlockChanFromLevelDB(b, sourceBlockDir, startBlock, endBlock, chanSize)
+	blockChan, err := createBlockChanFromLevelDB(b, blockDir, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
 	dbLogger := tests.NewDefaultLogger("db")
 
-	db, err := leveldb.New(targetDBDir, nil, dbLogger, prometheus.NewRegistry())
+	db, err := leveldb.New(vmDBDir, nil, dbLogger, prometheus.NewRegistry())
 	r.NoError(err)
 	defer func() {
 		log.Info("shutting down DB")
@@ -469,7 +466,7 @@ func blockKey(height uint64) []byte {
 }
 
 func TestExportBlockRange(t *testing.T) {
-	exportBlockRange(t, blockDirArg, blockDirDstArg, startBlockArg, endBlockArg, chanSizeArg)
+	exportBlockRange(t, blockDirSrcArg, blockDirDstArg, startBlockArg, endBlockArg, chanSizeArg)
 }
 
 func exportBlockRange(tb testing.TB, blockDirSrc string, blockDirDst string, startBlock, endBlock uint64, chanSize int) {

@@ -93,7 +93,7 @@ tasks:
       START_BLOCK: '{{.START_BLOCK}}'
       END_BLOCK: '{{.END_BLOCK}}'
     cmds:
-      - cmd: go test -timeout=0 -run=TestExportBlockRange github.com/ava-labs/avalanchego/tests/reexecute/c --block-dir={{.BLOCK_DIR_SRC}} --block-dir-dst={{.BLOCK_DIR_DST}} --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
+      - cmd: go test -timeout=0 -run=TestExportBlockRange github.com/ava-labs/avalanchego/tests/reexecute/c --block-dir-src={{.BLOCK_DIR_SRC}} --block-dir-dst={{.BLOCK_DIR_DST}} --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
 
   export-dir-to-s3:
     desc: Copies a directory to s3
