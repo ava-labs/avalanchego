@@ -250,6 +250,9 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 }
 
 func (vm *VM) GetLastAcceptedHeight() uint64 {
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
 	return vm.lastAcceptedHeight
 }
 

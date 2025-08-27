@@ -72,7 +72,7 @@ func TestGetProposedHeight(t *testing.T) {
 			require := require.New(t)
 
 			mc := NewMockClient(test.mockResponse, test.mockError)
-			c := &client{requester: mc}
+			c := &Client{Requester: mc}
 
 			height, err := c.GetProposedHeight(context.Background(), nil)
 			if test.mockError != nil {

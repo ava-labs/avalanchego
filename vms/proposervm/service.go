@@ -22,9 +22,7 @@ func (p *ProposerAPI) GetProposedHeight(_ *http.Request, _ *struct{}, reply *api
 		zap.String("service", "proposervm"),
 		zap.String("method", "getProposedHeight"),
 	)
-	p.vm.ctx.Lock.Lock()
-	defer p.vm.ctx.Lock.Unlock()
 
-	reply.Height = avajson.Uint64(p.vm.lastAcceptedHeight)
+	reply.Height = avajson.Uint64(p.vm.GetLastAcceptedHeight())
 	return nil
 }
