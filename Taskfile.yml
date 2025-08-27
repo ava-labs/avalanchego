@@ -144,7 +144,7 @@ tasks:
           DST: '{{.EXECUTION_DATA_DIR}}/current-state'
 
   import-s3-to-dir:
-    desc: Imports an S3 path to a local directory. Unzipping if needed.
+    desc: Imports an S3 path to a local directory.
     vars:
       SRC: '{{.SRC}}'
       DST: '{{.DST}}'
