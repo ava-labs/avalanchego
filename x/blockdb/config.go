@@ -101,8 +101,8 @@ func (c DatabaseConfig) WithCheckpointInterval(interval uint64) DatabaseConfig {
 	return c
 }
 
-// WithCompressBlocks returns a copy of the config with CompressBlocks set to the given value.
-func (c DatabaseConfig) WithCompressBlocks(compress bool) DatabaseConfig {
+// WithCompression returns a copy of the config with CompressBlocks set to the given value.
+func (c DatabaseConfig) WithCompression(compress bool) DatabaseConfig {
 	c.CompressBlocks = compress
 	return c
 }

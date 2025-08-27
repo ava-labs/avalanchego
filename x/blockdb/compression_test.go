@@ -29,9 +29,9 @@ func checkBlockCompression(t *testing.T, db *Database, height uint64) bool {
 }
 
 func TestCompression_Enabled(t *testing.T) {
-	config := DefaultConfig().WithCompressBlocks(true)
-	db, cleanup := newTestDatabase(t, config)
-	defer cleanup()
+	config := DefaultConfig().WithCompression(true)
+	db, closeDB := newTestDatabase(t, config)
+	defer closeDB()
 
 	// Write a block with repetitive content that should compress well
 	blockData := []byte("test block data with some repetitive content that should compress well " +
@@ -82,8 +82,8 @@ func TestCompression_Recovery(t *testing.T) {
 	}
 
 	// Step 1: Open database with compression enabled
-	config := DefaultConfig().WithDir(dir).WithCompressBlocks(true)
-	db, cleanup := newTestDatabase(t, config)
+	config := DefaultConfig().WithDir(dir).WithCompression(true)
+	db, closeDB := newTestDatabase(t, config)
 
 	// Step 2: Write first 5 blocks with compression enabled
 	for i := range 5 {
@@ -94,11 +94,11 @@ func TestCompression_Recovery(t *testing.T) {
 		// Verify compression was used
 		require.True(t, checkBlockCompression(t, db, height), "Block %d should be compressed", height)
 	}
-	cleanup()
+	closeDB()
 
 	// Step 3: Open database with compression disabled
-	config = config.WithCompressBlocks(false)
-	db, cleanup = newTestDatabase(t, config)
+	config = config.WithCompression(false)
+	db, closeDB = newTestDatabase(t, config)
 
 	// Step 4: Write next 5 blocks with compression disabled
 	for i := range 5 {
@@ -117,15 +117,15 @@ func TestCompression_Recovery(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, allBlocks[i], readBlock, "Block %d should be readable", height)
 	}
-	cleanup()
+	closeDB()
 
 	// Step 5: Delete index file
 	indexPath := filepath.Join(dir, indexFileName)
 	require.NoError(t, os.Remove(indexPath), "Failed to delete index file")
 
 	// Step 6: Open database (this should trigger recovery)
-	db, cleanup = newTestDatabase(t, config)
-	defer cleanup()
+	db, closeDB = newTestDatabase(t, config)
+	defer closeDB()
 
 	// Step 7: Verify all blocks are readable after recovery
 	for i := range 10 {
