@@ -104,7 +104,7 @@ func TestMain(m *testing.M) {
 
 	// Flags specific to TestExportBlockRange.
 	flag.StringVar(&blockDirSrcArg, "block-dir-src", blockDirSrcArg, "Source block directory to copy from when running TestExportBlockRange.")
-	flag.StringVar(&blockDirDstArg, "block-dir-dst", blockDirDstArg, "Destination blockdirectory to write blocks into when executing TestExportBlockRange.")
+	flag.StringVar(&blockDirDstArg, "block-dir-dst", blockDirDstArg, "Destination block directory to write blocks into when executing TestExportBlockRange.")
 
 	flag.Parse()
 
