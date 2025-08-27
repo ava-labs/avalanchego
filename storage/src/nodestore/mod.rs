@@ -277,6 +277,7 @@ impl<S: WritableStorage> NodeStore<MutableProposal, S> {
     /// # Panics
     ///
     /// Panics if the header cannot be written.
+    #[cfg(any(test, feature = "test_utils"))]
     pub fn new_empty_proposal(storage: Arc<S>) -> Self {
         let header = NodeStoreHeader::new();
         let header_bytes = bytemuck::bytes_of(&header);
