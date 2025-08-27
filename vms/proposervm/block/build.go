@@ -94,12 +94,6 @@ func Build(
 		}
 	}
 
-	return initializeAndSignBlock(block, chainID, parentID, key)
-}
-
-// initializeAndSignBlock handles the common initialization and signing logic
-// for both statelessBlock and statelessGraniteBlock types
-func initializeAndSignBlock(block SignedBlock, chainID, parentID ids.ID, key crypto.Signer) (SignedBlock, error) {
 	unsignedBytesWithEmptySignature, err := Codec.Marshal(CodecVersion, &block)
 	if err != nil {
 		return nil, err
@@ -113,12 +107,7 @@ func initializeAndSignBlock(block SignedBlock, chainID, parentID ids.ID, key cry
 	unsignedBytes := unsignedBytesWithEmptySignature[:lenUnsignedBytes]
 
 	// Set the block ID
-	switch b := block.(type) {
-	case *statelessBlock:
-		b.id = hashing.ComputeHash256Array(unsignedBytes)
-	case *statelessGraniteBlock:
-		b.id = hashing.ComputeHash256Array(unsignedBytes)
-	}
+	block.setID(hashing.ComputeHash256Array(unsignedBytes))
 
 	header, err := BuildHeader(chainID, parentID, block.ID())
 	if err != nil {
@@ -132,12 +121,7 @@ func initializeAndSignBlock(block SignedBlock, chainID, parentID ids.ID, key cry
 	}
 
 	// Set the signature
-	switch b := block.(type) {
-	case *statelessBlock:
-		b.Signature = signature
-	case *statelessGraniteBlock:
-		b.Signature = signature
-	}
+	block.setSignature(signature)
 
 	// Marshal the final block with signature
 	finalBytes, err := Codec.Marshal(CodecVersion, &block)
@@ -146,12 +130,7 @@ func initializeAndSignBlock(block SignedBlock, chainID, parentID ids.ID, key cry
 	}
 
 	// Set the final bytes
-	switch b := block.(type) {
-	case *statelessBlock:
-		b.bytes = finalBytes
-	case *statelessGraniteBlock:
-		b.bytes = finalBytes
-	}
+	block.setBytes(finalBytes)
 
 	return block, nil
 }
