@@ -39,6 +39,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
@@ -51,12 +52,10 @@ import (
 	"github.com/ava-labs/subnet-evm/consensus/misc/eip4844"
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/extstate"
-
 	"github.com/ava-labs/subnet-evm/core/txpool"
 	"github.com/ava-labs/subnet-evm/params"
 	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
-	"github.com/ava-labs/subnet-evm/predicate"
 	"github.com/holiman/uint256"
 )
 
@@ -85,7 +84,7 @@ type environment struct {
 	// The results are accumulated as transactions are executed by the miner and set on the BlockContext.
 	// If a transaction is dropped, its results must explicitly be removed from predicateResults in the same
 	// way that the gas pool and state is reset.
-	predicateResults *predicate.Results
+	predicateResults predicate.BlockResults
 
 	start time.Time // Time that block building began
 }
@@ -300,7 +299,7 @@ func (w *worker) createCurrentEnvironment(predicateContext *precompileconfig.Pre
 		gasPool:          new(core.GasPool).AddGas(capacity),
 		rules:            w.chainConfig.Rules(header.Number, params.IsMergeTODO, header.Time),
 		predicateContext: predicateContext,
-		predicateResults: predicate.NewResults(),
+		predicateResults: predicate.BlockResults{},
 		start:            tstart,
 	}, nil
 }
@@ -357,7 +356,7 @@ func (w *worker) applyTransaction(env *environment, tx *types.Transaction, coinb
 			log.Debug("Transaction predicate failed verification in miner", "tx", tx.Hash(), "err", err)
 			return nil, err
 		}
-		env.predicateResults.SetTxResults(tx.Hash(), results)
+		env.predicateResults.Set(tx.Hash(), results)
 
 		predicateResultsBytes, err := env.predicateResults.Bytes()
 		if err != nil {
@@ -372,7 +371,7 @@ func (w *worker) applyTransaction(env *environment, tx *types.Transaction, coinb
 	if err != nil {
 		env.state.RevertToSnapshot(snap)
 		env.gasPool.SetGas(gp)
-		env.predicateResults.DeleteTxResults(tx.Hash())
+		env.predicateResults.Set(tx.Hash(), nil) // Delete results by setting to nil
 	}
 	return receipt, err
 }

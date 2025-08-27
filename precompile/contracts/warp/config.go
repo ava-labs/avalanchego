@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/libevm/common"
@@ -15,7 +16,6 @@ import (
 	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
-	"github.com/ava-labs/subnet-evm/predicate"
 
 	warpValidators "github.com/ava-labs/subnet-evm/warp/validators"
 )
@@ -144,18 +144,18 @@ func (c *Config) Accept(acceptCtx *precompileconfig.AcceptContext, blockHash com
 // 4. TODO: Lookup of the validator set
 //
 // If the payload of the warp message fails parsing, return a non-nil error invalidating the transaction.
-func (c *Config) PredicateGas(predicateBytes []byte) (uint64, error) {
+func (c *Config) PredicateGas(pred predicate.Predicate) (uint64, error) {
 	totalGas := GasCostPerSignatureVerification
-	bytesGasCost, overflow := math.SafeMul(GasCostPerWarpMessageBytes, uint64(len(predicateBytes)))
+	bytesGasCost, overflow := math.SafeMul(GasCostPerWarpMessageChunk, uint64(len(pred)))
 	if overflow {
-		return 0, fmt.Errorf("overflow calculating gas cost for warp message bytes of size %d", len(predicateBytes))
+		return 0, fmt.Errorf("overflow calculating gas cost for %d warp message chunks", len(pred))
 	}
 	totalGas, overflow = math.SafeAdd(totalGas, bytesGasCost)
 	if overflow {
-		return 0, fmt.Errorf("overflow adding bytes gas cost of size %d", len(predicateBytes))
+		return 0, fmt.Errorf("overflow adding gas cost for %d warp message chunks", len(pred))
 	}
 
-	unpackedPredicateBytes, err := predicate.UnpackPredicate(predicateBytes)
+	unpackedPredicateBytes, err := pred.Bytes()
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errInvalidPredicateBytes, err)
 	}
@@ -185,8 +185,8 @@ func (c *Config) PredicateGas(predicateBytes []byte) (uint64, error) {
 }
 
 // VerifyPredicate returns whether the predicate described by [predicateBytes] passes verification.
-func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateContext, predicateBytes []byte) error {
-	unpackedPredicateBytes, err := predicate.UnpackPredicate(predicateBytes)
+func (c *Config) VerifyPredicate(predicateContext *precompileconfig.PredicateContext, pred predicate.Predicate) error {
+	unpackedPredicateBytes, err := pred.Bytes()
 	if err != nil {
 		return fmt.Errorf("%w: %w", errInvalidPredicateBytes, err)
 	}

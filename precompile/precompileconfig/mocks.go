@@ -12,6 +12,7 @@ package precompileconfig
 import (
 	reflect "reflect"
 
+	predicate "github.com/ava-labs/avalanchego/vms/evm/predicate"
 	common "github.com/ava-labs/libevm/common"
 	commontype "github.com/ava-labs/subnet-evm/commontype"
 	gomock "go.uber.org/mock/gomock"
@@ -42,32 +43,32 @@ func (m *MockPredicater) EXPECT() *MockPredicaterMockRecorder {
 }
 
 // PredicateGas mocks base method.
-func (m *MockPredicater) PredicateGas(predicateBytes []byte) (uint64, error) {
+func (m *MockPredicater) PredicateGas(pred predicate.Predicate) (uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PredicateGas", predicateBytes)
+	ret := m.ctrl.Call(m, "PredicateGas", pred)
 	ret0, _ := ret[0].(uint64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // PredicateGas indicates an expected call of PredicateGas.
-func (mr *MockPredicaterMockRecorder) PredicateGas(predicateBytes any) *gomock.Call {
+func (mr *MockPredicaterMockRecorder) PredicateGas(pred any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PredicateGas", reflect.TypeOf((*MockPredicater)(nil).PredicateGas), predicateBytes)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PredicateGas", reflect.TypeOf((*MockPredicater)(nil).PredicateGas), pred)
 }
 
 // VerifyPredicate mocks base method.
-func (m *MockPredicater) VerifyPredicate(predicateContext *PredicateContext, predicateBytes []byte) error {
+func (m *MockPredicater) VerifyPredicate(predicateContext *PredicateContext, pred predicate.Predicate) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "VerifyPredicate", predicateContext, predicateBytes)
+	ret := m.ctrl.Call(m, "VerifyPredicate", predicateContext, pred)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // VerifyPredicate indicates an expected call of VerifyPredicate.
-func (mr *MockPredicaterMockRecorder) VerifyPredicate(predicateContext, predicateBytes any) *gomock.Call {
+func (mr *MockPredicaterMockRecorder) VerifyPredicate(predicateContext, pred any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyPredicate", reflect.TypeOf((*MockPredicater)(nil).VerifyPredicate), predicateContext, predicateBytes)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "VerifyPredicate", reflect.TypeOf((*MockPredicater)(nil).VerifyPredicate), predicateContext, pred)
 }
 
 // MockConfig is a mock of Config interface.

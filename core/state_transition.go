@@ -32,6 +32,7 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/libevm/common"
 	cmath "github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/types"
@@ -42,7 +43,6 @@ import (
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
-	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/holiman/uint256"
 )
 
@@ -164,7 +164,7 @@ func accessListGas(rules params.Rules, accessList types.AccessList) (uint64, err
 			}
 			gas = totalGas
 		} else {
-			predicateGas, err := predicaterContract.PredicateGas(utils.HashSliceToBytes(accessTuple.StorageKeys))
+			predicateGas, err := predicaterContract.PredicateGas(predicate.Predicate(accessTuple.StorageKeys))
 			if err != nil {
 				return 0, err
 			}
