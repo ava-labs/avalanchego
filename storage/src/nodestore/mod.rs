@@ -265,7 +265,7 @@ impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
     }
 
     /// Returns the root of this proposal.
-    pub const fn mut_root(&mut self) -> &mut Option<Node> {
+    pub const fn root_mut(&mut self) -> &mut Option<Node> {
         &mut self.kind.root
     }
 }
@@ -924,7 +924,7 @@ mod tests {
             value: huge_value.into_boxed_slice(),
         });
 
-        node_store.mut_root().replace(giant_leaf);
+        node_store.root_mut().replace(giant_leaf);
 
         let immutable = NodeStore::<Arc<ImmutableProposal>, _>::try_from(node_store).unwrap();
         println!("{immutable:?}"); // should not be reached, but need to consume immutable to avoid optimization removal

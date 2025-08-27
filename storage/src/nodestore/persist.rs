@@ -532,7 +532,7 @@ mod tests {
     fn create_test_store_with_root(root: Node) -> NodeStore<MutableProposal, MemStore> {
         let mem_store = MemStore::new(vec![]).into();
         let mut store = NodeStore::new_empty_proposal(mem_store);
-        store.mut_root().replace(root);
+        store.root_mut().replace(root);
         store
     }
 
@@ -734,7 +734,7 @@ mod tests {
             vec![(1, leaf1.clone()), (2, leaf2.clone())],
         );
 
-        mutable_store.mut_root().replace(branch.clone());
+        mutable_store.root_mut().replace(branch.clone());
 
         // Convert to immutable proposal
         let immutable_store: NodeStore<Arc<ImmutableProposal>, _> =
