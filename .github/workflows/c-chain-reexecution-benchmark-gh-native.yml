@@ -72,6 +72,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
+    timeout-minutes: 1440
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego' }}
     permissions:
       id-token: write
