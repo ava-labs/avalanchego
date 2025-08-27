@@ -59,7 +59,10 @@ runs:
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
       shell: bash
-      run: $GITHUB_ACTION_PATH/notify-metrics-availability.sh | tee -a "$GITHUB_STEP_SUMMARY"
+      run: |
+        metrics_url=$($GITHUB_ACTION_PATH/output-metrics-url.sh)
+        echo "Grafana: ${metrics_url}"
+        echo "🔗 [View Grafana Dashboard](${metrics_url})" >> "$GITHUB_STEP_SUMMARY"
       env:
         GRAFANA_URL: https://grafana-poc.avax-dev.network/d/${{ inputs.grafana_dashboard_id }}?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
