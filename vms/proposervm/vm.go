@@ -76,7 +76,7 @@ type VM struct {
 
 	ctx *snow.Context
 	db  *versiondb.Database
-	
+
 	metrics proposervmmetrics.Metrics
 
 	// Block ID --> Block
