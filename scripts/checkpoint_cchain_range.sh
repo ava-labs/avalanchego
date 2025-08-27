@@ -48,9 +48,9 @@ set -euo pipefail
 parse_number() {
     local value="$1"
     if [[ "$value" =~ ^([0-9]+)k$ ]]; then
-        echo $((${BASH_REMATCH[1]} * 1000))
+        echo $((BASH_REMATCH[1] * 1000))
     elif [[ "$value" =~ ^([0-9]+)m$ ]]; then
-        echo $((${BASH_REMATCH[1]} * 1000000))
+        echo $((BASH_REMATCH[1] * 1000000))
     else
         echo "$value"
     fi
