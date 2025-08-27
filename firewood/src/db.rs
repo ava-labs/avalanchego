@@ -268,7 +268,7 @@ impl<'db> api::Proposal for Proposal<'db> {
     }
 
     fn commit(self) -> Result<(), api::Error> {
-        Ok(self.db.manager.commit(self.nodestore.clone())?)
+        Ok(self.db.manager.commit(self.nodestore)?)
     }
 }
 
@@ -407,6 +407,7 @@ mod test {
         let committed = db.root_hash().unwrap().unwrap();
         let historical = db.revision(committed).unwrap();
         assert_eq!(&*historical.val(b"a").unwrap().unwrap(), b"1");
+        drop(historical);
 
         let db = db.replace();
         println!("{:?}", db.root_hash().unwrap());

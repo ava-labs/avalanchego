@@ -101,6 +101,11 @@ impl RevisionManager {
             config.create,
             config.manager.cache_read_strategy,
         )?;
+
+        // Acquire an advisory lock on the database file to prevent multiple processes
+        // from opening the same database simultaneously
+        fb.lock()?;
+
         let storage = Arc::new(fb);
         let nodestore = Arc::new(NodeStore::open(storage.clone())?);
         let manager = Self {
@@ -306,6 +311,54 @@ impl RevisionManager {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
-    // TODO
+    use super::*;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_file_advisory_lock() {
+        // Create a temporary file for testing
+        let temp_file = NamedTempFile::new().unwrap();
+        let db_path = temp_file.path().to_path_buf();
+
+        let config = ConfigManager::builder()
+            .create(true)
+            .truncate(false)
+            .build();
+
+        // First database instance should open successfully
+        let first_manager = RevisionManager::new(db_path.clone(), config.clone());
+        assert!(
+            first_manager.is_ok(),
+            "First database should open successfully"
+        );
+
+        // Second database instance should fail to open due to file locking
+        let second_manager = RevisionManager::new(db_path.clone(), config.clone());
+        assert!(
+            second_manager.is_err(),
+            "Second database should fail to open"
+        );
+
+        // Verify the error message contains the expected information
+        let error = second_manager.unwrap_err();
+        let error_string = error.to_string();
+
+        assert!(
+            error_string.contains("database may be opened by another instance"),
+            "Error is missing 'database may be opened by another instance', got: {error_string}"
+        );
+
+        // The file lock is held by the FileBacked instance. When we drop the first_manager,
+        // the Arc<FileBacked> should be dropped, releasing the file lock.
+        drop(first_manager.unwrap());
+
+        // Now the second database should open successfully
+        let third_manager = RevisionManager::new(db_path, config);
+        assert!(
+            third_manager.is_ok(),
+            "Database should open after first instance is dropped"
+        );
+    }
 }
