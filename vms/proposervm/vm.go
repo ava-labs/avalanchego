@@ -7,8 +7,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
+	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
@@ -24,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/tree"
@@ -32,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
+	proposervmmetrics "github.com/ava-labs/avalanchego/vms/proposervm/metrics"
 )
 
 const (
@@ -72,6 +76,8 @@ type VM struct {
 
 	ctx *snow.Context
 	db  *versiondb.Database
+	
+	metrics proposervmmetrics.Metrics
 
 	// Block ID --> Block
 	// Each element is a block that passed verification but
@@ -136,6 +142,13 @@ func (vm *VM) Initialize(
 ) error {
 	vm.ctx = chainCtx
 	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
+
+	metrics, err := proposervmmetrics.New(vm.Config.Registerer)
+	if err != nil {
+		return err
+	}
+	vm.metrics = metrics
+
 	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer)
 	if err != nil {
 		return err
@@ -234,6 +247,31 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 		return err
 	}
 	return vm.ChainVM.Shutdown(ctx)
+}
+
+func (vm *VM) GetLastAcceptedHeight() uint64 {
+	return vm.lastAcceptedHeight
+}
+
+// overrides ChainVM.CreateHandlers to expose the proposervm API path
+func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
+	handlers, err := vm.ChainVM.CreateHandlers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create inner VM handlers: %w", err)
+	}
+
+	server := rpc.NewServer()
+	server.RegisterCodec(json.NewCodec(), "application/json")
+	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
+	server.RegisterInterceptFunc(vm.metrics.InterceptRequest)
+	server.RegisterAfterFunc(vm.metrics.AfterRequest)
+	err = server.RegisterService(&ProposerAPI{vm: vm}, "proposervm")
+	if err != nil {
+		return nil, fmt.Errorf("failed to register proposervm service: %w", err)
+	}
+	handlers["/proposervm"] = server
+
+	return handlers, nil
 }
 
 func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
