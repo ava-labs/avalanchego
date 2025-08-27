@@ -25,8 +25,8 @@ set -euo pipefail
 #       s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-40/
 #       s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-50/
 #
-# See reexecute-cchain-range task in [Taskfile.yml](./../Taskfile.yml) for
-# all optional variables to configure re-execution itself.
+# See reexecute-cchain-range task in the root Taskfile.yml for all optional
+# variables to configure re-execution itself.
 #
 # Example Usage:
 #   export START_BLOCK=1
