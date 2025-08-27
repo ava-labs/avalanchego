@@ -18,8 +18,5 @@
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"
             }
         ]
-    },
-    "schedule": {
-        "include": []
     }
 }
