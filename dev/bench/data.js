@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1756285839546,
+  "lastUpdate": 1756285931943,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -640,6 +640,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[101,250000]-Config-firewood",
             "value": 114.1,
+            "unit": "mgas/s",
+            "extra": "1 times\n6 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Stephen Buttolph",
+            "username": "StephenButtolph",
+            "email": "stephen@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "c2563d13031197962d20f25b576560d029c5125c",
+          "message": "Update versions for v1.13.5 (#4217)",
+          "timestamp": "2025-08-26T23:07:47Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/c2563d13031197962d20f25b576560d029c5125c"
+        },
+        "date": 1756285930819,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-archive",
+            "value": 84.13,
             "unit": "mgas/s",
             "extra": "1 times\n6 procs"
           }
