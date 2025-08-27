@@ -119,7 +119,7 @@ func TestCheckCompatible(t *testing.T) {
 			},
 		},
 		{
-			stored:        TestChainConfig,
+			stored:        TestSubnetEVMChainConfig,
 			new:           TestPreSubnetEVMChainConfig,
 			headBlock:     0,
 			headTimestamp: 0,
@@ -131,7 +131,7 @@ func TestCheckCompatible(t *testing.T) {
 			},
 		},
 		{
-			stored:        TestChainConfig,
+			stored:        TestSubnetEVMChainConfig,
 			new:           TestPreSubnetEVMChainConfig,
 			headBlock:     10,
 			headTimestamp: 100,

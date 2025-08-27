@@ -104,7 +104,7 @@ func (b *testBackend) teardown() {
 }
 
 func newTestBackendFakerEngine(t *testing.T, config *params.ChainConfig, numBlocks int, genBlocks func(i int, b *core.BlockGen)) *testBackend {
-	var gspec = &core.Genesis{
+	gspec := &core.Genesis{
 		Config: config,
 		Alloc:  types.GenesisAlloc{addr: {Balance: bal}},
 	}
@@ -132,7 +132,7 @@ func newTestBackendFakerEngine(t *testing.T, config *params.ChainConfig, numBloc
 // newTestBackend creates a test backend. OBS: don't forget to invoke tearDown
 // after use, otherwise the blockchain instance will mem-leak via goroutines.
 func newTestBackend(t *testing.T, config *params.ChainConfig, numBlocks int, genBlocks func(i int, b *core.BlockGen)) *testBackend {
-	var gspec = &core.Genesis{
+	gspec := &core.Genesis{
 		Config: config,
 		Alloc:  types.GenesisAlloc{addr: {Balance: bal}},
 	}
@@ -268,7 +268,7 @@ func TestSuggestTipCapSimple(t *testing.T) {
 		chainConfig: params.TestChainConfig,
 		numBlocks:   3,
 		genBlock:    testGenBlock(t, 55, 370),
-		expectedTip: big.NewInt(643_500_644),
+		expectedTip: big.NewInt(1_287_001_288),
 	}, defaultOracleConfig())
 }
 
@@ -277,7 +277,7 @@ func TestSuggestTipCapSimpleFloor(t *testing.T) {
 		chainConfig: params.TestChainConfig,
 		numBlocks:   1,
 		genBlock:    testGenBlock(t, 55, 370),
-		expectedTip: common.Big0,
+		expectedTip: big.NewInt(643_500_644),
 	}, defaultOracleConfig())
 }
 
@@ -321,7 +321,7 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 				b.AddTx(tx)
 			}
 		},
-		expectedTip: big.NewInt(643_500_644),
+		expectedTip: big.NewInt(1_287_001_288),
 	}, defaultOracleConfig())
 }
 
@@ -425,7 +425,7 @@ func TestSuggestGasPriceAfterFeeConfigUpdate(t *testing.T) {
 	genesis := backend.chain.Genesis()
 	engine := backend.chain.Engine()
 	db := rawdb.NewDatabase(backend.chain.StateCache().DiskDB())
-	blocks, _, err := core.GenerateChain(&chainConfig, genesis, engine, db, 1, 0, func(i int, b *core.BlockGen) {
+	blocks, _, err := core.GenerateChain(&chainConfig, genesis, engine, db, 1, chainConfigExtra.FeeConfig.TargetBlockRate, func(i int, b *core.BlockGen) {
 		b.SetCoinbase(common.Address{1})
 
 		// admin issues tx to change fee config to higher MinBaseFee

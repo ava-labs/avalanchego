@@ -50,6 +50,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/extstate"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/subnet-evm/triedb/pathdb"
 	"github.com/holiman/uint256"
@@ -317,13 +318,29 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Blo
 	if g.Difficulty == nil {
 		head.Difficulty = ethparams.GenesisDifficulty
 	}
+	if g.ExtraData == nil {
+		head.Extra = []byte{}
+	}
 	if conf := g.Config; conf != nil {
 		num := new(big.Int).SetUint64(g.Number)
+		confExtra := params.GetExtra(conf)
 		if params.GetExtra(conf).IsSubnetEVM(g.Timestamp) {
 			if g.BaseFee != nil {
 				head.BaseFee = g.BaseFee
 			} else {
 				head.BaseFee = new(big.Int).Set(params.GetExtra(g.Config).FeeConfig.MinBaseFee)
+			}
+		}
+		headerExtra := customtypes.GetHeaderExtra(head)
+
+		// When Etna/Cancun is active, `BlockGasCost` are decoded to 0 if it's nil.
+		// This is because these fields come before the other optional Cancun fields in RLP order.
+		// This only occurs with a serialized and written genesis block, and then reading it back.
+		// While this does not affect anything (because we don't use `ToBlock` to retrieve the genesis block),
+		// it's still confusing and breaking few tests. So we set it here to 0 to make it consistent.
+		if confExtra.IsEtna(g.Timestamp) {
+			if headerExtra.BlockGasCost == nil {
+				headerExtra.BlockGasCost = new(big.Int)
 			}
 		}
 		if conf.IsCancun(num, g.Timestamp) {

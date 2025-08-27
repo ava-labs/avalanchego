@@ -30,8 +30,6 @@ package params
 import (
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/utils/constants"
 	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/utils"
@@ -76,8 +74,8 @@ var (
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        utils.TimeToNewUint64(upgrade.GetConfig(constants.UnitTestID).DurangoTime),
-			CancunTime:          utils.TimeToNewUint64(upgrade.GetConfig(constants.UnitTestID).EtnaTime),
+			ShanghaiTime:        utils.NewUint64(0),
+			CancunTime:          utils.NewUint64(0),
 		},
 		extras.TestChainConfig,
 	)
@@ -132,7 +130,7 @@ var (
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
+			ShanghaiTime:        utils.NewUint64(0),
 		},
 		extras.TestDurangoChainConfig,
 	)
@@ -151,8 +149,8 @@ var (
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
-			CancunTime:          utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
+			ShanghaiTime:        utils.NewUint64(0),
+			CancunTime:          utils.NewUint64(0),
 		},
 		extras.TestEtnaChainConfig,
 	)
@@ -171,8 +169,8 @@ var (
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
-			CancunTime:          utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
+			ShanghaiTime:        utils.NewUint64(0),
+			CancunTime:          utils.NewUint64(0),
 		},
 		extras.TestFortunaChainConfig,
 	)
@@ -191,8 +189,8 @@ var (
 			MuirGlacierBlock:    big.NewInt(0),
 			BerlinBlock:         big.NewInt(0),
 			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
-			CancunTime:          utils.TimeToNewUint64(upgrade.InitiallyActiveTime),
+			ShanghaiTime:        utils.NewUint64(0),
+			CancunTime:          utils.NewUint64(0),
 		},
 		extras.TestGraniteChainConfig,
 	)

@@ -209,16 +209,6 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 		valid         bool
 	}{
 		{
-			name: "ValidNetworkUpgrades_for_latest_network",
-			upgrades: &NetworkUpgrades{
-				SubnetEVMTimestamp: utils.NewUint64(0),
-				DurangoTimestamp:   utils.NewUint64(1607144400),
-				EtnaTimestamp:      utils.NewUint64(1607144400),
-			},
-			avagoUpgrades: upgradetest.GetConfig(upgradetest.Latest),
-			valid:         true,
-		},
-		{
 			name: "Invalid_Durango_nil_upgrade",
 			upgrades: &NetworkUpgrades{
 				SubnetEVMTimestamp: utils.NewUint64(1),
@@ -284,14 +274,15 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 			valid:         false,
 		},
 		{
-			name: "Valid_Fortuna_nil",
+			name: "Valid_Granite_After_nil_Fortuna",
 			upgrades: &NetworkUpgrades{
 				SubnetEVMTimestamp: utils.NewUint64(0),
 				DurangoTimestamp:   utils.TimeToNewUint64(upgrade.Fuji.DurangoTime),
 				EtnaTimestamp:      utils.TimeToNewUint64(upgrade.Fuji.EtnaTime),
 				FortunaTimestamp:   nil,
+				GraniteTimestamp:   utils.TimeToNewUint64(upgrade.Fuji.GraniteTime),
 			},
-			avagoUpgrades: upgrade.Fuji,
+			avagoUpgrades: upgradetest.GetConfig(upgradetest.Granite),
 			valid:         true,
 		},
 	}
@@ -299,9 +290,9 @@ func TestVerifyNetworkUpgrades(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := test.upgrades.verifyNetworkUpgrades(test.avagoUpgrades)
 			if test.valid {
-				require.Nil(t, err)
+				require.NoError(t, err)
 			} else {
-				require.NotNil(t, err)
+				require.Error(t, err)
 			}
 		})
 	}
@@ -334,10 +325,30 @@ func TestForkOrder(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			err := checkForks(test.upgrades.forkOrder())
 			if test.expectedErr {
-				require.NotNil(t, err)
+				require.Error(t, err)
 			} else {
-				require.Nil(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
+}
+
+func TestSetDefaultsTreatsZeroAsUnset(t *testing.T) {
+	upgrades := &NetworkUpgrades{
+		SubnetEVMTimestamp: utils.NewUint64(0),
+		DurangoTimestamp:   utils.NewUint64(0),
+		EtnaTimestamp:      nil,
+		FortunaTimestamp:   utils.NewUint64(0),
+		GraniteTimestamp:   utils.NewUint64(0),
+	}
+	agoUpgrades := upgradetest.GetConfig(upgradetest.Granite)
+	upgrades.SetDefaults(agoUpgrades)
+
+	defaults := GetNetworkUpgrades(agoUpgrades)
+
+	require.EqualValues(t, defaults.SubnetEVMTimestamp, upgrades.SubnetEVMTimestamp)
+	require.EqualValues(t, defaults.DurangoTimestamp, upgrades.DurangoTimestamp)
+	require.EqualValues(t, defaults.EtnaTimestamp, upgrades.EtnaTimestamp)
+	require.EqualValues(t, defaults.FortunaTimestamp, upgrades.FortunaTimestamp)
+	require.EqualValues(t, defaults.GraniteTimestamp, upgrades.GraniteTimestamp)
 }

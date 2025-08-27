@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
+	"github.com/ava-labs/subnet-evm/params/paramstest"
 	"github.com/ava-labs/subnet-evm/utils"
 )
 
@@ -74,4 +76,33 @@ func TestGenesisEthUpgrades(t *testing.T) {
 	require.NoError(t, params.SetEthUpgrades(&config)) // New versions will set additional fields eg, LondonBlock
 	_, _, err = SetupGenesisBlock(db, tdb, &Genesis{Config: &config}, block.Hash(), false)
 	require.NoError(t, err)
+}
+
+func TestGenesisToBlockDecoding(t *testing.T) {
+	previousHashes := map[upgradetest.Fork]common.Hash{
+		upgradetest.ApricotPhase5: common.HexToHash("0x6116de25352c93149542e950162c7305f207bbc17b0eb725136b78c80aed79cc"),
+		upgradetest.ApricotPhase6: common.HexToHash("0x74dd5d404823f342fb3d372ea289565e5b1ff25d07e48a59db8130c5f61e941a"),
+		upgradetest.Banff:         common.HexToHash("0x74dd5d404823f342fb3d372ea289565e5b1ff25d07e48a59db8130c5f61e941a"),
+		upgradetest.Cortina:       common.HexToHash("0x74dd5d404823f342fb3d372ea289565e5b1ff25d07e48a59db8130c5f61e941a"),
+		upgradetest.Durango:       common.HexToHash("0x74dd5d404823f342fb3d372ea289565e5b1ff25d07e48a59db8130c5f61e941a"),
+		upgradetest.Etna:          common.HexToHash("0xa5de01cb7e5c6d721be62ab4b37878e863d65e0c1fe308e5df1f4c5b148650f9"),
+		upgradetest.Fortuna:       common.HexToHash("0xa5de01cb7e5c6d721be62ab4b37878e863d65e0c1fe308e5df1f4c5b148650f9"),
+		upgradetest.Granite:       common.HexToHash("0xa5de01cb7e5c6d721be62ab4b37878e863d65e0c1fe308e5df1f4c5b148650f9"),
+	}
+	for fork, chainConfig := range paramstest.ForkToChainConfig {
+		t.Run(fork.String(), func(t *testing.T) {
+			db := rawdb.NewMemoryDatabase()
+			tdb := triedb.NewDatabase(db, triedb.HashDefaults)
+			genesis := &Genesis{
+				Config: chainConfig,
+			}
+			block, err := genesis.Commit(db, tdb)
+			require.NoError(t, err)
+
+			readHeader := rawdb.ReadHeader(db, block.Hash(), 0)
+			require.Equal(t, block.Hash(), readHeader.Hash())
+			require.Equal(t, previousHashes[fork], block.Hash())
+			require.EqualValues(t, block.Header(), readHeader)
+		})
+	}
 }
