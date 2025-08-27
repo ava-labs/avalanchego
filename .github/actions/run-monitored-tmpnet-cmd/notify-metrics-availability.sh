@@ -16,4 +16,4 @@ if [[ -n "${FILTER_BY_OWNER:-}" ]]; then
   metrics_url="${metrics_url}&var-filter=network_owner%7C%3D%7C${FILTER_BY_OWNER}"
 fi
 
-echo "grafana link for shared network logs and metrics: ${metrics_url}"
+echo "Grafana: ${metrics_url}"
