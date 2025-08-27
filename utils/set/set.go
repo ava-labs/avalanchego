@@ -192,3 +192,17 @@ func (s *Set[T]) Peek() (T, bool) {
 	}
 	return utils.Zero[T](), false
 }
+
+// Intersect returns the set intersection of s1 and s2
+func Intersect[T comparable](s1 Set[T], s2 Set[T]) Set[T] {
+	s := Set[T]{}
+	for k := range s1 {
+		if !s2.Contains(k) {
+			continue
+		}
+
+		s.Add(k)
+	}
+
+	return s
+}
