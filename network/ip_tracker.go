@@ -65,12 +65,12 @@ func newIPTracker(
 			Name: "tracked_subnets",
 			Help: "number of subnets this node is monitoring",
 		}),
+		connectToAllValidators: connectToAllValidators,
 		bloomMetrics:           bloomMetrics,
 		tracked:                make(map[ids.NodeID]*trackedNode),
 		bloomAdditions:         make(map[ids.NodeID]int),
 		connected:              make(map[ids.NodeID]*connectedNode),
 		subnet:                 make(map[ids.ID]*gossipableSubnet),
-		connectToAllValidators: connectToAllValidators,
 	}
 	err = errors.Join(
 		registerer.Register(tracker.numTrackedPeers),
@@ -271,6 +271,7 @@ func (i *ipTracker) ManuallyGossip(subnetID ids.ID, nodeID ids.NodeID) {
 //  1. The node has been manually tracked.
 //  2. The node has been manually gossiped on a tracked subnet.
 //  3. The node is currently a validator on a tracked subnet.
+//  4. The node is currently a validator on any subnet and connectToAllValidators is true.
 func (i *ipTracker) WantsConnection(nodeID ids.NodeID) bool {
 	i.lock.RLock()
 	defer i.lock.RUnlock()
@@ -433,8 +434,7 @@ func (i *ipTracker) addTrackableID(nodeID ids.NodeID, subnetID *ids.ID) {
 		nodeTracker.manuallyTracked = true
 	} else {
 		nodeTracker.validatedSubnets.Add(*subnetID)
-		if *subnetID == constants.PrimaryNetworkID || i.trackedSubnets.Contains(*subnetID) ||
-			(i.connectToAllValidators && nodeTracker.validatedSubnets.Len() > 0) {
+		if *subnetID == constants.PrimaryNetworkID || i.trackedSubnets.Contains(*subnetID) || i.connectToAllValidators {
 			nodeTracker.trackedSubnets.Add(*subnetID)
 		}
 	}

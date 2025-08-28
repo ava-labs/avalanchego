@@ -649,6 +649,7 @@ func TestShouldDisconnect(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
+
 			shouldDisconnect := test.initialPeer.shouldDisconnect()
 			require.Equal(test.expectedPeer, test.initialPeer)
 			require.Equal(test.expectedShouldDisconnect, shouldDisconnect)
