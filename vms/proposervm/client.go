@@ -32,7 +32,7 @@ func (c *Client) GetProposedHeight(ctx context.Context, options ...rpc.Option) (
 }
 
 func (c *Client) GetEpoch(ctx context.Context, options ...rpc.Option) (block.PChainEpoch, error) {
-	res := &GetEpochResponse{}
+	res := &api.GetEpochResponse{}
 	if err := c.Requester.SendRequest(ctx, "proposervm.getEpoch", struct{}{}, res, options...); err != nil {
 		return block.PChainEpoch{}, err
 	}
