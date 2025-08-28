@@ -32,7 +32,9 @@ func (m *MemoryDatabase) WriteBlock(height BlockHeight, block BlockData) error {
 		return ErrBlockEmpty
 	}
 
-	m.blocks[height] = block
+	blockCopy := make([]byte, len(block))
+	copy(blockCopy, block)
+	m.blocks[height] = blockCopy
 
 	return nil
 }
@@ -51,7 +53,9 @@ func (m *MemoryDatabase) ReadBlock(height BlockHeight) (BlockData, error) {
 		return nil, ErrBlockNotFound
 	}
 
-	return block, nil
+	blockCopy := make([]byte, len(block))
+	copy(blockCopy, block)
+	return blockCopy, nil
 }
 
 // HasBlock checks if a block exists at the given height
