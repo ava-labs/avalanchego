@@ -88,12 +88,12 @@ tasks:
   export-cchain-block-range:
     desc: Export range of C-Chain blocks from source to target directory.
     vars:
-      SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR}}'
-      TARGET_BLOCK_DIR: '{{.TARGET_BLOCK_DIR}}'
+      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC}}'
+      BLOCK_DIR_DST: '{{.BLOCK_DIR_DST}}'
       START_BLOCK: '{{.START_BLOCK}}'
       END_BLOCK: '{{.END_BLOCK}}'
     cmds:
-      - cmd: go test -timeout=0 -run=TestExportBlockRange github.com/ava-labs/avalanchego/tests/reexecute/c --source-block-dir={{.SOURCE_BLOCK_DIR}} --target-block-dir={{.TARGET_BLOCK_DIR}} --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
+      - cmd: go test -timeout=0 -run=TestExportBlockRange github.com/ava-labs/avalanchego/tests/reexecute/c --block-dir-src={{.BLOCK_DIR_SRC}} --block-dir-dst={{.BLOCK_DIR_DST}} --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
 
   export-dir-to-s3:
     desc: Copies a directory to s3
@@ -131,16 +131,16 @@ tasks:
     desc: Imports the C-Chain block and state data to re-execute. Defaults to import the first 200 and the current state created with the default config of the C-Chain (hashdb).
     vars:
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
-      SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200-ldb/**"}}'
-      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"}}'
+      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200-ldb/**"}}'
+      CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"}}'
     cmds:
       - task: import-s3-to-dir
         vars:
-          SRC: '{{.SOURCE_BLOCK_DIR}}'
+          SRC: '{{.BLOCK_DIR_SRC}}'
           DST: '{{.EXECUTION_DATA_DIR}}/blocks'
       - task: import-s3-to-dir
         vars:
-          SRC: '{{.CURRENT_STATE_DIR}}'
+          SRC: '{{.CURRENT_STATE_DIR_SRC}}'
           DST: '{{.EXECUTION_DATA_DIR}}/current-state'
 
   import-s3-to-dir:
@@ -185,7 +185,7 @@ tasks:
     desc: Re-execute a range of C-Chain blocks.
     vars:
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
-      SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR}}'
+      BLOCK_DIR: '{{.BLOCK_DIR}}'
       CONFIG: '{{.CONFIG | default ""}}'
       START_BLOCK: '{{.START_BLOCK}}'
       END_BLOCK: '{{.END_BLOCK}}'
@@ -193,7 +193,7 @@ tasks:
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
     cmd: |
       CURRENT_STATE_DIR={{.CURRENT_STATE_DIR}} \
-      SOURCE_BLOCK_DIR={{.SOURCE_BLOCK_DIR}} \
+      BLOCK_DIR={{.BLOCK_DIR}} \
       CONFIG={{.CONFIG}} \
       START_BLOCK={{.START_BLOCK}} \
       END_BLOCK={{.END_BLOCK}} \
@@ -205,8 +205,8 @@ tasks:
     desc: Combines import-cchain-reexecute-range and reexecute-cchain-range
     vars:
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
-      SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/"}}'
-      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/"}}'
+      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**"}}'
+      CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"}}'
       START_BLOCK: '{{.START_BLOCK | default "101"}}'
       END_BLOCK: '{{.END_BLOCK | default "250000"}}'
       LABELS: '{{.LABELS | default ""}}'
@@ -214,12 +214,12 @@ tasks:
     cmds:
       - task: import-cchain-reexecute-range
         vars:
-          SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR}}'
-          CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
+          BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC}}'
+          CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC}}'
           EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
       - task: reexecute-cchain-range
         vars:
-          SOURCE_BLOCK_DIR: '{{.EXECUTION_DATA_DIR}}/blocks'
+          BLOCK_DIR: '{{.EXECUTION_DATA_DIR}}/blocks'
           CURRENT_STATE_DIR: '{{.EXECUTION_DATA_DIR}}/current-state'
           CONFIG: '{{.CONFIG}}'
           START_BLOCK: '{{.START_BLOCK}}'
