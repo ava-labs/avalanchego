@@ -43,7 +43,7 @@ import (
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/txpool"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/plugin/evm/header"
+	"github.com/ava-labs/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/consensus/misc/eip4844"
 	"github.com/ava-labs/libevm/core/state"
@@ -412,7 +412,7 @@ func (p *BlobPool) Init(gasTip uint64, head *types.Header, reserve txpool.Addres
 	for addr := range p.index {
 		p.recheck(addr, nil)
 	}
-	baseFee, err := header.EstimateNextBaseFee(
+	baseFee, err := customheader.EstimateNextBaseFee(
 		params.GetExtra(p.chain.Config()),
 		p.head,
 		uint64(time.Now().Unix()),
@@ -842,7 +842,7 @@ func (p *BlobPool) Reset(oldHead, newHead *types.Header) {
 	if p.chain.Config().IsCancun(p.head.Number, p.head.Time) {
 		p.limbo.finalize(p.chain.CurrentFinalBlock())
 	}
-	baseFeeBig, err := header.EstimateNextBaseFee(
+	baseFeeBig, err := customheader.EstimateNextBaseFee(
 		params.GetExtra(p.chain.Config()),
 		p.head,
 		uint64(time.Now().Unix()),

@@ -43,7 +43,7 @@ import (
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/txpool"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/plugin/evm/header"
+	"github.com/ava-labs/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/consensus/misc/eip4844"
@@ -118,7 +118,7 @@ func (bc *testBlockChain) CurrentBlock() *types.Header {
 			Extra:    make([]byte, ap3.WindowSize),
 		}
 		config := params.GetExtra(bc.config)
-		baseFee, err := header.BaseFee(
+		baseFee, err := customheader.BaseFee(
 			config, parent, blockTime,
 		)
 		if err != nil {

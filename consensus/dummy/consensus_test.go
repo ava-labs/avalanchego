@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 
-	"github.com/ava-labs/coreth/plugin/evm/header"
+	"github.com/ava-labs/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap4"
 )
 
@@ -160,7 +160,7 @@ func TestVerifyBlockFee(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			blockGasCost := header.BlockGasCostWithStep(
+			blockGasCost := customheader.BlockGasCostWithStep(
 				test.parentBlockGasCost,
 				ap4.BlockGasCostStep,
 				test.timeElapsed,

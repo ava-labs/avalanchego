@@ -40,7 +40,7 @@ import (
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/core/txpool"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/plugin/evm/header"
+	"github.com/ava-labs/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/prque"
@@ -1830,7 +1830,7 @@ func (pool *LegacyPool) updateBaseFee() {
 // assumes lock is already held
 func (pool *LegacyPool) updateBaseFeeAt(head *types.Header) error {
 	config := params.GetExtra(pool.chainconfig)
-	baseFeeEstimate, err := header.EstimateNextBaseFee(config, head, uint64(time.Now().Unix()))
+	baseFeeEstimate, err := customheader.EstimateNextBaseFee(config, head, uint64(time.Now().Unix()))
 	if err != nil {
 		return err
 	}

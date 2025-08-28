@@ -26,9 +26,9 @@ import (
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
+	"github.com/ava-labs/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
-	"github.com/ava-labs/coreth/plugin/evm/header"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
@@ -323,7 +323,7 @@ func (b *wrappedBlock) syntacticVerify() error {
 	}
 
 	// Verify the extra data is well-formed.
-	if err := header.VerifyExtra(rulesExtra.AvalancheRules, ethHeader.Extra); err != nil {
+	if err := customheader.VerifyExtra(rulesExtra.AvalancheRules, ethHeader.Extra); err != nil {
 		return err
 	}
 
@@ -456,7 +456,7 @@ func (b *wrappedBlock) verifyPredicates(predicateContext *precompileconfig.Predi
 	}
 	extraData := b.ethBlock.Extra()
 	avalancheRules := rulesExtra.AvalancheRules
-	headerPredicateResultsBytes := header.PredicateBytesFromExtra(avalancheRules, extraData)
+	headerPredicateResultsBytes := customheader.PredicateBytesFromExtra(avalancheRules, extraData)
 	if !bytes.Equal(headerPredicateResultsBytes, predicateResultsBytes) {
 		return fmt.Errorf("%w (remote: %x local: %x)", errInvalidHeaderPredicateResults, headerPredicateResultsBytes, predicateResultsBytes)
 	}

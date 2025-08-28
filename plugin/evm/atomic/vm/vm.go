@@ -38,6 +38,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
 	"github.com/ava-labs/coreth/plugin/evm/config"
+	"github.com/ava-labs/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 	"github.com/ava-labs/coreth/plugin/evm/gossip"
@@ -53,7 +54,6 @@ import (
 	avalancheutils "github.com/ava-labs/avalanchego/utils"
 	atomicstate "github.com/ava-labs/coreth/plugin/evm/atomic/state"
 	atomicsync "github.com/ava-labs/coreth/plugin/evm/atomic/sync"
-	customheader "github.com/ava-labs/coreth/plugin/evm/header"
 )
 
 var (

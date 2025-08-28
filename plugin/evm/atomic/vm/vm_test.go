@@ -36,9 +36,9 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
+	"github.com/ava-labs/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
-	"github.com/ava-labs/coreth/plugin/evm/header"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/coreth/plugin/evm/vmtest"
@@ -1509,7 +1509,7 @@ func testBuildApricotPhase5Block(t *testing.T, scheme string) {
 	if eExtDataGasUsed := customtypes.BlockExtDataGasUsed(ethBlk); eExtDataGasUsed == nil || eExtDataGasUsed.Cmp(big.NewInt(11230)) != 0 {
 		t.Fatalf("expected extDataGasUsed to be 11230 but got %d", eExtDataGasUsed)
 	}
-	minRequiredTip, err := header.EstimateRequiredTip(vm.chainConfigExtra(), ethBlk.Header())
+	minRequiredTip, err := customheader.EstimateRequiredTip(vm.chainConfigExtra(), ethBlk.Header())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1564,7 +1564,7 @@ func testBuildApricotPhase5Block(t *testing.T, scheme string) {
 	if customtypes.BlockExtDataGasUsed(ethBlk) == nil || customtypes.BlockExtDataGasUsed(ethBlk).Cmp(common.Big0) != 0 {
 		t.Fatalf("expected extDataGasUsed to be 0 but got %d", customtypes.BlockExtDataGasUsed(ethBlk))
 	}
-	minRequiredTip, err = header.EstimateRequiredTip(vm.chainConfigExtra(), ethBlk.Header())
+	minRequiredTip, err = customheader.EstimateRequiredTip(vm.chainConfigExtra(), ethBlk.Header())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1692,7 +1692,7 @@ func testBuildApricotPhase4Block(t *testing.T, scheme string) {
 	if eExtDataGasUsed := customtypes.BlockExtDataGasUsed(ethBlk); eExtDataGasUsed == nil || eExtDataGasUsed.Cmp(big.NewInt(1230)) != 0 {
 		t.Fatalf("expected extDataGasUsed to be 1000 but got %d", eExtDataGasUsed)
 	}
-	minRequiredTip, err := header.EstimateRequiredTip(vm.chainConfigExtra(), ethBlk.Header())
+	minRequiredTip, err := customheader.EstimateRequiredTip(vm.chainConfigExtra(), ethBlk.Header())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1741,7 +1741,7 @@ func testBuildApricotPhase4Block(t *testing.T, scheme string) {
 	if customtypes.BlockExtDataGasUsed(ethBlk) == nil || customtypes.BlockExtDataGasUsed(ethBlk).Cmp(common.Big0) != 0 {
 		t.Fatalf("expected extDataGasUsed to be 0 but got %d", customtypes.BlockExtDataGasUsed(ethBlk))
 	}
-	minRequiredTip, err = header.EstimateRequiredTip(vm.chainConfigExtra(), ethBlk.Header())
+	minRequiredTip, err = customheader.EstimateRequiredTip(vm.chainConfigExtra(), ethBlk.Header())
 	if err != nil {
 		t.Fatal(err)
 	}
