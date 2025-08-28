@@ -53,7 +53,6 @@ var (
 	_ block.ChainVM         = (*VM)(nil)
 	_ block.BatchedChainVM  = (*VM)(nil)
 	_ block.StateSyncableVM = (*VM)(nil)
-	_ ProposerVMServer      = (*VM)(nil)
 
 	dbPrefix = []byte("proposervm")
 )
@@ -142,13 +141,14 @@ func (vm *VM) Initialize(
 	appSender common.AppSender,
 ) error {
 	vm.ctx = chainCtx
+	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
+
 	metrics, err := proposervmmetrics.New(vm.Config.Registerer)
 	if err != nil {
 		return err
 	}
 	vm.metrics = metrics
 
-	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
 	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer)
 	if err != nil {
 		return err
@@ -250,6 +250,9 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 }
 
 func (vm *VM) GetLastAcceptedHeight() uint64 {
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
 	return vm.lastAcceptedHeight
 }
 

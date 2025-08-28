@@ -10,16 +10,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
-
-type ProposerVMServer interface {
-	GetStatelessSignedBlock(blkID ids.ID) (block.SignedBlock, error)
-	GetLastAcceptedHeight() uint64
-}
 
 type ProposerAPI struct {
 	vm *VM
@@ -30,10 +23,8 @@ func (p *ProposerAPI) GetProposedHeight(_ *http.Request, _ *struct{}, reply *api
 		zap.String("service", "proposervm"),
 		zap.String("method", "getProposedHeight"),
 	)
-	p.vm.ctx.Lock.Lock()
-	defer p.vm.ctx.Lock.Unlock()
 
-	reply.Height = 0 // TODO
+	reply.Height = avajson.Uint64(p.vm.GetLastAcceptedHeight())
 	return nil
 }
 
@@ -48,13 +39,12 @@ func (p *ProposerAPI) GetEpoch(r *http.Request, _ *struct{}, reply *GetEpochResp
 		zap.String("service", "proposervm"),
 		zap.String("method", "getEpoch"),
 	)
-	p.vm.ctx.Lock.Lock()
-	defer p.vm.ctx.Lock.Unlock()
 
 	lastAccepted, err := p.vm.GetLastAccepted()
 	if err != nil {
 		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
 	}
+
 	latestBlock, err := p.vm.getPostForkBlock(r.Context(), lastAccepted)
 	if err != nil {
 		return fmt.Errorf("couldn't get latest block: %w", err)

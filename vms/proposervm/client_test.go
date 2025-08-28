@@ -36,9 +36,6 @@ func (mc *mockClient) SendRequest(_ context.Context, _ string, _ interface{}, re
 	case *api.GetHeightResponse:
 		response := mc.response.(*api.GetHeightResponse)
 		*p = *response
-	case *api.FormattedBlock:
-		response := mc.response.(*api.FormattedBlock)
-		*p = *response
 	default:
 		panic("illegal type")
 	}
@@ -75,7 +72,7 @@ func TestGetProposedHeight(t *testing.T) {
 			require := require.New(t)
 
 			mc := NewMockClient(test.mockResponse, test.mockError)
-			c := &client{requester: mc}
+			c := &Client{Requester: mc}
 
 			height, err := c.GetProposedHeight(context.Background(), nil)
 			if test.mockError != nil {
