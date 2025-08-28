@@ -227,9 +227,8 @@ func (b *statelessGraniteBlock) setBytes(bytes []byte) {
 	b.bytes = bytes
 }
 
-// This is the same as the statelessBlock.initialize method except for the timestamp
-// which is now in milliseconds. Combining them would require adding more private methods on the
-// SignedBlock interface.
+// This is the same as the statelessBlock.initialize method. Combining them would require adding more
+// private methods on the SignedBlock interface.
 func (b *statelessGraniteBlock) initialize(bytes []byte) error {
 	b.bytes = bytes
 
@@ -240,7 +239,7 @@ func (b *statelessGraniteBlock) initialize(bytes []byte) error {
 	unsignedBytes := bytes[:lenUnsignedBytes]
 	b.id = hashing.ComputeHash256Array(unsignedBytes)
 
-	b.timestamp = time.UnixMilli(b.StatelessBlock.Timestamp)
+	b.timestamp = time.Unix(b.StatelessBlock.Timestamp, 0)
 	if len(b.StatelessBlock.Certificate) == 0 {
 		return nil
 	}

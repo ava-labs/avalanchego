@@ -38,7 +38,7 @@ func BuildUnsigned(
 			StatelessBlock: statelessUnsignedGraniteBlock{
 				PChainEpoch:  pChainEpoch,
 				ParentID:     parentID,
-				Timestamp:    timestamp.UnixMilli(),
+				Timestamp:    timestamp.Unix(),
 				PChainHeight: pChainHeight,
 				Certificate:  nil,
 				Block:        blockBytes,
@@ -83,7 +83,7 @@ func Build(
 			StatelessBlock: statelessUnsignedGraniteBlock{
 				PChainEpoch:  pChainEpoch,
 				ParentID:     parentID,
-				Timestamp:    timestamp.UnixMilli(),
+				Timestamp:    timestamp.Unix(),
 				PChainHeight: pChainHeight,
 				Certificate:  cert.Raw,
 				Block:        blockBytes,
