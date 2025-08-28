@@ -12,6 +12,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -65,6 +66,24 @@ var (
 		"is_ephemeral_node": "false",
 		"chain":             "C",
 	}
+
+	configKey         = "config"
+	defaultConfigKey  = "default"
+	predefinedConfigs = map[string]string{
+		defaultConfigKey: `{}`,
+		"archive": `{
+			"pruning-enabled": false
+		}`,
+		"firewood": `{
+			"state-scheme": "firewood",
+			"snapshot-cache": 0,
+			"pruning-enabled": true,
+			"state-sync-enabled": false
+		}`,
+	}
+
+	configNameArg  string
+	configBytesArg []byte
 )
 
 func TestMain(m *testing.M) {
@@ -85,6 +104,10 @@ func TestMain(m *testing.M) {
 	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", true, "Enable metrics collection.")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
+	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
+	predefinedConfigOptionsStr := fmt.Sprintf("[%s]", strings.Join(predefinedConfigKeys, ", "))
+	flag.StringVar(&configNameArg, configKey, defaultConfigKey, fmt.Sprintf("Specifies the predefined config to use for the VM. Options include %s.", predefinedConfigOptionsStr))
+
 	flag.Parse()
 
 	customLabels, err := parseLabels(labelsArg)
@@ -94,17 +117,26 @@ func TestMain(m *testing.M) {
 	}
 	maps.Copy(labels, customLabels)
 
+	// Set the config from the predefined configs and add to custom labels for the job.
+	predefinedConfigStr, ok := predefinedConfigs[configNameArg]
+	if !ok {
+		fmt.Fprintf(os.Stderr, "invalid config name %q. Valid options include %s.\n", configNameArg, predefinedConfigOptionsStr)
+		os.Exit(1)
+	}
+	labels[configKey] = configNameArg
+	configBytesArg = []byte(predefinedConfigStr)
+
 	m.Run()
 }
 
 func BenchmarkReexecuteRange(b *testing.B) {
 	require.Equalf(b, 1, b.N, "BenchmarkReexecuteRange expects to run a single iteration because it overwrites the input current-state, but found (b.N=%d)", b.N)
-	b.Run(fmt.Sprintf("[%d,%d]", startBlockArg, endBlockArg), func(b *testing.B) {
-		benchmarkReexecuteRange(b, sourceBlockDirArg, targetDirArg, startBlockArg, endBlockArg, chanSizeArg, metricsEnabledArg)
+	b.Run(fmt.Sprintf("[%d,%d]-Config-%s", startBlockArg, endBlockArg, configNameArg), func(b *testing.B) {
+		benchmarkReexecuteRange(b, sourceBlockDirArg, targetDirArg, configBytesArg, startBlockArg, endBlockArg, chanSizeArg, metricsEnabledArg)
 	})
 }
 
-func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir string, startBlock uint64, endBlock uint64, chanSize int, metricsEnabled bool) {
+func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir string, configBytes []byte, startBlock uint64, endBlock uint64, chanSize int, metricsEnabled bool) {
 	r := require.New(b)
 	ctx := context.Background()
 
@@ -156,7 +188,7 @@ func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir stri
 		ctx,
 		db,
 		chainDataDir,
-		nil,
+		configBytes,
 		vmMultiGatherer,
 	)
 	r.NoError(err)

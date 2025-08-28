@@ -515,7 +515,7 @@ func (e *Engine) Start(ctx context.Context, startReqID uint32) error {
 	e.metrics.bootstrapFinished.Set(1)
 
 	e.Ctx.State.Set(snow.EngineState{
-		Type:  p2p.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,
 		State: snow.NormalOp,
 	})
 	if err := e.VM.SetState(ctx, snow.NormalOp); err != nil {

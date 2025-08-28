@@ -101,7 +101,7 @@ tasks:
       LOCAL_SRC: '{{.LOCAL_SRC}}'
       S3_DST: '{{.S3_DST}}'
     cmds:
-      - cmd: s5cmd cp {{.LOCAL_SRC}} {{.S3_DST}}
+      - cmd: bash -x ./scripts/copy_dir.sh {{.LOCAL_SRC}} {{.S3_DST}}
 
   generate-mocks:
     desc: Generates testing mocks
@@ -131,8 +131,8 @@ tasks:
     desc: Imports the C-Chain block and state data to re-execute. Defaults to import the first 200 and the current state created with the default config of the C-Chain (hashdb).
     vars:
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
-      SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200.zip"}}'
-      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip"}}'
+      SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200-ldb/**"}}'
+      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"}}'
     cmds:
       - task: import-s3-to-dir
         vars:
@@ -144,7 +144,7 @@ tasks:
           DST: '{{.EXECUTION_DATA_DIR}}/current-state'
 
   import-s3-to-dir:
-    desc: Imports an S3 path to a local directory. Unzipping if needed.
+    desc: Imports an S3 path to a local directory.
     vars:
       SRC: '{{.SRC}}'
       DST: '{{.DST}}'
@@ -186,6 +186,7 @@ tasks:
     vars:
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
       SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR}}'
+      CONFIG: '{{.CONFIG | default ""}}'
       START_BLOCK: '{{.START_BLOCK}}'
       END_BLOCK: '{{.END_BLOCK}}'
       LABELS: '{{.LABELS | default ""}}'
@@ -193,6 +194,7 @@ tasks:
     cmd: |
       CURRENT_STATE_DIR={{.CURRENT_STATE_DIR}} \
       SOURCE_BLOCK_DIR={{.SOURCE_BLOCK_DIR}} \
+      CONFIG={{.CONFIG}} \
       START_BLOCK={{.START_BLOCK}} \
       END_BLOCK={{.END_BLOCK}} \
       LABELS={{.LABELS}} \
@@ -203,8 +205,8 @@ tasks:
     desc: Combines import-cchain-reexecute-range and reexecute-cchain-range
     vars:
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
-      SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip"}}'
-      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip"}}'
+      SOURCE_BLOCK_DIR: '{{.SOURCE_BLOCK_DIR | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/"}}'
+      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/"}}'
       START_BLOCK: '{{.START_BLOCK | default "101"}}'
       END_BLOCK: '{{.END_BLOCK | default "250000"}}'
       LABELS: '{{.LABELS | default ""}}'
@@ -219,6 +221,7 @@ tasks:
         vars:
           SOURCE_BLOCK_DIR: '{{.EXECUTION_DATA_DIR}}/blocks'
           CURRENT_STATE_DIR: '{{.EXECUTION_DATA_DIR}}/current-state'
+          CONFIG: '{{.CONFIG}}'
           START_BLOCK: '{{.START_BLOCK}}'
           END_BLOCK: '{{.END_BLOCK}}'
           LABELS: '{{.LABELS}}'
