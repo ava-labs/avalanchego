@@ -57,12 +57,14 @@ type statelessUnsignedBlock struct {
 }
 
 type statelessUnsignedGraniteBlock struct {
-	PChainEpoch  PChainEpoch `serialize:"true" json:"pChainEpoch"`
-	ParentID     ids.ID      `serialize:"true" json:"parentID"`
-	Timestamp    int64       `serialize:"true" json:"timestamp"`
-	PChainHeight uint64      `serialize:"true" json:"pChainHeight"`
-	Certificate  []byte      `serialize:"true" json:"certificate"`
-	Block        []byte      `serialize:"true" json:"block"`
+	ParentID            ids.ID `serialize:"true" json:"parentID"`
+	Timestamp           int64  `serialize:"true" json:"timestamp"`
+	PChainHeight        uint64 `serialize:"true" json:"pChainHeight"`
+	Certificate         []byte `serialize:"true" json:"certificate"`
+	Block               []byte `serialize:"true" json:"block"`
+	EpochNumber         uint64 `serialize:"true" json:"epochNumber"`
+	EpochStartTimestamp int64  `serialize:"true" json:"epochStartTimestamp"`
+	EpochHeight         uint64 `serialize:"true" json:"epochHeight"`
 }
 
 type PChainEpoch struct {
@@ -200,7 +202,11 @@ func (b *statelessGraniteBlock) PChainHeight() uint64 {
 }
 
 func (b *statelessGraniteBlock) PChainEpoch() PChainEpoch {
-	return b.StatelessBlock.PChainEpoch
+	return PChainEpoch{
+		Height:    b.StatelessBlock.EpochHeight,
+		Number:    b.StatelessBlock.EpochNumber,
+		StartTime: time.Unix(b.StatelessBlock.EpochStartTimestamp, 0),
+	}
 }
 
 func (b *statelessGraniteBlock) Bytes() []byte {

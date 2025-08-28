@@ -36,12 +36,14 @@ func BuildUnsigned(
 	} else {
 		block = &statelessGraniteBlock{
 			StatelessBlock: statelessUnsignedGraniteBlock{
-				PChainEpoch:  pChainEpoch,
-				ParentID:     parentID,
-				Timestamp:    timestamp.Unix(),
-				PChainHeight: pChainHeight,
-				Certificate:  nil,
-				Block:        blockBytes,
+				ParentID:            parentID,
+				Timestamp:           timestamp.Unix(),
+				PChainHeight:        pChainHeight,
+				Certificate:         nil,
+				Block:               blockBytes,
+				EpochNumber:         pChainEpoch.Number,
+				EpochStartTimestamp: pChainEpoch.StartTime.Unix(),
+				EpochHeight:         pChainEpoch.Height,
 			},
 		}
 	}
@@ -81,12 +83,14 @@ func Build(
 	} else {
 		block = &statelessGraniteBlock{
 			StatelessBlock: statelessUnsignedGraniteBlock{
-				PChainEpoch:  pChainEpoch,
-				ParentID:     parentID,
-				Timestamp:    timestamp.Unix(),
-				PChainHeight: pChainHeight,
-				Certificate:  cert.Raw,
-				Block:        blockBytes,
+				ParentID:            parentID,
+				Timestamp:           timestamp.Unix(),
+				PChainHeight:        pChainHeight,
+				Certificate:         cert.Raw,
+				Block:               blockBytes,
+				EpochNumber:         pChainEpoch.Number,
+				EpochStartTimestamp: pChainEpoch.StartTime.Unix(),
+				EpochHeight:         pChainEpoch.Height,
 			},
 			timestamp: timestamp,
 			cert:      cert,
