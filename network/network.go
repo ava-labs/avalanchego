@@ -504,7 +504,7 @@ func (n *network) AllowConnection(nodeID ids.NodeID) bool {
 		return true
 	}
 	_, areWeAPrimaryNetworkAValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
-	return areWeAPrimaryNetworkAValidator || n.ipTracker.WantsConnection(nodeID) || n.config.ConnectToAllValidators
+	return areWeAPrimaryNetworkAValidator || n.ipTracker.WantsConnection(nodeID)
 }
 
 func (n *network) Track(claimedIPPorts []*ips.ClaimedIPPort) error {
