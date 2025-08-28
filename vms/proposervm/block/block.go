@@ -66,9 +66,9 @@ type statelessUnsignedGraniteBlock struct {
 }
 
 type PChainEpoch struct {
-	Height    uint64
-	Number    uint64
-	StartTime time.Time
+	Height    uint64    `serialize:"true" json:"height"`
+	Number    uint64    `serialize:"true" json:"number"`
+	StartTime time.Time `serialize:"true" json:"startTime"`
 }
 
 type statelessBlock struct {

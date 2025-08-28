@@ -28,13 +28,7 @@ func (p *ProposerAPI) GetProposedHeight(_ *http.Request, _ *struct{}, reply *api
 	return nil
 }
 
-type GetEpochResponse struct {
-	Number       avajson.Uint64 `json:"Number"`
-	StartTime    avajson.Uint64 `json:"StartTime"`
-	PChainHeight avajson.Uint64 `json:"pChainHeight"`
-}
-
-func (p *ProposerAPI) GetEpoch(r *http.Request, _ *struct{}, reply *GetEpochResponse) error {
+func (p *ProposerAPI) GetEpoch(r *http.Request, _ *struct{}, reply *api.GetEpochResponse) error {
 	p.vm.ctx.Log.Debug("API called",
 		zap.String("service", "proposervm"),
 		zap.String("method", "getEpoch"),
