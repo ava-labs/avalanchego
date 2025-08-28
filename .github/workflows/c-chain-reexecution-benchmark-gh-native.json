@@ -7,7 +7,8 @@
                 "start-block": 101,
                 "end-block": 250000,
                 "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
-                "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"
+                "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**",
+                "timeout-minutes": 30
             },
             {
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
@@ -15,7 +16,8 @@
                 "start-block": 101,
                 "end-block": 250000,
                 "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
-                "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"
+                "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**",
+                "timeout-minutes": 30
             },
             {
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
@@ -23,7 +25,8 @@
                 "start-block": 101,
                 "end-block": 250000,
                 "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
-                "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-archive-100/**"
+                "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-archive-100/**",
+                "timeout-minutes": 30
             },
             {
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
@@ -31,7 +34,8 @@
                 "start-block": 101,
                 "end-block": 250000,
                 "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
-                "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**"
+                "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**",
+                "timeout-minutes": 30
             }
         ]
     },
@@ -43,7 +47,8 @@
                 "start-block": 101,
                 "end-block": 250000,
                 "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
-                "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"
+                "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**",
+                "timeout-minutes": 30
             },
             {
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
@@ -51,7 +56,8 @@
                 "start-block": 101,
                 "end-block": 250000,
                 "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
-                "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-archive-100/**"
+                "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-archive-100/**",
+                "timeout-minutes": 30
             },
             {
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
@@ -59,7 +65,8 @@
                 "start-block": 101,
                 "end-block": 250000,
                 "source-block-dir": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
-                "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**"
+                "current-state-dir": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**",
+                "timeout-minutes": 30
             }
         ]
     }
