@@ -13,36 +13,27 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-var _ Client = (*client)(nil)
-
-type Client interface {
-	// GetProposedHeight returns the current height of this node's proposer VM.
-	GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error)
-	// GetEpoch returns the current epoch number, start time, and P-Chain height.
-	GetEpoch(ctx context.Context, options ...rpc.Option) (block.PChainEpoch, error)
-}
-
-type client struct {
-	requester rpc.EndpointRequester
+type Client struct {
+	Requester rpc.EndpointRequester
 }
 
 // NewClient returns a Client for interacting with the ProposerVM API.
 // The provided blockchainName should be the blockchainID or an alias (e.g. "P" for the P-Chain).
-func NewClient(uri string, blockchainName string) Client {
-	return &client{
-		requester: rpc.NewEndpointRequester(uri + fmt.Sprintf("/ext/bc/%s/proposervm", blockchainName)),
+func NewClient(uri string, blockchainName string) *Client {
+	return &Client{
+		Requester: rpc.NewEndpointRequester(uri + fmt.Sprintf("/ext/bc/%s/proposervm", blockchainName)),
 	}
 }
 
-func (c *client) GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {
+func (c *Client) GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {
 	res := &api.GetHeightResponse{}
-	err := c.requester.SendRequest(ctx, "proposervm.getProposedHeight", struct{}{}, res, options...)
+	err := c.Requester.SendRequest(ctx, "proposervm.getProposedHeight", struct{}{}, res, options...)
 	return uint64(res.Height), err
 }
 
-func (c *client) GetEpoch(ctx context.Context, options ...rpc.Option) (block.PChainEpoch, error) {
+func (c *Client) GetEpoch(ctx context.Context, options ...rpc.Option) (block.PChainEpoch, error) {
 	res := &GetEpochResponse{}
-	if err := c.requester.SendRequest(ctx, "proposervm.getEpoch", struct{}{}, res, options...); err != nil {
+	if err := c.Requester.SendRequest(ctx, "proposervm.getEpoch", struct{}{}, res, options...); err != nil {
 		return block.PChainEpoch{}, err
 	}
 	return block.PChainEpoch{
