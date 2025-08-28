@@ -21,16 +21,31 @@ func BuildUnsigned(
 	pChainEpoch PChainEpoch,
 	blockBytes []byte,
 ) (SignedBlock, error) {
-	var block SignedBlock = &statelessBlock{
-		StatelessBlock: statelessUnsignedBlock{
-			ParentID:     parentID,
-			Timestamp:    timestamp.Unix(),
-			PChainHeight: pChainHeight,
-			PChainEpoch:  pChainEpoch,
-			Certificate:  nil,
-			Block:        blockBytes,
-		},
-		timestamp: timestamp,
+	var block SignedBlock
+	if pChainEpoch.Number == 0 {
+		block = &statelessBlock{
+			StatelessBlock: statelessUnsignedBlock{
+				ParentID:     parentID,
+				Timestamp:    timestamp.Unix(),
+				PChainHeight: pChainHeight,
+				Certificate:  nil,
+				Block:        blockBytes,
+			},
+			timestamp: timestamp,
+		}
+	} else {
+		block = &statelessGraniteBlock{
+			StatelessBlock: statelessUnsignedGraniteBlock{
+				ParentID:            parentID,
+				Timestamp:           timestamp.Unix(),
+				PChainHeight:        pChainHeight,
+				Certificate:         nil,
+				Block:               blockBytes,
+				EpochNumber:         pChainEpoch.Number,
+				EpochStartTimestamp: pChainEpoch.StartTime.Unix(),
+				EpochHeight:         pChainEpoch.Height,
+			},
+		}
 	}
 
 	bytes, err := Codec.Marshal(CodecVersion, &block)
@@ -51,22 +66,39 @@ func Build(
 	chainID ids.ID,
 	key crypto.Signer,
 ) (SignedBlock, error) {
-	block := &statelessBlock{
-		StatelessBlock: statelessUnsignedBlock{
-			ParentID:     parentID,
-			Timestamp:    timestamp.Unix(),
-			PChainHeight: pChainHeight,
-			PChainEpoch:  pChainEpoch,
-			Certificate:  cert.Raw,
-			Block:        blockBytes,
-		},
-		timestamp: timestamp,
-		cert:      cert,
-		proposer:  ids.NodeIDFromCert(cert),
+	var block SignedBlock
+	if pChainEpoch.Number == 0 {
+		block = &statelessBlock{
+			StatelessBlock: statelessUnsignedBlock{
+				ParentID:     parentID,
+				Timestamp:    timestamp.Unix(),
+				PChainHeight: pChainHeight,
+				Certificate:  cert.Raw,
+				Block:        blockBytes,
+			},
+			timestamp: timestamp,
+			cert:      cert,
+			proposer:  ids.NodeIDFromCert(cert),
+		}
+	} else {
+		block = &statelessGraniteBlock{
+			StatelessBlock: statelessUnsignedGraniteBlock{
+				ParentID:            parentID,
+				Timestamp:           timestamp.Unix(),
+				PChainHeight:        pChainHeight,
+				Certificate:         cert.Raw,
+				Block:               blockBytes,
+				EpochNumber:         pChainEpoch.Number,
+				EpochStartTimestamp: pChainEpoch.StartTime.Unix(),
+				EpochHeight:         pChainEpoch.Height,
+			},
+			timestamp: timestamp,
+			cert:      cert,
+			proposer:  ids.NodeIDFromCert(cert),
+		}
 	}
-	var blockIntf SignedBlock = block
 
-	unsignedBytesWithEmptySignature, err := Codec.Marshal(CodecVersion, &blockIntf)
+	unsignedBytesWithEmptySignature, err := Codec.Marshal(CodecVersion, &block)
 	if err != nil {
 		return nil, err
 	}
@@ -77,21 +109,34 @@ func Build(
 	// prefix to get the unsigned bytes.
 	lenUnsignedBytes := len(unsignedBytesWithEmptySignature) - wrappers.IntLen
 	unsignedBytes := unsignedBytesWithEmptySignature[:lenUnsignedBytes]
-	block.id = hashing.ComputeHash256Array(unsignedBytes)
 
-	header, err := BuildHeader(chainID, parentID, block.id)
+	// Set the block ID
+	block.setID(hashing.ComputeHash256Array(unsignedBytes))
+
+	header, err := BuildHeader(chainID, parentID, block.ID())
 	if err != nil {
 		return nil, err
 	}
 
 	headerHash := hashing.ComputeHash256(header.Bytes())
-	block.Signature, err = key.Sign(rand.Reader, headerHash, crypto.SHA256)
+	signature, err := key.Sign(rand.Reader, headerHash, crypto.SHA256)
 	if err != nil {
 		return nil, err
 	}
 
-	block.bytes, err = Codec.Marshal(CodecVersion, &blockIntf)
-	return block, err
+	// Set the signature
+	block.setSignature(signature)
+
+	// Marshal the final block with signature
+	finalBytes, err := Codec.Marshal(CodecVersion, &block)
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the final bytes
+	block.setBytes(finalBytes)
+
+	return block, nil
 }
 
 func BuildHeader(
