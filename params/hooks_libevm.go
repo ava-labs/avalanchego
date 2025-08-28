@@ -25,6 +25,10 @@ import (
 	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
 )
 
+// invalidateDelegateTime is the Unix timestamp for August 2nd, 2025, midnight Eastern Time
+// (August 2nd, 2025, 04:00 UTC)
+const invalidateDelegateUnix = 1754107200
+
 type RulesExtra extras.Rules
 
 func GetRulesExtra(r Rules) *extras.Rules {
@@ -90,9 +94,12 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 			},
 		}
 
-		if callType := env.IncomingCallType(); callType == vm.DelegateCall || callType == vm.CallCode {
+		callType := env.IncomingCallType()
+		isDisallowedCallType := callType == vm.DelegateCall || callType == vm.CallCode
+		if env.BlockTime() >= invalidateDelegateUnix && isDisallowedCallType {
 			env.InvalidateExecution(fmt.Errorf("precompile cannot be called with %s", callType))
 		}
+
 		return contract.Run(accessibleState, env.Addresses().Caller, env.Addresses().Self, input, suppliedGas, env.ReadOnly())
 	}
 	return vm.NewStatefulPrecompile(legacy.PrecompiledStatefulContract(run).Upgrade())
