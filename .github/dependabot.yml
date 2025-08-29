@@ -14,6 +14,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 0 # Disable non-security version updates
     ignore:
       - dependency-name: "ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd" # manually updated
       - dependency-name: "golangci/golangci-lint-action"
