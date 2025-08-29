@@ -25,12 +25,11 @@ type sample struct {
 	timestamp time.Time
 }
 
-// An EtaTracker tracks the ETA of a job
+// EtaTracker tracks the ETA of a job
 type EtaTracker struct {
 	samples        []sample
 	samplePosition uint8
 	maxSamples     uint8
-	lowestSample   uint64
 	totalSamples   uint64
 	slowdownFactor float64
 }
@@ -58,7 +57,6 @@ func NewEtaTracker(maxSamples uint8, slowdownFactor float64) *EtaTracker {
 		samples:        make([]sample, maxSamples),
 		samplePosition: 0,
 		maxSamples:     maxSamples,
-		lowestSample:   math.MaxUint64, // Initialize to maximum value
 		totalSamples:   0,
 		slowdownFactor: slowdownFactor,
 	}
@@ -72,10 +70,6 @@ func NewEtaTracker(maxSamples uint8, slowdownFactor float64) *EtaTracker {
 //
 // The first sample should be at 0% progress to establish a baseline
 func (t *EtaTracker) AddSample(completed uint64, target uint64, timestamp time.Time) (remaining *time.Duration, percentComplete float64) {
-	if completed < t.lowestSample {
-		t.lowestSample = completed
-	}
-
 	sample := sample{
 		completed: completed,
 		timestamp: timestamp,
