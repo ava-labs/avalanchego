@@ -527,17 +527,30 @@ impl<T, S: ReadableStorage> NodeStore<T, S> {
 }
 
 // Functionalities use by the checker
-impl<S: WritableStorage> NodeStore<super::Committed, S> {
+impl<T, S: WritableStorage> NodeStore<T, S> {
     pub(crate) fn truncate_free_list(
-        &self,
-        area_size_index: AreaIndex,
-        addr: LinearAddress,
+        &mut self,
+        free_list_parent: FreeListParent,
     ) -> Result<(), FileIoError> {
-        let free_area = FreeArea::new(None);
-        let mut stored_area_bytes = Vec::new();
-        free_area.as_bytes(area_size_index, &mut stored_area_bytes);
-        self.storage.write(addr.into(), &stored_area_bytes)?;
-        Ok(())
+        match free_list_parent {
+            FreeListParent::FreeListHead(area_size_index) => {
+                *self
+                    .freelists_mut()
+                    .get_mut(area_size_index.as_usize())
+                    .expect("area_size_index is less than AreaIndex::NUM_AREA_SIZES") = None;
+                Ok(())
+            }
+            FreeListParent::PrevFreeArea {
+                area_size_idx,
+                parent_addr,
+            } => {
+                let free_area = FreeArea::new(None);
+                let mut stored_area_bytes = Vec::new();
+                free_area.as_bytes(area_size_idx, &mut stored_area_bytes);
+                self.storage.write(parent_addr.into(), &stored_area_bytes)?;
+                Ok(())
+            }
+        }
     }
 }
 

@@ -470,6 +470,10 @@ impl<T, S> NodeStore<T, S> {
     pub(crate) const fn freelists(&self) -> &alloc::FreeLists {
         self.header.free_lists()
     }
+
+    pub(crate) const fn freelists_mut(&mut self) -> &mut alloc::FreeLists {
+        self.header.free_lists_mut()
+    }
 }
 
 /// Contains the state of a proposal that is still being modified.
@@ -813,7 +817,10 @@ impl<S: WritableStorage> NodeStore<Committed, S> {
 }
 
 // Helper functions for the checker
-impl<S: ReadableStorage> NodeStore<Committed, S> {
+impl<T, S: ReadableStorage> NodeStore<T, S>
+where
+    NodeStore<T, S>: NodeReader,
+{
     pub(crate) const fn size(&self) -> u64 {
         self.header.size()
     }
