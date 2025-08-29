@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	"github.com/ava-labs/coreth/params/extras"
@@ -41,7 +40,7 @@ type BlockFetcher interface {
 
 type VerifierBackend struct {
 	Ctx          *snow.Context
-	Fx           fx.Fx
+	Fx           *secp256k1fx.Fx
 	Rules        extras.Rules
 	Bootstrapped bool
 	BlockFetcher BlockFetcher
