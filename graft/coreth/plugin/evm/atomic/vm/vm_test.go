@@ -58,11 +58,7 @@ func (vm *VM) newImportTx(
 	baseFee *big.Int, // fee to use post-AP3
 	keys []*secp256k1.PrivateKey, // Keys to import the funds
 ) (*atomic.Tx, error) {
-	kc := secp256k1fx.NewKeychain()
-	for _, key := range keys {
-		kc.Add(key)
-	}
-
+	kc := secp256k1fx.NewKeychain(keys...)
 	atomicUTXOs, _, _, err := avax.GetAtomicUTXOs(vm.Ctx.SharedMemory, atomic.Codec, chainID, kc.Addresses(), ids.ShortEmpty, ids.Empty, maxUTXOsToFetch)
 	if err != nil {
 		return nil, fmt.Errorf("problem retrieving atomic UTXOs: %w", err)
@@ -1206,8 +1202,7 @@ func TestBuildBlockDoesNotExceedAtomicGasLimit(t *testing.T) {
 		}
 	}()
 
-	kc := secp256k1fx.NewKeychain()
-	kc.Add(vmtest.TestKeys[0])
+	kc := secp256k1fx.NewKeychain(vmtest.TestKeys[0])
 	txID, err := ids.ToID(hashing.ComputeHash256(vmtest.TestShortIDAddrs[0][:]))
 	require.NoError(t, err)
 
@@ -1270,8 +1265,6 @@ func TestExtraStateChangeAtomicGasLimitExceeded(t *testing.T) {
 		}
 	}()
 
-	kc := secp256k1fx.NewKeychain()
-	kc.Add(vmtest.TestKeys[0])
 	txID, err := ids.ToID(hashing.ComputeHash256(vmtest.TestShortIDAddrs[0][:]))
 	require.NoError(t, err)
 
