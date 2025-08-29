@@ -28,8 +28,6 @@ import (
 var (
 	allowedFutureBlockTime = 10 * time.Second // Max time from current time allowed for blocks, before they're considered future blocks
 
-	ErrInsufficientBlockGas = errors.New("insufficient gas to cover the block cost")
-
 	errInvalidBlockTime       = errors.New("timestamp less than parent's")
 	errUnclesUnsupported      = errors.New("uncles unsupported")
 	errExtDataGasUsedNil      = errors.New("extDataGasUsed is nil")
@@ -294,76 +292,6 @@ func (*DummyEngine) Prepare(_ consensus.ChainHeaderReader, header *types.Header)
 	return nil
 }
 
-func (eng *DummyEngine) verifyBlockFee(
-	baseFee *big.Int,
-	requiredBlockGasCost *big.Int,
-	txs []*types.Transaction,
-	receipts []*types.Receipt,
-	extraStateChangeContribution *big.Int,
-) error {
-	if eng.consensusMode.ModeSkipBlockFee {
-		return nil
-	}
-	if baseFee == nil || baseFee.Sign() <= 0 {
-		return fmt.Errorf("invalid base fee (%d) in apricot phase 4", baseFee)
-	}
-	if requiredBlockGasCost == nil || !requiredBlockGasCost.IsUint64() {
-		return fmt.Errorf("invalid block gas cost (%d) in apricot phase 4", requiredBlockGasCost)
-	}
-
-	var (
-		gasUsed              = new(big.Int)
-		blockFeeContribution = new(big.Int)
-		totalBlockFee        = new(big.Int)
-	)
-
-	// Add in the external contribution
-	if extraStateChangeContribution != nil {
-		if extraStateChangeContribution.Cmp(common.Big0) < 0 {
-			return fmt.Errorf("invalid extra state change contribution: %d", extraStateChangeContribution)
-		}
-		totalBlockFee.Add(totalBlockFee, extraStateChangeContribution)
-	}
-
-	// Calculate the total excess (denominated in AVAX) over the base fee that was paid towards the block fee
-	for i, receipt := range receipts {
-		// Each transaction contributes the excess over the baseFee towards the totalBlockFee
-		// This should be equivalent to the sum of the "priority fees" within EIP-1559.
-		txFeePremium, err := txs[i].EffectiveGasTip(baseFee)
-		if err != nil {
-			return err
-		}
-		// Multiply the [txFeePremium] by the gasUsed in the transaction since this gives the total AVAX that was paid
-		// above the amount required if the transaction had simply paid the minimum base fee for the block.
-		//
-		// Ex. LegacyTx paying a gas price of 100 gwei for 1M gas in a block with a base fee of 10 gwei.
-		// Total Fee = 100 gwei * 1M gas
-		// Minimum Fee = 10 gwei * 1M gas (minimum fee that would have been accepted for this transaction)
-		// Fee Premium = 90 gwei
-		// Total Overpaid = 90 gwei * 1M gas
-
-		blockFeeContribution.Mul(txFeePremium, gasUsed.SetUint64(receipt.GasUsed))
-		totalBlockFee.Add(totalBlockFee, blockFeeContribution)
-	}
-	// Calculate how much gas the [totalBlockFee] would purchase at the price level
-	// set by the base fee of this block.
-	blockGas := new(big.Int).Div(totalBlockFee, baseFee)
-
-	// Require that the amount of gas purchased by the effective tips within the
-	// block covers at least `requiredBlockGasCost`.
-	//
-	// NOTE: To determine the required block fee, multiply
-	// `requiredBlockGasCost` by `baseFee`.
-	if blockGas.Cmp(requiredBlockGasCost) < 0 {
-		return fmt.Errorf("%w: expected %d but got %d",
-			ErrInsufficientBlockGas,
-			requiredBlockGasCost,
-			blockGas,
-		)
-	}
-	return nil
-}
-
 func (eng *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types.Block, parent *types.Header, state *state.StateDB, receipts []*types.Receipt) error {
 	// Perform extra state change while finalizing the block
 	var (
@@ -402,14 +330,16 @@ func (eng *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types
 		}
 
 		// Verify the block fee was paid.
-		if err := eng.verifyBlockFee(
-			block.BaseFee(),
-			blockGasCost,
-			block.Transactions(),
-			receipts,
-			contribution,
-		); err != nil {
-			return err
+		if !eng.consensusMode.ModeSkipBlockFee {
+			if err := customheader.VerifyBlockFee(
+				block.BaseFee(),
+				blockGasCost,
+				block.Transactions(),
+				receipts,
+				contribution,
+			); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -446,14 +376,16 @@ func (eng *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, h
 		}
 
 		// Verify that this block covers the block fee.
-		if err := eng.verifyBlockFee(
-			header.BaseFee,
-			headerExtra.BlockGasCost,
-			txs,
-			receipts,
-			contribution,
-		); err != nil {
-			return nil, err
+		if !eng.consensusMode.ModeSkipBlockFee {
+			if err := customheader.VerifyBlockFee(
+				header.BaseFee,
+				headerExtra.BlockGasCost,
+				txs,
+				receipts,
+				contribution,
+			); err != nil {
+				return nil, err
+			}
 		}
 	}
 
