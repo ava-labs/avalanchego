@@ -25,7 +25,6 @@ func TestWriteBlock_Basic(t *testing.T) {
 		config             DatabaseConfig
 		expectedMCH        uint64 // expected max contiguous height
 		expectedMaxHeight  uint64
-		headerSizes        []BlockHeaderSize
 		syncToDisk         bool
 		checkpointInterval uint64
 	}{
@@ -99,20 +98,6 @@ func TestWriteBlock_Basic(t *testing.T) {
 			expectedMaxHeight: 12,
 		},
 		{
-			name:              "blocks with various header sizes",
-			blockHeights:      []uint64{0, 1, 2},
-			headerSizes:       []BlockHeaderSize{0, 50, 100},
-			expectedMCH:       2,
-			expectedMaxHeight: 2,
-		},
-		{
-			name:              "overwrite with different header size",
-			blockHeights:      []uint64{12, 13, 12}, // Write twice to same height
-			headerSizes:       []BlockHeaderSize{10, 0, 50},
-			expectedMCH:       unsetHeight,
-			expectedMaxHeight: 13,
-		},
-		{
 			name:              "with sync to disk",
 			blockHeights:      []uint64{0, 1, 2, 5},
 			syncToDisk:        true,
@@ -147,23 +132,12 @@ func TestWriteBlock_Basic(t *testing.T) {
 			defer cleanup()
 
 			blocksWritten := make(map[uint64][]byte)
-			headerSizesWritten := make(map[uint64]BlockHeaderSize)
-			for i, h := range tt.blockHeights {
+			for _, h := range tt.blockHeights {
 				block := randomBlock(t)
-				var headerSize BlockHeaderSize
-
-				// Use specific header size if provided
-				if tt.headerSizes != nil && i < len(tt.headerSizes) {
-					headerSize = tt.headerSizes[i]
-					// Ensure header size doesn't exceed block size
-					require.LessOrEqual(t, int(headerSize), len(block), "header size %d exceeds block size %d for test case", headerSize, len(block))
-				}
-
-				err := store.WriteBlock(h, block, headerSize)
+				err := store.WriteBlock(h, block)
 				require.NoError(t, err, "unexpected error at height %d", h)
 
 				blocksWritten[h] = block
-				headerSizesWritten[h] = headerSize // Store the header size for the final write to this height
 			}
 
 			// Verify all written blocks are readable and data is correct
@@ -171,27 +145,6 @@ func TestWriteBlock_Basic(t *testing.T) {
 				readBlock, err := store.ReadBlock(h)
 				require.NoError(t, err, "ReadBlock failed at height %d", h)
 				require.Equal(t, expectedBlock, readBlock)
-
-				// Test header/body separation if header size was specified
-				if tt.headerSizes != nil {
-					if headerSize, exists := headerSizesWritten[h]; exists {
-						header, err := store.ReadHeader(h)
-						require.NoError(t, err, "ReadHeader failed at height %d", h)
-
-						body, err := store.ReadBody(h)
-						require.NoError(t, err, "ReadBody failed at height %d", h)
-
-						if headerSize == 0 {
-							require.Nil(t, header)
-							require.Equal(t, expectedBlock, body)
-						} else {
-							expectedHeader := expectedBlock[:headerSize]
-							expectedBody := expectedBlock[headerSize:]
-							require.Equal(t, expectedHeader, header, "header mismatch at height %d", h)
-							require.Equal(t, expectedBody, body, "body mismatch at height %d", h)
-						}
-					}
-				}
 			}
 
 			checkDatabaseState(t, store, tt.expectedMaxHeight, tt.expectedMCH)
@@ -224,7 +177,7 @@ func TestWriteBlock_Concurrency(t *testing.T) {
 				height = uint64(i)
 			}
 
-			err := store.WriteBlock(height, block, 1)
+			err := store.WriteBlock(height, block)
 			if err != nil {
 				errors.Add(1)
 			}
@@ -253,72 +206,51 @@ func TestWriteBlock_Errors(t *testing.T) {
 		name       string
 		height     uint64
 		block      []byte
-		headerSize BlockHeaderSize
 		setup      func(db *Database)
 		config     DatabaseConfig
 		wantErr    error
 		wantErrMsg string
 	}{
 		{
-			name:       "empty block nil",
-			height:     0,
-			block:      nil,
-			headerSize: 0,
-			wantErr:    ErrBlockEmpty,
+			name:    "empty block nil",
+			height:  0,
+			block:   nil,
+			wantErr: ErrBlockEmpty,
 		},
 		{
-			name:       "empty block zero length",
-			height:     0,
-			block:      []byte{},
-			headerSize: 0,
-			wantErr:    ErrBlockEmpty,
+			name:    "empty block zero length",
+			height:  0,
+			block:   []byte{},
+			wantErr: ErrBlockEmpty,
 		},
 		{
-			name:       "header size larger than block",
-			height:     0,
-			block:      []byte("small"),
-			headerSize: 6, // block is only 5 bytes
-			wantErr:    ErrHeaderSizeTooLarge,
+			name:    "height below custom minimum",
+			height:  5,
+			block:   randomBlock(t),
+			config:  DefaultConfig().WithMinimumHeight(10),
+			wantErr: ErrInvalidBlockHeight,
 		},
 		{
-			name:       "header size equal to block",
-			height:     0,
-			block:      []byte("small"),
-			headerSize: 5,
-			wantErr:    ErrHeaderSizeTooLarge,
+			name:    "height causes overflow",
+			height:  math.MaxUint64,
+			block:   randomBlock(t),
+			wantErr: ErrInvalidBlockHeight,
 		},
 		{
-			name:       "height below custom minimum",
-			height:     5,
-			block:      randomBlock(t),
-			config:     DefaultConfig().WithMinimumHeight(10),
-			headerSize: 0,
-			wantErr:    ErrInvalidBlockHeight,
-		},
-		{
-			name:       "height causes overflow",
-			height:     math.MaxUint64,
-			block:      randomBlock(t),
-			headerSize: 0,
-			wantErr:    ErrInvalidBlockHeight,
-		},
-		{
-			name:       "database closed",
-			height:     0,
-			block:      randomBlock(t),
-			headerSize: 0,
+			name:   "database closed",
+			height: 0,
+			block:  randomBlock(t),
 			setup: func(db *Database) {
 				db.Close()
 			},
 			wantErr: ErrDatabaseClosed,
 		},
 		{
-			name:       "exceed max data file size",
-			height:     0,
-			block:      make([]byte, 999), // Block + header will exceed 1024 limit (999 + 26 = 1025 > 1024)
-			config:     DefaultConfig().WithMaxDataFileSize(1024),
-			headerSize: 0,
-			wantErr:    ErrBlockTooLarge,
+			name:    "exceed max data file size",
+			height:  0,
+			block:   make([]byte, 1002), // Block + header will exceed 1024 limit (1002 + 23 = 1025 > 1024)
+			config:  DefaultConfig().WithMaxDataFileSize(1024),
+			wantErr: ErrBlockTooLarge,
 		},
 		{
 			name:   "data file offset overflow",
@@ -329,8 +261,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 				// Set the next write offset to near max to trigger overflow
 				db.nextDataWriteOffset.Store(math.MaxUint64 - 50)
 			},
-			headerSize: 0,
-			wantErr:    safemath.ErrOverflow,
+			wantErr: safemath.ErrOverflow,
 		},
 		{
 			name:   "writeBlockAt - failed to get data file",
@@ -344,7 +275,6 @@ func TestWriteBlock_Errors(t *testing.T) {
 				file.Close()
 				require.NoError(t, os.Chmod(filePath, 0o444))
 			},
-			headerSize: 0,
 			wantErrMsg: "failed to get data file for writing block",
 		},
 		{
@@ -354,7 +284,6 @@ func TestWriteBlock_Errors(t *testing.T) {
 			setup: func(db *Database) {
 				db.indexFile.Close()
 			},
-			headerSize: 0,
 			wantErrMsg: "failed to write index entry",
 		},
 	}
@@ -373,7 +302,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 				tt.setup(store)
 			}
 
-			err := store.WriteBlock(tt.height, tt.block, tt.headerSize)
+			err := store.WriteBlock(tt.height, tt.block)
 			if tt.wantErrMsg != "" {
 				require.True(t, strings.HasPrefix(err.Error(), tt.wantErrMsg), "expected error message to start with %s, got %s", tt.wantErrMsg, err.Error())
 			} else {
