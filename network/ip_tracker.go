@@ -277,7 +277,7 @@ func (i *ipTracker) WantsConnection(nodeID ids.NodeID) bool {
 	defer i.lock.RUnlock()
 
 	node, ok := i.tracked[nodeID]
-	return ok && (node.wantsConnection() || (i.connectToAllValidators && node.validatedSubnets.Len() > 0))
+	return ok && node.wantsConnection()
 }
 
 // ShouldVerifyIP is used as an optimization to avoid unnecessary IP
@@ -326,7 +326,7 @@ func (i *ipTracker) AddIP(ip *ips.ClaimedIPPort) bool {
 	if connectedNode, ok := i.connected[ip.NodeID]; ok {
 		i.setGossipableIP(trackedNode.ip, connectedNode.trackedSubnets)
 	}
-	return trackedNode.wantsConnection() || (i.connectToAllValidators && trackedNode.validatedSubnets.Len() > 0)
+	return trackedNode.wantsConnection()
 }
 
 // GetIP returns the most recent IP of the provided nodeID. Returns true if all
