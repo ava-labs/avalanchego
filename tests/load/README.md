@@ -71,22 +71,20 @@ type Test interface {
 
 The `load` package provides a comprehensive suite of test types designed to stress different aspects of EVM execution. Each test targets specific performance characteristics and resource usage patterns.
 
-| Test Type         | Description                                                     |
-| ----------------- | --------------------------------------------------------------- |
-| Transfer          | Performs self-transfer of 0 AVAX                                |
-| Read              | Performs multiple storage reads from contract state             |
-| Write             | Executes equential storage writes to new contract storage slots |
-| StateModification | Updates existing storage values or creates new ones             |
-| Hashing           | Executes Keccak256 hash operations in a loop                    |
-| PureCompute       | Performs CPU-intensive mathematical computations                |
-| Memory            | Allocates and manipulates dynamic arrays                        |
-| CallDepth         | Performs recursive function calls to test stack limits          |
-| ContractCreation  | Deploys new contracts during execution                          |
-| ExternalCall      | Makes calls to external contract functions                      |
-| LargeEvent        | Emits events with large data payloads                           |
-| TrieStress        | Performs insert operations on TrieDB                            |
+| Test Type      | Description                                            |
+| -------------- | ------------------------------------------------------ |
+| Transfer       | Transfers 1 nAVAX to a random account                  |
+| Read           | Reads from a set of storage slots                      |
+| Write          | Writes to a set of storage slots                       |
+| Modify         | Modifies a set of non-empty storage slots              |
+| Hash           | Hash a value for N iterations                          |
+| Deploy         | Deploy an instance of the Dummy contract               |
+| Large Calldata | Compute the sum of a large calldata tx                 |
+| TrieStress     | Performs insert operations on TrieDB                   |
+| ERC20          | Transfers 1 unit of an ERC20 token to a random account |
 
-Additionally, there is a `RandomTest` which executes one of the aforementioned tests, selected uniformly at random.
+Additionally, there is a `RandomTest` which executes one of the aforementioned tests 
+at random, with certain tests having a higher probability of being executed than others.
 This test is particular useful for mimicking the diverse transactions patterns seen on blockchains like the C-Chain.
 
 ### Metrics
