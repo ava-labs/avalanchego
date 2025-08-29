@@ -360,7 +360,7 @@ func (w *worker) applyTransaction(env *environment, tx *types.Transaction, coinb
 
 	rulesExtra := params.GetRulesExtra(env.rules)
 	if rulesExtra.IsDurango {
-		results, err := core.CheckPredicates(env.rules, env.predicateContext, tx)
+		results, err := core.CheckTxPredicates(env.rules, env.predicateContext, tx)
 		if err != nil {
 			log.Debug("Transaction predicate failed verification in miner", "tx", tx.Hash(), "err", err)
 			return nil, err
