@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core/extstate"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap4"
 
 	ethparams "github.com/ava-labs/libevm/params"
@@ -1444,7 +1445,7 @@ func GenerateChainInvalidBlockFeeTest(t *testing.T, create createFunc) {
 		require.NoError(err)
 		gen.AddTx(signedTx)
 	})
-	require.ErrorIs(err, dummy.ErrInsufficientBlockGas)
+	require.ErrorIs(err, customheader.ErrInsufficientBlockGas)
 }
 
 func InsertChainInvalidBlockFeeTest(t *testing.T, create createFunc) {
@@ -1488,7 +1489,7 @@ func InsertChainInvalidBlockFeeTest(t *testing.T, create createFunc) {
 	})
 	require.NoError(err)
 	_, err = blockchain.InsertChain(chain)
-	require.ErrorIs(err, dummy.ErrInsufficientBlockGas)
+	require.ErrorIs(err, customheader.ErrInsufficientBlockGas)
 }
 
 func InsertChainValidBlockFeeTest(t *testing.T, create createFunc) {
