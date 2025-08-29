@@ -548,7 +548,7 @@ func (n *network) KnownPeers() ([]byte, []byte) {
 //
 // - Respond with all subnet IPs
 //   - The peer requests all peers
-//   - We believe ourself to be a primary network validator
+//   - We believe ourself to be a primary network validator or we track all subnets
 //
 // - Respond with subnet IPs tracked by the peer
 //   - The peer does not request all peers
@@ -576,7 +576,7 @@ func (n *network) Peers(
 		}
 	}
 
-	if areWeAPrimaryNetworkValidator && requestAllPeers {
+	if (areWeAPrimaryNetworkValidator || n.config.ConnectToAllValidators) && requestAllPeers {
 		// Return IPs for all subnets.
 		return getGossipableIPs(
 			n.ipTracker,
