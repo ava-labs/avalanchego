@@ -112,7 +112,7 @@ func TestHelperProcess(t *testing.T) {
 // interface are implemented.
 func TestVMServerInterface(t *testing.T) {
 	var wantMethods, gotMethods []string
-	pb := reflect.TypeOf((*vmpb.VMServer)(nil)).Elem()
+	pb := reflect.TypeFor[vm.VMServer]()
 	for i := 0; i < pb.NumMethod()-1; i++ {
 		wantMethods = append(wantMethods, pb.Method(i).Name)
 	}
