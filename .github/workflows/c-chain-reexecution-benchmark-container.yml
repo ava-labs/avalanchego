@@ -31,6 +31,10 @@ on:
       push-post-state:
         description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
         default: ''
+      timeout-minutes:
+        description: 'Timeout in minutes for the job.'
+        required: false
+        default: 30
 
   # Disabled because scheduled trigger is empty. To enable, uncomment and add at least one vector to the schedule
   # entry in the corresponding JSON file.
@@ -51,13 +55,14 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             {
               echo "matrix<<EOF"
-              printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s" }] }\n' \
+              printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": "%s" }] }\n' \
                 "${{ github.event.inputs.start-block }}" \
                 "${{ github.event.inputs.end-block }}" \
                 "${{ github.event.inputs.block-dir-src }}" \
                 "${{ github.event.inputs.current-state-dir-src }}" \
                 "${{ github.event.inputs.config }}" \
-                "${{ github.event.inputs.runner }}"
+                "${{ github.event.inputs.runner }}" \
+                "${{ github.event.inputs.timeout-minutes }}"
               echo EOF
             } >> "$GITHUB_OUTPUT"
           else
@@ -74,7 +79,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
-
+    timeout-minutes: ${{ matrix.timeout-minutes }}
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego' }}
     permissions:
       id-token: write
