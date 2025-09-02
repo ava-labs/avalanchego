@@ -12,13 +12,6 @@ type MemoryDatabase struct {
 	closed bool
 }
 
-// NewMemoryDatabase creates a new in-memory BlockDB
-func NewMemoryDatabase() *MemoryDatabase {
-	return &MemoryDatabase{
-		blocks: make(map[BlockHeight]BlockData),
-	}
-}
-
 // WriteBlock stores a block in memory
 func (m *MemoryDatabase) WriteBlock(height BlockHeight, block BlockData) error {
 	m.mu.Lock()
@@ -26,6 +19,10 @@ func (m *MemoryDatabase) WriteBlock(height BlockHeight, block BlockData) error {
 
 	if m.closed {
 		return ErrDatabaseClosed
+	}
+
+	if m.blocks == nil {
+		m.blocks = make(map[BlockHeight]BlockData)
 	}
 
 	if len(block) == 0 {
@@ -48,8 +45,8 @@ func (m *MemoryDatabase) ReadBlock(height BlockHeight) (BlockData, error) {
 		return nil, ErrDatabaseClosed
 	}
 
-	block, exists := m.blocks[height]
-	if !exists {
+	block, ok := m.blocks[height]
+	if !ok {
 		return nil, ErrBlockNotFound
 	}
 
@@ -67,12 +64,15 @@ func (m *MemoryDatabase) HasBlock(height BlockHeight) (bool, error) {
 		return false, ErrDatabaseClosed
 	}
 
-	_, exists := m.blocks[height]
-	return exists, nil
+	_, ok := m.blocks[height]
+	return ok, nil
 }
 
 // Inspect returns details about the database
-func (*MemoryDatabase) Inspect() (string, error) {
+func (m *MemoryDatabase) Inspect() (string, error) {
+	if m.closed {
+		return "", ErrDatabaseClosed
+	}
 	return "", nil
 }
 
@@ -80,10 +80,6 @@ func (*MemoryDatabase) Inspect() (string, error) {
 func (m *MemoryDatabase) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
-	if m.closed {
-		return nil
-	}
 
 	m.closed = true
 	m.blocks = nil
