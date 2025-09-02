@@ -70,7 +70,7 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	wal, err := wal.New(config.WalLocation)
+	wal, err := wal.New(config.WALLocation)
 	if err != nil {
 		return nil, err
 	}

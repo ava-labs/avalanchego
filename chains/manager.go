@@ -1763,7 +1763,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		OutboundMsgBuilder: m.MsgCreator,
 		Validators:         m.Validators.GetMap(ctx.SubnetID),
 		VM:                 vm,
-		WalLocation:        getChainWALLocation(ctx.ChainDataDir, ctx.ChainID),
+		WALLocation:        getChainWALLocation(ctx.ChainDataDir, ctx.ChainID),
 		SignBLS:            m.ManagerConfig.StakingBLSKey.Sign,
 		DB:                 simplexDB,
 	}
