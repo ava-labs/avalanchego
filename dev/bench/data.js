@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1756825566640,
+  "lastUpdate": 1756825609438,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -698,6 +698,34 @@ window.BENCHMARK_DATA = {
             "value": 88.89,
             "unit": "mgas/s",
             "extra": "1 times\n4 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "aaronbuchwald",
+            "username": "aaronbuchwald",
+            "email": "aaron.buchwald56@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "847eba16084195cf619154fca6958a74fb6b9c1e",
+          "message": "Add back empty schedule entry for reexecute w/ container job (#4230)",
+          "timestamp": "2025-08-29T18:38:11Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/847eba16084195cf619154fca6958a74fb6b9c1e"
+        },
+        "date": 1756825609079,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-default",
+            "value": 102.7,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
           }
         ]
       }
