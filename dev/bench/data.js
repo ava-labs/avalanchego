@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1756825609438,
+  "lastUpdate": 1756830219803,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -724,6 +724,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[101,250000]-Config-default",
             "value": 102.7,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "aaronbuchwald",
+            "username": "aaronbuchwald",
+            "email": "aaron.buchwald56@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "0e204855f1a89376e620bc1241a5b70c2f3a86ad",
+          "message": "Comment out schedule trigger for re-execution on w/container (#4234)\n\nSigned-off-by: aaronbuchwald <aaron.buchwald56@gmail.com>\nCo-authored-by: Copilot <175728472+Copilot@users.noreply.github.com>",
+          "timestamp": "2025-09-02T15:58:29Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/0e204855f1a89376e620bc1241a5b70c2f3a86ad"
+        },
+        "date": 1756830219391,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-default",
+            "value": 93.54,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
