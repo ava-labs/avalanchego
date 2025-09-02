@@ -12,7 +12,7 @@ Configure your AvalancheGo dev environment requires:
 - AWS Credentials
 - Prometheus Credentials
 
-### Setup Nix Shell
+### Nix Shell
 To install Nix, refer to the AvalancheGo [flake.nix](../../../flake.nix) file for installation instructions.
 
 To set up your shell environment, run:
@@ -22,7 +22,7 @@ nix develop
 ```
 
 
-### Setup AWS Access
+### AWS Access
 This walkthrough assumes AWS access to the S3 bucket `s3://avalanchego-bootstrap-testing` in the Ava Labs Experimental Account in `us-east-2`.
 
 To configure your development environment, sign in via either:
@@ -47,7 +47,7 @@ Note: the AWS Access Keys page provides the above credentials, but does not incl
 export AWS_REGION=us-east-2
 ```
 
-### Setup Prometheus Credentials
+### Metrics Collection
 
 To support metrics collection (enabled by default), re-execution requires Prometheus credentials to be exported to the environment. Follow the instructions in the e2e [README](../../e2e/README.md#monitoring) to support metrics collection.
 
