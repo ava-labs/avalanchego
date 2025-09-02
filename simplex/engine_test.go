@@ -53,7 +53,7 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 	}
 
 	for _, msg := range allSimplexMessages {
-		require.NoError(t, engine.SimplexMessage(configs[1].Ctx.NodeID, msg))
+		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
 	}
 }
 

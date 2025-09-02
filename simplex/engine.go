@@ -113,8 +113,8 @@ func (e *Engine) Start(_ context.Context, _ uint32) error {
 	return e.epoch.Start()
 }
 
-func (e *Engine) SimplexMessage(nodeID ids.NodeID, msg *p2p.Simplex) error {
-	simplexMsg, err := e.p2pToSimplexMessage(msg)
+func (e *Engine) SimplexMessage(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
+	simplexMsg, err := e.p2pToSimplexMessage(ctx, msg)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errConvertingMessage, err)
 	}
@@ -122,14 +122,14 @@ func (e *Engine) SimplexMessage(nodeID ids.NodeID, msg *p2p.Simplex) error {
 	return e.epoch.HandleMessage(simplexMsg, nodeID[:])
 }
 
-func (e *Engine) p2pToSimplexMessage(msg *p2p.Simplex) (*simplex.Message, error) {
+func (e *Engine) p2pToSimplexMessage(ctx context.Context, msg *p2p.Simplex) (*simplex.Message, error) {
 	if msg == nil {
 		return nil, errNilField
 	}
 
 	switch {
 	case msg.GetBlockProposal() != nil:
-		return blockProposalFromP2P(context.TODO(), msg.GetBlockProposal(), e.blockDeserializer)
+		return blockProposalFromP2P(ctx, msg.GetBlockProposal(), e.blockDeserializer)
 	case msg.GetEmptyNotarization() != nil:
 		return emptyNotarizationMessageFromP2P(msg.GetEmptyNotarization(), e.quorumDeserializer)
 	case msg.GetVote() != nil:
@@ -145,7 +145,7 @@ func (e *Engine) p2pToSimplexMessage(msg *p2p.Simplex) (*simplex.Message, error)
 	case msg.GetReplicationRequest() != nil:
 		return replicationRequestFromP2P(msg.GetReplicationRequest()), nil
 	case msg.GetReplicationResponse() != nil:
-		return replicationResponseFromP2P(context.TODO(), msg.GetReplicationResponse(), e.blockDeserializer, e.quorumDeserializer)
+		return replicationResponseFromP2P(ctx, msg.GetReplicationResponse(), e.blockDeserializer, e.quorumDeserializer)
 	default:
 		return nil, errUnknownMessageType
 	}

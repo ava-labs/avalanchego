@@ -1799,7 +1799,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 	}, nil
 }
 
-// createSimplexDBs creates dbs for simplex. ONe is used for the VM to store blocks,
+// createSimplexDBs creates dbs for simplex. One is used for the VM to store blocks,
 // the other is used for simplex to store finalizations
 func (m *manager) createSimplexDBs(primaryAlias string, chainID ids.ID) (*prefixdb.Database, *prefixdb.Database, error) {
 	meterDBReg, err := metrics.MakeAndRegister(
