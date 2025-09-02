@@ -125,9 +125,10 @@ func newWorkItem(localRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[
 }
 
 type Manager[T, U any] struct {
+	proofHandler ProofHandler[T, U]
 	// Must be held when accessing [config.TargetRoot].
 	syncTargetLock sync.RWMutex
-	config         ManagerConfig[T, U]
+	config         ManagerConfig
 
 	workLock sync.Mutex
 	// The number of work items currently being processed.
@@ -168,8 +169,7 @@ type Manager[T, U any] struct {
 }
 
 // TODO remove non-config values out of this struct
-type ManagerConfig[T, U any] struct {
-	ProofHandler          ProofHandler[T, U]
+type ManagerConfig struct {
 	RangeProofClient      *p2p.Client
 	ChangeProofClient     *p2p.Client
 	SimultaneousWorkLimit int
@@ -178,14 +178,14 @@ type ManagerConfig[T, U any] struct {
 	StateSyncNodes        []ids.NodeID
 }
 
-func NewManager[T, U any](config ManagerConfig[T, U], registerer prometheus.Registerer) (*Manager[T, U], error) {
+func NewManager[T, U any](proofHandler ProofHandler[T, U], config ManagerConfig, registerer prometheus.Registerer) (*Manager[T, U], error) {
 	switch {
+	case proofHandler == nil:
+		return nil, ErrNoParserProvided
 	case config.RangeProofClient == nil:
 		return nil, ErrNoRangeProofClientProvided
 	case config.ChangeProofClient == nil:
 		return nil, ErrNoChangeProofClientProvided
-	case config.ProofHandler == nil:
-		return nil, ErrNoParserProvided
 	case config.Log == nil:
 		return nil, ErrNoLogProvided
 	case config.SimultaneousWorkLimit == 0:
@@ -198,6 +198,7 @@ func NewManager[T, U any](config ManagerConfig[T, U], registerer prometheus.Regi
 	}
 
 	m := &Manager[T, U]{
+		proofHandler:    proofHandler,
 		config:          config,
 		doneChan:        make(chan struct{}),
 		unprocessedWork: newWorkHeap(),
@@ -500,7 +501,7 @@ func (m *Manager[_, _]) handleRangeProofResponse(
 		return err
 	}
 
-	rangeProof, err := m.config.ProofHandler.ParseRangeProof(
+	rangeProof, err := m.proofHandler.ParseRangeProof(
 		ctx,
 		responseBytes,
 		request.RootHash,
@@ -512,7 +513,7 @@ func (m *Manager[_, _]) handleRangeProofResponse(
 		return err
 	}
 	// Replace all the key-value pairs in the DB from start to end with values from the response.
-	nextKey, err := m.config.ProofHandler.CommitRangeProof(ctx, rangeProof)
+	nextKey, err := m.proofHandler.CommitRangeProof(ctx, rangeProof)
 	if err != nil {
 		m.setError(err)
 		return nil
@@ -615,7 +616,7 @@ func (m *Manager[_, _]) handleChangeProofResponse(
 		return err
 	}
 
-	proof, err := m.config.ProofHandler.ParseChangeProof(
+	proof, err := m.proofHandler.ParseChangeProof(
 		ctx,
 		responseBytes,
 		request.EndRootHash,
@@ -627,7 +628,7 @@ func (m *Manager[_, _]) handleChangeProofResponse(
 		return fmt.Errorf("%w: %w", errInvalidChangeProof, err)
 	}
 
-	nextKey, err := m.config.ProofHandler.CommitChangeProof(ctx, proof)
+	nextKey, err := m.proofHandler.CommitChangeProof(ctx, proof)
 	if err != nil {
 		m.setError(err)
 		return nil
