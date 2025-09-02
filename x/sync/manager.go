@@ -124,10 +124,10 @@ func newWorkItem(localRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[
 	}
 }
 
-type Manager struct {
+type Manager[T, U any] struct {
 	// Must be held when accessing [config.TargetRoot].
 	syncTargetLock sync.RWMutex
-	config         ManagerConfig
+	config         ManagerConfig[T, U]
 
 	workLock sync.Mutex
 	// The number of work items currently being processed.
@@ -168,8 +168,8 @@ type Manager struct {
 }
 
 // TODO remove non-config values out of this struct
-type ManagerConfig struct {
-	ProofHandler          ProofHandler[*rangeProofResponse, *changeProofResponse]
+type ManagerConfig[T, U any] struct {
+	ProofHandler          ProofHandler[T, U]
 	RangeProofClient      *p2p.Client
 	ChangeProofClient     *p2p.Client
 	SimultaneousWorkLimit int
@@ -178,7 +178,7 @@ type ManagerConfig struct {
 	StateSyncNodes        []ids.NodeID
 }
 
-func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manager, error) {
+func NewManager[T, U any](config ManagerConfig[T, U], registerer prometheus.Registerer) (*Manager[T, U], error) {
 	switch {
 	case config.RangeProofClient == nil:
 		return nil, ErrNoRangeProofClientProvided
@@ -197,7 +197,7 @@ func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manage
 		return nil, err
 	}
 
-	m := &Manager{
+	m := &Manager[T, U]{
 		config:          config,
 		doneChan:        make(chan struct{}),
 		unprocessedWork: newWorkHeap(),
@@ -209,7 +209,7 @@ func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manage
 	return m, nil
 }
 
-func (m *Manager) Start(ctx context.Context) error {
+func (m *Manager[_, _]) Start(ctx context.Context) error {
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
@@ -233,7 +233,7 @@ func (m *Manager) Start(ctx context.Context) error {
 // sync awaits signal on [m.unprocessedWorkCond], which indicates that there
 // is work to do or syncing completes.  If there is work, sync will dispatch a goroutine to do
 // the work.
-func (m *Manager) sync(ctx context.Context) {
+func (m *Manager[_, _]) sync(ctx context.Context) {
 	defer func() {
 		// Invariant: [m.workLock] is held when this goroutine begins.
 		m.close()
@@ -271,7 +271,7 @@ func (m *Manager) sync(ctx context.Context) {
 }
 
 // Close will stop the syncing process
-func (m *Manager) Close() {
+func (m *Manager[_, _]) Close() {
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
@@ -280,7 +280,7 @@ func (m *Manager) Close() {
 
 // close is called when there is a fatal error or sync is complete.
 // [workLock] must be held
-func (m *Manager) close() {
+func (m *Manager[_, _]) close() {
 	m.closeOnce.Do(func() {
 		// Don't process any more work items.
 		// Drop currently processing work items.
@@ -298,7 +298,7 @@ func (m *Manager) close() {
 	})
 }
 
-func (m *Manager) finishWorkItem() {
+func (m *Manager[_, _]) finishWorkItem() {
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
@@ -307,7 +307,7 @@ func (m *Manager) finishWorkItem() {
 }
 
 // Processes [item] by fetching a change or range proof.
-func (m *Manager) doWork(ctx context.Context, work *workItem) {
+func (m *Manager[_, _]) doWork(ctx context.Context, work *workItem) {
 	// Backoff for failed requests accounting for time this job has already
 	// spent waiting in the unprocessed queue
 	now := time.Now()
@@ -338,7 +338,7 @@ func (m *Manager) doWork(ctx context.Context, work *workItem) {
 
 // Fetch and apply the change proof given by [work].
 // Assumes [m.workLock] is not held.
-func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
+func (m *Manager[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 	targetRootID := m.getTargetRoot()
 
 	if work.localRootID == targetRootID {
@@ -392,7 +392,7 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 
 // Fetch and apply the range proof given by [work].
 // Assumes [m.workLock] is not held.
-func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
+func (m *Manager[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 	targetRootID := m.getTargetRoot()
 
 	request := &pb.SyncGetRangeProofRequest{
@@ -436,7 +436,7 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 	m.metrics.RequestMade()
 }
 
-func (m *Manager) sendRequest(ctx context.Context, client *p2p.Client, requestBytes []byte, onResponse p2p.AppResponseCallback) error {
+func (m *Manager[_, _]) sendRequest(ctx context.Context, client *p2p.Client, requestBytes []byte, onResponse p2p.AppResponseCallback) error {
 	if len(m.config.StateSyncNodes) == 0 {
 		return client.AppRequestAny(ctx, requestBytes, onResponse)
 	}
@@ -449,7 +449,7 @@ func (m *Manager) sendRequest(ctx context.Context, client *p2p.Client, requestBy
 	return client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse)
 }
 
-func (m *Manager) retryWork(work *workItem) {
+func (m *Manager[_, _]) retryWork(work *workItem) {
 	work.priority = retryPriority
 	work.queueTime = time.Now()
 	work.requestFailed()
@@ -461,7 +461,7 @@ func (m *Manager) retryWork(work *workItem) {
 }
 
 // Returns an error if we should drop the response
-func (m *Manager) shouldHandleResponse(
+func (m *Manager[_, _]) shouldHandleResponse(
 	bytesLimit uint32,
 	responseBytes []byte,
 	err error,
@@ -488,7 +488,7 @@ func (m *Manager) shouldHandleResponse(
 	return nil
 }
 
-func (m *Manager) handleRangeProofResponse(
+func (m *Manager[_, _]) handleRangeProofResponse(
 	ctx context.Context,
 	targetRootID ids.ID,
 	work *workItem,
@@ -603,7 +603,7 @@ func (p *proofHandler) CommitRangeProof(ctx context.Context, proof *rangeProofRe
 	return nextKey, nil
 }
 
-func (m *Manager) handleChangeProofResponse(
+func (m *Manager[_, _]) handleChangeProofResponse(
 	ctx context.Context,
 	targetRootID ids.ID,
 	work *workItem,
@@ -958,7 +958,7 @@ func findNextKey(
 	return nextKey, nil
 }
 
-func (m *Manager) Error() error {
+func (m *Manager[_, _]) Error() error {
 	m.errLock.Lock()
 	defer m.errLock.Unlock()
 
@@ -970,7 +970,7 @@ func (m *Manager) Error() error {
 // - sync fatally errored.
 // - [ctx] is canceled.
 // If [ctx] is canceled, returns [ctx].Err().
-func (m *Manager) Wait(ctx context.Context) error {
+func (m *Manager[_, _]) Wait(ctx context.Context) error {
 	select {
 	case <-m.doneChan:
 	case <-ctx.Done():
@@ -986,7 +986,7 @@ func (m *Manager) Wait(ctx context.Context) error {
 	return nil
 }
 
-func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
+func (m *Manager[_, _]) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 	m.syncTargetLock.Lock()
 	defer m.syncTargetLock.Unlock()
 
@@ -1025,7 +1025,7 @@ func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 	return nil
 }
 
-func (m *Manager) getTargetRoot() ids.ID {
+func (m *Manager[_, _]) getTargetRoot() ids.ID {
 	m.syncTargetLock.RLock()
 	defer m.syncTargetLock.RUnlock()
 
@@ -1033,7 +1033,7 @@ func (m *Manager) getTargetRoot() ids.ID {
 }
 
 // Record that there was a fatal error and begin shutting down.
-func (m *Manager) setError(err error) {
+func (m *Manager[_, _]) setError(err error) {
 	m.errLock.Lock()
 	defer m.errLock.Unlock()
 
@@ -1057,7 +1057,7 @@ func (m *Manager) setError(err error) {
 // the invariants of the work queue.
 //
 // Assumes [m.workLock] is not held.
-func (m *Manager) completeWorkItem(work *workItem, nextKey maybe.Maybe[[]byte], rootID ids.ID) {
+func (m *Manager[_, _]) completeWorkItem(work *workItem, nextKey maybe.Maybe[[]byte], rootID ids.ID) {
 	if !nextKey.IsNothing() {
 		// the full range wasn't completed, so enqueue a new work item for the range [nextStartKey, workItem.end]
 		m.enqueueWork(newWorkItem(work.localRootID, nextKey, work.end, work.priority, time.Now()))
@@ -1093,7 +1093,7 @@ func (m *Manager) completeWorkItem(work *workItem, nextKey maybe.Maybe[[]byte], 
 // If there are sufficiently few unprocessed/processing work items,
 // splits the range into two items and queues them both.
 // Assumes [m.workLock] is not held.
-func (m *Manager) enqueueWork(work *workItem) {
+func (m *Manager[_, _]) enqueueWork(work *workItem) {
 	m.workLock.Lock()
 	defer func() {
 		m.workLock.Unlock()

@@ -38,7 +38,7 @@ func Test_Creation(t *testing.T) {
 	proofhandler, err := NewHandler(db, merkledb.DefaultHasher, merkledb.BranchFactor16)
 	require.NoError(err)
 	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
+	syncer, err := NewManager(ManagerConfig[*rangeProofResponse, *changeProofResponse]{
 		ProofHandler:          proofhandler,
 		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
 		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
@@ -72,7 +72,7 @@ func Test_Completion(t *testing.T) {
 	require.NoError(err)
 
 	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
+	syncer, err := NewManager(ManagerConfig[*rangeProofResponse, *changeProofResponse]{
 		ProofHandler:          parser,
 		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(emptyDB)),
 		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(emptyDB)),
@@ -904,7 +904,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 				changeProofClient = tt.changeProofClient(dbToSync)
 			}
 
-			syncer, err := NewManager(ManagerConfig{
+			syncer, err := NewManager(ManagerConfig[*rangeProofResponse, *changeProofResponse]{
 				ProofHandler:          parser,
 				RangeProofClient:      rangeProofClient,
 				ChangeProofClient:     changeProofClient,
@@ -976,7 +976,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.NoError(err)
 
 	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
+	syncer, err := NewManager(ManagerConfig[*rangeProofResponse, *changeProofResponse]{
 		ProofHandler:          parser,
 		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
 		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
@@ -1002,7 +1002,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	)
 	syncer.Close()
 
-	newSyncer, err := NewManager(ManagerConfig{
+	newSyncer, err := NewManager(ManagerConfig[*rangeProofResponse, *changeProofResponse]{
 		ProofHandler:          parser,
 		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
 		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
@@ -1088,7 +1088,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		updatedRootChan: updatedRootChan,
 	})
 
-	syncer, err := NewManager(ManagerConfig{
+	syncer, err := NewManager(ManagerConfig[*rangeProofResponse, *changeProofResponse]{
 		ProofHandler:          parser,
 		RangeProofClient:      rangeProofClient,
 		ChangeProofClient:     changeProofClient,
@@ -1137,7 +1137,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require.NoError(err)
 
 	ctx := context.Background()
-	m, err := NewManager(ManagerConfig{
+	m, err := NewManager(ManagerConfig[*rangeProofResponse, *changeProofResponse]{
 		ProofHandler:          parser,
 		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
 		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
