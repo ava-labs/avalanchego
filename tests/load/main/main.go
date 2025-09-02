@@ -40,6 +40,10 @@ var (
 	loadTimeoutArg     time.Duration
 	firewoodEnabledArg bool
 
+	// firewoodConfig represents the minimum configuration required to enable
+	// Firewood in Coreth.
+	//
+	// Ref: https://github.com/ava-labs/coreth/issues/1180
 	firewoodConfig = tmpnet.ConfigMap{
 		"state-scheme":       "firewood",
 		"snapshot-cache":     0,
