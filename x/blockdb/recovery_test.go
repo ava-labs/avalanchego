@@ -13,7 +13,7 @@ import (
 
 func TestRecovery_Success(t *testing.T) {
 	// Create database with 10KB file size and 4KB blocks
-	// This means each file will have 2 blocks (4KB + 24 bytes header = ~4KB per block)
+	// This means each file will have 2 blocks (4KB + 26 bytes header = ~4KB per block)
 	config := DefaultConfig().WithMaxDataFileSize(10 * 1024) // 10KB per file
 
 	tests := []struct {
@@ -277,10 +277,11 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				}
 				secondBlockOffset := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))
 				bh := blockEntryHeader{
-					Height:   1,
-					Checksum: calculateChecksum(blocks[1]),
-					Size:     uint32(len(blocks[1])) + 1, // make block larger than actual
-					Version:  BlockEntryVersion,
+					Height:           1,
+					Checksum:         calculateChecksum(blocks[1]),
+					Size:             uint32(len(blocks[1])) + 1, // make block larger than actual
+					Version:          BlockEntryVersion,
+					UncompressedSize: uint32(len(blocks[1])) + 1,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -296,10 +297,11 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				}
 				secondBlockOffset := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))
 				bh := blockEntryHeader{
-					Height:   1,
-					Checksum: 0xDEADBEEF, // Wrong checksum
-					Size:     uint32(len(blocks[1])),
-					Version:  BlockEntryVersion,
+					Height:           1,
+					Checksum:         0xDEADBEEF, // Wrong checksum
+					Size:             uint32(len(blocks[1])),
+					Version:          BlockEntryVersion,
+					UncompressedSize: uint32(len(blocks[1])),
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -334,10 +336,11 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				}
 				secondBlockOffset := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))
 				bh := blockEntryHeader{
-					Height:   5, // Invalid height because its below the minimum height of 10
-					Checksum: calculateChecksum(blocks[1]),
-					Size:     uint32(len(blocks[1])),
-					Version:  BlockEntryVersion,
+					Height:           5, // Invalid height because its below the minimum height of 10
+					Checksum:         calculateChecksum(blocks[1]),
+					Size:             uint32(len(blocks[1])),
+					Version:          BlockEntryVersion,
+					UncompressedSize: uint32(len(blocks[1])),
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -389,10 +392,11 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				// Corrupt second block header version
 				secondBlockOffset := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))
 				bh := blockEntryHeader{
-					Height:   1,
-					Checksum: calculateChecksum(blocks[1]),
-					Size:     uint32(len(blocks[1])),
-					Version:  BlockEntryVersion + 1, // Invalid version
+					Height:           1,
+					Checksum:         calculateChecksum(blocks[1]),
+					Size:             uint32(len(blocks[1])),
+					Version:          BlockEntryVersion + 1, // Invalid version
+					UncompressedSize: uint32(len(blocks[1])),
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -409,10 +413,11 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				// Corrupt second block header with invalid version
 				secondBlockOffset := int64(sizeOfBlockEntryHeader) + int64(len(blocks[0]))
 				bh := blockEntryHeader{
-					Height:   1,
-					Checksum: calculateChecksum(blocks[1]),
-					Size:     uint32(len(blocks[1])),
-					Version:  BlockEntryVersion + 10, // version cannot be greater than current
+					Height:           1,
+					Checksum:         calculateChecksum(blocks[1]),
+					Size:             uint32(len(blocks[1])),
+					Version:          BlockEntryVersion + 10, // version cannot be greater than current
+					UncompressedSize: uint32(len(blocks[1])),
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},

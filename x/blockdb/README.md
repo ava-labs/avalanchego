@@ -76,7 +76,7 @@ Index Entry (16 bytes):
 Each block in the data file is stored with a block entry header followed by the raw block data:
 
 ```
-Block Entry Header (23 bytes):
+Block Entry Header (26 bytes):
 ┌────────────────────────────────┬─────────┐
 │ Field                          │ Size    │
 ├────────────────────────────────┼─────────┤
@@ -84,7 +84,7 @@ Block Entry Header (23 bytes):
 │ Size                           │ 4 bytes │
 │ Checksum                       │ 8 bytes │
 │ Version                        │ 2 bytes │
-│ Compressed                     │ 1 byte  │
+│ UncompressedSize               │ 4 bytes │
 └────────────────────────────────┴─────────┘
 ```
 

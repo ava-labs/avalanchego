@@ -64,11 +64,11 @@ var (
 // blockEntryHeader is the header of a block entry in the data file.
 // This is not the header portion of the block data itself.
 type blockEntryHeader struct {
-	Height     BlockHeight
-	Size       uint32
-	Checksum   uint64
-	Version    uint16
-	Compressed bool
+	Height           BlockHeight
+	Size             uint32
+	Checksum         uint64
+	Version          uint16
+	UncompressedSize uint32
 }
 
 // MarshalBinary implements the encoding.BinaryMarshaler interface.
@@ -78,11 +78,7 @@ func (beh blockEntryHeader) MarshalBinary() ([]byte, error) {
 	binary.LittleEndian.PutUint32(buf[8:], beh.Size)
 	binary.LittleEndian.PutUint64(buf[12:], beh.Checksum)
 	binary.LittleEndian.PutUint16(buf[20:], beh.Version)
-	if beh.Compressed {
-		buf[22] = 1
-	} else {
-		buf[22] = 0
-	}
+	binary.LittleEndian.PutUint32(buf[22:], beh.UncompressedSize)
 	return buf, nil
 }
 
@@ -95,7 +91,7 @@ func (beh *blockEntryHeader) UnmarshalBinary(data []byte) error {
 	beh.Size = binary.LittleEndian.Uint32(data[8:])
 	beh.Checksum = binary.LittleEndian.Uint64(data[12:])
 	beh.Version = binary.LittleEndian.Uint16(data[20:])
-	beh.Compressed = data[22] != 0
+	beh.UncompressedSize = binary.LittleEndian.Uint32(data[22:])
 	return nil
 }
 
@@ -393,11 +389,11 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData) error {
 	}
 
 	bh := blockEntryHeader{
-		Height:     height,
-		Size:       blockDataLen,
-		Checksum:   calculateChecksum(blockToWrite),
-		Version:    BlockEntryVersion,
-		Compressed: s.config.CompressBlocks,
+		Height:           height,
+		Size:             blockDataLen,
+		Checksum:         calculateChecksum(blockToWrite),
+		Version:          BlockEntryVersion,
+		UncompressedSize: uint32(blockSize),
 	}
 	if err := s.writeBlockAt(writeDataOffset, bh, blockToWrite); err != nil {
 		s.log.Error("Failed to write block: error writing block data",
@@ -529,11 +525,17 @@ func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
 		return nil, fmt.Errorf("failed to deserialize block header: %w", err)
 	}
 	blockData := buf[int(sizeOfBlockEntryHeader):]
-	if bh.Compressed {
+	if bh.UncompressedSize != bh.Size {
 		decompressed, err := s.compressor.Decompress(blockData)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decompress block data: %w", err)
 		}
+
+		// verify decompressed size is correct
+		if len(decompressed) != int(bh.UncompressedSize) {
+			return nil, fmt.Errorf("failed to decompress block data: decompressed size %d does not match expected size %d", len(decompressed), bh.UncompressedSize)
+		}
+
 		return decompressed, nil
 	}
 	return blockData, nil
@@ -853,6 +855,17 @@ func (s *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEntr
 	calculatedChecksum := calculateChecksum(blockData)
 	if calculatedChecksum != bh.Checksum {
 		return bh, fmt.Errorf("%w: checksum mismatch for block at offset %d", ErrCorrupted, offset)
+	}
+
+	// If compressed, ensure that decompression succeeds and matches expected uncompressed size
+	if bh.UncompressedSize != bh.Size {
+		decompressed, err := s.compressor.Decompress(blockData)
+		if err != nil {
+			return bh, fmt.Errorf("%w: failed to decompress block at offset %d: %v", ErrCorrupted, offset, err)
+		}
+		if len(decompressed) != int(bh.UncompressedSize) {
+			return bh, fmt.Errorf("%w: decompressed size mismatch at offset %d: got %d, expected %d", ErrCorrupted, offset, len(decompressed), bh.UncompressedSize)
+		}
 	}
 
 	// Write index entry for this block

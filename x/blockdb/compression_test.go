@@ -25,7 +25,7 @@ func checkBlockCompression(t *testing.T, db *Database, height uint64) bool {
 	var blockHeader blockEntryHeader
 	require.NoError(t, blockHeader.UnmarshalBinary(blockHeaderBuf))
 
-	return blockHeader.Compressed
+	return blockHeader.UncompressedSize != blockHeader.Size
 }
 
 func TestCompression_Enabled(t *testing.T) {

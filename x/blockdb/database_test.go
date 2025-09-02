@@ -377,9 +377,9 @@ func TestStructSizes(t *testing.T) {
 			memorySize:          unsafe.Sizeof(blockEntryHeader{}),
 			binarySize:          binary.Size(blockEntryHeader{}),
 			expectedMemorySize:  32,
-			expectedBinarySize:  23,
-			expectedMarshalSize: 23,
-			expectedPadding:     9,
+			expectedBinarySize:  26,
+			expectedMarshalSize: 26,
+			expectedPadding:     6,
 			createInstance:      func() interface{} { return blockEntryHeader{} },
 		},
 		{
