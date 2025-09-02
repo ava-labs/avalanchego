@@ -37,7 +37,15 @@ const (
 var (
 	flagVars *e2e.FlagVars
 
-	loadTimeout time.Duration
+	loadTimeoutArg     time.Duration
+	firewoodEnabledArg bool
+
+	firewoodConfig = tmpnet.ConfigMap{
+		"state-scheme":       "firewood",
+		"snapshot-cache":     0,
+		"pruning-enabled":    true,
+		"state-sync-enabled": false,
+	}
 )
 
 func init() {
@@ -46,10 +54,16 @@ func init() {
 	)
 
 	flag.DurationVar(
-		&loadTimeout,
+		&loadTimeoutArg,
 		"load-timeout",
 		0,
 		"the duration that the load test should run for",
+	)
+	flag.BoolVar(
+		&firewoodEnabledArg,
+		"firewood",
+		false,
+		"whether to use Firewood in Coreth",
 	)
 
 	flag.Parse()
@@ -69,9 +83,15 @@ func main() {
 
 	keys, err := tmpnet.NewPrivateKeys(numNodes)
 	require.NoError(err)
+
+	primaryChainConfigs := tmpnet.DefaultChainConfigs()
+	if firewoodEnabledArg {
+		primaryChainConfigs[blockchainID] = firewoodConfig
+	}
 	network := &tmpnet.Network{
-		Nodes:         nodes,
-		PreFundedKeys: keys,
+		Nodes:               nodes,
+		PreFundedKeys:       keys,
+		PrimaryChainConfigs: primaryChainConfigs,
 	}
 
 	e2e.NewTestEnvironment(tc, flagVars, network)
@@ -136,7 +156,7 @@ func main() {
 	)
 	require.NoError(err)
 
-	generator.Run(ctx, log, loadTimeout, testTimeout)
+	generator.Run(ctx, log, loadTimeoutArg, testTimeout)
 }
 
 // newTokenContract deploys an instance of an ERC20 token and distributes the
