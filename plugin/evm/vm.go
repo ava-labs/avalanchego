@@ -266,20 +266,13 @@ func (vm *VM) Initialize(
 	fxs []*commonEng.Fx,
 	appSender commonEng.AppSender,
 ) error {
+	vm.ctx = chainCtx
 	vm.stateSyncDone = make(chan struct{})
-	vm.config.SetDefaults(defaultTxPoolConfig)
-	if len(configBytes) > 0 {
-		if err := json.Unmarshal(configBytes, &vm.config); err != nil {
-			return fmt.Errorf("failed to unmarshal config %s: %w", string(configBytes), err)
-		}
+	cfg, deprecateMsg, err := config.GetConfig(configBytes, vm.ctx.NetworkID)
+	if err != nil {
+		return fmt.Errorf("failed to get config: %w", err)
 	}
-	if err := vm.config.Validate(); err != nil {
-		return err
-	}
-	// We should deprecate config flags as the first thing, before we do anything else
-	// because this can set old flags to new flags. log the message after we have
-	// initialized the logger.
-	deprecateMsg := vm.config.Deprecate()
+	vm.config = cfg
 
 	vm.ctx = chainCtx
 
@@ -358,6 +351,9 @@ func (vm *VM) Initialize(
 	vm.ethConfig.TxPool.AccountQueue = vm.config.TxPoolAccountQueue
 	vm.ethConfig.TxPool.GlobalQueue = vm.config.TxPoolGlobalQueue
 	vm.ethConfig.TxPool.Lifetime = vm.config.TxPoolLifetime.Duration
+	// If we re-enable txpool journaling, we should also add the saved local
+	// transactions to the p2p gossip on startup.
+	vm.ethConfig.TxPool.Journal = "" // disable journal
 
 	vm.ethConfig.AllowUnfinalizedQueries = vm.config.AllowUnfinalizedQueries
 	vm.ethConfig.AllowUnprotectedTxs = vm.config.AllowUnprotectedTxs

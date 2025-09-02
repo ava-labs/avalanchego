@@ -9,85 +9,17 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/spf13/cast"
 )
 
-const (
-	defaultAcceptorQueueLimit                     = 64 // Provides 2 minutes of buffer (2s block target) for a commit delay
-	defaultPruningEnabled                         = true
-	defaultCommitInterval                         = 4096
-	defaultTrieCleanCache                         = 512
-	defaultTrieDirtyCache                         = 512
-	defaultTrieDirtyCommitTarget                  = 20
-	defaultTriePrefetcherParallelism              = 16
-	defaultSnapshotCache                          = 256
-	defaultSyncableCommitInterval                 = defaultCommitInterval * 4
-	defaultSnapshotWait                           = false
-	defaultRpcGasCap                              = 50_000_000 // Default to 50M Gas Limit
-	defaultRpcTxFeeCap                            = 100        // 100 AVAX
-	defaultMetricsExpensiveEnabled                = true
-	defaultApiMaxDuration                         = 0 // Default to no maximum API call duration
-	defaultWsCpuRefillRate                        = 0 // Default to no maximum WS CPU usage
-	defaultWsCpuMaxStored                         = 0 // Default to no maximum WS CPU usage
-	defaultMaxBlocksPerRequest                    = 0 // Default to no maximum on the number of blocks per getLogs request
-	defaultContinuousProfilerFrequency            = 15 * time.Minute
-	defaultContinuousProfilerMaxFiles             = 5
-	defaultPushGossipPercentStake                 = .9
-	defaultPushGossipNumValidators                = 100
-	defaultPushGossipNumPeers                     = 0
-	defaultPushRegossipNumValidators              = 10
-	defaultPushRegossipNumPeers                   = 0
-	defaultPushGossipFrequency                    = 100 * time.Millisecond
-	defaultPullGossipFrequency                    = 1 * time.Second
-	defaultRegossipFrequency                      = 30 * time.Second
-	defaultOfflinePruningBloomFilterSize   uint64 = 512 // Default size (MB) for the offline pruner to use
-	defaultLogLevel                               = "info"
-	defaultLogJSONFormat                          = false
-	defaultMaxOutboundActiveRequests              = 16
-	defaultPopulateMissingTriesParallelism        = 1024
-	defaultStateSyncServerTrieCache               = 64 // MB
-	defaultAcceptedCacheSize                      = 32 // blocks
-
-	// defaultStateSyncMinBlocks is the minimum number of blocks the blockchain
-	// should be ahead of local last accepted to perform state sync.
-	// This constant is chosen so normal bootstrapping is preferred when it would
-	// be faster than state sync.
-	// time assumptions:
-	// - normal bootstrap processing time: ~14 blocks / second
-	// - state sync time: ~6 hrs.
-	defaultStateSyncMinBlocks   = 300_000
-	defaultStateSyncRequestSize = 1024 // the number of key/values to ask peers for per request
-	defaultDBType               = pebbledb.Name
-	defaultValidatorAPIEnabled  = true
-
-	estimatedBlockAcceptPeriod        = 2 * time.Second
-	defaultHistoricalProofQueryWindow = uint64(24 * time.Hour / estimatedBlockAcceptPeriod)
-	defaultStateHistory               = uint64(32)
-)
-
-type PBool bool
-
-var (
-	defaultEnabledAPIs = []string{
-		"eth",
-		"eth-filter",
-		"net",
-		"web3",
-		"internal-eth",
-		"internal-blockchain",
-		"internal-transaction",
-	}
-	defaultAllowUnprotectedTxHashes = []common.Hash{
-		common.HexToHash("0xfefb2da535e927b85fe68eb81cb2e4a5827c905f78381a01ef2322aa9b0aee8e"), // EIP-1820: https://eips.ethereum.org/EIPS/eip-1820
+type (
+	PBool    bool
+	Duration struct {
+		time.Duration
 	}
 )
-
-type Duration struct {
-	time.Duration
-}
 
 // Config ...
 type Config struct {
@@ -223,12 +155,10 @@ type Config struct {
 	TransactionHistory uint64 `json:"transaction-history"`
 	// The maximum number of blocks from head whose state histories are reserved for pruning blockchains.
 	StateHistory uint64 `json:"state-history"`
-	// Deprecated, use 'TransactionHistory' instead.
-	TxLookupLimit uint64 `json:"tx-lookup-limit"`
 
 	// SkipTxIndexing skips indexing transactions.
 	// This is useful for validators that don't need to index transactions.
-	// TxLookupLimit can be still used to control unindexing old transactions.
+	// TransactionHistory can be still used to control unindexing old transactions.
 	SkipTxIndexing bool `json:"skip-tx-indexing"`
 
 	// WarpOffChainMessages encodes off-chain messages (unrelated to any on-chain event ie. block or AddressedCall)
@@ -252,76 +182,31 @@ type Config struct {
 	StateScheme string `json:"state-scheme"`
 }
 
-// TxPoolConfig contains the transaction pool config to be passed
-// to [Config.SetDefaults].
-type TxPoolConfig struct {
-	PriceLimit   uint64
-	PriceBump    uint64
-	AccountSlots uint64
-	GlobalSlots  uint64
-	AccountQueue uint64
-	GlobalQueue  uint64
-	Lifetime     time.Duration
+// GetConfig returns a new config object with the default values set and the
+// deprecation message.
+// If configBytes is not empty, it will be unmarshalled into the config object.
+// If the unmarshalling fails, an error is returned.
+// If the config is invalid, an error is returned.
+func GetConfig(configBytes []byte, networkID uint32) (Config, string, error) {
+	config := NewDefaultConfig()
+	if len(configBytes) > 0 {
+		if err := json.Unmarshal(configBytes, &config); err != nil {
+			return Config{}, "", fmt.Errorf("failed to unmarshal config %s: %w", string(configBytes), err)
+		}
+	}
+	if err := config.validate(networkID); err != nil {
+		return Config{}, "", err
+	}
+	// We should deprecate config flags as the first thing, before we do anything else
+	// because this can set old flags to new flags. log the message after we have
+	// initialized the logger.
+	deprecateMsg := config.deprecate()
+	return config, deprecateMsg, nil
 }
 
 // EthAPIs returns an array of strings representing the Eth APIs that should be enabled
 func (c Config) EthAPIs() []string {
 	return c.EnabledEthAPIs
-}
-
-func (c *Config) SetDefaults(txPoolConfig TxPoolConfig) {
-	c.EnabledEthAPIs = defaultEnabledAPIs
-	c.RPCGasCap = defaultRpcGasCap
-	c.RPCTxFeeCap = defaultRpcTxFeeCap
-	c.MetricsExpensiveEnabled = defaultMetricsExpensiveEnabled
-
-	// TxPool settings
-	c.TxPoolPriceLimit = txPoolConfig.PriceLimit
-	c.TxPoolPriceBump = txPoolConfig.PriceBump
-	c.TxPoolAccountSlots = txPoolConfig.AccountSlots
-	c.TxPoolGlobalSlots = txPoolConfig.GlobalSlots
-	c.TxPoolAccountQueue = txPoolConfig.AccountQueue
-	c.TxPoolGlobalQueue = txPoolConfig.GlobalQueue
-	c.TxPoolLifetime.Duration = txPoolConfig.Lifetime
-
-	c.APIMaxDuration.Duration = defaultApiMaxDuration
-	c.WSCPURefillRate.Duration = defaultWsCpuRefillRate
-	c.WSCPUMaxStored.Duration = defaultWsCpuMaxStored
-	c.MaxBlocksPerRequest = defaultMaxBlocksPerRequest
-	c.ContinuousProfilerFrequency.Duration = defaultContinuousProfilerFrequency
-	c.ContinuousProfilerMaxFiles = defaultContinuousProfilerMaxFiles
-	c.Pruning = defaultPruningEnabled
-	c.TrieCleanCache = defaultTrieCleanCache
-	c.TrieDirtyCache = defaultTrieDirtyCache
-	c.TrieDirtyCommitTarget = defaultTrieDirtyCommitTarget
-	c.TriePrefetcherParallelism = defaultTriePrefetcherParallelism
-	c.SnapshotCache = defaultSnapshotCache
-	c.AcceptorQueueLimit = defaultAcceptorQueueLimit
-	c.CommitInterval = defaultCommitInterval
-	c.SnapshotWait = defaultSnapshotWait
-	c.PushGossipPercentStake = defaultPushGossipPercentStake
-	c.PushGossipNumValidators = defaultPushGossipNumValidators
-	c.PushGossipNumPeers = defaultPushGossipNumPeers
-	c.PushRegossipNumValidators = defaultPushRegossipNumValidators
-	c.PushRegossipNumPeers = defaultPushRegossipNumPeers
-	c.PushGossipFrequency.Duration = defaultPushGossipFrequency
-	c.PullGossipFrequency.Duration = defaultPullGossipFrequency
-	c.RegossipFrequency.Duration = defaultRegossipFrequency
-	c.OfflinePruningBloomFilterSize = defaultOfflinePruningBloomFilterSize
-	c.LogLevel = defaultLogLevel
-	c.LogJSONFormat = defaultLogJSONFormat
-	c.MaxOutboundActiveRequests = defaultMaxOutboundActiveRequests
-	c.PopulateMissingTriesParallelism = defaultPopulateMissingTriesParallelism
-	c.StateSyncServerTrieCache = defaultStateSyncServerTrieCache
-	c.StateSyncCommitInterval = defaultSyncableCommitInterval
-	c.StateSyncMinBlocks = defaultStateSyncMinBlocks
-	c.StateSyncRequestSize = defaultStateSyncRequestSize
-	c.AllowUnprotectedTxHashes = defaultAllowUnprotectedTxHashes
-	c.AcceptedCacheSize = defaultAcceptedCacheSize
-	c.DatabaseType = defaultDBType
-	c.ValidatorsAPIEnabled = defaultValidatorAPIEnabled
-	c.HistoricalProofQueryWindow = defaultHistoricalProofQueryWindow
-	c.StateHistory = defaultStateHistory
 }
 
 func (d *Duration) UnmarshalJSON(data []byte) (err error) {
@@ -343,8 +228,8 @@ func (d Duration) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.Duration.String())
 }
 
-// Validate returns an error if this is an invalid config.
-func (c *Config) Validate() error {
+// validate returns an error if this is an invalid config.
+func (c *Config) validate(_ uint32) error {
 	if c.PopulateMissingTries != nil && (c.OfflinePruning || c.Pruning) {
 		return fmt.Errorf("cannot enable populate missing tries while offline pruning (enabled: %t)/pruning (enabled: %t) are enabled", c.OfflinePruning, c.Pruning)
 	}
@@ -369,13 +254,11 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func (c *Config) Deprecate() string {
+// deprecate returns a string of deprecation messages for the config.
+// This is used to log a message when the config is loaded and contains deprecated flags.
+// This function should be kept as a placeholder even if it is empty.
+func (c *Config) deprecate() string {
 	msg := ""
-	// Deprecate the old config options and set the new ones.
-	if c.TxLookupLimit != 0 {
-		msg += "tx-lookup-limit is deprecated, use transaction-history instead. "
-		c.TransactionHistory = c.TxLookupLimit
-	}
 
 	return msg
 }

@@ -243,31 +243,6 @@ func TestVMConfig(t *testing.T) {
 	require.NoError(t, vm.Shutdown(context.Background()))
 }
 
-func TestVMConfigDefaults(t *testing.T) {
-	txFeeCap := float64(11)
-	enabledEthAPIs := []string{"debug"}
-	vm := newVM(t, testVMConfig{
-		configJSON: fmt.Sprintf(`{"rpc-tx-fee-cap": %g,"eth-apis": %s}`, txFeeCap, fmt.Sprintf("[%q]", enabledEthAPIs[0])),
-	}).vm
-
-	var vmConfig config.Config
-	vmConfig.SetDefaults(defaultTxPoolConfig)
-	vmConfig.RPCTxFeeCap = txFeeCap
-	vmConfig.EnabledEthAPIs = enabledEthAPIs
-	require.Equal(t, vmConfig, vm.config, "VM Config should match default with overrides")
-	require.NoError(t, vm.Shutdown(context.Background()))
-}
-
-func TestVMNilConfig(t *testing.T) {
-	vm := newVM(t, testVMConfig{}).vm
-
-	// VM Config should match defaults if no config is passed in
-	var vmConfig config.Config
-	vmConfig.SetDefaults(defaultTxPoolConfig)
-	require.Equal(t, vmConfig, vm.config, "VM Config should match default config")
-	require.NoError(t, vm.Shutdown(context.Background()))
-}
-
 func TestVMContinuousProfiler(t *testing.T) {
 	profilerDir := t.TempDir()
 	profilerFrequency := 500 * time.Millisecond
@@ -2781,8 +2756,7 @@ func TestAllowFeeRecipientEnabled(t *testing.T) {
 	}
 
 	etherBase := common.HexToAddress("0x0123456789")
-	c := config.Config{}
-	c.SetDefaults(defaultTxPoolConfig)
+	c := config.NewDefaultConfig()
 	c.FeeRecipient = etherBase.String()
 	configJSON, err := json.Marshal(c)
 	if err != nil {
@@ -2844,8 +2818,7 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	require.NoError(t, err)
 
 	etherBase := common.HexToAddress("0x0123456789") // give custom ether base
-	c := config.Config{}
-	c.SetDefaults(defaultTxPoolConfig)
+	c := config.NewDefaultConfig()
 	c.FeeRecipient = etherBase.String()
 	configJSON, err := json.Marshal(c)
 	require.NoError(t, err)
@@ -2988,8 +2961,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	genesisJSON, err := genesis.MarshalJSON()
 	require.NoError(t, err)
 	etherBase := common.HexToAddress("0x0123456789") // give custom ether base
-	c := config.Config{}
-	c.SetDefaults(defaultTxPoolConfig)
+	c := config.NewDefaultConfig()
 	c.FeeRecipient = etherBase.String()
 	configJSON, err := json.Marshal(c)
 	require.NoError(t, err)

@@ -9,8 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUnmarshalConfig(t *testing.T) {
@@ -100,12 +102,6 @@ func TestUnmarshalConfig(t *testing.T) {
 			true,
 		},
 		{
-			"deprecated tx lookup limit",
-			[]byte(`{"tx-lookup-limit": 1}`),
-			Config{TransactionHistory: 1, TxLookupLimit: 1},
-			false,
-		},
-		{
 			"allow unprotected tx hashes",
 			[]byte(`{"allow-unprotected-tx-hashes": ["0x803351deb6d745e91545a6a3e1c0ea3e9a6a02a1a4193b70edfcd2f40f71a01c"]}`),
 			Config{AllowUnprotectedTxHashes: []common.Hash{common.HexToHash("0x803351deb6d745e91545a6a3e1c0ea3e9a6a02a1a4193b70edfcd2f40f71a01c")}},
@@ -121,9 +117,60 @@ func TestUnmarshalConfig(t *testing.T) {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				tmp.Deprecate()
+				tmp.deprecate()
 				assert.Equal(t, tt.expected, tmp)
 			}
+		})
+	}
+}
+
+func TestGetConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		configJSON  []byte
+		networkID   uint32
+		expected    func(*testing.T, Config)
+		expectError bool
+	}{
+		{
+			name:       "custom config values",
+			configJSON: []byte(`{"rpc-tx-fee-cap": 11,"eth-apis": ["debug"]}`),
+			networkID:  constants.TestnetID,
+			expected: func(t *testing.T, config Config) {
+				require.Equal(t, float64(11), config.RPCTxFeeCap, "Tx Fee Cap should be set")
+				require.Equal(t, []string{"debug"}, config.EthAPIs(), "EnabledEthAPIs should be set")
+			},
+		},
+		{
+			name:       "partial config with defaults",
+			configJSON: []byte(`{"rpc-tx-fee-cap": 11,"eth-apis": ["debug"], "tx-pool-price-limit": 100}`),
+			networkID:  constants.TestnetID,
+			expected: func(t *testing.T, config Config) {
+				require.Equal(t, float64(11), config.RPCTxFeeCap)
+				require.Equal(t, []string{"debug"}, config.EthAPIs())
+				require.Equal(t, uint64(100), config.TxPoolPriceLimit)
+			},
+		},
+		{
+			name:       "nil config uses defaults",
+			configJSON: nil,
+			networkID:  constants.TestnetID,
+			expected: func(t *testing.T, config Config) {
+				defaultConfig := NewDefaultConfig()
+				require.Equal(t, defaultConfig, config)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config, _, err := GetConfig(tt.configJSON, tt.networkID)
+			if tt.expectError {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			tt.expected(t, config)
 		})
 	}
 }

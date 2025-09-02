@@ -5,6 +5,7 @@
   - `StorageRangeAt` 
   - `GetModifiedAccountsByNumber`
   - `GetModifiedAccountsByHash`
+- Removed deprecated flag `tx-lookup-limit`. Use `transaction-history` instead.
 - Add pending releases here
 
 
