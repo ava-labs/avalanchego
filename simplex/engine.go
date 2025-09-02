@@ -29,7 +29,19 @@ var (
 )
 
 type Engine struct {
-	common.Handler
+	// list of NoOpsHandler for messages dropped by engine
+	common.AllGetsServer
+	common.StateSummaryFrontierHandler
+	common.AcceptedStateSummaryHandler
+	common.AcceptedFrontierHandler
+	common.AcceptedHandler
+	common.AncestorsHandler
+	common.PutHandler
+	common.QueryHandler
+	common.ChitsHandler
+	common.InternalHandler
+
+	common.AppHandler
 
 	epoch              *simplex.Epoch
 	blockDeserializer  *blockDeserializer
@@ -101,10 +113,21 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 	}
 
 	return &Engine{
-		epoch:              epoch,
-		blockDeserializer:  blockDeserializer,
-		quorumDeserializer: qcDeserializer,
-		logger:             config.Log,
+		epoch:                       epoch,
+		blockDeserializer:           blockDeserializer,
+		quorumDeserializer:          qcDeserializer,
+		logger:                      config.Log,
+		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Log),
+		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Log),
+		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Log),
+		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Log),
+		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Log),
+		PutHandler:                  common.NewNoOpPutHandler(config.Log),
+		QueryHandler:                common.NewNoOpQueryHandler(config.Log),
+		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
+		InternalHandler:             common.NewNoOpInternalHandler(config.Log),
+
+		AppHandler: config.VM,
 	}, nil
 }
 
