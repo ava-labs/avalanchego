@@ -179,8 +179,7 @@ func (m *Mempool) meter(tx *txs.Tx) (meteredTx, error) {
 		// The caller should verify txs but perform overflow checks anyway
 		consumedAVAX, err = math.Add(consumedAVAX, utxo.In.Amount())
 		if err != nil {
-			return meteredTx{}, fmt.Errorf("failed to add consumed AVAX: %w",
-				err)
+			return meteredTx{}, fmt.Errorf("failed to add consumed AVAX: %w", err)
 		}
 	}
 
@@ -192,8 +191,7 @@ func (m *Mempool) meter(tx *txs.Tx) (meteredTx, error) {
 		// The caller should verify txs but perform overflow checks anyway
 		producedAVAX, err = math.Add(producedAVAX, utxo.Out.Amount())
 		if err != nil {
-			return meteredTx{}, fmt.Errorf("failed to add produced AVAX: %w",
-				err)
+			return meteredTx{}, fmt.Errorf("failed to add produced AVAX: %w", err)
 		}
 	}
 

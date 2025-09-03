@@ -150,7 +150,7 @@ func TestMempoolAdd(t *testing.T) {
 			wantErr: utxo.ErrUnsupportedTxType,
 		},
 		{
-			name:           "conflict - lower paying tx is not added",
+			name:           "not enough gas - lower paying tx is not added",
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 200,
 			prevTxs: []*txs.Tx{
@@ -171,7 +171,7 @@ func TestMempoolAdd(t *testing.T) {
 			},
 		},
 		{
-			name:           "conflict - equal paying tx is not added",
+			name:           "not enough gas - equal paying tx is not added",
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 200,
 			prevTxs: []*txs.Tx{
@@ -192,7 +192,7 @@ func TestMempoolAdd(t *testing.T) {
 			},
 		},
 		{
-			name:           "conflict - higher paying tx is added",
+			name:           "evict - higher paying tx is added",
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 200,
 			prevTxs: []*txs.Tx{
@@ -321,6 +321,68 @@ func TestMempoolAdd(t *testing.T) {
 				{2},
 			},
 			wantErr: ErrNotEnoughGas,
+		},
+		{
+			name:           "conflict - higher paying tx is dropped",
+			weights:        gas.Dimensions{1, 1, 1, 1},
+			maxGasCapacity: 200,
+			prevTxs: []*txs.Tx{
+				newTxWithUTXOs(
+					ids.ID{1},
+					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 1)},
+					0,
+				),
+			},
+			tx: newTxWithUTXOs(
+				ids.ID{2},
+				[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 10)},
+				0,
+			),
+			wantTxIDs: []ids.ID{
+				{1},
+			},
+		},
+		{
+			name:           "conflict - equal paying tx is dropped",
+			weights:        gas.Dimensions{1, 1, 1, 1},
+			maxGasCapacity: 200,
+			prevTxs: []*txs.Tx{
+				newTxWithUTXOs(
+					ids.ID{1},
+					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 1)},
+					0,
+				),
+			},
+			tx: newTxWithUTXOs(
+				ids.ID{2},
+				[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 1)},
+				0,
+			),
+			wantTxIDs: []ids.ID{
+				{1},
+			},
+			wantErr: mempool.ErrConflictsWithOtherTx,
+		},
+		{
+			name:           "conflict - lower paying tx is dropped",
+			weights:        gas.Dimensions{1, 1, 1, 1},
+			maxGasCapacity: 200,
+			prevTxs: []*txs.Tx{
+				newTxWithUTXOs(
+					ids.ID{1},
+					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 10)},
+					0,
+				),
+			},
+			tx: newTxWithUTXOs(
+				ids.ID{2},
+				[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 1)},
+				0,
+			),
+			wantTxIDs: []ids.ID{
+				{1},
+			},
+			wantErr: mempool.ErrConflictsWithOtherTx,
 		},
 	}
 
