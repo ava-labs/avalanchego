@@ -24,6 +24,7 @@ var _ common.Engine = (*Engine)(nil)
 var (
 	maxProposalWaitTime = time.Second * 2
 	maxRebroadcastWait  = time.Second * 2
+	tickInterval        = time.Millisecond * 500
 
 	errUnknownMessageType = errors.New("unknown message type")
 	errConvertingMessage  = errors.New("error converting message to simplex message")
@@ -133,7 +134,17 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 
 func (e *Engine) Start(_ context.Context, _ uint32) error {
 	e.logger.Info("Starting simplex engine")
+	go e.tick()
 	return e.epoch.Start()
+}
+
+// tick periodically advances the engine's time.
+func (e *Engine) tick() {
+	ticker := time.NewTicker(tickInterval)
+	for {
+		tick := <-ticker.C
+		e.epoch.AdvanceTime(tick)
+	}
 }
 
 func (e *Engine) SimplexMessage(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
