@@ -1593,8 +1593,8 @@ func (m *manager) getOrMakeVMGatherer(vmID ids.ID) (metrics.MultiGatherer, error
 	return vmGatherer, nil
 }
 
-// createHandler creates a handler that passes messages from the network to the consensus engine
-func (m *manager) createHandler(ctx *snow.ConsensusContext, vm *block.ChangeNotifier, sb subnets.Subnet, primaryAlias string, connectedValidators tracker.Peers, peerTracker *p2p.PeerTracker, halter common.Halter) (handler.Handler, error) {
+// createSimplexHandler creates a handler that passes messages from the network to the consensus engine
+func (m *manager) createSimplexHandler(ctx *snow.ConsensusContext, vm block.ChainVM, sb subnets.Subnet, primaryAlias string, connectedValidators tracker.Peers, peerTracker *p2p.PeerTracker, halter common.Halter) (handler.Handler, error) {
 	handlerReg, err := metrics.MakeAndRegister(
 		m.handlerGatherer,
 		primaryAlias,
@@ -1606,7 +1606,7 @@ func (m *manager) createHandler(ctx *snow.ConsensusContext, vm *block.ChangeNoti
 	// Asynchronously passes messages from the network to the consensus engine
 	return handler.New(
 		ctx,
-		vm,
+		nil, // we don't need a change notifier for simplex, since the engine listens for events and we don't want the handler to intercept them
 		vm.WaitForEvent,
 		m.Validators,
 		m.FrontierPollFrequency,
@@ -1714,10 +1714,6 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 	}
 
 	// TODO: wrap the vm in a LOCKED VM that locks the VM interface methods
-	cn := &block.ChangeNotifier{
-		ChainVM: vm,
-	}
-	vm = cn
 
 	var halter common.Halter
 	connectedValidators, err := m.createTrackedPeers(primaryAlias)
@@ -1731,7 +1727,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		return nil, fmt.Errorf("error creating peer tracking: %w", err)
 	}
 
-	h, err := m.createHandler(ctx, cn, sb, primaryAlias, connectedValidators, peerTracker, halter)
+	h, err := m.createSimplexHandler(ctx, vm, sb, primaryAlias, connectedValidators, peerTracker, halter)
 	if err != nil {
 		return nil, fmt.Errorf("error creating handler: %w", err)
 	}

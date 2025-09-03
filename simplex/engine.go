@@ -41,6 +41,7 @@ type Engine struct {
 	common.ChitsHandler
 	common.InternalHandler
 
+	// Handler that passes application messages to the VM
 	common.AppHandler
 
 	epoch              *simplex.Epoch
