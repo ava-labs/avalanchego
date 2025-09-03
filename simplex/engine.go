@@ -14,7 +14,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/version"
 )
@@ -49,10 +51,12 @@ type Engine struct {
 	blockDeserializer  *blockDeserializer
 	quorumDeserializer *QCDeserializer
 	logger             logging.Logger
+	vm                 block.ChainVM
+	consensusCtx       *snow.ConsensusContext
 }
 
 // THe VM must be initialized before creating the engine
-func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
+func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config *Config) (*Engine, error) {
 	signer, verifier := NewBLSAuth(config)
 	qcDeserializer := &QCDeserializer{
 		verifier: &verifier,
@@ -128,14 +132,25 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 		QueryHandler:                common.NewNoOpQueryHandler(config.Log),
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
 
-		AppHandler: config.VM,
+		AppHandler:   config.VM,
+		vm:           config.VM,
+		consensusCtx: consensusCtx,
 	}, nil
 }
 
-func (e *Engine) Start(_ context.Context, _ uint32) error {
+func (e *Engine) Start(ctx context.Context, _ uint32) error {
 	e.logger.Info("Starting simplex engine")
 	go e.tick()
-	return e.epoch.Start()
+	err := e.epoch.Start()
+	if err != nil {
+		return fmt.Errorf("failed to start simplex epoch: %w", err)
+	}
+
+	e.consensusCtx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,
+		State: snow.NormalOp,
+	})
+	return e.vm.SetState(ctx, snow.NormalOp)
 }
 
 // tick periodically advances the engine's time.
@@ -224,6 +239,16 @@ type TODOBootstrapper struct {
 
 func (t *TODOBootstrapper) Start(ctx context.Context, _ uint32) error {
 	t.Log.Info("Starting TODO bootstrapper - does nothing")
+
+	t.Engine.consensusCtx.State.Set(snow.EngineState{
+		Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,
+		State: snow.NormalOp,
+	})
+	if err := t.Engine.vm.SetState(ctx, snow.NormalOp); err != nil {
+		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
+			err)
+	}
+
 	return t.Engine.Start(ctx, 0)
 }
 

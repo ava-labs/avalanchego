@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
+	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/networking/sender/sendermock"
 )
@@ -26,7 +27,8 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 
 	config := configs[0]
 	config.Sender.(*sendermock.ExternalSender).EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	engine, err := NewEngine(ctx, config)
+	consensusCtx := &snow.ConsensusContext{}
+	engine, err := NewEngine(consensusCtx, ctx, config)
 	require.NoError(t, err)
 
 	config.VM.(*wrappedVM).ParseBlockF = func(_ context.Context, _ []byte) (snowman.Block, error) {
