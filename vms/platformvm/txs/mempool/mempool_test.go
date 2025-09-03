@@ -49,7 +49,15 @@ func newAVAXOutput(amount uint64) *avax.TransferableOutput {
 	}
 }
 
-func newTx(
+func newTx(txID ids.ID) *txs.Tx {
+	return newTxWithUTXOs(
+		txID,
+		[]*avax.TransferableInput{newAVAXInput(ids.GenerateTestID(), 2)},
+		1,
+	)
+}
+
+func newTxWithUTXOs(
 	txID ids.ID,
 	inputs []*avax.TransferableInput,
 	outputAmount uint64,
@@ -87,14 +95,14 @@ func TestMempoolOrdering(t *testing.T) {
 	)
 	require.NoError(err)
 
-	lowTx := newTx(
+	lowTx := newTxWithUTXOs(
 		ids.GenerateTestID(),
 		[]*avax.TransferableInput{newAVAXInput(ids.GenerateTestID(), 5)},
 		4,
 	)
 	require.NoError(m.Add(lowTx))
 
-	highTx := newTx(
+	highTx := newTxWithUTXOs(
 		ids.GenerateTestID(),
 		[]*avax.TransferableInput{newAVAXInput(ids.GenerateTestID(), 5)},
 		1,
@@ -124,11 +132,7 @@ func TestMempoolAdd(t *testing.T) {
 		{
 			name:    "dropped - no gas",
 			weights: gas.Dimensions{},
-			tx: newTx(
-				ids.GenerateTestID(),
-				[]*avax.TransferableInput{newAVAXInput(ids.GenerateTestID(), 2)},
-				1,
-			),
+			tx:      newTx(ids.GenerateTestID()),
 			wantErr: errNoGasUsed,
 		},
 		{
@@ -150,13 +154,13 @@ func TestMempoolAdd(t *testing.T) {
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 200,
 			prevTxs: []*txs.Tx{
-				newTx(
+				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 2)},
 					0,
 				),
 			},
-			tx: newTx(
+			tx: newTxWithUTXOs(
 				ids.ID{2},
 				[]*avax.TransferableInput{newAVAXInput(ids.ID{2}, 1)},
 				0,
@@ -171,13 +175,13 @@ func TestMempoolAdd(t *testing.T) {
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 200,
 			prevTxs: []*txs.Tx{
-				newTx(
+				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 2)},
 					0,
 				),
 			},
-			tx: newTx(
+			tx: newTxWithUTXOs(
 				ids.ID{2},
 				[]*avax.TransferableInput{newAVAXInput(ids.ID{2}, 2)},
 				0,
@@ -192,13 +196,13 @@ func TestMempoolAdd(t *testing.T) {
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 200,
 			prevTxs: []*txs.Tx{
-				newTx(
+				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 1)},
 					0,
 				),
 			},
-			tx: newTx(
+			tx: newTxWithUTXOs(
 				ids.ID{2},
 				[]*avax.TransferableInput{newAVAXInput(ids.ID{2}, 10)},
 				0,
@@ -212,13 +216,13 @@ func TestMempoolAdd(t *testing.T) {
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 200,
 			prevTxs: []*txs.Tx{
-				newTx(
+				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.GenerateTestID(), 5)},
 					0,
 				),
 			},
-			tx: newTx(
+			tx: newTxWithUTXOs(
 				ids.ID{2},
 				[]*avax.TransferableInput{newAVAXInput(ids.GenerateTestID(), 10)},
 				0,
@@ -232,18 +236,18 @@ func TestMempoolAdd(t *testing.T) {
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 500,
 			prevTxs: []*txs.Tx{
-				newTx(
+				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 1)},
 					0,
 				),
-				newTx(
+				newTxWithUTXOs(
 					ids.ID{2},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{2}, 10)},
 					0,
 				),
 			},
-			tx: newTx(
+			tx: newTxWithUTXOs(
 				ids.ID{3},
 				[]*avax.TransferableInput{
 					newAVAXInput(ids.ID{1}, 2),
@@ -262,18 +266,18 @@ func TestMempoolAdd(t *testing.T) {
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 400,
 			prevTxs: []*txs.Tx{
-				newTx(
+				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 10)},
 					0,
 				),
-				newTx(
+				newTxWithUTXOs(
 					ids.ID{2},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{2}, 5)},
 					0,
 				),
 			},
-			tx: newTx(
+			tx: newTxWithUTXOs(
 				ids.ID{3},
 				[]*avax.TransferableInput{
 					newAVAXInput(ids.ID{3}, 20),
@@ -291,18 +295,18 @@ func TestMempoolAdd(t *testing.T) {
 			weights:        gas.Dimensions{1, 1, 1, 1},
 			maxGasCapacity: 400,
 			prevTxs: []*txs.Tx{
-				newTx(
+				newTxWithUTXOs(
 					ids.ID{1},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 10)},
 					0,
 				),
-				newTx(
+				newTxWithUTXOs(
 					ids.ID{2},
 					[]*avax.TransferableInput{newAVAXInput(ids.ID{2}, 5)},
 					0,
 				),
 			},
-			tx: newTx(
+			tx: newTxWithUTXOs(
 				ids.ID{3},
 				[]*avax.TransferableInput{
 					newAVAXInput(ids.ID{3}, 20),
@@ -690,7 +694,7 @@ func TestMempool_WaitForEvent(t *testing.T) {
 
 	eg := &errgroup.Group{}
 	eg.Go(func() error {
-		tx := newTx(
+		tx := newTxWithUTXOs(
 			ids.GenerateTestID(),
 			[]*avax.TransferableInput{newAVAXInput(ids.GenerateTestID(), 5)},
 			1,
@@ -704,4 +708,65 @@ func TestMempool_WaitForEvent(t *testing.T) {
 	require.Equal(common.PendingTxs, gotMsg)
 
 	require.NoError(eg.Wait())
+}
+
+func TestMempool_Iterate(t *testing.T) {
+	tests := []struct {
+		name    string
+		txs     []*txs.Tx
+		wantTxs []ids.ID
+	}{
+		{
+			name: "no txs",
+		},
+		{
+			name: "one tx",
+			txs: []*txs.Tx{
+				newTx(ids.ID{1}),
+			},
+			wantTxs: []ids.ID{
+				{1},
+			},
+		},
+		{
+			name: "multiple txs",
+			txs: []*txs.Tx{
+				newTx(ids.ID{1}),
+				newTx(ids.ID{2}),
+				newTx(ids.ID{3}),
+			},
+			wantTxs: []ids.ID{
+				{1},
+				{2},
+				{3},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			m, err := New(
+				"",
+				gas.Dimensions{1, 1, 1, 1},
+				1_000_000,
+				snowtest.AVAXAssetID,
+				prometheus.NewRegistry(),
+			)
+			require.NoError(err)
+
+			for _, tx := range tt.txs {
+				require.NoError(m.Add(tx))
+			}
+
+			var gotTxs []ids.ID
+			m.Iterate(func(tx *txs.Tx) bool {
+				gotTxs = append(gotTxs, tx.ID())
+				return true
+			})
+
+			require.Equal(tt.wantTxs, gotTxs)
+		})
+	}
 }
