@@ -87,6 +87,9 @@ func NewDefaultConfig() Config {
 		TxPoolAccountQueue: 64,
 		TxPoolGlobalQueue:  1024,
 		TxPoolLifetime:     timeToDuration(10 * time.Minute),
+		// RPC settings
+		BatchRequestLimit:    1000,
+		BatchResponseMaxSize: 25 * 1000 * 1000, // 25MB
 		// Subnet EVM API settings
 		ValidatorsAPIEnabled: true,
 		// Database settings

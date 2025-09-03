@@ -168,7 +168,9 @@ type Config struct {
 	WarpOffChainMessages []hexutil.Bytes `json:"warp-off-chain-messages"`
 
 	// RPC settings
-	HttpBodyLimit uint64 `json:"http-body-limit"`
+	HttpBodyLimit        uint64 `json:"http-body-limit"`
+	BatchRequestLimit    uint64 `json:"batch-request-limit"`
+	BatchResponseMaxSize uint64 `json:"batch-response-max-size"`
 
 	// Database settings
 	UseStandaloneDatabase *PBool `json:"use-standalone-database"`

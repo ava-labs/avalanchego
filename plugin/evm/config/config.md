@@ -55,6 +55,8 @@ Configuration is provided as a JSON object. All fields are optional unless other
 | `api-max-duration` | duration | Maximum duration for API calls (0 = no limit) | `0` |
 | `api-max-blocks-per-request` | int64 | Maximum number of blocks per getLogs request (0 = no limit) | `0` |
 | `http-body-limit` | uint64 | Maximum size of HTTP request bodies | - |
+| `batch-request-limit` | uint64 | Maximum number of requests that can be batched in an RPC call. For no limit, set either this or `batch-response-max-size` to 0 | `1000` | 
+| `batch-response-max-size` | uint64 | Maximum size (in bytes) of response that can be returned from a batched RPC call. For no limit, set either this or `batch-request-limit` to 0. Defaults to `25 MB`| `1000` |
 
 ### WebSocket Settings
 

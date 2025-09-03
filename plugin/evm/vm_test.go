@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/txpool"
 	"github.com/ava-labs/subnet-evm/eth"
+	"github.com/ava-labs/subnet-evm/node"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/params/paramstest"
@@ -3696,4 +3697,81 @@ func TestGenesisGasLimit(t *testing.T) {
 
 	require.NoError(t, vm.Initialize(context.Background(), ctx, db, genesisBytes, []byte{}, []byte{}, []*commonEng.Fx{}, &enginetest.Sender{}))
 	require.NoError(t, vm.Shutdown(context.Background()))
+}
+
+// Copied from rpc/testservice_test.go
+type testService struct{}
+
+type echoArgs struct {
+	S string
+}
+type echoResult struct {
+	String string
+	Int    int
+	Args   *echoArgs
+}
+
+func (*testService) Echo(str string, i int, args *echoArgs) echoResult {
+	return echoResult{str, i, args}
+}
+
+// emulates server test
+func TestCreateHandlers(t *testing.T) {
+	var (
+		ctx = context.Background()
+		vm  = newVM(t, testVMConfig{
+			genesisJSON: genesisJSONSubnetEVM,
+		}).vm
+	)
+	defer func() {
+		require.NoError(t, vm.Shutdown(ctx))
+	}()
+
+	handlers, err := vm.CreateHandlers(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, handlers)
+
+	handler, ok := handlers[ethRPCEndpoint]
+	require.True(t, ok)
+	server, ok := handler.(*rpc.Server)
+	require.True(t, ok)
+
+	// registers at test_echo
+	require.NoError(t, server.RegisterName("test", new(testService)))
+	var (
+		batch        []rpc.BatchElem
+		client       = rpc.DialInProc(server)
+		maxResponses = node.DefaultConfig.BatchRequestLimit // Should be default
+	)
+	defer client.Close()
+
+	// Make a request at limit, ensure that all requests are handled
+	for i := 0; i < maxResponses; i++ {
+		batch = append(batch, rpc.BatchElem{
+			Method: "test_echo",
+			Args:   []any{"x", 1},
+			Result: new(echoResult),
+		})
+	}
+	require.NoError(t, client.BatchCall(batch))
+	for _, r := range batch {
+		require.NoError(t, r.Error, "error in batch response")
+	}
+
+	// Create a new batch that is too large
+	batch = nil
+	for i := 0; i < maxResponses+1; i++ {
+		batch = append(batch, rpc.BatchElem{
+			Method: "test_echo",
+			Args:   []any{"x", 1},
+			Result: new(echoResult),
+		})
+	}
+	require.NoError(t, client.BatchCall(batch))
+	require.ErrorContains(t, batch[0].Error, "batch too large")
+
+	// All other elements should have an error indicating there's no response
+	for _, elem := range batch[1:] {
+		require.ErrorIs(t, elem.Error, rpc.ErrMissingBatchResponse)
+	}
 }
