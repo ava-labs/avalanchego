@@ -16,11 +16,11 @@ on:
         description: 'The end block for the benchmark.'
         required: false
         default: 250000
-      source-block-dir:
+      block-dir-src:
         description: 'The source block directory. Supports S3 directory/zip and local directories.'
         required: false
         default: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**
-      current-state-dir:
+      current-state-dir-src:
         description: 'The current state directory. Supports S3 directory/zip and local directories.'
         required: false
         default: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**
@@ -31,9 +31,10 @@ on:
       push-post-state:
         description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
         default: ''
-
-  schedule:
-    - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
+      timeout-minutes:
+        description: 'Timeout in minutes for the job.'
+        required: false
+        default: 30
 
 jobs:
   define-matrix:
@@ -49,13 +50,14 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             {
               echo "matrix<<EOF"
-              printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "source-block-dir": "%s", "current-state-dir": "%s", "config": "%s", "runner": "%s" }] }\n' \
+              printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": "%s" }] }\n' \
                 "${{ github.event.inputs.start-block }}" \
                 "${{ github.event.inputs.end-block }}" \
-                "${{ github.event.inputs.source-block-dir }}" \
-                "${{ github.event.inputs.current-state-dir }}" \
+                "${{ github.event.inputs.block-dir-src }}" \
+                "${{ github.event.inputs.current-state-dir-src }}" \
                 "${{ github.event.inputs.config }}" \
-                "${{ github.event.inputs.runner }}"
+                "${{ github.event.inputs.runner }}" \
+                "${{ github.event.inputs.timeout-minutes }}"
               echo EOF
             } >> "$GITHUB_OUTPUT"
           else
@@ -72,6 +74,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
+    timeout-minutes: ${{ matrix.timeout-minutes }}
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego' }}
     permissions:
       id-token: write
@@ -85,11 +88,11 @@ jobs:
           config: ${{ matrix.config }}
           start-block: ${{ matrix.start-block }}
           end-block: ${{ matrix.end-block }}
-          source-block-dir: ${{ matrix.source-block-dir }}
-          current-state-dir: ${{ matrix.current-state-dir }}
+          block-dir-src: ${{ matrix.block-dir-src }}
+          current-state-dir-src: ${{ matrix.current-state-dir-src }}
           prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          push-github-action-benchmark: ${{ github.event_name == 'schedule' }}
+          push-github-action-benchmark: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master') }}
           aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: 'us-east-2'
           github-token: ${{ secrets.GITHUB_TOKEN }}

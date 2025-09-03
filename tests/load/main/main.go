@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
@@ -37,7 +38,8 @@ const (
 var (
 	flagVars *e2e.FlagVars
 
-	loadTimeout time.Duration
+	loadTimeoutArg     time.Duration
+	firewoodEnabledArg bool
 )
 
 func init() {
@@ -46,10 +48,16 @@ func init() {
 	)
 
 	flag.DurationVar(
-		&loadTimeout,
+		&loadTimeoutArg,
 		"load-timeout",
 		0,
 		"the duration that the load test should run for",
+	)
+	flag.BoolVar(
+		&firewoodEnabledArg,
+		"firewood",
+		false,
+		"whether to use Firewood in Coreth",
 	)
 
 	flag.Parse()
@@ -69,9 +77,15 @@ func main() {
 
 	keys, err := tmpnet.NewPrivateKeys(numNodes)
 	require.NoError(err)
+
+	primaryChainConfigs := tmpnet.DefaultChainConfigs()
+	if firewoodEnabledArg {
+		primaryChainConfigs = newPrimaryChainConfigsWithFirewood()
+	}
 	network := &tmpnet.Network{
-		Nodes:         nodes,
-		PreFundedKeys: keys,
+		Nodes:               nodes,
+		PreFundedKeys:       keys,
+		PrimaryChainConfigs: primaryChainConfigs,
 	}
 
 	e2e.NewTestEnvironment(tc, flagVars, network)
@@ -136,7 +150,7 @@ func main() {
 	)
 	require.NoError(err)
 
-	generator.Run(ctx, log, loadTimeout, testTimeout)
+	generator.Run(ctx, log, loadTimeoutArg, testTimeout)
 }
 
 // newTokenContract deploys an instance of an ERC20 token and distributes the
@@ -190,4 +204,27 @@ func newTokenContract(
 	}
 
 	return contract, nil
+}
+
+// newPrimaryChainConfigsWithFirewood extends the default primary chain configs
+// by enabling Firewood on the C-Chain.
+func newPrimaryChainConfigsWithFirewood() map[string]tmpnet.ConfigMap {
+	primaryChainConfigs := tmpnet.DefaultChainConfigs()
+	if _, ok := primaryChainConfigs[blockchainID]; !ok {
+		primaryChainConfigs[blockchainID] = make(tmpnet.ConfigMap)
+	}
+
+	// firewoodConfig represents the minimum configuration required to enable
+	// Firewood in Coreth.
+	//
+	// Ref: https://github.com/ava-labs/coreth/issues/1180
+	firewoodConfig := tmpnet.ConfigMap{
+		"state-scheme":       "firewood",
+		"snapshot-cache":     0,
+		"pruning-enabled":    true,
+		"state-sync-enabled": false,
+	}
+
+	maps.Copy(primaryChainConfigs[blockchainID], firewoodConfig)
+	return primaryChainConfigs
 }
