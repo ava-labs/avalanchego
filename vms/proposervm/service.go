@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
@@ -34,21 +35,23 @@ func (p *ProposerAPI) GetEpoch(r *http.Request, _ *struct{}, reply *api.GetEpoch
 		zap.String("method", "getEpoch"),
 	)
 
+	// This will error if we haven't advanced past the genesis block.
 	lastAccepted, err := p.vm.GetLastAccepted()
 	if err != nil {
-		return fmt.Errorf("couldn't get last accepted block ID: %w", err)
+		return fmt.Errorf("couldn't get last accepted block ID %w", err)
 	}
 
 	latestBlock, err := p.vm.getPostForkBlock(r.Context(), lastAccepted)
 	if err != nil {
-		return fmt.Errorf("couldn't get latest block: %w", err)
+		return fmt.Errorf("couldn't get latest block %s: %w", lastAccepted.String(), err)
 	}
 
-	epoch, err := latestBlock.pChainEpoch(r.Context())
-	if err != nil {
-		return fmt.Errorf("couldn't get epoch P-Chain height: %w", err)
+	blk, ok := latestBlock.(block.SignedBlock)
+	if !ok {
+		return fmt.Errorf("latest block is not a signed block")
 	}
 
+	epoch := blk.PChainEpoch()
 	reply.Number = avajson.Uint64(epoch.Number)
 	reply.StartTime = avajson.Uint64(epoch.StartTime.Unix())
 	reply.PChainHeight = avajson.Uint64(epoch.Height)

@@ -8,12 +8,14 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/ethclient"
+	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -27,41 +29,47 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 	const txAmount = 10 * units.Avax // Arbitrary amount to send and transfer
 
 	ginkgo.It("should advance the proposervm epoch according to the upgrade config epoch duration", func() {
-		// TODO: Skip this test if Granite is not activated
-
 		env := e2e.GetEnv(tc)
-		var (
-			senderKey    = env.PreFundedKey
-			recipientKey = e2e.NewPrivateKey(tc)
-		)
-
-		// Select a random node URI to use for both the eth client and
-		// the wallet to avoid having to verify that all nodes are at
-		// the same height before initializing the wallet.
+		senderKey := env.PreFundedKey
+		recipientKey := e2e.NewPrivateKey(tc)
 		nodeURI := env.GetRandomNodeURI()
 		ethClient := e2e.NewEthClient(tc, nodeURI)
 
-		proposerClient := proposervm.NewClient(nodeURI.URI, "C")
+		infoClient := info.NewClient(nodeURI.URI)
+		upgrades, err := infoClient.Upgrades(tc.DefaultContext())
+		require.NoError(err)
+
+		// Don't run test if granite isn't active.
+		if !upgrades.IsGraniteActivated(time.Now()) {
+			return
+		}
+
+		// Genesis does not contain a proposervm block
+		for blockNumber(tc, ethClient) == 0 {
+			time.Sleep(1 * time.Second)
+		}
 
 		tc.By("issuing C-Chain transactions to advance the epoch", func() {
+			proposerClient := proposervm.NewClient(nodeURI.URI, "C")
+
 			initialEpoch, err := proposerClient.GetEpoch(tc.DefaultContext())
 			require.NoError(err)
 
-			time.Sleep(5 * time.Second)
+			tc.Log().Info("initial epoch", zap.Any("epoch", initialEpoch))
 
-			issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), int64(txAmount))
+			issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
 
-			epoch, err := proposerClient.GetEpoch(tc.DefaultContext())
+			time.Sleep(upgrades.GraniteEpochDuration + 2*time.Second)
+
+			issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
+
+			advancedEpoch, err := proposerClient.GetEpoch(tc.DefaultContext())
 			require.NoError(err)
-			tc.Log().Debug(
-				"epoch",
-				zap.Uint64("Epoch Number:", epoch.Number),
-				zap.Int64("Epoch Start Time:", epoch.StartTime.Unix()),
-				zap.Uint64("P-Chain Height:", epoch.Height),
-			)
+
+			tc.Log().Info("advanced epoch", zap.Any("epoch", advancedEpoch))
 
 			require.Greater(
-				epoch.Number,
+				advancedEpoch.Number,
 				initialEpoch.Number,
 				"expected epoch number to advance, but it did not",
 			)
@@ -69,12 +77,18 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 	})
 })
 
+func blockNumber(tc *e2e.GinkgoTestContext, ethClient *ethclient.Client) uint64 {
+	blockNumber, err := ethClient.BlockNumber(tc.DefaultContext())
+	require.NoError(tc, err)
+	return blockNumber
+}
+
 func issueTransaction(
 	tc *e2e.GinkgoTestContext,
 	ethClient *ethclient.Client,
 	senderKey *secp256k1.PrivateKey,
 	recipientEthAddress common.Address,
-	txAmount int64,
+	txAmount uint64,
 ) {
 	acceptedNonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), senderKey.EthAddress())
 	require.NoError(tc, err)
@@ -82,7 +96,7 @@ func issueTransaction(
 	tx := types.NewTransaction(
 		acceptedNonce,
 		recipientEthAddress,
-		big.NewInt(txAmount),
+		new(big.Int).SetUint64(txAmount),
 		e2e.DefaultGasLimit,
 		gasPrice,
 		nil,
@@ -96,4 +110,6 @@ func issueTransaction(
 
 	receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
 	require.Equal(tc, types.ReceiptStatusSuccessful, receipt.Status)
+
+	bind.WaitMined(tc.DefaultContext(), ethClient, signedTx)
 }
