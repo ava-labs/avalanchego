@@ -244,7 +244,7 @@ func (t *TODOBootstrapper) Start(ctx context.Context, _ uint32) error {
 		Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,
 		State: snow.NormalOp,
 	})
-	if err := t.Engine.vm.SetState(ctx, snow.NormalOp); err != nil {
+	if err := t.Engine.vm.SetState(ctx, snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
 			err)
 	}
