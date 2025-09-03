@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/info"
+	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -28,18 +29,20 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 	const txAmount = 10 * units.Avax // Arbitrary amount to send and transfer
 
 	ginkgo.It("should advance the proposervm epoch according to the upgrade config epoch duration", func() {
-		env := e2e.GetEnv(tc)
-		senderKey := env.PreFundedKey
-		recipientKey := e2e.NewPrivateKey(tc)
-		nodeURI := env.GetRandomNodeURI()
-		ethClient := e2e.NewEthClient(tc, nodeURI)
+		var (
+			env          = e2e.GetEnv(tc)
+			nodeURI      = env.GetRandomNodeURI()
+			senderKey    = env.PreFundedKey
+			recipientKey = e2e.NewPrivateKey(tc)
+			ethClient    = e2e.NewEthClient(tc, nodeURI)
+			infoClient   = info.NewClient(nodeURI.URI)
+		)
 
-		infoClient := info.NewClient(nodeURI.URI)
 		upgrades, err := infoClient.Upgrades(tc.DefaultContext())
 		require.NoError(err)
 
-		// Don't run test if granite isn't active.
 		if !upgrades.IsGraniteActivated(time.Now()) {
+			tc.Log().Info("skipping test because granite isn't active")
 			return
 		}
 
@@ -76,14 +79,14 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 	})
 })
 
-func blockNumber(tc *e2e.GinkgoTestContext, ethClient *ethclient.Client) uint64 {
+func blockNumber(tc tests.TestContext, ethClient *ethclient.Client) uint64 {
 	blockNumber, err := ethClient.BlockNumber(tc.DefaultContext())
 	require.NoError(tc, err)
 	return blockNumber
 }
 
 func issueTransaction(
-	tc *e2e.GinkgoTestContext,
+	tc tests.TestContext,
 	ethClient *ethclient.Client,
 	senderKey *secp256k1.PrivateKey,
 	recipientEthAddress common.Address,
