@@ -69,6 +69,7 @@ type blockEntryHeader struct {
 	Checksum         uint64
 	Version          uint16
 	UncompressedSize uint32
+	// Compressed       bool
 }
 
 // MarshalBinary implements the encoding.BinaryMarshaler interface.
@@ -861,7 +862,7 @@ func (s *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEntr
 	if bh.UncompressedSize != bh.Size {
 		decompressed, err := s.compressor.Decompress(blockData)
 		if err != nil {
-			return bh, fmt.Errorf("%w: failed to decompress block at offset %d: %v", ErrCorrupted, offset, err)
+			return bh, fmt.Errorf("%w: failed to decompress block at offset %d: %w", ErrCorrupted, offset, err)
 		}
 		if len(decompressed) != int(bh.UncompressedSize) {
 			return bh, fmt.Errorf("%w: decompressed size mismatch at offset %d: got %d, expected %d", ErrCorrupted, offset, len(decompressed), bh.UncompressedSize)
