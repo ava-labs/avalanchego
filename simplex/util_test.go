@@ -5,7 +5,6 @@ package simplex
 
 import (
 	"context"
-	"os"
 	"testing"
 	"time"
 
@@ -107,9 +106,6 @@ func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
 	chainID := ids.GenerateTestID()
 
 	testNodes := generateTestNodes(t, numNodes)
-	writeCloser := os.Stdout
-	logFormat, err := logging.ToFormat("auto", writeCloser.Fd())
-	require.NoError(t, err)
 	configs := make([]*Config, 0, numNodes)
 	for _, node := range testNodes {
 		ctrl := gomock.NewController(t)
@@ -127,7 +123,7 @@ func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
 				ChainID:   chainID,
 				NetworkID: constants.UnitTestID,
 			},
-			Log:                logging.NewLogger("test", logging.NewWrappedCore(logging.Verbo, writeCloser, logFormat.ConsoleEncoder())),
+			Log:                logging.NoLog{},
 			Sender:             sender,
 			OutboundMsgBuilder: mc,
 			Validators:         newTestValidatorInfo(testNodes),
