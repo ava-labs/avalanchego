@@ -33,7 +33,7 @@ func TestServiceGetProposedHeight(t *testing.T) {
 	reply := api.GetHeightResponse{}
 	require.NoError(service.GetProposedHeight(&http.Request{}, nil, &reply))
 
-	minHeight, err := service.vm.GetMinimumHeight()
+	minHeight, err := service.vm.ctx.ValidatorState.GetMinimumHeight(context.Background())
 	require.NoError(err)
 	require.Equal(minHeight, uint64(reply.Height))
 }
