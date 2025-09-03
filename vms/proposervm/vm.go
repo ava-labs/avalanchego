@@ -249,13 +249,6 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 	return vm.ChainVM.Shutdown(ctx)
 }
 
-func (vm *VM) GetLastAcceptedHeight() uint64 {
-	vm.ctx.Lock.Lock()
-	defer vm.ctx.Lock.Unlock()
-
-	return vm.lastAcceptedHeight
-}
-
 // overrides ChainVM.CreateHandlers to expose the proposervm API path
 func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
 	handlers, err := vm.ChainVM.CreateHandlers(ctx)
