@@ -28,11 +28,12 @@ func TestServiceGetProposedHeight(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	proposerAPI := &ProposerAPI{vm: proVM}
-	proVM.lastAcceptedHeight = 42
+	service := &ProposerAPI{vm: proVM}
 
 	reply := api.GetHeightResponse{}
-	require.NoError(proposerAPI.GetProposedHeight(&http.Request{}, nil, &reply))
+	require.NoError(service.GetProposedHeight(&http.Request{}, nil, &reply))
 
-	require.Equal(proVM.lastAcceptedHeight, uint64(reply.Height))
+	minHeight, err := service.vm.GetMinimumHeight()
+	require.NoError(err)
+	require.Equal(minHeight, uint64(reply.Height))
 }
