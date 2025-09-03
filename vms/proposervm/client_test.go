@@ -49,7 +49,7 @@ func TestNewClient(t *testing.T) {
 	require.NotNil(c)
 }
 
-func TestGetProposedHeight(t *testing.T) {
+func TestGetProposedHeightFromClient(t *testing.T) {
 	tests := []struct {
 		name         string
 		mockResponse *api.GetHeightResponse
