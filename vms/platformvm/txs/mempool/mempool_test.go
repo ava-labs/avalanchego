@@ -703,6 +703,7 @@ func TestMempool_Drop(t *testing.T) {
 	tests := []struct {
 		name       string
 		droppedTxs map[ids.ID]error
+		addTxs     []ids.ID
 		tx         ids.ID
 		wantErr    error
 	}{
@@ -713,6 +714,14 @@ func TestMempool_Drop(t *testing.T) {
 			},
 			tx:      ids.Empty,
 			wantErr: errFoo,
+		},
+		{
+			name: "tx dropped then added",
+			droppedTxs: map[ids.ID]error{
+				ids.Empty: errFoo,
+			},
+			addTxs: []ids.ID{ids.Empty},
+			tx:     ids.Empty,
 		},
 		{
 			name: "tx not dropped",
@@ -734,6 +743,10 @@ func TestMempool_Drop(t *testing.T) {
 
 			for txID, dropReason := range tt.droppedTxs {
 				m.MarkDropped(txID, dropReason)
+			}
+
+			for _, txID := range tt.addTxs {
+				require.NoError(m.Add(newTx(txID)))
 			}
 
 			err = m.GetDropReason(tt.tx)

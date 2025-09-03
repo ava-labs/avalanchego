@@ -102,6 +102,7 @@ func New(
 	return m, nil
 }
 
+// Add adds the tx to the mempool and clears its dropped status.
 func (m *Mempool) Add(tx *txs.Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
