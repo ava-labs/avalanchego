@@ -114,6 +114,7 @@ updated by the generator/wallets. The server is configured to be targeted by
 ### Load Test Flags
 
 - `--load-timeout`: Maximum duration to run the load test (default: unlimited)
+- `--firewood`: Whether to use Firewood in Coreth (default: false)
 
 ### Network Configuration (`tmpnet` Flags)
 
