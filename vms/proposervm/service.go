@@ -19,13 +19,18 @@ type ProposerAPI struct {
 	vm *VM
 }
 
-func (p *ProposerAPI) GetProposedHeight(_ *http.Request, _ *struct{}, reply *api.GetHeightResponse) error {
+func (p *ProposerAPI) GetProposedHeight(r *http.Request, _ *struct{}, reply *api.GetHeightResponse) error {
 	p.vm.ctx.Log.Debug("API called",
 		zap.String("service", "proposervm"),
 		zap.String("method", "getProposedHeight"),
 	)
 
-	reply.Height = avajson.Uint64(p.vm.GetLastAcceptedHeight())
+	height, err := p.vm.ctx.ValidatorState.GetMinimumHeight(r.Context())
+	if err != nil {
+		return fmt.Errorf("couldn't get minimum height %w", err)
+	}
+
+	reply.Height = avajson.Uint64(height)
 	return nil
 }
 
