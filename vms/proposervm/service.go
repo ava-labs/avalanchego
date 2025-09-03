@@ -4,6 +4,7 @@
 package proposervm
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -53,7 +54,7 @@ func (p *ProposerAPI) GetEpoch(r *http.Request, _ *struct{}, reply *api.GetEpoch
 
 	blk, ok := latestBlock.(block.SignedBlock)
 	if !ok {
-		return fmt.Errorf("latest block is not a signed block")
+		return errors.New("latest block is not a signed block")
 	}
 
 	epoch := blk.PChainEpoch()

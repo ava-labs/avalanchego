@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/ethclient"
-	"github.com/ava-labs/libevm/accounts/abi/bind"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/onsi/ginkgo/v2"
@@ -110,6 +109,4 @@ func issueTransaction(
 
 	receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
 	require.Equal(tc, types.ReceiptStatusSuccessful, receipt.Status)
-
-	bind.WaitMined(tc.DefaultContext(), ethClient, signedTx)
 }
