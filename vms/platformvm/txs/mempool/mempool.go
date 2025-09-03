@@ -16,14 +16,14 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/lock"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/setmap"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
-	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 var (
@@ -47,9 +47,9 @@ type Mempool struct {
 	tree               *btree.BTreeG[meteredTx]
 	txs                map[ids.ID]meteredTx
 	consumedUTXOs      *setmap.SetMap[ids.ID, ids.ID]
-	droppedTxIDs *lru.Cache[ids.ID, error]
-	gasAvailable gas.Gas
-	numTxsMetric prometheus.Gauge
+	droppedTxIDs       *lru.Cache[ids.ID, error]
+	gasAvailable       gas.Gas
+	numTxsMetric       prometheus.Gauge
 	gasAvailableMetric prometheus.Gauge
 }
 
@@ -69,7 +69,7 @@ func New(
 	gasAvailableMetric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "gas_available",
-		Help: "amount of gas available",
+		Help:      "amount of gas available",
 	})
 
 	if err := errors.Join(
@@ -87,13 +87,13 @@ func New(
 				return a.gasPrice < b.gasPrice
 			}
 
-			// Break ties
+			// Break ties with txID
 			return a.TxID.Compare(b.TxID) < 0
 		}),
 		txs:                make(map[ids.ID]meteredTx),
 		consumedUTXOs:      setmap.New[ids.ID, ids.ID](),
 		droppedTxIDs:       lru.NewCache[ids.ID, error](64),
-		gasAvailable: gasCapacity,
+		gasAvailable:       gasCapacity,
 		numTxsMetric:       numTxsMetric,
 		gasAvailableMetric: gasAvailableMetric,
 	}
@@ -136,7 +136,7 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 }
 
 func (m *Mempool) tryEvictTxs(txToAdd meteredTx) error {
-	gasToFree := m.gasAvailable - txToAdd.gasUsed
+	gasToFree := txToAdd.gasUsed - m.gasAvailable
 	gasFreed := gas.Gas(0)
 	toEvict := make([]ids.ID, 0)
 
@@ -207,10 +207,6 @@ func (m *Mempool) meter(tx *txs.Tx) (meteredTx, error) {
 		return meteredTx{}, err
 	}
 
-	if gasUsed > m.gasCapacity {
-		return meteredTx{}, ErrNotEnoughGas
-	}
-
 	if gasUsed == 0 {
 		return meteredTx{}, errNoGasUsed
 	}
@@ -224,7 +220,7 @@ func (m *Mempool) meter(tx *txs.Tx) (meteredTx, error) {
 
 func (m *Mempool) updateMetrics() {
 	m.numTxsMetric.Set(float64(m.tree.Len()))
-	m.gasAvailableMetric.Set(float64(m.gasCapacity - m.currentGas))
+	m.gasAvailableMetric.Set(float64(m.gasAvailable))
 }
 
 func (m *Mempool) Get(txID ids.ID) (*txs.Tx, bool) {
@@ -252,7 +248,7 @@ func (m *Mempool) remove(txID ids.ID) {
 	m.tree.Delete(removedTx)
 	m.consumedUTXOs.DeleteKey(txID)
 
-	m.currentGas -= removedTx.gasUsed
+	m.gasAvailable += removedTx.gasUsed
 
 	m.updateMetrics()
 }
