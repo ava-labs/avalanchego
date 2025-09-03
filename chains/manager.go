@@ -1499,16 +1499,6 @@ func (m *manager) StartChainCreator(platformParams ChainParameters) error {
 	return nil
 }
 
-// startChainCreatorNoPChain is used for testing to bypass setting up the pchain
-// and unblocking the chain creator
-func (m *manager) startChainCreatorNoPChain() {
-	m.chainCreatorExited.Add(1)
-	go m.dispatchChainCreator()
-
-	// typically creating the pchain would unblock the chain creator channel
-	close(m.unblockChainCreatorCh)
-}
-
 func (m *manager) dispatchChainCreator() {
 	defer m.chainCreatorExited.Done()
 

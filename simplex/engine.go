@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/version"
 )
 
 var _ common.Engine = (*Engine)(nil)
@@ -39,7 +40,6 @@ type Engine struct {
 	common.PutHandler
 	common.QueryHandler
 	common.ChitsHandler
-	common.InternalHandler
 
 	// Handler that passes application messages to the VM
 	common.AppHandler
@@ -126,7 +126,6 @@ func NewEngine(ctx context.Context, config *Config) (*Engine, error) {
 		PutHandler:                  common.NewNoOpPutHandler(config.Log),
 		QueryHandler:                common.NewNoOpQueryHandler(config.Log),
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
-		InternalHandler:             common.NewNoOpInternalHandler(config.Log),
 
 		AppHandler: config.VM,
 	}, nil
@@ -173,6 +172,32 @@ func (e *Engine) p2pToSimplexMessage(ctx context.Context, msg *p2p.Simplex) (*si
 	default:
 		return nil, errUnknownMessageType
 	}
+}
+
+func (e *Engine) Shutdown(_ context.Context) error {
+	e.epoch.Stop()
+	e.logger.Info("Stopped simplex engine")
+	return nil
+}
+
+func (e *Engine) Gossip(_ context.Context) error {
+	e.logger.Debug("Gossip is not implemented for simplex")
+	return nil
+}
+
+func (e *Engine) Notify(_ context.Context, _ common.Message) error {
+	e.logger.Debug("Notify is not implemented for simplex")
+	return nil
+}
+
+func (e *Engine) Connected(_ context.Context, _ ids.NodeID, _ *version.Application) error {
+	e.logger.Debug("Connected is not implemented for simplex")
+	return nil
+}
+
+func (e *Engine) Disconnected(_ context.Context, _ ids.NodeID) error {
+	e.logger.Debug("Disconnected is not implemented for simplex")
+	return nil
 }
 
 func (*Engine) HealthCheck(_ context.Context) (interface{}, error) {

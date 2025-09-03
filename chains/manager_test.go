@@ -40,6 +40,16 @@ import (
 	"github.com/ava-labs/avalanchego/vms/vmsmock"
 )
 
+// startChainCreatorNoPChain is used for testing to bypass setting up the pchain
+// and unblocking the chain creator
+func (m *manager) startChainCreatorNoPChain() {
+	m.chainCreatorExited.Add(1)
+	go m.dispatchChainCreator()
+
+	// typically creating the pchain would unblock the chain creator channel
+	close(m.unblockChainCreatorCh)
+}
+
 // newRouter returns a mock router that mocks the call of adding a chain to the router.
 func newRouter(t *testing.T) router.Router {
 	ctrl := gomock.NewController(t)
