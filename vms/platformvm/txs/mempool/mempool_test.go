@@ -341,6 +341,7 @@ func TestMempoolAdd(t *testing.T) {
 			wantTxIDs: []ids.ID{
 				{1},
 			},
+			wantErr: mempool.ErrConflictsWithOtherTx,
 		},
 		{
 			name:           "conflict - equal paying tx is dropped",
