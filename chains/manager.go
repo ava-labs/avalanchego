@@ -104,7 +104,7 @@ var (
 	ChainBootstrappingDBPrefix = []byte("interval_bs")
 
 	// Prefix used for simplex storage
-	SimplexDBPrefix = []byte("simplex")
+	simplexDBPrefix = []byte("simplex")
 
 	errUnknownVMType           = errors.New("the vm should have type avalanche.DAGVM or snowman.ChainVM")
 	errCreatePlatformVM        = errors.New("attempted to create a chain running the PlatformVM")
@@ -1803,7 +1803,7 @@ func (m *manager) createSimplexDBs(primaryAlias string, chainID ids.ID) (*prefix
 
 	prefixDB := prefixdb.New(chainID[:], meterDB)
 	vmDB := prefixdb.New(VMDBPrefix, prefixDB)
-	simplexDB := prefixdb.New(SimplexDBPrefix, prefixDB)
+	simplexDB := prefixdb.New(simplexDBPrefix, prefixDB)
 	return vmDB, simplexDB, nil
 }
 
