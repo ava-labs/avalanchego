@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/compression"
 )
 
 func TestDataSplitting(t *testing.T) {
@@ -17,6 +19,9 @@ func TestDataSplitting(t *testing.T) {
 	config := DefaultConfig().WithMaxDataFileSize(1024 * 2.5)
 	store, cleanup := newTestDatabase(t, config)
 	defer cleanup()
+
+	// Override the compressor so we can have fixed size blocks
+	store.compressor = compression.NewNoCompressor()
 
 	// create 11 blocks, 1kb each
 	numBlocks := 11
@@ -52,6 +57,7 @@ func TestDataSplitting(t *testing.T) {
 	config = config.WithDataDir(store.config.DataDir).WithIndexDir(store.config.IndexDir)
 	store, err = New(config, store.log)
 	require.NoError(t, err)
+	store.compressor = compression.NewNoCompressor()
 	defer store.Close()
 	for i := range numBlocks {
 		readBlock, err := store.ReadBlock(uint64(i))

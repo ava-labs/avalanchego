@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -249,6 +250,7 @@ func TestFileCache_Eviction(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store, cleanup := newTestDatabase(t, tt.config.WithMaxDataFileSize(1024*1.5))
+			store.compressor = compression.NewNoCompressor()
 			defer cleanup()
 
 			// Override the file cache with specified size
@@ -377,9 +379,9 @@ func TestStructSizes(t *testing.T) {
 			memorySize:          unsafe.Sizeof(blockEntryHeader{}),
 			binarySize:          binary.Size(blockEntryHeader{}),
 			expectedMemorySize:  32,
-			expectedBinarySize:  26,
-			expectedMarshalSize: 26,
-			expectedPadding:     6,
+			expectedBinarySize:  22,
+			expectedMarshalSize: 22,
+			expectedPadding:     10,
 			createInstance:      func() interface{} { return blockEntryHeader{} },
 		},
 		{

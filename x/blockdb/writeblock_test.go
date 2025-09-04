@@ -13,6 +13,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/utils/compression"
+
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
@@ -203,13 +205,14 @@ func TestWriteBlock_Concurrency(t *testing.T) {
 
 func TestWriteBlock_Errors(t *testing.T) {
 	tests := []struct {
-		name       string
-		height     uint64
-		block      []byte
-		setup      func(db *Database)
-		config     DatabaseConfig
-		wantErr    error
-		wantErrMsg string
+		name               string
+		height             uint64
+		block              []byte
+		setup              func(db *Database)
+		config             DatabaseConfig
+		disableCompression bool
+		wantErr            error
+		wantErrMsg         string
 	}{
 		{
 			name:    "empty block nil",
@@ -246,17 +249,19 @@ func TestWriteBlock_Errors(t *testing.T) {
 			wantErr: ErrDatabaseClosed,
 		},
 		{
-			name:    "exceed max data file size",
-			height:  0,
-			block:   make([]byte, 1003), // Block + header will exceed 1024 limit (1003 + 26 = 1029 > 1024)
-			config:  DefaultConfig().WithMaxDataFileSize(1024),
-			wantErr: ErrBlockTooLarge,
+			name:               "exceed max data file size",
+			height:             0,
+			disableCompression: true,
+			block:              make([]byte, 1003), // Block + header will exceed 1024 limit (1003 + 26 = 1029 > 1024)
+			config:             DefaultConfig().WithMaxDataFileSize(1024),
+			wantErr:            ErrBlockTooLarge,
 		},
 		{
-			name:   "data file offset overflow",
-			height: 0,
-			block:  make([]byte, 100),
-			config: DefaultConfig(),
+			name:               "data file offset overflow",
+			height:             0,
+			block:              make([]byte, 100),
+			disableCompression: true,
+			config:             DefaultConfig(),
 			setup: func(db *Database) {
 				// Set the next write offset to near max to trigger overflow
 				db.nextDataWriteOffset.Store(math.MaxUint64 - 50)
@@ -296,6 +301,9 @@ func TestWriteBlock_Errors(t *testing.T) {
 			}
 
 			store, cleanup := newTestDatabase(t, config)
+			if tt.disableCompression {
+				store.compressor = compression.NewNoCompressor()
+			}
 			defer cleanup()
 
 			if tt.setup != nil {

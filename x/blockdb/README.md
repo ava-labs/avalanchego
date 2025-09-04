@@ -9,7 +9,7 @@ BlockDB is a specialized database optimized for blockchain blocks.
 - **Flexible Write Ordering**: Supports out-of-order block writes for bootstrapping
 - **Configurable Durability**: Optional `syncToDisk` mode guarantees immediate recoverability
 - **Automatic Recovery**: Detects and recovers unindexed blocks after unclean shutdowns
-- **Block Compression**: Optional zstd compression for block data
+- **Block Compression**: zstd compression for block data
 
 ## Design
 
@@ -76,7 +76,7 @@ Index Entry (16 bytes):
 Each block in the data file is stored with a block entry header followed by the raw block data:
 
 ```
-Block Entry Header (26 bytes):
+Block Entry Header (22 bytes):
 ┌────────────────────────────────┬─────────┐
 │ Field                          │ Size    │
 ├────────────────────────────────┼─────────┤
@@ -84,7 +84,6 @@ Block Entry Header (26 bytes):
 │ Size                           │ 4 bytes │
 │ Checksum                       │ 8 bytes │
 │ Version                        │ 2 bytes │
-│ UncompressedSize               │ 4 bytes │
 └────────────────────────────────┴─────────┘
 ```
 
