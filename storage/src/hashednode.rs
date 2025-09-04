@@ -127,7 +127,7 @@ impl<T: AsRef<[u8]>> ValueDigest<T> {
 }
 
 /// A node in the trie that can be hashed.
-pub trait Hashable {
+pub trait Hashable: std::fmt::Debug {
     /// The key of the node where each byte is a nibble.
     fn key(&self) -> impl Iterator<Item = u8> + Clone;
     /// The partial path of this node
@@ -141,14 +141,14 @@ pub trait Hashable {
 }
 
 /// A preimage of a hash.
-pub trait Preimage {
+pub trait Preimage: std::fmt::Debug {
     /// Returns the hash of this preimage.
     fn to_hash(&self) -> HashType;
     /// Write this hash preimage to `buf`.
     fn write(&self, buf: &mut impl HasUpdate);
 }
 
-trait HashableNode {
+trait HashableNode: std::fmt::Debug {
     fn partial_path(&self) -> impl Iterator<Item = u8> + Clone;
     fn value(&self) -> Option<&[u8]>;
     fn child_hashes(&self) -> Children<HashType>;
@@ -182,6 +182,7 @@ impl HashableNode for LeafNode {
     }
 }
 
+#[derive(Debug)]
 struct NodeAndPrefix<'a, N: HashableNode> {
     node: &'a N,
     prefix: &'a Path,
