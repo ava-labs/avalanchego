@@ -50,14 +50,14 @@ curl -X POST --data '{
 }
 ```
 
-### `proposervm.getEpoch`
+### `proposervm.getCurrentEpoch`
 
 Returns the current epoch information.
 
 **Signature:**
 
 ```go
-proposervm.getEpoch() ->
+proposervm.getCurrentEpoch() ->
 {
   number: int,
   startTime: int,
@@ -70,7 +70,7 @@ proposervm.getEpoch() ->
 ```sh
 curl -X POST --data '{
     "jsonrpc": "2.0",
-    "method": "proposervm.getEpoch",
+    "method": "proposervm.getCurrentEpoch",
     "params": {},
     "id": 1
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P/proposervm

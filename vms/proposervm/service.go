@@ -35,10 +35,10 @@ func (p *ProposerAPI) GetProposedHeight(r *http.Request, _ *struct{}, reply *api
 	return nil
 }
 
-func (p *ProposerAPI) GetEpoch(r *http.Request, _ *struct{}, reply *api.GetEpochResponse) error {
+func (p *ProposerAPI) GetCurrentEpoch(r *http.Request, _ *struct{}, reply *api.GetEpochResponse) error {
 	p.vm.ctx.Log.Debug("API called",
 		zap.String("service", "proposervm"),
-		zap.String("method", "getEpoch"),
+		zap.String("method", "getCurrentEpoch"),
 	)
 
 	// This will error if we haven't advanced past the genesis block.

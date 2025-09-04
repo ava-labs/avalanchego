@@ -58,7 +58,7 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 		tc.By("issuing C-Chain transactions to advance the epoch", func() {
 			proposerClient := proposervm.NewClient(nodeURI.URI, "C")
 
-			initialEpoch, err := proposerClient.GetEpoch(tc.DefaultContext())
+			initialEpoch, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
 			require.NoError(err)
 
 			tc.Log().Info("initial epoch", zap.Any("epoch", initialEpoch))
@@ -69,7 +69,7 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 
 			issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
 
-			advancedEpoch, err := proposerClient.GetEpoch(tc.DefaultContext())
+			advancedEpoch, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
 			require.NoError(err)
 
 			tc.Log().Info("advanced epoch", zap.Any("epoch", advancedEpoch))
