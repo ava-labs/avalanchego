@@ -13,6 +13,7 @@ set -euo pipefail
 
 : "${BLOCK_DIR:?BLOCK_DIR must be set}"
 : "${CURRENT_STATE_DIR:?CURRENT_STATE_DIR must be set}"
+: "${RUNNER_NAME:?RUNNER_NAME must be set}"
 : "${START_BLOCK:?START_BLOCK must be set}"
 : "${END_BLOCK:?END_BLOCK must be set}"
 

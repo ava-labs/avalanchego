@@ -112,3 +112,4 @@ jobs:
           aws-region: 'us-east-2'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ${{ github.event.inputs.push-post-state }}
+          runner_name: ${{ matrix.runner }}
