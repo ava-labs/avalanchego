@@ -51,6 +51,7 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 
 		// Genesis does not contain a proposervm block
 		for blockNumber(tc, ethClient) == 0 {
+			tc.Log().Info("Waiting to progress past genesis block")
 			time.Sleep(1 * time.Second)
 		}
 
