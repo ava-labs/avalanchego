@@ -246,31 +246,32 @@ func (proof *Proof) UnmarshalProto(pbProof *pb.Proof) error {
 
 type RangeProof ChangeProof
 
-func (proof *RangeProof) MarshalBinary() (data []byte, err error) {
-	return proto.Marshal(proof.ToProto())
+func (r *RangeProof) MarshalBinary() ([]byte, error) {
+	return proto.Marshal(r.ToProto())
 }
 
-func (proof *RangeProof) UnmarshalBinary(data []byte) error {
+func (r *RangeProof) UnmarshalBinary(data []byte) error {
 	var pbRangeProof pb.RangeProof
 	if err := proto.Unmarshal(data, &pbRangeProof); err != nil {
 		return err
 	}
-	return proof.UnmarshalProto(&pbRangeProof)
+
+	return r.UnmarshalProto(&pbRangeProof)
 }
 
-func (proof *RangeProof) ToProto() *pb.RangeProof {
-	startProof := make([]*pb.ProofNode, len(proof.StartProof))
-	for i, node := range proof.StartProof {
+func (r *RangeProof) ToProto() *pb.RangeProof {
+	startProof := make([]*pb.ProofNode, len(r.StartProof))
+	for i, node := range r.StartProof {
 		startProof[i] = node.ToProto()
 	}
 
-	endProof := make([]*pb.ProofNode, len(proof.EndProof))
-	for i, node := range proof.EndProof {
+	endProof := make([]*pb.ProofNode, len(r.EndProof))
+	for i, node := range r.EndProof {
 		endProof[i] = node.ToProto()
 	}
 
-	keyValues := make([]*pb.KeyValue, len(proof.KeyChanges))
-	for i, kv := range proof.KeyChanges {
+	keyValues := make([]*pb.KeyValue, len(r.KeyChanges))
+	for i, kv := range r.KeyChanges {
 		keyValues[i] = &pb.KeyValue{
 			Key:   kv.Key,
 			Value: kv.Value.Value(),
@@ -284,28 +285,28 @@ func (proof *RangeProof) ToProto() *pb.RangeProof {
 	}
 }
 
-func (proof *RangeProof) UnmarshalProto(pbProof *pb.RangeProof) error {
+func (r *RangeProof) UnmarshalProto(pbProof *pb.RangeProof) error {
 	if pbProof == nil {
 		return ErrNilRangeProof
 	}
 
-	proof.StartProof = make([]ProofNode, len(pbProof.StartProof))
+	r.StartProof = make([]ProofNode, len(pbProof.StartProof))
 	for i, protoNode := range pbProof.StartProof {
-		if err := proof.StartProof[i].UnmarshalProto(protoNode); err != nil {
+		if err := r.StartProof[i].UnmarshalProto(protoNode); err != nil {
 			return err
 		}
 	}
 
-	proof.EndProof = make([]ProofNode, len(pbProof.EndProof))
+	r.EndProof = make([]ProofNode, len(pbProof.EndProof))
 	for i, protoNode := range pbProof.EndProof {
-		if err := proof.EndProof[i].UnmarshalProto(protoNode); err != nil {
+		if err := r.EndProof[i].UnmarshalProto(protoNode); err != nil {
 			return err
 		}
 	}
 
-	proof.KeyChanges = make([]KeyChange, len(pbProof.KeyValues))
+	r.KeyChanges = make([]KeyChange, len(pbProof.KeyValues))
 	for i, kv := range pbProof.KeyValues {
-		proof.KeyChanges[i] = KeyChange{
+		r.KeyChanges[i] = KeyChange{
 			Key:   kv.Key,
 			Value: maybe.Some(kv.Value),
 		}
@@ -368,7 +369,7 @@ func validateChangeProof(
 //
 //	If [start] is Nothing, all keys are considered > [start].
 //	If [end] is Nothing, all keys are considered < [end].
-func (proof *RangeProof) Verify(
+func (r *RangeProof) Verify(
 	ctx context.Context,
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
@@ -394,7 +395,7 @@ func (proof *RangeProof) Verify(
 		return err
 	}
 
-	return db.VerifyChangeProof(ctx, (*ChangeProof)(proof), start, end, expectedRootID)
+	return db.VerifyChangeProof(ctx, (*ChangeProof)(r), start, end, expectedRootID)
 }
 
 type KeyChange struct {
@@ -465,31 +466,32 @@ type ChangeProof struct {
 	KeyChanges []KeyChange
 }
 
-func (proof *ChangeProof) MarshalBinary() (data []byte, err error) {
-	return proto.Marshal(proof.ToProto())
+func (c *ChangeProof) MarshalBinary() ([]byte, error) {
+	return proto.Marshal(c.ToProto())
 }
 
-func (proof *ChangeProof) UnmarshalBinary(data []byte) error {
+func (c *ChangeProof) UnmarshalBinary(data []byte) error {
 	var pbChangeProof pb.ChangeProof
 	if err := proto.Unmarshal(data, &pbChangeProof); err != nil {
 		return err
 	}
-	return proof.UnmarshalProto(&pbChangeProof)
+
+	return c.UnmarshalProto(&pbChangeProof)
 }
 
-func (proof *ChangeProof) ToProto() *pb.ChangeProof {
-	startProof := make([]*pb.ProofNode, len(proof.StartProof))
-	for i, node := range proof.StartProof {
+func (c *ChangeProof) ToProto() *pb.ChangeProof {
+	startProof := make([]*pb.ProofNode, len(c.StartProof))
+	for i, node := range c.StartProof {
 		startProof[i] = node.ToProto()
 	}
 
-	endProof := make([]*pb.ProofNode, len(proof.EndProof))
-	for i, node := range proof.EndProof {
+	endProof := make([]*pb.ProofNode, len(c.EndProof))
+	for i, node := range c.EndProof {
 		endProof[i] = node.ToProto()
 	}
 
-	keyChanges := make([]*pb.KeyChange, len(proof.KeyChanges))
-	for i, kv := range proof.KeyChanges {
+	keyChanges := make([]*pb.KeyChange, len(c.KeyChanges))
+	for i, kv := range c.KeyChanges {
 		keyChanges[i] = &pb.KeyChange{
 			Key: kv.Key,
 			Value: &pb.MaybeBytes{
@@ -506,26 +508,26 @@ func (proof *ChangeProof) ToProto() *pb.ChangeProof {
 	}
 }
 
-func (proof *ChangeProof) UnmarshalProto(pbProof *pb.ChangeProof) error {
+func (c *ChangeProof) UnmarshalProto(pbProof *pb.ChangeProof) error {
 	if pbProof == nil {
 		return ErrNilChangeProof
 	}
 
-	proof.StartProof = make([]ProofNode, len(pbProof.StartProof))
+	c.StartProof = make([]ProofNode, len(pbProof.StartProof))
 	for i, protoNode := range pbProof.StartProof {
-		if err := proof.StartProof[i].UnmarshalProto(protoNode); err != nil {
+		if err := c.StartProof[i].UnmarshalProto(protoNode); err != nil {
 			return err
 		}
 	}
 
-	proof.EndProof = make([]ProofNode, len(pbProof.EndProof))
+	c.EndProof = make([]ProofNode, len(pbProof.EndProof))
 	for i, protoNode := range pbProof.EndProof {
-		if err := proof.EndProof[i].UnmarshalProto(protoNode); err != nil {
+		if err := c.EndProof[i].UnmarshalProto(protoNode); err != nil {
 			return err
 		}
 	}
 
-	proof.KeyChanges = make([]KeyChange, len(pbProof.KeyChanges))
+	c.KeyChanges = make([]KeyChange, len(pbProof.KeyChanges))
 	for i, kv := range pbProof.KeyChanges {
 		if kv.Value == nil {
 			return ErrNilMaybeBytes
@@ -539,7 +541,7 @@ func (proof *ChangeProof) UnmarshalProto(pbProof *pb.ChangeProof) error {
 		if !kv.Value.IsNothing {
 			value = maybe.Some(kv.Value.Value)
 		}
-		proof.KeyChanges[i] = KeyChange{
+		c.KeyChanges[i] = KeyChange{
 			Key:   kv.Key,
 			Value: value,
 		}
@@ -598,9 +600,9 @@ func verifyChangeProofKeyValues(ctx context.Context, db *merkleDB, keyChanges []
 	return nil
 }
 
-func (proof *ChangeProof) Empty() bool {
-	return len(proof.KeyChanges) == 0 &&
-		len(proof.StartProof) == 0 && len(proof.EndProof) == 0
+func (c *ChangeProof) Empty() bool {
+	return len(c.KeyChanges) == 0 &&
+		len(c.StartProof) == 0 && len(c.EndProof) == 0
 }
 
 // Returns nil iff both hold:

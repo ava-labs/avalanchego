@@ -149,6 +149,7 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 					if err != nil {
 						return nil, err
 					}
+
 					return proto.Marshal(&pb.SyncGetChangeProofResponse{
 						Response: &pb.SyncGetChangeProofResponse_RangeProof{
 							RangeProof: proofBytes,
@@ -170,7 +171,6 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 		changeProofBytes, err := changeProof.MarshalBinary()
 		if err != nil {
 			return nil, &common.AppError{
-				Code:    p2p.ErrUnexpected.Code,
 				Message: fmt.Sprintf("failed to marshal change proof: %s", err),
 			}
 		}
