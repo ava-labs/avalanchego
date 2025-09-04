@@ -6,9 +6,12 @@ package merkledb
 import (
 	"bytes"
 	"context"
+	"encoding"
 	"errors"
 	"fmt"
 	"math"
+
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -22,6 +25,11 @@ import (
 const verificationCacheSize = math.MaxUint16
 
 var (
+	_ encoding.BinaryMarshaler   = (*ChangeProof)(nil)
+	_ encoding.BinaryUnmarshaler = (*ChangeProof)(nil)
+	_ encoding.BinaryMarshaler   = (*RangeProof)(nil)
+	_ encoding.BinaryUnmarshaler = (*RangeProof)(nil)
+
 	ErrInvalidProof                  = errors.New("proof obtained an invalid root ID")
 	ErrInvalidMaxLength              = errors.New("expected max length to be > 0")
 	ErrNonIncreasingValues           = errors.New("keys sent are not in increasing order")
@@ -238,6 +246,18 @@ func (proof *Proof) UnmarshalProto(pbProof *pb.Proof) error {
 
 type RangeProof ChangeProof
 
+func (proof *RangeProof) MarshalBinary() (data []byte, err error) {
+	return proto.Marshal(proof.ToProto())
+}
+
+func (proof *RangeProof) UnmarshalBinary(data []byte) error {
+	var pbRangeProof pb.RangeProof
+	if err := proto.Unmarshal(data, &pbRangeProof); err != nil {
+		return err
+	}
+	return proof.UnmarshalProto(&pbRangeProof)
+}
+
 func (proof *RangeProof) ToProto() *pb.RangeProof {
 	startProof := make([]*pb.ProofNode, len(proof.StartProof))
 	for i, node := range proof.StartProof {
@@ -443,6 +463,18 @@ type ChangeProof struct {
 	// [kv0, kv1] (For some kv1 < start)
 	// [kv1, kv2, kv3, kv4, kv5, kv6] (For some kv6 > end)
 	KeyChanges []KeyChange
+}
+
+func (proof *ChangeProof) MarshalBinary() (data []byte, err error) {
+	return proto.Marshal(proof.ToProto())
+}
+
+func (proof *ChangeProof) UnmarshalBinary(data []byte) error {
+	var pbChangeProof pb.ChangeProof
+	if err := proto.Unmarshal(data, &pbChangeProof); err != nil {
+		return err
+	}
+	return proof.UnmarshalProto(&pbChangeProof)
 }
 
 func (proof *ChangeProof) ToProto() *pb.ChangeProof {

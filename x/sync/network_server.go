@@ -145,9 +145,13 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 					BytesLimit: req.BytesLimit,
 				},
 				func(rangeProof *merkledb.RangeProof) ([]byte, error) {
+					proofBytes, err := rangeProof.MarshalBinary()
+					if err != nil {
+						return nil, err
+					}
 					return proto.Marshal(&pb.SyncGetChangeProofResponse{
 						Response: &pb.SyncGetChangeProofResponse_RangeProof{
-							RangeProof: rangeProof.ToProto(),
+							RangeProof: proofBytes,
 						},
 					})
 				},
@@ -163,9 +167,16 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 		}
 
 		// We generated a change proof. See if it's small enough.
-		proofBytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
+		changeProofBytes, err := changeProof.MarshalBinary()
+		if err != nil {
+			return nil, &common.AppError{
+				Code:    p2p.ErrUnexpected.Code,
+				Message: fmt.Sprintf("failed to marshal change proof: %s", err),
+			}
+		}
+		responseBytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
 			Response: &pb.SyncGetChangeProofResponse_ChangeProof{
-				ChangeProof: changeProof.ToProto(),
+				ChangeProof: changeProofBytes,
 			},
 		})
 		if err != nil {
@@ -175,8 +186,8 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 			}
 		}
 
-		if len(proofBytes) < bytesLimit {
-			return proofBytes, nil
+		if len(responseBytes) < bytesLimit {
+			return responseBytes, nil
 		}
 
 		// The proof was too large. Try to shrink it.
@@ -226,7 +237,7 @@ func (g *GetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ t
 		g.db,
 		req,
 		func(rangeProof *merkledb.RangeProof) ([]byte, error) {
-			return proto.Marshal(rangeProof.ToProto())
+			return rangeProof.MarshalBinary()
 		},
 	)
 	if err != nil {
