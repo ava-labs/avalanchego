@@ -25,13 +25,7 @@ nix develop
 ### AWS Access
 This walkthrough assumes AWS access to the S3 bucket `s3://avalanchego-bootstrap-testing` in the Ava Labs Experimental Account in `us-east-2`.
 
-To configure your development environment, sign in via either:
-
-```bash
-aws configure sso
-```
-
-or export AWS credentials to your environment via:
+To configure your development environment, fetch AWS and add them to the environment from:
 
 Okta -> AWS Access Portal -> Experimental -> Access Keys
 
@@ -53,17 +47,21 @@ To support metrics collection (enabled by default), re-execution requires Promet
 
 ## Quick Start
 
-Let's run the default benchmark. Once you've completed the [Prerequisites](#prerequisites), decide what directory to use as a working directory called `EXECUTION_DATA_DIR` for the benchmark. This is the directory that the task will copy required data into including both the blocks to execute and the initial contents of the current state. [Taskfile](https://taskfile.dev/) supports reading arguments via both environment variables and named arguments on the command line. To be explicit, we'll specify arguments on the command line here.
+Let's run the default benchmark to get started. Make sure that you have completed the [Prerequisites](#prerequisites) section because it is required to copy the data from S3..
+
+Decide what directory you want to use as a working directory and set the parameter `EXECUTION_DATA_DIR`. To re-execute a range of blocks, we need to copy the blocks themselves and the initial state of the chain, so these will be copied into `EXECUTION_DATA_DIR`.
+
+[Taskfile](https://taskfile.dev/) supports reading arguments via both environment variables and named arguments on the command line, so we'll set `EXECUTION_DATA_DIR` and use the defaults for the remainder of the parameters:
 
 ```bash
-export WORKDIR=$HOME/workdir
-task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$WORKDIR
+export EXECUTION_DATA_DIR=$HOME/.reexecute-cchain/default
+task reexecute-cchain-range-with-copied-data
 ```
 
 This performs the following steps:
 
-1. Copy a block database into `$WORKDIR/blocks` (first 1m blocks)
-2. Copy the current state as of the default task's initial height into `$WORKDIR/current-state` (state as of height 100) using the VM's default config
+1. Copy a block database into `$EXECUTION_DATA_DIR/blocks` (first 1m blocks)
+2. Copy the current state as of the default task's initial height into `$EXECUTION_DATA_DIR/current-state` (state as of height 100) using the VM's default config (hashdb full)
 3. Build and execute a Golang Benchmark a single time to execute the default block range (block range [101, 250k])
 
 The final output displays the top-level metrics from the benchmark run, which is simply mgas/s for the C-Chain:
@@ -91,52 +89,56 @@ PASS
 ok  	github.com/ava-labs/avalanchego/tests/reexecute/c	313.560s
 ```
 
-## Predefined Configs
+## Walkthrough
 
-## Metrics
+### Generate Initial State Snapshot
 
-The C-Chain benchmarks export VM metrics to the same Grafana instance as AvalancheGo CI: https://grafana-poc.avax-dev.network/.
+To generate an initial state snapshot at block height N, we will need to:
 
-You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).
+- Import the block range including at least blocks in [1, N]
+- Execute the block range [1, N]
 
-Note: to ensure Prometheus gets a final scrape at the end of a run, the test will sleep for 2s greater than the 10s Prometheus scrape interval, which will cause short-running tests to appear to take much longer than expected. Additionally, the linked dashboard displays most metrics using a 1min rate, which means that very short running tests will not produce a very useful visualization.
-
-For a realistic view, run the default C-Chain benchmark in the [final step](#run-default-c-chain-benchmark) or view the preview URL printed by the [c-chain-benchmark](../../../.github/workflows/c-chain-reexecution-benchmark.yml) job, which executes the block range [101, 250k].
-
-## CI and GitHub CLI
-
-- where they run, triggers and configs
-- how to trigger manual workflow
-
-## Detailed Walkthrough
-
-- include section on s3 bucket naming convention
-
-## Import Blocks
-
-To import the first 200 blocks for re-execution, you can fetch the following directory from S3: `s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/`:
+First, we will import the first 10k blocks. To see what block databases are available, you can check the contents of the S3 bucket with:
 
 ```bash
-task import-s3-to-dir SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/** DST=$HOME/exec-data/blocks
+s5cmd ls s3://avalanchego-bootstrap-testing | grep blocks
 ```
 
-## Create C-Chain State Snapshot
-
-To execute a range of blocks [N, N+K], we need an initial current state with the last accepted block of N-1. To generate this from scratch, simply execute the range of blocks [1, N-1] (genesis is "executed" vacuously, so do not provide 0 as the start block) locally starting from an empty state:
+In this case, we will use the directory: `s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/`. To import it, run the import task:
 
 ```bash
-task reexecute-cchain-range CURRENT_STATE_DIR=$HOME/exec-data/current-state BLOCK_DIR=$HOME/exec-data/blocks START_BLOCK=1 END_BLOCK=100
+export EXECUTION_DATA_DIR=$HOME/.reexecute-cchain/walkthrough
+task import-s3-to-dir SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/** DST=$EXECUTION_DATA_DIR/blocks
 ```
 
-This initializes a `current-state` subdirectory inside of `$HOME/exec-data`, which will contain two subdirectories `chain-data-dir` and `db`.
+Next, we need to want to execute the range of blocks [1, N]. We use 1 as the initial start block, since VM initialization typically vacuously executes the genesis block.
 
-The `chain-data-dir` is the path passed in via `*snow.Context` to the VM as `snowContext.ChainDataDir`.
-If the VM does not populate it, it may remain empty after a run.
+We can execute an arbitrary range [N, N+K] provided we have the required inputs:
+
+- `CURRENT_STATE_DIR` - the directory with the current state as of last accepted block N-1
+- `BLOCK_DIR` - the directory containing a LevelDB instance with the required block range [N, N+K]
+- `START_BLOCK` - the first block to execute in the range (inclusive)
+- `END_BLOCK` - the last block to execute in the range (inclusive)
+
+To generate this from scratch, we can use a directory path for `CURRENT_STATE_DIR` that is initially empty:
+
+```bash
+export CURRENT_STATE_DIR=$EXECUTION_DATA_DIR/current-state
+export BLOCK_DIR=$EXECUTION_DATA_DIR/blocks
+task reexecute-cchain-range START_BLOCK=1 END_BLOCK=100
+```
+
+This initializes the contents of `$EXECUTION_DATA_DIR/current-state` to include two subdirectories:
+
+- `chain-data-dir`
+- `db`
+
+The `chain-data-dir` is the path passed in via `*snow.Context` to the VM as `snowContext.ChainDataDir`. If the VM does not populate it, it may remain empty after a run.
 
 The `db` directory is used to initialize the leveldb instance used to create two nested PrefixDBs: the database passed into `vm.Initialize(...)` and the database used by shared memory.
 These two databases must be built on top of the same base database as documented in the shared memory [README](../../../chains/atomic/README.md#shared-database).
 
-For reference, the expected directory structure is:
+The expected directory structure will look something like:
 
 ```
 $HOME/exec-data
@@ -158,30 +160,56 @@ $HOME/exec-data
         └── MANIFEST-000004
 ```
 
-After generating the `$HOME/exec-data/current-state` directory from executing the first segment of blocks, we can take a snapshot of the current state and push to S3 (or copy to another location locally if preferred) for re-use.
+### Export Current State to S3
 
-Run the export task:
+After generating the `$EXECUTION_DATA_DIR/current-state` directory from executing the first segment of blocks, we can take a snapshot of the current state and push to S3 (or copy to another location including a local directory if preferred) for re-use.
+
+Since we are already using the S3 bucket `s3://avalanchego-bootstrap-testing`, we'll re-use it here. We'll use the `export-dir-to-s3` task, which takes in two parameters:
+
+- `LOCAL_SRC` - local path to recursive copy contents from
+- `S3_DST` - S3 bucket destination path
+
+To avoid clobbering useful data, `export-dir-to-s3` will first attempt to check that the destination does not yet exist and that the path does not have any nesting. For example, `s3://avalanchego-bootstrap-testing/target-dir/` is valid, but `s3://avalanchego-bootstrap-testing/nested/target-dir/` is not allowed because it has two levels of nesting.
+
+As a result, if you run into a warning using this command, check the current contents using either the AWS Console or `s5cmd ls` and make sure to pick an unused `S3_DST` value.
 
 ```bash
-task export-dir-to-s3 LOCAL_SRC=$HOME/exec-data/current-state/ S3_DST=s3://avalanchego-bootstrap-testing/cchain-current-state-test/
+export LOCAL_SRC=$EXECUTION_DATA_DIR/current-state/
+export S3_DST=s3://avalanchego-bootstrap-testing/cchain-current-state-test/
+task export-dir-to-s3
 ```
 
-## Run C-Chain Benchmark
+### Re-Execute C-Chain Range
 
-Now that we've pushed the current-state back to S3, we can run the target range of blocks [101, 200] either re-using the data we already have locally or copying all of the data including both the blocks and current state for a completely fresh run.
+Now that we've pushed the current-state back to S3, we can run the target range of blocks [101, 200] either re-using the data we already have locally or copying the data in fresh using the `reexecute-cchain-range-with-copied-data` task.
 
-First, to run the block range using our locally available data, run:
+First, let's continue executing using the already available `CURRENT_STATE_DIR` and `BLOCK_DIR`. Since we have already exported these values, the task will pick them up and we can set only the `START_BLOCK` and `END_BLOCK` parameters:
 
 ```bash
-task reexecute-cchain-range CURRENT_STATE_DIR=$HOME/exec-data/current-state BLOCK_DIR=$HOME/exec-data/blocks START_BLOCK=101 END_BLOCK=200
+task reexecute-cchain-range START_BLOCK=101 END_BLOCK=200
 ```
 
 Note: if you attempt to re-execute a second time on the same data set, it will fail because the current state has been updated to block 200.
 
-Provide the parameters explicitly that we have just used locally:
+### Re-Execute C-Chain Range with Copied Data
+
+Next, we can re-execute the same range using the `CURRENT_STATE_DIR` that we exported to S3 using `reexecute-cchain-with-copied-data`.
+
+This time we will copy the same block directory from S3 and copy the state snapshot that we just exported into S3 to pick up re-execution from where we left off.
+
+Specify the following parameters:
+
+- `EXECUTION_DATA_DIR` - local path to copy the block and current state directories
+- `BLOCK_DIR_SRC` - source path to copy the blocks from (supports both local directory and S3 URI)
+- `CURRENT_STATE_DIR_SRC` - source path to copy the current state directory from (supports both local directory and S3 URI)
+- `START_BLOCK` - first block to execute (inclusive)
+- `END_BLOCK` - final block to execute (inclusive)
+
+We'll use a new `EXECUTION_DATA_DIR` for this run to avoid conflicts with previous runs from this walkthrough:
 
 ```bash
-task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-params BLOCK_DIR_SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/** CURRENT_STATE_DIR_SRC=s3://avalanchego-bootstrap-testing/cchain-current-state-test/** START_BLOCK=101 END_BLOCK=10000
+export EXECUTION_DATA_DIR=$HOME/.reexecute-cchain/reexecute-with-copied-data
+task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$EXECUTION_DATA_DIR BLOCK_DIR_SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/** CURRENT_STATE_DIR_SRC=s3://avalanchego-bootstrap-testing/cchain-current-state-test/** START_BLOCK=101 END_BLOCK=10000
 ```
 
 ## Predefined Configs
@@ -190,17 +218,19 @@ To support testing the VM in multiple configurations, the benchmark supports a s
 
 The currently supported options are: "default", "archive", and "firewood".
 
-Note: to execute a benchmark with any of these options, double check to ensure you are using a compatible database via `CURRENT_STATE_DIR`. For example, attempting to execute the VM with Firewood on a database using the default configuration will refuse to startup.
+To execute a benchmark with any of these options, you must use a compatible `CURRENT_STATE_DIR` or `CURRENT_STATE_DIR_SRC` or the VM will refuse to start with an incompatible existing database and newly provided config.
 
-This currently only supports pre-defined configs and not passing a full JSON blob in, so that we have a clear config name to use in the name of the sub-benchmark (used by GitHub Action Benchmark to separate historical results) and added as a label to exported Prometheus metrics.
+The `CONFIG` parameter currently only supports pre-defined configs and not passing a full JSON blob in, so that we can define corresponding names for each config option. The config name is attached as a label to the exported metrics and included in the name of the sub-benchmark (used by GitHub Action Benchmark to separate historical results with different configs).
 
-## Run Default C-Chain Benchmark
+## Metrics
 
-To re-execute with an fresh copy, use the defaults provided in [Taskfile.yaml](../../../Taskfile.yml) to execute the range [101, 250k]:
+The C-Chain benchmarks export VM metrics to the same Grafana instance as AvalancheGo CI: https://grafana-poc.avax-dev.network/.
 
-```bash
-task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/reexec-data-defaults
-```
+You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).
+
+Note: to ensure Prometheus gets a final scrape at the end of a run, the test will sleep for 2s greater than the 10s Prometheus scrape interval, which will cause short-running tests to appear to take much longer than expected. Additionally, the linked dashboard displays most metrics using a 1min rate, which means that very short running tests will not produce a very useful visualization.
+
+For a realistic view, run the default C-Chain benchmark in the [final step](#run-default-c-chain-benchmark) or view the preview URL printed by the [c-chain-benchmark](../../../.github/workflows/c-chain-reexecution-benchmark.yml) job, which executes the block range [101, 250k].
 
 ## CI
 
@@ -234,9 +264,7 @@ For example, to add a new Firewood benchmark to execute the block range [30m, 40
 }
 ```
 
-## GitHub CLI
-
-### Trigger Workflow Dispatch
+## Trigger Workflow Dispatch with GitHub CLI
 
 To triggers runs conveniently, you can use the [GitHub CLI](https://cli.github.com/manual/gh_workflow_run) to trigger workflows.
 
