@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1756999201545,
+  "lastUpdate": 1756999208609,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -836,6 +836,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[101,250000]-Config-default",
             "value": 95.91,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "rodrigo",
+            "username": "RodrigoVillar",
+            "email": "77309055+RodrigoVillar@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "66ca7dc0ce354ff4c4ebdc8b377e099ba91f2e2b",
+          "message": "feat(load): add firewood flag (#4235)",
+          "timestamp": "2025-09-02T20:49:55Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/66ca7dc0ce354ff4c4ebdc8b377e099ba91f2e2b"
+        },
+        "date": 1756999208163,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-default",
+            "value": 103.2,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
