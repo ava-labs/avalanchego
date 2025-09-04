@@ -106,9 +106,6 @@ type BlockDatabase interface {
 	// HasBlock checks if a block exists at the given height.
 	HasBlock(height uint64) (bool, error)
 
-	// Inspect returns a detailed report of the block database.
-	Inspect() (string, error)
-
 	// Close closes the block database.
 	io.Closer
 }
