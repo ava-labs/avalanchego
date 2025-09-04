@@ -1,0 +1,114 @@
+name: C-Chain Re-Execution Benchmark w/ Container
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      config:
+        description: 'The config to pass to the VM for the benchmark. See BenchmarkReexecuteRange for details.'
+        required: false
+        default: ''
+      start-block:
+        description: 'The start block for the benchmark.'
+        required: false
+        default: 101
+      end-block:
+        description: 'The end block for the benchmark.'
+        required: false
+        default: 250000
+      block-dir-src:
+        description: 'The source block directory. Supports S3 directory/zip and local directories.'
+        required: false
+        default: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**
+      current-state-dir-src:
+        description: 'The current state directory. Supports S3 directory/zip and local directories.'
+        required: false
+        default: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**
+      runner:
+        description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
+        required: false
+        default: ubuntu-latest
+      push-post-state:
+        description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
+        default: ''
+      timeout-minutes:
+        description: 'Timeout in minutes for the job.'
+        required: false
+        default: 30
+
+  # Disabled because scheduled trigger is empty. To enable, uncomment and add at least one vector to the schedule
+  # entry in the corresponding JSON file.
+  # schedule:
+  #   - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
+
+jobs:
+  define-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.define-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Define Matrix
+        id: define-matrix
+        shell: bash -x {0}
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            {
+              echo "matrix<<EOF"
+              printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": "%s" }] }\n' \
+                "${{ github.event.inputs.start-block }}" \
+                "${{ github.event.inputs.end-block }}" \
+                "${{ github.event.inputs.block-dir-src }}" \
+                "${{ github.event.inputs.current-state-dir-src }}" \
+                "${{ github.event.inputs.config }}" \
+                "${{ github.event.inputs.runner }}" \
+                "${{ github.event.inputs.timeout-minutes }}"
+              echo EOF
+            } >> "$GITHUB_OUTPUT"
+          else
+            json_string=$(jq -r ".\"${{ github.event_name }}\"" .github/workflows/c-chain-reexecution-benchmark-container.json)
+            {
+              echo "matrix<<EOF"
+              echo "$json_string"
+              echo EOF
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+  c-chain-reexecution:
+    needs: define-matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix) }}
+    timeout-minutes: ${{ matrix.timeout-minutes }}
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'ava-labs/avalanchego' }}
+    permissions:
+      id-token: write
+      contents: write
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: ghcr.io/actions/actions-runner:2.325.0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ARC Dependencies
+        shell: bash
+        run: |
+          # xz-utils might be present on some containers. Install if not present.
+          if ! command -v xz &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y xz-utils
+          fi
+      - name: Run C-Chain Re-Execution Benchmark
+        uses: ./.github/actions/c-chain-reexecution-benchmark
+        with:
+          config: ${{ matrix.config }}
+          start-block: ${{ matrix.start-block }}
+          end-block: ${{ matrix.end-block }}
+          block-dir-src: ${{ matrix.block-dir-src }}
+          current-state-dir-src: ${{ matrix.current-state-dir-src }}
+          prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          push-github-action-benchmark: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master') }}
+          aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: 'us-east-2'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          push-post-state: ${{ github.event.inputs.push-post-state }}
