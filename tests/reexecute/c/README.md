@@ -51,6 +51,48 @@ export AWS_REGION=us-east-2
 
 To support metrics collection (enabled by default), re-execution requires Prometheus credentials to be exported to the environment. Follow the instructions in the e2e [README](../../e2e/README.md#monitoring) to support metrics collection.
 
+## Quick Start
+
+Let's run the default benchmark. Once you've completed the [Prerequisites](#prerequisites), decide what directory to use as a working directory called `EXECUTION_DATA_DIR` for the benchmark. This is the directory that the task will copy required data into including both the blocks to execute and the initial contents of the current state. [Taskfile](https://taskfile.dev/) supports reading arguments via both environment variables and named arguments on the command line. To be explicit, we'll specify arguments on the command line here.
+
+```bash
+export WORKDIR=$HOME/workdir
+task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$WORKDIR
+```
+
+This performs the following steps:
+
+1. Copy a block database into `$WORKDIR/blocks` (first 1m blocks)
+2. Copy the current state as of the default task's initial height into `$WORKDIR/current-state` (state as of height 100) using the VM's default config
+3. Build and execute a Golang Benchmark a single time to execute the default block range (block range [101, 250k])
+
+The final output displays the top-level metrics from the benchmark run, which is simply mgas/s for the C-Chain:
+
+```
+[09-02|16:25:21.481] INFO vm-executor c/vm_reexecute_test.go:383 executing block {"height": 250000, "eta": "0s"}
+[09-02|16:25:21.483] INFO vm-executor c/vm_reexecute_test.go:401 finished executing sequence
+[09-02|16:25:21.485] INFO c-chain-reexecution c/vm_reexecute_test.go:194 shutting down VM
+[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/txpool/legacypool/legacypool.go:449 Transaction pool stopped
+[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:966 Closing quit channel
+[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:969 Stopping Acceptor
+[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:972 Acceptor queue drained                   t="4.359µs"
+[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:975 Shutting down sender cacher
+[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:979 Closing scope
+[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:983 Waiting for background processes to complete
+[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:1002 Shutting down state manager
+[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:1007 State manager shut down                  t=198ns
+[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> core/blockchain.go:1012 Blockchain stopped
+[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> eth/backend.go:404 Stopped shutdownTracker
+[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> eth/backend.go:407 Closed chaindb
+[09-02|16:25:21.485] INFO <2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5 Chain> eth/backend.go:409 Stopped EventMux
+[09-02|16:25:21.485] INFO c-chain-reexecution c/vm_reexecute_test.go:181 shutting down DB
+BenchmarkReexecuteRange/[101,250000]-Config-archive-6         	       1	        85.29 mgas/s
+PASS
+ok  	github.com/ava-labs/avalanchego/tests/reexecute/c	313.560s
+```
+
+## Predefined Configs
+
 ## Metrics
 
 The C-Chain benchmarks export VM metrics to the same Grafana instance as AvalancheGo CI: https://grafana-poc.avax-dev.network/.
@@ -60,6 +102,15 @@ You can view granular C-Chain processing metrics with the label attached to this
 Note: to ensure Prometheus gets a final scrape at the end of a run, the test will sleep for 2s greater than the 10s Prometheus scrape interval, which will cause short-running tests to appear to take much longer than expected. Additionally, the linked dashboard displays most metrics using a 1min rate, which means that very short running tests will not produce a very useful visualization.
 
 For a realistic view, run the default C-Chain benchmark in the [final step](#run-default-c-chain-benchmark) or view the preview URL printed by the [c-chain-benchmark](../../../.github/workflows/c-chain-reexecution-benchmark.yml) job, which executes the block range [101, 250k].
+
+## CI and GitHub CLI
+
+- where they run, triggers and configs
+- how to trigger manual workflow
+
+## Detailed Walkthrough
+
+- include section on s3 bucket naming convention
 
 ## Import Blocks
 
