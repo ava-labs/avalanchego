@@ -144,7 +144,6 @@ func BenchmarkReexecuteRange(b *testing.B) {
 			endBlockArg,
 			chanSizeArg,
 			metricsEnabledArg,
-			runnerNameArg,
 		)
 	})
 }
@@ -158,7 +157,6 @@ func benchmarkReexecuteRange(
 	endBlock uint64,
 	chanSize int,
 	metricsEnabled bool,
-	runnerName string,
 ) {
 	r := require.New(b)
 	ctx := context.Background()
