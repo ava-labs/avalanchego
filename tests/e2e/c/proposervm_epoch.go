@@ -48,7 +48,7 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 
 		// Issue a transaction to the C-Chain to advance past genesis block
 		issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
-		
+
 		// Genesis does not contain a proposervm block
 		for blockNumber(tc, ethClient) == 0 {
 			time.Sleep(1 * time.Second)
