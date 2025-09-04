@@ -19,7 +19,7 @@ import (
 
 var _ pb.DBServer = (*DBServer)(nil)
 
-func NewDBServer(db sync.DB) *DBServer {
+func NewDBServer(db sync.DB[merkledb.RangeProof, merkledb.ChangeProof]) *DBServer {
 	return &DBServer{
 		db: db,
 	}
@@ -28,7 +28,7 @@ func NewDBServer(db sync.DB) *DBServer {
 type DBServer struct {
 	pb.UnsafeDBServer
 
-	db sync.DB
+	db sync.DB[merkledb.RangeProof, merkledb.ChangeProof]
 }
 
 func (s *DBServer) GetMerkleRoot(
@@ -115,7 +115,7 @@ func (s *DBServer) VerifyChangeProof(
 
 	// TODO there's probably a better way to do this.
 	var errString string
-	if err := s.db.VerifyChangeProof(ctx, &proof, startKey, endKey, rootID); err != nil {
+	if err := s.db.VerifyChangeProof(ctx, &proof, startKey, endKey, rootID, int(req.MaxKeys)); err != nil {
 		errString = err.Error()
 	}
 	return &pb.VerifyChangeProofResponse{
@@ -126,28 +126,24 @@ func (s *DBServer) VerifyChangeProof(
 func (s *DBServer) CommitChangeProof(
 	ctx context.Context,
 	req *pb.CommitChangeProofRequest,
-) (*emptypb.Empty, error) {
+) (*pb.CommitChangeProofResponse, error) {
 	var proof merkledb.ChangeProof
 	if err := proof.UnmarshalProto(req.Proof); err != nil {
 		return nil, err
 	}
 
-	err := s.db.CommitChangeProof(ctx, &proof)
-	return &emptypb.Empty{}, err
-}
-
-func (s *DBServer) GetProof(
-	ctx context.Context,
-	req *pb.GetProofRequest,
-) (*pb.GetProofResponse, error) {
-	proof, err := s.db.GetProof(ctx, req.Key)
-	if err != nil {
-		return nil, err
+	endKey := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		endKey = maybe.Some(req.EndKey.Value)
 	}
 
-	return &pb.GetProofResponse{
-		Proof: proof.ToProto(),
-	}, nil
+	nextKey, err := s.db.CommitChangeProof(ctx, endKey, &proof)
+	return &pb.CommitChangeProofResponse{
+		NextKey: &pb.MaybeBytes{
+			IsNothing: nextKey.IsNothing(),
+			Value:     nextKey.Value(),
+		},
+	}, err
 }
 
 func (s *DBServer) GetRangeProof(
@@ -194,10 +190,42 @@ func (s *DBServer) GetRangeProof(
 	return protoProof, nil
 }
 
+func (s *DBServer) VerifyRangeProof(
+	ctx context.Context,
+	req *pb.VerifyRangeProofRequest,
+) (*pb.VerifyRangeProofResponse, error) {
+	var proof merkledb.RangeProof
+	if err := proof.UnmarshalProto(req.Proof); err != nil {
+		return nil, err
+	}
+
+	rootID, err := ids.ToID(req.ExpectedRootHash)
+	if err != nil {
+		return nil, err
+	}
+	startKey := maybe.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		startKey = maybe.Some(req.StartKey.Value)
+	}
+	endKey := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		endKey = maybe.Some(req.EndKey.Value)
+	}
+
+	// TODO there's probably a better way to do this.
+	var errString string
+	if err := s.db.VerifyRangeProof(ctx, &proof, startKey, endKey, rootID, int(req.MaxKeys)); err != nil {
+		errString = err.Error()
+	}
+	return &pb.VerifyRangeProofResponse{
+		Error: errString,
+	}, nil
+}
+
 func (s *DBServer) CommitRangeProof(
 	ctx context.Context,
 	req *pb.CommitRangeProofRequest,
-) (*emptypb.Empty, error) {
+) (*pb.CommitRangeProofResponse, error) {
 	var proof merkledb.RangeProof
 	if err := proof.UnmarshalProto(req.RangeProof); err != nil {
 		return nil, err
@@ -213,8 +241,13 @@ func (s *DBServer) CommitRangeProof(
 		end = maybe.Some(req.EndKey.Value)
 	}
 
-	err := s.db.CommitRangeProof(ctx, start, end, &proof)
-	return &emptypb.Empty{}, err
+	nextKey, err := s.db.CommitRangeProof(ctx, start, end, &proof)
+	return &pb.CommitRangeProofResponse{
+		NextKey: &pb.MaybeBytes{
+			IsNothing: nextKey.IsNothing(),
+			Value:     nextKey.Value(),
+		},
+	}, err
 }
 
 func (s *DBServer) Clear(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {

@@ -22,11 +22,11 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	DB_GetMerkleRoot_FullMethodName     = "/sync.DB/GetMerkleRoot"
 	DB_Clear_FullMethodName             = "/sync.DB/Clear"
-	DB_GetProof_FullMethodName          = "/sync.DB/GetProof"
 	DB_GetChangeProof_FullMethodName    = "/sync.DB/GetChangeProof"
 	DB_VerifyChangeProof_FullMethodName = "/sync.DB/VerifyChangeProof"
 	DB_CommitChangeProof_FullMethodName = "/sync.DB/CommitChangeProof"
 	DB_GetRangeProof_FullMethodName     = "/sync.DB/GetRangeProof"
+	DB_VerifyRangeProof_FullMethodName  = "/sync.DB/VerifyRangeProof"
 	DB_CommitRangeProof_FullMethodName  = "/sync.DB/CommitRangeProof"
 )
 
@@ -41,12 +41,12 @@ const (
 type DBClient interface {
 	GetMerkleRoot(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetMerkleRootResponse, error)
 	Clear(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*GetProofResponse, error)
 	GetChangeProof(ctx context.Context, in *GetChangeProofRequest, opts ...grpc.CallOption) (*GetChangeProofResponse, error)
 	VerifyChangeProof(ctx context.Context, in *VerifyChangeProofRequest, opts ...grpc.CallOption) (*VerifyChangeProofResponse, error)
-	CommitChangeProof(ctx context.Context, in *CommitChangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	CommitChangeProof(ctx context.Context, in *CommitChangeProofRequest, opts ...grpc.CallOption) (*CommitChangeProofResponse, error)
 	GetRangeProof(ctx context.Context, in *GetRangeProofRequest, opts ...grpc.CallOption) (*GetRangeProofResponse, error)
-	CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	VerifyRangeProof(ctx context.Context, in *VerifyRangeProofRequest, opts ...grpc.CallOption) (*VerifyRangeProofResponse, error)
+	CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*CommitRangeProofResponse, error)
 }
 
 type dBClient struct {
@@ -77,16 +77,6 @@ func (c *dBClient) Clear(ctx context.Context, in *emptypb.Empty, opts ...grpc.Ca
 	return out, nil
 }
 
-func (c *dBClient) GetProof(ctx context.Context, in *GetProofRequest, opts ...grpc.CallOption) (*GetProofResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetProofResponse)
-	err := c.cc.Invoke(ctx, DB_GetProof_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *dBClient) GetChangeProof(ctx context.Context, in *GetChangeProofRequest, opts ...grpc.CallOption) (*GetChangeProofResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetChangeProofResponse)
@@ -107,9 +97,9 @@ func (c *dBClient) VerifyChangeProof(ctx context.Context, in *VerifyChangeProofR
 	return out, nil
 }
 
-func (c *dBClient) CommitChangeProof(ctx context.Context, in *CommitChangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *dBClient) CommitChangeProof(ctx context.Context, in *CommitChangeProofRequest, opts ...grpc.CallOption) (*CommitChangeProofResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
+	out := new(CommitChangeProofResponse)
 	err := c.cc.Invoke(ctx, DB_CommitChangeProof_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -127,9 +117,19 @@ func (c *dBClient) GetRangeProof(ctx context.Context, in *GetRangeProofRequest, 
 	return out, nil
 }
 
-func (c *dBClient) CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *dBClient) VerifyRangeProof(ctx context.Context, in *VerifyRangeProofRequest, opts ...grpc.CallOption) (*VerifyRangeProofResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
+	out := new(VerifyRangeProofResponse)
+	err := c.cc.Invoke(ctx, DB_VerifyRangeProof_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *dBClient) CommitRangeProof(ctx context.Context, in *CommitRangeProofRequest, opts ...grpc.CallOption) (*CommitRangeProofResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CommitRangeProofResponse)
 	err := c.cc.Invoke(ctx, DB_CommitRangeProof_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -148,12 +148,12 @@ func (c *dBClient) CommitRangeProof(ctx context.Context, in *CommitRangeProofReq
 type DBServer interface {
 	GetMerkleRoot(context.Context, *emptypb.Empty) (*GetMerkleRootResponse, error)
 	Clear(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
-	GetProof(context.Context, *GetProofRequest) (*GetProofResponse, error)
 	GetChangeProof(context.Context, *GetChangeProofRequest) (*GetChangeProofResponse, error)
 	VerifyChangeProof(context.Context, *VerifyChangeProofRequest) (*VerifyChangeProofResponse, error)
-	CommitChangeProof(context.Context, *CommitChangeProofRequest) (*emptypb.Empty, error)
+	CommitChangeProof(context.Context, *CommitChangeProofRequest) (*CommitChangeProofResponse, error)
 	GetRangeProof(context.Context, *GetRangeProofRequest) (*GetRangeProofResponse, error)
-	CommitRangeProof(context.Context, *CommitRangeProofRequest) (*emptypb.Empty, error)
+	VerifyRangeProof(context.Context, *VerifyRangeProofRequest) (*VerifyRangeProofResponse, error)
+	CommitRangeProof(context.Context, *CommitRangeProofRequest) (*CommitRangeProofResponse, error)
 	mustEmbedUnimplementedDBServer()
 }
 
@@ -170,22 +170,22 @@ func (UnimplementedDBServer) GetMerkleRoot(context.Context, *emptypb.Empty) (*Ge
 func (UnimplementedDBServer) Clear(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Clear not implemented")
 }
-func (UnimplementedDBServer) GetProof(context.Context, *GetProofRequest) (*GetProofResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetProof not implemented")
-}
 func (UnimplementedDBServer) GetChangeProof(context.Context, *GetChangeProofRequest) (*GetChangeProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetChangeProof not implemented")
 }
 func (UnimplementedDBServer) VerifyChangeProof(context.Context, *VerifyChangeProofRequest) (*VerifyChangeProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method VerifyChangeProof not implemented")
 }
-func (UnimplementedDBServer) CommitChangeProof(context.Context, *CommitChangeProofRequest) (*emptypb.Empty, error) {
+func (UnimplementedDBServer) CommitChangeProof(context.Context, *CommitChangeProofRequest) (*CommitChangeProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CommitChangeProof not implemented")
 }
 func (UnimplementedDBServer) GetRangeProof(context.Context, *GetRangeProofRequest) (*GetRangeProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetRangeProof not implemented")
 }
-func (UnimplementedDBServer) CommitRangeProof(context.Context, *CommitRangeProofRequest) (*emptypb.Empty, error) {
+func (UnimplementedDBServer) VerifyRangeProof(context.Context, *VerifyRangeProofRequest) (*VerifyRangeProofResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method VerifyRangeProof not implemented")
+}
+func (UnimplementedDBServer) CommitRangeProof(context.Context, *CommitRangeProofRequest) (*CommitRangeProofResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CommitRangeProof not implemented")
 }
 func (UnimplementedDBServer) mustEmbedUnimplementedDBServer() {}
@@ -241,24 +241,6 @@ func _DB_Clear_Handler(srv interface{}, ctx context.Context, dec func(interface{
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(DBServer).Clear(ctx, req.(*emptypb.Empty))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _DB_GetProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetProofRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(DBServer).GetProof(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: DB_GetProof_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(DBServer).GetProof(ctx, req.(*GetProofRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -335,6 +317,24 @@ func _DB_GetRangeProof_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DB_VerifyRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifyRangeProofRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DBServer).VerifyRangeProof(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: DB_VerifyRangeProof_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DBServer).VerifyRangeProof(ctx, req.(*VerifyRangeProofRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _DB_CommitRangeProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CommitRangeProofRequest)
 	if err := dec(in); err != nil {
@@ -369,10 +369,6 @@ var DB_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _DB_Clear_Handler,
 		},
 		{
-			MethodName: "GetProof",
-			Handler:    _DB_GetProof_Handler,
-		},
-		{
 			MethodName: "GetChangeProof",
 			Handler:    _DB_GetChangeProof_Handler,
 		},
@@ -387,6 +383,10 @@ var DB_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetRangeProof",
 			Handler:    _DB_GetRangeProof_Handler,
+		},
+		{
+			MethodName: "VerifyRangeProof",
+			Handler:    _DB_VerifyRangeProof_Handler,
 		},
 		{
 			MethodName: "CommitRangeProof",

@@ -17,7 +17,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-var _ sync.DB = (*DBClient)(nil)
+var _ sync.DB[merkledb.RangeProof, merkledb.ChangeProof] = (*DBClient)(nil)
 
 func NewDBClient(client pb.DBClient) *DBClient {
 	return &DBClient{
@@ -81,14 +81,15 @@ func (c *DBClient) GetChangeProof(
 	return &proof, nil
 }
 
-func (c *DBClient) VerifyChangeProof(
+func (c *DBClient) VerifyRangeProof(
 	ctx context.Context,
-	proof *merkledb.ChangeProof,
+	proof *merkledb.RangeProof,
 	startKey maybe.Maybe[[]byte],
 	endKey maybe.Maybe[[]byte],
-	expectedRootID ids.ID,
+	expectedEndrootID ids.ID,
+	maxKeys int,
 ) error {
-	resp, err := c.client.VerifyChangeProof(ctx, &pb.VerifyChangeProofRequest{
+	resp, err := c.client.VerifyRangeProof(ctx, &pb.VerifyRangeProofRequest{
 		Proof: proof.ToProto(),
 		StartKey: &pb.MaybeBytes{
 			Value:     startKey.Value(),
@@ -98,7 +99,8 @@ func (c *DBClient) VerifyChangeProof(
 			Value:     endKey.Value(),
 			IsNothing: endKey.IsNothing(),
 		},
-		ExpectedRootHash: expectedRootID[:],
+		ExpectedRootHash: expectedEndrootID[:],
+		MaxKeys:          int32(maxKeys),
 	})
 	if err != nil {
 		return err
@@ -111,26 +113,54 @@ func (c *DBClient) VerifyChangeProof(
 	return errors.New(resp.Error)
 }
 
-func (c *DBClient) CommitChangeProof(ctx context.Context, proof *merkledb.ChangeProof) error {
-	_, err := c.client.CommitChangeProof(ctx, &pb.CommitChangeProofRequest{
+func (c *DBClient) VerifyChangeProof(
+	ctx context.Context,
+	proof *merkledb.ChangeProof,
+	startKey maybe.Maybe[[]byte],
+	endKey maybe.Maybe[[]byte],
+	expectedRootID ids.ID,
+	maxKeys int,
+) error {
+	resp, err := c.client.VerifyChangeProof(ctx, &pb.VerifyChangeProofRequest{
 		Proof: proof.ToProto(),
-	})
-	return err
-}
-
-func (c *DBClient) GetProof(ctx context.Context, key []byte) (*merkledb.Proof, error) {
-	resp, err := c.client.GetProof(ctx, &pb.GetProofRequest{
-		Key: key,
+		StartKey: &pb.MaybeBytes{
+			Value:     startKey.Value(),
+			IsNothing: startKey.IsNothing(),
+		},
+		EndKey: &pb.MaybeBytes{
+			Value:     endKey.Value(),
+			IsNothing: endKey.IsNothing(),
+		},
+		ExpectedRootHash: expectedRootID[:],
+		MaxKeys:          int32(maxKeys),
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	var proof merkledb.Proof
-	if err := proof.UnmarshalProto(resp.Proof); err != nil {
-		return nil, err
+	// TODO there's probably a better way to do this.
+	if len(resp.Error) == 0 {
+		return nil
 	}
-	return &proof, nil
+	return errors.New(resp.Error)
+}
+
+func (c *DBClient) CommitChangeProof(ctx context.Context, endKey maybe.Maybe[[]byte], proof *merkledb.ChangeProof) (maybe.Maybe[[]byte], error) {
+	resp, err := c.client.CommitChangeProof(ctx, &pb.CommitChangeProofRequest{
+		Proof: proof.ToProto(),
+		EndKey: &pb.MaybeBytes{
+			IsNothing: endKey.IsNothing(),
+			Value:     endKey.Value(),
+		},
+	})
+	if err != nil {
+		return maybe.Nothing[[]byte](), err
+	}
+
+	if resp.NextKey == nil || resp.NextKey.IsNothing {
+		return maybe.Nothing[[]byte](), nil
+	}
+	return maybe.Some(resp.NextKey.Value), nil
 }
 
 func (c *DBClient) GetRangeProofAtRoot(
@@ -172,8 +202,8 @@ func (c *DBClient) CommitRangeProof(
 	startKey maybe.Maybe[[]byte],
 	endKey maybe.Maybe[[]byte],
 	proof *merkledb.RangeProof,
-) error {
-	_, err := c.client.CommitRangeProof(ctx, &pb.CommitRangeProofRequest{
+) (maybe.Maybe[[]byte], error) {
+	resp, err := c.client.CommitRangeProof(ctx, &pb.CommitRangeProofRequest{
 		StartKey: &pb.MaybeBytes{
 			IsNothing: startKey.IsNothing(),
 			Value:     startKey.Value(),
@@ -184,7 +214,13 @@ func (c *DBClient) CommitRangeProof(
 		},
 		RangeProof: proof.ToProto(),
 	})
-	return err
+	if err != nil {
+		return maybe.Nothing[[]byte](), err
+	}
+	if resp.NextKey == nil || resp.NextKey.IsNothing {
+		return maybe.Nothing[[]byte](), nil
+	}
+	return maybe.Some(resp.NextKey.Value), nil
 }
 
 func (c *DBClient) Clear() error {
