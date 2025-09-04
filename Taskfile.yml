@@ -196,7 +196,7 @@ tasks:
     cmd: |
       CURRENT_STATE_DIR={{.CURRENT_STATE_DIR}} \
       BLOCK_DIR={{.BLOCK_DIR}} \
-      RUNNER_NAME: '{{.RUNNER_NAME | default "dev"}}'
+      RUNNER_NAME='{{.RUNNER_NAME | default "dev"}}' \
       CONFIG={{.CONFIG}} \
       START_BLOCK={{.START_BLOCK}} \
       END_BLOCK={{.END_BLOCK}} \
