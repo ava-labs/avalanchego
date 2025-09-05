@@ -6,7 +6,7 @@ package load
 import (
 	"context"
 	"crypto/ecdsa"
-	"fmt"
+	"errors"
 	"math/big"
 	"time"
 
@@ -15,6 +15,8 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethclient"
 )
+
+var errTxExecutionFailed = errors.New("transaction accepted but failed to execute entirely")
 
 type Wallet struct {
 	privKey *ecdsa.PrivateKey
@@ -76,6 +78,9 @@ func (w *Wallet) SendTx(
 		tx.Hash(),
 	)
 	if err != nil {
+		if errors.Is(err, errTxExecutionFailed) {
+			w.nonce++
+		}
 		return err
 	}
 
@@ -118,7 +123,7 @@ func (w Wallet) awaitTx(
 				}
 
 				if receipt.Status != types.ReceiptStatusSuccessful {
-					return fmt.Errorf("failed tx: %d", receipt.Status)
+					return errTxExecutionFailed
 				}
 
 				return nil
