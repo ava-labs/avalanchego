@@ -2,6 +2,9 @@ name: 'C-Chain Re-Execution Benchmark'
 description: 'Run C-Chain re-execution benchmark'
 
 inputs:
+  runner_name:
+    description: 'The name of the runner to use and include in the Golang Benchmark name.'
+    required: true
   config:
     description: 'The config to pass to the VM for the benchmark. See BenchmarkReexecuteRange for details.'
     default: ''
@@ -78,8 +81,7 @@ runs:
     - name: Run C-Chain Re-Execution
       uses: ./.github/actions/run-monitored-tmpnet-cmd
       with:
-        run: |
-          ./scripts/run_task.sh reexecute-cchain-range-with-copied-data \
+        run_env: |
             CONFIG=${{ inputs.config }} \
             EXECUTION_DATA_DIR=${{ env.EXECUTION_DATA_DIR }} \
             BLOCK_DIR_SRC=${{ env.BLOCK_DIR_SRC }} \
@@ -87,7 +89,10 @@ runs:
             START_BLOCK=${{ env.START_BLOCK }} \
             END_BLOCK=${{ env.END_BLOCK }} \
             LABELS=${{ env.LABELS }} \
-            BENCHMARK_OUTPUT_FILE=${{ env.BENCHMARK_OUTPUT_FILE }}
+            BENCHMARK_OUTPUT_FILE=${{ env.BENCHMARK_OUTPUT_FILE }} \
+            RUNNER_NAME=${{ inputs.runner_name }}
+        run: ./scripts/run_task.sh reexecute-cchain-range-with-copied-data
+
         prometheus_push_url: ${{ inputs.prometheus-push-url }}
         prometheus_username: ${{ inputs.prometheus-username }}
         prometheus_password: ${{ inputs.prometheus-password }}
