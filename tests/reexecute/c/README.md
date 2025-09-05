@@ -4,6 +4,53 @@ The C-Chain benchmarks support re-executing a range of mainnet C-Chain blocks ag
 
 AvalancheGo provides a [Taskfile](https://taskfile.dev/) with commands to manage the import/export of data required for re-execution (block range and current state) and triggering a benchmark run.
 
+## Prerequisites
+
+Configure your AvalancheGo dev environment requires:
+
+- Nix
+- AWS Credentials
+- Prometheus Credentials
+
+### Setup Nix Shell
+To install Nix, refer to the AvalancheGo [flake.nix](../../../flake.nix) file for installation instructions.
+
+To set up your shell environment, run:
+
+```bash
+nix develop
+```
+
+
+### Setup AWS Access
+This walkthrough assumes AWS access to the S3 bucket `s3://avalanchego-bootstrap-testing` in the Ava Labs Experimental Account in `us-east-2`.
+
+To configure your development environment, sign in via either:
+
+```bash
+aws configure sso
+```
+
+or export AWS credentials to your environment via:
+
+Okta -> AWS Access Portal -> Experimental -> Access Keys
+
+```bash
+export AWS_ACCESS_KEY_ID=<AWS_ACCESS_KEY_ID>
+export AWS_SECRET_ACCESS_KEY=<AWS_SECRET_ACCESS_KEY>
+export AWS_SESSION_TOKEN=<AWS_SESSION_TOKEN>
+```
+
+Note: the AWS Access Keys page provides the above credentials, but does not include setting the region parameter. To access the bucket, set the region via:
+
+```bash
+export AWS_REGION=us-east-2
+```
+
+### Setup Prometheus Credentials
+
+To support metrics collection (enabled by default), re-execution requires Prometheus credentials to be exported to the environment. Follow the instructions in the e2e [README](../../e2e/README.md#monitoring) to support metrics collection.
+
 ## Metrics
 
 The C-Chain benchmarks export VM metrics to the same Grafana instance as AvalancheGo CI: https://grafana-poc.avax-dev.network/.
@@ -13,18 +60,6 @@ You can view granular C-Chain processing metrics with the label attached to this
 Note: to ensure Prometheus gets a final scrape at the end of a run, the test will sleep for 2s greater than the 10s Prometheus scrape interval, which will cause short-running tests to appear to take much longer than expected. Additionally, the linked dashboard displays most metrics using a 1min rate, which means that very short running tests will not produce a very useful visualization.
 
 For a realistic view, run the default C-Chain benchmark in the [final step](#run-default-c-chain-benchmark) or view the preview URL printed by the [c-chain-benchmark](../../../.github/workflows/c-chain-reexecution-benchmark.yml) job, which executes the block range [101, 250k].
-
-## Configure Dev Environment
-
-To set up your dev environment to run C-Chain benchmarks, run:
-
-```bash
-nix develop
-```
-
-If using AWS to push/pull S3 buckets, configure your AWS profile with the required access. The instructions here utilize the S3 bucket `s3://avalanchego-bootstrap-testing` in `us-east-2` under the Ava Labs Experimental AWS account.
-
-To authenticate metrics collection (enabled by default), provide the Prometheus credentials referenced in the e2e [README](../../e2e/README.md#monitoring).
 
 ## Import Blocks
 
