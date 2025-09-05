@@ -19,11 +19,11 @@ service DB {
 
   rpc GetChangeProof(GetChangeProofRequest) returns (GetChangeProofResponse);
   rpc VerifyChangeProof(VerifyChangeProofRequest) returns (VerifyChangeProofResponse);
-  rpc CommitChangeProof(CommitChangeProofRequest) returns (google.protobuf.Empty);
+  rpc CommitChangeProof(CommitChangeProofRequest) returns (CommitChangeProofResponse);
 
   rpc GetRangeProof(GetRangeProofRequest) returns (GetRangeProofResponse);
   rpc VerifyRangeProof(VerifyRangeProofRequest) returns (VerifyRangeProofResponse);
-  rpc CommitRangeProof(CommitRangeProofRequest) returns (google.protobuf.Empty);
+  rpc CommitRangeProof(CommitRangeProofRequest) returns (CommitRangeProofResponse);
 }
 
 message GetMerkleRootResponse {
@@ -93,6 +93,11 @@ message VerifyChangeProofResponse {
 
 message CommitChangeProofRequest {
   ChangeProof proof = 1;
+  MaybeBytes end_key = 2;
+}
+
+message CommitChangeProofResponse {
+  MaybeBytes next_key = 1;
 }
 
 // For use in sync client, which has a restriction on the size of
@@ -133,6 +138,10 @@ message CommitRangeProofRequest {
   MaybeBytes start_key = 1;
   MaybeBytes end_key = 2;
   RangeProof range_proof = 3;
+}
+
+message CommitRangeProofResponse {
+  MaybeBytes next_key = 1;
 }
 
 message ChangeProof {

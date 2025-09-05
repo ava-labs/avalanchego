@@ -113,11 +113,15 @@ func (c *DBClient) VerifyChangeProof(
 	return errors.New(resp.Error)
 }
 
-func (c *DBClient) CommitChangeProof(ctx context.Context, proof *merkledb.ChangeProof) error {
+func (c *DBClient) CommitChangeProof(ctx context.Context, end maybe.Maybe[[]byte], proof *merkledb.ChangeProof) (maybe.Maybe[[]byte], error) {
 	_, err := c.client.CommitChangeProof(ctx, &pb.CommitChangeProofRequest{
 		Proof: proof.ToProto(),
+		EndKey: &pb.MaybeBytes{
+			IsNothing: end.IsNothing(),
+			Value:     end.Value(),
+		},
 	})
-	return err
+	return maybe.Nothing[[]byte](), err
 }
 
 func (c *DBClient) GetProof(ctx context.Context, key []byte) (*merkledb.Proof, error) {
@@ -206,7 +210,7 @@ func (c *DBClient) CommitRangeProof(
 	startKey maybe.Maybe[[]byte],
 	endKey maybe.Maybe[[]byte],
 	proof *merkledb.RangeProof,
-) error {
+) (maybe.Maybe[[]byte], error) {
 	_, err := c.client.CommitRangeProof(ctx, &pb.CommitRangeProofRequest{
 		StartKey: &pb.MaybeBytes{
 			IsNothing: startKey.IsNothing(),
@@ -218,7 +222,7 @@ func (c *DBClient) CommitRangeProof(
 		},
 		RangeProof: proof.ToProto(),
 	})
-	return err
+	return maybe.Nothing[[]byte](), err
 }
 
 func (c *DBClient) Clear() error {

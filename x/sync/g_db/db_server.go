@@ -127,14 +127,27 @@ func (s *DBServer) VerifyChangeProof(
 func (s *DBServer) CommitChangeProof(
 	ctx context.Context,
 	req *pb.CommitChangeProofRequest,
-) (*emptypb.Empty, error) {
+) (*pb.CommitChangeProofResponse, error) {
 	var proof merkledb.ChangeProof
 	if err := proof.UnmarshalProto(req.Proof); err != nil {
 		return nil, err
 	}
 
-	err := s.db.CommitChangeProof(ctx, &proof)
-	return &emptypb.Empty{}, err
+	endKey := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		endKey = maybe.Some(req.EndKey.Value)
+	}
+
+	nextKey, err := s.db.CommitChangeProof(ctx, endKey, &proof)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.CommitChangeProofResponse{
+		NextKey: &pb.MaybeBytes{
+			Value:     nextKey.Value(),
+			IsNothing: nextKey.IsNothing(),
+		},
+	}, nil
 }
 
 func (s *DBServer) GetProof(
@@ -231,7 +244,7 @@ func (s *DBServer) VerifyRangeProof(
 func (s *DBServer) CommitRangeProof(
 	ctx context.Context,
 	req *pb.CommitRangeProofRequest,
-) (*emptypb.Empty, error) {
+) (*pb.CommitRangeProofResponse, error) {
 	var proof merkledb.RangeProof
 	if err := proof.UnmarshalProto(req.RangeProof); err != nil {
 		return nil, err
@@ -247,8 +260,16 @@ func (s *DBServer) CommitRangeProof(
 		end = maybe.Some(req.EndKey.Value)
 	}
 
-	err := s.db.CommitRangeProof(ctx, start, end, &proof)
-	return &emptypb.Empty{}, err
+	nextKey, err := s.db.CommitRangeProof(ctx, start, end, &proof)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.CommitRangeProofResponse{
+		NextKey: &pb.MaybeBytes{
+			Value:     nextKey.Value(),
+			IsNothing: nextKey.IsNothing(),
+		},
+	}, nil
 }
 
 func (s *DBServer) Clear(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
