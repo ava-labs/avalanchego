@@ -167,7 +167,7 @@ func startPrometheus(ctx context.Context, log logging.Logger) error {
 		prometheusListenAddress,
 	)
 
-	collectorConfig, err := getCollectorConfig(cmdName)
+	collectorConfig, err := getCollectorConfigForPush(cmdName)
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
@@ -198,7 +198,7 @@ remote_write:
     basic_auth:
       username: "%s"
       password: "%s"
-`, prometheusScrapeInterval, serviceDiscoveryDir, collectorConfig.pushURL, collectorConfig.username, collectorConfig.password)
+`, prometheusScrapeInterval, serviceDiscoveryDir, collectorConfig.url, collectorConfig.username, collectorConfig.password)
 
 	err = startCollector(ctx, log, cmdName, args, config)
 	if err != nil {
@@ -213,7 +213,7 @@ func startPromtail(ctx context.Context, log logging.Logger) error {
 
 	args := fmt.Sprintf("-config.file=%s.yaml", cmdName)
 
-	collectorConfig, err := getCollectorConfig(cmdName)
+	collectorConfig, err := getCollectorConfigForPush(cmdName)
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
@@ -250,7 +250,7 @@ scrape_configs:
     file_sd_configs:
       - files:
           - '%s/*.json'
-`, promtailHTTPPort, workingDir, collectorConfig.pushURL, collectorConfig.username, collectorConfig.password, serviceDiscoveryDir)
+`, promtailHTTPPort, workingDir, collectorConfig.url, collectorConfig.username, collectorConfig.password, serviceDiscoveryDir)
 
 	return startCollector(ctx, log, cmdName, args, config)
 }
@@ -454,14 +454,24 @@ type collectorConfig struct {
 	// Credentials for basic auth
 	username string
 	password string
-	// URL to use to check collection
+	// URL to push to or to query
 	url string
-	// URL the collector will push to
-	pushURL string
 }
 
-// getCollectorConfig retrieves the url, username and password for the command.
-func getCollectorConfig(cmdName string) (collectorConfig, error) {
+// getCollectorConfigForQuery retrieves the url, username and password to query with for the given command.
+func getCollectorConfigForQuery(cmdName string) (collectorConfig, error) {
+	return getCollectorConfig(cmdName, "_URL")
+}
+
+// getCollectorConfigForPush retrieves the url, username and password to push with for the given command.
+func getCollectorConfigForPush(cmdName string) (collectorConfig, error) {
+	return getCollectorConfig(cmdName, "_PUSH_URL")
+}
+
+// getCollectorConfig retrieves the url, username and password for the
+// command. The urlSuffix will determine whether the returned URL is
+// used for pushing data or verifying collection.
+func getCollectorConfig(cmdName string, urlSuffix string) (collectorConfig, error) {
 	var baseEnvName string
 	switch cmdName {
 	case prometheusCmd:
@@ -472,15 +482,10 @@ func getCollectorConfig(cmdName string) (collectorConfig, error) {
 		return collectorConfig{}, stacktrace.Errorf("unsupported cmd: %s", cmdName)
 	}
 
-	urlEnvVar := baseEnvName + "_URL"
+	urlEnvVar := baseEnvName + urlSuffix
 	url := GetEnvWithDefault(urlEnvVar, "")
 	if len(url) == 0 {
 		return collectorConfig{}, fmt.Errorf("%s env var not set", urlEnvVar)
-	}
-	pushURLEnvVar := baseEnvName + "_PUSH_URL"
-	pushURL := GetEnvWithDefault(pushURLEnvVar, "")
-	if len(pushURL) == 0 {
-		return collectorConfig{}, fmt.Errorf("%s env var not set", pushURLEnvVar)
 	}
 	usernameEnvVar := baseEnvName + "_USERNAME"
 	username := GetEnvWithDefault(usernameEnvVar, "")
@@ -494,7 +499,6 @@ func getCollectorConfig(cmdName string) (collectorConfig, error) {
 	}
 	return collectorConfig{
 		url:      url,
-		pushURL:  pushURL,
 		username: username,
 		password: password,
 	}, nil

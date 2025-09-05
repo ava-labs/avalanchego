@@ -110,7 +110,7 @@ func deployKubeCollector(
 	kubeConfig kubeCollectorConfig,
 ) error {
 	// Source the collector url and auth creds from the environment
-	config, err := getCollectorConfig(kubeConfig.name)
+	config, err := getCollectorConfigForPush(kubeConfig.name)
 	if err != nil {
 		return stacktrace.Errorf("failed to get collector config for %s: %w", kubeConfig.name, err)
 	}
@@ -139,7 +139,7 @@ func createCollectorConfigSecret(
 			Name: secretName,
 		},
 		StringData: map[string]string{
-			"url":      config.pushURL,
+			"url":      config.url,
 			"username": config.username,
 			"password": config.password,
 		},
