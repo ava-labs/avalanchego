@@ -235,7 +235,6 @@ tasks:
           LABELS: '{{.LABELS}}'
           BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE}}'
           METRICS_ENABLED: '{{.METRICS_ENABLED}}'
-          
 
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests
