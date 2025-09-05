@@ -15,6 +15,15 @@ pub struct KeyValuePair<'a> {
     pub value: BorrowedBytes<'a>,
 }
 
+impl<'a> KeyValuePair<'a> {
+    pub fn new((key, value): &'a (impl AsRef<[u8]>, impl AsRef<[u8]>)) -> Self {
+        Self {
+            key: BorrowedBytes::from_slice(key.as_ref()),
+            value: BorrowedBytes::from_slice(value.as_ref()),
+        }
+    }
+}
+
 impl fmt::Display for KeyValuePair<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let precision = f.precision().unwrap_or(64);

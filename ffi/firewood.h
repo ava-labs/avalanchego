@@ -12,12 +12,22 @@
 
 
 /**
+ * FFI context for a parsed or generated change proof.
+ */
+typedef struct ChangeProofContext ChangeProofContext;
+
+/**
  * A handle to the database, returned by `fwd_open_db`.
  *
  * These handles are passed to the other FFI functions.
  *
  */
 typedef struct DatabaseHandle DatabaseHandle;
+
+/**
+ * FFI context for for a parsed or generated range proof.
+ */
+typedef struct RangeProofContext RangeProofContext;
 
 /**
  * A database hash key, used in FFI functions that require hashes.
@@ -178,20 +188,68 @@ typedef struct BorrowedSlice_KeyValuePair {
 typedef struct BorrowedSlice_KeyValuePair BorrowedKeyValuePairs;
 
 /**
- * The result type returned from an FFI function that returns no value but may
- * return an error.
+ * Maybe is a C-compatible optional type using a tagged union pattern.
+ *
+ * FFI methods and types can use this to represent optional values where `Optional<T>`
+ * does not work due to it not having C-compatible layout.
  */
-typedef enum VoidResult_Tag {
+typedef enum Maybe_OwnedBytes_Tag {
+  /**
+   * No value present.
+   */
+  Maybe_OwnedBytes_None_OwnedBytes,
+  /**
+   * A value is present.
+   */
+  Maybe_OwnedBytes_Some_OwnedBytes,
+} Maybe_OwnedBytes_Tag;
+
+typedef struct Maybe_OwnedBytes {
+  Maybe_OwnedBytes_Tag tag;
+  union {
+    struct {
+      OwnedBytes some;
+    };
+  };
+} Maybe_OwnedBytes;
+
+/**
+ * A key range that should be fetched to continue iterating through a range
+ * or change proof that was truncated. Represents a half-open range
+ * `[start_key, end_key)`. If `end_key` is `None`, the range is unbounded
+ * and continues to the end of the keyspace.
+ */
+typedef struct NextKeyRange {
+  /**
+   * The start key of the next range to fetch.
+   */
+  OwnedBytes start_key;
+  /**
+   * If set, a non-inclusive upper bound for the next range to fetch. If not
+   * set, the range is unbounded (this is the final range).
+   */
+  struct Maybe_OwnedBytes end_key;
+} NextKeyRange;
+
+typedef enum NextKeyRangeResult_Tag {
   /**
    * The caller provided a null pointer to the input handle.
    */
-  VoidResult_NullHandlePointer,
+  NextKeyRangeResult_NullHandlePointer,
   /**
-   * The operation was successful and no error occurred.
+   * The proof has not prepared into a proposal nor committed to the database.
    */
-  VoidResult_Ok,
+  NextKeyRangeResult_NotPrepared,
   /**
-   * An error occurred and the message is returned as an [`OwnedBytes`]. Its
+   * There are no more keys to fetch.
+   */
+  NextKeyRangeResult_None,
+  /**
+   * The next key range to fetch is returned.
+   */
+  NextKeyRangeResult_Some,
+  /**
+   * An error occurred and the message is returned as an [`OwnedBytes`]. If
    * value is guaranteed to contain only valid UTF-8.
    *
    * The caller must call [`fwd_free_owned_bytes`] to free the memory
@@ -199,37 +257,73 @@ typedef enum VoidResult_Tag {
    *
    * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
    */
-  VoidResult_Err,
-} VoidResult_Tag;
+  NextKeyRangeResult_Err,
+} NextKeyRangeResult_Tag;
 
-typedef struct VoidResult {
-  VoidResult_Tag tag;
+typedef struct NextKeyRangeResult {
+  NextKeyRangeResult_Tag tag;
   union {
+    struct {
+      struct NextKeyRange some;
+    };
     struct {
       OwnedBytes err;
     };
   };
-} VoidResult;
+} NextKeyRangeResult;
 
 /**
- * A value returned by the FFI.
+ * A result type returned from FFI functions that create or parse change proofs.
  *
- * This is used in several different ways, including:
- * * An C-style string.
- * * An ID for a proposal.
- * * A byte slice containing data.
+ * The caller must ensure that [`fwd_free_change_proof`] is called to
+ * free the memory associated with the returned context when it is no longer
+ * needed.
  *
- * For more details on how the data may be stored, refer to the function signature
- * that returned it or the `From` implementations.
- *
- * The data stored in this struct (if `data` is not null) must be manually freed
- * by the caller using `fwd_free_value`.
- *
+ * [`fwd_free_change_proof`]: crate::fwd_free_change_proof
  */
-typedef struct Value {
-  size_t len;
-  uint8_t *data;
-} Value;
+typedef enum ChangeProofResult_Tag {
+  /**
+   * The caller provided a null pointer to the input handle.
+   */
+  ChangeProofResult_NullHandlePointer,
+  /**
+   * The provided root was not found in the database.
+   */
+  ChangeProofResult_RevisionNotFound,
+  /**
+   * The proof was successfully created or parsed.
+   *
+   * If the value was parsed from a serialized proof, this does not imply that
+   * the proof is valid, only that it is well-formed. The verify method must
+   * be called to ensure the proof is cryptographically valid.
+   */
+  ChangeProofResult_Ok,
+  /**
+   * An error occurred and the message is returned as an [`OwnedBytes`]. If
+   * value is guaranteed to contain only valid UTF-8.
+   *
+   * The caller must call [`fwd_free_owned_bytes`] to free the memory
+   * associated with this error.
+   *
+   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+   */
+  ChangeProofResult_Err,
+} ChangeProofResult_Tag;
+
+typedef struct ChangeProofResult {
+  ChangeProofResult_Tag tag;
+  union {
+    struct {
+      struct HashKey revision_not_found;
+    };
+    struct {
+      struct ChangeProofContext *ok;
+    };
+    struct {
+      OwnedBytes err;
+    };
+  };
+} ChangeProofResult;
 
 /**
  * A result type returned from FFI functions that retrieve a single value.
@@ -282,6 +376,284 @@ typedef struct ValueResult {
     };
   };
 } ValueResult;
+
+/**
+ * The result type returned from an FFI function that returns no value but may
+ * return an error.
+ */
+typedef enum VoidResult_Tag {
+  /**
+   * The caller provided a null pointer to the input handle.
+   */
+  VoidResult_NullHandlePointer,
+  /**
+   * The operation was successful and no error occurred.
+   */
+  VoidResult_Ok,
+  /**
+   * An error occurred and the message is returned as an [`OwnedBytes`]. Its
+   * value is guaranteed to contain only valid UTF-8.
+   *
+   * The caller must call [`fwd_free_owned_bytes`] to free the memory
+   * associated with this error.
+   *
+   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+   */
+  VoidResult_Err,
+} VoidResult_Tag;
+
+typedef struct VoidResult {
+  VoidResult_Tag tag;
+  union {
+    struct {
+      OwnedBytes err;
+    };
+  };
+} VoidResult;
+
+/**
+ * Maybe is a C-compatible optional type using a tagged union pattern.
+ *
+ * FFI methods and types can use this to represent optional values where `Optional<T>`
+ * does not work due to it not having C-compatible layout.
+ */
+typedef enum Maybe_BorrowedBytes_Tag {
+  /**
+   * No value present.
+   */
+  Maybe_BorrowedBytes_None_BorrowedBytes,
+  /**
+   * A value is present.
+   */
+  Maybe_BorrowedBytes_Some_BorrowedBytes,
+} Maybe_BorrowedBytes_Tag;
+
+typedef struct Maybe_BorrowedBytes {
+  Maybe_BorrowedBytes_Tag tag;
+  union {
+    struct {
+      BorrowedBytes some;
+    };
+  };
+} Maybe_BorrowedBytes;
+
+/**
+ * Arguments for creating a change proof.
+ */
+typedef struct CreateChangeProofArgs {
+  /**
+   * The root hash of the starting revision. This must be provided.
+   * If the root is not found in the database, the function will return
+   * [`ChangeProofResult::RevisionNotFound`].
+   */
+  BorrowedBytes start_root;
+  /**
+   * The root hash of the ending revision. This must be provided.
+   * If the root is not found in the database, the function will return
+   * [`ChangeProofResult::RevisionNotFound`].
+   */
+  BorrowedBytes end_root;
+  /**
+   * The start key of the range to create the proof for. If `None`, the range
+   * starts from the beginning of the keyspace.
+   */
+  struct Maybe_BorrowedBytes start_key;
+  /**
+   * The end key of the range to create the proof for. If `None`, the range
+   * ends at the end of the keyspace or until `max_length` items have been
+   * included in the proof.
+   */
+  struct Maybe_BorrowedBytes end_key;
+  /**
+   * The maximum number of key/value pairs to include in the proof. If the
+   * range contains more items than this, the proof will be truncated. If
+   * `0`, there is no limit.
+   */
+  uint32_t max_length;
+} CreateChangeProofArgs;
+
+/**
+ * A result type returned from FFI functions that create or parse range proofs.
+ *
+ * The caller must ensure that [`fwd_free_range_proof`] is called to
+ * free the memory associated with the returned context when it is no longer
+ * needed.
+ *
+ * [`fwd_free_range_proof`]: crate::fwd_free_range_proof
+ */
+typedef enum RangeProofResult_Tag {
+  /**
+   * The caller provided a null pointer to the input handle.
+   */
+  RangeProofResult_NullHandlePointer,
+  /**
+   * The provided root was not found in the database.
+   */
+  RangeProofResult_RevisionNotFound,
+  /**
+   * The proof was successfully created or parsed.
+   *
+   * If the value was parsed from a serialized proof, this does not imply that
+   * the proof is valid, only that it is well-formed. The verify method must
+   * be called to ensure the proof is cryptographically valid.
+   */
+  RangeProofResult_Ok,
+  /**
+   * An error occurred and the message is returned as an [`OwnedBytes`]. If
+   * value is guaranteed to contain only valid UTF-8.
+   *
+   * The caller must call [`fwd_free_owned_bytes`] to free the memory
+   * associated with this error.
+   *
+   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+   */
+  RangeProofResult_Err,
+} RangeProofResult_Tag;
+
+typedef struct RangeProofResult {
+  RangeProofResult_Tag tag;
+  union {
+    struct {
+      struct HashKey revision_not_found;
+    };
+    struct {
+      struct RangeProofContext *ok;
+    };
+    struct {
+      OwnedBytes err;
+    };
+  };
+} RangeProofResult;
+
+/**
+ * Arguments for creating a range proof.
+ */
+typedef struct CreateRangeProofArgs {
+  /**
+   * The root hash of the revision to prove. If `None`, the latest revision
+   * is used.
+   */
+  struct Maybe_BorrowedBytes root;
+  /**
+   * The start key of the range to prove. If `None`, the range starts from the
+   * beginning of the keyspace.
+   *
+   * The start key must be less than the end key if both are provided.
+   */
+  struct Maybe_BorrowedBytes start_key;
+  /**
+   * The end key of the range to prove. If `None`, the range ends at the end
+   * of the keyspace or until `max_length` items have been been included in
+   * the proof.
+   *
+   * If provided, end key is inclusive if not truncated. Otherwise, the end
+   * key will be the final key in the returned key-value pairs.
+   */
+  struct Maybe_BorrowedBytes end_key;
+  /**
+   * The maximum number of key/value pairs to include in the proof. If the
+   * range contains more items than this, the proof will be truncated. If
+   * `0`, there is no limit.
+   */
+  uint32_t max_length;
+} CreateRangeProofArgs;
+
+/**
+ * Arguments for verifying a change proof.
+ */
+typedef struct VerifyChangeProofArgs {
+  /**
+   * The change proof to verify. If null, the function will return
+   * [`VoidResult::NullHandlePointer`]. We need a mutable reference to
+   * update the validation context.
+   */
+  struct ChangeProofContext *proof;
+  /**
+   * The root hash of the starting revision. This must match the starting
+   * root of the proof.
+   */
+  BorrowedBytes start_root;
+  /**
+   * The root hash of the ending revision. This must match the ending root of
+   * the proof.
+   */
+  BorrowedBytes end_root;
+  /**
+   * The lower bound of the key range that the proof is expected to cover. If
+   * `None`, the proof is expected to cover from the start of the keyspace.
+   */
+  struct Maybe_BorrowedBytes start_key;
+  /**
+   * The upper bound of the key range that the proof is expected to cover. If
+   * `None`, the proof is expected to cover to the end of the keyspace.
+   */
+  struct Maybe_BorrowedBytes end_key;
+  /**
+   * The maximum number of key/value pairs that the proof is expected to cover.
+   * If the proof contains more items than this, it is considered invalid. If
+   * `0`, there is no limit.
+   */
+  uint32_t max_length;
+} VerifyChangeProofArgs;
+
+/**
+ * Arguments for verifying a range proof.
+ */
+typedef struct VerifyRangeProofArgs {
+  /**
+   * The range proof to verify. If null, the function will return
+   * [`VoidResult::NullHandlePointer`]. We need a mutable reference to
+   * update the validation context.
+   */
+  struct RangeProofContext *proof;
+  /**
+   * The root hash to verify the proof against. This must match the calculated
+   * hash of the root of the proof.
+   */
+  BorrowedBytes root;
+  /**
+   * The lower bound of the key range that the proof is expected to cover. If
+   * `None`, the proof is expected to cover from the start of the keyspace.
+   *
+   * Must be present if the range proof contains a lower bound proof and must
+   * be absent if the range proof does not contain a lower bound proof.
+   */
+  struct Maybe_BorrowedBytes start_key;
+  /**
+   * The upper bound of the key range that the proof is expected to cover. If
+   * `None`, the proof is expected to cover to the end of the keyspace.
+   *
+   * This is ignored if the proof is truncated and does not cover the full,
+   * in which case the upper bound key is the final key in the key-value pairs.
+   */
+  struct Maybe_BorrowedBytes end_key;
+  /**
+   * The maximum number of key/value pairs that the proof is expected to cover.
+   * If the proof contains more items than this, it is considered invalid. If
+   * `0`, there is no limit.
+   */
+  uint32_t max_length;
+} VerifyRangeProofArgs;
+
+/**
+ * A value returned by the FFI.
+ *
+ * This is used in several different ways, including:
+ * * An C-style string.
+ * * An ID for a proposal.
+ * * A byte slice containing data.
+ *
+ * For more details on how the data may be stored, refer to the function signature
+ * that returned it or the `From` implementations.
+ *
+ * The data stored in this struct (if `data` is not null) must be manually freed
+ * by the caller using `fwd_free_value`.
+ *
+ */
+typedef struct Value {
+  size_t len;
+  uint8_t *data;
+} Value;
 
 typedef uint32_t ProposalId;
 
@@ -420,6 +792,74 @@ typedef struct LogArgs {
 struct HashResult fwd_batch(const struct DatabaseHandle *db, BorrowedKeyValuePairs values);
 
 /**
+ * Returns the next key range that should be fetched after processing the
+ * current set of operations in a change proof that was truncated.
+ *
+ * Can be called multiple times to get subsequent disjoint key ranges until
+ * it returns [`NextKeyRangeResult::None`], indicating there are no more keys to
+ * fetch and the proof is complete.
+ *
+ * # Arguments
+ *
+ * - `proof` - A [`ChangeProofContext`] previously returned from the create
+ *   methods and has been prepared into a proposal or already committed.
+ *
+ * # Returns
+ *
+ * - [`NextKeyRangeResult::NullHandlePointer`] if the caller provided a null pointer.
+ * - [`NextKeyRangeResult::NotPrepared`] if the proof has not been prepared into
+ *   a proposal nor committed to the database.
+ * - [`NextKeyRangeResult::None`] if there are no more keys to fetch.
+ * - [`NextKeyRangeResult::Some`] containing the next key range to fetch.
+ * - [`NextKeyRangeResult::Err`] containing an error message if the next key range
+ *   could not be determined.
+ *
+ * # Thread Safety
+ *
+ * It is not safe to call this function concurrently with the same proof context
+ * nor is it safe to call any other function that accesses the same proof context
+ * concurrently. The caller must ensure exclusive access to the proof context
+ * for the duration of the call.
+ */
+struct NextKeyRangeResult fwd_change_proof_find_next_key(struct ChangeProofContext *_proof);
+
+/**
+ * Deserialize a `ChangeProof` from bytes.
+ *
+ * # Arguments
+ *
+ * * `bytes` - The bytes to deserialize the proof from.
+ *
+ * # Returns
+ *
+ * - [`ChangeProofResult::NullHandlePointer`] if the caller provided a null or zero-length slice.
+ * - [`ChangeProofResult::Ok`] containing a pointer to the `ChangeProofContext` if the proof
+ *   was successfully parsed. This does not imply that the proof is valid, only that it is
+ *   well-formed. The verify method must be called to ensure the proof is cryptographically valid.
+ * - [`ChangeProofResult::Err`] containing an error message if the proof could not be parsed.
+ */
+struct ChangeProofResult fwd_change_proof_from_bytes(BorrowedBytes _bytes);
+
+/**
+ * Serialize a `ChangeProof` to bytes.
+ *
+ * # Arguments
+ *
+ * - `proof` - A [`ChangeProofContext`] previously returned from the create
+ *   method. If from a parsed proof, the proof will not be verified before
+ *   serialization.
+ *
+ * # Returns
+ *
+ * - [`ValueResult::NullHandlePointer`] if the caller provided a null pointer.
+ * - [`ValueResult::Some`] containing the serialized bytes if successful.
+ * - [`ValueResult::Err`] if the caller provided a null pointer.
+ *
+ * The other [`ValueResult`] variants are not used.
+ */
+struct ValueResult fwd_change_proof_to_bytes(const struct ChangeProofContext *_proof);
+
+/**
  * Close and free the memory for a database handle
  *
  * # Arguments
@@ -463,6 +903,171 @@ struct VoidResult fwd_close_db(struct DatabaseHandle *db);
 struct HashResult fwd_commit(const struct DatabaseHandle *db, uint32_t proposal_id);
 
 /**
+ * Create a change proof for the given range of keys between two roots.
+ *
+ * # Arguments
+ *
+ * - `db` - The database to create the proof from.
+ * - `args` - The arguments for creating the change proof.
+ *
+ * # Returns
+ *
+ * - [`ChangeProofResult::NullHandlePointer`] if the caller provided a null pointer.
+ * - [`ChangeProofResult::RevisionNotFound`] if the caller provided a start or end root
+ *   that was not found in the database. The missing root hash is included in the result.
+ *   The start root is checked first, and if both are missing, only the start root is
+ *   reported.
+ * - [`ChangeProofResult::Ok`] containing a pointer to the `ChangeProofContext` if the proof
+ *   was successfully created.
+ * - [`ChangeProofResult::Err`] containing an error message if the proof could not be created.
+ */
+struct ChangeProofResult fwd_db_change_proof(const struct DatabaseHandle *_db,
+                                             struct CreateChangeProofArgs _args);
+
+/**
+ * Generate a range proof for the given range of keys for the latest revision.
+ *
+ * # Arguments
+ *
+ * - `db` - The database to create the proof from.
+ * - `args` - The arguments for creating the range proof.
+ *
+ * # Returns
+ *
+ * - [`RangeProofResult::NullHandlePointer`] if the caller provided a null pointer.
+ * - [`RangeProofResult::RevisionNotFound`] if the caller provided a root that was
+ *   not found in the database. The missing root hash is included in the result.
+ * - [`RangeProofResult::Ok`] containing a pointer to the `RangeProofContext` if the proof
+ *   was successfully created.
+ * - [`RangeProofResult::Err`] containing an error message if the proof could not be created.
+ */
+struct RangeProofResult fwd_db_range_proof(const struct DatabaseHandle *_db,
+                                           struct CreateRangeProofArgs _args);
+
+/**
+ * Verify and commit a change proof to the database.
+ *
+ * If the proof has already been verified, the previously prepared proposal will be
+ * committed instead of re-verifying. If the proof has not been verified, it will be
+ * verified now. If the prepared proposal is no longer valid (e.g., the database has
+ * changed since it was prepared), a new proposal will be created and committed.
+ *
+ * The proof context will be updated with additional information about the committed
+ * proof to allow for optimized introspection of the committed changes.
+ *
+ * # Arguments
+ *
+ * - `db` - The database to commit the changes to.
+ * - `args` - The arguments for verifying the change proof.
+ *
+ * # Returns
+ *
+ * - [`HashResult::NullHandlePointer`] if the caller provided a null pointer to either
+ *   the database or the proof.
+ * - [`HashResult::None`] if the proof resulted in an empty database (i.e., all keys were deleted).
+ * - [`HashResult::Some`] containing the new root hash if the proof was successfully verified
+ * - [`HashResult::Err`] containing an error message if the proof could not be verified or committed.
+ *
+ * [`fwd_commit`]: crate::fwd_commit
+ *
+ * # Thread Safety
+ *
+ * It is not safe to call this function concurrently with the same proof context
+ * nor is it safe to call any other function that accesses the same proof context
+ * concurrently. The caller must ensure exclusive access to the proof context
+ * for the duration of the call.
+ */
+struct HashResult fwd_db_verify_and_commit_change_proof(const struct DatabaseHandle *_db,
+                                                        struct VerifyChangeProofArgs _args);
+
+/**
+ * Verify and commit a range proof to the database.
+ *
+ * If a proposal was previously prepared by a call to [`fwd_db_verify_range_proof`],
+ * it will be committed instead of re-verifying the proof. If the proof has not yet
+ * been verified, it will be verified now. If the prepared proposal is no longer
+ * valid (e.g., the database has changed since it was prepared), a new proposal
+ * will be created and committed.
+ *
+ * The proof context will be updated with additional information about the committed
+ * proof to allow for optimized introspection of the committed changes.
+ *
+ * # Arguments
+ *
+ * - `db` - The database to commit the changes to.
+ * - `args` - The arguments for verifying the range proof.
+ *
+ * # Returns
+ *
+ * - [`HashResult::NullHandlePointer`] if the caller provided a null pointer to either
+ *   the database or the proof.
+ * - [`HashResult::None`] if the proof resulted in an empty database (i.e., all keys were deleted).
+ * - [`HashResult::Some`] containing the new root hash if the proof was successfully verified
+ * - [`HashResult::Err`] containing an error message if the proof could not be verified or committed.
+ *
+ * # Thread Safety
+ *
+ * It is not safe to call this function concurrently with the same proof context
+ * nor is it safe to call any other function that accesses the same proof context
+ * concurrently. The caller must ensure exclusive access to the proof context
+ * for the duration of the call.
+ */
+struct HashResult fwd_db_verify_and_commit_range_proof(const struct DatabaseHandle *_db,
+                                                       struct VerifyRangeProofArgs _args);
+
+/**
+ * Verify a change proof and prepare a proposal to later commit or drop.
+ *
+ * # Arguments
+ *
+ * - `db` - The database to verify the proof against.
+ * - `args` - The arguments for verifying the change proof.
+ *
+ * # Returns
+ *
+ * - [`VoidResult::NullHandlePointer`] if the caller provided a null pointer to either
+ *   the database or the proof.
+ * - [`VoidResult::Ok`] if the proof was successfully verified.
+ * - [`VoidResult::Err`] containing an error message if the proof could not be verified
+ *
+ * # Thread Safety
+ *
+ * It is not safe to call this function concurrently with the same proof context
+ * nor is it safe to call any other function that accesses the same proof context
+ * concurrently. The caller must ensure exclusive access to the proof context
+ * for the duration of the call.
+ */
+struct VoidResult fwd_db_verify_change_proof(const struct DatabaseHandle *_db,
+                                             struct VerifyChangeProofArgs _args);
+
+/**
+ * Verify a range proof and prepare a proposal to later commit or drop. If the
+ * proof has already been verified, the cached validation context will be used
+ * to avoid re-verifying the proof.
+ *
+ * # Arguments
+ *
+ * - `db` - The database to verify the proof against.
+ * - `args` - The arguments for verifying the range proof.
+ *
+ * # Returns
+ *
+ * - [`VoidResult::NullHandlePointer`] if the caller provided a null pointer to either
+ *   the database or the proof.
+ * - [`VoidResult::Ok`] if the proof was successfully verified.
+ * - [`VoidResult::Err`] containing an error message if the proof could not be verified
+ *
+ * # Thread Safety
+ *
+ * It is not safe to call this function concurrently with the same proof context
+ * nor is it safe to call any other function that accesses the same proof context
+ * concurrently. The caller must ensure exclusive access to the proof context
+ * for the duration of the call.
+ */
+struct VoidResult fwd_db_verify_range_proof(const struct DatabaseHandle *_db,
+                                            struct VerifyRangeProofArgs _args);
+
+/**
  * Drops a proposal from the database.
  * The propopsal's data is now inaccessible, and can be freed by the `RevisionManager`.
  *
@@ -478,6 +1083,20 @@ struct HashResult fwd_commit(const struct DatabaseHandle *db, uint32_t proposal_
  *
  */
 struct Value fwd_drop_proposal(const struct DatabaseHandle *db, uint32_t proposal_id);
+
+/**
+ * Frees the memory associated with a `ChangeProofContext`.
+ *
+ * # Arguments
+ *
+ * * `proof` - The `ChangeProofContext` to free, previously returned from any Rust function.
+ *
+ * # Returns
+ *
+ * - [`VoidResult::Ok`] if the memory was successfully freed.
+ * - [`VoidResult::Err`] if the process panics while freeing the memory.
+ */
+struct VoidResult fwd_free_change_proof(struct ChangeProofContext *proof);
 
 /**
  * Consumes the [`OwnedBytes`] and frees the memory associated with it.
@@ -499,6 +1118,20 @@ struct Value fwd_drop_proposal(const struct DatabaseHandle *db, uint32_t proposa
  * this function does nothing.
  */
 struct VoidResult fwd_free_owned_bytes(OwnedBytes bytes);
+
+/**
+ * Frees the memory associated with a `RangeProofContext`.
+ *
+ * # Arguments
+ *
+ * * `proof` - The `RangeProofContext` to free, previously returned from any Rust function.
+ *
+ * # Returns
+ *
+ * - [`VoidResult::Ok`] if the memory was successfully freed.
+ * - [`VoidResult::Err`] if the process panics while freeing the memory.
+ */
+struct VoidResult fwd_free_range_proof(struct RangeProofContext *proof);
 
 /**
  * Frees the memory associated with a `Value`.
@@ -699,6 +1332,96 @@ struct Value fwd_propose_on_db(const struct DatabaseHandle *db,
 struct Value fwd_propose_on_proposal(const struct DatabaseHandle *db,
                                      ProposalId proposal_id,
                                      BorrowedKeyValuePairs values);
+
+/**
+ * Returns the next key range that should be fetched after processing the
+ * current set of key-value pairs in a range proof that was truncated.
+ *
+ * Can be called multiple times to get subsequent disjoint key ranges until
+ * it returns [`NextKeyRangeResult::None`], indicating there are no more keys to
+ * fetch and the proof is complete.
+ *
+ * # Arguments
+ *
+ * - `proof` - A [`RangeProofContext`] previously returned from the create
+ *   methods and has been prepared into a proposal or already committed.
+ *
+ * # Returns
+ *
+ * - [`NextKeyRangeResult::NullHandlePointer`] if the caller provided a null pointer.
+ * - [`NextKeyRangeResult::NotPrepared`] if the proof has not been prepared into
+ *   a proposal nor committed to the database.
+ * - [`NextKeyRangeResult::None`] if there are no more keys to fetch.
+ * - [`NextKeyRangeResult::Some`] containing the next key range to fetch.
+ * - [`NextKeyRangeResult::Err`] containing an error message if the next key range
+ *   could not be determined.
+ *
+ * # Thread Safety
+ *
+ * It is not safe to call this function concurrently with the same proof context
+ * nor is it safe to call any other function that accesses the same proof context
+ * concurrently. The caller must ensure exclusive access to the proof context
+ * for the duration of the call.
+ */
+struct NextKeyRangeResult fwd_range_proof_find_next_key(struct RangeProofContext *_proof);
+
+/**
+ * Deserialize a `RangeProof` from bytes.
+ *
+ * # Arguments
+ *
+ * - `bytes` - The bytes to deserialize the proof from.
+ *
+ * # Returns
+ *
+ * - [`RangeProofResult::NullHandlePointer`] if the caller provided a null or zero-length slice.
+ * - [`RangeProofResult::Ok`] containing a pointer to the `RangeProofContext` if the proof
+ *   was successfully parsed. This does not imply that the proof is valid, only that it is
+ *   well-formed. The verify method must be called to ensure the proof is cryptographically valid.
+ * - [`RangeProofResult::Err`] containing an error message if the proof could not be parsed.
+ */
+struct RangeProofResult fwd_range_proof_from_bytes(BorrowedBytes _bytes);
+
+/**
+ * Serialize a `RangeProof` to bytes.
+ *
+ * # Arguments
+ *
+ * - `proof` - A [`RangeProofContext`] previously returned from the create
+ *   method. If from a parsed proof, the proof will not be verified before
+ *   serialization.
+ *
+ * # Returns
+ *
+ * - [`ValueResult::NullHandlePointer`] if the caller provided a null pointer.
+ * - [`ValueResult::Some`] containing the serialized bytes if successful.
+ * - [`ValueResult::Err`] if the caller provided a null pointer.
+ */
+struct ValueResult fwd_range_proof_to_bytes(const struct RangeProofContext *_proof);
+
+/**
+ * Verify a range proof against the given start and end keys and root hash. The
+ * proof will be updated with the validation context if the proof is valid to
+ * avoid re-verifying it during commit.
+ *
+ * # Arguments
+ *
+ * - `args` - The arguments for verifying the range proof.
+ *
+ * # Returns
+ *
+ * - [`VoidResult::NullHandlePointer`] if the caller provided a null pointer to the proof.
+ * - [`VoidResult::Ok`] if the proof was successfully verified.
+ * - [`VoidResult::Err`] containing an error message if the proof could not be verified.
+ *
+ * # Thread Safety
+ *
+ * It is not safe to call this function concurrently with the same proof context
+ * nor is it safe to call any other function that accesses the same proof context
+ * concurrently. The caller must ensure exclusive access to the proof context
+ * for the duration of the call.
+ */
+struct VoidResult fwd_range_proof_verify(struct VerifyRangeProofArgs _args);
 
 /**
  * Get the root hash of the latest version of the database

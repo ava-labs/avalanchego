@@ -30,6 +30,7 @@ mod arc_cache;
 mod handle;
 mod logging;
 mod metrics_setup;
+mod proofs;
 mod value;
 
 use std::collections::HashMap;
@@ -45,6 +46,7 @@ use firewood::v2::api::{self, Db as _, DbView, KeyValuePairIter, Proposal as _};
 use crate::arc_cache::ArcCache;
 pub use crate::handle::*;
 pub use crate::logging::*;
+pub use crate::proofs::*;
 pub use crate::value::*;
 
 #[cfg(unix)]
