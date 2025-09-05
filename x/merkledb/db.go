@@ -61,7 +61,8 @@ var (
 	hadCleanShutdown        = []byte{1}
 	didNotHaveCleanShutdown = []byte{0}
 
-	errSameRoot = errors.New("start and end root are the same")
+	errSameRoot    = errors.New("start and end root are the same")
+	errTooManyKeys = errors.New("response contains more than requested keys")
 )
 
 type ChangeProofer interface {
@@ -87,12 +88,13 @@ type ChangeProofer interface {
 	// Returns nil iff all the following hold:
 	//   - [start] <= [end].
 	//   - [proof] is non-empty.
+	//   - [proof.KeyValues] is not longer than [maxLength].
 	//   - All keys in [proof.KeyValues] and [proof.DeletedKeys] are in [start, end].
 	//     If [start] is nothing, all keys are considered > [start].
 	//     If [end] is nothing, all keys are considered < [end].
 	//   - [proof.KeyValues] and [proof.DeletedKeys] are sorted in order of increasing key.
 	//   - [proof.StartProof] and [proof.EndProof] are well-formed.
-	//   - When the changes in [proof.KeyChanes] are applied,
+	//   - When the changes in [proof.KeyChanges] are applied,
 	//     the root ID of the database is [expectedEndRootID].
 	VerifyChangeProof(
 		ctx context.Context,
@@ -100,6 +102,7 @@ type ChangeProofer interface {
 		start maybe.Maybe[[]byte],
 		end maybe.Maybe[[]byte],
 		expectedEndRootID ids.ID,
+		maxLength int,
 	) error
 
 	// CommitChangeProof commits the key/value pairs within the [proof] to the db.
@@ -121,6 +124,26 @@ type RangeProofer interface {
 		end maybe.Maybe[[]byte],
 		maxLength int,
 	) (*RangeProof, error)
+
+	// Returns nil iff all the following hold:
+	//   - [start] <= [end].
+	//   - [proof] is non-empty.
+	//   - [proof.KeyValues] is not longer than [maxLength].
+	//   - All keys in [proof.KeyValues] and [proof.DeletedKeys] are in [start, end].
+	//     If [start] is nothing, all keys are considered > [start].
+	//     If [end] is nothing, all keys are considered < [end].
+	//   - [proof.KeyValues] and [proof.DeletedKeys] are sorted in order of increasing key.
+	//   - [proof.StartProof] and [proof.EndProof] are well-formed.
+	//   - When the changes in [proof.KeyChanges] are applied,
+	//     the root ID of the database is [expectedEndRootID].
+	VerifyRangeProof(
+		ctx context.Context,
+		proof *RangeProof,
+		start maybe.Maybe[[]byte],
+		end maybe.Maybe[[]byte],
+		expectedEndRootID ids.ID,
+		maxLength int,
+	) error
 
 	// CommitRangeProof commits the key/value pairs within the [proof] to the db.
 	// [start] is the smallest possible key in the range this [proof] covers.
@@ -1087,9 +1110,13 @@ func (db *merkleDB) VerifyChangeProof(
 	start maybe.Maybe[[]byte],
 	end maybe.Maybe[[]byte],
 	expectedEndRootID ids.ID,
+	maxLength int,
 ) error {
 	if proof == nil {
 		return ErrEmptyProof
+	}
+	if len(proof.KeyChanges) > maxLength {
+		return fmt.Errorf("%w: [%d], max: [%d]", errTooManyKeys, len(proof.KeyChanges), maxLength)
 	}
 
 	startProofKey := maybe.Bind(start, ToKey)
@@ -1196,6 +1223,26 @@ func (db *merkleDB) VerifyChangeProof(
 	}
 
 	return nil
+}
+
+func (db *merkleDB) VerifyRangeProof(
+	ctx context.Context,
+	proof *RangeProof,
+	start maybe.Maybe[[]byte],
+	end maybe.Maybe[[]byte],
+	expectedEndRootID ids.ID,
+	maxLength int,
+) error {
+	// use db parameters
+	return proof.Verify(
+		ctx,
+		start,
+		end,
+		expectedEndRootID,
+		db.tokenSize,
+		db.hasher,
+		maxLength,
+	)
 }
 
 // Invalidates and removes any child views that aren't [exception].

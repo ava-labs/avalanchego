@@ -948,6 +948,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				root,
 				tokenSize,
 				config.Hasher,
+				maxProofLen,
 			))
 		case opGenerateChangeProof:
 			root, err := db.GetMerkleRoot(context.Background())
@@ -988,6 +989,7 @@ func runRandDBTest(require *require.Assertions, r *rand.Rand, rt randTest, token
 				start,
 				end,
 				root,
+				maxProofLen,
 			))
 		case opWriteBatch:
 			oldRoot, err := db.GetMerkleRoot(context.Background())
