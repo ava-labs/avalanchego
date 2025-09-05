@@ -10,6 +10,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/compression"
 )
 
 func TestDataSplitting(t *testing.T) {
@@ -18,12 +20,15 @@ func TestDataSplitting(t *testing.T) {
 	store, cleanup := newTestDatabase(t, config)
 	defer cleanup()
 
+	// Override the compressor so we can have fixed size blocks
+	store.compressor = compression.NewNoCompressor()
+
 	// create 11 blocks, 1kb each
 	numBlocks := 11
 	blocks := make([][]byte, numBlocks)
 	for i := range numBlocks {
 		blocks[i] = fixedSizeBlock(t, 1024, uint64(i))
-		require.NoError(t, store.WriteBlock(uint64(i), blocks[i], 0))
+		require.NoError(t, store.WriteBlock(uint64(i), blocks[i]))
 	}
 
 	// Verify that multiple data files were created.
@@ -52,6 +57,7 @@ func TestDataSplitting(t *testing.T) {
 	config = config.WithDataDir(store.config.DataDir).WithIndexDir(store.config.IndexDir)
 	store, err = New(config, store.log)
 	require.NoError(t, err)
+	store.compressor = compression.NewNoCompressor()
 	defer store.Close()
 	for i := range numBlocks {
 		readBlock, err := store.ReadBlock(uint64(i))
@@ -70,7 +76,7 @@ func TestDataSplitting_DeletedFile(t *testing.T) {
 	blocks := make([][]byte, numBlocks)
 	for i := range numBlocks {
 		blocks[i] = fixedSizeBlock(t, 1024, uint64(i))
-		require.NoError(t, store.WriteBlock(uint64(i), blocks[i], 0))
+		require.NoError(t, store.WriteBlock(uint64(i), blocks[i]))
 	}
 	store.Close()
 
