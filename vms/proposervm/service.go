@@ -4,14 +4,12 @@
 package proposervm
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
@@ -52,15 +50,26 @@ func (p *ProposerAPI) GetCurrentEpoch(r *http.Request, _ *struct{}, reply *api.G
 		return fmt.Errorf("couldn't get latest block %s: %w", lastAccepted.String(), err)
 	}
 
-	blk, ok := latestBlock.(block.SignedBlock)
-	if !ok {
-		return errors.New("latest block is not a signed block")
+	epoch, err := latestBlock.pChainEpoch(r.Context())
+	if err != nil {
+		return fmt.Errorf("couldn't get latest block epoch %s: %w", lastAccepted.String(), err)
 	}
 
-	epoch := blk.PChainEpoch()
-	reply.Number = avajson.Uint64(epoch.Number)
-	reply.StartTime = avajson.Uint64(epoch.StartTime.Unix())
-	reply.PChainHeight = avajson.Uint64(epoch.Height)
+	if latestBlock.Timestamp().Before(epoch.StartTime.Add(p.vm.Upgrades.GraniteEpochDuration)) {
+		// Latest block did not seal the epoch.
+		reply.Number = avajson.Uint64(epoch.Number)
+		reply.StartTime = avajson.Uint64(epoch.StartTime.Unix())
+		reply.PChainHeight = avajson.Uint64(epoch.Height)
+	} else {
+		// Latest block sealed the epoch.
+		pChainHeight, err := latestBlock.pChainHeight(r.Context())
+		if err != nil {
+			return fmt.Errorf("couldn't get latest block p-chain height %s: %w", lastAccepted.String(), err)
+		}
+		reply.Number = avajson.Uint64(epoch.Number + 1)
+		reply.StartTime = avajson.Uint64(latestBlock.Timestamp().Unix())
+		reply.PChainHeight = avajson.Uint64(pChainHeight)
+	}
 
 	return nil
 }

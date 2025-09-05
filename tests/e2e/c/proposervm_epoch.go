@@ -60,13 +60,9 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 
 			initialEpoch, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
 			require.NoError(err)
-
 			tc.Log().Info("initial epoch", zap.Any("epoch", initialEpoch))
 
-			issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
-
-			time.Sleep(upgrades.GraniteEpochDuration + 2*time.Second)
-
+			time.Sleep(upgrades.GraniteEpochDuration)
 			issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
 
 			advancedEpoch, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
@@ -74,9 +70,9 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 
 			tc.Log().Info("advanced epoch", zap.Any("epoch", advancedEpoch))
 
-			require.Greater(
+			require.Equal(
 				advancedEpoch.Number,
-				initialEpoch.Number,
+				initialEpoch.Number+1,
 				"expected epoch number to advance, but it did not",
 			)
 		})
