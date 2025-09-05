@@ -37,13 +37,16 @@ func Test_Creation(t *testing.T) {
 	require.NoError(err)
 
 	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-	}, prometheus.NewRegistry())
+	syncer, err := NewManager(
+		db,
+		ManagerConfig{
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
+			SimultaneousWorkLimit: 5,
+			Log:                   logging.NoLog{},
+		},
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 	require.NotNil(syncer)
 }
@@ -69,14 +72,17 @@ func Test_Completion(t *testing.T) {
 	require.NoError(err)
 
 	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(emptyDB)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(emptyDB)),
-		TargetRoot:            emptyRoot,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-	}, prometheus.NewRegistry())
+	syncer, err := NewManager(
+		db,
+		ManagerConfig{
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(emptyDB)),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(emptyDB)),
+			TargetRoot:            emptyRoot,
+			SimultaneousWorkLimit: 5,
+			Log:                   logging.NoLog{},
+		},
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 	require.NotNil(syncer)
 
@@ -173,14 +179,17 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	require.NoError(err)
 
 	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
-		TargetRoot:            syncRoot,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-	}, prometheus.NewRegistry())
+	syncer, err := NewManager(
+		db,
+		ManagerConfig{
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
+			TargetRoot:            syncRoot,
+			SimultaneousWorkLimit: 5,
+			Log:                   logging.NoLog{},
+		},
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 	require.NotNil(syncer)
 
@@ -828,14 +837,17 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 				changeProofClient = tt.changeProofClient(dbToSync)
 			}
 
-			syncer, err := NewManager(ManagerConfig{
-				DB:                    db,
-				RangeProofClient:      rangeProofClient,
-				ChangeProofClient:     changeProofClient,
-				TargetRoot:            syncRoot,
-				SimultaneousWorkLimit: 5,
-				Log:                   logging.NoLog{},
-			}, prometheus.NewRegistry())
+			syncer, err := NewManager(
+				db,
+				ManagerConfig{
+					RangeProofClient:      rangeProofClient,
+					ChangeProofClient:     changeProofClient,
+					TargetRoot:            syncRoot,
+					SimultaneousWorkLimit: 5,
+					Log:                   logging.NoLog{},
+				},
+				prometheus.NewRegistry(),
+			)
 
 			require.NoError(err)
 			require.NotNil(syncer)
@@ -899,14 +911,17 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.NoError(err)
 
 	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
-		TargetRoot:            syncRoot,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-	}, prometheus.NewRegistry())
+	syncer, err := NewManager(
+		db,
+		ManagerConfig{
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
+			TargetRoot:            syncRoot,
+			SimultaneousWorkLimit: 5,
+			Log:                   logging.NoLog{},
+		},
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 	require.NotNil(syncer)
 	require.NoError(syncer.Start(context.Background()))
@@ -925,14 +940,17 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	)
 	syncer.Close()
 
-	newSyncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
-		TargetRoot:            syncRoot,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-	}, prometheus.NewRegistry())
+	newSyncer, err := NewManager(
+		db,
+		ManagerConfig{
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
+			TargetRoot:            syncRoot,
+			SimultaneousWorkLimit: 5,
+			Log:                   logging.NoLog{},
+		},
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 	require.NotNil(newSyncer)
 
@@ -1008,14 +1026,17 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		updatedRootChan: updatedRootChan,
 	})
 
-	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      rangeProofClient,
-		ChangeProofClient:     changeProofClient,
-		TargetRoot:            firstSyncRoot,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-	}, prometheus.NewRegistry())
+	syncer, err := NewManager(
+		db,
+		ManagerConfig{
+			RangeProofClient:      rangeProofClient,
+			ChangeProofClient:     changeProofClient,
+			TargetRoot:            firstSyncRoot,
+			SimultaneousWorkLimit: 5,
+			Log:                   logging.NoLog{},
+		},
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 	require.NotNil(syncer)
 
@@ -1054,14 +1075,17 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	)
 	require.NoError(err)
 	ctx := context.Background()
-	m, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
-		TargetRoot:            ids.Empty,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-	}, prometheus.NewRegistry())
+	m, err := NewManager(
+		db,
+		ManagerConfig{
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
+			TargetRoot:            ids.Empty,
+			SimultaneousWorkLimit: 5,
+			Log:                   logging.NoLog{},
+		},
+		prometheus.NewRegistry(),
+	)
 	require.NoError(err)
 
 	// Populate [m.processWork] to ensure that UpdateSyncTarget
