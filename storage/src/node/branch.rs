@@ -197,7 +197,7 @@ mod ethhash {
 
     use super::Serializable;
 
-    #[derive(Clone, Debug, PartialEq, Eq)]
+    #[derive(Clone, Debug)]
     pub enum HashOrRlp {
         Hash(TrieHash),
         // TODO: this slice is never larger than 32 bytes so smallvec is probably not our best container
@@ -227,6 +227,39 @@ mod ethhash {
             self.into()
         }
     }
+
+    impl PartialEq<TrieHash> for HashOrRlp {
+        fn eq(&self, other: &TrieHash) -> bool {
+            match self {
+                HashOrRlp::Hash(h) => h == other,
+                HashOrRlp::Rlp(r) => Keccak256::digest(r.as_ref()).as_slice() == other.as_ref(),
+            }
+        }
+    }
+
+    impl PartialEq<HashOrRlp> for TrieHash {
+        fn eq(&self, other: &HashOrRlp) -> bool {
+            match other {
+                HashOrRlp::Hash(h) => h == self,
+                HashOrRlp::Rlp(r) => Keccak256::digest(r.as_ref()).as_slice() == self.as_ref(),
+            }
+        }
+    }
+
+    impl PartialEq for HashOrRlp {
+        fn eq(&self, other: &Self) -> bool {
+            match (self, other) {
+                (HashOrRlp::Hash(h1), HashOrRlp::Hash(h2)) => h1 == h2,
+                (HashOrRlp::Rlp(r1), HashOrRlp::Rlp(r2)) => r1 == r2,
+                (HashOrRlp::Hash(h), HashOrRlp::Rlp(r))
+                | (HashOrRlp::Rlp(r), HashOrRlp::Hash(h)) => {
+                    Keccak256::digest(r.as_ref()).as_slice() == h.as_ref()
+                }
+            }
+        }
+    }
+
+    impl Eq for HashOrRlp {}
 
     impl Serializable for HashOrRlp {
         fn write_to<W: ExtendableBytes>(&self, vec: &mut W) {
