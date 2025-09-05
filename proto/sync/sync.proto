@@ -56,8 +56,8 @@ message SyncGetChangeProofRequest {
 
 message SyncGetChangeProofResponse {
   oneof response {
-    ChangeProof change_proof = 1;
-    RangeProof range_proof = 2;
+    bytes change_proof = 1;
+    bytes range_proof = 2;
   }
 }
 

@@ -510,13 +510,8 @@ func (m *Manager) handleRangeProofResponse(
 		return err
 	}
 
-	var rangeProofProto pb.RangeProof
-	if err := proto.Unmarshal(responseBytes, &rangeProofProto); err != nil {
-		return err
-	}
-
 	var rangeProof merkledb.RangeProof
-	if err := rangeProof.UnmarshalProto(&rangeProofProto); err != nil {
+	if err := rangeProof.UnmarshalBinary(responseBytes); err != nil {
 		return err
 	}
 
@@ -573,7 +568,7 @@ func (m *Manager) handleChangeProofResponse(
 	case *pb.SyncGetChangeProofResponse_ChangeProof:
 		// The server had enough history to send us a change proof
 		var changeProof merkledb.ChangeProof
-		if err := changeProof.UnmarshalProto(changeProofResp.ChangeProof); err != nil {
+		if err := changeProof.UnmarshalBinary(changeProofResp.ChangeProof); err != nil {
 			return err
 		}
 
@@ -614,7 +609,7 @@ func (m *Manager) handleChangeProofResponse(
 		m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
 	case *pb.SyncGetChangeProofResponse_RangeProof:
 		var rangeProof merkledb.RangeProof
-		if err := rangeProof.UnmarshalProto(changeProofResp.RangeProof); err != nil {
+		if err := rangeProof.UnmarshalBinary(changeProofResp.RangeProof); err != nil {
 			return err
 		}
 
