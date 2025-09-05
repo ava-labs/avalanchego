@@ -150,8 +150,6 @@ type ManagerConfig struct {
 	TargetRoot            ids.ID
 	BranchFactor          merkledb.BranchFactor
 	StateSyncNodes        []ids.NodeID
-	// If not specified, [merkledb.DefaultHasher] will be used.
-	Hasher merkledb.Hasher
 }
 
 func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manager, error) {
@@ -169,10 +167,6 @@ func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manage
 	}
 	if err := config.BranchFactor.Valid(); err != nil {
 		return nil, err
-	}
-
-	if config.Hasher == nil {
-		config.Hasher = merkledb.DefaultHasher
 	}
 
 	metrics, err := NewMetrics("sync", registerer)
