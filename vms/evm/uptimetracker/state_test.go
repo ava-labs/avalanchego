@@ -19,7 +19,7 @@ import (
 func TestState(t *testing.T) {
 	require := require.New(t)
 	db := memdb.New()
-	state, err := newState(db)
+	state, err := NewState(db)
 	require.NoError(err)
 
 	// get non-existent uptime
@@ -118,7 +118,7 @@ func TestState(t *testing.T) {
 func TestWriteValidator(t *testing.T) {
 	require := require.New(t)
 	db := memdb.New()
-	state, err := newState(db)
+	state, err := NewState(db)
 	require.NoError(err)
 	// write empty uptimes
 	require.True(state.WriteState())
@@ -147,7 +147,7 @@ func TestWriteValidator(t *testing.T) {
 	require.True(state.WriteState())
 
 	// refresh state, should load from DB
-	state, err = newState(db)
+	state, err = NewState(db)
 	require.NoError(err)
 
 	// get uptime
@@ -280,7 +280,7 @@ func TestParseValidator(t *testing.T) {
 func TestStateCallbacks(t *testing.T) {
 	require := require.New(t)
 	db := memdb.New()
-	state, err := newState(db)
+	state, err := NewState(db)
 	require.NoError(err)
 
 	expectedvID := ids.GenerateTestID()
