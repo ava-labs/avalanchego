@@ -26,7 +26,7 @@ func TestLoadNewValidators(t *testing.T) {
 		ids.GenerateTestID(),
 	}
 
-	testCases := []struct {
+	tests := []struct {
 		name                  string
 		initialValidators     map[ids.ID]*validators.GetCurrentValidatorOutput
 		newValidators         map[ids.ID]*validators.GetCurrentValidatorOutput
@@ -181,15 +181,15 @@ func TestLoadNewValidators(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(tt *testing.T) {
-			require := require.New(tt)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
 			db := memdb.New()
 			validatorState, err := NewState(db)
 			require.NoError(err)
 
 			// Set initial validators
-			for vID, validator := range tc.initialValidators {
+			for vID, validator := range tt.initialValidators {
 				require.NoError(validatorState.AddValidator(Validator{
 					ValidationID:   vID,
 					NodeID:         validator.NodeID,
@@ -209,16 +209,16 @@ func TestLoadNewValidators(t *testing.T) {
 			)
 
 			// Load new validators using the same logic as the manager
-			err = loadValidatorsForTest(validatorState, tc.newValidators)
-			if tc.wantLoadErr != nil {
-				require.ErrorIs(err, tc.wantLoadErr)
+			err = loadValidatorsForTest(validatorState, tt.newValidators)
+			if tt.wantLoadErr != nil {
+				require.ErrorIs(err, tt.wantLoadErr)
 				return
 			}
 			require.NoError(err)
 
 			// Verify final state matches expectations
-			require.Equal(len(tc.newValidators), validatorState.GetValidationIDs().Len())
-			for vID, validator := range tc.newValidators {
+			require.Equal(len(tt.newValidators), validatorState.GetValidationIDs().Len())
+			for vID, validator := range tt.newValidators {
 				v, f := validatorState.GetValidator(vID)
 				require.True(f)
 				require.Equal(validator.NodeID, v.NodeID)
@@ -229,9 +229,9 @@ func TestLoadNewValidators(t *testing.T) {
 			}
 
 			// Verify callback tracking worked correctly
-			require.Equal(tc.wantAddedValidators, testManager.AddedValidators)
-			require.Equal(tc.wantRemovedValidators, testManager.RemovedValidators)
-			require.Equal(tc.wantStatusUpdates, testManager.StatusUpdates)
+			require.Equal(tt.wantAddedValidators, testManager.AddedValidators)
+			require.Equal(tt.wantRemovedValidators, testManager.RemovedValidators)
+			require.Equal(tt.wantStatusUpdates, testManager.StatusUpdates)
 		})
 	}
 }
