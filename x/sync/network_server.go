@@ -46,23 +46,23 @@ var (
 	errInvalidBounds        = errors.New("start key is greater than end key")
 	errInvalidRootHash      = fmt.Errorf("root hash must have length %d", hashing.HashLen)
 
-	_ p2p.Handler = (*GetChangeProofHandler)(nil)
-	_ p2p.Handler = (*GetRangeProofHandler)(nil)
+	_ p2p.Handler = (*GetChangeProofHandler[*merkledb.RangeProof, *merkledb.ChangeProof])(nil)
+	_ p2p.Handler = (*GetRangeProofHandler[*merkledb.RangeProof, *merkledb.ChangeProof])(nil)
 )
 
-func NewGetChangeProofHandler(db DB) *GetChangeProofHandler {
-	return &GetChangeProofHandler{
+func NewGetChangeProofHandler[TRange, TChange Proof](db DB[TRange, TChange]) *GetChangeProofHandler[TRange, TChange] {
+	return &GetChangeProofHandler[TRange, TChange]{
 		db: db,
 	}
 }
 
-type GetChangeProofHandler struct {
-	db DB
+type GetChangeProofHandler[TRange, TChange Proof] struct {
+	db DB[TRange, TChange]
 }
 
-func (*GetChangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
+func (*GetChangeProofHandler[TRange, TChange]) AppGossip(context.Context, ids.NodeID, []byte) {}
 
-func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+func (g *GetChangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	req := &pb.GetChangeProofRequest{}
 	if err := proto.Unmarshal(requestBytes, req); err != nil {
 		return nil, &common.AppError{
@@ -135,7 +135,7 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 					KeyLimit:   req.KeyLimit,
 					BytesLimit: req.BytesLimit,
 				},
-				func(rangeProof *merkledb.RangeProof) ([]byte, error) {
+				func(rangeProof TRange) ([]byte, error) {
 					proofBytes, err := rangeProof.MarshalBinary()
 					if err != nil {
 						return nil, err
@@ -183,7 +183,7 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 		}
 
 		// The proof was too large. Try to shrink it.
-		keyLimit = uint32(len(changeProof.KeyChanges)) / 2
+		keyLimit /= 2
 	}
 
 	return nil, &common.AppError{
@@ -192,19 +192,19 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 	}
 }
 
-func NewGetRangeProofHandler(db DB) *GetRangeProofHandler {
-	return &GetRangeProofHandler{
+func NewGetRangeProofHandler[TRange, TChange Proof](db DB[TRange, TChange]) *GetRangeProofHandler[TRange, TChange] {
+	return &GetRangeProofHandler[TRange, TChange]{
 		db: db,
 	}
 }
 
-type GetRangeProofHandler struct {
-	db DB
+type GetRangeProofHandler[TRange, TChange Proof] struct {
+	db DB[TRange, TChange]
 }
 
-func (*GetRangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
+func (*GetRangeProofHandler[_, _]) AppGossip(context.Context, ids.NodeID, []byte) {}
 
-func (g *GetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+func (g *GetRangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	req := &pb.GetRangeProofRequest{}
 	if err := proto.Unmarshal(requestBytes, req); err != nil {
 		return nil, &common.AppError{
@@ -228,7 +228,7 @@ func (g *GetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ t
 		ctx,
 		g.db,
 		req,
-		func(rangeProof *merkledb.RangeProof) ([]byte, error) {
+		func(rangeProof TRange) ([]byte, error) {
 			return rangeProof.MarshalBinary()
 		},
 	)
@@ -250,11 +250,11 @@ func (g *GetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ t
 // If no sufficiently small proof can be generated, returns [ErrMinProofSizeIsTooLarge].
 // TODO improve range proof generation so we don't need to iteratively
 // reduce the key limit.
-func getRangeProof(
+func getRangeProof[TRange, TChange Proof](
 	ctx context.Context,
-	db DB,
+	db DB[TRange, TChange],
 	req *pb.GetRangeProofRequest,
-	marshalFunc func(*merkledb.RangeProof) ([]byte, error),
+	marshalFunc func(TRange) ([]byte, error),
 ) ([]byte, error) {
 	root, err := ids.ToID(req.RootHash)
 	if err != nil {
@@ -288,7 +288,7 @@ func getRangeProof(
 		}
 
 		// The proof was too large. Try to shrink it.
-		keyLimit = len(rangeProof.KeyChanges) / 2
+		keyLimit /= 2
 	}
 	return nil, ErrMinProofSizeIsTooLarge
 }
