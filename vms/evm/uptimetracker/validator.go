@@ -5,6 +5,7 @@ package uptimetracker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -71,7 +72,7 @@ func (m *ValidatorState) Shutdown() error {
 		return fmt.Errorf("failed to stop uptime tracking: %w", err)
 	}
 	if !m.state.WriteState() {
-		return fmt.Errorf("failed to write validator state")
+		return errors.New("failed to write validator state")
 	}
 
 	return nil
@@ -120,7 +121,7 @@ func (m *ValidatorState) Sync(ctx context.Context) error {
 	// ValidatorState persists the state to disk at the end of every sync operation. The VM also
 	// persists the validator database when the node is shutting down.
 	if !m.state.WriteState() {
-		return fmt.Errorf("failed to write validator state")
+		return errors.New("failed to write validator state")
 	}
 
 	// TODO: add metrics

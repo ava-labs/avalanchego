@@ -32,7 +32,7 @@ func NewTestPausableManager() *TestPausableManager {
 }
 
 // Override the callback methods to track invocations
-func (t *TestPausableManager) OnValidatorAdded(vID ids.ID, nodeID ids.NodeID, startTime uint64, isActive bool) {
+func (t *TestPausableManager) OnValidatorAdded(vID ids.ID, nodeID ids.NodeID, _ uint64, _ bool) {
 	t.AddedValidators[vID] = nodeID
 }
 
@@ -40,6 +40,6 @@ func (t *TestPausableManager) OnValidatorRemoved(vID ids.ID, nodeID ids.NodeID) 
 	t.RemovedValidators[vID] = nodeID
 }
 
-func (t *TestPausableManager) OnValidatorStatusUpdated(vID ids.ID, nodeID ids.NodeID, isActive bool) {
+func (t *TestPausableManager) OnValidatorStatusUpdated(vID ids.ID, _ ids.NodeID, isActive bool) {
 	t.StatusUpdates[vID] = isActive
 }
