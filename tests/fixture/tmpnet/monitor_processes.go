@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -473,6 +474,9 @@ func getCollectorConfig(cmdName string, urlSuffix string) (collectorConfig, erro
 	url := GetEnvWithDefault(urlEnvVar, "")
 	if len(url) == 0 {
 		return collectorConfig{}, fmt.Errorf("%s env var not set", urlEnvVar)
+	}
+	if strings.HasSuffix(url, "\n") {
+		return collectorConfig{}, fmt.Errorf("%s env is terminated with a newline!", urlEnvVar)
 	}
 	usernameEnvVar := baseEnvName + "_USERNAME"
 	username := GetEnvWithDefault(usernameEnvVar, "")
