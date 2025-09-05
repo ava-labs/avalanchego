@@ -12,14 +12,13 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
-	"github.com/ava-labs/avalanchego/x/sync"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 var _ pb.DBServer = (*DBServer)(nil)
 
-func NewDBServer(db sync.DB) *DBServer {
+func NewDBServer(db merkledb.MerkleDB) *DBServer {
 	return &DBServer{
 		db: db,
 	}
@@ -28,7 +27,7 @@ func NewDBServer(db sync.DB) *DBServer {
 type DBServer struct {
 	pb.UnsafeDBServer
 
-	db sync.DB
+	db merkledb.MerkleDB
 }
 
 func (s *DBServer) GetMerkleRoot(

@@ -17,7 +17,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-var _ sync.DB = (*DBClient)(nil)
+var _ sync.DB[*merkledb.RangeProof, *merkledb.ChangeProof] = (*DBClient)(nil)
 
 func NewDBClient(client pb.DBClient) *DBClient {
 	return &DBClient{
