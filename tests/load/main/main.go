@@ -40,6 +40,7 @@ var (
 
 	loadTimeoutArg     time.Duration
 	firewoodEnabledArg bool
+	numWorkersArg      uint64
 )
 
 func init() {
@@ -59,6 +60,12 @@ func init() {
 		false,
 		"whether to use Firewood in Coreth",
 	)
+	flag.Uint64Var(
+		&numWorkersArg,
+		"num-workers",
+		defaultNodeCount,
+		"the number of workers to use for the load test",
+	)
 
 	flag.Parse()
 }
@@ -75,7 +82,7 @@ func main() {
 
 	nodes := tmpnet.NewNodesOrPanic(numNodes)
 
-	keys, err := tmpnet.NewPrivateKeys(numNodes)
+	keys, err := tmpnet.NewPrivateKeys(int(numWorkersArg))
 	require.NoError(err)
 
 	primaryChainConfigs := tmpnet.DefaultChainConfigs()
