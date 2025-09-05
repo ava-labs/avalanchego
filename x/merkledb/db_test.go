@@ -328,7 +328,8 @@ func Test_MerkleDB_CommitRangeProof_DeletesValuesInRange(t *testing.T) {
 	require.NoError(batch.Write())
 
 	// despite having no key/values in it, committing this proof should delete key1-key3.
-	require.NoError(db.CommitRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Some([]byte("key3")), proof))
+	_, err = db.CommitRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Some([]byte("key3")), proof)
+	require.NoError(err)
 
 	afterCommitRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
@@ -361,7 +362,8 @@ func Test_MerkleDB_CommitRangeProof_EmptyTrie(t *testing.T) {
 	db2, err := getBasicDB()
 	require.NoError(err)
 
-	require.NoError(db2.CommitRangeProof(context.Background(), maybe.Some([]byte("key1")), maybe.Some([]byte("key3")), proof))
+	_, err = db2.CommitRangeProof(context.Background(), maybe.Some([]byte("key1")), maybe.Some([]byte("key3")), proof)
+	require.NoError(err)
 
 	// [db2] should have the same key-value pairs as [db1].
 	db2Root, err := db2.GetMerkleRoot(context.Background())
@@ -406,12 +408,13 @@ func Test_MerkleDB_CommitRangeProof_TrieWithInitialValues(t *testing.T) {
 	require.NoError(batch.Write())
 
 	// Commit the proof from [db1] to [db2]
-	require.NoError(db2.CommitRangeProof(
+	_, err = db2.CommitRangeProof(
 		context.Background(),
 		maybe.Some([]byte("key1")),
 		maybe.Some([]byte("key3")),
 		proof,
-	))
+	)
+	require.NoError(err)
 
 	// [db2] should have the same key-value pairs as [db1].
 	// Note that "key25" was in the range covered by the proof,
