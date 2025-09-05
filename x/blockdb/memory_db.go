@@ -68,14 +68,6 @@ func (m *MemoryDatabase) HasBlock(height BlockHeight) (bool, error) {
 	return ok, nil
 }
 
-// Inspect returns details about the database
-func (m *MemoryDatabase) Inspect() (string, error) {
-	if m.closed {
-		return "", ErrDatabaseClosed
-	}
-	return "", nil
-}
-
 // Close closes the in-memory database
 func (m *MemoryDatabase) Close() error {
 	m.mu.Lock()
