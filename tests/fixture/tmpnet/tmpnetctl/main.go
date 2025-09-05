@@ -305,6 +305,117 @@ func main() {
 	collectorVars = flags.NewCollectorFlagSetVars(startKindClusterCmd.PersistentFlags())
 	rootCmd.AddCommand(startKindClusterCmd)
 
+	var bootstrapDBPath string
+	initLocalNetworkCmd := &cobra.Command{
+		Use:   "init-local-network",
+		Short: "Initialize a local network and export its database",
+		RunE: func(*cobra.Command, []string) error {
+			if bootstrapDBPath == "" {
+				return fmt.Errorf("--bootstrap-db-path is required")
+			}
+
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+
+			// Use LocalNetworkOrPanic to ensure consistent genesis
+			network := tmpnet.LocalNetworkOrPanic()
+			
+			// Set a default process runtime config
+			// Use the avalanchego binary from the current project
+			avalanchegoPath := filepath.Join(filepath.Dir(os.Args[0]), "avalanchego")
+			if _, err := os.Stat(avalanchegoPath); err != nil {
+				// Try to find avalanchego in PATH
+				avalanchegoPath = "avalanchego"
+			}
+			network.DefaultRuntimeConfig = tmpnet.NodeRuntimeConfig{
+				Process: &tmpnet.ProcessRuntimeConfig{
+					AvalancheGoPath: avalanchegoPath,
+				},
+			}
+			
+			// Bootstrap network and export DB
+			ctx, cancel := context.WithTimeout(context.Background(), 2*tmpnet.DefaultNetworkTimeout)
+			defer cancel()
+			
+			if err := tmpnet.InitBootstrapDB(ctx, log, network, bootstrapDBPath); err != nil {
+				return fmt.Errorf("failed to create bootstrap DB: %w", err)
+			}
+			
+			fmt.Printf("Bootstrap DB created at: %s\n", bootstrapDBPath)
+			return nil
+		},
+	}
+	initLocalNetworkCmd.PersistentFlags().StringVar(&bootstrapDBPath, "bootstrap-db-path", "",
+		"Path to export the bootstrapped database (required)")
+	initLocalNetworkCmd.MarkFlagRequired("bootstrap-db-path")
+	rootCmd.AddCommand(initLocalNetworkCmd)
+
+	var startLocalNetworkVars *flags.StartNetworkVars
+	startLocalNetworkCmd := &cobra.Command{
+		Use:   "start-local-network",
+		Short: "Start a local network using consistent genesis configuration",
+		RunE: func(*cobra.Command, []string) error {
+			log, err := tests.LoggerForFormat("", rawLogFormat)
+			if err != nil {
+				return err
+			}
+
+			// Use LocalNetworkOrPanic to ensure consistent genesis
+			network := tmpnet.LocalNetworkOrPanic()
+			network.Owner = startLocalNetworkVars.NetworkOwner
+
+			// Set the runtime config from flags
+			nodeRuntimeConfig, err := startLocalNetworkVars.GetNodeRuntimeConfig()
+			if err != nil {
+				return err
+			}
+			network.DefaultRuntimeConfig = *nodeRuntimeConfig
+
+			timeout, err := nodeRuntimeConfig.GetNetworkStartTimeout(len(network.Nodes))
+			if err != nil {
+				return err
+			}
+			log.Info("waiting for local network to start",
+				zap.Float64("timeoutSeconds", timeout.Seconds()),
+			)
+
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
+			defer cancel()
+			if err := tmpnet.BootstrapNewNetwork(
+				ctx,
+				log,
+				network,
+				startLocalNetworkVars.RootNetworkDir,
+			); err != nil {
+				log.Error("failed to bootstrap network", zap.Error(err))
+				return err
+			}
+
+			// Symlink the new network to the 'latest' network to simplify usage
+			networkRootDir := filepath.Dir(network.Dir)
+			networkDirName := filepath.Base(network.Dir)
+			latestSymlinkPath := filepath.Join(networkRootDir, "latest")
+			if err := os.Remove(latestSymlinkPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return err
+			}
+			if err := os.Symlink(networkDirName, latestSymlinkPath); err != nil {
+				return err
+			}
+
+			fmt.Fprintln(os.Stdout, "\nConfigure tmpnetctl to target this network by default with one of the following statements:")
+			fmt.Fprintf(os.Stdout, " - source %s\n", network.EnvFilePath())
+			fmt.Fprintf(os.Stdout, " - %s\n", network.EnvFileContents())
+			fmt.Fprintf(os.Stdout, " - export %s=%s\n", tmpnet.NetworkDirEnvName, latestSymlinkPath)
+
+			return nil
+		},
+	}
+	// Create new flag vars for start-local-network
+	startLocalNetworkVars = flags.NewStartNetworkFlagSetVars(startLocalNetworkCmd.PersistentFlags(), "" /* defaultNetworkOwner */)
+	rootCmd.AddCommand(startLocalNetworkCmd)
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "tmpnetctl failed: %v\n", err)
 		os.Exit(1)

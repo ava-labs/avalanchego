@@ -66,6 +66,7 @@ func NewNodeStatefulSet(
 	volumeMountPath string,
 	flags FlagsMap,
 	labels map[string]string,
+	sharedDBPVCName string,
 ) *appsv1.StatefulSet {
 	objectMeta := metav1.ObjectMeta{}
 	if generateName {
@@ -92,7 +93,7 @@ func NewNodeStatefulSet(
 		podLabels[label] = value
 	}
 
-	return &appsv1.StatefulSet{
+	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: objectMeta,
 		Spec: appsv1.StatefulSetSpec{
 			Replicas:    ptr.To[int32](1),
@@ -162,6 +163,55 @@ func NewNodeStatefulSet(
 			},
 		},
 	}
+
+	// Add init container and shared volume if initial DB is configured
+	if sharedDBPVCName != "" {
+		// Add shared DB volume
+		statefulSet.Spec.Template.Spec.Volumes = append(
+			statefulSet.Spec.Template.Spec.Volumes,
+			corev1.Volume{
+				Name: "shared-db",
+				VolumeSource: corev1.VolumeSource{
+					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+						ClaimName: sharedDBPVCName,
+						ReadOnly:  true,
+					},
+				},
+			},
+		)
+
+		// Add init container to copy DB
+		statefulSet.Spec.Template.Spec.InitContainers = []corev1.Container{
+			{
+				Name:  "init-db",
+				Image: "alpine:latest",
+				Command: []string{"/bin/sh", "-c"},
+				Args: []string{`
+					if [ ! -f /data/.db-initialized ]; then
+						echo "Copying initial database state..."
+						cp -r /shared-db/* /data/
+						touch /data/.db-initialized
+						echo "Database initialization complete"
+					else
+						echo "Database already initialized, skipping..."
+					fi
+				`},
+				VolumeMounts: []corev1.VolumeMount{
+					{
+						Name:      "shared-db",
+						MountPath: "/shared-db",
+						ReadOnly:  true,
+					},
+					{
+						Name:      volumeName,
+						MountPath: volumeMountPath,
+					},
+				},
+			},
+		}
+	}
+
+	return statefulSet
 }
 
 // stringMapToEnvVarSlice converts a string map to a kube EnvVar slice.

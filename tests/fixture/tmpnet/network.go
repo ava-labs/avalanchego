@@ -416,6 +416,13 @@ func (n *Network) StartNodes(ctx context.Context, log logging.Logger, nodesToSta
 
 // Start the network for the first time
 func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
+	// Check if initial DB is configured for Kubernetes runtime
+	if n.DefaultRuntimeConfig.Kube != nil && n.DefaultRuntimeConfig.Kube.InitialDBArchive != "" {
+		// Skip subnet creation if using initial DB
+		log.Info("Skipping subnet creation due to initial DB configuration")
+		return n.StartNodes(ctx, log, n.Nodes...)
+	}
+
 	if len(n.Subnets) == 0 {
 		// Without the need to coordinate subnet configuration,
 		// starting all nodes at once is the simplest option.
@@ -532,6 +539,58 @@ func (n *Network) Stop(ctx context.Context) error {
 	if len(errs) > 0 {
 		return fmt.Errorf("failed to stop network:\n%w", errors.Join(errs...))
 	}
+	return nil
+}
+
+// InitBootstrapDB bootstraps a network, creates its subnets and chains, and copies
+// the resulting db state from one of the nodes to the provided path. The path will be
+// created if it does not already exist.
+//
+// TODO(marun) Take an optional event handler for networkStarted/networkRunning to
+// enable programaticilly setting network state. This would also be
+// relevant to creating the initial state. e.g. run 10,000 insertions.
+//
+
+// generate db state
+//  - start network, wait for health, stop network
+//  - save the db to a tgz
+//  - also retain the network configuration
+//  - make note of the uncompressed size (to enable provisioning the correct size of PVC)
+
+// The sizes involved - really should be produced in a kube cluster
+ - Generating hundreds of gigabytes
+
+// Would the db state of a node in a single-node network differ from the db state of a node in a multi-node network, all else being equal?
+//
+// Would there be a difference in what would be stored between the
+// database of a single node network running with sybil protection
+// disabled and the database of a node in a network with at least one
+// other node and with sybil protection enabled, and both networks
+// subject to the same load generation?
+func InitBootstrapDB(ctx context.Context, log logging.Logger, network *Network, destPath string) error {
+	if err := BootstrapNewNetwork(ctx, log, network, ""); err != nil {
+		return fmt.Errorf("failed to bootstrap network: %w", err)
+	}
+	// Since the goal is to initialize the DB, we can stop the network after it has been started successfully
+	if err := network.Stop(ctx); err != nil {
+		return fmt.Errorf("failed to stop network: %w", err)
+	}
+
+	// Create tar.gz archive of the db state from the bootstrap node
+	sourcePath := filepath.Join(network.Nodes[0].DataDir, "db")
+
+	// Ensure source exists
+	if _, err := os.Stat(sourcePath); err != nil {
+		return fmt.Errorf("source db directory %q does not exist: %w", sourcePath, err)
+	}
+
+	// Create tar.gz archive
+	cmd := exec.Command("tar", "-czf", destPath, "-C", network.Nodes[0].DataDir, "db")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to create tar.gz archive from %q to %q: %w (output: %s)", sourcePath, destPath, err, string(output))
+	}
+
 	return nil
 }
 

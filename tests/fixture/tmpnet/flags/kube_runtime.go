@@ -32,6 +32,7 @@ type kubeRuntimeVars struct {
 	useExclusiveScheduling bool
 	schedulingLabelKey     string
 	schedulingLabelValue   string
+	initialDBArchive       string
 	config                 *KubeconfigVars
 }
 
@@ -85,6 +86,12 @@ func (v *kubeRuntimeVars) register(stringVar varFunc[string], uintVar varFunc[ui
 		"",
 		kubeDocPrefix+"The label value to use for exclusive scheduling for node selection and toleration",
 	)
+	stringVar(
+		&v.initialDBArchive,
+		"kube-initial-db-archive",
+		"",
+		kubeDocPrefix+"S3 URL to the initial database archive (tar.gz format) to download before starting nodes",
+	)
 }
 
 func (v *kubeRuntimeVars) getKubeRuntimeConfig() (*tmpnet.KubeRuntimeConfig, error) {
@@ -106,5 +113,6 @@ func (v *kubeRuntimeVars) getKubeRuntimeConfig() (*tmpnet.KubeRuntimeConfig, err
 		UseExclusiveScheduling: v.useExclusiveScheduling,
 		SchedulingLabelKey:     v.schedulingLabelKey,
 		SchedulingLabelValue:   v.schedulingLabelValue,
+		InitialDBArchive:       v.initialDBArchive,
 	}, nil
 }

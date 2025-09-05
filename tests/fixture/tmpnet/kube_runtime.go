@@ -24,9 +24,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	restclient "k8s.io/client-go/rest"
 )
@@ -86,6 +88,19 @@ type KubeRuntimeConfig struct {
 	IngressHost string `json:"ingressHost,omitempty"`
 	// TLS secret name for ingress (empty for HTTP, populated for HTTPS)
 	IngressSecret string `json:"ingressSecret,omitempty"`
+	// S3 URL to initial database archive (tar.gz format)
+	InitialDBArchive string `json:"initialDBArchive,omitempty"`
+}
+
+// GetInitialDBPVCName returns the PVC name for the initial database archive
+func (c *KubeRuntimeConfig) GetInitialDBPVCName() string {
+	if c.InitialDBArchive == "" {
+		return ""
+	}
+	urlParts := strings.Split(c.InitialDBArchive, "/")
+	filename := urlParts[len(urlParts)-1]
+	filebase := strings.TrimSuffix(filename, ".tar.gz")
+	return fmt.Sprintf("initial-db-%s", filebase)
 }
 
 // ensureDefaults sets cluster-specific defaults for fields not already set by flags.
@@ -355,6 +370,25 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 
 	// StatefulSet does not exist - create it
 
+	// Check if this is the first node and if initial DB is configured
+	var sharedDBPVCName string
+	if p.isFirstNode() && len(runtimeConfig.InitialDBArchive) > 0 {
+		// Create shared PVC
+		pvcName, err := p.createSharedDBPVC(ctx, runtimeConfig.InitialDBArchive)
+		if err != nil {
+			return fmt.Errorf("failed to create shared DB PVC: %w", err)
+		}
+		sharedDBPVCName = pvcName
+
+		// Create and wait for download job
+		if err := p.createDBDownloadJob(ctx, pvcName, runtimeConfig.InitialDBArchive); err != nil {
+			return fmt.Errorf("failed to download initial DB: %w", err)
+		}
+	} else if len(runtimeConfig.InitialDBArchive) > 0 {
+		// For subsequent nodes, use the existing PVC
+		sharedDBPVCName = runtimeConfig.GetInitialDBPVCName()
+	}
+
 	flags, err := p.getFlags()
 	if err != nil {
 		return err
@@ -375,6 +409,7 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 		volumeMountPath,
 		flags,
 		p.node.getMonitoringLabels(),
+		sharedDBPVCName,
 	)
 
 	if runtimeConfig.UseExclusiveScheduling {
@@ -816,6 +851,14 @@ func (p *KubeRuntime) getPodName() string {
 	return p.getStatefulSetName() + "-0"
 }
 
+func (p *KubeRuntime) isFirstNode() bool {
+	// Check if this is the first node in the network
+	if len(p.node.network.Nodes) > 0 && p.node == p.node.network.Nodes[0] {
+		return true
+	}
+	return false
+}
+
 func (p *KubeRuntime) runtimeConfig() *KubeRuntimeConfig {
 	return p.node.getRuntimeConfig().Kube
 }
@@ -849,6 +892,142 @@ func (p *KubeRuntime) getClientset() (*kubernetes.Clientset, error) {
 		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}
 	return clientset, nil
+}
+
+// createSharedDBPVC creates a shared PVC for the initial database archive
+func (p *KubeRuntime) createSharedDBPVC(ctx context.Context, archiveURL string) (string, error) {
+	pvcName := p.runtimeConfig().GetInitialDBPVCName()
+	
+	clientset, err := p.getClientset()
+	if err != nil {
+		return "", err
+	}
+	
+	runtimeConfig := p.runtimeConfig()
+	namespace := runtimeConfig.Namespace
+	log := p.node.network.log
+	
+	// Check if PVC already exists
+	_, err = clientset.CoreV1().PersistentVolumeClaims(namespace).Get(ctx, pvcName, metav1.GetOptions{})
+	if err == nil {
+		// PVC already exists, reuse it
+		log.Info("Reusing existing initial DB PVC", zap.String("pvc", pvcName))
+		return pvcName, nil
+	} else if !apierrors.IsNotFound(err) {
+		return "", fmt.Errorf("failed to check PVC existence: %w", err)
+	}
+	
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pvcName,
+			Namespace: namespace,
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: []corev1.PersistentVolumeAccessMode{
+				corev1.ReadWriteOnce, // Allow job to write, then nodes to read
+			},
+			Resources: corev1.VolumeResourceRequirements{
+				Requests: corev1.ResourceList{
+					corev1.ResourceStorage: resource.MustParse(fmt.Sprintf("%dGi", runtimeConfig.VolumeSizeGB)),
+				},
+			},
+		},
+	}
+	
+	_, err = clientset.CoreV1().PersistentVolumeClaims(namespace).Create(ctx, pvc, metav1.CreateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to create PVC: %w", err)
+	}
+	
+	log.Info("Created initial DB PVC", zap.String("pvc", pvcName))
+	return pvcName, nil
+}
+
+// createDBDownloadJob creates a Kubernetes Job that downloads and extracts the archive
+func (p *KubeRuntime) createDBDownloadJob(ctx context.Context, pvcName string, archiveURL string) error {
+	jobName := fmt.Sprintf("%s-db-download", p.node.network.UUID)
+	
+	clientset, err := p.getClientset()
+	if err != nil {
+		return err
+	}
+	
+	runtimeConfig := p.runtimeConfig()
+	namespace := runtimeConfig.Namespace
+	log := p.node.network.log
+	
+	job := &batchv1.Job{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      jobName,
+			Namespace: namespace,
+		},
+		Spec: batchv1.JobSpec{
+			Template: corev1.PodTemplateSpec{
+				Spec: corev1.PodSpec{
+					RestartPolicy: corev1.RestartPolicyOnFailure,
+					Containers: []corev1.Container{
+						{
+							Name:  "download-db",
+							Image: "alpine:latest",
+							Command: []string{"/bin/sh", "-c"},
+							Args: []string{
+								fmt.Sprintf(`
+									set -e
+									echo "Downloading database archive from %s..."
+									wget -O /tmp/db.tar.gz "%s"
+									echo "Extracting database archive..."
+									tar -xzf /tmp/db.tar.gz -C /shared-db
+									echo "Database download and extraction complete"
+								`, archiveURL, archiveURL),
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "shared-db",
+									MountPath: "/shared-db",
+								},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "shared-db",
+							VolumeSource: corev1.VolumeSource{
+								PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+									ClaimName: pvcName,
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	
+	_, err = clientset.BatchV1().Jobs(namespace).Create(ctx, job, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to create job: %w", err)
+	}
+	
+	log.Info("Created DB download job", zap.String("job", jobName))
+	
+	// Wait for job completion
+	return wait.PollImmediate(statusCheckInterval, 10*time.Minute, func() (bool, error) {
+		job, err := clientset.BatchV1().Jobs(namespace).Get(ctx, jobName, metav1.GetOptions{})
+		if err != nil {
+			return false, err
+		}
+		
+		if job.Status.Succeeded > 0 {
+			log.Info("DB download job completed successfully", zap.String("job", jobName))
+			return true, nil
+		}
+		
+		if job.Status.Failed > 0 {
+			return false, fmt.Errorf("DB download job failed")
+		}
+		
+		return false, nil
+	})
 }
 
 func (p *KubeRuntime) forwardPort(ctx context.Context, port int) (uint16, chan struct{}, error) {
