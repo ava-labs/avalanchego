@@ -112,10 +112,11 @@ func (s *DBServer) VerifyChangeProof(
 	if req.EndKey != nil && !req.EndKey.IsNothing {
 		endKey = maybe.Some(req.EndKey.Value)
 	}
+	maxLength := int(req.GetMaxLength())
 
 	// TODO there's probably a better way to do this.
 	var errString string
-	if err := s.db.VerifyChangeProof(ctx, &proof, startKey, endKey, rootID); err != nil {
+	if err := s.db.VerifyChangeProof(ctx, &proof, startKey, endKey, rootID, maxLength); err != nil {
 		errString = err.Error()
 	}
 	return &pb.VerifyChangeProofResponse{
@@ -126,14 +127,27 @@ func (s *DBServer) VerifyChangeProof(
 func (s *DBServer) CommitChangeProof(
 	ctx context.Context,
 	req *pb.CommitChangeProofRequest,
-) (*emptypb.Empty, error) {
+) (*pb.CommitChangeProofResponse, error) {
 	var proof merkledb.ChangeProof
 	if err := proof.UnmarshalProto(req.Proof); err != nil {
 		return nil, err
 	}
 
-	err := s.db.CommitChangeProof(ctx, &proof)
-	return &emptypb.Empty{}, err
+	endKey := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		endKey = maybe.Some(req.EndKey.Value)
+	}
+
+	nextKey, err := s.db.CommitChangeProof(ctx, endKey, &proof)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.CommitChangeProofResponse{
+		NextKey: &pb.MaybeBytes{
+			Value:     nextKey.Value(),
+			IsNothing: nextKey.IsNothing(),
+		},
+	}, nil
 }
 
 func (s *DBServer) GetProof(
@@ -194,10 +208,43 @@ func (s *DBServer) GetRangeProof(
 	return protoProof, nil
 }
 
+func (s *DBServer) VerifyRangeProof(
+	ctx context.Context,
+	req *pb.VerifyRangeProofRequest,
+) (*pb.VerifyRangeProofResponse, error) {
+	var proof merkledb.RangeProof
+	if err := proof.UnmarshalProto(req.Proof); err != nil {
+		return nil, err
+	}
+
+	rootID, err := ids.ToID(req.ExpectedRootHash)
+	if err != nil {
+		return nil, err
+	}
+	startKey := maybe.Nothing[[]byte]()
+	if req.StartKey != nil && !req.StartKey.IsNothing {
+		startKey = maybe.Some(req.StartKey.Value)
+	}
+	endKey := maybe.Nothing[[]byte]()
+	if req.EndKey != nil && !req.EndKey.IsNothing {
+		endKey = maybe.Some(req.EndKey.Value)
+	}
+	maxLength := int(req.GetMaxLength())
+
+	// TODO there's probably a better way to do this.
+	var errString string
+	if err := s.db.VerifyRangeProof(ctx, &proof, startKey, endKey, rootID, maxLength); err != nil {
+		errString = err.Error()
+	}
+	return &pb.VerifyRangeProofResponse{
+		Error: errString,
+	}, nil
+}
+
 func (s *DBServer) CommitRangeProof(
 	ctx context.Context,
 	req *pb.CommitRangeProofRequest,
-) (*emptypb.Empty, error) {
+) (*pb.CommitRangeProofResponse, error) {
 	var proof merkledb.RangeProof
 	if err := proof.UnmarshalProto(req.RangeProof); err != nil {
 		return nil, err
@@ -213,8 +260,16 @@ func (s *DBServer) CommitRangeProof(
 		end = maybe.Some(req.EndKey.Value)
 	}
 
-	err := s.db.CommitRangeProof(ctx, start, end, &proof)
-	return &emptypb.Empty{}, err
+	nextKey, err := s.db.CommitRangeProof(ctx, start, end, &proof)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.CommitRangeProofResponse{
+		NextKey: &pb.MaybeBytes{
+			Value:     nextKey.Value(),
+			IsNothing: nextKey.IsNothing(),
+		},
+	}, nil
 }
 
 func (s *DBServer) Clear(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
