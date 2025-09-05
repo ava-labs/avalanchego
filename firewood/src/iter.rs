@@ -415,13 +415,13 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                             Node::Branch(branch) => {
                                 // We're at a branch whose key is a prefix of `key`.
                                 // Find its child (if any) that matches the next nibble in the key.
+                                let saved_node = node.clone();
                                 let Some(next_unmatched_key_nibble) = unmatched_key.next() else {
                                     // We're at the node at `key` so we're done.
-                                    let node = node.clone();
                                     self.state = PathIteratorState::Exhausted;
                                     return Some(Ok(PathIterItem {
                                         key_nibbles: node_key.clone(),
-                                        node,
+                                        node: saved_node,
                                         next_nibble: None,
                                     }));
                                 };
@@ -432,11 +432,10 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                     None => {
                                         // There's no child at the index of the next nibble in the key.
                                         // There's no node at `key` in this trie so we're done.
-                                        let node = node.clone();
                                         self.state = PathIteratorState::Exhausted;
                                         Some(Ok(PathIterItem {
                                             key_nibbles: node_key.clone(),
-                                            node,
+                                            node: saved_node,
                                             next_nibble: None,
                                         }))
                                     }
@@ -449,12 +448,11 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                         let node_key = matched_key.clone().into_boxed_slice();
                                         matched_key.push(next_unmatched_key_nibble);
 
-                                        let ret = node.clone();
                                         *node = child;
 
                                         Some(Ok(PathIterItem {
                                             key_nibbles: node_key,
-                                            node: ret,
+                                            node: saved_node,
                                             next_nibble: Some(next_unmatched_key_nibble),
                                         }))
                                     }
@@ -462,12 +460,11 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                         let node_key = matched_key.clone().into_boxed_slice();
                                         matched_key.push(next_unmatched_key_nibble);
 
-                                        let ret = node.clone();
                                         *node = child.clone().into();
 
                                         Some(Ok(PathIterItem {
                                             key_nibbles: node_key,
-                                            node: ret,
+                                            node: saved_node,
                                             next_nibble: Some(next_unmatched_key_nibble),
                                         }))
                                     }
@@ -479,10 +476,11 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
 
                                         let node_key = matched_key.clone().into_boxed_slice();
                                         matched_key.push(next_unmatched_key_nibble);
+                                        *node = child;
 
                                         Some(Ok(PathIterItem {
                                             key_nibbles: node_key,
-                                            node: child,
+                                            node: saved_node,
                                             next_nibble: Some(next_unmatched_key_nibble),
                                         }))
                                     }

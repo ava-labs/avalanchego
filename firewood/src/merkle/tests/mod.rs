@@ -6,9 +6,10 @@
 #[cfg(feature = "ethhash")]
 mod ethhash;
 // TODO: get the hashes from merkledb and verify compatibility with branch factor 256
+mod proof;
+mod range;
 #[cfg(not(any(feature = "ethhash", feature = "branch_factor_256")))]
 mod triehash;
-mod unvalidated;
 
 use std::collections::HashMap;
 use std::fmt::Write;
@@ -227,6 +228,29 @@ fn test_insert_and_get() {
 
         assert_eq!(fetched_val.as_deref(), val.as_slice().into());
     }
+}
+
+#[test]
+fn overwrite_leaf() {
+    let key = &[0x00];
+    let val = &[1];
+    let overwrite = &[2];
+
+    let mut merkle = create_in_memory_merkle();
+
+    merkle.insert(key, val[..].into()).unwrap();
+
+    assert_eq!(
+        merkle.get_value(key).unwrap().as_deref(),
+        Some(val.as_slice())
+    );
+
+    merkle.insert(key, overwrite[..].into()).unwrap();
+
+    assert_eq!(
+        merkle.get_value(key).unwrap().as_deref(),
+        Some(overwrite.as_slice())
+    );
 }
 
 #[test]
