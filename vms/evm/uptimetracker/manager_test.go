@@ -1,9 +1,10 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package validators
+package uptimetracker
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/vms/evm/plugin/validators/state"
 )
 
 func TestLoadNewValidators(t *testing.T) {
@@ -172,7 +172,7 @@ func TestLoadNewValidators(t *testing.T) {
 					StartTime: 0,
 				},
 			},
-			wantLoadErr: state.ErrImmutableField,
+			wantLoadErr: ErrImmutableField,
 			wantAddedValidators: map[ids.ID]ids.NodeID{
 				testValidationIDs[0]: testNodeIDs[0], // Only initial validator
 			},
@@ -185,12 +185,12 @@ func TestLoadNewValidators(t *testing.T) {
 		t.Run(tc.name, func(tt *testing.T) {
 			require := require.New(tt)
 			db := memdb.New()
-			validatorState, err := state.NewState(db)
+			validatorState, err := NewState(db)
 			require.NoError(err)
 
 			// Set initial validators
 			for vID, validator := range tc.initialValidators {
-				require.NoError(validatorState.AddValidator(state.Validator{
+				require.NoError(validatorState.AddValidator(Validator{
 					ValidationID:   vID,
 					NodeID:         validator.NodeID,
 					Weight:         validator.Weight,
@@ -200,9 +200,13 @@ func TestLoadNewValidators(t *testing.T) {
 				}))
 			}
 
-			// Enable test listener
-			listener := state.NewTestListener()
-			validatorState.RegisterListener(listener)
+			// Enable test pausable manager to track callbacks
+			testManager := NewTestPausableManager()
+			validatorState.SetCallbacks(
+				testManager.OnValidatorAdded,
+				testManager.OnValidatorRemoved,
+				testManager.OnValidatorStatusUpdated,
+			)
 
 			// Load new validators using the same logic as the manager
 			err = loadValidatorsForTest(validatorState, tc.newValidators)
@@ -215,8 +219,8 @@ func TestLoadNewValidators(t *testing.T) {
 			// Verify final state matches expectations
 			require.Equal(len(tc.newValidators), validatorState.GetValidationIDs().Len())
 			for vID, validator := range tc.newValidators {
-				v, err := validatorState.GetValidator(vID)
-				require.NoError(err)
+				v, f := validatorState.GetValidator(vID)
+				require.True(f)
 				require.Equal(validator.NodeID, v.NodeID)
 				require.Equal(validator.Weight, v.Weight)
 				require.Equal(validator.StartTime, v.StartTimestamp)
@@ -224,31 +228,31 @@ func TestLoadNewValidators(t *testing.T) {
 				require.Equal(validator.IsL1Validator, v.IsL1Validator)
 			}
 
-			// Verify listener callbacks
-			require.Equal(tc.wantAddedValidators, listener.AddedValidators)
-			require.Equal(tc.wantRemovedValidators, listener.RemovedValidators)
-			require.Equal(tc.wantStatusUpdates, listener.StatusUpdates)
+			// Verify callback tracking worked correctly
+			require.Equal(tc.wantAddedValidators, testManager.AddedValidators)
+			require.Equal(tc.wantRemovedValidators, testManager.RemovedValidators)
+			require.Equal(tc.wantStatusUpdates, testManager.StatusUpdates)
 		})
 	}
 }
 
 // loadValidatorsForTest is a test helper that replicates the logic from the manager
 // for testing purposes
-func loadValidatorsForTest(validatorState *state.State, newValidators map[ids.ID]*validators.GetCurrentValidatorOutput) error {
+func loadValidatorsForTest(validatorState *state, newValidators map[ids.ID]*validators.GetCurrentValidatorOutput) error {
 	currentValidationIDs := validatorState.GetValidationIDs()
 
 	// Remove validators no longer in the current set
 	for vID := range currentValidationIDs {
 		if _, exists := newValidators[vID]; !exists {
-			if err := validatorState.DeleteValidator(vID); err != nil {
-				return err
+			if !validatorState.DeleteValidator(vID) {
+				return fmt.Errorf("failed to find validator %s", vID)
 			}
 		}
 	}
 
 	// Add or update validators
 	for vID, newVdr := range newValidators {
-		validator := state.Validator{
+		validator := Validator{
 			ValidationID:   vID,
 			NodeID:         newVdr.NodeID,
 			Weight:         newVdr.Weight,

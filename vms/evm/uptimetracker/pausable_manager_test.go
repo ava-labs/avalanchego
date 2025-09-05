@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package uptime
+package uptimetracker
 
 import (
 	"testing"
@@ -14,18 +14,18 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-func TestPausableManager(t *testing.T) {
+func TestPausableManagerM(t *testing.T) {
 	vID := ids.GenerateTestID()
 	nodeID0 := ids.GenerateTestNodeID()
 	startTime := time.Now()
 
 	tests := []struct {
 		name     string
-		testFunc func(t *testing.T, up PausableManager, clk *mockable.Clock, _ uptime.State)
+		testFunc func(t *testing.T, up pausableManager, clk *mockable.Clock, _ uptime.State)
 	}{
 		{
 			name: "Case 1: Connect, pause, start tracking",
-			testFunc: func(t *testing.T, up PausableManager, clk *mockable.Clock, _ uptime.State) {
+			testFunc: func(t *testing.T, up pausableManager, clk *mockable.Clock, _ uptime.State) {
 				require := require.New(t)
 
 				// Connect before tracking
@@ -44,7 +44,7 @@ func TestPausableManager(t *testing.T) {
 				wantUptime += 1 * time.Second
 
 				// Start tracking
-				require.NoError(up.StartTracking([]ids.NodeID{nodeID0}))
+				require.NoError(up.manager.StartTracking([]ids.NodeID{nodeID0}))
 				// Uptime here should not increase after start tracking
 				// since the node is still paused after we started tracking
 				currentTime := addTime(clk, time.Second)
@@ -58,11 +58,11 @@ func TestPausableManager(t *testing.T) {
 		},
 		{
 			name: "Case 2: Start tracking, connect, pause, re-connect, resume",
-			testFunc: func(t *testing.T, up PausableManager, clk *mockable.Clock, _ uptime.State) {
+			testFunc: func(t *testing.T, up pausableManager, clk *mockable.Clock, _ uptime.State) {
 				require := require.New(t)
 
 				// Start tracking
-				require.NoError(up.StartTracking([]ids.NodeID{nodeID0}))
+				require.NoError(up.manager.StartTracking([]ids.NodeID{nodeID0}))
 
 				// Connect
 				addTime(clk, 1*time.Second)
@@ -109,7 +109,7 @@ func TestPausableManager(t *testing.T) {
 		},
 		{
 			name: "Case 3: Pause, start tracking, connect, re-connect, resume",
-			testFunc: func(t *testing.T, up PausableManager, clk *mockable.Clock, _ uptime.State) {
+			testFunc: func(t *testing.T, up pausableManager, clk *mockable.Clock, _ uptime.State) {
 				require := require.New(t)
 
 				// Pause before tracking
@@ -120,7 +120,7 @@ func TestPausableManager(t *testing.T) {
 				addTime(clk, time.Second)
 				// Uptime should be 1 since the node was paused before we started tracking
 				wantUptime := 1 * time.Second
-				require.NoError(up.StartTracking([]ids.NodeID{nodeID0}))
+				require.NoError(up.manager.StartTracking([]ids.NodeID{nodeID0}))
 
 				// Connect and check uptime
 				addTime(clk, 1*time.Second)
@@ -153,11 +153,11 @@ func TestPausableManager(t *testing.T) {
 		},
 		{
 			name: "Case 4: Start tracking, connect, pause, stop tracking, resume tracking",
-			testFunc: func(t *testing.T, up PausableManager, clk *mockable.Clock, s uptime.State) {
+			testFunc: func(t *testing.T, up pausableManager, clk *mockable.Clock, s uptime.State) {
 				require := require.New(t)
 
 				// Start tracking and connect
-				require.NoError(up.StartTracking([]ids.NodeID{nodeID0}))
+				require.NoError(up.manager.StartTracking([]ids.NodeID{nodeID0}))
 				addTime(clk, time.Second)
 				require.NoError(up.Connect(nodeID0))
 
@@ -172,9 +172,9 @@ func TestPausableManager(t *testing.T) {
 
 				// Stop tracking and reinitialize manager
 				currentTime = addTime(clk, 3*time.Second)
-				require.NoError(up.StopTracking([]ids.NodeID{nodeID0}))
+				require.NoError(up.manager.StopTracking([]ids.NodeID{nodeID0}))
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
-				up = NewPausableManager(uptime.NewManager(s, clk))
+				up = *NewPausableManager(uptime.NewManager(s, clk))
 
 				// Uptime should not have increased since the node was paused
 				// and we have not started tracking again
@@ -196,7 +196,7 @@ func TestPausableManager(t *testing.T) {
 
 				// Start tracking and check elapsed time
 				currentTime = addTime(clk, 6*time.Second)
-				require.NoError(up.StartTracking([]ids.NodeID{nodeID0}))
+				require.NoError(up.manager.StartTracking([]ids.NodeID{nodeID0}))
 				// Uptime should have increased by 6 seconds since we started tracking
 				// and node was resumed (we assume the node was online until we started tracking)
 				wantUptime += 6 * time.Second
@@ -217,11 +217,11 @@ func TestPausableManager(t *testing.T) {
 		},
 		{
 			name: "Case 5: Node paused after we stop tracking",
-			testFunc: func(t *testing.T, up PausableManager, clk *mockable.Clock, _ uptime.State) {
+			testFunc: func(t *testing.T, up pausableManager, clk *mockable.Clock, _ uptime.State) {
 				require := require.New(t)
 
 				// Start tracking and connect
-				require.NoError(up.StartTracking([]ids.NodeID{nodeID0}))
+				require.NoError(up.manager.StartTracking([]ids.NodeID{nodeID0}))
 				addTime(clk, time.Second)
 				require.NoError(up.Connect(nodeID0))
 
@@ -229,7 +229,7 @@ func TestPausableManager(t *testing.T) {
 				currentTime := addTime(clk, 2*time.Second)
 				wantUptime := 2 * time.Second
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
-				require.NoError(up.StopTracking([]ids.NodeID{nodeID0}))
+				require.NoError(up.manager.StopTracking([]ids.NodeID{nodeID0}))
 
 				// Pause after a while
 				addTime(clk, 3*time.Second)
@@ -242,7 +242,7 @@ func TestPausableManager(t *testing.T) {
 				wantUptime += 4 * time.Second
 
 				// Start tracking and check elapsed time
-				require.NoError(up.StartTracking([]ids.NodeID{nodeID0}))
+				require.NoError(up.manager.StartTracking([]ids.NodeID{nodeID0}))
 				// Uptime have increased since the node was paused before we started tracking
 				// We should be optimistic and assume the node was online and active until we start tracking
 				require.True(up.IsPaused(nodeID0))
@@ -251,11 +251,11 @@ func TestPausableManager(t *testing.T) {
 		},
 		{
 			name: "Case 6: Paused node got resumed after we stop tracking",
-			testFunc: func(t *testing.T, up PausableManager, clk *mockable.Clock, _ uptime.State) {
+			testFunc: func(t *testing.T, up pausableManager, clk *mockable.Clock, _ uptime.State) {
 				require := require.New(t)
 
 				// Start tracking and connect
-				require.NoError(up.StartTracking([]ids.NodeID{nodeID0}))
+				require.NoError(up.manager.StartTracking([]ids.NodeID{nodeID0}))
 				addTime(clk, time.Second)
 				require.NoError(up.Connect(nodeID0))
 
@@ -271,7 +271,7 @@ func TestPausableManager(t *testing.T) {
 				currentTime = addTime(clk, 3*time.Second)
 				// wantUptime should not increase since the node was paused
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
-				require.NoError(up.StopTracking([]ids.NodeID{nodeID0}))
+				require.NoError(up.manager.StopTracking([]ids.NodeID{nodeID0}))
 
 				// Resume after a while
 				addTime(clk, 4*time.Second)
@@ -284,7 +284,7 @@ func TestPausableManager(t *testing.T) {
 				wantUptime += 5 * time.Second
 
 				// Start tracking and check elapsed time
-				require.NoError(up.StartTracking([]ids.NodeID{nodeID0}))
+				require.NoError(up.manager.StartTracking([]ids.NodeID{nodeID0}))
 				// Uptime should have increased by 4 seconds since the node was resumed
 				// We should be optimistic and assume the node was online and active until we start tracking
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
@@ -300,12 +300,12 @@ func TestPausableManager(t *testing.T) {
 	}
 }
 
-func setupTestEnv(nodeID ids.NodeID, startTime time.Time) (PausableManager, *mockable.Clock, uptime.State) {
+func setupTestEnv(nodeID ids.NodeID, startTime time.Time) (pausableManager, *mockable.Clock, uptime.State) {
 	clk := mockable.Clock{}
 	clk.Set(startTime)
 	s := uptime.NewTestState()
 	s.AddNode(nodeID, startTime)
-	up := NewPausableManager(uptime.NewManager(s, &clk))
+	up := *NewPausableManager(uptime.NewManager(s, &clk))
 	return up, &clk, s
 }
 
@@ -314,9 +314,9 @@ func addTime(clk *mockable.Clock, duration time.Duration) time.Time {
 	return clk.Time()
 }
 
-func checkUptime(t *testing.T, up PausableManager, nodeID ids.NodeID, wantUptime time.Duration, wantLastUpdate time.Time) {
+func checkUptime(t *testing.T, up pausableManager, nodeID ids.NodeID, wantUptime time.Duration, wantLastUpdate time.Time) {
 	t.Helper()
-	uptime, lastUpdated, err := up.CalculateUptime(nodeID)
+	uptime, lastUpdated, err := up.manager.CalculateUptime(nodeID)
 	require.NoError(t, err)
 	require.Equal(t, wantLastUpdate.Unix(), lastUpdated.Unix())
 	require.Equal(t, wantUptime, uptime)

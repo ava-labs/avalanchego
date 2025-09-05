@@ -1,29 +1,18 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package uptime
+package uptimetracker
 
 import (
-	"errors"
-
 	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/vms/evm/plugin/validators/state"
 )
 
-var errPausedDisconnect = errors.New("paused node cannot be disconnected")
-
-type PausableManager interface {
-	uptime.Manager
-	state.StateCallbackListener
-	IsPaused(nodeID ids.NodeID) bool
-}
-
 type pausableManager struct {
-	uptime.Manager
+	manager    uptime.Manager
 	pausedVdrs set.Set[ids.NodeID]
 	// connectedVdrs is a set of nodes that are connected to the manager.
 	// This is used to immediately connect nodes when they are unpaused.
@@ -31,11 +20,11 @@ type pausableManager struct {
 }
 
 // NewPausableManager takes an uptime.Manager and returns a PausableManager
-func NewPausableManager(manager uptime.Manager) PausableManager {
+func NewPausableManager(manager uptime.Manager) *pausableManager {
 	return &pausableManager{
+		manager:       manager,
 		pausedVdrs:    make(set.Set[ids.NodeID]),
 		connectedVdrs: make(set.Set[ids.NodeID]),
-		Manager:       manager,
 	}
 }
 
@@ -54,8 +43,8 @@ func NewPausableManager(manager uptime.Manager) PausableManager {
 // connected to the uptime manager.
 func (p *pausableManager) Connect(nodeID ids.NodeID) error {
 	p.connectedVdrs.Add(nodeID)
-	if !p.IsPaused(nodeID) && !p.Manager.IsConnected(nodeID) {
-		return p.Manager.Connect(nodeID)
+	if !p.IsPaused(nodeID) && !p.manager.IsConnected(nodeID) {
+		return p.manager.Connect(nodeID)
 	}
 	return nil
 }
@@ -71,8 +60,8 @@ func (p *pausableManager) Connect(nodeID ids.NodeID) error {
 // no paused peers can be disconnected again from the pausable uptime manager.
 func (p *pausableManager) Disconnect(nodeID ids.NodeID) error {
 	p.connectedVdrs.Remove(nodeID)
-	if p.Manager.IsConnected(nodeID) {
-		return p.Manager.Disconnect(nodeID)
+	if p.manager.IsConnected(nodeID) {
+		return p.manager.Disconnect(nodeID)
 	}
 	return nil
 }
@@ -135,12 +124,12 @@ func (p *pausableManager) IsPaused(nodeID ids.NodeID) bool {
 // uptime of the validator.
 func (p *pausableManager) pause(nodeID ids.NodeID) error {
 	p.pausedVdrs.Add(nodeID)
-	if p.Manager.IsConnected(nodeID) {
+	if p.manager.IsConnected(nodeID) {
 		// If the node is connected, then we need to disconnect it from
 		// manager
 		// This should be fine in case tracking has not started yet since
 		// the inner manager should handle disconnects accordingly
-		return p.Manager.Disconnect(nodeID)
+		return p.manager.Disconnect(nodeID)
 	}
 	return nil
 }
@@ -153,8 +142,8 @@ func (p *pausableManager) pause(nodeID ids.NodeID) error {
 // to the tracker node.
 func (p *pausableManager) resume(nodeID ids.NodeID) error {
 	p.pausedVdrs.Remove(nodeID)
-	if p.connectedVdrs.Contains(nodeID) && !p.Manager.IsConnected(nodeID) {
-		return p.Manager.Connect(nodeID)
+	if p.connectedVdrs.Contains(nodeID) && !p.manager.IsConnected(nodeID) {
+		return p.manager.Connect(nodeID)
 	}
 	return nil
 }

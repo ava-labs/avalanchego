@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package state
+package uptimetracker
 
 import (
 	"testing"
@@ -19,7 +19,7 @@ import (
 func TestState(t *testing.T) {
 	require := require.New(t)
 	db := memdb.New()
-	state, err := NewState(db)
+	state, err := newState(db)
 	require.NoError(err)
 
 	// get non-existent uptime
@@ -73,8 +73,8 @@ func TestState(t *testing.T) {
 	vdr.IsActive = false
 	require.NoError(state.UpdateValidator(vdr))
 	// get status
-	data, err := state.GetValidator(vID)
-	require.NoError(err)
+	data, f := state.GetValidator(vID)
+	require.True(f)
 	require.False(data.IsActive)
 
 	// set weight
@@ -82,8 +82,8 @@ func TestState(t *testing.T) {
 	vdr.Weight = newWeight
 	require.NoError(state.UpdateValidator(vdr))
 	// get weight
-	data, err = state.GetValidator(vID)
-	require.NoError(err)
+	data, f = state.GetValidator(vID)
+	require.True(f)
 	require.Equal(newWeight, data.Weight)
 
 	// set a different node ID should fail
@@ -108,7 +108,7 @@ func TestState(t *testing.T) {
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// delete uptime
-	require.NoError(state.DeleteValidator(vID))
+	require.True(state.DeleteValidator(vID))
 
 	// get deleted uptime
 	_, _, err = state.GetUptime(nodeID)
@@ -118,10 +118,10 @@ func TestState(t *testing.T) {
 func TestWriteValidator(t *testing.T) {
 	require := require.New(t)
 	db := memdb.New()
-	state, err := NewState(db)
+	state, err := newState(db)
 	require.NoError(err)
 	// write empty uptimes
-	require.NoError(state.WriteState())
+	require.True(state.WriteState())
 
 	// load uptime
 	nodeID := ids.GenerateTestNodeID()
@@ -137,17 +137,17 @@ func TestWriteValidator(t *testing.T) {
 	}))
 
 	// write state, should reflect to DB
-	require.NoError(state.WriteState())
+	require.True(state.WriteState())
 	require.True(db.Has(vID[:]))
 
 	// set uptime
 	newUptime := 2 * time.Minute
 	newLastUpdated := startTime.Add(time.Hour)
 	require.NoError(state.SetUptime(nodeID, newUptime, newLastUpdated))
-	require.NoError(state.WriteState())
+	require.True(state.WriteState())
 
 	// refresh state, should load from DB
-	state, err = NewState(db)
+	state, err = newState(db)
 	require.NoError(err)
 
 	// get uptime
@@ -157,10 +157,10 @@ func TestWriteValidator(t *testing.T) {
 	require.Equal(newLastUpdated.Unix(), lastUpdated.Unix())
 
 	// delete
-	require.NoError(state.DeleteValidator(vID))
+	require.True(state.DeleteValidator(vID))
 
 	// write state, should reflect to DB
-	require.NoError(state.WriteState())
+	require.True(state.WriteState())
 	require.False(db.Has(vID[:]))
 }
 
@@ -277,17 +277,17 @@ func TestParseValidator(t *testing.T) {
 	}
 }
 
-func TestStateListener(t *testing.T) {
+func TestStateCallbacks(t *testing.T) {
 	require := require.New(t)
 	db := memdb.New()
-	state, err := NewState(db)
+	state, err := newState(db)
 	require.NoError(err)
 
 	expectedvID := ids.GenerateTestID()
 	expectedNodeID := ids.GenerateTestNodeID()
 	expectedStartTime := time.Now()
 
-	// add initial validator to test RegisterListener
+	// add initial validator to test state functionality
 	initialvID := ids.GenerateTestID()
 	initialNodeID := ids.GenerateTestNodeID()
 	initialStartTime := time.Now()
@@ -303,17 +303,22 @@ func TestStateListener(t *testing.T) {
 	}))
 
 	// Verify initial validator was added
-	initialValidator, err := state.GetValidator(initialvID)
-	require.NoError(err)
+	initialValidator, f := state.GetValidator(initialvID)
+	require.True(f)
 	require.Equal(initialNodeID, initialValidator.NodeID)
 	require.Equal(uint64(1), initialValidator.Weight)
 	require.Equal(uint64(initialStartTime.Unix()), initialValidator.StartTimestamp)
 	require.True(initialValidator.IsActive)
 	require.True(initialValidator.IsL1Validator)
 
-	// Create a test listener to verify the callback behavior
-	testListener := NewTestListener()
-	state.RegisterListener(testListener)
+	// Create a test pausable manager to verify callback behavior
+	testManager := NewTestPausableManager()
+	// Wire callbacks to the recorder
+	state.SetCallbacks(
+		testManager.OnValidatorAdded,
+		testManager.OnValidatorRemoved,
+		testManager.OnValidatorStatusUpdated,
+	)
 
 	// add new validator
 	vdr := Validator{
@@ -327,39 +332,39 @@ func TestStateListener(t *testing.T) {
 	require.NoError(state.AddValidator(vdr))
 
 	// Verify new validator was added
-	newValidator, err := state.GetValidator(expectedvID)
-	require.NoError(err)
+	newValidator, f := state.GetValidator(expectedvID)
+	require.True(f)
 	require.Equal(expectedNodeID, newValidator.NodeID)
 	require.Equal(uint64(1), newValidator.Weight)
 	require.Equal(uint64(expectedStartTime.Unix()), newValidator.StartTimestamp)
 	require.True(newValidator.IsActive)
 	require.True(newValidator.IsL1Validator)
 
-	// Verify listener was called
-	require.Equal(expectedNodeID, testListener.AddedValidators[expectedvID])
+	// Verify callback was invoked
+	require.Equal(expectedNodeID, testManager.AddedValidators[expectedvID])
 
 	// update validator status
 	vdr.IsActive = false
 	require.NoError(state.UpdateValidator(vdr))
 
 	// Verify status was updated
-	updatedValidator, err := state.GetValidator(expectedvID)
-	require.NoError(err)
+	updatedValidator, f := state.GetValidator(expectedvID)
+	require.True(f)
 	require.False(updatedValidator.IsActive)
 
-	// Verify listener was called for status update
-	require.False(testListener.StatusUpdates[expectedvID])
+	// Verify status update callback was invoked
+	require.False(testManager.StatusUpdates[expectedvID])
 
-	// set status twice should not trigger listener (this is tested by the fact that no error occurs)
+	// set status twice should not cause any issues (this is tested by the fact that no error occurs)
 	require.NoError(state.UpdateValidator(vdr))
 
 	// remove validator
-	require.NoError(state.DeleteValidator(expectedvID))
+	require.True(state.DeleteValidator(expectedvID))
 
 	// Verify validator was removed
-	_, err = state.GetValidator(expectedvID)
-	require.ErrorIs(err, database.ErrNotFound)
+	_, f = state.GetValidator(expectedvID)
+	require.False(f)
 
-	// Verify listener was called for removal
-	require.Equal(expectedNodeID, testListener.RemovedValidators[expectedvID])
+	// Verify removal callback was invoked
+	require.Equal(expectedNodeID, testManager.RemovedValidators[expectedvID])
 }

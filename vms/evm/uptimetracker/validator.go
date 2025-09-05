@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package validators
+package uptimetracker
 
 import (
 	"context"
@@ -16,8 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"github.com/ava-labs/avalanchego/vms/evm/plugin/validators/state"
-	"github.com/ava-labs/avalanchego/vms/evm/plugin/validators/uptime"
 
 	avalancheuptime "github.com/ava-labs/avalanchego/snow/uptime"
 )
@@ -38,8 +36,8 @@ const (
 // validationIDs.
 type ValidatorState struct {
 	chainCtx        *snow.Context
-	State           *state.State
-	PausableManager uptime.PausableManager
+	state           *state
+	pausableManager pausableManager
 }
 
 // NewValidatorState returns a new validator state
@@ -50,30 +48,30 @@ func NewValidatorState(
 	db database.Database,
 	clock *mockable.Clock,
 ) (*ValidatorState, error) {
-	validatorState, err := state.NewState(db)
+	validatorState, err := NewState(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize validator state: %w", err)
 	}
 
 	// Initialize uptime manager
-	uptimeManager := uptime.NewPausableManager(avalancheuptime.NewManager(validatorState, clock))
-	validatorState.RegisterListener(uptimeManager)
+	uptimeManager := NewPausableManager(avalancheuptime.NewManager(validatorState, clock))
+	validatorState.SetPausableManager(uptimeManager)
 
 	return &ValidatorState{
 		chainCtx:        ctx,
-		State:           validatorState,
-		PausableManager: uptimeManager,
+		state:           validatorState,
+		pausableManager: *uptimeManager,
 	}, nil
 }
 
 // Shutdown stops uptime tracking and persists the validator state
 func (m *ValidatorState) Shutdown() error {
-	vdrIDs := m.State.GetNodeIDs().List()
-	if err := m.PausableManager.StopTracking(vdrIDs); err != nil {
+	vdrIDs := m.state.GetNodeIDs().List()
+	if err := m.pausableManager.manager.StopTracking(vdrIDs); err != nil {
 		return fmt.Errorf("failed to stop uptime tracking: %w", err)
 	}
-	if err := m.State.WriteState(); err != nil {
-		return fmt.Errorf("failed to write validator state: %w", err)
+	if !m.state.WriteState() {
+		return fmt.Errorf("failed to write validator state")
 	}
 
 	return nil
@@ -82,18 +80,18 @@ func (m *ValidatorState) Shutdown() error {
 // GetValidatorAndUptime returns the calculated uptime of the validator specified by [validationID]
 // and the last updated time.
 // GetValidatorAndUptime holds the lock while performing the operation and can be called concurrently.
-func (m *ValidatorState) GetValidatorAndUptime(validationID ids.ID, lock sync.Locker) (state.Validator, time.Duration, time.Time, error) {
+func (m *ValidatorState) GetValidatorAndUptime(validationID ids.ID, lock sync.Locker) (Validator, time.Duration, time.Time, error) {
 	lock.Lock()
 	defer lock.Unlock()
 
-	vdr, err := m.State.GetValidator(validationID)
-	if err != nil {
-		return state.Validator{}, 0, time.Time{}, fmt.Errorf("failed to get validator %s: %w", validationID, err)
+	vdr, f := m.state.GetValidator(validationID)
+	if !f {
+		return Validator{}, 0, time.Time{}, fmt.Errorf("failed to get validator %s", validationID)
 	}
 
-	uptime, lastUpdated, err := m.PausableManager.CalculateUptime(vdr.NodeID)
+	uptime, lastUpdated, err := m.pausableManager.manager.CalculateUptime(vdr.NodeID)
 	if err != nil {
-		return state.Validator{}, 0, time.Time{}, fmt.Errorf("failed to calculate uptime for validator %s: %w", validationID, err)
+		return Validator{}, 0, time.Time{}, fmt.Errorf("failed to calculate uptime for validator %s: %w", validationID, err)
 	}
 
 	return vdr, uptime, lastUpdated, nil
@@ -121,8 +119,8 @@ func (m *ValidatorState) Sync(ctx context.Context) error {
 
 	// ValidatorState persists the state to disk at the end of every sync operation. The VM also
 	// persists the validator database when the node is shutting down.
-	if err := m.State.WriteState(); err != nil {
-		return fmt.Errorf("failed to write validator state: %w", err)
+	if !m.state.WriteState() {
+		return fmt.Errorf("failed to write validator state")
 	}
 
 	// TODO: add metrics
@@ -132,20 +130,20 @@ func (m *ValidatorState) Sync(ctx context.Context) error {
 
 // updateValidatorState updates the local validator state to match the current validator set.
 func (m *ValidatorState) updateValidatorState(newValidators map[ids.ID]*validators.GetCurrentValidatorOutput) error {
-	currentValidationIDs := m.State.GetValidationIDs()
+	currentValidationIDs := m.state.GetValidationIDs()
 
 	// Remove validators no longer in the current set
 	for vID := range currentValidationIDs {
 		if _, exists := newValidators[vID]; !exists {
-			if err := m.State.DeleteValidator(vID); err != nil {
-				return fmt.Errorf("failed to delete validator %s: %w", vID, err)
+			if !m.state.DeleteValidator(vID) {
+				return fmt.Errorf("failed to delete validator %s", vID)
 			}
 		}
 	}
 
 	// Add or update validators
 	for vID, newVdr := range newValidators {
-		validator := state.Validator{
+		validator := Validator{
 			ValidationID:   vID,
 			NodeID:         newVdr.NodeID,
 			Weight:         newVdr.Weight,
@@ -155,11 +153,11 @@ func (m *ValidatorState) updateValidatorState(newValidators map[ids.ID]*validato
 		}
 
 		if currentValidationIDs.Contains(vID) {
-			if err := m.State.UpdateValidator(validator); err != nil {
+			if err := m.state.UpdateValidator(validator); err != nil {
 				return fmt.Errorf("failed to update validator %s: %w", vID, err)
 			}
 		} else {
-			if err := m.State.AddValidator(validator); err != nil {
+			if err := m.state.AddValidator(validator); err != nil {
 				return fmt.Errorf("failed to add validator %s: %w", vID, err)
 			}
 		}
