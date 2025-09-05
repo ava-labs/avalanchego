@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/peer"
@@ -31,11 +32,13 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/platformvm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
+	"github.com/ava-labs/avalanchego/vms/proposervm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	p2pmessage "github.com/ava-labs/avalanchego/message"
@@ -341,12 +344,74 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			})
 		})
 
-		advanceProposerVMPChainHeight := func() {
-			// We must wait at least [RecentlyAcceptedWindowTTL] to ensure the
-			// next block will reference the last accepted P-chain height.
-			time.Sleep((5 * platformvmvalidators.RecentlyAcceptedWindowTTL) / 4)
-		}
-		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
+		tc.By("advancing the P-Chain epoch", func() {
+			getCurrentEpochHeight := func() uint64 {
+				proposerClient := proposervm.NewClient(nodeURI.URI, "P")
+				epoch, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
+				require.NoError(err)
+				return epoch.Height
+			}
+
+			epochBefore := getCurrentEpochHeight()
+
+			tc.By("advancing the proposervm P-chain height epoched height", func() {
+				// The sleep duration must be the greater of the epoch duration and the recently accepted window TTL
+				// to ensure that the epoched height is advanced up to the most recently accepted block height.
+				sleepDuration := (5 * platformvmvalidators.RecentlyAcceptedWindowTTL) / 4
+
+				// Get the epoch duration
+				infoClient := info.NewClient(nodeURI.URI)
+				upgrades, err := infoClient.Upgrades(tc.DefaultContext())
+				require.NoError(err)
+				epochDuration := upgrades.GraniteEpochDuration
+
+				if sleepDuration < epochDuration {
+					sleepDuration = epochDuration
+				}
+				time.Sleep(sleepDuration)
+			})
+
+			tc.By("issue a dummy tx to advance the epoch", func() {
+				tx, err := pWallet.IssueBaseTx(
+					[]*avax.TransferableOutput{
+						{
+							Asset: avax.Asset{ID: pWallet.Builder().Context().AVAXAssetID},
+							Out: &secp256k1fx.TransferOutput{
+								Amt: 100 * units.MicroAvax,
+								OutputOwners: secp256k1fx.OutputOwners{
+									Threshold: 1,
+									Addrs: []ids.ShortID{
+										ids.GenerateTestShortID(),
+									},
+								},
+							},
+						},
+					},
+					tc.WithDefaultContext(),
+				)
+				require.NoError(err)
+
+				tc.By("ensuring the genesis peer has accepted the tx at "+nodeURI.URI, func() {
+					var (
+						client = platformvm.NewClient(nodeURI.URI)
+						txID   = tx.ID()
+					)
+
+					tc.Eventually(
+						func() bool {
+							_, err := client.GetTx(tc.DefaultContext(), txID)
+							return err == nil
+						},
+						tests.DefaultTimeout,
+						e2e.DefaultPollingInterval,
+						"transaction not accepted",
+					)
+				})
+			})
+
+			epochAfter := getCurrentEpochHeight()
+			require.Greater(epochAfter, epochBefore)
+		})
 
 		tc.By("creating the validator to register")
 		subnetRegisterNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.NewEphemeralNode(tmpnet.FlagsMap{
@@ -702,7 +767,11 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			})
 		})
 
-		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
+		tc.By("advancing the proposervm P-chain height", func() {
+			// We must wait at least [RecentlyAcceptedWindowTTL] to ensure the
+			// next block will reference the last accepted P-chain height.
+			time.Sleep((5 * platformvmvalidators.RecentlyAcceptedWindowTTL) / 4)
+		})
 
 		tc.By("removing the registered validator", func() {
 			setWeight(registerValidationID, 0)
