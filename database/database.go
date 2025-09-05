@@ -94,3 +94,18 @@ type Database interface {
 	io.Closer
 	health.Checker
 }
+
+// BlockDatabase defines the interface for storing and retrieving blockchain blocks.
+type BlockDatabase interface {
+	// WriteBlock inserts a block into the store at the given height.
+	WriteBlock(height uint64, block []byte) error
+
+	// ReadBlock retrieves a block by its height.
+	ReadBlock(height uint64) ([]byte, error)
+
+	// HasBlock checks if a block exists at the given height.
+	HasBlock(height uint64) (bool, error)
+
+	// Close closes the block database.
+	io.Closer
+}
