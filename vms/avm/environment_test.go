@@ -113,7 +113,8 @@ func setup(tb testing.TB, c *envConfig) *environment {
 	}
 
 	vm := &VM{
-		Config: vmStaticConfig,
+		Config:       vmStaticConfig,
+		StateFactory: LegacyStateFactory{},
 	}
 
 	vmDynamicConfig := DefaultConfig
