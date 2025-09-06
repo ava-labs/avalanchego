@@ -202,7 +202,7 @@ func (th *trieHistory) getValueChanges(
 	}
 
 	// historyChangesIndexHeap is used to traverse the changes sorted by ASC [key] and ASC [insertNumber].
-	historyChangesIndexHeap := heap.NewQueue[historyChangesIndex](func(a, b historyChangesIndex) bool {
+	historyChangesIndexHeap := heap.NewQueue(func(a, b historyChangesIndex) bool {
 		keyComparison := a.changes.sortedKeys[a.kvChangeIndex].Compare(b.changes.sortedKeys[b.kvChangeIndex])
 		if keyComparison != 0 {
 			return keyComparison < 0

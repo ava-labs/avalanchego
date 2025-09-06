@@ -59,14 +59,14 @@ func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
 	return maybe.Nothing[[]byte]()
 }
 
-func NewGetChangeProofHandler(db DB) *GetChangeProofHandler {
+func NewGetChangeProofHandler(db DB[merkledb.RangeProof, merkledb.ChangeProof]) *GetChangeProofHandler {
 	return &GetChangeProofHandler{
 		db: db,
 	}
 }
 
 type GetChangeProofHandler struct {
-	db DB
+	db DB[merkledb.RangeProof, merkledb.ChangeProof]
 }
 
 func (*GetChangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
@@ -189,14 +189,14 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 	}
 }
 
-func NewGetRangeProofHandler(db DB) *GetRangeProofHandler {
+func NewGetRangeProofHandler(db DB[merkledb.RangeProof, merkledb.ChangeProof]) *GetRangeProofHandler {
 	return &GetRangeProofHandler{
 		db: db,
 	}
 }
 
 type GetRangeProofHandler struct {
-	db DB
+	db DB[merkledb.RangeProof, merkledb.ChangeProof]
 }
 
 func (*GetRangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
@@ -249,7 +249,7 @@ func (g *GetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ t
 // reduce the key limit.
 func getRangeProof(
 	ctx context.Context,
-	db DB,
+	db DB[merkledb.RangeProof, merkledb.ChangeProof],
 	req *pb.SyncGetRangeProofRequest,
 	marshalFunc func(*merkledb.RangeProof) ([]byte, error),
 ) ([]byte, error) {

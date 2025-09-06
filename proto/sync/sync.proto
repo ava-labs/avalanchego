@@ -15,14 +15,13 @@ service DB {
 
   rpc Clear(google.protobuf.Empty) returns (google.protobuf.Empty);
 
-  rpc GetProof(GetProofRequest) returns (GetProofResponse);
-
   rpc GetChangeProof(GetChangeProofRequest) returns (GetChangeProofResponse);
   rpc VerifyChangeProof(VerifyChangeProofRequest) returns (VerifyChangeProofResponse);
-  rpc CommitChangeProof(CommitChangeProofRequest) returns (google.protobuf.Empty);
+  rpc CommitChangeProof(CommitChangeProofRequest) returns (CommitChangeProofResponse);
 
   rpc GetRangeProof(GetRangeProofRequest) returns (GetRangeProofResponse);
-  rpc CommitRangeProof(CommitRangeProofRequest) returns (google.protobuf.Empty);
+  rpc VerifyRangeProof(VerifyRangeProofRequest) returns (VerifyRangeProofResponse);
+  rpc CommitRangeProof(CommitRangeProofRequest) returns (CommitRangeProofResponse);
 }
 
 message GetMerkleRootResponse {
@@ -82,6 +81,7 @@ message VerifyChangeProofRequest {
   MaybeBytes start_key = 2;
   MaybeBytes end_key = 3;
   bytes expected_root_hash = 4;
+  int32 max_keys = 5;
 }
 
 message VerifyChangeProofResponse {
@@ -91,6 +91,24 @@ message VerifyChangeProofResponse {
 
 message CommitChangeProofRequest {
   ChangeProof proof = 1;
+  MaybeBytes end_key = 2;
+}
+
+message CommitChangeProofResponse {
+  MaybeBytes next_key = 1;
+}
+
+message VerifyRangeProofRequest {
+  RangeProof proof = 1;
+  MaybeBytes start_key = 2;
+  MaybeBytes end_key = 3;
+  bytes expected_root_hash = 4;
+  int32 max_keys = 5;
+}
+
+message VerifyRangeProofResponse {
+  // If empty, there was no error.
+  string error = 1;
 }
 
 // For use in sync client, which has a restriction on the size of
@@ -118,6 +136,10 @@ message CommitRangeProofRequest {
   MaybeBytes start_key = 1;
   MaybeBytes end_key = 2;
   RangeProof range_proof = 3;
+}
+
+message CommitRangeProofResponse {
+  MaybeBytes next_key = 1;
 }
 
 message ChangeProof {
