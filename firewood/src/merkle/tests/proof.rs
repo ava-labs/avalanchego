@@ -49,10 +49,6 @@ fn single_value_range_proof() {
     assert_eq!(rangeproof.key_values().len(), 1);
 }
 
-#[cfg_attr(
-    feature = "ethhash",
-    ignore = "https://github.com/ava-labs/firewood/issues/1261"
-)]
 #[test]
 fn shared_path_proof() {
     let key1 = b"key1";
@@ -74,10 +70,6 @@ fn shared_path_proof() {
     proof.verify(key, Some(value2), &root_hash).unwrap();
 }
 
-#[cfg_attr(
-    feature = "ethhash",
-    ignore = "https://github.com/ava-labs/firewood/issues/1261"
-)]
 #[test]
 fn single_key_proof_with_one_node() {
     let key = b"key";
@@ -91,10 +83,6 @@ fn single_key_proof_with_one_node() {
     proof.verify(key, Some(value), &root_hash).unwrap();
 }
 
-#[cfg_attr(
-    feature = "ethhash",
-    ignore = "https://github.com/ava-labs/firewood/issues/1261"
-)]
 #[test]
 fn two_key_proof_without_shared_path() {
     let key1 = &[0x00];
@@ -199,10 +187,6 @@ fn test_bad_proof() {
     }
 }
 
-#[cfg_attr(
-    feature = "ethhash",
-    ignore = "https://github.com/ava-labs/firewood/issues/1261"
-)]
 #[test]
 fn exclusion_with_proof_value_present() {
     // Build a trie where an ancestor on the path has a value
