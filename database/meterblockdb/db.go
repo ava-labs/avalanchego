@@ -24,12 +24,6 @@ var (
 	readBlockLabel = prometheus.Labels{
 		methodLabel: "read_block",
 	}
-	readHeaderLabel = prometheus.Labels{
-		methodLabel: "read_header",
-	}
-	readBodyLabel = prometheus.Labels{
-		methodLabel: "read_body",
-	}
 	hasBlockLabel = prometheus.Labels{
 		methodLabel: "has_block",
 	}

@@ -449,8 +449,7 @@ func TestDatabaseInspect(t *testing.T) {
 	}
 
 	for _, block := range testBlocks {
-		err := db.WriteBlock(block.height, block.data)
-		require.NoError(t, err)
+		require.NoError(t, db.WriteBlock(block.height, block.data))
 	}
 
 	result, err := db.Inspect()

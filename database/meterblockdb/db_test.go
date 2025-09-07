@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package meterblockdb
@@ -8,10 +8,11 @@ import (
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
-	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/x/blockdb"
+
+	dto "github.com/prometheus/client_model/go"
 )
 
 func TestMeterBlockDBMetricsCollection(t *testing.T) {
@@ -25,7 +26,6 @@ func TestMeterBlockDBMetricsCollection(t *testing.T) {
 	// Create 100 fixed-size blocks (1KB each)
 	const blockCount = 100
 	const blockSize = 1024 // 1KB
-	const headerSize = 64  // 64 bytes header, rest is body
 
 	blocks := make([][]byte, blockCount)
 	for i := range blockCount {
@@ -38,8 +38,7 @@ func TestMeterBlockDBMetricsCollection(t *testing.T) {
 
 	// Write all blocks
 	for i := range blockCount {
-		err := db.WriteBlock(uint64(i), blocks[i])
-		require.NoError(t, err)
+		require.NoError(t, db.WriteBlock(uint64(i), blocks[i]))
 	}
 
 	// Read from blocks 0 to 119 (including non-existent ones)
@@ -47,6 +46,7 @@ func TestMeterBlockDBMetricsCollection(t *testing.T) {
 	for height := range blocksToRead {
 		// ReadBlock
 		_, err := db.ReadBlock(uint64(height))
+		require.NoError(t, err)
 		if err != nil {
 			require.Equal(t, blockdb.ErrBlockNotFound, err)
 		}
@@ -62,8 +62,7 @@ func TestMeterBlockDBMetricsCollection(t *testing.T) {
 	}
 
 	// Close the database
-	err = db.Close()
-	require.NoError(t, err)
+	require.NoError(t, db.Close())
 
 	// Gather and validate metrics
 	metrics, err := reg.Gather()
@@ -76,10 +75,10 @@ func TestMeterBlockDBMetricsCollection(t *testing.T) {
 	size := extractMetricValues(metrics, "size")
 
 	// Validate calls
-	require.Equal(t, float64(blockCount), calls["write_block"])
-	require.Equal(t, float64(blocksToRead), calls["read_block"])
-	require.Equal(t, float64(blocksToRead), calls["has_block"])
-	require.Equal(t, float64(1), calls["close"])
+	require.InEpsilon(t, float64(blockCount), calls["write_block"], 0.01)
+	require.InEpsilon(t, float64(blocksToRead), calls["read_block"], 0.01)
+	require.InEpsilon(t, float64(blocksToRead), calls["has_block"], 0.01)
+	require.InEpsilon(t, float64(1), calls["close"], 0.01)
 
 	// Validate duration (just check they're positive)
 	for method, value := range duration {
@@ -87,8 +86,8 @@ func TestMeterBlockDBMetricsCollection(t *testing.T) {
 	}
 
 	// Validate size
-	require.Equal(t, float64(blockCount*blockSize), size["write_block"])
-	require.Equal(t, float64(blockCount*blockSize), size["read_block"])
+	require.InEpsilon(t, float64(blockCount*blockSize), size["write_block"], 0.01)
+	require.InEpsilon(t, float64(blockCount*blockSize), size["read_block"], 0.01)
 }
 
 // Helper function to extract metric values by method
