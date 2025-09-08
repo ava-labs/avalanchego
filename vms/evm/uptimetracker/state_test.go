@@ -9,17 +9,24 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"context"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"go.uber.org/mock/gomock"
 )
 
 func TestState(t *testing.T) {
 	require := require.New(t)
 	db := memdb.New()
-	state, err := NewState(db)
+	state, err := newState(db)
 	require.NoError(err)
 
 	// get non-existent uptime
@@ -42,15 +49,15 @@ func TestState(t *testing.T) {
 		IsActive:       true,
 		IsL1Validator:  true,
 	}
-	require.NoError(state.AddValidator(vdr))
+	require.NoError(state.addValidator(vdr))
 
 	// adding the same validator should fail
-	err = state.AddValidator(vdr)
+	err = state.addValidator(vdr)
 	require.ErrorIs(err, ErrAlreadyExists)
 	// adding the same nodeID should fail
 	newVdr := vdr
 	newVdr.ValidationID = ids.GenerateTestID()
-	err = state.AddValidator(newVdr)
+	err = state.addValidator(newVdr)
 	require.ErrorIs(err, ErrAlreadyExists)
 
 	// get uptime
@@ -71,44 +78,44 @@ func TestState(t *testing.T) {
 
 	// set status
 	vdr.IsActive = false
-	require.NoError(state.UpdateValidator(vdr))
+	require.NoError(state.updateValidator(vdr))
 	// get status
-	data, f := state.GetValidator(vID)
-	require.True(f)
-	require.False(data.IsActive)
+	vdata, ok := state.data[vID]
+	require.True(ok)
+	require.False(vdata.IsActive)
 
 	// set weight
 	newWeight := uint64(2)
 	vdr.Weight = newWeight
-	require.NoError(state.UpdateValidator(vdr))
+	require.NoError(state.updateValidator(vdr))
 	// get weight
-	data, f = state.GetValidator(vID)
-	require.True(f)
-	require.Equal(newWeight, data.Weight)
+	vdata, ok = state.data[vID]
+	require.True(ok)
+	require.Equal(newWeight, vdata.Weight)
 
 	// set a different node ID should fail
 	newNodeID := ids.GenerateTestNodeID()
 	vdr.NodeID = newNodeID
-	err = state.UpdateValidator(vdr)
+	err = state.updateValidator(vdr)
 	require.ErrorIs(err, ErrImmutableField)
 
 	// set a different start time should fail
 	vdr.StartTimestamp += 100
-	err = state.UpdateValidator(vdr)
+	err = state.updateValidator(vdr)
 	require.ErrorIs(err, ErrImmutableField)
 
 	// set IsL1Validator should fail
 	vdr.IsL1Validator = false
-	err = state.UpdateValidator(vdr)
+	err = state.updateValidator(vdr)
 	require.ErrorIs(err, ErrImmutableField)
 
 	// set validation ID should result in not found
 	vdr.ValidationID = ids.GenerateTestID()
-	err = state.UpdateValidator(vdr)
+	err = state.updateValidator(vdr)
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// delete uptime
-	require.True(state.DeleteValidator(vID))
+	require.True(state.deleteValidator(vID))
 
 	// get deleted uptime
 	_, _, err = state.GetUptime(nodeID)
@@ -118,16 +125,16 @@ func TestState(t *testing.T) {
 func TestWriteValidator(t *testing.T) {
 	require := require.New(t)
 	db := memdb.New()
-	state, err := NewState(db)
+	state, err := newState(db)
 	require.NoError(err)
 	// write empty uptimes
-	require.True(state.WriteState())
+	require.True(state.writeState())
 
 	// load uptime
 	nodeID := ids.GenerateTestNodeID()
 	vID := ids.GenerateTestID()
 	startTime := time.Now()
-	require.NoError(state.AddValidator(Validator{
+	require.NoError(state.addValidator(Validator{
 		ValidationID:   vID,
 		NodeID:         nodeID,
 		Weight:         1,
@@ -137,17 +144,17 @@ func TestWriteValidator(t *testing.T) {
 	}))
 
 	// write state, should reflect to DB
-	require.True(state.WriteState())
+	require.True(state.writeState())
 	require.True(db.Has(vID[:]))
 
 	// set uptime
 	newUptime := 2 * time.Minute
 	newLastUpdated := startTime.Add(time.Hour)
 	require.NoError(state.SetUptime(nodeID, newUptime, newLastUpdated))
-	require.True(state.WriteState())
+	require.True(state.writeState())
 
 	// refresh state, should load from DB
-	state, err = NewState(db)
+	state, err = newState(db)
 	require.NoError(err)
 
 	// get uptime
@@ -157,10 +164,10 @@ func TestWriteValidator(t *testing.T) {
 	require.Equal(newLastUpdated.Unix(), lastUpdated.Unix())
 
 	// delete
-	require.True(state.DeleteValidator(vID))
+	require.True(state.deleteValidator(vID))
 
 	// write state, should reflect to DB
-	require.True(state.WriteState())
+	require.True(state.writeState())
 	require.False(db.Has(vID[:]))
 }
 
@@ -277,10 +284,10 @@ func TestParseValidator(t *testing.T) {
 	}
 }
 
-func TestStateCallbacks(t *testing.T) {
+func TestStateModifications(t *testing.T) {
 	require := require.New(t)
 	db := memdb.New()
-	state, err := NewState(db)
+	state, err := newState(db)
 	require.NoError(err)
 
 	expectedvID := ids.GenerateTestID()
@@ -293,7 +300,7 @@ func TestStateCallbacks(t *testing.T) {
 	initialStartTime := time.Now()
 
 	// add initial validator
-	require.NoError(state.AddValidator(Validator{
+	require.NoError(state.addValidator(Validator{
 		ValidationID:   initialvID,
 		NodeID:         initialNodeID,
 		Weight:         1,
@@ -303,22 +310,13 @@ func TestStateCallbacks(t *testing.T) {
 	}))
 
 	// Verify initial validator was added
-	initialValidator, f := state.GetValidator(initialvID)
-	require.True(f)
-	require.Equal(initialNodeID, initialValidator.NodeID)
-	require.Equal(uint64(1), initialValidator.Weight)
-	require.Equal(uint64(initialStartTime.Unix()), initialValidator.StartTimestamp)
-	require.True(initialValidator.IsActive)
-	require.True(initialValidator.IsL1Validator)
-
-	// Create a test pausable manager to verify callback behavior
-	testManager := NewTestPausableManager()
-	// Wire callbacks to the recorder
-	state.SetCallbacks(
-		testManager.OnValidatorAdded,
-		testManager.OnValidatorRemoved,
-		testManager.OnValidatorStatusUpdated,
-	)
+	vdata, ok := state.data[initialvID]
+	require.True(ok)
+	require.Equal(initialNodeID, vdata.NodeID)
+	require.Equal(uint64(1), vdata.Weight)
+	require.Equal(uint64(initialStartTime.Unix()), vdata.StartTime)
+	require.True(vdata.IsActive)
+	require.True(vdata.IsL1Validator)
 
 	// add new validator
 	vdr := Validator{
@@ -329,42 +327,103 @@ func TestStateCallbacks(t *testing.T) {
 		IsActive:       true,
 		IsL1Validator:  true,
 	}
-	require.NoError(state.AddValidator(vdr))
+	require.NoError(state.addValidator(vdr))
 
 	// Verify new validator was added
-	newValidator, f := state.GetValidator(expectedvID)
-	require.True(f)
-	require.Equal(expectedNodeID, newValidator.NodeID)
-	require.Equal(uint64(1), newValidator.Weight)
-	require.Equal(uint64(expectedStartTime.Unix()), newValidator.StartTimestamp)
-	require.True(newValidator.IsActive)
-	require.True(newValidator.IsL1Validator)
-
-	// Verify callback was invoked
-	require.Equal(expectedNodeID, testManager.AddedValidators[expectedvID])
+	vdata, ok = state.data[expectedvID]
+	require.True(ok)
+	require.Equal(expectedNodeID, vdata.NodeID)
+	require.Equal(uint64(1), vdata.Weight)
+	require.Equal(uint64(expectedStartTime.Unix()), vdata.StartTime)
+	require.True(vdata.IsActive)
+	require.True(vdata.IsL1Validator)
 
 	// update validator status
 	vdr.IsActive = false
-	require.NoError(state.UpdateValidator(vdr))
+	require.NoError(state.updateValidator(vdr))
 
 	// Verify status was updated
-	updatedValidator, f := state.GetValidator(expectedvID)
-	require.True(f)
-	require.False(updatedValidator.IsActive)
-
-	// Verify status update callback was invoked
-	require.False(testManager.StatusUpdates[expectedvID])
-
-	// set status twice should not cause any issues (this is tested by the fact that no error occurs)
-	require.NoError(state.UpdateValidator(vdr))
+	vdata, ok = state.data[expectedvID]
+	require.True(ok)
+	require.False(vdata.IsActive)
 
 	// remove validator
-	require.True(state.DeleteValidator(expectedvID))
+	require.True(state.deleteValidator(expectedvID))
 
 	// Verify validator was removed
-	_, f = state.GetValidator(expectedvID)
-	require.False(f)
+	_, ok = state.data[expectedvID]
+	require.False(ok)
+}
 
-	// Verify removal callback was invoked
-	require.Equal(expectedNodeID, testManager.RemovedValidators[expectedvID])
+func TestSync_TriggersPauseResumeEventsViaChainCtx(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Prepare mock validator state to drive two successive Sync calls
+	mockVS := validatorsmock.NewState(ctrl)
+	ctx := &snow.Context{}
+	ctx.SubnetID = ids.GenerateTestID()
+	ctx.ValidatorState = validators.NewLockedState(&ctx.Lock, mockVS)
+
+	// Build NewUptimeTracker with real state and uptime manager
+	db := memdb.New()
+	clk := mockable.Clock{}
+	clk.Set(time.Unix(0, 0))
+	ut, err := NewUptimeTracker(ctx, db, &clk)
+	require.NoError(err)
+
+	nodeID := ids.GenerateTestNodeID()
+	vID := ids.GenerateTestID()
+
+	// Mark node as connected at the tracker before syncs
+	require.NoError(ut.Connect(nodeID))
+
+	// First sync: node active -> should be added and connected (not paused)
+	firstSet := map[ids.ID]*validators.GetCurrentValidatorOutput{
+		vID: {
+			ValidationID:  vID,
+			NodeID:        nodeID,
+			Weight:        1,
+			StartTime:     0,
+			IsActive:      true,
+			IsL1Validator: false,
+		},
+	}
+	mockVS.EXPECT().GetCurrentValidatorSet(gomock.Any(), ctx.SubnetID).Return(firstSet, uint64(1), nil)
+	require.NoError(ut.Sync(context.Background()))
+	require.False(ut.pausableManager.isPaused(nodeID))
+	require.True(ut.pausableManager.manager.IsConnected(nodeID))
+
+	// Second sync: same validator toggles to inactive -> should pause and disconnect
+	secondSet := map[ids.ID]*validators.GetCurrentValidatorOutput{
+		vID: {
+			ValidationID:  vID,
+			NodeID:        nodeID,
+			Weight:        1,
+			StartTime:     0,
+			IsActive:      false,
+			IsL1Validator: false,
+		},
+	}
+	mockVS.EXPECT().GetCurrentValidatorSet(gomock.Any(), ctx.SubnetID).Return(secondSet, uint64(2), nil)
+	require.NoError(ut.Sync(context.Background()))
+	require.True(ut.pausableManager.isPaused(nodeID))
+	require.False(ut.pausableManager.manager.IsConnected(nodeID))
+
+	// Third sync: back to active -> should resume and connect (since previously connected)
+	thirdSet := map[ids.ID]*validators.GetCurrentValidatorOutput{
+		vID: {
+			ValidationID:  vID,
+			NodeID:        nodeID,
+			Weight:        1,
+			StartTime:     0,
+			IsActive:      true,
+			IsL1Validator: false,
+		},
+	}
+	mockVS.EXPECT().GetCurrentValidatorSet(gomock.Any(), ctx.SubnetID).Return(thirdSet, uint64(3), nil)
+	require.NoError(ut.Sync(context.Background()))
+	require.False(ut.pausableManager.isPaused(nodeID))
+	require.True(ut.pausableManager.manager.IsConnected(nodeID))
 }

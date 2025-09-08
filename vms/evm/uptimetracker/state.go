@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
-	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var _ uptime.State = (*state)(nil)
@@ -61,15 +60,11 @@ type state struct {
 	// updatedData tracks the updates since WriteValidator was last called
 	updatedData map[ids.ID]dbUpdateStatus // vID -> updated status
 	db          database.Database
-
-	// Callback hooks for validator state changes
-	onAdded         func(vID ids.ID, nodeID ids.NodeID, startTime uint64, isActive bool)
-	onRemoved       func(vID ids.ID, nodeID ids.NodeID)
-	onStatusUpdated func(vID ids.ID, nodeID ids.NodeID, isActive bool)
 }
 
+// These methods are implemented and exported to satisfy the uptime.State interface
 // NewState creates a new State, it also loads the data from the disk
-func NewState(db database.Database) (*state, error) {
+func newState(db database.Database) (*state, error) {
 	s := &state{
 		index:       make(map[ids.NodeID]ids.ID),
 		data:        make(map[ids.ID]*validatorData),
@@ -80,44 +75,6 @@ func NewState(db database.Database) (*state, error) {
 		return nil, fmt.Errorf("failed to load data from disk: %w", err)
 	}
 	return s, nil
-}
-
-// SetPausableManager sets the pausable manager for state notifications
-func (s *state) SetPausableManager(pm *pausableManager) {
-	if pm == nil {
-		s.onAdded = nil
-		s.onRemoved = nil
-		s.onStatusUpdated = nil
-		return
-	}
-	s.onAdded = pm.OnValidatorAdded
-	s.onRemoved = pm.OnValidatorRemoved
-	s.onStatusUpdated = pm.OnValidatorStatusUpdated
-
-	// Notify the callbacks of current state (matches old RegisterListener behavior)
-	if s.onAdded != nil {
-		for vID, data := range s.data {
-			s.onAdded(vID, data.NodeID, data.StartTime, data.IsActive)
-		}
-	}
-}
-
-// SetCallbacks sets custom callbacks. Intended for tests.
-func (s *state) SetCallbacks(
-	onAdded func(vID ids.ID, nodeID ids.NodeID, startTime uint64, isActive bool),
-	onRemoved func(vID ids.ID, nodeID ids.NodeID),
-	onStatusUpdated func(vID ids.ID, nodeID ids.NodeID, isActive bool),
-) {
-	s.onAdded = onAdded
-	s.onRemoved = onRemoved
-	s.onStatusUpdated = onStatusUpdated
-
-	// Notify the callbacks of current state (matches old RegisterListener behavior)
-	if s.onAdded != nil {
-		for vID, data := range s.data {
-			s.onAdded(vID, data.NodeID, data.StartTime, data.IsActive)
-		}
-	}
 }
 
 // GetUptime returns the uptime of the validator with the given nodeID
@@ -157,9 +114,9 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	return data.getStartTime(), nil
 }
 
-// AddValidator adds a new validator to the state
+// addValidator adds a new validator to the state
 // the new validator is marked as updated and will be written to the disk when WriteState is called
-func (s *state) AddValidator(vdr Validator) error {
+func (s *state) addValidator(vdr Validator) error {
 	data := &validatorData{
 		NodeID:        vdr.NodeID,
 		validationID:  vdr.ValidationID,
@@ -175,17 +132,12 @@ func (s *state) AddValidator(vdr Validator) error {
 	}
 
 	s.updatedData[vdr.ValidationID] = updatedStatus
-
-	// Notify if callback is set
-	if s.onAdded != nil {
-		s.onAdded(vdr.ValidationID, vdr.NodeID, vdr.StartTimestamp, vdr.IsActive)
-	}
 	return nil
 }
 
-// UpdateValidator updates the validator in the state
+// updateValidator updates the validator in the state
 // returns an error if the validator does not exist or if the immutable fields are modified
-func (s *state) UpdateValidator(vdr Validator) error {
+func (s *state) updateValidator(vdr Validator) error {
 	data, ok := s.data[vdr.ValidationID]
 	if !ok {
 		return database.ErrNotFound
@@ -199,10 +151,6 @@ func (s *state) UpdateValidator(vdr Validator) error {
 	if data.IsActive != vdr.IsActive {
 		data.IsActive = vdr.IsActive
 		updated = updatedStatus
-		// Notify if callback is set
-		if s.onStatusUpdated != nil {
-			s.onStatusUpdated(data.validationID, data.NodeID, data.IsActive)
-		}
 	}
 
 	if data.Weight != vdr.Weight {
@@ -214,9 +162,9 @@ func (s *state) UpdateValidator(vdr Validator) error {
 	return nil
 }
 
-// DeleteValidator marks the validator as deleted
+// deleteValidator marks the validator as deleted
 // marked validator will be deleted from disk when WriteState is called
-func (s *state) DeleteValidator(vID ids.ID) bool {
+func (s *state) deleteValidator(vID ids.ID) bool {
 	data, ok := s.data[vID]
 	if !ok {
 		return false
@@ -226,16 +174,11 @@ func (s *state) DeleteValidator(vID ids.ID) bool {
 
 	// mark as deleted for WriteValidator
 	s.updatedData[data.validationID] = deletedStatus
-
-	// Notify if callback is set
-	if s.onRemoved != nil {
-		s.onRemoved(vID, data.NodeID)
-	}
 	return true
 }
 
-// WriteState writes the updated state to the disk
-func (s *state) WriteState() bool {
+// writeState writes the updated state to the disk
+func (s *state) writeState() bool {
 	// TODO: consider adding batch size
 	batch := s.db.NewBatch()
 	for vID, updateStatus := range s.updatedData {
@@ -262,51 +205,6 @@ func (s *state) WriteState() bool {
 	// we've successfully flushed the updates, clear the updated marker.
 	clear(s.updatedData)
 	return true
-}
-
-// GetValidationIDs returns the validation IDs in the state
-// The implementation tracks validators by their validationIDs and assumes
-// they're unique per node and their validation period.
-func (s *state) GetValidationIDs() set.Set[ids.ID] {
-	ids := set.NewSet[ids.ID](len(s.data))
-	for vID := range s.data {
-		ids.Add(vID)
-	}
-	return ids
-}
-
-// GetNodeIDs returns the node IDs of validators in the state
-func (s *state) GetNodeIDs() set.Set[ids.NodeID] {
-	ids := set.NewSet[ids.NodeID](len(s.index))
-	for nodeID := range s.index {
-		ids.Add(nodeID)
-	}
-	return ids
-}
-
-// GetValidationID returns the validation ID for the given nodeID
-func (s *state) GetValidationID(nodeID ids.NodeID) (ids.ID, bool) {
-	vID, exists := s.index[nodeID]
-	if !exists {
-		return ids.ID{}, false
-	}
-	return vID, true
-}
-
-// GetValidator returns the validator data for the given validationID
-func (s *state) GetValidator(vID ids.ID) (Validator, bool) {
-	data, ok := s.data[vID]
-	if !ok {
-		return Validator{}, false
-	}
-	return Validator{
-		ValidationID:   data.validationID,
-		NodeID:         data.NodeID,
-		StartTimestamp: data.StartTime,
-		IsActive:       data.IsActive,
-		Weight:         data.Weight,
-		IsL1Validator:  data.IsL1Validator,
-	}, true
 }
 
 // parseValidatorData parses the data from the bytes into given validatorData

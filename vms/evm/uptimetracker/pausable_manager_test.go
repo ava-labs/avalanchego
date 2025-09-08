@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-func TestPausableManagerM(t *testing.T) {
+func TestPausableManager(t *testing.T) {
 	vID := ids.GenerateTestID()
 	nodeID0 := ids.GenerateTestNodeID()
 	startTime := time.Now()
@@ -29,13 +29,13 @@ func TestPausableManagerM(t *testing.T) {
 				require := require.New(t)
 
 				// Connect before tracking
-				require.NoError(up.Connect(nodeID0))
+				require.NoError(up.connect(nodeID0))
 				addTime(clk, time.Second)
 				wantUptime := 1 * time.Second
 
 				// Pause before tracking
-				up.OnValidatorStatusUpdated(vID, nodeID0, false)
-				require.True(up.IsPaused(nodeID0))
+				up.onValidatorStatusUpdated(vID, nodeID0, false)
+				require.True(up.isPaused(nodeID0))
 
 				// Elapse Time
 				addTime(clk, time.Second)
@@ -51,7 +51,7 @@ func TestPausableManagerM(t *testing.T) {
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
 
 				// Disconnect
-				require.NoError(up.Disconnect(nodeID0))
+				require.NoError(up.disconnect(nodeID0))
 				// Uptime should not have increased
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
 			},
@@ -66,12 +66,12 @@ func TestPausableManagerM(t *testing.T) {
 
 				// Connect
 				addTime(clk, 1*time.Second)
-				require.NoError(up.Connect(nodeID0))
+				require.NoError(up.connect(nodeID0))
 
 				// Pause
 				addTime(clk, 1*time.Second)
-				up.OnValidatorStatusUpdated(vID, nodeID0, false)
-				require.True(up.IsPaused(nodeID0))
+				up.onValidatorStatusUpdated(vID, nodeID0, false)
+				require.True(up.isPaused(nodeID0))
 
 				// Elapse time
 				currentTime := addTime(clk, 2*time.Second)
@@ -81,21 +81,21 @@ func TestPausableManagerM(t *testing.T) {
 
 				// Disconnect and check uptime
 				currentTime = addTime(clk, 3*time.Second)
-				require.NoError(up.Disconnect(nodeID0))
+				require.NoError(up.disconnect(nodeID0))
 				// Uptime should not have increased since the node was paused
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
 
 				// Connect again and check uptime
 				addTime(clk, 4*time.Second)
-				require.NoError(up.Connect(nodeID0))
+				require.NoError(up.connect(nodeID0))
 				currentTime = addTime(clk, 5*time.Second)
 				// Uptime should not have increased since the node was paused
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
 
 				// Resume and check uptime
 				currentTime = addTime(clk, 6*time.Second)
-				up.OnValidatorStatusUpdated(vID, nodeID0, true)
-				require.False(up.IsPaused(nodeID0))
+				up.onValidatorStatusUpdated(vID, nodeID0, true)
+				require.False(up.isPaused(nodeID0))
 				// Uptime should not have increased since the node was paused
 				// and we just resumed it
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
@@ -113,8 +113,8 @@ func TestPausableManagerM(t *testing.T) {
 				require := require.New(t)
 
 				// Pause before tracking
-				up.OnValidatorStatusUpdated(vID, nodeID0, false)
-				require.True(up.IsPaused(nodeID0))
+				up.onValidatorStatusUpdated(vID, nodeID0, false)
+				require.True(up.isPaused(nodeID0))
 
 				// Start tracking
 				addTime(clk, time.Second)
@@ -125,7 +125,7 @@ func TestPausableManagerM(t *testing.T) {
 				// Connect and check uptime
 				addTime(clk, 1*time.Second)
 				checkUptime(t, up, nodeID0, wantUptime, clk.Time())
-				require.NoError(up.Connect(nodeID0))
+				require.NoError(up.connect(nodeID0))
 
 				currentTime := addTime(clk, 2*time.Second)
 				// Uptime should not have increased since the node was paused after we started tracking
@@ -133,16 +133,16 @@ func TestPausableManagerM(t *testing.T) {
 
 				// Disconnect and check uptime
 				currentTime = addTime(clk, 3*time.Second)
-				require.NoError(up.Disconnect(nodeID0))
+				require.NoError(up.disconnect(nodeID0))
 				// Uptime should not have increased since the node was paused
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
 
 				// Connect again and resume
 				addTime(clk, 4*time.Second)
-				require.NoError(up.Connect(nodeID0))
+				require.NoError(up.connect(nodeID0))
 				addTime(clk, 5*time.Second)
-				up.OnValidatorStatusUpdated(vID, nodeID0, true)
-				require.False(up.IsPaused(nodeID0))
+				up.onValidatorStatusUpdated(vID, nodeID0, true)
+				require.False(up.isPaused(nodeID0))
 
 				// Check uptime after resume
 				currentTime = addTime(clk, 6*time.Second)
@@ -159,12 +159,12 @@ func TestPausableManagerM(t *testing.T) {
 				// Start tracking and connect
 				require.NoError(up.manager.StartTracking([]ids.NodeID{nodeID0}))
 				addTime(clk, time.Second)
-				require.NoError(up.Connect(nodeID0))
+				require.NoError(up.connect(nodeID0))
 
 				// Pause and check uptime
 				currentTime := addTime(clk, 2*time.Second)
-				up.OnValidatorStatusUpdated(vID, nodeID0, false)
-				require.True(up.IsPaused(nodeID0))
+				up.onValidatorStatusUpdated(vID, nodeID0, false)
+				require.True(up.isPaused(nodeID0))
 				// Uptime should be 2 seconds since the node was paused after 2 seconds
 				wantUptime := 2 * time.Second
 
@@ -174,22 +174,22 @@ func TestPausableManagerM(t *testing.T) {
 				currentTime = addTime(clk, 3*time.Second)
 				require.NoError(up.manager.StopTracking([]ids.NodeID{nodeID0}))
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
-				up = *NewPausableManager(uptime.NewManager(s, clk))
+				up = *newPausableManager(uptime.NewManager(s, clk))
 
 				// Uptime should not have increased since the node was paused
 				// and we have not started tracking again
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
 
 				// Pause and check uptime
-				up.OnValidatorStatusUpdated(vID, nodeID0, false)
-				require.True(up.IsPaused(nodeID0))
+				up.onValidatorStatusUpdated(vID, nodeID0, false)
+				require.True(up.isPaused(nodeID0))
 				// Uptime should not have increased since the node was paused
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
 
 				// Resume and check uptime
 				currentTime = addTime(clk, 5*time.Second)
-				up.OnValidatorStatusUpdated(vID, nodeID0, true)
-				require.False(up.IsPaused(nodeID0))
+				up.onValidatorStatusUpdated(vID, nodeID0, true)
+				require.False(up.isPaused(nodeID0))
 				// Uptime should have increased by 5 seconds since the node was resumed
 				wantUptime += 5 * time.Second
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
@@ -208,7 +208,7 @@ func TestPausableManagerM(t *testing.T) {
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
 
 				// Connect and final uptime check
-				require.NoError(up.Connect(nodeID0))
+				require.NoError(up.connect(nodeID0))
 				currentTime = addTime(clk, 8*time.Second)
 				// Uptime should have increased by 8 seconds since the node was connected
 				wantUptime += 8 * time.Second
@@ -223,7 +223,7 @@ func TestPausableManagerM(t *testing.T) {
 				// Start tracking and connect
 				require.NoError(up.manager.StartTracking([]ids.NodeID{nodeID0}))
 				addTime(clk, time.Second)
-				require.NoError(up.Connect(nodeID0))
+				require.NoError(up.connect(nodeID0))
 
 				// Stop tracking
 				currentTime := addTime(clk, 2*time.Second)
@@ -235,8 +235,8 @@ func TestPausableManagerM(t *testing.T) {
 				addTime(clk, 3*time.Second)
 				// wantUptime should increase since we stopped tracking
 				wantUptime += 3 * time.Second
-				up.OnValidatorStatusUpdated(vID, nodeID0, false)
-				require.True(up.IsPaused(nodeID0))
+				up.onValidatorStatusUpdated(vID, nodeID0, false)
+				require.True(up.isPaused(nodeID0))
 				// wantUptime should increase since we stopped tracking (even if the node was paused)
 				currentTime = addTime(clk, 4*time.Second)
 				wantUptime += 4 * time.Second
@@ -245,7 +245,7 @@ func TestPausableManagerM(t *testing.T) {
 				require.NoError(up.manager.StartTracking([]ids.NodeID{nodeID0}))
 				// Uptime have increased since the node was paused before we started tracking
 				// We should be optimistic and assume the node was online and active until we start tracking
-				require.True(up.IsPaused(nodeID0))
+				require.True(up.isPaused(nodeID0))
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
 			},
 		},
@@ -257,14 +257,14 @@ func TestPausableManagerM(t *testing.T) {
 				// Start tracking and connect
 				require.NoError(up.manager.StartTracking([]ids.NodeID{nodeID0}))
 				addTime(clk, time.Second)
-				require.NoError(up.Connect(nodeID0))
+				require.NoError(up.connect(nodeID0))
 
 				// Pause after a while
 				currentTime := addTime(clk, 2*time.Second)
 				// wantUptime should increase
 				wantUptime := 2 * time.Second
-				up.OnValidatorStatusUpdated(vID, nodeID0, false)
-				require.True(up.IsPaused(nodeID0))
+				up.onValidatorStatusUpdated(vID, nodeID0, false)
+				require.True(up.isPaused(nodeID0))
 				checkUptime(t, up, nodeID0, wantUptime, currentTime)
 
 				// Stop tracking
@@ -277,8 +277,8 @@ func TestPausableManagerM(t *testing.T) {
 				addTime(clk, 4*time.Second)
 				// wantUptime should increase since we stopped tracking
 				wantUptime += 4 * time.Second
-				up.OnValidatorStatusUpdated(vID, nodeID0, true)
-				require.False(up.IsPaused(nodeID0))
+				up.onValidatorStatusUpdated(vID, nodeID0, true)
+				require.False(up.isPaused(nodeID0))
 				// wantUptime should increase since we stopped tracking
 				currentTime = addTime(clk, 5*time.Second)
 				wantUptime += 5 * time.Second
@@ -305,7 +305,7 @@ func setupTestEnv(nodeID ids.NodeID, startTime time.Time) (pausableManager, *moc
 	clk.Set(startTime)
 	s := uptime.NewTestState()
 	s.AddNode(nodeID, startTime)
-	up := *NewPausableManager(uptime.NewManager(s, &clk))
+	up := *newPausableManager(uptime.NewManager(s, &clk))
 	return up, &clk, s
 }
 

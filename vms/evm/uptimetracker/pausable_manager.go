@@ -20,7 +20,7 @@ type pausableManager struct {
 }
 
 // NewPausableManager takes an uptime.Manager and returns a PausableManager
-func NewPausableManager(manager uptime.Manager) *pausableManager {
+func newPausableManager(manager uptime.Manager) *pausableManager {
 	return &pausableManager{
 		manager:       manager,
 		pausedVdrs:    make(set.Set[ids.NodeID]),
@@ -41,12 +41,18 @@ func NewPausableManager(manager uptime.Manager) *pausableManager {
 // Note: The uptime manager does not check if the connected peer is a validator or not. It records
 // the connection time assuming that a non-validator peer can become a validator whilst they're
 // connected to the uptime manager.
-func (p *pausableManager) Connect(nodeID ids.NodeID) error {
+func (p *pausableManager) connect(nodeID ids.NodeID) error {
 	p.connectedVdrs.Add(nodeID)
-	if !p.IsPaused(nodeID) && !p.manager.IsConnected(nodeID) {
+	if !p.isPaused(nodeID) && !p.manager.IsConnected(nodeID) {
 		return p.manager.Connect(nodeID)
 	}
 	return nil
+}
+
+// IsConnected returns true if the node with the given ID is connected to this manager
+// Note: Inner manager may have a different view of the connection status due to pausing
+func (p *pausableManager) IsConnected(nodeID ids.NodeID) bool {
+	return p.connectedVdrs.Contains(nodeID)
 }
 
 // Disconnect disconnects the node with the given ID from the uptime.Manager
@@ -58,7 +64,7 @@ func (p *pausableManager) Connect(nodeID ids.NodeID) error {
 // uptime of the validator. When a validator is paused/`inactive`, the pausable uptime manager
 // handles the `inactive` peers as if they were disconnected. Thus the uptime manager assumes that
 // no paused peers can be disconnected again from the pausable uptime manager.
-func (p *pausableManager) Disconnect(nodeID ids.NodeID) error {
+func (p *pausableManager) disconnect(nodeID ids.NodeID) error {
 	p.connectedVdrs.Remove(nodeID)
 	if p.manager.IsConnected(nodeID) {
 		return p.manager.Disconnect(nodeID)
@@ -66,15 +72,9 @@ func (p *pausableManager) Disconnect(nodeID ids.NodeID) error {
 	return nil
 }
 
-// IsConnected returns true if the node with the given ID is connected to this manager
-// Note: Inner manager may have a different view of the connection status due to pausing
-func (p *pausableManager) IsConnected(nodeID ids.NodeID) bool {
-	return p.connectedVdrs.Contains(nodeID)
-}
-
 // OnValidatorAdded is called when a validator is added.
 // If the node is inactive, it will be paused.
-func (p *pausableManager) OnValidatorAdded(_ ids.ID, nodeID ids.NodeID, _ uint64, isActive bool) {
+func (p *pausableManager) onValidatorAdded(_ ids.ID, nodeID ids.NodeID, _ uint64, isActive bool) {
 	if !isActive {
 		err := p.pause(nodeID)
 		if err != nil {
@@ -85,8 +85,8 @@ func (p *pausableManager) OnValidatorAdded(_ ids.ID, nodeID ids.NodeID, _ uint64
 
 // OnValidatorRemoved is called when a validator is removed.
 // If the node is already paused, it will be resumed.
-func (p *pausableManager) OnValidatorRemoved(_ ids.ID, nodeID ids.NodeID) {
-	if p.IsPaused(nodeID) {
+func (p *pausableManager) onValidatorRemoved(_ ids.ID, nodeID ids.NodeID) {
+	if p.isPaused(nodeID) {
 		err := p.resume(nodeID)
 		if err != nil {
 			log.Error("failed to handle validator removed %s: %s", nodeID, err)
@@ -96,7 +96,7 @@ func (p *pausableManager) OnValidatorRemoved(_ ids.ID, nodeID ids.NodeID) {
 
 // OnValidatorStatusUpdated is called when the status of a validator is updated.
 // If the node is active, it will be resumed. If the node is inactive, it will be paused.
-func (p *pausableManager) OnValidatorStatusUpdated(_ ids.ID, nodeID ids.NodeID, isActive bool) {
+func (p *pausableManager) onValidatorStatusUpdated(_ ids.ID, nodeID ids.NodeID, isActive bool) {
 	var err error
 	if isActive {
 		err = p.resume(nodeID)
@@ -109,7 +109,7 @@ func (p *pausableManager) OnValidatorStatusUpdated(_ ids.ID, nodeID ids.NodeID, 
 }
 
 // IsPaused returns true if the node with the given ID is paused.
-func (p *pausableManager) IsPaused(nodeID ids.NodeID) bool {
+func (p *pausableManager) isPaused(nodeID ids.NodeID) bool {
 	return p.pausedVdrs.Contains(nodeID)
 }
 
