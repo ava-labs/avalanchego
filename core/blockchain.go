@@ -600,15 +600,16 @@ func (bc *BlockChain) startAcceptor() {
 		start := time.Now()
 		acceptorQueueGauge.Dec(1)
 
+		// Update acceptor tip and transaction lookup index
+		// Write this prior to state changes to allow easier reconstruction in `reprocessState`.
+		if err := bc.writeBlockAcceptedIndices(next); err != nil {
+			log.Crit("failed to write accepted block effects", "err", err)
+		}
+
 		if err := bc.flattenSnapshot(func() error {
 			return bc.stateManager.AcceptTrie(next)
 		}, next.Hash()); err != nil {
 			log.Crit("unable to flatten snapshot from acceptor", "blockHash", next.Hash(), "err", err)
-		}
-
-		// Update last processed and transaction lookup index
-		if err := bc.writeBlockAcceptedIndices(next); err != nil {
-			log.Crit("failed to write accepted block effects", "err", err)
 		}
 
 		// Ensure [hc.acceptedNumberCache] and [acceptedLogsCache] have latest content
@@ -1915,6 +1916,13 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 		}
 		roots = append(roots, root)
 
+		// Write any unsaved indices to disk
+		if writeIndices {
+			if err := bc.writeBlockAcceptedIndices(current); err != nil {
+				return fmt.Errorf("%w: failed to process accepted block indices", err)
+			}
+		}
+
 		// Flatten snapshot if initialized, holding a reference to the state root until the next block
 		// is processed.
 		if err := bc.flattenSnapshot(func() error {
@@ -1925,13 +1933,6 @@ func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error 
 			return nil
 		}, current.Hash()); err != nil {
 			return err
-		}
-
-		// Write any unsaved indices to disk
-		if writeIndices {
-			if err := bc.writeBlockAcceptedIndices(current); err != nil {
-				return fmt.Errorf("%w: failed to process accepted block indices", err)
-			}
 		}
 	}
 
