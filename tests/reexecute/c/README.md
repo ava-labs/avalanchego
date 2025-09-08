@@ -89,11 +89,19 @@ PASS
 ok  	github.com/ava-labs/avalanchego/tests/reexecute/c	313.560s
 ```
 
-## Walkthrough
+## How to Create and Use a Re-Execution Snapshot
+
+Let's walk through how to create a state snapshot for re-execution from scratch and how to use it. To do so, we'll walk through:
+
+- Importing the required block range
+- Executing the initial range [1, N]
+- Exporting the state snapshot to S3
+- Re-executing from where we left off on the current state
+- Re-executing by importing the current state from S3
 
 ### Generate Initial State Snapshot
 
-To generate an initial state snapshot at block height N, we will need to:
+To generate our initial state snapshot locally, we will:
 
 - Import the block range including at least blocks in [1, N]
 - Execute the block range [1, N]
@@ -169,14 +177,12 @@ Since we are already using the S3 bucket `s3://avalanchego-bootstrap-testing`, w
 - `LOCAL_SRC` - local path to recursive copy contents from
 - `S3_DST` - S3 bucket destination path
 
-To avoid clobbering useful data, `export-dir-to-s3` will first attempt to check that the destination does not yet exist and that the path does not have any nesting. For example, `s3://avalanchego-bootstrap-testing/target-dir/` is valid, but `s3://avalanchego-bootstrap-testing/nested/target-dir/` is not allowed because it has two levels of nesting.
+To avoid clobbering useful data, `export-dir-to-s3` will first attempt to check that the destination does not yet exist and that the path does not have any nesting. For example, `s3://avalanchego-bootstrap-testing/target-dir/` is valid, but `s3://avalanchego-bootstrap-testing/nested/target-dir/` is invalid because it contains two levels of nesting.
 
-As a result, if you run into a warning using this command, check the current contents using either the AWS Console or `s5cmd ls` and make sure to pick an unused `S3_DST` value.
+As a result, if you run into a warning using this command, check the current contents using either the AWS Console or `s5cmd ls` and pick a valid, unused prefix.
 
 ```bash
-export LOCAL_SRC=$EXECUTION_DATA_DIR/current-state/
-export S3_DST=s3://avalanchego-bootstrap-testing/cchain-current-state-test/
-task export-dir-to-s3
+task export-dir-to-s3 LOCAL_SRC=$EXECUTION_DATA_DIR/current-state/ S3_DST=s3://avalanchego-bootstrap-testing/cchain-current-state-test/
 ```
 
 ### Re-Execute C-Chain Range
@@ -208,8 +214,7 @@ Specify the following parameters:
 We'll use a new `EXECUTION_DATA_DIR` for this run to avoid conflicts with previous runs from this walkthrough:
 
 ```bash
-export EXECUTION_DATA_DIR=$HOME/.reexecute-cchain/reexecute-with-copied-data
-task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$EXECUTION_DATA_DIR BLOCK_DIR_SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/** CURRENT_STATE_DIR_SRC=s3://avalanchego-bootstrap-testing/cchain-current-state-test/** START_BLOCK=101 END_BLOCK=10000
+task reexecute-cchain-range-with-copied-data EXECUTION_DATA_DIR=$HOME/.reexecute-cchain/reexecute-with-copied-data BLOCK_DIR_SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/** CURRENT_STATE_DIR_SRC=s3://avalanchego-bootstrap-testing/cchain-current-state-test/** START_BLOCK=101 END_BLOCK=10000
 ```
 
 ## Predefined Configs
