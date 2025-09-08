@@ -46,7 +46,7 @@ To support metrics collection (enabled by default), re-execution requires Promet
 
 ## Quick Start
 
-Let's run the default benchmark to get started. Make sure that you have completed the [Prerequisites](#prerequisites) section because it is required to copy the data from S3..
+Let's run the default benchmark to get started. Make sure that you have completed the [Prerequisites](#prerequisites) section because it is required to copy the data from S3.
 
 Decide what directory you want to use as a working directory and set the parameter `EXECUTION_DATA_DIR`. To re-execute a range of blocks, we need to copy the blocks themselves and the initial state of the chain, so these will be copied into `EXECUTION_DATA_DIR`.
 
