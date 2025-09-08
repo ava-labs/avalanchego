@@ -48,6 +48,43 @@ func (s *Server) GetSubnetID(ctx context.Context, req *pb.GetSubnetIDRequest) (*
 	}, err
 }
 
+func (s *Server) GetAllValidatorSets(ctx context.Context, req *pb.GetAllValidatorSetsRequest) (*pb.GetAllValidatorSetsResponse, error) {
+	validatorSets, err := s.state.GetAllValidatorSets(ctx, req.Height)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &pb.GetAllValidatorSetsResponse{
+		ValidatorSets: make([]*pb.GetValidatorSetWithSubnetID, 0, len(validatorSets)),
+	}
+
+	i := 0
+	for subnetID, vdrs := range validatorSets {
+		validators := make([]*pb.Validator, len(vdrs))
+		j := 0
+		for _, vdr := range vdrs {
+			vdrPB := &pb.Validator{
+				NodeId: vdr.NodeID.Bytes(),
+				Weight: vdr.Weight,
+			}
+			if vdr.PublicKey != nil {
+				// Passing in the uncompressed bytes is a performance optimization
+				// to avoid the cost of calling PublicKeyFromCompressedBytes on the
+				// client side.
+				vdrPB.PublicKey = bls.PublicKeyToUncompressedBytes(vdr.PublicKey)
+			}
+			validators[j] = vdrPB
+			j++
+		}
+		resp.ValidatorSets[i] = &pb.GetValidatorSetWithSubnetID{
+			SubnetId:   subnetID[:],
+			Validators: validators,
+		}
+		i++
+	}
+	return resp, nil
+}
+
 func (s *Server) GetValidatorSet(ctx context.Context, req *pb.GetValidatorSetRequest) (*pb.GetValidatorSetResponse, error) {
 	subnetID, err := ids.ToID(req.SubnetId)
 	if err != nil {

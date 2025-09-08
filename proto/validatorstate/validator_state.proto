@@ -14,6 +14,9 @@ service ValidatorState {
   rpc GetCurrentHeight(google.protobuf.Empty) returns (GetCurrentHeightResponse);
   // GetSubnetID returns the subnetID of the provided chain.
   rpc GetSubnetID(GetSubnetIDRequest) returns (GetSubnetIDResponse);
+  // GetAllValidatorSets returns the weights of the nodeIDs for all
+  // subnets at the requested P-chain height.
+  rpc GetAllValidatorSets(GetAllValidatorSetsRequest) returns (GetAllValidatorSetsResponse);
   // GetValidatorSet returns the weights of the nodeIDs for the provided
   // subnet at the requested P-chain height.
   rpc GetValidatorSet(GetValidatorSetRequest) returns (GetValidatorSetResponse);
@@ -38,6 +41,10 @@ message GetSubnetIDResponse {
   bytes subnet_id = 1;
 }
 
+message GetAllValidatorSetsRequest {
+  uint64 height = 1;
+}
+
 message GetValidatorSetRequest {
   uint64 height = 1;
   bytes subnet_id = 2;
@@ -56,6 +63,15 @@ message Validator {
   bool is_active = 6; // can be empty
   bytes validation_id = 7; // can be empty
   bool is_l1_validator = 8; // can be empty
+}
+
+message GetAllValidatorSetsResponse {
+  repeated GetValidatorSetWithSubnetID validator_sets = 1;
+}
+
+message GetValidatorSetWithSubnetID {
+  bytes subnet_id = 1;
+  repeated Validator validators = 2;
 }
 
 message GetValidatorSetResponse {

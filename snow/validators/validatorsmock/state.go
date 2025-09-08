@@ -42,6 +42,21 @@ func (m *State) EXPECT() *StateMockRecorder {
 	return m.recorder
 }
 
+// GetAllValidatorSets mocks base method.
+func (m *State) GetAllValidatorSets(ctx context.Context, height uint64) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAllValidatorSets", ctx, height)
+	ret0, _ := ret[0].(map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetAllValidatorSets indicates an expected call of GetAllValidatorSets.
+func (mr *StateMockRecorder) GetAllValidatorSets(ctx, height any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAllValidatorSets", reflect.TypeOf((*State)(nil).GetAllValidatorSets), ctx, height)
+}
+
 // GetCurrentHeight mocks base method.
 func (m *State) GetCurrentHeight(arg0 context.Context) (uint64, error) {
 	m.ctrl.T.Helper()

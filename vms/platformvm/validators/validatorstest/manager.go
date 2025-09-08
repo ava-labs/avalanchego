@@ -28,6 +28,10 @@ func (manager) GetSubnetID(context.Context, ids.ID) (ids.ID, error) {
 	return ids.Empty, nil
 }
 
+func (manager) GetAllValidatorSets(context.Context, uint64) (map[ids.ID]map[ids.NodeID]*snowvalidators.GetValidatorOutput, error) {
+	return nil, nil
+}
+
 func (manager) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]*snowvalidators.GetValidatorOutput, error) {
 	return nil, nil
 }

@@ -5,12 +5,21 @@ package validators
 
 import (
 	"context"
+	"errors"
+	"maps"
 	"sync"
 
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ State = (*lockedState)(nil)
+const validatorSetsCacheSize = 32
+
+var (
+	_ State = (*CachedState)(nil)
+	_ State = (*lockedState)(nil)
+)
 
 // State allows the lookup of validator sets on specified subnets at the
 // requested P-chain height.
@@ -23,6 +32,14 @@ type State interface {
 
 	// GetSubnetID returns the subnetID of the provided chain.
 	GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error)
+
+	// GetAllValidatorSets returns the validators of all subnets at the
+	// requested P-chain height.
+	// The returned map should not be modified.
+	GetAllValidatorSets(
+		ctx context.Context,
+		height uint64,
+	) (map[ids.ID]map[ids.NodeID]*GetValidatorOutput, error)
 
 	// GetValidatorSet returns the validators of the provided subnet at the
 	// requested P-chain height.
@@ -86,6 +103,16 @@ func (s *lockedState) GetValidatorSet(
 	return s.s.GetValidatorSet(ctx, height, subnetID)
 }
 
+func (s *lockedState) GetAllValidatorSets(
+	ctx context.Context,
+	height uint64,
+) (map[ids.ID]map[ids.NodeID]*GetValidatorOutput, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.s.GetAllValidatorSets(ctx, height)
+}
+
 func (s *lockedState) GetCurrentValidatorSet(
 	ctx context.Context,
 	subnetID ids.ID,
@@ -106,6 +133,10 @@ func NewNoValidatorsState(state State) State {
 	}
 }
 
+func (*noValidators) GetAllValidatorSets(context.Context, uint64) (map[ids.ID]map[ids.NodeID]*GetValidatorOutput, error) {
+	return nil, nil
+}
+
 func (*noValidators) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]*GetValidatorOutput, error) {
 	return nil, nil
 }
@@ -113,4 +144,65 @@ func (*noValidators) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.N
 func (n *noValidators) GetCurrentValidatorSet(ctx context.Context, _ ids.ID) (map[ids.ID]*GetCurrentValidatorOutput, uint64, error) {
 	height, err := n.GetCurrentHeight(ctx)
 	return nil, height, err
+}
+
+type CachedState struct {
+	State
+
+	// Caches validators for all subnets at various heights.
+	// Key: height
+	// Value: mapping height -> subnet ID -> validator set
+	cache cache.Cacher[uint64, map[ids.ID]map[ids.NodeID]*GetValidatorOutput]
+}
+
+func NewCachedState(state State) *CachedState {
+	return &CachedState{
+		State: state,
+		cache: lru.NewCache[uint64, map[ids.ID]map[ids.NodeID]*GetValidatorOutput](validatorSetsCacheSize),
+	}
+}
+
+func (c *CachedState) GetAllValidatorSets(
+	ctx context.Context,
+	height uint64,
+) (map[ids.ID]map[ids.NodeID]*GetValidatorOutput, error) {
+	if validatorSet, ok := c.cache.Get(height); ok {
+		return maps.Clone(validatorSet), nil
+	}
+
+	validatorSets, err := c.State.GetAllValidatorSets(ctx, height)
+	if err != nil {
+		return nil, err
+	}
+
+	// cache the validator set
+	c.cache.Put(height, validatorSets)
+
+	return validatorSets, nil
+}
+
+func (c *CachedState) GetValidatorSet(
+	ctx context.Context,
+	height uint64,
+	subnetID ids.ID,
+) (map[ids.NodeID]*GetValidatorOutput, error) {
+	if validatorSets, ok := c.cache.Get(height); ok {
+		validatorSet, exists := validatorSets[subnetID]
+		if !exists {
+			return nil, errors.New("validator set for subnet not found")
+		}
+		return maps.Clone(validatorSet), nil
+	}
+
+	validatorSets, err := c.GetAllValidatorSets(ctx, height)
+	if err != nil {
+		return nil, err
+	}
+
+	validatorSet, exists := validatorSets[subnetID]
+	if !exists {
+		return nil, errors.New("validator set for subnet not found")
+	}
+
+	return maps.Clone(validatorSet), nil
 }

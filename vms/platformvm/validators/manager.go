@@ -63,6 +63,8 @@ type State interface {
 	GetLastAccepted() ids.ID
 	GetStatelessBlock(blockID ids.ID) (block.Block, error)
 
+	GetSubnetIDs() ([]ids.ID, error)
+
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
 	// block until it has applied all of the diffs up to and including
 	// [endHeight]. Applying the diffs modifies [validators].
@@ -194,6 +196,26 @@ func (m *manager) getCurrentHeight(context.Context) (uint64, error) {
 		return 0, err
 	}
 	return lastAccepted.Height(), nil
+}
+
+func (m *manager) GetAllValidatorSets(
+	ctx context.Context,
+	targetHeight uint64,
+) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	result := make(map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput)
+	subnets, err := m.state.GetSubnetIDs()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get subnet IDs: %w", err)
+	}
+
+	for _, subnetID := range subnets {
+		validatorSet, err := m.GetValidatorSet(ctx, targetHeight, subnetID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get validator set for subnet %s: %w", subnetID, err)
+		}
+		result[subnetID] = validatorSet
+	}
+	return result, nil
 }
 
 func (m *manager) GetValidatorSet(
