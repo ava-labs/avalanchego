@@ -4,11 +4,6 @@ package sync;
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 
-message Proof {
-  bytes key = 1;
-  MaybeBytes value = 2;
-  repeated ProofNode proof = 3;
-}
 
 // For use in sync client, which has a restriction on the size of
 // the response. GetChangeProof in the DB service doesn't.

@@ -1650,13 +1650,15 @@ func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
 		// Marshal and unmarshal it.
 		// Assert the unmarshaled one is the same as the original.
 		var unmarshaledProof RangeProof
-		protoProof := proof.ToProto()
-		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
+		originalBytes, err := proof.MarshalBinary()
+		require.NoError(err)
+		require.NoError(unmarshaledProof.UnmarshalBinary(originalBytes))
 		require.Equal(proof, unmarshaledProof)
 
 		// Marshaling again should yield same result.
-		protoUnmarshaledProof := unmarshaledProof.ToProto()
-		require.Equal(protoProof, protoUnmarshaledProof)
+		unmarshaledBytes, err := unmarshaledProof.MarshalBinary()
+		require.NoError(err)
+		require.Equal(originalBytes, unmarshaledBytes)
 	})
 }
 
@@ -1712,19 +1714,21 @@ func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
 		// Marshal and unmarshal it.
 		// Assert the unmarshaled one is the same as the original.
 		var unmarshaledProof ChangeProof
-		protoProof := proof.ToProto()
-		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
+		originalBytes, err := proof.MarshalBinary()
+		require.NoError(err)
+		require.NoError(unmarshaledProof.UnmarshalBinary(originalBytes))
 		require.Equal(proof, unmarshaledProof)
 
 		// Marshaling again should yield same result.
-		protoUnmarshaledProof := unmarshaledProof.ToProto()
-		require.Equal(protoProof, protoUnmarshaledProof)
+		unmarshaledBytes, err := unmarshaledProof.MarshalBinary()
+		require.NoError(err)
+		require.Equal(originalBytes, unmarshaledBytes)
 	})
 }
 
 func TestChangeProofUnmarshalProtoNil(t *testing.T) {
 	var proof ChangeProof
-	err := proof.UnmarshalProto(nil)
+	err := proof.unmarshalProto(nil)
 	require.ErrorIs(t, err, ErrNilChangeProof)
 }
 
@@ -1773,12 +1777,12 @@ func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
 		EndProof:   endProof,
 		KeyChanges: keyChanges,
 	}
-	protoProof := proof.ToProto()
+	protoProof := proof.toProto()
 	// Make a value nil
 	protoProof.KeyChanges[0].Value = nil
 
 	var unmarshaledProof ChangeProof
-	err := unmarshaledProof.UnmarshalProto(protoProof)
+	err := unmarshaledProof.unmarshalProto(protoProof)
 	require.ErrorIs(t, err, ErrNilMaybeBytes)
 }
 
@@ -1796,94 +1800,8 @@ func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
 	}
 
 	var proof ChangeProof
-	err := proof.UnmarshalProto(protoProof)
+	err := proof.unmarshalProto(protoProof)
 	require.ErrorIs(t, err, ErrInvalidMaybe)
-}
-
-func FuzzProofProtoMarshalUnmarshal(f *testing.F) {
-	f.Fuzz(func(
-		t *testing.T,
-		randSeed int64,
-	) {
-		require := require.New(t)
-		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
-
-		// Make a random proof.
-		proofLen := rand.Intn(32)
-		proofPath := make([]ProofNode, proofLen)
-		for i := 0; i < proofLen; i++ {
-			proofPath[i] = newRandomProofNode(rand)
-		}
-
-		keyLen := rand.Intn(32)
-		key := make([]byte, keyLen)
-		_, _ = rand.Read(key)
-
-		hasValue := rand.Intn(2) == 1
-		value := maybe.Nothing[[]byte]()
-		if hasValue {
-			valueLen := rand.Intn(32)
-			valueBytes := make([]byte, valueLen)
-			_, _ = rand.Read(valueBytes)
-			value = maybe.Some(valueBytes)
-		}
-
-		proof := Proof{
-			Key:   ToKey(key),
-			Value: value,
-			Path:  proofPath,
-		}
-
-		// Marshal and unmarshal it.
-		// Assert the unmarshaled one is the same as the original.
-		var unmarshaledProof Proof
-		protoProof := proof.ToProto()
-		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
-		require.Equal(proof, unmarshaledProof)
-
-		// Marshaling again should yield same result.
-		protoUnmarshaledProof := unmarshaledProof.ToProto()
-		require.Equal(protoProof, protoUnmarshaledProof)
-	})
-}
-
-func TestProofProtoUnmarshal(t *testing.T) {
-	type test struct {
-		name        string
-		proof       *pb.Proof
-		expectedErr error
-	}
-
-	tests := []test{
-		{
-			name:        "nil",
-			proof:       nil,
-			expectedErr: ErrNilProof,
-		},
-		{
-			name:        "nil value",
-			proof:       &pb.Proof{},
-			expectedErr: ErrNilValue,
-		},
-		{
-			name: "invalid maybe",
-			proof: &pb.Proof{
-				Value: &pb.MaybeBytes{
-					Value:     []byte{1},
-					IsNothing: true,
-				},
-			},
-			expectedErr: ErrInvalidMaybe,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var proof Proof
-			err := proof.UnmarshalProto(tt.proof)
-			require.ErrorIs(t, err, tt.expectedErr)
-		})
-	}
 }
 
 func FuzzRangeProofInvariants(f *testing.F) {

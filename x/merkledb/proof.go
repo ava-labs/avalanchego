@@ -199,55 +199,10 @@ func (proof *Proof) Verify(
 	return nil
 }
 
-func (proof *Proof) ToProto() *pb.Proof {
-	value := &pb.MaybeBytes{
-		Value:     proof.Value.Value(),
-		IsNothing: proof.Value.IsNothing(),
-	}
-
-	pbProof := &pb.Proof{
-		Key:   proof.Key.Bytes(),
-		Value: value,
-	}
-
-	pbProof.Proof = make([]*pb.ProofNode, len(proof.Path))
-	for i, node := range proof.Path {
-		pbProof.Proof[i] = node.ToProto()
-	}
-
-	return pbProof
-}
-
-func (proof *Proof) UnmarshalProto(pbProof *pb.Proof) error {
-	switch {
-	case pbProof == nil:
-		return ErrNilProof
-	case pbProof.Value == nil:
-		return ErrNilValue
-	case pbProof.Value.IsNothing && len(pbProof.Value.Value) != 0:
-		return ErrInvalidMaybe
-	}
-
-	proof.Key = ToKey(pbProof.Key)
-
-	if !pbProof.Value.IsNothing {
-		proof.Value = maybe.Some(pbProof.Value.Value)
-	}
-
-	proof.Path = make([]ProofNode, len(pbProof.Proof))
-	for i, pbNode := range pbProof.Proof {
-		if err := proof.Path[i].UnmarshalProto(pbNode); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 type RangeProof ChangeProof
 
 func (r *RangeProof) MarshalBinary() ([]byte, error) {
-	return proto.Marshal(r.ToProto())
+	return proto.Marshal(r.toProto())
 }
 
 func (r *RangeProof) UnmarshalBinary(data []byte) error {
@@ -256,10 +211,10 @@ func (r *RangeProof) UnmarshalBinary(data []byte) error {
 		return err
 	}
 
-	return r.UnmarshalProto(&pbRangeProof)
+	return r.unmarshalProto(&pbRangeProof)
 }
 
-func (r *RangeProof) ToProto() *pb.RangeProof {
+func (r *RangeProof) toProto() *pb.RangeProof {
 	startProof := make([]*pb.ProofNode, len(r.StartProof))
 	for i, node := range r.StartProof {
 		startProof[i] = node.ToProto()
@@ -285,7 +240,7 @@ func (r *RangeProof) ToProto() *pb.RangeProof {
 	}
 }
 
-func (r *RangeProof) UnmarshalProto(pbProof *pb.RangeProof) error {
+func (r *RangeProof) unmarshalProto(pbProof *pb.RangeProof) error {
 	if pbProof == nil {
 		return ErrNilRangeProof
 	}
@@ -467,7 +422,7 @@ type ChangeProof struct {
 }
 
 func (c *ChangeProof) MarshalBinary() ([]byte, error) {
-	return proto.Marshal(c.ToProto())
+	return proto.Marshal(c.toProto())
 }
 
 func (c *ChangeProof) UnmarshalBinary(data []byte) error {
@@ -476,10 +431,10 @@ func (c *ChangeProof) UnmarshalBinary(data []byte) error {
 		return err
 	}
 
-	return c.UnmarshalProto(&pbChangeProof)
+	return c.unmarshalProto(&pbChangeProof)
 }
 
-func (c *ChangeProof) ToProto() *pb.ChangeProof {
+func (c *ChangeProof) toProto() *pb.ChangeProof {
 	startProof := make([]*pb.ProofNode, len(c.StartProof))
 	for i, node := range c.StartProof {
 		startProof[i] = node.ToProto()
@@ -508,7 +463,7 @@ func (c *ChangeProof) ToProto() *pb.ChangeProof {
 	}
 }
 
-func (c *ChangeProof) UnmarshalProto(pbProof *pb.ChangeProof) error {
+func (c *ChangeProof) unmarshalProto(pbProof *pb.ChangeProof) error {
 	if pbProof == nil {
 		return ErrNilChangeProof
 	}
