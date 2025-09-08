@@ -34,7 +34,7 @@ func (*MockTrieDB) Size() (common.StorageSize, common.StorageSize, common.Storag
 	return 0, 0, 0
 }
 
-func (*MockTrieDB) Cap(_ common.StorageSize) error {
+func (*MockTrieDB) Cap(common.StorageSize) error {
 	return nil
 }
 

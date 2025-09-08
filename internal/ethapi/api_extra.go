@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 
 	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/rpc"
 )
 
@@ -21,6 +22,11 @@ type DetailedExecutionResult struct {
 	ErrCode    int           `json:"errCode"`    // EVM error code
 	Err        string        `json:"err"`        // Any error encountered during the execution(listed in core/vm/errors.go)
 	ReturnData hexutil.Bytes `json:"returnData"` // Data from evm(function result or data supplied with revert opcode)
+}
+
+// GetChainConfig returns the chain config.
+func (api *BlockChainAPI) GetChainConfig(context.Context) *params.ChainConfig {
+	return api.b.ChainConfig()
 }
 
 // CallDetailed performs the same call as Call, but returns the full context
@@ -63,7 +69,7 @@ type BadBlockArgs struct {
 
 // GetBadBlocks returns a list of the last 'bad blocks' that the client has seen on the network
 // and returns them as a JSON list of block hashes.
-func (s *BlockChainAPI) GetBadBlocks() ([]*BadBlockArgs, error) {
+func (s *BlockChainAPI) GetBadBlocks(context.Context) ([]*BadBlockArgs, error) {
 	var (
 		badBlocks, reasons = s.b.BadBlocks()
 		results            = make([]*BadBlockArgs, 0, len(badBlocks))

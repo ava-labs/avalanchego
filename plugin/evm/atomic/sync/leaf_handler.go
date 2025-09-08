@@ -25,7 +25,7 @@ var (
 
 type uninitializedHandler struct{}
 
-func (*uninitializedHandler) OnLeafsRequest(_ context.Context, _ ids.NodeID, _ uint32, _ message.LeafsRequest) ([]byte, error) {
+func (*uninitializedHandler) OnLeafsRequest(context.Context, ids.NodeID, uint32, message.LeafsRequest) ([]byte, error) {
 	return nil, errUninitialized
 }
 

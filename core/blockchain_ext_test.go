@@ -925,7 +925,7 @@ func EmptyBlocksTest(t *testing.T, create createFunc) {
 	blockchain.DrainAcceptorQueue()
 
 	// Nothing to assert about the state
-	checkState := func(_ *state.StateDB) error {
+	checkState := func(*state.StateDB) error {
 		return nil
 	}
 

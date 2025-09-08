@@ -110,7 +110,8 @@ type ChainConfig struct {
 	UpgradeConfig `json:"-"` // Config specified in upgradeBytes (avalanche network upgrades or enable/disabling precompiles). Not serialized.
 }
 
-func (c *ChainConfig) CheckConfigCompatible(newcfg_ *ethparams.ChainConfig, _ *big.Int, headTimestamp uint64) *ethparams.ConfigCompatError {
+//nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
+func (c *ChainConfig) CheckConfigCompatible(newcfg_ *ethparams.ChainConfig, headNumber *big.Int, headTimestamp uint64) *ethparams.ConfigCompatError {
 	if c == nil {
 		return nil
 	}

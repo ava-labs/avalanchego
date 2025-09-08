@@ -134,10 +134,10 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 func TestAppRequestOnCtxCancellation(t *testing.T) {
 	codecManager := buildCodec(t, HelloRequest{}, HelloResponse{})
 	sender := testAppSender{
-		sendAppRequestFn: func(_ context.Context, _ set.Set[ids.NodeID], _ uint32, _ []byte) error {
+		sendAppRequestFn: func(context.Context, set.Set[ids.NodeID], uint32, []byte) error {
 			return nil
 		},
-		sendAppResponseFn: func(_ ids.NodeID, _ uint32, _ []byte) error {
+		sendAppResponseFn: func(ids.NodeID, uint32, []byte) error {
 			return nil
 		},
 	}
@@ -263,7 +263,7 @@ func TestAppRequestOnShutdown(t *testing.T) {
 		called bool
 	)
 	sender := testAppSender{
-		sendAppRequestFn: func(_ context.Context, _ set.Set[ids.NodeID], _ uint32, _ []byte) error {
+		sendAppRequestFn: func(context.Context, set.Set[ids.NodeID], uint32, []byte) error {
 			wg.Add(1)
 			go func() {
 				called = true
@@ -319,7 +319,7 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 			}
 			return nil
 		},
-		sendAppResponseFn: func(_ ids.NodeID, _ uint32, _ []byte) error {
+		sendAppResponseFn: func(ids.NodeID, uint32, []byte) error {
 			return nil
 		},
 	}
@@ -639,7 +639,7 @@ func (t testAppSender) SendAppGossip(_ context.Context, config common.SendConfig
 	return t.sendAppGossipFn(config, message)
 }
 
-func (testAppSender) SendAppError(_ context.Context, _ ids.NodeID, _ uint32, _ int32, _ string) error {
+func (testAppSender) SendAppError(context.Context, ids.NodeID, uint32, int32, string) error {
 	panic("not implemented")
 }
 
@@ -751,12 +751,12 @@ type testSDKHandler struct {
 	appRequested bool
 }
 
-func (*testSDKHandler) AppGossip(_ context.Context, _ ids.NodeID, _ []byte) {
+func (*testSDKHandler) AppGossip(context.Context, ids.NodeID, []byte) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (t *testSDKHandler) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, _ []byte) ([]byte, *common.AppError) {
+func (t *testSDKHandler) AppRequest(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
 	t.appRequested = true
 	return nil, nil
 }
