@@ -147,7 +147,7 @@ impl DatabaseHandle<'_> {
     /// An error is returned if the proposal could not be created.
     pub fn create_batch<'kvp>(
         &self,
-        values: (impl AsRef<[KeyValuePair<'kvp>]> + 'kvp),
+        values: impl AsRef<[KeyValuePair<'kvp>]> + 'kvp,
     ) -> Result<Option<HashKey>, api::Error> {
         let start = coarsetime::Instant::now();
 

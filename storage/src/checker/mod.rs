@@ -47,7 +47,7 @@ fn is_valid_key(key: &Path) -> bool {
 
 #[cfg(not(feature = "ethhash"))]
 fn is_valid_key(key: &Path) -> bool {
-    key.0.len() % 2 == 0
+    key.0.len().is_multiple_of(2)
 }
 
 /// Options for the checker
