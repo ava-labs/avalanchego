@@ -4,7 +4,6 @@ package sync;
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 
-
 // For use in sync client, which has a restriction on the size of
 // the response. GetChangeProof in the DB service doesn't.
 message SyncGetChangeProofRequest {
