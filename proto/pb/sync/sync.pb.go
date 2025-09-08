@@ -348,7 +348,7 @@ func (x *SyncGetChangeProofResponse) GetResponse() isSyncGetChangeProofResponse_
 	return nil
 }
 
-func (x *SyncGetChangeProofResponse) GetChangeProof() *ChangeProof {
+func (x *SyncGetChangeProofResponse) GetChangeProof() []byte {
 	if x != nil {
 		if x, ok := x.Response.(*SyncGetChangeProofResponse_ChangeProof); ok {
 			return x.ChangeProof
@@ -357,7 +357,7 @@ func (x *SyncGetChangeProofResponse) GetChangeProof() *ChangeProof {
 	return nil
 }
 
-func (x *SyncGetChangeProofResponse) GetRangeProof() *RangeProof {
+func (x *SyncGetChangeProofResponse) GetRangeProof() []byte {
 	if x != nil {
 		if x, ok := x.Response.(*SyncGetChangeProofResponse_RangeProof); ok {
 			return x.RangeProof
@@ -371,11 +371,11 @@ type isSyncGetChangeProofResponse_Response interface {
 }
 
 type SyncGetChangeProofResponse_ChangeProof struct {
-	ChangeProof *ChangeProof `protobuf:"bytes,1,opt,name=change_proof,json=changeProof,proto3,oneof"`
+	ChangeProof []byte `protobuf:"bytes,1,opt,name=change_proof,json=changeProof,proto3,oneof"`
 }
 
 type SyncGetChangeProofResponse_RangeProof struct {
-	RangeProof *RangeProof `protobuf:"bytes,2,opt,name=range_proof,json=rangeProof,proto3,oneof"`
+	RangeProof []byte `protobuf:"bytes,2,opt,name=range_proof,json=rangeProof,proto3,oneof"`
 }
 
 func (*SyncGetChangeProofResponse_ChangeProof) isSyncGetChangeProofResponse_Response() {}
@@ -1360,10 +1360,10 @@ const file_sync_sync_proto_rawDesc = "" +
 	"\aend_key\x18\x04 \x01(\v2\x10.sync.MaybeBytesR\x06endKey\x12\x1b\n" +
 	"\tkey_limit\x18\x05 \x01(\rR\bkeyLimit\x12\x1f\n" +
 	"\vbytes_limit\x18\x06 \x01(\rR\n" +
-	"bytesLimit\"\x95\x01\n" +
-	"\x1aSyncGetChangeProofResponse\x126\n" +
-	"\fchange_proof\x18\x01 \x01(\v2\x11.sync.ChangeProofH\x00R\vchangeProof\x123\n" +
-	"\vrange_proof\x18\x02 \x01(\v2\x10.sync.RangeProofH\x00R\n" +
+	"bytesLimit\"p\n" +
+	"\x1aSyncGetChangeProofResponse\x12#\n" +
+	"\fchange_proof\x18\x01 \x01(\fH\x00R\vchangeProof\x12!\n" +
+	"\vrange_proof\x18\x02 \x01(\fH\x00R\n" +
 	"rangeProofB\n" +
 	"\n" +
 	"\bresponse\"\xda\x01\n" +
@@ -1495,54 +1495,52 @@ var file_sync_sync_proto_depIdxs = []int32{
 	17, // 2: sync.Proof.proof:type_name -> sync.ProofNode
 	20, // 3: sync.SyncGetChangeProofRequest.start_key:type_name -> sync.MaybeBytes
 	20, // 4: sync.SyncGetChangeProofRequest.end_key:type_name -> sync.MaybeBytes
-	15, // 5: sync.SyncGetChangeProofResponse.change_proof:type_name -> sync.ChangeProof
-	16, // 6: sync.SyncGetChangeProofResponse.range_proof:type_name -> sync.RangeProof
-	20, // 7: sync.GetChangeProofRequest.start_key:type_name -> sync.MaybeBytes
-	20, // 8: sync.GetChangeProofRequest.end_key:type_name -> sync.MaybeBytes
-	15, // 9: sync.GetChangeProofResponse.change_proof:type_name -> sync.ChangeProof
-	15, // 10: sync.VerifyChangeProofRequest.proof:type_name -> sync.ChangeProof
-	20, // 11: sync.VerifyChangeProofRequest.start_key:type_name -> sync.MaybeBytes
-	20, // 12: sync.VerifyChangeProofRequest.end_key:type_name -> sync.MaybeBytes
-	15, // 13: sync.CommitChangeProofRequest.proof:type_name -> sync.ChangeProof
-	20, // 14: sync.SyncGetRangeProofRequest.start_key:type_name -> sync.MaybeBytes
-	20, // 15: sync.SyncGetRangeProofRequest.end_key:type_name -> sync.MaybeBytes
-	20, // 16: sync.GetRangeProofRequest.start_key:type_name -> sync.MaybeBytes
-	20, // 17: sync.GetRangeProofRequest.end_key:type_name -> sync.MaybeBytes
-	16, // 18: sync.GetRangeProofResponse.proof:type_name -> sync.RangeProof
-	20, // 19: sync.CommitRangeProofRequest.start_key:type_name -> sync.MaybeBytes
-	20, // 20: sync.CommitRangeProofRequest.end_key:type_name -> sync.MaybeBytes
-	16, // 21: sync.CommitRangeProofRequest.range_proof:type_name -> sync.RangeProof
-	17, // 22: sync.ChangeProof.start_proof:type_name -> sync.ProofNode
-	17, // 23: sync.ChangeProof.end_proof:type_name -> sync.ProofNode
-	18, // 24: sync.ChangeProof.key_changes:type_name -> sync.KeyChange
-	17, // 25: sync.RangeProof.start_proof:type_name -> sync.ProofNode
-	17, // 26: sync.RangeProof.end_proof:type_name -> sync.ProofNode
-	21, // 27: sync.RangeProof.key_values:type_name -> sync.KeyValue
-	19, // 28: sync.ProofNode.key:type_name -> sync.Key
-	20, // 29: sync.ProofNode.value_or_hash:type_name -> sync.MaybeBytes
-	22, // 30: sync.ProofNode.children:type_name -> sync.ProofNode.ChildrenEntry
-	20, // 31: sync.KeyChange.value:type_name -> sync.MaybeBytes
-	23, // 32: sync.DB.GetMerkleRoot:input_type -> google.protobuf.Empty
-	23, // 33: sync.DB.Clear:input_type -> google.protobuf.Empty
-	1,  // 34: sync.DB.GetProof:input_type -> sync.GetProofRequest
-	6,  // 35: sync.DB.GetChangeProof:input_type -> sync.GetChangeProofRequest
-	8,  // 36: sync.DB.VerifyChangeProof:input_type -> sync.VerifyChangeProofRequest
-	10, // 37: sync.DB.CommitChangeProof:input_type -> sync.CommitChangeProofRequest
-	12, // 38: sync.DB.GetRangeProof:input_type -> sync.GetRangeProofRequest
-	14, // 39: sync.DB.CommitRangeProof:input_type -> sync.CommitRangeProofRequest
-	0,  // 40: sync.DB.GetMerkleRoot:output_type -> sync.GetMerkleRootResponse
-	23, // 41: sync.DB.Clear:output_type -> google.protobuf.Empty
-	2,  // 42: sync.DB.GetProof:output_type -> sync.GetProofResponse
-	7,  // 43: sync.DB.GetChangeProof:output_type -> sync.GetChangeProofResponse
-	9,  // 44: sync.DB.VerifyChangeProof:output_type -> sync.VerifyChangeProofResponse
-	23, // 45: sync.DB.CommitChangeProof:output_type -> google.protobuf.Empty
-	13, // 46: sync.DB.GetRangeProof:output_type -> sync.GetRangeProofResponse
-	23, // 47: sync.DB.CommitRangeProof:output_type -> google.protobuf.Empty
-	40, // [40:48] is the sub-list for method output_type
-	32, // [32:40] is the sub-list for method input_type
-	32, // [32:32] is the sub-list for extension type_name
-	32, // [32:32] is the sub-list for extension extendee
-	0,  // [0:32] is the sub-list for field type_name
+	20, // 5: sync.GetChangeProofRequest.start_key:type_name -> sync.MaybeBytes
+	20, // 6: sync.GetChangeProofRequest.end_key:type_name -> sync.MaybeBytes
+	15, // 7: sync.GetChangeProofResponse.change_proof:type_name -> sync.ChangeProof
+	15, // 8: sync.VerifyChangeProofRequest.proof:type_name -> sync.ChangeProof
+	20, // 9: sync.VerifyChangeProofRequest.start_key:type_name -> sync.MaybeBytes
+	20, // 10: sync.VerifyChangeProofRequest.end_key:type_name -> sync.MaybeBytes
+	15, // 11: sync.CommitChangeProofRequest.proof:type_name -> sync.ChangeProof
+	20, // 12: sync.SyncGetRangeProofRequest.start_key:type_name -> sync.MaybeBytes
+	20, // 13: sync.SyncGetRangeProofRequest.end_key:type_name -> sync.MaybeBytes
+	20, // 14: sync.GetRangeProofRequest.start_key:type_name -> sync.MaybeBytes
+	20, // 15: sync.GetRangeProofRequest.end_key:type_name -> sync.MaybeBytes
+	16, // 16: sync.GetRangeProofResponse.proof:type_name -> sync.RangeProof
+	20, // 17: sync.CommitRangeProofRequest.start_key:type_name -> sync.MaybeBytes
+	20, // 18: sync.CommitRangeProofRequest.end_key:type_name -> sync.MaybeBytes
+	16, // 19: sync.CommitRangeProofRequest.range_proof:type_name -> sync.RangeProof
+	17, // 20: sync.ChangeProof.start_proof:type_name -> sync.ProofNode
+	17, // 21: sync.ChangeProof.end_proof:type_name -> sync.ProofNode
+	18, // 22: sync.ChangeProof.key_changes:type_name -> sync.KeyChange
+	17, // 23: sync.RangeProof.start_proof:type_name -> sync.ProofNode
+	17, // 24: sync.RangeProof.end_proof:type_name -> sync.ProofNode
+	21, // 25: sync.RangeProof.key_values:type_name -> sync.KeyValue
+	19, // 26: sync.ProofNode.key:type_name -> sync.Key
+	20, // 27: sync.ProofNode.value_or_hash:type_name -> sync.MaybeBytes
+	22, // 28: sync.ProofNode.children:type_name -> sync.ProofNode.ChildrenEntry
+	20, // 29: sync.KeyChange.value:type_name -> sync.MaybeBytes
+	23, // 30: sync.DB.GetMerkleRoot:input_type -> google.protobuf.Empty
+	23, // 31: sync.DB.Clear:input_type -> google.protobuf.Empty
+	1,  // 32: sync.DB.GetProof:input_type -> sync.GetProofRequest
+	6,  // 33: sync.DB.GetChangeProof:input_type -> sync.GetChangeProofRequest
+	8,  // 34: sync.DB.VerifyChangeProof:input_type -> sync.VerifyChangeProofRequest
+	10, // 35: sync.DB.CommitChangeProof:input_type -> sync.CommitChangeProofRequest
+	12, // 36: sync.DB.GetRangeProof:input_type -> sync.GetRangeProofRequest
+	14, // 37: sync.DB.CommitRangeProof:input_type -> sync.CommitRangeProofRequest
+	0,  // 38: sync.DB.GetMerkleRoot:output_type -> sync.GetMerkleRootResponse
+	23, // 39: sync.DB.Clear:output_type -> google.protobuf.Empty
+	2,  // 40: sync.DB.GetProof:output_type -> sync.GetProofResponse
+	7,  // 41: sync.DB.GetChangeProof:output_type -> sync.GetChangeProofResponse
+	9,  // 42: sync.DB.VerifyChangeProof:output_type -> sync.VerifyChangeProofResponse
+	23, // 43: sync.DB.CommitChangeProof:output_type -> google.protobuf.Empty
+	13, // 44: sync.DB.GetRangeProof:output_type -> sync.GetRangeProofResponse
+	23, // 45: sync.DB.CommitRangeProof:output_type -> google.protobuf.Empty
+	38, // [38:46] is the sub-list for method output_type
+	30, // [30:38] is the sub-list for method input_type
+	30, // [30:30] is the sub-list for extension type_name
+	30, // [30:30] is the sub-list for extension extendee
+	0,  // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_sync_sync_proto_init() }
