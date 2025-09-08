@@ -42,18 +42,21 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 		require.NoError(err)
 
 		if !upgrades.IsGraniteActivated(time.Now()) {
-			tc.Log().Info("skipping test because granite isn't active")
-			return
+			ginkgo.Skip("skipping test because granite isn't active")
 		}
 
 		// Issue a transaction to the C-Chain to advance past genesis block
 		issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
 
-		// Genesis does not contain a proposervm block
-		for blockNumber(tc, ethClient) == 0 {
-			tc.Log().Info("Waiting to progress past genesis block")
-			time.Sleep(1 * time.Second)
-		}
+		tc.Eventually(func() bool {
+			bn, err := ethClient.BlockNumber(tc.DefaultContext())
+			require.NoError(err)
+			return bn != 0
+		},
+			e2e.DefaultTimeout,
+			e2e.DefaultPollingInterval,
+			"failed to see a non-zero block before timeout",
+		)
 
 		tc.By("issuing C-Chain transactions to advance the epoch", func() {
 			proposerClient := proposervm.NewClient(nodeURI.URI, "C")
@@ -78,12 +81,6 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 		})
 	})
 })
-
-func blockNumber(tc tests.TestContext, ethClient *ethclient.Client) uint64 {
-	blockNumber, err := ethClient.BlockNumber(tc.DefaultContext())
-	require.NoError(tc, err)
-	return blockNumber
-}
 
 func issueTransaction(
 	tc tests.TestContext,
