@@ -206,7 +206,7 @@ func (a *AccountTrie) hash() (common.Hash, error) {
 }
 
 // Commit implements state.Trie.
-func (a *AccountTrie) Commit(_ bool) (common.Hash, *trienode.NodeSet, error) {
+func (a *AccountTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
 	// Get the hash of the trie.
 	hash, err := a.hash()
 	if err != nil {
@@ -226,22 +226,22 @@ func (a *AccountTrie) Commit(_ bool) (common.Hash, *trienode.NodeSet, error) {
 
 // UpdateContractCode implements state.Trie.
 // Contract code is controlled by rawdb, so we don't need to do anything here.
-func (*AccountTrie) UpdateContractCode(_ common.Address, _ common.Hash, _ []byte) error {
+func (*AccountTrie) UpdateContractCode(common.Address, common.Hash, []byte) error {
 	return nil
 }
 
 // GetKey implements state.Trie.
-func (*AccountTrie) GetKey(_ []byte) []byte {
+func (*AccountTrie) GetKey([]byte) []byte {
 	return nil // Not implemented, as this is only used in APIs
 }
 
 // NodeIterator implements state.Trie.
-func (*AccountTrie) NodeIterator(_ []byte) (trie.NodeIterator, error) {
+func (*AccountTrie) NodeIterator([]byte) (trie.NodeIterator, error) {
 	return nil, errors.New("NodeIterator not implemented for Firewood")
 }
 
 // Prove implements state.Trie.
-func (*AccountTrie) Prove(_ []byte, _ ethdb.KeyValueWriter) error {
+func (*AccountTrie) Prove([]byte, ethdb.KeyValueWriter) error {
 	return errors.New("Prove not implemented for Firewood")
 }
 

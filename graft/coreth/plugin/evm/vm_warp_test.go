@@ -340,7 +340,7 @@ func testWarpVMTransaction(t *testing.T, scheme string, unsignedMessage *avalanc
 
 	vm.ctx.ValidatorState = &validatorstest.State{
 		// TODO: test both Primary Network / C-Chain and non-Primary Network
-		GetSubnetIDF: func(_ context.Context, _ ids.ID) (ids.ID, error) {
+		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
 			return ids.Empty, nil
 		},
 		GetValidatorSetF: func(_ context.Context, height uint64, _ ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
@@ -639,7 +639,7 @@ func testReceiveWarpMessage(
 	getValidatorSetTestErr := errors.New("can't get validator set test error")
 
 	vm.ctx.ValidatorState = &validatorstest.State{
-		GetSubnetIDF: func(_ context.Context, _ ids.ID) (ids.ID, error) {
+		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
 			if msgFrom == fromPrimary {
 				return constants.PrimaryNetworkID, nil
 			}
@@ -888,7 +888,7 @@ func testSignatureRequestsToVM(t *testing.T, scheme string) {
 				return nil
 			}
 
-			tvm.AppSender.SendAppErrorF = func(_ context.Context, _ ids.NodeID, _ uint32, _ int32, _ string) error {
+			tvm.AppSender.SendAppErrorF = func(context.Context, ids.NodeID, uint32, int32, string) error {
 				calledSendAppErrorFn = true
 				require.ErrorIs(t, test.err, test.err)
 				return nil

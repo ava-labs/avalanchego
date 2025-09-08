@@ -9,10 +9,10 @@ var _ gossip.Marshaller[*Tx] = (*TxMarshaller)(nil)
 
 type TxMarshaller struct{}
 
-func (_ *TxMarshaller) MarshalGossip(tx *Tx) ([]byte, error) {
+func (*TxMarshaller) MarshalGossip(tx *Tx) ([]byte, error) {
 	return tx.SignedBytes(), nil
 }
 
-func (_ *TxMarshaller) UnmarshalGossip(bytes []byte) (*Tx, error) {
+func (*TxMarshaller) UnmarshalGossip(bytes []byte) (*Tx, error) {
 	return ExtractAtomicTx(bytes, Codec)
 }

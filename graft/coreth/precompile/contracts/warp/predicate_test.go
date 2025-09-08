@@ -190,10 +190,10 @@ func createSnowCtx(tb testing.TB, validatorRanges []validatorRange) *snow.Contex
 
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
 	state := &validatorstest.State{
-		GetSubnetIDF: func(_ context.Context, _ ids.ID) (ids.ID, error) {
+		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
 			return sourceSubnetID, nil
 		},
-		GetValidatorSetF: func(_ context.Context, _ uint64, _ ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 			return getValidatorsOutput, nil
 		},
 	}
@@ -669,10 +669,10 @@ func makeWarpPredicateTests(tb testing.TB) map[string]precompiletest.PredicateTe
 
 		snowCtx := snowtest.Context(tb, snowtest.CChainID)
 		state := &validatorstest.State{
-			GetSubnetIDF: func(_ context.Context, _ ids.ID) (ids.ID, error) {
+			GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
 				return sourceSubnetID, nil
 			},
-			GetValidatorSetF: func(_ context.Context, _ uint64, _ ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 				return getValidatorsOutput, nil
 			},
 		}

@@ -186,7 +186,7 @@ func (b *wrappedBlock) Timestamp() time.Time {
 }
 
 // Verify implements the snowman.Block interface
-func (b *wrappedBlock) Verify(_ context.Context) error {
+func (b *wrappedBlock) Verify(context.Context) error {
 	return b.verify(&precompileconfig.PredicateContext{
 		SnowCtx:            b.vm.ctx,
 		ProposerVMBlockCtx: nil,

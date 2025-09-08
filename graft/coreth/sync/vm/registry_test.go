@@ -28,7 +28,7 @@ func newMockSyncer(name string, syncError error) *mockSyncer {
 	return &mockSyncer{name: name, syncError: syncError}
 }
 
-func (m *mockSyncer) Sync(_ context.Context) error {
+func (m *mockSyncer) Sync(context.Context) error {
 	m.started = true
 	return m.syncError
 }
