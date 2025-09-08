@@ -129,6 +129,7 @@ impl Hashable for ProofNode {
     fn value_digest(&self) -> Option<ValueDigest<&[u8]>> {
         self.value_digest.as_ref().map(|vd| match vd {
             ValueDigest::Value(v) => ValueDigest::Value(v.as_ref()),
+            #[cfg(not(feature = "ethhash"))]
             ValueDigest::Hash(h) => ValueDigest::Hash(h.as_ref()),
         })
     }

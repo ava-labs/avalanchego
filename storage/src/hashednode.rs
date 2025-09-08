@@ -7,7 +7,6 @@
 )]
 
 use crate::{BranchNode, Children, HashType, LeafNode, Node, Path};
-use sha2::{Digest, Sha256};
 use smallvec::SmallVec;
 use std::ops::Deref;
 
@@ -92,6 +91,7 @@ impl HasUpdate for SmallVec<[u8; 32]> {
 pub enum ValueDigest<T> {
     /// The node's value.
     Value(T),
+    #[cfg(not(feature = "ethhash"))]
     /// TODO this variant will be used when we deserialize a proof node
     /// from a remote Firewood instance. The serialized proof node they
     /// send us may the hash of the value, not the value itself.
@@ -104,6 +104,7 @@ impl<T> Deref for ValueDigest<T> {
     fn deref(&self) -> &Self::Target {
         match self {
             ValueDigest::Value(value) => value,
+            #[cfg(not(feature = "ethhash"))]
             ValueDigest::Hash(hash) => hash,
         }
     }
@@ -117,7 +118,9 @@ impl<T: AsRef<[u8]>> ValueDigest<T> {
                 // This proof proves that `key` maps to `got_value`.
                 got_value.as_ref() == expected.as_ref()
             }
+            #[cfg(not(feature = "ethhash"))]
             Self::Hash(got_hash) => {
+                use sha2::{Digest, Sha256};
                 // This proof proves that `key` maps to a value
                 // whose hash is `got_hash`.
                 got_hash.as_ref() == Sha256::digest(expected.as_ref()).as_slice()
