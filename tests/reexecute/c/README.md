@@ -24,7 +24,7 @@ nix develop
 ### AWS Access
 This walkthrough assumes AWS access to the S3 bucket `s3://avalanchego-bootstrap-testing` in the Ava Labs Experimental Account in `us-east-2`.
 
-To configure your development environment, fetch AWS and add them to the environment from:
+To configure your development environment, fetch AWS credentials and add them to the environment from:
 
 Okta -> AWS Access Portal -> Experimental -> Access Keys
 
