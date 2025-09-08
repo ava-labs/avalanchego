@@ -234,7 +234,7 @@ You can view granular C-Chain processing metrics with the label attached to this
 
 Note: to ensure Prometheus gets a final scrape at the end of a run, the test will sleep for 2s greater than the 10s Prometheus scrape interval, which will cause short-running tests to appear to take much longer than expected. Additionally, the linked dashboard displays most metrics using a 1min rate, which means that very short running tests will not produce a very useful visualization.
 
-For a realistic view, run the default C-Chain benchmark in the [final step](#run-default-c-chain-benchmark) or view the preview URL printed by the [c-chain-benchmark](../../../.github/workflows/c-chain-reexecution-benchmark.yml) job, which executes the block range [101, 250k].
+For a realistic view, run the default C-Chain benchmark in the [Quick Start](#quick-start) or view the preview URL printed by the [c-chain-benchmark](../../../.github/workflows/c-chain-reexecution-benchmark-gh-native.yml) job, which executes the block range [101, 250k].
 
 ## CI
 
