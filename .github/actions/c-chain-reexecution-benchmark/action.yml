@@ -38,10 +38,6 @@ inputs:
     description: 'The password for the Prometheus instance.'
     required: true
     default: ''
-  external-data-json-cache-key:
-    description: 'Cache key for the external data JSON file provided for comparison to GitHub Action Benchmark.'
-    required: true
-    default: 'c-chain-reexecution-benchmark-data.json'
   workspace:
     description: 'Working directory to use for the benchmark.'
     required: true
