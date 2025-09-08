@@ -21,7 +21,6 @@ To set up your shell environment, run:
 nix develop
 ```
 
-
 ### AWS Access
 This walkthrough assumes AWS access to the S3 bucket `s3://avalanchego-bootstrap-testing` in the Ava Labs Experimental Account in `us-east-2`.
 
