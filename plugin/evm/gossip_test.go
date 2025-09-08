@@ -74,7 +74,7 @@ func TestGossipSubscribe(t *testing.T) {
 	// Notify mempool about txs
 	errs := txPool.AddRemotesSync(ethTxs)
 	for _, err := range errs {
-		require.NoError(err, "failed adding subnet-evm tx to remote mempool")
+		require.NoError(err, "failed adding tx to remote mempool")
 	}
 
 	require.EventuallyWithTf(
