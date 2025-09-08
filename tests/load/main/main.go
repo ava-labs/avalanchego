@@ -82,7 +82,6 @@ func main() {
 
 	nodes := tmpnet.NewNodesOrPanic(numNodes)
 
-	require.Positive(numWorkersArg, "failed to create positive number of keys")
 	keys, err := tmpnet.NewPrivateKeys(numWorkersArg)
 	require.NoError(err)
 
