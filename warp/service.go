@@ -58,7 +58,7 @@ func (a *API) GetMessageSignature(ctx context.Context, messageID ids.ID) (hexuti
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signature for message %s with error %w", messageID, err)
 	}
-	return signature[:], nil
+	return signature, nil
 }
 
 // GetBlockSignature returns the BLS signature associated with a blockID.
@@ -67,7 +67,7 @@ func (a *API) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexutil.By
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signature for block %s with error %w", blockID, err)
 	}
-	return signature[:], nil
+	return signature, nil
 }
 
 // GetMessageAggregateSignature fetches the aggregate signature for the requested [messageID]

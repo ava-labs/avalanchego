@@ -358,8 +358,8 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 		"partial mid range": {
 			prepareTestFn: func() (context.Context, message.LeafsRequest) {
 				startKey := largeTrieKeys[1_000]
-				startKey[31] = startKey[31] + 1 // exclude start key from response
-				endKey := largeTrieKeys[1_040]  // include end key in response
+				startKey[31]++                 // exclude start key from response
+				endKey := largeTrieKeys[1_040] // include end key in response
 				return context.Background(), message.LeafsRequest{
 					Root:     largeTrieRoot,
 					Start:    startKey,

@@ -119,13 +119,11 @@ func (be *blockExtension) SyntacticVerify(rules extras.Rules) error {
 		if headerExtra.ExtDataHash != hash {
 			return fmt.Errorf("extra data hash mismatch: have %x, want %x", headerExtra.ExtDataHash, hash)
 		}
-	} else {
-		if headerExtra.ExtDataHash != (common.Hash{}) {
-			return fmt.Errorf(
-				"expected ExtDataHash to be empty but got %x",
-				headerExtra.ExtDataHash,
-			)
-		}
+	} else if headerExtra.ExtDataHash != (common.Hash{}) {
+		return fmt.Errorf(
+			"expected ExtDataHash to be empty but got %x",
+			headerExtra.ExtDataHash,
+		)
 	}
 
 	// Block must not be empty
