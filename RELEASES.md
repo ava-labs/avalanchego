@@ -1,13 +1,25 @@
 # Release Notes
 
 ## Pending Release
+
+- Add pending releases here
+
+## [v0.7.9](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.9)
+
+This version is backwards compatible to v0.7.0. It is optional, but encouraged.
+
+### AvalancheGo Compatibility
+
+The plugin version is unchanged at 43 and is compatible with AvalancheGo version v1.13.5.
+
+### Updates
+
 - Disable incompatible APIs for Firewood
   - `StorageRangeAt` 
   - `GetModifiedAccountsByNumber`
   - `GetModifiedAccountsByHash`
 - Removed deprecated flag `tx-lookup-limit`. Use `transaction-history` instead.
 - Enabled RPC batch limits by default, and configurable with `batch-request-limit` and `batch-max-response-size`.
-- Add pending releases here
 
 ## [v0.7.8](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.8)
 
