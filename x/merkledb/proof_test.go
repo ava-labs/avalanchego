@@ -1486,7 +1486,7 @@ func TestProofNodeUnmarshalProtoInvalidMaybe(t *testing.T) {
 	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	node := newRandomProofNode(rand)
-	protoNode := node.ToProto()
+	protoNode := node.toProto()
 
 	// It's invalid to have a value and be nothing.
 	protoNode.ValueOrHash = &pb.MaybeBytes{
@@ -1495,8 +1495,8 @@ func TestProofNodeUnmarshalProtoInvalidMaybe(t *testing.T) {
 	}
 
 	var unmarshaledNode ProofNode
-	err := unmarshaledNode.UnmarshalProto(protoNode)
-	require.ErrorIs(t, err, ErrInvalidMaybe)
+	err := unmarshaledNode.unmarshalProto(protoNode)
+	require.ErrorIs(t, err, errInvalidMaybe)
 }
 
 func TestProofNodeUnmarshalProtoInvalidChildBytes(t *testing.T) {
@@ -1505,14 +1505,14 @@ func TestProofNodeUnmarshalProtoInvalidChildBytes(t *testing.T) {
 	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	node := newRandomProofNode(rand)
-	protoNode := node.ToProto()
+	protoNode := node.toProto()
 
 	protoNode.Children = map[uint32][]byte{
 		1: []byte("not 32 bytes"),
 	}
 
 	var unmarshaledNode ProofNode
-	err := unmarshaledNode.UnmarshalProto(protoNode)
+	err := unmarshaledNode.unmarshalProto(protoNode)
 	require.ErrorIs(t, err, hashing.ErrInvalidHashLen)
 }
 
@@ -1522,13 +1522,13 @@ func TestProofNodeUnmarshalProtoInvalidChildIndex(t *testing.T) {
 	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	node := newRandomProofNode(rand)
-	protoNode := node.ToProto()
+	protoNode := node.toProto()
 
 	childID := ids.GenerateTestID()
 	protoNode.Children[256] = childID[:]
 
 	var unmarshaledNode ProofNode
-	err := unmarshaledNode.UnmarshalProto(protoNode)
+	err := unmarshaledNode.unmarshalProto(protoNode)
 	require.ErrorIs(t, err, errChildIndexTooLarge)
 }
 
@@ -1549,34 +1549,34 @@ func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
 			nodeFunc: func() *pb.ProofNode {
 				return nil
 			},
-			expectedErr: ErrNilProofNode,
+			expectedErr: errNilProofNode,
 		},
 		{
 			name: "nil ValueOrHash",
 			nodeFunc: func() *pb.ProofNode {
 				node := newRandomProofNode(rand)
-				protoNode := node.ToProto()
+				protoNode := node.toProto()
 				protoNode.ValueOrHash = nil
 				return protoNode
 			},
-			expectedErr: ErrNilValueOrHash,
+			expectedErr: errNilValueOrHash,
 		},
 		{
 			name: "nil key",
 			nodeFunc: func() *pb.ProofNode {
 				node := newRandomProofNode(rand)
-				protoNode := node.ToProto()
+				protoNode := node.toProto()
 				protoNode.Key = nil
 				return protoNode
 			},
-			expectedErr: ErrNilKey,
+			expectedErr: errNilKey,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var node ProofNode
-			err := node.UnmarshalProto(tt.nodeFunc())
+			err := node.unmarshalProto(tt.nodeFunc())
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -1593,13 +1593,13 @@ func FuzzProofNodeProtoMarshalUnmarshal(f *testing.F) {
 
 		// Marshal and unmarshal it.
 		// Assert the unmarshaled one is the same as the original.
-		protoNode := node.ToProto()
+		protoNode := node.toProto()
 		var unmarshaledNode ProofNode
-		require.NoError(unmarshaledNode.UnmarshalProto(protoNode))
+		require.NoError(unmarshaledNode.unmarshalProto(protoNode))
 		require.Equal(node, unmarshaledNode)
 
 		// Marshaling again should yield same result.
-		protoUnmarshaledNode := unmarshaledNode.ToProto()
+		protoUnmarshaledNode := unmarshaledNode.toProto()
 		require.Equal(protoNode, protoUnmarshaledNode)
 	})
 }
@@ -1718,7 +1718,7 @@ func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
 
 	var unmarshaledProof ChangeProof
 	err = unmarshaledProof.UnmarshalBinary(proofBytes)
-	require.ErrorIs(t, err, ErrNilMaybeBytes)
+	require.ErrorIs(t, err, errNilMaybeBytes)
 }
 
 func generateKeyChanges(rand *rand.Rand, numKeyChanges int, includeNone bool) []KeyChange {
@@ -1770,7 +1770,7 @@ func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
 
 	var proof ChangeProof
 	err = proof.UnmarshalBinary(proofBytes)
-	require.ErrorIs(t, err, ErrInvalidMaybe)
+	require.ErrorIs(t, err, errInvalidMaybe)
 }
 
 func FuzzRangeProofInvariants(f *testing.F) {

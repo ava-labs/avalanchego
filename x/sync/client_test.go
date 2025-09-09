@@ -86,7 +86,7 @@ func newFlakyChangeProofHandler(
 				return nil, appErr
 			}
 
-			response := &pb.SyncGetChangeProofResponse{}
+			response := &pb.GetChangeProofResponse{}
 			require.NoError(t, proto.Unmarshal(responseBytes, response))
 
 			proof := &merkledb.ChangeProof{}
@@ -99,8 +99,8 @@ func newFlakyChangeProofHandler(
 
 			proofBytes, err := proof.MarshalBinary()
 			require.NoError(t, err)
-			responseBytes, err = proto.Marshal(&pb.SyncGetChangeProofResponse{
-				Response: &pb.SyncGetChangeProofResponse_ChangeProof{
+			responseBytes, err = proto.Marshal(&pb.GetChangeProofResponse{
+				Response: &pb.GetChangeProofResponse_ChangeProof{
 					ChangeProof: proofBytes,
 				},
 			})

@@ -4,9 +4,7 @@ package sync;
 
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 
-// For use in sync client, which has a restriction on the size of
-// the response. GetChangeProof in the DB service doesn't.
-message SyncGetChangeProofRequest {
+message GetChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
   MaybeBytes start_key = 3;
@@ -15,7 +13,7 @@ message SyncGetChangeProofRequest {
   uint32 bytes_limit = 6;
 }
 
-message SyncGetChangeProofResponse {
+message GetChangeProofResponse {
   oneof response {
     bytes change_proof = 1;
     bytes range_proof = 2;
@@ -23,7 +21,7 @@ message SyncGetChangeProofResponse {
 }
 
 // Range proof responses don't require any extra data, so no message is needed.
-message SyncGetRangeProofRequest {
+message GetRangeProofRequest {
   bytes root_hash = 1;
   MaybeBytes start_key = 2;
   MaybeBytes end_key = 3;
@@ -61,8 +59,6 @@ message Key {
 
 message MaybeBytes {
   bytes value = 1;
-  // If false, this is None.
-  // Otherwise this is Some.
   bool is_nothing = 2;
 }
 

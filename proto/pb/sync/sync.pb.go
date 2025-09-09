@@ -21,9 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// For use in sync client, which has a restriction on the size of
-// the response. GetChangeProof in the DB service doesn't.
-type SyncGetChangeProofRequest struct {
+type GetChangeProofRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	StartRootHash []byte                 `protobuf:"bytes,1,opt,name=start_root_hash,json=startRootHash,proto3" json:"start_root_hash,omitempty"`
 	EndRootHash   []byte                 `protobuf:"bytes,2,opt,name=end_root_hash,json=endRootHash,proto3" json:"end_root_hash,omitempty"`
@@ -35,20 +33,20 @@ type SyncGetChangeProofRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *SyncGetChangeProofRequest) Reset() {
-	*x = SyncGetChangeProofRequest{}
+func (x *GetChangeProofRequest) Reset() {
+	*x = GetChangeProofRequest{}
 	mi := &file_sync_sync_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *SyncGetChangeProofRequest) String() string {
+func (x *GetChangeProofRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SyncGetChangeProofRequest) ProtoMessage() {}
+func (*GetChangeProofRequest) ProtoMessage() {}
 
-func (x *SyncGetChangeProofRequest) ProtoReflect() protoreflect.Message {
+func (x *GetChangeProofRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_sync_sync_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -60,78 +58,78 @@ func (x *SyncGetChangeProofRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SyncGetChangeProofRequest.ProtoReflect.Descriptor instead.
-func (*SyncGetChangeProofRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetChangeProofRequest.ProtoReflect.Descriptor instead.
+func (*GetChangeProofRequest) Descriptor() ([]byte, []int) {
 	return file_sync_sync_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *SyncGetChangeProofRequest) GetStartRootHash() []byte {
+func (x *GetChangeProofRequest) GetStartRootHash() []byte {
 	if x != nil {
 		return x.StartRootHash
 	}
 	return nil
 }
 
-func (x *SyncGetChangeProofRequest) GetEndRootHash() []byte {
+func (x *GetChangeProofRequest) GetEndRootHash() []byte {
 	if x != nil {
 		return x.EndRootHash
 	}
 	return nil
 }
 
-func (x *SyncGetChangeProofRequest) GetStartKey() *MaybeBytes {
+func (x *GetChangeProofRequest) GetStartKey() *MaybeBytes {
 	if x != nil {
 		return x.StartKey
 	}
 	return nil
 }
 
-func (x *SyncGetChangeProofRequest) GetEndKey() *MaybeBytes {
+func (x *GetChangeProofRequest) GetEndKey() *MaybeBytes {
 	if x != nil {
 		return x.EndKey
 	}
 	return nil
 }
 
-func (x *SyncGetChangeProofRequest) GetKeyLimit() uint32 {
+func (x *GetChangeProofRequest) GetKeyLimit() uint32 {
 	if x != nil {
 		return x.KeyLimit
 	}
 	return 0
 }
 
-func (x *SyncGetChangeProofRequest) GetBytesLimit() uint32 {
+func (x *GetChangeProofRequest) GetBytesLimit() uint32 {
 	if x != nil {
 		return x.BytesLimit
 	}
 	return 0
 }
 
-type SyncGetChangeProofResponse struct {
+type GetChangeProofResponse struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Response:
 	//
-	//	*SyncGetChangeProofResponse_ChangeProof
-	//	*SyncGetChangeProofResponse_RangeProof
-	Response      isSyncGetChangeProofResponse_Response `protobuf_oneof:"response"`
+	//	*GetChangeProofResponse_ChangeProof
+	//	*GetChangeProofResponse_RangeProof
+	Response      isGetChangeProofResponse_Response `protobuf_oneof:"response"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *SyncGetChangeProofResponse) Reset() {
-	*x = SyncGetChangeProofResponse{}
+func (x *GetChangeProofResponse) Reset() {
+	*x = GetChangeProofResponse{}
 	mi := &file_sync_sync_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *SyncGetChangeProofResponse) String() string {
+func (x *GetChangeProofResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SyncGetChangeProofResponse) ProtoMessage() {}
+func (*GetChangeProofResponse) ProtoMessage() {}
 
-func (x *SyncGetChangeProofResponse) ProtoReflect() protoreflect.Message {
+func (x *GetChangeProofResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_sync_sync_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -143,54 +141,54 @@ func (x *SyncGetChangeProofResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SyncGetChangeProofResponse.ProtoReflect.Descriptor instead.
-func (*SyncGetChangeProofResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetChangeProofResponse.ProtoReflect.Descriptor instead.
+func (*GetChangeProofResponse) Descriptor() ([]byte, []int) {
 	return file_sync_sync_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *SyncGetChangeProofResponse) GetResponse() isSyncGetChangeProofResponse_Response {
+func (x *GetChangeProofResponse) GetResponse() isGetChangeProofResponse_Response {
 	if x != nil {
 		return x.Response
 	}
 	return nil
 }
 
-func (x *SyncGetChangeProofResponse) GetChangeProof() []byte {
+func (x *GetChangeProofResponse) GetChangeProof() []byte {
 	if x != nil {
-		if x, ok := x.Response.(*SyncGetChangeProofResponse_ChangeProof); ok {
+		if x, ok := x.Response.(*GetChangeProofResponse_ChangeProof); ok {
 			return x.ChangeProof
 		}
 	}
 	return nil
 }
 
-func (x *SyncGetChangeProofResponse) GetRangeProof() []byte {
+func (x *GetChangeProofResponse) GetRangeProof() []byte {
 	if x != nil {
-		if x, ok := x.Response.(*SyncGetChangeProofResponse_RangeProof); ok {
+		if x, ok := x.Response.(*GetChangeProofResponse_RangeProof); ok {
 			return x.RangeProof
 		}
 	}
 	return nil
 }
 
-type isSyncGetChangeProofResponse_Response interface {
-	isSyncGetChangeProofResponse_Response()
+type isGetChangeProofResponse_Response interface {
+	isGetChangeProofResponse_Response()
 }
 
-type SyncGetChangeProofResponse_ChangeProof struct {
+type GetChangeProofResponse_ChangeProof struct {
 	ChangeProof []byte `protobuf:"bytes,1,opt,name=change_proof,json=changeProof,proto3,oneof"`
 }
 
-type SyncGetChangeProofResponse_RangeProof struct {
+type GetChangeProofResponse_RangeProof struct {
 	RangeProof []byte `protobuf:"bytes,2,opt,name=range_proof,json=rangeProof,proto3,oneof"`
 }
 
-func (*SyncGetChangeProofResponse_ChangeProof) isSyncGetChangeProofResponse_Response() {}
+func (*GetChangeProofResponse_ChangeProof) isGetChangeProofResponse_Response() {}
 
-func (*SyncGetChangeProofResponse_RangeProof) isSyncGetChangeProofResponse_Response() {}
+func (*GetChangeProofResponse_RangeProof) isGetChangeProofResponse_Response() {}
 
 // Range proof responses don't require any extra data, so no message is needed.
-type SyncGetRangeProofRequest struct {
+type GetRangeProofRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RootHash      []byte                 `protobuf:"bytes,1,opt,name=root_hash,json=rootHash,proto3" json:"root_hash,omitempty"`
 	StartKey      *MaybeBytes            `protobuf:"bytes,2,opt,name=start_key,json=startKey,proto3" json:"start_key,omitempty"`
@@ -201,20 +199,20 @@ type SyncGetRangeProofRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *SyncGetRangeProofRequest) Reset() {
-	*x = SyncGetRangeProofRequest{}
+func (x *GetRangeProofRequest) Reset() {
+	*x = GetRangeProofRequest{}
 	mi := &file_sync_sync_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *SyncGetRangeProofRequest) String() string {
+func (x *GetRangeProofRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*SyncGetRangeProofRequest) ProtoMessage() {}
+func (*GetRangeProofRequest) ProtoMessage() {}
 
-func (x *SyncGetRangeProofRequest) ProtoReflect() protoreflect.Message {
+func (x *GetRangeProofRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_sync_sync_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -226,40 +224,40 @@ func (x *SyncGetRangeProofRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use SyncGetRangeProofRequest.ProtoReflect.Descriptor instead.
-func (*SyncGetRangeProofRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use GetRangeProofRequest.ProtoReflect.Descriptor instead.
+func (*GetRangeProofRequest) Descriptor() ([]byte, []int) {
 	return file_sync_sync_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *SyncGetRangeProofRequest) GetRootHash() []byte {
+func (x *GetRangeProofRequest) GetRootHash() []byte {
 	if x != nil {
 		return x.RootHash
 	}
 	return nil
 }
 
-func (x *SyncGetRangeProofRequest) GetStartKey() *MaybeBytes {
+func (x *GetRangeProofRequest) GetStartKey() *MaybeBytes {
 	if x != nil {
 		return x.StartKey
 	}
 	return nil
 }
 
-func (x *SyncGetRangeProofRequest) GetEndKey() *MaybeBytes {
+func (x *GetRangeProofRequest) GetEndKey() *MaybeBytes {
 	if x != nil {
 		return x.EndKey
 	}
 	return nil
 }
 
-func (x *SyncGetRangeProofRequest) GetKeyLimit() uint32 {
+func (x *GetRangeProofRequest) GetKeyLimit() uint32 {
 	if x != nil {
 		return x.KeyLimit
 	}
 	return 0
 }
 
-func (x *SyncGetRangeProofRequest) GetBytesLimit() uint32 {
+func (x *GetRangeProofRequest) GetBytesLimit() uint32 {
 	if x != nil {
 		return x.BytesLimit
 	}
@@ -551,11 +549,9 @@ func (x *Key) GetValue() []byte {
 }
 
 type MaybeBytes struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Value []byte                 `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
-	// If false, this is None.
-	// Otherwise this is Some.
-	IsNothing     bool `protobuf:"varint,2,opt,name=is_nothing,json=isNothing,proto3" json:"is_nothing,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Value         []byte                 `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
+	IsNothing     bool                   `protobuf:"varint,2,opt,name=is_nothing,json=isNothing,proto3" json:"is_nothing,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -660,22 +656,22 @@ var File_sync_sync_proto protoreflect.FileDescriptor
 
 const file_sync_sync_proto_rawDesc = "" +
 	"\n" +
-	"\x0fsync/sync.proto\x12\x04sync\"\xff\x01\n" +
-	"\x19SyncGetChangeProofRequest\x12&\n" +
+	"\x0fsync/sync.proto\x12\x04sync\"\xfb\x01\n" +
+	"\x15GetChangeProofRequest\x12&\n" +
 	"\x0fstart_root_hash\x18\x01 \x01(\fR\rstartRootHash\x12\"\n" +
 	"\rend_root_hash\x18\x02 \x01(\fR\vendRootHash\x12-\n" +
 	"\tstart_key\x18\x03 \x01(\v2\x10.sync.MaybeBytesR\bstartKey\x12)\n" +
 	"\aend_key\x18\x04 \x01(\v2\x10.sync.MaybeBytesR\x06endKey\x12\x1b\n" +
 	"\tkey_limit\x18\x05 \x01(\rR\bkeyLimit\x12\x1f\n" +
 	"\vbytes_limit\x18\x06 \x01(\rR\n" +
-	"bytesLimit\"p\n" +
-	"\x1aSyncGetChangeProofResponse\x12#\n" +
+	"bytesLimit\"l\n" +
+	"\x16GetChangeProofResponse\x12#\n" +
 	"\fchange_proof\x18\x01 \x01(\fH\x00R\vchangeProof\x12!\n" +
 	"\vrange_proof\x18\x02 \x01(\fH\x00R\n" +
 	"rangeProofB\n" +
 	"\n" +
-	"\bresponse\"\xcf\x01\n" +
-	"\x18SyncGetRangeProofRequest\x12\x1b\n" +
+	"\bresponse\"\xcb\x01\n" +
+	"\x14GetRangeProofRequest\x12\x1b\n" +
 	"\troot_hash\x18\x01 \x01(\fR\brootHash\x12-\n" +
 	"\tstart_key\x18\x02 \x01(\v2\x10.sync.MaybeBytesR\bstartKey\x12)\n" +
 	"\aend_key\x18\x03 \x01(\v2\x10.sync.MaybeBytesR\x06endKey\x12\x1b\n" +
@@ -731,23 +727,23 @@ func file_sync_sync_proto_rawDescGZIP() []byte {
 
 var file_sync_sync_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_sync_sync_proto_goTypes = []any{
-	(*SyncGetChangeProofRequest)(nil),  // 0: sync.SyncGetChangeProofRequest
-	(*SyncGetChangeProofResponse)(nil), // 1: sync.SyncGetChangeProofResponse
-	(*SyncGetRangeProofRequest)(nil),   // 2: sync.SyncGetRangeProofRequest
-	(*ChangeProof)(nil),                // 3: sync.ChangeProof
-	(*RangeProof)(nil),                 // 4: sync.RangeProof
-	(*ProofNode)(nil),                  // 5: sync.ProofNode
-	(*KeyChange)(nil),                  // 6: sync.KeyChange
-	(*Key)(nil),                        // 7: sync.Key
-	(*MaybeBytes)(nil),                 // 8: sync.MaybeBytes
-	(*KeyValue)(nil),                   // 9: sync.KeyValue
-	nil,                                // 10: sync.ProofNode.ChildrenEntry
+	(*GetChangeProofRequest)(nil),  // 0: sync.GetChangeProofRequest
+	(*GetChangeProofResponse)(nil), // 1: sync.GetChangeProofResponse
+	(*GetRangeProofRequest)(nil),   // 2: sync.GetRangeProofRequest
+	(*ChangeProof)(nil),            // 3: sync.ChangeProof
+	(*RangeProof)(nil),             // 4: sync.RangeProof
+	(*ProofNode)(nil),              // 5: sync.ProofNode
+	(*KeyChange)(nil),              // 6: sync.KeyChange
+	(*Key)(nil),                    // 7: sync.Key
+	(*MaybeBytes)(nil),             // 8: sync.MaybeBytes
+	(*KeyValue)(nil),               // 9: sync.KeyValue
+	nil,                            // 10: sync.ProofNode.ChildrenEntry
 }
 var file_sync_sync_proto_depIdxs = []int32{
-	8,  // 0: sync.SyncGetChangeProofRequest.start_key:type_name -> sync.MaybeBytes
-	8,  // 1: sync.SyncGetChangeProofRequest.end_key:type_name -> sync.MaybeBytes
-	8,  // 2: sync.SyncGetRangeProofRequest.start_key:type_name -> sync.MaybeBytes
-	8,  // 3: sync.SyncGetRangeProofRequest.end_key:type_name -> sync.MaybeBytes
+	8,  // 0: sync.GetChangeProofRequest.start_key:type_name -> sync.MaybeBytes
+	8,  // 1: sync.GetChangeProofRequest.end_key:type_name -> sync.MaybeBytes
+	8,  // 2: sync.GetRangeProofRequest.start_key:type_name -> sync.MaybeBytes
+	8,  // 3: sync.GetRangeProofRequest.end_key:type_name -> sync.MaybeBytes
 	5,  // 4: sync.ChangeProof.start_proof:type_name -> sync.ProofNode
 	5,  // 5: sync.ChangeProof.end_proof:type_name -> sync.ProofNode
 	6,  // 6: sync.ChangeProof.key_changes:type_name -> sync.KeyChange
@@ -771,8 +767,8 @@ func file_sync_sync_proto_init() {
 		return
 	}
 	file_sync_sync_proto_msgTypes[1].OneofWrappers = []any{
-		(*SyncGetChangeProofResponse_ChangeProof)(nil),
-		(*SyncGetChangeProofResponse_RangeProof)(nil),
+		(*GetChangeProofResponse_ChangeProof)(nil),
+		(*GetChangeProofResponse_RangeProof)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
