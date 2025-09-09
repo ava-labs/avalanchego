@@ -74,11 +74,13 @@ var _ = e2e.DescribePChain("[L1]", func() {
 
 		tc.By("loading the wallet")
 		var (
-			keychain   = env.NewKeychain()
-			baseWallet = e2e.NewWallet(tc, keychain, nodeURI)
-			pWallet    = baseWallet.P()
-			pClient    = platformvm.NewClient(nodeURI.URI)
-			owner      = &secp256k1fx.OutputOwners{
+			keychain       = env.NewKeychain()
+			baseWallet     = e2e.NewWallet(tc, keychain, nodeURI)
+			pWallet        = baseWallet.P()
+			pClient        = platformvm.NewClient(nodeURI.URI)
+			proposerClient = proposervm.NewClient(nodeURI.URI, "P")
+			infoClient     = info.NewClient(nodeURI.URI)
+			owner          = &secp256k1fx.OutputOwners{
 				Threshold: 1,
 				Addrs: []ids.ShortID{
 					keychain.Keys[0].Address(),
@@ -344,9 +346,16 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			})
 		})
 
+		timeToAdvancePChainContext := (5 * platformvmvalidators.RecentlyAcceptedWindowTTL) / 4
+		upgrades, err := infoClient.Upgrades(tc.DefaultContext())
+		require.NoError(err)
+		epochDuration := upgrades.GraniteEpochDuration
+		if timeToAdvancePChainContext < epochDuration {
+			timeToAdvancePChainContext = epochDuration
+		}
+
 		tc.By("advancing the P-Chain epoch", func() {
 			getCurrentEpochHeight := func() uint64 {
-				proposerClient := proposervm.NewClient(nodeURI.URI, "P")
 				epoch, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
 				require.NoError(err)
 				return epoch.Height
@@ -354,21 +363,8 @@ var _ = e2e.DescribePChain("[L1]", func() {
 
 			epochBefore := getCurrentEpochHeight()
 
-			tc.By("advancing the proposervm P-chain height epoched height", func() {
-				// The sleep duration must be the greater of the epoch duration and the recently accepted window TTL
-				// to ensure that the epoched height is advanced up to the most recently accepted block height.
-				sleepDuration := (5 * platformvmvalidators.RecentlyAcceptedWindowTTL) / 4
-
-				// Get the epoch duration
-				infoClient := info.NewClient(nodeURI.URI)
-				upgrades, err := infoClient.Upgrades(tc.DefaultContext())
-				require.NoError(err)
-				epochDuration := upgrades.GraniteEpochDuration
-
-				if sleepDuration < epochDuration {
-					sleepDuration = epochDuration
-				}
-				time.Sleep(sleepDuration)
+			tc.By("advancing the proposervm P-chain epoched height", func() {
+				time.Sleep(timeToAdvancePChainContext)
 			})
 
 			tc.By("issue a dummy tx to advance the epoch", func() {
@@ -391,12 +387,11 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				)
 				require.NoError(err)
 
-				tc.By("ensuring the genesis peer has accepted the tx at "+nodeURI.URI, func() {
+				tc.By("ensuring the genesis peer has accepted the tx at "+subnetGenesisNodeURI, func() {
 					var (
-						client = platformvm.NewClient(nodeURI.URI)
+						client = platformvm.NewClient(subnetGenesisNodeURI)
 						txID   = tx.ID()
 					)
-
 					tc.Eventually(
 						func() bool {
 							_, err := client.GetTx(tc.DefaultContext(), txID)
@@ -770,7 +765,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		tc.By("advancing the proposervm P-chain height", func() {
 			// We must wait at least [RecentlyAcceptedWindowTTL] to ensure the
 			// next block will reference the last accepted P-chain height.
-			time.Sleep((5 * platformvmvalidators.RecentlyAcceptedWindowTTL) / 4)
+			time.Sleep(timeToAdvancePChainContext)
 		})
 
 		tc.By("removing the registered validator", func() {
