@@ -18,6 +18,24 @@
                 "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**",
                 "timeout-minutes": 30
+            },
+            {
+                "runner": "avago-runner-m6i-4xlarge-ebs-fast",
+                "config": "default",
+                "start-block": 101,
+                "end-block": 10000000,
+                "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1-10m-ldb/**",
+                "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**",
+                "timeout-minutes": 1440
+            },
+            {
+                "runner": "avago-runner-m6i-4xlarge-ebs-fast",
+                "config": "default",
+                "start-block": 10000001,
+                "end-block": 20000000,
+                "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10m-20m-ldb/**",
+                "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-10m/**",
+                "timeout-minutes": 1440
             }
         ]
     },
