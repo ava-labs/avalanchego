@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1756999208609,
+  "lastUpdate": 1757461041208,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -864,6 +864,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[101,250000]-Config-default",
             "value": 103.2,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Austin Larson",
+            "username": "alarso16",
+            "email": "78000745+alarso16@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "4856524c13ea53a9658419110a345b696fb9f029",
+          "message": "Delete gRPC client for MerkleDB (#4251)",
+          "timestamp": "2025-09-09T18:01:46Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/4856524c13ea53a9658419110a345b696fb9f029"
+        },
+        "date": 1757461039085,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33250000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
+            "value": 37.71,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
