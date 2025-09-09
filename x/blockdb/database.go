@@ -15,10 +15,12 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/DataDog/zstd"
 	"github.com/cespare/xxhash/v2"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -46,9 +48,6 @@ type BlockHeight = uint64
 // BlockData defines the type for block data.
 type BlockData = []byte
 
-// BlockHeaderSize is the size of the header in the block data.
-type BlockHeaderSize = uint32
-
 var (
 	_ encoding.BinaryMarshaler   = (*blockEntryHeader)(nil)
 	_ encoding.BinaryUnmarshaler = (*blockEntryHeader)(nil)
@@ -65,11 +64,10 @@ var (
 // blockEntryHeader is the header of a block entry in the data file.
 // This is not the header portion of the block data itself.
 type blockEntryHeader struct {
-	Height     BlockHeight
-	Size       uint32
-	Checksum   uint64
-	HeaderSize BlockHeaderSize
-	Version    uint16
+	Height   BlockHeight
+	Size     uint32
+	Checksum uint64
+	Version  uint16
 }
 
 // MarshalBinary implements the encoding.BinaryMarshaler interface.
@@ -78,8 +76,7 @@ func (beh blockEntryHeader) MarshalBinary() ([]byte, error) {
 	binary.LittleEndian.PutUint64(buf[0:], beh.Height)
 	binary.LittleEndian.PutUint32(buf[8:], beh.Size)
 	binary.LittleEndian.PutUint64(buf[12:], beh.Checksum)
-	binary.LittleEndian.PutUint32(buf[20:], beh.HeaderSize)
-	binary.LittleEndian.PutUint16(buf[24:], beh.Version)
+	binary.LittleEndian.PutUint16(buf[20:], beh.Version)
 	return buf, nil
 }
 
@@ -91,8 +88,7 @@ func (beh *blockEntryHeader) UnmarshalBinary(data []byte) error {
 	beh.Height = binary.LittleEndian.Uint64(data[0:])
 	beh.Size = binary.LittleEndian.Uint32(data[8:])
 	beh.Checksum = binary.LittleEndian.Uint64(data[12:])
-	beh.HeaderSize = binary.LittleEndian.Uint32(data[20:])
-	beh.Version = binary.LittleEndian.Uint16(data[24:])
+	beh.Version = binary.LittleEndian.Uint16(data[20:])
 	return nil
 }
 
@@ -102,8 +98,8 @@ type indexEntry struct {
 	Offset uint64
 	// Size is the length in bytes of the block's data (excluding the blockHeader).
 	Size uint32
-	// HeaderSize is the size in bytes of the block's header portion within the data.
-	HeaderSize BlockHeaderSize
+	// Reserved for future use and ensures alignment
+	Reserved [4]byte
 }
 
 // IsEmpty returns true if this entry is uninitialized.
@@ -117,7 +113,6 @@ func (e indexEntry) MarshalBinary() ([]byte, error) {
 	buf := make([]byte, sizeOfIndexEntry)
 	binary.LittleEndian.PutUint64(buf[0:], e.Offset)
 	binary.LittleEndian.PutUint32(buf[8:], e.Size)
-	binary.LittleEndian.PutUint32(buf[12:], e.HeaderSize)
 	return buf, nil
 }
 
@@ -128,7 +123,6 @@ func (e *indexEntry) UnmarshalBinary(data []byte) error {
 	}
 	e.Offset = binary.LittleEndian.Uint64(data[0:])
 	e.Size = binary.LittleEndian.Uint32(data[8:])
-	e.HeaderSize = binary.LittleEndian.Uint32(data[12:])
 	return nil
 }
 
@@ -140,7 +134,8 @@ type indexFileHeader struct {
 	MaxContiguousHeight BlockHeight
 	MaxHeight           BlockHeight
 	NextWriteOffset     uint64
-	// reserve 16 bytes for future use
+	// reserve remaining 16 bytes for future use while keeping the
+	// size of the index file header multiple of sizeOfIndexEntry.
 	Reserved [16]byte
 }
 
@@ -180,14 +175,15 @@ type blockHeights struct {
 	maxContiguousHeight BlockHeight
 }
 
-// Database stores blockchain blocks on disk and provides methods to read, and write blocks.
+// Database stores blockchain blocks on disk and provides methods to read and write blocks.
 type Database struct {
-	indexFile *os.File
-	config    DatabaseConfig
-	header    indexFileHeader
-	log       logging.Logger
-	closed    bool
-	fileCache *lru.Cache[int, *os.File]
+	indexFile  *os.File
+	config     DatabaseConfig
+	header     indexFileHeader
+	log        logging.Logger
+	closed     bool
+	fileCache  *lru.Cache[int, *os.File]
+	compressor compression.Compressor
 
 	// closeMu prevents the database from being closed while in use and prevents
 	// use of a closed database.
@@ -218,14 +214,23 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 		databaseLog = logging.NoLog{}
 	}
 
+	// from benchmarks, zstd.BestSpeed is about 100% faster than the default
+	// compression level while giving us ~5% better compression ratio than Snappy.
+	var err error
+	compressor, err := compression.NewZstdCompressorWithLevel(math.MaxUint32, zstd.BestSpeed)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize compressor: %w", err)
+	}
+
 	s := &Database{
 		config: config,
 		log:    databaseLog,
-		fileCache: lru.NewCacheWithOnEvict[int, *os.File](config.MaxDataFiles, func(_ int, f *os.File) {
+		fileCache: lru.NewCacheWithOnEvict(config.MaxDataFiles, func(_ int, f *os.File) {
 			if f != nil {
 				f.Close()
 			}
 		}),
+		compressor: compressor,
 	}
 
 	s.log.Info("Initializing BlockDB",
@@ -310,8 +315,8 @@ func (s *Database) Close() error {
 	return err
 }
 
-// WriteBlock inserts a block into the store at the given height with the specified header size.
-func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize BlockHeaderSize) error {
+// WriteBlock inserts a block into the store at the given height.
+func (s *Database) WriteBlock(height BlockHeight, block BlockData) error {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
 
@@ -337,15 +342,6 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize Bl
 		return ErrBlockEmpty
 	}
 
-	if headerSize >= blockDataLen {
-		s.log.Error("Failed to write block: header size exceeds block size",
-			zap.Uint64("height", height),
-			zap.Uint32("headerSize", headerSize),
-			zap.Uint32("blockSize", blockDataLen),
-		)
-		return ErrHeaderSizeTooLarge
-	}
-
 	indexFileOffset, err := s.indexEntryOffset(height)
 	if err != nil {
 		s.log.Error("Failed to write block: failed to calculate index entry offset",
@@ -354,6 +350,16 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize Bl
 		)
 		return fmt.Errorf("failed to get index entry offset for block at height %d: %w", height, err)
 	}
+
+	blockToWrite, err := s.compressor.Compress(block)
+	if err != nil {
+		s.log.Error("Failed to write block: error compressing block data",
+			zap.Uint64("height", height),
+			zap.Error(err),
+		)
+		return fmt.Errorf("failed to compress block data: %w", err)
+	}
+	blockDataLen = uint32(len(blockToWrite))
 
 	sizeWithDataHeader, err := safemath.Add(sizeOfBlockEntryHeader, blockDataLen)
 	if err != nil {
@@ -375,13 +381,12 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize Bl
 	}
 
 	bh := blockEntryHeader{
-		Height:     height,
-		Size:       blockDataLen,
-		HeaderSize: headerSize,
-		Checksum:   calculateChecksum(block),
-		Version:    BlockEntryVersion,
+		Height:   height,
+		Size:     blockDataLen,
+		Checksum: calculateChecksum(block),
+		Version:  BlockEntryVersion,
 	}
-	if err := s.writeBlockAt(writeDataOffset, bh, block); err != nil {
+	if err := s.writeBlockAt(writeDataOffset, bh, blockToWrite); err != nil {
 		s.log.Error("Failed to write block: error writing block data",
 			zap.Uint64("height", height),
 			zap.Uint64("dataOffset", writeDataOffset),
@@ -390,7 +395,7 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize Bl
 		return err
 	}
 
-	if err := s.writeIndexEntryAt(indexFileOffset, writeDataOffset, blockDataLen, headerSize); err != nil {
+	if err := s.writeIndexEntryAt(indexFileOffset, writeDataOffset, blockDataLen); err != nil {
 		s.log.Error("Failed to write block: error writing index entry",
 			zap.Uint64("height", height),
 			zap.Uint64("indexOffset", indexFileOffset),
@@ -411,7 +416,6 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData, headerSize Bl
 	s.log.Debug("Block written successfully",
 		zap.Uint64("height", height),
 		zap.Uint32("blockSize", blockDataLen),
-		zap.Uint32("headerSize", headerSize),
 		zap.Uint64("dataOffset", writeDataOffset),
 	)
 
@@ -478,135 +482,52 @@ func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
 		return nil, err
 	}
 
-	// Read the complete block data
-	blockData := make(BlockData, indexEntry.Size)
-	dataFile, localOffset, err := s.getDataFileAndOffset(indexEntry.Offset)
+	totalReadSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(indexEntry.Size))
 	if err != nil {
-		s.log.Error("Failed to read block: failed to get data file",
-			zap.Uint64("height", height),
-			zap.Uint64("dataOffset", indexEntry.Offset),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("failed to get data file for block at height %d: %w", height, err)
+		return nil, fmt.Errorf("failed to compute total read size: %w", err)
 	}
-	_, err = dataFile.ReadAt(blockData, int64(localOffset+uint64(sizeOfBlockEntryHeader)))
+	buf := make([]byte, int(totalReadSize))
+
+	// loop to retry fetching the data file if it got closed between get and read.
+	// If not closed, we read the block header and data.
+	for {
+		dataFile, localOffset, fileIndex, err := s.getDataFileAndOffset(indexEntry.Offset)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get data file and offset: %w", err)
+		}
+		if _, err := dataFile.ReadAt(buf, int64(localOffset)); err != nil {
+			if errors.Is(err, os.ErrClosed) {
+				s.fileCache.Evict(fileIndex)
+				continue
+			}
+			s.log.Error("Failed to read block: failed to read block data from file",
+				zap.Uint64("height", height),
+				zap.Uint64("localOffset", localOffset),
+				zap.Uint32("blockSize", indexEntry.Size),
+				zap.Error(err),
+			)
+			return nil, fmt.Errorf("failed to read block header and data: %w", err)
+		}
+		break
+	}
+
+	var bh blockEntryHeader
+	if err := bh.UnmarshalBinary(buf[:int(sizeOfBlockEntryHeader)]); err != nil {
+		return nil, fmt.Errorf("failed to deserialize block header: %w", err)
+	}
+	compressedData := buf[int(sizeOfBlockEntryHeader):]
+	decompressed, err := s.compressor.Decompress(compressedData)
 	if err != nil {
-		s.log.Error("Failed to read block: failed to read block data from file",
-			zap.Uint64("height", height),
-			zap.Uint64("localOffset", localOffset),
-			zap.Uint32("blockSize", indexEntry.Size),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("failed to read block data from data file: %w", err)
+		return nil, fmt.Errorf("failed to decompress block data: %w", err)
 	}
 
-	return blockData, nil
-}
-
-// ReadHeader retrieves only the header portion of a block by its height.
-// Returns ErrBlockNotFound if the block is not found, or nil if no header.
-func (s *Database) ReadHeader(height BlockHeight) (BlockData, error) {
-	s.closeMu.RLock()
-	defer s.closeMu.RUnlock()
-
-	indexEntry, err := s.readBlockIndex(height)
-	if err != nil {
-		return nil, err
+	// Verify checksum on uncompressed data
+	calculatedChecksum := calculateChecksum(decompressed)
+	if calculatedChecksum != bh.Checksum {
+		return nil, fmt.Errorf("checksum mismatch: calculated %d, stored %d", calculatedChecksum, bh.Checksum)
 	}
 
-	// Return nil if there's no header data
-	if indexEntry.HeaderSize == 0 {
-		return nil, nil
-	}
-
-	// Validate header size doesn't exceed total block size
-	if indexEntry.HeaderSize > indexEntry.Size {
-		s.log.Error("Failed to read header: header size exceeds block size",
-			zap.Uint64("height", height),
-			zap.Uint32("headerSize", indexEntry.HeaderSize),
-			zap.Uint32("blockSize", indexEntry.Size),
-		)
-		return nil, fmt.Errorf("%w: invalid header size %d exceeds block size %d", ErrHeaderSizeTooLarge, indexEntry.HeaderSize, indexEntry.Size)
-	}
-
-	// Read only the header portion
-	headerData := make([]byte, indexEntry.HeaderSize)
-	dataFile, localOffset, err := s.getDataFileAndOffset(indexEntry.Offset)
-	if err != nil {
-		s.log.Error("Failed to read header: failed to get data file",
-			zap.Uint64("height", height),
-			zap.Uint64("dataOffset", indexEntry.Offset),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("failed to get data file for block header at height %d: %w", height, err)
-	}
-	_, err = dataFile.ReadAt(headerData, int64(localOffset+uint64(sizeOfBlockEntryHeader)))
-	if err != nil {
-		s.log.Error("Failed to read header: failed to read header data from file",
-			zap.Uint64("height", height),
-			zap.Uint64("localOffset", localOffset),
-			zap.Uint32("headerSize", indexEntry.HeaderSize),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("failed to read block header data from data file: %w", err)
-	}
-
-	return headerData, nil
-}
-
-// ReadBody retrieves only the body portion (excluding header) of a block by its height.
-// Returns ErrBlockNotFound if the block is not found.
-func (s *Database) ReadBody(height BlockHeight) (BlockData, error) {
-	s.closeMu.RLock()
-	defer s.closeMu.RUnlock()
-
-	indexEntry, err := s.readBlockIndex(height)
-	if err != nil {
-		return nil, err
-	}
-
-	bodySize := indexEntry.Size - indexEntry.HeaderSize
-	bodyData := make([]byte, bodySize)
-	dataFile, localOffset, err := s.getDataFileAndOffset(indexEntry.Offset)
-	if err != nil {
-		s.log.Error("Failed to read body: failed to get data file",
-			zap.Uint64("height", height),
-			zap.Uint64("dataOffset", indexEntry.Offset),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("failed to get data file for block body at height %d: %w", height, err)
-	}
-	headerOffset, err := safemath.Add(localOffset, uint64(sizeOfBlockEntryHeader))
-	if err != nil {
-		s.log.Error("Failed to read body: header offset calculation overflow",
-			zap.Uint64("height", height),
-			zap.Uint64("localOffset", localOffset),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("calculating header offset would overflow for block at height %d: %w", height, err)
-	}
-	bodyOffset, err := safemath.Add(headerOffset, uint64(indexEntry.HeaderSize))
-	if err != nil {
-		s.log.Error("Failed to read body: body offset calculation overflow",
-			zap.Uint64("height", height),
-			zap.Uint64("headerOffset", headerOffset),
-			zap.Uint32("headerSize", indexEntry.HeaderSize),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("calculating body offset would overflow for block at height %d: %w", height, err)
-	}
-
-	_, err = dataFile.ReadAt(bodyData, int64(bodyOffset))
-	if err != nil {
-		s.log.Error("Failed to read body: failed to read body data from file",
-			zap.Uint64("height", height),
-			zap.Uint64("bodyOffset", bodyOffset),
-			zap.Uint32("bodySize", bodySize),
-			zap.Error(err),
-		)
-		return nil, fmt.Errorf("failed to read block body data from data file: %w", err)
-	}
-	return bodyData, nil
+	return decompressed, nil
 }
 
 // HasBlock checks if a block exists at the given height.
@@ -677,11 +598,10 @@ func (s *Database) readIndexEntry(height BlockHeight) (indexEntry, error) {
 	return entry, nil
 }
 
-func (s *Database) writeIndexEntryAt(indexFileOffset, dataFileBlockOffset uint64, blockDataLen uint32, headerSize BlockHeaderSize) error {
+func (s *Database) writeIndexEntryAt(indexFileOffset, dataFileBlockOffset uint64, blockDataLen uint32) error {
 	indexEntry := indexEntry{
-		Offset:     dataFileBlockOffset,
-		Size:       blockDataLen,
-		HeaderSize: headerSize,
+		Offset: dataFileBlockOffset,
+		Size:   blockDataLen,
 	}
 
 	entryBytes, err := indexEntry.MarshalBinary()
@@ -800,7 +720,7 @@ func (s *Database) recover() error {
 			"(calculated: %d bytes, index header: %d bytes)",
 			ErrCorrupted, calculatedNextDataWriteOffset, nextDataWriteOffset)
 	default:
-		// The data on disk is ahead of the index. We need to recover un-indexed blocks.
+		// The data on disk is ahead of the index. We need to recover unindexed blocks.
 		if err := s.recoverUnindexedBlocks(nextDataWriteOffset, calculatedNextDataWriteOffset); err != nil {
 			return err
 		}
@@ -810,7 +730,7 @@ func (s *Database) recover() error {
 
 // recoverUnindexedBlocks scans data files from the given offset and recovers blocks that were written but not indexed.
 func (s *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error {
-	s.log.Info("Recovery: data files are ahead of index; recovering un-indexed blocks.",
+	s.log.Info("Recovery: data files are ahead of index; recovering unindexed blocks.",
 		zap.Uint64("startOffset", startOffset),
 		zap.Uint64("endOffset", endOffset),
 	)
@@ -822,7 +742,7 @@ func (s *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error {
 		bh, err := s.recoverBlockAtOffset(currentScanOffset, endOffset)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				// reach end of this file, try to read the next file
+				// Reached end of this file, try to read the next file
 				currentFileIndex := int(currentScanOffset / s.header.MaxDataFileSize)
 				nextFileIndex, err := safemath.Add(uint64(currentFileIndex), 1)
 				if err != nil {
@@ -879,7 +799,7 @@ func (s *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEntr
 		return bh, fmt.Errorf("%w: not enough data for block header at offset %d", ErrCorrupted, offset)
 	}
 
-	dataFile, localOffset, err := s.getDataFileAndOffset(offset)
+	dataFile, localOffset, _, err := s.getDataFileAndOffset(offset)
 	if err != nil {
 		return bh, fmt.Errorf("recovery: failed to get data file for offset %d: %w", offset, err)
 	}
@@ -902,9 +822,6 @@ func (s *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEntr
 			ErrCorrupted, offset, bh.Height, s.header.MinHeight,
 		)
 	}
-	if bh.HeaderSize > bh.Size {
-		return bh, fmt.Errorf("%w: invalid block header size in header at offset %d: %d > %d", ErrCorrupted, offset, bh.HeaderSize, bh.Size)
-	}
 	expectedBlockEndOffset, err := safemath.Add(offset, uint64(sizeOfBlockEntryHeader))
 	if err != nil {
 		return bh, fmt.Errorf("calculating block end offset would overflow at offset %d: %w", offset, err)
@@ -924,7 +841,12 @@ func (s *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEntr
 	if _, err := dataFile.ReadAt(blockData, int64(blockDataOffset)); err != nil {
 		return bh, fmt.Errorf("%w: failed to read block data at offset %d: %w", ErrCorrupted, offset, err)
 	}
-	calculatedChecksum := calculateChecksum(blockData)
+	// Decompress block data and verify checksum
+	decompressed, err := s.compressor.Decompress(blockData)
+	if err != nil {
+		return bh, fmt.Errorf("%w: failed to decompress block at offset %d: %w", ErrCorrupted, offset, err)
+	}
+	calculatedChecksum := calculateChecksum(decompressed)
 	if calculatedChecksum != bh.Checksum {
 		return bh, fmt.Errorf("%w: checksum mismatch for block at offset %d", ErrCorrupted, offset)
 	}
@@ -934,7 +856,7 @@ func (s *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEntr
 	if idxErr != nil {
 		return bh, fmt.Errorf("cannot get index offset for recovered block %d: %w", bh.Height, idxErr)
 	}
-	if err := s.writeIndexEntryAt(indexFileOffset, offset, bh.Size, bh.HeaderSize); err != nil {
+	if err := s.writeIndexEntryAt(indexFileOffset, offset, bh.Size); err != nil {
 		return bh, fmt.Errorf("failed to update index for recovered block %d: %w", bh.Height, err)
 	}
 	return bh, nil
@@ -989,7 +911,7 @@ func (s *Database) initializeDataFiles() error {
 	// Pre-load the data file for the next write offset.
 	nextOffset := s.nextDataWriteOffset.Load()
 	if nextOffset > 0 {
-		_, _, err := s.getDataFileAndOffset(nextOffset)
+		_, _, _, err := s.getDataFileAndOffset(nextOffset)
 		if err != nil {
 			return fmt.Errorf("failed to pre-load data file for offset %d: %w", nextOffset, err)
 		}
@@ -1043,24 +965,29 @@ func (s *Database) loadOrInitializeHeader() error {
 	}
 	s.nextDataWriteOffset.Store(s.header.NextWriteOffset)
 	s.setBlockHeights(s.header.MaxHeight, s.header.MaxContiguousHeight)
+	s.logConfigAndHeaderMismatches()
 
-	// log a warning if the config does not match the index header
+	return nil
+}
+
+func (s *Database) logConfigAndHeaderMismatches() {
+	// Some config values cannot be changed after index initialization.
+	// If they do not match the index header, log an info that
+	// the index header values will be used instead.
 	if s.config.MinimumHeight != s.header.MinHeight {
 		s.log.Info(
-			"MinimumHeight in blockdb config does not match the index header. The MinimumHeight in the index header will be used.",
+			"MinimumHeight in config does not match the index header. The MinimumHeight in the index header will be used.",
 			zap.Uint64("configMinimumHeight", s.config.MinimumHeight),
 			zap.Uint64("headerMinimumHeight", s.header.MinHeight),
 		)
 	}
 	if s.config.MaxDataFileSize != s.header.MaxDataFileSize {
 		s.log.Info(
-			"MaxDataFileSize in blockdb config does not match the index header. The MaxDataFileSize in the index header will be used.",
+			"MaxDataFileSize in config does not match the index header. The MaxDataFileSize in the index header will be used.",
 			zap.Uint64("configMaxDataFileSize", s.config.MaxDataFileSize),
 			zap.Uint64("headerMaxDataFileSize", s.header.MaxDataFileSize),
 		)
 	}
-
-	return nil
 }
 
 func (s *Database) closeFiles() {
@@ -1121,11 +1048,6 @@ func (s *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block BlockD
 		return fmt.Errorf("failed to serialize block header: %w", err)
 	}
 
-	dataFile, localOffset, err := s.getDataFileAndOffset(offset)
-	if err != nil {
-		return fmt.Errorf("failed to get data file for writing block %d: %w", bh.Height, err)
-	}
-
 	// Allocate combined buffer for header and block data and write it to the data file
 	combinedBufSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(len(block)))
 	if err != nil {
@@ -1134,16 +1056,35 @@ func (s *Database) writeBlockAt(offset uint64, bh blockEntryHeader, block BlockD
 	combinedBuf := make([]byte, combinedBufSize)
 	copy(combinedBuf, headerBytes)
 	copy(combinedBuf[sizeOfBlockEntryHeader:], block)
-	if _, err := dataFile.WriteAt(combinedBuf, int64(localOffset)); err != nil {
-		return fmt.Errorf("failed to write block to data file at offset %d: %w", offset, err)
-	}
 
-	if s.config.SyncToDisk {
-		if err := dataFile.Sync(); err != nil {
-			return fmt.Errorf("failed to sync data file after writing block %d: %w", bh.Height, err)
+	// loop to retry fetching the data file if it got closed between get and write.
+	// If not closed, we write the block and return.
+	for {
+		dataFile, localOffset, fileIndex, err := s.getDataFileAndOffset(offset)
+		if err != nil {
+			return fmt.Errorf("failed to get data file for writing block %d: %w", bh.Height, err)
 		}
+
+		if _, err := dataFile.WriteAt(combinedBuf, int64(localOffset)); err != nil {
+			if errors.Is(err, os.ErrClosed) {
+				// ensure the file is evicted, otherwise we'll retry forever
+				s.fileCache.Evict(fileIndex)
+				continue
+			}
+			return fmt.Errorf("failed to write block to data file at offset %d: %w", offset, err)
+		}
+
+		if s.config.SyncToDisk {
+			if err := dataFile.Sync(); err != nil {
+				if errors.Is(err, os.ErrClosed) {
+					s.fileCache.Evict(fileIndex)
+					continue
+				}
+				return fmt.Errorf("failed to sync data file after writing block %d: %w", bh.Height, err)
+			}
+		}
+		return nil
 	}
-	return nil
 }
 
 func (s *Database) updateBlockHeights(writtenBlockHeight BlockHeight) error {
@@ -1335,10 +1276,10 @@ func (s *Database) allocateBlockSpace(totalSize uint32) (writeDataOffset uint64,
 	}
 }
 
-func (s *Database) getDataFileAndOffset(globalOffset uint64) (*os.File, uint64, error) {
+func (s *Database) getDataFileAndOffset(globalOffset uint64) (*os.File, uint64, int, error) {
 	maxFileSize := s.header.MaxDataFileSize
 	fileIndex := int(globalOffset / maxFileSize)
 	localOffset := globalOffset % maxFileSize
 	handle, err := s.getOrOpenDataFile(fileIndex)
-	return handle, localOffset, err
+	return handle, localOffset, fileIndex, err
 }

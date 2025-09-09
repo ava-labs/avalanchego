@@ -121,6 +121,15 @@ func TestSlidingWindowThrottlerHandle(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:  "throttled requests are counted as hits",
+			limit: 1,
+			calls: []call{
+				{time: currentWindowStartTime},
+				{time: currentWindowStartTime.Add(period).Add(time.Second), throttled: true},
+				{time: currentWindowStartTime.Add(2 * period).Add(time.Second), throttled: true},
+			},
+		},
 	}
 
 	for _, tt := range tests {

@@ -72,7 +72,7 @@ type GetChangeProofHandler struct {
 func (*GetChangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
 
 func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-	req := &pb.SyncGetChangeProofRequest{}
+	req := &pb.GetChangeProofRequest{}
 	if err := proto.Unmarshal(requestBytes, req); err != nil {
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
@@ -137,7 +137,7 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 			proofBytes, err := getRangeProof(
 				ctx,
 				g.db,
-				&pb.SyncGetRangeProofRequest{
+				&pb.GetRangeProofRequest{
 					RootHash:   req.EndRootHash,
 					StartKey:   req.StartKey,
 					EndKey:     req.EndKey,
@@ -145,9 +145,14 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 					BytesLimit: req.BytesLimit,
 				},
 				func(rangeProof *merkledb.RangeProof) ([]byte, error) {
-					return proto.Marshal(&pb.SyncGetChangeProofResponse{
-						Response: &pb.SyncGetChangeProofResponse_RangeProof{
-							RangeProof: rangeProof.ToProto(),
+					proofBytes, err := rangeProof.MarshalBinary()
+					if err != nil {
+						return nil, err
+					}
+
+					return proto.Marshal(&pb.GetChangeProofResponse{
+						Response: &pb.GetChangeProofResponse_RangeProof{
+							RangeProof: proofBytes,
 						},
 					})
 				},
@@ -163,9 +168,16 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 		}
 
 		// We generated a change proof. See if it's small enough.
-		proofBytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
-			Response: &pb.SyncGetChangeProofResponse_ChangeProof{
-				ChangeProof: changeProof.ToProto(),
+		changeProofBytes, err := changeProof.MarshalBinary()
+		if err != nil {
+			return nil, &common.AppError{
+				Code:    p2p.ErrUnexpected.Code,
+				Message: fmt.Sprintf("failed to marshal change proof: %s", err),
+			}
+		}
+		responseBytes, err := proto.Marshal(&pb.GetChangeProofResponse{
+			Response: &pb.GetChangeProofResponse_ChangeProof{
+				ChangeProof: changeProofBytes,
 			},
 		})
 		if err != nil {
@@ -175,8 +187,8 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 			}
 		}
 
-		if len(proofBytes) < bytesLimit {
-			return proofBytes, nil
+		if len(responseBytes) < bytesLimit {
+			return responseBytes, nil
 		}
 
 		// The proof was too large. Try to shrink it.
@@ -202,7 +214,7 @@ type GetRangeProofHandler struct {
 func (*GetRangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
 
 func (g *GetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-	req := &pb.SyncGetRangeProofRequest{}
+	req := &pb.GetRangeProofRequest{}
 	if err := proto.Unmarshal(requestBytes, req); err != nil {
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
@@ -226,7 +238,7 @@ func (g *GetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ t
 		g.db,
 		req,
 		func(rangeProof *merkledb.RangeProof) ([]byte, error) {
-			return proto.Marshal(rangeProof.ToProto())
+			return rangeProof.MarshalBinary()
 		},
 	)
 	if err != nil {
@@ -250,7 +262,7 @@ func (g *GetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ t
 func getRangeProof(
 	ctx context.Context,
 	db DB,
-	req *pb.SyncGetRangeProofRequest,
+	req *pb.GetRangeProofRequest,
 	marshalFunc func(*merkledb.RangeProof) ([]byte, error),
 ) ([]byte, error) {
 	root, err := ids.ToID(req.RootHash)
@@ -291,7 +303,7 @@ func getRangeProof(
 }
 
 // Returns nil iff [req] is well-formed.
-func validateChangeProofRequest(req *pb.SyncGetChangeProofRequest) error {
+func validateChangeProofRequest(req *pb.GetChangeProofRequest) error {
 	switch {
 	case req.BytesLimit == 0:
 		return errInvalidBytesLimit
@@ -316,7 +328,7 @@ func validateChangeProofRequest(req *pb.SyncGetChangeProofRequest) error {
 }
 
 // Returns nil iff [req] is well-formed.
-func validateRangeProofRequest(req *pb.SyncGetRangeProofRequest) error {
+func validateRangeProofRequest(req *pb.GetRangeProofRequest) error {
 	switch {
 	case req.BytesLimit == 0:
 		return errInvalidBytesLimit

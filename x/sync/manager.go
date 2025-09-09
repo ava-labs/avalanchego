@@ -346,7 +346,7 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	request := &pb.SyncGetChangeProofRequest{
+	request := &pb.GetChangeProofRequest{
 		StartRootHash: work.localRootID[:],
 		EndRootHash:   targetRootID[:],
 		StartKey: &pb.MaybeBytes{
@@ -405,7 +405,7 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 		return
 	}
 
-	request := &pb.SyncGetRangeProofRequest{
+	request := &pb.GetRangeProofRequest{
 		RootHash: targetRootID[:],
 		StartKey: &pb.MaybeBytes{
 			Value:     work.start.Value(),
@@ -502,7 +502,7 @@ func (m *Manager) handleRangeProofResponse(
 	ctx context.Context,
 	targetRootID ids.ID,
 	work *workItem,
-	request *pb.SyncGetRangeProofRequest,
+	request *pb.GetRangeProofRequest,
 	responseBytes []byte,
 	err error,
 ) error {
@@ -510,13 +510,8 @@ func (m *Manager) handleRangeProofResponse(
 		return err
 	}
 
-	var rangeProofProto pb.RangeProof
-	if err := proto.Unmarshal(responseBytes, &rangeProofProto); err != nil {
-		return err
-	}
-
 	var rangeProof merkledb.RangeProof
-	if err := rangeProof.UnmarshalProto(&rangeProofProto); err != nil {
+	if err := rangeProof.UnmarshalBinary(responseBytes); err != nil {
 		return err
 	}
 
@@ -553,7 +548,7 @@ func (m *Manager) handleChangeProofResponse(
 	ctx context.Context,
 	targetRootID ids.ID,
 	work *workItem,
-	request *pb.SyncGetChangeProofRequest,
+	request *pb.GetChangeProofRequest,
 	responseBytes []byte,
 	err error,
 ) error {
@@ -561,7 +556,7 @@ func (m *Manager) handleChangeProofResponse(
 		return err
 	}
 
-	var changeProofResp pb.SyncGetChangeProofResponse
+	var changeProofResp pb.GetChangeProofResponse
 	if err := proto.Unmarshal(responseBytes, &changeProofResp); err != nil {
 		return err
 	}
@@ -570,10 +565,10 @@ func (m *Manager) handleChangeProofResponse(
 	endKey := maybeBytesToMaybe(request.EndKey)
 
 	switch changeProofResp := changeProofResp.Response.(type) {
-	case *pb.SyncGetChangeProofResponse_ChangeProof:
+	case *pb.GetChangeProofResponse_ChangeProof:
 		// The server had enough history to send us a change proof
 		var changeProof merkledb.ChangeProof
-		if err := changeProof.UnmarshalProto(changeProofResp.ChangeProof); err != nil {
+		if err := changeProof.UnmarshalBinary(changeProofResp.ChangeProof); err != nil {
 			return err
 		}
 
@@ -612,9 +607,9 @@ func (m *Manager) handleChangeProofResponse(
 		}
 
 		m.completeWorkItem(ctx, work, largestHandledKey, targetRootID, changeProof.EndProof)
-	case *pb.SyncGetChangeProofResponse_RangeProof:
+	case *pb.GetChangeProofResponse_RangeProof:
 		var rangeProof merkledb.RangeProof
-		if err := rangeProof.UnmarshalProto(changeProofResp.RangeProof); err != nil {
+		if err := rangeProof.UnmarshalBinary(changeProofResp.RangeProof); err != nil {
 			return err
 		}
 
