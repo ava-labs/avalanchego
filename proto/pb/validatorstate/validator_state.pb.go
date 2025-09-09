@@ -439,8 +439,8 @@ func (x *Validator) GetIsL1Validator() bool {
 }
 
 type GetAllValidatorSetsResponse struct {
-	state         protoimpl.MessageState         `protogen:"open.v1"`
-	ValidatorSets []*GetValidatorSetWithSubnetID `protobuf:"bytes,1,rep,name=validator_sets,json=validatorSets,proto3" json:"validator_sets,omitempty"`
+	state         protoimpl.MessageState      `protogen:"open.v1"`
+	ValidatorSets []*ValidatorSetWithSubnetID `protobuf:"bytes,1,rep,name=validator_sets,json=validatorSets,proto3" json:"validator_sets,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -475,14 +475,14 @@ func (*GetAllValidatorSetsResponse) Descriptor() ([]byte, []int) {
 	return file_validatorstate_validator_state_proto_rawDescGZIP(), []int{8}
 }
 
-func (x *GetAllValidatorSetsResponse) GetValidatorSets() []*GetValidatorSetWithSubnetID {
+func (x *GetAllValidatorSetsResponse) GetValidatorSets() []*ValidatorSetWithSubnetID {
 	if x != nil {
 		return x.ValidatorSets
 	}
 	return nil
 }
 
-type GetValidatorSetWithSubnetID struct {
+type ValidatorSetWithSubnetID struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SubnetId      []byte                 `protobuf:"bytes,1,opt,name=subnet_id,json=subnetId,proto3" json:"subnet_id,omitempty"`
 	Validators    []*Validator           `protobuf:"bytes,2,rep,name=validators,proto3" json:"validators,omitempty"`
@@ -490,20 +490,20 @@ type GetValidatorSetWithSubnetID struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *GetValidatorSetWithSubnetID) Reset() {
-	*x = GetValidatorSetWithSubnetID{}
+func (x *ValidatorSetWithSubnetID) Reset() {
+	*x = ValidatorSetWithSubnetID{}
 	mi := &file_validatorstate_validator_state_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *GetValidatorSetWithSubnetID) String() string {
+func (x *ValidatorSetWithSubnetID) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*GetValidatorSetWithSubnetID) ProtoMessage() {}
+func (*ValidatorSetWithSubnetID) ProtoMessage() {}
 
-func (x *GetValidatorSetWithSubnetID) ProtoReflect() protoreflect.Message {
+func (x *ValidatorSetWithSubnetID) ProtoReflect() protoreflect.Message {
 	mi := &file_validatorstate_validator_state_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -515,19 +515,19 @@ func (x *GetValidatorSetWithSubnetID) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use GetValidatorSetWithSubnetID.ProtoReflect.Descriptor instead.
-func (*GetValidatorSetWithSubnetID) Descriptor() ([]byte, []int) {
+// Deprecated: Use ValidatorSetWithSubnetID.ProtoReflect.Descriptor instead.
+func (*ValidatorSetWithSubnetID) Descriptor() ([]byte, []int) {
 	return file_validatorstate_validator_state_proto_rawDescGZIP(), []int{9}
 }
 
-func (x *GetValidatorSetWithSubnetID) GetSubnetId() []byte {
+func (x *ValidatorSetWithSubnetID) GetSubnetId() []byte {
 	if x != nil {
 		return x.SubnetId
 	}
 	return nil
 }
 
-func (x *GetValidatorSetWithSubnetID) GetValidators() []*Validator {
+func (x *ValidatorSetWithSubnetID) GetValidators() []*Validator {
 	if x != nil {
 		return x.Validators
 	}
@@ -660,10 +660,10 @@ const file_validatorstate_validator_state_proto_rawDesc = "" +
 	"\tmin_nonce\x18\x05 \x01(\x04R\bminNonce\x12\x1b\n" +
 	"\tis_active\x18\x06 \x01(\bR\bisActive\x12#\n" +
 	"\rvalidation_id\x18\a \x01(\fR\fvalidationId\x12&\n" +
-	"\x0fis_l1_validator\x18\b \x01(\bR\risL1Validator\"q\n" +
-	"\x1bGetAllValidatorSetsResponse\x12R\n" +
-	"\x0evalidator_sets\x18\x01 \x03(\v2+.validatorstate.GetValidatorSetWithSubnetIDR\rvalidatorSets\"u\n" +
-	"\x1bGetValidatorSetWithSubnetID\x12\x1b\n" +
+	"\x0fis_l1_validator\x18\b \x01(\bR\risL1Validator\"n\n" +
+	"\x1bGetAllValidatorSetsResponse\x12O\n" +
+	"\x0evalidator_sets\x18\x01 \x03(\v2(.validatorstate.ValidatorSetWithSubnetIDR\rvalidatorSets\"r\n" +
+	"\x18ValidatorSetWithSubnetID\x12\x1b\n" +
 	"\tsubnet_id\x18\x01 \x01(\fR\bsubnetId\x129\n" +
 	"\n" +
 	"validators\x18\x02 \x03(\v2\x19.validatorstate.ValidatorR\n" +
@@ -708,14 +708,14 @@ var file_validatorstate_validator_state_proto_goTypes = []any{
 	(*GetCurrentValidatorSetRequest)(nil),  // 6: validatorstate.GetCurrentValidatorSetRequest
 	(*Validator)(nil),                      // 7: validatorstate.Validator
 	(*GetAllValidatorSetsResponse)(nil),    // 8: validatorstate.GetAllValidatorSetsResponse
-	(*GetValidatorSetWithSubnetID)(nil),    // 9: validatorstate.GetValidatorSetWithSubnetID
+	(*ValidatorSetWithSubnetID)(nil),       // 9: validatorstate.ValidatorSetWithSubnetID
 	(*GetValidatorSetResponse)(nil),        // 10: validatorstate.GetValidatorSetResponse
 	(*GetCurrentValidatorSetResponse)(nil), // 11: validatorstate.GetCurrentValidatorSetResponse
 	(*emptypb.Empty)(nil),                  // 12: google.protobuf.Empty
 }
 var file_validatorstate_validator_state_proto_depIdxs = []int32{
-	9,  // 0: validatorstate.GetAllValidatorSetsResponse.validator_sets:type_name -> validatorstate.GetValidatorSetWithSubnetID
-	7,  // 1: validatorstate.GetValidatorSetWithSubnetID.validators:type_name -> validatorstate.Validator
+	9,  // 0: validatorstate.GetAllValidatorSetsResponse.validator_sets:type_name -> validatorstate.ValidatorSetWithSubnetID
+	7,  // 1: validatorstate.ValidatorSetWithSubnetID.validators:type_name -> validatorstate.Validator
 	7,  // 2: validatorstate.GetValidatorSetResponse.validators:type_name -> validatorstate.Validator
 	7,  // 3: validatorstate.GetCurrentValidatorSetResponse.validators:type_name -> validatorstate.Validator
 	12, // 4: validatorstate.ValidatorState.GetMinimumHeight:input_type -> google.protobuf.Empty

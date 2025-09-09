@@ -55,32 +55,30 @@ func (s *Server) GetAllValidatorSets(ctx context.Context, req *pb.GetAllValidato
 	}
 
 	resp := &pb.GetAllValidatorSetsResponse{
-		ValidatorSets: make([]*pb.GetValidatorSetWithSubnetID, 0, len(validatorSets)),
+		ValidatorSets: make([]*pb.ValidatorSetWithSubnetID, 0, len(validatorSets)),
 	}
 
-	i := 0
 	for subnetID, vdrs := range validatorSets {
-		validators := make([]*pb.Validator, len(vdrs))
-		j := 0
+		validators := make([]*pb.Validator, 0, len(vdrs))
+
 		for _, vdr := range vdrs {
 			vdrPB := &pb.Validator{
 				NodeId: vdr.NodeID.Bytes(),
 				Weight: vdr.Weight,
 			}
+
 			if vdr.PublicKey != nil {
 				// Passing in the uncompressed bytes is a performance optimization
 				// to avoid the cost of calling PublicKeyFromCompressedBytes on the
 				// client side.
 				vdrPB.PublicKey = bls.PublicKeyToUncompressedBytes(vdr.PublicKey)
 			}
-			validators[j] = vdrPB
-			j++
+			validators = append(validators, vdrPB)
 		}
-		resp.ValidatorSets[i] = &pb.GetValidatorSetWithSubnetID{
+		resp.ValidatorSets = append(resp.ValidatorSets, &pb.ValidatorSetWithSubnetID{
 			SubnetId:   subnetID[:],
 			Validators: validators,
-		}
-		i++
+		})
 	}
 	return resp, nil
 }

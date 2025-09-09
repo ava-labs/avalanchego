@@ -5,7 +5,7 @@ package validators
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"maps"
 	"sync"
 
@@ -189,19 +189,19 @@ func (c *CachedState) GetValidatorSet(
 	if validatorSets, ok := c.cache.Get(height); ok {
 		validatorSet, exists := validatorSets[subnetID]
 		if !exists {
-			return nil, errors.New("validator set for subnet not found")
+			return nil, fmt.Errorf("validator set for subnet %s not found", subnetID.String())
 		}
 		return maps.Clone(validatorSet), nil
 	}
 
 	validatorSets, err := c.GetAllValidatorSets(ctx, height)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get all validator sets: %w", err)
 	}
 
 	validatorSet, exists := validatorSets[subnetID]
 	if !exists {
-		return nil, errors.New("validator set for subnet not found")
+		return nil, fmt.Errorf("validator set for subnet %s not found", subnetID.String())
 	}
 
 	return maps.Clone(validatorSet), nil

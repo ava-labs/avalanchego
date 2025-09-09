@@ -6,6 +6,7 @@ package gvalidators
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -26,9 +27,7 @@ type Client struct {
 }
 
 func NewClient(client pb.ValidatorStateClient) *Client {
-	return &Client{
-		client: client,
-	}
+	return &Client{client: client}
 }
 
 func (c *Client) GetMinimumHeight(ctx context.Context) (uint64, error) {
@@ -61,20 +60,24 @@ func (c *Client) GetAllValidatorSets(
 	ctx context.Context,
 	height uint64,
 ) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	resp, err := c.client.GetAllValidatorSets(ctx, &pb.GetAllValidatorSetsRequest{
-		Height: height,
-	})
+	resp, err := c.client.GetAllValidatorSets(
+		ctx,
+		&pb.GetAllValidatorSetsRequest{
+			Height: height,
+		},
+	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get all validator sets: %w", err)
 	}
 
 	vdrSets := make(map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, len(resp.ValidatorSets))
 	for _, validatorSet := range resp.ValidatorSets {
 		vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, len(validatorSet.Validators))
+
 		for _, validator := range validatorSet.Validators {
 			nodeID, err := ids.ToNodeID(validator.NodeId)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to parse node ID %s: %w", nodeID.String(), err)
 			}
 
 			var publicKey *bls.PublicKey
@@ -99,7 +102,7 @@ func (c *Client) GetAllValidatorSets(
 
 		subnetID, err := ids.ToID(validatorSet.SubnetId)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse subnet ID %s: %w", subnetID.String(), err)
 		}
 		vdrSets[subnetID] = vdrs
 	}
@@ -144,7 +147,6 @@ func (c *Client) GetValidatorSet(
 			Weight:    validator.Weight,
 		}
 	}
-
 	return vdrs, nil
 }
 

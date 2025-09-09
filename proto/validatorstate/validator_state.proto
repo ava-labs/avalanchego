@@ -66,10 +66,10 @@ message Validator {
 }
 
 message GetAllValidatorSetsResponse {
-  repeated GetValidatorSetWithSubnetID validator_sets = 1;
+  repeated ValidatorSetWithSubnetID validator_sets = 1;
 }
 
-message GetValidatorSetWithSubnetID {
+message ValidatorSetWithSubnetID {
   bytes subnet_id = 1;
   repeated Validator validators = 2;
 }
