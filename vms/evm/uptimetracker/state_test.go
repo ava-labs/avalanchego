@@ -4,12 +4,12 @@
 package uptimetracker
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"context"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"go.uber.org/mock/gomock"
 )
 
 func TestState(t *testing.T) {

@@ -165,7 +165,7 @@ func TestLoadNewValidators(t *testing.T) {
 			require.NoError(err)
 
 			// Verify final state matches expectations by inspecting validatorState directly
-			require.Equal(len(tt.newValidators), len(validatorState.data))
+			require.Len(validatorState.data, len(tt.newValidators))
 			for vID, newVdr := range tt.newValidators {
 				vdrData, ok := validatorState.data[vID]
 				require.True(ok)
