@@ -143,8 +143,13 @@ func (s *State) ConsumeGas(
 // UpdateTargetExcess updates the targetExcess to be as close as possible to the
 // desiredTargetExcess without exceeding the maximum targetExcess change.
 func (s *State) UpdateTargetExcess(desiredTargetExcess gas.Gas) {
+	s.UpdateTargetExcessUnbounded(targetExcess(s.TargetExcess, desiredTargetExcess))
+}
+
+// UpdateTargetExcessUnbounded updates the targetExcess to be the newTargetExcess.
+func (s *State) UpdateTargetExcessUnbounded(newTargetExcess gas.Gas) {
 	previousTargetPerSecond := s.Target()
-	s.TargetExcess = targetExcess(s.TargetExcess, desiredTargetExcess)
+	s.TargetExcess = newTargetExcess
 	newTargetPerSecond := s.Target()
 	s.Gas.Excess = scaleExcess(
 		s.Gas.Excess,
