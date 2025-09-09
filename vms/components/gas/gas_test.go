@@ -126,7 +126,7 @@ func Test_Gas_AddPerSecond(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%d+%d*%d=%d", test.initial, test.gasPerSecond, test.seconds, test.expected), func(t *testing.T) {
-			actual := test.initial.AddPerSecond(test.gasPerSecond, test.seconds)
+			actual := test.initial.AddDuration(test.gasPerSecond, test.seconds)
 			require.Equal(t, test.expected, actual)
 		})
 	}
@@ -166,7 +166,7 @@ func Test_Gas_SubPerSecond(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%d-%d*%d=%d", test.initial, test.gasPerSecond, test.seconds, test.expected), func(t *testing.T) {
-			actual := test.initial.SubPerSecond(test.gasPerSecond, test.seconds)
+			actual := test.initial.SubDuration(test.gasPerSecond, test.seconds)
 			require.Equal(t, test.expected, actual)
 		})
 	}

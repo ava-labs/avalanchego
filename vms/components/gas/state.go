@@ -18,27 +18,29 @@ type State struct {
 	Excess   Gas `serialize:"true" json:"excess"`
 }
 
-// AdvanceTime adds maxPerSecond to capacity and subtracts targetPerSecond
+// AdvanceTime adds capacityRate to capacity and subtracts targetRate
 // from excess over the provided duration.
+// The units chosen for time must be consistent with the units chosen for capacityRate and targetRate.
 //
 // Capacity is capped at maxCapacity.
 // Excess to be removed is capped at excess.
 func (s State) AdvanceTime(
 	maxCapacity Gas,
-	maxPerSecond Gas,
-	targetPerSecond Gas,
+	capacityRate Gas,
+	targetRate Gas,
 	duration uint64,
 ) State {
 	return State{
 		Capacity: min(
-			s.Capacity.AddPerSecond(maxPerSecond, duration),
+			s.Capacity.AddDuration(capacityRate, duration),
 			maxCapacity,
 		),
-		Excess: s.Excess.SubPerSecond(targetPerSecond, duration),
+		Excess: s.Excess.SubDuration(targetRate, duration),
 	}
 }
 
 // ConsumeGas removes gas from capacity and adds gas to excess.
+// The units chosen for time must be consistent with the units chosen for gasRate.
 //
 // If the capacity is insufficient, an error is returned.
 // If the excess would overflow, it is capped at MaxUint64.
