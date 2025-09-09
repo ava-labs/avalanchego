@@ -116,7 +116,8 @@ func (c *Config) Equal(s precompileconfig.Config) bool {
 	return equals && c.QuorumNumerator == other.QuorumNumerator
 }
 
-func (c *Config) Accept(acceptCtx *precompileconfig.AcceptContext, blockHash common.Hash, blockNumber uint64, txHash common.Hash, logIndex int, topics []common.Hash, logData []byte) error {
+//nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
+func (*Config) Accept(acceptCtx *precompileconfig.AcceptContext, blockHash common.Hash, blockNumber uint64, txHash common.Hash, logIndex int, topics []common.Hash, logData []byte) error {
 	unsignedMessage, err := UnpackSendWarpEventDataToMessage(logData)
 	if err != nil {
 		return fmt.Errorf("failed to parse warp log data into unsigned message (TxHash: %s, LogIndex: %d): %w", txHash, logIndex, err)
@@ -144,7 +145,7 @@ func (c *Config) Accept(acceptCtx *precompileconfig.AcceptContext, blockHash com
 // 4. TODO: Lookup of the validator set
 //
 // If the payload of the warp message fails parsing, return a non-nil error invalidating the transaction.
-func (c *Config) PredicateGas(pred predicate.Predicate) (uint64, error) {
+func (*Config) PredicateGas(pred predicate.Predicate) (uint64, error) {
 	totalGas := GasCostPerSignatureVerification
 	bytesGasCost, overflow := math.SafeMul(GasCostPerWarpMessageChunk, uint64(len(pred)))
 	if overflow {

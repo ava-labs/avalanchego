@@ -71,8 +71,8 @@ func TestPackReadAllowlistTest(f *testing.T) {
 
 func testPackReadAllowlistTest(t *testing.T, address common.Address) {
 	t.Helper()
-	require := require.New(t)
 	t.Run(fmt.Sprintf("TestPackReadAllowlistTest, address %v", address), func(t *testing.T) {
+		require := require.New(t)
 		// use new Pack/Unpack methods
 		input, err := PackReadAllowList(address)
 		require.NoError(err)
@@ -135,8 +135,8 @@ func FuzzPackModifyAllowlistTestSkipCheck(f *testing.F) {
 
 func testPackModifyAllowListTest(t *testing.T, address common.Address, role Role) {
 	t.Helper()
-	require := require.New(t)
 	t.Run(fmt.Sprintf("TestPackModifyAllowlistTest, address %v, role %s", address, role.String()), func(t *testing.T) {
+		require := require.New(t)
 		// use new Pack/Unpack methods
 		input, err := PackModifyAllowList(address, role)
 		require.NoError(err)
@@ -220,7 +220,7 @@ func OldPackModifyAllowList(address common.Address, role Role) ([]byte, error) {
 	return input, nil
 }
 
-func OldUnpackModifyAllowList(input []byte, role Role) (common.Address, error) {
+func OldUnpackModifyAllowList(input []byte, _ Role) (common.Address, error) {
 	if len(input) != allowListInputLen {
 		return common.Address{}, fmt.Errorf("invalid input length for modifying allow list: %d", len(input))
 	}

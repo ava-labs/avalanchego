@@ -79,7 +79,7 @@ func UnpackMintNativeCoinInput(input []byte, useStrictMode bool) (common.Address
 
 // mintNativeCoin checks if the caller is permissioned for minting operation.
 // The execution function parses the [input] into native coin amount and receiver address.
-func mintNativeCoin(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
+func mintNativeCoin(accessibleState contract.AccessibleState, caller common.Address, _ common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
 	if remainingGas, err = contract.DeductGas(suppliedGas, MintGasCost); err != nil {
 		return nil, 0, err
 	}

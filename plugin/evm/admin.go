@@ -28,7 +28,7 @@ func NewAdminService(vm *VM, performanceDir string) *Admin {
 }
 
 // StartCPUProfiler starts a cpu profile writing to the specified file
-func (p *Admin) StartCPUProfiler(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
+func (p *Admin) StartCPUProfiler(*http.Request, *struct{}, *api.EmptyReply) error {
 	log.Info("Admin: StartCPUProfiler called")
 
 	p.vm.vmLock.Lock()
@@ -38,7 +38,7 @@ func (p *Admin) StartCPUProfiler(_ *http.Request, _ *struct{}, _ *api.EmptyReply
 }
 
 // StopCPUProfiler stops the cpu profile
-func (p *Admin) StopCPUProfiler(r *http.Request, _ *struct{}, _ *api.EmptyReply) error {
+func (p *Admin) StopCPUProfiler(*http.Request, *struct{}, *api.EmptyReply) error {
 	log.Info("Admin: StopCPUProfiler called")
 
 	p.vm.vmLock.Lock()
@@ -48,7 +48,7 @@ func (p *Admin) StopCPUProfiler(r *http.Request, _ *struct{}, _ *api.EmptyReply)
 }
 
 // MemoryProfile runs a memory profile writing to the specified file
-func (p *Admin) MemoryProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
+func (p *Admin) MemoryProfile(*http.Request, *struct{}, *api.EmptyReply) error {
 	log.Info("Admin: MemoryProfile called")
 
 	p.vm.vmLock.Lock()
@@ -58,7 +58,7 @@ func (p *Admin) MemoryProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) e
 }
 
 // LockProfile runs a mutex profile writing to the specified file
-func (p *Admin) LockProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) error {
+func (p *Admin) LockProfile(*http.Request, *struct{}, *api.EmptyReply) error {
 	log.Info("Admin: LockProfile called")
 
 	p.vm.vmLock.Lock()
@@ -67,7 +67,7 @@ func (p *Admin) LockProfile(_ *http.Request, _ *struct{}, _ *api.EmptyReply) err
 	return p.profiler.LockProfile()
 }
 
-func (p *Admin) SetLogLevel(_ *http.Request, args *client.SetLogLevelArgs, reply *api.EmptyReply) error {
+func (p *Admin) SetLogLevel(_ *http.Request, args *client.SetLogLevelArgs, _ *api.EmptyReply) error {
 	log.Info("EVM: SetLogLevel called", "logLevel", args.Level)
 
 	p.vm.vmLock.Lock()

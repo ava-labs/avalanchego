@@ -206,13 +206,13 @@ func (d *dummyDerivableList) EncodeIndex(i int, w *bytes.Buffer) {
 
 func printList(l types.DerivableList) {
 	fmt.Printf("list length: %d\n", l.Len())
-	fmt.Printf("{\n")
+	fmt.Print("{\n")
 	for i := 0; i < l.Len(); i++ {
 		var buf bytes.Buffer
 		l.EncodeIndex(i, &buf)
 		fmt.Printf("\"%#x\",\n", buf.Bytes())
 	}
-	fmt.Printf("},\n")
+	fmt.Print("},\n")
 }
 
 type flatList []string
@@ -239,6 +239,6 @@ func (d *hashToHumanReadable) Update(i []byte, i2 []byte) error {
 	return nil
 }
 
-func (d *hashToHumanReadable) Hash() common.Hash {
+func (*hashToHumanReadable) Hash() common.Hash {
 	return common.Hash{}
 }

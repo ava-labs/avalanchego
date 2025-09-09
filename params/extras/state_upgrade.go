@@ -60,7 +60,7 @@ func (c *ChainConfig) verifyStateUpgrades() error {
 
 // GetActivatingStateUpgrades returns all state upgrades configured to activate during the
 // state transition from a block with timestamp [from] to a block with timestamp [to].
-func (c *ChainConfig) GetActivatingStateUpgrades(from *uint64, to uint64, upgrades []StateUpgrade) []StateUpgrade {
+func (*ChainConfig) GetActivatingStateUpgrades(from *uint64, to uint64, upgrades []StateUpgrade) []StateUpgrade {
 	activating := make([]StateUpgrade, 0)
 	for _, upgrade := range upgrades {
 		if IsForkTransition(upgrade.BlockTimestamp, from, to) {

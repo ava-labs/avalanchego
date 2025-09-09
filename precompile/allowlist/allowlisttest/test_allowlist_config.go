@@ -140,7 +140,7 @@ func AllowListConfigVerifyTests(t testing.TB, module modules.Module) map[string]
 	}
 }
 
-func AllowListConfigEqualTests(t testing.TB, module modules.Module) map[string]precompiletest.ConfigEqualTest {
+func AllowListConfigEqualTests(_ testing.TB, module modules.Module) map[string]precompiletest.ConfigEqualTest {
 	return map[string]precompiletest.ConfigEqualTest{
 		"allowlist non-nil config and nil other": {
 			Config: mkConfigWithAllowList(module, &allowlist.AllowListConfig{

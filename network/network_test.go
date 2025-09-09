@@ -131,10 +131,10 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 func TestAppRequestOnCtxCancellation(t *testing.T) {
 	codecManager := buildCodec(t, HelloRequest{}, HelloResponse{})
 	sender := testAppSender{
-		sendAppRequestFn: func(_ context.Context, nodes set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
+		sendAppRequestFn: func(context.Context, set.Set[ids.NodeID], uint32, []byte) error {
 			return nil
 		},
-		sendAppResponseFn: func(nodeID ids.NodeID, requestID uint32, responseBytes []byte) error {
+		sendAppResponseFn: func(ids.NodeID, uint32, []byte) error {
 			return nil
 		},
 	}
@@ -260,7 +260,7 @@ func TestAppRequestOnShutdown(t *testing.T) {
 		called bool
 	)
 	sender := testAppSender{
-		sendAppRequestFn: func(_ context.Context, nodes set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
+		sendAppRequestFn: func(context.Context, set.Set[ids.NodeID], uint32, []byte) error {
 			wg.Add(1)
 			go func() {
 				called = true
@@ -304,7 +304,7 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 	sentAppRequest := make(chan reqInfo, 1)
 
 	sender := testAppSender{
-		sendAppRequestFn: func(ctx context.Context, nodes set.Set[ids.NodeID], requestID uint32, requestBytes []byte) error {
+		sendAppRequestFn: func(ctx context.Context, nodes set.Set[ids.NodeID], requestID uint32, _ []byte) error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
@@ -316,7 +316,7 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 			}
 			return nil
 		},
-		sendAppResponseFn: func(nodeID ids.NodeID, requestID uint32, responseBytes []byte) error {
+		sendAppResponseFn: func(ids.NodeID, uint32, []byte) error {
 			return nil
 		},
 	}
@@ -377,7 +377,7 @@ func TestRequestMinVersion(t *testing.T) {
 
 	var net Network
 	sender := testAppSender{
-		sendAppRequestFn: func(_ context.Context, nodes set.Set[ids.NodeID], reqID uint32, messageBytes []byte) error {
+		sendAppRequestFn: func(_ context.Context, nodes set.Set[ids.NodeID], reqID uint32, _ []byte) error {
 			atomic.AddUint32(&callNum, 1)
 			assert.True(t, nodes.Contains(nodeID), "request nodes should contain expected nodeID")
 			assert.Len(t, nodes, 1, "request nodes should contain exactly one node")
@@ -444,10 +444,10 @@ func TestOnRequestHonoursDeadline(t *testing.T) {
 	var net Network
 	responded := false
 	sender := testAppSender{
-		sendAppRequestFn: func(_ context.Context, nodes set.Set[ids.NodeID], reqID uint32, message []byte) error {
+		sendAppRequestFn: func(context.Context, set.Set[ids.NodeID], uint32, []byte) error {
 			return nil
 		},
-		sendAppResponseFn: func(nodeID ids.NodeID, reqID uint32, message []byte) error {
+		sendAppResponseFn: func(ids.NodeID, uint32, []byte) error {
 			responded = true
 			return nil
 		},
@@ -570,10 +570,10 @@ func TestNetworkAppRequestAfterShutdown(t *testing.T) {
 func TestNetworkRouting(t *testing.T) {
 	require := require.New(t)
 	sender := &testAppSender{
-		sendAppRequestFn: func(_ context.Context, s set.Set[ids.NodeID], u uint32, bytes []byte) error {
+		sendAppRequestFn: func(context.Context, set.Set[ids.NodeID], uint32, []byte) error {
 			return nil
 		},
-		sendAppResponseFn: func(id ids.NodeID, u uint32, bytes []byte) error {
+		sendAppResponseFn: func(ids.NodeID, uint32, []byte) error {
 			return nil
 		},
 	}
@@ -634,7 +634,7 @@ func (t testAppSender) SendAppGossip(_ context.Context, config common.SendConfig
 	return t.sendAppGossipFn(config, message)
 }
 
-func (t testAppSender) SendAppError(ctx context.Context, nodeID ids.NodeID, requestID uint32, errorCode int32, errorMessage string) error {
+func (testAppSender) SendAppError(_ context.Context, _ ids.NodeID, _ uint32, _ int32, _ string) error {
 	panic("not implemented")
 }
 
@@ -682,11 +682,11 @@ type HelloGreetingRequestHandler struct {
 	codec codec.Manager
 }
 
-func (h *HelloGreetingRequestHandler) HandleHelloRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, request *HelloRequest) ([]byte, error) {
+func (h *HelloGreetingRequestHandler) HandleHelloRequest(_ context.Context, _ ids.NodeID, _ uint32, _ *HelloRequest) ([]byte, error) {
 	return h.codec.Marshal(message.Version, HelloResponse{Response: "Hi"})
 }
 
-func (h *HelloGreetingRequestHandler) HandleGreetingRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, request *GreetingRequest) ([]byte, error) {
+func (h *HelloGreetingRequestHandler) HandleGreetingRequest(_ context.Context, _ ids.NodeID, _ uint32, _ *GreetingRequest) ([]byte, error) {
 	return h.codec.Marshal(message.Version, GreetingResponse{Greet: "Hey there"})
 }
 
@@ -736,7 +736,6 @@ func (r *testRequestHandler) handleTestRequest(ctx context.Context, _ ids.NodeID
 	r.calls++
 	select {
 	case <-time.After(r.processingDuration):
-		break
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
@@ -747,12 +746,12 @@ type testSDKHandler struct {
 	appRequested bool
 }
 
-func (t *testSDKHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
+func (*testSDKHandler) AppGossip(_ context.Context, _ ids.NodeID, _ []byte) {
 	// TODO implement me
 	panic("implement me")
 }
 
-func (t *testSDKHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+func (t *testSDKHandler) AppRequest(_ context.Context, _ ids.NodeID, _ time.Time, _ []byte) ([]byte, *common.AppError) {
 	t.appRequested = true
 	return nil, nil
 }

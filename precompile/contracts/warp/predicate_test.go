@@ -190,10 +190,10 @@ func createSnowCtx(tb testing.TB, validatorRanges []validatorRange) *snow.Contex
 
 	snowCtx := utilstest.NewTestSnowContext(tb)
 	state := &validatorstest.State{
-		GetSubnetIDF: func(ctx context.Context, chainID ids.ID) (ids.ID, error) {
+		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
 			return sourceSubnetID, nil
 		},
-		GetValidatorSetF: func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 			return getValidatorsOutput, nil
 		},
 	}
@@ -266,11 +266,11 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 	snowCtx.ChainID = ids.GenerateTestID()
 	snowCtx.CChainID = cChainID
 	snowCtx.ValidatorState = &validatorstest.State{
-		GetSubnetIDF: func(ctx context.Context, chainID ids.ID) (ids.ID, error) {
+		GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
 			require.Equal(chainID, cChainID)
 			return constants.PrimaryNetworkID, nil // Return Primary Network SubnetID
 		},
-		GetValidatorSetF: func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		GetValidatorSetF: func(_ context.Context, _ uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 			expectedSubnetID := snowCtx.SubnetID
 			if requirePrimaryNetworkSigners {
 				expectedSubnetID = constants.PrimaryNetworkID
@@ -671,10 +671,10 @@ func makeWarpPredicateTests(tb testing.TB) map[string]precompiletest.PredicateTe
 		snowCtx := utilstest.NewTestSnowContext(tb)
 
 		state := &validatorstest.State{
-			GetSubnetIDF: func(ctx context.Context, chainID ids.ID) (ids.ID, error) {
+			GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
 				return sourceSubnetID, nil
 			},
-			GetValidatorSetF: func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+			GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 				return getValidatorsOutput, nil
 			},
 		}

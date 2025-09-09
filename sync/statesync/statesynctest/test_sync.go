@@ -90,7 +90,7 @@ func AssertDBConsistency(t testing.TB, root common.Hash, clientDB ethdb.Database
 }
 
 func FillAccountsWithStorage(t *testing.T, serverDB ethdb.Database, serverTrieDB *triedb.Database, root common.Hash, numAccounts int) common.Hash {
-	newRoot, _ := FillAccounts(t, serverTrieDB, root, numAccounts, func(t *testing.T, index int, account types.StateAccount) types.StateAccount {
+	newRoot, _ := FillAccounts(t, serverTrieDB, root, numAccounts, func(t *testing.T, _ int, account types.StateAccount) types.StateAccount {
 		codeBytes := make([]byte, 256)
 		_, err := rand.Read(codeBytes)
 		if err != nil {

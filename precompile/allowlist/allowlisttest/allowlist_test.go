@@ -26,8 +26,8 @@ type dummyConfig struct {
 	allowlist.AllowListConfig
 }
 
-func (d *dummyConfig) Key() string      { return "dummy" }
-func (d *dummyConfig) IsDisabled() bool { return false }
+func (*dummyConfig) Key() string      { return "dummy" }
+func (*dummyConfig) IsDisabled() bool { return false }
 func (d *dummyConfig) Verify(chainConfig precompileconfig.ChainConfig) error {
 	return d.AllowListConfig.Verify(chainConfig, d.Upgrade)
 }
@@ -42,11 +42,11 @@ func (d *dummyConfig) Equal(cfg precompileconfig.Config) bool {
 
 type dummyConfigurator struct{}
 
-func (d *dummyConfigurator) MakeConfig() precompileconfig.Config {
+func (*dummyConfigurator) MakeConfig() precompileconfig.Config {
 	return &dummyConfig{}
 }
 
-func (d *dummyConfigurator) Configure(
+func (*dummyConfigurator) Configure(
 	chainConfig precompileconfig.ChainConfig,
 	precompileConfig precompileconfig.Config,
 	state contract.StateDB,

@@ -20,7 +20,7 @@ var extras = ethtypes.RegisterExtras[
 type noopStateAccountExtras struct{}
 
 // EncodeRLP implements the [rlp.Encoder] interface.
-func (noopStateAccountExtras) EncodeRLP(w io.Writer) error { return nil }
+func (noopStateAccountExtras) EncodeRLP(io.Writer) error { return nil }
 
 // DecodeRLP implements the [rlp.Decoder] interface.
-func (*noopStateAccountExtras) DecodeRLP(s *rlp.Stream) error { return nil }
+func (*noopStateAccountExtras) DecodeRLP(*rlp.Stream) error { return nil }

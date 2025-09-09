@@ -43,7 +43,7 @@ func NewDisableConfig(blockTimestamp *uint64) *Config {
 	}
 }
 
-func (c *Config) Key() string { return ConfigKey }
+func (*Config) Key() string { return ConfigKey }
 
 // Equal returns true if [cfg] is a [*TxAllowListConfig] and it has been configured identical to [c].
 func (c *Config) Equal(cfg precompileconfig.Config) bool {

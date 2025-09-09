@@ -27,7 +27,7 @@ type mockNetwork struct {
 	nodesRequested []ids.NodeID
 }
 
-func (t *mockNetwork) SendSyncedAppRequestAny(ctx context.Context, _ *version.Application, request []byte) ([]byte, ids.NodeID, error) {
+func (t *mockNetwork) SendSyncedAppRequestAny(context.Context, *version.Application, []byte) ([]byte, ids.NodeID, error) {
 	if len(t.response) == 0 {
 		return nil, ids.EmptyNodeID, errors.New("no mocked response to return in mockNetwork")
 	}
@@ -36,7 +36,7 @@ func (t *mockNetwork) SendSyncedAppRequestAny(ctx context.Context, _ *version.Ap
 	return response, ids.EmptyNodeID, err
 }
 
-func (t *mockNetwork) SendSyncedAppRequest(ctx context.Context, nodeID ids.NodeID, request []byte) ([]byte, error) {
+func (t *mockNetwork) SendSyncedAppRequest(_ context.Context, nodeID ids.NodeID, _ []byte) ([]byte, error) {
 	if len(t.response) == 0 {
 		return nil, errors.New("no mocked response to return in mockNetwork")
 	}
@@ -69,7 +69,7 @@ func (t *mockNetwork) processMock() ([]byte, error) {
 	return response, err
 }
 
-func (t *mockNetwork) Gossip([]byte) error {
+func (*mockNetwork) Gossip([]byte) error {
 	panic("not implemented") // we don't care about this function for this test
 }
 
@@ -88,4 +88,4 @@ func (t *mockNetwork) mockResponses(callback func(), responses ...[]byte) {
 	t.numCalls = 0
 }
 
-func (t *mockNetwork) TrackBandwidth(ids.NodeID, float64) {}
+func (*mockNetwork) TrackBandwidth(ids.NodeID, float64) {}

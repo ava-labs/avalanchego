@@ -130,7 +130,7 @@ func BenchmarkPrefetcherDatabase(b *testing.B) {
 		}
 	}
 	require.NoError(levelDB.Close())
-	b.Logf("Starting benchmarks")
+	b.Log("Starting benchmarks")
 	b.Logf("Root: %v, kvs: %d, block: %d", root, count, block)
 	for _, updates := range []int{100, 200, 500} {
 		for _, prefetchers := range []int{0, 1, 4, 16} {

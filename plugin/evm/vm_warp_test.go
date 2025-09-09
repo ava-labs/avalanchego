@@ -362,10 +362,10 @@ func testWarpVMTransaction(t *testing.T, scheme string, unsignedMessage *avalanc
 
 	tvm.vm.ctx.ValidatorState = &validatorstest.State{
 		// TODO: test both Primary Network / C-Chain and non-Primary Network
-		GetSubnetIDF: func(ctx context.Context, chainID ids.ID) (ids.ID, error) {
+		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
 			return ids.Empty, nil
 		},
-		GetValidatorSetF: func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		GetValidatorSetF: func(_ context.Context, height uint64, _ ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 			if height < minimumValidPChainHeight {
 				return nil, getValidatorSetTestErr
 			}
@@ -660,13 +660,13 @@ func testReceiveWarpMessage(
 	getValidatorSetTestErr := errors.New("can't get validator set test error")
 
 	vm.ctx.ValidatorState = &validatorstest.State{
-		GetSubnetIDF: func(ctx context.Context, chainID ids.ID) (ids.ID, error) {
+		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
 			if msgFrom == fromPrimary {
 				return constants.PrimaryNetworkID, nil
 			}
 			return vm.ctx.SubnetID, nil
 		},
-		GetValidatorSetF: func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		GetValidatorSetF: func(_ context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 			if height < minimumValidPChainHeight {
 				return nil, getValidatorSetTestErr
 			}
@@ -898,7 +898,7 @@ func testSignatureRequestsToVM(t *testing.T, scheme string) {
 			calledSendAppResponseFn := false
 			calledSendAppErrorFn := false
 
-			tvm.appSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, responseBytes []byte) error {
+			tvm.appSender.SendAppResponseF = func(_ context.Context, _ ids.NodeID, _ uint32, responseBytes []byte) error {
 				calledSendAppResponseFn = true
 				var response sdk.SignatureResponse
 				if err := proto.Unmarshal(responseBytes, &response); err != nil {
@@ -908,7 +908,7 @@ func testSignatureRequestsToVM(t *testing.T, scheme string) {
 				return nil
 			}
 
-			tvm.appSender.SendAppErrorF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, errCode int32, errString string) error {
+			tvm.appSender.SendAppErrorF = func(context.Context, ids.NodeID, uint32, int32, string) error {
 				calledSendAppErrorFn = true
 				require.ErrorIs(t, test.err, test.err)
 				return nil

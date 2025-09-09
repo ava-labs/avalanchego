@@ -92,7 +92,7 @@ func CreateSubnetsSuite(genesisFiles map[string]string) *SubnetSuite {
 		blockchainIDsBytes, err := json.Marshal(blockchainIDs)
 		require.NoError(err)
 		return blockchainIDsBytes
-	}, func(ctx ginkgo.SpecContext, data []byte) {
+	}, func(_ ginkgo.SpecContext, data []byte) {
 		blockchainIDs := make(map[string]string)
 		require.NoError(json.Unmarshal(data, &blockchainIDs))
 

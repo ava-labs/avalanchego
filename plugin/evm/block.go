@@ -187,7 +187,7 @@ func (b *Block) ShouldVerifyWithContext(context.Context) (bool, error) {
 }
 
 // VerifyWithContext implements the block.WithVerifyContext interface
-func (b *Block) VerifyWithContext(ctx context.Context, proposerVMBlockCtx *block.Context) error {
+func (b *Block) VerifyWithContext(_ context.Context, proposerVMBlockCtx *block.Context) error {
 	return b.verify(&precompileconfig.PredicateContext{
 		SnowCtx:            b.vm.ctx,
 		ProposerVMBlockCtx: proposerVMBlockCtx,

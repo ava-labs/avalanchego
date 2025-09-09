@@ -43,7 +43,7 @@ func TestValidatorState(t *testing.T) {
 		ids.GenerateTestID(),
 	}
 	ctx.ValidatorState = &validatorstest.State{
-		GetCurrentValidatorSetF: func(ctx context.Context, subnetID ids.ID) (map[ids.ID]*avagovalidators.GetCurrentValidatorOutput, uint64, error) {
+		GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*avagovalidators.GetCurrentValidatorOutput, uint64, error) {
 			return map[ids.ID]*avagovalidators.GetCurrentValidatorOutput{
 				testValidationIDs[0]: {
 					NodeID:    testNodeIDs[0],
@@ -116,7 +116,7 @@ func TestValidatorState(t *testing.T) {
 	newValidationID := ids.GenerateTestID()
 	newNodeID := ids.GenerateTestNodeID()
 	testState := &validatorstest.State{
-		GetCurrentValidatorSetF: func(ctx context.Context, subnetID ids.ID) (map[ids.ID]*avagovalidators.GetCurrentValidatorOutput, uint64, error) {
+		GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*avagovalidators.GetCurrentValidatorOutput, uint64, error) {
 			return map[ids.ID]*avagovalidators.GetCurrentValidatorOutput{
 				testValidationIDs[0]: {
 					NodeID:    testNodeIDs[0],

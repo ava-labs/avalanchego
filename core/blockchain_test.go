@@ -164,7 +164,7 @@ type wrappedStateManager struct {
 	TrieWriter
 }
 
-func (w *wrappedStateManager) Shutdown() error { return nil }
+func (*wrappedStateManager) Shutdown() error { return nil }
 
 func TestPruningBlockChainUngracefulShutdown(t *testing.T) {
 	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, _ string) (*BlockChain, error) {
@@ -360,7 +360,7 @@ func testRepopulateMissingTriesParallel(t *testing.T, parallelism int) {
 
 	// This call generates a chain of 3 blocks.
 	signer := types.HomesteadSigner{}
-	_, chain, _, err := GenerateChainWithGenesis(gspec, blockchain.engine, 10, 10, func(i int, gen *BlockGen) {
+	_, chain, _, err := GenerateChainWithGenesis(gspec, blockchain.engine, 10, 10, func(_ int, gen *BlockGen) {
 		tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), ethparams.TxGas, nil, nil), signer, key1)
 		gen.AddTx(tx)
 	})
@@ -534,11 +534,11 @@ func testCanonicalHashMarker(t *testing.T, scheme string) {
 			}
 			engine = dummy.NewCoinbaseFaker()
 		)
-		_, forkA, _, err := GenerateChainWithGenesis(gspec, engine, c.forkA, 10, func(i int, gen *BlockGen) {})
+		_, forkA, _, err := GenerateChainWithGenesis(gspec, engine, c.forkA, 10, func(int, *BlockGen) {})
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, forkB, _, err := GenerateChainWithGenesis(gspec, engine, c.forkB, 10, func(i int, gen *BlockGen) {})
+		_, forkB, _, err := GenerateChainWithGenesis(gspec, engine, c.forkB, 10, func(int, *BlockGen) {})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -708,7 +708,7 @@ func testCreateThenDelete(t *testing.T, config *params.ChainConfig) {
 	}
 	nonce := uint64(0)
 	signer := types.HomesteadSigner{}
-	_, blocks, _, _ := GenerateChainWithGenesis(gspec, engine, 2, 10, func(i int, b *BlockGen) {
+	_, blocks, _, _ := GenerateChainWithGenesis(gspec, engine, 2, 10, func(_ int, b *BlockGen) {
 		fee := big.NewInt(1)
 		if b.header.BaseFee != nil {
 			fee = b.header.BaseFee
@@ -911,7 +911,7 @@ func TestTransientStorageReset(t *testing.T) {
 	}
 	nonce := uint64(0)
 	signer := types.HomesteadSigner{}
-	_, blocks, _, _ := GenerateChainWithGenesis(gspec, engine, 1, 10, func(i int, b *BlockGen) {
+	_, blocks, _, _ := GenerateChainWithGenesis(gspec, engine, 1, 10, func(_ int, b *BlockGen) {
 		fee := big.NewInt(1)
 		if b.header.BaseFee != nil {
 			fee = b.header.BaseFee
@@ -1009,7 +1009,7 @@ func TestEIP3651(t *testing.T) {
 
 	signer := types.LatestSigner(gspec.Config)
 
-	_, blocks, _, _ := GenerateChainWithGenesis(gspec, engine, 1, 10, func(i int, b *BlockGen) {
+	_, blocks, _, _ := GenerateChainWithGenesis(gspec, engine, 1, 10, func(_ int, b *BlockGen) {
 		b.SetCoinbase(aa)
 		// One transaction to Coinbase
 		txdata := &types.DynamicFeeTx{

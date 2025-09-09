@@ -26,7 +26,7 @@ func TestPausableManager(t *testing.T) {
 	}{
 		{
 			name: "Case 1: Connect, pause, start tracking",
-			testFunc: func(t *testing.T, up interfaces.PausableManager, clk *mockable.Clock, s uptime.State) {
+			testFunc: func(t *testing.T, up interfaces.PausableManager, clk *mockable.Clock, _ uptime.State) {
 				require := require.New(t)
 
 				// Connect before tracking
@@ -59,7 +59,7 @@ func TestPausableManager(t *testing.T) {
 		},
 		{
 			name: "Case 2: Start tracking, connect, pause, re-connect, resume",
-			testFunc: func(t *testing.T, up interfaces.PausableManager, clk *mockable.Clock, s uptime.State) {
+			testFunc: func(t *testing.T, up interfaces.PausableManager, clk *mockable.Clock, _ uptime.State) {
 				require := require.New(t)
 
 				// Start tracking
@@ -110,7 +110,7 @@ func TestPausableManager(t *testing.T) {
 		},
 		{
 			name: "Case 3: Pause, start tracking, connect, re-connect, resume",
-			testFunc: func(t *testing.T, up interfaces.PausableManager, clk *mockable.Clock, s uptime.State) {
+			testFunc: func(t *testing.T, up interfaces.PausableManager, clk *mockable.Clock, _ uptime.State) {
 				require := require.New(t)
 
 				// Pause before tracking
@@ -218,7 +218,7 @@ func TestPausableManager(t *testing.T) {
 		},
 		{
 			name: "Case 5: Node paused after we stop tracking",
-			testFunc: func(t *testing.T, up interfaces.PausableManager, clk *mockable.Clock, s uptime.State) {
+			testFunc: func(t *testing.T, up interfaces.PausableManager, clk *mockable.Clock, _ uptime.State) {
 				require := require.New(t)
 
 				// Start tracking and connect
@@ -252,7 +252,7 @@ func TestPausableManager(t *testing.T) {
 		},
 		{
 			name: "Case 6: Paused node got resumed after we stop tracking",
-			testFunc: func(t *testing.T, up interfaces.PausableManager, clk *mockable.Clock, s uptime.State) {
+			testFunc: func(t *testing.T, up interfaces.PausableManager, clk *mockable.Clock, _ uptime.State) {
 				require := require.New(t)
 
 				// Start tracking and connect

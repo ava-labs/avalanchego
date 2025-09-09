@@ -4,17 +4,86 @@
 package ethapi
 
 import (
+	"context"
 	"errors"
 	"math/big"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	"github.com/ava-labs/subnet-evm/consensus/dummy"
+	"github.com/ava-labs/subnet-evm/core"
+	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/rpc"
+
+	ethparams "github.com/ava-labs/libevm/params"
 )
+
+func TestBlockchainAPI_GetChainConfig(t *testing.T) {
+	t.Parallel()
+
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	wantConfig := &params.ChainConfig{
+		ChainID: big.NewInt(43114),
+	}
+	backend := NewMockBackend(ctrl)
+	backend.EXPECT().ChainConfig().Return(wantConfig)
+
+	api := NewBlockChainAPI(backend)
+
+	gotConfig := api.GetChainConfig(context.Background())
+	assert.Equal(t, params.ToWithUpgradesJSON(wantConfig), gotConfig)
+}
+
+// Copy one test case from TestCall
+func TestBlockchainAPI_CallDetailed(t *testing.T) {
+	t.Parallel()
+	// Initialize test accounts
+	var (
+		accounts = newAccounts(2)
+		genesis  = &core.Genesis{
+			Config: params.TestChainConfig,
+			Alloc: types.GenesisAlloc{
+				accounts[0].addr: {Balance: big.NewInt(params.Ether)},
+				accounts[1].addr: {Balance: big.NewInt(params.Ether)},
+			},
+		}
+		genBlocks   = 10
+		signer      = types.HomesteadSigner{}
+		blockNumber = rpc.LatestBlockNumber
+	)
+	api := NewBlockChainAPI(newTestBackend(t, genBlocks, genesis, dummy.NewCoinbaseFaker(), func(i int, b *core.BlockGen) {
+		// Transfer from account[0] to account[1]
+		//    value: 1000 wei
+		//    fee:   0 wei
+		tx, _ := types.SignTx(types.NewTx(&types.LegacyTx{Nonce: uint64(i), To: &accounts[1].addr, Value: big.NewInt(1000), Gas: ethparams.TxGas, GasPrice: b.BaseFee(), Data: nil}), signer, accounts[0].key)
+		b.AddTx(tx)
+	}))
+
+	result, err := api.CallDetailed(
+		context.Background(),
+		TransactionArgs{
+			From:  &accounts[0].addr,
+			To:    &accounts[1].addr,
+			Value: (*hexutil.Big)(big.NewInt(1000)),
+		},
+		rpc.BlockNumberOrHash{BlockNumber: &blockNumber},
+		nil,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Equal(t, 0, result.ErrCode)
+	require.Nil(t, result.ReturnData)
+	require.Equal(t, ethparams.TxGas, result.UsedGas)
+	require.Empty(t, result.Err)
+}
 
 func TestBlockChainAPI_stateQueryBlockNumberAllowed(t *testing.T) {
 	t.Parallel()

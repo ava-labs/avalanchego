@@ -44,7 +44,7 @@ func (*configurator) MakeConfig() precompileconfig.Config {
 
 // Configure configures [state] with the given [cfg] precompileconfig.
 // This function is called by the EVM once per precompile contract activation.
-func (c *configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, blockContext contract.ConfigurationBlockContext) error {
+func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg precompileconfig.Config, state contract.StateDB, blockContext contract.ConfigurationBlockContext) error {
 	config, ok := cfg.(*Config)
 	if !ok {
 		return fmt.Errorf("expected config type %T, got %T: %v", &Config{}, cfg, cfg)

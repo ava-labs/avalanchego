@@ -29,6 +29,7 @@ func RegisterAsyncTests() {
 	}
 	subnetsSuite := utils.CreateSubnetsSuite(genesisFiles)
 
+	timeout := 3 * time.Minute
 	_ = ginkgo.Describe("[Asynchronized Precompile Tests]", func() {
 		// Register the ping test first
 		utils.RegisterPingTest()
@@ -36,7 +37,7 @@ func RegisterAsyncTests() {
 		// Each ginkgo It node specifies the name of the genesis file (in ./tests/precompile/genesis/)
 		// to use to launch the subnet and the name of the TS test file to run on the subnet (in ./contracts/tests/)
 		ginkgo.It("contract native minter", ginkgo.Label("Precompile"), ginkgo.Label("ContractNativeMinter"), func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 
 			blockchainID := subnetsSuite.GetBlockchainID("contract_native_minter")
@@ -44,7 +45,7 @@ func RegisterAsyncTests() {
 		})
 
 		ginkgo.It("tx allow list", ginkgo.Label("Precompile"), ginkgo.Label("TxAllowList"), func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 
 			blockchainID := subnetsSuite.GetBlockchainID("tx_allow_list")
@@ -52,7 +53,7 @@ func RegisterAsyncTests() {
 		})
 
 		ginkgo.It("contract deployer allow list", ginkgo.Label("Precompile"), ginkgo.Label("ContractDeployerAllowList"), func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 
 			blockchainID := subnetsSuite.GetBlockchainID("contract_deployer_allow_list")
@@ -60,7 +61,7 @@ func RegisterAsyncTests() {
 		})
 
 		ginkgo.It("fee manager", ginkgo.Label("Precompile"), ginkgo.Label("FeeManager"), func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 
 			blockchainID := subnetsSuite.GetBlockchainID("fee_manager")
@@ -68,7 +69,7 @@ func RegisterAsyncTests() {
 		})
 
 		ginkgo.It("reward manager", ginkgo.Label("Precompile"), ginkgo.Label("RewardManager"), func() {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()
 
 			blockchainID := subnetsSuite.GetBlockchainID("reward_manager")
@@ -78,7 +79,7 @@ func RegisterAsyncTests() {
 		// ADD YOUR PRECOMPILE HERE
 		/*
 			ginkgo.It("your precompile", ginkgo.Label("Precompile"), ginkgo.Label("YourPrecompile"), func() {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+				ctx, cancel := context.WithTimeout(context.Background(), timeout)
 				defer cancel()
 
 				// Specify the name shared by the genesis file in ./tests/precompile/genesis/{your_precompile}.json

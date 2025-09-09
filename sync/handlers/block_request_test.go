@@ -110,7 +110,7 @@ func TestBlockRequestHandler(t *testing.T) {
 	tdb := triedb.NewDatabase(memdb, nil)
 	genesis := gspec.MustCommit(memdb, tdb)
 	engine := dummy.NewETHFaker()
-	blocks, _, err := core.GenerateChain(params.TestChainConfig, genesis, engine, memdb, 96, 0, func(i int, b *core.BlockGen) {})
+	blocks, _, err := core.GenerateChain(params.TestChainConfig, genesis, engine, memdb, 96, 0, func(int, *core.BlockGen) {})
 	if err != nil {
 		t.Fatal("unexpected error when generating test blockchain", err)
 	}
@@ -222,7 +222,7 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 	tdb := triedb.NewDatabase(memdb, nil)
 	genesis := gspec.MustCommit(memdb, tdb)
 	engine := dummy.NewETHFaker()
-	blocks, _, err := core.GenerateChain(params.TestChainConfig, genesis, engine, memdb, 11, 0, func(i int, b *core.BlockGen) {})
+	blocks, _, err := core.GenerateChain(params.TestChainConfig, genesis, engine, memdb, 11, 0, func(int, *core.BlockGen) {})
 	if err != nil {
 		t.Fatal("unexpected error when generating test blockchain", err)
 	}

@@ -27,7 +27,7 @@ var (
 	TestManagerAddr = common.HexToAddress("0x0000000000000000000000000000000000000044")
 )
 
-func AllowListTests(t testing.TB, module modules.Module) map[string]precompiletest.PrecompileTest {
+func AllowListTests(_ testing.TB, module modules.Module) map[string]precompiletest.PrecompileTest {
 	contractAddress := module.Address
 	return map[string]precompiletest.PrecompileTest{
 		"admin set admin": {

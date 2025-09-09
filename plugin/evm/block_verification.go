@@ -30,7 +30,7 @@ func NewBlockValidator() BlockValidator {
 	return &blockValidator{}
 }
 
-func (v blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
+func (blockValidator) SyntacticVerify(b *Block, rules params.Rules) error {
 	rulesExtra := params.GetRulesExtra(rules)
 	if b == nil || b.ethBlock == nil {
 		return errInvalidBlock

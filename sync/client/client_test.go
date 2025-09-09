@@ -148,7 +148,7 @@ func TestGetBlocks(t *testing.T) {
 	genesis := gspec.MustCommit(memdb, tdb)
 	engine := dummy.NewETHFaker()
 	numBlocks := 110
-	blocks, _, err := core.GenerateChain(params.TestChainConfig, genesis, engine, memdb, numBlocks, 0, func(i int, b *core.BlockGen) {})
+	blocks, _, err := core.GenerateChain(params.TestChainConfig, genesis, engine, memdb, numBlocks, 0, func(_ int, _ *core.BlockGen) {})
 	if err != nil {
 		t.Fatal("unexpected error when generating test blockchain", err)
 	}
@@ -238,7 +238,7 @@ func TestGetBlocks(t *testing.T) {
 				Height:  100,
 				Parents: 16,
 			},
-			getResponse: func(t *testing.T, request message.BlockRequest) []byte {
+			getResponse: func(_ *testing.T, _ message.BlockRequest) []byte {
 				return []byte("gibberish")
 			},
 			expectedErr: errUnmarshalResponse.Error(),
@@ -299,7 +299,7 @@ func TestGetBlocks(t *testing.T) {
 				Height:  100,
 				Parents: 16,
 			},
-			getResponse: func(t *testing.T, request message.BlockRequest) []byte {
+			getResponse: func(t *testing.T, _ message.BlockRequest) []byte {
 				// Encode blocks with a missing link
 				blks := make([]*types.Block, 0)
 				blks = append(blks, blocks[84:89]...)
@@ -324,7 +324,7 @@ func TestGetBlocks(t *testing.T) {
 				Height:  100,
 				Parents: 16,
 			},
-			getResponse: func(t *testing.T, request message.BlockRequest) []byte {
+			getResponse: func(t *testing.T, _ message.BlockRequest) []byte {
 				blockResponse := message.BlockResponse{
 					Blocks: nil,
 				}
@@ -343,7 +343,7 @@ func TestGetBlocks(t *testing.T) {
 				Height:  100,
 				Parents: 16,
 			},
-			getResponse: func(t *testing.T, request message.BlockRequest) []byte {
+			getResponse: func(t *testing.T, _ message.BlockRequest) []byte {
 				blockBytes := encodeBlockSlice(blocks[80:100])
 
 				blockResponse := message.BlockResponse{
