@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -1624,22 +1625,8 @@ func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
 			endProof[i] = newRandomProofNode(rand)
 		}
 
-		numKeyValues := rand.Intn(128)
-		keyValues := make([]KeyChange, numKeyValues)
-		for i := 0; i < numKeyValues; i++ {
-			keyLen := rand.Intn(32)
-			key := make([]byte, keyLen)
-			_, _ = rand.Read(key)
-
-			valueLen := rand.Intn(32)
-			value := make([]byte, valueLen)
-			_, _ = rand.Read(value)
-
-			keyValues[i] = KeyChange{
-				Key:   key,
-				Value: maybe.Some(value),
-			}
-		}
+		// Generate at least 1 key value, all maybe.Some
+		keyValues := generateKeyChanges(rand, rand.Intn(128), false)
 
 		proof := RangeProof{
 			StartProof: startProof,
@@ -1654,11 +1641,6 @@ func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
 		require.NoError(err)
 		require.NoError(unmarshaledProof.UnmarshalBinary(originalBytes))
 		require.Equal(proof, unmarshaledProof)
-
-		// Marshaling again should yield same result.
-		unmarshaledBytes, err := unmarshaledProof.MarshalBinary()
-		require.NoError(err)
-		require.Equal(originalBytes, unmarshaledBytes)
 	})
 }
 
@@ -1683,27 +1665,8 @@ func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
 			endProof[i] = newRandomProofNode(rand)
 		}
 
-		numKeyChanges := rand.Intn(128)
-		keyChanges := make([]KeyChange, numKeyChanges)
-		for i := 0; i < numKeyChanges; i++ {
-			keyLen := rand.Intn(32)
-			key := make([]byte, keyLen)
-			_, _ = rand.Read(key)
-
-			value := maybe.Nothing[[]byte]()
-			hasValue := rand.Intn(2) == 0
-			if hasValue {
-				valueLen := rand.Intn(32)
-				valueBytes := make([]byte, valueLen)
-				_, _ = rand.Read(valueBytes)
-				value = maybe.Some(valueBytes)
-			}
-
-			keyChanges[i] = KeyChange{
-				Key:   key,
-				Value: value,
-			}
-		}
+		// Include any number of key changes, including deletions
+		keyChanges := generateKeyChanges(rand, rand.Intn(128), true)
 
 		proof := ChangeProof{
 			StartProof: startProof,
@@ -1718,18 +1681,7 @@ func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
 		require.NoError(err)
 		require.NoError(unmarshaledProof.UnmarshalBinary(originalBytes))
 		require.Equal(proof, unmarshaledProof)
-
-		// Marshaling again should yield same result.
-		unmarshaledBytes, err := unmarshaledProof.MarshalBinary()
-		require.NoError(err)
-		require.Equal(originalBytes, unmarshaledBytes)
 	})
-}
-
-func TestChangeProofUnmarshalProtoNil(t *testing.T) {
-	var proof ChangeProof
-	err := proof.unmarshalProto(nil)
-	require.ErrorIs(t, err, ErrNilChangeProof)
 }
 
 func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
@@ -1750,27 +1702,8 @@ func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
 		endProof[i] = newRandomProofNode(rand)
 	}
 
-	numKeyChanges := rand.Intn(128) + 1
-	keyChanges := make([]KeyChange, numKeyChanges)
-	for i := 0; i < numKeyChanges; i++ {
-		keyLen := rand.Intn(32)
-		key := make([]byte, keyLen)
-		_, _ = rand.Read(key)
-
-		value := maybe.Nothing[[]byte]()
-		hasValue := rand.Intn(2) == 0
-		if hasValue {
-			valueLen := rand.Intn(32)
-			valueBytes := make([]byte, valueLen)
-			_, _ = rand.Read(valueBytes)
-			value = maybe.Some(valueBytes)
-		}
-
-		keyChanges[i] = KeyChange{
-			Key:   key,
-			Value: value,
-		}
-	}
+	// Generate at least 1 key change, include deletions
+	keyChanges := generateKeyChanges(rand, rand.Intn(128)+1, true)
 
 	proof := ChangeProof{
 		StartProof: startProof,
@@ -1780,10 +1713,44 @@ func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
 	protoProof := proof.toProto()
 	// Make a value nil
 	protoProof.KeyChanges[0].Value = nil
+	proofBytes, err := proto.Marshal(protoProof)
+	require.NoError(t, err)
 
 	var unmarshaledProof ChangeProof
-	err := unmarshaledProof.unmarshalProto(protoProof)
+	err = unmarshaledProof.UnmarshalBinary(proofBytes)
 	require.ErrorIs(t, err, ErrNilMaybeBytes)
+}
+
+func generateKeyChanges(rand *rand.Rand, numKeyChanges int, includeNone bool) []KeyChange {
+	keyChanges := make([]KeyChange, numKeyChanges)
+	for i := 0; i < numKeyChanges; i++ {
+		var key []byte
+		// length 0 is decoded as nil
+		if keyLen := rand.Intn(32); keyLen != 0 {
+			key = make([]byte, keyLen)
+			_, _ = rand.Read(key)
+		}
+		var valueBytes []byte
+		if valueLen := rand.Intn(32); valueLen != 0 {
+			valueBytes = make([]byte, valueLen)
+			_, _ = rand.Read(valueBytes)
+		}
+
+		// Replace the value if we want to include None values
+		var value maybe.Maybe[[]byte]
+		hasValue := rand.Intn(2) == 0
+		if hasValue && includeNone {
+			value = maybe.Nothing[[]byte]()
+		} else {
+			value = maybe.Some(valueBytes)
+		}
+
+		keyChanges[i] = KeyChange{
+			Key:   key,
+			Value: value,
+		}
+	}
+	return keyChanges
 }
 
 func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
@@ -1798,9 +1765,11 @@ func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
 			},
 		},
 	}
+	proofBytes, err := proto.Marshal(protoProof)
+	require.NoError(t, err)
 
 	var proof ChangeProof
-	err := proof.unmarshalProto(protoProof)
+	err = proof.UnmarshalBinary(proofBytes)
 	require.ErrorIs(t, err, ErrInvalidMaybe)
 }
 

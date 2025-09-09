@@ -53,13 +53,13 @@ var (
 	ErrNilValueOrHash                = errors.New("proof node's valueOrHash field is nil")
 	ErrNilKey                        = errors.New("key is nil")
 	ErrInvalidKeyLength              = errors.New("key length doesn't match bytes length, check specified branchFactor")
-	ErrNilRangeProof                 = errors.New("range proof is nil")
-	ErrNilChangeProof                = errors.New("change proof is nil")
 	ErrNilMaybeBytes                 = errors.New("maybe bytes is nil")
 	ErrNilProof                      = errors.New("proof is nil")
 	ErrNilValue                      = errors.New("value is nil")
 	ErrUnexpectedEndProof            = errors.New("end proof should be empty")
 	ErrUnexpectedStartProof          = errors.New("start proof should be empty")
+	errNilRangeProof                 = errors.New("range proof is nil")
+	errNilChangeProof                = errors.New("change proof is nil")
 )
 
 type ProofNode struct {
@@ -242,7 +242,7 @@ func (r *RangeProof) toProto() *pb.RangeProof {
 
 func (r *RangeProof) unmarshalProto(pbProof *pb.RangeProof) error {
 	if pbProof == nil {
-		return ErrNilRangeProof
+		return errNilRangeProof
 	}
 
 	r.StartProof = make([]ProofNode, len(pbProof.StartProof))
@@ -465,7 +465,7 @@ func (c *ChangeProof) toProto() *pb.ChangeProof {
 
 func (c *ChangeProof) unmarshalProto(pbProof *pb.ChangeProof) error {
 	if pbProof == nil {
-		return ErrNilChangeProof
+		return errNilChangeProof
 	}
 
 	c.StartProof = make([]ProofNode, len(pbProof.StartProof))
