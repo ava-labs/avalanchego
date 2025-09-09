@@ -48,18 +48,14 @@ var (
 	ErrProofValueDoesntMatch         = errors.New("the provided value does not match the proof node for the provided key's value")
 	ErrProofKeyPartialByte           = errors.New("the provided key has partial byte length")
 	ErrProofNodeHasUnincludedValue   = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
-	ErrInvalidMaybe                  = errors.New("maybe is nothing but has value")
-	ErrNilProofNode                  = errors.New("proof node is nil")
-	ErrNilValueOrHash                = errors.New("proof node's valueOrHash field is nil")
-	ErrNilKey                        = errors.New("key is nil")
-	ErrInvalidKeyLength              = errors.New("key length doesn't match bytes length, check specified branchFactor")
-	ErrNilRangeProof                 = errors.New("range proof is nil")
-	ErrNilChangeProof                = errors.New("change proof is nil")
-	ErrNilMaybeBytes                 = errors.New("maybe bytes is nil")
-	ErrNilProof                      = errors.New("proof is nil")
-	ErrNilValue                      = errors.New("value is nil")
 	ErrUnexpectedEndProof            = errors.New("end proof should be empty")
 	ErrUnexpectedStartProof          = errors.New("start proof should be empty")
+	errInvalidMaybe                  = errors.New("maybe is nothing but has value")
+	errNilMaybeBytes                 = errors.New("maybe bytes is nil")
+	errNilProofNode                  = errors.New("proof node is nil")
+	errNilValueOrHash                = errors.New("proof node's valueOrHash field is nil")
+	errNilKey                        = errors.New("key is nil")
+	errInvalidKeyLength              = errors.New("key length doesn't match bytes length, check specified branchFactor")
 )
 
 type ProofNode struct {
@@ -71,9 +67,9 @@ type ProofNode struct {
 	Children    map[byte]ids.ID
 }
 
-// ToProto converts the ProofNode into the protobuf version of a proof node
+// toProto converts the ProofNode into the protobuf version of a proof node
 // Assumes [node.Key.Key.length] <= math.MaxUint64.
-func (node *ProofNode) ToProto() *pb.ProofNode {
+func (node *ProofNode) toProto() *pb.ProofNode {
 	pbNode := &pb.ProofNode{
 		Key: &pb.Key{
 			Length: uint64(node.Key.length),
@@ -93,18 +89,18 @@ func (node *ProofNode) ToProto() *pb.ProofNode {
 	return pbNode
 }
 
-func (node *ProofNode) UnmarshalProto(pbNode *pb.ProofNode) error {
+func (node *ProofNode) unmarshalProto(pbNode *pb.ProofNode) error {
 	switch {
 	case pbNode == nil:
-		return ErrNilProofNode
+		return errNilProofNode
 	case pbNode.ValueOrHash == nil:
-		return ErrNilValueOrHash
+		return errNilValueOrHash
 	case pbNode.ValueOrHash.IsNothing && len(pbNode.ValueOrHash.Value) != 0:
-		return ErrInvalidMaybe
+		return errInvalidMaybe
 	case pbNode.Key == nil:
-		return ErrNilKey
+		return errNilKey
 	case len(pbNode.Key.Value) != bytesNeeded(int(pbNode.Key.Length)):
-		return ErrInvalidKeyLength
+		return errInvalidKeyLength
 	}
 	node.Key = ToKey(pbNode.Key.Value).Take(int(pbNode.Key.Length))
 	node.Children = make(map[byte]ids.ID, len(pbNode.Children))
@@ -199,55 +195,10 @@ func (proof *Proof) Verify(
 	return nil
 }
 
-func (proof *Proof) ToProto() *pb.Proof {
-	value := &pb.MaybeBytes{
-		Value:     proof.Value.Value(),
-		IsNothing: proof.Value.IsNothing(),
-	}
-
-	pbProof := &pb.Proof{
-		Key:   proof.Key.Bytes(),
-		Value: value,
-	}
-
-	pbProof.Proof = make([]*pb.ProofNode, len(proof.Path))
-	for i, node := range proof.Path {
-		pbProof.Proof[i] = node.ToProto()
-	}
-
-	return pbProof
-}
-
-func (proof *Proof) UnmarshalProto(pbProof *pb.Proof) error {
-	switch {
-	case pbProof == nil:
-		return ErrNilProof
-	case pbProof.Value == nil:
-		return ErrNilValue
-	case pbProof.Value.IsNothing && len(pbProof.Value.Value) != 0:
-		return ErrInvalidMaybe
-	}
-
-	proof.Key = ToKey(pbProof.Key)
-
-	if !pbProof.Value.IsNothing {
-		proof.Value = maybe.Some(pbProof.Value.Value)
-	}
-
-	proof.Path = make([]ProofNode, len(pbProof.Proof))
-	for i, pbNode := range pbProof.Proof {
-		if err := proof.Path[i].UnmarshalProto(pbNode); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 type RangeProof ChangeProof
 
 func (r *RangeProof) MarshalBinary() ([]byte, error) {
-	return proto.Marshal(r.ToProto())
+	return proto.Marshal(r.toProto())
 }
 
 func (r *RangeProof) UnmarshalBinary(data []byte) error {
@@ -256,18 +207,18 @@ func (r *RangeProof) UnmarshalBinary(data []byte) error {
 		return err
 	}
 
-	return r.UnmarshalProto(&pbRangeProof)
+	return r.unmarshalProto(&pbRangeProof)
 }
 
-func (r *RangeProof) ToProto() *pb.RangeProof {
+func (r *RangeProof) toProto() *pb.RangeProof {
 	startProof := make([]*pb.ProofNode, len(r.StartProof))
 	for i, node := range r.StartProof {
-		startProof[i] = node.ToProto()
+		startProof[i] = node.toProto()
 	}
 
 	endProof := make([]*pb.ProofNode, len(r.EndProof))
 	for i, node := range r.EndProof {
-		endProof[i] = node.ToProto()
+		endProof[i] = node.toProto()
 	}
 
 	keyValues := make([]*pb.KeyValue, len(r.KeyChanges))
@@ -285,21 +236,17 @@ func (r *RangeProof) ToProto() *pb.RangeProof {
 	}
 }
 
-func (r *RangeProof) UnmarshalProto(pbProof *pb.RangeProof) error {
-	if pbProof == nil {
-		return ErrNilRangeProof
-	}
-
+func (r *RangeProof) unmarshalProto(pbProof *pb.RangeProof) error {
 	r.StartProof = make([]ProofNode, len(pbProof.StartProof))
 	for i, protoNode := range pbProof.StartProof {
-		if err := r.StartProof[i].UnmarshalProto(protoNode); err != nil {
+		if err := r.StartProof[i].unmarshalProto(protoNode); err != nil {
 			return err
 		}
 	}
 
 	r.EndProof = make([]ProofNode, len(pbProof.EndProof))
 	for i, protoNode := range pbProof.EndProof {
-		if err := r.EndProof[i].UnmarshalProto(protoNode); err != nil {
+		if err := r.EndProof[i].unmarshalProto(protoNode); err != nil {
 			return err
 		}
 	}
@@ -467,7 +414,7 @@ type ChangeProof struct {
 }
 
 func (c *ChangeProof) MarshalBinary() ([]byte, error) {
-	return proto.Marshal(c.ToProto())
+	return proto.Marshal(c.toProto())
 }
 
 func (c *ChangeProof) UnmarshalBinary(data []byte) error {
@@ -476,18 +423,18 @@ func (c *ChangeProof) UnmarshalBinary(data []byte) error {
 		return err
 	}
 
-	return c.UnmarshalProto(&pbChangeProof)
+	return c.unmarshalProto(&pbChangeProof)
 }
 
-func (c *ChangeProof) ToProto() *pb.ChangeProof {
+func (c *ChangeProof) toProto() *pb.ChangeProof {
 	startProof := make([]*pb.ProofNode, len(c.StartProof))
 	for i, node := range c.StartProof {
-		startProof[i] = node.ToProto()
+		startProof[i] = node.toProto()
 	}
 
 	endProof := make([]*pb.ProofNode, len(c.EndProof))
 	for i, node := range c.EndProof {
-		endProof[i] = node.ToProto()
+		endProof[i] = node.toProto()
 	}
 
 	keyChanges := make([]*pb.KeyChange, len(c.KeyChanges))
@@ -508,21 +455,17 @@ func (c *ChangeProof) ToProto() *pb.ChangeProof {
 	}
 }
 
-func (c *ChangeProof) UnmarshalProto(pbProof *pb.ChangeProof) error {
-	if pbProof == nil {
-		return ErrNilChangeProof
-	}
-
+func (c *ChangeProof) unmarshalProto(pbProof *pb.ChangeProof) error {
 	c.StartProof = make([]ProofNode, len(pbProof.StartProof))
 	for i, protoNode := range pbProof.StartProof {
-		if err := c.StartProof[i].UnmarshalProto(protoNode); err != nil {
+		if err := c.StartProof[i].unmarshalProto(protoNode); err != nil {
 			return err
 		}
 	}
 
 	c.EndProof = make([]ProofNode, len(pbProof.EndProof))
 	for i, protoNode := range pbProof.EndProof {
-		if err := c.EndProof[i].UnmarshalProto(protoNode); err != nil {
+		if err := c.EndProof[i].unmarshalProto(protoNode); err != nil {
 			return err
 		}
 	}
@@ -530,11 +473,11 @@ func (c *ChangeProof) UnmarshalProto(pbProof *pb.ChangeProof) error {
 	c.KeyChanges = make([]KeyChange, len(pbProof.KeyChanges))
 	for i, kv := range pbProof.KeyChanges {
 		if kv.Value == nil {
-			return ErrNilMaybeBytes
+			return errNilMaybeBytes
 		}
 
 		if kv.Value.IsNothing && len(kv.Value.Value) != 0 {
-			return ErrInvalidMaybe
+			return errInvalidMaybe
 		}
 
 		value := maybe.Nothing[[]byte]()
