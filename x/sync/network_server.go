@@ -43,8 +43,6 @@ var (
 	errInvalidKeyLimit      = errors.New("key limit must be greater than 0")
 	errInvalidStartRootHash = fmt.Errorf("start root hash must have length %d", hashing.HashLen)
 	errInvalidEndRootHash   = fmt.Errorf("end root hash must have length %d", hashing.HashLen)
-	errInvalidStartKey      = errors.New("start key is Nothing but has value")
-	errInvalidEndKey        = errors.New("end key is Nothing but has value")
 	errInvalidBounds        = errors.New("start key is greater than end key")
 	errInvalidRootHash      = fmt.Errorf("root hash must have length %d", hashing.HashLen)
 
@@ -53,10 +51,19 @@ var (
 )
 
 func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
-	if mb != nil && !mb.IsNothing {
-		return maybe.Some(mb.Value)
+	if mb == nil {
+		return maybe.Nothing[[]byte]()
 	}
-	return maybe.Nothing[[]byte]()
+	return maybe.Some(mb.Value)
+}
+
+func maybeToMaybeBytes(m maybe.Maybe[[]byte]) *pb.MaybeBytes {
+	if m.IsNothing() {
+		return nil
+	}
+	return &pb.MaybeBytes{
+		Value: m.Value(),
+	}
 }
 
 func NewGetChangeProofHandler(db DB) *GetChangeProofHandler {
@@ -315,12 +322,7 @@ func validateChangeProofRequest(req *pb.GetChangeProofRequest) error {
 		return errInvalidEndRootHash
 	case bytes.Equal(req.EndRootHash, ids.Empty[:]):
 		return merkledb.ErrEmptyProof
-	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
-		return errInvalidStartKey
-	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
-		return errInvalidEndKey
-	case req.StartKey != nil && req.EndKey != nil && !req.StartKey.IsNothing &&
-		!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
+	case req.StartKey != nil && req.EndKey != nil && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
 		return errInvalidBounds
 	default:
 		return nil
@@ -338,12 +340,7 @@ func validateRangeProofRequest(req *pb.GetRangeProofRequest) error {
 		return errInvalidRootHash
 	case bytes.Equal(req.RootHash, ids.Empty[:]):
 		return merkledb.ErrEmptyProof
-	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
-		return errInvalidStartKey
-	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
-		return errInvalidEndKey
-	case req.StartKey != nil && req.EndKey != nil && !req.StartKey.IsNothing &&
-		!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
+	case req.StartKey != nil && req.EndKey != nil && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
 		return errInvalidBounds
 	default:
 		return nil

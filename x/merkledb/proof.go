@@ -50,10 +50,7 @@ var (
 	ErrProofNodeHasUnincludedValue   = errors.New("the provided proof has a value for a key within the range that is not present in the provided key/values")
 	ErrUnexpectedEndProof            = errors.New("end proof should be empty")
 	ErrUnexpectedStartProof          = errors.New("start proof should be empty")
-	errInvalidMaybe                  = errors.New("maybe is nothing but has value")
-	errNilMaybeBytes                 = errors.New("maybe bytes is nil")
 	errNilProofNode                  = errors.New("proof node is nil")
-	errNilValueOrHash                = errors.New("proof node's valueOrHash field is nil")
 	errNilKey                        = errors.New("key is nil")
 	errInvalidKeyLength              = errors.New("key length doesn't match bytes length, check specified branchFactor")
 )
@@ -70,16 +67,20 @@ type ProofNode struct {
 // toProto converts the ProofNode into the protobuf version of a proof node
 // Assumes [node.Key.Key.length] <= math.MaxUint64.
 func (node *ProofNode) toProto() *pb.ProofNode {
+	var valueOrHash *pb.MaybeBytes
+	if node.ValueOrHash.HasValue() {
+		valueOrHash = &pb.MaybeBytes{
+			Value: node.ValueOrHash.Value(),
+		}
+	}
+
 	pbNode := &pb.ProofNode{
 		Key: &pb.Key{
 			Length: uint64(node.Key.length),
 			Value:  node.Key.Bytes(),
 		},
-		ValueOrHash: &pb.MaybeBytes{
-			Value:     node.ValueOrHash.Value(),
-			IsNothing: node.ValueOrHash.IsNothing(),
-		},
-		Children: make(map[uint32][]byte, len(node.Children)),
+		ValueOrHash: valueOrHash,
+		Children:    make(map[uint32][]byte, len(node.Children)),
 	}
 
 	for childIndex, childID := range node.Children {
@@ -93,10 +94,6 @@ func (node *ProofNode) unmarshalProto(pbNode *pb.ProofNode) error {
 	switch {
 	case pbNode == nil:
 		return errNilProofNode
-	case pbNode.ValueOrHash == nil:
-		return errNilValueOrHash
-	case pbNode.ValueOrHash.IsNothing && len(pbNode.ValueOrHash.Value) != 0:
-		return errInvalidMaybe
 	case pbNode.Key == nil:
 		return errNilKey
 	case len(pbNode.Key.Value) != bytesNeeded(int(pbNode.Key.Length)):
@@ -115,7 +112,7 @@ func (node *ProofNode) unmarshalProto(pbNode *pb.ProofNode) error {
 		node.Children[byte(childIndex)] = childID
 	}
 
-	if !pbNode.ValueOrHash.IsNothing {
+	if pbNode.ValueOrHash != nil {
 		node.ValueOrHash = maybe.Some(pbNode.ValueOrHash.Value)
 	}
 
@@ -439,12 +436,16 @@ func (c *ChangeProof) toProto() *pb.ChangeProof {
 
 	keyChanges := make([]*pb.KeyChange, len(c.KeyChanges))
 	for i, kv := range c.KeyChanges {
+		var value *pb.MaybeBytes
+		if kv.Value.HasValue() {
+			value = &pb.MaybeBytes{
+				Value: kv.Value.Value(),
+			}
+		}
+
 		keyChanges[i] = &pb.KeyChange{
-			Key: kv.Key,
-			Value: &pb.MaybeBytes{
-				Value:     kv.Value.Value(),
-				IsNothing: kv.Value.IsNothing(),
-			},
+			Key:   kv.Key,
+			Value: value,
 		}
 	}
 
@@ -472,16 +473,8 @@ func (c *ChangeProof) unmarshalProto(pbProof *pb.ChangeProof) error {
 
 	c.KeyChanges = make([]KeyChange, len(pbProof.KeyChanges))
 	for i, kv := range pbProof.KeyChanges {
-		if kv.Value == nil {
-			return errNilMaybeBytes
-		}
-
-		if kv.Value.IsNothing && len(kv.Value.Value) != 0 {
-			return errInvalidMaybe
-		}
-
 		value := maybe.Nothing[[]byte]()
-		if !kv.Value.IsNothing {
+		if kv.Value != nil {
 			value = maybe.Some(kv.Value.Value)
 		}
 		c.KeyChanges[i] = KeyChange{

@@ -349,16 +349,10 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 	request := &pb.GetChangeProofRequest{
 		StartRootHash: work.localRootID[:],
 		EndRootHash:   targetRootID[:],
-		StartKey: &pb.MaybeBytes{
-			Value:     work.start.Value(),
-			IsNothing: work.start.IsNothing(),
-		},
-		EndKey: &pb.MaybeBytes{
-			Value:     work.end.Value(),
-			IsNothing: work.end.IsNothing(),
-		},
-		KeyLimit:   defaultRequestKeyLimit,
-		BytesLimit: defaultRequestByteSizeLimit,
+		StartKey:      maybeToMaybeBytes(work.start),
+		EndKey:        maybeToMaybeBytes(work.end),
+		KeyLimit:      defaultRequestKeyLimit,
+		BytesLimit:    defaultRequestByteSizeLimit,
 	}
 
 	requestBytes, err := proto.Marshal(request)
@@ -406,15 +400,9 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 	}
 
 	request := &pb.GetRangeProofRequest{
-		RootHash: targetRootID[:],
-		StartKey: &pb.MaybeBytes{
-			Value:     work.start.Value(),
-			IsNothing: work.start.IsNothing(),
-		},
-		EndKey: &pb.MaybeBytes{
-			Value:     work.end.Value(),
-			IsNothing: work.end.IsNothing(),
-		},
+		RootHash:   targetRootID[:],
+		StartKey:   maybeToMaybeBytes(work.start),
+		EndKey:     maybeToMaybeBytes(work.end),
 		KeyLimit:   defaultRequestKeyLimit,
 		BytesLimit: defaultRequestByteSizeLimit,
 	}

@@ -57,9 +57,9 @@ message Key {
   bytes value = 2;
 }
 
+// If the message is empty, the value is considered to be "nothing".
 message MaybeBytes {
   bytes value = 1;
-  bool is_nothing = 2;
 }
 
 message KeyValue {
