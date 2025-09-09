@@ -17,7 +17,13 @@ import (
 func newTestDatabase(t *testing.T, opts DatabaseConfig) (*Database, func()) {
 	t.Helper()
 	dir := t.TempDir()
-	config := opts.WithDir(dir)
+	config := opts
+	if config.IndexDir == "" {
+		config = config.WithIndexDir(dir)
+	}
+	if config.DataDir == "" {
+		config = config.WithDataDir(dir)
+	}
 	db, err := New(config, logging.NoLog{})
 	require.NoError(t, err, "failed to create database")
 

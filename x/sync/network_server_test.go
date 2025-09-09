@@ -130,11 +130,8 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				return
 			}
 
-			var proofProto pb.RangeProof
-			require.NoError(proto.Unmarshal(responseBytes, &proofProto))
-
 			var proof merkledb.RangeProof
-			require.NoError(proof.UnmarshalProto(&proofProto))
+			require.NoError(proof.UnmarshalBinary(responseBytes))
 
 			if test.expectedResponseLen > 0 {
 				require.LessOrEqual(len(proof.KeyChanges), test.expectedResponseLen)
@@ -361,9 +358,13 @@ func Test_Server_GetChangeProof(t *testing.T) {
 
 			if test.expectedResponseLen > 0 {
 				if test.expectRangeProof {
-					require.LessOrEqual(len(proofResult.GetRangeProof().KeyValues), test.expectedResponseLen)
+					var response merkledb.RangeProof
+					require.NoError(response.UnmarshalBinary(proofResult.GetRangeProof()))
+					require.LessOrEqual(len(response.KeyChanges), test.expectedResponseLen)
 				} else {
-					require.LessOrEqual(len(proofResult.GetChangeProof().KeyChanges), test.expectedResponseLen)
+					var response merkledb.ChangeProof
+					require.NoError(response.UnmarshalBinary(proofResult.GetChangeProof()))
+					require.LessOrEqual(len(response.KeyChanges), test.expectedResponseLen)
 				}
 			}
 
