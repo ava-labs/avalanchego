@@ -70,7 +70,7 @@ func (c *Client) GetAllValidatorSets(
 		return nil, fmt.Errorf("failed to get all validator sets: %w", err)
 	}
 
-	vdrSets := make(map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, len(resp.ValidatorSets))
+	validatorSets := make(map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, len(resp.ValidatorSets))
 	for _, validatorSet := range resp.ValidatorSets {
 		vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, len(validatorSet.Validators))
 
@@ -104,10 +104,10 @@ func (c *Client) GetAllValidatorSets(
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse subnet ID %s: %w", subnetID.String(), err)
 		}
-		vdrSets[subnetID] = vdrs
+		validatorSets[subnetID] = vdrs
 	}
 
-	return vdrSets, nil
+	return validatorSets, nil
 }
 
 func (c *Client) GetValidatorSet(
