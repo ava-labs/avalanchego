@@ -199,10 +199,10 @@ func BaseFeeTest(t *testing.T, feeConfig commontype.FeeConfig) {
 
 func TestEstimateNextBaseFee(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
-		BlockGasCostTest(t, testFeeConfig)
+		EstimateNextBaseFeeTest(t, testFeeConfig)
 	})
 	t.Run("double", func(t *testing.T) {
-		BlockGasCostTest(t, testFeeConfigDouble)
+		EstimateNextBaseFeeTest(t, testFeeConfigDouble)
 	})
 }
 
