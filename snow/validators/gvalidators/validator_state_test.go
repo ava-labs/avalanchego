@@ -236,3 +236,65 @@ func setupValidatorSet(b *testing.B, size int) map[ids.NodeID]*validators.GetVal
 	}
 	return set
 }
+
+func TestGetAllValidatorSets(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+
+	state := setupState(t, ctrl)
+
+	// Happy path
+	sk0, err := localsigner.New()
+	require.NoError(err)
+	vdr0 := &validators.GetValidatorOutput{
+		NodeID:    ids.GenerateTestNodeID(),
+		PublicKey: sk0.PublicKey(),
+		Weight:    1,
+	}
+
+	sk1, err := localsigner.New()
+	require.NoError(err)
+	vdr1 := &validators.GetValidatorOutput{
+		NodeID:    ids.GenerateTestNodeID(),
+		PublicKey: sk1.PublicKey(),
+		Weight:    2,
+	}
+
+	vdr2 := &validators.GetValidatorOutput{
+		NodeID:    ids.GenerateTestNodeID(),
+		PublicKey: nil,
+		Weight:    3,
+	}
+
+	vdr3 := &validators.GetValidatorOutput{
+		NodeID:    ids.GenerateTestNodeID(),
+		PublicKey: nil,
+		Weight:    4,
+	}
+
+	subnetID1 := ids.GenerateTestID()
+	subnetID2 := ids.GenerateTestID()
+	expectedVdrSets := map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput{
+		subnetID1: {
+			vdr0.NodeID: vdr0,
+			vdr1.NodeID: vdr1,
+			vdr2.NodeID: vdr2,
+		},
+		subnetID2: {
+			vdr2.NodeID: vdr2,
+			vdr3.NodeID: vdr3,
+		},
+	}
+	height := uint64(1337)
+	state.server.EXPECT().GetAllValidatorSets(gomock.Any(), height).Return(expectedVdrSets, nil)
+
+	vdrSets, err := state.client.GetAllValidatorSets(context.Background(), height)
+	require.NoError(err)
+	require.Equal(expectedVdrSets, vdrSets)
+
+	// Error path
+	state.server.EXPECT().GetAllValidatorSets(gomock.Any(), height).Return(expectedVdrSets, errCustom)
+
+	_, err = state.client.GetAllValidatorSets(context.Background(), height)
+	require.Error(err) //nolint:forbidigo // currently returns grpc error
+}
