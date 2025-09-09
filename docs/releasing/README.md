@@ -23,7 +23,7 @@ Remember to use the appropriate versioning for your release.
 1. Create your branch, usually from the tip of the `master` branch:
 
     ```bash
-    git fetch origin master:master
+    git fetch origin master
     git checkout master
     git checkout -b "releases/$VERSION_RC"
     ```
@@ -93,7 +93,7 @@ Remember to use the appropriate versioning for your release.
 11. Create and push a tag from the `master` branch:
 
     ```bash
-    git fetch origin master:master
+    git fetch origin master
     git checkout master
     # Double check the tip of the master branch is the expected commit
     # of the squashed release branch
@@ -388,7 +388,7 @@ export P_VERSION=v0.7.4
 ```
 1. Create a branch, from the tip of the `master` branch after the release PR has been merged:
     ```bash
-    git fetch origin master:master
+    git fetch origin master
     git checkout master
     git checkout -b "prep-$P_VERSION-release"
     ```
@@ -414,6 +414,13 @@ export P_VERSION=v0.7.4
     ```
 
     This message can help you figure out what the correct RPC chain VM protocol version (here `39`) has to be in compatibility.json for your current release. Alternatively, you can refer to the [Avalanchego repository `version/compatibility.json` file](https://github.com/ava-labs/avalanchego/blob/main/version/compatibility.json) to find the RPC chain VM protocol version matching the AvalancheGo version we use here.
+1. Commit your changes and push the branch
+
+    ```bash
+    git add .
+    git commit -S -m "chore: prep release $P_VERSION"
+    git push -u origin "prep-$P_VERSION-release"
+    ```
 1. Create a pull request (PR) from your branch targeting master, for example using [`gh`](https://cli.github.com/):
     ```bash
     gh pr create --repo github.com/ava-labs/subnet-evm --base master --title "chore: prep next release $P_VERSION"

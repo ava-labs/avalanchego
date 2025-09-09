@@ -9,7 +9,7 @@ var (
 	// GitCommit is set by the build script
 	GitCommit string
 	// Version is the version of Subnet EVM
-	Version string = "v0.7.9"
+	Version string = "v0.7.10"
 )
 
 func init() {
