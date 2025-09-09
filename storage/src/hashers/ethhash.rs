@@ -6,13 +6,6 @@
 #![cfg_attr(
     feature = "ethhash",
     expect(
-        clippy::indexing_slicing,
-        reason = "Found 4 occurrences after enabling the lint."
-    )
-)]
-#![cfg_attr(
-    feature = "ethhash",
-    expect(
         clippy::too_many_lines,
         reason = "Found 1 occurrences after enabling the lint."
     )
@@ -60,30 +53,31 @@ fn nibbles_to_eth_compact<T: AsRef<[u8]>>(nibbles: T, is_leaf: bool) -> SmallVec
     }
 
     let nibbles = nibbles.as_ref();
+    if cfg!(debug_assertions) {
+        for &nibble in nibbles {
+            assert!(
+                nibble < 16,
+                "nibbles contains byte out of range: {nibbles:?}"
+            );
+        }
+    }
 
-    // nibble_pairs points to the first nibble that will be combined with the next nibble
-    // so we skip the first byte if there's an odd length and set the odd_nibbles bit to true
-    let (nibble_pairs, first_byte) = if nibbles.len() & 1 == 1 {
-        let low_nibble = nibbles[0];
-        debug_assert!(low_nibble < 16);
-        (
-            &nibbles[1..],
-            CompactFirstByte::new(is_leaf, true, low_nibble),
-        )
+    let mut first_byte = CompactFirstByte(0);
+    first_byte.set_is_leaf(is_leaf);
+
+    let (maybe_low_nibble, nibble_pairs) = nibbles.as_rchunks::<2>();
+    if let &[low_nibble] = maybe_low_nibble {
+        // we have an odd number of nibbles
+        first_byte.set_odd_nibbles(true);
+        first_byte.set_low_nibble(low_nibble);
     } else {
-        (nibbles, CompactFirstByte::new(is_leaf, false, 0))
-    };
-
-    // at this point, we can be sure that nibble_pairs has an even length
-    debug_assert!(nibble_pairs.len() % 2 == 0);
+        // as_rchunks can only return 0 or 1 element in the first slice if N is 2
+        debug_assert!(maybe_low_nibble.is_empty());
+    }
 
     // now assemble everything: the first byte, and the nibble pairs compacted back together
     once(first_byte.0)
-        .chain(
-            nibble_pairs
-                .chunks(2)
-                .map(|chunk| (chunk[0] << 4) | chunk[1]),
-        )
+        .chain(nibble_pairs.iter().map(|&[hi, lo]| (hi << 4) | lo))
         .collect()
 }
 
@@ -94,17 +88,11 @@ impl<T: Hashable> Preimage for T {
         let mut collector = SmallVec::with_capacity(32);
         self.write(&mut collector);
 
-        if crate::logger::trace_enabled() {
-            if self.key().size_hint().0 == 64 {
-                trace!("SIZE WAS 64 {}", hex::encode(&collector));
-            } else {
-                trace!(
-                    "SIZE WAS {1} {0}",
-                    hex::encode(&collector),
-                    self.key().size_hint().0
-                );
-            }
-        }
+        trace!(
+            "SIZE WAS {} {}",
+            self.key().count(),
+            hex::encode(&collector),
+        );
 
         if collector.len() >= 32 {
             HashType::Hash(Keccak256::digest(collector).into())
@@ -114,7 +102,7 @@ impl<T: Hashable> Preimage for T {
     }
 
     fn write(&self, buf: &mut impl HasUpdate) {
-        let is_account = self.key().size_hint().0 == 64;
+        let is_account = self.key().count() == 64;
         trace!("is_account: {is_account}");
 
         let child_hashes = self.children();
