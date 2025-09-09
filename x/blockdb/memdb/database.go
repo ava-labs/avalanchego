@@ -1,32 +1,36 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package blockdb
+package memdb
 
-import "sync"
+import (
+	"sync"
 
-// MemoryDatabase is an in-memory implementation of BlockDB
-type MemoryDatabase struct {
+	"github.com/ava-labs/avalanchego/x/blockdb"
+)
+
+// Database is an in-memory implementation of BlockDB
+type Database struct {
 	mu     sync.RWMutex
-	blocks map[BlockHeight]BlockData
+	blocks map[blockdb.BlockHeight]blockdb.BlockData
 	closed bool
 }
 
 // WriteBlock stores a block in memory
-func (m *MemoryDatabase) WriteBlock(height BlockHeight, block BlockData) error {
+func (m *Database) WriteBlock(height blockdb.BlockHeight, block blockdb.BlockData) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.closed {
-		return ErrDatabaseClosed
+		return blockdb.ErrDatabaseClosed
 	}
 
 	if m.blocks == nil {
-		m.blocks = make(map[BlockHeight]BlockData)
+		m.blocks = make(map[blockdb.BlockHeight]blockdb.BlockData)
 	}
 
 	if len(block) == 0 {
-		return ErrBlockEmpty
+		return blockdb.ErrBlockEmpty
 	}
 
 	blockCopy := make([]byte, len(block))
@@ -37,17 +41,17 @@ func (m *MemoryDatabase) WriteBlock(height BlockHeight, block BlockData) error {
 }
 
 // ReadBlock retrieves the full block data for the given height
-func (m *MemoryDatabase) ReadBlock(height BlockHeight) (BlockData, error) {
+func (m *Database) ReadBlock(height blockdb.BlockHeight) (blockdb.BlockData, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	if m.closed {
-		return nil, ErrDatabaseClosed
+		return nil, blockdb.ErrDatabaseClosed
 	}
 
 	block, ok := m.blocks[height]
 	if !ok {
-		return nil, ErrBlockNotFound
+		return nil, blockdb.ErrBlockNotFound
 	}
 
 	blockCopy := make([]byte, len(block))
@@ -56,12 +60,12 @@ func (m *MemoryDatabase) ReadBlock(height BlockHeight) (BlockData, error) {
 }
 
 // HasBlock checks if a block exists at the given height
-func (m *MemoryDatabase) HasBlock(height BlockHeight) (bool, error) {
+func (m *Database) HasBlock(height blockdb.BlockHeight) (bool, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
 	if m.closed {
-		return false, ErrDatabaseClosed
+		return false, blockdb.ErrDatabaseClosed
 	}
 
 	_, ok := m.blocks[height]
@@ -69,7 +73,7 @@ func (m *MemoryDatabase) HasBlock(height BlockHeight) (bool, error) {
 }
 
 // Close closes the in-memory database
-func (m *MemoryDatabase) Close() error {
+func (m *Database) Close() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
