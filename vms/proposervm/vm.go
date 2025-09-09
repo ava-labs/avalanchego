@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"connectrpc.com/grpcreflect"
 	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
+	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -249,6 +251,21 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 	return vm.ChainVM.Shutdown(ctx)
 }
 
+func (vm *VM) NewHTTPHandler(context.Context) (http.Handler, error) {
+	mux := http.NewServeMux()
+
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(proposervmconnect.ProposerVMName),
+	)
+	mux.Handle(reflectionPattern, reflectionHandler)
+
+	service := &service{vm: vm}
+	proposerVMPath, proposerVMHandler := proposervmconnect.NewProposerVMHandler(service)
+	mux.Handle(proposerVMPath, proposerVMHandler)
+
+	return mux, nil
+}
+
 // overrides ChainVM.CreateHandlers to expose the proposervm API path
 func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
 	handlers, err := vm.ChainVM.CreateHandlers(ctx)
@@ -261,7 +278,7 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
 	server.RegisterInterceptFunc(vm.metrics.InterceptRequest)
 	server.RegisterAfterFunc(vm.metrics.AfterRequest)
-	err = server.RegisterService(&ProposerAPI{vm: vm}, "proposervm")
+	err = server.RegisterService(&service{vm: vm}, "proposervm")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register proposervm service: %w", err)
 	}

@@ -5,13 +5,10 @@ package proposervm
 
 import (
 	"context"
-	"net/http"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/api"
 )
 
 func TestGetProposedHeight(t *testing.T) {
@@ -27,12 +24,11 @@ func TestGetProposedHeight(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	service := &ProposerAPI{vm: proVM}
+	service := &service{vm: proVM}
 
-	reply := api.GetHeightResponse{}
-	require.NoError(service.GetProposedHeight(&http.Request{}, nil, &reply))
-
+	proposedHeightResponse, err := service.GetProposedHeight(context.TODO(), nil)
+	require.NoError(err)
 	minHeight, err := service.vm.ctx.ValidatorState.GetMinimumHeight(context.Background())
 	require.NoError(err)
-	require.Equal(minHeight, uint64(reply.Height))
+	require.Equal(minHeight, proposedHeightResponse.Msg.Height)
 }

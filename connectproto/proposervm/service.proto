@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package proposervm;
+
+option go_package = "github.com/ava-labs/avalanchego/connectproto/pb/proposervm";
+
+service ProposerVM {
+  rpc GetProposedHeight(GetProposedHeightRequest) returns (GetProposedHeightReply);
+}
+
+message GetProposedHeightRequest {}
+
+message GetProposedHeightReply {
+  uint64 height = 1;
+}

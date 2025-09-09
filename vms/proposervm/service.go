@@ -4,31 +4,31 @@
 package proposervm
 
 import (
+	"context"
 	"fmt"
-	"net/http"
 
-	"go.uber.org/zap"
+	"connectrpc.com/connect"
 
-	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
 
-	avajson "github.com/ava-labs/avalanchego/utils/json"
+	pb "github.com/ava-labs/avalanchego/connectproto/pb/proposervm"
 )
 
-type ProposerAPI struct {
+var _ proposervmconnect.ProposerVMHandler = (*service)(nil)
+
+type service struct {
 	vm *VM
 }
 
-func (p *ProposerAPI) GetProposedHeight(r *http.Request, _ *struct{}, reply *api.GetHeightResponse) error {
-	p.vm.ctx.Log.Debug("API called",
-		zap.String("service", "proposervm"),
-		zap.String("method", "getProposedHeight"),
-	)
+func (p *service) GetProposedHeight(ctx context.Context, _ *connect.Request[pb.GetProposedHeightRequest]) (*connect.Response[pb.GetProposedHeightReply], error) {
+	p.vm.ctx.Log.Debug("proposervm: GetProposedHeight called")
 
-	height, err := p.vm.ctx.ValidatorState.GetMinimumHeight(r.Context())
+	height, err := p.vm.ctx.ValidatorState.GetMinimumHeight(ctx)
 	if err != nil {
-		return fmt.Errorf("couldn't get minimum height %w", err)
+		return nil, fmt.Errorf("couldn't get minimum height %w", err)
 	}
 
-	reply.Height = avajson.Uint64(height)
-	return nil
+	return connect.NewResponse(&pb.GetProposedHeightReply{
+		Height: height,
+	}), nil
 }
