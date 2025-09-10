@@ -82,8 +82,8 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 	var (
 		keyLimit   = min(req.KeyLimit, maxKeyValuesLimit)
 		bytesLimit = min(int(req.BytesLimit), maxByteSizeLimit)
-		start      = protoutils.MaybeBytesToMaybe(req.StartKey)
-		end        = protoutils.MaybeBytesToMaybe(req.EndKey)
+		start      = protoutils.ProtoToMaybe(req.StartKey)
+		end        = protoutils.ProtoToMaybe(req.EndKey)
 	)
 
 	startRoot, err := ids.ToID(req.StartRootHash)
@@ -267,8 +267,8 @@ func getRangeProof(
 		rangeProof, err := db.GetRangeProofAtRoot(
 			ctx,
 			root,
-			protoutils.MaybeBytesToMaybe(req.StartKey),
-			protoutils.MaybeBytesToMaybe(req.EndKey),
+			protoutils.ProtoToMaybe(req.StartKey),
+			protoutils.ProtoToMaybe(req.EndKey),
 			keyLimit,
 		)
 		if err != nil {

@@ -73,7 +73,7 @@ func (node *ProofNode) toProto() *pb.ProofNode {
 			Length: uint64(node.Key.length),
 			Value:  node.Key.Bytes(),
 		},
-		ValueOrHash: protoutils.MaybeToMaybeBytes(node.ValueOrHash),
+		ValueOrHash: protoutils.MaybeToProto(node.ValueOrHash),
 		Children:    make(map[uint32][]byte, len(node.Children)),
 	}
 
@@ -105,7 +105,7 @@ func (node *ProofNode) unmarshalProto(pbNode *pb.ProofNode) error {
 		}
 		node.Children[byte(childIndex)] = childID
 	}
-	node.ValueOrHash = protoutils.MaybeBytesToMaybe(pbNode.ValueOrHash)
+	node.ValueOrHash = protoutils.ProtoToMaybe(pbNode.ValueOrHash)
 
 	return nil
 }
@@ -429,7 +429,7 @@ func (c *ChangeProof) toProto() *pb.ChangeProof {
 	for i, kv := range c.KeyChanges {
 		keyChanges[i] = &pb.KeyChange{
 			Key:   kv.Key,
-			Value: protoutils.MaybeToMaybeBytes(kv.Value),
+			Value: protoutils.MaybeToProto(kv.Value),
 		}
 	}
 
@@ -459,7 +459,7 @@ func (c *ChangeProof) unmarshalProto(pbProof *pb.ChangeProof) error {
 	for i, kv := range pbProof.KeyChanges {
 		c.KeyChanges[i] = KeyChange{
 			Key:   kv.Key,
-			Value: protoutils.MaybeBytesToMaybe(kv.Value),
+			Value: protoutils.ProtoToMaybe(kv.Value),
 		}
 	}
 

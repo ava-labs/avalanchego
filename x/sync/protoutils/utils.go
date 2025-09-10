@@ -9,7 +9,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
-func MaybeToMaybeBytes(m maybe.Maybe[[]byte]) *pb.MaybeBytes {
+func MaybeToProto(m maybe.Maybe[[]byte]) *pb.MaybeBytes {
 	if m.IsNothing() {
 		return nil
 	}
@@ -18,7 +18,7 @@ func MaybeToMaybeBytes(m maybe.Maybe[[]byte]) *pb.MaybeBytes {
 	}
 }
 
-func MaybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
+func ProtoToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
 	if mb == nil {
 		return maybe.Nothing[[]byte]()
 	}

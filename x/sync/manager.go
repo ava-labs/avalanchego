@@ -350,8 +350,8 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 	request := &pb.GetChangeProofRequest{
 		StartRootHash: work.localRootID[:],
 		EndRootHash:   targetRootID[:],
-		StartKey:      protoutils.MaybeToMaybeBytes(work.start),
-		EndKey:        protoutils.MaybeToMaybeBytes(work.end),
+		StartKey:      protoutils.MaybeToProto(work.start),
+		EndKey:        protoutils.MaybeToProto(work.end),
 		KeyLimit:      defaultRequestKeyLimit,
 		BytesLimit:    defaultRequestByteSizeLimit,
 	}
@@ -402,8 +402,8 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 
 	request := &pb.GetRangeProofRequest{
 		RootHash:   targetRootID[:],
-		StartKey:   protoutils.MaybeToMaybeBytes(work.start),
-		EndKey:     protoutils.MaybeToMaybeBytes(work.end),
+		StartKey:   protoutils.MaybeToProto(work.start),
+		EndKey:     protoutils.MaybeToProto(work.end),
 		KeyLimit:   defaultRequestKeyLimit,
 		BytesLimit: defaultRequestByteSizeLimit,
 	}
@@ -508,8 +508,8 @@ func (m *Manager) handleRangeProofResponse(
 		ctx,
 		&rangeProof,
 		int(request.KeyLimit),
-		protoutils.MaybeBytesToMaybe(request.StartKey),
-		protoutils.MaybeBytesToMaybe(request.EndKey),
+		protoutils.ProtoToMaybe(request.StartKey),
+		protoutils.ProtoToMaybe(request.EndKey),
 		request.RootHash,
 		m.tokenSize,
 		m.config.Hasher,
@@ -550,8 +550,8 @@ func (m *Manager) handleChangeProofResponse(
 		return err
 	}
 
-	startKey := protoutils.MaybeBytesToMaybe(request.StartKey)
-	endKey := protoutils.MaybeBytesToMaybe(request.EndKey)
+	startKey := protoutils.ProtoToMaybe(request.StartKey)
+	endKey := protoutils.ProtoToMaybe(request.EndKey)
 
 	switch changeProofResp := changeProofResp.Response.(type) {
 	case *pb.GetChangeProofResponse_ChangeProof:
