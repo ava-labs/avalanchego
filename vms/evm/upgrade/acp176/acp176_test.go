@@ -9,6 +9,8 @@ import (
 	"testing"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/upgrade/acp176/config"
+	"github.com/ava-labs/avalanchego/vms/evm/upgrade/acp176/constants"
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 )
@@ -32,9 +34,9 @@ var (
 				},
 				TargetExcess: 0,
 			},
-			target:      MinTargetPerSecond,
-			maxCapacity: MinMaxCapacity,
-			gasPrice:    MinGasPrice,
+			target:      constants.MinTargetPerSecond,
+			maxCapacity: config.DefaultACP176Config.MinMaxCapacity(),
+			gasPrice:    config.DefaultACP176Config.MinGasPrice,
 		},
 		{
 			name: "almost_excess_change",
@@ -45,9 +47,9 @@ var (
 				TargetExcess: 33, // Largest excess that doesn't increase the target
 			},
 			skipTestDesiredTargetExcess: true,
-			target:                      MinTargetPerSecond,
-			maxCapacity:                 MinMaxCapacity,
-			gasPrice:                    2 * MinGasPrice,
+			target:                      constants.MinTargetPerSecond,
+			maxCapacity:                 config.DefaultACP176Config.MinMaxCapacity(),
+			gasPrice:                    2 * config.DefaultACP176Config.MinGasPrice,
 		},
 		{
 			name: "small_excess_change",
@@ -57,9 +59,9 @@ var (
 				},
 				TargetExcess: 34, // Smallest excess that increases the target
 			},
-			target:      MinTargetPerSecond + 1,
-			maxCapacity: TargetToMaxCapacity * (MinTargetPerSecond + 1),
-			gasPrice:    2 * MinGasPrice,
+			target:      constants.MinTargetPerSecond + 1,
+			maxCapacity: config.DefaultACP176Config.TargetToMaxCapacity() * (constants.MinTargetPerSecond + 1),
+			gasPrice:    2 * config.DefaultACP176Config.MinGasPrice,
 		},
 		{
 			name: "max_initial_excess_change",
@@ -67,12 +69,12 @@ var (
 				Gas: gas.State{
 					Excess: 95_672_652, // (MinTargetPerSecond + 977) * ln(3) * TargetToPriceUpdateConversion
 				},
-				TargetExcess: MaxTargetExcessDiff,
+				TargetExcess: constants.MaxTargetExcessDiff,
 			},
 			skipTestDesiredTargetExcess: true,
-			target:                      MinTargetPerSecond + 977,
-			maxCapacity:                 TargetToMaxCapacity * (MinTargetPerSecond + 977),
-			gasPrice:                    3 * MinGasPrice,
+			target:                      constants.MinTargetPerSecond + 977,
+			maxCapacity:                 config.DefaultACP176Config.TargetToMaxCapacity() * (constants.MinTargetPerSecond + 977),
+			gasPrice:                    3 * config.DefaultACP176Config.MinGasPrice,
 		},
 		{
 			name: "current_target",
@@ -83,8 +85,8 @@ var (
 				TargetExcess: 13_605_152, // 2^25 * ln(1.5)
 			},
 			target:      1_500_000,
-			maxCapacity: TargetToMaxCapacity * 1_500_000,
-			gasPrice:    nAVAX*MinGasPrice + 2, // +2 due to approximation
+			maxCapacity: config.DefaultACP176Config.TargetToMaxCapacity() * 1_500_000,
+			gasPrice:    nAVAX*config.DefaultACP176Config.MinGasPrice + 2, // +2 due to approximation
 		},
 		{
 			name: "3m_target",
@@ -95,8 +97,8 @@ var (
 				TargetExcess: 36_863_312, // 2^25 * ln(3)
 			},
 			target:      3_000_000,
-			maxCapacity: TargetToMaxCapacity * 3_000_000,
-			gasPrice:    100*nAVAX*MinGasPrice + 4, // +4 due to approximation
+			maxCapacity: config.DefaultACP176Config.TargetToMaxCapacity() * 3_000_000,
+			gasPrice:    100*nAVAX*config.DefaultACP176Config.MinGasPrice + 4, // +4 due to approximation
 		},
 		{
 			name: "6m_target",
@@ -107,8 +109,8 @@ var (
 				TargetExcess: 60_121_472, // 2^25 * ln(6)
 			},
 			target:      6_000_000,
-			maxCapacity: TargetToMaxCapacity * 6_000_000,
-			gasPrice:    100*nAVAX*MinGasPrice + 4, // +4 due to approximation
+			maxCapacity: config.DefaultACP176Config.TargetToMaxCapacity() * 6_000_000,
+			gasPrice:    100*nAVAX*config.DefaultACP176Config.MinGasPrice + 4, // +4 due to approximation
 		},
 		{
 			name: "10m_target",
@@ -119,8 +121,8 @@ var (
 				TargetExcess: 77_261_935, // 2^25 * ln(10)
 			},
 			target:      10_000_000,
-			maxCapacity: TargetToMaxCapacity * 10_000_000,
-			gasPrice:    100*nAVAX*MinGasPrice + 5, // +5 due to approximation
+			maxCapacity: config.DefaultACP176Config.TargetToMaxCapacity() * 10_000_000,
+			gasPrice:    100*nAVAX*config.DefaultACP176Config.MinGasPrice + 5, // +5 due to approximation
 		},
 		{
 			name: "100m_target",
@@ -131,8 +133,8 @@ var (
 				TargetExcess: 154_523_870, // 2^25 * ln(100)
 			},
 			target:      100_000_000,
-			maxCapacity: TargetToMaxCapacity * 100_000_000,
-			gasPrice:    100*nAVAX*MinGasPrice + 5, // +5 due to approximation
+			maxCapacity: config.DefaultACP176Config.TargetToMaxCapacity() * 100_000_000,
+			gasPrice:    100*nAVAX*config.DefaultACP176Config.MinGasPrice + 5, // +5 due to approximation
 		},
 		{
 			name: "low_1b_target",
@@ -143,8 +145,8 @@ var (
 				TargetExcess: 231_785_804, // 2^25 * ln(1000)
 			},
 			target:      1_000_000_000 - 24,
-			maxCapacity: TargetToMaxCapacity * (1_000_000_000 - 24),
-			gasPrice:    100 * nAVAX * MinGasPrice,
+			maxCapacity: config.DefaultACP176Config.TargetToMaxCapacity() * (1_000_000_000 - 24),
+			gasPrice:    100 * nAVAX * config.DefaultACP176Config.MinGasPrice,
 		},
 		{
 			name: "high_1b_target",
@@ -155,8 +157,8 @@ var (
 				TargetExcess: 231_785_805, // 2^25 * ln(1000) + 1
 			},
 			target:      1_000_000_000 + 6,
-			maxCapacity: TargetToMaxCapacity * (1_000_000_000 + 6),
-			gasPrice:    100 * nAVAX * MinGasPrice,
+			maxCapacity: config.DefaultACP176Config.TargetToMaxCapacity() * (1_000_000_000 + 6),
+			gasPrice:    100 * nAVAX * config.DefaultACP176Config.MinGasPrice,
 		},
 		{
 			name: "largest_max_capacity",
@@ -168,7 +170,7 @@ var (
 			},
 			target:      1_844_674_384_269_701_322,
 			maxCapacity: 18_446_743_842_697_013_220,
-			gasPrice:    2 * MinGasPrice,
+			gasPrice:    2 * config.DefaultACP176Config.MinGasPrice,
 		},
 		{
 			name: "largest_int64_target",
@@ -180,7 +182,7 @@ var (
 			},
 			target:      9_223_371_923_824_614_091,
 			maxCapacity: math.MaxUint64,
-			gasPrice:    2 * MinGasPrice,
+			gasPrice:    2 * config.DefaultACP176Config.MinGasPrice,
 		},
 		{
 			name: "second_largest_uint64_target",
@@ -192,7 +194,7 @@ var (
 			},
 			target:      18_446_743_882_783_898_031,
 			maxCapacity: math.MaxUint64,
-			gasPrice:    2 * MinGasPrice,
+			gasPrice:    2 * config.DefaultACP176Config.MinGasPrice,
 		},
 		{
 			name: "largest_uint64_target",
@@ -204,7 +206,7 @@ var (
 			},
 			target:      math.MaxUint64,
 			maxCapacity: math.MaxUint64,
-			gasPrice:    2 * MinGasPrice,
+			gasPrice:    2 * config.DefaultACP176Config.MinGasPrice,
 		},
 		{
 			name: "largest_excess",
@@ -217,7 +219,7 @@ var (
 			skipTestDesiredTargetExcess: true,
 			target:                      math.MaxUint64,
 			maxCapacity:                 math.MaxUint64,
-			gasPrice:                    2 * MinGasPrice,
+			gasPrice:                    2 * config.DefaultACP176Config.MinGasPrice,
 		},
 	}
 	advanceTimeTests = []struct {
@@ -502,12 +504,12 @@ var (
 				},
 				TargetExcess: 0,
 			},
-			desiredTargetExcess: MaxTargetExcessDiff + 1,
+			desiredTargetExcess: constants.MaxTargetExcessDiff + 1,
 			expected: State{
 				Gas: gas.State{
 					Excess: 2_001_954, // 2M * NewTarget / OldTarget
 				},
-				TargetExcess: MaxTargetExcessDiff, // capped
+				TargetExcess: constants.MaxTargetExcessDiff, // capped
 			},
 		},
 		{
@@ -516,7 +518,7 @@ var (
 				Gas: gas.State{
 					Excess: 2_001_954,
 				},
-				TargetExcess: MaxTargetExcessDiff,
+				TargetExcess: constants.MaxTargetExcessDiff,
 			},
 			desiredTargetExcess: 0,
 			expected: State{
@@ -532,14 +534,14 @@ var (
 				Gas: gas.State{
 					Excess: 2_000_000_000,
 				},
-				TargetExcess: 2 * MaxTargetExcessDiff,
+				TargetExcess: 2 * constants.MaxTargetExcessDiff,
 			},
 			desiredTargetExcess: 0,
 			expected: State{
 				Gas: gas.State{
 					Excess: 1_998_047_816, // 2M * NewTarget / OldTarget
 				},
-				TargetExcess: MaxTargetExcessDiff,
+				TargetExcess: constants.MaxTargetExcessDiff,
 			},
 		},
 		{
@@ -548,32 +550,32 @@ var (
 				Gas: gas.State{
 					Excess: 1_998_047_816,
 				},
-				TargetExcess: MaxTargetExcessDiff,
+				TargetExcess: constants.MaxTargetExcessDiff,
 			},
-			desiredTargetExcess: 2 * MaxTargetExcessDiff,
+			desiredTargetExcess: 2 * constants.MaxTargetExcessDiff,
 			expected: State{
 				Gas: gas.State{
 					Excess: 1_999_999_999, // inverse of max_decrease -1 due to rounding error
 				},
-				TargetExcess: 2 * MaxTargetExcessDiff,
+				TargetExcess: 2 * constants.MaxTargetExcessDiff,
 			},
 		},
 		{
 			name: "reduce_capacity",
 			initial: State{
 				Gas: gas.State{
-					Capacity: 10_019_550, // MinMaxCapacity * e^(2*MaxTargetExcessDiff / TargetConversion)
+					Capacity: 10_019_550, // MinMaxCapacity * e^(2*constants.MaxTargetExcessDiff / TargetConversion)
 					Excess:   2_000_000_000,
 				},
-				TargetExcess: 2 * MaxTargetExcessDiff,
+				TargetExcess: 2 * constants.MaxTargetExcessDiff,
 			},
 			desiredTargetExcess: 0,
 			expected: State{
 				Gas: gas.State{
-					Capacity: 10_009_770,    // MinMaxCapacity * e^(MaxTargetExcessDiff / TargetConversion)
+					Capacity: 10_009_770,    // MinMaxCapacity * e^(constants.MaxTargetExcessDiff / TargetConversion)
 					Excess:   1_998_047_816, // 2M * NewTarget / OldTarget
 				},
-				TargetExcess: MaxTargetExcessDiff,
+				TargetExcess: constants.MaxTargetExcessDiff,
 			},
 		},
 		{
@@ -591,7 +593,7 @@ var (
 					Capacity: math.MaxUint64,
 					Excess:   1_998_047_867, // 2M * NewTarget / OldTarget
 				},
-				TargetExcess: maxTargetExcess - MaxTargetExcessDiff,
+				TargetExcess: maxTargetExcess - constants.MaxTargetExcessDiff,
 			},
 		},
 	}
@@ -603,18 +605,18 @@ var (
 	}{
 		{
 			name:        "insufficient_length",
-			bytes:       make([]byte, StateSize-1),
+			bytes:       make([]byte, stateSize-1),
 			expectedErr: ErrStateInsufficientLength,
 		},
 		{
 			name:  "zero_state",
-			bytes: make([]byte, StateSize),
+			bytes: make([]byte, stateSize),
 			state: State{},
 		},
 		{
 			name: "truncate_bytes",
 			bytes: []byte{
-				StateSize: 1,
+				stateSize: 1,
 			},
 			state: State{},
 		},
@@ -657,7 +659,7 @@ func BenchmarkTarget(b *testing.B) {
 func TestMaxCapacity(t *testing.T) {
 	for _, test := range readerTests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.maxCapacity, test.state.MaxCapacity())
+			require.Equal(t, test.maxCapacity, test.state.MaxCapacity(config.DefaultACP176Config))
 		})
 	}
 }
@@ -666,7 +668,7 @@ func BenchmarkMaxCapacity(b *testing.B) {
 	for _, test := range readerTests {
 		b.Run(test.name, func(b *testing.B) {
 			for range b.N {
-				test.state.MaxCapacity()
+				test.state.MaxCapacity(config.DefaultACP176Config)
 			}
 		})
 	}
@@ -675,7 +677,7 @@ func BenchmarkMaxCapacity(b *testing.B) {
 func TestGasPrice(t *testing.T) {
 	for _, test := range readerTests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.gasPrice, test.state.GasPrice())
+			require.Equal(t, test.gasPrice, test.state.GasPrice(config.DefaultACP176Config))
 		})
 	}
 }
@@ -684,7 +686,7 @@ func BenchmarkGasPrice(b *testing.B) {
 	for _, test := range readerTests {
 		b.Run(test.name, func(b *testing.B) {
 			for range b.N {
-				test.state.GasPrice()
+				test.state.GasPrice(config.DefaultACP176Config)
 			}
 		})
 	}
@@ -694,7 +696,7 @@ func TestAdvanceTime(t *testing.T) {
 	for _, test := range advanceTimeTests {
 		t.Run(test.name, func(t *testing.T) {
 			initial := test.initial
-			initial.AdvanceTime(test.seconds)
+			initial.AdvanceTime(test.seconds, config.DefaultACP176Config)
 			require.Equal(t, test.expected, initial)
 		})
 	}
@@ -705,7 +707,7 @@ func BenchmarkAdvanceTime(b *testing.B) {
 		b.Run(test.name, func(b *testing.B) {
 			for range b.N {
 				initial := test.initial
-				initial.AdvanceTime(test.seconds)
+				initial.AdvanceTime(test.seconds, config.DefaultACP176Config)
 			}
 		})
 	}
@@ -737,7 +739,7 @@ func TestUpdateTargetExcess(t *testing.T) {
 	for _, test := range updateTargetExcessTests {
 		t.Run(test.name, func(t *testing.T) {
 			initial := test.initial
-			initial.UpdateTargetExcess(test.desiredTargetExcess)
+			initial.UpdateTargetExcess(test.desiredTargetExcess, config.DefaultACP176Config)
 			require.Equal(t, test.expected, initial)
 		})
 	}
@@ -748,7 +750,7 @@ func BenchmarkUpdateTargetExcess(b *testing.B) {
 		b.Run(test.name, func(b *testing.B) {
 			for range b.N {
 				initial := test.initial
-				initial.UpdateTargetExcess(test.desiredTargetExcess)
+				initial.UpdateTargetExcess(test.desiredTargetExcess, config.DefaultACP176Config)
 			}
 		})
 	}
@@ -806,7 +808,7 @@ func TestBytes(t *testing.T) {
 			continue
 		}
 		t.Run(test.name, func(t *testing.T) {
-			expectedBytes := test.bytes[:StateSize]
+			expectedBytes := test.bytes[:stateSize]
 			bytes := test.state.Bytes()
 			require.Equal(t, expectedBytes, bytes)
 		})
