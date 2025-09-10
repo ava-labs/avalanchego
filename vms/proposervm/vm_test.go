@@ -2610,7 +2610,7 @@ func TestTimestampMetrics(t *testing.T) {
 		t.Run(tt.blockType, func(t *testing.T) {
 			gauge, err := gaugeVec.GetMetricWithLabelValues(tt.blockType)
 			require.NoError(t, err)
-			require.InDelta(t, float64(tt.want.Unix()), testutil.ToFloat64(gauge), 0)
+			require.Equal(t, float64(tt.want.Unix()), testutil.ToFloat64(gauge))
 		})
 	}
 }
