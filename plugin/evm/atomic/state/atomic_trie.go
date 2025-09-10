@@ -244,8 +244,7 @@ func (a *AtomicTrie) InsertTrie(nodes *trienode.NodeSet, root common.Hash) error
 			return err
 		}
 	}
-	err := a.trieDB.Reference(root, common.Hash{})
-	if err != nil {
+	if err := a.trieDB.Reference(root, common.Hash{}); err != nil {
 		return err
 	}
 
