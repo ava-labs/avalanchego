@@ -605,18 +605,18 @@ var (
 	}{
 		{
 			name:        "insufficient_length",
-			bytes:       make([]byte, stateSize-1),
+			bytes:       make([]byte, StateSize-1),
 			expectedErr: ErrStateInsufficientLength,
 		},
 		{
 			name:  "zero_state",
-			bytes: make([]byte, stateSize),
+			bytes: make([]byte, StateSize),
 			state: State{},
 		},
 		{
 			name: "truncate_bytes",
 			bytes: []byte{
-				stateSize: 1,
+				StateSize: 1,
 			},
 			state: State{},
 		},
@@ -808,7 +808,7 @@ func TestBytes(t *testing.T) {
 			continue
 		}
 		t.Run(test.name, func(t *testing.T) {
-			expectedBytes := test.bytes[:stateSize]
+			expectedBytes := test.bytes[:StateSize]
 			bytes := test.state.Bytes()
 			require.Equal(t, expectedBytes, bytes)
 		})

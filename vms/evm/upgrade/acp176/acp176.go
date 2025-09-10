@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	stateSize       = 3 * wrappers.LongLen
+	StateSize       = 3 * wrappers.LongLen
 	maxTargetExcess = 1_024_950_627 // TargetConversion * ln(MaxUint64 / MinTargetPerSecond) + 1
 )
 
@@ -39,10 +39,10 @@ type State struct {
 // [State.Bytes]. This function allows for additional bytes to be padded at the
 // end of the provided bytes.
 func ParseState(bytes []byte) (State, error) {
-	if len(bytes) < stateSize {
+	if len(bytes) < StateSize {
 		return State{}, fmt.Errorf("%w: expected at least %d bytes but got %d bytes",
 			ErrStateInsufficientLength,
-			stateSize,
+			StateSize,
 			len(bytes),
 		)
 	}
@@ -151,7 +151,7 @@ func (s *State) UpdateTargetExcessUnbounded(newTargetExcess gas.Gas, config conf
 
 // Bytes returns the binary representation of the state.
 func (s *State) Bytes() []byte {
-	bytes := make([]byte, stateSize)
+	bytes := make([]byte, StateSize)
 	binary.BigEndian.PutUint64(bytes, uint64(s.Gas.Capacity))
 	binary.BigEndian.PutUint64(bytes[wrappers.LongLen:], uint64(s.Gas.Excess))
 	binary.BigEndian.PutUint64(bytes[2*wrappers.LongLen:], uint64(s.TargetExcess))
