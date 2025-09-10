@@ -2027,7 +2027,8 @@ func TestWaitForEvent(t *testing.T) {
 				Fork: &fork,
 			})
 			testCase.testCase(t, vm)
-			vm.Shutdown(context.Background())
+			err := vm.Shutdown(context.Background())
+			require.NoError(t, err)
 		})
 	}
 }

@@ -57,7 +57,8 @@ func TestCappedMemoryTrieWriter(t *testing.T) {
 		assert.Equal(common.Hash{}, m.LastDereference, "should not have dereferenced block on insert")
 		assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on insert")
 
-		w.AcceptTrie(block)
+		err := w.AcceptTrie(block)
+		assert.NoError(err)
 		if i <= tipBufferSize {
 			assert.Equal(common.Hash{}, m.LastDereference, "should not have dereferenced block on accept")
 		} else {
@@ -71,7 +72,8 @@ func TestCappedMemoryTrieWriter(t *testing.T) {
 			m.LastCommit = common.Hash{}
 		}
 
-		w.RejectTrie(block)
+		err = w.RejectTrie(block)
+		assert.NoError(err)
 		assert.Equal(block.Root(), m.LastDereference, "should have dereferenced block on reject")
 		assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on reject")
 		m.LastDereference = common.Hash{}
@@ -96,12 +98,14 @@ func TestNoPruningTrieWriter(t *testing.T) {
 		assert.Equal(common.Hash{}, m.LastDereference, "should not have dereferenced block on insert")
 		assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on insert")
 
-		w.AcceptTrie(block)
+		err := w.AcceptTrie(block)
+		assert.NoError(err)
 		assert.Equal(common.Hash{}, m.LastDereference, "should not have dereferenced block on accept")
 		assert.Equal(block.Root(), m.LastCommit, "should have committed block on accept")
 		m.LastCommit = common.Hash{}
 
-		w.RejectTrie(block)
+		err = w.RejectTrie(block)
+		assert.NoError(err)
 		assert.Equal(block.Root(), m.LastDereference, "should have dereferenced block on reject")
 		assert.Equal(common.Hash{}, m.LastCommit, "should not have committed block on reject")
 		m.LastDereference = common.Hash{}

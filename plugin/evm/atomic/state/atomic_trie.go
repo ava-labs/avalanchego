@@ -244,7 +244,10 @@ func (a *AtomicTrie) InsertTrie(nodes *trienode.NodeSet, root common.Hash) error
 			return err
 		}
 	}
-	a.trieDB.Reference(root, common.Hash{})
+	err := a.trieDB.Reference(root, common.Hash{})
+	if err != nil {
+		return err
+	}
 
 	// The use of [Cap] in [insertTrie] prevents exceeding the configured memory
 	// limit (and OOM) in case there is a large backlog of processing (unaccepted) blocks.
@@ -285,12 +288,18 @@ func (a *AtomicTrie) AcceptTrie(height uint64, root common.Hash) (bool, error) {
 	// - not committted, in which case the current root we are inserting contains
 	//   references to all the relevant data from the previous root, so the previous
 	//   root can be dereferenced.
-	a.trieDB.Dereference(a.lastAcceptedRoot)
+	err := a.trieDB.Dereference(a.lastAcceptedRoot)
+	if err != nil {
+		return false, err
+	}
 	a.lastAcceptedRoot = root
 	return hasCommitted, nil
 }
 
 func (a *AtomicTrie) RejectTrie(root common.Hash) error {
-	a.trieDB.Dereference(root)
+	err := a.trieDB.Dereference(root)
+	if err != nil {
+		return err
+	}
 	return nil
 }

@@ -547,7 +547,11 @@ func (db *Database) getProposalHash(parentRoot common.Hash, keys, values [][]byt
 	ffiHashTimer.Inc(time.Since(start).Milliseconds())
 
 	// We succesffuly created a proposal, so we must drop it after use.
-	defer p.Drop()
+	defer func() {
+		if err := p.Drop(); err != nil {
+			log.Error("firewood: error dropping proposal after hash computation", "parentRoot", parentRoot.Hex(), "error", err)
+		}
+	}()
 
 	rootBytes, err := p.Root()
 	if err != nil {

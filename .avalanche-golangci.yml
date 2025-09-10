@@ -55,7 +55,7 @@ linters:
     - bodyclose
     - copyloopvar
     # - depguard
-    # - errcheck
+    - errcheck
     - errorlint
     # - forbidigo
     - goconst

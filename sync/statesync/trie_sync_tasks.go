@@ -75,7 +75,10 @@ func (m *mainTrieTask) OnLeafs(db ethdb.KeyValueWriter, keys, vals [][]byte) err
 
 		// check if this account has storage root that we need to fetch
 		if acc.Root != (common.Hash{}) && acc.Root != types.EmptyRootHash {
-			m.sync.trieQueue.RegisterStorageTrie(acc.Root, accountHash)
+			err := m.sync.trieQueue.RegisterStorageTrie(acc.Root, accountHash)
+			if err != nil {
+				return err
+			}
 		}
 
 		// check if this account has code and add it to codeHashes to fetch

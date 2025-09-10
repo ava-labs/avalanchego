@@ -644,7 +644,8 @@ func TestAtomicTrie_AcceptTrie(t *testing.T) {
 				_, storageSize, _ := atomicTrie.trieDB.Size()
 				require.NotZero(t, storageSize, "there should be a dirty node taking up storage space")
 			}
-			atomicTrie.updateLastCommitted(testCase.lastCommittedRoot, testCase.lastCommittedHeight)
+			err = atomicTrie.updateLastCommitted(testCase.lastCommittedRoot, testCase.lastCommittedHeight)
+			require.NoError(t, err)
 
 			hasCommitted, err := atomicTrie.AcceptTrie(testCase.height, testCase.root)
 			require.NoError(t, err)

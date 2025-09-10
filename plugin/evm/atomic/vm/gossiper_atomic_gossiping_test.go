@@ -143,7 +143,8 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	tx, conflictingTx := importTxs[0], importTxs[1]
 	txID := tx.ID()
 
-	vm.AtomicMempool.AddRemoteTx(tx)
+	err := vm.AtomicMempool.AddRemoteTx(tx)
+	assert.NoError(err)
 	vm.AtomicMempool.NextTx()
 	vm.AtomicMempool.DiscardCurrentTx(txID)
 
@@ -177,7 +178,8 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	// Conflicting tx must be submitted over the API to be included in push gossip.
 	// (i.e., txs received via p2p are not included in push gossip)
 	// This test adds it directly to the mempool + gossiper to simulate that.
-	vm.AtomicMempool.AddRemoteTx(conflictingTx)
+	err = vm.AtomicMempool.AddRemoteTx(conflictingTx)
+	assert.NoError(err)
 	vm.AtomicTxPushGossiper.Add(conflictingTx)
 	time.Sleep(500 * time.Millisecond)
 
