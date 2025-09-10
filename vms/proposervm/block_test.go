@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	pblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer/proposermock"
 
@@ -425,8 +424,6 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 }
 
 func TestNextPChainEpoch(t *testing.T) {
-	require := require.New(t)
-
 	var (
 		epochDuration = 5 * time.Minute
 		now           = time.Now()
@@ -436,19 +433,19 @@ func TestNextPChainEpoch(t *testing.T) {
 		name               string
 		parentPChainHeight uint64
 		parentTimestamp    time.Time
-		parentEpoch        pblock.PChainEpoch
-		expected           pblock.PChainEpoch
+		parentEpoch        statelessblock.PChainEpoch
+		expected           statelessblock.PChainEpoch
 	}{
 		{
 			name:               "first granite block",
 			parentPChainHeight: 100,
 			parentTimestamp:    now,
-			parentEpoch: pblock.PChainEpoch{
+			parentEpoch: statelessblock.PChainEpoch{
 				Height:    0,
 				Number:    0,
 				StartTime: time.Time{},
 			},
-			expected: pblock.PChainEpoch{
+			expected: statelessblock.PChainEpoch{
 				Height:    100,
 				Number:    1,
 				StartTime: now,
@@ -458,12 +455,12 @@ func TestNextPChainEpoch(t *testing.T) {
 			name:               "sealed epoch",
 			parentPChainHeight: 100,
 			parentTimestamp:    now.Add(epochDuration + 1),
-			parentEpoch: pblock.PChainEpoch{
+			parentEpoch: statelessblock.PChainEpoch{
 				Height:    2,
 				Number:    2,
 				StartTime: now,
 			},
-			expected: pblock.PChainEpoch{
+			expected: statelessblock.PChainEpoch{
 				Height:    100,
 				Number:    3,
 				StartTime: now.Add(epochDuration + 1),
@@ -473,12 +470,12 @@ func TestNextPChainEpoch(t *testing.T) {
 			name:               "no epoch change",
 			parentPChainHeight: 100,
 			parentTimestamp:    now.Add(epochDuration),
-			parentEpoch: pblock.PChainEpoch{
+			parentEpoch: statelessblock.PChainEpoch{
 				Height:    2,
 				Number:    2,
 				StartTime: now,
 			},
-			expected: pblock.PChainEpoch{
+			expected: statelessblock.PChainEpoch{
 				Height:    2,
 				Number:    2,
 				StartTime: now,
@@ -487,8 +484,9 @@ func TestNextPChainEpoch(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
 			epoch := nextPChainEpoch(test.parentPChainHeight, test.parentEpoch, test.parentTimestamp, epochDuration)
-			require.Equal(epoch, test.expected, "unexpected next epoch")
+			require.Equal(test.expected, epoch, "unexpected next epoch")
 		})
 	}
 }
