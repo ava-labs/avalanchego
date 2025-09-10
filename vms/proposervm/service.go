@@ -33,6 +33,7 @@ func (p *ProposerAPI) GetProposedHeight(r *http.Request, _ *struct{}, reply *api
 	return nil
 }
 
+// Returns the epoch information that will be used for the next block to be proposed.
 func (p *ProposerAPI) GetCurrentEpoch(r *http.Request, _ *struct{}, reply *api.GetEpochResponse) error {
 	p.vm.ctx.Log.Debug("API called",
 		zap.String("service", "proposervm"),
@@ -55,21 +56,22 @@ func (p *ProposerAPI) GetCurrentEpoch(r *http.Request, _ *struct{}, reply *api.G
 		return fmt.Errorf("couldn't get latest block epoch %s: %w", lastAccepted.String(), err)
 	}
 
-	if latestBlock.Timestamp().Before(epoch.StartTime.Add(p.vm.Upgrades.GraniteEpochDuration)) {
-		// Latest block did not seal the epoch.
-		reply.Number = avajson.Uint64(epoch.Number)
-		reply.StartTime = avajson.Uint64(epoch.StartTime.Unix())
-		reply.PChainHeight = avajson.Uint64(epoch.Height)
-	} else {
-		// Latest block sealed the epoch.
-		pChainHeight, err := latestBlock.pChainHeight(r.Context())
-		if err != nil {
-			return fmt.Errorf("couldn't get latest block p-chain height %s: %w", lastAccepted.String(), err)
-		}
-		reply.Number = avajson.Uint64(epoch.Number + 1)
-		reply.StartTime = avajson.Uint64(latestBlock.Timestamp().Unix())
-		reply.PChainHeight = avajson.Uint64(pChainHeight)
+	pChainHeight, err := latestBlock.pChainHeight(r.Context())
+	if err != nil {
+		return fmt.Errorf("couldn't get latest block p-chain height %s: %w", lastAccepted.String(), err)
 	}
+
+	nextEpoch := nextPChainEpoch(
+		pChainHeight,
+		epoch,
+		latestBlock.Timestamp(),
+		p.vm.Upgrades.GraniteEpochDuration,
+	)
+
+	// Latest block sealed the epoch.
+	reply.Number = avajson.Uint64(nextEpoch.Number)
+	reply.StartTime = avajson.Uint64(nextEpoch.StartTime.Unix())
+	reply.PChainHeight = avajson.Uint64(nextEpoch.Height)
 
 	return nil
 }

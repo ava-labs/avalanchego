@@ -48,37 +48,31 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 		// Issue a transaction to the C-Chain to advance past genesis block
 		issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
 
-		tc.Eventually(func() bool {
-			bn, err := ethClient.BlockNumber(tc.DefaultContext())
-			require.NoError(err)
-			return bn != 0
-		},
-			e2e.DefaultTimeout,
-			e2e.DefaultPollingInterval,
-			"failed to see a non-zero block before timeout",
+		proposerClient := proposervm.NewClient(nodeURI.URI, "C")
+
+		initialEpoch, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
+		require.NoError(err)
+		tc.Log().Info("initial epoch", zap.Any("epoch", initialEpoch))
+
+		time.Sleep(upgrades.GraniteEpochDuration)
+		issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
+
+		advancedEpoch, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
+		require.NoError(err)
+
+		tc.Log().Info("advanced epoch", zap.Any("epoch", advancedEpoch))
+
+		require.Greater(
+			advancedEpoch.Number,
+			initialEpoch.Number,
+			"expected epoch number to advance, but it did not",
 		)
-
-		tc.By("issuing C-Chain transactions to advance the epoch", func() {
-			proposerClient := proposervm.NewClient(nodeURI.URI, "C")
-
-			initialEpoch, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
-			require.NoError(err)
-			tc.Log().Info("initial epoch", zap.Any("epoch", initialEpoch))
-
-			time.Sleep(upgrades.GraniteEpochDuration)
-			issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
-
-			advancedEpoch, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
-			require.NoError(err)
-
-			tc.Log().Info("advanced epoch", zap.Any("epoch", advancedEpoch))
-
-			require.Equal(
-				advancedEpoch.Number,
-				initialEpoch.Number+1,
-				"expected epoch number to advance, but it did not",
-			)
-		})
+		require.GreaterOrEqual(
+			advancedEpoch.StartTime,
+			initialEpoch.StartTime.Add(upgrades.GraniteEpochDuration),
+			"expected epoch start time to advance, but it did not",
+		)
+		// P-chain height may not increase if no new blocks were created on the P-chain
 	})
 })
 

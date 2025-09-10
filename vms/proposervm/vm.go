@@ -669,25 +669,6 @@ func (vm *VM) parsePreForkBlock(ctx context.Context, b []byte) (*preForkBlock, e
 	}, err
 }
 
-func (vm *VM) GetStatelessSignedBlock(blkID ids.ID) (statelessblock.SignedBlock, error) {
-	block, exists := vm.verifiedBlocks[blkID]
-	if exists {
-		if signedBlock, ok := block.getStatelessBlk().(statelessblock.SignedBlock); ok {
-			return signedBlock, nil
-		}
-	}
-
-	statelessBlock, err := vm.State.GetBlock(blkID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get stateless block %s: %w", blkID, err)
-	}
-	if signedBlock, ok := statelessBlock.(statelessblock.SignedBlock); ok {
-		return signedBlock, nil
-	} else {
-		return nil, fmt.Errorf("block %s is not a stateless signed block", blkID)
-	}
-}
-
 func (vm *VM) getBlock(ctx context.Context, id ids.ID) (Block, error) {
 	if blk, err := vm.getPostForkBlock(ctx, id); err == nil {
 		return blk, nil

@@ -346,22 +346,17 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			})
 		})
 
-		timeToAdvancePChainContext := (5 * platformvmvalidators.RecentlyAcceptedWindowTTL) / 4
 		upgrades, err := infoClient.Upgrades(tc.DefaultContext())
 		require.NoError(err)
-		epochDuration := upgrades.GraniteEpochDuration
-		if timeToAdvancePChainContext < epochDuration {
-			timeToAdvancePChainContext = epochDuration
+
+		timeToAdvancePChainContext := (5 * platformvmvalidators.RecentlyAcceptedWindowTTL) / 4
+		if timeToAdvancePChainContext < upgrades.GraniteEpochDuration {
+			timeToAdvancePChainContext = upgrades.GraniteEpochDuration
 		}
 
 		tc.By("advancing the P-Chain epoch", func() {
-			getCurrentEpochHeight := func() uint64 {
-				epoch, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
-				require.NoError(err)
-				return epoch.Height
-			}
-
-			epochBefore := getCurrentEpochHeight()
+			epochBefore, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
+			require.NoError(err)
 
 			tc.By("advancing the proposervm P-chain epoched height", func() {
 				time.Sleep(timeToAdvancePChainContext)
@@ -404,8 +399,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 				})
 			})
 
-			epochAfter := getCurrentEpochHeight()
-			require.Greater(epochAfter, epochBefore)
+			epochAfter, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
+			require.NoError(err)
+			require.Greater(epochAfter.Height, epochBefore.Height)
 		})
 
 		tc.By("creating the validator to register")
