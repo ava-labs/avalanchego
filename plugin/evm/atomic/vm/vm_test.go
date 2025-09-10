@@ -1049,9 +1049,7 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, blk.Verify(context.Background()))
-
 	require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
-
 	require.NoError(t, blk.Accept(context.Background()))
 
 	newHead := <-newTxPoolHeadChan
@@ -2078,8 +2076,7 @@ func TestWaitForEvent(t *testing.T) {
 				},
 			}}}}))
 			testCase.testCase(t, vm, address, key)
-			err = vm.Shutdown(context.Background())
-			require.NoError(t, err)
+			require.NoError(t, vm.Shutdown(context.Background()))
 		})
 	}
 }
