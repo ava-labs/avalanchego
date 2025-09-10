@@ -44,7 +44,8 @@ const (
 var (
 	_ validators.State = (*manager)(nil)
 
-	errUnfinalizedHeight = errors.New("failed to fetch validator set at unfinalized height")
+	errUnfinalizedHeight    = errors.New("failed to fetch validator set at unfinalized height")
+	errFailedToGetSubnetIDs = errors.New("failed to get subnet IDs")
 )
 
 // Manager adds the ability to introduce newly accepted blocks IDs to the State
@@ -205,13 +206,13 @@ func (m *manager) GetAllValidatorSets(
 	result := make(map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput)
 	subnets, err := m.state.GetSubnetIDs()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get subnet IDs: %w", err)
+		return nil, errFailedToGetSubnetIDs
 	}
 
 	for _, subnetID := range subnets {
 		validatorSet, err := m.GetValidatorSet(ctx, targetHeight, subnetID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get validator set for subnet %s: %w", subnetID, err)
+			return nil, err
 		}
 		result[subnetID] = validatorSet
 	}

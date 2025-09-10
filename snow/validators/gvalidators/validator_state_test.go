@@ -298,3 +298,150 @@ func TestGetAllValidatorSets(t *testing.T) {
 	_, err = state.client.GetAllValidatorSets(context.Background(), height)
 	require.Error(err) //nolint:forbidigo // currently returns grpc error
 }
+
+func TestGetAllValidatorSetsCached(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+
+	state := setupState(t, ctrl)
+
+	sk0, err := localsigner.New()
+	require.NoError(err)
+	vdr0 := &validators.GetValidatorOutput{
+		NodeID:    ids.GenerateTestNodeID(),
+		PublicKey: sk0.PublicKey(),
+		Weight:    1,
+	}
+
+	sk1, err := localsigner.New()
+	require.NoError(err)
+	vdr1 := &validators.GetValidatorOutput{
+		NodeID:    ids.GenerateTestNodeID(),
+		PublicKey: sk1.PublicKey(),
+		Weight:    2,
+	}
+
+	vdr2 := &validators.GetValidatorOutput{
+		NodeID:    ids.GenerateTestNodeID(),
+		PublicKey: nil,
+		Weight:    3,
+	}
+
+	cachedState := validators.NewCachedState(state.server)
+
+	subnetID1 := ids.GenerateTestID()
+	subnetID2 := ids.GenerateTestID()
+	subnetID3 := ids.GenerateTestID()
+
+	type test struct {
+		name             string
+		height           uint64
+		subnetID         ids.ID
+		returnedVdrSets  map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput
+		returnedErr      error
+		expectedCacheHit bool
+		expectedVdrSet   map[ids.NodeID]*validators.GetValidatorOutput
+		expectedErr      error
+	}
+	tests := []test{
+		{
+			name:     "subnet1",
+			height:   uint64(1337),
+			subnetID: subnetID1,
+			returnedVdrSets: map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput{
+				subnetID1: {
+					vdr0.NodeID: vdr0,
+					vdr1.NodeID: vdr1,
+				},
+				subnetID2: {
+					vdr2.NodeID: vdr2,
+				},
+			},
+			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
+				vdr0.NodeID: vdr0,
+				vdr1.NodeID: vdr1,
+			},
+			expectedCacheHit: false,
+			expectedErr:      nil,
+		},
+		{
+			name:     "subnet1 - cached",
+			height:   uint64(1337),
+			subnetID: subnetID1,
+			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
+				vdr0.NodeID: vdr0,
+				vdr1.NodeID: vdr1,
+			},
+			expectedCacheHit: true,
+			expectedErr:      nil,
+		},
+		{
+			name:     "subnet2 - cached",
+			height:   uint64(1337),
+			subnetID: subnetID2,
+			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
+				vdr2.NodeID: vdr2,
+			},
+			expectedCacheHit: true,
+			expectedErr:      nil,
+		},
+		{
+			name:             "missing subnet - cached",
+			height:           uint64(1337),
+			subnetID:         subnetID3,
+			returnedVdrSets:  nil,
+			returnedErr:      nil,
+			expectedVdrSet:   nil,
+			expectedCacheHit: true,
+			expectedErr:      validators.ErrValidatorSetForSubnetNotFound,
+		},
+		{
+			name:     "missing subnet - not cached",
+			height:   uint64(1400),
+			subnetID: subnetID3,
+			returnedVdrSets: map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput{
+				subnetID1: {
+					vdr0.NodeID: vdr0,
+					vdr1.NodeID: vdr1,
+				},
+			},
+			returnedErr:      nil,
+			expectedVdrSet:   nil,
+			expectedCacheHit: false,
+			expectedErr:      validators.ErrValidatorSetForSubnetNotFound,
+		},
+		{
+			name:            "cache hit caused by previous failure",
+			height:          uint64(1400),
+			subnetID:        subnetID1,
+			returnedVdrSets: nil,
+			returnedErr:     nil,
+			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
+				vdr0.NodeID: vdr0,
+				vdr1.NodeID: vdr1,
+			},
+			expectedCacheHit: true,
+			expectedErr:      nil,
+		},
+		{
+			name:             "failed state lookup",
+			height:           uint64(1500),
+			subnetID:         subnetID1,
+			returnedVdrSets:  nil,
+			returnedErr:      errCustom,
+			expectedVdrSet:   nil,
+			expectedCacheHit: false,
+			expectedErr:      errCustom,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if !test.expectedCacheHit {
+				state.server.EXPECT().GetAllValidatorSets(gomock.Any(), test.height).Return(test.returnedVdrSets, test.returnedErr).Times(1)
+			}
+			vdrSet, err := cachedState.GetValidatorSet(context.Background(), test.height, test.subnetID)
+			require.ErrorIs(err, test.expectedErr)
+			require.Equal(test.expectedVdrSet, vdrSet)
+		})
+	}
+}
