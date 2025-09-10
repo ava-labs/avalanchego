@@ -1,5 +1,5 @@
---- .github/.golangci.yaml	2025-08-22 10:01:30
-+++ ffi/.golangci.yaml	2025-08-22 10:01:26
+--- .github/.golangci.yaml	2025-09-10 10:51:41
++++ ffi/.golangci.yaml	2025-08-22 11:42:25
 @@ -69,8 +69,6 @@
        rules:
          packages:
@@ -57,33 +57,6 @@
      tagalign:
        align: true
        sort: true
-@@ -189,16 +157,16 @@
-         - serialize
-       strict: true
-     testifylint:
--    # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
--    # Default: false
--    enable-all: true
--    # Disable checkers by name
--    # (in addition to default
--    #   suite-thelper
--    # ).
--    disable:
--      - go-require
--      - float-compare
-+      # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
-+      # Default: false
-+      enable-all: true
-+      # Disable checkers by name
-+      # (in addition to default
-+      #   suite-thelper
-+      # ).
-+      disable:
-+        - go-require
-+        - float-compare
-     unused:
-       # Mark all struct fields that have been written to as used.
-       # Default: true
 @@ -227,7 +195,7 @@
          - standard
          - default
