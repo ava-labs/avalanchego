@@ -58,6 +58,12 @@ type GetHeightResponse struct {
 	Height avajson.Uint64 `json:"height"`
 }
 
+type GetEpochResponse struct {
+	Number       avajson.Uint64 `json:"number"`
+	StartTime    avajson.Uint64 `json:"startTime"`
+	PChainHeight avajson.Uint64 `json:"pChainHeight"`
+}
+
 // FormattedBlock defines a JSON formatted struct containing a block in Hex
 // format
 type FormattedBlock struct {
