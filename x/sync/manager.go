@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/x/merkledb"
+	"github.com/ava-labs/avalanchego/x/sync/protoutils"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -349,8 +350,8 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 	request := &pb.GetChangeProofRequest{
 		StartRootHash: work.localRootID[:],
 		EndRootHash:   targetRootID[:],
-		StartKey:      maybeToMaybeBytes(work.start),
-		EndKey:        maybeToMaybeBytes(work.end),
+		StartKey:      protoutils.MaybeToMaybeBytes(work.start),
+		EndKey:        protoutils.MaybeToMaybeBytes(work.end),
 		KeyLimit:      defaultRequestKeyLimit,
 		BytesLimit:    defaultRequestByteSizeLimit,
 	}
@@ -401,8 +402,8 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 
 	request := &pb.GetRangeProofRequest{
 		RootHash:   targetRootID[:],
-		StartKey:   maybeToMaybeBytes(work.start),
-		EndKey:     maybeToMaybeBytes(work.end),
+		StartKey:   protoutils.MaybeToMaybeBytes(work.start),
+		EndKey:     protoutils.MaybeToMaybeBytes(work.end),
 		KeyLimit:   defaultRequestKeyLimit,
 		BytesLimit: defaultRequestByteSizeLimit,
 	}
@@ -507,8 +508,8 @@ func (m *Manager) handleRangeProofResponse(
 		ctx,
 		&rangeProof,
 		int(request.KeyLimit),
-		maybeBytesToMaybe(request.StartKey),
-		maybeBytesToMaybe(request.EndKey),
+		protoutils.MaybeBytesToMaybe(request.StartKey),
+		protoutils.MaybeBytesToMaybe(request.EndKey),
 		request.RootHash,
 		m.tokenSize,
 		m.config.Hasher,
@@ -549,8 +550,8 @@ func (m *Manager) handleChangeProofResponse(
 		return err
 	}
 
-	startKey := maybeBytesToMaybe(request.StartKey)
-	endKey := maybeBytesToMaybe(request.EndKey)
+	startKey := protoutils.MaybeBytesToMaybe(request.StartKey)
+	endKey := protoutils.MaybeBytesToMaybe(request.EndKey)
 
 	switch changeProofResp := changeProofResp.Response.(type) {
 	case *pb.GetChangeProofResponse_ChangeProof:

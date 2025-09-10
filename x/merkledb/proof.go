@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/x/sync/protoutils"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -67,19 +68,12 @@ type ProofNode struct {
 // toProto converts the ProofNode into the protobuf version of a proof node
 // Assumes [node.Key.Key.length] <= math.MaxUint64.
 func (node *ProofNode) toProto() *pb.ProofNode {
-	var valueOrHash *pb.MaybeBytes
-	if node.ValueOrHash.HasValue() {
-		valueOrHash = &pb.MaybeBytes{
-			Value: node.ValueOrHash.Value(),
-		}
-	}
-
 	pbNode := &pb.ProofNode{
 		Key: &pb.Key{
 			Length: uint64(node.Key.length),
 			Value:  node.Key.Bytes(),
 		},
-		ValueOrHash: valueOrHash,
+		ValueOrHash: protoutils.MaybeToMaybeBytes(node.ValueOrHash),
 		Children:    make(map[uint32][]byte, len(node.Children)),
 	}
 
@@ -111,10 +105,7 @@ func (node *ProofNode) unmarshalProto(pbNode *pb.ProofNode) error {
 		}
 		node.Children[byte(childIndex)] = childID
 	}
-
-	if pbNode.ValueOrHash != nil {
-		node.ValueOrHash = maybe.Some(pbNode.ValueOrHash.Value)
-	}
+	node.ValueOrHash = protoutils.MaybeBytesToMaybe(pbNode.ValueOrHash)
 
 	return nil
 }
@@ -436,16 +427,9 @@ func (c *ChangeProof) toProto() *pb.ChangeProof {
 
 	keyChanges := make([]*pb.KeyChange, len(c.KeyChanges))
 	for i, kv := range c.KeyChanges {
-		var value *pb.MaybeBytes
-		if kv.Value.HasValue() {
-			value = &pb.MaybeBytes{
-				Value: kv.Value.Value(),
-			}
-		}
-
 		keyChanges[i] = &pb.KeyChange{
 			Key:   kv.Key,
-			Value: value,
+			Value: protoutils.MaybeToMaybeBytes(kv.Value),
 		}
 	}
 
@@ -473,13 +457,9 @@ func (c *ChangeProof) unmarshalProto(pbProof *pb.ChangeProof) error {
 
 	c.KeyChanges = make([]KeyChange, len(pbProof.KeyChanges))
 	for i, kv := range pbProof.KeyChanges {
-		value := maybe.Nothing[[]byte]()
-		if kv.Value != nil {
-			value = maybe.Some(kv.Value.Value)
-		}
 		c.KeyChanges[i] = KeyChange{
 			Key:   kv.Key,
-			Value: value,
+			Value: protoutils.MaybeBytesToMaybe(kv.Value),
 		}
 	}
 

@@ -17,9 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
+	"github.com/ava-labs/avalanchego/x/sync/protoutils"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -49,22 +49,6 @@ var (
 	_ p2p.Handler = (*GetChangeProofHandler)(nil)
 	_ p2p.Handler = (*GetRangeProofHandler)(nil)
 )
-
-func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
-	if mb == nil {
-		return maybe.Nothing[[]byte]()
-	}
-	return maybe.Some(mb.Value)
-}
-
-func maybeToMaybeBytes(m maybe.Maybe[[]byte]) *pb.MaybeBytes {
-	if m.IsNothing() {
-		return nil
-	}
-	return &pb.MaybeBytes{
-		Value: m.Value(),
-	}
-}
 
 func NewGetChangeProofHandler(db DB) *GetChangeProofHandler {
 	return &GetChangeProofHandler{
@@ -98,8 +82,8 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 	var (
 		keyLimit   = min(req.KeyLimit, maxKeyValuesLimit)
 		bytesLimit = min(int(req.BytesLimit), maxByteSizeLimit)
-		start      = maybeBytesToMaybe(req.StartKey)
-		end        = maybeBytesToMaybe(req.EndKey)
+		start      = protoutils.MaybeBytesToMaybe(req.StartKey)
+		end        = protoutils.MaybeBytesToMaybe(req.EndKey)
 	)
 
 	startRoot, err := ids.ToID(req.StartRootHash)
@@ -283,8 +267,8 @@ func getRangeProof(
 		rangeProof, err := db.GetRangeProofAtRoot(
 			ctx,
 			root,
-			maybeBytesToMaybe(req.StartKey),
-			maybeBytesToMaybe(req.EndKey),
+			protoutils.MaybeBytesToMaybe(req.StartKey),
+			protoutils.MaybeBytesToMaybe(req.EndKey),
 			keyLimit,
 		)
 		if err != nil {

@@ -57,10 +57,8 @@ message Key {
   bytes value = 2;
 }
 
-// If the message is empty, the value is considered to be "nothing".
-message MaybeBytes {
-  bytes value = 1;
-}
+// If the message is present, the value is considered to be "something".
+message MaybeBytes { bytes value = 1; }
 
 message KeyValue {
   bytes key = 1;
