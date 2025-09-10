@@ -1039,30 +1039,20 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 	importTxs := createImportTxOptions(t, vm, tvm.AtomicMemory)
 
 	// Issue the first import transaction, build, and accept the block.
-	if err := vm.AtomicMempool.AddLocalTx(importTxs[0]); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, vm.AtomicMempool.AddLocalTx(importTxs[0]))
 
 	msg, err := vm.WaitForEvent(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, commonEng.PendingTxs, msg)
 
 	blk, err := vm.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if err := blk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, blk.Verify(context.Background()))
 
-	if err := vm.SetPreference(context.Background(), blk.ID()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
 
-	if err := blk.Accept(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, blk.Accept(context.Background()))
 
 	newHead := <-newTxPoolHeadChan
 	if newHead.Head.Hash() != common.Hash(blk.ID()) {
@@ -1071,14 +1061,8 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 
 	// Add the two conflicting transactions directly to the mempool, so that two consecutive transactions
 	// will fail verification when build block is called.
-	err = vm.AtomicMempool.AddRemoteTx(importTxs[1])
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = vm.AtomicMempool.AddRemoteTx(importTxs[2])
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, vm.AtomicMempool.ForceAddTx(importTxs[1]))
+	require.NoError(t, vm.AtomicMempool.ForceAddTx(importTxs[2]))
 
 	if _, err := vm.BuildBlock(context.Background()); err == nil {
 		t.Fatal("Expected build block to fail due to empty block")
