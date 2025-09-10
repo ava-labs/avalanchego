@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/x/merkledb"
+	"github.com/ava-labs/avalanchego/x/sync/protoutils"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -349,16 +350,10 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 	request := &pb.GetChangeProofRequest{
 		StartRootHash: work.localRootID[:],
 		EndRootHash:   targetRootID[:],
-		StartKey: &pb.MaybeBytes{
-			Value:     work.start.Value(),
-			IsNothing: work.start.IsNothing(),
-		},
-		EndKey: &pb.MaybeBytes{
-			Value:     work.end.Value(),
-			IsNothing: work.end.IsNothing(),
-		},
-		KeyLimit:   defaultRequestKeyLimit,
-		BytesLimit: defaultRequestByteSizeLimit,
+		StartKey:      protoutils.MaybeToProto(work.start),
+		EndKey:        protoutils.MaybeToProto(work.end),
+		KeyLimit:      defaultRequestKeyLimit,
+		BytesLimit:    defaultRequestByteSizeLimit,
 	}
 
 	requestBytes, err := proto.Marshal(request)
@@ -406,15 +401,9 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 	}
 
 	request := &pb.GetRangeProofRequest{
-		RootHash: targetRootID[:],
-		StartKey: &pb.MaybeBytes{
-			Value:     work.start.Value(),
-			IsNothing: work.start.IsNothing(),
-		},
-		EndKey: &pb.MaybeBytes{
-			Value:     work.end.Value(),
-			IsNothing: work.end.IsNothing(),
-		},
+		RootHash:   targetRootID[:],
+		StartKey:   protoutils.MaybeToProto(work.start),
+		EndKey:     protoutils.MaybeToProto(work.end),
 		KeyLimit:   defaultRequestKeyLimit,
 		BytesLimit: defaultRequestByteSizeLimit,
 	}
@@ -519,8 +508,8 @@ func (m *Manager) handleRangeProofResponse(
 		ctx,
 		&rangeProof,
 		int(request.KeyLimit),
-		maybeBytesToMaybe(request.StartKey),
-		maybeBytesToMaybe(request.EndKey),
+		protoutils.ProtoToMaybe(request.StartKey),
+		protoutils.ProtoToMaybe(request.EndKey),
 		request.RootHash,
 		m.tokenSize,
 		m.config.Hasher,
@@ -561,8 +550,8 @@ func (m *Manager) handleChangeProofResponse(
 		return err
 	}
 
-	startKey := maybeBytesToMaybe(request.StartKey)
-	endKey := maybeBytesToMaybe(request.EndKey)
+	startKey := protoutils.ProtoToMaybe(request.StartKey)
+	endKey := protoutils.ProtoToMaybe(request.EndKey)
 
 	switch changeProofResp := changeProofResp.Response.(type) {
 	case *pb.GetChangeProofResponse_ChangeProof:

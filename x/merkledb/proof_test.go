@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -1480,25 +1479,6 @@ func TestVerifyProofPath(t *testing.T) {
 	}
 }
 
-func TestProofNodeUnmarshalProtoInvalidMaybe(t *testing.T) {
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
-
-	node := newRandomProofNode(rand)
-	protoNode := node.toProto()
-
-	// It's invalid to have a value and be nothing.
-	protoNode.ValueOrHash = &pb.MaybeBytes{
-		Value:     []byte{1, 2, 3},
-		IsNothing: true,
-	}
-
-	var unmarshaledNode ProofNode
-	err := unmarshaledNode.unmarshalProto(protoNode)
-	require.ErrorIs(t, err, errInvalidMaybe)
-}
-
 func TestProofNodeUnmarshalProtoInvalidChildBytes(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
@@ -1550,16 +1530,6 @@ func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
 				return nil
 			},
 			expectedErr: errNilProofNode,
-		},
-		{
-			name: "nil ValueOrHash",
-			nodeFunc: func() *pb.ProofNode {
-				node := newRandomProofNode(rand)
-				protoNode := node.toProto()
-				protoNode.ValueOrHash = nil
-				return protoNode
-			},
-			expectedErr: errNilValueOrHash,
 		},
 		{
 			name: "nil key",
@@ -1684,43 +1654,6 @@ func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
 	})
 }
 
-func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
-
-	// Make a random change proof.
-	startProofLen := rand.Intn(32)
-	startProof := make([]ProofNode, startProofLen)
-	for i := 0; i < startProofLen; i++ {
-		startProof[i] = newRandomProofNode(rand)
-	}
-
-	endProofLen := rand.Intn(32)
-	endProof := make([]ProofNode, endProofLen)
-	for i := 0; i < endProofLen; i++ {
-		endProof[i] = newRandomProofNode(rand)
-	}
-
-	// Generate at least 1 key change, include deletions
-	keyChanges := generateKeyChanges(rand, rand.Intn(128)+1, true)
-
-	proof := ChangeProof{
-		StartProof: startProof,
-		EndProof:   endProof,
-		KeyChanges: keyChanges,
-	}
-	protoProof := proof.toProto()
-	// Make a value nil
-	protoProof.KeyChanges[0].Value = nil
-	proofBytes, err := proto.Marshal(protoProof)
-	require.NoError(t, err)
-
-	var unmarshaledProof ChangeProof
-	err = unmarshaledProof.UnmarshalBinary(proofBytes)
-	require.ErrorIs(t, err, errNilMaybeBytes)
-}
-
 func generateKeyChanges(rand *rand.Rand, numKeyChanges int, includeNone bool) []KeyChange {
 	keyChanges := make([]KeyChange, numKeyChanges)
 	for i := 0; i < numKeyChanges; i++ {
@@ -1751,26 +1684,6 @@ func generateKeyChanges(rand *rand.Rand, numKeyChanges int, includeNone bool) []
 		}
 	}
 	return keyChanges
-}
-
-func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
-	protoProof := &pb.ChangeProof{
-		KeyChanges: []*pb.KeyChange{
-			{
-				Key: []byte{1},
-				Value: &pb.MaybeBytes{
-					Value:     []byte{1},
-					IsNothing: true,
-				},
-			},
-		},
-	}
-	proofBytes, err := proto.Marshal(protoProof)
-	require.NoError(t, err)
-
-	var proof ChangeProof
-	err = proof.UnmarshalBinary(proofBytes)
-	require.ErrorIs(t, err, errInvalidMaybe)
 }
 
 func FuzzRangeProofInvariants(f *testing.F) {
