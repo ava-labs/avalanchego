@@ -35,6 +35,8 @@ on:
         description: 'Timeout in minutes for the job.'
         required: false
         default: 30
+  schedule:
+    - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 
 jobs:
   define-matrix:

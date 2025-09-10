@@ -2,50 +2,9 @@ syntax = "proto3";
 
 package sync;
 
-import "google/protobuf/empty.proto";
-
 option go_package = "github.com/ava-labs/avalanchego/proto/pb/sync";
 
-// The interface required by an x/sync/SyncManager for syncing.
-// Note this service definition only exists for use in tests.
-// A database shouldn't expose this over the internet, as it
-// allows for reading/writing to the database.
-service DB {
-  rpc GetMerkleRoot(google.protobuf.Empty) returns (GetMerkleRootResponse);
-
-  rpc Clear(google.protobuf.Empty) returns (google.protobuf.Empty);
-
-  rpc GetProof(GetProofRequest) returns (GetProofResponse);
-
-  rpc GetChangeProof(GetChangeProofRequest) returns (GetChangeProofResponse);
-  rpc VerifyChangeProof(VerifyChangeProofRequest) returns (VerifyChangeProofResponse);
-  rpc CommitChangeProof(CommitChangeProofRequest) returns (google.protobuf.Empty);
-
-  rpc GetRangeProof(GetRangeProofRequest) returns (GetRangeProofResponse);
-  rpc CommitRangeProof(CommitRangeProofRequest) returns (google.protobuf.Empty);
-}
-
-message GetMerkleRootResponse {
-  bytes root_hash = 1;
-}
-
-message GetProofRequest {
-  bytes key = 1;
-}
-
-message GetProofResponse {
-  Proof proof = 1;
-}
-
-message Proof {
-  bytes key = 1;
-  MaybeBytes value = 2;
-  repeated ProofNode proof = 3;
-}
-
-// For use in sync client, which has a restriction on the size of
-// the response. GetChangeProof in the DB service doesn't.
-message SyncGetChangeProofRequest {
+message GetChangeProofRequest {
   bytes start_root_hash = 1;
   bytes end_root_hash = 2;
   MaybeBytes start_key = 3;
@@ -54,70 +13,20 @@ message SyncGetChangeProofRequest {
   uint32 bytes_limit = 6;
 }
 
-message SyncGetChangeProofResponse {
+message GetChangeProofResponse {
   oneof response {
     bytes change_proof = 1;
     bytes range_proof = 2;
   }
 }
 
-message GetChangeProofRequest {
-  bytes start_root_hash = 1;
-  bytes end_root_hash = 2;
-  MaybeBytes start_key = 3;
-  MaybeBytes end_key = 4;
-  uint32 key_limit = 5;
-}
-
-message GetChangeProofResponse {
-  oneof response {
-    ChangeProof change_proof = 1;
-    // True iff server errored with merkledb.ErrInsufficientHistory.
-    bool root_not_present = 2;
-  }
-}
-
-message VerifyChangeProofRequest {
-  ChangeProof proof = 1;
-  MaybeBytes start_key = 2;
-  MaybeBytes end_key = 3;
-  bytes expected_root_hash = 4;
-}
-
-message VerifyChangeProofResponse {
-  // If empty, there was no error.
-  string error = 1;
-}
-
-message CommitChangeProofRequest {
-  ChangeProof proof = 1;
-}
-
-// For use in sync client, which has a restriction on the size of
-// the response. GetRangeProof in the DB service doesn't.
-message SyncGetRangeProofRequest {
-  bytes root_hash = 1;
-  MaybeBytes start_key = 2;
-  MaybeBytes end_key = 3;
-  uint32 key_limit = 4;
-  uint32 bytes_limit = 5;
-}
-
+// Range proof responses don't require any extra data, so no message is needed.
 message GetRangeProofRequest {
   bytes root_hash = 1;
   MaybeBytes start_key = 2;
   MaybeBytes end_key = 3;
   uint32 key_limit = 4;
-}
-
-message GetRangeProofResponse {
-  RangeProof proof = 1;
-}
-
-message CommitRangeProofRequest {
-  MaybeBytes start_key = 1;
-  MaybeBytes end_key = 2;
-  RangeProof range_proof = 3;
+  uint32 bytes_limit = 5;
 }
 
 message ChangeProof {
@@ -150,8 +59,6 @@ message Key {
 
 message MaybeBytes {
   bytes value = 1;
-  // If false, this is None.
-  // Otherwise this is Some.
   bool is_nothing = 2;
 }
 
