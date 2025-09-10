@@ -548,7 +548,7 @@ func (x *Key) GetValue() []byte {
 	return nil
 }
 
-// If the message is empty, the value is considered to be "nothing".
+// If the message is present, the value is considered to be "something".
 type MaybeBytes struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Value         []byte                 `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`

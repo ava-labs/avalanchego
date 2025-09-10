@@ -58,7 +58,9 @@ message Key {
 }
 
 // If the message is present, the value is considered to be "something".
-message MaybeBytes { bytes value = 1; }
+message MaybeBytes {
+  bytes value = 1;
+}
 
 message KeyValue {
   bytes key = 1;
