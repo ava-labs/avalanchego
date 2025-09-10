@@ -42,7 +42,6 @@ func (s State) AdvanceTime(
 }
 
 // ConsumeGas removes gas from capacity and adds gas to excess.
-// The units chosen for time must be consistent with the units chosen for gasRate.
 //
 // If the capacity is insufficient, an error is returned.
 // If the excess would overflow, it is capped at MaxUint64.
