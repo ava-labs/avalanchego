@@ -54,6 +54,8 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 		require.NoError(err)
 		tc.Log().Info("initial epoch", zap.Any("epoch", initialEpoch))
 
+		issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
+
 		time.Sleep(upgrades.GraniteEpochDuration)
 		issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
 
