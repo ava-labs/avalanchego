@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	pblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer/proposermock"
 
@@ -421,4 +422,73 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 	)
 	require.NoError(err)
 	require.Equal(innerChildBlock, gotChild.(*postForkBlock).innerBlk)
+}
+
+func TestNextPChainEpoch(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		epochDuration = 5 * time.Minute
+		now           = time.Now()
+	)
+
+	tests := []struct {
+		name               string
+		parentPChainHeight uint64
+		parentTimestamp    time.Time
+		parentEpoch        pblock.PChainEpoch
+		expected           pblock.PChainEpoch
+	}{
+		{
+			name:               "first granite block",
+			parentPChainHeight: 100,
+			parentTimestamp:    now,
+			parentEpoch: pblock.PChainEpoch{
+				Height:    0,
+				Number:    0,
+				StartTime: time.Time{},
+			},
+			expected: pblock.PChainEpoch{
+				Height:    100,
+				Number:    1,
+				StartTime: now,
+			},
+		},
+		{
+			name:               "sealed epoch",
+			parentPChainHeight: 100,
+			parentTimestamp:    now.Add(epochDuration + 1),
+			parentEpoch: pblock.PChainEpoch{
+				Height:    2,
+				Number:    2,
+				StartTime: now,
+			},
+			expected: pblock.PChainEpoch{
+				Height:    100,
+				Number:    3,
+				StartTime: now.Add(epochDuration + 1),
+			},
+		},
+		{
+			name:               "no epoch change",
+			parentPChainHeight: 100,
+			parentTimestamp:    now.Add(epochDuration),
+			parentEpoch: pblock.PChainEpoch{
+				Height:    2,
+				Number:    2,
+				StartTime: now,
+			},
+			expected: pblock.PChainEpoch{
+				Height:    2,
+				Number:    2,
+				StartTime: now,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			epoch := nextPChainEpoch(test.parentPChainHeight, test.parentEpoch, test.parentTimestamp, epochDuration)
+			require.Equal(epoch, test.expected, "unexpected next epoch")
+		})
+	}
 }
