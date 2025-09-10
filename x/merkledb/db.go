@@ -31,7 +31,6 @@ const (
 	// TODO: name better
 	rebuildViewSizeFractionOfCacheSize   = 50
 	minRebuildViewSizePerCommit          = 1000
-	clearBatchSize                       = units.MiB
 	rebuildIntermediateDeletionWriteSize = units.MiB
 	valueNodePrefixLen                   = 1
 	cacheEntryOverHead                   = 8
@@ -107,6 +106,12 @@ type ChangeProofer interface {
 	) error
 
 	// CommitChangeProof commits the key/value pairs within the [proof] to the db.
+	// [end] is the largest possible key in the range this [proof] covers.
+	// [end] may be Nothing, meaning that there is no upper bound on the
+	// range.
+	// The key returned indicates the next key after the largest key in
+	// the proof. If the database has all keys from the start of the proof
+	// until [end], then Nothing is returned.
 	CommitChangeProof(ctx context.Context, end maybe.Maybe[[]byte], proof *ChangeProof) (maybe.Maybe[[]byte], error)
 }
 
@@ -149,6 +154,11 @@ type RangeProofer interface {
 	// CommitRangeProof commits the key/value pairs within the [proof] to the db.
 	// [start] is the smallest possible key in the range this [proof] covers.
 	// [end] is the largest possible key in the range this [proof] covers.
+	// [end] may be Nothing, meaning that there is no upper bound on the
+	// range.
+	// The key returned indicates the next key after the largest key in
+	// the proof. If the database has all keys from the start of the proof
+	// until [end], then Nothing is returned.
 	CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) (maybe.Maybe[[]byte], error)
 }
 
