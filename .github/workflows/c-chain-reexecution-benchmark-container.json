@@ -1,0 +1,27 @@
+{
+    "pull_request": {
+        "include": [
+            {
+                "runner": "ubuntu-latest",
+                "config": "default",
+                "start-block": 101,
+                "end-block": 250000,
+                "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
+                "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**",
+                "timeout-minutes": 30
+            },
+            {
+                "runner": "avalanche-avalanchego-runner-2ti",
+                "config": "default",
+                "start-block": 101,
+                "end-block": 250000,
+                "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
+                "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**",
+                "timeout-minutes": 30
+            }
+        ]
+    },
+    "schedule": {
+        "include": []
+    }
+}

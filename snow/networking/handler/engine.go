@@ -37,18 +37,18 @@ func (e *Engine) Get(state snow.State) (common.Engine, bool) {
 // EngineManager resolves the engine that should be used given the current
 // execution context of the chain.
 type EngineManager struct {
-	Avalanche *Engine
-	Snowman   *Engine
+	DAG   *Engine
+	Chain *Engine
 }
 
 // Get returns the engine corresponding to the provided type if possible.
 // If an engine type is not specified, the initial engine type is returned.
 func (e *EngineManager) Get(engineType p2p.EngineType) *Engine {
 	switch engineType {
-	case p2p.EngineType_ENGINE_TYPE_AVALANCHE:
-		return e.Avalanche
-	case p2p.EngineType_ENGINE_TYPE_SNOWMAN:
-		return e.Snowman
+	case p2p.EngineType_ENGINE_TYPE_DAG:
+		return e.DAG
+	case p2p.EngineType_ENGINE_TYPE_CHAIN:
+		return e.Chain
 	default:
 		return nil
 	}

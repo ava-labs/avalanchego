@@ -5,6 +5,7 @@ package network
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -48,7 +49,20 @@ func New(
 	registerer prometheus.Registerer,
 	config Config,
 ) (*Network, error) {
-	p2pNetwork, err := p2p.NewNetwork(log, appSender, registerer, "p2p")
+	validators := p2p.NewValidators(
+		log,
+		subnetID,
+		vdrs,
+		config.MaxValidatorSetStaleness,
+	)
+
+	p2pNetwork, err := p2p.NewNetwork(
+		log,
+		appSender,
+		registerer,
+		"p2p",
+		validators,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -56,17 +70,7 @@ func New(
 	marshaller := &txParser{
 		parser: parser,
 	}
-	validators := p2p.NewValidators(
-		p2pNetwork.Peers,
-		log,
-		subnetID,
-		vdrs,
-		config.MaxValidatorSetStaleness,
-	)
-	txGossipClient := p2pNetwork.NewClient(
-		p2p.TxGossipHandlerID,
-		p2p.WithValidatorSampling(validators),
-	)
+	txGossipClient := p2pNetwork.NewClient(p2p.TxGossipHandlerID, validators)
 	txGossipMetrics, err := gossip.NewMetrics(registerer, "tx")
 	if err != nil {
 		return nil, err
@@ -132,15 +136,21 @@ func New(
 		config.TargetGossipSize,
 	)
 
+	throttlerHandler, err := p2p.NewDynamicThrottlerHandler(
+		log,
+		handler,
+		validators,
+		config.PullGossipThrottlingPeriod,
+		config.PullGossipRequestsPerValidator,
+		registerer,
+		"tx_gossip",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize throttler handler: %w", err)
+	}
+
 	validatorHandler := p2p.NewValidatorHandler(
-		p2p.NewThrottlerHandler(
-			handler,
-			p2p.NewSlidingWindowThrottler(
-				config.PullGossipThrottlingPeriod,
-				config.PullGossipThrottlingLimit,
-			),
-			log,
-		),
+		throttlerHandler,
 		validators,
 		log,
 	)

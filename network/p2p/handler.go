@@ -5,8 +5,13 @@ package p2p
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"math"
+	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -27,6 +32,9 @@ var (
 	_ Handler = (*NoOpHandler)(nil)
 	_ Handler = (*TestHandler)(nil)
 	_ Handler = (*ValidatorHandler)(nil)
+
+	errPeriodMustBePositive             = errors.New("period must be positive")
+	errRequestsPerPeerMustBeNonNegative = errors.New("requests-per-peer must be non-negative")
 )
 
 // Handler is the server-side logic for virtual machine application protocols.
@@ -55,6 +63,117 @@ func (NoOpHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
 
 func (NoOpHandler) AppRequest(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
 	return nil, nil
+}
+
+type DynamicThrottlerHandler struct {
+	handler         *ThrottlerHandler
+	validatorSet    ValidatorSet
+	requestsPerPeer float64
+
+	throttler                  *SlidingWindowThrottler
+	throttleLimitMetric        prometheus.Gauge
+	lock                       sync.Mutex
+	prevNumConnectedValidators int
+}
+
+func (d *DynamicThrottlerHandler) AppGossip(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	gossipBytes []byte,
+) {
+	d.checkUpdateThrottlingLimit(ctx)
+
+	d.handler.AppGossip(ctx, nodeID, gossipBytes)
+}
+
+func (d *DynamicThrottlerHandler) AppRequest(
+	ctx context.Context,
+	nodeID ids.NodeID,
+	deadline time.Time,
+	requestBytes []byte,
+) ([]byte, *common.AppError) {
+	d.checkUpdateThrottlingLimit(ctx)
+
+	return d.handler.AppRequest(ctx, nodeID, deadline, requestBytes)
+}
+
+func (d *DynamicThrottlerHandler) checkUpdateThrottlingLimit(ctx context.Context) {
+	d.lock.Lock()
+	defer d.lock.Unlock()
+
+	numValidators := d.validatorSet.Len(ctx)
+
+	if numValidators == d.prevNumConnectedValidators {
+		return
+	}
+
+	d.prevNumConnectedValidators = numValidators
+
+	if numValidators == 0 {
+		d.setLimit(0)
+		return
+	}
+
+	n := float64(numValidators)
+
+	// guaranteed to not overflow an int
+	expectedSamples := d.requestsPerPeer / n
+	variance := d.requestsPerPeer * (n - 1) / (n * n)
+	stdDeviation := math.Sqrt(variance)
+
+	// Throttle anything beyond 4 standard deviations which should throttle
+	// anything beyond the 99.994 percentile of expected requests.
+	limit := expectedSamples + 4*stdDeviation
+	d.setLimit(limit)
+}
+
+func (d *DynamicThrottlerHandler) setLimit(limit float64) {
+	d.throttler.setLimit(limit)
+	d.throttleLimitMetric.Set(limit)
+}
+
+// NewDynamicThrottlerHandler wraps a handler with defaults.
+// Period is the throttling evaluation period during which this node is
+// expecting each peer to make requestsPerPeer requests to the network. The
+// throttling limit is dynamically updated to be inversely proportional to the
+// number of connected network validators.
+func NewDynamicThrottlerHandler(
+	log logging.Logger,
+	handler Handler,
+	validatorSet ValidatorSet,
+	period time.Duration,
+	requestsPerPeer float64,
+	metrics prometheus.Registerer,
+	namespace string,
+) (*DynamicThrottlerHandler, error) {
+	if period <= 0 {
+		return nil, errPeriodMustBePositive
+	}
+
+	if math.IsNaN(requestsPerPeer) || requestsPerPeer < 0 {
+		return nil, errRequestsPerPeerMustBeNonNegative
+	}
+
+	// Throttling limit will be initialized when a request is handled
+	throttler := NewSlidingWindowThrottler(period, 0)
+
+	throttleLimitMetric := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespace,
+		Name:      "throttle_limit",
+		Help:      "maximum number of requests per peer for a single throttling period",
+	})
+
+	if err := metrics.Register(throttleLimitMetric); err != nil {
+		return nil, fmt.Errorf("failed to register throttle limit metric: %w", err)
+	}
+
+	return &DynamicThrottlerHandler{
+		handler:             NewThrottlerHandler(handler, throttler, log),
+		validatorSet:        validatorSet,
+		requestsPerPeer:     requestsPerPeer,
+		throttler:           throttler,
+		throttleLimitMetric: throttleLimitMetric,
+	}, nil
 }
 
 func NewValidatorHandler(

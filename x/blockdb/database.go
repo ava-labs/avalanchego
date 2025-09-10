@@ -65,11 +65,10 @@ var (
 // blockEntryHeader is the header of a block entry in the data file.
 // This is not the header portion of the block data itself.
 type blockEntryHeader struct {
-	Height     BlockHeight
-	Size       uint32
-	Checksum   uint64
-	Version    uint16
-	Compressed bool
+	Height   BlockHeight
+	Size     uint32
+	Checksum uint64
+	Version  uint16
 }
 
 // MarshalBinary implements the encoding.BinaryMarshaler interface.
@@ -79,11 +78,6 @@ func (beh blockEntryHeader) MarshalBinary() ([]byte, error) {
 	binary.LittleEndian.PutUint32(buf[8:], beh.Size)
 	binary.LittleEndian.PutUint64(buf[12:], beh.Checksum)
 	binary.LittleEndian.PutUint16(buf[20:], beh.Version)
-	if beh.Compressed {
-		buf[22] = 1
-	} else {
-		buf[22] = 0
-	}
 	return buf, nil
 }
 
@@ -96,7 +90,6 @@ func (beh *blockEntryHeader) UnmarshalBinary(data []byte) error {
 	beh.Size = binary.LittleEndian.Uint32(data[8:])
 	beh.Checksum = binary.LittleEndian.Uint64(data[12:])
 	beh.Version = binary.LittleEndian.Uint16(data[20:])
-	beh.Compressed = data[22] != 0
 	return nil
 }
 
@@ -359,20 +352,15 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData) error {
 		return fmt.Errorf("failed to get index entry offset for block at height %d: %w", height, err)
 	}
 
-	// Optionally compress block data if enabled in config
-	blockToWrite := block
-	if s.config.CompressBlocks {
-		compressed, err := s.compressor.Compress(block)
-		if err != nil {
-			s.log.Error("Failed to write block: error compressing block data",
-				zap.Uint64("height", height),
-				zap.Error(err),
-			)
-			return fmt.Errorf("failed to compress block data: %w", err)
-		}
-		blockToWrite = compressed
-		blockDataLen = uint32(len(compressed))
+	blockToWrite, err := s.compressor.Compress(block)
+	if err != nil {
+		s.log.Error("Failed to write block: error compressing block data",
+			zap.Uint64("height", height),
+			zap.Error(err),
+		)
+		return fmt.Errorf("failed to compress block data: %w", err)
 	}
+	blockDataLen = uint32(len(blockToWrite))
 
 	sizeWithDataHeader, err := safemath.Add(sizeOfBlockEntryHeader, blockDataLen)
 	if err != nil {
@@ -394,11 +382,10 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData) error {
 	}
 
 	bh := blockEntryHeader{
-		Height:     height,
-		Size:       blockDataLen,
-		Checksum:   calculateChecksum(blockToWrite),
-		Version:    BlockEntryVersion,
-		Compressed: s.config.CompressBlocks,
+		Height:   height,
+		Size:     blockDataLen,
+		Checksum: calculateChecksum(block),
+		Version:  BlockEntryVersion,
 	}
 	if err := s.writeBlockAt(writeDataOffset, bh, blockToWrite); err != nil {
 		s.log.Error("Failed to write block: error writing block data",
@@ -529,15 +516,19 @@ func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
 	if err := bh.UnmarshalBinary(buf[:int(sizeOfBlockEntryHeader)]); err != nil {
 		return nil, fmt.Errorf("failed to deserialize block header: %w", err)
 	}
-	blockData := buf[int(sizeOfBlockEntryHeader):]
-	if bh.Compressed {
-		decompressed, err := s.compressor.Decompress(blockData)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decompress block data: %w", err)
-		}
-		return decompressed, nil
+	compressedData := buf[int(sizeOfBlockEntryHeader):]
+	decompressed, err := s.compressor.Decompress(compressedData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decompress block data: %w", err)
 	}
-	return blockData, nil
+
+	// Verify checksum on uncompressed data
+	calculatedChecksum := calculateChecksum(decompressed)
+	if calculatedChecksum != bh.Checksum {
+		return nil, fmt.Errorf("checksum mismatch: calculated %d, stored %d", calculatedChecksum, bh.Checksum)
+	}
+
+	return decompressed, nil
 }
 
 // HasBlock checks if a block exists at the given height.
@@ -851,7 +842,12 @@ func (s *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEntr
 	if _, err := dataFile.ReadAt(blockData, int64(blockDataOffset)); err != nil {
 		return bh, fmt.Errorf("%w: failed to read block data at offset %d: %w", ErrCorrupted, offset, err)
 	}
-	calculatedChecksum := calculateChecksum(blockData)
+	// Decompress block data and verify checksum
+	decompressed, err := s.compressor.Decompress(blockData)
+	if err != nil {
+		return bh, fmt.Errorf("%w: failed to decompress block at offset %d: %w", ErrCorrupted, offset, err)
+	}
+	calculatedChecksum := calculateChecksum(decompressed)
 	if calculatedChecksum != bh.Checksum {
 		return bh, fmt.Errorf("%w: checksum mismatch for block at offset %d", ErrCorrupted, offset)
 	}
