@@ -1,4 +1,4 @@
-package constants
+package acp176
 
 const (
 	MinTargetPerSecond  = 1_000_000                                 // P

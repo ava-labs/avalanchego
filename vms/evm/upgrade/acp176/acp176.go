@@ -15,8 +15,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/upgrade/acp176/config"
-	"github.com/ava-labs/avalanchego/vms/evm/upgrade/acp176/constants"
 	"github.com/holiman/uint256"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -61,14 +59,14 @@ func ParseState(bytes []byte) (State, error) {
 // Target = MinTargetPerSecond * e^(TargetExcess / TargetConversion)
 func (s *State) Target() gas.Gas {
 	return gas.Gas(gas.CalculatePrice(
-		constants.MinTargetPerSecond,
+		MinTargetPerSecond,
 		s.TargetExcess,
-		constants.TargetConversion,
+		TargetConversion,
 	))
 }
 
 // MaxCapacity returns the maximum possible accrued gas capacity, `C`.
-func (s *State) MaxCapacity(config config.ACP176Config) gas.Gas {
+func (s *State) MaxCapacity(config Config) gas.Gas {
 	targetPerSecond := s.Target()
 	return mulWithUpperBound(targetPerSecond, config.TargetToMaxCapacity())
 }
@@ -76,7 +74,7 @@ func (s *State) MaxCapacity(config config.ACP176Config) gas.Gas {
 // GasPrice returns the current required fee per gas.
 //
 // GasPrice = MinGasPrice * e^(Excess / (Target() * TargetToPriceUpdateConversion))
-func (s *State) GasPrice(config config.ACP176Config) gas.Price {
+func (s *State) GasPrice(config Config) gas.Price {
 	targetPerSecond := s.Target()
 	priceUpdateConversion := mulWithUpperBound(targetPerSecond, config.TargetToPriceUpdateConversion()) // K
 	return gas.CalculatePrice(gas.Price(config.MinGasPrice), s.Gas.Excess, priceUpdateConversion)
@@ -84,9 +82,9 @@ func (s *State) GasPrice(config config.ACP176Config) gas.Price {
 
 // AdvanceTime increases the gas capacity and decreases the gas excess based on
 // the elapsed seconds.
-func (s *State) AdvanceTime(seconds uint64, config config.ACP176Config) {
+func (s *State) AdvanceTime(seconds uint64, config Config) {
 	targetPerSecond := s.Target()
-	maxPerSecond := mulWithUpperBound(targetPerSecond, constants.TargetToMax) // R
+	maxPerSecond := mulWithUpperBound(targetPerSecond, TargetToMax)           // R
 	maxCapacity := mulWithUpperBound(maxPerSecond, config.TimeToFillCapacity) // C
 	s.Gas = s.Gas.AdvanceTime(
 		maxCapacity,
@@ -129,12 +127,12 @@ func (s *State) ConsumeGas(
 
 // UpdateTargetExcess updates the targetExcess to be as close as possible to the
 // desiredTargetExcess without exceeding the maximum targetExcess change.
-func (s *State) UpdateTargetExcess(desiredTargetExcess gas.Gas, config config.ACP176Config) {
+func (s *State) UpdateTargetExcess(desiredTargetExcess gas.Gas, config Config) {
 	s.UpdateTargetExcessUnbounded(targetExcess(s.TargetExcess, desiredTargetExcess), config)
 }
 
 // UpdateTargetExcessUnbounded updates the targetExcess to be the newTargetExcess.
-func (s *State) UpdateTargetExcessUnbounded(newTargetExcess gas.Gas, config config.ACP176Config) {
+func (s *State) UpdateTargetExcessUnbounded(newTargetExcess gas.Gas, config Config) {
 	previousTargetPerSecond := s.Target()
 	s.TargetExcess = newTargetExcess
 	newTargetPerSecond := s.Target()
@@ -176,7 +174,7 @@ func DesiredTargetExcess(desiredTarget gas.Gas) gas.Gas {
 // include given the current and desired excess values.
 func targetExcess(excess, desired gas.Gas) gas.Gas {
 	change := safemath.AbsDiff(excess, desired)
-	change = min(change, constants.MaxTargetExcessDiff)
+	change = min(change, MaxTargetExcessDiff)
 	if excess < desired {
 		return excess + change
 	}
