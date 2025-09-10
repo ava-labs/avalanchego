@@ -68,8 +68,8 @@ func TestAdvanceTimeTo_UpdatesFeeState(t *testing.T) {
 				Excess:   10_000,
 			},
 			expectedState: gas.State{
-				Capacity: min(gas.Gas(1).AddDuration(feeConfig.MaxPerSecond, secondsToAdvance), feeConfig.MaxCapacity),
-				Excess:   gas.Gas(10_000).SubDuration(feeConfig.TargetPerSecond, secondsToAdvance),
+				Capacity: min(gas.Gas(1).AddOverTime(feeConfig.MaxPerSecond, secondsToAdvance), feeConfig.MaxCapacity),
+				Excess:   gas.Gas(10_000).SubOverTime(feeConfig.TargetPerSecond, secondsToAdvance),
 			},
 		},
 	}

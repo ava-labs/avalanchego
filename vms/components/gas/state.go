@@ -20,7 +20,9 @@ type State struct {
 
 // AdvanceTime adds capacityRate to capacity and subtracts targetRate
 // from excess over the provided duration.
-// The units chosen for time must be consistent with the units chosen for capacityRate and targetRate.
+//
+// The units chosen for time must be consistent with the units chosen for
+// capacityRate and targetRate.
 //
 // Capacity is capped at maxCapacity.
 // Excess to be removed is capped at excess.
@@ -32,10 +34,10 @@ func (s State) AdvanceTime(
 ) State {
 	return State{
 		Capacity: min(
-			s.Capacity.AddDuration(capacityRate, duration),
+			s.Capacity.AddOverTime(capacityRate, duration),
 			maxCapacity,
 		),
-		Excess: s.Excess.SubDuration(targetRate, duration),
+		Excess: s.Excess.SubOverTime(targetRate, duration),
 	}
 }
 

@@ -33,9 +33,9 @@ type State struct {
 func (s State) AdvanceTime(target gas.Gas, seconds uint64) State {
 	excess := s.Excess
 	if s.Current < target {
-		excess = excess.SubDuration(target-s.Current, seconds)
+		excess = excess.SubOverTime(target-s.Current, seconds)
 	} else if s.Current > target {
-		excess = excess.AddDuration(s.Current-target, seconds)
+		excess = excess.AddOverTime(s.Current-target, seconds)
 	}
 	return State{
 		Current: s.Current,

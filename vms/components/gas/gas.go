@@ -25,11 +25,10 @@ func (g Gas) Cost(price Price) (uint64, error) {
 	return safemath.Mul(uint64(g), uint64(price))
 }
 
-// AddDuration returns g + gasRate * duration.
-// The units chosen for time must be consistent with the units chosen for gasRate.
+// AddOverTime returns g + gasRate * duration.
 //
 // If overflow would occur, MaxUint64 is returned.
-func (g Gas) AddDuration(gasRate Gas, duration uint64) Gas {
+func (g Gas) AddOverTime(gasRate Gas, duration uint64) Gas {
 	newGas, err := safemath.Mul(uint64(gasRate), duration)
 	if err != nil {
 		return math.MaxUint64
@@ -41,11 +40,10 @@ func (g Gas) AddDuration(gasRate Gas, duration uint64) Gas {
 	return Gas(totalGas)
 }
 
-// SubDuration returns g - gasRate * duration.
-// The units chosen for time must be consistent with the units chosen for gasRate.
+// SubOverTime returns g - gasRate * duration.
 //
 // If underflow would occur, 0 is returned.
-func (g Gas) SubDuration(gasRate Gas, duration uint64) Gas {
+func (g Gas) SubOverTime(gasRate Gas, duration uint64) Gas {
 	gasToRemove, err := safemath.Mul(uint64(gasRate), duration)
 	if err != nil {
 		return 0

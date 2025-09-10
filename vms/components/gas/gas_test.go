@@ -92,7 +92,7 @@ func Test_Gas_Cost(t *testing.T) {
 	require.Equal(expected, actual)
 }
 
-func Test_Gas_AddPerSecond(t *testing.T) {
+func Test_Gas_AddOverTime(t *testing.T) {
 	tests := []struct {
 		initial      Gas
 		gasPerSecond Gas
@@ -126,13 +126,13 @@ func Test_Gas_AddPerSecond(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%d+%d*%d=%d", test.initial, test.gasPerSecond, test.seconds, test.expected), func(t *testing.T) {
-			actual := test.initial.AddDuration(test.gasPerSecond, test.seconds)
+			actual := test.initial.AddOverTime(test.gasPerSecond, test.seconds)
 			require.Equal(t, test.expected, actual)
 		})
 	}
 }
 
-func Test_Gas_SubPerSecond(t *testing.T) {
+func Test_Gas_SubOverTime(t *testing.T) {
 	tests := []struct {
 		initial      Gas
 		gasPerSecond Gas
@@ -166,7 +166,7 @@ func Test_Gas_SubPerSecond(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%d-%d*%d=%d", test.initial, test.gasPerSecond, test.seconds, test.expected), func(t *testing.T) {
-			actual := test.initial.SubDuration(test.gasPerSecond, test.seconds)
+			actual := test.initial.SubOverTime(test.gasPerSecond, test.seconds)
 			require.Equal(t, test.expected, actual)
 		})
 	}
