@@ -72,6 +72,11 @@ var (
 	defaultConfigKey  = "default"
 	predefinedConfigs = map[string]string{
 		defaultConfigKey: `{}`,
+		"full-large-caches": `{
+			"trie-clean-cache": 2048,
+			"trie-dirty-cache": 2048,
+			"snapshot-cache": 1024
+		}`,
 		"archive": `{
 			"pruning-enabled": false
 		}`,
