@@ -62,6 +62,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/tracedvm"
+	"github.com/ava-labs/simplex/wal"
 
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -847,6 +848,10 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("error while fetching weight for subnet %s: %w", ctx.SubnetID, err)
 	}
 
+	// sanity check as this should be set by default
+	if sb.Config().ConsensusConfig.SnowballParams == nil {
+		return nil, fmt.Errorf("snowball parameters not specified for subnet %s", ctx.SubnetID)
+	}
 	consensusParams := *sb.Config().ConsensusConfig.SnowballParams
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
@@ -1240,6 +1245,10 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("error while fetching weight for subnet %s: %w", ctx.SubnetID, err)
 	}
 
+	// sanity check as this should be set by default
+	if sb.Config().ConsensusConfig.SnowballParams == nil {
+		return nil, fmt.Errorf("snowball parameters not specified for subnet %s", ctx.SubnetID)
+	}
 	consensusParams := *sb.Config().ConsensusConfig.SnowballParams
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
@@ -1584,7 +1593,7 @@ func (m *manager) getOrMakeVMGatherer(vmID ids.ID) (metrics.MultiGatherer, error
 }
 
 // createSimplexHandler creates a handler that passes messages from the network to the consensus engine
-func (m *manager) createSimplexHandler(ctx *snow.ConsensusContext, vm block.ChainVM, sb subnets.Subnet, primaryAlias string, connectedValidators tracker.Peers, peerTracker *p2p.PeerTracker, halter common.Halter) (handler.Handler, error) {
+func (m *manager) createSimplexHandler(ctx *snow.ConsensusContext, sb subnets.Subnet, primaryAlias string, connectedValidators tracker.Peers, peerTracker *p2p.PeerTracker, halter common.Halter) (handler.Handler, error) {
 	handlerReg, err := metrics.MakeAndRegister(
 		m.handlerGatherer,
 		primaryAlias,
@@ -1597,7 +1606,7 @@ func (m *manager) createSimplexHandler(ctx *snow.ConsensusContext, vm block.Chai
 	return handler.New(
 		ctx,
 		nil, // we don't need a change notifier for simplex, since the engine listens for events and we don't want the handler to intercept them
-		vm.WaitForEvent,
+		nil,
 		m.Validators,
 		m.FrontierPollFrequency,
 		m.ConsensusAppConcurrency,
@@ -1717,7 +1726,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		return nil, fmt.Errorf("error creating peer tracking: %w", err)
 	}
 
-	h, err := m.createSimplexHandler(ctx, vm, sb, primaryAlias, connectedValidators, peerTracker, halter)
+	h, err := m.createSimplexHandler(ctx, sb, primaryAlias, connectedValidators, peerTracker, halter)
 	if err != nil {
 		return nil, fmt.Errorf("error creating handler: %w", err)
 	}
@@ -1742,6 +1751,12 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		return nil, fmt.Errorf("couldn't initialize simplex VM: %w", err)
 	}
 
+	walLocation := getChainWALLocation(ctx.ChainDataDir, ctx.ChainID)
+	wal, err := wal.New(walLocation)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create simplex wal: %w", err)
+	}
+
 	config := &simplex.Config{
 		Ctx:                simplexCtxConfig(ctx),
 		Log:                ctx.Log,
@@ -1749,7 +1764,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		OutboundMsgBuilder: m.MsgCreator,
 		Validators:         m.Validators.GetMap(ctx.SubnetID),
 		VM:                 vm,
-		WALLocation:        getChainWALLocation(ctx.ChainDataDir, ctx.ChainID),
+		WAL:                 wal,
 		SignBLS:            m.ManagerConfig.StakingBLSKey.Sign,
 		DB:                 simplexDB,
 	}
@@ -1760,8 +1775,9 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 	}
 
 	bootstrapper := &simplex.TODOBootstrapper{
-		Log:    ctx.Log,
-		Engine: engine,
+		BootstrapTracker: sb,
+		Log:              ctx.Log,
+		Engine:           engine,
 	}
 
 	h.SetEngineManager(&handler.EngineManager{

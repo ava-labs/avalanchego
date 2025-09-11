@@ -120,6 +120,7 @@ func computeDigest(bytes []byte) simplex.Digest {
 
 type blockDeserializer struct {
 	parser block.Parser
+	blockTracker *blockTracker
 }
 
 func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) (simplex.Block, error) {
@@ -143,6 +144,7 @@ func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) 
 		metadata: *md,
 		vmBlock:  vmblock,
 		digest:   computeDigest(bytes),
+		blockTracker: d.blockTracker,
 	}, nil
 }
 

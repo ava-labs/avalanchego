@@ -155,7 +155,7 @@ func (s *Subnet) CreateChains(ctx context.Context, log logging.Logger, uri strin
 func (s *Subnet) AddValidators(ctx context.Context, log logging.Logger, apiURI string, nodes ...*Node) error {
 	wallet, err := s.GetWallet(ctx, apiURI)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get wallet for subnet %q: %w", s.Name, err)
 	}
 	pWallet := wallet.P()
 
@@ -163,7 +163,7 @@ func (s *Subnet) AddValidators(ctx context.Context, log logging.Logger, apiURI s
 	pvmClient := platformvm.NewClient(apiURI)
 	validators, err := pvmClient.GetCurrentValidators(ctx, constants.PrimaryNetworkID, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get current validators for subnet %q: %w", s.Name, err)
 	}
 	endTimes := make(map[ids.NodeID]uint64)
 	for _, validator := range validators {
@@ -190,7 +190,7 @@ func (s *Subnet) AddValidators(ctx context.Context, log logging.Logger, apiURI s
 			common.WithContext(ctx),
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to add subnet validator for %q: %w", s.Name, err)
 		}
 
 		log.Info("added validator to subnet",

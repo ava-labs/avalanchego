@@ -10,15 +10,15 @@ import (
 	"time"
 
 	"github.com/ava-labs/simplex"
-	"github.com/ava-labs/simplex/wal"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/version"
 )
 
 var _ common.Engine = (*Engine)(nil)
@@ -33,6 +33,13 @@ var (
 )
 
 type Engine struct {
+	// nonValidator marks that this node is not a validator
+	// this is included, but marked as a todo since the e2e tests currently
+	// try and bootstrap a node that is not a validator(see func `CheckBootstrapIsPossible`).
+	// The bootstrapped node is a non-validator which is currently not supported.
+	// TODO: handle non-validators properly
+	nonValidator bool
+
 	// list of NoOpsHandler for messages dropped by engine
 	common.AllGetsServer
 	common.StateSummaryFrontierHandler
@@ -46,6 +53,7 @@ type Engine struct {
 
 	// Handler that passes application messages to the VM
 	common.AppHandler
+	validators.Connector
 
 	epoch              *simplex.Epoch
 	blockDeserializer  *blockDeserializer
@@ -57,13 +65,20 @@ type Engine struct {
 
 // THe VM must be initialized before creating the engine
 func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config *Config) (*Engine, error) {
+	if _, ok := config.Validators[config.Ctx.NodeID]; !ok {
+		config.Log.Info("Node is not a validator for the subnet",
+			zap.Stringer("nodeID", config.Ctx.NodeID),
+			zap.Stringer("chainID", config.Ctx.ChainID),
+			zap.Stringer("subnetID", config.Ctx.SubnetID),
+		)
+		return nonValidatingEngine(consensusCtx, config)
+	}
+
 	signer, verifier := NewBLSAuth(config)
 	qcDeserializer := &QCDeserializer{
 		verifier: &verifier,
 	}
-	blockDeserializer := &blockDeserializer{
-		parser: config.VM,
-	}
+
 	signatureAggregator := &SignatureAggregator{
 		verifier: &verifier,
 	}
@@ -76,10 +91,6 @@ func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config 
 	if err != nil {
 		return nil, err
 	}
-	wal, err := wal.New(config.WALLocation)
-	if err != nil {
-		return nil, err
-	}
 
 	lastBlock, _, err := storage.Retrieve(storage.NumBlocks() - 1)
 	if err != nil {
@@ -87,13 +98,17 @@ func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config 
 	}
 
 	blockTracker := newBlockTracker(lastBlock.(*Block))
-
 	blockBuilder := &BlockBuilder{
 		vm:           config.VM,
 		blockTracker: blockTracker,
 		log:          config.Log,
 	}
+	storage.blockTracker = blockTracker
 
+	blockDeserializer := &blockDeserializer{
+		parser: config.VM,
+		blockTracker: blockTracker,
+	}
 	epochConfig := simplex.EpochConfig{
 		MaxProposalWait:     maxProposalWaitTime,
 		MaxRebroadcastWait:  maxRebroadcastWait,
@@ -106,7 +121,7 @@ func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config 
 		SignatureAggregator: signatureAggregator,
 		Comm:                comm,
 		Storage:             storage,
-		WAL:                 wal,
+		WAL:                 config.WAL,
 		BlockBuilder:        blockBuilder,
 		Epoch:               0, // 0 for now, but we would get the epoch from the metadata associated with the latest block
 		StartTime:           time.Now(),
@@ -131,6 +146,7 @@ func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config 
 		PutHandler:                  common.NewNoOpPutHandler(config.Log),
 		QueryHandler:                common.NewNoOpQueryHandler(config.Log),
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
+		Connector:                   config.VM,
 
 		AppHandler:   config.VM,
 		vm:           config.VM,
@@ -139,6 +155,11 @@ func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config 
 }
 
 func (e *Engine) Start(ctx context.Context, _ uint32) error {
+	if e.nonValidator {
+		e.logger.Info("non-validator cannot start simplex engine")
+		return nil
+	}
+
 	e.logger.Info("Starting simplex engine")
 	go e.tick()
 	err := e.epoch.Start()
@@ -163,6 +184,11 @@ func (e *Engine) tick() {
 }
 
 func (e *Engine) SimplexMessage(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
+	if e.nonValidator {
+		e.logger.Info("non-validator received simplex message; dropping")
+		return nil
+	}
+
 	simplexMsg, err := e.p2pToSimplexMessage(ctx, msg)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errConvertingMessage, err)
@@ -216,18 +242,22 @@ func (e *Engine) Notify(_ context.Context, _ common.Message) error {
 	return nil
 }
 
-func (e *Engine) Connected(_ context.Context, _ ids.NodeID, _ *version.Application) error {
-	e.logger.Debug("Connected is not implemented for simplex")
-	return nil
-}
-
 func (e *Engine) Disconnected(_ context.Context, _ ids.NodeID) error {
 	e.logger.Debug("Disconnected is not implemented for simplex")
 	return nil
 }
 
-func (*Engine) HealthCheck(_ context.Context) (interface{}, error) {
-	return nil, nil
+func (e *Engine) HealthCheck(ctx context.Context) (interface{}, error) {
+	if e.nonValidator {
+		return "non-validator; no health status", nil
+	}
+	vmIntf, vmErr := e.vm.HealthCheck(ctx)
+	intf := map[string]interface{}{
+		"consensus": struct{}{},
+		"vm":        vmIntf,
+	}
+
+	return intf, vmErr
 }
 
 var _ common.BootstrapableEngine = (*TODOBootstrapper)(nil)
@@ -235,23 +265,52 @@ var _ common.BootstrapableEngine = (*TODOBootstrapper)(nil)
 type TODOBootstrapper struct {
 	*Engine
 	Log logging.Logger
+	common.BootstrapTracker
 }
 
 func (t *TODOBootstrapper) Start(ctx context.Context, _ uint32) error {
-	t.Log.Info("Starting TODO bootstrapper - does nothing")
-
 	t.Engine.consensusCtx.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,
-		State: snow.NormalOp,
+		State: snow.Bootstrapping,
 	})
+
 	if err := t.Engine.vm.SetState(ctx, snow.Bootstrapping); err != nil {
 		return fmt.Errorf("failed to notify VM that consensus is starting: %w",
 			err)
 	}
 
+	// must notify the tracker we have finished bootstrapping
+	t.BootstrapTracker.Bootstrapped(t.Engine.consensusCtx.ChainID)
+
+	// Do not start the engine if we are a validator
 	return t.Engine.Start(ctx, 0)
 }
 
 func (*TODOBootstrapper) Clear(_ context.Context) error {
 	return nil
+}
+
+func (t *TODOBootstrapper) HealthCheck(ctx context.Context) (interface{}, error) {
+	return t.Engine.HealthCheck(ctx)
+}
+
+func nonValidatingEngine(consensusCtx *snow.ConsensusContext, config *Config) (*Engine, error) {
+	engine := &Engine{
+		nonValidator:                true,
+		logger:                      config.Log,
+		StateSummaryFrontierHandler: common.NewNoOpStateSummaryFrontierHandler(config.Log),
+		AcceptedStateSummaryHandler: common.NewNoOpAcceptedStateSummaryHandler(config.Log),
+		AcceptedFrontierHandler:     common.NewNoOpAcceptedFrontierHandler(config.Log),
+		AcceptedHandler:             common.NewNoOpAcceptedHandler(config.Log),
+		AncestorsHandler:            common.NewNoOpAncestorsHandler(config.Log),
+		PutHandler:                  common.NewNoOpPutHandler(config.Log),
+		QueryHandler:                common.NewNoOpQueryHandler(config.Log),
+		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
+		Connector:                   config.VM,
+		consensusCtx:                consensusCtx,
+		AppHandler:                  common.NewNoOpAppHandler(config.Log),
+		vm:                          config.VM,
+	}
+
+	return engine, nil
 }

@@ -134,7 +134,6 @@ const (
 	LogRotaterMaxAgeKey                                = "log-rotater-max-age"
 	LogRotaterCompressEnabledKey                       = "log-rotater-compress-enabled"
 	LogDisableDisplayPluginLogsKey                     = "log-disable-display-plugin-logs"
-	SimplexEnabledKey                                  = "simplex-enabled"
 	SnowSampleSizeKey                                  = "snow-sample-size"
 	SnowQuorumSizeKey                                  = "snow-quorum-size"
 	SnowPreferenceQuorumSizeKey                        = "snow-preference-quorum-size"
