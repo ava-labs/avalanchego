@@ -92,9 +92,7 @@ func (t *EtaTracker) AddSample(completed uint64, target uint64, timestamp time.T
 	// Check if target is already completed or exceeded
 	if sample.completed >= target {
 		zeroDuration := time.Duration(0)
-		percentComplete := float64(sample.completed) / float64(target)
-		roundedPercentComplete := math.Round(percentComplete*10000) / 100 // Return percentage (0.0 to 100.0)
-		return &zeroDuration, roundedPercentComplete
+		return &zeroDuration, 100
 	}
 
 	if timeSinceOldest == 0 {
@@ -108,6 +106,7 @@ func (t *EtaTracker) AddSample(completed uint64, target uint64, timestamp time.T
 	remainingProgress := target - sample.completed
 
 	actualPercentComplete := float64(sample.completed) / float64(target)
+	// scale to 0.00 to 100.00
 	roundedScaledPercentComplete := math.Round(actualPercentComplete*10000) / 100
 
 	duration := float64(remainingProgress) / rate

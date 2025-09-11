@@ -29,7 +29,7 @@ func TestEtaTracker(t *testing.T) {
 	}{
 		{
 			// should return nil ETA and 0% complete
-			name:            "first sample - insufficient data",
+			name:            "sample 1: insufficient data",
 			completed:       0,
 			timestamp:       now,
 			expectedEta:     nil,
@@ -37,7 +37,7 @@ func TestEtaTracker(t *testing.T) {
 		},
 		{
 			// should return nil ETA and 0% complete (rate is 10 per second)
-			name:            "second sample - insufficient data",
+			name:            "sample 2: insufficient data",
 			completed:       100,
 			timestamp:       now.Add(10 * time.Second),
 			expectedEta:     nil,
@@ -45,7 +45,7 @@ func TestEtaTracker(t *testing.T) {
 		},
 		{
 			// should return 80s ETA and 20% complete (rate still 10 per second)
-			name:            "third sample - sufficient data for ETA",
+			name:            "sample 3: sufficient data for ETA",
 			completed:       200,
 			timestamp:       now.Add(20 * time.Second),
 			expectedEta:     timePtr(80 * time.Second),
@@ -53,11 +53,27 @@ func TestEtaTracker(t *testing.T) {
 		},
 		{
 			// should return 24s ETA and 60% complete (rate is 15 per second)
-			name:            "fourth sample - non linear since we sped up",
+			name:            "sample 4: non linear since we sped up",
 			completed:       600,
 			timestamp:       now.Add(40 * time.Second),
 			expectedEta:     timePtr(24 * time.Second),
 			expectedPercent: 60.0,
+		},
+		{
+			// should return 0s ETA and 100% complete since we're at the end
+			name:            "sample 5: at the end",
+			completed:       1000,
+			timestamp:       now.Add(1 * time.Second),
+			expectedEta:     timePtr(0),
+			expectedPercent: 100.0,
+		},
+		{
+			// should return 0s ETA and 100% complete
+			name:            "sample 6: past the end",
+			completed:       2000,
+			timestamp:       now.Add(1 * time.Second),
+			expectedEta:     timePtr(0),
+			expectedPercent: 100.0,
 		},
 	}
 
