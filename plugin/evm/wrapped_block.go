@@ -268,7 +268,9 @@ func (b *wrappedBlock) verify(predicateContext *precompileconfig.PredicateContex
 	// got an error while inserting to blockchain, we may need to cleanup the extension.
 	// so that the extension can be garbage collected.
 	if doCleanup := err != nil || !writes; b.extension != nil && doCleanup {
-		b.extension.CleanupVerified()
+		if err := b.extension.CleanupVerified(); err != nil {
+			return fmt.Errorf("failed to cleanup extension: %w", err)
+		}
 	}
 	return err
 }
