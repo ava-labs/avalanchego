@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1757581844529,
+  "lastUpdate": 1757581872508,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -976,6 +976,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-blacksmith-4vcpu-ubuntu-2404",
             "value": 110,
+            "unit": "mgas/s",
+            "extra": "1 times\n6 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Austin Larson",
+            "username": "alarso16",
+            "email": "78000745+alarso16@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "2823d83dc58aca63a110b1fb9b551864261cf773",
+          "message": "Remove unnecessary field from MaybeBytes (#4259)",
+          "timestamp": "2025-09-10T18:51:03Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/2823d83dc58aca63a110b1fb9b551864261cf773"
+        },
+        "date": 1757581871321,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-blacksmith-4vcpu-ubuntu-2404",
+            "value": 104.1,
             "unit": "mgas/s",
             "extra": "1 times\n6 procs"
           }
