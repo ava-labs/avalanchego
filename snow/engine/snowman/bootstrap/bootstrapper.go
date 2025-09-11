@@ -625,7 +625,7 @@ func (b *Bootstrapper) process(
 		if shouldLog {
 			totalBlocksToFetch := b.tipHeight - b.startingHeight
 
-			eta, progressPercentage := b.etaTracker.AddSample(
+			etaPtr, progressPercentage := b.etaTracker.AddSample(
 				numFetched,
 				totalBlocksToFetch,
 				now,
@@ -635,7 +635,7 @@ func (b *Bootstrapper) process(
 			b.lastProgressUpdateTime = now
 
 			// Only log if we have a valid ETA estimate
-			if eta != nil {
+			if etaPtr != nil {
 				logger := b.Ctx.Log.Info
 				if b.restarted {
 					// Lower log level for restarted bootstrapping.
@@ -644,7 +644,7 @@ func (b *Bootstrapper) process(
 				logger("fetching blocks",
 					zap.Uint64("numFetchedBlocks", numFetched),
 					zap.Uint64("numTotalBlocks", totalBlocksToFetch),
-					zap.Duration("eta", *eta),
+					zap.Duration("eta", *etaPtr),
 					zap.Float64("pctComplete", progressPercentage),
 				)
 			}
