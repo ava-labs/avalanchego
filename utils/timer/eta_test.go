@@ -62,13 +62,11 @@ func TestEtaTracker(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			eta, percentComplete := tracker.AddSample(tt.completed, target, tt.timestamp)
-			require.Equal(t, tt.expectedEta == nil, eta == nil)
-			if eta != nil {
-				require.InDelta(t, float64(*tt.expectedEta), float64(*eta), 0.0001)
-			}
-			require.InDelta(t, tt.expectedPercent, percentComplete, 0.01)
-		})
+		eta, percentComplete := tracker.AddSample(tt.completed, target, tt.timestamp)
+		require.Equal(t, tt.expectedEta == nil, eta == nil, tt.name)
+		if eta != nil {
+			require.InDelta(t, float64(*tt.expectedEta), float64(*eta), 0.0001, tt.name)
+		}
+		require.InDelta(t, tt.expectedPercent, percentComplete, 0.01, tt.name)
 	}
 }
