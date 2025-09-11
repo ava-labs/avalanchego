@@ -103,13 +103,13 @@ func (t *EtaTracker) AddSample(completed uint64, target uint64, timestamp time.T
 		return nil, 0.0
 	}
 
-	remainingProgress := target - sample.completed
+	remainingWork := target - sample.completed
 
 	actualPercentComplete := float64(sample.completed) / float64(target)
 	// scale to 0.00 to 100.00
 	roundedScaledPercentComplete := math.Round(actualPercentComplete*10000) / 100
 
-	duration := float64(remainingProgress) / rate
+	duration := float64(remainingWork) / rate
 	adjustment := t.slowdownFactor - (t.slowdownFactor-1.0)*actualPercentComplete
 
 	adjustedDuration := duration * adjustment
