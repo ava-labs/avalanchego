@@ -106,7 +106,7 @@ func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config 
 	storage.blockTracker = blockTracker
 
 	blockDeserializer := &blockDeserializer{
-		parser: config.VM,
+		parser:       config.VM,
 		blockTracker: blockTracker,
 	}
 	epochConfig := simplex.EpochConfig{

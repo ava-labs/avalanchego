@@ -4,6 +4,8 @@
 package simplex
 
 import (
+	"github.com/ava-labs/simplex"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -11,7 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/networking/sender"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/simplex"
 )
 
 // Config wraps all the parameters needed for a simplex engine

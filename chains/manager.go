@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/simplex/wal"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
@@ -62,7 +63,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/vms/tracedvm"
-	"github.com/ava-labs/simplex/wal"
 
 	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
 	smcon "github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -1764,7 +1764,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		OutboundMsgBuilder: m.MsgCreator,
 		Validators:         m.Validators.GetMap(ctx.SubnetID),
 		VM:                 vm,
-		WAL:                 wal,
+		WAL:                wal,
 		SignBLS:            m.ManagerConfig.StakingBLSKey.Sign,
 		DB:                 simplexDB,
 	}

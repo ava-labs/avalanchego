@@ -62,6 +62,3 @@ vendor
 .direnv
 # Personal extension to .envrc
 .envrc.local
-
-# for simplex wal files
-*.WAL

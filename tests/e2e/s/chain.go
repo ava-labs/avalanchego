@@ -4,50 +4,22 @@
 package s
 
 import (
-	"errors"
 	"fmt"
 	"math"
-	"slices"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/constants"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
-
-	p2pmessage "github.com/ava-labs/avalanchego/message"
-	p2psdk "github.com/ava-labs/avalanchego/network/p2p"
-	p2ppb "github.com/ava-labs/avalanchego/proto/pb/p2p"
-)
-
-const pollingInterval = 50 * time.Millisecond
-
-const (
-	genesisWeight   = units.Schmeckle
-	genesisBalance  = units.Avax
-	registerWeight  = genesisWeight / 10
-	updatedWeight   = 2 * registerWeight
-	registerBalance = 0
-
-	// Validator registration attempts expire 5 minutes after they are created
-	expiryDelay = 5 * time.Minute
-	// P2P message requests timeout after 10 seconds
-	p2pTimeout = 10 * time.Second
 )
 
 var simplexSubnetName = "simplex-a"
@@ -125,7 +97,6 @@ var _ = e2e.DescribeSimplex("Create a Simplex [L1]", func() {
 			zap.String("nodeURI", sourceAPINodeURI),
 		)
 
-
 		tc.By(fmt.Sprintf("issuing transaction on chain %s on subnet %s to activate snowman++ consensus",
 			sourceChain.ChainID, sourceSubnet.SubnetID))
 		recipientKey := e2e.NewPrivateKey(tc)
@@ -179,102 +150,7 @@ var _ = e2e.DescribeSimplex("Create a Simplex [L1]", func() {
 
 		_ = e2e.CheckBootstrapIsPossible(tc, network)
 	})
-
-
 })
-
-func wrapWarpSignatureRequest(
-	msg *warp.UnsignedMessage,
-	justification []byte,
-) (p2pmessage.OutboundMessage, error) {
-	p2pMessageFactory, err := p2pmessage.NewCreator(
-		prometheus.NewRegistry(),
-		constants.DefaultNetworkCompressionType,
-		p2pTimeout,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	request := sdk.SignatureRequest{
-		Message:       msg.Bytes(),
-		Justification: justification,
-	}
-	requestBytes, err := proto.Marshal(&request)
-	if err != nil {
-		return nil, err
-	}
-
-	return p2pMessageFactory.AppRequest(
-		msg.SourceChainID,
-		0,
-		time.Hour,
-		p2psdk.PrefixMessage(
-			p2psdk.ProtocolPrefix(p2psdk.SignatureRequestHandlerID),
-			requestBytes,
-		),
-	)
-}
-
-func findMessage[T any](
-	q buffer.BlockingDeque[p2pmessage.InboundMessage],
-	parser func(p2pmessage.InboundMessage) (T, bool, error),
-) (T, bool, error) {
-	var messagesToReprocess []p2pmessage.InboundMessage
-	defer func() {
-		slices.Reverse(messagesToReprocess)
-		for _, msg := range messagesToReprocess {
-			q.PushLeft(msg)
-		}
-	}()
-
-	for {
-		msg, ok := q.PopLeft()
-		if !ok {
-			return utils.Zero[T](), false, nil
-		}
-
-		parsed, ok, err := parser(msg)
-		if err != nil {
-			return utils.Zero[T](), false, err
-		}
-		if ok {
-			return parsed, true, nil
-		}
-
-		messagesToReprocess = append(messagesToReprocess, msg)
-	}
-}
-
-// unwrapWarpSignature assumes the only type of AppResponses that will be
-// received are ACP-118 compliant responses.
-func unwrapWarpSignature(msg p2pmessage.InboundMessage) (*bls.Signature, bool, error) {
-	var appResponse *p2ppb.AppResponse
-	switch msg := msg.Message().(type) {
-	case *p2ppb.AppResponse:
-		appResponse = msg
-	case *p2ppb.AppError:
-		return nil, false, errors.New(msg.ErrorMessage)
-	default:
-		return nil, false, nil
-	}
-
-	var response sdk.SignatureResponse
-	if err := proto.Unmarshal(appResponse.AppBytes, &response); err != nil {
-		return nil, false, err
-	}
-
-	warpSignature, err := bls.SignatureFromBytes(response.Signature)
-	return warpSignature, true, err
-}
-
-func must[T any](t require.TestingT) func(T, error) T {
-	return func(val T, err error) T {
-		require.NoError(t, err)
-		return val
-	}
-}
-
 
 // Retrieve the nodes corresponding to the provided IDs
 func getNodesForIDs(nodes []*tmpnet.Node, nodeIDs []ids.NodeID) []*tmpnet.Node {
