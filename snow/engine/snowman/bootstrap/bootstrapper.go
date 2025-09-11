@@ -418,7 +418,6 @@ func (b *Bootstrapper) startSyncing(ctx context.Context, acceptedBlockIDs []ids.
 	b.startTime = time.Now()
 
 	// Add the first sample to the EtaTracker to establish an accurate baseline
-	// This ensures t.lowestSample is set correctly from the start
 	b.etaTracker.AddSample(b.initiallyFetched, b.tipHeight-b.startingHeight, b.startTime)
 
 	// Process received blocks
