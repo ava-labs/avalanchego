@@ -209,6 +209,14 @@ func (m *manager) GetAllValidatorSets(
 		return nil, errFailedToGetSubnetIDs
 	}
 
+	// Get validator set for the primary network
+	primaryNetworkValidators, err := m.GetValidatorSet(ctx, targetHeight, constants.PrimaryNetworkID)
+	if err != nil {
+		return nil, err
+	}
+	result[constants.PrimaryNetworkID] = primaryNetworkValidators
+
+	// Get validator sets for all other subnets
 	for _, subnetID := range subnets {
 		validatorSet, err := m.GetValidatorSet(ctx, targetHeight, subnetID)
 		if err != nil {
