@@ -69,7 +69,7 @@ func NewEtaTracker(maxSamples uint8, slowdownFactor float64) *EtaTracker {
 // samples to calculate an accurate ETA.
 //
 // The first sample should be at 0% progress to establish a baseline
-func (t *EtaTracker) AddSample(completed uint64, target uint64, timestamp time.Time) (remaining *time.Duration, percentComplete float64) {
+func (t *EtaTracker) AddSample(completed uint64, target uint64, timestamp time.Time) (*time.Duration, float64) {
 	sample := sample{
 		completed: completed,
 		timestamp: timestamp,
