@@ -52,6 +52,9 @@ func (e StackTraceError) Unwrap() error {
 }
 
 func New(msg string) error {
+	if !stackTraceErrors {
+		return errors.New(msg)
+	}
 	return wrap(errors.New(msg))
 }
 
@@ -82,6 +85,9 @@ func Errorf(format string, args ...interface{}) error {
 }
 
 func Wrap(err error) error {
+	if !stackTraceErrors {
+		return err
+	}
 	return wrap(err)
 }
 
@@ -90,10 +96,6 @@ func Wrap(err error) error {
 func wrap(err error) error {
 	if err == nil {
 		return nil
-	}
-
-	if !stackTraceErrors {
-		return err
 	}
 
 	// If there's already a StackTraceError in the chain, just return it
