@@ -75,6 +75,20 @@ func TestEtaTracker(t *testing.T) {
 			expectedEta:     timePtr(0),
 			expectedPercent: 100.0,
 		},
+		{
+			name:            "bogus sample: time warp",
+			completed:       100,
+			timestamp:       now,
+			expectedEta:     nil,
+			expectedPercent: 0.0,
+		},
+		{
+			name:            "bogus sample: no progress",
+			completed:       100,
+			timestamp:       now,
+			expectedEta:     nil,
+			expectedPercent: 0.0,
+		},
 	}
 
 	for _, tt := range tests {
