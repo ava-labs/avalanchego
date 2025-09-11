@@ -121,6 +121,7 @@ func (t *EtaTracker) AddSample(completed uint64, target uint64, timestamp time.T
 }
 
 // EstimateETA calculates ETA from start time and current progress.
+//
 // Deprecated: use EtaTracker instead
 func EstimateETA(startTime time.Time, progress, end uint64) time.Duration {
 	timeSpent := time.Since(startTime)
