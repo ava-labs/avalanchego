@@ -1115,6 +1115,9 @@ func (m *manager) createSnowmanChain(
 			return nil, fmt.Errorf("expected validators.State but got %T", vm)
 		}
 
+		// Wrap the validator state with a cached state
+		m.validatorState = validators.NewCachedState(m.validatorState)
+
 		if m.TracingEnabled {
 			valState = validators.Trace(valState, "platformvm", m.Tracer)
 		}
@@ -1129,9 +1132,6 @@ func (m *manager) createSnowmanChain(
 		if m.TracingEnabled {
 			m.validatorState = validators.Trace(m.validatorState, "lockedState", m.Tracer)
 		}
-
-		// Wrap the validator state with a cached state
-		m.validatorState = validators.NewCachedState(m.validatorState)
 
 		if !m.ManagerConfig.SybilProtectionEnabled {
 			m.validatorState = validators.NewNoValidatorsState(m.validatorState)
