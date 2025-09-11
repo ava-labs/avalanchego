@@ -82,6 +82,13 @@ var (
 			"state-sync-enabled": false
 		}`,
 	}
+	topLevelMetrics = []topLevelMetric{
+		{
+			MetricName:  "mgas/s",
+			Queries:     []string{"avalanche_evm_eth_chain_block_gas_used_processed"},
+			Denominator: 1_000_000,
+		},
+	}
 
 	configNameArg  string
 	runnerNameArg  string
@@ -593,13 +600,26 @@ func parseCustomLabels(labelsStr string) (map[string]string, error) {
 	return labels, nil
 }
 
+type topLevelMetric struct {
+	MetricName  string
+	Queries     []string
+	Denominator float64
+}
+
 func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time.Duration) {
 	r := require.New(b)
 
-	gasUsed, err := getCounterMetricValue(registry, "avalanche_evm_eth_chain_block_gas_used_processed")
-	r.NoError(err)
-	mgasPerSecond := gasUsed / 1_000_000 / elapsed.Seconds()
-	b.ReportMetric(mgasPerSecond, "mgas/s")
+	for _, metric := range topLevelMetrics {
+		metricCounterVal := float64(0)
+		for _, query := range metric.Queries {
+			val, err := getCounterMetricValue(registry, query)
+			r.NoError(err, "failed to get counter value for metric %q from query %q", metric.MetricName, query)
+			metricCounterVal += val
+		}
+
+		metricPerSecond := metricCounterVal / metric.Denominator / elapsed.Seconds()
+		b.ReportMetric(metricPerSecond, metric.MetricName)
+	}
 }
 
 func getCounterMetricValue(registry prometheus.Gatherer, query string) (float64, error) {
