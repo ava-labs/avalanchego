@@ -28,10 +28,18 @@ import (
 var (
 	allowedFutureBlockTime = 10 * time.Second // Max time from current time allowed for blocks, before they're considered future blocks
 
-	errInvalidBlockTime       = errors.New("timestamp less than parent's")
-	errUnclesUnsupported      = errors.New("uncles unsupported")
-	errExtDataGasUsedNil      = errors.New("extDataGasUsed is nil")
-	errExtDataGasUsedTooLarge = errors.New("extDataGasUsed is not uint64")
+	errInvalidBlockTime                    = errors.New("timestamp less than parent's")
+	errUnclesUnsupported                   = errors.New("uncles unsupported")
+	errExtDataGasUsedNil                   = errors.New("extDataGasUsed is nil")
+	errExtDataGasUsedTooLarge              = errors.New("extDataGasUsed is not uint64")
+	ErrInvalidBlockGasCost                 = errors.New("invalid blockGasCost")
+	errInvalidExtDataGasUsed               = errors.New("invalid extDataGasUsed")
+	errInvalidExcessBlobGasBeforeCancun    = errors.New("invalid excessBlobGas before cancun")
+	errInvalidBlobGasUsedBeforeCancun      = errors.New("invalid blobGasUsed before cancun")
+	errInvalidParentBeaconRootBeforeCancun = errors.New("invalid parentBeaconRoot before cancun")
+	errMissingParentBeaconRoot             = errors.New("header is missing beaconRoot")
+	errNonEmptyParentBeaconRoot            = errors.New("invalid non-empty parentBeaconRoot")
+	errBlobsNotEnabled                     = errors.New("blobs not enabled on avalanche networks")
 )
 
 type Mode struct {
@@ -235,24 +243,24 @@ func (eng *DummyEngine) verifyHeader(chain consensus.ChainHeaderReader, header *
 	if !cancun {
 		switch {
 		case header.ExcessBlobGas != nil:
-			return fmt.Errorf("invalid excessBlobGas: have %d, expected nil", *header.ExcessBlobGas)
+			return fmt.Errorf("%w: have %d, expected nil", errInvalidExcessBlobGasBeforeCancun, *header.ExcessBlobGas)
 		case header.BlobGasUsed != nil:
-			return fmt.Errorf("invalid blobGasUsed: have %d, expected nil", *header.BlobGasUsed)
+			return fmt.Errorf("%w: have %d, expected nil", errInvalidBlobGasUsedBeforeCancun, *header.BlobGasUsed)
 		case header.ParentBeaconRoot != nil:
-			return fmt.Errorf("invalid parentBeaconRoot, have %#x, expected nil", *header.ParentBeaconRoot)
+			return fmt.Errorf("%w: have %#x, expected nil", errInvalidParentBeaconRootBeforeCancun, *header.ParentBeaconRoot)
 		}
 	} else {
 		if header.ParentBeaconRoot == nil {
-			return errors.New("header is missing beaconRoot")
+			return errMissingParentBeaconRoot
 		}
 		if *header.ParentBeaconRoot != (common.Hash{}) {
-			return fmt.Errorf("invalid parentBeaconRoot, have %#x, expected empty", *header.ParentBeaconRoot)
+			return fmt.Errorf("%w: have %#x, expected empty", errNonEmptyParentBeaconRoot, *header.ParentBeaconRoot)
 		}
 		if err := eip4844.VerifyEIP4844Header(parent, header); err != nil {
 			return err
 		}
 		if *header.BlobGasUsed > 0 { // VerifyEIP4844Header ensures BlobGasUsed is non-nil
-			return fmt.Errorf("blobs not enabled on avalanche networks: used %d blob gas, expected 0", *header.BlobGasUsed)
+			return fmt.Errorf("%w: used %d blob gas, expected 0", errBlobsNotEnabled, *header.BlobGasUsed)
 		}
 	}
 	return nil
@@ -315,7 +323,7 @@ func (eng *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types
 		timestamp,
 	)
 	if !utils.BigEqual(blockGasCost, expectedBlockGasCost) {
-		return fmt.Errorf("invalid blockGasCost: have %d, want %d", blockGasCost, expectedBlockGasCost)
+		return fmt.Errorf("%w: have %d, want %d", ErrInvalidBlockGasCost, blockGasCost, expectedBlockGasCost)
 	}
 	if config.IsApricotPhase4(timestamp) {
 		// Validate extDataGasUsed and BlockGasCost match expectations
@@ -326,7 +334,7 @@ func (eng *DummyEngine) Finalize(chain consensus.ChainHeaderReader, block *types
 			extDataGasUsed = new(big.Int).Set(common.Big0)
 		}
 		if blockExtDataGasUsed := customtypes.BlockExtDataGasUsed(block); blockExtDataGasUsed == nil || !blockExtDataGasUsed.IsUint64() || blockExtDataGasUsed.Cmp(extDataGasUsed) != 0 {
-			return fmt.Errorf("invalid extDataGasUsed: have %d, want %d", blockExtDataGasUsed, extDataGasUsed)
+			return fmt.Errorf("%w: have %d, want %d", errInvalidExtDataGasUsed, blockExtDataGasUsed, extDataGasUsed)
 		}
 
 		// Verify the block fee was paid.
