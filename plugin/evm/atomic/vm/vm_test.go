@@ -208,7 +208,6 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 	require.NoError(t, err)
 	require.NoError(t, blk.Verify(context.Background()))
 	require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
-	require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
 	require.NoError(t, blk.Accept(context.Background()))
 
 	if lastAcceptedID, err := vm.LastAccepted(context.Background()); err != nil {
