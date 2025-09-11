@@ -60,7 +60,7 @@ func New(msg string) error {
 
 // Errorf adds a stack trace to the last argument provided if it is an
 // error and stack traces are enabled.
-func Errorf(format string, args ...interface{}) error {
+func Errorf(format string, args ...any) error {
 	if !stackTraceErrors {
 		return fmt.Errorf(format, args...)
 	}
