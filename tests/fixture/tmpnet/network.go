@@ -450,8 +450,7 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 	}
 
 	// Don't restart the node during subnet creation since it will always be restarted afterwards.
-	uri := bootstrapNode.GetAccessibleURI()
-	if err := n.CreateSubnets(ctx, log, uri, false /* restartRequired */); err != nil {
+	if err := n.CreateSubnets(ctx, log, bootstrapNode, false /* restartRequired */); err != nil {
 		return err
 	}
 
@@ -610,8 +609,9 @@ func (n *Network) GetSubnet(name string) *Subnet {
 
 // Ensure that each subnet on the network is created. If restartRequired is false, node restart
 // to pick up configuration changes becomes the responsibility of the caller.
-func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI string, restartRequired bool) error {
+func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode *Node, restartRequired bool) error {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
+	apiURI := apiNode.GetAccessibleURI()
 	for _, subnet := range n.Subnets {
 		if len(subnet.ValidatorIDs) == 0 {
 			return fmt.Errorf("subnet %s needs at least one validator", subnet.SubnetID)
@@ -677,6 +677,8 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 		reconfiguredNodes = append(reconfiguredNodes, node)
 	}
 
+	// TODO(samliok): remove the restart required parameter, and check if subnet configuration requires
+	// a restart instead.
 	if restartRequired {
 		log.Info("restarting node(s) to enable them to track the new subnet(s)")
 
@@ -694,6 +696,9 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiURI 
 		if err := WaitForHealthyNodes(ctx, n.log, runningNodes); err != nil {
 			return err
 		}
+
+		// since we have restarted nodes, refetch the api uri in case it changed
+		apiURI = apiNode.GetAccessibleURI()
 	}
 
 	// Add validators for the subnet
