@@ -21,12 +21,18 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
 // The Node type is defined in this file (node.go - orchestration) and
 // node_config.go (reading/writing configuration).
+
+// isPublicNetwork returns true if the given network ID corresponds to a public network
+func isPublicNetwork(networkID uint32) bool {
+	return networkID == constants.FujiID || networkID == constants.MainnetID
+}
 
 const (
 	defaultNodeTickerInterval = 50 * time.Millisecond
@@ -373,10 +379,14 @@ func (n *Node) composeFlags() (FlagsMap, error) {
 	// Convert the network id to a string to ensure consistency in JSON round-tripping.
 	flags.SetDefault(config.NetworkNameKey, strconv.FormatUint(uint64(n.network.GetNetworkID()), 10))
 
-	// Set the bootstrap configuration
-	bootstrapIPs, bootstrapIDs := n.network.GetBootstrapIPsAndIDs(n)
-	flags.SetDefault(config.BootstrapIDsKey, strings.Join(bootstrapIDs, ","))
-	flags.SetDefault(config.BootstrapIPsKey, strings.Join(bootstrapIPs, ","))
+	// Set the bootstrap configuration only for non-public networks
+	// Public networks should use avalanchego's built-in bootstrappers
+	networkID := n.network.GetNetworkID()
+	if !isPublicNetwork(networkID) {
+		bootstrapIPs, bootstrapIDs := n.network.GetBootstrapIPsAndIDs(n)
+		flags.SetDefault(config.BootstrapIDsKey, strings.Join(bootstrapIDs, ","))
+		flags.SetDefault(config.BootstrapIPsKey, strings.Join(bootstrapIPs, ","))
+	}
 
 	// TODO(marun) Maybe avoid computing content flags for each node start?
 
