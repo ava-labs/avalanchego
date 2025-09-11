@@ -367,7 +367,7 @@ func TestCalculateUptimeWhenNeverTracked(t *testing.T) {
 
 	uptime, err := up.CalculateUptimePercentFrom(nodeID0, startTime.Truncate(time.Second))
 	require.NoError(err)
-	require.InDelta(float64(1), uptime, 0)
+	require.Equal(float64(1), uptime)
 }
 
 func TestCalculateUptimeWhenNeverConnected(t *testing.T) {
@@ -390,12 +390,12 @@ func TestCalculateUptimeWhenNeverConnected(t *testing.T) {
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0)
 	require.NoError(err)
-	require.Equal(time.Duration(0), duration)
+	require.Zero(duration)
 	require.Equal(clk.UnixTime(), lastUpdated)
 
 	uptime, err := up.CalculateUptimePercentFrom(nodeID0, startTime)
 	require.NoError(err)
-	require.InDelta(float64(0), uptime, 0)
+	require.Zero(uptime)
 }
 
 func TestCalculateUptimeWhenConnectedBeforeTracking(t *testing.T) {
@@ -489,7 +489,7 @@ func TestCalculateUptimePercentageDivBy0(t *testing.T) {
 
 	uptime, err := up.CalculateUptimePercentFrom(nodeID0, startTime.Truncate(time.Second))
 	require.NoError(err)
-	require.InDelta(float64(1), uptime, 0)
+	require.Equal(float64(1), uptime)
 }
 
 func TestCalculateUptimePercentage(t *testing.T) {
@@ -512,7 +512,7 @@ func TestCalculateUptimePercentage(t *testing.T) {
 
 	uptime, err := up.CalculateUptimePercentFrom(nodeID0, startTime.Truncate(time.Second))
 	require.NoError(err)
-	require.InDelta(float64(0), uptime, 0)
+	require.Zero(uptime)
 }
 
 func TestStopTrackingUnixTimeRegression(t *testing.T) {
