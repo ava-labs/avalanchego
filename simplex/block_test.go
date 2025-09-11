@@ -24,6 +24,7 @@ import (
 func TestBlockSerialization(t *testing.T) {
 	unexpectedBlockBytes := errors.New("unexpected block bytes")
 	ctx := context.Background()
+	gensisBlock := newTestBlock(t, newBlockConfig{})
 	testBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
 	b := &Block{
@@ -33,7 +34,7 @@ func TestBlockSerialization(t *testing.T) {
 			Epoch:   1,
 			Round:   1,
 			Seq:     1,
-			Prev:    [32]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07},
+			Prev:    gensisBlock.digest,
 		},
 	}
 
@@ -86,7 +87,8 @@ func TestBlockSerialization(t *testing.T) {
 
 			testVM.ParseBlockF = tt.parseFunc
 			deserializer := &blockDeserializer{
-				parser: testVM,
+				parser:       testVM,
+				blockTracker: newBlockTracker(gensisBlock),
 			}
 
 			// Deserialize the block
@@ -95,6 +97,8 @@ func TestBlockSerialization(t *testing.T) {
 
 			if tt.expectedError == nil {
 				require.Equal(t, b.BlockHeader().ProtocolMetadata, deserializedBlock.BlockHeader().ProtocolMetadata)
+				_, err := deserializedBlock.Verify(ctx)
+				require.NoError(t, err)
 			}
 		})
 	}
