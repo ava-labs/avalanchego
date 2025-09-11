@@ -638,7 +638,6 @@ func (b *Bootstrapper) process(
 				logger := b.Ctx.Log.Info
 				if b.restarted {
 					// Lower log level for restarted bootstrapping.
-					// Kept for compatibility; is this desired?
 					logger = b.Ctx.Log.Debug
 				}
 				logger("fetching blocks",
