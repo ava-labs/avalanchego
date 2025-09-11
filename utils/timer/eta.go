@@ -29,7 +29,6 @@ type sample struct {
 type EtaTracker struct {
 	samples        []sample
 	samplePosition uint8
-	maxSamples     uint8
 	totalSamples   uint64
 	slowdownFactor float64
 }
@@ -56,7 +55,6 @@ func NewEtaTracker(maxSamples uint8, slowdownFactor float64) *EtaTracker {
 	return &EtaTracker{
 		samples:        make([]sample, maxSamples),
 		samplePosition: 0,
-		maxSamples:     maxSamples,
 		totalSamples:   0,
 		slowdownFactor: slowdownFactor,
 	}
@@ -75,12 +73,13 @@ func (t *EtaTracker) AddSample(completed uint64, target uint64, timestamp time.T
 		timestamp: timestamp,
 	}
 	// save the oldest sample; this will not be used if we don't have enough samples
+	maxSamples := len(t.samples)
 	t.samples[t.samplePosition] = sample
-	t.samplePosition = (t.samplePosition + 1) % t.maxSamples
+	t.samplePosition = (t.samplePosition + 1) % uint8(maxSamples)
 	t.totalSamples++
 
 	// If we don't have enough samples, return nil
-	if t.totalSamples < uint64(t.maxSamples) {
+	if t.totalSamples < uint64(maxSamples) {
 		return nil, 0.0
 	}
 
