@@ -95,7 +95,7 @@ func (t *EtaTracker) AddSample(completed uint64, target uint64, timestamp time.T
 		return &zeroDuration, 100
 	}
 
-	if timeSinceOldest == 0 {
+	if timeSinceOldest <= 0 {
 		return nil, 0.0
 	}
 	rate := float64(progressSinceOldest) / float64(timeSinceOldest)
