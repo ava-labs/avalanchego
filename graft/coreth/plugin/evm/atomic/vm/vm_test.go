@@ -6,7 +6,6 @@ package vm
 import (
 	"context"
 	"crypto/ecdsa"
-	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -434,9 +433,8 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork, scheme string
 		t.Fatal(err)
 	}
 
-	if err := parsedBlock.Verify(context.Background()); !errors.Is(err, ErrConflictingAtomicInputs) {
-		t.Fatalf("Expected to fail with err: %s, but found err: %s", ErrConflictingAtomicInputs, err)
-	}
+	err = parsedBlock.Verify(context.Background())
+	require.ErrorIs(t, err, ErrConflictingAtomicInputs)
 
 	if !rules.IsApricotPhase5 {
 		return
@@ -471,9 +469,8 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork, scheme string
 		t.Fatal(err)
 	}
 
-	if err := parsedBlock.Verify(context.Background()); !errors.Is(err, ErrConflictingAtomicInputs) {
-		t.Fatalf("Expected to fail with err: %s, but found err: %s", ErrConflictingAtomicInputs, err)
-	}
+	err = parsedBlock.Verify(context.Background())
+	require.ErrorIs(t, err, ErrConflictingAtomicInputs)
 }
 
 func TestReissueAtomicTxHigherGasPrice(t *testing.T) {
@@ -570,9 +567,8 @@ func testReissueAtomicTxHigherGasPrice(t *testing.T, scheme string) {
 				t.Fatal(err)
 			}
 
-			if err := vm.AtomicMempool.AddLocalTx(reissuanceTx1); !errors.Is(err, txpool.ErrConflict) {
-				t.Fatalf("Expected to fail with err: %s, but found err: %s", txpool.ErrConflict, err)
-			}
+			err = vm.AtomicMempool.AddLocalTx(reissuanceTx1)
+			require.ErrorIs(t, err, txpool.ErrConflict)
 
 			require.True(t, vm.AtomicMempool.Has(importTx1.ID()))
 			require.True(t, vm.AtomicMempool.Has(importTx2.ID()))
@@ -1397,9 +1393,8 @@ func testEmptyBlock(t *testing.T, scheme string) {
 	emptyBlockBytes, err := rlp.EncodeToBytes(emptyEthBlock)
 	require.NoError(t, err)
 
-	if _, err := vm.ParseBlock(context.Background(), emptyBlockBytes); !errors.Is(err, ErrEmptyBlock) {
-		t.Fatalf("VM should have failed with errEmptyBlock but got %s", err.Error())
-	}
+	_, err = vm.ParseBlock(context.Background(), emptyBlockBytes)
+	require.ErrorIs(t, err, ErrEmptyBlock)
 }
 
 // Regression test to ensure we can build blocks if we are starting with the
