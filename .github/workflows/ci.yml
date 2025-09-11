@@ -254,55 +254,101 @@ jobs:
   #      - name: Deploy kind with chaos mesh
   #        shell: bash
   #        run: nix develop --command ./scripts/run_task.sh test-robustness
-  c-chain-reexecution-firewood-v0-0-8:
+  # Add this job to your existing Tests workflow
+  # Add this job to your existing Tests workflow
+  c-chain-reexecution-firewood-matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        firewood-version:
+          - "v0.0.8"
+          - "v0.0.12"
     runs-on: avalanche-avalanchego-runner
-    container:
-      image: ghcr.io/elvis339/avalanchego-firewood:v0.0.8
     permissions:
       id-token: write
       contents: write
+    name: "C-Chain Re-execution (Firewood ${{ matrix.firewood-version }})"
     steps:
-      - uses: actions/checkout@v4
-      - name: Install ARC Dependencies
+      - name: Install dependencies
         shell: bash
+        # The xz-utils might be present on some containers
         run: |
-          # xz-utils might be present on some containers. Install if not present.
           if ! command -v xz &> /dev/null; then
             sudo apt-get update
             sudo apt-get install -y xz-utils
           fi
-      - name: Run C-Chain Re-Execution Benchmark
-        uses: ./.github/actions/c-chain-reexecution-benchmark
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/install-nix
+      - name: Cache Firewood Build
+        uses: actions/cache@v4
+        id: cache-firewood
         with:
-          config: firewood
-          start-block: 101
-          end-block: 200
-          prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
-          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          push-github-action-benchmark: false
-          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
-          aws-region: us-east-2
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          push-post-state: ''
-          runner_name: 'avalanche-avalanchego-runner'
+          path: |
+            ${{ github.workspace }}/firewood
+          key: firewood-${{ matrix.firewood-version }}-${{ runner.os }}-${{ runner.arch }}
+          restore-keys: |
+            firewood-${{ matrix.firewood-version }}-${{ runner.os }}-
+            firewood-${{ matrix.firewood-version }}-
+      - name: Setup Rust 1.88
+        if: steps.cache-firewood.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.88"
+      - name: Clone and Build Firewood
+        if: steps.cache-firewood.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          echo "Building Firewood ${{ matrix.firewood-version }}"
 
-  c-chain-reexecution-firewood-v0-0-12:
-    runs-on: avalanche-avalanchego-runner
-    container:
-      image: ghcr.io/elvis339/firewood-avalanchego:v0.0.12
-    permissions:
-      id-token: write
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install ARC Dependencies
-        shell: bash
-        run: |
-          # xz-utils might be present on some containers. Install if not present.
-          if ! command -v xz &> /dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y xz-utils
+          git clone https://github.com/ava-labs/firewood.git
+          cd firewood
+          git checkout ${{ matrix.firewood-version }}
+
+          cargo build --profile maxperf --features ethhash,logger
+
+          # Create consistent directory structure for Go to find the library
+          mkdir -p target/maxperf
+          if [ -f "target/maxperf/libfirewood_ffi.a" ]; then
+            echo "Found libfirewood_ffi.a in target/maxperf/"
+          else
+            echo "Looking for libfirewood_ffi.a in other locations..."
+            find target -name "libfirewood_ffi.a" -exec cp {} target/maxperf/ \;
+            if [ -f "target/maxperf/libfirewood_ffi.a" ]; then
+              echo "Copied libfirewood_ffi.a to target/maxperf/"
+            else
+              echo "libfirewood_ffi.a not found"
+              exit 1
+            fi
           fi
+
+          echo "Firewood build complete"
+          ls -la target/maxperf/
+      - name: Configure AvalancheGo to use Firewood
+        shell: nix develop --command bash -x {0}
+        run: |
+          echo "Configuring AvalancheGo to use local Firewood..."
+
+          # Configure go.mod to use local Firewood FFI
+          go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=./firewood/ffi
+
+          # Re-download dependencies after mod edit
+          go mod download
+
+          echo "Firewood ${{ matrix.firewood-version }} setup complete"
+
+          # Verify the setup
+          if [ -f "firewood/target/maxperf/libfirewood_ffi.a" ]; then
+            echo "Firewood library found"
+            ls -la firewood/target/maxperf/libfirewood_ffi.a
+          else
+            echo "Firewood library not found"
+            exit 1
+          fi
+
+          # Show go.mod changes
+          echo "Current go.mod replacements:"
+          grep -A5 -B5 "firewood" go.mod || echo "No firewood entries found"
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
@@ -316,4 +362,13 @@ jobs:
           aws-region: us-east-2
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ''
-          runner_name: 'avalanche-avalanchego-runner'
+          runner_name: 'avalanche-avalanchego-runner-firewood-${{ matrix.firewood-version }}'
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-firewood-${{ matrix.firewood-version }}
+          path: |
+            output.txt
+            benchmark-results/
+          retention-days: 30
