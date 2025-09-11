@@ -292,6 +292,12 @@ jobs:
           restore-keys: |
             firewood-${{ matrix.firewood-version }}-${{ runner.os }}-
             firewood-${{ matrix.firewood-version }}-
+      - name: Install build dependencies
+        if: steps.cache-firewood.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc
       - name: Setup Rust 1.88
         if: steps.cache-firewood.outputs.cache-hit != 'true'
         uses: dtolnay/rust-toolchain@stable
