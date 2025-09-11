@@ -304,6 +304,7 @@ func TestGetAllValidatorSetsCached(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	state := setupState(t, ctrl)
+	cachedState := validators.NewCachedState(state.server)
 
 	sk0, err := localsigner.New()
 	require.NoError(err)
@@ -326,8 +327,6 @@ func TestGetAllValidatorSetsCached(t *testing.T) {
 		PublicKey: nil,
 		Weight:    3,
 	}
-
-	cachedState := validators.NewCachedState(state.server)
 
 	subnetID1 := ids.GenerateTestID()
 	subnetID2 := ids.GenerateTestID()
@@ -435,7 +434,7 @@ func TestGetAllValidatorSetsCached(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
+		t.Run(test.name, func(_ *testing.T) {
 			if !test.expectedCacheHit {
 				state.server.EXPECT().GetAllValidatorSets(gomock.Any(), test.height).Return(test.returnedVdrSets, test.returnedErr).Times(1)
 			}
