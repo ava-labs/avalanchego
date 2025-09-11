@@ -131,10 +131,11 @@ func (m *Mempool) ForceAddTx(tx *atomic.Tx) error {
 func (m *Mempool) checkConflictTx(tx *atomic.Tx) (uint256.Int, ids.ID, []*atomic.Tx, error) {
 	utxoSet := tx.InputUTXOs()
 
-	var (
+	var ( //nolint:prealloc
 		highestGasPrice             uint256.Int
 		highestGasPriceConflictTxID ids.ID
-		conflictingTxs              []*atomic.Tx
+		// We don't know the length ahead of time (# of conflicts), so we don't want to preallocate
+		conflictingTxs []*atomic.Tx
 	)
 	for utxoID := range utxoSet {
 		// Get current gas price of the existing tx in the mempool

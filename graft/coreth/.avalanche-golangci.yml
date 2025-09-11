@@ -71,7 +71,7 @@ linters:
     - noctx
     - nolintlint
     - perfsprint
-    # - prealloc
+    - prealloc
     # - predeclared
     - revive
     - spancheck
