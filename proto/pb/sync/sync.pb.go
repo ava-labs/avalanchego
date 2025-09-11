@@ -548,10 +548,10 @@ func (x *Key) GetValue() []byte {
 	return nil
 }
 
+// If the message is present, the value is considered to be "something".
 type MaybeBytes struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Value         []byte                 `protobuf:"bytes,1,opt,name=value,proto3" json:"value,omitempty"`
-	IsNothing     bool                   `protobuf:"varint,2,opt,name=is_nothing,json=isNothing,proto3" json:"is_nothing,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -591,13 +591,6 @@ func (x *MaybeBytes) GetValue() []byte {
 		return x.Value
 	}
 	return nil
-}
-
-func (x *MaybeBytes) GetIsNothing() bool {
-	if x != nil {
-		return x.IsNothing
-	}
-	return false
 }
 
 type KeyValue struct {
@@ -703,12 +696,10 @@ const file_sync_sync_proto_rawDesc = "" +
 	"\x05value\x18\x02 \x01(\v2\x10.sync.MaybeBytesR\x05value\"3\n" +
 	"\x03Key\x12\x16\n" +
 	"\x06length\x18\x01 \x01(\x04R\x06length\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\fR\x05value\"A\n" +
+	"\x05value\x18\x02 \x01(\fR\x05value\"\"\n" +
 	"\n" +
 	"MaybeBytes\x12\x14\n" +
-	"\x05value\x18\x01 \x01(\fR\x05value\x12\x1d\n" +
-	"\n" +
-	"is_nothing\x18\x02 \x01(\bR\tisNothing\"2\n" +
+	"\x05value\x18\x01 \x01(\fR\x05value\"2\n" +
 	"\bKeyValue\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\fR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\fR\x05valueB/Z-github.com/ava-labs/avalanchego/proto/pb/syncb\x06proto3"
