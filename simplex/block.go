@@ -119,7 +119,8 @@ func computeDigest(bytes []byte) simplex.Digest {
 }
 
 type blockDeserializer struct {
-	parser block.Parser
+	parser       block.Parser
+	blockTracker *blockTracker
 }
 
 func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) (simplex.Block, error) {
@@ -139,11 +140,7 @@ func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) 
 		return nil, err
 	}
 
-	return &Block{
-		metadata: *md,
-		vmBlock:  vmblock,
-		digest:   computeDigest(bytes),
-	}, nil
+	return newBlock(*md, vmblock, d.blockTracker)
 }
 
 // blockTracker is used to ensure that blocks are properly rejected, if competing blocks are accepted.
