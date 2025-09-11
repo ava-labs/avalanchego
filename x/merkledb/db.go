@@ -1262,7 +1262,6 @@ func (db *merkleDB) VerifyRangeProof(
 	expectedEndRootID ids.ID,
 	maxLength int,
 ) error {
-	// use db parameters
 	return proof.Verify(
 		ctx,
 		start,

@@ -502,7 +502,7 @@ func (m *Manager) handleRangeProofResponse(
 		root,
 		int(request.KeyLimit),
 	); err != nil {
-		return fmt.Errorf("%w due to %w", errInvalidRangeProof, err)
+		return fmt.Errorf("%w: %w", errInvalidRangeProof, err)
 	}
 
 	// Replace all the key-value pairs in the DB from start to end with values from the response.
