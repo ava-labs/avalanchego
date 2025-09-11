@@ -165,6 +165,7 @@ func execute(
 
 		startTime     = time.Now()
 		timeOfNextLog = startTime.Add(logPeriod)
+		etaTracker    = timer.NewEtaTracker(10, 1.2)
 	)
 	defer func() {
 		iterator.Release()
@@ -194,6 +195,9 @@ func execute(
 	log("executing blocks",
 		zap.Uint64("numToExecute", totalNumberToProcess),
 	)
+
+	// Add the first sample to the EtaTracker to establish an accurate baseline
+	etaTracker.AddSample(0, totalNumberToProcess, startTime)
 
 	for !shouldHalt() && iterator.Next() {
 		blkBytes := iterator.Value()
@@ -237,15 +241,22 @@ func execute(
 		}
 
 		if now := time.Now(); now.After(timeOfNextLog) {
-			var (
-				numProcessed = totalNumberToProcess - tree.Len()
-				eta          = timer.EstimateETA(startTime, numProcessed, totalNumberToProcess)
-			)
-			log("executing blocks",
-				zap.Uint64("numExecuted", numProcessed),
-				zap.Uint64("numToExecute", totalNumberToProcess),
-				zap.Duration("eta", eta),
-			)
+			numProcessed := totalNumberToProcess - tree.Len()
+
+			// Use the tracked previous progress for accurate ETA calculation
+			currentProgress := numProcessed
+
+			etaPtr, progressPercentage := etaTracker.AddSample(currentProgress, totalNumberToProcess, now)
+			// Only log if we have a valid ETA estimate
+			if etaPtr != nil {
+				log("executing blocks",
+					zap.Uint64("numExecuted", numProcessed),
+					zap.Uint64("numToExecute", totalNumberToProcess),
+					zap.Duration("eta", *etaPtr),
+					zap.Float64("pctComplete", progressPercentage),
+				)
+			}
+
 			timeOfNextLog = now.Add(logPeriod)
 		}
 
