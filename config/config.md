@@ -289,7 +289,7 @@ It is possible to provide parameters for Subnets. Parameters here apply to all c
 
 | Flag | Env Var | Type | Default | Description |
 |--------|--------|------|----|--------------------|
-| `--subnet-config-dir` | `AVAGO_SUBNET_CONFIG_DIR` | string | `$HOME/.avalanchego/configs/subnets` | Specifies the directory that contains Subnet configs, as described above. If the flag is set explicitly, the specified folder must exist, or AvalancheGo will exit with an error. This flag is ignored if `--subnet-config-content` is specified. Example: Let's say we have a Subnet with ID `p4jUwqZsA2LuSftroCd3zb4ytH8W99oXKuKVZdsty7eQ3rXD6`. We can create a config file under the default `subnet-config-dir` at `$HOME/.avalanchego/configs/subnets/p4jUwqZsA2LuSftroCd3zb4ytH8W99oXKuKVZdsty7eQ3rXD6.json`. An example config file is: `{"validatorOnly": false, "consensusParameters": {"k": 25, "alpha": 18}}`. By default, none of these directories and/or files exist. You would need to create them manually if needed. |
+| `--subnet-config-dir` | `AVAGO_SUBNET_CONFIG_DIR` | string | `$HOME/.avalanchego/configs/subnets` | Specifies the directory that contains Subnet configs, as described above. If the flag is set explicitly, the specified folder must exist, or AvalancheGo will exit with an error. This flag is ignored if `--subnet-config-content` is specified. Example: Let's say we have a Subnet with ID `p4jUwqZsA2LuSftroCd3zb4ytH8W99oXKuKVZdsty7eQ3rXD6`. We can create a config file under the default `subnet-config-dir` at `$HOME/.avalanchego/configs/subnets/p4jUwqZsA2LuSftroCd3zb4ytH8W99oXKuKVZdsty7eQ3rXD6.json`. An example config file is: `{"validatorOnly": false, "consensusConfig":{"snowballParameters":{"k":25,"alpha":18}}}`. By default, none of these directories and/or files exist. You would need to create them manually if needed. |
 | `--subnet-config-content` | `AVAGO_SUBNET_CONFIG_CONTENT` | string | - | As an alternative to `--subnet-config-dir`, it allows specifying base64 encoded parameters for a Subnet. |
 
 ### Version
@@ -365,6 +365,14 @@ Staking economics configuration.
 | `--stake-max-consumption-rate` | `AVAGO_STAKE_MAX_CONSUMPTION_RATE` | uint | `120000` | The maximum percentage of the consumption rate for the remaining token supply in the minting period, which is 1 year on Mainnet. This can only be changed on a local network. |
 | `--stake-min-consumption-rate` | `AVAGO_STAKE_MIN_CONSUMPTION_RATE` | uint | `100000` | The minimum percentage of the consumption rate for the remaining token supply in the minting period, which is 1 year on Mainnet. This can only be changed on a local network. |
 | `--stake-supply-cap` | `AVAGO_STAKE_SUPPLY_CAP` | uint | `720000000000000000` | The maximum stake supply, in nAVAX, that can be placed on a validator. This can only be changed on a local network. |
+
+### Simplex Consensus
+
+Simplex consensus protocol parameters
+
+| Flag | Env Var | Type | Default | Description |
+|--------|--------|------|----|--------------------|
+| `--simplex-enabled` | `AVAGO_SIMPLEX_ENABLED` | bool | `false` | If true, enables simplex consensus.
 
 ### Snow Consensus
 
