@@ -15,6 +15,12 @@ import (
 
 const nAVAX = 1_000_000_000
 
+var TestACP176Config = Config{
+	MinGasPrice:        1,
+	TimeToDouble:       60,
+	TimeToFillCapacity: 5,
+}
+
 var (
 	readerTests = []struct {
 		name                        string
@@ -33,8 +39,8 @@ var (
 				TargetExcess: 0,
 			},
 			target:      MinTargetPerSecond,
-			maxCapacity: DefaultACP176Config.MinMaxCapacity(),
-			gasPrice:    DefaultACP176Config.MinGasPrice,
+			maxCapacity: TestACP176Config.MinMaxCapacity(),
+			gasPrice:    TestACP176Config.MinGasPrice,
 		},
 		{
 			name: "almost_excess_change",
@@ -46,8 +52,8 @@ var (
 			},
 			skipTestDesiredTargetExcess: true,
 			target:                      MinTargetPerSecond,
-			maxCapacity:                 DefaultACP176Config.MinMaxCapacity(),
-			gasPrice:                    2 * DefaultACP176Config.MinGasPrice,
+			maxCapacity:                 TestACP176Config.MinMaxCapacity(),
+			gasPrice:                    2 * TestACP176Config.MinGasPrice,
 		},
 		{
 			name: "small_excess_change",
@@ -58,8 +64,8 @@ var (
 				TargetExcess: 34, // Smallest excess that increases the target
 			},
 			target:      MinTargetPerSecond + 1,
-			maxCapacity: DefaultACP176Config.TargetToMaxCapacity() * (MinTargetPerSecond + 1),
-			gasPrice:    2 * DefaultACP176Config.MinGasPrice,
+			maxCapacity: TestACP176Config.TargetToMaxCapacity() * (MinTargetPerSecond + 1),
+			gasPrice:    2 * TestACP176Config.MinGasPrice,
 		},
 		{
 			name: "max_initial_excess_change",
@@ -71,8 +77,8 @@ var (
 			},
 			skipTestDesiredTargetExcess: true,
 			target:                      MinTargetPerSecond + 977,
-			maxCapacity:                 DefaultACP176Config.TargetToMaxCapacity() * (MinTargetPerSecond + 977),
-			gasPrice:                    3 * DefaultACP176Config.MinGasPrice,
+			maxCapacity:                 TestACP176Config.TargetToMaxCapacity() * (MinTargetPerSecond + 977),
+			gasPrice:                    3 * TestACP176Config.MinGasPrice,
 		},
 		{
 			name: "current_target",
@@ -83,8 +89,8 @@ var (
 				TargetExcess: 13_605_152, // 2^25 * ln(1.5)
 			},
 			target:      1_500_000,
-			maxCapacity: DefaultACP176Config.TargetToMaxCapacity() * 1_500_000,
-			gasPrice:    nAVAX*DefaultACP176Config.MinGasPrice + 2, // +2 due to approximation
+			maxCapacity: TestACP176Config.TargetToMaxCapacity() * 1_500_000,
+			gasPrice:    nAVAX*TestACP176Config.MinGasPrice + 2, // +2 due to approximation
 		},
 		{
 			name: "3m_target",
@@ -95,8 +101,8 @@ var (
 				TargetExcess: 36_863_312, // 2^25 * ln(3)
 			},
 			target:      3_000_000,
-			maxCapacity: DefaultACP176Config.TargetToMaxCapacity() * 3_000_000,
-			gasPrice:    100*nAVAX*DefaultACP176Config.MinGasPrice + 4, // +4 due to approximation
+			maxCapacity: TestACP176Config.TargetToMaxCapacity() * 3_000_000,
+			gasPrice:    100*nAVAX*TestACP176Config.MinGasPrice + 4, // +4 due to approximation
 		},
 		{
 			name: "6m_target",
@@ -107,8 +113,8 @@ var (
 				TargetExcess: 60_121_472, // 2^25 * ln(6)
 			},
 			target:      6_000_000,
-			maxCapacity: DefaultACP176Config.TargetToMaxCapacity() * 6_000_000,
-			gasPrice:    100*nAVAX*DefaultACP176Config.MinGasPrice + 4, // +4 due to approximation
+			maxCapacity: TestACP176Config.TargetToMaxCapacity() * 6_000_000,
+			gasPrice:    100*nAVAX*TestACP176Config.MinGasPrice + 4, // +4 due to approximation
 		},
 		{
 			name: "10m_target",
@@ -119,8 +125,8 @@ var (
 				TargetExcess: 77_261_935, // 2^25 * ln(10)
 			},
 			target:      10_000_000,
-			maxCapacity: DefaultACP176Config.TargetToMaxCapacity() * 10_000_000,
-			gasPrice:    100*nAVAX*DefaultACP176Config.MinGasPrice + 5, // +5 due to approximation
+			maxCapacity: TestACP176Config.TargetToMaxCapacity() * 10_000_000,
+			gasPrice:    100*nAVAX*TestACP176Config.MinGasPrice + 5, // +5 due to approximation
 		},
 		{
 			name: "100m_target",
@@ -131,8 +137,8 @@ var (
 				TargetExcess: 154_523_870, // 2^25 * ln(100)
 			},
 			target:      100_000_000,
-			maxCapacity: DefaultACP176Config.TargetToMaxCapacity() * 100_000_000,
-			gasPrice:    100*nAVAX*DefaultACP176Config.MinGasPrice + 5, // +5 due to approximation
+			maxCapacity: TestACP176Config.TargetToMaxCapacity() * 100_000_000,
+			gasPrice:    100*nAVAX*TestACP176Config.MinGasPrice + 5, // +5 due to approximation
 		},
 		{
 			name: "low_1b_target",
@@ -143,8 +149,8 @@ var (
 				TargetExcess: 231_785_804, // 2^25 * ln(1000)
 			},
 			target:      1_000_000_000 - 24,
-			maxCapacity: DefaultACP176Config.TargetToMaxCapacity() * (1_000_000_000 - 24),
-			gasPrice:    100 * nAVAX * DefaultACP176Config.MinGasPrice,
+			maxCapacity: TestACP176Config.TargetToMaxCapacity() * (1_000_000_000 - 24),
+			gasPrice:    100 * nAVAX * TestACP176Config.MinGasPrice,
 		},
 		{
 			name: "high_1b_target",
@@ -155,8 +161,8 @@ var (
 				TargetExcess: 231_785_805, // 2^25 * ln(1000) + 1
 			},
 			target:      1_000_000_000 + 6,
-			maxCapacity: DefaultACP176Config.TargetToMaxCapacity() * (1_000_000_000 + 6),
-			gasPrice:    100 * nAVAX * DefaultACP176Config.MinGasPrice,
+			maxCapacity: TestACP176Config.TargetToMaxCapacity() * (1_000_000_000 + 6),
+			gasPrice:    100 * nAVAX * TestACP176Config.MinGasPrice,
 		},
 		{
 			name: "largest_max_capacity",
@@ -168,7 +174,7 @@ var (
 			},
 			target:      1_844_674_384_269_701_322,
 			maxCapacity: 18_446_743_842_697_013_220,
-			gasPrice:    2 * DefaultACP176Config.MinGasPrice,
+			gasPrice:    2 * TestACP176Config.MinGasPrice,
 		},
 		{
 			name: "largest_int64_target",
@@ -180,7 +186,7 @@ var (
 			},
 			target:      9_223_371_923_824_614_091,
 			maxCapacity: math.MaxUint64,
-			gasPrice:    2 * DefaultACP176Config.MinGasPrice,
+			gasPrice:    2 * TestACP176Config.MinGasPrice,
 		},
 		{
 			name: "second_largest_uint64_target",
@@ -192,7 +198,7 @@ var (
 			},
 			target:      18_446_743_882_783_898_031,
 			maxCapacity: math.MaxUint64,
-			gasPrice:    2 * DefaultACP176Config.MinGasPrice,
+			gasPrice:    2 * TestACP176Config.MinGasPrice,
 		},
 		{
 			name: "largest_uint64_target",
@@ -204,7 +210,7 @@ var (
 			},
 			target:      math.MaxUint64,
 			maxCapacity: math.MaxUint64,
-			gasPrice:    2 * DefaultACP176Config.MinGasPrice,
+			gasPrice:    2 * TestACP176Config.MinGasPrice,
 		},
 		{
 			name: "largest_excess",
@@ -217,7 +223,7 @@ var (
 			skipTestDesiredTargetExcess: true,
 			target:                      math.MaxUint64,
 			maxCapacity:                 math.MaxUint64,
-			gasPrice:                    2 * DefaultACP176Config.MinGasPrice,
+			gasPrice:                    2 * TestACP176Config.MinGasPrice,
 		},
 	}
 	advanceTimeTests = []struct {
@@ -657,7 +663,7 @@ func BenchmarkTarget(b *testing.B) {
 func TestMaxCapacity(t *testing.T) {
 	for _, test := range readerTests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.maxCapacity, test.state.MaxCapacity(DefaultACP176Config))
+			require.Equal(t, test.maxCapacity, test.state.MaxCapacity(TestACP176Config))
 		})
 	}
 }
@@ -666,7 +672,7 @@ func BenchmarkMaxCapacity(b *testing.B) {
 	for _, test := range readerTests {
 		b.Run(test.name, func(b *testing.B) {
 			for range b.N {
-				test.state.MaxCapacity(DefaultACP176Config)
+				test.state.MaxCapacity(TestACP176Config)
 			}
 		})
 	}
@@ -675,7 +681,7 @@ func BenchmarkMaxCapacity(b *testing.B) {
 func TestGasPrice(t *testing.T) {
 	for _, test := range readerTests {
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.gasPrice, test.state.GasPrice(DefaultACP176Config))
+			require.Equal(t, test.gasPrice, test.state.GasPrice(TestACP176Config))
 		})
 	}
 }
@@ -684,7 +690,7 @@ func BenchmarkGasPrice(b *testing.B) {
 	for _, test := range readerTests {
 		b.Run(test.name, func(b *testing.B) {
 			for range b.N {
-				test.state.GasPrice(DefaultACP176Config)
+				test.state.GasPrice(TestACP176Config)
 			}
 		})
 	}
@@ -694,7 +700,7 @@ func TestAdvanceTime(t *testing.T) {
 	for _, test := range advanceTimeTests {
 		t.Run(test.name, func(t *testing.T) {
 			initial := test.initial
-			initial.AdvanceTime(test.seconds, DefaultACP176Config)
+			initial.AdvanceTime(test.seconds, TestACP176Config)
 			require.Equal(t, test.expected, initial)
 		})
 	}
@@ -705,7 +711,7 @@ func BenchmarkAdvanceTime(b *testing.B) {
 		b.Run(test.name, func(b *testing.B) {
 			for range b.N {
 				initial := test.initial
-				initial.AdvanceTime(test.seconds, DefaultACP176Config)
+				initial.AdvanceTime(test.seconds, TestACP176Config)
 			}
 		})
 	}
@@ -737,7 +743,7 @@ func TestUpdateTargetExcess(t *testing.T) {
 	for _, test := range updateTargetExcessTests {
 		t.Run(test.name, func(t *testing.T) {
 			initial := test.initial
-			initial.UpdateTargetExcess(test.desiredTargetExcess, DefaultACP176Config)
+			initial.UpdateTargetExcess(test.desiredTargetExcess, TestACP176Config)
 			require.Equal(t, test.expected, initial)
 		})
 	}
@@ -748,7 +754,7 @@ func BenchmarkUpdateTargetExcess(b *testing.B) {
 		b.Run(test.name, func(b *testing.B) {
 			for range b.N {
 				initial := test.initial
-				initial.UpdateTargetExcess(test.desiredTargetExcess, DefaultACP176Config)
+				initial.UpdateTargetExcess(test.desiredTargetExcess, TestACP176Config)
 			}
 		})
 	}

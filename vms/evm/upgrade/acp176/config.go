@@ -12,12 +12,6 @@ const (
 	ln2Precision                     = 100_000_000_000
 )
 
-var DefaultACP176Config = Config{
-	MinGasPrice:        1,
-	TimeToDouble:       60,
-	TimeToFillCapacity: 5,
-}
-
 type Config struct {
 	MinGasPrice        gas.Price // M
 	TimeToDouble       uint64    // in seconds
@@ -25,12 +19,12 @@ type Config struct {
 }
 
 func (p *Config) Verify() error {
-	if p.TimeToDouble > 0 || p.TimeToDouble > MaxTimeToDouble {
+	if p.TimeToDouble == 0 || p.TimeToDouble > MaxTimeToDouble {
 		return fmt.Errorf("time to double (%d) is invalid",
 			p.TimeToDouble,
 		)
 	}
-	if p.TimeToFillCapacity > 0 || p.TimeToFillCapacity > MaxTimeToFillCapacity {
+	if p.TimeToFillCapacity == 0 || p.TimeToFillCapacity > MaxTimeToFillCapacity {
 		return fmt.Errorf("time to fill capacity (%d) is invalid",
 			p.TimeToFillCapacity,
 		)
