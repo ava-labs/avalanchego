@@ -96,7 +96,7 @@ func TestMain(m *testing.M) {
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
-	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", true, "Enable metrics collection.")
+	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", false, "Enable metrics collection.")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
