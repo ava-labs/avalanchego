@@ -18,10 +18,10 @@ type BoundedWorkers struct {
 }
 
 // NewBoundedWorkers returns an instance of [BoundedWorkers] that
-// will spawn up to [max] goroutines.
-func NewBoundedWorkers(max int) *BoundedWorkers {
+// will spawn up to count goroutines.
+func NewBoundedWorkers(count int) *BoundedWorkers {
 	return &BoundedWorkers{
-		workerSpawner: make(chan struct{}, max),
+		workerSpawner: make(chan struct{}, count),
 		work:          make(chan func()),
 	}
 }
