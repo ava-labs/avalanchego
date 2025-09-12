@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package sync
+package merkledb_test
 
 import (
 	"context"
@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
 var _ p2p.Handler = (*flakyHandler)(nil)
@@ -27,10 +28,10 @@ var _ p2p.Handler = (*flakyHandler)(nil)
 func newDefaultDBConfig() merkledb.Config {
 	return merkledb.Config{
 		IntermediateWriteBatchSize:  100,
-		HistoryLength:               defaultRequestKeyLimit,
-		ValueNodeCacheSize:          defaultRequestKeyLimit,
-		IntermediateWriteBufferSize: defaultRequestKeyLimit,
-		IntermediateNodeCacheSize:   defaultRequestKeyLimit,
+		HistoryLength:               xsync.DefaultRequestKeyLimit,
+		ValueNodeCacheSize:          xsync.DefaultRequestKeyLimit,
+		IntermediateWriteBufferSize: xsync.DefaultRequestKeyLimit,
+		IntermediateNodeCacheSize:   xsync.DefaultRequestKeyLimit,
 		Reg:                         prometheus.NewRegistry(),
 		Tracer:                      trace.Noop,
 		BranchFactor:                merkledb.BranchFactor16,
@@ -42,7 +43,7 @@ func newFlakyRangeProofHandler(
 	db merkledb.MerkleDB,
 	modifyResponse func(response *merkledb.RangeProof),
 ) p2p.Handler {
-	handler := NewGetRangeProofHandler(db)
+	handler := xsync.NewGetRangeProofHandler(db)
 
 	c := counter{m: 2}
 	return &p2p.TestHandler{
@@ -75,7 +76,7 @@ func newFlakyChangeProofHandler(
 	db merkledb.MerkleDB,
 	modifyResponse func(response *merkledb.ChangeProof),
 ) p2p.Handler {
-	handler := NewGetChangeProofHandler(db)
+	handler := xsync.NewGetChangeProofHandler(db)
 
 	c := counter{m: 2}
 	return &p2p.TestHandler{
@@ -111,6 +112,23 @@ func newFlakyChangeProofHandler(
 			return responseBytes, nil
 		},
 	}
+}
+
+type p2pHandlerCancel struct {
+	p2p.Handler
+	action func()
+}
+
+func newRangeProofHandlerCancel(db merkledb.MerkleDB, action func()) *p2pHandlerCancel {
+	return &p2pHandlerCancel{
+		Handler: xsync.NewGetRangeProofHandler(db),
+		action:  action,
+	}
+}
+
+func (h *p2pHandlerCancel) AppRequest(ctx context.Context, id ids.NodeID, time time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+	h.action()
+	return h.Handler.AppRequest(ctx, id, time, requestBytes)
 }
 
 type flakyHandler struct {
