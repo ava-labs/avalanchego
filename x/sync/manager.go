@@ -29,8 +29,8 @@ import (
 )
 
 const (
-	defaultRequestKeyLimit      = maxKeyValuesLimit
-	defaultRequestByteSizeLimit = maxByteSizeLimit
+	DefaultRequestKeyLimit      = MaxKeyValuesLimit
+	DefaultRequestByteSizeLimit = maxByteSizeLimit
 	initialRetryWait            = 10 * time.Millisecond
 	maxRetryWait                = time.Second
 	retryWaitFactor             = 1.5 // Larger --> timeout grows more quickly
@@ -337,8 +337,8 @@ func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 		EndRootHash:   targetRootID[:],
 		StartKey:      protoutils.MaybeToProto(work.start),
 		EndKey:        protoutils.MaybeToProto(work.end),
-		KeyLimit:      defaultRequestKeyLimit,
-		BytesLimit:    defaultRequestByteSizeLimit,
+		KeyLimit:      DefaultRequestKeyLimit,
+		BytesLimit:    DefaultRequestByteSizeLimit,
 	}
 
 	requestBytes, err := proto.Marshal(request)
@@ -389,8 +389,8 @@ func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 		RootHash:   targetRootID[:],
 		StartKey:   protoutils.MaybeToProto(work.start),
 		EndKey:     protoutils.MaybeToProto(work.end),
-		KeyLimit:   defaultRequestKeyLimit,
-		BytesLimit: defaultRequestByteSizeLimit,
+		KeyLimit:   DefaultRequestKeyLimit,
+		BytesLimit: DefaultRequestByteSizeLimit,
 	}
 
 	requestBytes, err := proto.Marshal(request)
@@ -765,7 +765,7 @@ func (m *Manager) enqueueWork(work *workItem) {
 
 	// Split the remaining range into to 2.
 	// Find the middle point.
-	mid := midPoint(work.start, work.end)
+	mid := Midpoint(work.start, work.end)
 
 	if maybe.Equal(work.start, mid, bytes.Equal) || maybe.Equal(mid, work.end, bytes.Equal) {
 		// The range is too small to split.
@@ -790,7 +790,7 @@ func (m *Manager) enqueueWork(work *workItem) {
 // start is expected to be less than end
 // Nothing/nil [start] is treated as all 0's
 // Nothing/nil [end] is treated as all 255's
-func midPoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
+func Midpoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
 	start := startMaybe.Value()
 	end := endMaybe.Value()
 	length := max(len(end), len(start))

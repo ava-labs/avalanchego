@@ -1,13 +1,14 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package sync
+package merkledb_test
 
 import (
 	"bytes"
 	"context"
 	"math/rand"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -22,6 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
+
+	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
 var _ p2p.Handler = (*waitingHandler)(nil)
@@ -37,167 +40,54 @@ func Test_Creation(t *testing.T) {
 	require.NoError(err)
 
 	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
+	syncer, err := xsync.NewManager(xsync.ManagerConfig{
 		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(db)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(db)),
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 	require.NotNil(syncer)
-}
-
-func Test_Completion(t *testing.T) {
-	require := require.New(t)
-
-	emptyDB, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-	)
-	require.NoError(err)
-
-	emptyRoot, err := emptyDB.GetMerkleRoot(context.Background())
-	require.NoError(err)
-
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-	)
-	require.NoError(err)
-
-	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(emptyDB)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(emptyDB)),
-		TargetRoot:            emptyRoot,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-	}, prometheus.NewRegistry())
-	require.NoError(err)
-	require.NotNil(syncer)
-
 	require.NoError(syncer.Start(context.Background()))
 	require.NoError(syncer.Wait(context.Background()))
-
-	syncer.workLock.Lock()
-	require.Zero(syncer.unprocessedWork.Len())
-	require.Equal(1, syncer.processedWork.Len())
-	syncer.workLock.Unlock()
-}
-
-func Test_Midpoint(t *testing.T) {
-	require := require.New(t)
-
-	mid := midPoint(maybe.Some([]byte{1, 255}), maybe.Some([]byte{2, 1}))
-	require.Equal(maybe.Some([]byte{2, 0}), mid)
-
-	mid = midPoint(maybe.Nothing[[]byte](), maybe.Some([]byte{255, 255, 0}))
-	require.Equal(maybe.Some([]byte{127, 255, 128}), mid)
-
-	mid = midPoint(maybe.Some([]byte{255, 255, 255}), maybe.Some([]byte{255, 255}))
-	require.Equal(maybe.Some([]byte{255, 255, 127, 128}), mid)
-
-	mid = midPoint(maybe.Nothing[[]byte](), maybe.Some([]byte{255}))
-	require.Equal(maybe.Some([]byte{127, 127}), mid)
-
-	mid = midPoint(maybe.Some([]byte{1, 255}), maybe.Some([]byte{255, 1}))
-	require.Equal(maybe.Some([]byte{128, 128}), mid)
-
-	mid = midPoint(maybe.Some([]byte{140, 255}), maybe.Some([]byte{141, 0}))
-	require.Equal(maybe.Some([]byte{140, 255, 127}), mid)
-
-	mid = midPoint(maybe.Some([]byte{126, 255}), maybe.Some([]byte{127}))
-	require.Equal(maybe.Some([]byte{126, 255, 127}), mid)
-
-	mid = midPoint(maybe.Nothing[[]byte](), maybe.Nothing[[]byte]())
-	require.Equal(maybe.Some([]byte{127}), mid)
-
-	low := midPoint(maybe.Nothing[[]byte](), mid)
-	require.Equal(maybe.Some([]byte{63, 127}), low)
-
-	high := midPoint(mid, maybe.Nothing[[]byte]())
-	require.Equal(maybe.Some([]byte{191}), high)
-
-	mid = midPoint(maybe.Some([]byte{255, 255}), maybe.Nothing[[]byte]())
-	require.Equal(maybe.Some([]byte{255, 255, 127, 127}), mid)
-
-	mid = midPoint(maybe.Some([]byte{255}), maybe.Nothing[[]byte]())
-	require.Equal(maybe.Some([]byte{255, 127, 127}), mid)
-
-	for i := 0; i < 5000; i++ {
-		r := rand.New(rand.NewSource(int64(i))) // #nosec G404
-
-		start := make([]byte, r.Intn(99)+1)
-		_, err := r.Read(start)
-		require.NoError(err)
-
-		end := make([]byte, r.Intn(99)+1)
-		_, err = r.Read(end)
-		require.NoError(err)
-
-		for bytes.Equal(start, end) {
-			_, err = r.Read(end)
-			require.NoError(err)
-		}
-
-		if bytes.Compare(start, end) == 1 {
-			start, end = end, start
-		}
-
-		mid = midPoint(maybe.Some(start), maybe.Some(end))
-		require.Equal(-1, bytes.Compare(start, mid.Value()))
-		require.Equal(-1, bytes.Compare(mid.Value(), end))
-	}
 }
 
 func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	require := require.New(t)
-
+	ctx := context.Background()
 	now := time.Now().UnixNano()
+
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
 	dbToSync, err := generateTrie(t, r, 1000)
 	require.NoError(err)
-	syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
-	require.NoError(err)
 
 	db, err := merkledb.New(
-		context.Background(),
+		ctx,
 		memdb.New(),
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
 
-	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
-		TargetRoot:            syncRoot,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-	}, prometheus.NewRegistry())
+	// sync db to the same state as dbToSync
+	proof, err := dbToSync.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1000)
 	require.NoError(err)
-	require.NotNil(syncer)
+	nextKey, err := db.CommitRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), proof)
+	require.NoError(err)
+	require.True(nextKey.IsNothing())
 
-	require.NoError(syncer.Start(context.Background()))
-	require.NoError(syncer.Wait(context.Background()))
-
-	proof, err := dbToSync.GetRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 500)
+	proof, err = dbToSync.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 500)
 	require.NoError(err)
 
 	// the two dbs should be in sync, so next key should be nil
 	lastKey := proof.KeyChanges[len(proof.KeyChanges)-1].Key
-	nextKey, err := db.CommitRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), proof)
+	nextKey, err = db.CommitRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), proof)
 	require.NoError(err)
 	require.True(nextKey.IsNothing())
 
 	// add an extra value to sync db past the last key returned
-	newKey := midPoint(maybe.Some(lastKey), maybe.Nothing[[]byte]())
+	newKey := xsync.Midpoint(maybe.Some(lastKey), maybe.Nothing[[]byte]())
 	newKeyVal := newKey.Value()
 	require.NoError(db.Put(newKeyVal, []byte{1}))
 
@@ -225,7 +115,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 		// both nibbles were 0, so move onto the next byte
 	}
 
-	nextKey, err = db.CommitRangeProof(context.Background(), maybe.Nothing[[]byte](), maybe.Some(endPointBeforeNewKey), proof)
+	nextKey, err = db.CommitRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Some(endPointBeforeNewKey), proof)
 	require.NoError(err)
 
 	// next key would be after the end of the range, so it returns Nothing instead
@@ -343,7 +233,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 
 	// add an extra value to local db
 	lastKey := rangeProof.KeyChanges[len(rangeProof.KeyChanges)-1].Key
-	midpoint := midPoint(maybe.Some(lastKey), maybe.Nothing[[]byte]())
+	midpoint := xsync.Midpoint(maybe.Some(lastKey), maybe.Nothing[[]byte]())
 	midPointVal := midpoint.Value()
 
 	require.NoError(db.Put(midPointVal, []byte{1}))
@@ -735,7 +625,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			name: "range proof server flake",
 			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
 				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, &flakyHandler{
-					Handler: NewGetRangeProofHandler(db),
+					Handler: xsync.NewGetRangeProofHandler(db),
 					c:       &counter{m: 2},
 				})
 			},
@@ -744,7 +634,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			name: "change proof bad response - too many keys in response",
 			changeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
 				handler := newFlakyChangeProofHandler(t, db, func(response *merkledb.ChangeProof) {
-					response.KeyChanges = append(response.KeyChanges, make([]merkledb.KeyChange, defaultRequestKeyLimit)...)
+					response.KeyChanges = append(response.KeyChanges, make([]merkledb.KeyChange, xsync.DefaultRequestKeyLimit)...)
 				})
 
 				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
@@ -786,7 +676,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			name: "change proof flaky server",
 			changeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
 				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, &flakyHandler{
-					Handler: NewGetChangeProofHandler(db),
+					Handler: xsync.NewGetChangeProofHandler(db),
 					c:       &counter{m: 2},
 				})
 			},
@@ -798,7 +688,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			require := require.New(t)
 
 			ctx := context.Background()
-			dbToSync, err := generateTrie(t, r, 3*maxKeyValuesLimit)
+			dbToSync, err := generateTrie(t, r, 3*xsync.MaxKeyValuesLimit)
 			require.NoError(err)
 
 			syncRoot, err := dbToSync.GetMerkleRoot(ctx)
@@ -816,19 +706,19 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 				changeProofClient *p2p.Client
 			)
 
-			rangeProofHandler := NewGetRangeProofHandler(dbToSync)
+			rangeProofHandler := xsync.NewGetRangeProofHandler(dbToSync)
 			rangeProofClient = p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, rangeProofHandler)
 			if tt.rangeProofClient != nil {
 				rangeProofClient = tt.rangeProofClient(dbToSync)
 			}
 
-			changeProofHandler := NewGetChangeProofHandler(dbToSync)
+			changeProofHandler := xsync.NewGetChangeProofHandler(dbToSync)
 			changeProofClient = p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, changeProofHandler)
 			if tt.changeProofClient != nil {
 				changeProofClient = tt.changeProofClient(dbToSync)
 			}
 
-			syncer, err := NewManager(ManagerConfig{
+			syncer, err := xsync.NewManager(xsync.ManagerConfig{
 				DB:                    db,
 				RangeProofClient:      rangeProofClient,
 				ChangeProofClient:     changeProofClient,
@@ -886,7 +776,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
-	dbToSync, err := generateTrie(t, r, 3*maxKeyValuesLimit)
+	dbToSync, err := generateTrie(t, r, 3*xsync.MaxKeyValuesLimit)
 	require.NoError(err)
 	syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
 	require.NoError(err)
@@ -899,36 +789,28 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.NoError(err)
 
 	ctx := context.Background()
-	syncer, err := NewManager(ManagerConfig{
+	cancelCtx, cancel := context.WithCancel(ctx)
+	syncer, err := xsync.NewManager(xsync.ManagerConfig{
 		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, newRangeProofHandlerCancel(dbToSync, cancel)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync)),
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 	require.NotNil(syncer)
-	require.NoError(syncer.Start(context.Background()))
 
-	// Wait until we've processed some work
-	// before updating the sync target.
-	require.Eventually(
-		func() bool {
-			syncer.workLock.Lock()
-			defer syncer.workLock.Unlock()
-
-			return syncer.processedWork.Len() > 0
-		},
-		5*time.Second,
-		5*time.Millisecond,
-	)
+	// Start syncing from the server, will be cancelled by the range proof handler
+	require.NoError(syncer.Start(cancelCtx))
+	err = syncer.Wait(cancelCtx)
+	require.ErrorIs(err, context.Canceled)
 	syncer.Close()
 
-	newSyncer, err := NewManager(ManagerConfig{
+	newSyncer, err := xsync.NewManager(xsync.ManagerConfig{
 		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(dbToSync)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(dbToSync)),
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(dbToSync)),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync)),
 		TargetRoot:            syncRoot,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
@@ -945,155 +827,52 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.Equal(syncRoot, newRoot)
 }
 
-func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
-	t.Skip("FLAKY")
-
+func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require := require.New(t)
+	ctx := context.Background()
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
 
-	dbToSync, err := generateTrie(t, r, 3*maxKeyValuesLimit)
+	// Generate a source DB with two roots
+	dbToSync, err := generateTrie(t, r, 1000)
 	require.NoError(err)
-
-	firstSyncRoot, err := dbToSync.GetMerkleRoot(context.Background())
+	root1, err := dbToSync.GetMerkleRoot(ctx)
 	require.NoError(err)
-
-	for x := 0; x < 100; x++ {
-		key := make([]byte, r.Intn(50))
-		_, err = r.Read(key)
-		require.NoError(err)
-
-		val := make([]byte, r.Intn(50))
-		_, err = r.Read(val)
-		require.NoError(err)
-
-		require.NoError(dbToSync.Put(key, val))
-
-		deleteKeyStart := make([]byte, r.Intn(50))
-		_, err = r.Read(deleteKeyStart)
-		require.NoError(err)
-
-		it := dbToSync.NewIteratorWithStart(deleteKeyStart)
-		if it.Next() {
-			require.NoError(dbToSync.Delete(it.Key()))
-		}
-		require.NoError(it.Error())
-		it.Release()
-	}
-
-	secondSyncRoot, err := dbToSync.GetMerkleRoot(context.Background())
+	val, _ := dbToSync.Get([]byte{0}) // get any value if it exists
+	require.NoError(dbToSync.Put([]byte{0}, append(val, 0)))
+	root2, err := dbToSync.GetMerkleRoot(ctx)
 	require.NoError(err)
+	require.NotEqual(root1, root2)
 
 	db, err := merkledb.New(
-		context.Background(),
+		ctx,
 		memdb.New(),
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
 
-	// Only let one response go through until we update the root.
-	updatedRootChan := make(chan struct{}, 1)
-	updatedRootChan <- struct{}{}
-
-	ctx := context.Background()
-	rangeProofClient := p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, &waitingHandler{
-		handler:         NewGetRangeProofHandler(dbToSync),
-		updatedRootChan: updatedRootChan,
-	})
-
-	changeProofClient := p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, &waitingHandler{
-		handler:         NewGetChangeProofHandler(dbToSync),
-		updatedRootChan: updatedRootChan,
-	})
-
-	syncer, err := NewManager(ManagerConfig{
+	rangeProofHandler := newRangeProofHandlerCancel(dbToSync, func() {})
+	m, err := xsync.NewManager(xsync.ManagerConfig{
 		DB:                    db,
-		RangeProofClient:      rangeProofClient,
-		ChangeProofClient:     changeProofClient,
-		TargetRoot:            firstSyncRoot,
-		SimultaneousWorkLimit: 5,
-		Log:                   logging.NoLog{},
-	}, prometheus.NewRegistry())
-	require.NoError(err)
-	require.NotNil(syncer)
-
-	require.NoError(syncer.Start(context.Background()))
-
-	// Wait until we've processed some work
-	// before updating the sync target.
-	require.Eventually(
-		func() bool {
-			syncer.workLock.Lock()
-			defer syncer.workLock.Unlock()
-
-			return syncer.processedWork.Len() > 0
-		},
-		5*time.Second,
-		10*time.Millisecond,
-	)
-	require.NoError(syncer.UpdateSyncTarget(secondSyncRoot))
-	close(updatedRootChan)
-
-	require.NoError(syncer.Wait(context.Background()))
-	require.NoError(syncer.Error())
-
-	newRoot, err := db.GetMerkleRoot(context.Background())
-	require.NoError(err)
-	require.Equal(secondSyncRoot, newRoot)
-}
-
-func Test_Sync_UpdateSyncTarget(t *testing.T) {
-	require := require.New(t)
-
-	db, err := merkledb.New(
-		context.Background(),
-		memdb.New(),
-		newDefaultDBConfig(),
-	)
-	require.NoError(err)
-	ctx := context.Background()
-	m, err := NewManager(ManagerConfig{
-		DB:                    db,
-		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetRangeProofHandler(db)),
-		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, NewGetChangeProofHandler(db)),
-		TargetRoot:            ids.Empty,
+		RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, rangeProofHandler),
+		ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync)),
+		TargetRoot:            root1,
 		SimultaneousWorkLimit: 5,
 		Log:                   logging.NoLog{},
 	}, prometheus.NewRegistry())
 	require.NoError(err)
 
-	// Populate [m.processWork] to ensure that UpdateSyncTarget
-	// moves the work to [m.unprocessedWork].
-	item := &workItem{
-		start:       maybe.Some([]byte{1}),
-		end:         maybe.Some([]byte{2}),
-		localRootID: ids.GenerateTestID(),
+	// Update sync target on first request
+	once := &sync.Once{}
+	rangeProofHandler.action = func() {
+		once.Do(func() {
+			require.NoError(m.UpdateSyncTarget(root2))
+		})
 	}
-	m.processedWork.Insert(item)
-
-	// Make sure that [m.unprocessedWorkCond] is signaled.
-	gotSignalChan := make(chan struct{})
-	// Don't UpdateSyncTarget until we're waiting for the signal.
-	startedWaiting := make(chan struct{})
-	go func() {
-		m.workLock.Lock()
-		defer m.workLock.Unlock()
-
-		close(startedWaiting)
-		m.unprocessedWorkCond.Wait()
-		close(gotSignalChan)
-	}()
-
-	<-startedWaiting
-	newSyncRoot := ids.GenerateTestID()
-	require.NoError(m.UpdateSyncTarget(newSyncRoot))
-	<-gotSignalChan
-
-	require.Equal(newSyncRoot, m.config.TargetRoot)
-	require.Zero(m.processedWork.Len())
-	require.Equal(1, m.unprocessedWork.Len())
+	require.NoError(m.Start(ctx))
+	require.NoError(m.Wait(ctx))
 }
 
 func generateTrie(t *testing.T, r *rand.Rand, count int) (merkledb.MerkleDB, error) {
