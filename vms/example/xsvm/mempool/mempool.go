@@ -1,15 +1,20 @@
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package mempool
 
 import (
 	"context"
+	"fmt"
 	"sync"
+
+	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/builder"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 const (
@@ -65,7 +70,10 @@ func (g *GossipMempool) Add(t *tx.Tx) error {
 
 func (g *GossipMempool) AddWithContext(ctx context.Context, t *tx.Tx) error {
 	// no need to add to g.mempool, since the builder adds to g.mempool via its reference
-	g.Builder.AddTx(ctx, t)
+	err := g.Builder.AddTx(ctx, t)
+	if err != nil {
+		return fmt.Errorf("failed to add tx to builder: %w", err)
+	}
 
 	// note: we do not verify transactions that are gossiped to us.
 	g.lock.Lock()

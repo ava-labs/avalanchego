@@ -145,7 +145,10 @@ func (vm *VM) Initialize(
 		time.Minute,
 	)
 
-	vm.setAndInitializeMempool(metrics)
+	err = vm.setAndInitializeMempool(metrics)
+	if err != nil {
+		return fmt.Errorf("failed to initialize mempool: %w", err)
+	}
 
 	chainContext.Log.Info("initialized xsvm",
 		zap.Stringer("lastAcceptedID", vm.chain.LastAccepted()),

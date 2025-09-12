@@ -62,7 +62,11 @@ func (b *builder) AddTx(_ context.Context, newTx *tx.Tx) error {
 	b.pendingTxsCond.L.Lock()
 	defer b.pendingTxsCond.L.Unlock()
 
-	b.pendingTxs.Add(newTx)
+	err := b.pendingTxs.Add(newTx)
+	if err != nil {
+		return err
+	}
+
 	b.pendingTxsCond.Broadcast()
 	return nil
 }
