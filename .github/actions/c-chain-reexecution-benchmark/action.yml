@@ -52,6 +52,9 @@ inputs:
   push-post-state:
     description: 'S3 destination to copy the current-state directory after completing re-execution. If empty, this will be skipped.'
     default: ''
+  metrics-enabled:
+    description: "Whether to enable metrics collection for the benchmark."
+    default: true
 
 runs:
   using: composite
@@ -67,6 +70,7 @@ runs:
           echo "END_BLOCK=${{ inputs.end-block }}"
           echo "BLOCK_DIR_SRC=${{ inputs.block-dir-src }}"
           echo "CURRENT_STATE_DIR_SRC=${{ inputs.current-state-dir-src }}"
+          echo "METRICS_ENABLED=${{ inputs.metrics-enabled }}"
         } >> $GITHUB_ENV
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
@@ -87,6 +91,7 @@ runs:
             LABELS=${{ env.LABELS }} \
             BENCHMARK_OUTPUT_FILE=${{ env.BENCHMARK_OUTPUT_FILE }} \
             RUNNER_NAME=${{ inputs.runner_name }}
+            METRICS_ENABLED=${{ env.METRICS_ENABLED }}
         run: ./scripts/run_task.sh reexecute-cchain-range-with-copied-data
 
         prometheus_push_url: ${{ inputs.prometheus-push-url }}

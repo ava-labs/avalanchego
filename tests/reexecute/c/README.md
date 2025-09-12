@@ -24,7 +24,7 @@ nix develop
 
 If using AWS to push/pull S3 buckets, configure your AWS profile with the required access. The instructions here utilize the S3 bucket `s3://avalanchego-bootstrap-testing` in `us-east-2` under the Ava Labs Experimental AWS account.
 
-To authenticate metrics collection (enabled by default), provide the Prometheus credentials referenced in the e2e [README](../../e2e/README.md#monitoring).
+To authenticate metrics collection (disabled by default), provide the Prometheus credentials referenced in the e2e [README](../../e2e/README.md#monitoring).
 
 ## Import Blocks
 
