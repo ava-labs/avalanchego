@@ -78,7 +78,8 @@ runs:
         role-to-assume: ${{ inputs.aws-role }}
         aws-region: ${{ inputs.aws-region }}
         role-duration-seconds: ${{ inputs.aws-role-duration-seconds }}
-    - name: Run C-Chain Re-Execution
+    - name: Run C-Chain Re-Execution (with monitoring)
+      if: ${{ inputs.metrics-enabled == 'true' }}
       uses: ./.github/actions/run-monitored-tmpnet-cmd
       with:
         run_env: |
@@ -99,6 +100,22 @@ runs:
         prometheus_password: ${{ inputs.prometheus-password }}
         grafana_dashboard_id: 'Gl1I20mnk/c-chain'
         runtime: "" # Set runtime input to empty string to disable log collection
+
+    - name: Run C-Chain Re-Execution (without monitoring)
+      if: ${{ inputs.metrics-enabled != 'true' }}
+      shell: bash
+      env:
+        CONFIG: ${{ inputs.config }}
+        EXECUTION_DATA_DIR: ${{ env.EXECUTION_DATA_DIR }}
+        BLOCK_DIR_SRC: ${{ env.BLOCK_DIR_SRC }}
+        CURRENT_STATE_DIR_SRC: ${{ env.CURRENT_STATE_DIR_SRC }}
+        START_BLOCK: ${{ env.START_BLOCK }}
+        END_BLOCK: ${{ env.END_BLOCK }}
+        LABELS: ${{ env.LABELS }}
+        BENCHMARK_OUTPUT_FILE: ${{ env.BENCHMARK_OUTPUT_FILE }}
+        RUNNER_NAME: ${{ inputs.runner_name }}
+        METRICS_ENABLED: ${{ env.METRICS_ENABLED }}
+      run: ./scripts/run_task.sh reexecute-cchain-range-with-copied-data
 
     - name: Compare Benchmark Results
       uses: benchmark-action/github-action-benchmark@v1
