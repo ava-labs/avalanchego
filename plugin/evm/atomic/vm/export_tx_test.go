@@ -1718,7 +1718,6 @@ func TestNewExportTx(t *testing.T) {
 				}
 			}()
 
-			parent := vm.LastAcceptedExtendedBlock()
 			importAmount := uint64(50000000)
 			utxoID := avax.UTXOID{TxID: ids.GenerateTestID()}
 
@@ -1780,9 +1779,8 @@ func TestNewExportTx(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			parent = vm.LastAcceptedExtendedBlock()
+			parent := vm.LastAcceptedExtendedBlock()
 			exportAmount := uint64(5000000)
-
 			statedb, err := vm.Ethereum().BlockChain().State()
 			if err != nil {
 				t.Fatal(err)
@@ -1881,7 +1879,6 @@ func TestNewExportTxMulticoin(t *testing.T) {
 				}
 			}()
 
-			parent := vm.LastAcceptedExtendedBlock()
 			importAmount := uint64(50000000)
 			utxoID := avax.UTXOID{TxID: ids.GenerateTestID()}
 
@@ -1973,11 +1970,10 @@ func TestNewExportTxMulticoin(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			parent = vm.LastAcceptedExtendedBlock()
+			parent := vm.LastAcceptedExtendedBlock()
 			exportAmount := uint64(5000000)
-
 			testKeys0Addr := vmtest.TestKeys[0].EthAddress()
-			exportId, err := ids.ToShortID(testKeys0Addr[:])
+			exportID, err := ids.ToShortID(testKeys0Addr[:])
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1988,7 +1984,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 			}
 
 			wrappedStateDB := extstate.New(statedb)
-			tx, err = atomic.NewExportTx(vm.Ctx, vm.CurrentRules(), wrappedStateDB, tid, exportAmount, vm.Ctx.XChainID, exportId, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{key})
+			tx, err = atomic.NewExportTx(vm.Ctx, vm.CurrentRules(), wrappedStateDB, tid, exportAmount, vm.Ctx.XChainID, exportID, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{key})
 			if err != nil {
 				t.Fatal(err)
 			}
