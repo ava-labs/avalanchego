@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
@@ -89,13 +90,13 @@ func (v *kubeRuntimeVars) register(stringVar varFunc[string], uintVar varFunc[ui
 
 func (v *kubeRuntimeVars) getKubeRuntimeConfig() (*tmpnet.KubeRuntimeConfig, error) {
 	if len(v.namespace) == 0 {
-		return nil, errKubeNamespaceRequired
+		return nil, stacktrace.Wrap(errKubeNamespaceRequired)
 	}
 	if len(v.image) == 0 {
-		return nil, errKubeImageRequired
+		return nil, stacktrace.Wrap(errKubeImageRequired)
 	}
 	if v.volumeSizeGB < tmpnet.MinimumVolumeSizeGB {
-		return nil, errKubeMinVolumeSizeRequired
+		return nil, stacktrace.Wrap(errKubeMinVolumeSizeRequired)
 	}
 	return &tmpnet.KubeRuntimeConfig{
 		ConfigPath:             v.config.Path,
