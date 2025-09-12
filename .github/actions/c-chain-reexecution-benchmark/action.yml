@@ -104,6 +104,8 @@ runs:
     - name: Run C-Chain Re-Execution (without monitoring)
       if: ${{ inputs.metrics-enabled != 'true' }}
       uses: ./.github/actions/install-nix
+      with:
+        command: 'task reexecute-cchain-range-with-copied-data'
       env:
         CONFIG: ${{ inputs.config }}
         EXECUTION_DATA_DIR: ${{ env.EXECUTION_DATA_DIR }}
@@ -115,7 +117,6 @@ runs:
         BENCHMARK_OUTPUT_FILE: ${{ env.BENCHMARK_OUTPUT_FILE }}
         RUNNER_NAME: ${{ inputs.runner_name }}
         METRICS_ENABLED: ${{ env.METRICS_ENABLED }}
-      run: nix develop --command bash -x -c "task reexecute-cchain-range-with-copied-data"
 
     - name: Compare Benchmark Results
       uses: benchmark-action/github-action-benchmark@v1
