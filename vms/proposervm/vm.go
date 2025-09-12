@@ -7,14 +7,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
+	"connectrpc.com/grpcreflect"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
+	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -234,6 +237,21 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 		return err
 	}
 	return vm.ChainVM.Shutdown(ctx)
+}
+
+func (vm *VM) NewHTTPHandler(context.Context) (http.Handler, error) {
+	mux := http.NewServeMux()
+
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(proposervmconnect.ProposerVMName),
+	)
+	mux.Handle(reflectionPattern, reflectionHandler)
+
+	service := &service{vm: vm}
+	proposerVMPath, proposerVMHandler := proposervmconnect.NewProposerVMHandler(service)
+	mux.Handle(proposerVMPath, proposerVMHandler)
+
+	return mux, nil
 }
 
 func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
