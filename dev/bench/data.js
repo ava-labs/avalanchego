@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1757581872508,
+  "lastUpdate": 1757668202591,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -1004,6 +1004,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-blacksmith-4vcpu-ubuntu-2404",
             "value": 104.1,
+            "unit": "mgas/s",
+            "extra": "1 times\n6 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "maru",
+            "username": "maru-ava",
+            "email": "maru.newby@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "a5ee7a40079a0e3a6a5b7bd8da1434f4cc0e3388",
+          "message": "[tmpnet] Add optional stack traces to errors originating from tmpnet (#4262)\n\nSigned-off-by: maru <maru.newby@avalabs.org>\nCo-authored-by: rodrigo <77309055+RodrigoVillar@users.noreply.github.com>",
+          "timestamp": "2025-09-11T21:12:09Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/a5ee7a40079a0e3a6a5b7bd8da1434f4cc0e3388"
+        },
+        "date": 1757668201383,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-blacksmith-4vcpu-ubuntu-2404",
+            "value": 129.9,
             "unit": "mgas/s",
             "extra": "1 times\n6 procs"
           }
