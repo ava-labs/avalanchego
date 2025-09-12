@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests"
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -67,17 +68,17 @@ func main() {
 		RunE: func(*cobra.Command, []string) error {
 			log, err := tests.LoggerForFormat("", rawLogFormat)
 			if err != nil {
-				return err
+				return stacktrace.Wrap(err)
 			}
 
 			nodeCount, err := startNetworkVars.GetNodeCount()
 			if err != nil {
-				return err
+				return stacktrace.Wrap(err)
 			}
 
 			nodeRuntimeConfig, err := startNetworkVars.GetNodeRuntimeConfig()
 			if err != nil {
-				return err
+				return stacktrace.Wrap(err)
 			}
 
 			network := &tmpnet.Network{
@@ -88,7 +89,7 @@ func main() {
 
 			timeout, err := nodeRuntimeConfig.GetNetworkStartTimeout(nodeCount)
 			if err != nil {
-				return err
+				return stacktrace.Wrap(err)
 			}
 			log.Info("waiting for network to start",
 				zap.Float64("timeoutSeconds", timeout.Seconds()),
@@ -103,7 +104,7 @@ func main() {
 				startNetworkVars.RootNetworkDir,
 			); err != nil {
 				log.Error("failed to bootstrap network", zap.Error(err))
-				return err
+				return stacktrace.Wrap(err)
 			}
 
 			// Symlink the new network to the 'latest' network to simplify usage
@@ -111,10 +112,10 @@ func main() {
 			networkDirName := filepath.Base(network.Dir)
 			latestSymlinkPath := filepath.Join(networkRootDir, "latest")
 			if err := os.Remove(latestSymlinkPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
-				return err
+				return stacktrace.Wrap(err)
 			}
 			if err := os.Symlink(networkDirName, latestSymlinkPath); err != nil {
-				return err
+				return stacktrace.Wrap(err)
 			}
 
 			fmt.Fprintln(os.Stdout, "\nConfigure tmpnetctl to target this network by default with one of the following statements:")
@@ -137,16 +138,16 @@ func main() {
 		Short: "Stop a temporary network",
 		RunE: func(*cobra.Command, []string) error {
 			if len(networkDir) == 0 {
-				return errNetworkDirRequired
+				return stacktrace.Wrap(errNetworkDirRequired)
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
 			defer cancel()
 			log, err := tests.LoggerForFormat("", rawLogFormat)
 			if err != nil {
-				return err
+				return stacktrace.Wrap(err)
 			}
 			if err := tmpnet.StopNetwork(ctx, log, networkDir); err != nil {
-				return err
+				return stacktrace.Wrap(err)
 			}
 			fmt.Fprintf(os.Stdout, "Stopped network configured at: %s\n", networkDir)
 			return nil
@@ -159,11 +160,11 @@ func main() {
 		Short: "Restart a temporary network",
 		RunE: func(*cobra.Command, []string) error {
 			if len(networkDir) == 0 {
-				return errNetworkDirRequired
+				return stacktrace.Wrap(errNetworkDirRequired)
 			}
 			log, err := tests.LoggerForFormat("", rawLogFormat)
 			if err != nil {
-				return err
+				return stacktrace.Wrap(err)
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), tmpnet.DefaultNetworkTimeout)
 			defer cancel()
@@ -180,7 +181,7 @@ func main() {
 			defer cancel()
 			log, err := tests.LoggerForFormat("", rawLogFormat)
 			if err != nil {
-				return err
+				return stacktrace.Wrap(err)
 			}
 			return tmpnet.StartPrometheus(ctx, log)
 		},
@@ -195,7 +196,7 @@ func main() {
 			defer cancel()
 			log, err := tests.LoggerForFormat("", rawLogFormat)
 			if err != nil {
-				return err
+				return stacktrace.Wrap(err)
 			}
 			return tmpnet.StartPromtail(ctx, log)
 		},
@@ -210,7 +211,7 @@ func main() {
 			defer cancel()
 			log, err := tests.LoggerForFormat("", rawLogFormat)
 			if err != nil {
-				return err
+				return stacktrace.Wrap(err)
 			}
 			return tmpnet.StopMetricsCollector(ctx, log)
 		},
@@ -225,7 +226,7 @@ func main() {
 			defer cancel()
 			log, err := tests.LoggerForFormat("", rawLogFormat)
 			if err != nil {
-				return err
+				return stacktrace.Wrap(err)
 			}
 			return tmpnet.StopLogsCollector(ctx, log)
 		},
@@ -242,7 +243,7 @@ func main() {
 			defer cancel()
 			log, err := tests.LoggerForFormat("", rawLogFormat)
 			if err != nil {
-				return err
+				return stacktrace.Wrap(err)
 			}
 			return tmpnet.CheckMetricsExist(ctx, log, networkUUID)
 		},
@@ -263,7 +264,7 @@ func main() {
 			defer cancel()
 			log, err := tests.LoggerForFormat("", rawLogFormat)
 			if err != nil {
-				return err
+				return stacktrace.Wrap(err)
 			}
 			return tmpnet.CheckLogsExist(ctx, log, networkUUID)
 		},
@@ -289,12 +290,12 @@ func main() {
 			defer cancel()
 			log, err := tests.LoggerForFormat("", rawLogFormat)
 			if err != nil {
-				return err
+				return stacktrace.Wrap(err)
 			}
 			// A valid kubeconfig is required for local kind usage but this is not validated by KubeconfigVars
 			// since unlike kind, tmpnet usage may involve an implicit in-cluster config.
 			if len(kubeconfigVars.Path) == 0 {
-				return errKubeconfigRequired
+				return stacktrace.Wrap(errKubeconfigRequired)
 			}
 			// TODO(marun) Consider supporting other contexts. Will require modifying the kind cluster start script.
 			if len(kubeconfigVars.Context) > 0 && kubeconfigVars.Context != tmpnet.KindKubeconfigContext {

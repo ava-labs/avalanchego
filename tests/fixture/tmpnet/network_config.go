@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 
 	"github.com/ava-labs/avalanchego/genesis"
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
@@ -24,10 +25,10 @@ var errMissingNetworkDir = errors.New("failed to write network: missing network 
 // Read network and node configuration from disk.
 func (n *Network) Read(ctx context.Context) error {
 	if err := n.readNetwork(); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	if err := n.readNodes(ctx); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	return n.readSubnets()
 }
@@ -35,24 +36,24 @@ func (n *Network) Read(ctx context.Context) error {
 // Write network configuration to disk.
 func (n *Network) Write() error {
 	if len(n.Dir) == 0 {
-		return errMissingNetworkDir
+		return stacktrace.Wrap(errMissingNetworkDir)
 	}
 	if err := n.writeGenesis(); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	if err := n.writeNetworkConfig(); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	if err := n.writeEnvFile(); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
-	return n.writeNodes()
+	return stacktrace.Wrap(n.writeNodes())
 }
 
 // Read network configuration from disk.
 func (n *Network) readNetwork() error {
 	if err := n.readGenesis(); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	return n.readConfig()
 }
@@ -64,7 +65,7 @@ func (n *Network) readNodes(ctx context.Context) error {
 	// Node configuration is stored in child directories
 	entries, err := os.ReadDir(n.Dir)
 	if err != nil {
-		return fmt.Errorf("failed to read dir: %w", err)
+		return stacktrace.Errorf("failed to read dir: %w", err)
 	}
 	for _, entry := range entries {
 		if !entry.IsDir() {
@@ -78,7 +79,7 @@ func (n *Network) readNodes(ctx context.Context) error {
 			// If no config file exists, assume this is not the path of a node
 			continue
 		} else if err != nil {
-			return err
+			return stacktrace.Wrap(err)
 		}
 
 		nodes = append(nodes, node)
@@ -92,7 +93,7 @@ func (n *Network) readNodes(ctx context.Context) error {
 func (n *Network) writeNodes() error {
 	for _, node := range n.Nodes {
 		if err := node.Write(); err != nil {
-			return err
+			return stacktrace.Wrap(err)
 		}
 	}
 	return nil
@@ -110,11 +111,11 @@ func (n *Network) readGenesis() error {
 			n.Genesis = nil
 			return nil
 		}
-		return fmt.Errorf("failed to read genesis: %w", err)
+		return stacktrace.Errorf("failed to read genesis: %w", err)
 	}
 	genesis := genesis.UnparsedConfig{}
 	if err := json.Unmarshal(bytes, &genesis); err != nil {
-		return fmt.Errorf("failed to unmarshal genesis: %w", err)
+		return stacktrace.Errorf("failed to unmarshal genesis: %w", err)
 	}
 	n.Genesis = &genesis
 	return nil
@@ -126,10 +127,10 @@ func (n *Network) writeGenesis() error {
 	}
 	bytes, err := DefaultJSONMarshal(n.Genesis)
 	if err != nil {
-		return fmt.Errorf("failed to marshal genesis: %w", err)
+		return stacktrace.Errorf("failed to marshal genesis: %w", err)
 	}
 	if err := os.WriteFile(n.GetGenesisPath(), bytes, perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write genesis: %w", err)
+		return stacktrace.Errorf("failed to write genesis: %w", err)
 	}
 	return nil
 }
@@ -141,10 +142,10 @@ func (n *Network) getConfigPath() string {
 func (n *Network) readConfig() error {
 	bytes, err := os.ReadFile(n.getConfigPath())
 	if err != nil {
-		return fmt.Errorf("failed to read network config: %w", err)
+		return stacktrace.Errorf("failed to read network config: %w", err)
 	}
 	if err := json.Unmarshal(bytes, n); err != nil {
-		return fmt.Errorf("failed to unmarshal network config: %w", err)
+		return stacktrace.Errorf("failed to unmarshal network config: %w", err)
 	}
 	return nil
 }
@@ -172,10 +173,10 @@ func (n *Network) writeNetworkConfig() error {
 	}
 	bytes, err := DefaultJSONMarshal(config)
 	if err != nil {
-		return fmt.Errorf("failed to marshal network config: %w", err)
+		return stacktrace.Errorf("failed to marshal network config: %w", err)
 	}
 	if err := os.WriteFile(n.getConfigPath(), bytes, perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write network config: %w", err)
+		return stacktrace.Errorf("failed to write network config: %w", err)
 	}
 	return nil
 }
@@ -191,7 +192,7 @@ func (n *Network) EnvFileContents() string {
 // Write an env file that sets the network dir env when sourced.
 func (n *Network) writeEnvFile() error {
 	if err := os.WriteFile(n.EnvFilePath(), []byte(n.EnvFileContents()), perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write network env file: %w", err)
+		return stacktrace.Errorf("failed to write network env file: %w", err)
 	}
 	return nil
 }
@@ -203,7 +204,7 @@ func (n *Network) GetSubnetDir() string {
 func (n *Network) readSubnets() error {
 	subnets, err := readSubnets(n.GetSubnetDir())
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	n.Subnets = subnets
 	return nil

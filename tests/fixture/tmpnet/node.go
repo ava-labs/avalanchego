@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
@@ -73,7 +74,7 @@ func (c *NodeRuntimeConfig) GetNetworkStartTimeout(nodeCount int) (time.Duration
 
 		return timeout, nil
 	default:
-		return 0, errors.New("no runtime configuration set")
+		return 0, stacktrace.New("no runtime configuration set")
 	}
 }
 
@@ -178,7 +179,7 @@ func (n *Node) Start(ctx context.Context) error {
 
 func (n *Node) InitiateStop(ctx context.Context) error {
 	if err := n.SaveMetricsSnapshot(ctx); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	return n.getRuntime().InitiateStop(ctx)
 }
@@ -190,7 +191,7 @@ func (n *Node) WaitForStopped(ctx context.Context) error {
 func (n *Node) Restart(ctx context.Context) error {
 	// Ensure the config used to restart the node is persisted for future use
 	if err := n.Write(); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	return n.getRuntime().Restart(ctx)
 }
@@ -216,16 +217,16 @@ func (n *Node) SaveMetricsSnapshot(ctx context.Context) error {
 	uri := n.GetAccessibleURI() + "/ext/metrics"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, uri, nil)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	return n.writeMetricsSnapshot(body)
 }
@@ -233,7 +234,7 @@ func (n *Node) SaveMetricsSnapshot(ctx context.Context) error {
 // Initiates node shutdown and waits for the node to stop.
 func (n *Node) Stop(ctx context.Context) error {
 	if err := n.InitiateStop(ctx); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	return n.WaitForStopped(ctx)
 }
@@ -242,10 +243,10 @@ func (n *Node) Stop(ctx context.Context) error {
 // that the node ID (derived from the staking keypair) is set.
 func (n *Node) EnsureKeys() error {
 	if err := n.EnsureBLSSigningKey(); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	if err := n.EnsureStakingKeypair(); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	return n.EnsureNodeID()
 }
@@ -262,7 +263,7 @@ func (n *Node) EnsureBLSSigningKey() error {
 	// Generate a new signing key
 	newKey, err := localsigner.New()
 	if err != nil {
-		return fmt.Errorf("failed to generate staking signer key: %w", err)
+		return stacktrace.Errorf("failed to generate staking signer key: %w", err)
 	}
 	n.Flags[config.StakingSignerKeyContentKey] = base64.StdEncoding.EncodeToString(newKey.ToBytes())
 	return nil
@@ -279,13 +280,13 @@ func (n *Node) EnsureStakingKeypair() error {
 		// Generate new keypair
 		tlsCertBytes, tlsKeyBytes, err := staking.NewCertAndKeyBytes()
 		if err != nil {
-			return fmt.Errorf("failed to generate staking keypair: %w", err)
+			return stacktrace.Errorf("failed to generate staking keypair: %w", err)
 		}
 		n.Flags[keyKey] = base64.StdEncoding.EncodeToString(tlsKeyBytes)
 		n.Flags[certKey] = base64.StdEncoding.EncodeToString(tlsCertBytes)
 	} else if len(key) == 0 || len(cert) == 0 {
 		// Only one of key and cert was provided
-		return errInvalidKeypair
+		return stacktrace.Wrap(errInvalidKeypair)
 	}
 
 	return nil
@@ -297,15 +298,15 @@ func (n *Node) GetProofOfPossession() (*signer.ProofOfPossession, error) {
 	signingKey := n.Flags[config.StakingSignerKeyContentKey]
 	signingKeyBytes, err := base64.StdEncoding.DecodeString(signingKey)
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Wrap(err)
 	}
 	secretKey, err := localsigner.FromBytes(signingKeyBytes)
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Wrap(err)
 	}
 	pop, err := signer.NewProofOfPossession(secretKey)
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Wrap(err)
 	}
 
 	return pop, nil
@@ -318,29 +319,29 @@ func (n *Node) EnsureNodeID() error {
 
 	key := n.Flags[keyKey]
 	if len(key) == 0 {
-		return errMissingTLSKeyForNodeID
+		return stacktrace.Wrap(errMissingTLSKeyForNodeID)
 	}
 	keyBytes, err := base64.StdEncoding.DecodeString(key)
 	if err != nil {
-		return fmt.Errorf("failed to ensure node ID: failed to base64 decode value for %q: %w", keyKey, err)
+		return stacktrace.Errorf("failed to ensure node ID: failed to base64 decode value for %q: %w", keyKey, err)
 	}
 
 	cert := n.Flags[certKey]
 	if len(cert) == 0 {
-		return errMissingCertForNodeID
+		return stacktrace.Wrap(errMissingCertForNodeID)
 	}
 	certBytes, err := base64.StdEncoding.DecodeString(cert)
 	if err != nil {
-		return fmt.Errorf("failed to ensure node ID: failed to base64 decode value for %q: %w", certKey, err)
+		return stacktrace.Errorf("failed to ensure node ID: failed to base64 decode value for %q: %w", certKey, err)
 	}
 
 	tlsCert, err := staking.LoadTLSCertFromBytes(keyBytes, certBytes)
 	if err != nil {
-		return fmt.Errorf("failed to ensure node ID: failed to load tls cert: %w", err)
+		return stacktrace.Errorf("failed to ensure node ID: failed to load tls cert: %w", err)
 	}
 	stakingCert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
 	if err != nil {
-		return fmt.Errorf("failed to ensure node ID: failed to parse staking cert: %w", err)
+		return stacktrace.Errorf("failed to ensure node ID: failed to parse staking cert: %w", err)
 	}
 	n.NodeID = ids.NodeIDFromCert(stakingCert)
 
@@ -378,7 +379,7 @@ func (n *Node) composeFlags() (FlagsMap, error) {
 	if n.network.Genesis != nil {
 		genesisFileContent, err := n.network.GetGenesisFileContent()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get genesis file content: %w", err)
+			return nil, stacktrace.Errorf("failed to get genesis file content: %w", err)
 		}
 		flags.SetDefault(config.GenesisFileContentKey, genesisFileContent)
 
@@ -391,7 +392,7 @@ func (n *Node) composeFlags() (FlagsMap, error) {
 
 	subnetConfigContent, err := n.network.GetSubnetConfigContent()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get subnet config content: %w", err)
+		return nil, stacktrace.Errorf("failed to get subnet config content: %w", err)
 	}
 	if len(subnetConfigContent) > 0 {
 		flags.SetDefault(config.SubnetConfigContentKey, subnetConfigContent)
@@ -399,7 +400,7 @@ func (n *Node) composeFlags() (FlagsMap, error) {
 
 	chainConfigContent, err := n.network.GetChainConfigContent()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get chain config content: %w", err)
+		return nil, stacktrace.Errorf("failed to get chain config content: %w", err)
 	}
 	if len(chainConfigContent) > 0 {
 		flags.SetDefault(config.ChainConfigContentKey, chainConfigContent)
@@ -411,7 +412,7 @@ func (n *Node) composeFlags() (FlagsMap, error) {
 // WaitForHealthy blocks until node health is true or an error (including context timeout) is observed.
 func (n *Node) WaitForHealthy(ctx context.Context) error {
 	if _, ok := ctx.Deadline(); !ok {
-		return fmt.Errorf("unable to wait for health for node %q with a context without a deadline", n.NodeID)
+		return stacktrace.Errorf("unable to wait for health for node %q with a context without a deadline", n.NodeID)
 	}
 	ticker := time.NewTicker(DefaultNodeTickerInterval)
 	defer ticker.Stop()
@@ -420,7 +421,7 @@ func (n *Node) WaitForHealthy(ctx context.Context) error {
 		healthy, err := n.IsHealthy(ctx)
 		switch {
 		case errors.Is(err, ErrUnrecoverableNodeHealthCheck):
-			return fmt.Errorf("%w for node %q", err, n.NodeID)
+			return stacktrace.Errorf("node %q saw unrecoverable health check: %w", n.NodeID, err)
 		case err != nil:
 			n.network.log.Verbo("failed to query node health",
 				zap.Stringer("nodeID", n.NodeID),
@@ -433,7 +434,7 @@ func (n *Node) WaitForHealthy(ctx context.Context) error {
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("failed to wait for health of node %q before timeout: %w", n.NodeID, ctx.Err())
+			return stacktrace.Errorf("failed to wait for health of node %q before timeout: %w", n.NodeID, ctx.Err())
 		case <-ticker.C:
 		}
 	}
