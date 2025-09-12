@@ -44,7 +44,8 @@ const (
 var (
 	_ validators.State = (*manager)(nil)
 
-	errUnfinalizedHeight = errors.New("failed to fetch validator set at unfinalized height")
+	errUnfinalizedHeight    = errors.New("failed to fetch validator set at unfinalized height")
+	errFailedToGetSubnetIDs = errors.New("failed to get subnet IDs")
 )
 
 // Manager adds the ability to introduce newly accepted blocks IDs to the State
@@ -62,6 +63,8 @@ type State interface {
 
 	GetLastAccepted() ids.ID
 	GetStatelessBlock(blockID ids.ID) (block.Block, error)
+
+	GetSubnetIDs() ([]ids.ID, error)
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
 	// block until it has applied all of the diffs up to and including
@@ -194,6 +197,34 @@ func (m *manager) getCurrentHeight(context.Context) (uint64, error) {
 		return 0, err
 	}
 	return lastAccepted.Height(), nil
+}
+
+func (m *manager) GetAllValidatorSets(
+	ctx context.Context,
+	targetHeight uint64,
+) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	result := make(map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput)
+	subnets, err := m.state.GetSubnetIDs()
+	if err != nil {
+		return nil, errFailedToGetSubnetIDs
+	}
+
+	// Get validator set for the primary network
+	primaryNetworkValidators, err := m.GetValidatorSet(ctx, targetHeight, constants.PrimaryNetworkID)
+	if err != nil {
+		return nil, err
+	}
+	result[constants.PrimaryNetworkID] = primaryNetworkValidators
+
+	// Get validator sets for all other subnets
+	for _, subnetID := range subnets {
+		validatorSet, err := m.GetValidatorSet(ctx, targetHeight, subnetID)
+		if err != nil {
+			return nil, err
+		}
+		result[subnetID] = validatorSet
+	}
+	return result, nil
 }
 
 func (m *manager) GetValidatorSet(

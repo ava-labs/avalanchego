@@ -18,6 +18,7 @@ var (
 	errMinimumHeight          = errors.New("unexpectedly called GetMinimumHeight")
 	errCurrentHeight          = errors.New("unexpectedly called GetCurrentHeight")
 	errSubnetID               = errors.New("unexpectedly called GetSubnetID")
+	errGetAllValidatorSets    = errors.New("unexpectedly called GetAllValidatorSets")
 	errGetValidatorSet        = errors.New("unexpectedly called GetValidatorSet")
 	errGetCurrentValidatorSet = errors.New("unexpectedly called GetCurrentValidatorSet")
 )
@@ -30,12 +31,14 @@ type State struct {
 	CantGetMinimumHeight,
 	CantGetCurrentHeight,
 	CantGetSubnetID,
-	CantGetValidatorSet bool
+	CantGetAllValidatorSets bool
+	CantGetValidatorSet        bool
 	CantGetCurrentValidatorSet bool
 
 	GetMinimumHeightF       func(ctx context.Context) (uint64, error)
 	GetCurrentHeightF       func(ctx context.Context) (uint64, error)
 	GetSubnetIDF            func(ctx context.Context, chainID ids.ID) (ids.ID, error)
+	GetAllValidatorSetsF    func(ctx context.Context, height uint64) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, error)
 	GetValidatorSetF        func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 	GetCurrentValidatorSetF func(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
 }
@@ -70,6 +73,19 @@ func (vm *State) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error
 	return ids.Empty, errSubnetID
 }
 
+func (vm *State) GetAllValidatorSets(
+	ctx context.Context,
+	height uint64,
+) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	if vm.GetAllValidatorSetsF != nil {
+		return vm.GetAllValidatorSetsF(ctx, height)
+	}
+	if vm.CantGetAllValidatorSets && vm.T != nil {
+		require.FailNow(vm.T, errGetAllValidatorSets.Error())
+	}
+	return nil, errGetAllValidatorSets
+}
+
 func (vm *State) GetValidatorSet(
 	ctx context.Context,
 	height uint64,
@@ -78,7 +94,7 @@ func (vm *State) GetValidatorSet(
 	if vm.GetValidatorSetF != nil {
 		return vm.GetValidatorSetF(ctx, height, subnetID)
 	}
-	if vm.CantGetValidatorSet && vm.T != nil {
+	if vm.CantGetAllValidatorSets && vm.T != nil {
 		require.FailNow(vm.T, errGetValidatorSet.Error())
 	}
 	return nil, errGetValidatorSet
