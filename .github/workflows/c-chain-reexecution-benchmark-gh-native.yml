@@ -59,7 +59,7 @@ jobs:
                 "${{ github.event.inputs.current-state-dir-src }}" \
                 "${{ github.event.inputs.config }}" \
                 "${{ github.event.inputs.runner }}" \
-                "${{ github.event.inputs.timeout-minutes }}" \
+                "${{ github.event.inputs.timeout-minutes }}" 
               echo EOF
             } >> "$GITHUB_OUTPUT"
           else

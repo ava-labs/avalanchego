@@ -67,7 +67,6 @@ runs:
           echo "END_BLOCK=${{ inputs.end-block }}"
           echo "BLOCK_DIR_SRC=${{ inputs.block-dir-src }}"
           echo "CURRENT_STATE_DIR_SRC=${{ inputs.current-state-dir-src }}"
-          echo "METRICS_ENABLED=${{ inputs.metrics-enabled }}"
         } >> $GITHUB_ENV
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
@@ -75,7 +74,7 @@ runs:
         role-to-assume: ${{ inputs.aws-role }}
         aws-region: ${{ inputs.aws-region }}
         role-duration-seconds: ${{ inputs.aws-role-duration-seconds }}
-    - name: Run C-Chain Re-Execution (with monitoring)
+    - name: Run C-Chain Re-Execution
       uses: ./.github/actions/run-monitored-tmpnet-cmd
       with:
         run_env: |
