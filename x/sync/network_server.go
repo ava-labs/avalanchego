@@ -28,7 +28,7 @@ const (
 	// Maximum number of key-value pairs to return in a proof.
 	// This overrides any other Limit specified in a RangeProofRequest
 	// or ChangeProofRequest if the given Limit is greater.
-	maxKeyValuesLimit = 2048
+	MaxKeyValuesLimit = 2048
 	// Estimated max overhead, in bytes, of putting a proof into a message.
 	// We use this to ensure that the proof we generate is not too large to fit in a message.
 	// TODO: refine this estimate. This is almost certainly a large overestimate.
@@ -80,7 +80,7 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 
 	// override limits if they exceed caps
 	var (
-		keyLimit   = min(req.KeyLimit, maxKeyValuesLimit)
+		keyLimit   = min(req.KeyLimit, MaxKeyValuesLimit)
 		bytesLimit = min(int(req.BytesLimit), maxByteSizeLimit)
 		start      = protoutils.ProtoToMaybe(req.StartKey)
 		end        = protoutils.ProtoToMaybe(req.EndKey)
@@ -221,7 +221,7 @@ func (g *GetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ t
 	}
 
 	// override limits if they exceed caps
-	req.KeyLimit = min(req.KeyLimit, maxKeyValuesLimit)
+	req.KeyLimit = min(req.KeyLimit, MaxKeyValuesLimit)
 	req.BytesLimit = min(req.BytesLimit, maxByteSizeLimit)
 
 	proofBytes, err := getRangeProof(
