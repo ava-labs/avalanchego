@@ -536,9 +536,9 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(
 	var (
 		batchAtomicTxs    []*atomic.Tx
 		batchAtomicUTXOs  set.Set[ids.ID]
-		batchContribution *big.Int = new(big.Int).Set(common.Big0)
-		batchGasUsed      *big.Int = new(big.Int).Set(common.Big0)
-		rules                      = vm.rules(header.Number, header.Time)
+		batchContribution = new(big.Int).Set(common.Big0)
+		batchGasUsed      = new(big.Int).Set(common.Big0)
+		rules             = vm.rules(header.Number, header.Time)
 		size              int
 	)
 
@@ -651,10 +651,10 @@ func (vm *VM) onFinalizeAndAssemble(
 
 func (vm *VM) onExtraStateChange(block *types.Block, parent *types.Header, statedb *state.StateDB) (*big.Int, *big.Int, error) {
 	var (
-		batchContribution *big.Int = big.NewInt(0)
-		batchGasUsed      *big.Int = big.NewInt(0)
-		header                     = block.Header()
-		chainConfig                = vm.InnerVM.ChainConfig()
+		batchContribution = big.NewInt(0)
+		batchGasUsed      = big.NewInt(0)
+		header            = block.Header()
+		chainConfig       = vm.InnerVM.ChainConfig()
 		// We cannot use chain config from InnerVM since it's not available when this function is called for the first time (bc.loadLastState).
 		rules      = chainConfig.Rules(header.Number, params.IsMergeTODO, header.Time)
 		rulesExtra = *params.GetRulesExtra(rules)

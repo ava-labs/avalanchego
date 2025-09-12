@@ -95,15 +95,18 @@ type Database struct {
 // New creates a new Firewood database with the given disk database and configuration.
 // Any error during creation will cause the program to exit.
 func New(config *Config) *Database {
+	//nolint:staticcheck // this nolint is required for the config.* nolints to work.
 	if config == nil {
 		log.Crit("firewood: config must be provided")
 	}
 
+	//nolint:staticcheck // false positive, if config is nil then we will have exited.
 	err := validatePath(config.FilePath)
 	if err != nil {
 		log.Crit("firewood: error validating config", "error", err)
 	}
 
+	//nolint:staticcheck // false positive, if config is nil then we will have exited.
 	fw, err := ffi.New(config.FilePath, &ffi.Config{
 		NodeCacheEntries:     uint(config.CleanCacheSize) / 256, // TODO: estimate 256 bytes per node
 		FreeListCacheEntries: config.FreeListCacheEntries,

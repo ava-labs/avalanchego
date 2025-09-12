@@ -25,12 +25,12 @@ type Module struct {
 
 type moduleArray []Module
 
-func (u moduleArray) Len() int {
-	return len(u)
+func (m moduleArray) Len() int {
+	return len(m)
 }
 
-func (u moduleArray) Swap(i, j int) {
-	u[i], u[j] = u[j], u[i]
+func (m moduleArray) Swap(i, j int) {
+	m[i], m[j] = m[j], m[i]
 }
 
 func (m moduleArray) Less(i, j int) bool {

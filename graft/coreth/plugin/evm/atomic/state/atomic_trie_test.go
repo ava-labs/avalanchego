@@ -377,8 +377,6 @@ func TestIndexingNilShouldNotImpactTrie(t *testing.T) {
 			if err := indexAtomicTxs(a1, i, ops[i]); err != nil {
 				t.Fatal(err)
 			}
-		} else {
-			// do nothing
 		}
 	}
 
