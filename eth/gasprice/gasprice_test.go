@@ -381,13 +381,53 @@ func TestSuggestGasPricePreAP3(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// NOTE: [Oracle.SuggestTipCap] does NOT simply return the "required" (minimum) tip.
+// The oracle computes a percentile of recent required tips (not observed on-chain tips)
+// within a time/blocks lookback window and applies a small floor (e.g., 1 wei in tests):
+//
+//	suggested = max(floor, recent-required-percentile)
+//
+// After Granite, BlockGasCost is 0 and per-block required tips are 0, so the oracle
+// suggestion equals the floor (1 wei) in steady state, regardless of high on-chain tips.
+// The cases below exercise behavior across forks using the same percentile logic and floor.
 func TestSuggestTipCapMaxBlocksLookback(t *testing.T) {
+	cases := []struct {
+		chainConfig *params.ChainConfig
+		expectedTip *big.Int
+	}{
+		// TODO: remove Fortuna case when we activate Granite
+		{
+			chainConfig: params.TestFortunaChainConfig,
+			expectedTip: big.NewInt(3),
+		},
+		{
+			chainConfig: params.TestChainConfig,
+			expectedTip: big.NewInt(1),
+		},
+	}
+	for _, c := range cases {
+		applyGasPriceTest(t, suggestTipCapTest{
+			chainConfig:     c.chainConfig,
+			numBlocks:       200,
+			extDataGasUsage: common.Big0,
+			genBlock:        testGenBlock(t, 550, 80),
+			expectedTip:     c.expectedTip,
+		}, defaultOracleConfig())
+	}
+}
+
+// Post-Granite, even very high observed tx tips should not affect SuggestTipCap, which
+// is computed from required tips. Since required tips are 0 in Granite, the returned
+// suggestion should be the floor (1 wei).
+func TestSuggestTipCapIgnoresObservedTipsPostGranite(t *testing.T) {
 	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig:     params.TestChainConfig,
-		numBlocks:       200,
+		chainConfig:     params.TestChainConfig, // Granite active in TestChainConfig
+		numBlocks:       20,
 		extDataGasUsage: common.Big0,
-		genBlock:        testGenBlock(t, 550, 80),
-		expectedTip:     big.NewInt(3),
+		// Generate blocks with very high on-chain tips to ensure they wouldn't bias the result
+		// if the oracle looked at observed tips. Expectation remains 1 wei.
+		genBlock:    testGenBlock(t, 100_000, 80),
+		expectedTip: big.NewInt(1),
 	}, defaultOracleConfig())
 }
 
@@ -402,14 +442,30 @@ func TestSuggestTipCapMaxBlocksSecondsLookback(t *testing.T) {
 }
 
 func TestSuggestTipCapIncludesExtraDataGas(t *testing.T) {
-	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig:     params.TestChainConfig,
-		numBlocks:       1000,
-		extDataGasUsage: big.NewInt(acp176.MinMaxPerSecond - int64(ethparams.TxGas)),
-		// The tip on the transaction is very large to pay the block gas cost.
-		genBlock: testGenBlock(t, 100_000, 1),
-		// The actual tip doesn't matter, we just want to ensure that the tip is
-		// non-zero when almost all the gas is coming from the extDataGasUsage.
-		expectedTip: big.NewInt(44_252),
-	}, defaultOracleConfig())
+	cases := []struct {
+		chainConfig *params.ChainConfig
+		expectedTip *big.Int
+	}{
+		// TODO: remove Fortuna case when we activate Granite
+		{
+			chainConfig: params.TestFortunaChainConfig,
+			expectedTip: big.NewInt(44_252),
+		},
+		{
+			chainConfig: params.TestChainConfig,
+			expectedTip: big.NewInt(1),
+		},
+	}
+	for _, c := range cases {
+		applyGasPriceTest(t, suggestTipCapTest{
+			chainConfig:     c.chainConfig,
+			numBlocks:       1000,
+			extDataGasUsage: big.NewInt(acp176.MinMaxPerSecond - int64(ethparams.TxGas)),
+			// The tip on the transaction is very large to pay the block gas cost.
+			genBlock: testGenBlock(t, 100_000, 1),
+			// The actual tip doesn't matter, we just want to ensure that the tip is
+			// non-zero when almost all the gas is coming from the extDataGasUsage.
+			expectedTip: c.expectedTip,
+		}, defaultOracleConfig())
+	}
 }
