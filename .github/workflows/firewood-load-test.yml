@@ -7,8 +7,18 @@ on:
 
 jobs:
   load-test:
-    runs-on: ubuntu-latest
+    runs-on: avalanche-avalanchego-runner
+    container:
+      image: ghcr.io/actions/actions-runner:2.325.0
     steps:
+      - name: Install dependencies
+        shell: bash
+        # The xz-utils might be present on some containers
+        run: |
+          if ! command -v xz &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y xz-utils
+          fi
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
