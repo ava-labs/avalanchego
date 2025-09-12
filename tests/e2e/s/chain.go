@@ -89,7 +89,7 @@ var _ = e2e.DescribeSimplex("Create a Simplex [L1]", func() {
 		sourceChain := sourceSubnet.Chains[0]
 		sourceValidators := getNodesForIDs(network.Nodes, sourceSubnet.ValidatorIDs)
 		require.NotEmpty(sourceValidators)
-		sourceAPINode := sourceValidators[1]
+		sourceAPINode := sourceValidators[0] // set to 1 if bb
 		sourceAPINodeURI := sourceAPINode.GetAccessibleURI()
 		tc.Log().Info("issuing transactions for source subnet",
 			zap.String("subnetName", simplexSubnetName),
