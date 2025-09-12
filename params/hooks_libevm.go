@@ -29,7 +29,7 @@ import (
 
 // invalidateDelegateTime is the Unix timestamp for August 2nd, 2025, midnight Eastern Time
 // (August 2nd, 2025, 04:00 UTC)
-const invalidateDelegateUnix = 1754107200
+const InvalidateDelegateUnix = 1754107200
 
 // P256VerifyAddress is the address of the p256 signature verification precompile
 var P256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
@@ -139,12 +139,14 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 			},
 		}
 
-		callType := env.IncomingCallType()
-		isDissallowedCallType := callType == vm.DelegateCall || callType == vm.CallCode
-		if env.BlockTime() >= invalidateDelegateUnix {
-			if isDissallowedCallType {
-				env.InvalidateExecution(fmt.Errorf("precompile cannot be called with %s", callType))
-			}
+		switch call := env.IncomingCallType(); {
+		case call != vm.DelegateCall && call != vm.CallCode: // Others always allowed
+		case rules.IsGranite:
+			return nil, 0, vm.ErrExecutionReverted
+		case env.BlockTime() >= InvalidateDelegateUnix:
+			env.InvalidateExecution(fmt.Errorf("precompile cannot be called with %s", call))
+		default:
+			// Otherwise, we allow the precompile to be called
 		}
 
 		// EVM semantic addresses are used here to maintain consistency with prior behavior as present in AvalancheGo 1.13.0.
