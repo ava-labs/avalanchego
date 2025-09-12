@@ -337,6 +337,6 @@ func CalculateDynamicFee(cost uint64, baseFee *big.Int) (uint64, error) {
 	return fee.Uint64(), nil
 }
 
-func calcBytesCost(len int) uint64 {
-	return uint64(len) * TxBytesGas
+func calcBytesCost(n int) uint64 {
+	return uint64(n) * TxBytesGas
 }
