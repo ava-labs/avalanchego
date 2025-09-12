@@ -35,9 +35,6 @@ on:
         description: 'Timeout in minutes for the job.'
         required: false
         default: 30
-      metrics-enabled:
-        description: "Whether to enable metrics collection for the benchmark."
-        default: false
 
   # Disabled because scheduled trigger is empty. To enable, uncomment and add at least one vector to the schedule
   # entry in the corresponding JSON file.
@@ -58,15 +55,14 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             {
               echo "matrix<<EOF"
-              printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s, "metrics-enabled": %s }] }\n' \
+              printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
                 "${{ github.event.inputs.start-block }}" \
                 "${{ github.event.inputs.end-block }}" \
                 "${{ github.event.inputs.block-dir-src }}" \
                 "${{ github.event.inputs.current-state-dir-src }}" \
                 "${{ github.event.inputs.config }}" \
                 "${{ github.event.inputs.runner }}" \
-                "${{ github.event.inputs.timeout-minutes }}" \
-                "${{ github.event.inputs.metrics-enabled }}"
+                "${{ github.event.inputs.timeout-minutes }}" 
               echo EOF
             } >> "$GITHUB_OUTPUT"
           else
@@ -117,4 +113,3 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ${{ github.event.inputs.push-post-state }}
           runner_name: ${{ matrix.runner }}
-          metrics-enabled: ${{ matrix.metrics-enabled }}
