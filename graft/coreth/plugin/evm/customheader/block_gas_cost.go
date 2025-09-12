@@ -32,6 +32,7 @@ var (
 // BlockGasCost calculates the required block gas cost based on the parent
 // header and the timestamp of the new block.
 // Prior to AP4, the returned block gas cost will be nil.
+// In Granite, the returned block gas cost will be 0.
 func BlockGasCost(
 	config *extras.ChainConfig,
 	parent *types.Header,
@@ -39,6 +40,9 @@ func BlockGasCost(
 ) *big.Int {
 	if !config.IsApricotPhase4(timestamp) {
 		return nil
+	}
+	if config.IsGranite(timestamp) {
+		return big.NewInt(0)
 	}
 	step := uint64(ap4.BlockGasCostStep)
 	if config.IsApricotPhase5(timestamp) {
