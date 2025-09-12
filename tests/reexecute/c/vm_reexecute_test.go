@@ -82,11 +82,79 @@ var (
 			"state-sync-enabled": false
 		}`,
 	}
+	denominatorMetric = topLevelMetric{
+		MetricName:  "mgas",
+		Queries:     []string{"avalanche_evm_eth_chain_block_gas_used_processed"},
+		Denominator: 1_000_000,
+	}
 	topLevelMetrics = []topLevelMetric{
 		{
-			MetricName:  "mgas/s",
-			Queries:     []string{"avalanche_evm_eth_chain_block_gas_used_processed"},
-			Denominator: 1_000_000,
+			MetricName:  "content_validation",
+			Queries:     []string{"avalanche_evm_eth_chain_block_validations_content"},
+			Denominator: 1,
+		},
+		{
+			MetricName: "state_init",
+			Queries: []string{
+				"avalanche_evm_eth_chain_block_inits_state",
+			},
+			Denominator: 1,
+		},
+		{
+			MetricName: "execution",
+			Queries: []string{
+				"avalanche_evm_eth_chain_block_executions",
+			},
+			Denominator: 1,
+		},
+		{
+			MetricName: "block_validation",
+			Queries: []string{
+				"avalanche_evm_eth_chain_block_validations_state",
+			},
+			Denominator: 1,
+		},
+		{
+			MetricName: "trie_hash",
+			Queries: []string{
+				"avalanche_evm_eth_chain_storage_hashes",
+				"avalanche_evm_eth_chain_account_hashes",
+			},
+			Denominator: 1,
+		},
+		{
+			MetricName: "trie_update",
+			Queries: []string{
+				"avalanche_evm_eth_chain_account_updates",
+				"avalanche_evm_eth_chain_storage_updates",
+			},
+			Denominator: 1,
+		},
+		{
+			MetricName: "trie_read",
+			Queries: []string{
+				"avalanche_evm_eth_chain_snapshot_account_reads",
+				"avalanche_evm_eth_chain_account_reads",
+				"avalanche_evm_eth_chain_snapshot_storage_reads",
+				"avalanche_evm_eth_chain_storage_reads",
+			},
+			Denominator: 1,
+		},
+		{
+			MetricName: "block_write",
+			Queries: []string{
+				"avalanche_evm_eth_chain_block_writes",
+			},
+			Denominator: 1,
+		},
+		{
+			MetricName: "commit",
+			Queries: []string{
+				"avalanche_evm_eth_chain_account_commits",
+				"avalanche_evm_eth_chain_storage_commits",
+				"avalanche_evm_eth_chain_snapshot_commits",
+				"avalanche_evm_eth_chain_triedb_commits",
+			},
 		},
 	}
 
@@ -600,28 +668,6 @@ func parseCustomLabels(labelsStr string) (map[string]string, error) {
 	return labels, nil
 }
 
-type topLevelMetric struct {
-	MetricName  string
-	Queries     []string
-	Denominator float64
-}
-
-func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time.Duration) {
-	r := require.New(b)
-
-	for _, metric := range topLevelMetrics {
-		metricCounterVal := float64(0)
-		for _, query := range metric.Queries {
-			val, err := getCounterMetricValue(registry, query)
-			r.NoError(err, "failed to get counter value for metric %q from query %q", metric.MetricName, query)
-			metricCounterVal += val
-		}
-
-		metricPerSecond := metricCounterVal / metric.Denominator / elapsed.Seconds()
-		b.ReportMetric(metricPerSecond, metric.MetricName)
-	}
-}
-
 func getCounterMetricValue(registry prometheus.Gatherer, query string) (float64, error) {
 	metricFamilies, err := registry.Gather()
 	if err != nil {
@@ -635,4 +681,38 @@ func getCounterMetricValue(registry prometheus.Gatherer, query string) (float64,
 	}
 
 	return 0, fmt.Errorf("metric %s not found", query)
+}
+
+type topLevelMetric struct {
+	MetricName  string
+	Queries     []string
+	Denominator float64
+}
+
+func calcMetric(tb testing.TB, m topLevelMetric, registry prometheus.Gatherer) float64 {
+	r := require.New(tb)
+	sum := float64(0)
+	for _, query := range m.Queries {
+		val, err := getCounterMetricValue(registry, query)
+		r.NoError(err, "failed to get counter value for metric %q query %q", m.MetricName, query)
+		sum += val
+	}
+	return sum / m.Denominator
+}
+
+func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time.Duration) {
+	r := require.New(b)
+
+	denominatorMetricVal := calcMetric(b, denominatorMetric, registry)
+	r.NotZero(denominatorMetricVal, "denominator metric %q has value 0", denominatorMetric.MetricName)
+
+	denominatorPerSecond := denominatorMetricVal / elapsed.Seconds()
+	b.ReportMetric(denominatorPerSecond, fmt.Sprintf("%s/s", denominatorMetric.MetricName))
+
+	for _, metric := range topLevelMetrics {
+		counterVal := calcMetric(b, metric, registry)
+		counterVal /= denominatorMetricVal
+
+		b.ReportMetric(counterVal, fmt.Sprintf("%s/%s", metric.MetricName, denominatorMetric.MetricName))
+	}
 }
