@@ -122,8 +122,15 @@ func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time
 	b.ReportMetric(mgasPerSecond, fmt.Sprintf("m%s/s", gasMetric.Name))
 
 	totalGGas := totalGas / 1_000_000_000 // giga
+
+	totalMSTrackedPerGGas := float64(0)
 	for _, metric := range topLevelMetrics {
-		counterVal := calcMetric(b, metric, registry) / (totalGGas) // metric / ggas
-		b.ReportMetric(counterVal, fmt.Sprintf("%s/g%s", metric.Name, gasMetric.Name))
+		metricValMS := calcMetric(b, metric, registry) / (totalGGas) // metric / ggas
+		totalMSTrackedPerGGas += metricValMS
+		b.ReportMetric(metricValMS, fmt.Sprintf("%s_ms/g%s", metric.Name, gasMetric.Name))
 	}
+	totalSTracked := totalMSTrackedPerGGas / 1000
+	b.ReportMetric(totalSTracked, "s_tracked")
+	b.ReportMetric(elapsed.Seconds(), "s_total")
+	b.ReportMetric(totalSTracked/elapsed.Seconds(), "s_tracked/s_total")
 }
