@@ -8,7 +8,8 @@
                 "end-block": 250000,
                 "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**",
-                "timeout-minutes": 30
+                "timeout-minutes": 30,
+                "metrics-enabled": true
             },
             {
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
@@ -17,7 +18,8 @@
                 "end-block": 250000,
                 "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**",
-                "timeout-minutes": 30
+                "timeout-minutes": 30,
+                "metrics-enabled": true
             },
             {
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
@@ -26,7 +28,8 @@
                 "end-block": 250000,
                 "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-archive-100/**",
-                "timeout-minutes": 30
+                "timeout-minutes": 30,
+                "metrics-enabled": true
             }
         ]
     },
@@ -39,7 +42,8 @@
                 "end-block": 250000,
                 "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**",
-                "timeout-minutes": 30
+                "timeout-minutes": 30,
+                "metrics-enabled": true
             },
             {
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
@@ -48,7 +52,8 @@
                 "end-block": 250000,
                 "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-archive-100/**",
-                "timeout-minutes": 30
+                "timeout-minutes": 30,
+                "metrics-enabled": true
             },
             {
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
@@ -57,7 +62,8 @@
                 "end-block": 250000,
                 "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**",
-                "timeout-minutes": 30
+                "timeout-minutes": 30,
+                "metrics-enabled": true
             }
         ]
     }

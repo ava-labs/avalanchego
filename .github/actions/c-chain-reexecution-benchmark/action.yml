@@ -54,7 +54,7 @@ inputs:
     default: ''
   metrics-enabled:
     description: "Whether to enable metrics collection for the benchmark."
-    default: true
+    default: false
 
 runs:
   using: composite
