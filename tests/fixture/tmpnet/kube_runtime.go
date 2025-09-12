@@ -22,6 +22,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	corev1 "k8s.io/api/core/v1"
@@ -99,7 +100,7 @@ func (c *KubeRuntimeConfig) ensureDefaults(ctx context.Context, log logging.Logg
 
 	clientset, err := GetClientset(log, c.ConfigPath, c.ConfigContext)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	log.Info("attempting to retrieve configmap containing tmpnet defaults",
@@ -109,7 +110,7 @@ func (c *KubeRuntimeConfig) ensureDefaults(ctx context.Context, log logging.Logg
 
 	configMap, err := clientset.CoreV1().ConfigMaps(c.Namespace).Get(ctx, defaultsConfigMapName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to get ConfigMap: %w", err)
+		return stacktrace.Errorf("failed to get ConfigMap: %w", err)
 	}
 
 	if requireSchedulingDefaults {
@@ -130,7 +131,7 @@ func (c *KubeRuntimeConfig) ensureDefaults(ctx context.Context, log logging.Logg
 			c.SchedulingLabelValue = schedulingLabelValue
 		}
 		if len(c.SchedulingLabelKey) == 0 || len(c.SchedulingLabelValue) == 0 {
-			return errMissingSchedulingLabels
+			return stacktrace.Wrap(errMissingSchedulingLabels)
 		}
 	}
 	if requireIngressDefaults {
@@ -151,7 +152,7 @@ func (c *KubeRuntimeConfig) ensureDefaults(ctx context.Context, log logging.Logg
 			c.IngressSecret = ingressSecret
 		}
 		if len(c.IngressHost) == 0 {
-			return errMissingIngressHost
+			return stacktrace.Wrap(errMissingIngressHost)
 		}
 	}
 
@@ -182,12 +183,12 @@ func (p *KubeRuntime) readState(ctx context.Context) error {
 
 	// Validate that it will be possible to construct accessible URIs when running external to the kube cluster
 	if !IsRunningInCluster() && len(runtimeConfig.IngressHost) == 0 {
-		return errors.New("IngressHost must be set when running outside of the kubernetes cluster")
+		return stacktrace.New("IngressHost must be set when running outside of the kubernetes cluster")
 	}
 
 	clientset, err := p.getClientset()
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	log.Debug("checking if StatefulSet exists",
@@ -206,7 +207,7 @@ func (p *KubeRuntime) readState(ctx context.Context) error {
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("failed to retrieve scale of StatefulSet %s/%s for %s: %w", namespace, statefulSetName, nodeID, err)
+		return stacktrace.Errorf("failed to retrieve scale of StatefulSet %s/%s for %s: %w", namespace, statefulSetName, nodeID, err)
 	}
 
 	if scale.Spec.Replicas == 0 {
@@ -221,7 +222,7 @@ func (p *KubeRuntime) readState(ctx context.Context) error {
 
 	if err := p.waitForPodReadiness(ctx); err != nil {
 		p.setNotRunning()
-		return fmt.Errorf("failed to wait for readiness of StatefulSet %s/%s for %s: %w", namespace, statefulSetName, nodeID, err)
+		return stacktrace.Errorf("failed to wait for readiness of StatefulSet %s/%s for %s: %w", namespace, statefulSetName, nodeID, err)
 	}
 
 	return nil
@@ -258,7 +259,7 @@ func (p *KubeRuntime) GetAccessibleStakingAddress(ctx context.Context) (netip.Ad
 	if p.node.StakingAddress == (netip.AddrPort{}) {
 		// Assume that an empty staking address indicates a need to retrieve pod state
 		if err := p.readState(ctx); err != nil {
-			return netip.AddrPort{}, func() {}, fmt.Errorf("failed to read Pod state: %w", err)
+			return netip.AddrPort{}, func() {}, stacktrace.Errorf("failed to read Pod state: %w", err)
 		}
 	}
 
@@ -269,7 +270,7 @@ func (p *KubeRuntime) GetAccessibleStakingAddress(ctx context.Context) (netip.Ad
 
 	port, stopChan, err := p.forwardPort(ctx, config.DefaultStakingPort)
 	if err != nil {
-		return netip.AddrPort{}, nil, err
+		return netip.AddrPort{}, nil, stacktrace.Wrap(err)
 	}
 	return netip.AddrPortFrom(
 		netip.AddrFrom4([4]byte{127, 0, 0, 1}),
@@ -295,7 +296,7 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 
 	clientset, err := p.getClientset()
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	log.Debug("attempting to retrieve existing StatefulSet",
@@ -314,7 +315,7 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 		)
 		scale, err := clientset.AppsV1().StatefulSets(namespace).GetScale(ctx, statefulSetName, metav1.GetOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to retrieve scale for StatefulSet %s/%s: %w", namespace, statefulSetName, err)
+			return stacktrace.Errorf("failed to retrieve scale for StatefulSet %s/%s: %w", namespace, statefulSetName, err)
 		}
 
 		if scale.Spec.Replicas != 0 {
@@ -339,7 +340,7 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 			metav1.UpdateOptions{},
 		)
 		if err != nil {
-			return fmt.Errorf("failed to scale up StatefulSet for %s: %w", p.node.NodeID.String(), err)
+			return stacktrace.Errorf("failed to scale up StatefulSet for %s: %w", p.node.NodeID.String(), err)
 		}
 
 		log.Debug("scaled up StatefulSet",
@@ -350,14 +351,14 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 
 		return nil
 	} else if !apierrors.IsNotFound(err) {
-		return fmt.Errorf("failed to retrieve StatefulSet %s/%s: %w", namespace, statefulSetName, err)
+		return stacktrace.Errorf("failed to retrieve StatefulSet %s/%s: %w", namespace, statefulSetName, err)
 	}
 
 	// StatefulSet does not exist - create it
 
 	flags, err := p.getFlags()
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	log.Debug("creating StatefulSet",
@@ -388,7 +389,7 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 			zap.String("schedulingLabelValue", labelValue),
 		)
 		if labelKey == "" || labelValue == "" {
-			return errors.New("scheduling label key and value must be non-empty when exclusive scheduling is enabled")
+			return stacktrace.New("scheduling label key and value must be non-empty when exclusive scheduling is enabled")
 		}
 		configureExclusiveScheduling(&statefulSet.Spec.Template, labelKey, labelValue)
 	}
@@ -399,7 +400,7 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 		metav1.CreateOptions{},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create StatefulSet: %w", err)
+		return stacktrace.Errorf("failed to create StatefulSet: %w", err)
 	}
 	log.Debug("created StatefulSet",
 		zap.String("nodeID", nodeID),
@@ -412,15 +413,15 @@ func (p *KubeRuntime) Start(ctx context.Context) error {
 
 		serviceName := "s-" + statefulSetName // The 's-' prefix ensures DNS compatibility
 		if err := p.createNodeService(ctx, serviceName); err != nil {
-			return fmt.Errorf("failed to create Service for node: %w", err)
+			return stacktrace.Errorf("failed to create Service for node: %w", err)
 		}
 
 		if err := p.createNodeIngress(ctx, serviceName); err != nil {
-			return fmt.Errorf("failed to create Ingress for node: %w", err)
+			return stacktrace.Errorf("failed to create Ingress for node: %w", err)
 		}
 
 		if err := p.waitForIngressReadiness(ctx, serviceName); err != nil {
-			return fmt.Errorf("failed to wait for Ingress readiness: %w", err)
+			return stacktrace.Errorf("failed to wait for Ingress readiness: %w", err)
 		}
 	}
 
@@ -445,7 +446,7 @@ func (p *KubeRuntime) InitiateStop(ctx context.Context) error {
 
 	clientset, err := p.getClientset()
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	log.Debug("retrieving StatefulSet scale",
 		zap.String("nodeID", nodeID),
@@ -454,7 +455,7 @@ func (p *KubeRuntime) InitiateStop(ctx context.Context) error {
 	)
 	scale, err := clientset.AppsV1().StatefulSets(namespace).GetScale(ctx, statefulSetName, metav1.GetOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to retrieve scale for StatefulSet %s/%s: %w", namespace, statefulSetName, err)
+		return stacktrace.Errorf("failed to retrieve scale for StatefulSet %s/%s: %w", namespace, statefulSetName, err)
 	}
 
 	if scale.Spec.Replicas == 0 {
@@ -475,7 +476,7 @@ func (p *KubeRuntime) InitiateStop(ctx context.Context) error {
 		metav1.UpdateOptions{},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to replicas to zero for StatefulSet %s/%s for %s: %w", namespace, statefulSetName, nodeID, err)
+		return stacktrace.Errorf("failed to replicas to zero for StatefulSet %s/%s for %s: %w", namespace, statefulSetName, nodeID, err)
 	}
 
 	log.Debug("StatefulSet replicas set to zero",
@@ -508,7 +509,7 @@ func (p *KubeRuntime) WaitForStopped(ctx context.Context) error {
 
 	clientset, err := p.getClientset()
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	err = wait.PollUntilContextCancel(
@@ -548,7 +549,7 @@ func (p *KubeRuntime) WaitForStopped(ctx context.Context) error {
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to wait for StatefulSet %s/%s for %s to stop: %w", namespace, statefulSetName, nodeID, err)
+		return stacktrace.Errorf("failed to wait for StatefulSet %s/%s for %s to stop: %w", namespace, statefulSetName, nodeID, err)
 	}
 
 	return nil
@@ -572,12 +573,12 @@ func (p *KubeRuntime) Restart(ctx context.Context) error {
 
 	clientset, err := p.getClientset()
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	statefulset, err := clientset.AppsV1().StatefulSets(namespace).Get(ctx, statefulSetName, metav1.GetOptions{})
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	// TODO(marun) Maybe optionally avoid restart if the patches will be no-op?
@@ -587,7 +588,7 @@ func (p *KubeRuntime) Restart(ctx context.Context) error {
 
 	flags, err := p.getFlags()
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	nodeEnv := flagsToEnvVarSlice(flags)
 	patches = append(patches, map[string]any{
@@ -605,7 +606,7 @@ func (p *KubeRuntime) Restart(ctx context.Context) error {
 
 	patchBytes, err := json.Marshal(patches)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	log.Debug("ensuring StatefulSet is up to date",
@@ -621,7 +622,7 @@ func (p *KubeRuntime) Restart(ctx context.Context) error {
 		metav1.PatchOptions{},
 	)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	updatedGeneration := updatedStatefulSet.Generation
 
@@ -634,10 +635,10 @@ func (p *KubeRuntime) Restart(ctx context.Context) error {
 
 		// Force a restart by scaling up and down
 		if err := p.InitiateStop(ctx); err != nil {
-			return fmt.Errorf("failed to stop StatefulSet %s/%s for %s: %w", namespace, statefulSetName, nodeID, err)
+			return stacktrace.Errorf("failed to stop StatefulSet %s/%s for %s: %w", namespace, statefulSetName, nodeID, err)
 		}
 		if err := p.WaitForStopped(ctx); err != nil {
-			return fmt.Errorf("failed to wait for StatefulSet %s/%s for %s to stop: %w", namespace, statefulSetName, nodeID, err)
+			return stacktrace.Errorf("failed to wait for StatefulSet %s/%s for %s to stop: %w", namespace, statefulSetName, nodeID, err)
 		}
 		return p.Start(ctx)
 	}
@@ -675,7 +676,7 @@ func (p *KubeRuntime) Restart(ctx context.Context) error {
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to wait for StatefulSet to finish rolling out: %w", err)
+		return stacktrace.Errorf("failed to wait for StatefulSet to finish rolling out: %w", err)
 	}
 
 	p.setNotRunning()
@@ -687,15 +688,15 @@ func (p *KubeRuntime) Restart(ctx context.Context) error {
 func (p *KubeRuntime) IsHealthy(ctx context.Context) (bool, error) {
 	err := p.readState(ctx)
 	if err != nil {
-		return false, err
+		return false, stacktrace.Wrap(err)
 	}
 	if len(p.node.URI) == 0 {
-		return false, errNotRunning
+		return false, stacktrace.Wrap(errNotRunning)
 	}
 
 	healthReply, err := CheckNodeHealth(ctx, p.GetAccessibleURI())
 	if errors.Is(err, ErrUnrecoverableNodeHealthCheck) {
-		return false, err
+		return false, stacktrace.Wrap(err)
 	} else if err != nil {
 		p.node.network.log.Verbo("failed to check node health",
 			zap.String("nodeID", p.node.NodeID.String()),
@@ -753,11 +754,11 @@ func (p *KubeRuntime) waitForPodReadiness(ctx context.Context) error {
 
 	clientset, err := p.getClientset()
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	if err := WaitForPodCondition(ctx, clientset, namespace, podName, corev1.PodReady); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	log.Debug("pod is ready",
 		zap.String("nodeID", nodeID),
@@ -772,11 +773,11 @@ func (p *KubeRuntime) waitForPodReadiness(ctx context.Context) error {
 	)
 	pod, err := clientset.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	addr, err := netip.ParseAddr(pod.Status.PodIP)
 	if err != nil {
-		return fmt.Errorf("failed to parse Pod IP: %w", err)
+		return stacktrace.Errorf("failed to parse Pod IP: %w", err)
 	}
 
 	var (
@@ -832,21 +833,22 @@ func (p *KubeRuntime) getKubeconfig() (*restclient.Config, error) {
 			runtimeConfig.ConfigContext,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get kubeconfig: %w", err)
+			return nil, stacktrace.Errorf("failed to get kubeconfig: %w", err)
 		}
 		p.kubeConfig = config
 	}
 	return p.kubeConfig, nil
 }
 
+// TODO(marun) Add a function that returns the kubeconfig and the clientset
 func (p *KubeRuntime) getClientset() (*kubernetes.Clientset, error) {
 	kubeconfig, err := p.getKubeconfig()
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Wrap(err)
 	}
 	clientset, err := kubernetes.NewForConfig(kubeconfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create clientset: %w", err)
+		return nil, stacktrace.Errorf("failed to create clientset: %w", err)
 	}
 	return clientset, nil
 }
@@ -854,11 +856,11 @@ func (p *KubeRuntime) getClientset() (*kubernetes.Clientset, error) {
 func (p *KubeRuntime) forwardPort(ctx context.Context, port int) (uint16, chan struct{}, error) {
 	kubeconfig, err := p.getKubeconfig()
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, stacktrace.Wrap(err)
 	}
 	clientset, err := p.getClientset()
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, stacktrace.Wrap(err)
 	}
 
 	var (
@@ -868,7 +870,7 @@ func (p *KubeRuntime) forwardPort(ctx context.Context, port int) (uint16, chan s
 
 	// Wait for the Pod to become ready (otherwise it won't be accepting network connections)
 	if err := WaitForPodCondition(ctx, clientset, namespace, podName, corev1.PodReady); err != nil {
-		return 0, nil, err
+		return 0, nil, stacktrace.Wrap(err)
 	}
 
 	forwardedPort, stopChan, err := enableLocalForwardForPod(
@@ -880,7 +882,7 @@ func (p *KubeRuntime) forwardPort(ctx context.Context, port int) (uint16, chan s
 		os.Stderr,
 	)
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to enable local forward for Pod: %w", err)
+		return 0, nil, stacktrace.Errorf("failed to enable local forward for Pod: %w", err)
 	}
 	return forwardedPort, stopChan, nil
 }
@@ -897,7 +899,7 @@ func (p *KubeRuntime) setNotRunning() {
 func (p *KubeRuntime) getFlags() (FlagsMap, error) {
 	flags, err := p.node.composeFlags()
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Wrap(err)
 	}
 	// The data dir path is fixed for the Pod
 	flags[config.DataDirKey] = volumeMountPath
@@ -972,7 +974,7 @@ func (p *KubeRuntime) createNodeService(ctx context.Context, serviceName string)
 
 	clientset, err := p.getClientset()
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	service := &corev1.Service{
@@ -1004,7 +1006,7 @@ func (p *KubeRuntime) createNodeService(ctx context.Context, serviceName string)
 
 	_, err = clientset.CoreV1().Services(namespace).Create(ctx, service, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create Service: %w", err)
+		return stacktrace.Errorf("failed to create Service: %w", err)
 	}
 
 	log.Debug("created Service",
@@ -1034,7 +1036,7 @@ func (p *KubeRuntime) createNodeIngress(ctx context.Context, serviceName string)
 
 	clientset, err := p.getClientset()
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	var (
@@ -1109,7 +1111,7 @@ func (p *KubeRuntime) createNodeIngress(ctx context.Context, serviceName string)
 
 	_, err = clientset.NetworkingV1().Ingresses(namespace).Create(ctx, ingress, metav1.CreateOptions{})
 	if err != nil {
-		return fmt.Errorf("failed to create Ingress: %w", err)
+		return stacktrace.Errorf("failed to create Ingress: %w", err)
 	}
 
 	log.Debug("created Ingress",
@@ -1140,7 +1142,7 @@ func (p *KubeRuntime) waitForIngressReadiness(ctx context.Context, serviceName s
 
 	clientset, err := p.getClientset()
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	// Wait for the ingress to exist, be processed by the controller, and service endpoints to be available
@@ -1247,7 +1249,7 @@ func (p *KubeRuntime) waitForIngressReadiness(ctx context.Context, serviceName s
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to wait for Ingress %s/%s readiness: %w", namespace, serviceName, err)
+		return stacktrace.Errorf("failed to wait for Ingress %s/%s readiness: %w", namespace, serviceName, err)
 	}
 
 	log.Debug("Ingress is ready",

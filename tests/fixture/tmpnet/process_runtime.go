@@ -25,6 +25,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/config/node"
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
 )
@@ -75,11 +76,11 @@ func (p *ProcessRuntime) readState(_ context.Context) error {
 		p.setProcessContext(node.ProcessContext{})
 		return nil
 	} else if err != nil {
-		return fmt.Errorf("failed to read node process context: %w", err)
+		return stacktrace.Errorf("failed to read node process context: %w", err)
 	}
 	processContext := node.ProcessContext{}
 	if err := json.Unmarshal(bytes, &processContext); err != nil {
-		return fmt.Errorf("failed to unmarshal node process context: %w", err)
+		return stacktrace.Errorf("failed to unmarshal node process context: %w", err)
 	}
 	p.setProcessContext(processContext)
 	return nil
@@ -96,27 +97,27 @@ func (p *ProcessRuntime) Start(ctx context.Context) error {
 	// Avoid attempting to start an already running node.
 	proc, err := p.getProcess()
 	if err != nil {
-		return fmt.Errorf("failed to retrieve existing process: %w", err)
+		return stacktrace.Errorf("failed to retrieve existing process: %w", err)
 	}
 	if proc != nil {
-		return errNodeAlreadyRunning
+		return stacktrace.Wrap(errNodeAlreadyRunning)
 	}
 
 	runtimeConfig := p.getRuntimeConfig()
 
 	// Attempt to check for rpc version compatibility
 	if err := checkVMBinaries(log, p.node.network.Subnets, runtimeConfig); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	// Ensure a stale process context file is removed so that the
 	// creation of a new file can indicate node start.
 	if err := os.Remove(p.getProcessContextPath()); err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("failed to remove stale process context file: %w", err)
+		return stacktrace.Errorf("failed to remove stale process context file: %w", err)
 	}
 
 	if err := p.writeFlags(); err != nil {
-		return fmt.Errorf("writing node flags: %w", err)
+		return stacktrace.Errorf("writing node flags: %w", err)
 	}
 
 	// All arguments are provided in the flags file
@@ -125,7 +126,7 @@ func (p *ProcessRuntime) Start(ctx context.Context) error {
 	configureDetachedProcess(cmd)
 
 	if err := cmd.Start(); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	// Watch the node's main.log file in the background for FATAL log entries that indicate
@@ -141,7 +142,7 @@ func (p *ProcessRuntime) Start(ctx context.Context) error {
 	// found in a reasonable amount of time, the node is unlikely to have
 	// started successfully.
 	if err := p.waitForProcessContext(ctx); err != nil {
-		return fmt.Errorf("failed to start local node: %w", err)
+		return stacktrace.Errorf("failed to start local node: %w", err)
 	}
 
 	log.Info("started local node",
@@ -157,7 +158,7 @@ func (p *ProcessRuntime) Start(ctx context.Context) error {
 func (p *ProcessRuntime) writeFlags() error {
 	flags, err := p.node.composeFlags()
 	if err != nil {
-		return fmt.Errorf("failed to compose node flags: %w", err)
+		return stacktrace.Errorf("failed to compose node flags: %w", err)
 	}
 
 	flags.SetDefaults(FlagsMap{
@@ -185,16 +186,16 @@ func (p *ProcessRuntime) writeFlags() error {
 	pluginDir := flags[config.PluginDirKey]
 	if len(pluginDir) > 0 {
 		if err := os.MkdirAll(pluginDir, perms.ReadWriteExecute); err != nil {
-			return fmt.Errorf("failed to create plugin dir: %w", err)
+			return stacktrace.Errorf("failed to create plugin dir: %w", err)
 		}
 	}
 
 	bytes, err := DefaultJSONMarshal(flags)
 	if err != nil {
-		return fmt.Errorf("failed to marshal node flags: %w", err)
+		return stacktrace.Errorf("failed to marshal node flags: %w", err)
 	}
 	if err := os.WriteFile(p.node.GetFlagsPath(), bytes, perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write node flags: %w", err)
+		return stacktrace.Errorf("failed to write node flags: %w", err)
 	}
 	return nil
 }
@@ -203,14 +204,14 @@ func (p *ProcessRuntime) writeFlags() error {
 func (p *ProcessRuntime) InitiateStop(_ context.Context) error {
 	proc, err := p.getProcess()
 	if err != nil {
-		return fmt.Errorf("failed to retrieve process to stop: %w", err)
+		return stacktrace.Errorf("failed to retrieve process to stop: %w", err)
 	}
 	if proc == nil {
 		// Already stopped
 		return p.removeMonitoringConfig()
 	}
 	if err := proc.Signal(syscall.SIGTERM); err != nil {
-		return fmt.Errorf("failed to send SIGTERM to pid %d: %w", p.pid, err)
+		return stacktrace.Errorf("failed to send SIGTERM to pid %d: %w", p.pid, err)
 	}
 	return nil
 }
@@ -222,7 +223,7 @@ func (p *ProcessRuntime) WaitForStopped(ctx context.Context) error {
 	for {
 		proc, err := p.getProcess()
 		if err != nil {
-			return fmt.Errorf("failed to retrieve process: %w", err)
+			return stacktrace.Errorf("failed to retrieve process: %w", err)
 		}
 		if proc == nil {
 			return p.removeMonitoringConfig()
@@ -230,7 +231,7 @@ func (p *ProcessRuntime) WaitForStopped(ctx context.Context) error {
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("failed to see node process stop %q before timeout: %w", p.node.NodeID, ctx.Err())
+			return stacktrace.Errorf("failed to see node process stop %q before timeout: %w", p.node.NodeID, ctx.Err())
 		case <-ticker.C:
 		}
 	}
@@ -244,14 +245,14 @@ func (p *ProcessRuntime) Restart(ctx context.Context) error {
 		// failing to start if the operating system allocates the port
 		// to a different process between node stop and start.
 		if err := p.saveAPIPort(); err != nil {
-			return err
+			return stacktrace.Wrap(err)
 		}
 	}
 	if err := p.node.Stop(ctx); err != nil {
-		return fmt.Errorf("failed to stop node %s: %w", p.node.NodeID, err)
+		return stacktrace.Errorf("failed to stop node %s: %w", p.node.NodeID, err)
 	}
 	if err := p.Start(ctx); err != nil {
-		return fmt.Errorf("failed to start node %s: %w", p.node.NodeID, err)
+		return stacktrace.Errorf("failed to start node %s: %w", p.node.NodeID, err)
 	}
 	return nil
 }
@@ -262,15 +263,15 @@ func (p *ProcessRuntime) IsHealthy(ctx context.Context) (bool, error) {
 	// API URI is current.
 	proc, err := p.getProcess()
 	if err != nil {
-		return false, fmt.Errorf("failed to determine process status: %w", err)
+		return false, stacktrace.Errorf("failed to determine process status: %w", err)
 	}
 	if proc == nil {
-		return false, errNotRunning
+		return false, stacktrace.Wrap(errNotRunning)
 	}
 
 	healthReply, err := CheckNodeHealth(ctx, p.node.URI)
 	if err != nil {
-		return false, err
+		return false, stacktrace.Wrap(err)
 	}
 	return healthReply.Healthy, nil
 }
@@ -288,12 +289,12 @@ func (p *ProcessRuntime) waitForProcessContext(ctx context.Context) error {
 	for len(p.node.URI) == 0 {
 		err := p.readState(ctx)
 		if err != nil {
-			return fmt.Errorf("failed to read process context for node %q: %w", p.node.NodeID, err)
+			return stacktrace.Errorf("failed to read process context for node %q: %w", p.node.NodeID, err)
 		}
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("failed to load process context for node %q: %w", p.node.NodeID, context.Cause(ctx))
+			return stacktrace.Errorf("failed to load process context for node %q: %w", p.node.NodeID, context.Cause(ctx))
 		case <-ticker.C:
 		}
 	}
@@ -309,7 +310,7 @@ func (p *ProcessRuntime) getProcess() (*os.Process, error) {
 	// Read the process context to ensure freshness. The node may have
 	// stopped or been restarted since last read.
 	if err := p.readState(ctx); err != nil {
-		return nil, fmt.Errorf("failed to read process context: %w", err)
+		return nil, stacktrace.Errorf("failed to read process context: %w", err)
 	}
 
 	if p.pid == 0 {
@@ -324,7 +325,7 @@ func (p *ProcessRuntime) getProcess() (*os.Process, error) {
 func getProcess(pid int) (*os.Process, error) {
 	proc, err := os.FindProcess(pid)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find process: %w", err)
+		return nil, stacktrace.Errorf("failed to find process: %w", err)
 	}
 
 	// Sending 0 will not actually send a signal but will perform
@@ -338,7 +339,7 @@ func getProcess(pid int) (*os.Process, error) {
 		// Process is not running
 		return nil, nil
 	}
-	return nil, fmt.Errorf("failed to determine process status: %w", err)
+	return nil, stacktrace.Errorf("failed to determine process status: %w", err)
 }
 
 // Write monitoring configuration enabling collection of metrics and logs from the node.
@@ -353,7 +354,7 @@ func (p *ProcessRuntime) writeMonitoringConfig() error {
 		},
 	}
 	if err := p.writeMonitoringConfigFile(prometheusCmd, prometheusConfig); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	promtailLabels := map[string]string{}
@@ -374,7 +375,7 @@ func (p *ProcessRuntime) getMonitoringConfigPath(name string) (string, error) {
 	// by multiple nodes without conflict.
 	serviceDiscoveryDir, err := getServiceDiscoveryDir(name)
 	if err != nil {
-		return "", err
+		return "", stacktrace.Wrap(err)
 	}
 	return filepath.Join(serviceDiscoveryDir, fmt.Sprintf("%s_%s.json", p.node.network.UUID, p.node.NodeID)), nil
 }
@@ -384,10 +385,10 @@ func (p *ProcessRuntime) removeMonitoringConfig() error {
 	for _, name := range []string{promtailCmd, prometheusCmd} {
 		configPath, err := p.getMonitoringConfigPath(name)
 		if err != nil {
-			return err
+			return stacktrace.Wrap(err)
 		}
 		if err := os.Remove(configPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("failed to remove %s config: %w", name, err)
+			return stacktrace.Errorf("failed to remove %s config: %w", name, err)
 		}
 	}
 	return nil
@@ -397,21 +398,21 @@ func (p *ProcessRuntime) removeMonitoringConfig() error {
 func (p *ProcessRuntime) writeMonitoringConfigFile(name string, config []ConfigMap) error {
 	configPath, err := p.getMonitoringConfigPath(name)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	dir := filepath.Dir(configPath)
 	if err := os.MkdirAll(dir, perms.ReadWriteExecute); err != nil {
-		return fmt.Errorf("failed to create %s service discovery dir: %w", name, err)
+		return stacktrace.Errorf("failed to create %s service discovery dir: %w", name, err)
 	}
 
 	bytes, err := DefaultJSONMarshal(config)
 	if err != nil {
-		return fmt.Errorf("failed to marshal %s config: %w", name, err)
+		return stacktrace.Errorf("failed to marshal %s config: %w", name, err)
 	}
 
 	if err := os.WriteFile(configPath, bytes, perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write %s config: %w", name, err)
+		return stacktrace.Errorf("failed to write %s config: %w", name, err)
 	}
 
 	return nil
@@ -436,7 +437,7 @@ func (p *ProcessRuntime) saveAPIPort() error {
 	}
 	_, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	p.node.Flags[config.HTTPPortKey] = port
 	return nil

@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -217,7 +218,7 @@ func WaitForNodeHealthy(
 		outErr,
 	)
 	if err != nil {
-		return ids.NodeID{}, fmt.Errorf("failed to enable local forward for pod: %w", err)
+		return ids.NodeID{}, stacktrace.Errorf("failed to enable local forward for pod: %w", err)
 	}
 	defer close(localPortStopChan)
 	localNodeURI := fmt.Sprintf("http://127.0.0.1:%d", localPort)
@@ -226,12 +227,12 @@ func WaitForNodeHealthy(
 	infoClient := info.NewClient(localNodeURI)
 	bootstrapNodeID, _, err := infoClient.GetNodeID(ctx)
 	if err != nil {
-		return ids.NodeID{}, fmt.Errorf("failed to retrieve node bootstrap ID: %w", err)
+		return ids.NodeID{}, stacktrace.Errorf("failed to retrieve node bootstrap ID: %w", err)
 	}
 	if err := wait.PollImmediateInfinite(healthCheckInterval, func() (bool, error) {
 		healthReply, err := CheckNodeHealth(ctx, localNodeURI)
 		if errors.Is(err, ErrUnrecoverableNodeHealthCheck) {
-			return false, err
+			return false, stacktrace.Wrap(err)
 		} else if err != nil {
 			// Error is potentially recoverable - log and continue
 			log.Debug("failed to check node health",
@@ -241,7 +242,7 @@ func WaitForNodeHealthy(
 		}
 		return healthReply.Healthy, nil
 	}); err != nil {
-		return ids.NodeID{}, fmt.Errorf("failed to wait for node to report healthy: %w", err)
+		return ids.NodeID{}, stacktrace.Errorf("failed to wait for node to report healthy: %w", err)
 	}
 
 	return bootstrapNodeID, nil
@@ -249,7 +250,7 @@ func WaitForNodeHealthy(
 
 // WaitForPodCondition watches the specified pod until the status includes the specified condition.
 func WaitForPodCondition(ctx context.Context, clientset *kubernetes.Clientset, namespace string, podName string, conditionType corev1.PodConditionType) error {
-	return WaitForPodStatus(
+	err := WaitForPodStatus(
 		ctx,
 		clientset,
 		namespace,
@@ -263,6 +264,10 @@ func WaitForPodCondition(ctx context.Context, clientset *kubernetes.Clientset, n
 			return false
 		},
 	)
+	if err != nil {
+		return stacktrace.Errorf("failed to wait for pod condition %s: %w", conditionType, err)
+	}
+	return nil
 }
 
 // WaitForPodStatus watches the specified pod until the status is deemed acceptable by the provided test function.
@@ -275,7 +280,7 @@ func WaitForPodStatus(
 ) error {
 	watch, err := clientset.CoreV1().Pods(namespace).Watch(ctx, metav1.SingleObject(metav1.ObjectMeta{Name: name}))
 	if err != nil {
-		return fmt.Errorf("failed to initiate watch of pod %s/%s: %w", namespace, name, err)
+		return stacktrace.Errorf("failed to initiate watch of pod %s/%s: %w", namespace, name, err)
 	}
 
 	for {
@@ -290,7 +295,7 @@ func WaitForPodStatus(
 				return nil
 			}
 		case <-ctx.Done():
-			return fmt.Errorf("timeout waiting for pod readiness: %w", ctx.Err())
+			return stacktrace.Errorf("timeout waiting for pod status: %w", ctx.Err())
 		}
 	}
 }
@@ -306,7 +311,7 @@ func enableLocalForwardForPod(
 ) (uint16, chan struct{}, error) {
 	transport, upgrader, err := spdy.RoundTripperFor(kubeconfig)
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to create round tripper: %w", err)
+		return 0, nil, stacktrace.Errorf("failed to create round tripper: %w", err)
 	}
 
 	dialer := spdy.NewDialer(
@@ -326,7 +331,7 @@ func enableLocalForwardForPod(
 	stopChan, readyChan := make(chan struct{}, 1), make(chan struct{}, 1)
 	forwarder, err := portforward.NewOnAddresses(dialer, addresses, ports, stopChan, readyChan, out, errOut)
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed to create forwarder: %w", err)
+		return 0, nil, stacktrace.Errorf("failed to create forwarder: %w", err)
 	}
 
 	go func() {
@@ -342,11 +347,11 @@ func enableLocalForwardForPod(
 	forwardedPorts, err := forwarder.GetPorts()
 	if err != nil {
 		close(stopChan)
-		return 0, nil, fmt.Errorf("failed to get forwarded ports: %w", err)
+		return 0, nil, stacktrace.Errorf("failed to get forwarded ports: %w", err)
 	}
 	if len(forwardedPorts) == 0 {
 		close(stopChan)
-		return 0, nil, fmt.Errorf("failed to find at least one forwarded port: %w", err)
+		return 0, nil, stacktrace.Errorf("failed to find at least one forwarded port: %w", err)
 	}
 	return forwardedPorts[0].Local, stopChan, nil
 }
@@ -381,12 +386,12 @@ func GetClientConfig(log logging.Logger, path string, context string) (*restclie
 func GetClientset(log logging.Logger, path string, context string) (*kubernetes.Clientset, error) {
 	clientConfig, err := GetClientConfig(log, path, context)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get client config: %w", err)
+		return nil, stacktrace.Errorf("failed to get client config: %w", err)
 	}
 
 	clientset, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create clientset: %w", err)
+		return nil, stacktrace.Errorf("failed to create clientset: %w", err)
 	}
 	return clientset, nil
 }
@@ -413,7 +418,7 @@ func applyManifest(
 		obj := &unstructured.Unstructured{}
 		_, gvk, err := decoder.Decode([]byte(doc), nil, obj)
 		if err != nil {
-			return fmt.Errorf("failed to decode manifest: %w", err)
+			return stacktrace.Errorf("failed to decode manifest: %w", err)
 		}
 
 		gvr := schema.GroupVersionResource{
@@ -439,7 +444,7 @@ func applyManifest(
 		// Convert object to JSON for server-side apply
 		data, err := json.Marshal(obj)
 		if err != nil {
-			return fmt.Errorf("failed to marshal object to JSON: %w", err)
+			return stacktrace.Errorf("failed to marshal object to JSON: %w", err)
 		}
 
 		// Use server-side apply to create or update the resource
@@ -448,7 +453,7 @@ func applyManifest(
 			Force:        ptr.To(true),
 		})
 		if err != nil {
-			return fmt.Errorf("failed to apply %s %s/%s: %w", gvk.Kind, resourceNamespace, obj.GetName(), err)
+			return stacktrace.Errorf("failed to apply %s %s/%s: %w", gvk.Kind, resourceNamespace, obj.GetName(), err)
 		}
 		log.Info("applied resource",
 			zap.String("kind", gvk.Kind),

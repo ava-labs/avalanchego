@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
@@ -64,7 +65,7 @@ func (v *processRuntimeVars) register(stringVar varFunc[string], boolVar varFunc
 
 func (v *processRuntimeVars) getProcessRuntimeConfig() (*tmpnet.ProcessRuntimeConfig, error) {
 	if err := v.validate(); err != nil {
-		return nil, err
+		return nil, stacktrace.Wrap(err)
 	}
 	return &v.config, nil
 }
@@ -73,12 +74,12 @@ func (v *processRuntimeVars) validate() error {
 	path := v.config.AvalancheGoPath
 
 	if len(path) == 0 {
-		return errAvalancheGoRequired
+		return stacktrace.Wrap(errAvalancheGoRequired)
 	}
 
 	if filepath.IsAbs(path) {
 		if _, err := os.Stat(path); err != nil {
-			return fmt.Errorf("--%s (%s) not found: %w", avalanchegoPathFlag, path, err)
+			return stacktrace.Errorf("--%s (%s) not found: %w", avalanchegoPathFlag, path, err)
 		}
 		return nil
 	}
@@ -86,7 +87,7 @@ func (v *processRuntimeVars) validate() error {
 	// A relative path must be resolvable to an absolute path
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return fmt.Errorf(
+		return stacktrace.Errorf(
 			"--%s (%s) is a relative path but its absolute path cannot be determined: %w",
 			avalanchegoPathFlag,
 			path,
@@ -96,7 +97,7 @@ func (v *processRuntimeVars) validate() error {
 
 	// The absolute path must exist
 	if _, err := os.Stat(absPath); err != nil {
-		return fmt.Errorf(
+		return stacktrace.Errorf(
 			"--%s (%s) is a relative path but its absolute path (%s) is not found: %w",
 			avalanchegoPathFlag,
 			path,
