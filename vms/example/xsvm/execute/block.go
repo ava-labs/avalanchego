@@ -30,10 +30,7 @@ func Block(
 	}
 
 	for _, currentTx := range blk.Txs {
-		txID, err := currentTx.ID()
-		if err != nil {
-			return err
-		}
+		txID := currentTx.ID()
 		sender, err := currentTx.SenderID()
 		if err != nil {
 			return err
