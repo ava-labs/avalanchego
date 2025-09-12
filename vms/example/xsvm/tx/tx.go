@@ -7,18 +7,30 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 var secpCache = secp256k1.NewRecoverCache(2048)
 
+var _ mempool.Tx = (*Tx)(nil)
+
 type Tx struct {
 	Unsigned  `serialize:"true" json:"unsigned"`
 	Signature [secp256k1.SignatureLen]byte `serialize:"true" json:"signature"`
+
+	// non serialized fields
+	id   ids.ID
+	size int
 }
 
 func Parse(bytes []byte) (*Tx, error) {
 	tx := &Tx{}
 	_, err := Codec.Unmarshal(bytes, tx)
+
+	id := hashing.ComputeHash256Array(bytes)
+	tx.id = id
+	tx.size = len(bytes)
 	return tx, err
 }
 
@@ -40,9 +52,22 @@ func Sign(utx Unsigned, key *secp256k1.PrivateKey) (*Tx, error) {
 	return tx, nil
 }
 
-func (tx *Tx) ID() (ids.ID, error) {
-	bytes, err := Codec.Marshal(CodecVersion, tx)
-	return hashing.ComputeHash256Array(bytes), err
+func (tx *Tx) ID() ids.ID {
+	return tx.id
+}
+
+// TODO: not sure what input ids are
+func (*Tx) InputIDs() set.Set[ids.ID] {
+	return set.Set[ids.ID]{}
+}
+
+func (tx *Tx) Size() int {
+	return tx.size
+}
+
+// GossipID returns the unique ID that this tx should use for mempool gossip
+func (tx *Tx) GossipID() ids.ID {
+	return tx.ID()
 }
 
 func (tx *Tx) SenderID() (ids.ShortID, error) {

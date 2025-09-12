@@ -12,11 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/chain"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/execute"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
+	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	smblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	xsblock "github.com/ava-labs/avalanchego/vms/example/xsvm/block"
@@ -40,16 +40,16 @@ type builder struct {
 	preference ids.ID
 	// pendingTxsCond is awoken once there is at least one pending transaction.
 	pendingTxsCond *lock.Cond
-	pendingTxs     *linked.Hashmap[ids.ID, *tx.Tx]
+	pendingTxs     mempool.Mempool[*tx.Tx]
 }
 
-func New(chainContext *snow.Context, chain chain.Chain) Builder {
+func New(chainContext *snow.Context, chain chain.Chain, mempool mempool.Mempool[*tx.Tx]) Builder {
 	return &builder{
 		chainContext:   chainContext,
 		chain:          chain,
 		preference:     chain.LastAccepted(),
 		pendingTxsCond: lock.NewCond(&sync.Mutex{}),
-		pendingTxs:     linked.NewHashmap[ids.ID, *tx.Tx](),
+		pendingTxs:     mempool,
 	}
 }
 
@@ -59,15 +59,14 @@ func (b *builder) SetPreference(preferred ids.ID) {
 
 func (b *builder) AddTx(_ context.Context, newTx *tx.Tx) error {
 	// TODO: verify [tx] against the currently preferred state
-	txID, err := newTx.ID()
+	b.pendingTxsCond.L.Lock()
+	defer b.pendingTxsCond.L.Unlock()
+
+	err := b.pendingTxs.Add(newTx)
 	if err != nil {
 		return err
 	}
 
-	b.pendingTxsCond.L.Lock()
-	defer b.pendingTxsCond.L.Unlock()
-
-	b.pendingTxs.Put(txID, newTx)
 	b.pendingTxsCond.Broadcast()
 	return nil
 }
@@ -113,11 +112,11 @@ func (b *builder) BuildBlock(ctx context.Context, blockContext *smblock.Context)
 
 	currentState := versiondb.New(preferredState)
 	for len(wipBlock.Txs) < MaxTxsPerBlock {
-		txID, currentTx, exists := b.pendingTxs.Oldest()
+		currentTx, exists := b.pendingTxs.Peek()
 		if !exists {
 			break
 		}
-		b.pendingTxs.Delete(txID)
+		b.pendingTxs.Remove(currentTx)
 
 		sender, err := currentTx.SenderID()
 		if err != nil {
@@ -131,7 +130,7 @@ func (b *builder) BuildBlock(ctx context.Context, blockContext *smblock.Context)
 			ChainContext: b.chainContext,
 			Database:     txState,
 			BlockContext: blockContext,
-			TxID:         txID,
+			TxID:         currentTx.ID(),
 			Sender:       sender,
 			// TODO: populate fees
 		}

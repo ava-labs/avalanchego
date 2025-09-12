@@ -10,9 +10,9 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/block"
-	"github.com/ava-labs/avalanchego/vms/example/xsvm/builder"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/chain"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/mempool"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/state"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -36,14 +36,14 @@ func NewServer(
 	genesis *genesis.Genesis,
 	state database.KeyValueReader,
 	chain chain.Chain,
-	builder builder.Builder,
+	mempool *mempool.GossipMempool,
 ) Server {
 	return &server{
 		ctx:     ctx,
 		genesis: genesis,
 		state:   state,
 		chain:   chain,
-		builder: builder,
+		mempool: mempool,
 	}
 }
 
@@ -52,7 +52,7 @@ type server struct {
 	genesis *genesis.Genesis
 	state   database.KeyValueReader
 	chain   chain.Chain
-	builder builder.Builder
+	mempool *mempool.GossipMempool
 }
 
 type NetworkReply struct {
@@ -136,14 +136,14 @@ func (s *server) IssueTx(r *http.Request, args *IssueTxArgs, reply *IssueTxReply
 
 	ctx := r.Context()
 	s.ctx.Lock.Lock()
-	err = s.builder.AddTx(ctx, newTx)
+	err = s.mempool.AddWithContext(ctx, newTx)
 	s.ctx.Lock.Unlock()
+
 	if err != nil {
 		return err
 	}
 
-	txID, err := newTx.ID()
-	reply.TxID = txID
+	reply.TxID = newTx.ID()
 	return err
 }
 
