@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1757754618058,
+  "lastUpdate": 1757841000898,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -1116,6 +1116,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-blacksmith-4vcpu-ubuntu-2404",
             "value": 103.9,
+            "unit": "mgas/s",
+            "extra": "1 times\n10 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Sam Liokumovich",
+            "username": "samliok",
+            "email": "65994425+samliok@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "e5fd77b491153d93e60ca5f6204e5d55cb862833",
+          "message": "[tmpnet] Use Api Node Instead of URI in CreateSubnets (#4263)\n\nSigned-off-by: Sam Liokumovich <65994425+samliok@users.noreply.github.com>",
+          "timestamp": "2025-09-12T21:52:04Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/e5fd77b491153d93e60ca5f6204e5d55cb862833"
+        },
+        "date": 1757840999832,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-blacksmith-4vcpu-ubuntu-2404",
+            "value": 115.1,
             "unit": "mgas/s",
             "extra": "1 times\n10 procs"
           }
