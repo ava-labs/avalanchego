@@ -203,7 +203,7 @@ func TestSync_ValidatorLifecycle(t *testing.T) {
 	clk.Set(time.Unix(0, 0))
 	state, err := newState(db)
 	require.NoError(err)
-	ut, err := NewUptimeTracker(ctx, uptime.NewManager(state, &clk), db, &clk)
+	ut, err := NewUptimeTracker(ctx, uptime.NewManager(state, &clk), db)
 	require.NoError(err)
 
 	nodeID := ids.GenerateTestNodeID()
@@ -315,11 +315,11 @@ func TestUptimeTracking_ValidatorStatusChanges(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		testFunc func(t *testing.T, u UptimeTracker, clk *mockable.Clock, _ uptime.State)
+		testFunc func(t *testing.T, u UptimeTracker, clk *mockable.Clock)
 	}{
 		{
 			name: "Connect before tracking, then track inactive validator",
-			testFunc: func(t *testing.T, u UptimeTracker, clk *mockable.Clock, _ uptime.State) {
+			testFunc: func(t *testing.T, u UptimeTracker, clk *mockable.Clock) {
 				require := require.New(t)
 
 				// Connect before tracking
@@ -351,7 +351,7 @@ func TestUptimeTracking_ValidatorStatusChanges(t *testing.T) {
 		},
 		{
 			name: "Start tracking, connect, then validator becomes inactive",
-			testFunc: func(t *testing.T, u UptimeTracker, clk *mockable.Clock, _ uptime.State) {
+			testFunc: func(t *testing.T, u UptimeTracker, clk *mockable.Clock) {
 				require := require.New(t)
 
 				// Start tracking
@@ -400,7 +400,7 @@ func TestUptimeTracking_ValidatorStatusChanges(t *testing.T) {
 		},
 		{
 			name: "Validator inactive before tracking, then becomes active",
-			testFunc: func(t *testing.T, up UptimeTracker, clk *mockable.Clock, _ uptime.State) {
+			testFunc: func(t *testing.T, up UptimeTracker, clk *mockable.Clock) {
 				require := require.New(t)
 
 				// Validator becomes inactive before tracking
@@ -442,7 +442,7 @@ func TestUptimeTracking_ValidatorStatusChanges(t *testing.T) {
 		},
 		{
 			name: "Basic uptime tracking with connection and disconnection",
-			testFunc: func(t *testing.T, up UptimeTracker, clk *mockable.Clock, s uptime.State) {
+			testFunc: func(t *testing.T, up UptimeTracker, clk *mockable.Clock) {
 				require := require.New(t)
 
 				// Start tracking and connect
@@ -474,12 +474,12 @@ func TestUptimeTracking_ValidatorStatusChanges(t *testing.T) {
 				addTime(t, clk, 2*time.Second)
 				finalUptime, _, err := up.manager.CalculateUptime(nodeID0)
 				require.NoError(err)
-				require.True(finalUptime >= initialUptime) // Should have increased or stayed the same
+				require.GreaterOrEqual(finalUptime, initialUptime) // Should have increased or stayed the same
 			},
 		},
 		{
 			name: "Uptime tracking with stop and restart",
-			testFunc: func(t *testing.T, up UptimeTracker, clk *mockable.Clock, _ uptime.State) {
+			testFunc: func(t *testing.T, up UptimeTracker, clk *mockable.Clock) {
 				require := require.New(t)
 
 				// Start tracking and connect
@@ -511,7 +511,7 @@ func TestUptimeTracking_ValidatorStatusChanges(t *testing.T) {
 		},
 		{
 			name: "Validator status changes during tracking stop",
-			testFunc: func(t *testing.T, up UptimeTracker, clk *mockable.Clock, _ uptime.State) {
+			testFunc: func(t *testing.T, up UptimeTracker, clk *mockable.Clock) {
 				require := require.New(t)
 
 				// Start tracking and connect
@@ -552,8 +552,8 @@ func TestUptimeTracking_ValidatorStatusChanges(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			u, clk, s := setupTestEnv(t, nodeID0, startTime)
-			test.testFunc(t, u, clk, s)
+			u, clk, _ := setupTestEnv(t, nodeID0, startTime)
+			test.testFunc(t, u, clk)
 		})
 	}
 }
@@ -604,7 +604,7 @@ func setupTestEnv(t *testing.T, nodeID ids.NodeID, startTime time.Time) (UptimeT
 	db := memdb.New()
 	ctx := &snow.Context{}
 	ctx.SubnetID = ids.GenerateTestID()
-	u, err := NewUptimeTracker(ctx, uptime.NewManager(s, &clk), db, &clk)
+	u, err := NewUptimeTracker(ctx, uptime.NewManager(s, &clk), db)
 	require.NoError(t, err)
 	return *u, &clk, s
 }

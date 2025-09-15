@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/uptime"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 // UptimeTracker maintains local validator state synchronized with the P-Chain validator set.
@@ -41,7 +40,6 @@ func NewUptimeTracker(
 	ctx *snow.Context,
 	manager uptime.Manager,
 	db database.Database,
-	clock *mockable.Clock,
 ) (*UptimeTracker, error) {
 	validatorState, err := newState(db)
 	if err != nil {
