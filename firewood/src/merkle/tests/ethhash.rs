@@ -86,11 +86,6 @@ fn test_eth_compatible_accounts(
     use sha2::Digest as _;
     use sha3::Keccak256;
 
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
-        .is_test(true)
-        .try_init()
-        .ok();
-
     let account = make_key(account);
     let expected_key_hash = Keccak256::digest(&account);
 

@@ -150,3 +150,22 @@ pub mod v2;
 
 /// Expose the storage logger
 pub use firewood_storage::logger;
+
+#[cfg(all(test, feature = "logger"))]
+#[ctor::ctor]
+/// `ctor` will ensure this function is invoked before any tests are run so we
+/// can initialize the logger consistently across all tests without having to
+/// manually call it in each test.
+///
+/// This is technically black magic as it runs before `main` is invoked, which
+/// violates some of the Rust guarantees. But, it is convenient to ensure the
+/// logger is initialized for all tests.
+///
+/// In the event of unexpected behavior in testing, disable this first before
+/// looking elsewhere.
+fn init_logger() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("trace"))
+        .is_test(true)
+        .try_init()
+        .ok();
+}

@@ -619,8 +619,6 @@ mod test {
 
     #[test]
     fn fuzz_checker() {
-        let _ = env_logger::Builder::new().is_test(true).try_init();
-
         let rng = firewood_storage::SeededRng::from_env_or_random();
 
         let db = testdb();

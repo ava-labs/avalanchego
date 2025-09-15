@@ -56,6 +56,7 @@ rand.workspace = true
 tempfile.workspace = true
 test-case.workspace = true
 # Regular dependencies
+ctor = "0.5.0"
 hash-db = "0.16.0"
 plain_hasher = "0.2.3"
 rlp = "0.6.1"

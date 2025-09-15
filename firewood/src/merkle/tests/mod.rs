@@ -707,8 +707,6 @@ fn test_delete_some() {
 
 #[test]
 fn test_root_hash_reversed_deletions() -> Result<(), FileIoError> {
-    let _ = env_logger::Builder::new().is_test(true).try_init();
-
     let rng = firewood_storage::SeededRng::from_env_or_random();
 
     let max_len0 = 8;
