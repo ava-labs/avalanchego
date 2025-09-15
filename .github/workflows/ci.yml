@@ -276,7 +276,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           # Pin to a specific commit that's compatible with Firewood v0.0.8 FFI
-          ref: 'eabe3e0d57368b7d33ef2bdba633de80fa990ef9'
+          ref: '5f7cd934105e59483ee954d6cbd4cba2e9b5623e'
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/install-nix
       - name: Cache Firewood v0.0.8 Build
