@@ -97,7 +97,7 @@ func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config 
 		return nil, fmt.Errorf("couldn't find last block at height %d: %w", storage.NumBlocks()-1, err)
 	}
 
-	blockTracker := newBlockTracker(lastBlock.(*Block))
+	blockTracker := newBlockTracker(lastBlock.(*Block), config.VM)
 	blockBuilder := &BlockBuilder{
 		vm:           config.VM,
 		blockTracker: blockTracker,
@@ -232,8 +232,7 @@ func (e *Engine) Shutdown(_ context.Context) error {
 	return nil
 }
 
-func (e *Engine) Gossip(_ context.Context) error {
-	e.logger.Debug("Gossip is not implemented for simplex")
+func (*Engine) Gossip(_ context.Context) error {
 	return nil
 }
 

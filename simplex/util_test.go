@@ -37,10 +37,11 @@ type newBlockConfig struct {
 
 func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 	if config.prev == nil {
+		vm := newTestVM()
 		block := &Block{
 			vmBlock: &wrappedBlock{
 				Block: snowmantest.Genesis,
-				vm:    newTestVM(),
+				vm:    vm,
 			},
 			metadata: genesisMetadata,
 		}
@@ -50,7 +51,7 @@ func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 		digest := computeDigest(bytes)
 		block.digest = digest
 
-		block.blockTracker = newBlockTracker(block)
+		block.blockTracker = newBlockTracker(block, vm)
 		return block
 	}
 	if config.round == 0 {

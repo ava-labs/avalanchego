@@ -4,7 +4,6 @@
 package s
 
 import (
-	"fmt"
 	"math"
 	"time"
 
@@ -18,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 )
@@ -80,77 +81,95 @@ var _ = e2e.DescribeSimplex("Create a Simplex [L1]", func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
-	ginkgo.It("should support transfers between subnets", func() {
+	ginkgo.It("Issue and Finalize a Transaction", func() {
 		network := e2e.GetEnv(tc).GetNetwork()
 
-		sourceSubnet := network.GetSubnet(simplexSubnetName)
-		require.NotNil(sourceSubnet)
+		simplexSubnet := network.GetSubnet(simplexSubnetName)
+		require.NotNil(simplexSubnet)
 
-		sourceChain := sourceSubnet.Chains[0]
-		sourceValidators := getNodesForIDs(network.Nodes, sourceSubnet.ValidatorIDs)
-		require.NotEmpty(sourceValidators)
-		sourceAPINode := sourceValidators[0] // set to 1 if bb
-		sourceAPINodeURI := sourceAPINode.GetAccessibleURI()
-		tc.Log().Info("issuing transactions for source subnet",
-			zap.String("subnetName", simplexSubnetName),
-			zap.Stringer("nodeID", sourceAPINode.NodeID),
-			zap.String("nodeURI", sourceAPINodeURI),
-		)
+		simplexChain := simplexSubnet.Chains[0]
+		simplexValidators := getNodesForIDs(network.Nodes, simplexSubnet.ValidatorIDs)
+		require.NotEmpty(simplexValidators)
 
-		tc.By(fmt.Sprintf("issuing transaction on chain %s on subnet %s to activate snowman++ consensus",
-			sourceChain.ChainID, sourceSubnet.SubnetID))
-		recipientKey := e2e.NewPrivateKey(tc)
-		transferTxStatus, err := transfer.Transfer(
-			tc.DefaultContext(),
-			&transfer.Config{
-				URI:        sourceAPINodeURI,
-				ChainID:    sourceChain.ChainID,
-				AssetID:    sourceChain.ChainID,
-				Amount:     units.Schmeckle,
-				To:         recipientKey.Address(),
-				PrivateKey: sourceChain.PreFundedKey,
-			},
-		)
-		require.NoError(err)
-		tc.Log().Info("issued transfer transaction",
-			zap.Stringer("txID", transferTxStatus.TxID),
-		)
+		sortNodes(simplexValidators)
 
-		// tc.By(fmt.Sprintf("importing to blockchain %s on subnet %s", destinationChain.ChainID, destinationSubnet.SubnetID))
-		// sourceURIs := make([]string, len(sourceValidators))
-		// for i, node := range sourceValidators {
-		// 	sourceURIs[i] = node.GetAccessibleURI()
-		// }
-		// importTxStatus, err := importtx.Import(
-		// 	tc.DefaultContext(),
-		// 	&importtx.Config{
-		// 		URI:                destinationAPINodeURI,
-		// 		SourceURIs:         sourceURIs,
-		// 		SourceChainID:      sourceChain.ChainID.String(),
-		// 		DestinationChainID: destinationChain.ChainID.String(),
-		// 		TxID:               exportTxStatus.TxID,
-		// 		PrivateKey:         destinationKey,
-		// 	},
-		// )
-		// require.NoError(err)
-		// tc.Log().Info("issued import transaction",
-		// 	zap.Stringer("txID", importTxStatus.TxID),
-		// )
-
-		// tc.By("checking that the balance of the source key has decreased")
-		// sourceBalance, err := sourceClient.Balance(tc.DefaultContext(), sourceChain.PreFundedKey.Address(), sourceChain.ChainID)
-		// require.NoError(err)
-		// require.GreaterOrEqual(initialSourcedBalance-units.Schmeckle, sourceBalance)
-
-		// tc.By("checking that the balance of the destination key is non-zero")
-		// destinationClient := api.NewClient(destinationAPINodeURI, destinationChain.ChainID.String())
-		// destinationBalance, err := destinationClient.Balance(tc.DefaultContext(), destinationKey.Address(), sourceChain.ChainID)
-		// require.NoError(err)
-		// require.Equal(units.Schmeckle, destinationBalance)
+		// advance two rounds
+		buildBlock(tc, simplexChain, simplexValidators)
+		buildBlock(tc, simplexChain, simplexValidators)
 
 		_ = e2e.CheckBootstrapIsPossible(tc, network)
 	})
 })
+
+// builds a block
+// advances a round
+// ensures all nodes have synced to the new block
+func buildBlock(tc *e2e.GinkgoTestContext, chain *tmpnet.Chain, nodes []*tmpnet.Node) {
+	require := require.New(tc)
+
+	// grab the current round
+	client := api.NewClient(nodes[0].GetAccessibleURI(), chain.ChainID.String())
+	_, bytes, err := client.LastAccepted(tc.DefaultContext())
+	require.NoError(err)
+	latestBlock, err := block.Parse(bytes)
+	require.NoError(err)
+
+	round := latestBlock.Height + 1
+	leader := getLeaderForRound(nodes, round)
+	tc.Log().Info("current height and round",
+		zap.Uint64("height", latestBlock.Height),
+		zap.Uint64("round", round),
+		zap.Stringer("leader", leader.NodeID),
+	)
+
+	// issue a transfer transaction to the leader
+	leaderURI := leader.GetAccessibleURI()
+	tc.Log().Info("issuing XSVM transfer transaction for simplex subnet",
+		zap.Stringer("leader", leader.NodeID),
+		zap.String("leaderURI", leaderURI),
+	)
+	recipientKey := e2e.NewPrivateKey(tc)
+	transferTxStatus, err := transfer.Transfer(
+		tc.DefaultContext(),
+		&transfer.Config{
+			URI:        leaderURI,
+			ChainID:    chain.ChainID,
+			AssetID:    chain.ChainID,
+			Amount:     units.Schmeckle,
+			To:         recipientKey.Address(),
+			PrivateKey: chain.PreFundedKey,
+		},
+	)
+	require.NoError(err)
+
+	tc.Log().Info("successfully issued XSVM transfer transaction",
+		zap.Stringer("txID", transferTxStatus.TxID),
+		zap.Uint64("round", round),
+	)
+
+	tc.By("checking all nodes have accepted the tx")
+	for _, node := range nodes {
+		client = api.NewClient(node.GetAccessibleURI(), chain.ChainID.String())
+		balance, err := client.Balance(tc.DefaultContext(), recipientKey.Address(), chain.ChainID)
+		require.NoError(err)
+		require.Equal(units.Schmeckle, balance)
+
+		_, blockBytes, err := client.LastAccepted(tc.DefaultContext())
+		require.NoError(err)
+		statelessBlock, err := block.Parse(blockBytes)
+		require.NoError(err)
+
+		require.Len(statelessBlock.Txs, 1)
+		require.Equal(statelessBlock.Txs[0], transferTxStatus.Tx)
+
+		tc.Log().Info("node has accepted the tx",
+			zap.Stringer("node", node.NodeID),
+			zap.Stringer("txID", transferTxStatus.TxID),
+			zap.Uint64("height", statelessBlock.Height),
+			zap.Uint64("round", round),
+		)
+	}
+}
 
 // Retrieve the nodes corresponding to the provided IDs
 func getNodesForIDs(nodes []*tmpnet.Node, nodeIDs []ids.NodeID) []*tmpnet.Node {
