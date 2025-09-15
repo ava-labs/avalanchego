@@ -22,24 +22,17 @@ type StartNetworkVars struct {
 	runtimeVars *RuntimeConfigVars
 
 	defaultNetworkOwner string
-	defaultNodeCount    int
 }
 
-func NewStartNetworkFlagVars(defaultNetworkOwner string, defaultNodeCount int) *StartNetworkVars {
-	v := &StartNetworkVars{
-		defaultNetworkOwner: defaultNetworkOwner,
-		defaultNodeCount:    defaultNodeCount,
-	}
+func NewStartNetworkFlagVars(defaultNetworkOwner string) *StartNetworkVars {
+	v := &StartNetworkVars{defaultNetworkOwner: defaultNetworkOwner}
 	v.runtimeVars = NewRuntimeConfigFlagVars()
 	v.register(flag.StringVar, flag.IntVar)
 	return v
 }
 
-func NewStartNetworkFlagSetVars(flagSet *pflag.FlagSet, defaultNetworkOwner string, defaultNodeCount int) *StartNetworkVars {
-	v := &StartNetworkVars{
-		defaultNetworkOwner: defaultNetworkOwner,
-		defaultNodeCount:    defaultNodeCount,
-	}
+func NewStartNetworkFlagSetVars(flagSet *pflag.FlagSet, defaultNetworkOwner string) *StartNetworkVars {
+	v := &StartNetworkVars{defaultNetworkOwner: defaultNetworkOwner}
 	v.runtimeVars = NewRuntimeConfigFlagSetVars(flagSet)
 	v.register(flagSet.StringVar, flagSet.IntVar)
 	return v
@@ -61,7 +54,7 @@ func (v *StartNetworkVars) register(stringVar varFunc[string], intVar varFunc[in
 	intVar(
 		&v.nodeCount,
 		"node-count",
-		v.defaultNodeCount,
+		tmpnet.DefaultNodeCount,
 		"Number of nodes the network should initially consist of",
 	)
 }

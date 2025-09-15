@@ -76,13 +76,13 @@ func (v *kubeRuntimeVars) register(stringVar varFunc[string], uintVar varFunc[ui
 	stringVar(
 		&v.schedulingLabelKey,
 		"kube-scheduling-label-key",
-		"",
+		"purpose",
 		kubeDocPrefix+"The label key to use for exclusive scheduling for node selection and toleration",
 	)
 	stringVar(
 		&v.schedulingLabelValue,
 		"kube-scheduling-label-value",
-		"",
+		"higher-spec",
 		kubeDocPrefix+"The label value to use for exclusive scheduling for node selection and toleration",
 	)
 }
@@ -96,6 +96,9 @@ func (v *kubeRuntimeVars) getKubeRuntimeConfig() (*tmpnet.KubeRuntimeConfig, err
 	}
 	if v.volumeSizeGB < tmpnet.MinimumVolumeSizeGB {
 		return nil, errKubeMinVolumeSizeRequired
+	}
+	if v.useExclusiveScheduling && (len(v.schedulingLabelKey) == 0 || len(v.schedulingLabelValue) == 0) {
+		return nil, errKubeSchedulingLabelRequired
 	}
 	return &tmpnet.KubeRuntimeConfig{
 		ConfigPath:             v.config.Path,
