@@ -30,11 +30,6 @@ import (
 // The Node type is defined in this file (node.go - orchestration) and
 // node_config.go (reading/writing configuration).
 
-// isPublicNetwork returns true if the given network ID corresponds to a public network
-func isPublicNetwork(networkID uint32) bool {
-	return networkID == constants.FujiID || networkID == constants.MainnetID
-}
-
 const (
 	defaultNodeTickerInterval = 50 * time.Millisecond
 )
@@ -378,7 +373,7 @@ func (n *Node) composeFlags() (FlagsMap, error) {
 	// Set the bootstrap configuration only for non-public networks
 	// Public networks should use avalanchego's built-in bootstrappers
 	networkID := n.network.GetNetworkID()
-	if !isPublicNetwork(networkID) {
+	if networkID != constants.FujiID && networkID != constants.MainnetID {
 		bootstrapIPs, bootstrapIDs := n.network.GetBootstrapIPsAndIDs(n)
 		flags.SetDefault(config.BootstrapIDsKey, strings.Join(bootstrapIDs, ","))
 		flags.SetDefault(config.BootstrapIPsKey, strings.Join(bootstrapIPs, ","))
