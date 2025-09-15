@@ -1054,8 +1054,8 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 
 	// Add the two conflicting transactions directly to the mempool, so that two consecutive transactions
 	// will fail verification when build block is called.
-	require.NoError(t, vm.AtomicMempool.ForceAddTx(importTxs[1]))
-	require.NoError(t, vm.AtomicMempool.ForceAddTx(importTxs[2]))
+	require.NoError(t, vm.AtomicMempool.AddRemoteTx(importTxs[1]))
+	require.NoError(t, vm.AtomicMempool.AddRemoteTx(importTxs[2]))
 
 	if _, err := vm.BuildBlock(context.Background()); err == nil {
 		t.Fatal("Expected build block to fail due to empty block")

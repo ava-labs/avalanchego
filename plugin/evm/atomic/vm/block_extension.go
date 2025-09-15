@@ -231,8 +231,7 @@ func (be *blockExtension) CleanupVerified() error {
 	vm := be.blockExtender.vm
 	atomicState, err := vm.AtomicBackend.GetVerifiedAtomicState(be.block.GetEthBlock().Hash())
 	if err != nil {
-		// Atomic state not found
-		return nil
+		return nil //nolint:nilerr // Atomic state not found
 	}
 	if err := atomicState.Reject(); err != nil {
 		return fmt.Errorf("failed to reject atomic state: %w", err)

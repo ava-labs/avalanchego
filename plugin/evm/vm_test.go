@@ -1392,7 +1392,7 @@ func TestBuildTimeMilliseconds(t *testing.T) {
 				Fork: &test.fork,
 			})
 
-			defer vm.Shutdown(context.Background())
+			defer require.NoError(t, vm.Shutdown(context.Background()))
 
 			vm.clock.Set(buildTime)
 			signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(10), 21000, big.NewInt(ap0.MinGasPrice), nil)
@@ -1422,9 +1422,7 @@ func testBuildApricotPhase1Block(t *testing.T, scheme string) {
 		Scheme: scheme,
 	})
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, vm.Shutdown(context.Background()))
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
@@ -1503,9 +1501,7 @@ func testLastAcceptedBlockNumberAllow(t *testing.T, scheme string) {
 	})
 
 	defer func() {
-		if err := vm.Shutdown(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, vm.Shutdown(context.Background()))
 	}()
 
 	signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, big.NewInt(ap0.MinGasPrice), nil)
@@ -1635,9 +1631,7 @@ func TestParentBeaconRootBlock(t *testing.T) {
 			})
 
 			defer func() {
-				if err := vm.Shutdown(context.Background()); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, vm.Shutdown(context.Background()))
 			}()
 
 			signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
@@ -2209,7 +2203,9 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 			vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
 				Fork: &tt.fork,
 			})
-			defer vm.Shutdown(ctx)
+			defer func() {
+				require.NoError(t, vm.Shutdown(ctx))
+			}()
 
 			if tt.preDeployTime != 0 {
 				vm.clock.Set(time.Unix(tt.preDeployTime, 0))
