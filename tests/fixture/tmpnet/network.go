@@ -28,6 +28,7 @@ import (
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -160,9 +161,13 @@ func NewDefaultNetwork(owner string) *Network {
 func toCanonicalDir(dir string) (string, error) {
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
-		return "", err
+		return "", stacktrace.Wrap(err)
 	}
-	return filepath.EvalSymlinks(absDir)
+	canonicalDir, err := filepath.EvalSymlinks(absDir)
+	if err != nil {
+		return "", stacktrace.Wrap(err)
+	}
+	return canonicalDir, nil
 }
 
 func BootstrapNewNetwork(
@@ -172,17 +177,17 @@ func BootstrapNewNetwork(
 	rootNetworkDir string,
 ) error {
 	if len(network.Nodes) == 0 {
-		return errInsufficientNodes
+		return stacktrace.Wrap(errInsufficientNodes)
 	}
 
 	if err := checkVMBinaries(log, network.Subnets, network.DefaultRuntimeConfig.Process); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	if err := network.EnsureDefaultConfig(ctx, log); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	if err := network.Create(rootNetworkDir); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	return network.Bootstrap(ctx, log)
 }
@@ -191,7 +196,7 @@ func BootstrapNewNetwork(
 func StopNetwork(ctx context.Context, log logging.Logger, dir string) error {
 	network, err := ReadNetwork(ctx, log, dir)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	return network.Stop(ctx)
 }
@@ -200,7 +205,7 @@ func StopNetwork(ctx context.Context, log logging.Logger, dir string) error {
 func RestartNetwork(ctx context.Context, log logging.Logger, dir string) error {
 	network, err := ReadNetwork(ctx, log, dir)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	return network.Restart(ctx)
 }
@@ -209,7 +214,7 @@ func RestartNetwork(ctx context.Context, log logging.Logger, dir string) error {
 func restartNodes(ctx context.Context, nodes []*Node) error {
 	for _, node := range nodes {
 		if err := node.Restart(ctx); err != nil {
-			return fmt.Errorf("failed to restart node %s: %w", node.NodeID, err)
+			return stacktrace.Errorf("failed to restart node %s: %w", node.NodeID, err)
 		}
 	}
 	return nil
@@ -219,14 +224,14 @@ func restartNodes(ctx context.Context, nodes []*Node) error {
 func ReadNetwork(ctx context.Context, log logging.Logger, dir string) (*Network, error) {
 	canonicalDir, err := toCanonicalDir(dir)
 	if err != nil {
-		return nil, err
+		return nil, stacktrace.Wrap(err)
 	}
 	network := &Network{
 		Dir: canonicalDir,
 		log: log,
 	}
 	if err := network.Read(ctx); err != nil {
-		return nil, fmt.Errorf("failed to read network: %w", err)
+		return nil, stacktrace.Errorf("failed to read network: %w", err)
 	}
 	if network.DefaultFlags == nil {
 		network.DefaultFlags = FlagsMap{}
@@ -239,7 +244,7 @@ func (n *Network) EnsureDefaultConfig(ctx context.Context, log logging.Logger) e
 	// Populate runtime defaults before logging it
 	if n.DefaultRuntimeConfig.Kube != nil {
 		if err := n.DefaultRuntimeConfig.Kube.ensureDefaults(ctx, log); err != nil {
-			return err
+			return stacktrace.Wrap(err)
 		}
 	}
 
@@ -262,7 +267,7 @@ func (n *Network) EnsureDefaultConfig(ctx context.Context, log logging.Logger) e
 	if n.Genesis == nil && len(n.PreFundedKeys) == 0 {
 		keys, err := NewPrivateKeys(DefaultPreFundedKeyCount)
 		if err != nil {
-			return err
+			return stacktrace.Wrap(err)
 		}
 		n.PreFundedKeys = keys
 	}
@@ -286,7 +291,7 @@ func (n *Network) EnsureDefaultConfig(ctx context.Context, log logging.Logger) e
 
 	emptyRuntime := NodeRuntimeConfig{}
 	if n.DefaultRuntimeConfig == emptyRuntime {
-		return errMissingRuntimeConfig
+		return stacktrace.Wrap(errMissingRuntimeConfig)
 	}
 
 	return nil
@@ -300,11 +305,11 @@ func (n *Network) Create(rootDir string) error {
 		var err error
 		rootDir, err = getDefaultRootNetworkDir()
 		if err != nil {
-			return err
+			return stacktrace.Wrap(err)
 		}
 	}
 	if err := os.MkdirAll(rootDir, perms.ReadWriteExecute); err != nil {
-		return fmt.Errorf("failed to create root network dir: %w", err)
+		return stacktrace.Errorf("failed to create root network dir: %w", err)
 	}
 
 	// A time-based name ensures consistent directory ordering
@@ -317,18 +322,18 @@ func (n *Network) Create(rootDir string) error {
 	// Ensure creation of the network dir
 	networkDir := filepath.Join(rootDir, dirName)
 	if err := os.MkdirAll(networkDir, perms.ReadWriteExecute); err != nil {
-		return fmt.Errorf("failed to create network dir: %w", err)
+		return stacktrace.Errorf("failed to create network dir: %w", err)
 	}
 	canonicalDir, err := toCanonicalDir(networkDir)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	n.Dir = canonicalDir
 
 	if n.NetworkID == 0 && n.Genesis == nil {
 		genesis, err := n.DefaultGenesis()
 		if err != nil {
-			return err
+			return stacktrace.Wrap(err)
 		}
 		n.Genesis = genesis
 	}
@@ -337,7 +342,7 @@ func (n *Network) Create(rootDir string) error {
 		// Ensure the node is configured for use with the network and
 		// knows where to write its configuration.
 		if err := n.EnsureNodeConfig(node); err != nil {
-			return err
+			return stacktrace.Wrap(err)
 		}
 	}
 
@@ -363,7 +368,7 @@ func (n *Network) DefaultGenesis() (*genesis.UnparsedConfig, error) {
 // Starts the specified nodes
 func (n *Network) StartNodes(ctx context.Context, log logging.Logger, nodesToStart ...*Node) error {
 	if len(nodesToStart) == 0 {
-		return errInsufficientNodes
+		return stacktrace.Wrap(errInsufficientNodes)
 	}
 	nodesToWaitFor := nodesToStart
 	if !slices.Contains(nodesToStart, n.Nodes[0]) {
@@ -385,13 +390,13 @@ func (n *Network) StartNodes(ctx context.Context, log logging.Logger, nodesToSta
 
 	for _, node := range nodesToStart {
 		if err := n.StartNode(ctx, node); err != nil {
-			return err
+			return stacktrace.Wrap(err)
 		}
 	}
 
 	log.Info("waiting for nodes to report healthy")
 	if err := waitForHealthy(ctx, log, nodesToWaitFor); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	log.Info("started network",
 		zap.String("networkDir", n.Dir),
@@ -404,7 +409,7 @@ func (n *Network) StartNodes(ctx context.Context, log logging.Logger, nodesToSta
 	// Write link to the network path
 	metricsPath := filepath.Join(n.Dir, "metrics.txt")
 	if err := os.WriteFile(metricsPath, []byte(metricsURL+"\n"), perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write metrics link to %s: %w", metricsPath, err)
+		return stacktrace.Errorf("failed to write metrics link to %s: %w", metricsPath, err)
 	}
 
 	log.Info(MetricsAvailableMessage,
@@ -446,13 +451,13 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 	}
 
 	if err := n.StartNodes(ctx, log, bootstrapNode); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	// Don't restart the node during subnet creation since it will always be restarted afterwards.
 	// uri := bootstrapNode.GetAccessibleURI()
 	if err := n.CreateSubnets(ctx, log, bootstrapNode, true /* restartRequired */); err != nil {
-		return fmt.Errorf("failed to create subnets: %w", err)
+		return stacktrace.Wrap(err)
 	}
 
 	if existingSybilProtectionValue == nil {
@@ -477,7 +482,7 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 		zap.Stringer("nodeID", bootstrapNode.NodeID),
 	)
 	if err := bootstrapNode.Restart(ctx); err != nil {
-		return fmt.Errorf("failed to restart bootstrap node: %w", err)
+		return stacktrace.Wrap(err)
 	}
 
 	if len(n.Nodes) == 1 {
@@ -491,17 +496,17 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 // Starts the provided node after configuring it for the network.
 func (n *Network) StartNode(ctx context.Context, node *Node) error {
 	if err := n.EnsureNodeConfig(node); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	if err := node.Write(); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	if err := node.Start(ctx); err != nil {
 		// Attempt to stop an unhealthy node to provide some assurance to the caller
 		// that an error condition will not result in a lingering process.
 		err = errors.Join(err, node.Stop(ctx))
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	return nil
@@ -511,7 +516,7 @@ func (n *Network) StartNode(ctx context.Context, node *Node) error {
 func (n *Network) Stop(ctx context.Context) error {
 	// Ensure the node state is up-to-date
 	if err := n.readNodes(ctx); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	var errs []error
@@ -519,19 +524,19 @@ func (n *Network) Stop(ctx context.Context) error {
 	// Initiate stop on all nodes
 	for _, node := range n.Nodes {
 		if err := node.InitiateStop(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("failed to stop node %s: %w", node.NodeID, err))
+			errs = append(errs, stacktrace.Errorf("failed to stop node %s: %w", node.NodeID, err))
 		}
 	}
 
 	// Wait for stop to complete on all nodes
 	for _, node := range n.Nodes {
 		if err := node.WaitForStopped(ctx); err != nil {
-			errs = append(errs, fmt.Errorf("failed to wait for node %s to stop: %w", node.NodeID, err))
+			errs = append(errs, stacktrace.Errorf("failed to wait for node %s to stop: %w", node.NodeID, err))
 		}
 	}
 
 	if len(errs) > 0 {
-		return fmt.Errorf("failed to stop network:\n%w", errors.Join(errs...))
+		return stacktrace.Errorf("failed to stop network:\n%w", errors.Join(errs...))
 	}
 	return nil
 }
@@ -547,7 +552,7 @@ func (n *Network) Restart(ctx context.Context) error {
 		nodes = append(nodes, node)
 	}
 	if err := restartNodes(ctx, nodes); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	return WaitForHealthyNodes(ctx, n.log, nodes)
 }
@@ -559,7 +564,7 @@ func WaitForHealthyNodes(ctx context.Context, log logging.Logger, nodes []*Node)
 			zap.Stringer("nodeID", node.NodeID),
 		)
 		if err := node.WaitForHealthy(ctx); err != nil {
-			return err
+			return stacktrace.Wrap(err)
 		}
 	}
 	return nil
@@ -572,7 +577,7 @@ func (n *Network) EnsureNodeConfig(node *Node) error {
 	node.network = n
 
 	if err := node.EnsureKeys(); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	// Ensure a data directory if not already set
@@ -614,7 +619,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
 	for _, subnet := range n.Subnets {
 		if len(subnet.ValidatorIDs) == 0 {
-			return fmt.Errorf("subnet %s needs at least one validator", subnet.SubnetID)
+			return stacktrace.Errorf("subnet %s needs at least one validator", subnet.SubnetID)
 		}
 		if subnet.SubnetID != ids.Empty {
 			// The subnet already exists
@@ -629,7 +634,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 			// Allocate a pre-funded key and remove it from the network so it won't be used for
 			// other purposes
 			if len(n.PreFundedKeys) == 0 {
-				return fmt.Errorf("no pre-funded keys available to create subnet %q", subnet.Name)
+				return stacktrace.Errorf("no pre-funded keys available to create subnet %q", subnet.Name)
 			}
 			subnet.OwningKey = n.PreFundedKeys[len(n.PreFundedKeys)-1]
 			n.PreFundedKeys = n.PreFundedKeys[:len(n.PreFundedKeys)-1]
@@ -637,7 +642,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 
 		// Create the subnet on the network
 		if err := subnet.Create(ctx, apiNode.GetAccessibleURI()); err != nil {
-			return fmt.Errorf("failed to create subnet %q: %w", subnet.Name, err)
+			return stacktrace.Wrap(err)
 		}
 
 		log.Info("created subnet",
@@ -647,7 +652,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 
 		// Persist the subnet configuration
 		if err := subnet.Write(n.GetSubnetDir()); err != nil {
-			return err
+			return stacktrace.Wrap(err)
 		}
 
 		log.Info("wrote subnet configuration",
@@ -663,7 +668,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 
 	// Ensure the pre-funded key changes are persisted to disk
 	if err := n.Write(); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	reconfiguredNodes := []*Node{}
@@ -688,11 +693,11 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		}
 
 		if err := restartNodes(ctx, runningNodes); err != nil {
-			return fmt.Errorf("here: failed to restart nodes: %w", err)
+			return stacktrace.Wrap(err)
 		}
 
 		if err := WaitForHealthyNodes(ctx, n.log, runningNodes); err != nil {
-			return fmt.Errorf("there: failed to wait for healthy nodes: %w", err)
+			return stacktrace.Wrap(err)
 		}
 	}
 
@@ -714,7 +719,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		}
 
 		if err := subnet.AddValidators(ctx, log, apiNode.GetAccessibleURI(), validatorNodes...); err != nil {
-			return fmt.Errorf("failed to add validators for subnet %q: %w", subnet.Name, err)
+			return stacktrace.Wrap(err)
 		}
 	}
 
@@ -725,12 +730,12 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 	validatorsToRestart := set.Set[ids.NodeID]{}
 	for _, subnet := range createdSubnets {
 		if err := WaitForActiveValidators(ctx, log, pChainClient, subnet); err != nil {
-			return fmt.Errorf("failed to wait for active validators for subnet %q: %w", subnet.Name, err)
+			return stacktrace.Wrap(err)
 		}
 
 		// It should now be safe to create chains for the subnet
 		if err := subnet.CreateChains(ctx, log, apiNode.GetAccessibleURI()); err != nil {
-			return fmt.Errorf("failed to create chains for subnet %q: %w", subnet.Name, err)
+			return stacktrace.Wrap(err)
 		}
 
 		if err := subnet.Write(n.GetSubnetDir()); err != nil {
@@ -764,11 +769,11 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 	}
 
 	if err := restartNodes(ctx, nodesToRestart); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	if err := WaitForHealthyNodes(ctx, log, nodesToRestart); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	return nil
@@ -780,7 +785,7 @@ func (n *Network) GetNode(nodeID ids.NodeID) (*Node, error) {
 			return node, nil
 		}
 	}
-	return nil, fmt.Errorf("%s is not known to the network", nodeID)
+	return nil, stacktrace.Errorf("%s is not known to the network", nodeID)
 }
 
 // GetNodeURIs returns the accessible URIs of nodes in the network that are running and not ephemeral.
@@ -843,7 +848,7 @@ func (n *Network) GetNetworkID() uint32 {
 func (n *Network) GetGenesisFileContent() (string, error) {
 	bytes, err := json.Marshal(n.Genesis)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal genesis: %w", err)
+		return "", stacktrace.Errorf("failed to marshal genesis: %w", err)
 	}
 	return base64.StdEncoding.EncodeToString(bytes), nil
 }
@@ -876,7 +881,7 @@ func (n *Network) GetSubnetConfigContent() (string, error) {
 
 	marshaledConfigs, err := json.Marshal(subnetConfigs)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal subnet configs: %w", err)
+		return "", stacktrace.Errorf("failed to marshal subnet configs: %w", err)
 	}
 	return base64.StdEncoding.EncodeToString(marshaledConfigs), nil
 }
@@ -888,7 +893,7 @@ func (n *Network) GetChainConfigContent() (string, error) {
 	for alias, flags := range n.PrimaryChainConfigs {
 		marshaledFlags, err := json.Marshal(flags)
 		if err != nil {
-			return "", fmt.Errorf("failed to marshal flags map for %s-Chain: %w", alias, err)
+			return "", stacktrace.Errorf("failed to marshal flags map for %s-Chain: %w", alias, err)
 		}
 		chainConfigs[alias] = chains.ChainConfig{
 			Config: marshaledFlags,
@@ -911,7 +916,7 @@ func (n *Network) GetChainConfigContent() (string, error) {
 
 	marshaledConfigs, err := json.Marshal(chainConfigs)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal chain configs: %w", err)
+		return "", stacktrace.Errorf("failed to marshal chain configs: %w", err)
 	}
 	return base64.StdEncoding.EncodeToString(marshaledConfigs), nil
 }
@@ -955,7 +960,7 @@ func waitForHealthy(ctx context.Context, log logging.Logger, nodes []*Node) erro
 		for node := range unhealthyNodes {
 			healthy, err := node.IsHealthy(ctx)
 			if err != nil {
-				return err
+				return stacktrace.Wrap(err)
 			}
 			if !healthy {
 				continue
@@ -974,7 +979,7 @@ func waitForHealthy(ctx context.Context, log logging.Logger, nodes []*Node) erro
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("failed to see all nodes healthy before timeout: %w", ctx.Err())
+			return stacktrace.Errorf("failed to see all nodes healthy before timeout: %w", ctx.Err())
 		case <-ticker.C:
 		}
 	}
@@ -984,7 +989,7 @@ func waitForHealthy(ctx context.Context, log logging.Logger, nodes []*Node) erro
 func getTmpnetPath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return "", err
+		return "", stacktrace.Wrap(err)
 	}
 	return filepath.Join(homeDir, ".tmpnet"), nil
 }
@@ -994,7 +999,7 @@ func getTmpnetPath() (string, error) {
 func getDefaultRootNetworkDir() (string, error) {
 	tmpnetPath, err := getTmpnetPath()
 	if err != nil {
-		return "", err
+		return "", stacktrace.Wrap(err)
 	}
 	return filepath.Join(tmpnetPath, "networks"), nil
 }
@@ -1003,7 +1008,7 @@ func getDefaultRootNetworkDir() (string, error) {
 func GetReusableNetworkPathForOwner(owner string) (string, error) {
 	networkPath, err := getDefaultRootNetworkDir()
 	if err != nil {
-		return "", err
+		return "", stacktrace.Wrap(err)
 	}
 	return filepath.Join(networkPath, "latest_"+owner), nil
 }
@@ -1069,7 +1074,7 @@ func checkVMBinaries(log logging.Logger, subnets []*Subnet, config *ProcessRunti
 	}
 
 	if incompatibleChains {
-		return errors.New("the rpcchainvm version of the VMs for one or more chains may not be compatible with the specified avalanchego binary")
+		return stacktrace.New("the rpcchainvm version of the VMs for one or more chains may not be compatible with the specified avalanchego binary")
 	}
 	return nil
 }
@@ -1084,7 +1089,7 @@ func getRPCVersion(log logging.Logger, command string, versionArgs ...string) (u
 	cmd := exec.Command(command, versionArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return 0, fmt.Errorf("command %q failed with output: %s", command, output)
+		return 0, stacktrace.Errorf("command %q failed with output: %s", command, output)
 	}
 
 	// Ignore output before the opening brace to tolerate the case of a command being invoked
@@ -1099,7 +1104,7 @@ func getRPCVersion(log logging.Logger, command string, versionArgs ...string) (u
 
 	version := &RPCChainVMVersion{}
 	if err := json.Unmarshal(output, version); err != nil {
-		return 0, fmt.Errorf("failed to unmarshal output from command %q: %w, output: %s", command, err, output)
+		return 0, stacktrace.Errorf("failed to unmarshal output from command %q: %w, output: %s", command, err, output)
 	}
 
 	return version.RPCChainVM, nil

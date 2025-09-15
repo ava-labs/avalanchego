@@ -38,10 +38,6 @@ inputs:
     description: 'The password for the Prometheus instance.'
     required: true
     default: ''
-  external-data-json-cache-key:
-    description: 'Cache key for the external data JSON file provided for comparison to GitHub Action Benchmark.'
-    required: true
-    default: 'c-chain-reexecution-benchmark-data.json'
   workspace:
     description: 'Working directory to use for the benchmark.'
     required: true
@@ -99,30 +95,14 @@ runs:
         grafana_dashboard_id: 'Gl1I20mnk/c-chain'
         runtime: "" # Set runtime input to empty string to disable log collection
 
-    - name: Download Previous Benchmark Result
-      uses: actions/cache@v4
-      with:
-        path: ./tmp
-        key: ${{ inputs.external-data-json-cache-key }}
-
-    - name: Compare Benchmark Result
+    - name: Compare Benchmark Results
       uses: benchmark-action/github-action-benchmark@v1
       with:
         tool: 'go'
         output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
-        external-data-json-path: ./tmp/${{ inputs.external-data-json-cache-key }}
         fail-on-alert: true
-        github-token: ${{ inputs.github-token }}
         summary-always: true
         comment-on-alert: true
-        auto-push: false
-
-    - name: Push Benchmark Result
-      if: ${{ inputs.push-github-action-benchmark }}
-      uses: benchmark-action/github-action-benchmark@v1
-      with:
-        tool: 'go'
-        output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
         github-token: ${{ inputs.github-token }}
         auto-push: ${{ inputs.push-github-action-benchmark }}
 
