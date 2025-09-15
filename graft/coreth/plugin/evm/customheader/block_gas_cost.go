@@ -146,6 +146,10 @@ func VerifyBlockFee(
 	if requiredBlockGasCost == nil || !requiredBlockGasCost.IsUint64() {
 		return fmt.Errorf("%w: %d", errInvalidRequiredBlockGasCostApricotPhase4, requiredBlockGasCost)
 	}
+	// If the required block gas cost is 0, we don't need to verify the block fee
+	if requiredBlockGasCost.Sign() == 0 {
+		return nil
+	}
 
 	var (
 		gasUsed              = new(big.Int)
