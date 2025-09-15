@@ -6,17 +6,15 @@ package sync
 import (
 	"context"
 	"encoding"
+	"errors"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"github.com/ava-labs/avalanchego/x/merkledb"
 )
 
 var (
-	_ DB[*merkledb.RangeProof, *merkledb.ChangeProof] = (merkledb.MerkleDB)(nil)
-
-	_ Proof = (*merkledb.RangeProof)(nil)
-	_ Proof = (*merkledb.ChangeProof)(nil)
+	ErrStartRootNotFound = errors.New("start root not found")
+	ErrEndRootNotFound   = errors.New("end root not found")
 )
 
 type DB[TRange, TChange Proof] interface {

@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/x/sync"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -820,8 +821,7 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 		maybe.Nothing[[]byte](),
 		50,
 	)
-	require.ErrorIs(err, ErrNoEndRoot)
-	require.ErrorIs(err, ErrInsufficientHistory)
+	require.ErrorIs(err, sync.ErrEndRootNotFound)
 
 	_, err = db.GetChangeProof(
 		context.Background(),
@@ -831,8 +831,7 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 		maybe.Nothing[[]byte](),
 		50,
 	)
-	require.NotErrorIs(err, ErrNoEndRoot)
-	require.ErrorIs(err, ErrInsufficientHistory)
+	require.ErrorIs(err, sync.ErrStartRootNotFound)
 
 	_, err = db.GetChangeProof(
 		context.Background(),

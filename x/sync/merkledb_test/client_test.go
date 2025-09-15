@@ -23,7 +23,11 @@ import (
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
-var _ p2p.Handler = (*flakyHandler)(nil)
+var (
+	_ p2p.Handler = (*xsync.GetChangeProofHandler[*merkledb.RangeProof, *merkledb.ChangeProof])(nil)
+	_ p2p.Handler = (*xsync.GetRangeProofHandler[*merkledb.RangeProof, *merkledb.ChangeProof])(nil)
+	_ p2p.Handler = (*flakyHandler)(nil)
+)
 
 func newDefaultDBConfig() merkledb.Config {
 	return merkledb.Config{
