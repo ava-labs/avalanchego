@@ -27,7 +27,7 @@ func TestCalculateDynamicFee(t *testing.T) {
 		expectedErr   error
 		expectedValue uint64
 	}
-	var tests []test = []test{
+	tests := []test{
 		{
 			gas:           1,
 			baseFee:       new(big.Int).Set(atomic.X2CRate.ToBig()),

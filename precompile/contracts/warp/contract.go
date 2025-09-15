@@ -321,14 +321,13 @@ func UnpackSendWarpEventDataToMessage(data []byte) (*warp.UnsignedMessage, error
 
 // createWarpPrecompile returns a StatefulPrecompiledContract with getters and setters for the precompile.
 func createWarpPrecompile() contract.StatefulPrecompiledContract {
-	var functions []*contract.StatefulPrecompileFunction
-
 	abiFunctionMap := map[string]contract.RunStatefulPrecompileFunc{
 		"getBlockchainID":          getBlockchainID,
 		"getVerifiedWarpBlockHash": getVerifiedWarpBlockHash,
 		"getVerifiedWarpMessage":   getVerifiedWarpMessage,
 		"sendWarpMessage":          sendWarpMessage,
 	}
+	functions := make([]*contract.StatefulPrecompileFunction, 0, len(abiFunctionMap))
 
 	for name, function := range abiFunctionMap {
 		method, ok := WarpABI.Methods[name]

@@ -24,7 +24,6 @@ import (
 	"github.com/ava-labs/coreth/utils/utilstest"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
-	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	commoneng "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
@@ -64,7 +63,7 @@ func SetupTestVM(t *testing.T, vm commoneng.VM, config TestVMConfig) *TestVMSuit
 	appSender := &enginetest.Sender{
 		T:                 t,
 		CantSendAppGossip: true,
-		SendAppGossipF:    func(context.Context, commonEng.SendConfig, []byte) error { return nil },
+		SendAppGossipF:    func(context.Context, commoneng.SendConfig, []byte) error { return nil },
 	}
 
 	scheme := config.Scheme
@@ -148,7 +147,7 @@ func IssueTxsAndBuild(txs []*types.Transaction, vm extension.InnerVM) (snowman.B
 	if err != nil {
 		return nil, fmt.Errorf("failed to wait for event: %w", err)
 	}
-	if msg != commonEng.PendingTxs {
+	if msg != commoneng.PendingTxs {
 		return nil, fmt.Errorf("expected pending txs, got %v", msg)
 	}
 

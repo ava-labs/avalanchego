@@ -28,9 +28,10 @@ var (
 )
 
 var (
-	errNilEthBlock  = errors.New("nil ethBlock")
-	ErrMissingUTXOs = errors.New("missing UTXOs")
-	ErrEmptyBlock   = errors.New("empty block")
+	errNilEthBlock            = errors.New("nil ethBlock")
+	ErrMissingUTXOs           = errors.New("missing UTXOs")
+	ErrEmptyBlock             = errors.New("empty block")
+	errAtomicExtractionFailed = errors.New("atomic tx extraction failed")
 )
 
 type blockExtender struct {
@@ -67,7 +68,7 @@ func (be *blockExtender) NewBlockExtension(b extension.ExtendedBlock) (extension
 	isApricotPhase5 := be.vm.chainConfigExtra().IsApricotPhase5(ethBlock.Time())
 	atomicTxs, err := atomic.ExtractAtomicTxs(customtypes.BlockExtData(ethBlock), isApricotPhase5, atomic.Codec)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(errAtomicExtractionFailed, err)
 	}
 
 	return &blockExtension{

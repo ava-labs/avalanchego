@@ -11,29 +11,29 @@ import (
 )
 
 var (
-	_ ethdb.KeyValueStore = (*ethDbWrapper)(nil)
+	_ ethdb.KeyValueStore = (*ethDBWrapper)(nil)
 
 	ErrSnapshotNotSupported = errors.New("snapshot is not supported")
 )
 
 // ethDbWrapper implements ethdb.Database
-type ethDbWrapper struct{ database.Database }
+type ethDBWrapper struct{ database.Database }
 
-func WrapDatabase(db database.Database) ethdb.KeyValueStore { return ethDbWrapper{db} }
+func WrapDatabase(db database.Database) ethdb.KeyValueStore { return ethDBWrapper{db} }
 
 // Stat implements ethdb.Database
-func (ethDbWrapper) Stat(string) (string, error) { return "", database.ErrNotFound }
+func (ethDBWrapper) Stat(string) (string, error) { return "", database.ErrNotFound }
 
 // NewBatch implements ethdb.Database
-func (db ethDbWrapper) NewBatch() ethdb.Batch { return wrappedBatch{db.Database.NewBatch()} }
+func (db ethDBWrapper) NewBatch() ethdb.Batch { return wrappedBatch{db.Database.NewBatch()} }
 
 // NewBatchWithSize implements ethdb.Database
 // TODO: propagate size through avalanchego Database interface
-func (db ethDbWrapper) NewBatchWithSize(int) ethdb.Batch {
+func (db ethDBWrapper) NewBatchWithSize(int) ethdb.Batch {
 	return wrappedBatch{db.Database.NewBatch()}
 }
 
-func (ethDbWrapper) NewSnapshot() (ethdb.Snapshot, error) {
+func (ethDBWrapper) NewSnapshot() (ethdb.Snapshot, error) {
 	return nil, ErrSnapshotNotSupported
 }
 
@@ -41,7 +41,7 @@ func (ethDbWrapper) NewSnapshot() (ethdb.Snapshot, error) {
 //
 // Note: This method assumes that the prefix is NOT part of the start, so there's
 // no need for the caller to prepend the prefix to the start.
-func (db ethDbWrapper) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
+func (db ethDBWrapper) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 	// avalanchego's database implementation assumes that the prefix is part of the
 	// start, so it is added here (if it is provided).
 	if len(prefix) > 0 {
@@ -54,7 +54,7 @@ func (db ethDbWrapper) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 }
 
 // NewIteratorWithStart implements ethdb.Database
-func (db ethDbWrapper) NewIteratorWithStart(start []byte) ethdb.Iterator {
+func (db ethDBWrapper) NewIteratorWithStart(start []byte) ethdb.Iterator {
 	return db.Database.NewIteratorWithStart(start)
 }
 

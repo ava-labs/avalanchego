@@ -330,7 +330,7 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 		log.Info("Shutting down server VM")
 		require.NoError(serverVM.Shutdown(context.Background()))
 	})
-	serverVmSetup := SyncVMSetup{
+	serverVMSetup := SyncVMSetup{
 		VM:                 serverVM,
 		AppSender:          serverTest.AppSender,
 		SnowCtx:            serverTest.Ctx,
@@ -340,7 +340,7 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 	}
 	var err error
 	if testSetup.AfterInit != nil {
-		testSetup.AfterInit(t, test, serverVmSetup, true)
+		testSetup.AfterInit(t, test, serverVMSetup, true)
 	}
 	generateAndAcceptBlocks(t, serverVM, numBlocks, testSetup.GenFn, nil, cb)
 
@@ -374,7 +374,7 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 	t.Cleanup(func() {
 		require.NoError(shutdownOnceSyncerVM.Shutdown(context.Background()))
 	})
-	syncerVmSetup := syncerVMSetup{
+	syncerVMSetup := syncerVMSetup{
 		SyncVMSetup: SyncVMSetup{
 			VM:                 syncerVM,
 			ConsensusCallbacks: syncerCB,
@@ -385,7 +385,7 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 		shutdownOnceSyncerVM: shutdownOnceSyncerVM,
 	}
 	if testSetup.AfterInit != nil {
-		testSetup.AfterInit(t, test, syncerVmSetup.SyncVMSetup, false)
+		testSetup.AfterInit(t, test, syncerVMSetup.SyncVMSetup, false)
 	}
 	require.NoError(syncerVM.SetState(context.Background(), snow.StateSyncing))
 	enabled, err := syncerVM.StateSyncEnabled(context.Background())
@@ -431,7 +431,7 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 			SnowCtx:   serverTest.Ctx,
 		},
 		fundedAccounts: accounts,
-		syncerVM:       syncerVmSetup,
+		syncerVM:       syncerVMSetup,
 	}
 }
 

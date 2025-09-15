@@ -196,10 +196,8 @@ func ExecuteLoader(ctx context.Context, config config.Config) error {
 	log.Info("Distributed funds successfully", "time", time.Since(fundStart))
 
 	pks := make([]*ecdsa.PrivateKey, 0, len(keys))
-	senders := make([]common.Address, 0, len(keys))
 	for _, key := range keys {
 		pks = append(pks, key.PrivKey)
-		senders = append(senders, key.Address)
 	}
 
 	bigGwei := big.NewInt(params.GWei)

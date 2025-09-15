@@ -67,12 +67,12 @@ type EVMOutput struct {
 	AssetID ids.ID         `serialize:"true" json:"assetID"`
 }
 
-func (o EVMOutput) Compare(other EVMOutput) int {
-	addrComp := bytes.Compare(o.Address.Bytes(), other.Address.Bytes())
+func (out EVMOutput) Compare(other EVMOutput) int {
+	addrComp := bytes.Compare(out.Address.Bytes(), other.Address.Bytes())
 	if addrComp != 0 {
 		return addrComp
 	}
-	return bytes.Compare(o.AssetID[:], other.AssetID[:])
+	return bytes.Compare(out.AssetID[:], other.AssetID[:])
 }
 
 // EVMInput defines an input created from the EVM state to fund export transactions
@@ -83,12 +83,12 @@ type EVMInput struct {
 	Nonce   uint64         `serialize:"true" json:"nonce"`
 }
 
-func (i EVMInput) Compare(other EVMInput) int {
-	addrComp := bytes.Compare(i.Address.Bytes(), other.Address.Bytes())
+func (in EVMInput) Compare(other EVMInput) int {
+	addrComp := bytes.Compare(in.Address.Bytes(), other.Address.Bytes())
 	if addrComp != 0 {
 		return addrComp
 	}
-	return bytes.Compare(i.AssetID[:], other.AssetID[:])
+	return bytes.Compare(in.AssetID[:], other.AssetID[:])
 }
 
 // Verify ...
@@ -337,6 +337,6 @@ func CalculateDynamicFee(cost uint64, baseFee *big.Int) (uint64, error) {
 	return fee.Uint64(), nil
 }
 
-func calcBytesCost(len int) uint64 {
-	return uint64(len) * TxBytesGas
+func calcBytesCost(n int) uint64 {
+	return uint64(n) * TxBytesGas
 }

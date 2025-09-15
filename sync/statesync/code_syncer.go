@@ -80,7 +80,7 @@ func (c *codeSyncer) Sync(ctx context.Context) error {
 
 	// Queue the code hashes from the previous sync
 	if err := c.addCode(c.dbCodeHashes); err != nil {
-		return fmt.Errorf("Unable to resume previous sync: %w", err)
+		return fmt.Errorf("unable to resume previous sync: %w", err)
 	}
 	c.dbCodeHashes = nil
 	close(c.open)

@@ -71,11 +71,11 @@ linters:
     - noctx
     - nolintlint
     - perfsprint
-    # - prealloc
-    # - predeclared
+    - prealloc
+    - predeclared
     - revive
     - spancheck
-    # - staticcheck
+    - staticcheck
     - tagalign
     # - testifylint
     - unconvert
