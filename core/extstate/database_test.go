@@ -82,7 +82,7 @@ func newFuzzState(t *testing.T) *fuzzState {
 	})
 
 	firewoodMemdb := rawdb.NewMemoryDatabase()
-	fwCfg := firewood.Defaults
+	fwCfg := firewood.Defaults                              // copy the defaults
 	fwCfg.FilePath = filepath.Join(t.TempDir(), "firewood") // Use a temporary directory for the Firewood
 	firewoodState := NewDatabaseWithConfig(
 		firewoodMemdb,
@@ -309,15 +309,6 @@ func (fs *fuzzState) deleteStorage(accountIndex int, storageIndexInput uint64) {
 }
 
 func FuzzTree(f *testing.F) {
-	for randSeed := range int64(1000) {
-		rand := rand.New(rand.NewSource(randSeed))
-		steps := make([]byte, 32)
-		_, err := rand.Read(steps)
-		if err != nil {
-			f.Fatal(err)
-		}
-		f.Add(randSeed, steps)
-	}
 	f.Fuzz(func(t *testing.T, randSeed int64, byteSteps []byte) {
 		fuzzState := newFuzzState(t)
 		rand := rand.New(rand.NewSource(randSeed))

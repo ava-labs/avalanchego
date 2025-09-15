@@ -25,6 +25,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -440,9 +441,28 @@ func testBuildEthTxBlock(t *testing.T, scheme string) {
 		t.Fatalf("Found unexpected blkID for parent of blk2")
 	}
 
-	restartedTVM, err := restartVM(tvm, tvm.config)
-	require.NoError(t, err)
-	restartedVM := restartedTVM.vm
+	// Close the vm and all databases
+	if err := tvm.vm.Shutdown(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	restartedVM := &VM{}
+	newCTX := snowtest.Context(t, snowtest.CChainID)
+	newCTX.NetworkUpgrades = upgradetest.GetConfig(fork)
+	newCTX.ChainDataDir = tvm.vm.ctx.ChainDataDir
+	conf := getConfig(scheme, "")
+	if err := restartedVM.Initialize(
+		context.Background(),
+		newCTX,
+		tvm.db,
+		[]byte(toGenesisJSON(paramstest.ForkToChainConfig[fork])),
+		[]byte(""),
+		[]byte(conf),
+		[]*commonEng.Fx{},
+		nil,
+	); err != nil {
+		t.Fatal(err)
+	}
 
 	// State root should not have been committed and discarded on restart
 	if ethBlk1Root := ethBlk1.Root(); restartedVM.blockChain.HasState(ethBlk1Root) {
@@ -453,6 +473,11 @@ func testBuildEthTxBlock(t *testing.T, scheme string) {
 	ethBlk2 := blk2.(*chain.BlockWrapper).Block.(*Block).ethBlock
 	if ethBlk2Root := ethBlk2.Root(); !restartedVM.blockChain.HasState(ethBlk2Root) {
 		t.Fatalf("Expected blk2 state root to not be pruned after shutdown (last accepted tip should be committed)")
+	}
+
+	// Shutdown the newest VM
+	if err := restartedVM.Shutdown(context.Background()); err != nil {
+		t.Fatal(err)
 	}
 }
 
