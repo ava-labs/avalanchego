@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -37,6 +38,10 @@ var (
 	_ snowman.Block           = (*wrappedBlock)(nil)
 	_ block.WithVerifyContext = (*wrappedBlock)(nil)
 	_ extension.ExtendedBlock = (*wrappedBlock)(nil)
+
+	errMissingParentBlock                  = errors.New("missing parent block")
+	errInvalidGasUsedRelativeToCapacity    = errors.New("invalid gas used relative to capacity")
+	errTotalIntrinsicGasCostExceedsClaimed = errors.New("total intrinsic gas cost is greater than claimed gas used")
 )
 
 // Sentinel errors for header validation in this file
@@ -247,6 +252,7 @@ func (b *wrappedBlock) verify(predicateContext *precompileconfig.PredicateContex
 	} else {
 		log.Debug("Verifying block without context", "block", b.ID(), "height", b.Height())
 	}
+
 	if err := b.syntacticVerify(); err != nil {
 		return fmt.Errorf("syntactic block verification failed: %w", err)
 	}
@@ -260,6 +266,10 @@ func (b *wrappedBlock) verify(predicateContext *precompileconfig.PredicateContex
 	// bootstrapping only verifies blocks that have been canonically accepted by
 	// the network, these checks would be guaranteed to pass on a synced node.
 	if b.vm.bootstrapped.Get() {
+		if err := b.verifyIntrinsicGas(); err != nil {
+			return fmt.Errorf("failed to verify intrinsic gas: %w", err)
+		}
+
 		// Verify that all the ICM messages are correctly marked as either valid
 		// or invalid.
 		if err := b.verifyPredicates(predicateContext); err != nil {
@@ -284,6 +294,53 @@ func (b *wrappedBlock) verify(predicateContext *precompileconfig.PredicateContex
 		b.extension.CleanupVerified()
 	}
 	return err
+}
+
+func (b *wrappedBlock) verifyIntrinsicGas() error {
+	// Verify claimed gas used fits within available capacity for this header.
+	// This checks that the gas used is less than the block's capacity.
+	parentHash := b.ethBlock.ParentHash()
+	parentHeight := b.ethBlock.NumberU64() - 1
+	parent := b.vm.blockChain.GetHeader(parentHash, parentHeight)
+	if parent == nil {
+		return fmt.Errorf("%w: hash:%q height:%d",
+			errMissingParentBlock,
+			parentHash,
+			parentHeight,
+		)
+	}
+
+	// Verify that the claimed GasUsed is within the current capacity.
+	if err := customheader.VerifyGasUsed(b.vm.chainConfigExtra(), parent, b.ethBlock.Header()); err != nil {
+		return fmt.Errorf("%w: %w", errInvalidGasUsedRelativeToCapacity, err)
+	}
+
+	// Collect all intrinsic gas costs for all transactions in the block.
+	rules := b.vm.chainConfig.Rules(b.ethBlock.Number(), params.IsMergeTODO, b.ethBlock.Time())
+	var totalIntrinsicGasCost uint64
+	for _, tx := range b.ethBlock.Transactions() {
+		intrinsicGas, err := core.IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, rules)
+		if err != nil {
+			return fmt.Errorf("failed to calculate intrinsic gas: %w for tx %s", err, tx.Hash())
+		}
+
+		totalIntrinsicGasCost, err = math.Add(totalIntrinsicGasCost, intrinsicGas)
+		if err != nil {
+			return fmt.Errorf("%w: intrinsic gas exceeds MaxUint64", errTotalIntrinsicGasCostExceedsClaimed)
+		}
+	}
+
+	// Verify that the total intrinsic gas cost is less than or equal to the
+	// claimed GasUsed.
+	if claimedGasUsed := b.ethBlock.GasUsed(); totalIntrinsicGasCost > claimedGasUsed {
+		return fmt.Errorf("%w: intrinsic gas (%d) > claimed gas used (%d)",
+			errTotalIntrinsicGasCostExceedsClaimed,
+			totalIntrinsicGasCost,
+			claimedGasUsed,
+		)
+	}
+
+	return nil
 }
 
 // semanticVerify verifies that a *Block is internally consistent.
