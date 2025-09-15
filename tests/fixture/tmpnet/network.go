@@ -739,7 +739,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		}
 
 		if err := subnet.Write(n.GetSubnetDir()); err != nil {
-			return fmt.Errorf("failed to write subnet configuration for %q: %w", subnet.Name, err)
+			return stacktrace.Wrap(err)
 		}
 		log.Info("wrote subnet configuration",
 			zap.String("name", subnet.Name),
