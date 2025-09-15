@@ -6,18 +6,24 @@ package uptimetracker
 import (
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-var _ uptime.State = (*state)(nil)
-
-type dbUpdateStatus int
+var (
+	_        uptime.State = (*state)(nil)
+	vdrCodec codec.Manager
+)
 
 const (
+	codecVersion  uint16         = 0
 	updatedStatus dbUpdateStatus = iota
 	deletedStatus
 )
@@ -26,6 +32,8 @@ var (
 	ErrAlreadyExists  = errors.New("validator already exists")
 	ErrImmutableField = errors.New("immutable field cannot be updated")
 )
+
+type dbUpdateStatus int
 
 // Validator represents a validator in the state
 type Validator struct {
@@ -60,6 +68,22 @@ type state struct {
 	// updatedData tracks the updates since WriteValidator was last called
 	updatedData map[ids.ID]dbUpdateStatus // vID -> updated status
 	db          database.Database
+}
+
+func init() {
+	vdrCodec = codec.NewManager(math.MaxInt32)
+	c := linearcodec.NewDefault()
+
+	errs := wrappers.Errs{}
+	errs.Add(
+		c.RegisterType(validatorData{}),
+
+		vdrCodec.RegisterCodec(codecVersion, c),
+	)
+
+	if errs.Errored() {
+		panic(errs.Err)
+	}
 }
 
 // These methods are implemented and exported to satisfy the uptime.State interface
@@ -243,10 +267,10 @@ func (s *state) loadFromDisk() error {
 // addData adds the data to the state
 // returns an error if the data already exists
 func (s *state) addData(vID ids.ID, data *validatorData) error {
-	if _, exists := s.data[vID]; exists {
+	if _, ok := s.data[vID]; ok {
 		return fmt.Errorf("%w, validationID: %s", ErrAlreadyExists, vID)
 	}
-	if _, exists := s.index[data.NodeID]; exists {
+	if _, ok := s.index[data.NodeID]; ok {
 		return fmt.Errorf("%w, nodeID: %s", ErrAlreadyExists, data.NodeID)
 	}
 

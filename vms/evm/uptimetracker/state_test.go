@@ -4,21 +4,15 @@
 package uptimetracker
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -352,77 +346,4 @@ func TestStateModifications(t *testing.T) {
 	// Verify validator was removed
 	_, ok = state.data[expectedvID]
 	require.False(ok)
-}
-
-func TestSync_TriggersPauseResumeEventsViaChainCtx(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	// Prepare mock validator state to drive two successive Sync calls
-	mockVS := validatorsmock.NewState(ctrl)
-	ctx := &snow.Context{}
-	ctx.SubnetID = ids.GenerateTestID()
-	ctx.ValidatorState = validators.NewLockedState(&ctx.Lock, mockVS)
-
-	// Build NewUptimeTracker with real state and uptime manager
-	db := memdb.New()
-	clk := mockable.Clock{}
-	clk.Set(time.Unix(0, 0))
-	ut, err := NewUptimeTracker(ctx, db, &clk)
-	require.NoError(err)
-
-	nodeID := ids.GenerateTestNodeID()
-	vID := ids.GenerateTestID()
-
-	// Mark node as connected at the tracker before syncs
-	require.NoError(ut.Connect(nodeID))
-
-	// First sync: node active -> should be added and connected (not paused)
-	firstSet := map[ids.ID]*validators.GetCurrentValidatorOutput{
-		vID: {
-			ValidationID:  vID,
-			NodeID:        nodeID,
-			Weight:        1,
-			StartTime:     0,
-			IsActive:      true,
-			IsL1Validator: false,
-		},
-	}
-	mockVS.EXPECT().GetCurrentValidatorSet(gomock.Any(), ctx.SubnetID).Return(firstSet, uint64(1), nil)
-	require.NoError(ut.Sync(context.Background()))
-	require.False(ut.pausableManager.isPaused(nodeID))
-	require.True(ut.pausableManager.manager.IsConnected(nodeID))
-
-	// Second sync: same validator toggles to inactive -> should pause and disconnect
-	secondSet := map[ids.ID]*validators.GetCurrentValidatorOutput{
-		vID: {
-			ValidationID:  vID,
-			NodeID:        nodeID,
-			Weight:        1,
-			StartTime:     0,
-			IsActive:      false,
-			IsL1Validator: false,
-		},
-	}
-	mockVS.EXPECT().GetCurrentValidatorSet(gomock.Any(), ctx.SubnetID).Return(secondSet, uint64(2), nil)
-	require.NoError(ut.Sync(context.Background()))
-	require.True(ut.pausableManager.isPaused(nodeID))
-	require.False(ut.pausableManager.manager.IsConnected(nodeID))
-
-	// Third sync: back to active -> should resume and connect (since previously connected)
-	thirdSet := map[ids.ID]*validators.GetCurrentValidatorOutput{
-		vID: {
-			ValidationID:  vID,
-			NodeID:        nodeID,
-			Weight:        1,
-			StartTime:     0,
-			IsActive:      true,
-			IsL1Validator: false,
-		},
-	}
-	mockVS.EXPECT().GetCurrentValidatorSet(gomock.Any(), ctx.SubnetID).Return(thirdSet, uint64(3), nil)
-	require.NoError(ut.Sync(context.Background()))
-	require.False(ut.pausableManager.isPaused(nodeID))
-	require.True(ut.pausableManager.manager.IsConnected(nodeID))
 }
