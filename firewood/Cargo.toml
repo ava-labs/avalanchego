@@ -32,7 +32,7 @@ metrics.workspace = true
 sha2.workspace = true
 thiserror.workspace = true
 # Regular dependencies
-typed-builder = "0.21.0"
+typed-builder = "0.22.0"
 
 [features]
 default = []
