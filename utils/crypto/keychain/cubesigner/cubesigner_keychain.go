@@ -54,6 +54,14 @@ func processKey(
 		return nil, fmt.Errorf("could not find server key %s: %w", keyID, err)
 	}
 
+	// Validate key type
+	switch keyInfo.KeyType {
+	case models.SecpAvaAddr, models.SecpAvaTestAddr, models.SecpEthAddr:
+		// Supported key types
+	default:
+		return nil, fmt.Errorf("keytype %s of server key %s is not supported", keyInfo.KeyType, keyID)
+	}
+
 	// get public key
 	pubKeyHex := strings.TrimPrefix(keyInfo.PublicKey, "0x")
 	pubKeyBytes, err := hex.DecodeString(pubKeyHex)

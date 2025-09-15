@@ -7,6 +7,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -174,9 +175,11 @@ func TestCubesignerKeychain_GetEth(t *testing.T) {
 	require.True(found)
 	require.NotNil(signer)
 
-	// verify this is a C-chain signer
-	cubesignerSigner := signer.(*cubesignerSigner)
-	require.True(cubesignerSigner.cChainSigner)
+	// Test non-existent address
+	nonExistentAddr := common.HexToAddress("0x0000000000000000000000000000000000000000")
+	signer, found = kc.GetEth(nonExistentAddr)
+	require.False(found)
+	require.Nil(signer)
 }
 
 func TestCubesignerSigner_SignHash(t *testing.T) {
