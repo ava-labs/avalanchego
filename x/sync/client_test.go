@@ -52,18 +52,15 @@ func newFlakyRangeProofHandler(
 				return nil, appErr
 			}
 
-			response := &pb.RangeProof{}
-			require.NoError(t, proto.Unmarshal(responseBytes, response))
-
 			proof := &merkledb.RangeProof{}
-			require.NoError(t, proof.UnmarshalProto(response))
+			require.NoError(t, proof.UnmarshalBinary(responseBytes))
 
 			// Half of requests are modified
 			if c.Inc() == 0 {
 				modifyResponse(proof)
 			}
 
-			responseBytes, err := proto.Marshal(proof.ToProto())
+			responseBytes, err := proof.MarshalBinary()
 			if err != nil {
 				return nil, &common.AppError{Code: 123, Message: err.Error()}
 			}
@@ -89,7 +86,7 @@ func newFlakyChangeProofHandler(
 				return nil, appErr
 			}
 
-			response := &pb.SyncGetChangeProofResponse{}
+			response := &pb.GetChangeProofResponse{}
 			require.NoError(t, proto.Unmarshal(responseBytes, response))
 
 			proof := &merkledb.ChangeProof{}
@@ -102,8 +99,8 @@ func newFlakyChangeProofHandler(
 
 			proofBytes, err := proof.MarshalBinary()
 			require.NoError(t, err)
-			responseBytes, err = proto.Marshal(&pb.SyncGetChangeProofResponse{
-				Response: &pb.SyncGetChangeProofResponse_ChangeProof{
+			responseBytes, err = proto.Marshal(&pb.GetChangeProofResponse{
+				Response: &pb.GetChangeProofResponse_ChangeProof{
 					ChangeProof: proofBytes,
 				},
 			})

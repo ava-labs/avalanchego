@@ -17,9 +17,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/hashing"
-	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/x/merkledb"
+	"github.com/ava-labs/avalanchego/x/sync/protoutils"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
@@ -43,21 +43,12 @@ var (
 	errInvalidKeyLimit      = errors.New("key limit must be greater than 0")
 	errInvalidStartRootHash = fmt.Errorf("start root hash must have length %d", hashing.HashLen)
 	errInvalidEndRootHash   = fmt.Errorf("end root hash must have length %d", hashing.HashLen)
-	errInvalidStartKey      = errors.New("start key is Nothing but has value")
-	errInvalidEndKey        = errors.New("end key is Nothing but has value")
 	errInvalidBounds        = errors.New("start key is greater than end key")
 	errInvalidRootHash      = fmt.Errorf("root hash must have length %d", hashing.HashLen)
 
 	_ p2p.Handler = (*GetChangeProofHandler)(nil)
 	_ p2p.Handler = (*GetRangeProofHandler)(nil)
 )
-
-func maybeBytesToMaybe(mb *pb.MaybeBytes) maybe.Maybe[[]byte] {
-	if mb != nil && !mb.IsNothing {
-		return maybe.Some(mb.Value)
-	}
-	return maybe.Nothing[[]byte]()
-}
 
 func NewGetChangeProofHandler(db DB) *GetChangeProofHandler {
 	return &GetChangeProofHandler{
@@ -72,7 +63,7 @@ type GetChangeProofHandler struct {
 func (*GetChangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
 
 func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-	req := &pb.SyncGetChangeProofRequest{}
+	req := &pb.GetChangeProofRequest{}
 	if err := proto.Unmarshal(requestBytes, req); err != nil {
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
@@ -91,8 +82,8 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 	var (
 		keyLimit   = min(req.KeyLimit, maxKeyValuesLimit)
 		bytesLimit = min(int(req.BytesLimit), maxByteSizeLimit)
-		start      = maybeBytesToMaybe(req.StartKey)
-		end        = maybeBytesToMaybe(req.EndKey)
+		start      = protoutils.ProtoToMaybe(req.StartKey)
+		end        = protoutils.ProtoToMaybe(req.EndKey)
 	)
 
 	startRoot, err := ids.ToID(req.StartRootHash)
@@ -137,7 +128,7 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 			proofBytes, err := getRangeProof(
 				ctx,
 				g.db,
-				&pb.SyncGetRangeProofRequest{
+				&pb.GetRangeProofRequest{
 					RootHash:   req.EndRootHash,
 					StartKey:   req.StartKey,
 					EndKey:     req.EndKey,
@@ -150,8 +141,8 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 						return nil, err
 					}
 
-					return proto.Marshal(&pb.SyncGetChangeProofResponse{
-						Response: &pb.SyncGetChangeProofResponse_RangeProof{
+					return proto.Marshal(&pb.GetChangeProofResponse{
+						Response: &pb.GetChangeProofResponse_RangeProof{
 							RangeProof: proofBytes,
 						},
 					})
@@ -175,8 +166,8 @@ func (g *GetChangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ 
 				Message: fmt.Sprintf("failed to marshal change proof: %s", err),
 			}
 		}
-		responseBytes, err := proto.Marshal(&pb.SyncGetChangeProofResponse{
-			Response: &pb.SyncGetChangeProofResponse_ChangeProof{
+		responseBytes, err := proto.Marshal(&pb.GetChangeProofResponse{
+			Response: &pb.GetChangeProofResponse_ChangeProof{
 				ChangeProof: changeProofBytes,
 			},
 		})
@@ -214,7 +205,7 @@ type GetRangeProofHandler struct {
 func (*GetRangeProofHandler) AppGossip(context.Context, ids.NodeID, []byte) {}
 
 func (g *GetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-	req := &pb.SyncGetRangeProofRequest{}
+	req := &pb.GetRangeProofRequest{}
 	if err := proto.Unmarshal(requestBytes, req); err != nil {
 		return nil, &common.AppError{
 			Code:    p2p.ErrUnexpected.Code,
@@ -262,7 +253,7 @@ func (g *GetRangeProofHandler) AppRequest(ctx context.Context, _ ids.NodeID, _ t
 func getRangeProof(
 	ctx context.Context,
 	db DB,
-	req *pb.SyncGetRangeProofRequest,
+	req *pb.GetRangeProofRequest,
 	marshalFunc func(*merkledb.RangeProof) ([]byte, error),
 ) ([]byte, error) {
 	root, err := ids.ToID(req.RootHash)
@@ -276,8 +267,8 @@ func getRangeProof(
 		rangeProof, err := db.GetRangeProofAtRoot(
 			ctx,
 			root,
-			maybeBytesToMaybe(req.StartKey),
-			maybeBytesToMaybe(req.EndKey),
+			protoutils.ProtoToMaybe(req.StartKey),
+			protoutils.ProtoToMaybe(req.EndKey),
 			keyLimit,
 		)
 		if err != nil {
@@ -303,7 +294,7 @@ func getRangeProof(
 }
 
 // Returns nil iff [req] is well-formed.
-func validateChangeProofRequest(req *pb.SyncGetChangeProofRequest) error {
+func validateChangeProofRequest(req *pb.GetChangeProofRequest) error {
 	switch {
 	case req.BytesLimit == 0:
 		return errInvalidBytesLimit
@@ -315,12 +306,7 @@ func validateChangeProofRequest(req *pb.SyncGetChangeProofRequest) error {
 		return errInvalidEndRootHash
 	case bytes.Equal(req.EndRootHash, ids.Empty[:]):
 		return merkledb.ErrEmptyProof
-	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
-		return errInvalidStartKey
-	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
-		return errInvalidEndKey
-	case req.StartKey != nil && req.EndKey != nil && !req.StartKey.IsNothing &&
-		!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
+	case req.StartKey != nil && req.EndKey != nil && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
 		return errInvalidBounds
 	default:
 		return nil
@@ -328,7 +314,7 @@ func validateChangeProofRequest(req *pb.SyncGetChangeProofRequest) error {
 }
 
 // Returns nil iff [req] is well-formed.
-func validateRangeProofRequest(req *pb.SyncGetRangeProofRequest) error {
+func validateRangeProofRequest(req *pb.GetRangeProofRequest) error {
 	switch {
 	case req.BytesLimit == 0:
 		return errInvalidBytesLimit
@@ -338,12 +324,7 @@ func validateRangeProofRequest(req *pb.SyncGetRangeProofRequest) error {
 		return errInvalidRootHash
 	case bytes.Equal(req.RootHash, ids.Empty[:]):
 		return merkledb.ErrEmptyProof
-	case req.StartKey != nil && req.StartKey.IsNothing && len(req.StartKey.Value) > 0:
-		return errInvalidStartKey
-	case req.EndKey != nil && req.EndKey.IsNothing && len(req.EndKey.Value) > 0:
-		return errInvalidEndKey
-	case req.StartKey != nil && req.EndKey != nil && !req.StartKey.IsNothing &&
-		!req.EndKey.IsNothing && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
+	case req.StartKey != nil && req.EndKey != nil && bytes.Compare(req.StartKey.Value, req.EndKey.Value) > 0:
 		return errInvalidBounds
 	default:
 		return nil
