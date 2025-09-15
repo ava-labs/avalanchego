@@ -287,8 +287,7 @@ func (a *AtomicTrie) AcceptTrie(height uint64, root common.Hash) (bool, error) {
 	// - not committted, in which case the current root we are inserting contains
 	//   references to all the relevant data from the previous root, so the previous
 	//   root can be dereferenced.
-	err := a.trieDB.Dereference(a.lastAcceptedRoot)
-	if err != nil {
+	if err := a.trieDB.Dereference(a.lastAcceptedRoot); err != nil {
 		return false, err
 	}
 	a.lastAcceptedRoot = root
@@ -296,8 +295,7 @@ func (a *AtomicTrie) AcceptTrie(height uint64, root common.Hash) (bool, error) {
 }
 
 func (a *AtomicTrie) RejectTrie(root common.Hash) error {
-	err := a.trieDB.Dereference(root)
-	if err != nil {
+	if err := a.trieDB.Dereference(root); err != nil {
 		return err
 	}
 	return nil

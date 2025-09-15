@@ -1101,8 +1101,7 @@ func TestAtomicTxBuildBlockDropsConflicts(t *testing.T) {
 			t.Fatal("should conflict with the utxoSet in the mempool")
 		}
 		// force add the tx
-		err = vm.AtomicMempool.ForceAddTx(conflictTx)
-		if err != nil {
+		if err := vm.AtomicMempool.ForceAddTx(conflictTx); err != nil {
 			t.Fatal(err)
 		}
 		conflictSets[index].Add(conflictTx.ID())

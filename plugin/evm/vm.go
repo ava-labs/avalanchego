@@ -468,8 +468,7 @@ func (vm *VM) Initialize(
 
 	// Add p2p warp message warpHandler
 	warpHandler := acp118.NewCachedHandler(meteredCache, vm.warpBackend, vm.ctx.WarpSigner)
-	err = vm.Network.AddHandler(p2p.SignatureRequestHandlerID, warpHandler)
-	if err != nil {
+	if err = vm.Network.AddHandler(p2p.SignatureRequestHandlerID, warpHandler); err != nil {
 		return err
 	}
 
