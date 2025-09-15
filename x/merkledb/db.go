@@ -1490,8 +1490,8 @@ func (db *merkleDB) findNextKey(
 	// Note that [largestHandledKey] can't be Nothing.
 	// Proof: Suppose it is. That means that we got a range/change proof that proved up to the
 	// greatest key-value pair in the database. That means we requested a proof with no upper
-	// bound. That is, [workItem.end] is Nothing. Since we're here, [bothNothing] is false,
-	// which means [workItem.end] isn't Nothing. Contradiction.
+	// bound. That is, [rangeEnd] is Nothing. Since we're here, [bothNothing] is false,
+	// which means [rangeEnd] isn't Nothing. Contradiction.
 	lastReceivedKey := largestHandledKey.Value()
 
 	if len(endProof) == 0 {
