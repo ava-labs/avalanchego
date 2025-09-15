@@ -161,11 +161,8 @@ func StateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup
 		if !hasItem {
 			t.Fatal("expected nodeSet to contain at least 1 nodeID")
 		}
-		go func() {
-			if err := testSyncVMSetup.serverVM.VM.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request); err != nil {
-				panic(err)
-			}
-		}()
+		require.NoError(t, testSyncVMSetup.serverVM.VM.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request))
+
 		return nil
 	}
 	ResetMetrics(testSyncVMSetup.syncerVM.SnowCtx)
@@ -250,13 +247,9 @@ func StateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup
 	// override [serverVM]'s SendAppResponse function to trigger AppResponse on [syncerVM]
 	testSyncVMSetup.serverVM.AppSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 		if test.responseIntercept == nil {
-			go func() {
-				if err := syncReEnabledVM.AppResponse(ctx, nodeID, requestID, response); err != nil {
-					panic(err)
-				}
-			}()
+			require.NoError(t, syncReEnabledVM.AppResponse(ctx, nodeID, requestID, response))
 		} else {
-			go test.responseIntercept(syncReEnabledVM, nodeID, requestID, response)
+			test.responseIntercept(syncReEnabledVM, nodeID, requestID, response)
 		}
 
 		return nil
@@ -395,13 +388,9 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 	// override [serverVM]'s SendAppResponse function to trigger AppResponse on [syncerVM]
 	serverTest.AppSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 		if test.responseIntercept == nil {
-			go func() {
-				if err := syncerVM.AppResponse(ctx, nodeID, requestID, response); err != nil {
-					panic(err)
-				}
-			}()
+			require.NoError(syncerVM.AppResponse(ctx, nodeID, requestID, response))
 		} else {
-			go test.responseIntercept(syncerVM, nodeID, requestID, response)
+			test.responseIntercept(syncerVM, nodeID, requestID, response)
 		}
 
 		return nil
