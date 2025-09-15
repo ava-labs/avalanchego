@@ -131,16 +131,20 @@ impl<T: AsRef<[u8]>> ValueDigest<T> {
 
 /// A node in the trie that can be hashed.
 pub trait Hashable: std::fmt::Debug {
-    /// The key of the node where each byte is a nibble.
-    fn key(&self) -> impl Iterator<Item = u8> + Clone;
-    /// The partial path of this node
-    #[cfg(feature = "ethhash")]
+    /// The full path of this node's parent where each byte is a nibble.
+    fn parent_prefix_path(&self) -> impl Iterator<Item = u8> + Clone;
+    /// The partial path of this node where each byte is a nibble.
     fn partial_path(&self) -> impl Iterator<Item = u8> + Clone;
     /// The node's value or hash.
     fn value_digest(&self) -> Option<ValueDigest<&[u8]>>;
     /// Each element is a child's index and hash.
     /// Yields 0 elements if the node is a leaf.
     fn children(&self) -> Children<HashType>;
+
+    /// The full path of this node including the parent's prefix where each byte is a nibble.
+    fn full_path(&self) -> impl Iterator<Item = u8> + Clone {
+        self.parent_prefix_path().chain(self.partial_path())
+    }
 }
 
 /// A preimage of a hash.
@@ -198,15 +202,10 @@ impl<'a, N: HashableNode> From<NodeAndPrefix<'a, N>> for HashType {
 }
 
 impl<'a, N: HashableNode> Hashable for NodeAndPrefix<'a, N> {
-    fn key(&self) -> impl Iterator<Item = u8> + Clone {
-        self.prefix
-            .0
-            .iter()
-            .copied()
-            .chain(self.node.partial_path())
+    fn parent_prefix_path(&self) -> impl Iterator<Item = u8> + Clone {
+        self.prefix.0.iter().copied()
     }
 
-    #[cfg(feature = "ethhash")]
     fn partial_path(&self) -> impl Iterator<Item = u8> + Clone {
         self.node.partial_path()
     }

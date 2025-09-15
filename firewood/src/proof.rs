@@ -80,7 +80,6 @@ pub struct ProofNode {
     /// The key this node is at. Each byte is a nibble.
     pub key: Key,
     /// The length of the key prefix that is shared with the previous node.
-    #[cfg(feature = "ethhash")]
     pub partial_len: usize,
     /// None if the node does not have a value.
     /// Otherwise, the node's value or the hash of its value.
@@ -91,39 +90,37 @@ pub struct ProofNode {
 
 impl std::fmt::Debug for ProofNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let key: Vec<u8> = self.key().collect();
-        let children: Vec<(usize, &HashType)> = self
+        // Filter the missing children and only show the present ones with their indices
+        let child_hashes = self
             .child_hashes
             .iter()
             .enumerate()
-            .filter_map(|(i, c)| c.as_ref().map(|h| (i, h)))
-            .collect();
-        let value_digest = self.value_digest();
-
-        let mut ds = f.debug_struct("ProofNode");
-        ds.field("key", &key)
-            .field("value_digest", &value_digest)
-            .field("child_hashes", &children);
-
-        #[cfg(feature = "ethhash")]
-        ds.field("partial_len", &self.partial_len);
-
+            .filter_map(|(i, h)| h.as_ref().map(|h| (i, h)))
+            .collect::<Vec<_>>();
         // Compute the hash and render it as well
         let hash = firewood_storage::Preimage::to_hash(self);
-        ds.field("hash", &hash);
 
-        ds.finish()
+        f.debug_struct("ProofNode")
+            .field("key", &self.key)
+            .field("partial_len", &self.partial_len)
+            .field("value_digest", &self.value_digest)
+            .field("child_hashes", &child_hashes)
+            .field("hash", &hash)
+            .finish()
     }
 }
 
 impl Hashable for ProofNode {
-    fn key(&self) -> impl Iterator<Item = u8> + Clone {
-        self.key.as_ref().iter().copied()
+    fn parent_prefix_path(&self) -> impl Iterator<Item = u8> + Clone {
+        self.full_path().take(self.partial_len)
     }
 
-    #[cfg(feature = "ethhash")]
     fn partial_path(&self) -> impl Iterator<Item = u8> + Clone {
-        self.key.as_ref().iter().skip(self.partial_len).copied()
+        self.full_path().skip(self.partial_len)
+    }
+
+    fn full_path(&self) -> impl Iterator<Item = u8> + Clone {
+        self.key.as_ref().iter().copied()
     }
 
     fn value_digest(&self) -> Option<ValueDigest<&[u8]>> {
@@ -147,15 +144,13 @@ impl From<PathIterItem> for ProofNode {
             BranchNode::empty_children()
         };
 
-        #[cfg(feature = "ethhash")]
         let partial_len = item
             .key_nibbles
             .len()
-            .saturating_sub(item.node.partial_path().0.len());
+            .saturating_sub(item.node.partial_path().len());
 
         Self {
             key: item.key_nibbles,
-            #[cfg(feature = "ethhash")]
             partial_len,
             value_digest: item
                 .node
@@ -207,19 +202,19 @@ impl<T: ProofCollection + ?Sized> Proof<T> {
             // Assert that only nodes whose keys are an even number of nibbles
             // have a `value_digest`.
             #[cfg(not(feature = "branch_factor_256"))]
-            if node.key().count() % 2 != 0 && node.value_digest().is_some() {
+            if node.full_path().count() % 2 != 0 && node.value_digest().is_some() {
                 return Err(ProofError::ValueAtOddNibbleLength);
             }
 
             if let Some(next_node) = iter.peek() {
                 // Assert that every node's key is a prefix of `key`, except for the last node,
                 // whose key can be equal to or a suffix of `key` in an exclusion proof.
-                if next_nibble(node.key(), key.iter().copied()).is_none() {
+                if next_nibble(node.full_path(), key.iter().copied()).is_none() {
                     return Err(ProofError::ShouldBePrefixOfProvenKey);
                 }
 
                 // Assert that every node's key is a prefix of the next node's key.
-                let next_node_index = next_nibble(node.key(), next_node.key());
+                let next_node_index = next_nibble(node.full_path(), next_node.full_path());
 
                 let Some(next_nibble) = next_node_index else {
                     return Err(ProofError::ShouldBePrefixOfNextKey);
@@ -235,7 +230,7 @@ impl<T: ProofCollection + ?Sized> Proof<T> {
             }
         }
 
-        if last_node.key().count() == key.len() {
+        if last_node.full_path().count() == key.len() {
             return Ok(last_node.value_digest());
         }
 

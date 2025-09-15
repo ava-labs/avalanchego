@@ -167,7 +167,6 @@ impl<T: TrieReader> Merkle<T> {
 
             proof.push(ProofNode {
                 key: root.partial_path().bytes(),
-                #[cfg(feature = "ethhash")]
                 partial_len: root.partial_path().0.len(),
                 value_digest: root
                     .value()

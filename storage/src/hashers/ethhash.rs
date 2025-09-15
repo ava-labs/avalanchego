@@ -90,7 +90,7 @@ impl<T: Hashable> Preimage for T {
 
         trace!(
             "SIZE WAS {} {}",
-            self.key().count(),
+            self.full_path().count(),
             hex::encode(&collector),
         );
 
@@ -102,7 +102,7 @@ impl<T: Hashable> Preimage for T {
     }
 
     fn write(&self, buf: &mut impl HasUpdate) {
-        let is_account = self.key().count() == 64;
+        let is_account = self.full_path().count() == 64;
         trace!("is_account: {is_account}");
 
         let child_hashes = self.children();
@@ -224,7 +224,7 @@ impl<T: Hashable> Preimage for T {
                     // treat like non-account since it didn't have a value
                     warn!(
                         "Account node {:x?} without value",
-                        self.key().collect::<Vec<_>>()
+                        self.full_path().collect::<Vec<_>>()
                     );
                     bytes.as_ref().into()
                 }

@@ -50,7 +50,7 @@ impl<T: Hashable> Preimage for T {
         add_value_digest_to_buf(buf, self.value_digest());
 
         // Add key length (in bits) to hash pre-image
-        let mut key = self.key();
+        let mut key = self.full_path();
         // let mut key = key.as_ref().iter();
         let key_bit_len = BITS_PER_NIBBLE * key.clone().count() as u64;
         add_varint_to_buf(buf, key_bit_len);
