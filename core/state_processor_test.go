@@ -424,6 +424,13 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 
 		header.ParentBeaconRoot = new(common.Hash)
 	}
+
+	if configExtra.IsGranite(header.Time) {
+		headerExtra := customtypes.GetHeaderExtra(header)
+		headerExtra.TimeMilliseconds = new(uint64)
+		*headerExtra.TimeMilliseconds = header.Time * 1000
+	}
+
 	// Assemble and return the final block for sealing
 	return types.NewBlock(header, txs, nil, receipts, trie.NewStackTrie(nil))
 }

@@ -290,10 +290,10 @@ func (b *wrappedBlock) verify(predicateContext *precompileconfig.PredicateContex
 
 // semanticVerify verifies that a *Block is internally consistent.
 func (b *wrappedBlock) semanticVerify() error {
-	// Make sure the block isn't too far in the future
-	blockTimestamp := b.ethBlock.Time()
-	if maxBlockTime := uint64(b.vm.clock.Time().Add(maxFutureBlockTime).Unix()); blockTimestamp > maxBlockTime {
-		return fmt.Errorf("block timestamp is too far in the future: %d > allowed %d", blockTimestamp, maxBlockTime)
+	// Ensure Time and TimeMilliseconds are consistent with rules.
+	extraConfig := params.GetExtra(b.vm.chainConfig)
+	if err := customheader.VerifyTime(extraConfig, b.ethBlock.Header(), b.vm.clock.Time()); err != nil {
+		return err
 	}
 
 	if b.extension != nil {
