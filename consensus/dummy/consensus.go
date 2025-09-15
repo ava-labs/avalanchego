@@ -155,9 +155,8 @@ func NewFullFaker() *DummyEngine {
 }
 
 func verifyHeaderGasFields(config *extras.ChainConfig, header *types.Header, parent *types.Header) error {
-	if err := customheader.VerifyGasUsed(config, parent, header); err != nil {
-		return err
-	}
+	// Verifying the gas used occurs earlier in the block validation process in verifyIntrinsicGas, so
+	// customheader.VerifyGasUsed is not called here.
 	if err := customheader.VerifyGasLimit(config, parent, header); err != nil {
 		return err
 	}
