@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package p
@@ -110,7 +110,7 @@ var _ = e2e.DescribePChain("[Interchain Workflow]", ginkgo.Label(e2e.UsesCChainL
 		e2e.WaitForHealthy(tc, node)
 
 		tc.By("retrieving new node's id and pop")
-		uri := e2e.GetLocalURI(tc, node)
+		uri := node.GetAccessibleURI()
 		infoClient := info.NewClient(uri)
 		nodeID, nodePOP, err := infoClient.GetNodeID(tc.DefaultContext())
 		require.NoError(err)

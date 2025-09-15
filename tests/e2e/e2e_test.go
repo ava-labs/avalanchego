@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package e2e_test
@@ -34,7 +34,7 @@ func TestE2E(t *testing.T) {
 var flagVars *e2e.FlagVars
 
 func init() {
-	flagVars = e2e.RegisterFlagsWithDefaultOwner("avalanchego-e2e")
+	flagVars = e2e.RegisterFlags(e2e.WithDefaultOwner("avalanchego-e2e"))
 }
 
 var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
