@@ -100,7 +100,7 @@ to [keccak256](https://docs.rs/sha3/latest/sha3/type.Keccak256.html),
 understands that an "account" is actually just a node in the storage tree at a specific depth with a specific RLP-encoded value,
 and computes the hash of the account trie as if it were an actual root.
 
-It is worth nothing that the hash stored as a value inside the account root RLP is not used.
+It is worth noting that the hash stored as a value inside the account root RLP is not used.
 During hash calculations, we know the hash of the children,
 and use that directly to modify the value in-place
 when hashing the node.
