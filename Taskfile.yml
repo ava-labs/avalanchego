@@ -85,6 +85,24 @@ tasks:
       - cmd: go mod tidy
       - task: check-clean-branch
 
+  export-cchain-block-range:
+    desc: Export range of C-Chain blocks from source to target directory.
+    vars:
+      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC}}'
+      BLOCK_DIR_DST: '{{.BLOCK_DIR_DST}}'
+      START_BLOCK: '{{.START_BLOCK}}'
+      END_BLOCK: '{{.END_BLOCK}}'
+    cmds:
+      - cmd: go test -timeout=0 -run=TestExportBlockRange github.com/ava-labs/avalanchego/tests/reexecute/c --block-dir-src={{.BLOCK_DIR_SRC}} --block-dir-dst={{.BLOCK_DIR_DST}} --start-block={{.START_BLOCK}} --end-block={{.END_BLOCK}}
+
+  export-dir-to-s3:
+    desc: Copies a directory to s3
+    vars:
+      LOCAL_SRC: '{{.LOCAL_SRC}}'
+      S3_DST: '{{.S3_DST}}'
+    cmds:
+      - cmd: bash -x ./scripts/copy_dir.sh {{.LOCAL_SRC}} {{.S3_DST}}
+
   generate-mocks:
     desc: Generates testing mocks
     cmds:
@@ -98,8 +116,8 @@ tasks:
   generate-load-contract-bindings:
     desc: Generates load contract bindings
     cmds:
-      - cmd: grep -lr -E '^// Code generated - DO NOT EDIT\.$' tests/load/c | xargs -r rm
-      - cmd: go generate ./tests/load/c/...
+      - cmd: grep -lr -E '^// Code generated - DO NOT EDIT\.$' tests/load | xargs -r rm
+      - cmd: go generate ./tests/load/...
 
   generate-protobuf:
     desc: Generates protobuf
@@ -108,6 +126,30 @@ tasks:
   ginkgo-build:
     desc: Runs ginkgo against the current working directory
     cmd: ./bin/ginkgo build {{.USER_WORKING_DIR}}
+
+  import-cchain-reexecute-range:
+    desc: Imports the C-Chain block and state data to re-execute. Defaults to import the first 200 and the current state created with the default config of the C-Chain (hashdb).
+    vars:
+      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200-ldb/**"}}'
+      CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"}}'
+    cmds:
+      - task: import-s3-to-dir
+        vars:
+          SRC: '{{.BLOCK_DIR_SRC}}'
+          DST: '{{.EXECUTION_DATA_DIR}}/blocks'
+      - task: import-s3-to-dir
+        vars:
+          SRC: '{{.CURRENT_STATE_DIR_SRC}}'
+          DST: '{{.EXECUTION_DATA_DIR}}/current-state'
+
+  import-s3-to-dir:
+    desc: Imports an S3 path to a local directory.
+    vars:
+      SRC: '{{.SRC}}'
+      DST: '{{.DST}}'
+    cmds:
+      - cmd: bash -x ./scripts/copy_dir.sh {{.SRC}} {{.DST}}
 
   install-nix:
     desc: Installs nix with the determinate systems installer
@@ -138,6 +180,61 @@ tasks:
   lint-shell:
     desc: Runs shellcheck to check sanity of shell scripts
     cmd: ./scripts/shellcheck.sh
+
+  reexecute-cchain-range:
+    desc: Re-execute a range of C-Chain blocks.
+    vars:
+      CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
+      BLOCK_DIR: '{{.BLOCK_DIR}}'
+      RUNNER_NAME: '{{.RUNNER_NAME | default "dev"}}'
+      CONFIG: '{{.CONFIG | default ""}}'
+      START_BLOCK: '{{.START_BLOCK}}'
+      END_BLOCK: '{{.END_BLOCK}}'
+      LABELS: '{{.LABELS | default ""}}'
+      BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
+      METRICS_ENABLED: '{{.METRICS_ENABLED | default "true"}}'
+    cmd: |
+      CURRENT_STATE_DIR={{.CURRENT_STATE_DIR}} \
+      BLOCK_DIR={{.BLOCK_DIR}} \
+      RUNNER_NAME='{{.RUNNER_NAME | default "dev"}}' \
+      CONFIG={{.CONFIG}} \
+      START_BLOCK={{.START_BLOCK}} \
+      END_BLOCK={{.END_BLOCK}} \
+      LABELS={{.LABELS}} \
+      BENCHMARK_OUTPUT_FILE={{.BENCHMARK_OUTPUT_FILE}} \
+      METRICS_ENABLED={{.METRICS_ENABLED}} \
+      bash -x ./scripts/benchmark_cchain_range.sh
+
+  reexecute-cchain-range-with-copied-data:
+    desc: Combines import-cchain-reexecute-range and reexecute-cchain-range
+    vars:
+      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**"}}'
+      CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"}}'
+      RUNNER_NAME: '{{.RUNNER_NAME | default "dev"}}'
+      CONFIG: '{{.CONFIG | default ""}}'
+      START_BLOCK: '{{.START_BLOCK | default "101"}}'
+      END_BLOCK: '{{.END_BLOCK | default "250000"}}'
+      LABELS: '{{.LABELS | default ""}}'
+      BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
+      METRICS_ENABLED: '{{.METRICS_ENABLED | default "true"}}'
+    cmds:
+      - task: import-cchain-reexecute-range
+        vars:
+          BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC}}'
+          CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC}}'
+          EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+      - task: reexecute-cchain-range
+        vars:
+          BLOCK_DIR: '{{.EXECUTION_DATA_DIR}}/blocks'
+          CURRENT_STATE_DIR: '{{.EXECUTION_DATA_DIR}}/current-state'
+          RUNNER_NAME: '{{.RUNNER_NAME}}'
+          CONFIG: '{{.CONFIG}}'
+          START_BLOCK: '{{.START_BLOCK}}'
+          END_BLOCK: '{{.END_BLOCK}}'
+          LABELS: '{{.LABELS}}'
+          BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE}}'
+          METRICS_ENABLED: '{{.METRICS_ENABLED}}'
 
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests
@@ -199,11 +296,12 @@ tasks:
       - cmd: bash -x ./scripts/tests.e2e.kube.sh {{.CLI_ARGS}}
 
   test-e2e-kube-ci:
-    desc: Runs e2e tests against a network deployed to kube [serially]
+    # Free github action runners do not have sufficient resources to reliably run a full e2e run against a kube-hosted network
+    desc: Runs the xsvm e2e tests in serial against a network deployed to kube
     env:
       E2E_SERIAL: 1
     cmds:
-      - task: test-e2e-kube
+      - cmd: bash -x ./scripts/tests.e2e.kube.sh --ginkgo.focus-file=xsvm.go {{.CLI_ARGS}}
 
   # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
   # A value of `-1` will run until it encounters a failing output.
@@ -231,24 +329,29 @@ tasks:
     cmds:
       - task: generate-load-contract-bindings
       - task: build
-      - cmd: go run ./tests/load/c/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
-
-  test-load-kube:
-    desc: Runs load tests against a network deployed to kube
-    cmds:
-      - task: generate-load-contract-bindings
-      - cmd: bash -x ./scripts/tests.load.kube.sh {{.CLI_ARGS}}
-
-  test-load2:
-    desc: Runs second iteration of load tests
-    cmds: 
-      - task: build
-      - cmd: go run ./tests/load2/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
+      - cmd: go run ./tests/load/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
 
   test-load-exclusive:
     desc: Runs load tests against kube with exclusive scheduling
     cmds:
-      - cmd: go run ./tests/load/c/main --runtime=kube --kube-use-exclusive-scheduling {{.CLI_ARGS}}
+      - cmd: go run ./tests/load/main --runtime=kube --kube-use-exclusive-scheduling {{.CLI_ARGS}}
+
+  test-load-kube:
+    desc: Runs load tests against a kubernetes cluster
+    cmds:
+      - task: generate-load-contract-bindings
+      - cmd: go run ./tests/load/main --runtime=kube {{.CLI_ARGS}}
+
+  test-load-kube-kind:
+    desc: Runs load tests against a kind cluster
+    cmds:
+      - task: generate-load-contract-bindings
+      - cmd: bash -x ./scripts/tests.load.kube.kind.sh {{.CLI_ARGS}}
+
+  test-robustness:
+    desc: Deploys kind with chaos mesh. Intended to eventually run a robustness (fault-injection) test suite.
+    cmds:
+      - ./bin/tmpnetctl start-kind-cluster --install-chaos-mesh
 
   test-unit:
     desc: Runs unit tests
