@@ -88,11 +88,11 @@ type ChangeProofer interface {
 	// Returns nil iff all the following hold:
 	//   - [start] <= [end].
 	//   - [proof] is non-empty.
-	//   - [proof.KeyValues] is not longer than [maxLength].
-	//   - All keys in [proof.KeyValues] and [proof.DeletedKeys] are in [start, end].
+	//   - [proof.KeyChanges] is not longer than [maxLength].
+	//   - All keys in [proof.KeyChanges] are in [start, end].
 	//     If [start] is nothing, all keys are considered > [start].
 	//     If [end] is nothing, all keys are considered < [end].
-	//   - [proof.KeyValues] and [proof.DeletedKeys] are sorted in order of increasing key.
+	//   - [proof.KeyChanges] are sorted in order of increasing key.
 	//   - [proof.StartProof] and [proof.EndProof] are well-formed.
 	//   - When the changes in [proof.KeyChanges] are applied,
 	//     the root ID of the database is [expectedEndRootID].
@@ -134,11 +134,11 @@ type RangeProofer interface {
 	// Returns nil iff all the following hold:
 	//   - [start] <= [end].
 	//   - [proof] is non-empty.
-	//   - [proof.KeyValues] is not longer than [maxLength].
-	//   - All keys in [proof.KeyValues] and [proof.DeletedKeys] are in [start, end].
+	//   - [proof.KeyChanges] is not longer than [maxLength].
+	//   - All keys in [proof.KeyChanges] are in [start, end].
 	//     If [start] is nothing, all keys are considered > [start].
 	//     If [end] is nothing, all keys are considered < [end].
-	//   - [proof.KeyValues] and [proof.DeletedKeys] are sorted in order of increasing key.
+	//   - [proof.KeyChanges] are sorted in order of increasing key.
 	//   - [proof.StartProof] and [proof.EndProof] are well-formed.
 	//   - When the changes in [proof.KeyChanges] are applied,
 	//     the root ID of the database is [expectedEndRootID].
@@ -473,13 +473,11 @@ func (db *merkleDB) CommitChangeProof(ctx context.Context, end maybe.Maybe[[]byt
 	}
 
 	// Commit the changes to the DB.
-	largestKey := end
-	if len(proof.KeyChanges) > 0 {
-		if err := view.commitToDB(ctx); err != nil {
-			return maybe.Nothing[[]byte](), err
-		}
-		largestKey = maybe.Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key)
+	if err := view.commitToDB(ctx); err != nil {
+		return maybe.Nothing[[]byte](), err
 	}
+	largestKey := maybe.Some(proof.KeyChanges[len(proof.KeyChanges)-1].Key)
+
 	return db.findNextKey(largestKey, end, proof.EndProof)
 }
 
