@@ -4,7 +4,7 @@
 package signer
 
 import (
-	stdcontext "context"
+	"context"
 
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
@@ -30,7 +30,6 @@ func WithOptions(signer Signer, options ...common.Option) Signer {
 	}
 }
 
-func (w *withOptions) Sign(ctx stdcontext.Context, tx *txs.Tx, options ...common.Option) error {
+func (w *withOptions) Sign(ctx context.Context, tx *txs.Tx, options ...common.Option) error {
 	return w.signer.Sign(ctx, tx, common.UnionOptions(w.options, options)...)
 }
-

@@ -124,7 +124,7 @@ func (l *ledgerSigner) SignHash(b []byte) ([]byte, error) {
 }
 
 // expects to receive the unsigned tx bytes
-func (l *ledgerSigner) Sign(b []byte, opts ...keychain.SigningOption) ([]byte, error) {
+func (l *ledgerSigner) Sign(b []byte, _ ...keychain.SigningOption) ([]byte, error) {
 	// Ignore options - ledger signing doesn't need chain/network context
 	// Sign using the address with index l.idx on the ledger device. The number
 	// of returned signatures should be the same length as the provided indices.

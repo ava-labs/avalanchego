@@ -243,7 +243,6 @@ func WithConfirmationHandler(f func(ConfirmationReceipt)) Option {
 	}
 }
 
-
 func WithForceSignHash() Option {
 	return func(o *Options) {
 		o.forceSignHash = true

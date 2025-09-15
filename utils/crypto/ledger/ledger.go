@@ -20,7 +20,6 @@ const (
 	ledgerPathSize    = 9
 )
 
-
 // Ledger is a wrapper around the low-level Ledger Device interface that
 // provides Avalanche-specific access.
 type Ledger struct {

@@ -5,21 +5,23 @@ package cubesigner
 import (
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/ava-labs/libevm/common"
+	"github.com/cubist-labs/cubesigner-go-sdk/client"
+	"github.com/cubist-labs/cubesigner-go-sdk/models"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
-	avasecp256k1 "github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/libevm/common"
 
-	"github.com/cubist-labs/cubesigner-go-sdk/client"
-	"github.com/cubist-labs/cubesigner-go-sdk/models"
+	avasecp256k1 "github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
-	"golang.org/x/exp/maps"
 )
 
 var (
@@ -27,6 +29,13 @@ var (
 	_ keychain.EthKeychain = (*CubesignerKeychain)(nil)
 	_ keychain.Signer      = (*cubesignerSigner)(nil)
 	_ CubeSignerClient     = (*client.ApiClient)(nil)
+
+	ErrNoKeysProvided           = errors.New("you need to provide at least one key to create a server keychain")
+	ErrEmptySignatureFromServer = errors.New("empty signature obtained from server")
+	ErrChainAliasMissing        = errors.New("chainAlias must be specified in options for CubeSigner")
+	ErrNetworkIDMissing         = errors.New("network ID must be specified in options for CubeSigner")
+	ErrUnsupportedKeyType       = errors.New("unsupported key type")
+	ErrInvalidPublicKey         = errors.New("invalid public key format")
 )
 
 // keyInfo holds both the public key and keyID for a cubesigner key
@@ -59,14 +68,14 @@ func processKey(
 	case models.SecpAvaAddr, models.SecpAvaTestAddr, models.SecpEthAddr:
 		// Supported key types
 	default:
-		return nil, fmt.Errorf("keytype %s of server key %s is not supported", keyInfo.KeyType, keyID)
+		return nil, fmt.Errorf("keytype %s of server key %s: %w", keyInfo.KeyType, keyID, ErrUnsupportedKeyType)
 	}
 
 	// get public key
 	pubKeyHex := strings.TrimPrefix(keyInfo.PublicKey, "0x")
 	pubKeyBytes, err := hex.DecodeString(pubKeyHex)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode public key for server key %s: %w", keyID, err)
+		return nil, fmt.Errorf("%w: failed to decode public key for server key %s: %w", ErrInvalidPublicKey, keyID, err)
 	}
 	if len(pubKeyBytes) != 65 {
 		return nil, fmt.Errorf("invalid public key length for server key %s: expected 65 bytes, got %d", keyID, len(pubKeyBytes))
@@ -92,7 +101,7 @@ func NewCubesignerKeychain(
 	keyIDs []string,
 ) (*CubesignerKeychain, error) {
 	if len(keyIDs) == 0 {
-		return nil, fmt.Errorf("you need to provide at least one key to create a server keychain")
+		return nil, ErrNoKeysProvided
 	}
 
 	avaAddrToKeyInfo := map[ids.ShortID]*keyInfo{}
@@ -185,7 +194,7 @@ func (s *cubesignerSigner) SignHash(b []byte) ([]byte, error) {
 		return nil, fmt.Errorf("server signing err: %w", err)
 	}
 	if response.ResponseData == nil {
-		return nil, fmt.Errorf("empty signature obtained from server")
+		return nil, ErrEmptySignatureFromServer
 	}
 	return processSignatureResponse(response.ResponseData.Signature)
 }
@@ -196,18 +205,16 @@ func (s *cubesignerSigner) Sign(b []byte, opts ...keychain.SigningOption) ([]byt
 	for _, opt := range opts {
 		opt(options)
 	}
-	
 	// Require chainAlias and network from options
 	if options.ChainAlias == "" {
-		return nil, fmt.Errorf("chainAlias must be specified in options for CubeSigner")
+		return nil, ErrChainAliasMissing
 	}
 	if options.ChainAlias != "P" && options.ChainAlias != "X" && options.ChainAlias != "C" {
 		return nil, fmt.Errorf("chainAlias must be 'P', 'X' or 'C' for CubeSigner, got %q", options.ChainAlias)
 	}
 	if options.NetworkID == 0 {
-		return nil, fmt.Errorf("network ID must be specified in options for CubeSigner")
+		return nil, ErrNetworkIDMissing
 	}
-	
 	var materialID string
 	if options.ChainAlias == "C" {
 		materialID = s.pubKey.EthAddress().Hex()
@@ -232,7 +239,7 @@ func (s *cubesignerSigner) Sign(b []byte, opts ...keychain.SigningOption) ([]byt
 		return nil, fmt.Errorf("server signing err: %w", err)
 	}
 	if response.ResponseData == nil {
-		return nil, fmt.Errorf("empty signature obtained from server")
+		return nil, ErrEmptySignatureFromServer
 	}
 	return processSignatureResponse(response.ResponseData.Signature)
 }

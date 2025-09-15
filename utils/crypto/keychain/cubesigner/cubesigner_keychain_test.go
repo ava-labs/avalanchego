@@ -8,32 +8,32 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/cubist-labs/cubesigner-go-sdk/client"
+	"github.com/cubist-labs/cubesigner-go-sdk/models"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain/cubesigner/cubesignermock"
-	"github.com/cubist-labs/cubesigner-go-sdk/client"
-	"github.com/cubist-labs/cubesigner-go-sdk/models"
 )
 
 var errTest = errors.New("test")
+
+const testKeyID = "test-key-id"
 
 func TestNewCubesignerKeychain(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	keyID := "test-key-id"
-
 	// user provides no keys
 	mockClient := cubesignermock.NewCubeSignerClient(ctrl)
 	_, err := NewCubesignerKeychain(mockClient, []string{})
-	require.ErrorContains(err, "you need to provide at least one key")
+	require.ErrorIs(err, ErrNoKeysProvided)
 
 	// client returns error when getting key info
 	mockClient = cubesignermock.NewCubeSignerClient(ctrl)
-	mockClient.EXPECT().GetKeyInOrg(keyID).Return(nil, errTest).Times(1)
-	_, err = NewCubesignerKeychain(mockClient, []string{keyID})
+	mockClient.EXPECT().GetKeyInOrg(testKeyID).Return(nil, errTest).Times(1)
+	_, err = NewCubesignerKeychain(mockClient, []string{testKeyID})
 	require.ErrorIs(err, errTest)
 
 	// client returns unsupported key type
@@ -42,9 +42,9 @@ func TestNewCubesignerKeychain(t *testing.T) {
 		KeyType:   "UnsupportedType",
 		PublicKey: "0x04" + "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 	}
-	mockClient.EXPECT().GetKeyInOrg(keyID).Return(keyInfo, nil).Times(1)
-	_, err = NewCubesignerKeychain(mockClient, []string{keyID})
-	require.ErrorContains(err, "keytype UnsupportedType of server key")
+	mockClient.EXPECT().GetKeyInOrg(testKeyID).Return(keyInfo, nil).Times(1)
+	_, err = NewCubesignerKeychain(mockClient, []string{testKeyID})
+	require.ErrorIs(err, ErrUnsupportedKeyType)
 
 	// client returns invalid public key format
 	mockClient = cubesignermock.NewCubeSignerClient(ctrl)
@@ -52,9 +52,9 @@ func TestNewCubesignerKeychain(t *testing.T) {
 		KeyType:   models.SecpAvaAddr,
 		PublicKey: "invalid-hex",
 	}
-	mockClient.EXPECT().GetKeyInOrg(keyID).Return(keyInfo, nil).Times(1)
-	_, err = NewCubesignerKeychain(mockClient, []string{keyID})
-	require.ErrorContains(err, "failed to decode public key")
+	mockClient.EXPECT().GetKeyInOrg(testKeyID).Return(keyInfo, nil).Times(1)
+	_, err = NewCubesignerKeychain(mockClient, []string{testKeyID})
+	require.ErrorIs(err, ErrInvalidPublicKey)
 
 	// good path - Avalanche address
 	mockClient = cubesignermock.NewCubeSignerClient(ctrl)
@@ -62,8 +62,8 @@ func TestNewCubesignerKeychain(t *testing.T) {
 		KeyType:   models.SecpAvaAddr,
 		PublicKey: "0x04" + "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
 	}
-	mockClient.EXPECT().GetKeyInOrg(keyID).Return(keyInfo, nil).Times(1)
-	kc, err := NewCubesignerKeychain(mockClient, []string{keyID})
+	mockClient.EXPECT().GetKeyInOrg(testKeyID).Return(keyInfo, nil).Times(1)
+	kc, err := NewCubesignerKeychain(mockClient, []string{testKeyID})
 	require.NoError(err)
 	require.NotNil(kc)
 
@@ -73,8 +73,8 @@ func TestNewCubesignerKeychain(t *testing.T) {
 		KeyType:   models.SecpEthAddr,
 		PublicKey: "0x04" + "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
 	}
-	mockClient.EXPECT().GetKeyInOrg(keyID).Return(keyInfo, nil).Times(1)
-	kc, err = NewCubesignerKeychain(mockClient, []string{keyID})
+	mockClient.EXPECT().GetKeyInOrg(testKeyID).Return(keyInfo, nil).Times(1)
+	kc, err = NewCubesignerKeychain(mockClient, []string{testKeyID})
 	require.NoError(err)
 	require.NotNil(kc)
 }
@@ -83,16 +83,15 @@ func TestCubesignerKeychain_Addresses(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	keyID := "test-key-id"
 	mockClient := cubesignermock.NewCubeSignerClient(ctrl)
 
 	keyInfo := &models.KeyInfo{
 		KeyType:   models.SecpAvaAddr,
 		PublicKey: "0x04" + "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
 	}
-	mockClient.EXPECT().GetKeyInOrg(keyID).Return(keyInfo, nil).Times(1)
+	mockClient.EXPECT().GetKeyInOrg(testKeyID).Return(keyInfo, nil).Times(1)
 
-	kc, err := NewCubesignerKeychain(mockClient, []string{keyID})
+	kc, err := NewCubesignerKeychain(mockClient, []string{testKeyID})
 	require.NoError(err)
 
 	addresses := kc.Addresses()
@@ -103,16 +102,15 @@ func TestCubesignerKeychain_Get(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	keyID := "test-key-id"
 	mockClient := cubesignermock.NewCubeSignerClient(ctrl)
 
 	keyInfo := &models.KeyInfo{
 		KeyType:   models.SecpAvaAddr,
 		PublicKey: "0x04" + "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
 	}
-	mockClient.EXPECT().GetKeyInOrg(keyID).Return(keyInfo, nil).Times(1)
+	mockClient.EXPECT().GetKeyInOrg(testKeyID).Return(keyInfo, nil).Times(1)
 
-	kc, err := NewCubesignerKeychain(mockClient, []string{keyID})
+	kc, err := NewCubesignerKeychain(mockClient, []string{testKeyID})
 	require.NoError(err)
 
 	addresses := kc.Addresses()
@@ -135,16 +133,15 @@ func TestCubesignerKeychain_EthAddresses(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	keyID := "test-key-id"
 	mockClient := cubesignermock.NewCubeSignerClient(ctrl)
 
 	keyInfo := &models.KeyInfo{
 		KeyType:   models.SecpEthAddr,
 		PublicKey: "0x04" + "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
 	}
-	mockClient.EXPECT().GetKeyInOrg(keyID).Return(keyInfo, nil).Times(1)
+	mockClient.EXPECT().GetKeyInOrg(testKeyID).Return(keyInfo, nil).Times(1)
 
-	kc, err := NewCubesignerKeychain(mockClient, []string{keyID})
+	kc, err := NewCubesignerKeychain(mockClient, []string{testKeyID})
 	require.NoError(err)
 
 	ethAddresses := kc.EthAddresses()
@@ -155,16 +152,15 @@ func TestCubesignerKeychain_GetEth(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	keyID := "test-key-id"
 	mockClient := cubesignermock.NewCubeSignerClient(ctrl)
 
 	keyInfo := &models.KeyInfo{
 		KeyType:   models.SecpEthAddr,
 		PublicKey: "0x04" + "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
 	}
-	mockClient.EXPECT().GetKeyInOrg(keyID).Return(keyInfo, nil).Times(1)
+	mockClient.EXPECT().GetKeyInOrg(testKeyID).Return(keyInfo, nil).Times(1)
 
-	kc, err := NewCubesignerKeychain(mockClient, []string{keyID})
+	kc, err := NewCubesignerKeychain(mockClient, []string{testKeyID})
 	require.NoError(err)
 
 	ethAddresses := kc.EthAddresses()
@@ -186,16 +182,15 @@ func TestCubesignerSigner_SignHash(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
-	keyID := "test-key-id"
 	mockClient := cubesignermock.NewCubeSignerClient(ctrl)
 
 	keyInfo := &models.KeyInfo{
 		KeyType:   models.SecpAvaAddr,
 		PublicKey: "0x04" + "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8",
 	}
-	mockClient.EXPECT().GetKeyInOrg(keyID).Return(keyInfo, nil).Times(1)
+	mockClient.EXPECT().GetKeyInOrg(testKeyID).Return(keyInfo, nil).Times(1)
 
-	kc, err := NewCubesignerKeychain(mockClient, []string{keyID})
+	kc, err := NewCubesignerKeychain(mockClient, []string{testKeyID})
 	require.NoError(err)
 
 	addresses := kc.Addresses()
@@ -211,14 +206,14 @@ func TestCubesignerSigner_SignHash(t *testing.T) {
 			Signature: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef01",
 		},
 	}
-	mockClient.EXPECT().BlobSign(keyID, gomock.Any()).Return(response, nil).Times(1)
+	mockClient.EXPECT().BlobSign(testKeyID, gomock.Any()).Return(response, nil).Times(1)
 
 	signature, err := signer.SignHash(hash)
 	require.NoError(err)
 	require.NotNil(signature)
 
 	// test client error
-	mockClient.EXPECT().BlobSign(keyID, gomock.Any()).Return(nil, errTest).Times(1)
+	mockClient.EXPECT().BlobSign(testKeyID, gomock.Any()).Return(nil, errTest).Times(1)
 	_, err = signer.SignHash(hash)
 	require.ErrorIs(err, errTest)
 
@@ -226,7 +221,7 @@ func TestCubesignerSigner_SignHash(t *testing.T) {
 	emptyResponse := &client.CubeSignerResponse[models.SignResponse]{
 		ResponseData: nil,
 	}
-	mockClient.EXPECT().BlobSign(keyID, gomock.Any()).Return(emptyResponse, nil).Times(1)
+	mockClient.EXPECT().BlobSign(testKeyID, gomock.Any()).Return(emptyResponse, nil).Times(1)
 	_, err = signer.SignHash(hash)
-	require.ErrorContains(err, "empty signature obtained from server")
+	require.ErrorIs(err, ErrEmptySignatureFromServer)
 }

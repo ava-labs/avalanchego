@@ -5,10 +5,10 @@ package keychain
 
 import (
 	"github.com/ava-labs/libevm/common"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
-
 
 // Signer implements functions for a keychain to return its main address and
 // to sign a hash or transaction
