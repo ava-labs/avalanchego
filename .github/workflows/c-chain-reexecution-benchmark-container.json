@@ -2,7 +2,7 @@
     "pull_request": {
         "include": [
             {
-                "runner": "avago-runner-m6i-4xlarge-ebs-fast",
+                "runner": "avago-runner-i4i-4xlarge-local-ssd",
                 "config": "default",
                 "start-block": 10000001,
                 "end-block": 12000000,
@@ -11,7 +11,7 @@
                 "timeout-minutes": 1440
             },
             {
-                "runner": "avago-runner-m6i-4xlarge-ebs-fast",
+                "runner": "avago-runner-i4i-4xlarge-local-ssd",
                 "config": "default",
                 "start-block": 20000001,
                 "end-block": 22000000,
@@ -20,16 +20,16 @@
                 "timeout-minutes": 1440
             },
             {
-                "runner": "avago-runner-m6i-4xlarge-ebs-fast",
+                "runner": "avago-runner-i4i-4xlarge-local-ssd",
                 "config": "default",
                 "start-block": 30000001,
-                "end-block": 31000000,
+                "end-block": 32000000,
                 "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-30m-40m-ldb/**",
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-30m/**",
                 "timeout-minutes": 1440
             },
             {
-                "runner": "avago-runner-m6i-4xlarge-ebs-fast",
+                "runner": "avago-runner-i4i-4xlarge-local-ssd",
                 "config": "default",
                 "start-block": 40000001,
                 "end-block": 42000000,
