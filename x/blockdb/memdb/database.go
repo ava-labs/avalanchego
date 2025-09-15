@@ -17,16 +17,16 @@ type Database struct {
 }
 
 // WriteBlock stores a block in memory
-func (m *Database) WriteBlock(height blockdb.BlockHeight, block blockdb.BlockData) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (d *Database) WriteBlock(height blockdb.BlockHeight, block blockdb.BlockData) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
-	if m.closed {
+	if d.closed {
 		return blockdb.ErrDatabaseClosed
 	}
 
-	if m.blocks == nil {
-		m.blocks = make(map[blockdb.BlockHeight]blockdb.BlockData)
+	if d.blocks == nil {
+		d.blocks = make(map[blockdb.BlockHeight]blockdb.BlockData)
 	}
 
 	if len(block) == 0 {
@@ -35,21 +35,21 @@ func (m *Database) WriteBlock(height blockdb.BlockHeight, block blockdb.BlockDat
 
 	blockCopy := make([]byte, len(block))
 	copy(blockCopy, block)
-	m.blocks[height] = blockCopy
+	d.blocks[height] = blockCopy
 
 	return nil
 }
 
 // ReadBlock retrieves the full block data for the given height
-func (m *Database) ReadBlock(height blockdb.BlockHeight) (blockdb.BlockData, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+func (d *Database) ReadBlock(height blockdb.BlockHeight) (blockdb.BlockData, error) {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 
-	if m.closed {
+	if d.closed {
 		return nil, blockdb.ErrDatabaseClosed
 	}
 
-	block, ok := m.blocks[height]
+	block, ok := d.blocks[height]
 	if !ok {
 		return nil, blockdb.ErrBlockNotFound
 	}
@@ -60,24 +60,24 @@ func (m *Database) ReadBlock(height blockdb.BlockHeight) (blockdb.BlockData, err
 }
 
 // HasBlock checks if a block exists at the given height
-func (m *Database) HasBlock(height blockdb.BlockHeight) (bool, error) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+func (d *Database) HasBlock(height blockdb.BlockHeight) (bool, error) {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
 
-	if m.closed {
+	if d.closed {
 		return false, blockdb.ErrDatabaseClosed
 	}
 
-	_, ok := m.blocks[height]
+	_, ok := d.blocks[height]
 	return ok, nil
 }
 
 // Close closes the in-memory database
-func (m *Database) Close() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (d *Database) Close() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
-	m.closed = true
-	m.blocks = nil
+	d.closed = true
+	d.blocks = nil
 	return nil
 }

@@ -20,18 +20,56 @@ func TestOperationsAfterCloseReturnError(t *testing.T) {
 	height := blockdb.BlockHeight(1)
 	blockData := blockdb.BlockData("test block data")
 
-	// All operations should fail after close
-	err := db.WriteBlock(height, blockData)
-	require.ErrorIs(t, err, blockdb.ErrDatabaseClosed)
+	tests := []struct {
+		name string
+		fn   func() error
+	}{
+		{
+			name: "WriteBlock",
+			fn: func() error {
+				return db.WriteBlock(height, blockData)
+			},
+		},
+		{
+			name: "ReadBlock",
+			fn: func() error {
+				_, err := db.ReadBlock(height)
+				return err
+			},
+		},
+		{
+			name: "HasBlock",
+			fn: func() error {
+				_, err := db.HasBlock(height)
+				return err
+			},
+		},
+	}
 
-	_, err = db.ReadBlock(height)
-	require.ErrorIs(t, err, blockdb.ErrDatabaseClosed)
-
-	_, err = db.HasBlock(height)
-	require.ErrorIs(t, err, blockdb.ErrDatabaseClosed)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.fn()
+			require.ErrorIs(t, err, blockdb.ErrDatabaseClosed)
+		})
+	}
 }
 
-func TestWriteReadAndHasBlock(t *testing.T) {
+func TestWriteAndReadBlock(t *testing.T) {
+	db := &Database{}
+
+	height := blockdb.BlockHeight(1)
+	blockData := blockdb.BlockData("test block data")
+
+	// Write block
+	require.NoError(t, db.WriteBlock(height, blockData))
+
+	// Read block back
+	retrievedBlock, err := db.ReadBlock(height)
+	require.NoError(t, err)
+	require.Equal(t, blockData, retrievedBlock)
+}
+
+func TestHasBlockForExistingBlock(t *testing.T) {
 	db := &Database{}
 
 	height := blockdb.BlockHeight(1)
@@ -44,15 +82,14 @@ func TestWriteReadAndHasBlock(t *testing.T) {
 	exists, err := db.HasBlock(height)
 	require.NoError(t, err)
 	require.True(t, exists)
+}
 
-	// Read block back
-	retrievedBlock, err := db.ReadBlock(height)
-	require.NoError(t, err)
-	require.Equal(t, blockData, retrievedBlock)
+func TestHasBlockForNonExistentBlock(t *testing.T) {
+	db := &Database{}
 
-	// Verify non-existent block
+	// Verify non-existent block returns false
 	nonExistentHeight := blockdb.BlockHeight(999)
-	exists, err = db.HasBlock(nonExistentHeight)
+	exists, err := db.HasBlock(nonExistentHeight)
 	require.NoError(t, err)
 	require.False(t, exists)
 }
