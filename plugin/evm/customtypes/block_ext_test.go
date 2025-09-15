@@ -17,6 +17,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/coreth/utils"
+
 	// TODO(arr4n) These tests were originally part of the `coreth/core/types`
 	// package so assume the presence of identifiers. A dot-import reduces PR
 	// noise during the refactoring.
@@ -312,33 +314,37 @@ func TestBlockGetters(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name               string
-		headerExtra        *HeaderExtra
-		blockExtra         *BlockBodyExtra
-		wantExtDataGasUsed *big.Int
-		wantBlockGasCost   *big.Int
-		wantVersion        uint32
-		wantExtData        []byte
+		name                 string
+		headerExtra          *HeaderExtra
+		blockExtra           *BlockBodyExtra
+		wantExtDataGasUsed   *big.Int
+		wantBlockGasCost     *big.Int
+		wantVersion          uint32
+		wantExtData          []byte
+		wantTimeMilliseconds *uint64
 	}{
 		{
-			name:        "empty",
-			headerExtra: &HeaderExtra{},
-			blockExtra:  &BlockBodyExtra{},
+			name:                 "empty",
+			headerExtra:          &HeaderExtra{},
+			blockExtra:           &BlockBodyExtra{},
+			wantTimeMilliseconds: nil,
 		},
 		{
 			name: "fields_set",
 			headerExtra: &HeaderExtra{
-				ExtDataGasUsed: big.NewInt(1),
-				BlockGasCost:   big.NewInt(2),
+				ExtDataGasUsed:   big.NewInt(1),
+				BlockGasCost:     big.NewInt(2),
+				TimeMilliseconds: utils.NewUint64(3),
 			},
 			blockExtra: &BlockBodyExtra{
 				Version: 3,
 				ExtData: &[]byte{4},
 			},
-			wantExtDataGasUsed: big.NewInt(1),
-			wantBlockGasCost:   big.NewInt(2),
-			wantVersion:        3,
-			wantExtData:        []byte{4},
+			wantExtDataGasUsed:   big.NewInt(1),
+			wantBlockGasCost:     big.NewInt(2),
+			wantVersion:          3,
+			wantExtData:          []byte{4},
+			wantTimeMilliseconds: utils.NewUint64(3),
 		},
 	}
 
@@ -362,6 +368,9 @@ func TestBlockGetters(t *testing.T) {
 
 			blockGasCost := BlockGasCost(block)
 			assert.Equal(t, test.wantBlockGasCost, blockGasCost, "BlockGasCost()")
+
+			timeMilliseconds := BlockTimeMilliseconds(block)
+			assert.Equal(t, test.wantTimeMilliseconds, timeMilliseconds, "BlockTimeMilliseconds()")
 		})
 	}
 }

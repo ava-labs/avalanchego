@@ -80,6 +80,7 @@ func TestBlockEncoding(t *testing.T) {
 	check("BaseFee", block.BaseFee(), (*big.Int)(nil))
 	check("ExtDataGasUsed", BlockExtDataGasUsed(&block), (*big.Int)(nil))
 	check("BlockGasCost", BlockGasCost(&block), (*big.Int)(nil))
+	check("TimeMilliseconds", BlockTimeMilliseconds(&block), (*uint64)(nil))
 
 	check("Size", block.Size(), uint64(len(blockEnc)))
 	check("BlockHash", block.Hash(), common.HexToHash("0608e5d5e13c337f226b621a0b08b3d50470f1961329826fd59f5a241d1df49e"))
@@ -122,6 +123,7 @@ func TestEIP1559BlockEncoding(t *testing.T) {
 	check("BaseFee", block.BaseFee(), new(big.Int).SetUint64(1_000_000_000))
 	check("ExtDataGasUsed", BlockExtDataGasUsed(&block), (*big.Int)(nil))
 	check("BlockGasCost", BlockGasCost(&block), (*big.Int)(nil))
+	check("TimeMilliseconds", BlockTimeMilliseconds(&block), (*uint64)(nil))
 
 	tx1 := types.NewTransaction(0, common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"), big.NewInt(10), 50000, big.NewInt(10), nil)
 	tx1, _ = tx1.WithSignature(types.HomesteadSigner{}, common.Hex2Bytes("9bea4c4daac7c7c52e093e6a4c35dbbcf8856f1af7b059ba20253e70848d094f8a8fae537ce25ed8cb5af9adac3f141af69bd515bd2ba031522df09b97dd72b100"))
@@ -188,6 +190,7 @@ func TestEIP2718BlockEncoding(t *testing.T) {
 	check("BaseFee", block.BaseFee(), (*big.Int)(nil))
 	check("ExtDataGasUsed", BlockExtDataGasUsed(&block), (*big.Int)(nil))
 	check("BlockGasCost", BlockGasCost(&block), (*big.Int)(nil))
+	check("TimeMilliseconds", BlockTimeMilliseconds(&block), (*uint64)(nil))
 
 	// Create legacy tx.
 	to := common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87")
@@ -263,6 +266,7 @@ func TestBlockEncodingWithExtraData(t *testing.T) {
 	check("BaseFee", block.BaseFee(), (*big.Int)(nil))
 	check("ExtDataGasUsed", BlockExtDataGasUsed(&block), (*big.Int)(nil))
 	check("BlockGasCost", BlockGasCost(&block), (*big.Int)(nil))
+	check("TimeMilliseconds", BlockTimeMilliseconds(&block), (*uint64)(nil))
 
 	check("Size", block.Size(), uint64(len(blockEnc)))
 	check("BlockHash", block.Hash(), common.HexToHash("4504ee98a94d16dbd70a35370501a3cb00c2965b012672085fbd328a72962902"))
@@ -374,6 +378,7 @@ func TestAP4BlockEncoding(t *testing.T) {
 	check("BaseFee", block.BaseFee(), big.NewInt(1_000_000_000))
 	check("ExtDataGasUsed", BlockExtDataGasUsed(&block), big.NewInt(25_000))
 	check("BlockGasCost", BlockGasCost(&block), big.NewInt(1_000_000))
+	check("TimeMilliseconds", BlockTimeMilliseconds(&block), (*uint64)(nil))
 
 	tx1 := types.NewTransaction(0, common.HexToAddress("095e7baea6a6c7c4c2dfeb977efac326af552d87"), big.NewInt(10), 50000, big.NewInt(10), nil)
 	tx1, _ = tx1.WithSignature(types.HomesteadSigner{}, common.Hex2Bytes("9bea4c4daac7c7c52e093e6a4c35dbbcf8856f1af7b059ba20253e70848d094f8a8fae537ce25ed8cb5af9adac3f141af69bd515bd2ba031522df09b97dd72b100"))
