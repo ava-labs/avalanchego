@@ -15,7 +15,6 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
@@ -102,10 +101,6 @@ var (
 )
 
 const (
-	// Max time from current time allowed for blocks, before they're considered future blocks
-	// and fail verification
-	maxFutureBlockTime = 10 * time.Second
-
 	secpCacheSize          = 1024
 	decidedCacheSize       = 10 * units.MiB
 	missingCacheSize       = 50
