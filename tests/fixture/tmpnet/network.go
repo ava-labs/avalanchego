@@ -1113,3 +1113,15 @@ func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string)
 		endTime,
 	)
 }
+
+// GetGitHubLabels returns a map of GitHub labels and their values if available.
+func GetGitHubLabels() map[string]string {
+	labels := map[string]string{}
+	for _, label := range githubLabels {
+		value := os.Getenv(strings.ToUpper(label))
+		if len(value) > 0 {
+			labels[label] = value
+		}
+	}
+	return labels
+}
