@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package wallet
@@ -611,7 +611,7 @@ func (w *wallet) IssueUnsignedTx(
 ) (*txs.Tx, error) {
 	ops := common.NewOptions(options)
 	ctx := ops.Context()
-	tx, err := walletsigner.SignUnsigned(ctx, w.signer, utx)
+	tx, err := walletsigner.SignUnsigned(ctx, w.signer, utx, options...)
 	if err != nil {
 		return nil, err
 	}

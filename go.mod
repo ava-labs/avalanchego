@@ -68,7 +68,7 @@ require (
 	golang.org/x/net v0.38.0
 	golang.org/x/sync v0.12.0
 	golang.org/x/term v0.30.0
-	golang.org/x/time v0.3.0
+	golang.org/x/time v0.5.0
 	golang.org/x/tools v0.29.0
 	gonum.org/v1/gonum v0.11.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240827150818-7e3bb234dfed
@@ -80,6 +80,26 @@ require (
 	k8s.io/apimachinery v0.29.0
 	k8s.io/client-go v0.29.0
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
+)
+
+require (
+	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.36.2 // indirect
+	github.com/aws/aws-sdk-go-v2/config v1.29.7 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.17.60 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.29 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.33 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.33 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.14 // indirect
+	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.34.19 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.24.16 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.28.15 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.33.15 // indirect
+	github.com/aws/smithy-go v1.22.2 // indirect
+	github.com/cubist-labs/cubesigner-go-sdk v0.0.16
+	github.com/oapi-codegen/runtime v1.1.1 // indirect
 )
 
 require (
@@ -150,7 +170,7 @@ require (
 	github.com/magiconair/properties v1.8.6 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.17 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/mattn/go-shellwords v1.0.12 // indirect
 	github.com/mitchellh/pointerstructure v1.2.0 // indirect
@@ -163,7 +183,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
-	github.com/pelletier/go-toml/v2 v2.0.5 // indirect
+	github.com/pelletier/go-toml/v2 v2.0.9 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package secp256k1fx
@@ -22,6 +22,7 @@ var (
 	errCantSpend = errors.New("unable to spend this UTXO")
 
 	_ keychain.Keychain = (*Keychain)(nil)
+	_ keychain.EthKeychain = (*Keychain)(nil)
 )
 
 // Keychain is a collection of keys that can be used to spend outputs

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package ledger
@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/version"
 
@@ -21,7 +20,6 @@ const (
 	ledgerPathSize    = 9
 )
 
-var _ keychain.Ledger = (*Ledger)(nil)
 
 // Ledger is a wrapper around the low-level Ledger Device interface that
 // provides Avalanche-specific access.
@@ -30,7 +28,7 @@ type Ledger struct {
 	epk    *bip32.Key
 }
 
-func New() (keychain.Ledger, error) {
+func New() (*Ledger, error) {
 	device, err := ledger.FindLedgerAvalancheApp()
 	return &Ledger{
 		device: device,

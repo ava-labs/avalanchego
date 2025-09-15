@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package primary
@@ -82,7 +82,7 @@ func MakeWallet(
 	ctx context.Context,
 	uri string,
 	avaxKeychain keychain.Keychain,
-	ethKeychain c.EthKeychain,
+	ethKeychain keychain.EthKeychain,
 	config WalletConfig,
 ) (*Wallet, error) {
 	avaxAddrs := avaxKeychain.Addresses()
@@ -106,13 +106,13 @@ func MakeWallet(
 	pBackend := pwallet.NewBackend(pUTXOs, owners)
 	pClient := p.NewClient(avaxState.PClient, pBackend)
 	pBuilder := pbuilder.New(avaxAddrs, avaxState.PCTX, pBackend)
-	pSigner := psigner.New(avaxKeychain, pBackend)
+	pSigner := psigner.New(avaxKeychain, pBackend, avaxState.PCTX.NetworkID)
 
 	xChainID := avaxState.XCTX.BlockchainID
 	xUTXOs := common.NewChainUTXOs(xChainID, avaxState.UTXOs)
 	xBackend := x.NewBackend(avaxState.XCTX, xUTXOs)
 	xBuilder := xbuilder.New(avaxAddrs, avaxState.XCTX, xBackend)
-	xSigner := xsigner.New(avaxKeychain, xBackend)
+	xSigner := xsigner.New(avaxKeychain, xBackend, avaxState.XCTX.NetworkID)
 
 	cChainID := avaxState.CCTX.BlockchainID
 	cUTXOs := common.NewChainUTXOs(cChainID, avaxState.UTXOs)
@@ -157,6 +157,6 @@ func MakePWallet(
 	pBackend := pwallet.NewBackend(pUTXOs, owners)
 	pClient := p.NewClient(client, pBackend)
 	pBuilder := pbuilder.New(addrs, context, pBackend)
-	pSigner := psigner.New(keychain, pBackend)
+	pSigner := psigner.New(keychain, pBackend, context.NetworkID)
 	return pwallet.New(pClient, pBuilder, pSigner), nil
 }
