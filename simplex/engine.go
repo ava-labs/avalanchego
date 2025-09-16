@@ -241,7 +241,7 @@ func (*Engine) Gossip(_ context.Context) error {
 	return nil
 }
 
-func (e *Engine) Notify(_ context.Context, _ common.Message) error {
+func (*Engine) Notify(_ context.Context, _ common.Message) error {
 	return nil
 }
 

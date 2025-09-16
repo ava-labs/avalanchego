@@ -680,7 +680,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		node.Flags[config.TrackSubnetsKey] = trackedSubnets
 		reconfiguredNodes = append(reconfiguredNodes, node)
 	}
-	
+
 	restartRequired := restartRequired(createdSubnets)
 	if restartRequired {
 		log.Info("restarting node(s) to enable them to track the new subnet(s)")

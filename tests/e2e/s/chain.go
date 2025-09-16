@@ -101,7 +101,7 @@ var _ = e2e.DescribeSimplex("Create a Simplex [L1]", func() {
 	})
 })
 
-// Builds and proposes a new block by issuing a transfer transaction from the leader of the next round.  
+// Builds and proposes a new block by issuing a transfer transaction from the leader of the next round.
 // Verifies that all nodes have accepted the block and advanced to the next round.
 func buildBlock(tc *e2e.GinkgoTestContext, chain *tmpnet.Chain, nodes []*tmpnet.Node) {
 	require := require.New(tc)
