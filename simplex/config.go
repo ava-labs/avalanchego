@@ -13,11 +13,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-type KeyValueReaderWriter interface {
-	Get(key []byte) ([]byte, error)
-	Put(key []byte, value []byte) error
-}
-
 // Config wraps all the parameters needed for a simplex engine
 type Config struct {
 	Ctx SimplexChainContext

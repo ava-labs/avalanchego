@@ -24,41 +24,43 @@ type BlockBuilder struct {
 // BuildBlock continuously tries to build a block until the context is cancelled. If there are no blocks to be built, it will wait for an event from the VM.
 // It returns false if the context was cancelled, otherwise it returns the built block and true.
 func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.ProtocolMetadata) (simplex.VerifiedBlock, bool) {
-	curWait := 10 * time.Millisecond
-	maxBackoff := 5 * time.Second
+	const (
+		maxBackoff  = 5 * time.Second
+		initBackoff = 10 * time.Millisecond
+	)
 
-	for {
-		select {
-		case <-ctx.Done():
-			b.log.Debug("Context cancelled, stopping block building")
+	for curWait := initBackoff; ; curWait = backoff(ctx, curWait, maxBackoff) {
+		if ctx.Err() != nil {
+			b.log.Debug("Context cancelled, stopping block building", zap.Error(ctx.Err()))
 			return nil, false
-		default:
-			err := b.incomingBlock(ctx)
-			if err != nil {
-				b.log.Debug("Error waiting for incoming block", zap.Error(err))
-				curWait = backoff(ctx, curWait, maxBackoff)
-				continue
-			}
-			vmBlock, err := b.vm.BuildBlock(ctx)
-			if err != nil {
-				b.log.Info("Error building block", zap.Error(err))
-				curWait = backoff(ctx, curWait, maxBackoff)
-				continue
-			}
-			simplexBlock, err := newBlock(metadata, vmBlock, b.blockTracker)
-			if err != nil {
-				return nil, false
-			}
-			curWait = 10 * time.Millisecond // Reset backoff after a successful block build
-			verifiedBlock, err := simplexBlock.Verify(ctx)
-			if err != nil {
-				b.log.Warn("Error verifying block we built ourselves", zap.Error(err))
-				curWait = backoff(ctx, curWait, maxBackoff)
-				continue
-			}
-
-			return verifiedBlock, true
 		}
+
+		err := b.incomingBlock(ctx)
+		if err != nil {
+			b.log.Debug("Error waiting for incoming block", zap.Error(err))
+			curWait = backoff(ctx, curWait, maxBackoff)
+			continue
+		}
+		vmBlock, err := b.vm.BuildBlock(ctx)
+		if err != nil {
+			b.log.Info("Error building block", zap.Error(err))
+			curWait = backoff(ctx, curWait, maxBackoff)
+			continue
+		}
+		simplexBlock, err := newBlock(metadata, vmBlock, b.blockTracker)
+		if err != nil {
+			b.log.Error("Error creating simplex block from built block", zap.Error(err))
+			return nil, false
+		}
+		curWait = initBackoff // Reset backoff after a successful block build
+		verifiedBlock, err := simplexBlock.Verify(ctx)
+		if err != nil {
+			b.log.Warn("Error verifying block we built ourselves", zap.Error(err))
+			curWait = backoff(ctx, curWait, maxBackoff)
+			continue
+		}
+
+		return verifiedBlock, true
 	}
 }
 
@@ -80,7 +82,7 @@ func (b *BlockBuilder) incomingBlock(ctx context.Context) error {
 		if msg == common.PendingTxs {
 			return nil
 		}
-		b.log.Info("Received unexpected message", zap.String("message", msg.String()))
+		b.log.Warn("Received unexpected message", zap.Stringer("message", msg))
 	}
 }
 
@@ -93,9 +95,5 @@ func backoff(ctx context.Context, backoff, maxBackoff time.Duration) time.Durati
 	case <-time.After(backoff):
 	}
 
-	backoff *= 2 // Exponential backoff
-	if backoff > maxBackoff {
-		backoff = maxBackoff
-	}
-	return backoff
+	return min(maxBackoff, 2*backoff) // exponential backoff
 }
