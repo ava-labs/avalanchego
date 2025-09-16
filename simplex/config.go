@@ -4,6 +4,8 @@
 package simplex
 
 import (
+	"github.com/ava-labs/simplex"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/message"
@@ -12,11 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
-
-type KeyValueReaderWriter interface {
-	Get(key []byte) ([]byte, error)
-	Put(key []byte, value []byte) error
-}
 
 // Config wraps all the parameters needed for a simplex engine
 type Config struct {
@@ -34,6 +31,10 @@ type Config struct {
 	VM block.ChainVM
 
 	DB database.KeyValueReaderWriter
+
+	// The file location where simplex will store its WAL.
+	WAL simplex.WriteAheadLog
+
 	// SignBLS is the signing function used for this node to sign messages.
 	SignBLS SignFunc
 }

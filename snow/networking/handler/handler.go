@@ -249,8 +249,10 @@ func (h *handler) Start(ctx context.Context, recoverPanic bool) {
 		return
 	}
 
-	h.nf = common.NewNotificationForwarder(h, h.subscription, h.ctx.Log)
-	h.cn.OnChange = h.nf.CheckForEvent
+	if h.cn != nil {
+		h.nf = common.NewNotificationForwarder(h, h.subscription, h.ctx.Log)
+		h.cn.OnChange = h.nf.CheckForEvent
+	}
 
 	h.ctx.Lock.Lock()
 	err = gear.Start(ctx, 0)
@@ -742,7 +744,8 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 			zap.String("messageOp", op),
 			zap.Stringer("message", body),
 		)
-		return nil
+
+		return engine.SimplexMessage(ctx, nodeID, msg)
 	// Connection messages can be sent to the currently executing engine
 	case *message.Connected:
 		err := h.peerTracker.Connected(ctx, nodeID, msg.NodeVersion)
