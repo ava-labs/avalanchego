@@ -9,7 +9,6 @@ type KeyValuePairs = Vec<(Box<[u8]>, Box<[u8]>)>;
 #[test]
 // Tests that missing keys can also be proven. The test explicitly uses a single
 // entry trie and checks for missing keys both before and after the single entry.
-#[ignore = "https://github.com/ava-labs/firewood/issues/738"]
 fn test_missing_key_proof() {
     let items = [("k", "v")];
     let merkle = init_merkle(items);

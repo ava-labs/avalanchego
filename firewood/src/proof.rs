@@ -230,7 +230,7 @@ impl<T: ProofCollection + ?Sized> Proof<T> {
             }
         }
 
-        if last_node.full_path().count() == key.len() {
+        if last_node.full_path().eq(key.iter().copied()) {
             return Ok(last_node.value_digest());
         }
 
