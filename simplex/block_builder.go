@@ -21,15 +21,14 @@ type BlockBuilder struct {
 	blockTracker *blockTracker
 }
 
+const maxBackoff = 5 * time.Second
+
 // BuildBlock continuously tries to build a block until the context is cancelled. If there are no blocks to be built, it will wait for an event from the VM.
 // It returns false if the context was cancelled, otherwise it returns the built block and true.
 func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.ProtocolMetadata) (simplex.VerifiedBlock, bool) {
-	const (
-		maxBackoff  = 5 * time.Second
-		initBackoff = 10 * time.Millisecond
-	)
+	const initBackoff = 10 * time.Millisecond
 
-	for curWait := initBackoff; ; curWait = backoff(ctx, curWait, maxBackoff) {
+	for curWait := initBackoff; ; curWait = backoff(ctx, curWait) {
 		if ctx.Err() != nil {
 			b.log.Debug("Context cancelled, stopping block building", zap.Error(ctx.Err()))
 			return nil, false
@@ -38,13 +37,13 @@ func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.Protocol
 		err := b.incomingBlock(ctx)
 		if err != nil {
 			b.log.Debug("Error waiting for incoming block", zap.Error(err))
-			curWait = backoff(ctx, curWait, maxBackoff)
+			curWait = backoff(ctx, curWait)
 			continue
 		}
 		vmBlock, err := b.vm.BuildBlock(ctx)
 		if err != nil {
 			b.log.Info("Error building block", zap.Error(err))
-			curWait = backoff(ctx, curWait, maxBackoff)
+			curWait = backoff(ctx, curWait)
 			continue
 		}
 		simplexBlock, err := newBlock(metadata, vmBlock, b.blockTracker)
@@ -56,7 +55,7 @@ func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.Protocol
 		verifiedBlock, err := simplexBlock.Verify(ctx)
 		if err != nil {
 			b.log.Warn("Error verifying block we built ourselves", zap.Error(err))
-			curWait = backoff(ctx, curWait, maxBackoff)
+			curWait = backoff(ctx, curWait)
 			continue
 		}
 
@@ -88,7 +87,7 @@ func (b *BlockBuilder) incomingBlock(ctx context.Context) error {
 
 // backoff waits for `backoff` duration before returning the next backoff duration.
 // It doubles the backoff duration each time it is called, up to a maximum of `maxBackoff`.
-func backoff(ctx context.Context, backoff, maxBackoff time.Duration) time.Duration {
+func backoff(ctx context.Context, backoff time.Duration) time.Duration {
 	select {
 	case <-ctx.Done():
 		return 0
