@@ -366,14 +366,6 @@ Staking economics configuration.
 | `--stake-min-consumption-rate` | `AVAGO_STAKE_MIN_CONSUMPTION_RATE` | uint | `100000` | The minimum percentage of the consumption rate for the remaining token supply in the minting period, which is 1 year on Mainnet. This can only be changed on a local network. |
 | `--stake-supply-cap` | `AVAGO_STAKE_SUPPLY_CAP` | uint | `720000000000000000` | The maximum stake supply, in nAVAX, that can be placed on a validator. This can only be changed on a local network. |
 
-### Simplex Consensus
-
-Simplex consensus protocol parameters
-
-| Flag | Env Var | Type | Default | Description |
-|--------|--------|------|----|--------------------|
-| `--simplex-enabled` | `AVAGO_SIMPLEX_ENABLED` | bool | `false` | If true, enables simplex consensus.
-
 ### Snow Consensus
 
 Snow consensus protocol parameters.
