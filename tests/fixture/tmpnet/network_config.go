@@ -154,6 +154,7 @@ func (n *Network) readConfig() error {
 type serializedNetworkConfig struct {
 	UUID                 string                  `json:"uuid,omitempty"`
 	Owner                string                  `json:"owner,omitempty"`
+	NetworkID            uint32                  `json:"networkID,omitempty"`
 	PrimarySubnetConfig  ConfigMap               `json:"primarySubnetConfig,omitempty"`
 	PrimaryChainConfigs  map[string]ConfigMap    `json:"primaryChainConfigs,omitempty"`
 	DefaultFlags         FlagsMap                `json:"defaultFlags,omitempty"`
@@ -165,6 +166,7 @@ func (n *Network) writeNetworkConfig() error {
 	config := &serializedNetworkConfig{
 		UUID:                 n.UUID,
 		Owner:                n.Owner,
+		NetworkID:            n.NetworkID,
 		PrimarySubnetConfig:  n.PrimarySubnetConfig,
 		PrimaryChainConfigs:  n.PrimaryChainConfigs,
 		DefaultFlags:         n.DefaultFlags,
