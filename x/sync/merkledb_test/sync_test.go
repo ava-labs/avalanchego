@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"math/rand"
+	"path/filepath"
 	"slices"
 	"sync"
 	"testing"
@@ -23,11 +24,51 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/x/merkledb"
+	"github.com/ava-labs/avalanchego/x/sync/firewood"
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
 var _ p2p.Handler = (*waitingHandler)(nil)
+
+func Test_Firewood_Creation(t *testing.T) {
+	require := require.New(t)
+
+	folder := t.TempDir()
+	path := filepath.Join(folder, "firewood.db")
+
+	db, err := ffi.New(path, ffi.DefaultConfig())
+	require.NoError(err)
+	t.Cleanup(func() {
+		require.NoError(db.Close())
+	})
+
+	wrappedDB := firewood.New(db)
+	originalRoot, err := db.Update([][]byte{[]byte{0x10}}, [][]byte{[]byte{0x10}})
+	require.NoError(err)
+
+	ctx := context.Background()
+	root, err := wrappedDB.GetMerkleRoot(ctx)
+	require.NoError(err)
+	require.Equal(originalRoot[:], root[:])
+
+	syncer, err := xsync.NewManager(
+		wrappedDB,
+		xsync.ManagerConfig{
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(wrappedDB)),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(wrappedDB)),
+			SimultaneousWorkLimit: 5,
+			Log:                   logging.NoLog{},
+			TargetRoot:            root,
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+	require.NotNil(syncer)
+	require.NoError(syncer.Start(ctx))
+	require.NoError(syncer.Wait(ctx))
+}
 
 func Test_Creation(t *testing.T) {
 	require := require.New(t)
