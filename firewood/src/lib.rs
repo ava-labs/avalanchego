@@ -15,7 +15,7 @@
 //! a very fast storage layer for the EVM but could be used on any blockchain that
 //! requires authenticated state.
 //!
-//! Firewood only attempts to store recent revisions on-disk and will actively clean up
+//! Firewood only attempts to support queries from recent revisions and will actively clean up
 //! unused older revisions when state diffs are committed. The number of revisions is
 //! configured when the database is opened.
 //!
@@ -67,7 +67,7 @@
 //!   the state of the nodestore, and a storage type.
 //!
 //!   There are three states for a nodestore:
-//!    - [`firewood_storage::Committed`] for revisions that are on disk
+//!    - [`firewood_storage::Committed`] for revisions that are committed
 //!    - [`firewood_storage::ImmutableProposal`] for revisions that are proposals against committed versions
 //!    - [`firewood_storage::MutableProposal`] for revisions where nodes are still being added.
 //!
@@ -96,16 +96,12 @@
 //! - If you delete a node, mark it as deleted in the proposal and remove the child reference to it.
 //!
 //! - After making all mutations, convert the [`firewood_storage::MutableProposal`] to an [`firewood_storage::ImmutableProposal`]. This
-//!   involves walking the in-memory trie and looking for nodes without disk addresses, then assigning
-//!   them from the freelist of the parent. This gives the node an address, but it is stil in
-//!   memory.
+//!   involves walking the in-memory trie and converting them to a [`firewood_storage::SharedNode`].
 //!
 //! - Since the root is guaranteed to be new, the new root will reference all of the new revision.
 //!
-//! A commit involves simply writing the nodes and the freelist to disk. If the proposal is
-//! abandoned, nothing has actually been written to disk.
+//! A commit involves allocating space for the nmodes and writing them as well as the freelist to disk.
 //!
-#![warn(missing_debug_implementations, rust_2018_idioms, missing_docs)]
 // Instead of using a `compile_error!`, cause clippy to hard fail if the target is not 64-bit. This
 // is a workaround for the fact that the `clippy::cast_possible_truncation` lint does not delineate
 // between 64-bit and non-64-bit targets with respect to `usize -> u64` casts and vice versa which

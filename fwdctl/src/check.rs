@@ -16,7 +16,7 @@ use num_format::{Locale, ToFormattedString};
 use crate::DatabasePath;
 
 // TODO: (optionally) add a fix option
-#[derive(Args)]
+#[derive(Args, Debug)]
 pub struct Options {
     #[command(flatten)]
     pub database: DatabasePath,

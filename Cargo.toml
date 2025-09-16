@@ -31,6 +31,7 @@ inherits = "release"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
+missing_debug_implementations = "warn"
 
 [workspace.lints.clippy]
 unwrap_used = "warn"

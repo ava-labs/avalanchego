@@ -5,6 +5,7 @@ use crate::BorrowedBytes;
 
 /// Arguments for initializing logging for the Firewood FFI.
 #[repr(C)]
+#[derive(Debug)]
 pub struct LogArgs<'a> {
     /// The file path where logs for this process are stored.
     ///
