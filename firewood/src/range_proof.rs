@@ -93,4 +93,159 @@ where
     pub fn is_empty(&self) -> bool {
         self.start_proof.is_empty() && self.end_proof.is_empty() && self.key_values.is_empty()
     }
+
+    /// Returns an iterator over the key-value pairs in this range proof.
+    ///
+    /// The iterator yields references to the key-value pairs in the order they
+    /// appear in the proof (which should be lexicographic order as they appear
+    /// in the trie).
+    #[must_use]
+    pub fn iter(&self) -> RangeProofIter<'_, K, V> {
+        RangeProofIter(self.key_values.iter())
+    }
+}
+
+/// An iterator over the key-value pairs in a [`RangeProof`].
+///
+/// This iterator yields references to the key-value pairs contained within
+/// the range proof in the order they appear (lexicographic order).
+#[derive(Debug)]
+pub struct RangeProofIter<'a, K, V>(std::slice::Iter<'a, (K, V)>);
+
+impl<'a, K, V> Iterator for RangeProofIter<'a, K, V> {
+    type Item = &'a (K, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
+}
+
+impl<K, V> ExactSizeIterator for RangeProofIter<'_, K, V> {}
+
+impl<K, V> std::iter::FusedIterator for RangeProofIter<'_, K, V> {}
+
+impl<'a, K, V, H> IntoIterator for &'a RangeProof<K, V, H>
+where
+    K: AsRef<[u8]>,
+    V: AsRef<[u8]>,
+    H: ProofCollection,
+{
+    type Item = &'a (K, V);
+    type IntoIter = RangeProofIter<'a, K, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![expect(clippy::unwrap_used, reason = "Tests can use unwrap")]
+    #![expect(clippy::indexing_slicing, reason = "Tests can use indexing")]
+
+    use super::*;
+    use crate::v2::api::KeyValuePairIter;
+
+    #[test]
+    fn test_range_proof_iterator() {
+        // Create test data
+        let key_values: Box<[(Vec<u8>, Vec<u8>)]> = Box::new([
+            (b"key1".to_vec(), b"value1".to_vec()),
+            (b"key2".to_vec(), b"value2".to_vec()),
+            (b"key3".to_vec(), b"value3".to_vec()),
+        ]);
+
+        // Create empty proofs for testing
+        let start_proof = Proof::empty();
+        let end_proof = Proof::empty();
+
+        let range_proof = RangeProof::new(start_proof, end_proof, key_values);
+
+        // Test basic iterator functionality
+        let mut iter = range_proof.iter();
+        assert_eq!(iter.len(), 3);
+
+        let first = iter.next().unwrap();
+        assert_eq!(first.0, b"key1");
+        assert_eq!(first.1, b"value1");
+
+        let second = iter.next().unwrap();
+        assert_eq!(second.0, b"key2");
+        assert_eq!(second.1, b"value2");
+
+        let third = iter.next().unwrap();
+        assert_eq!(third.0, b"key3");
+        assert_eq!(third.1, b"value3");
+
+        assert!(iter.next().is_none());
+    }
+
+    #[test]
+    fn test_range_proof_into_iterator() {
+        let key_values: Box<[(Vec<u8>, Vec<u8>)]> = Box::new([
+            (b"a".to_vec(), b"alpha".to_vec()),
+            (b"b".to_vec(), b"beta".to_vec()),
+        ]);
+
+        let start_proof = Proof::empty();
+        let end_proof = Proof::empty();
+        let range_proof = RangeProof::new(start_proof, end_proof, key_values);
+
+        // Test that we can use for-loop syntax
+        let mut items = Vec::new();
+        for item in &range_proof {
+            items.push(item);
+        }
+
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].0, b"a");
+        assert_eq!(items[0].1, b"alpha");
+        assert_eq!(items[1].0, b"b");
+        assert_eq!(items[1].1, b"beta");
+    }
+
+    #[test]
+    fn test_keyvaluepair_iter_trait() {
+        let key_values: Box<[(Vec<u8>, Vec<u8>)]> =
+            Box::new([(b"test".to_vec(), b"data".to_vec())]);
+
+        let start_proof = Proof::empty();
+        let end_proof = Proof::empty();
+        let range_proof = RangeProof::new(start_proof, end_proof, key_values);
+
+        // Test that our iterator implements KeyValuePairIter
+        let iter = range_proof.iter();
+
+        // Verify we can call methods from KeyValuePairIter
+        let batch_iter = iter.map_into_batch();
+        let batches: Vec<_> = batch_iter.collect();
+
+        assert_eq!(batches.len(), 1);
+        // The batch should be a Put operation since value is non-empty
+        if let crate::v2::api::BatchOp::Put { key, value } = &batches[0] {
+            assert_eq!(key.as_ref() as &[u8], b"test");
+            assert_eq!(value.as_ref() as &[u8], b"data");
+        } else {
+            panic!("Expected Put operation");
+        }
+    }
+
+    #[test]
+    fn test_empty_range_proof_iterator() {
+        let key_values: Box<[(Vec<u8>, Vec<u8>)]> = Box::new([]);
+        let start_proof = Proof::empty();
+        let end_proof = Proof::empty();
+        let range_proof = RangeProof::new(start_proof, end_proof, key_values);
+
+        let mut iter = range_proof.iter();
+        assert_eq!(iter.len(), 0);
+        assert!(iter.next().is_none());
+
+        let items: Vec<_> = range_proof.into_iter().collect();
+        assert!(items.is_empty());
+    }
 }
