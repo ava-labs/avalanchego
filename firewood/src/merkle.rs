@@ -166,8 +166,11 @@ impl<T: TrieReader> Merkle<T> {
             };
 
             proof.push(ProofNode {
-                key: root.partial_path().bytes(),
-                partial_len: root.partial_path().0.len(),
+                // key is expected to be in nibbles
+                key: root.partial_path().iter().copied().collect(),
+                // partial len is the number of nibbles in the path leading to this node,
+                // which is always zero for the root node.
+                partial_len: 0,
                 value_digest: root
                     .value()
                     .map(|value| ValueDigest::Value(value.to_vec().into_boxed_slice())),

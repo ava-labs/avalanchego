@@ -138,12 +138,6 @@ impl Path {
             nibbles_iter: self.iter(),
         }
     }
-
-    /// Create a boxed set of bytes from the Path
-    #[must_use]
-    pub fn bytes(&self) -> Box<[u8]> {
-        self.bytes_iter().collect()
-    }
 }
 
 /// Returns the nibbles in `nibbles_iter` as compressed bytes.
