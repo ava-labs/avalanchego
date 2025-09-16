@@ -127,5 +127,9 @@ func RegisterEtnaTypes(targetCodec linearcodec.Codec) error {
 		targetCodec.RegisterType(&SetL1ValidatorWeightTx{}),
 		targetCodec.RegisterType(&IncreaseL1ValidatorBalanceTx{}),
 		targetCodec.RegisterType(&DisableL1ValidatorTx{}),
+
+		// todo: mode
+		targetCodec.RegisterType(&AddContinuousValidatorTx{}),
+		targetCodec.RegisterType(&StopContinuousValidatorTx{}),
 	)
 }

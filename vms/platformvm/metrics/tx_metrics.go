@@ -173,3 +173,17 @@ func (m *txMetrics) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
 	}).Inc()
 	return nil
 }
+
+func (m *txMetrics) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "add_continuous_validator",
+	}).Inc()
+	return nil
+}
+
+func (m *txMetrics) StopContinuousValidatorTx(tx *txs.StopContinuousValidatorTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "stop_continuous_validator",
+	}).Inc()
+	return nil
+}

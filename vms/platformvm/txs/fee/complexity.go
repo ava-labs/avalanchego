@@ -223,6 +223,27 @@ var (
 		gas.DBWrite: 6, // write remaining balance utxo + weight diff + deactivated weight diff + public key diff + delete staker + write staker
 	}
 
+	IntrinsicAddContinuousValidatorTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			ids.NodeIDLen + // nodeID
+			wrappers.LongLen + // period
+			wrappers.IntLen + // signer typeID
+			wrappers.IntLen + // num stake outs
+			wrappers.IntLen + // validator rewards typeID
+			wrappers.IntLen + // delegator rewards typeID
+			wrappers.IntLen, // delegation shares
+		gas.DBRead:  1, // get staking config // todo @razvan:
+		gas.DBWrite: 3, // put current staker + write weight diff + write pk diff // todo @razvan:
+	}
+
+	IntrinsicStopContinuousValidatorTxComplexities = gas.Dimensions{
+		gas.Bandwidth: IntrinsicBaseTxComplexities[gas.Bandwidth] +
+			ids.IDLen + // txID
+			bls.SignatureLen, // signature
+		gas.DBRead:  1, // read staker  // todo @razvan:
+		gas.DBWrite: 1, // write staker // todo @razvan:
+	}
+
 	errUnsupportedOutput = errors.New("unsupported output type")
 	errUnsupportedInput  = errors.New("unsupported input type")
 	errUnsupportedOwner  = errors.New("unsupported owner type")
@@ -792,6 +813,46 @@ func (c *complexityVisitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) e
 		&baseTxComplexity,
 		&authComplexity,
 	)
+	return err
+}
+
+func (c *complexityVisitor) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	signerComplexity, err := SignerComplexity(tx.Signer)
+	if err != nil {
+		return err
+	}
+	outputsComplexity, err := OutputComplexity(tx.StakeOuts...)
+	if err != nil {
+		return err
+	}
+	validatorOwnerComplexity, err := OwnerComplexity(tx.ValidatorRewardsOwner)
+	if err != nil {
+		return err
+	}
+	delegatorOwnerComplexity, err := OwnerComplexity(tx.DelegatorRewardsOwner)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicAddContinuousValidatorTxComplexities.Add(
+		&baseTxComplexity,
+		&signerComplexity,
+		&outputsComplexity,
+		&validatorOwnerComplexity,
+		&delegatorOwnerComplexity,
+	)
+	return err
+}
+
+func (c *complexityVisitor) StopContinuousValidatorTx(tx *txs.StopContinuousValidatorTx) error {
+	baseTxComplexity, err := baseTxComplexity(&tx.BaseTx)
+	if err != nil {
+		return err
+	}
+	c.output, err = IntrinsicStopContinuousValidatorTxComplexities.Add(&baseTxComplexity)
 	return err
 }
 

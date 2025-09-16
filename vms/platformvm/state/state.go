@@ -269,7 +269,7 @@ type State interface {
 	ReindexBlocks(lock sync.Locker, log logging.Logger) error
 
 	// Commit changes to the base database.
-	Commit() error
+	Commit() error // todo: test commit with the new stuff added
 
 	// Returns a batch of unwritten changes that, when written, will commit all
 	// pending changes to the base database.
@@ -1004,6 +1004,42 @@ func (s *state) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker
 func (s *state) PutCurrentValidator(staker *Staker) error {
 	s.currentStakers.PutValidator(staker)
 	return nil
+}
+
+// todo: add test for this
+func (s *state) UpdateCurrentValidator(staker *Staker) error {
+	return s.currentStakers.UpdateValidator(staker.SubnetID, staker.NodeID, func(validator Staker) (*Staker, error) {
+		return staker, nil
+	})
+}
+
+// todo: add test for this
+func (s *state) StopContinuousValidator(subnetID ids.ID, nodeID ids.NodeID) error {
+	return s.currentStakers.UpdateValidator(subnetID, nodeID, func(validator Staker) (*Staker, error) {
+		if validator.ContinuationPeriod == 0 {
+			return nil, fmt.Errorf("validator %s is not a continuous staker", nodeID)
+		}
+
+		validator.ContinuationPeriod = 0
+		return &validator, nil
+	})
+}
+
+// todo: add test for this
+func (s *state) ResetContinuousValidatorCycle(
+	subnetID ids.ID,
+	nodeID ids.NodeID,
+	startTime time.Time,
+	weight uint64,
+	potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64,
+) error {
+	return s.currentStakers.UpdateValidator(subnetID, nodeID, func(validator Staker) (*Staker, error) {
+		if err := validator.resetContinuationStakerCycle(startTime, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards); err != nil {
+			return nil, err
+		}
+
+		return &validator, nil
+	})
 }
 
 func (s *state) DeleteCurrentValidator(staker *Staker) {
@@ -2820,9 +2856,10 @@ func (s *state) writeCurrentStakers(codecVersion uint16) error {
 					txID:        staker.TxID,
 					lastUpdated: staker.StartTime,
 
-					UpDuration:               0,
-					LastUpdated:              startTime,
-					StakerStartTime:          startTime,
+					UpDuration:      0,
+					LastUpdated:     startTime,
+					StakerStartTime: startTime,
+					//ContinuationPeriod:       uint64(staker.ContinuationPeriod.Seconds()),
 					PotentialReward:          staker.PotentialReward,
 					PotentialDelegateeReward: 0,
 				}

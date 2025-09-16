@@ -28,7 +28,7 @@ var (
 type Diff interface {
 	Chain
 
-	Apply(Chain) error
+	Apply(Chain) error // todo: test commit with the new stuff added
 }
 
 type diff struct {
@@ -78,6 +78,7 @@ func NewDiff(
 	if !ok {
 		return nil, fmt.Errorf("%w: %s", ErrMissingParentState, parentID)
 	}
+
 	return &diff{
 		parentID:                    parentID,
 		stateVersions:               stateVersions,
@@ -267,7 +268,7 @@ func (d *diff) GetCurrentValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 	// validator.
 	newValidator, status := d.currentStakerDiffs.GetValidator(subnetID, nodeID)
 	switch status {
-	case added:
+	case added, modified:
 		return newValidator, nil
 	case deleted:
 		return nil, database.ErrNotFound
@@ -308,6 +309,58 @@ func (d *diff) GetDelegateeReward(subnetID ids.ID, nodeID ids.NodeID) (uint64, e
 
 func (d *diff) PutCurrentValidator(staker *Staker) error {
 	return d.currentStakerDiffs.PutValidator(staker)
+}
+
+// todo: add test for this
+func (d *diff) UpdateCurrentValidator(staker *Staker) error {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return d.currentStakerDiffs.updateValidator(parentState, staker.SubnetID, staker.NodeID, func(validator Staker) (*Staker, error) {
+		return staker, nil
+	})
+}
+
+// todo: add test for this
+func (d *diff) StopContinuousValidator(subnetID ids.ID, nodeID ids.NodeID) error {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return d.currentStakerDiffs.updateValidator(parentState, subnetID, nodeID, func(validator Staker) (*Staker, error) {
+		if validator.ContinuationPeriod == 0 {
+			return nil, fmt.Errorf("validator %s is not in a continuous staker cycle", nodeID)
+		}
+
+		validator.ContinuationPeriod = 0
+
+		return &validator, nil
+	})
+}
+
+// todo: add test for this
+func (d *diff) ResetContinuousValidatorCycle(
+	subnetID ids.ID,
+	nodeID ids.NodeID,
+	startTime time.Time,
+	weight uint64,
+	potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64,
+) error {
+	parentState, ok := d.stateVersions.GetState(d.parentID)
+	if !ok {
+		return fmt.Errorf("%w: %s", ErrMissingParentState, d.parentID)
+	}
+
+	return d.currentStakerDiffs.updateValidator(parentState, subnetID, nodeID, func(validator Staker) (*Staker, error) {
+		if err := validator.resetContinuationStakerCycle(startTime, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards); err != nil {
+			return nil, err
+		}
+
+		return &validator, nil
+	})
 }
 
 func (d *diff) DeleteCurrentValidator(staker *Staker) {
@@ -601,6 +654,10 @@ func (d *diff) Apply(baseState Chain) error {
 				}
 			case deleted:
 				baseState.DeleteCurrentValidator(validatorDiff.validator)
+			case modified:
+				if err := baseState.UpdateCurrentValidator(validatorDiff.validator); err != nil {
+					return err
+				}
 			}
 
 			addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)
@@ -630,6 +687,8 @@ func (d *diff) Apply(baseState Chain) error {
 				}
 			case deleted:
 				baseState.DeletePendingValidator(validatorDiff.validator)
+			case modified:
+				return fmt.Errorf("pending stakers cannot be modified")
 			}
 
 			addedDelegatorIterator := iterator.FromTree(validatorDiff.addedDelegators)

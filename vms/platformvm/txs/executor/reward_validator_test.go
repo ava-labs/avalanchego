@@ -14,11 +14,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/genesis/genesistest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
+	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -877,4 +879,336 @@ func TestRewardDelegatorTxExecuteOnAbort(t *testing.T) {
 	newSupply, err := env.state.GetCurrentSupply(constants.PrimaryNetworkID)
 	require.NoError(err)
 	require.Equal(initialSupply-expectedReward, newSupply, "should have removed un-rewarded tokens from the potential supply")
+}
+
+func TestRewardContinuousValidatorTxExecute(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(t, upgradetest.ApricotPhase5)
+	dummyHeight := uint64(1)
+
+	wallet := newWallet(t, env, walletConfig{})
+	sk, err := localsigner.New()
+	require.NoError(err)
+
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
+	vdrStartTime := time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0)
+	vdrNodeID := ids.GenerateTestNodeID()
+	vdrPotentialReward := uint64(1000000)
+	vdrWeight := env.config.MinValidatorStake
+	vdrPeriod := defaultMinStakingDuration
+
+	rewardOwners := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+
+	vdrTx, err := wallet.IssueAddContinuousValidatorTx(
+		&txs.Validator{
+			NodeID: vdrNodeID,
+			Wght:   vdrWeight,
+		},
+		pop,
+		env.ctx.AVAXAssetID,
+		rewardOwners,
+		rewardOwners,
+		reward.PercentDenominator,
+		vdrPeriod,
+	)
+	require.NoError(err)
+
+	addContValTx := vdrTx.Unsigned.(*txs.AddContinuousValidatorTx)
+
+	vdrStaker, err := state.NewCurrentStaker(
+		vdrTx.ID(),
+		addContValTx,
+		vdrStartTime,
+		vdrPotentialReward,
+	)
+	require.NoError(err)
+
+	require.Equal(vdrPeriod, vdrStaker.ContinuationPeriod)
+	require.Equal(vdrStartTime.Add(vdrPeriod), vdrStaker.EndTime)
+
+	require.NoError(env.state.PutCurrentValidator(vdrStaker))
+	env.state.AddTx(vdrTx, status.Committed)
+
+	env.state.SetTimestamp(vdrStaker.EndTime)
+	env.state.SetHeight(dummyHeight)
+	require.NoError(env.state.Commit())
+
+	tx, err := newRewardValidatorTx(t, vdrTx.ID())
+	require.NoError(err)
+
+	onCommitState, err := state.NewDiff(lastAcceptedID, env)
+	require.NoError(err)
+
+	onAbortState, err := state.NewDiff(lastAcceptedID, env)
+	require.NoError(err)
+
+	feeCalculator := state.PickFeeCalculator(env.config, onCommitState)
+	require.NoError(ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onCommitState,
+		onAbortState,
+	))
+
+	// Check onAbortState
+	validator, err := onAbortState.GetCurrentValidator(vdrStaker.SubnetID, vdrStaker.NodeID)
+	require.NoError(err)
+
+	require.Equal(vdrWeight, validator.Weight)
+	require.Equal(uint64(0), validator.AccruedRewards)
+	require.Equal(nil, validator.AccruedDelegateeRewards) // todo:
+	require.Equal(onAbortState.GetTimestamp(), validator.StartTime)
+	require.Equal(onAbortState.GetTimestamp().Add(vdrPeriod), validator.EndTime)
+	require.Equal(vdrPeriod, validator.ContinuationPeriod)
+
+	// Check onCommitState
+	validator, err = onCommitState.GetCurrentValidator(vdrStaker.SubnetID, vdrStaker.NodeID)
+	require.NoError(err)
+
+	expectedReward := validator.PotentialReward + validator.AccruedRewards // todo: add delegators
+
+	require.Equal(vdrWeight+vdrPotentialReward, validator.Weight)
+	require.Equal(vdrPotentialReward, validator.AccruedRewards)
+	require.Equal(nil, validator.AccruedDelegateeRewards) // todo:
+	require.Equal(onAbortState.GetTimestamp(), validator.StartTime)
+	require.Equal(onAbortState.GetTimestamp().Add(vdrPeriod), validator.EndTime)
+	require.Equal(vdrPeriod, validator.ContinuationPeriod)
+
+	// Move forward with onCommitState
+	require.NoError(onCommitState.Apply(env.state))
+	require.NoError(env.state.Commit())
+
+	// Stop validator
+	err = env.state.StopContinuousValidator(vdrStaker.SubnetID, vdrStaker.NodeID)
+	require.NoError(err)
+
+	// Check after being stopped
+	env.state.SetTimestamp(validator.EndTime)
+
+	tx, err = newRewardValidatorTx(t, vdrTx.ID())
+	require.NoError(err)
+
+	onCommitState, err = state.NewDiffOn(env.state)
+	require.NoError(err)
+
+	onAbortState, err = state.NewDiffOn(env.state)
+	require.NoError(err)
+
+	require.NoError(ProposalTx(
+		&env.backend,
+		feeCalculator,
+		tx,
+		onCommitState,
+		onAbortState,
+	))
+
+	// Check onAbortState
+	{
+		validator, err = onAbortState.GetCurrentValidator(vdrStaker.SubnetID, vdrStaker.NodeID)
+		require.ErrorIs(database.ErrNotFound, err)
+
+		outputIndex := len(addContValTx.Outputs())
+
+		// Check stake UTXOs
+		for _, stake := range addContValTx.Stake() {
+			stakeUTXOID := &avax.UTXOID{
+				TxID:        vdrTx.ID(),
+				OutputIndex: uint32(outputIndex),
+			}
+
+			stakeUTXO, err := onAbortState.GetUTXO(stakeUTXOID.InputID())
+			require.NoError(err)
+			require.Equal(stake.AssetID(), stakeUTXO.Asset.AssetID())
+			require.Equal(stake.Output().(*secp256k1fx.TransferOutput).Amount(), stakeUTXO.Out.(*secp256k1fx.TransferOutput).Amount())
+			require.True(stake.Output().(*secp256k1fx.TransferOutput).OutputOwners.Equals(&stakeUTXO.Out.(*secp256k1fx.TransferOutput).OutputOwners))
+
+			outputIndex++
+		}
+
+		utxoID := &avax.UTXOID{
+			TxID:        vdrTx.ID(),
+			OutputIndex: uint32(outputIndex),
+		}
+
+		_, err := onAbortState.GetUTXO(utxoID.InputID())
+		require.Error(database.ErrNotFound, err)
+	}
+
+	// Check onCommitState
+	{
+
+		validator, err = onCommitState.GetCurrentValidator(vdrStaker.SubnetID, vdrStaker.NodeID)
+		require.ErrorIs(database.ErrNotFound, err)
+
+		outputIndex := len(addContValTx.Outputs())
+
+		// Check stake UTXOs
+		for _, stake := range addContValTx.Stake() {
+			stakeUTXOID := &avax.UTXOID{
+				TxID:        vdrTx.ID(),
+				OutputIndex: uint32(outputIndex),
+			}
+
+			stakeUTXO, err := onCommitState.GetUTXO(stakeUTXOID.InputID())
+			require.NoError(err)
+			require.Equal(stake.AssetID(), stakeUTXO.Asset.AssetID())
+			require.Equal(stake.Output().(*secp256k1fx.TransferOutput).Amount(), stakeUTXO.Out.(*secp256k1fx.TransferOutput).Amount())
+			require.True(stake.Output().(*secp256k1fx.TransferOutput).OutputOwners.Equals(&stakeUTXO.Out.(*secp256k1fx.TransferOutput).OutputOwners))
+
+			outputIndex++
+		}
+
+		// Check Rewards UTXOs
+		rewardUTXOID := &avax.UTXOID{
+			TxID:        vdrTx.ID(),
+			OutputIndex: uint32(outputIndex),
+		}
+
+		rewardUTXO, err := onCommitState.GetUTXO(rewardUTXOID.InputID())
+		require.NoError(err)
+		require.Equal(env.ctx.AVAXAssetID, rewardUTXO.Asset.AssetID())
+		require.Equal(expectedReward, rewardUTXO.Out.(*secp256k1fx.TransferOutput).Amount())
+		require.True(rewardOwners.Equals(&rewardUTXO.Out.(*secp256k1fx.TransferOutput).OutputOwners))
+
+		{
+			// Check Delegating Rewards UTXOs
+			// todo: add delegators
+		}
+
+		utxoID := &avax.UTXOID{
+			TxID:        vdrTx.ID(),
+			OutputIndex: uint32(outputIndex),
+		}
+
+		_, err = onAbortState.GetUTXO(utxoID.InputID())
+		require.Error(database.ErrNotFound, err)
+	}
+
+	// todo IMPORTANT: test if withdrawal works correct with multiple excesses and then stop
+
+	// todo: check balance of the staker (where stakeouts are going)
+	// todo: add a test for a staker with previous cycles ended
+
+	// todo: add delegators in this flow so we are 100% is correct
+	// todo: extract correctness of state changing based on AddContinuousValidatorTx and StopContinuousValidatorTx
+	// 		this test should only check rewards stuff
+}
+
+func TestRewardContinuousValidatorTxMaxStakeLimit(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(t, upgradetest.ApricotPhase5)
+
+	wallet := newWallet(t, env, walletConfig{})
+
+	sk, err := localsigner.New()
+	require.NoError(err)
+
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
+	vdrPotentialReward := uint64(1_000_000)
+	delPotentialReward := uint64(500_000)
+	vdrWeight := env.config.MaxValidatorStake - 500_000
+
+	vdrTx, err := wallet.IssueAddContinuousValidatorTx(
+		&txs.Validator{
+			NodeID: ids.GenerateTestNodeID(),
+			Wght:   vdrWeight,
+		},
+		pop,
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
+		reward.PercentDenominator,
+		defaultMinStakingDuration,
+	)
+	require.NoError(err)
+
+	uVdrTx := vdrTx.Unsigned.(*txs.AddContinuousValidatorTx)
+
+	vdrStaker, err := state.NewCurrentStaker(
+		vdrTx.ID(),
+		uVdrTx,
+		time.Unix(int64(genesistest.DefaultValidatorStartTimeUnix+1), 0),
+		vdrPotentialReward,
+	)
+	require.NoError(err)
+
+	require.NoError(env.state.PutCurrentValidator(vdrStaker))
+	env.state.AddTx(vdrTx, status.Committed)
+
+	// Add delegator
+	delTx, err := wallet.IssueAddPermissionlessDelegatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: vdrStaker.NodeID,
+				Start:  uint64(vdrStaker.StartTime.Unix()),
+				End:    uint64(vdrStaker.EndTime.Unix()),
+				Wght:   delPotentialReward,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
+		env.ctx.AVAXAssetID,
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+		},
+	)
+	require.NoError(err)
+
+	uDelTx := delTx.Unsigned.(*txs.AddDelegatorTx)
+
+	delegator, err := state.NewCurrentStaker(
+		delTx.ID(),
+		uDelTx,
+		vdrStaker.StartTime,
+		1000,
+	)
+	require.NoError(err)
+
+	require.NoError(env.state.PutCurrentValidator(delegator))
+	env.state.AddTx(vdrTx, status.Committed)
+
+	env.state.SetTimestamp(vdrStaker.EndTime)
+	require.NoError(env.state.Commit())
+
+	tx, err := newRewardValidatorTx(t, vdrTx.ID())
+	require.NoError(err)
+
+	onCommitState, err := state.NewDiffOn(env.state)
+	require.NoError(err)
+
+	onAbortState, err := state.NewDiffOn(env.state)
+	require.NoError(err)
+
+	require.NoError(ProposalTx(
+		&env.backend,
+		state.PickFeeCalculator(env.config, onCommitState),
+		tx,
+		onCommitState,
+		onAbortState,
+	))
+
+	// Check onCommitState
+	require.NoError(onCommitState.Apply(env.state))
+	require.NoError(env.state.Commit())
+
+	validator, err := env.state.GetCurrentValidator(vdrStaker.SubnetID, vdrStaker.NodeID)
+	require.NoError(err)
+
+	require.Equal(env.config.MaxValidatorStake, validator.Weight)
+	require.Equal(vdrPotentialReward, validator.AccruedRewards)
+	require.Equal(nil, validator.AccruedDelegateeRewards) // todo:
 }

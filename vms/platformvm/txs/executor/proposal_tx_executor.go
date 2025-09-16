@@ -147,6 +147,14 @@ func (*proposalTxExecutor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error
 	return ErrWrongTxType
 }
 
+func (*proposalTxExecutor) AddContinuousValidatorTx(*txs.AddContinuousValidatorTx) error {
+	return ErrWrongTxType
+}
+
+func (*proposalTxExecutor) StopContinuousValidatorTx(*txs.StopContinuousValidatorTx) error {
+	return ErrWrongTxType
+}
+
 func (e *proposalTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	// AddValidatorTx is a proposal transaction until the Banff fork
 	// activation. Following the activation, AddValidatorTxs must be issued into
@@ -378,6 +386,151 @@ func (e *proposalTxExecutor) RewardValidatorTx(tx *txs.RewardValidatorTx) error 
 	//            [txs.ValidatorTx] interface.
 	switch uStakerTx := stakerTx.Unsigned.(type) {
 	case txs.ValidatorTx:
+		if continuousStaker, ok := uStakerTx.(txs.ContinuousStaker); ok {
+			if stakerToReward.ContinuationPeriod > 0 {
+				// todo: rewardvalidatorTX will have the same ID everytime for same staker
+				// Running continuous staker
+				rewards, err := GetRewardsCalculator(e.backend, e.onCommitState, continuousStaker.SubnetID())
+				if err != nil {
+					return err
+				}
+
+				currentSupply, err := e.onCommitState.GetCurrentSupply(continuousStaker.SubnetID())
+				if err != nil {
+					return err
+				}
+
+				newStartTime := currentChainTime
+
+				{
+					// Set onAbortState.
+					currentSupply, err = math.Sub(currentSupply, stakerToReward.PotentialReward)
+					if err != nil {
+						return err
+					}
+
+					onAbortPotentialReward := rewards.Calculate(
+						continuousStaker.PeriodDuration(),
+						stakerToReward.Weight,
+						currentSupply,
+					)
+
+					newCurrentSupply, err := math.Add(currentSupply, onAbortPotentialReward)
+					if err != nil {
+						return err
+					}
+
+					e.onAbortState.SetCurrentSupply(stakerToReward.SubnetID, newCurrentSupply)
+					err = e.onAbortState.ResetContinuousValidatorCycle(
+						stakerToReward.SubnetID,
+						stakerToReward.NodeID,
+						newStartTime,
+						stakerToReward.Weight,
+						onAbortPotentialReward,
+						stakerToReward.AccruedRewards,
+						stakerToReward.AccruedDelegateeRewards,
+					)
+					if err != nil {
+						return err
+					}
+				}
+
+				{
+					// Set onCommitState.
+					delegateeReward, err := e.onCommitState.GetDelegateeReward(
+						stakerToReward.SubnetID,
+						stakerToReward.NodeID,
+					)
+					if err != nil {
+						return fmt.Errorf("failed to fetch accrued delegatee rewards: %w", err)
+					}
+
+					newAccruedRewards, err := math.Add(stakerToReward.AccruedRewards, stakerToReward.PotentialReward)
+					if err != nil {
+						return err
+					}
+
+					newWeight, err := math.Add(stakerToReward.Weight, stakerToReward.PotentialReward)
+					if err != nil {
+						return err
+					}
+
+					newAccruedDelegateeRewards := stakerToReward.AccruedDelegateeRewards
+					if delegateeReward > 0 {
+						newAccruedDelegateeRewards, err = math.Add(stakerToReward.AccruedDelegateeRewards, delegateeReward)
+						if err != nil {
+							return err
+						}
+
+						newWeight, err = math.Add(newWeight, delegateeReward)
+						if err != nil {
+							return err
+						}
+					}
+
+					// todo: can potentialrewards be 0 in any situation?
+					if newWeight > e.backend.Config.MaxValidatorStake {
+						utxosOffset, err := avax.GetNextOutputIndex(e.onCommitState, stakerTx.TxID)
+						if err != nil {
+							return err
+						}
+
+						excessValidationRewards, excessDelegateeRewards, err := e.rewardExcessValidatorTx(
+							tx,
+							uStakerTx,
+							newWeight,
+							delegateeReward,
+							stakerToReward,
+							utxosOffset,
+						)
+						if err != nil {
+							return err
+						}
+
+						newAccruedRewards, err = math.Sub(newAccruedRewards, excessValidationRewards)
+						if err != nil {
+							return err
+						}
+
+						newAccruedDelegateeRewards, err = math.Sub(newAccruedDelegateeRewards, excessDelegateeRewards)
+						if err != nil {
+							return err
+						}
+
+						newWeight = e.backend.Config.MaxValidatorStake
+					}
+
+					onCommitPotentialReward := rewards.Calculate(
+						continuousStaker.PeriodDuration(),
+						newWeight,
+						currentSupply,
+					)
+
+					newCurrentSupply, err := math.Add(currentSupply, onCommitPotentialReward)
+					if err != nil {
+						return err
+					}
+
+					e.onCommitState.SetCurrentSupply(stakerToReward.SubnetID, newCurrentSupply)
+					err = e.onCommitState.ResetContinuousValidatorCycle(
+						stakerToReward.SubnetID,
+						stakerToReward.NodeID,
+						newStartTime,
+						newWeight,
+						onCommitPotentialReward,
+						newAccruedRewards,
+						newAccruedDelegateeRewards,
+					)
+					if err != nil {
+						return err
+					}
+				}
+
+				// Early return because we don't need to do anything else.
+				return nil
+			}
+		}
+
 		if err := e.rewardValidatorTx(uStakerTx, stakerToReward); err != nil {
 			return err
 		}
@@ -423,25 +576,39 @@ func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 		stakeAsset = stake[0].Asset
 	)
 
+	utxosOffset := uint32(len(outputs))
+	if _, ok := uValidatorTx.(txs.ContinuousStaker); ok {
+		outputIndex, err := avax.GetNextOutputIndex(e.onCommitState, validator.TxID)
+		if err != nil {
+			return err
+		}
+
+		utxosOffset = outputIndex
+	}
+
 	// Refund the stake only when validator is about to leave
 	// the staking set
-	for i, out := range stake {
+	for _, out := range stake {
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        txID,
-				OutputIndex: uint32(len(outputs) + i),
+				OutputIndex: utxosOffset,
 			},
 			Asset: out.Asset,
 			Out:   out.Output(),
 		}
 		e.onCommitState.AddUTXO(utxo)
 		e.onAbortState.AddUTXO(utxo)
+
+		utxosOffset++
 	}
 
-	utxosOffset := 0
-
-	// Provide the reward here
+	// Provide the potential reward here + accrued rewards for continuous stakers.
 	reward := validator.PotentialReward
+	if _, ok := uValidatorTx.(txs.ContinuousStaker); ok {
+		reward += validator.AccruedRewards
+	}
+
 	if reward > 0 {
 		validationRewardsOwner := uValidatorTx.ValidationRewardsOwner()
 		outIntf, err := e.backend.Fx.CreateOutput(reward, validationRewardsOwner)
@@ -456,7 +623,7 @@ func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 		utxo := &avax.UTXO{
 			UTXOID: avax.UTXOID{
 				TxID:        txID,
-				OutputIndex: uint32(len(outputs) + len(stake)),
+				OutputIndex: utxosOffset,
 			},
 			Asset: stakeAsset,
 			Out:   out,
@@ -493,7 +660,7 @@ func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	onCommitUtxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
 			TxID:        txID,
-			OutputIndex: uint32(len(outputs) + len(stake) + utxosOffset),
+			OutputIndex: utxosOffset,
 		},
 		Asset: stakeAsset,
 		Out:   out,
@@ -501,12 +668,14 @@ func (e *proposalTxExecutor) rewardValidatorTx(uValidatorTx txs.ValidatorTx, val
 	e.onCommitState.AddUTXO(onCommitUtxo)
 	e.onCommitState.AddRewardUTXO(txID, onCommitUtxo)
 
+	utxosOffset++
+
 	// Note: There is no [offset] if the RewardValidatorTx is
 	// aborted, because the validator reward is not awarded.
 	onAbortUtxo := &avax.UTXO{
 		UTXOID: avax.UTXOID{
 			TxID:        txID,
-			OutputIndex: uint32(len(outputs) + len(stake)),
+			OutputIndex: utxosOffset,
 		},
 		Asset: stakeAsset,
 		Out:   out,
@@ -647,4 +816,91 @@ func (e *proposalTxExecutor) rewardDelegatorTx(uDelegatorTx txs.DelegatorTx, del
 		e.onCommitState.AddRewardUTXO(txID, utxo)
 	}
 	return nil
+}
+
+// Invariants:
+//  1. [newWeight] > [e.backend.Config.MaxValidatorStake]
+//  2. [newWeight] > [staker.Weight]
+func (e *proposalTxExecutor) rewardExcessValidatorTx(
+	rewardValidatorTx *txs.RewardValidatorTx,
+	uValidatorTx txs.ValidatorTx,
+	newWeight uint64,
+	delegateeReward uint64,
+	staker *state.Staker,
+	utxoOffset uint32,
+) (uint64, uint64, error) {
+	// todo: think about having any of them 0
+	asset := uValidatorTx.Stake()[0].Asset
+
+	// Invariant: newWeight > staker.Weight
+	restakingRewards, err := math.Sub(newWeight, staker.Weight)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	excess, err := math.Sub(newWeight, e.backend.Config.MaxValidatorStake)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	excessRatio := excess / restakingRewards
+
+	excessValidationReward, err := math.Mul(excessRatio, staker.PotentialReward)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	excessDelegateeReward, err := math.Mul(excessRatio, delegateeReward)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	// Create UTXO for [excessDelegateeReward]
+	if excessDelegateeReward > 0 {
+		outIntf, err := e.backend.Fx.CreateOutput(excessDelegateeReward, uValidatorTx.DelegationRewardsOwner())
+		if err != nil {
+			return 0, 0, fmt.Errorf("failed to create output: %w", err)
+		}
+
+		out, ok := outIntf.(verify.State)
+		if !ok {
+			return 0, 0, ErrInvalidState
+		}
+
+		excessDelegateeRewardUTXO := &avax.UTXO{
+			UTXOID: avax.UTXOID{
+				TxID:        rewardValidatorTx.TxID,
+				OutputIndex: utxoOffset,
+			},
+			Asset: asset,
+			Out:   out,
+		}
+		e.onCommitState.AddUTXO(excessDelegateeRewardUTXO)
+		e.onCommitState.AddRewardUTXO(rewardValidatorTx.TxID, excessDelegateeRewardUTXO)
+	}
+
+	// Create UTXO for [excessValidationReward]
+	outIntf, err := e.backend.Fx.CreateOutput(excessValidationReward, uValidatorTx.ValidationRewardsOwner())
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to create output: %w", err)
+	}
+
+	out, ok := outIntf.(verify.State)
+	if !ok {
+		return 0, 0, ErrInvalidState
+	}
+
+	excessValidationRewardUTXO := &avax.UTXO{
+		UTXOID: avax.UTXOID{
+			TxID:        rewardValidatorTx.TxID,
+			OutputIndex: utxoOffset + 1,
+		},
+		Asset: asset,
+		Out:   out,
+	}
+
+	e.onCommitState.AddUTXO(excessValidationRewardUTXO)
+	e.onCommitState.AddRewardUTXO(rewardValidatorTx.TxID, excessValidationRewardUTXO)
+
+	return excessDelegateeReward, excessValidationReward, nil
 }

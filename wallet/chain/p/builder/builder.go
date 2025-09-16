@@ -319,6 +319,23 @@ type Builder interface {
 		rewardsOwner *secp256k1fx.OutputOwners,
 		options ...common.Option,
 	) (*txs.AddPermissionlessDelegatorTx, error)
+
+	NewAddContinuousValidatorTx(
+		vdr *txs.Validator,
+		signer signer.Signer,
+		assetID ids.ID,
+		validationRewardsOwner *secp256k1fx.OutputOwners,
+		delegationRewardsOwner *secp256k1fx.OutputOwners,
+		shares uint32,
+		period time.Duration,
+		options ...common.Option,
+	) (*txs.AddContinuousValidatorTx, error)
+
+	NewStopContinuousValidatorTx(
+		txID ids.ID,
+		signature [bls.SignatureLen]byte,
+		options ...common.Option,
+	) (*txs.StopContinuousValidatorTx, error)
 }
 
 type Backend interface {
@@ -1489,6 +1506,132 @@ func (b *builder) NewAddPermissionlessDelegatorTx(
 		Subnet:                 vdr.Subnet,
 		StakeOuts:              stakeOutputs,
 		DelegationRewardsOwner: rewardsOwner,
+	}
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewAddContinuousValidatorTx(
+	vdr *txs.Validator,
+	signer signer.Signer,
+	assetID ids.ID,
+	validationRewardsOwner *secp256k1fx.OutputOwners,
+	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	shares uint32,
+	period time.Duration,
+	options ...common.Option,
+) (*txs.AddContinuousValidatorTx, error) {
+	toBurn := map[ids.ID]uint64{}
+	toStake := map[ids.ID]uint64{
+		assetID: vdr.Wght,
+	}
+
+	ops := common.NewOptions(options)
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+	signerComplexity, err := fee.SignerComplexity(signer)
+	if err != nil {
+		return nil, err
+	}
+	validatorOwnerComplexity, err := fee.OwnerComplexity(validationRewardsOwner)
+	if err != nil {
+		return nil, err
+	}
+	delegatorOwnerComplexity, err := fee.OwnerComplexity(delegationRewardsOwner)
+	if err != nil {
+		return nil, err
+	}
+	complexity, err := fee.IntrinsicAddContinuousValidatorTxComplexities.Add(
+		&memoComplexity,
+		&signerComplexity,
+		&validatorOwnerComplexity,
+		&delegatorOwnerComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, baseOutputs, stakeOutputs, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	utils.Sort(validationRewardsOwner.Addrs)
+	utils.Sort(delegationRewardsOwner.Addrs)
+	tx := &txs.AddContinuousValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         baseOutputs,
+			Memo:         memo,
+		}},
+		ValidatorNodeID:       vdr.NodeID,
+		Period:                uint64(period.Seconds()),
+		Signer:                signer,
+		StakeOuts:             stakeOutputs,
+		ValidatorRewardsOwner: validationRewardsOwner,
+		DelegatorRewardsOwner: delegationRewardsOwner,
+		DelegationShares:      shares,
+		Wght:                  vdr.Wght,
+	}
+
+	return tx, b.initCtx(tx)
+}
+
+func (b *builder) NewStopContinuousValidatorTx(
+	txID ids.ID,
+	signature [bls.SignatureLen]byte,
+	options ...common.Option,
+) (*txs.StopContinuousValidatorTx, error) {
+	var (
+		toBurn  = map[ids.ID]uint64{}
+		toStake = map[ids.ID]uint64{}
+		ops     = common.NewOptions(options)
+	)
+
+	memo := ops.Memo()
+	memoComplexity := gas.Dimensions{
+		gas.Bandwidth: uint64(len(memo)),
+	}
+
+	complexity, err := fee.IntrinsicStopContinuousValidatorTxComplexities.Add(
+		&memoComplexity,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	inputs, outputs, _, err := b.spend(
+		toBurn,
+		toStake,
+		0,
+		complexity,
+		nil,
+		ops,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tx := &txs.StopContinuousValidatorTx{
+		BaseTx: txs.BaseTx{BaseTx: avax.BaseTx{
+			NetworkID:    b.context.NetworkID,
+			BlockchainID: constants.PlatformChainID,
+			Ins:          inputs,
+			Outs:         outputs,
+			Memo:         memo,
+		}},
+		TxID:          txID,
+		StopSignature: signature,
 	}
 	return tx, b.initCtx(tx)
 }

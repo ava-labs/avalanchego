@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
@@ -42,6 +43,7 @@ var (
 	ErrDurangoUpgradeNotActive         = errors.New("attempting to use a Durango-upgrade feature prior to activation")
 	ErrAddValidatorTxPostDurango       = errors.New("AddValidatorTx is not permitted post-Durango")
 	ErrAddDelegatorTxPostDurango       = errors.New("AddDelegatorTx is not permitted post-Durango")
+	ErrInvalidStakerTx                 = errors.New("invalid staker tx")
 )
 
 // verifySubnetValidatorPrimaryNetworkRequirements verifies the primary
@@ -866,6 +868,181 @@ func verifyTransferSubnetOwnershipTx(
 	}
 
 	return nil
+}
+
+// verifyAddContinuousValidatorTx carries out the validation for an AddContinuousValidatorTx.
+func verifyAddContinuousValidatorTx(
+	backend *Backend,
+	feeCalculator fee.Calculator,
+	chainState state.Chain,
+	sTx *txs.Tx,
+	tx *txs.AddContinuousValidatorTx,
+) error {
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		upgrades         = backend.Config.UpgradeConfig
+	)
+	if !upgrades.IsDurangoActivated(currentTimestamp) { // todo: replace with proper upgrade
+		return ErrDurangoUpgradeNotActive
+	}
+
+	// Verify the tx is well-formed
+	if err := sTx.SyntacticVerify(backend.Ctx); err != nil {
+		return err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return err
+	}
+
+	if !backend.Bootstrapped.Get() {
+		return nil
+	}
+
+	validatorRules, err := getValidatorRules(backend, chainState, tx.SubnetID())
+	if err != nil {
+		return err
+	}
+
+	duration := tx.PeriodDuration()
+
+	stakedAssetID := tx.StakeOuts[0].AssetID()
+	switch {
+	case tx.Weight() < validatorRules.minValidatorStake:
+		// Ensure validator is staking at least the minimum amount
+		return ErrWeightTooSmall
+
+	case tx.Weight() > validatorRules.maxValidatorStake:
+		// Ensure validator isn't staking too much
+		return ErrWeightTooLarge
+
+	case tx.DelegationShares < validatorRules.minDelegationFee:
+		// Ensure the validator fee is at least the minimum amount
+		return ErrInsufficientDelegationFee
+
+	case duration < validatorRules.minStakeDuration:
+		// Ensure staking length is not too short
+		return ErrStakeTooShort
+
+	case duration > validatorRules.maxStakeDuration:
+		// Ensure staking length is not too long
+		return ErrStakeTooLong
+
+	case stakedAssetID != validatorRules.assetID:
+		// Wrong assetID used
+		return fmt.Errorf(
+			"%w: %s != %s",
+			ErrWrongStakedAssetID,
+			validatorRules.assetID,
+			stakedAssetID,
+		)
+	}
+
+	_, err = GetValidator(chainState, tx.SubnetID(), tx.NodeID())
+	switch {
+	case err == nil:
+		return fmt.Errorf(
+			"%w: %s on %s",
+			ErrDuplicateValidator,
+			tx.NodeID(),
+			tx.SubnetID(),
+		)
+	case errors.Is(err, database.ErrNotFound):
+		// OK: validator not found
+
+	default:
+		return fmt.Errorf(
+			"failed to check if validator %s is on subnet %s: %w",
+			tx.NodeID(),
+			tx.SubnetID(),
+			err,
+		)
+	}
+
+	outs := make([]*avax.TransferableOutput, len(tx.Outs)+len(tx.StakeOuts))
+	copy(outs, tx.Outs)
+	copy(outs[len(tx.Outs):], tx.StakeOuts)
+
+	// Verify the flowcheck
+	fee, err := feeCalculator.CalculateFee(tx)
+	if err != nil {
+		return err
+	}
+	if err := backend.FlowChecker.VerifySpend(
+		tx,
+		chainState,
+		tx.Ins,
+		outs,
+		sTx.Creds,
+		map[ids.ID]uint64{
+			backend.Ctx.AVAXAssetID: fee,
+		},
+	); err != nil {
+		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
+	}
+
+	return nil
+}
+
+// verifyStopContinuousValidatorTx carries out the validation for an StopContinuousValidatorTx.
+func verifyStopContinuousValidatorTx(
+	backend *Backend,
+	chainState state.Chain,
+	tx *txs.StopContinuousValidatorTx,
+) (*state.Staker, error) {
+	var (
+		currentTimestamp = chainState.GetTimestamp()
+		upgrades         = backend.Config.UpgradeConfig
+	)
+
+	if !upgrades.IsEtnaActivated(currentTimestamp) { // todo: replace with proper upgrade
+		return nil, errEtnaUpgradeNotActive
+	}
+
+	if err := tx.SyntacticVerify(backend.Ctx); err != nil {
+		return nil, err
+	}
+
+	if err := avax.VerifyMemoFieldLength(tx.Memo, true /*=isDurangoActive*/); err != nil {
+		return nil, err
+	}
+
+	stakerTx, _, err := chainState.GetTx(tx.TxID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get staker tx: %w", err)
+	}
+
+	continuousStakerTx, ok := stakerTx.Unsigned.(txs.ContinuousStaker)
+	if !ok {
+		return nil, fmt.Errorf("%w: different type %T", ErrInvalidStakerTx, stakerTx.Unsigned)
+	}
+
+	validator, err := chainState.GetCurrentValidator(continuousStakerTx.SubnetID(), continuousStakerTx.NodeID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to get validator %s from state: %w", continuousStakerTx.NodeID(), err)
+	}
+
+	if tx.TxID != validator.TxID {
+		// This can happen if a validator restaked with the same public key and node id.
+		// In this case, TxID should be the latest transaction for the continuous validator.
+		return nil, fmt.Errorf("%w: wrong tx id", ErrInvalidStakerTx)
+	}
+
+	// Check stop signature
+	signature, err := bls.SignatureFromBytes(tx.StopSignature[:])
+	if err != nil {
+		return nil, err
+	}
+
+	if !bls.VerifyProofOfPossession(validator.PublicKey, signature, validator.TxID[:]) {
+		return nil, errUnauthorizedModification
+	}
+
+	if validator.ContinuationPeriod == 0 {
+		return nil, fmt.Errorf("%w: %s", errContinuousValidatorAlreadyStopped, continuousStakerTx.NodeID())
+	}
+
+	return validator, nil
 }
 
 // Ensure the proposed validator starts after the current time
