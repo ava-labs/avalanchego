@@ -554,7 +554,6 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 		dummy.NewDummyEngine(
 			vm.extensionConfig.ConsensusCallbacks,
 			dummy.Mode{},
-			vm.clock,
 			desiredTargetExcess,
 		),
 		vm.clock,
