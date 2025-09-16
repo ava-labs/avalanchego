@@ -904,6 +904,20 @@ func (mr *MockStateMockRecorder) ReindexBlocks(lock, log any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReindexBlocks", reflect.TypeOf((*MockState)(nil).ReindexBlocks), lock, log)
 }
 
+// ResetContinuousValidatorCycle mocks base method.
+func (m *MockState) ResetContinuousValidatorCycle(subnetID ids.ID, nodeID ids.NodeID, startTime time.Time, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResetContinuousValidatorCycle", subnetID, nodeID, startTime, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ResetContinuousValidatorCycle indicates an expected call of ResetContinuousValidatorCycle.
+func (mr *MockStateMockRecorder) ResetContinuousValidatorCycle(subnetID, nodeID, startTime, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetContinuousValidatorCycle", reflect.TypeOf((*MockState)(nil).ResetContinuousValidatorCycle), subnetID, nodeID, startTime, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards)
+}
+
 // SetAccruedFees mocks base method.
 func (m *MockState) SetAccruedFees(f uint64) {
 	m.ctrl.T.Helper()
@@ -1040,6 +1054,20 @@ func (mr *MockStateMockRecorder) SetUptime(nodeID, upDuration, lastUpdated any) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetUptime", reflect.TypeOf((*MockState)(nil).SetUptime), nodeID, upDuration, lastUpdated)
 }
 
+// StopContinuousValidator mocks base method.
+func (m *MockState) StopContinuousValidator(subnetID ids.ID, nodeID ids.NodeID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "StopContinuousValidator", subnetID, nodeID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// StopContinuousValidator indicates an expected call of StopContinuousValidator.
+func (mr *MockStateMockRecorder) StopContinuousValidator(subnetID, nodeID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StopContinuousValidator", reflect.TypeOf((*MockState)(nil).StopContinuousValidator), subnetID, nodeID)
+}
+
 // UTXOIDs mocks base method.
 func (m *MockState) UTXOIDs(addr []byte, previous ids.ID, limit int) ([]ids.ID, error) {
 	m.ctrl.T.Helper()
@@ -1053,6 +1081,20 @@ func (m *MockState) UTXOIDs(addr []byte, previous ids.ID, limit int) ([]ids.ID, 
 func (mr *MockStateMockRecorder) UTXOIDs(addr, previous, limit any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UTXOIDs", reflect.TypeOf((*MockState)(nil).UTXOIDs), addr, previous, limit)
+}
+
+// UpdateCurrentValidator mocks base method.
+func (m *MockState) UpdateCurrentValidator(staker *Staker) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateCurrentValidator", staker)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateCurrentValidator indicates an expected call of UpdateCurrentValidator.
+func (mr *MockStateMockRecorder) UpdateCurrentValidator(staker any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCurrentValidator", reflect.TypeOf((*MockState)(nil).UpdateCurrentValidator), staker)
 }
 
 // WeightOfL1Validators mocks base method.

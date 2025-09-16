@@ -158,3 +158,54 @@ func TestGetPaginatedUTXOs(t *testing.T) {
 	require.NoError(err)
 	require.Len(notPaginatedUTXOs, len(totalUTXOs))
 }
+
+func TestGetNextOutputIndex(t *testing.T) {
+	require := require.New(t)
+
+	txID := ids.GenerateTestID()
+	assetID := ids.GenerateTestID()
+	addr := ids.GenerateTestShortID()
+	utxo := &UTXO{
+		UTXOID: UTXOID{
+			TxID:        txID,
+			OutputIndex: 0,
+		},
+		Asset: Asset{ID: assetID},
+		Out: &secp256k1fx.TransferOutput{
+			Amt: 12345,
+			OutputOwners: secp256k1fx.OutputOwners{
+				Locktime:  54321,
+				Threshold: 1,
+				Addrs:     []ids.ShortID{addr},
+			},
+		},
+	}
+
+	c := linearcodec.NewDefault()
+	manager := codec.NewDefaultManager()
+
+	require.NoError(c.RegisterType(&secp256k1fx.TransferOutput{}))
+	require.NoError(manager.RegisterCodec(codecVersion, c))
+
+	db := memdb.New()
+	s, err := NewUTXOState(db, manager, trackChecksum)
+	require.NoError(err)
+
+	require.NoError(s.PutUTXO(utxo))
+
+	utxo.UTXOID = UTXOID{
+		TxID:        txID,
+		OutputIndex: 1,
+	}
+	require.NoError(s.PutUTXO(utxo))
+
+	utxo.UTXOID = UTXOID{
+		TxID:        txID,
+		OutputIndex: 2,
+	}
+	require.NoError(s.PutUTXO(utxo))
+
+	nextOutputIndex, err := GetNextOutputIndex(s, txID)
+	require.NoError(err)
+	require.Equal(uint32(3), nextOutputIndex)
+}

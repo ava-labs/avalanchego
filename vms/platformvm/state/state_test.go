@@ -2404,3 +2404,17 @@ func TestGetCurrentValidators(t *testing.T) {
 		})
 	}
 }
+
+func TestContinuousValidatorsLifecycle(t *testing.T) {
+	// todo: implement
+	//validator, err := env.state.GetCurrentValidator(vdrStaker.SubnetID, vdrStaker.NodeID)
+	//require.NoError(err)
+	//require.Equal(time.Duration(0), validator.ContinuationPeriod)
+	//
+	//require.NoError(diff.Apply(env.state))
+	//require.NoError(env.state.Commit())
+	//
+	//validator, err = onCommitState.GetCurrentValidator(vdrStaker.SubnetID, vdrStaker.NodeID)
+	//require.NoError(err)
+	//require.Equal(time.Duration(0), validator.ContinuationPeriod)
+}

@@ -45,22 +45,23 @@ const (
 var (
 	_ txs.Visitor = (*standardTxExecutor)(nil)
 
-	errEmptyNodeID                      = errors.New("validator nodeID cannot be empty")
-	errMaxStakeDurationTooLarge         = errors.New("max stake duration must be less than or equal to the global max stake duration")
-	errMissingStartTimePreDurango       = errors.New("staker transactions must have a StartTime pre-Durango")
-	errEtnaUpgradeNotActive             = errors.New("attempting to use an Etna-upgrade feature prior to activation")
-	errTransformSubnetTxPostEtna        = errors.New("TransformSubnetTx is not permitted post-Etna")
-	errMaxNumActiveValidators           = errors.New("already at the max number of active validators")
-	errCouldNotLoadSubnetToL1Conversion = errors.New("could not load subnet conversion")
-	errWrongWarpMessageSourceChainID    = errors.New("wrong warp message source chain ID")
-	errWrongWarpMessageSourceAddress    = errors.New("wrong warp message source address")
-	errWarpMessageExpired               = errors.New("warp message expired")
-	errWarpMessageNotYetAllowed         = errors.New("warp message not yet allowed")
-	errWarpMessageAlreadyIssued         = errors.New("warp message already issued")
-	errCouldNotLoadL1Validator          = errors.New("could not load L1 validator")
-	errWarpMessageContainsStaleNonce    = errors.New("warp message contains stale nonce")
-	errRemovingLastValidator            = errors.New("attempting to remove the last L1 validator from a converted subnet")
-	errStateCorruption                  = errors.New("state corruption")
+	errEmptyNodeID                       = errors.New("validator nodeID cannot be empty")
+	errMaxStakeDurationTooLarge          = errors.New("max stake duration must be less than or equal to the global max stake duration")
+	errMissingStartTimePreDurango        = errors.New("staker transactions must have a StartTime pre-Durango")
+	errEtnaUpgradeNotActive              = errors.New("attempting to use an Etna-upgrade feature prior to activation")
+	errTransformSubnetTxPostEtna         = errors.New("TransformSubnetTx is not permitted post-Etna")
+	errMaxNumActiveValidators            = errors.New("already at the max number of active validators")
+	errCouldNotLoadSubnetToL1Conversion  = errors.New("could not load subnet conversion")
+	errWrongWarpMessageSourceChainID     = errors.New("wrong warp message source chain ID")
+	errWrongWarpMessageSourceAddress     = errors.New("wrong warp message source address")
+	errWarpMessageExpired                = errors.New("warp message expired")
+	errWarpMessageNotYetAllowed          = errors.New("warp message not yet allowed")
+	errWarpMessageAlreadyIssued          = errors.New("warp message already issued")
+	errCouldNotLoadL1Validator           = errors.New("could not load L1 validator")
+	errWarpMessageContainsStaleNonce     = errors.New("warp message contains stale nonce")
+	errRemovingLastValidator             = errors.New("attempting to remove the last L1 validator from a converted subnet")
+	errStateCorruption                   = errors.New("state corruption")
+	errContinuousValidatorAlreadyStopped = errors.New("continuous validator already stopped")
 )
 
 // StandardTx executes the standard transaction [tx].
@@ -1368,6 +1369,51 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 	return e.state.PutL1Validator(l1Validator)
 }
 
+func (e *standardTxExecutor) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+	if err := verifyAddContinuousValidatorTx(
+		e.backend,
+		e.feeCalculator,
+		e.state,
+		e.tx,
+		tx,
+	); err != nil {
+		return err
+	}
+
+	if err := e.putStaker(tx); err != nil {
+		return err
+	}
+
+	txID := e.tx.ID()
+	avax.Consume(e.state, tx.Ins)
+	avax.Produce(e.state, txID, tx.Outs)
+
+	if e.backend.Config.PartialSyncPrimaryNetwork &&
+		tx.ValidatorNodeID == e.backend.Ctx.NodeID {
+		e.backend.Ctx.Log.Warn("verified transaction that would cause this node to become unhealthy",
+			zap.String("reason", "primary network is not being fully synced"),
+			zap.Stringer("txID", txID),
+			zap.String("txType", "addContinuousValidatorTx"),
+			zap.Stringer("nodeID", tx.ValidatorNodeID),
+		)
+	}
+
+	return nil
+}
+
+func (e *standardTxExecutor) StopContinuousValidatorTx(tx *txs.StopContinuousValidatorTx) error {
+	validator, err := verifyStopContinuousValidatorTx(e.backend, e.state, tx)
+	if err != nil {
+		return err
+	}
+
+	if err := e.state.StopContinuousValidator(validator.SubnetID, validator.NodeID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // Creates the staker as defined in [stakerTx] and adds it to [e.State].
 func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
 	var (
@@ -1405,7 +1451,17 @@ func (e *standardTxExecutor) putStaker(stakerTx txs.Staker) error {
 
 			// Post-Durango, stakers are immediately added to the current staker
 			// set. Their [StartTime] is the current chain time.
-			stakeDuration := stakerTx.EndTime().Sub(chainTime)
+			var stakeDuration time.Duration
+
+			switch tTx := stakerTx.(type) {
+			case txs.FixedStaker:
+				stakeDuration = tTx.EndTime().Sub(chainTime)
+			case txs.ContinuousStaker:
+				stakeDuration = tTx.PeriodDuration()
+			default:
+				return fmt.Errorf("unexpected staker tx type: %T", stakerTx)
+			}
+
 			potentialReward = rewards.Calculate(
 				stakeDuration,
 				stakerTx.Weight(),

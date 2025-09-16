@@ -234,6 +234,23 @@ func (s *visitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) error {
 	return sign(s.tx, txSigners)
 }
 
+func (s *visitor) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+	return sign(s.tx, true, txSigners)
+}
+
+func (s *visitor) StopContinuousValidatorTx(tx *txs.StopContinuousValidatorTx) error {
+	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
+	if err != nil {
+		return err
+	}
+
+	return sign(s.tx, true, txSigners)
+}
+
 func (s *visitor) getSigners(sourceChainID ids.ID, ins []*avax.TransferableInput) ([][]keychain.Signer, error) {
 	txSigners := make([][]keychain.Signer, len(ins))
 	for credIndex, transferInput := range ins {

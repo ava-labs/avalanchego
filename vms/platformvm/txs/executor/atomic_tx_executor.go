@@ -128,6 +128,14 @@ func (*atomicTxExecutor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
 	return ErrWrongTxType
 }
 
+func (e *atomicTxExecutor) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+	return ErrWrongTxType
+}
+
+func (e *atomicTxExecutor) StopContinuousValidatorTx(tx *txs.StopContinuousValidatorTx) error {
+	return ErrWrongTxType
+}
+
 func (e *atomicTxExecutor) ImportTx(*txs.ImportTx) error {
 	return e.atomicTx()
 }
