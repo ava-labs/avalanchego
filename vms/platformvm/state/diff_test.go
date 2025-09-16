@@ -37,6 +37,40 @@ func TestDiffMissingState(t *testing.T) {
 	require.ErrorIs(t, err, ErrMissingParentState)
 }
 
+func TestMutatedValidatorDiffState(t *testing.T) {
+	require := require.New(t)
+
+	state := newTestState(t, memdb.New())
+
+	// Put a current validator
+	currentValidator := &Staker{
+		TxID:               ids.GenerateTestID(),
+		SubnetID:           ids.GenerateTestID(),
+		NodeID:             ids.GenerateTestNodeID(),
+		Weight:             100,
+		ContinuationPeriod: 100 * time.Second,
+	}
+	require.NoError(state.PutCurrentValidator(currentValidator))
+
+	d, err := NewDiffOn(state)
+	require.NoError(err)
+
+	staker, err := d.GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID)
+	require.NoError(err)
+	require.Equal(100*time.Second, staker.ContinuationPeriod)
+
+	err = d.StopContinuousValidator(staker.SubnetID, staker.NodeID)
+	require.NoError(err)
+
+	stakerAgain, err := d.GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID)
+	require.NoError(err)
+	require.Equal(time.Duration(0), stakerAgain.ContinuationPeriod)
+
+	stateStaker, err := state.GetCurrentValidator(currentValidator.SubnetID, currentValidator.NodeID)
+	require.NoError(err)
+	require.Equal(100*time.Second, stateStaker.ContinuationPeriod)
+}
+
 func TestNewDiffOn(t *testing.T) {
 	require := require.New(t)
 

@@ -32,4 +32,8 @@ type Visitor interface {
 	SetL1ValidatorWeightTx(*SetL1ValidatorWeightTx) error
 	IncreaseL1ValidatorBalanceTx(*IncreaseL1ValidatorBalanceTx) error
 	DisableL1ValidatorTx(*DisableL1ValidatorTx) error
+
+	// ? Transactions:
+	AddContinuousValidatorTx(tx *AddContinuousValidatorTx) error
+	StopContinuousValidatorTx(tx *StopContinuousValidatorTx) error
 }
