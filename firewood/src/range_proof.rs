@@ -21,7 +21,7 @@ use crate::proof::{Proof, ProofCollection};
 /// - State synchronization between nodes
 /// - Light client verification
 /// - Efficient auditing of specific key ranges
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct RangeProof<K, V, H> {
     start_proof: Proof<H>,
     end_proof: Proof<H>,

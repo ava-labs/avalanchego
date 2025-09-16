@@ -139,6 +139,10 @@ pub mod merkle;
 /// Proof module
 pub mod proof;
 
+/// Change, Range, and Key proofs for the Merkle Trie
+// TODO: push `proof` and `range_proof` modules into this module
+pub mod proofs;
+
 // Re-export the proc macro from firewood-macros
 pub use firewood_macros::metrics;
 

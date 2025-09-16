@@ -19,25 +19,25 @@ rust-version.workspace = true
 [dependencies]
 # Workspace dependencies
 aquamarine.workspace = true
+bytemuck.workspace = true
+bytemuck_derive.workspace = true
 coarsetime.workspace = true
 fastrace.workspace = true
 hex.workspace = true
+integer-encoding.workspace = true
 metrics.workspace = true
 nonzero_ext.workspace = true
+rand = { workspace = true, optional = true }
 sha2.workspace = true
 smallvec = { workspace = true, features = ["write", "union"] }
-rand = { workspace = true, optional = true }
 thiserror.workspace = true
 # Regular dependencies
 arc-swap = "1.7.1"
 bitfield = "0.19.1"
 bitflags = "2.9.1"
-bytemuck = "1.23.1"
-bytemuck_derive = "1.10.0"
 derive-where = "1.5.0"
 enum-as-inner = "0.6.1"
 indicatif = "0.18.0"
-integer-encoding = "4.0.2"
 lru = "0.16.0"
 semver = "1.0.26"
 triomphe = "0.1.14"

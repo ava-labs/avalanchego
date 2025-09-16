@@ -1,7 +1,9 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use firewood::v2::api::FrozenRangeProof;
+use std::num::NonZeroUsize;
+
+use firewood::v2::api::{self, FrozenRangeProof};
 
 use crate::{
     BorrowedBytes, CResult, DatabaseHandle, HashResult, Maybe, NextKeyRangeResult,
@@ -65,7 +67,7 @@ pub struct VerifyRangeProofArgs<'a> {
 /// FFI context for for a parsed or generated range proof.
 #[derive(Debug)]
 pub struct RangeProofContext {
-    _proof: FrozenRangeProof,
+    proof: FrozenRangeProof,
     /// Information about the proof discovered during verification that does not
     /// need to be recomputed. Also serves as a token that ensured we have
     /// validated the proof and can skip it during commit.
@@ -75,6 +77,16 @@ pub struct RangeProofContext {
     /// and is needed to optimize discovery of the next key/range as well as
     /// other introspective optimizations.
     _commit_context: (), // placeholder for future use
+}
+
+impl From<FrozenRangeProof> for RangeProofContext {
+    fn from(proof: FrozenRangeProof) -> Self {
+        Self {
+            proof,
+            _validation_context: (),
+            _commit_context: (),
+        }
+    }
 }
 
 /// Generate a range proof for the given range of keys for the latest revision.
@@ -94,10 +106,30 @@ pub struct RangeProofContext {
 /// - [`RangeProofResult::Err`] containing an error message if the proof could not be created.
 #[unsafe(no_mangle)]
 pub extern "C" fn fwd_db_range_proof(
-    _db: Option<&DatabaseHandle>,
-    _args: CreateRangeProofArgs,
+    db: Option<&DatabaseHandle>,
+    args: CreateRangeProofArgs,
 ) -> RangeProofResult {
-    CResult::from_err("not yet implemented")
+    crate::invoke_with_handle(db, |db| {
+        let root_hash = match args.root {
+            Maybe::Some(root) => root.as_ref().try_into()?,
+            Maybe::None => db
+                .current_root_hash()?
+                .ok_or(api::Error::RangeProofOnEmptyTrie)?,
+        };
+
+        let view = db.get_root(root_hash)?;
+        view.range_proof(
+            args.start_key
+                .as_ref()
+                .map(BorrowedBytes::as_slice)
+                .into_option(),
+            args.end_key
+                .as_ref()
+                .map(BorrowedBytes::as_slice)
+                .into_option(),
+            NonZeroUsize::new(args.max_length as usize),
+        )
+    })
 }
 
 /// Verify a range proof against the given start and end keys and root hash. The
@@ -242,8 +274,12 @@ pub extern "C" fn fwd_range_proof_find_next_key(
 /// - [`ValueResult::Some`] containing the serialized bytes if successful.
 /// - [`ValueResult::Err`] if the caller provided a null pointer.
 #[unsafe(no_mangle)]
-pub extern "C" fn fwd_range_proof_to_bytes(_proof: Option<&RangeProofContext>) -> ValueResult {
-    CResult::from_err("not yet implemented")
+pub extern "C" fn fwd_range_proof_to_bytes(proof: Option<&RangeProofContext>) -> ValueResult {
+    crate::invoke_with_handle(proof, |ctx| {
+        let mut vec = Vec::new();
+        ctx.proof.write_to_vec(&mut vec);
+        vec
+    })
 }
 
 /// Deserialize a `RangeProof` from bytes.
@@ -260,8 +296,12 @@ pub extern "C" fn fwd_range_proof_to_bytes(_proof: Option<&RangeProofContext>) -
 ///   well-formed. The verify method must be called to ensure the proof is cryptographically valid.
 /// - [`RangeProofResult::Err`] containing an error message if the proof could not be parsed.
 #[unsafe(no_mangle)]
-pub extern "C" fn fwd_range_proof_from_bytes(_bytes: BorrowedBytes) -> RangeProofResult {
-    CResult::from_err("not yet implemented")
+pub extern "C" fn fwd_range_proof_from_bytes(bytes: BorrowedBytes) -> RangeProofResult {
+    crate::invoke(move || {
+        FrozenRangeProof::from_slice(&bytes).map_err(|err| {
+            api::Error::ProofError(firewood::proof::ProofError::Deserialization(err))
+        })
+    })
 }
 
 /// Frees the memory associated with a `RangeProofContext`.

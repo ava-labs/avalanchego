@@ -3,6 +3,12 @@
 
 msrv = "1.89"
 
+doc-valid-idents = [
+  "MerkleDB",
+  # this list must end with ".." so that it does not truncate the default list
+  "..",
+]
+
 disallowed-methods = [
   { path = "rand::rng", replacement = "firewood_storage::StdRng::from_env_or_random", reason = "use a prng with a user-defined seed instead", allow-invalid = true },
 ]

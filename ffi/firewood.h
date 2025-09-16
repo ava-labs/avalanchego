@@ -191,7 +191,7 @@ typedef struct BorrowedSlice_KeyValuePair BorrowedKeyValuePairs;
  * Maybe is a C-compatible optional type using a tagged union pattern.
  *
  * FFI methods and types can use this to represent optional values where `Optional<T>`
- * does not work due to it not having C-compatible layout.
+ * does not work due to it not having a C-compatible layout.
  */
 typedef enum Maybe_OwnedBytes_Tag {
   /**
@@ -415,7 +415,7 @@ typedef struct VoidResult {
  * Maybe is a C-compatible optional type using a tagged union pattern.
  *
  * FFI methods and types can use this to represent optional values where `Optional<T>`
- * does not work due to it not having C-compatible layout.
+ * does not work due to it not having a C-compatible layout.
  */
 typedef enum Maybe_BorrowedBytes_Tag {
   /**
@@ -490,6 +490,10 @@ typedef enum RangeProofResult_Tag {
    * The provided root was not found in the database.
    */
   RangeProofResult_RevisionNotFound,
+  /**
+   * A range proof was requested on an empty trie.
+   */
+  RangeProofResult_EmptyTrie,
   /**
    * The proof was successfully created or parsed.
    *
@@ -941,8 +945,8 @@ struct ChangeProofResult fwd_db_change_proof(const struct DatabaseHandle *_db,
  *   was successfully created.
  * - [`RangeProofResult::Err`] containing an error message if the proof could not be created.
  */
-struct RangeProofResult fwd_db_range_proof(const struct DatabaseHandle *_db,
-                                           struct CreateRangeProofArgs _args);
+struct RangeProofResult fwd_db_range_proof(const struct DatabaseHandle *db,
+                                           struct CreateRangeProofArgs args);
 
 /**
  * Verify and commit a change proof to the database.
@@ -1380,7 +1384,7 @@ struct NextKeyRangeResult fwd_range_proof_find_next_key(struct RangeProofContext
  *   well-formed. The verify method must be called to ensure the proof is cryptographically valid.
  * - [`RangeProofResult::Err`] containing an error message if the proof could not be parsed.
  */
-struct RangeProofResult fwd_range_proof_from_bytes(BorrowedBytes _bytes);
+struct RangeProofResult fwd_range_proof_from_bytes(BorrowedBytes bytes);
 
 /**
  * Serialize a `RangeProof` to bytes.
@@ -1397,7 +1401,7 @@ struct RangeProofResult fwd_range_proof_from_bytes(BorrowedBytes _bytes);
  * - [`ValueResult::Some`] containing the serialized bytes if successful.
  * - [`ValueResult::Err`] if the caller provided a null pointer.
  */
-struct ValueResult fwd_range_proof_to_bytes(const struct RangeProofContext *_proof);
+struct ValueResult fwd_range_proof_to_bytes(const struct RangeProofContext *proof);
 
 /**
  * Verify a range proof against the given start and end keys and root hash. The

@@ -24,12 +24,14 @@ rust-version.workspace = true
 
 [dependencies]
 # Workspace dependencies
+bytemuck_derive.workspace = true
+bytemuck.workspace = true
 coarsetime.workspace = true
 fastrace.workspace = true
 firewood-macros.workspace = true
 hex.workspace = true
+integer-encoding.workspace = true
 metrics.workspace = true
-sha2.workspace = true
 thiserror.workspace = true
 # Regular dependencies
 typed-builder = "0.22.0"

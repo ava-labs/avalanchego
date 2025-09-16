@@ -45,7 +45,7 @@ fn into_committed(
     ns.into()
 }
 
-fn init_merkle<I, K, V>(iter: I) -> Merkle<NodeStore<Committed, MemStore>>
+pub(crate) fn init_merkle<I, K, V>(iter: I) -> Merkle<NodeStore<Committed, MemStore>>
 where
     I: Clone + IntoIterator<Item = (K, V)>,
     K: AsRef<[u8]>,

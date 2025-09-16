@@ -170,8 +170,8 @@ impl<T: Hashable> Preimage for T {
             // This is because account nodes have special handling where the storage root hash
             // gets replaced in the account data structure during serialization.
             let digest = (!is_account).then(|| self.value_digest()).flatten();
-            if let Some(digest) = digest {
-                rlp.append(&*digest);
+            if let Some(ValueDigest::Value(digest)) = digest {
+                rlp.append(&digest);
             } else {
                 rlp.append_empty_data();
             }

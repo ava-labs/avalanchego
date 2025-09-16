@@ -1,14 +1,8 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-#![expect(
-    clippy::arithmetic_side_effects,
-    reason = "Found 1 occurrences after enabling the lint."
-)]
-
 use crate::{BranchNode, Children, HashType, LeafNode, Node, Path};
 use smallvec::SmallVec;
-use std::ops::Deref;
 
 /// Returns the hash of `node`, which is at the given `path_prefix`.
 #[must_use]
@@ -44,6 +38,7 @@ pub fn hash_node(node: &Node, path_prefix: &Path) -> HashType {
 #[must_use]
 pub fn hash_preimage(node: &Node, path_prefix: &Path) -> Box<[u8]> {
     // Key, 3 options, value digest
+    #[expect(clippy::arithmetic_side_effects)]
     let est_len = node.partial_path().len() + path_prefix.len() + 3 + HashType::empty().len();
     let mut buf = Vec::with_capacity(est_len);
     match node {
@@ -92,22 +87,9 @@ pub enum ValueDigest<T> {
     /// The node's value.
     Value(T),
     #[cfg(not(feature = "ethhash"))]
-    /// TODO this variant will be used when we deserialize a proof node
-    /// from a remote Firewood instance. The serialized proof node they
-    /// send us may the hash of the value, not the value itself.
-    Hash(T),
-}
-
-impl<T> Deref for ValueDigest<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            ValueDigest::Value(value) => value,
-            #[cfg(not(feature = "ethhash"))]
-            ValueDigest::Hash(hash) => hash,
-        }
-    }
+    /// For MerkleDB hashing, the digest is the hash of the value if it is 32
+    /// bytes or longer.
+    Hash(HashType),
 }
 
 impl<T: AsRef<[u8]>> ValueDigest<T> {
@@ -123,8 +105,48 @@ impl<T: AsRef<[u8]>> ValueDigest<T> {
                 use sha2::{Digest, Sha256};
                 // This proof proves that `key` maps to a value
                 // whose hash is `got_hash`.
-                got_hash.as_ref() == Sha256::digest(expected.as_ref()).as_slice()
+                *got_hash == HashType::from(Sha256::digest(expected.as_ref()))
             }
+        }
+    }
+
+    /// Returns a `ValueDigest` that borrows from this one.
+    pub fn as_ref(&self) -> ValueDigest<&[u8]> {
+        match self {
+            Self::Value(v) => ValueDigest::Value(v.as_ref()),
+            #[cfg(not(feature = "ethhash"))]
+            Self::Hash(h) => ValueDigest::Hash(h.clone()),
+        }
+    }
+
+    /// Convert the value to a hash if it is not already a hash.
+    ///
+    /// If the value is less than 32 bytes, it will be passed through as is
+    /// instead of hashing.
+    ///
+    /// If etherum hashing is enabled, this will always return the value as is.
+    pub fn make_hash(&self) -> ValueDigest<&[u8]> {
+        match self.as_ref() {
+            #[cfg(not(feature = "ethhash"))]
+            ValueDigest::Value(v) if v.len() >= 32 => {
+                use sha2::{Digest, Sha256};
+                ValueDigest::Hash(HashType::from(Sha256::digest(v)))
+            }
+
+            ValueDigest::Value(v) => ValueDigest::Value(v),
+
+            #[cfg(not(feature = "ethhash"))]
+            ValueDigest::Hash(v) => ValueDigest::Hash(v),
+        }
+    }
+}
+
+impl<T: AsRef<[u8]>> AsRef<[u8]> for ValueDigest<T> {
+    fn as_ref(&self) -> &[u8] {
+        match self {
+            Self::Value(v) => v.as_ref(),
+            #[cfg(not(feature = "ethhash"))]
+            Self::Hash(h) => h.as_ref(),
         }
     }
 }

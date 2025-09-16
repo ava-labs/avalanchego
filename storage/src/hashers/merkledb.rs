@@ -51,7 +51,6 @@ impl<T: Hashable> Preimage for T {
 
         // Add key length (in bits) to hash pre-image
         let mut key = self.full_path();
-        // let mut key = key.as_ref().iter();
         let key_bit_len = BITS_PER_NIBBLE * key.clone().count() as u64;
         add_varint_to_buf(buf, key_bit_len);
 
@@ -77,18 +76,7 @@ fn add_value_digest_to_buf<H: HasUpdate, T: AsRef<[u8]>>(
     let value_exists: u8 = 1;
     buf.update([value_exists]);
 
-    match value_digest {
-        ValueDigest::Value(value) if value.as_ref().len() >= 32 => {
-            let hash = Sha256::digest(value);
-            add_len_and_value_to_buf(buf, hash);
-        }
-        ValueDigest::Value(value) => {
-            add_len_and_value_to_buf(buf, value);
-        }
-        ValueDigest::Hash(hash) => {
-            add_len_and_value_to_buf(buf, hash);
-        }
-    }
+    add_len_and_value_to_buf(buf, value_digest.make_hash());
 }
 
 #[inline]

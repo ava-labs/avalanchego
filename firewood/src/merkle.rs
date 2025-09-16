@@ -2,7 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 use crate::iter::{MerkleKeyValueIter, PathIterator, TryExtend};
 use crate::proof::{Proof, ProofCollection, ProofError, ProofNode};

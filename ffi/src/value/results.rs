@@ -130,6 +130,18 @@ impl From<Result<Option<Box<[u8]>>, firewood::db::DbError>> for ValueResult {
     }
 }
 
+impl From<Vec<u8>> for ValueResult {
+    fn from(value: Vec<u8>) -> Self {
+        value.into_boxed_slice().into()
+    }
+}
+
+impl From<Box<[u8]>> for ValueResult {
+    fn from(value: Box<[u8]>) -> Self {
+        ValueResult::Some(value.into())
+    }
+}
+
 /// A result type returned from FFI functions return the database root hash. This
 /// may or may not be after a mutation.
 #[derive(Debug)]
@@ -178,6 +190,8 @@ pub enum RangeProofResult {
     NullHandlePointer,
     /// The provided root was not found in the database.
     RevisionNotFound(HashKey),
+    /// A range proof was requested on an empty trie.
+    EmptyTrie,
     /// The proof was successfully created or parsed.
     ///
     /// If the value was parsed from a serialized proof, this does not imply that
@@ -192,6 +206,19 @@ pub enum RangeProofResult {
     ///
     /// [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
     Err(OwnedBytes),
+}
+
+impl From<Result<api::FrozenRangeProof, api::Error>> for RangeProofResult {
+    fn from(value: Result<api::FrozenRangeProof, api::Error>) -> Self {
+        match value {
+            Ok(proof) => RangeProofResult::Ok(Box::new(proof.into())),
+            Err(api::Error::RevisionNotFound { provided }) => RangeProofResult::RevisionNotFound(
+                HashKey::from(provided.unwrap_or_else(api::HashKey::empty)),
+            ),
+            Err(api::Error::RangeProofOnEmptyTrie) => RangeProofResult::EmptyTrie,
+            Err(err) => RangeProofResult::Err(err.to_string().into_bytes().into()),
+        }
+    }
 }
 
 /// A result type returned from FFI functions that create or parse change proofs.

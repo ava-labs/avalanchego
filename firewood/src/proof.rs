@@ -69,12 +69,16 @@ pub enum ProofError {
     #[error("{0:?}")]
     IO(#[from] FileIoError),
 
+    /// Error deserializing a proof
+    #[error("error deserializing a proof: {0}")]
+    Deserialization(crate::proofs::ReadError),
+
     /// Empty range
     #[error("empty range")]
     EmptyRange,
 }
 
-#[derive(Clone, PartialEq, Eq, Default)]
+#[derive(Clone, PartialEq, Eq)]
 /// A node in a proof.
 pub struct ProofNode {
     /// The key this node is at. Each byte is a nibble.
@@ -124,11 +128,7 @@ impl Hashable for ProofNode {
     }
 
     fn value_digest(&self) -> Option<ValueDigest<&[u8]>> {
-        self.value_digest.as_ref().map(|vd| match vd {
-            ValueDigest::Value(v) => ValueDigest::Value(v.as_ref()),
-            #[cfg(not(feature = "ethhash"))]
-            ValueDigest::Hash(h) => ValueDigest::Hash(h.as_ref()),
-        })
+        self.value_digest.as_ref().map(ValueDigest::as_ref)
     }
 
     fn children(&self) -> Children<HashType> {

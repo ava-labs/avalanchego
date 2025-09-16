@@ -14,7 +14,10 @@ import (
 	"unsafe"
 )
 
-var errNotPrepared = errors.New("proof not prepared into a proposal or committed")
+var (
+	errNotPrepared = errors.New("proof not prepared into a proposal or committed")
+	errEmptyTrie   = errors.New("a range proof was requested on an empty trie")
+)
 
 // RangeProof represents a proof that a range of keys and their values are
 // included in a trie with a given root hash.
@@ -393,5 +396,41 @@ func getNextKeyRangeFromNextKeyRangeResult(result C.NextKeyRangeResult) (*NextKe
 		return nil, newOwnedBytes(*(*C.OwnedBytes)(unsafe.Pointer(&result.anon0))).intoError()
 	default:
 		return nil, fmt.Errorf("unknown C.NextKeyRangeResult tag: %d", result.tag)
+	}
+}
+
+func getRangeProofFromRangeProofResult(result C.RangeProofResult) (*RangeProof, error) {
+	switch result.tag {
+	case C.RangeProofResult_NullHandlePointer:
+		return nil, errDBClosed
+	case C.RangeProofResult_RevisionNotFound:
+		// NOTE: the result value contains the provided root hash, we could use
+		// it in the error message if needed.
+		return nil, errRevisionNotFound
+	case C.RangeProofResult_EmptyTrie:
+		return nil, errEmptyTrie
+	case C.RangeProofResult_Ok:
+		ptr := *(**C.RangeProofContext)(unsafe.Pointer(&result.anon0))
+		return &RangeProof{handle: ptr}, nil
+	case C.RangeProofResult_Err:
+		err := newOwnedBytes(*(*C.OwnedBytes)(unsafe.Pointer(&result.anon0))).intoError()
+		return nil, err
+	default:
+		return nil, fmt.Errorf("unknown C.RangeProofResult tag: %d", result.tag)
+	}
+}
+
+func getChangeProofFromChangeProofResult(result C.ChangeProofResult) (*ChangeProof, error) {
+	switch result.tag {
+	case C.ChangeProofResult_NullHandlePointer:
+		return nil, errDBClosed
+	case C.ChangeProofResult_Ok:
+		ptr := *(**C.ChangeProofContext)(unsafe.Pointer(&result.anon0))
+		return &ChangeProof{handle: ptr}, nil
+	case C.ChangeProofResult_Err:
+		err := newOwnedBytes(*(*C.OwnedBytes)(unsafe.Pointer(&result.anon0))).intoError()
+		return nil, err
+	default:
+		return nil, fmt.Errorf("unknown C.ChangeProofResult tag: %d", result.tag)
 	}
 }

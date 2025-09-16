@@ -348,36 +348,6 @@ func getDatabaseFromHandleResult(result C.HandleResult) (*Database, error) {
 	}
 }
 
-func getRangeProofFromRangeProofResult(result C.RangeProofResult) (*RangeProof, error) {
-	switch result.tag {
-	case C.RangeProofResult_NullHandlePointer:
-		return nil, errDBClosed
-	case C.RangeProofResult_Ok:
-		ptr := *(**C.RangeProofContext)(unsafe.Pointer(&result.anon0))
-		return &RangeProof{handle: ptr}, nil
-	case C.RangeProofResult_Err:
-		err := newOwnedBytes(*(*C.OwnedBytes)(unsafe.Pointer(&result.anon0))).intoError()
-		return nil, err
-	default:
-		return nil, fmt.Errorf("unknown C.RangeProofResult tag: %d", result.tag)
-	}
-}
-
-func getChangeProofFromChangeProofResult(result C.ChangeProofResult) (*ChangeProof, error) {
-	switch result.tag {
-	case C.ChangeProofResult_NullHandlePointer:
-		return nil, errDBClosed
-	case C.ChangeProofResult_Ok:
-		ptr := *(**C.ChangeProofContext)(unsafe.Pointer(&result.anon0))
-		return &ChangeProof{handle: ptr}, nil
-	case C.ChangeProofResult_Err:
-		err := newOwnedBytes(*(*C.OwnedBytes)(unsafe.Pointer(&result.anon0))).intoError()
-		return nil, err
-	default:
-		return nil, fmt.Errorf("unknown C.ChangeProofResult tag: %d", result.tag)
-	}
-}
-
 // hashAndIDFromValue converts the cgo `Value` payload into:
 //
 //	case | data    | len   | meaning

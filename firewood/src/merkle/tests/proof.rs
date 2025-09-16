@@ -34,6 +34,14 @@ fn full_range_proof() {
     let right_proof = merkle.prove(&[u8::MAX]).unwrap();
     assert_eq!(rangeproof.start_proof(), &left_proof);
     assert_eq!(rangeproof.end_proof(), &right_proof);
+
+    let rangeproof = roundtrip_range_proof(&rangeproof);
+    assert_eq!(rangeproof.key_values().len(), u8::MAX as usize + 1);
+    assert_ne!(rangeproof.start_proof(), rangeproof.end_proof());
+    let left_proof = merkle.prove(&[u8::MIN]).unwrap();
+    let right_proof = merkle.prove(&[u8::MAX]).unwrap();
+    assert_eq!(rangeproof.start_proof(), &left_proof);
+    assert_eq!(rangeproof.end_proof(), &right_proof);
 }
 
 #[test]
@@ -45,6 +53,10 @@ fn single_value_range_proof() {
     let rangeproof = merkle
         .range_proof(Some(&[RANDOM_KEY]), None, NonZeroUsize::new(1))
         .unwrap();
+    assert_eq!(rangeproof.start_proof(), rangeproof.end_proof());
+    assert_eq!(rangeproof.key_values().len(), 1);
+
+    let rangeproof = roundtrip_range_proof(&rangeproof);
     assert_eq!(rangeproof.start_proof(), rangeproof.end_proof());
     assert_eq!(rangeproof.key_values().len(), 1);
 }
@@ -268,4 +280,26 @@ fn proof_path_construction_and_corruption() {
         err,
         crate::proof::ProofError::NodeNotInTrie | crate::proof::ProofError::UnexpectedHash
     ));
+}
+
+#[test]
+fn range_proof_serialization_roundtrip() {
+    let merkle = init_merkle((u8::MIN..=u8::MAX).map(|k| ([k], [k])));
+
+    let start_key = &[42u8];
+    let end_key = &[84u8];
+
+    let rangeproof = merkle
+        .range_proof(Some(start_key), Some(end_key), NonZeroUsize::new(10))
+        .unwrap();
+
+    drop(roundtrip_range_proof(&rangeproof));
+}
+
+fn roundtrip_range_proof(proof: &FrozenRangeProof) -> FrozenRangeProof {
+    let mut serialized = Vec::new();
+    proof.write_to_vec(&mut serialized);
+    let deserialized = FrozenRangeProof::from_slice(&serialized).unwrap();
+    assert_eq!(proof, &deserialized);
+    deserialized
 }
