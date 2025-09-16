@@ -102,14 +102,22 @@ func (g *GetChangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context,
 	for keyLimit > 0 {
 		changeProof, err := g.db.GetChangeProof(ctx, startRoot, endRoot, start, end, int(keyLimit))
 		if err != nil {
-			if !errors.Is(err, ErrStartRootNotFound) {
-				// We should only fail to get a change proof if we have insufficient history.
-				// Other errors are unexpected.
-				// TODO define custom errors
-				return nil, &common.AppError{
+			unexpectedChangeProofAppErr := func(err error) *common.AppError {
+				return &common.AppError{
 					Code:    p2p.ErrUnexpected.Code,
 					Message: fmt.Sprintf("failed to get change proof: %s", err),
 				}
+			}
+
+			switch {
+			case errors.Is(err, ErrEndRootNotFound):
+				// End root unknown -> surface error.
+				return nil, unexpectedChangeProofAppErr(err)
+			case errors.Is(err, ErrStartRootNotFound):
+				// Insufficient history for change proof -> try range proof
+				// (fall through to range proof path).
+			default:
+				return nil, unexpectedChangeProofAppErr(err)
 			}
 
 			// [s.db] doesn't have sufficient history to generate change proof.
@@ -141,6 +149,14 @@ func (g *GetChangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context,
 				return nil, &common.AppError{
 					Code:    p2p.ErrUnexpected.Code,
 					Message: fmt.Sprintf("failed to get range proof: %s", err),
+				}
+			}
+
+			if proofBytes == nil {
+				// Insufficient history for both change and range proofs.
+				return nil, &common.AppError{
+					Code:    p2p.ErrUnexpected.Code,
+					Message: "failed to generate change or range proof due to insufficient history",
 				}
 			}
 

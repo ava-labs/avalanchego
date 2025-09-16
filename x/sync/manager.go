@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -93,13 +94,13 @@ func newWorkItem(localRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[
 	}
 }
 
-type Manager[TRange, TChange any, PRange PProof[TRange], PChange PProof[TChange]] struct {
+type Manager[PRange Proof, PChange Proof] struct {
 	// The database to sync.
 	db DB[PRange, PChange]
 
 	// Must be held when accessing [config.TargetRoot].
 	syncTargetLock sync.RWMutex
-	config         ManagerConfig
+	config         ManagerConfig[PRange, PChange]
 
 	workLock sync.Mutex
 	// The number of work items currently being processed.
@@ -140,24 +141,24 @@ type Manager[TRange, TChange any, PRange PProof[TRange], PChange PProof[TChange]
 }
 
 // TODO remove non-config values out of this struct
-type ManagerConfig struct {
+type ManagerConfig[PRange Proof, PChange Proof] struct {
 	RangeProofClient      *p2p.Client
 	ChangeProofClient     *p2p.Client
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
 	StateSyncNodes        []ids.NodeID
+
+	// Factories to allocate zero-value proofs for decoding.
+	NewRangeProof  func() PRange
+	NewChangeProof func() PChange
 }
 
-func NewManager[
-	TRange, TChange any,
-	PRange PProof[TRange],
-	PChange PProof[TChange],
-](
+func NewManager[PRange Proof, PChange Proof](
 	db DB[PRange, PChange],
-	config ManagerConfig,
+	config ManagerConfig[PRange, PChange],
 	registerer prometheus.Registerer,
-) (*Manager[TRange, TChange, PRange, PChange], error) {
+) (*Manager[PRange, PChange], error) {
 	switch {
 	case db == nil:
 		return nil, ErrNoDatabaseProvided
@@ -171,12 +172,26 @@ func NewManager[
 		return nil, ErrZeroWorkLimit
 	}
 
+	// Default factories to zero-value constructors when not provided.
+	if config.NewRangeProof == nil {
+		config.NewRangeProof = func() PRange {
+			et := reflect.TypeOf((*PRange)(nil)).Elem()
+			return reflect.New(et.Elem()).Interface().(PRange)
+		}
+	}
+	if config.NewChangeProof == nil {
+		config.NewChangeProof = func() PChange {
+			et := reflect.TypeOf((*PChange)(nil)).Elem()
+			return reflect.New(et.Elem()).Interface().(PChange)
+		}
+	}
+
 	metrics, err := NewMetrics("sync", registerer)
 	if err != nil {
 		return nil, err
 	}
 
-	m := &Manager[TRange, TChange, PRange, PChange]{
+	m := &Manager[PRange, PChange]{
 		db:              db,
 		config:          config,
 		doneChan:        make(chan struct{}),
@@ -189,7 +204,7 @@ func NewManager[
 	return m, nil
 }
 
-func (m *Manager[_, _, _, _]) Start(ctx context.Context) error {
+func (m *Manager[_, _]) Start(ctx context.Context) error {
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
@@ -213,7 +228,7 @@ func (m *Manager[_, _, _, _]) Start(ctx context.Context) error {
 // sync awaits signal on [m.unprocessedWorkCond], which indicates that there
 // is work to do or syncing completes.  If there is work, sync will dispatch a goroutine to do
 // the work.
-func (m *Manager[_, _, _, _]) sync(ctx context.Context) {
+func (m *Manager[_, _]) sync(ctx context.Context) {
 	defer func() {
 		// Invariant: [m.workLock] is held when this goroutine begins.
 		m.close()
@@ -251,7 +266,7 @@ func (m *Manager[_, _, _, _]) sync(ctx context.Context) {
 }
 
 // Close will stop the syncing process
-func (m *Manager[_, _, _, _]) Close() {
+func (m *Manager[_, _]) Close() {
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
@@ -260,7 +275,7 @@ func (m *Manager[_, _, _, _]) Close() {
 
 // close is called when there is a fatal error or sync is complete.
 // [workLock] must be held
-func (m *Manager[_, _, _, _]) close() {
+func (m *Manager[_, _]) close() {
 	m.closeOnce.Do(func() {
 		// Don't process any more work items.
 		// Drop currently processing work items.
@@ -278,7 +293,7 @@ func (m *Manager[_, _, _, _]) close() {
 	})
 }
 
-func (m *Manager[_, _, _, _]) finishWorkItem() {
+func (m *Manager[_, _]) finishWorkItem() {
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
@@ -287,7 +302,7 @@ func (m *Manager[_, _, _, _]) finishWorkItem() {
 }
 
 // Processes [item] by fetching a change or range proof.
-func (m *Manager[_, _, _, _]) doWork(ctx context.Context, work *workItem) {
+func (m *Manager[_, _]) doWork(ctx context.Context, work *workItem) {
 	// Backoff for failed requests accounting for time this job has already
 	// spent waiting in the unprocessed queue
 	now := time.Now()
@@ -318,7 +333,7 @@ func (m *Manager[_, _, _, _]) doWork(ctx context.Context, work *workItem) {
 
 // Fetch and apply the change proof given by [work].
 // Assumes [m.workLock] is not held.
-func (m *Manager[_, _, _, _]) requestChangeProof(ctx context.Context, work *workItem) {
+func (m *Manager[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
 	targetRootID := m.getTargetRoot()
 
 	if work.localRootID == targetRootID {
@@ -380,7 +395,7 @@ func (m *Manager[_, _, _, _]) requestChangeProof(ctx context.Context, work *work
 
 // Fetch and apply the range proof given by [work].
 // Assumes [m.workLock] is not held.
-func (m *Manager[_, _, _, _]) requestRangeProof(ctx context.Context, work *workItem) {
+func (m *Manager[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 	targetRootID := m.getTargetRoot()
 
 	if targetRootID == ids.Empty {
@@ -430,7 +445,7 @@ func (m *Manager[_, _, _, _]) requestRangeProof(ctx context.Context, work *workI
 	m.metrics.RequestMade()
 }
 
-func (m *Manager[_, _, _, _]) sendRequest(ctx context.Context, client *p2p.Client, requestBytes []byte, onResponse p2p.AppResponseCallback) error {
+func (m *Manager[_, _]) sendRequest(ctx context.Context, client *p2p.Client, requestBytes []byte, onResponse p2p.AppResponseCallback) error {
 	if len(m.config.StateSyncNodes) == 0 {
 		return client.AppRequestAny(ctx, requestBytes, onResponse)
 	}
@@ -443,7 +458,7 @@ func (m *Manager[_, _, _, _]) sendRequest(ctx context.Context, client *p2p.Clien
 	return client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse)
 }
 
-func (m *Manager[_, _, _, _]) retryWork(work *workItem) {
+func (m *Manager[_, _]) retryWork(work *workItem) {
 	work.priority = retryPriority
 	work.queueTime = time.Now()
 	work.requestFailed()
@@ -455,7 +470,7 @@ func (m *Manager[_, _, _, _]) retryWork(work *workItem) {
 }
 
 // Returns an error if we should drop the response
-func (m *Manager[_, _, _, _]) shouldHandleResponse(
+func (m *Manager[_, _]) shouldHandleResponse(
 	bytesLimit uint32,
 	responseBytes []byte,
 	err error,
@@ -482,7 +497,7 @@ func (m *Manager[_, _, _, _]) shouldHandleResponse(
 	return nil
 }
 
-func (m *Manager[TRange, _, PRange, _]) handleRangeProofResponse(
+func (m *Manager[PRange, _]) handleRangeProofResponse(
 	ctx context.Context,
 	targetRootID ids.ID,
 	work *workItem,
@@ -494,39 +509,16 @@ func (m *Manager[TRange, _, PRange, _]) handleRangeProofResponse(
 		return err
 	}
 
-	rangeProof := PRange(new(TRange))
-	if err := rangeProof.UnmarshalBinary(responseBytes); err != nil {
-		return err
-	}
-
-	root, err := ids.ToID(request.RootHash)
+	nextKey, err := m.unmarshalVerifyCommitRange(ctx, request, work, responseBytes)
 	if err != nil {
 		return err
-	}
-
-	if err := m.db.VerifyRangeProof(
-		ctx,
-		rangeProof,
-		protoutils.ProtoToMaybe(request.StartKey),
-		protoutils.ProtoToMaybe(request.EndKey),
-		root,
-		int(request.KeyLimit),
-	); err != nil {
-		return fmt.Errorf("%w: %w", errInvalidRangeProof, err)
-	}
-
-	// Replace all the key-value pairs in the DB from start to end with values from the response.
-	nextKey, err := m.db.CommitRangeProof(ctx, work.start, work.end, rangeProof)
-	if err != nil {
-		m.setError(err)
-		return nil
 	}
 
 	m.completeWorkItem(work, nextKey, targetRootID)
 	return nil
 }
 
-func (m *Manager[TRange, TChange, PRange, PChange]) handleChangeProofResponse(
+func (m *Manager[PRange, PChange]) handleChangeProofResponse(
 	ctx context.Context,
 	targetRootID ids.ID,
 	work *workItem,
@@ -552,68 +544,59 @@ func (m *Manager[TRange, TChange, PRange, PChange]) handleChangeProofResponse(
 
 	switch changeProofResp := changeProofResp.Response.(type) {
 	case *pb.GetChangeProofResponse_ChangeProof:
-		// The server had enough history to send us a change proof
-		changeProof := PChange(new(TChange))
-		if err := changeProof.UnmarshalBinary(changeProofResp.ChangeProof); err != nil {
-			return err
-		}
-		if err := m.db.VerifyChangeProof(
-			ctx,
-			changeProof,
-			startKey,
-			endKey,
-			endRoot,
-			int(request.KeyLimit),
-		); err != nil {
-			return fmt.Errorf("%w due to %w", errInvalidChangeProof, err)
-		}
-
-		// if the proof wasn't empty, apply changes to the sync DB
-		nextKey, err := m.db.CommitChangeProof(ctx, endKey, changeProof)
+		nextKey, err := m.unmarshalVerifyCommitChange(ctx, request, startKey, endKey, endRoot, changeProofResp.ChangeProof)
 		if err != nil {
-			m.setError(err)
-			return nil
+			return err
 		}
 
 		m.completeWorkItem(work, nextKey, targetRootID)
 	case *pb.GetChangeProofResponse_RangeProof:
-		rangeProof := PRange(new(TRange))
-		if err := rangeProof.UnmarshalBinary(changeProofResp.RangeProof); err != nil {
-			return err
-		}
-
-		// The server did not have enough history to send us a change proof
-		// so they sent a range proof instead.
-		if err := m.db.VerifyRangeProof(
-			ctx,
-			rangeProof,
-			startKey,
-			endKey,
-			endRoot,
-			int(request.KeyLimit),
-		); err != nil {
-			return err
-		}
-
-		// Add all the key-value pairs we got to the database.
-		nextKey, err := m.db.CommitRangeProof(ctx, work.start, work.end, rangeProof)
+		nextKey, err := m.unmarshalVerifyCommitRangeWithBounds(ctx, startKey, endKey, endRoot, work, changeProofResp.RangeProof)
 		if err != nil {
-			m.setError(err)
-			return nil
+			return err
 		}
 
 		m.completeWorkItem(work, nextKey, targetRootID)
 	default:
-		return fmt.Errorf(
-			"%w: %T",
-			errUnexpectedChangeProofResponse, changeProofResp,
-		)
+		return fmt.Errorf("%w: %T", errUnexpectedChangeProofResponse, changeProofResp)
 	}
 
 	return nil
 }
 
-func (m *Manager[_, _, _, _]) Error() error {
+// unmarshalVerifyCommitRange unmarshals a range proof from bytes, verifies
+// it against the request, and commits it to the DB, returning the next key.
+func (m *Manager[PRange, _]) unmarshalVerifyCommitRange(
+	ctx context.Context,
+	request *pb.GetRangeProofRequest,
+	work *workItem,
+	responseBytes []byte,
+) (maybe.Maybe[[]byte], error) {
+	rangeProof := m.config.NewRangeProof()
+	if err := rangeProof.UnmarshalBinary(responseBytes); err != nil {
+		return maybe.Nothing[[]byte](), err
+	}
+
+	root, err := ids.ToID(request.RootHash)
+	if err != nil {
+		return maybe.Nothing[[]byte](), err
+	}
+
+	if err := m.db.VerifyRangeProof(
+		ctx,
+		rangeProof,
+		protoutils.ProtoToMaybe(request.StartKey),
+		protoutils.ProtoToMaybe(request.EndKey),
+		root,
+		int(request.KeyLimit),
+	); err != nil {
+		return maybe.Nothing[[]byte](), fmt.Errorf("%w: %w", errInvalidRangeProof, err)
+	}
+
+	return m.db.CommitRangeProof(ctx, work.start, work.end, rangeProof)
+}
+
+func (m *Manager[_, _]) Error() error {
 	m.errLock.Lock()
 	defer m.errLock.Unlock()
 
@@ -625,7 +608,7 @@ func (m *Manager[_, _, _, _]) Error() error {
 // - sync fatally errored.
 // - [ctx] is canceled.
 // If [ctx] is canceled, returns [ctx].Err().
-func (m *Manager[_, _, _, _]) Wait(ctx context.Context) error {
+func (m *Manager[_, _]) Wait(ctx context.Context) error {
 	select {
 	case <-m.doneChan:
 	case <-ctx.Done():
@@ -651,7 +634,7 @@ func (m *Manager[_, _, _, _]) Wait(ctx context.Context) error {
 	return nil
 }
 
-func (m *Manager[_, _, _, _]) UpdateSyncTarget(syncTargetRoot ids.ID) error {
+func (m *Manager[_, _]) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 	m.syncTargetLock.Lock()
 	defer m.syncTargetLock.Unlock()
 
@@ -690,7 +673,7 @@ func (m *Manager[_, _, _, _]) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 	return nil
 }
 
-func (m *Manager[_, _, _, _]) getTargetRoot() ids.ID {
+func (m *Manager[_, _]) getTargetRoot() ids.ID {
 	m.syncTargetLock.RLock()
 	defer m.syncTargetLock.RUnlock()
 
@@ -698,7 +681,7 @@ func (m *Manager[_, _, _, _]) getTargetRoot() ids.ID {
 }
 
 // Record that there was a fatal error and begin shutting down.
-func (m *Manager[_, _, _, _]) setError(err error) {
+func (m *Manager[_, _]) setError(err error) {
 	m.errLock.Lock()
 	defer m.errLock.Unlock()
 
@@ -722,7 +705,7 @@ func (m *Manager[_, _, _, _]) setError(err error) {
 // that gave us the range up to and including [largestHandledKey].
 //
 // Assumes [m.workLock] is not held.
-func (m *Manager[_, _, _, _]) completeWorkItem(work *workItem, largestHandledKey maybe.Maybe[[]byte], rootID ids.ID) {
+func (m *Manager[_, _]) completeWorkItem(work *workItem, largestHandledKey maybe.Maybe[[]byte], rootID ids.ID) {
 	// nextStartKey being Nothing indicates that the entire range has been completed
 	if largestHandledKey.IsNothing() {
 		largestHandledKey = work.end
@@ -760,7 +743,7 @@ func (m *Manager[_, _, _, _]) completeWorkItem(work *workItem, largestHandledKey
 // If there are sufficiently few unprocessed/processing work items,
 // splits the range into two items and queues them both.
 // Assumes [m.workLock] is not held.
-func (m *Manager[_, _, _, _]) enqueueWork(work *workItem) {
+func (m *Manager[_, _]) enqueueWork(work *workItem) {
 	m.workLock.Lock()
 	defer func() {
 		m.workLock.Unlock()
@@ -876,4 +859,59 @@ func calculateBackoff(attempt int) time.Duration {
 		initialRetryWait*time.Duration(math.Pow(retryWaitFactor, float64(attempt))),
 		maxRetryWait,
 	)
+}
+
+// unmarshalVerifyCommitRangeWithBounds is like unmarshalVerifyCommitRange but
+// takes bounds explicitly and commits over [work.start, work.end].
+func (m *Manager[PRange, _]) unmarshalVerifyCommitRangeWithBounds(
+	ctx context.Context,
+	startKey, endKey maybe.Maybe[[]byte],
+	root ids.ID,
+	work *workItem,
+	resp []byte,
+) (maybe.Maybe[[]byte], error) {
+	rp := m.config.NewRangeProof()
+	if err := rp.UnmarshalBinary(resp); err != nil {
+		return maybe.Nothing[[]byte](), err
+	}
+
+	if err := m.db.VerifyRangeProof(
+		ctx,
+		rp,
+		startKey,
+		endKey,
+		root,
+		int(MaxKeyValuesLimit),
+	); err != nil {
+		return maybe.Nothing[[]byte](), err
+	}
+
+	return m.db.CommitRangeProof(ctx, work.start, work.end, rp)
+}
+
+// unmarshalVerifyCommitChange unmarshals a change proof, verifies and commits.
+func (m *Manager[PRange, PChange]) unmarshalVerifyCommitChange(
+	ctx context.Context,
+	request *pb.GetChangeProofRequest,
+	startKey, endKey maybe.Maybe[[]byte],
+	endRoot ids.ID,
+	resp []byte,
+) (maybe.Maybe[[]byte], error) {
+	cp := m.config.NewChangeProof()
+	if err := cp.UnmarshalBinary(resp); err != nil {
+		return maybe.Nothing[[]byte](), err
+	}
+
+	if err := m.db.VerifyChangeProof(
+		ctx,
+		cp,
+		startKey,
+		endKey,
+		endRoot,
+		int(request.KeyLimit),
+	); err != nil {
+		return maybe.Nothing[[]byte](), fmt.Errorf("%w due to %w", errInvalidChangeProof, err)
+	}
+
+	return m.db.CommitChangeProof(ctx, endKey, cp)
 }

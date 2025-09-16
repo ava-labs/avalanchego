@@ -42,7 +42,7 @@ func Test_Creation(t *testing.T) {
 	ctx := context.Background()
 	syncer, err := xsync.NewManager(
 		db,
-		xsync.ManagerConfig{
+		xsync.ManagerConfig[*merkledb.RangeProof, *merkledb.ChangeProof]{
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(db)),
 			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(db)),
 			SimultaneousWorkLimit: 5,
@@ -723,7 +723,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 
 			syncer, err := xsync.NewManager(
 				db,
-				xsync.ManagerConfig{
+				xsync.ManagerConfig[*merkledb.RangeProof, *merkledb.ChangeProof]{
 					RangeProofClient:      rangeProofClient,
 					ChangeProofClient:     changeProofClient,
 					TargetRoot:            syncRoot,
@@ -798,7 +798,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	cancelCtx, cancel := context.WithCancel(ctx)
 	syncer, err := xsync.NewManager(
 		db,
-		xsync.ManagerConfig{
+		xsync.ManagerConfig[*merkledb.RangeProof, *merkledb.ChangeProof]{
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, newRangeProofHandlerCancel(dbToSync, cancel)),
 			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync)),
 			TargetRoot:            syncRoot,
@@ -818,7 +818,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 
 	newSyncer, err := xsync.NewManager(
 		db,
-		xsync.ManagerConfig{
+		xsync.ManagerConfig[*merkledb.RangeProof, *merkledb.ChangeProof]{
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(dbToSync)),
 			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync)),
 			TargetRoot:            syncRoot,
@@ -868,7 +868,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	rangeProofHandler := newRangeProofHandlerCancel(dbToSync, func() {})
 	m, err := xsync.NewManager(
 		db,
-		xsync.ManagerConfig{
+		xsync.ManagerConfig[*merkledb.RangeProof, *merkledb.ChangeProof]{
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, rangeProofHandler),
 			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync)),
 			TargetRoot:            root1,

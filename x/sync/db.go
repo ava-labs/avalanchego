@@ -17,17 +17,13 @@ var (
 	ErrEndRootNotFound   = errors.New("end root not found")
 )
 
-type DB[TRange, TChange Proof] interface {
+type DB[PRange Proof, PChange Proof] interface {
 	GetMerkleRoot(ctx context.Context) (ids.ID, error)
 	Clear() error
-	ChangeProofer[TChange]
-	RangeProofer[TRange]
+	ChangeProofer[PChange]
+	RangeProofer[PRange]
 }
 
-type PProof[T any] interface {
-	*T
-	Proof
-}
 type Proof interface {
 	encoding.BinaryMarshaler
 	encoding.BinaryUnmarshaler
@@ -57,8 +53,8 @@ type ChangeProofer[T Proof] interface {
 	//   - [start] <= [end].
 	//   - [proof] is non-empty.
 	//   - [proof] is well-formed.
-	//   - The keys in [proof] is not longer than [maxLength].
-	//   - All keys in [proof] and [proof] are in [start, end].
+	//   - The number of keys referenced by [proof] does not exceed [maxLength].
+	//   - All keys referenced by [proof] are within [start, end].
 	//     If [start] is nothing, all keys are considered > [start].
 	//     If [end] is nothing, all keys are considered < [end].
 	//   - When the changes in [proof] are applied,
@@ -96,8 +92,8 @@ type RangeProofer[T Proof] interface {
 	//   - [start] <= [end].
 	//   - [proof] is non-empty.
 	//   - [proof] is well-formed.
-	//   - The keys in [proof] is not longer than [maxLength].
-	//   - All keys in [proof] and [proof] are in [start, end].
+	//   - The number of keys referenced by [proof] does not exceed [maxLength].
+	//   - All keys referenced by [proof] are within [start, end].
 	//     If [start] is nothing, all keys are considered > [start].
 	//     If [end] is nothing, all keys are considered < [end].
 	//   - When the changes in [proof] are applied,
