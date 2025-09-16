@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1757927601602,
+  "lastUpdate": 1758013876741,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -1228,6 +1228,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-blacksmith-4vcpu-ubuntu-2404",
             "value": 119.9,
+            "unit": "mgas/s",
+            "extra": "1 times\n6 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "felipemadero",
+            "username": "felipemadero",
+            "email": "felipe.madero@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "87cda9a8b0f194b70b7481e4fe258b8c78e404fa",
+          "message": "Add public network support to tmpnet (#4267)\n\nSigned-off-by: Ron Kuris <swcafe@gmail.com>\nSigned-off-by: maru <maru.newby@avalabs.org>\nSigned-off-by: Sam Liokumovich <65994425+samliok@users.noreply.github.com>\nCo-authored-by: Ron Kuris <swcafe@gmail.com>\nCo-authored-by: Copilot <175728472+Copilot@users.noreply.github.com>\nCo-authored-by: maru <maru.newby@avalabs.org>\nCo-authored-by: rodrigo <77309055+RodrigoVillar@users.noreply.github.com>\nCo-authored-by: Sam Liokumovich <65994425+samliok@users.noreply.github.com>",
+          "timestamp": "2025-09-16T01:09:25Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/87cda9a8b0f194b70b7481e4fe258b8c78e404fa"
+        },
+        "date": 1758013875550,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-blacksmith-4vcpu-ubuntu-2404",
+            "value": 106.2,
             "unit": "mgas/s",
             "extra": "1 times\n6 procs"
           }
