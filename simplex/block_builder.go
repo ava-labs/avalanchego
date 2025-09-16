@@ -37,13 +37,11 @@ func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.Protocol
 		err := b.incomingBlock(ctx)
 		if err != nil {
 			b.log.Debug("Error waiting for incoming block", zap.Error(err))
-			curWait = backoff(ctx, curWait)
 			continue
 		}
 		vmBlock, err := b.vm.BuildBlock(ctx)
 		if err != nil {
 			b.log.Info("Error building block", zap.Error(err))
-			curWait = backoff(ctx, curWait)
 			continue
 		}
 		simplexBlock, err := newBlock(metadata, vmBlock, b.blockTracker)
@@ -55,7 +53,6 @@ func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.Protocol
 		verifiedBlock, err := simplexBlock.Verify(ctx)
 		if err != nil {
 			b.log.Warn("Error verifying block we built ourselves", zap.Error(err))
-			curWait = backoff(ctx, curWait)
 			continue
 		}
 
