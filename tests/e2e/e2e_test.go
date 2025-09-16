@@ -17,6 +17,7 @@ import (
 	_ "github.com/ava-labs/avalanchego/tests/e2e/c"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/faultinjection"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/p"
+	"github.com/ava-labs/avalanchego/tests/e2e/vms"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x"
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
 
@@ -45,10 +46,9 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	nodeCount, err := flagVars.NodeCount()
 	require.NoError(tc, err)
 	nodes := tmpnet.NewNodesOrPanic(nodeCount)
-	// xsvmSubnets := vms.XSVMSubnetsOrPanic(nodes...)
-	// simplexSubnets := s.SimplexSubnetsOrPanic(nodes...)
-	// subnets := append(xsvmSubnets, simplexSubnets...)
-	subnets := s.SimplexSubnetsOrPanic(nodes...)
+	xsvmSubnets := vms.XSVMSubnetsOrPanic(nodes...)
+	simplexSubnets := s.SimplexSubnetsOrPanic(nodes...)
+	subnets := append(xsvmSubnets, simplexSubnets...)
 	upgrades := upgrade.Default
 	if flagVars.ActivateGranite() {
 		upgrades.GraniteTime = upgrade.InitiallyActiveTime

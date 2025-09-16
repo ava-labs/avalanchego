@@ -746,6 +746,7 @@ func (h *handler) handleSyncMsg(ctx context.Context, msg Message) error {
 		)
 
 		return engine.SimplexMessage(ctx, nodeID, msg)
+	// Connection messages can be sent to the currently executing engine
 	case *message.Connected:
 		err := h.peerTracker.Connected(ctx, nodeID, msg.NodeVersion)
 		if err != nil {

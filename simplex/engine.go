@@ -242,7 +242,6 @@ func (*Engine) Gossip(_ context.Context) error {
 }
 
 func (e *Engine) Notify(_ context.Context, _ common.Message) error {
-	e.logger.Debug("Notify is not implemented for simplex")
 	return nil
 }
 
