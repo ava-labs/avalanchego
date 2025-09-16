@@ -63,7 +63,7 @@ func (a *Aggregator) AggregateSignatures(ctx context.Context, unsignedMessage *a
 	defer signatureFetchCancel()
 
 	// Fetch signatures from validators concurrently.
-	signatureFetchResultChan := make(chan *signatureFetchResult)
+	signatureFetchResultChan := make(chan *signatureFetchResult, len(a.validators))
 	for i, validator := range a.validators {
 		var (
 			i         = i
@@ -86,7 +86,10 @@ func (a *Aggregator) AggregateSignatures(ctx context.Context, unsignedMessage *a
 					"err", err,
 					"msgID", unsignedMessage.ID(),
 				)
-				signatureFetchResultChan <- nil
+				select {
+				case <-signatureFetchCtx.Done():
+				case signatureFetchResultChan <- nil:
+				}
 				return
 			}
 
@@ -102,14 +105,20 @@ func (a *Aggregator) AggregateSignatures(ctx context.Context, unsignedMessage *a
 					"index", i,
 					"msgID", unsignedMessage.ID(),
 				)
-				signatureFetchResultChan <- nil
+				select {
+				case <-signatureFetchCtx.Done():
+				case signatureFetchResultChan <- nil:
+				}
 				return
 			}
 
-			signatureFetchResultChan <- &signatureFetchResult{
+			select {
+			case <-signatureFetchCtx.Done():
+			case signatureFetchResultChan <- &signatureFetchResult{
 				sig:    signature,
 				index:  i,
 				weight: validator.Weight,
+			}:
 			}
 		}()
 	}
