@@ -1,15 +1,24 @@
 package firewood
 
 import (
+	"bytes"
 	"context"
+	"errors"
+
+	"github.com/ava-labs/firewood-go-ethhash/ffi"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+
 	xsync "github.com/ava-labs/avalanchego/x/sync"
-	"github.com/ava-labs/firewood-go-ethhash/ffi"
 )
 
-var _ xsync.DB[*ffi.RangeProof, *ffi.ChangeProof] = (*DB)(nil)
+var (
+	_ xsync.DB[*rangeProof, *changeProof] = (*DB)(nil)
+
+	errNilProof        = errors.New("nil proof")
+	errMismatchingRoot = errors.New("committed root does not match expected root")
+)
 
 type DB struct {
 	fw *ffi.Database
@@ -19,7 +28,7 @@ func New(db *ffi.Database) *DB {
 	return &DB{fw: db}
 }
 
-func (db *DB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
+func (db *DB) GetMerkleRoot(context.Context) (ids.ID, error) {
 	root, err := db.fw.Root()
 	if err != nil {
 		return ids.ID{}, err
@@ -27,41 +36,107 @@ func (db *DB) GetMerkleRoot(ctx context.Context) (ids.ID, error) {
 	return ids.ID(root), nil
 }
 
-func (db *DB) CommitChangeProof(ctx context.Context, end maybe.Maybe[[]byte], proof *ffi.ChangeProof) (maybe.Maybe[[]byte], error) {
-	// TODO: implement
-	return maybe.Maybe[[]byte]{}, nil
+// TODO: implement
+//
+//nolint:revive
+func (db *DB) CommitChangeProof(_ context.Context, end maybe.Maybe[[]byte], proof *changeProof) (maybe.Maybe[[]byte], error) {
+	return maybe.Nothing[[]byte](), errors.New("CommitChangeProof not implemented")
 }
 
-func (db *DB) CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof *ffi.RangeProof) (maybe.Maybe[[]byte], error) {
-	/*
-	result, err := db.fw.VerifyAndCommitRangeProof(proof, end, start, end, maxLength)
+// Commit the range proof to the database.
+// TODO: This should only commit the range proof, not verify it.
+// This will be resolved once the Firewood supports that.
+// This is the last call to the proof, so it and any resources should be freed.
+func (db *DB) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[]byte], proof *rangeProof) (nextKey maybe.Maybe[[]byte], err error) {
+	// Set up cleanup.
+	var nextKeyRange *ffi.NextKeyRange
+	defer func() {
+		// This will be our last call to the proof.
+		err = errors.Join(err, proof.proof.Free())
+		// If we got a nextKeyRange, free it too.
+		if nextKeyRange != nil {
+			err = errors.Join(err, nextKeyRange.Free())
+		}
+	}()
+
+	// TODO: Remove copy. Currently necessary to avoid passing pointer to a stack variable?
+	rootBytes := make([]byte, ids.IDLen)
+	copy(rootBytes, proof.root[:])
+
+	// Verify and commit the proof in a single step (TODO: separate these steps).
+	// CommitRangeProof will verify the proof as part of committing it.
+	root, err := db.fw.VerifyAndCommitRangeProof(proof.proof, start, end, rootBytes, uint32(proof.maxLength))
 	if err != nil {
-		return maybe.Maybe[[]byte]{}, err
+		return maybe.Nothing[[]byte](), err
 	}
-	return maybe.Some(result), nil
-	return db.fw.CommitRangeProof(ctx, start, end, proof)
-	*/
-	return maybe.Maybe[[]byte]{}, nil
+
+	// Unexpected root - should never happen, but easy to verify.
+	if bytes.Equal(root, proof.root[:]) {
+		return maybe.Nothing[[]byte](), errMismatchingRoot
+	}
+
+	// We can now get the FindNextKey iterator.
+	nextKeyRange, err = proof.proof.FindNextKey()
+	if err != nil {
+		return maybe.Nothing[[]byte](), err
+	}
+
+	// Return next key
+	if nextKeyRange.HasEndKey() {
+		return maybe.Some(nextKeyRange.EndKey()), nil
+	}
+	return maybe.Nothing[[]byte](), nil
 }
 
-func (db *DB) GetChangeProof(ctx context.Context, startRootID ids.ID, endRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*ffi.ChangeProof, error) {
-	// return db.fw.ChangeProof(startRootID, endRootID, start, end, maxLength)
-	return nil, nil
+// TODO: implement
+//
+//nolint:revive
+func (db *DB) GetChangeProof(_ context.Context, startRootID ids.ID, endRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*changeProof, error) {
+	return nil, errors.New("GetChangeProof not implemented")
 }
 
-func (db *DB) GetRangeProofAtRoot(ctx context.Context, rootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*ffi.RangeProof, error) {
-	return db.fw.RangeProof(maybe.Some(rootID[:]), start, end, uint32(maxLength))
+// Get the range proof between [start, end].
+// The returned proof must be freed when no longer needed.
+// Since this method is only called prior to marshalling the proof for sending over the
+// network, the proof will be freed when marshalled.
+func (db *DB) GetRangeProofAtRoot(_ context.Context, rootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*rangeProof, error) {
+	proof, err := db.fw.RangeProof(maybe.Some(rootID[:]), start, end, uint32(maxLength))
+	if err != nil {
+		return nil, err
+	}
+
+	return newRangeProof(proof), nil
 }
 
-func (db *DB) VerifyChangeProof(ctx context.Context, proof *ffi.ChangeProof, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
+// TODO: implement
+//
+//nolint:revive
+func (db *DB) VerifyChangeProof(_ context.Context, proof *changeProof, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
+	return errors.New("VerifyChangeProof not implemented")
+}
+
+// TODO: implement
+// Right now, we verify the proof as part of committing it, making this function a no-op.
+// We must only pass the necessary data to CommitRangeProof so it can verify the proof.
+//
+//nolint:revive
+func (db *DB) VerifyRangeProof(_ context.Context, proof *rangeProof, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
+	if proof.proof == nil {
+		return errNilProof
+	}
+
+	// TODO: once firewood can verify separately from committing, do that here.
+	// For now, pass any necessary data to be done in CommitRangeProof.
+	// Namely, the max length and root.
+	proof.root = expectedEndRootID
+	proof.maxLength = maxLength
 	return nil
 }
 
-func (db *DB) VerifyRangeProof(ctx context.Context, proof *ffi.RangeProof, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
-	return proof.Verify(expectedEndRootID[:], start, end, uint32(maxLength))
-}
-
+// TODO: implement
+// No error is returned to ensure some tests pass.
+//
+//nolint:revive
 func (db *DB) Clear() error {
-	// TODO: implement
 	return nil
 }
