@@ -97,7 +97,12 @@ func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config 
 		return nil, fmt.Errorf("couldn't find last block at height %d: %w", storage.NumBlocks()-1, err)
 	}
 
-	blockTracker := newBlockTracker(lastBlock.(*Block), config.VM)
+	simplexBlock, ok := lastBlock.(*Block)
+	if !ok {
+		return nil, fmt.Errorf("expected last block to be of type *Block but got %T", lastBlock)
+	}
+
+	blockTracker := newBlockTracker(simplexBlock, config.VM)
 	blockBuilder := &BlockBuilder{
 		vm:           config.VM,
 		blockTracker: blockTracker,
@@ -123,7 +128,7 @@ func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config 
 		Storage:             storage,
 		WAL:                 config.WAL,
 		BlockBuilder:        blockBuilder,
-		Epoch:               0, // 0 for now, but we would get the epoch from the metadata associated with the latest block
+		Epoch:               simplexBlock.metadata.Epoch,
 		StartTime:           time.Now(),
 		ReplicationEnabled:  true,
 	}
@@ -241,11 +246,6 @@ func (e *Engine) Notify(_ context.Context, _ common.Message) error {
 	return nil
 }
 
-func (e *Engine) Disconnected(_ context.Context, _ ids.NodeID) error {
-	e.logger.Debug("Disconnected is not implemented for simplex")
-	return nil
-}
-
 func (e *Engine) HealthCheck(ctx context.Context) (interface{}, error) {
 	if e.nonValidator {
 		return "non-validator; no health status", nil
@@ -263,7 +263,6 @@ var _ common.BootstrapableEngine = (*TODOBootstrapper)(nil)
 
 type TODOBootstrapper struct {
 	*Engine
-	Log logging.Logger
 	common.BootstrapTracker
 }
 

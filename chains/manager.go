@@ -1776,7 +1776,6 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 
 	bootstrapper := &simplex.TODOBootstrapper{
 		BootstrapTracker: sb,
-		Log:              ctx.Log,
 		Engine:           engine,
 	}
 

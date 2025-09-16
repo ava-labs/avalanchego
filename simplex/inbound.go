@@ -15,7 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/proto/pb/p2p"
 )
 
-var errNilField = errors.New("nil field")
+var (
+	errNilField            = errors.New("nil field")
+	errInvalidDigestLength = errors.New("invalid digest length")
+	errInvalidSigner       = errors.New("invalid signer")
+)
 
 // -> MESSAGES
 func emptyNotarizationMessageFromP2P(emptyNotarization *p2p.EmptyNotarization, qcDeserializer *QCDeserializer) (*simplex.Message, error) {
@@ -154,8 +158,12 @@ func replicationResponseFromP2P(ctx context.Context, replicationResponse *p2p.Re
 	}, nil
 }
 
-// HELPERS _-----------------
+// HELPERS -----------------
 func p2pVoteToSimplexVote(p2pVote *p2p.Vote) (simplex.Vote, error) {
+	if p2pVote == nil {
+		return simplex.Vote{}, errNilField
+	}
+
 	bh, err := p2pBlockHeaderToSimplexBlockHeader(p2pVote.BlockHeader)
 	if err != nil {
 		return simplex.Vote{}, err
@@ -183,7 +191,7 @@ func p2pSignatureToSimplexSignature(p2pSig *p2p.Signature) (simplex.Signature, e
 
 	nodeID, err := ids.ToNodeID(p2pSig.Signer)
 	if err != nil {
-		return simplex.Signature{}, fmt.Errorf("failed to convert signer to NodeID: %w", err)
+		return simplex.Signature{}, fmt.Errorf("%w: %w", errInvalidSigner, err)
 	}
 
 	return simplex.Signature{
@@ -193,6 +201,10 @@ func p2pSignatureToSimplexSignature(p2pSig *p2p.Signature) (simplex.Signature, e
 }
 
 func p2pBlockHeaderToSimplexBlockHeader(p2pHeader *p2p.BlockHeader) (simplex.BlockHeader, error) {
+	if p2pHeader == nil {
+		return simplex.BlockHeader{}, errNilField
+	}
+
 	md, err := p2pMetadataToSimplexMetadata(p2pHeader.Metadata)
 	if err != nil {
 		return simplex.BlockHeader{}, fmt.Errorf("failed to convert previous metadata: %w", err)
@@ -210,6 +222,10 @@ func p2pBlockHeaderToSimplexBlockHeader(p2pHeader *p2p.BlockHeader) (simplex.Blo
 }
 
 func p2pMetadataToSimplexMetadata(p2pMetadata *p2p.ProtocolMetadata) (simplex.ProtocolMetadata, error) {
+	if p2pMetadata == nil {
+		return simplex.ProtocolMetadata{}, errNilField
+	}
+
 	if p2pMetadata.Version > math.MaxUint8 {
 		return simplex.ProtocolMetadata{}, fmt.Errorf("version %d exceeds maximum value %d", p2pMetadata.Version, math.MaxUint8)
 	}
@@ -240,7 +256,7 @@ func emptyVoteMetadataFromP2P(emptyVote *p2p.EmptyVoteMetadata) (simplex.EmptyVo
 
 func digestFromP2P(p2pDigest []byte) (simplex.Digest, error) {
 	if len(p2pDigest) != 32 {
-		return simplex.Digest{}, fmt.Errorf("invalid digest length %d, expected %d", len(p2pDigest), 32)
+		return simplex.Digest{}, fmt.Errorf("%w: go %d, expected %d", errInvalidDigestLength, len(p2pDigest), 32)
 	}
 
 	var digest simplex.Digest
@@ -281,6 +297,10 @@ func notarizationFromP2P(notarization *p2p.QuorumCertificate, qcDeserializer *QC
 }
 
 func emptyNotarizationFromP2P(emptyNotarization *p2p.EmptyNotarization, qcDeserializer *QCDeserializer) (*simplex.EmptyNotarization, error) {
+	if emptyNotarization == nil {
+		return nil, errNilField
+	}
+
 	md, err := emptyVoteMetadataFromP2P(emptyNotarization.Metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert metadata: %w", err)

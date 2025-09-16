@@ -59,6 +59,230 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 	}
 }
 
+func TestSimplexEngineRejectsMalformedSimplexMessages(t *testing.T) {
+	configs := newNetworkConfigs(t, 4)
+	ctx := context.Background()
+
+	config := configs[0]
+	config.Sender.(*sendermock.ExternalSender).
+		EXPECT().
+		Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+		AnyTimes()
+
+	consensusCtx := &snow.ConsensusContext{}
+	engine, err := NewEngine(consensusCtx, ctx, config)
+	require.NoError(t, err)
+
+	config.VM.(*wrappedVM).ParseBlockF = func(_ context.Context, _ []byte) (snowman.Block, error) {
+		return newTestBlock(t, newBlockConfig{round: 1}).vmBlock, nil
+	}
+
+	require.NoError(t, engine.Start(ctx, 1))
+
+	tests := []struct {
+		name        string
+		msg         *p2p.Simplex
+		expectedErr error
+	}{
+		// --- BlockProposal ---
+		{
+			name: "BlockProposal missing block",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_BlockProposal{
+					BlockProposal: &p2p.BlockProposal{},
+				},
+			},
+			expectedErr: errFailedToParseMetadata,
+		},
+		{
+			name: "BlockProposal missing vote",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_BlockProposal{
+					BlockProposal: &p2p.BlockProposal{
+						Block: blockBytes,
+					},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		// --- Vote ---
+		{
+			name: "Vote with nil header",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_Vote{
+					Vote: &p2p.Vote{},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		// --- EmptyVote ---
+		{
+			name: "EmptyVote with nil metadata",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_EmptyVote{
+					EmptyVote: &p2p.EmptyVote{},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		{
+			name: "EmptyVote with nil signature",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_EmptyVote{
+					EmptyVote: &p2p.EmptyVote{
+						Metadata: &p2p.EmptyVoteMetadata{
+							Epoch: 1, Round: 1,
+						},
+					},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		// --- FinalizeVote ---
+		{
+			name: "FinalizeVote missing header + sig",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_FinalizeVote{
+					FinalizeVote: &p2p.Vote{},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		// --- Notarization ---
+		{
+			name: "Notarization with nil BlockHeader",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_Notarization{
+					Notarization: &p2p.QuorumCertificate{},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		{
+			name: "Notarization with nil QC",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_Notarization{
+					Notarization: &p2p.QuorumCertificate{
+						BlockHeader: &p2p.BlockHeader{
+							Metadata: p2pProtocolMetadata,
+							Digest:   digest[:],
+						},
+					},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		// --- EmptyNotarization ---
+		{
+			name: "EmptyNotarization with nil metadata",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_EmptyNotarization{
+					EmptyNotarization: &p2p.EmptyNotarization{},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		{
+			name: "EmptyNotarization with nil QC",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_EmptyNotarization{
+					EmptyNotarization: &p2p.EmptyNotarization{
+						Metadata: &p2p.EmptyVoteMetadata{
+							Epoch: 1, Round: 1,
+						},
+					},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		// --- Finalization ---
+		{
+			name: "Finalization with nil BlockHeader",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_Finalization{
+					Finalization: &p2p.QuorumCertificate{},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		{
+			name: "Finalization with nil QC",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_Finalization{
+					Finalization: &p2p.QuorumCertificate{
+						BlockHeader: &p2p.BlockHeader{
+							Metadata: p2pProtocolMetadata,
+							Digest:   digest[:],
+						},
+					},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		// --- ReplicationRequest ---
+		{
+			name: "ReplicationRequest missing seqs/round (allowed)",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_ReplicationRequest{
+					ReplicationRequest: &p2p.ReplicationRequest{},
+				},
+			},
+			expectedErr: nil,
+		},
+		// --- ReplicationResponse ---
+		{
+			name: "ReplicationResponse with nil latest_round",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_ReplicationResponse{
+					ReplicationResponse: &p2p.ReplicationResponse{},
+				},
+			},
+			expectedErr: errNilField,
+		},
+		// --- Edge case: invalid digest ---
+		{
+			name: "Vote with invalid digest length",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_Vote{
+					Vote: &p2p.Vote{
+						BlockHeader: &p2p.BlockHeader{
+							Metadata: &p2p.ProtocolMetadata{},
+						},
+						Signature: &p2p.Signature{
+							Signer: []byte{1, 2, 3}, Value: []byte{4},
+						},
+					},
+				},
+			},
+			expectedErr: errInvalidDigestLength,
+		},
+		{
+			name: "Vote with invalid signer",
+			msg: &p2p.Simplex{
+				Message: &p2p.Simplex_Vote{
+					Vote: &p2p.Vote{
+						BlockHeader: &p2p.BlockHeader{
+							Metadata: p2pProtocolMetadata,
+							Digest:   digest[:],
+						},
+						Signature: &p2p.Signature{
+							Signer: []byte{1, 2, 3}, Value: []byte{4},
+						},
+					},
+				},
+			},
+			expectedErr: errInvalidSigner,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, tt.msg)
+			require.ErrorIs(t, err, tt.expectedErr)
+		})
+	}
+}
+
 // -----------------------------------------------------------------------------
 // Shared Test Data
 // -----------------------------------------------------------------------------
@@ -88,6 +312,13 @@ var (
 // -----------------------------------------------------------------------------
 
 var (
+	p2pProtocolMetadata = &p2p.ProtocolMetadata{
+		Version: 1,
+		Epoch:   42,
+		Round:   7,
+		Seq:     100,
+		Prev:    digest[:],
+	}
 	// BlockProposal
 	simplexBlockProposal = &p2p.Simplex{
 		ChainId: []byte("chain-1"),
@@ -96,14 +327,8 @@ var (
 				Block: blockBytes,
 				Vote: &p2p.Vote{
 					BlockHeader: &p2p.BlockHeader{
-						Metadata: &p2p.ProtocolMetadata{
-							Version: 1,
-							Epoch:   42,
-							Round:   7,
-							Seq:     100,
-							Prev:    digest[:],
-						},
-						Digest: digest[:],
+						Metadata: p2pProtocolMetadata,
+						Digest:   digest[:],
 					},
 					Signature: &p2p.Signature{Signer: signer, Value: []byte("signature")},
 				},

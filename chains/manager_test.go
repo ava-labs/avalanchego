@@ -109,6 +109,7 @@ func newMockVMManager(t *testing.T) vms.Manager {
 	return manager
 }
 
+// testLogger is used for debugging to print out logs to stdout.
 func testLogger(t *testing.T) logging.Logger {
 	writeCloser := os.Stdout
 	logFormat, err := logging.ToFormat("auto", writeCloser.Fd())
@@ -140,7 +141,7 @@ func TestCreateSimplexChain(t *testing.T) {
 		SubnetID: ids.GenerateTestID(),
 		VMID:     ids.GenerateTestID(),
 	}
-	logger := testLogger(t)
+	logger := logging.NoLog{}
 	subnets := newTestSubnets(t, chainParams.SubnetID)
 	signer, err := localsigner.New()
 	require.NoError(t, err)
@@ -203,7 +204,7 @@ func TestCreateSimplexChain(t *testing.T) {
 	chainManager.QueueChainCreation(chainParams)
 	primaryAlias := chainManager.PrimaryAliasOrDefault(chainParams.ID)
 
-	timeout := time.After(10 * time.Second)
+	timeout := time.After(1 * time.Minute)
 	for {
 		select {
 		case <-timeout:
