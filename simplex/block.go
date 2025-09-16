@@ -221,10 +221,5 @@ func (bt *blockTracker) indexBlock(ctx context.Context, digest simplex.Digest) e
 	}
 
 	// notify the VM that we are accepting this block, and reject all competing blocks
-	err := bt.tree.Accept(ctx, bd.vmBlock)
-	if err != nil {
-		return fmt.Errorf("failed to accept block: %w", err)
-	}
-
-	return nil
+	return bt.tree.Accept(ctx, bd.vmBlock)
 }

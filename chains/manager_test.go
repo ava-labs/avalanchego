@@ -6,7 +6,6 @@ package chains
 import (
 	"context"
 	"errors"
-	"os"
 	"testing"
 	"time"
 
@@ -107,14 +106,6 @@ func newMockVMManager(t *testing.T) vms.Manager {
 	manager.EXPECT().GetFactory(gomock.Any()).Return(factory, nil).AnyTimes()
 
 	return manager
-}
-
-// testLogger is used for debugging to print out logs to stdout.
-func testLogger(t *testing.T) logging.Logger {
-	writeCloser := os.Stdout
-	logFormat, err := logging.ToFormat("auto", writeCloser.Fd())
-	require.NoError(t, err)
-	return logging.NewLogger("chain_manager_test", logging.NewWrappedCore(logging.Verbo, writeCloser, logFormat.ConsoleEncoder()))
 }
 
 func newTestSubnets(t *testing.T, subnetID ids.ID) *Subnets {
