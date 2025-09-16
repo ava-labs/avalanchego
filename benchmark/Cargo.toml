@@ -13,6 +13,9 @@ repository.workspace = true
 readme.workspace = true
 rust-version.workspace = true
 
+[package.metadata.cargo-machete]
+ignored = ["opentelemetry-proto"]
+
 [[bin]]
 name = "benchmark"
 path = "src/main.rs"
@@ -34,9 +37,10 @@ sha2.workspace = true
 # Regular dependencies
 fastrace-opentelemetry = { version = "0.13.0" }
 metrics-exporter-prometheus = { version = "0.17.2", optional = true }
-opentelemetry = "0.30.0"
-opentelemetry-otlp = { version = "0.30.0", features = ["grpc-tonic"] }
-opentelemetry_sdk = "0.30.0"
+opentelemetry = "=0.30.0"
+opentelemetry-otlp = { version = "=0.30.0", features = ["grpc-tonic"] }
+opentelemetry-proto = "=0.30.0"
+opentelemetry_sdk = "=0.30.0"
 pretty-duration = "0.1.1"
 
 [dependencies.tokio]
