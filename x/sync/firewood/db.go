@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
+	"sync"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 
@@ -17,12 +17,12 @@ import (
 var (
 	_ xsync.DB[*rangeProof, *changeProof] = (*DB)(nil)
 
-	errNilProof        = errors.New("nil proof")
-	errMismatchingRoot = errors.New("committed root does not match expected root")
+	errNilProof = errors.New("nil proof")
 )
 
 type DB struct {
-	fw *ffi.Database
+	fw   *ffi.Database
+	lock sync.Mutex
 }
 
 func New(db *ffi.Database) *DB {
@@ -58,14 +58,11 @@ func (db *DB) CommitChangeProof(_ context.Context, end maybe.Maybe[[]byte], proo
 
 	// Verify and commit the proof in a single step (TODO: separate these steps).
 	// CommitRangeProof will verify the proof as part of committing it.
-	root, err := db.fw.VerifyAndCommitChangeProof(proof.proof, startRootBytes, endRootBytes, proof.startKey, end, uint32(proof.maxLength))
+	db.lock.Lock()
+	defer db.lock.Unlock()
+	_, err = db.fw.VerifyAndCommitChangeProof(proof.proof, startRootBytes, endRootBytes, proof.startKey, end, uint32(proof.maxLength))
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
-	}
-
-	// Unexpected root - should never happen, but easy to verify.
-	if bytes.Equal(root, proof.endRoot[:]) {
-		return maybe.Nothing[[]byte](), fmt.Errorf("%w: %v != %v", errMismatchingRoot, root, proof.endRoot[:])
 	}
 
 	// We can now get the FindNextKey iterator.
@@ -103,14 +100,14 @@ func (db *DB) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[]byte]
 
 	// Verify and commit the proof in a single step (TODO: separate these steps).
 	// CommitRangeProof will verify the proof as part of committing it.
-	root, err := db.fw.VerifyAndCommitRangeProof(proof.proof, start, end, rootBytes, uint32(proof.maxLength))
+	db.lock.Lock()
+	defer db.lock.Unlock()
+	newRoot, err := db.fw.VerifyAndCommitRangeProof(proof.proof, start, end, rootBytes, uint32(proof.maxLength))
 	if err != nil {
 		return maybe.Nothing[[]byte](), err
 	}
-
-	// Unexpected root - should never happen, but easy to verify.
-	if !bytes.Equal(root, proof.root[:]) {
-		return maybe.Nothing[[]byte](), fmt.Errorf("%w: %v != %v", errMismatchingRoot, root, proof.root[:])
+	if bytes.Equal(newRoot, rootBytes) {
+		return maybe.Nothing[[]byte](), nil
 	}
 
 	// We can now get the FindNextKey iterator.
@@ -119,11 +116,7 @@ func (db *DB) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[]byte]
 		return maybe.Nothing[[]byte](), err
 	}
 
-	// Return next key
-	if nextKeyRange.HasEndKey() {
-		return maybe.Some(nextKeyRange.EndKey()), nil
-	}
-	return maybe.Nothing[[]byte](), nil
+	return maybe.Some(nextKeyRange.StartKey()), nil
 }
 
 // TODO: implement
