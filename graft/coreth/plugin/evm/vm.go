@@ -72,6 +72,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/message"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/acp176"
 	"github.com/ava-labs/coreth/plugin/evm/vmerrors"
+	"github.com/ava-labs/coreth/plugin/evm/vmsync"
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
 	"github.com/ava-labs/coreth/rpc"
 	"github.com/ava-labs/coreth/sync/client/stats"
@@ -87,7 +88,6 @@ import (
 	warpcontract "github.com/ava-labs/coreth/precompile/contracts/warp"
 	statesyncclient "github.com/ava-labs/coreth/sync/client"
 	handlerstats "github.com/ava-labs/coreth/sync/handlers/stats"
-	vmsync "github.com/ava-labs/coreth/sync/vm"
 	utilsrpc "github.com/ava-labs/coreth/utils/rpc"
 	ethparams "github.com/ava-labs/libevm/params"
 )

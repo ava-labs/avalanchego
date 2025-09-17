@@ -1,10 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package utilstest provides small testing helpers used across the codebase.
-// It includes lightweight syncer adapters and utilities for coordinating
-// goroutines under test.
-package synctest
+package vmsync
 
 import (
 	"context"
