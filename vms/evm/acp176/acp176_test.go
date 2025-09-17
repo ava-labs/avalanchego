@@ -8,9 +8,10 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
 const nAVAX = 1_000_000_000
