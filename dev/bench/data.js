@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1758100210718,
+  "lastUpdate": 1758118082918,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -1342,6 +1342,34 @@ window.BENCHMARK_DATA = {
             "value": 125.6,
             "unit": "mgas/s",
             "extra": "1 times\n6 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Meaghan FitzGerald",
+            "username": "meaghanfitzgerald",
+            "email": "meag.fitz@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "b433b9695da8d6b2288900a7f98269f88633d223",
+          "message": "Update config.md (#4278)\n\nSigned-off-by: Meaghan FitzGerald <meag.fitz@avalabs.org>",
+          "timestamp": "2025-09-16T20:13:37Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/b433b9695da8d6b2288900a7f98269f88633d223"
+        },
+        "date": 1758118082390,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,1000000]-Config-default-Runner-ubuntu-latest",
+            "value": 86.82,
+            "unit": "mgas/s",
+            "extra": "1 times\n4 procs"
           }
         ]
       }
