@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package merkledb_test
+package merkledb
 
 import (
 	"bytes"
@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
@@ -30,7 +29,7 @@ import (
 func Test_Creation(t *testing.T) {
 	require := require.New(t)
 
-	db, err := merkledb.New(
+	db, err := New(
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
@@ -64,7 +63,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	dbToSync, err := generateTrie(t, r, 1000)
 	require.NoError(err)
 
-	db, err := merkledb.New(
+	db, err := New(
 		ctx,
 		memdb.New(),
 		newDefaultDBConfig(),
@@ -108,7 +107,7 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
-	dbToSync, err := merkledb.New(
+	dbToSync, err := New(
 		ctx,
 		memdb.New(),
 		newDefaultDBConfig(),
@@ -118,7 +117,7 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 	require.NoError(dbToSync.Put([]byte{0x11, 0x11}, []byte{2}))
 
 	// Create empty DB to commit to one key
-	db, err := merkledb.New(ctx, memdb.New(), newDefaultDBConfig())
+	db, err := New(ctx, memdb.New(), newDefaultDBConfig())
 	require.NoError(err)
 	require.NoError(db.Put([]byte{0x13}, []byte{3}))
 
@@ -146,7 +145,7 @@ func Test_Sync_FindNextKey_Deleted(t *testing.T) {
 func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
-	db, err := merkledb.New(
+	db, err := New(
 		ctx,
 		memdb.New(),
 		newDefaultDBConfig(),
@@ -168,7 +167,7 @@ func Test_Sync_FindNextKey_BranchInLocal(t *testing.T) {
 func Test_Sync_FindNextKey_BranchInReceived(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
-	db, err := merkledb.New(
+	db, err := New(
 		ctx,
 		memdb.New(),
 		newDefaultDBConfig(),
@@ -198,7 +197,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	require.NoError(err)
 
 	// Make a matching DB
-	db, err := merkledb.New(
+	db, err := New(
 		ctx,
 		memdb.New(),
 		newDefaultDBConfig(),
@@ -267,7 +266,7 @@ func Test_Sync_FindNextKey_DifferentChild(t *testing.T) {
 	require.NoError(err)
 
 	// Make a matching DB
-	db, err := merkledb.New(
+	db, err := New(
 		ctx,
 		memdb.New(),
 		newDefaultDBConfig(),
@@ -308,7 +307,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 	require := require.New(t)
 
 	// Create a "remote" database and "local" database
-	remoteDB, err := merkledb.New(
+	remoteDB, err := New(
 		ctx,
 		memdb.New(),
 		newDefaultDBConfig(),
@@ -316,7 +315,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 	require.NoError(err)
 
 	config := newDefaultDBConfig()
-	localDB, err := merkledb.New(
+	localDB, err := New(
 		ctx,
 		memdb.New(),
 		config,
@@ -399,7 +398,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		require.NoError(err)
 
 		type keyAndID struct {
-			key merkledb.Key
+			key Key
 			id  ids.ID
 		}
 
@@ -408,7 +407,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for _, node := range remoteProof.EndProof {
 			for childIdx, childID := range node.Children {
 				remoteKeyIDs = append(remoteKeyIDs, keyAndID{
-					key: node.Key.Extend(merkledb.ToToken(childIdx, merkledb.BranchFactorToTokenSize[config.BranchFactor])),
+					key: node.Key.Extend(ToToken(childIdx, BranchFactorToTokenSize[config.BranchFactor])),
 					id:  childID,
 				})
 			}
@@ -419,7 +418,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		for _, node := range localProof.Path {
 			for childIdx, childID := range node.Children {
 				localKeyIDs = append(localKeyIDs, keyAndID{
-					key: node.Key.Extend(merkledb.ToToken(childIdx, merkledb.BranchFactorToTokenSize[config.BranchFactor])),
+					key: node.Key.Extend(ToToken(childIdx, BranchFactorToTokenSize[config.BranchFactor])),
 					id:  childID,
 				})
 			}
@@ -462,7 +461,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 		// Find smallest difference between the set of key/ID pairs proven by
 		// the remote/local proofs for key/ID pairs after the last received key.
 		var (
-			smallestDiffKey merkledb.Key
+			smallestDiffKey Key
 			foundDiff       bool
 		)
 		for i := 0; i < len(remoteKeyIDs) && i < len(localKeyIDs); i++ {
@@ -511,15 +510,15 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 
 	tests := []struct {
 		name              string
-		db                merkledb.MerkleDB
-		rangeProofClient  func(db merkledb.MerkleDB) *p2p.Client
-		changeProofClient func(db merkledb.MerkleDB) *p2p.Client
+		db                MerkleDB
+		rangeProofClient  func(db MerkleDB) *p2p.Client
+		changeProofClient func(db MerkleDB) *p2p.Client
 	}{
 		{
 			name: "range proof bad response - too many leaves in response",
-			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
-					response.KeyChanges = append(response.KeyChanges, merkledb.KeyChange{})
+			rangeProofClient: func(db MerkleDB) *p2p.Client {
+				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
+					response.KeyChanges = append(response.KeyChanges, KeyChange{})
 				})
 
 				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
@@ -527,8 +526,8 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "range proof bad response - removed first key in response",
-			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
+			rangeProofClient: func(db MerkleDB) *p2p.Client {
+				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
 
@@ -537,23 +536,23 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "range proof bad response - removed first key in response and replaced proof",
-			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
+			rangeProofClient: func(db MerkleDB) *p2p.Client {
+				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
-					response.KeyChanges = []merkledb.KeyChange{
+					response.KeyChanges = []KeyChange{
 						{
 							Key:   []byte("foo"),
 							Value: maybe.Some([]byte("bar")),
 						},
 					}
-					response.StartProof = []merkledb.ProofNode{
+					response.StartProof = []ProofNode{
 						{
-							Key: merkledb.Key{},
+							Key: Key{},
 						},
 					}
-					response.EndProof = []merkledb.ProofNode{
+					response.EndProof = []ProofNode{
 						{
-							Key: merkledb.Key{},
+							Key: Key{},
 						},
 					}
 				})
@@ -563,8 +562,8 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "range proof bad response - removed key from middle of response",
-			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
+			rangeProofClient: func(db MerkleDB) *p2p.Client {
+				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					i := rand.Intn(max(1, len(response.KeyChanges)-1)) // #nosec G404
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
@@ -574,8 +573,8 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "range proof bad response - start and end proof nodes removed",
-			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
+			rangeProofClient: func(db MerkleDB) *p2p.Client {
+				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.StartProof = nil
 					response.EndProof = nil
 				})
@@ -585,8 +584,8 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "range proof bad response - end proof removed",
-			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
+			rangeProofClient: func(db MerkleDB) *p2p.Client {
+				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.EndProof = nil
 				})
 
@@ -595,8 +594,8 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "range proof bad response - empty proof",
-			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newFlakyRangeProofHandler(t, db, func(response *merkledb.RangeProof) {
+			rangeProofClient: func(db MerkleDB) *p2p.Client {
+				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
 					response.StartProof = nil
 					response.EndProof = nil
 					response.KeyChanges = nil
@@ -607,7 +606,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "range proof server flake",
-			rangeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
+			rangeProofClient: func(db MerkleDB) *p2p.Client {
 				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, &flakyHandler{
 					Handler: xsync.NewGetRangeProofHandler(db),
 					c:       &counter{m: 2},
@@ -616,9 +615,9 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "change proof bad response - too many keys in response",
-			changeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newFlakyChangeProofHandler(t, db, func(response *merkledb.ChangeProof) {
-					response.KeyChanges = append(response.KeyChanges, make([]merkledb.KeyChange, xsync.DefaultRequestKeyLimit)...)
+			changeProofClient: func(db MerkleDB) *p2p.Client {
+				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
+					response.KeyChanges = append(response.KeyChanges, make([]KeyChange, xsync.DefaultRequestKeyLimit)...)
 				})
 
 				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
@@ -626,8 +625,8 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "change proof bad response - removed first key in response",
-			changeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newFlakyChangeProofHandler(t, db, func(response *merkledb.ChangeProof) {
+			changeProofClient: func(db MerkleDB) *p2p.Client {
+				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
 
@@ -636,8 +635,8 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "change proof bad response - removed key from middle of response",
-			changeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newFlakyChangeProofHandler(t, db, func(response *merkledb.ChangeProof) {
+			changeProofClient: func(db MerkleDB) *p2p.Client {
+				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
 					i := rand.Intn(max(1, len(response.KeyChanges)-1)) // #nosec G404
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
@@ -647,8 +646,8 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "change proof bad response - all proof keys removed from response",
-			changeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
-				handler := newFlakyChangeProofHandler(t, db, func(response *merkledb.ChangeProof) {
+			changeProofClient: func(db MerkleDB) *p2p.Client {
+				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
 					response.StartProof = nil
 					response.EndProof = nil
 				})
@@ -658,7 +657,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		},
 		{
 			name: "change proof flaky server",
-			changeProofClient: func(db merkledb.MerkleDB) *p2p.Client {
+			changeProofClient: func(db MerkleDB) *p2p.Client {
 				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, &flakyHandler{
 					Handler: xsync.NewGetChangeProofHandler(db),
 					c:       &counter{m: 2},
@@ -678,7 +677,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			syncRoot, err := dbToSync.GetMerkleRoot(ctx)
 			require.NoError(err)
 
-			db, err := merkledb.New(
+			db, err := New(
 				ctx,
 				memdb.New(),
 				newDefaultDBConfig(),
@@ -768,7 +767,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	db, err := merkledb.New(
+	db, err := New(
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
@@ -862,7 +861,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	secondSyncRoot, err := dbToSync.GetMerkleRoot(context.Background())
 	require.NoError(err)
 
-	db, err := merkledb.New(
+	db, err := New(
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
@@ -931,7 +930,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require.NoError(err)
 	require.NotEqual(root1, root2)
 
-	db, err := merkledb.New(
+	db, err := New(
 		ctx,
 		memdb.New(),
 		newDefaultDBConfig(),
@@ -965,14 +964,14 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require.NoError(m.Wait(ctx))
 }
 
-func generateTrie(t *testing.T, r *rand.Rand, count int) (merkledb.MerkleDB, error) {
+func generateTrie(t *testing.T, r *rand.Rand, count int) (MerkleDB, error) {
 	return generateTrieWithMinKeyLen(t, r, count, 0)
 }
 
-func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen int) (merkledb.MerkleDB, error) {
+func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen int) (MerkleDB, error) {
 	require := require.New(t)
 
-	db, err := merkledb.New(
+	db, err := New(
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),

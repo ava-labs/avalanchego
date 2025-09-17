@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package merkledb_test
+package merkledb
 
 import (
 	"context"
@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 	xsync "github.com/ava-labs/avalanchego/x/sync"
@@ -131,7 +130,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				return
 			}
 
-			var proof merkledb.RangeProof
+			var proof RangeProof
 			require.NoError(proof.UnmarshalBinary(responseBytes))
 
 			if test.expectedResponseLen > 0 {
@@ -153,7 +152,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 	t.Logf("seed: %d", now)
 	r := rand.New(rand.NewSource(now)) // #nosec G404
 
-	serverDB, err := merkledb.New(
+	serverDB, err := New(
 		context.Background(),
 		memdb.New(),
 		newDefaultDBConfig(),
@@ -192,7 +191,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 
 		view, err := serverDB.NewView(
 			context.Background(),
-			merkledb.ViewChanges{BatchOps: ops},
+			ViewChanges{BatchOps: ops},
 		)
 		require.NoError(t, err)
 		require.NoError(t, view.CommitToDB(context.Background()))
@@ -359,11 +358,11 @@ func Test_Server_GetChangeProof(t *testing.T) {
 
 			if test.expectedResponseLen > 0 {
 				if test.expectRangeProof {
-					var response merkledb.RangeProof
+					var response RangeProof
 					require.NoError(response.UnmarshalBinary(proofResult.GetRangeProof()))
 					require.LessOrEqual(len(response.KeyChanges), test.expectedResponseLen)
 				} else {
-					var response merkledb.ChangeProof
+					var response ChangeProof
 					require.NoError(response.UnmarshalBinary(proofResult.GetChangeProof()))
 					require.LessOrEqual(len(response.KeyChanges), test.expectedResponseLen)
 				}
