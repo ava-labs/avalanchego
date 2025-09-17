@@ -41,7 +41,7 @@ subjects:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: prometheus-config
+  name: prometheus-config-template
 data:
   # This template needs to have PROMETHEUS_URL substituted before use
   prometheus.yaml.template: |
@@ -140,7 +140,7 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
         - |
-          sed "s|\$\{PROMETHEUS_URL\}|${PROMETHEUS_URL}" /tmp/config-template/prometheus.yaml.template > /tmp/config/prometheus.yaml
+          sed 's|${PROMETHEUS_URL}|'"${PROMETHEUS_URL}"'|' /tmp/config-template/prometheus.yaml.template > /tmp/config/prometheus.yaml
         env:
         - name: PROMETHEUS_URL
           valueFrom:
@@ -167,21 +167,21 @@ spec:
           readOnly: true
         - name: prometheus-data
           mountPath: /prometheus
-        - name: prometheus-credentials
+        - name: prometheus-config
           mountPath: /run/secrets
           readOnly: true
       volumes:
       - name: config-template
         configMap:
-          name: prometheus-config
+          name: prometheus-config-template
       - name: config
         # The config path doesn't need to be persistent since the config
         # file will be written to the volume by the init container every
         # time the pod starts.
         emptyDir: {}
-      - name: prometheus-credentials
+      - name: prometheus-config
         secret:
-          secretName: prometheus-credentials
+          secretName: prometheus-config
   volumeClaimTemplates:
   - metadata:
       name: prometheus-data
