@@ -102,10 +102,6 @@ func (g *GetChangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context,
 	for keyLimit > 0 {
 		changeProof, err := g.db.GetChangeProof(ctx, startRoot, endRoot, start, end, int(keyLimit))
 		if err != nil {
-			if errors.Is(err, ErrEndRootNotFound) {
-				// We don't have the end root. Drop the request.
-				return nil, nil
-			}
 			if !errors.Is(err, ErrStartRootNotFound) {
 				// We should only fail to get a change proof if we have insufficient history.
 				// Other errors are unexpected.
