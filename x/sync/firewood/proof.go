@@ -6,6 +6,7 @@ import (
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/maybe"
 
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
@@ -55,12 +56,14 @@ func (r *rangeProof) UnmarshalBinary(data []byte) error {
 }
 
 type changeProof struct {
-	proof *ffi.ChangeProof
+	proof     *ffi.ChangeProof
+	startRoot ids.ID
+	endRoot   ids.ID
+	startKey  maybe.Maybe[[]byte]
+	maxLength int
 }
 
 // Wrap the ffi proof in our proof type.
-//
-//nolint:unused
 func newChangeProof(proof *ffi.ChangeProof) *changeProof {
 	return &changeProof{
 		proof: proof,

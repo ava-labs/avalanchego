@@ -37,10 +37,47 @@ func (db *DB) GetMerkleRoot(context.Context) (ids.ID, error) {
 }
 
 // TODO: implement
-//
-//nolint:revive
-func (db *DB) CommitChangeProof(_ context.Context, end maybe.Maybe[[]byte], proof *changeProof) (maybe.Maybe[[]byte], error) {
-	return maybe.Nothing[[]byte](), errors.New("CommitChangeProof not implemented")
+func (db *DB) CommitChangeProof(_ context.Context, end maybe.Maybe[[]byte], proof *changeProof) (nextKey maybe.Maybe[[]byte], err error) {
+	// Set up cleanup.
+	var nextKeyRange *ffi.NextKeyRange
+	defer func() {
+		// This will be our last call to the proof.
+		err = errors.Join(err, proof.proof.Free())
+		// If we got a nextKeyRange, free it too.
+		if nextKeyRange != nil {
+			err = errors.Join(err, nextKeyRange.Free())
+		}
+	}()
+
+	// TODO: Remove copy. Currently necessary to avoid passing pointer to a stack variable?
+	startRootBytes := make([]byte, ids.IDLen)
+	copy(startRootBytes, proof.startRoot[:])
+	endRootBytes := make([]byte, ids.IDLen)
+	copy(endRootBytes, proof.endRoot[:])
+
+	// Verify and commit the proof in a single step (TODO: separate these steps).
+	// CommitRangeProof will verify the proof as part of committing it.
+	root, err := db.fw.VerifyAndCommitChangeProof(proof.proof, startRootBytes, endRootBytes, proof.startKey, end, uint32(proof.maxLength))
+	if err != nil {
+		return maybe.Nothing[[]byte](), err
+	}
+
+	// Unexpected root - should never happen, but easy to verify.
+	if bytes.Equal(root, proof.endRoot[:]) {
+		return maybe.Nothing[[]byte](), errMismatchingRoot
+	}
+
+	// We can now get the FindNextKey iterator.
+	nextKeyRange, err = proof.proof.FindNextKey()
+	if err != nil {
+		return maybe.Nothing[[]byte](), err
+	}
+
+	// Return next key
+	if nextKeyRange.HasEndKey() {
+		return maybe.Some(nextKeyRange.EndKey()), nil
+	}
+	return maybe.Nothing[[]byte](), nil
 }
 
 // Commit the range proof to the database.
@@ -89,10 +126,13 @@ func (db *DB) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[]byte]
 }
 
 // TODO: implement
-//
-//nolint:revive
 func (db *DB) GetChangeProof(_ context.Context, startRootID ids.ID, endRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*changeProof, error) {
-	return nil, errors.New("GetChangeProof not implemented")
+	proof, err := db.fw.ChangeProof(startRootID[:], endRootID[:], start, end, uint32(maxLength))
+	if err != nil {
+		return nil, err
+	}
+
+	return newChangeProof(proof), nil
 }
 
 // Get the range proof between [start, end].
@@ -109,10 +149,22 @@ func (db *DB) GetRangeProofAtRoot(_ context.Context, rootID ids.ID, start maybe.
 }
 
 // TODO: implement
+// Right now, we verify the proof as part of committing it, making this function a no-op.
+// We must only pass the necessary data to CommitChangeProof so it can verify the proof.
 //
 //nolint:revive
 func (db *DB) VerifyChangeProof(_ context.Context, proof *changeProof, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
-	return errors.New("VerifyChangeProof not implemented")
+	if proof.proof == nil {
+		return errNilProof
+	}
+
+	// TODO: once firewood can verify separately from committing, do that here.
+	// For now, pass any necessary data to be done in CommitChangeProof.
+	// Namely, the start root, end root, and max length.
+	proof.startRoot = expectedEndRootID
+	proof.endRoot = expectedEndRootID
+	proof.maxLength = maxLength
+	return nil
 }
 
 // TODO: implement
