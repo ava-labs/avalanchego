@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1758013937843,
+  "lastUpdate": 1758100208438,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -1284,6 +1284,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-blacksmith-4vcpu-ubuntu-2404",
             "value": 86.13,
+            "unit": "mgas/s",
+            "extra": "1 times\n6 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Meaghan FitzGerald",
+            "username": "meaghanfitzgerald",
+            "email": "meag.fitz@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "b433b9695da8d6b2288900a7f98269f88633d223",
+          "message": "Update config.md (#4278)\n\nSigned-off-by: Meaghan FitzGerald <meag.fitz@avalabs.org>",
+          "timestamp": "2025-09-16T20:13:37Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/b433b9695da8d6b2288900a7f98269f88633d223"
+        },
+        "date": 1758100207302,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-blacksmith-4vcpu-ubuntu-2404",
+            "value": 126.4,
             "unit": "mgas/s",
             "extra": "1 times\n6 procs"
           }
