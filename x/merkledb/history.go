@@ -5,7 +5,6 @@ package merkledb
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"slices"
 
@@ -15,11 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-)
-
-var (
-	ErrInsufficientHistory = errors.New("insufficient history to generate proof")
-	ErrNoEndRoot           = fmt.Errorf("%w: end root not found", ErrInsufficientHistory)
+	"github.com/ava-labs/avalanchego/x/sync"
 )
 
 // stores previous trie states
@@ -144,7 +139,7 @@ func (th *trieHistory) getValueChanges(
 	// [endRootChanges] is the last change in the history resulting in [endRoot].
 	endRootChanges, ok := th.getRootChanges(endRoot)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", ErrNoEndRoot, endRoot)
+		return nil, fmt.Errorf("%w: %s", sync.ErrEndRootNotFound, endRoot)
 	}
 
 	// Confirm there's a change resulting in [startRoot] before
@@ -152,7 +147,7 @@ func (th *trieHistory) getValueChanges(
 	// [startRootChanges] is the last appearance of [startRoot].
 	startRootChanges, ok := th.getRootChanges(startRoot)
 	if !ok {
-		return nil, fmt.Errorf("%w: start root %s not found", ErrInsufficientHistory, startRoot)
+		return nil, fmt.Errorf("%w: start root %s not found", sync.ErrStartRootNotFound, startRoot)
 	}
 
 	var (
@@ -189,7 +184,7 @@ func (th *trieHistory) getValueChanges(
 			if i == 0 {
 				return nil, fmt.Errorf(
 					"%w: start root %s not found before end root %s",
-					ErrInsufficientHistory, startRoot, endRoot,
+					sync.ErrStartRootNotFound, startRoot, endRoot,
 				)
 			}
 		}
@@ -331,7 +326,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 	// [lastRootChange] is the last change in the history resulting in [rootID].
 	lastRootChange, ok := th.getRootChanges(rootID)
 	if !ok {
-		return nil, ErrInsufficientHistory
+		return nil, sync.ErrStartRootNotFound
 	}
 
 	var (
