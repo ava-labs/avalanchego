@@ -989,37 +989,25 @@ func TestUptimeTracker_MultipleValidators(t *testing.T) {
 	require.Equal(vID2, validatorList[0].ValidationID)
 }
 
-// testValidatorState implements validators.State for testing without mocks
+// testValidatorState is a minimal implementation that only provides what we actually use
 type testValidatorState struct {
 	validators map[ids.ID]*validators.GetCurrentValidatorOutput
 }
 
-func (t *testValidatorState) GetMinimumHeight(ctx context.Context) (uint64, error) {
-	return 0, nil
+func (t *testValidatorState) GetCurrentValidatorSet(_ context.Context, _ ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+	return t.validators, uint64(len(t.validators)), nil
 }
 
-func (t *testValidatorState) GetCurrentHeight(ctx context.Context) (uint64, error) {
+// Stub implementations for the rest of the interface (unused in our tests)
+func (*testValidatorState) GetMinimumHeight(_ context.Context) (uint64, error) { return 0, nil }
+func (t *testValidatorState) GetCurrentHeight(_ context.Context) (uint64, error) {
 	return uint64(len(t.validators)), nil
 }
-
-func (t *testValidatorState) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error) {
+func (*testValidatorState) GetSubnetID(_ context.Context, _ ids.ID) (ids.ID, error) {
 	return ids.Empty, nil
 }
-
-func (t *testValidatorState) GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	result := make(map[ids.NodeID]*validators.GetValidatorOutput)
-	for _, vdr := range t.validators {
-		result[vdr.NodeID] = &validators.GetValidatorOutput{
-			NodeID:    vdr.NodeID,
-			PublicKey: vdr.PublicKey,
-			Weight:    vdr.Weight,
-		}
-	}
-	return result, nil
-}
-
-func (t *testValidatorState) GetCurrentValidatorSet(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
-	return t.validators, uint64(len(t.validators)), nil
+func (t *testValidatorState) GetValidatorSet(_ context.Context, _ uint64, _ ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	return nil, nil
 }
 
 // setupUptimeTracker is a helper function to setup a UptimeTracker for testing
