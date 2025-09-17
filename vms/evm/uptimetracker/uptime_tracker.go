@@ -73,7 +73,7 @@ func NewUptimeTracker(
 	}
 
 	clock := &mockable.Clock{}
-	clock.Set(time.Unix(0, 0)) // Initialize with Unix epoch
+	clock.Set(time.Now()) // Initialize with current time
 	u.manager = uptime.NewManager(u, clock)
 	u.clock = clock
 
