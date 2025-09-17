@@ -1024,6 +1024,11 @@ func setupUptimeTracker(t *testing.T, validatorSet map[ids.ID]*validators.GetCur
 
 	ut, err := NewUptimeTracker(validatorState, subnetID, db)
 	require.NoError(t, err)
+
+	// Set the clock to a known time for consistent testing
+	// This ensures that uptime calculations are based on a predictable time
+	ut.clock.Set(time.Unix(0, 0)) // Start at epoch
+
 	return ut
 }
 
