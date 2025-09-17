@@ -6,9 +6,7 @@
 package acp226
 
 import (
-	"encoding/binary"
 	"errors"
-	"fmt"
 	"sort"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
@@ -18,79 +16,57 @@ import (
 )
 
 const (
-	// MinTargetDelayMilliseconds (M) is the minimum target block delay in milliseconds
-	MinTargetDelayMilliseconds = 1 // ms
-	// TargetConversion (D) is the conversion factor for exponential calculations
-	TargetConversion = 1 << 20
-	// MaxTargetDelayExcessDiff (Q) is the maximum change in target excess per update
-	MaxTargetDelayExcessDiff = 200
+	// MinDelayMilliseconds (M) is the minimum block delay in milliseconds
+	MinDelayMilliseconds = 1 // ms
+	// ConversionRate (D) is the conversion factor for exponential calculations
+	ConversionRate = 1 << 20
+	// MaxDelayExcessDiff (Q) is the maximum change in  excess per update
+	MaxDelayExcessDiff = 200
 
-	TargetDelayExcessBytesSize = wrappers.LongLen
+	DelayExcessBytesSize = wrappers.LongLen
 
-	maxTargetDelayExcess = 46_516_320 // TargetConversion * ln(MaxUint64 / MinTargetDelayMilliseconds) + 1
+	maxDelayExcess = 46_516_320 // ConversionRate * ln(MaxUint64 / MinDelayMilliseconds) + 1
 )
 
-var ErrTargetDelayExcessInsufficientLength = errors.New("insufficient length for block delay state")
+var ErrDelayExcessInsufficientLength = errors.New("insufficient length for block delay state")
 
-// TargetDelayExcess represents the target excess for delay calculation in the dynamic minimum block delay mechanism.
-type TargetDelayExcess uint64
+// DelayExcess represents the  excess for delay calculation in the dynamic minimum block delay mechanism.
+type DelayExcess uint64
 
-// ParseTargetDelayExcess returns the target delay excess from the provided bytes. It is the inverse of
-// [TargetDelayExcess.Bytes]. This function allows for additional bytes to be padded at the
-// end of the provided bytes.
-func ParseTargetDelayExcess(bytes []byte) (TargetDelayExcess, error) {
-	if len(bytes) < TargetDelayExcessBytesSize {
-		return 0, fmt.Errorf("%w: expected at least %d bytes but got %d bytes",
-			ErrTargetDelayExcessInsufficientLength,
-			TargetDelayExcessBytesSize,
-			len(bytes),
-		)
-	}
-
-	return TargetDelayExcess(binary.BigEndian.Uint64(bytes)), nil
-}
-
-// Bytes returns the binary representation of the target delay excess.
-func (t TargetDelayExcess) Bytes() []byte {
-	bytes := make([]byte, TargetDelayExcessBytesSize)
-	binary.BigEndian.PutUint64(bytes, uint64(t))
-	return bytes
-}
-
-// TargetDelay returns the target minimum block delay in milliseconds, `T`.
+// Delay returns the  minimum block delay in milliseconds, `T`.
 //
-// TargetDelay = MinTargetDelayMilliseconds * e^(TargetDelayExcess / TargetConversion)
-func (t TargetDelayExcess) TargetDelay() uint64 {
+// Delay = MinDelayMilliseconds * e^(DelayExcess / ConversionRate)
+func (t DelayExcess) Delay() uint64 {
 	return uint64(gas.CalculatePrice(
-		MinTargetDelayMilliseconds,
+		MinDelayMilliseconds,
 		gas.Gas(t),
-		TargetConversion,
+		ConversionRate,
 	))
 }
 
-// UpdateTargetDelayExcess updates the targetDelayExcess to be as close as possible to the
-// desiredTargetDelayExcess without exceeding the maximum targetDelayExcess change.
-func (t *TargetDelayExcess) UpdateTargetDelayExcess(desiredTargetDelayExcess uint64) {
-	*t = TargetDelayExcess(targetDelayExcess(uint64(*t), desiredTargetDelayExcess))
+// UpdateDelayExcess updates the DelayExcess to be as close as possible to the
+// desiredDelayExcess without exceeding the maximum DelayExcess change.
+func (t *DelayExcess) UpdateDelayExcess(desiredDelayExcess uint64) {
+	*t = DelayExcess(calculateDelayExcess(uint64(*t), desiredDelayExcess))
 }
 
-// DesiredTargetDelayExcess calculates the optimal desiredTargetDelayExcess given the
-// desired target delay.
-func DesiredTargetDelayExcess(desiredTargetDelayExcess uint64) uint64 {
-	// This could be solved directly by calculating D * ln(desiredTarget / M)
+// DesiredDelayExcess calculates the optimal desiredDelayExcess given the
+// desired  delay.
+func DesiredDelayExcess(desiredDelayExcess uint64) uint64 {
+	// This could be solved directly by calculating D * ln(desired / M)
 	// using floating point math. However, it introduces inaccuracies. So, we
 	// use a binary search to find the closest integer solution.
-	return uint64(sort.Search(maxTargetDelayExcess, func(targetDelayExcessGuess int) bool {
-		excess := TargetDelayExcess(targetDelayExcessGuess)
-		return excess.TargetDelay() >= desiredTargetDelayExcess
+	return uint64(sort.Search(maxDelayExcess, func(DelayExcessGuess int) bool {
+		excess := DelayExcess(DelayExcessGuess)
+		return excess.Delay() >= desiredDelayExcess
 	}))
 }
 
-// targetDelayExcess calculates the optimal new targetDelayExcess for a block proposer to
+// calculateDelayExcess calculates the optimal new DelayExcess for a block proposer to
 // include given the current and desired excess values.
-func targetDelayExcess(excess, desired uint64) uint64 {
+func calculateDelayExcess(excess, desired uint64) uint64 {
 	change := safemath.AbsDiff(excess, desired)
-	change = min(change, MaxTargetDelayExcessDiff)
+	change = min(change, MaxDelayExcessDiff)
 	if excess < desired {
 		return excess + change
 	}
