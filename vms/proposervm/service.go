@@ -20,12 +20,12 @@ type service struct {
 	vm *VM
 }
 
-func (p *service) GetProposedHeight(ctx context.Context, _ *connect.Request[pb.GetProposedHeightRequest]) (*connect.Response[pb.GetProposedHeightReply], error) {
-	p.vm.ctx.Log.Debug("proposervm: GetProposedHeight called")
+func (s *service) GetProposedHeight(ctx context.Context, _ *connect.Request[pb.GetProposedHeightRequest]) (*connect.Response[pb.GetProposedHeightReply], error) {
+	s.vm.ctx.Log.Debug("GetProposedHeight called")
 
-	height, err := p.vm.ctx.ValidatorState.GetMinimumHeight(ctx)
+	height, err := s.vm.ctx.ValidatorState.GetMinimumHeight(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("couldn't get minimum height %w", err)
+		return nil, fmt.Errorf("could not get minimum height: %w", err)
 	}
 
 	return connect.NewResponse(&pb.GetProposedHeightReply{

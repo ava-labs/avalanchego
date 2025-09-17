@@ -9,7 +9,6 @@ import (
 	"math/big"
 	"net"
 	"net/http"
-	"time"
 
 	"connectrpc.com/connect"
 	"github.com/ava-labs/coreth/ethclient"
@@ -20,7 +19,6 @@ import (
 	"golang.org/x/net/http2"
 
 	"github.com/ava-labs/avalanchego/api/connectclient"
-	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
@@ -30,7 +28,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
 )
 
-var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
+var _ = e2e.DescribeCChain("[ProposerVM API]", func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
@@ -38,23 +36,10 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 
 	ginkgo.It("should advance the proposervm epoch according to the upgrade config epoch duration", func() {
 		var (
-			env          = e2e.GetEnv(tc)
-			nodeURI      = env.GetRandomNodeURI()
-			senderKey    = env.PreFundedKey
-			recipientKey = e2e.NewPrivateKey(tc)
-			ethClient    = e2e.NewEthClient(tc, nodeURI)
-			infoClient   = info.NewClient(nodeURI.URI)
+			env       = e2e.GetEnv(tc)
+			nodeURI   = env.GetRandomNodeURI()
+			ethClient = e2e.NewEthClient(tc, nodeURI)
 		)
-
-		upgrades, err := infoClient.Upgrades(tc.DefaultContext())
-		require.NoError(err)
-
-		if !upgrades.IsGraniteActivated(time.Now()) {
-			ginkgo.Skip("skipping test because granite isn't active")
-		}
-
-		// Issue a transaction to the C-Chain to advance past genesis block
-		issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
 
 		httpClient := &http.Client{
 			Transport: &http2.Transport{
