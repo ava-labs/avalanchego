@@ -485,7 +485,7 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 					err = u.pause(validator.NodeID)
 				}
 				if err != nil {
-					log.Error("failed to update status for node %s: %s", validator.NodeID, err)
+					log.Error("failed to update status for node %s: %v", validator.NodeID, err)
 				}
 			}
 		} else {
