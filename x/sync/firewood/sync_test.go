@@ -14,51 +14,34 @@ import (
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
-func Test_Firewood_Creation(t *testing.T) {
-	require := require.New(t)
-	db := generateDB(t, 0)
+func Test_Firewood_Sync(t *testing.T) {
+	numKeys := []int{0, 1, 1000}
+	for _, n := range numKeys {
+		t.Run("numKeys="+string(rune(n)), func(t *testing.T) {
+			require := require.New(t)
+			numKeys := 1000
+			fullDB := generateDB(t, numKeys)
+			db := generateDB(t, 0)
 
-	ctx := context.Background()
-	syncer, err := xsync.NewManager(
-		db,
-		xsync.ManagerConfig{
-			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(db)),
-			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(db)),
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-			TargetRoot:            ids.Empty,
-		},
-		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
-	require.NotNil(syncer)
-	require.NoError(syncer.Start(ctx))
-	require.NoError(syncer.Wait(ctx))
-}
+			root, err := fullDB.GetMerkleRoot(context.Background())
+			require.NoError(err)
 
-func Test_Firewood_Sync_Short(t *testing.T) {
-	require := require.New(t)
-	numKeys := 1000
-	fullDB := generateDB(t, numKeys)
-	db := generateDB(t, 0)
-
-	root, err := fullDB.GetMerkleRoot(context.Background())
-	require.NoError(err)
-
-	ctx := context.Background()
-	syncer, err := xsync.NewManager(
-		db,
-		xsync.ManagerConfig{
-			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(fullDB)),
-			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(fullDB)),
-			SimultaneousWorkLimit: 5,
-			Log:                   logging.NoLog{},
-			TargetRoot:            root,
-		},
-		prometheus.NewRegistry(),
-	)
-	require.NoError(err)
-	require.NotNil(syncer)
-	require.NoError(syncer.Start(ctx))
-	require.NoError(syncer.Wait(ctx))
+			ctx := context.Background()
+			syncer, err := xsync.NewManager(
+				db,
+				xsync.ManagerConfig{
+					RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(fullDB)),
+					ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(fullDB)),
+					SimultaneousWorkLimit: 5,
+					Log:                   logging.NoLog{},
+					TargetRoot:            root,
+				},
+				prometheus.NewRegistry(),
+			)
+			require.NoError(err)
+			require.NotNil(syncer)
+			require.NoError(syncer.Start(ctx))
+			require.NoError(syncer.Wait(ctx))
+		})
+	}
 }

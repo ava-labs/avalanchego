@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 
@@ -64,7 +65,7 @@ func (db *DB) CommitChangeProof(_ context.Context, end maybe.Maybe[[]byte], proo
 
 	// Unexpected root - should never happen, but easy to verify.
 	if bytes.Equal(root, proof.endRoot[:]) {
-		return maybe.Nothing[[]byte](), errMismatchingRoot
+		return maybe.Nothing[[]byte](), fmt.Errorf("%w: %v != %v", errMismatchingRoot, root, proof.endRoot[:])
 	}
 
 	// We can now get the FindNextKey iterator.
@@ -108,8 +109,8 @@ func (db *DB) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[]byte]
 	}
 
 	// Unexpected root - should never happen, but easy to verify.
-	if bytes.Equal(root, proof.root[:]) {
-		return maybe.Nothing[[]byte](), errMismatchingRoot
+	if !bytes.Equal(root, proof.root[:]) {
+		return maybe.Nothing[[]byte](), fmt.Errorf("%w: %v != %v", errMismatchingRoot, root, proof.root[:])
 	}
 
 	// We can now get the FindNextKey iterator.
