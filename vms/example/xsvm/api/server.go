@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/builder"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/chain"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
@@ -148,8 +147,8 @@ func (s *server) IssueTx(r *http.Request, args *IssueTxArgs, reply *IssueTxReply
 }
 
 type LastAcceptedReply struct {
-	BlockID ids.ID           `json:"blockID"`
-	Block   *block.Stateless `json:"block"`
+	BlockID    ids.ID `json:"blockID"`
+	BlockBytes []byte `json:"blockBytes"`
 }
 
 func (s *server) LastAccepted(_ *http.Request, _ *struct{}, reply *LastAcceptedReply) error {
@@ -157,11 +156,7 @@ func (s *server) LastAccepted(_ *http.Request, _ *struct{}, reply *LastAcceptedR
 	reply.BlockID = s.chain.LastAccepted()
 	s.ctx.Lock.RUnlock()
 	blkBytes, err := state.GetBlock(s.state, reply.BlockID)
-	if err != nil {
-		return err
-	}
-
-	reply.Block, err = block.Parse(blkBytes)
+	reply.BlockBytes = blkBytes
 	return err
 }
 
@@ -170,16 +165,12 @@ type BlockArgs struct {
 }
 
 type BlockReply struct {
-	Block *block.Stateless `json:"block"`
+	BlockBytes []byte `json:"blockBytes"`
 }
 
 func (s *server) Block(_ *http.Request, args *BlockArgs, reply *BlockReply) error {
 	blkBytes, err := state.GetBlock(s.state, args.BlockID)
-	if err != nil {
-		return err
-	}
-
-	reply.Block, err = block.Parse(blkBytes)
+	reply.BlockBytes = blkBytes
 	return err
 }
 

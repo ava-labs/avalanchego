@@ -623,7 +623,7 @@ platform.getCurrentValidators({
 - `validators` can include different fields based on the subnet type (L1, PoA Subnets, the Primary Network):
   - `txID` is the validator transaction.
   - `startTime` is the Unix time when the validator starts validating the Subnet.
-  - `endTime` is the Unix time when the validator stops validating the Subnet. Ommitted if `subnetID` is a L1 Subnet.
+  - `endTime` is the Unix time when the validator stops validating the Subnet. Omitted if `subnetID` is a L1 Subnet.
   - `nodeID` is the validator’s node ID.
   - `weight` is the validator’s weight (stake) when sampling validators.
   - `validationID` is the ID for L1 subnet validator registration transaction. Omitted if `subnetID` is not an L1 Subnet.

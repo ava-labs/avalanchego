@@ -6,7 +6,6 @@ package tmpnet
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -15,6 +14,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
@@ -53,18 +53,18 @@ func NewTestGenesis(
 	// Validate inputs
 	switch networkID {
 	case constants.TestnetID, constants.MainnetID, constants.LocalID:
-		return nil, errInvalidNetworkIDForGenesis
+		return nil, stacktrace.Wrap(errInvalidNetworkIDForGenesis)
 	}
 	if len(nodes) == 0 {
-		return nil, errMissingStakersForGenesis
+		return nil, stacktrace.Wrap(errMissingStakersForGenesis)
 	}
 	if len(keysToFund) == 0 {
-		return nil, errNoKeysForGenesis
+		return nil, stacktrace.Wrap(errNoKeysForGenesis)
 	}
 
 	initialStakers, err := stakersForNodes(networkID, nodes)
 	if err != nil {
-		return nil, fmt.Errorf("failed to configure stakers for nodes: %w", err)
+		return nil, stacktrace.Errorf("failed to configure stakers for nodes: %w", err)
 	}
 
 	// Address that controls stake doesn't matter -- generate it randomly
@@ -74,7 +74,7 @@ func NewTestGenesis(
 		ids.GenerateTestShortID().Bytes(),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to format stake address: %w", err)
+		return nil, stacktrace.Errorf("failed to format stake address: %w", err)
 	}
 
 	// Ensure the total stake allows a MegaAvax per staker
@@ -125,7 +125,7 @@ func NewTestGenesis(
 	for xChainAddress, balance := range xChainBalances {
 		avaxAddr, err := address.Format("X", constants.GetHRP(networkID), xChainAddress[:])
 		if err != nil {
-			return nil, fmt.Errorf("failed to format X-Chain address: %w", err)
+			return nil, stacktrace.Errorf("failed to format X-Chain address: %w", err)
 		}
 		config.Allocations = append(
 			config.Allocations,
@@ -157,7 +157,7 @@ func NewTestGenesis(
 	}
 	cChainGenesisBytes, err := json.Marshal(cChainGenesis)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal C-Chain genesis: %w", err)
+		return nil, stacktrace.Errorf("failed to marshal C-Chain genesis: %w", err)
 	}
 	config.CChainGenesis = string(cChainGenesisBytes)
 
@@ -171,7 +171,7 @@ func stakersForNodes(networkID uint32, nodes []*Node) ([]genesis.UnparsedStaker,
 	// staking can be more easily controlled.
 	rewardAddr, err := address.Format("X", constants.GetHRP(networkID), ids.GenerateTestShortID().Bytes())
 	if err != nil {
-		return nil, fmt.Errorf("failed to format reward address: %w", err)
+		return nil, stacktrace.Errorf("failed to format reward address: %w", err)
 	}
 
 	// Configure provided nodes as initial stakers
@@ -179,7 +179,7 @@ func stakersForNodes(networkID uint32, nodes []*Node) ([]genesis.UnparsedStaker,
 	for i, node := range nodes {
 		pop, err := node.GetProofOfPossession()
 		if err != nil {
-			return nil, fmt.Errorf("failed to derive proof of possession for node %s: %w", node.NodeID, err)
+			return nil, stacktrace.Errorf("failed to derive proof of possession for node %s: %w", node.NodeID, err)
 		}
 		initialStakers[i] = genesis.UnparsedStaker{
 			NodeID:        node.NodeID,

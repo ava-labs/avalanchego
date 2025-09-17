@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -23,6 +22,7 @@ import (
 	"github.com/prometheus/common/model"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
@@ -51,7 +51,7 @@ func waitForCount(ctx context.Context, log logging.Logger, name string, getCount
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("%s not found before timeout: %w", name, err)
+		return stacktrace.Errorf("%s not found before timeout: %w", name, err)
 	}
 	return nil
 }
@@ -62,17 +62,17 @@ func waitForCount(ctx context.Context, log logging.Logger, name string, getCount
 func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string) error {
 	username, password, err := getCollectorCredentials(promtailCmd)
 	if err != nil {
-		return fmt.Errorf("failed to get collector credentials: %w", err)
+		return stacktrace.Errorf("failed to get collector credentials: %w", err)
 	}
 
 	url := getLokiURL()
 	if !strings.HasPrefix(url, "https") {
-		return fmt.Errorf("loki URL must be https for basic auth to be secure: %s", url)
+		return stacktrace.Errorf("loki URL must be https for basic auth to be secure: %s", url)
 	}
 
 	selectors, err := getSelectors(networkUUID)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	query := fmt.Sprintf("sum(count_over_time({%s}[1h]))", selectors)
 
@@ -81,7 +81,7 @@ func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string)
 		zap.String("query", query),
 	)
 
-	return waitForCount(
+	err = waitForCount(
 		ctx,
 		log,
 		"logs",
@@ -89,6 +89,10 @@ func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string)
 			return queryLoki(ctx, url, username, password, query)
 		},
 	)
+	if err != nil {
+		return stacktrace.Errorf("failed to find logs: %w", err)
+	}
+	return nil
 }
 
 func queryLoki(
@@ -106,7 +110,7 @@ func queryLoki(
 	// Create request
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create request: %w", err)
+		return 0, stacktrace.Errorf("failed to create request: %w", err)
 	}
 
 	auth := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
@@ -115,18 +119,18 @@ func queryLoki(
 	// Execute request
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("failed to execute request: %w", err)
+		return 0, stacktrace.Errorf("failed to execute request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	// Read and parse response
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return 0, fmt.Errorf("failed to read response: %w", err)
+		return 0, stacktrace.Errorf("failed to read response: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return 0, fmt.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
+		return 0, stacktrace.Errorf("unexpected status code %d: %s", resp.StatusCode, string(body))
 	}
 
 	// Parse JSON response
@@ -140,7 +144,7 @@ func queryLoki(
 	}
 
 	if err := json.Unmarshal(body, &result); err != nil {
-		return 0, fmt.Errorf("failed to parse response: %w", err)
+		return 0, stacktrace.Errorf("failed to parse response: %w", err)
 	}
 
 	// Extract count value
@@ -148,17 +152,17 @@ func queryLoki(
 		return 0, nil
 	}
 	if len(result.Data.Result[0].Value) != 2 {
-		return 0, errors.New("unexpected value format in response")
+		return 0, stacktrace.New("unexpected value format in response")
 	}
 	// Convert value to a string
 	valueStr, ok := result.Data.Result[0].Value[1].(string)
 	if !ok {
-		return 0, errors.New("value is not a string")
+		return 0, stacktrace.New("value is not a string")
 	}
 	// Convert string to float64 first to handle scientific notation
 	floatVal, err := strconv.ParseFloat(valueStr, 64)
 	if err != nil {
-		return 0, fmt.Errorf("parsing count value: %w", err)
+		return 0, stacktrace.Errorf("parsing count value: %w", err)
 	}
 	// Round to nearest integer
 	return int(math.Round(floatVal)), nil
@@ -169,17 +173,17 @@ func queryLoki(
 func CheckMetricsExist(ctx context.Context, log logging.Logger, networkUUID string) error {
 	username, password, err := getCollectorCredentials(prometheusCmd)
 	if err != nil {
-		return fmt.Errorf("failed to get collector credentials: %w", err)
+		return stacktrace.Errorf("failed to get collector credentials: %w", err)
 	}
 
 	url := getPrometheusURL()
 	if !strings.HasPrefix(url, "https") {
-		return fmt.Errorf("prometheus URL must be https for basic auth to be secure: %s", url)
+		return stacktrace.Errorf("prometheus URL must be https for basic auth to be secure: %s", url)
 	}
 
 	selectors, err := getSelectors(networkUUID)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	query := fmt.Sprintf("count({%s})", selectors)
 
@@ -216,7 +220,7 @@ func queryPrometheus(
 		},
 	})
 	if err != nil {
-		return 0, fmt.Errorf("failed to create client: %w", err)
+		return 0, stacktrace.Errorf("failed to create client: %w", err)
 	}
 
 	// Query Prometheus
@@ -226,7 +230,7 @@ func queryPrometheus(
 		Step:  time.Minute,
 	})
 	if err != nil {
-		return 0, fmt.Errorf("query failed: %w", err)
+		return 0, stacktrace.Errorf("query failed: %w", err)
 	}
 	if len(warnings) > 0 {
 		log.Warn("prometheus query warnings",
@@ -235,7 +239,7 @@ func queryPrometheus(
 	}
 
 	if matrix, ok := result.(model.Matrix); !ok {
-		return 0, fmt.Errorf("unexpected result type: %s", result.Type())
+		return 0, stacktrace.Errorf("unexpected result type: %s", result.Type())
 	} else if len(matrix) > 0 {
 		return int(matrix[0].Values[len(matrix[0].Values)-1].Value), nil
 	}
@@ -269,7 +273,7 @@ func getSelectors(networkUUID string) (string, error) {
 		}
 	}
 	if len(selectors) == 0 {
-		return "", errors.New("no GH_* env vars set to use for selectors")
+		return "", stacktrace.New("no GH_* env vars set to use for selectors")
 	}
 
 	return strings.Join(selectors, ","), nil

@@ -40,6 +40,7 @@ var (
 
 	loadTimeoutArg     time.Duration
 	firewoodEnabledArg bool
+	numWorkersArg      int
 )
 
 func init() {
@@ -59,6 +60,12 @@ func init() {
 		false,
 		"whether to use Firewood in Coreth",
 	)
+	flag.IntVar(
+		&numWorkersArg,
+		"num-workers",
+		defaultNodeCount,
+		"the number of workers to use for the load test",
+	)
 
 	flag.Parse()
 }
@@ -75,7 +82,7 @@ func main() {
 
 	nodes := tmpnet.NewNodesOrPanic(numNodes)
 
-	keys, err := tmpnet.NewPrivateKeys(numNodes)
+	keys, err := tmpnet.NewPrivateKeys(numWorkersArg)
 	require.NoError(err)
 
 	primaryChainConfigs := tmpnet.DefaultChainConfigs()
@@ -168,10 +175,10 @@ func newTokenContract(
 	}
 
 	var (
-		totalRecipients = int64(len(recipients) + 1)
+		totalRecipients = big.NewInt(int64(len(recipients)) + 1)
 		// assumes that token has 18 decimals
 		recipientAmount = big.NewInt(1e18)
-		totalSupply     = big.NewInt(totalRecipients * 1e18)
+		totalSupply     = new(big.Int).Mul(totalRecipients, recipientAmount)
 	)
 
 	_, tx, contract, err := contracts.DeployERC20(txOpts, client, totalSupply)
