@@ -35,6 +35,7 @@ type dbUpdateStatus int
 // UptimeTracker maintains local validator state synchronized with the P-Chain validator set.
 // It tracks validator uptime and manages validator lifecycle events (additions, updates, removals)
 // for the EVM subnet.
+// TODO: consider adding a metrics object to the UptimeTracker
 type UptimeTracker struct {
 	validatorState validators.State
 	subnetID       ids.ID
