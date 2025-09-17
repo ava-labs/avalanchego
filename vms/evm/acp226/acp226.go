@@ -56,8 +56,8 @@ func DesiredDelayExcess(desiredDelayExcess uint64) uint64 {
 	// This could be solved directly by calculating D * ln(desired / M)
 	// using floating point math. However, it introduces inaccuracies. So, we
 	// use a binary search to find the closest integer solution.
-	return uint64(sort.Search(maxDelayExcess, func(DelayExcessGuess int) bool {
-		excess := DelayExcess(DelayExcessGuess)
+	return uint64(sort.Search(maxDelayExcess, func(delayExcessGuess int) bool {
+		excess := DelayExcess(delayExcessGuess)
 		return excess.Delay() >= desiredDelayExcess
 	}))
 }
