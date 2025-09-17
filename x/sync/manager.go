@@ -772,7 +772,7 @@ func (m *Manager[_, _]) enqueueWork(work *workItem) {
 
 	// Split the remaining range into to 2.
 	// Find the middle point.
-	mid := Midpoint(work.start, work.end)
+	mid := midpoint(work.start, work.end)
 
 	if maybe.Equal(work.start, mid, bytes.Equal) || maybe.Equal(mid, work.end, bytes.Equal) {
 		// The range is too small to split.
@@ -797,7 +797,7 @@ func (m *Manager[_, _]) enqueueWork(work *workItem) {
 // start is expected to be less than end
 // Nothing/nil [start] is treated as all 0's
 // Nothing/nil [end] is treated as all 255's
-func Midpoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
+func midpoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
 	start := startMaybe.Value()
 	end := endMaybe.Value()
 	length := max(len(end), len(start))

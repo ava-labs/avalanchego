@@ -118,19 +118,12 @@ func newFlakyChangeProofHandler(
 	}
 }
 
-type p2pHandlerCancel struct {
+type p2pHandlerAction struct {
 	p2p.Handler
 	action func()
 }
 
-func newRangeProofHandlerCancel(db merkledb.MerkleDB, action func()) *p2pHandlerCancel {
-	return &p2pHandlerCancel{
-		Handler: xsync.NewGetRangeProofHandler(db),
-		action:  action,
-	}
-}
-
-func (h *p2pHandlerCancel) AppRequest(ctx context.Context, id ids.NodeID, time time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+func (h *p2pHandlerAction) AppRequest(ctx context.Context, id ids.NodeID, time time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	h.action()
 	return h.Handler.AppRequest(ctx, id, time, requestBytes)
 }
@@ -163,15 +156,4 @@ func (c *counter) Inc() int {
 
 	c.i++
 	return result
-}
-
-type waitingHandler struct {
-	p2p.NoOpHandler
-	handler         p2p.Handler
-	updatedRootChan chan struct{}
-}
-
-func (w *waitingHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-	<-w.updatedRootChan
-	return w.handler.AppRequest(ctx, nodeID, deadline, requestBytes)
 }

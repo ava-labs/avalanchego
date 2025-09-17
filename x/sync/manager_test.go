@@ -16,40 +16,40 @@ import (
 func Test_Midpoint(t *testing.T) {
 	require := require.New(t)
 
-	mid := Midpoint(maybe.Some([]byte{1, 255}), maybe.Some([]byte{2, 1}))
+	mid := midpoint(maybe.Some([]byte{1, 255}), maybe.Some([]byte{2, 1}))
 	require.Equal(maybe.Some([]byte{2, 0}), mid)
 
-	mid = Midpoint(maybe.Nothing[[]byte](), maybe.Some([]byte{255, 255, 0}))
+	mid = midpoint(maybe.Nothing[[]byte](), maybe.Some([]byte{255, 255, 0}))
 	require.Equal(maybe.Some([]byte{127, 255, 128}), mid)
 
-	mid = Midpoint(maybe.Some([]byte{255, 255, 255}), maybe.Some([]byte{255, 255}))
+	mid = midpoint(maybe.Some([]byte{255, 255, 255}), maybe.Some([]byte{255, 255}))
 	require.Equal(maybe.Some([]byte{255, 255, 127, 128}), mid)
 
-	mid = Midpoint(maybe.Nothing[[]byte](), maybe.Some([]byte{255}))
+	mid = midpoint(maybe.Nothing[[]byte](), maybe.Some([]byte{255}))
 	require.Equal(maybe.Some([]byte{127, 127}), mid)
 
-	mid = Midpoint(maybe.Some([]byte{1, 255}), maybe.Some([]byte{255, 1}))
+	mid = midpoint(maybe.Some([]byte{1, 255}), maybe.Some([]byte{255, 1}))
 	require.Equal(maybe.Some([]byte{128, 128}), mid)
 
-	mid = Midpoint(maybe.Some([]byte{140, 255}), maybe.Some([]byte{141, 0}))
+	mid = midpoint(maybe.Some([]byte{140, 255}), maybe.Some([]byte{141, 0}))
 	require.Equal(maybe.Some([]byte{140, 255, 127}), mid)
 
-	mid = Midpoint(maybe.Some([]byte{126, 255}), maybe.Some([]byte{127}))
+	mid = midpoint(maybe.Some([]byte{126, 255}), maybe.Some([]byte{127}))
 	require.Equal(maybe.Some([]byte{126, 255, 127}), mid)
 
-	mid = Midpoint(maybe.Nothing[[]byte](), maybe.Nothing[[]byte]())
+	mid = midpoint(maybe.Nothing[[]byte](), maybe.Nothing[[]byte]())
 	require.Equal(maybe.Some([]byte{127}), mid)
 
-	low := Midpoint(maybe.Nothing[[]byte](), mid)
+	low := midpoint(maybe.Nothing[[]byte](), mid)
 	require.Equal(maybe.Some([]byte{63, 127}), low)
 
-	high := Midpoint(mid, maybe.Nothing[[]byte]())
+	high := midpoint(mid, maybe.Nothing[[]byte]())
 	require.Equal(maybe.Some([]byte{191}), high)
 
-	mid = Midpoint(maybe.Some([]byte{255, 255}), maybe.Nothing[[]byte]())
+	mid = midpoint(maybe.Some([]byte{255, 255}), maybe.Nothing[[]byte]())
 	require.Equal(maybe.Some([]byte{255, 255, 127, 127}), mid)
 
-	mid = Midpoint(maybe.Some([]byte{255}), maybe.Nothing[[]byte]())
+	mid = midpoint(maybe.Some([]byte{255}), maybe.Nothing[[]byte]())
 	require.Equal(maybe.Some([]byte{255, 127, 127}), mid)
 
 	for i := 0; i < 5000; i++ {
@@ -72,7 +72,7 @@ func Test_Midpoint(t *testing.T) {
 			start, end = end, start
 		}
 
-		mid = Midpoint(maybe.Some(start), maybe.Some(end))
+		mid = midpoint(maybe.Some(start), maybe.Some(end))
 		require.Equal(-1, bytes.Compare(start, mid.Value()))
 		require.Equal(-1, bytes.Compare(mid.Value(), end))
 	}

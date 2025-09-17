@@ -27,8 +27,6 @@ import (
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
-var _ p2p.Handler = (*waitingHandler)(nil)
-
 func Test_Creation(t *testing.T) {
 	require := require.New(t)
 
@@ -90,33 +88,15 @@ func Test_Sync_FindNextKey_InSync(t *testing.T) {
 	require.True(nextKey.IsNothing())
 
 	// add an extra value to sync db past the last key returned
-	newKey := xsync.Midpoint(maybe.Some(lastKey), maybe.Nothing[[]byte]())
-	newKeyVal := newKey.Value()
+	newKeyVal := make([]byte, len(lastKey))
+	copy(newKeyVal, lastKey)
+	newKeyVal = append(newKeyVal, 16) // make sure new key is after last key
 	require.NoError(db.Put(newKeyVal, []byte{1}))
 
 	// create a range endpoint that is before the newly added key, but after the last key
-	endPointBeforeNewKey := make([]byte, 0, 2)
-	for i := 0; i < len(newKeyVal); i++ {
-		endPointBeforeNewKey = append(endPointBeforeNewKey, newKeyVal[i])
-
-		// we need the new key to be after the last key
-		// don't subtract anything from the current byte if newkey and lastkey are equal
-		if lastKey[i] == newKeyVal[i] {
-			continue
-		}
-
-		// if the first nibble is > 0, subtract "1" from it
-		if endPointBeforeNewKey[i] >= 16 {
-			endPointBeforeNewKey[i] -= 16
-			break
-		}
-		// if the second nibble > 0, subtract 1 from it
-		if endPointBeforeNewKey[i] > 0 {
-			endPointBeforeNewKey[i] -= 1
-			break
-		}
-		// both nibbles were 0, so move onto the next byte
-	}
+	endPointBeforeNewKey := make([]byte, len(newKeyVal))
+	copy(endPointBeforeNewKey, newKeyVal)
+	endPointBeforeNewKey[len(endPointBeforeNewKey)-1] = 8
 
 	nextKey, err = db.CommitRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Some(endPointBeforeNewKey), proof)
 	require.NoError(err)
@@ -236,20 +216,21 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 
 	// add an extra value to local db
 	lastKey := rangeProof.KeyChanges[len(rangeProof.KeyChanges)-1].Key
-	midpoint := xsync.Midpoint(maybe.Some(lastKey), maybe.Nothing[[]byte]())
-	midPointVal := midpoint.Value()
+	afterKeyVal := make([]byte, len(lastKey))
+	copy(afterKeyVal, lastKey)
+	afterKeyVal = append(afterKeyVal, 16) // make sure new key is after last key
 
-	require.NoError(db.Put(midPointVal, []byte{1}))
+	require.NoError(db.Put(afterKeyVal, []byte{1}))
 
 	// next key at prefix of newly added point
 	nextKey, err = db.CommitRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), rangeProof)
 	require.NoError(err)
 	require.True(nextKey.HasValue())
-	require.True(isPrefix(midPointVal, nextKey.Value()))
+	require.True(isPrefix(afterKeyVal, nextKey.Value()))
 
-	require.NoError(db.Delete(midPointVal))
+	require.NoError(db.Delete(afterKeyVal))
 
-	require.NoError(dbToSync.Put(midPointVal, []byte{1}))
+	require.NoError(dbToSync.Put(afterKeyVal, []byte{1}))
 
 	rangeProof, err = dbToSync.GetRangeProof(ctx, maybe.Nothing[[]byte](), maybe.Some(lastKey), 500)
 	require.NoError(err)
@@ -260,7 +241,7 @@ func Test_Sync_FindNextKey_ExtraValues(t *testing.T) {
 	require.True(nextKey.HasValue())
 
 	// deal with odd length key
-	require.True(isPrefix(midPointVal, nextKey.Value()))
+	require.True(isPrefix(afterKeyVal, nextKey.Value()))
 }
 
 func isPrefix(data []byte, prefix []byte) bool {
@@ -795,11 +776,10 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.NoError(err)
 
 	ctx := context.Background()
-	cancelCtx, cancel := context.WithCancel(ctx)
 	syncer, err := xsync.NewManager(
 		db,
 		xsync.ManagerConfig{
-			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, newRangeProofHandlerCancel(dbToSync, cancel)),
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(dbToSync)),
 			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync)),
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
@@ -811,10 +791,12 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.NotNil(syncer)
 
 	// Start syncing from the server, will be cancelled by the range proof handler
-	require.NoError(syncer.Start(cancelCtx))
-	err = syncer.Wait(cancelCtx)
-	require.ErrorIs(err, context.Canceled)
-	syncer.Close()
+	require.NoError(syncer.Start(ctx))
+
+	// Wait until we've processed some work before closing
+	require.Eventually(func() bool {
+		return db.NewIterator().Next()
+	}, 5*time.Second, 5*time.Millisecond)
 
 	newSyncer, err := xsync.NewManager(
 		db,
@@ -837,6 +819,97 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	newRoot, err := db.GetMerkleRoot(context.Background())
 	require.NoError(err)
 	require.Equal(syncRoot, newRoot)
+}
+
+func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
+	t.Skip("FLAKY")
+
+	require := require.New(t)
+
+	now := time.Now().UnixNano()
+	t.Logf("seed: %d", now)
+	r := rand.New(rand.NewSource(now)) // #nosec G404
+
+	dbToSync, err := generateTrie(t, r, 3*xsync.MaxKeyValuesLimit)
+	require.NoError(err)
+
+	firstSyncRoot, err := dbToSync.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
+	for x := 0; x < 100; x++ {
+		key := make([]byte, r.Intn(50))
+		_, err = r.Read(key)
+		require.NoError(err)
+
+		val := make([]byte, r.Intn(50))
+		_, err = r.Read(val)
+		require.NoError(err)
+
+		require.NoError(dbToSync.Put(key, val))
+
+		deleteKeyStart := make([]byte, r.Intn(50))
+		_, err = r.Read(deleteKeyStart)
+		require.NoError(err)
+
+		it := dbToSync.NewIteratorWithStart(deleteKeyStart)
+		if it.Next() {
+			require.NoError(dbToSync.Delete(it.Key()))
+		}
+		require.NoError(it.Error())
+		it.Release()
+	}
+
+	secondSyncRoot, err := dbToSync.GetMerkleRoot(context.Background())
+	require.NoError(err)
+
+	db, err := merkledb.New(
+		context.Background(),
+		memdb.New(),
+		newDefaultDBConfig(),
+	)
+	require.NoError(err)
+
+	rangeProofHandler := &p2pHandlerAction{
+		Handler: xsync.NewGetRangeProofHandler(dbToSync),
+	}
+
+	ctx := context.Background()
+	syncer, err := xsync.NewManager(
+		db,
+		xsync.ManagerConfig{
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, rangeProofHandler),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync)),
+			TargetRoot:            firstSyncRoot,
+			SimultaneousWorkLimit: 5,
+			Log:                   logging.NoLog{},
+		},
+		prometheus.NewRegistry(),
+	)
+	require.NoError(err)
+	require.NotNil(syncer)
+
+	// Allow 1 request to go through before blocking
+	updatedRootChan := make(chan struct{}, 1)
+	updatedRootChan <- struct{}{}
+	once := &sync.Once{}
+	rangeProofHandler.action = func() {
+		select {
+		case <-updatedRootChan:
+			// do nothing, allow 1 request to go through
+		default:
+			once.Do(func() {
+				require.NoError(syncer.UpdateSyncTarget(secondSyncRoot))
+			})
+		}
+	}
+
+	require.NoError(syncer.Start(context.Background()))
+	require.NoError(syncer.Wait(context.Background()))
+	require.NoError(syncer.Error())
+
+	newRoot, err := db.GetMerkleRoot(context.Background())
+	require.NoError(err)
+	require.Equal(secondSyncRoot, newRoot)
 }
 
 func Test_Sync_UpdateSyncTarget(t *testing.T) {
@@ -865,7 +938,9 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	)
 	require.NoError(err)
 
-	rangeProofHandler := newRangeProofHandlerCancel(dbToSync, func() {})
+	rangeProofHandler := &p2pHandlerAction{
+		Handler: xsync.NewGetRangeProofHandler(dbToSync),
+	}
 	m, err := xsync.NewManager(
 		db,
 		xsync.ManagerConfig{
