@@ -18,16 +18,12 @@ var (
 )
 
 type DB[TRange, TChange Proof] interface {
-	GetMerkleRoot(ctx context.Context) (ids.ID, error)
+	GetMerkleRoot(context.Context) (ids.ID, error)
 	Clear() error
 	ChangeProofer[TChange]
 	RangeProofer[TRange]
 }
 
-type PProof[T any] interface {
-	*T
-	Proof
-}
 type Proof interface {
 	encoding.BinaryMarshaler
 	encoding.BinaryUnmarshaler
