@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package vm
+package vmsync
 
 import (
 	"context"
@@ -164,7 +164,7 @@ func (client *client) stateSync(ctx context.Context) error {
 	}
 
 	// Run all registered syncers sequentially.
-	return registry.RunSyncerTasks(ctx, client)
+	return registry.RunSyncerTasks(ctx, client.summary)
 }
 
 func (client *client) registerSyncers(registry *SyncerRegistry) error {
