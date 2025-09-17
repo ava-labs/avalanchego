@@ -132,9 +132,7 @@ func newWithNode(stack *node.Node, conf *eth.Config, blockPeriod uint64) (*Backe
 	clock := &mockable.Clock{}
 	clock.Set(time.Unix(0, 0))
 
-	engine := dummy.NewFakerWithModeAndClock(
-		dummy.Mode{ModeSkipCoinbase: true}, clock,
-	)
+	engine := dummy.NewCoinbaseFaker()
 
 	backend, err := eth.New(
 		stack, conf, &fakePushGossiper{}, chaindb, eth.Settings{}, common.Hash{},
