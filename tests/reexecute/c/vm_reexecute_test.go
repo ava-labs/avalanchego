@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -168,6 +169,9 @@ func benchmarkReexecuteRange(
 	vmMultiGatherer := metrics.NewPrefixGatherer()
 	r.NoError(prefixGatherer.Register("avalanche_evm", vmMultiGatherer))
 
+	meterVMGatherer := metrics.NewPrefixGatherer()
+	r.NoError(prefixGatherer.Register("avalanche_meterchainvm", meterVMGatherer))
+
 	// consensusRegistry includes the chain="C" label and the prefix "avalanche_snowman".
 	// The consensus registry is passed to the executor to mimic a subset of consensus metrics.
 	consensusRegistry := prometheus.NewRegistry()
@@ -211,6 +215,7 @@ func benchmarkReexecuteRange(
 		chainDataDir,
 		configBytes,
 		vmMultiGatherer,
+		meterVMGatherer,
 	)
 	r.NoError(err)
 	defer func() {
@@ -241,7 +246,8 @@ func newMainnetCChainVM(
 	vmAndSharedMemoryDB database.Database,
 	chainDataDir string,
 	configBytes []byte,
-	metricsGatherer metrics.MultiGatherer,
+	vmMultiGatherer metrics.MultiGatherer,
+	meterVMGatherer metrics.MultiGatherer,
 ) (block.ChainVM, error) {
 	factory := factory.Factory{}
 	vmIntf, err := factory.New(logging.NoLog{})
@@ -269,6 +275,13 @@ func newMainnetCChainVM(
 		ids.Empty:       constants.PrimaryNetworkID,
 	}
 
+	meterVMRegistry, err := metrics.MakeAndRegister(meterVMGatherer, "C")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create meterVM registry: %w", err)
+	}
+
+	vm = metervm.NewBlockVM(vm, meterVMRegistry)
+
 	if err := vm.Initialize(
 		ctx,
 		&snow.Context{
@@ -286,7 +299,7 @@ func newMainnetCChainVM(
 			Log:          tests.NewDefaultLogger("mainnet-vm-reexecution"),
 			SharedMemory: atomicMemory.NewSharedMemory(mainnetCChainID),
 			BCLookup:     ids.NewAliaser(),
-			Metrics:      metricsGatherer,
+			Metrics:      vmMultiGatherer,
 
 			WarpSigner: warpSigner,
 
