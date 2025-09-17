@@ -6,10 +6,8 @@
 package acp226
 
 import (
-	"errors"
 	"sort"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -23,12 +21,8 @@ const (
 	// MaxDelayExcessDiff (Q) is the maximum change in  excess per update
 	MaxDelayExcessDiff = 200
 
-	DelayExcessBytesSize = wrappers.LongLen
-
 	maxDelayExcess = 46_516_320 // ConversionRate * ln(MaxUint64 / MinDelayMilliseconds) + 1
 )
-
-var ErrDelayExcessInsufficientLength = errors.New("insufficient length for block delay state")
 
 // DelayExcess represents the  excess for delay calculation in the dynamic minimum block delay mechanism.
 type DelayExcess uint64
