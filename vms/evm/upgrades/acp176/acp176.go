@@ -11,14 +11,12 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"sort"
 
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/vms/evm/upgrades/common"
 )
 
 const (
@@ -41,7 +39,16 @@ const (
 	maxTargetExcess = 1_024_950_627 // TargetConversion * ln(MaxUint64 / MinTargetPerSecond) + 1
 )
 
-var ErrStateInsufficientLength = errors.New("insufficient length for fee state")
+var (
+	ErrStateInsufficientLength = errors.New("insufficient length for fee state")
+
+	acp176Params = common.TargetExcessParams{
+		MinTarget:        MinTargetPerSecond,
+		TargetConversion: TargetConversion,
+		MaxExcessDiff:    MaxTargetExcessDiff,
+		MaxExcess:        maxTargetExcess,
+	}
+)
 
 // State represents the current state of the gas pricing and constraints.
 type State struct {
@@ -74,17 +81,13 @@ func ParseState(bytes []byte) (State, error) {
 //
 // Target = MinTargetPerSecond * e^(TargetExcess / TargetConversion)
 func (s *State) Target() gas.Gas {
-	return gas.Gas(gas.CalculatePrice(
-		MinTargetPerSecond,
-		s.TargetExcess,
-		TargetConversion,
-	))
+	return gas.Gas(acp176Params.CalculateTarget(uint64(s.TargetExcess)))
 }
 
 // MaxCapacity returns the maximum possible accrued gas capacity, `C`.
 func (s *State) MaxCapacity() gas.Gas {
 	targetPerSecond := s.Target()
-	return mulWithUpperBound(targetPerSecond, TargetToMaxCapacity)
+	return gas.Gas(common.MulWithUpperBound(uint64(targetPerSecond), TargetToMaxCapacity))
 }
 
 // GasPrice returns the current required fee per gas.
@@ -92,16 +95,16 @@ func (s *State) MaxCapacity() gas.Gas {
 // GasPrice = MinGasPrice * e^(Excess / (Target() * TargetToPriceUpdateConversion))
 func (s *State) GasPrice() gas.Price {
 	targetPerSecond := s.Target()
-	priceUpdateConversion := mulWithUpperBound(targetPerSecond, TargetToPriceUpdateConversion) // K
-	return gas.CalculatePrice(MinGasPrice, s.Gas.Excess, priceUpdateConversion)
+	priceUpdateConversion := common.MulWithUpperBound(uint64(targetPerSecond), TargetToPriceUpdateConversion) // K
+	return gas.CalculatePrice(MinGasPrice, s.Gas.Excess, gas.Gas(priceUpdateConversion))
 }
 
 // AdvanceTime increases the gas capacity and decreases the gas excess based on
 // the elapsed seconds.
 func (s *State) AdvanceTime(seconds uint64) {
 	targetPerSecond := s.Target()
-	maxPerSecond := mulWithUpperBound(targetPerSecond, TargetToMax)    // R
-	maxCapacity := mulWithUpperBound(maxPerSecond, TimeToFillCapacity) // C
+	maxPerSecond := gas.Gas(common.MulWithUpperBound(uint64(targetPerSecond), TargetToMax))    // R
+	maxCapacity := gas.Gas(common.MulWithUpperBound(uint64(maxPerSecond), TimeToFillCapacity)) // C
 	s.Gas = s.Gas.AdvanceTime(
 		maxCapacity,
 		maxPerSecond,
@@ -145,7 +148,7 @@ func (s *State) ConsumeGas(
 // desiredTargetExcess without exceeding the maximum targetExcess change.
 func (s *State) UpdateTargetExcess(desiredTargetExcess gas.Gas) {
 	previousTargetPerSecond := s.Target()
-	s.TargetExcess = targetExcess(s.TargetExcess, desiredTargetExcess)
+	s.TargetExcess = gas.Gas(acp176Params.TargetExcess(uint64(s.TargetExcess), uint64(desiredTargetExcess)))
 	newTargetPerSecond := s.Target()
 	s.Gas.Excess = scaleExcess(
 		s.Gas.Excess,
@@ -154,7 +157,7 @@ func (s *State) UpdateTargetExcess(desiredTargetExcess gas.Gas) {
 	)
 
 	// Ensure the gas capacity does not exceed the maximum capacity.
-	newMaxCapacity := mulWithUpperBound(newTargetPerSecond, TargetToMaxCapacity) // C
+	newMaxCapacity := gas.Gas(common.MulWithUpperBound(uint64(newTargetPerSecond), TargetToMaxCapacity)) // C
 	s.Gas.Capacity = min(s.Gas.Capacity, newMaxCapacity)
 }
 
@@ -170,26 +173,7 @@ func (s *State) Bytes() []byte {
 // DesiredTargetExcess calculates the optimal desiredTargetExcess given the
 // desired target.
 func DesiredTargetExcess(desiredTarget gas.Gas) gas.Gas {
-	// This could be solved directly by calculating D * ln(desiredTarget / P)
-	// using floating point math. However, it introduces inaccuracies. So, we
-	// use a binary search to find the closest integer solution.
-	return gas.Gas(sort.Search(maxTargetExcess, func(targetExcessGuess int) bool {
-		state := State{
-			TargetExcess: gas.Gas(targetExcessGuess),
-		}
-		return state.Target() >= desiredTarget
-	}))
-}
-
-// targetExcess calculates the optimal new targetExcess for a block proposer to
-// include given the current and desired excess values.
-func targetExcess(excess, desired gas.Gas) gas.Gas {
-	change := safemath.AbsDiff(excess, desired)
-	change = min(change, MaxTargetExcessDiff)
-	if excess < desired {
-		return excess + change
-	}
-	return excess - change
+	return gas.Gas(acp176Params.DesiredTargetExcess(uint64(desiredTarget)))
 }
 
 // scaleExcess scales the excess during gas target modifications to keep the
@@ -212,14 +196,4 @@ func scaleExcess(
 		return math.MaxUint64
 	}
 	return gas.Gas(bigExcess.Uint64())
-}
-
-// mulWithUpperBound multiplies two numbers and returns the result. If the
-// result overflows, it returns [math.MaxUint64].
-func mulWithUpperBound(a, b gas.Gas) gas.Gas {
-	product, err := safemath.Mul(a, b)
-	if err != nil {
-		return math.MaxUint64
-	}
-	return product
 }
