@@ -48,8 +48,7 @@ func TestUptimeTracker_AddSingleValidator(t *testing.T) {
 
 	ut := setupUptimeTracker(t, validatorSet, nil)
 
-	err := ut.Sync(context.Background())
-	require.NoError(err)
+	require.NoError(ut.Sync(context.Background()))
 
 	// Verify validator was added
 	validatorList := ut.GetValidators()
@@ -87,8 +86,7 @@ func TestUptimeTracker_RemoveValidator(t *testing.T) {
 
 	ut := setupUptimeTracker(t, validatorSet, nil)
 
-	err := ut.Sync(context.Background())
-	require.NoError(err)
+	require.NoError(ut.Sync(context.Background()))
 
 	// Verify validator was added
 	validatorList := ut.GetValidators()
@@ -96,8 +94,7 @@ func TestUptimeTracker_RemoveValidator(t *testing.T) {
 
 	// Remove validator by setting empty validator set
 	ut = setupUptimeTracker(t, map[ids.ID]*validators.GetCurrentValidatorOutput{}, nil)
-	err = ut.Sync(context.Background())
-	require.NoError(err)
+	require.NoError(ut.Sync(context.Background()))
 
 	// Verify validator was removed
 	validatorList = ut.GetValidators()
@@ -128,8 +125,7 @@ func TestUptimeTracker_UpdateValidatorStatus(t *testing.T) {
 
 	ut := setupUptimeTracker(t, validatorSet, nil)
 
-	err := ut.Sync(context.Background())
-	require.NoError(err)
+	require.NoError(ut.Sync(context.Background()))
 
 	// Verify validator is active
 	validator, exists := ut.GetValidator(vID)
@@ -138,8 +134,7 @@ func TestUptimeTracker_UpdateValidatorStatus(t *testing.T) {
 
 	// Update validator to inactive
 	validatorSet[vID].IsActive = false
-	err = ut.Sync(context.Background())
-	require.NoError(err)
+	require.NoError(ut.Sync(context.Background()))
 
 	// Verify validator is now inactive
 	validator, exists = ut.GetValidator(vID)
@@ -167,8 +162,7 @@ func TestUptimeTracker_UpdateValidatorWeight(t *testing.T) {
 
 	ut := setupUptimeTracker(t, validatorSet, nil)
 
-	err := ut.Sync(context.Background())
-	require.NoError(err)
+	require.NoError(ut.Sync(context.Background()))
 
 	// Verify initial weight
 	validator, exists := ut.GetValidator(vID)
@@ -177,8 +171,7 @@ func TestUptimeTracker_UpdateValidatorWeight(t *testing.T) {
 
 	// Update weight
 	validatorSet[vID].Weight = 2000
-	err = ut.Sync(context.Background())
-	require.NoError(err)
+	require.NoError(ut.Sync(context.Background()))
 
 	// Verify weight was updated
 	validator, exists = ut.GetValidator(vID)
@@ -206,12 +199,11 @@ func TestUptimeTracker_ImmutableFieldError(t *testing.T) {
 
 	ut := setupUptimeTracker(t, validatorSet, nil)
 
-	err := ut.Sync(context.Background())
-	require.NoError(err)
+	require.NoError(ut.Sync(context.Background()))
 
 	// Try to change NodeID (immutable field)
 	validatorSet[vID].NodeID = ids.GenerateTestNodeID()
-	err = ut.Sync(context.Background())
+	err := ut.Sync(context.Background())
 	require.ErrorIs(err, ErrImmutableField)
 }
 
@@ -999,14 +991,19 @@ func (t *testValidatorState) GetCurrentValidatorSet(_ context.Context, _ ids.ID)
 }
 
 // Stub implementations for the rest of the interface (unused in our tests)
-func (*testValidatorState) GetMinimumHeight(_ context.Context) (uint64, error) { return 0, nil }
+func (*testValidatorState) GetMinimumHeight(_ context.Context) (uint64, error) {
+	return 0, nil
+}
+
 func (t *testValidatorState) GetCurrentHeight(_ context.Context) (uint64, error) {
 	return uint64(len(t.validators)), nil
 }
+
 func (*testValidatorState) GetSubnetID(_ context.Context, _ ids.ID) (ids.ID, error) {
 	return ids.Empty, nil
 }
-func (t *testValidatorState) GetValidatorSet(_ context.Context, _ uint64, _ ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+
+func (*testValidatorState) GetValidatorSet(_ context.Context, _ uint64, _ ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	return nil, nil
 }
 
