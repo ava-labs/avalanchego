@@ -25,12 +25,12 @@ const (
 	// MaxTargetDelayExcessDiff (Q) is the maximum change in target excess per update
 	MaxTargetDelayExcessDiff = 200
 
-	StateSize = wrappers.LongLen
+	TargetDelayExcessBytesSize = wrappers.LongLen
 
 	maxTargetDelayExcess = 46_516_320 // TargetConversion * ln(MaxUint64 / MinTargetDelayMilliseconds) + 1
 )
 
-var ErrStateInsufficientLength = errors.New("insufficient length for block delay state")
+var ErrTargetDelayExcessInsufficientLength = errors.New("insufficient length for block delay state")
 
 // TargetDelayExcess represents the target excess for delay calculation in the dynamic minimum block delay mechanism.
 type TargetDelayExcess uint64
@@ -39,10 +39,10 @@ type TargetDelayExcess uint64
 // [TargetDelayExcess.Bytes]. This function allows for additional bytes to be padded at the
 // end of the provided bytes.
 func ParseTargetDelayExcess(bytes []byte) (TargetDelayExcess, error) {
-	if len(bytes) < StateSize {
+	if len(bytes) < TargetDelayExcessBytesSize {
 		return 0, fmt.Errorf("%w: expected at least %d bytes but got %d bytes",
-			ErrStateInsufficientLength,
-			StateSize,
+			ErrTargetDelayExcessInsufficientLength,
+			TargetDelayExcessBytesSize,
 			len(bytes),
 		)
 	}
@@ -52,7 +52,7 @@ func ParseTargetDelayExcess(bytes []byte) (TargetDelayExcess, error) {
 
 // Bytes returns the binary representation of the target delay excess.
 func (t TargetDelayExcess) Bytes() []byte {
-	bytes := make([]byte, StateSize)
+	bytes := make([]byte, TargetDelayExcessBytesSize)
 	binary.BigEndian.PutUint64(bytes, uint64(t))
 	return bytes
 }

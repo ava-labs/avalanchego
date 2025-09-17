@@ -164,17 +164,17 @@ var (
 	}{
 		{
 			name:        "insufficient_length",
-			bytes:       make([]byte, StateSize-1),
+			bytes:       make([]byte, TargetDelayExcessBytesSize-1),
 			expectedErr: ErrStateInsufficientLength,
 		},
 		{
 			name:   "zero_state",
-			bytes:  make([]byte, StateSize),
+			bytes:  make([]byte, TargetDelayExcessBytesSize),
 			excess: 0,
 		},
 		{
 			name:   "truncate_bytes",
-			bytes:  []byte{StateSize: 1},
+			bytes:  []byte{TargetDelayExcessBytesSize: 1},
 			excess: 0,
 		},
 		{
@@ -292,7 +292,7 @@ func TestBytes(t *testing.T) {
 			continue
 		}
 		t.Run(test.name, func(t *testing.T) {
-			expectedBytes := test.bytes[:StateSize]
+			expectedBytes := test.bytes[:TargetDelayExcessBytesSize]
 			bytes := test.excess.Bytes()
 			require.Equal(t, expectedBytes, bytes)
 		})
