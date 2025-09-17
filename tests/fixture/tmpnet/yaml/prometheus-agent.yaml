@@ -135,6 +135,7 @@ spec:
       # parameterize the config file with the prometheus URL.
       initContainers:
       - name: init-prometheus-config
+        # Any image with sed will do
         image: busybox
         command: ["/bin/sh", "-c"]
         args:
