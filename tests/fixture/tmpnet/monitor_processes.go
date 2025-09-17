@@ -485,7 +485,7 @@ func getCollectorConfig(cmdName string, urlSuffix string) (collectorConfig, erro
 	urlEnvVar := baseEnvName + urlSuffix
 	url := GetEnvWithDefault(urlEnvVar, "")
 	if len(url) == 0 {
-		return collectorConfig{}, fmt.Errorf("%s env var not set", urlEnvVar)
+		return collectorConfig{}, stacktrace.Errorf("%s env var not set", urlEnvVar)
 	}
 	usernameEnvVar := baseEnvName + "_USERNAME"
 	username := GetEnvWithDefault(usernameEnvVar, "")
