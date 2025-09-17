@@ -452,7 +452,7 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 			if u.isPaused(existing.NodeID) {
 				err := u.resume(existing.NodeID)
 				if err != nil {
-					log.Error("failed to handle validator removed %s: %s", existing.NodeID, err)
+					log.Error("failed to handle validator removed %s: %v", existing.NodeID, err)
 				}
 			}
 		}
@@ -495,7 +495,7 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 			if !validator.IsActive {
 				err := u.pause(validator.NodeID)
 				if err != nil {
-					log.Error("failed to handle added validator %s: %s", validator.NodeID, err)
+					log.Error("failed to handle added validator %s: %v", validator.NodeID, err)
 				}
 			}
 		}
