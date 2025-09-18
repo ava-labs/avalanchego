@@ -79,6 +79,20 @@ var (
 			},
 		},
 	}
+	meterVMMetrics = []topLevelMetric{
+		{
+			Name:    "avg_block_parse",
+			Queries: []string{"avalanche_meterchainvm_C_parse_block"},
+		},
+		{
+			Name:    "avg_block_verify",
+			Queries: []string{"avalanche_meterchainvm_C_verify"},
+		},
+		{
+			Name:    "avg_block_accept",
+			Queries: []string{"avalanche_meterchainvm_C_accept"},
+		},
+	}
 )
 
 func getCounterMetricValue(registry prometheus.Gatherer, query string) (float64, error) {
@@ -94,6 +108,38 @@ func getCounterMetricValue(registry prometheus.Gatherer, query string) (float64,
 	}
 
 	return 0, fmt.Errorf("metric %s not found", query)
+}
+
+func getAveragerValue(registry prometheus.Gatherer, query string) (float64, error) {
+	metricFamilies, err := registry.Gather()
+	if err != nil {
+		return 0, fmt.Errorf("failed to gather metrics: %w", err)
+	}
+
+	var (
+		sumName   = query + "_sum"
+		countName = query + "_count"
+
+		sum   float64
+		count float64
+	)
+
+	for _, mf := range metricFamilies {
+		name := mf.GetName()
+		switch name {
+		case sumName:
+			sum = mf.GetMetric()[0].Gauge.GetValue()
+		case countName:
+			count = mf.GetMetric()[0].Counter.GetValue()
+		default:
+		}
+	}
+
+	if sum == 0 || count == 0 {
+		return 0, fmt.Errorf("failed to compute averager value for %s", query)
+	}
+
+	return sum / count, nil
 }
 
 type topLevelMetric struct {
@@ -129,6 +175,18 @@ func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time
 		totalMSTrackedPerGGas += metricValMS
 		b.ReportMetric(metricValMS, fmt.Sprintf("%s_ms/g%s", metric.Name, gasMetric.Name))
 	}
+
+	for _, metric := range meterVMMetrics {
+		query := metric.Queries[0]
+		queryVal, err := getAveragerValue(registry, query)
+		r.NoError(err)
+
+		// convert from ns to ms
+		queryVal /= 1_000_000
+
+		b.ReportMetric(queryVal, metric.Name+"_ms/block")
+	}
+
 	totalSTracked := totalMSTrackedPerGGas / 1000
 	b.ReportMetric(totalSTracked, "s_tracked")
 	b.ReportMetric(elapsed.Seconds(), "s_total")
