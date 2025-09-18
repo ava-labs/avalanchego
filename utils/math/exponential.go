@@ -53,11 +53,11 @@ func CalculateExponential(
 
 		maxOutput uint256.Int
 	)
-	num.SetUint64(uint64(numerator))     // range is [0, MaxUint64]
-	denom.SetUint64(uint64(denominator)) // range is [0, MaxUint64]
+	num.SetUint64(numerator)     // range is [0, MaxUint64]
+	denom.SetUint64(denominator) // range is [0, MaxUint64]
 
 	i.SetOne()
-	numeratorAccum.SetUint64(uint64(factor))    // range is [0, MaxUint64]
+	numeratorAccum.SetUint64(factor)            // range is [0, MaxUint64]
 	numeratorAccum.Mul(&numeratorAccum, &denom) // range is [0, MaxUint128]
 
 	maxOutput.Mul(&denom, max256Uint64) // range is [0, MaxUint128]

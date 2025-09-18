@@ -46,11 +46,11 @@ func (p TargetExcessParams) DesiredTargetExcess(desiredTarget uint64) uint64 {
 // CalculateTarget calculates the target value using exponential formula:
 // Target = MinTarget * e^(Excess / TargetConversion)
 func (p TargetExcessParams) CalculateTarget(excess uint64) uint64 {
-	return uint64(safemath.CalculateExponential(
+	return safemath.CalculateExponential(
 		p.MinTarget,
 		excess,
 		p.TargetConversion,
-	))
+	)
 }
 
 // MulWithUpperBound multiplies two numbers and returns the result. If the
