@@ -208,6 +208,9 @@ func scaleExcess(
 
 	bigTarget.SetUint64(uint64(previousTargetPerSecond))
 	bigExcess.Div(&bigExcess, &bigTarget)
+	if !bigExcess.IsUint64() {
+		return math.MaxUint64
+	}
 	return gas.Gas(bigExcess.Uint64())
 }
 
