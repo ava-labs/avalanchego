@@ -329,6 +329,10 @@ jobs:
           # Configure go.mod to use local FFI
           go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=./ffi
           go mod download
+      - name: Temporarily stash go.mod changes
+        run: |
+          git add go.mod go.sum
+          git stash push -m "temp stash for benchmark"
       - name: Run C-Chain Re-Execution Benchmark (Firewood v0.0.8)
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
@@ -343,6 +347,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ''
           runner_name: 'avalanche-avalanchego-runner'
+      - name: Restore go.mod changes
+        run: |
+          git stash pop
       - name: Upload baseline results
         uses: actions/upload-artifact@v4
         with:
