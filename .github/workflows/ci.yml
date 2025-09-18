@@ -274,6 +274,11 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.88"
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc
       - name: Checkout Firewood source (build from source)
         uses: actions/checkout@v4
         with:
@@ -365,6 +370,8 @@ jobs:
             sudo apt-get install -y xz-utils
           fi
       - uses: actions/checkout@v4
+        with:
+          ref: "c2563d13031197962d20f25b576560d029c5125c" # v1.13.5
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/install-nix
       - name: Setup Firewood Candidate Without Source Build
