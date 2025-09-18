@@ -24,7 +24,7 @@ const (
 	maxDelayExcess = 46_516_320 // ConversionRate * ln(MaxUint64 / MinDelayMilliseconds) + 1
 )
 
-// DelayExcess represents the  excess for delay calculation in the dynamic minimum block delay mechanism.
+// DelayExcess represents the excess for delay calculation in the dynamic minimum block delay mechanism.
 type DelayExcess uint64
 
 // Delay returns the  minimum block delay in milliseconds, `T`.
