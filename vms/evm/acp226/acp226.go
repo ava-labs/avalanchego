@@ -27,7 +27,7 @@ const (
 // DelayExcess represents the excess for delay calculation in the dynamic minimum block delay mechanism.
 type DelayExcess uint64
 
-// Delay returns the  minimum block delay in milliseconds, `T`.
+// Delay returns the minimum block delay in milliseconds, `m`.
 //
 // Delay = MinDelayMilliseconds * e^(DelayExcess / ConversionRate)
 func (t DelayExcess) Delay() uint64 {
