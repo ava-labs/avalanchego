@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1758186622854,
+  "lastUpdate": 1758186624639,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -1396,6 +1396,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-blacksmith-4vcpu-ubuntu-2404",
             "value": 113.7,
+            "unit": "mgas/s",
+            "extra": "1 times\n6 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "rodrigo",
+            "username": "RodrigoVillar",
+            "email": "77309055+RodrigoVillar@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "40413f5042cd842f0a596e53f45b5dbb35225302",
+          "message": "test(reexecute/c): disable metrics collection by default (#4272)",
+          "timestamp": "2025-09-17T20:11:16Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/40413f5042cd842f0a596e53f45b5dbb35225302"
+        },
+        "date": 1758186621422,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-blacksmith-4vcpu-ubuntu-2404",
+            "value": 115.3,
             "unit": "mgas/s",
             "extra": "1 times\n6 procs"
           }
