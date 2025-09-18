@@ -406,6 +406,10 @@ jobs:
           # Configure go.mod to use local FFI
           go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=./ffi
           go mod download
+      - name: Temporarily stash go.mod changes
+        run: |
+          git add go.mod go.sum
+          git stash push -m "temp stash for benchmark"
       - name: Run C-Chain Re-Execution Benchmark (Firewood v0.0.12)
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
@@ -420,6 +424,9 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ''
           runner_name: 'avalanche-avalanchego-runner'
+      - name: Restore go.mod changes
+        run: |
+          git stash pop
       - name: Upload baseline results
         uses: actions/upload-artifact@v4
         with:
@@ -429,7 +436,7 @@ jobs:
             benchmark-results/
           retention-days: 1
   compare-results:
-    needs: [c-chain-reexecution-firewood-v0-0-8, c-chain-reexecution-firewood-v0-0-12]
+    needs: [ c-chain-reexecution-firewood-v0-0-8, c-chain-reexecution-firewood-v0-0-12 ]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -452,19 +459,48 @@ jobs:
           echo "**Baseline:** v0.0.8" >> $GITHUB_STEP_SUMMARY
           echo "**Candidate:** v0.0.12" >> $GITHUB_STEP_SUMMARY
           echo "**Blocks:** 101 - 200" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [ -f "./baseline-results/output.txt" ] && [ -f "./candidate-results/output.txt" ]; then
-            BASELINE_MGAS=$(grep -o '[0-9]\+\.[0-9]\+ mgas/s' ./baseline-results/output.txt | head -1 | cut -d' ' -f1 || echo "N/A")
-            CANDIDATE_MGAS=$(grep -o '[0-9]\+\.[0-9]\+ mgas/s' ./candidate-results/output.txt | head -1 | cut -d' ' -f1 || echo "N/A")
-
-            echo "- Baseline: ${BASELINE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
-            echo "- Candidate: ${CANDIDATE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
-
-            if [ "$BASELINE_MGAS" != "N/A" ] && [ "$CANDIDATE_MGAS" != "N/A" ]; then
-              CHANGE=$(echo "scale=2; ($CANDIDATE_MGAS - $BASELINE_MGAS) / $BASELINE_MGAS * 100" | bc -l)
-              echo "- Change: ${CHANGE}%" >> $GITHUB_STEP_SUMMARY
-            fi
+          # Parse Go benchmark format: "BenchmarkName 1 1361 mgas/s"
+          if [ -f "./baseline-results/output.txt" ]; then
+            BASELINE_MGAS=$(grep -o '[0-9]\+ mgas/s' ./baseline-results/output.txt | head -1 | cut -d' ' -f1 || echo "N/A")
+            echo "- **Baseline (v0.0.8):** ${BASELINE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
           else
-            [ -f "./baseline-results/output.txt" ] && echo "- Baseline: Completed" >> $GITHUB_STEP_SUMMARY || echo "- Baseline: Failed" >> $GITHUB_STEP_SUMMARY
-            [ -f "./candidate-results/output.txt" ] && echo "- Candidate: Completed" >> $GITHUB_STEP_SUMMARY || echo "- Candidate: Failed" >> $GITHUB_STEP_SUMMARY
+            BASELINE_MGAS="N/A"
+            echo "- **Baseline (v0.0.8):** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -f "./candidate-results/output.txt" ]; then
+            CANDIDATE_MGAS=$(grep -o '[0-9]\+ mgas/s' ./candidate-results/output.txt | head -1 | cut -d' ' -f1 || echo "N/A")
+            echo "- **Candidate (v0.0.12):** ${CANDIDATE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
+          else
+            CANDIDATE_MGAS="N/A"
+            echo "- **Candidate (v0.0.12):** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Calculate percentage change if both values are available
+          if [ "$BASELINE_MGAS" != "N/A" ] && [ "$CANDIDATE_MGAS" != "N/A" ]; then
+            # Install bc if not available
+            command -v bc >/dev/null 2>&1 || { echo "bc not found, installing..."; apt-get update && apt-get install -y bc; }
+
+            CHANGE=$(echo "scale=2; ($CANDIDATE_MGAS - $BASELINE_MGAS) / $BASELINE_MGAS * 100" | bc -l)
+            if (( $(echo "$CHANGE > 0" | bc -l) )); then
+              echo "- **Performance Change:** +${CHANGE}% 🚀" >> $GITHUB_STEP_SUMMARY
+            elif (( $(echo "$CHANGE < 0" | bc -l) )); then
+              echo "- **Performance Change:** ${CHANGE}% 📉" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **Performance Change:** No change" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## Raw Results" >> $GITHUB_STEP_SUMMARY
+            echo "### Baseline (v0.0.8)" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat ./baseline-results/output.txt >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No baseline output found" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+
+            echo "### Candidate (v0.0.12)" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat ./candidate-results/output.txt >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No candidate output found" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
           fi
