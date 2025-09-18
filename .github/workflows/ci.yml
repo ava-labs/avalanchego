@@ -270,44 +270,59 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y xz-utils
           fi
-      - uses: actions/checkout@v4
-        with:
-          ref: '92d0e99bce8fc3f7af1fa7d300e4fe1e7d210e6b'
-      - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/install-nix
-      - name: Install build dependencies
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential gcc
-      - name: Setup Rust for source build
+      - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: "1.88"
-      - name: Setup Firewood Baseline
-        shell: nix develop --command bash -x {0}
+      - name: Checkout Firewood source (build from source)
+        uses: actions/checkout@v4
+        with:
+          repository: ava-labs/firewood
+          ref: v0.0.8
+          path: firewood-src
+      - name: Build Firewood v0.0.8
+        working-directory: firewood-src
         run: |
-          FIREWOOD_VERSION="${{ github.event.inputs.firewood-baseline-version }}"
+          cargo build --profile maxperf --features ethhash,logger
 
-          if [[ "$FIREWOOD_VERSION" =~ ^(v|ffi/) ]]; then
-            echo "Detected tag: $FIREWOOD_VERSION - using pre-built binaries"
-            # For tags, fetch pre-built binaries from firewood-go-ethhash repo
-            TEMP_DIR=$(mktemp -d)
-            trap "rm -rf $TEMP_DIR" EXIT
+          # Verify library was built
+          BUILT_LIB=$(find target -name "libfirewood_ffi.a" | head -1)
+          if [ -z "$BUILT_LIB" ]; then
+            echo "Error: libfirewood_ffi.a not found"
+            exit 1
+          fi
+          echo "Built library: $BUILT_LIB"
+      - uses: actions/checkout@v4
+        with:
+          ref: '92d0e99bce8fc3f7af1fa7d300e4fe1e7d210e6b'
+          path: avalanchego
+      - uses: ./.github/actions/setup-go-for-project
+      - name: Setup FFI directory structure
+        working-directory: avalanchego
+        run: |
+          # Copy FFI directory from built Firewood
+          cp -r ../firewood-src/ffi ./ffi
 
-            cd "$TEMP_DIR"
-            git clone https://github.com/ava-labs/firewood-go-ethhash.git
-            cd firewood-go-ethhash
-            git checkout "$FIREWOOD_VERSION"
+          # Create platform-specific directory and copy library
+          PLATFORM="$(uname -m | sed 's/arm64/aarch64/')-unknown-linux-gnu"
+          mkdir -p "ffi/libs/$PLATFORM"
 
-            cd "$GITHUB_WORKSPACE"
-            rm -rf ./ffi
-            cp -r "$TEMP_DIR/firewood-go-ethhash/ffi" ./ffi
-          else
-            echo "Detected commit: $FIREWOOD_VERSION - building from source"
-            ./scripts/build_firewood.sh "$FIREWOOD_VERSION" ./ffi
+          # Find and copy the built library
+          BUILT_LIB=$(find ../firewood-src/target -name "libfirewood_ffi.a" | head -1)
+          cp "$BUILT_LIB" "ffi/libs/$PLATFORM/"
+
+          # Verify setup
+          if [ ! -f "ffi/libs/$PLATFORM/libfirewood_ffi.a" ]; then
+            echo "Error: Failed to set up FFI library"
+            exit 1
           fi
 
+          echo "FFI setup complete for $PLATFORM"
+          ls -la "ffi/libs/$PLATFORM/"
+      - name: Configure AvalancheGo to work with Firewood
+        working-directory: avalanchego
+        run: |
           # Configure go.mod to use local FFI
           go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=./ffi
           go mod download
@@ -422,9 +437,9 @@ jobs:
         shell: bash
         run: |
           echo "# Firewood Performance Comparison (Test)" >> $GITHUB_STEP_SUMMARY
-          echo "**Baseline:** ${{ env.FIREWOOD_BASELINE_VERSION }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Candidate:** ${{ env.FIREWOOD_CANDIDATE_VERSION }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Blocks:** ${{ env.START_BLOCK }} - ${{ env.END_BLOCK }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Baseline:** v0.0.8" >> $GITHUB_STEP_SUMMARY
+          echo "**Candidate:** v0.0.12" >> $GITHUB_STEP_SUMMARY
+          echo "**Blocks:** 101 - 200" >> $GITHUB_STEP_SUMMARY
 
           if [ -f "./baseline-results/output.txt" ] && [ -f "./candidate-results/output.txt" ]; then
             BASELINE_MGAS=$(grep -o '[0-9]\+\.[0-9]\+ mgas/s' ./baseline-results/output.txt | head -1 | cut -d' ' -f1 || echo "N/A")
