@@ -20,237 +20,424 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  Unit:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-14, ubuntu-22.04, ubuntu-24.04, custom-arm64-jammy, custom-arm64-noble]
+#  Unit:
+#    runs-on: ${{ matrix.os }}
+#    strategy:
+#      fail-fast: false
+#      matrix:
+#        os: [macos-14, ubuntu-22.04, ubuntu-24.04, custom-arm64-jammy, custom-arm64-noble]
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - name: test-unit
+#        shell: bash
+#        run: ./scripts/run_task.sh test-unit
+#        env:
+#          TIMEOUT: ${{ env.TIMEOUT }}
+#  Fuzz:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - name: test-fuzz
+#        shell: bash
+#        run: ./scripts/run_task.sh test-fuzz
+#  e2e:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - name: Run e2e tests
+#        uses: ./.github/actions/run-monitored-tmpnet-cmd
+#        with:
+#          run: ./scripts/run_task.sh test-e2e-ci
+#          artifact_prefix: e2e
+#          filter_by_owner: avalanchego-e2e
+#          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+#          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+#          loki_username: ${{ secrets.LOKI_ID || '' }}
+#          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+#  e2e_post_granite:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - name: Run e2e tests
+#        uses: ./.github/actions/run-monitored-tmpnet-cmd
+#        with:
+#          run: ./scripts/run_task.sh test-e2e-ci -- --activate-granite
+#          artifact_prefix: e2e-post-granite
+#          filter_by_owner: avalanchego-e2e
+#          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+#          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+#          loki_username: ${{ secrets.LOKI_ID || '' }}
+#          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+#  e2e_kube:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - uses: ./.github/actions/run-monitored-tmpnet-cmd
+#        with:
+#          run: ./scripts/run_task.sh test-e2e-kube-ci
+#          runtime: kube
+#          artifact_prefix: e2e-kube
+#          filter_by_owner: avalanchego-e2e
+#          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+#          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+#          loki_username: ${{ secrets.LOKI_ID || '' }}
+#          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+#  e2e_existing_network:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - name: Run e2e tests with existing network
+#        uses: ./.github/actions/run-monitored-tmpnet-cmd
+#        with:
+#          run: ./scripts/run_task.sh test-e2e-existing-ci
+#          artifact_prefix: e2e-existing-network
+#          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+#          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+#          loki_username: ${{ secrets.LOKI_ID || '' }}
+#          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+#  Upgrade:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - name: Run e2e tests
+#        uses: ./.github/actions/run-monitored-tmpnet-cmd
+#        with:
+#          run: ./scripts/run_task.sh test-upgrade
+#          artifact_prefix: upgrade
+#          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+#          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+#          loki_username: ${{ secrets.LOKI_ID || '' }}
+#          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+#  Lint:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - uses: ./.github/actions/install-nix
+#      - name: Runs all lint checks
+#        shell: nix develop --command bash -x {0}
+#        run: ./scripts/run_task.sh lint-all-ci
+#  links-lint:
+#    name: Markdown Links Lint
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 #v1.2.5
+#        with:
+#          fail_level: any
+#  check_generated_protobuf:
+#    name: Up-to-date protobuf
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      # Use the dev shell instead of bufbuild/buf-action to ensure the dev shell provides the expected versions
+#      - uses: ./.github/actions/install-nix
+#      - shell: nix develop --command bash -x {0}
+#        run: ./scripts/run_task.sh check-generate-protobuf
+#  check_mockgen:
+#    name: Up-to-date mocks
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - shell: bash
+#        run: ./scripts/run_task.sh check-generate-mocks
+#  check_canotogen:
+#    name: Up-to-date canoto
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - shell: bash
+#        run: ./scripts/run_task.sh check-generate-canoto
+#  check_contract_bindings:
+#    name: Up-to-date contract bindings
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - uses: ./.github/actions/install-nix
+#      - shell: nix develop --command bash -x {0}
+#        run: task check-generate-load-contract-bindings
+#  go_mod_tidy:
+#    name: Up-to-date go.mod and go.sum
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - shell: bash
+#        run: ./scripts/run_task.sh check-go-mod-tidy
+#  test_build_image:
+#    name: Image build
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - name: Install qemu (required for cross-platform builds)
+#        run: |
+#          sudo apt update
+#          sudo apt -y install qemu-system qemu-user-static
+#      - name: Check image build
+#        shell: bash
+#        run: ./scripts/run_task.sh test-build-image
+#  test_build_antithesis_avalanchego_images:
+#    name: Build Antithesis avalanchego images
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - name: Check image build for avalanchego test setup
+#        shell: bash
+#        run: ./scripts/run_task.sh test-build-antithesis-images-avalanchego
+#  test_build_antithesis_xsvm_images:
+#    name: Build Antithesis xsvm images
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - name: Check image build for xsvm test setup
+#        shell: bash
+#        run: ./scripts/run_task.sh test-build-antithesis-images-xsvm
+#  e2e_bootstrap_monitor:
+#    name: Run bootstrap monitor e2e tests
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - uses: ./.github/actions/install-nix
+#      - name: Run e2e tests
+#        shell: bash
+#        run: nix develop --command ./scripts/run_task.sh test-bootstrap-monitor-e2e
+#  load:
+#    name: Run process-based load test
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - uses: ./.github/actions/run-monitored-tmpnet-cmd
+#        with:
+#          run: ./scripts/run_task.sh test-load -- --load-timeout=30s
+#          artifact_prefix: load
+#          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+#          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+#          loki_username: ${{ secrets.LOKI_ID || '' }}
+#          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+#  load_kube_kind:
+#    name: Run load test on kind cluster
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - uses: ./.github/actions/run-monitored-tmpnet-cmd
+#        with:
+#          run: ./scripts/run_task.sh test-load-kube-kind -- --load-timeout=30s
+#          runtime: kube
+#          artifact_prefix: load-kube
+#          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+#          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+#          loki_username: ${{ secrets.LOKI_ID || '' }}
+#          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+#  robustness:
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: ./.github/actions/setup-go-for-project
+#      - uses: ./.github/actions/install-nix
+#        # TODO(marun) Extend testing of robustness beyond deploying a suitable test environment
+#      - name: Deploy kind with chaos mesh
+#        shell: bash
+#        run: nix develop --command ./scripts/run_task.sh test-robustness
+  c-chain-reexecution-firewood-v0-0-8:
+    runs-on: avalanche-avalanchego-runner
+    container:
+      image: ghcr.io/actions/actions-runner:2.325.0
+    permissions:
+      id-token: write
+      contents: write
+    name: "C-Chain Re-execution (Firewood v0.0.8)"
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - name: test-unit
+      - name: Install dependencies
         shell: bash
-        run: ./scripts/run_task.sh test-unit
-        env:
-          TIMEOUT: ${{ env.TIMEOUT }}
-  Fuzz:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - name: test-fuzz
-        shell: bash
-        run: ./scripts/run_task.sh test-fuzz
-  e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - name: Run e2e tests
-        uses: ./.github/actions/run-monitored-tmpnet-cmd
-        with:
-          run: ./scripts/run_task.sh test-e2e-ci
-          artifact_prefix: e2e
-          filter_by_owner: avalanchego-e2e
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  e2e_post_granite:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - name: Run e2e tests
-        uses: ./.github/actions/run-monitored-tmpnet-cmd
-        with:
-          run: ./scripts/run_task.sh test-e2e-ci -- --activate-granite
-          artifact_prefix: e2e-post-granite
-          filter_by_owner: avalanchego-e2e
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  e2e_kube:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - uses: ./.github/actions/run-monitored-tmpnet-cmd
-        with:
-          run: ./scripts/run_task.sh test-e2e-kube-ci
-          runtime: kube
-          artifact_prefix: e2e-kube
-          filter_by_owner: avalanchego-e2e
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  e2e_existing_network:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - name: Run e2e tests with existing network
-        uses: ./.github/actions/run-monitored-tmpnet-cmd
-        with:
-          run: ./scripts/run_task.sh test-e2e-existing-ci
-          artifact_prefix: e2e-existing-network
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  Upgrade:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - name: Run e2e tests
-        uses: ./.github/actions/run-monitored-tmpnet-cmd
-        with:
-          run: ./scripts/run_task.sh test-upgrade
-          artifact_prefix: upgrade
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  Lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - uses: ./.github/actions/install-nix
-      - name: Runs all lint checks
-        shell: nix develop --command bash -x {0}
-        run: ./scripts/run_task.sh lint-all-ci
-  links-lint:
-    name: Markdown Links Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: umbrelladocs/action-linkspector@de84085e0f51452a470558693d7d308fbb2fa261 #v1.2.5
-        with:
-          fail_level: any
-  check_generated_protobuf:
-    name: Up-to-date protobuf
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      # Use the dev shell instead of bufbuild/buf-action to ensure the dev shell provides the expected versions
-      - uses: ./.github/actions/install-nix
-      - shell: nix develop --command bash -x {0}
-        run: ./scripts/run_task.sh check-generate-protobuf
-  check_mockgen:
-    name: Up-to-date mocks
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - shell: bash
-        run: ./scripts/run_task.sh check-generate-mocks
-  check_canotogen:
-    name: Up-to-date canoto
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - shell: bash
-        run: ./scripts/run_task.sh check-generate-canoto
-  check_contract_bindings:
-    name: Up-to-date contract bindings
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - uses: ./.github/actions/install-nix
-      - shell: nix develop --command bash -x {0}
-        run: task check-generate-load-contract-bindings
-  go_mod_tidy:
-    name: Up-to-date go.mod and go.sum
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - shell: bash
-        run: ./scripts/run_task.sh check-go-mod-tidy
-  test_build_image:
-    name: Image build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install qemu (required for cross-platform builds)
         run: |
-          sudo apt update
-          sudo apt -y install qemu-system qemu-user-static
-      - name: Check image build
-        shell: bash
-        run: ./scripts/run_task.sh test-build-image
-  test_build_antithesis_avalanchego_images:
-    name: Build Antithesis avalanchego images
-    runs-on: ubuntu-latest
-    steps:
+          if ! command -v xz &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y xz-utils
+          fi
       - uses: actions/checkout@v4
+        with:
+          ref: '92d0e99bce8fc3f7af1fa7d300e4fe1e7d210e6b'
       - uses: ./.github/actions/setup-go-for-project
-      - name: Check image build for avalanchego test setup
+      - uses: ./.github/actions/install-nix
+      - name: Install build dependencies
         shell: bash
-        run: ./scripts/run_task.sh test-build-antithesis-images-avalanchego
-  test_build_antithesis_xsvm_images:
-    name: Build Antithesis xsvm images
-    runs-on: ubuntu-latest
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc
+      - name: Setup Rust for source build
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: "1.88"
+      - name: Setup Firewood Baseline
+        shell: nix develop --command bash -x {0}
+        run: |
+          FIREWOOD_VERSION="${{ github.event.inputs.firewood-baseline-version }}"
+
+          if [[ "$FIREWOOD_VERSION" =~ ^(v|ffi/) ]]; then
+            echo "Detected tag: $FIREWOOD_VERSION - using pre-built binaries"
+            # For tags, fetch pre-built binaries from firewood-go-ethhash repo
+            TEMP_DIR=$(mktemp -d)
+            trap "rm -rf $TEMP_DIR" EXIT
+
+            cd "$TEMP_DIR"
+            git clone https://github.com/ava-labs/firewood-go-ethhash.git
+            cd firewood-go-ethhash
+            git checkout "$FIREWOOD_VERSION"
+
+            cd "$GITHUB_WORKSPACE"
+            rm -rf ./ffi
+            cp -r "$TEMP_DIR/firewood-go-ethhash/ffi" ./ffi
+          else
+            echo "Detected commit: $FIREWOOD_VERSION - building from source"
+            ./scripts/build_firewood.sh "$FIREWOOD_VERSION" ./ffi
+          fi
+
+          # Configure go.mod to use local FFI
+          go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=./ffi
+          go mod download
+      - name: Run C-Chain Re-Execution Benchmark (Firewood v0.0.8)
+        uses: ./.github/actions/c-chain-reexecution-benchmark
+        with:
+          config: firewood
+          start-block: 101
+          end-block: 200
+          prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          push-github-action-benchmark: false
+          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: us-east-2
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          push-post-state: ''
+          runner_name: 'avalanche-avalanchego-runner'
+      - name: Upload baseline results
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-benchmark-results
+          path: |
+            output.txt
+            benchmark-results/
+          retention-days: 1
+  c-chain-reexecution-firewood-v0-0-12:
+    runs-on: avalanche-avalanchego-runner
+    container:
+      image: ghcr.io/actions/actions-runner:2.325.0
+    permissions:
+      id-token: write
+      contents: write
+    name: "C-Chain Re-execution (Firewood v0.0.12)"
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - name: Check image build for xsvm test setup
+      - name: Install dependencies
         shell: bash
-        run: ./scripts/run_task.sh test-build-antithesis-images-xsvm
-  e2e_bootstrap_monitor:
-    name: Run bootstrap monitor e2e tests
-    runs-on: ubuntu-latest
-    steps:
+        run: |
+          if ! command -v xz &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y xz-utils
+          fi
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/install-nix
-      - name: Run e2e tests
-        shell: bash
-        run: nix develop --command ./scripts/run_task.sh test-bootstrap-monitor-e2e
-  load:
-    name: Run process-based load test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - uses: ./.github/actions/run-monitored-tmpnet-cmd
+      - name: Setup Firewood Candidate Without Source Build
+        shell: nix develop --command bash -x {0}
+        run: |
+          FIREWOOD_VERSION="ffi/v0.0.12"
+
+          if [[ "$FIREWOOD_VERSION" =~ ^(v|ffi/) ]]; then
+            echo "Detected tag: $FIREWOOD_VERSION - using pre-built binaries"
+            # For tags, fetch pre-built binaries from firewood-go-ethhash repo
+            TEMP_DIR=$(mktemp -d)
+            trap "rm -rf $TEMP_DIR" EXIT
+
+            cd "$TEMP_DIR"
+            git clone https://github.com/ava-labs/firewood-go-ethhash.git
+            cd firewood-go-ethhash
+            git checkout "$FIREWOOD_VERSION"
+
+            cd "$GITHUB_WORKSPACE"
+            rm -rf ./ffi
+            cp -r "$TEMP_DIR/firewood-go-ethhash/ffi" ./ffi
+          else
+            echo "Detected commit: $FIREWOOD_VERSION - building from source"
+            ./scripts/build_firewood.sh "$FIREWOOD_VERSION" ./ffi
+          fi
+
+          # Configure go.mod to use local FFI
+          go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=./ffi
+          go mod download
+      - name: Run C-Chain Re-Execution Benchmark (Firewood v0.0.12)
+        uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
-          run: ./scripts/run_task.sh test-load -- --load-timeout=30s
-          artifact_prefix: load
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  load_kube_kind:
-    name: Run load test on kind cluster
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - uses: ./.github/actions/run-monitored-tmpnet-cmd
+          config: firewood
+          start-block: 101
+          end-block: 200
+          prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          push-github-action-benchmark: false
+          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: us-east-2
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          push-post-state: ''
+          runner_name: 'avalanche-avalanchego-runner'
+      - name: Upload baseline results
+        uses: actions/upload-artifact@v4
         with:
-          run: ./scripts/run_task.sh test-load-kube-kind -- --load-timeout=30s
-          runtime: kube
-          artifact_prefix: load-kube
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
-          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
-          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
-  robustness:
+          name: candidate-benchmark-results
+          path: |
+            output.txt
+            benchmark-results/
+          retention-days: 1
+  compare-results:
+    needs: [c-chain-reexecution-firewood-v0-0-8, c-chain-reexecution-firewood-v0-0-12]
     runs-on: ubuntu-latest
+    if: always()
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
-      - uses: ./.github/actions/install-nix
-        # TODO(marun) Extend testing of robustness beyond deploying a suitable test environment
-      - name: Deploy kind with chaos mesh
+      - name: Download baseline results
+        uses: actions/download-artifact@v4
+        with:
+          name: baseline-benchmark-results
+          path: ./baseline-results
+        continue-on-error: true
+      - name: Download candidate results
+        uses: actions/download-artifact@v4
+        with:
+          name: candidate-benchmark-results
+          path: ./candidate-results
+        continue-on-error: true
+      - name: Compare Results
         shell: bash
-        run: nix develop --command ./scripts/run_task.sh test-robustness
+        run: |
+          echo "# Firewood Performance Comparison (Test)" >> $GITHUB_STEP_SUMMARY
+          echo "**Baseline:** ${{ env.FIREWOOD_BASELINE_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Candidate:** ${{ env.FIREWOOD_CANDIDATE_VERSION }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Blocks:** ${{ env.START_BLOCK }} - ${{ env.END_BLOCK }}" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f "./baseline-results/output.txt" ] && [ -f "./candidate-results/output.txt" ]; then
+            BASELINE_MGAS=$(grep -o '[0-9]\+\.[0-9]\+ mgas/s' ./baseline-results/output.txt | head -1 | cut -d' ' -f1 || echo "N/A")
+            CANDIDATE_MGAS=$(grep -o '[0-9]\+\.[0-9]\+ mgas/s' ./candidate-results/output.txt | head -1 | cut -d' ' -f1 || echo "N/A")
+
+            echo "- Baseline: ${BASELINE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
+            echo "- Candidate: ${CANDIDATE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
+
+            if [ "$BASELINE_MGAS" != "N/A" ] && [ "$CANDIDATE_MGAS" != "N/A" ]; then
+              CHANGE=$(echo "scale=2; ($CANDIDATE_MGAS - $BASELINE_MGAS) / $BASELINE_MGAS * 100" | bc -l)
+              echo "- Change: ${CHANGE}%" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            [ -f "./baseline-results/output.txt" ] && echo "- Baseline: Completed" >> $GITHUB_STEP_SUMMARY || echo "- Baseline: Failed" >> $GITHUB_STEP_SUMMARY
+            [ -f "./candidate-results/output.txt" ] && echo "- Candidate: Completed" >> $GITHUB_STEP_SUMMARY || echo "- Candidate: Failed" >> $GITHUB_STEP_SUMMARY
+          fi

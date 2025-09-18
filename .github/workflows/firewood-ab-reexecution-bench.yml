@@ -145,7 +145,7 @@ jobs:
         if: ${{ !startsWith(github.event.inputs.firewood-candidate-version, 'v') && !startsWith(github.event.inputs.firewood-candidate-version, 'ffi/') }}
         uses: Swatinem/rust-cache@v2
       - name: Setup Firewood Candidate
-        shell: bash
+        shell: nix develop --command bash -x {0}
         run: |
           FIREWOOD_VERSION="${{ github.event.inputs.firewood-candidate-version }}"
 
