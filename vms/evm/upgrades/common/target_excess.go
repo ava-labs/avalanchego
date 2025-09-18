@@ -23,7 +23,7 @@ type TargetExcessParams struct {
 // include given the current and desired excess values.
 func (p TargetExcessParams) TargetExcess(excess, desired uint64) uint64 {
 	change := safemath.AbsDiff(excess, desired)
-	change = min(change, p.MaxExcessDiff)
+	change = getMin(change, p.MaxExcessDiff)
 	if excess < desired {
 		return excess + change
 	}
@@ -62,8 +62,8 @@ func MulWithUpperBound(a, b uint64) uint64 {
 	return product
 }
 
-// min returns the minimum of two uint64 values.
-func min(a, b uint64) uint64 {
+// getMin returns the minimum of two uint64 values.
+func getMin(a, b uint64) uint64 {
 	if a < b {
 		return a
 	}
