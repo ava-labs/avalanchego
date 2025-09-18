@@ -86,7 +86,8 @@ runs:
             END_BLOCK=${{ env.END_BLOCK }} \
             LABELS=${{ env.LABELS }} \
             BENCHMARK_OUTPUT_FILE=${{ env.BENCHMARK_OUTPUT_FILE }} \
-            RUNNER_NAME=${{ inputs.runner_name }}
+            RUNNER_NAME=${{ inputs.runner_name }} \
+            METRICS_ENABLED=true
         run: ./scripts/run_task.sh reexecute-cchain-range-with-copied-data
 
         prometheus_push_url: ${{ inputs.prometheus-push-url }}
