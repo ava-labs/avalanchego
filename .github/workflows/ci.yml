@@ -270,7 +270,6 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y xz-utils
           fi
-      - uses: ./.github/actions/install-nix
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -297,6 +296,7 @@ jobs:
         with:
           ref: '92d0e99bce8fc3f7af1fa7d300e4fe1e7d210e6b'
           path: avalanchego
+      - uses: ./.github/actions/install-nix
       - uses: ./.github/actions/setup-go-for-project
       - name: Setup FFI directory structure
         working-directory: avalanchego
