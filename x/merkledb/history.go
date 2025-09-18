@@ -14,7 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"github.com/ava-labs/avalanchego/x/sync"
+
+	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
 // stores previous trie states
@@ -117,10 +118,9 @@ type valueChange struct {
 // [start, end] that occurred between [startRoot] and [endRoot].
 // If [start] is Nothing, there's no lower bound on the range.
 // If [end] is Nothing, there's no upper bound on the range.
-// Returns [ErrInsufficientHistory] if the history is insufficient
+// Returns [xsync.ErrStartRootNotFound] if the history is insufficient
 // to generate the proof.
-// Returns [ErrNoEndRoot], which wraps [ErrInsufficientHistory], if
-// the [endRoot] isn't in the history.
+// Returns [xsync.ErrEndRootNotFound], if the history doesn't contain the [endRootID].
 func (th *trieHistory) getValueChanges(
 	startRoot ids.ID,
 	endRoot ids.ID,
@@ -139,7 +139,7 @@ func (th *trieHistory) getValueChanges(
 	// [endRootChanges] is the last change in the history resulting in [endRoot].
 	endRootChanges, ok := th.getRootChanges(endRoot)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", sync.ErrEndRootNotFound, endRoot)
+		return nil, fmt.Errorf("%w: %s", xsync.ErrEndRootNotFound, endRoot)
 	}
 
 	// Confirm there's a change resulting in [startRoot] before
@@ -147,7 +147,7 @@ func (th *trieHistory) getValueChanges(
 	// [startRootChanges] is the last appearance of [startRoot].
 	startRootChanges, ok := th.getRootChanges(startRoot)
 	if !ok {
-		return nil, fmt.Errorf("%w: start root %s not found", sync.ErrStartRootNotFound, startRoot)
+		return nil, fmt.Errorf("%w: start root %s not found", xsync.ErrStartRootNotFound, startRoot)
 	}
 
 	var (
@@ -184,7 +184,7 @@ func (th *trieHistory) getValueChanges(
 			if i == 0 {
 				return nil, fmt.Errorf(
 					"%w: start root %s not found before end root %s",
-					sync.ErrStartRootNotFound, startRoot, endRoot,
+					xsync.ErrStartRootNotFound, startRoot, endRoot,
 				)
 			}
 		}
@@ -326,7 +326,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 	// [lastRootChange] is the last change in the history resulting in [rootID].
 	lastRootChange, ok := th.getRootChanges(rootID)
 	if !ok {
-		return nil, sync.ErrStartRootNotFound
+		return nil, xsync.ErrStartRootNotFound
 	}
 
 	var (

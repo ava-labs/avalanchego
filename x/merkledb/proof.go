@@ -6,7 +6,6 @@ package merkledb
 import (
 	"bytes"
 	"context"
-	"encoding"
 	"errors"
 	"fmt"
 	"math"
@@ -27,12 +26,8 @@ import (
 const verificationCacheSize = math.MaxUint16
 
 var (
-	_ encoding.BinaryMarshaler   = (*ChangeProof)(nil)
-	_ encoding.BinaryUnmarshaler = (*ChangeProof)(nil)
-	_ encoding.BinaryMarshaler   = (*RangeProof)(nil)
-	_ encoding.BinaryUnmarshaler = (*RangeProof)(nil)
-	_ sync.Proof                 = (*ChangeProof)(nil)
-	_ sync.Proof                 = (*RangeProof)(nil)
+	_ sync.Proof = (*ChangeProof)(nil)
+	_ sync.Proof = (*RangeProof)(nil)
 
 	ErrInvalidProof                  = errors.New("proof obtained an invalid root ID")
 	ErrInvalidMaxLength              = errors.New("expected max length to be > 0")

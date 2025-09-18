@@ -71,13 +71,12 @@ type ChangeProofer interface {
 	// GetChangeProof returns a proof for a subset of the key/value changes in key range
 	// [start, end] that occurred between [startRootID] and [endRootID].
 	// Returns at most [maxLength] key/value pairs.
-	// Returns [ErrInsufficientHistory] if this node has insufficient history
+	// Returns [xsync.ErrStartRootNotFound] if this node has insufficient history
 	// to generate the proof.
 	// Returns ErrEmptyProof if [endRootID] is ids.Empty.
 	// Note that [endRootID] == ids.Empty means the trie is empty
 	// (i.e. we don't need a change proof.)
-	// Returns [ErrNoEndRoot], which wraps [ErrInsufficientHistory], if the
-	// history doesn't contain the [endRootID].
+	// Returns [xsync.ErrEndRootNotFound], if the history doesn't contain the [endRootID].
 	GetChangeProof(
 		ctx context.Context,
 		startRootID ids.ID,
