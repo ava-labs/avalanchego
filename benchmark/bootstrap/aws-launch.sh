@@ -213,6 +213,18 @@ users:
     sudo: "ALL=(ALL) NOPASSWD:ALL"
     ssh_authorized_keys:
 	  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFuwpEMnsBLdfr7V9SFRTm9XWHEFX3yQQP7nmsFHetBo cardno:26_763_547 brandon
+  - name: amin
+    groups: users, adm, sudo
+    shell: /usr/bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_authorized_keys:
+	  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE8iR1X8/ELrzjczZvCkrTGCEoN6/dtlP01QFGuUpYxV cardno:33_317_839 amin
+  - name: bernard
+    groups: users, adm, sudo
+    shell: /usr/bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_authorized_keys:
+	  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE/1C8JVL0g6qqMw1p0TwJMqJqERxYTX+7PnP+gXP4km cardno:19_155_748 bernard
 
 swap:
   filename: /swapfile
