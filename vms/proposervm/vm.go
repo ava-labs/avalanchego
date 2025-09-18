@@ -242,25 +242,34 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
 	mux := http.NewServeMux()
 
-	// First, set up the inner VM's HTTP handler
+	// Get inner VM's HTTP handler first
 	innerHandler, err := vm.ChainVM.NewHTTPHandler(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if innerHandler != nil {
-		mux.Handle("/", innerHandler)
-	}
 
-	// Then, set up the proposer VM's own handlers
+	// Set up the proposer VM's specific handlers
 	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
 		grpcreflect.NewStaticReflector(proposervmconnect.ProposerVMName),
 	)
+	vm.ctx.Log.Info("Registering gRPC reflection handler", zap.String("pattern", reflectionPattern))
 	mux.Handle(reflectionPattern, reflectionHandler)
 
 	service := &service{vm: vm}
 	proposerVMPath, proposerVMHandler := proposervmconnect.NewProposerVMHandler(service)
+	vm.ctx.Log.Info("Registering ProposerVM handler", zap.String("path", proposerVMPath))
 	mux.Handle(proposerVMPath, proposerVMHandler)
 
+	// Mount inner VM handler at root path only if it exists
+	// This acts as a fallback for any requests not handled by specific proposer VM paths
+	if innerHandler != nil {
+		vm.ctx.Log.Info("Registering inner VM handler at root path")
+		mux.Handle("/", innerHandler)
+	} else {
+		vm.ctx.Log.Info("Inner VM returned nil handler - not registering at root path")
+	}
+
+	vm.ctx.Log.Info("ProposerVM NewHTTPHandler setup complete")
 	return mux, nil
 }
 

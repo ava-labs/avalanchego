@@ -23,7 +23,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/units"
 
 	pb "github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
 )
@@ -31,8 +30,6 @@ import (
 var _ = e2e.DescribeCChain("[ProposerVM API]", func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
-
-	const txAmount = 10 * units.Avax // Arbitrary amount to send and transfer
 
 	ginkgo.It("should advance the proposervm epoch according to the upgrade config epoch duration", func() {
 		var (
