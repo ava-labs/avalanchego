@@ -375,8 +375,6 @@ jobs:
             sudo apt-get install -y xz-utils
           fi
       - uses: actions/checkout@v4
-        with:
-          ref: "c2563d13031197962d20f25b576560d029c5125c" # v1.13.5
       - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/install-nix
       - name: Setup Firewood Candidate Without Source Build
