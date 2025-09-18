@@ -29,6 +29,7 @@ import (
 var (
 	ErrNotEnoughGas = errors.New("not enough gas")
 	errNoGasUsed    = errors.New("no gas used")
+	errInvalidAVAX = errors.New("bad avax")
 )
 
 type meteredTx struct {
@@ -194,6 +195,11 @@ func (m *Mempool) meter(tx *txs.Tx) (meteredTx, error) {
 		if err != nil {
 			return meteredTx{}, fmt.Errorf("failed to add produced AVAX: %w", err)
 		}
+	}
+
+	// The caller should verify txs but perform this check anyway
+	if consumedAVAX < producedAVAX {
+		return meteredTx{}, errInvalidAVAX
 	}
 
 	c, err := fee.TxComplexity(tx.Unsigned)
