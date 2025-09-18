@@ -50,7 +50,7 @@ inputs:
     default: ${{ github.job }}
   grafana_dashboard_id:
     description: 'The identifier of the Grafana dashboard to use, in the format <UID>/<dashboard-name>.'
-    default: 'makr6k7/avalanche-main-dashboard'
+    default: 'mabpvtq/avalanche-main-dashboard'
 
 runs:
   using: composite
