@@ -1,4 +1,4 @@
-name: C-Chain Re-Execution Benchmark ARC
+Avaxname: C-Chain Re-Execution Benchmark ARC
 
 on:
   pull_request:
