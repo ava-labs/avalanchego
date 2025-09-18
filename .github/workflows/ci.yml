@@ -302,24 +302,11 @@ jobs:
           echo "Built library: $BUILT_LIB"
       - uses: ./.github/actions/install-nix
       - uses: ./.github/actions/setup-go-for-project
-      - name: Debug - Check what exists
-        run: |
-          echo "=== Current working directory ==="
-          pwd
-          echo "=== Workspace root contents ==="
-          ls -la
-          echo "=== Does firewood-src exist? ==="
-          ls -la firewood-src/ || echo "firewood-src does not exist"
-          echo "=== Does firewood-src/ffi exist? ==="
-          ls -la firewood-src/ffi/ || echo "firewood-src/ffi does not exist"
-          echo "=== Find all ffi directories ==="
-          find . -name "ffi" -type d
-          echo "=== Find all .a files ==="
-          find . -name "*.a"
       - name: Setup FFI directory structure
         run: |
           # Copy FFI directory from built Firewood
           cp -r firewood-src/ffi ./ffi
+          cp -r firewood-src/target ./target
 
           # Create platform-specific directory and copy library
           PLATFORM="$(uname -m | sed 's/arm64/aarch64/')-unknown-linux-gnu"
