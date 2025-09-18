@@ -303,27 +303,26 @@ jobs:
       - uses: ./.github/actions/install-nix
       - uses: ./.github/actions/setup-go-for-project
       - name: Setup FFI directory structure
-        working-directory: avalanchego
         run: |
           # Copy FFI directory from built Firewood
-          cp -r ../firewood-src/ffi ./ffi
+          cp -r firewood-src/ffi avalanchego/ffi
 
           # Create platform-specific directory and copy library
           PLATFORM="$(uname -m | sed 's/arm64/aarch64/')-unknown-linux-gnu"
-          mkdir -p "ffi/libs/$PLATFORM"
+          mkdir -p "avalanchego/ffi/libs/$PLATFORM"
 
           # Find and copy the built library
-          BUILT_LIB=$(find ../firewood-src/target -name "libfirewood_ffi.a" | head -1)
-          cp "$BUILT_LIB" "ffi/libs/$PLATFORM/"
+          BUILT_LIB=$(find firewood-src/target -name "libfirewood_ffi.a" | head -1)
+          cp "$BUILT_LIB" "avalanchego/ffi/libs/$PLATFORM/"
 
           # Verify setup
-          if [ ! -f "ffi/libs/$PLATFORM/libfirewood_ffi.a" ]; then
-            echo "Error: Failed to set up FFI library"
-            exit 1
+          if [ ! -f "avalanchego/ffi/libs/$PLATFORM/libfirewood_ffi.a" ]; then
+          echo "Error: Failed to set up FFI library"
+          exit 1
           fi
 
           echo "FFI setup complete for $PLATFORM"
-          ls -la "ffi/libs/$PLATFORM/"
+          ls -la "avalanchego/ffi/libs/$PLATFORM/"
       - name: Configure AvalancheGo to work with Firewood
         working-directory: avalanchego
         run: |
