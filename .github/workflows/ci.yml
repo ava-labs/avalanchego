@@ -270,6 +270,9 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y xz-utils
           fi
+      - uses: actions/checkout@v4
+        with:
+          ref: '92d0e99bce8fc3f7af1fa7d300e4fe1e7d210e6b'
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -297,9 +300,6 @@ jobs:
             exit 1
           fi
           echo "Built library: $BUILT_LIB"
-      - uses: actions/checkout@v4
-        with:
-          ref: '92d0e99bce8fc3f7af1fa7d300e4fe1e7d210e6b'
       - uses: ./.github/actions/install-nix
       - uses: ./.github/actions/setup-go-for-project
       - name: Debug - Check what exists
@@ -319,26 +319,25 @@ jobs:
       - name: Setup FFI directory structure
         run: |
           # Copy FFI directory from built Firewood
-          cp -r firewood-src/ffi avalanchego/ffi
+          cp -r firewood-src/ffi ./ffi
 
           # Create platform-specific directory and copy library
           PLATFORM="$(uname -m | sed 's/arm64/aarch64/')-unknown-linux-gnu"
-          mkdir -p "avalanchego/ffi/libs/$PLATFORM"
+          mkdir -p "ffi/libs/$PLATFORM"
 
           # Find and copy the built library
           BUILT_LIB=$(find firewood-src/target -name "libfirewood_ffi.a" | head -1)
-          cp "$BUILT_LIB" "avalanchego/ffi/libs/$PLATFORM/"
+          cp "$BUILT_LIB" "ffi/libs/$PLATFORM/"
 
           # Verify setup
-          if [ ! -f "avalanchego/ffi/libs/$PLATFORM/libfirewood_ffi.a" ]; then
-          echo "Error: Failed to set up FFI library"
-          exit 1
+          if [ ! -f "ffi/libs/$PLATFORM/libfirewood_ffi.a" ]; then
+            echo "Error: Failed to set up FFI library"
+            exit 1
           fi
 
           echo "FFI setup complete for $PLATFORM"
-          ls -la "avalanchego/ffi/libs/$PLATFORM/"
+          ls -la "ffi/libs/$PLATFORM/"
       - name: Configure AvalancheGo to work with Firewood
-        working-directory: avalanchego
         run: |
           # Configure go.mod to use local FFI
           go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=./ffi
@@ -362,8 +361,9 @@ jobs:
         with:
           name: baseline-benchmark-results
           path: |
-            avalanchego/output.txt
-            avalanchego/benchmark-results/
+            output.txt
+            benchmark-results/
+          retention-days: 1
   c-chain-reexecution-firewood-v0-0-12:
     runs-on: avalanche-avalanchego-runner
     container:
