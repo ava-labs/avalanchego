@@ -18,7 +18,7 @@ const (
 	MinDelayMilliseconds = 1 // ms
 	// ConversionRate (D) is the conversion factor for exponential calculations
 	ConversionRate = 1 << 20
-	// MaxDelayExcessDiff (Q) is the maximum change in  excess per update
+	// MaxDelayExcessDiff (Q) is the maximum change in excess per update
 	MaxDelayExcessDiff = 200
 
 	maxDelayExcess = 46_516_320 // ConversionRate * ln(MaxUint64 / MinDelayMilliseconds) + 1
