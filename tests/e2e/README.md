@@ -138,6 +138,6 @@ Once started, the collectors will continue to run in the background
 until stopped by `tmpnetctl stop-metrics-collector` and `tmpnetctl stop-logs-collector`.
 
 The results of collection will be viewable at
-https://avalabs.grafana.net.
+https://grafana-poc.avax-dev.network.
 
 For more detail, see the [tmpnet docs](../fixture/tmpnet/README.md##monitoring).

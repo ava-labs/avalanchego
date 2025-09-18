@@ -61,7 +61,7 @@ const (
 	HardHatKeyStr = "56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
 
 	// Default grafana URI used to construct metrics links. Can be overridden by setting GRAFANA_URI env var.
-	defaultGrafanaURI = "https://avalabs.grafana.net/d/mabpvtq/avalanche-main-dashboard"
+	defaultGrafanaURI = "https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard"
 )
 
 var (

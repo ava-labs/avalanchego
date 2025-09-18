@@ -488,11 +488,11 @@ Example usage:
     prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
     prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
     prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
-    prometheus_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
+    prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
     loki_url: ${{ secrets.LOKI_URL || '' }}
     loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
     loki_username: ${{ secrets.LOKI_USERNAME || '' }}
-    loki_password: ${{ secrets.GRAFANA_CLOUD_TOKEN || '' }}
+    loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 ```
 
 ### Viewing
@@ -501,7 +501,7 @@ Example usage:
 [Top](#table-of-contents)
 
 When a network is started with tmpnet, a link to the [default grafana
-instance](https://avalabs.grafana.net) will be
+instance](https://grafana-poc.avax-dev.network) will be
 emitted. The dashboards will only be populated if prometheus and
 promtail are running locally (as per previous sections) to collect
 metrics and logs.
