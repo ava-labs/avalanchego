@@ -5,7 +5,6 @@ package tmpnet
 
 import (
 	"context"
-	"fmt"
 
 	"go.uber.org/zap"
 	"k8s.io/client-go/dynamic"
@@ -13,6 +12,7 @@ import (
 
 	_ "embed"
 
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	corev1 "k8s.io/api/core/v1"
@@ -52,15 +52,15 @@ func deployKubeCollectors(
 
 	clientConfig, err := GetClientConfig(log, configPath, configContext)
 	if err != nil {
-		return fmt.Errorf("failed to get client config: %w", err)
+		return stacktrace.Errorf("failed to get client config: %w", err)
 	}
 	clientset, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create clientset: %w", err)
+		return stacktrace.Errorf("failed to create clientset: %w", err)
 	}
 	dynamicClient, err := dynamic.NewForConfig(clientConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create dynamic client: %w", err)
+		return stacktrace.Errorf("failed to create dynamic client: %w", err)
 	}
 
 	namespace := &corev1.Namespace{
@@ -70,7 +70,7 @@ func deployKubeCollectors(
 	}
 	_, err = clientset.CoreV1().Namespaces().Create(ctx, namespace, metav1.CreateOptions{})
 	if err != nil && !apierrors.IsAlreadyExists(err) {
-		return fmt.Errorf("failed to create namespace %s: %w", monitoringNamespace, err)
+		return stacktrace.Errorf("failed to create namespace %s: %w", monitoringNamespace, err)
 	}
 
 	collectorConfigs := []kubeCollectorConfig{
@@ -93,7 +93,7 @@ func deployKubeCollectors(
 			zap.String("target", collectorConfig.target),
 		)
 		if err := deployKubeCollector(ctx, log, clientset, dynamicClient, collectorConfig); err != nil {
-			return err
+			return stacktrace.Wrap(err)
 		}
 	}
 
@@ -110,15 +110,15 @@ func deployKubeCollector(
 ) error {
 	username, password, err := getCollectorCredentials(collectorConfig.name)
 	if err != nil {
-		return fmt.Errorf("failed to get credentials for %s: %w", collectorConfig.name, err)
+		return stacktrace.Errorf("failed to get credentials for %s: %w", collectorConfig.name, err)
 	}
 
 	if err := createCredentialSecret(ctx, log, clientset, collectorConfig.secretPrefix, username, password); err != nil {
-		return fmt.Errorf("failed to create credential secret for %s: %w", collectorConfig.name, err)
+		return stacktrace.Errorf("failed to create credential secret for %s: %w", collectorConfig.name, err)
 	}
 
 	if err := applyManifest(ctx, log, dynamicClient, collectorConfig.manifest, monitoringNamespace); err != nil {
-		return fmt.Errorf("failed to apply manifest for %s: %w", collectorConfig.name, err)
+		return stacktrace.Errorf("failed to apply manifest for %s: %w", collectorConfig.name, err)
 	}
 	return nil
 }
@@ -151,7 +151,7 @@ func createCredentialSecret(
 			)
 			return nil
 		}
-		return fmt.Errorf("failed to create secret %s/%s: %w", monitoringNamespace, secretName, err)
+		return stacktrace.Errorf("failed to create secret %s/%s: %w", monitoringNamespace, secretName, err)
 	}
 
 	log.Info("created secret",

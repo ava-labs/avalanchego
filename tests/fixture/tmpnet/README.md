@@ -16,6 +16,8 @@ orchestrate the same temporary networks without the use of an rpc daemon.
   - [Simplifying usage with direnv](#simplifying-usage-with-direnv)
     - [Deprecated usage with e2e suite](#deprecated-usage-with-e2e-suite)
   - [Via code](#via-code)
+  - [Enabling errors with stack traces](#enabling-errors-with-stack-traces)
+    - [Ensuring stack trace support](#ensuring-stack-trace-support)
 - [Networking configuration](#networking-configuration)
 - [Configuration on disk](#configuration-on-disk)
   - [Common networking configuration](#common-networking-configuration)
@@ -187,6 +189,30 @@ uris := network.GetNodeURIs()
 // Stop all nodes in the network
 network.Stop(context.Background())
 ```
+
+### Enabling errors with stack traces
+[Top](#table-of-contents)
+
+By default, errors originating from tmpnet will be standard golang
+errors. Setting `STACK_TRACE_ERRORS=1` in the environment in which
+tmpnet is run will ensure that such errors also include the stack trace
+from the point of failure. While there is some overhead associated
+with collecting and storing a stack trace, a testing tool like tmpnet
+is not performance critical.
+
+#### Ensuring stack trace support
+[Top](#table-of-contents)
+
+For an error originating from tmpnet to have a stack trace, the error
+must pass through one of the methods of the
+`github.com/ava-labs/avalanchego/tests/fixture/stacktrace`
+package. The following alternatives to stdlib functions are supported:
+
+| stdlib       | stacktrace             |
+|:-------------|:-----------------------|
+| `err`        | `stacktrace.Wrap(err)` |
+| `errors.New` | `stacktrace.New`       |
+| `fmt.Errorf` | `stacktrace.Errorf`    |
 
 ## Networking configuration
 [Top](#table-of-contents)

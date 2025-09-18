@@ -21,7 +21,7 @@ func TestAverager(t *testing.T) {
 
 	currentTime = currentTime.Add(halflife)
 	a.Observe(1, currentTime)
-	require.InDelta(1.0/1.5, a.Read(), 0)
+	require.Equal(1.0/1.5, a.Read())
 }
 
 func TestAveragerTimeTravel(t *testing.T) {
@@ -31,11 +31,11 @@ func TestAveragerTimeTravel(t *testing.T) {
 	currentTime := time.Now()
 
 	a := NewSyncAverager(NewAverager(1, halflife, currentTime))
-	require.InDelta(float64(1), a.Read(), 0)
+	require.Equal(float64(1), a.Read())
 
 	currentTime = currentTime.Add(-halflife)
 	a.Observe(0, currentTime)
-	require.InDelta(1.0/1.5, a.Read(), 0)
+	require.Equal(1.0/1.5, a.Read())
 }
 
 func TestUninitializedAverager(t *testing.T) {
@@ -50,5 +50,5 @@ func TestUninitializedAverager(t *testing.T) {
 	require.Zero(a.Read())
 
 	a.Observe(firstObservation, currentTime)
-	require.InDelta(firstObservation, a.Read(), 0)
+	require.Equal(firstObservation, a.Read())
 }
