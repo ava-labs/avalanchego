@@ -302,6 +302,20 @@ jobs:
           ref: '92d0e99bce8fc3f7af1fa7d300e4fe1e7d210e6b'
       - uses: ./.github/actions/install-nix
       - uses: ./.github/actions/setup-go-for-project
+      - name: Debug - Check what exists
+        run: |
+          echo "=== Current working directory ==="
+          pwd
+          echo "=== Workspace root contents ==="
+          ls -la
+          echo "=== Does firewood-src exist? ==="
+          ls -la firewood-src/ || echo "firewood-src does not exist"
+          echo "=== Does firewood-src/ffi exist? ==="
+          ls -la firewood-src/ffi/ || echo "firewood-src/ffi does not exist"
+          echo "=== Find all ffi directories ==="
+          find . -name "ffi" -type d
+          echo "=== Find all .a files ==="
+          find . -name "*.a"
       - name: Setup FFI directory structure
         run: |
           # Copy FFI directory from built Firewood
