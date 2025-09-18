@@ -9,7 +9,6 @@ import (
 	"sort"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/vms/components/gas"
 )
 
 // TargetExcessParams contains the parameters needed for target excess calculations.
