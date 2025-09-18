@@ -239,9 +239,19 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 	return vm.ChainVM.Shutdown(ctx)
 }
 
-func (vm *VM) NewHTTPHandler(context.Context) (http.Handler, error) {
+func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
 	mux := http.NewServeMux()
 
+	// First, set up the inner VM's HTTP handler
+	innerHandler, err := vm.ChainVM.NewHTTPHandler(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if innerHandler != nil {
+		mux.Handle("/", innerHandler)
+	}
+
+	// Then, set up the proposer VM's own handlers
 	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
 		grpcreflect.NewStaticReflector(proposervmconnect.ProposerVMName),
 	)
