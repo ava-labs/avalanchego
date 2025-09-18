@@ -1389,6 +1389,7 @@ func BenchmarkIteration(b *testing.B) {
 		}
 	})
 }
+
 func Test_FindNextKey_InSync(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
