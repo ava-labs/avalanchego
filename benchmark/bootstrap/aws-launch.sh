@@ -17,10 +17,11 @@ declare -A VALID_INSTANCES=(
     ["i4i.large"]="amd64"
     ["m6id.xlarge"]="arm64"
     ["c6gd.2xlarge"]="arm64"
-    ["r6gd.2xlarge"]="arm64"
     ["x2gd.xlarge"]="arm64"
-    ["x2gd.2xlarge"]="arm64"
     ["m5ad.2xlarge"]="arm64"
+    ["r6gd.2xlarge"]="arm64"
+    ["r6id.2xlarge"]="amd64"
+    ["x2gd.2xlarge"]="arm64"
     ["z1d.2xlarge"]="amd64"
 )
 
@@ -48,10 +49,11 @@ show_usage() {
     echo "  i4i.large      amd64 468  2    16 GiB   \$0.1720 Intel Xeon Scalable"
     echo "  m6id.xlarge    arm64 237  4    16 GiB   \$0.2373 Intel Xeon Scalable"
     echo "  c6gd.2xlarge   arm64 474  8    16 GiB   \$0.3072 Graviton2 compute-optimized"
-    echo "  r6gd.2xlarge   arm64 474  8    64 GiB   \$0.4608 Graviton2 memory-optimized"
     echo "  x2gd.xlarge    arm64 237  4    64 GiB   \$0.3340 Graviton2 memory-optimized"
-    echo "  x2gd.2xlarge   arm64 475  8    128 GiB  \$0.6680 Graviton2 memory-optimized"
     echo "  m5ad.2xlarge   arm64 300  8    32 GiB   \$0.4120 AMD EPYC processors"
+    echo "  r6gd.2xlarge   arm64 474  8    64 GiB   \$0.4608 Graviton2 memory-optimized"
+    echo "  r6id.2xlarge   amd64 474  8    64 GiB   \$0.6048 Intel Xeon Scalable"
+    echo "  x2gd.2xlarge   arm64 475  8    128 GiB  \$0.6680 Graviton2 memory-optimized"
     echo "  z1d.2xlarge    amd64 300  8    64 GiB   \$0.7440 High-frequency Intel Xeon CPUs"
     echo ""
     echo "Valid nblocks values: ${VALID_NBLOCKS[*]}"
@@ -168,7 +170,7 @@ if [ -n "$LIBEVM_BRANCH" ]; then
 fi
 
 # set up this script to run at startup, installing a few packages, creating user accounts,
-# and downloading the 50m blockstore for the C-chain
+# and downloading the blocks for the C-chain
 USERDATA_TEMPLATE=$(cat <<'END_HEREDOC'
 #cloud-config
 package_update: true
