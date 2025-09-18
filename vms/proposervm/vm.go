@@ -240,37 +240,42 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 }
 
 func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
-	mux := http.NewServeMux()
-
-	// Get inner VM's HTTP handler first
+	// Get inner VM's HTTP handler
 	innerHandler, err := vm.ChainVM.NewHTTPHandler(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Set up the proposer VM's specific handlers
+	// Create the multiplexer
+	mux := http.NewServeMux()
+
+	// Add ProposerVM specific handlers
+	service := &service{vm: vm}
+	proposerVMPath, proposerVMHandler := proposervmconnect.NewProposerVMHandler(service)
+	vm.ctx.Log.Info("Registering ProposerVM Connect handler", zap.String("path", proposerVMPath))
+	mux.Handle(proposerVMPath, proposerVMHandler)
+
+	// Add gRPC reflection
 	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
 		grpcreflect.NewStaticReflector(proposervmconnect.ProposerVMName),
 	)
 	vm.ctx.Log.Info("Registering gRPC reflection handler", zap.String("pattern", reflectionPattern))
 	mux.Handle(reflectionPattern, reflectionHandler)
 
-	service := &service{vm: vm}
-	proposerVMPath, proposerVMHandler := proposervmconnect.NewProposerVMHandler(service)
-	vm.ctx.Log.Info("Registering ProposerVM handler", zap.String("path", proposerVMPath))
-	mux.Handle(proposerVMPath, proposerVMHandler)
-
-	// Mount inner VM handler at root path only if it exists
-	// This acts as a fallback for any requests not handled by specific proposer VM paths
+	// Add inner VM handler as fallback if it exists
 	if innerHandler != nil {
-		vm.ctx.Log.Info("Registering inner VM handler at root path")
+		vm.ctx.Log.Info("Adding inner VM handler as fallback")
 		mux.Handle("/", innerHandler)
-	} else {
-		vm.ctx.Log.Info("Inner VM returned nil handler - not registering at root path")
 	}
 
-	vm.ctx.Log.Info("ProposerVM NewHTTPHandler setup complete")
-	return mux, nil
+	// Wrap with logging
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		vm.ctx.Log.Info("ProposerVM handling request",
+			zap.String("method", r.Method),
+			zap.String("path", r.URL.Path),
+		)
+		mux.ServeHTTP(w, r)
+	}), nil
 }
 
 func (vm *VM) SetState(ctx context.Context, newState snow.State) error {

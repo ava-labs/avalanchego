@@ -22,7 +22,7 @@ type service struct {
 }
 
 func (s *service) GetProposedHeight(ctx context.Context, req *connect.Request[pb.GetProposedHeightRequest]) (*connect.Response[pb.GetProposedHeightReply], error) {
-	s.vm.ctx.Log.Info("GetProposedHeight called - proposer VM service is working")
+	s.vm.ctx.Log.Debug("GetProposedHeight called")
 
 	height, err := s.vm.ctx.ValidatorState.GetMinimumHeight(ctx)
 	if err != nil {
