@@ -126,7 +126,8 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 				needPermute := round > 3
 				if needPermute {
-					rand.Shuffle(len(testKeys), func(i, j int) {
+					r := rand.New(rand.NewSource(time.Now().UnixNano())) //#nosec G404
+					r.Shuffle(len(testKeys), func(i, j int) {
 						testKeys[i], testKeys[j] = testKeys[j], testKeys[i]
 					})
 				}
