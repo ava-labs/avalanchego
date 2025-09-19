@@ -68,6 +68,7 @@ pub type SharedNode = triomphe::Arc<Node>;
 /// cache write operations, but for some read-heavy workloads
 /// you can enable caching of branch reads or all reads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum CacheReadStrategy {
     /// Only cache writes (no reads will be cached)
     WritesOnly,

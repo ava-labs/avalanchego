@@ -46,6 +46,7 @@ pub struct RevisionManagerConfig {
 }
 
 #[derive(Clone, Debug, TypedBuilder)]
+#[non_exhaustive]
 /// Configuration manager that contains both truncate and revision manager config
 pub struct ConfigManager {
     /// Whether to create the DB if it doesn't exist.

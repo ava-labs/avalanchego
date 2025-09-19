@@ -3,14 +3,17 @@
 
 use crate::v2::api::{KeyType, ValueType};
 
-/// A key/value pair operation. Only put (upsert) and delete are
-/// supported
+/// A key/value pair operation.
+///
+/// Put (upsert), Delete (single key), or Prefix Delete (range) are supported.
 #[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
 pub enum BatchOp<K: KeyType, V: ValueType> {
     /// Upsert a key/value pair
     Put {
         /// the key
         key: K,
+
         /// the value
         value: V,
     },

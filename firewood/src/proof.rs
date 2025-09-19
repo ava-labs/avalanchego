@@ -19,6 +19,7 @@ use thiserror::Error;
 use crate::merkle::{Key, Value};
 
 #[derive(Debug, Error)]
+#[non_exhaustive]
 /// Reasons why a proof is invalid
 pub enum ProofError {
     /// Non-monotonic range decrease
@@ -79,6 +80,7 @@ pub enum ProofError {
 }
 
 #[derive(Clone, PartialEq, Eq)]
+#[non_exhaustive]
 /// A node in a proof.
 pub struct ProofNode {
     /// The key this node is at. Each byte is a nibble.
