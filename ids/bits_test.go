@@ -71,8 +71,8 @@ func TestEqualSubsetBadMiddle(t *testing.T) {
 }
 
 func TestEqualSubsetAll3Bytes(t *testing.T) {
-	rand := rand.New(rand.NewSource(time.Now().UnixNano()))
-	seed := uint64(rand.Int63()) // #nosec G404
+	rand := rand.New(rand.NewSource(time.Now().UnixNano())) //#nosec G404
+	seed := uint64(rand.Int63())                            //#nosec G404
 	t.Logf("seed: %d", seed)
 	id1 := ID{}.Prefix(seed)
 
