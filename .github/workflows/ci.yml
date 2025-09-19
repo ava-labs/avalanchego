@@ -281,7 +281,7 @@ jobs:
       - name: Setup Firewood
         uses: ./.github/actions/setup-firewood
         with:
-          firewood-version: 'v0.0.8'
+          firewood-version: '6cbcd3d4ba67a88c9991bec7ca5d4973be340295'
           rust-version: '1.88'
       - name: Configure AvalancheGo to work with Firewood
         run: |

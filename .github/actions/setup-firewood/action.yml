@@ -21,7 +21,7 @@ runs:
       id: detect-build-type
       shell: bash
       run: |
-        if [[ "${{ inputs.firewood-version }}" =~ ^(v|ffi/) ]]; then
+        if [[ "${{ inputs.firewood-version }}" =~ ^(ffi/) ]]; then
           echo "build-type=prebuilt" >> $GITHUB_OUTPUT
           echo "Using pre-built binaries for ${{ inputs.firewood-version }}"
         else
