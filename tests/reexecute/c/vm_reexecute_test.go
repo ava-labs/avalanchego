@@ -51,15 +51,16 @@ var (
 )
 
 var (
-	sourceBlockDirArg string
-	targetBlockDirArg string
-	targetDirArg      string
-	startBlockArg     uint64
-	endBlockArg       uint64
-	chanSizeArg       int
-	metricsEnabledArg bool
-	executionTimeout  time.Duration
-	labelsArg         string
+	blockDirArg        string
+	blockDirSrcArg     string
+	blockDirDstArg     string
+	currentStateDirArg string
+	startBlockArg      uint64
+	endBlockArg        uint64
+	chanSizeArg        int
+	metricsEnabledArg  bool
+	executionTimeout   time.Duration
+	labelsArg          string
 
 	labels = map[string]string{
 		"job":               "c-chain-reexecution",
@@ -83,34 +84,33 @@ var (
 	}
 
 	configNameArg  string
+	runnerNameArg  string
 	configBytesArg []byte
 )
 
 func TestMain(m *testing.M) {
-	// Source directory must be a leveldb dir with the required blocks accessible via rawdb.ReadBlock.
-	flag.StringVar(&sourceBlockDirArg, "source-block-dir", sourceBlockDirArg, "DB directory storing executable block range.")
-	// Target block directory to write blocks into when executing TestExportBlockRange.
-	flag.StringVar(&targetBlockDirArg, "target-block-dir", targetBlockDirArg, "DB directory to write blocks into when executing TestExportBlockRange.")
-
-	// Target directory assumes the current-state directory contains a db directory and a chain-data-dir directory.
-	// - db/
-	// - chain-data-dir/
-	flag.StringVar(&targetDirArg, "target-dir", targetDirArg, "Target directory for the current state including VM DB and Chain Data Directory.")
+	flag.StringVar(&blockDirArg, "block-dir", blockDirArg, "Block DB directory to read from during re-execution.")
+	flag.StringVar(&currentStateDirArg, "current-state-dir", currentStateDirArg, "Current state directory including VM DB and Chain Data Directory for re-execution.")
 	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (exclusive).")
 	flag.Uint64Var(&endBlockArg, "end-block", 200, "End block to end execution (inclusive).")
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
-	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", true, "Enable metrics collection.")
+	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", false, "Enable metrics collection.")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
 	predefinedConfigOptionsStr := fmt.Sprintf("[%s]", strings.Join(predefinedConfigKeys, ", "))
 	flag.StringVar(&configNameArg, configKey, defaultConfigKey, fmt.Sprintf("Specifies the predefined config to use for the VM. Options include %s.", predefinedConfigOptionsStr))
+	flag.StringVar(&runnerNameArg, "runner", "dev", "Name of the runner executing this test. Added as a metric label and to the sub-benchmark's name to differentiate results on the runner key.")
+
+	// Flags specific to TestExportBlockRange.
+	flag.StringVar(&blockDirSrcArg, "block-dir-src", blockDirSrcArg, "Source block directory to copy from when running TestExportBlockRange.")
+	flag.StringVar(&blockDirDstArg, "block-dir-dst", blockDirDstArg, "Destination block directory to write blocks into when executing TestExportBlockRange.")
 
 	flag.Parse()
 
-	customLabels, err := parseLabels(labelsArg)
+	customLabels, err := parseCustomLabels(labelsArg)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to parse labels: %v\n", err)
 		os.Exit(1)
@@ -126,17 +126,38 @@ func TestMain(m *testing.M) {
 	labels[configKey] = configNameArg
 	configBytesArg = []byte(predefinedConfigStr)
 
+	// Set the runner name label on the metrics.
+	labels["runner"] = runnerNameArg
+
 	m.Run()
 }
 
 func BenchmarkReexecuteRange(b *testing.B) {
 	require.Equalf(b, 1, b.N, "BenchmarkReexecuteRange expects to run a single iteration because it overwrites the input current-state, but found (b.N=%d)", b.N)
-	b.Run(fmt.Sprintf("[%d,%d]-Config-%s", startBlockArg, endBlockArg, configNameArg), func(b *testing.B) {
-		benchmarkReexecuteRange(b, sourceBlockDirArg, targetDirArg, configBytesArg, startBlockArg, endBlockArg, chanSizeArg, metricsEnabledArg)
+	b.Run(fmt.Sprintf("[%d,%d]-Config-%s-Runner-%s", startBlockArg, endBlockArg, configNameArg, runnerNameArg), func(b *testing.B) {
+		benchmarkReexecuteRange(
+			b,
+			blockDirArg,
+			currentStateDirArg,
+			configBytesArg,
+			startBlockArg,
+			endBlockArg,
+			chanSizeArg,
+			metricsEnabledArg,
+		)
 	})
 }
 
-func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir string, configBytes []byte, startBlock uint64, endBlock uint64, chanSize int, metricsEnabled bool) {
+func benchmarkReexecuteRange(
+	b *testing.B,
+	blockDir string,
+	currentStateDir string,
+	configBytes []byte,
+	startBlock uint64,
+	endBlock uint64,
+	chanSize int,
+	metricsEnabled bool,
+) {
 	r := require.New(b)
 	ctx := context.Background()
 
@@ -159,25 +180,25 @@ func benchmarkReexecuteRange(b *testing.B, sourceBlockDir string, targetDir stri
 	log := tests.NewDefaultLogger("c-chain-reexecution")
 
 	var (
-		targetDBDir  = filepath.Join(targetDir, "db")
-		chainDataDir = filepath.Join(targetDir, "chain-data-dir")
+		vmDBDir      = filepath.Join(currentStateDir, "db")
+		chainDataDir = filepath.Join(currentStateDir, "chain-data-dir")
 	)
 
 	log.Info("re-executing block range with params",
-		zap.String("source-block-dir", sourceBlockDir),
-		zap.String("target-db-dir", targetDBDir),
+		zap.String("block-dir", blockDir),
+		zap.String("vm-db-dir", vmDBDir),
 		zap.String("chain-data-dir", chainDataDir),
 		zap.Uint64("start-block", startBlock),
 		zap.Uint64("end-block", endBlock),
 		zap.Int("chan-size", chanSize),
 	)
 
-	blockChan, err := createBlockChanFromLevelDB(b, sourceBlockDir, startBlock, endBlock, chanSize)
+	blockChan, err := createBlockChanFromLevelDB(b, blockDir, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
 	dbLogger := tests.NewDefaultLogger("db")
 
-	db, err := leveldb.New(targetDBDir, nil, dbLogger, prometheus.NewRegistry())
+	db, err := leveldb.New(vmDBDir, nil, dbLogger, prometheus.NewRegistry())
 	r.NoError(err)
 	defer func() {
 		log.Info("shutting down DB")
@@ -468,15 +489,15 @@ func blockKey(height uint64) []byte {
 }
 
 func TestExportBlockRange(t *testing.T) {
-	exportBlockRange(t, sourceBlockDirArg, targetBlockDirArg, startBlockArg, endBlockArg, chanSizeArg)
+	exportBlockRange(t, blockDirSrcArg, blockDirDstArg, startBlockArg, endBlockArg, chanSizeArg)
 }
 
-func exportBlockRange(tb testing.TB, sourceDir string, targetDir string, startBlock, endBlock uint64, chanSize int) {
+func exportBlockRange(tb testing.TB, blockDirSrc string, blockDirDst string, startBlock, endBlock uint64, chanSize int) {
 	r := require.New(tb)
-	blockChan, err := createBlockChanFromLevelDB(tb, sourceDir, startBlock, endBlock, chanSize)
+	blockChan, err := createBlockChanFromLevelDB(tb, blockDirSrc, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
-	db, err := leveldb.New(targetDir, nil, logging.NoLog{}, prometheus.NewRegistry())
+	db, err := leveldb.New(blockDirDst, nil, logging.NoLog{}, prometheus.NewRegistry())
 	r.NoError(err)
 	tb.Cleanup(func() {
 		r.NoError(db.Close())
@@ -555,7 +576,9 @@ func collectRegistry(tb testing.TB, name string, timeout time.Duration, gatherer
 	r.NoError(err)
 }
 
-func parseLabels(labelsStr string) (map[string]string, error) {
+// parseCustomLabels parses a comma-separated list of key-value pairs into a map
+// of custom labels.
+func parseCustomLabels(labelsStr string) (map[string]string, error) {
 	labels := make(map[string]string)
 	if labelsStr == "" {
 		return labels, nil

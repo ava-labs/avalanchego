@@ -660,7 +660,7 @@ func TestGetCurrentValidators(t *testing.T) {
 			require.Equal(validator.EndTime().Unix(), int64(gotVdr.EndTime))
 			require.Equal(validator.StartTime().Unix(), int64(gotVdr.StartTime))
 			require.Equal(connectedIDs.Contains(validator.NodeID()), *gotVdr.Connected)
-			require.InDelta(float32(avajson.Float32(100)), float32(*gotVdr.Uptime), 0)
+			require.Equal(float32(avajson.Float32(100)), float32(*gotVdr.Uptime))
 			found = true
 			break
 		}
