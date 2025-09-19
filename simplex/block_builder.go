@@ -21,13 +21,14 @@ type BlockBuilder struct {
 	blockTracker *blockTracker
 }
 
-const maxBackoff = 5 * time.Second
+const (
+	maxBackoff  = 5 * time.Second
+	initBackoff = 10 * time.Millisecond
+)
 
 // BuildBlock continuously tries to build a block until the context is cancelled. If there are no blocks to be built, it will wait for an event from the VM.
 // It returns false if the context was cancelled, otherwise it returns the built block and true.
 func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.ProtocolMetadata) (simplex.VerifiedBlock, bool) {
-	const initBackoff = 10 * time.Millisecond
-
 	for curWait := initBackoff; ; curWait = backoff(ctx, curWait) {
 		if ctx.Err() != nil {
 			b.log.Debug("Context cancelled, stopping block building", zap.Error(ctx.Err()))
@@ -70,7 +71,7 @@ func (b *BlockBuilder) IncomingBlock(ctx context.Context) {
 }
 
 func (b *BlockBuilder) incomingBlock(ctx context.Context) error {
-	for {
+	for curBackoff := initBackoff; ; curBackoff = backoff(ctx, curBackoff) {
 		msg, err := b.vm.WaitForEvent(ctx)
 		if err != nil {
 			return err

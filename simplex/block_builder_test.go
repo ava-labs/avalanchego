@@ -182,3 +182,36 @@ func TestBlockBuildingExponentialBackoff(t *testing.T) {
 	// ensure we haven't timed out
 	require.NotEqual(t, timeoutTime, endTime)
 }
+
+func TestIncomingBlockBackoff(t *testing.T) {
+	ctx := context.Background()
+	vm := newTestVM()
+
+	count := 0
+	vm.WaitForEventF = func(_ context.Context) (common.Message, error) {
+		if count < 7 {
+			count++
+			return common.StateSyncDone, nil
+		}
+		return common.PendingTxs, nil
+	}
+
+	bb := &BlockBuilder{
+		log:          logging.NoLog{},
+		vm:           vm,
+		blockTracker: nil,
+	}
+
+	timeoutTime := 10 * time.Second
+	timeoutCtx, cancelCtx := context.WithTimeout(ctx, timeoutTime)
+	defer cancelCtx()
+
+	start := time.Now()
+	bb.IncomingBlock(timeoutCtx)
+	endTime := time.Since(start)
+
+	// 10, 20, 40, 80, 160, 320, 640 = 1270ms
+	require.GreaterOrEqual(t, endTime.Milliseconds(), int64(1270))
+	// ensure we haven't timed out
+	require.NotEqual(t, timeoutTime, endTime)
+}
