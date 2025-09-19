@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/simplex"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -27,7 +28,7 @@ func TestBlockBuilder(t *testing.T) {
 		name          string
 		block         snowman.Block
 		shouldBuild   bool
-		expectedBlock *Block
+		expectedBlock simplex.VerifiedBlock
 		vmBlockBuildF func(ctx context.Context) (snowman.Block, error)
 	}{
 		{
@@ -83,11 +84,9 @@ func TestBlockBuilder(t *testing.T) {
 
 			block, built := bb.BuildBlock(timeoutCtx, child.BlockHeader().ProtocolMetadata)
 			require.Equal(t, tt.shouldBuild, built)
+			require.Equal(t, tt.expectedBlock, block)
 			if tt.expectedBlock == nil {
-				require.Nil(t, block)
 				require.Greater(t, count, 1)
-			} else {
-				require.Equal(t, tt.expectedBlock, block)
 			}
 		})
 	}
@@ -118,7 +117,7 @@ func TestBlockBuilderCancelContext(t *testing.T) {
 	require.False(t, built, "Block should not be built when context is cancelled")
 }
 
-func TestIncomingBlock(t *testing.T) {
+func TestWaitForPendingBlock(t *testing.T) {
 	ctx := context.Background()
 	vm := newTestVM()
 	genesis := newTestBlock(t, newBlockConfig{})
@@ -137,7 +136,7 @@ func TestIncomingBlock(t *testing.T) {
 		blockTracker: genesis.blockTracker,
 	}
 
-	bb.IncomingBlock(ctx)
+	bb.WaitForPendingBlock(ctx)
 	require.Equal(t, 1, count)
 }
 
@@ -156,6 +155,9 @@ func TestBlockBuildingExponentialBackoff(t *testing.T) {
 	}
 
 	vm.BuildBlockF = func(_ context.Context) (snowman.Block, error) {
+		if count > 7 {
+			return child.vmBlock, nil
+		}
 		return nil, errors.New("failed to build block")
 	}
 
@@ -165,14 +167,52 @@ func TestBlockBuildingExponentialBackoff(t *testing.T) {
 		blockTracker: genesis.blockTracker,
 	}
 
-	timeoutCtx, cancelCtx := context.WithTimeout(ctx, time.Second)
+	timeoutTime := 10 * time.Second
+	timeoutCtx, cancelCtx := context.WithTimeout(ctx, timeoutTime)
 	defer cancelCtx()
 
+	start := time.Now()
 	block, built := bb.BuildBlock(timeoutCtx, child.BlockHeader().ProtocolMetadata)
-	require.False(t, built)
-	require.Nil(t, block)
+	endTime := time.Since(start)
 
-	// expected number of count increases
-	// 10, 20, 40, 80, 160, 320, 640 = 7 attempts
-	require.Equal(t, 7, count, "Should have retried multiple times due to backoff")
+	require.True(t, built)
+	require.Equal(t, child.BlockHeader(), block.BlockHeader())
+
+	// 10, 20, 40, 80, 160, 320, 640 = 1270ms
+	require.GreaterOrEqual(t, endTime.Milliseconds(), int64(1270))
+	// ensure we haven't timed out
+	require.NotEqual(t, timeoutTime, endTime)
+}
+
+func TestWaitForPendingBlockBackoff(t *testing.T) {
+	ctx := context.Background()
+	vm := newTestVM()
+
+	count := 0
+	vm.WaitForEventF = func(_ context.Context) (common.Message, error) {
+		if count < 7 {
+			count++
+			return common.StateSyncDone, nil
+		}
+		return common.PendingTxs, nil
+	}
+
+	bb := &BlockBuilder{
+		log:          logging.NoLog{},
+		vm:           vm,
+		blockTracker: nil,
+	}
+
+	timeoutTime := 10 * time.Second
+	timeoutCtx, cancelCtx := context.WithTimeout(ctx, timeoutTime)
+	defer cancelCtx()
+
+	start := time.Now()
+	bb.WaitForPendingBlock(timeoutCtx)
+	endTime := time.Since(start)
+
+	// 10, 20, 40, 80, 160, 320, 640 = 1270ms
+	require.GreaterOrEqual(t, endTime.Milliseconds(), int64(1270))
+	// ensure we haven't timed out
+	require.NotEqual(t, timeoutTime, endTime)
 }

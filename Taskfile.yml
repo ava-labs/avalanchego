@@ -85,6 +85,14 @@ tasks:
       - cmd: go mod tidy
       - task: check-clean-branch
 
+  create-kind-cluster:
+    desc: Creates the default kind cluster
+    cmd: bash -x ./scripts/start_kind_cluster.sh {{.CLI_ARGS}}
+
+  delete-kind-cluster:
+    desc: Deletes the default kind cluster
+    cmd: kind delete cluster
+
   export-cchain-block-range:
     desc: Export range of C-Chain blocks from source to target directory.
     vars:
