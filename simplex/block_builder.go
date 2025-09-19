@@ -15,6 +15,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+var _ simplex.BlockBuilder = (*BlockBuilder)(nil)
+
 type BlockBuilder struct {
 	log          logging.Logger
 	vm           block.ChainVM
@@ -35,7 +37,7 @@ func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.Protocol
 			return nil, false
 		}
 
-		err := b.incomingBlock(ctx)
+		err := b.waitForPendingBlock(ctx)
 		if err != nil {
 			b.log.Debug("Error waiting for incoming block", zap.Error(err))
 			continue
@@ -61,16 +63,16 @@ func (b *BlockBuilder) BuildBlock(ctx context.Context, metadata simplex.Protocol
 	}
 }
 
-// IncomingBlock blocks until a new block is ready to be built from the VM, or until the
+// WaitForPendingBlock blocks until a new block is ready to be built from the VM, or until the
 // context is cancelled.
-func (b *BlockBuilder) IncomingBlock(ctx context.Context) {
-	err := b.incomingBlock(ctx)
+func (b *BlockBuilder) WaitForPendingBlock(ctx context.Context) {
+	err := b.waitForPendingBlock(ctx)
 	if err != nil {
 		b.log.Debug("Error waiting for incoming block", zap.Error(err))
 	}
 }
 
-func (b *BlockBuilder) incomingBlock(ctx context.Context) error {
+func (b *BlockBuilder) waitForPendingBlock(ctx context.Context) error {
 	for curBackoff := initBackoff; ; curBackoff = backoff(ctx, curBackoff) {
 		msg, err := b.vm.WaitForEvent(ctx)
 		if err != nil {

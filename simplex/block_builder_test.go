@@ -136,7 +136,7 @@ func TestIncomingBlock(t *testing.T) {
 		blockTracker: genesis.blockTracker,
 	}
 
-	bb.IncomingBlock(ctx)
+	bb.WaitForPendingBlock(ctx)
 	require.Equal(t, 1, count)
 }
 
@@ -208,7 +208,7 @@ func TestIncomingBlockBackoff(t *testing.T) {
 	defer cancelCtx()
 
 	start := time.Now()
-	bb.IncomingBlock(timeoutCtx)
+	bb.WaitForPendingBlock(timeoutCtx)
 	endTime := time.Since(start)
 
 	// 10, 20, 40, 80, 160, 320, 640 = 1270ms
