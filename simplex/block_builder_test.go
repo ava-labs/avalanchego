@@ -83,11 +83,9 @@ func TestBlockBuilder(t *testing.T) {
 
 			block, built := bb.BuildBlock(timeoutCtx, child.BlockHeader().ProtocolMetadata)
 			require.Equal(t, tt.shouldBuild, built)
+			require.Equal(t, tt.expectedBlock, block)
 			if tt.expectedBlock == nil {
-				require.Nil(t, block)
 				require.Greater(t, count, 1)
-			} else {
-				require.Equal(t, tt.expectedBlock, block)
 			}
 		})
 	}
