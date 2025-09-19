@@ -117,7 +117,7 @@ func TestBlockBuilderCancelContext(t *testing.T) {
 	require.False(t, built, "Block should not be built when context is cancelled")
 }
 
-func TestIncomingBlock(t *testing.T) {
+func TestWaitForPendingBlock(t *testing.T) {
 	ctx := context.Background()
 	vm := newTestVM()
 	genesis := newTestBlock(t, newBlockConfig{})
@@ -184,7 +184,7 @@ func TestBlockBuildingExponentialBackoff(t *testing.T) {
 	require.NotEqual(t, timeoutTime, endTime)
 }
 
-func TestIncomingBlockBackoff(t *testing.T) {
+func TestWaitForPendingBlockBackoff(t *testing.T) {
 	ctx := context.Background()
 	vm := newTestVM()
 
