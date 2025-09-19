@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package sync
+package merkledb
 
 import (
 	"context"
@@ -17,32 +17,36 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/trace"
-	"github.com/ava-labs/avalanchego/x/merkledb"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
-var _ p2p.Handler = (*flakyHandler)(nil)
+var (
+	_ p2p.Handler = (*xsync.GetChangeProofHandler[*RangeProof, *ChangeProof])(nil)
+	_ p2p.Handler = (*xsync.GetRangeProofHandler[*RangeProof, *ChangeProof])(nil)
+	_ p2p.Handler = (*flakyHandler)(nil)
+)
 
-func newDefaultDBConfig() merkledb.Config {
-	return merkledb.Config{
+func newDefaultDBConfig() Config {
+	return Config{
 		IntermediateWriteBatchSize:  100,
-		HistoryLength:               defaultRequestKeyLimit,
-		ValueNodeCacheSize:          defaultRequestKeyLimit,
-		IntermediateWriteBufferSize: defaultRequestKeyLimit,
-		IntermediateNodeCacheSize:   defaultRequestKeyLimit,
+		HistoryLength:               xsync.DefaultRequestKeyLimit,
+		ValueNodeCacheSize:          xsync.DefaultRequestKeyLimit,
+		IntermediateWriteBufferSize: xsync.DefaultRequestKeyLimit,
+		IntermediateNodeCacheSize:   xsync.DefaultRequestKeyLimit,
 		Reg:                         prometheus.NewRegistry(),
 		Tracer:                      trace.Noop,
-		BranchFactor:                merkledb.BranchFactor16,
+		BranchFactor:                BranchFactor16,
 	}
 }
 
 func newFlakyRangeProofHandler(
 	t *testing.T,
-	db merkledb.MerkleDB,
-	modifyResponse func(response *merkledb.RangeProof),
+	db MerkleDB,
+	modifyResponse func(response *RangeProof),
 ) p2p.Handler {
-	handler := NewGetRangeProofHandler(db)
+	handler := xsync.NewGetRangeProofHandler(db)
 
 	c := counter{m: 2}
 	return &p2p.TestHandler{
@@ -52,7 +56,7 @@ func newFlakyRangeProofHandler(
 				return nil, appErr
 			}
 
-			proof := &merkledb.RangeProof{}
+			proof := &RangeProof{}
 			require.NoError(t, proof.UnmarshalBinary(responseBytes))
 
 			// Half of requests are modified
@@ -72,10 +76,10 @@ func newFlakyRangeProofHandler(
 
 func newFlakyChangeProofHandler(
 	t *testing.T,
-	db merkledb.MerkleDB,
-	modifyResponse func(response *merkledb.ChangeProof),
+	db MerkleDB,
+	modifyResponse func(response *ChangeProof),
 ) p2p.Handler {
-	handler := NewGetChangeProofHandler(db)
+	handler := xsync.NewGetChangeProofHandler(db)
 
 	c := counter{m: 2}
 	return &p2p.TestHandler{
@@ -89,7 +93,7 @@ func newFlakyChangeProofHandler(
 			response := &pb.GetChangeProofResponse{}
 			require.NoError(t, proto.Unmarshal(responseBytes, response))
 
-			proof := &merkledb.ChangeProof{}
+			proof := &ChangeProof{}
 			require.NoError(t, proof.UnmarshalBinary(response.GetChangeProof()))
 
 			// Half of requests are modified
@@ -111,6 +115,16 @@ func newFlakyChangeProofHandler(
 			return responseBytes, nil
 		},
 	}
+}
+
+type p2pHandlerAction struct {
+	p2p.Handler
+	action func()
+}
+
+func (h *p2pHandlerAction) AppRequest(ctx context.Context, id ids.NodeID, time time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+	h.action()
+	return h.Handler.AppRequest(ctx, id, time, requestBytes)
 }
 
 type flakyHandler struct {
@@ -141,15 +155,4 @@ func (c *counter) Inc() int {
 
 	c.i++
 	return result
-}
-
-type waitingHandler struct {
-	p2p.NoOpHandler
-	handler         p2p.Handler
-	updatedRootChan chan struct{}
-}
-
-func (w *waitingHandler) AppRequest(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-	<-w.updatedRootChan
-	return w.handler.AppRequest(ctx, nodeID, deadline, requestBytes)
 }
