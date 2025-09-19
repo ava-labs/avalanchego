@@ -147,6 +147,10 @@ func TestBlockBuildingExponentialBackoff(t *testing.T) {
 	child := newTestBlock(t, newBlockConfig{
 		prev: genesis,
 	})
+	const (
+		failedAttempts       = 7
+		minimumExpectedDelay = initBackoff * (1<<failedAttempts - 1)
+	)
 
 	vm.WaitForEventF = func(_ context.Context) (common.Message, error) {
 		return common.PendingTxs, nil
@@ -154,7 +158,7 @@ func TestBlockBuildingExponentialBackoff(t *testing.T) {
 
 	count := 0
 	vm.BuildBlockF = func(_ context.Context) (snowman.Block, error) {
-		if count < 7 {
+		if count < failedAttempts {
 			count++
 			return nil, errors.New("failed to build block")
 		}
@@ -177,21 +181,24 @@ func TestBlockBuildingExponentialBackoff(t *testing.T) {
 	require.Equal(t, child.BlockHeader(), block.BlockHeader())
 
 	// 10, 20, 40, 80, 160, 320, 640 = 1270ms
-	require.GreaterOrEqual(t, endTime, 1270*time.Millisecond)
+	require.GreaterOrEqual(t, endTime, minimumExpectedDelay)
 }
 
 func TestWaitForPendingBlockBackoff(t *testing.T) {
 	ctx := context.Background()
 	vm := newTestVM()
+	const (
+		failedAttempts       = 7
+		minimumExpectedDelay = initBackoff * (1<<failedAttempts - 1)
+	)
 
 	count := 0
 	vm.WaitForEventF = func(_ context.Context) (common.Message, error) {
-		if count < 7 {
+		if count < failedAttempts {
 			count++
 			return common.StateSyncDone, nil
 		}
 
-		// on the 8th try, return PendingTxs
 		return common.PendingTxs, nil
 	}
 
@@ -206,5 +213,5 @@ func TestWaitForPendingBlockBackoff(t *testing.T) {
 	endTime := time.Since(start)
 
 	// 10, 20, 40, 80, 160, 320, 640 = 1270ms
-	require.GreaterOrEqual(t, endTime, 1270*time.Millisecond)
+	require.GreaterOrEqual(t, endTime, minimumExpectedDelay)
 }
