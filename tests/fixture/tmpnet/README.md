@@ -356,8 +356,12 @@ shared.
 nix develop
 
 # Enable collection of logs and metrics
+PROMETHEUS_URL=<url> \
+PROMETHEUS_PUSH_URL=<push url> \
 PROMETHEUS_USERNAME=<username> \
 PROMETHEUS_PASSWORD=<password> \
+LOKI_URL=<url> \
+LOKI_PUSH_URL=<push url> \
 LOKI_USERNAME=<username> \
 LOKI_PASSWORD=<password> \
 ./bin/tmpnetctl start-metrics-collector
@@ -378,7 +382,9 @@ LOKI_PASSWORD=<password> \
    configured to scrape metrics from configured nodes and forward
    them to https://prometheus-poc.avax-dev.network.
    - Requires:
-     - Credentials supplied as env vars:
+     - Config supplied as env vars:
+       - `PROMETHEUS_URL`
+       - `PROMETHEUS_PUSH_URL`
        - `PROMETHEUS_USERNAME`
        - `PROMETHEUS_PASSWORD`
      - A `prometheus` binary available in the path
@@ -387,7 +393,9 @@ LOKI_PASSWORD=<password> \
    from configured nodes and forward them to
    https://loki-poc.avax-dev.network.
    - Requires:
-     - Credentials supplied as env vars:
+     - Config supplied as env vars:
+       - `LOKI_URL`
+       - `LOKI_PUSH_URL`
        - `LOKI_USERNAME`
        - `LOKI_PASSWORD`
      - A `promtail` binary available in the path
@@ -476,10 +484,14 @@ Example usage:
     # will have a unique name.
     artifact_prefix: e2e
 
-    # These credentials are mandatory
-    prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+    # This configuration is mandatory
+    prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+    prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+    prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
     prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-    loki_username: ${{ secrets.LOKI_ID || '' }}
+    loki_url: ${{ secrets.LOKI_URL || '' }}
+    loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+    loki_username: ${{ secrets.LOKI_USERNAME || '' }}
     loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
 ```
 
@@ -493,6 +505,11 @@ instance](https://grafana-poc.avax-dev.network) will be
 emitted. The dashboards will only be populated if prometheus and
 promtail are running locally (as per previous sections) to collect
 metrics and logs.
+
+If using a non-default grafana instance, set
+`GRAFANA_URI=https://<non-default server name>/d/<dashboard id>` as an
+env var in the shell to ensure the emitted link points to the desired
+instance.
 
 #### CI
 [Top](#table-of-contents)

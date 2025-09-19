@@ -60,14 +60,9 @@ func waitForCount(ctx context.Context, log logging.Logger, name string, getCount
 // provided, an attempt will be made to derive selectors from env vars (GH_*) identifying
 // a github actions run.
 func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string) error {
-	username, password, err := getCollectorCredentials(promtailCmd)
+	config, err := getCollectorConfigForQuery(promtailCmd)
 	if err != nil {
 		return stacktrace.Errorf("failed to get collector credentials: %w", err)
-	}
-
-	url := getLokiURL()
-	if !strings.HasPrefix(url, "https") {
-		return stacktrace.Errorf("loki URL must be https for basic auth to be secure: %s", url)
 	}
 
 	selectors, err := getSelectors(networkUUID)
@@ -77,7 +72,7 @@ func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string)
 	query := fmt.Sprintf("sum(count_over_time({%s}[1h]))", selectors)
 
 	log.Info("checking if logs exist",
-		zap.String("url", url),
+		zap.String("url", config.url),
 		zap.String("query", query),
 	)
 
@@ -86,7 +81,7 @@ func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string)
 		log,
 		"logs",
 		func() (int, error) {
-			return queryLoki(ctx, url, username, password, query)
+			return queryLoki(ctx, config, query)
 		},
 	)
 	if err != nil {
@@ -97,15 +92,13 @@ func CheckLogsExist(ctx context.Context, log logging.Logger, networkUUID string)
 
 func queryLoki(
 	ctx context.Context,
-	lokiURL string,
-	username string,
-	password string,
+	config collectorConfig,
 	query string,
 ) (int, error) {
 	// Compose the URL
 	params := url.Values{}
 	params.Add("query", query)
-	reqURL := fmt.Sprintf("%s/loki/api/v1/query?%s", lokiURL, params.Encode())
+	reqURL := fmt.Sprintf("%s/query?%s", config.url, params.Encode())
 
 	// Create request
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
@@ -113,7 +106,7 @@ func queryLoki(
 		return 0, stacktrace.Errorf("failed to create request: %w", err)
 	}
 
-	auth := base64.StdEncoding.EncodeToString([]byte(username + ":" + password))
+	auth := base64.StdEncoding.EncodeToString([]byte(config.username + ":" + config.password))
 	req.Header.Set("Authorization", "Basic "+auth)
 
 	// Execute request
@@ -171,14 +164,9 @@ func queryLoki(
 // CheckMetricsExist checks if metrics exist for the given network. Github labels are also
 // used as filters if provided as env vars (GH_*).
 func CheckMetricsExist(ctx context.Context, log logging.Logger, networkUUID string) error {
-	username, password, err := getCollectorCredentials(prometheusCmd)
+	config, err := getCollectorConfigForQuery(prometheusCmd)
 	if err != nil {
 		return stacktrace.Errorf("failed to get collector credentials: %w", err)
-	}
-
-	url := getPrometheusURL()
-	if !strings.HasPrefix(url, "https") {
-		return stacktrace.Errorf("prometheus URL must be https for basic auth to be secure: %s", url)
 	}
 
 	selectors, err := getSelectors(networkUUID)
@@ -188,7 +176,7 @@ func CheckMetricsExist(ctx context.Context, log logging.Logger, networkUUID stri
 	query := fmt.Sprintf("count({%s})", selectors)
 
 	log.Info("checking if metrics exist",
-		zap.String("url", url),
+		zap.String("url", config.url),
 		zap.String("query", query),
 	)
 
@@ -197,7 +185,7 @@ func CheckMetricsExist(ctx context.Context, log logging.Logger, networkUUID stri
 		log,
 		"metrics",
 		func() (int, error) {
-			return queryPrometheus(ctx, log, url, username, password, query)
+			return queryPrometheus(ctx, log, config, query)
 		},
 	)
 }
@@ -205,17 +193,15 @@ func CheckMetricsExist(ctx context.Context, log logging.Logger, networkUUID stri
 func queryPrometheus(
 	ctx context.Context,
 	log logging.Logger,
-	url string,
-	username string,
-	password string,
+	config collectorConfig,
 	query string,
 ) (int, error) {
 	// Create client with basic auth
 	client, err := api.NewClient(api.Config{
-		Address: url,
+		Address: config.url,
 		RoundTripper: &basicAuthRoundTripper{
-			username: username,
-			password: password,
+			username: config.username,
+			password: config.password,
 			rt:       api.DefaultRoundTripper,
 		},
 	})
