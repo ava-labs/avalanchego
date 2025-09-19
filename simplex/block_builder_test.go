@@ -156,6 +156,9 @@ func TestBlockBuildingExponentialBackoff(t *testing.T) {
 	}
 
 	vm.BuildBlockF = func(_ context.Context) (snowman.Block, error) {
+		if count > 7 {
+			return child.vmBlock, nil
+		}
 		return nil, errors.New("failed to build block")
 	}
 
@@ -165,14 +168,19 @@ func TestBlockBuildingExponentialBackoff(t *testing.T) {
 		blockTracker: genesis.blockTracker,
 	}
 
-	timeoutCtx, cancelCtx := context.WithTimeout(ctx, time.Second)
+	timeoutTime := 10 * time.Second
+	timeoutCtx, cancelCtx := context.WithTimeout(ctx, timeoutTime)
 	defer cancelCtx()
 
+	start := time.Now()
 	block, built := bb.BuildBlock(timeoutCtx, child.BlockHeader().ProtocolMetadata)
-	require.False(t, built)
-	require.Nil(t, block)
+	endTime := time.Since(start)
 
-	// expected number of count increases
-	// 10, 20, 40, 80, 160, 320, 640 = 7 attempts
-	require.Equal(t, 7, count, "Should have retried multiple times due to backoff")
+	require.True(t, built)
+	require.Equal(t, child.BlockHeader(), block.BlockHeader())
+
+	// 10, 20, 40, 80, 160, 320, 640 = 1270ms
+	require.GreaterOrEqual(t, endTime.Milliseconds(), int64(1270))
+	// ensure we haven't timed out
+	require.NotEqual(t, timeoutTime, endTime)
 }
