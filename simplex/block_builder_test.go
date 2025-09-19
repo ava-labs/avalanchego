@@ -148,17 +148,19 @@ func TestBlockBuildingExponentialBackoff(t *testing.T) {
 		prev: genesis,
 	})
 
-	count := 0
 	vm.WaitForEventF = func(_ context.Context) (common.Message, error) {
-		count++
 		return common.PendingTxs, nil
 	}
 
+	count := 0
 	vm.BuildBlockF = func(_ context.Context) (snowman.Block, error) {
-		if count > 7 {
-			return child.vmBlock, nil
+		if count < 7 {
+			count++
+			return nil, errors.New("failed to build block")
 		}
-		return nil, errors.New("failed to build block")
+
+		// on the 8th try, return the block successfully
+		return child.vmBlock, nil
 	}
 
 	bb := &BlockBuilder{
@@ -167,21 +169,15 @@ func TestBlockBuildingExponentialBackoff(t *testing.T) {
 		blockTracker: genesis.blockTracker,
 	}
 
-	timeoutTime := 10 * time.Second
-	timeoutCtx, cancelCtx := context.WithTimeout(ctx, timeoutTime)
-	defer cancelCtx()
-
 	start := time.Now()
-	block, built := bb.BuildBlock(timeoutCtx, child.BlockHeader().ProtocolMetadata)
+	block, built := bb.BuildBlock(ctx, child.BlockHeader().ProtocolMetadata)
 	endTime := time.Since(start)
 
 	require.True(t, built)
 	require.Equal(t, child.BlockHeader(), block.BlockHeader())
 
 	// 10, 20, 40, 80, 160, 320, 640 = 1270ms
-	require.GreaterOrEqual(t, endTime.Milliseconds(), int64(1270))
-	// ensure we haven't timed out
-	require.NotEqual(t, timeoutTime, endTime)
+	require.GreaterOrEqual(t, endTime, 1270*time.Millisecond)
 }
 
 func TestWaitForPendingBlockBackoff(t *testing.T) {
@@ -194,6 +190,8 @@ func TestWaitForPendingBlockBackoff(t *testing.T) {
 			count++
 			return common.StateSyncDone, nil
 		}
+
+		// on the 8th try, return PendingTxs
 		return common.PendingTxs, nil
 	}
 
@@ -203,16 +201,10 @@ func TestWaitForPendingBlockBackoff(t *testing.T) {
 		blockTracker: nil,
 	}
 
-	timeoutTime := 10 * time.Second
-	timeoutCtx, cancelCtx := context.WithTimeout(ctx, timeoutTime)
-	defer cancelCtx()
-
 	start := time.Now()
-	bb.WaitForPendingBlock(timeoutCtx)
+	bb.WaitForPendingBlock(ctx)
 	endTime := time.Since(start)
 
 	// 10, 20, 40, 80, 160, 320, 640 = 1270ms
-	require.GreaterOrEqual(t, endTime.Milliseconds(), int64(1270))
-	// ensure we haven't timed out
-	require.NotEqual(t, timeoutTime, endTime)
+	require.GreaterOrEqual(t, endTime, 1270*time.Millisecond)
 }
