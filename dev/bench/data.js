@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1758273028281,
+  "lastUpdate": 1758273046290,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -1452,6 +1452,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-blacksmith-4vcpu-ubuntu-2404",
             "value": 122.3,
+            "unit": "mgas/s",
+            "extra": "1 times\n6 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Ceyhun Onur",
+            "username": "ceyonur",
+            "email": "ceyhun.onur@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "8aa4f1e2592e5f31a7743ac055d3484e295a8827",
+          "message": "Implement ACP-226 Math (#4289)\n\nSigned-off-by: Ceyhun Onur <ceyhunonur54@gmail.com>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>",
+          "timestamp": "2025-09-18T19:18:40Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/8aa4f1e2592e5f31a7743ac055d3484e295a8827"
+        },
+        "date": 1758273045207,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-blacksmith-4vcpu-ubuntu-2404",
+            "value": 114.5,
             "unit": "mgas/s",
             "extra": "1 times\n6 procs"
           }
