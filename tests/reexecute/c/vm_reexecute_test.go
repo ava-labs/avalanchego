@@ -592,27 +592,3 @@ func parseCustomLabels(labelsStr string) (map[string]string, error) {
 	}
 	return labels, nil
 }
-
-func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time.Duration) {
-	r := require.New(b)
-
-	gasUsed, err := getCounterMetricValue(registry, "avalanche_evm_eth_chain_block_gas_used_processed")
-	r.NoError(err)
-	mgasPerSecond := gasUsed / 1_000_000 / elapsed.Seconds()
-	b.ReportMetric(mgasPerSecond, "mgas/s")
-}
-
-func getCounterMetricValue(registry prometheus.Gatherer, query string) (float64, error) {
-	metricFamilies, err := registry.Gather()
-	if err != nil {
-		return 0, fmt.Errorf("failed to gather metrics: %w", err)
-	}
-
-	for _, mf := range metricFamilies {
-		if mf.GetName() == query {
-			return mf.GetMetric()[0].Counter.GetValue(), nil
-		}
-	}
-
-	return 0, fmt.Errorf("metric %s not found", query)
-}
