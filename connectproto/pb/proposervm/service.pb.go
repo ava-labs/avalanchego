@@ -4,6 +4,8 @@
 // 	protoc        (unknown)
 // source: proposervm/service.proto
 
+// The ProposerVM package defines RPCs for interacting with the ProposerVM service.
+
 package proposervm
 
 import (
@@ -21,6 +23,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// Request to get the current proposed block height.
 type GetProposedHeightRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -57,9 +60,13 @@ func (*GetProposedHeightRequest) Descriptor() ([]byte, []int) {
 	return file_proposervm_service_proto_rawDescGZIP(), []int{0}
 }
 
+// Response containing the current proposed block height.
 type GetProposedHeightReply struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Height        uint64                 `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The current proposed block height.
+	// This represents the height of the block that the ProposerVM is
+	// currently proposing to the network for acceptance.
+	Height        uint64 `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

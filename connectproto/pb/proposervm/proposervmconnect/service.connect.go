@@ -2,6 +2,7 @@
 //
 // Source: proposervm/service.proto
 
+// The ProposerVM package defines RPCs for interacting with the ProposerVM service.
 package proposervmconnect
 
 import (
@@ -40,6 +41,9 @@ const (
 
 // ProposerVMClient is a client for the proposervm.ProposerVM service.
 type ProposerVMClient interface {
+	// GetProposedHeight returns the height of the currently proposed block.
+	// This method is used to query the height of the block that is currently
+	// being proposed by the ProposerVM for network consensus.
 	GetProposedHeight(context.Context, *connect.Request[proposervm.GetProposedHeightRequest]) (*connect.Response[proposervm.GetProposedHeightReply], error)
 }
 
@@ -75,6 +79,9 @@ func (c *proposerVMClient) GetProposedHeight(ctx context.Context, req *connect.R
 
 // ProposerVMHandler is an implementation of the proposervm.ProposerVM service.
 type ProposerVMHandler interface {
+	// GetProposedHeight returns the height of the currently proposed block.
+	// This method is used to query the height of the block that is currently
+	// being proposed by the ProposerVM for network consensus.
 	GetProposedHeight(context.Context, *connect.Request[proposervm.GetProposedHeightRequest]) (*connect.Response[proposervm.GetProposedHeightReply], error)
 }
 
