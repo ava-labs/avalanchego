@@ -139,11 +139,11 @@ func TestSimplexMessageReplicationResponse(t *testing.T) {
 		{
 			name: "nil latest round",
 			resp: &simplex.VerifiedReplicationResponse{
-				Data:        []simplex.VerifiedQuorumRound{
+				Data: []simplex.VerifiedQuorumRound{
 					{
 						VerifiedBlock: &Block{
 							metadata: simplex.ProtocolMetadata{},
-							vmBlock: snowmantest.Genesis,
+							vmBlock:  snowmantest.Genesis,
 						},
 					},
 				},
@@ -164,7 +164,7 @@ func TestSimplexMessageReplicationResponse(t *testing.T) {
 				LatestRound: &simplex.VerifiedQuorumRound{
 					VerifiedBlock: &Block{
 						metadata: simplex.ProtocolMetadata{},
-						vmBlock:  snowmantest.Genesis,	
+						vmBlock:  snowmantest.Genesis,
 					},
 				},
 			},
