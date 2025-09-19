@@ -273,7 +273,7 @@ jobs:
       - name: Checkout AvalancheGo
         uses: actions/checkout@v4
         with:
-          ref: '92d0e99bce8fc3f7af1fa7d300e4fe1e7d210e6b'
+          ref: 'b6409a4f336b32e0323a654aefdec941fc3fb3e5'
       - name: Install nix
         uses: ./.github/actions/install-nix
       - name: Setup Go
@@ -296,8 +296,8 @@ jobs:
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
           config: firewood
-          start-block: ${{ github.event.inputs.start-block }}
-          end-block: ${{ github.event.inputs.end-block }}
+          start-block: '101'
+          end-block: '250000'
           prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           push-github-action-benchmark: false
@@ -305,7 +305,7 @@ jobs:
           aws-region: us-east-2
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ''
-          runner_name: 'baseline-${{ github.event.inputs.firewood-baseline-version }}'
+          runner_name: 'avalanche-avalanchego-runner'
       - name: Restore go.mod changes
         shell: nix develop --command bash -x {0}
         run: |
@@ -361,8 +361,8 @@ jobs:
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
           config: firewood
-          start-block: ${{ github.event.inputs.start-block }}
-          end-block: ${{ github.event.inputs.end-block }}
+          start-block: '101'
+          end-block: '250000'
           prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           push-github-action-benchmark: false
@@ -370,7 +370,7 @@ jobs:
           aws-region: us-east-2
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ''
-          runner_name: 'candidate-${{ github.event.inputs.firewood-candidate-version }}'
+          runner_name: 'avalanche-avalanchego-runner'
       - name: Restore go.mod changes
         shell: nix develop --command bash -x {0}
         run: |
@@ -394,14 +394,12 @@ jobs:
           name: baseline-benchmark-results
           path: ./baseline-results
         continue-on-error: true
-
       - name: Download candidate results
         uses: actions/download-artifact@v4
         with:
           name: candidate-benchmark-results
           path: ./candidate-results
         continue-on-error: true
-
       - name: Compare Results
         shell: bash
         run: |
