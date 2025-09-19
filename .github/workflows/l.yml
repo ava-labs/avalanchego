@@ -1,0 +1,235 @@
+# Firewood Comparison Benchmark
+#
+# Compares performance between two Firewood versions by running C-Chain re-execution benchmarks.
+# Supports both tagged releases (uses pre-built binaries when available) and source builds.
+# Each version runs with its specified AvalancheGo commit for compatibility.
+
+name: Firewood Comparison Benchmark
+
+env:
+  RUST_VERSION: "1.88"
+
+on:
+  workflow_dispatch:
+    inputs:
+      firewood-baseline-version:
+        description: 'Baseline Firewood version (tag like ffi/v0.0.12 or commit hash)'
+        required: true
+      avalanchego-baseline-version:
+        description: 'AvalancheGo version (tag like v1.13.0 or commit hash)'
+        required: true
+        default: 'master'
+      firewood-candidate-version:
+        description: 'Candidate Firewood version (tag or commit hash)'
+        required: true
+      avalanchego-candidate-version:
+        description: 'AvalancheGo version (tag like v1.13.0 or commit hash)'
+        required: true
+      start-block:
+        description: 'Start block for benchmark'
+        required: false
+        default: '101'
+      end-block:
+        description: 'End block for benchmark'
+        required: false
+        default: '200'
+
+jobs:
+  baseline-benchmark:
+    runs-on: avalanche-avalanchego-runner
+    container:
+      image: ghcr.io/actions/actions-runner:2.325.0
+    permissions:
+      id-token: write
+      contents: write
+    name: "Baseline: ${{ github.event.inputs.firewood-baseline-version }}"
+    steps:
+      - name: Install dependencies
+        shell: bash
+        run: |
+          if ! command -v xz &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y xz-utils
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.avalanchego-baseline-version }}
+      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/install-nix
+      # Only install Rust toolchain when building from source (non-tag versions)
+      - name: Setup Rust for source build
+        if: ${{ !startsWith(github.event.inputs.firewood-baseline-version, 'v') && !startsWith(github.event.inputs.firewood-baseline-version, 'ffi/') }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+      - name: Setup Rust cache for source build
+        if: ${{ !startsWith(github.event.inputs.firewood-baseline-version, 'v') && !startsWith(github.event.inputs.firewood-baseline-version, 'ffi/') }}
+        uses: Swatinem/rust-cache@v2
+      - name: Setup Firewood Baseline
+        shell: bash
+        run: |
+          FIREWOOD_VERSION="${{ github.event.inputs.firewood-baseline-version }}"
+
+          if [[ "$FIREWOOD_VERSION" =~ ^(v|ffi/) ]]; then
+            echo "Detected tag: $FIREWOOD_VERSION - using pre-built binaries"
+            # For tags, fetch pre-built binaries from firewood-go-ethhash repo
+            TEMP_DIR=$(mktemp -d)
+            trap "rm -rf $TEMP_DIR" EXIT
+
+            cd "$TEMP_DIR"
+            git clone https://github.com/ava-labs/firewood-go-ethhash.git
+            cd firewood-go-ethhash
+            git checkout "$FIREWOOD_VERSION"
+
+            cd "$GITHUB_WORKSPACE"
+            rm -rf ./ffi
+            cp -r "$TEMP_DIR/firewood-go-ethhash/ffi" ./ffi
+          else
+            echo "Detected commit: $FIREWOOD_VERSION - building from source"
+            ./scripts/build_firewood.sh "$FIREWOOD_VERSION" ./ffi
+          fi
+
+          # Configure go.mod to use local FFI
+          go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=./ffi
+          go mod download
+      - name: Run Baseline Benchmark
+        uses: ./.github/actions/c-chain-reexecution-benchmark
+        with:
+          config: firewood
+          start-block: ${{ github.event.inputs.start-block }}
+          end-block: ${{ github.event.inputs.end-block }}
+          prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          push-github-action-benchmark: false
+          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: us-east-2
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          push-post-state: ''
+          runner_name: 'baseline-${{ github.event.inputs.firewood-baseline-version }}'
+      - name: Upload baseline results
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-benchmark-results
+          path: |
+            output.txt
+            benchmark-results/
+          retention-days: 7
+  candidate-benchmark:
+    runs-on: avalanche-avalanchego-runner
+    container:
+      image: ghcr.io/actions/actions-runner:2.325.0
+    permissions:
+      id-token: write
+      contents: write
+    name: "Candidate: ${{ github.event.inputs.firewood-candidate-version }}"
+    steps:
+      - name: Install dependencies
+        shell: bash
+        run: |
+          if ! command -v xz &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y xz-utils
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.avalanchego-candidate-version }}
+      - uses: ./.github/actions/setup-go-for-project
+      - uses: ./.github/actions/install-nix
+      # Only install Rust toolchain when building from source (non-tag versions)
+      - name: Setup Rust for source build
+        if: ${{ !startsWith(github.event.inputs.firewood-candidate-version, 'v') && !startsWith(github.event.inputs.firewood-candidate-version, 'ffi/') }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+      - name: Setup Rust cache for source build
+        if: ${{ !startsWith(github.event.inputs.firewood-candidate-version, 'v') && !startsWith(github.event.inputs.firewood-candidate-version, 'ffi/') }}
+        uses: Swatinem/rust-cache@v2
+      - name: Setup Firewood Candidate
+        shell: bash
+        run: |
+          FIREWOOD_VERSION="${{ github.event.inputs.firewood-candidate-version }}"
+
+          if [[ "$FIREWOOD_VERSION" =~ ^(v|ffi/) ]]; then
+            echo "Detected tag: $FIREWOOD_VERSION - using pre-built binaries"
+            # For tags, fetch pre-built binaries from firewood-go-ethhash repo
+            TEMP_DIR=$(mktemp -d)
+            trap "rm -rf $TEMP_DIR" EXIT
+
+            cd "$TEMP_DIR"
+            git clone https://github.com/ava-labs/firewood-go-ethhash.git
+            cd firewood-go-ethhash
+            git checkout "$FIREWOOD_VERSION"
+
+            cd "$GITHUB_WORKSPACE"
+            rm -rf ./ffi
+            cp -r "$TEMP_DIR/firewood-go-ethhash/ffi" ./ffi
+          else
+            echo "Detected commit: $FIREWOOD_VERSION - building from source"
+            ./scripts/build_firewood.sh "$FIREWOOD_VERSION" ./ffi
+          fi
+
+          # Configure go.mod to use local FFI
+          go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=./ffi
+          go mod download
+      - name: Run Candidate Benchmark
+        uses: ./.github/actions/c-chain-reexecution-benchmark
+        with:
+          config: firewood
+          start-block: ${{ github.event.inputs.start-block }}
+          end-block: ${{ github.event.inputs.end-block }}
+          prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          push-github-action-benchmark: false
+          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: us-east-2
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          push-post-state: ''
+          runner_name: 'candidate-${{ github.event.inputs.firewood-candidate-version }}'
+      - name: Upload candidate results
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-benchmark-results
+          path: |
+            output.txt
+            benchmark-results/
+          retention-days: 7
+  compare-results:
+    needs: [baseline-benchmark, candidate-benchmark]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Download baseline results
+        uses: actions/download-artifact@v4
+        with:
+          name: baseline-benchmark-results
+          path: ./baseline-results
+        continue-on-error: true
+      - name: Download candidate results
+        uses: actions/download-artifact@v4
+        with:
+          name: candidate-benchmark-results
+          path: ./candidate-results
+        continue-on-error: true
+      - name: Compare Results
+        shell: bash
+        run: |
+          echo "# Firewood Performance Comparison" >> $GITHUB_STEP_SUMMARY
+          echo "**Baseline:** ${{ github.event.inputs.firewood-baseline-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Candidate:** ${{ github.event.inputs.firewood-candidate-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Blocks:** ${{ github.event.inputs.start-block }} - ${{ github.event.inputs.end-block }}" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f "./baseline-results/output.txt" ] && [ -f "./candidate-results/output.txt" ]; then
+            BASELINE_MGAS=$(grep -o '[0-9]\+\.[0-9]\+ mgas/s' ./baseline-results/output.txt | head -1 | cut -d' ' -f1 || echo "N/A")
+            CANDIDATE_MGAS=$(grep -o '[0-9]\+\.[0-9]\+ mgas/s' ./candidate-results/output.txt | head -1 | cut -d' ' -f1 || echo "N/A")
+
+            echo "- Baseline: ${BASELINE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
+            echo "- Candidate: ${CANDIDATE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
+
+            if [ "$BASELINE_MGAS" != "N/A" ] && [ "$CANDIDATE_MGAS" != "N/A" ]; then
+              CHANGE=$(echo "scale=2; ($CANDIDATE_MGAS - $BASELINE_MGAS) / $BASELINE_MGAS * 100" | bc -l)
+              echo "- Change: ${CHANGE}%" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            [ -f "./baseline-results/output.txt" ] && echo "- Baseline: Completed" >> $GITHUB_STEP_SUMMARY || echo "- Baseline: Failed" >> $GITHUB_STEP_SUMMARY
+            [ -f "./candidate-results/output.txt" ] && echo "- Candidate: Completed" >> $GITHUB_STEP_SUMMARY || echo "- Candidate: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
