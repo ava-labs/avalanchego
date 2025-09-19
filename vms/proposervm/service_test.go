@@ -5,10 +5,16 @@ package proposervm
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	"connectrpc.com/connect"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm"
+	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
 )
 
 func TestGetProposedHeight(t *testing.T) {
@@ -24,11 +30,29 @@ func TestGetProposedHeight(t *testing.T) {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	service := &service{vm: proVM}
+	// Test through the exported NewHTTPHandler API
+	handler, err := proVM.NewHTTPHandler(context.Background())
+	require.NoError(err)
+	require.NotNil(handler)
 
-	proposedHeightResponse, err := service.GetProposedHeight(context.TODO(), nil)
+	// Create a test server with the handler
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	// Create a Connect client to make requests to our handler
+	client := proposervmconnect.NewProposerVMClient(
+		http.DefaultClient,
+		server.URL,
+	)
+
+	// Test the GetProposedHeight endpoint
+	req := connect.NewRequest(&proposervm.GetProposedHeightRequest{})
+	resp, err := client.GetProposedHeight(context.Background(), req)
 	require.NoError(err)
-	minHeight, err := service.vm.ctx.ValidatorState.GetMinimumHeight(context.Background())
+	require.NotNil(resp.Msg)
+
+	// Verify the response matches the expected minimum height
+	expectedHeight, err := proVM.ctx.ValidatorState.GetMinimumHeight(context.Background())
 	require.NoError(err)
-	require.Equal(minHeight, proposedHeightResponse.Msg.Height)
+	require.Equal(expectedHeight, resp.Msg.Height)
 }
