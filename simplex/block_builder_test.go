@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/simplex"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
@@ -27,7 +28,7 @@ func TestBlockBuilder(t *testing.T) {
 		name          string
 		block         snowman.Block
 		shouldBuild   bool
-		expectedBlock *Block
+		expectedBlock simplex.VerifiedBlock
 		vmBlockBuildF func(ctx context.Context) (snowman.Block, error)
 	}{
 		{
