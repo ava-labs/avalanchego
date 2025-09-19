@@ -1,0 +1,244 @@
+# Firewood Comparison Benchmark
+#
+# Compares performance between two Firewood versions by running C-Chain re-execution benchmarks.
+# Supports both tagged releases (uses pre-built binaries when available) and source builds.
+# Each version runs with its specified AvalancheGo commit for compatibility.
+
+name: Firewood AB Reexecution Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'Select self-hosted runner'
+        type: choice
+        required: true
+        options:
+          - avalanche-avalanchego-runner
+          - avalanche-avalanchego-runner-2ti
+      firewood-baseline-version:
+        description: 'Baseline Firewood version (tag like ffi/v0.0.12 or commit hash)'
+        required: true
+      avalanchego-baseline-version:
+        description: 'AvalancheGo version (tag like v1.13.0 or commit hash)'
+        required: true
+        default: 'master'
+      firewood-candidate-version:
+        description: 'Candidate Firewood version (tag or commit hash)'
+        required: true
+      avalanchego-candidate-version:
+        description: 'AvalancheGo version (tag like v1.13.0 or commit hash)'
+        required: true
+      start-block:
+        description: 'Start block for benchmark'
+        required: false
+        default: '101'
+      end-block:
+        description: 'End block for benchmark'
+        required: false
+        default: '200'
+
+env:
+  RUST_VERSION: '1.88'
+
+jobs:
+  baseline-benchmark:
+    runs-on: ${{ github.event.inputs.runner }}
+    container:
+      image: ghcr.io/actions/actions-runner:2.325.0
+    permissions:
+      id-token: write
+      contents: write
+    name: "Baseline: ${{ github.event.inputs.firewood-baseline-version }}"
+    steps:
+      - name: Install dependencies
+        shell: bash
+        run: |
+          if ! command -v xz &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y xz-utils
+          fi
+      - name: Checkout AvalancheGo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.avalanchego-baseline-version }}
+      - name: Install nix
+        uses: ./.github/actions/install-nix
+      - name: Setup Go
+        uses: ./.github/actions/setup-go-for-project
+      - name: Setup Firewood
+        uses: ./.github/actions/setup-firewood
+        with:
+          firewood-version: ${{ github.event.inputs.firewood-baseline-version }}
+          rust-version: ${{ env.RUST_VERSION }}
+      - name: Configure AvalancheGo to work with Firewood
+        run: |
+          # Configure go.mod to use local FFI
+          go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=./ffi
+          go mod download
+
+          # Stash changes for benchmark without this compare-results fails
+          git add go.mod go.sum || true
+          git stash push -m "temp stash for baseline benchmark" || echo "Nothing to stash"
+      - name: Run Baseline Benchmark
+        uses: ./.github/actions/c-chain-reexecution-benchmark
+        with:
+          config: firewood
+          start-block: ${{ github.event.inputs.start-block }}
+          end-block: ${{ github.event.inputs.end-block }}
+          prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          push-github-action-benchmark: false
+          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: us-east-2
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          push-post-state: ''
+          runner_name: 'baseline-${{ github.event.inputs.firewood-baseline-version }}'
+      - name: Restore go.mod changes
+        shell: nix develop --command bash -x {0}
+        run: |
+          git stash pop || echo "Nothing to restore"
+      - name: Upload baseline results
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-benchmark-results
+          path: |
+            output.txt
+            benchmark-results/
+          retention-days: 7
+  candidate-benchmark:
+    runs-on: ${{ github.event.inputs.runner }}
+    container:
+      image: ghcr.io/actions/actions-runner:2.325.0
+    permissions:
+      id-token: write
+      contents: write
+    name: "Candidate: ${{ github.event.inputs.firewood-candidate-version }}"
+    steps:
+      - name: Install dependencies
+        shell: bash
+        run: |
+          if ! command -v xz &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y xz-utils
+          fi
+      - name: Checkout AvalancheGo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.avalanchego-candidate-version }}
+      - name: Install nix
+        uses: ./.github/actions/install-nix
+      - name: Setup Go
+        uses: ./.github/actions/setup-go-for-project
+      - name: Setup Firewood
+        uses: ./.github/actions/setup-firewood
+        with:
+          firewood-version: ${{ github.event.inputs.firewood-candidate-version }}
+          rust-version: ${{ env.RUST_VERSION }}
+      - name: Configure AvalancheGo to work with Firewood
+        shell: nix develop --command bash -x {0}
+        run: |
+          # Configure go.mod to use local FFI
+          go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=./ffi
+          go mod download
+
+          # Stash changes for benchmark
+          git add go.mod go.sum || true
+          git stash push -m "temp stash for candidate benchmark" || echo "Nothing to stash"
+      - name: Run Candidate Benchmark
+        uses: ./.github/actions/c-chain-reexecution-benchmark
+        with:
+          config: firewood
+          start-block: ${{ github.event.inputs.start-block }}
+          end-block: ${{ github.event.inputs.end-block }}
+          prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          push-github-action-benchmark: false
+          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: us-east-2
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          push-post-state: ''
+          runner_name: 'candidate-${{ github.event.inputs.firewood-candidate-version }}'
+      - name: Restore go.mod changes
+        shell: nix develop --command bash -x {0}
+        run: |
+          git stash pop || echo "Nothing to restore"
+      - name: Upload candidate results
+        uses: actions/upload-artifact@v4
+        with:
+          name: candidate-benchmark-results
+          path: |
+            output.txt
+            benchmark-results/
+          retention-days: 7
+  compare-results:
+    needs: [baseline-benchmark, candidate-benchmark]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Download baseline results
+        uses: actions/download-artifact@v4
+        with:
+          name: baseline-benchmark-results
+          path: ./baseline-results
+        continue-on-error: true
+
+      - name: Download candidate results
+        uses: actions/download-artifact@v4
+        with:
+          name: candidate-benchmark-results
+          path: ./candidate-results
+        continue-on-error: true
+
+      - name: Compare Results
+        shell: bash
+        run: |
+          echo "# Firewood Performance Comparison" >> $GITHUB_STEP_SUMMARY
+          echo "**Baseline:** ${{ github.event.inputs.firewood-baseline-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Candidate:** ${{ github.event.inputs.firewood-candidate-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Blocks:** ${{ github.event.inputs.start-block }} - ${{ github.event.inputs.end-block }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Parse Go benchmark format: "BenchmarkName 1 1361 mgas/s"
+          if [ -f "./baseline-results/output.txt" ]; then
+            BASELINE_MGAS=$(grep -o '[0-9]\+ mgas/s' ./baseline-results/output.txt | head -1 | cut -d' ' -f1 || echo "N/A")
+            echo "- **Baseline (${{ github.event.inputs.firewood-baseline-version }}):** ${BASELINE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
+          else
+            BASELINE_MGAS="N/A"
+            echo "- **Baseline (${{ github.event.inputs.firewood-baseline-version }}):** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ -f "./candidate-results/output.txt" ]; then
+            CANDIDATE_MGAS=$(grep -o '[0-9]\+ mgas/s' ./candidate-results/output.txt | head -1 | cut -d' ' -f1 || echo "N/A")
+            echo "- **Candidate (${{ github.event.inputs.firewood-candidate-version }}):** ${CANDIDATE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
+          else
+            CANDIDATE_MGAS="N/A"
+            echo "- **Candidate (${{ github.event.inputs.firewood-candidate-version }}):** Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Calculate percentage change if both values are available
+          if [ "$BASELINE_MGAS" != "N/A" ] && [ "$CANDIDATE_MGAS" != "N/A" ]; then
+            # Install bc if not available
+            command -v bc >/dev/null 2>&1 || { echo "bc not found, installing..."; apt-get update && apt-get install -y bc; }
+
+            CHANGE=$(echo "scale=2; ($CANDIDATE_MGAS - $BASELINE_MGAS) / $BASELINE_MGAS * 100" | bc -l)
+            if (( $(echo "$CHANGE > 0" | bc -l) )); then
+              echo "- **Performance Change:** +${CHANGE}%" >> $GITHUB_STEP_SUMMARY
+            elif (( $(echo "$CHANGE < 0" | bc -l) )); then
+              echo "- **Performance Change:** ${CHANGE}%" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- **Performance Change:** No change" >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "## Raw Results" >> $GITHUB_STEP_SUMMARY
+            echo "### Baseline (${{ github.event.inputs.firewood-baseline-version }})" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat ./baseline-results/output.txt >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No baseline output found" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+
+            echo "### Candidate (${{ github.event.inputs.firewood-candidate-version }})" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat ./candidate-results/output.txt >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No candidate output found" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          fi

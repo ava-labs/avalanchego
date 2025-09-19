@@ -1,0 +1,115 @@
+name: 'Setup Firewood'
+description: 'Sets up Firewood either from pre-built binaries or by building from source'
+inputs:
+  firewood-version:
+    description: 'Firewood version (tag like ffi/v0.0.12 or commit hash for source build)'
+    required: true
+  rust-version:
+    description: 'Rust version for source builds'
+    required: false
+    default: '1.88'
+
+outputs:
+  build-type:
+    description: 'Whether this was a source build or pre-built'
+    value: ${{ steps.detect-build-type.outputs.build-type }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Determine build type
+      id: detect-build-type
+      shell: bash
+      run: |
+        if [[ "${{ inputs.firewood-version }}" =~ ^(v|ffi/) ]]; then
+          echo "build-type=prebuilt" >> $GITHUB_OUTPUT
+          echo "Using pre-built binaries for ${{ inputs.firewood-version }}"
+        else
+          echo "build-type=source" >> $GITHUB_OUTPUT
+          echo "Building from source for ${{ inputs.firewood-version }}"
+        fi
+    # === Source build path ===
+    - name: Install build dependencies
+      if: steps.detect-build-type.outputs.build-type == 'source'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential gcc
+    - name: Setup Rust toolchain
+      if: steps.detect-build-type.outputs.build-type == 'source'
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: ${{ inputs.rust-version }}
+    - name: Setup Rust cache
+      if: steps.detect-build-type.outputs.build-type == 'source'
+      uses: Swatinem/rust-cache@v2
+
+    - name: Checkout Firewood source
+      if: steps.detect-build-type.outputs.build-type == 'source'
+      uses: actions/checkout@v4
+      with:
+        repository: ava-labs/firewood
+        ref: ${{ inputs.firewood-version }}
+        path: firewood-src
+    - name: Build Firewood
+      if: steps.detect-build-type.outputs.build-type == 'source'
+      working-directory: firewood-src
+      shell: bash
+      run: |
+        cargo build --profile maxperf --features ethhash,logger
+
+        # Verify library was built
+        BUILT_LIB=$(find target -name "libfirewood_ffi.a" | head -1)
+        if [ -z "$BUILT_LIB" ]; then
+          echo "Error: libfirewood_ffi.a not found"
+          exit 1
+        fi
+        echo "Built library: $BUILT_LIB"
+    - name: Setup FFI from source build
+      if: steps.detect-build-type.outputs.build-type == 'source'
+      shell: bash
+      run: |
+        # Copy FFI and target directories
+        cp -r firewood-src/ffi ./ffi
+        cp -r firewood-src/target ./target
+
+        # Setup platform-specific library
+        PLATFORM="$(uname -m | sed 's/arm64/aarch64/')-unknown-linux-gnu"
+        mkdir -p "ffi/libs/$PLATFORM"
+
+        BUILT_LIB=$(find firewood-src/target -name "libfirewood_ffi.a" | head -1)
+        cp "$BUILT_LIB" "ffi/libs/$PLATFORM/"
+
+        # Verify
+        if [ ! -f "ffi/libs/$PLATFORM/libfirewood_ffi.a" ]; then
+          echo "Error: Failed to set up FFI library"
+          exit 1
+        fi
+        echo "FFI setup complete for $PLATFORM"
+    # === Pre-built binary path ===
+    - name: Checkout pre-built binaries
+      if: steps.detect-build-type.outputs.build-type == 'prebuilt'
+      uses: actions/checkout@v4
+      with:
+        repository: ava-labs/firewood-go-ethhash # For prebuilt checkout firewood-go-ethhash
+        ref: ${{ inputs.firewood-version }}
+        path: firewood-prebuilt
+    - name: Setup pre-built FFI
+      if: steps.detect-build-type.outputs.build-type == 'prebuilt'
+      shell: bash
+      run: |
+        echo "Setting up pre-built Firewood FFI for ${{ inputs.firewood-version }}"
+
+        # Copy FFI to workspace
+        rm -rf ./ffi
+        cp -r firewood-prebuilt/ffi ./ffi
+
+        # Verify setup
+        PLATFORM="$(uname -m | sed 's/arm64/aarch64/')-unknown-linux-gnu"
+        if [ ! -f "ffi/libs/$PLATFORM/libfirewood_ffi.a" ]; then
+          echo "Warning: Expected library not found at ffi/libs/$PLATFORM/libfirewood_ffi.a"
+          echo "Available files:"
+          find ffi/libs/ -name "*.a" || echo "No .a files found"
+        else
+          echo "FFI setup complete for $PLATFORM"
+        fi
