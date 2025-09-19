@@ -5,7 +5,7 @@ module github.com/ava-labs/avalanchego
 //   - README.md
 //   - go.mod (here)
 //
-// - If updating between minor versions (e.g. 1.23.x -> 1.24.x):
+// - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
 //   - Consider updating the version of golangci-lint (in scripts/lint.sh).
 go 1.24.7
 
