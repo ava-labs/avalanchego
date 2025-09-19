@@ -45,7 +45,8 @@ func (obj *HeaderSerializable) EncodeRLP(_w io.Writer) error {
 	_tmp5 := obj.ExcessBlobGas != nil
 	_tmp6 := obj.ParentBeaconRoot != nil
 	_tmp7 := obj.TimeMilliseconds != nil
-	if _tmp1 || _tmp2 || _tmp3 || _tmp4 || _tmp5 || _tmp6 || _tmp7 {
+	_tmp8 := obj.MinDelayExcess != nil
+	if _tmp1 || _tmp2 || _tmp3 || _tmp4 || _tmp5 || _tmp6 || _tmp7 || _tmp8 {
 		if obj.BaseFee == nil {
 			w.Write(rlp.EmptyString)
 		} else {
@@ -55,7 +56,7 @@ func (obj *HeaderSerializable) EncodeRLP(_w io.Writer) error {
 			w.WriteBigInt(obj.BaseFee)
 		}
 	}
-	if _tmp2 || _tmp3 || _tmp4 || _tmp5 || _tmp6 || _tmp7 {
+	if _tmp2 || _tmp3 || _tmp4 || _tmp5 || _tmp6 || _tmp7 || _tmp8 {
 		if obj.ExtDataGasUsed == nil {
 			w.Write(rlp.EmptyString)
 		} else {
@@ -65,7 +66,7 @@ func (obj *HeaderSerializable) EncodeRLP(_w io.Writer) error {
 			w.WriteBigInt(obj.ExtDataGasUsed)
 		}
 	}
-	if _tmp3 || _tmp4 || _tmp5 || _tmp6 || _tmp7 {
+	if _tmp3 || _tmp4 || _tmp5 || _tmp6 || _tmp7 || _tmp8 {
 		if obj.BlockGasCost == nil {
 			w.Write(rlp.EmptyString)
 		} else {
@@ -75,32 +76,39 @@ func (obj *HeaderSerializable) EncodeRLP(_w io.Writer) error {
 			w.WriteBigInt(obj.BlockGasCost)
 		}
 	}
-	if _tmp4 || _tmp5 || _tmp6 || _tmp7 {
+	if _tmp4 || _tmp5 || _tmp6 || _tmp7 || _tmp8 {
 		if obj.BlobGasUsed == nil {
 			w.Write([]byte{0x80})
 		} else {
 			w.WriteUint64((*obj.BlobGasUsed))
 		}
 	}
-	if _tmp5 || _tmp6 || _tmp7 {
+	if _tmp5 || _tmp6 || _tmp7 || _tmp8 {
 		if obj.ExcessBlobGas == nil {
 			w.Write([]byte{0x80})
 		} else {
 			w.WriteUint64((*obj.ExcessBlobGas))
 		}
 	}
-	if _tmp6 || _tmp7 {
+	if _tmp6 || _tmp7 || _tmp8 {
 		if obj.ParentBeaconRoot == nil {
 			w.Write([]byte{0x80})
 		} else {
 			w.WriteBytes(obj.ParentBeaconRoot[:])
 		}
 	}
-	if _tmp7 {
+	if _tmp7 || _tmp8 {
 		if obj.TimeMilliseconds == nil {
 			w.Write([]byte{0x80})
 		} else {
 			w.WriteUint64((*obj.TimeMilliseconds))
+		}
+	}
+	if _tmp8 {
+		if obj.MinDelayExcess == nil {
+			w.Write([]byte{0x80})
+		} else {
+			w.WriteUint64((*obj.MinDelayExcess))
 		}
 	}
 	w.ListEnd(_tmp0)
