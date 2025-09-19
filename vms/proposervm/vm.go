@@ -7,14 +7,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
+	"connectrpc.com/grpcreflect"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
+	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -234,6 +237,45 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 		return err
 	}
 	return vm.ChainVM.Shutdown(ctx)
+}
+
+func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
+	// Get inner VM's HTTP handler
+	innerHandler, err := vm.ChainVM.NewHTTPHandler(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create the multiplexer
+	mux := http.NewServeMux()
+
+	// Add ProposerVM specific handlers
+	service := &service{vm: vm}
+	proposerVMPath, proposerVMHandler := proposervmconnect.NewProposerVMHandler(service)
+	vm.ctx.Log.Info("Registering ProposerVM Connect handler", zap.String("path", proposerVMPath))
+	mux.Handle(proposerVMPath, proposerVMHandler)
+
+	// Add gRPC reflection
+	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(proposervmconnect.ProposerVMName),
+	)
+	vm.ctx.Log.Info("Registering gRPC reflection handler", zap.String("pattern", reflectionPattern))
+	mux.Handle(reflectionPattern, reflectionHandler)
+
+	// Add inner VM handler as fallback if it exists
+	if innerHandler != nil {
+		vm.ctx.Log.Info("Adding inner VM handler as fallback")
+		mux.Handle("/", innerHandler)
+	}
+
+	// Wrap with logging
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		vm.ctx.Log.Info("ProposerVM handling request",
+			zap.String("method", r.Method),
+			zap.String("path", r.URL.Path),
+		)
+		mux.ServeHTTP(w, r)
+	}), nil
 }
 
 func (vm *VM) SetState(ctx context.Context, newState snow.State) error {
