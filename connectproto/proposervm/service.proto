@@ -1,15 +1,27 @@
 syntax = "proto3";
 
+// The ProposerVM package defines RPCs for interacting with the ProposerVM service.
 package proposervm;
 
 option go_package = "github.com/ava-labs/avalanchego/connectproto/pb/proposervm";
 
+// ProposerVM service provides RPCs for querying ProposerVM state.
+// This service allows clients to retrieve information about the current
+// state of block proposals in the proposer consensus mechanism.
 service ProposerVM {
+  // GetProposedHeight returns the height of the currently proposed block.
+  // This method is used to query the height of the block that is currently
+  // being proposed by the ProposerVM for network consensus.
   rpc GetProposedHeight(GetProposedHeightRequest) returns (GetProposedHeightReply);
 }
 
+// Request to get the current proposed block height.
 message GetProposedHeightRequest {}
 
+// Response containing the current proposed block height.
 message GetProposedHeightReply {
+  // The current proposed block height.
+  // This represents the height of the block that the ProposerVM is
+  // currently proposing to the network for acceptance.
   uint64 height = 1;
 }
