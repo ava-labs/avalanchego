@@ -49,8 +49,8 @@ var (
 			delay:  1000,
 		},
 		{
-			name:   "2000ms_delay",
-			excess: 7_970_124, // ConversionRate (2^20) * ln(2000) + 1
+			name:   "2000ms_delay_initial",
+			excess: InitialDelayExcess, // ConversionRate (2^20) * ln(2000) + 1
 			delay:  2000,
 		},
 		{
