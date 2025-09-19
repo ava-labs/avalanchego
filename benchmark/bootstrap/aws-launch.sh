@@ -10,11 +10,14 @@ LIBEVM_BRANCH=""
 NBLOCKS="1m"
 REGION="us-west-2"
 DRY_RUN=false
+SPOT_INSTANCE=false
 
 # Valid instance types and their architectures
 declare -A VALID_INSTANCES=(
     ["i4g.large"]="arm64"
+    ["i4g.xlarge"]="arm64"
     ["i4i.large"]="amd64"
+    ["i4i.xlarge"]="amd64"
     ["m6id.xlarge"]="arm64"
     ["c6gd.2xlarge"]="arm64"
     ["x2gd.xlarge"]="arm64"
@@ -23,6 +26,22 @@ declare -A VALID_INSTANCES=(
     ["r6id.2xlarge"]="amd64"
     ["x2gd.2xlarge"]="arm64"
     ["z1d.2xlarge"]="amd64"
+)
+
+# Maximum spot prices for each instance type (from the pricing table)
+declare -A MAX_SPOT_PRICES=(
+    ["i4g.large"]="0.1544"
+    ["i4g.xlarge"]="0.3088"
+    ["i4i.large"]="0.1720"
+    ["i4i.xlarge"]="0.3440"
+    ["m6id.xlarge"]="0.2373"
+    ["c6gd.2xlarge"]="0.3072"
+    ["x2gd.xlarge"]="0.3340"
+    ["m5ad.2xlarge"]="0.4120"
+    ["r6gd.2xlarge"]="0.4608"
+    ["r6id.2xlarge"]="0.6048"
+    ["x2gd.2xlarge"]="0.6680"
+    ["z1d.2xlarge"]="0.7440"
 )
 
 # Valid nblocks values
@@ -40,6 +59,7 @@ show_usage() {
     echo "  --libevm-branch BRANCH      LibEVM git branch to checkout"
     echo "  --nblocks BLOCKS            Number of blocks to download (default: 1m)"
     echo "  --region REGION             AWS region (default: us-west-2)"
+    echo "  --spot                      Use spot instance pricing (default depends on instance type)"
     echo "  --dry-run                   Show the aws command that would be run without executing it"
     echo "  --help                      Show this help message"
     echo ""
@@ -49,6 +69,8 @@ show_usage() {
     echo "  i4i.large      amd64 468  2    16 GiB   \$0.1720 Intel Xeon Scalable"
     echo "  m6id.xlarge    arm64 237  4    16 GiB   \$0.2373 Intel Xeon Scalable"
     echo "  c6gd.2xlarge   arm64 474  8    16 GiB   \$0.3072 Graviton2 compute-optimized"
+    echo "  i4g.xlarge     arm64 937  4    32 GiB   \$0.3088 Graviton2-powered"
+    echo "  i4i.xlarge     amd64 937  4    32 GiB   \$0.3440 Intel Xeon Scalable"
     echo "  x2gd.xlarge    arm64 237  4    64 GiB   \$0.3340 Graviton2 memory-optimized"
     echo "  m5ad.2xlarge   arm64 300  8    32 GiB   \$0.4120 AMD EPYC processors"
     echo "  r6gd.2xlarge   arm64 474  8    64 GiB   \$0.4608 Graviton2 memory-optimized"
@@ -101,6 +123,10 @@ while [[ $# -gt 0 ]]; do
             REGION="$2"
             shift 2
             ;;
+        --spot)
+            SPOT_INSTANCE=true
+            shift
+            ;;
         --dry-run)
             DRY_RUN=true
             shift
@@ -128,6 +154,11 @@ echo "  Coreth Branch: ${CORETH_BRANCH:-default}"
 echo "  LibEVM Branch: ${LIBEVM_BRANCH:-default}"
 echo "  Number of Blocks: $NBLOCKS"
 echo "  Region: $REGION"
+if [ "$SPOT_INSTANCE" = true ]; then
+    echo "  Spot Instance: Yes (max price: \$${MAX_SPOT_PRICES[$INSTANCE_TYPE]})"
+else
+    echo "  Spot Instance: No"
+fi
 if [ "$DRY_RUN" = true ]; then
     echo "  Mode: DRY RUN (will not launch instance)"
 fi
@@ -208,23 +239,26 @@ users:
     ssh_authorized_keys:
       - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMj2j6ySwsFx7Y6FW2UXlkjCZfFDQKHWh0GTBjkK9ruV cardno:19_236_959 aaron
   - name: brandon
+    lock_passwd: true
     groups: users, adm, sudo
     shell: /usr/bin/bash
     sudo: "ALL=(ALL) NOPASSWD:ALL"
     ssh_authorized_keys:
-	  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFuwpEMnsBLdfr7V9SFRTm9XWHEFX3yQQP7nmsFHetBo cardno:26_763_547 brandon
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFuwpEMnsBLdfr7V9SFRTm9XWHEFX3yQQP7nmsFHetBo cardno:26_763_547 brandon
   - name: amin
+    lock_passwd: true
     groups: users, adm, sudo
     shell: /usr/bin/bash
     sudo: "ALL=(ALL) NOPASSWD:ALL"
     ssh_authorized_keys:
-	  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE8iR1X8/ELrzjczZvCkrTGCEoN6/dtlP01QFGuUpYxV cardno:33_317_839 amin
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE8iR1X8/ELrzjczZvCkrTGCEoN6/dtlP01QFGuUpYxV cardno:33_317_839 amin
   - name: bernard
+    lock_passwd: true
     groups: users, adm, sudo
     shell: /usr/bin/bash
     sudo: "ALL=(ALL) NOPASSWD:ALL"
     ssh_authorized_keys:
-	  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE/1C8JVL0g6qqMw1p0TwJMqJqERxYTX+7PnP+gXP4km cardno:19_155_748 bernard
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE/1C8JVL0g6qqMw1p0TwJMqJqERxYTX+7PnP+gXP4km cardno:19_155_748 bernard
 
 swap:
   filename: /swapfile
@@ -362,7 +396,12 @@ if [ -n "$LIBEVM_BRANCH" ]; then
     INSTANCE_NAME="$INSTANCE_NAME-le-$LIBEVM_BRANCH"
 fi
 
-#  --instance-market-options '{"MarketType":"spot", "SpotOptions": {"MaxPrice":"0.6048"}}' \
+# Build spot instance market options if requested
+SPOT_OPTIONS=""
+if [ "$SPOT_INSTANCE" = true ]; then
+    MAX_PRICE=${MAX_SPOT_PRICES[$INSTANCE_TYPE]}
+    SPOT_OPTIONS="--instance-market-options '{\"MarketType\":\"spot\", \"SpotOptions\": {\"MaxPrice\":\"$MAX_PRICE\"}}'"
+fi
 
 if [ "$DRY_RUN" = true ]; then
     echo "DRY RUN - Would execute the following command:"
@@ -375,6 +414,9 @@ if [ "$DRY_RUN" = true ]; then
     echo "  --key-name rkuris \\"
     echo "  --security-groups rkuris-starlink-only \\"
     echo "  --iam-instance-profile \"Name=s3-readonly\" \\"
+    if [ "$SPOT_INSTANCE" = true ]; then
+        echo "  $SPOT_OPTIONS \\"
+    fi
     echo "  --user-data \"$USERDATA\" \\"
     echo "  --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=$INSTANCE_NAME}]\" \\"
     echo "  --block-device-mappings \"DeviceName=/dev/sda1,Ebs={VolumeSize=50,VolumeType=gp3}\" \\"
@@ -384,20 +426,28 @@ if [ "$DRY_RUN" = true ]; then
     echo "Instance would be named: $INSTANCE_NAME"
 else
     set -e
-    INSTANCE_ID=$(aws ec2 run-instances \
-      --region "$REGION" \
-      --image-id "$AMI_ID" \
+    # Build the AWS command with conditional spot options
+    AWS_CMD="aws ec2 run-instances \
+      --region \"$REGION\" \
+      --image-id \"$AMI_ID\" \
       --count 1 \
-      --instance-type "$INSTANCE_TYPE" \
+      --instance-type \"$INSTANCE_TYPE\" \
       --key-name rkuris \
       --security-groups rkuris-starlink-only \
-      --iam-instance-profile "Name=s3-readonly" \
-      --user-data "$USERDATA" \
-      --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=$INSTANCE_NAME}]" \
-      --block-device-mappings "DeviceName=/dev/sda1,Ebs={VolumeSize=50,VolumeType=gp3}" \
+      --iam-instance-profile \"Name=s3-readonly\""
+
+    if [ "$SPOT_INSTANCE" = true ]; then
+        AWS_CMD="$AWS_CMD $SPOT_OPTIONS"
+    fi
+
+    AWS_CMD="$AWS_CMD \
+      --user-data \"$USERDATA\" \
+      --tag-specifications \"ResourceType=instance,Tags=[{Key=Name,Value=$INSTANCE_NAME}]\" \
+      --block-device-mappings \"DeviceName=/dev/sda1,Ebs={VolumeSize=50,VolumeType=gp3}\" \
       --query 'Instances[0].InstanceId' \
-      --output text \
-    )
+      --output text"
+
+    INSTANCE_ID=$(eval "$AWS_CMD")
     echo "instance id $INSTANCE_ID started"
 fi
 
