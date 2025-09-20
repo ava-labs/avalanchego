@@ -422,3 +422,86 @@ func TestLedgerSignerFromIndices_SignHash(t *testing.T) {
 	require.NoError(err)
 	require.Equal(expectedSignature3, signature)
 }
+
+func TestLedgerSigner_Sign(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+
+	addr1 := ids.GenerateTestShortID()
+	addr2 := ids.GenerateTestShortID()
+	addr3 := ids.GenerateTestShortID()
+	toSign := []byte{1, 2, 3, 4, 5}
+	expectedSignature1 := []byte{1, 1, 1}
+	expectedSignature2 := []byte{2, 2, 2}
+	expectedSignature3 := []byte{3, 3, 3}
+
+	// ledger returns an incorrect number of signatures
+	ledger := ledgermock.NewLedger(ctrl)
+	ledger.EXPECT().Addresses([]uint32{0}).Return([]ids.ShortID{addr1}, nil).Times(1)
+	ledger.EXPECT().Sign(toSign, []uint32{0}).Return([][]byte{}, nil).Times(1)
+	kc, err := NewKeychain(ledger, 1)
+	require.NoError(err)
+
+	s, b := kc.Get(addr1)
+	require.True(b)
+
+	_, err = s.Sign(toSign)
+	require.ErrorIs(err, ErrInvalidNumSignatures)
+
+	// ledger returns an error when asked for signature
+	ledger = ledgermock.NewLedger(ctrl)
+	ledger.EXPECT().Addresses([]uint32{0}).Return([]ids.ShortID{addr1}, nil).Times(1)
+	ledger.EXPECT().Sign(toSign, []uint32{0}).Return([][]byte{expectedSignature1}, errTest).Times(1)
+	kc, err = NewKeychain(ledger, 1)
+	require.NoError(err)
+
+	s, b = kc.Get(addr1)
+	require.True(b)
+
+	_, err = s.Sign(toSign)
+	require.ErrorIs(err, errTest)
+
+	// good path 1 addr
+	ledger = ledgermock.NewLedger(ctrl)
+	ledger.EXPECT().Addresses([]uint32{0}).Return([]ids.ShortID{addr1}, nil).Times(1)
+	ledger.EXPECT().Sign(toSign, []uint32{0}).Return([][]byte{expectedSignature1}, nil).Times(1)
+	kc, err = NewKeychain(ledger, 1)
+	require.NoError(err)
+
+	s, b = kc.Get(addr1)
+	require.True(b)
+
+	signature, err := s.Sign(toSign)
+	require.NoError(err)
+	require.Equal(expectedSignature1, signature)
+
+	// good path 3 addr
+	ledger = ledgermock.NewLedger(ctrl)
+	ledger.EXPECT().Addresses([]uint32{0, 1, 2}).Return([]ids.ShortID{addr1, addr2, addr3}, nil).Times(1)
+	ledger.EXPECT().Sign(toSign, []uint32{0}).Return([][]byte{expectedSignature1}, nil).Times(1)
+	ledger.EXPECT().Sign(toSign, []uint32{1}).Return([][]byte{expectedSignature2}, nil).Times(1)
+	ledger.EXPECT().Sign(toSign, []uint32{2}).Return([][]byte{expectedSignature3}, nil).Times(1)
+	kc, err = NewKeychain(ledger, 3)
+	require.NoError(err)
+
+	s, b = kc.Get(addr1)
+	require.True(b)
+
+	signature, err = s.Sign(toSign)
+	require.NoError(err)
+	require.Equal(expectedSignature1, signature)
+
+	s, b = kc.Get(addr2)
+	require.True(b)
+
+	signature, err = s.Sign(toSign)
+	require.NoError(err)
+	require.Equal(expectedSignature2, signature)
+
+	s, b = kc.Get(addr3)
+	require.True(b)
+
+	signature, err = s.Sign(toSign)
+	require.NoError(err)
+	require.Equal(expectedSignature3, signature)
+}

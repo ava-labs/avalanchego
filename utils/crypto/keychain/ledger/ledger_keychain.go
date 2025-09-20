@@ -78,10 +78,12 @@ func NewKeychainFromIndices(l Ledger, indices []uint32) (*KeyChain, error) {
 	}, nil
 }
 
+// Addresses returns the set of addresses that this keychain can sign for.
 func (l *KeyChain) Addresses() set.Set[ids.ShortID] {
 	return l.addrs
 }
 
+// Get returns a signer for the given address, if it exists in this keychain.
 func (l *KeyChain) Get(addr ids.ShortID) (keychain.Signer, bool) {
 	idx, ok := l.addrToIdx[addr]
 	if !ok {
@@ -103,7 +105,8 @@ type ledgerSigner struct {
 	addr   ids.ShortID
 }
 
-// expects to receive a hash of the unsigned tx bytes
+// SignHash signs the provided hash using the Ledger device.
+// It expects to receive a hash of the unsigned transaction bytes.
 func (l *ledgerSigner) SignHash(b []byte) ([]byte, error) {
 	// Sign using the address with index l.idx on the ledger device. The number
 	// of returned signatures should be the same length as the provided indices.
@@ -123,7 +126,8 @@ func (l *ledgerSigner) SignHash(b []byte) ([]byte, error) {
 	return sigs[0], nil
 }
 
-// expects to receive the unsigned tx bytes
+// Sign signs the provided unsigned transaction bytes using the Ledger device.
+// It expects to receive the unsigned transaction bytes and returns the signature.
 func (l *ledgerSigner) Sign(b []byte, _ ...keychain.SigningOption) ([]byte, error) {
 	// Ignore options - ledger signing doesn't need chain/network context
 	// Sign using the address with index l.idx on the ledger device. The number
@@ -144,6 +148,7 @@ func (l *ledgerSigner) Sign(b []byte, _ ...keychain.SigningOption) ([]byte, erro
 	return sigs[0], nil
 }
 
+// Address returns the address associated with this signer.
 func (l *ledgerSigner) Address() ids.ShortID {
 	return l.addr
 }
