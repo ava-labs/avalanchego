@@ -93,6 +93,7 @@ func TestConfigUnmarshal(t *testing.T) {
 			L1SubnetIDNodeIDCacheSize:     13,
 			ChecksumsEnabled:              true,
 			MempoolPruneFrequency:         time.Minute,
+			MempoolGasCapacity:            14,
 		}
 		verifyInitializedStruct(t, *expected)
 		verifyInitializedStruct(t, expected.Network)
