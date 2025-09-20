@@ -29,6 +29,7 @@ var prometheusManifest []byte
 // This must match the namespace defined in the manifests
 const monitoringNamespace = "ci-monitoring"
 
+// Configuration for a kube-hosted collector
 type kubeCollectorConfig struct {
 	name         string
 	target       string
@@ -106,40 +107,41 @@ func deployKubeCollector(
 	log logging.Logger,
 	clientset *kubernetes.Clientset,
 	dynamicClient dynamic.Interface,
-	collectorConfig kubeCollectorConfig,
+	kubeConfig kubeCollectorConfig,
 ) error {
-	username, password, err := getCollectorCredentials(collectorConfig.name)
+	// Source the collector url and auth creds from the environment
+	config, err := getCollectorConfigForPush(kubeConfig.name)
 	if err != nil {
-		return stacktrace.Errorf("failed to get credentials for %s: %w", collectorConfig.name, err)
+		return stacktrace.Errorf("failed to get collector config for %s: %w", kubeConfig.name, err)
 	}
 
-	if err := createCredentialSecret(ctx, log, clientset, collectorConfig.secretPrefix, username, password); err != nil {
-		return stacktrace.Errorf("failed to create credential secret for %s: %w", collectorConfig.name, err)
+	if err := createCollectorConfigSecret(ctx, log, clientset, kubeConfig.secretPrefix, config); err != nil {
+		return stacktrace.Errorf("failed to create collector config secret for %s: %w", kubeConfig.name, err)
 	}
 
-	if err := applyManifest(ctx, log, dynamicClient, collectorConfig.manifest, monitoringNamespace); err != nil {
-		return stacktrace.Errorf("failed to apply manifest for %s: %w", collectorConfig.name, err)
+	if err := applyManifest(ctx, log, dynamicClient, kubeConfig.manifest, monitoringNamespace); err != nil {
+		return stacktrace.Errorf("failed to apply manifest for %s: %w", kubeConfig.name, err)
 	}
 	return nil
 }
 
-// createCredentialSecret creates a secret with the provided username and password for a collector
-func createCredentialSecret(
+// createCollectorConfigSecret creates a secret with the provided collector config
+func createCollectorConfigSecret(
 	ctx context.Context,
 	log logging.Logger,
 	clientset *kubernetes.Clientset,
 	namePrefix string,
-	username string,
-	password string,
+	config collectorConfig,
 ) error {
-	secretName := namePrefix + "-credentials"
+	secretName := namePrefix + "-config"
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: secretName,
 		},
 		StringData: map[string]string{
-			"username": username,
-			"password": password,
+			"url":      config.url,
+			"username": config.username,
+			"password": config.password,
 		},
 	}
 	_, err := clientset.CoreV1().Secrets(monitoringNamespace).Create(ctx, secret, metav1.CreateOptions{})

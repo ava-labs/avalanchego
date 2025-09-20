@@ -81,8 +81,8 @@ github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60 h1:EL
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60/go.mod h1:/7qKobTfbzBu7eSTVaXMTr56yTYk4j2Px6/8G+idxHo=
 github.com/ava-labs/libevm v1.13.14-0.3.0.rc.6 h1:tyM659nDOknwTeU4A0fUVsGNIU7k0v738wYN92nqs/Y=
 github.com/ava-labs/libevm v1.13.14-0.3.0.rc.6/go.mod h1:zP/DOcABRWargBmUWv1jXplyWNcfmBy9cxr0lw3LW3g=
-github.com/ava-labs/simplex v0.0.0-20250819180907-c9b5ae6aad19 h1:dtsx6DJw6wWkrMwDIcSUVJ9lXMeckgI5oZ7fJbAi23c=
-github.com/ava-labs/simplex v0.0.0-20250819180907-c9b5ae6aad19/go.mod h1:GVzumIo3zR23/qGRN2AdnVkIPHcKMq/D89EGWZfMGQ0=
+github.com/ava-labs/simplex v0.0.0-20250919142550-9cdfff10fd19 h1:S6oFasZsplNmw8B2S8cMJQMa62nT5ZKGzZRdCpd+5qQ=
+github.com/ava-labs/simplex v0.0.0-20250919142550-9cdfff10fd19/go.mod h1:GVzumIo3zR23/qGRN2AdnVkIPHcKMq/D89EGWZfMGQ0=
 github.com/aws/aws-sdk-go-v2 v1.36.2 h1:Ub6I4lq/71+tPb/atswvToaLGVMxKZvjYDVOWEExOcU=
 github.com/aws/aws-sdk-go-v2 v1.36.2/go.mod h1:LLXuLpgzEbD766Z5ECcRmi8AzSwfZItDtmABVkRLGzg=
 github.com/aws/aws-sdk-go-v2/config v1.29.7 h1:71nqi6gUbAUiEQkypHQcNVSFJVUFANpSeUNShiwWX2M=
