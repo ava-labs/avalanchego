@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	_ keychain.Keychain = (*ledgerKeychain)(nil)
+	_ keychain.Keychain = (*KeyChain)(nil)
 	_ keychain.Signer   = (*ledgerSigner)(nil)
 
 	ErrInvalidIndicesLength    = errors.New("number of indices should be greater than 0")
@@ -22,16 +22,16 @@ var (
 	ErrInvalidNumSignatures    = errors.New("incorrect number of signatures")
 )
 
-// ledgerKeychain is an abstraction of the underlying ledger hardware device,
+// KeyChain is an abstraction of the underlying ledger hardware device,
 // to be able to get a signer from a finite set of derived signers
-type ledgerKeychain struct {
+type KeyChain struct {
 	ledger    Ledger
 	addrs     set.Set[ids.ShortID]
 	addrToIdx map[ids.ShortID]uint32
 }
 
-// NewLedgerKeychain creates a new Ledger with [numToDerive] addresses.
-func NewLedgerKeychain(l Ledger, numToDerive int) (keychain.Keychain, error) {
+// NewKeychain creates a new Ledger with [numToDerive] addresses.
+func NewKeychain(l Ledger, numToDerive int) (*KeyChain, error) {
 	if numToDerive < 1 {
 		return nil, ErrInvalidNumAddrsToDerive
 	}
@@ -41,11 +41,11 @@ func NewLedgerKeychain(l Ledger, numToDerive int) (keychain.Keychain, error) {
 		indices[i] = uint32(i)
 	}
 
-	return NewLedgerKeychainFromIndices(l, indices)
+	return NewKeychainFromIndices(l, indices)
 }
 
-// NewLedgerKeychainFromIndices creates a new Ledger with addresses taken from the given [indices].
-func NewLedgerKeychainFromIndices(l Ledger, indices []uint32) (keychain.Keychain, error) {
+// NewKeychainFromIndices creates a new Ledger with addresses taken from the given [indices].
+func NewKeychainFromIndices(l Ledger, indices []uint32) (*KeyChain, error) {
 	if len(indices) == 0 {
 		return nil, ErrInvalidIndicesLength
 	}
@@ -71,18 +71,18 @@ func NewLedgerKeychainFromIndices(l Ledger, indices []uint32) (keychain.Keychain
 		addrToIdx[addrs[i]] = indices[i]
 	}
 
-	return &ledgerKeychain{
+	return &KeyChain{
 		ledger:    l,
 		addrs:     addrsSet,
 		addrToIdx: addrToIdx,
 	}, nil
 }
 
-func (l *ledgerKeychain) Addresses() set.Set[ids.ShortID] {
+func (l *KeyChain) Addresses() set.Set[ids.ShortID] {
 	return l.addrs
 }
 
-func (l *ledgerKeychain) Get(addr ids.ShortID) (keychain.Signer, bool) {
+func (l *KeyChain) Get(addr ids.ShortID) (keychain.Signer, bool) {
 	idx, ok := l.addrToIdx[addr]
 	if !ok {
 		return nil, false
