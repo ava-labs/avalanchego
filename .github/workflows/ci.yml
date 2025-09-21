@@ -53,9 +53,13 @@ jobs:
           run: ./scripts/run_task.sh test-e2e-ci
           artifact_prefix: e2e
           filter_by_owner: avalanchego-e2e
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_post_granite:
     runs-on: ubuntu-latest
@@ -68,9 +72,13 @@ jobs:
           run: ./scripts/run_task.sh test-e2e-ci -- --activate-granite
           artifact_prefix: e2e-post-granite
           filter_by_owner: avalanchego-e2e
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_kube:
     runs-on: ubuntu-latest
@@ -83,9 +91,13 @@ jobs:
           runtime: kube
           artifact_prefix: e2e-kube
           filter_by_owner: avalanchego-e2e
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   e2e_existing_network:
     runs-on: ubuntu-latest
@@ -97,9 +109,13 @@ jobs:
         with:
           run: ./scripts/run_task.sh test-e2e-existing-ci
           artifact_prefix: e2e-existing-network
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   Upgrade:
     runs-on: ubuntu-latest
@@ -111,9 +127,13 @@ jobs:
         with:
           run: ./scripts/run_task.sh test-upgrade
           artifact_prefix: upgrade
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   Lint:
     runs-on: ubuntu-latest
@@ -225,9 +245,13 @@ jobs:
         with:
           run: ./scripts/run_task.sh test-load -- --load-timeout=30s
           artifact_prefix: load
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   load_kube_kind:
     name: Run load test on kind cluster
@@ -240,9 +264,13 @@ jobs:
           run: ./scripts/run_task.sh test-load-kube-kind -- --load-timeout=30s
           runtime: kube
           artifact_prefix: load-kube
-          prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki_username: ${{ secrets.LOKI_ID || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   robustness:
     runs-on: ubuntu-latest

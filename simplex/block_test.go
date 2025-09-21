@@ -24,6 +24,7 @@ import (
 func TestBlockSerialization(t *testing.T) {
 	unexpectedBlockBytes := errors.New("unexpected block bytes")
 	ctx := context.Background()
+	genesisBlock := newTestBlock(t, newBlockConfig{})
 	testBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
 	b := &Block{
@@ -33,7 +34,7 @@ func TestBlockSerialization(t *testing.T) {
 			Epoch:   1,
 			Round:   1,
 			Seq:     1,
-			Prev:    [32]byte{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07},
+			Prev:    genesisBlock.digest,
 		},
 	}
 
@@ -86,7 +87,8 @@ func TestBlockSerialization(t *testing.T) {
 
 			testVM.ParseBlockF = tt.parseFunc
 			deserializer := &blockDeserializer{
-				parser: testVM,
+				parser:       testVM,
+				blockTracker: newBlockTracker(genesisBlock),
 			}
 
 			// Deserialize the block
@@ -95,6 +97,8 @@ func TestBlockSerialization(t *testing.T) {
 
 			if tt.expectedError == nil {
 				require.Equal(t, b.BlockHeader().ProtocolMetadata, deserializedBlock.BlockHeader().ProtocolMetadata)
+				_, err := deserializedBlock.Verify(ctx)
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -104,8 +108,8 @@ func TestBlockSerialization(t *testing.T) {
 func TestVerifyPrevNotFound(t *testing.T) {
 	ctx := context.Background()
 
-	genesis := newBlock(t, newBlockConfig{})
-	b := newBlock(t, newBlockConfig{
+	genesis := newTestBlock(t, newBlockConfig{})
+	b := newTestBlock(t, newBlockConfig{
 		prev: genesis,
 	})
 	b.metadata.Prev[0]++ // Invalid prev digest
@@ -119,8 +123,8 @@ func TestVerifyPrevNotFound(t *testing.T) {
 func TestVerifyTwice(t *testing.T) {
 	ctx := context.Background()
 
-	genesis := newBlock(t, newBlockConfig{})
-	b := newBlock(t, newBlockConfig{
+	genesis := newTestBlock(t, newBlockConfig{})
+	b := newTestBlock(t, newBlockConfig{
 		prev: genesis,
 	})
 
@@ -138,7 +142,7 @@ func TestVerifyTwice(t *testing.T) {
 func TestVerifyGenesis(t *testing.T) {
 	ctx := context.Background()
 
-	genesis := newBlock(t, newBlockConfig{})
+	genesis := newTestBlock(t, newBlockConfig{})
 	_, err := genesis.Verify(ctx)
 	require.ErrorIs(t, err, errGenesisVerification)
 }
@@ -146,8 +150,8 @@ func TestVerifyGenesis(t *testing.T) {
 func TestVerify(t *testing.T) {
 	ctx := context.Background()
 
-	genesis := newBlock(t, newBlockConfig{})
-	b := newBlock(t, newBlockConfig{
+	genesis := newTestBlock(t, newBlockConfig{})
+	b := newTestBlock(t, newBlockConfig{
 		prev: genesis,
 	})
 
@@ -168,11 +172,11 @@ func TestVerify(t *testing.T) {
 func TestVerifyParentAccepted(t *testing.T) {
 	ctx := context.Background()
 
-	genesis := newBlock(t, newBlockConfig{})
-	seq1Block := newBlock(t, newBlockConfig{
+	genesis := newTestBlock(t, newBlockConfig{})
+	seq1Block := newTestBlock(t, newBlockConfig{
 		prev: genesis,
 	})
-	seq2Block := newBlock(t, newBlockConfig{
+	seq2Block := newTestBlock(t, newBlockConfig{
 		prev: seq1Block,
 	})
 
@@ -194,15 +198,15 @@ func TestVerifyParentAccepted(t *testing.T) {
 func TestVerifyBlockRejectsSiblings(t *testing.T) {
 	ctx := context.Background()
 
-	genesis := newBlock(t, newBlockConfig{})
+	genesis := newTestBlock(t, newBlockConfig{})
 	// genesisChild0 and genesisChild1 are siblings, both children of genesis.
 	// This can happen if we verify a block for round 1, but the network
 	// notarizes the dummy block. Then we will verify a sibling block for round
 	// 2 and must reject the round 1 block.
-	genesisChild0 := newBlock(t, newBlockConfig{
+	genesisChild0 := newTestBlock(t, newBlockConfig{
 		prev: genesis,
 	})
-	genesisChild1 := newBlock(t, newBlockConfig{
+	genesisChild1 := newTestBlock(t, newBlockConfig{
 		prev:  genesis,
 		round: genesisChild0.metadata.Round + 1,
 	})
@@ -225,8 +229,8 @@ func TestVerifyBlockRejectsSiblings(t *testing.T) {
 func TestVerifyInnerBlockBreaksHashChain(t *testing.T) {
 	ctx := context.Background()
 
-	genesis := newBlock(t, newBlockConfig{})
-	b := newBlock(t, newBlockConfig{
+	genesis := newTestBlock(t, newBlockConfig{})
+	b := newTestBlock(t, newBlockConfig{
 		prev: genesis,
 	})
 
@@ -241,7 +245,7 @@ func TestVerifyInnerBlockBreaksHashChain(t *testing.T) {
 func TestIndexBlockDigestNotFound(t *testing.T) {
 	ctx := context.Background()
 
-	genesis := newBlock(t, newBlockConfig{})
+	genesis := newTestBlock(t, newBlockConfig{})
 
 	unknownDigest := ids.GenerateTestID()
 	err := genesis.blockTracker.indexBlock(ctx, simplex.Digest(unknownDigest))

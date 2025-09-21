@@ -120,9 +120,13 @@ temporary networks used for e2e testing by:
 
 Both methods require:
 
- - Auth credentials to be supplied as env vars:
+ - Collector config to be supplied as env vars:
+   - `PROMETHEUS_URL`
+   - `PROMETHEUS_PUSH_URL`
    - `PROMETHEUS_USERNAME`
    - `PROMETHEUS_PASSWORD`
+   - `LOKI_URL`
+   - `LOKI_PUSH_URL`
    - `LOKI_USERNAME`
    - `LOKI_PASSWORD`
  - The availability in the path of binaries for promtail and prometheus

@@ -684,7 +684,7 @@ func (n *Node) Dispatch() error {
 			)
 		}
 		// If the API server isn't running, shut down the node.
-		// If node is already shutting down, this does not tigger shutdown again,
+		// If node is already shutting down, this does not trigger shutdown again,
 		// and blocks until Shutdown returns.
 		n.Shutdown(1)
 	})
@@ -722,7 +722,7 @@ func (n *Node) Dispatch() error {
 	retErr := n.Net.Dispatch()
 
 	// If the P2P server isn't running, shut down the node.
-	// If node is already shutting down, this does not tigger shutdown again,
+	// If node is already shutting down, this does not trigger shutdown again,
 	// and blocks until Shutdown returns.
 	n.Shutdown(1)
 
@@ -1243,7 +1243,7 @@ func (n *Node) initVMs() error {
 	return err
 }
 
-// initSharedMemory initializes the shared memory for cross chain interation
+// initSharedMemory initializes the shared memory for cross chain interaction
 func (n *Node) initSharedMemory() {
 	n.Log.Info("initializing SharedMemory")
 	sharedMemoryDB := prefixdb.New([]byte("shared memory"), n.DB)

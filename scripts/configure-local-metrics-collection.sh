@@ -49,10 +49,11 @@ cat > "${PROMTAIL_CONFIG_FILE}" <<EOL
 EOL
 echo "Wrote promtail configuration to ${PROMTAIL_CONFIG_FILE}"
 
-echo "Metrics collection by prometheus can be started with ./scripts/run_prometheus.sh"
-echo "Log collection by promtail can be started with ./scripts/run_promtail.sh"
+echo "Metrics collection by prometheus can be started with ./bin/tmpnetctl start-metrics-collector"
+echo "Log collection by promtail can be started with ./bin/tmpnetctl start-logs-collector"
 
-GRAFANA_LINK="https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard?var-filter=network_uuid%7C%3D%7C${METRICS_UUID}"
+GRAFANA_URI="${GRAFANA_URI:-https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard}"
+GRAFANA_LINK="${GRAFANA_URI}?var-filter=network_uuid%7C%3D%7C${METRICS_UUID}"
 METRICS_PATH="${HOME}/.avalanchego/metrics.txt"
 echo "${GRAFANA_LINK}" > "${METRICS_PATH}"
 echo "Metrics and logs can be viewed at: ${GRAFANA_LINK}"
