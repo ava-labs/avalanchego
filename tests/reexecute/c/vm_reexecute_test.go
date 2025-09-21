@@ -81,6 +81,10 @@ var (
 			"pruning-enabled": true,
 			"state-sync-enabled": false
 		}`,
+		"blockdb": `{
+			"block-database-enabled": true,
+			"block-database-sync-to-disk": false
+		}`,
 	}
 
 	configNameArg  string
