@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1758445777277,
+  "lastUpdate": 1758445791205,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -1564,6 +1564,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-blacksmith-4vcpu-ubuntu-2404",
             "value": 115.5,
+            "unit": "mgas/s",
+            "extra": "1 times\n10 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Sam Liokumovich",
+            "username": "samliok",
+            "email": "65994425+samliok@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "582d3c26a11e1f3f77a0e39ec0c902128b21628e",
+          "message": "Pass block tracker in deserialize block (#4266)",
+          "timestamp": "2025-09-19T18:51:10Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/582d3c26a11e1f3f77a0e39ec0c902128b21628e"
+        },
+        "date": 1758445790072,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-default-Runner-blacksmith-4vcpu-ubuntu-2404",
+            "value": 111.6,
             "unit": "mgas/s",
             "extra": "1 times\n10 procs"
           }
