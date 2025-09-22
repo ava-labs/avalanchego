@@ -336,6 +336,10 @@ jobs:
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki-url: ${{ secrets.LOKI_URL || '' }}
+          loki-push-url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki-username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki-password: ${{ secrets.LOKI_PASSWORD || '' }}
       - name: Restore go.mod changes
         shell: nix develop --command bash -x {0}
         run: |
@@ -403,6 +407,10 @@ jobs:
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki-url: ${{ secrets.LOKI_URL || '' }}
+          loki-push-url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki-username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki-password: ${{ secrets.LOKI_PASSWORD || '' }}
       - name: Restore go.mod changes
         shell: nix develop --command bash -x {0}
         run: |
@@ -483,7 +491,7 @@ jobs:
           # Calculate percentage change if both values are valid
           if [ "$BASELINE_SUCCESS" = true ] && [ "$CANDIDATE_SUCCESS" = true ]; then
             CHANGE=$(awk "BEGIN {printf \"%.2f\", ($CANDIDATE_MGAS - $BASELINE_MGAS) / $BASELINE_MGAS * 100}")
-            CHANGE_ABS=$(awk "BEGIN {printf \"%.2f\", ($CHANGE < 0) ? -$CHANGE : $CHANGE}")
+            CHANGE_ABS=$(awk "BEGIN {printf \"%.2f\", ($CHANGE < 0) ? -($CHANGE) : $CHANGE}")
 
             # Determine performance indicator
             if (( $(awk "BEGIN {print ($CHANGE > 5)}") )); then

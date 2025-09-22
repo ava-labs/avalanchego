@@ -46,6 +46,22 @@ inputs:
     description: 'The password for the Prometheus instance.'
     required: true
     default: ''
+  loki-url:
+    description: 'The URL of the Loki instance.'
+    required: true
+    default: ''
+  loki-push-url:
+    description: 'The push URL of the Loki instance.'
+    required: true
+    default: ''
+  loki-username:
+    description: 'The username for the Loki instance.'
+    required: true
+    default: ''
+  loki-password:
+    description: 'The password for the Loki instance.'
+    required: true
+    default: ''
   workspace:
     description: 'Working directory to use for the benchmark.'
     required: true
@@ -103,6 +119,10 @@ runs:
         prometheus_url: ${{ inputs.prometheus-url }}
         grafana_dashboard_id: 'Gl1I20mnk/c-chain'
         runtime: "" # Set runtime input to empty string to disable log collection
+        loki_push_url: ${{ inputs.loki-push-url }}
+        loki_username: ${{ inputs.loki-username }}
+        loki_password: ${{ inputs.loki-password }}
+        loki_url: ${{ inputs.loki-url }}
 
     - name: Compare Benchmark Results
       uses: benchmark-action/github-action-benchmark@v1
