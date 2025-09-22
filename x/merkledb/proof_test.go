@@ -821,7 +821,7 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 		maybe.Nothing[[]byte](),
 		50,
 	)
-	require.ErrorIs(err, sync.ErrEndRootNotFound)
+	require.ErrorIs(err, sync.ErrNoEndRoot)
 
 	_, err = db.GetChangeProof(
 		context.Background(),
@@ -831,7 +831,7 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 		maybe.Nothing[[]byte](),
 		50,
 	)
-	require.ErrorIs(err, sync.ErrStartRootNotFound)
+	require.ErrorIs(err, sync.ErrInsufficientHistory)
 
 	_, err = db.GetChangeProof(
 		context.Background(),

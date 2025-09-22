@@ -17,17 +17,18 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/trace"
 	"github.com/ava-labs/avalanchego/utils/maybe"
-	"github.com/ava-labs/avalanchego/x/sync"
 	"github.com/ava-labs/avalanchego/x/sync/protoutils"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
 const verificationCacheSize = math.MaxUint16
 
 var (
-	_ sync.Proof = (*ChangeProof)(nil)
-	_ sync.Proof = (*RangeProof)(nil)
+	_ xsync.ProofFactory[*RangeProof, *ChangeProof] = (*ProofFactory)(nil)
+	_ xsync.Proof                                   = (*ChangeProof)(nil)
+	_ xsync.Proof                                   = (*RangeProof)(nil)
 
 	ErrInvalidProof                  = errors.New("proof obtained an invalid root ID")
 	ErrInvalidMaxLength              = errors.New("expected max length to be > 0")
@@ -179,6 +180,16 @@ func (proof *Proof) Verify(
 		return fmt.Errorf("%w:[%s], expected:[%s]", ErrInvalidProof, gotRootID, expectedRootID)
 	}
 	return nil
+}
+
+type ProofFactory struct{}
+
+func (ProofFactory) NewRangeProof() *RangeProof {
+	return &RangeProof{}
+}
+
+func (ProofFactory) NewChangeProof() *ChangeProof {
+	return &ChangeProof{}
 }
 
 type RangeProof ChangeProof

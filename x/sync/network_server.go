@@ -102,10 +102,18 @@ func (g *GetChangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context,
 	for keyLimit > 0 {
 		changeProof, err := g.db.GetChangeProof(ctx, startRoot, endRoot, start, end, int(keyLimit))
 		if err != nil {
-			if !errors.Is(err, ErrStartRootNotFound) {
+			if !errors.Is(err, ErrInsufficientHistory) {
 				// We should only fail to get a change proof if we have insufficient history.
 				// Other errors are unexpected.
 				// TODO define custom errors
+				return nil, &common.AppError{
+					Code:    p2p.ErrUnexpected.Code,
+					Message: fmt.Sprintf("failed to get change proof: %s", err),
+				}
+			}
+			if errors.Is(err, ErrNoEndRoot) {
+				// [s.db] doesn't have [endRoot] in its history.
+				// We can't generate a change/range proof. Drop this request.
 				return nil, &common.AppError{
 					Code:    p2p.ErrUnexpected.Code,
 					Message: fmt.Sprintf("failed to get change proof: %s", err),
@@ -261,7 +269,7 @@ func getRangeProof[TRange, TChange Proof](
 			keyLimit,
 		)
 		if err != nil {
-			if errors.Is(err, ErrStartRootNotFound) || errors.Is(err, ErrEndRootNotFound) {
+			if errors.Is(err, ErrInsufficientHistory) || errors.Is(err, ErrNoEndRoot) {
 				return nil, nil // drop request
 			}
 			return nil, err

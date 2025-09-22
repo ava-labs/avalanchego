@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
+	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 
@@ -37,6 +38,7 @@ func Test_Creation(t *testing.T) {
 	ctx := context.Background()
 	syncer, err := xsync.NewManager(
 		db,
+		ProofFactory{},
 		xsync.ManagerConfig{
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(db)),
 			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(db)),
@@ -253,6 +255,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 
 			syncer, err := xsync.NewManager(
 				db,
+				ProofFactory{},
 				xsync.ManagerConfig{
 					RangeProofClient:      rangeProofClient,
 					ChangeProofClient:     changeProofClient,
@@ -327,6 +330,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	ctx := context.Background()
 	syncer, err := xsync.NewManager(
 		db,
+		ProofFactory{},
 		xsync.ManagerConfig{
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(dbToSync)),
 			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync)),
@@ -349,6 +353,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 
 	newSyncer, err := xsync.NewManager(
 		db,
+		ProofFactory{},
 		xsync.ManagerConfig{
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(dbToSync)),
 			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync)),
@@ -418,15 +423,14 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	)
 	require.NoError(err)
 
-	rangeProofHandler := &p2pHandlerAction{
-		Handler: xsync.NewGetRangeProofHandler(dbToSync),
-	}
+	actionHandler := p2p.TestHandler{}
 
 	ctx := context.Background()
 	syncer, err := xsync.NewManager(
 		db,
+		ProofFactory{},
 		xsync.ManagerConfig{
-			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, rangeProofHandler),
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
 			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync)),
 			TargetRoot:            firstSyncRoot,
 			SimultaneousWorkLimit: 5,
@@ -438,10 +442,11 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	require.NotNil(syncer)
 
 	// Allow 1 request to go through before blocking
+	rangeProofHandler := xsync.NewGetRangeProofHandler(dbToSync)
 	updatedRootChan := make(chan struct{}, 1)
 	updatedRootChan <- struct{}{}
 	once := &sync.Once{}
-	rangeProofHandler.action = func() {
+	actionHandler.AppRequestF = func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 		select {
 		case <-updatedRootChan:
 			// do nothing, allow 1 request to go through
@@ -450,6 +455,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 				require.NoError(syncer.UpdateSyncTarget(secondSyncRoot))
 			})
 		}
+		return rangeProofHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
 	}
 
 	require.NoError(syncer.Start(context.Background()))
@@ -487,13 +493,13 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	)
 	require.NoError(err)
 
-	rangeProofHandler := &p2pHandlerAction{
-		Handler: xsync.NewGetRangeProofHandler(dbToSync),
-	}
+	rangeProofHandler := xsync.NewGetRangeProofHandler(dbToSync)
+	actionHandler := p2p.TestHandler{}
 	m, err := xsync.NewManager(
 		db,
+		ProofFactory{},
 		xsync.ManagerConfig{
-			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, rangeProofHandler),
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
 			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync)),
 			TargetRoot:            root1,
 			SimultaneousWorkLimit: 5,
@@ -505,10 +511,11 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 
 	// Update sync target on first request
 	once := &sync.Once{}
-	rangeProofHandler.action = func() {
+	actionHandler.AppRequestF = func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 		once.Do(func() {
 			require.NoError(m.UpdateSyncTarget(root2))
 		})
+		return rangeProofHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
 	}
 	require.NoError(m.Start(ctx))
 	require.NoError(m.Wait(ctx))

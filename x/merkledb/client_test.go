@@ -117,16 +117,6 @@ func newFlakyChangeProofHandler(
 	}
 }
 
-type p2pHandlerAction struct {
-	p2p.Handler
-	action func()
-}
-
-func (h *p2pHandlerAction) AppRequest(ctx context.Context, id ids.NodeID, time time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-	h.action()
-	return h.Handler.AppRequest(ctx, id, time, requestBytes)
-}
-
 type flakyHandler struct {
 	p2p.Handler
 	c *counter

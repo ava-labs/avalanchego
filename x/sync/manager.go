@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -94,9 +93,10 @@ func newWorkItem(localRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[
 	}
 }
 
-type Manager[R, C Proof] struct {
+type Manager[TRange, TChange Proof] struct {
 	// The database to sync.
-	db DB[R, C]
+	db           DB[TRange, TChange]
+	proofFactory ProofFactory[TRange, TChange]
 
 	// Must be held when accessing [config.TargetRoot].
 	syncTargetLock sync.RWMutex
@@ -152,6 +152,7 @@ type ManagerConfig struct {
 
 func NewManager[R, C Proof](
 	db DB[R, C],
+	proofFactory ProofFactory[R, C],
 	config ManagerConfig,
 	registerer prometheus.Registerer,
 ) (*Manager[R, C], error) {
@@ -175,6 +176,7 @@ func NewManager[R, C Proof](
 
 	m := &Manager[R, C]{
 		db:              db,
+		proofFactory:    proofFactory,
 		config:          config,
 		doneChan:        make(chan struct{}),
 		unprocessedWork: newWorkHeap(),
@@ -491,7 +493,7 @@ func (m *Manager[R, _]) handleRangeProofResponse(
 		return err
 	}
 
-	rangeProof := allocateProof[R]()
+	rangeProof := m.proofFactory.NewRangeProof()
 	if err := rangeProof.UnmarshalBinary(responseBytes); err != nil {
 		return err
 	}
@@ -550,7 +552,7 @@ func (m *Manager[R, C]) handleChangeProofResponse(
 	switch changeProofResp := changeProofResp.Response.(type) {
 	case *pb.GetChangeProofResponse_ChangeProof:
 		// The server had enough history to send us a change proof
-		changeProof := allocateProof[C]()
+		changeProof := m.proofFactory.NewChangeProof()
 		if err := changeProof.UnmarshalBinary(changeProofResp.ChangeProof); err != nil {
 			return err
 		}
@@ -574,7 +576,7 @@ func (m *Manager[R, C]) handleChangeProofResponse(
 
 		m.completeWorkItem(work, nextKey, targetRootID)
 	case *pb.GetChangeProofResponse_RangeProof:
-		rangeProof := allocateProof[R]()
+		rangeProof := m.proofFactory.NewRangeProof()
 		if err := rangeProof.UnmarshalBinary(changeProofResp.RangeProof); err != nil {
 			return err
 		}
@@ -772,7 +774,7 @@ func (m *Manager[_, _]) enqueueWork(work *workItem) {
 
 	// Split the remaining range into to 2.
 	// Find the middle point.
-	mid := midpoint(work.start, work.end)
+	mid := midPoint(work.start, work.end)
 
 	if maybe.Equal(work.start, mid, bytes.Equal) || maybe.Equal(mid, work.end, bytes.Equal) {
 		// The range is too small to split.
@@ -793,11 +795,11 @@ func (m *Manager[_, _]) enqueueWork(work *workItem) {
 	m.unprocessedWork.Insert(second)
 }
 
-// find the midpoint between two keys
+// find the midPoint between two keys
 // start is expected to be less than end
 // Nothing/nil [start] is treated as all 0's
 // Nothing/nil [end] is treated as all 255's
-func midpoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
+func midPoint(startMaybe, endMaybe maybe.Maybe[[]byte]) maybe.Maybe[[]byte] {
 	start := startMaybe.Value()
 	end := endMaybe.Value()
 	length := max(len(end), len(start))
@@ -873,10 +875,4 @@ func calculateBackoff(attempt int) time.Duration {
 		initialRetryWait*time.Duration(math.Pow(retryWaitFactor, float64(attempt))),
 		maxRetryWait,
 	)
-}
-
-// Assumes T is a pointer to a struct.
-func allocateProof[T any]() T {
-	et := reflect.TypeOf((*T)(nil)).Elem()
-	return reflect.New(et.Elem()).Interface().(T)
 }
