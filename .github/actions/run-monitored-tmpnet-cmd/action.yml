@@ -3,7 +3,7 @@ description: 'Run the provided command in an environment configured to monitor t
 
 inputs:
   run:
-    description: "the bash script to run e.g. ./scripts/my-script.sh"
+    description: "the task invocation e.g. ./scripts/run_task.sh my-task"
     required: true
   working_directory:
     description: "the working directory to run the command in"
