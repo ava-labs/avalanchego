@@ -356,6 +356,10 @@ jobs:
       id-token: write
       contents: write
     name: "Candidate: v0.0.12"
+    env:
+      # Isolate Go caches per job
+      GOCACHE: /tmp/go-build-candidate-${{ github.run_id }}
+      GOMODCACHE: /tmp/go-mod-candidate-${{ github.run_id }}
     steps:
       - name: Install dependencies
         shell: bash
@@ -368,17 +372,21 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.avalanchego-candidate-version }}
-      - name: Install nix
-        uses: ./.github/actions/install-nix
-      - name: Clear Go caches
+      - name: Clear existing Go caches
         shell: nix develop --command bash -x {0}
         run: |
-          # Clear Go module and build caches
+          # Clear any existing Go caches to prevent conflicts
           rm -rf ~/.cache/go-build || true
           rm -rf ~/go/pkg/mod || true
-          rm -rf /go/pkg/mod || true
           rm -rf /github/home/go/pkg/mod || true
           rm -rf /github/home/.cache/go-build || true
+          rm -rf /go/pkg/mod || true
+
+          # Create isolated cache directories
+          mkdir -p $GOCACHE
+          mkdir -p $GOMODCACHE
+      - name: Install nix
+        uses: ./.github/actions/install-nix
       - name: Setup Go
         uses: ./.github/actions/setup-go-for-project
       - name: Setup Firewood
