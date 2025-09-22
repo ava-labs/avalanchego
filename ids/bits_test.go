@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -71,8 +70,7 @@ func TestEqualSubsetBadMiddle(t *testing.T) {
 }
 
 func TestEqualSubsetAll3Bytes(t *testing.T) {
-	rand := rand.New(rand.NewSource(time.Now().UnixNano())) //#nosec G404
-	seed := uint64(rand.Int63())                            //#nosec G404
+	seed := rand.Uint64() //#nosec G404
 	t.Logf("seed: %d", seed)
 	id1 := ID{}.Prefix(seed)
 
