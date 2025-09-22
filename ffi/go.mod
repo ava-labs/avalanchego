@@ -1,8 +1,8 @@
 module github.com/ava-labs/firewood/ffi
 
-go 1.23
+go 1.24
 
-toolchain go1.23.6
+toolchain go1.24.7
 
 require (
 	github.com/prometheus/client_golang v1.22.0
