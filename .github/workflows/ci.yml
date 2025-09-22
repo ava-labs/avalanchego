@@ -332,6 +332,10 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ''
           runner_name: 'avalanche-avalanchego-runner'
+          prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
       - name: Restore go.mod changes
         shell: nix develop --command bash -x {0}
         run: |
@@ -389,14 +393,16 @@ jobs:
           config: firewood
           start-block: '101'
           end-block: '250000'
-          prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
-          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           push-github-action-benchmark: false
           aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: us-east-2
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ''
           runner_name: 'avalanche-avalanchego-runner'
+          prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
       - name: Restore go.mod changes
         shell: nix develop --command bash -x {0}
         run: |
