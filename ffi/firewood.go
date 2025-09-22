@@ -177,7 +177,7 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 }
 
 // GetFromRoot retrieves the value for the given key from a specific root hash.
-// If the root is not found, it returnas an error.
+// If the root is not found, it returns an error.
 // If key is not found, it returns (nil, nil).
 func (db *Database) GetFromRoot(root, key []byte) ([]byte, error) {
 	if db.handle == nil {
