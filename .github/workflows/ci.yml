@@ -336,10 +336,6 @@ jobs:
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki-url: ${{ secrets.LOKI_URL || '' }}
-          loki-push-url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki-username: ${{ secrets.LOKI_USERNAME || '' }}
-          loki-password: ${{ secrets.LOKI_PASSWORD || '' }}
       - name: Restore go.mod changes
         shell: nix develop --command bash -x {0}
         run: |
@@ -353,7 +349,7 @@ jobs:
             benchmark-results/
           retention-days: 7
   candidate-v0-0-12-benchmark:
-    runs-on: avalanche-avalanchego-runner
+    runs-on: avalanche-avalanchego-runner-2ti
     container:
       image: ghcr.io/actions/actions-runner:2.325.0
     permissions:
@@ -402,15 +398,11 @@ jobs:
           aws-region: us-east-2
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ''
-          runner_name: 'avalanche-avalanchego-runner'
+          runner_name: 'avalanche-avalanchego-runner-2ti'
           prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          loki-url: ${{ secrets.LOKI_URL || '' }}
-          loki-push-url: ${{ secrets.LOKI_PUSH_URL || '' }}
-          loki-username: ${{ secrets.LOKI_USERNAME || '' }}
-          loki-password: ${{ secrets.LOKI_PASSWORD || '' }}
       - name: Restore go.mod changes
         shell: nix develop --command bash -x {0}
         run: |
