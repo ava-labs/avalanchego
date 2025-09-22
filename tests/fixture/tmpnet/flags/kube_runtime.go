@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
@@ -76,29 +77,26 @@ func (v *kubeRuntimeVars) register(stringVar varFunc[string], uintVar varFunc[ui
 	stringVar(
 		&v.schedulingLabelKey,
 		"kube-scheduling-label-key",
-		"purpose",
+		"",
 		kubeDocPrefix+"The label key to use for exclusive scheduling for node selection and toleration",
 	)
 	stringVar(
 		&v.schedulingLabelValue,
 		"kube-scheduling-label-value",
-		"higher-spec",
+		"",
 		kubeDocPrefix+"The label value to use for exclusive scheduling for node selection and toleration",
 	)
 }
 
 func (v *kubeRuntimeVars) getKubeRuntimeConfig() (*tmpnet.KubeRuntimeConfig, error) {
 	if len(v.namespace) == 0 {
-		return nil, errKubeNamespaceRequired
+		return nil, stacktrace.Wrap(errKubeNamespaceRequired)
 	}
 	if len(v.image) == 0 {
-		return nil, errKubeImageRequired
+		return nil, stacktrace.Wrap(errKubeImageRequired)
 	}
 	if v.volumeSizeGB < tmpnet.MinimumVolumeSizeGB {
-		return nil, errKubeMinVolumeSizeRequired
-	}
-	if v.useExclusiveScheduling && (len(v.schedulingLabelKey) == 0 || len(v.schedulingLabelValue) == 0) {
-		return nil, errKubeSchedulingLabelRequired
+		return nil, stacktrace.Wrap(errKubeMinVolumeSizeRequired)
 	}
 	return &tmpnet.KubeRuntimeConfig{
 		ConfigPath:             v.config.Path,

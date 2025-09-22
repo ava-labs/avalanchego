@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
@@ -22,17 +23,24 @@ type StartNetworkVars struct {
 	runtimeVars *RuntimeConfigVars
 
 	defaultNetworkOwner string
+	defaultNodeCount    int
 }
 
-func NewStartNetworkFlagVars(defaultNetworkOwner string) *StartNetworkVars {
-	v := &StartNetworkVars{defaultNetworkOwner: defaultNetworkOwner}
+func NewStartNetworkFlagVars(defaultNetworkOwner string, defaultNodeCount int) *StartNetworkVars {
+	v := &StartNetworkVars{
+		defaultNetworkOwner: defaultNetworkOwner,
+		defaultNodeCount:    defaultNodeCount,
+	}
 	v.runtimeVars = NewRuntimeConfigFlagVars()
 	v.register(flag.StringVar, flag.IntVar)
 	return v
 }
 
-func NewStartNetworkFlagSetVars(flagSet *pflag.FlagSet, defaultNetworkOwner string) *StartNetworkVars {
-	v := &StartNetworkVars{defaultNetworkOwner: defaultNetworkOwner}
+func NewStartNetworkFlagSetVars(flagSet *pflag.FlagSet, defaultNetworkOwner string, defaultNodeCount int) *StartNetworkVars {
+	v := &StartNetworkVars{
+		defaultNetworkOwner: defaultNetworkOwner,
+		defaultNodeCount:    defaultNodeCount,
+	}
 	v.runtimeVars = NewRuntimeConfigFlagSetVars(flagSet)
 	v.register(flagSet.StringVar, flagSet.IntVar)
 	return v
@@ -54,14 +62,14 @@ func (v *StartNetworkVars) register(stringVar varFunc[string], intVar varFunc[in
 	intVar(
 		&v.nodeCount,
 		"node-count",
-		tmpnet.DefaultNodeCount,
+		v.defaultNodeCount,
 		"Number of nodes the network should initially consist of",
 	)
 }
 
 func (v *StartNetworkVars) GetNodeCount() (int, error) {
 	if v.nodeCount < 1 {
-		return 0, fmt.Errorf("--node-count must be greater than 0 but got %d", v.nodeCount)
+		return 0, stacktrace.Errorf("--node-count must be greater than 0 but got %d", v.nodeCount)
 	}
 	return v.nodeCount, nil
 }

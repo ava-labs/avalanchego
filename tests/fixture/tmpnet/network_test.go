@@ -26,7 +26,7 @@ func TestNetworkSerialization(t *testing.T) {
 	network.PrimarySubnetConfig = ConfigMap{
 		"validatorOnly": true,
 	}
-	require.NoError(network.EnsureDefaultConfig(logging.NoLog{}))
+	require.NoError(network.EnsureDefaultConfig(ctx, logging.NoLog{}))
 	require.NoError(network.Create(tmpDir))
 	// Ensure node runtime is initialized
 	require.NoError(network.readNodes(ctx))

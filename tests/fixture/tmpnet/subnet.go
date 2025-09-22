@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -80,7 +80,7 @@ func (s *Subnet) GetWallet(ctx context.Context, uri string) (*primary.Wallet, er
 		subnetIDs = append(subnetIDs, s.SubnetID)
 	}
 
-	return primary.MakeWallet(
+	wallet, err := primary.MakeWallet(
 		ctx,
 		uri,
 		keychain,
@@ -89,6 +89,10 @@ func (s *Subnet) GetWallet(ctx context.Context, uri string) (*primary.Wallet, er
 			SubnetIDs: subnetIDs,
 		},
 	)
+	if err != nil {
+		return nil, stacktrace.Errorf("failed to create wallet for subnet %s: %w", s.Name, err)
+	}
+	return wallet, nil
 }
 
 // Issues the subnet creation transaction and retains the result. The URI of a node is
@@ -96,7 +100,7 @@ func (s *Subnet) GetWallet(ctx context.Context, uri string) (*primary.Wallet, er
 func (s *Subnet) Create(ctx context.Context, uri string) error {
 	wallet, err := s.GetWallet(ctx, uri)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	pWallet := wallet.P()
 
@@ -110,7 +114,7 @@ func (s *Subnet) Create(ctx context.Context, uri string) error {
 		common.WithContext(ctx),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create subnet %s: %w", s.Name, err)
+		return stacktrace.Errorf("failed to create subnet %s: %w", s.Name, err)
 	}
 	s.SubnetID = subnetTx.ID()
 
@@ -120,7 +124,7 @@ func (s *Subnet) Create(ctx context.Context, uri string) error {
 func (s *Subnet) CreateChains(ctx context.Context, log logging.Logger, uri string) error {
 	wallet, err := s.GetWallet(ctx, uri)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	pWallet := wallet.P()
 
@@ -138,7 +142,7 @@ func (s *Subnet) CreateChains(ctx context.Context, log logging.Logger, uri strin
 			common.WithContext(ctx),
 		)
 		if err != nil {
-			return fmt.Errorf("failed to create chain: %w", err)
+			return stacktrace.Errorf("failed to create chain: %w", err)
 		}
 		chain.ChainID = createChainTx.ID()
 
@@ -155,7 +159,7 @@ func (s *Subnet) CreateChains(ctx context.Context, log logging.Logger, uri strin
 func (s *Subnet) AddValidators(ctx context.Context, log logging.Logger, apiURI string, nodes ...*Node) error {
 	wallet, err := s.GetWallet(ctx, apiURI)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	pWallet := wallet.P()
 
@@ -163,7 +167,7 @@ func (s *Subnet) AddValidators(ctx context.Context, log logging.Logger, apiURI s
 	pvmClient := platformvm.NewClient(apiURI)
 	validators, err := pvmClient.GetCurrentValidators(ctx, constants.PrimaryNetworkID, nil)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	endTimes := make(map[ids.NodeID]uint64)
 	for _, validator := range validators {
@@ -174,7 +178,7 @@ func (s *Subnet) AddValidators(ctx context.Context, log logging.Logger, apiURI s
 	for _, node := range nodes {
 		endTime, ok := endTimes[node.NodeID]
 		if !ok {
-			return fmt.Errorf("failed to find end time for %s", node.NodeID)
+			return stacktrace.Errorf("failed to find end time for %s", node.NodeID)
 		}
 
 		_, err := pWallet.IssueAddSubnetValidatorTx(
@@ -190,7 +194,7 @@ func (s *Subnet) AddValidators(ctx context.Context, log logging.Logger, apiURI s
 			common.WithContext(ctx),
 		)
 		if err != nil {
-			return err
+			return stacktrace.Wrap(err)
 		}
 
 		log.Info("added validator to subnet",
@@ -205,7 +209,7 @@ func (s *Subnet) AddValidators(ctx context.Context, log logging.Logger, apiURI s
 // Write the subnet configuration to disk
 func (s *Subnet) Write(subnetDir string) error {
 	if err := os.MkdirAll(subnetDir, perms.ReadWriteExecute); err != nil {
-		return fmt.Errorf("failed to create subnet dir: %w", err)
+		return stacktrace.Errorf("failed to create subnet dir: %w", err)
 	}
 
 	tmpnetConfigPath := filepath.Join(subnetDir, s.Name+jsonFileSuffix)
@@ -217,20 +221,20 @@ func (s *Subnet) Write(subnetDir string) error {
 	if len(s.Chains) > 0 && s.Chains[0].ChainID == ids.Empty {
 		_, err := os.Stat(tmpnetConfigPath)
 		if err != nil && !os.IsNotExist(err) {
-			return err
+			return stacktrace.Wrap(err)
 		}
 		if err == nil {
-			return fmt.Errorf("a subnet with name %s already exists", s.Name)
+			return stacktrace.Errorf("a subnet with name %s already exists", s.Name)
 		}
 	}
 
 	// Write subnet configuration for tmpnet
 	bytes, err := DefaultJSONMarshal(s)
 	if err != nil {
-		return fmt.Errorf("failed to marshal tmpnet subnet %s: %w", s.Name, err)
+		return stacktrace.Errorf("failed to marshal tmpnet subnet %s: %w", s.Name, err)
 	}
 	if err := os.WriteFile(tmpnetConfigPath, bytes, perms.ReadWrite); err != nil {
-		return fmt.Errorf("failed to write tmpnet subnet config %s: %w", s.Name, err)
+		return stacktrace.Errorf("failed to write tmpnet subnet config %s: %w", s.Name, err)
 	}
 
 	return nil
@@ -252,7 +256,7 @@ func (s *Subnet) HasChainConfig() bool {
 func WaitForActiveValidators(
 	ctx context.Context,
 	log logging.Logger,
-	pChainClient platformvm.Client,
+	pChainClient *platformvm.Client,
 	subnet *Subnet,
 ) error {
 	ticker := time.NewTicker(DefaultPollingInterval)
@@ -265,7 +269,7 @@ func WaitForActiveValidators(
 	for {
 		validators, err := pChainClient.GetCurrentValidators(ctx, subnet.SubnetID, nil)
 		if err != nil {
-			return err
+			return stacktrace.Wrap(err)
 		}
 		validatorSet := set.NewSet[ids.NodeID](len(validators))
 		for _, validator := range validators {
@@ -286,7 +290,7 @@ func WaitForActiveValidators(
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("failed to see the expected active validators of subnet %q before timeout: %w", subnet.Name, ctx.Err())
+			return stacktrace.Errorf("failed to see the expected active validators of subnet %q before timeout: %w", subnet.Name, ctx.Err())
 		case <-ticker.C:
 		}
 	}
@@ -298,7 +302,7 @@ func readSubnets(subnetDir string) ([]*Subnet, error) {
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	} else if err != nil {
-		return nil, fmt.Errorf("failed to read subnet dir: %w", err)
+		return nil, stacktrace.Errorf("failed to read subnet dir: %w", err)
 	}
 
 	subnets := []*Subnet{}
@@ -316,11 +320,11 @@ func readSubnets(subnetDir string) ([]*Subnet, error) {
 		subnetPath := filepath.Join(subnetDir, fileName)
 		bytes, err := os.ReadFile(subnetPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read subnet file %s: %w", subnetPath, err)
+			return nil, stacktrace.Errorf("failed to read subnet file %s: %w", subnetPath, err)
 		}
 		subnet := &Subnet{}
 		if err := json.Unmarshal(bytes, subnet); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal subnet from %s: %w", subnetPath, err)
+			return nil, stacktrace.Errorf("failed to unmarshal subnet from %s: %w", subnetPath, err)
 		}
 		subnets = append(subnets, subnet)
 	}

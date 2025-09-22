@@ -30,6 +30,10 @@ inputs:
     description: 'The duration of the AWS role to assume for S3 access.'
     required: true
     default: '43200' # 12 hours
+  prometheus-push-url:
+    description: 'The push URL of the prometheus instance.'
+    required: true
+    default: ''
   prometheus-username:
     description: 'The username for the Prometheus instance.'
     required: true
@@ -89,7 +93,6 @@ runs:
             RUNNER_NAME=${{ inputs.runner_name }} \
             METRICS_ENABLED=true
         run: ./scripts/run_task.sh reexecute-cchain-range-with-copied-data
-
         prometheus_push_url: ${{ inputs.prometheus-push-url }}
         prometheus_username: ${{ inputs.prometheus-username }}
         prometheus_password: ${{ inputs.prometheus-password }}
