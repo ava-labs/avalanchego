@@ -349,9 +349,6 @@ jobs:
             benchmark-results/
           retention-days: 7
   candidate-v0-0-12-benchmark:
-    env:
-      GOCACHE: /tmp/go-build-candidate
-      GOMODCACHE: /tmp/go-mod-candidate
     runs-on: avalanche-avalanchego-runner-2ti
     container:
       image: ghcr.io/actions/actions-runner:2.325.0
@@ -373,11 +370,6 @@ jobs:
           ref: ${{ github.event.inputs.avalanchego-candidate-version }}
       - name: Install nix
         uses: ./.github/actions/install-nix
-      - name: Clear Go caches
-        shell: nix develop --command bash -x {0}
-        run: |
-          rm -rf ~/.cache/go-build /github/home/go/pkg/mod /github/home/.cache/go-build || true
-          mkdir -p $GOCACHE $GOMODCACHE
       - name: Setup Go
         uses: ./.github/actions/setup-go-for-project
       - name: Setup Firewood
