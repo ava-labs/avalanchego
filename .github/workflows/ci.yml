@@ -283,7 +283,7 @@ jobs:
 #        shell: bash
 #        run: nix develop --command ./scripts/run_task.sh test-robustness
   baseline-v0-0-8-benchmark:
-    runs-on: avalanche-avalanchego-runner
+    runs-on: avalanche-avalanchego-runner-2ti
     container:
       image: ghcr.io/actions/actions-runner:2.325.0
     permissions:
@@ -398,7 +398,7 @@ jobs:
           aws-region: us-east-2
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ''
-          runner_name: 'avalanche-avalanchego-runner-2ti'
+          runner_name: 'avalanche-avalanchego-runner-2ti-v0.0.12'
           prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
@@ -415,121 +415,121 @@ jobs:
             output.txt
             benchmark-results/
           retention-days: 7
-  compare-results:
-    needs: [ baseline-v0-0-8-benchmark, candidate-v0-0-12-benchmark ]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Download baseline results
-        uses: actions/download-artifact@v4
-        with:
-          name: baseline-benchmark-results
-          path: ./baseline-results
-        continue-on-error: true
-      - name: Download candidate results
-        uses: actions/download-artifact@v4
-        with:
-          name: candidate-benchmark-results
-          path: ./candidate-results
-        continue-on-error: true
-      - name: Compare Results
-        shell: bash
-        run: |
-          # Function to extract mgas/s value from benchmark output
-          extract_mgas() {
-            local file="$1"
-            if [ -f "$file" ]; then
-              # Extract decimal number followed by " mgas/s"
-              grep -oE '[0-9]+(\.[0-9]+)? mgas/s' "$file" | head -1 | grep -oE '[0-9]+(\.[0-9]+)?' || echo ""
-            else
-              echo ""
-            fi
-          }
-
-          # Function to check if a number is valid
-          is_valid_number() {
-            [[ $1 =~ ^[0-9]+(\.[0-9]+)?$ ]] && [ -n "$1" ]
-          }
-
-          # Extract performance metrics
-          BASELINE_MGAS=$(extract_mgas "./baseline-results/output.txt")
-          CANDIDATE_MGAS=$(extract_mgas "./candidate-results/output.txt")
-
-          # Start building the summary
-          echo "# Firewood Performance Comparison" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Baseline:** \`${{ github.event.inputs.firewood-baseline-version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Candidate:** \`${{ github.event.inputs.firewood-candidate-version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Blocks:** ${{ github.event.inputs.start-block }} - ${{ github.event.inputs.end-block }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Display results with better error handling
-          if is_valid_number "$BASELINE_MGAS"; then
-            echo "- **Baseline (\`${{ github.event.inputs.firewood-baseline-version }}\`):** ${BASELINE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
-            BASELINE_SUCCESS=true
-          else
-            echo "- **Baseline (\`${{ github.event.inputs.firewood-baseline-version }}\`):** Failed to parse results" >> $GITHUB_STEP_SUMMARY
-            BASELINE_SUCCESS=false
-          fi
-
-          if is_valid_number "$CANDIDATE_MGAS"; then
-            echo "- **Candidate (\`${{ github.event.inputs.firewood-candidate-version }}\`):** ${CANDIDATE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
-            CANDIDATE_SUCCESS=true
-          else
-            echo "- **Candidate (\`${{ github.event.inputs.firewood-candidate-version }}\`):** Failed to parse results" >> $GITHUB_STEP_SUMMARY
-            CANDIDATE_SUCCESS=false
-          fi
-
-          # Calculate percentage change if both values are valid
-          if [ "$BASELINE_SUCCESS" = true ] && [ "$CANDIDATE_SUCCESS" = true ]; then
-            CHANGE=$(awk "BEGIN {printf \"%.2f\", ($CANDIDATE_MGAS - $BASELINE_MGAS) / $BASELINE_MGAS * 100}")
-            CHANGE_ABS=$(awk "BEGIN {printf \"%.2f\", ($CHANGE < 0) ? -($CHANGE) : $CHANGE}")
-
-            # Determine performance indicator
-            if (( $(awk "BEGIN {print ($CHANGE > 5)}") )); then
-              PERF_INDICATOR="**Significant Improvement**"
-            elif (( $(awk "BEGIN {print ($CHANGE > 1)}") )); then
-              PERF_INDICATOR="**Improvement**"
-            elif (( $(awk "BEGIN {print ($CHANGE < -5)}") )); then
-              PERF_INDICATOR="**Significant Regression**"
-            elif (( $(awk "BEGIN {print ($CHANGE < -1)}") )); then
-              PERF_INDICATOR="**Regression**"
-            else
-              PERF_INDICATOR="**No significant change**"
-            fi
-
-            if (( $(awk "BEGIN {print ($CHANGE > 0)}") )); then
-              echo "- **Performance Change:** +${CHANGE}% ${PERF_INDICATOR}" >> $GITHUB_STEP_SUMMARY
-            elif (( $(awk "BEGIN {print ($CHANGE < 0)}") )); then
-              echo "- **Performance Change:** ${CHANGE}% ${PERF_INDICATOR}" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "- **Performance Change:** No change ${PERF_INDICATOR}" >> $GITHUB_STEP_SUMMARY
-            fi
-
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "## Raw Results" >> $GITHUB_STEP_SUMMARY
-            echo "### Baseline (${{ github.event.inputs.firewood-baseline-version }})" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            cat ./baseline-results/output.txt >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No baseline output found" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-
-            echo "### Candidate (${{ github.event.inputs.firewood-candidate-version }})" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            cat ./candidate-results/output.txt >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No candidate output found" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "## Raw Results" >> $GITHUB_STEP_SUMMARY
-            if [ -f "./baseline-results/output.txt" ]; then
-              echo "### Baseline (${{ github.event.inputs.firewood-baseline-version }})" >> $GITHUB_STEP_SUMMARY
-              echo '```' >> $GITHUB_STEP_SUMMARY
-              cat ./baseline-results/output.txt >> $GITHUB_STEP_SUMMARY
-              echo '```' >> $GITHUB_STEP_SUMMARY
-            fi
-            if [ -f "./candidate-results/output.txt" ]; then
-              echo "### Candidate (${{ github.event.inputs.firewood-candidate-version }})" >> $GITHUB_STEP_SUMMARY
-              echo '```' >> $GITHUB_STEP_SUMMARY
-              cat ./candidate-results/output.txt >> $GITHUB_STEP_SUMMARY
-              echo '```' >> $GITHUB_STEP_SUMMARY
-            fi
-          fi
+#  compare-results:
+#    needs: [ baseline-v0-0-8-benchmark, candidate-v0-0-12-benchmark ]
+#    runs-on: ubuntu-latest
+#    if: always()
+#    steps:
+#      - name: Download baseline results
+#        uses: actions/download-artifact@v4
+#        with:
+#          name: baseline-benchmark-results
+#          path: ./baseline-results
+#        continue-on-error: true
+#      - name: Download candidate results
+#        uses: actions/download-artifact@v4
+#        with:
+#          name: candidate-benchmark-results
+#          path: ./candidate-results
+#        continue-on-error: true
+#      - name: Compare Results
+#        shell: bash
+#        run: |
+#          # Function to extract mgas/s value from benchmark output
+#          extract_mgas() {
+#            local file="$1"
+#            if [ -f "$file" ]; then
+#              # Extract decimal number followed by " mgas/s"
+#              grep -oE '[0-9]+(\.[0-9]+)? mgas/s' "$file" | head -1 | grep -oE '[0-9]+(\.[0-9]+)?' || echo ""
+#            else
+#              echo ""
+#            fi
+#          }
+#
+#          # Function to check if a number is valid
+#          is_valid_number() {
+#            [[ $1 =~ ^[0-9]+(\.[0-9]+)?$ ]] && [ -n "$1" ]
+#          }
+#
+#          # Extract performance metrics
+#          BASELINE_MGAS=$(extract_mgas "./baseline-results/output.txt")
+#          CANDIDATE_MGAS=$(extract_mgas "./candidate-results/output.txt")
+#
+#          # Start building the summary
+#          echo "# Firewood Performance Comparison" >> $GITHUB_STEP_SUMMARY
+#          echo "" >> $GITHUB_STEP_SUMMARY
+#          echo "**Baseline:** \`${{ github.event.inputs.firewood-baseline-version }}\`" >> $GITHUB_STEP_SUMMARY
+#          echo "**Candidate:** \`${{ github.event.inputs.firewood-candidate-version }}\`" >> $GITHUB_STEP_SUMMARY
+#          echo "**Blocks:** ${{ github.event.inputs.start-block }} - ${{ github.event.inputs.end-block }}" >> $GITHUB_STEP_SUMMARY
+#          echo "" >> $GITHUB_STEP_SUMMARY
+#
+#          # Display results with better error handling
+#          if is_valid_number "$BASELINE_MGAS"; then
+#            echo "- **Baseline (\`${{ github.event.inputs.firewood-baseline-version }}\`):** ${BASELINE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
+#            BASELINE_SUCCESS=true
+#          else
+#            echo "- **Baseline (\`${{ github.event.inputs.firewood-baseline-version }}\`):** Failed to parse results" >> $GITHUB_STEP_SUMMARY
+#            BASELINE_SUCCESS=false
+#          fi
+#
+#          if is_valid_number "$CANDIDATE_MGAS"; then
+#            echo "- **Candidate (\`${{ github.event.inputs.firewood-candidate-version }}\`):** ${CANDIDATE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
+#            CANDIDATE_SUCCESS=true
+#          else
+#            echo "- **Candidate (\`${{ github.event.inputs.firewood-candidate-version }}\`):** Failed to parse results" >> $GITHUB_STEP_SUMMARY
+#            CANDIDATE_SUCCESS=false
+#          fi
+#
+#          # Calculate percentage change if both values are valid
+#          if [ "$BASELINE_SUCCESS" = true ] && [ "$CANDIDATE_SUCCESS" = true ]; then
+#            CHANGE=$(awk "BEGIN {printf \"%.2f\", ($CANDIDATE_MGAS - $BASELINE_MGAS) / $BASELINE_MGAS * 100}")
+#            CHANGE_ABS=$(awk "BEGIN {printf \"%.2f\", ($CHANGE < 0) ? -($CHANGE) : $CHANGE}")
+#
+#            # Determine performance indicator
+#            if (( $(awk "BEGIN {print ($CHANGE > 5)}") )); then
+#              PERF_INDICATOR="**Significant Improvement**"
+#            elif (( $(awk "BEGIN {print ($CHANGE > 1)}") )); then
+#              PERF_INDICATOR="**Improvement**"
+#            elif (( $(awk "BEGIN {print ($CHANGE < -5)}") )); then
+#              PERF_INDICATOR="**Significant Regression**"
+#            elif (( $(awk "BEGIN {print ($CHANGE < -1)}") )); then
+#              PERF_INDICATOR="**Regression**"
+#            else
+#              PERF_INDICATOR="**No significant change**"
+#            fi
+#
+#            if (( $(awk "BEGIN {print ($CHANGE > 0)}") )); then
+#              echo "- **Performance Change:** +${CHANGE}% ${PERF_INDICATOR}" >> $GITHUB_STEP_SUMMARY
+#            elif (( $(awk "BEGIN {print ($CHANGE < 0)}") )); then
+#              echo "- **Performance Change:** ${CHANGE}% ${PERF_INDICATOR}" >> $GITHUB_STEP_SUMMARY
+#            else
+#              echo "- **Performance Change:** No change ${PERF_INDICATOR}" >> $GITHUB_STEP_SUMMARY
+#            fi
+#
+#            echo "" >> $GITHUB_STEP_SUMMARY
+#            echo "## Raw Results" >> $GITHUB_STEP_SUMMARY
+#            echo "### Baseline (${{ github.event.inputs.firewood-baseline-version }})" >> $GITHUB_STEP_SUMMARY
+#            echo '```' >> $GITHUB_STEP_SUMMARY
+#            cat ./baseline-results/output.txt >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No baseline output found" >> $GITHUB_STEP_SUMMARY
+#            echo '```' >> $GITHUB_STEP_SUMMARY
+#
+#            echo "### Candidate (${{ github.event.inputs.firewood-candidate-version }})" >> $GITHUB_STEP_SUMMARY
+#            echo '```' >> $GITHUB_STEP_SUMMARY
+#            cat ./candidate-results/output.txt >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No candidate output found" >> $GITHUB_STEP_SUMMARY
+#            echo '```' >> $GITHUB_STEP_SUMMARY
+#          else
+#            echo "" >> $GITHUB_STEP_SUMMARY
+#            echo "## Raw Results" >> $GITHUB_STEP_SUMMARY
+#            if [ -f "./baseline-results/output.txt" ]; then
+#              echo "### Baseline (${{ github.event.inputs.firewood-baseline-version }})" >> $GITHUB_STEP_SUMMARY
+#              echo '```' >> $GITHUB_STEP_SUMMARY
+#              cat ./baseline-results/output.txt >> $GITHUB_STEP_SUMMARY
+#              echo '```' >> $GITHUB_STEP_SUMMARY
+#            fi
+#            if [ -f "./candidate-results/output.txt" ]; then
+#              echo "### Candidate (${{ github.event.inputs.firewood-candidate-version }})" >> $GITHUB_STEP_SUMMARY
+#              echo '```' >> $GITHUB_STEP_SUMMARY
+#              cat ./candidate-results/output.txt >> $GITHUB_STEP_SUMMARY
+#              echo '```' >> $GITHUB_STEP_SUMMARY
+#            fi
+#          fi
