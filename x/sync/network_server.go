@@ -269,7 +269,7 @@ func getRangeProof[TRange, TChange Proof](
 			keyLimit,
 		)
 		if err != nil {
-			if errors.Is(err, ErrInsufficientHistory) || errors.Is(err, ErrNoEndRoot) {
+			if errors.Is(err, ErrInsufficientHistory) {
 				return nil, nil // drop request
 			}
 			return nil, err

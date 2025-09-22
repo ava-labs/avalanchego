@@ -71,12 +71,12 @@ type ChangeProofer interface {
 	// GetChangeProof returns a proof for a subset of the key/value changes in key range
 	// [start, end] that occurred between [startRootID] and [endRootID].
 	// Returns at most [maxLength] key/value pairs.
-	// Returns [xsync.ErrStartRootNotFound] if this node has insufficient history
+	// Returns [xsync.ErrInsufficientHistory] if this node has insufficient history
 	// to generate the proof.
 	// Returns ErrEmptyProof if [endRootID] is ids.Empty.
 	// Note that [endRootID] == ids.Empty means the trie is empty
 	// (i.e. we don't need a change proof.)
-	// Returns [xsync.ErrEndRootNotFound], if the history doesn't contain the [endRootID].
+	// Returns [xsync.ErrNoEndRoot], if the history doesn't contain the [endRootID].
 	GetChangeProof(
 		ctx context.Context,
 		startRootID ids.ID,
@@ -124,6 +124,7 @@ type RangeProofer interface {
 	// Returns ErrEmptyProof if [rootID] is ids.Empty.
 	// Note that [rootID] == ids.Empty means the trie is empty
 	// (i.e. we don't need a range proof.)
+	// Returns [xsync.ErrNoEndRoot], if the history doesn't contain the [rootID].
 	GetRangeProofAtRoot(
 		ctx context.Context,
 		rootID ids.ID,
