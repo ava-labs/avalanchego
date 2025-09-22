@@ -372,6 +372,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.avalanchego-candidate-version }}
+      - name: Install nix
+        uses: ./.github/actions/install-nix
       - name: Clear existing Go caches
         shell: nix develop --command bash -x {0}
         run: |
@@ -385,8 +387,6 @@ jobs:
           # Create isolated cache directories
           mkdir -p $GOCACHE
           mkdir -p $GOMODCACHE
-      - name: Install nix
-        uses: ./.github/actions/install-nix
       - name: Setup Go
         uses: ./.github/actions/setup-go-for-project
       - name: Setup Firewood
