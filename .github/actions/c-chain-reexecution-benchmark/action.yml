@@ -66,7 +66,7 @@ runs:
   steps:
     - uses: ./.github/actions/setup-go-for-project
     - name: Set task env
-      shell: nix develop --command bash -x {0}
+      shell: bash
       run: |
         {
           echo "EXECUTION_DATA_DIR=${{ inputs.workspace }}/reexecution-data"
