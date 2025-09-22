@@ -282,72 +282,72 @@ jobs:
 #      - name: Deploy kind with chaos mesh
 #        shell: bash
 #        run: nix develop --command ./scripts/run_task.sh test-robustness
-  baseline-v0-0-8-benchmark:
-    runs-on: avalanche-avalanchego-runner-2ti
-    container:
-      image: ghcr.io/actions/actions-runner:2.325.0
-    permissions:
-      id-token: write
-      contents: write
-    name: "Baseline: v0.0.8"
-    steps:
-      - name: Install dependencies
-        shell: bash
-        run: |
-          if ! command -v xz &> /dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y xz-utils
-          fi
-      - name: Checkout AvalancheGo
-        uses: actions/checkout@v4
-        with:
-          ref: 'b6409a4f336b32e0323a654aefdec941fc3fb3e5'
-      - name: Install nix
-        uses: ./.github/actions/install-nix
-      - name: Setup Go
-        uses: ./.github/actions/setup-go-for-project
-      - name: Setup Firewood
-        uses: ./.github/actions/setup-firewood
-        with:
-          firewood-version: '6cbcd3d4ba67a88c9991bec7ca5d4973be340295'
-          rust-version: '1.88'
-      - name: Configure AvalancheGo to work with Firewood
-        run: |
-          # Configure go.mod to use local FFI
-          go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=./ffi
-          go mod download
-
-          # Stash changes for benchmark without this compare-results fails
-          git add go.mod go.sum || true
-          git stash push -m "temp stash for baseline benchmark" || echo "Nothing to stash"
-      - name: Run Baseline Benchmark
-        uses: ./.github/actions/c-chain-reexecution-benchmark
-        with:
-          config: firewood
-          start-block: '101'
-          end-block: '250000'
-          push-github-action-benchmark: false
-          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
-          aws-region: us-east-2
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          push-post-state: ''
-          runner_name: 'avalanche-avalanchego-runner'
-          prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
-          prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
-          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-      - name: Restore go.mod changes
-        shell: nix develop --command bash -x {0}
-        run: |
-          git stash pop || echo "Nothing to restore"
-      - name: Upload baseline results
-        uses: actions/upload-artifact@v4
-        with:
-          name: baseline-benchmark-results
-          path: |
-            output.txt
-            benchmark-results/
-          retention-days: 7
+#  baseline-v0-0-8-benchmark:
+#    runs-on: avalanche-avalanchego-runner-2ti
+#    container:
+#      image: ghcr.io/actions/actions-runner:2.325.0
+#    permissions:
+#      id-token: write
+#      contents: write
+#    name: "Baseline: v0.0.8"
+#    steps:
+#      - name: Install dependencies
+#        shell: bash
+#        run: |
+#          if ! command -v xz &> /dev/null; then
+#            sudo apt-get update
+#            sudo apt-get install -y xz-utils
+#          fi
+#      - name: Checkout AvalancheGo
+#        uses: actions/checkout@v4
+#        with:
+#          ref: 'b6409a4f336b32e0323a654aefdec941fc3fb3e5'
+#      - name: Install nix
+#        uses: ./.github/actions/install-nix
+#      - name: Setup Go
+#        uses: ./.github/actions/setup-go-for-project
+#      - name: Setup Firewood
+#        uses: ./.github/actions/setup-firewood
+#        with:
+#          firewood-version: '6cbcd3d4ba67a88c9991bec7ca5d4973be340295'
+#          rust-version: '1.88'
+#      - name: Configure AvalancheGo to work with Firewood
+#        run: |
+#          # Configure go.mod to use local FFI
+#          go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=./ffi
+#          go mod download
+#
+#          # Stash changes for benchmark without this compare-results fails
+#          git add go.mod go.sum || true
+#          git stash push -m "temp stash for baseline benchmark" || echo "Nothing to stash"
+#      - name: Run Baseline Benchmark
+#        uses: ./.github/actions/c-chain-reexecution-benchmark
+#        with:
+#          config: firewood
+#          start-block: '101'
+#          end-block: '250000'
+#          push-github-action-benchmark: false
+#          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+#          aws-region: us-east-2
+#          github-token: ${{ secrets.GITHUB_TOKEN }}
+#          push-post-state: ''
+#          runner_name: 'avalanche-avalanchego-runner'
+#          prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
+#          prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+#          prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+#          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+#      - name: Restore go.mod changes
+#        shell: nix develop --command bash -x {0}
+#        run: |
+#          git stash pop || echo "Nothing to restore"
+#      - name: Upload baseline results
+#        uses: actions/upload-artifact@v4
+#        with:
+#          name: baseline-benchmark-results
+#          path: |
+#            output.txt
+#            benchmark-results/
+#          retention-days: 7
   candidate-v0-0-12-benchmark:
     runs-on: avalanche-avalanchego-runner-2ti
     container:
