@@ -370,6 +370,15 @@ jobs:
           ref: ${{ github.event.inputs.avalanchego-candidate-version }}
       - name: Install nix
         uses: ./.github/actions/install-nix
+      - name: Clear Go caches
+        shell: nix develop --command bash -x {0}
+        run: |
+          # Clear Go module and build caches
+          rm -rf ~/.cache/go-build || true
+          rm -rf ~/go/pkg/mod || true
+          rm -rf /go/pkg/mod || true
+          rm -rf /github/home/go/pkg/mod || true
+          rm -rf /github/home/.cache/go-build || true
       - name: Setup Go
         uses: ./.github/actions/setup-go-for-project
       - name: Setup Firewood
