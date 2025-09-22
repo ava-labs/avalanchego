@@ -1400,7 +1400,9 @@ func TestBuildTimeMilliseconds(t *testing.T) {
 				Fork: &test.fork,
 			})
 
-			defer require.NoError(t, vm.Shutdown(context.Background()))
+			defer func() {
+				require.NoError(t, vm.Shutdown(context.Background()))
+			}()
 
 			vm.clock.Set(buildTime)
 			signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(10), 21000, big.NewInt(ap0.MinGasPrice), nil)
