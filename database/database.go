@@ -94,3 +94,18 @@ type Database interface {
 	io.Closer
 	health.Checker
 }
+
+// HeightIndex defines the interface for storing and retrieving entries by height.
+type HeightIndex interface {
+	// Put inserts the entry into the store at the given height.
+	Put(height uint64, bytes []byte) error
+
+	// Get retrieves an entry by its height.
+	Get(height uint64) ([]byte, error)
+
+	// Has checks if an entry exists at the given height.
+	Has(height uint64) (bool, error)
+
+	// Close closes the database.
+	io.Closer
+}

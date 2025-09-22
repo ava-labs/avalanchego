@@ -595,6 +595,24 @@ var (
 				TargetExcess: maxTargetExcess - MaxTargetExcessDiff,
 			},
 		},
+		{
+			name: "overflow_excess",
+			initial: State{
+				Gas: gas.State{
+					Capacity: math.MaxUint64,
+					Excess:   math.MaxUint64,
+				},
+				TargetExcess: maxTargetExcess - MaxTargetExcessDiff,
+			},
+			desiredTargetExcess: maxTargetExcess,
+			expected: State{
+				Gas: gas.State{
+					Capacity: math.MaxUint64,
+					Excess:   math.MaxUint64,
+				},
+				TargetExcess: maxTargetExcess,
+			},
+		},
 	}
 	parseTests = []struct {
 		name        string
