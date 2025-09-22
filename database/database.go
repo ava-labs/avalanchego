@@ -95,17 +95,17 @@ type Database interface {
 	health.Checker
 }
 
-// BlockDatabase defines the interface for storing and retrieving blockchain blocks.
-type BlockDatabase interface {
-	// WriteBlock inserts a block into the store at the given height.
-	WriteBlock(height uint64, block []byte) error
+// HeightIndex defines the interface for storing and retrieving entries by height.
+type HeightIndex interface {
+	// Put inserts the entry into the store at the given height.
+	Put(height uint64, bytes []byte) error
 
-	// ReadBlock retrieves a block by its height.
-	ReadBlock(height uint64) ([]byte, error)
+	// Get retrieves an entry by its height.
+	Get(height uint64) ([]byte, error)
 
-	// HasBlock checks if a block exists at the given height.
-	HasBlock(height uint64) (bool, error)
+	// Has checks if an entry exists at the given height.
+	Has(height uint64) (bool, error)
 
-	// Close closes the block database.
+	// Close closes the database.
 	io.Closer
 }
