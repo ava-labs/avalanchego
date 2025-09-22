@@ -22,7 +22,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/core/extstate"
-	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/vmtest"
 	"github.com/ava-labs/coreth/utils"
@@ -556,185 +555,171 @@ func TestExportTxSemanticVerify(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		tx        *atomic.Tx
-		signers   [][]*secp256k1.PrivateKey
-		baseFee   *big.Int
-		rules     *extras.Rules
-		shouldErr bool
+		name    string
+		tx      *atomic.UnsignedExportTx
+		signers [][]*secp256k1.PrivateKey
+		fork    upgradetest.Fork
+		wantErr error
 	}{
 		{
 			name: "valid",
-			tx:   &atomic.Tx{UnsignedAtomicTx: validExportTx},
+			tx:   validExportTx,
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: false,
+			fork: upgradetest.ApricotPhase3,
 		},
 		{
 			name: "P-chain before AP5",
-			tx: func() *atomic.Tx {
-				validExportTx := *validAVAXExportTx
-				validExportTx.DestinationChain = constants.PlatformChainID
-				return &atomic.Tx{UnsignedAtomicTx: &validExportTx}
+			tx: func() *atomic.UnsignedExportTx {
+				tx := *validAVAXExportTx
+				tx.DestinationChain = constants.PlatformChainID
+				return &tx
 			}(),
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: atomic.ErrWrongChainID,
 		},
 		{
 			name: "P-chain after AP5",
-			tx: func() *atomic.Tx {
-				validExportTx := *validAVAXExportTx
-				validExportTx.DestinationChain = constants.PlatformChainID
-				return &atomic.Tx{UnsignedAtomicTx: &validExportTx}
+			tx: func() *atomic.UnsignedExportTx {
+				tx := *validAVAXExportTx
+				tx.DestinationChain = constants.PlatformChainID
+				return &tx
 			}(),
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase5),
-			shouldErr: false,
+			fork: upgradetest.ApricotPhase5,
 		},
 		{
 			name: "random chain after AP5",
-			tx: func() *atomic.Tx {
-				validExportTx := *validAVAXExportTx
-				validExportTx.DestinationChain = ids.GenerateTestID()
-				return &atomic.Tx{UnsignedAtomicTx: &validExportTx}
+			tx: func() *atomic.UnsignedExportTx {
+				tx := *validAVAXExportTx
+				tx.DestinationChain = ids.GenerateTestID()
+				return &tx
 			}(),
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase5),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase5,
+			wantErr: atomic.ErrWrongChainID,
 		},
 		{
 			name: "P-chain multi-coin before AP5",
-			tx: func() *atomic.Tx {
-				validExportTx := *validExportTx
-				validExportTx.DestinationChain = constants.PlatformChainID
-				return &atomic.Tx{UnsignedAtomicTx: &validExportTx}
+			tx: func() *atomic.UnsignedExportTx {
+				tx := *validExportTx
+				tx.DestinationChain = constants.PlatformChainID
+				return &tx
 			}(),
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: atomic.ErrWrongChainID,
 		},
 		{
 			name: "P-chain multi-coin after AP5",
-			tx: func() *atomic.Tx {
-				validExportTx := *validExportTx
-				validExportTx.DestinationChain = constants.PlatformChainID
-				return &atomic.Tx{UnsignedAtomicTx: &validExportTx}
+			tx: func() *atomic.UnsignedExportTx {
+				tx := *validExportTx
+				tx.DestinationChain = constants.PlatformChainID
+				return &tx
 			}(),
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase5),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase5,
+			wantErr: atomic.ErrWrongChainID,
 		},
 		{
-			name: "random chain multi-coin  after AP5",
-			tx: func() *atomic.Tx {
-				validExportTx := *validExportTx
-				validExportTx.DestinationChain = ids.GenerateTestID()
-				return &atomic.Tx{UnsignedAtomicTx: &validExportTx}
+			name: "random chain multi-coin after AP5",
+			tx: func() *atomic.UnsignedExportTx {
+				tx := *validExportTx
+				tx.DestinationChain = ids.GenerateTestID()
+				return &tx
 			}(),
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase5),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase5,
+			wantErr: atomic.ErrWrongChainID,
 		},
 		{
 			name: "no outputs",
-			tx: func() *atomic.Tx {
-				validExportTx := *validExportTx
-				validExportTx.ExportedOutputs = nil
-				return &atomic.Tx{UnsignedAtomicTx: &validExportTx}
+			tx: func() *atomic.UnsignedExportTx {
+				tx := *validExportTx
+				tx.ExportedOutputs = nil
+				return &tx
 			}(),
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: atomic.ErrNoExportOutputs,
 		},
 		{
 			name: "wrong networkID",
-			tx: func() *atomic.Tx {
-				validExportTx := *validExportTx
-				validExportTx.NetworkID++
-				return &atomic.Tx{UnsignedAtomicTx: &validExportTx}
+			tx: func() *atomic.UnsignedExportTx {
+				tx := *validExportTx
+				tx.NetworkID++
+				return &tx
 			}(),
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: atomic.ErrWrongNetworkID,
 		},
 		{
 			name: "wrong chainID",
-			tx: func() *atomic.Tx {
-				validExportTx := *validExportTx
-				validExportTx.BlockchainID = ids.GenerateTestID()
-				return &atomic.Tx{UnsignedAtomicTx: &validExportTx}
+			tx: func() *atomic.UnsignedExportTx {
+				tx := *validExportTx
+				tx.BlockchainID = ids.GenerateTestID()
+				return &tx
 			}(),
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: atomic.ErrWrongChainID,
 		},
 		{
 			name: "invalid input",
-			tx: func() *atomic.Tx {
-				validExportTx := *validExportTx
-				validExportTx.Ins = append([]atomic.EVMInput{}, validExportTx.Ins...)
-				validExportTx.Ins[2].Amount = 0
-				return &atomic.Tx{UnsignedAtomicTx: &validExportTx}
+			tx: func() *atomic.UnsignedExportTx {
+				tx := *validExportTx
+				tx.Ins = append([]atomic.EVMInput{}, tx.Ins...)
+				tx.Ins[2].Amount = 0
+				return &tx
 			}(),
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: atomic.ErrNoValueInput,
 		},
 		{
 			name: "invalid output",
-			tx: func() *atomic.Tx {
-				validExportTx := *validExportTx
-				validExportTx.ExportedOutputs = []*avax.TransferableOutput{{
+			tx: func() *atomic.UnsignedExportTx {
+				tx := *validExportTx
+				tx.ExportedOutputs = []*avax.TransferableOutput{{
 					Asset: avax.Asset{ID: custom0AssetID},
 					Out: &secp256k1fx.TransferOutput{
 						Amt: custom0Balance,
@@ -744,21 +729,20 @@ func TestExportTxSemanticVerify(t *testing.T) {
 						},
 					},
 				}}
-				return &atomic.Tx{UnsignedAtomicTx: &validExportTx}
+				return &tx
 			}(),
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: secp256k1fx.ErrOutputUnoptimized,
 		},
 		{
 			name: "unsorted outputs",
-			tx: func() *atomic.Tx {
-				validExportTx := *validExportTx
+			tx: func() *atomic.UnsignedExportTx {
+				tx := *validExportTx
 				exportOutputs := []*avax.TransferableOutput{
 					{
 						Asset: avax.Asset{ID: custom0AssetID},
@@ -784,40 +768,38 @@ func TestExportTxSemanticVerify(t *testing.T) {
 				// Sort the outputs and then swap the ordering to ensure that they are ordered incorrectly
 				avax.SortTransferableOutputs(exportOutputs, atomic.Codec)
 				exportOutputs[0], exportOutputs[1] = exportOutputs[1], exportOutputs[0]
-				validExportTx.ExportedOutputs = exportOutputs
-				return &atomic.Tx{UnsignedAtomicTx: &validExportTx}
+				tx.ExportedOutputs = exportOutputs
+				return &tx
 			}(),
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: atomic.ErrOutputsNotSorted,
 		},
 		{
 			name: "not unique inputs",
-			tx: func() *atomic.Tx {
-				validExportTx := *validExportTx
-				validExportTx.Ins = append([]atomic.EVMInput{}, validExportTx.Ins...)
-				validExportTx.Ins[2] = validExportTx.Ins[1]
-				return &atomic.Tx{UnsignedAtomicTx: &validExportTx}
+			tx: func() *atomic.UnsignedExportTx {
+				tx := *validExportTx
+				tx.Ins = append([]atomic.EVMInput{}, tx.Ins...)
+				tx.Ins[2] = tx.Ins[1]
+				return &tx
 			}(),
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: atomic.ErrInputsNotSortedUnique,
 		},
 		{
 			name: "custom asset insufficient funds",
-			tx: func() *atomic.Tx {
-				validExportTx := *validExportTx
-				validExportTx.ExportedOutputs = []*avax.TransferableOutput{
+			tx: func() *atomic.UnsignedExportTx {
+				tx := *validExportTx
+				tx.ExportedOutputs = []*avax.TransferableOutput{
 					{
 						Asset: avax.Asset{ID: custom0AssetID},
 						Out: &secp256k1fx.TransferOutput{
@@ -829,22 +811,21 @@ func TestExportTxSemanticVerify(t *testing.T) {
 						},
 					},
 				}
-				return &atomic.Tx{UnsignedAtomicTx: &validExportTx}
+				return &tx
 			}(),
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: avax.ErrInsufficientFunds,
 		},
 		{
 			name: "avax insufficient funds",
-			tx: func() *atomic.Tx {
-				validExportTx := *validExportTx
-				validExportTx.ExportedOutputs = []*avax.TransferableOutput{
+			tx: func() *atomic.UnsignedExportTx {
+				tx := *validExportTx
+				tx.ExportedOutputs = []*avax.TransferableOutput{
 					{
 						Asset: avax.Asset{ID: vm.Ctx.AVAXAssetID},
 						Out: &secp256k1fx.TransferOutput{
@@ -856,102 +837,89 @@ func TestExportTxSemanticVerify(t *testing.T) {
 						},
 					},
 				}
-				return &atomic.Tx{UnsignedAtomicTx: &validExportTx}
+				return &tx
 			}(),
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: avax.ErrInsufficientFunds,
 		},
 		{
 			name: "too many signatures",
-			tx:   &atomic.Tx{UnsignedAtomicTx: validExportTx},
+			tx:   validExportTx,
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: errIncorrectNumCredentials,
 		},
 		{
 			name: "too few signatures",
-			tx:   &atomic.Tx{UnsignedAtomicTx: validExportTx},
+			tx:   validExportTx,
 			signers: [][]*secp256k1.PrivateKey{
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: errIncorrectNumCredentials,
 		},
 		{
 			name: "too many signatures on credential",
-			tx:   &atomic.Tx{UnsignedAtomicTx: validExportTx},
+			tx:   validExportTx,
 			signers: [][]*secp256k1.PrivateKey{
 				{key, vmtest.TestKeys[1]},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: errIncorrectNumSignatures,
 		},
 		{
 			name: "too few signatures on credential",
-			tx:   &atomic.Tx{UnsignedAtomicTx: validExportTx},
+			tx:   validExportTx,
 			signers: [][]*secp256k1.PrivateKey{
 				{},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: errIncorrectNumSignatures,
 		},
 		{
 			name: "wrong signature on credential",
-			tx:   &atomic.Tx{UnsignedAtomicTx: validExportTx},
+			tx:   validExportTx,
 			signers: [][]*secp256k1.PrivateKey{
 				{vmtest.TestKeys[1]},
 				{key},
 				{key},
 			},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: errPublicKeySignatureMismatch,
 		},
 		{
-			name:      "no signatures",
-			tx:        &atomic.Tx{UnsignedAtomicTx: validExportTx},
-			signers:   [][]*secp256k1.PrivateKey{},
-			baseFee:   vmtest.InitialBaseFee,
-			rules:     vmtest.ForkToRules(upgradetest.ApricotPhase3),
-			shouldErr: true,
+			name:    "no signatures",
+			tx:      validExportTx,
+			signers: [][]*secp256k1.PrivateKey{},
+			fork:    upgradetest.ApricotPhase3,
+			wantErr: errIncorrectNumCredentials,
 		},
 	}
 	for _, test := range tests {
-		if err := test.tx.Sign(atomic.Codec, test.signers); err != nil {
-			t.Fatal(err)
-		}
-
-		backend := NewVerifierBackend(vm, *test.rules)
-
 		t.Run(test.name, func(t *testing.T) {
-			tx := test.tx
-			err := backend.SemanticVerify(tx, parent, test.baseFee)
-			if test.shouldErr && err == nil {
-				t.Fatalf("should have errored but returned valid")
-			}
-			if !test.shouldErr && err != nil {
-				t.Fatalf("shouldn't have errored but returned %s", err)
-			}
+			tx := &atomic.Tx{UnsignedAtomicTx: test.tx}
+			require.NoError(t, tx.Sign(atomic.Codec, test.signers))
+
+			rules := vmtest.ForkToRules(test.fork)
+			backend := NewVerifierBackend(vm, *rules)
+
+			err := backend.SemanticVerify(tx, parent, vmtest.InitialBaseFee)
+			require.ErrorIs(t, err, test.wantErr)
 		})
 	}
 }

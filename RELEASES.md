@@ -6,6 +6,7 @@
 - Enabled RPC batch limits by default, and configurable with `batch-request-limit` and `batch-max-response-size`.
 - Implement ACP-226: Set expected block gas cost to 0 in Granite network upgrade, removing block gas cost requirements for block building.
 - Implement ACP-226: Add `timeMilliseconds` (Unix uint64) timestamp to block header for Granite upgrade.
+- Implement ACP-226: Add `minDelayExcess` (uint64) to block header for Granite upgrade.
 
 ## [v0.15.3](https://github.com/ava-labs/coreth/releases/tag/v0.15.3)
 

@@ -322,12 +322,14 @@ func TestBlockGetters(t *testing.T) {
 		wantVersion          uint32
 		wantExtData          []byte
 		wantTimeMilliseconds *uint64
+		wantMinDelayExcess   *uint64
 	}{
 		{
 			name:                 "empty",
 			headerExtra:          &HeaderExtra{},
 			blockExtra:           &BlockBodyExtra{},
 			wantTimeMilliseconds: nil,
+			wantMinDelayExcess:   nil,
 		},
 		{
 			name: "fields_set",
@@ -335,6 +337,7 @@ func TestBlockGetters(t *testing.T) {
 				ExtDataGasUsed:   big.NewInt(1),
 				BlockGasCost:     big.NewInt(2),
 				TimeMilliseconds: utils.NewUint64(3),
+				MinDelayExcess:   utils.NewUint64(4),
 			},
 			blockExtra: &BlockBodyExtra{
 				Version: 3,
@@ -345,6 +348,7 @@ func TestBlockGetters(t *testing.T) {
 			wantVersion:          3,
 			wantExtData:          []byte{4},
 			wantTimeMilliseconds: utils.NewUint64(3),
+			wantMinDelayExcess:   utils.NewUint64(4),
 		},
 	}
 
@@ -371,6 +375,9 @@ func TestBlockGetters(t *testing.T) {
 
 			timeMilliseconds := BlockTimeMilliseconds(block)
 			assert.Equal(t, test.wantTimeMilliseconds, timeMilliseconds, "BlockTimeMilliseconds()")
+
+			minDelayExcess := BlockMinDelayExcess(block)
+			assert.Equal(t, test.wantMinDelayExcess, minDelayExcess, "BlockMinDelayExcess()")
 		})
 	}
 }

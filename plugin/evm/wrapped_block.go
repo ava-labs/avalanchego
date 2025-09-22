@@ -50,8 +50,7 @@ var (
 	errInvalidBlobGasUsedBeforeCancun      = errors.New("invalid blobGasUsed before cancun")
 	errInvalidParent                       = errors.New("parent header not found")
 	errInvalidParentBeaconRootBeforeCancun = errors.New("invalid parentBeaconRoot before cancun")
-	errMissingExcessBlobGas                = errors.New("header is missing excessBlobGas")
-	errMissingBlobGasUsed                  = errors.New("header is missing blobGasUsed")
+	errInvalidExcessBlobGas                = errors.New("invalid excessBlobGas")
 	errMissingParentBeaconRoot             = errors.New("header is missing parentBeaconRoot")
 	errParentBeaconRootNonEmpty            = errors.New("invalid non-empty parentBeaconRoot")
 	errBlobGasUsedNilInCancun              = errors.New("blob gas used must not be nil in Cancun")
@@ -353,7 +352,6 @@ func (b *wrappedBlock) semanticVerify() error {
 	if parent == nil {
 		return fmt.Errorf("%w: %s at height %d", errInvalidParent, b.ethBlock.ParentHash(), b.ethBlock.NumberU64()-1)
 	}
-
 	// Ensure Time and TimeMilliseconds are consistent with rules.
 	if err := customheader.VerifyTime(extraConfig, parent, b.ethBlock.Header(), b.vm.clock.Time()); err != nil {
 		return err
@@ -468,33 +466,29 @@ func (b *wrappedBlock) syntacticVerify() error {
 	}
 
 	// Verify the existence / non-existence of excessBlobGas
-	cancun := rules.IsCancun
-	if !cancun && ethHeader.ExcessBlobGas != nil {
-		return fmt.Errorf("%w: have %d, expected nil", errInvalidExcessBlobGasBeforeCancun, *ethHeader.ExcessBlobGas)
-	}
-	if !cancun && ethHeader.BlobGasUsed != nil {
-		return fmt.Errorf("%w: have %d, expected nil", errInvalidBlobGasUsedBeforeCancun, *ethHeader.BlobGasUsed)
-	}
-	if cancun && ethHeader.ExcessBlobGas == nil {
-		return errMissingExcessBlobGas
-	}
-	if cancun && ethHeader.BlobGasUsed == nil {
-		return errMissingBlobGasUsed
-	}
-	if !cancun && ethHeader.ParentBeaconRoot != nil {
-		return fmt.Errorf("%w: have %x, expected nil", errInvalidParentBeaconRootBeforeCancun, *ethHeader.ParentBeaconRoot)
-	}
-	if cancun {
+	if rules.IsCancun {
 		switch {
 		case ethHeader.ParentBeaconRoot == nil:
 			return errMissingParentBeaconRoot
 		case *ethHeader.ParentBeaconRoot != (common.Hash{}):
 			return fmt.Errorf("%w: have %x, expected empty hash", errParentBeaconRootNonEmpty, ethHeader.ParentBeaconRoot)
-		}
-		if ethHeader.BlobGasUsed == nil {
+		case ethHeader.BlobGasUsed == nil:
 			return errBlobGasUsedNilInCancun
-		} else if *ethHeader.BlobGasUsed > 0 {
+		case *ethHeader.BlobGasUsed != 0:
 			return fmt.Errorf("%w: used %d blob gas, expected 0", errBlobsNotEnabled, *ethHeader.BlobGasUsed)
+		case ethHeader.ExcessBlobGas == nil:
+			return fmt.Errorf("%w: have nil, expected 0", errInvalidExcessBlobGas)
+		case *ethHeader.ExcessBlobGas != 0:
+			return fmt.Errorf("%w: have %d, expected 0", errInvalidExcessBlobGas, *ethHeader.ExcessBlobGas)
+		}
+	} else {
+		switch {
+		case ethHeader.ExcessBlobGas != nil:
+			return fmt.Errorf("%w: have %d, expected nil", errInvalidExcessBlobGasBeforeCancun, *ethHeader.ExcessBlobGas)
+		case ethHeader.BlobGasUsed != nil:
+			return fmt.Errorf("%w: have %d, expected nil", errInvalidBlobGasUsedBeforeCancun, *ethHeader.BlobGasUsed)
+		case ethHeader.ParentBeaconRoot != nil:
+			return fmt.Errorf("%w: have %x, expected nil", errInvalidParentBeaconRootBeforeCancun, *ethHeader.ParentBeaconRoot)
 		}
 	}
 
