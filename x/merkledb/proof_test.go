@@ -18,9 +18,9 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/ava-labs/avalanchego/x/sync"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
 func Test_Proof_Empty(t *testing.T) {
@@ -821,7 +821,8 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 		maybe.Nothing[[]byte](),
 		50,
 	)
-	require.ErrorIs(err, sync.ErrNoEndRoot)
+	require.ErrorIs(err, xsync.ErrNoEndRoot)
+	require.ErrorIs(err, xsync.ErrInsufficientHistory)
 
 	_, err = db.GetChangeProof(
 		context.Background(),
@@ -831,7 +832,8 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 		maybe.Nothing[[]byte](),
 		50,
 	)
-	require.ErrorIs(err, sync.ErrInsufficientHistory)
+	require.NotErrorIs(err, xsync.ErrNoEndRoot)
+	require.ErrorIs(err, xsync.ErrInsufficientHistory)
 
 	_, err = db.GetChangeProof(
 		context.Background(),

@@ -423,7 +423,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	)
 	require.NoError(err)
 
-	actionHandler := p2p.TestHandler{}
+	actionHandler := &p2p.TestHandler{}
 
 	ctx := context.Background()
 	syncer, err := xsync.NewManager(
@@ -494,7 +494,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require.NoError(err)
 
 	rangeProofHandler := xsync.NewGetRangeProofHandler(dbToSync)
-	actionHandler := p2p.TestHandler{}
+	actionHandler := &p2p.TestHandler{}
 	m, err := xsync.NewManager(
 		db,
 		ProofFactory{},
