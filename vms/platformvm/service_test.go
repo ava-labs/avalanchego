@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package platformvm
@@ -660,7 +660,7 @@ func TestGetCurrentValidators(t *testing.T) {
 			require.Equal(validator.EndTime().Unix(), int64(gotVdr.EndTime))
 			require.Equal(validator.StartTime().Unix(), int64(gotVdr.StartTime))
 			require.Equal(connectedIDs.Contains(validator.NodeID()), *gotVdr.Connected)
-			require.InDelta(float32(avajson.Float32(100)), float32(*gotVdr.Uptime), 0)
+			require.Equal(float32(avajson.Float32(100)), float32(*gotVdr.Uptime))
 			found = true
 			break
 		}

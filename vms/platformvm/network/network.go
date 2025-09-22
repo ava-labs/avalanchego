@@ -1,10 +1,11 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -53,23 +54,26 @@ func New(
 	registerer prometheus.Registerer,
 	config config.Network,
 ) (*Network, error) {
-	p2pNetwork, err := p2p.NewNetwork(log, appSender, registerer, "p2p")
-	if err != nil {
-		return nil, err
-	}
-
-	marshaller := txMarshaller{}
 	validators := p2p.NewValidators(
-		p2pNetwork.Peers,
 		log,
 		subnetID,
 		vdrs,
 		config.MaxValidatorSetStaleness,
 	)
-	txGossipClient := p2pNetwork.NewClient(
-		p2p.TxGossipHandlerID,
-		p2p.WithValidatorSampling(validators),
+
+	p2pNetwork, err := p2p.NewNetwork(
+		log,
+		appSender,
+		registerer,
+		"p2p",
+		validators,
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	marshaller := txMarshaller{}
+	txGossipClient := p2pNetwork.NewClient(p2p.TxGossipHandlerID, validators)
 	txGossipMetrics, err := gossip.NewMetrics(registerer, "tx")
 	if err != nil {
 		return nil, err
@@ -135,15 +139,21 @@ func New(
 		config.TargetGossipSize,
 	)
 
+	throttlerHandler, err := p2p.NewDynamicThrottlerHandler(
+		log,
+		handler,
+		validators,
+		config.PullGossipThrottlingPeriod,
+		config.PullGossipRequestsPerValidator,
+		registerer,
+		"tx_gossip",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize throttler handler: %w", err)
+	}
+
 	validatorHandler := p2p.NewValidatorHandler(
-		p2p.NewThrottlerHandler(
-			handler,
-			p2p.NewSlidingWindowThrottler(
-				config.PullGossipThrottlingPeriod,
-				config.PullGossipThrottlingLimit,
-			),
-			log,
-		),
+		throttlerHandler,
 		validators,
 		log,
 	)

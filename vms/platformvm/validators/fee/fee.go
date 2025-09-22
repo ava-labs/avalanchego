@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package fee
@@ -33,9 +33,9 @@ type State struct {
 func (s State) AdvanceTime(target gas.Gas, seconds uint64) State {
 	excess := s.Excess
 	if s.Current < target {
-		excess = excess.SubPerSecond(target-s.Current, seconds)
+		excess = excess.SubOverTime(target-s.Current, seconds)
 	} else if s.Current > target {
-		excess = excess.AddPerSecond(s.Current-target, seconds)
+		excess = excess.AddOverTime(s.Current-target, seconds)
 	}
 	return State{
 		Current: s.Current,

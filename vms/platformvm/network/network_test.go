@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package network
@@ -41,7 +41,7 @@ var (
 		PullGossipPollSize:                          1,
 		PullGossipFrequency:                         time.Second,
 		PullGossipThrottlingPeriod:                  time.Second,
-		PullGossipThrottlingLimit:                   1,
+		PullGossipRequestsPerValidator:              1,
 		ExpectedBloomFilterElements:                 10,
 		ExpectedBloomFilterFalsePositiveProbability: .1,
 		MaxBloomFilterFalsePositiveProbability:      .5,
