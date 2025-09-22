@@ -8,9 +8,6 @@ inputs:
   working_directory:
     description: "the working directory to run the command in"
     default: ''
-  run_env:
-    description: 'a string containing env vars for the command e.g. "MY_VAR1=foo MY_VAR2=bar"'
-    default: ''
   runtime:
     description: 'the tmpnet runtime being used'
     default: 'process'
@@ -110,7 +107,7 @@ runs:
     - name: Run command
       shell: bash
       # --impure ensures the env vars are accessible to the command
-      run: ${{ inputs.run_env }} $GITHUB_ACTION_PATH/nix-develop.sh --impure --command bash -x ${{ inputs.run }}
+      run: $GITHUB_ACTION_PATH/nix-develop.sh --impure --command bash -x ${{ inputs.run }}
       working-directory: ${{ inputs.working_directory }}
       env:
         # Always collect metrics locally even when nodes are running in kube to enable collection from the test workload
