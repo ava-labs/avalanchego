@@ -28,8 +28,8 @@ import (
 
 var (
 	ErrNotEnoughGas = errors.New("not enough gas")
-	errNoGasUsed  = errors.New("no gas used")
-	errAVAXMinted = errors.New("AVAX minted")
+	errNoGasUsed    = errors.New("no gas used")
+	errAVAXMinted   = errors.New("AVAX minted")
 )
 
 type meteredTx struct {
