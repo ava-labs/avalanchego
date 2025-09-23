@@ -347,7 +347,7 @@ jobs:
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
           config: firewood
-          current-state-dir-src: 's3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**'
+          current-state-dir-src: 's3://avalanchego-bootstrap-testing/cchain-current-state-firewood-1m/**'
           start-block: '101'
           end-block: '250000'
           push-github-action-benchmark: false
@@ -439,7 +439,7 @@ jobs:
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
           config: firewood
-          current-state-dir-src: 's3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**'
+          current-state-dir-src: 's3://avalanchego-bootstrap-testing/cchain-current-state-firewood-1m/**'
           start-block: '101'
           end-block: '250000'
           push-github-action-benchmark: false
