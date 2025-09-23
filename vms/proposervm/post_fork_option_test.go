@@ -115,7 +115,7 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return childCoreBlk, nil
 	}
-	require.NoError(waitForProposerWindow(proVM, opts[0], postForkOracleBlk.PChainHeight()))
+	require.NoError(advanceTimeToPropose(proVM, opts[0], postForkOracleBlk.PChainHeight()))
 
 	proChild, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)

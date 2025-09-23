@@ -211,7 +211,7 @@ func initTestProposerVM(
 	return coreVM, valState, proVM, db
 }
 
-func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) error {
+func advanceTimeToPropose(vm *VM, chainTip snowman.Block, pChainHeight uint64) error {
 	var (
 		ctx              = context.Background()
 		childBlockHeight = chainTip.Height() + 1
@@ -219,11 +219,12 @@ func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) 
 	)
 
 	for {
-		slot := proposer.TimeToSlot(parentTimestamp, vm.Clock.Time().Truncate(time.Second))
+		now := vm.Clock.Time().Truncate(time.Second)
+		slot := proposer.TimeToSlot(parentTimestamp, now)
 		delay, err := vm.MinDelayForProposer(
 			ctx,
 			childBlockHeight,
-			pchainHeight,
+			pChainHeight,
 			vm.ctx.NodeID,
 			slot,
 		)
@@ -231,10 +232,12 @@ func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) 
 			return err
 		}
 
-		vm.Clock.Set(parentTimestamp.Add(delay))
-		if delay < proposer.MaxLookAheadWindow {
+		delayUntil := parentTimestamp.Add(delay)
+		if !now.Before(delayUntil) {
 			return nil
 		}
+
+		vm.Clock.Set(delayUntil)
 	}
 }
 
@@ -392,7 +395,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		return coreBlk3, nil
 	}
 
-	require.NoError(waitForProposerWindow(proVM, proBlk2, proBlk2.(*postForkBlock).PChainHeight()))
+	require.NoError(advanceTimeToPropose(proVM, proBlk2, proBlk2.(*postForkBlock).PChainHeight()))
 	builtBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -464,7 +467,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		return coreBlk3, nil
 	}
 
-	require.NoError(waitForProposerWindow(proVM, proBlk2, proBlk2.(*postForkBlock).PChainHeight()))
+	require.NoError(advanceTimeToPropose(proVM, proBlk2, proBlk2.(*postForkBlock).PChainHeight()))
 	blk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 

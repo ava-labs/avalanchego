@@ -233,7 +233,7 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 		},
 	}
 
-	require.NoError(waitForProposerWindow(proVM, parentBlk, parentBlk.(*postForkBlock).PChainHeight()))
+	require.NoError(advanceTimeToPropose(proVM, parentBlk, parentBlk.(*postForkBlock).PChainHeight()))
 
 	{
 		// child block referring unknown parent does not verify
@@ -532,7 +532,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	// set VM to be ready to build next block. We set it to generate unsigned blocks
 	// for simplicity.
 	parentBlkPChainHeight := parentBlk.(*postForkBlock).PChainHeight()
-	require.NoError(waitForProposerWindow(proVM, parentBlk, parentBlkPChainHeight))
+	require.NoError(advanceTimeToPropose(proVM, parentBlk, parentBlkPChainHeight))
 
 	childCoreBlk := snowmantest.BuildChild(parentCoreBlk)
 	childBlk := postForkBlock{
