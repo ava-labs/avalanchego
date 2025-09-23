@@ -89,12 +89,13 @@ func runFetchBlocks(cmd *cobra.Command, args []string) error {
 		}
 	}()
 
-	eg := errgroup.Group{}
+	ctx := context.Background()
+	eg, ctx := errgroup.WithContext(ctx)
 	for i := 0; i < concurrency; i++ {
 		eg.Go(func() error {
 			for blockNum := range blocksCh {
 				log.Debug("Fetching block", zap.Uint64("blockNumber", blockNum))
-				block, err := client.BlockByNumber(context.Background(), new(big.Int).SetUint64(blockNum))
+				block, err := client.BlockByNumber(ctx, new(big.Int).SetUint64(blockNum))
 				if err != nil {
 					return fmt.Errorf("failed to fetch block %d: %w", blockNum, err)
 				}
