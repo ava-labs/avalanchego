@@ -175,7 +175,7 @@ const (
 	// clean cache's underlying fastcache.
 	trieCleanCacheStatsNamespace = "hashdb/memcache/clean/fastcache"
 
-	firewoodFileName = "firewood_state"
+	firewoodFileName = "firewood.db"
 )
 
 // cacheableFeeConfig encapsulates fee configuration itself and the block number that it has changed at,

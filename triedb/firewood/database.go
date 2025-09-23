@@ -76,8 +76,12 @@ var Defaults = Config{
 	ReadCacheStrategy:    ffi.CacheAllReads,
 }
 
-func (c Config) BackendConstructor(_ ethdb.Database) triedb.DBOverride {
-	return New(&c)
+func (c Config) BackendConstructor(ethdb.Database) triedb.DBOverride {
+	db, err := New(c)
+	if err != nil {
+		log.Crit("firewood: error creating database", "error", err)
+	}
+	return db
 }
 
 type Database struct {
@@ -94,14 +98,9 @@ type Database struct {
 
 // New creates a new Firewood database with the given disk database and configuration.
 // Any error during creation will cause the program to exit.
-func New(config *Config) *Database {
-	if config == nil {
-		log.Crit("firewood: config must be provided")
-	}
-
-	err := validatePath(config.FilePath)
-	if err != nil {
-		log.Crit("firewood: error validating config", "error", err)
+func New(config Config) (*Database, error) {
+	if err := validatePath(config.FilePath); err != nil {
+		return nil, err
 	}
 
 	fw, err := ffi.New(config.FilePath, &ffi.Config{
@@ -111,12 +110,12 @@ func New(config *Config) *Database {
 		ReadCacheStrategy:    config.ReadCacheStrategy,
 	})
 	if err != nil {
-		log.Crit("firewood: error creating firewood database", "error", err)
+		return nil, err
 	}
 
 	currentRoot, err := fw.Root()
 	if err != nil {
-		log.Crit("firewood: error getting current root", "error", err)
+		return nil, err
 	}
 
 	return &Database{
@@ -125,7 +124,7 @@ func New(config *Config) *Database {
 		proposalTree: &ProposalContext{
 			Root: common.Hash(currentRoot),
 		},
-	}
+	}, nil
 }
 
 func validatePath(path string) error {
@@ -135,17 +134,19 @@ func validatePath(path string) error {
 
 	// Check that the directory exists
 	dir := filepath.Dir(path)
-	_, err := os.Stat(dir)
-	if err == nil {
-		return nil // Directory exists
-	}
-	if !os.IsNotExist(err) {
+	switch info, err := os.Stat(dir); {
+	case os.IsNotExist(err):
+		log.Info("Database directory not found, creating", "path", dir)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return fmt.Errorf("error creating database directory: %w", err)
+		}
+		return nil
+	case err != nil:
 		return fmt.Errorf("error checking database directory: %w", err)
+	case !info.IsDir():
+		return fmt.Errorf("database directory path is not a directory: %s", dir)
 	}
-	log.Info("Database directory not found, creating", "path", dir)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("error creating database directory: %w", err)
-	}
+
 	return nil
 }
 
@@ -161,7 +162,7 @@ func (*Database) Scheme() string {
 }
 
 // Initialized checks whether a non-empty genesis block has been written.
-func (db *Database) Initialized(_ common.Hash) bool {
+func (db *Database) Initialized(common.Hash) bool {
 	rootBytes, err := db.fwDisk.Root()
 	if err != nil {
 		log.Error("firewood: error getting current root", "error", err)
