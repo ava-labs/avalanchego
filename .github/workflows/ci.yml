@@ -290,11 +290,11 @@ jobs:
     permissions:
       id-token: write
       contents: write
-    name: "Baseline: main"
+    name: "Baseline: main(61a80a28)"
     env:
       # Isolate Go caches per job
-      GOCACHE: /tmp/go-build-candidate-${{ github.run_id }}
-      GOMODCACHE: /tmp/go-mod-candidate-${{ github.run_id }}
+      GOCACHE: /tmp/go-build-baseline-${{ github.run_id }}
+      GOMODCACHE: /tmp/go-mod-baseline-${{ github.run_id }}
     steps:
       - name: Install dependencies
         shell: bash
@@ -332,10 +332,6 @@ jobs:
           # Configure go.mod to use local FFI
           go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=./ffi
           go mod download
-
-          # Stash changes for benchmark without this compare-results fails
-          git add go.mod go.sum || true
-          git stash push -m "temp stash for baseline benchmark" || echo "Nothing to stash"
       - name: Run Baseline Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
@@ -354,9 +350,8 @@ jobs:
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
       - name: Restore go.mod changes
-        shell: nix develop --command bash -x {0}
         run: |
-          git stash pop || echo "Nothing to restore"
+          git checkout go.mod go.sum || echo "Nothing to restore"
       - name: Upload baseline results
         uses: actions/upload-artifact@v4
         with:
@@ -418,10 +413,6 @@ jobs:
           # Configure go.mod to use local FFI
           go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=./ffi
           go mod download
-
-          # Stash changes for benchmark
-          git add go.mod go.sum || true
-          git stash push -m "temp stash for candidate benchmark" || echo "Nothing to stash"
       - name: Run Candidate Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
@@ -440,9 +431,8 @@ jobs:
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
       - name: Restore go.mod changes
-        shell: nix develop --command bash -x {0}
         run: |
-          git stash pop || echo "Nothing to restore"
+          git checkout go.mod go.sum || echo "Nothing to restore"
       - name: Upload candidate results
         uses: actions/upload-artifact@v4
         with:
