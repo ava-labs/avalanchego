@@ -18,6 +18,7 @@ var Tests = map[string]func(t *testing.T, newDB func() database.HeightIndex){
 	"CloseAndPut":         TestCloseAndPut,
 	"CloseAndGet":         TestCloseAndGet,
 	"CloseAndHas":         TestCloseAndHas,
+	"Close":               TestClose,
 	"ModifyValueAfterPut": TestModifyValueAfterPut,
 	"ModifyValueAfterGet": TestModifyValueAfterGet,
 }
@@ -237,4 +238,13 @@ func TestModifyValueAfterGet(t *testing.T, newDB func() database.HeightIndex) {
 	require.NoError(t, err)
 	require.Equal(t, originalData, retrievedData2)
 	require.NotEqual(t, retrievedData, retrievedData2)
+}
+
+func TestClose(t *testing.T, newDB func() database.HeightIndex) {
+	db := newDB()
+	require.NoError(t, db.Close())
+
+	// Second close should return error
+	err := db.Close()
+	require.ErrorIs(t, err, database.ErrClosed)
 }

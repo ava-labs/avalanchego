@@ -4,6 +4,7 @@
 package memdb
 
 import (
+	"slices"
 	"sync"
 
 	"github.com/ava-labs/avalanchego/database"
@@ -41,9 +42,7 @@ func (db *Database) Put(height uint64, data []byte) error {
 		// don't save empty slice if data is nil or empty
 		db.data[height] = nil
 	} else {
-		dataCopy := make([]byte, len(data))
-		copy(dataCopy, data)
-		db.data[height] = dataCopy
+		db.data[height] = slices.Clone(data)
 	}
 
 	return nil
@@ -68,9 +67,7 @@ func (db *Database) Get(height uint64) ([]byte, error) {
 		return nil, nil
 	}
 
-	dataCopy := make([]byte, len(data))
-	copy(dataCopy, data)
-	return dataCopy, nil
+	return slices.Clone(data), nil
 }
 
 // Has checks if data exists at the given height
@@ -90,6 +87,10 @@ func (db *Database) Has(height uint64) (bool, error) {
 func (db *Database) Close() error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
+
+	if db.closed {
+		return database.ErrClosed
+	}
 
 	db.closed = true
 	db.data = nil
