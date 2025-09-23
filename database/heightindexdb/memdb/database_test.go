@@ -8,17 +8,17 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/avalanchego/x/blockdb"
+	"github.com/ava-labs/avalanchego/database"
 )
 
-func TestOperationsAfterCloseReturnError(t *testing.T) {
+func TestOperationsAfterClose(t *testing.T) {
 	db := &Database{}
 
 	// Close database
 	require.NoError(t, db.Close())
 
-	height := blockdb.BlockHeight(1)
-	blockData := blockdb.BlockData("test block data")
+	height := uint64(1)
+	blockData := []byte("test block data")
 
 	tests := []struct {
 		name string
@@ -49,7 +49,7 @@ func TestOperationsAfterCloseReturnError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.fn()
-			require.ErrorIs(t, err, blockdb.ErrDatabaseClosed)
+			require.ErrorIs(t, err, database.ErrClosed)
 		})
 	}
 }
@@ -57,16 +57,16 @@ func TestOperationsAfterCloseReturnError(t *testing.T) {
 func TestPut(t *testing.T) {
 	db := &Database{}
 
-	height := blockdb.BlockHeight(1)
-	blockData := blockdb.BlockData("test block data")
+	height := uint64(1)
+	blockData := []byte("test block data")
 	require.NoError(t, db.Put(height, blockData))
 }
 
 func TestGet(t *testing.T) {
 	db := &Database{}
 
-	height := blockdb.BlockHeight(1)
-	blockData := blockdb.BlockData("test block data")
+	height := uint64(1)
+	blockData := []byte("test block data")
 	require.NoError(t, db.Put(height, blockData))
 
 	// Read block back
@@ -78,16 +78,16 @@ func TestGet(t *testing.T) {
 func TestHas(t *testing.T) {
 	t.Run("non-existent block", func(t *testing.T) {
 		db := &Database{}
-		exists, err := db.Has(blockdb.BlockHeight(1))
+		exists, err := db.Has(uint64(1))
 		require.NoError(t, err)
 		require.False(t, exists)
 	})
 
 	t.Run("existing block", func(t *testing.T) {
 		db := &Database{}
-		blockData := blockdb.BlockData("test block data")
-		require.NoError(t, db.Put(blockdb.BlockHeight(1), blockData))
-		exists, err := db.Has(blockdb.BlockHeight(1))
+		blockData := []byte("test block data")
+		require.NoError(t, db.Put(uint64(1), blockData))
+		exists, err := db.Has(uint64(1))
 		require.NoError(t, err)
 		require.True(t, exists)
 	})
@@ -96,9 +96,9 @@ func TestHas(t *testing.T) {
 func TestPut_Overwrite(t *testing.T) {
 	db := &Database{}
 
-	height := blockdb.BlockHeight(1)
-	originalData := blockdb.BlockData("original data")
-	updatedData := blockdb.BlockData("updated data")
+	height := uint64(1)
+	originalData := []byte("original data")
+	updatedData := []byte("updated data")
 
 	// Write original block
 	require.NoError(t, db.Put(height, originalData))
