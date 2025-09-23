@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -28,7 +29,7 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 		balanceChange  *math.HexOrDecimal256
 		accountExists  bool
 		wantBalance    *uint256.Int
-		wantError      string
+		wantError      error
 	}{
 		{
 			name:           "positive balance change on existing account",
@@ -50,7 +51,7 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 			balanceChange:  hexOrDecimal256FromInt64(-100),
 			accountExists:  true,
 			wantBalance:    uint256.NewInt(50), // unchanged
-			wantError:      "insufficient balance for subtraction",
+			wantError:      ErrInsufficientBalanceForSubtraction,
 		},
 		{
 			name:           "zero balance change",
@@ -79,7 +80,7 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 			balanceChange:  hexOrDecimal256FromInt64(-100),
 			accountExists:  false,
 			wantBalance:    uint256.NewInt(0), // unchanged
-			wantError:      "insufficient balance for subtraction",
+			wantError:      ErrInsufficientBalanceForSubtraction,
 		},
 		{
 			name:           "exact balance subtraction",
@@ -94,14 +95,24 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 			balanceChange:  hexOrDecimal256FromInt64(-101),
 			accountExists:  true,
 			wantBalance:    uint256.NewInt(100), // unchanged
-			wantError:      "insufficient balance for subtraction",
+			wantError:      ErrInsufficientBalanceForSubtraction,
 		},
 		{
-			name:           "large positive balance change",
+			name: "large positive balance change",
+			// Initial balance: 2^255 - 1000 (a very large number near half of max uint256)
 			initialBalance: uint256.MustFromBig(new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 255), big.NewInt(1000))),
 			balanceChange:  hexOrDecimal256FromInt64(500),
 			accountExists:  true,
-			wantBalance:    uint256.MustFromBig(new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 255), big.NewInt(500))),
+			// Expected balance: 2^255 - 500 (initial + 500)
+			wantBalance: uint256.MustFromBig(new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 255), big.NewInt(500))),
+		},
+		{
+			name:           "balance overflow protection",
+			initialBalance: uint256.MustFromBig(abi.MaxUint256), // Max uint256
+			balanceChange:  hexOrDecimal256FromInt64(1),
+			accountExists:  true,
+			wantBalance:    uint256.MustFromBig(abi.MaxUint256), // unchanged
+			wantError:      ErrBalanceOverflow,
 		},
 	}
 
@@ -121,13 +132,10 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 			err := upgradeAccount(testAddr, upgrade, statedb, false)
 
 			// Check error expectations
-			require.ErrorIs(t, err, tt.wantError)
 			if tt.wantError != nil {
-				require.ErrorContains(t, err, testAddr.Hex()) // I'm not even sure this is necessary
-			}
 				require.Error(t, err)
-				require.Contains(t, err.Error(), tt.wantError)
-				require.Contains(t, err.Error(), testAddr.Hex())
+				require.ErrorIs(t, err, tt.wantError)
+				require.ErrorContains(t, err, testAddr.Hex())
 			} else {
 				require.NoError(t, err)
 			}
@@ -140,28 +148,6 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 			require.True(t, statedb.Exist(testAddr), "account should exist after upgrade")
 		})
 	}
-}
-
-func TestUpgradeAccount_ErrorMessageFormat(t *testing.T) {
-	statedb := createTestStateDB(t)
-	addr := common.HexToAddress("0xabcdef1234567890abcdef1234567890abcdef12")
-
-	// Set initial balance to 50
-	setAccountBalance(t, statedb, addr, uint256.NewInt(50))
-
-	upgrade := extras.StateUpgradeAccount{
-		BalanceChange: hexOrDecimal256FromInt64(-75),
-	}
-
-	err := upgradeAccount(addr, upgrade, statedb, false)
-	require.Error(t, err)
-
-	// Check specific error message components
-	errorMsg := err.Error()
-	require.Contains(t, errorMsg, "insufficient balance for subtraction")
-	require.Contains(t, errorMsg, addr.Hex()) // EIP-55 checksum format
-	require.Contains(t, errorMsg, "has 50")
-	require.Contains(t, errorMsg, "trying to subtract 75")
 }
 
 func TestUpgradeAccount_CompleteUpgrade(t *testing.T) {

@@ -4,13 +4,20 @@
 package stateupgrade
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/graft/subnet-evm/params/extras"
+)
+
+var (
+	ErrInsufficientBalanceForSubtraction = errors.New("insufficient balance for subtraction")
+	ErrBalanceOverflow                   = errors.New("balance overflow")
 )
 
 // Configure applies the state upgrade to the state.
@@ -37,15 +44,20 @@ func upgradeAccount(account common.Address, upgrade extras.StateUpgradeAccount, 
 		bigChange := (*big.Int)(upgrade.BalanceChange)
 		switch bigChange.Sign() {
 		case 1: // Positive
-			// ParseBig256 already enforced 256-bit limit during JSON parsing, so no overflow check needed
 			balanceChange, _ := uint256.FromBig(bigChange)
+			currentBalance := state.GetBalance(account)
+			if new(big.Int).Add(currentBalance.ToBig(), balanceChange.ToBig()).Cmp(abi.MaxUint256) > 0 {
+				return fmt.Errorf("%w: account %s current balance %s + change %s would exceed maximum uint256",
+					ErrBalanceOverflow, account.Hex(), currentBalance.ToBig().String(), balanceChange.ToBig().String())
+			}
 			state.AddBalance(account, balanceChange)
 		case -1: // Negative
 			absChange := new(big.Int).Abs(bigChange)
 			balanceChange, _ := uint256.FromBig(absChange)
 			currentBalance := state.GetBalance(account)
 			if currentBalance.Cmp(balanceChange) < 0 {
-				return fmt.Errorf("insufficient balance for subtraction: account %s has %s but trying to subtract %s",
+				return fmt.Errorf("%w: account %s has %s but trying to subtract %s",
+					ErrInsufficientBalanceForSubtraction,
 					account.Hex(), currentBalance.ToBig().String(), balanceChange.ToBig().String())
 			}
 			state.SubBalance(account, balanceChange)
