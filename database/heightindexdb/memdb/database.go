@@ -9,9 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
-var (
-	_ database.HeightIndex = (*Database)(nil)
-)
+var _ database.HeightIndex = (*Database)(nil)
 
 // Database is an in-memory implementation of database.HeightIndex
 type Database struct {
