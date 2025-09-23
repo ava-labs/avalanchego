@@ -11,8 +11,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/database"
 )
 
 func TestReadOperations(t *testing.T) {

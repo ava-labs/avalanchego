@@ -339,8 +339,6 @@ func (s *Database) Put(height BlockHeight, block BlockData) error {
 		return fmt.Errorf("%w: block size cannot exceed %d bytes", ErrBlockTooLarge, math.MaxUint32)
 	}
 
-	blockDataLen := uint32(blockSize)
-
 	indexFileOffset, err := s.indexEntryOffset(height)
 	if err != nil {
 		s.log.Error("Failed to write block: failed to calculate index entry offset",
@@ -358,7 +356,7 @@ func (s *Database) Put(height BlockHeight, block BlockData) error {
 		)
 		return fmt.Errorf("failed to compress block data: %w", err)
 	}
-	blockDataLen = uint32(len(blockToWrite))
+	blockDataLen := uint32(len(blockToWrite))
 
 	sizeWithDataHeader, err := safemath.Add(sizeOfBlockEntryHeader, blockDataLen)
 	if err != nil {
