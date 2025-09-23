@@ -84,6 +84,9 @@ tasks:
     cmds:
       - cmd: go mod tidy
       - task: check-clean-branch
+      - cmd: go mod tidy
+        dir: tools
+      - task: check-clean-branch
 
   create-kind-cluster:
     desc: Creates the default kind cluster

@@ -1,12 +1,17 @@
 module github.com/ava-labs/avalanchego
 
+// CLI tools intended for invocation with `go tool` should be added to
+// tools/go.mod to avoid polluting the main module's dependencies. See
+// tools/go.mod for usage details.
+
 // - Changes to the minimum golang version must also be replicated in:
 //   - CONTRIBUTING.md
 //   - README.md
 //   - go.mod (here)
+//   - tools/go.mod
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
-//   - Consider updating the version of golangci-lint (in scripts/lint.sh).
+//   - Consider updating the version of golangci-lint (see tools/go.mod)
 go 1.24.7
 
 require (
