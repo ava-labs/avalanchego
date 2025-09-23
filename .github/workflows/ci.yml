@@ -325,7 +325,7 @@ jobs:
         uses: ./.github/actions/setup-firewood
         with:
           firewood-version: '61a80a28838e3d41d45bf1e428b211e1982d2328'
-          rust-version: '1.88'
+          rust-version: '1.89'
       - name: Configure AvalancheGo to work with Firewood
         run: |
           # Configure go.mod to use local FFI
@@ -410,7 +410,7 @@ jobs:
         uses: ./.github/actions/setup-firewood
         with:
           firewood-version: '7db595487e0bccba02cedbb3dabded7ca24bfa11'
-          rust-version: '1.88'
+          rust-version: '1.89'
       - name: Configure AvalancheGo to work with Firewood
         shell: nix develop --command bash -x {0}
         run: |
