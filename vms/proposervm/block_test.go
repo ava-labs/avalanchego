@@ -50,7 +50,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 		parentTimestamp        = time.Now().Truncate(time.Second)
 		parentHeight    uint64 = 1234
 		blkID                  = ids.GenerateTestID()
-		parentEpoch            = statelessblock.PChainEpoch{}
+		parentEpoch            = statelessblock.Epoch{}
 	)
 
 	innerBlk := snowmanmock.NewBlock(ctrl)
@@ -373,7 +373,7 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 		parentPChainHeght        = pChainHeight - 1
 		parentID                 = ids.GenerateTestID()
 		parentTimestamp          = time.Now().Truncate(time.Second)
-		parentEpoch              = statelessblock.PChainEpoch{}
+		parentEpoch              = statelessblock.Epoch{}
 	)
 	innerParentBlock := snowmantest.Genesis
 	innerChildBlock := snowmantest.BuildChild(innerParentBlock)
@@ -426,59 +426,59 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 func TestNextPChainEpoch(t *testing.T) {
 	var (
 		epochDuration = 5 * time.Minute
-		now           = time.Now()
+		now           = time.Now().Truncate(time.Second)
 	)
 
 	tests := []struct {
 		name               string
 		parentPChainHeight uint64
 		parentTimestamp    time.Time
-		parentEpoch        statelessblock.PChainEpoch
-		expected           statelessblock.PChainEpoch
+		parentEpoch        statelessblock.Epoch
+		expected           statelessblock.Epoch
 	}{
 		{
 			name:               "first granite block",
 			parentPChainHeight: 100,
 			parentTimestamp:    now,
-			parentEpoch: statelessblock.PChainEpoch{
-				Height:    0,
-				Number:    0,
-				StartTime: time.Time{},
+			parentEpoch: statelessblock.Epoch{
+				PChainHeight:   0,
+				Number:         0,
+				StartTimestamp: 0,
 			},
-			expected: statelessblock.PChainEpoch{
-				Height:    100,
-				Number:    1,
-				StartTime: now,
+			expected: statelessblock.Epoch{
+				PChainHeight:   100,
+				Number:         1,
+				StartTimestamp: uint64(now.Unix()),
 			},
 		},
 		{
 			name:               "sealed epoch",
 			parentPChainHeight: 100,
 			parentTimestamp:    now.Add(epochDuration + 1),
-			parentEpoch: statelessblock.PChainEpoch{
-				Height:    2,
-				Number:    2,
-				StartTime: now,
+			parentEpoch: statelessblock.Epoch{
+				PChainHeight:   2,
+				Number:         2,
+				StartTimestamp: uint64(now.Unix()),
 			},
-			expected: statelessblock.PChainEpoch{
-				Height:    100,
-				Number:    3,
-				StartTime: now.Add(epochDuration + 1),
+			expected: statelessblock.Epoch{
+				PChainHeight:   100,
+				Number:         3,
+				StartTimestamp: uint64(now.Add(epochDuration + 1).Unix()),
 			},
 		},
 		{
 			name:               "no epoch change",
 			parentPChainHeight: 100,
 			parentTimestamp:    now.Add(epochDuration),
-			parentEpoch: statelessblock.PChainEpoch{
-				Height:    2,
-				Number:    2,
-				StartTime: now,
+			parentEpoch: statelessblock.Epoch{
+				PChainHeight:   2,
+				Number:         2,
+				StartTimestamp: uint64(now.Unix()),
 			},
-			expected: statelessblock.PChainEpoch{
-				Height:    2,
-				Number:    2,
-				StartTime: now,
+			expected: statelessblock.Epoch{
+				PChainHeight:   2,
+				Number:         2,
+				StartTimestamp: uint64(now.Unix()),
 			},
 		},
 	}

@@ -21,10 +21,10 @@ func TestParseBlocks(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
-	pChainEpoch := PChainEpoch{
-		Height:    2,
-		Number:    0,
-		StartTime: time.Unix(123, 0),
+	pChainEpoch := Epoch{
+		PChainHeight:   2,
+		Number:         0,
+		StartTimestamp: 123,
 	}
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
@@ -58,14 +58,42 @@ func TestParseBlocks(t *testing.T) {
 		output []ParseResult
 	}{
 		{
-			name:   "ValidThenInvalid",
-			input:  [][]byte{signedBlockBytes, malformedBlockBytes},
-			output: []ParseResult{{Block: &statelessBlock{bytes: signedBlockBytes}}, {Err: wrappers.ErrInsufficientLength}},
+			name: "ValidThenInvalid",
+			input: [][]byte{
+				signedBlockBytes,
+				malformedBlockBytes,
+			},
+			output: []ParseResult{
+				{
+					Block: &statelessBlock{
+						statelessBlockMetadata: statelessBlockMetadata{
+							bytes: signedBlockBytes,
+						},
+					},
+				},
+				{
+					Err: wrappers.ErrInsufficientLength,
+				},
+			},
 		},
 		{
-			name:   "InvalidThenValid",
-			input:  [][]byte{malformedBlockBytes, signedBlockBytes},
-			output: []ParseResult{{Err: wrappers.ErrInsufficientLength}, {Block: &statelessBlock{bytes: signedBlockBytes}}},
+			name: "InvalidThenValid",
+			input: [][]byte{
+				malformedBlockBytes,
+				signedBlockBytes,
+			},
+			output: []ParseResult{
+				{
+					Err: wrappers.ErrInsufficientLength,
+				},
+				{
+					Block: &statelessBlock{
+						statelessBlockMetadata: statelessBlockMetadata{
+							bytes: signedBlockBytes,
+						},
+					},
+				},
+			},
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -87,10 +115,10 @@ func TestParse(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
-	pChainEpoch := PChainEpoch{
-		Height:    2,
-		Number:    0,
-		StartTime: time.Unix(123, 0),
+	pChainEpoch := Epoch{
+		PChainHeight:   2,
+		Number:         0,
+		StartTimestamp: 123,
 	}
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}

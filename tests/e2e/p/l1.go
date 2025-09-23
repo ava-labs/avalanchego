@@ -401,7 +401,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 
 			epochAfter, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
 			require.NoError(err)
-			require.Greater(epochAfter.Height, epochBefore.Height)
+			require.Greater(epochAfter.PChainHeight, epochBefore.PChainHeight)
 		})
 
 		tc.By("creating the validator to register")

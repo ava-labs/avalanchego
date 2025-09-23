@@ -133,7 +133,7 @@ func (*postForkBlock) verifyPreForkChild(context.Context, *preForkBlock) error {
 func (b *postForkBlock) verifyPostForkChild(ctx context.Context, child *postForkBlock) error {
 	parentTimestamp := b.Timestamp()
 	parentPChainHeight := b.PChainHeight()
-	parentEpoch := b.PChainEpoch()
+	parentEpoch := b.Epoch()
 	return b.postForkCommonComponents.Verify(
 		ctx,
 		parentTimestamp,
@@ -165,7 +165,7 @@ func (b *postForkBlock) buildChild(ctx context.Context) (Block, error) {
 		b.ID(),
 		b.Timestamp(),
 		b.PChainHeight(),
-		b.PChainEpoch(),
+		b.Epoch(),
 	)
 }
 
@@ -173,8 +173,8 @@ func (b *postForkBlock) pChainHeight(context.Context) (uint64, error) {
 	return b.PChainHeight(), nil
 }
 
-func (b *postForkBlock) pChainEpoch(context.Context) (block.PChainEpoch, error) {
-	return b.PChainEpoch(), nil
+func (b *postForkBlock) pChainEpoch(context.Context) (block.Epoch, error) {
+	return b.Epoch(), nil
 }
 
 func (b *postForkBlock) getStatelessBlk() block.Block {

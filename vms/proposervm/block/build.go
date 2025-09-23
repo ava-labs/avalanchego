@@ -18,32 +18,28 @@ func BuildUnsigned(
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
-	pChainEpoch PChainEpoch,
+	epoch Epoch,
 	blockBytes []byte,
 ) (SignedBlock, error) {
-	var block SignedBlock
-	if pChainEpoch.Number == 0 {
+	var (
+		preGraniteStatelessUnsignedBlock = statelessUnsignedBlock{
+			ParentID:     parentID,
+			Timestamp:    timestamp.Unix(),
+			PChainHeight: pChainHeight,
+			Certificate:  nil,
+			Block:        blockBytes,
+		}
+		block SignedBlock
+	)
+	if epoch.Number == 0 {
 		block = &statelessBlock{
-			StatelessBlock: statelessUnsignedBlock{
-				ParentID:     parentID,
-				Timestamp:    timestamp.Unix(),
-				PChainHeight: pChainHeight,
-				Certificate:  nil,
-				Block:        blockBytes,
-			},
-			timestamp: timestamp,
+			StatelessBlock: preGraniteStatelessUnsignedBlock,
 		}
 	} else {
 		block = &statelessGraniteBlock{
 			StatelessBlock: statelessUnsignedGraniteBlock{
-				ParentID:            parentID,
-				Timestamp:           timestamp.Unix(),
-				PChainHeight:        pChainHeight,
-				Certificate:         nil,
-				Block:               blockBytes,
-				EpochNumber:         pChainEpoch.Number,
-				EpochStartTimestamp: pChainEpoch.StartTime.Unix(),
-				EpochHeight:         pChainEpoch.Height,
+				StatelessBlock: preGraniteStatelessUnsignedBlock,
+				Epoch:          epoch,
 			},
 		}
 	}
@@ -60,42 +56,47 @@ func Build(
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
-	pChainEpoch PChainEpoch,
+	epoch Epoch,
 	cert *staking.Certificate,
 	blockBytes []byte,
 	chainID ids.ID,
 	key crypto.Signer,
 ) (SignedBlock, error) {
-	var block SignedBlock
-	if pChainEpoch.Number == 0 {
-		block = &statelessBlock{
-			StatelessBlock: statelessUnsignedBlock{
-				ParentID:     parentID,
-				Timestamp:    timestamp.Unix(),
-				PChainHeight: pChainHeight,
-				Certificate:  cert.Raw,
-				Block:        blockBytes,
-			},
+	var (
+		preGraniteStatelessUnsignedBlock = statelessUnsignedBlock{
+			ParentID:     parentID,
+			Timestamp:    timestamp.Unix(),
+			PChainHeight: pChainHeight,
+			Certificate:  cert.Raw,
+			Block:        blockBytes,
+		}
+		block    SignedBlock
+		sig      *[]byte
+		metadata = &statelessBlockMetadata{
 			timestamp: timestamp,
 			cert:      cert,
 			proposer:  ids.NodeIDFromCert(cert),
 		}
+	)
+	if epoch.Number == 0 {
+		blk := &statelessBlock{
+			StatelessBlock:         preGraniteStatelessUnsignedBlock,
+			statelessBlockMetadata: *metadata,
+		}
+		block = blk
+		sig = &blk.Signature
+		metadata = &blk.statelessBlockMetadata
 	} else {
-		block = &statelessGraniteBlock{
+		blk := &statelessGraniteBlock{
 			StatelessBlock: statelessUnsignedGraniteBlock{
-				ParentID:            parentID,
-				Timestamp:           timestamp.Unix(),
-				PChainHeight:        pChainHeight,
-				Certificate:         cert.Raw,
-				Block:               blockBytes,
-				EpochNumber:         pChainEpoch.Number,
-				EpochStartTimestamp: pChainEpoch.StartTime.Unix(),
-				EpochHeight:         pChainEpoch.Height,
+				StatelessBlock: preGraniteStatelessUnsignedBlock,
+				Epoch:          epoch,
 			},
-			timestamp: timestamp,
-			cert:      cert,
-			proposer:  ids.NodeIDFromCert(cert),
+			statelessBlockMetadata: *metadata,
 		}
+		block = blk
+		sig = &blk.Signature
+		metadata = &blk.statelessBlockMetadata
 	}
 
 	unsignedBytesWithEmptySignature, err := Codec.Marshal(CodecVersion, &block)
@@ -111,9 +112,8 @@ func Build(
 	unsignedBytes := unsignedBytesWithEmptySignature[:lenUnsignedBytes]
 
 	// Set the block ID
-	block.setID(hashing.ComputeHash256Array(unsignedBytes))
-
-	header, err := BuildHeader(chainID, parentID, block.ID())
+	metadata.id = hashing.ComputeHash256Array(unsignedBytes)
+	header, err := BuildHeader(chainID, parentID, metadata.id)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func Build(
 	}
 
 	// Set the signature
-	block.setSignature(signature)
+	*sig = signature
 
 	// Marshal the final block with signature
 	finalBytes, err := Codec.Marshal(CodecVersion, &block)
@@ -134,8 +134,7 @@ func Build(
 	}
 
 	// Set the final bytes
-	block.setBytes(finalBytes)
-
+	metadata.bytes = finalBytes
 	return block, nil
 }
 

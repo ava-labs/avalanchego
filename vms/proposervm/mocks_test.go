@@ -228,10 +228,10 @@ func (mr *MockPostForkBlockMockRecorder) getStatelessBlk() *gomock.Call {
 }
 
 // pChainEpoch mocks base method.
-func (m *MockPostForkBlock) pChainEpoch(arg0 context.Context) (block.PChainEpoch, error) {
+func (m *MockPostForkBlock) pChainEpoch(arg0 context.Context) (block.Epoch, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "pChainEpoch", arg0)
-	ret0, _ := ret[0].(block.PChainEpoch)
+	ret0, _ := ret[0].(block.Epoch)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

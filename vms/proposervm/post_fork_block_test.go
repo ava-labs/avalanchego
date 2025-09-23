@@ -67,7 +67,7 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 		ids.Empty, // refer unknown parent
 		time.Time{},
 		0, // pChainHeight,
-		block.PChainEpoch{},
+		block.Epoch{},
 		proVM.StakingCertLeaf,
 		innerOracleBlk.Bytes(),
 		proVM.ctx.ChainID,
@@ -150,7 +150,7 @@ func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 	// set proVM to be able to build unsigned blocks
 	proVM.Set(proVM.Time().Add(proposer.MaxVerifyDelay))
 
-	childEpoch := nextPChainEpoch(0, block.PChainEpoch{}, parentBlk.Timestamp(), proVM.Upgrades.GraniteEpochDuration)
+	childEpoch := nextPChainEpoch(0, block.Epoch{}, parentBlk.Timestamp(), proVM.Upgrades.GraniteEpochDuration)
 
 	{
 		// child block referring unknown parent does not verify
@@ -249,7 +249,7 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 			ids.Empty, // refer unknown parent
 			proVM.Time(),
 			pChainHeight,
-			block.PChainEpoch{},
+			block.Epoch{},
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -268,7 +268,7 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			pChainHeight,
-			block.PChainEpoch{},
+			block.Epoch{},
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -365,7 +365,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		},
 	}
 
-	childEpoch := nextPChainEpoch(parentPChainHeight, block.PChainEpoch{}, parentTimestamp, proVM.Upgrades.GraniteEpochDuration)
+	childEpoch := nextPChainEpoch(parentPChainHeight, block.Epoch{}, parentTimestamp, proVM.Upgrades.GraniteEpochDuration)
 
 	{
 		// child block timestamp cannot be lower than parent timestamp
@@ -564,7 +564,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 
 	nextEpoch := nextPChainEpoch(
 		parentBlkPChainHeight,
-		block.PChainEpoch{},
+		block.Epoch{},
 		parentBlk.Timestamp(),
 		proVM.Upgrades.GraniteEpochDuration,
 	)
@@ -760,7 +760,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 
 	nextEpoch := nextPChainEpoch(
 		parentBlkPChainHeight,
-		block.PChainEpoch{},
+		block.Epoch{},
 		parentBlk.Timestamp(),
 		proVM.Upgrades.GraniteEpochDuration,
 	)
@@ -833,7 +833,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			parentBlk.ID(),
 			nextTime,
 			currPChainHeight*2,
-			block.PChainEpoch{},
+			block.Epoch{},
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -1113,7 +1113,7 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		postForkOracleBlk.ID(),
 		postForkOracleBlk.Timestamp().Add(proposer.WindowDuration),
 		postForkOracleBlk.PChainHeight(),
-		block.PChainEpoch{},
+		block.Epoch{},
 		proVM.StakingCertLeaf,
 		oracleCoreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
@@ -1170,7 +1170,7 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 		snowmantest.GenesisID,
 		snowmantest.GenesisTimestamp,
 		4,
-		block.PChainEpoch{},
+		block.Epoch{},
 		coreBlk.Bytes(),
 	)
 	require.NoError(err)
