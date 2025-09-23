@@ -32,17 +32,17 @@ func TestGetValidatorSetPrimaryNetwork(t *testing.T) {
 	mockState.EXPECT().GetValidatorSet(gomock.Any(), gomock.Any(), mySubnetID).Return(make(map[ids.NodeID]*validators.GetValidatorOutput), nil)
 	output, err := state.GetValidatorSet(context.Background(), 10, mySubnetID)
 	require.NoError(err)
-	require.Len(output, 0)
+	require.Empty(output)
 
 	// Expect that requesting the Primary Network validator set overrides and returns my validator set
 	mockState.EXPECT().GetValidatorSet(gomock.Any(), gomock.Any(), mySubnetID).Return(make(map[ids.NodeID]*validators.GetValidatorOutput), nil)
 	output, err = state.GetValidatorSet(context.Background(), 10, constants.PrimaryNetworkID)
 	require.NoError(err)
-	require.Len(output, 0)
+	require.Empty(output)
 
 	// Expect that requesting other validator set returns that validator set
 	mockState.EXPECT().GetValidatorSet(gomock.Any(), gomock.Any(), otherSubnetID).Return(make(map[ids.NodeID]*validators.GetValidatorOutput), nil)
 	output, err = state.GetValidatorSet(context.Background(), 10, otherSubnetID)
 	require.NoError(err)
-	require.Len(output, 0)
+	require.Empty(output)
 }

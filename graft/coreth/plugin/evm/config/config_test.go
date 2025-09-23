@@ -11,7 +11,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/libevm/common"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -120,11 +119,11 @@ func TestUnmarshalConfig(t *testing.T) {
 			var tmp Config
 			err := json.Unmarshal(tt.givenJSON, &tmp)
 			if tt.expectedErr {
-				assert.Error(t, err)
+				require.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				tmp.deprecate()
-				assert.Equal(t, tt.expected, tmp)
+				require.Equal(t, tt.expected, tmp)
 			}
 		})
 	}

@@ -133,7 +133,7 @@ func TestGenesisToBlockDecoding(t *testing.T) {
 			readHeader := rawdb.ReadHeader(db, block.Hash(), 0)
 			require.Equal(t, block.Hash(), readHeader.Hash())
 			require.Equal(t, previousHashes[fork], block.Hash())
-			require.EqualValues(t, block.Header(), readHeader)
+			require.Equal(t, block.Header(), readHeader)
 		})
 	}
 }

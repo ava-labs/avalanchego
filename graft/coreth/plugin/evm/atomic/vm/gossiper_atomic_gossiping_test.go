@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/utils/set"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
@@ -26,12 +26,12 @@ import (
 // show that a txID discovered from gossip is requested to the same node only if
 // the txID is unknown
 func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vm := newAtomicTestVM()
 	tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{})
 	defer func() {
-		assert.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(context.Background()))
 	}()
 
 	nodeID := ids.GenerateTestNodeID()
@@ -61,63 +61,63 @@ func TestMempoolAtmTxsAppGossipHandling(t *testing.T) {
 	// gossip tx and check it is accepted and gossiped
 	marshaller := atomic.TxMarshaller{}
 	txBytes, err := marshaller.MarshalGossip(tx)
-	assert.NoError(err)
+	require.NoError(err)
 	vm.Ctx.Lock.Unlock()
 
 	msgBytes, err := buildAtomicPushGossip(txBytes)
-	assert.NoError(err)
+	require.NoError(err)
 
 	// show that no txID is requested
-	assert.NoError(vm.AppGossip(context.Background(), nodeID, msgBytes))
+	require.NoError(vm.AppGossip(context.Background(), nodeID, msgBytes))
 	time.Sleep(500 * time.Millisecond)
 
 	vm.Ctx.Lock.Lock()
 
-	assert.False(txRequested, "tx should not have been requested")
+	require.False(txRequested, "tx should not have been requested")
 	txGossipedLock.Lock()
-	assert.Equal(0, txGossiped, "tx should not have been gossiped")
+	require.Zero(txGossiped, "tx should not have been gossiped")
 	txGossipedLock.Unlock()
-	assert.True(vm.AtomicMempool.Has(tx.ID()))
+	require.True(vm.AtomicMempool.Has(tx.ID()))
 
 	vm.Ctx.Lock.Unlock()
 
 	// show that tx is not re-gossiped
-	assert.NoError(vm.AppGossip(context.Background(), nodeID, msgBytes))
+	require.NoError(vm.AppGossip(context.Background(), nodeID, msgBytes))
 
 	vm.Ctx.Lock.Lock()
 
 	txGossipedLock.Lock()
-	assert.Equal(0, txGossiped, "tx should not have been gossiped")
+	require.Zero(txGossiped, "tx should not have been gossiped")
 	txGossipedLock.Unlock()
 
 	// show that conflicting tx is not added to mempool
 	marshaller = atomic.TxMarshaller{}
 	txBytes, err = marshaller.MarshalGossip(conflictingTx)
-	assert.NoError(err)
+	require.NoError(err)
 
 	vm.Ctx.Lock.Unlock()
 
 	msgBytes, err = buildAtomicPushGossip(txBytes)
-	assert.NoError(err)
-	assert.NoError(vm.AppGossip(context.Background(), nodeID, msgBytes))
+	require.NoError(err)
+	require.NoError(vm.AppGossip(context.Background(), nodeID, msgBytes))
 
 	vm.Ctx.Lock.Lock()
 
-	assert.False(txRequested, "tx should not have been requested")
+	require.False(txRequested, "tx should not have been requested")
 	txGossipedLock.Lock()
-	assert.Equal(0, txGossiped, "tx should not have been gossiped")
+	require.Zero(txGossiped, "tx should not have been gossiped")
 	txGossipedLock.Unlock()
-	assert.False(vm.AtomicMempool.Has(conflictingTx.ID()), "conflicting tx should not be in the atomic mempool")
+	require.False(vm.AtomicMempool.Has(conflictingTx.ID()), "conflicting tx should not be in the atomic mempool")
 }
 
 // show that txs already marked as invalid are not re-requested on gossiping
 func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
-	assert := assert.New(t)
+	require := require.New(t)
 
 	vm := newAtomicTestVM()
 	tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{})
 	defer func() {
-		assert.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(context.Background()))
 	}()
 
 	var (
@@ -148,29 +148,29 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 	vm.AtomicMempool.DiscardCurrentTx(txID)
 
 	// Check the mempool does not contain the discarded transaction
-	assert.False(vm.AtomicMempool.Has(txID))
+	require.False(vm.AtomicMempool.Has(txID))
 
 	// Gossip the transaction to the VM and ensure that it is not added to the mempool
 	// and is not re-gossipped.
 	nodeID := ids.GenerateTestNodeID()
 	marshaller := atomic.TxMarshaller{}
 	txBytes, err := marshaller.MarshalGossip(tx)
-	assert.NoError(err)
+	require.NoError(err)
 
 	vm.Ctx.Lock.Unlock()
 
 	msgBytes, err := buildAtomicPushGossip(txBytes)
-	assert.NoError(err)
-	assert.NoError(vm.AppGossip(context.Background(), nodeID, msgBytes))
+	require.NoError(err)
+	require.NoError(vm.AppGossip(context.Background(), nodeID, msgBytes))
 
 	vm.Ctx.Lock.Lock()
 
-	assert.False(txRequested, "tx shouldn't be requested")
+	require.False(txRequested, "tx shouldn't be requested")
 	txGossipedLock.Lock()
-	assert.Zero(txGossiped, "tx should not have been gossiped")
+	require.Zero(txGossiped, "tx should not have been gossiped")
 	txGossipedLock.Unlock()
 
-	assert.False(vm.AtomicMempool.Has(txID))
+	require.False(vm.AtomicMempool.Has(txID))
 
 	vm.Ctx.Lock.Unlock()
 
@@ -183,13 +183,13 @@ func TestMempoolAtmTxsAppGossipHandlingDiscardedTx(t *testing.T) {
 
 	vm.Ctx.Lock.Lock()
 
-	assert.False(txRequested, "tx shouldn't be requested")
+	require.False(txRequested, "tx shouldn't be requested")
 	txGossipedLock.Lock()
-	assert.Equal(1, txGossiped, "conflicting tx should have been gossiped")
+	require.Equal(1, txGossiped, "conflicting tx should have been gossiped")
 	txGossipedLock.Unlock()
 
-	assert.False(vm.AtomicMempool.Has(txID))
-	assert.True(vm.AtomicMempool.Has(conflictingTx.ID()))
+	require.False(vm.AtomicMempool.Has(txID))
+	require.True(vm.AtomicMempool.Has(conflictingTx.ID()))
 }
 
 func buildAtomicPushGossip(txBytes []byte) ([]byte, error) {

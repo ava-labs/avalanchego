@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/core"
@@ -165,7 +166,7 @@ func testImportMissingUTXOs(t *testing.T, scheme string) {
 	// This should not result in a bad block since the missing UTXO should
 	// prevent InsertBlockManual from being called.
 	badBlocks, _ := vm2.Ethereum().BlockChain().BadBlocks()
-	require.Len(t, badBlocks, 0)
+	require.Empty(t, badBlocks)
 }
 
 // Simple test to ensure we can issue an import transaction followed by an export transaction
@@ -1162,7 +1163,7 @@ func TestAtomicTxBuildBlockDropsConflicts(t *testing.T) {
 	blockExtension, ok := wrappedBlk.GetBlockExtension().(*blockExtension)
 	require.True(t, ok, "expected block to be a blockExtension")
 	atomicTxs := blockExtension.atomicTxs
-	require.True(t, len(atomicTxs) == len(vmtest.TestKeys), "Conflict transactions should be out of the batch")
+	require.Len(t, atomicTxs, len(vmtest.TestKeys), "Conflict transactions should be out of the batch")
 	atomicTxIDs := set.Set[ids.ID]{}
 	for _, tx := range atomicTxs {
 		atomicTxIDs.Add(tx.ID())
@@ -1930,8 +1931,8 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(ctx)
-					require.ErrorIs(t, err, context.DeadlineExceeded)
-					require.Zero(t, msg)
+					assert.ErrorIs(t, err, context.DeadlineExceeded)
+					assert.Zero(t, msg)
 				}()
 
 				wg.Wait()
@@ -1949,8 +1950,8 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
-					require.NoError(t, err)
-					require.Equal(t, commonEng.PendingTxs, msg)
+					assert.NoError(t, err)
+					assert.Equal(t, commonEng.PendingTxs, msg)
 				}()
 
 				require.NoError(t, vm.AtomicMempool.AddLocalTx(importTx))
@@ -1985,8 +1986,8 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(ctx)
-					require.ErrorIs(t, err, context.DeadlineExceeded)
-					require.Zero(t, msg)
+					assert.ErrorIs(t, err, context.DeadlineExceeded)
+					assert.Zero(t, msg)
 				}()
 
 				wg.Wait()
@@ -2011,8 +2012,8 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
-					require.NoError(t, err)
-					require.Equal(t, commonEng.PendingTxs, msg)
+					assert.NoError(t, err)
+					assert.Equal(t, commonEng.PendingTxs, msg)
 				}()
 
 				wg.Wait()
@@ -2066,9 +2067,9 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
-					require.NoError(t, err)
-					require.Equal(t, commonEng.PendingTxs, msg)
-					require.GreaterOrEqual(t, time.Since(lastBuildBlockTime), evm.MinBlockBuildingRetryDelay)
+					assert.NoError(t, err)
+					assert.Equal(t, commonEng.PendingTxs, msg)
+					assert.GreaterOrEqual(t, time.Since(lastBuildBlockTime), evm.MinBlockBuildingRetryDelay)
 				}()
 
 				wg.Wait()

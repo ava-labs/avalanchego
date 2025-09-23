@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/libevm/common"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/plugin/evm/atomic/atomictest"
@@ -23,7 +22,7 @@ func TestIteratorCanIterate(t *testing.T) {
 	lastAcceptedHeight := uint64(1000)
 	db := versiondb.New(memdb.New())
 	repo, err := NewAtomicTxRepository(db, atomictest.TestTxCodec, lastAcceptedHeight)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// create state with multiple transactions
 	// since each test transaction generates random ID for blockchainID we should get
@@ -34,25 +33,25 @@ func TestIteratorCanIterate(t *testing.T) {
 	// create an atomic trie
 	// on create it will initialize all the transactions from the above atomic repository
 	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, 100)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	atomicTrie1 := atomicBackend.AtomicTrie()
 
 	lastCommittedHash1, lastCommittedHeight1 := atomicTrie1.LastCommitted()
-	assert.NoError(t, err)
-	assert.NotEqual(t, common.Hash{}, lastCommittedHash1)
-	assert.EqualValues(t, 1000, lastCommittedHeight1)
+	require.NoError(t, err)
+	require.NotZero(t, lastCommittedHash1)
+	require.Equal(t, uint64(1000), lastCommittedHeight1)
 
 	verifyOperations(t, atomicTrie1, atomictest.TestTxCodec, lastCommittedHash1, 1, 1000, operationsMap)
 
 	// iterate on a new atomic trie to make sure there is no resident state affecting the data and the
 	// iterator
 	atomicBackend2, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, lastAcceptedHeight, common.Hash{}, 100)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	atomicTrie2 := atomicBackend2.AtomicTrie()
 	lastCommittedHash2, lastCommittedHeight2 := atomicTrie2.LastCommitted()
-	assert.NoError(t, err)
-	assert.NotEqual(t, common.Hash{}, lastCommittedHash2)
-	assert.EqualValues(t, 1000, lastCommittedHeight2)
+	require.NoError(t, err)
+	require.NotZero(t, lastCommittedHash2)
+	require.Equal(t, uint64(1000), lastCommittedHeight2)
 
 	verifyOperations(t, atomicTrie2, atomictest.TestTxCodec, lastCommittedHash1, 1, 1000, operationsMap)
 }
@@ -78,8 +77,8 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 	atomicTrie := atomicBackend.AtomicTrie()
 
 	lastCommittedHash, lastCommittedHeight := atomicTrie.LastCommitted()
-	require.NotEqual(common.Hash{}, lastCommittedHash)
-	require.EqualValues(1000, lastCommittedHeight)
+	require.NotZero(lastCommittedHash)
+	require.Equal(uint64(1000), lastCommittedHeight)
 
 	verifyOperations(t, atomicTrie, atomictest.TestTxCodec, lastCommittedHash, 1, 1000, operationsMap)
 
