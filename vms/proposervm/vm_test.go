@@ -39,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -648,8 +647,8 @@ func TestPreFork_Initialize(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = mockable.MaxTime
-		durangoTime    = activationTime
+		activationTime = upgrade.UnscheduledActivationTime
+		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -671,8 +670,8 @@ func TestPreFork_BuildBlock(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = mockable.MaxTime
-		durangoTime    = activationTime
+		activationTime = upgrade.UnscheduledActivationTime
+		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -704,8 +703,8 @@ func TestPreFork_ParseBlock(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = mockable.MaxTime
-		durangoTime    = activationTime
+		activationTime = upgrade.UnscheduledActivationTime
+		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -737,8 +736,8 @@ func TestPreFork_SetPreference(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = mockable.MaxTime
-		durangoTime    = activationTime
+		activationTime = upgrade.UnscheduledActivationTime
+		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1234,7 +1233,7 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
+		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1323,7 +1322,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
+		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1395,7 +1394,7 @@ func TestTooFarAdvanced(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
+		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1468,7 +1467,7 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 
 	var (
 		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
+		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -2528,7 +2527,11 @@ func TestLocalParse(t *testing.T) {
 func TestTimestampMetrics(t *testing.T) {
 	ctx := context.Background()
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, time.Unix(0, 0), mockable.MaxTime, 0)
+	var (
+		activationTime = time.Unix(0, 0)
+		durangoTime    = upgrade.UnscheduledActivationTime
+	)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 
 	defer func() {
 		require.NoError(t, proVM.Shutdown(ctx))
