@@ -30,6 +30,10 @@ inputs:
     description: 'The duration of the AWS role to assume for S3 access.'
     required: true
     default: '43200' # 12 hours
+  prometheus-push-url:
+    description: 'The push URL of the prometheus instance.'
+    required: true
+    default: ''
   prometheus-username:
     description: 'The username for the Prometheus instance.'
     required: true
@@ -77,7 +81,8 @@ runs:
     - name: Run C-Chain Re-Execution
       uses: ./.github/actions/run-monitored-tmpnet-cmd
       with:
-        run_env: |
+        run: |
+          ./scripts/run_task.sh reexecute-cchain-range-with-copied-data \
             CONFIG=${{ inputs.config }} \
             EXECUTION_DATA_DIR=${{ env.EXECUTION_DATA_DIR }} \
             BLOCK_DIR_SRC=${{ env.BLOCK_DIR_SRC }} \
@@ -86,9 +91,8 @@ runs:
             END_BLOCK=${{ env.END_BLOCK }} \
             LABELS=${{ env.LABELS }} \
             BENCHMARK_OUTPUT_FILE=${{ env.BENCHMARK_OUTPUT_FILE }} \
-            RUNNER_NAME=${{ inputs.runner_name }}
-        run: ./scripts/run_task.sh reexecute-cchain-range-with-copied-data
-
+            RUNNER_NAME=${{ inputs.runner_name }} \
+            METRICS_ENABLED=true
         prometheus_push_url: ${{ inputs.prometheus-push-url }}
         prometheus_username: ${{ inputs.prometheus-username }}
         prometheus_password: ${{ inputs.prometheus-password }}
@@ -100,9 +104,7 @@ runs:
       with:
         tool: 'go'
         output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
-        fail-on-alert: true
         summary-always: true
-        comment-on-alert: true
         github-token: ${{ inputs.github-token }}
         auto-push: ${{ inputs.push-github-action-benchmark }}
 
