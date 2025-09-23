@@ -3,6 +3,9 @@
 </div>
 
 ---
+[![Release](https://img.shields.io/github/v/release/ava-labs/avalanchego)](https://github.com/ava-labs/avalanchego/releases)
+[![Test](https://github.com/ava-labs/avalanchego/actions/workflows/ci.yml/badge.svg)](https://github.com/ava-labs/avalanchego/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/ava-labs/avalanchego)](https://github.com/ava-labs/avalanchego/blob/master/LICENSE)
 
 Node implementation for the [Avalanche](https://avax.network) network -
 a blockchains platform with high throughput, and blazing fast transactions.
