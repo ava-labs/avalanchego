@@ -137,6 +137,8 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 	return nil
 }
 
+// tryToEvictTxs tries to evict transactions until there is capacity to add the
+// given txToAdd.
 func (m *Mempool) tryEvictTxs(txToAdd meteredTx) error {
 	gasToFree := txToAdd.gasUsed - m.gasAvailable
 	gasFreed := gas.Gas(0)
