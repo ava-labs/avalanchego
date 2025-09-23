@@ -84,6 +84,17 @@ tasks:
     cmds:
       - cmd: go mod tidy
       - task: check-clean-branch
+      - cmd: go mod tidy
+        dir: tools
+      - task: check-clean-branch
+
+  create-kind-cluster:
+    desc: Creates the default kind cluster
+    cmd: bash -x ./scripts/start_kind_cluster.sh {{.CLI_ARGS}}
+
+  delete-kind-cluster:
+    desc: Deletes the default kind cluster
+    cmd: kind delete cluster
 
   export-cchain-block-range:
     desc: Export range of C-Chain blocks from source to target directory.
@@ -192,7 +203,7 @@ tasks:
       END_BLOCK: '{{.END_BLOCK}}'
       LABELS: '{{.LABELS | default ""}}'
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
-      METRICS_ENABLED: '{{.METRICS_ENABLED | default "true"}}'
+      METRICS_ENABLED: '{{.METRICS_ENABLED | default "false"}}'
     cmd: |
       CURRENT_STATE_DIR={{.CURRENT_STATE_DIR}} \
       BLOCK_DIR={{.BLOCK_DIR}} \
@@ -217,7 +228,7 @@ tasks:
       END_BLOCK: '{{.END_BLOCK | default "250000"}}'
       LABELS: '{{.LABELS | default ""}}'
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
-      METRICS_ENABLED: '{{.METRICS_ENABLED | default "true"}}'
+      METRICS_ENABLED: '{{.METRICS_ENABLED | default "false"}}'
     cmds:
       - task: import-cchain-reexecute-range
         vars:
@@ -356,6 +367,13 @@ tasks:
   test-unit:
     desc: Runs unit tests
     # Invoking with bash ensures compatibility with CI execution on Windows
+    cmd: bash ./scripts/build_test.sh
+
+  test-unit-fast:
+    desc: Runs unit tests
+    env:
+      NO_SHUFFLE: TRUE # Allows caching
+      NO_RACE: TRUE    # Tests are much faster without race detection
     cmd: bash ./scripts/build_test.sh
 
   test-upgrade:

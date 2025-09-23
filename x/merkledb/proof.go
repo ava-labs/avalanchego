@@ -311,6 +311,7 @@ func (r *RangeProof) Verify(
 	expectedRootID ids.ID,
 	tokenSize int,
 	hasher Hasher,
+	maxLength int,
 ) error {
 	db, err := newDatabase(
 		ctx,
@@ -330,7 +331,7 @@ func (r *RangeProof) Verify(
 		return err
 	}
 
-	return db.VerifyChangeProof(ctx, (*ChangeProof)(r), start, end, expectedRootID)
+	return db.VerifyChangeProof(ctx, (*ChangeProof)(r), start, end, expectedRootID, maxLength)
 }
 
 type KeyChange struct {
