@@ -9,6 +9,20 @@ name: Firewood AB Reexecution Benchmark
 on:
   workflow_dispatch:
     inputs:
+      current-state-dir-src:
+        description: 'Contains the VM database and chain state needed as a starting point for re-execution'
+        type: choice
+        required: false
+        default: 'cchain-current-state-firewood-100'
+        options:
+          - cchain-current-state-firewood-100/
+          - cchain-current-state-firewood-1m/
+          - cchain-current-state-firewood-10m/
+          - cchain-current-state-firewood-20m/
+          - cchain-current-state-firewood-30m/
+          - cchain-current-state-firewood-33m/
+          - cchain-current-state-firewood-40m/
+          - cchain-current-state-firewood-50m/
       runner:
         description: 'Select self-hosted runner'
         type: choice
@@ -43,13 +57,13 @@ env:
 
 jobs:
   baseline-benchmark:
-    runs-on: ${{ github.event.inputs.runner }}
+    runs-on: ${{ inputs.runner }}
     container:
       image: ghcr.io/actions/actions-runner:2.325.0
     permissions:
       id-token: write
       contents: write
-    name: "Baseline: ${{ github.event.inputs.firewood-baseline-version }}"
+    name: "Baseline: ${{ inputs.firewood-baseline-version }}"
     steps:
       - name: Install dependencies
         shell: bash
@@ -61,7 +75,7 @@ jobs:
       - name: Checkout AvalancheGo
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.avalanchego-baseline-version }}
+          ref: ${{ avalanchego-baseline-version }}
       - name: Install nix
         uses: ./.github/actions/install-nix
       - name: Setup Go
@@ -69,7 +83,7 @@ jobs:
       - name: Setup Firewood
         uses: ./.github/actions/setup-firewood
         with:
-          firewood-version: ${{ github.event.inputs.firewood-baseline-version }}
+          firewood-version: ${{ inputs.firewood-baseline-version }}
           rust-version: ${{ env.RUST_VERSION }}
       - name: Configure AvalancheGo to work with Firewood
         run: |
@@ -84,8 +98,9 @@ jobs:
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
           config: firewood
-          start-block: ${{ github.event.inputs.start-block }}
-          end-block: ${{ github.event.inputs.end-block }}
+          current-state-dir-src: ${{ inputs.current-state-dir-src }}
+          start-block: ${{ inputs.start-block }}
+          end-block: ${{ inputs.end-block }}
           prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           push-github-action-benchmark: false
@@ -93,7 +108,7 @@ jobs:
           aws-region: us-east-2
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ''
-          runner_name: '${{ github.event.inputs.runner }}'
+          runner_name: '${{ inputs.runner }}'
       - name: Restore go.mod changes
         shell: nix develop --command bash -x {0}
         run: |
@@ -107,13 +122,13 @@ jobs:
             benchmark-results/
           retention-days: 7
   candidate-benchmark:
-    runs-on: ${{ github.event.inputs.runner }}
+    runs-on: ${{ inputs.runner }}
     container:
       image: ghcr.io/actions/actions-runner:2.325.0
     permissions:
       id-token: write
       contents: write
-    name: "Candidate: ${{ github.event.inputs.firewood-candidate-version }}"
+    name: "Candidate: ${{ inputs.firewood-candidate-version }}"
     steps:
       - name: Install dependencies
         shell: bash
@@ -125,7 +140,7 @@ jobs:
       - name: Checkout AvalancheGo
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.avalanchego-candidate-version }}
+          ref: ${{ inputs.avalanchego-candidate-version }}
       - name: Install nix
         uses: ./.github/actions/install-nix
       - name: Setup Go
@@ -133,7 +148,7 @@ jobs:
       - name: Setup Firewood
         uses: ./.github/actions/setup-firewood
         with:
-          firewood-version: ${{ github.event.inputs.firewood-candidate-version }}
+          firewood-version: ${{ inputs.firewood-candidate-version }}
           rust-version: ${{ env.RUST_VERSION }}
       - name: Configure AvalancheGo to work with Firewood
         shell: nix develop --command bash -x {0}
@@ -149,8 +164,9 @@ jobs:
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
           config: firewood
-          start-block: ${{ github.event.inputs.start-block }}
-          end-block: ${{ github.event.inputs.end-block }}
+          current-state-dir-src: ${{ inputs.current-state-dir-src }}
+          start-block: ${{ inputs.start-block }}
+          end-block: ${{ inputs.end-block }}
           prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           push-github-action-benchmark: false
@@ -158,7 +174,7 @@ jobs:
           aws-region: us-east-2
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ''
-          runner_name: '${{ github.event.inputs.runner }}'
+          runner_name: '${{ inputs.runner }}'
       - name: Restore go.mod changes
         shell: nix develop --command bash -x {0}
         run: |
@@ -214,25 +230,25 @@ jobs:
           # Start building the summary
           echo "# Firewood Performance Comparison" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Baseline:** \`${{ github.event.inputs.firewood-baseline-version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Candidate:** \`${{ github.event.inputs.firewood-candidate-version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Blocks:** ${{ github.event.inputs.start-block }} - ${{ github.event.inputs.end-block }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Baseline:** \`${{ inputs.firewood-baseline-version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Candidate:** \`${{ inputs.firewood-candidate-version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Blocks:** ${{ inputs.start-block }} - ${{ inputs.end-block }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
           # Display results with better error handling
           if is_valid_number "$BASELINE_MGAS"; then
-            echo "- **Baseline (\`${{ github.event.inputs.firewood-baseline-version }}\`):** ${BASELINE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
+            echo "- **Baseline (\`${{ inputs.firewood-baseline-version }}\`):** ${BASELINE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
             BASELINE_SUCCESS=true
           else
-            echo "- **Baseline (\`${{ github.event.inputs.firewood-baseline-version }}\`):** Failed to parse results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Baseline (\`${{ inputs.firewood-baseline-version }}\`):** Failed to parse results" >> $GITHUB_STEP_SUMMARY
             BASELINE_SUCCESS=false
           fi
 
           if is_valid_number "$CANDIDATE_MGAS"; then
-            echo "- **Candidate (\`${{ github.event.inputs.firewood-candidate-version }}\`):** ${CANDIDATE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
+            echo "- **Candidate (\`${{ inputs.firewood-candidate-version }}\`):** ${CANDIDATE_MGAS} mgas/s" >> $GITHUB_STEP_SUMMARY
             CANDIDATE_SUCCESS=true
           else
-            echo "- **Candidate (\`${{ github.event.inputs.firewood-candidate-version }}\`):** Failed to parse results" >> $GITHUB_STEP_SUMMARY
+            echo "- **Candidate (\`${{ inputs.firewood-candidate-version }}\`):** Failed to parse results" >> $GITHUB_STEP_SUMMARY
             CANDIDATE_SUCCESS=false
           fi
 
@@ -264,12 +280,12 @@ jobs:
 
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "## Raw Results" >> $GITHUB_STEP_SUMMARY
-            echo "### Baseline (${{ github.event.inputs.firewood-baseline-version }})" >> $GITHUB_STEP_SUMMARY
+            echo "### Baseline (${{ inputs.firewood-baseline-version }})" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
             cat ./baseline-results/output.txt >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No baseline output found" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
 
-            echo "### Candidate (${{ github.event.inputs.firewood-candidate-version }})" >> $GITHUB_STEP_SUMMARY
+            echo "### Candidate (${{ inputs.firewood-candidate-version }})" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
             cat ./candidate-results/output.txt >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "No candidate output found" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
@@ -277,13 +293,13 @@ jobs:
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "## Raw Results" >> $GITHUB_STEP_SUMMARY
             if [ -f "./baseline-results/output.txt" ]; then
-              echo "### Baseline (${{ github.event.inputs.firewood-baseline-version }})" >> $GITHUB_STEP_SUMMARY
+              echo "### Baseline (${{ inputs.firewood-baseline-version }})" >> $GITHUB_STEP_SUMMARY
               echo '```' >> $GITHUB_STEP_SUMMARY
               cat ./baseline-results/output.txt >> $GITHUB_STEP_SUMMARY
               echo '```' >> $GITHUB_STEP_SUMMARY
             fi
             if [ -f "./candidate-results/output.txt" ]; then
-              echo "### Candidate (${{ github.event.inputs.firewood-candidate-version }})" >> $GITHUB_STEP_SUMMARY
+              echo "### Candidate (${{ inputs.firewood-candidate-version }})" >> $GITHUB_STEP_SUMMARY
               echo '```' >> $GITHUB_STEP_SUMMARY
               cat ./candidate-results/output.txt >> $GITHUB_STEP_SUMMARY
               echo '```' >> $GITHUB_STEP_SUMMARY
