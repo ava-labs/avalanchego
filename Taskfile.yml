@@ -369,6 +369,13 @@ tasks:
     # Invoking with bash ensures compatibility with CI execution on Windows
     cmd: bash ./scripts/build_test.sh
 
+  test-unit-fast:
+    desc: Runs unit tests
+    env:
+      NO_SHUFFLE: TRUE # Allows caching
+      NO_RACE: TRUE    # Tests are much faster without race detection
+    cmd: bash ./scripts/build_test.sh
+
   test-upgrade:
     desc: Runs upgrade tests
     cmds:
