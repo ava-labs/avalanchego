@@ -63,7 +63,6 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 		{
 			name:           "nil balance change",
 			initialBalance: uint256.NewInt(100),
-			balanceChange:  nil,
 			accountExists:  true,
 			wantBalance:    uint256.NewInt(100),
 		},
@@ -71,14 +70,12 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 			name:           "new account with positive balance",
 			initialBalance: uint256.NewInt(0),
 			balanceChange:  hexOrDecimal256FromInt64(1000),
-			accountExists:  false,
 			wantBalance:    uint256.NewInt(1000),
 		},
 		{
 			name:           "new account with negative balance",
 			initialBalance: uint256.NewInt(0),
 			balanceChange:  hexOrDecimal256FromInt64(-100),
-			accountExists:  false,
 			wantBalance:    uint256.NewInt(0), // unchanged
 			wantError:      ErrInsufficientBalanceForSubtraction,
 		},
@@ -123,7 +120,7 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 
 			// Set up initial account state
 			if tt.accountExists {
-				setAccountBalance(t, statedb, testAddr, tt.initialBalance)
+				setAccountBalance(statedb, testAddr, tt.initialBalance)
 			}
 
 			upgrade := extras.StateUpgradeAccount{
@@ -131,13 +128,9 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 			}
 			err := upgradeAccount(testAddr, upgrade, statedb, false)
 
-			// Check error expectations
-			if tt.wantError != nil {
-				require.Error(t, err)
-				require.ErrorIs(t, err, tt.wantError)
+			require.ErrorIs(t, err, tt.wantError)
+			if err != nil {
 				require.ErrorContains(t, err, testAddr.Hex())
-			} else {
-				require.NoError(t, err)
 			}
 
 			// Check final balance
@@ -190,9 +183,7 @@ func createTestStateDB(t *testing.T) StateDB {
 }
 
 // setAccountBalance is a helper to set an account's initial balance for testing
-func setAccountBalance(t *testing.T, statedb StateDB, addr common.Address, balance *uint256.Int) {
-	t.Helper()
-
+func setAccountBalance(statedb StateDB, addr common.Address, balance *uint256.Int) {
 	// Cast to extstate.StateDB to access the underlying state
 	extStateDB := statedb.(*extstate.StateDB)
 	extStateDB.CreateAccount(addr)
