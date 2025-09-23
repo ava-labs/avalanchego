@@ -18,42 +18,54 @@ type Database struct {
 	closed bool
 }
 
-// Put stores data in memory at the given height
-func (d *Database) Put(height uint64, data []byte) error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+func New() *Database {
+	return &Database{
+		data: make(map[uint64][]byte),
+	}
+}
 
-	if d.closed {
+// Put stores data in memory at the given height
+func (db *Database) Put(height uint64, data []byte) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	if db.closed {
 		return database.ErrClosed
 	}
 
-	if d.data == nil {
-		d.data = make(map[uint64][]byte)
+	if db.data == nil {
+		db.data = make(map[uint64][]byte)
 	}
 
 	if len(data) == 0 {
-		return database.ErrNotFound
+		// don't save empty slice if data is nil or empty
+		db.data[height] = nil
+	} else {
+		dataCopy := make([]byte, len(data))
+		copy(dataCopy, data)
+		db.data[height] = dataCopy
 	}
-
-	dataCopy := make([]byte, len(data))
-	copy(dataCopy, data)
-	d.data[height] = dataCopy
 
 	return nil
 }
 
 // Get retrieves data at the given height
-func (d *Database) Get(height uint64) ([]byte, error) {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
+func (db *Database) Get(height uint64) ([]byte, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
 
-	if d.closed {
+	if db.closed {
 		return nil, database.ErrClosed
 	}
 
-	data, ok := d.data[height]
+	data, ok := db.data[height]
 	if !ok {
 		return nil, database.ErrNotFound
+	}
+
+	// don't return empty slice if data is nil or empty
+	if data == nil {
+		return nil, nil
 	}
 
 	dataCopy := make([]byte, len(data))
@@ -62,24 +74,24 @@ func (d *Database) Get(height uint64) ([]byte, error) {
 }
 
 // Has checks if data exists at the given height
-func (d *Database) Has(height uint64) (bool, error) {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
+func (db *Database) Has(height uint64) (bool, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
 
-	if d.closed {
+	if db.closed {
 		return false, database.ErrClosed
 	}
 
-	_, ok := d.data[height]
+	_, ok := db.data[height]
 	return ok, nil
 }
 
 // Close closes the in-memory database
-func (d *Database) Close() error {
-	d.mu.Lock()
-	defer d.mu.Unlock()
+func (db *Database) Close() error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
 
-	d.closed = true
-	d.data = nil
+	db.closed = true
+	db.data = nil
 	return nil
 }
