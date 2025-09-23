@@ -18,7 +18,7 @@ func BuildUnsigned(
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
-	pChainEpoch PChainEpoch,
+	epoch Epoch,
 	blockBytes []byte,
 ) (SignedBlock, error) {
 	var (
@@ -31,17 +31,15 @@ func BuildUnsigned(
 		}
 		block SignedBlock
 	)
-	if pChainEpoch.Number == 0 {
+	if epoch.Number == 0 {
 		block = &statelessBlock{
 			StatelessBlock: preGraniteStatelessUnsignedBlock,
 		}
 	} else {
 		block = &statelessGraniteBlock{
 			StatelessBlock: statelessUnsignedGraniteBlock{
-				statelessUnsignedBlock: preGraniteStatelessUnsignedBlock,
-				EpochNumber:            pChainEpoch.Number,
-				EpochStartTimestamp:    pChainEpoch.StartTime.Unix(),
-				EpochHeight:            pChainEpoch.Height,
+				StatelessBlock: preGraniteStatelessUnsignedBlock,
+				Epoch:          epoch,
 			},
 		}
 	}
@@ -58,7 +56,7 @@ func Build(
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
-	pChainEpoch PChainEpoch,
+	epoch Epoch,
 	cert *staking.Certificate,
 	blockBytes []byte,
 	chainID ids.ID,
@@ -80,7 +78,7 @@ func Build(
 			proposer:  ids.NodeIDFromCert(cert),
 		}
 	)
-	if pChainEpoch.Number == 0 {
+	if epoch.Number == 0 {
 		blk := &statelessBlock{
 			StatelessBlock:         preGraniteStatelessUnsignedBlock,
 			statelessBlockMetadata: *metadata,
@@ -91,10 +89,8 @@ func Build(
 	} else {
 		blk := &statelessGraniteBlock{
 			StatelessBlock: statelessUnsignedGraniteBlock{
-				statelessUnsignedBlock: preGraniteStatelessUnsignedBlock,
-				EpochNumber:            pChainEpoch.Number,
-				EpochStartTimestamp:    pChainEpoch.StartTime.Unix(),
-				EpochHeight:            pChainEpoch.Height,
+				StatelessBlock: preGraniteStatelessUnsignedBlock,
+				Epoch:          epoch,
 			},
 			statelessBlockMetadata: *metadata,
 		}

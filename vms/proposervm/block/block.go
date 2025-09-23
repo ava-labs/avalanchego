@@ -36,7 +36,7 @@ type SignedBlock interface {
 	Block
 
 	PChainHeight() uint64
-	PChainEpoch() PChainEpoch
+	Epoch() Epoch
 	Timestamp() time.Time
 
 	// Proposer returns the ID of the node that proposed this block. If no node
@@ -50,19 +50,6 @@ type statelessUnsignedBlock struct {
 	PChainHeight uint64 `serialize:"true" json:"pChainHeight"`
 	Certificate  []byte `serialize:"true" json:"certificate"`
 	Block        []byte `serialize:"true" json:"block"`
-}
-
-type statelessUnsignedGraniteBlock struct {
-	statelessUnsignedBlock `serialize:"true"`
-	EpochNumber            uint64 `serialize:"true" json:"epochNumber"`
-	EpochStartTimestamp    int64  `serialize:"true" json:"epochStartTimestamp"`
-	EpochHeight            uint64 `serialize:"true" json:"epochHeight"`
-}
-
-type PChainEpoch struct {
-	Height    uint64    `serialize:"true" json:"height"`
-	Number    uint64    `serialize:"true" json:"number"`
-	StartTime time.Time `serialize:"true" json:"startTime"`
 }
 
 type statelessBlockMetadata struct {
@@ -169,8 +156,23 @@ func (b *statelessBlock) PChainHeight() uint64 {
 	return b.StatelessBlock.PChainHeight
 }
 
-func (*statelessBlock) PChainEpoch() PChainEpoch {
-	return PChainEpoch{}
+func (*statelessBlock) Epoch() Epoch {
+	return Epoch{}
+}
+
+type Epoch struct {
+	PChainHeight   uint64 `serialize:"true" json:"pChainHeight"`
+	Number         uint64 `serialize:"true" json:"number"`
+	StartTimestamp uint64 `serialize:"true" json:"startTimestamp"`
+}
+
+func (e Epoch) StartTime() time.Time {
+	return time.Unix(int64(e.StartTimestamp), 0)
+}
+
+type statelessUnsignedGraniteBlock struct {
+	StatelessBlock statelessUnsignedBlock `serialize:"true" json:"statelessBlock"`
+	Epoch          Epoch                  `serialize:"true" json:"epoch"`
 }
 
 type statelessGraniteBlock struct {
@@ -180,29 +182,25 @@ type statelessGraniteBlock struct {
 }
 
 func (b *statelessGraniteBlock) ParentID() ids.ID {
-	return b.StatelessBlock.ParentID
+	return b.StatelessBlock.StatelessBlock.ParentID
 }
 
 func (b *statelessGraniteBlock) Block() []byte {
-	return b.StatelessBlock.Block
+	return b.StatelessBlock.StatelessBlock.Block
 }
 
 func (b *statelessGraniteBlock) PChainHeight() uint64 {
-	return b.StatelessBlock.PChainHeight
+	return b.StatelessBlock.StatelessBlock.PChainHeight
 }
 
-func (b *statelessGraniteBlock) PChainEpoch() PChainEpoch {
-	return PChainEpoch{
-		Height:    b.StatelessBlock.EpochHeight,
-		Number:    b.StatelessBlock.EpochNumber,
-		StartTime: time.Unix(b.StatelessBlock.EpochStartTimestamp, 0),
-	}
+func (b *statelessGraniteBlock) Epoch() Epoch {
+	return b.StatelessBlock.Epoch
 }
 
 func (b *statelessGraniteBlock) initialize(bytes []byte) error {
-	return b.statelessBlockMetadata.initialize(&b.StatelessBlock.statelessUnsignedBlock, b.Signature, bytes)
+	return b.statelessBlockMetadata.initialize(&b.StatelessBlock.StatelessBlock, b.Signature, bytes)
 }
 
 func (b *statelessGraniteBlock) verify(chainID ids.ID) error {
-	return b.statelessBlockMetadata.verify(&b.StatelessBlock.statelessUnsignedBlock, b.Signature, chainID)
+	return b.statelessBlockMetadata.verify(&b.StatelessBlock.StatelessBlock, b.Signature, chainID)
 }

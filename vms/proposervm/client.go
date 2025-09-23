@@ -6,7 +6,6 @@ package proposervm
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -31,14 +30,14 @@ func (c *Client) GetProposedHeight(ctx context.Context, options ...rpc.Option) (
 	return uint64(res.Height), err
 }
 
-func (c *Client) GetCurrentEpoch(ctx context.Context, options ...rpc.Option) (block.PChainEpoch, error) {
+func (c *Client) GetCurrentEpoch(ctx context.Context, options ...rpc.Option) (block.Epoch, error) {
 	res := &api.GetEpochResponse{}
 	if err := c.Requester.SendRequest(ctx, "proposervm.getCurrentEpoch", struct{}{}, res, options...); err != nil {
-		return block.PChainEpoch{}, err
+		return block.Epoch{}, err
 	}
-	return block.PChainEpoch{
-		Height:    uint64(res.PChainHeight),
-		Number:    uint64(res.Number),
-		StartTime: time.Unix(int64(res.StartTime), 0),
+	return block.Epoch{
+		PChainHeight:   uint64(res.PChainHeight),
+		Number:         uint64(res.Number),
+		StartTimestamp: uint64(res.StartTime),
 	}, nil
 }

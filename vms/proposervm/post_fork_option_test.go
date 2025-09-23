@@ -466,7 +466,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		snowmantest.GenesisID,
 		oracleBlkTime,
 		0,
-		block.PChainEpoch{},
+		block.Epoch{},
 		coreOracleBlk.Bytes(),
 	)
 	require.NoError(err)
