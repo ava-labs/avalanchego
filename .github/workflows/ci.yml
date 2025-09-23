@@ -99,13 +99,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: "go.mod"
-      - name: Build AvalancheGo and update Coreth dependency
-        run: ./scripts/run_task.sh build-avalanchego-with-coreth
       - name: Run e2e tests
         uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@cc3242f48a6262c52057e98a85d6cf8184dfaca3
         with:
-          run: ./scripts/run_task.sh test-e2e
-          run_env: AVALANCHEGO_CLONE_PATH=avalanchego
+          run: ./scripts/run_task.sh test-e2e-ci
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           loki_username: ${{ secrets.LOKI_ID || '' }}
@@ -130,18 +127,10 @@ jobs:
           repository: ${{ github.event.inputs.avalanchegoRepo }}
           ref: ${{ github.event.inputs.avalanchegoBranch }}
           path: avalanchego
-      - name: Move AvalancheGo
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        run: mv avalanchego /tmp/e2e/warp/avalanchego
-      - name: Build AvalancheGo and update Coreth dependency
-        run: ./scripts/run_task.sh build-avalanchego-with-coreth
-        env:
-          AVALANCHEGO_CLONE_PATH: /tmp/e2e/warp/avalanchego
       - name: Run Warp E2E Tests
         uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@cc3242f48a6262c52057e98a85d6cf8184dfaca3
         with:
           run: ./scripts/run_task.sh test-e2e-warp-ci
-          run_env: AVALANCHEGO_BUILD_PATH=/tmp/e2e/warp/avalanchego/build
           artifact_prefix: warp
           prometheus_username: ${{ secrets.PROMETHEUS_ID || '' }}
           prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
