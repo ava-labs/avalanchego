@@ -290,6 +290,10 @@ jobs:
       id-token: write
       contents: write
     name: "Baseline: v0.0.8"
+    env:
+      # Isolate Go caches per job
+      GOCACHE: /tmp/go-build-candidate-${{ github.run_id }}
+      GOMODCACHE: /tmp/go-mod-candidate-${{ github.run_id }}
     steps:
       - name: Install dependencies
         shell: bash
@@ -304,6 +308,19 @@ jobs:
           ref: 'b6409a4f336b32e0323a654aefdec941fc3fb3e5'
       - name: Install nix
         uses: ./.github/actions/install-nix
+      - name: Clear existing Go caches
+        shell: nix develop --command bash -x {0}
+        run: |
+          # Clear any existing Go caches to prevent conflicts
+          rm -rf ~/.cache/go-build || true
+          rm -rf ~/go/pkg/mod || true
+          rm -rf /github/home/go/pkg/mod || true
+          rm -rf /github/home/.cache/go-build || true
+          rm -rf /go/pkg/mod || true
+
+          # Create isolated cache directories
+          mkdir -p $GOCACHE
+          mkdir -p $GOMODCACHE
       - name: Setup Go
         uses: ./.github/actions/setup-go-for-project
       - name: Setup Firewood
@@ -324,6 +341,7 @@ jobs:
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
           config: firewood
+          current-state-dir-src: 's3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**'
           start-block: '101'
           end-block: '250000'
           push-github-action-benchmark: false
@@ -408,6 +426,7 @@ jobs:
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
           config: firewood
+          current-state-dir-src: 's3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**'
           start-block: '101'
           end-block: '250000'
           push-github-action-benchmark: false
