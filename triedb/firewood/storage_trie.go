@@ -10,28 +10,28 @@ import (
 
 type StorageTrie struct {
 	*AccountTrie
-	storageRoot common.Hash
 }
 
 // `NewStorageTrie` returns a wrapper around an `AccountTrie` since Firewood
 // does not require a separate storage trie. All changes are managed by the account trie.
-func NewStorageTrie(accountTrie *AccountTrie, storageRoot common.Hash) (*StorageTrie, error) {
+func NewStorageTrie(accountTrie *AccountTrie) (*StorageTrie, error) {
 	return &StorageTrie{
 		AccountTrie: accountTrie,
-		storageRoot: storageRoot,
 	}, nil
 }
 
 // Actual commit is handled by the account trie.
-// Return the old storage root as if there was no change - we don't want to use the
-// actual account trie hash and nodeset here.
-func (s *StorageTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
-	return s.storageRoot, nil, nil
+// Return the old storage root as if there was no change since Firewood
+// will manage the hash calculations without it.
+// All changes are managed by the account trie.
+func (*StorageTrie) Commit(bool) (common.Hash, *trienode.NodeSet, error) {
+	return common.Hash{}, nil, nil
 }
 
 // Firewood doesn't require tracking storage roots inside of an account.
-func (s *StorageTrie) Hash() common.Hash {
-	return s.storageRoot // only used in statedb to populate a `StateAccount`
+// They will be updated in place when hashing of the proposal takes place.
+func (*StorageTrie) Hash() common.Hash {
+	return common.Hash{}
 }
 
 // Copy should never be called on a storage trie, as it is just a wrapper around the account trie.
