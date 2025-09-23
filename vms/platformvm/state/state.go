@@ -211,6 +211,22 @@ type State interface {
 		subnetID ids.ID,
 	) error
 
+	// TODO
+	ApplyValidatorWeightDiffsByHeight(
+		ctx context.Context,
+		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
+		startHeight uint64,
+		endHeight uint64,
+	) error
+
+	// TODO
+	ApplyValidatorPublicKeyDiffsByHeight(
+		ctx context.Context,
+		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
+		startHeight uint64,
+		endHeight uint64,
+	) error
+
 	SetHeight(height uint64)
 
 	// GetCurrentValidators returns subnet and L1 validators for the given
@@ -1410,7 +1426,7 @@ func (s *state) ApplyValidatorWeightDiffsByHeight(
 			return err
 		}
 
-		subnetID, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
+		parsedHeight, subnetID, nodeID, err := unmarshalDiffKey2(diffIter.Key())
 		if err != nil {
 			return err
 		}
@@ -1550,7 +1566,7 @@ func applyWeightDiff(
 	return nil
 }
 
-func (s *state) ApplyValidatorPublicKeyDiffsAllValidators(
+func (s *state) ApplyValidatorPublicKeyDiffsByHeight(
 	ctx context.Context,
 	allValidators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
@@ -1566,7 +1582,7 @@ func (s *state) ApplyValidatorPublicKeyDiffsAllValidators(
 			return err
 		}
 
-		subnetID, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
+		parsedHeight, subnetID, nodeID, err := unmarshalDiffKey2(diffIter.Key())
 		if err != nil {
 			return err
 		}

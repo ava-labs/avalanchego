@@ -45,7 +45,7 @@ func marshalStartDiffKey(subnetID ids.ID, height uint64) []byte {
 // same arguments.
 func marshalStartDiffKey2(height uint64) []byte {
 	key := make([]byte, database.Uint64Size)
-	packIterableHeight(key[:], height)
+	packIterableHeight(key, height)
 	return key
 }
 

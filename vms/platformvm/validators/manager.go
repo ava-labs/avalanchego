@@ -81,7 +81,7 @@ type State interface {
 		subnetID ids.ID,
 	) error
 
-	ApplyValidatorWeightDiffsAllValidators(
+	ApplyValidatorWeightDiffsByHeight(
 		ctx context.Context,
 		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
@@ -106,7 +106,7 @@ type State interface {
 		subnetID ids.ID,
 	) error
 
-	ApplyValidatorPublicKeyDiffsAllValidators(
+	ApplyValidatorPublicKeyDiffsByHeight(
 		ctx context.Context,
 		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
@@ -270,7 +270,7 @@ func (m *manager) makeAllValidatorSets(
 		return nil, 0, err
 	}
 	if currentHeight < targetHeight {
-		return nil, 0, fmt.Errorf("%w with SubnetID = %s: current P-chain height (%d) < requested P-Chain height (%d)",
+		return nil, 0, fmt.Errorf("%w: current P-chain height (%d) < requested P-Chain height (%d)",
 			errUnfinalizedHeight,
 			currentHeight,
 			targetHeight,
@@ -284,7 +284,7 @@ func (m *manager) makeAllValidatorSets(
 	// (targetHeight, currentHeight]. Because the state interface is implemented
 	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
 	lastDiffHeight := targetHeight + 1
-	err = m.state.ApplyValidatorWeightDiffsAllValidators(
+	err = m.state.ApplyValidatorWeightDiffsByHeight(
 		ctx,
 		allValidators,
 		currentHeight,
@@ -294,7 +294,7 @@ func (m *manager) makeAllValidatorSets(
 		return nil, 0, err
 	}
 
-	err = m.state.ApplyValidatorPublicKeyDiffsAllValidators(
+	err = m.state.ApplyValidatorPublicKeyDiffsByHeight(
 		ctx,
 		allValidators,
 		currentHeight,
