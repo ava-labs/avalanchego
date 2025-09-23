@@ -1879,14 +1879,22 @@ func TestWaitForEvent(t *testing.T) {
 				wg.Add(1)
 
 				// We run WaitForEvent in a goroutine to ensure it can be safely called concurrently.
+				type eventResult struct {
+					msg commonEng.Message
+					err error
+				}
+				resultCh := make(chan eventResult, 1)
+
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(ctx)
-					require.ErrorIs(t, err, context.DeadlineExceeded)
-					require.Zero(t, msg)
+					resultCh <- eventResult{msg: msg, err: err}
 				}()
 
 				wg.Wait()
+				result := <-resultCh
+				require.ErrorIs(t, result.err, context.DeadlineExceeded)
+				require.Zero(t, result.msg)
 			},
 		},
 		{
@@ -1895,11 +1903,16 @@ func TestWaitForEvent(t *testing.T) {
 				var wg sync.WaitGroup
 				wg.Add(1)
 
+				type eventResult struct {
+					msg commonEng.Message
+					err error
+				}
+				resultCh := make(chan eventResult, 1)
+
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
-					require.NoError(t, err)
-					require.Equal(t, commonEng.PendingTxs, msg)
+					resultCh <- eventResult{msg: msg, err: err}
 				}()
 
 				signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
@@ -1908,6 +1921,9 @@ func TestWaitForEvent(t *testing.T) {
 				}
 
 				wg.Wait()
+				result := <-resultCh
+				require.NoError(t, result.err)
+				require.Equal(t, commonEng.PendingTxs, result.msg)
 			},
 		},
 		{
@@ -1935,14 +1951,22 @@ func TestWaitForEvent(t *testing.T) {
 				wg.Add(1)
 
 				// We run WaitForEvent in a goroutine to ensure it can be safely called concurrently.
+				type eventResult struct {
+					msg commonEng.Message
+					err error
+				}
+				resultCh := make(chan eventResult, 1)
+
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(ctx)
-					require.ErrorIs(t, err, context.DeadlineExceeded)
-					require.Zero(t, msg)
+					resultCh <- eventResult{msg: msg, err: err}
 				}()
 
 				wg.Wait()
+				result := <-resultCh
+				require.ErrorIs(t, result.err, context.DeadlineExceeded)
+				require.Zero(t, result.msg)
 
 				t.Log("WaitForEvent returns when regular transactions are added to the mempool")
 
@@ -1956,14 +1980,17 @@ func TestWaitForEvent(t *testing.T) {
 
 				wg.Add(1)
 
+				resultCh2 := make(chan eventResult, 1)
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
-					require.NoError(t, err)
-					require.Equal(t, commonEng.PendingTxs, msg)
+					resultCh2 <- eventResult{msg: msg, err: err}
 				}()
 
 				wg.Wait()
+				result2 := <-resultCh2
+				require.NoError(t, result2.err)
+				require.Equal(t, commonEng.PendingTxs, result2.msg)
 
 				// Build a block again to wipe out the subscription
 				blk, err = vm.BuildBlock(context.Background())
@@ -1993,15 +2020,23 @@ func TestWaitForEvent(t *testing.T) {
 				var wg sync.WaitGroup
 				wg.Add(1)
 
+				type eventResult struct {
+					msg commonEng.Message
+					err error
+				}
+				resultCh := make(chan eventResult, 1)
+
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
-					require.NoError(t, err)
-					require.Equal(t, commonEng.PendingTxs, msg)
-					require.GreaterOrEqual(t, time.Since(lastBuildBlockTime), MinBlockBuildingRetryDelay)
+					resultCh <- eventResult{msg: msg, err: err}
 				}()
 
 				wg.Wait()
+				result := <-resultCh
+				require.NoError(t, result.err)
+				require.Equal(t, commonEng.PendingTxs, result.msg)
+				require.GreaterOrEqual(t, time.Since(lastBuildBlockTime), MinBlockBuildingRetryDelay)
 			},
 		},
 	} {

@@ -44,10 +44,10 @@ func TestTxHeap(t *testing.T) {
 	id2 := tx2.ID()
 
 	t.Run("add/remove single entry", func(t *testing.T) {
+		require := require.New(t)
+
 		h := newTxHeap(3)
 		require.Zero(t, h.Len())
-
-		require := require.New(t)
 		h.Push(tx0, *uint256.NewInt(5))
 		require.True(h.Has(id0))
 		gTx0, gHas0 := h.Get(id0)
@@ -62,10 +62,10 @@ func TestTxHeap(t *testing.T) {
 	})
 
 	t.Run("add other items", func(t *testing.T) {
+		require := require.New(t)
+
 		h := newTxHeap(3)
 		require.Zero(t, h.Len())
-
-		require := require.New(t)
 		h.Push(tx1, *uint256.NewInt(10))
 		require.True(h.Has(id1))
 		gTx1, gHas1 := h.Get(id1)
@@ -99,8 +99,8 @@ func TestTxHeap(t *testing.T) {
 
 	verifyRemovalOrder := func(t *testing.T, h *txHeap) {
 		t.Helper()
-
 		require := require.New(t)
+
 		require.Equal(id2, h.PopMin().ID())
 		require.True(h.Has(id0))
 		require.True(h.Has(id1))
