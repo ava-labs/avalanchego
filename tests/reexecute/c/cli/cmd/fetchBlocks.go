@@ -8,13 +8,14 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/tests/reexecute/blockdb"
-	ethclient "github.com/ava-labs/coreth/plugin/evm/customethclient"
-	_ "github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/ava-labs/avalanchego/tests/reexecute/blockdb"
+
+	ethclient "github.com/ava-labs/coreth/plugin/evm/customethclient"
 )
 
 const (
@@ -42,7 +43,7 @@ func init() {
 	fetchBlocksCmd.Flags().Int(concurrencyKey, 1000, "Number of concurrent fetches to make")
 }
 
-func runFetchBlocks(cmd *cobra.Command, args []string) error {
+func runFetchBlocks(cmd *cobra.Command, _ []string) error {
 	dbDir, err := cmd.Flags().GetString(dbDirKey)
 	if err != nil {
 		return fmt.Errorf("failed to get db-dir flag: %w", err)

@@ -7,10 +7,11 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 type BlockDB struct {

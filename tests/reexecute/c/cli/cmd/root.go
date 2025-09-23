@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 var (
@@ -39,7 +40,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.cli.yaml)")
 	rootCmd.PersistentFlags().String(logLevelKey, logging.Info.String(), "Log level")
 
-	rootCmd.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
+	rootCmd.PersistentPreRunE = func(_ *cobra.Command, _ []string) error {
 		logLevelStr, err := rootCmd.PersistentFlags().GetString(logLevelKey)
 		if err != nil {
 			return fmt.Errorf("failed to get %q flag: %w", logLevelKey, err)

@@ -29,10 +29,11 @@ jobs:
       - name: Build Argo CLI
         working-directory: ./tests/reexecute/c/cli
         shell: bash -x {0}
-        run: go run main.go fetchBlocks \
+        run: |
+          go run main.go fetchBlocks \
           --start-block ${{ github.event.inputs.start-block || 100 }} \
           --end-block ${{ github.event.inputs.end-block  || 200 }} \
-          --rpc-url ${{ github.event.inputs.rpc-url || https://api.avax.network/ext/bc/C/rpc }} \
+          --rpc-url ${{ github.event.inputs.rpc-url || 'https://api.avax.network/ext/bc/C/rpc' }} \
           --db-dir ./blocks
       - uses: ./.github/actions/install-nix
         if: ${{ github.event.inputs.s3-block-dst != '' }}
