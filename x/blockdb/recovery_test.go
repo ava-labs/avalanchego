@@ -208,7 +208,7 @@ func TestRecovery_Success(t *testing.T) {
 				// Create 4KB blocks
 				block := fixedSizeBlock(t, 4*1024, height)
 
-				require.NoError(t, store.WriteBlock(height, block))
+				require.NoError(t, store.Put(height, block))
 				blocks[height] = block
 			}
 			checkDatabaseState(t, store, 8, 4)
@@ -225,7 +225,7 @@ func TestRecovery_Success(t *testing.T) {
 
 			// Verify blocks are readable
 			for _, height := range blockHeights {
-				readBlock, err := recoveredStore.ReadBlock(height)
+				readBlock, err := recoveredStore.Get(height)
 				require.NoError(t, err)
 				require.Equal(t, blocks[height], readBlock, "block %d should be the same", height)
 			}
@@ -332,7 +332,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 					Height:   1,
 					Checksum: calculateChecksum(blocks[1]),
 					Size:     compressedSize1 + 1, // make block larger than actual compressed size
-					Version:  BlockEntryVersion,
+					Version:  DataEntryVersion,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -359,7 +359,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 					Height:   1,
 					Checksum: 0xDEADBEEF, // Wrong checksum
 					Size:     compressedSize1,
-					Version:  BlockEntryVersion,
+					Version:  DataEntryVersion,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -409,7 +409,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 					Height:   5, // Invalid height because its below the minimum height of 10
 					Checksum: calculateChecksum(blocks[1]),
 					Size:     compressedSize1,
-					Version:  BlockEntryVersion,
+					Version:  DataEntryVersion,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -473,7 +473,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 					Height:   1,
 					Checksum: calculateChecksum(blocks[1]),
 					Size:     compressedSize1,
-					Version:  BlockEntryVersion + 1, // Invalid version
+					Version:  DataEntryVersion + 1, // Invalid version
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -501,7 +501,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 					Height:   1,
 					Checksum: calculateChecksum(blocks[1]),
 					Size:     compressedSize1,
-					Version:  BlockEntryVersion + 10, // version cannot be greater than current
+					Version:  DataEntryVersion + 10, // version cannot be greater than current
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -534,7 +534,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				} else {
 					blocks[i] = randomBlock(t)
 				}
-				require.NoError(t, store.WriteBlock(height, blocks[i]))
+				require.NoError(t, store.Put(height, blocks[i]))
 			}
 			require.NoError(t, store.Close())
 

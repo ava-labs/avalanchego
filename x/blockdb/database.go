@@ -20,6 +20,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
@@ -27,8 +28,8 @@ import (
 )
 
 const (
-	indexFileName          = "blockdb.idx"
-	dataFileNameFormat     = "blockdb_%d.dat"
+	indexFileName          = "db.idx"
+	dataFileNameFormat     = "db_%d.dat"
 	defaultFilePermissions = 0o666
 
 	// Since 0 is a valid height, math.MaxUint64 is used to indicate unset height.
@@ -38,8 +39,8 @@ const (
 	// IndexFileVersion is the version of the index file format.
 	IndexFileVersion uint64 = 1
 
-	// BlockEntryVersion is the version of the block entry.
-	BlockEntryVersion uint16 = 1
+	// DataEntryVersion is the version of a data entry.
+	DataEntryVersion uint16 = 1
 )
 
 // BlockHeight defines the type for block heights.
@@ -49,6 +50,8 @@ type BlockHeight = uint64
 type BlockData = []byte
 
 var (
+	_ database.HeightIndex = (*Database)(nil)
+
 	_ encoding.BinaryMarshaler   = (*blockEntryHeader)(nil)
 	_ encoding.BinaryUnmarshaler = (*blockEntryHeader)(nil)
 	_ encoding.BinaryMarshaler   = (*indexEntry)(nil)
@@ -315,8 +318,8 @@ func (s *Database) Close() error {
 	return err
 }
 
-// WriteBlock inserts a block into the store at the given height.
-func (s *Database) WriteBlock(height BlockHeight, block BlockData) error {
+// Put inserts a block into the store at the given height.
+func (s *Database) Put(height BlockHeight, block BlockData) error {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
 
@@ -384,7 +387,7 @@ func (s *Database) WriteBlock(height BlockHeight, block BlockData) error {
 		Height:   height,
 		Size:     blockDataLen,
 		Checksum: calculateChecksum(block),
-		Version:  BlockEntryVersion,
+		Version:  DataEntryVersion,
 	}
 	if err := s.writeBlockAt(writeDataOffset, bh, blockToWrite); err != nil {
 		s.log.Error("Failed to write block: error writing block data",
@@ -471,9 +474,9 @@ func (s *Database) readBlockIndex(height BlockHeight) (indexEntry, error) {
 	return entry, nil
 }
 
-// ReadBlock retrieves a block by its height.
+// Get retrieves a block by its height.
 // Returns ErrBlockNotFound if the block is not found.
-func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
+func (s *Database) Get(height BlockHeight) (BlockData, error) {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
 
@@ -530,8 +533,8 @@ func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
 	return decompressed, nil
 }
 
-// HasBlock checks if a block exists at the given height.
-func (s *Database) HasBlock(height BlockHeight) (bool, error) {
+// Has checks if a block exists at the given height.
+func (s *Database) Has(height BlockHeight) (bool, error) {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
 
@@ -813,8 +816,8 @@ func (s *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEntr
 	if bh.Size == 0 {
 		return bh, fmt.Errorf("%w: invalid block size in header at offset %d: %d", ErrCorrupted, offset, bh.Size)
 	}
-	if bh.Version > BlockEntryVersion {
-		return bh, fmt.Errorf("%w: invalid block entry version at offset %d, version %d is greater than the current version %d", ErrCorrupted, offset, bh.Version, BlockEntryVersion)
+	if bh.Version > DataEntryVersion {
+		return bh, fmt.Errorf("%w: invalid block entry version at offset %d, version %d is greater than the current version %d", ErrCorrupted, offset, bh.Version, DataEntryVersion)
 	}
 	if bh.Height < s.header.MinHeight || bh.Height == unsetHeight {
 		return bh, fmt.Errorf(
