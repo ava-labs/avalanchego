@@ -22,7 +22,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/plugin/evm/message"
@@ -113,16 +112,16 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 		go func(wg *sync.WaitGroup) {
 			defer wg.Done()
 			requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			responseBytes, _, err := net.SendSyncedAppRequestAny(context.Background(), defaultPeerVersion, requestBytes)
-			assert.NoError(t, err)
-			assert.NotNil(t, responseBytes)
+			require.NoError(t, err)
+			require.NotNil(t, responseBytes)
 
 			var response TestMessage
 			if _, err = codecManager.Unmarshal(responseBytes, &response); err != nil {
 				panic(fmt.Errorf("unexpected error during unmarshal: %w", err))
 			}
-			assert.Equal(t, "Hi", response.Message)
+			require.Equal(t, "Hi", response.Message)
 		}(requestWg)
 	}
 
@@ -227,16 +226,16 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 		go func(wg *sync.WaitGroup, nodeID ids.NodeID) {
 			defer wg.Done()
 			requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			responseBytes, err := net.SendSyncedAppRequest(context.Background(), nodeID, requestBytes)
-			assert.NoError(t, err)
-			assert.NotNil(t, responseBytes)
+			require.NoError(t, err)
+			require.NotNil(t, responseBytes)
 
 			var response TestMessage
 			if _, err = codecManager.Unmarshal(responseBytes, &response); err != nil {
 				panic(fmt.Errorf("unexpected error during unmarshal: %w", err))
 			}
-			assert.Equal(t, "Hi", response.Message)
+			require.Equal(t, "Hi", response.Message)
 		}(requestWg, nodeID)
 	}
 
@@ -289,10 +288,10 @@ func TestAppRequestOnShutdown(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		responseBytes, _, err := net.SendSyncedAppRequestAny(context.Background(), defaultPeerVersion, requestBytes)
-		assert.ErrorIs(t, err, errRequestFailed)
-		assert.Nil(t, responseBytes)
+		require.ErrorIs(t, err, errRequestFailed)
+		require.Nil(t, responseBytes)
 	}()
 	wg.Wait()
 	require.True(t, called)
@@ -358,7 +357,7 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 	doneChan := make(chan struct{})
 	go func() {
 		_, _, err = net.SendSyncedAppRequestAny(ctx, defaultPeerVersion, requestBytes)
-		assert.ErrorIs(t, err, context.Canceled)
+		require.ErrorIs(t, err, context.Canceled)
 		close(doneChan)
 	}()
 	// Wait until we've "sent" the app request over the network
@@ -396,7 +395,7 @@ func TestRequestMinVersion(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
-				assert.NoError(t, net.AppResponse(context.Background(), nodeID, reqID, responseBytes))
+				require.NoError(t, net.AppResponse(context.Background(), nodeID, reqID, responseBytes))
 			}()
 			return nil
 		},

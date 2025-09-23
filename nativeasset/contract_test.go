@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/holiman/uint256"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	// Force import core to register the VM hooks.
@@ -474,17 +473,16 @@ func TestStatefulPrecompile(t *testing.T) {
 			evm := vm.NewEVM(vmCtx, vm.TxContext{}, stateDB, params.TestApricotPhase5Config, vm.Config{}) // Use ApricotPhase5Config because these precompiles are deprecated in ApricotPhase6.
 			ret, gasRemaining, err := evm.Call(vm.AccountRef(test.from), test.precompileAddr, test.input, test.gasInput, test.value)
 			// Place gas remaining check before error check, so that it is not skipped when there is an error
-			assert.Equalf(t, test.expectedGasRemaining, gasRemaining, "unexpected gas remaining (%d of %d)", gasRemaining, test.gasInput)
+			require.Equalf(t, test.expectedGasRemaining, gasRemaining, "unexpected gas remaining (%d of %d)", gasRemaining, test.gasInput)
 
 			if test.expectedErr != nil {
-				assert.Equal(t, test.expectedErr, err, "expected error to match")
+				require.Equal(t, test.expectedErr, err, "expected error to match")
 				return
 			}
-			if assert.NoError(t, err, "EVM Call produced unexpected error") {
-				assert.Equal(t, test.expectedResult, ret, "unexpected return value")
-				if test.stateDBCheck != nil {
-					test.stateDBCheck(t, stateDB)
-				}
+			require.NoError(t, err, "EVM Call produced unexpected error")
+			require.Equal(t, test.expectedResult, ret, "unexpected return value")
+			if test.stateDBCheck != nil {
+				test.stateDBCheck(t, stateDB)
 			}
 		})
 	}

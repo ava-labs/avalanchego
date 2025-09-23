@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -138,6 +138,6 @@ func TestUpstreamParamsValues(t *testing.T) {
 	}
 
 	for name, test := range tests {
-		assert.Equal(t, test.want, test.param, name)
+		require.Equal(t, test.want, test.param, name)
 	}
 }

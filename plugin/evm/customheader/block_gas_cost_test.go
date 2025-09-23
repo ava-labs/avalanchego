@@ -10,7 +10,6 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/params/extras"
@@ -85,7 +84,7 @@ func TestBlockGasCost(t *testing.T) {
 				},
 			)
 
-			assert.Equal(t, test.expected, BlockGasCost(
+			require.Equal(t, test.expected, BlockGasCost(
 				config,
 				parent,
 				test.timestamp,
@@ -177,7 +176,7 @@ func TestBlockGasCostWithStep(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expected, BlockGasCostWithStep(
+			require.Equal(t, test.expected, BlockGasCostWithStep(
 				test.parentCost,
 				ap4.BlockGasCostStep,
 				test.timeElapsed,

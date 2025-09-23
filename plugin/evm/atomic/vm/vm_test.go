@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/core"
@@ -1931,8 +1930,8 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(ctx)
-					assert.ErrorIs(t, err, context.DeadlineExceeded)
-					assert.Zero(t, msg)
+					require.ErrorIs(t, err, context.DeadlineExceeded)
+					require.Zero(t, msg)
 				}()
 
 				wg.Wait()
@@ -1950,8 +1949,8 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
-					assert.NoError(t, err)
-					assert.Equal(t, commonEng.PendingTxs, msg)
+					require.NoError(t, err)
+					require.Equal(t, commonEng.PendingTxs, msg)
 				}()
 
 				require.NoError(t, vm.AtomicMempool.AddLocalTx(importTx))
@@ -1986,8 +1985,8 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(ctx)
-					assert.ErrorIs(t, err, context.DeadlineExceeded)
-					assert.Zero(t, msg)
+					require.ErrorIs(t, err, context.DeadlineExceeded)
+					require.Zero(t, msg)
 				}()
 
 				wg.Wait()
@@ -2012,8 +2011,8 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
-					assert.NoError(t, err)
-					assert.Equal(t, commonEng.PendingTxs, msg)
+					require.NoError(t, err)
+					require.Equal(t, commonEng.PendingTxs, msg)
 				}()
 
 				wg.Wait()
@@ -2067,9 +2066,9 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
-					assert.NoError(t, err)
-					assert.Equal(t, commonEng.PendingTxs, msg)
-					assert.GreaterOrEqual(t, time.Since(lastBuildBlockTime), evm.MinBlockBuildingRetryDelay)
+					require.NoError(t, err)
+					require.Equal(t, commonEng.PendingTxs, msg)
+					require.GreaterOrEqual(t, time.Since(lastBuildBlockTime), evm.MinBlockBuildingRetryDelay)
 				}()
 
 				wg.Wait()

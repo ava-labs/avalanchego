@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
@@ -37,7 +37,7 @@ type blockRequestTest struct {
 	requestedParents  uint16
 	expectedBlocks    int
 	expectNilResponse bool
-	assertResponse    func(t testing.TB, stats *statstest.TestHandlerStats, b []byte)
+	requireResponse   func(t testing.TB, stats *statstest.TestHandlerStats, b []byte)
 }
 
 func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*types.Block) {
@@ -74,30 +74,30 @@ func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*type
 	if err != nil {
 		t.Fatal("unexpected error during block request", err)
 	}
-	if test.assertResponse != nil {
-		test.assertResponse(t, testHandlerStats, responseBytes)
+	if test.requireResponse != nil {
+		test.requireResponse(t, testHandlerStats, responseBytes)
 	}
 
 	if test.expectNilResponse {
-		assert.Nil(t, responseBytes)
+		require.Nil(t, responseBytes)
 		return
 	}
 
-	assert.NotEmpty(t, responseBytes)
+	require.NotEmpty(t, responseBytes)
 
 	var response message.BlockResponse
 	if _, err = message.Codec.Unmarshal(responseBytes, &response); err != nil {
 		t.Fatal("error unmarshalling", err)
 	}
-	assert.Len(t, response.Blocks, test.expectedBlocks)
+	require.Len(t, response.Blocks, test.expectedBlocks)
 
 	for _, blockBytes := range response.Blocks {
 		block := new(types.Block)
 		if err := rlp.DecodeBytes(blockBytes, block); err != nil {
 			t.Fatal("could not parse block", err)
 		}
-		assert.GreaterOrEqual(t, test.startBlockIndex, 0)
-		assert.Equal(t, blocks[test.startBlockIndex].Hash(), block.Hash())
+		require.GreaterOrEqual(t, test.startBlockIndex, 0)
+		require.Equal(t, blocks[test.startBlockIndex].Hash(), block.Hash())
 		test.startBlockIndex--
 	}
 	testHandlerStats.Reset()
@@ -115,7 +115,7 @@ func TestBlockRequestHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal("unexpected error when generating test blockchain", err)
 	}
-	assert.Len(t, blocks, 96)
+	require.Len(t, blocks, 96)
 
 	tests := []blockRequestTest{
 		{
@@ -142,8 +142,8 @@ func TestBlockRequestHandler(t *testing.T) {
 			startBlockHeight:  1_000_000,
 			requestedParents:  64,
 			expectNilResponse: true,
-			assertResponse: func(t testing.TB, testHandlerStats *statstest.TestHandlerStats, _ []byte) {
-				assert.Equal(t, uint32(1), testHandlerStats.MissingBlockHashCount)
+			requireResponse: func(t testing.TB, testHandlerStats *statstest.TestHandlerStats, _ []byte) {
+				require.Equal(t, uint32(1), testHandlerStats.MissingBlockHashCount)
 			},
 		},
 	}
@@ -186,7 +186,7 @@ func TestBlockRequestHandlerLargeBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal("unexpected error when generating test blockchain", err)
 	}
-	assert.Len(t, blocks, 96)
+	require.Len(t, blocks, 96)
 
 	tests := []blockRequestTest{
 		{
@@ -228,7 +228,7 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 		t.Fatal("unexpected error when generating test blockchain", err)
 	}
 
-	assert.Len(t, blocks, 11)
+	require.Len(t, blocks, 11)
 
 	// convert into map
 	blocksDB := make(map[common.Hash]*types.Block, 11)
@@ -264,20 +264,20 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 	if err != nil {
 		t.Fatal("unexpected error from BlockRequestHandler", err)
 	}
-	assert.NotEmpty(t, responseBytes)
+	require.NotEmpty(t, responseBytes)
 
 	var response message.BlockResponse
 	if _, err = message.Codec.Unmarshal(responseBytes, &response); err != nil {
 		t.Fatal("error unmarshalling", err)
 	}
 	// requested 8 blocks, received cancelAfterNumRequests because of timeout
-	assert.Len(t, response.Blocks, cancelAfterNumRequests)
+	require.Len(t, response.Blocks, cancelAfterNumRequests)
 
 	for i, blockBytes := range response.Blocks {
 		block := new(types.Block)
 		if err := rlp.DecodeBytes(blockBytes, block); err != nil {
 			t.Fatal("could not parse block", err)
 		}
-		assert.Equal(t, blocks[len(blocks)-i-1].Hash(), block.Hash())
+		require.Equal(t, blocks[len(blocks)-i-1].Hash(), block.Hash())
 	}
 }

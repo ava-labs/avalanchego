@@ -6,7 +6,7 @@ package contract
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFunctionSignatureRegex(t *testing.T) {
@@ -61,6 +61,6 @@ func TestFunctionSignatureRegex(t *testing.T) {
 			pass: false,
 		},
 	} {
-		assert.Equal(t, test.pass, functionSignatureRegex.MatchString(test.str), "unexpected result for %q", test.str)
+		require.Equal(t, test.pass, functionSignatureRegex.MatchString(test.str), "unexpected result for %q", test.str)
 	}
 }
