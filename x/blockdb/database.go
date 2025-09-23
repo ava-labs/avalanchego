@@ -327,7 +327,7 @@ func (s *Database) Put(height BlockHeight, block BlockData) error {
 		s.log.Error("Failed to write block: database is closed",
 			zap.Uint64("height", height),
 		)
-		return ErrDatabaseClosed
+		return database.ErrClosed
 	}
 
 	blockSize := len(block)
@@ -340,10 +340,6 @@ func (s *Database) Put(height BlockHeight, block BlockData) error {
 	}
 
 	blockDataLen := uint32(blockSize)
-	if blockDataLen == 0 {
-		s.log.Error("Failed to write block: empty block", zap.Uint64("height", height))
-		return ErrBlockEmpty
-	}
 
 	indexFileOffset, err := s.indexEntryOffset(height)
 	if err != nil {
@@ -426,14 +422,14 @@ func (s *Database) Put(height BlockHeight, block BlockData) error {
 }
 
 // readBlockIndex reads the index entry for the given height.
-// It returns ErrBlockNotFound if the block does not exist.
+// It returns database.ErrNotFound if the block does not exist.
 func (s *Database) readBlockIndex(height BlockHeight) (indexEntry, error) {
 	var entry indexEntry
 	if s.closed {
 		s.log.Error("Failed to read block index: database is closed",
 			zap.Uint64("height", height),
 		)
-		return entry, ErrDatabaseClosed
+		return entry, database.ErrClosed
 	}
 
 	// Skip the index entry read if we know the block is past the max height.
@@ -443,7 +439,7 @@ func (s *Database) readBlockIndex(height BlockHeight) (indexEntry, error) {
 			zap.Uint64("height", height),
 			zap.String("reason", "no blocks written yet"),
 		)
-		return entry, fmt.Errorf("%w: no blocks written yet", ErrBlockNotFound)
+		return entry, fmt.Errorf("%w: no blocks written yet", database.ErrNotFound)
 	}
 	if height > heights.maxBlockHeight {
 		s.log.Debug("Block not found",
@@ -451,12 +447,12 @@ func (s *Database) readBlockIndex(height BlockHeight) (indexEntry, error) {
 			zap.Uint64("maxHeight", heights.maxBlockHeight),
 			zap.String("reason", "height beyond max"),
 		)
-		return entry, fmt.Errorf("%w: height %d is beyond max height %d", ErrBlockNotFound, height, heights.maxBlockHeight)
+		return entry, fmt.Errorf("%w: height %d is beyond max height %d", database.ErrNotFound, height, heights.maxBlockHeight)
 	}
 
 	entry, err := s.readIndexEntry(height)
 	if err != nil {
-		if errors.Is(err, ErrBlockNotFound) {
+		if errors.Is(err, database.ErrNotFound) {
 			s.log.Debug("Block not found",
 				zap.Uint64("height", height),
 				zap.String("reason", "no index entry found"),
@@ -475,7 +471,7 @@ func (s *Database) readBlockIndex(height BlockHeight) (indexEntry, error) {
 }
 
 // Get retrieves a block by its height.
-// Returns ErrBlockNotFound if the block is not found.
+// Returns database.ErrNotFound if the block is not found.
 func (s *Database) Get(height BlockHeight) (BlockData, error) {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
@@ -540,7 +536,7 @@ func (s *Database) Has(height BlockHeight) (bool, error) {
 
 	_, err := s.readBlockIndex(height)
 	if err != nil {
-		if errors.Is(err, ErrBlockNotFound) {
+		if errors.Is(err, database.ErrNotFound) {
 			return false, nil
 		}
 		s.log.Error("Failed to check if block exists: failed to read index entry",
@@ -571,7 +567,7 @@ func (s *Database) indexEntryOffset(height BlockHeight) (uint64, error) {
 }
 
 // readIndexEntry reads the index entry for the given height from the index file.
-// Returns ErrBlockNotFound if the block does not exist.
+// Returns database.ErrNotFound if the block does not exist.
 func (s *Database) readIndexEntry(height BlockHeight) (indexEntry, error) {
 	var entry indexEntry
 
@@ -583,10 +579,10 @@ func (s *Database) readIndexEntry(height BlockHeight) (indexEntry, error) {
 	buf := make([]byte, sizeOfIndexEntry)
 	_, err = s.indexFile.ReadAt(buf, int64(offset))
 	if err != nil {
-		// Return ErrBlockNotFound if trying to read past the end of the index file
+		// Return database.ErrNotFound if trying to read past the end of the index file
 		// for a block that has not been indexed yet.
 		if errors.Is(err, io.EOF) {
-			return entry, fmt.Errorf("%w: EOF reading index entry at offset %d for height %d", ErrBlockNotFound, offset, height)
+			return entry, fmt.Errorf("%w: EOF reading index entry at offset %d for height %d", database.ErrNotFound, offset, height)
 		}
 		return entry, fmt.Errorf("failed to read index entry at offset %d for height %d: %w", offset, height, err)
 	}
@@ -595,7 +591,7 @@ func (s *Database) readIndexEntry(height BlockHeight) (indexEntry, error) {
 	}
 
 	if entry.IsEmpty() {
-		return entry, fmt.Errorf("%w: empty index entry for height %d", ErrBlockNotFound, height)
+		return entry, fmt.Errorf("%w: empty index entry for height %d", database.ErrNotFound, height)
 	}
 
 	return entry, nil
@@ -1125,7 +1121,7 @@ func (s *Database) updateBlockHeights(writtenBlockHeight BlockHeight) error {
 				_, err = s.readIndexEntry(nextHeightToVerify)
 				if err != nil {
 					// If no block exists at this height, we've reached the end of our contiguous sequence
-					if errors.Is(err, ErrBlockNotFound) {
+					if errors.Is(err, database.ErrNotFound) {
 						break
 					}
 
@@ -1184,7 +1180,7 @@ func (s *Database) updateRecoveredBlockHeights(recoveredHeights []BlockHeight) e
 		_, err := s.readIndexEntry(nextHeightToVerify)
 		if err != nil {
 			// If no block exists at this height, we've reached the end of our contiguous sequence
-			if errors.Is(err, ErrBlockNotFound) {
+			if errors.Is(err, database.ErrNotFound) {
 				break
 			}
 

@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,7 +58,7 @@ func TestReadOperations(t *testing.T) {
 			setup: func(db *Database) {
 				db.Close()
 			},
-			wantErr: ErrDatabaseClosed,
+			wantErr: database.ErrClosed,
 		},
 		{
 			name:       "height below minimum",
@@ -73,12 +74,12 @@ func TestReadOperations(t *testing.T) {
 		{
 			name:       "block is past max height",
 			readHeight: 51,
-			wantErr:    ErrBlockNotFound,
+			wantErr:    database.ErrNotFound,
 		},
 		{
 			name:       "block height is max height",
 			readHeight: math.MaxUint64,
-			wantErr:    ErrBlockNotFound,
+			wantErr:    database.ErrNotFound,
 		},
 	}
 
@@ -122,7 +123,7 @@ func TestReadOperations(t *testing.T) {
 			// Handle success cases
 			if tt.noBlock {
 				_, err := store.Get(tt.readHeight)
-				require.ErrorIs(t, err, ErrBlockNotFound)
+				require.ErrorIs(t, err, database.ErrNotFound)
 			} else {
 				readBlock, err := store.Get(tt.readHeight)
 				require.NoError(t, err)
@@ -166,7 +167,7 @@ func TestReadOperations_Concurrency(t *testing.T) {
 			defer wg.Done()
 			block, err := store.Get(uint64(height))
 			if gapHeights[uint64(height)] || height >= numBlocks {
-				if err == nil || !errors.Is(err, ErrBlockNotFound) {
+				if err == nil || !errors.Is(err, database.ErrNotFound) {
 					errorCount.Add(1)
 				}
 			} else {
@@ -184,7 +185,7 @@ func TestReadOperations_Concurrency(t *testing.T) {
 			defer wg.Done()
 			_, err := store.Get(uint64(height))
 			if gapHeights[uint64(height)] || height >= numBlocks {
-				if err == nil || !errors.Is(err, ErrBlockNotFound) {
+				if err == nil || !errors.Is(err, database.ErrNotFound) {
 					errorCount.Add(1)
 				}
 			} else {
@@ -199,7 +200,7 @@ func TestReadOperations_Concurrency(t *testing.T) {
 			defer wg.Done()
 			_, err := store.Get(uint64(height))
 			if gapHeights[uint64(height)] || height >= numBlocks {
-				if err == nil || !errors.Is(err, ErrBlockNotFound) {
+				if err == nil || !errors.Is(err, database.ErrNotFound) {
 					errorCount.Add(1)
 				}
 			} else {

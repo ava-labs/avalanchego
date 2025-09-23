@@ -13,6 +13,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/compression"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -194,7 +195,7 @@ func TestWriteBlock_Concurrency(t *testing.T) {
 		height := uint64(i)
 		block, err := store.Get(height)
 		if i == 5 || i == 10 {
-			require.ErrorIs(t, err, ErrBlockNotFound, "expected ErrBlockNotFound at gap height %d", height)
+			require.ErrorIs(t, err, database.ErrNotFound, "expected ErrNotFound at gap height %d", height)
 		} else {
 			require.NoError(t, err)
 			require.Equal(t, blocks[i], block, "block mismatch at height %d", height)
@@ -215,18 +216,6 @@ func TestWriteBlock_Errors(t *testing.T) {
 		wantErrMsg         string
 	}{
 		{
-			name:    "empty block nil",
-			height:  0,
-			block:   nil,
-			wantErr: ErrBlockEmpty,
-		},
-		{
-			name:    "empty block zero length",
-			height:  0,
-			block:   []byte{},
-			wantErr: ErrBlockEmpty,
-		},
-		{
 			name:    "height below custom minimum",
 			height:  5,
 			block:   randomBlock(t),
@@ -246,7 +235,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 			setup: func(db *Database) {
 				db.Close()
 			},
-			wantErr: ErrDatabaseClosed,
+			wantErr: database.ErrClosed,
 		},
 		{
 			name:               "exceed max data file size",
@@ -319,4 +308,23 @@ func TestWriteBlock_Errors(t *testing.T) {
 			checkDatabaseState(t, store, unsetHeight, unsetHeight)
 		})
 	}
+}
+
+func TestWriteBlock_EmptyBlock(t *testing.T) {
+	store, cleanup := newTestDatabase(t, DefaultConfig())
+	defer cleanup()
+
+	t.Run("nil block", func(t *testing.T) {
+		require.NoError(t, store.Put(0, nil))
+		block, err := store.Get(0)
+		require.NoError(t, err)
+		require.Equal(t, []byte{}, block)
+	})
+
+	t.Run("zero length block", func(t *testing.T) {
+		require.NoError(t, store.Put(1, []byte{}))
+		block, err := store.Get(1)
+		require.NoError(t, err)
+		require.Equal(t, []byte{}, block)
+	})
 }
