@@ -283,9 +283,10 @@ jobs:
 #        shell: bash
 #        run: nix develop --command ./scripts/run_task.sh test-robustness
   baseline-benchmark:
-    runs-on: avalanche-avalanchego-runner-2ti
+    runs-on: avalanche-avalanchego-runner
     container:
       image: ghcr.io/actions/actions-runner:2.325.0
+      options: --cap-add=SYS_ADMIN --privileged
     permissions:
       id-token: write
       contents: write
@@ -372,7 +373,7 @@ jobs:
     permissions:
       id-token: write
       contents: write
-    name: "Candidate: v0.0.12"
+    name: "Candidate: 7db59548"
     env:
       # Isolate Go caches per job
       GOCACHE: /tmp/go-build-candidate-${{ github.run_id }}
