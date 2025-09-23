@@ -74,7 +74,7 @@ func TestAddAndGetUnknownMessage(t *testing.T) {
 
 	// Try getting a signature for a message that was not added.
 	_, err = backend.GetMessageSignature(context.TODO(), testUnsignedMessage)
-	require.Error(t, err)
+	require.ErrorContains(t, err, "unknown payload type")
 }
 
 func TestGetBlockSignature(t *testing.T) {
@@ -103,7 +103,7 @@ func TestGetBlockSignature(t *testing.T) {
 	require.Equal(expectedSig, signature)
 
 	_, err = backend.GetBlockSignature(context.TODO(), ids.GenerateTestID())
-	require.Error(err)
+	require.ErrorContains(err, "failed to get block")
 }
 
 func TestZeroSizedCache(t *testing.T) {

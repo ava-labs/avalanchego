@@ -4,7 +4,6 @@
 package abi
 
 import (
-	"bytes"
 	"math/big"
 	"strings"
 	"testing"
@@ -82,14 +81,10 @@ func TestUnpackInputIntoInterface(t *testing.T) {
 				err = abi.UnpackInputIntoInterface(&v, "receive", data, test.strictMode) // skips 4 byte selector
 
 				if test.expectedErrorSubstring != "" {
-					require.Error(t, err)
 					require.ErrorContains(t, err, test.expectedErrorSubstring)
 				} else {
 					require.NoError(t, err)
-					// Verify unpacked values match input
-					require.Equal(t, v.Amount, input.Amount)
-					require.EqualValues(t, v.Amount, input.Amount)
-					require.True(t, bytes.Equal(v.Memo, input.Memo))
+					require.Equal(t, input, v)
 				}
 			})
 		}

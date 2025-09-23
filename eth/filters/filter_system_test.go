@@ -892,5 +892,5 @@ func TestGetLogsRegression(t *testing.T) {
 	test := FilterCriteria{BlockHash: &common.Hash{}, FromBlock: big.NewInt(rpc.LatestBlockNumber.Int64())}
 
 	_, err := api.GetLogs(context.Background(), test)
-	require.Error(t, err, "unknown block")
+	require.ErrorContains(t, err, "unknown block")
 }

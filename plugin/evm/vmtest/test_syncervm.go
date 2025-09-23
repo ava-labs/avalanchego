@@ -28,7 +28,6 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -192,8 +191,8 @@ func StateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup
 	}
 
 	enabled, err := syncDisabledVM.StateSyncEnabled(context.Background())
-	assert.NoError(t, err)
-	assert.False(t, enabled, "sync should be disabled")
+	require.NoError(t, err)
+	require.False(t, enabled, "sync should be disabled")
 
 	// Process the first 10 blocks from the serverVM
 	for i := uint64(1); i < 10; i++ {
@@ -256,15 +255,15 @@ func StateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup
 	}
 
 	// connect peer to [syncerVM]
-	assert.NoError(t, syncReEnabledVM.Connected(
+	require.NoError(t, syncReEnabledVM.Connected(
 		context.Background(),
 		testSyncVMSetup.serverVM.SnowCtx.NodeID,
 		statesyncclient.StateSyncVersion,
 	))
 
 	enabled, err = syncReEnabledVM.StateSyncEnabled(context.Background())
-	assert.NoError(t, err)
-	assert.True(t, enabled, "sync should be enabled")
+	require.NoError(t, err)
+	require.True(t, enabled, "sync should be enabled")
 
 	testSyncVMSetup.syncerVM.VM = syncReEnabledVM
 	testSyncerVM(t, testSyncVMSetup, test, testSetup.ExtraSyncerVMTest)
@@ -495,7 +494,7 @@ func testSyncerVM(t *testing.T, testSyncVMSetup *testSyncVMSetup, test SyncTestP
 	require.NoError(err)
 	require.Equal(commonEng.StateSyncDone, msg)
 
-	// If the test is expected to error, assert the correct error is returned and finish the test.
+	// If the test is expected to error, require that the correct error is returned and finish the test.
 	err = syncerVM.SyncerClient().Error()
 	if test.expectedErr != nil {
 		require.ErrorIs(err, test.expectedErr)
@@ -503,7 +502,7 @@ func testSyncerVM(t *testing.T, testSyncVMSetup *testSyncVMSetup, test SyncTestP
 		// TODO: this avoids circular dependencies but is not ideal.
 		ethDBPrefix := []byte("ethdb")
 		chaindb := database.WrapDatabase(prefixdb.NewNested(ethDBPrefix, testSyncVMSetup.syncerVM.DB))
-		assertSyncPerformedHeights(t, chaindb, map[uint64]struct{}{})
+		requireSyncPerformedHeights(t, chaindb, map[uint64]struct{}{})
 		return
 	}
 	require.NoError(err, "state sync failed")
@@ -514,7 +513,7 @@ func testSyncerVM(t *testing.T, testSyncVMSetup *testSyncVMSetup, test SyncTestP
 	require.Equal(serverVM.LastAcceptedExtendedBlock().Height(), syncerVM.LastAcceptedExtendedBlock().Height(), "block height mismatch between syncer and server")
 	require.Equal(serverVM.LastAcceptedExtendedBlock().ID(), syncerVM.LastAcceptedExtendedBlock().ID(), "blockID mismatch between syncer and server")
 	require.True(syncerVM.Ethereum().BlockChain().HasState(syncerVM.Ethereum().BlockChain().LastAcceptedBlock().Root()), "unavailable state for last accepted block")
-	assertSyncPerformedHeights(t, syncerVM.Ethereum().ChainDb(), map[uint64]struct{}{retrievedSummary.Height(): {}})
+	requireSyncPerformedHeights(t, syncerVM.Ethereum().ChainDb(), map[uint64]struct{}{retrievedSummary.Height(): {}})
 
 	lastNumber := syncerVM.Ethereum().BlockChain().LastAcceptedBlock().NumberU64()
 	// check the last block is indexed
@@ -672,9 +671,9 @@ func generateAndAcceptBlocks(t *testing.T, vm extension.InnerVM, numBlocks int, 
 	vm.Ethereum().BlockChain().DrainAcceptorQueue()
 }
 
-// assertSyncPerformedHeights iterates over all heights the VM has synced to and
+// requireSyncPerformedHeights iterates over all heights the VM has synced to and
 // verifies they all match the heights present in `expected`.
-func assertSyncPerformedHeights(t *testing.T, db ethdb.Iteratee, expected map[uint64]struct{}) {
+func requireSyncPerformedHeights(t *testing.T, db ethdb.Iteratee, expected map[uint64]struct{}) {
 	it := customrawdb.NewSyncPerformedIterator(db)
 	defer it.Release()
 
