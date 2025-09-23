@@ -25,22 +25,22 @@ func TestOperationsAfterCloseReturnError(t *testing.T) {
 		fn   func() error
 	}{
 		{
-			name: "WriteBlock",
+			name: "Put",
 			fn: func() error {
-				return db.WriteBlock(height, blockData)
+				return db.Put(height, blockData)
 			},
 		},
 		{
-			name: "ReadBlock",
+			name: "Get",
 			fn: func() error {
-				_, err := db.ReadBlock(height)
+				_, err := db.Get(height)
 				return err
 			},
 		},
 		{
-			name: "HasBlock",
+			name: "Has",
 			fn: func() error {
-				_, err := db.HasBlock(height)
+				_, err := db.Has(height)
 				return err
 			},
 		},
@@ -54,47 +54,46 @@ func TestOperationsAfterCloseReturnError(t *testing.T) {
 	}
 }
 
-func TestWriteAndReadBlock(t *testing.T) {
+func TestPut(t *testing.T) {
 	db := &Database{}
 
 	height := blockdb.BlockHeight(1)
 	blockData := blockdb.BlockData("test block data")
+	require.NoError(t, db.Put(height, blockData))
+}
 
-	// Write block
-	require.NoError(t, db.WriteBlock(height, blockData))
+func TestGet(t *testing.T) {
+	db := &Database{}
+
+	height := blockdb.BlockHeight(1)
+	blockData := blockdb.BlockData("test block data")
+	require.NoError(t, db.Put(height, blockData))
 
 	// Read block back
-	retrievedBlock, err := db.ReadBlock(height)
+	retrievedBlock, err := db.Get(height)
 	require.NoError(t, err)
 	require.Equal(t, blockData, retrievedBlock)
 }
 
-func TestHasBlockForExistingBlock(t *testing.T) {
-	db := &Database{}
+func TestHas(t *testing.T) {
+	t.Run("non-existent block", func(t *testing.T) {
+		db := &Database{}
+		exists, err := db.Has(blockdb.BlockHeight(1))
+		require.NoError(t, err)
+		require.False(t, exists)
+	})
 
-	height := blockdb.BlockHeight(1)
-	blockData := blockdb.BlockData("test block data")
-
-	// Write block
-	require.NoError(t, db.WriteBlock(height, blockData))
-
-	// Verify HasBlock returns true
-	exists, err := db.HasBlock(height)
-	require.NoError(t, err)
-	require.True(t, exists)
+	t.Run("existing block", func(t *testing.T) {
+		db := &Database{}
+		blockData := blockdb.BlockData("test block data")
+		require.NoError(t, db.Put(blockdb.BlockHeight(1), blockData))
+		exists, err := db.Has(blockdb.BlockHeight(1))
+		require.NoError(t, err)
+		require.True(t, exists)
+	})
 }
 
-func TestHasBlockForNonExistentBlock(t *testing.T) {
-	db := &Database{}
-
-	// Verify non-existent block returns false
-	nonExistentHeight := blockdb.BlockHeight(999)
-	exists, err := db.HasBlock(nonExistentHeight)
-	require.NoError(t, err)
-	require.False(t, exists)
-}
-
-func TestOverwritingBlockUpdatesData(t *testing.T) {
+func TestPut_Overwrite(t *testing.T) {
 	db := &Database{}
 
 	height := blockdb.BlockHeight(1)
@@ -102,13 +101,13 @@ func TestOverwritingBlockUpdatesData(t *testing.T) {
 	updatedData := blockdb.BlockData("updated data")
 
 	// Write original block
-	require.NoError(t, db.WriteBlock(height, originalData))
+	require.NoError(t, db.Put(height, originalData))
 
 	// Overwrite with new data
-	require.NoError(t, db.WriteBlock(height, updatedData))
+	require.NoError(t, db.Put(height, updatedData))
 
 	// Verify updated data
-	retrievedBlock, err := db.ReadBlock(height)
+	retrievedBlock, err := db.Get(height)
 	require.NoError(t, err)
 	require.Equal(t, updatedData, retrievedBlock)
 }

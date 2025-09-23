@@ -6,7 +6,12 @@ package memdb
 import (
 	"sync"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/x/blockdb"
+)
+
+var (
+	_ database.HeightIndex = (*Database)(nil)
 )
 
 // Database is an in-memory implementation of BlockDB
@@ -16,8 +21,8 @@ type Database struct {
 	closed bool
 }
 
-// WriteBlock stores a block in memory
-func (d *Database) WriteBlock(height blockdb.BlockHeight, block blockdb.BlockData) error {
+// Put stores data in memory at the given height
+func (d *Database) Put(height blockdb.BlockHeight, block blockdb.BlockData) error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -40,8 +45,8 @@ func (d *Database) WriteBlock(height blockdb.BlockHeight, block blockdb.BlockDat
 	return nil
 }
 
-// ReadBlock retrieves the full block data for the given height
-func (d *Database) ReadBlock(height blockdb.BlockHeight) (blockdb.BlockData, error) {
+// Get retrieves data at the given height
+func (d *Database) Get(height blockdb.BlockHeight) (blockdb.BlockData, error) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
@@ -59,8 +64,8 @@ func (d *Database) ReadBlock(height blockdb.BlockHeight) (blockdb.BlockData, err
 	return blockCopy, nil
 }
 
-// HasBlock checks if a block exists at the given height
-func (d *Database) HasBlock(height blockdb.BlockHeight) (bool, error) {
+// Has checks if data exists at the given height
+func (d *Database) Has(height blockdb.BlockHeight) (bool, error) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 
