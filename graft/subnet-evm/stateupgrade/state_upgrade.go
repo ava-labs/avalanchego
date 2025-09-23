@@ -16,7 +16,8 @@ import (
 )
 
 var (
-	ErrInsufficientBalanceForSubtraction = errors.New("insufficient balance for subtraction")
+	errInsufficientBalanceForSubtraction = errors.New("insufficient balance for subtraction")
+	errBalanceOverflow                   = errors.New("balance overflow")
 	ErrBalanceOverflow                   = errors.New("balance overflow")
 )
 

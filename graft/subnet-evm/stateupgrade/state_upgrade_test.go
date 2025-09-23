@@ -127,7 +127,6 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 				BalanceChange: tt.balanceChange,
 			}
 			err := upgradeAccount(testAddr, upgrade, statedb, false)
-
 			require.ErrorIs(t, err, tt.wantError)
 			if err != nil {
 				require.ErrorContains(t, err, testAddr.Hex())
