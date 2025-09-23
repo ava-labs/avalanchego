@@ -58,7 +58,7 @@ func upgradeAccount(account common.Address, upgrade extras.StateUpgradeAccount, 
 			currentBalance := state.GetBalance(account)
 			if currentBalance.Cmp(balanceChange) < 0 {
 				return fmt.Errorf("%w: account %s has %s but trying to subtract %s",
-					ErrInsufficientBalanceForSubtraction,
+					errInsufficientBalanceForSubtraction,
 					account.Hex(), currentBalance.ToBig().String(), balanceChange.ToBig().String())
 			}
 			state.SubBalance(account, balanceChange)

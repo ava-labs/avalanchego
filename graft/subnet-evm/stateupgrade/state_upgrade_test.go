@@ -51,7 +51,7 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 			balanceChange:  hexOrDecimal256FromInt64(-100),
 			accountExists:  true,
 			wantBalance:    uint256.NewInt(50), // unchanged
-			wantError:      ErrInsufficientBalanceForSubtraction,
+			wantError:      errInsufficientBalanceForSubtraction,
 		},
 		{
 			name:           "zero balance change",
@@ -77,7 +77,7 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 			initialBalance: uint256.NewInt(0),
 			balanceChange:  hexOrDecimal256FromInt64(-100),
 			wantBalance:    uint256.NewInt(0), // unchanged
-			wantError:      ErrInsufficientBalanceForSubtraction,
+			wantError:      errInsufficientBalanceForSubtraction,
 		},
 		{
 			name:           "exact balance subtraction",
@@ -92,7 +92,7 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 			balanceChange:  hexOrDecimal256FromInt64(-101),
 			accountExists:  true,
 			wantBalance:    uint256.NewInt(100), // unchanged
-			wantError:      ErrInsufficientBalanceForSubtraction,
+			wantError:      errInsufficientBalanceForSubtraction,
 		},
 		{
 			name: "large positive balance change",
