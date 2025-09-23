@@ -44,8 +44,7 @@ const (
 var (
 	_ validators.State = (*manager)(nil)
 
-	errUnfinalizedHeight    = errors.New("failed to fetch validator set at unfinalized height")
-	errFailedToGetSubnetIDs = errors.New("failed to get subnet IDs")
+	errUnfinalizedHeight = errors.New("failed to fetch validator set at unfinalized height")
 )
 
 // Manager adds the ability to introduce newly accepted blocks IDs to the State
@@ -84,6 +83,13 @@ type State interface {
 		subnetID ids.ID,
 	) error
 
+	ApplyValidatorWeightDiffsAllValidators(
+		ctx context.Context,
+		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
+		startHeight uint64,
+		endHeight uint64,
+	) error
+
 	// ApplyValidatorPublicKeyDiffs iterates from [startHeight] towards the
 	// genesis block until it has applied all of the diffs up to and including
 	// [endHeight]. Applying the diffs modifies [validators].
@@ -102,6 +108,13 @@ type State interface {
 		subnetID ids.ID,
 	) error
 
+	ApplyValidatorPublicKeyDiffsAllValidators(
+		ctx context.Context,
+		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
+		startHeight uint64,
+		endHeight uint64,
+	) error
+
 	GetCurrentValidators(ctx context.Context, subnetID ids.ID) ([]*state.Staker, []state.L1Validator, uint64, error)
 }
 
@@ -116,6 +129,7 @@ func NewManager(
 		state:   state,
 		metrics: metrics,
 		clk:     clk,
+		cache:   lru.NewCache[uint64, map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput](validatorSetsCacheSize),
 		caches:  make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
 		recentlyAccepted: window.New[ids.ID](
 			window.Config{
@@ -135,6 +149,9 @@ type manager struct {
 	state   State
 	metrics metrics.Metrics
 	clk     *mockable.Clock
+
+	// Caches all validator sets at a given height.
+	cache cache.Cacher[uint64, map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput]
 
 	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
@@ -203,28 +220,20 @@ func (m *manager) GetAllValidatorSets(
 	ctx context.Context,
 	targetHeight uint64,
 ) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	result := make(map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput)
-	subnets, err := m.state.GetSubnetIDs()
-	if err != nil {
-		return nil, errFailedToGetSubnetIDs
+	if allValidators, ok := m.cache.Get(targetHeight); ok {
+		// TODO add metrics m.metrics.IncAllValidatorSetsCached()
+		return maps.Clone(allValidators), nil
 	}
 
-	// Get validator set for the primary network
-	primaryNetworkValidators, err := m.GetValidatorSet(ctx, targetHeight, constants.PrimaryNetworkID)
+	allValidators, _, err := m.makeAllValidatorSets(ctx, targetHeight)
 	if err != nil {
 		return nil, err
 	}
-	result[constants.PrimaryNetworkID] = primaryNetworkValidators
 
-	// Get validator sets for all other subnets
-	for _, subnetID := range subnets {
-		validatorSet, err := m.GetValidatorSet(ctx, targetHeight, subnetID)
-		if err != nil {
-			return nil, err
-		}
-		result[subnetID] = validatorSet
-	}
-	return result, nil
+	// cache the validator set
+	m.cache.Put(targetHeight, allValidators)
+
+	return allValidators, nil
 }
 
 func (m *manager) GetValidatorSet(
@@ -273,6 +282,49 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 	return validatorSetsCache
 }
 
+// TODO this can fail if we query a targetHeight before the new indexes existed
+func (m *manager) makeAllValidatorSets(
+	ctx context.Context,
+	targetHeight uint64,
+) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	allValidators, currentHeight, err := m.getAllCurrentValidatorSets(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	if currentHeight < targetHeight {
+		return nil, 0, fmt.Errorf("%w with SubnetID = %s: current P-chain height (%d) < requested P-Chain height (%d)",
+			errUnfinalizedHeight,
+			currentHeight,
+			targetHeight,
+		)
+	}
+
+	// Rebuild subnet validators at [targetHeight]
+	//
+	// Note: Since we are attempting to generate the validator set at
+	// [targetHeight], we want to apply the diffs from
+	// (targetHeight, currentHeight]. Because the state interface is implemented
+	// to be inclusive, we apply diffs in [targetHeight + 1, currentHeight].
+	lastDiffHeight := targetHeight + 1
+	err = m.state.ApplyValidatorWeightDiffsAllValidators(
+		ctx,
+		allValidators,
+		currentHeight,
+		lastDiffHeight,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	err = m.state.ApplyValidatorPublicKeyDiffsAllValidators(
+		ctx,
+		allValidators,
+		currentHeight,
+		lastDiffHeight,
+	)
+	return allValidators, currentHeight, err
+}
+
 func (m *manager) makeValidatorSet(
 	ctx context.Context,
 	targetHeight uint64,
@@ -317,6 +369,15 @@ func (m *manager) makeValidatorSet(
 		subnetID,
 	)
 	return validatorSet, currentHeight, err
+}
+
+func (m *manager) getAllCurrentValidatorSets(
+	ctx context.Context,
+) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+	subnetsMap := m.cfg.Validators.GetAllMaps()
+	// TODO is there a race-condition here?
+	currentHeight, err := m.getCurrentHeight(ctx)
+	return subnetsMap, currentHeight, err
 }
 
 func (m *manager) getCurrentValidatorSet(

@@ -39,10 +39,28 @@ func marshalStartDiffKey(subnetID ids.ID, height uint64) []byte {
 	return key
 }
 
+// marshalStartDiffKey2 is used to determine the starting key when iterating.
+//
+// Invariant: the result is a prefix of [marshalDiffKey] when called with the
+// same arguments.
+func marshalStartDiffKey2(height uint64) []byte {
+	key := make([]byte, database.Uint64Size)
+	packIterableHeight(key[:], height)
+	return key
+}
+
 func marshalDiffKey(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
 	key := make([]byte, diffKeyLength)
 	copy(key, subnetID[:])
 	packIterableHeight(key[ids.IDLen:], height)
+	copy(key[diffKeyNodeIDOffset:], nodeID.Bytes())
+	return key
+}
+
+func marshalDiffKey2(height uint64, subnetID ids.ID, nodeID ids.NodeID) []byte {
+	key := make([]byte, diffKeyLength)
+	packIterableHeight(key, height)
+	copy(key[database.Uint64Size:], subnetID[:])
 	copy(key[diffKeyNodeIDOffset:], nodeID.Bytes())
 	return key
 }
@@ -59,6 +77,20 @@ func unmarshalDiffKey(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 	height := unpackIterableHeight(key[ids.IDLen:])
 	copy(nodeID[:], key[diffKeyNodeIDOffset:])
 	return subnetID, height, nodeID, nil
+}
+
+func unmarshalDiffKey2(key []byte) (uint64, ids.ID, ids.NodeID, error) {
+	if len(key) != diffKeyLength {
+		return 0, ids.Empty, ids.EmptyNodeID, errUnexpectedDiffKeyLength
+	}
+	var (
+		subnetID ids.ID
+		nodeID   ids.NodeID
+	)
+	height := unpackIterableHeight(key)
+	copy(subnetID[:], key[database.Uint64Size:])
+	copy(nodeID[:], key[diffKeyNodeIDOffset:])
+	return height, subnetID, nodeID, nil
 }
 
 func marshalWeightDiff(diff *ValidatorWeightDiff) []byte {

@@ -95,6 +95,9 @@ type Manager interface {
 	Sample(subnetID ids.ID, size int) ([]ids.NodeID, error)
 
 	// Map of the validators in this subnet
+	GetAllMaps() map[ids.ID]map[ids.NodeID]*GetValidatorOutput
+
+	// Map of the validators in this subnet
 	GetMap(subnetID ids.ID) map[ids.NodeID]*GetValidatorOutput
 
 	// When a validator is added, removed, or its weight changes, the listener
@@ -272,6 +275,17 @@ func (m *manager) Sample(subnetID ids.ID, size int) ([]ids.NodeID, error) {
 	}
 
 	return set.Sample(size)
+}
+
+func (m *manager) GetAllMaps() map[ids.ID]map[ids.NodeID]*GetValidatorOutput {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	set := make(map[ids.ID]map[ids.NodeID]*GetValidatorOutput, len(m.subnetToVdrs))
+	for subnetID, vdrs := range m.subnetToVdrs {
+		set[subnetID] = vdrs.Map()
+	}
+	return set
 }
 
 func (m *manager) GetMap(subnetID ids.ID) map[ids.NodeID]*GetValidatorOutput {
