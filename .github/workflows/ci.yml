@@ -367,10 +367,10 @@ jobs:
 #            benchmark-results/
 #          retention-days: 7
   candidate-v0-0-12-benchmark:
-    runs-on: avalanche-avalanchego-runner-2ti
+    runs-on: avalanche-avalanchego-runner
     container:
       image: ghcr.io/actions/actions-runner:2.325.0
-      options: --cap-add=SYS_ADMIN
+      options: --cap-add=SYS_ADMIN --privileged
     permissions:
       id-token: write
       contents: write
@@ -435,7 +435,7 @@ jobs:
           aws-region: us-east-2
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ''
-          runner_name: 'avalanche-avalanchego-runner-2ti-v0.0.12'
+          runner_name: 'avalanche-avalanchego-runner-v0.0.12'
           prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
