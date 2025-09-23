@@ -19,6 +19,11 @@ import (
 
 var _ p2p.Handler = (*txGossipHandler)(nil)
 
+type txGossipHandler struct {
+	appGossipHandler  p2p.Handler
+	appRequestHandler p2p.Handler
+}
+
 func NewTxGossipHandler[T gossip.Gossipable](
 	log logging.Logger,
 	marshaller gossip.Marshaller[T],
@@ -65,11 +70,6 @@ func NewTxGossipHandler[T gossip.Gossipable](
 		appGossipHandler:  handler,
 		appRequestHandler: validatorHandler,
 	}, nil
-}
-
-type txGossipHandler struct {
-	appGossipHandler  p2p.Handler
-	appRequestHandler p2p.Handler
 }
 
 func (t *txGossipHandler) AppGossip(ctx context.Context, nodeID ids.NodeID, gossipBytes []byte) {
