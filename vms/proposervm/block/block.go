@@ -57,14 +57,10 @@ type statelessUnsignedBlock struct {
 }
 
 type statelessUnsignedGraniteBlock struct {
-	ParentID            ids.ID `serialize:"true" json:"parentID"`
-	Timestamp           int64  `serialize:"true" json:"timestamp"`
-	PChainHeight        uint64 `serialize:"true" json:"pChainHeight"`
-	Certificate         []byte `serialize:"true" json:"certificate"`
-	Block               []byte `serialize:"true" json:"block"`
-	EpochNumber         uint64 `serialize:"true" json:"epochNumber"`
-	EpochStartTimestamp int64  `serialize:"true" json:"epochStartTimestamp"`
-	EpochHeight         uint64 `serialize:"true" json:"epochHeight"`
+	statelessUnsignedBlock `serialize:"true"`
+	EpochNumber            uint64 `serialize:"true" json:"epochNumber"`
+	EpochStartTimestamp    int64  `serialize:"true" json:"epochStartTimestamp"`
+	EpochHeight            uint64 `serialize:"true" json:"epochHeight"`
 }
 
 type PChainEpoch struct {

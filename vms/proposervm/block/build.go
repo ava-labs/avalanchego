@@ -21,29 +21,27 @@ func BuildUnsigned(
 	pChainEpoch PChainEpoch,
 	blockBytes []byte,
 ) (SignedBlock, error) {
-	var block SignedBlock
+	var (
+		preGraniteStatelessUnsignedBlock = statelessUnsignedBlock{
+			ParentID:     parentID,
+			Timestamp:    timestamp.Unix(),
+			PChainHeight: pChainHeight,
+			Certificate:  nil,
+			Block:        blockBytes,
+		}
+		block SignedBlock
+	)
 	if pChainEpoch.Number == 0 {
 		block = &statelessBlock{
-			StatelessBlock: statelessUnsignedBlock{
-				ParentID:     parentID,
-				Timestamp:    timestamp.Unix(),
-				PChainHeight: pChainHeight,
-				Certificate:  nil,
-				Block:        blockBytes,
-			},
-			timestamp: timestamp,
+			StatelessBlock: preGraniteStatelessUnsignedBlock,
 		}
 	} else {
 		block = &statelessGraniteBlock{
 			StatelessBlock: statelessUnsignedGraniteBlock{
-				ParentID:            parentID,
-				Timestamp:           timestamp.Unix(),
-				PChainHeight:        pChainHeight,
-				Certificate:         nil,
-				Block:               blockBytes,
-				EpochNumber:         pChainEpoch.Number,
-				EpochStartTimestamp: pChainEpoch.StartTime.Unix(),
-				EpochHeight:         pChainEpoch.Height,
+				statelessUnsignedBlock: preGraniteStatelessUnsignedBlock,
+				EpochNumber:            pChainEpoch.Number,
+				EpochStartTimestamp:    pChainEpoch.StartTime.Unix(),
+				EpochHeight:            pChainEpoch.Height,
 			},
 		}
 	}
@@ -66,31 +64,30 @@ func Build(
 	chainID ids.ID,
 	key crypto.Signer,
 ) (SignedBlock, error) {
-	var block SignedBlock
+	var (
+		preGraniteStatelessUnsignedBlock = statelessUnsignedBlock{
+			ParentID:     parentID,
+			Timestamp:    timestamp.Unix(),
+			PChainHeight: pChainHeight,
+			Certificate:  cert.Raw,
+			Block:        blockBytes,
+		}
+		block SignedBlock
+	)
 	if pChainEpoch.Number == 0 {
 		block = &statelessBlock{
-			StatelessBlock: statelessUnsignedBlock{
-				ParentID:     parentID,
-				Timestamp:    timestamp.Unix(),
-				PChainHeight: pChainHeight,
-				Certificate:  cert.Raw,
-				Block:        blockBytes,
-			},
-			timestamp: timestamp,
-			cert:      cert,
-			proposer:  ids.NodeIDFromCert(cert),
+			StatelessBlock: preGraniteStatelessUnsignedBlock,
+			timestamp:      timestamp,
+			cert:           cert,
+			proposer:       ids.NodeIDFromCert(cert),
 		}
 	} else {
 		block = &statelessGraniteBlock{
 			StatelessBlock: statelessUnsignedGraniteBlock{
-				ParentID:            parentID,
-				Timestamp:           timestamp.Unix(),
-				PChainHeight:        pChainHeight,
-				Certificate:         cert.Raw,
-				Block:               blockBytes,
-				EpochNumber:         pChainEpoch.Number,
-				EpochStartTimestamp: pChainEpoch.StartTime.Unix(),
-				EpochHeight:         pChainEpoch.Height,
+				statelessUnsignedBlock: preGraniteStatelessUnsignedBlock,
+				EpochNumber:            pChainEpoch.Number,
+				EpochStartTimestamp:    pChainEpoch.StartTime.Unix(),
+				EpochHeight:            pChainEpoch.Height,
 			},
 			timestamp: timestamp,
 			cert:      cert,
