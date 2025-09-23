@@ -35,7 +35,7 @@ func NewTxGossipHandler[T gossip.Gossipable](
 	validators p2p.ValidatorSet,
 	registerer prometheus.Registerer,
 	namespace string,
-) (*txGossipHandler, error) {
+) (p2p.Handler, error) {
 	// push gossip messages can be handled from any peer
 	handler := gossip.NewHandler(
 		log,
