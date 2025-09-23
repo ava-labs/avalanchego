@@ -115,12 +115,9 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 				setAccountBalance(t, statedb, testAddr, tt.initialBalance)
 			}
 
-			// Create the upgrade configuration
 			upgrade := extras.StateUpgradeAccount{
 				BalanceChange: tt.balanceChange,
 			}
-
-			// Execute the upgrade
 			err := upgradeAccount(testAddr, upgrade, statedb, false)
 
 			// Check error expectations
@@ -178,8 +175,6 @@ func TestUpgradeAccount_CompleteUpgrade(t *testing.T) {
 		Code:          code,
 		Storage:       map[common.Hash]common.Hash{storageKey: storageValue},
 	}
-
-	// Execute the upgrade
 	err := upgradeAccount(addr, upgrade, statedb, true) // Test with EIP158 = true
 	require.NoError(t, err)
 
@@ -198,10 +193,7 @@ func TestUpgradeAccount_CompleteUpgrade(t *testing.T) {
 func createTestStateDB(t *testing.T) StateDB {
 	t.Helper()
 
-	// Create an in-memory database
 	db := rawdb.NewMemoryDatabase()
-
-	// Create a new state database
 	statedb, err := state.New(types.EmptyRootHash, state.NewDatabase(db), nil)
 	require.NoError(t, err)
 
