@@ -175,8 +175,7 @@ func TestUpgradeAccount_CompleteUpgrade(t *testing.T) {
 		Code:          code,
 		Storage:       map[common.Hash]common.Hash{storageKey: storageValue},
 	}
-	err := upgradeAccount(addr, upgrade, statedb, true) // Test with EIP158 = true
-	require.NoError(t, err)
+	require.NoError(t, upgradeAccount(addr, upgrade, statedb, true)) // Test with EIP158 = true
 
 	// Verify all changes were applied
 	require.Equal(t, uint256.NewInt(1000), statedb.GetBalance(addr))
