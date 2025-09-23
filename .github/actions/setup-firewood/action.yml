@@ -40,10 +40,6 @@ runs:
       uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: ${{ inputs.rust-version }}
-    - name: Setup Rust cache
-      if: steps.detect-build-type.outputs.build-type == 'source'
-      uses: Swatinem/rust-cache@v2
-
     - name: Checkout Firewood source
       if: steps.detect-build-type.outputs.build-type == 'source'
       uses: actions/checkout@v4
