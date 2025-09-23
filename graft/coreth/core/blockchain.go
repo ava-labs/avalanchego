@@ -176,7 +176,7 @@ const (
 	// clean cache's underlying fastcache.
 	trieCleanCacheStatsNamespace = "hashdb/memcache/clean/fastcache"
 
-	firewoodFileName = "firewood_state"
+	firewoodFileName = "firewood.db"
 )
 
 // CacheConfig contains the configuration values for the trie database
