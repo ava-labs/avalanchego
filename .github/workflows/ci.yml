@@ -327,6 +327,17 @@ jobs:
         with:
           firewood-version: '61a80a28838e3d41d45bf1e428b211e1982d2328'
           rust-version: '1.89'
+      - name: Verify Firewood Setup
+        run: |
+          echo "=== FFI Directory Structure ==="
+          ls -la ./ffi/ || echo "No ffi directory"
+
+          echo "=== Platform Library ==="
+          PLATFORM="$(uname -m | sed 's/arm64/aarch64/')-unknown-linux-gnu"
+          ls -la "./ffi/libs/$PLATFORM/" || echo "No platform libs"
+
+          echo "=== Go Module Status ==="
+          go list -m all | grep firewood || echo "No firewood modules"
       - name: Configure AvalancheGo to work with Firewood
         run: |
           # Configure go.mod to use local FFI
@@ -407,6 +418,17 @@ jobs:
         with:
           firewood-version: '7db595487e0bccba02cedbb3dabded7ca24bfa11'
           rust-version: '1.89'
+      - name: Verify Firewood Setup
+        run: |
+          echo "=== FFI Directory Structure ==="
+          ls -la ./ffi/ || echo "No ffi directory"
+
+          echo "=== Platform Library ==="
+          PLATFORM="$(uname -m | sed 's/arm64/aarch64/')-unknown-linux-gnu"
+          ls -la "./ffi/libs/$PLATFORM/" || echo "No platform libs"
+
+          echo "=== Go Module Status ==="
+          go list -m all | grep firewood || echo "No firewood modules"
       - name: Configure AvalancheGo to work with Firewood
         shell: nix develop --command bash -x {0}
         run: |
