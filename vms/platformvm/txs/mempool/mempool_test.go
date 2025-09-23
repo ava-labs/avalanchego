@@ -385,6 +385,30 @@ func TestMempoolAdd(t *testing.T) {
 			},
 			wantErr: mempool.ErrConflictsWithOtherTx,
 		},
+		{
+			name:           "AVAX minted",
+			weights:        gas.Dimensions{1, 1, 1, 1},
+			maxGasCapacity: 200,
+			tx: newTxWithUTXOs(
+				ids.ID{1},
+				[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 1)},
+				2,
+			),
+			wantErr: errAVAXMinted,
+		},
+		{
+			name:           "tx added",
+			weights:        gas.Dimensions{1, 1, 1, 1},
+			maxGasCapacity: 200,
+			tx: newTxWithUTXOs(
+				ids.ID{1},
+				[]*avax.TransferableInput{newAVAXInput(ids.ID{1}, 1)},
+				0,
+			),
+			wantTxIDs: []ids.ID{
+				{1},
+			},
+		},
 	}
 
 	for _, tt := range tests {
