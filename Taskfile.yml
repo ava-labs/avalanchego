@@ -5,9 +5,7 @@
 version: '3'
 
 env:
-  BASEDIR: '{{.BASEDIR | default "/tmp/e2e-test"}}'
-  AVALANCHEGO_BUILD_PATH: '{{.AVALANCHEGO_BUILD_PATH | default "/tmp/e2e-test/avalanchego"}}'
-  DATA_DIR: '{{.DATA_DIR | default "/tmp/e2e-test/coreth-data"}}'
+  AVALANCHEGO_BUILD_PATH: '{{.AVALANCHEGO_BUILD_PATH | default (printf "%s/avalanchego/build" .TASKFILE_DIR) }}'
 
 tasks:
   default: ./scripts/run_task.sh --list
@@ -120,16 +118,23 @@ tasks:
     desc: Run AvalancheGo e2e tests from target version against current state of coreth
     cmd: ./scripts/tests.e2e.sh # ci.yml
 
+  test-e2e-ci:
+    desc: Run AvalancheGo e2e tests from target version against current state of coreth, cloning and building avalanchego if necessary
+    cmds:
+      - task: build-avalanchego-with-coreth
+      - task: test-e2e
+
   test-e2e-warp:
     desc: Run end-to-end warp tests using Ginkgo test framework
-    cmd: ./scripts/run_ginkgo_warp.sh # ci.yml
+    cmd: bash -x ./scripts/run_ginkgo_warp.sh # ci.yml
 
   test-e2e-warp-ci: # consolidated test-e2e-warp
     desc: Run E2E warp tests with CI setup
     cmds:
+      - task: build-avalanchego-with-coreth
       - task: build
       - task: test-e2e-warp
 
   update-avalanchego-version:
     desc: Update AvalancheGo version in go.mod and sync GitHub Actions workflow custom action version
-    cmd: bash -x ./scripts/update_avalanchego_version.sh # ci.yml 
+    cmd: bash -x ./scripts/update_avalanchego_version.sh # ci.yml
