@@ -15,7 +15,10 @@ import (
 type StateDB interface {
 	SetState(common.Address, common.Hash, common.Hash, ...stateconf.StateDBStateOption)
 	SetCode(common.Address, []byte)
+
+	GetBalance(common.Address) *uint256.Int
 	AddBalance(common.Address, *uint256.Int)
+	SubBalance(common.Address, *uint256.Int)
 
 	GetNonce(common.Address) uint64
 	SetNonce(common.Address, uint64)
