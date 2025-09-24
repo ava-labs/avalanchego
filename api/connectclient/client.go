@@ -20,12 +20,14 @@ var _ connect.Interceptor = (*SetRouteHeaderInterceptor)(nil)
 // SetRouteHeaderInterceptor sets the api routing header for connect-rpc
 // requests
 type SetRouteHeaderInterceptor struct {
-	Route string
+	Route []string
 }
 
 func (s SetRouteHeaderInterceptor) WrapUnary(next connect.UnaryFunc) connect.UnaryFunc {
 	return func(ctx context.Context, request connect.AnyRequest) (connect.AnyResponse, error) {
-		request.Header().Set(server.HTTPHeaderRoute, s.Route)
+		for _, route := range s.Route {
+			request.Header().Add(server.HTTPHeaderRoute, route)
+		}
 		return next(ctx, request)
 	}
 }
@@ -33,7 +35,9 @@ func (s SetRouteHeaderInterceptor) WrapUnary(next connect.UnaryFunc) connect.Una
 func (s SetRouteHeaderInterceptor) WrapStreamingClient(next connect.StreamingClientFunc) connect.StreamingClientFunc {
 	return func(ctx context.Context, spec connect.Spec) connect.StreamingClientConn {
 		conn := next(ctx, spec)
-		conn.RequestHeader().Set(server.HTTPHeaderRoute, s.Route)
+		for _, route := range s.Route {
+			conn.RequestHeader().Add(server.HTTPHeaderRoute, route)
+		}
 		return conn
 	}
 }

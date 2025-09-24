@@ -15,6 +15,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
@@ -148,6 +149,10 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
+	vm.metrics, err = proposervmmetrics.New(vm.Config.Registerer)
+	if err != nil {
+		return fmt.Errorf("failed to initialize metrics: %w", err)
+	}
 	vm.State = baseState
 	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID)
 	vm.Tree = tree.New()
@@ -271,35 +276,52 @@ func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
 		return nil, err
 	}
 
-	// Create the multiplexer
-	mux := http.NewServeMux()
+	// Create ProposerVM multiplexer for ProposerVM-specific routes
+	proposerMux := http.NewServeMux()
 
-	// Add ProposerVM specific handlers
+	// Add ProposerVM specific handlers to proposerMux
 	service := &service{vm: vm}
 	proposerVMPath, proposerVMHandler := proposervmconnect.NewProposerVMHandler(service)
 	vm.ctx.Log.Info("Registering ProposerVM Connect handler", zap.String("path", proposerVMPath))
-	mux.Handle(proposerVMPath, proposerVMHandler)
+	proposerMux.Handle(proposerVMPath, proposerVMHandler)
 
-	// Add gRPC reflection
+	// Add gRPC reflection for ProposerVM
 	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
 		grpcreflect.NewStaticReflector(proposervmconnect.ProposerVMName),
 	)
-	vm.ctx.Log.Info("Registering gRPC reflection handler", zap.String("pattern", reflectionPattern))
-	mux.Handle(reflectionPattern, reflectionHandler)
+	vm.ctx.Log.Info("Registering ProposerVM gRPC reflection handler", zap.String("pattern", reflectionPattern))
+	proposerMux.Handle(reflectionPattern, reflectionHandler)
 
-	// Add inner VM handler as fallback if it exists
-	if innerHandler != nil {
-		vm.ctx.Log.Info("Adding inner VM handler as fallback")
-		mux.Handle("/", innerHandler)
-	}
-
-	// Wrap with logging
+	// Create header-based router
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		vm.ctx.Log.Info("ProposerVM handling request",
+		vm.ctx.Log.Info("ProposerVM routing request",
 			zap.String("method", r.Method),
 			zap.String("path", r.URL.Path),
+			zap.String("header", r.Header.Get(server.HTTPHeaderRoute)),
 		)
-		mux.ServeHTTP(w, r)
+
+		// Check for routing header
+		route, ok := r.Header[server.HTTPHeaderRoute]
+		if !ok {
+			// No routing header - fall back to path-based routing for ProposerVM
+			// This maintains backward compatibility
+			proposerMux.ServeHTTP(w, r)
+			return
+		}
+
+		if len(route) < 2 {
+			innerHandler.ServeHTTP(w, r)
+			return
+		}
+
+		for _, routeValue := range route {
+			if routeValue == "proposervm" {
+				proposerMux.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		innerHandler.ServeHTTP(w, r)
 	}), nil
 }
 

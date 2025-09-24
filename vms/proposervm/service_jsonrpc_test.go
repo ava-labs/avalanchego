@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
+
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
 

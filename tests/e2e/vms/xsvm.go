@@ -201,7 +201,7 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 			connectclient.New(),
 			node.URI,
 			connect.WithInterceptors(
-				connectclient.SetRouteHeaderInterceptor{Route: chainID},
+				connectclient.SetRouteHeaderInterceptor{Route: []string{chainID}},
 			),
 		)
 

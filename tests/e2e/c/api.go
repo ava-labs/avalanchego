@@ -37,7 +37,7 @@ var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("ProposerVMAPI"), fu
 			connectclient.New(),
 			nodeURI.URI,
 			connect.WithInterceptors(
-				connectclient.SetRouteHeaderInterceptor{Route: avalancheCChainID.String()},
+				connectclient.SetRouteHeaderInterceptor{Route: []string{avalancheCChainID.String(), "proposervm"}},
 			),
 		)
 		resp, err := proposerClient.GetProposedHeight(tc.DefaultContext(), &connect.Request[proposervm.GetProposedHeightRequest]{})
