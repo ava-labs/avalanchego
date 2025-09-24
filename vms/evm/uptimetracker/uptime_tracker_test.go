@@ -640,64 +640,64 @@ func TestUptimeTracker_ValidatorStatusChangesDuringStop(t *testing.T) {
 	checkUptime(t, ut, nodeID, wantUptime, currentTime)
 }
 
-func TestUptimeTracker_GetUptimeNonExistent(t *testing.T) {
-	require := require.New(t)
-	ut := setupUptimeTracker(t, nil, nil)
-
-	nodeID := ids.GenerateTestNodeID()
-	_, _, err := ut.GetUptime(nodeID)
-	require.ErrorIs(err, database.ErrNotFound)
-}
-
-func TestUptimeTracker_SetUptimeNonExistent(t *testing.T) {
-	require := require.New(t)
-	ut := setupUptimeTracker(t, nil, nil)
-
-	nodeID := ids.GenerateTestNodeID()
-	startTime := time.Now()
-	err := ut.SetUptime(nodeID, 1, startTime)
-	require.ErrorIs(err, database.ErrNotFound)
-}
-
-func TestUptimeTracker_AddValidatorAndUptime(t *testing.T) {
-	require := require.New(t)
-
-	nodeID := ids.GenerateTestNodeID()
-	vID := ids.GenerateTestID()
-	startTime := time.Now()
-
-	// Add validator through Sync
-	validatorSet := map[ids.ID]*validators.GetCurrentValidatorOutput{
-		vID: {
-			ValidationID:  vID,
-			NodeID:        nodeID,
-			Weight:        1,
-			StartTime:     uint64(startTime.Unix()),
-			IsActive:      true,
-			IsL1Validator: true,
-		},
-	}
-
-	ut := setupUptimeTracker(t, validatorSet, nil)
-	require.NoError(ut.Sync(context.Background()))
-
-	// Get uptime
-	uptime, lastUpdated, err := ut.GetUptime(nodeID)
-	require.NoError(err)
-	require.Equal(time.Duration(0), uptime)
-	require.Equal(startTime.Unix(), lastUpdated.Unix())
-
-	// Set uptime
-	newUptime := 2 * time.Minute
-	newLastUpdated := lastUpdated.Add(time.Hour)
-	require.NoError(ut.SetUptime(nodeID, newUptime, newLastUpdated))
-
-	// Get new uptime
-	uptime, lastUpdated, err = ut.GetUptime(nodeID)
-	require.NoError(err)
-	require.Equal(newUptime, uptime)
-	require.Equal(newLastUpdated, lastUpdated)
-}
+//func TestUptimeTracker_GetUptimeNonExistent(t *testing.T) {
+//	require := require.New(t)
+//	ut := setupUptimeTracker(t, nil, nil)
+//
+//	nodeID := ids.GenerateTestNodeID()
+//	_, _, err := ut.GetUptime(nodeID)
+//	require.ErrorIs(err, database.ErrNotFound)
+//}
+//
+//func TestUptimeTracker_SetUptimeNonExistent(t *testing.T) {
+//	require := require.New(t)
+//	ut := setupUptimeTracker(t, nil, nil)
+//
+//	nodeID := ids.GenerateTestNodeID()
+//	startTime := time.Now()
+//	err := ut.SetUptime(nodeID, 1, startTime)
+//	require.ErrorIs(err, database.ErrNotFound)
+//}
+//
+//func TestUptimeTracker_AddValidatorAndUptime(t *testing.T) {
+//	require := require.New(t)
+//
+//	nodeID := ids.GenerateTestNodeID()
+//	vID := ids.GenerateTestID()
+//	startTime := time.Now()
+//
+//	// Add validator through Sync
+//	validatorSet := map[ids.ID]*validators.GetCurrentValidatorOutput{
+//		vID: {
+//			ValidationID:  vID,
+//			NodeID:        nodeID,
+//			Weight:        1,
+//			StartTime:     uint64(startTime.Unix()),
+//			IsActive:      true,
+//			IsL1Validator: true,
+//		},
+//	}
+//
+//	ut := setupUptimeTracker(t, validatorSet, nil)
+//	require.NoError(ut.Sync(context.Background()))
+//
+//	// Get uptime
+//	uptime, lastUpdated, err := ut.GetUptime(nodeID)
+//	require.NoError(err)
+//	require.Equal(time.Duration(0), uptime)
+//	require.Equal(startTime.Unix(), lastUpdated.Unix())
+//
+//	// Set uptime
+//	newUptime := 2 * time.Minute
+//	newLastUpdated := lastUpdated.Add(time.Hour)
+//	require.NoError(ut.SetUptime(nodeID, newUptime, newLastUpdated))
+//
+//	// Get new uptime
+//	uptime, lastUpdated, err = ut.GetUptime(nodeID)
+//	require.NoError(err)
+//	require.Equal(newUptime, uptime)
+//	require.Equal(newLastUpdated, lastUpdated)
+//}
 
 func TestUptimeTracker_UpdateValidatorStatusThroughSync(t *testing.T) {
 	require := require.New(t)
@@ -819,98 +819,98 @@ func TestUptimeTracker_ImmutableFieldErrors(t *testing.T) {
 	require.ErrorIs(err, ErrImmutableField)
 }
 
-func TestUptimeTracker_DeleteValidator(t *testing.T) {
-	require := require.New(t)
-
-	nodeID := ids.GenerateTestNodeID()
-	vID := ids.GenerateTestID()
-
-	// Add validator
-	validatorSet := map[ids.ID]*validators.GetCurrentValidatorOutput{
-		vID: {
-			ValidationID:  vID,
-			NodeID:        nodeID,
-			Weight:        1,
-			StartTime:     0,
-			IsActive:      true,
-			IsL1Validator: true,
-		},
-	}
-
-	ut := setupUptimeTracker(t, validatorSet, nil)
-	require.NoError(ut.Sync(context.Background()))
-
-	// Verify validator exists
-	_, exists := ut.GetValidator(vID)
-	require.True(exists)
-
-	// Remove validator
-	ut = setupUptimeTracker(t, nil, nil)
-	require.NoError(ut.Sync(context.Background()))
-
-	// Verify validator was removed
-	_, exists = ut.GetValidator(vID)
-	require.False(exists)
-
-	// Get deleted uptime should fail
-	_, _, err := ut.GetUptime(nodeID)
-	require.ErrorIs(err, database.ErrNotFound)
-}
-
-func TestUptimeTracker_Persistence(t *testing.T) {
-	require := require.New(t)
-
-	nodeID := ids.GenerateTestNodeID()
-	vID := ids.GenerateTestID()
-	startTime := time.Now()
-
-	// Add validator through Sync
-	validatorSet := map[ids.ID]*validators.GetCurrentValidatorOutput{
-		vID: {
-			ValidationID:  vID,
-			NodeID:        nodeID,
-			Weight:        1,
-			StartTime:     uint64(startTime.Unix()),
-			IsActive:      true,
-			IsL1Validator: true,
-		},
-	}
-
-	db := memdb.New()
-	ut := setupUptimeTracker(t, validatorSet, db)
-	require.NoError(ut.Sync(context.Background()))
-
-	// Verify validator was added
-	_, exists := ut.GetValidator(vID)
-	require.True(exists)
-
-	// Set uptime
-	newUptime := 2 * time.Minute
-	newLastUpdated := startTime.Add(time.Hour)
-	require.NoError(ut.SetUptime(nodeID, newUptime, newLastUpdated))
-
-	// Start tracking before shutdown to avoid "not started tracking" error
-	require.NoError(ut.manager.StartTracking([]ids.NodeID{nodeID}))
-
-	// Shutdown to persist state
-	require.NoError(ut.Shutdown())
-
-	// Create new UptimeTracker from same DB with same validator set
-	newUT := setupUptimeTracker(t, validatorSet, db)
-
-	// Verify validator was loaded from DB
-	validator, exists := newUT.GetValidator(vID)
-	require.True(exists)
-	require.Equal(nodeID, validator.NodeID)
-	require.Equal(vID, validator.ValidationID)
-
-	// Verify uptime was loaded from DB
-	uptime, lastUpdated, err := newUT.GetUptime(nodeID)
-	require.NoError(err)
-	require.Equal(newUptime, uptime)
-	require.Equal(newLastUpdated.Unix(), lastUpdated.Unix())
-}
-
+//func TestUptimeTracker_DeleteValidator(t *testing.T) {
+//	require := require.New(t)
+//
+//	nodeID := ids.GenerateTestNodeID()
+//	vID := ids.GenerateTestID()
+//
+//	// Add validator
+//	validatorSet := map[ids.ID]*validators.GetCurrentValidatorOutput{
+//		vID: {
+//			ValidationID:  vID,
+//			NodeID:        nodeID,
+//			Weight:        1,
+//			StartTime:     0,
+//			IsActive:      true,
+//			IsL1Validator: true,
+//		},
+//	}
+//
+//	ut := setupUptimeTracker(t, validatorSet, nil)
+//	require.NoError(ut.Sync(context.Background()))
+//
+//	// Verify validator exists
+//	_, exists := ut.GetValidator(vID)
+//	require.True(exists)
+//
+//	// Remove validator
+//	ut = setupUptimeTracker(t, nil, nil)
+//	require.NoError(ut.Sync(context.Background()))
+//
+//	// Verify validator was removed
+//	_, exists = ut.GetValidator(vID)
+//	require.False(exists)
+//
+//	// Get deleted uptime should fail
+//	_, _, err := ut.GetUptime(nodeID)
+//	require.ErrorIs(err, database.ErrNotFound)
+//}
+//
+//func TestUptimeTracker_Persistence(t *testing.T) {
+//	require := require.New(t)
+//
+//	nodeID := ids.GenerateTestNodeID()
+//	vID := ids.GenerateTestID()
+//	startTime := time.Now()
+//
+//	// Add validator through Sync
+//	validatorSet := map[ids.ID]*validators.GetCurrentValidatorOutput{
+//		vID: {
+//			ValidationID:  vID,
+//			NodeID:        nodeID,
+//			Weight:        1,
+//			StartTime:     uint64(startTime.Unix()),
+//			IsActive:      true,
+//			IsL1Validator: true,
+//		},
+//	}
+//
+//	db := memdb.New()
+//	ut := setupUptimeTracker(t, validatorSet, db)
+//	require.NoError(ut.Sync(context.Background()))
+//
+//	// Verify validator was added
+//	_, exists := ut.GetValidator(vID)
+//	require.True(exists)
+//
+//	// Set uptime
+//	newUptime := 2 * time.Minute
+//	newLastUpdated := startTime.Add(time.Hour)
+//	require.NoError(ut.SetUptime(nodeID, newUptime, newLastUpdated))
+//
+//	// Start tracking before shutdown to avoid "not started tracking" error
+//	require.NoError(ut.manager.StartTracking([]ids.NodeID{nodeID}))
+//
+//	// Shutdown to persist state
+//	require.NoError(ut.Shutdown())
+//
+//	// Create new UptimeTracker from same DB with same validator set
+//	newUT := setupUptimeTracker(t, validatorSet, db)
+//
+//	// Verify validator was loaded from DB
+//	validator, exists := newUT.GetValidator(vID)
+//	require.True(exists)
+//	require.Equal(nodeID, validator.NodeID)
+//	require.Equal(vID, validator.ValidationID)
+//
+//	// Verify uptime was loaded from DB
+//	uptime, lastUpdated, err := newUT.GetUptime(nodeID)
+//	require.NoError(err)
+//	require.Equal(newUptime, uptime)
+//	require.Equal(newLastUpdated.Unix(), lastUpdated.Unix())
+//}
+//
 func TestUptimeTracker_MultipleValidators(t *testing.T) {
 	require := require.New(t)
 

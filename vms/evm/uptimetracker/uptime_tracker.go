@@ -20,18 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-const (
-	updatedStatus dbUpdateStatus = iota
-	deletedStatus
-)
-
-var (
-	ErrAlreadyExists  = errors.New("validator already exists")
-	ErrImmutableField = errors.New("immutable field cannot be updated")
-)
-
-type dbUpdateStatus int
-
 // UptimeTracker maintains local validator state synchronized with the P-Chain validator set.
 // It tracks validator uptime and manages validator lifecycle events (additions, updates, removals)
 // for the EVM subnet.
@@ -39,13 +27,10 @@ type dbUpdateStatus int
 type UptimeTracker struct {
 	validatorState validators.State
 	subnetID       ids.ID
-	index          map[ids.NodeID]ids.ID // nodeID -> vID
 	// updatedData tracks the updates since WriteValidator was last called
-	data        map[ids.ID]*validatorData // vID -> validatorData
-	updatedData map[ids.ID]dbUpdateStatus // vID -> updated status
-	db          database.Database
-	manager     uptime.Manager
-	pausedVdrs  set.Set[ids.NodeID]
+	manager    uptime.Manager
+	pausedVdrs set.Set[ids.NodeID]
+	state      *state
 	// connectedVdrs is a set of nodes that are connected to the manager.
 	// This is used to immediately connect nodes when they are unpaused.
 	connectedVdrs set.Set[ids.NodeID]
@@ -60,27 +45,23 @@ func NewUptimeTracker(
 	subnetID ids.ID,
 	db database.Database,
 ) (*UptimeTracker, error) {
-	// Create the UptimeTracker first
-	u := &UptimeTracker{
-		validatorState: validatorState,
-		subnetID:       subnetID,
-		index:          make(map[ids.NodeID]ids.ID),
-		data:           make(map[ids.ID]*validatorData),
-		updatedData:    make(map[ids.ID]dbUpdateStatus),
-		db:             db,
-		pausedVdrs:     make(set.Set[ids.NodeID]),
-		connectedVdrs:  make(set.Set[ids.NodeID]),
+	state, err := newState(db)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create state: %w", err)
 	}
-
 	clock := &mockable.Clock{}
 	clock.Set(time.Now()) // Initialize with current time
-	u.manager = uptime.NewManager(u, clock)
-	u.clock = clock
 
-	if err := u.loadFromDisk(); err != nil {
-		return nil, fmt.Errorf("failed to load data from disk: %w", err)
-	}
-	return u, nil
+	// Create the UptimeTracker first
+	return &UptimeTracker{
+		validatorState: validatorState,
+		subnetID:       subnetID,
+		manager:        uptime.NewManager(state, clock),
+		pausedVdrs:     make(set.Set[ids.NodeID]),
+		state:          state,
+		connectedVdrs:  make(set.Set[ids.NodeID]),
+		clock:          clock,
+	}, nil
 }
 
 // Validator represents a validator in the state
@@ -106,18 +87,18 @@ func (u *UptimeTracker) addValidator(vdr Validator) error {
 		IsL1Validator: vdr.IsL1Validator,
 		Weight:        vdr.Weight,
 	}
-	if err := u.addData(vdr.ValidationID, data); err != nil {
+	if err := u.state.addData(vdr.ValidationID, data); err != nil {
 		return err
 	}
 
-	u.updatedData[vdr.ValidationID] = updatedStatus
+	u.state.updatedData[vdr.ValidationID] = updatedStatus
 	return nil
 }
 
 // updateValidator updates the validator in the state
 // returns an error if the validator does not exist or if the immutable fields are modified
 func (u *UptimeTracker) updateValidator(vdr Validator) error {
-	data, ok := u.data[vdr.ValidationID]
+	data, ok := u.state.data[vdr.ValidationID]
 	if !ok {
 		return database.ErrNotFound
 	}
@@ -137,28 +118,28 @@ func (u *UptimeTracker) updateValidator(vdr Validator) error {
 		updated = updatedStatus
 	}
 
-	u.updatedData[vdr.ValidationID] = updated
+	u.state.updatedData[vdr.ValidationID] = updated
 	return nil
 }
 
 // deleteValidator marks the validator as deleted
 // marked validator will be deleted from disk when WriteState is called
 func (u *UptimeTracker) deleteValidator(vID ids.ID) bool {
-	data, ok := u.data[vID]
+	data, ok := u.state.data[vID]
 	if !ok {
 		return false
 	}
-	delete(u.data, data.validationID)
-	delete(u.index, data.NodeID)
+	delete(u.state.data, data.validationID)
+	delete(u.state.index, data.NodeID)
 
 	// mark as deleted for WriteValidator
-	u.updatedData[data.validationID] = deletedStatus
+	u.state.updatedData[data.validationID] = deletedStatus
 	return true
 }
 
 // GetValidator returns the validator data for the given validationID
 func (u *UptimeTracker) GetValidator(vID ids.ID) (Validator, bool) {
-	data, ok := u.data[vID]
+	data, ok := u.state.data[vID]
 	if !ok {
 		return Validator{}, false
 	}
@@ -174,8 +155,8 @@ func (u *UptimeTracker) GetValidator(vID ids.ID) (Validator, bool) {
 
 // GetValidators returns all validators in the state.
 func (u *UptimeTracker) GetValidators() []Validator {
-	validators := make([]Validator, 0, len(u.data))
-	for _, vdr := range u.data {
+	validators := make([]Validator, 0, len(u.state.data))
+	for _, vdr := range u.state.data {
 		validators = append(validators, Validator{
 			ValidationID:   vdr.validationID,
 			NodeID:         vdr.NodeID,
@@ -206,125 +187,6 @@ func (u *UptimeTracker) GetValidatorAndUptime(validationID ids.ID, lock sync.Loc
 	}
 
 	return vdr, uptime, lastUpdated, nil
-}
-
-// addData adds the data to the state
-// returns an error if the data already exists
-func (u *UptimeTracker) addData(vID ids.ID, data *validatorData) error {
-	if _, ok := u.data[vID]; ok {
-		return fmt.Errorf("%w, validationID: %s", ErrAlreadyExists, vID)
-	}
-	if _, ok := u.index[data.NodeID]; ok {
-		return fmt.Errorf("%w, nodeID: %s", ErrAlreadyExists, data.NodeID)
-	}
-
-	u.data[vID] = data
-	u.index[data.NodeID] = vID
-	return nil
-}
-
-// getData returns the data for the validator with the given nodeID
-// returns false if the data does not exist
-func (u *UptimeTracker) getData(nodeID ids.NodeID) (*validatorData, bool) {
-	vID, ok := u.index[nodeID]
-	if !ok {
-		return nil, false
-	}
-	data, ok := u.data[vID]
-	if !ok {
-		return nil, false
-	}
-	return data, true
-}
-
-// writeState writes the updated state to the disk
-func (u *UptimeTracker) writeState() bool {
-	// TODO: consider adding batch size
-	batch := u.db.NewBatch()
-	for vID, updateStatus := range u.updatedData {
-		switch updateStatus {
-		case updatedStatus:
-			data := u.data[vID]
-
-			dataBytes, err := vdrCodec.Marshal(codecVersion, data)
-			if err != nil {
-				return false
-			}
-			if err := batch.Put(vID[:], dataBytes); err != nil {
-				return false
-			}
-		case deletedStatus:
-			if err := batch.Delete(vID[:]); err != nil {
-				return false
-			}
-		}
-	}
-	if err := batch.Write(); err != nil {
-		return false
-	}
-	// we've successfully flushed the updates, clear the updated marker.
-	clear(u.updatedData)
-	return true
-}
-
-// Load the state from the disk
-func (u *UptimeTracker) loadFromDisk() error {
-	it := u.db.NewIterator()
-	defer it.Release()
-	for it.Next() {
-		vIDBytes := it.Key()
-		vID, err := ids.ToID(vIDBytes)
-		if err != nil {
-			return fmt.Errorf("failed to parse validator ID: %w", err)
-		}
-		vdr := &validatorData{
-			validationID: vID,
-		}
-		if err := parseValidatorData(it.Value(), vdr); err != nil {
-			return fmt.Errorf("failed to parse validator data: %w", err)
-		}
-		if err := u.addData(vID, vdr); err != nil {
-			return err
-		}
-	}
-	return it.Error()
-}
-
-// GetUptime returns the uptime of the validator with the given nodeID
-func (u *UptimeTracker) GetUptime(
-	nodeID ids.NodeID,
-) (time.Duration, time.Time, error) {
-	data, ok := u.getData(nodeID)
-	if !ok {
-		return 0, time.Time{}, database.ErrNotFound
-	}
-	return data.UpDuration, data.getLastUpdated(), nil
-}
-
-// SetUptime sets the uptime of the validator with the given nodeID
-func (u *UptimeTracker) SetUptime(
-	nodeID ids.NodeID,
-	upDuration time.Duration,
-	lastUpdated time.Time,
-) error {
-	data, ok := u.getData(nodeID)
-	if !ok {
-		return database.ErrNotFound
-	}
-	data.UpDuration = upDuration
-	data.setLastUpdated(lastUpdated)
-
-	u.updatedData[data.validationID] = updatedStatus
-	return nil
-}
-
-// GetStartTime returns the start time of the validator with the given nodeID
-func (u *UptimeTracker) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
-	data, ok := u.getData(nodeID)
-	if !ok {
-		return time.Time{}, database.ErrNotFound
-	}
-	return data.getStartTime(), nil
 }
 
 // Connect connects a node to the uptime manager for tracking.
@@ -409,7 +271,7 @@ func (u *UptimeTracker) Shutdown() error {
 	if err := u.manager.StopTracking(vdrIDs); err != nil {
 		return fmt.Errorf("failed to stop uptime tracking: %w", err)
 	}
-	if !u.writeState() {
+	if !u.state.writeState() {
 		return errors.New("failed to write validator state")
 	}
 
@@ -419,9 +281,6 @@ func (u *UptimeTracker) Shutdown() error {
 // Sync synchronizes the validator state with the current validator set and writes the state to the database.
 // Sync is not safe to call concurrently and should be called with the VM locked.
 func (u *UptimeTracker) Sync(ctx context.Context) error {
-	start := time.Now()
-	log.Debug("starting validator sync")
-
 	// Get current validator set from P-Chain. P-Chain's `GetCurrentValidatorSet` can report both
 	// L1 and Subnet validators. Subnet-EVM's uptime manager also tracks both of these validator
 	// types. So even if a the Subnet has not yet been converted to an L1, the uptime and validator
@@ -440,21 +299,25 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 
 	// Remove validators no longer in the current set
 	for vID := range currentValidationIDs {
-		if _, ok := newValidators[vID]; !ok {
-			// fetch validator for nodeID prior to deletion
-			existing, ok := u.GetValidator(vID)
-			if !ok {
-				return fmt.Errorf("failed to fetch validator %s", vID)
-			}
-			if !u.deleteValidator(vID) {
-				return fmt.Errorf("failed to delete validator %s", vID)
-			}
-			if u.isPaused(existing.NodeID) {
-				err := u.resume(existing.NodeID)
-				if err != nil {
-					log.Error("failed to handle validator removed %s: %v", existing.NodeID, err)
-				}
-			}
+		if _, ok := newValidators[vID]; ok {
+			continue
+		}
+
+		// fetch validator for nodeID prior to deletion
+		validator, ok := u.GetValidator(vID)
+		if !ok {
+			return fmt.Errorf("failed to fetch validator %s", vID)
+		}
+		if !u.deleteValidator(vID) {
+			return fmt.Errorf("failed to delete validator %s", vID)
+		}
+
+		if !u.isPaused(validator.NodeID) {
+			continue
+		}
+
+		if err := u.resume(validator.NodeID); err != nil {
+			return err
 		}
 	}
 
@@ -503,18 +366,16 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 
 	// ValidatorState persists the state to disk at the end of every sync operation. The VM also
 	// persists the validator database when the node is shutting down.
-	if !u.writeState() {
+	if !u.state.writeState() {
 		return errors.New("failed to write validator state")
 	}
 
-	// TODO: add metrics
-	log.Debug("validator sync complete", "duration", time.Since(start))
 	return nil
 }
 
 // GetValidationID returns the validation ID for the given nodeID
 func (u *UptimeTracker) GetValidationID(nodeID ids.NodeID) (ids.ID, bool) {
-	vID, ok := u.index[nodeID]
+	vID, ok := u.state.index[nodeID]
 	if !ok {
 		return ids.ID{}, false
 	}

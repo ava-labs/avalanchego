@@ -4,34 +4,11 @@
 package uptimetracker
 
 import (
-	"math"
 	"time"
 
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-const codecVersion uint16 = 0
-
-var vdrCodec codec.Manager
-
-func init() {
-	vdrCodec = codec.NewManager(math.MaxInt32)
-	c := linearcodec.NewDefault()
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(validatorData{}),
-
-		vdrCodec.RegisterCodec(codecVersion, c),
-	)
-
-	if errs.Errored() {
-		panic(errs.Err)
-	}
-}
 
 // The validatorData implementation only allows existing validator's `weight` and `IsActive`
 // fields to be updated; all other fields should be constant and if any other field
