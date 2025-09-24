@@ -426,7 +426,7 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 func TestNextPChainEpoch(t *testing.T) {
 	var (
 		epochDuration = 5 * time.Minute
-		now           = time.Now()
+		now           = time.Now().Truncate(time.Second)
 	)
 
 	tests := []struct {
