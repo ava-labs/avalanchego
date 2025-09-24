@@ -59,10 +59,23 @@ runs:
     # - Avoid using the install-nix custom action since a relative
     #   path wouldn't be resolveable from other repos and an absolute
     #   path would require setting a version.
+    # - TODO(marun) Switch to a relative reference to the install-nix
+    #   custom action if/when no external repos use this action.
     - uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f #v31
       with:
         github_access_token: ${{ inputs.github_token }}
     - run: $GITHUB_ACTION_PATH/nix-develop.sh --command echo "dependencies installed"
+      shell: bash
+    # Cache Go modules and build cache
+    - uses: actions/cache@v4
+      with:
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-mod-
+    - run: $GITHUB_ACTION_PATH/nix-develop.sh --command go mod download
       shell: bash
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')

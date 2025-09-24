@@ -15,3 +15,14 @@ runs:
         github_access_token: ${{ inputs.github_token }}
     - run: nix develop --command echo "dependencies installed"
       shell: bash
+    # Cache Go modules and build cache
+    - uses: actions/cache@v4
+      with:
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-mod-
+    - run: nix develop --command go mod download
+      shell: bash
