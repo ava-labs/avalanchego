@@ -6,8 +6,9 @@ package database
 import (
 	"errors"
 
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/libevm/ethdb"
+
+	"github.com/ava-labs/avalanchego/database"
 )
 
 var (
