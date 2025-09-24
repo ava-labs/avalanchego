@@ -255,7 +255,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 
 ## Database Configuration
 
-> **WARNING**: `firewood` scheme is untested in production. To use `firewood`, you must also set the following config options:
+> **WARNING**: `firewood` and `path` schemes are untested in production. Using `path` is strongly discouraged. To use `firewood`, you must also set the following config options:
 >
 > - `pruning-enabled: true` (enabled by default)
 > - `state-sync-enabled: false`
@@ -266,7 +266,7 @@ Failing to set these options will result in errors on VM initialization. Additio
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
 | `inspect-database` | bool | Inspect database on startup | `false` |
-| `state-scheme` | string |  EXPERIMENTAL: specifies the database scheme to store state data; can be one of `hash` or `firewood` | `hash` | 
+| `state-scheme` | string |  EXPERIMENTAL: specifies the database scheme to store state data; can be one of `hash`, `firewood`, or `path` | `hash` | 
 
 ## Transaction Indexing
 
