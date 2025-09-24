@@ -7,4 +7,5 @@ TestResyncNewRootAfterDeletes
 TestTransactionSkipIndexing
 TestVMShutdownWhileSyncing
 TestWaitDeployedCornerCases
+TestClientWebsocketLargeMessage
 TestWebsocketLargeRead
