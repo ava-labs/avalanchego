@@ -257,24 +257,8 @@ func (b *wrappedBlock) verify(predicateContext *precompileconfig.PredicateContex
 		return fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 
-	if err := b.semanticVerify(); err != nil {
+	if err := b.semanticVerify(predicateContext); err != nil {
 		return fmt.Errorf("failed to verify block: %w", err)
-	}
-
-	// If the VM is not marked as bootstrapped the other chains may also be
-	// bootstrapping and not have populated the required indices. Since
-	// bootstrapping only verifies blocks that have been canonically accepted by
-	// the network, these checks would be guaranteed to pass on a synced node.
-	if b.vm.bootstrapped.Get() {
-		if err := b.verifyIntrinsicGas(); err != nil {
-			return fmt.Errorf("failed to verify intrinsic gas: %w", err)
-		}
-
-		// Verify that all the ICM messages are correctly marked as either valid
-		// or invalid.
-		if err := b.verifyPredicates(predicateContext); err != nil {
-			return fmt.Errorf("failed to verify predicates: %w", err)
-		}
 	}
 
 	// The engine may call VerifyWithContext multiple times on the same block with different contexts.
@@ -344,7 +328,7 @@ func (b *wrappedBlock) verifyIntrinsicGas() error {
 }
 
 // semanticVerify verifies that a *Block is internally consistent.
-func (b *wrappedBlock) semanticVerify() error {
+func (b *wrappedBlock) semanticVerify(predicateContext *precompileconfig.PredicateContext) error {
 	extraConfig := params.GetExtra(b.vm.chainConfig)
 	parent := b.vm.blockChain.GetHeader(b.ethBlock.ParentHash(), b.ethBlock.NumberU64()-1)
 	if parent == nil {
@@ -355,11 +339,28 @@ func (b *wrappedBlock) semanticVerify() error {
 		return err
 	}
 
+	// If the VM is not marked as bootstrapped the other chains may also be
+	// bootstrapping and not have populated the required indices. Since
+	// bootstrapping only verifies blocks that have been canonically accepted by
+	// the network, these checks would be guaranteed to pass on a synced node.
+	if b.vm.bootstrapped.Get() {
+		if err := b.verifyIntrinsicGas(); err != nil {
+			return fmt.Errorf("failed to verify intrinsic gas: %w", err)
+		}
+
+		// Verify that all the ICM messages are correctly marked as either valid
+		// or invalid.
+		if err := b.verifyPredicates(predicateContext); err != nil {
+			return fmt.Errorf("failed to verify predicates: %w", err)
+		}
+	}
+
 	if b.extension != nil {
 		if err := b.extension.SemanticVerify(); err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
