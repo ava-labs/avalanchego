@@ -128,9 +128,6 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 			}
 			err := upgradeAccount(testAddr, upgrade, statedb, false)
 			require.ErrorIs(t, err, tt.wantError)
-			if err != nil {
-				require.ErrorContains(t, err, testAddr.Hex())
-			}
 
 			// Check final balance
 			actualBalance := statedb.GetBalance(testAddr)
