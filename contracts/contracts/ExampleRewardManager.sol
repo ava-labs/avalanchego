@@ -10,7 +10,7 @@ address constant REWARD_MANAGER_ADDRESS = 0x020000000000000000000000000000000000
 contract ExampleRewardManager is Ownable {
   IRewardManager rewardManager = IRewardManager(REWARD_MANAGER_ADDRESS);
 
-  constructor() Ownable() {}
+  constructor() Ownable(msg.sender) {}
 
   function currentRewardAddress() public view returns (address) {
     return rewardManager.currentRewardAddress();

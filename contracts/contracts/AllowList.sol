@@ -21,7 +21,7 @@ contract AllowList is Ownable {
     Manager
   }
 
-  constructor(address precompileAddr) Ownable() {
+  constructor(address precompileAddr) Ownable(msg.sender) {
     allowList = IAllowList(precompileAddr);
   }
 
