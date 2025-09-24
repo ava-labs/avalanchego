@@ -17,12 +17,17 @@ runs:
       shell: bash
     # Cache Go modules and build cache
     - uses: actions/cache@v4
+      id: go-cache
       with:
         path: |
           ~/go/pkg/mod
           ~/.cache/go-build
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum', 'tools/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-mod-
     - run: nix develop --command go mod download
+      if: steps.go-cache.outputs.cache-hit != 'true'
+      shell: bash
+    - run: nix develop --command go mod download -modfile=tools/go.mod
+      if: steps.go-cache.outputs.cache-hit != 'true'
       shell: bash
