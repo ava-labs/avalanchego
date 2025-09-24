@@ -32,7 +32,7 @@ const (
 	// TODO(marun) Maybe use dynamic HTTP ports to avoid the possibility of them being already bound?
 
 	// Prometheus configuration
-	prometheusCmd            = "prometheus"
+	prometheusCmd            = "prometheus-3"
 	prometheusScrapeInterval = 10 * time.Second
 	prometheusListenAddress  = "127.0.0.1:9095"
 	prometheusReadinessURL   = "http://" + prometheusListenAddress + "/-/ready"
