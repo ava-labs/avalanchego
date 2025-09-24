@@ -109,7 +109,7 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 			balanceChange:  hexOrDecimal256FromInt64(1),
 			accountExists:  true,
 			wantBalance:    uint256.MustFromBig(abi.MaxUint256), // unchanged
-			wantError:      ErrBalanceOverflow,
+			wantError:      errBalanceOverflow,
 		},
 	}
 

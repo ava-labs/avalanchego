@@ -18,7 +18,6 @@ import (
 var (
 	errInsufficientBalanceForSubtraction = errors.New("insufficient balance for subtraction")
 	errBalanceOverflow                   = errors.New("balance overflow")
-	ErrBalanceOverflow                   = errors.New("balance overflow")
 )
 
 // Configure applies the state upgrade to the state.
@@ -49,7 +48,7 @@ func upgradeAccount(account common.Address, upgrade extras.StateUpgradeAccount, 
 			currentBalance := state.GetBalance(account)
 			if new(big.Int).Add(currentBalance.ToBig(), balanceChange.ToBig()).Cmp(abi.MaxUint256) > 0 {
 				return fmt.Errorf("%w: account %s current balance %s + change %s would exceed maximum uint256",
-					ErrBalanceOverflow, account.Hex(), currentBalance.ToBig().String(), balanceChange.ToBig().String())
+					errBalanceOverflow, account.Hex(), currentBalance.ToBig().String(), balanceChange.ToBig().String())
 			}
 			state.AddBalance(account, balanceChange)
 		case -1: // Negative
