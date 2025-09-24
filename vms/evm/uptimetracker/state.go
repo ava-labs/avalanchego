@@ -175,7 +175,7 @@ func (s *state) deleteValidator(vID ids.ID) bool {
 }
 
 // writeState writes the updated state to the disk
-func (s *state) writeState() bool {
+func (s *state) writeState() error {
 	// TODO: consider adding batch size
 	batch := s.db.NewBatch()
 	for vID, updateStatus := range s.updatedData {
@@ -185,23 +185,23 @@ func (s *state) writeState() bool {
 
 			dataBytes, err := vdrCodec.Marshal(codecVersion, data)
 			if err != nil {
-				return false
+				return err
 			}
 			if err := batch.Put(vID[:], dataBytes); err != nil {
-				return false
+				return err
 			}
 		case deletedStatus:
 			if err := batch.Delete(vID[:]); err != nil {
-				return false
+				return err
 			}
 		}
 	}
 	if err := batch.Write(); err != nil {
-		return false
+		return err
 	}
 	// we've successfully flushed the updates, clear the updated marker.
 	clear(s.updatedData)
-	return true
+	return nil
 }
 
 // Load the state from the disk
