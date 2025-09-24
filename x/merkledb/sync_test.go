@@ -504,6 +504,8 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	m, err := xsync.NewManager(
 		db,
 		xsync.ManagerConfig[*RangeProof, *ChangeProof]{
+			RangeProofMarshaler:   RangeProofMarshaler{},
+			ChangeProofMarshaler:  ChangeProofMarshaler{},
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
 			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync, RangeProofMarshaler{}, ChangeProofMarshaler{})),
 			TargetRoot:            root1,
