@@ -45,7 +45,7 @@ func (ethDBWrapper) NewSnapshot() (ethdb.Snapshot, error) {
 func (db ethDBWrapper) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 	// avalanchego's database implementation assumes that the prefix is part of the
 	// start, so it is added here (if it is provided).
-	if len(prefix) > 0 {
+	if len(prefix) != 0 {
 		newStart := make([]byte, len(prefix)+len(start))
 		copy(newStart, prefix)
 		copy(newStart[len(prefix):], start)
@@ -59,7 +59,7 @@ func (db ethDBWrapper) NewIteratorWithStart(start []byte) ethdb.Iterator {
 	return db.Database.NewIteratorWithStart(start)
 }
 
-// wrappedBatch implements ethdb.wrappedBatch
+// wrappedBatch implements ethdb.Batch
 type wrappedBatch struct{ database.Batch }
 
 // ValueSize implements ethdb.Batch
