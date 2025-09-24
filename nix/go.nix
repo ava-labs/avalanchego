@@ -42,9 +42,15 @@ pkgs.stdenv.mkDerivation {
     sha256 = goSHA256s.${targetSystem.goURLPath} or (throw "Unsupported system: ${pkgs.system}");
   };
 
+  # Skip unpacking since we need special handling for the tarball
+  dontUnpack = true;
+
   installPhase = ''
     mkdir -p $out
-    cp -r ./* $out/
+    # Extract directly to output, stripping the 'go' directory prefix
+    # and ignoring permission/ownership issues in containers
+    tar xzf $src -C $out --strip-components=1 --no-same-owner --no-same-permissions
+    # Ensure go binary is executable
     chmod +x $out/bin/go
   '';
 }
