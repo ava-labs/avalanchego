@@ -353,6 +353,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.Eventually(func() bool {
 		return db.NewIterator().Next()
 	}, 5*time.Second, 5*time.Millisecond)
+	syncer.Close()
 
 	newSyncer, err := xsync.NewManager(
 		db,

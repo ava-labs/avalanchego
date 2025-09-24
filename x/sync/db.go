@@ -22,7 +22,7 @@ type Marshaler[T any] interface {
 	Unmarshal([]byte) (T, error)
 }
 
-type DB[TRange any, TChange any] interface {
+type DB[R any, C any] interface {
 	// GetMerkleRoot returns the current root of the trie.
 	// If the trie is empty, returns ids.Empty.
 	GetMerkleRoot(context.Context) (ids.ID, error)
@@ -46,7 +46,7 @@ type DB[TRange any, TChange any] interface {
 		start maybe.Maybe[[]byte],
 		end maybe.Maybe[[]byte],
 		maxLength int,
-	) (TChange, error)
+	) (C, error)
 
 	// Returns nil iff all the following hold:
 	//   - [start] <= [end].
@@ -60,7 +60,7 @@ type DB[TRange any, TChange any] interface {
 	//     the root ID of the database is [expectedEndRootID].
 	VerifyChangeProof(
 		ctx context.Context,
-		proof TChange,
+		proof C,
 		start maybe.Maybe[[]byte],
 		end maybe.Maybe[[]byte],
 		expectedEndRootID ids.ID,
@@ -71,7 +71,7 @@ type DB[TRange any, TChange any] interface {
 	// [end] is the largest possible key in the range this [proof] covers.
 	// Returns the next key that should be requested, or Nothing if all keys
 	// have been are correct prior to [end].
-	CommitChangeProof(ctx context.Context, end maybe.Maybe[[]byte], proof TChange) (maybe.Maybe[[]byte], error)
+	CommitChangeProof(ctx context.Context, end maybe.Maybe[[]byte], proof C) (maybe.Maybe[[]byte], error)
 
 	// GetRangeProofAtRoot returns a proof for the key/value pairs in this trie within the range
 	// [start, end] when the root of the trie was [rootID].
@@ -86,7 +86,7 @@ type DB[TRange any, TChange any] interface {
 		start maybe.Maybe[[]byte],
 		end maybe.Maybe[[]byte],
 		maxLength int,
-	) (TRange, error)
+	) (R, error)
 
 	// Returns nil iff all the following hold:
 	//   - [start] <= [end].
@@ -100,7 +100,7 @@ type DB[TRange any, TChange any] interface {
 	//     the root ID of the database is [expectedEndRootID].
 	VerifyRangeProof(
 		ctx context.Context,
-		proof TRange,
+		proof R,
 		start maybe.Maybe[[]byte],
 		end maybe.Maybe[[]byte],
 		expectedEndRootID ids.ID,
@@ -112,5 +112,5 @@ type DB[TRange any, TChange any] interface {
 	// [end] is the largest possible key in the range this [proof] covers.
 	// Returns the next key that should be requested, or Nothing if all keys
 	// have been are correct prior to [end].
-	CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof TRange) (maybe.Maybe[[]byte], error)
+	CommitRangeProof(ctx context.Context, start, end maybe.Maybe[[]byte], proof R) (maybe.Maybe[[]byte], error)
 }

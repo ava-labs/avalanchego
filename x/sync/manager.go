@@ -93,13 +93,13 @@ func newWorkItem(localRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[
 	}
 }
 
-type Manager[TRange any, TChange any] struct {
+type Manager[R any, C any] struct {
 	// The database to sync.
-	db DB[TRange, TChange]
+	db DB[R, C]
 
 	// Must be held when accessing [config.TargetRoot].
 	syncTargetLock sync.RWMutex
-	config         ManagerConfig[TRange, TChange]
+	config         ManagerConfig[R, C]
 
 	workLock sync.Mutex
 	// The number of work items currently being processed.
@@ -140,9 +140,9 @@ type Manager[TRange any, TChange any] struct {
 }
 
 // TODO remove non-config values out of this struct
-type ManagerConfig[TRange any, TChange any] struct {
-	RangeProofMarshaler   Marshaler[TRange]
-	ChangeProofMarshaler  Marshaler[TChange]
+type ManagerConfig[R any, C any] struct {
+	RangeProofMarshaler   Marshaler[R]
+	ChangeProofMarshaler  Marshaler[C]
 	RangeProofClient      *p2p.Client
 	ChangeProofClient     *p2p.Client
 	SimultaneousWorkLimit int
@@ -151,11 +151,11 @@ type ManagerConfig[TRange any, TChange any] struct {
 	StateSyncNodes        []ids.NodeID
 }
 
-func NewManager[TRange any, TChange any](
-	db DB[TRange, TChange],
-	config ManagerConfig[TRange, TChange],
+func NewManager[R any, C any](
+	db DB[R, C],
+	config ManagerConfig[R, C],
 	registerer prometheus.Registerer,
-) (*Manager[TRange, TChange], error) {
+) (*Manager[R, C], error) {
 	switch {
 	case db == nil:
 		return nil, ErrNoDatabaseProvided
@@ -174,7 +174,7 @@ func NewManager[TRange any, TChange any](
 		return nil, err
 	}
 
-	m := &Manager[TRange, TChange]{
+	m := &Manager[R, C]{
 		db:              db,
 		config:          config,
 		doneChan:        make(chan struct{}),
@@ -794,7 +794,7 @@ func (m *Manager[_, _]) enqueueWork(work *workItem) {
 	m.unprocessedWork.Insert(second)
 }
 
-// find the midPoint between two keys
+// find the midpoint between two keys
 // start is expected to be less than end
 // Nothing/nil [start] is treated as all 0's
 // Nothing/nil [end] is treated as all 255's
