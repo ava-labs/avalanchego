@@ -338,6 +338,9 @@ jobs:
 
           echo "=== Go Module Status ==="
           go list -m all | grep firewood || echo "No firewood modules"
+
+          echo "=== Firewood .a ==="
+          find /Users/elvis.sabanovic/Projects/avalanchego/firewood -name "*firewood_ffi*" -type f
       - name: Configure AvalancheGo to work with Firewood
         run: |
           # Configure go.mod to use local FFI
@@ -429,6 +432,9 @@ jobs:
 
           echo "=== Go Module Status ==="
           go list -m all | grep firewood || echo "No firewood modules"
+
+          echo "=== Firewood .a ==="
+          find /Users/elvis.sabanovic/Projects/avalanchego/firewood -name "*firewood_ffi*" -type f
       - name: Configure AvalancheGo to work with Firewood
         shell: nix develop --command bash -x {0}
         run: |
