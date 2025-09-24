@@ -66,21 +66,25 @@ runs:
         github_access_token: ${{ inputs.github_token }}
     - run: $GITHUB_ACTION_PATH/nix-develop.sh --command echo "dependencies installed"
       shell: bash
-    # Cache Go modules and build cache
+    # Cache Go modules (architecture-independent)
     - uses: actions/cache@v4
-      id: go-cache
+      id: go-mod-cache
       with:
-        path: |
-          ~/go/pkg/mod
-          ~/.cache/go-build
+        path: ~/go/pkg/mod
         key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum', 'tools/go.sum') }}
-        restore-keys: |
-          ${{ runner.os }}-go-mod-
+        restore-keys: ${{ runner.os }}-go-mod-
+    # Cache Go build cache (architecture-specific)
+    - uses: actions/cache@v4
+      with:
+        path: ~/.cache/go-build
+        key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.sum', 'tools/go.sum') }}
+        restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
+    # Download modules only on cache miss
     - run: $GITHUB_ACTION_PATH/nix-develop.sh --command go mod download
-      if: steps.go-cache.outputs.cache-hit != 'true'
+      if: steps.go-mod-cache.outputs.cache-hit != 'true'
       shell: bash
     - run: $GITHUB_ACTION_PATH/nix-develop.sh --command go mod download -modfile=tools/go.mod
-      if: steps.go-cache.outputs.cache-hit != 'true'
+      if: steps.go-mod-cache.outputs.cache-hit != 'true'
       shell: bash
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
