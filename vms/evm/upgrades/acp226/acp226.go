@@ -45,8 +45,5 @@ func (t *DelayExcess) UpdateDelayExcess(desiredDelayExcess uint64) {
 // DesiredDelayExcess calculates the optimal delay excess given the desired
 // delay.
 func DesiredDelayExcess(desiredDelay uint64) uint64 {
-	// This could be solved directly by calculating D * ln(desired / M)
-	// using floating point math. However, it introduces inaccuracies. So, we
-	// use a binary search to find the closest integer solution.
 	return acp226Params.DesiredExcess(desiredDelay)
 }
