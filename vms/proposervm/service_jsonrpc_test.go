@@ -34,13 +34,11 @@ func TestServiceJsonRPCGetProposedHeight(t *testing.T) {
 	server := rpc.NewServer()
 	server.RegisterCodec(avajson.NewCodec(), "application/json")
 	proposerAPI := &ProposerAPI{vm: proVM}
-	err := server.RegisterService(proposerAPI, "proposervm")
-	require.NoError(err)
+	require.NoError(server.RegisterService(proposerAPI, "proposervm"))
 
 	// Test the GetProposedHeight method directly
 	var reply api.GetHeightResponse
-	err = proposerAPI.GetProposedHeight(&http.Request{}, &struct{}{}, &reply)
-	require.NoError(err)
+	require.NoError(proposerAPI.GetProposedHeight(&http.Request{}, &struct{}{}, &reply))
 
 	// Verify the response matches the expected minimum height
 	expectedHeight, err := proVM.ctx.ValidatorState.GetMinimumHeight(context.Background())
