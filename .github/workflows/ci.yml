@@ -46,7 +46,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -65,7 +64,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -84,7 +82,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh test-e2e-kube-ci
@@ -103,7 +100,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
       - name: Run e2e tests with existing network
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -121,7 +117,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
       - name: Run e2e tests
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
@@ -236,7 +231,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh test-load -- --load-timeout=30s
@@ -254,7 +248,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
       - uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:
           run: ./scripts/run_task.sh test-load-kube-kind -- --load-timeout=30s
