@@ -19,16 +19,29 @@ type ProposerAPI struct {
 }
 
 func (p *ProposerAPI) GetProposedHeight(r *http.Request, _ *struct{}, reply *api.GetHeightResponse) error {
-	p.vm.ctx.Log.Debug("API called",
+	log := p.vm.ctx.Log.With(
 		zap.String("service", "proposervm"),
-		zap.String("method", "getProposedHeight"),
+		zap.String("method", "GetProposedHeight"),
 	)
-	height, err := p.vm.ctx.ValidatorState.GetMinimumHeight(r.Context())
+
+	log.Debug("Connect RPC called")
+
+	id, err := p.vm.State.GetLastAccepted()
 	if err != nil {
-		p.vm.ctx.Log.Error("failed to get minimum height",
-			zap.String("method", "getProposedHeight"),
-			zap.Error(err))
-		return fmt.Errorf("could not get minimum height from validator state: %w", err)
+		log.Error("failed to get last accepted block", zap.Error(err))
+		return fmt.Errorf("failed to get last accepted block: %w", err)
+	}
+
+	blk, err := p.vm.getBlock(r.Context(), id)
+	if err != nil {
+		log.Error("failed to get block", zap.Error(err))
+		return fmt.Errorf("failed to get block: %w", err)
+	}
+
+	height, err := blk.selectChildPChainHeight(r.Context())
+	if err != nil {
+		log.Error("failed to get child p-chain height", zap.Error(err))
+		return fmt.Errorf("failed to get child p-chain height: %w", err)
 	}
 
 	reply.Height = avajson.Uint64(height)

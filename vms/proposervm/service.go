@@ -22,20 +22,32 @@ type service struct {
 }
 
 func (s *service) GetProposedHeight(ctx context.Context, _ *connect.Request[pb.GetProposedHeightRequest]) (*connect.Response[pb.GetProposedHeightReply], error) {
-	s.vm.ctx.Log.Debug("Connect RPC called",
+	log := s.vm.ctx.Log.With(
 		zap.String("service", "proposervm"),
 		zap.String("method", "GetProposedHeight"),
 	)
 
-	height, err := s.vm.ctx.ValidatorState.GetMinimumHeight(ctx)
+	log.Debug("Connect RPC called")
+
+	id, err := s.vm.State.GetLastAccepted()
 	if err != nil {
-		s.vm.ctx.Log.Error("failed to get minimum height",
-			zap.String("method", "GetProposedHeight"),
-			zap.Error(err))
-		return nil, fmt.Errorf("could not get minimum height from validator state: %w", err)
+		log.Error("failed to get last accepted block", zap.Error(err))
+		return nil, fmt.Errorf("failed to get last accepted block: %w", err)
 	}
 
-	s.vm.ctx.Log.Debug("GetProposedHeight returning", zap.Uint64("height", height))
+	blk, err := s.vm.getBlock(ctx, id)
+	if err != nil {
+		log.Error("failed to get block", zap.Error(err))
+		return nil, fmt.Errorf("failed to get block: %w", err)
+	}
+
+	height, err := blk.selectChildPChainHeight(ctx)
+	if err != nil {
+		log.Error("failed to get child p-chain height", zap.Error(err))
+		return nil, fmt.Errorf("failed to get child p-chain height: %w", err)
+	}
+
+	log.Debug("GetProposedHeight returning", zap.Uint64("height", height))
 	return connect.NewResponse(&pb.GetProposedHeightReply{
 		Height: height,
 	}), nil
