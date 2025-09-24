@@ -18,10 +18,9 @@ service ProposerVM {
 // Request to get the current proposed block height.
 message GetProposedHeightRequest {}
 
-// Response containing the current proposed block height.
+// Response containing the current proposed P-chain block height.
 message GetProposedHeightReply {
-  // The current proposed block height.
-  // This represents the height of the block that the ProposerVM is
-  // currently proposing to the network for acceptance.
+  // The P-chain height that would be included in a block if it were proposed
+  // right now.
   uint64 height = 1;
 }

@@ -22,15 +22,20 @@ type service struct {
 }
 
 func (s *service) GetProposedHeight(ctx context.Context, _ *connect.Request[pb.GetProposedHeightRequest]) (*connect.Response[pb.GetProposedHeightReply], error) {
-	s.vm.ctx.Log.Debug("GetProposedHeight called")
+	s.vm.ctx.Log.Debug("Connect RPC called",
+		zap.String("service", "proposervm"),
+		zap.String("method", "GetProposedHeight"),
+	)
 
 	height, err := s.vm.ctx.ValidatorState.GetMinimumHeight(ctx)
 	if err != nil {
-		s.vm.ctx.Log.Error("failed to get minimum height", zap.Error(err))
-		return nil, fmt.Errorf("could not get minimum height: %w", err)
+		s.vm.ctx.Log.Error("failed to get minimum height",
+			zap.String("method", "GetProposedHeight"),
+			zap.Error(err))
+		return nil, fmt.Errorf("could not get minimum height from validator state: %w", err)
 	}
 
-	s.vm.ctx.Log.Info("GetProposedHeight returning", zap.Uint64("height", height))
+	s.vm.ctx.Log.Debug("GetProposedHeight returning", zap.Uint64("height", height))
 	return connect.NewResponse(&pb.GetProposedHeightReply{
 		Height: height,
 	}), nil

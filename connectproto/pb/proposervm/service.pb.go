@@ -60,12 +60,11 @@ func (*GetProposedHeightRequest) Descriptor() ([]byte, []int) {
 	return file_proposervm_service_proto_rawDescGZIP(), []int{0}
 }
 
-// Response containing the current proposed block height.
+// Response containing the current proposed P-chain block height.
 type GetProposedHeightReply struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// The current proposed block height.
-	// This represents the height of the block that the ProposerVM is
-	// currently proposing to the network for acceptance.
+	// The P-chain height that would be included in a block if it were proposed
+	// right now.
 	Height        uint64 `protobuf:"varint,1,opt,name=height,proto3" json:"height,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
