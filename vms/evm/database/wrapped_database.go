@@ -12,9 +12,11 @@ import (
 )
 
 var (
+	_ ethdb.Batch         = (*ethBatchWrapper)(nil)
 	_ ethdb.KeyValueStore = (*ethDBWrapper)(nil)
 
 	ErrSnapshotNotSupported = errors.New("snapshot is not supported")
+	ErrStatNotSupported     = errors.New("stat is not supported")
 )
 
 func WrapDatabase(db database.Database) ethdb.KeyValueStore { return ethDBWrapper{db} }
@@ -23,15 +25,15 @@ func WrapDatabase(db database.Database) ethdb.KeyValueStore { return ethDBWrappe
 type ethDBWrapper struct{ database.Database }
 
 // Stat implements ethdb.Database
-func (ethDBWrapper) Stat(string) (string, error) { return "", database.ErrNotFound }
+func (ethDBWrapper) Stat(string) (string, error) { return "", ErrStatNotSupported }
 
 // NewBatch implements ethdb.Database
-func (db ethDBWrapper) NewBatch() ethdb.Batch { return wrappedBatch{db.Database.NewBatch()} }
+func (db ethDBWrapper) NewBatch() ethdb.Batch { return ethBatchWrapper{db.Database.NewBatch()} }
 
 // NewBatchWithSize implements ethdb.Database
 // TODO: propagate size through avalanchego Database interface
 func (db ethDBWrapper) NewBatchWithSize(int) ethdb.Batch {
-	return wrappedBatch{db.Database.NewBatch()}
+	return ethBatchWrapper{db.Database.NewBatch()}
 }
 
 func (ethDBWrapper) NewSnapshot() (ethdb.Snapshot, error) {
@@ -59,11 +61,11 @@ func (db ethDBWrapper) NewIteratorWithStart(start []byte) ethdb.Iterator {
 	return db.Database.NewIteratorWithStart(start)
 }
 
-// wrappedBatch implements ethdb.Batch
-type wrappedBatch struct{ database.Batch }
+// ethBatchWrapper implements ethdb.Batch
+type ethBatchWrapper struct{ database.Batch }
 
 // ValueSize implements ethdb.Batch
-func (batch wrappedBatch) ValueSize() int { return batch.Batch.Size() }
+func (batch ethBatchWrapper) ValueSize() int { return batch.Batch.Size() }
 
 // Replay implements ethdb.Batch
-func (batch wrappedBatch) Replay(w ethdb.KeyValueWriter) error { return batch.Batch.Replay(w) }
+func (batch ethBatchWrapper) Replay(w ethdb.KeyValueWriter) error { return batch.Batch.Replay(w) }
