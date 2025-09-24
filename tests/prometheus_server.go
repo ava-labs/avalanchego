@@ -14,7 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-const defaultPrometheusListenAddr = "127.0.0.1:0"
+const defaultPrometheusListenAddr = "127.0.0.1:10023"
 
 // PrometheusServer is a HTTP server that serves Prometheus metrics from the provided
 // gahterer.

@@ -34,7 +34,7 @@ const (
 	// Prometheus configuration
 	prometheusCmd            = "prometheus"
 	prometheusScrapeInterval = 10 * time.Second
-	prometheusListenAddress  = "127.0.0.1:9090"
+	prometheusListenAddress  = "127.0.0.1:9095"
 	prometheusReadinessURL   = "http://" + prometheusListenAddress + "/-/ready"
 
 	// Promtail configuration
