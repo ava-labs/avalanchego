@@ -1609,7 +1609,7 @@ func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
 		// Generate at least 1 key value, all maybe.Some
 		keyValues := generateKeyChanges(rand, rand.Intn(128), false)
 
-		proof := RangeProof{
+		proof := &RangeProof{
 			StartProof: startProof,
 			EndProof:   endProof,
 			KeyChanges: keyValues,
@@ -1617,7 +1617,7 @@ func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
 
 		// Marshal and unmarshal it.
 		// Assert the unmarshaled one is the same as the original.
-		originalBytes, err := RangeProofMarshaler{}.Marshal(&proof)
+		originalBytes, err := RangeProofMarshaler{}.Marshal(proof)
 		require.NoError(err)
 		unmarshaledProof, err := RangeProofMarshaler{}.Unmarshal(originalBytes)
 		require.NoError(err)
@@ -1649,7 +1649,7 @@ func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
 		// Include any number of key changes, including deletions
 		keyChanges := generateKeyChanges(rand, rand.Intn(128), true)
 
-		proof := ChangeProof{
+		proof := &ChangeProof{
 			StartProof: startProof,
 			EndProof:   endProof,
 			KeyChanges: keyChanges,
@@ -1657,7 +1657,7 @@ func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
 
 		// Marshal and unmarshal it.
 		// Assert the unmarshaled one is the same as the original.
-		originalBytes, err := ChangeProofMarshaler{}.Marshal(&proof)
+		originalBytes, err := ChangeProofMarshaler{}.Marshal(proof)
 		require.NoError(err)
 		unmarshaledProof, err := ChangeProofMarshaler{}.Unmarshal(originalBytes)
 		require.NoError(err)

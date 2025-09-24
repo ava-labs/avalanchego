@@ -551,7 +551,7 @@ func (m *Manager[R, C]) handleChangeProofResponse(
 	switch changeProofResp := changeProofResp.Response.(type) {
 	case *pb.GetChangeProofResponse_ChangeProof:
 		// The server had enough history to send us a change proof
-		changeProof, err := m.config.ChangeProofMarshaler.Unmarshal(responseBytes)
+		changeProof, err := m.config.ChangeProofMarshaler.Unmarshal(changeProofResp.ChangeProof)
 		if err != nil {
 			return err
 		}

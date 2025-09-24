@@ -84,7 +84,6 @@ func newFlakyChangeProofHandler(
 	c := counter{m: 2}
 	return &p2p.TestHandler{
 		AppRequestF: func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
-			var err error
 			responseBytes, appErr := handler.AppRequest(ctx, nodeID, deadline, requestBytes)
 			if appErr != nil {
 				return nil, appErr
