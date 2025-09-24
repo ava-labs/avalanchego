@@ -20,10 +20,10 @@ func TestBuild(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
-	pChainEpoch := PChainEpoch{
-		Height:    2,
-		Number:    0,
-		StartTime: time.Unix(123, 0),
+	pChainEpoch := Epoch{
+		PChainHeight: 2,
+		Number:       0,
+		StartTime:    time.Unix(123, 0),
 	}
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
@@ -59,10 +59,10 @@ func TestBuildUnsigned(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
-	pChainEpoch := PChainEpoch{
-		Height:    2,
-		Number:    0,
-		StartTime: time.Unix(123, 0),
+	pChainEpoch := Epoch{
+		PChainHeight: 2,
+		Number:       0,
+		StartTime:    time.Unix(123, 0),
 	}
 	innerBlockBytes := []byte{3}
 

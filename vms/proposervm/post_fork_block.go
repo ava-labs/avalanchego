@@ -173,7 +173,7 @@ func (b *postForkBlock) pChainHeight(context.Context) (uint64, error) {
 	return b.PChainHeight(), nil
 }
 
-func (b *postForkBlock) pChainEpoch(context.Context) (block.PChainEpoch, error) {
+func (b *postForkBlock) pChainEpoch(context.Context) (block.Epoch, error) {
 	return b.PChainEpoch(), nil
 }
 

@@ -601,10 +601,10 @@ func TestBatchedParseBlockParallel(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
-	pChainEpoch := blockbuilder.PChainEpoch{
-		Height:    uint64(2),
-		Number:    uint64(0),
-		StartTime: time.Unix(123, 0),
+	pChainEpoch := blockbuilder.Epoch{
+		PChainHeight: uint64(2),
+		Number:       uint64(0),
+		StartTime:    time.Unix(123, 0),
 	}
 	chainID := ids.GenerateTestID()
 
@@ -673,7 +673,7 @@ func TestBatchedParseBlockParallel(t *testing.T) {
 	}
 }
 
-func makeParseableBlocks(t *testing.T, parentID ids.ID, timestamp time.Time, pChainHeight uint64, pChainEpoch blockbuilder.PChainEpoch, cert *staking.Certificate, chainID ids.ID, key crypto.Signer) [][]byte {
+func makeParseableBlocks(t *testing.T, parentID ids.ID, timestamp time.Time, pChainHeight uint64, pChainEpoch blockbuilder.Epoch, cert *staking.Certificate, chainID ids.ID, key crypto.Signer) [][]byte {
 	makeSignedBlock := func(i int) []byte {
 		buff := binary.AppendVarint(nil, int64(i))
 

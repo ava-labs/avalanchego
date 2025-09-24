@@ -18,7 +18,7 @@ func BuildUnsigned(
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
-	pChainEpoch PChainEpoch,
+	pChainEpoch Epoch,
 	blockBytes []byte,
 ) (SignedBlock, error) {
 	var block SignedBlock
@@ -43,7 +43,7 @@ func BuildUnsigned(
 				Block:               blockBytes,
 				EpochNumber:         pChainEpoch.Number,
 				EpochStartTimestamp: pChainEpoch.StartTime.Unix(),
-				EpochHeight:         pChainEpoch.Height,
+				EpochHeight:         pChainEpoch.PChainHeight,
 			},
 		}
 	}
@@ -60,7 +60,7 @@ func Build(
 	parentID ids.ID,
 	timestamp time.Time,
 	pChainHeight uint64,
-	pChainEpoch PChainEpoch,
+	pChainEpoch Epoch,
 	cert *staking.Certificate,
 	blockBytes []byte,
 	chainID ids.ID,
@@ -90,7 +90,7 @@ func Build(
 				Block:               blockBytes,
 				EpochNumber:         pChainEpoch.Number,
 				EpochStartTimestamp: pChainEpoch.StartTime.Unix(),
-				EpochHeight:         pChainEpoch.Height,
+				EpochHeight:         pChainEpoch.PChainHeight,
 			},
 			timestamp: timestamp,
 			cert:      cert,
