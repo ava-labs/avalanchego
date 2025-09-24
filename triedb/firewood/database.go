@@ -147,15 +147,6 @@ func validatePath(path string) error {
 		return fmt.Errorf("database directory path is not a directory: %s", dir)
 	}
 
-	// TODO(#1253): remove this after testing infrastructure is updated
-	oldPath := filepath.Join(dir, "firewood_state")
-	if _, err := os.Stat(oldPath); err == nil {
-		log.Warn("Found old database file, moving to new location", "old", oldPath, "new", path)
-		if err := os.Rename(oldPath, path); err != nil {
-			return fmt.Errorf("failed to move old database file: %w", err)
-		}
-	}
-
 	return nil
 }
 

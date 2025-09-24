@@ -1319,8 +1319,8 @@ func TestABI_PackEvent(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			assert.EqualValues(t, test.expectedTopics, topics)
-			assert.EqualValues(t, test.expectedData, data)
+			assert.Equal(t, test.expectedTopics, topics)
+			assert.Equal(t, test.expectedData, data)
 		})
 	}
 }

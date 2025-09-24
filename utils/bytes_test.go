@@ -9,7 +9,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/libevm/common"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,7 +34,7 @@ func TestIncrOne(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			output := common.CopyBytes(test.input)
 			IncrOne(output)
-			assert.Equal(t, output, test.expected)
+			require.Equal(t, test.expected, output)
 		})
 	}
 }

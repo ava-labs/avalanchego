@@ -9,10 +9,10 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// TestMarshalCodeRequest asserts that the structure or serialization logic hasn't changed, primarily to
+// TestMarshalCodeRequest requires that the structure or serialization logic hasn't changed, primarily to
 // ensure compatibility with the network.
 func TestMarshalCodeRequest(t *testing.T) {
 	codeRequest := CodeRequest{
@@ -22,16 +22,16 @@ func TestMarshalCodeRequest(t *testing.T) {
 	base64CodeRequest := "AAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAHNvbWUgY29kZSBwbHM="
 
 	codeRequestBytes, err := Codec.Marshal(Version, codeRequest)
-	assert.NoError(t, err)
-	assert.Equal(t, base64CodeRequest, base64.StdEncoding.EncodeToString(codeRequestBytes))
+	require.NoError(t, err)
+	require.Equal(t, base64CodeRequest, base64.StdEncoding.EncodeToString(codeRequestBytes))
 
 	var c CodeRequest
 	_, err = Codec.Unmarshal(codeRequestBytes, &c)
-	assert.NoError(t, err)
-	assert.Equal(t, codeRequest.Hashes, c.Hashes)
+	require.NoError(t, err)
+	require.Equal(t, codeRequest.Hashes, c.Hashes)
 }
 
-// TestMarshalCodeResponse asserts that the structure or serialization logic hasn't changed, primarily to
+// TestMarshalCodeResponse requires that the structure or serialization logic hasn't changed, primarily to
 // ensure compatibility with the network.
 func TestMarshalCodeResponse(t *testing.T) {
 	// generate some random code data
@@ -39,7 +39,7 @@ func TestMarshalCodeResponse(t *testing.T) {
 	rand.Seed(1)
 	codeData := make([]byte, 50)
 	_, err := rand.Read(codeData)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	codeResponse := CodeResponse{
 		Data: [][]byte{codeData},
@@ -48,11 +48,11 @@ func TestMarshalCodeResponse(t *testing.T) {
 	base64CodeResponse := "AAAAAAABAAAAMlL9/AchgmVPFj9fD5piHXKVZsdNEAN8TXu7BAfR4sZJgYVa2GgdDYbR6R4AFnk5y2aU"
 
 	codeResponseBytes, err := Codec.Marshal(Version, codeResponse)
-	assert.NoError(t, err)
-	assert.Equal(t, base64CodeResponse, base64.StdEncoding.EncodeToString(codeResponseBytes))
+	require.NoError(t, err)
+	require.Equal(t, base64CodeResponse, base64.StdEncoding.EncodeToString(codeResponseBytes))
 
 	var c CodeResponse
 	_, err = Codec.Unmarshal(codeResponseBytes, &c)
-	assert.NoError(t, err)
-	assert.Equal(t, codeResponse.Data, c.Data)
+	require.NoError(t, err)
+	require.Equal(t, codeResponse.Data, c.Data)
 }

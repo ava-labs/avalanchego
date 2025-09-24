@@ -18,7 +18,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -29,12 +28,13 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/holiman/uint256"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -46,6 +46,7 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/paramstest"
 	"github.com/ava-labs/coreth/plugin/evm/customheader"
+	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 	"github.com/ava-labs/coreth/plugin/evm/message"
@@ -199,7 +200,8 @@ func testVMUpgrades(t *testing.T, scheme string) {
 }
 
 func TestBuildEthTxBlock(t *testing.T) {
-	for _, scheme := range vmtest.Schemes {
+	// This test is done for all schemes to ensure the VM can be started with any scheme.
+	for _, scheme := range []string{rawdb.HashScheme, rawdb.PathScheme, customrawdb.FirewoodScheme} {
 		t.Run(scheme, func(t *testing.T) {
 			testBuildEthTxBlock(t, scheme)
 		})
@@ -1880,8 +1882,8 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(ctx)
-					require.ErrorIs(t, err, context.DeadlineExceeded)
-					require.Zero(t, msg)
+					assert.ErrorIs(t, err, context.DeadlineExceeded)
+					assert.Zero(t, msg)
 				}()
 
 				wg.Wait()
@@ -1896,8 +1898,8 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
-					require.NoError(t, err)
-					require.Equal(t, commonEng.PendingTxs, msg)
+					assert.NoError(t, err)
+					assert.Equal(t, commonEng.PendingTxs, msg)
 				}()
 
 				signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
@@ -1936,8 +1938,8 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(ctx)
-					require.ErrorIs(t, err, context.DeadlineExceeded)
-					require.Zero(t, msg)
+					assert.ErrorIs(t, err, context.DeadlineExceeded)
+					assert.Zero(t, msg)
 				}()
 
 				wg.Wait()
@@ -1957,8 +1959,8 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
-					require.NoError(t, err)
-					require.Equal(t, commonEng.PendingTxs, msg)
+					assert.NoError(t, err)
+					assert.Equal(t, commonEng.PendingTxs, msg)
 				}()
 
 				wg.Wait()
@@ -1994,9 +1996,9 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
-					require.NoError(t, err)
-					require.Equal(t, commonEng.PendingTxs, msg)
-					require.GreaterOrEqual(t, time.Since(lastBuildBlockTime), MinBlockBuildingRetryDelay)
+					assert.NoError(t, err)
+					assert.Equal(t, commonEng.PendingTxs, msg)
+					assert.GreaterOrEqual(t, time.Since(lastBuildBlockTime), MinBlockBuildingRetryDelay)
 				}()
 
 				wg.Wait()
@@ -2276,13 +2278,7 @@ func TestBlockGasValidation(t *testing.T) {
 	) *types.Block {
 		require := require.New(t)
 
-		chainExtra := params.GetExtra(vm.chainConfig)
-		parent := vm.eth.APIBackend.CurrentBlock()
-		const timeDelta = acp176.TimeToFillCapacity
-		timestamp := parent.Time + timeDelta
-		gasLimit, err := customheader.GasLimit(chainExtra, parent, timestamp)
-		require.NoError(err)
-		baseFee, err := customheader.BaseFee(chainExtra, parent, timestamp)
+		blk, err := vm.BuildBlock(context.Background())
 		require.NoError(err)
 
 		callPayload, err := payload.NewAddressedCall(nil, nil)
@@ -2321,8 +2317,8 @@ func TestBlockGasValidation(t *testing.T) {
 				Nonce:      1,
 				To:         &vmtest.TestEthAddrs[0],
 				Gas:        acp176.MinMaxCapacity,
-				GasFeeCap:  baseFee,
-				GasTipCap:  baseFee,
+				GasFeeCap:  big.NewInt(10),
+				GasTipCap:  big.NewInt(10),
 				Value:      common.Big0,
 				AccessList: accessList,
 			}),
@@ -2331,36 +2327,14 @@ func TestBlockGasValidation(t *testing.T) {
 		)
 		require.NoError(err)
 
-		header := &types.Header{
-			ParentHash:       parent.Hash(),
-			Coinbase:         constants.BlackholeAddr,
-			Difficulty:       new(big.Int).Add(parent.Difficulty, common.Big1),
-			Number:           new(big.Int).Add(parent.Number, common.Big1),
-			GasLimit:         gasLimit,
-			GasUsed:          0,
-			Time:             timestamp,
-			BaseFee:          baseFee,
-			BlobGasUsed:      new(uint64),
-			ExcessBlobGas:    new(uint64),
-			ParentBeaconRoot: &common.Hash{},
-		}
-
-		configExtra := params.GetExtra(vm.chainConfig)
-		header.Extra, err = customheader.ExtraPrefix(configExtra, parent, header, nil)
-		require.NoError(err)
-
-		// Set TimeMilliseconds for Granite blocks
-		if configExtra.IsGranite(timestamp) {
-			headerExtra := customtypes.GetHeaderExtra(header)
-			timeMilliseconds := timestamp * 1000
-			headerExtra.TimeMilliseconds = &timeMilliseconds
-		}
+		ethBlock := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+		modifiedHeader := types.CopyHeader(ethBlock.Header())
 
 		// Set the gasUsed after calculating the extra prefix to support large
 		// claimed gas used values.
-		header.GasUsed = claimedGasUsed
+		modifiedHeader.GasUsed = claimedGasUsed
 		return customtypes.NewBlockWithExtData(
-			header,
+			modifiedHeader,
 			[]*types.Transaction{tx},
 			nil,
 			nil,
@@ -2398,23 +2372,11 @@ func TestBlockGasValidation(t *testing.T) {
 			}()
 
 			blk := newBlock(t, vm, test.gasUsed)
-			blkBytes, err := rlp.EncodeToBytes(blk)
+
+			modifiedBlk, err := wrapBlock(blk, vm)
 			require.NoError(err)
 
-			parsedBlk, err := vm.ParseBlock(ctx, blkBytes)
-			require.NoError(err)
-
-			parsedBlkWithContext, ok := parsedBlk.(block.WithVerifyContext)
-			require.True(ok)
-
-			shouldVerify, err := parsedBlkWithContext.ShouldVerifyWithContext(ctx)
-			require.NoError(err)
-			require.True(shouldVerify)
-
-			err = parsedBlkWithContext.VerifyWithContext(
-				ctx,
-				&block.Context{},
-			)
+			err = modifiedBlk.Verify(ctx)
 			require.ErrorIs(err, test.want)
 		})
 	}
