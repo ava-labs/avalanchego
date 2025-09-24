@@ -5,7 +5,7 @@ const CONTRACT_ALLOW_LIST_ADDRESS = "0x0200000000000000000000000000000000000000"
 const MINT_ADDRESS = "0x0200000000000000000000000000000000000001"
 const TX_ALLOW_LIST_ADDRESS = "0x0200000000000000000000000000000000000002"
 const FEE_MANAGER_ADDRESS = "0x0200000000000000000000000000000000000003"
-const REWARD_MANAGER_ADDDRESS = "0x0200000000000000000000000000000000000004"
+const REWARD_MANAGER_ADDRESS = "0x0200000000000000000000000000000000000004"
 
 
 const ROLES = {
@@ -226,7 +226,7 @@ task("feeManager:readRole", "Gets the network deployer minter list")
 // npx hardhat rewardManager:currentRewardAddress --network local
 task("rewardManager:currentRewardAddress", "Gets the current configured rewarding address")
   .setAction(async (_, hre) => {
-    const rewardManager = await hre.ethers.getContractAt("IRewardManager", REWARD_MANAGER_ADDDRESS)
+    const rewardManager = await hre.ethers.getContractAt("IRewardManager", REWARD_MANAGER_ADDRESS)
     const areFeeRecipientsAllowed = await rewardManager.areFeeRecipientsAllowed()
     const result = await rewardManager.currentRewardAddress()
     if (areFeeRecipientsAllowed) {
@@ -239,7 +239,7 @@ task("rewardManager:currentRewardAddress", "Gets the current configured rewardin
 // npx hardhat rewardManager:areFeeRecipientsAllowed --network local
 task("rewardManager:areFeeRecipientsAllowed", "Gets whether the fee recipients are allowed to receive rewards")
   .setAction(async (_, hre) => {
-    const rewardManager = await hre.ethers.getContractAt("IRewardManager", REWARD_MANAGER_ADDDRESS)
+    const rewardManager = await hre.ethers.getContractAt("IRewardManager", REWARD_MANAGER_ADDRESS)
     const result = await rewardManager.areFeeRecipientsAllowed()
     console.log(result)
   })
@@ -248,7 +248,7 @@ task("rewardManager:areFeeRecipientsAllowed", "Gets whether the fee recipients a
 task("rewardManager:setRewardAddress", "Sets a new reward address")
   .addParam("address", "the address that will receive rewards")
   .setAction(async (args, hre) => {
-    const rewardManager = await hre.ethers.getContractAt("IRewardManager", REWARD_MANAGER_ADDDRESS)
+    const rewardManager = await hre.ethers.getContractAt("IRewardManager", REWARD_MANAGER_ADDRESS)
     const result = await rewardManager.setRewardAddress(args.address)
     console.log(result)
   })
@@ -256,7 +256,7 @@ task("rewardManager:setRewardAddress", "Sets a new reward address")
 // npx hardhat rewardManager:allowFeeRecipients --network local
 task("rewardManager:allowFeeRecipients", "Allows custom fee recipients to receive rewards")
   .setAction(async (_, hre) => {
-    const rewardManager = await hre.ethers.getContractAt("IRewardManager", REWARD_MANAGER_ADDDRESS)
+    const rewardManager = await hre.ethers.getContractAt("IRewardManager", REWARD_MANAGER_ADDRESS)
     const result = await rewardManager.allowFeeRecipients()
     console.log(result)
   })
@@ -264,7 +264,7 @@ task("rewardManager:allowFeeRecipients", "Allows custom fee recipients to receiv
 // npx hardhat rewardManager:disableRewards --network local
 task("rewardManager:disableRewards", "Disables all rewards, and starts burning fees.")
   .setAction(async (_, hre) => {
-    const rewardManager = await hre.ethers.getContractAt("IRewardManager", REWARD_MANAGER_ADDDRESS)
+    const rewardManager = await hre.ethers.getContractAt("IRewardManager", REWARD_MANAGER_ADDRESS)
     const result = await rewardManager.disableRewards()
     console.log(result)
   })
