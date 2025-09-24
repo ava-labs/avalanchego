@@ -9,7 +9,7 @@ import (
 	"github.com/holiman/uint256"
 )
 
-var maxUint64 = new(uint256.Int).SetUint64(math.MaxUint64)
+var max256Uint64 = new(uint256.Int).SetUint64(math.MaxUint64)
 
 // CalculateExponential returns the approximate exponential result given the factor, the
 // numerator, and the denominator.
@@ -60,7 +60,7 @@ func CalculateExponential(
 	numeratorAccum.SetUint64(factor)            // range is [0, MaxUint64]
 	numeratorAccum.Mul(&numeratorAccum, &denom) // range is [0, MaxUint128]
 
-	maxOutput.Mul(&denom, maxUint64) // range is [0, MaxUint128]
+	maxOutput.Mul(&denom, max256Uint64) // range is [0, MaxUint128]
 	for numeratorAccum.Sign() > 0 {
 		output.Add(&output, &numeratorAccum) // range is [0, MaxUint192+MaxUint128]
 		if output.Cmp(&maxOutput) >= 0 {
