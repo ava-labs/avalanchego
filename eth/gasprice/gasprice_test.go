@@ -45,7 +45,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
-	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/subnet-evm/rpc"

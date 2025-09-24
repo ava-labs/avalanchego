@@ -12,7 +12,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 
 	"github.com/ava-labs/subnet-evm/commontype"
-	"github.com/ava-labs/subnet-evm/plugin/evm/header"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customheader"
 )
 
 var testFeeConfig = commontype.FeeConfig{
@@ -113,7 +113,7 @@ func TestVerifyBlockFee(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			blockGasCost := header.BlockGasCostWithStep(
+			blockGasCost := customheader.BlockGasCostWithStep(
 				testFeeConfig,
 				test.parentBlockGasCost,
 				testFeeConfig.BlockGasCostStep.Uint64(),

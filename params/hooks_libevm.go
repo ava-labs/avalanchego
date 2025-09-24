@@ -16,13 +16,13 @@ import (
 	"github.com/ava-labs/libevm/libevm/legacy"
 
 	"github.com/ava-labs/subnet-evm/params/extras"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 
 	ethparams "github.com/ava-labs/libevm/params"
-	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
 )
 
 // invalidateDelegateTime is the Unix timestamp for August 2nd, 2025, midnight Eastern Time

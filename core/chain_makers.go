@@ -44,7 +44,7 @@ import (
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core/extstate"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/plugin/evm/header"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customheader"
 	"github.com/holiman/uint256"
 )
 
@@ -382,11 +382,11 @@ func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.S
 		panic(err)
 	}
 	config := params.GetExtra(cm.config)
-	gasLimit, err := header.GasLimit(config, feeConfig, parent.Header(), time)
+	gasLimit, err := customheader.GasLimit(config, feeConfig, parent.Header(), time)
 	if err != nil {
 		panic(err)
 	}
-	baseFee, err := header.BaseFee(config, feeConfig, parent.Header(), time)
+	baseFee, err := customheader.BaseFee(config, feeConfig, parent.Header(), time)
 	if err != nil {
 		panic(err)
 	}

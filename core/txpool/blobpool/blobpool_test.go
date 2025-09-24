@@ -55,7 +55,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/txpool"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/plugin/evm/header"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/subnetevm"
 	"github.com/holiman/billy"
@@ -121,7 +121,7 @@ func (bc *testBlockChain) CurrentBlock() *types.Header {
 			Extra:    make([]byte, subnetevm.WindowSize),
 		}
 		config := params.GetExtra(bc.config)
-		baseFee, err := header.BaseFee(
+		baseFee, err := customheader.BaseFee(
 			config, config.FeeConfig, parent, blockTime,
 		)
 		if err != nil {

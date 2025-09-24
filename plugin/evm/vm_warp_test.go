@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/params/paramstest"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ava-labs/subnet-evm/warp"
@@ -49,7 +50,6 @@ import (
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	avagoUtils "github.com/ava-labs/avalanchego/utils"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
 	warpcontract "github.com/ava-labs/subnet-evm/precompile/contracts/warp"
 )
 

@@ -48,9 +48,9 @@ import (
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/params/paramstest"
 	"github.com/ava-labs/subnet-evm/plugin/evm/config"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
-	"github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/ava-labs/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
@@ -2125,7 +2125,7 @@ func testBuildSubnetEVMBlock(t *testing.T, scheme string) {
 		t.Fatalf("expected blockGasCost to be at least 100 but got %d", customtypes.BlockGasCost(ethBlk))
 	}
 	chainConfig := params.GetExtra(tvm.vm.chainConfig)
-	minRequiredTip, err := header.EstimateRequiredTip(chainConfig, ethBlk.Header())
+	minRequiredTip, err := customheader.EstimateRequiredTip(chainConfig, ethBlk.Header())
 	if err != nil {
 		t.Fatal(err)
 	}

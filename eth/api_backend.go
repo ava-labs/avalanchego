@@ -48,7 +48,7 @@ import (
 	"github.com/ava-labs/subnet-evm/eth/gasprice"
 	"github.com/ava-labs/subnet-evm/eth/tracers"
 	"github.com/ava-labs/subnet-evm/params"
-	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/subnet-evm/rpc"
 )
 

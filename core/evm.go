@@ -40,9 +40,9 @@ import (
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/core/extstate"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customheader"
 
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
-	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
 	"github.com/holiman/uint256"
 )
 

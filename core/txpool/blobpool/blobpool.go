@@ -52,7 +52,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/txpool"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/plugin/evm/header"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customheader"
 	"github.com/holiman/billy"
 	"github.com/holiman/uint256"
 )
@@ -417,7 +417,7 @@ func (p *BlobPool) Init(gasTip uint64, head *types.Header, reserve txpool.Addres
 		p.Close()
 		return err
 	}
-	baseFee, err := header.EstimateNextBaseFee(
+	baseFee, err := customheader.EstimateNextBaseFee(
 		params.GetExtra(p.chain.Config()),
 		feeConfig,
 		p.head,
@@ -853,7 +853,7 @@ func (p *BlobPool) Reset(oldHead, newHead *types.Header) {
 		log.Error("Failed to get fee config to reset blobpool fees", "err", err)
 		return
 	}
-	baseFeeBig, err := header.EstimateNextBaseFee(
+	baseFeeBig, err := customheader.EstimateNextBaseFee(
 		params.GetExtra(p.chain.Config()),
 		feeConfig,
 		p.head,

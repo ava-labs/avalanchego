@@ -48,7 +48,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/txpool"
 	"github.com/ava-labs/subnet-evm/params"
-	"github.com/ava-labs/subnet-evm/plugin/evm/header"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/holiman/uint256"
@@ -1852,7 +1852,7 @@ func (pool *LegacyPool) updateBaseFeeAt(head *types.Header) error {
 		return err
 	}
 	chainConfig := params.GetExtra(pool.chainconfig)
-	baseFeeEstimate, err := header.EstimateNextBaseFee(chainConfig, feeConfig, head, uint64(time.Now().Unix()))
+	baseFeeEstimate, err := customheader.EstimateNextBaseFee(chainConfig, feeConfig, head, uint64(time.Now().Unix()))
 	if err != nil {
 		return err
 	}

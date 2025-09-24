@@ -44,7 +44,7 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/subnet-evm/eth/tracers"
 	"github.com/ava-labs/subnet-evm/params"
-	customheader "github.com/ava-labs/subnet-evm/plugin/evm/header"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/subnetevm"
 	"github.com/ava-labs/subnet-evm/tests"
 	"github.com/urfave/cli/v2"
