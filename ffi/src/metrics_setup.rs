@@ -160,8 +160,8 @@ impl TextRecorder {
             write!(output, "{sanitized_key_name}").expect("write error");
             self.write_labels(&mut output, key.labels());
             // Load gauge value: Uses gauge.load(Ordering::Relaxed) to get the current gauge value
-            writeln!(output, " {} {}", gauge.load(Ordering::Relaxed), epoch_ms)
-                .expect("write error");
+            let value = gauge.load(Ordering::Relaxed);
+            writeln!(output, " {} {}", f64::from_bits(value), epoch_ms).expect("write error");
         }
 
         // Prometheus does not support multiple TYPE declarations for the same metric,
