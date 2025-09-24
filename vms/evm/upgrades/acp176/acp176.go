@@ -42,11 +42,11 @@ const (
 var (
 	ErrStateInsufficientLength = errors.New("insufficient length for fee state")
 
-	acp176Params = common.TargetExcessParams{
-		MinTarget:        MinTargetPerSecond,
-		TargetConversion: TargetConversion,
-		MaxExcessDiff:    MaxTargetExcessDiff,
-		MaxExcess:        maxTargetExcess,
+	acp176Params = common.ExcessParams{
+		MinValue:       MinTargetPerSecond,
+		ConversionRate: TargetConversion,
+		MaxExcessDiff:  MaxTargetExcessDiff,
+		MaxExcess:      maxTargetExcess,
 	}
 )
 
@@ -81,7 +81,7 @@ func ParseState(bytes []byte) (State, error) {
 //
 // Target = MinTargetPerSecond * e^(TargetExcess / TargetConversion)
 func (s *State) Target() gas.Gas {
-	return gas.Gas(acp176Params.CalculateTarget(uint64(s.TargetExcess)))
+	return gas.Gas(acp176Params.CalculateValue(uint64(s.TargetExcess)))
 }
 
 // MaxCapacity returns the maximum possible accrued gas capacity, `C`.
@@ -148,7 +148,7 @@ func (s *State) ConsumeGas(
 // desiredTargetExcess without exceeding the maximum targetExcess change.
 func (s *State) UpdateTargetExcess(desiredTargetExcess gas.Gas) {
 	previousTargetPerSecond := s.Target()
-	s.TargetExcess = gas.Gas(acp176Params.TargetExcess(uint64(s.TargetExcess), uint64(desiredTargetExcess)))
+	s.TargetExcess = gas.Gas(acp176Params.AdjustExcess(uint64(s.TargetExcess), uint64(desiredTargetExcess)))
 	newTargetPerSecond := s.Target()
 	s.Gas.Excess = scaleExcess(
 		s.Gas.Excess,
@@ -173,7 +173,7 @@ func (s *State) Bytes() []byte {
 // DesiredTargetExcess calculates the optimal desiredTargetExcess given the
 // desired target.
 func DesiredTargetExcess(desiredTarget gas.Gas) gas.Gas {
-	return gas.Gas(acp176Params.DesiredTargetExcess(uint64(desiredTarget)))
+	return gas.Gas(acp176Params.DesiredExcess(uint64(desiredTarget)))
 }
 
 // scaleExcess scales the excess during gas target modifications to keep the

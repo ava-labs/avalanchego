@@ -19,11 +19,11 @@ const (
 )
 
 // acp226Params is the params used for the acp226 upgrade.
-var acp226Params = common.TargetExcessParams{
-	MinTarget:        MinDelayMilliseconds,
-	TargetConversion: ConversionRate,
-	MaxExcessDiff:    MaxDelayExcessDiff,
-	MaxExcess:        maxDelayExcess,
+var acp226Params = common.ExcessParams{
+	MinValue:       MinDelayMilliseconds,
+	ConversionRate: ConversionRate,
+	MaxExcessDiff:  MaxDelayExcessDiff,
+	MaxExcess:      maxDelayExcess,
 }
 
 // DelayExcess represents the excess for delay calculation in the dynamic minimum block delay mechanism.
@@ -33,13 +33,13 @@ type DelayExcess uint64
 //
 // Delay = MinDelayMilliseconds * e^(DelayExcess / ConversionRate)
 func (t DelayExcess) Delay() uint64 {
-	return acp226Params.CalculateTarget(uint64(t))
+	return acp226Params.CalculateValue(uint64(t))
 }
 
 // UpdateDelayExcess updates the DelayExcess to be as close as possible to the
 // desiredDelayExcess without exceeding the maximum DelayExcess change.
 func (t *DelayExcess) UpdateDelayExcess(desiredDelayExcess uint64) {
-	*t = DelayExcess(acp226Params.TargetExcess(uint64(*t), desiredDelayExcess))
+	*t = DelayExcess(acp226Params.AdjustExcess(uint64(*t), desiredDelayExcess))
 }
 
 // DesiredDelayExcess calculates the optimal delay excess given the desired
@@ -48,5 +48,5 @@ func DesiredDelayExcess(desiredDelay uint64) uint64 {
 	// This could be solved directly by calculating D * ln(desired / M)
 	// using floating point math. However, it introduces inaccuracies. So, we
 	// use a binary search to find the closest integer solution.
-	return acp226Params.DesiredTargetExcess(desiredDelay)
+	return acp226Params.DesiredExcess(desiredDelay)
 }

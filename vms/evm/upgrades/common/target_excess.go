@@ -11,17 +11,17 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// TargetExcessParams contains the parameters needed for target excess calculations.
-type TargetExcessParams struct {
-	MinTarget        uint64 // Minimum target value (P or M)
-	TargetConversion uint64 // Conversion factor for exponential calculations (D)
-	MaxExcessDiff    uint64 // Maximum change in excess per update (Q)
-	MaxExcess        uint64 // Maximum possible excess value
+// ExcessParams contains the parameters needed for excess calculations.
+type ExcessParams struct {
+	MinValue       uint64 // Minimum value (P or M)
+	ConversionRate uint64 // Conversion factor for exponential calculations (D)
+	MaxExcessDiff  uint64 // Maximum change in excess per update (Q)
+	MaxExcess      uint64 // Maximum possible excess value
 }
 
-// TargetExcess calculates the optimal new targetExcess for a block proposer to
-// include given the current and desired excess values.
-func (p TargetExcessParams) TargetExcess(excess, desired uint64) uint64 {
+// AdjustExcess calculates the optimal new excess given the current and desired excess values,
+// ensuring the change does not exceed the maximum excess difference.
+func (p ExcessParams) AdjustExcess(excess, desired uint64) uint64 {
 	change := safemath.AbsDiff(excess, desired)
 	change = min(change, p.MaxExcessDiff)
 	if excess < desired {
@@ -30,25 +30,25 @@ func (p TargetExcessParams) TargetExcess(excess, desired uint64) uint64 {
 	return excess - change
 }
 
-// DesiredTargetExcess calculates the optimal desiredTargetExcess given the
-// desired target using binary search.
-func (p TargetExcessParams) DesiredTargetExcess(desiredTarget uint64) uint64 {
-	// This could be solved directly by calculating D * ln(desiredTarget / P)
+// DesiredExcess calculates the optimal desiredExcess given the
+// desired value using binary search.
+func (p ExcessParams) DesiredExcess(desiredValue uint64) uint64 {
+	// This could be solved directly by calculating D * ln(desiredValue / P)
 	// using floating point math. However, it introduces inaccuracies. So, we
 	// use a binary search to find the closest integer solution.
 	return uint64(sort.Search(int(p.MaxExcess), func(targetExcessGuess int) bool {
-		calculatedTarget := p.CalculateTarget(uint64(targetExcessGuess))
-		return calculatedTarget >= desiredTarget
+		calculatedValue := p.CalculateValue(uint64(targetExcessGuess))
+		return calculatedValue >= desiredValue
 	}))
 }
 
-// CalculateTarget calculates the target value using exponential formula:
-// Target = MinTarget * e^(Excess / TargetConversion)
-func (p TargetExcessParams) CalculateTarget(excess uint64) uint64 {
+// CalculateValue calculates the value using exponential formula:
+// Value = MinValue * e^(Excess / ConversionRate)
+func (p ExcessParams) CalculateValue(excess uint64) uint64 {
 	return safemath.CalculateExponential(
-		p.MinTarget,
+		p.MinValue,
 		excess,
-		p.TargetConversion,
+		p.ConversionRate,
 	)
 }
 
