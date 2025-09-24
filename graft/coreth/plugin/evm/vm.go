@@ -144,7 +144,6 @@ var (
 	errFirewoodSnapshotCacheDisabled     = errors.New("snapshot cache must be disabled for Firewood")
 	errFirewoodOfflinePruningUnsupported = errors.New("offline pruning is not supported for Firewood")
 	errFirewoodStateSyncUnsupported      = errors.New("state sync is not yet supported for Firewood")
-	errPathStateUnsupported              = errors.New("path state scheme is not supported")
 )
 
 var originalStderr *os.File
@@ -410,8 +409,7 @@ func (vm *VM) Initialize(
 		}
 	}
 	if vm.ethConfig.StateScheme == rawdb.PathScheme {
-		log.Error("Path state scheme is not supported. Please use HashDB or Firewood state schemes instead")
-		return errPathStateUnsupported
+		log.Warn("Path state scheme is not supported. Please use HashDB or Firewood state schemes instead")
 	}
 
 	// Create directory for offline pruning
