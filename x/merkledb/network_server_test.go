@@ -117,7 +117,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := xsync.NewGetRangeProofHandler(smallTrieDB)
+			handler := xsync.NewGetRangeProofHandler(smallTrieDB, RangeProofMarshaler{})
 			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)
 			responseBytes, err := handler.AppRequest(context.Background(), test.nodeID, time.Time{}, requestBytes)
@@ -130,14 +130,14 @@ func Test_Server_GetRangeProof(t *testing.T) {
 				return
 			}
 
-			var proof RangeProof
-			require.NoError(proof.UnmarshalBinary(responseBytes))
+			proof, err := RangeProofMarshaler{}.Unmarshal(responseBytes)
+			require.NoError(err)
 
 			if test.expectedResponseLen > 0 {
 				require.LessOrEqual(len(proof.KeyChanges), test.expectedResponseLen)
 			}
 
-			bytes, err := proof.MarshalBinary()
+			bytes, err := RangeProofMarshaler{}.Marshal(proof)
 			require.NoError(err)
 			require.LessOrEqual(len(bytes), int(test.request.BytesLimit))
 			if test.expectedMaxResponseBytes > 0 {
@@ -335,7 +335,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			handler := xsync.NewGetChangeProofHandler(serverDB)
+			handler := xsync.NewGetChangeProofHandler(serverDB, RangeProofMarshaler{}, ChangeProofMarshaler{})
 
 			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)
@@ -358,12 +358,12 @@ func Test_Server_GetChangeProof(t *testing.T) {
 
 			if test.expectedResponseLen > 0 {
 				if test.expectRangeProof {
-					var response RangeProof
-					require.NoError(response.UnmarshalBinary(proofResult.GetRangeProof()))
+					response, err := RangeProofMarshaler{}.Unmarshal(proofResult.GetRangeProof())
+					require.NoError(err)
 					require.LessOrEqual(len(response.KeyChanges), test.expectedResponseLen)
 				} else {
-					var response ChangeProof
-					require.NoError(response.UnmarshalBinary(proofResult.GetChangeProof()))
+					response, err := ChangeProofMarshaler{}.Unmarshal(proofResult.GetChangeProof())
+					require.NoError(err)
 					require.LessOrEqual(len(response.KeyChanges), test.expectedResponseLen)
 				}
 			}

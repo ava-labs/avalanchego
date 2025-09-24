@@ -5,7 +5,6 @@ package sync
 
 import (
 	"context"
-	"encoding"
 	"errors"
 	"fmt"
 
@@ -18,16 +17,12 @@ var (
 	ErrNoEndRoot           = fmt.Errorf("%w: end root not found", ErrInsufficientHistory)
 )
 
-type ProofFactory[TRange, TChange Proof] interface {
-	NewRangeProof() TRange
-	NewChangeProof() TChange
+type Marshaler[T any] interface {
+	Marshal(T) ([]byte, error)
+	Unmarshal([]byte) (T, error)
 }
 
-type Proof interface {
-	encoding.BinaryMarshaler
-	encoding.BinaryUnmarshaler
-}
-type DB[TRange, TChange Proof] interface {
+type DB[TRange any, TChange any] interface {
 	// GetMerkleRoot returns the current root of the trie.
 	// If the trie is empty, returns ids.Empty.
 	GetMerkleRoot(context.Context) (ids.ID, error)

@@ -93,14 +93,13 @@ func newWorkItem(localRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[
 	}
 }
 
-type Manager[TRange, TChange Proof] struct {
+type Manager[TRange any, TChange any] struct {
 	// The database to sync.
-	db           DB[TRange, TChange]
-	proofFactory ProofFactory[TRange, TChange]
+	db DB[TRange, TChange]
 
 	// Must be held when accessing [config.TargetRoot].
 	syncTargetLock sync.RWMutex
-	config         ManagerConfig
+	config         ManagerConfig[TRange, TChange]
 
 	workLock sync.Mutex
 	// The number of work items currently being processed.
@@ -141,7 +140,9 @@ type Manager[TRange, TChange Proof] struct {
 }
 
 // TODO remove non-config values out of this struct
-type ManagerConfig struct {
+type ManagerConfig[TRange any, TChange any] struct {
+	RangeProofMarshaler   Marshaler[TRange]
+	ChangeProofMarshaler  Marshaler[TChange]
 	RangeProofClient      *p2p.Client
 	ChangeProofClient     *p2p.Client
 	SimultaneousWorkLimit int
@@ -150,12 +151,11 @@ type ManagerConfig struct {
 	StateSyncNodes        []ids.NodeID
 }
 
-func NewManager[R, C Proof](
-	db DB[R, C],
-	proofFactory ProofFactory[R, C],
-	config ManagerConfig,
+func NewManager[TRange any, TChange any](
+	db DB[TRange, TChange],
+	config ManagerConfig[TRange, TChange],
 	registerer prometheus.Registerer,
-) (*Manager[R, C], error) {
+) (*Manager[TRange, TChange], error) {
 	switch {
 	case db == nil:
 		return nil, ErrNoDatabaseProvided
@@ -174,9 +174,8 @@ func NewManager[R, C Proof](
 		return nil, err
 	}
 
-	m := &Manager[R, C]{
+	m := &Manager[TRange, TChange]{
 		db:              db,
-		proofFactory:    proofFactory,
 		config:          config,
 		doneChan:        make(chan struct{}),
 		unprocessedWork: newWorkHeap(),
@@ -493,8 +492,8 @@ func (m *Manager[R, _]) handleRangeProofResponse(
 		return err
 	}
 
-	rangeProof := m.proofFactory.NewRangeProof()
-	if err := rangeProof.UnmarshalBinary(responseBytes); err != nil {
+	rangeProof, err := m.config.RangeProofMarshaler.Unmarshal(responseBytes)
+	if err != nil {
 		return err
 	}
 
@@ -552,8 +551,8 @@ func (m *Manager[R, C]) handleChangeProofResponse(
 	switch changeProofResp := changeProofResp.Response.(type) {
 	case *pb.GetChangeProofResponse_ChangeProof:
 		// The server had enough history to send us a change proof
-		changeProof := m.proofFactory.NewChangeProof()
-		if err := changeProof.UnmarshalBinary(changeProofResp.ChangeProof); err != nil {
+		changeProof, err := m.config.ChangeProofMarshaler.Unmarshal(responseBytes)
+		if err != nil {
 			return err
 		}
 		if err := m.db.VerifyChangeProof(
@@ -576,8 +575,8 @@ func (m *Manager[R, C]) handleChangeProofResponse(
 
 		m.completeWorkItem(work, nextKey, targetRootID)
 	case *pb.GetChangeProofResponse_RangeProof:
-		rangeProof := m.proofFactory.NewRangeProof()
-		if err := rangeProof.UnmarshalBinary(changeProofResp.RangeProof); err != nil {
+		rangeProof, err := m.config.RangeProofMarshaler.Unmarshal(changeProofResp.RangeProof)
+		if err != nil {
 			return err
 		}
 

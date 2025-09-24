@@ -47,14 +47,18 @@ var (
 	errEmptyProof           = errors.New("proof for empty trie requested")
 )
 
-func NewGetChangeProofHandler[TRange, TChange Proof](db DB[TRange, TChange]) *GetChangeProofHandler[TRange, TChange] {
+func NewGetChangeProofHandler[TRange any, TChange any](db DB[TRange, TChange], rangeProofMarshaler Marshaler[TRange], changeProofMarshaler Marshaler[TChange]) *GetChangeProofHandler[TRange, TChange] {
 	return &GetChangeProofHandler[TRange, TChange]{
-		db: db,
+		db:                   db,
+		rangeProofMarshaler:  rangeProofMarshaler,
+		changeProofMarshaler: changeProofMarshaler,
 	}
 }
 
-type GetChangeProofHandler[TRange, TChange Proof] struct {
-	db DB[TRange, TChange]
+type GetChangeProofHandler[TRange any, TChange any] struct {
+	db                   DB[TRange, TChange]
+	rangeProofMarshaler  Marshaler[TRange]
+	changeProofMarshaler Marshaler[TChange]
 }
 
 func (*GetChangeProofHandler[TRange, TChange]) AppGossip(context.Context, ids.NodeID, []byte) {}
@@ -133,7 +137,7 @@ func (g *GetChangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context,
 					BytesLimit: req.BytesLimit,
 				},
 				func(rangeProof TRange) ([]byte, error) {
-					proofBytes, err := rangeProof.MarshalBinary()
+					proofBytes, err := g.rangeProofMarshaler.Marshal(rangeProof)
 					if err != nil {
 						return nil, err
 					}
@@ -156,7 +160,7 @@ func (g *GetChangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context,
 		}
 
 		// We generated a change proof. See if it's small enough.
-		changeProofBytes, err := changeProof.MarshalBinary()
+		changeProofBytes, err := g.changeProofMarshaler.Marshal(changeProof)
 		if err != nil {
 			return nil, &common.AppError{
 				Code:    p2p.ErrUnexpected.Code,
@@ -189,14 +193,16 @@ func (g *GetChangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context,
 	}
 }
 
-func NewGetRangeProofHandler[TRange, TChange Proof](db DB[TRange, TChange]) *GetRangeProofHandler[TRange, TChange] {
+func NewGetRangeProofHandler[TRange any, TChange any](db DB[TRange, TChange], rangeProofMarshaler Marshaler[TRange]) *GetRangeProofHandler[TRange, TChange] {
 	return &GetRangeProofHandler[TRange, TChange]{
-		db: db,
+		db:                  db,
+		rangeProofMarshaler: rangeProofMarshaler,
 	}
 }
 
-type GetRangeProofHandler[TRange, TChange Proof] struct {
-	db DB[TRange, TChange]
+type GetRangeProofHandler[TRange any, TChange any] struct {
+	db                  DB[TRange, TChange]
+	rangeProofMarshaler Marshaler[TRange]
 }
 
 func (*GetRangeProofHandler[_, _]) AppGossip(context.Context, ids.NodeID, []byte) {}
@@ -226,7 +232,7 @@ func (g *GetRangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context, 
 		g.db,
 		req,
 		func(rangeProof TRange) ([]byte, error) {
-			return rangeProof.MarshalBinary()
+			return g.rangeProofMarshaler.Marshal(rangeProof)
 		},
 	)
 	if err != nil {
@@ -247,7 +253,7 @@ func (g *GetRangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context, 
 // If no sufficiently small proof can be generated, returns [ErrMinProofSizeIsTooLarge].
 // TODO improve range proof generation so we don't need to iteratively
 // reduce the key limit.
-func getRangeProof[TRange, TChange Proof](
+func getRangeProof[TRange any, TChange any](
 	ctx context.Context,
 	db DB[TRange, TChange],
 	req *pb.GetRangeProofRequest,
