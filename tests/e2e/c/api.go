@@ -4,15 +4,9 @@
 package c
 
 import (
-	"context"
-	"crypto/tls"
-	"net"
-	"net/http"
-
 	"connectrpc.com/connect"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/net/http2"
 
 	"github.com/ava-labs/avalanchego/api/connectclient"
 	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm"
@@ -39,18 +33,8 @@ var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("ProposerVMAPI"), fu
 		cContext := cBuilder.Context()
 		avalancheCChainID := cContext.BlockchainID
 
-		httpClient := &http.Client{
-			Transport: &http2.Transport{
-				AllowHTTP: true,
-				DialTLSContext: func(_ context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
-					// Skip TLS to use h2c
-					return net.Dial(network, addr)
-				},
-			},
-		}
-
 		proposerClient := pb.NewProposerVMClient(
-			httpClient,
+			connectclient.New(),
 			nodeURI.URI,
 			connect.WithInterceptors(
 				connectclient.SetRouteHeaderInterceptor{Route: avalancheCChainID.String()},

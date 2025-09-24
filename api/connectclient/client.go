@@ -5,8 +5,12 @@ package connectclient
 
 import (
 	"context"
+	"crypto/tls"
+	"net"
+	"net/http"
 
 	"connectrpc.com/connect"
+	"golang.org/x/net/http2"
 
 	"github.com/ava-labs/avalanchego/api/server"
 )
@@ -36,4 +40,16 @@ func (s SetRouteHeaderInterceptor) WrapStreamingClient(next connect.StreamingCli
 
 func (SetRouteHeaderInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFunc) connect.StreamingHandlerFunc {
 	return next
+}
+
+func New() *http.Client {
+	return &http.Client{
+		Transport: &http2.Transport{
+			AllowHTTP: true,
+			DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, network, addr) // Skip TLS to use h2c
+			},
+		},
+	}
 }

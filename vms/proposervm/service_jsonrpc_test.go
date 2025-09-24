@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/utils/json"
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
 
@@ -32,7 +31,7 @@ func TestServiceJsonRPCGetProposedHeight(t *testing.T) {
 
 	// Create JSON-RPC server
 	server := rpc.NewServer()
-	server.RegisterCodec(json.NewCodec(), "application/json")
+	server.RegisterCodec(avajson.NewCodec(), "application/json")
 	proposerAPI := &ProposerAPI{vm: proVM}
 	err := server.RegisterService(proposerAPI, "proposervm")
 	require.NoError(err)
