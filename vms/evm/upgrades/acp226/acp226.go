@@ -15,6 +15,10 @@ const (
 	// MaxDelayExcessDiff (Q) is the maximum change in excess per update
 	MaxDelayExcessDiff = 200
 
+	// InitialDelayExcess represents the initial (≈2000ms) delay excess.
+	// Formula: ConversionRate (2^20) * ln(2000) + 1
+	InitialDelayExcess = 7_970_124
+
 	maxDelayExcess = 46_516_320 // ConversionRate * ln(MaxUint64 / MinDelayMilliseconds) + 1
 )
 
