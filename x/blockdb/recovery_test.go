@@ -208,7 +208,7 @@ func TestRecovery_Success(t *testing.T) {
 				// Create 4KB blocks
 				block := fixedSizeBlock(t, 4*1024, height)
 
-				require.NoError(t, store.WriteBlock(height, block))
+				require.NoError(t, store.Put(height, block))
 				blocks[height] = block
 			}
 			checkDatabaseState(t, store, 8, 4)
@@ -225,7 +225,7 @@ func TestRecovery_Success(t *testing.T) {
 
 			// Verify blocks are readable
 			for _, height := range blockHeights {
-				readBlock, err := recoveredStore.ReadBlock(height)
+				readBlock, err := recoveredStore.Get(height)
 				require.NoError(t, err)
 				require.Equal(t, blocks[height], readBlock, "block %d should be the same", height)
 			}
@@ -534,7 +534,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				} else {
 					blocks[i] = randomBlock(t)
 				}
-				require.NoError(t, store.WriteBlock(height, blocks[i]))
+				require.NoError(t, store.Put(height, blocks[i]))
 			}
 			require.NoError(t, store.Close())
 
