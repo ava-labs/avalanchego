@@ -5,6 +5,7 @@ package metervm
 
 import (
 	"context"
+	"time"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -14,9 +15,9 @@ func (vm *blockVM) StateSyncEnabled(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 
-	start := vm.clock.Time()
+	start := time.Now()
 	enabled, err := vm.ssVM.StateSyncEnabled(ctx)
-	end := vm.clock.Time()
+	end := time.Now()
 	vm.blockMetrics.stateSyncEnabled.Observe(float64(end.Sub(start)))
 	return enabled, err
 }
@@ -26,9 +27,9 @@ func (vm *blockVM) GetOngoingSyncStateSummary(ctx context.Context) (block.StateS
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
-	start := vm.clock.Time()
+	start := time.Now()
 	summary, err := vm.ssVM.GetOngoingSyncStateSummary(ctx)
-	end := vm.clock.Time()
+	end := time.Now()
 	vm.blockMetrics.getOngoingSyncStateSummary.Observe(float64(end.Sub(start)))
 	return summary, err
 }
@@ -38,9 +39,9 @@ func (vm *blockVM) GetLastStateSummary(ctx context.Context) (block.StateSummary,
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
-	start := vm.clock.Time()
+	start := time.Now()
 	summary, err := vm.ssVM.GetLastStateSummary(ctx)
-	end := vm.clock.Time()
+	end := time.Now()
 	vm.blockMetrics.getLastStateSummary.Observe(float64(end.Sub(start)))
 	return summary, err
 }
@@ -50,9 +51,9 @@ func (vm *blockVM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
-	start := vm.clock.Time()
+	start := time.Now()
 	summary, err := vm.ssVM.ParseStateSummary(ctx, summaryBytes)
-	end := vm.clock.Time()
+	end := time.Now()
 	duration := float64(end.Sub(start))
 	if err != nil {
 		vm.blockMetrics.parseStateSummaryErr.Observe(duration)
@@ -67,9 +68,9 @@ func (vm *blockVM) GetStateSummary(ctx context.Context, height uint64) (block.St
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
-	start := vm.clock.Time()
+	start := time.Now()
 	summary, err := vm.ssVM.GetStateSummary(ctx, height)
-	end := vm.clock.Time()
+	end := time.Now()
 	duration := float64(end.Sub(start))
 	if err != nil {
 		vm.blockMetrics.getStateSummaryErr.Observe(duration)

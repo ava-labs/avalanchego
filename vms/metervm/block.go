@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -27,9 +28,9 @@ type meterBlock struct {
 }
 
 func (mb *meterBlock) Verify(ctx context.Context) error {
-	start := mb.vm.clock.Time()
+	start := time.Now()
 	err := mb.Block.Verify(ctx)
-	end := mb.vm.clock.Time()
+	end := time.Now()
 	duration := float64(end.Sub(start))
 	if err != nil {
 		mb.vm.blockMetrics.verifyErr.Observe(duration)
@@ -40,18 +41,18 @@ func (mb *meterBlock) Verify(ctx context.Context) error {
 }
 
 func (mb *meterBlock) Accept(ctx context.Context) error {
-	start := mb.vm.clock.Time()
+	start := time.Now()
 	err := mb.Block.Accept(ctx)
-	end := mb.vm.clock.Time()
+	end := time.Now()
 	duration := float64(end.Sub(start))
 	mb.vm.blockMetrics.accept.Observe(duration)
 	return err
 }
 
 func (mb *meterBlock) Reject(ctx context.Context) error {
-	start := mb.vm.clock.Time()
+	start := time.Now()
 	err := mb.Block.Reject(ctx)
-	end := mb.vm.clock.Time()
+	end := time.Now()
 	duration := float64(end.Sub(start))
 	mb.vm.blockMetrics.reject.Observe(duration)
 	return err
@@ -85,9 +86,9 @@ func (mb *meterBlock) ShouldVerifyWithContext(ctx context.Context) (bool, error)
 		return false, nil
 	}
 
-	start := mb.vm.clock.Time()
+	start := time.Now()
 	shouldVerify, err := blkWithCtx.ShouldVerifyWithContext(ctx)
-	end := mb.vm.clock.Time()
+	end := time.Now()
 	duration := float64(end.Sub(start))
 	mb.vm.blockMetrics.shouldVerifyWithContext.Observe(duration)
 	return shouldVerify, err
@@ -99,9 +100,9 @@ func (mb *meterBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Con
 		return fmt.Errorf("%w but got %T", errExpectedBlockWithVerifyContext, mb.Block)
 	}
 
-	start := mb.vm.clock.Time()
+	start := time.Now()
 	err := blkWithCtx.VerifyWithContext(ctx, blockCtx)
-	end := mb.vm.clock.Time()
+	end := time.Now()
 	duration := float64(end.Sub(start))
 	if err != nil {
 		mb.vm.blockMetrics.verifyWithContextErr.Observe(duration)
