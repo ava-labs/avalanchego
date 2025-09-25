@@ -66,6 +66,8 @@ func WithCapacity(n int) CodeQueueOption {
 }
 
 // NewCodeQueue creates a new code queue applying optional functional options.
+// The `quit` channel, if non-nil, MUST eventually be closed to avoid leaking a
+// goroutine.
 func NewCodeQueue(db ethdb.Database, quit <-chan struct{}, opts ...CodeQueueOption) (*CodeQueue, error) {
 	// Apply defaults then options.
 	o := codeQueueOptions{
@@ -81,13 +83,15 @@ func NewCodeQueue(db ethdb.Database, quit <-chan struct{}, opts ...CodeQueueOpti
 		quit: quit,
 	}
 
-	// Close the output channel on early shutdown to unblock consumers.
-	go func() {
-		<-q.quit
-		// Transition to quit, wait for in-flight enqueues to finish,
-		// then close the output channel to signal consumers.
-		q.closed.markQuitAndClose(q.out, &q.enqueueWG)
-	}()
+	if quit != nil {
+		// Close the output channel on early shutdown to unblock consumers.
+		go func() {
+			<-q.quit
+			// Transition to quit, wait for in-flight enqueues to finish,
+			// then close the output channel to signal consumers.
+			q.closed.markQuitAndClose(q.out, &q.enqueueWG)
+		}()
+	}
 
 	// Always initialize eagerly.
 	if err := q.init(); err != nil {
