@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/libevm/common"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -37,6 +39,16 @@ type Keychain interface {
 	// Returns the set of addresses for which the accessor keeps an associated
 	// signer
 	Addresses() set.Set[ids.ShortID]
+}
+
+// EthKeychain maintains a set of Ethereum addresses together with their corresponding
+// signers
+type EthKeychain interface {
+	// The returned Signer can provide a signature for [addr]
+	GetEth(addr common.Address) (Signer, bool)
+	// Returns the set of Ethereum addresses for which the accessor keeps an associated
+	// signer
+	EthAddresses() set.Set[common.Address]
 }
 
 // ledgerKeychain is an abstraction of the underlying ledger hardware device,
