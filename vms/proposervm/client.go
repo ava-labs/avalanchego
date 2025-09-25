@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
+// Client for interacting with the json API.
 type Client struct {
 	Requester rpc.EndpointRequester
 }
@@ -33,7 +34,8 @@ func NewClient(uri string, chain string) *Client {
 	}
 }
 
-// GetProposedHeight P-chain height this node would propose in the next block.
+// GetProposedHeight returns the P-chain height this node would propose in the
+// next block.
 func (c *Client) GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {
 	res := &api.GetHeightResponse{}
 	err := c.Requester.SendRequest(ctx, "proposervm.getProposedHeight", struct{}{}, res, options...)
