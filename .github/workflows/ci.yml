@@ -345,6 +345,4 @@ jobs:
       - name: Run avalanchego
         shell: nix develop --command bash -x {0}
         run: |
-          echo "=== Debug ==="
-          ls -lah
-          ./build/avalanchego --help
+          ./bin/avalanchego --help
