@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/connectclient"
-	pbproposervm "github.com/ava-labs/avalanchego/connectproto/pb/proposervm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
 
+	pbproposervm "github.com/ava-labs/avalanchego/connectproto/pb/proposervm"
 	pb "github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
 )
 
@@ -29,6 +29,7 @@ var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("ProposerVMAPI"), fu
 		var (
 			env = e2e.GetEnv(tc)
 		)
+
 		nodeURI = env.GetRandomNodeURI()
 
 		// Get the proper Avalanche C-Chain ID for routing
@@ -92,7 +93,7 @@ var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("ProposerVMAPI"), fu
 		require.Positive(resp.Msg.Height, "proposervm height should be greater than 0")
 	})
 
-	ginkgo.It("should provide JSON-RPC API for ProposerVM", ginkgo.Label("ProposerVMAPI"), func() {
+	ginkgo.It("should provide JSON-RPC API for ProposerVM", func() {
 		// Set up environment and trigger block production
 		avalancheCChainID, nodeURI := setupProposerVMTest()
 
