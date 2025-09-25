@@ -340,7 +340,7 @@ jobs:
           cd avalanchego
           echo "Building manually in setup mode..."
           ./scripts/run_task.sh build
-          echo "Manual build completed successfully
+          echo "Manual build completed successfully"
       - name: Run avalanchego
         run: |
           ./build/avalanchego --help
