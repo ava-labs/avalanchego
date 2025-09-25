@@ -283,7 +283,7 @@ jobs:
 #        shell: bash
 #        run: nix develop --command ./scripts/run_task.sh test-robustness
   self-hosted-build-mode:
-    name: Build avalanchego on self-hosted runner
+    name: Build reexecution bench on self-hosted runner
     runs-on: avalanche-avalanchego-runner
     container:
       image: ghcr.io/actions/actions-runner:2.325.0
@@ -298,7 +298,7 @@ jobs:
         id: build
         uses: ./.github/actions/avalanchego-build-action
         with:
-          target: "avalanchego"
+          target: "reexecution"
           args: "--help"
       - name: Verify binary output
         run: |
@@ -326,36 +326,13 @@ jobs:
         with:
           coreth: "2d2f6cbb997ece114b408387773fa161b7324a21"
           libevm: "414b1f5dffea8f1c1deb6edde125ad896570b183"
-      - name: Verify versions and setup
-        run: |
-          cd avalanchego
-          echo "Checking go.mod exists..."
-          if [ ! -f "go.mod" ]; then
-            echo "Error: go.mod not found"
-            exit 1
-          fi
-
-          echo "=== Verifying coreth version ==="
-          if [ -f "go.mod" ]; then
-            echo "Coreth version from go.mod:"
-            cat go.mod | grep "github.com/ava-labs/coreth"
-          fi
-
-          echo "=== Verifying libevm version ==="
-          if [ -f "go.mod" ]; then
-            echo "LibEVM version from go.mod:"
-            cat go.mod | grep "github.com/ava-labs/libevm"
-          fi
-
-          echo "=== Full go.mod content ==="
-          cat go.mod
-      - name: Verify setup and build manually
-        run: |
-          cd avalanchego
-          echo "Building manually in setup mode..."
-          ./scripts/run_task.sh build
-          echo "Manual build completed successfully"
-      - name: Run avalanchego
-        shell: nix develop --command bash -x {0}
-        run: |
-          ./bin/avalanchego --help
+      - name: Run C-Chain Re-Execution Benchmark
+        uses: ./.github/actions/c-chain-reexecution-benchmark
+        with:
+          prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: 'us-east-2'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          runner_name: ${{ matrix.runner }}
