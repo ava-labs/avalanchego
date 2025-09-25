@@ -8,226 +8,148 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
+	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 
 	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 )
 
-// Test that adding the same hash multiple times only enqueues once.
-func TestCodeQueue_AllowsDuplicateEnqueues(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-	q, err := NewCodeQueue(db, make(chan struct{}))
-	require.NoError(t, err)
-
-	// Init first. AddCode should enqueue a single instance even with duplicates.
-	codeBytes := utils.RandomBytes(32)
-	codeHash := crypto.Keccak256Hash(codeBytes)
-
-	// Enqueue with duplicates. Queue should allow duplicates and preserve order.
-	// Auto-initialized in constructor.
-	require.NoError(t, q.AddCode([]common.Hash{codeHash, codeHash}))
-
-	// Should receive both duplicates.
-	got1 := <-q.CodeHashes()
-	got2 := <-q.CodeHashes()
-	require.Equal(t, codeHash, got1)
-	require.Equal(t, codeHash, got2)
-
-	q.Finalize()
-	// Channel should close without more values.
-	_, ok := <-q.CodeHashes()
-	require.False(t, ok)
-}
-
-func TestCodeQueue_Init_ResumeFromDB(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-
-	// Persist a to-fetch marker prior to construction.
-	codeBytes := utils.RandomBytes(20)
-	want := crypto.Keccak256Hash(codeBytes)
-	customrawdb.AddCodeToFetch(db, want)
-
-	q, err := NewCodeQueue(db, make(chan struct{}))
-	require.NoError(t, err)
-
-	// CodeQueue auto-inits and surfaces the pre-seeded DB marker.
-
-	result := <-q.CodeHashes()
-	require.Equal(t, want, result)
-
-	q.Finalize()
-	_, ok := <-q.CodeHashes()
-	require.False(t, ok)
-}
-
-func TestCodeQueue_Init_AddCodeBlocks(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-
-	// Prepare a hash that will be added via AddCode (which should block pre-Init).
-	codeBytes := utils.RandomBytes(10)
-	want := crypto.Keccak256Hash(codeBytes)
-
-	q, err := NewCodeQueue(db, make(chan struct{}))
-	require.NoError(t, err)
-
-	// With auto-init, AddCode should proceed and enqueue the hash.
-	require.NoError(t, q.AddCode([]common.Hash{want}))
-
-	result := <-q.CodeHashes()
-	require.Equal(t, want, result)
-
-	q.Finalize()
-	_, ok := <-q.CodeHashes()
-	require.False(t, ok)
-}
-
-func TestCodeQueue_AddCode_Empty(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-	q, err := NewCodeQueue(db, make(chan struct{}))
-	require.NoError(t, err)
-
-	// No input should enqueue nothing and return nil.
-	require.NoError(t, q.AddCode(nil))
-
-	select {
-	case <-q.CodeHashes():
-		t.Fatal("unexpected hash enqueued")
-	default:
+func TestCodeQueue(t *testing.T) {
+	hashes := make([]common.Hash, 256)
+	for i := range hashes {
+		hashes[i] = crypto.Keccak256Hash([]byte{byte(i)})
 	}
 
-	q.Finalize()
-	_, ok := <-q.CodeHashes()
-	require.False(t, ok)
-}
-
-func TestCodeQueue_AddCode_PresentCode_StillEnqueues(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-	q, err := NewCodeQueue(db, make(chan struct{}))
-	require.NoError(t, err)
-
-	// Prepare a sample hash and persist code locally to skip enqueue.
-	codeBytes := utils.RandomBytes(33)
-	h := crypto.Keccak256Hash(codeBytes)
-	rawdb.WriteCode(db, h, codeBytes)
-
-	require.NoError(t, q.AddCode([]common.Hash{h}))
-
-	// Queue now allows enqueuing even if code is already present; consumer will skip.
-	got := <-q.CodeHashes()
-	require.Equal(t, h, got)
-
-	q.Finalize()
-	_, ok := <-q.CodeHashes()
-	require.False(t, ok)
-}
-
-func TestCodeQueue_AddCode_Duplicates_EnqueueBoth(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-	q, err := NewCodeQueue(db, make(chan struct{}))
-	require.NoError(t, err)
-
-	// Prepare a sample hash and submit duplicates - expect single enqueue.
-	codeBytes := utils.RandomBytes(33)
-	h := crypto.Keccak256Hash(codeBytes)
-
-	require.NoError(t, q.AddCode([]common.Hash{h, h}))
-
-	// Expect both duplicates in order.
-	r1 := <-q.CodeHashes()
-	r2 := <-q.CodeHashes()
-	require.Equal(t, h, r1)
-	require.Equal(t, h, r2)
-
-	q.Finalize()
-	_, ok := <-q.CodeHashes()
-	require.False(t, ok)
-}
-
-// Test queuing several distinct code hashes at once preserves order and enqueues all.
-func TestCodeQueue_AddCode_MultipleHashes(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-	q, err := NewCodeQueue(db, make(chan struct{}))
-	require.NoError(t, err)
-
-	// Prepare several distinct code hashes.
-	num := 10
-	inputs := make([]common.Hash, 0, num)
-	for i := 0; i < num; i++ {
-		h := crypto.Keccak256Hash([]byte(fmt.Sprintf("code-%d", i)))
-		inputs = append(inputs, h)
+	tests := []struct {
+		name                  string
+		alreadyToFetch        set.Set[common.Hash]
+		alreadyHave           map[common.Hash][]byte
+		addCode               [][]common.Hash
+		want                  []common.Hash
+		quitInsteadOfFinalize bool
+		addCodeAfter          []common.Hash
+	}{
+		{
+			name: "multiple_calls_to_addcode",
+			addCode: [][]common.Hash{
+				hashes[:20],
+				hashes[20:35],
+				hashes[35:42],
+				hashes[42:],
+			},
+			want: hashes,
+		},
+		{
+			name:    "allow_duplicates",
+			addCode: [][]common.Hash{{hashes[0], hashes[0]}},
+			want:    []common.Hash{hashes[0], hashes[0]},
+		},
+		{
+			name:    "AddCode_empty",
+			addCode: [][]common.Hash{{}},
+			want:    nil,
+		},
+		{
+			name:           "init_resumes_from_db",
+			alreadyToFetch: set.Of(hashes[1]),
+			want:           []common.Hash{hashes[1]},
+		},
+		{
+			name:        "deduplication_in_consumer",
+			alreadyHave: map[common.Hash][]byte{hashes[42]: {42}},
+			// It is the consumer's responsibility, not the queue's, to check
+			// the database.
+			addCode: [][]common.Hash{{hashes[42]}},
+			want:    []common.Hash{hashes[42]},
+		},
+		{
+			name:                  "external_shutdown_via_quit_channel",
+			quitInsteadOfFinalize: true,
+			addCodeAfter:          []common.Hash{hashes[11]},
+			want:                  nil,
+		},
 	}
 
-	require.NoError(t, q.AddCode(inputs))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
 
-	// Drain exactly num items and assert order is preserved.
-	results := make([]common.Hash, 0, num)
-	for i := 0; i < num; i++ {
-		results = append(results, <-q.CodeHashes())
+			db := rawdb.NewMemoryDatabase()
+			for hash, code := range tt.alreadyHave {
+				rawdb.WriteCode(db, hash, code)
+			}
+			for hash := range tt.alreadyToFetch {
+				customrawdb.AddCodeToFetch(db, hash)
+			}
+
+			quit := make(chan struct{})
+			q, err := NewCodeQueue(db, quit)
+			require.NoError(t, err, "NewCodeQueue()")
+
+			recvDone := make(chan struct{})
+			go func() {
+				for _, add := range tt.addCode {
+					require.NoErrorf(t, q.AddCode(add), "%T.AddCode(%v)", q, add)
+				}
+
+				if tt.quitInsteadOfFinalize {
+					close(quit)
+					<-recvDone
+					require.ErrorIsf(t, q.AddCode(tt.addCodeAfter), errFailedToAddCodeHashesToQueue, "%T.AddCode() after `quit` channel closed", q)
+				} else {
+					require.NoErrorf(t, q.Finalize(), "%T.Finalize()", q)
+					// Avoid leaking the internal goroutine
+					close(quit)
+				}
+			}()
+
+			var got []common.Hash
+			for h := range q.CodeHashes() {
+				got = append(got, h)
+			}
+			close(recvDone)
+			require.Emptyf(t, cmp.Diff(tt.want, got), "Diff (-want +got) of values received from %T.CodeHashes()", q)
+
+			t.Run("restart_with_same_db", func(t *testing.T) {
+				q, err := NewCodeQueue(db, nil, WithCapacity(len(tt.want)))
+				require.NoError(t, err, "NewCodeQueue([reused db])")
+				require.NoErrorf(t, q.Finalize(), "%T.Finalize() immediately after creation", q)
+
+				got := make(set.Set[common.Hash])
+				for h := range q.CodeHashes() {
+					got.Add(h)
+				}
+
+				// Unlike newly added code hashes, the initialisation function
+				// checks for existing code when recovering from the database.
+				// The order can't be maintained.
+				want := set.Of(tt.want...)
+				for hash := range tt.alreadyHave {
+					want.Remove(hash)
+				}
+
+				require.ElementsMatchf(t, want.List(), got.List(), "All received on %T.CodeHashes() after restart", q)
+			})
+		})
 	}
-	require.Equal(t, inputs, results)
-
-	// Ensure no unexpected extra value.
-	select {
-	case <-q.CodeHashes():
-		t.Fatal("unexpected hash enqueued")
-	default:
-	}
-
-	q.Finalize()
-	_, ok := <-q.CodeHashes()
-	require.False(t, ok)
-}
-
-// Test that Finalize closes the channel and no further sends happen.
-func TestCodeQueue_FinalizeCloses(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-	q, err := NewCodeQueue(db, make(chan struct{}))
-	require.NoError(t, err)
-
-	q.Finalize()
-	_, ok := <-q.CodeHashes()
-	require.False(t, ok)
-}
-
-// Test that shutdown during enqueue returns the expected error.
-func TestCodeQueue_ShutdownDuringEnqueue(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-
-	// Create a done channel we control and a very small buffer to force blocking.
-	done := make(chan struct{})
-	q, err := NewCodeQueue(db, done, WithCapacity(1))
-	require.NoError(t, err)
-
-	// Fill the buffer with one hash so the next enqueue would block if not for done.
-	codeBytes1 := utils.RandomBytes(16)
-	codeHash1 := crypto.Keccak256Hash(codeBytes1)
-	require.NoError(t, q.AddCode([]common.Hash{codeHash1}))
-
-	// Now close done to simulate shutdown while trying to enqueue another hash.
-	close(done)
-
-	codeBytes2 := utils.RandomBytes(16)
-	codeHash2 := crypto.Keccak256Hash(codeBytes2)
-	err = q.AddCode([]common.Hash{codeHash2})
-	require.ErrorIs(t, err, errFailedToAddCodeHashesToQueue)
 }
 
 // Test that Finalize waits for in-flight AddCode calls to complete before closing the channel.
 func TestCodeQueue_FinalizeWaitsForInflightAddCodeCalls(t *testing.T) {
+	const capacity = 1
 	db := rawdb.NewMemoryDatabase()
-	q, err := NewCodeQueue(db, make(chan struct{}), WithCapacity(1))
-	require.NoError(t, err)
-
-	numHashes := 3
+	q, err := NewCodeQueue(db, nil, WithCapacity(capacity))
+	require.NoError(t, err, "NewCodeQueue()")
 
 	// Prepare multiple distinct hashes to exceed the buffer and cause AddCode to block on enqueue.
-	hashes := make([]common.Hash, 0, numHashes)
-	for i := 0; i < numHashes; i++ {
-		hashes = append(hashes, crypto.Keccak256Hash([]byte(fmt.Sprintf("code-%d", i))))
+	hashes := make([]common.Hash, capacity+2)
+	for i := range hashes {
+		hashes[i] = crypto.Keccak256Hash([]byte(fmt.Sprintf("code-%d", i)))
 	}
 
 	addDone := make(chan error, 1)
@@ -236,12 +158,13 @@ func TestCodeQueue_FinalizeWaitsForInflightAddCodeCalls(t *testing.T) {
 	}()
 
 	// Read the first enqueued hash to ensure AddCode is actively enqueuing and will block on the next send.
-	first := <-q.CodeHashes()
+	var got []common.Hash //nolint:prealloc
+	got = append(got, <-q.CodeHashes())
 
 	// Call Finalize concurrently - it should block until AddCode returns.
-	finalized := make(chan struct{}, 1)
+	finalized := make(chan struct{})
 	go func() {
-		q.Finalize()
+		require.NoError(t, q.Finalize(), "Finalize()")
 		close(finalized)
 	}()
 
@@ -249,130 +172,22 @@ func TestCodeQueue_FinalizeWaitsForInflightAddCodeCalls(t *testing.T) {
 	select {
 	case <-finalized:
 		t.Fatal("Finalize returned before in-flight AddCode completed")
-	default:
+	case <-addDone:
+		t.Fatal("AddCode returned before enqueuing all hashes")
+	case <-time.After(100 * time.Millisecond):
+		// TODO(powerslider) once we're using Go 1.25 and the `synctest` package
+		// is generally available, use it here instead of an arbitrary amount of
+		// time. Without this, we have no way to guarantee that Finalize() and
+		// AddCode() are actually blocked.
 	}
 
 	// Drain remaining enqueued hashes; this will unblock AddCode so it can finish.
-	result := make([]common.Hash, 0, numHashes)
-	result = append(result, first)
-	for i := 1; i < len(hashes); i++ {
-		result = append(result, <-q.CodeHashes())
+	for h := range q.CodeHashes() {
+		got = append(got, h)
 	}
-	require.Equal(t, hashes, result)
+	require.Equal(t, hashes, got)
 
 	// Now AddCode should complete without error, and Finalize should return and close the channel.
-	require.NoError(t, <-addDone)
-
-	// Wait for finalize to complete and close the channel.
+	require.NoError(t, <-addDone, "AddCode()")
 	<-finalized
-	_, ok := <-q.CodeHashes()
-	require.False(t, ok)
-}
-
-// Test that if hashes are added and the process shuts down abruptly, the
-// "to-fetch" markers remain in the DB and are recovered on restart.
-func TestCodeQueue_PersistsMarkersAcrossRestart(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-
-	// First run: add a handful of hashes and do not finalize or consume.
-	q1, err := NewCodeQueue(db, make(chan struct{}))
-	require.NoError(t, err)
-
-	num := 5
-	inputs := make([]common.Hash, 0, num)
-	for i := 0; i < num; i++ {
-		inputs = append(inputs, crypto.Keccak256Hash([]byte(fmt.Sprintf("persist-%d", i))))
-	}
-	require.NoError(t, q1.AddCode(inputs))
-
-	// Assert markers exist in the DB.
-	it := customrawdb.NewCodeToFetchIterator(db)
-	defer it.Release()
-
-	seen := make(map[common.Hash]struct{}, num)
-	for it.Next() {
-		h := common.BytesToHash(it.Key()[len(customrawdb.CodeToFetchPrefix):])
-		seen[h] = struct{}{}
-	}
-	require.NoError(t, it.Error())
-
-	for _, h := range inputs {
-		if _, ok := seen[h]; !ok {
-			t.Fatalf("missing marker for hash %v", h)
-		}
-	}
-
-	// Restart: construct a new queue over the same DB. It should recover
-	// the outstanding markers and enqueue them on Init.
-	//
-	// NOTE: This actually simulates a restart at the component level by discarding the first
-	// CodeRequestQueue (which holds all in-memory state: channels, outstanding, etc.)
-	// and constructing a new one over the same DB handle. Given that the DB is the single source
-	// of truth for the "to-fetch" markers, the new queue immediately recovers the markers and
-	// enqueues them on Init.
-	q2, err := NewCodeQueue(db, make(chan struct{}))
-	require.NoError(t, err)
-
-	recovered := make(map[common.Hash]struct{}, num)
-	for i := 0; i < num; i++ {
-		recovered[<-q2.CodeHashes()] = struct{}{}
-	}
-
-	for _, h := range inputs {
-		if _, ok := recovered[h]; !ok {
-			t.Fatalf("missing recovered hash %v", h)
-		}
-	}
-
-	q2.Finalize()
-	_, ok := <-q2.CodeHashes()
-	require.False(t, ok)
-}
-
-// Early quit closes the output channel and Finalize reports early-exit error.
-func TestCodeQueue_EarlyQuitClosesOutput(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-	quit := make(chan struct{})
-	q, err := NewCodeQueue(db, quit)
-	require.NoError(t, err)
-
-	// Trigger early shutdown before Finalize.
-	close(quit)
-
-	// CodeHashes channel should close eventually; non-blocking poll until closed or timeout.
-	done := make(chan struct{})
-	go func() {
-		// Drain until channel closes to observe closure on early quit.
-		for range q.CodeHashes() {
-		}
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		// proceed
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for CodeHashes channel to close on early quit")
-	}
-
-	// Finalize should report early-exit error since quit already closed.
-	err = q.Finalize()
-	require.ErrorIs(t, err, errFailedToFinalizeCodeQueue)
-
-	// AddCode should fail after shutdown.
-	codeBytes := utils.RandomBytes(8)
-	h := crypto.Keccak256Hash(codeBytes)
-	err = q.AddCode([]common.Hash{h})
-	require.ErrorIs(t, err, errFailedToAddCodeHashesToQueue)
-}
-
-// Clean Finalize closes the output channel and rejects further AddCode calls appropriately.
-func TestCodeQueue_CleanFinalizeClosesOutput(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-	q, err := NewCodeQueue(db, make(chan struct{}))
-	require.NoError(t, err)
-
-	require.NoError(t, q.Finalize())
-	_, ok := <-q.CodeHashes()
-	require.False(t, ok)
 }
