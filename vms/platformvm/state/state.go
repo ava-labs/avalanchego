@@ -1592,13 +1592,7 @@ func (s *state) ApplyValidatorPublicKeyDiffsByHeight(
 			break
 		}
 
-		vdrs, ok := allValidators[subnetID]
-		if !ok {
-			// A subnet that is eventually removed from the map for having no validators may have a key diff before it was removed
-			continue
-		}
-
-		vdr, ok := vdrs[nodeID]
+		vdr, ok := allValidators[subnetID][nodeID]
 		if !ok {
 			// A validator that is eventually removed may have a key diff before it was removed
 			continue
