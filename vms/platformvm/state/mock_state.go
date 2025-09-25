@@ -149,6 +149,34 @@ func (mr *MockStateMockRecorder) AddUTXO(utxo any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUTXO", reflect.TypeOf((*MockState)(nil).AddUTXO), utxo)
 }
 
+// ApplyAllValidatorPublicKeyDiffs mocks base method.
+func (m *MockState) ApplyAllValidatorPublicKeyDiffs(ctx context.Context, validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, startHeight, endHeight uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ApplyAllValidatorPublicKeyDiffs", ctx, validators, startHeight, endHeight)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ApplyAllValidatorPublicKeyDiffs indicates an expected call of ApplyAllValidatorPublicKeyDiffs.
+func (mr *MockStateMockRecorder) ApplyAllValidatorPublicKeyDiffs(ctx, validators, startHeight, endHeight any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyAllValidatorPublicKeyDiffs", reflect.TypeOf((*MockState)(nil).ApplyAllValidatorPublicKeyDiffs), ctx, validators, startHeight, endHeight)
+}
+
+// ApplyAllValidatorWeightDiffs mocks base method.
+func (m *MockState) ApplyAllValidatorWeightDiffs(ctx context.Context, validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, startHeight, endHeight uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ApplyAllValidatorWeightDiffs", ctx, validators, startHeight, endHeight)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ApplyAllValidatorWeightDiffs indicates an expected call of ApplyAllValidatorWeightDiffs.
+func (mr *MockStateMockRecorder) ApplyAllValidatorWeightDiffs(ctx, validators, startHeight, endHeight any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyAllValidatorWeightDiffs", reflect.TypeOf((*MockState)(nil).ApplyAllValidatorWeightDiffs), ctx, validators, startHeight, endHeight)
+}
+
 // ApplyValidatorPublicKeyDiffs mocks base method.
 func (m *MockState) ApplyValidatorPublicKeyDiffs(ctx context.Context, validators map[ids.NodeID]*validators.GetValidatorOutput, startHeight, endHeight uint64, subnetID ids.ID) error {
 	m.ctrl.T.Helper()
@@ -163,20 +191,6 @@ func (mr *MockStateMockRecorder) ApplyValidatorPublicKeyDiffs(ctx, validators, s
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyValidatorPublicKeyDiffs", reflect.TypeOf((*MockState)(nil).ApplyValidatorPublicKeyDiffs), ctx, validators, startHeight, endHeight, subnetID)
 }
 
-// ApplyValidatorPublicKeyDiffsByHeight mocks base method.
-func (m *MockState) ApplyValidatorPublicKeyDiffsByHeight(ctx context.Context, validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, startHeight, endHeight uint64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ApplyValidatorPublicKeyDiffsByHeight", ctx, validators, startHeight, endHeight)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ApplyValidatorPublicKeyDiffsByHeight indicates an expected call of ApplyValidatorPublicKeyDiffsByHeight.
-func (mr *MockStateMockRecorder) ApplyValidatorPublicKeyDiffsByHeight(ctx, validators, startHeight, endHeight any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyValidatorPublicKeyDiffsByHeight", reflect.TypeOf((*MockState)(nil).ApplyValidatorPublicKeyDiffsByHeight), ctx, validators, startHeight, endHeight)
-}
-
 // ApplyValidatorWeightDiffs mocks base method.
 func (m *MockState) ApplyValidatorWeightDiffs(ctx context.Context, validators map[ids.NodeID]*validators.GetValidatorOutput, startHeight, endHeight uint64, subnetID ids.ID) error {
 	m.ctrl.T.Helper()
@@ -189,20 +203,6 @@ func (m *MockState) ApplyValidatorWeightDiffs(ctx context.Context, validators ma
 func (mr *MockStateMockRecorder) ApplyValidatorWeightDiffs(ctx, validators, startHeight, endHeight, subnetID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyValidatorWeightDiffs", reflect.TypeOf((*MockState)(nil).ApplyValidatorWeightDiffs), ctx, validators, startHeight, endHeight, subnetID)
-}
-
-// ApplyValidatorWeightDiffsByHeight mocks base method.
-func (m *MockState) ApplyValidatorWeightDiffsByHeight(ctx context.Context, validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, startHeight, endHeight uint64) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ApplyValidatorWeightDiffsByHeight", ctx, validators, startHeight, endHeight)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ApplyValidatorWeightDiffsByHeight indicates an expected call of ApplyValidatorWeightDiffsByHeight.
-func (mr *MockStateMockRecorder) ApplyValidatorWeightDiffsByHeight(ctx, validators, startHeight, endHeight any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyValidatorWeightDiffsByHeight", reflect.TypeOf((*MockState)(nil).ApplyValidatorWeightDiffsByHeight), ctx, validators, startHeight, endHeight)
 }
 
 // Checksum mocks base method.
