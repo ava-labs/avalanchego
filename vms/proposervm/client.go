@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
@@ -15,15 +16,24 @@ type Client struct {
 	Requester rpc.EndpointRequester
 }
 
-// NewClient returns a Client for interacting with the ProposerVM API.
-// The provided blockchainName should be the blockchainID or an alias (e.g. "P" for the P-Chain).
-func NewClient(uri string, blockchainName string) *Client {
+// NewClient returns a Client for interacting with the json API.
+//
+// The provided chain should be the chainID or an alias. Such as "P" for the
+// P-Chain.
+func NewClient(uri string, chain string) *Client {
+	path := fmt.Sprintf(
+		"%s/ext/%s/%s%s",
+		uri,
+		constants.ChainAliasPrefix,
+		chain,
+		HTTPPathEndpoint,
+	)
 	return &Client{
-		Requester: rpc.NewEndpointRequester(uri + fmt.Sprintf("/ext/bc/%s/proposervm", blockchainName)),
+		Requester: rpc.NewEndpointRequester(path),
 	}
 }
 
-// GetProposedHeight returns the current height of this node's proposer VM.
+// GetProposedHeight P-chain height this node would propose in the next block.
 func (c *Client) GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {
 	res := &api.GetHeightResponse{}
 	err := c.Requester.SendRequest(ctx, "proposervm.getProposedHeight", struct{}{}, res, options...)

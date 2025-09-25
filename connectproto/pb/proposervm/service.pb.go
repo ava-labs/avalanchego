@@ -4,8 +4,6 @@
 // 	protoc        (unknown)
 // source: proposervm/service.proto
 
-// The ProposerVM package defines RPCs for interacting with the ProposerVM service.
-
 package proposervm
 
 import (

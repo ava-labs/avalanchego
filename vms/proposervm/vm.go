@@ -42,6 +42,9 @@ import (
 )
 
 const (
+	HTTPPathEndpoint = "/proposervm"
+	HTTPHeaderRoute  = "proposervm"
+
 	// DefaultMinBlockDelay should be kept as whole seconds because block
 	// timestamps are only specific to the second.
 	DefaultMinBlockDelay = time.Second
@@ -50,8 +53,6 @@ const (
 	DefaultNumHistoricalBlocks uint64 = 0
 
 	innerBlkCacheSize = 64 * units.MiB
-
-	HTTPHeaderRoute = "proposervm"
 )
 
 var (
@@ -261,12 +262,15 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
 	server.RegisterInterceptFunc(metrics.InterceptRequest)
 	server.RegisterAfterFunc(metrics.AfterRequest)
-	err = server.RegisterService(&ProposerAPI{vm: vm}, "proposervm")
+	err = server.RegisterService(&jsonService{vm: vm}, "proposervm")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register proposervm service: %w", err)
 	}
-	handlers["/proposervm"] = server
 
+	if handlers == nil {
+		handlers = make(map[string]http.Handler)
+	}
+	handlers[HTTPPathEndpoint] = server
 	return handlers, nil
 }
 
@@ -281,7 +285,7 @@ func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
 	proposerMux := http.NewServeMux()
 
 	// Add ProposerVM specific handlers to proposerMux
-	service := &service{vm: vm}
+	service := &grpcService{vm: vm}
 	proposerVMPath, proposerVMHandler := proposervmconnect.NewProposerVMHandler(service)
 	vm.ctx.Log.Info("Registering ProposerVM Connect handler", zap.String("path", proposerVMPath))
 	proposerMux.Handle(proposerVMPath, proposerVMHandler)
