@@ -287,6 +287,7 @@ jobs:
     name: Build avalanchego on GitHub runner
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Build avalanchego
         id: build
         uses: ./.github/actions/avalanchego-build-action
@@ -305,6 +306,7 @@ jobs:
     name: Setup mode on GitHub runner
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Setup AvalancheGo
         uses: ./.github/actions/avalanchego-build-action
         with:
