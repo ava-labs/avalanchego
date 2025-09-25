@@ -94,8 +94,11 @@ runs:
         # Extract binary path from script output
         BINARY_PATH=$(echo "$OUTPUT" | grep "BINARY_PATH=" | cut -d'=' -f2)
 
+        # Convert to absolute path to avoid relative pathing issues
+        ABSOLUTE_BINARY_PATH=$(realpath "$BINARY_PATH")
+
         # Set output for consumer use
-        echo "binary-path=$BINARY_PATH" >> $GITHUB_OUTPUT
+        echo "binary-path=$ABSOLUTE_BINARY_PATH" >> $GITHUB_OUTPUT
     - name: Upload binary artifact (BUILD mode)
       if: inputs.target != ''
       uses: actions/upload-artifact@v4

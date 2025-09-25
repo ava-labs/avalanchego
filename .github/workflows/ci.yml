@@ -307,6 +307,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-nix
       - name: Setup AvalancheGo
         uses: ./.github/actions/avalanchego-build-action
         with:
@@ -342,5 +343,8 @@ jobs:
           ./scripts/run_task.sh build
           echo "Manual build completed successfully"
       - name: Run avalanchego
+        shell: nix develop --command bash -x {0}
         run: |
+          echo "=== Debug ==="
+          ls -lah
           ./build/avalanchego --help
