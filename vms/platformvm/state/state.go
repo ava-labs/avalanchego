@@ -1416,7 +1416,7 @@ func (s *state) ApplyValidatorWeightDiffsByHeight(
 	endHeight uint64,
 ) error {
 	diffIter := s.validatorPublicKeyDiffsByHeightDB.NewIteratorWithStart(
-		marshalStartDiffKey2(startHeight),
+		marshalStartDiffKeyByHeight(startHeight),
 	)
 	defer diffIter.Release()
 
@@ -1426,7 +1426,7 @@ func (s *state) ApplyValidatorWeightDiffsByHeight(
 			return err
 		}
 
-		parsedHeight, subnetID, nodeID, err := unmarshalDiffKey2(diffIter.Key())
+		parsedHeight, subnetID, nodeID, err := unmarshalDiffKeyByHeight(diffIter.Key())
 		if err != nil {
 			return err
 		}
@@ -1493,7 +1493,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 			return err
 		}
 
-		_, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
+		_, parsedHeight, nodeID, err := unmarshalDiffKeyBySubnet(diffIter.Key())
 		if err != nil {
 			return err
 		}
@@ -1573,7 +1573,7 @@ func (s *state) ApplyValidatorPublicKeyDiffsByHeight(
 	endHeight uint64,
 ) error {
 	diffIter := s.validatorPublicKeyDiffsDB.NewIteratorWithStart(
-		marshalStartDiffKey2(startHeight),
+		marshalStartDiffKeyByHeight(startHeight),
 	)
 	defer diffIter.Release()
 
@@ -1582,7 +1582,7 @@ func (s *state) ApplyValidatorPublicKeyDiffsByHeight(
 			return err
 		}
 
-		parsedHeight, subnetID, nodeID, err := unmarshalDiffKey2(diffIter.Key())
+		parsedHeight, subnetID, nodeID, err := unmarshalDiffKeyByHeight(diffIter.Key())
 		if err != nil {
 			return err
 		}
@@ -1606,9 +1606,6 @@ func (s *state) ApplyValidatorPublicKeyDiffsByHeight(
 		}
 	}
 
-	// Note: this does not fallback to the linkeddb index because the linkeddb
-	// index does not contain entries for when to remove the public key.
-	//
 	// Nodes may see inconsistent public keys for heights before the new public
 	// key index was populated.
 	return diffIter.Error()
@@ -1632,7 +1629,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 			return err
 		}
 
-		_, parsedHeight, nodeID, err := unmarshalDiffKey(diffIter.Key())
+		_, parsedHeight, nodeID, err := unmarshalDiffKeyBySubnet(diffIter.Key())
 		if err != nil {
 			return err
 		}
@@ -2723,11 +2720,20 @@ func (s *state) writeValidatorDiffs(height uint64) error {
 
 	// Write the changes to the database
 	for subnetIDNodeID, diff := range changes {
-		diffKey := marshalDiffKey(subnetIDNodeID.subnetID, height, subnetIDNodeID.nodeID)
+		diffKey := marshalDiffKeyBySubnet(subnetIDNodeID.subnetID, height, subnetIDNodeID.nodeID)
+		diffKey2 := marshalDiffKeyByHeight(height, subnetIDNodeID.subnetID, subnetIDNodeID.nodeID)
 		if diff.weightDiff.Amount != 0 {
+			weightDiff := marshalWeightDiff(&diff.weightDiff)
 			err := s.validatorWeightDiffsDB.Put(
 				diffKey,
-				marshalWeightDiff(&diff.weightDiff),
+				weightDiff,
+			)
+			if err != nil {
+				return err
+			}
+			err = s.validatorWeightDiffsByHeightDB.Put(
+				diffKey2,
+				weightDiff,
 			)
 			if err != nil {
 				return err
@@ -2741,19 +2747,7 @@ func (s *state) writeValidatorDiffs(height uint64) error {
 			if err != nil {
 				return err
 			}
-		}
-		diffKey2 := marshalDiffKey2(height, subnetIDNodeID.subnetID, subnetIDNodeID.nodeID)
-		if diff.weightDiff.Amount != 0 {
-			err := s.validatorWeightDiffsByHeightDB.Put(
-				diffKey2,
-				marshalWeightDiff(&diff.weightDiff),
-			)
-			if err != nil {
-				return err
-			}
-		}
-		if !bytes.Equal(diff.prevPublicKey, diff.newPublicKey) {
-			err := s.validatorPublicKeyDiffsByHeightDB.Put(
+			err = s.validatorPublicKeyDiffsByHeightDB.Put(
 				diffKey2,
 				diff.prevPublicKey,
 			)

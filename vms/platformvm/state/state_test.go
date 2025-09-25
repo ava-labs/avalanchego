@@ -514,7 +514,7 @@ func TestState_writeStakers(t *testing.T) {
 				)
 
 				for subnetIDNodeID, expectedDiff := range test.expectedValidatorDiffs {
-					diffKey := marshalDiffKey(subnetIDNodeID.subnetID, 1, subnetIDNodeID.nodeID)
+					diffKey := marshalDiffKeyBySubnet(subnetIDNodeID.subnetID, 1, subnetIDNodeID.nodeID)
 					weightDiffBytes, err := state.validatorWeightDiffsDB.Get(diffKey)
 					if expectedDiff.weightDiff.Amount == 0 {
 						require.ErrorIs(err, database.ErrNotFound)
