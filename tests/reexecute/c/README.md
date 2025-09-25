@@ -6,7 +6,7 @@ AvalancheGo provides a [Taskfile](https://taskfile.dev/) with commands to manage
 
 ## Prerequisites
 
-Configure your AvalancheGo dev environment requires:
+Configuring your AvalancheGo dev environment requires:
 
 - Nix
 - AWS Credentials
@@ -42,7 +42,7 @@ export AWS_REGION=us-east-2
 
 ### Metrics Collection
 
-To support metrics collection (disabled by default), re-execution requires Prometheus credentials to be exported to the environment. Follow the instructions in the e2e [README](../../e2e/README.md#monitoring) to support metrics collection.
+If running with metrics collection, enabled in CI and configured locally with `METRICS_ENABLED=true`, follow the instructions in the e2e [README](../../e2e/README.md#monitoring) to set the required Prometheus environment variables.
 
 ## Quick Start
 
@@ -118,7 +118,7 @@ export EXECUTION_DATA_DIR=$HOME/.reexecute-cchain/walkthrough
 task import-s3-to-dir SRC=s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/** DST=$EXECUTION_DATA_DIR/blocks
 ```
 
-Next, we need to want to execute the range of blocks [1, N]. We use 1 as the initial start block, since VM initialization typically vacuously executes the genesis block.
+Next, we need to want to execute the range of blocks [1, N]. We use 1 as the initial start block, since VM initialization vacuously executes the genesis block.
 
 We can execute an arbitrary range [N, N+K] provided we have the required inputs:
 
