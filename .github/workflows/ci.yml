@@ -294,7 +294,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y xz-utils build-essential
       - uses: actions/checkout@v4
-      - name: Build avalanchego
+      - name: Build reexecution bench
         id: build
         uses: ./.github/actions/avalanchego-build-action
         with:
@@ -310,7 +310,7 @@ jobs:
           echo "Binary verified successfully"
   self-hosted-setup-mode:
     name: Setup mode on self-hosted runner
-    runs-on: ubuntu-latest
+    runs-on: avalanche-avalanchego-runner
     container:
       image: ghcr.io/actions/actions-runner:2.325.0
     steps:
