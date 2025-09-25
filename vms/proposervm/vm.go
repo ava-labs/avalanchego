@@ -82,8 +82,6 @@ type VM struct {
 	ctx *snow.Context
 	db  *versiondb.Database
 
-	metrics metric.APIInterceptor
-
 	// Block ID --> Block
 	// Each element is a block that passed verification but
 	// hasn't yet been accepted/rejected
@@ -150,10 +148,6 @@ func (vm *VM) Initialize(
 	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer)
 	if err != nil {
 		return err
-	}
-	vm.metrics, err = metric.NewAPIInterceptor(vm.Config.Registerer)
-	if err != nil {
-		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
 	vm.State = baseState
 	vm.Windower = proposer.New(chainCtx.ValidatorState, chainCtx.SubnetID, chainCtx.ChainID)
@@ -257,11 +251,16 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 		return nil, fmt.Errorf("failed to create inner VM handlers: %w", err)
 	}
 
+	metrics, err := metric.NewAPIInterceptor(vm.Config.Registerer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize metrics: %w", err)
+	}
+
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	server.RegisterInterceptFunc(vm.metrics.InterceptRequest)
-	server.RegisterAfterFunc(vm.metrics.AfterRequest)
+	server.RegisterInterceptFunc(metrics.InterceptRequest)
+	server.RegisterAfterFunc(metrics.AfterRequest)
 	err = server.RegisterService(&ProposerAPI{vm: vm}, "proposervm")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register proposervm service: %w", err)
