@@ -57,14 +57,10 @@ type statelessUnsignedBlock struct {
 }
 
 type statelessUnsignedGraniteBlock struct {
-	ParentID            ids.ID `serialize:"true" json:"parentID"`
-	Timestamp           int64  `serialize:"true" json:"timestamp"`
-	PChainHeight        uint64 `serialize:"true" json:"pChainHeight"`
-	Certificate         []byte `serialize:"true" json:"certificate"`
-	Block               []byte `serialize:"true" json:"block"`
-	EpochNumber         uint64 `serialize:"true" json:"epochNumber"`
-	EpochStartTimestamp int64  `serialize:"true" json:"epochStartTimestamp"`
-	EpochHeight         uint64 `serialize:"true" json:"epochHeight"`
+	StatelessBlock      statelessUnsignedBlock `serialize:"true" json:"statelessBlock"`
+	EpochNumber         uint64                 `serialize:"true" json:"epochNumber"`
+	EpochStartTimestamp int64                  `serialize:"true" json:"epochStartTimestamp"`
+	EpochHeight         uint64                 `serialize:"true" json:"epochHeight"`
 }
 
 type Epoch struct {
@@ -85,8 +81,8 @@ type statelessBlock struct {
 }
 
 type statelessGraniteBlock struct {
-	StatelessBlock statelessUnsignedGraniteBlock `serialize:"true" json:"statelessBlock"`
-	Signature      []byte                        `serialize:"true" json:"signature"`
+	StatelessGraniteBlock statelessUnsignedGraniteBlock `serialize:"true" json:"statelessGraniteBlock"`
+	Signature             []byte                        `serialize:"true" json:"signature"`
 
 	id        ids.ID
 	timestamp time.Time
@@ -190,22 +186,22 @@ func (b *statelessGraniteBlock) ID() ids.ID {
 }
 
 func (b *statelessGraniteBlock) ParentID() ids.ID {
-	return b.StatelessBlock.ParentID
+	return b.StatelessGraniteBlock.StatelessBlock.ParentID
 }
 
 func (b *statelessGraniteBlock) Block() []byte {
-	return b.StatelessBlock.Block
+	return b.StatelessGraniteBlock.StatelessBlock.Block
 }
 
 func (b *statelessGraniteBlock) PChainHeight() uint64 {
-	return b.StatelessBlock.PChainHeight
+	return b.StatelessGraniteBlock.StatelessBlock.PChainHeight
 }
 
 func (b *statelessGraniteBlock) PChainEpoch() Epoch {
 	return Epoch{
-		PChainHeight: b.StatelessBlock.EpochHeight,
-		Number:       b.StatelessBlock.EpochNumber,
-		StartTime:    time.Unix(b.StatelessBlock.EpochStartTimestamp, 0),
+		PChainHeight: b.StatelessGraniteBlock.EpochHeight,
+		Number:       b.StatelessGraniteBlock.EpochNumber,
+		StartTime:    time.Unix(b.StatelessGraniteBlock.EpochStartTimestamp, 0),
 	}
 }
 
@@ -245,13 +241,15 @@ func (b *statelessGraniteBlock) initialize(bytes []byte) error {
 	unsignedBytes := bytes[:lenUnsignedBytes]
 	b.id = hashing.ComputeHash256Array(unsignedBytes)
 
-	b.timestamp = time.Unix(b.StatelessBlock.Timestamp, 0)
-	if len(b.StatelessBlock.Certificate) == 0 {
+	statelessBlock := b.StatelessGraniteBlock.StatelessBlock
+
+	b.timestamp = time.Unix(statelessBlock.Timestamp, 0)
+	if len(statelessBlock.Certificate) == 0 {
 		return nil
 	}
 
 	var err error
-	b.cert, err = staking.ParseCertificate(b.StatelessBlock.Certificate)
+	b.cert, err = staking.ParseCertificate(statelessBlock.Certificate)
 	if err != nil {
 		return fmt.Errorf("%w: %w", errInvalidCertificate, err)
 	}
@@ -263,14 +261,15 @@ func (b *statelessGraniteBlock) initialize(bytes []byte) error {
 // This is the same as the statelessBlock.verify method. Combining them would require
 // ~5 more private methods on the SignedBlock interface.
 func (b *statelessGraniteBlock) verify(chainID ids.ID) error {
-	if len(b.StatelessBlock.Certificate) == 0 {
+	statelessBlock := b.StatelessGraniteBlock.StatelessBlock
+	if len(statelessBlock.Certificate) == 0 {
 		if len(b.Signature) > 0 {
 			return errUnexpectedSignature
 		}
 		return nil
 	}
 
-	header, err := BuildHeader(chainID, b.StatelessBlock.ParentID, b.id)
+	header, err := BuildHeader(chainID, statelessBlock.ParentID, b.id)
 	if err != nil {
 		return err
 	}
