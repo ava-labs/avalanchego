@@ -233,7 +233,7 @@ func (be *blockExtension) CleanupVerified() error {
 	if err != nil {
 		// If atomic state doesn't exist, it means verification failed before
 		// the state was created, so there's nothing to clean up
-		return nil
+		return nil //nolint:nilerr
 	}
 	return atomicState.Reject()
 }
