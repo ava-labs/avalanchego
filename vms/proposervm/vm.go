@@ -50,6 +50,8 @@ const (
 	DefaultNumHistoricalBlocks uint64 = 0
 
 	innerBlkCacheSize = 64 * units.MiB
+
+	HTTPHeaderRoute = "proposervm"
 )
 
 var (
@@ -294,34 +296,21 @@ func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
 
 	// Create header-based router
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		route := r.Header[server.HTTPHeaderRoute]
 		vm.ctx.Log.Info("ProposerVM routing request",
 			zap.String("method", r.Method),
 			zap.String("path", r.URL.Path),
-			zap.String("header", r.Header.Get(server.HTTPHeaderRoute)),
+			zap.Strings("header", route),
 		)
-
-		// Check for routing header
-		route, ok := r.Header[server.HTTPHeaderRoute]
-		if !ok {
-			// No routing header - fall back to path-based routing for ProposerVM
-			// This maintains backward compatibility
-			proposerMux.ServeHTTP(w, r)
-			return
-		}
-
-		if len(route) < 2 {
-			innerHandler.ServeHTTP(w, r)
-			return
-		}
-
-		for _, routeValue := range route {
-			if routeValue == "proposervm" {
-				proposerMux.ServeHTTP(w, r)
-				return
+		if len(route) < 2 || route[1] != HTTPHeaderRoute {
+			if innerHandler != nil {
+				innerHandler.ServeHTTP(w, r)
+			} else {
+				w.WriteHeader(http.StatusNotFound)
 			}
+			return
 		}
-
-		innerHandler.ServeHTTP(w, r)
+		proposerMux.ServeHTTP(w, r)
 	}), nil
 }
 

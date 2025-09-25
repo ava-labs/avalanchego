@@ -14,6 +14,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/api/connectclient"
 	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm"
 	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
 	"github.com/ava-labs/avalanchego/database"
@@ -94,6 +95,9 @@ func TestGetProposedHeight(t *testing.T) {
 	client := proposervmconnect.NewProposerVMClient(
 		http.DefaultClient,
 		server.URL,
+		connect.WithInterceptors(
+			connectclient.SetRouteHeaderInterceptor{Route: []string{"dummy-chain-id", HTTPHeaderRoute}},
+		),
 	)
 
 	// Test the GetProposedHeight endpoint

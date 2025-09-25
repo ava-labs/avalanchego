@@ -12,8 +12,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/api/connectclient"
-	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm"
+	pbproposervm "github.com/ava-labs/avalanchego/connectproto/pb/proposervm"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
+	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/vms/proposervm"
 
 	pb "github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
 )
@@ -22,25 +25,22 @@ var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("ProposerVMAPI"), fu
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
-	ginkgo.It("should advance the proposervm epoch according to the upgrade config epoch duration", func() {
+	setupProposerVMTest := func() (avalancheCChainID ids.ID, nodeURI tmpnet.NodeURI) {
 		var (
-			env     = e2e.GetEnv(tc)
-			nodeURI = env.GetRandomNodeURI()
+			env = e2e.GetEnv(tc)
 		)
+		nodeURI = env.GetRandomNodeURI()
 
-		// Get the proper Avalanche C-Chain ID for routing (not the Ethereum chain ID)
+		// Get the proper Avalanche C-Chain ID for routing
 		keychain := env.NewKeychain()
 		baseWallet := e2e.NewWallet(tc, keychain, nodeURI)
 		cWallet := baseWallet.C()
 		cBuilder := cWallet.Builder()
 		cContext := cBuilder.Context()
-		avalancheCChainID := cContext.BlockchainID
+		avalancheCChainID = cContext.BlockchainID
 
-		// First, create an ethereum client and send some transactions to trigger block production
-		// This ensures the ProposerVM has forked and has some proposer blocks
+		// Send transactions to trigger block production and ProposerVM fork
 		ethClient := e2e.NewEthClient(tc, nodeURI)
-
-		// Send a few transactions to ensure block production and ProposerVM fork
 		senderKey := env.PreFundedKey
 		senderEthAddress := senderKey.EthAddress()
 		recipientKey := e2e.NewPrivateKey(tc)
@@ -54,7 +54,7 @@ var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("ProposerVMAPI"), fu
 			tx := types.NewTransaction(
 				nonce,
 				recipientEthAddress,
-				big.NewInt(1000000000000000), // 0.001 ETH
+				big.NewInt(1000000000000000),
 				e2e.DefaultGasLimit,
 				gasPrice,
 				nil,
@@ -72,16 +72,34 @@ var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("ProposerVMAPI"), fu
 			require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
 		}
 
-		// Now test the ProposerVM API - it should work since we have proposer blocks
+		return avalancheCChainID, nodeURI
+	}
+
+	ginkgo.It("should advance the proposervm epoch according to the upgrade config epoch duration", func() {
+		// Set up environment and trigger block production
+		avalancheCChainID, nodeURI := setupProposerVMTest()
+
+		// Test the ProposerVM Connect RPC API
 		proposerClient := pb.NewProposerVMClient(
 			connectclient.New(),
 			nodeURI.URI,
 			connect.WithInterceptors(
-				connectclient.SetRouteHeaderInterceptor{Route: []string{avalancheCChainID.String(), "proposervm"}},
+				connectclient.SetRouteHeaderInterceptor{Route: []string{avalancheCChainID.String(), proposervm.HTTPHeaderRoute}},
 			),
 		)
-		resp, err := proposerClient.GetProposedHeight(tc.DefaultContext(), &connect.Request[proposervm.GetProposedHeightRequest]{})
+		resp, err := proposerClient.GetProposedHeight(tc.DefaultContext(), &connect.Request[pbproposervm.GetProposedHeightRequest]{})
 		require.NoError(err)
 		require.Positive(resp.Msg.Height, "proposervm height should be greater than 0")
+	})
+
+	ginkgo.It("should provide JSON-RPC API for ProposerVM", ginkgo.Label("ProposerVMAPI"), func() {
+		// Set up environment and trigger block production
+		avalancheCChainID, nodeURI := setupProposerVMTest()
+
+		// Test the ProposerVM JSON-RPC API
+		client := proposervm.NewClient(nodeURI.URI, avalancheCChainID.String())
+		height, err := client.GetProposedHeight(tc.DefaultContext())
+		require.NoError(err)
+		require.Positive(height, "proposervm height should be greater than 0")
 	})
 })
