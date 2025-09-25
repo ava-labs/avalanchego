@@ -144,25 +144,8 @@ func (m *manager) AddWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) e
 		return ErrZeroWeight
 	}
 
-	// We do not need to grab a write lock here because we never modify the
-	// subnetToVdrs map. However, we must hold the read lock during the entirety
-	// of this function to ensure that errors are returned consistently.
-	//
-	// Consider the case that:
-	//	AddStaker(subnetID, nodeID, 1)
-	//	go func() {
-	//		AddWeight(subnetID, nodeID, 1)
-	//	}
-	//	go func() {
-	//		RemoveWeight(subnetID, nodeID, 1)
-	//	}
-	//
-	// In this case, after both goroutines have finished, either AddWeight
-	// should have errored, or the weight of the node should equal 1. It would
-	// be unexpected to not have received an error from AddWeight but for the
-	// node to no longer be tracked as a validator.
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
 	set, exists := m.subnetToVdrs[subnetID]
 	if !exists {
