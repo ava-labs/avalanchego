@@ -14,10 +14,6 @@ inputs:
     description: 'Directory path where AvalancheGo will be checked out'
     required: false
     default: 'avalanchego'
-  avalanchego:
-    description: 'AvalancheGo version (commit SHA, branch name, or tag)'
-    required: false
-    default: 'main'
   firewood:
     description: 'Firewood version (commit SHA, branch, tag). Consumer should run Firewood shared workflow first.'
     required: false
@@ -25,7 +21,7 @@ inputs:
   coreth:
     description: 'Coreth version (commit SHA, branch name, or tag)'
     required: false
-    default: 'main'
+    default: 'master'
   libevm:
     description: 'LibEVM version (commit SHA, branch name, or tag)'
     required: false
@@ -39,12 +35,6 @@ outputs:
 runs:
   using: 'composite'
   steps:
-    - name: Checkout AvalancheGo
-      uses: actions/checkout@v4
-      with:
-        repository: 'ava-labs/avalanchego'
-        ref: ${{ inputs.avalanchego }}
-        path: ${{ inputs.checkout-path }}
     - name: Checkout Coreth
       if: inputs.coreth != 'master'
       uses: actions/checkout@v4
