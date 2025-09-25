@@ -71,6 +71,9 @@ runs:
           echo "END_BLOCK=${{ inputs.end-block }}"
           echo "BLOCK_DIR_SRC=${{ inputs.block-dir-src }}"
           echo "CURRENT_STATE_DIR_SRC=${{ inputs.current-state-dir-src }}"
+          echo "CONFIG=${{ inputs.config }}"
+          echo "METRICS_ENABLED=true"
+          echo "RUNNER_NAME=${{ inputs.runner_name }}"
         } >> $GITHUB_ENV
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
