@@ -127,7 +127,6 @@ func NewManager(
 		state:   state,
 		metrics: metrics,
 		clk:     clk,
-		cache:   lru.NewCache[uint64, map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput](validatorSetsCacheSize),
 		caches:  make(map[ids.ID]cache.Cacher[uint64, map[ids.NodeID]*validators.GetValidatorOutput]),
 		recentlyAccepted: window.New[ids.ID](
 			window.Config{
@@ -147,9 +146,6 @@ type manager struct {
 	state   State
 	metrics metrics.Metrics
 	clk     *mockable.Clock
-
-	// Caches all validator sets at a given height.
-	cache cache.Cacher[uint64, map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput]
 
 	// Maps caches for each subnet that is currently tracked.
 	// Key: Subnet ID
@@ -214,6 +210,14 @@ func (m *manager) getCurrentHeight(context.Context) (uint64, error) {
 	return lastAccepted.Height(), nil
 }
 
+func (m *manager) GetAllValidatorSets(
+	ctx context.Context,
+	targetHeight uint64,
+) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	// TODO implement caching of all validator sets here
+	return m.makeAllValidatorSets(ctx, targetHeight)
+}
+
 func (m *manager) GetValidatorSet(
 	ctx context.Context,
 	targetHeight uint64,
@@ -264,13 +268,13 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 func (m *manager) makeAllValidatorSets(
 	ctx context.Context,
 	targetHeight uint64,
-) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
+) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, error) {
 	allValidators, currentHeight, err := m.getAllCurrentValidatorSets(ctx)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 	if currentHeight < targetHeight {
-		return nil, 0, fmt.Errorf("%w: current P-chain height (%d) < requested P-Chain height (%d)",
+		return nil, fmt.Errorf("%w: current P-chain height (%d) < requested P-Chain height (%d)",
 			errUnfinalizedHeight,
 			currentHeight,
 			targetHeight,
@@ -291,7 +295,7 @@ func (m *manager) makeAllValidatorSets(
 		lastDiffHeight,
 	)
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	err = m.state.ApplyAllValidatorPublicKeyDiffs(
@@ -300,7 +304,7 @@ func (m *manager) makeAllValidatorSets(
 		currentHeight,
 		lastDiffHeight,
 	)
-	return allValidators, currentHeight, err
+	return allValidators, err
 }
 
 func (m *manager) makeValidatorSet(
