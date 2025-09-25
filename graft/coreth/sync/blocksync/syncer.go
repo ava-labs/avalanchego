@@ -20,6 +20,12 @@ const blocksPerRequest = 32
 
 var _ synccommon.Syncer = (*blockSyncer)(nil)
 
+// Name returns the human-readable name for this sync task.
+func (*blockSyncer) Name() string { return "Block Syncer" }
+
+// ID returns the stable identifier for this sync task.
+func (*blockSyncer) ID() string { return "state_block_sync" }
+
 type Config struct {
 	FromHash      common.Hash // `FromHash` is the most recent
 	FromHeight    uint64

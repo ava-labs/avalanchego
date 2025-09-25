@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
@@ -57,13 +58,29 @@ func testSync(t *testing.T, test syncTest) {
 	mockClient.GetLeafsIntercept = test.GetLeafsIntercept
 	mockClient.GetCodeIntercept = test.GetCodeIntercept
 
-	s, err := NewSyncer(mockClient, clientDB, root, Config{
+	// Create the code fetcher.
+	fetcher, err := NewCodeQueue(clientDB, make(chan struct{}))
+	require.NoError(t, err, "failed to create code fetcher")
+
+	// Create the consumer code syncer.
+	codeSyncer, err := NewCodeSyncer(mockClient, clientDB, fetcher.CodeHashes())
+	require.NoError(t, err, "failed to create code syncer")
+
+	cfg := Config{
 		BatchSize:   1000, // Use a lower batch size in order to get test coverage of batches being written early.
 		RequestSize: testRequestSize,
-	})
+	}
+
+	// Create the state syncer.
+	stateSyncer, err := NewSyncer(mockClient, clientDB, root, fetcher, cfg)
 	require.NoError(t, err, "failed to create state syncer")
 
-	err = s.Sync(ctx)
+	// Run both syncers concurrently and wait for the first error.
+	eg, egCtx := errgroup.WithContext(ctx)
+	eg.Go(func() error { return codeSyncer.Sync(egCtx) })
+	eg.Go(func() error { return stateSyncer.Sync(egCtx) })
+
+	err = eg.Wait()
 	require.ErrorIs(t, err, test.expectedError, "unexpected error during sync")
 
 	// Only assert database consistency if the sync was expected to succeed.
@@ -186,7 +203,8 @@ func TestCancelSync(t *testing.T) {
 	// Create trie with 2000 accounts (more than one leaf request)
 	root := fillAccountsWithStorage(t, serverDB, serverTrieDB, common.Hash{}, 2000)
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	t.Cleanup(cancel)
+
 	testSync(t, syncTest{
 		ctx: ctx,
 		prepareForTest: func(*testing.T) (ethdb.Database, ethdb.Database, *triedb.Database, common.Hash) {

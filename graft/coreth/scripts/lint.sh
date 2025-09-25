@@ -148,9 +148,17 @@ function test_require_error_is_no_funcs_as_params {
 }
 
 function test_require_no_error_inline_func {
-  if grep -R -zo -P '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)' "${DEFAULT_FILES[@]}"; then
+  # Flag only when a single variable whose name contains "err" or "Err"
+  # (e.g., err, myErr, parseError) is assigned from a call (:= or =), and later
+  # that same variable is passed to require.NoError(...). We explicitly require
+  # no commas on the LHS to avoid flagging multi-return assignments like
+  # "val, err := f()" or "err, val := f()".
+  #
+  # Capture the variable name and enforce it matches in the subsequent require.NoError.
+  local -r pattern='^\s*([A-Za-z_][A-Za-z0-9_]*[eE]rr[A-Za-z0-9_]*)\s*:?=\s*[^,\n]*\([^)]*\).*\n(?:(?!^\s*(?:if|require)).*\n)*^\s*require\.NoError\((?:t,\s*)?\1\)'
+  if grep -R -zo -P "$pattern" "${DEFAULT_FILES[@]}"; then
     echo ""
-    echo "Checking that a function with a single error return doesn't error should be done in-line."
+    echo "Checking that a function with a single error return doesn't error should be done in-line (single LHS var containing 'err')."
     echo ""
     return 1
   fi
