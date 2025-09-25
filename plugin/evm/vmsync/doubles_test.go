@@ -8,6 +8,8 @@ import (
 	"errors"
 	"sync"
 	"time"
+
+	syncpkg "github.com/ava-labs/coreth/sync"
 )
 
 // FuncSyncer adapts a function to the simple Syncer shape used in tests. It is
@@ -18,6 +20,12 @@ type FuncSyncer struct {
 
 // Sync calls the wrapped function and returns its result.
 func (f FuncSyncer) Sync(ctx context.Context) error { return f.fn(ctx) }
+
+// Name returns the provided name or a default if unspecified.
+func (FuncSyncer) Name() string { return "Test Name" }
+func (FuncSyncer) ID() string   { return "test_id" }
+
+var _ syncpkg.Syncer = FuncSyncer{}
 
 // NewBarrierSyncer returns a syncer that, upon entering Sync, calls wg.Done() to
 // signal it has started, then blocks until either:
