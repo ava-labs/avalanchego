@@ -31,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/tree"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -38,7 +39,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
-	proposervmmetrics "github.com/ava-labs/avalanchego/vms/proposervm/metrics"
 )
 
 const (
@@ -82,7 +82,7 @@ type VM struct {
 	ctx *snow.Context
 	db  *versiondb.Database
 
-	metrics proposervmmetrics.Metrics
+	metrics metric.APIInterceptor
 
 	// Block ID --> Block
 	// Each element is a block that passed verification but
@@ -151,7 +151,7 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
-	vm.metrics, err = proposervmmetrics.New(vm.Config.Registerer)
+	vm.metrics, err = metric.NewAPIInterceptor(vm.Config.Registerer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize metrics: %w", err)
 	}
