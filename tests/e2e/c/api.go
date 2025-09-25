@@ -4,7 +4,10 @@
 package c
 
 import (
+	"math/big"
+
 	"connectrpc.com/connect"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 
@@ -33,6 +36,43 @@ var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("ProposerVMAPI"), fu
 		cContext := cBuilder.Context()
 		avalancheCChainID := cContext.BlockchainID
 
+		// First, create an ethereum client and send some transactions to trigger block production
+		// This ensures the ProposerVM has forked and has some proposer blocks
+		ethClient := e2e.NewEthClient(tc, nodeURI)
+
+		// Send a few transactions to ensure block production and ProposerVM fork
+		senderKey := env.PreFundedKey
+		senderEthAddress := senderKey.EthAddress()
+		recipientKey := e2e.NewPrivateKey(tc)
+		recipientEthAddress := recipientKey.EthAddress()
+
+		for i := 0; i < 3; i++ {
+			// Create and send a simple transaction to trigger block production
+			nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), senderEthAddress)
+			require.NoError(err)
+			gasPrice := e2e.SuggestGasPrice(tc, ethClient)
+			tx := types.NewTransaction(
+				nonce,
+				recipientEthAddress,
+				big.NewInt(1000000000000000), // 0.001 ETH
+				e2e.DefaultGasLimit,
+				gasPrice,
+				nil,
+			)
+
+			// Sign transaction
+			cChainID, err := ethClient.ChainID(tc.DefaultContext())
+			require.NoError(err)
+			signer := types.NewEIP155Signer(cChainID)
+			signedTx, err := types.SignTx(tx, signer, senderKey.ToECDSA())
+			require.NoError(err)
+
+			// Send the transaction and wait for receipt
+			receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
+			require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
+		}
+
+		// Now test the ProposerVM API - it should work since we have proposer blocks
 		proposerClient := pb.NewProposerVMClient(
 			connectclient.New(),
 			nodeURI.URI,

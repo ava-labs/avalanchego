@@ -24,7 +24,7 @@ func (p *ProposerAPI) GetProposedHeight(r *http.Request, _ *struct{}, reply *api
 		zap.String("method", "GetProposedHeight"),
 	)
 
-	log.Debug("Connect RPC called")
+	log.Debug("JSON-RPC called")
 
 	id, err := p.vm.State.GetLastAccepted()
 	if err != nil {
