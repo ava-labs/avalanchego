@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
-	proposervmmetrics "github.com/ava-labs/avalanchego/vms/proposervm/metrics"
 )
 
 const (
@@ -76,8 +75,6 @@ type VM struct {
 
 	ctx *snow.Context
 	db  *versiondb.Database
-
-	metrics proposervmmetrics.Metrics
 
 	// Block ID --> Block
 	// Each element is a block that passed verification but
@@ -142,12 +139,6 @@ func (vm *VM) Initialize(
 ) error {
 	vm.ctx = chainCtx
 	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
-
-	metrics, err := proposervmmetrics.New(vm.Config.Registerer)
-	if err != nil {
-		return err
-	}
-	vm.metrics = metrics
 
 	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer)
 	if err != nil {
@@ -259,8 +250,6 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	server.RegisterInterceptFunc(vm.metrics.InterceptRequest)
-	server.RegisterAfterFunc(vm.metrics.AfterRequest)
 	err = server.RegisterService(&ProposerAPI{vm: vm}, "proposervm")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register proposervm service: %w", err)

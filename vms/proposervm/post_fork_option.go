@@ -113,6 +113,11 @@ func (b *postForkOption) buildChild(ctx context.Context) (Block, error) {
 	}
 	parentEpoch, err := b.pChainEpoch(ctx)
 	if err != nil {
+		b.vm.ctx.Log.Error("unexpected build block failure",
+			zap.String("reason", "failed to fetch parent's epoch"),
+			zap.Stringer("parentID", parentID),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
