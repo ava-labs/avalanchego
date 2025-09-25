@@ -212,7 +212,7 @@ type State interface {
 	) error
 
 	// TODO
-	ApplyValidatorWeightDiffsByHeight(
+	ApplyAllValidatorWeightDiffs(
 		ctx context.Context,
 		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
@@ -220,7 +220,7 @@ type State interface {
 	) error
 
 	// TODO
-	ApplyValidatorPublicKeyDiffsByHeight(
+	ApplyAllValidatorPublicKeyDiffs(
 		ctx context.Context,
 		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
 		startHeight uint64,
@@ -1409,7 +1409,7 @@ func (s *state) SetCurrentSupply(subnetID ids.ID, cs uint64) {
 	}
 }
 
-func (s *state) ApplyValidatorWeightDiffsByHeight(
+func (s *state) ApplyAllValidatorWeightDiffs(
 	ctx context.Context,
 	allValidators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
@@ -1566,7 +1566,7 @@ func applyWeightDiff(
 	return nil
 }
 
-func (s *state) ApplyValidatorPublicKeyDiffsByHeight(
+func (s *state) ApplyAllValidatorPublicKeyDiffs(
 	ctx context.Context,
 	allValidators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
 	startHeight uint64,
