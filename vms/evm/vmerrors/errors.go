@@ -10,5 +10,5 @@ var (
 	ErrBlockVerificationFailed     = errors.New("failed to verify block")
 	ErrWrapBlockFailed             = errors.New("failed to wrap block")
 	ErrInvalidCoinbase             = errors.New("invalid coinbase")
-	ErrSenderAddressNotAllowListed = errors.New("cannot issue transaction from non-allow listed address")
+	ErrSenderAddressNotAllowListed = errors.New("cannot issue transaction from non-allowlisted address")
 )
