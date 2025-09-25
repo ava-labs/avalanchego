@@ -25,8 +25,8 @@ func FuzzMarshalDiffKey(f *testing.F) {
 		fz := fuzzer.NewFuzzer(data)
 		fz.Fill(&subnetID, &height, &nodeID)
 
-		key := marshalDiffKeyBySubnet(subnetID, height, nodeID)
-		parsedSubnetID, parsedHeight, parsedNodeID, err := unmarshalDiffKeyBySubnet(key)
+		key := marshalDiffKeyBySubnetID(subnetID, height, nodeID)
+		parsedSubnetID, parsedHeight, parsedNodeID, err := unmarshalDiffKeyBySubnetID(key)
 		require.NoError(err)
 		require.Equal(subnetID, parsedSubnetID)
 		require.Equal(height, parsedHeight)
@@ -38,13 +38,13 @@ func FuzzUnmarshalDiffKey(f *testing.F) {
 	f.Fuzz(func(t *testing.T, key []byte) {
 		require := require.New(t)
 
-		subnetID, height, nodeID, err := unmarshalDiffKeyBySubnet(key)
+		subnetID, height, nodeID, err := unmarshalDiffKeyBySubnetID(key)
 		if err != nil {
 			require.ErrorIs(err, errUnexpectedDiffKeyLength)
 			return
 		}
 
-		formattedKey := marshalDiffKeyBySubnet(subnetID, height, nodeID)
+		formattedKey := marshalDiffKeyBySubnetID(subnetID, height, nodeID)
 		require.Equal(key, formattedKey)
 	})
 }
@@ -60,13 +60,13 @@ func TestDiffIteration(t *testing.T) {
 	nodeID0 := ids.BuildTestNodeID([]byte{0x00})
 	nodeID1 := ids.BuildTestNodeID([]byte{0x01})
 
-	subnetID0Height0NodeID0 := marshalDiffKeyBySubnet(subnetID0, 0, nodeID0)
-	subnetID0Height1NodeID0 := marshalDiffKeyBySubnet(subnetID0, 1, nodeID0)
-	subnetID0Height1NodeID1 := marshalDiffKeyBySubnet(subnetID0, 1, nodeID1)
+	subnetID0Height0NodeID0 := marshalDiffKeyBySubnetID(subnetID0, 0, nodeID0)
+	subnetID0Height1NodeID0 := marshalDiffKeyBySubnetID(subnetID0, 1, nodeID0)
+	subnetID0Height1NodeID1 := marshalDiffKeyBySubnetID(subnetID0, 1, nodeID1)
 
-	subnetID1Height0NodeID0 := marshalDiffKeyBySubnet(subnetID1, 0, nodeID0)
-	subnetID1Height1NodeID0 := marshalDiffKeyBySubnet(subnetID1, 1, nodeID0)
-	subnetID1Height1NodeID1 := marshalDiffKeyBySubnet(subnetID1, 1, nodeID1)
+	subnetID1Height0NodeID0 := marshalDiffKeyBySubnetID(subnetID1, 0, nodeID0)
+	subnetID1Height1NodeID0 := marshalDiffKeyBySubnetID(subnetID1, 1, nodeID0)
+	subnetID1Height1NodeID1 := marshalDiffKeyBySubnetID(subnetID1, 1, nodeID1)
 
 	require.NoError(db.Put(subnetID0Height0NodeID0, nil))
 	require.NoError(db.Put(subnetID0Height1NodeID0, nil))
@@ -76,7 +76,7 @@ func TestDiffIteration(t *testing.T) {
 	require.NoError(db.Put(subnetID1Height1NodeID1, nil))
 
 	{
-		it := db.NewIteratorWithStartAndPrefix(marshalStartDiffKey(subnetID0, 0), subnetID0[:])
+		it := db.NewIteratorWithStartAndPrefix(marshalStartDiffKeyBySubnetID(subnetID0, 0), subnetID0[:])
 		defer it.Release()
 
 		expectedKeys := [][]byte{
@@ -91,7 +91,7 @@ func TestDiffIteration(t *testing.T) {
 	}
 
 	{
-		it := db.NewIteratorWithStartAndPrefix(marshalStartDiffKey(subnetID0, 1), subnetID0[:])
+		it := db.NewIteratorWithStartAndPrefix(marshalStartDiffKeyBySubnetID(subnetID0, 1), subnetID0[:])
 		defer it.Release()
 
 		expectedKeys := [][]byte{

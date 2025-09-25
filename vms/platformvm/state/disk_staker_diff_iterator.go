@@ -28,11 +28,11 @@ var (
 	errUnexpectedWeightValueLength = fmt.Errorf("expected weight value length %d", weightValueLength)
 )
 
-// marshalStartDiffKey is used to determine the starting key when iterating.
+// marshalStartDiffKeyBySubnetID is used to determine the starting key when iterating.
 //
 // Invariant: the result is a prefix of [marshalDiffKey] when called with the
 // same arguments.
-func marshalStartDiffKey(subnetID ids.ID, height uint64) []byte {
+func marshalStartDiffKeyBySubnetID(subnetID ids.ID, height uint64) []byte {
 	key := make([]byte, startDiffKeyLength)
 	copy(key, subnetID[:])
 	packIterableHeight(key[ids.IDLen:], height)
@@ -49,7 +49,7 @@ func marshalStartDiffKeyByHeight(height uint64) []byte {
 	return key
 }
 
-func marshalDiffKeyBySubnet(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
+func marshalDiffKeyBySubnetID(subnetID ids.ID, height uint64, nodeID ids.NodeID) []byte {
 	key := make([]byte, diffKeyLength)
 	copy(key, subnetID[:])
 	packIterableHeight(key[ids.IDLen:], height)
@@ -65,7 +65,7 @@ func marshalDiffKeyByHeight(height uint64, subnetID ids.ID, nodeID ids.NodeID) [
 	return key
 }
 
-func unmarshalDiffKeyBySubnet(key []byte) (ids.ID, uint64, ids.NodeID, error) {
+func unmarshalDiffKeyBySubnetID(key []byte) (ids.ID, uint64, ids.NodeID, error) {
 	if len(key) != diffKeyLength {
 		return ids.Empty, 0, ids.EmptyNodeID, errUnexpectedDiffKeyLength
 	}
