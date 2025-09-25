@@ -291,10 +291,8 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
-          if ! command -v xz &> /dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y xz-utils
-          fi
+          sudo apt-get update
+          sudo apt-get install -y xz-utils build-essential
       - uses: actions/checkout@v4
       - name: Build avalanchego
         id: build
@@ -319,10 +317,8 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
-          if ! command -v xz &> /dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y xz-utils
-          fi
+          sudo apt-get update
+          sudo apt-get install -y xz-utils build-essential
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-nix
       - name: Setup AvalancheGo with custom Coreth and LibEVM
