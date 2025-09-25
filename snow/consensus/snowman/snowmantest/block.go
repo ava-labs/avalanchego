@@ -10,12 +10,13 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
 const (
 	GenesisHeight        uint64 = 0
-	GenesisUnixTimestamp int64  = 1607144400
+	GenesisUnixTimestamp        = upgrade.InitiallyActiveTimeUnix
 )
 
 var (

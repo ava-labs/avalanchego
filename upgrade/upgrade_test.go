@@ -46,3 +46,7 @@ func TestInvalidUpgrade(t *testing.T) {
 	err := upgrade.Validate()
 	require.ErrorIs(err, ErrInvalidUpgradeTimes)
 }
+
+func TestInitiallyActiveTime(t *testing.T) {
+	require.Equal(t, int64(InitiallyActiveTimeUnix), InitiallyActiveTime.Unix())
+}
