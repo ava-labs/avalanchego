@@ -25,11 +25,11 @@ inputs:
   coreth:
     description: 'Coreth version (commit SHA, branch name, or tag)'
     required: false
-    default: 'master'
+    default: ''
   libevm:
     description: 'LibEVM version (commit SHA, branch name, or tag)'
     required: false
-    default: 'main'
+    default: ''
 
 outputs:
   binary-path:
@@ -62,11 +62,10 @@ runs:
     - name: Setup Go for project
       uses: ./.github/actions/setup-go-for-project  # Note: If Nix-specific functionality is needed, consumer should install Nix as prerequiste to this action
     - name: Replace dependencies with local checkouts
+      if: ${{ inputs.coreth != '' || inputs.libevm != '' }}
       shell: bash
       working-directory: ./${{ inputs.checkout-path }}
       run: |
-        echo "Replacing dependencies with local checkouts..."
-
         # Use local path replacement for checked out repositories
         if [ "${{ inputs.coreth }}" != "master" ]; then
           echo "Replacing Coreth with local checkout: ../coreth"
