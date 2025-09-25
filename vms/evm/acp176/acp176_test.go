@@ -221,7 +221,7 @@ var (
 			gasPrice:                    2 * MinGasPrice,
 		},
 	}
-	advanceTimeTests = []struct {
+	advanceSecondsTests = []struct {
 		name     string
 		initial  State
 		seconds  uint64
@@ -304,33 +304,34 @@ var (
 			},
 		},
 		{
-			name: "hit_max_capacity_boundary",
+			name: "max_capacity_overflow",
 			initial: State{
 				Gas: gas.State{
 					Capacity: 0, // Could happen if the targetExcess was modified
 					Excess:   math.MaxUint64,
 				},
 				// Set MaxCapacity to MaxUint64
-				TargetExcess: 924_430_532, // 2^25 * ln(MaxUint64 / MinMaxCapacity)
+				// Requires Target >= MaxUint64 / TargetToMaxCapacity
+				TargetExcess: 947_688_692, // ceil(TargetConversion * ln(MaxUint64 / MinMaxCapacity))
 			},
 			seconds: 1,
 			expected: State{
 				Gas: gas.State{
-					Capacity: 1_844_674_435_731_815_790,                // greater than MaxUint64/10
-					Excess:   math.MaxUint64 - 922_337_217_865_907_895, // MaxUint64 - capacity / TargetToMax
+					Capacity: 3_689_348_878_490_565_692,                        // greater than MaxUint64/10
+					Excess:   math.MaxUint64 - (3_689_348_878_490_565_692 / 2), // MaxUint64 - capacity / TargetToMax
 				},
-				TargetExcess: 924_430_532, // unmodified
+				TargetExcess: 947_688_692, // unmodified
 			},
 		},
 		{
-			name: "hit_max_rate_boundary",
+			name: "max_rate_overflow",
 			initial: State{
 				Gas: gas.State{
 					Capacity: 0, // Could happen if the targetExcess was modified
 					Excess:   math.MaxUint64,
 				},
 				// Set MaxPerSecond to MaxUint64
-				TargetExcess: 1_001_692_467, // 2^25 * ln(MaxUint64 / MinMaxPerSecond)
+				TargetExcess: 1_001_692_467, // ceil(TargetConversion * ln(MaxUint64 / MinMaxPerSecond))
 			},
 			seconds: 1,
 			expected: State{
@@ -339,6 +340,167 @@ var (
 					Excess:   9_223_371_875_007_030_354, // less than MaxUint64/2
 				},
 				TargetExcess: 1_001_692_467, // unmodified
+			},
+		},
+	}
+	advanceMillisecondsTests = []struct {
+		name         string
+		initial      State
+		milliseconds uint64
+		expected     State
+	}{
+		{
+			name: "0_seconds",
+			initial: State{
+				Gas: gas.State{
+					Capacity: 0,
+					Excess:   2_000_000,
+				},
+				// Set target to 1.5M per second
+				TargetExcess: 13_605_152, // 2^25 * ln(1.5)
+			},
+			milliseconds: 0,
+			expected: State{
+				Gas: gas.State{
+					Capacity: 0,
+					Excess:   2_000_000,
+				},
+				TargetExcess: 13_605_152, // unmodified
+			},
+		},
+		{
+			name: "1_seconds",
+			initial: State{
+				Gas: gas.State{
+					Capacity: 0,
+					Excess:   2_000_000,
+				},
+				// Set target to 1.5M per second
+				TargetExcess: 13_605_152, // 2^25 * ln(1.5)
+			},
+			milliseconds: 1000,
+			expected: State{
+				Gas: gas.State{
+					Capacity: 3_000_000,
+					Excess:   500_000,
+				},
+				TargetExcess: 13_605_152, // unmodified
+			},
+		},
+		{
+			name: "5_seconds",
+			initial: State{
+				Gas: gas.State{
+					Capacity: 0,
+					Excess:   15_000_000,
+				},
+				// Set target to 1.5M per second
+				TargetExcess: 13_605_152, // 2^25 * ln(1.5)
+			},
+			milliseconds: 5000,
+			expected: State{
+				Gas: gas.State{
+					Capacity: 15_000_000,
+					Excess:   7_500_000,
+				},
+				TargetExcess: 13_605_152, // unmodified
+			},
+		},
+		{
+			name: "0_seconds_over_capacity",
+			initial: State{
+				Gas: gas.State{
+					Capacity: 16_000_000, // Could happen if the targetExcess was modified
+					Excess:   2_000_000,
+				},
+				// Set capacity to 15M
+				TargetExcess: 13_605_152, // 2^25 * ln(1.5)
+			},
+			milliseconds: 0,
+			expected: State{
+				Gas: gas.State{
+					Capacity: 15_000_000, // capped at 15M
+					Excess:   2_000_000,  // unmodified
+				},
+				TargetExcess: 13_605_152, // unmodified
+			},
+		},
+		{
+			name: "max_capacity_overflow",
+			initial: State{
+				Gas: gas.State{
+					Capacity: 0, // Could happen if the targetExcess was modified
+					Excess:   math.MaxUint64,
+				},
+				// Set MaxCapacity to MaxUint64
+				// Requires Target >= MaxUint64 / TargetToMaxCapacity
+				// Target in seconds is used for calculating maxCapacity
+				TargetExcess: 947_688_692, // ceil(TargetConversion * ln(MaxUint64 / MinMaxCapacity))
+			},
+			milliseconds: 1000,
+			expected: State{
+				Gas: gas.State{
+					Capacity: 3_689_348_878_490_564_000,                        // greater than MaxUint64/10
+					Excess:   math.MaxUint64 - (3_689_348_878_490_564_000 / 2), // MaxUint64 - capacity / TargetToMax
+				},
+				TargetExcess: 947_688_692, // unmodified
+			},
+		},
+		{
+			name: "max_rate_overflow",
+			initial: State{
+				Gas: gas.State{
+					Capacity: 0, // Could happen if the targetExcess was modified
+					Excess:   math.MaxUint64,
+				},
+				// Set MaxPerSecond to MaxUint64
+				TargetExcess: 1_001_692_467, // 2^25 * ln(MaxUint64 / MinMaxPerSecond)
+			},
+			milliseconds: 1000,
+			expected: State{
+				Gas: gas.State{
+					Capacity: math.MaxUint64,            // greater than MaxUint64/10
+					Excess:   9_223_371_875_007_030_615, // less than MaxUint64/2
+				},
+				TargetExcess: 1_001_692_467, // unmodified
+			},
+		},
+		{
+			name: "1_millisecond",
+			initial: State{
+				Gas: gas.State{
+					Capacity: 0,
+					Excess:   2_000_000,
+				},
+				// Set target to 1.5M per second
+				TargetExcess: 13_605_152, // 2^25 * ln(1.5)
+			},
+			milliseconds: 1,
+			expected: State{
+				Gas: gas.State{
+					Capacity: 3_000,
+					Excess:   1_998_500,
+				},
+				TargetExcess: 13_605_152, // unmodified
+			},
+		},
+		{
+			name: "target_rounds_down",
+			initial: State{
+				Gas: gas.State{
+					Capacity: 0,
+					Excess:   2_000_000,
+				},
+				// Set target to 1_500_999 per second
+				TargetExcess: 13_627_491, // 2^25 * ln(1.500999)
+			},
+			milliseconds: 999, // large to ensure target is rounding, not result.
+			expected: State{
+				Gas: gas.State{
+					Capacity: 2_997_000, // 3_000 * 999
+					Excess:   501_500,   // 2_000_000 - 1_500 * 999
+				},
+				TargetExcess: 13_627_491, // unmodified
 			},
 		},
 	}
@@ -709,22 +871,43 @@ func BenchmarkGasPrice(b *testing.B) {
 	}
 }
 
-func TestAdvanceTime(t *testing.T) {
-	for _, test := range advanceTimeTests {
+func TestAdvanceSeconds(t *testing.T) {
+	for _, test := range advanceSecondsTests {
 		t.Run(test.name, func(t *testing.T) {
 			initial := test.initial
-			initial.AdvanceTime(test.seconds)
+			initial.AdvanceSeconds(test.seconds)
 			require.Equal(t, test.expected, initial)
 		})
 	}
 }
 
-func BenchmarkAdvanceTime(b *testing.B) {
-	for _, test := range advanceTimeTests {
+func BenchmarkAdvanceSeconds(b *testing.B) {
+	for _, test := range advanceSecondsTests {
 		b.Run(test.name, func(b *testing.B) {
 			for range b.N {
 				initial := test.initial
-				initial.AdvanceTime(test.seconds)
+				initial.AdvanceSeconds(test.seconds)
+			}
+		})
+	}
+}
+
+func TestAdvanceMilliseconds(t *testing.T) {
+	for _, test := range advanceMillisecondsTests {
+		t.Run(test.name, func(t *testing.T) {
+			initial := test.initial
+			initial.AdvanceMilliseconds(test.milliseconds)
+			require.Equal(t, test.expected, initial)
+		})
+	}
+}
+
+func BenchmarkAdvanceMilliseconds(b *testing.B) {
+	for _, test := range advanceMillisecondsTests {
+		b.Run(test.name, func(b *testing.B) {
+			for range b.N {
+				initial := test.initial
+				initial.AdvanceMilliseconds(test.milliseconds)
 			}
 		})
 	}
