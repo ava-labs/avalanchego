@@ -76,8 +76,7 @@ func (vm *blockVM) Initialize(
 func (vm *blockVM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 	start := time.Now()
 	blk, err := vm.ChainVM.BuildBlock(ctx)
-	end := time.Now()
-	duration := float64(end.Sub(start))
+	duration := float64(time.Since(start))
 	if err != nil {
 		vm.blockMetrics.buildBlockErr.Observe(duration)
 		return nil, err
@@ -92,8 +91,7 @@ func (vm *blockVM) BuildBlock(ctx context.Context) (snowman.Block, error) {
 func (vm *blockVM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, error) {
 	start := time.Now()
 	blk, err := vm.ChainVM.ParseBlock(ctx, b)
-	end := time.Now()
-	duration := float64(end.Sub(start))
+	duration := float64(time.Since(start))
 	if err != nil {
 		vm.blockMetrics.parseBlockErr.Observe(duration)
 		return nil, err
@@ -108,8 +106,7 @@ func (vm *blockVM) ParseBlock(ctx context.Context, b []byte) (snowman.Block, err
 func (vm *blockVM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, error) {
 	start := time.Now()
 	blk, err := vm.ChainVM.GetBlock(ctx, id)
-	end := time.Now()
-	duration := float64(end.Sub(start))
+	duration := float64(time.Since(start))
 	if err != nil {
 		vm.blockMetrics.getBlockErr.Observe(duration)
 		return nil, err
@@ -124,23 +121,20 @@ func (vm *blockVM) GetBlock(ctx context.Context, id ids.ID) (snowman.Block, erro
 func (vm *blockVM) SetPreference(ctx context.Context, id ids.ID) error {
 	start := time.Now()
 	err := vm.ChainVM.SetPreference(ctx, id)
-	end := time.Now()
-	vm.blockMetrics.setPreference.Observe(float64(end.Sub(start)))
+	vm.blockMetrics.setPreference.Observe(float64(time.Since(start)))
 	return err
 }
 
 func (vm *blockVM) LastAccepted(ctx context.Context) (ids.ID, error) {
 	start := time.Now()
 	lastAcceptedID, err := vm.ChainVM.LastAccepted(ctx)
-	end := time.Now()
-	vm.blockMetrics.lastAccepted.Observe(float64(end.Sub(start)))
+	vm.blockMetrics.lastAccepted.Observe(float64(time.Since(start)))
 	return lastAcceptedID, err
 }
 
 func (vm *blockVM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, error) {
 	start := time.Now()
 	blockID, err := vm.ChainVM.GetBlockIDAtHeight(ctx, height)
-	end := time.Now()
-	vm.blockMetrics.getBlockIDAtHeight.Observe(float64(end.Sub(start)))
+	vm.blockMetrics.getBlockIDAtHeight.Observe(float64(time.Since(start)))
 	return blockID, err
 }
