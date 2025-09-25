@@ -81,7 +81,6 @@ var SyncerVMTests = []SyncerVMTest{
 }
 
 func SkipStateSyncTest(t *testing.T, testSetup *SyncTestSetup) {
-	rand.Seed(1)
 	test := SyncTestParams{
 		SyncableInterval:   256,
 		StateSyncMinBlocks: 300, // must be greater than [syncableInterval] to skip sync
@@ -93,7 +92,6 @@ func SkipStateSyncTest(t *testing.T, testSetup *SyncTestSetup) {
 }
 
 func StateSyncFromScratchTest(t *testing.T, testSetup *SyncTestSetup) {
-	rand.Seed(1)
 	test := SyncTestParams{
 		SyncableInterval:   256,
 		StateSyncMinBlocks: 50, // must be less than [syncableInterval] to perform sync
@@ -105,7 +103,6 @@ func StateSyncFromScratchTest(t *testing.T, testSetup *SyncTestSetup) {
 }
 
 func StateSyncFromScratchExceedParentTest(t *testing.T, testSetup *SyncTestSetup) {
-	rand.Seed(1)
 	numToGen := vmsync.BlocksToFetch + uint64(32)
 	test := SyncTestParams{
 		SyncableInterval:   numToGen,
@@ -118,7 +115,6 @@ func StateSyncFromScratchExceedParentTest(t *testing.T, testSetup *SyncTestSetup
 }
 
 func StateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup) {
-	rand.Seed(1)
 	var lock sync.Mutex
 	reqCount := 0
 	test := SyncTestParams{
@@ -337,7 +333,8 @@ func initSyncServerAndClientVMs(t *testing.T, test SyncTestParams, numBlocks int
 	generateAndAcceptBlocks(t, serverVM, numBlocks, testSetup.GenFn, nil, cb)
 
 	// make some accounts
-	root, accounts := statesynctest.FillAccountsWithOverlappingStorage(t, serverVM.Ethereum().BlockChain().TrieDB(), types.EmptyRootHash, 1000, 16)
+	r := rand.New(rand.NewSource(1))
+	root, accounts := statesynctest.FillAccountsWithOverlappingStorage(t, r, serverVM.Ethereum().BlockChain().TrieDB(), types.EmptyRootHash, 1000, 16)
 
 	// patch serverVM's lastAcceptedBlock to have the new root
 	// and update the vm's state so the trie with accounts will
