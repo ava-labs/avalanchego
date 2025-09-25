@@ -33,6 +33,9 @@ func (s *grpcService) GetProposedHeight(ctx context.Context, r *connect.Request[
 	)
 	log.Debug("API called")
 
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
 	blk, err := s.vm.getBlock(ctx, s.vm.preferred)
 	if err != nil {
 		log.Error("failed to get preferred block", zap.Error(err))
@@ -61,6 +64,9 @@ func (s *jsonService) GetProposedHeight(r *http.Request, _ *struct{}, reply *api
 		zap.String("path", r.URL.Path),
 	)
 	log.Debug("API called")
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
 
 	ctx := r.Context()
 	blk, err := s.vm.getBlock(ctx, s.vm.preferred)
