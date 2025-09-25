@@ -328,10 +328,14 @@ type stateBlk struct {
  * | | | '-- validationID -> l1Validator
  * | | '-. inactive
  * | |   '-- validationID -> l1Validator
- * | |-. weight diffs
+ * | |-. weight diffs by subnet ID
  * | | '-- subnet+height+nodeID -> weightChange
- * | '-. pub key diffs
+ * | |-. weight diffs by height
+ * | | '-- height+subnet+nodeID -> weightChange
+ * | '-. pub key diffs by subnet ID
  * |   '-- subnet+height+nodeID -> uncompressed public key or nil
+ * | '-. pub key diffs by height
+ * |   '-- height+subnet+nodeID -> uncompressed public key or nil
  * |-. blockIDs
  * | '-- height -> blockID
  * |-. blocks
