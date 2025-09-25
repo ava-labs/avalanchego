@@ -285,7 +285,7 @@ jobs:
   # GitHub runners - BUILD mode
   build_github_avalanchego:
     name: Build avalanchego on GitHub runner
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - name: Build avalanchego
         id: build
@@ -303,7 +303,7 @@ jobs:
           echo "Binary verified successfully"
   setup_github:
     name: Setup mode on GitHub runner
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - name: Setup AvalancheGo
         uses: ./.github/actions/avalanchego-build-action
