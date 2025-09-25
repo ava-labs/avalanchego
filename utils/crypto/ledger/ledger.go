@@ -5,6 +5,8 @@ package ledger
 
 import (
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
@@ -19,9 +21,38 @@ const (
 	rootPath          = "m/44'/9000'/0'" // BIP44: m / purpose' / coin_type' / account'
 	ledgerBufferLimit = 8192
 	ledgerPathSize    = 9
+	maxRetries        = 5
+	initialRetryDelay = 200 * time.Millisecond
 )
 
 var _ keychain.Ledger = (*Ledger)(nil)
+
+// retryOnHIDAPIError executes a function up to maxRetries times if it encounters
+// the specific "hidapi: unknown failure" error or APDU error 0x6987
+func retryOnHIDAPIError(fn func() error) error {
+	var err error
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		err = fn()
+		if err == nil {
+			return nil
+		}
+
+		// Check if the error contains the specific HIDAPI failure message or APDU 0x6987
+		if strings.Contains(err.Error(), "hidapi: unknown failure") ||
+			strings.Contains(err.Error(), "APDU Error Code from Ledger Device: 0x6987") {
+			if attempt < maxRetries {
+				// Calculate backoff delay: 200ms, 400ms, 600ms, 800ms
+				delay := time.Duration(attempt) * initialRetryDelay
+				time.Sleep(delay)
+				continue
+			}
+		}
+
+		// If it's not a retryable error or we've exhausted retries, return the error
+		return err
+	}
+	return err
+}
 
 // Ledger is a wrapper around the low-level Ledger Device interface that
 // provides Avalanche-specific access.
@@ -30,8 +61,13 @@ type Ledger struct {
 	epk    *bip32.Key
 }
 
-func New() (keychain.Ledger, error) {
-	device, err := ledger.FindLedgerAvalancheApp()
+func New() (*Ledger, error) {
+	var device *ledger.LedgerAvalanche
+	err := retryOnHIDAPIError(func() error {
+		var err error
+		device, err = ledger.FindLedgerAvalancheApp()
+		return err
+	})
 	return &Ledger{
 		device: device,
 	}, err
@@ -42,7 +78,12 @@ func addressPath(index uint32) string {
 }
 
 func (l *Ledger) Address(hrp string, addressIndex uint32) (ids.ShortID, error) {
-	resp, err := l.device.GetPubKey(addressPath(addressIndex), true, hrp, "")
+	var resp *ledger.ResponseAddr
+	err := retryOnHIDAPIError(func() error {
+		var err error
+		resp, err = l.device.GetPubKey(addressPath(addressIndex), false, hrp, "")
+		return err
+	})
 	if err != nil {
 		return ids.ShortEmpty, err
 	}
@@ -51,7 +92,13 @@ func (l *Ledger) Address(hrp string, addressIndex uint32) (ids.ShortID, error) {
 
 func (l *Ledger) Addresses(addressIndices []uint32) ([]ids.ShortID, error) {
 	if l.epk == nil {
-		pk, chainCode, err := l.device.GetExtPubKey(rootPath, false, "", "")
+		var pk []byte
+		var chainCode []byte
+		err := retryOnHIDAPIError(func() error {
+			var err error
+			pk, chainCode, err = l.device.GetExtPubKey(rootPath, false, "", "")
+			return err
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +134,12 @@ func convertToSigningPaths(input []uint32) []string {
 
 func (l *Ledger) SignHash(hash []byte, addressIndices []uint32) ([][]byte, error) {
 	strIndices := convertToSigningPaths(addressIndices)
-	response, err := l.device.SignHash(rootPath, strIndices, hash)
+	var response *ledger.ResponseSign
+	err := retryOnHIDAPIError(func() error {
+		var err error
+		response, err = l.device.SignHash(rootPath, strIndices, hash)
+		return err
+	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: unable to sign hash", err)
 	}
@@ -116,7 +168,12 @@ func (l *Ledger) Sign(txBytes []byte, addressIndices []uint32) ([][]byte, error)
 		return l.SignHash(unsignedHash, addressIndices)
 	}
 	strIndices := convertToSigningPaths(addressIndices)
-	response, err := l.device.Sign(rootPath, strIndices, txBytes, strIndices)
+	var response *ledger.ResponseSign
+	err := retryOnHIDAPIError(func() error {
+		var err error
+		response, err = l.device.Sign(rootPath, strIndices, txBytes, strIndices)
+		return err
+	})
 	if err != nil {
 		return nil, fmt.Errorf("%w: unable to sign transaction", err)
 	}
@@ -132,7 +189,12 @@ func (l *Ledger) Sign(txBytes []byte, addressIndices []uint32) ([][]byte, error)
 }
 
 func (l *Ledger) Version() (*version.Semantic, error) {
-	resp, err := l.device.GetVersion()
+	var resp *ledger.VersionInfo
+	err := retryOnHIDAPIError(func() error {
+		var err error
+		resp, err = l.device.GetVersion()
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -144,5 +206,7 @@ func (l *Ledger) Version() (*version.Semantic, error) {
 }
 
 func (l *Ledger) Disconnect() error {
-	return l.device.Close()
+	return retryOnHIDAPIError(func() error {
+		return l.device.Close()
+	})
 }
