@@ -14,44 +14,48 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
+	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customheader"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 )
 
 var (
-	_ snowman.Block           = (*Block)(nil)
-	_ block.WithVerifyContext = (*Block)(nil)
+	_ snowman.Block           = (*wrappedBlock)(nil)
+	_ block.WithVerifyContext = (*wrappedBlock)(nil)
 )
 
-// Block implements the snowman.Block interface
-type Block struct {
+// wrappedBlock implements the snowman.Block interface by wrapping a libevm block
+type wrappedBlock struct {
 	id       ids.ID
 	ethBlock *types.Block
 	vm       *VM
 }
 
-// newBlock returns a new Block wrapping the ethBlock type and implementing the snowman.Block interface
-func (vm *VM) newBlock(ethBlock *types.Block) *Block {
-	return &Block{
+// wrapBlock returns a new Block wrapping the ethBlock type and implementing the snowman.Block interface
+func wrapBlock(ethBlock *types.Block, vm *VM) (*wrappedBlock, error) { //nolint:unparam // this just makes the function compatible with the future syncs I'll do, it's temporary!!
+	b := &wrappedBlock{
 		id:       ids.ID(ethBlock.Hash()),
 		ethBlock: ethBlock,
 		vm:       vm,
 	}
+	return b, nil
 }
 
 // ID implements the snowman.Block interface
-func (b *Block) ID() ids.ID { return b.id }
+func (b *wrappedBlock) ID() ids.ID { return b.id }
 
 // Accept implements the snowman.Block interface
-func (b *Block) Accept(context.Context) error {
+func (b *wrappedBlock) Accept(context.Context) error {
 	vm := b.vm
 
 	// Although returning an error from Accept is considered fatal, it is good
@@ -65,9 +69,7 @@ func (b *Block) Accept(context.Context) error {
 		"height", b.Height(),
 	)
 
-	// Call Accept for relevant precompile logs. Note we do this prior to
-	// calling Accept on the blockChain so any side effects (eg warp signatures)
-	// take place before the accepted log is emitted to subscribers.
+	// Call Accept for relevant precompile logs before accepting on the chain.
 	rules := b.vm.rules(b.ethBlock.Number(), b.ethBlock.Time())
 	if err := b.handlePrecompileAccept(rules); err != nil {
 		return err
@@ -76,16 +78,17 @@ func (b *Block) Accept(context.Context) error {
 		return fmt.Errorf("chain could not accept %s: %w", blkID, err)
 	}
 
-	if err := vm.acceptedBlockDB.Put(lastAcceptedKey, blkID[:]); err != nil {
+	if err := vm.PutLastAcceptedID(blkID); err != nil {
 		return fmt.Errorf("failed to put %s as the last accepted block: %w", blkID, err)
 	}
 
+	// No block extension batching path in subnet-evm; commit versioned DB directly
 	return b.vm.versiondb.Commit()
 }
 
 // handlePrecompileAccept calls Accept on any logs generated with an active precompile address that implements
 // contract.Accepter
-func (b *Block) handlePrecompileAccept(rules extras.Rules) error {
+func (b *wrappedBlock) handlePrecompileAccept(rules extras.Rules) error {
 	// Short circuit early if there are no precompile accepters to execute
 	if len(rules.AccepterPrecompiles) == 0 {
 		return nil
@@ -118,7 +121,7 @@ func (b *Block) handlePrecompileAccept(rules extras.Rules) error {
 }
 
 // Reject implements the snowman.Block interface
-func (b *Block) Reject(context.Context) error {
+func (b *wrappedBlock) Reject(context.Context) error {
 	blkID := b.ID()
 	log.Debug("rejecting block",
 		"hash", blkID.Hex(),
@@ -129,33 +132,18 @@ func (b *Block) Reject(context.Context) error {
 }
 
 // Parent implements the snowman.Block interface
-func (b *Block) Parent() ids.ID {
+func (b *wrappedBlock) Parent() ids.ID {
 	return ids.ID(b.ethBlock.ParentHash())
 }
 
 // Height implements the snowman.Block interface
-func (b *Block) Height() uint64 {
-	return b.ethBlock.NumberU64()
-}
+func (b *wrappedBlock) Height() uint64 { return b.ethBlock.NumberU64() }
 
 // Timestamp implements the snowman.Block interface
-func (b *Block) Timestamp() time.Time {
-	return time.Unix(int64(b.ethBlock.Time()), 0)
-}
-
-// syntacticVerify verifies that a *Block is well-formed.
-func (b *Block) syntacticVerify() error {
-	if b == nil || b.ethBlock == nil {
-		return errInvalidBlock
-	}
-
-	header := b.ethBlock.Header()
-	rules := b.vm.chainConfig.Rules(header.Number, params.IsMergeTODO, header.Time)
-	return b.vm.syntacticBlockValidator.SyntacticVerify(b, rules)
-}
+func (b *wrappedBlock) Timestamp() time.Time { return time.Unix(int64(b.ethBlock.Time()), 0) }
 
 // Verify implements the snowman.Block interface
-func (b *Block) Verify(context.Context) error {
+func (b *wrappedBlock) Verify(context.Context) error {
 	return b.verify(&precompileconfig.PredicateContext{
 		SnowCtx:            b.vm.ctx,
 		ProposerVMBlockCtx: nil,
@@ -163,7 +151,7 @@ func (b *Block) Verify(context.Context) error {
 }
 
 // ShouldVerifyWithContext implements the block.WithVerifyContext interface
-func (b *Block) ShouldVerifyWithContext(context.Context) (bool, error) {
+func (b *wrappedBlock) ShouldVerifyWithContext(context.Context) (bool, error) {
 	rules := b.vm.rules(b.ethBlock.Number(), b.ethBlock.Time())
 	predicates := rules.Predicaters
 	// Short circuit early if there are no predicates to verify
@@ -171,7 +159,7 @@ func (b *Block) ShouldVerifyWithContext(context.Context) (bool, error) {
 		return false, nil
 	}
 
-	// Check if any of the transactions in the block specify a precompile that enforces a predicate, which requires
+	// Check if any transaction specifies a precompile that enforces a predicate, requiring
 	// the ProposerVMBlockCtx.
 	for _, tx := range b.ethBlock.Transactions() {
 		for _, accessTuple := range tx.AccessList() {
@@ -187,7 +175,7 @@ func (b *Block) ShouldVerifyWithContext(context.Context) (bool, error) {
 }
 
 // VerifyWithContext implements the block.WithVerifyContext interface
-func (b *Block) VerifyWithContext(_ context.Context, proposerVMBlockCtx *block.Context) error {
+func (b *wrappedBlock) VerifyWithContext(_ context.Context, proposerVMBlockCtx *block.Context) error {
 	return b.verify(&precompileconfig.PredicateContext{
 		SnowCtx:            b.vm.ctx,
 		ProposerVMBlockCtx: proposerVMBlockCtx,
@@ -197,7 +185,7 @@ func (b *Block) VerifyWithContext(_ context.Context, proposerVMBlockCtx *block.C
 // Verify the block is valid.
 // Enforces that the predicates are valid within [predicateContext].
 // Writes the block details to disk and the state to the trie manager iff writes=true.
-func (b *Block) verify(predicateContext *precompileconfig.PredicateContext, writes bool) error {
+func (b *wrappedBlock) verify(predicateContext *precompileconfig.PredicateContext, writes bool) error {
 	if predicateContext.ProposerVMBlockCtx != nil {
 		log.Debug("Verifying block with context", "block", b.ID(), "height", b.Height())
 	} else {
@@ -207,10 +195,11 @@ func (b *Block) verify(predicateContext *precompileconfig.PredicateContext, writ
 		return fmt.Errorf("syntactic block verification failed: %w", err)
 	}
 
+	if err := b.semanticVerify(); err != nil {
+		return fmt.Errorf("failed to verify block: %w", err)
+	}
+
 	// Only enforce predicates if the chain has already bootstrapped.
-	// If the chain is still bootstrapping, we can assume that all blocks we are verifying have
-	// been accepted by the network (so the predicate was validated by the network when the
-	// block was originally verified).
 	if b.vm.bootstrapped.Get() {
 		if err := b.verifyPredicates(predicateContext); err != nil {
 			return fmt.Errorf("failed to verify predicates: %w", err)
@@ -218,10 +207,6 @@ func (b *Block) verify(predicateContext *precompileconfig.PredicateContext, writ
 	}
 
 	// The engine may call VerifyWithContext multiple times on the same block with different contexts.
-	// Since the engine will only call Accept/Reject once, we should only call InsertBlockManual once.
-	// Additionally, if a block is already in processing, then it has already passed verification and
-	// at this point we have checked the predicates are still valid in the different context so we
-	// can return nil.
 	if b.vm.State.IsProcessing(b.id) {
 		return nil
 	}
@@ -229,8 +214,132 @@ func (b *Block) verify(predicateContext *precompileconfig.PredicateContext, writ
 	return b.vm.blockChain.InsertBlockManual(b.ethBlock, writes)
 }
 
+// semanticVerify verifies that a *Block is internally consistent.
+func (b *wrappedBlock) semanticVerify() error {
+	// Make sure the block isn't too far in the future
+	blockTimestamp := b.ethBlock.Time()
+	if maxBlockTime := uint64(b.vm.clock.Time().Add(maxFutureBlockTime).Unix()); blockTimestamp > maxBlockTime {
+		return fmt.Errorf("block timestamp is too far in the future: %d > allowed %d", blockTimestamp, maxBlockTime)
+	}
+
+	return nil
+}
+
+// syntacticVerify verifies that a *Block is well-formed.
+func (b *wrappedBlock) syntacticVerify() error {
+	if b == nil || b.ethBlock == nil {
+		return errInvalidBlock
+	}
+
+	// Skip verification of the genesis block since it should already be marked as accepted.
+	if b.ethBlock.Hash() == b.vm.genesisHash {
+		return nil
+	}
+
+	ethHeader := b.ethBlock.Header()
+	rules := b.vm.chainConfig.Rules(ethHeader.Number, params.IsMergeTODO, ethHeader.Time)
+	rulesExtra := params.GetRulesExtra(rules)
+	// Perform block and header sanity checks
+	if !ethHeader.Number.IsUint64() {
+		return fmt.Errorf("invalid block number: %v", ethHeader.Number)
+	}
+	if !ethHeader.Difficulty.IsUint64() || ethHeader.Difficulty.Cmp(common.Big1) != 0 {
+		return fmt.Errorf("invalid difficulty: %d", ethHeader.Difficulty)
+	}
+	if ethHeader.Nonce.Uint64() != 0 {
+		return fmt.Errorf(
+			"expected nonce to be 0 but got %d: %w",
+			ethHeader.Nonce.Uint64(), errInvalidNonce,
+		)
+	}
+
+	if ethHeader.MixDigest != (common.Hash{}) {
+		return fmt.Errorf("invalid mix digest: %v", ethHeader.MixDigest)
+	}
+
+	// Verify the extra data is well-formed.
+	if err := customheader.VerifyExtra(rulesExtra.AvalancheRules, ethHeader.Extra); err != nil {
+		return err
+	}
+
+	if rulesExtra.IsSubnetEVM {
+		if ethHeader.BaseFee == nil {
+			return errNilBaseFeeSubnetEVM
+		}
+		if bfLen := ethHeader.BaseFee.BitLen(); bfLen > 256 {
+			return fmt.Errorf("too large base fee: bitlen %d", bfLen)
+		}
+	}
+
+	// Check that the tx hash in the header matches the body
+	txs := b.ethBlock.Transactions()
+	if len(txs) == 0 {
+		// Empty blocks are not allowed on Subnet-EVM
+		return errEmptyBlock
+	}
+	txsHash := types.DeriveSha(txs, trie.NewStackTrie(nil))
+	if txsHash != ethHeader.TxHash {
+		return fmt.Errorf("invalid txs hash %v does not match calculated txs hash %v", ethHeader.TxHash, txsHash)
+	}
+	// Check that the uncle hash in the header matches the body
+	uncleHash := types.CalcUncleHash(b.ethBlock.Uncles())
+	if uncleHash != ethHeader.UncleHash {
+		return fmt.Errorf("invalid uncle hash %v does not match calculated uncle hash %v", ethHeader.UncleHash, uncleHash)
+	}
+
+	// Block must not have any uncles
+	if len(b.ethBlock.Uncles()) > 0 {
+		return errUnclesUnsupported
+	}
+
+	if rulesExtra.IsSubnetEVM {
+		blockGasCost := customtypes.GetHeaderExtra(ethHeader).BlockGasCost
+		switch {
+		// Make sure BlockGasCost is not nil
+		// NOTE: ethHeader.BlockGasCost correctness is checked in header verification
+		case blockGasCost == nil:
+			return errNilBlockGasCostSubnetEVM
+		case !blockGasCost.IsUint64():
+			return fmt.Errorf("too large blockGasCost: %d", blockGasCost)
+		}
+	}
+
+	// Verify the existence / non-existence of excessBlobGas
+	cancun := rules.IsCancun
+	if !cancun && ethHeader.ExcessBlobGas != nil {
+		return fmt.Errorf("invalid excessBlobGas: have %d, expected nil", *ethHeader.ExcessBlobGas)
+	}
+	if !cancun && ethHeader.BlobGasUsed != nil {
+		return fmt.Errorf("invalid blobGasUsed: have %d, expected nil", *ethHeader.BlobGasUsed)
+	}
+	if cancun && ethHeader.ExcessBlobGas == nil {
+		return errors.New("header is missing excessBlobGas")
+	}
+	if cancun && ethHeader.BlobGasUsed == nil {
+		return errors.New("header is missing blobGasUsed")
+	}
+	if !cancun && ethHeader.ParentBeaconRoot != nil {
+		return fmt.Errorf("invalid parentBeaconRoot: have %x, expected nil", *ethHeader.ParentBeaconRoot)
+	}
+	if cancun {
+		switch {
+		case ethHeader.ParentBeaconRoot == nil:
+			return errors.New("header is missing parentBeaconRoot")
+		case *ethHeader.ParentBeaconRoot != (common.Hash{}):
+			return fmt.Errorf("invalid parentBeaconRoot: have %x, expected empty hash", ethHeader.ParentBeaconRoot)
+		}
+		if ethHeader.BlobGasUsed == nil {
+			return errors.New("blob gas used must not be nil in Cancun")
+		} else if *ethHeader.BlobGasUsed > 0 {
+			return fmt.Errorf("blobs not enabled on avalanche networks: used %d blob gas, expected 0", *ethHeader.BlobGasUsed)
+		}
+	}
+
+	return nil
+}
+
 // verifyPredicates verifies the predicates in the block are valid according to predicateContext.
-func (b *Block) verifyPredicates(predicateContext *precompileconfig.PredicateContext) error {
+func (b *wrappedBlock) verifyPredicates(predicateContext *precompileconfig.PredicateContext) error {
 	rules := b.vm.chainConfig.Rules(b.ethBlock.Number(), params.IsMergeTODO, b.ethBlock.Time())
 	rulesExtra := params.GetRulesExtra(rules)
 
@@ -263,7 +372,7 @@ func (b *Block) verifyPredicates(predicateContext *precompileconfig.PredicateCon
 }
 
 // Bytes implements the snowman.Block interface
-func (b *Block) Bytes() []byte {
+func (b *wrappedBlock) Bytes() []byte {
 	res, err := rlp.EncodeToBytes(b.ethBlock)
 	if err != nil {
 		panic(err)
@@ -271,4 +380,6 @@ func (b *Block) Bytes() []byte {
 	return res
 }
 
-func (b *Block) String() string { return fmt.Sprintf("EVM block, ID = %s", b.ID()) }
+func (b *wrappedBlock) String() string { return fmt.Sprintf("EVM block, ID = %s", b.ID()) }
+
+func (b *wrappedBlock) GetEthBlock() *types.Block { return b.ethBlock }

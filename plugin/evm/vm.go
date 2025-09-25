@@ -210,8 +210,6 @@ type VM struct {
 
 	validatorsDB database.Database
 
-	syntacticBlockValidator BlockValidator
-
 	// builderLock is used to synchronize access to the block builder,
 	// as it is uninitialized at first and is only initialized when onNormalOperationsStarted is called.
 	builderLock sync.Mutex
@@ -325,8 +323,6 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
-
-	vm.syntacticBlockValidator = NewBlockValidator()
 
 	vm.ethConfig = ethconfig.NewDefaultConfig()
 	vm.ethConfig.Genesis = g
@@ -682,7 +678,10 @@ func (vm *VM) initializeStateSyncClient(lastAcceptedHeight uint64) error {
 }
 
 func (vm *VM) initChainState(lastAcceptedBlock *types.Block) error {
-	block := vm.newBlock(lastAcceptedBlock)
+	block, err := wrapBlock(lastAcceptedBlock, vm)
+	if err != nil {
+		return fmt.Errorf("failed to wrap last accepted block: %w", err)
+	}
 
 	config := &chain.Config{
 		DecidedCacheSize:      decidedCacheSize,
@@ -973,7 +972,10 @@ func (vm *VM) buildBlockWithContext(_ context.Context, proposerVMBlockCtx *block
 	}
 
 	// Note: the status of block is set by ChainState
-	blk := vm.newBlock(block)
+	blk, err := wrapBlock(block, vm)
+	if err != nil {
+		return nil, fmt.Errorf("failed to wrap built block: %w", err)
+	}
 
 	// Verify is called on a non-wrapped block here, such that this
 	// does not add [blk] to the processing blocks map in ChainState.
@@ -1007,7 +1009,10 @@ func (vm *VM) parseBlock(_ context.Context, b []byte) (snowman.Block, error) {
 	}
 
 	// Note: the status of block is set by ChainState
-	block := vm.newBlock(ethBlock)
+	block, err := wrapBlock(ethBlock, vm)
+	if err != nil {
+		return nil, err
+	}
 	// Performing syntactic verification in ParseBlock allows for
 	// short-circuiting bad blocks before they are processed by the VM.
 	if err := block.syntacticVerify(); err != nil {
@@ -1022,7 +1027,7 @@ func (vm *VM) ParseEthBlock(b []byte) (*types.Block, error) {
 		return nil, err
 	}
 
-	return block.(*Block).ethBlock, nil
+	return block.(*wrappedBlock).ethBlock, nil
 }
 
 // getBlock attempts to retrieve block [id] from the VM to be wrapped
@@ -1035,7 +1040,7 @@ func (vm *VM) getBlock(_ context.Context, id ids.ID) (snowman.Block, error) {
 		return nil, database.ErrNotFound
 	}
 	// Note: the status of block is set by ChainState
-	return vm.newBlock(ethBlock), nil
+	return wrapBlock(ethBlock, vm)
 }
 
 // GetAcceptedBlock attempts to retrieve block [blkID] from the VM. This method
@@ -1069,7 +1074,7 @@ func (vm *VM) SetPreference(ctx context.Context, blkID ids.ID) error {
 		return fmt.Errorf("failed to set preference to %s: %w", blkID, err)
 	}
 
-	return vm.blockChain.SetPreference(block.(*Block).ethBlock)
+	return vm.blockChain.SetPreference(block.(*wrappedBlock).ethBlock)
 }
 
 // GetBlockIDAtHeight returns the canonical block at [height].
@@ -1337,4 +1342,8 @@ func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	}
 
 	return vm.Network.Disconnected(ctx, nodeID)
+}
+
+func (vm *VM) PutLastAcceptedID(id ids.ID) error {
+	return vm.acceptedBlockDB.Put(lastAcceptedKey, id[:])
 }

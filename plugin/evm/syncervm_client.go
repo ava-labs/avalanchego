@@ -312,7 +312,7 @@ func (client *stateSyncerClient) finishSync() error {
 	if !ok {
 		return fmt.Errorf("could not convert block(%T) to *chain.BlockWrapper", wrapper)
 	}
-	evmBlock, ok := wrapper.Block.(*Block)
+	evmBlock, ok := wrapper.Block.(*wrappedBlock)
 	if !ok {
 		return fmt.Errorf("could not convert block(%T) to evm.Block", stateBlock)
 	}

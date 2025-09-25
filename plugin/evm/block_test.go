@@ -89,7 +89,8 @@ func TestHandlePrecompileAccept(t *testing.T) {
 	)
 
 	// Call handlePrecompileAccept
-	blk := vm.newBlock(ethBlock)
+	blk, err := wrapBlock(ethBlock, vm)
+	require.NoError(err)
 	rules := extras.Rules{
 		AccepterPrecompiles: map[common.Address]precompileconfig.Accepter{
 			precompileAddr: mockAccepter,
