@@ -81,6 +81,16 @@ type State interface {
 		subnetID ids.ID,
 	) error
 
+	// ApplyAllValidatorWeightDiffs iterates from [startHeight] towards the genesis
+	// block until it has applied all of the diffs up to and including
+	// [endHeight]. Applying the diffs modifies [validators].
+	//
+	// Invariant: If attempting to generate the validator set for
+	// [endHeight - 1], [validators] must initially contain the validator
+	// weights for [startHeight].
+	//
+	// Note: Because this function iterates towards the genesis, [startHeight]
+	// should normally be greater than or equal to [endHeight].
 	ApplyAllValidatorWeightDiffs(
 		ctx context.Context,
 		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,
@@ -106,6 +116,16 @@ type State interface {
 		subnetID ids.ID,
 	) error
 
+	// ApplyAllValidatorPublicKeyDiffs iterates from [startHeight] towards the
+	// genesis block until it has applied all of the diffs up to and including
+	// [endHeight]. Applying the diffs modifies [validators].
+	//
+	// Invariant: If attempting to generate the validator set for
+	// [endHeight - 1], [validators] must initially contain the validator
+	// weights for [startHeight].
+	//
+	// Note: Because this function iterates towards the genesis, [startHeight]
+	// should normally be greater than or equal to [endHeight].
 	ApplyAllValidatorPublicKeyDiffs(
 		ctx context.Context,
 		validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput,

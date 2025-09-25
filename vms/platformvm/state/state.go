@@ -2740,19 +2740,19 @@ func (s *state) writeValidatorDiffs(height uint64) error {
 
 	// Write the changes to the database
 	for subnetIDNodeID, diff := range changes {
-		diffKey := marshalDiffKeyBySubnetID(subnetIDNodeID.subnetID, height, subnetIDNodeID.nodeID)
-		diffKey2 := marshalDiffKeyByHeight(height, subnetIDNodeID.subnetID, subnetIDNodeID.nodeID)
+		diffKeyBySubnetID := marshalDiffKeyBySubnetID(subnetIDNodeID.subnetID, height, subnetIDNodeID.nodeID)
+		diffKeyByHeight := marshalDiffKeyByHeight(height, subnetIDNodeID.subnetID, subnetIDNodeID.nodeID)
 		if diff.weightDiff.Amount != 0 {
 			weightDiff := marshalWeightDiff(&diff.weightDiff)
 			err := s.validatorWeightDiffsBySubnetIDDB.Put(
-				diffKey,
+				diffKeyBySubnetID,
 				weightDiff,
 			)
 			if err != nil {
 				return err
 			}
 			err = s.validatorWeightDiffsByHeightDB.Put(
-				diffKey2,
+				diffKeyByHeight,
 				weightDiff,
 			)
 			if err != nil {
@@ -2761,14 +2761,14 @@ func (s *state) writeValidatorDiffs(height uint64) error {
 		}
 		if !bytes.Equal(diff.prevPublicKey, diff.newPublicKey) {
 			err := s.validatorPublicKeyDiffsBySubnetIDDB.Put(
-				diffKey,
+				diffKeyBySubnetID,
 				diff.prevPublicKey,
 			)
 			if err != nil {
 				return err
 			}
 			err = s.validatorPublicKeyDiffsByHeightDB.Put(
-				diffKey2,
+				diffKeyByHeight,
 				diff.prevPublicKey,
 			)
 			if err != nil {
