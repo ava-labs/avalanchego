@@ -313,6 +313,9 @@ jobs:
     runs-on: avalanche-avalanchego-runner
     container:
       image: ghcr.io/actions/actions-runner:2.325.0
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Install dependencies
         shell: bash
