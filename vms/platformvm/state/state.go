@@ -407,10 +407,10 @@ type state struct {
 	pendingSubnetDelegatorBaseDB database.Database
 	pendingSubnetDelegatorList   linkeddb.LinkedDB
 
-	validatorWeightDiffsDB            database.Database
-	validatorWeightDiffsByHeightDB    database.Database
-	validatorPublicKeyDiffsDB         database.Database
-	validatorPublicKeyDiffsByHeightDB database.Database
+	validatorWeightDiffsBySubnetIDDB    database.Database
+	validatorWeightDiffsByHeightDB      database.Database
+	validatorPublicKeyDiffsBySubnetIDDB database.Database
+	validatorPublicKeyDiffsByHeightDB   database.Database
 
 	addedTxs map[ids.ID]*txAndStatus            // map of txID -> {*txs.Tx, Status}
 	txCache  cache.Cacher[ids.ID, *txAndStatus] // txID -> {*txs.Tx, Status}; if the entry is nil, it is not in the database
@@ -591,9 +591,9 @@ func New(
 
 	l1ValidatorsDB := prefixdb.New(L1Prefix, validatorsDB)
 
-	validatorWeightDiffsDB := prefixdb.New(ValidatorWeightDiffsPrefix, validatorsDB)
+	validatorWeightDiffsBySubnetIDDB := prefixdb.New(ValidatorWeightDiffsPrefix, validatorsDB)
 	validatorWeightDiffsByHeightDB := prefixdb.New(ValidatorWeightDiffsByHeightPrefix, validatorsDB)
-	validatorPublicKeyDiffsDB := prefixdb.New(ValidatorPublicKeyDiffsPrefix, validatorsDB)
+	validatorPublicKeyDiffsBySubnetDB := prefixdb.New(ValidatorPublicKeyDiffsPrefix, validatorsDB)
 	validatorPublicKeyDiffsByHeightDB := prefixdb.New(ValidatorPublicKeyDiffsByHeightPrefix, validatorsDB)
 
 	weightsCache, err := metercacher.New(
@@ -765,29 +765,29 @@ func New(
 		currentStakers: newBaseStakers(),
 		pendingStakers: newBaseStakers(),
 
-		validatorsDB:                      validatorsDB,
-		currentValidatorsDB:               currentValidatorsDB,
-		currentValidatorBaseDB:            currentValidatorBaseDB,
-		currentValidatorList:              linkeddb.NewDefault(currentValidatorBaseDB),
-		currentDelegatorBaseDB:            currentDelegatorBaseDB,
-		currentDelegatorList:              linkeddb.NewDefault(currentDelegatorBaseDB),
-		currentSubnetValidatorBaseDB:      currentSubnetValidatorBaseDB,
-		currentSubnetValidatorList:        linkeddb.NewDefault(currentSubnetValidatorBaseDB),
-		currentSubnetDelegatorBaseDB:      currentSubnetDelegatorBaseDB,
-		currentSubnetDelegatorList:        linkeddb.NewDefault(currentSubnetDelegatorBaseDB),
-		pendingValidatorsDB:               pendingValidatorsDB,
-		pendingValidatorBaseDB:            pendingValidatorBaseDB,
-		pendingValidatorList:              linkeddb.NewDefault(pendingValidatorBaseDB),
-		pendingDelegatorBaseDB:            pendingDelegatorBaseDB,
-		pendingDelegatorList:              linkeddb.NewDefault(pendingDelegatorBaseDB),
-		pendingSubnetValidatorBaseDB:      pendingSubnetValidatorBaseDB,
-		pendingSubnetValidatorList:        linkeddb.NewDefault(pendingSubnetValidatorBaseDB),
-		pendingSubnetDelegatorBaseDB:      pendingSubnetDelegatorBaseDB,
-		pendingSubnetDelegatorList:        linkeddb.NewDefault(pendingSubnetDelegatorBaseDB),
-		validatorWeightDiffsDB:            validatorWeightDiffsDB,
-		validatorWeightDiffsByHeightDB:    validatorWeightDiffsByHeightDB,
-		validatorPublicKeyDiffsDB:         validatorPublicKeyDiffsDB,
-		validatorPublicKeyDiffsByHeightDB: validatorPublicKeyDiffsByHeightDB,
+		validatorsDB:                        validatorsDB,
+		currentValidatorsDB:                 currentValidatorsDB,
+		currentValidatorBaseDB:              currentValidatorBaseDB,
+		currentValidatorList:                linkeddb.NewDefault(currentValidatorBaseDB),
+		currentDelegatorBaseDB:              currentDelegatorBaseDB,
+		currentDelegatorList:                linkeddb.NewDefault(currentDelegatorBaseDB),
+		currentSubnetValidatorBaseDB:        currentSubnetValidatorBaseDB,
+		currentSubnetValidatorList:          linkeddb.NewDefault(currentSubnetValidatorBaseDB),
+		currentSubnetDelegatorBaseDB:        currentSubnetDelegatorBaseDB,
+		currentSubnetDelegatorList:          linkeddb.NewDefault(currentSubnetDelegatorBaseDB),
+		pendingValidatorsDB:                 pendingValidatorsDB,
+		pendingValidatorBaseDB:              pendingValidatorBaseDB,
+		pendingValidatorList:                linkeddb.NewDefault(pendingValidatorBaseDB),
+		pendingDelegatorBaseDB:              pendingDelegatorBaseDB,
+		pendingDelegatorList:                linkeddb.NewDefault(pendingDelegatorBaseDB),
+		pendingSubnetValidatorBaseDB:        pendingSubnetValidatorBaseDB,
+		pendingSubnetValidatorList:          linkeddb.NewDefault(pendingSubnetValidatorBaseDB),
+		pendingSubnetDelegatorBaseDB:        pendingSubnetDelegatorBaseDB,
+		pendingSubnetDelegatorList:          linkeddb.NewDefault(pendingSubnetDelegatorBaseDB),
+		validatorWeightDiffsBySubnetIDDB:    validatorWeightDiffsBySubnetIDDB,
+		validatorWeightDiffsByHeightDB:      validatorWeightDiffsByHeightDB,
+		validatorPublicKeyDiffsBySubnetIDDB: validatorPublicKeyDiffsBySubnetDB,
+		validatorPublicKeyDiffsByHeightDB:   validatorPublicKeyDiffsByHeightDB,
 
 		addedTxs: make(map[ids.ID]*txAndStatus),
 		txDB:     prefixdb.New(TxPrefix, baseDB),
@@ -1481,7 +1481,7 @@ func (s *state) ApplyValidatorWeightDiffs(
 	endHeight uint64,
 	subnetID ids.ID,
 ) error {
-	diffIter := s.validatorWeightDiffsDB.NewIteratorWithStartAndPrefix(
+	diffIter := s.validatorWeightDiffsBySubnetIDDB.NewIteratorWithStartAndPrefix(
 		marshalStartDiffKey(subnetID, startHeight),
 		subnetID[:],
 	)
@@ -1572,7 +1572,7 @@ func (s *state) ApplyAllValidatorPublicKeyDiffs(
 	startHeight uint64,
 	endHeight uint64,
 ) error {
-	diffIter := s.validatorPublicKeyDiffsDB.NewIteratorWithStart(
+	diffIter := s.validatorPublicKeyDiffsBySubnetIDDB.NewIteratorWithStart(
 		marshalStartDiffKeyByHeight(startHeight),
 	)
 	defer diffIter.Release()
@@ -1618,7 +1618,7 @@ func (s *state) ApplyValidatorPublicKeyDiffs(
 	endHeight uint64,
 	subnetID ids.ID,
 ) error {
-	diffIter := s.validatorPublicKeyDiffsDB.NewIteratorWithStartAndPrefix(
+	diffIter := s.validatorPublicKeyDiffsBySubnetIDDB.NewIteratorWithStartAndPrefix(
 		marshalStartDiffKey(subnetID, startHeight),
 		subnetID[:],
 	)
@@ -2724,7 +2724,7 @@ func (s *state) writeValidatorDiffs(height uint64) error {
 		diffKey2 := marshalDiffKeyByHeight(height, subnetIDNodeID.subnetID, subnetIDNodeID.nodeID)
 		if diff.weightDiff.Amount != 0 {
 			weightDiff := marshalWeightDiff(&diff.weightDiff)
-			err := s.validatorWeightDiffsDB.Put(
+			err := s.validatorWeightDiffsBySubnetIDDB.Put(
 				diffKey,
 				weightDiff,
 			)
@@ -2740,7 +2740,7 @@ func (s *state) writeValidatorDiffs(height uint64) error {
 			}
 		}
 		if !bytes.Equal(diff.prevPublicKey, diff.newPublicKey) {
-			err := s.validatorPublicKeyDiffsDB.Put(
+			err := s.validatorPublicKeyDiffsBySubnetIDDB.Put(
 				diffKey,
 				diff.prevPublicKey,
 			)
