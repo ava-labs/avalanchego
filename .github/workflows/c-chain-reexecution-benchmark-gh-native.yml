@@ -8,19 +8,19 @@ on:
         description: 'The config to pass to the VM for the benchmark. See BenchmarkReexecuteRange for details.'
         required: false
         default: ''
-      start-block:
+      start_block:
         description: 'The start block for the benchmark.'
         required: false
         default: 101
-      end-block:
+      end_block:
         description: 'The end block for the benchmark.'
         required: false
         default: 250000
-      block-dir-src:
+      block_dir_src:
         description: 'The source block directory. Supports S3 directory/zip and local directories.'
         required: false
         default: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**
-      current-state-dir-src:
+      current_state_dir_src:
         description: 'The current state directory. Supports S3 directory/zip and local directories.'
         required: false
         default: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**
@@ -28,10 +28,10 @@ on:
         description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
         required: false
         default: ubuntu-latest
-      push-post-state:
+      push_post_state:
         description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
         default: ''
-      timeout-minutes:
+      timeout_minutes:
         description: 'Timeout in minutes for the job.'
         required: false
         default: 30
@@ -52,14 +52,14 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             {
               echo "matrix<<EOF"
-              printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
-                "${{ github.event.inputs.start-block }}" \
-                "${{ github.event.inputs.end-block }}" \
-                "${{ github.event.inputs.block-dir-src }}" \
-                "${{ github.event.inputs.current-state-dir-src }}" \
+              printf '{ "include": [{ "start_block": "%s", "end_block": "%s", "block_dir_src": "%s", "current_state_dir_src": "%s", "config": "%s", "runner": "%s", "timeout_minutes": %s }] }\n' \
+                "${{ github.event.inputs.start_block }}" \
+                "${{ github.event.inputs.end_block }}" \
+                "${{ github.event.inputs.block_dir_src }}" \
+                "${{ github.event.inputs.current_state_dir_src }}" \
                 "${{ github.event.inputs.config }}" \
                 "${{ github.event.inputs.runner }}" \
-                "${{ github.event.inputs.timeout-minutes }}"
+                "${{ github.event.inputs.timeout_minutes }}"
               echo EOF
             } >> "$GITHUB_OUTPUT"
           else
@@ -88,17 +88,17 @@ jobs:
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
           config: ${{ matrix.config }}
-          start-block: ${{ matrix.start-block }}
-          end-block: ${{ matrix.end-block }}
-          block-dir-src: ${{ matrix.block-dir-src }}
-          current-state-dir-src: ${{ matrix.current-state-dir-src }}
-          prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
-          prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
-          prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
-          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          push-github-action-benchmark: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master') }}
-          aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
-          aws-region: 'us-east-2'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          push-post-state: ${{ github.event.inputs.push-post-state }}
+          start_block: ${{ matrix.start_block }}
+          end_block: ${{ matrix.end_block }}
+          block_dir_src: ${{ matrix.block_dir_src }}
+          current_state_dir_src: ${{ matrix.current_state_dir_src }}
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          push_github_action_benchmark: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master') }}
+          aws_role: ${{ github.event.inputs.push_post_state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws_region: 'us-east-2'
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          push_post_state: ${{ github.event.inputs.push_post_state }}
           runner_name: ${{ matrix.runner }}
