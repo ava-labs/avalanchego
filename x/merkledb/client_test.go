@@ -46,9 +46,12 @@ func newFlakyRangeProofHandler(
 	db MerkleDB,
 	modifyResponse func(response *RangeProof),
 ) p2p.Handler {
-	handler := xsync.NewGetRangeProofHandler(db, RangeProofMarshaler{})
+	var (
+		c                   = counter{m: 2}
+		rangeProofMarshaler = RangeProofMarshaler{}
+		handler             = xsync.NewGetRangeProofHandler(db, rangeProofMarshaler)
+	)
 
-	c := counter{m: 2}
 	return &p2p.TestHandler{
 		AppRequestF: func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 			responseBytes, appErr := handler.AppRequest(ctx, nodeID, deadline, requestBytes)
@@ -56,7 +59,7 @@ func newFlakyRangeProofHandler(
 				return nil, appErr
 			}
 
-			proof, err := RangeProofMarshaler{}.Unmarshal(responseBytes)
+			proof, err := rangeProofMarshaler.Unmarshal(responseBytes)
 			require.NoError(t, err)
 
 			// Half of requests are modified
@@ -64,7 +67,7 @@ func newFlakyRangeProofHandler(
 				modifyResponse(proof)
 			}
 
-			responseBytes, err = RangeProofMarshaler{}.Marshal(proof)
+			responseBytes, err = rangeProofMarshaler.Marshal(proof)
 			if err != nil {
 				return nil, &common.AppError{Code: 123, Message: err.Error()}
 			}
@@ -79,9 +82,13 @@ func newFlakyChangeProofHandler(
 	db MerkleDB,
 	modifyResponse func(response *ChangeProof),
 ) p2p.Handler {
-	handler := xsync.NewGetChangeProofHandler(db, RangeProofMarshaler{}, ChangeProofMarshaler{})
+	var (
+		c                    = counter{m: 2}
+		rangeProofMarshaler  = RangeProofMarshaler{}
+		changeProofMarshaler = ChangeProofMarshaler{}
+		handler              = xsync.NewGetChangeProofHandler(db, rangeProofMarshaler, changeProofMarshaler)
+	)
 
-	c := counter{m: 2}
 	return &p2p.TestHandler{
 		AppRequestF: func(ctx context.Context, nodeID ids.NodeID, deadline time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 			responseBytes, appErr := handler.AppRequest(ctx, nodeID, deadline, requestBytes)
@@ -92,7 +99,7 @@ func newFlakyChangeProofHandler(
 			response := &pb.GetChangeProofResponse{}
 			require.NoError(t, proto.Unmarshal(responseBytes, response))
 
-			proof, err := ChangeProofMarshaler{}.Unmarshal(response.GetChangeProof())
+			proof, err := changeProofMarshaler.Unmarshal(response.GetChangeProof())
 			require.NoError(t, err)
 
 			// Half of requests are modified
@@ -100,7 +107,7 @@ func newFlakyChangeProofHandler(
 				modifyResponse(proof)
 			}
 
-			proofBytes, err := ChangeProofMarshaler{}.Marshal(proof)
+			proofBytes, err := changeProofMarshaler.Marshal(proof)
 			require.NoError(t, err)
 			responseBytes, err = proto.Marshal(&pb.GetChangeProofResponse{
 				Response: &pb.GetChangeProofResponse_ChangeProof{
