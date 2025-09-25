@@ -375,7 +375,6 @@ func (m *manager) getAllCurrentValidatorSets(
 	ctx context.Context,
 ) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, uint64, error) {
 	subnetsMap := m.cfg.Validators.GetAllMaps()
-	// TODO is there a race-condition here?
 	currentHeight, err := m.getCurrentHeight(ctx)
 	return subnetsMap, currentHeight, err
 }
