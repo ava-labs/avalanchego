@@ -42,10 +42,6 @@ type SignedBlock interface {
 	// Proposer returns the ID of the node that proposed this block. If no node
 	// signed this block, [ids.EmptyNodeID] will be returned.
 	Proposer() ids.NodeID
-
-	setID(id ids.ID)
-	setSignature(signature []byte)
-	setBytes(bytes []byte)
 }
 
 type statelessUnsignedBlock struct {
@@ -183,18 +179,6 @@ func (*statelessBlock) PChainEpoch() Epoch {
 	return Epoch{}
 }
 
-func (b *statelessBlock) setID(id ids.ID) {
-	b.id = id
-}
-
-func (b *statelessBlock) setSignature(signature []byte) {
-	b.Signature = signature
-}
-
-func (b *statelessBlock) setBytes(bytes []byte) {
-	b.bytes = bytes
-}
-
 func (b *statelessGraniteBlock) ParentID() ids.ID {
 	return b.StatelessGraniteBlock.StatelessBlock.ParentID
 }
@@ -209,18 +193,6 @@ func (b *statelessGraniteBlock) PChainHeight() uint64 {
 
 func (b *statelessGraniteBlock) PChainEpoch() Epoch {
 	return b.StatelessGraniteBlock.Epoch
-}
-
-func (b *statelessGraniteBlock) setID(id ids.ID) {
-	b.id = id
-}
-
-func (b *statelessGraniteBlock) setSignature(signature []byte) {
-	b.Signature = signature
-}
-
-func (b *statelessGraniteBlock) setBytes(bytes []byte) {
-	b.bytes = bytes
 }
 
 func (b *statelessGraniteBlock) initialize(bytes []byte) error {

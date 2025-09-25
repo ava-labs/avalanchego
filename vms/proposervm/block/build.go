@@ -63,11 +63,6 @@ func Build(
 	key crypto.Signer,
 ) (SignedBlock, error) {
 	var (
-		metadata = statelessBlockMetadata{
-			timestamp: timestamp,
-			cert:      cert,
-			proposer:  ids.NodeIDFromCert(cert),
-		}
 		statelessUnsignedBlock = statelessUnsignedBlock{
 			ParentID:     parentID,
 			Timestamp:    timestamp.Unix(),
@@ -75,21 +70,27 @@ func Build(
 			Certificate:  cert.Raw,
 			Block:        blockBytes,
 		}
-		block SignedBlock
+		metadata  *statelessBlockMetadata
+		signature *[]byte
+		block     SignedBlock
 	)
 	if epoch.Number == 0 {
-		block = &statelessBlock{
-			statelessBlockMetadata: metadata,
-			StatelessBlock:         statelessUnsignedBlock,
+		b := &statelessBlock{
+			StatelessBlock: statelessUnsignedBlock,
 		}
+		metadata = &b.statelessBlockMetadata
+		signature = &b.Signature
+		block = b
 	} else {
-		block = &statelessGraniteBlock{
-			statelessBlockMetadata: metadata,
+		b := &statelessGraniteBlock{
 			StatelessGraniteBlock: statelessUnsignedGraniteBlock{
 				StatelessBlock: statelessUnsignedBlock,
 				Epoch:          epoch,
 			},
 		}
+		metadata = &b.statelessBlockMetadata
+		signature = &b.Signature
+		block = b
 	}
 
 	unsignedBytesWithEmptySignature, err := Codec.Marshal(CodecVersion, &block)
@@ -104,22 +105,17 @@ func Build(
 	lenUnsignedBytes := len(unsignedBytesWithEmptySignature) - wrappers.IntLen
 	unsignedBytes := unsignedBytesWithEmptySignature[:lenUnsignedBytes]
 
-	// Set the block ID
-	block.setID(hashing.ComputeHash256Array(unsignedBytes))
-
-	header, err := BuildHeader(chainID, parentID, block.ID())
+	id := hashing.ComputeHash256Array(unsignedBytes)
+	header, err := BuildHeader(chainID, parentID, id)
 	if err != nil {
 		return nil, err
 	}
 
 	headerHash := hashing.ComputeHash256(header.Bytes())
-	signature, err := key.Sign(rand.Reader, headerHash, crypto.SHA256)
+	*signature, err = key.Sign(rand.Reader, headerHash, crypto.SHA256)
 	if err != nil {
 		return nil, err
 	}
-
-	// Set the signature
-	block.setSignature(signature)
 
 	// Marshal the final block with signature
 	finalBytes, err := Codec.Marshal(CodecVersion, &block)
@@ -127,9 +123,14 @@ func Build(
 		return nil, err
 	}
 
-	// Set the final bytes
-	block.setBytes(finalBytes)
-
+	// Set the metadata
+	*metadata = statelessBlockMetadata{
+		id:        id,
+		timestamp: timestamp,
+		cert:      cert,
+		proposer:  ids.NodeIDFromCert(cert),
+		bytes:     finalBytes,
+	}
 	return block, nil
 }
 
