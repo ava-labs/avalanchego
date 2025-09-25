@@ -36,7 +36,7 @@ func TestMarshalCodeRequest(t *testing.T) {
 func TestMarshalCodeResponse(t *testing.T) {
 	// generate some random code data
 	// set random seed for deterministic random
-	rand.Seed(1)
+	rand := rand.New(rand.NewSource(1))
 	codeData := make([]byte, 50)
 	_, err := rand.Read(codeData)
 	require.NoError(t, err)

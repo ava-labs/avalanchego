@@ -68,10 +68,10 @@ func TestSyncerScenarios(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rand.Seed(1)
+			r := rand.New(rand.NewSource(1))
 			targetHeight := 10 * uint64(testCommitInterval)
 			serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-			root, _, _ := statesynctest.GenerateTrie(t, serverTrieDB, int(targetHeight), state.TrieKeyLength)
+			root, _, _ := statesynctest.GenerateTrie(t, r, serverTrieDB, int(targetHeight), state.TrieKeyLength)
 
 			testSyncer(t, serverTrieDB, targetHeight, root, nil, int64(targetHeight), tt.numWorkers)
 		})
@@ -104,11 +104,11 @@ func TestSyncerResumeScenarios(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rand.Seed(1)
+			r := rand.New(rand.NewSource(1))
 			targetHeight := 10 * uint64(testCommitInterval)
 			serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 			numTrieKeys := int(targetHeight) - 1 // no atomic ops for genesis
-			root, _, _ := statesynctest.GenerateTrie(t, serverTrieDB, numTrieKeys, state.TrieKeyLength)
+			root, _, _ := statesynctest.GenerateTrie(t, r, serverTrieDB, numTrieKeys, state.TrieKeyLength)
 
 			testSyncer(t, serverTrieDB, targetHeight, root, []atomicSyncTestCheckpoint{
 				{
@@ -148,16 +148,16 @@ func TestSyncerResumeNewRootCheckpointScenarios(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			rand.Seed(1)
+			r := rand.New(rand.NewSource(1))
 			targetHeight1 := 10 * uint64(testCommitInterval)
 			serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 			numTrieKeys1 := int(targetHeight1) - 1 // no atomic ops for genesis
-			root1, _, _ := statesynctest.GenerateTrie(t, serverTrieDB, numTrieKeys1, state.TrieKeyLength)
+			root1, _, _ := statesynctest.GenerateTrie(t, r, serverTrieDB, numTrieKeys1, state.TrieKeyLength)
 
 			targetHeight2 := 20 * uint64(testCommitInterval)
 			numTrieKeys2 := int(targetHeight2) - 1 // no atomic ops for genesis
 			root2, _, _ := statesynctest.FillTrie(
-				t, numTrieKeys1, numTrieKeys2, state.TrieKeyLength, serverTrieDB, root1,
+				t, r, numTrieKeys1, numTrieKeys2, state.TrieKeyLength, serverTrieDB, root1,
 			)
 
 			testSyncer(t, serverTrieDB, targetHeight1, root1, []atomicSyncTestCheckpoint{
@@ -222,8 +222,9 @@ func TestSyncerContextCancellation(t *testing.T) {
 // It returns the context, mock client, atomic backend, client DB, and root hash for testing.
 func setupParallelizationTest(t *testing.T, targetHeight uint64) (context.Context, *syncclient.TestClient, *state.AtomicBackend, *versiondb.Database, common.Hash) {
 	// Create a simple test trie with some data.
+	r := rand.New(rand.NewSource(1))
 	serverTrieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	root, _, _ := statesynctest.GenerateTrie(t, serverTrieDB, int(targetHeight), state.TrieKeyLength)
+	root, _, _ := statesynctest.GenerateTrie(t, r, serverTrieDB, int(targetHeight), state.TrieKeyLength)
 
 	ctx, mockClient, atomicBackend, clientDB := setupTestInfrastructure(t, serverTrieDB)
 

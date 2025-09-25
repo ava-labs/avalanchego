@@ -17,7 +17,7 @@ import (
 func TestMarshalLeafsRequest(t *testing.T) {
 	// generate some random code data
 	// set random seed for deterministic random
-	rand.Seed(1)
+	rand := rand.New(rand.NewSource(1))
 
 	startBytes := make([]byte, common.HashLength)
 	endBytes := make([]byte, common.HashLength)
@@ -57,7 +57,7 @@ func TestMarshalLeafsRequest(t *testing.T) {
 func TestMarshalLeafsResponse(t *testing.T) {
 	// generate some random code data
 	// set random seed for deterministic random
-	rand.Seed(1)
+	rand := rand.New(rand.NewSource(1))
 
 	keysBytes := make([][]byte, 16)
 	valsBytes := make([][]byte, 16)
