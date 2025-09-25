@@ -1458,7 +1458,7 @@ func (s *state) ApplyValidatorWeightDiffsByHeight(
 		vdrs, ok := allValidators[subnetID]
 		if !ok {
 			// If this subnet previously had no validators, add the map back
-			vdrs = make(map[ids.NodeID]*validators.GetValidatorOutput, 1)
+			vdrs = make(map[ids.NodeID]*validators.GetValidatorOutput)
 			allValidators[subnetID] = vdrs
 		}
 
