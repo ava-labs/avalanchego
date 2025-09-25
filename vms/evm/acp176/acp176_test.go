@@ -317,7 +317,7 @@ var (
 			seconds: 1,
 			expected: State{
 				Gas: gas.State{
-					Capacity: 3_689_348_878_490_565_692,                        // greater than MaxUint64/10
+					Capacity: 3_689_348_878_490_565_692,                        // greater than MaxUint / TargetToMaxCapacity
 					Excess:   math.MaxUint64 - (3_689_348_878_490_565_692 / 2), // MaxUint64 - capacity / TargetToMax
 				},
 				TargetExcess: 947_688_692, // unmodified
@@ -336,8 +336,8 @@ var (
 			seconds: 1,
 			expected: State{
 				Gas: gas.State{
-					Capacity: math.MaxUint64,            // greater than MaxUint64/10
-					Excess:   9_223_371_875_007_030_354, // less than MaxUint64/2
+					Capacity: math.MaxUint64,            // greater than MaxUint / TargetToMaxCapacity
+					Excess:   9_223_371_875_007_030_354, // less than MaxUint / TargetToMax
 				},
 				TargetExcess: 1_001_692_467, // unmodified
 			},
@@ -350,7 +350,7 @@ var (
 		expected     State
 	}{
 		{
-			name: "0_seconds",
+			name: "0_ms",
 			initial: State{
 				Gas: gas.State{
 					Capacity: 0,
@@ -369,7 +369,7 @@ var (
 			},
 		},
 		{
-			name: "1_seconds",
+			name: "1000_ms",
 			initial: State{
 				Gas: gas.State{
 					Capacity: 0,
@@ -388,7 +388,7 @@ var (
 			},
 		},
 		{
-			name: "5_seconds",
+			name: "5000_ms",
 			initial: State{
 				Gas: gas.State{
 					Capacity: 0,
@@ -407,7 +407,7 @@ var (
 			},
 		},
 		{
-			name: "0_seconds_over_capacity",
+			name: "0_ms_over_capacity",
 			initial: State{
 				Gas: gas.State{
 					Capacity: 16_000_000, // Could happen if the targetExcess was modified
@@ -440,7 +440,7 @@ var (
 			milliseconds: 1000,
 			expected: State{
 				Gas: gas.State{
-					Capacity: 3_689_348_878_490_564_000,                        // greater than MaxUint64/10
+					Capacity: 3_689_348_878_490_564_000,                        // greater than MaxUint64 / TargetToMaxCapacity
 					Excess:   math.MaxUint64 - (3_689_348_878_490_564_000 / 2), // MaxUint64 - capacity / TargetToMax
 				},
 				TargetExcess: 947_688_692, // unmodified
@@ -459,8 +459,8 @@ var (
 			milliseconds: 1000,
 			expected: State{
 				Gas: gas.State{
-					Capacity: math.MaxUint64,            // greater than MaxUint64/10
-					Excess:   9_223_371_875_007_030_615, // less than MaxUint64/2
+					Capacity: math.MaxUint64,            // greater than MaxUint64 / TargetToMaxCapacity
+					Excess:   9_223_371_875_007_030_615, // less than MaxUint / TargetToMax
 				},
 				TargetExcess: 1_001_692_467, // unmodified
 			},
