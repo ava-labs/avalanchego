@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/platformvm/fx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
-	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	stdcontext "context"
 )
@@ -25,7 +24,7 @@ type Signer interface {
 	//
 	// If the signer doesn't have the ability to provide a required signature,
 	// the signature slot will be skipped without reporting an error.
-	Sign(ctx stdcontext.Context, tx *txs.Tx, options ...common.Option) error
+	Sign(ctx stdcontext.Context, tx *txs.Tx) error
 }
 
 type Backend interface {
@@ -47,16 +46,13 @@ func New(kc keychain.Keychain, backend Backend, networkID uint32) Signer {
 	}
 }
 
-func (s *txSigner) Sign(ctx stdcontext.Context, tx *txs.Tx, options ...common.Option) error {
-	ops := common.NewOptions(options)
-
+func (s *txSigner) Sign(ctx stdcontext.Context, tx *txs.Tx) error {
 	return tx.Unsigned.Visit(&visitor{
-		kc:            s.kc,
-		backend:       s.backend,
-		ctx:           ctx,
-		tx:            tx,
-		networkID:     s.networkID,
-		forceSignHash: ops.ForceSignHash(),
+		kc:        s.kc,
+		backend:   s.backend,
+		ctx:       ctx,
+		tx:        tx,
+		networkID: s.networkID,
 	})
 }
 
@@ -64,8 +60,7 @@ func SignUnsigned(
 	ctx stdcontext.Context,
 	signer Signer,
 	utx txs.UnsignedTx,
-	options ...common.Option,
 ) (*txs.Tx, error) {
 	tx := &txs.Tx{Unsigned: utx}
-	return tx, signer.Sign(ctx, tx, options...)
+	return tx, signer.Sign(ctx, tx)
 }

@@ -9,12 +9,14 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -45,17 +47,25 @@ type Signer interface {
 	SignAtomic(ctx context.Context, tx *atomic.Tx) error
 }
 
+type EthKeychain interface {
+	// The returned Signer can provide a signature for [addr]
+	GetEth(addr common.Address) (keychain.Signer, bool)
+	// Returns the set of addresses for which the accessor keeps an associated
+	// signer
+	EthAddresses() set.Set[common.Address]
+}
+
 type SignerBackend interface {
 	GetUTXO(ctx context.Context, chainID, utxoID ids.ID) (*avax.UTXO, error)
 }
 
 type txSigner struct {
 	avaxKC  keychain.Keychain
-	ethKC   keychain.EthKeychain
+	ethKC   EthKeychain
 	backend SignerBackend
 }
 
-func NewSigner(avaxKC keychain.Keychain, ethKC keychain.EthKeychain, backend SignerBackend) Signer {
+func NewSigner(avaxKC keychain.Keychain, ethKC EthKeychain, backend SignerBackend) Signer {
 	return &txSigner{
 		avaxKC:  avaxKC,
 		ethKC:   ethKC,

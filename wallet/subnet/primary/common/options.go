@@ -70,8 +70,6 @@ type Options struct {
 
 	issuanceHandler     func(IssuanceReceipt)
 	confirmationHandler func(ConfirmationReceipt)
-
-	forceSignHash bool
 }
 
 func NewOptions(ops []Option) *Options {
@@ -163,10 +161,6 @@ func (o *Options) ConfirmationHandler() func(ConfirmationReceipt) {
 	return o.confirmationHandler
 }
 
-func (o *Options) ForceSignHash() bool {
-	return o.forceSignHash
-}
-
 func WithContext(ctx context.Context) Option {
 	return func(o *Options) {
 		o.ctx = ctx
@@ -240,11 +234,5 @@ func WithIssuanceHandler(f func(IssuanceReceipt)) Option {
 func WithConfirmationHandler(f func(ConfirmationReceipt)) Option {
 	return func(o *Options) {
 		o.confirmationHandler = f
-	}
-}
-
-func WithForceSignHash() Option {
-	return func(o *Options) {
-		o.forceSignHash = true
 	}
 }

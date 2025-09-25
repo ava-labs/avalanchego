@@ -20,16 +20,17 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/wallet/chain/c"
 
 	avasecp256k1 "github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	secp256k1 "github.com/decred/dcrd/dcrec/secp256k1/v4"
 )
 
 var (
-	_ keychain.Keychain    = (*Keychain)(nil)
-	_ keychain.EthKeychain = (*Keychain)(nil)
-	_ keychain.Signer      = (*cubesignerSigner)(nil)
-	_ CubeSignerClient     = (*client.ApiClient)(nil)
+	_ keychain.Keychain = (*Keychain)(nil)
+	_ c.EthKeychain     = (*Keychain)(nil)
+	_ keychain.Signer   = (*cubesignerSigner)(nil)
+	_ CubeSignerClient  = (*client.ApiClient)(nil)
 
 	ErrNoKeysProvided           = errors.New("you need to provide at least one key to create a server keychain")
 	ErrEmptySignatureFromServer = errors.New("empty signature obtained from server")

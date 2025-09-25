@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -38,12 +37,11 @@ var (
 
 // visitor handles signing transactions for the signer
 type visitor struct {
-	kc            keychain.Keychain
-	backend       Backend
-	ctx           context.Context
-	tx            *txs.Tx
-	networkID     uint32
-	forceSignHash bool
+	kc        keychain.Keychain
+	backend   Backend
+	ctx       context.Context
+	tx        *txs.Tx
+	networkID uint32
 }
 
 func (s *visitor) BaseTx(tx *txs.BaseTx) error {
@@ -51,7 +49,7 @@ func (s *visitor) BaseTx(tx *txs.BaseTx) error {
 	if err != nil {
 		return err
 	}
-	return sign(s.tx, txCreds, txSigners, s.networkID, s.forceSignHash)
+	return sign(s.tx, txCreds, txSigners, s.networkID)
 }
 
 func (s *visitor) CreateAssetTx(tx *txs.CreateAssetTx) error {
@@ -59,7 +57,7 @@ func (s *visitor) CreateAssetTx(tx *txs.CreateAssetTx) error {
 	if err != nil {
 		return err
 	}
-	return sign(s.tx, txCreds, txSigners, s.networkID, s.forceSignHash)
+	return sign(s.tx, txCreds, txSigners, s.networkID)
 }
 
 func (s *visitor) OperationTx(tx *txs.OperationTx) error {
@@ -73,7 +71,7 @@ func (s *visitor) OperationTx(tx *txs.OperationTx) error {
 	}
 	txCreds = append(txCreds, txOpsCreds...)
 	txSigners = append(txSigners, txOpsSigners...)
-	return sign(s.tx, txCreds, txSigners, s.networkID, s.forceSignHash)
+	return sign(s.tx, txCreds, txSigners, s.networkID)
 }
 
 func (s *visitor) ImportTx(tx *txs.ImportTx) error {
@@ -87,7 +85,7 @@ func (s *visitor) ImportTx(tx *txs.ImportTx) error {
 	}
 	txCreds = append(txCreds, txImportCreds...)
 	txSigners = append(txSigners, txImportSigners...)
-	return sign(s.tx, txCreds, txSigners, s.networkID, s.forceSignHash)
+	return sign(s.tx, txCreds, txSigners, s.networkID)
 }
 
 func (s *visitor) ExportTx(tx *txs.ExportTx) error {
@@ -95,7 +93,7 @@ func (s *visitor) ExportTx(tx *txs.ExportTx) error {
 	if err != nil {
 		return err
 	}
-	return sign(s.tx, txCreds, txSigners, s.networkID, s.forceSignHash)
+	return sign(s.tx, txCreds, txSigners, s.networkID)
 }
 
 func (s *visitor) getSigners(ctx context.Context, sourceChainID ids.ID, ins []*avax.TransferableInput) ([]verify.Verifiable, [][]keychain.Signer, error) {
@@ -221,7 +219,7 @@ func (s *visitor) getOpsSigners(ctx context.Context, sourceChainID ids.ID, ops [
 	return txCreds, txSigners, nil
 }
 
-func sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]keychain.Signer, networkID uint32, signHash bool) error {
+func sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]keychain.Signer, networkID uint32) error {
 	codec := builder.Parser.Codec()
 	unsignedBytes, err := codec.Marshal(txs.CodecVersion, &tx.Unsigned)
 	if err != nil {
@@ -285,15 +283,9 @@ func sign(tx *txs.Tx, creds []verify.Verifiable, txSigners [][]keychain.Signer, 
 				continue
 			}
 
-			var sig []byte
-			if signHash {
-				unsignedHash := hashing.ComputeHash256(unsignedBytes)
-				sig, err = signer.SignHash(unsignedHash)
-			} else {
-				sig, err = signer.Sign(unsignedBytes,
-					keychain.WithChainAlias(builder.Alias),
-					keychain.WithNetworkID(networkID))
-			}
+			sig, err := signer.Sign(unsignedBytes,
+				keychain.WithChainAlias(builder.Alias),
+				keychain.WithNetworkID(networkID))
 			if err != nil {
 				return fmt.Errorf("problem signing tx: %w", err)
 			}

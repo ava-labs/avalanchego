@@ -1,11 +1,10 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package ledger
+package keychain
 
 import (
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto/ledger"
 	"github.com/ava-labs/avalanchego/version"
 )
 
@@ -18,6 +17,3 @@ type Ledger interface {
 	Sign(unsignedTxBytes []byte, addressIndices []uint32) ([][]byte, error)
 	Disconnect() error
 }
-
-// Verify that the ledger implementation satisfies the interface
-var _ Ledger = (*ledger.Ledger)(nil)
