@@ -101,7 +101,7 @@ func TestPutGet(t *testing.T, newDB func() database.HeightIndex) {
 			// Query the specific height
 			retrievedData, err := db.Get(tt.queryHeight)
 			if tt.expectedErr != nil {
-				require.Equal(t, tt.expectedErr, err)
+				require.ErrorIs(t, err, tt.expectedErr)
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tt.expected, retrievedData)
