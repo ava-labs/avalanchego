@@ -18,9 +18,24 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/heightindexdb/dbtest"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
+
+func TestInterface(t *testing.T) {
+	for name, test := range dbtest.Tests {
+		t.Run(name, func(t *testing.T) {
+			test(t, func() database.HeightIndex {
+				tempDir := t.TempDir()
+				db, err := New(DefaultConfig().WithDir(tempDir), logging.NoLog{})
+				require.NoError(t, err)
+				return db
+			})
+		})
+	}
+}
 
 func TestNew_Params(t *testing.T) {
 	tempDir := t.TempDir()

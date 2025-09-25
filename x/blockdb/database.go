@@ -303,7 +303,7 @@ func (s *Database) Close() error {
 	defer s.closeMu.Unlock()
 
 	if s.closed {
-		return nil
+		return database.ErrClosed
 	}
 	s.closed = true
 
@@ -522,6 +522,10 @@ func (s *Database) Get(height BlockHeight) (BlockData, error) {
 	calculatedChecksum := calculateChecksum(decompressed)
 	if calculatedChecksum != bh.Checksum {
 		return nil, fmt.Errorf("checksum mismatch: calculated %d, stored %d", calculatedChecksum, bh.Checksum)
+	}
+
+	if len(decompressed) == 0 {
+		return nil, nil
 	}
 
 	return decompressed, nil
