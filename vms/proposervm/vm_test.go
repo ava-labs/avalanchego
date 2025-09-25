@@ -211,7 +211,7 @@ func initTestProposerVM(
 	return coreVM, valState, proVM, db
 }
 
-func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) error {
+func waitForProposerWindow(vm *VM, chainTip snowman.Block, pChainHeight uint64) error {
 	var (
 		ctx              = context.Background()
 		childBlockHeight = chainTip.Height() + 1
@@ -219,11 +219,12 @@ func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) 
 	)
 
 	for {
-		slot := proposer.TimeToSlot(parentTimestamp, vm.Clock.Time().Truncate(time.Second))
+		now := vm.Clock.Time().Truncate(time.Second)
+		slot := proposer.TimeToSlot(parentTimestamp, now)
 		delay, err := vm.MinDelayForProposer(
 			ctx,
 			childBlockHeight,
-			pchainHeight,
+			pChainHeight,
 			vm.ctx.NodeID,
 			slot,
 		)
@@ -231,10 +232,12 @@ func waitForProposerWindow(vm *VM, chainTip snowman.Block, pchainHeight uint64) 
 			return err
 		}
 
-		vm.Clock.Set(parentTimestamp.Add(delay))
-		if delay < proposer.MaxLookAheadWindow {
+		delayUntil := parentTimestamp.Add(delay)
+		if !now.Before(delayUntil) {
 			return nil
 		}
+
+		vm.Clock.Set(delayUntil)
 	}
 }
 
@@ -2561,7 +2564,7 @@ func TestTimestampMetrics(t *testing.T) {
 		t.Run(tt.blockType, func(t *testing.T) {
 			gauge, err := gaugeVec.GetMetricWithLabelValues(tt.blockType)
 			require.NoError(t, err)
-			require.InDelta(t, float64(tt.want.Unix()), testutil.ToFloat64(gauge), 0)
+			require.Equal(t, float64(tt.want.Unix()), testutil.ToFloat64(gauge))
 		})
 	}
 }

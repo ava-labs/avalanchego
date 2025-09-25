@@ -24,7 +24,7 @@ nix develop
 ### AWS Access
 This walkthrough assumes AWS access to the S3 bucket `s3://avalanchego-bootstrap-testing` in the Ava Labs Experimental Account in `us-east-2`.
 
-To configure your development environment, fetch AWS credentials and add them to the environment from:
+To authenticate metrics collection (disabled by default), provide the Prometheus credentials referenced in the e2e [README](../../e2e/README.md#monitoring).
 
 Okta -> AWS Access Portal -> Experimental -> Access Keys
 

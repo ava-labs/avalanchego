@@ -126,7 +126,6 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 
 				needPermute := round > 3
 				if needPermute {
-					rand.Seed(time.Now().UnixNano())
 					rand.Shuffle(len(testKeys), func(i, j int) {
 						testKeys[i], testKeys[j] = testKeys[j], testKeys[i]
 					})
@@ -290,12 +289,12 @@ var _ = e2e.DescribeXChainSerial("[Virtuous Transfer Tx AVAX]", func() {
 					// by now
 					currentXBlksProcessing, _ := tests.GetMetricValue(mm, blksProcessingMetric, xChainMetricLabels)
 					previousXBlksProcessing, _ := tests.GetMetricValue(prev, blksProcessingMetric, xChainMetricLabels)
-					require.InDelta(currentXBlksProcessing, previousXBlksProcessing, 0)
+					require.Equal(currentXBlksProcessing, previousXBlksProcessing)
 
 					// +1 since X-chain tx must have been accepted by now
 					currentXBlksAccepted, _ := tests.GetMetricValue(mm, blksAcceptedMetric, xChainMetricLabels)
 					previousXBlksAccepted, _ := tests.GetMetricValue(prev, blksAcceptedMetric, xChainMetricLabels)
-					require.InDelta(currentXBlksAccepted, previousXBlksAccepted+1, 0)
+					require.Equal(currentXBlksAccepted, previousXBlksAccepted+1)
 
 					metricsBeforeTx[u] = mm
 				}

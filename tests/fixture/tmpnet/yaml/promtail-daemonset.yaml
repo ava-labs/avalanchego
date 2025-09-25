@@ -55,7 +55,7 @@ data:
       grpc_listen_port: 0
 
     clients:
-    - url: https://loki-poc.avax-dev.network/api/prom/push
+    - url: ${LOKI_URL}
       basic_auth:
         username: ${LOKI_USERNAME}
         password: ${LOKI_PASSWORD}
@@ -154,15 +154,20 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: 'spec.nodeName'
+        - name: LOKI_URL
+          valueFrom:
+            secretKeyRef:
+              name: loki-config
+              key: url
         - name: LOKI_USERNAME
           valueFrom:
             secretKeyRef:
-              name: loki-credentials
+              name: loki-config
               key: username
         - name: LOKI_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: loki-credentials
+              name: loki-config
               key: password
         volumeMounts:
         - name: logs
