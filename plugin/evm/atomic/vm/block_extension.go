@@ -230,13 +230,10 @@ func (be *blockExtension) Reject() error {
 func (be *blockExtension) CleanupVerified() error {
 	vm := be.blockExtender.vm
 	atomicState, err := vm.AtomicBackend.GetVerifiedAtomicState(be.block.GetEthBlock().Hash())
-	if err == nil {
-		err = atomicState.Reject()
-		if err != nil {
-			return fmt.Errorf("failed to reject atomic state: %w", err)
-		}
+	if err != nil {
+		return err
 	}
-	return nil
+	return atomicState.Reject()
 }
 
 // AtomicTxs returns the atomic transactions in this block.
