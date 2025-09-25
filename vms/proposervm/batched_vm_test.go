@@ -604,7 +604,7 @@ func TestBatchedParseBlockParallel(t *testing.T) {
 	pChainEpoch := blockbuilder.Epoch{
 		PChainHeight: uint64(2),
 		Number:       uint64(0),
-		StartTime:    time.Unix(123, 0),
+		StartTime:    time.Unix(123, 0).Unix(),
 	}
 	chainID := ids.GenerateTestID()
 

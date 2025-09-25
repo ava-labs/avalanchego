@@ -214,7 +214,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 		block.Epoch{
 			PChainHeight: pChainHeight,
 			Number:       0,
-			StartTime:    time.Time{},
+			StartTime:    0,
 		},
 		innerBlock.Bytes(),
 	)

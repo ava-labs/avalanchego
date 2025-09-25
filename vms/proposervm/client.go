@@ -6,7 +6,6 @@ package proposervm
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/utils/rpc"
@@ -39,6 +38,6 @@ func (c *Client) GetCurrentEpoch(ctx context.Context, options ...rpc.Option) (bl
 	return block.Epoch{
 		PChainHeight: uint64(res.PChainHeight),
 		Number:       uint64(res.Number),
-		StartTime:    time.Unix(int64(res.StartTime), 0),
+		StartTime:    int64(res.StartTime),
 	}, nil
 }

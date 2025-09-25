@@ -443,12 +443,12 @@ func TestNextPChainEpoch(t *testing.T) {
 			parentEpoch: statelessblock.Epoch{
 				PChainHeight: 0,
 				Number:       0,
-				StartTime:    time.Time{},
+				StartTime:    0,
 			},
 			expected: statelessblock.Epoch{
 				PChainHeight: 100,
 				Number:       1,
-				StartTime:    now,
+				StartTime:    now.Unix(),
 			},
 		},
 		{
@@ -458,12 +458,12 @@ func TestNextPChainEpoch(t *testing.T) {
 			parentEpoch: statelessblock.Epoch{
 				PChainHeight: 2,
 				Number:       2,
-				StartTime:    now,
+				StartTime:    now.Unix(),
 			},
 			expected: statelessblock.Epoch{
 				PChainHeight: 100,
 				Number:       3,
-				StartTime:    now.Add(epochDuration + 1),
+				StartTime:    now.Add(epochDuration + 1).Unix(),
 			},
 		},
 		{
@@ -473,12 +473,12 @@ func TestNextPChainEpoch(t *testing.T) {
 			parentEpoch: statelessblock.Epoch{
 				PChainHeight: 2,
 				Number:       2,
-				StartTime:    now,
+				StartTime:    now.Unix(),
 			},
 			expected: statelessblock.Epoch{
 				PChainHeight: 2,
 				Number:       2,
-				StartTime:    now,
+				StartTime:    now.Unix(),
 			},
 		},
 	}

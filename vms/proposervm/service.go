@@ -76,7 +76,7 @@ func (p *ProposerAPI) GetCurrentEpoch(r *http.Request, _ *struct{}, reply *GetEp
 
 	// Latest block sealed the epoch.
 	reply.Number = avajson.Uint64(nextEpoch.Number)
-	reply.StartTime = avajson.Uint64(nextEpoch.StartTime.Unix())
+	reply.StartTime = avajson.Uint64(nextEpoch.StartTime)
 	reply.PChainHeight = avajson.Uint64(nextEpoch.PChainHeight)
 
 	return nil

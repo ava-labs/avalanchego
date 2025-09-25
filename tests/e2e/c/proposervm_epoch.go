@@ -71,7 +71,7 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 		)
 		require.GreaterOrEqual(
 			advancedEpoch.StartTime,
-			initialEpoch.StartTime.Add(upgrades.GraniteEpochDuration),
+			initialEpoch.StartTime+int64(upgrades.GraniteEpochDuration.Seconds()),
 			"expected epoch start time to advance, but it did not",
 		)
 		// P-chain height may not increase if no new blocks were created on the P-chain

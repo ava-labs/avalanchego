@@ -88,18 +88,18 @@ func nextPChainEpoch(parentPChainHeight uint64, parentEpoch block.Epoch, parentT
 		return block.Epoch{
 			PChainHeight: parentPChainHeight,
 			Number:       1,
-			StartTime:    parentTimestamp,
+			StartTime:    parentTimestamp.Unix(),
 		}
 	}
 
-	if parentTimestamp.After(parentEpoch.StartTime.Add(epochDuration)) {
+	if parentTimestamp.After(time.Unix(parentEpoch.StartTime, 0).Add(epochDuration)) {
 		// If the parent crossed the epoch boundary, then it sealed the previous epoch. The child
 		// is the first block of the new epoch, so should use the parent's P-Chain height, increment
 		// the epoch number, and set the epoch start time to the parent's timestamp.
 		return block.Epoch{
 			PChainHeight: parentPChainHeight,
 			Number:       parentEpoch.Number + 1,
-			StartTime:    parentTimestamp,
+			StartTime:    parentTimestamp.Unix(),
 		}
 	}
 	// Otherwise, the parent did not seal the previous epoch, so the child should use the parent's
@@ -278,7 +278,7 @@ func (p *postForkCommonComponents) buildChild(
 			zap.Uint64("pChainHeight", pChainHeight),
 			zap.Uint64("epochPChainHeight", epoch.PChainHeight),
 			zap.Uint64("epochNumber", epoch.Number),
-			zap.Time("epochStartTime", epoch.StartTime),
+			zap.Time("epochStartTime", time.Unix(epoch.StartTime, 0)),
 		)
 		contextPChainHeight = epoch.PChainHeight
 	case p.vm.Upgrades.IsEtnaActivated(newTimestamp):
