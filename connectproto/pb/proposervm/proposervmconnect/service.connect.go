@@ -41,9 +41,7 @@ const (
 
 // ProposerVMClient is a client for the proposervm.ProposerVM service.
 type ProposerVMClient interface {
-	// GetProposedHeight returns the height of the currently proposed block.
-	// This method is used to query the height of the block that is currently
-	// being proposed by the ProposerVM for network consensus.
+	// GetProposedHeight returns the P-Chain height that would be included in a block if it were proposed right now.
 	GetProposedHeight(context.Context, *connect.Request[proposervm.GetProposedHeightRequest]) (*connect.Response[proposervm.GetProposedHeightReply], error)
 }
 
@@ -79,9 +77,7 @@ func (c *proposerVMClient) GetProposedHeight(ctx context.Context, req *connect.R
 
 // ProposerVMHandler is an implementation of the proposervm.ProposerVM service.
 type ProposerVMHandler interface {
-	// GetProposedHeight returns the height of the currently proposed block.
-	// This method is used to query the height of the block that is currently
-	// being proposed by the ProposerVM for network consensus.
+	// GetProposedHeight returns the P-Chain height that would be included in a block if it were proposed right now.
 	GetProposedHeight(context.Context, *connect.Request[proposervm.GetProposedHeightRequest]) (*connect.Response[proposervm.GetProposedHeightReply], error)
 }
 
