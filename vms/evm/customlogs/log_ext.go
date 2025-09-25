@@ -12,7 +12,6 @@ func FlattenLogs(list [][]*types.Log) []*types.Log {
 		numLogs += len(logs)
 	}
 
-	// Pre-allocate slice with exact capacity
 	flat := make([]*types.Log, 0, numLogs)
 	for _, logs := range list {
 		flat = append(flat, logs...)
