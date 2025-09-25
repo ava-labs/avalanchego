@@ -475,11 +475,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			// Place gas remaining check before error check, so that it is not skipped when there is an error
 			require.Equalf(t, test.expectedGasRemaining, gasRemaining, "unexpected gas remaining (%d of %d)", gasRemaining, test.gasInput)
 
-			if test.expectedErr != nil {
-				require.ErrorIs(t, err, test.expectedErr, "expected error to match")
-				return
-			}
-			require.NoError(t, err, "EVM Call produced unexpected error")
+			require.ErrorIs(t, err, test.expectedErr)
 			require.Equal(t, test.expectedResult, ret, "unexpected return value")
 			if test.stateDBCheck != nil {
 				test.stateDBCheck(t, stateDB)

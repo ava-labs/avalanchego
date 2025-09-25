@@ -299,27 +299,25 @@ func TestAppRequestOnShutdown(t *testing.T) {
 	requestMessage := HelloRequest{Message: "this is a request"}
 	require.NoError(t, net.Connected(context.Background(), nodeID, defaultPeerVersion))
 
-	wg.Add(1)
-	var requestErr error
+	doneChan := make(chan error, 1)
 	go func() {
-		defer wg.Done()
 		requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
 		if err != nil {
-			requestErr = fmt.Errorf("failed to convert request to bytes: %w", err)
+			doneChan <- fmt.Errorf("failed to convert request to bytes: %w", err)
 			return
 		}
 		responseBytes, _, err := net.SendSyncedAppRequestAny(context.Background(), defaultPeerVersion, requestBytes)
 		if !errors.Is(err, errRequestFailed) {
-			requestErr = fmt.Errorf("expected errRequestFailed, got: %w", err)
+			doneChan <- fmt.Errorf("expected errRequestFailed, got: %w", err)
 			return
 		}
 		if responseBytes != nil {
-			requestErr = errors.New("response bytes should be nil")
+			doneChan <- errors.New("response bytes should be nil")
 			return
 		}
+		doneChan <- nil
 	}()
-	wg.Wait()
-	require.NoError(t, requestErr)
+	require.NoError(t, <-doneChan)
 	require.True(t, called)
 }
 

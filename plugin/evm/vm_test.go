@@ -1868,6 +1868,11 @@ func TestBuildBlockLargeTxStarvation(t *testing.T) {
 }
 
 func TestWaitForEvent(t *testing.T) {
+	type eventResult struct {
+		msg commonEng.Message
+		err error
+	}
+
 	for _, testCase := range []struct {
 		name     string
 		testCase func(*testing.T, *VM)
@@ -1880,12 +1885,6 @@ func TestWaitForEvent(t *testing.T) {
 
 				var wg sync.WaitGroup
 				wg.Add(1)
-
-				// We run WaitForEvent in a goroutine to ensure it can be safely called concurrently.
-				type eventResult struct {
-					msg commonEng.Message
-					err error
-				}
 				resultCh := make(chan eventResult, 1)
 
 				go func() {
@@ -1905,11 +1904,6 @@ func TestWaitForEvent(t *testing.T) {
 			testCase: func(t *testing.T, vm *VM) {
 				var wg sync.WaitGroup
 				wg.Add(1)
-
-				type eventResult struct {
-					msg commonEng.Message
-					err error
-				}
 				resultCh := make(chan eventResult, 1)
 
 				go func() {
@@ -1940,11 +1934,8 @@ func TestWaitForEvent(t *testing.T) {
 
 				blk, err := vm.BuildBlock(context.Background())
 				require.NoError(t, err)
-
 				require.NoError(t, blk.Verify(context.Background()))
-
 				require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
-
 				require.NoError(t, blk.Accept(context.Background()))
 
 				ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
@@ -1952,12 +1943,6 @@ func TestWaitForEvent(t *testing.T) {
 
 				var wg sync.WaitGroup
 				wg.Add(1)
-
-				// We run WaitForEvent in a goroutine to ensure it can be safely called concurrently.
-				type eventResult struct {
-					msg commonEng.Message
-					err error
-				}
 				resultCh := make(chan eventResult, 1)
 
 				go func() {
@@ -1970,11 +1955,8 @@ func TestWaitForEvent(t *testing.T) {
 				result := <-resultCh
 				require.ErrorIs(t, result.err, context.DeadlineExceeded)
 				require.Zero(t, result.msg)
-
 				t.Log("WaitForEvent returns when regular transactions are added to the mempool")
-
 				time.Sleep(time.Second * 2) // sleep some time to let the gas capacity to refill
-
 				signedTx = newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 1, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
 
 				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
@@ -1982,8 +1964,8 @@ func TestWaitForEvent(t *testing.T) {
 				}
 
 				wg.Add(1)
-
 				resultCh2 := make(chan eventResult, 1)
+
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
@@ -1998,11 +1980,8 @@ func TestWaitForEvent(t *testing.T) {
 				// Build a block again to wipe out the subscription
 				blk, err = vm.BuildBlock(context.Background())
 				require.NoError(t, err)
-
 				require.NoError(t, blk.Verify(context.Background()))
-
 				require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
-
 				require.NoError(t, blk.Accept(context.Background()))
 			},
 		},
@@ -2022,11 +2001,6 @@ func TestWaitForEvent(t *testing.T) {
 
 				var wg sync.WaitGroup
 				wg.Add(1)
-
-				type eventResult struct {
-					msg commonEng.Message
-					err error
-				}
 				resultCh := make(chan eventResult, 1)
 
 				go func() {
