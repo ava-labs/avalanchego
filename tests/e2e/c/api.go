@@ -26,10 +26,7 @@ var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("ProposerVMAPI"), fu
 	require := require.New(tc)
 
 	setupProposerVMTest := func() (avalancheCChainID ids.ID, nodeURI tmpnet.NodeURI) {
-		var (
-			env = e2e.GetEnv(tc)
-		)
-
+		env := e2e.GetEnv(tc)
 		nodeURI = env.GetRandomNodeURI()
 
 		// Get the proper Avalanche C-Chain ID for routing
