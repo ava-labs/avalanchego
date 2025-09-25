@@ -14,6 +14,10 @@ inputs:
     description: 'Directory path where AvalancheGo will be checked out'
     required: false
     default: 'avalanchego'
+  avalanchego:
+    description: 'AvalancheGo version (commit SHA, branch name, or tag)'
+    required: false
+    default: ${{ github.sha }}
   firewood:
     description: 'Firewood version (commit SHA, branch, tag). Consumer should run Firewood shared workflow first.'
     required: false
@@ -35,6 +39,12 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    - name: Checkout AvalancheGo
+      uses: actions/checkout@v4
+      with:
+        repository: 'ava-labs/avalanchego'
+        ref: ${{ inputs.avalanchego }}
+        path: ${{ inputs.checkout-path }}
     - name: Checkout Coreth
       if: inputs.coreth != 'master'
       uses: actions/checkout@v4
@@ -50,7 +60,7 @@ runs:
         ref: ${{ inputs.libevm }}
         path: 'libevm'
     - name: Setup Go for project
-      uses: ./.github/actions/setup-go-for-project  # Note: If Nix-specific functionality is needed, consumer should install Nix as prerequisite to this action
+      uses: ./.github/actions/setup-go-for-project  # Note: If Nix-specific functionality is needed, consumer should install Nix as prerequiste to this action
     - name: Replace dependencies with local checkouts
       shell: bash
       working-directory: ./${{ inputs.checkout-path }}
