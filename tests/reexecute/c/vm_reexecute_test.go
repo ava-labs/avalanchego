@@ -81,6 +81,9 @@ var (
 			"pruning-enabled": true,
 			"state-sync-enabled": false
 		}`,
+		"blockdb": `{
+			"block-database-enabled": true
+		}`,
 	}
 
 	configNameArg  string
