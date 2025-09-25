@@ -231,7 +231,9 @@ func (be *blockExtension) CleanupVerified() error {
 	vm := be.blockExtender.vm
 	atomicState, err := vm.AtomicBackend.GetVerifiedAtomicState(be.block.GetEthBlock().Hash())
 	if err != nil {
-		return err
+		// If atomic state doesn't exist, it means verification failed before
+		// the state was created, so there's nothing to clean up
+		return nil
 	}
 	return atomicState.Reject()
 }
