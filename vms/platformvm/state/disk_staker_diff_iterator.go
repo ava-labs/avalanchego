@@ -41,7 +41,7 @@ func marshalStartDiffKey(subnetID ids.ID, height uint64) []byte {
 
 // marshalStartDiffKeyByHeight is used to determine the starting key when iterating.
 //
-// Invariant: the result is a prefix of [marshalDiffKey] when called with the
+// Invariant: the result is a prefix of [marshalDiffKeyByHeight] when called with the
 // same arguments.
 func marshalStartDiffKeyByHeight(height uint64) []byte {
 	key := make([]byte, database.Uint64Size)
