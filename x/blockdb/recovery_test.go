@@ -332,7 +332,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 					Height:   1,
 					Checksum: calculateChecksum(blocks[1]),
 					Size:     compressedSize1 + 1, // make block larger than actual compressed size
-					Version:  DataEntryVersion,
+					Version:  BlockEntryVersion,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -359,7 +359,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 					Height:   1,
 					Checksum: 0xDEADBEEF, // Wrong checksum
 					Size:     compressedSize1,
-					Version:  DataEntryVersion,
+					Version:  BlockEntryVersion,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -409,7 +409,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 					Height:   5, // Invalid height because its below the minimum height of 10
 					Checksum: calculateChecksum(blocks[1]),
 					Size:     compressedSize1,
-					Version:  DataEntryVersion,
+					Version:  BlockEntryVersion,
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -473,7 +473,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 					Height:   1,
 					Checksum: calculateChecksum(blocks[1]),
 					Size:     compressedSize1,
-					Version:  DataEntryVersion + 1, // Invalid version
+					Version:  BlockEntryVersion + 1, // Invalid version
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},
@@ -501,7 +501,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 					Height:   1,
 					Checksum: calculateChecksum(blocks[1]),
 					Size:     compressedSize1,
-					Version:  DataEntryVersion + 10, // version cannot be greater than current
+					Version:  BlockEntryVersion + 10, // version cannot be greater than current
 				}
 				return writeBlockHeader(store, secondBlockOffset, bh)
 			},

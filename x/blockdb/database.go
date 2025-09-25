@@ -28,8 +28,8 @@ import (
 )
 
 const (
-	indexFileName          = "db.idx"
-	dataFileNameFormat     = "db_%d.dat"
+	indexFileName          = "blockdb.idx"
+	dataFileNameFormat     = "blockdb_%d.dat"
 	defaultFilePermissions = 0o666
 
 	// Since 0 is a valid height, math.MaxUint64 is used to indicate unset height.
@@ -39,8 +39,8 @@ const (
 	// IndexFileVersion is the version of the index file format.
 	IndexFileVersion uint64 = 1
 
-	// DataEntryVersion is the version of a data entry.
-	DataEntryVersion uint16 = 1
+	// BlockEntryVersion is the version of the block entry.
+	BlockEntryVersion uint16 = 1
 )
 
 // BlockHeight defines the type for block heights.
@@ -381,7 +381,7 @@ func (s *Database) Put(height BlockHeight, block BlockData) error {
 		Height:   height,
 		Size:     blockDataLen,
 		Checksum: calculateChecksum(block),
-		Version:  DataEntryVersion,
+		Version:  BlockEntryVersion,
 	}
 	if err := s.writeBlockAt(writeDataOffset, bh, blockToWrite); err != nil {
 		s.log.Error("Failed to write block: error writing block data",
@@ -810,8 +810,8 @@ func (s *Database) recoverBlockAtOffset(offset, totalDataSize uint64) (blockEntr
 	if bh.Size == 0 {
 		return bh, fmt.Errorf("%w: invalid block size in header at offset %d: %d", ErrCorrupted, offset, bh.Size)
 	}
-	if bh.Version > DataEntryVersion {
-		return bh, fmt.Errorf("%w: invalid block entry version at offset %d, version %d is greater than the current version %d", ErrCorrupted, offset, bh.Version, DataEntryVersion)
+	if bh.Version > BlockEntryVersion {
+		return bh, fmt.Errorf("%w: invalid block entry version at offset %d, version %d is greater than the current version %d", ErrCorrupted, offset, bh.Version, BlockEntryVersion)
 	}
 	if bh.Height < s.header.MinHeight || bh.Height == unsetHeight {
 		return bh, fmt.Errorf(
