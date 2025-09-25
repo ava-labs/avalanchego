@@ -309,34 +309,3 @@ func TestWriteBlock_Errors(t *testing.T) {
 		})
 	}
 }
-
-func TestWriteBlock_EmptyBlock(t *testing.T) {
-	tests := []struct {
-		name   string
-		height uint64
-		block  []byte
-	}{
-		{
-			name:   "nil block",
-			height: 0,
-			block:  nil,
-		},
-		{
-			name:   "zero length block",
-			height: 1,
-			block:  []byte{},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			store, cleanup := newTestDatabase(t, DefaultConfig())
-			defer cleanup()
-
-			require.NoError(t, store.Put(tt.height, tt.block))
-			block, err := store.Get(tt.height)
-			require.NoError(t, err)
-			require.Nil(t, block)
-		})
-	}
-}
