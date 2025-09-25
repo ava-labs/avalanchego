@@ -15,7 +15,7 @@ import (
 
 const (
 	GenesisHeight        uint64 = 0
-	GenesisUnixTimestamp int64  = 1
+	GenesisUnixTimestamp int64  = 1607144400
 )
 
 var (
