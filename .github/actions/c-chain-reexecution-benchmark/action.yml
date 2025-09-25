@@ -98,6 +98,7 @@ runs:
         prometheus_password: ${{ inputs.prometheus-password }}
         grafana_dashboard_id: 'Gl1I20mnk/c-chain'
         runtime: "" # Set runtime input to empty string to disable log collection
+        prometheus_url: ${{ inputs.prometheus-push-url }}
 
     - name: Compare Benchmark Results
       uses: benchmark-action/github-action-benchmark@v1

@@ -329,10 +329,11 @@ jobs:
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
+          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: us-east-2
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          push-post-state: ''
+          runner_name: 'avalanche-avalanchego-runner'
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
-          aws-region: 'us-east-2'
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          runner_name: ${{ matrix.runner }}
