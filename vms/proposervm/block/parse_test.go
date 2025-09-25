@@ -58,14 +58,36 @@ func TestParseBlocks(t *testing.T) {
 		output []ParseResult
 	}{
 		{
-			name:   "ValidThenInvalid",
-			input:  [][]byte{signedBlockBytes, malformedBlockBytes},
-			output: []ParseResult{{Block: &statelessBlock{bytes: signedBlockBytes}}, {Err: wrappers.ErrInsufficientLength}},
+			name:  "ValidThenInvalid",
+			input: [][]byte{signedBlockBytes, malformedBlockBytes},
+			output: []ParseResult{
+				{
+					Block: &statelessBlock{
+						statelessBlockMetadata: statelessBlockMetadata{
+							bytes: signedBlockBytes,
+						},
+					},
+				},
+				{
+					Err: wrappers.ErrInsufficientLength,
+				},
+			},
 		},
 		{
-			name:   "InvalidThenValid",
-			input:  [][]byte{malformedBlockBytes, signedBlockBytes},
-			output: []ParseResult{{Err: wrappers.ErrInsufficientLength}, {Block: &statelessBlock{bytes: signedBlockBytes}}},
+			name:  "InvalidThenValid",
+			input: [][]byte{malformedBlockBytes, signedBlockBytes},
+			output: []ParseResult{
+				{
+					Err: wrappers.ErrInsufficientLength,
+				},
+				{
+					Block: &statelessBlock{
+						statelessBlockMetadata: statelessBlockMetadata{
+							bytes: signedBlockBytes,
+						},
+					},
+				},
+			},
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {

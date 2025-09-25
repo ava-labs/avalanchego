@@ -67,30 +67,96 @@ type Epoch struct {
 	StartTime    int64  `serialize:"true" json:"startTime"`
 }
 
-type statelessBlock struct {
-	StatelessBlock statelessUnsignedBlock `serialize:"true" json:"statelessBlock"`
-	Signature      []byte                 `serialize:"true" json:"signature"`
-
+type statelessBlockMetadata struct {
 	id        ids.ID
 	timestamp time.Time
 	cert      *staking.Certificate
 	proposer  ids.NodeID
 	bytes     []byte
+}
+
+func (m *statelessBlockMetadata) initialize(
+	b *statelessUnsignedBlock,
+	sig []byte,
+	bytes []byte,
+) error {
+	m.bytes = bytes
+
+	// The serialized form of the block is the unsignedBytes followed by the
+	// signature, which is prefixed by a uint32. So, we need to strip off the
+	// signature as well as it's length prefix to get the unsigned bytes.
+	lenUnsignedBytes := len(bytes) - wrappers.IntLen - len(sig)
+	unsignedBytes := bytes[:lenUnsignedBytes]
+	m.id = hashing.ComputeHash256Array(unsignedBytes)
+
+	m.timestamp = time.Unix(b.Timestamp, 0)
+	if len(b.Certificate) == 0 {
+		return nil
+	}
+
+	var err error
+	m.cert, err = staking.ParseCertificate(b.Certificate)
+	if err != nil {
+		return fmt.Errorf("%w: %w", errInvalidCertificate, err)
+	}
+
+	m.proposer = ids.NodeIDFromCert(m.cert)
+	return nil
+}
+
+func (m *statelessBlockMetadata) verify(
+	b *statelessUnsignedBlock,
+	sig []byte,
+	chainID ids.ID,
+) error {
+	if len(b.Certificate) == 0 {
+		if len(sig) > 0 {
+			return errUnexpectedSignature
+		}
+		return nil
+	}
+
+	header, err := BuildHeader(chainID, b.ParentID, m.id)
+	if err != nil {
+		return err
+	}
+
+	headerBytes := header.Bytes()
+	return staking.CheckSignature(
+		m.cert,
+		headerBytes,
+		sig,
+	)
+}
+
+func (m *statelessBlockMetadata) ID() ids.ID {
+	return m.id
+}
+
+func (m *statelessBlockMetadata) Timestamp() time.Time {
+	return m.timestamp
+}
+
+func (m *statelessBlockMetadata) Proposer() ids.NodeID {
+	return m.proposer
+}
+
+func (m *statelessBlockMetadata) Bytes() []byte {
+	return m.bytes
+}
+
+type statelessBlock struct {
+	statelessBlockMetadata
+
+	StatelessBlock statelessUnsignedBlock `serialize:"true" json:"statelessBlock"`
+	Signature      []byte                 `serialize:"true" json:"signature"`
 }
 
 type statelessGraniteBlock struct {
+	statelessBlockMetadata
+
 	StatelessGraniteBlock statelessUnsignedGraniteBlock `serialize:"true" json:"statelessGraniteBlock"`
 	Signature             []byte                        `serialize:"true" json:"signature"`
-
-	id        ids.ID
-	timestamp time.Time
-	cert      *staking.Certificate
-	proposer  ids.NodeID
-	bytes     []byte
-}
-
-func (b *statelessBlock) ID() ids.ID {
-	return b.id
 }
 
 func (b *statelessBlock) ParentID() ids.ID {
@@ -101,54 +167,12 @@ func (b *statelessBlock) Block() []byte {
 	return b.StatelessBlock.Block
 }
 
-func (b *statelessBlock) Bytes() []byte {
-	return b.bytes
-}
-
 func (b *statelessBlock) initialize(bytes []byte) error {
-	b.bytes = bytes
-
-	// The serialized form of the block is the unsignedBytes followed by the
-	// signature, which is prefixed by a uint32. So, we need to strip off the
-	// signature as well as it's length prefix to get the unsigned bytes.
-	lenUnsignedBytes := len(bytes) - wrappers.IntLen - len(b.Signature)
-	unsignedBytes := bytes[:lenUnsignedBytes]
-	b.id = hashing.ComputeHash256Array(unsignedBytes)
-
-	b.timestamp = time.Unix(b.StatelessBlock.Timestamp, 0)
-	if len(b.StatelessBlock.Certificate) == 0 {
-		return nil
-	}
-
-	var err error
-	b.cert, err = staking.ParseCertificate(b.StatelessBlock.Certificate)
-	if err != nil {
-		return fmt.Errorf("%w: %w", errInvalidCertificate, err)
-	}
-
-	b.proposer = ids.NodeIDFromCert(b.cert)
-	return nil
+	return b.statelessBlockMetadata.initialize(&b.StatelessBlock, b.Signature, bytes)
 }
 
 func (b *statelessBlock) verify(chainID ids.ID) error {
-	if len(b.StatelessBlock.Certificate) == 0 {
-		if len(b.Signature) > 0 {
-			return errUnexpectedSignature
-		}
-		return nil
-	}
-
-	header, err := BuildHeader(chainID, b.StatelessBlock.ParentID, b.id)
-	if err != nil {
-		return err
-	}
-
-	headerBytes := header.Bytes()
-	return staking.CheckSignature(
-		b.cert,
-		headerBytes,
-		b.Signature,
-	)
+	return b.statelessBlockMetadata.verify(&b.StatelessBlock, b.Signature, chainID)
 }
 
 func (b *statelessBlock) PChainHeight() uint64 {
@@ -157,14 +181,6 @@ func (b *statelessBlock) PChainHeight() uint64 {
 
 func (*statelessBlock) PChainEpoch() Epoch {
 	return Epoch{}
-}
-
-func (b *statelessBlock) Timestamp() time.Time {
-	return b.timestamp
-}
-
-func (b *statelessBlock) Proposer() ids.NodeID {
-	return b.proposer
 }
 
 func (b *statelessBlock) setID(id ids.ID) {
@@ -177,10 +193,6 @@ func (b *statelessBlock) setSignature(signature []byte) {
 
 func (b *statelessBlock) setBytes(bytes []byte) {
 	b.bytes = bytes
-}
-
-func (b *statelessGraniteBlock) ID() ids.ID {
-	return b.id
 }
 
 func (b *statelessGraniteBlock) ParentID() ids.ID {
@@ -199,18 +211,6 @@ func (b *statelessGraniteBlock) PChainEpoch() Epoch {
 	return b.StatelessGraniteBlock.Epoch
 }
 
-func (b *statelessGraniteBlock) Bytes() []byte {
-	return b.bytes
-}
-
-func (b *statelessGraniteBlock) Proposer() ids.NodeID {
-	return b.proposer
-}
-
-func (b *statelessGraniteBlock) Timestamp() time.Time {
-	return b.timestamp
-}
-
 func (b *statelessGraniteBlock) setID(id ids.ID) {
 	b.id = id
 }
@@ -223,55 +223,10 @@ func (b *statelessGraniteBlock) setBytes(bytes []byte) {
 	b.bytes = bytes
 }
 
-// This is the same as the statelessBlock.initialize method. Combining them would require adding more
-// private methods on the SignedBlock interface.
 func (b *statelessGraniteBlock) initialize(bytes []byte) error {
-	b.bytes = bytes
-
-	// The serialized form of the block is the unsignedBytes followed by the
-	// signature, which is prefixed by a uint32. So, we need to strip off the
-	// signature as well as it's length prefix to get the unsigned bytes.
-	lenUnsignedBytes := len(bytes) - wrappers.IntLen - len(b.Signature)
-	unsignedBytes := bytes[:lenUnsignedBytes]
-	b.id = hashing.ComputeHash256Array(unsignedBytes)
-
-	statelessBlock := b.StatelessGraniteBlock.StatelessBlock
-
-	b.timestamp = time.Unix(statelessBlock.Timestamp, 0)
-	if len(statelessBlock.Certificate) == 0 {
-		return nil
-	}
-
-	var err error
-	b.cert, err = staking.ParseCertificate(statelessBlock.Certificate)
-	if err != nil {
-		return fmt.Errorf("%w: %w", errInvalidCertificate, err)
-	}
-
-	b.proposer = ids.NodeIDFromCert(b.cert)
-	return nil
+	return b.statelessBlockMetadata.initialize(&b.StatelessGraniteBlock.StatelessBlock, b.Signature, bytes)
 }
 
-// This is the same as the statelessBlock.verify method. Combining them would require
-// ~5 more private methods on the SignedBlock interface.
 func (b *statelessGraniteBlock) verify(chainID ids.ID) error {
-	statelessBlock := b.StatelessGraniteBlock.StatelessBlock
-	if len(statelessBlock.Certificate) == 0 {
-		if len(b.Signature) > 0 {
-			return errUnexpectedSignature
-		}
-		return nil
-	}
-
-	header, err := BuildHeader(chainID, statelessBlock.ParentID, b.id)
-	if err != nil {
-		return err
-	}
-
-	headerBytes := header.Bytes()
-	return staking.CheckSignature(
-		b.cert,
-		headerBytes,
-		b.Signature,
-	)
+	return b.statelessBlockMetadata.verify(&b.StatelessGraniteBlock.StatelessBlock, b.Signature, chainID)
 }

@@ -21,29 +21,25 @@ func BuildUnsigned(
 	epoch Epoch,
 	blockBytes []byte,
 ) (SignedBlock, error) {
-	var block SignedBlock
+	var (
+		statelessUnsignedBlock = statelessUnsignedBlock{
+			ParentID:     parentID,
+			Timestamp:    timestamp.Unix(),
+			PChainHeight: pChainHeight,
+			Certificate:  nil,
+			Block:        blockBytes,
+		}
+		block SignedBlock
+	)
 	if epoch.Number == 0 {
 		block = &statelessBlock{
-			StatelessBlock: statelessUnsignedBlock{
-				ParentID:     parentID,
-				Timestamp:    timestamp.Unix(),
-				PChainHeight: pChainHeight,
-				Certificate:  nil,
-				Block:        blockBytes,
-			},
-			timestamp: timestamp,
+			StatelessBlock: statelessUnsignedBlock,
 		}
 	} else {
 		block = &statelessGraniteBlock{
 			StatelessGraniteBlock: statelessUnsignedGraniteBlock{
-				StatelessBlock: statelessUnsignedBlock{
-					ParentID:     parentID,
-					Timestamp:    timestamp.Unix(),
-					PChainHeight: pChainHeight,
-					Certificate:  nil,
-					Block:        blockBytes,
-				},
-				Epoch: epoch,
+				StatelessBlock: statelessUnsignedBlock,
+				Epoch:          epoch,
 			},
 		}
 	}
@@ -66,35 +62,33 @@ func Build(
 	chainID ids.ID,
 	key crypto.Signer,
 ) (SignedBlock, error) {
-	var block SignedBlock
-	if epoch.Number == 0 {
-		block = &statelessBlock{
-			StatelessBlock: statelessUnsignedBlock{
-				ParentID:     parentID,
-				Timestamp:    timestamp.Unix(),
-				PChainHeight: pChainHeight,
-				Certificate:  cert.Raw,
-				Block:        blockBytes,
-			},
+	var (
+		metadata = statelessBlockMetadata{
 			timestamp: timestamp,
 			cert:      cert,
 			proposer:  ids.NodeIDFromCert(cert),
 		}
+		statelessUnsignedBlock = statelessUnsignedBlock{
+			ParentID:     parentID,
+			Timestamp:    timestamp.Unix(),
+			PChainHeight: pChainHeight,
+			Certificate:  cert.Raw,
+			Block:        blockBytes,
+		}
+		block SignedBlock
+	)
+	if epoch.Number == 0 {
+		block = &statelessBlock{
+			statelessBlockMetadata: metadata,
+			StatelessBlock:         statelessUnsignedBlock,
+		}
 	} else {
 		block = &statelessGraniteBlock{
+			statelessBlockMetadata: metadata,
 			StatelessGraniteBlock: statelessUnsignedGraniteBlock{
-				StatelessBlock: statelessUnsignedBlock{
-					ParentID:     parentID,
-					Timestamp:    timestamp.Unix(),
-					PChainHeight: pChainHeight,
-					Certificate:  cert.Raw,
-					Block:        blockBytes,
-				},
-				Epoch: epoch,
+				StatelessBlock: statelessUnsignedBlock,
+				Epoch:          epoch,
 			},
-			timestamp: timestamp,
-			cert:      cert,
-			proposer:  ids.NodeIDFromCert(cert),
 		}
 	}
 
