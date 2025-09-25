@@ -45,6 +45,8 @@ runs:
         repository: 'ava-labs/avalanchego'
         ref: ${{ inputs.avalanchego }}
         path: ${{ inputs.checkout-path }}
+    - name: Setup Go for project
+      uses: ./.github/actions/setup-go-for-project  # Note: If Nix-specific functionality is needed, consumer should install Nix as prerequiste to this action
     - name: Checkout Coreth
       if: inputs.coreth != 'master'
       uses: actions/checkout@v4
@@ -59,8 +61,6 @@ runs:
         repository: 'ava-labs/libevm'
         ref: ${{ inputs.libevm }}
         path: 'libevm'
-    - name: Setup Go for project
-      uses: ./.github/actions/setup-go-for-project  # Note: If Nix-specific functionality is needed, consumer should install Nix as prerequiste to this action
     - name: Replace dependencies with local checkouts
       if: ${{ inputs.coreth != '' || inputs.libevm != '' }}
       shell: bash
@@ -85,6 +85,16 @@ runs:
       shell: bash
       working-directory: ./${{ inputs.checkout-path }}
       run: |
+        echo "=== Debug: Directory structure before replacement ==="
+        echo "Current working directory:"
+        pwd
+        echo "Contents of current directory:"
+        ls -la
+        echo "Contents of parent directory (..):"
+        ls -la ..
+        echo "Github action path:"
+        echo "$GITHUB_ACTION_PATH"
+
         if [ -n "${{ inputs.args }}" ]; then
           OUTPUT=$(./build_target.sh "${{ inputs.target }}" ${{ inputs.args }})
         else

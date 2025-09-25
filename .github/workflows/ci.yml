@@ -312,7 +312,7 @@ jobs:
         with:
           coreth: "2d2f6cbb997ece114b408387773fa161b7324a21"
           libevm: "414b1f5dffea8f1c1deb6edde125ad896570b183"
-      - name: Verify setup and build manually
+      - name: Verify versions and setup
         run: |
           cd avalanchego
           echo "Checking go.mod exists..."
@@ -320,6 +320,27 @@ jobs:
             echo "Error: go.mod not found"
             exit 1
           fi
+
+          echo "=== Verifying coreth version ==="
+          if [ -f "go.mod" ]; then
+            echo "Coreth version from go.mod:"
+            cat go.mod | grep "github.com/ava-labs/coreth"
+          fi
+
+          echo "=== Verifying libevm version ==="
+          if [ -f "go.mod" ]; then
+            echo "LibEVM version from go.mod:"
+            cat go.mod | grep "github.com/ava-labs/libevm"
+          fi
+
+          echo "=== Full go.mod content ==="
+          cat go.mod
+      - name: Verify setup and build manually
+        run: |
+          cd avalanchego
           echo "Building manually in setup mode..."
           ./scripts/run_task.sh build
-          echo "Manual build completed successfully"
+          echo "Manual build completed successfully
+      - name: Run avalanchego
+        run: |
+          ./build/avalanchego --help
