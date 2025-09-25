@@ -18,6 +18,12 @@ type ProposerAPI struct {
 	vm *VM
 }
 
+type GetEpochResponse struct {
+	Number       avajson.Uint64 `json:"number"`
+	StartTime    avajson.Uint64 `json:"startTime"`
+	PChainHeight avajson.Uint64 `json:"pChainHeight"`
+}
+
 func (p *ProposerAPI) GetProposedHeight(r *http.Request, _ *struct{}, reply *api.GetHeightResponse) error {
 	p.vm.ctx.Log.Debug("API called",
 		zap.String("service", "proposervm"),
@@ -34,7 +40,7 @@ func (p *ProposerAPI) GetProposedHeight(r *http.Request, _ *struct{}, reply *api
 }
 
 // Returns the epoch information that will be used for the next block to be proposed.
-func (p *ProposerAPI) GetCurrentEpoch(r *http.Request, _ *struct{}, reply *api.GetEpochResponse) error {
+func (p *ProposerAPI) GetCurrentEpoch(r *http.Request, _ *struct{}, reply *GetEpochResponse) error {
 	p.vm.ctx.Log.Debug("API called",
 		zap.String("service", "proposervm"),
 		zap.String("method", "getCurrentEpoch"),
