@@ -336,7 +336,7 @@ func TestWriteBlock_EmptyBlock(t *testing.T) {
 			require.NoError(t, store.Put(tt.height, tt.block))
 			block, err := store.Get(tt.height)
 			require.NoError(t, err)
-			require.Equal(t, []byte{}, block)
+			require.Nil(t, block)
 		})
 	}
 }

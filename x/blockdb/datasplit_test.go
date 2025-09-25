@@ -78,14 +78,13 @@ func TestDataSplitting_DeletedFile(t *testing.T) {
 		blocks[i] = fixedSizeBlock(t, 1024, uint64(i))
 		require.NoError(t, store.Put(uint64(i), blocks[i]))
 	}
-	store.Close()
+	require.NoError(t, store.Close())
 
 	// Delete the first data file (blockdb_0.dat)
 	firstDataFilePath := filepath.Join(store.config.DataDir, fmt.Sprintf(dataFileNameFormat, 0))
 	require.NoError(t, os.Remove(firstDataFilePath))
 
 	// reopen and verify the blocks
-	require.NoError(t, store.Close())
 	config = config.WithIndexDir(store.config.IndexDir).WithDataDir(store.config.DataDir)
 	_, err := New(config, store.log)
 	require.ErrorIs(t, err, ErrCorrupted)
