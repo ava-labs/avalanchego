@@ -30,7 +30,7 @@ var (
 
 // marshalStartDiffKeyBySubnetID is used to determine the starting key when iterating.
 //
-// Invariant: the result is a prefix of [marshalDiffKey] when called with the
+// Invariant: the result is a prefix of [marshalDiffKeyBySubnetID] when called with the
 // same arguments.
 func marshalStartDiffKeyBySubnetID(subnetID ids.ID, height uint64) []byte {
 	key := make([]byte, startDiffKeyLength)
