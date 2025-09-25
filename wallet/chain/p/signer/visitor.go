@@ -37,10 +37,11 @@ var (
 
 // visitor handles signing transactions for the signer
 type visitor struct {
-	kc      keychain.Keychain
-	backend Backend
-	ctx     context.Context
-	tx      *txs.Tx
+	kc            keychain.Keychain
+	backend       Backend
+	ctx           context.Context
+	tx            *txs.Tx
+	forceSignHash bool
 }
 
 func (*visitor) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
@@ -56,7 +57,7 @@ func (s *visitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	if err != nil {
 		return err
 	}
-	return sign(s.tx, false, txSigners)
+	return sign(s.tx, s.forceSignHash, txSigners)
 }
 
 func (s *visitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
@@ -69,7 +70,7 @@ func (s *visitor) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
 		return err
 	}
 	txSigners = append(txSigners, subnetAuthSigners)
-	return sign(s.tx, false, txSigners)
+	return sign(s.tx, s.forceSignHash, txSigners)
 }
 
 func (s *visitor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
@@ -77,7 +78,7 @@ func (s *visitor) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
 	if err != nil {
 		return err
 	}
-	return sign(s.tx, false, txSigners)
+	return sign(s.tx, s.forceSignHash, txSigners)
 }
 
 func (s *visitor) CreateChainTx(tx *txs.CreateChainTx) error {
@@ -90,7 +91,7 @@ func (s *visitor) CreateChainTx(tx *txs.CreateChainTx) error {
 		return err
 	}
 	txSigners = append(txSigners, subnetAuthSigners)
-	return sign(s.tx, false, txSigners)
+	return sign(s.tx, s.forceSignHash, txSigners)
 }
 
 func (s *visitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
@@ -98,7 +99,7 @@ func (s *visitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 	if err != nil {
 		return err
 	}
-	return sign(s.tx, false, txSigners)
+	return sign(s.tx, s.forceSignHash, txSigners)
 }
 
 func (s *visitor) ImportTx(tx *txs.ImportTx) error {
@@ -111,7 +112,7 @@ func (s *visitor) ImportTx(tx *txs.ImportTx) error {
 		return err
 	}
 	txSigners = append(txSigners, txImportSigners...)
-	return sign(s.tx, false, txSigners)
+	return sign(s.tx, s.forceSignHash, txSigners)
 }
 
 func (s *visitor) ExportTx(tx *txs.ExportTx) error {
@@ -119,7 +120,7 @@ func (s *visitor) ExportTx(tx *txs.ExportTx) error {
 	if err != nil {
 		return err
 	}
-	return sign(s.tx, false, txSigners)
+	return sign(s.tx, s.forceSignHash, txSigners)
 }
 
 func (s *visitor) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
@@ -182,7 +183,7 @@ func (s *visitor) BaseTx(tx *txs.BaseTx) error {
 	if err != nil {
 		return err
 	}
-	return sign(s.tx, false, txSigners)
+	return sign(s.tx, s.forceSignHash, txSigners)
 }
 
 func (s *visitor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error {
