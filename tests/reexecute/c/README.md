@@ -42,7 +42,7 @@ export AWS_REGION=us-east-2
 
 ### Metrics Collection
 
-To support metrics collection (enabled by default), re-execution requires Prometheus credentials to be exported to the environment. Follow the instructions in the e2e [README](../../e2e/README.md#monitoring) to support metrics collection.
+To support metrics collection (disabled by default), re-execution requires Prometheus credentials to be exported to the environment. Follow the instructions in the e2e [README](../../e2e/README.md#monitoring) to support metrics collection.
 
 ## Quick Start
 
@@ -230,7 +230,11 @@ The `CONFIG` parameter currently only supports pre-defined configs and not passi
 
 The C-Chain benchmarks export VM metrics to the same Grafana instance as AvalancheGo CI: https://grafana-poc.avax-dev.network/.
 
+To export metrics for a local run, simply set the Taskfile variable `METRICS_ENABLED=true` either via environment variable or passing it at the command line.
+
 You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).
+
+To attach additional labels to the metrics from a local run, set the Taskfile variable `LABELS` to a comma separated list of key value pairs (ex. `LABELS=user=alice,os=ubuntu`).
 
 Note: to ensure Prometheus gets a final scrape at the end of a run, the test will sleep for 2s greater than the 10s Prometheus scrape interval, which will cause short-running tests to appear to take much longer than expected. Additionally, the linked dashboard displays most metrics using a 1min rate, which means that very short running tests will not produce a very useful visualization.
 
