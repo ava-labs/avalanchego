@@ -3,11 +3,11 @@
 
 package customlogs
 
-import ethtypes "github.com/ava-labs/libevm/core/types"
+import "github.com/ava-labs/libevm/core/types"
 
 // FlattenLogs converts a nested array of logs to a single array of logs.
 func FlattenLogs(list [][]*ethtypes.Log) []*ethtypes.Log {
-	totalLen := 0
+	numLogs := 0
 	for _, logs := range list {
 		totalLen += len(logs)
 	}
