@@ -85,20 +85,10 @@ runs:
       shell: bash
       working-directory: ./${{ inputs.checkout-path }}
       run: |
-        echo "=== Debug: Directory structure before replacement ==="
-        echo "Current working directory:"
-        pwd
-        echo "Contents of current directory:"
-        ls -la
-        echo "Contents of parent directory (..):"
-        ls -la ..
-        echo "Github action path:"
-        echo "$GITHUB_ACTION_PATH"
-
         if [ -n "${{ inputs.args }}" ]; then
-          OUTPUT=$(./build_target.sh "${{ inputs.target }}" ${{ inputs.args }})
+          OUTPUT=$($GITHUB_ACTION_PATH/build_target.sh "${{ inputs.target }}" ${{ inputs.args }})
         else
-          OUTPUT=$(./build_target.sh "${{ inputs.target }}")
+          OUTPUT=$($GITHUB_ACTION_PATH/build_target.sh "${{ inputs.target }}")
         fi
 
         # Extract binary path from script output
