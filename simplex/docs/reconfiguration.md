@@ -4,11 +4,11 @@
 In this document, we describe the reconfiguration technique of Simplex.
 We start by briefly recalling the Simplex consensus protocol, following by describing the challenges of reconfiguring a consensus system,
 after which we describe how epochs address these challenges.
-Specifically, we distinguish between ICM epochs and Simplex epochs and then explain how Simplex epochs are implemented.
+Specifically, we distinguish between [ICM epochs](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/181-p-chain-epoched-views/README.md) and Simplex epochs and then explain how Simplex epochs are implemented.
 We then introduce the MSM (Metadata State-Machine) which is a consensus agnostic functionality that is used to manage metadata for consensus systems.
 Once we have explained how epochs and metadata are maintained, we describe the Simplex reconfiguration mechanism and how it is accomplished by using the MSM.
-Lastly, we explain how a new node that onboards the system can validate all blocks in the chain from genesis despite the fact that the validator set changed over time.
-
+We then explain how a new node that onboards the system can validate all blocks in the chain from genesis despite the fact that the validator set changed over time.
+Lastly, we outline how Simplex blocks are encoded.
 
 ## 1. The Simplex consensus protocol
 
@@ -69,91 +69,9 @@ The validator set for epoch $k$ is derived from the P-chain height of the sealin
 
 In order to support ICM epochs, the Simplex protocol facilitates the encoding of both ICM epochs and Simplex epochs.
 Whenever a block is built, the block builder encodes the ICM epoch information (`EpochStartTime`, `epoch_number`, `PChainEpochHeight`) in the same manner as the proposerVM encodes it,
-and also encodes the Simplex epoch information, as well as some additional auxiliary information that may be used by other protocols, as explained in the next section:
-
-### Simplex block encoding
-
-The blocks created by Simplex therefore have the following structure:
-
-
-```
-_________________________
-____________________    |
-|                  |  O |
-|      Inner       |  u |
-|      Block       |  t |
-|                  |  e |
-|__________________|  r |
-|                       |
-|                     B |
-|                     l |
-|  ICM epoch info     o |
-|                     c |
-| Simplex Epoch info  k |
-|                       |
-|   Auxiliary info      |
-|_______________________|
-```
-
+and also encodes the Simplex epoch information, as well as some additional auxiliary information that may be used by other protocols, as explained below:
 
 ```proto
-message SimplexBlock {
-   bytes inner_block = 1; // The inner block built by the VM, opaque to Simplex.
-   OuterBlock outer_block = 2; // The outer block that wraps the inner block without the inner block.
-   bytes protocol_metadata = 3 // The Simplex protocol metadata, set by the Simplex consensus protocol.
-}
-```
-
-where `OuterBlock` is a protobuf message that contains the ICM epoch information, the Simplex epoch information, and auxiliary information:
-
-```proto
-message OuterBlock {
-  ICMEpochInfo icm_epoch_info = 1; // The ICM epoch information.
-  SimplexEpochInfo simplex_epoch_info = 2; // The Simplex epoch information.
-  AuxiliaryInfo auxiliary_info = 3; // The auxiliary information.
-}
-```
-
-The digest of the block is computed as follows:
-
-Let $h_i$ be the hash of the inner block, $*$ be the raw bytes of the simplex block after the inner block.
-Then, the digest of the Simplex block is the hash of: `h_i || *` where `||` denotes concatenation.
-This way of hashing the block allows any holder of a finalization certificate for the block to authenticate the block while hiding the content of the inner block.
-
-The `ICM epoch info` is encoded as a protobuf message with the following schema:
-
-```proto
-message ICMEpochInfo {
-   uint64 epoch_start_time = 1; // The start time
-   uint64 epoch_number = 2; // The epoch number
-   uint64 p_chain_epoch_height = 3; // The P-chain height of the epoch
-```
-
-The Simplex epoch information is a protobuf encoded message with the following schema:
-
-```proto
-message ObservedPChainHeight {
-   bytes node_index = 1; // The index of the node that proposed the block, always two bytes long (uint16)
-   uint64 p_chain_height = 2; // The P-chain height sampled by the node
-}
-
-message NodeBLSMapping {
-    bytes node_id = 1; // The nodeID
-    bytes bls_key = 2; // The BLS key of the node
-  }
-
-message BlockValidationDescriptor {
-  oneof BlockValidationType {
-      repeated NodeBLSMapping aggregated_membership = 1; // The BLS keys of the nodes in the next epoch
-  }
-}
-
-message NextEpochApprovals {
-  repeated bytes node_ids = 1; // The nodeIDs of nodes belonging to the next epoch that approve the epoch change.
-  bytes aux_info_digest = 2; // The digest of the auxiliary information that is approved by the nodes.
-  bytes signature = 3; // The signature of the nodes that approve the epoch change.
-}
-
 message SimplexEpochInfo {
    uint64 p_chain_reference_height = 1;
    uint64 epoch_number = 2;
@@ -166,7 +84,7 @@ message SimplexEpochInfo {
 }
 ```
 
-- The validator set of the epoch numbered `epoch_number` is therefore derived from `p_chain_reference_height`.
+- The validator set of the epoch numbered `epoch_number` is derived from `p_chain_reference_height`.
   Even though it is sufficient to know `epoch_number` to calculate `p_chain_reference_height`, it is encoded in the block for convenience.
 
 - The `next_p_chain_reference_height` is the P-chain height of the next epoch and is only encoded in the last block of epoch `epoch_number` (the sealing block), otherwise it is set to `0`.
@@ -184,7 +102,7 @@ message SimplexEpochInfo {
   It is only encoded in the sealing block of the epoch, and it is empty in all other blocks.
   It is used to verify the finalization certificates of blocks that were built in the next epoch.
 
-- The `next_epoch_approvals` is a protobuf message that contains the approvals of the next epoch by at least `n-f` nodes.
+- The `next_epoch_approvals` is a canoto message that contains the approvals of the next epoch by at least `n-f` nodes.
   It is required in order to create the sealing block of the epoch and indicates that the nodes comprising the next epoch's validator set
   are ready to start the next epoch. It prevents cases where nodes in the current epoch creating a sealing block and moving to the next epoch
   while the nodes of the next epoch still replicating blocks and cannot yet participate in the consensus protocol.
@@ -198,13 +116,13 @@ Apart from the ICM epoch information and the Simplex epoch information, the bloc
 that may be used by other protocols that require their information to be collected via the process of block building by the protocol participants.
 A common way for such information collection is to have each participant supply its input as part of the auxiliary information in the block, when it is its turn to build a block.
 
-The auxiliary information is encoded as a protobuf message with the following schema:
+The auxiliary information is encoded as a canoto message with the following schema:
 
 ```proto
 message AuxiliaryInfo {
    bytes info = 1; // The auxiliary information. Can be empty if no auxiliary information is provided.
    uint64 prev_aux_info_seq = 2; // The sequence number of the previous block containing auxiliary information.
-   bytes application_id = 3; // The application ID of the auxiliary information (if applicable) encoded as a two byte long uint16.
+   uint32 application_id = 3; // The application ID of the auxiliary information (if applicable).
 }
 ```
 
@@ -471,3 +389,109 @@ Therefore, it is only required to query for the latest block in order to be able
 
 After replicating the sealing blocks, the onboarding node has the public key(s) of the validator set for each epoch.
 It can thereafter parallelize the replication and finalization certificate verification of all blocks in the chain that reside in between the sealing blocks.
+
+
+## 4. Simplex block encoding
+
+The blocks created by Simplex therefore have the following structure:
+
+
+```
+_________________________
+____________________    |
+|                  |  O |
+|      Inner       |  u |
+|      Block       |  t |
+|                  |  e |
+|__________________|  r |
+|                       |
+|                     B |
+|                     l |
+|  ICM epoch info     o |
+|                     c |
+| Simplex Epoch info  k |
+|                       |
+|   Auxiliary info      |
+|_______________________|
+```
+
+
+```proto
+message SimplexBlock {
+   bytes inner_block = 1; // The inner block built by the VM, opaque to Simplex.
+   OuterBlock outer_block = 2; // The outer block that wraps the inner block without the inner block.
+   bytes protocol_metadata = 3 // The Simplex protocol metadata, set by the Simplex consensus protocol.
+}
+```
+
+where `OuterBlock` is a protobuf message that contains the ICM epoch information, the Simplex epoch information, and auxiliary information:
+
+```proto
+message OuterBlock {
+  ICMEpochInfo icm_epoch_info = 1; // The ICM epoch information.
+  SimplexEpochInfo simplex_epoch_info = 2; // The Simplex epoch information.
+  AuxiliaryInfo auxiliary_info = 3; // The auxiliary information.
+}
+```
+
+The digest of the simplex block is computed as follows:
+
+Let $h_i$ be the hash of the inner block.
+The digest of the Simplex block is the hash of the following encoding:
+
+```proto
+message HashPreImage {
+   bytes h_i = 1; // The inner block hash
+   OuterBlock outer_block = 2;
+   bytes protocol_metadata = 3;
+}
+```
+
+
+This way of hashing the block allows any holder of a finalization certificate for the block to authenticate the block while hiding the content of the inner block.
+
+The `ICM epoch info` is encoded as a canoto message with the following schema:
+
+```proto
+message ICMEpochInfo {
+   uint64 epoch_start_time = 1; // The start time
+   uint64 epoch_number = 2; // The epoch number
+   uint64 p_chain_epoch_height = 3; // The P-chain height of the epoch
+```
+
+The Simplex epoch information is a canoto encoded message with the following schema:
+
+```proto
+message ObservedPChainHeight {
+   uint32 node_index = 1; // The index of the node that proposed the block
+   uint64 p_chain_height = 2; // The P-chain height sampled by the node
+}
+
+message NodeBLSMapping {
+    bytes node_id = 1; // The nodeID
+    bytes bls_key = 2; // The BLS key of the node
+  }
+
+message BlockValidationDescriptor {
+  oneof BlockValidationType {
+      repeated NodeBLSMapping aggregated_membership = 1; // The BLS keys of the nodes in the next epoch
+  }
+}
+
+message NextEpochApprovals {
+  repeated bytes node_ids = 1; // The nodeIDs of nodes belonging to the next epoch that approve the epoch change.
+  bytes aux_info_digest = 2; // The digest of the auxiliary information that is approved by the nodes.
+  bytes signature = 3; // The signature of the nodes that approve the epoch change.
+}
+
+message SimplexEpochInfo {
+   uint64 p_chain_reference_height = 1;
+   uint64 epoch_number = 2;
+   uint64 next_p_chain_reference_height = 3;
+   uint64 prev_vm_block_seq = 4; // The sequence of the previous VM block
+   repeated ObservedPChainHeight observed_p_chain_height = 5;
+   uint64 sealing_block_seq = 6; // The sequence number of the sealing block
+   BlockValidationDescriptor block_validation_descriptor = 7; // Describes how to validate the blocks of the next epoch
+   NextEpochApprovals next_epoch_approvals = 8; // The epoch change approvals of the next epoch by at least n-f nodes.
+}
+```
