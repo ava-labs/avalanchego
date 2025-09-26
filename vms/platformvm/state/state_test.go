@@ -1015,6 +1015,7 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 		// Verify that applying diffs against the current state results in the
 		// expected state.
 		for i := 0; i < currentIndex; i++ {
+			t.Log("checking diffs for height", i)
 			prevDiff := diffs[i]
 			prevHeight := uint64(i + 1)
 
@@ -1086,6 +1087,41 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 				))
 				require.Equal(prevDiff.expectedSubnetValidatorSet, subnetValidatorSet)
 			}
+
+			// Checks applying diffs to all validator sets using height-based indices
+			{
+				allValidatorSets := make(map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput)
+
+				// Only copy non-empty validator sets, so empty subnets are not in the map
+				if len(diff.expectedPrimaryValidatorSet) != 0 {
+					allValidatorSets[constants.PrimaryNetworkID] = copyValidatorSet(diff.expectedPrimaryValidatorSet)
+				}
+				if len(diff.expectedSubnetValidatorSet) != 0 {
+					allValidatorSets[subnetID] = copyValidatorSet(diff.expectedSubnetValidatorSet)
+				}
+				require.NoError(state.ApplyAllValidatorWeightDiffs(
+					context.Background(),
+					allValidatorSets,
+					currentHeight,
+					prevHeight+1,
+				))
+				require.NoError(state.ApplyAllValidatorPublicKeyDiffs(
+					context.Background(),
+					allValidatorSets,
+					currentHeight,
+					prevHeight+1,
+				))
+
+				// Compare empty maps as nil
+				require.Equal(
+					copyValidatorSetNullable(prevDiff.expectedPrimaryValidatorSet),
+					allValidatorSets[constants.PrimaryNetworkID],
+				)
+				require.Equal(
+					copyValidatorSetNullable(prevDiff.expectedSubnetValidatorSet),
+					allValidatorSets[subnetID],
+				)
+			}
 		}
 	}
 }
@@ -1093,6 +1129,20 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 func copyValidatorSet(
 	input map[ids.NodeID]*validators.GetValidatorOutput,
 ) map[ids.NodeID]*validators.GetValidatorOutput {
+	result := make(map[ids.NodeID]*validators.GetValidatorOutput, len(input))
+	for nodeID, vdr := range input {
+		vdrCopy := *vdr
+		result[nodeID] = &vdrCopy
+	}
+	return result
+}
+
+func copyValidatorSetNullable(
+	input map[ids.NodeID]*validators.GetValidatorOutput,
+) map[ids.NodeID]*validators.GetValidatorOutput {
+	if len(input) == 0 {
+		return nil
+	}
 	result := make(map[ids.NodeID]*validators.GetValidatorOutput, len(input))
 	for nodeID, vdr := range input {
 		vdrCopy := *vdr

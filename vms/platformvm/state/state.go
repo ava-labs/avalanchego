@@ -67,35 +67,35 @@ var (
 	errIsNotSubnet                    = errors.New("is not a subnet")
 	errMissingPrimaryNetworkValidator = errors.New("missing primary network validator")
 
-	BlockIDPrefix                         = []byte("blockID")
-	BlockPrefix                           = []byte("block")
-	ValidatorsPrefix                      = []byte("validators")
-	CurrentPrefix                         = []byte("current")
-	PendingPrefix                         = []byte("pending")
-	ValidatorPrefix                       = []byte("validator")
-	DelegatorPrefix                       = []byte("delegator")
-	SubnetValidatorPrefix                 = []byte("subnetValidator")
-	SubnetDelegatorPrefix                 = []byte("subnetDelegator")
-	ValidatorWeightDiffsPrefix            = []byte("flatValidatorDiffs")
-	ValidatorWeightDiffsByHeightPrefix    = []byte("flatValidatorDiffsByHeight")
-	ValidatorPublicKeyDiffsPrefix         = []byte("flatPublicKeyDiffs")
-	ValidatorPublicKeyDiffsByHeightPrefix = []byte("flatPublicKeyDiffsByHeight")
-	TxPrefix                              = []byte("tx")
-	RewardUTXOsPrefix                     = []byte("rewardUTXOs")
-	UTXOPrefix                            = []byte("utxo")
-	SubnetPrefix                          = []byte("subnet")
-	SubnetOwnerPrefix                     = []byte("subnetOwner")
-	SubnetToL1ConversionPrefix            = []byte("subnetToL1Conversion")
-	TransformedSubnetPrefix               = []byte("transformedSubnet")
-	SupplyPrefix                          = []byte("supply")
-	ChainPrefix                           = []byte("chain")
-	ExpiryReplayProtectionPrefix          = []byte("expiryReplayProtection")
-	L1Prefix                              = []byte("l1")
-	WeightsPrefix                         = []byte("weights")
-	SubnetIDNodeIDPrefix                  = []byte("subnetIDNodeID")
-	ActivePrefix                          = []byte("active")
-	InactivePrefix                        = []byte("inactive")
-	SingletonPrefix                       = []byte("singleton")
+	BlockIDPrefix                           = []byte("blockID")
+	BlockPrefix                             = []byte("block")
+	ValidatorsPrefix                        = []byte("validators")
+	CurrentPrefix                           = []byte("current")
+	PendingPrefix                           = []byte("pending")
+	ValidatorPrefix                         = []byte("validator")
+	DelegatorPrefix                         = []byte("delegator")
+	SubnetValidatorPrefix                   = []byte("subnetValidator")
+	SubnetDelegatorPrefix                   = []byte("subnetDelegator")
+	ValidatorWeightDiffsBySubnetIDPrefix    = []byte("flatValidatorDiffs")
+	ValidatorWeightDiffsByHeightPrefix      = []byte("flatValidatorDiffsByHeight")
+	ValidatorPublicKeyDiffsBySubnetIDPrefix = []byte("flatPublicKeyDiffs")
+	ValidatorPublicKeyDiffsByHeightPrefix   = []byte("flatPublicKeyDiffsByHeight")
+	TxPrefix                                = []byte("tx")
+	RewardUTXOsPrefix                       = []byte("rewardUTXOs")
+	UTXOPrefix                              = []byte("utxo")
+	SubnetPrefix                            = []byte("subnet")
+	SubnetOwnerPrefix                       = []byte("subnetOwner")
+	SubnetToL1ConversionPrefix              = []byte("subnetToL1Conversion")
+	TransformedSubnetPrefix                 = []byte("transformedSubnet")
+	SupplyPrefix                            = []byte("supply")
+	ChainPrefix                             = []byte("chain")
+	ExpiryReplayProtectionPrefix            = []byte("expiryReplayProtection")
+	L1Prefix                                = []byte("l1")
+	WeightsPrefix                           = []byte("weights")
+	SubnetIDNodeIDPrefix                    = []byte("subnetIDNodeID")
+	ActivePrefix                            = []byte("active")
+	InactivePrefix                          = []byte("inactive")
+	SingletonPrefix                         = []byte("singleton")
 
 	TimestampKey         = []byte("timestamp")
 	FeeStateKey          = []byte("fee state")
@@ -615,9 +615,9 @@ func New(
 
 	l1ValidatorsDB := prefixdb.New(L1Prefix, validatorsDB)
 
-	validatorWeightDiffsBySubnetIDDB := prefixdb.New(ValidatorWeightDiffsPrefix, validatorsDB)
+	validatorWeightDiffsBySubnetIDDB := prefixdb.New(ValidatorWeightDiffsBySubnetIDPrefix, validatorsDB)
 	validatorWeightDiffsByHeightDB := prefixdb.New(ValidatorWeightDiffsByHeightPrefix, validatorsDB)
-	validatorPublicKeyDiffsBySubnetDB := prefixdb.New(ValidatorPublicKeyDiffsPrefix, validatorsDB)
+	validatorPublicKeyDiffsBySubnetIDDB := prefixdb.New(ValidatorPublicKeyDiffsBySubnetIDPrefix, validatorsDB)
 	validatorPublicKeyDiffsByHeightDB := prefixdb.New(ValidatorPublicKeyDiffsByHeightPrefix, validatorsDB)
 
 	weightsCache, err := metercacher.New(
@@ -810,7 +810,7 @@ func New(
 		pendingSubnetDelegatorList:          linkeddb.NewDefault(pendingSubnetDelegatorBaseDB),
 		validatorWeightDiffsBySubnetIDDB:    validatorWeightDiffsBySubnetIDDB,
 		validatorWeightDiffsByHeightDB:      validatorWeightDiffsByHeightDB,
-		validatorPublicKeyDiffsBySubnetIDDB: validatorPublicKeyDiffsBySubnetDB,
+		validatorPublicKeyDiffsBySubnetIDDB: validatorPublicKeyDiffsBySubnetIDDB,
 		validatorPublicKeyDiffsByHeightDB:   validatorPublicKeyDiffsByHeightDB,
 
 		addedTxs: make(map[ids.ID]*txAndStatus),
@@ -1439,7 +1439,7 @@ func (s *state) ApplyAllValidatorWeightDiffs(
 	startHeight uint64,
 	endHeight uint64,
 ) error {
-	diffIter := s.validatorPublicKeyDiffsByHeightDB.NewIteratorWithStart(
+	diffIter := s.validatorWeightDiffsByHeightDB.NewIteratorWithStart(
 		marshalStartDiffKeyByHeight(startHeight),
 	)
 	defer diffIter.Release()
@@ -1558,6 +1558,9 @@ func applyWeightDiff(
 	nodeID ids.NodeID,
 	weightDiff *ValidatorWeightDiff,
 ) error {
+	if vdrs == nil {
+		return errors.New("unexpected nil validator set")
+	}
 	vdr, ok := vdrs[nodeID]
 	if !ok {
 		// This node isn't in the current validator set.
@@ -1596,7 +1599,7 @@ func (s *state) ApplyAllValidatorPublicKeyDiffs(
 	startHeight uint64,
 	endHeight uint64,
 ) error {
-	diffIter := s.validatorPublicKeyDiffsBySubnetIDDB.NewIteratorWithStart(
+	diffIter := s.validatorPublicKeyDiffsByHeightDB.NewIteratorWithStart(
 		marshalStartDiffKeyByHeight(startHeight),
 	)
 	defer diffIter.Release()
