@@ -10,10 +10,6 @@ import (
 	"time"
 )
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
 type trackedIP struct {
 	delayLock sync.RWMutex
 	delay     time.Duration

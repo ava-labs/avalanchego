@@ -15,9 +15,17 @@ inputs:
     default: ''
   artifact_prefix:
     default: ''
+  prometheus_url:
+    required: true
+  prometheus_push_url:
+    required: true
   prometheus_username:
     required: true
   prometheus_password:
+    required: true
+  loki_url:
+    required: true
+  loki_push_url:
     required: true
   loki_username:
     required: true
@@ -82,8 +90,12 @@ runs:
         TMPNET_START_LOGS_COLLECTOR: ${{ inputs.loki_username != '' && inputs.runtime == 'process' }}
         TMPNET_CHECK_METRICS_COLLECTED: ${{ inputs.prometheus_username != '' }}
         TMPNET_CHECK_LOGS_COLLECTED: ${{ inputs.loki_username != '' }}
+        LOKI_URL: ${{ inputs.loki_url }}
+        LOKI_PUSH_URL: ${{ inputs.loki_push_url }}
         LOKI_USERNAME: ${{ inputs.loki_username }}
         LOKI_PASSWORD: ${{ inputs.loki_password }}
+        PROMETHEUS_URL: ${{ inputs.prometheus_url }}
+        PROMETHEUS_PUSH_URL: ${{ inputs.prometheus_push_url }}
         PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
         PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
         GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}
