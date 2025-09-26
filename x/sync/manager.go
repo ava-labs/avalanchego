@@ -36,18 +36,20 @@ const (
 )
 
 var (
-	ErrAlreadyStarted                = errors.New("cannot start a Manager that has already been started")
-	ErrAlreadyClosed                 = errors.New("Manager is closed")
-	ErrNoRangeProofClientProvided    = errors.New("range proof client is a required field of the sync config")
-	ErrNoChangeProofClientProvided   = errors.New("change proof client is a required field of the sync config")
-	ErrNoDatabaseProvided            = errors.New("sync database is a required field of the sync config")
-	ErrNoLogProvided                 = errors.New("log is a required field of the sync config")
-	ErrZeroWorkLimit                 = errors.New("simultaneous work limit must be greater than 0")
-	ErrFinishedWithUnexpectedRoot    = errors.New("finished syncing with an unexpected root")
-	errInvalidRangeProof             = errors.New("failed to verify range proof")
-	errInvalidChangeProof            = errors.New("failed to verify change proof")
-	errTooManyBytes                  = errors.New("response contains more than requested bytes")
-	errUnexpectedChangeProofResponse = errors.New("unexpected response type")
+	ErrAlreadyStarted                 = errors.New("cannot start a Manager that has already been started")
+	ErrAlreadyClosed                  = errors.New("Manager is closed")
+	ErrNoRangeProofMarshalerProvided  = errors.New("range proof marshaler is a required field of the sync config")
+	ErrNoChangeProofMarshalerProvided = errors.New("change proof marshaler is a required field of the sync config")
+	ErrNoRangeProofClientProvided     = errors.New("range proof client is a required field of the sync config")
+	ErrNoChangeProofClientProvided    = errors.New("change proof client is a required field of the sync config")
+	ErrNoDatabaseProvided             = errors.New("sync database is a required field of the sync config")
+	ErrNoLogProvided                  = errors.New("log is a required field of the sync config")
+	ErrZeroWorkLimit                  = errors.New("simultaneous work limit must be greater than 0")
+	ErrFinishedWithUnexpectedRoot     = errors.New("finished syncing with an unexpected root")
+	errInvalidRangeProof              = errors.New("failed to verify range proof")
+	errInvalidChangeProof             = errors.New("failed to verify change proof")
+	errTooManyBytes                   = errors.New("response contains more than requested bytes")
+	errUnexpectedChangeProofResponse  = errors.New("unexpected response type")
 )
 
 type priority byte
@@ -159,6 +161,10 @@ func NewManager[R any, C any](
 	switch {
 	case db == nil:
 		return nil, ErrNoDatabaseProvided
+	case config.RangeProofMarshaler == nil:
+		return nil, ErrNoRangeProofMarshalerProvided
+	case config.ChangeProofMarshaler == nil:
+		return nil, ErrNoChangeProofMarshalerProvided
 	case config.RangeProofClient == nil:
 		return nil, ErrNoRangeProofClientProvided
 	case config.ChangeProofClient == nil:

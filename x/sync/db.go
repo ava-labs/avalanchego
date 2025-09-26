@@ -38,7 +38,7 @@ type DB[R any, C any] interface {
 	// Returns ErrEmptyProof if [endRootID] is ids.Empty.
 	// Note that [endRootID] == ids.Empty means the trie is empty
 	// (i.e. we don't need a change proof.)
-	// Returns [sync.ErrEndRootNotFound], if the history doesn't contain the [endRootID].
+	// Returns [ErrNoEndRoot], if the history doesn't contain the [endRootID].
 	GetChangeProof(
 		ctx context.Context,
 		startRootID ids.ID,
@@ -78,6 +78,7 @@ type DB[R any, C any] interface {
 	// If [start] is Nothing, there's no lower bound on the range.
 	// If [end] is Nothing, there's no upper bound on the range.
 	// Returns an error if [rootID] is ids.Empty.
+	// Returns [ErrInsufficientHistory] if the root is not found.
 	// Note that [rootID] == ids.Empty means the trie is empty
 	// (i.e. we don't need a range proof.)
 	GetRangeProofAtRoot(

@@ -48,7 +48,7 @@ func newFlakyRangeProofHandler(
 ) p2p.Handler {
 	var (
 		c                   = counter{m: 2}
-		rangeProofMarshaler = RangeProofMarshaler{}
+		rangeProofMarshaler = rangeProofMarshaler
 		handler             = xsync.NewGetRangeProofHandler(db, rangeProofMarshaler)
 	)
 
@@ -84,8 +84,8 @@ func newFlakyChangeProofHandler(
 ) p2p.Handler {
 	var (
 		c                    = counter{m: 2}
-		rangeProofMarshaler  = RangeProofMarshaler{}
-		changeProofMarshaler = ChangeProofMarshaler{}
+		rangeProofMarshaler  = rangeProofMarshaler
+		changeProofMarshaler = changeProofMarshaler
 		handler              = xsync.NewGetChangeProofHandler(db, rangeProofMarshaler, changeProofMarshaler)
 	)
 

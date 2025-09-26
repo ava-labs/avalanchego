@@ -25,6 +25,11 @@ import (
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
+var (
+	rangeProofMarshaler  = RangeProofMarshaler{}
+	changeProofMarshaler = ChangeProofMarshaler{}
+)
+
 func Test_Creation(t *testing.T) {
 	require := require.New(t)
 
@@ -39,10 +44,10 @@ func Test_Creation(t *testing.T) {
 	syncer, err := xsync.NewManager(
 		db,
 		xsync.ManagerConfig[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   RangeProofMarshaler{},
-			ChangeProofMarshaler:  ChangeProofMarshaler{},
-			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(db, RangeProofMarshaler{})),
-			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(db, RangeProofMarshaler{}, ChangeProofMarshaler{})),
+			RangeProofMarshaler:   rangeProofMarshaler,
+			ChangeProofMarshaler:  changeProofMarshaler,
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(db, rangeProofMarshaler)),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(db, rangeProofMarshaler, changeProofMarshaler)),
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
 		},
@@ -161,7 +166,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			name: "range proof server flake",
 			rangeProofClient: func(db MerkleDB) *p2p.Client {
 				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, &flakyHandler{
-					Handler: xsync.NewGetRangeProofHandler(db, RangeProofMarshaler{}),
+					Handler: xsync.NewGetRangeProofHandler(db, rangeProofMarshaler),
 					c:       &counter{m: 2},
 				})
 			},
@@ -212,7 +217,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			name: "change proof flaky server",
 			changeProofClient: func(db MerkleDB) *p2p.Client {
 				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, &flakyHandler{
-					Handler: xsync.NewGetChangeProofHandler(db, RangeProofMarshaler{}, ChangeProofMarshaler{}),
+					Handler: xsync.NewGetChangeProofHandler(db, rangeProofMarshaler, changeProofMarshaler),
 					c:       &counter{m: 2},
 				})
 			},
@@ -242,13 +247,13 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 				changeProofClient *p2p.Client
 			)
 
-			rangeProofHandler := xsync.NewGetRangeProofHandler(dbToSync, RangeProofMarshaler{})
+			rangeProofHandler := xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler)
 			rangeProofClient = p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, rangeProofHandler)
 			if tt.rangeProofClient != nil {
 				rangeProofClient = tt.rangeProofClient(dbToSync)
 			}
 
-			changeProofHandler := xsync.NewGetChangeProofHandler(dbToSync, RangeProofMarshaler{}, ChangeProofMarshaler{})
+			changeProofHandler := xsync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)
 			changeProofClient = p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, changeProofHandler)
 			if tt.changeProofClient != nil {
 				changeProofClient = tt.changeProofClient(dbToSync)
@@ -257,8 +262,8 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			syncer, err := xsync.NewManager(
 				db,
 				xsync.ManagerConfig[*RangeProof, *ChangeProof]{
-					RangeProofMarshaler:   RangeProofMarshaler{},
-					ChangeProofMarshaler:  ChangeProofMarshaler{},
+					RangeProofMarshaler:   rangeProofMarshaler,
+					ChangeProofMarshaler:  changeProofMarshaler,
 					RangeProofClient:      rangeProofClient,
 					ChangeProofClient:     changeProofClient,
 					TargetRoot:            syncRoot,
@@ -333,10 +338,10 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	syncer, err := xsync.NewManager(
 		db,
 		xsync.ManagerConfig[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   RangeProofMarshaler{},
-			ChangeProofMarshaler:  ChangeProofMarshaler{},
-			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(dbToSync, RangeProofMarshaler{})),
-			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync, RangeProofMarshaler{}, ChangeProofMarshaler{})),
+			RangeProofMarshaler:   rangeProofMarshaler,
+			ChangeProofMarshaler:  changeProofMarshaler,
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler)),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
@@ -358,10 +363,10 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	newSyncer, err := xsync.NewManager(
 		db,
 		xsync.ManagerConfig[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   RangeProofMarshaler{},
-			ChangeProofMarshaler:  ChangeProofMarshaler{},
-			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(dbToSync, RangeProofMarshaler{})),
-			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync, RangeProofMarshaler{}, ChangeProofMarshaler{})),
+			RangeProofMarshaler:   rangeProofMarshaler,
+			ChangeProofMarshaler:  changeProofMarshaler,
+			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler)),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
 			TargetRoot:            syncRoot,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
@@ -434,10 +439,10 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	syncer, err := xsync.NewManager(
 		db,
 		xsync.ManagerConfig[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   RangeProofMarshaler{},
-			ChangeProofMarshaler:  ChangeProofMarshaler{},
+			RangeProofMarshaler:   rangeProofMarshaler,
+			ChangeProofMarshaler:  changeProofMarshaler,
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
-			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync, RangeProofMarshaler{}, ChangeProofMarshaler{})),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
 			TargetRoot:            firstSyncRoot,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},
@@ -448,7 +453,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	require.NotNil(syncer)
 
 	// Allow 1 request to go through before blocking
-	rangeProofHandler := xsync.NewGetRangeProofHandler(dbToSync, RangeProofMarshaler{})
+	rangeProofHandler := xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler)
 	updatedRootChan := make(chan struct{}, 1)
 	updatedRootChan <- struct{}{}
 	once := &sync.Once{}
@@ -499,15 +504,15 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	)
 	require.NoError(err)
 
-	rangeProofHandler := xsync.NewGetRangeProofHandler(dbToSync, RangeProofMarshaler{})
+	rangeProofHandler := xsync.NewGetRangeProofHandler(dbToSync, rangeProofMarshaler)
 	actionHandler := &p2p.TestHandler{}
 	m, err := xsync.NewManager(
 		db,
 		xsync.ManagerConfig[*RangeProof, *ChangeProof]{
-			RangeProofMarshaler:   RangeProofMarshaler{},
-			ChangeProofMarshaler:  ChangeProofMarshaler{},
+			RangeProofMarshaler:   rangeProofMarshaler,
+			ChangeProofMarshaler:  changeProofMarshaler,
 			RangeProofClient:      p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, actionHandler),
-			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync, RangeProofMarshaler{}, ChangeProofMarshaler{})),
+			ChangeProofClient:     p2ptest.NewSelfClient(t, ctx, ids.EmptyNodeID, xsync.NewGetChangeProofHandler(dbToSync, rangeProofMarshaler, changeProofMarshaler)),
 			TargetRoot:            root1,
 			SimultaneousWorkLimit: 5,
 			Log:                   logging.NoLog{},

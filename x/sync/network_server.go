@@ -47,23 +47,23 @@ var (
 	errEmptyProof           = errors.New("proof for empty trie requested")
 )
 
-func NewGetChangeProofHandler[TRange any, TChange any](db DB[TRange, TChange], rangeProofMarshaler Marshaler[TRange], changeProofMarshaler Marshaler[TChange]) *GetChangeProofHandler[TRange, TChange] {
-	return &GetChangeProofHandler[TRange, TChange]{
+func NewGetChangeProofHandler[R any, C any](db DB[R, C], rangeProofMarshaler Marshaler[R], changeProofMarshaler Marshaler[C]) *GetChangeProofHandler[R, C] {
+	return &GetChangeProofHandler[R, C]{
 		db:                   db,
 		rangeProofMarshaler:  rangeProofMarshaler,
 		changeProofMarshaler: changeProofMarshaler,
 	}
 }
 
-type GetChangeProofHandler[TRange any, TChange any] struct {
-	db                   DB[TRange, TChange]
-	rangeProofMarshaler  Marshaler[TRange]
-	changeProofMarshaler Marshaler[TChange]
+type GetChangeProofHandler[R any, C any] struct {
+	db                   DB[R, C]
+	rangeProofMarshaler  Marshaler[R]
+	changeProofMarshaler Marshaler[C]
 }
 
-func (*GetChangeProofHandler[TRange, TChange]) AppGossip(context.Context, ids.NodeID, []byte) {}
+func (*GetChangeProofHandler[_, _]) AppGossip(context.Context, ids.NodeID, []byte) {}
 
-func (g *GetChangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+func (g *GetChangeProofHandler[R, _]) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	req := &pb.GetChangeProofRequest{}
 	if err := proto.Unmarshal(requestBytes, req); err != nil {
 		return nil, &common.AppError{
@@ -136,7 +136,7 @@ func (g *GetChangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context,
 					KeyLimit:   req.KeyLimit,
 					BytesLimit: req.BytesLimit,
 				},
-				func(rangeProof TRange) ([]byte, error) {
+				func(rangeProof R) ([]byte, error) {
 					proofBytes, err := g.rangeProofMarshaler.Marshal(rangeProof)
 					if err != nil {
 						return nil, err
@@ -193,21 +193,21 @@ func (g *GetChangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context,
 	}
 }
 
-func NewGetRangeProofHandler[TRange any, TChange any](db DB[TRange, TChange], rangeProofMarshaler Marshaler[TRange]) *GetRangeProofHandler[TRange, TChange] {
-	return &GetRangeProofHandler[TRange, TChange]{
+func NewGetRangeProofHandler[R any, C any](db DB[R, C], rangeProofMarshaler Marshaler[R]) *GetRangeProofHandler[R, C] {
+	return &GetRangeProofHandler[R, C]{
 		db:                  db,
 		rangeProofMarshaler: rangeProofMarshaler,
 	}
 }
 
-type GetRangeProofHandler[TRange any, TChange any] struct {
-	db                  DB[TRange, TChange]
-	rangeProofMarshaler Marshaler[TRange]
+type GetRangeProofHandler[R any, C any] struct {
+	db                  DB[R, C]
+	rangeProofMarshaler Marshaler[R]
 }
 
 func (*GetRangeProofHandler[_, _]) AppGossip(context.Context, ids.NodeID, []byte) {}
 
-func (g *GetRangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
+func (g *GetRangeProofHandler[R, _]) AppRequest(ctx context.Context, _ ids.NodeID, _ time.Time, requestBytes []byte) ([]byte, *common.AppError) {
 	req := &pb.GetRangeProofRequest{}
 	if err := proto.Unmarshal(requestBytes, req); err != nil {
 		return nil, &common.AppError{
@@ -231,7 +231,7 @@ func (g *GetRangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context, 
 		ctx,
 		g.db,
 		req,
-		func(rangeProof TRange) ([]byte, error) {
+		func(rangeProof R) ([]byte, error) {
 			return g.rangeProofMarshaler.Marshal(rangeProof)
 		},
 	)
@@ -253,11 +253,11 @@ func (g *GetRangeProofHandler[TRange, TChange]) AppRequest(ctx context.Context, 
 // If no sufficiently small proof can be generated, returns [ErrMinProofSizeIsTooLarge].
 // TODO improve range proof generation so we don't need to iteratively
 // reduce the key limit.
-func getRangeProof[TRange any, TChange any](
+func getRangeProof[R any, C any](
 	ctx context.Context,
-	db DB[TRange, TChange],
+	db DB[R, C],
 	req *pb.GetRangeProofRequest,
-	marshalFunc func(TRange) ([]byte, error),
+	marshalFunc func(R) ([]byte, error),
 ) ([]byte, error) {
 	root, err := ids.ToID(req.RootHash)
 	if err != nil {

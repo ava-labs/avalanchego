@@ -1617,9 +1617,9 @@ func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
 
 		// Marshal and unmarshal it.
 		// Assert the unmarshaled one is the same as the original.
-		originalBytes, err := RangeProofMarshaler{}.Marshal(proof)
+		originalBytes, err := rangeProofMarshaler.Marshal(proof)
 		require.NoError(err)
-		unmarshaledProof, err := RangeProofMarshaler{}.Unmarshal(originalBytes)
+		unmarshaledProof, err := rangeProofMarshaler.Unmarshal(originalBytes)
 		require.NoError(err)
 		require.Equal(proof, unmarshaledProof)
 	})
@@ -1657,9 +1657,9 @@ func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
 
 		// Marshal and unmarshal it.
 		// Assert the unmarshaled one is the same as the original.
-		originalBytes, err := ChangeProofMarshaler{}.Marshal(proof)
+		originalBytes, err := changeProofMarshaler.Marshal(proof)
 		require.NoError(err)
-		unmarshaledProof, err := ChangeProofMarshaler{}.Unmarshal(originalBytes)
+		unmarshaledProof, err := changeProofMarshaler.Unmarshal(originalBytes)
 		require.NoError(err)
 		require.Equal(proof, unmarshaledProof)
 	})

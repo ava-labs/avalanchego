@@ -181,9 +181,9 @@ func (proof *Proof) Verify(
 	return nil
 }
 
-type RangeProofMarshaler struct{}
-
 type RangeProof ChangeProof
+
+type RangeProofMarshaler struct{}
 
 func (RangeProofMarshaler) Marshal(proof *RangeProof) ([]byte, error) {
 	return proto.Marshal(proof.toProto())
