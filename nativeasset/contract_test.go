@@ -84,8 +84,6 @@ func TestStatefulPrecompile(t *testing.T) {
 	userAddr2 := common.BytesToAddress([]byte("user2"))
 	assetID := common.BytesToHash([]byte("ScoobyCoin"))
 	zeroBytes := make([]byte, 32)
-	big0 := uint256.NewInt(0)
-	bigZero := big.NewInt(0)
 	bigHundred := big.NewInt(100)
 	u256Hundred := uint256.NewInt(100)
 	oneHundredBytes := make([]byte, 32)
@@ -112,7 +110,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetBalanceAddr,
 			input:                PackNativeAssetBalanceInput(userAddr1, assetID),
-			value:                big0,
+			value:                common.U2560,
 			gasInput:             params.AssetBalanceApricot,
 			expectedGasRemaining: 0,
 			expectedErr:          nil,
@@ -139,7 +137,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetBalanceAddr,
 			input:                PackNativeAssetBalanceInput(userAddr1, assetID),
-			value:                big0,
+			value:                common.U2560,
 			gasInput:             params.AssetBalanceApricot,
 			expectedGasRemaining: 0,
 			expectedErr:          nil,
@@ -165,7 +163,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetBalanceAddr,
 			input:                PackNativeAssetBalanceInput(userAddr1, assetID),
-			value:                big0,
+			value:                common.U2560,
 			gasInput:             params.AssetBalanceApricot,
 			expectedGasRemaining: 0,
 			expectedErr:          nil,
@@ -183,7 +181,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetBalanceAddr,
 			input:                nil,
-			value:                big0,
+			value:                common.U2560,
 			gasInput:             params.AssetBalanceApricot,
 			expectedGasRemaining: 0,
 			expectedErr:          vm.ErrExecutionReverted,
@@ -201,7 +199,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetBalanceAddr,
 			input:                PackNativeAssetBalanceInput(userAddr1, assetID),
-			value:                big0,
+			value:                common.U2560,
 			gasInput:             params.AssetBalanceApricot - 1,
 			expectedGasRemaining: 0,
 			expectedErr:          vm.ErrOutOfGas,
@@ -241,7 +239,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			from:                 userAddr1,
 			precompileAddr:       NativeAssetCallAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
-			value:                big0,
+			value:                common.U2560,
 			gasInput:             params.AssetCallApricot + ethparams.CallNewAccountGas + 123,
 			expectedGasRemaining: 123,
 			expectedErr:          nil,
@@ -329,7 +327,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.Equal(t, u256Hundred, user1Balance, "user 1 balance")
 				require.True(t, user2Balance.IsZero(), "user 2 balance should be zero")
 				require.Equal(t, big.NewInt(50), user1AssetBalance, "user 1 asset balance")
-				require.Equal(t, 0, user2AssetBalance.Cmp(bigZero), "user 2 asset balance should be zero")
+				require.Zero(t, user2AssetBalance.Cmp(common.Big0), "user 2 asset balance should be zero")
 			},
 		},
 		{
@@ -363,7 +361,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.Equal(t, uint256.NewInt(50), user1Balance, "user 1 balance")
 				require.True(t, user2Balance.IsZero(), "user 2 balance should be zero")
 				require.Equal(t, big.NewInt(50), user1AssetBalance, "user 1 asset balance")
-				require.Equal(t, 0, user2AssetBalance.Cmp(bigZero), "user 2 asset balance should be zero")
+				require.Zero(t, user2AssetBalance.Cmp(common.Big0), "user 2 asset balance should be zero")
 			},
 		},
 		{
@@ -419,7 +417,7 @@ func TestStatefulPrecompile(t *testing.T) {
 				require.Equal(t, u256Hundred, user1Balance, "user 1 balance")
 				require.True(t, user2Balance.IsZero(), "user 2 balance should be zero")
 				require.Equal(t, bigHundred, user1AssetBalance, "user 1 asset balance")
-				require.Equal(t, 0, user2AssetBalance.Cmp(bigZero), "user 2 asset balance should be zero")
+				require.Zero(t, user2AssetBalance.Cmp(common.Big0), "user 2 asset balance should be zero")
 			},
 		},
 		{
@@ -459,7 +457,7 @@ func TestStatefulPrecompile(t *testing.T) {
 			from:                 userAddr1,
 			precompileAddr:       GenesisContractAddr,
 			input:                PackNativeAssetCallInput(userAddr2, assetID, big.NewInt(50), nil),
-			value:                big0,
+			value:                common.U2560,
 			gasInput:             params.AssetCallApricot + ethparams.CallNewAccountGas,
 			expectedGasRemaining: params.AssetCallApricot + ethparams.CallNewAccountGas,
 			expectedErr:          vm.ErrExecutionReverted,

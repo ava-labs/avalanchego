@@ -299,25 +299,25 @@ func TestAppRequestOnShutdown(t *testing.T) {
 	requestMessage := HelloRequest{Message: "this is a request"}
 	require.NoError(t, net.Connected(context.Background(), nodeID, defaultPeerVersion))
 
-	doneChan := make(chan error, 1)
+	errChan := make(chan error, 1)
 	go func() {
 		requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
 		if err != nil {
-			doneChan <- fmt.Errorf("failed to convert request to bytes: %w", err)
+			errChan <- fmt.Errorf("failed to convert request to bytes: %w", err)
 			return
 		}
 		responseBytes, _, err := net.SendSyncedAppRequestAny(context.Background(), defaultPeerVersion, requestBytes)
 		if !errors.Is(err, errRequestFailed) {
-			doneChan <- fmt.Errorf("expected errRequestFailed, got: %w", err)
+			errChan <- fmt.Errorf("expected errRequestFailed, got: %w", err)
 			return
 		}
 		if responseBytes != nil {
-			doneChan <- errors.New("response bytes should be nil")
+			errChan <- errors.New("response bytes should be nil")
 			return
 		}
-		doneChan <- nil
+		errChan <- nil
 	}()
-	require.NoError(t, <-doneChan)
+	require.NoError(t, <-errChan)
 	require.True(t, called)
 }
 
@@ -378,21 +378,18 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 	// Cancel context after sending
 	require.Empty(t, net.(*network).outstandingRequestHandlers) // no outstanding requests
 	ctx, cancel = context.WithCancel(context.Background())
-	doneChan := make(chan error, 1)
+	errChan := make(chan error, 1)
 	go func() {
 		_, _, err = net.SendSyncedAppRequestAny(ctx, defaultPeerVersion, requestBytes)
-		if !errors.Is(err, context.Canceled) {
-			doneChan <- fmt.Errorf("expected context.Canceled, got: %w", err)
-			return
-		}
-		doneChan <- nil
+		errChan <- err
 	}()
 	// Wait until we've "sent" the app request over the network
 	// before cancelling context.
 	sentAppRequestInfo := <-sentAppRequest
 	require.Len(t, net.(*network).outstandingRequestHandlers, 1)
 	cancel()
-	require.NoError(t, <-doneChan)
+	err = <-errChan
+	require.ErrorIs(t, err, context.Canceled)
 	// Should still be able to process a response after cancelling.
 	require.Len(t, net.(*network).outstandingRequestHandlers, 1) // context cancellation SendAppRequestAny failure doesn't clear
 	require.NoError(t, net.AppResponse(
