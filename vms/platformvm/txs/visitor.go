@@ -36,4 +36,5 @@ type Visitor interface {
 	// ? Transactions:
 	AddContinuousValidatorTx(tx *AddContinuousValidatorTx) error
 	StopContinuousValidatorTx(tx *StopContinuousValidatorTx) error
+	RewardContinuousValidatorTx(*RewardContinuousValidatorTx) error
 }
