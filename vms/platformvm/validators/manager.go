@@ -44,8 +44,7 @@ const (
 var (
 	_ validators.State = (*manager)(nil)
 
-	errUnfinalizedHeight    = errors.New("failed to fetch validator set at unfinalized height")
-	errFailedToGetSubnetIDs = errors.New("failed to get subnet IDs")
+	errUnfinalizedHeight = errors.New("failed to fetch validator set at unfinalized height")
 )
 
 // Manager adds the ability to introduce newly accepted blocks IDs to the State
@@ -63,8 +62,6 @@ type State interface {
 
 	GetLastAccepted() ids.ID
 	GetStatelessBlock(blockID ids.ID) (block.Block, error)
-
-	GetSubnetIDs() ([]ids.ID, error)
 
 	// ApplyValidatorWeightDiffs iterates from [startHeight] towards the genesis
 	// block until it has applied all of the diffs up to and including
