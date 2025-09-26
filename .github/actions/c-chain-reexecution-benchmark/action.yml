@@ -60,7 +60,7 @@ inputs:
 runs:
   using: composite
   steps:
-#    - uses: ./.github/actions/setup-go-for-project
+    - uses: ./.github/actions/setup-go-for-project
     - name: Set task env
       shell: bash
       run: |
