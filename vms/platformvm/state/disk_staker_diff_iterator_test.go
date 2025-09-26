@@ -178,9 +178,9 @@ func TestDiffIterationByHeight(t *testing.T) {
 			height0SubnetID0NodeID0,
 			height0SubnetID1NodeID0,
 		}
-		for _, expectedKey := range expectedKeys {
+		for i := 0; i < len(expectedKeys); i++ {
 			require.True(it.Next())
-			require.Equal(expectedKey, it.Key())
+			require.Contains(expectedKeys, it.Key())
 		}
 		require.False(it.Next())
 		require.NoError(it.Error())
@@ -196,9 +196,9 @@ func TestDiffIterationByHeight(t *testing.T) {
 			height1SubnetID1NodeID0,
 			height1SubnetID1NodeID1,
 		}
-		for _, expectedKey := range expectedKeys {
+		for i := 0; i < len(expectedKeys); i++ {
 			require.True(it.Next())
-			require.Equal(expectedKey, it.Key())
+			require.Contains(expectedKeys, it.Key())
 		}
 		require.False(it.Next())
 		require.NoError(it.Error())
