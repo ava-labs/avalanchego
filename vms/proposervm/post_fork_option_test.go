@@ -456,7 +456,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		},
 	}
 
-	oracleBlkTime := proVM.Time().Truncate(time.Second)
+	oracleBlkTime := proVM.Time().Truncate(time.Second).UTC()
 	statelessBlock, err := block.BuildUnsigned(
 		snowmantest.GenesisID,
 		oracleBlkTime,
@@ -519,7 +519,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		return nil, nil
 	}
 
-	require.Equal(oracleBlkTime, option.Timestamp())
+	require.Equal(oracleBlkTime, option.Timestamp().UTC())
 
 	require.NoError(option.Accept(context.Background()))
 	require.NoError(proVM.Shutdown(context.Background()))
@@ -611,5 +611,5 @@ func TestOptionTimestampValidity(t *testing.T) {
 		return nil, nil
 	}
 
-	require.Equal(oracleBlkTime, statefulOptionBlock.Timestamp())
+	require.Equal(oracleBlkTime, statefulOptionBlock.Timestamp().UTC())
 }
