@@ -2542,8 +2542,8 @@ func TestTimestampMetrics(t *testing.T) {
 
 	innerBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
-	outerTime := time.Unix(upgrade.InitiallyActiveTimeUnix+1000, 0)
-	innerTime := time.Unix(49463, 0) // the actual numbers do not matter here, we just verify the metrics are populated correctly
+	outerTime := time.Unix(upgrade.InitiallyActiveTime.Add(1000*time.Second).Unix(), 0)
+	innerTime := time.Unix(upgrade.InitiallyActiveTime.Add(500*time.Second).Unix(), 0) // the actual numbers do not matter here, we just verify the metrics are populated correctly
 	proVM.Clock.Set(outerTime)
 	innerBlock.TimestampV = innerTime
 
