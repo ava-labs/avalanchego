@@ -275,25 +275,19 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 }
 
 func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
-	// Get inner VM's HTTP handler
 	innerHandler, err := vm.ChainVM.NewHTTPHandler(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create ProposerVM multiplexer for ProposerVM-specific routes
 	proposerMux := http.NewServeMux()
-
-	// Add ProposerVM specific handlers to proposerMux
-	service := &connectrpcService{vm: vm}
-	proposerMux.Handle(proposervmconnect.NewProposerVMHandler(service))
-
-	// Add gRPC reflection for ProposerVM
+	proposerMux.Handle(proposervmconnect.NewProposerVMHandler(
+		&connectrpcService{vm: vm},
+	))
 	proposerMux.Handle(grpcreflect.NewHandlerV1(
 		grpcreflect.NewStaticReflector(proposervmconnect.ProposerVMName),
 	))
 
-	// Create header-based router
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		route := r.Header[server.HTTPHeaderRoute]
 		vm.ctx.Log.Debug("routing request",
