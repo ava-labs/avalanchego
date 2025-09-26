@@ -12,16 +12,17 @@ import (
 	"github.com/ava-labs/avalanchego/utils/packages"
 )
 
+// TestMustNotImport tests that we do not import certain packages that would configure libevm globally.
+// This must not be done for packages that support both coreth and subnet-evm.
 func TestMustNotImport(t *testing.T) {
 	require := require.New(t)
 
+	// These packages configure libevm globally by registering custom types and extras.
 	illegalPaths := []string{
 		"github.com/ava-labs/coreth/params",
 		"github.com/ava-labs/coreth/plugin/evm/customtypes",
 	}
 	mustNotImport := map[string][]string{
-		// Importing these packages configures libevm globally. This must not be
-		// done to support both coreth and subnet-evm.
 		"tests/":            illegalPaths,
 		"tests/antithesis/": illegalPaths,
 		"tests/fixture/...": illegalPaths,
