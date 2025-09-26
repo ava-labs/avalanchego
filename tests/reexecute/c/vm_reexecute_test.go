@@ -348,9 +348,12 @@ func newVMExecutor(vm block.ChainVM, config vmExecutorConfig) (*vmExecutor, erro
 	}
 
 	return &vmExecutor{
-		vm:         vm,
-		metrics:    metrics,
-		config:     config,
+		vm:      vm,
+		metrics: metrics,
+		config:  config,
+		// ETA tracker uses a 10-sample moving window to smooth rate estimates,
+		// and a 1.2 slowdown factor to slightly pad ETA early in the run,
+		// tapering to 1.0 as progress approaches 100%.
 		etaTracker: timer.NewEtaTracker(10, 1.2),
 	}, nil
 }
@@ -405,15 +408,17 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan blockRe
 
 		if blkResult.Height%1000 == 0 {
 			completed := blkResult.Height - e.config.StartBlock
-			etaPtr, _ := e.etaTracker.AddSample(completed, totalWork, time.Now())
+			etaPtr, progressPercentage := e.etaTracker.AddSample(completed, totalWork, time.Now())
 			if etaPtr != nil {
 				e.config.Log.Info("executing block",
 					zap.Uint64("height", blkResult.Height),
+					zap.Float64("progress_pct", progressPercentage),
 					zap.Duration("eta", *etaPtr),
 				)
 			} else {
 				e.config.Log.Info("executing block",
 					zap.Uint64("height", blkResult.Height),
+					zap.Float64("progress_pct", progressPercentage),
 				)
 			}
 		}
