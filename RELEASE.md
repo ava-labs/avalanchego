@@ -12,9 +12,9 @@ Start off by crating a new branch:
 
 ```console
 $ git fetch
-$ git switch -c release/v0.0.13 origin/main
-branch 'release/v0.0.13' set up to track 'origin/main'.
-Switched to a new branch 'release/v0.0.13'
+$ git switch -c release/v0.0.14 origin/main
+branch 'release/v0.0.14' set up to track 'origin/main'.
+Switched to a new branch 'release/v0.0.14'
 ```
 
 ## Package Version
@@ -26,7 +26,7 @@ table to define the version for all subpackages.
 
 ```toml
 [workspace.package]
-version = "0.0.13"
+version = "0.0.14"
 ```
 
 Each package inherits this version by setting `package.version.workspace = true`.
@@ -41,15 +41,16 @@ Therefore, updating only the version defined in the root config is needed.
 
 ## Dependency Version
 
-The next step is to bump the dependency declarations to the new version. Packages
-within the workspace that are used as libraries are also defined within the
-[`[workspace.dependencies]`](https://doc.rust-lang.org/cargo/reference/workspaces.html#the-dependencies-table)
+`cargo publish` for each package requires that each dependency specify _a_ version;
+therefore, the next step is to bump the dependency declarations to the new version.
+Packages within the workspace that are used as libraries are also defined within
+the [`[workspace.dependencies]`](https://doc.rust-lang.org/cargo/reference/workspaces.html#the-dependencies-table)
 table. E.g.,:
 
 ```toml
 [workspace.dependencies]
 # workspace local packages
-firewood = { path = "firewood", version = "0.0.13" }
+firewood = { path = "firewood", version = "0.0.14" }
 ```
 
 This allows packages within the workspace to inherit the dependency,
@@ -78,7 +79,7 @@ To build the changelog, see git-cliff.org. Short version:
 
 ```sh
 cargo install --locked git-cliff
-git cliff --tag v0.0.13 > CHANGELOG.md
+git cliff --tag v0.0.14 -o CHANGELOG.md
 ```
 
 ## Review
@@ -92,11 +93,14 @@ git cliff --tag v0.0.13 > CHANGELOG.md
 To trigger a release, push a tag to the main branch matching the new version,
 
 ```sh
-git tag -s -a v0.0.13 -m 'Release v0.0.13'
-git push origin v0.0.13
+# be sure to switch back to the main branch before tagging
+git checkout main
+git pull --prune
+git tag -s -a v0.0.14 -m 'Release v0.0.14'
+git push origin v0.0.14
 ```
 
-for `v0.0.13` for the merged version change. The CI will automatically publish a
+for `v0.0.14` for the merged version change. The CI will automatically publish a
 draft release which consists of release notes and changes (see
 [.github/workflows/release.yaml](.github/workflows/release.yaml)).
 

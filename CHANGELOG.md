@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.0.12] - 2025-08-26
+## [0.0.13] - 2025-09-26
 
 ### 🚀 Features
 
@@ -16,6 +16,43 @@ All notable changes to this project will be documented in this file.
 - *(ffi-refactor)* Refactor how hash values are returned (5/8) ([#1226](https://github.com/ava-labs/firewood/pull/1226))
 - *(ffi-refactor)* Refactor revision to use database handle (6/8) ([#1227](https://github.com/ava-labs/firewood/pull/1227))
 - *(ffi-refactor)* Add `ValueResult` type (7/8) ([#1228](https://github.com/ava-labs/firewood/pull/1228))
+- *(checker)* Print report using template for better readability ([#1237](https://github.com/ava-labs/firewood/pull/1237))
+- *(checker)* Fix free lists when the erroneous area is the head ([#1240](https://github.com/ava-labs/firewood/pull/1240))
+- *(ffi-proofs)* Stub interfaces for FFI to interact with proofs. ([#1253](https://github.com/ava-labs/firewood/pull/1253))
+- Explicit impl of PartialEq/Eq on HashOrRlp ([#1260](https://github.com/ava-labs/firewood/pull/1260))
+- *(proofs)* [**breaking**] Disable `ValueDigest::Hash` for ethhash ([#1269](https://github.com/ava-labs/firewood/pull/1269))
+- [**breaking**] Rename `Hashable::key` ([#1270](https://github.com/ava-labs/firewood/pull/1270))
+- *(range-proofs)* KeyValuePairIter (1/2) ([#1282](https://github.com/ava-labs/firewood/pull/1282))
+- *(proofs)* [**breaking**] Add v0 serialization for RangeProofs ([#1271](https://github.com/ava-labs/firewood/pull/1271))
+- *(ffi-refactor)* Replace sequence id with pointer to proposals (8/8) ([#1221](https://github.com/ava-labs/firewood/pull/1221))
+
+### 🐛 Bug Fixes
+
+- Add an advisory lock ([#1244](https://github.com/ava-labs/firewood/pull/1244))
+- Path iterator returned wrong node ([#1259](https://github.com/ava-labs/firewood/pull/1259))
+- Use `count` instead of `size_hint` ([#1268](https://github.com/ava-labs/firewood/pull/1268))
+- Correct typo in README.md ([#1276](https://github.com/ava-labs/firewood/pull/1276))
+- Resolve build failures by pinning opentelemetry to 0.30 ([#1281](https://github.com/ava-labs/firewood/pull/1281))
+- *(range-proofs)* Serialize range proof key consistently ([#1278](https://github.com/ava-labs/firewood/pull/1278))
+- *(range-proofs)* Fix verify of exclusion proofs ([#1279](https://github.com/ava-labs/firewood/pull/1279))
+- *(ffi)* GetFromRoot typo ([#1298](https://github.com/ava-labs/firewood/pull/1298))
+- Incorrect gauge metrics ([#1300](https://github.com/ava-labs/firewood/pull/1300))
+- M6id is a amd64 machine ([#1305](https://github.com/ava-labs/firewood/pull/1305))
+- Revert #1116 ([#1313](https://github.com/ava-labs/firewood/pull/1313))
+
+### 💼 Other
+
+- *(deps)* Update typed-builder requirement from 0.21.0 to 0.22.0 ([#1275](https://github.com/ava-labs/firewood/pull/1275))
+
+### 📚 Documentation
+
+- README implies commit == persist ([#1283](https://github.com/ava-labs/firewood/pull/1283))
+
+### 🧪 Testing
+
+- Mark new_empty_proposal as test only ([#1249](https://github.com/ava-labs/firewood/pull/1249))
+- *(firewood)* Use ctor section to init logger for all tests ([#1277](https://github.com/ava-labs/firewood/pull/1277))
+- *(bootstrap)* Bootstrap testing scripts ([#1287](https://github.com/ava-labs/firewood/pull/1287))
 
 ### ⚙️ Miscellaneous Tasks
 
@@ -23,6 +60,24 @@ All notable changes to this project will be documented in this file.
 - Synchronize .golangci.yaml ([#1234](https://github.com/ava-labs/firewood/pull/1234))
 - *(metrics-check)* Re-use previous comment instead of spamming new ones ([#1232](https://github.com/ava-labs/firewood/pull/1232))
 - Nuke grpc-testtool ([#1220](https://github.com/ava-labs/firewood/pull/1220))
+- Rename FuzzTree ([#1239](https://github.com/ava-labs/firewood/pull/1239))
+- Upgrade to rust 1.89 ([#1242](https://github.com/ava-labs/firewood/pull/1242))
+- Rename mut_root to root_mut ([#1248](https://github.com/ava-labs/firewood/pull/1248))
+- Add missing debug traits ([#1254](https://github.com/ava-labs/firewood/pull/1254))
+- These tests actually work now ([#1262](https://github.com/ava-labs/firewood/pull/1262))
+- Cargo +nightly clippy --fix ([#1265](https://github.com/ava-labs/firewood/pull/1265))
+- Update .golangci.yaml ([#1274](https://github.com/ava-labs/firewood/pull/1274))
+- Various script improvements ([#1288](https://github.com/ava-labs/firewood/pull/1288))
+- *(bootstrap)* Add keys for brandon ([#1289](https://github.com/ava-labs/firewood/pull/1289))
+- *(bootstrap)* Add keys for Bernard and Amin ([#1291](https://github.com/ava-labs/firewood/pull/1291))
+- [**breaking**] Decorate enums and structs with `#[non_exhaustive]` ([#1292](https://github.com/ava-labs/firewood/pull/1292))
+- Add spot instance support ([#1294](https://github.com/ava-labs/firewood/pull/1294))
+- Upgrade go ([#1296](https://github.com/ava-labs/firewood/pull/1296))
+- Ask for clippy and rustfmt ([#1306](https://github.com/ava-labs/firewood/pull/1306))
+- Add support for enormous disk ([#1308](https://github.com/ava-labs/firewood/pull/1308))
+- Disable non-security dependabot version bumps ([#1315](https://github.com/ava-labs/firewood/pull/1315))
+- Upgrade dependencies ([#1314](https://github.com/ava-labs/firewood/pull/1314))
+- *(benchmark)* Add ssh key ([#1316](https://github.com/ava-labs/firewood/pull/1316))
 
 ## [0.0.11] - 2025-08-20
 
