@@ -12,10 +12,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/packages"
 )
 
-// TestMustNotImport tests that we do not import certain packages that would configure libevm globally.
+// TestMustNotImport tests that we do not import certain packages that would configure libevm globals.
+// Libevm panics if a package tries to register a custom type or extra after the globals have been configured (re-registration).
 // E2E test packages are used both from Subnet-EVM and Coreth.
 // Registering the libevm globals here in these packages does not necessarily break avalanchego e2e testing, but Subnet-EVM (or Coreth) E2E testing.
-// So any illegal use here will only be a problem once Subnet-EVM or Coreth bumps the avalanchego version, breaking the release cycles of 
+// So any illegal use here will only be a problem once Subnet-EVM or Coreth bumps the avalanchego version, breaking the release cycles of
 // AvalancheGo and other repositories.
 func TestMustNotImport(t *testing.T) {
 	require := require.New(t)
