@@ -149,8 +149,8 @@ func TestDiffIterationByHeight(t *testing.T) {
 
 	db := memdb.New()
 
-	subnetID0 := ids.GenerateTestID()
-	subnetID1 := ids.GenerateTestID()
+	subnetID0 := ids.ID{0x00}
+	subnetID1 := ids.ID{0x01}
 
 	nodeID0 := ids.BuildTestNodeID([]byte{0x00})
 	nodeID1 := ids.BuildTestNodeID([]byte{0x01})
@@ -171,23 +171,23 @@ func TestDiffIterationByHeight(t *testing.T) {
 	require.NoError(db.Put(height1SubnetID1NodeID1, nil))
 
 	{
-		it := db.NewIteratorWithPrefix(marshalStartDiffKeyByHeight(0))
+		it := db.NewIteratorWithStart(marshalStartDiffKeyByHeight(0))
 		defer it.Release()
 
 		expectedKeys := [][]byte{
 			height0SubnetID0NodeID0,
 			height0SubnetID1NodeID0,
 		}
-		for i := 0; i < len(expectedKeys); i++ {
+		for _, expectedKey := range expectedKeys {
 			require.True(it.Next())
-			require.Contains(expectedKeys, it.Key())
+			require.Equal(expectedKey, it.Key())
 		}
 		require.False(it.Next())
 		require.NoError(it.Error())
 	}
 
 	{
-		it := db.NewIteratorWithPrefix(marshalStartDiffKeyByHeight(1))
+		it := db.NewIteratorWithStart(marshalStartDiffKeyByHeight(1))
 		defer it.Release()
 
 		expectedKeys := [][]byte{
@@ -195,10 +195,12 @@ func TestDiffIterationByHeight(t *testing.T) {
 			height1SubnetID0NodeID1,
 			height1SubnetID1NodeID0,
 			height1SubnetID1NodeID1,
+			height0SubnetID0NodeID0,
+			height0SubnetID1NodeID0,
 		}
-		for i := 0; i < len(expectedKeys); i++ {
+		for _, expectedKey := range expectedKeys {
 			require.True(it.Next())
-			require.Contains(expectedKeys, it.Key())
+			require.Equal(expectedKey, it.Key())
 		}
 		require.False(it.Next())
 		require.NoError(it.Error())
