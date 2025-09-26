@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/pflag"
 
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 )
 
@@ -68,7 +69,7 @@ func (v *StartNetworkVars) register(stringVar varFunc[string], intVar varFunc[in
 
 func (v *StartNetworkVars) GetNodeCount() (int, error) {
 	if v.nodeCount < 1 {
-		return 0, fmt.Errorf("--node-count must be greater than 0 but got %d", v.nodeCount)
+		return 0, stacktrace.Errorf("--node-count must be greater than 0 but got %d", v.nodeCount)
 	}
 	return v.nodeCount, nil
 }

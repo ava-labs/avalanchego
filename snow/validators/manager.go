@@ -95,6 +95,9 @@ type Manager interface {
 	Sample(subnetID ids.ID, size int) ([]ids.NodeID, error)
 
 	// Map of the validators in this subnet
+	GetAllMaps() map[ids.ID]map[ids.NodeID]*GetValidatorOutput
+
+	// Map of the validators in this subnet
 	GetMap(subnetID ids.ID) map[ids.NodeID]*GetValidatorOutput
 
 	// When a validator is added, removed, or its weight changes, the listener
@@ -144,25 +147,8 @@ func (m *manager) AddWeight(subnetID ids.ID, nodeID ids.NodeID, weight uint64) e
 		return ErrZeroWeight
 	}
 
-	// We do not need to grab a write lock here because we never modify the
-	// subnetToVdrs map. However, we must hold the read lock during the entirety
-	// of this function to ensure that errors are returned consistently.
-	//
-	// Consider the case that:
-	//	AddStaker(subnetID, nodeID, 1)
-	//	go func() {
-	//		AddWeight(subnetID, nodeID, 1)
-	//	}
-	//	go func() {
-	//		RemoveWeight(subnetID, nodeID, 1)
-	//	}
-	//
-	// In this case, after both goroutines have finished, either AddWeight
-	// should have errored, or the weight of the node should equal 1. It would
-	// be unexpected to not have received an error from AddWeight but for the
-	// node to no longer be tracked as a validator.
-	m.lock.RLock()
-	defer m.lock.RUnlock()
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
 	set, exists := m.subnetToVdrs[subnetID]
 	if !exists {
@@ -272,6 +258,17 @@ func (m *manager) Sample(subnetID ids.ID, size int) ([]ids.NodeID, error) {
 	}
 
 	return set.Sample(size)
+}
+
+func (m *manager) GetAllMaps() map[ids.ID]map[ids.NodeID]*GetValidatorOutput {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	set := make(map[ids.ID]map[ids.NodeID]*GetValidatorOutput, len(m.subnetToVdrs))
+	for subnetID, vdrs := range m.subnetToVdrs {
+		set[subnetID] = vdrs.Map()
+	}
+	return set
 }
 
 func (m *manager) GetMap(subnetID ids.ID) map[ids.NodeID]*GetValidatorOutput {

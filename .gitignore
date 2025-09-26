@@ -62,3 +62,6 @@ vendor
 .direnv
 # Personal extension to .envrc
 .envrc.local
+
+# debug files
+__debug_*

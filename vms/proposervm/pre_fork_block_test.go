@@ -21,8 +21,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -53,8 +53,8 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = mockable.MaxTime
-		durangoTime    = activationTime
+		activationTime = upgrade.UnscheduledActivationTime
+		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -400,8 +400,8 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 
 	// setup
 	var (
-		activationTime = mockable.MaxTime
-		durangoTime    = activationTime
+		activationTime = upgrade.UnscheduledActivationTime
+		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -455,8 +455,8 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = mockable.MaxTime
-		durangoTime    = activationTime
+		activationTime = upgrade.UnscheduledActivationTime
+		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -638,7 +638,7 @@ func TestPreForkBlock_BuildBlockWithContext(t *testing.T) {
 	blkID := ids.GenerateTestID()
 	innerBlk := snowmanmock.NewBlock(ctrl)
 	innerBlk.EXPECT().ID().Return(blkID).AnyTimes()
-	innerBlk.EXPECT().Timestamp().Return(mockable.MaxTime)
+	innerBlk.EXPECT().Timestamp().Return(upgrade.UnscheduledActivationTime)
 	builtBlk := snowmanmock.NewBlock(ctrl)
 	builtBlk.EXPECT().Bytes().Return([]byte{1, 2, 3}).AnyTimes()
 	builtBlk.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
@@ -668,7 +668,7 @@ func TestPreForkBlock_BuildBlockWithContext(t *testing.T) {
 
 	// Should call BuildBlock since proposervm is not activated
 	innerBlk.EXPECT().Timestamp().Return(time.Time{})
-	vm.Upgrades.ApricotPhase4Time = mockable.MaxTime
+	vm.Upgrades.ApricotPhase4Time = upgrade.UnscheduledActivationTime
 
 	gotChild, err = blk.buildChild(context.Background())
 	require.NoError(err)
