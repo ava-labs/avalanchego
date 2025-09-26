@@ -276,7 +276,7 @@ func RandomizedParams(rng *rand.Rand, baseParams genesis.Params) genesis.Params 
 	// Randomize P-Chain minimum gas price
 	// Range: 1 to 1000 nAVAX (1 to 1000 * 10^9 wei equivalent)
 	minPrice := 1 + rng.Intn(1000)
-	params.TxFeeConfig.DynamicFeeConfig.MinPrice = gas.Price(minPrice)
+	params.TxFeeConfig.DynamicFeeConfig.MinPrice = gas.Price(uint64(minPrice) * units.NanoAvax)
 
 	// Randomize validator fee minimum price
 	// Range: 1 to 1000 nAVAX
