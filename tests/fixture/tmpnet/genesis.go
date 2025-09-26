@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"math/big"
+	"math/rand"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/ava-labs/libevm/core"
@@ -20,6 +23,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/formatting/address"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 )
 
@@ -190,4 +194,164 @@ func stakersForNodes(networkID uint32, nodes []*Node) ([]genesis.UnparsedStaker,
 	}
 
 	return initialStakers, nil
+}
+
+// NewRandomizedTestGenesis creates a test genesis with randomized parameters
+// using the ANTITHESIS_RANDOM_SEED environment variable for consistent randomization
+// across all containers in antithesis tests.
+func NewRandomizedTestGenesis(
+	networkID uint32,
+	nodes []*Node,
+	keysToFund []*secp256k1.PrivateKey,
+) (*genesis.UnparsedConfig, error) {
+	// Get the base genesis config first
+	config, err := NewTestGenesis(networkID, nodes, keysToFund)
+	if err != nil {
+		return nil, stacktrace.Wrap(err)
+	}
+
+	// Check for antithesis random seed
+	antithesisSeed := os.Getenv("ANTITHESIS_RANDOM_SEED")
+	if antithesisSeed == "" {
+		// No randomization requested, return the original config
+		return config, nil
+	}
+
+	// Parse the seed and create a deterministic random source
+	seed, err := strconv.ParseInt(antithesisSeed, 10, 64)
+	if err != nil {
+		return nil, stacktrace.Errorf("failed to parse ANTITHESIS_RANDOM_SEED: %w", err)
+	}
+
+	// Create a deterministic random source
+	rng := rand.New(rand.NewSource(seed)) // #nosec G404
+
+	// Randomize the genesis parameters
+	if err := randomizeGenesisParams(rng, config); err != nil {
+		return nil, stacktrace.Errorf("failed to randomize genesis params: %w", err)
+	}
+
+	return config, nil
+}
+
+// randomizeGenesisParams randomizes various genesis parameters
+func randomizeGenesisParams(rng *rand.Rand, config *genesis.UnparsedConfig) error {
+	// Parse C-Chain genesis to modify it
+	var cChainGenesis core.Genesis
+	if err := json.Unmarshal([]byte(config.CChainGenesis), &cChainGenesis); err != nil {
+		return stacktrace.Errorf("failed to unmarshal C-Chain genesis: %w", err)
+	}
+
+	// Randomize gas limit (between 50M and 200M)
+	cChainGenesis.GasLimit = uint64(50_000_000 + rng.Intn(150_000_000))
+
+	// Randomize initial stake duration (between 12 hours and 48 hours)
+	minStakeDuration := 12 * 60 * 60 // 12 hours in seconds
+	maxStakeDuration := 48 * 60 * 60 // 48 hours in seconds
+	stakeDurationRange := maxStakeDuration - minStakeDuration
+	config.InitialStakeDuration = uint64(minStakeDuration + rng.Intn(stakeDurationRange))
+
+	// Randomize initial stake duration offset (between 30 minutes and 3 hours)
+	minOffset := 30 * 60     // 30 minutes in seconds
+	maxOffset := 3 * 60 * 60 // 3 hours in seconds
+	offsetRange := maxOffset - minOffset
+	config.InitialStakeDurationOffset = uint64(minOffset + rng.Intn(offsetRange))
+
+	// Serialize the modified C-Chain genesis back
+	cChainGenesisBytes, err := json.Marshal(&cChainGenesis)
+	if err != nil {
+		return stacktrace.Errorf("failed to marshal C-Chain genesis: %w", err)
+	}
+	config.CChainGenesis = string(cChainGenesisBytes)
+
+	return nil
+}
+
+// RandomizedParams creates randomized network parameters for testing
+// using the ANTITHESIS_RANDOM_SEED environment variable.
+func RandomizedParams(rng *rand.Rand, baseParams genesis.Params) genesis.Params {
+	// Create a copy of the base params
+	params := baseParams
+
+	// Randomize P-Chain minimum gas price
+	// Range: 1 to 1000 nAVAX (1 to 1000 * 10^9 wei equivalent)
+	minPrice := 1 + rng.Intn(1000)
+	params.TxFeeConfig.DynamicFeeConfig.MinPrice = gas.Price(minPrice)
+
+	// Randomize validator fee minimum price
+	// Range: 1 to 1000 nAVAX
+	validatorMinPrice := 1 + rng.Intn(1000)
+	params.TxFeeConfig.ValidatorFeeConfig.MinPrice = gas.Price(uint64(validatorMinPrice) * units.NanoAvax)
+
+	// Randomize transaction fees
+	// Base transaction fee: 0.1 to 10 milliAVAX
+	baseFeeMultiplier := 1 + rng.Intn(100) // 1 to 100
+	params.TxFeeConfig.TxFee = uint64(baseFeeMultiplier) * (units.MilliAvax / 10)
+
+	// Create asset transaction fee: 0.5 to 50 milliAVAX
+	createAssetFeeMultiplier := 5 + rng.Intn(500) // 5 to 500 (0.5 to 50 milliAVAX)
+	params.TxFeeConfig.CreateAssetTxFee = uint64(createAssetFeeMultiplier) * (units.MilliAvax / 10)
+
+	// Randomize gas capacity and throughput parameters
+	// Max capacity: 500K to 2M
+	params.TxFeeConfig.DynamicFeeConfig.MaxCapacity = gas.Gas(500_000 + rng.Intn(1_500_000))
+
+	// Max per second: 50K to 200K
+	maxPerSecond := 50_000 + rng.Intn(150_000)
+	params.TxFeeConfig.DynamicFeeConfig.MaxPerSecond = gas.Gas(maxPerSecond)
+
+	// Target per second: 25% to 75% of max per second
+	targetRatio := 25 + rng.Intn(51) // 25 to 75
+	params.TxFeeConfig.DynamicFeeConfig.TargetPerSecond = gas.Gas(maxPerSecond * targetRatio / 100)
+
+	// Randomize validator fee capacity and target
+	validatorCapacity := 10_000 + rng.Intn(40_000) // 10K to 50K
+	params.TxFeeConfig.ValidatorFeeConfig.Capacity = gas.Gas(validatorCapacity)
+
+	// Target: 25% to 75% of capacity
+	validatorTargetRatio := 25 + rng.Intn(51) // 25 to 75
+	params.TxFeeConfig.ValidatorFeeConfig.Target = gas.Gas(validatorCapacity * validatorTargetRatio / 100)
+
+	// Randomize staking parameters
+	// Min validator stake: 1 to 5 KiloAVAX
+	minValidatorStakeMultiplier := 1 + rng.Intn(5)
+	params.StakingConfig.MinValidatorStake = uint64(minValidatorStakeMultiplier) * units.KiloAvax
+
+	// Max validator stake: 2 to 10 MegaAVAX
+	maxValidatorStakeMultiplier := 2 + rng.Intn(9)
+	params.StakingConfig.MaxValidatorStake = uint64(maxValidatorStakeMultiplier) * units.MegaAvax
+
+	// Min delegator stake: 5 to 100 AVAX
+	minDelegatorStakeMultiplier := 5 + rng.Intn(96)
+	params.StakingConfig.MinDelegatorStake = uint64(minDelegatorStakeMultiplier) * units.Avax
+
+	// Min delegation fee: 1% to 10%
+	minDelegationFeePercent := 1 + rng.Intn(10)
+	params.StakingConfig.MinDelegationFee = uint32(minDelegationFeePercent * 10000) // Convert to basis points
+
+	return params
+}
+
+// GetRandomizedParams returns randomized network parameters if ANTITHESIS_RANDOM_SEED is set,
+// otherwise returns the original parameters for the given network.
+func GetRandomizedParams(networkID uint32) genesis.Params {
+	baseParams := genesis.Params{
+		TxFeeConfig:   genesis.GetTxFeeConfig(networkID),
+		StakingConfig: genesis.GetStakingConfig(networkID),
+	}
+
+	// Check for antithesis random seed
+	antithesisSeed := os.Getenv("ANTITHESIS_RANDOM_SEED")
+	if antithesisSeed == "" {
+		return baseParams
+	}
+
+	// Parse the seed and create a deterministic random source
+	seed, err := strconv.ParseInt(antithesisSeed, 10, 64)
+	if err != nil {
+		return baseParams
+	}
+
+	rng := rand.New(rand.NewSource(seed)) // #nosec G404
+	return RandomizedParams(rng, baseParams)
 }

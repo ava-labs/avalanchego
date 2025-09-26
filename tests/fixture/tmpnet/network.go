@@ -294,6 +294,13 @@ func (n *Network) EnsureDefaultConfig(ctx context.Context, log logging.Logger) e
 		return stacktrace.Wrap(errMissingRuntimeConfig)
 	}
 
+	// Apply randomized network parameters if ANTITHESIS_RANDOM_SEED is set
+	if antithesisSeed := os.Getenv("ANTITHESIS_RANDOM_SEED"); antithesisSeed != "" {
+		if err := n.applyRandomizedFlags(log, antithesisSeed); err != nil {
+			return stacktrace.Wrap(err)
+		}
+	}
+
 	return nil
 }
 
@@ -361,6 +368,11 @@ func (n *Network) DefaultGenesis() (*genesis.UnparsedConfig, error) {
 		HardhatKey,
 	}
 	keysToFund = append(keysToFund, n.PreFundedKeys...)
+
+	// Check if we should use randomized genesis for antithesis testing
+	if os.Getenv("ANTITHESIS_RANDOM_SEED") != "" {
+		return NewRandomizedTestGenesis(defaultNetworkID, n.Nodes, keysToFund)
+	}
 
 	return NewTestGenesis(defaultNetworkID, n.Nodes, keysToFund)
 }
@@ -1131,4 +1143,64 @@ func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string)
 		startTime,
 		endTime,
 	)
+}
+
+// applyRandomizedFlags applies randomized network parameters using the provided seed
+func (n *Network) applyRandomizedFlags(log logging.Logger, antithesisSeed string) error {
+	// Validate the seed format (the actual randomization is done in GetRandomized* functions)
+	if _, err := strconv.ParseInt(antithesisSeed, 10, 64); err != nil {
+		log.Warn("failed to parse ANTITHESIS_RANDOM_SEED, skipping randomization", zap.Error(err))
+		return nil
+	}
+
+	// Get randomized configuration - single call instead of two separate functions
+	randomizedParams := GetRandomizedParams(n.GetNetworkID())
+
+	// Apply randomized config using structured mappings
+	configMappings := []struct {
+		flagKey string
+		value   uint64
+	}{
+		// Dynamic fee parameters
+		{config.DynamicFeesMinGasPriceKey, uint64(randomizedParams.DynamicFeeConfig.MinPrice)},
+		{config.DynamicFeesMaxGasCapacityKey, uint64(randomizedParams.DynamicFeeConfig.MaxCapacity)},
+		{config.DynamicFeesMaxGasPerSecondKey, uint64(randomizedParams.DynamicFeeConfig.MaxPerSecond)},
+		{config.DynamicFeesTargetGasPerSecondKey, uint64(randomizedParams.DynamicFeeConfig.TargetPerSecond)},
+		{config.DynamicFeesExcessConversionConstantKey, uint64(randomizedParams.DynamicFeeConfig.ExcessConversionConstant)},
+
+		// Validator fee parameters
+		{config.ValidatorFeesCapacityKey, uint64(randomizedParams.ValidatorFeeConfig.Capacity)},
+		{config.ValidatorFeesTargetKey, uint64(randomizedParams.ValidatorFeeConfig.Target)},
+		{config.ValidatorFeesMinPriceKey, uint64(randomizedParams.ValidatorFeeConfig.MinPrice)},
+		{config.ValidatorFeesExcessConversionConstantKey, uint64(randomizedParams.ValidatorFeeConfig.ExcessConversionConstant)},
+
+		// Static fee parameters
+		{config.TxFeeKey, randomizedParams.TxFee},
+		{config.CreateAssetTxFeeKey, randomizedParams.CreateAssetTxFee},
+
+		// Staking parameters
+		{config.MinValidatorStakeKey, randomizedParams.MinValidatorStake},
+		{config.MaxValidatorStakeKey, randomizedParams.MaxValidatorStake},
+		{config.MinDelegatorStakeKey, randomizedParams.MinDelegatorStake},
+		{config.MinDelegatorFeeKey, uint64(randomizedParams.MinDelegationFee)},
+	}
+
+	// Apply all mappings
+	for _, mapping := range configMappings {
+		n.DefaultFlags[mapping.flagKey] = strconv.FormatUint(mapping.value, 10)
+	}
+
+	log.Info("applied randomized network parameters",
+		zap.String("seed", antithesisSeed),
+		zap.Uint64("minGasPrice", uint64(randomizedParams.DynamicFeeConfig.MinPrice)),
+		zap.Uint64("validatorMinPrice", uint64(randomizedParams.ValidatorFeeConfig.MinPrice)),
+		zap.Uint64("txFee", randomizedParams.TxFee),
+		zap.Uint64("createAssetTxFee", randomizedParams.CreateAssetTxFee),
+		zap.Uint64("minValidatorStake", randomizedParams.MinValidatorStake),
+		zap.Uint64("maxValidatorStake", randomizedParams.MaxValidatorStake),
+		zap.Uint64("minDelegatorStake", randomizedParams.MinDelegatorStake),
+		zap.Uint32("minDelegationFee", randomizedParams.MinDelegationFee),
+	)
+
+	return nil
 }
