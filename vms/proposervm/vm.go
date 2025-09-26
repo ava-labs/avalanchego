@@ -42,7 +42,7 @@ import (
 )
 
 const (
-	HTTPPathEndpoint = "/proposervm"
+	httpPathEndpoint = "/proposervm"
 	HTTPHeaderRoute  = "proposervm"
 
 	// DefaultMinBlockDelay should be kept as whole seconds because block
@@ -262,7 +262,7 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
 	server.RegisterInterceptFunc(metrics.InterceptRequest)
 	server.RegisterAfterFunc(metrics.AfterRequest)
-	err = server.RegisterService(&jsonService{vm: vm}, "proposervm")
+	err = server.RegisterService(&jsonrpcService{vm: vm}, "proposervm")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register proposervm service: %w", err)
 	}
@@ -270,7 +270,7 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 	if handlers == nil {
 		handlers = make(map[string]http.Handler)
 	}
-	handlers[HTTPPathEndpoint] = server
+	handlers[httpPathEndpoint] = server
 	return handlers, nil
 }
 
@@ -285,32 +285,29 @@ func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
 	proposerMux := http.NewServeMux()
 
 	// Add ProposerVM specific handlers to proposerMux
-	service := &grpcService{vm: vm}
-	proposerVMPath, proposerVMHandler := proposervmconnect.NewProposerVMHandler(service)
-	vm.ctx.Log.Info("Registering ProposerVM Connect handler", zap.String("path", proposerVMPath))
-	proposerMux.Handle(proposerVMPath, proposerVMHandler)
+	service := &connectrpcService{vm: vm}
+	proposerMux.Handle(proposervmconnect.NewProposerVMHandler(service))
 
 	// Add gRPC reflection for ProposerVM
-	reflectionPattern, reflectionHandler := grpcreflect.NewHandlerV1(
+	proposerMux.Handle(grpcreflect.NewHandlerV1(
 		grpcreflect.NewStaticReflector(proposervmconnect.ProposerVMName),
-	)
-	vm.ctx.Log.Info("Registering ProposerVM gRPC reflection handler", zap.String("pattern", reflectionPattern))
-	proposerMux.Handle(reflectionPattern, reflectionHandler)
+	))
 
 	// Create header-based router
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		route := r.Header[server.HTTPHeaderRoute]
-		vm.ctx.Log.Info("ProposerVM routing request",
+		vm.ctx.Log.Debug("routing request",
 			zap.String("method", r.Method),
 			zap.String("path", r.URL.Path),
 			zap.Strings("header", route),
 		)
 		if len(route) < 2 || route[1] != HTTPHeaderRoute {
-			if innerHandler != nil {
-				innerHandler.ServeHTTP(w, r)
-			} else {
+			if innerHandler == nil {
 				w.WriteHeader(http.StatusNotFound)
+				return
 			}
+
+			innerHandler.ServeHTTP(w, r)
 			return
 		}
 		proposerMux.ServeHTTP(w, r)

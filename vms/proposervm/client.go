@@ -12,32 +12,32 @@ import (
 	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
-// Client for interacting with the json API.
-type Client struct {
+// JSONRPCClient for interacting with the jsonrpc API.
+type JSONRPCClient struct {
 	Requester rpc.EndpointRequester
 }
 
-// NewClient returns a Client for interacting with the json API.
+// NewJSONRPCClient returns a Client for interacting with the jsonrpc API.
 //
 // The provided chain should be the chainID or an alias. Such as "P" for the
 // P-Chain.
-func NewClient(uri string, chain string) *Client {
+func NewJSONRPCClient(uri string, chain string) *JSONRPCClient {
 	path := fmt.Sprintf(
 		"%s/ext/%s/%s%s",
 		uri,
 		constants.ChainAliasPrefix,
 		chain,
-		HTTPPathEndpoint,
+		httpPathEndpoint,
 	)
-	return &Client{
+	return &JSONRPCClient{
 		Requester: rpc.NewEndpointRequester(path),
 	}
 }
 
 // GetProposedHeight returns the P-chain height this node would propose in the
 // next block.
-func (c *Client) GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {
+func (j *JSONRPCClient) GetProposedHeight(ctx context.Context, options ...rpc.Option) (uint64, error) {
 	res := &api.GetHeightResponse{}
-	err := c.Requester.SendRequest(ctx, "proposervm.getProposedHeight", struct{}{}, res, options...)
+	err := j.Requester.SendRequest(ctx, "proposervm.getProposedHeight", struct{}{}, res, options...)
 	return uint64(res.Height), err
 }

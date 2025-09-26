@@ -19,7 +19,7 @@ import (
 	pb "github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
 )
 
-var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("ProposerVMAPI"), func() {
+var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("proposervm"), func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
@@ -79,14 +79,14 @@ var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("ProposerVMAPI"), fu
 			)
 			resp, err := proposerClient.GetProposedHeight(tc.DefaultContext(), &connect.Request[pbproposervm.GetProposedHeightRequest]{})
 			require.NoError(err)
-			require.Positive(resp.Msg.Height, "proposervm height should be greater than 0")
+			require.Positive(resp.Msg.Height)
 		})
 
 		tc.By("verifying the jsonrpc service handles API calls", func() {
-			client := proposervm.NewClient(nodeURI.URI, cChainID.String())
+			client := proposervm.NewJSONRPCClient(nodeURI.URI, cChainID.String())
 			height, err := client.GetProposedHeight(tc.DefaultContext())
 			require.NoError(err)
-			require.Positive(height, "proposervm height should be greater than 0")
+			require.Positive(height)
 		})
 	})
 })

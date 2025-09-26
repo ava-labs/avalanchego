@@ -19,24 +19,24 @@ import (
 	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
 
-var _ proposervmconnect.ProposerVMHandler = (*grpcService)(nil)
+var _ proposervmconnect.ProposerVMHandler = (*connectrpcService)(nil)
 
-type grpcService struct {
+type connectrpcService struct {
 	vm *VM
 }
 
-func (s *grpcService) GetProposedHeight(ctx context.Context, r *connect.Request[pb.GetProposedHeightRequest]) (*connect.Response[pb.GetProposedHeightReply], error) {
-	log := s.vm.ctx.Log.With(
+func (c *connectrpcService) GetProposedHeight(ctx context.Context, r *connect.Request[pb.GetProposedHeightRequest]) (*connect.Response[pb.GetProposedHeightReply], error) {
+	log := c.vm.ctx.Log.With(
 		zap.String("service", "proposervm"),
 		zap.String("method", "GetProposedHeight"),
 		zap.Strings("route", r.Header()[server.HTTPHeaderRoute]),
 	)
 	log.Debug("API called")
 
-	s.vm.ctx.Lock.Lock()
-	defer s.vm.ctx.Lock.Unlock()
+	c.vm.ctx.Lock.Lock()
+	defer c.vm.ctx.Lock.Unlock()
 
-	blk, err := s.vm.getBlock(ctx, s.vm.preferred)
+	blk, err := c.vm.getBlock(ctx, c.vm.preferred)
 	if err != nil {
 		log.Error("failed to get preferred block", zap.Error(err))
 		return nil, fmt.Errorf("failed to get preferred block: %w", err)
@@ -53,23 +53,23 @@ func (s *grpcService) GetProposedHeight(ctx context.Context, r *connect.Request[
 	}), nil
 }
 
-type jsonService struct {
+type jsonrpcService struct {
 	vm *VM
 }
 
-func (s *jsonService) GetProposedHeight(r *http.Request, _ *struct{}, reply *api.GetHeightResponse) error {
-	log := s.vm.ctx.Log.With(
+func (j *jsonrpcService) GetProposedHeight(r *http.Request, _ *struct{}, reply *api.GetHeightResponse) error {
+	log := j.vm.ctx.Log.With(
 		zap.String("service", "proposervm"),
 		zap.String("method", "GetProposedHeight"),
 		zap.String("path", r.URL.Path),
 	)
 	log.Debug("API called")
 
-	s.vm.ctx.Lock.Lock()
-	defer s.vm.ctx.Lock.Unlock()
+	j.vm.ctx.Lock.Lock()
+	defer j.vm.ctx.Lock.Unlock()
 
 	ctx := r.Context()
-	blk, err := s.vm.getBlock(ctx, s.vm.preferred)
+	blk, err := j.vm.getBlock(ctx, j.vm.preferred)
 	if err != nil {
 		log.Error("failed to get preferred block", zap.Error(err))
 		return fmt.Errorf("failed to get preferred block: %w", err)

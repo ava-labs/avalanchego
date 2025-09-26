@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
 )
 
-func TestGRPCService_GetProposedHeight(t *testing.T) {
+func TestConnectRPCService_GetProposedHeight(t *testing.T) {
 	require := require.New(t)
 
 	var (
@@ -62,7 +62,7 @@ func TestGRPCService_GetProposedHeight(t *testing.T) {
 	require.Equal(uint64(pChainHeight), resp.Msg.GetHeight())
 }
 
-func TestJSONService_GetProposedHeight(t *testing.T) {
+func TestJSONRPCService_GetProposedHeight(t *testing.T) {
 	require := require.New(t)
 
 	var (
@@ -75,19 +75,8 @@ func TestJSONService_GetProposedHeight(t *testing.T) {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
 
-	s := &jsonService{vm: vm}
+	s := &jsonrpcService{vm: vm}
 	var reply api.GetHeightResponse
-	require.NoError(s.GetProposedHeight(
-		&http.Request{
-			URL: &url.URL{},
-		},
-		&struct{}{},
-		&reply,
-	))
-	require.Equal(
-		api.GetHeightResponse{
-			Height: pChainHeight,
-		},
-		reply,
-	)
+	require.NoError(s.GetProposedHeight(&http.Request{URL: &url.URL{}}, &struct{}{}, &reply))
+	require.Equal(api.GetHeightResponse{Height: pChainHeight}, reply)
 }
