@@ -5,13 +5,7 @@
 // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/226-dynamic-minimum-block-times/README.md
 package acp226
 
-import (
-	"sort"
-
-	"github.com/ava-labs/avalanchego/vms/components/gas"
-
-	safemath "github.com/ava-labs/avalanchego/utils/math"
-)
+import "github.com/ava-labs/avalanchego/vms/evm/upgrades/common"
 
 const (
 	// MinDelayMilliseconds (M) is the minimum block delay in milliseconds
@@ -28,6 +22,14 @@ const (
 	maxDelayExcess = 46_516_320 // ConversionRate * ln(MaxUint64 / MinDelayMilliseconds) + 1
 )
 
+// acp226Params is the params used for the acp226 upgrade.
+var acp226Params = common.ExcessParams{
+	MinValue:       MinDelayMilliseconds,
+	ConversionRate: ConversionRate,
+	MaxExcessDiff:  MaxDelayExcessDiff,
+	MaxExcess:      maxDelayExcess,
+}
+
 // DelayExcess represents the excess for delay calculation in the dynamic minimum block delay mechanism.
 type DelayExcess uint64
 
@@ -35,38 +37,17 @@ type DelayExcess uint64
 //
 // Delay = MinDelayMilliseconds * e^(DelayExcess / ConversionRate)
 func (t DelayExcess) Delay() uint64 {
-	return uint64(gas.CalculatePrice(
-		MinDelayMilliseconds,
-		gas.Gas(t),
-		ConversionRate,
-	))
+	return acp226Params.CalculateValue(uint64(t))
 }
 
 // UpdateDelayExcess updates the DelayExcess to be as close as possible to the
 // desiredDelayExcess without exceeding the maximum DelayExcess change.
 func (t *DelayExcess) UpdateDelayExcess(desiredDelayExcess uint64) {
-	*t = DelayExcess(calculateDelayExcess(uint64(*t), desiredDelayExcess))
+	*t = DelayExcess(acp226Params.AdjustExcess(uint64(*t), desiredDelayExcess))
 }
 
 // DesiredDelayExcess calculates the optimal delay excess given the desired
 // delay.
 func DesiredDelayExcess(desiredDelay uint64) uint64 {
-	// This could be solved directly by calculating D * ln(desired / M)
-	// using floating point math. However, it introduces inaccuracies. So, we
-	// use a binary search to find the closest integer solution.
-	return uint64(sort.Search(maxDelayExcess, func(delayExcessGuess int) bool {
-		excess := DelayExcess(delayExcessGuess)
-		return excess.Delay() >= desiredDelay
-	}))
-}
-
-// calculateDelayExcess calculates the optimal new DelayExcess for a block proposer to
-// include given the current and desired excess values.
-func calculateDelayExcess(excess, desired uint64) uint64 {
-	change := safemath.AbsDiff(excess, desired)
-	change = min(change, MaxDelayExcessDiff)
-	if excess < desired {
-		return excess + change
-	}
-	return excess - change
+	return acp226Params.DesiredExcess(desiredDelay)
 }
