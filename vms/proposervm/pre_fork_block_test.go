@@ -120,7 +120,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 
 	var (
 		activationTime = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-		durangoTime    = upgrade.InitiallyActiveTime
+		durangoTime    = snowmantest.GenesisTimestamp.Add(10 * time.Second)
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -129,14 +129,14 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 
 	// create pre fork oracle block pre activation time...
 	coreTestBlk := snowmantest.BuildChild(snowmantest.Genesis)
-	coreTestBlk.TimestampV = upgrade.InitiallyActiveTime.Add(-1 * time.Second)
+	coreTestBlk.TimestampV = activationTime.Add(-1 * time.Second)
 
 	// ... whose options are post activation time
 	preferredBlk := snowmantest.BuildChild(coreTestBlk)
-	preferredBlk.TimestampV = upgrade.InitiallyActiveTime.Add(time.Second)
+	preferredBlk.TimestampV = activationTime.Add(time.Second)
 
 	unpreferredBlk := snowmantest.BuildChild(coreTestBlk)
-	unpreferredBlk.TimestampV = upgrade.InitiallyActiveTime.Add(time.Second)
+	unpreferredBlk.TimestampV = activationTime.Add(time.Second)
 
 	oracleCoreBlk := &TestOptionsBlock{
 		Block: *coreTestBlk,
@@ -194,7 +194,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 
 	var (
 		activationTime = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-		durangoTime    = upgrade.InitiallyActiveTime
+		durangoTime    = snowmantest.GenesisTimestamp.Add(10 * time.Second)
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -256,14 +256,14 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 
 	var (
 		activationTime = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-		durangoTime    = upgrade.InitiallyActiveTime
+		durangoTime    = snowmantest.GenesisTimestamp.Add(10 * time.Second)
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	preActivationTime := upgrade.InitiallyActiveTime.Add(-1 * time.Second)
+	preActivationTime := activationTime.Add(-1 * time.Second)
 	proVM.Set(preActivationTime)
 
 	coreBlk := snowmantest.BuildChild(snowmantest.Genesis)
@@ -303,7 +303,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	require.ErrorIs(err, errProposersNotActivated)
 
 	// once activation time is crossed postForkBlock are produced
-	postActivationTime := upgrade.InitiallyActiveTime.Add(time.Second)
+	postActivationTime := activationTime.Add(time.Second)
 	proVM.Set(postActivationTime)
 
 	coreVM.SetPreferenceF = func(context.Context, ids.ID) error {
@@ -365,7 +365,7 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 
 	var (
 		activationTime = snowmantest.GenesisTimestamp.Add(-1 * time.Second)
-		durangoTime    = upgrade.InitiallyActiveTime
+		durangoTime    = snowmantest.GenesisTimestamp.Add(-1 * time.Second)
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	proVM.Set(activationTime)
@@ -482,14 +482,14 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 
 	var (
 		activationTime = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-		durangoTime    = upgrade.InitiallyActiveTime
+		durangoTime    = snowmantest.GenesisTimestamp.Add(10 * time.Second)
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	postActivationTime := upgrade.InitiallyActiveTime.Add(time.Second)
+	postActivationTime := activationTime.Add(time.Second)
 	proVM.Set(postActivationTime)
 
 	coreTestBlk := snowmantest.BuildChild(snowmantest.Genesis)
@@ -552,14 +552,14 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 
 	var (
 		activationTime = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-		durangoTime    = upgrade.InitiallyActiveTime
+		durangoTime    = snowmantest.GenesisTimestamp.Add(10 * time.Second)
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
 
-	postActivationTime := upgrade.InitiallyActiveTime.Add(time.Second)
+	postActivationTime := activationTime.Add(time.Second)
 	proVM.Set(postActivationTime)
 
 	coreTestBlk := snowmantest.BuildChild(snowmantest.Genesis)
