@@ -5,7 +5,10 @@ use std::fmt;
 
 use firewood::v2::api;
 
-use crate::{ChangeProofContext, HashKey, NextKeyRange, OwnedBytes, RangeProofContext};
+use crate::{
+    ChangeProofContext, CreateProposalResult, HashKey, NextKeyRange, OwnedBytes, ProposalHandle,
+    RangeProofContext,
+};
 
 /// The result type returned from an FFI function that returns no value but may
 /// return an error.
@@ -54,7 +57,7 @@ pub enum HandleResult {
     /// associated with this handle when it is no longer needed.
     ///
     /// [`fwd_close_db`]: crate::fwd_close_db
-    Ok(Box<crate::DatabaseHandle<'static>>),
+    Ok(Box<crate::DatabaseHandle>),
 
     /// An error occurred and the message is returned as an [`OwnedBytes`]. If
     /// value is guaranteed to contain only valid UTF-8.
@@ -66,8 +69,8 @@ pub enum HandleResult {
     Err(OwnedBytes),
 }
 
-impl<E: fmt::Display> From<Result<crate::DatabaseHandle<'static>, E>> for HandleResult {
-    fn from(value: Result<crate::DatabaseHandle<'static>, E>) -> Self {
+impl<E: fmt::Display> From<Result<crate::DatabaseHandle, E>> for HandleResult {
+    fn from(value: Result<crate::DatabaseHandle, E>) -> Self {
         match value {
             Ok(handle) => HandleResult::Ok(Box::new(handle)),
             Err(err) => HandleResult::Err(err.to_string().into_bytes().into()),
@@ -272,6 +275,49 @@ pub enum NextKeyRangeResult {
     Err(OwnedBytes),
 }
 
+/// A result type returned from FFI functions that create a proposal but do not
+/// commit it to the database.
+#[derive(Debug)]
+#[repr(C)]
+pub enum ProposalResult<'db> {
+    /// The caller provided a null pointer to a database handle.
+    NullHandlePointer,
+    /// Buulding the proposal was successful and the proposal ID and root hash
+    /// are returned.
+    Ok {
+        /// An opaque pointer to the [`ProposalHandle`] that can be use to create
+        /// an additional proposal or later commit. The caller must ensure that this
+        /// pointer is freed with [`fwd_free_proposal`] if it is not committed.
+        ///
+        /// [`fwd_free_proposal`]: crate::fwd_free_proposal
+        // note: opaque pointers mut be boxed because the FFI does not the structure definition.
+        handle: Box<ProposalHandle<'db>>,
+        /// The root hash of the proposal. Zeroed if the proposal resulted in an
+        /// empty database.
+        root_hash: HashKey,
+    },
+    /// An error occurred and the message is returned as an [`OwnedBytes`]. If
+    /// value is guaranteed to contain only valid UTF-8.
+    ///
+    /// The caller must call [`fwd_free_owned_bytes`] to free the memory
+    /// associated with this error.
+    ///
+    /// [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+    Err(OwnedBytes),
+}
+
+impl<'db, E: fmt::Display> From<Result<CreateProposalResult<'db>, E>> for ProposalResult<'db> {
+    fn from(value: Result<CreateProposalResult<'db>, E>) -> Self {
+        match value {
+            Ok(CreateProposalResult { handle, .. }) => ProposalResult::Ok {
+                root_hash: handle.hash_key().unwrap_or_default(),
+                handle: Box::new(handle),
+            },
+            Err(err) => ProposalResult::Err(err.to_string().into_bytes().into()),
+        }
+    }
+}
+
 /// Helper trait to handle the different result types returned from FFI functions.
 ///
 /// Once Try trait is stable, we can use that instead of this trait:
@@ -336,6 +382,7 @@ impl_null_handle_result!(
     RangeProofResult,
     ChangeProofResult,
     NextKeyRangeResult,
+    ProposalResult<'_>,
 );
 
 impl_cresult!(
@@ -346,6 +393,7 @@ impl_cresult!(
     RangeProofResult,
     ChangeProofResult,
     NextKeyRangeResult,
+    ProposalResult<'_>,
 );
 
 enum Panic {

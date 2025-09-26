@@ -513,21 +513,14 @@ func TestDropProposal(t *testing.T) {
 	_, err = proposal.Get([]byte("non-existent"))
 	r.ErrorIs(err, errDroppedProposal)
 	_, err = proposal.Root()
-	r.ErrorIs(err, errDroppedProposal)
+	r.NoError(err, "Root of dropped proposal should still be accessible")
 
-	// Attempt to "emulate" the proposal to ensure it isn't internally available still.
-	proposal = &Proposal{
-		handle: db.handle,
-		id:     1,
+	// Check that the keys are not in the database.
+	for i := range keys {
+		got, err := db.Get(keys[i])
+		r.NoError(err, "Get(%d)", i)
+		r.Empty(got, "Get(%d)", i)
 	}
-
-	// Check all operations on the fake proposal.
-	_, err = proposal.Get([]byte("non-existent"))
-	r.Contains(err.Error(), "proposal not found", "Get(fake proposal)")
-	_, err = proposal.Propose([][]byte{[]byte("key")}, [][]byte{[]byte("value")})
-	r.Contains(err.Error(), "proposal not found", "Propose(fake proposal)")
-	err = proposal.Commit()
-	r.Contains(err.Error(), "proposal not found", "Commit(fake proposal)")
 }
 
 // Create a proposal with 10 key-value pairs.

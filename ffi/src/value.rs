@@ -15,8 +15,8 @@ pub use self::kvp::KeyValuePair;
 pub use self::owned::{OwnedBytes, OwnedSlice};
 pub(crate) use self::results::{CResult, NullHandleResult};
 pub use self::results::{
-    ChangeProofResult, HandleResult, HashResult, NextKeyRangeResult, RangeProofResult, ValueResult,
-    VoidResult,
+    ChangeProofResult, HandleResult, HashResult, NextKeyRangeResult, ProposalResult,
+    RangeProofResult, ValueResult, VoidResult,
 };
 
 /// Maybe is a C-compatible optional type using a tagged union pattern.

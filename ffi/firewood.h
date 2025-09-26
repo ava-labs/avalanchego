@@ -25,6 +25,12 @@ typedef struct ChangeProofContext ChangeProofContext;
 typedef struct DatabaseHandle DatabaseHandle;
 
 /**
+ * An opaque wrapper around a Proposal that also retains a reference to the
+ * database handle it was created from.
+ */
+typedef struct ProposalHandle ProposalHandle;
+
+/**
  * FFI context for for a parsed or generated range proof.
  */
 typedef struct RangeProofContext RangeProofContext;
@@ -640,28 +646,6 @@ typedef struct VerifyRangeProofArgs {
 } VerifyRangeProofArgs;
 
 /**
- * A value returned by the FFI.
- *
- * This is used in several different ways, including:
- * * An C-style string.
- * * An ID for a proposal.
- * * A byte slice containing data.
- *
- * For more details on how the data may be stored, refer to the function signature
- * that returned it or the `From` implementations.
- *
- * The data stored in this struct (if `data` is not null) must be manually freed
- * by the caller using `fwd_free_value`.
- *
- */
-typedef struct Value {
-  size_t len;
-  uint8_t *data;
-} Value;
-
-typedef uint32_t ProposalId;
-
-/**
  * The result type returned from the open or create database functions.
  */
 typedef enum HandleResult_Tag {
@@ -746,6 +730,58 @@ typedef struct DatabaseHandleArgs {
    */
   bool truncate;
 } DatabaseHandleArgs;
+
+/**
+ * A result type returned from FFI functions that create a proposal but do not
+ * commit it to the database.
+ */
+typedef enum ProposalResult_Tag {
+  /**
+   * The caller provided a null pointer to a database handle.
+   */
+  ProposalResult_NullHandlePointer,
+  /**
+   * Buulding the proposal was successful and the proposal ID and root hash
+   * are returned.
+   */
+  ProposalResult_Ok,
+  /**
+   * An error occurred and the message is returned as an [`OwnedBytes`]. If
+   * value is guaranteed to contain only valid UTF-8.
+   *
+   * The caller must call [`fwd_free_owned_bytes`] to free the memory
+   * associated with this error.
+   *
+   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+   */
+  ProposalResult_Err,
+} ProposalResult_Tag;
+
+typedef struct ProposalResult_Ok_Body {
+  /**
+   * An opaque pointer to the [`ProposalHandle`] that can be use to create
+   * an additional proposal or later commit. The caller must ensure that this
+   * pointer is freed with [`fwd_free_proposal`] if it is not committed.
+   *
+   * [`fwd_free_proposal`]: crate::fwd_free_proposal
+   */
+  struct ProposalHandle *handle;
+  /**
+   * The root hash of the proposal. Zeroed if the proposal resulted in an
+   * empty database.
+   */
+  struct HashKey root_hash;
+} ProposalResult_Ok_Body;
+
+typedef struct ProposalResult {
+  ProposalResult_Tag tag;
+  union {
+    ProposalResult_Ok_Body ok;
+    struct {
+      OwnedBytes err;
+    };
+  };
+} ProposalResult;
 
 /**
  * Arguments for initializing logging for the Firewood FFI.
@@ -881,6 +917,8 @@ struct ValueResult fwd_change_proof_to_bytes(const struct ChangeProofContext *_p
  * Callers must ensure that:
  *
  * - `db` is a valid pointer to a [`DatabaseHandle`] returned by [`fwd_open_db`].
+ * - There are no handles to any open proposals. If so, they must be freed first
+ *   using [`fwd_free_proposal`].
  * - The database handle is not used after this function is called.
  */
 struct VoidResult fwd_close_db(struct DatabaseHandle *db);
@@ -888,23 +926,33 @@ struct VoidResult fwd_close_db(struct DatabaseHandle *db);
 /**
  * Commits a proposal to the database.
  *
+ * This function will consume the proposal regardless of whether the commit
+ * is successful.
+ *
  * # Arguments
  *
- * * `db` - The database handle returned by `open_db`
- * * `proposal_id` - The ID of the proposal to commit
+ * * `handle` - The proposal handle returned by [`fwd_propose_on_db`] or
+ *   [`fwd_propose_on_proposal`].
  *
  * # Returns
  *
- * A `Value` containing {0, null} if the commit was successful.
- * A `Value` containing {0, "error message"} if the commit failed.
+ * # Returns
+ *
+ * - [`HashResult::NullHandlePointer`] if the provided database handle is null.
+ * - [`HashResult::None`] if the commit resulted in an empty database.
+ * - [`HashResult::Some`] if the commit was successful, containing the new root hash.
+ * - [`HashResult::Err`] if an error occurred while committing the batch.
  *
  * # Safety
  *
- * This function is unsafe because it dereferences raw pointers.
- * The caller must ensure that `db` is a valid pointer returned by `open_db`
- *
+ * The caller must:
+ * * ensure that `handle` is a valid pointer to a [`ProposalHandle`]
+ * * ensure that `handle` is not used again after this function is called.
+ * * call [`fwd_free_owned_bytes`] to free the memory associated with the
+ *   returned error ([`HashKey`] does not need to be freed as it is returned
+ *   by value).
  */
-struct HashResult fwd_commit(const struct DatabaseHandle *db, uint32_t proposal_id);
+struct HashResult fwd_commit_proposal(struct ProposalHandle *proposal);
 
 /**
  * Create a change proof for the given range of keys between two roots.
@@ -971,8 +1019,6 @@ struct RangeProofResult fwd_db_range_proof(const struct DatabaseHandle *db,
  * - [`HashResult::None`] if the proof resulted in an empty database (i.e., all keys were deleted).
  * - [`HashResult::Some`] containing the new root hash if the proof was successfully verified
  * - [`HashResult::Err`] containing an error message if the proof could not be verified or committed.
- *
- * [`fwd_commit`]: crate::fwd_commit
  *
  * # Thread Safety
  *
@@ -1072,23 +1118,6 @@ struct VoidResult fwd_db_verify_range_proof(const struct DatabaseHandle *_db,
                                             struct VerifyRangeProofArgs _args);
 
 /**
- * Drops a proposal from the database.
- * The propopsal's data is now inaccessible, and can be freed by the `RevisionManager`.
- *
- * # Arguments
- *
- * * `db` - The database handle returned by `open_db`
- * * `proposal_id` - The ID of the proposal to drop
- *
- * # Safety
- *
- * This function is unsafe because it dereferences raw pointers.
- * The caller must ensure that `db` is a valid pointer returned by `open_db`
- *
- */
-struct Value fwd_drop_proposal(const struct DatabaseHandle *db, uint32_t proposal_id);
-
-/**
  * Frees the memory associated with a `ChangeProofContext`.
  *
  * # Arguments
@@ -1124,6 +1153,30 @@ struct VoidResult fwd_free_change_proof(struct ChangeProofContext *proof);
 struct VoidResult fwd_free_owned_bytes(OwnedBytes bytes);
 
 /**
+ * Consumes the [`ProposalHandle`], cancels the proposal, and frees the memory.
+ *
+ * # Arguments
+ *
+ * * `proposal` - A pointer to a [`ProposalHandle`] previously returned from a
+ *   function from this library.
+ *
+ * # Returns
+ *
+ * - [`VoidResult::NullHandlePointer`] if the provided proposal handle is null.
+ * - [`VoidResult::Ok`] if the proposal was successfully cancelled and freed.
+ * - [`VoidResult::Err`] if the process panics while freeing the memory.
+ *
+ * # Safety
+ *
+ * The caller must ensure that the `proposal` is not null and that it points to
+ * a valid [`ProposalHandle`] previously returned by a function from this library.
+ *
+ * The caller must ensure that the proposal was not committed. [`fwd_commit_proposal`]
+ * will consume the proposal automatically.
+ */
+struct VoidResult fwd_free_proposal(struct ProposalHandle *proposal);
+
+/**
  * Frees the memory associated with a `RangeProofContext`.
  *
  * # Arguments
@@ -1136,25 +1189,6 @@ struct VoidResult fwd_free_owned_bytes(OwnedBytes bytes);
  * - [`VoidResult::Err`] if the process panics while freeing the memory.
  */
 struct VoidResult fwd_free_range_proof(struct RangeProofContext *proof);
-
-/**
- * Frees the memory associated with a `Value`.
- *
- * # Arguments
- *
- * * `value` - The `Value` to free, previously returned from any Rust function.
- *
- * # Safety
- *
- * This function is unsafe because it dereferences raw pointers.
- * The caller must ensure that `value` is a valid pointer.
- *
- * # Panics
- *
- * This function panics if `value` is `null`.
- *
- */
-struct VoidResult fwd_free_value(struct Value *value);
 
 /**
  * Gather latest metrics for this process.
@@ -1179,26 +1213,26 @@ struct ValueResult fwd_gather(void);
  *
  * # Arguments
  *
- * * `db` - The database handle returned by `open_db`
- * * `id` - The ID of the proposal to get the value from
- * * `key` - The key to look up, in `BorrowedBytes` form
+ * * `handle` - The proposal handle returned by [`fwd_propose_on_db`] or
+ *   [`fwd_propose_on_proposal`].
+ * * `key` - The key to look up, as a [`BorrowedBytes`].
  *
  * # Returns
  *
- * A `Value` containing the requested value.
- * A `Value` containing {0, "error message"} if the get failed.
+ * - [`ValueResult::NullHandlePointer`] if the provided database handle is null.
+ * - [`ValueResult::None`] if the key was not found.
+ * - [`ValueResult::Some`] if the key was found with the associated value.
+ * - [`ValueResult::Err`] if an error occurred while retrieving the value.
  *
  * # Safety
  *
  * The caller must:
- *  * ensure that `db` is a valid pointer returned by `open_db`
- *  * ensure that `key` is a valid pointer to a `Value` struct
- *  * call `free_value` to free the memory associated with the returned `Value`
- *
+ * * ensure that `handle` is a valid pointer to a [`ProposalHandle`]
+ * * ensure that `key` is valid for [`BorrowedBytes`]
+ * * call [`fwd_free_owned_bytes`] to free the memory associated [`OwnedBytes`]
+ *   returned in the result.
  */
-struct ValueResult fwd_get_from_proposal(const struct DatabaseHandle *db,
-                                         ProposalId id,
-                                         BorrowedBytes key);
+struct ValueResult fwd_get_from_proposal(const struct ProposalHandle *handle, BorrowedBytes key);
 
 /**
  * Gets a value assoicated with the given root hash and key.
@@ -1288,54 +1322,55 @@ struct HandleResult fwd_open_db(struct DatabaseHandleArgs args);
  *
  * # Arguments
  *
- * * `db` - The database handle returned by `open_db`
- * * `values` - A `BorrowedKeyValuePairs` struct containing the key-value pairs to put.
+ * * `db` - The database handle returned by [`fwd_open_db`]
+ * * `values` - A [`BorrowedKeyValuePairs`] containing the key-value pairs to put.
  *
  * # Returns
  *
- * On success, a `Value` containing {len=id, data=hash}. In this case, the
- * hash will always be 32 bytes, and the id will be non-zero.
- * On failure, a `Value` containing {0, "error message"}.
+ * - [`ProposalResult::NullHandlePointer`] if the provided database handle is null.
+ * - [`ProposalResult::Ok`] if the proposal was created, with the proposal handle
+ *   and calculated root hash.
+ * - [`ProposalResult::Err`] if an error occurred while creating the proposal.
  *
  * # Safety
  *
- * This function is unsafe because it dereferences raw pointers.
  * The caller must:
- *  * ensure that `db` is a valid pointer returned by `open_db`
- *  * ensure that `values` is a valid pointer and that it points to an array of `KeyValue` structs of length `nkeys`.
- *  * ensure that the `Value` fields of the `KeyValue` structs are valid pointers.
- *
+ * * ensure that `db` is a valid pointer to a [`DatabaseHandle`]
+ * * ensure that `values` is valid for [`BorrowedKeyValuePairs`]
+ * * call [`fwd_commit_proposal`] or [`fwd_free_proposal`] to free the memory
+ *   associated with the proposal. And, the caller must ensure this is done
+ *   before calling [`fwd_close_db`] to avoid memory leaks or undefined behavior.
  */
-struct Value fwd_propose_on_db(const struct DatabaseHandle *db,
-                               BorrowedKeyValuePairs values);
+struct ProposalResult fwd_propose_on_db(const struct DatabaseHandle *db,
+                                        BorrowedKeyValuePairs values);
 
 /**
  * Proposes a batch of operations to the database on top of an existing proposal.
  *
  * # Arguments
  *
- * * `db` - The database handle returned by `open_db`
- * * `proposal_id` - The ID of the proposal to propose on
- * * `values` - A `BorrowedKeyValuePairs` struct containing the key-value pairs to put.
+ * * `handle` - The proposal handle returned by [`fwd_propose_on_db`] or
+ *   [`fwd_propose_on_proposal`].
+ * * `values` - A [`BorrowedKeyValuePairs`] containing the key-value pairs to put.
  *
  * # Returns
  *
- * On success, a `Value` containing {len=id, data=hash}. In this case, the
- * hash will always be 32 bytes, and the id will be non-zero.
- * On failure, a `Value` containing {0, "error message"}.
+ * - [`ProposalResult::NullHandlePointer`] if the provided database handle is null.
+ * - [`ProposalResult::Ok`] if the proposal was created, with the proposal handle
+ *   and calculated root hash.
+ * - [`ProposalResult::Err`] if an error occurred while creating the proposal.
  *
  * # Safety
  *
- * This function is unsafe because it dereferences raw pointers.
  * The caller must:
- *  * ensure that `db` is a valid pointer returned by `open_db`
- *  * ensure that `values` is a valid pointer and that it points to an array of `KeyValue` structs of length `nkeys`.
- *  * ensure that the `Value` fields of the `KeyValue` structs are valid pointers.
- *
+ * * ensure that `handle` is a valid pointer to a [`ProposalHandle`]
+ * * ensure that `values` is valid for [`BorrowedKeyValuePairs`]
+ * * call [`fwd_commit_proposal`] or [`fwd_free_proposal`] to free the memory
+ *   associated with the proposal. And, the caller must ensure this is done
+ *   before calling [`fwd_close_db`] to avoid memory leaks or undefined behavior.
  */
-struct Value fwd_propose_on_proposal(const struct DatabaseHandle *db,
-                                     ProposalId proposal_id,
-                                     BorrowedKeyValuePairs values);
+struct ProposalResult fwd_propose_on_proposal(const struct ProposalHandle *handle,
+                                              BorrowedKeyValuePairs values);
 
 /**
  * Returns the next key range that should be fetched after processing the

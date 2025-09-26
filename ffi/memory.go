@@ -14,13 +14,10 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"runtime"
 	"unsafe"
 )
 
 var (
-	errNilStruct     = errors.New("nil struct pointer cannot be freed")
-	errBadValue      = errors.New("value from cgo formatted incorrectly")
 	errKeysAndValues = errors.New("keys and values must have the same length")
 	errFreeingValue  = errors.New("unexpected error while freeing value")
 )
@@ -134,25 +131,6 @@ func newKeyValuePairs(keys, vals [][]byte, pinner Pinner) (C.BorrowedKeyValuePai
 	}
 
 	return newBorrowedKeyValuePairs(pairs, pinner), nil
-}
-
-// Close releases the memory associated with the Database.
-//
-// This is safe to call if the pointer is nil, in which case it does nothing. The
-// pointer will be set to nil after freeing to prevent double free. However, it is
-// not safe to call this method concurrently from multiple goroutines.
-func (db *Database) Close() error {
-	if db.handle == nil {
-		return nil
-	}
-
-	if err := getErrorFromVoidResult(C.fwd_close_db(db.handle)); err != nil {
-		return fmt.Errorf("unexpected error when closing database: %w", err)
-	}
-
-	db.handle = nil // Prevent double free
-
-	return nil
 }
 
 // ownedBytes is a wrapper around C.OwnedBytes that provides a Go interface
@@ -346,90 +324,4 @@ func getDatabaseFromHandleResult(result C.HandleResult) (*Database, error) {
 	default:
 		return nil, fmt.Errorf("unknown C.HandleResult tag: %d", result.tag)
 	}
-}
-
-// hashAndIDFromValue converts the cgo `Value` payload into:
-//
-//	case | data    | len   | meaning
-//
-// 1.    | nil     | 0     | invalid
-// 2.    | nil     | non-0 | proposal deleted everything
-// 3.    | non-nil | 0     | error string
-// 4.    | non-nil | non-0 | hash and id
-//
-// The value should never be nil.
-func hashAndIDFromValue(v *C.struct_Value) ([]byte, uint32, error) {
-	// Pin the returned value to prevent it from being garbage collected.
-	defer runtime.KeepAlive(v)
-
-	if v == nil {
-		return nil, 0, errNilStruct
-	}
-
-	if v.data == nil {
-		// Case 2
-		if v.len != 0 {
-			return nil, uint32(v.len), nil
-		}
-
-		// Case 1
-		return nil, 0, errBadValue
-	}
-
-	// Case 3
-	if v.len == 0 {
-		errStr := C.GoString((*C.char)(unsafe.Pointer(v.data)))
-		if err := getErrorFromVoidResult(C.fwd_free_value(v)); err != nil {
-			return nil, 0, fmt.Errorf("%w: %w", errFreeingValue, err)
-		}
-		return nil, 0, errors.New(errStr)
-	}
-
-	// Case 4
-	id := uint32(v.len)
-	buf := C.GoBytes(unsafe.Pointer(v.data), RootLength)
-	v.len = C.size_t(RootLength) // set the length to free
-	if err := getErrorFromVoidResult(C.fwd_free_value(v)); err != nil {
-		return nil, 0, fmt.Errorf("%w: %w", errFreeingValue, err)
-	}
-	return buf, id, nil
-}
-
-// errorFromValue converts the cgo `Value` payload into:
-//
-//	case | data    | len   | meaning
-//
-// 1.    | nil     | 0     | empty
-// 2.    | nil     | non-0 | invalid
-// 3.    | non-nil | 0     | error string
-// 4.    | non-nil | non-0 | invalid
-//
-// The value should never be nil.
-func errorFromValue(v *C.struct_Value) error {
-	// Pin the returned value to prevent it from being garbage collected.
-	defer runtime.KeepAlive(v)
-
-	if v == nil {
-		return errNilStruct
-	}
-
-	// Case 1
-	if v.data == nil && v.len == 0 {
-		return nil
-	}
-
-	// Case 3
-	if v.len == 0 {
-		errStr := C.GoString((*C.char)(unsafe.Pointer(v.data)))
-		if err := getErrorFromVoidResult(C.fwd_free_value(v)); err != nil {
-			return fmt.Errorf("%w: %w", errFreeingValue, err)
-		}
-		return errors.New(errStr)
-	}
-
-	// Case 2 and 4
-	if err := getErrorFromVoidResult(C.fwd_free_value(v)); err != nil {
-		return fmt.Errorf("%w: %w", errFreeingValue, err)
-	}
-	return errBadValue
 }
