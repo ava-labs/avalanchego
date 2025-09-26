@@ -46,50 +46,40 @@ runs:
         ref: ${{ inputs.avalanchego }}
         path: ${{ inputs.checkout-path }}
     - name: Setup Go for project
-      uses: ./.github/actions/setup-go-for-project  # Note: If Nix-specific functionality is needed, consumer should install Nix as a prerequisite to this action
+      uses: ./.github/actions/setup-go-for-project
     - name: Setup Firewood FFI
       if: inputs.firewood != ''
       id: firewood
       uses: ava-labs/firewood/.github/actions/build-action@composable-ci-action
       with:
         version: ${{ inputs.firewood }}
-    - name: Checkout Coreth
-      if: inputs.coreth != '' && inputs.coreth != 'master'
-      uses: actions/checkout@v4
-      with:
-        repository: 'ava-labs/coreth'
-        ref: ${{ inputs.coreth }}
-        path: 'coreth'
-    - name: Checkout LibEVM
-      if: inputs.libevm != '' && inputs.libevm != 'main'
-      uses: actions/checkout@v4
-      with:
-        repository: 'ava-labs/libevm'
-        ref: ${{ inputs.libevm }}
-        path: 'libevm'
-    - name: Replace dependencies with local checkouts
+    - name: Update Coreth dependency
+      if: inputs.coreth != ''
+      shell: bash
+      working-directory: ./${{ inputs.checkout-path }}
+      run: |
+        echo "Updating Coreth to version: ${{ inputs.coreth }}"
+        go get github.com/ava-labs/coreth@${{ inputs.coreth }}
+    - name: Update LibEVM dependency
+      if: inputs.libevm != ''
+      shell: bash
+      working-directory: ./${{ inputs.checkout-path }}
+      run: |
+        echo "Updating LibEVM to version: ${{ inputs.libevm }}"
+        go get github.com/ava-labs/libevm@${{ inputs.libevm }}
+    - name: Update Firewood FFI
+      if: inputs.firewood != ''
+      shell: bash
+      working-directory: ./${{ inputs.checkout-path }}
+      run: |
+        echo "Replacing Firewood FFI with: ${{ steps.firewood.outputs.ffi-path }}"
+        go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=${{ steps.firewood.outputs.ffi-path }}
+    - name: Finalize dependencies
       if: ${{ inputs.firewood != '' || inputs.coreth != '' || inputs.libevm != '' }}
       shell: bash
       working-directory: ./${{ inputs.checkout-path }}
       run: |
-        # Replace Firewood FFI if provided
-        if [ "${{ inputs.firewood }}" != "" ]; then
-          echo "Replacing Firewood FFI with: ${{ steps.firewood.outputs.ffi-path }}"
-          go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=${{ steps.firewood.outputs.ffi-path }}
-        fi
-
-        # Replace Coreth if provided and not default
-        if [ "${{ inputs.coreth }}" != "" ] && [ "${{ inputs.coreth }}" != "master" ]; then
-          echo "Replacing Coreth with local checkout: ../coreth"
-          go mod edit -replace github.com/ava-labs/coreth=../coreth
-        fi
-
-        # Replace LibEVM if provided and not default
-        if [ "${{ inputs.libevm }}" != "" ] && [ "${{ inputs.libevm }}" != "main" ]; then
-          echo "Replacing LibEVM with local checkout: ../libevm"
-          go mod edit -replace github.com/ava-labs/libevm=../libevm
-        fi
-
+        echo "Finalizing Go module dependencies"
         go mod tidy
         go mod download
     - name: Build and run target (BUILD mode)
@@ -106,6 +96,12 @@ runs:
 
         # Extract binary path from script output
         BINARY_PATH=$(echo "$OUTPUT" | grep "BINARY_PATH=" | cut -d'=' -f2)
+
+        # Verify binary path was found
+        if [ -z "$BINARY_PATH" ]; then
+          echo "Error: Could not extract binary path from build output"
+          exit 1
+        fi
 
         # Convert to absolute path to avoid relative pathing issues
         ABSOLUTE_BINARY_PATH=$(realpath "$BINARY_PATH")
