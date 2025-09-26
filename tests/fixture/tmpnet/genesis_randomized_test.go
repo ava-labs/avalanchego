@@ -19,7 +19,7 @@ func TestNewRandomizedTestGenesis(t *testing.T) {
 	keys, err := NewPrivateKeys(3)
 	require.NoError(err)
 
-	networkID := uint32(98765) // Use a valid test network ID
+	networkID := uint32(98765)
 
 	// Normal genesis without randomization
 	originalGenesis, err := NewTestGenesis(networkID, nodes, keys)
@@ -31,7 +31,7 @@ func TestNewRandomizedTestGenesis(t *testing.T) {
 
 	// Should behave the same when no seed is set
 	require.Equal(originalGenesis.NetworkID, randomizedGenesis.NetworkID)
-	require.Equal(len(originalGenesis.Allocations), len(randomizedGenesis.Allocations))
+	require.Len(randomizedGenesis.Allocations, len(originalGenesis.Allocations))
 
 	// Test with ANTITHESIS_RANDOM_SEED set
 	t.Setenv("ANTITHESIS_RANDOM_SEED", "12345")
@@ -41,7 +41,7 @@ func TestNewRandomizedTestGenesis(t *testing.T) {
 
 	// Should still have same basic structure
 	require.Equal(originalGenesis.NetworkID, randomizedGenesis2.NetworkID)
-	require.Equal(len(originalGenesis.Allocations), len(randomizedGenesis2.Allocations))
+	require.Len(randomizedGenesis2.Allocations, len(originalGenesis.Allocations))
 
 	// But may have different timing parameters
 	require.NotEqual(randomizedGenesis.InitialStakeDuration, randomizedGenesis2.InitialStakeDuration)
@@ -109,7 +109,7 @@ func TestRandomizedParamsValidation(t *testing.T) {
 
 			// Should have valid randomized values
 			require.Greater(params.DynamicFeeConfig.MinPrice, genesis.LocalParams.DynamicFeeConfig.MinPrice)
-			require.Greater(params.MinValidatorStake, uint64(0))
+			require.Positive(params.MinValidatorStake)
 		})
 	}
 }
@@ -124,7 +124,7 @@ func TestRandomizedGenesisWithDifferentSeeds(t *testing.T) {
 
 	// Test with different seeds produce different results
 	seeds := []string{"111", "222", "333"}
-	var allParams []genesis.Params
+	allParams := make([]genesis.Params, 0, len(seeds))
 
 	for _, seed := range seeds {
 		t.Setenv("ANTITHESIS_RANDOM_SEED", seed)

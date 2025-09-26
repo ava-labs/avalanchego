@@ -296,9 +296,7 @@ func (n *Network) EnsureDefaultConfig(ctx context.Context, log logging.Logger) e
 
 	// Apply randomized network parameters if ANTITHESIS_RANDOM_SEED is set
 	if antithesisSeed := os.Getenv("ANTITHESIS_RANDOM_SEED"); antithesisSeed != "" {
-		if err := n.applyRandomizedFlags(log, antithesisSeed); err != nil {
-			return stacktrace.Wrap(err)
-		}
+		n.applyRandomizedFlags(log, antithesisSeed)
 	}
 
 	return nil
@@ -1146,17 +1144,15 @@ func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string)
 }
 
 // applyRandomizedFlags applies randomized network parameters using the provided seed
-func (n *Network) applyRandomizedFlags(log logging.Logger, antithesisSeed string) error {
-	// Validate the seed format (the actual randomization is done in GetRandomized* functions)
+func (n *Network) applyRandomizedFlags(log logging.Logger, antithesisSeed string) {
+	// Validate the seed format (the actual randomization is done in GetRandomizedParams)
 	if _, err := strconv.ParseInt(antithesisSeed, 10, 64); err != nil {
 		log.Warn("failed to parse ANTITHESIS_RANDOM_SEED, skipping randomization", zap.Error(err))
-		return nil
+		return
 	}
 
-	// Get randomized configuration - single call instead of two separate functions
+	// TODO(jonathanoppenheimer): is there a better way to apply these values?
 	randomizedParams := GetRandomizedParams(n.GetNetworkID())
-
-	// Apply randomized config using structured mappings
 	configMappings := []struct {
 		flagKey string
 		value   uint64
@@ -1201,6 +1197,4 @@ func (n *Network) applyRandomizedFlags(log logging.Logger, antithesisSeed string
 		zap.Uint64("minDelegatorStake", randomizedParams.MinDelegatorStake),
 		zap.Uint32("minDelegationFee", randomizedParams.MinDelegationFee),
 	)
-
-	return nil
 }
