@@ -26,6 +26,30 @@ var (
 	ErrTimeMillisecondsBeforeGranite = errors.New("TimeMilliseconds should be nil before Granite activation")
 )
 
+// GetNextTimestamp calculates the timestamp (in seconds and milliseconds) for the next child block based on the parent's timestamp and the current time.
+// First return value is the timestamp in seconds, second return value is the timestamp in milliseconds.
+func GetNextTimestamp(parent *types.Header, now time.Time) (uint64, uint64) {
+	var (
+		timestamp   = uint64(now.Unix())
+		timestampMS = uint64(now.UnixMilli())
+	)
+	// Note: in order to support asynchronous block production, blocks are allowed to have
+	// the same timestamp as their parent. This allows more than one block to be produced
+	// per second.
+	parentExtra := customtypes.GetHeaderExtra(parent)
+	if parent.Time >= timestamp ||
+		(parentExtra.TimeMilliseconds != nil && *parentExtra.TimeMilliseconds >= timestampMS) {
+		timestamp = parent.Time
+		// If the parent has a TimeMilliseconds, use it. Otherwise, use the parent time * 1000.
+		if parentExtra.TimeMilliseconds != nil {
+			timestampMS = *parentExtra.TimeMilliseconds
+		} else {
+			timestampMS = parent.Time * 1000 // TODO: establish minimum time
+		}
+	}
+	return timestamp, timestampMS
+}
+
 // VerifyTime verifies that the header's Time and TimeMilliseconds fields are
 // consistent with the given rules and the current time.
 // This includes:
