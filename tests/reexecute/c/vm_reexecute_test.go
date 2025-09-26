@@ -83,7 +83,8 @@ var (
 		}`,
 		"blockdb": `{
 			"block-database-enabled": true,
-			"block-database-sync-to-disk": false
+			"block-database-sync-to-disk": false,
+			"block-database-migration-disabled": true
 		}`,
 	}
 
