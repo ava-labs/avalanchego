@@ -262,6 +262,13 @@ users:
     sudo: "ALL=(ALL) NOPASSWD:ALL"
     ssh_authorized_keys:
       - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE/1C8JVL0g6qqMw1p0TwJMqJqERxYTX+7PnP+gXP4km cardno:19_155_748 bernard
+  - name: rodrigo
+    lock_passwd: true
+    groups: users, adm, sudo
+    shell: /usr/bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDT0/IE2kLNpvaELug1zppQGY03z3fe2zOTjyS655Sgq cardno:28_650_437 rodrigo
 
 swap:
   filename: /swapfile
