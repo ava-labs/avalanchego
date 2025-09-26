@@ -6,6 +6,7 @@ package gvalidators
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 
@@ -55,6 +56,47 @@ func (c *Client) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error
 	return ids.ToID(resp.SubnetId)
 }
 
+func (c *Client) GetAllValidatorSets(
+	ctx context.Context,
+	height uint64,
+) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, error) {
+	resp, err := c.client.GetAllValidatorSets(
+		ctx,
+		&pb.GetAllValidatorSetsRequest{
+			Height: height,
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all validator sets: %w", err)
+	}
+
+	validatorSets := make(map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, len(resp.ValidatorSets))
+	for _, validatorSet := range resp.ValidatorSets {
+		vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, len(validatorSet.Validators))
+
+		for _, validator := range validatorSet.Validators {
+			vdr, err := validatorOutputFromProto(validator)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse validator: %w", err)
+			}
+
+			vdrs[vdr.NodeID] = &validators.GetValidatorOutput{
+				NodeID:    vdr.NodeID,
+				PublicKey: vdr.PublicKey,
+				Weight:    vdr.Weight,
+			}
+		}
+
+		subnetID, err := ids.ToID(validatorSet.SubnetId)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse subnet ID %s: %w", subnetID.String(), err)
+		}
+		validatorSets[subnetID] = vdrs
+	}
+
+	return validatorSets, nil
+}
+
 func (c *Client) GetValidatorSet(
 	ctx context.Context,
 	height uint64,
@@ -65,32 +107,16 @@ func (c *Client) GetValidatorSet(
 		SubnetId: subnetID[:],
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get validator set for subnet %s at height %d: %w", subnetID.String(), height, err)
 	}
 
 	vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, len(resp.Validators))
 	for _, validator := range resp.Validators {
-		nodeID, err := ids.ToNodeID(validator.NodeId)
+		vdr, err := validatorOutputFromProto(validator)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to parse validator: %w", err)
 		}
-		var publicKey *bls.PublicKey
-		if len(validator.PublicKey) > 0 {
-			// PublicKeyFromValidUncompressedBytes is used rather than
-			// PublicKeyFromCompressedBytes because it is significantly faster
-			// due to the avoidance of decompression and key re-verification. We
-			// can safely assume that the BLS Public Keys are verified before
-			// being added to the P-Chain and served by the gRPC server.
-			publicKey = bls.PublicKeyFromValidUncompressedBytes(validator.PublicKey)
-			if publicKey == nil {
-				return nil, errFailedPublicKeyDeserialize
-			}
-		}
-		vdrs[nodeID] = &validators.GetValidatorOutput{
-			NodeID:    nodeID,
-			PublicKey: publicKey,
-			Weight:    validator.Weight,
-		}
+		vdrs[vdr.NodeID] = vdr
 	}
 	return vdrs, nil
 }
@@ -103,36 +129,24 @@ func (c *Client) GetCurrentValidatorSet(
 		SubnetId: subnetID[:],
 	})
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("failed to get current validator set for subnet %s: %w", subnetID.String(), err)
 	}
 
 	vdrs := make(map[ids.ID]*validators.GetCurrentValidatorOutput, len(resp.Validators))
 	for _, validator := range resp.Validators {
-		nodeID, err := ids.ToNodeID(validator.NodeId)
+		vdr, err := validatorOutputFromProto(validator)
 		if err != nil {
-			return nil, 0, err
-		}
-		var publicKey *bls.PublicKey
-		if len(validator.PublicKey) > 0 {
-			// PublicKeyFromValidUncompressedBytes is used rather than
-			// PublicKeyFromCompressedBytes because it is significantly faster
-			// due to the avoidance of decompression and key re-verification. We
-			// can safely assume that the BLS Public Keys are verified before
-			// being added to the P-Chain and served by the gRPC server.
-			publicKey = bls.PublicKeyFromValidUncompressedBytes(validator.PublicKey)
-			if publicKey == nil {
-				return nil, 0, errFailedPublicKeyDeserialize
-			}
+			return nil, 0, fmt.Errorf("failed to parse validator: %w", err)
 		}
 		validationID, err := ids.ToID(validator.ValidationId)
 		if err != nil {
-			return nil, 0, err
+			return nil, 0, fmt.Errorf("failed to parse validation ID %s: %w", validationID.String(), err)
 		}
 
 		vdrs[validationID] = &validators.GetCurrentValidatorOutput{
 			ValidationID:  validationID,
-			NodeID:        nodeID,
-			PublicKey:     publicKey,
+			NodeID:        vdr.NodeID,
+			PublicKey:     vdr.PublicKey,
 			Weight:        validator.Weight,
 			StartTime:     validator.StartTime,
 			MinNonce:      validator.MinNonce,
@@ -141,4 +155,30 @@ func (c *Client) GetCurrentValidatorSet(
 		}
 	}
 	return vdrs, resp.GetCurrentHeight(), nil
+}
+
+func validatorOutputFromProto(validator *pb.Validator) (*validators.GetValidatorOutput, error) {
+	nodeID, err := ids.ToNodeID(validator.NodeId)
+	if err != nil {
+		return nil, err
+	}
+
+	var publicKey *bls.PublicKey
+	if len(validator.PublicKey) > 0 {
+		// PublicKeyFromValidUncompressedBytes is used rather than
+		// PublicKeyFromCompressedBytes because it is significantly faster
+		// due to the avoidance of decompression and key re-verification. We
+		// can safely assume that the BLS Public Keys are verified before
+		// being added to the P-Chain and served by the gRPC server.
+		publicKey = bls.PublicKeyFromValidUncompressedBytes(validator.PublicKey)
+		if publicKey == nil {
+			return nil, errFailedPublicKeyDeserialize
+		}
+	}
+
+	return &validators.GetValidatorOutput{
+		NodeID:    nodeID,
+		PublicKey: publicKey,
+		Weight:    validator.Weight,
+	}, nil
 }

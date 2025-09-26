@@ -1115,6 +1115,9 @@ func (m *manager) createSnowmanChain(
 			return nil, fmt.Errorf("expected validators.State but got %T", vm)
 		}
 
+		// Wrap the validator state with a cached state
+		valState = validators.NewCachedState(valState)
+
 		if m.TracingEnabled {
 			valState = validators.Trace(valState, "platformvm", m.Tracer)
 		}
