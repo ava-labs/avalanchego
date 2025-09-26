@@ -19,7 +19,7 @@ inputs:
     required: false
     default: ${{ github.sha }}
   firewood:
-    description: 'Firewood version (commit SHA, branch, tag). Consumer should run Firewood shared workflow first.'
+    description: 'Firewood version (commit SHA, branch, tag, or ffi/vX.Y.Z for pre-built)'
     required: false
     default: ''
   coreth:
@@ -47,32 +47,45 @@ runs:
         path: ${{ inputs.checkout-path }}
     - name: Setup Go for project
       uses: ./.github/actions/setup-go-for-project  # Note: If Nix-specific functionality is needed, consumer should install Nix as prerequiste to this action
+    - name: Setup Firewood FFI
+      if: inputs.firewood != ''
+      id: firewood
+      uses: ava-labs/firewood/.github/actions/build-action@composable-ci-action
+      with:
+        version: ${{ inputs.firewood }}
     - name: Checkout Coreth
-      if: inputs.coreth != 'master'
+      if: inputs.coreth != '' && inputs.coreth != 'master'
       uses: actions/checkout@v4
       with:
         repository: 'ava-labs/coreth'
         ref: ${{ inputs.coreth }}
         path: 'coreth'
     - name: Checkout LibEVM
-      if: inputs.libevm != 'main'
+      if: inputs.libevm != '' && inputs.libevm != 'main'
       uses: actions/checkout@v4
       with:
         repository: 'ava-labs/libevm'
         ref: ${{ inputs.libevm }}
         path: 'libevm'
     - name: Replace dependencies with local checkouts
-      if: ${{ inputs.coreth != '' || inputs.libevm != '' }}
+      if: ${{ inputs.firewood != '' || inputs.coreth != '' || inputs.libevm != '' }}
       shell: bash
       working-directory: ./${{ inputs.checkout-path }}
       run: |
-        # Use local path replacement for checked out repositories
-        if [ "${{ inputs.coreth }}" != "master" ]; then
+        # Replace Firewood FFI if provided
+        if [ "${{ inputs.firewood }}" != "" ]; then
+          echo "Replacing Firewood FFI with: ${{ steps.firewood.outputs.ffi-path }}"
+          go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=${{ steps.firewood.outputs.ffi-path }}
+        fi
+
+        # Replace Coreth if provided and not default
+        if [ "${{ inputs.coreth }}" != "" ] && [ "${{ inputs.coreth }}" != "master" ]; then
           echo "Replacing Coreth with local checkout: ../coreth"
           go mod edit -replace github.com/ava-labs/coreth=../coreth
         fi
 
-        if [ "${{ inputs.libevm }}" != "main" ]; then
+        # Replace LibEVM if provided and not default
+        if [ "${{ inputs.libevm }}" != "" ] && [ "${{ inputs.libevm }}" != "main" ]; then
           echo "Replacing LibEVM with local checkout: ../libevm"
           go mod edit -replace github.com/ava-labs/libevm=../libevm
         fi
@@ -86,9 +99,9 @@ runs:
       working-directory: ./${{ inputs.checkout-path }}
       run: |
         if [ -n "${{ inputs.args }}" ]; then
-          OUTPUT=$($GITHUB_ACTION_PATH/build_target.sh "${{ inputs.target }}" ${{ inputs.args }})
+          OUTPUT=$(./scripts/build_target.sh "${{ inputs.target }}" ${{ inputs.args }})
         else
-          OUTPUT=$($GITHUB_ACTION_PATH/build_target.sh "${{ inputs.target }}")
+          OUTPUT=$(./scripts/build_target.sh "${{ inputs.target }}")
         fi
 
         # Extract binary path from script output
