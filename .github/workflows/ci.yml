@@ -216,6 +216,9 @@ jobs:
       - name: Check image build for avalanchego test setup
         shell: bash
         run: ./scripts/run_task.sh test-build-antithesis-images-avalanchego
+        env:
+          # Use GitHub run ID as a consistent random seed for CI testing
+          ANTITHESIS_RANDOM_SEED: ${{ github.run_id }}
   test_build_antithesis_xsvm_images:
     name: Build Antithesis xsvm images
     runs-on: ubuntu-latest
@@ -225,6 +228,9 @@ jobs:
       - name: Check image build for xsvm test setup
         shell: bash
         run: ./scripts/run_task.sh test-build-antithesis-images-xsvm
+        env:
+          # Use GitHub run ID as a consistent random seed for CI testing
+          ANTITHESIS_RANDOM_SEED: ${{ github.run_id }}
   e2e_bootstrap_monitor:
     name: Run bootstrap monitor e2e tests
     runs-on: ubuntu-latest

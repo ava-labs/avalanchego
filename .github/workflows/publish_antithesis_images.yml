@@ -36,9 +36,13 @@ jobs:
       env:
         IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
         IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
+        # Use GitHub run ID for deterministic randomization across Antithesis containers
+        ANTITHESIS_RANDOM_SEED: ${{ github.run_id }}
 
     - name: Build and push images for xsvm test setup
       run: ./scripts/run_task.sh build-antithesis-images-xsvm
       env:
         IMAGE_PREFIX: ${{ env.REGISTRY }}/${{ env.REPOSITORY }}
         IMAGE_TAG: ${{ github.event.inputs.image_tag || 'latest' }}
+        # Use GitHub run ID for deterministic randomization across Antithesis containers
+        ANTITHESIS_RANDOM_SEED: ${{ github.run_id }}
