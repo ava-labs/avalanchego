@@ -282,34 +282,8 @@ jobs:
 #      - name: Deploy kind with chaos mesh
 #        shell: bash
 #        run: nix develop --command ./scripts/run_task.sh test-robustness
-  self-hosted-build-mode:
-    name: Build reexecution bench on self-hosted runner
-    runs-on: avalanche-avalanchego-runner
-    container:
-      image: ghcr.io/actions/actions-runner:2.325.0
-    steps:
-      - name: Install dependencies
-        shell: bash
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xz-utils build-essential
-      - uses: actions/checkout@v4
-      - name: Build reexecution bench
-        id: build
-        uses: ./.github/actions/avalanchego-build-action
-        with:
-          target: "reexecution"
-          args: "--help"
-      - name: Verify binary output
-        run: |
-          echo "Binary path: ${{ steps.build.outputs.binary-path }}"
-          if [ ! -f "${{ steps.build.outputs.binary-path }}" ]; then
-            echo "Error: Binary not found at output path"
-            exit 1
-          fi
-          echo "Binary verified successfully"
-  self-hosted-setup-mode:
-    name: Setup mode on self-hosted runner
+  self-hosted-prebuult-firewood-reexec:
+    name: Reexecution benchmark with pre built ffi/v0.0.12 Firewood
     runs-on: avalanche-avalanchego-runner
     container:
       image: ghcr.io/actions/actions-runner:2.325.0
@@ -321,14 +295,44 @@ jobs:
         shell: bash
         run: |
           sudo apt-get update
-          sudo apt-get install -y xz-utils build-essential
+          sudo apt-get install -y xz-utils
       - uses: actions/checkout@v4
       - uses: ./.github/actions/install-nix
-      - name: Setup AvalancheGo with custom Coreth and LibEVM
+      - name: Setup AvalancheGo with ffi/v0.0.12 Firewood
         uses: ./.github/actions/avalanchego-build-action
         with:
-          coreth: "2d2f6cbb997ece114b408387773fa161b7324a21"
-          libevm: "414b1f5dffea8f1c1deb6edde125ad896570b183"
+          firewood: 'ffi/v0.0.12'
+      - name: Run C-Chain Re-Execution Benchmark
+        uses: ./.github/actions/c-chain-reexecution-benchmark
+        with:
+          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: us-east-2
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          push-post-state: ''
+          runner_name: 'avalanche-avalanchego-runner'
+          prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+  self-hosted-source-build-firewood-reexec:
+    name: Reexecution benchmark with source built Firewood
+    runs-on: avalanche-avalanchego-runner
+    container:
+      image: ghcr.io/actions/actions-runner:2.325.0
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Install dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xz-utils
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/install-nix
+      - name: Setup AvalancheGo with custom Firewood
+        uses: ./.github/actions/avalanchego-build-action
+        with:
+          firewood: '3b644fae75e0c5799e2139949e9061b129937597'
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
