@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/plugin/factory"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -62,10 +63,12 @@ var (
 	executionTimeout   time.Duration
 	labelsArg          string
 
-	labels = map[string]string{
+	networkUUID string = uuid.NewString()
+	labels             = map[string]string{
 		"job":               "c-chain-reexecution",
 		"is_ephemeral_node": "false",
 		"chain":             "C",
+		"network_uuid":      networkUUID,
 	}
 
 	configKey         = "config"
@@ -547,7 +550,8 @@ func collectRegistry(tb testing.TB, name string, timeout time.Duration, gatherer
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	tb.Cleanup(cancel)
 
-	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
+	logger := tests.NewDefaultLogger("prometheus")
+	r.NoError(tmpnet.StartPrometheus(ctx, logger))
 
 	server, err := tests.NewPrometheusServer(gatherer)
 	r.NoError(err)
@@ -567,6 +571,8 @@ func collectRegistry(tb testing.TB, name string, timeout time.Duration, gatherer
 				return nil
 			}(),
 		))
+
+		r.NoError(tmpnet.CheckMetricsExist(ctx, logger, networkUUID))
 	})
 
 	sdConfigFilePath, err = tmpnet.WritePrometheusSDConfig(name, tmpnet.SDConfig{
