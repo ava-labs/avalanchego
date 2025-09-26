@@ -15,15 +15,14 @@ import (
 )
 
 const (
-	GenesisHeight        uint64 = 0
-	GenesisUnixTimestamp        = upgrade.InitiallyActiveTimeUnix
+	GenesisHeight uint64 = 0
 )
 
 var (
 	_ utils.Sortable[*Block] = (*Block)(nil)
 
 	GenesisID        = ids.GenerateTestID()
-	GenesisTimestamp = time.Unix(GenesisUnixTimestamp, 0)
+	GenesisTimestamp = upgrade.InitiallyActiveTime
 	GenesisBytes     = GenesisID[:]
 	Genesis          = BuildChain(1)[0]
 )

@@ -12,10 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
-const InitiallyActiveTimeUnix = 1607144400
-
 var (
-	InitiallyActiveTime       = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC) // This corresponds to the InitiallyActiveTimeUnix
+	InitiallyActiveTime       = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 	UnscheduledActivationTime = time.Date(9999, time.December, 1, 0, 0, 0, 0, time.UTC)
 
 	Mainnet = Config{
