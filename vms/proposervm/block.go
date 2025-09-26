@@ -59,6 +59,7 @@ type Block interface {
 	buildChild(context.Context) (Block, error)
 
 	pChainHeight(context.Context) (uint64, error)
+	pChainEpoch(context.Context) (block.Epoch, error)
 }
 
 type PostForkBlock interface {
@@ -79,6 +80,34 @@ func (p *postForkCommonComponents) Height() uint64 {
 	return p.innerBlk.Height()
 }
 
+// Calculates a block's P-Chain epoch height based on its ancestor's epoch membership
+func nextPChainEpoch(parentPChainHeight uint64, parentEpoch block.Epoch, parentTimestamp time.Time, epochDuration time.Duration) block.Epoch {
+	if parentEpoch.Number == 0 {
+		// If the parent was not assigned an epoch, then the child is the first block of
+		// the initial epoch.
+		return block.Epoch{
+			PChainHeight: parentPChainHeight,
+			Number:       1,
+			StartTime:    parentTimestamp.Unix(),
+		}
+	}
+
+	if parentTimestamp.After(time.Unix(parentEpoch.StartTime, 0).Add(epochDuration)) {
+		// If the parent crossed the epoch boundary, then it sealed the previous epoch. The child
+		// is the first block of the new epoch, so should use the parent's P-Chain height, increment
+		// the epoch number, and set the epoch start time to the parent's timestamp.
+		return block.Epoch{
+			PChainHeight: parentPChainHeight,
+			Number:       parentEpoch.Number + 1,
+			StartTime:    parentTimestamp.Unix(),
+		}
+	}
+	// Otherwise, the parent did not seal the previous epoch, so the child should use the parent's
+	// epoch information. This is true even if the child crosses the epoch boundary, since sealing
+	// blocks are considered to be part of the epoch they seal.
+	return parentEpoch
+}
+
 // Verify returns nil if:
 // 1) [p]'s inner block is not an oracle block
 // 2) [child]'s P-Chain height >= [parentPChainHeight]
@@ -89,10 +118,12 @@ func (p *postForkCommonComponents) Height() uint64 {
 // 7) [child]'s timestamp is within its proposer's window
 // 8) [child] has a valid signature from its proposer
 // 9) [child]'s inner block is valid
+// 10) [child] has the expected P-Chain epoch
 func (p *postForkCommonComponents) Verify(
 	ctx context.Context,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
+	parentEpoch block.Epoch,
 	child *postForkBlock,
 ) error {
 	if err := verifyIsNotOracleBlock(ctx, p.innerBlk); err != nil {
@@ -163,9 +194,18 @@ func (p *postForkCommonComponents) Verify(
 	}
 
 	var contextPChainHeight uint64
-	if p.vm.Upgrades.IsEtnaActivated(childTimestamp) {
+	switch {
+	case p.vm.Upgrades.IsGraniteActivated(childTimestamp):
+		calculatedEpoch := nextPChainEpoch(parentPChainHeight, parentEpoch, parentTimestamp, p.vm.Upgrades.GraniteEpochDuration)
+
+		childEpoch := child.PChainEpoch()
+		if childEpoch != calculatedEpoch {
+			return fmt.Errorf("epoch mismatch: calculated epoch %v != epoch %v", calculatedEpoch, childEpoch)
+		}
+		contextPChainHeight = childEpoch.PChainHeight
+	case p.vm.Upgrades.IsEtnaActivated(childTimestamp):
 		contextPChainHeight = childPChainHeight
-	} else {
+	default:
 		contextPChainHeight = parentPChainHeight
 	}
 
@@ -184,6 +224,7 @@ func (p *postForkCommonComponents) buildChild(
 	parentID ids.ID,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
+	parentEpoch block.Epoch,
 ) (Block, error) {
 	// Child's timestamp is the later of now and this block's timestamp
 	newTimestamp := p.vm.Time().Truncate(time.Second)
@@ -225,10 +266,24 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
-	var contextPChainHeight uint64
-	if p.vm.Upgrades.IsEtnaActivated(newTimestamp) {
+	var (
+		contextPChainHeight uint64
+		epoch               block.Epoch
+	)
+	switch {
+	case p.vm.Upgrades.IsGraniteActivated(newTimestamp):
+		epoch = nextPChainEpoch(parentPChainHeight, parentEpoch, parentTimestamp, p.vm.Upgrades.GraniteEpochDuration)
+		p.vm.ctx.Log.Debug(
+			"epoch",
+			zap.Uint64("pChainHeight", pChainHeight),
+			zap.Uint64("epochPChainHeight", epoch.PChainHeight),
+			zap.Uint64("epochNumber", epoch.Number),
+			zap.Time("epochStartTime", time.Unix(epoch.StartTime, 0)),
+		)
+		contextPChainHeight = epoch.PChainHeight
+	case p.vm.Upgrades.IsEtnaActivated(newTimestamp):
 		contextPChainHeight = pChainHeight
-	} else {
+	default:
 		contextPChainHeight = parentPChainHeight
 	}
 
@@ -251,6 +306,7 @@ func (p *postForkCommonComponents) buildChild(
 			parentID,
 			newTimestamp,
 			pChainHeight,
+			epoch,
 			p.vm.StakingCertLeaf,
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
@@ -261,6 +317,7 @@ func (p *postForkCommonComponents) buildChild(
 			parentID,
 			newTimestamp,
 			pChainHeight,
+			epoch,
 			innerBlock.Bytes(),
 		)
 	}

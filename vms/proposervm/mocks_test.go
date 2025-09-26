@@ -227,6 +227,21 @@ func (mr *MockPostForkBlockMockRecorder) getStatelessBlk() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "getStatelessBlk", reflect.TypeOf((*MockPostForkBlock)(nil).getStatelessBlk))
 }
 
+// pChainEpoch mocks base method.
+func (m *MockPostForkBlock) pChainEpoch(arg0 context.Context) (block.Epoch, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "pChainEpoch", arg0)
+	ret0, _ := ret[0].(block.Epoch)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// pChainEpoch indicates an expected call of pChainEpoch.
+func (mr *MockPostForkBlockMockRecorder) pChainEpoch(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "pChainEpoch", reflect.TypeOf((*MockPostForkBlock)(nil).pChainEpoch), arg0)
+}
+
 // pChainHeight mocks base method.
 func (m *MockPostForkBlock) pChainHeight(arg0 context.Context) (uint64, error) {
 	m.ctrl.T.Helper()

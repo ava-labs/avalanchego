@@ -31,6 +31,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer/proposermock"
+
+	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 // Assert that when the underlying VM implements ChainVMWithBuildBlockContext
@@ -48,6 +50,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 		parentTimestamp        = time.Now().Truncate(time.Second)
 		parentHeight    uint64 = 1234
 		blkID                  = ids.GenerateTestID()
+		parentEpoch            = statelessblock.Epoch{}
 	)
 
 	innerBlk := snowmanmock.NewBlock(ctrl)
@@ -100,7 +103,8 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 		context.Background(),
 		parentID,
 		parentTimestamp,
-		pChainHeight-1,
+		pChainHeight,
+		parentEpoch,
 	)
 	require.NoError(err)
 	require.Equal(builtBlk, gotChild.(*postForkBlock).innerBlk)
@@ -113,8 +117,9 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = upgrade.UnscheduledActivationTime
+		graniteTime    = upgrade.UnscheduledActivationTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -243,8 +248,9 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = upgrade.UnscheduledActivationTime
+		graniteTime    = upgrade.UnscheduledActivationTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -367,8 +373,8 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 		parentPChainHeght        = pChainHeight - 1
 		parentID                 = ids.GenerateTestID()
 		parentTimestamp          = time.Now().Truncate(time.Second)
+		parentEpoch              = statelessblock.Epoch{}
 	)
-
 	innerParentBlock := snowmantest.Genesis
 	innerChildBlock := snowmantest.BuildChild(innerParentBlock)
 
@@ -411,7 +417,76 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 		parentID,
 		parentTimestamp,
 		parentPChainHeght,
+		parentEpoch,
 	)
 	require.NoError(err)
 	require.Equal(innerChildBlock, gotChild.(*postForkBlock).innerBlk)
+}
+
+func TestNextPChainEpoch(t *testing.T) {
+	var (
+		epochDuration = 5 * time.Minute
+		now           = time.Now().Truncate(time.Second)
+	)
+
+	tests := []struct {
+		name               string
+		parentPChainHeight uint64
+		parentTimestamp    time.Time
+		parentEpoch        statelessblock.Epoch
+		expected           statelessblock.Epoch
+	}{
+		{
+			name:               "first granite block",
+			parentPChainHeight: 100,
+			parentTimestamp:    now,
+			parentEpoch: statelessblock.Epoch{
+				PChainHeight: 0,
+				Number:       0,
+				StartTime:    0,
+			},
+			expected: statelessblock.Epoch{
+				PChainHeight: 100,
+				Number:       1,
+				StartTime:    now.Unix(),
+			},
+		},
+		{
+			name:               "sealed epoch",
+			parentPChainHeight: 100,
+			parentTimestamp:    now.Add(epochDuration + 1),
+			parentEpoch: statelessblock.Epoch{
+				PChainHeight: 2,
+				Number:       2,
+				StartTime:    now.Unix(),
+			},
+			expected: statelessblock.Epoch{
+				PChainHeight: 100,
+				Number:       3,
+				StartTime:    now.Add(epochDuration + 1).Unix(),
+			},
+		},
+		{
+			name:               "no epoch change",
+			parentPChainHeight: 100,
+			parentTimestamp:    now.Add(epochDuration),
+			parentEpoch: statelessblock.Epoch{
+				PChainHeight: 2,
+				Number:       2,
+				StartTime:    now.Unix(),
+			},
+			expected: statelessblock.Epoch{
+				PChainHeight: 2,
+				Number:       2,
+				StartTime:    now.Unix(),
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+			epoch := nextPChainEpoch(test.parentPChainHeight, test.parentEpoch, test.parentTimestamp, epochDuration)
+			require.Equal(test.expected, epoch, "unexpected next epoch")
+		})
+	}
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -47,8 +48,9 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -66,6 +68,7 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 		ids.Empty, // refer unknown parent
 		time.Time{},
 		0, // pChainHeight,
+		block.Epoch{},
 		proVM.StakingCertLeaf,
 		innerOracleBlk.Bytes(),
 		proVM.ctx.ChainID,
@@ -92,8 +95,9 @@ func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = upgrade.UnscheduledActivationTime
+		graniteTime    = upgrade.UnscheduledActivationTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -147,12 +151,15 @@ func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 	// set proVM to be able to build unsigned blocks
 	proVM.Set(proVM.Time().Add(proposer.MaxVerifyDelay))
 
+	childEpoch := nextPChainEpoch(0, block.Epoch{}, parentBlk.Timestamp(), proVM.Upgrades.GraniteEpochDuration)
+
 	{
 		// child block referring unknown parent does not verify
 		childSlb, err := block.BuildUnsigned(
 			ids.Empty, // refer unknown parent
 			proVM.Time(),
 			pChainHeight,
+			childEpoch,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -168,6 +175,7 @@ func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 			parentBlk.ID(), // refer known parent
 			proVM.Time(),
 			pChainHeight,
+			childEpoch,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -183,8 +191,9 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime // post Durango
+		graniteTime    = mockable.MaxTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -241,6 +250,7 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 			ids.Empty, // refer unknown parent
 			proVM.Time(),
 			pChainHeight,
+			block.Epoch{},
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -259,6 +269,7 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			pChainHeight,
+			block.Epoch{},
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -279,8 +290,9 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = upgrade.UnscheduledActivationTime
+		graniteTime    = upgrade.UnscheduledActivationTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -354,6 +366,8 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 		},
 	}
 
+	childEpoch := nextPChainEpoch(parentPChainHeight, block.Epoch{}, parentTimestamp, proVM.Upgrades.GraniteEpochDuration)
+
 	{
 		// child block timestamp cannot be lower than parent timestamp
 		newTime := parentTimestamp.Add(-1 * time.Second)
@@ -363,6 +377,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			parentBlk.ID(),
 			newTime,
 			pChainHeight,
+			childEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -387,6 +402,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			parentBlk.ID(),
 			beforeWinStart,
 			pChainHeight,
+			childEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -408,6 +424,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			parentBlk.ID(),
 			atWindowStart,
 			pChainHeight,
+			childEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -428,6 +445,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			parentBlk.ID(),
 			afterWindowStart,
 			pChainHeight,
+			childEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -448,6 +466,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			parentBlk.ID(),
 			atSubWindowEnd,
 			pChainHeight,
+			childEpoch,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -464,6 +483,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 			parentBlk.ID(),
 			afterSubWinEnd,
 			pChainHeight,
+			childEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -483,8 +503,9 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -542,12 +563,20 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		},
 	}
 
+	nextEpoch := nextPChainEpoch(
+		parentBlkPChainHeight,
+		block.Epoch{},
+		parentBlk.Timestamp(),
+		proVM.Upgrades.GraniteEpochDuration,
+	)
+
 	{
 		// child P-Chain height must not precede parent P-Chain height
 		childSlb, err := block.Build(
 			parentBlk.ID(),
 			proVM.Time(),
 			parentBlkPChainHeight-1,
+			nextEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -566,6 +595,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			parentBlkPChainHeight,
+			nextEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -583,6 +613,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			parentBlkPChainHeight,
+			nextEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -601,6 +632,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			currPChainHeight,
+			nextEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -618,6 +650,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			currPChainHeight*2,
+			nextEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -637,8 +670,9 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = upgrade.UnscheduledActivationTime
+		graniteTime    = upgrade.UnscheduledActivationTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -725,12 +759,20 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 		},
 	}
 
+	nextEpoch := nextPChainEpoch(
+		parentBlkPChainHeight,
+		block.Epoch{},
+		parentBlk.Timestamp(),
+		proVM.Upgrades.GraniteEpochDuration,
+	)
+
 	{
 		// child P-Chain height must not precede parent P-Chain height
 		childSlb, err := block.BuildUnsigned(
 			parentBlk.ID(),
 			nextTime,
 			parentBlkPChainHeight-1,
+			nextEpoch,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -746,6 +788,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			parentBlk.ID(),
 			nextTime,
 			parentBlkPChainHeight,
+			nextEpoch,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -760,6 +803,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			parentBlk.ID(),
 			nextTime,
 			parentBlkPChainHeight+1,
+			nextEpoch,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -775,6 +819,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			parentBlk.ID(),
 			nextTime,
 			currPChainHeight,
+			nextEpoch,
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -789,6 +834,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 			parentBlk.ID(),
 			nextTime,
 			currPChainHeight*2,
+			block.Epoch{},
 			childCoreBlk.Bytes(),
 		)
 		require.NoError(err)
@@ -806,8 +852,9 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -865,8 +912,9 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -924,8 +972,9 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -967,8 +1016,9 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -993,8 +1043,9 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1063,6 +1114,7 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 		postForkOracleBlk.ID(),
 		postForkOracleBlk.Timestamp().Add(proposer.WindowDuration),
 		postForkOracleBlk.PChainHeight(),
+		block.Epoch{},
 		proVM.StakingCertLeaf,
 		oracleCoreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
@@ -1086,8 +1138,9 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 5)
+	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 5)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1118,6 +1171,7 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 		snowmantest.GenesisID,
 		snowmantest.GenesisTimestamp,
 		4,
+		block.Epoch{},
 		coreBlk.Bytes(),
 	)
 	require.NoError(err)

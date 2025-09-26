@@ -39,8 +39,9 @@ func TestCoreVMNotRemote(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -69,8 +70,9 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 	var (
 		activationTime = upgrade.UnscheduledActivationTime
 		durangoTime    = upgrade.UnscheduledActivationTime
+		graniteTime    = upgrade.UnscheduledActivationTime
 	)
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime, graniteTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -192,8 +194,9 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime, graniteTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -221,7 +224,7 @@ func TestGetAncestorsPostForkOnly(t *testing.T) {
 	// prepare build of next block
 	require.NoError(builtBlk2.Verify(context.Background()))
 	require.NoError(proRemoteVM.SetPreference(context.Background(), builtBlk2.ID()))
-	require.NoError(waitForProposerWindow(proRemoteVM, builtBlk2, 0))
+	require.NoError(waitForProposerWindow(proRemoteVM, builtBlk2, builtBlk2.(*postForkBlock).PChainHeight()))
 
 	coreBlk3 := snowmantest.BuildChild(coreBlk2)
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
@@ -326,10 +329,11 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 		postForkTime = currentTime.Add(15 * time.Minute)
 
 		durangoTime = forkTime
+		graniteTime = forkTime
 	)
 
 	// enable ProBlks in next future
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, forkTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, forkTime, durangoTime, graniteTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -498,8 +502,9 @@ func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 	var (
 		activationTime = upgrade.UnscheduledActivationTime
 		durangoTime    = upgrade.UnscheduledActivationTime
+		graniteTime    = upgrade.UnscheduledActivationTime
 	)
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime, graniteTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -595,6 +600,11 @@ func TestBatchedParseBlockParallel(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
+	pChainEpoch := blockbuilder.Epoch{
+		PChainHeight: uint64(2),
+		Number:       uint64(0),
+		StartTime:    time.Unix(123, 0).Unix(),
+	}
 	chainID := ids.GenerateTestID()
 
 	vm := VM{
@@ -615,10 +625,10 @@ func TestBatchedParseBlockParallel(t *testing.T) {
 
 	blockThatCantBeParsed := snowmantest.BuildChild(snowmantest.Genesis)
 
-	blocksWithUnparsable := makeParseableBlocks(t, parentID, timestamp, pChainHeight, cert, chainID, key)
+	blocksWithUnparsable := makeParseableBlocks(t, parentID, timestamp, pChainHeight, pChainEpoch, cert, chainID, key)
 	blocksWithUnparsable[50] = blockThatCantBeParsed.Bytes()
 
-	parsableBlocks := makeParseableBlocks(t, parentID, timestamp, pChainHeight, cert, chainID, key)
+	parsableBlocks := makeParseableBlocks(t, parentID, timestamp, pChainHeight, pChainEpoch, cert, chainID, key)
 
 	for _, testCase := range []struct {
 		name         string
@@ -662,7 +672,7 @@ func TestBatchedParseBlockParallel(t *testing.T) {
 	}
 }
 
-func makeParseableBlocks(t *testing.T, parentID ids.ID, timestamp time.Time, pChainHeight uint64, cert *staking.Certificate, chainID ids.ID, key crypto.Signer) [][]byte {
+func makeParseableBlocks(t *testing.T, parentID ids.ID, timestamp time.Time, pChainHeight uint64, pChainEpoch blockbuilder.Epoch, cert *staking.Certificate, chainID ids.ID, key crypto.Signer) [][]byte {
 	makeSignedBlock := func(i int) []byte {
 		buff := binary.AppendVarint(nil, int64(i))
 
@@ -670,6 +680,7 @@ func makeParseableBlocks(t *testing.T, parentID ids.ID, timestamp time.Time, pCh
 			parentID,
 			timestamp,
 			pChainHeight,
+			pChainEpoch,
 			cert,
 			buff,
 			chainID,
@@ -692,8 +703,9 @@ func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	var (
 		activationTime = time.Unix(0, 0)
 		durangoTime    = activationTime
+		graniteTime    = activationTime
 	)
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime, graniteTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -783,10 +795,11 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 		postForkTime = currentTime.Add(15 * time.Minute)
 
 		durangoTime = forkTime
+		graniteTime = forkTime
 	)
 
 	// enable ProBlks in next future
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, forkTime, durangoTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, forkTime, durangoTime, graniteTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -916,6 +929,7 @@ func initTestRemoteProposerVM(
 	t *testing.T,
 	activationTime,
 	durangoTime time.Time,
+	graniteTime time.Time,
 ) (
 	TestRemoteProposerVM,
 	*VM,
@@ -969,6 +983,7 @@ func initTestRemoteProposerVM(
 				ApricotPhase4Time:            activationTime,
 				ApricotPhase4MinPChainHeight: 0,
 				DurangoTime:                  durangoTime,
+				GraniteTime:                  graniteTime,
 			},
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
