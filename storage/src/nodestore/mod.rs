@@ -44,7 +44,6 @@ pub(crate) mod header;
 pub(crate) mod persist;
 pub(crate) mod primitives;
 
-use crate::firewood_gauge;
 use crate::linear::OffsetReader;
 use crate::logger::trace;
 use crate::node::branch::ReadSerializable as _;
@@ -53,7 +52,6 @@ use arc_swap::access::DynAccess;
 use smallvec::SmallVec;
 use std::fmt::Debug;
 use std::io::{Error, ErrorKind, Read};
-use std::sync::atomic::AtomicUsize;
 
 // Re-export types from alloc module
 pub use alloc::NodeAllocator;
@@ -125,7 +123,6 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
                 deleted: Box::default(),
                 root_hash: None,
                 root: header.root_address().map(Into::into),
-                unwritten_nodes: AtomicUsize::new(0),
             },
             storage,
         };
@@ -155,7 +152,6 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
                 deleted: Box::default(),
                 root_hash: None,
                 root: None,
-                unwritten_nodes: AtomicUsize::new(0),
             },
         })
     }
@@ -362,8 +358,6 @@ pub struct Committed {
     deleted: Box<[MaybePersistedNode]>,
     root_hash: Option<TrieHash>,
     root: Option<MaybePersistedNode>,
-    /// TODO: No readers of this variable yet - will be used for tracking unwritten nodes in committed revisions
-    unwritten_nodes: AtomicUsize,
 }
 
 impl Clone for Committed {
@@ -372,10 +366,6 @@ impl Clone for Committed {
             deleted: self.deleted.clone(),
             root_hash: self.root_hash.clone(),
             root: self.root.clone(),
-            unwritten_nodes: AtomicUsize::new(
-                self.unwritten_nodes
-                    .load(std::sync::atomic::Ordering::Relaxed),
-            ),
         }
     }
 }
@@ -409,8 +399,6 @@ pub struct ImmutableProposal {
     root_hash: Option<TrieHash>,
     /// The root node, either in memory or on disk
     root: Option<MaybePersistedNode>,
-    /// The number of unwritten nodes in this proposal
-    unwritten_nodes: usize,
 }
 
 impl ImmutableProposal {
@@ -424,21 +412,6 @@ impl ImmutableProposal {
         {
             NodeStoreParent::Committed(root_hash) => *root_hash == hash,
             NodeStoreParent::Proposed(_) => false,
-        }
-    }
-}
-
-impl Drop for ImmutableProposal {
-    fn drop(&mut self) {
-        // When an immutable proposal is dropped without being committed,
-        // decrement the gauge to reflect that these nodes will never be written
-        if self.unwritten_nodes > 0 {
-            #[allow(clippy::cast_precision_loss)]
-            firewood_gauge!(
-                "firewood.nodes.unwritten",
-                "current number of unwritten nodes"
-            )
-            .decrement(self.unwritten_nodes as f64);
         }
     }
 }
@@ -505,23 +478,14 @@ impl<T: Into<NodeStoreParent>, S: ReadableStorage> From<NodeStore<T, S>>
 /// Commit a proposal to a new revision of the trie
 impl<S: WritableStorage> From<NodeStore<ImmutableProposal, S>> for NodeStore<Committed, S> {
     fn from(val: NodeStore<ImmutableProposal, S>) -> Self {
-        let NodeStore {
-            header,
-            kind,
-            storage,
-        } = val;
-        // Use ManuallyDrop to prevent the Drop impl from running since we're committing
-        let kind = std::mem::ManuallyDrop::new(kind);
-
         NodeStore {
-            header,
+            header: val.header,
             kind: Committed {
-                deleted: kind.deleted.clone(),
-                root_hash: kind.root_hash.clone(),
-                root: kind.root.clone(),
-                unwritten_nodes: AtomicUsize::new(kind.unwritten_nodes),
+                deleted: val.kind.deleted.clone(),
+                root_hash: val.kind.root_hash.clone(),
+                root: val.kind.root.clone(),
             },
-            storage,
+            storage: val.storage,
         }
     }
 }
@@ -548,7 +512,6 @@ impl<S: WritableStorage> NodeStore<Arc<ImmutableProposal>, S> {
                 deleted: self.kind.deleted.clone(),
                 root_hash: self.kind.root_hash.clone(),
                 root: self.kind.root.clone(),
-                unwritten_nodes: AtomicUsize::new(self.kind.unwritten_nodes),
             },
             storage: self.storage.clone(),
         }
@@ -574,7 +537,6 @@ impl<S: ReadableStorage> TryFrom<NodeStore<MutableProposal, S>>
                 parent: Arc::new(ArcSwap::new(Arc::new(kind.parent))),
                 root_hash: None,
                 root: None,
-                unwritten_nodes: 0,
             }),
             storage,
         };
@@ -587,30 +549,18 @@ impl<S: ReadableStorage> TryFrom<NodeStore<MutableProposal, S>>
 
         // Hashes the trie and returns the address of the new root.
         #[cfg(feature = "ethhash")]
-        let (root, root_hash, unwritten_count) = nodestore.hash_helper(root)?;
+        let (root, root_hash) = nodestore.hash_helper(root)?;
         #[cfg(not(feature = "ethhash"))]
-        let (root, root_hash, unwritten_count) =
-            NodeStore::<MutableProposal, S>::hash_helper(root)?;
+        let (root, root_hash) = NodeStore::<MutableProposal, S>::hash_helper(root)?;
 
         let immutable_proposal =
             Arc::into_inner(nodestore.kind).expect("no other references to the proposal");
-        // Use ManuallyDrop to prevent Drop from running since we're replacing the proposal
-        let immutable_proposal = std::mem::ManuallyDrop::new(immutable_proposal);
         nodestore.kind = Arc::new(ImmutableProposal {
             deleted: immutable_proposal.deleted.clone(),
             parent: immutable_proposal.parent.clone(),
             root_hash: Some(root_hash.into_triehash()),
             root: Some(root),
-            unwritten_nodes: unwritten_count,
         });
-
-        // Track unwritten nodes in metrics
-        #[allow(clippy::cast_precision_loss)]
-        firewood_gauge!(
-            "firewood.nodes.unwritten",
-            "current number of unwritten nodes"
-        )
-        .increment(unwritten_count as f64);
 
         Ok(nodestore)
     }
