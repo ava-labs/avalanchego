@@ -120,9 +120,9 @@ func (s *State) AdvanceSeconds(seconds uint64) {
 func (s *State) AdvanceMilliseconds(milliseconds uint64) {
 	targetPerSecond := s.Target()
 	targetPerMS := targetPerSecond / 1000
-	maxPerMS := targetPerMS * TargetToMax                              // R - this can't overflow since 1000 > TargetToMax.
-	maxPerSecond := mulWithUpperBound(targetPerSecond, TargetToMax)    // rate used for calculating maxCapacity
-	maxCapacity := mulWithUpperBound(maxPerSecond, TimeToFillCapacity) // C
+	maxPerMS := targetPerMS * TargetToMax                                              // R - this can't overflow since 1000 > TargetToMax.
+	maxPerSecond := common.MulWithUpperBound(uint64(targetPerSecond), TargetToMax)     // rate used for calculating maxCapacity
+	maxCapacity := gas.Gas(common.MulWithUpperBound(maxPerSecond, TimeToFillCapacity)) // C
 	s.Gas = s.Gas.AdvanceTime(
 		maxCapacity,
 		maxPerMS,
