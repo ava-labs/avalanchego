@@ -4586,7 +4586,7 @@ func TestStandardExecutorStopContinuousValidatorTx(t *testing.T) {
 			diff, err = state.NewDiffOn(env.state)
 			require.NoError(err)
 
-			standarxTxEx := &standardTxExecutor{
+			standardTxEx := &standardTxExecutor{
 				backend:       &env.backend,
 				feeCalculator: feeCalculator,
 				tx:            stopContVdrTx,
@@ -4594,10 +4594,10 @@ func TestStandardExecutorStopContinuousValidatorTx(t *testing.T) {
 			}
 
 			if test.updateState != nil {
-				test.updateState(require, standarxTxEx.state)
+				test.updateState(require, standardTxEx.state)
 			}
 
-			require.ErrorIs(stopContVdrTx.Unsigned.Visit(standarxTxEx), test.expectedErr)
+			require.ErrorIs(stopContVdrTx.Unsigned.Visit(standardTxEx), test.expectedErr)
 			require.True(stopContVdrTx.Unsigned.(*txs.StopContinuousValidatorTx).BaseTx.SyntacticallyVerified)
 			require.NoError(diff.Apply(env.state))
 			require.NoError(env.state.Commit())
@@ -4683,6 +4683,25 @@ func TestStandardExecutorStopContinuousValidatorTxInvalidStaker(t *testing.T) {
 	)
 
 	require.ErrorIs(err, ErrInvalidStakerTx)
+}
+
+func TestStandardExecutorRewardContinuousValidatorTx(t *testing.T) {
+	require := require.New(t)
+	env := newEnvironment(t, upgradetest.Latest)
+
+	tx, err := newRewardContinuousValidatorTx(t, ids.GenerateTestID(), 1)
+	require.NoError(err)
+
+	diff, err := state.NewDiffOn(env.state)
+	require.NoError(err)
+
+	_, _, _, err = StandardTx(
+		&env.backend,
+		state.PickFeeCalculator(env.config, env.state),
+		tx,
+		diff,
+	)
+	require.ErrorIs(err, ErrWrongTxType)
 }
 
 func must[T any](t require.TestingT) func(T, error) T {

@@ -78,6 +78,10 @@ func (*warpVerifier) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return nil
 }
 
+func (*warpVerifier) RewardContinuousValidatorTx(tx *txs.RewardContinuousValidatorTx) error {
+	return nil
+}
+
 func (*warpVerifier) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
 	return nil
 }
