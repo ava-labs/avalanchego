@@ -1558,9 +1558,6 @@ func applyWeightDiff(
 	nodeID ids.NodeID,
 	weightDiff *ValidatorWeightDiff,
 ) error {
-	if vdrs == nil {
-		return errors.New("unexpected nil validator set")
-	}
 	vdr, ok := vdrs[nodeID]
 	if !ok {
 		// This node isn't in the current validator set.
