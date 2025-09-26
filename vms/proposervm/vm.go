@@ -301,16 +301,14 @@ func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
 			zap.String("path", r.URL.Path),
 			zap.Strings("header", route),
 		)
-		if len(route) < 2 || route[1] != HTTPHeaderRoute {
-			if innerHandler == nil {
-				w.WriteHeader(http.StatusNotFound)
-				return
-			}
-
+		switch {
+		case len(route) < 2 && innerHandler != nil:
 			innerHandler.ServeHTTP(w, r)
-			return
+		case len(route) == 2 && route[1] == HTTPHeaderRoute:
+			proposerMux.ServeHTTP(w, r)
+		default:
+			w.WriteHeader(http.StatusNotFound)
 		}
-		proposerMux.ServeHTTP(w, r)
 	}), nil
 }
 
