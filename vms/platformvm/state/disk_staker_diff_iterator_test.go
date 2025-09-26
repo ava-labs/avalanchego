@@ -47,7 +47,7 @@ func FuzzMarshalDiffKeyByHeight(f *testing.F) {
 		fz.Fill(&height, &subnetID, &nodeID)
 
 		key := marshalDiffKeyByHeight(height, subnetID, nodeID)
-		parsedSubnetID, parsedHeight, parsedNodeID, err := unmarshalDiffKeyByHeight(key)
+		parsedHeight, parsedSubnetID, parsedNodeID, err := unmarshalDiffKeyByHeight(key)
 		require.NoError(err)
 		require.Equal(subnetID, parsedSubnetID)
 		require.Equal(height, parsedHeight)
