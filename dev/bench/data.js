@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1758843819539,
+  "lastUpdate": 1758907832604,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -84,6 +84,34 @@ window.BENCHMARK_DATA = {
             "value": 43.43,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Geoff Stuart",
+            "username": "geoff-vball",
+            "email": "geoff.vball@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "0985c16d1088975c0d9db18748a8c1263b68646f",
+          "message": "Implement GetProposedHeight API in Proposervm (#4222)\n\nSigned-off-by: Michael Kaplan <55204436+michaelkaplan13@users.noreply.github.com>\nCo-authored-by: ylg <yang.linguan@avalabs.org>\nCo-authored-by: Michael Kaplan <55204436+michaelkaplan13@users.noreply.github.com>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>\nCo-authored-by: Michael Kaplan <michael@avalabs.org>",
+          "timestamp": "2025-09-26T15:19:34Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/0985c16d1088975c0d9db18748a8c1263b68646f"
+        },
+        "date": 1758907830849,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[1000001,3000000]-Config-default-Runner-blacksmith-16vcpu-ubuntu-2404",
+            "value": 122.9,
+            "unit": "mgas/s",
+            "extra": "1 times\n20 procs"
           }
         ]
       }
