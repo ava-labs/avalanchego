@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/avalanchego/genesis"
 )
 
+const networkID = uint32(147147)
+
 func TestNewRandomizedTestGenesis(t *testing.T) {
 	require := require.New(t)
 
@@ -18,8 +20,6 @@ func TestNewRandomizedTestGenesis(t *testing.T) {
 	nodes := NewNodesOrPanic(5)
 	keys, err := NewPrivateKeys(3)
 	require.NoError(err)
-
-	networkID := uint32(98765)
 
 	// Normal genesis without randomization
 	originalGenesis, err := NewTestGenesis(networkID, nodes, keys)
@@ -50,8 +50,6 @@ func TestNewRandomizedTestGenesis(t *testing.T) {
 
 func TestRandomizedParams(t *testing.T) {
 	require := require.New(t)
-
-	networkID := uint32(98765) // Use a valid test network ID
 
 	// Test with local params as base
 	baseParams := genesis.LocalParams
@@ -88,8 +86,6 @@ func TestRandomizedParams(t *testing.T) {
 func TestRandomizedParamsValidation(t *testing.T) {
 	require := require.New(t)
 
-	networkID := uint32(98765)
-
 	// Test with valid seeds
 	testCases := []struct {
 		seed string
@@ -117,7 +113,6 @@ func TestRandomizedParamsValidation(t *testing.T) {
 func TestRandomizedGenesisWithDifferentSeeds(t *testing.T) {
 	require := require.New(t)
 
-	networkID := uint32(98765)
 	nodes := NewNodesOrPanic(3)
 	keys, err := NewPrivateKeys(2)
 	require.NoError(err)
