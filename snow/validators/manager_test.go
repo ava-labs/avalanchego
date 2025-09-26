@@ -454,8 +454,7 @@ func TestGetAllMaps(t *testing.T) {
 
 	maps = m.GetAllMaps()
 	require.Len(maps, 1)
-	map0, ok = maps[subnetID0]
-	require.False(ok)
+	require.NotContains(maps, subnetID0)
 	map1, ok = maps[subnetID1]
 	require.True(ok)
 	require.Contains(map1, nodeID1)
