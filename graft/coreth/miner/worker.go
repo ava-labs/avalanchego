@@ -153,10 +153,11 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 	// Note: in order to support asynchronous block production, blocks are allowed to have
 	// the same timestamp as their parent. This allows more than one block to be produced
 	// per second.
-	if parent.Time >= timestamp {
+	parentExtra := customtypes.GetHeaderExtra(parent)
+	if parent.Time >= timestamp ||
+		(parentExtra.TimeMilliseconds != nil && *parentExtra.TimeMilliseconds >= timestampMS) {
 		timestamp = parent.Time
 		// If the parent has a TimeMilliseconds, use it. Otherwise, use the parent time * 1000.
-		parentExtra := customtypes.GetHeaderExtra(parent)
 		if parentExtra.TimeMilliseconds != nil {
 			timestampMS = *parentExtra.TimeMilliseconds
 		} else {
