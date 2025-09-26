@@ -46,7 +46,7 @@ runs:
         ref: ${{ inputs.avalanchego }}
         path: ${{ inputs.checkout-path }}
     - name: Setup Go for project
-      uses: ./.github/actions/setup-go-for-project  # Note: If Nix-specific functionality is needed, consumer should install Nix as prerequiste to this action
+      uses: ./.github/actions/setup-go-for-project  # Note: If Nix-specific functionality is needed, consumer should install Nix as a prerequisite to this action
     - name: Setup Firewood FFI
       if: inputs.firewood != ''
       id: firewood

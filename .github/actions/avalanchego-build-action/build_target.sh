@@ -15,6 +15,10 @@ shift # Remove target from arguments, remaining args are for execution
 
 case "$TARGET" in
     "avalanchego")
+        if [[ ! -f "./scripts/run_task.sh" || ! -x "./scripts/run_task.sh" ]]; then
+            echo "Error: ./scripts/run_task.sh not found or not executable"
+            exit 1
+        fi
         ./scripts/run_task.sh build
         EXECUTABLE="./build/avalanchego"
 
