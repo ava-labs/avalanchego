@@ -50,6 +50,10 @@ func (*visitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrUnsupportedTxType
 }
 
+func (*visitor) RewardContinuousValidatorTx(tx *txs.RewardContinuousValidatorTx) error {
+	return ErrUnsupportedTxType
+}
+
 func (s *visitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	txSigners, err := s.getSigners(constants.PlatformChainID, tx.Ins)
 	if err != nil {

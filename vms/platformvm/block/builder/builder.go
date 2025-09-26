@@ -323,9 +323,23 @@ func buildBlock(
 		return nil, fmt.Errorf("could not find next staker to reward: %w", err)
 	}
 	if shouldReward {
-		rewardValidatorTx, err := NewRewardValidatorTx(builder.txExecutorBackend.Ctx, stakerTxID)
+		var rewardValidatorTx *txs.Tx
+
+		stakerTx, _, err := parentState.GetTx(stakerTxID)
 		if err != nil {
-			return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
+			return nil, err
+		}
+
+		if _, ok := stakerTx.Unsigned.(txs.ContinuousStaker); ok {
+			rewardValidatorTx, err = NewRewardContinuousValidatorTx(builder.txExecutorBackend.Ctx, stakerTxID, uint64(timestamp.Unix()))
+			if err != nil {
+				return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
+			}
+		} else {
+			rewardValidatorTx, err = NewRewardValidatorTx(builder.txExecutorBackend.Ctx, stakerTxID)
+			if err != nil {
+				return nil, fmt.Errorf("could not build tx to reward staker: %w", err)
+			}
 		}
 
 		return block.NewBanffProposalBlock(
@@ -635,6 +649,15 @@ func getNextStakerToReward(
 
 func NewRewardValidatorTx(ctx *snow.Context, txID ids.ID) (*txs.Tx, error) {
 	utx := &txs.RewardValidatorTx{TxID: txID}
+	tx, err := txs.NewSigned(utx, txs.Codec, nil)
+	if err != nil {
+		return nil, err
+	}
+	return tx, tx.SyntacticVerify(ctx)
+}
+
+func NewRewardContinuousValidatorTx(ctx *snow.Context, txID ids.ID, timestamp uint64) (*txs.Tx, error) {
+	utx := &txs.RewardContinuousValidatorTx{TxID: txID, Timestamp: timestamp}
 	tx, err := txs.NewSigned(utx, txs.Codec, nil)
 	if err != nil {
 		return nil, err

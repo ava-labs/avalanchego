@@ -534,6 +534,10 @@ func (*complexityVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrUnsupportedTx
 }
 
+func (*complexityVisitor) RewardContinuousValidatorTx(tx *txs.RewardContinuousValidatorTx) error {
+	return ErrUnsupportedTx
+}
+
 func (*complexityVisitor) TransformSubnetTx(*txs.TransformSubnetTx) error {
 	return ErrUnsupportedTx
 }

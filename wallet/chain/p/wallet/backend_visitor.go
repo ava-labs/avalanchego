@@ -38,6 +38,10 @@ func (*backendVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrUnsupportedTxType
 }
 
+func (*backendVisitor) RewardContinuousValidatorTx(tx *txs.RewardContinuousValidatorTx) error {
+	return ErrUnsupportedTxType
+}
+
 func (b *backendVisitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	return b.baseTx(&tx.BaseTx)
 }

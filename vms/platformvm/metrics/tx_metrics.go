@@ -97,6 +97,13 @@ func (m *txMetrics) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return nil
 }
 
+func (m *txMetrics) RewardContinuousValidatorTx(tx *txs.RewardContinuousValidatorTx) error {
+	m.numTxs.With(prometheus.Labels{
+		txLabel: "reward_continuous_validator",
+	}).Inc()
+	return nil
+}
+
 func (m *txMetrics) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
 	m.numTxs.With(prometheus.Labels{
 		txLabel: "remove_subnet_validator",

@@ -115,6 +115,10 @@ func (*standardTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrWrongTxType
 }
 
+func (*standardTxExecutor) RewardContinuousValidatorTx(tx *txs.RewardContinuousValidatorTx) error {
+	return ErrWrongTxType
+}
+
 func (e *standardTxExecutor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	if tx.Validator.NodeID == ids.EmptyNodeID {
 		return errEmptyNodeID
