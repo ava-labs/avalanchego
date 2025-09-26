@@ -382,8 +382,8 @@ func TestGetAllMaps(t *testing.T) {
 	subnetID0 := ids.GenerateTestID()
 	subnetID1 := ids.GenerateTestID()
 
-	mps := m.GetAllMaps()
-	require.Empty(mps)
+	maps := m.GetAllMaps()
+	require.Empty(maps)
 
 	sk, err := localsigner.New()
 	require.NoError(err)
@@ -392,14 +392,14 @@ func TestGetAllMaps(t *testing.T) {
 	nodeID0 := ids.GenerateTestNodeID()
 	require.NoError(m.AddStaker(subnetID0, nodeID0, pk, ids.Empty, 2))
 
-	mps = m.GetAllMaps()
-	require.Len(mps, 1)
-	mp0, ok := mps[subnetID0]
+	maps = m.GetAllMaps()
+	require.Len(maps, 1)
+	map0, ok := maps[subnetID0]
 	require.True(ok)
-	require.Len(mp0, 1)
-	require.Contains(mp0, nodeID0)
+	require.Len(map0, 1)
+	require.Contains(map0, nodeID0)
 
-	node0 := mp0[nodeID0]
+	node0 := map0[nodeID0]
 	require.Equal(nodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
 	require.Equal(uint64(2), node0.Weight)
@@ -407,21 +407,21 @@ func TestGetAllMaps(t *testing.T) {
 	nodeID1 := ids.GenerateTestNodeID()
 	require.NoError(m.AddStaker(subnetID1, nodeID1, nil, ids.Empty, 1))
 
-	mps = m.GetAllMaps()
-	require.Len(mps, 2)
-	mp0, ok = mps[subnetID0]
+	maps = m.GetAllMaps()
+	require.Len(maps, 2)
+	map0, ok = maps[subnetID0]
 	require.True(ok)
-	require.Contains(mp0, nodeID0)
-	mp1, ok := mps[subnetID1]
+	require.Contains(map0, nodeID0)
+	map1, ok := maps[subnetID1]
 	require.True(ok)
-	require.Contains(mp1, nodeID1)
+	require.Contains(map1, nodeID1)
 
-	node0 = mp0[nodeID0]
+	node0 = map0[nodeID0]
 	require.Equal(nodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
 	require.Equal(uint64(2), node0.Weight)
 
-	node1 := mp1[nodeID1]
+	node1 := map1[nodeID1]
 	require.Equal(nodeID1, node1.NodeID)
 	require.Nil(node1.PublicKey)
 	require.Equal(uint64(1), node1.Weight)
@@ -431,36 +431,36 @@ func TestGetAllMaps(t *testing.T) {
 	require.Equal(pk, node0.PublicKey)
 	require.Equal(uint64(2), node0.Weight)
 
-	mps = m.GetAllMaps()
-	require.Len(mps, 2)
-	mp0, ok = mps[subnetID0]
+	maps = m.GetAllMaps()
+	require.Len(maps, 2)
+	map0, ok = maps[subnetID0]
 	require.True(ok)
-	mp1, ok = mps[subnetID1]
+	map1, ok = maps[subnetID1]
 	require.True(ok)
-	require.Contains(mp0, nodeID0)
-	require.Contains(mp1, nodeID1)
+	require.Contains(map0, nodeID0)
+	require.Contains(map1, nodeID1)
 
-	node0 = mp0[nodeID0]
+	node0 = map0[nodeID0]
 	require.Equal(nodeID0, node0.NodeID)
 	require.Equal(pk, node0.PublicKey)
 	require.Equal(uint64(1), node0.Weight)
 
-	node1 = mp1[nodeID1]
+	node1 = map1[nodeID1]
 	require.Equal(nodeID1, node1.NodeID)
 	require.Nil(node1.PublicKey)
 	require.Equal(uint64(1), node1.Weight)
 
 	require.NoError(m.RemoveWeight(subnetID0, nodeID0, 1))
 
-	mps = m.GetAllMaps()
-	require.Len(mps, 1)
-	mp0, ok = mps[subnetID0]
+	maps = m.GetAllMaps()
+	require.Len(maps, 1)
+	map0, ok = maps[subnetID0]
 	require.False(ok)
-	mp1, ok = mps[subnetID1]
+	map1, ok = maps[subnetID1]
 	require.True(ok)
-	require.Contains(mp1, nodeID1)
+	require.Contains(map1, nodeID1)
 
-	node1 = mp1[nodeID1]
+	node1 = map1[nodeID1]
 	require.Equal(nodeID1, node1.NodeID)
 	require.Nil(node1.PublicKey)
 	require.Equal(uint64(1), node1.Weight)
