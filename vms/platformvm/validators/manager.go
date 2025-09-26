@@ -234,7 +234,7 @@ func (m *manager) GetAllValidatorSets(
 	ctx context.Context,
 	targetHeight uint64,
 ) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	// TODO implement caching of all validator sets here
+	// TODO: cache all validator sets
 	return m.makeAllValidatorSets(ctx, targetHeight)
 }
 
@@ -284,7 +284,6 @@ func (m *manager) getValidatorSetCache(subnetID ids.ID) cache.Cacher[uint64, map
 	return validatorSetsCache
 }
 
-// TODO this can fail if we query a targetHeight before the new indexes existed
 func (m *manager) makeAllValidatorSets(
 	ctx context.Context,
 	targetHeight uint64,

@@ -514,26 +514,43 @@ func TestState_writeStakers(t *testing.T) {
 				)
 
 				for subnetIDNodeID, expectedDiff := range test.expectedValidatorDiffs {
-					diffKey := marshalDiffKeyBySubnetID(subnetIDNodeID.subnetID, 1, subnetIDNodeID.nodeID)
-					weightDiffBytes, err := state.validatorWeightDiffsBySubnetIDDB.Get(diffKey)
-					if expectedDiff.weightDiff.Amount == 0 {
-						require.ErrorIs(err, database.ErrNotFound)
-					} else {
-						require.NoError(err)
+					requireValidDiff := func(
+						diffKey []byte,
+						weightDiffs database.Database,
+						publicKeyDiffs database.Database,
+					) {
+						t.Helper()
 
-						weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
-						require.NoError(err)
-						require.Equal(&expectedDiff.weightDiff, weightDiff)
+						weightDiffBytes, err := weightDiffs.Get(diffKey)
+						if expectedDiff.weightDiff.Amount == 0 {
+							require.ErrorIs(err, database.ErrNotFound)
+						} else {
+							require.NoError(err)
+
+							weightDiff, err := unmarshalWeightDiff(weightDiffBytes)
+							require.NoError(err)
+							require.Equal(&expectedDiff.weightDiff, weightDiff)
+						}
+
+						publicKeyDiffBytes, err := publicKeyDiffs.Get(diffKey)
+						if bytes.Equal(expectedDiff.prevPublicKey, expectedDiff.newPublicKey) {
+							require.ErrorIs(err, database.ErrNotFound)
+						} else {
+							require.NoError(err)
+
+							require.Equal(expectedDiff.prevPublicKey, publicKeyDiffBytes)
+						}
 					}
-
-					publicKeyDiffBytes, err := state.validatorPublicKeyDiffsBySubnetIDDB.Get(diffKey)
-					if bytes.Equal(expectedDiff.prevPublicKey, expectedDiff.newPublicKey) {
-						require.ErrorIs(err, database.ErrNotFound)
-					} else {
-						require.NoError(err)
-
-						require.Equal(expectedDiff.prevPublicKey, publicKeyDiffBytes)
-					}
+					requireValidDiff(
+						marshalDiffKeyBySubnetID(subnetIDNodeID.subnetID, 1, subnetIDNodeID.nodeID),
+						state.validatorWeightDiffsBySubnetIDDB,
+						state.validatorPublicKeyDiffsBySubnetIDDB,
+					)
+					requireValidDiff(
+						marshalDiffKeyByHeight(1, subnetIDNodeID.subnetID, subnetIDNodeID.nodeID),
+						state.validatorWeightDiffsByHeightDB,
+						state.validatorPublicKeyDiffsByHeightDB,
+					)
 				}
 
 				// re-load the state from disk for the second iteration
@@ -1015,7 +1032,6 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 		// Verify that applying diffs against the current state results in the
 		// expected state.
 		for i := 0; i < currentIndex; i++ {
-			t.Log("checking diffs for height", i)
 			prevDiff := diffs[i]
 			prevHeight := uint64(i + 1)
 
@@ -1091,8 +1107,6 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 			// Checks applying diffs to all validator sets using height-based indices
 			{
 				allValidatorSets := make(map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput)
-
-				// Only copy non-empty validator sets, so empty subnets are not in the map
 				if len(diff.expectedPrimaryValidatorSet) != 0 {
 					allValidatorSets[constants.PrimaryNetworkID] = copyValidatorSet(diff.expectedPrimaryValidatorSet)
 				}
@@ -1112,15 +1126,14 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 					prevHeight+1,
 				))
 
-				// Compare empty maps as nil
-				require.Equal(
-					copyValidatorSetNullable(prevDiff.expectedPrimaryValidatorSet),
-					allValidatorSets[constants.PrimaryNetworkID],
-				)
-				require.Equal(
-					copyValidatorSetNullable(prevDiff.expectedSubnetValidatorSet),
-					allValidatorSets[subnetID],
-				)
+				expectedAllValidatorSets := make(map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput)
+				if len(prevDiff.expectedPrimaryValidatorSet) != 0 {
+					expectedAllValidatorSets[constants.PrimaryNetworkID] = prevDiff.expectedPrimaryValidatorSet
+				}
+				if len(prevDiff.expectedSubnetValidatorSet) != 0 {
+					expectedAllValidatorSets[subnetID] = prevDiff.expectedSubnetValidatorSet
+				}
+				require.Equal(expectedAllValidatorSets, allValidatorSets)
 			}
 		}
 	}
@@ -1129,20 +1142,6 @@ func TestState_ApplyValidatorDiffs(t *testing.T) {
 func copyValidatorSet(
 	input map[ids.NodeID]*validators.GetValidatorOutput,
 ) map[ids.NodeID]*validators.GetValidatorOutput {
-	result := make(map[ids.NodeID]*validators.GetValidatorOutput, len(input))
-	for nodeID, vdr := range input {
-		vdrCopy := *vdr
-		result[nodeID] = &vdrCopy
-	}
-	return result
-}
-
-func copyValidatorSetNullable(
-	input map[ids.NodeID]*validators.GetValidatorOutput,
-) map[ids.NodeID]*validators.GetValidatorOutput {
-	if len(input) == 0 {
-		return nil
-	}
 	result := make(map[ids.NodeID]*validators.GetValidatorOutput, len(input))
 	for nodeID, vdr := range input {
 		vdrCopy := *vdr
