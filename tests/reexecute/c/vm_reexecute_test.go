@@ -335,9 +335,10 @@ type vmExecutorConfig struct {
 }
 
 type vmExecutor struct {
-	config  vmExecutorConfig
-	vm      block.ChainVM
-	metrics *consensusMetrics
+	config     vmExecutorConfig
+	vm         block.ChainVM
+	metrics    *consensusMetrics
+	etaTracker *timer.EtaTracker
 }
 
 func newVMExecutor(vm block.ChainVM, config vmExecutorConfig) (*vmExecutor, error) {
@@ -347,9 +348,10 @@ func newVMExecutor(vm block.ChainVM, config vmExecutorConfig) (*vmExecutor, erro
 	}
 
 	return &vmExecutor{
-		vm:      vm,
-		metrics: metrics,
-		config:  config,
+		vm:         vm,
+		metrics:    metrics,
+		config:     config,
+		etaTracker: timer.NewEtaTracker(10, 1.2),
 	}, nil
 }
 
@@ -386,6 +388,10 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan blockRe
 		zap.Uint64("height", blk.Height()),
 	)
 
+	// Initialize ETA tracking with a baseline sample at 0 progress
+	totalWork := e.config.EndBlock - e.config.StartBlock
+	e.etaTracker.AddSample(0, totalWork, start)
+
 	if e.config.ExecutionTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, e.config.ExecutionTimeout)
@@ -398,15 +404,18 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan blockRe
 		}
 
 		if blkResult.Height%1000 == 0 {
-			eta := timer.EstimateETA(
-				start,
-				blkResult.Height-e.config.StartBlock,
-				e.config.EndBlock-e.config.StartBlock,
-			)
-			e.config.Log.Info("executing block",
-				zap.Uint64("height", blkResult.Height),
-				zap.Duration("eta", eta),
-			)
+			completed := blkResult.Height - e.config.StartBlock
+			etaPtr, _ := e.etaTracker.AddSample(completed, totalWork, time.Now())
+			if etaPtr != nil {
+				e.config.Log.Info("executing block",
+					zap.Uint64("height", blkResult.Height),
+					zap.Duration("eta", *etaPtr),
+				)
+			} else {
+				e.config.Log.Info("executing block",
+					zap.Uint64("height", blkResult.Height),
+				)
+			}
 		}
 		if err := e.execute(ctx, blkResult.BlockBytes); err != nil {
 			return err
