@@ -112,6 +112,7 @@ func NewWallet(
 		signer.New(
 			kc,
 			backend,
+			ctx.NetworkID,
 		),
 	)
 }
