@@ -43,7 +43,7 @@ func (w *withOptions) Builder() builder.Builder {
 }
 
 func (w *withOptions) Signer() walletsigner.Signer {
-	return w.wallet.Signer()
+	return walletsigner.WithOptions(w.wallet.Signer(), w.options...)
 }
 
 func (w *withOptions) IssueBaseTx(
