@@ -34,7 +34,6 @@ jobs:
             sudo apt-get install -y xz-utils
           fi
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-go-for-project
       - name: Run load test
         uses: ./.github/actions/run-monitored-tmpnet-cmd
         with:

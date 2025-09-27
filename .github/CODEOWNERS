@@ -22,6 +22,7 @@
 /flake.nix @joshua-kim @maru-ava
 /network/p2p/ @joshua-kim
 /network/p2p/*.md @joshua-kim @meaghanfitzgerald
+/nix/* @joshua-kim @maru-ava
 /scripts/ @joshua-kim @maru-ava
 /scripts/*.md @joshua-kim @maru-ava @meaghanfitzgerald
 /scripts/benchmark_cchain_range.sh @aaronbuchwald
