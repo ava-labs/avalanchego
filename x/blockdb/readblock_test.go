@@ -215,3 +215,79 @@ func TestReadOperations_Concurrency(t *testing.T) {
 	require.Zero(t, errorCount.Load(), "concurrent read operations had errors")
 	require.Zero(t, blockErrors.Load(), "block data mismatches detected")
 }
+
+func TestHasBlock(t *testing.T) {
+	minHeight := uint64(10)
+	blocksCount := uint64(10)
+	gapHeight := minHeight + 5
+
+	testCases := []struct {
+		name     string
+		height   uint64
+		expected bool
+		wantErr  error
+		dbClosed bool
+	}{
+		{
+			name:     "has_height",
+			height:   12,
+			expected: true,
+		},
+		{
+			name:     "below_minimum_height",
+			height:   0,
+			expected: false,
+		},
+		{
+			name:     "above_max_height",
+			height:   minHeight + blocksCount + 1,
+			expected: false,
+		},
+		{
+			name:     "at_max_height",
+			height:   minHeight + blocksCount,
+			expected: true,
+		},
+		{
+			name:     "at_min_height",
+			height:   minHeight,
+			expected: true,
+		},
+		{
+			name:     "no_block",
+			height:   gapHeight,
+			expected: false,
+		},
+		{
+			name:     "db_closed",
+			dbClosed: true,
+			wantErr:  ErrDatabaseClosed,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			store, cleanup := newTestDatabase(t, DefaultConfig().WithMinimumHeight(minHeight))
+			defer cleanup()
+
+			for i := minHeight; i <= minHeight+blocksCount; i++ {
+				if i == gapHeight {
+					continue
+				}
+				require.NoError(t, store.WriteBlock(i, randomBlock(t)))
+			}
+
+			if tc.dbClosed {
+				require.NoError(t, store.Close())
+			}
+
+			has, err := store.HasBlock(tc.height)
+			if tc.wantErr != nil {
+				require.ErrorIs(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.expected, has)
+			}
+		})
+	}
+}

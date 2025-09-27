@@ -537,7 +537,7 @@ func (s *Database) HasBlock(height BlockHeight) (bool, error) {
 
 	_, err := s.readBlockIndex(height)
 	if err != nil {
-		if errors.Is(err, ErrBlockNotFound) {
+		if errors.Is(err, ErrBlockNotFound) || errors.Is(err, ErrInvalidBlockHeight) {
 			return false, nil
 		}
 		s.log.Error("Failed to check if block exists: failed to read index entry",
