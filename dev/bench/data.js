@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1758907832604,
+  "lastUpdate": 1758933353842,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -112,6 +112,34 @@ window.BENCHMARK_DATA = {
             "value": 122.9,
             "unit": "mgas/s",
             "extra": "1 times\n20 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Geoff Stuart",
+            "username": "geoff-vball",
+            "email": "geoff.vball@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "32806e08957c3179dc928fcb385a7759e253cd4a",
+          "message": "Support all validator set diffs by height (#4342)\n\nSigned-off-by: Geoff Stuart <geoff.vball@gmail.com>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>",
+          "timestamp": "2025-09-26T20:40:10Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/32806e08957c3179dc928fcb385a7759e253cd4a"
+        },
+        "date": 1758933352743,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[1000001,3000000]-Config-default-Runner-blacksmith-16vcpu-ubuntu-2404",
+            "value": 78.17,
+            "unit": "mgas/s",
+            "extra": "1 times\n32 procs"
           }
         ]
       }
