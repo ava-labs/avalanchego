@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1758976121674,
+  "lastUpdate": 1758987358777,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -166,6 +166,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
             "value": 77.44,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Geoff Stuart",
+            "username": "geoff-vball",
+            "email": "geoff.vball@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "32806e08957c3179dc928fcb385a7759e253cd4a",
+          "message": "Support all validator set diffs by height (#4342)\n\nSigned-off-by: Geoff Stuart <geoff.vball@gmail.com>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>",
+          "timestamp": "2025-09-26T20:40:10Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/32806e08957c3179dc928fcb385a7759e253cd4a"
+        },
+        "date": 1758987356757,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
+            "value": 40.54,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
