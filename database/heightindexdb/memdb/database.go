@@ -19,7 +19,6 @@ type Database struct {
 	closed bool
 }
 
-// Put stores data in memory at the given height
 func (db *Database) Put(height uint64, data []byte) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
@@ -32,17 +31,10 @@ func (db *Database) Put(height uint64, data []byte) error {
 		db.data = make(map[uint64][]byte)
 	}
 
-	if len(data) == 0 {
-		// don't save empty slice if data is nil or empty
-		db.data[height] = nil
-	} else {
-		db.data[height] = slices.Clone(data)
-	}
-
+	db.data[height] = slices.Clone(data)
 	return nil
 }
 
-// Get retrieves data at the given height
 func (db *Database) Get(height uint64) ([]byte, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
@@ -59,7 +51,6 @@ func (db *Database) Get(height uint64) ([]byte, error) {
 	return slices.Clone(data), nil
 }
 
-// Has checks if data exists at the given height
 func (db *Database) Has(height uint64) (bool, error) {
 	db.mu.RLock()
 	defer db.mu.RUnlock()
@@ -72,7 +63,6 @@ func (db *Database) Has(height uint64) (bool, error) {
 	return ok, nil
 }
 
-// Close closes the in-memory database
 func (db *Database) Close() error {
 	db.mu.Lock()
 	defer db.mu.Unlock()

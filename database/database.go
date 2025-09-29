@@ -99,25 +99,25 @@ type Database interface {
 type HeightIndex interface {
 	// Put inserts the value into the database at the given height.
 	//
-	// A nil or empty slice for [value] is allowed and will be returned as nil
-	// when retrieved via Get.
+	// A nil or empty slice for [value] is accepted and will return their respective
+	// value if retrieved via Get.
 	//
-	// Note: [value] is safe to read and modify after calling Put.
+	// [value] is safe to read and modify after calling Put.
 	Put(height uint64, value []byte) error
 
 	// Get retrieves a value by its height.
 	// Returns ErrNotFound if the key is not present in the database.
 	//
-	// Note: Get always returns a new copy of the data.
+	// Returned []byte is safe to read and modify after calling Get.
 	Get(height uint64) ([]byte, error)
 
 	// Has checks if a value exists at the given height.
 	//
-	// Return true even if the stored value is nil, or empty.
+	// Returns true even if the stored value is nil or empty.
 	Has(height uint64) (bool, error)
 
 	// Close closes the database.
 	//
-	// Note: Calling Close after Close returns ErrClosed.
+	// Calling Close after Close returns ErrClosed.
 	io.Closer
 }

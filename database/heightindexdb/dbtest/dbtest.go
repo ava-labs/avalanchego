@@ -73,12 +73,12 @@ func TestPutGet(t *testing.T, newDB func() database.HeightIndex) {
 			want:        nil,
 		},
 		{
-			name: "put empty bytes and get nil",
+			name: "put and get empty bytes",
 			puts: []putArgs{
 				{1, []byte{}},
 			},
 			queryHeight: 1,
-			want:        nil,
+			want:        []byte{},
 		},
 		{
 			name: "put and get large data",
