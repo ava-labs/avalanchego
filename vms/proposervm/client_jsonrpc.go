@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 // JSONRPCClient for interacting with the jsonrpc API.
@@ -40,4 +41,19 @@ func (j *JSONRPCClient) GetProposedHeight(ctx context.Context, options ...rpc.Op
 	res := &api.GetHeightResponse{}
 	err := j.Requester.SendRequest(ctx, "proposervm.getProposedHeight", struct{}{}, res, options...)
 	return uint64(res.Height), err
+}
+
+// GetCurrentEpoch returns the current epoch information.
+func (j *JSONRPCClient) GetCurrentEpoch(ctx context.Context, options ...rpc.Option) (block.Epoch, error) {
+	res := &GetEpochResponse{}
+	err := j.Requester.SendRequest(ctx, "proposervm.getCurrentEpoch", struct{}{}, res, options...)
+	if err != nil {
+		return block.Epoch{}, err
+	}
+	
+	return block.Epoch{
+		PChainHeight: uint64(res.PChainHeight),
+		Number:       uint64(res.Number),
+		StartTime:    int64(res.StartTime),
+	}, nil
 }

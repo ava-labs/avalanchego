@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
+	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 
 	pb "github.com/ava-labs/avalanchego/connectproto/pb/proposervm"
 	avajson "github.com/ava-labs/avalanchego/utils/json"
@@ -50,6 +51,25 @@ func (c *connectrpcService) GetProposedHeight(ctx context.Context, r *connect.Re
 
 	return connect.NewResponse(&pb.GetProposedHeightReply{
 		Height: height,
+	}), nil
+}
+
+// GetCurrentEpoch implements proposervmconnect.ProposerVMHandler.
+func (c *connectrpcService) GetCurrentEpoch(ctx context.Context, r *connect.Request[pb.GetCurrentEpochRequest]) (*connect.Response[pb.GetCurrentEpochReply], error) {
+	c.vm.ctx.Log.Debug("API called",
+		zap.String("service", "proposervm"),
+		zap.String("method", "getCurrentEpoch"),
+	)
+
+	epoch, err := c.vm.getCurrentEpoch(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get current epoch: %w", err)
+	}
+
+	return connect.NewResponse(&pb.GetCurrentEpochReply{
+		Number:       epoch.Number,
+		StartTime:    epoch.StartTime,
+		PChainHeight: epoch.PChainHeight,
 	}), nil
 }
 
@@ -98,38 +118,45 @@ func (j *jsonrpcService) GetCurrentEpoch(r *http.Request, _ *struct{}, reply *Ge
 		zap.String("method", "getCurrentEpoch"),
 	)
 
+	epoch, err := j.vm.getCurrentEpoch(r.Context())
+	if err != nil {
+		return fmt.Errorf("couldn't get current epoch: %w", err)
+	}
+
+	// Latest block sealed the epoch.
+	reply.Number = avajson.Uint64(epoch.Number)
+	reply.StartTime = avajson.Uint64(epoch.StartTime)
+	reply.PChainHeight = avajson.Uint64(epoch.PChainHeight)
+
+	return nil
+}
+
+func (v *VM) getCurrentEpoch(ctx context.Context) (block.Epoch, error) {
 	// This will error if we haven't advanced past the genesis block.
-	lastAccepted, err := j.vm.GetLastAccepted()
+	lastAccepted, err := v.GetLastAccepted()
 	if err != nil {
-		return fmt.Errorf("couldn't get last accepted block ID %w", err)
+		return block.Epoch{}, fmt.Errorf("couldn't get last accepted block ID %w", err)
 	}
 
-	latestBlock, err := j.vm.getPostForkBlock(r.Context(), lastAccepted)
+	latestBlock, err := v.getPostForkBlock(ctx, lastAccepted)
 	if err != nil {
-		return fmt.Errorf("couldn't get latest block %s: %w", lastAccepted.String(), err)
+		return block.Epoch{}, fmt.Errorf("couldn't get latest block: %w", err)
 	}
 
-	epoch, err := latestBlock.pChainEpoch(r.Context())
+	epoch, err := latestBlock.pChainEpoch(ctx)
 	if err != nil {
-		return fmt.Errorf("couldn't get latest block epoch %s: %w", lastAccepted.String(), err)
+		return block.Epoch{}, fmt.Errorf("couldn't get latest block epoch: %w", err)
 	}
 
-	pChainHeight, err := latestBlock.pChainHeight(r.Context())
+	pChainHeight, err := latestBlock.pChainHeight(ctx)
 	if err != nil {
-		return fmt.Errorf("couldn't get latest block p-chain height %s: %w", lastAccepted.String(), err)
+		return block.Epoch{}, fmt.Errorf("couldn't get latest block p-chain height: %w", err)
 	}
 
-	nextEpoch := nextPChainEpoch(
+	return nextPChainEpoch(
 		pChainHeight,
 		epoch,
 		latestBlock.Timestamp(),
-		j.vm.Upgrades.GraniteEpochDuration,
-	)
-
-	// Latest block sealed the epoch.
-	reply.Number = avajson.Uint64(nextEpoch.Number)
-	reply.StartTime = avajson.Uint64(nextEpoch.StartTime)
-	reply.PChainHeight = avajson.Uint64(nextEpoch.PChainHeight)
-
-	return nil
+		v.Upgrades.GraniteEpochDuration,
+	), nil
 }

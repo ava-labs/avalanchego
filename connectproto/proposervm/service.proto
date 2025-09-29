@@ -9,6 +9,7 @@ service ProposerVM {
   // GetProposedHeight returns the P-Chain height that would be included in a
   // block if it were proposed right now.
   rpc GetProposedHeight(GetProposedHeightRequest) returns (GetProposedHeightReply);
+  rpc GetCurrentEpoch(GetCurrentEpochRequest) returns (GetCurrentEpochReply);
 }
 
 // Request to get the current proposed block height.
@@ -19,4 +20,14 @@ message GetProposedHeightReply {
   // The P-chain height that would be included in a block if it were proposed
   // right now.
   uint64 height = 1;
+}
+
+// Request to get the current epoch.
+message GetCurrentEpochRequest {}
+
+// Response containing the current epoch.
+message GetCurrentEpochReply {
+  uint64 p_chain_height = 1;
+  uint64 number = 2;
+  int64 start_time = 3;
 }
