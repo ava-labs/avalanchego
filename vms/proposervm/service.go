@@ -55,7 +55,7 @@ func (c *connectrpcService) GetProposedHeight(ctx context.Context, r *connect.Re
 }
 
 // GetCurrentEpoch implements proposervmconnect.ProposerVMHandler.
-func (c *connectrpcService) GetCurrentEpoch(ctx context.Context, r *connect.Request[pb.GetCurrentEpochRequest]) (*connect.Response[pb.GetCurrentEpochReply], error) {
+func (c *connectrpcService) GetCurrentEpoch(ctx context.Context, _ *connect.Request[pb.GetCurrentEpochRequest]) (*connect.Response[pb.GetCurrentEpochReply], error) {
 	c.vm.ctx.Log.Debug("API called",
 		zap.String("service", "proposervm"),
 		zap.String("method", "getCurrentEpoch"),
@@ -131,14 +131,14 @@ func (j *jsonrpcService) GetCurrentEpoch(r *http.Request, _ *struct{}, reply *Ge
 	return nil
 }
 
-func (v *VM) getCurrentEpoch(ctx context.Context) (block.Epoch, error) {
+func (vm *VM) getCurrentEpoch(ctx context.Context) (block.Epoch, error) {
 	// This will error if we haven't advanced past the genesis block.
-	lastAccepted, err := v.GetLastAccepted()
+	lastAccepted, err := vm.GetLastAccepted()
 	if err != nil {
-		return block.Epoch{}, fmt.Errorf("couldn't get last accepted block ID %w", err)
+		return block.Epoch{}, fmt.Errorf("couldn't get last accepted block ID: %w", err)
 	}
 
-	latestBlock, err := v.getPostForkBlock(ctx, lastAccepted)
+	latestBlock, err := vm.getPostForkBlock(ctx, lastAccepted)
 	if err != nil {
 		return block.Epoch{}, fmt.Errorf("couldn't get latest block: %w", err)
 	}
@@ -157,6 +157,6 @@ func (v *VM) getCurrentEpoch(ctx context.Context) (block.Epoch, error) {
 		pChainHeight,
 		epoch,
 		latestBlock.Timestamp(),
-		v.Upgrades.GraniteEpochDuration,
+		vm.Upgrades.GraniteEpochDuration,
 	), nil
 }

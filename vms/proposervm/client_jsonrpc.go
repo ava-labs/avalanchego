@@ -50,7 +50,7 @@ func (j *JSONRPCClient) GetCurrentEpoch(ctx context.Context, options ...rpc.Opti
 	if err != nil {
 		return block.Epoch{}, err
 	}
-	
+
 	return block.Epoch{
 		PChainHeight: uint64(res.PChainHeight),
 		Number:       uint64(res.Number),
