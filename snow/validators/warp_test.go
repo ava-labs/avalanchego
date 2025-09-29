@@ -18,17 +18,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-type testWarp struct {
-	nodeID ids.NodeID
-	sk     bls.Signer
-	vdr    *Warp
-}
-
-func (v *testWarp) Compare(o *testWarp) int {
-	return v.vdr.Compare(o.vdr)
-}
-
-func newTestWarp(t *testing.T) *testWarp {
+func newWarp(t *testing.T) *Warp {
 	t.Helper()
 
 	sk, err := localsigner.New()
@@ -36,29 +26,43 @@ func newTestWarp(t *testing.T) *testWarp {
 
 	nodeID := ids.GenerateTestNodeID()
 	pk := sk.PublicKey()
-	return &testWarp{
-		nodeID: nodeID,
-		sk:     sk,
-		vdr: &Warp{
-			PublicKey:      pk,
-			PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
-			Weight:         3,
-			NodeIDs:        []ids.NodeID{nodeID},
-		},
+	return &Warp{
+		PublicKey:      pk,
+		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
+		Weight:         3,
+		NodeIDs:        []ids.NodeID{nodeID},
 	}
 }
 
-func newTestWarpSet(t *testing.T, n int) []*testWarp {
-	vdrs := make([]*testWarp, n)
+func newWarpSet(t *testing.T, n uint64) WarpSet {
+	t.Helper()
+
+	vdrs := make([]*Warp, n)
 	for i := range vdrs {
-		vdrs[i] = newTestWarp(t)
+		vdrs[i] = newWarp(t)
 	}
 	utils.Sort(vdrs)
-	return vdrs
+	return WarpSet{
+		Validators:  vdrs,
+		TotalWeight: 3 * n,
+	}
+}
+
+func warpToOutput(w *Warp) *GetValidatorOutput {
+	return &GetValidatorOutput{
+		NodeID:    w.NodeIDs[0],
+		PublicKey: w.PublicKey,
+		Weight:    w.Weight,
+	}
 }
 
 func TestFlattenValidatorSet(t *testing.T) {
-	vdrs := newTestWarpSet(t, 3)
+	var (
+		vdrs    = newWarpSet(t, 3)
+		nodeID0 = vdrs.Validators[0].NodeIDs[0]
+		nodeID1 = vdrs.Validators[1].NodeIDs[0]
+		nodeID2 = vdrs.Validators[2].NodeIDs[0]
+	)
 	tests := []struct {
 		name       string
 		validators map[ids.NodeID]*GetValidatorOutput
@@ -68,14 +72,14 @@ func TestFlattenValidatorSet(t *testing.T) {
 		{
 			name: "overflow",
 			validators: map[ids.NodeID]*GetValidatorOutput{
-				vdrs[0].nodeID: {
-					NodeID:    vdrs[0].nodeID,
-					PublicKey: vdrs[0].vdr.PublicKey,
+				nodeID0: {
+					NodeID:    nodeID0,
+					PublicKey: vdrs.Validators[0].PublicKey,
 					Weight:    math.MaxUint64,
 				},
-				vdrs[1].nodeID: {
-					NodeID:    vdrs[1].nodeID,
-					PublicKey: vdrs[1].vdr.PublicKey,
+				nodeID1: {
+					NodeID:    nodeID1,
+					PublicKey: vdrs.Validators[1].PublicKey,
 					Weight:    1,
 				},
 			},
@@ -84,45 +88,30 @@ func TestFlattenValidatorSet(t *testing.T) {
 		{
 			name: "nil_public_key_skipped",
 			validators: map[ids.NodeID]*GetValidatorOutput{
-				vdrs[0].nodeID: {
-					NodeID:    vdrs[0].nodeID,
-					PublicKey: vdrs[0].vdr.PublicKey,
-					Weight:    vdrs[0].vdr.Weight,
+				nodeID0: {
+					NodeID:    nodeID0,
+					PublicKey: vdrs.Validators[0].PublicKey,
+					Weight:    vdrs.Validators[0].Weight,
 				},
-				vdrs[1].nodeID: {
-					NodeID:    vdrs[1].nodeID,
+				nodeID1: {
+					NodeID:    nodeID1,
 					PublicKey: nil,
 					Weight:    1,
 				},
 			},
 			want: WarpSet{
-				Validators:  []*Warp{vdrs[0].vdr},
-				TotalWeight: vdrs[0].vdr.Weight + 1,
+				Validators:  []*Warp{vdrs.Validators[0]},
+				TotalWeight: vdrs.Validators[0].Weight + 1,
 			},
 		},
 		{
 			name: "sorted", // Would non-deterministically fail without sorting
 			validators: map[ids.NodeID]*GetValidatorOutput{
-				vdrs[0].nodeID: {
-					NodeID:    vdrs[0].nodeID,
-					PublicKey: vdrs[0].vdr.PublicKey,
-					Weight:    vdrs[0].vdr.Weight,
-				},
-				vdrs[1].nodeID: {
-					NodeID:    vdrs[1].nodeID,
-					PublicKey: vdrs[1].vdr.PublicKey,
-					Weight:    vdrs[1].vdr.Weight,
-				},
-				vdrs[2].nodeID: {
-					NodeID:    vdrs[2].nodeID,
-					PublicKey: vdrs[2].vdr.PublicKey,
-					Weight:    vdrs[2].vdr.Weight,
-				},
+				nodeID0: warpToOutput(vdrs.Validators[0]),
+				nodeID1: warpToOutput(vdrs.Validators[1]),
+				nodeID2: warpToOutput(vdrs.Validators[2]),
 			},
-			want: WarpSet{
-				Validators:  []*Warp{vdrs[0].vdr, vdrs[1].vdr, vdrs[2].vdr},
-				TotalWeight: vdrs[0].vdr.Weight + vdrs[1].vdr.Weight + vdrs[2].vdr.Weight,
-			},
+			want: vdrs,
 		},
 	}
 	for _, test := range tests {
