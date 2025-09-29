@@ -38,21 +38,21 @@ func TestMeterBlockDBMetricsCollection(t *testing.T) {
 
 	// Write all blocks
 	for i := range blockCount {
-		require.NoError(t, db.WriteBlock(uint64(i), blocks[i]))
+		require.NoError(t, db.Put(uint64(i), blocks[i]))
 	}
 
 	// Read from blocks 0 to 119 (including non-existent ones)
 	const blocksToRead = 120
 	for height := range blocksToRead {
-		// ReadBlock
-		_, err := db.ReadBlock(uint64(height))
+		// Get
+		_, err := db.Get(uint64(height))
 		require.NoError(t, err)
 		if err != nil {
 			require.Equal(t, blockdb.ErrBlockNotFound, err)
 		}
 
-		// HasBlock
-		exists, err := db.HasBlock(uint64(height))
+		// Has
+		exists, err := db.Has(uint64(height))
 		require.NoError(t, err)
 		if height >= 0 && height < blockCount {
 			require.True(t, exists)

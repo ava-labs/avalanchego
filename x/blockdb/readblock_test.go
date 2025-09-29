@@ -105,7 +105,7 @@ func TestReadOperations(t *testing.T) {
 				}
 
 				block := randomBlock(t)
-				require.NoError(t, store.WriteBlock(i, block))
+				require.NoError(t, store.Put(i, block))
 				seededBlocks[i] = block
 			}
 
@@ -114,21 +114,21 @@ func TestReadOperations(t *testing.T) {
 			}
 
 			if tt.wantErr != nil {
-				_, err := store.ReadBlock(tt.readHeight)
+				_, err := store.Get(tt.readHeight)
 				require.ErrorIs(t, err, tt.wantErr)
 				return
 			}
 
 			// Handle success cases
 			if tt.noBlock {
-				_, err := store.ReadBlock(tt.readHeight)
+				_, err := store.Get(tt.readHeight)
 				require.ErrorIs(t, err, ErrBlockNotFound)
 			} else {
-				readBlock, err := store.ReadBlock(tt.readHeight)
+				Get, err := store.Get(tt.readHeight)
 				require.NoError(t, err)
-				require.NotNil(t, readBlock)
+				require.NotNil(t, Get)
 				expectedBlock := seededBlocks[tt.readHeight]
-				require.Equal(t, expectedBlock, readBlock)
+				require.Equal(t, expectedBlock, Get)
 			}
 		})
 	}
@@ -152,7 +152,7 @@ func TestReadOperations_Concurrency(t *testing.T) {
 		}
 
 		blocks[i] = randomBlock(t)
-		require.NoError(t, store.WriteBlock(uint64(i), blocks[i]))
+		require.NoError(t, store.Put(uint64(i), blocks[i]))
 	}
 
 	var wg sync.WaitGroup
@@ -164,7 +164,7 @@ func TestReadOperations_Concurrency(t *testing.T) {
 
 		go func(height int) {
 			defer wg.Done()
-			block, err := store.ReadBlock(uint64(height))
+			block, err := store.Get(uint64(height))
 			if gapHeights[uint64(height)] || height >= numBlocks {
 				if err == nil || !errors.Is(err, ErrBlockNotFound) {
 					errorCount.Add(1)
@@ -182,7 +182,7 @@ func TestReadOperations_Concurrency(t *testing.T) {
 
 		go func(height int) {
 			defer wg.Done()
-			_, err := store.ReadBlock(uint64(height))
+			_, err := store.Get(uint64(height))
 			if gapHeights[uint64(height)] || height >= numBlocks {
 				if err == nil || !errors.Is(err, ErrBlockNotFound) {
 					errorCount.Add(1)
@@ -197,7 +197,7 @@ func TestReadOperations_Concurrency(t *testing.T) {
 
 		go func(height int) {
 			defer wg.Done()
-			_, err := store.ReadBlock(uint64(height))
+			_, err := store.Get(uint64(height))
 			if gapHeights[uint64(height)] || height >= numBlocks {
 				if err == nil || !errors.Is(err, ErrBlockNotFound) {
 					errorCount.Add(1)
@@ -274,14 +274,14 @@ func TestHasBlock(t *testing.T) {
 				if i == gapHeight {
 					continue
 				}
-				require.NoError(t, store.WriteBlock(i, randomBlock(t)))
+				require.NoError(t, store.Put(i, randomBlock(t)))
 			}
 
 			if tc.dbClosed {
 				require.NoError(t, store.Close())
 			}
 
-			has, err := store.HasBlock(tc.height)
+			has, err := store.Has(tc.height)
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
 			} else {

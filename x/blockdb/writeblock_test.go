@@ -136,7 +136,7 @@ func TestWriteBlock_Basic(t *testing.T) {
 			blocksWritten := make(map[uint64][]byte)
 			for _, h := range tt.blockHeights {
 				block := randomBlock(t)
-				err := store.WriteBlock(h, block)
+				err := store.Put(h, block)
 				require.NoError(t, err, "unexpected error at height %d", h)
 
 				blocksWritten[h] = block
@@ -144,9 +144,9 @@ func TestWriteBlock_Basic(t *testing.T) {
 
 			// Verify all written blocks are readable and data is correct
 			for h, expectedBlock := range blocksWritten {
-				readBlock, err := store.ReadBlock(h)
-				require.NoError(t, err, "ReadBlock failed at height %d", h)
-				require.Equal(t, expectedBlock, readBlock)
+				Get, err := store.Get(h)
+				require.NoError(t, err, "Get failed at height %d", h)
+				require.Equal(t, expectedBlock, Get)
 			}
 
 			checkDatabaseState(t, store, tt.expectedMaxHeight, tt.expectedMCH)
@@ -179,7 +179,7 @@ func TestWriteBlock_Concurrency(t *testing.T) {
 				height = uint64(i)
 			}
 
-			err := store.WriteBlock(height, block)
+			err := store.Put(height, block)
 			if err != nil {
 				errors.Add(1)
 			}
@@ -192,7 +192,7 @@ func TestWriteBlock_Concurrency(t *testing.T) {
 	// Verify that all expected heights have blocks (except 5, 10)
 	for i := range 20 {
 		height := uint64(i)
-		block, err := store.ReadBlock(height)
+		block, err := store.Get(height)
 		if i == 5 || i == 10 {
 			require.ErrorIs(t, err, ErrBlockNotFound, "expected ErrBlockNotFound at gap height %d", height)
 		} else {
@@ -310,7 +310,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 				tt.setup(store)
 			}
 
-			err := store.WriteBlock(tt.height, tt.block)
+			err := store.Put(tt.height, tt.block)
 			if tt.wantErrMsg != "" {
 				require.True(t, strings.HasPrefix(err.Error(), tt.wantErrMsg), "expected error message to start with %s, got %s", tt.wantErrMsg, err.Error())
 			} else {

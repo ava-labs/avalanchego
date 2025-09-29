@@ -21,6 +21,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
@@ -50,6 +51,8 @@ type BlockHeight = uint64
 type BlockData = []byte
 
 var (
+	_ database.HeightIndex = (*Database)(nil)
+
 	_ encoding.BinaryMarshaler   = (*blockEntryHeader)(nil)
 	_ encoding.BinaryUnmarshaler = (*blockEntryHeader)(nil)
 	_ encoding.BinaryMarshaler   = (*indexEntry)(nil)
@@ -316,8 +319,8 @@ func (s *Database) Close() error {
 	return err
 }
 
-// WriteBlock inserts a block into the store at the given height.
-func (s *Database) WriteBlock(height BlockHeight, block BlockData) error {
+// Put inserts a block into the store at the given height.
+func (s *Database) Put(height BlockHeight, block BlockData) error {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
 
@@ -472,9 +475,9 @@ func (s *Database) readBlockIndex(height BlockHeight) (indexEntry, error) {
 	return entry, nil
 }
 
-// ReadBlock retrieves a block by its height.
+// Get retrieves a block by its height.
 // Returns ErrBlockNotFound if the block is not found.
-func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
+func (s *Database) Get(height BlockHeight) (BlockData, error) {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
 
@@ -531,8 +534,8 @@ func (s *Database) ReadBlock(height BlockHeight) (BlockData, error) {
 	return decompressed, nil
 }
 
-// HasBlock checks if a block exists at the given height.
-func (s *Database) HasBlock(height BlockHeight) (bool, error) {
+// Has checks if a block exists at the given height.
+func (s *Database) Has(height BlockHeight) (bool, error) {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
 
@@ -1333,7 +1336,7 @@ func (s *Database) Inspect() (string, error) {
 
 		// Count additional blocks beyond contiguous range
 		for h := maxContiguousHeight + 1; h <= maxBlockHeight; h++ {
-			if hasBlock, err := s.HasBlock(h); err == nil && hasBlock {
+			if Has, err := s.Has(h); err == nil && Has {
 				totalBlocks++
 			}
 		}

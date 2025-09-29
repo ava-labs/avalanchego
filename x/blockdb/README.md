@@ -149,14 +149,14 @@ defer db.Close()
 // Write a block
 height := uint64(100)
 blockData := []byte("block data")
-err := db.WriteBlock(height, blockData)
+err := db.Put(height, blockData)
 if err != nil {
     fmt.Println("Error writing block:", err)
     return
 }
 
 // Read a block
-blockData, err := db.ReadBlock(height)
+blockData, err := db.Get(height)
 if err != nil {
     if errors.Is(err, blockdb.ErrBlockNotFound) {
         fmt.Println("Block doesn't exist at this height")

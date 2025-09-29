@@ -15,7 +15,7 @@ import (
 const methodLabel = "method"
 
 var (
-	_ database.BlockDatabase = (*Database)(nil)
+	_ database.HeightIndex = (*Database)(nil)
 
 	methodLabels    = []string{methodLabel}
 	writeBlockLabel = prometheus.Labels{
@@ -35,7 +35,7 @@ var (
 // Database tracks the amount of time each operation takes and how many bytes
 // are read/written to the underlying block database instance.
 type Database struct {
-	db database.BlockDatabase
+	db database.HeightIndex
 
 	calls    *prometheus.CounterVec
 	duration *prometheus.GaugeVec
@@ -46,7 +46,7 @@ type Database struct {
 func New(
 	reg prometheus.Registerer,
 	namespace string,
-	db database.BlockDatabase,
+	db database.HeightIndex,
 ) (*Database, error) {
 	meterDB := &Database{
 		db: db,
@@ -82,9 +82,9 @@ func New(
 	)
 }
 
-func (db *Database) WriteBlock(height uint64, block []byte) error {
+func (db *Database) Put(height uint64, block []byte) error {
 	start := time.Now()
-	err := db.db.WriteBlock(height, block)
+	err := db.db.Put(height, block)
 	duration := time.Since(start)
 
 	db.calls.With(writeBlockLabel).Inc()
@@ -93,9 +93,9 @@ func (db *Database) WriteBlock(height uint64, block []byte) error {
 	return err
 }
 
-func (db *Database) ReadBlock(height uint64) ([]byte, error) {
+func (db *Database) Get(height uint64) ([]byte, error) {
 	start := time.Now()
-	block, err := db.db.ReadBlock(height)
+	block, err := db.db.Get(height)
 	duration := time.Since(start)
 
 	db.calls.With(readBlockLabel).Inc()
@@ -106,9 +106,9 @@ func (db *Database) ReadBlock(height uint64) ([]byte, error) {
 	return block, err
 }
 
-func (db *Database) HasBlock(height uint64) (bool, error) {
+func (db *Database) Has(height uint64) (bool, error) {
 	start := time.Now()
-	has, err := db.db.HasBlock(height)
+	has, err := db.db.Has(height)
 	duration := time.Since(start)
 
 	db.calls.With(hasBlockLabel).Inc()
@@ -124,8 +124,4 @@ func (db *Database) Close() error {
 	db.calls.With(closeLabel).Inc()
 	db.duration.With(closeLabel).Add(float64(duration))
 	return err
-}
-
-func (db *Database) Inspect() (string, error) {
-	return db.db.Inspect()
 }

@@ -19,8 +19,8 @@ func NewMemoryDatabase() *MemoryDatabase {
 	}
 }
 
-// WriteBlock stores a block in memory
-func (m *MemoryDatabase) WriteBlock(height BlockHeight, block BlockData) error {
+// Put stores a block in memory
+func (m *MemoryDatabase) Put(height BlockHeight, block BlockData) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -37,8 +37,8 @@ func (m *MemoryDatabase) WriteBlock(height BlockHeight, block BlockData) error {
 	return nil
 }
 
-// ReadBlock retrieves the full block data for the given height
-func (m *MemoryDatabase) ReadBlock(height BlockHeight) (BlockData, error) {
+// Get retrieves the full block data for the given height
+func (m *MemoryDatabase) Get(height BlockHeight) (BlockData, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -54,8 +54,8 @@ func (m *MemoryDatabase) ReadBlock(height BlockHeight) (BlockData, error) {
 	return block, nil
 }
 
-// HasBlock checks if a block exists at the given height
-func (m *MemoryDatabase) HasBlock(height BlockHeight) (bool, error) {
+// Has checks if a block exists at the given height
+func (m *MemoryDatabase) Has(height BlockHeight) (bool, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 

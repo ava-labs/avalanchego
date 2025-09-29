@@ -28,7 +28,7 @@ func TestDataSplitting(t *testing.T) {
 	blocks := make([][]byte, numBlocks)
 	for i := range numBlocks {
 		blocks[i] = fixedSizeBlock(t, 1024, uint64(i))
-		require.NoError(t, store.WriteBlock(uint64(i), blocks[i]))
+		require.NoError(t, store.Put(uint64(i), blocks[i]))
 	}
 
 	// Verify that multiple data files were created.
@@ -47,9 +47,9 @@ func TestDataSplitting(t *testing.T) {
 
 	// Verify all blocks are readable
 	for i := range numBlocks {
-		readBlock, err := store.ReadBlock(uint64(i))
+		Get, err := store.Get(uint64(i))
 		require.NoError(t, err)
-		require.Equal(t, blocks[i], readBlock)
+		require.Equal(t, blocks[i], Get)
 	}
 
 	// reopen and verify all blocks are readable
@@ -60,9 +60,9 @@ func TestDataSplitting(t *testing.T) {
 	store.compressor = compression.NewNoCompressor()
 	defer store.Close()
 	for i := range numBlocks {
-		readBlock, err := store.ReadBlock(uint64(i))
+		Get, err := store.Get(uint64(i))
 		require.NoError(t, err)
-		require.Equal(t, blocks[i], readBlock)
+		require.Equal(t, blocks[i], Get)
 	}
 }
 
@@ -76,7 +76,7 @@ func TestDataSplitting_DeletedFile(t *testing.T) {
 	blocks := make([][]byte, numBlocks)
 	for i := range numBlocks {
 		blocks[i] = fixedSizeBlock(t, 1024, uint64(i))
-		require.NoError(t, store.WriteBlock(uint64(i), blocks[i]))
+		require.NoError(t, store.Put(uint64(i), blocks[i]))
 	}
 	store.Close()
 
