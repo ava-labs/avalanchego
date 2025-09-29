@@ -172,7 +172,7 @@ func allFieldsSet[T interface {
 			case []uint8, []*Header, Transactions, []*Transaction, Withdrawals, []*Withdrawal:
 				require.NotEmpty(t, f)
 			default:
-				t.Errorf("Field %q has unsupported type %T", field.Name, f)
+				assert.Failf(t, "Field %q has unsupported type %T", field.Name, f)
 			}
 		})
 	}
@@ -183,10 +183,7 @@ func assertNonZero[T interface {
 		*big.Int | *common.Hash | *uint64 | *[]uint8 | *Header
 }](t *testing.T, v T) {
 	t.Helper()
-	var zero T
-	if v == zero {
-		t.Errorf("must not be zero value for %T", v)
-	}
+	require.NotZero(t, v)
 }
 
 // Note [TestCopyHeader] tests the [HeaderExtra.PostCopy] method.

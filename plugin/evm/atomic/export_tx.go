@@ -36,10 +36,10 @@ var (
 	_                           secp256k1fx.UnsignedTx = (*UnsignedExportTx)(nil)
 	ErrExportNonAVAXInputBanff                         = errors.New("export input cannot contain non-AVAX in Banff")
 	ErrExportNonAVAXOutputBanff                        = errors.New("export output cannot contain non-AVAX in Banff")
+	ErrInvalidNonce                                    = errors.New("invalid nonce")
 	ErrNoExportOutputs                                 = errors.New("tx has no export outputs")
 	errOverflowExport                                  = errors.New("overflow when computing export amount + txFee")
 	errInsufficientFunds                               = errors.New("insufficient funds")
-	errInvalidNonce                                    = errors.New("invalid nonce")
 )
 
 // UnsignedExportTx is an unsigned ExportTx
@@ -335,7 +335,7 @@ func (utx *UnsignedExportTx) EVMStateTransfer(ctx *snow.Context, state StateDB) 
 			state.SubBalanceMultiCoin(from.Address, common.Hash(from.AssetID), amount)
 		}
 		if state.GetNonce(from.Address) != from.Nonce {
-			return errInvalidNonce
+			return ErrInvalidNonce
 		}
 		addrs[from.Address] = from.Nonce
 	}

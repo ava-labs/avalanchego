@@ -6,7 +6,6 @@ package vm
 import (
 	"context"
 	"math/big"
-	"strings"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -47,9 +46,7 @@ func createImportTxOptions(t *testing.T, vm *VM, sharedMemory *avalancheatomic.M
 		},
 	}
 	utxoBytes, err := atomic.Codec.Marshal(atomic.CodecVersion, utxo)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	xChainSharedMemory := sharedMemory.NewSharedMemory(vm.Ctx.XChainID)
 	inputID := utxo.InputID()
@@ -60,15 +57,13 @@ func createImportTxOptions(t *testing.T, vm *VM, sharedMemory *avalancheatomic.M
 			vmtest.TestKeys[0].Address().Bytes(),
 		},
 	}}}}); err != nil {
-		t.Fatal(err)
+		require.NoError(t, err)
 	}
 
 	importTxs := make([]*atomic.Tx, 0, 3)
 	for _, ethAddr := range vmtest.TestEthAddrs {
 		importTx, err := vm.newImportTx(vm.Ctx.XChainID, ethAddr, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{vmtest.TestKeys[0]})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		importTxs = append(importTxs, importTx)
 	}
 
@@ -443,40 +438,28 @@ func TestNewImportTx(t *testing.T) {
 	createNewImportAVAXTx := func(t *testing.T, vm *VM, sharedMemory *avalancheatomic.Memory) *atomic.Tx {
 		txID := ids.GenerateTestID()
 		_, err := addUTXO(sharedMemory, vm.Ctx, txID, 0, vm.Ctx.AVAXAssetID, importAmount, key.Address())
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		tx, err := vm.newImportTx(vm.Ctx.XChainID, ethAddress, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{key})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		importTx := tx.UnsignedAtomicTx
 		var actualFee uint64
 		actualAVAXBurned, err := importTx.Burned(vm.Ctx.AVAXAssetID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		rules := vm.CurrentRules()
 		switch {
 		case rules.IsApricotPhase3:
 			actualCost, err := importTx.GasUsed(rules.IsApricotPhase5)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			actualFee, err = atomic.CalculateDynamicFee(actualCost, vmtest.InitialBaseFee)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 		case rules.IsApricotPhase2:
 			actualFee = 1000000
 		default:
 			actualFee = 0
 		}
 
-		if actualAVAXBurned != actualFee {
-			t.Fatalf("AVAX burned (%d) != actual fee (%d)", actualAVAXBurned, actualFee)
-		}
+		require.Equalf(t, actualFee, actualAVAXBurned, "AVAX burned (%d) != actual fee (%d)", actualAVAXBurned, actualFee)
 
 		return tx
 	}
@@ -485,38 +468,26 @@ func TestNewImportTx(t *testing.T) {
 		blockExtension, ok := blk.GetBlockExtension().(atomic.AtomicBlockContext)
 		require.True(t, ok)
 		txs := blockExtension.AtomicTxs()
-		if len(txs) != 1 {
-			t.Fatalf("Expected one import tx to be in the last accepted block, but found %d", len(txs))
-		}
+		require.Lenf(t, txs, 1, "Expected one import tx to be in the last accepted block, but found %d", len(txs))
 
 		tx := txs[0]
 		actualAVAXBurned, err := tx.UnsignedAtomicTx.Burned(vm.Ctx.AVAXAssetID)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		// Ensure that the UTXO has been removed from shared memory within Accept
 		addrSet := set.Set[ids.ShortID]{}
 		addrSet.Add(key.Address())
 		utxos, _, _, err := avax.GetAtomicUTXOs(vm.Ctx.SharedMemory, atomic.Codec, vm.Ctx.XChainID, addrSet, ids.ShortEmpty, ids.Empty, maxUTXOsToFetch)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(utxos) != 0 {
-			t.Fatalf("Expected to find 0 UTXOs after accepting import transaction, but found %d", len(utxos))
-		}
+		require.NoError(t, err)
+		require.Emptyf(t, utxos, "Expected to find 0 UTXOs after accepting import transaction, but found %d", len(utxos))
 
 		// Ensure that the call to EVMStateTransfer correctly updates the balance of [addr]
-		sdb, err := vm.Ethereum().BlockChain().State()
-		if err != nil {
-			t.Fatal(err)
-		}
+		statedb, err := vm.Ethereum().BlockChain().State()
+		require.NoError(t, err)
 
-		expectedRemainingBalance := new(uint256.Int).Mul(
-			uint256.NewInt(importAmount-actualAVAXBurned), atomic.X2CRate)
-		if actualBalance := sdb.GetBalance(ethAddress); actualBalance.Cmp(expectedRemainingBalance) != 0 {
-			t.Fatalf("address remaining balance %s equal %s not %s", ethAddress.String(), actualBalance, expectedRemainingBalance)
-		}
+		expectedRemainingBalance := new(uint256.Int).Mul(uint256.NewInt(importAmount-actualAVAXBurned), atomic.X2CRate)
+		actualBalance := statedb.GetBalance(ethAddress)
+		require.Zerof(t, actualBalance.Cmp(expectedRemainingBalance), "address remaining balance %s equal %s not %s", ethAddress.String(), actualBalance, expectedRemainingBalance)
 	}
 	tests2 := map[string]atomicTxTest{
 		"apricot phase 0": {
@@ -859,25 +830,15 @@ func TestImportTxGasCost(t *testing.T) {
 			tx := &atomic.Tx{UnsignedAtomicTx: test.UnsignedImportTx}
 
 			// Sign with the correct key
-			if err := tx.Sign(atomic.Codec, test.Keys); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, tx.Sign(atomic.Codec, test.Keys))
 
 			gasUsed, err := tx.GasUsed(test.FixedFee)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if gasUsed != test.ExpectedGasUsed {
-				t.Fatalf("Expected gasUsed to be %d, but found %d", test.ExpectedGasUsed, gasUsed)
-			}
+			require.NoError(t, err)
+			require.Equalf(t, test.ExpectedGasUsed, gasUsed, "Expected gasUsed to be %d, but found %d", test.ExpectedGasUsed, gasUsed)
 
 			fee, err := atomic.CalculateDynamicFee(gasUsed, test.BaseFee)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if fee != test.ExpectedFee {
-				t.Fatalf("Expected fee to be %d, but found %d", test.ExpectedFee, fee)
-			}
+			require.NoError(t, err)
+			require.Equalf(t, test.ExpectedFee, fee, "Expected fee to be %d, but found %d", test.ExpectedFee, fee)
 		})
 	}
 }
@@ -909,9 +870,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 						AssetID: vm.Ctx.AVAXAssetID,
 					}},
 				}}
-				if err := tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}))
 				return tx
 			},
 			bootstrapping: true,
@@ -938,9 +897,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 						AssetID: vm.Ctx.AVAXAssetID,
 					}},
 				}}
-				if err := tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}))
 				return tx
 			},
 			semanticVerifyErr: "failed to fetch import UTXOs from",
@@ -950,15 +907,13 @@ func TestImportTxSemanticVerify(t *testing.T) {
 				utxoID := avax.UTXOID{TxID: ids.GenerateTestID()}
 				xChainSharedMemory := sharedMemory.NewSharedMemory(vm.Ctx.XChainID)
 				inputID := utxoID.InputID()
-				if err := xChainSharedMemory.Apply(map[ids.ID]*avalancheatomic.Requests{vm.Ctx.ChainID: {PutRequests: []*avalancheatomic.Element{{
+				require.NoError(t, xChainSharedMemory.Apply(map[ids.ID]*avalancheatomic.Requests{vm.Ctx.ChainID: {PutRequests: []*avalancheatomic.Element{{
 					Key:   inputID[:],
 					Value: []byte("hey there"),
 					Traits: [][]byte{
 						key.Address().Bytes(),
 					},
-				}}}}); err != nil {
-					t.Fatal(err)
-				}
+				}}}}))
 
 				tx := &atomic.Tx{UnsignedAtomicTx: &atomic.UnsignedImportTx{
 					NetworkID:    vm.Ctx.NetworkID,
@@ -978,9 +933,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 						AssetID: vm.Ctx.AVAXAssetID,
 					}},
 				}}
-				if err := tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}))
 				return tx
 			},
 			semanticVerifyErr: "failed to unmarshal UTXO",
@@ -990,9 +943,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 				txID := ids.GenerateTestID()
 				expectedAssetID := ids.GenerateTestID()
 				utxo, err := addUTXO(sharedMemory, vm.Ctx, txID, 0, expectedAssetID, 1, key.Address())
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 
 				tx := &atomic.Tx{UnsignedAtomicTx: &atomic.UnsignedImportTx{
 					NetworkID:    vm.Ctx.NetworkID,
@@ -1012,9 +963,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 						AssetID: vm.Ctx.AVAXAssetID,
 					}},
 				}}
-				if err := tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}))
 				return tx
 			},
 			semanticVerifyErr: ErrAssetIDMismatch.Error(),
@@ -1023,9 +972,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 			setup: func(t *testing.T, vm *VM, sharedMemory *avalancheatomic.Memory) *atomic.Tx {
 				txID := ids.GenerateTestID()
 				utxo, err := addUTXO(sharedMemory, vm.Ctx, txID, 0, vm.Ctx.AVAXAssetID, 1, key.Address())
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 
 				tx := &atomic.Tx{UnsignedAtomicTx: &atomic.UnsignedImportTx{
 					NetworkID:    vm.Ctx.NetworkID,
@@ -1045,9 +992,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 						AssetID: vm.Ctx.AVAXAssetID,
 					}},
 				}}
-				if err := tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}))
 				return tx
 			},
 			semanticVerifyErr: "import tx flow check failed due to",
@@ -1057,9 +1002,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 				txID := ids.GenerateTestID()
 				assetID := ids.GenerateTestID()
 				utxo, err := addUTXO(sharedMemory, vm.Ctx, txID, 0, assetID, 1, key.Address())
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 
 				tx := &atomic.Tx{UnsignedAtomicTx: &atomic.UnsignedImportTx{
 					NetworkID:    vm.Ctx.NetworkID,
@@ -1079,9 +1022,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 						AssetID: assetID,
 					}},
 				}}
-				if err := tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}))
 				return tx
 			},
 			semanticVerifyErr: "import tx flow check failed due to",
@@ -1090,9 +1031,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 			setup: func(t *testing.T, vm *VM, sharedMemory *avalancheatomic.Memory) *atomic.Tx {
 				txID := ids.GenerateTestID()
 				utxo, err := addUTXO(sharedMemory, vm.Ctx, txID, 0, vm.Ctx.AVAXAssetID, 1, key.Address())
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 
 				tx := &atomic.Tx{UnsignedAtomicTx: &atomic.UnsignedImportTx{
 					NetworkID:    vm.Ctx.NetworkID,
@@ -1112,9 +1051,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 						AssetID: vm.Ctx.AVAXAssetID,
 					}},
 				}}
-				if err := tx.Sign(atomic.Codec, nil); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, tx.Sign(atomic.Codec, nil))
 				return tx
 			},
 			semanticVerifyErr: "import tx contained mismatched number of inputs/credentials",
@@ -1123,9 +1060,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 			setup: func(t *testing.T, vm *VM, sharedMemory *avalancheatomic.Memory) *atomic.Tx {
 				txID := ids.GenerateTestID()
 				utxo, err := addUTXO(sharedMemory, vm.Ctx, txID, 0, vm.Ctx.AVAXAssetID, 1, key.Address())
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 
 				tx := &atomic.Tx{UnsignedAtomicTx: &atomic.UnsignedImportTx{
 					NetworkID:    vm.Ctx.NetworkID,
@@ -1148,9 +1083,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 				incorrectKey, err := secp256k1.NewPrivateKey()
 				require.NoError(t, err)
 				// Sign the transaction with the incorrect key
-				if err := tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{incorrectKey}}); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{incorrectKey}}))
 				return tx
 			},
 			semanticVerifyErr: "import tx transfer failed verification",
@@ -1159,9 +1092,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 			setup: func(t *testing.T, vm *VM, sharedMemory *avalancheatomic.Memory) *atomic.Tx {
 				txID := ids.GenerateTestID()
 				utxo, err := addUTXO(sharedMemory, vm.Ctx, txID, 0, vm.Ctx.AVAXAssetID, 2, key.Address())
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 
 				tx := &atomic.Tx{UnsignedAtomicTx: &atomic.UnsignedImportTx{
 					NetworkID:    vm.Ctx.NetworkID,
@@ -1188,9 +1119,7 @@ func TestImportTxSemanticVerify(t *testing.T) {
 						},
 					},
 				}}
-				if err := tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}))
 				return tx
 			},
 			fork:              upgradetest.ApricotPhase3,
@@ -1215,9 +1144,7 @@ func TestImportTxEVMStateTransfer(t *testing.T) {
 			setup: func(t *testing.T, vm *VM, sharedMemory *avalancheatomic.Memory) *atomic.Tx {
 				txID := ids.GenerateTestID()
 				utxo, err := addUTXO(sharedMemory, vm.Ctx, txID, 0, vm.Ctx.AVAXAssetID, 1, key.Address())
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 
 				tx := &atomic.Tx{UnsignedAtomicTx: &atomic.UnsignedImportTx{
 					NetworkID:    vm.Ctx.NetworkID,
@@ -1237,32 +1164,24 @@ func TestImportTxEVMStateTransfer(t *testing.T) {
 						AssetID: vm.Ctx.AVAXAssetID,
 					}},
 				}}
-				if err := tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}))
 				return tx
 			},
 			checkState: func(t *testing.T, vm *VM) {
 				lastAcceptedBlock := vm.LastAcceptedExtendedBlock()
 
-				sdb, err := vm.Ethereum().BlockChain().StateAt(lastAcceptedBlock.GetEthBlock().Root())
-				if err != nil {
-					t.Fatal(err)
-				}
+				statedb, err := vm.Ethereum().BlockChain().StateAt(lastAcceptedBlock.GetEthBlock().Root())
+				require.NoError(t, err)
 
-				avaxBalance := sdb.GetBalance(ethAddress)
-				if avaxBalance.Cmp(atomic.X2CRate) != 0 {
-					t.Fatalf("Expected AVAX balance to be %d, found balance: %d", *atomic.X2CRate, avaxBalance)
-				}
+				avaxBalance := statedb.GetBalance(ethAddress)
+				require.Zerof(t, avaxBalance.Cmp(atomic.X2CRate), "Expected AVAX balance to be %d, found balance: %d", *atomic.X2CRate, avaxBalance)
 			},
 		},
 		"non-AVAX UTXO": {
 			setup: func(t *testing.T, vm *VM, sharedMemory *avalancheatomic.Memory) *atomic.Tx {
 				txID := ids.GenerateTestID()
 				utxo, err := addUTXO(sharedMemory, vm.Ctx, txID, 0, assetID, 1, key.Address())
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 
 				tx := &atomic.Tx{UnsignedAtomicTx: &atomic.UnsignedImportTx{
 					NetworkID:    vm.Ctx.NetworkID,
@@ -1282,28 +1201,20 @@ func TestImportTxEVMStateTransfer(t *testing.T) {
 						AssetID: assetID,
 					}},
 				}}
-				if err := tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, tx.Sign(atomic.Codec, [][]*secp256k1.PrivateKey{{key}}))
 				return tx
 			},
 			checkState: func(t *testing.T, vm *VM) {
 				lastAcceptedBlock := vm.LastAcceptedExtendedBlock()
 
 				statedb, err := vm.Ethereum().BlockChain().StateAt(lastAcceptedBlock.GetEthBlock().Root())
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 
 				wrappedStateDB := extstate.New(statedb)
 				assetBalance := wrappedStateDB.GetBalanceMultiCoin(ethAddress, common.Hash(assetID))
-				if assetBalance.Cmp(common.Big1) != 0 {
-					t.Fatalf("Expected asset balance to be %d, found balance: %d", common.Big1, assetBalance)
-				}
+				require.Equalf(t, 0, assetBalance.Cmp(common.Big1), "Expected asset balance to be %d, found balance: %d", common.Big1, assetBalance)
 				avaxBalance := wrappedStateDB.GetBalance(ethAddress)
-				if avaxBalance.Cmp(common.U2560) != 0 {
-					t.Fatalf("Expected AVAX balance to be 0, found balance: %d", avaxBalance)
-				}
+				require.Zerof(t, avaxBalance.Cmp(uint256.NewInt(0)), "Expected AVAX balance to be 0, found balance: %d", avaxBalance)
 			},
 		},
 	}
@@ -1334,41 +1245,27 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 	lastAcceptedBlock := vm.LastAcceptedExtendedBlock()
 	backend := NewVerifierBackend(vm, rules)
 
-	if err := backend.SemanticVerify(tx, lastAcceptedBlock, baseFee); len(test.semanticVerifyErr) == 0 && err != nil {
-		t.Fatalf("SemanticVerify failed unexpectedly due to: %s", err)
-	} else if len(test.semanticVerifyErr) != 0 {
-		if err == nil {
-			t.Fatalf("SemanticVerify unexpectedly returned a nil error. Expected err: %s", test.semanticVerifyErr)
-		}
-		if !strings.Contains(err.Error(), test.semanticVerifyErr) {
-			t.Fatalf("Expected SemanticVerify to fail due to %s, but failed with: %s", test.semanticVerifyErr, err)
-		}
+	err := backend.SemanticVerify(tx, lastAcceptedBlock, baseFee)
+	if len(test.semanticVerifyErr) > 0 {
+		require.ErrorContains(t, err, test.semanticVerifyErr)
 		// If SemanticVerify failed for the expected reason, return early
 		return
 	}
+	require.NoError(t, err)
 
 	// Retrieve dummy state to test that EVMStateTransfer works correctly
 	statedb, err := vm.Ethereum().BlockChain().StateAt(lastAcceptedBlock.GetEthBlock().Root())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	wrappedStateDB := extstate.New(statedb)
-	if err := tx.UnsignedAtomicTx.EVMStateTransfer(vm.Ctx, wrappedStateDB); len(test.evmStateTransferErr) == 0 && err != nil {
-		t.Fatalf("EVMStateTransfer failed unexpectedly due to: %s", err)
-	} else if len(test.evmStateTransferErr) != 0 {
-		if err == nil {
-			t.Fatalf("EVMStateTransfer unexpectedly returned a nil error. Expected err: %s", test.evmStateTransferErr)
-		}
-		if !strings.Contains(err.Error(), test.evmStateTransferErr) {
-			t.Fatalf("Expected SemanticVerify to fail due to %s, but failed with: %s", test.evmStateTransferErr, err)
-		}
+	err = tx.UnsignedAtomicTx.EVMStateTransfer(vm.Ctx, wrappedStateDB)
+	if len(test.evmStateTransferErr) > 0 {
+		require.ErrorContains(t, err, test.evmStateTransferErr)
 		// If EVMStateTransfer failed for the expected reason, return early
 		return
 	}
+	require.NoError(t, err)
 
-	if err := vm.AtomicMempool.AddLocalTx(tx); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, vm.AtomicMempool.AddLocalTx(tx))
 
 	if test.bootstrapping {
 		return
@@ -1379,26 +1276,17 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 
 	// If we've reached this point, we expect to be able to build and verify the block without any errors
 	blk, err := vm.BuildBlock(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	if err := blk.Verify(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, blk.Verify(context.Background()))
 
-	if err := blk.Accept(context.Background()); len(test.acceptErr) == 0 && err != nil {
-		t.Fatalf("Accept failed unexpectedly due to: %s", err)
-	} else if len(test.acceptErr) != 0 {
-		if err == nil {
-			t.Fatalf("Accept unexpectedly returned a nil error. Expected err: %s", test.acceptErr)
-		}
-		if !strings.Contains(err.Error(), test.acceptErr) {
-			t.Fatalf("Expected Accept to fail due to %s, but failed with: %s", test.acceptErr, err)
-		}
+	err = blk.Accept(context.Background())
+	if len(test.acceptErr) > 0 {
+		require.ErrorContains(t, err, test.acceptErr)
 		// If Accept failed for the expected reason, return early
 		return
 	}
+	require.NoErrorf(t, err, "Accept failed unexpectedly due to: %s", err)
 
 	if test.checkState != nil {
 		test.checkState(t, vm)

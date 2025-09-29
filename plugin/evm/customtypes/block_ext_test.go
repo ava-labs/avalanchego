@@ -98,7 +98,7 @@ func exportedFieldsPointToDifferentMemory[T interface {
 			case []uint8:
 				assertDifferentPointers(t, unsafe.SliceData(f), unsafe.SliceData(fieldCp.([]uint8)))
 			default:
-				t.Errorf("field %q type %T needs to be added to switch cases of exportedFieldsDeepCopied", field.Name, f)
+				assert.Failf(t, "field %q type %T needs to be added to switch cases of exportedFieldsDeepCopied", field.Name, f)
 			}
 		})
 	}
@@ -108,14 +108,9 @@ func exportedFieldsPointToDifferentMemory[T interface {
 // pointers pointing to different memory locations.
 func assertDifferentPointers[T any](t *testing.T, a *T, b any) {
 	t.Helper()
-	switch {
-	case a == nil:
-		t.Errorf("a (%T) cannot be nil", a)
-	case b == nil:
-		t.Errorf("b (%T) cannot be nil", b)
-	case a == b:
-		t.Errorf("pointers to same memory")
-	}
+	require.NotNilf(t, a, "a (%T) cannot be nil", a)
+	require.NotNilf(t, b, "b (%T) cannot be nil", b)
+	require.NotSame(t, a, b, "a and b must not point to the same memory address")
 	// Note: no need to check `b` is of the same type as `a`, otherwise
 	// the memory address would be different as well.
 }
@@ -231,14 +226,12 @@ func TestBodyExtraRLP(t *testing.T) {
 		headerHashComparer(),
 		cmpopts.IgnoreUnexported(Body{}),
 	}
-	if diff := cmp.Diff(wantBody, gotBody, opts); diff != "" {
-		t.Errorf("%T diff after RLP round-trip (-want +got):\n%s", wantBody, diff)
-	}
+	diff := cmp.Diff(wantBody, gotBody, opts)
+	require.Emptyf(t, diff, "%T diff after RLP round-trip (-want +got):\n%s", wantBody, diff)
 
 	gotExtra := extras.Body.Get(gotBody)
-	if diff := cmp.Diff(wantExtra, gotExtra); diff != "" {
-		t.Errorf("%T diff after RLP round-trip of %T (-want +got):\n%s", wantExtra, wantBody, diff)
-	}
+	diff = cmp.Diff(wantExtra, gotExtra)
+	require.Emptyf(t, diff, "%T diff after RLP round-trip of %T (-want +got):\n%s", wantExtra, wantBody, diff)
 
 	// Golden data from original coreth implementation, before integration of
 	// libevm. WARNING: changing these values can break backwards compatibility
@@ -267,14 +260,12 @@ func TestBlockExtraRLP(t *testing.T) {
 		headerHashComparer(),
 		cmpopts.IgnoreUnexported(Block{}),
 	}
-	if diff := cmp.Diff(wantBlock, gotBlock, opts); diff != "" {
-		t.Errorf("%T diff after RLP round-trip (-want +got):\n%s", gotBlock, diff)
-	}
+	diff := cmp.Diff(wantBlock, gotBlock, opts)
+	require.Emptyf(t, diff, "%T diff after RLP round-trip (-want +got):\n%s", gotBlock, diff)
 
 	gotExtra := extras.Block.Get(gotBlock)
-	if diff := cmp.Diff(wantExtra, gotExtra); diff != "" {
-		t.Errorf("%T diff after RLP round-trip of %T (-want +got):\n%s", wantExtra, wantBlock, diff)
-	}
+	diff = cmp.Diff(wantExtra, gotExtra)
+	require.Emptyf(t, diff, "%T diff after RLP round-trip of %T (-want +got):\n%s", wantExtra, wantBlock, diff)
 
 	// Golden data from original coreth implementation, before integration of
 	// libevm. WARNING: changing these values can break backwards compatibility
