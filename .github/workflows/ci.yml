@@ -296,7 +296,7 @@ jobs:
       uses: ./.github/actions/c-chain-reexecution-benchmark
       with:
         aws-region: 'us-east-2'
-        aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+        aws-role: ${{ secrets.AWS_S3_RW_ROLE }}
         github-token: ${{ secrets.GITHUB_TOKEN }}
         runner_name: 'self-hosted-runner-0.0.12'
  firewood-13-reexecution:
@@ -313,6 +313,6 @@ jobs:
        uses: ./.github/actions/c-chain-reexecution-benchmark
        with:
          aws-region: 'us-east-2'
-         aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+         aws-role: ${{ secrets.AWS_S3_RW_ROLE }}
          github-token: ${{ secrets.GITHUB_TOKEN }}
          runner_name: 'self-hosted-runner-0.0.13'
