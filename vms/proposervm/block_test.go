@@ -26,9 +26,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/staking"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer/proposermock"
 )
@@ -111,8 +111,8 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	ctx := context.Background()
 
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -241,8 +241,8 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	ctx := context.Background()
 
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = mockable.MaxTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {

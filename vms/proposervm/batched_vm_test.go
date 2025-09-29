@@ -29,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
 	blockbuilder "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -38,8 +37,8 @@ func TestCoreVMNotRemote(t *testing.T) {
 	// if coreVM is not remote VM, a specific error is returned
 	require := require.New(t)
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
 	)
 	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -68,8 +67,8 @@ func TestCoreVMNotRemote(t *testing.T) {
 func TestGetAncestorsPreForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
-		activationTime = mockable.MaxTime
-		durangoTime    = activationTime
+		activationTime = upgrade.UnscheduledActivationTime
+		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {
@@ -191,8 +190,8 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 func TestGetAncestorsPostForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {
@@ -497,8 +496,8 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
-		activationTime = mockable.MaxTime
-		durangoTime    = activationTime
+		activationTime = upgrade.UnscheduledActivationTime
+		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {
@@ -691,8 +690,8 @@ func makeParseableBlocks(t *testing.T, parentID ids.ID, timestamp time.Time, pCh
 func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime)
 	defer func() {

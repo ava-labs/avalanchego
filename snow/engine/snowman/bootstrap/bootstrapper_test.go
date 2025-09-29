@@ -121,7 +121,7 @@ func TestBootstrapperStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	vm.Default(true)
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
-	// create boostrapper configuration
+	// create bootstrapper configuration
 	peers := validators.NewManager()
 	sampleK := 2
 	alpha := uint64(10)

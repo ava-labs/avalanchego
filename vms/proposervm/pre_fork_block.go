@@ -161,6 +161,10 @@ func (*preForkBlock) verifyPostForkOption(context.Context, *postForkOption) erro
 	return errUnexpectedBlockType
 }
 
+func (b *preForkBlock) selectChildPChainHeight(ctx context.Context) (uint64, error) {
+	return b.vm.selectChildPChainHeight(ctx, b.vm.Upgrades.ApricotPhase4MinPChainHeight)
+}
+
 func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 	parentTimestamp := b.Timestamp()
 	if !b.vm.Upgrades.IsApricotPhase4Activated(parentTimestamp) {
@@ -192,7 +196,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 
 	// The child's P-Chain height is proposed as the optimal P-Chain height that
 	// is at least the minimum height
-	pChainHeight, err := b.vm.selectChildPChainHeight(ctx, b.vm.Upgrades.ApricotPhase4MinPChainHeight)
+	pChainHeight, err := b.selectChildPChainHeight(ctx)
 	if err != nil {
 		b.vm.ctx.Log.Error("unexpected build block failure",
 			zap.String("reason", "failed to calculate optimal P-chain height"),

@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package proposervm;
+
+option go_package = "github.com/ava-labs/avalanchego/connectproto/pb/proposervm";
+
+// ProposerVM service provides RPCs for querying ProposerVM state.
+service ProposerVM {
+  // GetProposedHeight returns the P-Chain height that would be included in a
+  // block if it were proposed right now.
+  rpc GetProposedHeight(GetProposedHeightRequest) returns (GetProposedHeightReply);
+}
+
+// Request to get the current proposed block height.
+message GetProposedHeightRequest {}
+
+// Response containing the current proposed P-chain block height.
+message GetProposedHeightReply {
+  // The P-chain height that would be included in a block if it were proposed
+  // right now.
+  uint64 height = 1;
+}

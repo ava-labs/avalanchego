@@ -398,9 +398,8 @@ func (c *genericCodec) marshal(
 		}
 		return nil
 	case reflect.Array:
-		if elemKind := value.Type().Kind(); elemKind == reflect.Uint8 {
-			sliceVal := value.Convert(reflect.TypeOf([]byte{}))
-			p.PackFixedBytes(sliceVal.Bytes())
+		if value.CanAddr() && value.Type().Elem().Kind() == reflect.Uint8 {
+			p.PackFixedBytes(value.Bytes())
 			return p.Err
 		}
 		numElts := value.Len()

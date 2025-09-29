@@ -242,6 +242,21 @@ func (mr *MockPostForkBlockMockRecorder) pChainHeight(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "pChainHeight", reflect.TypeOf((*MockPostForkBlock)(nil).pChainHeight), arg0)
 }
 
+// selectChildPChainHeight mocks base method.
+func (m *MockPostForkBlock) selectChildPChainHeight(arg0 context.Context) (uint64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "selectChildPChainHeight", arg0)
+	ret0, _ := ret[0].(uint64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// selectChildPChainHeight indicates an expected call of selectChildPChainHeight.
+func (mr *MockPostForkBlockMockRecorder) selectChildPChainHeight(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "selectChildPChainHeight", reflect.TypeOf((*MockPostForkBlock)(nil).selectChildPChainHeight), arg0)
+}
+
 // setInnerBlk mocks base method.
 func (m *MockPostForkBlock) setInnerBlk(arg0 snowman.Block) {
 	m.ctrl.T.Helper()

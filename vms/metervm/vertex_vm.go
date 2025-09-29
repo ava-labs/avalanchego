@@ -5,6 +5,7 @@ package metervm
 
 import (
 	"context"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -13,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var (
@@ -35,7 +35,6 @@ type vertexVM struct {
 	vertex.LinearizableVMWithEngine
 	vertexMetrics
 	registry prometheus.Registerer
-	clock    mockable.Clock
 }
 
 func (vm *vertexVM) Initialize(
@@ -65,10 +64,9 @@ func (vm *vertexVM) Initialize(
 }
 
 func (vm *vertexVM) ParseTx(ctx context.Context, b []byte) (snowstorm.Tx, error) {
-	start := vm.clock.Time()
+	start := time.Now()
 	tx, err := vm.LinearizableVMWithEngine.ParseTx(ctx, b)
-	end := vm.clock.Time()
-	duration := float64(end.Sub(start))
+	duration := float64(time.Since(start))
 	if err != nil {
 		vm.vertexMetrics.parseErr.Observe(duration)
 		return nil, err
@@ -87,10 +85,9 @@ type meterTx struct {
 }
 
 func (mtx *meterTx) Verify(ctx context.Context) error {
-	start := mtx.vm.clock.Time()
+	start := time.Now()
 	err := mtx.Tx.Verify(ctx)
-	end := mtx.vm.clock.Time()
-	duration := float64(end.Sub(start))
+	duration := float64(time.Since(start))
 	if err != nil {
 		mtx.vm.vertexMetrics.verifyErr.Observe(duration)
 	} else {
@@ -100,17 +97,15 @@ func (mtx *meterTx) Verify(ctx context.Context) error {
 }
 
 func (mtx *meterTx) Accept(ctx context.Context) error {
-	start := mtx.vm.clock.Time()
+	start := time.Now()
 	err := mtx.Tx.Accept(ctx)
-	end := mtx.vm.clock.Time()
-	mtx.vm.vertexMetrics.accept.Observe(float64(end.Sub(start)))
+	mtx.vm.vertexMetrics.accept.Observe(float64(time.Since(start)))
 	return err
 }
 
 func (mtx *meterTx) Reject(ctx context.Context) error {
-	start := mtx.vm.clock.Time()
+	start := time.Now()
 	err := mtx.Tx.Reject(ctx)
-	end := mtx.vm.clock.Time()
-	mtx.vm.vertexMetrics.reject.Observe(float64(end.Sub(start)))
+	mtx.vm.vertexMetrics.reject.Observe(float64(time.Since(start)))
 	return err
 }

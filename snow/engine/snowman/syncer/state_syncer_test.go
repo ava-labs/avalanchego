@@ -1273,7 +1273,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 	// check that finally summary is passed to VM
 	require.False(majoritySummaryCalled)
 	require.False(minoritySummaryCalled)
-	require.True(stateSyncFullyDone) // no restart, just move to boostrapping
+	require.True(stateSyncFullyDone) // no restart, just move to bootstrapping
 }
 
 func TestStateSyncIsDoneOnceVMNotifies(t *testing.T) {

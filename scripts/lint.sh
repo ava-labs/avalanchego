@@ -32,7 +32,7 @@ fi
 TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
 
 function test_golangci_lint {
-  go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.1.6 run --config .golangci.yml
+  ./scripts/run_tool.sh golangci-lint run --config .golangci.yml
 }
 
 # automatically checks license headers
@@ -53,7 +53,7 @@ function test_license_header {
     )
 
   # shellcheck disable=SC2086
-  go run github.com/palantir/go-license@v1.25.0 \
+  ./scripts/run_tool.sh go-license \
   --config=./header.yml \
   ${_addlicense_flags} \
   "${files[@]}"

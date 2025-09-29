@@ -1,9 +1,14 @@
 module github.com/ava-labs/avalanchego
 
+// CLI tools intended for invocation with `go tool` should be added to
+// tools/go.mod to avoid polluting the main module's dependencies. See
+// tools/go.mod for usage details.
+
 // - Changes to the minimum golang version must also be replicated in:
 //   - CONTRIBUTING.md
 //   - README.md
 //   - go.mod (here)
+//   - tools/go.mod
 //
 // - If updating between minor versions (e.g. 1.23.x -> 1.24.x):
 //   - Consider updating the version of golangci-lint (in scripts/lint.sh).
@@ -13,7 +18,7 @@ require (
 	connectrpc.com/connect v1.18.1
 	connectrpc.com/grpcreflect v1.3.0
 	github.com/DataDog/zstd v1.5.2
-	github.com/StephenButtolph/canoto v0.17.1
+	github.com/StephenButtolph/canoto v0.17.2
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/ava-labs/coreth v0.15.4-rc.3.0.20250929144905-7d38c3145fb7
 	github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60

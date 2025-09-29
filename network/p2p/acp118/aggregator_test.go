@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/p2ptest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
@@ -49,7 +50,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 		ctx            context.Context
 		msg            *warp.Message
 		signature      warp.BitSetSignature
-		validators     []*warp.Validator
+		validators     []*validators.Warp
 		quorumNum      uint64
 		quorumDen      uint64
 		wantTotalStake int
@@ -75,7 +76,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -105,7 +106,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -136,7 +137,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -169,7 +170,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -212,7 +213,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -255,7 +256,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -298,7 +299,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -341,7 +342,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -384,7 +385,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -427,7 +428,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk1,
 					Weight:    1,
@@ -460,7 +461,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -501,7 +502,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -538,7 +539,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       &warp.BitSetSignature{},
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
@@ -589,7 +590,7 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 					Signature:       sig,
 				}
 			}(),
-			validators: []*warp.Validator{
+			validators: []*validators.Warp{
 				{
 					PublicKey: pk0,
 					Weight:    1,
