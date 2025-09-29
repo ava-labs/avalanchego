@@ -49,8 +49,8 @@ github.com/Joker/hpp v1.0.0/go.mod h1:8x5n+M1Hp5hC0g8okX3sR3vFQwynaX/UgSOM9MeBKz
 github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migciow=
 github.com/Microsoft/go-winio v0.6.1/go.mod h1:LRdKpFKfdobln8UmuiYcKPot9D2v6svN5+sAH+4kjUM=
 github.com/Shopify/goreferrer v0.0.0-20181106222321-ec9c9a553398/go.mod h1:a1uqRtAwp2Xwc6WNPJEufxJ7fx3npB4UV/JOLmbu5I0=
-github.com/StephenButtolph/canoto v0.17.1 h1:WnN5czIHHALq7pwc+Z2F1sCsKJCDhxlq0zL0YK1etHc=
-github.com/StephenButtolph/canoto v0.17.1/go.mod h1:IcnAHC6nJUfQFVR9y60ko2ecUqqHHSB6UwI9NnBFZnE=
+github.com/StephenButtolph/canoto v0.17.2 h1:kRLJwtYk0bzdGEeEvwHaVmmDm0HFHxrS0VlVN5Hyo7U=
+github.com/StephenButtolph/canoto v0.17.2/go.mod h1:IcnAHC6nJUfQFVR9y60ko2ecUqqHHSB6UwI9NnBFZnE=
 github.com/VictoriaMetrics/fastcache v1.12.1 h1:i0mICQuojGDL3KblA7wUNlY5lOK6a4bwt3uRKnkZU40=
 github.com/VictoriaMetrics/fastcache v1.12.1/go.mod h1:tX04vaqcNoQeGLD+ra5pU5sWkuxnzWhEzLwhP9w653o=
 github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBAUSII=
@@ -60,8 +60,8 @@ github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
-github.com/ava-labs/avalanchego v1.13.6-0.20250919185110-582d3c26a11e h1:gCOjvYwacWC2sJhWQ3PpTGZYy3V6PoolZuSLd3WLHQI=
-github.com/ava-labs/avalanchego v1.13.6-0.20250919185110-582d3c26a11e/go.mod h1:67ghhSEl7SnYpA+UKj8fqsKgJ/rgotHYH3NuCSjLWMY=
+github.com/ava-labs/avalanchego v1.13.6-0.20250925183853-36baa0509d61 h1:jO+73dnER4I04a16ZjEM2M8L40bCXsac1vwKppRkIB8=
+github.com/ava-labs/avalanchego v1.13.6-0.20250925183853-36baa0509d61/go.mod h1:xgSvWMEJjXRKXmpeH3yNs2uM4brSYiFqgPaw3c26PwY=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.0.12 h1:aMcrLbpJ/dyu2kZDf/Di/4JIWsUcYPyTDKymiHpejt0=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.0.12/go.mod h1:cq89ua3iiZ5wPBALTEQS5eG8DIZcs7ov6OiL4YR1BVY=
 github.com/ava-labs/libevm v1.13.14-0.3.0.release h1:7sPD8wExeLl8XsK2zHNGeDH1p+h6jVMl/Zz867epMD8=
