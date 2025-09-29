@@ -46,6 +46,8 @@ type ProposerVMClient interface {
 	// GetProposedHeight returns the P-Chain height that would be included in a
 	// block if it were proposed right now.
 	GetProposedHeight(context.Context, *connect.Request[proposervm.GetProposedHeightRequest]) (*connect.Response[proposervm.GetProposedHeightReply], error)
+	// GetCurrentEpoch returns the epoch that would be included in a block if it
+	// were proposed right now.
 	GetCurrentEpoch(context.Context, *connect.Request[proposervm.GetCurrentEpochRequest]) (*connect.Response[proposervm.GetCurrentEpochReply], error)
 }
 
@@ -96,6 +98,8 @@ type ProposerVMHandler interface {
 	// GetProposedHeight returns the P-Chain height that would be included in a
 	// block if it were proposed right now.
 	GetProposedHeight(context.Context, *connect.Request[proposervm.GetProposedHeightRequest]) (*connect.Response[proposervm.GetProposedHeightReply], error)
+	// GetCurrentEpoch returns the epoch that would be included in a block if it
+	// were proposed right now.
 	GetCurrentEpoch(context.Context, *connect.Request[proposervm.GetCurrentEpochRequest]) (*connect.Response[proposervm.GetCurrentEpochReply], error)
 }
 
