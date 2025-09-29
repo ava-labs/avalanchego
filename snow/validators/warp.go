@@ -25,7 +25,8 @@ type WarpSet struct {
 }
 
 type Warp struct {
-	PublicKey      *bls.PublicKey
+	PublicKey *bls.PublicKey
+	// PublicKeyBytes is expected to be in the uncompressed form.
 	PublicKeyBytes []byte
 	Weight         uint64
 	NodeIDs        []ids.NodeID
