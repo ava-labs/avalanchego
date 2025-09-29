@@ -307,6 +307,7 @@ jobs:
       uses: ./.github/actions/c-chain-reexecution-benchmark
       with:
         config: 'firewood'
+        current-state-dir-src: 's3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**'
         aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
         aws-region: us-east-2
         github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -340,6 +341,7 @@ jobs:
        uses: ./.github/actions/c-chain-reexecution-benchmark
        with:
          config: 'firewood'
+         current-state-dir-src: 's3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**'
          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
          aws-region: us-east-2
          github-token: ${{ secrets.GITHUB_TOKEN }}
