@@ -875,9 +875,7 @@ func TestAtomicTxBuildBlockDropsConflicts(t *testing.T) {
 		err = vm.AtomicMempool.AddLocalTx(conflictTx)
 		require.ErrorIs(err, txpool.ErrConflict)
 		// force add the tx
-		if err := vm.AtomicMempool.ForceAddTx(conflictTx); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(vm.AtomicMempool.ForceAddTx(conflictTx))
 		conflictSets[index].Add(conflictTx.ID())
 	}
 	msg, err := vm.WaitForEvent(context.Background())

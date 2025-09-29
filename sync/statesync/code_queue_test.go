@@ -235,7 +235,7 @@ func TestQuitAndAddCodeRace(t *testing.T) {
 				in := []common.Hash{{}}
 				ready.Done()
 				<-start
-				q.AddCode(in)
+				require.NoError(t, q.AddCode(in))
 			}()
 
 			ready.Wait()
