@@ -15,6 +15,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: full
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -57,8 +58,12 @@ jobs:
         if: matrix.pre-build-cmd != ''
         run: ${{ matrix.pre-build-cmd }}
 
+      # Require Cargo.lock to be up to date and ensure the registry cache is populated
+      - name: Cargo Fetch (run `cargo generate-lockfile` if this fails)
+        run: cargo fetch --locked --verbose
+
       - name: Build for ${{ matrix.target }}
-        run: cargo build --profile maxperf --features ethhash,logger --target ${{ matrix.target }} -p firewood-ffi
+        run: cargo build --frozen --profile maxperf --features ethhash,logger --target ${{ matrix.target }} -p firewood-ffi
 
       - name: Upload binary
         uses: actions/upload-artifact@v4

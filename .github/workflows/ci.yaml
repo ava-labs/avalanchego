@@ -7,6 +7,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: full
 
 jobs:
   build:
@@ -45,10 +46,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: ${{ matrix.profile-key }}
+          cache-all-crates: true
+          cache-workspace-crates: true
+      # Require Cargo.lock to be up to date and ensure the registry cache is populated
+      - name: Cargo Fetch (run `cargo generate-lockfile` if this fails)
+        run: cargo fetch --locked --verbose
       - name: Check
-        run: cargo check ${{ matrix.profile-args }} --workspace --all-targets
+        run: cargo check --frozen ${{ matrix.profile-args }} --workspace --all-targets
       - name: Build
-        run: cargo build ${{ matrix.profile-args }} --workspace --all-targets
+        run: cargo build --frozen ${{ matrix.profile-args }} --workspace --all-targets
 
   no-rust-cache-lint:
     runs-on: ubuntu-latest
@@ -97,7 +103,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           name: ${{ matrix.profile-key }}
-          args: ${{ matrix.profile-args }} --workspace --all-targets
+          args: --locked ${{ matrix.profile-args }} --workspace --all-targets
 
   rust-lint:
     needs: build
@@ -126,7 +132,7 @@ jobs:
           save-if: "false"
           shared-key: ${{ matrix.profile-key }}
       - name: Clippy
-        run: cargo clippy ${{ matrix.profile-args }} --workspace --all-targets -- -D warnings
+        run: cargo clippy --locked ${{ matrix.profile-args }} --workspace --all-targets -- -D warnings
 
   test:
     needs: build
@@ -155,7 +161,7 @@ jobs:
           save-if: "false"
           shared-key: ${{ matrix.profile-key }}
       - name: Run tests with features enabled
-        run: cargo test --verbose ${{ matrix.profile-args }}
+        run: cargo test --locked --verbose ${{ matrix.profile-args }}
 
   examples:
     needs: build
@@ -182,9 +188,9 @@ jobs:
           save-if: "false"
           shared-key: ${{ matrix.profile-key }}
       - name: Run benchmark example
-        run: RUST_BACKTRACE=1 cargo run ${{ matrix.profile-args }} --bin benchmark -- --number-of-batches 100 --batch-size 1000 create
+        run: cargo run --locked ${{ matrix.profile-args }} --bin benchmark -- --number-of-batches 100 --batch-size 1000 create
       - name: Run insert example
-        run: RUST_BACKTRACE=1 cargo run ${{ matrix.profile-args }} --example insert
+        run: cargo run --locked ${{ matrix.profile-args }} --example insert
 
   docs:
     needs: build
@@ -205,7 +211,7 @@ jobs:
             !CHANGELOG.md
             !target/**
       - name: doc generation
-        run: RUSTDOCFLAGS="-D warnings" cargo doc --document-private-items --no-deps
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --locked --document-private-items --no-deps
 
   ffi:
     needs: build
@@ -222,7 +228,7 @@ jobs:
           shared-key: "debug-no-features"
       - name: Build Firewood FFI
         working-directory: ffi
-        run: cargo build --release
+        run: cargo build --locked --release
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
