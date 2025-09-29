@@ -295,10 +295,14 @@ jobs:
     - name: Firewood v0.0.12 Reexecution
       uses: ./.github/actions/c-chain-reexecution-benchmark
       with:
-        aws-region: 'us-east-2'
-        aws-role: ${{ secrets.AWS_S3_RW_ROLE }}
+        aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+        aws-region: us-east-2
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        runner_name: 'self-hosted-runner-0.0.12'
+        push-post-state: ''
+        runner_name: 'avalanche-avalanchego-runner-v0.0.12'
+        prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+        prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+        prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
  firewood-13-reexecution:
    runs-on: avalanche-avalanchego-runner
    container:
@@ -312,7 +316,11 @@ jobs:
      - name: Firewood v0.0.13 Reexecution
        uses: ./.github/actions/c-chain-reexecution-benchmark
        with:
-         aws-region: 'us-east-2'
-         aws-role: ${{ secrets.AWS_S3_RW_ROLE }}
+         aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+         aws-region: us-east-2
          github-token: ${{ secrets.GITHUB_TOKEN }}
-         runner_name: 'self-hosted-runner-0.0.13'
+         push-post-state: ''
+         runner_name: 'avalanche-avalanchego-runner-v0.0.13'
+         prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+         prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+         prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
