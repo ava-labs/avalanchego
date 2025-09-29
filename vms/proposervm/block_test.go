@@ -111,7 +111,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	ctx := context.Background()
 
 	var (
-		activationTime = time.Unix(0, 0)
+		activationTime = upgrade.InitiallyActiveTime
 		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
@@ -241,7 +241,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	ctx := context.Background()
 
 	var (
-		activationTime = time.Unix(0, 0)
+		activationTime = upgrade.InitiallyActiveTime
 		durangoTime    = upgrade.UnscheduledActivationTime
 	)
 	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)

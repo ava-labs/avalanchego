@@ -30,7 +30,6 @@ type Tracker interface {
 	StartedTracking() bool
 
 	Connect(nodeID ids.NodeID) error
-	IsConnected(nodeID ids.NodeID) bool
 	Disconnect(nodeID ids.NodeID) error
 }
 

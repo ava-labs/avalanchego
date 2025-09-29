@@ -94,7 +94,7 @@ type Manager interface {
 	// If sampling the requested size isn't possible, an error will be returned.
 	Sample(subnetID ids.ID, size int) ([]ids.NodeID, error)
 
-	// Map of the validators in this subnet
+	// GetAllMaps returns a copy of all validators of all subnets
 	GetAllMaps() map[ids.ID]map[ids.NodeID]*GetValidatorOutput
 
 	// Map of the validators in this subnet
