@@ -98,7 +98,7 @@ func exportedFieldsPointToDifferentMemory[T interface {
 			case []uint8:
 				assertDifferentPointers(t, unsafe.SliceData(f), unsafe.SliceData(fieldCp.([]uint8)))
 			default:
-				assert.Failf(t, "field %q type %T needs to be added to switch cases of exportedFieldsDeepCopied", field.Name, f)
+				require.Failf(t, "field %q type %T needs to be added to switch cases of exportedFieldsDeepCopied", field.Name, f)
 			}
 		})
 	}
