@@ -191,7 +191,7 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 	utxos := map[ids.ShortID]uint64{
 		vmtest.TestShortIDAddrs[0]: importAmount,
 	}
-	require.NoError(t, addUTXOs(tvm.AtomicMemory, vm.Ctx, utxos))
+	require.NoError(addUTXOs(tvm.AtomicMemory, vm.Ctx, utxos))
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
@@ -837,8 +837,8 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 
 	// Add the two conflicting transactions directly to the mempool, so that two consecutive transactions
 	// will fail verification when build block is called.
-	require.NoError(t, vm.AtomicMempool.ForceAddTx(importTxs[1]))
-	require.NoError(t, vm.AtomicMempool.ForceAddTx(importTxs[2]))
+	require.NoError(vm.AtomicMempool.ForceAddTx(importTxs[1]))
+	require.NoError(vm.AtomicMempool.ForceAddTx(importTxs[2]))
 
 	_, err = vm.BuildBlock(context.Background())
 	require.ErrorIs(err, ErrEmptyBlock)
