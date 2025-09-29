@@ -32,12 +32,6 @@ runs:
         repository: 'ava-labs/avalanchego'
         ref: ${{ inputs.avalanchego }}
         path: ${{ inputs.checkout-path }}
-    - name: Setup Firewood FFI
-      if: inputs.firewood != ''
-      id: firewood
-      uses: ava-labs/firewood/.github/actions/build-action@composable-ci-action
-      with:
-        version: ${{ inputs.firewood }}
     - name: Update Coreth dependency
       if: inputs.coreth != ''
       shell: bash
@@ -52,18 +46,8 @@ runs:
       run: |
         echo "Updating LibEVM to version: ${{ inputs.libevm }}"
         go get github.com/ava-labs/libevm@${{ inputs.libevm }}
-    - name: Update Firewood FFI
+    - name: Setup Firewood FFI
       if: inputs.firewood != ''
       shell: bash
       working-directory: ${{ inputs.checkout-path }}
-      run: |
-        echo "Replacing Firewood FFI with: ${{ steps.firewood.outputs.ffi-path }}"
-        go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=${{ steps.firewood.outputs.ffi-path }}
-    - name: Finalize dependencies
-      if: ${{ inputs.firewood != '' || inputs.coreth != '' || inputs.libevm != '' }}
-      shell: bash
-      working-directory: ${{ inputs.checkout-path }}
-      run: |
-        echo "Finalizing Go module dependencies"
-        go mod tidy
-        go mod download
+      run: ./scripts/setup_firewood.sh ${{ inputs.firewood }}
