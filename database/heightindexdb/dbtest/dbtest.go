@@ -11,13 +11,11 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
-type testCase struct {
+// Tests is a list of all database tests
+var Tests = []struct {
 	Name string
 	Test func(t *testing.T, newDB func() database.HeightIndex)
-}
-
-// Tests is a list of all database tests
-var Tests = []testCase{
+}{
 	{"TestPutGet", TestPutGet},
 	{"TestHas", TestHas},
 	{"TestCloseAndPut", TestCloseAndPut},
