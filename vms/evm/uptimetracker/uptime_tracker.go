@@ -19,29 +19,29 @@ import (
 
 // Validator represents a validator in the state
 type Validator struct {
-	ValidationID   ids.ID     `json:"validationID"`   // Unique validation identifier
-	NodeID         ids.NodeID `json:"nodeID"`         // Node identifier
-	Weight         uint64     `json:"weight"`         // Validator weight/stake
-	StartTimestamp uint64     `json:"startTimestamp"` // When validation started
-	IsActive       bool       `json:"isActive"`       // Whether validator is currently active
-	IsL1Validator  bool       `json:"isL1Validator"`  // Whether this is an L1 validator
+	// ValidationID is the TxID of the tx on the P-Chain that added this
+	// validator.
+	ValidationID   ids.ID     `json:"validationID"`
+	NodeID         ids.NodeID `json:"nodeID"`
+	Weight         uint64     `json:"weight"`
+	StartTimestamp uint64     `json:"startTimestamp"`
+	IsActive       bool       `json:"isActive"`
+	IsL1Validator  bool       `json:"isL1Validator"`
 }
 
 // UptimeTracker maintains local validator state synchronized with the P-Chain validator set.
 // It tracks validator uptime and manages validator lifecycle events (additions, updates, removals)
 // for the EVM subnet.
-// TODO: consider adding a metrics object to the UptimeTracker
 type UptimeTracker struct {
 	validatorState validators.State
 	subnetID       ids.ID
-	// updatedData tracks the updates since WriteValidator was last called
 	manager    uptime.Manager
-	pausedVdrs set.Set[ids.NodeID]
+	clock *mockable.Clock
+
 	state      *state
-	// connectedVdrs is a set of nodes that are connected to the manager.
-	// This is used to immediately connect nodes when they are unpaused.
 	connectedVdrs set.Set[ids.NodeID]
-	clock         *mockable.Clock
+	// TODO godoc
+	deactivatedValidators set.Set[ids.NodeID]
 }
 
 // NewUptimeTracker returns a new validator state
@@ -55,17 +55,14 @@ func NewUptimeTracker(
 ) (*UptimeTracker, error) {
 	state, err := newState(db)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create state: %w", err)
+		return nil, fmt.Errorf("failed to initialize state: %w", err)
 	}
 
-	// Create the UptimeTracker first
 	return &UptimeTracker{
 		validatorState: validatorState,
 		subnetID:       subnetID,
 		manager:        uptime.NewManager(state, clock),
-		pausedVdrs:     make(set.Set[ids.NodeID]),
 		state:          state,
-		connectedVdrs:  make(set.Set[ids.NodeID]),
 		clock:          clock,
 	}, nil
 }
@@ -76,6 +73,7 @@ func (u *UptimeTracker) GetValidator(vID ids.ID) (Validator, bool) {
 	if !ok {
 		return Validator{}, false
 	}
+
 	return Validator{
 		ValidationID:   data.validationID,
 		NodeID:         data.NodeID,
@@ -92,6 +90,7 @@ func (u *UptimeTracker) GetValidationID(nodeID ids.NodeID) (ids.ID, bool) {
 	if !ok {
 		return ids.ID{}, false
 	}
+
 	return vID, true
 }
 
@@ -108,12 +107,14 @@ func (u *UptimeTracker) GetValidators() []Validator {
 			IsL1Validator:  vdr.IsL1Validator,
 		})
 	}
+
 	return validators
 }
 
 // GetValidatorAndUptime returns the calculated uptime of the validator specified by [validationID]
 // and the last updated time.
 // GetValidatorAndUptime holds the lock while performing the operation and can be called concurrently.
+// TODO to lock or not to lock?
 func (u *UptimeTracker) GetValidatorAndUptime(validationID ids.ID, lock sync.Locker) (Validator, time.Duration, time.Time, error) {
 	lock.Lock()
 	defer lock.Unlock()
@@ -132,34 +133,22 @@ func (u *UptimeTracker) GetValidatorAndUptime(validationID ids.ID, lock sync.Loc
 }
 
 // Connect connects a node to the uptime manager for tracking.
-// Paused validators are not connected until they resume operation.
+// Paused validators are not connected until they activate operation.
 func (u *UptimeTracker) Connect(nodeID ids.NodeID) error {
 	u.connectedVdrs.Add(nodeID)
-	if !u.isPaused(nodeID) && !u.manager.IsConnected(nodeID) {
-		return u.manager.Connect(nodeID)
-	}
-	return nil
-}
-
-// IsConnected returns true if the node with the given ID is connected to the uptime tracker.
-func (u *UptimeTracker) IsConnected(nodeID ids.NodeID) bool {
-	return u.connectedVdrs.Contains(nodeID)
-}
-
-// Disconnect disconnects the node with the given ID from the uptime.Manager
-// If the node is paused, it will not be disconnected
-// Invariant: we should never have a connected paused node that is disconnecting
-//
-// When a peer validator is disconnected, the AvalancheGo uptime manager updates the uptime of the
-// validator by adding the duration between the connection time and the disconnection time to the
-// uptime of the validator. When a validator is paused/`inactive`, the pausable uptime manager
-// handles the `inactive` peers as if they were disconnected. Thus the uptime manager assumes that
-// no paused peers can be disconnected again from the pausable uptime manager.
-func (u *UptimeTracker) Disconnect(nodeID ids.NodeID) error {
-	u.connectedVdrs.Remove(nodeID)
-	if !u.manager.IsConnected(nodeID) {
+	if u.deactivatedValidators.Contains(nodeID) {
 		return nil
 	}
+
+	return u.manager.Connect(nodeID)
+}
+
+func (u *UptimeTracker) Disconnect(nodeID ids.NodeID) error {
+	u.connectedVdrs.Remove(nodeID)
+	if u.deactivatedValidators.Contains(nodeID) {
+		return nil
+	}
+
 	return u.manager.Disconnect(nodeID)
 }
 
@@ -197,11 +186,11 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 			return fmt.Errorf("failed to delete validator %s", vID)
 		}
 
-		if !u.isPaused(validator.NodeID) {
+		if !u.deactivatedValidators.Contains(validator.NodeID) {
 			continue
 		}
 
-		if err := u.resume(validator.NodeID); err != nil {
+		if err := u.activate(validator.NodeID); err != nil {
 			return err
 		}
 	}
@@ -230,11 +219,11 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 			}
 
 			if validator.IsActive {
-				if err := u.resume(validator.NodeID); err != nil {
+				if err := u.activate(validator.NodeID); err != nil {
 					return err
 				}
 			} else {
-				if err := u.pause(validator.NodeID); err != nil {
+				if err := u.deactivate(validator.NodeID); err != nil {
 					return err
 				}
 			}
@@ -246,7 +235,7 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 				continue
 			}
 
-			err := u.pause(validator.NodeID)
+			err := u.deactivate(validator.NodeID)
 			if err != nil {
 				return err
 			}
@@ -258,43 +247,31 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 	return u.state.writeState()
 }
 
-// resume resumes uptime tracking for the node with the given ID
-// resume can connect the node to the uptime.Manager if it was connected.
+// activate resumes uptime tracking for the node with the given ID
+// activate can connect the node to the uptime.Manager if it was connected.
 //
 // When a paused validator peer resumes, meaning its status becomes `active`, the pausable uptime
 // manager resumes the uptime tracking of the validator. It treats the peer as if it is connected
 // to the tracker node.
-func (u *UptimeTracker) resume(nodeID ids.NodeID) error {
-	u.pausedVdrs.Remove(nodeID)
-	if u.connectedVdrs.Contains(nodeID) && !u.manager.IsConnected(nodeID) {
-		return u.manager.Connect(nodeID)
-	}
-	return nil
+func (u *UptimeTracker) activate(nodeID ids.NodeID) error {
+	u.deactivatedValidators.Remove(nodeID)
+
+	return u.manager.Connect(nodeID)
 }
 
-// pause pauses uptime tracking for the node with the given ID
-// pause can disconnect the node from the uptime.Manager if it is connected.
+// deactivate pauses uptime tracking for the node with the given ID
+// deactivate can disconnect the node from the uptime.Manager if it is connected.
 //
 // The pausable uptime manager can listen for validator status changes by subscribing to the state.
 // When the state invokes the `OnValidatorStatusChange` method, the pausable uptime manager pauses
 // the uptime tracking of the validator if the validator is currently `inactive`. When a validator
 // is paused, it is treated as if it is disconnected from the tracker node; thus, its uptime is
-// updated from the connection time to the pause time, and uptime manager stops tracking the
+// updated from the connection time to the deactivate time, and uptime manager stops tracking the
 // uptime of the validator.
-func (u *UptimeTracker) pause(nodeID ids.NodeID) error {
-	u.pausedVdrs.Add(nodeID)
-	if !u.manager.IsConnected(nodeID) {
-		return nil
-	}
-	// If the node is connected, then we need to disconnect it from manager
-	// This should be fine in case tracking has not started yet since
-	// the inner manager should handle disconnects accordingly
-	return u.manager.Disconnect(nodeID)
-}
+func (u *UptimeTracker) deactivate(nodeID ids.NodeID) error {
+	u.deactivatedValidators.Add(nodeID)
 
-// isPaused returns true if the node with the given ID is paused.
-func (u *UptimeTracker) isPaused(nodeID ids.NodeID) bool {
-	return u.pausedVdrs.Contains(nodeID)
+	return u.manager.Disconnect(nodeID)
 }
 
 // Shutdown stops uptime tracking and persists the validator state

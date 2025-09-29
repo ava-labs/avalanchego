@@ -234,7 +234,6 @@ func TestUptimeTracker_ValidatorLifecycle(t *testing.T) {
 
 	// Connect node before it's a validator
 	require.NoError(ut.Connect(nodeID))
-	require.True(ut.IsConnected(nodeID))
 
 	require.NoError(ut.Sync(context.Background()))
 
@@ -243,7 +242,6 @@ func TestUptimeTracker_ValidatorLifecycle(t *testing.T) {
 	require.Len(validatorList, 1)
 	require.Equal(nodeID, validatorList[0].NodeID)
 	require.Equal(vID, validatorList[0].ValidationID)
-	require.True(ut.IsConnected(nodeID))
 
 	// Get validator info
 	validator, exists := ut.GetValidator(vID)
@@ -274,7 +272,6 @@ func TestUptimeTracker_ValidatorLifecycle(t *testing.T) {
 	require.Len(validatorList, 1)
 	require.Equal(nodeID, validatorList[0].NodeID)
 	require.Equal(vID, validatorList[0].ValidationID)
-	require.True(ut2.IsConnected(nodeID)) // Still connected from our perspective
 
 	// Get updated validator info
 	validator, exists = ut2.GetValidator(vID)
@@ -302,7 +299,6 @@ func TestUptimeTracker_ValidatorLifecycle(t *testing.T) {
 	require.Len(validatorList, 1)
 	require.Equal(nodeID, validatorList[0].NodeID)
 	require.Equal(vID, validatorList[0].ValidationID)
-	require.True(ut3.IsConnected(nodeID))
 
 	// Get updated validator info
 	validator, exists = ut3.GetValidator(vID)
@@ -318,7 +314,6 @@ func TestUptimeTracker_ValidatorLifecycle(t *testing.T) {
 	// Validator should be removed
 	validatorList = ut4.GetValidators()
 	require.Empty(validatorList)
-	require.True(ut4.IsConnected(nodeID)) // Still connected from our perspective
 }
 
 func TestUptimeTracker_ConnectBeforeValidator(t *testing.T) {
@@ -479,7 +474,7 @@ func TestUptimeTracker_ValidatorInactiveBeforeTracking(t *testing.T) {
 	validatorSet[vID].IsActive = true
 	require.NoError(ut.Sync(context.Background()))
 
-	// Check uptime after resume
+	// Check uptime after activate
 	currentTime = addTime(t, ut.clock, 6*time.Second)
 	// Uptime should have increased by 6 seconds since the node was resumed
 	wantUptime += 6 * time.Second
