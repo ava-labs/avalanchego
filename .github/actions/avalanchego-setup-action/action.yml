@@ -1,0 +1,69 @@
+name: 'Setup AvalancheGo'
+description: 'Setup AvalancheGo with custom dependencies (Firewood, Coreth, LibEVM)'
+
+inputs:
+  checkout-path:
+    description: 'Directory path where AvalancheGo will be checked out'
+    required: false
+    default: '.'
+  avalanchego:
+    description: 'AvalancheGo version (commit SHA, branch name, or tag)'
+    required: false
+    default: ${{ github.sha }}
+  firewood:
+    description: 'Firewood version (commit SHA, branch, tag, or ffi/vX.Y.Z for pre-built)'
+    required: false
+    default: ''
+  coreth:
+    description: 'Coreth version (commit SHA, branch name, or tag)'
+    required: false
+    default: ''
+  libevm:
+    description: 'LibEVM version (commit SHA, branch name, or tag)'
+    required: false
+    default: ''
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout AvalancheGo
+      uses: actions/checkout@v4
+      with:
+        repository: 'ava-labs/avalanchego'
+        ref: ${{ inputs.avalanchego }}
+        path: ${{ inputs.checkout-path }}
+    - name: Setup Firewood FFI
+      if: inputs.firewood != ''
+      id: firewood
+      uses: ava-labs/firewood/.github/actions/build-action@composable-ci-action
+      with:
+        version: ${{ inputs.firewood }}
+    - name: Update Coreth dependency
+      if: inputs.coreth != ''
+      shell: bash
+      working-directory: ${{ inputs.checkout-path }}
+      run: |
+        echo "Updating Coreth to version: ${{ inputs.coreth }}"
+        go get github.com/ava-labs/coreth@${{ inputs.coreth }}
+    - name: Update LibEVM dependency
+      if: inputs.libevm != ''
+      shell: bash
+      working-directory: ${{ inputs.checkout-path }}
+      run: |
+        echo "Updating LibEVM to version: ${{ inputs.libevm }}"
+        go get github.com/ava-labs/libevm@${{ inputs.libevm }}
+    - name: Update Firewood FFI
+      if: inputs.firewood != ''
+      shell: bash
+      working-directory: ${{ inputs.checkout-path }}
+      run: |
+        echo "Replacing Firewood FFI with: ${{ steps.firewood.outputs.ffi-path }}"
+        go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi=${{ steps.firewood.outputs.ffi-path }}
+    - name: Finalize dependencies
+      if: ${{ inputs.firewood != '' || inputs.coreth != '' || inputs.libevm != '' }}
+      shell: bash
+      working-directory: ${{ inputs.checkout-path }}
+      run: |
+        echo "Finalizing Go module dependencies"
+        go mod tidy
+        go mod download
