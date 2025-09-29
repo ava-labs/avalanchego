@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/eth/tracers"
@@ -31,9 +32,7 @@ func TestPrestateWithDiffModeANTTracer(t *testing.T) {
 // eth/tracers/internal/tracetest/prestate_test.go.
 func testPrestateDiffTracer(tracerName string, dirPath string, t *testing.T) {
 	files, err := os.ReadDir(filepath.Join("testdata", dirPath))
-	if err != nil {
-		t.Fatalf("failed to retrieve tracer test suite: %v", err)
-	}
+	require.NoError(t, err, "failed to retrieve tracer test suite")
 	for _, file := range files {
 		if !strings.HasSuffix(file.Name(), ".json") {
 			continue
@@ -46,14 +45,11 @@ func testPrestateDiffTracer(tracerName string, dirPath string, t *testing.T) {
 				tx   = new(types.Transaction)
 			)
 			// Call tracer test found, read if from disk
-			if blob, err := os.ReadFile(filepath.Join("testdata", dirPath, file.Name())); err != nil {
-				t.Fatalf("failed to read testcase: %v", err)
-			} else if err := json.Unmarshal(blob, test); err != nil {
-				t.Fatalf("failed to parse testcase: %v", err)
-			}
-			if err := tx.UnmarshalBinary(common.FromHex(test.Input)); err != nil {
-				t.Fatalf("failed to parse testcase input: %v", err)
-			}
+			blob, err := os.ReadFile(filepath.Join("testdata", dirPath, file.Name()))
+			require.NoError(t, err, "failed to read testcase")
+			require.NoError(t, json.Unmarshal(blob, test), "failed to parse testcase")
+			require.NoError(t, tx.UnmarshalBinary(common.FromHex(test.Input)), "failed to parse testcase input")
+
 			// Configure a blockchain with the given prestate
 			var (
 				signer  = types.MakeSigner(test.Genesis.Config, new(big.Int).SetUint64(uint64(test.Context.Number)), uint64(test.Context.Time))
@@ -76,30 +72,19 @@ func testPrestateDiffTracer(tracerName string, dirPath string, t *testing.T) {
 			defer state.Close()
 
 			tracer, err := tracers.DefaultDirectory.New(tracerName, new(tracers.Context), test.TracerConfig)
-			if err != nil {
-				t.Fatalf("failed to create call tracer: %v", err)
-			}
+			require.NoError(t, err, "failed to create call tracer")
 			msg, err := core.TransactionToMessage(tx, signer, context.BaseFee)
-			if err != nil {
-				t.Fatalf("failed to prepare transaction for tracing: %v", err)
-			}
+			require.NoError(t, err, "failed to prepare transaction for tracing")
 			evm := vm.NewEVM(context, core.NewEVMTxContext(msg), state.StateDB, test.Genesis.Config, vm.Config{Tracer: tracer})
 			st := core.NewStateTransition(evm, msg, new(core.GasPool).AddGas(tx.Gas()))
-			if _, err = st.TransitionDb(); err != nil {
-				t.Fatalf("failed to execute transaction: %v", err)
-			}
+			_, err = st.TransitionDb()
+			require.NoError(t, err, "failed to execute transaction")
 			// Retrieve the trace result and compare against the expected
 			res, err := tracer.GetResult()
-			if err != nil {
-				t.Fatalf("failed to retrieve trace result: %v", err)
-			}
+			require.NoError(t, err, "failed to retrieve trace result")
 			want, err := json.Marshal(test.Result)
-			if err != nil {
-				t.Fatalf("failed to marshal test: %v", err)
-			}
-			if string(want) != string(res) {
-				t.Fatalf("trace mismatch\n have: %v\n want: %v\n", string(res), string(want))
-			}
+			require.NoError(t, err, "failed to marshal test result")
+			require.Equal(t, string(want), string(res), "trace mismatch")
 		})
 	}
 }

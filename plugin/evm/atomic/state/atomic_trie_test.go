@@ -139,17 +139,13 @@ func TestAtomicTrieInitialize(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			db := versiondb.New(memdb.New())
 			repo, err := NewAtomicTxRepository(db, atomictest.TestTxCodec, test.lastAcceptedHeight)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			operationsMap := make(map[uint64]map[ids.ID]*avalancheatomic.Requests)
 			writeTxs(t, repo, 1, test.lastAcceptedHeight+1, test.numTxsPerBlock, nil, operationsMap)
 
 			// Construct the atomic trie for the first time
 			atomicBackend1, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, test.lastAcceptedHeight, common.Hash{}, test.commitInterval)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			atomicTrie1 := atomicBackend1.AtomicTrie()
 
 			rootHash1, commitHeight1 := atomicTrie1.LastCommitted()
@@ -163,17 +159,13 @@ func TestAtomicTrieInitialize(t *testing.T) {
 
 			// Construct the atomic trie again (on the same database) and ensure the last accepted root is correct.
 			atomicBackend2, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, test.lastAcceptedHeight, common.Hash{}, test.commitInterval)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			atomicTrie2 := atomicBackend2.AtomicTrie()
 			require.Equal(t, atomicTrie1.LastAcceptedRoot(), atomicTrie2.LastAcceptedRoot())
 
 			// Construct the atomic trie again (on an empty database) and ensure that it produces the same hash.
 			atomicBackend3, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, test.lastAcceptedHeight, common.Hash{}, test.commitInterval)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			atomicTrie3 := atomicBackend3.AtomicTrie()
 
 			rootHash3, commitHeight3 := atomicTrie3.LastCommitted()
@@ -201,9 +193,7 @@ func TestAtomicTrieInitialize(t *testing.T) {
 
 			// Generate a new atomic trie to compare the root against.
 			atomicBackend4, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, nextCommitHeight, common.Hash{}, test.commitInterval)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			atomicTrie4 := atomicBackend4.AtomicTrie()
 
 			rootHash4, commitHeight4 := atomicTrie4.LastCommitted()
@@ -249,13 +239,9 @@ func TestIndexerInitializesOnlyOnce(t *testing.T) {
 func newTestAtomicTrie(t *testing.T) *AtomicTrie {
 	db := versiondb.New(memdb.New())
 	repo, err := NewAtomicTxRepository(db, atomictest.TestTxCodec, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), nil, repo, 0, common.Hash{}, testCommitInterval)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return atomicBackend.AtomicTrie()
 }
 
@@ -323,9 +309,7 @@ func TestAtomicTrieDoesNotSkipBonusBlocks(t *testing.T) {
 	expectedCommitHeight := uint64(100)
 	db := versiondb.New(memdb.New())
 	repo, err := NewAtomicTxRepository(db, atomictest.TestTxCodec, lastAcceptedHeight)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	operationsMap := make(map[uint64]map[ids.ID]*avalancheatomic.Requests)
 	writeTxs(t, repo, 1, lastAcceptedHeight, constTxsPerHeight(numTxsPerBlock), nil, operationsMap)
 
@@ -336,9 +320,7 @@ func TestAtomicTrieDoesNotSkipBonusBlocks(t *testing.T) {
 	}
 	// Construct the atomic trie for the first time
 	atomicBackend, err := NewAtomicBackend(atomictest.TestSharedMemory(), bonusBlocks, repo, lastAcceptedHeight, common.Hash{}, commitInterval)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	atomicTrie := atomicBackend.AtomicTrie()
 
 	rootHash, commitHeight := atomicTrie.LastCommitted()
@@ -362,9 +344,7 @@ func TestIndexingNilShouldNotImpactTrie(t *testing.T) {
 	a1 := newTestAtomicTrie(t)
 	for i := uint64(0); i <= testCommitInterval; i++ {
 		if i%2 == 0 {
-			if err := indexAtomicTxs(a1, i, ops[i]); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, indexAtomicTxs(a1, i, ops[i]))
 		}
 	}
 
@@ -376,13 +356,9 @@ func TestIndexingNilShouldNotImpactTrie(t *testing.T) {
 	a2 := newTestAtomicTrie(t)
 	for i := uint64(0); i <= testCommitInterval; i++ {
 		if i%2 == 0 {
-			if err := indexAtomicTxs(a2, i, ops[i]); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, indexAtomicTxs(a2, i, ops[i]))
 		} else {
-			if err := indexAtomicTxs(a2, i, nil); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, indexAtomicTxs(a2, i, nil))
 		}
 	}
 	root2, height2 := a2.LastCommitted()
@@ -458,9 +434,7 @@ func TestApplyToSharedMemory(t *testing.T) {
 
 			// prepare peer chain's shared memory by applying items we expect to remove as puts
 			for _, ops := range operationsMap {
-				if err := sharedMemories.AddItemsToBeRemovedToPeerChain(ops); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, sharedMemories.AddItemsToBeRemovedToPeerChain(ops))
 			}
 
 			require.NoError(t, test.setMarker(backend))
@@ -712,9 +686,7 @@ func BenchmarkAtomicTrieIterate(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		it, err := atomicTrie.Iterator(hash, nil)
-		if err != nil {
-			b.Fatal("could not initialize atomic trie iterator")
-		}
+		require.NoError(b, err)
 		for it.Next() {
 			require.NotZero(b, it.BlockNumber())
 			require.NotZero(b, it.BlockchainID())
@@ -725,9 +697,7 @@ func BenchmarkAtomicTrieIterate(b *testing.B) {
 
 func levelDB(t testing.TB) database.Database {
 	db, err := leveldb.New(t.TempDir(), nil, logging.NoLog{}, prometheus.NewRegistry())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return db
 }
 
@@ -776,9 +746,7 @@ func benchmarkApplyToSharedMemory(b *testing.B, disk database.Database, blocks u
 	require.NoError(b, err)
 
 	backend, err := NewAtomicBackend(sharedMemory, nil, repo, 0, common.Hash{}, 5000)
-	if err != nil {
-		b.Fatal(err)
-	}
+	require.NoError(b, err)
 	trie := backend.AtomicTrie()
 	for height := uint64(1); height <= lastAcceptedHeight; height++ {
 		txs := atomictest.NewTestTxs(constTxsPerHeight(3)(height))
@@ -839,9 +807,7 @@ func verifyOperations(t testing.TB, atomicTrie *AtomicTrie, codec codec.Manager,
 	iteratorMarshalledOperationsMap := make(map[uint64]map[ids.ID][]byte)
 	for iter.Next() {
 		height := iter.BlockNumber()
-		if height < from {
-			t.Fatalf("Iterator starting at (%d) found value at block height (%d)", from, height)
-		}
+		require.GreaterOrEqualf(t, height, from, "Iterator starting at (%d) found value at block height (%d)", from, height)
 		if height > to {
 			continue
 		}

@@ -27,6 +27,7 @@ var _ atomic.Visitor = (*semanticVerifier)(nil)
 var (
 	ErrAssetIDMismatch            = errors.New("asset IDs in the input don't match the utxo")
 	ErrConflictingAtomicInputs    = errors.New("invalid block due to conflicting atomic inputs")
+	errFailedToFetchImportUTXOs   = errors.New("failed to fetch import UTXOs")
 	errRejectedParent             = errors.New("rejected parent")
 	errIncorrectNumCredentials    = errors.New("incorrect number of credentials")
 	errIncorrectNumSignatures     = errors.New("incorrect number of signatures")
@@ -135,7 +136,7 @@ func (s *semanticVerifier) ImportTx(utx *atomic.UnsignedImportTx) error {
 	// allUTXOBytes is guaranteed to be the same length as utxoIDs
 	allUTXOBytes, err := ctx.SharedMemory.Get(utx.SourceChain, utxoIDs)
 	if err != nil {
-		return fmt.Errorf("failed to fetch import UTXOs from %s due to: %w", utx.SourceChain, err)
+		return fmt.Errorf("%w from %s due to: %w", errFailedToFetchImportUTXOs, utx.SourceChain, err)
 	}
 
 	for i, in := range utx.ImportedInputs {

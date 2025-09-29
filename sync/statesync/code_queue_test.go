@@ -113,7 +113,7 @@ func TestCodeQueue(t *testing.T) {
 					ch := q.CodeHashes()
 					require.NotNilf(t, ch, "%T.CodeHashes()", q)
 					for range ch {
-						t.Fatalf("Unexpected receive on %T.CodeHashes()", q)
+						require.FailNowf(t, "Unexpected receive", "%T.CodeHashes()", q)
 					}
 				})
 			}()
@@ -181,9 +181,9 @@ func TestCodeQueue_FinalizeWaitsForInflightAddCodeCalls(t *testing.T) {
 	// Finalize should not complete yet because AddCode is still enqueuing (buffer=1 and we haven't drained).
 	select {
 	case <-finalized:
-		t.Fatal("Finalize returned before in-flight AddCode completed")
+		require.FailNow(t, "Finalize returned before in-flight AddCode completed")
 	case <-addDone:
-		t.Fatal("AddCode returned before enqueuing all hashes")
+		require.FailNow(t, "AddCode returned before enqueuing all hashes")
 	case <-time.After(100 * time.Millisecond):
 		// TODO(powerslider) once we're using Go 1.25 and the `synctest` package
 		// is generally available, use it here instead of an arbitrary amount of
