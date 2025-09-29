@@ -99,62 +99,6 @@ window.BENCHMARK_DATA = {
             "username": "web-flow",
             "email": "noreply@github.com"
           },
-          "id": "0985c16d1088975c0d9db18748a8c1263b68646f",
-          "message": "Implement GetProposedHeight API in Proposervm (#4222)\n\nSigned-off-by: Michael Kaplan <55204436+michaelkaplan13@users.noreply.github.com>\nCo-authored-by: ylg <yang.linguan@avalabs.org>\nCo-authored-by: Michael Kaplan <55204436+michaelkaplan13@users.noreply.github.com>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>\nCo-authored-by: Michael Kaplan <michael@avalabs.org>",
-          "timestamp": "2025-09-26T15:19:34Z",
-          "url": "https://github.com/ava-labs/avalanchego/commit/0985c16d1088975c0d9db18748a8c1263b68646f"
-        },
-        "date": 1758907830849,
-        "tool": "go",
-        "benches": [
-          {
-            "name": "BenchmarkReexecuteRange/[1000001,3000000]-Config-default-Runner-blacksmith-16vcpu-ubuntu-2404",
-            "value": 122.9,
-            "unit": "mgas/s",
-            "extra": "1 times\n20 procs"
-          }
-        ]
-      },
-      {
-        "commit": {
-          "author": {
-            "name": "Geoff Stuart",
-            "username": "geoff-vball",
-            "email": "geoff.vball@gmail.com"
-          },
-          "committer": {
-            "name": "GitHub",
-            "username": "web-flow",
-            "email": "noreply@github.com"
-          },
-          "id": "32806e08957c3179dc928fcb385a7759e253cd4a",
-          "message": "Support all validator set diffs by height (#4342)\n\nSigned-off-by: Geoff Stuart <geoff.vball@gmail.com>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>",
-          "timestamp": "2025-09-26T20:40:10Z",
-          "url": "https://github.com/ava-labs/avalanchego/commit/32806e08957c3179dc928fcb385a7759e253cd4a"
-        },
-        "date": 1758933352743,
-        "tool": "go",
-        "benches": [
-          {
-            "name": "BenchmarkReexecuteRange/[1000001,3000000]-Config-default-Runner-blacksmith-16vcpu-ubuntu-2404",
-            "value": 78.17,
-            "unit": "mgas/s",
-            "extra": "1 times\n32 procs"
-          }
-        ]
-      },
-      {
-        "commit": {
-          "author": {
-            "name": "Geoff Stuart",
-            "username": "geoff-vball",
-            "email": "geoff.vball@gmail.com"
-          },
-          "committer": {
-            "name": "GitHub",
-            "username": "web-flow",
-            "email": "noreply@github.com"
-          },
           "id": "32806e08957c3179dc928fcb385a7759e253cd4a",
           "message": "Support all validator set diffs by height (#4342)\n\nSigned-off-by: Geoff Stuart <geoff.vball@gmail.com>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>",
           "timestamp": "2025-09-26T20:40:10Z",
