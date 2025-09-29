@@ -19,7 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -46,9 +45,9 @@ func TestOracle_PostForkBlock_ImplementsInterface(t *testing.T) {
 
 	// setup
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-		graniteTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
+		graniteTime    = upgrade.InitiallyActiveTime
 	)
 	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
@@ -93,7 +92,7 @@ func TestBlockVerify_PostForkBlock_PreDurango_ParentChecks(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = time.Unix(0, 0)
+		activationTime = upgrade.InitiallyActiveTime
 		durangoTime    = upgrade.UnscheduledActivationTime
 		graniteTime    = upgrade.UnscheduledActivationTime
 	)
@@ -189,9 +188,9 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime // post Durango
-		graniteTime    = mockable.MaxTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
+		graniteTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
@@ -288,7 +287,7 @@ func TestBlockVerify_PostForkBlock_TimestampChecks(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = time.Unix(0, 0)
+		activationTime = upgrade.InitiallyActiveTime
 		durangoTime    = upgrade.UnscheduledActivationTime
 		graniteTime    = upgrade.UnscheduledActivationTime
 	)
@@ -501,9 +500,9 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-		graniteTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
+		graniteTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
@@ -668,7 +667,7 @@ func TestBlockVerify_PostForkBlockBuiltOnOption_PChainHeightChecks(t *testing.T)
 	require := require.New(t)
 
 	var (
-		activationTime = time.Unix(0, 0)
+		activationTime = upgrade.InitiallyActiveTime
 		durangoTime    = upgrade.UnscheduledActivationTime
 		graniteTime    = upgrade.UnscheduledActivationTime
 	)
@@ -850,9 +849,9 @@ func TestBlockVerify_PostForkBlock_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 	// Verify a block once (in this test by building it).
 	// Show that other verify call would not call coreBlk.Verify()
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-		graniteTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
+		graniteTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
@@ -910,9 +909,9 @@ func TestBlockAccept_PostForkBlock_SetsLastAcceptedBlock(t *testing.T) {
 
 	// setup
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-		graniteTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
+		graniteTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
@@ -970,9 +969,9 @@ func TestBlockAccept_PostForkBlock_TwoProBlocksWithSameCoreBlock_OneIsAccepted(t
 	require := require.New(t)
 
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-		graniteTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
+		graniteTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
@@ -1014,9 +1013,9 @@ func TestBlockReject_PostForkBlock_InnerBlockIsNotRejected(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-		graniteTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
+		graniteTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
@@ -1041,9 +1040,9 @@ func TestBlockVerify_PostForkBlock_ShouldBePostForkOption(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-		graniteTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
+		graniteTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
@@ -1136,9 +1135,9 @@ func TestBlockVerify_PostForkBlock_PChainTooLow(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-		graniteTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
+		graniteTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 5)
 	defer func() {

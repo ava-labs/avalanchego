@@ -115,7 +115,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	ctx := context.Background()
 
 	var (
-		activationTime = time.Unix(0, 0)
+		activationTime = upgrade.InitiallyActiveTime
 		durangoTime    = upgrade.UnscheduledActivationTime
 		graniteTime    = upgrade.UnscheduledActivationTime
 	)
@@ -246,7 +246,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	ctx := context.Background()
 
 	var (
-		activationTime = time.Unix(0, 0)
+		activationTime = upgrade.InitiallyActiveTime
 		durangoTime    = upgrade.UnscheduledActivationTime
 		graniteTime    = upgrade.UnscheduledActivationTime
 	)

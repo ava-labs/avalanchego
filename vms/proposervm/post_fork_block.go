@@ -177,6 +177,10 @@ func (b *postForkBlock) pChainEpoch(context.Context) (block.Epoch, error) {
 	return b.PChainEpoch(), nil
 }
 
+func (b *postForkBlock) selectChildPChainHeight(ctx context.Context) (uint64, error) {
+	return b.vm.selectChildPChainHeight(ctx, b.PChainHeight())
+}
+
 func (b *postForkBlock) getStatelessBlk() block.Block {
 	return b.SignedBlock
 }

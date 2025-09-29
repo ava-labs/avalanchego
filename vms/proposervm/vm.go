@@ -10,13 +10,16 @@ import (
 	"net/http"
 	"time"
 
+	"connectrpc.com/grpcreflect"
 	"github.com/gorilla/rpc/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/cache/metercacher"
+	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -28,6 +31,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/math"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/tree"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -38,6 +42,9 @@ import (
 )
 
 const (
+	httpPathEndpoint = "/proposervm"
+	HTTPHeaderRoute  = "proposervm"
+
 	// DefaultMinBlockDelay should be kept as whole seconds because block
 	// timestamps are only specific to the second.
 	DefaultMinBlockDelay = time.Second
@@ -247,16 +254,58 @@ func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, erro
 		return nil, fmt.Errorf("failed to create inner VM handlers: %w", err)
 	}
 
+	metrics, err := metric.NewAPIInterceptor(vm.Config.Registerer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize metrics: %w", err)
+	}
+
 	server := rpc.NewServer()
 	server.RegisterCodec(json.NewCodec(), "application/json")
 	server.RegisterCodec(json.NewCodec(), "application/json;charset=UTF-8")
-	err = server.RegisterService(&ProposerAPI{vm: vm}, "proposervm")
+	server.RegisterInterceptFunc(metrics.InterceptRequest)
+	server.RegisterAfterFunc(metrics.AfterRequest)
+	err = server.RegisterService(&jsonrpcService{vm: vm}, "proposervm")
 	if err != nil {
 		return nil, fmt.Errorf("failed to register proposervm service: %w", err)
 	}
-	handlers["/proposervm"] = server
 
+	if handlers == nil {
+		handlers = make(map[string]http.Handler)
+	}
+	handlers[httpPathEndpoint] = server
 	return handlers, nil
+}
+
+func (vm *VM) NewHTTPHandler(ctx context.Context) (http.Handler, error) {
+	innerHandler, err := vm.ChainVM.NewHTTPHandler(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	proposerMux := http.NewServeMux()
+	proposerMux.Handle(proposervmconnect.NewProposerVMHandler(
+		&connectrpcService{vm: vm},
+	))
+	proposerMux.Handle(grpcreflect.NewHandlerV1(
+		grpcreflect.NewStaticReflector(proposervmconnect.ProposerVMName),
+	))
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		route := r.Header[server.HTTPHeaderRoute]
+		vm.ctx.Log.Debug("routing request",
+			zap.String("method", r.Method),
+			zap.String("path", r.URL.Path),
+			zap.Strings("header", route),
+		)
+		switch {
+		case len(route) < 2 && innerHandler != nil:
+			innerHandler.ServeHTTP(w, r)
+		case len(route) == 2 && route[1] == HTTPHeaderRoute:
+			proposerMux.ServeHTTP(w, r)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}), nil
 }
 
 func (vm *VM) SetState(ctx context.Context, newState snow.State) error {

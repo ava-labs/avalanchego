@@ -60,6 +60,7 @@ type Block interface {
 
 	pChainHeight(context.Context) (uint64, error)
 	pChainEpoch(context.Context) (block.Epoch, error)
+	selectChildPChainHeight(context.Context) (uint64, error)
 }
 
 type PostForkBlock interface {

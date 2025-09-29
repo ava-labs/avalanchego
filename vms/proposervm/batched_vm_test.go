@@ -37,9 +37,9 @@ func TestCoreVMNotRemote(t *testing.T) {
 	// if coreVM is not remote VM, a specific error is returned
 	require := require.New(t)
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-		graniteTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
+		graniteTime    = upgrade.InitiallyActiveTime
 	)
 	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
 	defer func() {
@@ -192,9 +192,9 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 func TestGetAncestorsPostForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-		graniteTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
+		graniteTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime, graniteTime)
 	defer func() {
@@ -701,9 +701,9 @@ func makeParseableBlocks(t *testing.T, parentID ids.ID, timestamp time.Time, pCh
 func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	require := require.New(t)
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-		graniteTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
+		graniteTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime, graniteTime)
 	defer func() {
