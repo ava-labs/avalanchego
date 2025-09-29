@@ -17,9 +17,10 @@ import (
 var _ utils.Sortable[*Warp] = (*Warp)(nil)
 
 type WarpSet struct {
-	// Validators slice in canonical ordering of the validators that has public key
+	// Slice, in canonical ordering, of the validators that have a public key.
 	Validators []*Warp
-	// The total weight of all the validators, including the ones that doesn't have a public key
+	// The total weight of all the validators, including the ones that don't
+	// have a public key.
 	TotalWeight uint64
 }
 
