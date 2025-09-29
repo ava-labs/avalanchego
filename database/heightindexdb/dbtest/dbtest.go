@@ -11,16 +11,19 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
+type testCase struct {
+	Name string
+	Test func(t *testing.T, newDB func() database.HeightIndex)
+}
+
 // Tests is a list of all database tests
-var Tests = map[string]func(t *testing.T, newDB func() database.HeightIndex){
-	"PutGet":              TestPutGet,
-	"Has":                 TestHas,
-	"CloseAndPut":         TestCloseAndPut,
-	"CloseAndGet":         TestCloseAndGet,
-	"CloseAndHas":         TestCloseAndHas,
-	"Close":               TestClose,
-	"ModifyValueAfterPut": TestModifyValueAfterPut,
-	"ModifyValueAfterGet": TestModifyValueAfterGet,
+var Tests = []testCase{
+	{"TestPutGet", TestPutGet},
+	{"TestHas", TestHas},
+	{"TestCloseAndPut", TestCloseAndPut},
+	{"TestCloseAndGet", TestCloseAndGet},
+	{"TestCloseAndHas", TestCloseAndHas},
+	{"TestClose", TestClose},
 }
 
 type putArgs struct {
@@ -33,8 +36,8 @@ func TestPutGet(t *testing.T, newDB func() database.HeightIndex) {
 		name        string
 		puts        []putArgs
 		queryHeight uint64
-		expected    []byte
-		expectedErr error
+		want        []byte
+		wantErr     error
 	}{
 		{
 			name: "normal operation",
@@ -42,7 +45,7 @@ func TestPutGet(t *testing.T, newDB func() database.HeightIndex) {
 				{1, []byte("test data 1")},
 			},
 			queryHeight: 1,
-			expected:    []byte("test data 1"),
+			want:        []byte("test data 1"),
 		},
 		{
 			name: "not found error when getting on non-existing height",
@@ -50,8 +53,7 @@ func TestPutGet(t *testing.T, newDB func() database.HeightIndex) {
 				{1, []byte("test data")},
 			},
 			queryHeight: 2,
-			expected:    nil,
-			expectedErr: database.ErrNotFound,
+			wantErr:     database.ErrNotFound,
 		},
 		{
 			name: "overwriting data on same height",
@@ -60,7 +62,7 @@ func TestPutGet(t *testing.T, newDB func() database.HeightIndex) {
 				{1, []byte("overwritten data")},
 			},
 			queryHeight: 1,
-			expected:    []byte("overwritten data"),
+			want:        []byte("overwritten data"),
 		},
 		{
 			name: "put and get nil data",
@@ -68,15 +70,15 @@ func TestPutGet(t *testing.T, newDB func() database.HeightIndex) {
 				{1, nil},
 			},
 			queryHeight: 1,
-			expected:    nil,
+			want:        nil,
 		},
 		{
-			name: "put and get empty data",
+			name: "put empty bytes and get nil",
 			puts: []putArgs{
 				{1, []byte{}},
 			},
 			queryHeight: 1,
-			expected:    nil,
+			want:        nil,
 		},
 		{
 			name: "put and get large data",
@@ -84,28 +86,39 @@ func TestPutGet(t *testing.T, newDB func() database.HeightIndex) {
 				{1, make([]byte, 1000)},
 			},
 			queryHeight: 1,
-			expected:    make([]byte, 1000),
+			want:        make([]byte, 1000),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := newDB()
-			defer db.Close()
+			defer func() {
+				require.NoError(t, db.Close())
+			}()
 
 			// Perform all puts
 			for _, write := range tt.puts {
 				require.NoError(t, db.Put(write.height, write.data))
 			}
 
+			// modify the original value of the put data to ensure the saved
+			// value won't be changed after Get
+			if len(tt.puts) > int(tt.queryHeight) && tt.puts[tt.queryHeight].data != nil {
+				copy(tt.puts[tt.queryHeight].data, []byte("modified data"))
+			}
+
 			// Query the specific height
 			retrievedData, err := db.Get(tt.queryHeight)
-			if tt.expectedErr != nil {
-				require.ErrorIs(t, err, tt.expectedErr)
-			} else {
-				require.NoError(t, err)
-				require.Equal(t, tt.expected, retrievedData)
-			}
+			require.ErrorIs(t, err, tt.wantErr)
+			require.Equal(t, tt.want, retrievedData)
+
+			// modify the data returned from Get and ensure it won't change the
+			// data from a second Get
+			copy(retrievedData, []byte("modified data"))
+			newData, err := db.Get(tt.queryHeight)
+			require.ErrorIs(t, err, tt.wantErr)
+			require.Equal(t, tt.want, newData)
 		})
 	}
 }
@@ -115,31 +128,29 @@ func TestHas(t *testing.T, newDB func() database.HeightIndex) {
 		name        string
 		puts        []putArgs
 		queryHeight uint64
-		expected    bool
+		want        bool
 	}{
 		{
 			name:        "non-existent item",
-			puts:        []putArgs{},
 			queryHeight: 1,
-			expected:    false,
 		},
 		{
 			name:        "existing item with data",
 			puts:        []putArgs{{1, []byte("test data")}},
 			queryHeight: 1,
-			expected:    true,
+			want:        true,
 		},
 		{
 			name:        "existing item with nil data",
 			puts:        []putArgs{{1, nil}},
 			queryHeight: 1,
-			expected:    true,
+			want:        true,
 		},
 		{
 			name:        "existing item with empty bytes",
 			puts:        []putArgs{{1, []byte{}}},
 			queryHeight: 1,
-			expected:    true,
+			want:        true,
 		},
 		{
 			name: "has returns true on overridden height",
@@ -148,23 +159,25 @@ func TestHas(t *testing.T, newDB func() database.HeightIndex) {
 				{1, []byte("overridden data")},
 			},
 			queryHeight: 1,
-			expected:    true,
+			want:        true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			db := newDB()
-			defer db.Close()
+			defer func() {
+				require.NoError(t, db.Close())
+			}()
 
 			// Perform all puts
 			for _, write := range tt.puts {
 				require.NoError(t, db.Put(write.height, write.data))
 			}
 
-			exists, err := db.Has(tt.queryHeight)
+			ok, err := db.Has(tt.queryHeight)
 			require.NoError(t, err)
-			require.Equal(t, tt.expected, exists)
+			require.Equal(t, tt.want, ok)
 		})
 	}
 }
@@ -194,50 +207,6 @@ func TestCloseAndHas(t *testing.T, newDB func() database.HeightIndex) {
 	// Try to has after close - should return error
 	_, err := db.Has(1)
 	require.ErrorIs(t, err, database.ErrClosed)
-}
-
-func TestModifyValueAfterPut(t *testing.T, newDB func() database.HeightIndex) {
-	db := newDB()
-	defer db.Close()
-
-	originalData := []byte("original data")
-	modifiedData := []byte("modified data")
-
-	// Put original data
-	require.NoError(t, db.Put(1, originalData))
-
-	// Modify the original data slice
-	copy(originalData, modifiedData)
-
-	// Get the data back - should still be the original data, not the modified slice
-	retrievedData, err := db.Get(1)
-	require.NoError(t, err)
-	require.Equal(t, []byte("original data"), retrievedData)
-	require.NotEqual(t, modifiedData, retrievedData)
-}
-
-func TestModifyValueAfterGet(t *testing.T, newDB func() database.HeightIndex) {
-	db := newDB()
-	defer db.Close()
-
-	originalData := []byte("original data")
-
-	// Put original data
-	require.NoError(t, db.Put(1, originalData))
-
-	// Get the data
-	retrievedData, err := db.Get(1)
-	require.NoError(t, err)
-	require.Equal(t, originalData, retrievedData)
-
-	// Modify the retrieved data
-	copy(retrievedData, []byte("modified data"))
-
-	// Get the data again - should still be the original data
-	retrievedData2, err := db.Get(1)
-	require.NoError(t, err)
-	require.Equal(t, originalData, retrievedData2)
-	require.NotEqual(t, retrievedData, retrievedData2)
 }
 
 func TestClose(t *testing.T, newDB func() database.HeightIndex) {

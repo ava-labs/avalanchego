@@ -11,9 +11,9 @@ import (
 )
 
 func TestInterface(t *testing.T) {
-	for name, test := range dbtest.Tests {
-		t.Run(name, func(t *testing.T) {
-			test(t, func() database.HeightIndex { return New() })
+	for _, test := range dbtest.Tests {
+		t.Run("memdb_"+test.Name, func(t *testing.T) {
+			test.Test(t, func() database.HeightIndex { return &Database{} })
 		})
 	}
 }

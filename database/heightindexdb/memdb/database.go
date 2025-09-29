@@ -19,12 +19,6 @@ type Database struct {
 	closed bool
 }
 
-func New() *Database {
-	return &Database{
-		data: make(map[uint64][]byte),
-	}
-}
-
 // Put stores data in memory at the given height
 func (db *Database) Put(height uint64, data []byte) error {
 	db.mu.Lock()
@@ -60,11 +54,6 @@ func (db *Database) Get(height uint64) ([]byte, error) {
 	data, ok := db.data[height]
 	if !ok {
 		return nil, database.ErrNotFound
-	}
-
-	// don't return empty slice if data is nil or empty
-	if data == nil {
-		return nil, nil
 	}
 
 	return slices.Clone(data), nil
