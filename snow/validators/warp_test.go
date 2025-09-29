@@ -72,15 +72,11 @@ func TestFlattenValidatorSet(t *testing.T) {
 		{
 			name: "overflow",
 			validators: map[ids.NodeID]*GetValidatorOutput{
-				nodeID0: {
-					NodeID:    nodeID0,
-					PublicKey: vdrs.Validators[0].PublicKey,
-					Weight:    math.MaxUint64,
-				},
+				nodeID0: warpToOutput(vdrs.Validators[0]),
 				nodeID1: {
 					NodeID:    nodeID1,
 					PublicKey: vdrs.Validators[1].PublicKey,
-					Weight:    1,
+					Weight:    math.MaxUint64,
 				},
 			},
 			wantErr: safemath.ErrOverflow,
@@ -88,11 +84,7 @@ func TestFlattenValidatorSet(t *testing.T) {
 		{
 			name: "nil_public_key_skipped",
 			validators: map[ids.NodeID]*GetValidatorOutput{
-				nodeID0: {
-					NodeID:    nodeID0,
-					PublicKey: vdrs.Validators[0].PublicKey,
-					Weight:    vdrs.Validators[0].Weight,
-				},
+				nodeID0: warpToOutput(vdrs.Validators[0]),
 				nodeID1: {
 					NodeID:    nodeID1,
 					PublicKey: nil,
