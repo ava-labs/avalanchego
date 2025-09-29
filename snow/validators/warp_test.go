@@ -29,7 +29,7 @@ func newWarp(t *testing.T) *Warp {
 	return &Warp{
 		PublicKey:      pk,
 		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
-		Weight:         3,
+		Weight:         1,
 		NodeIDs:        []ids.NodeID{nodeID},
 	}
 }
@@ -44,7 +44,7 @@ func newWarpSet(t *testing.T, n uint64) WarpSet {
 	utils.Sort(vdrs)
 	return WarpSet{
 		Validators:  vdrs,
-		TotalWeight: 3 * n,
+		TotalWeight: n,
 	}
 }
 
@@ -88,12 +88,12 @@ func TestFlattenValidatorSet(t *testing.T) {
 				nodeID1: {
 					NodeID:    nodeID1,
 					PublicKey: nil,
-					Weight:    1,
+					Weight:    5, // don't use 1 to distinguish from default
 				},
 			},
 			want: WarpSet{
 				Validators:  []*Warp{vdrs.Validators[0]},
-				TotalWeight: vdrs.Validators[0].Weight + 1,
+				TotalWeight: vdrs.Validators[0].Weight + 5,
 			},
 		},
 		{
