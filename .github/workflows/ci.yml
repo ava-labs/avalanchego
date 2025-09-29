@@ -286,6 +286,9 @@ jobs:
   runs-on: avalanche-avalanchego-runner
   container:
     image: ghcr.io/actions/actions-runner:2.325.0
+  permissions:
+    id-token: write
+    contents: read
   steps:
     - uses: actions/checkout@v4
     - uses: ./.github/actions/setup-go-for-project
@@ -307,6 +310,9 @@ jobs:
    runs-on: avalanche-avalanchego-runner
    container:
      image: ghcr.io/actions/actions-runner:2.325.0
+   permissions:
+    id-token: write
+    contents: read
    steps:
      - uses: actions/checkout@v4
      - uses: ./.github/actions/setup-go-for-project
