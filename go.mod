@@ -4,7 +4,7 @@ go 1.24.7
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
-	github.com/ava-labs/avalanchego v1.13.5-rc.4
+	github.com/ava-labs/avalanchego v1.13.6-0.20250925183853-36baa0509d61
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.12
 	github.com/ava-labs/libevm v1.13.14-0.3.0.release
 	github.com/davecgh/go-spew v1.1.1
@@ -45,7 +45,7 @@ require (
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
-	github.com/StephenButtolph/canoto v0.17.1 // indirect
+	github.com/StephenButtolph/canoto v0.17.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.10.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect

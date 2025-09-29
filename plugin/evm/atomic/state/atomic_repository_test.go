@@ -65,18 +65,14 @@ func writeTxs(t testing.TB, repo *AtomicRepository, fromHeight uint64, toHeight 
 ) {
 	for height := fromHeight; height < toHeight; height++ {
 		txs := atomictest.NewTestTxs(txsPerHeight(height))
-		if err := repo.Write(height, txs); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, repo.Write(height, txs))
 		// save this to the map (if non-nil) for verifying expected results in verifyTxs
 		if txMap != nil {
 			txMap[height] = txs
 		}
 		if operationsMap != nil {
 			atomicRequests, err := mergeAtomicOps(txs)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			if len(atomicRequests) == 0 {
 				continue
 			}

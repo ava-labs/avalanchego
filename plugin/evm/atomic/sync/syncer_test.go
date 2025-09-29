@@ -318,9 +318,8 @@ func testSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight uint64
 	hasher := trie.NewEmpty(triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil))
 
 	serverTrie, err := trie.New(trie.TrieID(targetRoot), serverTrieDB)
-	if err != nil {
-		t.Fatalf("failed to create server trie: %v", err)
-	}
+	require.NoError(t, err)
+
 	addAllKeysWithPrefix := func(prefix []byte) error {
 		nodeIt, err := serverTrie.NodeIterator(prefix)
 		if err != nil {
@@ -339,16 +338,12 @@ func testSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight uint64
 	}
 
 	for height := uint64(0); height <= targetHeight; height++ {
-		if err := addAllKeysWithPrefix(database.PackUInt64(height)); err != nil {
-			t.Fatalf("failed to add keys for height %d: %v", height, err)
-		}
+		require.NoErrorf(t, addAllKeysWithPrefix(database.PackUInt64(height)), "failed to add keys for height %d", height)
 
 		if height%testCommitInterval == 0 {
 			expected := hasher.Hash()
 			root, err := atomicTrie.Root(height)
-			if err != nil {
-				t.Fatalf("failed to get root for height %d: %v", height, err)
-			}
+			require.NoError(t, err)
 			require.Equal(t, expected, root)
 		}
 	}

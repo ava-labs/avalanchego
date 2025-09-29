@@ -5,6 +5,7 @@ package statesync
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -106,6 +107,15 @@ func TestCodeQueue(t *testing.T) {
 					// Avoid leaking the internal goroutine
 					close(quit)
 				}
+
+				t.Run("after_quit_or_Finalize", func(t *testing.T) {
+					<-recvDone
+					ch := q.CodeHashes()
+					require.NotNilf(t, ch, "%T.CodeHashes()", q)
+					for range ch {
+						require.FailNowf(t, "Unexpected receive", "%T.CodeHashes()", q)
+					}
+				})
 			}()
 
 			var got []common.Hash
@@ -171,9 +181,9 @@ func TestCodeQueue_FinalizeWaitsForInflightAddCodeCalls(t *testing.T) {
 	// Finalize should not complete yet because AddCode is still enqueuing (buffer=1 and we haven't drained).
 	select {
 	case <-finalized:
-		t.Fatal("Finalize returned before in-flight AddCode completed")
+		require.FailNow(t, "Finalize returned before in-flight AddCode completed")
 	case <-addDone:
-		t.Fatal("AddCode returned before enqueuing all hashes")
+		require.FailNow(t, "AddCode returned before enqueuing all hashes")
 	case <-time.After(100 * time.Millisecond):
 		// TODO(powerslider) once we're using Go 1.25 and the `synctest` package
 		// is generally available, use it here instead of an arbitrary amount of
@@ -190,4 +200,47 @@ func TestCodeQueue_FinalizeWaitsForInflightAddCodeCalls(t *testing.T) {
 	// Now AddCode should complete without error, and Finalize should return and close the channel.
 	require.NoError(t, <-addDone, "AddCode()")
 	<-finalized
+}
+
+func TestQuitAndAddCodeRace(t *testing.T) {
+	{
+		q := new(CodeQueue)
+		// Before the introduction of these fields, this test would panic.
+		_ = []any{&q.closeChanOnce, &q.chanLock}
+	}
+	for range 10_000 {
+		t.Run("", func(t *testing.T) {
+			t.Parallel()
+
+			quit := make(chan struct{})
+			q, err := NewCodeQueue(rawdb.NewMemoryDatabase(), quit)
+			require.NoError(t, err)
+
+			var ready, finished sync.WaitGroup
+			ready.Add(2)
+			finished.Add(2)
+			start := make(chan struct{})
+
+			go func() {
+				defer finished.Done()
+
+				ready.Done()
+				<-start
+				close(quit)
+			}()
+
+			go func() {
+				defer finished.Done()
+
+				in := []common.Hash{{}}
+				ready.Done()
+				<-start
+				q.AddCode(in)
+			}()
+
+			ready.Wait()
+			close(start)
+			finished.Wait()
+		})
+	}
 }

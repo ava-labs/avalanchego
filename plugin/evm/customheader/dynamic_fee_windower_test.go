@@ -6,6 +6,8 @@ package customheader
 import (
 	"math/big"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestSelectBigWithinBounds(t *testing.T) {
@@ -49,9 +51,7 @@ func TestSelectBigWithinBounds(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			v := selectBigWithinBounds(test.lower, test.value, test.upper)
-			if v.Cmp(test.expected) != 0 {
-				t.Fatalf("Expected (%d), found (%d)", test.expected, v)
-			}
+			require.Zerof(t, v.Cmp(test.expected), "Expected (%d), found (%d)", test.expected, v)
 		})
 	}
 }

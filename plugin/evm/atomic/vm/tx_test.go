@@ -42,15 +42,9 @@ func TestCalculateDynamicFee(t *testing.T) {
 
 	for _, test := range tests {
 		cost, err := atomic.CalculateDynamicFee(test.gas, test.baseFee)
+		require.ErrorIs(t, err, test.expectedErr)
 		if test.expectedErr == nil {
-			if err != nil {
-				t.Fatalf("Unexpectedly failed to calculate dynamic fee: %s", err)
-			}
-			if cost != test.expectedValue {
-				t.Fatalf("Expected value: %d, found: %d", test.expectedValue, cost)
-			}
-		} else if err != test.expectedErr {
-			t.Fatalf("Expected error: %s, found error: %s", test.expectedErr, err)
+			require.Equal(t, test.expectedValue, cost)
 		}
 	}
 }

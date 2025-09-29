@@ -131,7 +131,7 @@ func attemptAwait(t *testing.T, wg *sync.WaitGroup, delay time.Duration) {
 
 	select {
 	case <-time.After(delay):
-		t.Fatal("Timed out waiting for wait group to complete")
+		require.FailNow(t, "Timed out waiting for wait group to complete")
 	case <-ticker:
 		// The wait group completed without issue
 	}
