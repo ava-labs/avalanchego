@@ -306,6 +306,7 @@ jobs:
     - name: Firewood v0.0.12 Reexecution
       uses: ./.github/actions/c-chain-reexecution-benchmark
       with:
+        config: 'firewood'
         aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
         aws-region: us-east-2
         github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -338,6 +339,7 @@ jobs:
      - name: Firewood v0.0.13 Reexecution
        uses: ./.github/actions/c-chain-reexecution-benchmark
        with:
+         config: 'firewood'
          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
          aws-region: us-east-2
          github-token: ${{ secrets.GITHUB_TOKEN }}
