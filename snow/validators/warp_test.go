@@ -29,7 +29,7 @@ func newWarp(t *testing.T) *Warp {
 	return &Warp{
 		PublicKey:      pk,
 		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
-		Weight:         3,
+		Weight:         1,
 		NodeIDs:        []ids.NodeID{nodeID},
 	}
 }
@@ -44,7 +44,7 @@ func newWarpSet(t *testing.T, n uint64) WarpSet {
 	utils.Sort(vdrs)
 	return WarpSet{
 		Validators:  vdrs,
-		TotalWeight: 3 * n,
+		TotalWeight: n,
 	}
 }
 
@@ -72,15 +72,11 @@ func TestFlattenValidatorSet(t *testing.T) {
 		{
 			name: "overflow",
 			validators: map[ids.NodeID]*GetValidatorOutput{
-				nodeID0: {
-					NodeID:    nodeID0,
-					PublicKey: vdrs.Validators[0].PublicKey,
-					Weight:    math.MaxUint64,
-				},
+				nodeID0: warpToOutput(vdrs.Validators[0]),
 				nodeID1: {
 					NodeID:    nodeID1,
 					PublicKey: vdrs.Validators[1].PublicKey,
-					Weight:    1,
+					Weight:    math.MaxUint64,
 				},
 			},
 			wantErr: safemath.ErrOverflow,
@@ -88,20 +84,16 @@ func TestFlattenValidatorSet(t *testing.T) {
 		{
 			name: "nil_public_key_skipped",
 			validators: map[ids.NodeID]*GetValidatorOutput{
-				nodeID0: {
-					NodeID:    nodeID0,
-					PublicKey: vdrs.Validators[0].PublicKey,
-					Weight:    vdrs.Validators[0].Weight,
-				},
+				nodeID0: warpToOutput(vdrs.Validators[0]),
 				nodeID1: {
 					NodeID:    nodeID1,
 					PublicKey: nil,
-					Weight:    1,
+					Weight:    5, // don't use 1 to distinguish from default
 				},
 			},
 			want: WarpSet{
 				Validators:  []*Warp{vdrs.Validators[0]},
-				TotalWeight: vdrs.Validators[0].Weight + 1,
+				TotalWeight: vdrs.Validators[0].Weight + 5,
 			},
 		},
 		{
