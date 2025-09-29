@@ -43,7 +43,7 @@ func feeStateBeforeBlock(
 		}
 	}
 
-	state.AdvanceTime(timestamp - parent.Time)
+	state.AdvanceSeconds(timestamp - parent.Time)
 	return state, nil
 }
 
