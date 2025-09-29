@@ -241,7 +241,16 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 		},
 	}
 
-	require.NoError(waitForProposerWindow(proVM, parentBlk, parentBlk.(*postForkBlock).PChainHeight()))
+	parentPChainHeight := parentBlk.(*postForkBlock).PChainHeight()
+
+	nextEpoch := nextPChainEpoch(
+		parentPChainHeight,
+		block.Epoch{},
+		parentBlk.Timestamp(),
+		proVM.Upgrades.GraniteEpochDuration,
+	)
+
+	require.NoError(waitForProposerWindow(proVM, parentBlk, parentPChainHeight))
 
 	{
 		// child block referring unknown parent does not verify
@@ -249,7 +258,7 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 			ids.Empty, // refer unknown parent
 			proVM.Time(),
 			pChainHeight,
-			block.Epoch{},
+			nextEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
@@ -268,7 +277,7 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 			parentBlk.ID(),
 			proVM.Time(),
 			pChainHeight,
-			block.Epoch{},
+			nextEpoch,
 			proVM.StakingCertLeaf,
 			childCoreBlk.Bytes(),
 			proVM.ctx.ChainID,
