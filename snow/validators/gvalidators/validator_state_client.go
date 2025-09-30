@@ -220,7 +220,7 @@ func warpValidatorsFromProto(proto []*pb.WarpValidator) ([]*validators.Warp, err
 		for j, nodeIDBytes := range nodeIDsBytes {
 			nodeID, err := ids.ToNodeID(nodeIDBytes)
 			if err != nil {
-				return nil, fmt.Errorf("failed to parse node ID %s: %w", nodeID, err)
+				return nil, fmt.Errorf("failed to parse node ID: %w", err)
 			}
 			nodeIDs[j] = nodeID
 		}
