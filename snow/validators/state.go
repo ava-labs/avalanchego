@@ -5,7 +5,6 @@ package validators
 
 import (
 	"context"
-	"errors"
 	"sync"
 	"time"
 
@@ -17,10 +16,8 @@ import (
 const validatorSetsCacheSize = 8
 
 var (
-	_ State = (*CachedState)(nil)
 	_ State = (*lockedState)(nil)
-
-	ErrValidatorSetForSubnetNotFound = errors.New("validator set for subnet not found")
+	_ State = (*cachedState)(nil)
 )
 
 // State allows the lookup of validator sets on specified subnets at the
@@ -174,7 +171,7 @@ func (n *noValidators) GetCurrentValidatorSet(ctx context.Context, _ ids.ID) (ma
 	return nil, height, err
 }
 
-type CachedState struct {
+type cachedState struct {
 	State
 
 	// Activate caching of individual validator sets after this time.
@@ -191,15 +188,15 @@ type CachedState struct {
 func NewCachedState(
 	state State,
 	graniteActivation time.Time,
-) *CachedState {
-	return &CachedState{
+) *cachedState {
+	return &cachedState{
 		State:      state,
 		activation: graniteActivation,
 		cache:      lru.NewCache[uint64, map[ids.ID]WarpSet](validatorSetsCacheSize),
 	}
 }
 
-func (c *CachedState) GetWarpValidatorSets(
+func (c *cachedState) GetWarpValidatorSets(
 	ctx context.Context,
 	height uint64,
 ) (map[ids.ID]WarpSet, error) {
@@ -215,7 +212,7 @@ func (c *CachedState) GetWarpValidatorSets(
 	return s, nil
 }
 
-func (c *CachedState) GetWarpValidatorSet(
+func (c *cachedState) GetWarpValidatorSet(
 	ctx context.Context,
 	height uint64,
 	subnetID ids.ID,
