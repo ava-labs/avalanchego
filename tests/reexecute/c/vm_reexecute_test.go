@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/plugin/factory"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -62,10 +63,12 @@ var (
 	executionTimeout   time.Duration
 	labelsArg          string
 
-	labels = map[string]string{
+	networkUUID string = uuid.NewString()
+	labels             = map[string]string{
 		"job":               "c-chain-reexecution",
 		"is_ephemeral_node": "false",
 		"chain":             "C",
+		"network_uuid":      networkUUID,
 	}
 
 	configKey         = "config"
@@ -96,7 +99,7 @@ func TestMain(m *testing.M) {
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
-	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", true, "Enable metrics collection.")
+	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", false, "Enable metrics collection.")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
@@ -174,7 +177,7 @@ func benchmarkReexecuteRange(
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
 
 	if metricsEnabled {
-		collectRegistry(b, "c-chain-reexecution", time.Minute, prefixGatherer, labels)
+		collectRegistry(b, "c-chain-reexecution", prefixGatherer, labels)
 	}
 
 	log := tests.NewDefaultLogger("c-chain-reexecution")
@@ -541,13 +544,14 @@ func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, err
 
 // collectRegistry starts prometheus and collects metrics from the provided gatherer.
 // Attaches the provided labels + GitHub labels if available to the collected metrics.
-func collectRegistry(tb testing.TB, name string, timeout time.Duration, gatherer prometheus.Gatherer, labels map[string]string) {
+func collectRegistry(tb testing.TB, name string, gatherer prometheus.Gatherer, labels map[string]string) {
 	r := require.New(tb)
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	tb.Cleanup(cancel)
+	startPromCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
+	defer cancel()
 
-	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
+	logger := tests.NewDefaultLogger("prometheus")
+	r.NoError(tmpnet.StartPrometheus(startPromCtx, logger))
 
 	server, err := tests.NewPrometheusServer(gatherer)
 	r.NoError(err)
@@ -567,6 +571,10 @@ func collectRegistry(tb testing.TB, name string, timeout time.Duration, gatherer
 				return nil
 			}(),
 		))
+
+		checkMetricsCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
+		defer cancel()
+		r.NoError(tmpnet.CheckMetricsExist(checkMetricsCtx, logger, networkUUID))
 	})
 
 	sdConfigFilePath, err = tmpnet.WritePrometheusSDConfig(name, tmpnet.SDConfig{

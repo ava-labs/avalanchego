@@ -6,7 +6,6 @@ package merkledb
 import (
 	"bytes"
 	"context"
-	"encoding"
 	"errors"
 	"fmt"
 	"math"
@@ -21,15 +20,14 @@ import (
 	"github.com/ava-labs/avalanchego/x/sync/protoutils"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
 const verificationCacheSize = math.MaxUint16
 
 var (
-	_ encoding.BinaryMarshaler   = (*ChangeProof)(nil)
-	_ encoding.BinaryUnmarshaler = (*ChangeProof)(nil)
-	_ encoding.BinaryMarshaler   = (*RangeProof)(nil)
-	_ encoding.BinaryUnmarshaler = (*RangeProof)(nil)
+	_ xsync.Marshaler[*ChangeProof] = (*ChangeProofMarshaler)(nil)
+	_ xsync.Marshaler[*RangeProof]  = (*RangeProofMarshaler)(nil)
 
 	ErrInvalidProof                  = errors.New("proof obtained an invalid root ID")
 	ErrInvalidMaxLength              = errors.New("expected max length to be > 0")
@@ -185,17 +183,23 @@ func (proof *Proof) Verify(
 
 type RangeProof ChangeProof
 
-func (r *RangeProof) MarshalBinary() ([]byte, error) {
-	return proto.Marshal(r.toProto())
+type RangeProofMarshaler struct{}
+
+func (RangeProofMarshaler) Marshal(proof *RangeProof) ([]byte, error) {
+	return proto.Marshal(proof.toProto())
 }
 
-func (r *RangeProof) UnmarshalBinary(data []byte) error {
+func (RangeProofMarshaler) Unmarshal(data []byte) (*RangeProof, error) {
 	var pbRangeProof pb.RangeProof
 	if err := proto.Unmarshal(data, &pbRangeProof); err != nil {
-		return err
+		return nil, err
 	}
 
-	return r.unmarshalProto(&pbRangeProof)
+	var proof RangeProof
+	if err := proof.unmarshalProto(&pbRangeProof); err != nil {
+		return nil, err
+	}
+	return &proof, nil
 }
 
 func (r *RangeProof) toProto() *pb.RangeProof {
@@ -311,6 +315,7 @@ func (r *RangeProof) Verify(
 	expectedRootID ids.ID,
 	tokenSize int,
 	hasher Hasher,
+	maxLength int,
 ) error {
 	db, err := newDatabase(
 		ctx,
@@ -330,7 +335,7 @@ func (r *RangeProof) Verify(
 		return err
 	}
 
-	return db.VerifyChangeProof(ctx, (*ChangeProof)(r), start, end, expectedRootID)
+	return db.VerifyChangeProof(ctx, (*ChangeProof)(r), start, end, expectedRootID, maxLength)
 }
 
 type KeyChange struct {
@@ -401,17 +406,23 @@ type ChangeProof struct {
 	KeyChanges []KeyChange
 }
 
-func (c *ChangeProof) MarshalBinary() ([]byte, error) {
-	return proto.Marshal(c.toProto())
+type ChangeProofMarshaler struct{}
+
+func (ChangeProofMarshaler) Marshal(proof *ChangeProof) ([]byte, error) {
+	return proto.Marshal(proof.toProto())
 }
 
-func (c *ChangeProof) UnmarshalBinary(data []byte) error {
+func (ChangeProofMarshaler) Unmarshal(data []byte) (*ChangeProof, error) {
 	var pbChangeProof pb.ChangeProof
 	if err := proto.Unmarshal(data, &pbChangeProof); err != nil {
-		return err
+		return nil, err
 	}
 
-	return c.unmarshalProto(&pbChangeProof)
+	var proof ChangeProof
+	if err := proof.unmarshalProto(&pbChangeProof); err != nil {
+		return nil, err
+	}
+	return &proof, nil
 }
 
 func (c *ChangeProof) toProto() *pb.ChangeProof {

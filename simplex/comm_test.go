@@ -91,3 +91,52 @@ func TestCommFailsWithoutCurrentNode(t *testing.T) {
 	_, err := NewComm(config)
 	require.ErrorIs(t, err, errNodeNotFound)
 }
+
+func TestSimplexMessageReplicationResponse(t *testing.T) {
+	chainID := ids.GenerateTestID()
+	tests := []struct {
+		name string
+		resp *simplex.VerifiedReplicationResponse
+	}{
+		{
+			name: "nil latest round",
+			resp: &simplex.VerifiedReplicationResponse{
+				Data: []simplex.VerifiedQuorumRound{
+					{
+						VerifiedBlock: &Block{
+							metadata: simplex.ProtocolMetadata{},
+							vmBlock:  snowmantest.Genesis,
+						},
+					},
+				},
+				LatestRound: nil,
+			},
+		},
+		{
+			name: "empty seqs",
+			resp: &simplex.VerifiedReplicationResponse{
+				Data:        []simplex.VerifiedQuorumRound{},
+				LatestRound: nil,
+			},
+		},
+		{
+			name: "non-nil latest round",
+			resp: &simplex.VerifiedReplicationResponse{
+				Data: []simplex.VerifiedQuorumRound{},
+				LatestRound: &simplex.VerifiedQuorumRound{
+					VerifiedBlock: &Block{
+						metadata: simplex.ProtocolMetadata{},
+						vmBlock:  snowmantest.Genesis,
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := newReplicationResponse(chainID, tt.resp)
+			require.NoError(t, err)
+		})
+	}
+}

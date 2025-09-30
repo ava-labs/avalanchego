@@ -60,8 +60,8 @@ const (
 	// eth address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 	HardHatKeyStr = "56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
 
-	// grafanaURI is remote Grafana URI
-	grafanaURI = "grafana-poc.avax-dev.network"
+	// Default grafana URI used to construct metrics links. Can be overridden by setting GRAFANA_URI env var.
+	defaultGrafanaURI = "https://grafana-poc.avax-dev.network/d/kBQpRdWnk/avalanche-main-dashboard"
 )
 
 var (
@@ -616,6 +616,7 @@ func (n *Network) GetSubnet(name string) *Subnet {
 // to pick up configuration changes becomes the responsibility of the caller.
 func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode *Node) error {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
+	apiURI := apiNode.GetAccessibleURI()
 	for _, subnet := range n.Subnets {
 		if len(subnet.ValidatorIDs) == 0 {
 			return stacktrace.Errorf("subnet %s needs at least one validator", subnet.SubnetID)
@@ -699,6 +700,9 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		if err := WaitForHealthyNodes(ctx, n.log, runningNodes); err != nil {
 			return stacktrace.Wrap(err)
 		}
+
+		// since we have restarted nodes, refetch the api uri in case it changed
+		apiURI = apiNode.GetAccessibleURI()
 	}
 
 	// Add validators for the subnet
@@ -1133,8 +1137,9 @@ func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string)
 	if endTime == "" {
 		endTime = "now"
 	}
+	grafanaURI := GetEnvWithDefault("GRAFANA_URI", defaultGrafanaURI)
 	return fmt.Sprintf(
-		"https://%s/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
+		"%s?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
 		grafanaURI,
 		networkUUID,
 		startTime,

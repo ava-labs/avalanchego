@@ -35,8 +35,11 @@ on:
         description: 'Timeout in minutes for the job.'
         required: false
         default: 30
-  schedule:
-    - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
+
+  # Disabled because scheduled trigger is empty. To enable, uncomment and add at least one vector to the schedule
+  # entry in the corresponding JSON file.
+  # schedule:
+  #   - cron: '0 9 * * *' # Runs every day at 09:00 UTC (04:00 EST)
 
 jobs:
   define-matrix:
@@ -92,7 +95,9 @@ jobs:
           end-block: ${{ matrix.end-block }}
           block-dir-src: ${{ matrix.block-dir-src }}
           current-state-dir-src: ${{ matrix.current-state-dir-src }}
-          prometheus-username: ${{ secrets.PROMETHEUS_ID || '' }}
+          prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
           push-github-action-benchmark: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master') }}
           aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}

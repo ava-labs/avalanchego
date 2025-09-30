@@ -158,7 +158,7 @@ func generateTestNodes(t *testing.T, num uint64) []*testNode {
 	return nodes
 }
 
-// newFinalization creates a new finalization over the BlockHeader, by collecting a
+// newTestFinalization creates a new finalization over the BlockHeader, by collecting a
 // quorum of signatures from the provided configs.
 func newTestFinalization(t *testing.T, configs []*Config, bh simplex.BlockHeader) simplex.Finalization {
 	quorum := simplex.Quorum(len(configs))
