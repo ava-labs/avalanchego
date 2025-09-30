@@ -76,9 +76,13 @@ func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time
 	r.NotZero(totalGas, "denominator metric %q has value 0", gasMetric.name)
 
 	var (
+		mGas    float64 = 1_000_000
 		gGas    float64 = 1_000_000_000
 		nsPerMs float64 = 1_000_000
 	)
+
+	mGasPerSecond := (totalGas / mGas) / elapsed.Seconds()
+	b.ReportMetric(mGasPerSecond, "mGas/s")
 
 	totalGGas := totalGas / gGas
 	msPerGGas := (float64(elapsed) / nsPerMs) / totalGGas
