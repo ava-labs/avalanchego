@@ -61,6 +61,7 @@ func New(
 // GetUptime returns the uptime of the validator corresponding to validationID
 func (u *UptimeTracker) GetUptime(validationID ids.ID) (
 	time.Duration,
+	time.Time,
 	bool,
 	error,
 ) {
@@ -69,19 +70,19 @@ func (u *UptimeTracker) GetUptime(validationID ids.ID) (
 
 	nodeID, ok := u.state.getNodeID(validationID)
 	if !ok {
-		return 0, false, nil
+		return 0, time.Time{}, false, nil
 	}
 
-	uptime, _, err := u.manager.CalculateUptime(nodeID)
+	uptime, lastUpdated, err := u.manager.CalculateUptime(nodeID)
 	if err != nil {
-		return 0, false, fmt.Errorf(
+		return 0, time.Time{}, false, fmt.Errorf(
 			"failed to calculate uptime for validator %s: %w",
 			validationID,
 			err,
 		)
 	}
 
-	return uptime, true, nil
+	return uptime, lastUpdated, true, nil
 }
 
 // Connect starts tracking a node. Nodes that are activated and connected will
@@ -246,7 +247,7 @@ func (u *UptimeTracker) update(
 				continue
 			}
 
-			// This validator not active and is treated as offline
+			// This validator not
 			if err := u.deactivate(next.NodeID); err != nil {
 				return fmt.Errorf(
 					"failed to deactivate validator %s: %w",
