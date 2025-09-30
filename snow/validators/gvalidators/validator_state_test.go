@@ -261,7 +261,7 @@ func TestGetWarpValidatorSets(t *testing.T) {
 			ids.GenerateTestID(): validatorstest.NewWarpSet(t, 3),
 		}
 		state := &validatorstest.State{
-			GetWarpValidatorSetsF: func(ctx context.Context, h uint64) (map[ids.ID]validators.WarpSet, error) {
+			GetWarpValidatorSetsF: func(_ context.Context, h uint64) (map[ids.ID]validators.WarpSet, error) {
 				require.Equal(height, h)
 				return expectedVdrSets, nil
 			},
@@ -292,7 +292,7 @@ func TestGetWarpValidatorSet(t *testing.T) {
 		subnetID := ids.GenerateTestID()
 		expectedVdrSet := validatorstest.NewWarpSet(t, 3)
 		state := &validatorstest.State{
-			GetWarpValidatorSetF: func(ctx context.Context, h uint64, s ids.ID) (validators.WarpSet, error) {
+			GetWarpValidatorSetF: func(_ context.Context, h uint64, s ids.ID) (validators.WarpSet, error) {
 				require.Equal(height, h)
 				require.Equal(subnetID, s)
 				return expectedVdrSet, nil
