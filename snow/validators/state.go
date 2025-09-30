@@ -188,7 +188,7 @@ type cachedState struct {
 func NewCachedState(
 	state State,
 	graniteActivation time.Time,
-) *cachedState {
+) State {
 	return &cachedState{
 		State:      state,
 		activation: graniteActivation,
