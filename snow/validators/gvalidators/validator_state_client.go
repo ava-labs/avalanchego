@@ -214,7 +214,6 @@ func (c *Client) GetCurrentValidatorSet(
 func warpValidatorsFromProto(proto []*pb.WarpValidator) ([]*validators.Warp, error) {
 	vdrs := make([]*validators.Warp, len(proto))
 	for i, vdr := range proto {
-		pkBytes := vdr.GetPublicKey()
 		nodeIDsBytes := vdr.GetNodeIds()
 		nodeIDs := make([]ids.NodeID, len(nodeIDsBytes))
 		for j, nodeIDBytes := range nodeIDsBytes {
@@ -224,6 +223,7 @@ func warpValidatorsFromProto(proto []*pb.WarpValidator) ([]*validators.Warp, err
 			}
 			nodeIDs[j] = nodeID
 		}
+		pkBytes := vdr.GetPublicKey()
 		pk := bls.PublicKeyFromValidUncompressedBytes(pkBytes)
 		if pk == nil {
 			return nil, errFailedPublicKeyDeserialize

@@ -151,9 +151,13 @@ type ValidatorStateServer interface {
 	// canonical warp validator set, it is omitted from the response.
 	GetWarpValidatorSets(context.Context, *GetWarpValidatorSetsRequest) (*GetWarpValidatorSetsResponse, error)
 	// GetWarpValidatorSet returns the canonical warp validator set for the
+<<<<<<< HEAD
 	// provided subnet at the requested P-chain height. If the subnet doesn't have
 	// a valid canonical warp validator set, either the returned set will be empty
 	// or an error may occur.
+=======
+	// provided subnet at the requested P-chain height.
+>>>>>>> add-warp-to-validators-state
 	GetWarpValidatorSet(context.Context, *GetWarpValidatorSetRequest) (*GetWarpValidatorSetResponse, error)
 	// GetValidatorSet returns the weights of the nodeIDs for the provided
 	// subnet at the requested P-chain height.

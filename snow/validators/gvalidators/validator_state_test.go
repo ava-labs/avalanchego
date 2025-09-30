@@ -273,3 +273,35 @@ func TestGetWarpValidatorSets(t *testing.T) {
 		require.Equal(expectedVdrSets, vdrSets)
 	})
 }
+
+func TestGetWarpValidatorSet(t *testing.T) {
+	const height uint64 = 1337
+	t.Run("error", func(t *testing.T) {
+		state := &validatorstest.State{
+			CantGetWarpValidatorSets: true,
+		}
+		c := newClient(t, state)
+
+		_, err := c.GetWarpValidatorSet(context.Background(), height, ids.GenerateTestID())
+		require.Error(t, err) //nolint:forbidigo // returns grpc error
+	})
+
+	t.Run("valid", func(t *testing.T) {
+		require := require.New(t)
+
+		subnetID := ids.GenerateTestID()
+		expectedVdrSet := validatorstest.NewWarpSet(t, 3)
+		state := &validatorstest.State{
+			GetWarpValidatorSetF: func(ctx context.Context, h uint64, s ids.ID) (validators.WarpSet, error) {
+				require.Equal(height, h)
+				require.Equal(subnetID, s)
+				return expectedVdrSet, nil
+			},
+		}
+		c := newClient(t, state)
+
+		vdrSet, err := c.GetWarpValidatorSet(context.Background(), height, subnetID)
+		require.NoError(err)
+		require.Equal(expectedVdrSet, vdrSet)
+	})
+}

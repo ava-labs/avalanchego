@@ -4,7 +4,9 @@
 package validators_test
 
 import (
+	"bytes"
 	"context"
+	"math"
 	"testing"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
@@ -25,6 +28,12 @@ import (
 
 	. "github.com/ava-labs/avalanchego/vms/platformvm/validators"
 )
+
+func newPublicKey(t *testing.T) *bls.PublicKey {
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+	return sk.PublicKey()
+}
 
 func TestGetValidatorSet_AfterEtna(t *testing.T) {
 	require := require.New(t)
@@ -38,13 +47,11 @@ func TestGetValidatorSet_AfterEtna(t *testing.T) {
 		Upgrades:   upgrades,
 	})
 
-	sk, err := localsigner.New()
-	require.NoError(err)
 	var (
 		subnetID      = ids.GenerateTestID()
 		startTime     = genesistest.DefaultValidatorStartTime
 		endTime       = startTime.Add(24 * time.Hour)
-		pk            = sk.PublicKey()
+		pk            = newPublicKey(t)
 		primaryStaker = &state.Staker{
 			TxID:            ids.GenerateTestID(),
 			NodeID:          ids.GenerateTestNodeID(),
@@ -124,248 +131,210 @@ func TestGetValidatorSet_AfterEtna(t *testing.T) {
 	}
 }
 
-// func TestGetAllValidatorSets(t *testing.T) {
-// 	require := require.New(t)
+func TestGetWarpValidatorSets(t *testing.T) {
+	require := require.New(t)
 
-// 	vdrs := validators.NewManager()
-// 	upgrades := upgradetest.GetConfig(upgradetest.Granite)
-// 	upgradeTime := genesistest.DefaultValidatorStartTime.Add(2 * time.Second)
-// 	s := statetest.New(t, statetest.Config{
-// 		Validators: vdrs,
-// 		Upgrades:   upgrades,
-// 	})
+	vdrs := validators.NewManager()
+	s := statetest.New(t, statetest.Config{
+		Validators: vdrs,
+	})
 
-// 	sk1, err := localsigner.New()
-// 	require.NoError(err)
-// 	sk2, err := localsigner.New()
-// 	require.NoError(err)
-// 	var (
-// 		subnetID      = ids.GenerateTestID()
-// 		startTime     = genesistest.DefaultValidatorStartTime
-// 		endTime       = startTime.Add(24 * time.Hour)
-// 		endTime2      = startTime.Add(48 * time.Hour)
-// 		pk1           = sk1.PublicKey()
-// 		pk2           = sk2.PublicKey()
-// 		primaryStaker = &state.Staker{
-// 			TxID:            ids.GenerateTestID(),
-// 			NodeID:          ids.GenerateTestNodeID(),
-// 			PublicKey:       pk1,
-// 			SubnetID:        constants.PrimaryNetworkID,
-// 			Weight:          100,
-// 			StartTime:       startTime,
-// 			EndTime:         endTime,
-// 			PotentialReward: 1,
-// 		}
-// 		primaryStaker2 = &state.Staker{
-// 			TxID:            ids.GenerateTestID(),
-// 			NodeID:          ids.GenerateTestNodeID(),
-// 			PublicKey:       pk2,
-// 			SubnetID:        constants.PrimaryNetworkID,
-// 			Weight:          100,
-// 			StartTime:       startTime,
-// 			EndTime:         endTime,
-// 			PotentialReward: 1,
-// 		}
-// 		subnetStaker = &state.Staker{
-// 			TxID:      ids.GenerateTestID(),
-// 			NodeID:    primaryStaker.NodeID,
-// 			PublicKey: nil,
-// 			SubnetID:  subnetID,
-// 			Weight:    50,
-// 			StartTime: upgradeTime,
-// 			EndTime:   endTime,
-// 		}
-// 		subnetStaker2 = &state.Staker{
-// 			TxID:      ids.GenerateTestID(),
-// 			NodeID:    primaryStaker2.NodeID,
-// 			PublicKey: nil,
-// 			SubnetID:  subnetID,
-// 			Weight:    50,
-// 			StartTime: upgradeTime,
-// 			EndTime:   endTime2,
-// 		}
-// 	)
+	// Warp validators are sorted by their public key bytes, so define the
+	// sorted order as 0 then 1.
+	var (
+		pk0      = newPublicKey(t)
+		pk0Bytes = bls.PublicKeyToUncompressedBytes(pk0)
+		pk1      = newPublicKey(t)
+		pk1Bytes = bls.PublicKeyToUncompressedBytes(pk1)
+	)
+	if bytes.Compare(pk0Bytes, pk1Bytes) > 0 {
+		pk0, pk1 = pk1, pk0
+		pk0Bytes, pk1Bytes = pk1Bytes, pk0Bytes
+	}
 
-// 	s.AddSubnet(subnetID)
+	var (
+		subnetID       = ids.GenerateTestID()
+		startTime      = genesistest.DefaultValidatorStartTime
+		endTime        = startTime.Add(24 * time.Hour)
+		primaryStaker0 = &state.Staker{
+			TxID:            ids.GenerateTestID(),
+			NodeID:          ids.GenerateTestNodeID(),
+			PublicKey:       pk0,
+			SubnetID:        constants.PrimaryNetworkID,
+			Weight:          1,
+			StartTime:       startTime,
+			EndTime:         endTime,
+			PotentialReward: 1,
+		}
+		subnetStaker0 = &state.Staker{
+			TxID:      ids.GenerateTestID(),
+			NodeID:    primaryStaker0.NodeID,
+			PublicKey: nil, // inherited from primaryStaker
+			SubnetID:  subnetID,
+			Weight:    1,
+			StartTime: startTime,
+			EndTime:   endTime,
+		}
+		primaryStaker1 = &state.Staker{
+			TxID:            ids.GenerateTestID(),
+			NodeID:          ids.GenerateTestNodeID(),
+			PublicKey:       pk1,
+			SubnetID:        constants.PrimaryNetworkID,
+			Weight:          1,
+			StartTime:       startTime,
+			EndTime:         endTime,
+			PotentialReward: 1,
+		}
+		subnetStaker1 = &state.Staker{
+			TxID:      ids.GenerateTestID(),
+			NodeID:    primaryStaker1.NodeID,
+			PublicKey: nil, // inherited from primaryStaker1
+			SubnetID:  subnetID,
+			Weight:    math.MaxUint64,
+			StartTime: startTime,
+			EndTime:   endTime,
+		}
+	)
 
-// 	m := NewManager(
-// 		config.Internal{
-// 			Validators: vdrs,
-// 		},
-// 		s,
-// 		metrics.Noop,
-// 		new(mockable.Clock),
-// 	)
+	var lastHeight uint64
+	acceptBlock := func(
+		newStakers []*state.Staker,
+		removedStakers []*state.Staker,
+	) {
+		t.Helper()
 
-// 	type testCase struct {
-// 		name           string
-// 		height         uint64
-// 		setup          func()
-// 		expectedResult map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput
-// 	}
+		lastHeight++
+		blk, err := block.NewBanffStandardBlock(s.GetTimestamp(), s.GetLastAccepted(), lastHeight, nil)
+		require.NoError(err)
 
-// 	genesisValidators := make(map[ids.NodeID]*validators.GetValidatorOutput)
-// 	for _, nodeID := range genesistest.DefaultNodeIDs {
-// 		genesisValidators[nodeID] = &validators.GetValidatorOutput{
-// 			NodeID:    nodeID,
-// 			PublicKey: nil,
-// 			Weight:    genesistest.DefaultValidatorWeight,
-// 		}
-// 	}
+		s.SetHeight(blk.Height())
+		s.SetTimestamp(blk.Timestamp())
+		s.AddStatelessBlock(blk)
+		s.SetLastAccepted(blk.ID())
 
-// 	appendGenesisVdrs := func(vdrs map[ids.NodeID]*validators.GetValidatorOutput) map[ids.NodeID]*validators.GetValidatorOutput {
-// 		for nodeID, vdr := range genesisValidators {
-// 			vdrs[nodeID] = vdr
-// 		}
-// 		return vdrs
-// 	}
+		for _, v := range newStakers {
+			require.NoError(s.PutCurrentValidator(v))
+		}
+		for _, v := range removedStakers {
+			s.DeleteCurrentValidator(v)
+		}
+		require.NoError(s.Commit())
+	}
 
-// 	testCases := []testCase{
-// 		{
-// 			name:   "height_0_genesis",
-// 			height: 0,
-// 			setup: func() {
-// 				// No setup needed for genesis
-// 			},
-// 			expectedResult: map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput{
-// 				constants.PrimaryNetworkID: genesisValidators,
-// 				subnetID:                   {},
-// 			},
-// 		},
-// 		{
-// 			name:   "height_1_after_adding_validators",
-// 			height: 1,
-// 			setup: func() {
-// 				blk, err := block.NewBanffStandardBlock(upgradeTime, s.GetLastAccepted(), 1, nil)
-// 				require.NoError(err)
+	acceptBlock( // Add a subnet staker during the Etna upgrade
+		[]*state.Staker{primaryStaker0, subnetStaker0},
+		nil,
+	)
+	acceptBlock( // Overflow the subnet
+		[]*state.Staker{primaryStaker1, subnetStaker1},
+		nil,
+	)
+	acceptBlock( // Remove the subnet overflow
+		nil,
+		[]*state.Staker{subnetStaker1},
+	)
+	acceptBlock( // Remove the subnet entirely
+		nil,
+		[]*state.Staker{subnetStaker0},
+	)
 
-// 				s.SetHeight(blk.Height())
-// 				s.SetTimestamp(blk.Timestamp())
-// 				s.AddStatelessBlock(blk)
-// 				s.SetLastAccepted(blk.ID())
+	m := NewManager(
+		config.Internal{
+			Validators: vdrs,
+		},
+		s,
+		metrics.Noop,
+		new(mockable.Clock),
+	)
 
-// 				require.NoError(s.PutCurrentValidator(primaryStaker))
-// 				require.NoError(s.PutCurrentValidator(primaryStaker2))
-// 				require.NoError(s.PutCurrentValidator(subnetStaker))
-// 				require.NoError(s.PutCurrentValidator(subnetStaker2))
+	expectedPrimaryNetworkWithAllValidators := validators.WarpSet{
+		Validators: []*validators.Warp{
+			{
+				PublicKey:      pk0,
+				PublicKeyBytes: pk0Bytes,
+				Weight:         1,
+				NodeIDs:        []ids.NodeID{primaryStaker0.NodeID},
+			},
+			{
+				PublicKey:      pk1,
+				PublicKeyBytes: pk1Bytes,
+				Weight:         1,
+				NodeIDs:        []ids.NodeID{primaryStaker1.NodeID},
+			},
+		},
+		TotalWeight: genesistest.DefaultValidatorWeight*uint64(len(genesistest.DefaultNodeIDs)) + 2,
+	}
+	expectedValidators := []map[ids.ID]validators.WarpSet{
+		{
+			constants.PrimaryNetworkID: {
+				Validators:  []*validators.Warp{},
+				TotalWeight: genesistest.DefaultValidatorWeight * uint64(len(genesistest.DefaultNodeIDs)),
+			},
+		}, // Subnet didn't exist at genesis
+		{
+			constants.PrimaryNetworkID: {
+				Validators: []*validators.Warp{
+					{
+						PublicKey:      pk0,
+						PublicKeyBytes: pk0Bytes,
+						Weight:         1,
+						NodeIDs:        []ids.NodeID{primaryStaker0.NodeID},
+					},
+				},
+				TotalWeight: genesistest.DefaultValidatorWeight*uint64(len(genesistest.DefaultNodeIDs)) + 1,
+			},
+			subnetID: {
+				Validators: []*validators.Warp{
+					{
+						PublicKey:      pk0,
+						PublicKeyBytes: pk0Bytes,
+						Weight:         1,
+						NodeIDs:        []ids.NodeID{subnetStaker0.NodeID},
+					},
+				},
+				TotalWeight: 1,
+			},
+		}, // Subnet was added at height 1
+		{
+			constants.PrimaryNetworkID: expectedPrimaryNetworkWithAllValidators,
+		}, // Subnet overflow occurred at height 1
+		{
+			constants.PrimaryNetworkID: expectedPrimaryNetworkWithAllValidators,
+			subnetID: {
+				Validators: []*validators.Warp{
+					{
+						PublicKey:      pk0,
+						PublicKeyBytes: pk0Bytes,
+						Weight:         1,
+						NodeIDs:        []ids.NodeID{subnetStaker0.NodeID},
+					},
+				},
+				TotalWeight: 1,
+			},
+		}, // Subnet overflow was removed at height 2
+		{
+			constants.PrimaryNetworkID: expectedPrimaryNetworkWithAllValidators,
+		}, // Subnet was removed at height 3
+	}
+	for height, expected := range expectedValidators {
+		actual, err := m.GetWarpValidatorSets(context.Background(), uint64(height))
+		require.NoError(err)
+		require.Equal(expected, actual)
 
-// 				require.NoError(s.Commit())
-// 			},
-// 			expectedResult: map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput{
-// 				constants.PrimaryNetworkID: appendGenesisVdrs(map[ids.NodeID]*validators.GetValidatorOutput{
-// 					primaryStaker.NodeID: {
-// 						NodeID:    primaryStaker.NodeID,
-// 						PublicKey: pk1,
-// 						Weight:    primaryStaker.Weight,
-// 					},
-// 					primaryStaker2.NodeID: {
-// 						NodeID:    primaryStaker2.NodeID,
-// 						PublicKey: pk2,
-// 						Weight:    primaryStaker2.Weight,
-// 					},
-// 				},
-// 				),
-// 				subnetID: {
-// 					subnetStaker.NodeID: {
-// 						NodeID:    subnetStaker.NodeID,
-// 						PublicKey: pk1,
-// 						Weight:    subnetStaker.Weight,
-// 					},
-// 					subnetStaker2.NodeID: {
-// 						NodeID:    subnetStaker2.NodeID,
-// 						PublicKey: pk2,
-// 						Weight:    subnetStaker2.Weight,
-// 					},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name:   "height_2_after_removing_subnet_staker",
-// 			height: 2,
-// 			setup: func() {
-// 				blk, err := block.NewBanffStandardBlock(s.GetTimestamp(), s.GetLastAccepted(), 2, nil)
-// 				require.NoError(err)
+		actualPrimaryNetwork, err := m.GetWarpValidatorSet(context.Background(), uint64(height), constants.PrimaryNetworkID)
+		require.NoError(err)
+		require.Equal(expected[constants.PrimaryNetworkID], actualPrimaryNetwork)
 
-// 				s.SetHeight(blk.Height())
-// 				s.SetTimestamp(blk.Timestamp())
-// 				s.AddStatelessBlock(blk)
-// 				s.SetLastAccepted(blk.ID())
+		actualSubnet, err := m.GetWarpValidatorSet(context.Background(), uint64(height), subnetID)
+		if err != nil {
+			require.NotContains(expected, subnetID)
+			continue
+		}
 
-// 				s.DeleteCurrentValidator(subnetStaker)
-
-// 				require.NoError(s.Commit())
-// 			},
-// 			expectedResult: map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput{
-// 				constants.PrimaryNetworkID: appendGenesisVdrs(map[ids.NodeID]*validators.GetValidatorOutput{
-// 					primaryStaker.NodeID: {
-// 						NodeID:    primaryStaker.NodeID,
-// 						PublicKey: pk1,
-// 						Weight:    primaryStaker.Weight,
-// 					},
-// 					primaryStaker2.NodeID: {
-// 						NodeID:    primaryStaker2.NodeID,
-// 						PublicKey: pk2,
-// 						Weight:    primaryStaker2.Weight,
-// 					},
-// 				}),
-// 				subnetID: {
-// 					subnetStaker2.NodeID: {
-// 						NodeID:    subnetStaker2.NodeID,
-// 						PublicKey: pk2,
-// 						Weight:    subnetStaker2.Weight,
-// 					},
-// 				},
-// 			},
-// 		},
-// 		{
-// 			name:   "height_3_after_removing_subnet_staker2",
-// 			height: 3,
-// 			setup: func() {
-// 				blk, err := block.NewBanffStandardBlock(s.GetTimestamp(), s.GetLastAccepted(), 3, nil)
-// 				require.NoError(err)
-
-// 				s.SetHeight(blk.Height())
-// 				s.SetTimestamp(blk.Timestamp())
-// 				s.AddStatelessBlock(blk)
-// 				s.SetLastAccepted(blk.ID())
-
-// 				s.DeleteCurrentValidator(subnetStaker2)
-
-// 				require.NoError(s.Commit())
-// 			},
-// 			expectedResult: map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput{
-// 				constants.PrimaryNetworkID: appendGenesisVdrs(map[ids.NodeID]*validators.GetValidatorOutput{
-// 					primaryStaker.NodeID: {
-// 						NodeID:    primaryStaker.NodeID,
-// 						PublicKey: pk1,
-// 						Weight:    primaryStaker.Weight,
-// 					},
-// 					primaryStaker2.NodeID: {
-// 						NodeID:    primaryStaker2.NodeID,
-// 						PublicKey: pk2,
-// 						Weight:    primaryStaker2.Weight,
-// 					},
-// 				}),
-// 				subnetID: {},
-// 			},
-// 		},
-// 	}
-
-// 	for _, tc := range testCases {
-// 		t.Run(tc.name, func(_ *testing.T) {
-// 			tc.setup()
-
-// 			allValidatorSets, err := m.GetAllValidatorSets(context.Background(), tc.height)
-// 			require.NoError(err)
-
-// 			require.Equal(tc.expectedResult, allValidatorSets)
-
-// 			// Confirm that individual GetValidatorSet calls return the same results
-// 			for subnetID := range tc.expectedResult {
-// 				individualValidators, err := m.GetValidatorSet(context.Background(), tc.height, subnetID)
-// 				require.NoError(err)
-// 				require.Equal(allValidatorSets[subnetID], individualValidators)
-// 			}
-// 		})
-// 	}
-// }
+		// Treat nil and empty slices as the same
+		if len(actualSubnet.Validators) == 0 {
+			actualSubnet.Validators = nil
+		}
+		require.Equal(expected[subnetID], actualSubnet)
+	}
+}
