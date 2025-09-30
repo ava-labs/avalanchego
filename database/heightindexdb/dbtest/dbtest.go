@@ -4,6 +4,7 @@
 package dbtest
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -68,7 +69,6 @@ func TestPutGet(t *testing.T, newDB func() database.HeightIndex) {
 				{1, nil},
 			},
 			queryHeight: 1,
-			want:        nil,
 		},
 		{
 			name: "put and get empty bytes",
@@ -76,7 +76,6 @@ func TestPutGet(t *testing.T, newDB func() database.HeightIndex) {
 				{1, []byte{}},
 			},
 			queryHeight: 1,
-			want:        []byte{},
 		},
 		{
 			name: "put and get large data",
@@ -109,14 +108,14 @@ func TestPutGet(t *testing.T, newDB func() database.HeightIndex) {
 			// Query the specific height
 			retrievedData, err := db.Get(tt.queryHeight)
 			require.ErrorIs(t, err, tt.wantErr)
-			require.Equal(t, tt.want, retrievedData)
+			require.True(t, bytes.Equal(tt.want, retrievedData))
 
 			// modify the data returned from Get and ensure it won't change the
 			// data from a second Get
 			copy(retrievedData, []byte("modified data"))
 			newData, err := db.Get(tt.queryHeight)
 			require.ErrorIs(t, err, tt.wantErr)
-			require.Equal(t, tt.want, newData)
+			require.True(t, bytes.Equal(tt.want, newData))
 		})
 	}
 }

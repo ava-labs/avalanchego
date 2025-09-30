@@ -99,8 +99,8 @@ type Database interface {
 type HeightIndex interface {
 	// Put inserts the value into the database at the given height.
 	//
-	// A nil or empty slice for [value] is accepted and will return their respective
-	// value if retrieved via Get.
+	// If [value] is nil or an empty slice, then when it's retrieved
+	// it may be nil or an empty slice.
 	//
 	// [value] is safe to read and modify after calling Put.
 	Put(height uint64, value []byte) error
