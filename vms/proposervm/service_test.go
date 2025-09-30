@@ -18,17 +18,14 @@ import (
 	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm"
 	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 )
 
 func TestConnectRPCService_GetProposedHeight(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
-	)
 	const pChainHeight = 123
-	_, _, vm, _ := initTestProposerVM(t, activationTime, durangoTime, pChainHeight)
+	_, _, vm, _ := initTestProposerVM(t, upgradetest.Durango, upgrade.InitiallyActiveTime, pChainHeight)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
@@ -65,12 +62,8 @@ func TestConnectRPCService_GetProposedHeight(t *testing.T) {
 func TestJSONRPCService_GetProposedHeight(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
-	)
 	const pChainHeight = 123
-	_, _, vm, _ := initTestProposerVM(t, activationTime, durangoTime, pChainHeight)
+	_, _, vm, _ := initTestProposerVM(t, upgradetest.Durango, upgrade.InitiallyActiveTime, pChainHeight)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
