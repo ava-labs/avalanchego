@@ -148,7 +148,7 @@ func (c *Client) GetCurrentValidatorSet(
 		SubnetId: subnetID[:],
 	})
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get current validator set for subnet %s: %w", subnetID.String(), err)
+		return nil, 0, fmt.Errorf("failed to get current validator set for subnet %s: %w", subnetID, err)
 	}
 
 	vdrs := make(map[ids.ID]*validators.GetCurrentValidatorOutput, len(resp.Validators))
