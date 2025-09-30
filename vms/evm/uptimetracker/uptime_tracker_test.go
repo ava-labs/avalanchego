@@ -5,7 +5,6 @@ package uptimetracker
 
 import (
 	"context"
-	"sync"
 	"testing"
 	"time"
 
@@ -455,10 +454,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 				require.NoError(uptimeTracker.Sync(context.Background()))
 			}
 
-			gotUptime, err := uptimeTracker.GetUptime(
-				tt.validationID,
-				&sync.Mutex{},
-			)
+			gotUptime, err := uptimeTracker.GetUptime(tt.validationID)
 			require.ErrorIs(err, tt.wantErr)
 			require.Equal(tt.wantUptime, gotUptime)
 
@@ -500,7 +496,7 @@ func TestUptimeTracker_Restart(t *testing.T) {
 	require.NoError(uptimeTracker.Connect(nodeID))
 
 	clock.Set(start.Add(10 * time.Second))
-	uptime, err := uptimeTracker.GetUptime(validationID, &sync.Mutex{})
+	uptime, err := uptimeTracker.GetUptime(validationID)
 	require.NoError(err)
 	require.Equal(10*time.Second, uptime)
 
@@ -510,7 +506,7 @@ func TestUptimeTracker_Restart(t *testing.T) {
 	require.NoError(err)
 	require.NoError(uptimeTracker.Sync(context.Background()))
 
-	uptime, err = uptimeTracker.GetUptime(validationID, &sync.Mutex{})
+	uptime, err = uptimeTracker.GetUptime(validationID)
 	require.NoError(err)
 	require.Equal(10*time.Second, uptime)
 }

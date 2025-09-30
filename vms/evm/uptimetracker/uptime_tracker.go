@@ -27,7 +27,7 @@ type UptimeTracker struct {
 	manager    uptime.Manager
 	clock *mockable.Clock
 
-	lock   sync.Mutex // TODO
+	lock sync.Mutex
 	height int
 	state      *state
 	synced              bool
@@ -59,13 +59,9 @@ func New(
 }
 
 // GetUptime returns the uptime of the validator corresponding to validationID
-// TODO to lock or not to lock?
-func (u *UptimeTracker) GetUptime(
-	validationID ids.ID,
-	lock sync.Locker,
-) (time.Duration, error) {
-	lock.Lock()
-	defer lock.Unlock()
+func (u *UptimeTracker) GetUptime(validationID ids.ID) (time.Duration, error) {
+	u.lock.Lock()
+	defer u.lock.Unlock()
 
 	nodeID, ok := u.state.getNodeID(validationID)
 	if !ok {
@@ -87,6 +83,9 @@ func (u *UptimeTracker) GetUptime(
 // Connect starts tracking a node. Nodes that are activated and connected will
 // be treated as online.
 func (u *UptimeTracker) Connect(nodeID ids.NodeID) error {
+	u.lock.Lock()
+	defer u.lock.Unlock()
+
 	u.connectedValidators.Add(nodeID)
 	if u.deactivatedValidators.Contains(nodeID) {
 		return nil
@@ -98,6 +97,9 @@ func (u *UptimeTracker) Connect(nodeID ids.NodeID) error {
 // Disconnect stops tracking a node. Disconnected nodes are treated as being
 // offline.
 func (u *UptimeTracker) Disconnect(nodeID ids.NodeID) error {
+	u.lock.Lock()
+	defer u.lock.Unlock()
+
 	u.connectedValidators.Remove(nodeID)
 	if u.deactivatedValidators.Contains(nodeID) {
 		return nil
@@ -109,7 +111,9 @@ func (u *UptimeTracker) Disconnect(nodeID ids.NodeID) error {
 // Sync updates the validator set and writes our state. Sync starts tracking
 // uptimes for all active validators the first time it is called.
 func (u *UptimeTracker) Sync(ctx context.Context) error {
-	// TODO don't update if the height hasn't changed
+	u.lock.Lock()
+	defer u.lock.Unlock()
+
 	currentValidatorSet, height, err := u.validatorState.GetCurrentValidatorSet(
 		ctx,
 		u.subnetID,
@@ -269,6 +273,9 @@ func (u *UptimeTracker) deactivate(nodeID ids.NodeID) error {
 
 // Shutdown stops tracking uptimes and writes our state.
 func (u *UptimeTracker) Shutdown() error {
+	u.lock.Lock()
+	defer u.lock.Unlock()
+
 	if !u.synced {
 		return nil
 	}
