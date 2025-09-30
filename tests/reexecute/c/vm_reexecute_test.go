@@ -177,7 +177,7 @@ func benchmarkReexecuteRange(
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
 
 	if metricsEnabled {
-		collectRegistry(b, "c-chain-reexecution", time.Minute, prefixGatherer, labels)
+		collectRegistry(b, "c-chain-reexecution", prefixGatherer, labels)
 	}
 
 	log := tests.NewDefaultLogger("c-chain-reexecution")
@@ -544,14 +544,14 @@ func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, err
 
 // collectRegistry starts prometheus and collects metrics from the provided gatherer.
 // Attaches the provided labels + GitHub labels if available to the collected metrics.
-func collectRegistry(tb testing.TB, name string, timeout time.Duration, gatherer prometheus.Gatherer, labels map[string]string) {
+func collectRegistry(tb testing.TB, name string, gatherer prometheus.Gatherer, labels map[string]string) {
 	r := require.New(tb)
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	tb.Cleanup(cancel)
+	startPromCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
+	defer cancel()
 
 	logger := tests.NewDefaultLogger("prometheus")
-	r.NoError(tmpnet.StartPrometheus(ctx, logger))
+	r.NoError(tmpnet.StartPrometheus(startPromCtx, logger))
 
 	server, err := tests.NewPrometheusServer(gatherer)
 	r.NoError(err)
@@ -572,7 +572,9 @@ func collectRegistry(tb testing.TB, name string, timeout time.Duration, gatherer
 			}(),
 		))
 
-		r.NoError(tmpnet.CheckMetricsExist(ctx, logger, networkUUID))
+		checkMetricsCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
+		defer cancel()
+		r.NoError(tmpnet.CheckMetricsExist(checkMetricsCtx, logger, networkUUID))
 	})
 
 	sdConfigFilePath, err = tmpnet.WritePrometheusSDConfig(name, tmpnet.SDConfig{
