@@ -4,22 +4,16 @@
 package uptimetracker
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"time"
 
 	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
-)
-
-var (
-	_        uptime.State = (*state)(nil)
-	vdrCodec codec.Manager
+	"golang.org/x/exp/maps"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 )
 
 const (
@@ -29,18 +23,26 @@ const (
 )
 
 var (
-	ErrAlreadyExists  = errors.New("validator already exists")
-	ErrImmutableField = errors.New("immutable field cannot be updated")
+	codecManager codec.Manager
+	_            uptime.State = (*state)(nil)
 )
+
+func init() {
+	codecManager = codec.NewManager(math.MaxInt32)
+	c := linearcodec.NewDefault()
+
+	if err := c.RegisterType(validator{}); err != nil {
+		panic(fmt.Errorf("failed to register type: %w", err))
+	}
+
+	if err := codecManager.RegisterCodec(codecVersion, c); err != nil {
+		panic(fmt.Errorf("failed to register codec: %w", err))
+	}
+}
 
 type dbUpdateStatus int
 
-// The validatorData implementation only allows existing validator's `weight` and `IsActive`
-// fields to be updated; all other fields should be constant and if any other field
-// changes, the state manager errors and does not update the validator.
-//
-// The validatorData implementation also assumes NodeIDs are unique in the tracked set.
-type validatorData struct {
+type validator struct {
 	UpDuration    time.Duration `serialize:"true"`
 	LastUpdated   uint64        `serialize:"true"`
 	NodeID        ids.NodeID    `serialize:"true"`
@@ -49,257 +51,216 @@ type validatorData struct {
 	IsActive      bool          `serialize:"true"`
 	IsL1Validator bool          `serialize:"true"`
 
-	validationID ids.ID // database key
+	validationID ids.ID
 }
 
-func (v *validatorData) setLastUpdated(t time.Time) {
-	v.LastUpdated = uint64(t.Unix())
-}
-
-func (v *validatorData) getLastUpdated() time.Time {
-	return time.Unix(int64(v.LastUpdated), 0)
-}
-
-func (v *validatorData) getStartTime() time.Time {
-	return time.Unix(int64(v.StartTime), 0)
-}
-
-// constantsAreUnmodified returns true if the constants of this validator have
-// not been modified compared to the updated validator.
-func (v *validatorData) constantsAreUnmodified(u Validator) bool {
-	return v.validationID == u.ValidationID &&
-		v.NodeID == u.NodeID &&
-		v.IsL1Validator == u.IsL1Validator &&
-		v.StartTime == u.StartTimestamp
-}
-
-// parseValidatorData parses the data from the bytes into given validatorData
-func parseValidatorData(bytes []byte, data *validatorData) error {
-	if len(bytes) != 0 {
-		if _, err := vdrCodec.Unmarshal(bytes, data); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
+// state holds the on-disk and cached representation of the validator set
 type state struct {
-	data  map[ids.ID]*validatorData // vID -> validatorData
-	index map[ids.NodeID]ids.ID     // nodeID -> vID
-	// updatedData tracks the updates since WriteValidator was last called
-	updatedData map[ids.ID]dbUpdateStatus // vID -> updated status
-	db          database.Database
+	db database.Database
+
+	validators             map[ids.ID]*validator
+	nodeIDsToValidationIDs map[ids.NodeID]ids.ID
+	updates                map[ids.ID]dbUpdateStatus
 }
 
-func init() {
-	vdrCodec = codec.NewManager(math.MaxInt32)
-	c := linearcodec.NewDefault()
-
-	errs := wrappers.Errs{}
-	errs.Add(
-		c.RegisterType(validatorData{}),
-
-		vdrCodec.RegisterCodec(codecVersion, c),
-	)
-
-	if errs.Errored() {
-		panic(errs.Err)
-	}
-}
-
-// These methods are implemented and exported to satisfy the uptime.State interface
-// NewState creates a new State, it also loads the data from the disk
 func newState(db database.Database) (*state, error) {
 	s := &state{
-		index:       make(map[ids.NodeID]ids.ID),
-		data:        make(map[ids.ID]*validatorData),
-		updatedData: make(map[ids.ID]dbUpdateStatus),
-		db:          db,
+		db:                     db,
+		validators:             make(map[ids.ID]*validator),
+		nodeIDsToValidationIDs: make(map[ids.NodeID]ids.ID),
+		updates:                make(map[ids.ID]dbUpdateStatus),
 	}
-	if err := s.loadFromDisk(); err != nil {
-		return nil, fmt.Errorf("failed to load data from disk: %w", err)
+
+	it := db.NewIterator()
+	defer it.Release()
+
+	for it.Next() {
+		validationIDBytes := it.Key()
+		validationID, err := ids.ToID(validationIDBytes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse validation ID: %w", err)
+		}
+
+		vdr := &validator{
+			validationID: validationID,
+		}
+
+		if _, err := codecManager.Unmarshal(it.Value(), vdr); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal validator validator: %w", err)
+		}
+
+		s.addData(validationID, vdr)
 	}
+
+	if err := it.Error(); err != nil {
+		return nil, fmt.Errorf("failed to iterate: %w", err)
+	}
+
 	return s, nil
 }
 
-// GetUptime returns the uptime of the validator with the given nodeID
-func (s *state) GetUptime(
-	nodeID ids.NodeID,
-) (time.Duration, time.Time, error) {
-	data, f := s.getData(nodeID)
-	if !f {
+func (s *state) GetUptime(nodeID ids.NodeID) (time.Duration, time.Time, error) {
+	v, ok := s.getValidatorByNodeID(nodeID)
+	if !ok {
 		return 0, time.Time{}, database.ErrNotFound
 	}
-	return data.UpDuration, data.getLastUpdated(), nil
+
+	return v.UpDuration, time.Unix(int64(v.LastUpdated), 0), nil
 }
 
-// SetUptime sets the uptime of the validator with the given nodeID
 func (s *state) SetUptime(
 	nodeID ids.NodeID,
 	upDuration time.Duration,
 	lastUpdated time.Time,
 ) error {
-	data, f := s.getData(nodeID)
-	if !f {
-		return database.ErrNotFound
-	}
-	data.UpDuration = upDuration
-	data.setLastUpdated(lastUpdated)
-
-	s.updatedData[data.validationID] = updatedStatus
-	return nil
-}
-
-// GetStartTime returns the start time of the validator with the given nodeID
-func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
-	data, f := s.getData(nodeID)
-	if !f {
-		return time.Time{}, database.ErrNotFound
-	}
-	return data.getStartTime(), nil
-}
-
-// addValidator adds a new validator to the state
-// the new validator is marked as updated and will be written to the disk when WriteState is called
-func (s *state) addValidator(vdr Validator) error {
-	data := &validatorData{
-		NodeID:        vdr.NodeID,
-		validationID:  vdr.ValidationID,
-		IsActive:      vdr.IsActive,
-		StartTime:     vdr.StartTimestamp,
-		UpDuration:    0,
-		LastUpdated:   vdr.StartTimestamp,
-		IsL1Validator: vdr.IsL1Validator,
-		Weight:        vdr.Weight,
-	}
-	if err := s.addData(vdr.ValidationID, data); err != nil {
-		return err
-	}
-
-	s.updatedData[vdr.ValidationID] = updatedStatus
-	return nil
-}
-
-// updateValidator updates the validator in the state
-// returns an error if the validator does not exist or if the immutable fields are modified
-func (s *state) updateValidator(vdr Validator) error {
-	data, ok := s.data[vdr.ValidationID]
+	v, ok := s.getValidatorByNodeID(nodeID)
 	if !ok {
 		return database.ErrNotFound
 	}
-	// check immutable fields
-	if !data.constantsAreUnmodified(vdr) {
-		return ErrImmutableField
-	}
-	// check if mutable fields have changed
-	updated := deletedStatus
-	if data.IsActive != vdr.IsActive {
-		data.IsActive = vdr.IsActive
-		updated = updatedStatus
-	}
 
-	if data.Weight != vdr.Weight {
-		data.Weight = vdr.Weight
-		updated = updatedStatus
-	}
+	v.UpDuration = upDuration
+	v.LastUpdated = uint64(lastUpdated.Unix())
 
-	s.updatedData[vdr.ValidationID] = updated
+	s.updates[v.validationID] = updatedStatus
+
 	return nil
 }
 
-// deleteValidator marks the validator as deleted
-// marked validator will be deleted from disk when WriteState is called
-func (s *state) deleteValidator(vID ids.ID) bool {
-	data, ok := s.data[vID]
+func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
+	v, ok := s.getValidatorByNodeID(nodeID)
+	if !ok {
+		return time.Time{}, database.ErrNotFound
+	}
+
+	return time.Unix(int64(v.LastUpdated), 0), nil
+}
+
+func (s *state) addValidator(vdr *validator) error {
+	s.addData(vdr.validationID, vdr)
+	s.updates[vdr.validationID] = updatedStatus
+
+	return nil
+}
+
+func (s *state) updateValidator(
+	validationID ids.ID,
+	isActive bool,
+	weight uint64,
+) error {
+	v, ok := s.validators[validationID]
+	if !ok {
+		return database.ErrNotFound
+	}
+
+	updated := deletedStatus
+	if v.IsActive != isActive {
+		v.IsActive = isActive
+		updated = updatedStatus
+	}
+
+	if v.Weight != weight {
+		v.Weight = weight
+		updated = updatedStatus
+	}
+
+	s.updates[validationID] = updated
+
+	return nil
+}
+
+func (s *state) deleteValidator(validationID ids.ID) bool {
+	v, ok := s.validators[validationID]
 	if !ok {
 		return false
 	}
-	delete(s.data, data.validationID)
-	delete(s.index, data.NodeID)
 
-	// mark as deleted for WriteValidator
-	s.updatedData[data.validationID] = deletedStatus
+	delete(s.validators, v.validationID)
+	delete(s.nodeIDsToValidationIDs, v.NodeID)
+
+	s.updates[v.validationID] = deletedStatus
+
 	return true
 }
 
-// writeState writes the updated state to the disk
 func (s *state) writeState() error {
-	// TODO: consider adding batch size
 	batch := s.db.NewBatch()
-	for vID, updateStatus := range s.updatedData {
+
+	for validationID, updateStatus := range s.updates {
 		switch updateStatus {
 		case updatedStatus:
-			data := s.data[vID]
+			v := s.validators[validationID]
 
-			dataBytes, err := vdrCodec.Marshal(codecVersion, data)
+			validatorBytes, err := codecManager.Marshal(codecVersion, v)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to marshal validator: %w", err)
 			}
-			if err := batch.Put(vID[:], dataBytes); err != nil {
-				return err
+
+			if err := batch.Put(validationID[:], validatorBytes); err != nil {
+				return fmt.Errorf("failed to put validator: %w", err)
 			}
 		case deletedStatus:
-			if err := batch.Delete(vID[:]); err != nil {
-				return err
+			if err := batch.Delete(validationID[:]); err != nil {
+				return fmt.Errorf("failed to delete validator: %w", err)
 			}
+		default:
+			return fmt.Errorf("unknown update status: %v", updateStatus)
 		}
 	}
+
 	if err := batch.Write(); err != nil {
-		return err
+		return fmt.Errorf("failed to write batch: %w", err)
 	}
-	// we've successfully flushed the updates, clear the updated marker.
-	clear(s.updatedData)
+
+	// We have written all pending updates
+	clear(s.updates)
+
 	return nil
 }
 
-// Load the state from the disk
-func (s *state) loadFromDisk() error {
-	it := s.db.NewIterator()
-	defer it.Release()
-	for it.Next() {
-		vIDBytes := it.Key()
-		vID, err := ids.ToID(vIDBytes)
-		if err != nil {
-			return fmt.Errorf("failed to parse validator ID: %w", err)
-		}
-		vdr := &validatorData{
-			validationID: vID,
-		}
-		if err := parseValidatorData(it.Value(), vdr); err != nil {
-			return fmt.Errorf("failed to parse validator data: %w", err)
-		}
-		if err := s.addData(vID, vdr); err != nil {
-			return err
-		}
-	}
-	return it.Error()
+func (s *state) addData(validationID ids.ID, validator *validator) {
+	s.validators[validationID] = validator
+	s.nodeIDsToValidationIDs[validator.NodeID] = validationID
 }
 
-// addData adds the data to the state
-// returns an error if the data already exists
-func (s *state) addData(vID ids.ID, data *validatorData) error {
-	if _, ok := s.data[vID]; ok {
-		return fmt.Errorf("%w, validationID: %s", ErrAlreadyExists, vID)
-	}
-	if _, ok := s.index[data.NodeID]; ok {
-		return fmt.Errorf("%w, nodeID: %s", ErrAlreadyExists, data.NodeID)
-	}
-
-	s.data[vID] = data
-	s.index[data.NodeID] = vID
-	return nil
-}
-
-// getData returns the data for the validator with the given nodeID
-// returns false if the data does not exist
-func (s *state) getData(nodeID ids.NodeID) (*validatorData, bool) {
-	vID, ok := s.index[nodeID]
+func (s *state) getValidatorByNodeID(nodeID ids.NodeID) (*validator, bool) {
+	validationID, ok := s.nodeIDsToValidationIDs[nodeID]
 	if !ok {
 		return nil, false
 	}
-	data, ok := s.data[vID]
+
+	v, ok := s.validators[validationID]
 	if !ok {
 		return nil, false
 	}
-	return data, true
+
+	return v, true
+}
+
+func (s *state) getValidatorByValidationID(validationID ids.ID) (
+	*validator,
+	bool,
+) {
+	v, ok := s.validators[validationID]
+	if !ok {
+		return &validator{}, false
+	}
+
+	return v, true
+}
+
+func (s *state) getNodeID(validationID ids.ID) (ids.NodeID, bool) {
+	v, ok := s.validators[validationID]
+	if !ok {
+		return ids.NodeID{}, false
+	}
+
+	return v.NodeID, true
+}
+
+func (s *state) getNodeIDs() []ids.NodeID {
+	return maps.Keys(s.nodeIDsToValidationIDs)
+}
+
+func (s *state) getValidationIDs() []ids.ID {
+	return maps.Keys(s.validators)
 }
