@@ -230,7 +230,14 @@ func (c *cachedState) GetWarpValidatorSet(
 	subnetID ids.ID,
 ) (WarpSet, error) {
 	if time.Now().Before(c.activation) {
-		return c.State.GetWarpValidatorSet(ctx, height, subnetID)
+		// Rather than calling [State.GetWarpValidatorSet], we fetch the
+		// non-canonical validator set and canonicalize it here. This avoids
+		// canonicalizing the validator set with the P-chain lock held.
+		vdrSet, err := c.GetValidatorSet(ctx, height, subnetID)
+		if err != nil {
+			return WarpSet{}, err
+		}
+		return FlattenValidatorSet(vdrSet)
 	}
 
 	s, err := c.GetWarpValidatorSets(ctx, height)
