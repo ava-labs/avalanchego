@@ -221,7 +221,7 @@ func (u *UptimeTracker) update(
 			}
 		} else {
 			// This is a new validator
-			if err := u.state.addValidator(&validator{
+			if err := u.state.addValidatorUpdate(&validator{
 				NodeID:        next.NodeID,
 				validationID:  validationID,
 				IsActive:      next.IsActive,

@@ -89,7 +89,7 @@ func newState(db database.Database) (*state, error) {
 			return nil, fmt.Errorf("failed to unmarshal validator validator: %w", err)
 		}
 
-		s.addData(validationID, vdr)
+		s.addValidator(validationID, vdr)
 	}
 
 	if err := it.Error(); err != nil {
@@ -135,8 +135,8 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	return time.Unix(int64(v.LastUpdated), 0), nil
 }
 
-func (s *state) addValidator(vdr *validator) error {
-	s.addData(vdr.validationID, vdr)
+func (s *state) addValidatorUpdate(vdr *validator) error {
+	s.addValidator(vdr.validationID, vdr)
 	s.updates[vdr.validationID] = updatedStatus
 
 	return nil
@@ -217,7 +217,7 @@ func (s *state) writeState() error {
 	return nil
 }
 
-func (s *state) addData(validationID ids.ID, validator *validator) {
+func (s *state) addValidator(validationID ids.ID, validator *validator) {
 	s.validators[validationID] = validator
 	s.nodeIDsToValidationIDs[validator.NodeID] = validationID
 }
