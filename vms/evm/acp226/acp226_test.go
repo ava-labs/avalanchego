@@ -98,7 +98,7 @@ var (
 	updateExcessTests = []struct {
 		name          string
 		initial       DelayExcess
-		desiredExcess DelayExcess
+		desiredExcess uint64
 		expected      DelayExcess
 	}{
 		{
@@ -203,7 +203,7 @@ func TestDesiredDelayExcess(t *testing.T) {
 			continue
 		}
 		t.Run(test.name, func(t *testing.T) {
-			require.Equal(t, test.excess, DesiredDelayExcess(test.delay))
+			require.Equal(t, test.excess, DelayExcess(DesiredDelayExcess(test.delay)))
 		})
 	}
 }

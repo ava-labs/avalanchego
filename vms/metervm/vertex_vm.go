@@ -5,7 +5,6 @@ package metervm
 
 import (
 	"context"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -14,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowstorm"
 	"github.com/ava-labs/avalanchego/snow/engine/avalanche/vertex"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 var (
@@ -35,6 +35,7 @@ type vertexVM struct {
 	vertex.LinearizableVMWithEngine
 	vertexMetrics
 	registry prometheus.Registerer
+	clock    mockable.Clock
 }
 
 func (vm *vertexVM) Initialize(
@@ -64,9 +65,10 @@ func (vm *vertexVM) Initialize(
 }
 
 func (vm *vertexVM) ParseTx(ctx context.Context, b []byte) (snowstorm.Tx, error) {
-	start := time.Now()
+	start := vm.clock.Time()
 	tx, err := vm.LinearizableVMWithEngine.ParseTx(ctx, b)
-	duration := float64(time.Since(start))
+	end := vm.clock.Time()
+	duration := float64(end.Sub(start))
 	if err != nil {
 		vm.vertexMetrics.parseErr.Observe(duration)
 		return nil, err
@@ -85,9 +87,10 @@ type meterTx struct {
 }
 
 func (mtx *meterTx) Verify(ctx context.Context) error {
-	start := time.Now()
+	start := mtx.vm.clock.Time()
 	err := mtx.Tx.Verify(ctx)
-	duration := float64(time.Since(start))
+	end := mtx.vm.clock.Time()
+	duration := float64(end.Sub(start))
 	if err != nil {
 		mtx.vm.vertexMetrics.verifyErr.Observe(duration)
 	} else {
@@ -97,15 +100,17 @@ func (mtx *meterTx) Verify(ctx context.Context) error {
 }
 
 func (mtx *meterTx) Accept(ctx context.Context) error {
-	start := time.Now()
+	start := mtx.vm.clock.Time()
 	err := mtx.Tx.Accept(ctx)
-	mtx.vm.vertexMetrics.accept.Observe(float64(time.Since(start)))
+	end := mtx.vm.clock.Time()
+	mtx.vm.vertexMetrics.accept.Observe(float64(end.Sub(start)))
 	return err
 }
 
 func (mtx *meterTx) Reject(ctx context.Context) error {
-	start := time.Now()
+	start := mtx.vm.clock.Time()
 	err := mtx.Tx.Reject(ctx)
-	mtx.vm.vertexMetrics.reject.Observe(float64(time.Since(start)))
+	end := mtx.vm.clock.Time()
+	mtx.vm.vertexMetrics.reject.Observe(float64(end.Sub(start)))
 	return err
 }

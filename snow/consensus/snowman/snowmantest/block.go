@@ -10,19 +10,19 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 )
 
 const (
-	GenesisHeight uint64 = 0
+	GenesisHeight        uint64 = 0
+	GenesisUnixTimestamp int64  = 1
 )
 
 var (
 	_ utils.Sortable[*Block] = (*Block)(nil)
 
 	GenesisID        = ids.GenerateTestID()
-	GenesisTimestamp = upgrade.InitiallyActiveTime
+	GenesisTimestamp = time.Unix(GenesisUnixTimestamp, 0)
 	GenesisBytes     = GenesisID[:]
 	Genesis          = BuildChain(1)[0]
 )

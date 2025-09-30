@@ -5,6 +5,7 @@ package merkledb
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -14,8 +15,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/heap"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+)
 
-	xsync "github.com/ava-labs/avalanchego/x/sync"
+var (
+	ErrInsufficientHistory = errors.New("insufficient history to generate proof")
+	ErrNoEndRoot           = fmt.Errorf("%w: end root not found", ErrInsufficientHistory)
 )
 
 // stores previous trie states
@@ -118,9 +122,10 @@ type valueChange struct {
 // [start, end] that occurred between [startRoot] and [endRoot].
 // If [start] is Nothing, there's no lower bound on the range.
 // If [end] is Nothing, there's no upper bound on the range.
-// Returns [xsync.ErrInsufficientHistory] if the history is insufficient
+// Returns [ErrInsufficientHistory] if the history is insufficient
 // to generate the proof.
-// Returns [xsync.ErrNoEndRoot], if the history doesn't contain the [endRootID].
+// Returns [ErrNoEndRoot], which wraps [ErrInsufficientHistory], if
+// the [endRoot] isn't in the history.
 func (th *trieHistory) getValueChanges(
 	startRoot ids.ID,
 	endRoot ids.ID,
@@ -139,7 +144,7 @@ func (th *trieHistory) getValueChanges(
 	// [endRootChanges] is the last change in the history resulting in [endRoot].
 	endRootChanges, ok := th.getRootChanges(endRoot)
 	if !ok {
-		return nil, fmt.Errorf("%w: %s", xsync.ErrNoEndRoot, endRoot)
+		return nil, fmt.Errorf("%w: %s", ErrNoEndRoot, endRoot)
 	}
 
 	// Confirm there's a change resulting in [startRoot] before
@@ -147,7 +152,7 @@ func (th *trieHistory) getValueChanges(
 	// [startRootChanges] is the last appearance of [startRoot].
 	startRootChanges, ok := th.getRootChanges(startRoot)
 	if !ok {
-		return nil, fmt.Errorf("%w: start root %s not found", xsync.ErrInsufficientHistory, startRoot)
+		return nil, fmt.Errorf("%w: start root %s not found", ErrInsufficientHistory, startRoot)
 	}
 
 	var (
@@ -184,7 +189,7 @@ func (th *trieHistory) getValueChanges(
 			if i == 0 {
 				return nil, fmt.Errorf(
 					"%w: start root %s not found before end root %s",
-					xsync.ErrInsufficientHistory, startRoot, endRoot,
+					ErrInsufficientHistory, startRoot, endRoot,
 				)
 			}
 		}
@@ -326,7 +331,7 @@ func (th *trieHistory) getChangesToGetToRoot(rootID ids.ID, start maybe.Maybe[[]
 	// [lastRootChange] is the last change in the history resulting in [rootID].
 	lastRootChange, ok := th.getRootChanges(rootID)
 	if !ok {
-		return nil, xsync.ErrInsufficientHistory
+		return nil, ErrInsufficientHistory
 	}
 
 	var (

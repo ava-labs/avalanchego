@@ -80,15 +80,12 @@ contract LoadSimulator {
         uint256 newValue
     ) external returns (bool success) {
         assembly {
-            let offset := 2
-            let firstEmptySlot := sload(latestEmptySlot.slot)
-            let numModifiedSlots := sub(firstEmptySlot, offset)
+            let slotLimit := sload(latestEmptySlot.slot)
 
-            // if numModifiedSlots >= numSlots
-            if not(lt(numModifiedSlots, numSlots)) {
+            if lt(numSlots, add(slotLimit, 1)) {
                 for {
-                    let i := offset
-                } lt(i, add(offset, numSlots)) {
+                    let i := 0
+                } lt(i, numSlots) {
                     i := add(i, 1)
                 } {
                     sstore(i, newValue)

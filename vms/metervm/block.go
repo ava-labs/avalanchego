@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -28,9 +27,10 @@ type meterBlock struct {
 }
 
 func (mb *meterBlock) Verify(ctx context.Context) error {
-	start := time.Now()
+	start := mb.vm.clock.Time()
 	err := mb.Block.Verify(ctx)
-	duration := float64(time.Since(start))
+	end := mb.vm.clock.Time()
+	duration := float64(end.Sub(start))
 	if err != nil {
 		mb.vm.blockMetrics.verifyErr.Observe(duration)
 	} else {
@@ -40,17 +40,19 @@ func (mb *meterBlock) Verify(ctx context.Context) error {
 }
 
 func (mb *meterBlock) Accept(ctx context.Context) error {
-	start := time.Now()
+	start := mb.vm.clock.Time()
 	err := mb.Block.Accept(ctx)
-	duration := float64(time.Since(start))
+	end := mb.vm.clock.Time()
+	duration := float64(end.Sub(start))
 	mb.vm.blockMetrics.accept.Observe(duration)
 	return err
 }
 
 func (mb *meterBlock) Reject(ctx context.Context) error {
-	start := time.Now()
+	start := mb.vm.clock.Time()
 	err := mb.Block.Reject(ctx)
-	duration := float64(time.Since(start))
+	end := mb.vm.clock.Time()
+	duration := float64(end.Sub(start))
 	mb.vm.blockMetrics.reject.Observe(duration)
 	return err
 }
@@ -83,9 +85,10 @@ func (mb *meterBlock) ShouldVerifyWithContext(ctx context.Context) (bool, error)
 		return false, nil
 	}
 
-	start := time.Now()
+	start := mb.vm.clock.Time()
 	shouldVerify, err := blkWithCtx.ShouldVerifyWithContext(ctx)
-	duration := float64(time.Since(start))
+	end := mb.vm.clock.Time()
+	duration := float64(end.Sub(start))
 	mb.vm.blockMetrics.shouldVerifyWithContext.Observe(duration)
 	return shouldVerify, err
 }
@@ -96,9 +99,10 @@ func (mb *meterBlock) VerifyWithContext(ctx context.Context, blockCtx *block.Con
 		return fmt.Errorf("%w but got %T", errExpectedBlockWithVerifyContext, mb.Block)
 	}
 
-	start := time.Now()
+	start := mb.vm.clock.Time()
 	err := blkWithCtx.VerifyWithContext(ctx, blockCtx)
-	duration := float64(time.Since(start))
+	end := mb.vm.clock.Time()
+	duration := float64(end.Sub(start))
 	if err != nil {
 		mb.vm.blockMetrics.verifyWithContextErr.Observe(duration)
 	} else {

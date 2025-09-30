@@ -6,6 +6,7 @@ package merkledb
 import (
 	"bytes"
 	"context"
+	"encoding"
 	"errors"
 	"fmt"
 	"math"
@@ -20,14 +21,15 @@ import (
 	"github.com/ava-labs/avalanchego/x/sync/protoutils"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
-	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
 const verificationCacheSize = math.MaxUint16
 
 var (
-	_ xsync.Marshaler[*ChangeProof] = (*ChangeProofMarshaler)(nil)
-	_ xsync.Marshaler[*RangeProof]  = (*RangeProofMarshaler)(nil)
+	_ encoding.BinaryMarshaler   = (*ChangeProof)(nil)
+	_ encoding.BinaryUnmarshaler = (*ChangeProof)(nil)
+	_ encoding.BinaryMarshaler   = (*RangeProof)(nil)
+	_ encoding.BinaryUnmarshaler = (*RangeProof)(nil)
 
 	ErrInvalidProof                  = errors.New("proof obtained an invalid root ID")
 	ErrInvalidMaxLength              = errors.New("expected max length to be > 0")
@@ -183,23 +185,17 @@ func (proof *Proof) Verify(
 
 type RangeProof ChangeProof
 
-type RangeProofMarshaler struct{}
-
-func (RangeProofMarshaler) Marshal(proof *RangeProof) ([]byte, error) {
-	return proto.Marshal(proof.toProto())
+func (r *RangeProof) MarshalBinary() ([]byte, error) {
+	return proto.Marshal(r.toProto())
 }
 
-func (RangeProofMarshaler) Unmarshal(data []byte) (*RangeProof, error) {
+func (r *RangeProof) UnmarshalBinary(data []byte) error {
 	var pbRangeProof pb.RangeProof
 	if err := proto.Unmarshal(data, &pbRangeProof); err != nil {
-		return nil, err
+		return err
 	}
 
-	var proof RangeProof
-	if err := proof.unmarshalProto(&pbRangeProof); err != nil {
-		return nil, err
-	}
-	return &proof, nil
+	return r.unmarshalProto(&pbRangeProof)
 }
 
 func (r *RangeProof) toProto() *pb.RangeProof {
@@ -406,23 +402,17 @@ type ChangeProof struct {
 	KeyChanges []KeyChange
 }
 
-type ChangeProofMarshaler struct{}
-
-func (ChangeProofMarshaler) Marshal(proof *ChangeProof) ([]byte, error) {
-	return proto.Marshal(proof.toProto())
+func (c *ChangeProof) MarshalBinary() ([]byte, error) {
+	return proto.Marshal(c.toProto())
 }
 
-func (ChangeProofMarshaler) Unmarshal(data []byte) (*ChangeProof, error) {
+func (c *ChangeProof) UnmarshalBinary(data []byte) error {
 	var pbChangeProof pb.ChangeProof
 	if err := proto.Unmarshal(data, &pbChangeProof); err != nil {
-		return nil, err
+		return err
 	}
 
-	var proof ChangeProof
-	if err := proof.unmarshalProto(&pbChangeProof); err != nil {
-		return nil, err
-	}
-	return &proof, nil
+	return c.unmarshalProto(&pbChangeProof)
 }
 
 func (c *ChangeProof) toProto() *pb.ChangeProof {

@@ -39,6 +39,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -247,8 +248,8 @@ func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 
 	// given the same core block, BuildBlock returns the same proposer block
 	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -275,8 +276,8 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 
 	// given the same core block, BuildBlock returns the same proposer block
 	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -305,8 +306,8 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 
 	// setup
 	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -334,8 +335,8 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -406,8 +407,8 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -479,8 +480,8 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -519,8 +520,8 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -589,8 +590,8 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -650,8 +651,8 @@ func TestPreFork_Initialize(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = upgrade.UnscheduledActivationTime
-		durangoTime    = upgrade.UnscheduledActivationTime
+		activationTime = mockable.MaxTime
+		durangoTime    = activationTime
 	)
 	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -673,8 +674,8 @@ func TestPreFork_BuildBlock(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = upgrade.UnscheduledActivationTime
-		durangoTime    = upgrade.UnscheduledActivationTime
+		activationTime = mockable.MaxTime
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -706,8 +707,8 @@ func TestPreFork_ParseBlock(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = upgrade.UnscheduledActivationTime
-		durangoTime    = upgrade.UnscheduledActivationTime
+		activationTime = mockable.MaxTime
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -739,8 +740,8 @@ func TestPreFork_SetPreference(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = upgrade.UnscheduledActivationTime
-		durangoTime    = upgrade.UnscheduledActivationTime
+		activationTime = mockable.MaxTime
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -972,8 +973,8 @@ func TestInnerBlockDeduplication(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1235,8 +1236,8 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.UnscheduledActivationTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1324,8 +1325,8 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.UnscheduledActivationTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1396,8 +1397,8 @@ func TestTooFarAdvanced(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.UnscheduledActivationTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1469,8 +1470,8 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.UnscheduledActivationTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = mockable.MaxTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -1517,8 +1518,8 @@ func TestLaggedPChainHeight(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -2375,8 +2376,8 @@ func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
 	)
 	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -2530,11 +2531,7 @@ func TestLocalParse(t *testing.T) {
 func TestTimestampMetrics(t *testing.T) {
 	ctx := context.Background()
 
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.UnscheduledActivationTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, time.Unix(0, 0), mockable.MaxTime, 0)
 
 	defer func() {
 		require.NoError(t, proVM.Shutdown(ctx))
@@ -2542,10 +2539,8 @@ func TestTimestampMetrics(t *testing.T) {
 
 	innerBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
-	// The actual numbers do not matter here, we just verify the metrics are
-	// populated correctly.
-	outerTime := upgrade.InitiallyActiveTime.Add(1000 * time.Second)
-	innerTime := upgrade.InitiallyActiveTime.Add(500 * time.Second)
+	outerTime := time.Unix(314159, 0)
+	innerTime := time.Unix(142857, 0)
 	proVM.Clock.Set(outerTime)
 	innerBlock.TimestampV = innerTime
 
@@ -2576,8 +2571,8 @@ func TestTimestampMetrics(t *testing.T) {
 
 func TestSelectChildPChainHeight(t *testing.T) {
 	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
+		activationTime = time.Unix(0, 0)
+		durangoTime    = activationTime
 
 		beforeOverrideEnds = fujiOverridePChainHeightUntilTimestamp.Add(-time.Minute)
 	)

@@ -4,13 +4,18 @@
 package vms
 
 import (
+	"context"
+	"crypto/tls"
 	"fmt"
+	"net"
+	"net/http"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
+	"golang.org/x/net/http2"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/api/connectclient"
@@ -196,12 +201,22 @@ var _ = ginkgo.Describe("[XSVM]", ginkgo.Label("xsvm"), func() {
 		node, err := network.GetNode(nodeID)
 		require.NoError(err)
 
+		httpClient := &http.Client{
+			Transport: &http2.Transport{
+				AllowHTTP: true,
+				DialTLSContext: func(_ context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+					// Skip TLS to use h2c
+					return net.Dial(network, addr)
+				},
+			},
+		}
+
 		chainID := network.GetSubnet(subnetAName).Chains[0].ChainID.String()
 		client := xsvmconnect.NewPingClient(
-			connectclient.New(),
+			httpClient,
 			node.URI,
 			connect.WithInterceptors(
-				connectclient.SetRouteHeaderInterceptor{Route: []string{chainID}},
+				connectclient.SetRouteHeaderInterceptor{Route: chainID},
 			),
 		)
 

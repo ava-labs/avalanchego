@@ -22,34 +22,33 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/maybe"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/ava-labs/avalanchego/x/sync/protoutils"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 )
 
 const (
-	DefaultRequestKeyLimit      = MaxKeyValuesLimit
-	DefaultRequestByteSizeLimit = maxByteSizeLimit
+	defaultRequestKeyLimit      = maxKeyValuesLimit
+	defaultRequestByteSizeLimit = maxByteSizeLimit
 	initialRetryWait            = 10 * time.Millisecond
 	maxRetryWait                = time.Second
 	retryWaitFactor             = 1.5 // Larger --> timeout grows more quickly
 )
 
 var (
-	ErrAlreadyStarted                 = errors.New("cannot start a Manager that has already been started")
-	ErrAlreadyClosed                  = errors.New("Manager is closed")
-	ErrNoRangeProofMarshalerProvided  = errors.New("range proof marshaler is a required field of the sync config")
-	ErrNoChangeProofMarshalerProvided = errors.New("change proof marshaler is a required field of the sync config")
-	ErrNoRangeProofClientProvided     = errors.New("range proof client is a required field of the sync config")
-	ErrNoChangeProofClientProvided    = errors.New("change proof client is a required field of the sync config")
-	ErrNoDatabaseProvided             = errors.New("sync database is a required field of the sync config")
-	ErrNoLogProvided                  = errors.New("log is a required field of the sync config")
-	ErrZeroWorkLimit                  = errors.New("simultaneous work limit must be greater than 0")
-	ErrFinishedWithUnexpectedRoot     = errors.New("finished syncing with an unexpected root")
-	errInvalidRangeProof              = errors.New("failed to verify range proof")
-	errInvalidChangeProof             = errors.New("failed to verify change proof")
-	errTooManyBytes                   = errors.New("response contains more than requested bytes")
-	errUnexpectedChangeProofResponse  = errors.New("unexpected response type")
+	ErrAlreadyStarted                = errors.New("cannot start a Manager that has already been started")
+	ErrAlreadyClosed                 = errors.New("Manager is closed")
+	ErrNoRangeProofClientProvided    = errors.New("range proof client is a required field of the sync config")
+	ErrNoChangeProofClientProvided   = errors.New("change proof client is a required field of the sync config")
+	ErrNoDatabaseProvided            = errors.New("sync database is a required field of the sync config")
+	ErrNoLogProvided                 = errors.New("log is a required field of the sync config")
+	ErrZeroWorkLimit                 = errors.New("simultaneous work limit must be greater than 0")
+	ErrFinishedWithUnexpectedRoot    = errors.New("finished syncing with an unexpected root")
+	errInvalidRangeProof             = errors.New("failed to verify range proof")
+	errInvalidChangeProof            = errors.New("failed to verify change proof")
+	errTooManyBytes                  = errors.New("response contains more than requested bytes")
+	errUnexpectedChangeProofResponse = errors.New("unexpected response type")
 )
 
 type priority byte
@@ -95,13 +94,10 @@ func newWorkItem(localRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[
 	}
 }
 
-type Manager[R any, C any] struct {
-	// The database to sync.
-	db DB[R, C]
-
+type Manager struct {
 	// Must be held when accessing [config.TargetRoot].
 	syncTargetLock sync.RWMutex
-	config         ManagerConfig[R, C]
+	config         ManagerConfig
 
 	workLock sync.Mutex
 	// The number of work items currently being processed.
@@ -142,9 +138,8 @@ type Manager[R any, C any] struct {
 }
 
 // TODO remove non-config values out of this struct
-type ManagerConfig[R any, C any] struct {
-	RangeProofMarshaler   Marshaler[R]
-	ChangeProofMarshaler  Marshaler[C]
+type ManagerConfig struct {
+	DB                    DB
 	RangeProofClient      *p2p.Client
 	ChangeProofClient     *p2p.Client
 	SimultaneousWorkLimit int
@@ -153,22 +148,14 @@ type ManagerConfig[R any, C any] struct {
 	StateSyncNodes        []ids.NodeID
 }
 
-func NewManager[R any, C any](
-	db DB[R, C],
-	config ManagerConfig[R, C],
-	registerer prometheus.Registerer,
-) (*Manager[R, C], error) {
+func NewManager(config ManagerConfig, registerer prometheus.Registerer) (*Manager, error) {
 	switch {
-	case db == nil:
-		return nil, ErrNoDatabaseProvided
-	case config.RangeProofMarshaler == nil:
-		return nil, ErrNoRangeProofMarshalerProvided
-	case config.ChangeProofMarshaler == nil:
-		return nil, ErrNoChangeProofMarshalerProvided
 	case config.RangeProofClient == nil:
 		return nil, ErrNoRangeProofClientProvided
 	case config.ChangeProofClient == nil:
 		return nil, ErrNoChangeProofClientProvided
+	case config.DB == nil:
+		return nil, ErrNoDatabaseProvided
 	case config.Log == nil:
 		return nil, ErrNoLogProvided
 	case config.SimultaneousWorkLimit == 0:
@@ -180,8 +167,7 @@ func NewManager[R any, C any](
 		return nil, err
 	}
 
-	m := &Manager[R, C]{
-		db:              db,
+	m := &Manager{
 		config:          config,
 		doneChan:        make(chan struct{}),
 		unprocessedWork: newWorkHeap(),
@@ -193,7 +179,7 @@ func NewManager[R any, C any](
 	return m, nil
 }
 
-func (m *Manager[_, _]) Start(ctx context.Context) error {
+func (m *Manager) Start(ctx context.Context) error {
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
@@ -217,7 +203,7 @@ func (m *Manager[_, _]) Start(ctx context.Context) error {
 // sync awaits signal on [m.unprocessedWorkCond], which indicates that there
 // is work to do or syncing completes.  If there is work, sync will dispatch a goroutine to do
 // the work.
-func (m *Manager[_, _]) sync(ctx context.Context) {
+func (m *Manager) sync(ctx context.Context) {
 	defer func() {
 		// Invariant: [m.workLock] is held when this goroutine begins.
 		m.close()
@@ -255,7 +241,7 @@ func (m *Manager[_, _]) sync(ctx context.Context) {
 }
 
 // Close will stop the syncing process
-func (m *Manager[_, _]) Close() {
+func (m *Manager) Close() {
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
@@ -264,7 +250,7 @@ func (m *Manager[_, _]) Close() {
 
 // close is called when there is a fatal error or sync is complete.
 // [workLock] must be held
-func (m *Manager[_, _]) close() {
+func (m *Manager) close() {
 	m.closeOnce.Do(func() {
 		// Don't process any more work items.
 		// Drop currently processing work items.
@@ -282,7 +268,7 @@ func (m *Manager[_, _]) close() {
 	})
 }
 
-func (m *Manager[_, _]) finishWorkItem() {
+func (m *Manager) finishWorkItem() {
 	m.workLock.Lock()
 	defer m.workLock.Unlock()
 
@@ -291,7 +277,7 @@ func (m *Manager[_, _]) finishWorkItem() {
 }
 
 // Processes [item] by fetching a change or range proof.
-func (m *Manager[_, _]) doWork(ctx context.Context, work *workItem) {
+func (m *Manager) doWork(ctx context.Context, work *workItem) {
 	// Backoff for failed requests accounting for time this job has already
 	// spent waiting in the unprocessed queue
 	now := time.Now()
@@ -322,7 +308,7 @@ func (m *Manager[_, _]) doWork(ctx context.Context, work *workItem) {
 
 // Fetch and apply the change proof given by [work].
 // Assumes [m.workLock] is not held.
-func (m *Manager[_, _]) requestChangeProof(ctx context.Context, work *workItem) {
+func (m *Manager) requestChangeProof(ctx context.Context, work *workItem) {
 	targetRootID := m.getTargetRoot()
 
 	if work.localRootID == targetRootID {
@@ -337,7 +323,7 @@ func (m *Manager[_, _]) requestChangeProof(ctx context.Context, work *workItem) 
 
 		// The trie is empty after this change.
 		// Delete all the key-value pairs in the range.
-		if err := m.db.Clear(); err != nil {
+		if err := m.config.DB.Clear(); err != nil {
 			m.setError(err)
 			return
 		}
@@ -351,8 +337,8 @@ func (m *Manager[_, _]) requestChangeProof(ctx context.Context, work *workItem) 
 		EndRootHash:   targetRootID[:],
 		StartKey:      protoutils.MaybeToProto(work.start),
 		EndKey:        protoutils.MaybeToProto(work.end),
-		KeyLimit:      DefaultRequestKeyLimit,
-		BytesLimit:    DefaultRequestByteSizeLimit,
+		KeyLimit:      defaultRequestKeyLimit,
+		BytesLimit:    defaultRequestByteSizeLimit,
 	}
 
 	requestBytes, err := proto.Marshal(request)
@@ -384,13 +370,13 @@ func (m *Manager[_, _]) requestChangeProof(ctx context.Context, work *workItem) 
 
 // Fetch and apply the range proof given by [work].
 // Assumes [m.workLock] is not held.
-func (m *Manager[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
+func (m *Manager) requestRangeProof(ctx context.Context, work *workItem) {
 	targetRootID := m.getTargetRoot()
 
 	if targetRootID == ids.Empty {
 		defer m.finishWorkItem()
 
-		if err := m.db.Clear(); err != nil {
+		if err := m.config.DB.Clear(); err != nil {
 			m.setError(err)
 			return
 		}
@@ -403,8 +389,8 @@ func (m *Manager[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 		RootHash:   targetRootID[:],
 		StartKey:   protoutils.MaybeToProto(work.start),
 		EndKey:     protoutils.MaybeToProto(work.end),
-		KeyLimit:   DefaultRequestKeyLimit,
-		BytesLimit: DefaultRequestByteSizeLimit,
+		KeyLimit:   defaultRequestKeyLimit,
+		BytesLimit: defaultRequestByteSizeLimit,
 	}
 
 	requestBytes, err := proto.Marshal(request)
@@ -434,7 +420,7 @@ func (m *Manager[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 	m.metrics.RequestMade()
 }
 
-func (m *Manager[_, _]) sendRequest(ctx context.Context, client *p2p.Client, requestBytes []byte, onResponse p2p.AppResponseCallback) error {
+func (m *Manager) sendRequest(ctx context.Context, client *p2p.Client, requestBytes []byte, onResponse p2p.AppResponseCallback) error {
 	if len(m.config.StateSyncNodes) == 0 {
 		return client.AppRequestAny(ctx, requestBytes, onResponse)
 	}
@@ -447,7 +433,7 @@ func (m *Manager[_, _]) sendRequest(ctx context.Context, client *p2p.Client, req
 	return client.AppRequest(ctx, set.Of(nodeID), requestBytes, onResponse)
 }
 
-func (m *Manager[_, _]) retryWork(work *workItem) {
+func (m *Manager) retryWork(work *workItem) {
 	work.priority = retryPriority
 	work.queueTime = time.Now()
 	work.requestFailed()
@@ -459,7 +445,7 @@ func (m *Manager[_, _]) retryWork(work *workItem) {
 }
 
 // Returns an error if we should drop the response
-func (m *Manager[_, _]) shouldHandleResponse(
+func (m *Manager) shouldHandleResponse(
 	bytesLimit uint32,
 	responseBytes []byte,
 	err error,
@@ -486,7 +472,7 @@ func (m *Manager[_, _]) shouldHandleResponse(
 	return nil
 }
 
-func (m *Manager[R, _]) handleRangeProofResponse(
+func (m *Manager) handleRangeProofResponse(
 	ctx context.Context,
 	targetRootID ids.ID,
 	work *workItem,
@@ -498,8 +484,8 @@ func (m *Manager[R, _]) handleRangeProofResponse(
 		return err
 	}
 
-	rangeProof, err := m.config.RangeProofMarshaler.Unmarshal(responseBytes)
-	if err != nil {
+	var rangeProof merkledb.RangeProof
+	if err := rangeProof.UnmarshalBinary(responseBytes); err != nil {
 		return err
 	}
 
@@ -508,9 +494,9 @@ func (m *Manager[R, _]) handleRangeProofResponse(
 		return err
 	}
 
-	if err := m.db.VerifyRangeProof(
+	if err := m.config.DB.VerifyRangeProof(
 		ctx,
-		rangeProof,
+		&rangeProof,
 		protoutils.ProtoToMaybe(request.StartKey),
 		protoutils.ProtoToMaybe(request.EndKey),
 		root,
@@ -520,7 +506,7 @@ func (m *Manager[R, _]) handleRangeProofResponse(
 	}
 
 	// Replace all the key-value pairs in the DB from start to end with values from the response.
-	nextKey, err := m.db.CommitRangeProof(ctx, work.start, work.end, rangeProof)
+	nextKey, err := m.config.DB.CommitRangeProof(ctx, work.start, work.end, &rangeProof)
 	if err != nil {
 		m.setError(err)
 		return nil
@@ -530,7 +516,7 @@ func (m *Manager[R, _]) handleRangeProofResponse(
 	return nil
 }
 
-func (m *Manager[R, C]) handleChangeProofResponse(
+func (m *Manager) handleChangeProofResponse(
 	ctx context.Context,
 	targetRootID ids.ID,
 	work *workItem,
@@ -557,13 +543,13 @@ func (m *Manager[R, C]) handleChangeProofResponse(
 	switch changeProofResp := changeProofResp.Response.(type) {
 	case *pb.GetChangeProofResponse_ChangeProof:
 		// The server had enough history to send us a change proof
-		changeProof, err := m.config.ChangeProofMarshaler.Unmarshal(changeProofResp.ChangeProof)
-		if err != nil {
+		var changeProof merkledb.ChangeProof
+		if err := changeProof.UnmarshalBinary(changeProofResp.ChangeProof); err != nil {
 			return err
 		}
-		if err := m.db.VerifyChangeProof(
+		if err := m.config.DB.VerifyChangeProof(
 			ctx,
-			changeProof,
+			&changeProof,
 			startKey,
 			endKey,
 			endRoot,
@@ -573,7 +559,7 @@ func (m *Manager[R, C]) handleChangeProofResponse(
 		}
 
 		// if the proof wasn't empty, apply changes to the sync DB
-		nextKey, err := m.db.CommitChangeProof(ctx, endKey, changeProof)
+		nextKey, err := m.config.DB.CommitChangeProof(ctx, endKey, &changeProof)
 		if err != nil {
 			m.setError(err)
 			return nil
@@ -581,16 +567,16 @@ func (m *Manager[R, C]) handleChangeProofResponse(
 
 		m.completeWorkItem(work, nextKey, targetRootID)
 	case *pb.GetChangeProofResponse_RangeProof:
-		rangeProof, err := m.config.RangeProofMarshaler.Unmarshal(changeProofResp.RangeProof)
-		if err != nil {
+		var rangeProof merkledb.RangeProof
+		if err := rangeProof.UnmarshalBinary(changeProofResp.RangeProof); err != nil {
 			return err
 		}
 
 		// The server did not have enough history to send us a change proof
 		// so they sent a range proof instead.
-		if err := m.db.VerifyRangeProof(
+		if err := m.config.DB.VerifyRangeProof(
 			ctx,
-			rangeProof,
+			&rangeProof,
 			startKey,
 			endKey,
 			endRoot,
@@ -600,7 +586,7 @@ func (m *Manager[R, C]) handleChangeProofResponse(
 		}
 
 		// Add all the key-value pairs we got to the database.
-		nextKey, err := m.db.CommitRangeProof(ctx, work.start, work.end, rangeProof)
+		nextKey, err := m.config.DB.CommitRangeProof(ctx, work.start, work.end, &rangeProof)
 		if err != nil {
 			m.setError(err)
 			return nil
@@ -617,7 +603,7 @@ func (m *Manager[R, C]) handleChangeProofResponse(
 	return nil
 }
 
-func (m *Manager[_, _]) Error() error {
+func (m *Manager) Error() error {
 	m.errLock.Lock()
 	defer m.errLock.Unlock()
 
@@ -629,7 +615,7 @@ func (m *Manager[_, _]) Error() error {
 // - sync fatally errored.
 // - [ctx] is canceled.
 // If [ctx] is canceled, returns [ctx].Err().
-func (m *Manager[_, _]) Wait(ctx context.Context) error {
+func (m *Manager) Wait(ctx context.Context) error {
 	select {
 	case <-m.doneChan:
 	case <-ctx.Done():
@@ -641,7 +627,7 @@ func (m *Manager[_, _]) Wait(ctx context.Context) error {
 		return err
 	}
 
-	root, err := m.db.GetMerkleRoot(ctx)
+	root, err := m.config.DB.GetMerkleRoot(ctx)
 	if err != nil {
 		return err
 	}
@@ -655,7 +641,7 @@ func (m *Manager[_, _]) Wait(ctx context.Context) error {
 	return nil
 }
 
-func (m *Manager[_, _]) UpdateSyncTarget(syncTargetRoot ids.ID) error {
+func (m *Manager) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 	m.syncTargetLock.Lock()
 	defer m.syncTargetLock.Unlock()
 
@@ -694,7 +680,7 @@ func (m *Manager[_, _]) UpdateSyncTarget(syncTargetRoot ids.ID) error {
 	return nil
 }
 
-func (m *Manager[_, _]) getTargetRoot() ids.ID {
+func (m *Manager) getTargetRoot() ids.ID {
 	m.syncTargetLock.RLock()
 	defer m.syncTargetLock.RUnlock()
 
@@ -702,7 +688,7 @@ func (m *Manager[_, _]) getTargetRoot() ids.ID {
 }
 
 // Record that there was a fatal error and begin shutting down.
-func (m *Manager[_, _]) setError(err error) {
+func (m *Manager) setError(err error) {
 	m.errLock.Lock()
 	defer m.errLock.Unlock()
 
@@ -726,7 +712,7 @@ func (m *Manager[_, _]) setError(err error) {
 // that gave us the range up to and including [largestHandledKey].
 //
 // Assumes [m.workLock] is not held.
-func (m *Manager[_, _]) completeWorkItem(work *workItem, largestHandledKey maybe.Maybe[[]byte], rootID ids.ID) {
+func (m *Manager) completeWorkItem(work *workItem, largestHandledKey maybe.Maybe[[]byte], rootID ids.ID) {
 	// nextStartKey being Nothing indicates that the entire range has been completed
 	if largestHandledKey.IsNothing() {
 		largestHandledKey = work.end
@@ -764,7 +750,7 @@ func (m *Manager[_, _]) completeWorkItem(work *workItem, largestHandledKey maybe
 // If there are sufficiently few unprocessed/processing work items,
 // splits the range into two items and queues them both.
 // Assumes [m.workLock] is not held.
-func (m *Manager[_, _]) enqueueWork(work *workItem) {
+func (m *Manager) enqueueWork(work *workItem) {
 	m.workLock.Lock()
 	defer func() {
 		m.workLock.Unlock()

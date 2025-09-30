@@ -59,7 +59,6 @@ type Block interface {
 	buildChild(context.Context) (Block, error)
 
 	pChainHeight(context.Context) (uint64, error)
-	selectChildPChainHeight(context.Context) (uint64, error)
 }
 
 type PostForkBlock interface {

@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
-	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
 func Test_Proof_Empty(t *testing.T) {
@@ -821,8 +820,8 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 		maybe.Nothing[[]byte](),
 		50,
 	)
-	require.ErrorIs(err, xsync.ErrNoEndRoot)
-	require.ErrorIs(err, xsync.ErrInsufficientHistory)
+	require.ErrorIs(err, ErrNoEndRoot)
+	require.ErrorIs(err, ErrInsufficientHistory)
 
 	_, err = db.GetChangeProof(
 		context.Background(),
@@ -832,8 +831,8 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 		maybe.Nothing[[]byte](),
 		50,
 	)
-	require.NotErrorIs(err, xsync.ErrNoEndRoot)
-	require.ErrorIs(err, xsync.ErrInsufficientHistory)
+	require.NotErrorIs(err, ErrNoEndRoot)
+	require.ErrorIs(err, ErrInsufficientHistory)
 
 	_, err = db.GetChangeProof(
 		context.Background(),
@@ -1609,7 +1608,7 @@ func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
 		// Generate at least 1 key value, all maybe.Some
 		keyValues := generateKeyChanges(rand, rand.Intn(128), false)
 
-		proof := &RangeProof{
+		proof := RangeProof{
 			StartProof: startProof,
 			EndProof:   endProof,
 			KeyChanges: keyValues,
@@ -1617,10 +1616,10 @@ func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
 
 		// Marshal and unmarshal it.
 		// Assert the unmarshaled one is the same as the original.
-		originalBytes, err := rangeProofMarshaler.Marshal(proof)
+		var unmarshaledProof RangeProof
+		originalBytes, err := proof.MarshalBinary()
 		require.NoError(err)
-		unmarshaledProof, err := rangeProofMarshaler.Unmarshal(originalBytes)
-		require.NoError(err)
+		require.NoError(unmarshaledProof.UnmarshalBinary(originalBytes))
 		require.Equal(proof, unmarshaledProof)
 	})
 }
@@ -1649,7 +1648,7 @@ func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
 		// Include any number of key changes, including deletions
 		keyChanges := generateKeyChanges(rand, rand.Intn(128), true)
 
-		proof := &ChangeProof{
+		proof := ChangeProof{
 			StartProof: startProof,
 			EndProof:   endProof,
 			KeyChanges: keyChanges,
@@ -1657,10 +1656,10 @@ func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
 
 		// Marshal and unmarshal it.
 		// Assert the unmarshaled one is the same as the original.
-		originalBytes, err := changeProofMarshaler.Marshal(proof)
+		var unmarshaledProof ChangeProof
+		originalBytes, err := proof.MarshalBinary()
 		require.NoError(err)
-		unmarshaledProof, err := changeProofMarshaler.Unmarshal(originalBytes)
-		require.NoError(err)
+		require.NoError(unmarshaledProof.UnmarshalBinary(originalBytes))
 		require.Equal(proof, unmarshaledProof)
 	})
 }

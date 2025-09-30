@@ -122,15 +122,6 @@ func (b *postForkOption) pChainHeight(ctx context.Context) (uint64, error) {
 	return parent.pChainHeight(ctx)
 }
 
-func (b *postForkOption) selectChildPChainHeight(ctx context.Context) (uint64, error) {
-	pChainHeight, err := b.pChainHeight(ctx)
-	if err != nil {
-		return 0, err
-	}
-
-	return b.vm.selectChildPChainHeight(ctx, pChainHeight)
-}
-
 func (b *postForkOption) getStatelessBlk() block.Block {
 	return b.Block
 }

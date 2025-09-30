@@ -5,7 +5,6 @@ package metervm
 
 import (
 	"context"
-	"time"
 
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
@@ -16,9 +15,10 @@ func (vm *blockVM) BuildBlockWithContext(ctx context.Context, blockCtx *block.Co
 		return vm.BuildBlock(ctx)
 	}
 
-	start := time.Now()
+	start := vm.clock.Time()
 	blk, err := vm.buildBlockVM.BuildBlockWithContext(ctx, blockCtx)
-	duration := float64(time.Since(start))
+	end := vm.clock.Time()
+	duration := float64(end.Sub(start))
 	if err != nil {
 		vm.blockMetrics.buildBlockWithContextErr.Observe(duration)
 		return nil, err

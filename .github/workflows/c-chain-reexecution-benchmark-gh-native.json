@@ -31,6 +31,16 @@
         ]
     },
     "schedule": {
-        "include": []
+        "include": [
+            {
+                "runner": "blacksmith-4vcpu-ubuntu-2404",
+                "config": "default",
+                "start-block": 33000001,
+                "end-block": 33500000,
+                "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-30m-40m-ldb/**",
+                "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-33m/**",
+                "timeout-minutes": 1440
+            }
+        ]
     }
 }

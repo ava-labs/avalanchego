@@ -5,7 +5,6 @@ package metervm
 
 import (
 	"context"
-	"time"
 
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
@@ -15,9 +14,10 @@ func (vm *blockVM) StateSyncEnabled(ctx context.Context) (bool, error) {
 		return false, nil
 	}
 
-	start := time.Now()
+	start := vm.clock.Time()
 	enabled, err := vm.ssVM.StateSyncEnabled(ctx)
-	vm.blockMetrics.stateSyncEnabled.Observe(float64(time.Since(start)))
+	end := vm.clock.Time()
+	vm.blockMetrics.stateSyncEnabled.Observe(float64(end.Sub(start)))
 	return enabled, err
 }
 
@@ -26,9 +26,10 @@ func (vm *blockVM) GetOngoingSyncStateSummary(ctx context.Context) (block.StateS
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
-	start := time.Now()
+	start := vm.clock.Time()
 	summary, err := vm.ssVM.GetOngoingSyncStateSummary(ctx)
-	vm.blockMetrics.getOngoingSyncStateSummary.Observe(float64(time.Since(start)))
+	end := vm.clock.Time()
+	vm.blockMetrics.getOngoingSyncStateSummary.Observe(float64(end.Sub(start)))
 	return summary, err
 }
 
@@ -37,9 +38,10 @@ func (vm *blockVM) GetLastStateSummary(ctx context.Context) (block.StateSummary,
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
-	start := time.Now()
+	start := vm.clock.Time()
 	summary, err := vm.ssVM.GetLastStateSummary(ctx)
-	vm.blockMetrics.getLastStateSummary.Observe(float64(time.Since(start)))
+	end := vm.clock.Time()
+	vm.blockMetrics.getLastStateSummary.Observe(float64(end.Sub(start)))
 	return summary, err
 }
 
@@ -48,9 +50,10 @@ func (vm *blockVM) ParseStateSummary(ctx context.Context, summaryBytes []byte) (
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
-	start := time.Now()
+	start := vm.clock.Time()
 	summary, err := vm.ssVM.ParseStateSummary(ctx, summaryBytes)
-	duration := float64(time.Since(start))
+	end := vm.clock.Time()
+	duration := float64(end.Sub(start))
 	if err != nil {
 		vm.blockMetrics.parseStateSummaryErr.Observe(duration)
 		return nil, err
@@ -64,9 +67,10 @@ func (vm *blockVM) GetStateSummary(ctx context.Context, height uint64) (block.St
 		return nil, block.ErrStateSyncableVMNotImplemented
 	}
 
-	start := time.Now()
+	start := vm.clock.Time()
 	summary, err := vm.ssVM.GetStateSummary(ctx, height)
-	duration := float64(time.Since(start))
+	end := vm.clock.Time()
+	duration := float64(end.Sub(start))
 	if err != nil {
 		vm.blockMetrics.getStateSummaryErr.Observe(duration)
 		return nil, err

@@ -23,7 +23,7 @@ func (vm *blockVM) GetAncestors(
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
-	start := time.Now()
+	start := vm.clock.Time()
 	ancestors, err := vm.batchedVM.GetAncestors(
 		ctx,
 		blkID,
@@ -31,7 +31,8 @@ func (vm *blockVM) GetAncestors(
 		maxBlocksSize,
 		maxBlocksRetrivalTime,
 	)
-	vm.blockMetrics.getAncestors.Observe(float64(time.Since(start)))
+	end := vm.clock.Time()
+	vm.blockMetrics.getAncestors.Observe(float64(end.Sub(start)))
 	return ancestors, err
 }
 
@@ -40,9 +41,10 @@ func (vm *blockVM) BatchedParseBlock(ctx context.Context, blks [][]byte) ([]snow
 		return nil, block.ErrRemoteVMNotImplemented
 	}
 
-	start := time.Now()
+	start := vm.clock.Time()
 	blocks, err := vm.batchedVM.BatchedParseBlock(ctx, blks)
-	vm.blockMetrics.batchedParseBlock.Observe(float64(time.Since(start)))
+	end := vm.clock.Time()
+	vm.blockMetrics.batchedParseBlock.Observe(float64(end.Sub(start)))
 
 	wrappedBlocks := make([]snowman.Block, len(blocks))
 	for i, block := range blocks {
