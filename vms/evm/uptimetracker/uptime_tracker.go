@@ -59,25 +59,29 @@ func New(
 }
 
 // GetUptime returns the uptime of the validator corresponding to validationID
-func (u *UptimeTracker) GetUptime(validationID ids.ID) (time.Duration, error) {
+func (u *UptimeTracker) GetUptime(validationID ids.ID) (
+	time.Duration,
+	bool,
+	error,
+) {
 	u.lock.Lock()
 	defer u.lock.Unlock()
 
 	nodeID, ok := u.state.getNodeID(validationID)
 	if !ok {
-		return 0, fmt.Errorf("%w: %s", errNotFound, validationID)
+		return 0, false, nil
 	}
 
 	uptime, _, err := u.manager.CalculateUptime(nodeID)
 	if err != nil {
-		return 0, fmt.Errorf(
+		return 0, false, fmt.Errorf(
 			"failed to calculate uptime for validator %s: %w",
 			validationID,
 			err,
 		)
 	}
 
-	return uptime, nil
+	return uptime, true, nil
 }
 
 // Connect starts tracking a node. Nodes that are activated and connected will
