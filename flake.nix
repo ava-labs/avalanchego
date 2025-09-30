@@ -39,6 +39,9 @@
             # Task runner
             go-task
 
+            # Local Go package
+            (import ./nix/go.nix { inherit pkgs; })
+
             # Monitoring tools
             promtail                                   # Loki log shipper
             prometheus                                 # Metrics collector
@@ -71,6 +74,12 @@
           # Add scripts/ directory to PATH so kind-with-registry.sh is accessible
           shellHook = ''
             export PATH="$PWD/scripts:$PATH"
+
+            # Ensure golang bin is in the path
+            GOBIN="$(go env GOPATH)/bin"
+            if [[ ":$PATH:" != *":$GOBIN:"* ]]; then
+              export PATH="$GOBIN:$PATH"
+            fi
           '';
         };
       });

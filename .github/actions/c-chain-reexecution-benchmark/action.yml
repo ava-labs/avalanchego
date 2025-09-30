@@ -64,7 +64,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/setup-go-for-project
     - name: Set task env
       shell: bash
       run: |
@@ -113,8 +112,6 @@ runs:
         github-token: ${{ inputs.github-token }}
         auto-push: ${{ inputs.push-github-action-benchmark }}
 
-    - uses: ./.github/actions/install-nix
-      if: ${{ inputs.push-post-state != '' }}
     - name: Push Post-State to S3 (if not exists)
       if: ${{ inputs.push-post-state != '' }}
       shell: nix develop --command bash -x {0}
