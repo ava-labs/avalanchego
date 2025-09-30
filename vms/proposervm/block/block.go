@@ -20,6 +20,7 @@ var (
 
 	errUnexpectedSignature = errors.New("signature provided when none was expected")
 	errInvalidCertificate  = errors.New("invalid certificate")
+	errZeroEpoch           = errors.New("epoch number must be greater than 0 prior to granite")
 )
 
 type Block interface {
@@ -200,5 +201,8 @@ func (b *statelessGraniteBlock) initialize(bytes []byte) error {
 }
 
 func (b *statelessGraniteBlock) verify(chainID ids.ID) error {
+	if b.StatelessGraniteBlock.Epoch.Number == 0 {
+		return errZeroEpoch
+	}
 	return b.statelessBlockMetadata.verify(&b.StatelessGraniteBlock.StatelessBlock, b.Signature, chainID)
 }
