@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -110,7 +109,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, upgrade.InitiallyActiveTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -236,7 +235,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, upgrade.InitiallyActiveTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()

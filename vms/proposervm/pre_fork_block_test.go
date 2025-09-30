@@ -53,7 +53,7 @@ func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
 func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, upgrade.UnscheduledActivationTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.NoUpgrades, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -116,7 +116,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	require := require.New(t)
 
 	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, activationTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0, activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -186,7 +186,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, snowmantest.GenesisTimestamp.Add(10*time.Second), 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.NoUpgrades, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -245,7 +245,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	require := require.New(t)
 
 	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, activationTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0, activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -351,7 +351,7 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 	require := require.New(t)
 
 	activationTime := snowmantest.GenesisTimestamp.Add(-1 * time.Second)
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, activationTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0)
 	proVM.Set(activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
@@ -383,7 +383,7 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 	require := require.New(t)
 
 	// setup
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, upgrade.UnscheduledActivationTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.NoUpgrades, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -434,7 +434,7 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, upgrade.UnscheduledActivationTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.NoUpgrades, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -457,7 +457,7 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 	require := require.New(t)
 
 	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, activationTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0, activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -524,7 +524,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 	require := require.New(t)
 
 	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, activationTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0, activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()

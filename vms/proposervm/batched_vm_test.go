@@ -37,7 +37,7 @@ import (
 func TestCoreVMNotRemote(t *testing.T) {
 	// if coreVM is not remote VM, a specific error is returned
 	require := require.New(t)
-	_, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, upgrade.InitiallyActiveTime, 0)
+	_, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -63,7 +63,7 @@ func TestCoreVMNotRemote(t *testing.T) {
 
 func TestGetAncestorsPreForkOnly(t *testing.T) {
 	require := require.New(t)
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, upgradetest.ApricotPhase4, upgrade.UnscheduledActivationTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, upgradetest.NoUpgrades)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -182,7 +182,7 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 
 func TestGetAncestorsPostForkOnly(t *testing.T) {
 	require := require.New(t)
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, upgradetest.Durango, upgrade.InitiallyActiveTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, upgradetest.Durango)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -482,7 +482,7 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 
 func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 	require := require.New(t)
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, upgradetest.ApricotPhase4, upgrade.UnscheduledActivationTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, upgradetest.NoUpgrades)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -672,7 +672,7 @@ func makeParseableBlocks(t *testing.T, parentID ids.ID, timestamp time.Time, pCh
 
 func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	require := require.New(t)
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, upgradetest.Durango, upgrade.InitiallyActiveTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, upgradetest.Durango)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -889,10 +889,13 @@ type TestRemoteProposerVM struct {
 	*blocktest.VM
 }
 
+// initTestRemoteProposerVM creates a proposerVM for testing.
+// If forkActivationTime is provided, the fork activates at that specific time.
+// If not provided, the fork is already activated at InitiallyActiveTime.
 func initTestRemoteProposerVM(
 	t *testing.T,
 	fork upgradetest.Fork,
-	forkActivationTime time.Time,
+	forkActivationTime ...time.Time,
 ) (
 	TestRemoteProposerVM,
 	*VM,
@@ -939,10 +942,17 @@ func initTestRemoteProposerVM(
 		}
 	}
 
+	var upgrades upgrade.Config
+	if len(forkActivationTime) > 0 {
+		upgrades = upgradetest.GetConfigWithUpgradeTime(fork, forkActivationTime[0])
+	} else {
+		upgrades = upgradetest.GetConfig(fork)
+	}
+
 	proVM := New(
 		coreVM,
 		Config{
-			Upgrades:            upgradetest.GetConfigWithUpgradeTime(fork, forkActivationTime),
+			Upgrades:            upgrades,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
