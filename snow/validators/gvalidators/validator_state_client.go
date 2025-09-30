@@ -67,14 +67,17 @@ func (c *Client) GetWarpValidatorSets(
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get all validator sets: %w", err)
+		return nil, fmt.Errorf("failed to get warp validator sets at %d: %w",
+			height,
+			err,
+		)
 	}
 
 	validatorSets := make(map[ids.ID]validators.WarpSet, len(resp.ValidatorSets))
 	for _, validatorSet := range resp.ValidatorSets {
 		subnetID, err := ids.ToID(validatorSet.GetSubnetId())
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse subnet ID %s: %w", subnetID, err)
+			return nil, fmt.Errorf("failed to parse subnet ID: %w", err)
 		}
 
 		vdrs, err := warpValidatorsFromProto(validatorSet.GetValidators())
@@ -103,7 +106,11 @@ func (c *Client) GetWarpValidatorSet(
 		},
 	)
 	if err != nil {
-		return validators.WarpSet{}, fmt.Errorf("failed to get all validator sets: %w", err)
+		return validators.WarpSet{}, fmt.Errorf("failed to get warp validator set at %d for %s: %w",
+			height,
+			subnetID,
+			err,
+		)
 	}
 
 	vdrs, err := warpValidatorsFromProto(resp.GetValidators())
