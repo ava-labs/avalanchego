@@ -126,7 +126,7 @@ func (c *Client) GetValidatorSet(
 		SubnetId: subnetID[:],
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get validator set for subnet %s at height %d: %w", subnetID.String(), height, err)
+		return nil, fmt.Errorf("failed to get validator set for subnet %s at height %d: %w", subnetID, height, err)
 	}
 
 	vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, len(resp.Validators))
