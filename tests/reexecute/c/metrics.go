@@ -95,15 +95,11 @@ func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time
 	msPerGGas := (float64(elapsed) / nsPerMs) / totalGGas
 	b.ReportMetric(msPerGGas, "ms/ggas")
 
-	totalMSTrackedPerGGas := float64(0)
 	for _, metric := range meterVMMetrics {
 		metricVal, err := getMetricValue(registry, metric)
 		r.NoError(err)
 
 		metricValMS := (metricVal / nsPerMs) / totalGGas
-		totalMSTrackedPerGGas += metricValMS
 		b.ReportMetric(metricValMS, metric.name+"_ms/ggas")
 	}
-
-	b.ReportMetric(totalMSTrackedPerGGas, "tracked_ms/ggas")
 }
