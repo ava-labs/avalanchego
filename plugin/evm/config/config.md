@@ -234,6 +234,14 @@ Configuration is provided as a JSON object. All fields are optional unless other
 
 ## Database Configuration
 
+> **WARNING**: `firewood` and `path` schemes are untested in production. Using `path` is strongly discouraged. To use `firewood`, you must also set the following config options:
+>
+> - `pruning-enabled: true` (enabled by default)
+> - `state-sync-enabled: false`
+> - `snapshot-cache: 0`
+
+Failing to set these options will result in errors on VM initialization. Additionally, not all APIs are available - see these portions of the config documentation for more details.
+
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
 | `database-type` | string | Type of database to use | `"pebbledb"` |
