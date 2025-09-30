@@ -28,17 +28,17 @@ var (
 	meterVMMetrics = []topLevelMetric{
 		{
 			name:  "block_parse",
-			query: "avalanche_meterchainvm_C_parse_block_sum",
+			query: "avalanche_meterchainvm_parse_block_sum",
 			kind:  gauge,
 		},
 		{
 			name:  "block_verify",
-			query: "avalanche_meterchainvm_C_verify_sum",
+			query: "avalanche_meterchainvm_verify_sum",
 			kind:  gauge,
 		},
 		{
 			name:  "block_accept",
-			query: "avalanche_meterchainvm_C_accept_sum",
+			query: "avalanche_meterchainvm_accept_sum",
 			kind:  gauge,
 		},
 	}

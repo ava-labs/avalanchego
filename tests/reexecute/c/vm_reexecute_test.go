@@ -170,7 +170,7 @@ func benchmarkReexecuteRange(
 	r.NoError(prefixGatherer.Register("avalanche_evm", vmMultiGatherer))
 
 	meterVMRegistry := prometheus.NewRegistry()
-	r.NoError(prefixGatherer.Register("avalanche_meterchainvm_C", meterVMRegistry))
+	r.NoError(prefixGatherer.Register("avalanche_meterchainvm", meterVMRegistry))
 
 	// consensusRegistry includes the chain="C" label and the prefix "avalanche_snowman".
 	// The consensus registry is passed to the executor to mimic a subset of consensus metrics.
