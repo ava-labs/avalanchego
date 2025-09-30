@@ -42,9 +42,14 @@ type State interface {
 	GetWarpValidatorSets(ctx context.Context, height uint64) (map[ids.ID]WarpSet, error)
 
 	// GetWarpValidatorSet returns the canonical warp validator set for the
-	// requested subnet at the requested P-chain height.
+	// requested subnet at the requested P-chain height. If the subnet doesn't
+	// have a canonical warp validator set, either the returned set will be
+	// empty or an error will be returned.
 	//
 	// The returned set should not be modified.
+	//
+	// TODO: After Granite, this method should be removed and users should
+	// directly call GetWarpValidatorSets.
 	GetWarpValidatorSet(
 		ctx context.Context,
 		height uint64,
@@ -175,6 +180,13 @@ type cachedState struct {
 	State
 
 	// Activate caching of individual validator sets after this time.
+	//
+	// This enables pre-Granite code to call GetWarpValidatorSet without
+	// generating the full validator set for each P-chain height.
+	//
+	// After Granite, it is expected that the P-chain height will be frozen for
+	// the duration of an epoch, so generating the full set is not expensive as
+	// long as it is cached.
 	activation time.Time
 
 	// Caches validators for all subnets at various heights.
