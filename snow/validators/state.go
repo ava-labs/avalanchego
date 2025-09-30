@@ -244,9 +244,5 @@ func (c *cachedState) GetWarpValidatorSet(
 	if err != nil {
 		return WarpSet{}, err
 	}
-
-	if vdrs, ok := s[subnetID]; ok {
-		return vdrs, nil
-	}
-	return WarpSet{}, nil
+	return s[subnetID], nil
 }
