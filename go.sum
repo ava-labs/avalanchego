@@ -74,6 +74,8 @@ github.com/ava-labs/coreth v0.15.4-rc.3 h1:v33OOerxpGIKa1MpljXMBB3Yljy23xzsez3E/
 github.com/ava-labs/coreth v0.15.4-rc.3/go.mod h1:Esb0FK+KJr6co7rrhtBWsmSMXEL5JWelEsijlqAHdq0=
 github.com/ava-labs/coreth v0.15.4-rc.3.0.20250929221643-bc25aaacde2d h1:beqduk4h/Qjom0DrmrQtxvZSuIM1ejExtwW9NAIVU4E=
 github.com/ava-labs/coreth v0.15.4-rc.3.0.20250929221643-bc25aaacde2d/go.mod h1:rpu0ScTXW9u5AJbvWmVicOGsMvWViNK2GozB1yHxmR0=
+github.com/ava-labs/coreth v0.15.4-rc.3.0.20250930181108-d1ee6c7a54bb h1:eYIr+075Idl64G5jL+7m6x7c0buGO4guCehJ6+UHZ7o=
+github.com/ava-labs/coreth v0.15.4-rc.3.0.20250930181108-d1ee6c7a54bb/go.mod h1:rpu0ScTXW9u5AJbvWmVicOGsMvWViNK2GozB1yHxmR0=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.0.12 h1:aMcrLbpJ/dyu2kZDf/Di/4JIWsUcYPyTDKymiHpejt0=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.0.12/go.mod h1:cq89ua3iiZ5wPBALTEQS5eG8DIZcs7ov6OiL4YR1BVY=
 github.com/ava-labs/ledger-avalanche/go v0.0.0-20241009183145-e6f90a8a1a60 h1:EL66gtXOAwR/4KYBjOV03LTWgkEXvLePribLlJNu4g0=
