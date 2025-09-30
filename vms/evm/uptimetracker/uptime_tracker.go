@@ -246,7 +246,7 @@ func (u *UptimeTracker) update(
 				continue
 			}
 
-			// This validator is no longer active and is treated as offline
+			// This validator not active and is treated as offline
 			if err := u.deactivate(next.NodeID); err != nil {
 				return fmt.Errorf(
 					"failed to deactivate validator %s: %w",
