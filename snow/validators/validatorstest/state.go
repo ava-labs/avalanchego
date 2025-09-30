@@ -32,9 +32,9 @@ type State struct {
 	CantGetMinimumHeight,
 	CantGetCurrentHeight,
 	CantGetSubnetID,
-	CantGetWarpValidatorSets bool
-	CantGetWarpValidatorSet    bool
-	CantGetValidatorSet        bool
+	CantGetWarpValidatorSets,
+	CantGetWarpValidatorSet,
+	CantGetValidatorSet,
 	CantGetCurrentValidatorSet bool
 
 	GetMinimumHeightF       func(ctx context.Context) (uint64, error)
