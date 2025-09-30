@@ -157,8 +157,12 @@ func NewNoValidatorsState(state State) State {
 	}
 }
 
-func (*noValidators) GetAllValidatorSets(context.Context, uint64) (map[ids.ID]WarpSet, error) {
+func (*noValidators) GetWarpValidatorSets(context.Context, uint64) (map[ids.ID]WarpSet, error) {
 	return nil, nil
+}
+
+func (*noValidators) GetWarpValidatorSet(context.Context, uint64, ids.ID) (WarpSet, error) {
+	return WarpSet{}, nil
 }
 
 func (*noValidators) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]*GetValidatorOutput, error) {

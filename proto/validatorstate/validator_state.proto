@@ -14,11 +14,14 @@ service ValidatorState {
   rpc GetCurrentHeight(google.protobuf.Empty) returns (GetCurrentHeightResponse);
   // GetSubnetID returns the subnetID of the provided chain.
   rpc GetSubnetID(GetSubnetIDRequest) returns (GetSubnetIDResponse);
-  // GetAllValidatorSets returns the weights of the nodeIDs for all
-  // subnets at the requested P-chain height.
+  // GetWarpValidatorSets returns the canonical warp validator set for all
+  // subnets at the requested P-chain height. If a subnet doesn't have a valid
+  // canonical warp validator set, it is omitted from the response.
   rpc GetWarpValidatorSets(GetWarpValidatorSetsRequest) returns (GetWarpValidatorSetsResponse);
-  // GetAllValidatorSets returns the weights of the nodeIDs for all
-  // subnets at the requested P-chain height.
+  // GetWarpValidatorSet returns the canonical warp validator set for the
+  // provided subnet at the requested P-chain height. If the subnet doesn't have
+  // a valid canonical warp validator set, either the returned set will be empty
+  // or an error may occur.
   rpc GetWarpValidatorSet(GetWarpValidatorSetRequest) returns (GetWarpValidatorSetResponse);
   // GetValidatorSet returns the weights of the nodeIDs for the provided
   // subnet at the requested P-chain height.

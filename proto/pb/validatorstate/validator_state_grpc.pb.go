@@ -40,11 +40,14 @@ type ValidatorStateClient interface {
 	GetCurrentHeight(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetCurrentHeightResponse, error)
 	// GetSubnetID returns the subnetID of the provided chain.
 	GetSubnetID(ctx context.Context, in *GetSubnetIDRequest, opts ...grpc.CallOption) (*GetSubnetIDResponse, error)
-	// GetAllValidatorSets returns the weights of the nodeIDs for all
-	// subnets at the requested P-chain height.
+	// GetWarpValidatorSets returns the canonical warp validator set for all
+	// subnets at the requested P-chain height. If a subnet doesn't have a valid
+	// canonical warp validator set, it is omitted from the response.
 	GetWarpValidatorSets(ctx context.Context, in *GetWarpValidatorSetsRequest, opts ...grpc.CallOption) (*GetWarpValidatorSetsResponse, error)
-	// GetAllValidatorSets returns the weights of the nodeIDs for all
-	// subnets at the requested P-chain height.
+	// GetWarpValidatorSet returns the canonical warp validator set for the
+	// provided subnet at the requested P-chain height. If the subnet doesn't have
+	// a valid canonical warp validator set, either the returned set will be empty
+	// or an error may occur.
 	GetWarpValidatorSet(ctx context.Context, in *GetWarpValidatorSetRequest, opts ...grpc.CallOption) (*GetWarpValidatorSetResponse, error)
 	// GetValidatorSet returns the weights of the nodeIDs for the provided
 	// subnet at the requested P-chain height.
@@ -143,11 +146,14 @@ type ValidatorStateServer interface {
 	GetCurrentHeight(context.Context, *emptypb.Empty) (*GetCurrentHeightResponse, error)
 	// GetSubnetID returns the subnetID of the provided chain.
 	GetSubnetID(context.Context, *GetSubnetIDRequest) (*GetSubnetIDResponse, error)
-	// GetAllValidatorSets returns the weights of the nodeIDs for all
-	// subnets at the requested P-chain height.
+	// GetWarpValidatorSets returns the canonical warp validator set for all
+	// subnets at the requested P-chain height. If a subnet doesn't have a valid
+	// canonical warp validator set, it is omitted from the response.
 	GetWarpValidatorSets(context.Context, *GetWarpValidatorSetsRequest) (*GetWarpValidatorSetsResponse, error)
-	// GetAllValidatorSets returns the weights of the nodeIDs for all
-	// subnets at the requested P-chain height.
+	// GetWarpValidatorSet returns the canonical warp validator set for the
+	// provided subnet at the requested P-chain height. If the subnet doesn't have
+	// a valid canonical warp validator set, either the returned set will be empty
+	// or an error may occur.
 	GetWarpValidatorSet(context.Context, *GetWarpValidatorSetRequest) (*GetWarpValidatorSetResponse, error)
 	// GetValidatorSet returns the weights of the nodeIDs for the provided
 	// subnet at the requested P-chain height.
