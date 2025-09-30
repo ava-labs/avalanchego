@@ -100,7 +100,7 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 			env.InvalidateExecution(fmt.Errorf("precompile cannot be called with %s", callType))
 		}
 
-		return contract.Run(accessibleState, env.Addresses().Caller, env.Addresses().Self, input, suppliedGas, env.ReadOnly())
+		return contract.Run(accessibleState, env.Addresses().EVMSemantic.Caller, env.Addresses().EVMSemantic.Self, input, suppliedGas, env.ReadOnly())
 	}
 	return vm.NewStatefulPrecompile(legacy.PrecompiledStatefulContract(run).Upgrade())
 }
