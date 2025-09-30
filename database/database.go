@@ -107,5 +107,6 @@ type HeightIndex interface {
 	Has(height uint64) (bool, error)
 
 	// Close closes the database.
+	// Calling Close after Close returns [ErrClosed].
 	io.Closer
 }

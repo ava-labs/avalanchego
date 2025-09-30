@@ -21,7 +21,8 @@ type tracedState struct {
 	getMinimumHeightTag       string
 	getCurrentHeightTag       string
 	getSubnetIDTag            string
-	getAllValidatorSetsTag    string
+	getWarpValidatorSetsTag   string
+	getWarpValidatorSetTag    string
 	getValidatorSetTag        string
 	getCurrentValidatorSetTag string
 	tracer                    trace.Tracer
@@ -33,6 +34,8 @@ func Trace(s State, name string, tracer trace.Tracer) State {
 		getMinimumHeightTag:       name + ".GetMinimumHeight",
 		getCurrentHeightTag:       name + ".GetCurrentHeight",
 		getSubnetIDTag:            name + ".GetSubnetID",
+		getWarpValidatorSetsTag:   name + ".GetWarpValidatorSets",
+		getWarpValidatorSetTag:    name + ".GetWarpValidatorSet",
 		getValidatorSetTag:        name + ".GetValidatorSet",
 		getCurrentValidatorSetTag: name + ".GetCurrentValidatorSet",
 		tracer:                    tracer,
@@ -62,16 +65,30 @@ func (s *tracedState) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, 
 	return s.s.GetSubnetID(ctx, chainID)
 }
 
-func (s *tracedState) GetAllValidatorSets(
+func (s *tracedState) GetWarpValidatorSets(
 	ctx context.Context,
 	height uint64,
-) (map[ids.ID]map[ids.NodeID]*GetValidatorOutput, error) {
-	ctx, span := s.tracer.Start(ctx, s.getAllValidatorSetsTag, oteltrace.WithAttributes(
+) (map[ids.ID]*WarpSet, error) {
+	ctx, span := s.tracer.Start(ctx, s.getWarpValidatorSetsTag, oteltrace.WithAttributes(
 		attribute.Int64("height", int64(height)),
 	))
 	defer span.End()
 
-	return s.s.GetAllValidatorSets(ctx, height)
+	return s.s.GetWarpValidatorSets(ctx, height)
+}
+
+func (s *tracedState) GetWarpValidatorSet(
+	ctx context.Context,
+	height uint64,
+	subnetID ids.ID,
+) (*WarpSet, error) {
+	ctx, span := s.tracer.Start(ctx, s.getWarpValidatorSetTag, oteltrace.WithAttributes(
+		attribute.Int64("height", int64(height)),
+		attribute.Stringer("subnetID", subnetID),
+	))
+	defer span.End()
+
+	return s.s.GetWarpValidatorSet(ctx, height, subnetID)
 }
 
 func (s *tracedState) GetValidatorSet(

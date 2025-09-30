@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
@@ -237,7 +238,7 @@ func setupValidatorSet(b *testing.B, size int) map[ids.NodeID]*validators.GetVal
 	return set
 }
 
-func TestGetAllValidatorSets(t *testing.T) {
+func TestGetWarpValidatorSets(t *testing.T) {
 	require := require.New(t)
 	ctrl := gomock.NewController(t)
 
@@ -286,16 +287,16 @@ func TestGetAllValidatorSets(t *testing.T) {
 		},
 	}
 	height := uint64(1337)
-	state.server.EXPECT().GetAllValidatorSets(gomock.Any(), height).Return(expectedVdrSets, nil)
+	state.server.EXPECT().GetWarpValidatorSets(gomock.Any(), height).Return(expectedVdrSets, nil)
 
-	vdrSets, err := state.client.GetAllValidatorSets(context.Background(), height)
+	vdrSets, err := state.client.GetWarpValidatorSets(context.Background(), height)
 	require.NoError(err)
 	require.Equal(expectedVdrSets, vdrSets)
 
 	// Error path
-	state.server.EXPECT().GetAllValidatorSets(gomock.Any(), height).Return(expectedVdrSets, errCustom)
+	state.server.EXPECT().GetWarpValidatorSets(gomock.Any(), height).Return(expectedVdrSets, errCustom)
 
-	_, err = state.client.GetAllValidatorSets(context.Background(), height)
+	_, err = state.client.GetWarpValidatorSets(context.Background(), height)
 	require.Error(err) //nolint:forbidigo // currently returns grpc error
 }
 
@@ -304,7 +305,7 @@ func TestGetAllValidatorSetsCached(t *testing.T) {
 	ctrl := gomock.NewController(t)
 
 	state := setupState(t, ctrl)
-	cachedState := validators.NewCachedState(state.server)
+	cachedState := validators.NewCachedState(state.server, upgrade.InitiallyActiveTime)
 
 	sk0, err := localsigner.New()
 	require.NoError(err)
@@ -436,7 +437,7 @@ func TestGetAllValidatorSetsCached(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(_ *testing.T) {
 			if !test.expectedCacheHit {
-				state.server.EXPECT().GetAllValidatorSets(gomock.Any(), test.height).Return(test.returnedVdrSets, test.returnedErr).Times(1)
+				state.server.EXPECT().GetWarpValidatorSets(gomock.Any(), test.height).Return(test.returnedVdrSets, test.returnedErr).Times(1)
 			}
 			vdrSet, err := cachedState.GetValidatorSet(context.Background(), test.height, test.subnetID)
 			require.ErrorIs(err, test.expectedErr)

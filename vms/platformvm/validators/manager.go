@@ -230,12 +230,43 @@ func (m *manager) getCurrentHeight(context.Context) (uint64, error) {
 	return lastAccepted.Height(), nil
 }
 
-func (m *manager) GetAllValidatorSets(
+func (m *manager) GetWarpValidatorSets(
 	ctx context.Context,
 	targetHeight uint64,
-) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	// TODO: cache all validator sets
-	return m.makeAllValidatorSets(ctx, targetHeight)
+) (map[ids.ID]*validators.WarpSet, error) {
+	allValidators, err := m.makeAllValidatorSets(ctx, targetHeight)
+	if err != nil {
+		return nil, err
+	}
+
+	validatorSets := make(map[ids.ID]*validators.WarpSet, len(allValidators))
+	for subnetID, vdrSet := range allValidators {
+		ws, err := validators.FlattenValidatorSet(vdrSet)
+		if err != nil {
+			// If we can't flatten the validator set, skip it and disallow warp
+			// message verification from this subnet.
+			continue
+		}
+		validatorSets[subnetID] = &ws
+	}
+	return validatorSets, nil
+}
+
+func (m *manager) GetWarpValidatorSet(
+	ctx context.Context,
+	targetHeight uint64,
+	subnetID ids.ID,
+) (*validators.WarpSet, error) {
+	vdrSet, err := m.GetValidatorSet(ctx, targetHeight, subnetID)
+	if err != nil {
+		return nil, err
+	}
+
+	ws, err := validators.FlattenValidatorSet(vdrSet)
+	if err != nil {
+		return nil, err
+	}
+	return &ws, nil
 }
 
 func (m *manager) GetValidatorSet(

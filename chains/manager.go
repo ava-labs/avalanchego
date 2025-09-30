@@ -1116,7 +1116,7 @@ func (m *manager) createSnowmanChain(
 		}
 
 		// Wrap the validator state with a cached state
-		valState = validators.NewCachedState(valState)
+		valState = validators.NewCachedState(valState, m.Upgrades.GraniteTime)
 
 		if m.TracingEnabled {
 			valState = validators.Trace(valState, "platformvm", m.Tracer)

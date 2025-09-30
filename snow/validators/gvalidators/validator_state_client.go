@@ -56,13 +56,13 @@ func (c *Client) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error
 	return ids.ToID(resp.SubnetId)
 }
 
-func (c *Client) GetAllValidatorSets(
+func (c *Client) GetWarpValidatorSets(
 	ctx context.Context,
 	height uint64,
-) (map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, error) {
-	resp, err := c.client.GetAllValidatorSets(
+) (map[ids.ID]*validators.WarpSet, error) {
+	resp, err := c.client.GetWarpValidatorSets(
 		ctx,
-		&pb.GetAllValidatorSetsRequest{
+		&pb.GetWarpValidatorSetsRequest{
 			Height: height,
 		},
 	)
@@ -70,31 +70,50 @@ func (c *Client) GetAllValidatorSets(
 		return nil, fmt.Errorf("failed to get all validator sets: %w", err)
 	}
 
-	validatorSets := make(map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, len(resp.ValidatorSets))
+	validatorSets := make(map[ids.ID]*validators.WarpSet, len(resp.ValidatorSets))
 	for _, validatorSet := range resp.ValidatorSets {
-		vdrs := make(map[ids.NodeID]*validators.GetValidatorOutput, len(validatorSet.Validators))
-
-		for _, validator := range validatorSet.Validators {
-			vdr, err := validatorOutputFromProto(validator)
-			if err != nil {
-				return nil, fmt.Errorf("failed to parse validator: %w", err)
-			}
-
-			vdrs[vdr.NodeID] = &validators.GetValidatorOutput{
-				NodeID:    vdr.NodeID,
-				PublicKey: vdr.PublicKey,
-				Weight:    vdr.Weight,
-			}
-		}
-
-		subnetID, err := ids.ToID(validatorSet.SubnetId)
+		subnetID, err := ids.ToID(validatorSet.GetSubnetId())
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse subnet ID %s: %w", subnetID.String(), err)
+			return nil, fmt.Errorf("failed to parse subnet ID %s: %w", subnetID, err)
 		}
-		validatorSets[subnetID] = vdrs
+
+		vdrs, err := warpValidatorsFromProto(validatorSet.GetValidators())
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse warp validators: %w", err)
+		}
+		validatorSets[subnetID] = &validators.WarpSet{
+			Validators:  vdrs,
+			TotalWeight: validatorSet.GetTotalWeight(),
+		}
 	}
 
 	return validatorSets, nil
+}
+
+func (c *Client) GetWarpValidatorSet(
+	ctx context.Context,
+	height uint64,
+	subnetID ids.ID,
+) (*validators.WarpSet, error) {
+	resp, err := c.client.GetWarpValidatorSet(
+		ctx,
+		&pb.GetWarpValidatorSetRequest{
+			Height:   height,
+			SubnetId: subnetID[:],
+		},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all validator sets: %w", err)
+	}
+
+	vdrs, err := warpValidatorsFromProto(resp.GetValidators())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse warp validators: %w", err)
+	}
+	return &validators.WarpSet{
+		Validators:  vdrs,
+		TotalWeight: resp.GetTotalWeight(),
+	}, nil
 }
 
 func (c *Client) GetValidatorSet(
@@ -181,4 +200,27 @@ func validatorOutputFromProto(validator *pb.Validator) (*validators.GetValidator
 		PublicKey: publicKey,
 		Weight:    validator.Weight,
 	}, nil
+}
+
+func warpValidatorsFromProto(proto []*pb.WarpValidator) ([]*validators.Warp, error) {
+	vdrs := make([]*validators.Warp, len(proto))
+	for i, vdr := range proto {
+		pkBytes := vdr.GetPublicKey()
+		nodeIDsBytes := vdr.GetNodeIds()
+		nodeIDs := make([]ids.NodeID, len(nodeIDsBytes))
+		for j, nodeIDBytes := range nodeIDsBytes {
+			nodeID, err := ids.ToNodeID(nodeIDBytes)
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse node ID %s: %w", nodeID, err)
+			}
+			nodeIDs[j] = nodeID
+		}
+		vdrs[i] = &validators.Warp{
+			PublicKey:      bls.PublicKeyFromValidUncompressedBytes(pkBytes),
+			PublicKeyBytes: pkBytes,
+			Weight:         vdr.GetWeight(),
+			NodeIDs:        nodeIDs,
+		}
+	}
+	return vdrs, nil
 }
