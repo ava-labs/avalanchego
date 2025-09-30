@@ -169,8 +169,8 @@ func benchmarkReexecuteRange(
 	vmMultiGatherer := metrics.NewPrefixGatherer()
 	r.NoError(prefixGatherer.Register("avalanche_evm", vmMultiGatherer))
 
-	meterVMGatherer := metrics.NewPrefixGatherer()
-	r.NoError(prefixGatherer.Register("avalanche_meterchainvm", meterVMGatherer))
+	meterVMRegistry := prometheus.NewRegistry()
+	r.NoError(prefixGatherer.Register("avalanche_meterchainvm_C", meterVMRegistry))
 
 	// consensusRegistry includes the chain="C" label and the prefix "avalanche_snowman".
 	// The consensus registry is passed to the executor to mimic a subset of consensus metrics.
@@ -215,7 +215,7 @@ func benchmarkReexecuteRange(
 		chainDataDir,
 		configBytes,
 		vmMultiGatherer,
-		meterVMGatherer,
+		meterVMRegistry,
 	)
 	r.NoError(err)
 	defer func() {
@@ -247,7 +247,7 @@ func newMainnetCChainVM(
 	chainDataDir string,
 	configBytes []byte,
 	vmMultiGatherer metrics.MultiGatherer,
-	meterVMGatherer metrics.MultiGatherer,
+	meterVMRegistry prometheus.Registerer,
 ) (block.ChainVM, error) {
 	factory := factory.Factory{}
 	vmIntf, err := factory.New(logging.NoLog{})
@@ -273,11 +273,6 @@ func newMainnetCChainVM(
 		mainnetXChainID: constants.PrimaryNetworkID,
 		mainnetCChainID: constants.PrimaryNetworkID,
 		ids.Empty:       constants.PrimaryNetworkID,
-	}
-
-	meterVMRegistry, err := metrics.MakeAndRegister(meterVMGatherer, "C")
-	if err != nil {
-		return nil, fmt.Errorf("failed to create meterVM registry: %w", err)
 	}
 
 	vm = metervm.NewBlockVM(vm, meterVMRegistry)
