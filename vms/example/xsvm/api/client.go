@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/rpc"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -146,7 +147,7 @@ func (c *Client) IssueTx(
 func (c *Client) LastAccepted(
 	ctx context.Context,
 	options ...rpc.Option,
-) (ids.ID, []byte, error) {
+) (ids.ID, *block.Stateless, error) {
 	resp := new(LastAcceptedReply)
 	err := c.Req.SendRequest(
 		ctx,
@@ -167,7 +168,7 @@ func (c *Client) Block(
 	ctx context.Context,
 	blkID ids.ID,
 	options ...rpc.Option,
-) ([]byte, error) {
+) (*block.Stateless, error) {
 	resp := new(BlockReply)
 	err := c.Req.SendRequest(
 		ctx,

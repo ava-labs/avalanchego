@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
-	"github.com/ava-labs/avalanchego/vms/example/xsvm/block"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 )
@@ -108,9 +107,7 @@ func buildBlock(tc *e2e.GinkgoTestContext, chain *tmpnet.Chain, nodes []*tmpnet.
 
 	// grab the current round
 	client := api.NewClient(nodes[0].GetAccessibleURI(), chain.ChainID.String())
-	_, bytes, err := client.LastAccepted(tc.DefaultContext())
-	require.NoError(err)
-	latestBlock, err := block.Parse(bytes)
+	_, latestBlock, err := client.LastAccepted(tc.DefaultContext())
 	require.NoError(err)
 
 	round := latestBlock.Height + 1
@@ -153,9 +150,7 @@ func buildBlock(tc *e2e.GinkgoTestContext, chain *tmpnet.Chain, nodes []*tmpnet.
 		require.NoError(err)
 		require.Equal(units.Schmeckle, balance)
 
-		_, blockBytes, err := client.LastAccepted(tc.DefaultContext())
-		require.NoError(err)
-		statelessBlock, err := block.Parse(blockBytes)
+		_, statelessBlock, err := client.LastAccepted(tc.DefaultContext())
 		require.NoError(err)
 
 		require.Len(statelessBlock.Txs, 1)

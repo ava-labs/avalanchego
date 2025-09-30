@@ -616,7 +616,6 @@ func (n *Network) GetSubnet(name string) *Subnet {
 // to pick up configuration changes becomes the responsibility of the caller.
 func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode *Node) error {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
-	apiURI := apiNode.GetAccessibleURI()
 	for _, subnet := range n.Subnets {
 		if len(subnet.ValidatorIDs) == 0 {
 			return stacktrace.Errorf("subnet %s needs at least one validator", subnet.SubnetID)
@@ -702,7 +701,6 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		}
 
 		// since we have restarted nodes, refetch the api uri in case it changed
-		apiURI = apiNode.GetAccessibleURI()
 	}
 
 	// Add validators for the subnet
