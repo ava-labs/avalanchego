@@ -99,14 +99,14 @@ type Database interface {
 type HeightIndex interface {
 	// Put inserts the value into the database at the given height.
 	//
-	// If [value] is nil or an empty slice, then when it's retrieved
-	// it may be nil or an empty slice.
+	// If value is nil or an empty slice, then when it's retrieved it may be nil
+	// or an empty slice.
 	//
-	// [value] is safe to read and modify after calling Put.
+	// value is safe to read and modify after calling Put.
 	Put(height uint64, value []byte) error
 
 	// Get retrieves a value by its height.
-	// Returns ErrNotFound if the key is not present in the database.
+	// Returns [ErrNotFound] if the key is not present in the database.
 	//
 	// Returned []byte is safe to read and modify after calling Get.
 	Get(height uint64) ([]byte, error)
@@ -118,6 +118,6 @@ type HeightIndex interface {
 
 	// Close closes the database.
 	//
-	// Calling Close after Close returns ErrClosed.
+	// Calling Close after Close returns [ErrClosed].
 	io.Closer
 }
