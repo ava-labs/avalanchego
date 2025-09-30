@@ -298,8 +298,9 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	}, nil)
 
 	// make some accounts
+	r := rand.New(rand.NewSource(1))
 	trieDB := triedb.NewDatabase(serverVM.vm.chaindb, nil)
-	root, accounts := statesynctest.FillAccountsWithOverlappingStorage(t, trieDB, types.EmptyRootHash, 1000, 16)
+	root, accounts := statesynctest.FillAccountsWithOverlappingStorage(t, r, trieDB, types.EmptyRootHash, 1000, 16)
 
 	// patch serverVM's lastAcceptedBlock to have the new root
 	// and update the vm's state so the trie with accounts will

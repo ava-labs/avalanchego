@@ -137,9 +137,6 @@ func TestGetCode(t *testing.T) {
 }
 
 func TestGetBlocks(t *testing.T) {
-	// set random seed for deterministic tests
-	rand.Seed(1)
-
 	gspec := &core.Genesis{
 		Config: params.TestChainConfig,
 	}
@@ -408,13 +405,12 @@ func buildGetter(blocks []*types.Block) handlers.BlockProvider {
 }
 
 func TestGetLeafs(t *testing.T) {
-	rand.Seed(1)
-
 	const leafsLimit = 1024
+	r := rand.New(rand.NewSource(1))
 
 	trieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	largeTrieRoot, largeTrieKeys, _ := statesynctest.GenerateTrie(t, trieDB, 100_000, common.HashLength)
-	smallTrieRoot, _, _ := statesynctest.GenerateTrie(t, trieDB, leafsLimit, common.HashLength)
+	largeTrieRoot, largeTrieKeys, _ := statesynctest.GenerateTrie(t, r, trieDB, 100_000, common.HashLength)
+	smallTrieRoot, _, _ := statesynctest.GenerateTrie(t, r, trieDB, leafsLimit, common.HashLength)
 
 	handler := handlers.NewLeafsRequestHandler(trieDB, nil, message.Codec, handlerstats.NewNoopHandlerStats())
 	client := NewClient(&ClientConfig{
@@ -781,10 +777,9 @@ func TestGetLeafs(t *testing.T) {
 }
 
 func TestGetLeafsRetries(t *testing.T) {
-	rand.Seed(1)
-
+	r := rand.New(rand.NewSource(1))
 	trieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
-	root, _, _ := statesynctest.GenerateTrie(t, trieDB, 100_000, common.HashLength)
+	root, _, _ := statesynctest.GenerateTrie(t, r, trieDB, 100_000, common.HashLength)
 
 	handler := handlers.NewLeafsRequestHandler(trieDB, nil, message.Codec, handlerstats.NewNoopHandlerStats())
 	mockNetClient := &mockNetwork{}

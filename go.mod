@@ -1,6 +1,6 @@
 module github.com/ava-labs/subnet-evm
 
-go 1.23.9
+go 1.24.7
 
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1

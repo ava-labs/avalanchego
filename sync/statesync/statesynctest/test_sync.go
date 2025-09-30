@@ -89,10 +89,10 @@ func AssertDBConsistency(t testing.TB, root common.Hash, clientDB ethdb.Database
 	assert.Equal(t, trieAccountLeaves, numSnapshotAccounts)
 }
 
-func FillAccountsWithStorage(t *testing.T, serverDB ethdb.Database, serverTrieDB *triedb.Database, root common.Hash, numAccounts int) common.Hash {
-	newRoot, _ := FillAccounts(t, serverTrieDB, root, numAccounts, func(t *testing.T, _ int, account types.StateAccount) types.StateAccount {
+func FillAccountsWithStorage(t *testing.T, r *rand.Rand, serverDB ethdb.Database, serverTrieDB *triedb.Database, root common.Hash, numAccounts int) common.Hash {
+	newRoot, _ := FillAccounts(t, r, serverTrieDB, root, numAccounts, func(t *testing.T, _ int, account types.StateAccount) types.StateAccount {
 		codeBytes := make([]byte, 256)
-		_, err := rand.Read(codeBytes)
+		_, err := r.Read(codeBytes)
 		if err != nil {
 			t.Fatalf("error reading random code bytes: %v", err)
 		}
@@ -103,7 +103,7 @@ func FillAccountsWithStorage(t *testing.T, serverDB ethdb.Database, serverTrieDB
 
 		// now create state trie
 		numKeys := 16
-		account.Root, _, _ = GenerateTrie(t, serverTrieDB, numKeys, common.HashLength)
+		account.Root, _, _ = GenerateTrie(t, r, serverTrieDB, numKeys, common.HashLength)
 		return account
 	})
 	return newRoot
@@ -116,22 +116,22 @@ func FillAccountsWithStorage(t *testing.T, serverDB ethdb.Database, serverTrieDB
 // - One has a uniquely generated storage trie,
 // returns the new trie root and a map of funded keys to StateAccount structs.
 func FillAccountsWithOverlappingStorage(
-	t *testing.T, trieDB *triedb.Database, root common.Hash, numAccounts int, numOverlappingStorageRoots int,
+	t *testing.T, r *rand.Rand, trieDB *triedb.Database, root common.Hash, numAccounts int, numOverlappingStorageRoots int,
 ) (common.Hash, map[*utilstest.Key]*types.StateAccount) {
 	storageRoots := make([]common.Hash, 0, numOverlappingStorageRoots)
 	for i := 0; i < numOverlappingStorageRoots; i++ {
-		storageRoot, _, _ := GenerateTrie(t, trieDB, 16, common.HashLength)
+		storageRoot, _, _ := GenerateTrie(t, r, trieDB, 16, common.HashLength)
 		storageRoots = append(storageRoots, storageRoot)
 	}
 	storageRootIndex := 0
-	return FillAccounts(t, trieDB, root, numAccounts, func(t *testing.T, i int, account types.StateAccount) types.StateAccount {
+	return FillAccounts(t, r, trieDB, root, numAccounts, func(t *testing.T, i int, account types.StateAccount) types.StateAccount {
 		switch i % 3 {
 		case 0: // unmodified account
 		case 1: // account with overlapping storage root
 			account.Root = storageRoots[storageRootIndex%numOverlappingStorageRoots]
 			storageRootIndex++
 		case 2: // account with unique storage root
-			account.Root, _, _ = GenerateTrie(t, trieDB, 16, common.HashLength)
+			account.Root, _, _ = GenerateTrie(t, r, trieDB, 16, common.HashLength)
 		}
 
 		return account

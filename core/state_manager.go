@@ -29,18 +29,12 @@ package core
 
 import (
 	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
 )
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
 
 // flushWindow is the distance to the [commitInterval] when we start
 // optimistically flushing trie nodes to disk (only applicable in [pruning]

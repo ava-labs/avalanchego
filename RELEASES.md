@@ -3,6 +3,7 @@
 ## [v0.7.10](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.10)
 
 - Add pending releases here
+- Upgrade to Go version 1.24
 
 ## [v0.7.9](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.9)
 
