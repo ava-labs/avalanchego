@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1759235369423,
+  "lastUpdate": 1759244696732,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -306,6 +306,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
             "value": 77.26,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Stephen Buttolph",
+            "username": "StephenButtolph",
+            "email": "stephen@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "240dc5430217ca1181bf830e66f6615b0f0ca2a8",
+          "message": "Move canonical warp ordering to validators package (#4363)",
+          "timestamp": "2025-09-29T21:19:46Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/240dc5430217ca1181bf830e66f6615b0f0ca2a8"
+        },
+        "date": 1759244694558,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
+            "value": 44.54,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
