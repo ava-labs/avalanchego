@@ -40,8 +40,8 @@ type State struct {
 	GetMinimumHeightF       func(ctx context.Context) (uint64, error)
 	GetCurrentHeightF       func(ctx context.Context) (uint64, error)
 	GetSubnetIDF            func(ctx context.Context, chainID ids.ID) (ids.ID, error)
-	GetWarpValidatorSetsF   func(ctx context.Context, height uint64) (map[ids.ID]*validators.WarpSet, error)
-	GetWarpValidatorSetF    func(ctx context.Context, height uint64, subnetID ids.ID) (*validators.WarpSet, error)
+	GetWarpValidatorSetsF   func(ctx context.Context, height uint64) (map[ids.ID]validators.WarpSet, error)
+	GetWarpValidatorSetF    func(ctx context.Context, height uint64, subnetID ids.ID) (validators.WarpSet, error)
 	GetValidatorSetF        func(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 	GetCurrentValidatorSetF func(ctx context.Context, subnetID ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error)
 }
@@ -79,7 +79,7 @@ func (vm *State) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error
 func (vm *State) GetWarpValidatorSets(
 	ctx context.Context,
 	height uint64,
-) (map[ids.ID]*validators.WarpSet, error) {
+) (map[ids.ID]validators.WarpSet, error) {
 	if vm.GetWarpValidatorSetsF != nil {
 		return vm.GetWarpValidatorSetsF(ctx, height)
 	}
@@ -93,14 +93,14 @@ func (vm *State) GetWarpValidatorSet(
 	ctx context.Context,
 	height uint64,
 	subnetID ids.ID,
-) (*validators.WarpSet, error) {
+) (validators.WarpSet, error) {
 	if vm.GetWarpValidatorSetF != nil {
 		return vm.GetWarpValidatorSetF(ctx, height, subnetID)
 	}
 	if vm.CantGetWarpValidatorSet && vm.T != nil {
 		require.FailNow(vm.T, errGetWarpValidatorSet.Error())
 	}
-	return nil, errGetWarpValidatorSet
+	return validators.WarpSet{}, errGetWarpValidatorSet
 }
 
 func (vm *State) GetValidatorSet(

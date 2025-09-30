@@ -42,7 +42,7 @@ type State interface {
 	// subnet is not currently able to send warp messages.
 	//
 	// The returned map should not be modified.
-	GetWarpValidatorSets(ctx context.Context, height uint64) (map[ids.ID]*WarpSet, error)
+	GetWarpValidatorSets(ctx context.Context, height uint64) (map[ids.ID]WarpSet, error)
 
 	// GetWarpValidatorSet returns the canonical warp validator set for the
 	// requested subnet at the requested P-chain height.
@@ -52,7 +52,7 @@ type State interface {
 		ctx context.Context,
 		height uint64,
 		subnetID ids.ID,
-	) (*WarpSet, error)
+	) (WarpSet, error)
 
 	// GetValidatorSet returns the validators of the provided subnet at the
 	// requested P-chain height.
@@ -119,7 +119,7 @@ func (s *lockedState) GetValidatorSet(
 func (s *lockedState) GetWarpValidatorSets(
 	ctx context.Context,
 	height uint64,
-) (map[ids.ID]*WarpSet, error) {
+) (map[ids.ID]WarpSet, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -130,7 +130,7 @@ func (s *lockedState) GetWarpValidatorSet(
 	ctx context.Context,
 	height uint64,
 	subnetID ids.ID,
-) (*WarpSet, error) {
+) (WarpSet, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -157,7 +157,7 @@ func NewNoValidatorsState(state State) State {
 	}
 }
 
-func (*noValidators) GetAllValidatorSets(context.Context, uint64) (map[ids.ID]*WarpSet, error) {
+func (*noValidators) GetAllValidatorSets(context.Context, uint64) (map[ids.ID]WarpSet, error) {
 	return nil, nil
 }
 
@@ -179,7 +179,7 @@ type CachedState struct {
 	// Caches validators for all subnets at various heights.
 	// Key: height
 	// Value: mapping height -> subnet ID -> validator set
-	cache cache.Cacher[uint64, map[ids.ID]*WarpSet]
+	cache cache.Cacher[uint64, map[ids.ID]WarpSet]
 }
 
 // TODO: Remove the graniteActivation parameter once all networks have
@@ -191,14 +191,14 @@ func NewCachedState(
 	return &CachedState{
 		State:      state,
 		activation: graniteActivation,
-		cache:      lru.NewCache[uint64, map[ids.ID]*WarpSet](validatorSetsCacheSize),
+		cache:      lru.NewCache[uint64, map[ids.ID]WarpSet](validatorSetsCacheSize),
 	}
 }
 
 func (c *CachedState) GetWarpValidatorSets(
 	ctx context.Context,
 	height uint64,
-) (map[ids.ID]*WarpSet, error) {
+) (map[ids.ID]WarpSet, error) {
 	if s, ok := c.cache.Get(height); ok {
 		return s, nil
 	}
@@ -215,18 +215,18 @@ func (c *CachedState) GetWarpValidatorSet(
 	ctx context.Context,
 	height uint64,
 	subnetID ids.ID,
-) (*WarpSet, error) {
+) (WarpSet, error) {
 	if time.Now().Before(c.activation) {
 		return c.State.GetWarpValidatorSet(ctx, height, subnetID)
 	}
 
 	s, err := c.GetWarpValidatorSets(ctx, height)
 	if err != nil {
-		return nil, err
+		return WarpSet{}, err
 	}
 
 	if vdrs, ok := s[subnetID]; ok {
 		return vdrs, nil
 	}
-	return &WarpSet{}, nil
+	return WarpSet{}, nil
 }

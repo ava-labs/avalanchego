@@ -59,7 +59,7 @@ func (c *Client) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error
 func (c *Client) GetWarpValidatorSets(
 	ctx context.Context,
 	height uint64,
-) (map[ids.ID]*validators.WarpSet, error) {
+) (map[ids.ID]validators.WarpSet, error) {
 	resp, err := c.client.GetWarpValidatorSets(
 		ctx,
 		&pb.GetWarpValidatorSetsRequest{
@@ -70,7 +70,7 @@ func (c *Client) GetWarpValidatorSets(
 		return nil, fmt.Errorf("failed to get all validator sets: %w", err)
 	}
 
-	validatorSets := make(map[ids.ID]*validators.WarpSet, len(resp.ValidatorSets))
+	validatorSets := make(map[ids.ID]validators.WarpSet, len(resp.ValidatorSets))
 	for _, validatorSet := range resp.ValidatorSets {
 		subnetID, err := ids.ToID(validatorSet.GetSubnetId())
 		if err != nil {
@@ -81,7 +81,7 @@ func (c *Client) GetWarpValidatorSets(
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse warp validators: %w", err)
 		}
-		validatorSets[subnetID] = &validators.WarpSet{
+		validatorSets[subnetID] = validators.WarpSet{
 			Validators:  vdrs,
 			TotalWeight: validatorSet.GetTotalWeight(),
 		}
@@ -94,7 +94,7 @@ func (c *Client) GetWarpValidatorSet(
 	ctx context.Context,
 	height uint64,
 	subnetID ids.ID,
-) (*validators.WarpSet, error) {
+) (validators.WarpSet, error) {
 	resp, err := c.client.GetWarpValidatorSet(
 		ctx,
 		&pb.GetWarpValidatorSetRequest{
@@ -103,14 +103,14 @@ func (c *Client) GetWarpValidatorSet(
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get all validator sets: %w", err)
+		return validators.WarpSet{}, fmt.Errorf("failed to get all validator sets: %w", err)
 	}
 
 	vdrs, err := warpValidatorsFromProto(resp.GetValidators())
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse warp validators: %w", err)
+		return validators.WarpSet{}, fmt.Errorf("failed to parse warp validators: %w", err)
 	}
-	return &validators.WarpSet{
+	return validators.WarpSet{
 		Validators:  vdrs,
 		TotalWeight: resp.GetTotalWeight(),
 	}, nil

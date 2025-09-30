@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
-	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
@@ -25,42 +25,44 @@ import (
 
 var errCustom = errors.New("custom")
 
-type testState struct {
-	client *Client
-	server *validatorsmock.State
-}
-
-func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
-	require := require.New(t)
-
+func newClient(t testing.TB, state validators.State) *Client {
 	t.Helper()
 
-	state := &testState{
-		server: validatorsmock.NewState(ctrl),
-	}
+	require := require.New(t)
 
 	listener, err := grpcutils.NewListener()
 	require.NoError(err)
-	serverCloser := grpcutils.ServerCloser{}
 
 	server := grpcutils.NewServer()
-	pb.RegisterValidatorStateServer(server, NewServer(state.server))
-	serverCloser.Add(server)
+	pb.RegisterValidatorStateServer(server, NewServer(state))
 
 	go grpcutils.Serve(listener, server)
 
 	conn, err := grpcutils.Dial(listener.Addr().String())
 	require.NoError(err)
 
-	state.client = NewClient(pb.NewValidatorStateClient(conn))
-
 	t.Cleanup(func() {
-		serverCloser.Stop()
+		server.Stop()
 		_ = conn.Close()
 		_ = listener.Close()
 	})
 
-	return state
+	return NewClient(pb.NewValidatorStateClient(conn))
+}
+
+type testState struct {
+	client *Client
+	server *validatorsmock.State
+}
+
+func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
+	t.Helper()
+
+	state := validatorsmock.NewState(ctrl)
+	return &testState{
+		client: newClient(t, state),
+		server: state,
+	}
 }
 
 func TestGetMinimumHeight(t *testing.T) {
@@ -239,209 +241,35 @@ func setupValidatorSet(b *testing.B, size int) map[ids.NodeID]*validators.GetVal
 }
 
 func TestGetWarpValidatorSets(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
+	const height uint64 = 1337
+	t.Run("error", func(t *testing.T) {
+		state := &validatorstest.State{
+			CantGetWarpValidatorSets: true,
+		}
+		c := newClient(t, state)
 
-	state := setupState(t, ctrl)
+		_, err := c.GetWarpValidatorSets(context.Background(), height)
+		require.Error(t, err) //nolint:forbidigo // returns grpc error
+	})
 
-	// Happy path
-	sk0, err := localsigner.New()
-	require.NoError(err)
-	vdr0 := &validators.GetValidatorOutput{
-		NodeID:    ids.GenerateTestNodeID(),
-		PublicKey: sk0.PublicKey(),
-		Weight:    1,
-	}
+	t.Run("valid", func(t *testing.T) {
+		require := require.New(t)
 
-	sk1, err := localsigner.New()
-	require.NoError(err)
-	vdr1 := &validators.GetValidatorOutput{
-		NodeID:    ids.GenerateTestNodeID(),
-		PublicKey: sk1.PublicKey(),
-		Weight:    2,
-	}
-
-	vdr2 := &validators.GetValidatorOutput{
-		NodeID:    ids.GenerateTestNodeID(),
-		PublicKey: nil,
-		Weight:    3,
-	}
-
-	vdr3 := &validators.GetValidatorOutput{
-		NodeID:    ids.GenerateTestNodeID(),
-		PublicKey: nil,
-		Weight:    4,
-	}
-
-	subnetID1 := ids.GenerateTestID()
-	subnetID2 := ids.GenerateTestID()
-	expectedVdrSets := map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput{
-		subnetID1: {
-			vdr0.NodeID: vdr0,
-			vdr1.NodeID: vdr1,
-			vdr2.NodeID: vdr2,
-		},
-		subnetID2: {
-			vdr2.NodeID: vdr2,
-			vdr3.NodeID: vdr3,
-		},
-	}
-	height := uint64(1337)
-	state.server.EXPECT().GetWarpValidatorSets(gomock.Any(), height).Return(expectedVdrSets, nil)
-
-	vdrSets, err := state.client.GetWarpValidatorSets(context.Background(), height)
-	require.NoError(err)
-	require.Equal(expectedVdrSets, vdrSets)
-
-	// Error path
-	state.server.EXPECT().GetWarpValidatorSets(gomock.Any(), height).Return(expectedVdrSets, errCustom)
-
-	_, err = state.client.GetWarpValidatorSets(context.Background(), height)
-	require.Error(err) //nolint:forbidigo // currently returns grpc error
-}
-
-func TestGetAllValidatorSetsCached(t *testing.T) {
-	require := require.New(t)
-	ctrl := gomock.NewController(t)
-
-	state := setupState(t, ctrl)
-	cachedState := validators.NewCachedState(state.server, upgrade.InitiallyActiveTime)
-
-	sk0, err := localsigner.New()
-	require.NoError(err)
-	vdr0 := &validators.GetValidatorOutput{
-		NodeID:    ids.GenerateTestNodeID(),
-		PublicKey: sk0.PublicKey(),
-		Weight:    1,
-	}
-
-	sk1, err := localsigner.New()
-	require.NoError(err)
-	vdr1 := &validators.GetValidatorOutput{
-		NodeID:    ids.GenerateTestNodeID(),
-		PublicKey: sk1.PublicKey(),
-		Weight:    2,
-	}
-
-	vdr2 := &validators.GetValidatorOutput{
-		NodeID:    ids.GenerateTestNodeID(),
-		PublicKey: nil,
-		Weight:    3,
-	}
-
-	subnetID1 := ids.GenerateTestID()
-	subnetID2 := ids.GenerateTestID()
-	subnetID3 := ids.GenerateTestID()
-
-	type test struct {
-		name             string
-		height           uint64
-		subnetID         ids.ID
-		returnedVdrSets  map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput
-		returnedErr      error
-		expectedCacheHit bool
-		expectedVdrSet   map[ids.NodeID]*validators.GetValidatorOutput
-		expectedErr      error
-	}
-	tests := []test{
-		{
-			name:     "subnet1",
-			height:   uint64(1337),
-			subnetID: subnetID1,
-			returnedVdrSets: map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput{
-				subnetID1: {
-					vdr0.NodeID: vdr0,
-					vdr1.NodeID: vdr1,
-				},
-				subnetID2: {
-					vdr2.NodeID: vdr2,
-				},
+		expectedVdrSets := map[ids.ID]validators.WarpSet{
+			ids.GenerateTestID(): validatorstest.NewWarpSet(t, 1),
+			ids.GenerateTestID(): validatorstest.NewWarpSet(t, 2),
+			ids.GenerateTestID(): validatorstest.NewWarpSet(t, 3),
+		}
+		state := &validatorstest.State{
+			GetWarpValidatorSetsF: func(ctx context.Context, h uint64) (map[ids.ID]validators.WarpSet, error) {
+				require.Equal(height, h)
+				return expectedVdrSets, nil
 			},
-			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				vdr0.NodeID: vdr0,
-				vdr1.NodeID: vdr1,
-			},
-			expectedCacheHit: false,
-			expectedErr:      nil,
-		},
-		{
-			name:     "subnet1 - cached",
-			height:   uint64(1337),
-			subnetID: subnetID1,
-			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				vdr0.NodeID: vdr0,
-				vdr1.NodeID: vdr1,
-			},
-			expectedCacheHit: true,
-			expectedErr:      nil,
-		},
-		{
-			name:     "subnet2 - cached",
-			height:   uint64(1337),
-			subnetID: subnetID2,
-			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				vdr2.NodeID: vdr2,
-			},
-			expectedCacheHit: true,
-			expectedErr:      nil,
-		},
-		{
-			name:             "missing subnet - cached",
-			height:           uint64(1337),
-			subnetID:         subnetID3,
-			returnedVdrSets:  nil,
-			returnedErr:      nil,
-			expectedVdrSet:   nil,
-			expectedCacheHit: true,
-			expectedErr:      validators.ErrValidatorSetForSubnetNotFound,
-		},
-		{
-			name:     "missing subnet - not cached",
-			height:   uint64(1400),
-			subnetID: subnetID3,
-			returnedVdrSets: map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput{
-				subnetID1: {
-					vdr0.NodeID: vdr0,
-					vdr1.NodeID: vdr1,
-				},
-			},
-			returnedErr:      nil,
-			expectedVdrSet:   nil,
-			expectedCacheHit: false,
-			expectedErr:      validators.ErrValidatorSetForSubnetNotFound,
-		},
-		{
-			name:            "cache hit caused by previous failure",
-			height:          uint64(1400),
-			subnetID:        subnetID1,
-			returnedVdrSets: nil,
-			returnedErr:     nil,
-			expectedVdrSet: map[ids.NodeID]*validators.GetValidatorOutput{
-				vdr0.NodeID: vdr0,
-				vdr1.NodeID: vdr1,
-			},
-			expectedCacheHit: true,
-			expectedErr:      nil,
-		},
-		{
-			name:             "failed state lookup",
-			height:           uint64(1500),
-			subnetID:         subnetID1,
-			returnedVdrSets:  nil,
-			returnedErr:      errCustom,
-			expectedVdrSet:   nil,
-			expectedCacheHit: false,
-			expectedErr:      errCustom,
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(_ *testing.T) {
-			if !test.expectedCacheHit {
-				state.server.EXPECT().GetWarpValidatorSets(gomock.Any(), test.height).Return(test.returnedVdrSets, test.returnedErr).Times(1)
-			}
-			vdrSet, err := cachedState.GetValidatorSet(context.Background(), test.height, test.subnetID)
-			require.ErrorIs(err, test.expectedErr)
-			require.Equal(test.expectedVdrSet, vdrSet)
-		})
-	}
+		}
+		c := newClient(t, state)
+
+		vdrSets, err := c.GetWarpValidatorSets(context.Background(), height)
+		require.NoError(err)
+		require.Equal(expectedVdrSets, vdrSets)
+	})
 }

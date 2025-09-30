@@ -68,7 +68,7 @@ func (s *tracedState) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, 
 func (s *tracedState) GetWarpValidatorSets(
 	ctx context.Context,
 	height uint64,
-) (map[ids.ID]*WarpSet, error) {
+) (map[ids.ID]WarpSet, error) {
 	ctx, span := s.tracer.Start(ctx, s.getWarpValidatorSetsTag, oteltrace.WithAttributes(
 		attribute.Int64("height", int64(height)),
 	))
@@ -81,7 +81,7 @@ func (s *tracedState) GetWarpValidatorSet(
 	ctx context.Context,
 	height uint64,
 	subnetID ids.ID,
-) (*WarpSet, error) {
+) (WarpSet, error) {
 	ctx, span := s.tracer.Start(ctx, s.getWarpValidatorSetTag, oteltrace.WithAttributes(
 		attribute.Int64("height", int64(height)),
 		attribute.Stringer("subnetID", subnetID),
