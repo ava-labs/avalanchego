@@ -83,17 +83,17 @@ func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time
 	r.NotZero(totalGas, "denominator metric %q has value 0", gasMetric.name)
 
 	var (
-		mGas    float64 = 1_000_000
-		gGas    float64 = 1_000_000_000
+		mgas    float64 = 1_000_000
+		ggas    float64 = 1_000_000_000
 		nsPerMs float64 = 1_000_000
 	)
 
-	mGasPerSecond := (totalGas / mGas) / elapsed.Seconds()
-	b.ReportMetric(mGasPerSecond, "mGas/s")
+	mgasPerSecond := (totalGas / mgas) / elapsed.Seconds()
+	b.ReportMetric(mgasPerSecond, "mgas/s")
 
-	totalGGas := totalGas / gGas
+	totalGGas := totalGas / ggas
 	msPerGGas := (float64(elapsed) / nsPerMs) / totalGGas
-	b.ReportMetric(msPerGGas, "ms/gGas")
+	b.ReportMetric(msPerGGas, "ms/ggas")
 
 	totalMSTrackedPerGGas := float64(0)
 	for _, metric := range meterVMMetrics {
@@ -102,8 +102,8 @@ func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time
 
 		metricValMS := (metricVal / nsPerMs) / totalGGas
 		totalMSTrackedPerGGas += metricValMS
-		b.ReportMetric(metricValMS, metric.name+"_ms/gGas")
+		b.ReportMetric(metricValMS, metric.name+"_ms/ggas")
 	}
 
-	b.ReportMetric(totalMSTrackedPerGGas, "tracked_ms/gGas")
+	b.ReportMetric(totalMSTrackedPerGGas, "tracked_ms/ggas")
 }
