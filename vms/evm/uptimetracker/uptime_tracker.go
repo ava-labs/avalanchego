@@ -15,21 +15,17 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
-	"errors"
 )
-
-var errNotFound = errors.New("not found")
 
 // UptimeTracker tracks uptime information for validators
 type UptimeTracker struct {
 	validatorState validators.State
 	subnetID       ids.ID
-	manager    uptime.Manager
-	clock *mockable.Clock
+	manager        uptime.Manager
 
-	lock sync.Mutex
-	height int
-	state      *state
+	lock                sync.Mutex
+	height              int
+	state               *state
 	synced              bool
 	connectedValidators set.Set[ids.NodeID]
 	// Deactivated validators are treated as being offline
@@ -51,10 +47,9 @@ func New(
 	return &UptimeTracker{
 		validatorState: validatorState,
 		subnetID:       subnetID,
-		manager: uptime.NewManager(s, clock),
-		clock:  clock,
-		height: -1,
-		state:   s,
+		manager:        uptime.NewManager(s, clock),
+		height:         -1,
+		state:          s,
 	}, nil
 }
 
@@ -137,9 +132,7 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 	// Initialize uptimes if this is the first time Sync has been called
 	if !u.synced {
 		validationIDs := make([]ids.NodeID, 0)
-		for _, nodeID := range u.state.getNodeIDs() {
-			validationIDs = append(validationIDs, nodeID)
-		}
+		validationIDs = append(validationIDs, u.state.getNodeIDs()...)
 
 		if err := u.manager.StartTracking(validationIDs); err != nil {
 			return fmt.Errorf("failed to start tracking validators: %w", err)
@@ -226,7 +219,7 @@ func (u *UptimeTracker) update(
 			}
 		} else {
 			// This is a new validator
-			if err := u.state.addValidatorUpdate(&validator{
+			u.state.addValidatorUpdate(&validator{
 				NodeID:        next.NodeID,
 				validationID:  validationID,
 				IsActive:      next.IsActive,
@@ -235,13 +228,7 @@ func (u *UptimeTracker) update(
 				LastUpdated:   next.StartTime,
 				IsL1Validator: next.IsL1Validator,
 				Weight:        next.Weight,
-			}); err != nil {
-				return fmt.Errorf(
-					"failed to add validator %s: %w",
-					next.NodeID,
-					err,
-				)
-			}
+			})
 
 			if next.IsActive {
 				continue

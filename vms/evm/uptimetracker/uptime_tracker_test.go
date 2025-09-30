@@ -13,9 +13,9 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
 func TestUptimeTracker_GetUptime(t *testing.T) {
@@ -29,12 +29,12 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 
 		validationID ids.ID
 
-		wantUptime time.Duration
+		wantUptime      time.Duration
 		wantLastUpdated time.Time
-		wantOk bool
+		wantOk          bool
 	}{
 		{
-			name:    "no validators",
+			name:   "no validators",
 			wantOk: false,
 		},
 		{
@@ -58,7 +58,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 					},
 				},
 			},
-			validationID: ids.ID{1},
+			validationID:    ids.ID{1},
 			wantUptime:      10 * time.Second,
 			wantLastUpdated: time.Time{}.Add(10 * time.Second),
 			wantOk:          true,
@@ -122,8 +122,8 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 					},
 				},
 			},
-			validationID: ids.ID{1},
-			wantUptime:   10 * time.Second,
+			validationID:    ids.ID{1},
+			wantUptime:      10 * time.Second,
 			wantLastUpdated: time.Time{}.Add(10 * time.Second),
 			wantOk:          true,
 		},
@@ -170,8 +170,8 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 					},
 				},
 			},
-			validationID: ids.ID{1},
-			wantUptime:   10 * time.Second,
+			validationID:    ids.ID{1},
+			wantUptime:      10 * time.Second,
 			wantLastUpdated: time.Time{}.Add(20 * time.Second),
 			wantOk:          true,
 		},
@@ -207,8 +207,8 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 					},
 				},
 			},
-			validationID: ids.ID{1},
-			wantUptime:   10 * time.Second,
+			validationID:    ids.ID{1},
+			wantUptime:      10 * time.Second,
 			wantLastUpdated: time.Time{}.Add(10 * time.Second),
 			wantOk:          true,
 		},
@@ -255,8 +255,8 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 					},
 				},
 			},
-			validationID: ids.ID{1},
-			wantUptime:   10 * time.Second,
+			validationID:    ids.ID{1},
+			wantUptime:      10 * time.Second,
 			wantLastUpdated: time.Time{}.Add(20 * time.Second),
 			wantOk:          true,
 		},
@@ -282,7 +282,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 				},
 			},
 			validationID: ids.ID{1},
-			wantOk: true,
+			wantOk:       true,
 		},
 		{
 			name: "validator removed",
@@ -344,9 +344,9 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 					},
 				},
 			},
-			validationID: ids.ID{1},
+			validationID:    ids.ID{1},
 			wantLastUpdated: time.Time{}.Add(10 * time.Second),
-			wantOk: true,
+			wantOk:          true,
 		},
 		{
 			name: "disconnected inactive validator becomes connected + active",
@@ -379,9 +379,9 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 					},
 				},
 			},
-			validationID: ids.ID{1},
+			validationID:    ids.ID{1},
 			wantLastUpdated: time.Time{}.Add(10 * time.Second),
-			wantOk: true,
+			wantOk:          true,
 		},
 		{
 			name: "deactivated validator leaves validator set",
@@ -493,7 +493,6 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 					require.NoError(uptimeTracker.Disconnect(v))
 				}
 
-
 				validatorState.GetCurrentValidatorSetF = func(
 					context.Context,
 					ids.ID,
@@ -535,10 +534,7 @@ func TestUptimeTracker_Restart(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	start := time.Time{}
 	validatorState := &validatorstest.State{
-		GetCurrentValidatorSetF: func(
-			ctx context.Context,
-			subnetID ids.ID,
-		) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+		GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
 			return map[ids.ID]*validators.GetCurrentValidatorOutput{
 				validationID: {
 					ValidationID: validationID,

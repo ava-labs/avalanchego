@@ -8,12 +8,13 @@ import (
 	"math"
 	"time"
 
+	"golang.org/x/exp/maps"
+
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
-	"golang.org/x/exp/maps"
-	"github.com/ava-labs/avalanchego/codec/linearcodec"
 )
 
 const (
@@ -135,11 +136,9 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	return time.Unix(int64(v.LastUpdated), 0), nil
 }
 
-func (s *state) addValidatorUpdate(vdr *validator) error {
+func (s *state) addValidatorUpdate(vdr *validator) {
 	s.addValidator(vdr.validationID, vdr)
 	s.updates[vdr.validationID] = updatedStatus
-
-	return nil
 }
 
 func (s *state) updateValidator(
