@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1759244696732,
+  "lastUpdate": 1759322302579,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -334,6 +334,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
             "value": 44.54,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Ceyhun Onur",
+            "username": "ceyonur",
+            "email": "ceyhun.onur@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "aa60844c2bd8bd9682e70882a6eef8a331add255",
+          "message": "test only relevant packages for subnet-evm (#4345)\n\nSigned-off-by: Ceyhun Onur <ceyhun.onur@avalabs.org>",
+          "timestamp": "2025-10-01T00:48:18Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/aa60844c2bd8bd9682e70882a6eef8a331add255"
+        },
+        "date": 1759322301868,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
+            "value": 78.56,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
