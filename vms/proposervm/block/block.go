@@ -201,7 +201,7 @@ func (b *statelessGraniteBlock) initialize(bytes []byte) error {
 }
 
 func (b *statelessGraniteBlock) verify(chainID ids.ID) error {
-	if b.StatelessGraniteBlock.Epoch.Number == 0 {
+	if b.StatelessGraniteBlock.Epoch == (Epoch{}) {
 		return errZeroEpoch
 	}
 	return b.statelessBlockMetadata.verify(&b.StatelessGraniteBlock.StatelessBlock, b.Signature, chainID)
