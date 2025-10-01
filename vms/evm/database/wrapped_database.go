@@ -12,50 +12,56 @@ import (
 )
 
 var (
+	errSnapshotNotSupported = errors.New("snapshot is not supported")
+	errStatNotSupported     = errors.New("stat is not supported")
+
 	_ ethdb.Batch         = (*ethBatchWrapper)(nil)
 	_ ethdb.KeyValueStore = (*ethDBWrapper)(nil)
-
-	ErrSnapshotNotSupported = errors.New("snapshot is not supported")
-	ErrStatNotSupported     = errors.New("stat is not supported")
 )
 
-func WrapDatabase(db database.Database) ethdb.KeyValueStore { return ethDBWrapper{db} }
-
-type ethDBWrapper struct{ database.Database }
-
-func (ethDBWrapper) Stat(string) (string, error) { return "", ErrStatNotSupported }
-
-func (db ethDBWrapper) NewBatch() ethdb.Batch { return ethBatchWrapper{db.Database.NewBatch()} }
-
-// TODO: propagate size through avalanchego Database interface
-func (db ethDBWrapper) NewBatchWithSize(int) ethdb.Batch {
-	return ethBatchWrapper{db.Database.NewBatch()}
+type ethDBWrapper struct {
+	db database.Database
 }
+
+func New(db database.Database) ethdb.KeyValueStore { return ethDBWrapper{db} }
+
+func (ethDBWrapper) Stat(string) (string, error) { return "", errStatNotSupported }
+
+func (db ethDBWrapper) NewBatch() ethdb.Batch { return ethBatchWrapper{db.db.NewBatch()} }
+
+func (db ethDBWrapper) Has(key []byte) (bool, error) { return db.db.Has(key) }
+
+func (db ethDBWrapper) Get(key []byte) ([]byte, error) { return db.db.Get(key) }
+
+func (db ethDBWrapper) Put(key, value []byte) error { return db.db.Put(key, value) }
+
+func (db ethDBWrapper) Delete(key []byte) error { return db.db.Delete(key) }
+
+func (db ethDBWrapper) Compact(start, limit []byte) error { return db.db.Compact(start, limit) }
+
+func (db ethDBWrapper) Close() error { return db.db.Close() }
+
+func (db ethDBWrapper) NewBatchWithSize(int) ethdb.Batch { return ethBatchWrapper{db.db.NewBatch()} }
 
 func (ethDBWrapper) NewSnapshot() (ethdb.Snapshot, error) {
-	return nil, ErrSnapshotNotSupported
+	return nil, errSnapshotNotSupported
 }
 
-// This method assumes that the prefix is NOT part of the start, so there's
-// no need for the caller to prepend the prefix to the start.
 func (db ethDBWrapper) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
-	// avalanchego's database implementation assumes that the prefix is part of the
-	// start, so it is added here (if it is provided).
-	if len(prefix) != 0 {
-		newStart := make([]byte, len(prefix)+len(start))
-		copy(newStart, prefix)
-		copy(newStart[len(prefix):], start)
-		start = newStart
-	}
-	return db.Database.NewIteratorWithStartAndPrefix(start, prefix)
+	newStart := make([]byte, len(prefix)+len(start))
+	copy(newStart, prefix)
+	copy(newStart[len(prefix):], start)
+	start = newStart
+
+	return db.db.NewIteratorWithStartAndPrefix(start, prefix)
 }
 
 func (db ethDBWrapper) NewIteratorWithStart(start []byte) ethdb.Iterator {
-	return db.Database.NewIteratorWithStart(start)
+	return db.db.NewIteratorWithStart(start)
 }
 
 type ethBatchWrapper struct{ database.Batch }
 
-func (batch ethBatchWrapper) ValueSize() int { return batch.Batch.Size() }
+func (e ethBatchWrapper) ValueSize() int { return e.Batch.Size() }
 
-func (batch ethBatchWrapper) Replay(w ethdb.KeyValueWriter) error { return batch.Batch.Replay(w) }
+func (e ethBatchWrapper) Replay(w ethdb.KeyValueWriter) error { return e.Batch.Replay(w) }
