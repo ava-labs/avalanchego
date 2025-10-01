@@ -120,7 +120,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 
 	var (
 		activationTime = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-		durangoTime    = activationTime
+		durangoTime    = snowmantest.GenesisTimestamp.Add(10 * time.Second)
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -194,7 +194,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 
 	var (
 		activationTime = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-		durangoTime    = activationTime
+		durangoTime    = snowmantest.GenesisTimestamp.Add(10 * time.Second)
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -256,7 +256,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 
 	var (
 		activationTime = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-		durangoTime    = activationTime
+		durangoTime    = snowmantest.GenesisTimestamp.Add(10 * time.Second)
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -365,7 +365,7 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 
 	var (
 		activationTime = snowmantest.GenesisTimestamp.Add(-1 * time.Second)
-		durangoTime    = activationTime
+		durangoTime    = snowmantest.GenesisTimestamp.Add(-1 * time.Second)
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	proVM.Set(activationTime)
@@ -482,7 +482,7 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 
 	var (
 		activationTime = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-		durangoTime    = activationTime
+		durangoTime    = snowmantest.GenesisTimestamp.Add(10 * time.Second)
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -552,7 +552,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 
 	var (
 		activationTime = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-		durangoTime    = activationTime
+		durangoTime    = snowmantest.GenesisTimestamp.Add(10 * time.Second)
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {

@@ -28,7 +28,8 @@ const (
 	maxDelayExcess = 46_516_320 // ConversionRate * ln(MaxUint64 / MinDelayMilliseconds) + 1
 )
 
-// DelayExcess represents the excess for delay calculation in the dynamic minimum block delay mechanism.
+// DelayExcess represents the excess for delay calculation in the dynamic
+// minimum block delay mechanism.
 type DelayExcess uint64
 
 // Delay returns the minimum block delay in milliseconds, `m`.
@@ -44,25 +45,25 @@ func (t DelayExcess) Delay() uint64 {
 
 // UpdateDelayExcess updates the DelayExcess to be as close as possible to the
 // desiredDelayExcess without exceeding the maximum DelayExcess change.
-func (t *DelayExcess) UpdateDelayExcess(desiredDelayExcess uint64) {
-	*t = DelayExcess(calculateDelayExcess(uint64(*t), desiredDelayExcess))
+func (t *DelayExcess) UpdateDelayExcess(desiredDelayExcess DelayExcess) {
+	*t = calculateDelayExcess(*t, desiredDelayExcess)
 }
 
 // DesiredDelayExcess calculates the optimal delay excess given the desired
-// delay.
-func DesiredDelayExcess(desiredDelay uint64) uint64 {
+// delay in milliseconds.
+func DesiredDelayExcess(desiredDelay uint64) DelayExcess {
 	// This could be solved directly by calculating D * ln(desired / M)
 	// using floating point math. However, it introduces inaccuracies. So, we
 	// use a binary search to find the closest integer solution.
-	return uint64(sort.Search(maxDelayExcess, func(delayExcessGuess int) bool {
+	return DelayExcess(sort.Search(maxDelayExcess, func(delayExcessGuess int) bool {
 		excess := DelayExcess(delayExcessGuess)
 		return excess.Delay() >= desiredDelay
 	}))
 }
 
-// calculateDelayExcess calculates the optimal new DelayExcess for a block proposer to
-// include given the current and desired excess values.
-func calculateDelayExcess(excess, desired uint64) uint64 {
+// calculateDelayExcess calculates the optimal new DelayExcess for a block
+// proposer to include given the current and desired excess values.
+func calculateDelayExcess(excess, desired DelayExcess) DelayExcess {
 	change := safemath.AbsDiff(excess, desired)
 	change = min(change, MaxDelayExcessDiff)
 	if excess < desired {
