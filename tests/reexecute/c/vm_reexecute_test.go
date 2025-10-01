@@ -42,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -171,6 +172,9 @@ func benchmarkReexecuteRange(
 	vmMultiGatherer := metrics.NewPrefixGatherer()
 	r.NoError(prefixGatherer.Register("avalanche_evm", vmMultiGatherer))
 
+	meterVMRegistry := prometheus.NewRegistry()
+	r.NoError(prefixGatherer.Register("avalanche_meterchainvm", meterVMRegistry))
+
 	// consensusRegistry includes the chain="C" label and the prefix "avalanche_snowman".
 	// The consensus registry is passed to the executor to mimic a subset of consensus metrics.
 	consensusRegistry := prometheus.NewRegistry()
@@ -214,6 +218,7 @@ func benchmarkReexecuteRange(
 		chainDataDir,
 		configBytes,
 		vmMultiGatherer,
+		meterVMRegistry,
 	)
 	r.NoError(err)
 	defer func() {
@@ -244,7 +249,8 @@ func newMainnetCChainVM(
 	vmAndSharedMemoryDB database.Database,
 	chainDataDir string,
 	configBytes []byte,
-	metricsGatherer metrics.MultiGatherer,
+	vmMultiGatherer metrics.MultiGatherer,
+	meterVMRegistry prometheus.Registerer,
 ) (block.ChainVM, error) {
 	factory := factory.Factory{}
 	vmIntf, err := factory.New(logging.NoLog{})
@@ -272,6 +278,8 @@ func newMainnetCChainVM(
 		ids.Empty:       constants.PrimaryNetworkID,
 	}
 
+	vm = metervm.NewBlockVM(vm, meterVMRegistry)
+
 	if err := vm.Initialize(
 		ctx,
 		&snow.Context{
@@ -289,7 +297,7 @@ func newMainnetCChainVM(
 			Log:          tests.NewDefaultLogger("mainnet-vm-reexecution"),
 			SharedMemory: atomicMemory.NewSharedMemory(mainnetCChainID),
 			BCLookup:     ids.NewAliaser(),
-			Metrics:      metricsGatherer,
+			Metrics:      vmMultiGatherer,
 
 			WarpSigner: warpSigner,
 
@@ -599,28 +607,4 @@ func parseCustomLabels(labelsStr string) (map[string]string, error) {
 		labels[parts[0]] = parts[1]
 	}
 	return labels, nil
-}
-
-func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time.Duration) {
-	r := require.New(b)
-
-	gasUsed, err := getCounterMetricValue(registry, "avalanche_evm_eth_chain_block_gas_used_processed")
-	r.NoError(err)
-	mgasPerSecond := gasUsed / 1_000_000 / elapsed.Seconds()
-	b.ReportMetric(mgasPerSecond, "mgas/s")
-}
-
-func getCounterMetricValue(registry prometheus.Gatherer, query string) (float64, error) {
-	metricFamilies, err := registry.Gather()
-	if err != nil {
-		return 0, fmt.Errorf("failed to gather metrics: %w", err)
-	}
-
-	for _, mf := range metricFamilies {
-		if mf.GetName() == query {
-			return mf.GetMetric()[0].Counter.GetValue(), nil
-		}
-	}
-
-	return 0, fmt.Errorf("metric %s not found", query)
 }
