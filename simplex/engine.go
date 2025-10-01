@@ -196,7 +196,8 @@ func (e *Engine) SimplexMessage(ctx context.Context, nodeID ids.NodeID, msg *p2p
 
 	simplexMsg, err := e.p2pToSimplexMessage(ctx, msg)
 	if err != nil {
-		return fmt.Errorf("%w: %w", errConvertingMessage, err)
+		e.logger.Info("failed to convert p2p message to simplex message", zap.Error(err))
+		return nil
 	}
 
 	return e.epoch.HandleMessage(simplexMsg, nodeID[:])

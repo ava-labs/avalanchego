@@ -256,7 +256,7 @@ func emptyVoteMetadataFromP2P(emptyVote *p2p.EmptyVoteMetadata) (simplex.EmptyVo
 
 func digestFromP2P(p2pDigest []byte) (simplex.Digest, error) {
 	if len(p2pDigest) != 32 {
-		return simplex.Digest{}, fmt.Errorf("%w: go %d, expected %d", errInvalidDigestLength, len(p2pDigest), 32)
+		return simplex.Digest{}, fmt.Errorf("%w: got %d, expected %d", errInvalidDigestLength, len(p2pDigest), 32)
 	}
 
 	var digest simplex.Digest
