@@ -41,7 +41,7 @@ func (db ethDBWrapper) Compact(start, limit []byte) error { return db.db.Compact
 
 func (db ethDBWrapper) Close() error { return db.db.Close() }
 
-func (db ethDBWrapper) NewBatchWithSize(int) ethdb.Batch { return ethBatchWrapper{db.db.NewBatch()} }
+func (db ethDBWrapper) NewBatchWithSize(int) ethdb.Batch { return db.NewBatch() }
 
 func (ethDBWrapper) NewSnapshot() (ethdb.Snapshot, error) {
 	return nil, errSnapshotNotSupported
