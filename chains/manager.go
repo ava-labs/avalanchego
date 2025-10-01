@@ -1712,7 +1712,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		return nil, fmt.Errorf("couldn't create simplex DBs: %w", err)
 	}
 
-	// TODO: wrap the vm in a LOCKED VM that locks the VM interface methods
+	// TODO: wrap the vm in a LOCKED VM that locks the VM interface methods(excluding WaitForEvent)
 
 	var halter common.Halter
 	connectedValidators, err := m.createTrackedPeers(primaryAlias)

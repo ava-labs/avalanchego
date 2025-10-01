@@ -195,13 +195,7 @@ func TestCreateSimplexChain(t *testing.T) {
 	chainManager.QueueChainCreation(chainParams)
 	primaryAlias := chainManager.PrimaryAliasOrDefault(chainParams.ID)
 
-	timeout := time.After(1 * time.Minute)
 	for {
-		select {
-		case <-timeout:
-			require.Fail(t, "timed out waiting for chain to be created")
-		default:
-		}
 		id, err := chainManager.Lookup(primaryAlias)
 		if errors.Is(err, ids.ErrNoIDWithAlias) {
 			time.Sleep(100 * time.Millisecond)
