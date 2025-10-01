@@ -23,7 +23,12 @@ const (
 	//
 	// Ref: https://github.com/ava-labs/ledger-avalanche/blob/main/app/src/common/tx.c
 	ledgerBufferLimit = 8192
-	ledgerPathSize    = 9
+	// ledgerPathSize is the serialized size of a path suffix (e.g., "0/123") as produced
+	// by SerializePathSuffix in the ledger library. Format: 1 byte (component count) +
+	// 4 bytes (first component) + 4 bytes (second component) = 9 bytes total.
+	//
+	// Ref: https://github.com/ava-labs/ledger-avalanche-go/blob/main/common.go (SerializePathSuffix)
+	ledgerPathSize = 9
 )
 
 var _ keychain.Ledger = (*Ledger)(nil)
