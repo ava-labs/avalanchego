@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1759340244440,
+  "lastUpdate": 1759349464294,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -390,6 +390,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
             "value": 71.2,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Stephen Buttolph",
+            "username": "StephenButtolph",
+            "email": "stephen@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "220cb2629972423c1cfd340f6f40933133b5bdc0",
+          "message": "Add warp accessors to `validators.State` (#4373)\n\nSigned-off-by: Stephen Buttolph <stephen@avalabs.org>\nCo-authored-by: Geoff Stuart <geoff.vball@gmail.com>\nCo-authored-by: Ian Suvak <ian.suvak@avalabs.org>\nCo-authored-by: Michael Kaplan <55204436+michaelkaplan13@users.noreply.github.com>",
+          "timestamp": "2025-10-01T19:48:17Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/220cb2629972423c1cfd340f6f40933133b5bdc0"
+        },
+        "date": 1759349462218,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
+            "value": 42.41,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
