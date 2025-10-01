@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/plugin/factory"
+	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -41,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -62,10 +64,12 @@ var (
 	executionTimeout   time.Duration
 	labelsArg          string
 
-	labels = map[string]string{
+	networkUUID string = uuid.NewString()
+	labels             = map[string]string{
 		"job":               "c-chain-reexecution",
 		"is_ephemeral_node": "false",
 		"chain":             "C",
+		"network_uuid":      networkUUID,
 	}
 
 	configKey         = "config"
@@ -168,13 +172,16 @@ func benchmarkReexecuteRange(
 	vmMultiGatherer := metrics.NewPrefixGatherer()
 	r.NoError(prefixGatherer.Register("avalanche_evm", vmMultiGatherer))
 
+	meterVMRegistry := prometheus.NewRegistry()
+	r.NoError(prefixGatherer.Register("avalanche_meterchainvm", meterVMRegistry))
+
 	// consensusRegistry includes the chain="C" label and the prefix "avalanche_snowman".
 	// The consensus registry is passed to the executor to mimic a subset of consensus metrics.
 	consensusRegistry := prometheus.NewRegistry()
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
 
 	if metricsEnabled {
-		collectRegistry(b, "c-chain-reexecution", time.Minute, prefixGatherer, labels)
+		collectRegistry(b, "c-chain-reexecution", prefixGatherer, labels)
 	}
 
 	log := tests.NewDefaultLogger("c-chain-reexecution")
@@ -211,6 +218,7 @@ func benchmarkReexecuteRange(
 		chainDataDir,
 		configBytes,
 		vmMultiGatherer,
+		meterVMRegistry,
 	)
 	r.NoError(err)
 	defer func() {
@@ -241,7 +249,8 @@ func newMainnetCChainVM(
 	vmAndSharedMemoryDB database.Database,
 	chainDataDir string,
 	configBytes []byte,
-	metricsGatherer metrics.MultiGatherer,
+	vmMultiGatherer metrics.MultiGatherer,
+	meterVMRegistry prometheus.Registerer,
 ) (block.ChainVM, error) {
 	factory := factory.Factory{}
 	vmIntf, err := factory.New(logging.NoLog{})
@@ -269,6 +278,8 @@ func newMainnetCChainVM(
 		ids.Empty:       constants.PrimaryNetworkID,
 	}
 
+	vm = metervm.NewBlockVM(vm, meterVMRegistry)
+
 	if err := vm.Initialize(
 		ctx,
 		&snow.Context{
@@ -286,7 +297,7 @@ func newMainnetCChainVM(
 			Log:          tests.NewDefaultLogger("mainnet-vm-reexecution"),
 			SharedMemory: atomicMemory.NewSharedMemory(mainnetCChainID),
 			BCLookup:     ids.NewAliaser(),
-			Metrics:      metricsGatherer,
+			Metrics:      vmMultiGatherer,
 
 			WarpSigner: warpSigner,
 
@@ -541,13 +552,14 @@ func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, err
 
 // collectRegistry starts prometheus and collects metrics from the provided gatherer.
 // Attaches the provided labels + GitHub labels if available to the collected metrics.
-func collectRegistry(tb testing.TB, name string, timeout time.Duration, gatherer prometheus.Gatherer, labels map[string]string) {
+func collectRegistry(tb testing.TB, name string, gatherer prometheus.Gatherer, labels map[string]string) {
 	r := require.New(tb)
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	tb.Cleanup(cancel)
+	startPromCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
+	defer cancel()
 
-	r.NoError(tmpnet.StartPrometheus(ctx, tests.NewDefaultLogger("prometheus")))
+	logger := tests.NewDefaultLogger("prometheus")
+	r.NoError(tmpnet.StartPrometheus(startPromCtx, logger))
 
 	server, err := tests.NewPrometheusServer(gatherer)
 	r.NoError(err)
@@ -567,6 +579,10 @@ func collectRegistry(tb testing.TB, name string, timeout time.Duration, gatherer
 				return nil
 			}(),
 		))
+
+		checkMetricsCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
+		defer cancel()
+		r.NoError(tmpnet.CheckMetricsExist(checkMetricsCtx, logger, networkUUID))
 	})
 
 	sdConfigFilePath, err = tmpnet.WritePrometheusSDConfig(name, tmpnet.SDConfig{
@@ -591,28 +607,4 @@ func parseCustomLabels(labelsStr string) (map[string]string, error) {
 		labels[parts[0]] = parts[1]
 	}
 	return labels, nil
-}
-
-func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time.Duration) {
-	r := require.New(b)
-
-	gasUsed, err := getCounterMetricValue(registry, "avalanche_evm_eth_chain_block_gas_used_processed")
-	r.NoError(err)
-	mgasPerSecond := gasUsed / 1_000_000 / elapsed.Seconds()
-	b.ReportMetric(mgasPerSecond, "mgas/s")
-}
-
-func getCounterMetricValue(registry prometheus.Gatherer, query string) (float64, error) {
-	metricFamilies, err := registry.Gather()
-	if err != nil {
-		return 0, fmt.Errorf("failed to gather metrics: %w", err)
-	}
-
-	for _, mf := range metricFamilies {
-		if mf.GetName() == query {
-			return mf.GetMetric()[0].Counter.GetValue(), nil
-		}
-	}
-
-	return 0, fmt.Errorf("metric %s not found", query)
 }
