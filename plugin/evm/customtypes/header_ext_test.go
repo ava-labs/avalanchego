@@ -12,10 +12,13 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/coreth/utils/utilstest"
 
 	// TODO(arr4n) These tests were originally part of the `coreth/core/types`
 	// package so assume the presence of identifiers. A dot-import reduces PR
@@ -109,16 +112,16 @@ func headerWithNonZeroFields() (*Header, *HeaderExtra) {
 		Nonce:            BlockNonce{15},
 		BaseFee:          big.NewInt(16),
 		WithdrawalsHash:  &common.Hash{17},
-		BlobGasUsed:      ptrTo(uint64(18)),
-		ExcessBlobGas:    ptrTo(uint64(19)),
+		BlobGasUsed:      utilstest.PointerTo(uint64(18)),
+		ExcessBlobGas:    utilstest.PointerTo(uint64(19)),
 		ParentBeaconRoot: &common.Hash{20},
 	}
 	extra := &HeaderExtra{
 		ExtDataHash:      common.Hash{21},
 		ExtDataGasUsed:   big.NewInt(22),
 		BlockGasCost:     big.NewInt(23),
-		TimeMilliseconds: ptrTo(uint64(24)),
-		MinDelayExcess:   ptrTo(uint64(25)),
+		TimeMilliseconds: utilstest.PointerTo(uint64(24)),
+		MinDelayExcess:   utilstest.PointerTo(acp226.DelayExcess(25)),
 	}
 	return WithHeaderExtra(header, extra), extra
 }
@@ -170,6 +173,8 @@ func allFieldsSet[T interface {
 				assertNonZero(t, f)
 			case *Header:
 				assertNonZero(t, f)
+			case *acp226.DelayExcess:
+				assertNonZero(t, f)
 			case []uint8, []*Header, Transactions, []*Transaction, Withdrawals, []*Withdrawal:
 				assert.NotEmpty(t, f)
 			default:
@@ -181,12 +186,10 @@ func allFieldsSet[T interface {
 
 func assertNonZero[T interface {
 	common.Hash | common.Address | BlockNonce | uint32 | uint64 | Bloom |
-		*big.Int | *common.Hash | *uint64 | *[]uint8 | *Header
+		*big.Int | *common.Hash | *uint64 | *[]uint8 | *Header | *acp226.DelayExcess
 }](t *testing.T, v T) {
 	t.Helper()
 	require.NotZero(t, v)
 }
 
 // Note [TestCopyHeader] tests the [HeaderExtra.PostCopy] method.
-
-func ptrTo[T any](x T) *T { return &x }

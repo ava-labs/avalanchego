@@ -34,6 +34,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/coreth/core/extstate"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
@@ -325,8 +326,8 @@ func (g *Genesis) toBlock(db ethdb.Database, triedb *triedb.Database) *types.Blo
 			headerExtra.TimeMilliseconds = new(uint64)
 			*headerExtra.TimeMilliseconds = g.Timestamp * 1000
 
-			headerExtra.MinDelayExcess = new(uint64)
-			*headerExtra.MinDelayExcess = 0 // TODO: decide whether we want this to be configurable by genesis/chainconfig
+			headerExtra.MinDelayExcess = new(acp226.DelayExcess)
+			*headerExtra.MinDelayExcess = acp226.InitialDelayExcess
 		}
 	}
 
