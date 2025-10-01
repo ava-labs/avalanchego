@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -40,8 +41,8 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -129,8 +130,8 @@ func TestBlockVerify_PostForkOption_CoreBlockVerifyIsCalledOnce(t *testing.T) {
 
 	// Verify an option once; then show that another verify call would not call coreBlk.Verify()
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -211,8 +212,8 @@ func TestBlockAccept_PostForkOption_SetsLastAcceptedBlock(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -296,8 +297,8 @@ func TestBlockReject_InnerBlockIsNotRejected(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -368,8 +369,8 @@ func TestBlockVerify_PostForkOption_ParentIsNotOracleWithError(t *testing.T) {
 
 	// Verify an option once; then show that another verify call would not call coreBlk.Verify()
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
 	defer func() {
@@ -441,8 +442,8 @@ func TestOptionTimestampValidity(t *testing.T) {
 	require := require.New(t)
 
 	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
 	)
 	coreVM, _, proVM, db := initTestProposerVM(t, activationTime, durangoTime, 0)
 
@@ -455,7 +456,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		},
 	}
 
-	oracleBlkTime := proVM.Time().Truncate(time.Second)
+	oracleBlkTime := proVM.Time().Truncate(time.Second).UTC()
 	statelessBlock, err := block.BuildUnsigned(
 		snowmantest.GenesisID,
 		oracleBlkTime,
@@ -518,7 +519,7 @@ func TestOptionTimestampValidity(t *testing.T) {
 		return nil, nil
 	}
 
-	require.Equal(oracleBlkTime, option.Timestamp())
+	require.Equal(oracleBlkTime, option.Timestamp().UTC())
 
 	require.NoError(option.Accept(context.Background()))
 	require.NoError(proVM.Shutdown(context.Background()))
@@ -610,5 +611,5 @@ func TestOptionTimestampValidity(t *testing.T) {
 		return nil, nil
 	}
 
-	require.Equal(oracleBlkTime, statefulOptionBlock.Timestamp())
+	require.Equal(oracleBlkTime, statefulOptionBlock.Timestamp().UTC())
 }
