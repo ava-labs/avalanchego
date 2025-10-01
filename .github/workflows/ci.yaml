@@ -242,7 +242,7 @@ jobs:
       - name: Test Go FFI bindings
         working-directory: ffi
         # cgocheck2 is expensive but provides complete pointer checks
-        run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=firewood go test ./...
+        run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=firewood go test -race ./...
 
   firewood-ethhash-differential-fuzz:
     needs: build
@@ -264,7 +264,7 @@ jobs:
       - name: Test Go FFI bindings
         working-directory: ffi
         # cgocheck2 is expensive but provides complete pointer checks
-        run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=ethhash go test ./...
+        run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=ethhash go test -race ./...
       - name: Test Firewood <> Ethereum Differential Fuzz
         working-directory: ffi/tests/eth
         run: go test -fuzz=. -fuzztime=1m
