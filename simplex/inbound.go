@@ -21,7 +21,6 @@ var (
 	errInvalidSigner       = errors.New("invalid signer")
 )
 
-// -> MESSAGES
 func emptyNotarizationMessageFromP2P(emptyNotarization *p2p.EmptyNotarization, qcDeserializer *QCDeserializer) (*simplex.Message, error) {
 	notarization, err := emptyNotarizationFromP2P(emptyNotarization, qcDeserializer)
 	if err != nil {

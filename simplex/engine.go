@@ -29,7 +29,6 @@ var (
 	tickInterval        = time.Millisecond * 500
 
 	errUnknownMessageType = errors.New("unknown message type")
-	errConvertingMessage  = errors.New("error converting message to simplex message")
 )
 
 type Engine struct {
@@ -61,6 +60,8 @@ type Engine struct {
 	logger             logging.Logger
 	vm                 block.ChainVM
 	consensusCtx       *snow.ConsensusContext
+
+	shutdown bool
 }
 
 // The VM must be initialized before creating the engine
@@ -183,6 +184,10 @@ func (e *Engine) Start(ctx context.Context, _ uint32) error {
 func (e *Engine) tick() {
 	ticker := time.NewTicker(tickInterval)
 	for {
+		if e.shutdown {
+			return
+		}
+
 		tick := <-ticker.C
 		e.epoch.AdvanceTime(tick)
 	}
@@ -235,6 +240,7 @@ func (e *Engine) p2pToSimplexMessage(ctx context.Context, msg *p2p.Simplex) (*si
 func (e *Engine) Shutdown(_ context.Context) error {
 	e.epoch.Stop()
 	e.logger.Info("Stopped simplex engine")
+	e.shutdown = true
 	return nil
 }
 
