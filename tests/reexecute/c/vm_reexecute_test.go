@@ -36,12 +36,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
+	"github.com/ava-labs/avalanchego/tests/reexecute/blockdb"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -441,18 +441,18 @@ func createBlockChanFromLevelDB(tb testing.TB, sourceDir string, startBlock, end
 	r := require.New(tb)
 	ch := make(chan blockResult, chanSize)
 
-	db, err := leveldb.New(sourceDir, nil, logging.NoLog{}, prometheus.NewRegistry())
+	blockDB, err := blockdb.New(sourceDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create leveldb database from %q: %w", sourceDir, err)
+		return nil, err
 	}
 	tb.Cleanup(func() {
-		r.NoError(db.Close())
+		r.NoError(blockDB.Close())
 	})
 
 	go func() {
 		defer close(ch)
 
-		iter := db.NewIteratorWithStart(blockKey(startBlock))
+		iter := blockDB.NewIteratorFromHeight(startBlock)
 		defer iter.Release()
 
 		currentHeight := startBlock
@@ -495,10 +495,6 @@ func createBlockChanFromLevelDB(tb testing.TB, sourceDir string, startBlock, end
 	return ch, nil
 }
 
-func blockKey(height uint64) []byte {
-	return binary.BigEndian.AppendUint64(nil, height)
-}
-
 func TestExportBlockRange(t *testing.T) {
 	exportBlockRange(t, blockDirSrcArg, blockDirDstArg, startBlockArg, endBlockArg, chanSizeArg)
 }
@@ -508,23 +504,13 @@ func exportBlockRange(tb testing.TB, blockDirSrc string, blockDirDst string, sta
 	blockChan, err := createBlockChanFromLevelDB(tb, blockDirSrc, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
-	db, err := leveldb.New(blockDirDst, nil, logging.NoLog{}, prometheus.NewRegistry())
+	blockDB, err := blockdb.New(blockDirDst)
 	r.NoError(err)
-	tb.Cleanup(func() {
-		r.NoError(db.Close())
-	})
+	r.NoError(blockDB.Close())
 
-	batch := db.NewBatch()
 	for blkResult := range blockChan {
-		r.NoError(batch.Put(blockKey(blkResult.Height), blkResult.BlockBytes))
-
-		if batch.Size() > 10*units.MiB {
-			r.NoError(batch.Write())
-			batch = db.NewBatch()
-		}
+		r.NoError(blockDB.WriteBlock(blkResult.Height, blkResult.BlockBytes))
 	}
-
-	r.NoError(batch.Write())
 }
 
 type consensusMetrics struct {
