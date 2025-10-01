@@ -95,17 +95,29 @@ type Database interface {
 	health.Checker
 }
 
-// HeightIndex defines the interface for storing and retrieving entries by height.
+// HeightIndex defines the interface for storing and retrieving values by height.
 type HeightIndex interface {
-	// Put inserts the entry into the store at the given height.
-	Put(height uint64, bytes []byte) error
+	// Put inserts the value into the database at the given height.
+	//
+	// If value is nil or an empty slice, then when it's retrieved it may be nil
+	// or an empty slice.
+	//
+	// value is safe to read and modify after calling Put.
+	Put(height uint64, value []byte) error
 
-	// Get retrieves an entry by its height.
+	// Get retrieves a value by its height.
+	// Returns [ErrNotFound] if the key is not present in the database.
+	//
+	// Returned []byte is safe to read and modify after calling Get.
 	Get(height uint64) ([]byte, error)
 
-	// Has checks if an entry exists at the given height.
+	// Has checks if a value exists at the given height.
+	//
+	// Returns true even if the stored value is nil or empty.
 	Has(height uint64) (bool, error)
 
 	// Close closes the database.
+	//
+	// Calling Close after Close returns [ErrClosed].
 	io.Closer
 }
