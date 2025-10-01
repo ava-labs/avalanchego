@@ -44,8 +44,7 @@ import (
 
 func decodeEncode(input []byte, val interface{}) error {
 	if err := rlp.DecodeBytes(input, val); err != nil {
-		// not valid rlp, nothing to do
-		return nil
+		return nil //nolint:nilerr // not valid rlp, nothing to do
 	}
 	// If it _were_ valid rlp, we can encode it again
 	output, err := rlp.EncodeToBytes(val)
