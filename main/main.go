@@ -15,9 +15,12 @@ import (
 	"github.com/ava-labs/avalanchego/app"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/version"
+	"github.com/ava-labs/coreth/plugin/evm"
 )
 
 func main() {
+	evm.RegisterAllLibEVMExtras()
+
 	fs := config.BuildFlagSet()
 	v, err := config.BuildViper(fs, os.Args[1:])
 
