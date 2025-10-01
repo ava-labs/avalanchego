@@ -8,6 +8,7 @@ module github.com/ava-labs/avalanchego
 //   - CONTRIBUTING.md
 //   - README.md
 //   - go.mod (here)
+//   - nix/go.nix (update version and sha256 for supported arches)
 //   - tools/go.mod
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
@@ -144,7 +145,7 @@ require (
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
+	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.1 // indirect
 	github.com/hashicorp/go-bexpr v0.1.10 // indirect
@@ -209,3 +210,5 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
+
+tool github.com/onsi/ginkgo/v2/ginkgo

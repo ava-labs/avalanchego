@@ -94,6 +94,9 @@ type Manager interface {
 	// If sampling the requested size isn't possible, an error will be returned.
 	Sample(subnetID ids.ID, size int) ([]ids.NodeID, error)
 
+	// GetAllMaps returns a copy of all validators of all subnets
+	GetAllMaps() map[ids.ID]map[ids.NodeID]*GetValidatorOutput
+
 	// Map of the validators in this subnet
 	GetMap(subnetID ids.ID) map[ids.NodeID]*GetValidatorOutput
 
@@ -255,6 +258,17 @@ func (m *manager) Sample(subnetID ids.ID, size int) ([]ids.NodeID, error) {
 	}
 
 	return set.Sample(size)
+}
+
+func (m *manager) GetAllMaps() map[ids.ID]map[ids.NodeID]*GetValidatorOutput {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+
+	set := make(map[ids.ID]map[ids.NodeID]*GetValidatorOutput, len(m.subnetToVdrs))
+	for subnetID, vdrs := range m.subnetToVdrs {
+		set[subnetID] = vdrs.Map()
+	}
+	return set
 }
 
 func (m *manager) GetMap(subnetID ids.ID) map[ids.NodeID]*GetValidatorOutput {
