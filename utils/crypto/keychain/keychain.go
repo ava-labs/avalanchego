@@ -71,12 +71,12 @@ func NewLedgerKeychain(l Ledger, numToDerive int) (Keychain, error) {
 	if numToDerive < 1 {
 		return nil, ErrInvalidNumAddrsToDerive
 	}
+	if numToDerive > math.MaxUint32 {
+		return nil, fmt.Errorf("number of addresses to derive %d exceeds uint32 max", numToDerive)
+	}
 
 	indices := make([]uint32, numToDerive)
 	for i := range indices {
-		if i > math.MaxUint32 {
-			return nil, fmt.Errorf("index %d exceeds uint32 max", i)
-		}
 		indices[i] = uint32(i)
 	}
 
