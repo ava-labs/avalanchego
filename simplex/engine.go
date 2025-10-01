@@ -63,7 +63,7 @@ type Engine struct {
 	consensusCtx       *snow.ConsensusContext
 }
 
-// THe VM must be initialized before creating the engine
+// The VM must be initialized before creating the engine
 func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config *Config) (*Engine, error) {
 	if _, ok := config.Validators[config.Ctx.NodeID]; !ok {
 		config.Log.Info("Node is not a validator for the subnet",
