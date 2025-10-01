@@ -191,7 +191,7 @@ type cachedState struct {
 
 	// Caches validators for all subnets at various heights.
 	// Key: height
-	// Value: mapping height -> subnet ID -> validator set
+	// Value: mapping subnet ID -> validator set
 	cache cache.Cacher[uint64, map[ids.ID]WarpSet]
 }
 
