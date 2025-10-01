@@ -4,11 +4,11 @@
 package customheader
 
 import (
+	"math"
 	"math/big"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -455,6 +455,14 @@ func TestVerifyBlockFee(t *testing.T) {
 			},
 			extraStateContribution: nil,
 			shouldErr:              false,
+		},
+		"zero block gas cost": {
+			baseFee:                big.NewInt(100),
+			parentBlockGasCost:     big.NewInt(0),
+			timeElapsed:            testFeeConfig.TargetBlockRate + 1,
+			txs:                    nil,
+			receipts:               nil,
+			extraStateContribution: nil,
 		},
 	}
 
