@@ -55,7 +55,7 @@ runs:
       shell: bash
       run: |
         if [ -n "${{ inputs.firewood-path }}" ]; then
-          ${{ inputs.checkout-path }}/scripts/setup_firewood.sh ${{ inputs.firewood }} ${{ inputs.firewood-path }}
+          "${{ inputs.checkout-path }}/scripts/setup_firewood.sh" "${{ inputs.firewood }}" "${{ inputs.firewood-path }}"
         else
-          ${{ inputs.checkout-path }}/scripts/setup_firewood.sh ${{ inputs.firewood }}
+          "${{ inputs.checkout-path }}/scripts/setup_firewood.sh" "${{ inputs.firewood }}"
         fi
