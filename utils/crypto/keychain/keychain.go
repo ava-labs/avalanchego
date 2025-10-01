@@ -6,8 +6,13 @@ package keychain
 import (
 	"errors"
 	"fmt"
+	"math"
+
+	"github.com/ava-labs/libevm/common"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -39,12 +44,18 @@ type Keychain interface {
 	Addresses() set.Set[ids.ShortID]
 }
 
+// keyInfo holds both the public key and ledger index for a ledger key.
+type keyInfo struct {
+	pubKey *secp256k1.PublicKey // The Avalanche public key obtained from ledger
+	idx    uint32               // The ledger index
+}
+
 // ledgerKeychain is an abstraction of the underlying ledger hardware device,
 // to be able to get a signer from a finite set of derived signers
 type ledgerKeychain struct {
-	ledger    Ledger
-	addrs     set.Set[ids.ShortID]
-	addrToIdx map[ids.ShortID]uint32
+	ledger           Ledger
+	avaAddrToKeyInfo map[ids.ShortID]*keyInfo    // Maps Avalanche addresses to key info
+	ethAddrToKeyInfo map[common.Address]*keyInfo // Maps Ethereum addresses to key info
 }
 
 // ledgerSigner is an abstraction of the underlying ledger hardware device,
@@ -52,7 +63,7 @@ type ledgerKeychain struct {
 type ledgerSigner struct {
 	ledger Ledger
 	idx    uint32
-	addr   ids.ShortID
+	pubKey *secp256k1.PublicKey
 }
 
 // NewLedgerKeychain creates a new Ledger with [numToDerive] addresses.
@@ -63,6 +74,9 @@ func NewLedgerKeychain(l Ledger, numToDerive int) (Keychain, error) {
 
 	indices := make([]uint32, numToDerive)
 	for i := range indices {
+		if i > math.MaxUint32 {
+			return nil, fmt.Errorf("index %d exceeds uint32 max", i)
+		}
 		indices[i] = uint32(i)
 	}
 
@@ -75,48 +89,69 @@ func NewLedgerKeychainFromIndices(l Ledger, indices []uint32) (Keychain, error) 
 		return nil, ErrInvalidIndicesLength
 	}
 
-	addrs, err := l.Addresses(indices)
+	pubKeys, err := l.PubKeys(indices)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(addrs) != len(indices) {
+	if len(pubKeys) != len(indices) {
 		return nil, fmt.Errorf(
 			"%w. expected %d, got %d",
 			ErrInvalidNumAddrsDerived,
 			len(indices),
-			len(addrs),
+			len(pubKeys),
 		)
 	}
 
-	addrsSet := set.Of(addrs...)
-
-	addrToIdx := map[ids.ShortID]uint32{}
+	avaAddrToKeyInfo := map[ids.ShortID]*keyInfo{}
+	ethAddrToKeyInfo := map[common.Address]*keyInfo{}
 	for i := range indices {
-		addrToIdx[addrs[i]] = indices[i]
+		keyInf := &keyInfo{
+			pubKey: pubKeys[i],
+			idx:    indices[i],
+		}
+		avaAddrToKeyInfo[pubKeys[i].Address()] = keyInf
+		ethAddrToKeyInfo[pubKeys[i].EthAddress()] = keyInf
 	}
 
 	return &ledgerKeychain{
-		ledger:    l,
-		addrs:     addrsSet,
-		addrToIdx: addrToIdx,
+		ledger:           l,
+		avaAddrToKeyInfo: avaAddrToKeyInfo,
+		ethAddrToKeyInfo: ethAddrToKeyInfo,
 	}, nil
 }
 
-func (l *ledgerKeychain) Addresses() set.Set[ids.ShortID] {
-	return l.addrs
+func (kc *ledgerKeychain) Addresses() set.Set[ids.ShortID] {
+	return set.Of(maps.Keys(kc.avaAddrToKeyInfo)...)
 }
 
-func (l *ledgerKeychain) Get(addr ids.ShortID) (Signer, bool) {
-	idx, ok := l.addrToIdx[addr]
-	if !ok {
+func (kc *ledgerKeychain) Get(addr ids.ShortID) (Signer, bool) {
+	keyInf, found := kc.avaAddrToKeyInfo[addr]
+	if !found {
 		return nil, false
 	}
-
 	return &ledgerSigner{
-		ledger: l.ledger,
-		idx:    idx,
-		addr:   addr,
+		ledger: kc.ledger,
+		pubKey: keyInf.pubKey,
+		idx:    keyInf.idx,
+	}, true
+}
+
+// EthAddresses returns the set of Ethereum addresses that this keychain can sign for.
+func (kc *ledgerKeychain) EthAddresses() set.Set[common.Address] {
+	return set.Of(maps.Keys(kc.ethAddrToKeyInfo)...)
+}
+
+// GetEth returns a signer for the given Ethereum address, if it exists in this keychain.
+func (kc *ledgerKeychain) GetEth(addr common.Address) (Signer, bool) {
+	keyInf, found := kc.ethAddrToKeyInfo[addr]
+	if !found {
+		return nil, false
+	}
+	return &ledgerSigner{
+		ledger: kc.ledger,
+		pubKey: keyInf.pubKey,
+		idx:    keyInf.idx,
 	}, true
 }
 
@@ -161,5 +196,5 @@ func (l *ledgerSigner) Sign(b []byte) ([]byte, error) {
 }
 
 func (l *ledgerSigner) Address() ids.ShortID {
-	return l.addr
+	return l.pubKey.Address()
 }

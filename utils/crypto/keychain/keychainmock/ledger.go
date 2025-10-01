@@ -12,7 +12,7 @@ package keychainmock
 import (
 	reflect "reflect"
 
-	ids "github.com/ava-labs/avalanchego/ids"
+	secp256k1 "github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	version "github.com/ava-labs/avalanchego/version"
 	gomock "go.uber.org/mock/gomock"
 )
@@ -41,36 +41,6 @@ func (m *Ledger) EXPECT() *LedgerMockRecorder {
 	return m.recorder
 }
 
-// Address mocks base method.
-func (m *Ledger) Address(displayHRP string, addressIndex uint32) (ids.ShortID, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Address", displayHRP, addressIndex)
-	ret0, _ := ret[0].(ids.ShortID)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Address indicates an expected call of Address.
-func (mr *LedgerMockRecorder) Address(displayHRP, addressIndex any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Address", reflect.TypeOf((*Ledger)(nil).Address), displayHRP, addressIndex)
-}
-
-// Addresses mocks base method.
-func (m *Ledger) Addresses(addressIndices []uint32) ([]ids.ShortID, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Addresses", addressIndices)
-	ret0, _ := ret[0].([]ids.ShortID)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Addresses indicates an expected call of Addresses.
-func (mr *LedgerMockRecorder) Addresses(addressIndices any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Addresses", reflect.TypeOf((*Ledger)(nil).Addresses), addressIndices)
-}
-
 // Disconnect mocks base method.
 func (m *Ledger) Disconnect() error {
 	m.ctrl.T.Helper()
@@ -83,6 +53,36 @@ func (m *Ledger) Disconnect() error {
 func (mr *LedgerMockRecorder) Disconnect() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Disconnect", reflect.TypeOf((*Ledger)(nil).Disconnect))
+}
+
+// PubKey mocks base method.
+func (m *Ledger) PubKey(addressIndex uint32) (*secp256k1.PublicKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PubKey", addressIndex)
+	ret0, _ := ret[0].(*secp256k1.PublicKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PubKey indicates an expected call of PubKey.
+func (mr *LedgerMockRecorder) PubKey(addressIndex any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PubKey", reflect.TypeOf((*Ledger)(nil).PubKey), addressIndex)
+}
+
+// PubKeys mocks base method.
+func (m *Ledger) PubKeys(addressIndices []uint32) ([]*secp256k1.PublicKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PubKeys", addressIndices)
+	ret0, _ := ret[0].([]*secp256k1.PublicKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PubKeys indicates an expected call of PubKeys.
+func (mr *LedgerMockRecorder) PubKeys(addressIndices any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PubKeys", reflect.TypeOf((*Ledger)(nil).PubKeys), addressIndices)
 }
 
 // Sign mocks base method.
