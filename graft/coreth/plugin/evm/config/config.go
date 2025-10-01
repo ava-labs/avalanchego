@@ -27,6 +27,11 @@ type Config struct {
 	// default to use the parent block's target gas per second.
 	GasTarget *gas.Gas `json:"gas-target,omitempty"`
 
+	// MinDelayTarget is the minimum delay between blocks (in milliseconds) that this node will attempt to use
+	// when creating blocks. If this config is not specified, the node will
+	// default to use the parent block's target delay per second.
+	MinDelayTarget *uint64 `json:"min-delay-target,omitempty"`
+
 	// Coreth APIs
 	AdminAPIEnabled bool   `json:"admin-api-enabled"`
 	AdminAPIDir     string `json:"admin-api-dir"`
