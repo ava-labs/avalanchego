@@ -31,6 +31,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer/proposermock"
+
+	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 // Assert that when the underlying VM implements ChainVMWithBuildBlockContext
@@ -414,4 +416,104 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 	)
 	require.NoError(err)
 	require.Equal(innerChildBlock, gotChild.(*postForkBlock).innerBlk)
+}
+
+// Confirm that VM rejects blocks with non-zero epoch prior to granite upgrade activation
+func TestPreGraniteBlock_NonZeroEpoch(t *testing.T) {
+	require := require.New(t)
+	ctrl := gomock.NewController(t)
+
+	var (
+		nodeID                 = ids.GenerateTestNodeID()
+		pChainHeight    uint64 = 1337
+		parentID               = ids.GenerateTestID()
+		parentTimestamp        = time.Now().Truncate(time.Second)
+		parentHeight    uint64 = 1234
+		coreBlkID              = ids.GenerateTestID()
+		childBlkID             = ids.GenerateTestID()
+	)
+
+	innerBlk := snowmanmock.NewBlock(ctrl)
+	innerBlk.EXPECT().ID().Return(coreBlkID).AnyTimes()
+	innerBlk.EXPECT().Height().Return(parentHeight + 1).AnyTimes()
+
+	innerChildBlock := snowmanmock.NewBlock(ctrl)
+	innerChildBlock.EXPECT().ID().Return(childBlkID).AnyTimes()
+	innerChildBlock.EXPECT().Bytes().Return([]byte{1, 2, 3}).AnyTimes()
+
+	builtBlk := snowmanmock.NewBlock(ctrl)
+	builtBlk.EXPECT().Bytes().Return([]byte{1, 2, 3}).AnyTimes()
+	builtBlk.EXPECT().ID().Return(ids.GenerateTestID()).AnyTimes()
+	builtBlk.EXPECT().Height().Return(pChainHeight).AnyTimes()
+
+	innerVM := blockmock.NewChainVM(ctrl)
+	innerBlockBuilderVM := blockmock.NewBuildBlockWithContextChainVM(ctrl)
+	innerBlockBuilderVM.EXPECT().BuildBlockWithContext(gomock.Any(), &block.Context{
+		PChainHeight: pChainHeight,
+	}).Return(builtBlk, nil).AnyTimes()
+
+	vdrState := validatorsmock.NewState(ctrl)
+	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
+
+	windower := proposermock.NewWindower(ctrl)
+	windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nodeID, nil).AnyTimes()
+
+	pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(err)
+	vm := &VM{
+		Config: Config{
+			Upgrades:          upgradetest.GetConfig(upgradetest.Fortuna), // Use fortuna for pre-Granite behavior
+			StakingCertLeaf:   &staking.Certificate{},
+			StakingLeafSigner: pk,
+			Registerer:        prometheus.NewRegistry(),
+		},
+		ChainVM:        innerVM,
+		blockBuilderVM: innerBlockBuilderVM,
+		ctx: &snow.Context{
+			NodeID:         nodeID,
+			ValidatorState: vdrState,
+			Log:            logging.NoLog{},
+		},
+		Windower: windower,
+	}
+
+	blk := &postForkCommonComponents{
+		innerBlk: innerBlk,
+		vm:       vm,
+	}
+
+	gotChild, err := blk.buildChild(
+		context.Background(),
+		parentID,
+		parentTimestamp,
+		pChainHeight-1,
+	)
+	require.NoError(err)
+	require.Equal(builtBlk, gotChild.(*postForkBlock).innerBlk)
+
+	nonZeroEpochStatelessBlock, err := statelessblock.Build(
+		coreBlkID,
+		gotChild.Timestamp().Add(time.Second),
+		pChainHeight,
+		statelessblock.Epoch{
+			PChainHeight: pChainHeight,
+			Number:       1,
+			StartTime:    parentTimestamp.Unix(),
+		},
+		vm.StakingCertLeaf,
+		innerChildBlock.Bytes(),
+		vm.ctx.ChainID,
+		vm.StakingLeafSigner,
+	)
+	require.NoError(err)
+
+	postForkNonZeroEpochBlock := &postForkBlock{
+		SignedBlock: nonZeroEpochStatelessBlock,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       vm,
+			innerBlk: innerChildBlock,
+		},
+	}
+	err = blk.Verify(context.Background(), parentTimestamp, pChainHeight, postForkNonZeroEpochBlock)
+	require.ErrorIs(err, errEpochNotZero)
 }
