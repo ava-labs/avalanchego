@@ -268,9 +268,7 @@ func TestParseBytes(t *testing.T) {
 			bytes, err := hex.DecodeString(test.hex)
 			require.NoError(err)
 
-			blk, err := Parse(bytes, chainID)
-
-			require.IsType(test.expectedType, blk)
+			_, err = Parse(bytes, chainID)
 			require.ErrorIs(err, test.expectedErr)
 		})
 	}

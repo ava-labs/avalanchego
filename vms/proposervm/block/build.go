@@ -31,7 +31,7 @@ func BuildUnsigned(
 		}
 		block SignedBlock
 	)
-	if epoch.Number == 0 {
+	if epoch == (Epoch{}) {
 		block = &statelessBlock{
 			StatelessBlock: statelessUnsignedBlock,
 		}

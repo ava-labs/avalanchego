@@ -20,7 +20,7 @@ var (
 
 	errUnexpectedSignature = errors.New("signature provided when none was expected")
 	errInvalidCertificate  = errors.New("invalid certificate")
-	errZeroEpoch           = errors.New("epoch number must be greater than 0 after granite")
+	errZeroEpoch           = errors.New("epoch must be provided after granite")
 )
 
 type Block interface {

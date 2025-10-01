@@ -38,7 +38,7 @@ var (
 	errProposerMismatch         = errors.New("proposer mismatch")
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
 	errPChainHeightTooLow       = errors.New("block P-chain height is too low")
-	errEpochNotZero             = errors.New("epoch number must be 0 prior to granite")
+	errEpochNotZero             = errors.New("epoch must not be provided prior to granite")
 )
 
 type Block interface {
