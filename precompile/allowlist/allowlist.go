@@ -191,7 +191,7 @@ func CreateAllowListPrecompile(precompileAddr common.Address) contract.StatefulP
 }
 
 func CreateAllowListFunctions(precompileAddr common.Address) []*contract.StatefulPrecompileFunction {
-	var functions []*contract.StatefulPrecompileFunction
+	functions := make([]*contract.StatefulPrecompileFunction, 0, len(AllowListABI.Methods))
 
 	for name, method := range AllowListABI.Methods {
 		var fn *contract.StatefulPrecompileFunction
