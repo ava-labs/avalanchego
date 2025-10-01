@@ -10,10 +10,10 @@ doc-valid-idents = [
 ]
 
 disallowed-methods = [
-  { path = "rand::rng", replacement = "firewood_storage::StdRng::from_env_or_random", reason = "use a prng with a user-defined seed instead", allow-invalid = true },
+  { path = "rand::rng", replacement = "firewood_storage::SeededRng::from_env_or_random", reason = "use a prng with a user-defined seed instead", allow-invalid = true },
 ]
 
 disallowed-types = [
-  { path = "rand::SeedableRng", replacement = "firewood_storage::StdRng", reason = "use a prng with a user-defined seed instead", allow-invalid = true },
-  { path = "rand::rngs::StdRng", replacement = "firewood_storage::StdRng", reason = "use a prng with a user-defined seed instead", allow-invalid = true },
+  { path = "rand::SeedableRng", replacement = "firewood_storage::SeededRng", reason = "use a prng with a user-defined seed instead", allow-invalid = true },
+  { path = "rand::rngs::StdRng", replacement = "firewood_storage::SeededRng", reason = "use a prng with a user-defined seed instead", allow-invalid = true },
 ]
