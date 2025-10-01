@@ -15,13 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/uptime"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-const (
-	codecVersion  uint16         = 0
-	updatedStatus dbUpdateStatus = iota
-	deletedStatus
-)
+const codecVersion uint16 = 0
 
 var (
 	codecManager codec.Manager
@@ -41,8 +38,6 @@ func init() {
 	}
 }
 
-type dbUpdateStatus int
-
 type validator struct {
 	UpDuration    time.Duration `serialize:"true"`
 	LastUpdated   uint64        `serialize:"true"`
@@ -61,7 +56,8 @@ type state struct {
 
 	validators             map[ids.ID]*validator
 	nodeIDsToValidationIDs map[ids.NodeID]ids.ID
-	updates                map[ids.ID]dbUpdateStatus
+	updatedValidators set.Set[ids.ID]
+	deletedValidators set.Set[ids.ID]
 }
 
 func newState(db database.Database) (*state, error) {
@@ -69,15 +65,13 @@ func newState(db database.Database) (*state, error) {
 		db:                     db,
 		validators:             make(map[ids.ID]*validator),
 		nodeIDsToValidationIDs: make(map[ids.NodeID]ids.ID),
-		updates:                make(map[ids.ID]dbUpdateStatus),
 	}
 
 	it := db.NewIterator()
 	defer it.Release()
 
 	for it.Next() {
-		validationIDBytes := it.Key()
-		validationID, err := ids.ToID(validationIDBytes)
+		validationID, err := ids.ToID(it.Key())
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse validation ID: %w", err)
 		}
@@ -122,7 +116,7 @@ func (s *state) SetUptime(
 	v.UpDuration = upDuration
 	v.LastUpdated = uint64(lastUpdated.Unix())
 
-	s.updates[v.validationID] = updatedStatus
+	s.updatedValidators.Add(v.validationID)
 
 	return nil
 }
@@ -138,33 +132,20 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 
 func (s *state) addValidatorUpdate(vdr *validator) {
 	s.addValidator(vdr.validationID, vdr)
-	s.updates[vdr.validationID] = updatedStatus
+	s.updatedValidators.Add(vdr.validationID)
 }
 
-func (s *state) updateValidator(
-	validationID ids.ID,
-	isActive bool,
-	weight uint64,
-) error {
-	v, ok := s.validators[validationID]
-	if !ok {
-		return database.ErrNotFound
-	}
+func (s *state) updateValidator(validationID ids.ID, isActive bool) bool {
+	v := s.validators[validationID]
 
-	updated := deletedStatus
+	updated := false
 	if v.IsActive != isActive {
 		v.IsActive = isActive
-		updated = updatedStatus
+		s.updatedValidators.Add(validationID)
+		updated = true
 	}
 
-	if v.Weight != weight {
-		v.Weight = weight
-		updated = updatedStatus
-	}
-
-	s.updates[validationID] = updated
-
-	return nil
+	return updated
 }
 
 func (s *state) deleteValidator(validationID ids.ID) bool {
@@ -176,7 +157,7 @@ func (s *state) deleteValidator(validationID ids.ID) bool {
 	delete(s.validators, v.validationID)
 	delete(s.nodeIDsToValidationIDs, v.NodeID)
 
-	s.updates[v.validationID] = deletedStatus
+	s.deletedValidators.Add(v.validationID)
 
 	return true
 }
@@ -184,25 +165,23 @@ func (s *state) deleteValidator(validationID ids.ID) bool {
 func (s *state) writeState() error {
 	batch := s.db.NewBatch()
 
-	for validationID, updateStatus := range s.updates {
-		switch updateStatus {
-		case updatedStatus:
-			v := s.validators[validationID]
+	for validationID := range s.updatedValidators {
+		validatorBytes, err := codecManager.Marshal(
+			codecVersion,
+			s.validators[validationID],
+		)
+		if err != nil {
+			return fmt.Errorf("failed to marshal validator: %w", err)
+		}
 
-			validatorBytes, err := codecManager.Marshal(codecVersion, v)
-			if err != nil {
-				return fmt.Errorf("failed to marshal validator: %w", err)
-			}
+		if err := batch.Put(validationID[:], validatorBytes); err != nil {
+			return fmt.Errorf("failed to put validator: %w", err)
+		}
+	}
 
-			if err := batch.Put(validationID[:], validatorBytes); err != nil {
-				return fmt.Errorf("failed to put validator: %w", err)
-			}
-		case deletedStatus:
-			if err := batch.Delete(validationID[:]); err != nil {
-				return fmt.Errorf("failed to delete validator: %w", err)
-			}
-		default:
-			return fmt.Errorf("unknown update status: %v", updateStatus)
+	for validationID := range s.deletedValidators {
+		if err := batch.Delete(validationID[:]); err != nil {
+			return fmt.Errorf("failed to delete validator: %w", err)
 		}
 	}
 
@@ -211,7 +190,8 @@ func (s *state) writeState() error {
 	}
 
 	// We have written all pending updates
-	clear(s.updates)
+	clear(s.updatedValidators)
+	clear(s.deletedValidators)
 
 	return nil
 }

@@ -175,34 +175,21 @@ func (u *UptimeTracker) update(
 	}
 
 	// Add or update validators
-	for validationID, next := range newValidators {
-		if prev, ok := u.state.getValidatorByValidationID(validationID); ok {
-			// We are updating a validator we know about
-			isActiveUpdated := prev.IsActive == next.IsActive
-
-			if err := u.state.updateValidator(
-				validationID,
-				next.IsActive,
-				next.Weight,
-			); err != nil {
-				return fmt.Errorf(
-					"failed to update validator %s: %w",
-					validationID,
-					err,
-				)
-			}
-
-			// Check if the validator changed its status
-			if isActiveUpdated {
+	for validationID, newValidator := range newValidators {
+		if _, ok := u.state.getValidatorByValidationID(validationID); ok {
+			// Check if there was a status change
+			if !u.state.updateValidator(validationID, newValidator.IsActive) {
 				continue
 			}
 
-			if next.IsActive {
+			// If there was a status change we need to activate/deactivate the
+			// validator
+			if newValidator.IsActive {
 				// This validator is now active and is treated as online
-				if err := u.activate(next.NodeID); err != nil {
+				if err := u.activate(newValidator.NodeID); err != nil {
 					return fmt.Errorf(
 						"failed to activate validator %s: %w",
-						next.NodeID,
+						newValidator.NodeID,
 						err,
 					)
 				}
@@ -210,35 +197,35 @@ func (u *UptimeTracker) update(
 			}
 
 			// This validator is no longer active and is treated as offline
-			if err := u.deactivate(next.NodeID); err != nil {
+			if err := u.deactivate(newValidator.NodeID); err != nil {
 				return fmt.Errorf(
 					"failed to deactivate validator %s: %w",
-					next.NodeID,
+					newValidator.NodeID,
 					err,
 				)
 			}
 		} else {
 			// This is a new validator
 			u.state.addValidatorUpdate(&validator{
-				NodeID:        next.NodeID,
+				NodeID:        newValidator.NodeID,
 				validationID:  validationID,
-				IsActive:      next.IsActive,
-				StartTime:     next.StartTime,
+				IsActive:      newValidator.IsActive,
+				StartTime:     newValidator.StartTime,
 				UpDuration:    0,
-				LastUpdated:   next.StartTime,
-				IsL1Validator: next.IsL1Validator,
-				Weight:        next.Weight,
+				LastUpdated:   newValidator.StartTime,
+				IsL1Validator: newValidator.IsL1Validator,
+				Weight:        newValidator.Weight,
 			})
 
-			if next.IsActive {
+			if newValidator.IsActive {
 				continue
 			}
 
-			// This validator not
-			if err := u.deactivate(next.NodeID); err != nil {
+			// This validator is not active and is treated is offline
+			if err := u.deactivate(newValidator.NodeID); err != nil {
 				return fmt.Errorf(
 					"failed to deactivate validator %s: %w",
-					next.NodeID,
+					newValidator.NodeID,
 					err,
 				)
 			}
