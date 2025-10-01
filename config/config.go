@@ -104,6 +104,16 @@ func getConsensusConfig(v *viper.Viper) subnets.ConsensusConfig {
 	}
 }
 
+func setSimplexDefaults(config *subnets.ConsensusConfig, v *viper.Viper) {
+	config.SnowballParams = nil
+	if config.SimplexParams.MaxProposalWait == 0 {
+		config.SimplexParams.MaxProposalWait = v.GetDuration(SimplexMaxProposalWaitKey)
+	}
+	if config.SimplexParams.MaxRebroadcastWait == 0 {
+		config.SimplexParams.MaxRebroadcastWait = v.GetDuration(SimplexMaxRebroadcastWaitKey)
+	}
+}
+
 func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
 	loggingConfig := logging.Config{}
 	loggingConfig.Directory = getExpandedArg(v, LogsDirKey)
@@ -1036,7 +1046,8 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 			}
 
 			if config.ConsensusConfig.SimplexParams != nil {
-				config.ConsensusConfig.SnowballParams = nil
+				fmt.Printf("setting simplex defaults in flags %+v\n", config.ConsensusConfig.SimplexParams)
+				setSimplexDefaults(&config.ConsensusConfig, v)
 			} else if config.ConsensusConfig.SnowballParams.Alpha != nil {
 				config.ConsensusConfig.SnowballParams.AlphaPreference = *config.ConsensusConfig.SnowballParams.Alpha
 				config.ConsensusConfig.SnowballParams.AlphaConfidence = config.ConsensusConfig.SnowballParams.AlphaPreference
@@ -1096,7 +1107,8 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 		}
 
 		if config.ConsensusConfig.SimplexParams != nil {
-			config.ConsensusConfig.SnowballParams = nil
+			fmt.Printf("setting simplex defaults in dir %+v\n", config.ConsensusConfig.SimplexParams)
+			setSimplexDefaults(&config.ConsensusConfig, v)
 		} else if config.ConsensusConfig.SnowballParams.Alpha != nil {
 			config.ConsensusConfig.SnowballParams.AlphaPreference = *config.ConsensusConfig.SnowballParams.Alpha
 			config.ConsensusConfig.SnowballParams.AlphaConfidence = config.ConsensusConfig.SnowballParams.AlphaPreference

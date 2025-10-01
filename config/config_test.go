@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -435,14 +436,15 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 		},
 		"correct simplex config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"validatorOnly": true, "consensusConfig":{"simplexParameters":{"enabled":true}}}`,
+			givenJSON: `{"validatorOnly": true, "consensusConfig":{"simplexParameters":{"MaxProposalWait":1000,"MaxRebroadcastWait":1000}}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
 				require.True(ok)
 
 				require.True(config.ValidatorOnly)
-				require.True(config.ConsensusConfig.SimplexParams.Enabled)
+				require.Equal(time.Duration(1000), config.ConsensusConfig.SimplexParams.MaxProposalWait)
+				require.Equal(time.Duration(1000), config.ConsensusConfig.SimplexParams.MaxRebroadcastWait)
 			},
 			expectedErr: nil,
 		},
@@ -508,7 +510,8 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
 					"consensusConfig": {
 						"simplexParameters": {
-							"enabled": true
+							"MaxProposalWait":1000,
+							"MaxRebroadcastWait":1000
 						}
 					},
 					"validatorOnly": true
@@ -520,7 +523,8 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				config, ok := given[id]
 				require.True(ok)
 				// should respect defaults
-				require.True(config.ConsensusConfig.SimplexParams.Enabled)
+				require.Equal(time.Duration(1000), config.ConsensusConfig.SimplexParams.MaxProposalWait)
+				require.Equal(time.Duration(1000), config.ConsensusConfig.SimplexParams.MaxRebroadcastWait)
 			},
 			expectedErr: nil,
 		},

@@ -5,10 +5,12 @@ package subnets
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -67,8 +69,9 @@ func TestValid(t *testing.T) {
 			name: "valid simplex parameters",
 			s: Config{
 				ConsensusConfig: ConsensusConfig{
-					SimplexParams: &SimplexParameters{
-						Enabled: true,
+					SimplexParams: &simplex.Parameters{
+						MaxProposalWait:    1 * time.Second,
+						MaxRebroadcastWait: 1 * time.Second,
 					},
 				},
 				ValidatorOnly: false,
@@ -87,19 +90,34 @@ func TestValid(t *testing.T) {
 			s: Config{
 				ConsensusConfig: ConsensusConfig{
 					SnowballParams: &validParameters,
-					SimplexParams:  &SimplexParameters{Enabled: true},
+					SimplexParams:  &simplex.Parameters{},
 				},
 			},
 			expectedErr: errTwoConfigs,
 		},
 		{
-			name: "simplex not enabled",
+			name: "invalid simplex parameters",
 			s: Config{
 				ConsensusConfig: ConsensusConfig{
-					SimplexParams: &SimplexParameters{Enabled: false},
+					SimplexParams: &simplex.Parameters{
+						MaxProposalWait:    -1,
+						MaxRebroadcastWait: -10,
+					},
 				},
 			},
-			expectedErr: errSimplexNotEnabled,
+			expectedErr: simplex.ErrInvalidParameters,
+		},
+		{
+			name: "empty simplex parameters",
+			s: Config{
+				ConsensusConfig: ConsensusConfig{
+					SimplexParams: &simplex.Parameters{
+						MaxProposalWait:    0,
+						MaxRebroadcastWait: 0,
+					},
+				},
+			},
+			expectedErr: simplex.ErrInvalidParameters,
 		},
 	}
 	for _, tt := range tests {

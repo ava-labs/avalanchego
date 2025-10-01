@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -16,18 +17,12 @@ import (
 var (
 	errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
 	errMissingConsensusParameters       = errors.New("consensus config must have either snowball or simplex parameters set")
-	errSimplexNotEnabled                = errors.New("simplex parameters must be enabled")
 	errTwoConfigs                       = errors.New("subnet config must have exactly one of snowball or simplex parameters set")
 )
 
-// Params for simplex Config
-type SimplexParameters struct {
-	Enabled bool `json:"enabled" yaml:"enabled"`
-}
-
 type ConsensusConfig struct {
 	SnowballParams *snowball.Parameters `json:"snowballParameters,omitempty" yaml:"snowballParameters,omitempty"`
-	SimplexParams  *SimplexParameters   `json:"simplexParameters,omitempty"  yaml:"simplexParameters,omitempty"`
+	SimplexParams  *simplex.Parameters  `json:"simplexParameters,omitempty"  yaml:"simplexParameters,omitempty"`
 }
 
 type Config struct {
@@ -77,18 +72,16 @@ func (c *Config) Valid() error {
 }
 
 func (c *ConsensusConfig) Verify() error {
-	if c.SnowballParams != nil {
-		if c.SimplexParams != nil {
-			return errTwoConfigs
-		}
-		return c.SnowballParams.Verify()
-	} else if c.SimplexParams != nil {
-		// rudimentary check
-		if !c.SimplexParams.Enabled {
-			return errSimplexNotEnabled
-		}
-		return nil
+	if c.SnowballParams == nil && c.SimplexParams == nil {
+		return errMissingConsensusParameters
+	}
+	if c.SnowballParams != nil && c.SimplexParams != nil {
+		return errTwoConfigs
 	}
 
-	return errMissingConsensusParameters
+	if c.SimplexParams != nil {
+		return c.SimplexParams.Verify()
+	}
+
+	return c.SnowballParams.Verify()
 }

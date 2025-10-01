@@ -18,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
+	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -113,9 +114,7 @@ func newTestSubnets(t *testing.T, subnetID ids.ID) *Subnets {
 		constants.PrimaryNetworkID: {},
 		subnetID: {
 			ConsensusConfig: subnets.ConsensusConfig{
-				SimplexParams: &subnets.SimplexParameters{
-					Enabled: true,
-				},
+				SimplexParams: &simplex.Parameters{},
 			},
 		},
 	}

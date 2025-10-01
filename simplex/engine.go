@@ -24,9 +24,7 @@ import (
 var _ common.Engine = (*Engine)(nil)
 
 var (
-	maxProposalWaitTime = time.Second * 2
-	maxRebroadcastWait  = time.Second * 2
-	tickInterval        = time.Millisecond * 500
+	tickInterval = time.Millisecond * 500
 
 	errUnknownMessageType = errors.New("unknown message type")
 )
@@ -115,9 +113,10 @@ func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config 
 		parser:       config.VM,
 		blockTracker: blockTracker,
 	}
+
 	epochConfig := simplex.EpochConfig{
-		MaxProposalWait:     maxProposalWaitTime,
-		MaxRebroadcastWait:  maxRebroadcastWait,
+		MaxProposalWait:     config.Params.MaxProposalWait,
+		MaxRebroadcastWait:  config.Params.MaxRebroadcastWait,
 		QCDeserializer:      qcDeserializer,
 		Logger:              config.Log,
 		ID:                  config.Ctx.NodeID[:],

@@ -45,12 +45,8 @@ func NewSimplexSubnetOrPanic(name string, key *secp256k1.PrivateKey, nodes ...*t
 	return &tmpnet.Subnet{
 		Name: name,
 		Config: tmpnet.ConfigMap{
-			// Reducing this from the 1s default speeds up tx acceptance
-			"proposerMinBlockDelay": 0,
 			"consensusConfig": map[string]interface{}{
-				"simplexParameters": map[string]interface{}{
-					"enabled": true,
-				},
+				"simplexParameters": map[string]interface{}{},
 			},
 		},
 		Chains: []*tmpnet.Chain{

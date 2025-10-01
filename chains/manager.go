@@ -1767,6 +1767,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		WAL:                wal,
 		SignBLS:            m.ManagerConfig.StakingBLSKey.Sign,
 		DB:                 simplexDB,
+		Params:             sb.Config().ConsensusConfig.SimplexParams,
 	}
 
 	engine, err := simplex.NewEngine(ctx, context.TODO(), config)
