@@ -56,8 +56,8 @@ type state struct {
 
 	validators             map[ids.ID]*validator
 	nodeIDsToValidationIDs map[ids.NodeID]ids.ID
-	updatedValidators set.Set[ids.ID]
-	deletedValidators set.Set[ids.ID]
+	updatedValidators      set.Set[ids.ID]
+	deletedValidators      set.Set[ids.ID]
 }
 
 func newState(db database.Database) (*state, error) {
