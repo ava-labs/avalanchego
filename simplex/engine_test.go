@@ -22,23 +22,8 @@ import (
 // various types of Simplex messages without errors. The contents of the messages do not have
 // to be valid, as long as they can be parsed and processed by the engine.
 func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
-	configs := newNetworkConfigs(t, 4)
 	ctx := context.Background()
-
-	config := configs[0]
-	config.Sender.(*sendermock.ExternalSender).EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
-	consensusCtx := &snow.ConsensusContext{}
-	engine, err := NewEngine(consensusCtx, ctx, config)
-	require.NoError(t, err)
-
-	config.VM.(*wrappedVM).ParseBlockF = func(_ context.Context, _ []byte) (snowman.Block, error) {
-		return newTestBlock(t, newBlockConfig{round: 1}).vmBlock, nil
-	}
-
-	require.NoError(t, engine.Start(ctx, 1))
-	md := engine.epoch.Metadata()
-	require.Equal(t, uint64(1), md.Seq)
-	require.Equal(t, uint64(1), md.Round)
+	engine, configs := setupEngine(t)
 
 	qcBytes := buildQCBytes(t, configs)
 
@@ -277,7 +262,7 @@ func TestSimplexEngineRejectsMalformedSimplexMessages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, tt.msg)
+			_, err := engine.p2pToSimplexMessage(ctx, tt.msg)
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -395,10 +380,9 @@ var (
 // QC Builder
 // -----------------------------------------------------------------------------
 
-func buildQCBytes(t *testing.T, configs []*Config) []byte {
+func buildQCWithBytes(t testing.TB, configs []*Config, msg []byte) []byte {
 	t.Helper()
 
-	msg := []byte("test message")
 	sigs := make([]simplex.Signature, 0, len(configs))
 
 	for _, config := range configs {
@@ -416,6 +400,10 @@ func buildQCBytes(t *testing.T, configs []*Config) []byte {
 	qc, err := agg.Aggregate(sigs)
 	require.NoError(t, err)
 	return qc.Bytes()
+}
+
+func buildQCBytes(t testing.TB, configs []*Config) []byte {
+	return buildQCWithBytes(t, configs, []byte("test message"))
 }
 
 // -----------------------------------------------------------------------------
@@ -491,4 +479,266 @@ func NewReplicationResponseMessage(qcBytes []byte) *p2p.Simplex {
 			},
 		},
 	}
+}
+
+func FuzzSimplexVotes(f *testing.F) {
+	f.Add(digest[:], signer, uint64(1), uint64(1), uint64(1), uint32(1))
+	f.Fuzz(func(t *testing.T, blockDigest []byte, signer []byte, epoch, round, seq uint64, version uint32) {
+		ctx := context.Background()
+		engine, configs := setupEngine(t)
+
+		msg := &p2p.Simplex{
+			Message: &p2p.Simplex_Vote{
+				Vote: &p2p.Vote{
+					BlockHeader: &p2p.BlockHeader{
+						Metadata: &p2p.ProtocolMetadata{
+							Version: version,
+							Epoch:   epoch,
+							Round:   round,
+							Seq:     seq,
+							Prev:    blockDigest,
+						},
+						Digest: blockDigest,
+					},
+					Signature: &p2p.Signature{Signer: signer, Value: []byte("vote-sig")},
+				},
+			},
+		}
+
+		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+	})
+}
+
+func FuzzSimplexEmptyVotes(f *testing.F) {
+	f.Add(signer, uint64(1), uint64(1), []byte("emptyvote-sig"))
+	f.Fuzz(func(t *testing.T, signer []byte, epoch, round uint64, signerValue []byte) {
+		ctx := context.Background()
+		engine, configs := setupEngine(t)
+
+		msg := &p2p.Simplex{
+			Message: &p2p.Simplex_EmptyVote{
+				EmptyVote: &p2p.EmptyVote{
+					Metadata:  &p2p.EmptyVoteMetadata{Epoch: epoch, Round: round},
+					Signature: &p2p.Signature{Signer: signer, Value: signerValue},
+				},
+			},
+		}
+
+		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+	})
+}
+
+func FuzzSimplexFinalizeVotes(f *testing.F) {
+	f.Add(digest[:], signer, []byte("signervalue"), uint64(2), uint64(5), uint64(50), uint32(1))
+	f.Fuzz(func(t *testing.T, signer []byte, signerValue []byte, blockDigest []byte, epoch, round, seq uint64, version uint32) {
+		ctx := context.Background()
+		engine, configs := setupEngine(t)
+
+		msg := &p2p.Simplex{
+			Message: &p2p.Simplex_FinalizeVote{
+				FinalizeVote: &p2p.Vote{
+					BlockHeader: &p2p.BlockHeader{
+						Metadata: &p2p.ProtocolMetadata{
+							Version: version,
+							Epoch:   epoch,
+							Round:   round,
+							Seq:     seq,
+							Prev:    blockDigest,
+						},
+						Digest: blockDigest,
+					},
+					Signature: &p2p.Signature{Signer: signer, Value: signerValue},
+				},
+			},
+		}
+
+		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+	})
+}
+
+func FuzzSimplexNotarizations(f *testing.F) {
+	f.Add([]byte("qc-data"), digest[:], uint64(3), uint64(8), uint64(75), uint32(1))
+	f.Fuzz(func(t *testing.T, qcData, blockDigest []byte, epoch, round, seq uint64, version uint32) {
+		ctx := context.Background()
+		engine, configs := setupEngine(t)
+		qc := buildQCWithBytes(t, configs, qcData)
+
+		msg := &p2p.Simplex{
+			Message: &p2p.Simplex_Notarization{
+				Notarization: &p2p.QuorumCertificate{
+					BlockHeader: &p2p.BlockHeader{
+						Metadata: &p2p.ProtocolMetadata{
+							Version: version,
+							Epoch:   epoch,
+							Round:   round,
+							Seq:     seq,
+							Prev:    blockDigest,
+						},
+						Digest: blockDigest,
+					},
+					QuorumCertificate: qc,
+				},
+			},
+		}
+
+		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+	})
+}
+
+func FuzzSimplexFinalizations(f *testing.F) {
+	f.Add([]byte("qc-data"), digest[:], uint64(5), uint64(11), uint64(120), uint32(1))
+	f.Fuzz(func(t *testing.T, qcData, blockDigest []byte, epoch, round, seq uint64, version uint32) {
+		ctx := context.Background()
+		engine, configs := setupEngine(t)
+		qc := buildQCWithBytes(t, configs, qcData)
+
+		msg := &p2p.Simplex{
+			Message: &p2p.Simplex_Finalization{
+				Finalization: &p2p.QuorumCertificate{
+					BlockHeader: &p2p.BlockHeader{
+						Metadata: &p2p.ProtocolMetadata{
+							Version: version,
+							Epoch:   epoch,
+							Round:   round,
+							Seq:     seq,
+							Prev:    blockDigest,
+						},
+						Digest: blockDigest,
+					},
+					QuorumCertificate: qc,
+				},
+			},
+		}
+
+		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+	})
+}
+
+func FuzzSimplexReplicationRequests(f *testing.F) {
+	f.Add(uint64(1), uint64(2), uint64(3), uint64(42))
+	f.Fuzz(func(t *testing.T, seq1, seq2, seq3, latestRound uint64) {
+		ctx := context.Background()
+		engine, configs := setupEngine(t)
+
+		msg := &p2p.Simplex{
+			Message: &p2p.Simplex_ReplicationRequest{
+				ReplicationRequest: &p2p.ReplicationRequest{
+					Seqs:        []uint64{seq1, seq2, seq3},
+					LatestRound: latestRound,
+				},
+			},
+		}
+
+		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+	})
+}
+
+func FuzzSimplexReplicationResponses(f *testing.F) {
+	f.Log("hello!!!!")
+	f.Add([]byte("qc-data"), digest[:], uint64(6), uint64(13), uint64(150), uint32(1))
+	f.Fuzz(func(t *testing.T, qcData, blockDigest []byte, epoch, round, seq uint64, version uint32) {
+		t.Log("!!FuzzSimplexReplicationResponses called with:", qcData, blockDigest, epoch, round, seq, version)
+		ctx := context.Background()
+		engine, configs := setupEngine(t)
+		qc := buildQCWithBytes(t, configs, qcData)
+
+		msg := &p2p.Simplex{
+			Message: &p2p.Simplex_ReplicationResponse{
+				ReplicationResponse: &p2p.ReplicationResponse{
+					Data: []*p2p.QuorumRound{
+						{
+							Block: blockBytes,
+							Notarization: &p2p.QuorumCertificate{
+								BlockHeader: &p2p.BlockHeader{
+									Metadata: &p2p.ProtocolMetadata{
+										Version: version,
+										Epoch:   epoch,
+										Round:   round,
+										Seq:     seq,
+										Prev:    blockDigest,
+									},
+									Digest: blockDigest,
+								},
+								QuorumCertificate: qc,
+							},
+						},
+					},
+					LatestRound: &p2p.QuorumRound{Block: blockBytes},
+				},
+			},
+		}
+
+		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+	})
+}
+
+func FuzzSimplexBlockProposals(f *testing.F) {
+	f.Add(blockBytes, digest[:], uint64(112), uint64(18), uint64(7), uint32(1))
+	f.Fuzz(func(t *testing.T, blockBytes []byte, blockDigest []byte, round, epoch, seq uint64, version uint32) {
+		ctx := context.Background()
+		engine, configs := setupEngine(t)
+		msg := &p2p.Simplex{
+			ChainId: []byte("chain-1"),
+			Message: &p2p.Simplex_BlockProposal{
+				BlockProposal: &p2p.BlockProposal{
+					Block: blockBytes,
+					Vote: &p2p.Vote{
+						BlockHeader: &p2p.BlockHeader{
+							Metadata: &p2p.ProtocolMetadata{
+								Version: version,
+								Epoch:   epoch,
+								Round:   round,
+								Seq:     seq,
+								Prev:    blockDigest,
+							},
+							Digest: blockDigest,
+						},
+						Signature: &p2p.Signature{Signer: signer, Value: []byte("signature")},
+					},
+				},
+			},
+		}
+
+		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+	})
+}
+
+func FuzzSimplexEmptyNotarizations(f *testing.F) {
+	f.Add([]byte("random msg data i am passing into QC"), uint64(112), uint64(18))
+	f.Fuzz(func(t *testing.T, data []byte, round uint64, epoch uint64) {
+		ctx := context.Background()
+		engine, configs := setupEngine(t)
+		qc := buildQCWithBytes(t, configs, data)
+		msg := &p2p.Simplex{
+			Message: &p2p.Simplex_EmptyNotarization{
+				EmptyNotarization: &p2p.EmptyNotarization{
+					Metadata:          &p2p.EmptyVoteMetadata{Epoch: epoch, Round: round},
+					QuorumCertificate: qc,
+				},
+			},
+		}
+
+		require.NoError(t, engine.SimplexMessage(ctx, configs[1].Ctx.NodeID, msg))
+	})
+}
+
+func setupEngine(t *testing.T) (*Engine, []*Config) {
+	configs := newNetworkConfigs(t, 4)
+	ctx := context.Background()
+
+	config := configs[0]
+	config.Sender.(*sendermock.ExternalSender).EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
+	consensusCtx := &snow.ConsensusContext{}
+	engine, err := NewEngine(consensusCtx, ctx, config)
+	require.NoError(t, err)
+
+	config.VM.(*wrappedVM).ParseBlockF = func(_ context.Context, _ []byte) (snowman.Block, error) {
+		return newTestBlock(t, newBlockConfig{round: 1}).vmBlock, nil
+	}
+
+	require.NoError(t, engine.Start(ctx, 1))
+	md := engine.epoch.Metadata()
+	require.Equal(t, uint64(1), md.Seq)
+	require.Equal(t, uint64(1), md.Round)
+	return engine, configs
 }

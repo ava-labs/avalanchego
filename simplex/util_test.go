@@ -26,6 +26,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	pSimplex "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
 
 type newBlockConfig struct {
@@ -133,6 +135,7 @@ func newNetworkConfigs(t *testing.T, numNodes uint64) []*Config {
 			DB:                 memdb.New(),
 			WAL:                wal.NewMemWAL(t),
 			SignBLS:            node.signFunc,
+			Params:             &pSimplex.DefaultParameters,
 		}
 		configs = append(configs, config)
 	}
