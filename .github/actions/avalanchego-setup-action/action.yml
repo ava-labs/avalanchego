@@ -2,16 +2,16 @@ name: 'Setup AvalancheGo'
 description: 'Setup AvalancheGo with custom dependencies (Firewood, Coreth, LibEVM)'
 
 inputs:
-  checkout-path:
-    description: 'Directory path where AvalancheGo will be checked out'
-    required: false
-    default: '.'
   avalanchego:
     description: 'AvalancheGo version (commit SHA, branch name, or tag)'
     required: false
     default: ${{ github.sha }}
   firewood:
     description: 'Firewood version (commit SHA, branch, tag, or ffi/vX.Y.Z for pre-built)'
+    required: false
+    default: ''
+  firewood-path:
+    description: 'Directory path where Firewood will be cloned/built (preferably NVMe storage)'
     required: false
     default: ''
   coreth:
@@ -50,4 +50,9 @@ runs:
       if: inputs.firewood != ''
       shell: bash
       working-directory: ${{ inputs.checkout-path }}
-      run: ./scripts/setup_firewood.sh ${{ inputs.firewood }}
+      run: |
+        if [ -n "${{ inputs.firewood-path }}" ]; then
+          ./scripts/setup_firewood.sh ${{ inputs.firewood }} ${{ inputs.firewood-path }}
+        else
+          ./scripts/setup_firewood.sh ${{ inputs.firewood }}
+        fi
