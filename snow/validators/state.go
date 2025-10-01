@@ -36,7 +36,7 @@ type State interface {
 	// subnets at the requested P-chain height.
 	//
 	// If a subnet is not present in the returned map, that indicates that the
-	// subnet is not currently able to send warp messages.
+	// subnet is not currently able to produce valid warp message signatures.
 	//
 	// The returned map should not be modified.
 	GetWarpValidatorSets(ctx context.Context, height uint64) (map[ids.ID]WarpSet, error)

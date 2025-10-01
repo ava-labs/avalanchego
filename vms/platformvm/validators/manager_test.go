@@ -154,45 +154,29 @@ func TestGetWarpValidatorSets(t *testing.T) {
 
 	var (
 		subnetID       = ids.GenerateTestID()
-		startTime      = genesistest.DefaultValidatorStartTime
-		endTime        = startTime.Add(24 * time.Hour)
 		primaryStaker0 = &state.Staker{
-			TxID:            ids.GenerateTestID(),
-			NodeID:          ids.GenerateTestNodeID(),
-			PublicKey:       pk0,
-			SubnetID:        constants.PrimaryNetworkID,
-			Weight:          1,
-			StartTime:       startTime,
-			EndTime:         endTime,
-			PotentialReward: 1,
+			NodeID:    ids.GenerateTestNodeID(),
+			PublicKey: pk0,
+			SubnetID:  constants.PrimaryNetworkID,
+			Weight:    1,
 		}
 		subnetStaker0 = &state.Staker{
-			TxID:      ids.GenerateTestID(),
 			NodeID:    primaryStaker0.NodeID,
 			PublicKey: nil, // inherited from primaryStaker
 			SubnetID:  subnetID,
 			Weight:    1,
-			StartTime: startTime,
-			EndTime:   endTime,
 		}
 		primaryStaker1 = &state.Staker{
-			TxID:            ids.GenerateTestID(),
-			NodeID:          ids.GenerateTestNodeID(),
-			PublicKey:       pk1,
-			SubnetID:        constants.PrimaryNetworkID,
-			Weight:          1,
-			StartTime:       startTime,
-			EndTime:         endTime,
-			PotentialReward: 1,
+			NodeID:    ids.GenerateTestNodeID(),
+			PublicKey: pk1,
+			SubnetID:  constants.PrimaryNetworkID,
+			Weight:    1,
 		}
 		subnetStaker1 = &state.Staker{
-			TxID:      ids.GenerateTestID(),
 			NodeID:    primaryStaker1.NodeID,
 			PublicKey: nil, // inherited from primaryStaker1
 			SubnetID:  subnetID,
 			Weight:    math.MaxUint64,
-			StartTime: startTime,
-			EndTime:   endTime,
 		}
 	)
 
