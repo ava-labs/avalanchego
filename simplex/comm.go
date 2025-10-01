@@ -105,11 +105,11 @@ func (c *Comm) simplexMessageToOutboundMessage(msg *simplex.Message) (message.Ou
 	var simplexMsg *p2p.Simplex
 	switch {
 	case msg.VerifiedBlockMessage != nil:
-		bytes, err := msg.VerifiedBlockMessage.VerifiedBlock.Bytes()
+		msg, err := newBlockProposal(c.chainID, msg.VerifiedBlockMessage)
 		if err != nil {
-			return nil, fmt.Errorf("failed to serialize block: %w", err)
+			return nil, fmt.Errorf("failed to create block proposal: %w", err)
 		}
-		simplexMsg = newBlockProposal(c.chainID, bytes, msg.VerifiedBlockMessage.Vote)
+		simplexMsg = msg
 	case msg.VoteMessage != nil:
 		simplexMsg = newVote(c.chainID, msg.VoteMessage)
 	case msg.EmptyVoteMessage != nil:

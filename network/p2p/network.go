@@ -160,6 +160,13 @@ func (p *Peers) Disconnected(nodeID ids.NodeID) {
 	p.set.Remove(nodeID)
 }
 
+func (p *Peers) Has(nodeID ids.NodeID) bool {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+
+	return p.set.Contains(nodeID)
+}
+
 // Sample returns a pseudo-random sample of up to limit Peers
 func (p *Peers) Sample(limit int) []ids.NodeID {
 	p.lock.RLock()
