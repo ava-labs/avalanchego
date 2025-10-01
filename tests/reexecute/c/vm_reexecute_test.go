@@ -77,6 +77,7 @@ var (
 		}`,
 		"firewood": `{
 			"state-scheme": "firewood",
+			"log-level": "debug",
 			"snapshot-cache": 0,
 			"pruning-enabled": true,
 			"state-sync-enabled": false
