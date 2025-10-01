@@ -10,10 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade"
-	"github.com/stretchr/testify/require"
 
 	. "github.com/ava-labs/avalanchego/snow/validators"
 )
