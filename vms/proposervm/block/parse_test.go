@@ -109,11 +109,7 @@ func TestParse(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
-	pChainEpoch := Epoch{
-		PChainHeight: 2,
-		Number:       0,
-		StartTime:    timestamp.Unix(),
-	}
+	pChainEpoch := Epoch{}
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
 

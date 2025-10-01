@@ -108,7 +108,7 @@ func (p *postForkCommonComponents) Verify(
 	}
 
 	// TODO: Remove this check once the implementation is in place.
-	if child.PChainEpoch().Number != 0 {
+	if child.PChainEpoch() != (block.Epoch{}) {
 		return errEpochNotZero
 	}
 
