@@ -6,6 +6,10 @@ inputs:
     description: 'AvalancheGo version (commit SHA, branch name, or tag)'
     required: false
     default: ${{ github.sha }}
+  checkout-path:
+    description: 'Path where AvalancheGo will be checked out'
+    required: false
+    default: '.'
   firewood:
     description: 'Firewood version (commit SHA, branch, tag, or ffi/vX.Y.Z for pre-built)'
     required: false
@@ -49,10 +53,9 @@ runs:
     - name: Setup Firewood FFI
       if: inputs.firewood != ''
       shell: bash
-      working-directory: ${{ inputs.checkout-path }}
       run: |
         if [ -n "${{ inputs.firewood-path }}" ]; then
-          ./scripts/setup_firewood.sh ${{ inputs.firewood }} ${{ inputs.firewood-path }}
+          ${{ inputs.checkout-path }}/scripts/setup_firewood.sh ${{ inputs.firewood }} ${{ inputs.firewood-path }}
         else
-          ./scripts/setup_firewood.sh ${{ inputs.firewood }}
+          ${{ inputs.checkout-path }}/scripts/setup_firewood.sh ${{ inputs.firewood }}
         fi
