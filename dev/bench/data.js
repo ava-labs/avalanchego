@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1759349464294,
+  "lastUpdate": 1759408938653,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -419,6 +419,64 @@ window.BENCHMARK_DATA = {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
             "value": 42.41,
             "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Ian Suvak",
+            "username": "iansuvak",
+            "email": "ian.suvak@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "cfdfbea60da1899c6bd99bdb5c35801e3e29ea05",
+          "message": "StatelessGraniteBlock types (#4370)\n\nSigned-off-by: Ian Suvak <ian.suvak@avalabs.org>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>",
+          "timestamp": "2025-10-02T02:00:26Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/cfdfbea60da1899c6bd99bdb5c35801e3e29ea05"
+        },
+        "date": 1759408937961,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
+            "value": 55.4,
+            "unit": "block_accept_ms/ggas\t        72.92 block_parse_ms/ggas\t     13556 block_verify_ms/ggas\t        73.06 mgas/s\t     13687 ms/ggas",
+            "extra": "1 times\n16 procs"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_accept_ms/ggas",
+            "value": 55.4,
+            "unit": "block_accept_ms/ggas",
+            "extra": "1 times\n16 procs"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_parse_ms/ggas",
+            "value": 72.92,
+            "unit": "block_parse_ms/ggas",
+            "extra": "1 times\n16 procs"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - block_verify_ms/ggas",
+            "value": 13556,
+            "unit": "block_verify_ms/ggas",
+            "extra": "1 times\n16 procs"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - mgas/s",
+            "value": 73.06,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - ms/ggas",
+            "value": 13687,
+            "unit": "ms/ggas",
             "extra": "1 times\n16 procs"
           }
         ]
