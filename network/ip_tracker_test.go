@@ -141,7 +141,6 @@ func TestIPTracker_ManuallyTrack(t *testing.T) {
 				tracker.tracked[ip.NodeID].manuallyTracked = true
 			},
 		},
-		// Section below is same as above with connectToAllValidators set to true
 		{
 			name: "connect-to-all - non-connected non-validator",
 			initialState: func(t *testing.T) *ipTracker {
@@ -389,7 +388,6 @@ func TestIPTracker_ManuallyGossip(t *testing.T) {
 				tracker.subnet[subnetID].manuallyGossipable = set.Of(ip.NodeID)
 			},
 		},
-		// Cases below are same as above with connectToAllValidators set to true with modified expected change if necessary
 		{
 			name: "connect-to-all - non-connected tracked non-validator",
 			initialState: func(t *testing.T) *ipTracker {
@@ -637,7 +635,6 @@ func TestIPTracker_ShouldVerifyIP(t *testing.T) {
 			expectedTrackAllSubnets:       true,
 			expectedTrackRequestedSubnets: true,
 		},
-		// Section below is same as above with connectToAllValidators set to true and modified expected change if necessary
 		{
 			name: "connect-to-all - node not tracked",
 			tracker: func(t *testing.T) *ipTracker {
@@ -872,7 +869,6 @@ func TestIPTracker_AddIP(t *testing.T) {
 				tracker.bloomAdditions[newerIP.NodeID] = 2
 			},
 		},
-		// Section below is same as above with connectToAllValidators set to true and modified expected change if necessary
 		{
 			name:                      "non-validator",
 			initialState:              func(t *testing.T) *ipTracker { return newTestIPTracker(t, true) },
@@ -1220,7 +1216,6 @@ func TestIPTracker_Connected(t *testing.T) {
 				}
 			},
 		},
-		// Section below is same as above with connectToAllValidators set to true and modified expected change if necessary
 		{
 			name:         "non-validator",
 			initialState: func(t *testing.T) *ipTracker { return newTestIPTracker(t, true) },
@@ -1490,7 +1485,6 @@ func TestIPTracker_Disconnected(t *testing.T) {
 				subnet.gossipableIPs = subnet.gossipableIPs[:0]
 			},
 		},
-		// Section below is same as above with connectToAllValidators set to true
 		{
 			name: "connect-to-all - not gossipable",
 			initialState: func(t *testing.T) *ipTracker {
@@ -1731,8 +1725,6 @@ func TestIPTracker_OnValidatorAdded(t *testing.T) {
 				}
 			},
 		},
-		// Section below is same as above with connectToAllValidators set to true and modified expectations
-		// to track new subnets
 		{
 			name: "connect-to-all - manually tracked",
 			initialState: func(t *testing.T) *ipTracker {
@@ -2014,7 +2006,6 @@ func TestIPTracker_OnValidatorRemoved(t *testing.T) {
 				}
 			},
 		},
-		// Section below is same as above with connectToAllValidators set to true and modified expectations
 		{
 			name: "connect-to-all - remove last validator of subnet",
 			initialState: func(t *testing.T) *ipTracker {
