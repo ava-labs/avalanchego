@@ -5,6 +5,7 @@ package customheader
 
 import (
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -20,6 +21,11 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/coreth/utils"
 )
+
+func TestMain(m *testing.M) {
+	customtypes.Register()
+	os.Exit(m.Run())
+}
 
 func TestExtraPrefix(t *testing.T) {
 	tests := []struct {

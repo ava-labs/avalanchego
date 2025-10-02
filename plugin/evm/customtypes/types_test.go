@@ -29,6 +29,7 @@ package customtypes
 
 import (
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -40,6 +41,11 @@ import (
 	// noise during the refactoring.
 	. "github.com/ava-labs/libevm/core/types"
 )
+
+func TestMain(m *testing.M) {
+	Register()
+	os.Exit(m.Run())
+}
 
 type devnull struct{ len int }
 

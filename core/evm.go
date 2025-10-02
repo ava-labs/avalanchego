@@ -45,7 +45,14 @@ import (
 	"github.com/holiman/uint256"
 )
 
-func init() {
+// RegisterExtras registers hooks with libevm to achieve Avalanche behaviour of
+// the EVM. It MUST NOT be called more than once and therefore is only allowed
+// to be used in tests and `package main`, to avoid polluting other packages
+// that transitively depend on this one but don't need registration.
+func RegisterExtras() {
+	// Although the registration function refers to just Hooks (not Extras) this
+	// will be changed in the future to standardise across libevm, hence the
+	// name of the function we're in.
 	vm.RegisterHooks(hooks{})
 }
 

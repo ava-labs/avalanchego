@@ -62,6 +62,11 @@ var (
 	eip1559Config *params.ChainConfig
 )
 
+func TestMain(m *testing.M) {
+	params.RegisterExtras()
+	os.Exit(m.Run())
+}
+
 func init() {
 	cpy := *params.TestChainConfig
 	eip1559Config = &cpy
