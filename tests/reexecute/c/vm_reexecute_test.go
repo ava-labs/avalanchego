@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -180,11 +181,11 @@ func benchmarkReexecuteRange(
 	consensusRegistry := prometheus.NewRegistry()
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
 
-	if metricsEnabled {
-		collectRegistry(b, "c-chain-reexecution", prefixGatherer, labels)
-	}
-
 	log := tests.NewDefaultLogger("c-chain-reexecution")
+
+	if metricsEnabled {
+		collectRegistry(b, log, "c-chain-reexecution", prefixGatherer, labels)
+	}
 
 	var (
 		vmDBDir      = filepath.Join(currentStateDir, "db")
@@ -552,7 +553,7 @@ func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, err
 
 // collectRegistry starts prometheus and collects metrics from the provided gatherer.
 // Attaches the provided labels + GitHub labels if available to the collected metrics.
-func collectRegistry(tb testing.TB, name string, gatherer prometheus.Gatherer, labels map[string]string) {
+func collectRegistry(tb testing.TB, log logging.Logger, name string, gatherer prometheus.Gatherer, labels map[string]string) {
 	r := require.New(tb)
 
 	startPromCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
@@ -590,6 +591,10 @@ func collectRegistry(tb testing.TB, name string, gatherer prometheus.Gatherer, l
 		Labels:  labels,
 	}, true /* withGitHubLabels */)
 	r.NoError(err)
+
+	startTimeStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
+	metricsURL := tmpnet.MetricsLinkForNetwork(networkUUID, startTimeStr, "")
+	log.Info("metrics available via grafana", zap.String("url", metricsURL))
 }
 
 // parseCustomLabels parses a comma-separated list of key-value pairs into a map
