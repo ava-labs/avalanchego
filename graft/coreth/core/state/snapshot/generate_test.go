@@ -33,6 +33,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/triedb/hashdb"
 	"github.com/ava-labs/coreth/triedb/pathdb"
 	"github.com/ava-labs/libevm/common"
@@ -47,6 +48,11 @@ import (
 	"github.com/holiman/uint256"
 	"golang.org/x/crypto/sha3"
 )
+
+func TestMain(m *testing.M) {
+	customtypes.Register()
+	os.Exit(m.Run())
+}
 
 var testBlockHash = common.HexToHash("0xdeadbeef")
 

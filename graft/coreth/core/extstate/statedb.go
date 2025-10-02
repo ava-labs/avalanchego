@@ -17,10 +17,14 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 )
 
-// Register the state key normalization to libevm's [state.StateDB]. This will
-// normalize all state keys passing through the implementation unless
-// [stateconf.SkipStateKeyTransformation] is provided as an option.
-func init() {
+// RegisterExtras registers hooks with libevm to achieve Avalanche state
+// management. It MUST NOT be called more than once and therefore is only
+// allowed to be used in tests and `package main`, to avoid polluting other
+// packages that transitively depend on this one but don't need registration.
+//
+// Of note, a call to RegisterExtras will result in state-key normalization
+// unless [stateconf.SkipStateKeyTransformation] is used.
+func RegisterExtras() {
 	state.RegisterExtras(normalizeStateKeysHook{})
 }
 

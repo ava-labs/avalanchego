@@ -26,12 +26,12 @@ github.com/allegro/bigcache v1.2.1-0.20190218064605-e24eb225f156/go.mod h1:Cb/ax
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
-github.com/ava-labs/avalanchego v1.13.6-0.20251002193337-23ace817fe84 h1:+aSPSzajVlmZdKG5q6yClDY0RUQXC/KUAQwTKR5EmCE=
-github.com/ava-labs/avalanchego v1.13.6-0.20251002193337-23ace817fe84/go.mod h1:4kotB9pnVuXpwZDVdcB48cSGzRLcanEZ1ZJj2gJo73o=
+github.com/ava-labs/avalanchego v1.13.6-0.20251002202053-3f91f67b9b4c h1:8E/BAkU307FEnPlnu7thcirlB0Chu2VK0kEgMV/gFg0=
+github.com/ava-labs/avalanchego v1.13.6-0.20251002202053-3f91f67b9b4c/go.mod h1:rvv45JMX5tKYOvq1kWVq2D7raPpZ96aIg7wsajl+3fU=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.0.12 h1:aMcrLbpJ/dyu2kZDf/Di/4JIWsUcYPyTDKymiHpejt0=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.0.12/go.mod h1:cq89ua3iiZ5wPBALTEQS5eG8DIZcs7ov6OiL4YR1BVY=
-github.com/ava-labs/libevm v1.13.14-0.3.0.release h1:7sPD8wExeLl8XsK2zHNGeDH1p+h6jVMl/Zz867epMD8=
-github.com/ava-labs/libevm v1.13.14-0.3.0.release/go.mod h1:zP/DOcABRWargBmUWv1jXplyWNcfmBy9cxr0lw3LW3g=
+github.com/ava-labs/libevm v1.13.15-0.20251002164226-35926db4d661 h1:lt4yQE1HMvxWrdD5RFj+h9kWUsZK2rmNohvkeQsbG9M=
+github.com/ava-labs/libevm v1.13.15-0.20251002164226-35926db4d661/go.mod h1:ivRC/KojP8sai7j8WnpXIReQpcRklL2bIzoysnjpARQ=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=
 github.com/beorn7/perks v1.0.1 h1:VlbKKnNfV8bJzeqoa4cOKqO6bYr3WgKZxO8Z16+hsOM=
 github.com/beorn7/perks v1.0.1/go.mod h1:G2ZrVWU2WbWT9wwq4/hrbKbnv/1ERSJQ0ibhJ6rlkpw=

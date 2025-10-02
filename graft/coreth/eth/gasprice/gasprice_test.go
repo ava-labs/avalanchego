@@ -30,6 +30,7 @@ package gasprice
 import (
 	"context"
 	"math/big"
+	"os"
 	"testing"
 	"time"
 
@@ -38,6 +39,7 @@ import (
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/customheader"
+	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap4"
 	"github.com/ava-labs/coreth/rpc"
@@ -51,6 +53,12 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	customtypes.Register()
+	params.RegisterExtras()
+	os.Exit(m.Run())
+}
 
 var (
 	key, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")

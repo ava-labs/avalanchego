@@ -73,6 +73,8 @@ var (
 var testChainConfig *params.ChainConfig
 
 func init() {
+	params.RegisterExtras()
+
 	testChainConfig = new(params.ChainConfig)
 	*testChainConfig = params.Copy(params.TestChainConfig)
 
