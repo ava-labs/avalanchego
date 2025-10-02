@@ -9,6 +9,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
@@ -68,18 +69,21 @@ type (
 		cb                  ConsensusCallbacks
 		consensusMode       Mode
 		desiredTargetExcess *gas.Gas
+		desiredDelayExcess  *acp226.DelayExcess
 	}
 )
 
 func NewDummyEngine(
 	cb ConsensusCallbacks,
 	mode Mode,
-	desiredTargetExcess *gas.Gas,
+	desiredTargetExcess *gas.Gas, // Guides the target gas excess (ACP-176) toward the desired value
+	desiredDelayExcess *acp226.DelayExcess, // Guides the min delay excess (ACP-226) toward the desired value
 ) *DummyEngine {
 	return &DummyEngine{
 		cb:                  cb,
 		consensusMode:       mode,
 		desiredTargetExcess: desiredTargetExcess,
+		desiredDelayExcess:  desiredDelayExcess,
 	}
 }
 
@@ -333,6 +337,18 @@ func (eng *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, h
 		return nil, fmt.Errorf("failed to calculate new header.Extra: %w", err)
 	}
 	header.Extra = append(extraPrefix, header.Extra...)
+
+	// Set the min delay excess
+	minDelayExcess, err := customheader.MinDelayExcess(
+		configExtra,
+		parent,
+		header.Time,
+		eng.desiredDelayExcess,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate min delay excess: %w", err)
+	}
+	headerExtra.MinDelayExcess = minDelayExcess
 
 	// commit the final state root
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/google/go-cmp/cmp"
@@ -17,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/utils"
+	"github.com/ava-labs/coreth/utils/utilstest"
 
 	// TODO(arr4n) These tests were originally part of the `coreth/core/types`
 	// package so assume the presence of identifiers. A dot-import reduces PR
@@ -90,6 +92,8 @@ func exportedFieldsPointToDifferentMemory[T interface {
 			case *big.Int:
 				assertDifferentPointers(t, f, fieldCp)
 			case *common.Hash:
+				assertDifferentPointers(t, f, fieldCp)
+			case *acp226.DelayExcess:
 				assertDifferentPointers(t, f, fieldCp)
 			case *uint64:
 				assertDifferentPointers(t, f, fieldCp)
@@ -312,7 +316,7 @@ func TestBlockGetters(t *testing.T) {
 		wantVersion          uint32
 		wantExtData          []byte
 		wantTimeMilliseconds *uint64
-		wantMinDelayExcess   *uint64
+		wantMinDelayExcess   *acp226.DelayExcess
 	}{
 		{
 			name:                 "empty",
@@ -327,7 +331,7 @@ func TestBlockGetters(t *testing.T) {
 				ExtDataGasUsed:   big.NewInt(1),
 				BlockGasCost:     big.NewInt(2),
 				TimeMilliseconds: utils.NewUint64(3),
-				MinDelayExcess:   utils.NewUint64(4),
+				MinDelayExcess:   utilstest.PointerTo(acp226.DelayExcess(4)),
 			},
 			blockExtra: &BlockBodyExtra{
 				Version: 3,
@@ -338,7 +342,7 @@ func TestBlockGetters(t *testing.T) {
 			wantVersion:          3,
 			wantExtData:          []byte{4},
 			wantTimeMilliseconds: utils.NewUint64(3),
-			wantMinDelayExcess:   utils.NewUint64(4),
+			wantMinDelayExcess:   utilstest.PointerTo(acp226.DelayExcess(4)),
 		},
 	}
 
