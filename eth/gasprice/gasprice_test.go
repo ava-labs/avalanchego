@@ -330,7 +330,7 @@ func TestSuggestTipCapMinGas(t *testing.T) {
 		chainConfig: params.TestChainConfig,
 		numBlocks:   3,
 		genBlock:    testGenBlock(t, 500, 50),
-		expectedTip: big.NewInt(0),
+		expectedTip: DefaultMinPrice,
 	}, defaultOracleConfig())
 }
 
@@ -390,7 +390,7 @@ func TestSuggestTipCapMaxBlocksSecondsLookback(t *testing.T) {
 
 // Regression test to ensure the last estimation of base fee is not used
 // for the block immediately following a fee configuration update.
-func TestSuggestGasPriceAfterFeeConfigUpdate(t *testing.T) {
+func TestEstimateBaseFeeAfterFeeConfigUpdate(t *testing.T) {
 	require := require.New(t)
 	config := Config{
 		Blocks:     20,
@@ -417,7 +417,7 @@ func TestSuggestGasPriceAfterFeeConfigUpdate(t *testing.T) {
 	defer backend.teardown()
 	oracle, err := NewOracle(backend, config)
 	require.NoError(err)
-	got, err := oracle.SuggestPrice(context.Background())
+	got, err := oracle.EstimateBaseFee(context.Background())
 	require.NoError(err)
 	require.Equal(chainConfigExtra.FeeConfig.MinBaseFee, got)
 
@@ -447,8 +447,8 @@ func TestSuggestGasPriceAfterFeeConfigUpdate(t *testing.T) {
 	_, err = backend.chain.InsertChain(blocks)
 	require.NoError(err)
 
-	// verify the suggested price follows the new fee config.
-	got, err = oracle.SuggestPrice(context.Background())
+	// verify the base fee estimation follows the new fee config.
+	got, err = oracle.EstimateBaseFee(context.Background())
 	require.NoError(err)
 	require.Equal(highFeeConfig.MinBaseFee, got)
 }
