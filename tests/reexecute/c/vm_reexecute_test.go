@@ -598,8 +598,12 @@ func collectRegistry(tb testing.TB, log logging.Logger, name string, gatherer pr
 		startTime     = strconv.FormatInt(time.Now().UnixMilli(), 10)
 	)
 
-	metricsURL := tmpnet.NewGrafanaLink(networkUUID, startTime, "now", grafanaURI)
-	log.Info("metrics available via grafana", zap.String("url", metricsURL))
+	log.Info("metrics available via grafana",
+		zap.String(
+			"url",
+			tmpnet.NewGrafanaLink(networkUUID, startTime, "", grafanaURI),
+		),
+	)
 }
 
 // parseCustomLabels parses a comma-separated list of key-value pairs into a map
