@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -544,6 +545,12 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 		*desiredTargetExcess = acp176.DesiredTargetExcess(*vm.config.GasTarget)
 	}
 
+	var desiredDelayExcess *acp226.DelayExcess
+	if vm.config.MinDelayTarget != nil {
+		desiredDelayExcess = new(acp226.DelayExcess)
+		*desiredDelayExcess = acp226.DesiredDelayExcess(*vm.config.MinDelayTarget)
+	}
+
 	vm.eth, err = eth.New(
 		node,
 		&vm.ethConfig,
@@ -555,6 +562,7 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 			vm.extensionConfig.ConsensusCallbacks,
 			dummy.Mode{},
 			desiredTargetExcess,
+			desiredDelayExcess,
 		),
 		vm.clock,
 	)
@@ -870,7 +878,7 @@ func (vm *VM) WaitForEvent(ctx context.Context) (commonEng.Message, error) {
 		}
 	}
 
-	return builder.waitForEvent(ctx)
+	return builder.waitForEvent(ctx, vm.blockChain.CurrentHeader())
 }
 
 // Shutdown implements the snowman.ChainVM interface
@@ -914,7 +922,7 @@ func (vm *VM) buildBlockWithContext(_ context.Context, proposerVMBlockCtx *block
 	}
 
 	block, err := vm.miner.GenerateBlock(predicateCtx)
-	vm.builder.handleGenerateBlock()
+	vm.builder.handleGenerateBlock(vm.blockChain.CurrentHeader().ParentHash)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", vmerrors.ErrGenerateBlockFailed, err)
 	}
