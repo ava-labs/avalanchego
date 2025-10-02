@@ -1586,23 +1586,8 @@ func TestWaitForEvent(t *testing.T) {
 			},
 		},
 		{
-			name: "WaitForEvent doesn't return once a block is built and accepted",
+			name: "WaitForEvent doesn't return if mempool is empty",
 			testCase: func(t *testing.T, vm *VM) {
-				signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
-
-				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
-					require.NoError(t, err)
-				}
-
-				blk, err := vm.BuildBlock(context.Background())
-				require.NoError(t, err)
-
-				require.NoError(t, blk.Verify(context.Background()))
-
-				require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
-
-				require.NoError(t, blk.Accept(context.Background()))
-
 				ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
 				defer cancel()
 
@@ -1618,56 +1603,49 @@ func TestWaitForEvent(t *testing.T) {
 				}()
 
 				wg.Wait()
-
-				t.Log("WaitForEvent returns when regular transactions are added to the mempool")
-
-				time.Sleep(time.Second * 2) // sleep some time to let the gas capacity to refill
-
+			},
+		},
+		{
+			name: "WaitForEvent does not wait to build on a new block",
+			testCase: func(t *testing.T, vm *VM) {
+				signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
+				blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
+				require.NoError(t, err)
+				require.NoError(t, blk.Accept(context.Background()))
 				signedTx = newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 1, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
 
 				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
 					require.NoError(t, err)
 				}
 
-				wg.Add(1)
+				ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+				defer cancel()
 
+				var wg sync.WaitGroup
+				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					msg, err := vm.WaitForEvent(context.Background())
+					msg, err := vm.WaitForEvent(ctx)
 					assert.NoError(t, err)
 					assert.Equal(t, commonEng.PendingTxs, msg)
 				}()
-
 				wg.Wait()
-
-				// Build a block again to wipe out the subscription
-				blk, err = vm.BuildBlock(context.Background())
-				require.NoError(t, err)
-
-				require.NoError(t, blk.Verify(context.Background()))
-
-				require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
-
-				require.NoError(t, blk.Accept(context.Background()))
 			},
 		},
 		{
-			name: "WaitForEvent waits some time after a block is built",
+			name: "WaitForEvent waits for a delay with a retry",
 			testCase: func(t *testing.T, vm *VM) {
-				signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
 				lastBuildBlockTime := time.Now()
-				blk, err := vmtest.IssueTxsAndBuild([]*types.Transaction{signedTx}, vm)
+				_, err := vm.BuildBlock(context.Background())
 				require.NoError(t, err)
-				require.NoError(t, blk.Accept(context.Background()))
-				signedTx = newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 1, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
-
+				// we haven't advanced the tip to include the previous built block, so this is a retry
+				signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
 				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
 					require.NoError(t, err)
 				}
 
 				var wg sync.WaitGroup
 				wg.Add(1)
-
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
@@ -1675,7 +1653,6 @@ func TestWaitForEvent(t *testing.T) {
 					assert.Equal(t, commonEng.PendingTxs, msg)
 					assert.GreaterOrEqual(t, time.Since(lastBuildBlockTime), MinBlockBuildingRetryDelay)
 				}()
-
 				wg.Wait()
 			},
 		},
