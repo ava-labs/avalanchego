@@ -601,7 +601,7 @@ func collectRegistry(tb testing.TB, log logging.Logger, name string, gatherer pr
 	log.Info("metrics available via grafana",
 		zap.String(
 			"url",
-			tmpnet.NewGrafanaLink(networkUUID, startTime, "", grafanaURI),
+			tmpnet.NewGrafanaURI(networkUUID, startTime, "", grafanaURI),
 		),
 	)
 }

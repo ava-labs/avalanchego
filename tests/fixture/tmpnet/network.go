@@ -1120,7 +1120,7 @@ func getRPCVersion(log logging.Logger, command string, versionArgs ...string) (u
 // with the given UUID. The start and end times are accepted as strings to support the
 // use of Grafana's time range syntax (e.g. `now`, `now-1h`).
 func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string) string {
-	return NewGrafanaLink(
+	return NewGrafanaURI(
 		networkUUID,
 		startTime,
 		endTime,
@@ -1128,8 +1128,8 @@ func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string)
 	)
 }
 
-// NewGrafanaLink returns a Grafana dashboard link.
-func NewGrafanaLink(
+// NewGrafanaURI returns a Grafana dashboard URI.
+func NewGrafanaURI(
 	networkUUID string,
 	startTime string,
 	endTime string,
