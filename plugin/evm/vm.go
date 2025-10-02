@@ -876,7 +876,7 @@ func (vm *VM) WaitForEvent(ctx context.Context) (commonEng.Message, error) {
 		}
 	}
 
-	return builder.waitForEvent(ctx)
+	return builder.waitForEvent(ctx, vm.blockChain.CurrentHeader())
 }
 
 // Shutdown implements the snowman.ChainVM interface
@@ -918,7 +918,7 @@ func (vm *VM) buildBlockWithContext(_ context.Context, proposerVMBlockCtx *block
 	}
 
 	block, err := vm.miner.GenerateBlock(predicateCtx)
-	vm.builder.handleGenerateBlock()
+	vm.builder.handleGenerateBlock(vm.blockChain.CurrentHeader().ParentHash)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", vmerrors.ErrGenerateBlockFailed, err)
 	}

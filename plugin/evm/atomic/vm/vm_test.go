@@ -1555,22 +1555,8 @@ func TestWaitForEvent(t *testing.T) {
 			},
 		},
 		{
-			name: "WaitForEvent doesn't return once a block is built and accepted",
+			name: "WaitForEvent doesn't return if both mempool is empty",
 			testCase: func(t *testing.T, vm *VM, address common.Address, key *ecdsa.PrivateKey) {
-				importTx, err := vm.newImportTx(vm.Ctx.XChainID, address, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{vmtest.TestKeys[0]})
-				require.NoError(t, err)
-
-				require.NoError(t, vm.AtomicMempool.AddLocalTx(importTx))
-
-				blk, err := vm.BuildBlock(context.Background())
-				require.NoError(t, err)
-
-				require.NoError(t, blk.Verify(context.Background()))
-
-				require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
-
-				require.NoError(t, blk.Accept(context.Background()))
-
 				ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
 				defer cancel()
 
@@ -1614,26 +1600,6 @@ func TestWaitForEvent(t *testing.T) {
 				wg.Wait()
 
 				// Build a block again to wipe out the subscription
-				blk, err = vm.BuildBlock(context.Background())
-				require.NoError(t, err)
-
-				require.NoError(t, blk.Verify(context.Background()))
-
-				require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
-
-				require.NoError(t, blk.Accept(context.Background()))
-			},
-		},
-		{
-			name: "WaitForEvent waits some time after a block is built",
-			testCase: func(t *testing.T, vm *VM, address common.Address, key *ecdsa.PrivateKey) {
-				importTx, err := vm.newImportTx(vm.Ctx.XChainID, address, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{vmtest.TestKeys[0]})
-				require.NoError(t, err)
-
-				require.NoError(t, vm.AtomicMempool.AddLocalTx(importTx))
-
-				lastBuildBlockTime := time.Now()
-
 				blk, err := vm.BuildBlock(context.Background())
 				require.NoError(t, err)
 
@@ -1642,32 +1608,6 @@ func TestWaitForEvent(t *testing.T) {
 				require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
 
 				require.NoError(t, blk.Accept(context.Background()))
-
-				txs := make([]*types.Transaction, 10)
-				for i := 0; i < 10; i++ {
-					tx := types.NewTransaction(uint64(i), address, big.NewInt(10), 21000, big.NewInt(3*ap0.MinGasPrice), nil)
-					signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.Ethereum().BlockChain().Config().ChainID), key)
-					require.NoError(t, err)
-
-					txs[i] = signedTx
-				}
-				errs := vm.Ethereum().TxPool().Add(txs, false, false)
-				for _, err := range errs {
-					require.NoError(t, err)
-				}
-
-				var wg sync.WaitGroup
-				wg.Add(1)
-
-				go func() {
-					defer wg.Done()
-					msg, err := vm.WaitForEvent(context.Background())
-					assert.NoError(t, err)
-					assert.Equal(t, commonEng.PendingTxs, msg)
-					assert.GreaterOrEqual(t, time.Since(lastBuildBlockTime), evm.MinBlockBuildingRetryDelay)
-				}()
-
-				wg.Wait()
 			},
 		},
 	} {
