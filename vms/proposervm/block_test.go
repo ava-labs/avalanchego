@@ -30,6 +30,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer/proposermock"
+
+	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 // Assert that when the underlying VM implements ChainVMWithBuildBlockContext
@@ -405,4 +407,44 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 	)
 	require.NoError(err)
 	require.Equal(innerChildBlock, gotChild.(*postForkBlock).innerBlk)
+}
+
+// Confirm that VM rejects blocks with non-zero epoch prior to granite upgrade activation
+func TestPreGraniteBlock_NonZeroEpoch(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
+	)
+	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	innerBlk := snowmantest.BuildChild(snowmantest.Genesis)
+	slb, err := statelessblock.Build(
+		proVM.preferred,
+		proVM.Time(),
+		100, // pChainHeight,
+		statelessblock.Epoch{
+			PChainHeight: 1,
+			Number:       1,
+			StartTime:    1,
+		},
+		proVM.StakingCertLeaf,
+		innerBlk.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.StakingLeafSigner,
+	)
+	require.NoError(err)
+	proBlk := postForkBlock{
+		SignedBlock: slb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: innerBlk,
+		},
+	}
+	err = proBlk.Verify(context.Background())
+	require.ErrorIs(err, errEpochNotZero)
 }

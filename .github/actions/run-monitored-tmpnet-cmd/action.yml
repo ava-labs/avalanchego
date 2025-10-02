@@ -83,7 +83,10 @@ runs:
     - run: $GITHUB_ACTION_PATH/nix-develop.sh --command go mod download
       if: steps.go-mod-cache.outputs.cache-hit != 'true'
       shell: bash
-    - run: $GITHUB_ACTION_PATH/nix-develop.sh --command go mod download -modfile=tools/go.mod
+    - run: |
+        if [[ -f tools/go.mod ]]; then
+          $GITHUB_ACTION_PATH/nix-develop.sh --command go mod download -modfile=tools/go.mod
+        fi
       if: steps.go-mod-cache.outputs.cache-hit != 'true'
       shell: bash
     - name: Notify of metrics availability
