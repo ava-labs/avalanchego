@@ -38,6 +38,7 @@ var (
 	errProposerMismatch         = errors.New("proposer mismatch")
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
 	errPChainHeightTooLow       = errors.New("block P-chain height is too low")
+	errEpochNotZero             = errors.New("epoch must not be provided prior to granite")
 )
 
 type Block interface {
@@ -134,6 +135,11 @@ func (p *postForkCommonComponents) Verify(
 	childPChainHeight := child.PChainHeight()
 	if childPChainHeight < parentPChainHeight {
 		return errPChainHeightNotMonotonic
+	}
+
+	// If granite is not activated, the child must not have an epoch.
+	if !p.vm.Upgrades.IsGraniteActivated(child.Timestamp()) && child.PChainEpoch() != (block.Epoch{}) {
+		return errEpochNotZero
 	}
 
 	expectedInnerParentID := p.innerBlk.ID()

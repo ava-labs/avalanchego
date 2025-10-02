@@ -503,7 +503,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	slb, err := statelessblock.Build(
 		proVM.preferred,
 		proVM.Time(),
-		100,
+		100, // pChainHeight,
 		statelessblock.Epoch{},
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
@@ -1981,8 +1981,8 @@ func TestVMInnerBlkCache(t *testing.T) {
 	blkNearTip, err := statelessblock.Build(
 		ids.GenerateTestID(),   // parent
 		time.Time{},            // timestamp
-		1,                      // pChainHeight,
-		statelessblock.Epoch{}, // pChainEpoch
+		1,                      // pChainHeight
+		statelessblock.Epoch{}, // epoch
 		vm.StakingCertLeaf,     // cert
 		blkNearTipInnerBytes,   // inner blk bytes
 		vm.ctx.ChainID,         // chain ID

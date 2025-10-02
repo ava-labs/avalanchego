@@ -490,3 +490,44 @@ func TestNextPChainEpoch(t *testing.T) {
 		})
 	}
 }
+
+// Confirm that VM rejects blocks with non-zero epoch prior to granite upgrade activation
+func TestPreGraniteBlock_NonZeroEpoch(t *testing.T) {
+	require := require.New(t)
+
+	var (
+		activationTime = upgrade.InitiallyActiveTime
+		durangoTime    = upgrade.InitiallyActiveTime
+		graniteTime    = upgrade.UnscheduledActivationTime
+	)
+	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	innerBlk := snowmantest.BuildChild(snowmantest.Genesis)
+	slb, err := statelessblock.Build(
+		proVM.preferred,
+		proVM.Time(),
+		100, // pChainHeight,
+		statelessblock.Epoch{
+			PChainHeight: 1,
+			Number:       1,
+			StartTime:    1,
+		},
+		proVM.StakingCertLeaf,
+		innerBlk.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.StakingLeafSigner,
+	)
+	require.NoError(err)
+	proBlk := postForkBlock{
+		SignedBlock: slb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: innerBlk,
+		},
+	}
+	err = proBlk.Verify(context.Background())
+	require.ErrorIs(err, errEpochNotZero)
+}

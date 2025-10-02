@@ -602,7 +602,7 @@ func TestBatchedParseBlockParallel(t *testing.T) {
 	pChainHeight := uint64(2)
 	pChainEpoch := blockbuilder.Epoch{
 		PChainHeight: uint64(2),
-		Number:       uint64(0),
+		Number:       uint64(1),
 		StartTime:    time.Unix(123, 0).Unix(),
 	}
 	chainID := ids.GenerateTestID()
