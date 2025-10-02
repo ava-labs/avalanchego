@@ -5,7 +5,6 @@ package ledger
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -37,19 +36,21 @@ func retryOnHIDAPIError(fn func() error) error {
 			return nil
 		}
 
-		// Check if the error contains the specific HIDAPI failure message or APDU 0x6987
-		if strings.Contains(err.Error(), "hidapi: unknown failure") ||
-			strings.Contains(err.Error(), "APDU Error Code from Ledger Device: 0x6987") {
+		// Check if the error is HIDAPI failure message or APDU 0x6987
+		if err.Error() == "hidapi: unknown failure" || err.Error() == "APDU Error Code from Ledger Device: 0x6987" {
 			if attempt < maxRetries {
 				// Calculate backoff delay: 200ms, 400ms, 600ms, 800ms
+				// This linear backoff prevents excessive delay (at most 2s), while at the same
+				// time it is quick enough in most cases. Also proved to successfully recover
+				// in all tests.
 				delay := time.Duration(attempt) * initialRetryDelay
 				time.Sleep(delay)
 				continue
 			}
 		}
 
-		// If it's not a retryable error or we've exhausted retries, return the error
-		return err
+		// If it's not a retryable error or we've exhausted retries, exit the loop
+		break
 	}
 	return err
 }
