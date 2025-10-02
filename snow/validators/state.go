@@ -24,6 +24,28 @@ type State interface {
 	// GetSubnetID returns the subnetID of the provided chain.
 	GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error)
 
+	// GetWarpValidatorSets returns the canonical warp validator set for all
+	// subnets at the requested P-chain height.
+	//
+	// If a subnet is not present in the returned map, that indicates that the
+	// subnet is not currently able to produce valid warp message signatures.
+	//
+	// The returned map should not be modified.
+	GetWarpValidatorSets(ctx context.Context, height uint64) (map[ids.ID]WarpSet, error)
+
+	// GetWarpValidatorSet returns the canonical warp validator set for the
+	// requested subnet at the requested P-chain height.
+	//
+	// The returned set should not be modified.
+	//
+	// TODO: After Granite, this method should be removed and users should
+	// directly call GetWarpValidatorSets.
+	GetWarpValidatorSet(
+		ctx context.Context,
+		height uint64,
+		subnetID ids.ID,
+	) (WarpSet, error)
+
 	// GetValidatorSet returns the validators of the provided subnet at the
 	// requested P-chain height.
 	// The returned map should not be modified.
@@ -86,6 +108,27 @@ func (s *lockedState) GetValidatorSet(
 	return s.s.GetValidatorSet(ctx, height, subnetID)
 }
 
+func (s *lockedState) GetWarpValidatorSets(
+	ctx context.Context,
+	height uint64,
+) (map[ids.ID]WarpSet, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.s.GetWarpValidatorSets(ctx, height)
+}
+
+func (s *lockedState) GetWarpValidatorSet(
+	ctx context.Context,
+	height uint64,
+	subnetID ids.ID,
+) (WarpSet, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	return s.s.GetWarpValidatorSet(ctx, height, subnetID)
+}
+
 func (s *lockedState) GetCurrentValidatorSet(
 	ctx context.Context,
 	subnetID ids.ID,
@@ -104,6 +147,14 @@ func NewNoValidatorsState(state State) State {
 	return &noValidators{
 		State: state,
 	}
+}
+
+func (*noValidators) GetWarpValidatorSets(context.Context, uint64) (map[ids.ID]WarpSet, error) {
+	return nil, nil
+}
+
+func (*noValidators) GetWarpValidatorSet(context.Context, uint64, ids.ID) (WarpSet, error) {
+	return WarpSet{}, nil
 }
 
 func (*noValidators) GetValidatorSet(context.Context, uint64, ids.ID) (map[ids.NodeID]*GetValidatorOutput, error) {
