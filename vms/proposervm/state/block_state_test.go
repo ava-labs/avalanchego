@@ -24,7 +24,7 @@ func testBlockState(require *require.Assertions, bs BlockState) {
 	pChainHeight := uint64(2)
 	pChainEpoch := block.Epoch{
 		PChainHeight: 2,
-		Number:       0,
+		Number:       1,
 		StartTime:    timestamp.Unix(),
 	}
 	innerBlockBytes := []byte{3}
