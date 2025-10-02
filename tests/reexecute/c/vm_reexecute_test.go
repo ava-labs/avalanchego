@@ -592,8 +592,13 @@ func collectRegistry(tb testing.TB, log logging.Logger, name string, gatherer pr
 	}, true /* withGitHubLabels */)
 	r.NoError(err)
 
-	startTimeStr := strconv.FormatInt(time.Now().UnixMilli(), 10)
-	metricsURL := tmpnet.MetricsLinkForNetwork(networkUUID, startTimeStr, "")
+	var (
+		dashboardPath = "d/Gl1I20mnk/c-chain"
+		grafanaURI    = tmpnet.DefaultBaseGrafanaURI + dashboardPath
+		startTime     = strconv.FormatInt(time.Now().UnixMilli(), 10)
+	)
+
+	metricsURL := tmpnet.NewGrafanaLink(networkUUID, startTime, "now", grafanaURI)
 	log.Info("metrics available via grafana", zap.String("url", metricsURL))
 }
 
