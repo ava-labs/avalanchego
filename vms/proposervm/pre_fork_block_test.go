@@ -186,7 +186,8 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.NoUpgrades, 0)
+	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -351,7 +352,7 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 	require := require.New(t)
 
 	activationTime := snowmantest.GenesisTimestamp.Add(-1 * time.Second)
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	proVM.Set(activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
