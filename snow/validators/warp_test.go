@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package validators
+package validators_test
 
 import (
 	"math"
@@ -11,42 +11,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
-	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
+
+	. "github.com/ava-labs/avalanchego/snow/validators"
 )
-
-func newWarp(t *testing.T) *Warp {
-	t.Helper()
-
-	sk, err := localsigner.New()
-	require.NoError(t, err)
-
-	nodeID := ids.GenerateTestNodeID()
-	pk := sk.PublicKey()
-	return &Warp{
-		PublicKey:      pk,
-		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
-		Weight:         1,
-		NodeIDs:        []ids.NodeID{nodeID},
-	}
-}
-
-func newWarpSet(t *testing.T, n uint64) WarpSet {
-	t.Helper()
-
-	vdrs := make([]*Warp, n)
-	for i := range vdrs {
-		vdrs[i] = newWarp(t)
-	}
-	utils.Sort(vdrs)
-	return WarpSet{
-		Validators:  vdrs,
-		TotalWeight: n,
-	}
-}
 
 func warpToOutput(w *Warp) *GetValidatorOutput {
 	return &GetValidatorOutput{
@@ -58,7 +29,7 @@ func warpToOutput(w *Warp) *GetValidatorOutput {
 
 func TestFlattenValidatorSet(t *testing.T) {
 	var (
-		vdrs    = newWarpSet(t, 3)
+		vdrs    = validatorstest.NewWarpSet(t, 3)
 		nodeID0 = vdrs.Validators[0].NodeIDs[0]
 		nodeID1 = vdrs.Validators[1].NodeIDs[0]
 		nodeID2 = vdrs.Validators[2].NodeIDs[0]
