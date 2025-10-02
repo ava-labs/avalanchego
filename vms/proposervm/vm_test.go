@@ -253,7 +253,7 @@ func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 	require := require.New(t)
 
 	// given the same core block, BuildBlock returns the same proposer block
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -277,7 +277,7 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 	require := require.New(t)
 
 	// given the same core block, BuildBlock returns the same proposer block
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -303,7 +303,7 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 	require := require.New(t)
 
 	// setup
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -328,7 +328,7 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -396,7 +396,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -465,7 +465,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -501,7 +501,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -567,7 +567,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -930,7 +930,7 @@ func (b *wrappedBlock) Verify(ctx context.Context) error {
 func TestInnerBlockDeduplication(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1455,7 +1455,7 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 func TestLaggedPChainHeight(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -2309,7 +2309,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -2561,7 +2561,7 @@ func TestSelectChildPChainHeight(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			_, vdrState, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0)
+			_, vdrState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 			defer func() {
 				require.NoError(proVM.Shutdown(context.Background()))
 			}()
@@ -2638,11 +2638,7 @@ func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
 	proVM := New(
 		coreVM,
 		Config{
-			Upgrades: upgrade.Config{
-				ApricotPhase4Time:            snowmantest.GenesisTimestamp,
-				ApricotPhase4MinPChainHeight: 0,
-				DurangoTime:                  snowmantest.GenesisTimestamp,
-			},
+			Upgrades:            upgradetest.GetConfig(upgradetest.Latest),
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,

@@ -116,7 +116,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	require := require.New(t)
 
 	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0, activationTime)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -245,7 +245,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	require := require.New(t)
 
 	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0, activationTime)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -351,7 +351,7 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 	require := require.New(t)
 
 	activationTime := snowmantest.GenesisTimestamp.Add(-1 * time.Second)
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	proVM.Set(activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
@@ -457,7 +457,7 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 	require := require.New(t)
 
 	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0, activationTime)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -524,7 +524,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 	require := require.New(t)
 
 	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Durango, 0, activationTime)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
