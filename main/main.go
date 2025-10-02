@@ -9,13 +9,13 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
 
 	"github.com/ava-labs/avalanchego/app"
 	"github.com/ava-labs/avalanchego/config"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/ava-labs/coreth/plugin/evm"
 )
 
 func main() {
