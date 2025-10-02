@@ -38,6 +38,7 @@ var (
 	errProposerMismatch         = errors.New("proposer mismatch")
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
 	errPChainHeightTooLow       = errors.New("block P-chain height is too low")
+	errEpochNotZero             = errors.New("epoch must not be provided prior to granite")
 )
 
 type Block interface {
@@ -90,6 +91,7 @@ func (p *postForkCommonComponents) Height() uint64 {
 // 7) [child]'s timestamp is within its proposer's window
 // 8) [child] has a valid signature from its proposer
 // 9) [child]'s inner block is valid
+// 10) [child] has the expected epoch number
 func (p *postForkCommonComponents) Verify(
 	ctx context.Context,
 	parentTimestamp time.Time,
@@ -103,6 +105,11 @@ func (p *postForkCommonComponents) Verify(
 	childPChainHeight := child.PChainHeight()
 	if childPChainHeight < parentPChainHeight {
 		return errPChainHeightNotMonotonic
+	}
+
+	// TODO: Remove this check once the implementation is in place.
+	if child.PChainEpoch() != (block.Epoch{}) {
+		return errEpochNotZero
 	}
 
 	expectedInnerParentID := p.innerBlk.ID()
@@ -252,6 +259,7 @@ func (p *postForkCommonComponents) buildChild(
 			parentID,
 			newTimestamp,
 			pChainHeight,
+			block.Epoch{},
 			p.vm.StakingCertLeaf,
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
@@ -262,6 +270,7 @@ func (p *postForkCommonComponents) buildChild(
 			parentID,
 			newTimestamp,
 			pChainHeight,
+			block.Epoch{},
 			innerBlock.Bytes(),
 		)
 	}
