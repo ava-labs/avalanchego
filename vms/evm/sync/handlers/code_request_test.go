@@ -6,18 +6,18 @@ package handlers
 import (
 	"context"
 	"crypto/rand"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/message"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/statesynctest"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb/memorydb"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 
-	ethparams "github.com/ava-labs/libevm/params"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/message"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/statesynctest"
 )
 
 func TestCodeRequestHandler(t *testing.T) {

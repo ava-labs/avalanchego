@@ -6,12 +6,10 @@ package handlers
 import (
 	"bytes"
 	"context"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/message"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/statesynctest"
-	"math/rand"
+	"crypto/rand"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -21,11 +19,13 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/coreth/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/message"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/statesynctest"
 )
 
 func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
-	r := rand.New(rand.NewSource(1))
+	r := rand.Reader
 	testHandlerStats := &statesynctest.TestHandlerStats{}
 	memdb := rawdb.NewMemoryDatabase()
 	trieDB := triedb.NewDatabase(memdb, nil)
@@ -40,7 +40,6 @@ func TestLeafsRequestHandler_OnLeafsRequest(t *testing.T) {
 	smallTrieRoot, _, _ := statesynctest.GenerateTrie(t, r, trieDB, 500, common.HashLength)
 	accountTrieRoot, accounts := statesynctest.FillAccounts(
 		t,
-		r,
 		trieDB,
 		common.Hash{},
 		10_000,

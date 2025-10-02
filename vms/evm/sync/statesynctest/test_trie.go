@@ -4,11 +4,13 @@
 package statesynctest
 
 import (
+	"crypto/rand"
 	"encoding/binary"
-	"math/rand"
+	"io"
+	"math/big"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/coreth/utils/utilstest"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
@@ -19,21 +21,21 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/coreth/utils/utilstest"
+	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
 // GenerateTrie creates a trie with [numKeys] random key-value pairs inside of [trieDB].
 // Returns the root of the generated trie, the slice of keys inserted into the trie in lexicographical
 // order, and the slice of corresponding values.
-// GenerateTrie reads from [rand] and the caller should call rand.Seed(n) for deterministic results
-func GenerateTrie(t *testing.T, r *rand.Rand, trieDB *triedb.Database, numKeys int, keySize int) (common.Hash, [][]byte, [][]byte) {
+// GenerateTrie reads from [r]
+func GenerateTrie(t *testing.T, r io.Reader, trieDB *triedb.Database, numKeys int, keySize int) (common.Hash, [][]byte, [][]byte) {
 	require.GreaterOrEqual(t, keySize, wrappers.LongLen+1, "key size must be at least 9 bytes (8 bytes for uint64 and 1 random byte)")
 	return FillTrie(t, r, 0, numKeys, keySize, trieDB, types.EmptyRootHash)
 }
 
 // FillTrie fills a given trie with [numKeys] random keys, each of size [keySize]
 // returns inserted keys and values
-func FillTrie(t *testing.T, r *rand.Rand, start, numKeys int, keySize int, trieDB *triedb.Database, root common.Hash) (common.Hash, [][]byte, [][]byte) {
+func FillTrie(t *testing.T, r io.Reader, start, numKeys int, keySize int, trieDB *triedb.Database, root common.Hash) (common.Hash, [][]byte, [][]byte) {
 	testTrie, err := trie.New(trie.TrieID(root), trieDB)
 	require.NoError(t, err)
 
@@ -44,11 +46,13 @@ func FillTrie(t *testing.T, r *rand.Rand, start, numKeys int, keySize int, trieD
 	for i := start; i < numKeys; i++ {
 		key := make([]byte, keySize)
 		binary.BigEndian.PutUint64(key[:wrappers.LongLen], uint64(i+1))
-		_, err := r.Read(key[wrappers.LongLen:])
+		_, err := io.ReadFull(r, key[wrappers.LongLen:])
 		require.NoError(t, err)
 
-		value := make([]byte, r.Intn(128)+128) // min 128 bytes, max 256 bytes
-		_, err = r.Read(value)
+		nBig, err := rand.Int(rand.Reader, big.NewInt(128))
+		require.NoError(t, err)
+		value := make([]byte, int(nBig.Int64())+128) // min 128 bytes, max 256 bytes
+		_, err = io.ReadFull(r, value)
 		require.NoError(t, err)
 
 		testTrie.MustUpdate(key, value)
@@ -88,7 +92,7 @@ func CorruptTrie(t *testing.T, diskdb ethdb.Batcher, tr *trie.Trie, n int) {
 // [onAccount] is called if non-nil (so the caller can modify the account before it is stored in the secure trie).
 // returns the new trie root and a map of funded keys to StateAccount structs.
 func FillAccounts(
-	t *testing.T, r *rand.Rand, trieDB *triedb.Database, root common.Hash, numAccounts int,
+	t *testing.T, trieDB *triedb.Database, root common.Hash, numAccounts int,
 	onAccount func(*testing.T, int, types.StateAccount) types.StateAccount,
 ) (common.Hash, map[*utilstest.Key]*types.StateAccount) {
 	var (
@@ -101,9 +105,12 @@ func FillAccounts(
 	tr, err := trie.NewStateTrie(trie.TrieID(root), trieDB)
 	require.NoError(t, err)
 
-	for i := 0; i < numAccounts; i++ {
+	for i := range numAccounts {
+		// random nonce in [0, maxNonce)
+		nBig, err := rand.Int(rand.Reader, big.NewInt(int64(maxNonce)))
+		require.NoError(t, err)
 		acc := types.StateAccount{
-			Nonce:    uint64(r.Intn(maxNonce)),
+			Nonce:    uint64(nBig.Int64()),
 			Balance:  new(uint256.Int).Add(minBalance, randBalance),
 			CodeHash: types.EmptyCodeHash[:],
 			Root:     types.EmptyRootHash,
@@ -124,5 +131,6 @@ func FillAccounts(
 	require.NoError(t, err)
 	require.NoError(t, trieDB.Update(newRoot, root, 0, trienode.NewWithNodeSet(nodes), nil))
 	require.NoError(t, trieDB.Commit(newRoot, false))
+
 	return newRoot, accounts
 }

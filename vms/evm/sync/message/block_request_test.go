@@ -40,10 +40,10 @@ func TestMarshalBlockRequest(t *testing.T) {
 func TestMarshalBlockResponse(t *testing.T) {
 	// create some random bytes
 	// set seed to ensure deterministic random behaviour
-	r := rand.New(rand.NewSource(1))
+	r := rand.New(rand.NewSource(1)) //nolint:gosec // deterministic bytes for golden assertion
 	blocksBytes := make([][]byte, 32)
 	for i := range blocksBytes {
-		blocksBytes[i] = make([]byte, r.Intn(32)+32) // min 32 length, max 64
+		blocksBytes[i] = make([]byte, r.Intn(32)+32)
 		_, err := r.Read(blocksBytes[i])
 		require.NoError(t, err)
 	}

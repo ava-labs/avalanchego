@@ -8,11 +8,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/evm/sync/message"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/stats"
-
-	"github.com/ava-labs/avalanchego/codec"
-	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/coreth/core/state/snapshot"
+	"github.com/ava-labs/coreth/sync/syncutils"
+	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
@@ -21,9 +19,10 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 
-	"github.com/ava-labs/coreth/core/state/snapshot"
-	"github.com/ava-labs/coreth/sync/syncutils"
-	"github.com/ava-labs/coreth/utils"
+	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/message"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/stats"
 )
 
 var _ LeafRequestHandler = (*leafsRequestHandler)(nil)

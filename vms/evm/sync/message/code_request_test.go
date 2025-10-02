@@ -36,8 +36,8 @@ func TestMarshalCodeRequest(t *testing.T) {
 func TestMarshalCodeResponse(t *testing.T) {
 	// generate some random code data
 	// set random seed for deterministic random
-	r := rand.New(rand.NewSource(1))
 	codeData := make([]byte, 50)
+	r := rand.New(rand.NewSource(1)) //nolint:gosec // deterministic bytes for golden assertion
 	_, err := r.Read(codeData)
 	require.NoError(t, err)
 

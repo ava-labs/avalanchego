@@ -8,9 +8,10 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 func TestMarshalBlockSyncSummary(t *testing.T) {

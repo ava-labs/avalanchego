@@ -9,23 +9,21 @@ import (
 	"math/big"
 	"testing"
 
-	syncclient "github.com/ava-labs/avalanchego/vms/evm/sync/client"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/stats"
-
-	"github.com/ava-labs/avalanchego/vms/evm/sync/message"
+	"github.com/ava-labs/coreth/consensus/dummy"
+	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb"
+	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/coreth/consensus/dummy"
-	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/params"
-
-	ethparams "github.com/ava-labs/libevm/params"
+	syncclient "github.com/ava-labs/avalanchego/vms/evm/sync/client"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/message"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/stats"
 )
 
 func TestBlockSyncer_ParameterizedTests(t *testing.T) {

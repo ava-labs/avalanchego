@@ -8,24 +8,22 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/vms/evm/sync/message"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/statesynctest"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/stats"
-
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/coreth/consensus/dummy"
+	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/triedb"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/coreth/consensus/dummy"
-	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/message"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/statesynctest"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/stats"
 )
 
 type blockRequestTest struct {
@@ -79,22 +77,22 @@ func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*type
 	}
 
 	if test.expectNilResponse {
-		assert.Nil(t, responseBytes)
+		require.Nil(t, responseBytes)
 		return
 	}
 
-	assert.NotEmpty(t, responseBytes)
+	require.NotEmpty(t, responseBytes)
 
 	var response message.BlockResponse
 	_, err = message.Codec.Unmarshal(responseBytes, &response)
 	require.NoError(t, err)
-	assert.Len(t, response.Blocks, test.expectedBlocks)
+	require.Len(t, response.Blocks, test.expectedBlocks)
 
 	for _, blockBytes := range response.Blocks {
 		block := new(types.Block)
 		require.NoError(t, rlp.DecodeBytes(blockBytes, block))
-		assert.GreaterOrEqual(t, test.startBlockIndex, 0)
-		assert.Equal(t, blocks[test.startBlockIndex].Hash(), block.Hash())
+		require.GreaterOrEqual(t, test.startBlockIndex, 0)
+		require.Equal(t, blocks[test.startBlockIndex].Hash(), block.Hash())
 		test.startBlockIndex--
 	}
 	testHandlerStats.Reset()
@@ -110,7 +108,7 @@ func TestBlockRequestHandler(t *testing.T) {
 	engine := dummy.NewETHFaker()
 	blocks, _, err := core.GenerateChain(params.TestChainConfig, genesis, engine, memdb, 96, 0, func(_ int, _ *core.BlockGen) {})
 	require.NoError(t, err)
-	assert.Len(t, blocks, 96)
+	require.Len(t, blocks, 96)
 
 	tests := []blockRequestTest{
 		{
@@ -138,7 +136,7 @@ func TestBlockRequestHandler(t *testing.T) {
 			requestedParents:  64,
 			expectNilResponse: true,
 			assertResponse: func(t testing.TB, testHandlerStats *statesynctest.TestHandlerStats, _ []byte) {
-				assert.Equal(t, uint32(1), testHandlerStats.MissingBlockHashCount)
+				require.Equal(t, uint32(1), testHandlerStats.MissingBlockHashCount)
 			},
 		},
 	}
@@ -177,7 +175,7 @@ func TestBlockRequestHandlerLargeBlocks(t *testing.T) {
 		b.AddTx(tx)
 	})
 	require.NoError(t, err)
-	assert.Len(t, blocks, 96)
+	require.Len(t, blocks, 96)
 
 	tests := []blockRequestTest{
 		{
@@ -217,7 +215,7 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 	blocks, _, err := core.GenerateChain(params.TestChainConfig, genesis, engine, memdb, 11, 0, func(_ int, _ *core.BlockGen) {})
 	require.NoError(t, err)
 
-	assert.Len(t, blocks, 11)
+	require.Len(t, blocks, 11)
 
 	// convert into map
 	blocksDB := make(map[common.Hash]*types.Block, 11)
@@ -251,17 +249,17 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 		Parents: uint16(8),
 	})
 	require.NoError(t, err)
-	assert.NotEmpty(t, responseBytes)
+	require.NotEmpty(t, responseBytes)
 
 	var response message.BlockResponse
 	_, err = message.Codec.Unmarshal(responseBytes, &response)
 	require.NoError(t, err)
 	// requested 8 blocks, received cancelAfterNumRequests because of timeout
-	assert.Len(t, response.Blocks, cancelAfterNumRequests)
+	require.Len(t, response.Blocks, cancelAfterNumRequests)
 
 	for i, blockBytes := range response.Blocks {
 		block := new(types.Block)
 		require.NoError(t, rlp.DecodeBytes(blockBytes, block))
-		assert.Equal(t, blocks[len(blocks)-i-1].Hash(), block.Hash())
+		require.Equal(t, blocks[len(blocks)-i-1].Hash(), block.Hash())
 	}
 }

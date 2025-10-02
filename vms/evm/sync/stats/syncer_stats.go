@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/evm/sync/message"
-
 	"github.com/ava-labs/libevm/metrics"
+
+	"github.com/ava-labs/avalanchego/vms/evm/sync/message"
 )
 
 var (

@@ -7,13 +7,7 @@ import (
 	"errors"
 	"testing"
 
-	statesyncclient "github.com/ava-labs/avalanchego/vms/evm/sync/client"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
-	"github.com/ava-labs/avalanchego/vms/evm/sync/stats"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
-
-	"github.com/ava-labs/avalanchego/utils"
+	"github.com/ava-labs/coreth/utils/utilstest"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
@@ -21,7 +15,12 @@ import (
 	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/coreth/utils/utilstest"
+	"github.com/ava-labs/avalanchego/utils"
+	statesyncclient "github.com/ava-labs/avalanchego/vms/evm/sync/client"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/handlers"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/stats"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 )
 
 type syncerTest struct {

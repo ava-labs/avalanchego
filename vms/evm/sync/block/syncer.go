@@ -8,13 +8,13 @@ import (
 	"errors"
 	"fmt"
 
-	syncclient "github.com/ava-labs/avalanchego/vms/evm/sync/client"
-
-	"github.com/ava-labs/avalanchego/vms/evm/sync"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
+
+	"github.com/ava-labs/avalanchego/vms/evm/sync"
+	syncclient "github.com/ava-labs/avalanchego/vms/evm/sync/client"
 )
 
 const blocksPerRequest = 32
