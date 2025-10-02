@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -125,7 +126,7 @@ func TestSignatureVerification(t *testing.T) {
 				require.NoError(err)
 				return msg
 			},
-			canonicalErr: avalancheWarp.ErrWeightOverflow,
+			canonicalErr: safemath.ErrOverflow,
 		},
 		{
 			name: "invalid bit set index",
