@@ -6,11 +6,9 @@ package merkledb
 import (
 	"context"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
@@ -23,11 +21,6 @@ import (
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
-
-func TestMain(m *testing.M) {
-	evm.RegisterAllLibEVMExtras()
-	os.Exit(m.Run())
-}
 
 func Test_Server_GetRangeProof(t *testing.T) {
 	now := time.Now().UnixNano()
