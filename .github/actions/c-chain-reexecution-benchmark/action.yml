@@ -115,4 +115,4 @@ runs:
     - name: Push Post-State to S3 (if not exists)
       if: ${{ inputs.push-post-state != '' }}
       shell: nix develop --command bash -x {0}
-      run: ./scripts/run_task.sh export-dir-to-s3 LOCAL_SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ S3_DST=${{ inputs.push-post-state }}
+      run: ./scripts/run_task.sh export-dir-to-s3 SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ DST=${{ inputs.push-post-state }}
