@@ -17,25 +17,22 @@ import (
 	"github.com/ava-labs/libevm/log"
 
 	warpprecompile "github.com/ava-labs/coreth/precompile/contracts/warp"
-	warpValidators "github.com/ava-labs/coreth/warp/validators"
 )
 
 var errNoValidators = errors.New("cannot aggregate signatures from subnet with no validators")
 
 // API introduces snowman specific functionality to the evm
 type API struct {
-	chainContext                 *snow.Context
-	backend                      Backend
-	signatureAggregator          *acp118.SignatureAggregator
-	requirePrimaryNetworkSigners func() bool
+	chainContext        *snow.Context
+	backend             Backend
+	signatureAggregator *acp118.SignatureAggregator
 }
 
-func NewAPI(chainCtx *snow.Context, backend Backend, signatureAggregator *acp118.SignatureAggregator, requirePrimaryNetworkSigners func() bool) *API {
+func NewAPI(chainCtx *snow.Context, backend Backend, signatureAggregator *acp118.SignatureAggregator) *API {
 	return &API{
-		backend:                      backend,
-		chainContext:                 chainCtx,
-		signatureAggregator:          signatureAggregator,
-		requirePrimaryNetworkSigners: requirePrimaryNetworkSigners,
+		backend:             backend,
+		chainContext:        chainCtx,
+		signatureAggregator: signatureAggregator,
 	}
 }
 
@@ -108,8 +105,7 @@ func (a *API) aggregateSignatures(ctx context.Context, unsignedMessage *warp.Uns
 		return nil, err
 	}
 
-	state := warpValidators.NewState(validatorState, a.chainContext.SubnetID, a.chainContext.ChainID, a.requirePrimaryNetworkSigners())
-	validatorSet, err := warp.GetCanonicalValidatorSetFromSubnetID(ctx, state, pChainHeight, subnetID)
+	validatorSet, err := warp.GetCanonicalValidatorSetFromSubnetID(ctx, validatorState, pChainHeight, subnetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get validator set: %w", err)
 	}
