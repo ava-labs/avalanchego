@@ -48,7 +48,7 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 		// Issue a transaction to the C-Chain to advance past genesis block
 		issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
 
-		proposerClient := proposervm.NewClient(nodeURI.URI, "C")
+		proposerClient := proposervm.NewJSONRPCClient(nodeURI.URI, "C")
 
 		initialEpoch, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
 		require.NoError(err)

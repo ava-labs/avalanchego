@@ -78,7 +78,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			baseWallet     = e2e.NewWallet(tc, keychain, nodeURI)
 			pWallet        = baseWallet.P()
 			pClient        = platformvm.NewClient(nodeURI.URI)
-			proposerClient = proposervm.NewClient(nodeURI.URI, "P")
+			proposerClient = proposervm.NewJSONRPCClient(nodeURI.URI, "P")
 			infoClient     = info.NewClient(nodeURI.URI)
 			owner          = &secp256k1fx.OutputOwners{
 				Threshold: 1,
