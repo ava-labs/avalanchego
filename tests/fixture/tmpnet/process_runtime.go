@@ -125,13 +125,12 @@ func (p *ProcessRuntime) Start(ctx context.Context) error {
 		return stacktrace.Errorf("writing node flags: %w", err)
 	}
 
-	// All arguments are provided in the flags file.
-	//
 	// Ensure process is detached from the parent process so that an error in the
 	// parent will not affect the child.
 	cmd := exec.CommandContext(
 		context.WithoutCancel(ctx),
 		runtimeConfig.AvalancheGoPath,
+		// All arguments are provided in the flags file
 		"--config-file",
 		p.node.GetFlagsPath(),
 	) // #nosec G204
