@@ -505,8 +505,6 @@ func TestMakeEpoch(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			require := require.New(t)
-
 			epoch := makeEpoch(
 				upgradetest.GetConfig(test.fork),
 				test.parentPChainHeight,
@@ -514,7 +512,7 @@ func TestMakeEpoch(t *testing.T) {
 				test.parentTimestamp,
 				test.childTimestamp,
 			)
-			require.Equal(test.expected, epoch)
+			require.Equal(t, test.expected, epoch)
 		})
 	}
 }
