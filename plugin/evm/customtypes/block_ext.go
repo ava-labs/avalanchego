@@ -16,3 +16,12 @@ func BlockGasCost(b *ethtypes.Block) *big.Int {
 	}
 	return new(big.Int).Set(cost)
 }
+
+func BlockTimeMilliseconds(b *ethtypes.Block) *uint64 {
+	var time *uint64
+	if t := GetHeaderExtra(b.Header()).TimeMilliseconds; t != nil {
+		time = new(uint64)
+		*time = *t
+	}
+	return time
+}

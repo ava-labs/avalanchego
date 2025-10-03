@@ -55,6 +55,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/txpool"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customheader"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/holiman/uint256"
 )
@@ -137,15 +138,25 @@ func (w *worker) setEtherbase(addr common.Address) {
 func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateContext) (*types.Block, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-
-	tstart := w.clock.Time()
-	timestamp := uint64(tstart.Unix())
-	parent := w.chain.CurrentBlock()
+	var (
+		parent      = w.chain.CurrentBlock()
+		tstart      = w.clock.Time()
+		timestamp   = uint64(tstart.Unix())
+		timestampMS = uint64(tstart.UnixMilli())
+		chainExtra  = params.GetExtra(w.chainConfig)
+	)
 	// Note: in order to support asynchronous block production, blocks are allowed to have
 	// the same timestamp as their parent. This allows more than one block to be produced
 	// per second.
 	if parent.Time >= timestamp {
 		timestamp = parent.Time
+		// If the parent has a TimeMilliseconds, use it. Otherwise, use the parent time * 1000.
+		parentExtra := customtypes.GetHeaderExtra(parent)
+		if parentExtra.TimeMilliseconds != nil {
+			timestampMS = *parentExtra.TimeMilliseconds
+		} else {
+			timestampMS = parent.Time * 1000 // TODO: establish minimum time
+		}
 	}
 
 	// The fee manager relies on the state of the parent block to set the fee config
@@ -184,6 +195,12 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 		header.BlobGasUsed = new(uint64)
 		header.ExcessBlobGas = &excessBlobGas
 		header.ParentBeaconRoot = w.beaconRoot
+	}
+
+	// Add TimeMilliseconds if Granite is active.
+	if chainExtra.IsGranite(header.Time) {
+		headerExtra := customtypes.GetHeaderExtra(header)
+		headerExtra.TimeMilliseconds = &timestampMS
 	}
 
 	if w.coinbase == (common.Address{}) {
