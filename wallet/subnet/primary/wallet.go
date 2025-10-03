@@ -82,7 +82,7 @@ func MakeWallet(
 	ctx context.Context,
 	uri string,
 	avaxKeychain keychain.Keychain,
-	ethKeychain c.EthKeychain,
+	ethKeychain keychain.EthKeychain,
 	config WalletConfig,
 ) (*Wallet, error) {
 	avaxAddrs := avaxKeychain.Addresses()
