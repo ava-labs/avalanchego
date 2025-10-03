@@ -223,7 +223,7 @@ mod ethhash {
             self
         }
 
-        pub(crate) fn into_triehash(self) -> TrieHash {
+        pub fn into_triehash(self) -> TrieHash {
             self.into()
         }
     }

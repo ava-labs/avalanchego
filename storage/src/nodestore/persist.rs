@@ -29,9 +29,9 @@
 
 use std::iter::FusedIterator;
 
-use crate::firewood_counter;
 use crate::linear::FileIoError;
 use crate::nodestore::AreaIndex;
+use crate::{Child, firewood_counter};
 use coarsetime::Instant;
 
 #[cfg(feature = "io-uring")]
@@ -288,11 +288,7 @@ impl<S: WritableStorage + 'static> NodeStore<Committed, S> {
         self.header = self.flush_nodes()?;
 
         // Set the root address in the header based on the persisted root
-        let root_address = self
-            .kind
-            .root
-            .as_ref()
-            .and_then(crate::MaybePersistedNode::as_linear_address);
+        let root_address = self.kind.root.as_ref().and_then(Child::persisted_address);
         self.header.set_root_address(root_address);
 
         // Finally persist the header
@@ -707,7 +703,10 @@ mod tests {
 
         // Verify the committed store has the expected values
         let root = committed_store.kind.root.as_ref().unwrap();
-        let root_node = root.as_shared_node(&committed_store).unwrap();
+        let root_maybe_persisted = root.as_maybe_persisted_node();
+        let root_node = root_maybe_persisted
+            .as_shared_node(&committed_store)
+            .unwrap();
         assert_eq!(*root_node.partial_path(), Path::from(&[0]));
         assert_eq!(root_node.value(), Some(&b"branch_value"[..]));
         assert!(root_node.is_branch());
@@ -718,16 +717,16 @@ mod tests {
         );
 
         let child1 = root_branch.children[1].as_ref().unwrap();
-        let child1_node = child1
-            .as_maybe_persisted_node()
+        let child1_maybe_persisted = child1.as_maybe_persisted_node();
+        let child1_node = child1_maybe_persisted
             .as_shared_node(&committed_store)
             .unwrap();
         assert_eq!(*child1_node.partial_path(), Path::from(&[1, 2, 3]));
         assert_eq!(child1_node.value(), Some(&b"value1"[..]));
 
         let child2 = root_branch.children[2].as_ref().unwrap();
-        let child2_node = child2
-            .as_maybe_persisted_node()
+        let child2_maybe_persisted = child2.as_maybe_persisted_node();
+        let child2_node = child2_maybe_persisted
             .as_shared_node(&committed_store)
             .unwrap();
         assert_eq!(*child2_node.partial_path(), Path::from(&[4, 5, 6]));

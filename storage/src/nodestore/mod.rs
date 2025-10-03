@@ -89,7 +89,9 @@ use std::sync::Arc;
 use crate::hashednode::hash_node;
 use crate::node::Node;
 use crate::node::persist::MaybePersistedNode;
-use crate::{CacheReadStrategy, FileIoError, Path, ReadableStorage, SharedNode, TrieHash};
+use crate::{
+    CacheReadStrategy, Child, FileIoError, HashType, Path, ReadableStorage, SharedNode, TrieHash,
+};
 
 use super::linear::WritableStorage;
 
@@ -121,16 +123,15 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
             header,
             kind: Committed {
                 deleted: Box::default(),
-                root_hash: None,
-                root: header.root_address().map(Into::into),
+                root: None,
             },
             storage,
         };
 
-        if let Some(root_address) = nodestore.header.root_address() {
+        if let Some(root_address) = header.root_address() {
             let node = nodestore.read_node_from_disk(root_address, "open");
             let root_hash = node.map(|n| hash_node(&n, &Path(SmallVec::default())))?;
-            nodestore.kind.root_hash = Some(root_hash.into_triehash());
+            nodestore.kind.root = Some(Child::AddressWithHash(root_address, root_hash));
         }
 
         Ok(nodestore)
@@ -150,7 +151,6 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
             storage,
             kind: Committed {
                 deleted: Box::default(),
-                root_hash: None,
                 root: None,
             },
         })
@@ -177,10 +177,12 @@ impl Parentable for Arc<ImmutableProposal> {
         NodeStoreParent::Proposed(Arc::clone(self))
     }
     fn root_hash(&self) -> Option<TrieHash> {
-        self.root_hash.clone()
+        self.root
+            .as_ref()
+            .and_then(|root| root.hash().cloned().map(HashType::into_triehash))
     }
     fn root(&self) -> Option<MaybePersistedNode> {
-        self.root.clone()
+        self.root.as_ref().map(Child::as_maybe_persisted_node)
     }
 }
 
@@ -204,13 +206,19 @@ impl<S> NodeStore<Arc<ImmutableProposal>, S> {
 
 impl Parentable for Committed {
     fn as_nodestore_parent(&self) -> NodeStoreParent {
-        NodeStoreParent::Committed(self.root_hash.clone())
+        NodeStoreParent::Committed(
+            self.root
+                .as_ref()
+                .and_then(|root| root.hash().cloned().map(HashType::into_triehash)),
+        )
     }
     fn root_hash(&self) -> Option<TrieHash> {
-        self.root_hash.clone()
+        self.root
+            .as_ref()
+            .and_then(|root| root.hash().cloned().map(HashType::into_triehash))
     }
     fn root(&self) -> Option<MaybePersistedNode> {
-        self.root.clone()
+        self.root.as_ref().map(Child::as_maybe_persisted_node)
     }
 }
 
@@ -353,21 +361,10 @@ pub trait RootReader {
 }
 
 /// A committed revision of a merkle trie.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Committed {
     deleted: Box<[MaybePersistedNode]>,
-    root_hash: Option<TrieHash>,
-    root: Option<MaybePersistedNode>,
-}
-
-impl Clone for Committed {
-    fn clone(&self) -> Self {
-        Self {
-            deleted: self.deleted.clone(),
-            root_hash: self.root_hash.clone(),
-            root: self.root.clone(),
-        }
-    }
+    root: Option<Child>,
 }
 
 #[derive(Clone, Debug)]
@@ -395,10 +392,8 @@ pub struct ImmutableProposal {
     deleted: Box<[MaybePersistedNode]>,
     /// The parent of this proposal.
     parent: Arc<ArcSwap<NodeStoreParent>>,
-    /// The hash of the root node for this proposal
-    root_hash: Option<TrieHash>,
-    /// The root node, either in memory or on disk
-    root: Option<MaybePersistedNode>,
+    /// The root of the trie in this proposal.
+    root: Option<Child>,
 }
 
 impl ImmutableProposal {
@@ -482,7 +477,6 @@ impl<S: WritableStorage> From<NodeStore<ImmutableProposal, S>> for NodeStore<Com
             header: val.header,
             kind: Committed {
                 deleted: val.kind.deleted.clone(),
-                root_hash: val.kind.root_hash.clone(),
                 root: val.kind.root.clone(),
             },
             storage: val.storage,
@@ -510,7 +504,6 @@ impl<S: WritableStorage> NodeStore<Arc<ImmutableProposal>, S> {
             header: current_revision.header,
             kind: Committed {
                 deleted: self.kind.deleted.clone(),
-                root_hash: self.kind.root_hash.clone(),
                 root: self.kind.root.clone(),
             },
             storage: self.storage.clone(),
@@ -535,7 +528,6 @@ impl<S: ReadableStorage> TryFrom<NodeStore<MutableProposal, S>>
             kind: Arc::new(ImmutableProposal {
                 deleted: kind.deleted.into(),
                 parent: Arc::new(ArcSwap::new(Arc::new(kind.parent))),
-                root_hash: None,
                 root: None,
             }),
             storage,
@@ -558,8 +550,7 @@ impl<S: ReadableStorage> TryFrom<NodeStore<MutableProposal, S>>
         nodestore.kind = Arc::new(ImmutableProposal {
             deleted: immutable_proposal.deleted.clone(),
             parent: immutable_proposal.parent.clone(),
-            root_hash: Some(root_hash.into_triehash()),
-            root: Some(root),
+            root: Some(Child::MaybePersisted(root, root_hash)),
         });
 
         Ok(nodestore)
@@ -593,20 +584,28 @@ impl<S: ReadableStorage> RootReader for NodeStore<MutableProposal, S> {
 impl<S: ReadableStorage> RootReader for NodeStore<Committed, S> {
     fn root_node(&self) -> Option<SharedNode> {
         // TODO: If the read_node fails, we just say there is no root; this is incorrect
-        self.kind.root.as_ref()?.as_shared_node(self).ok()
+        self.kind
+            .root
+            .as_ref()
+            .map(Child::as_maybe_persisted_node)
+            .and_then(|node| node.as_shared_node(self).ok())
     }
     fn root_as_maybe_persisted_node(&self) -> Option<MaybePersistedNode> {
-        self.kind.root.clone()
+        self.kind.root.as_ref().map(Child::as_maybe_persisted_node)
     }
 }
 
 impl<S: ReadableStorage> RootReader for NodeStore<Arc<ImmutableProposal>, S> {
     fn root_node(&self) -> Option<SharedNode> {
         // Use the MaybePersistedNode's as_shared_node method to get the root
-        self.kind.root.as_ref()?.as_shared_node(self).ok()
+        self.kind
+            .root
+            .as_ref()
+            .map(Child::as_maybe_persisted_node)
+            .and_then(|node| node.as_shared_node(self).ok())
     }
     fn root_as_maybe_persisted_node(&self) -> Option<MaybePersistedNode> {
-        self.kind.root.clone()
+        self.kind.root.as_ref().map(Child::as_maybe_persisted_node)
     }
 }
 
