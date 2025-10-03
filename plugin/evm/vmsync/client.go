@@ -210,20 +210,22 @@ func (client *client) registerSyncers(registry *SyncerRegistry) error {
 }
 
 func (client *client) createBlockSyncer(fromHash common.Hash, fromHeight uint64) (syncpkg.Syncer, error) {
-	return blocksync.NewSyncer(client.Client, client.ChainDB, blocksync.Config{
-		FromHash:      fromHash,
-		FromHeight:    fromHeight,
-		BlocksToFetch: BlocksToFetch,
-	})
+	return blocksync.NewSyncer(
+		client.Client,
+		client.ChainDB,
+		fromHash,
+		fromHeight,
+		BlocksToFetch,
+	)
 }
 
-func (client *client) createEVMSyncer(fetcher *statesync.CodeQueue) (syncpkg.Syncer, error) {
+func (client *client) createEVMSyncer(queue *statesync.CodeQueue) (syncpkg.Syncer, error) {
 	return statesync.NewSyncer(
 		client.Client,
 		client.ChainDB,
 		client.summary.GetBlockRoot(),
-		fetcher,
-		statesync.NewDefaultConfig(client.RequestSize),
+		queue,
+		client.RequestSize,
 	)
 }
 

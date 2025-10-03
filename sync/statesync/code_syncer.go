@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/options"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
@@ -43,51 +44,61 @@ type CodeSyncer struct {
 	inFlight sync.Map // key: common.Hash, value: struct{}
 }
 
-// Name returns the human-readable name for this sync task.
-func (*CodeSyncer) Name() string { return "Code Syncer" }
-
-// ID returns the stable identifier for this sync task.
-func (*CodeSyncer) ID() string { return "state_code_sync" }
+// codeSyncerConfig carries construction-time options for code syncer.
+type codeSyncerConfig struct {
+	numWorkers       int
+	codeHashesPerReq int
+}
 
 // CodeSyncerOption configures CodeSyncer at construction time.
-type CodeSyncerOption func(*CodeSyncer)
+type CodeSyncerOption = options.Option[codeSyncerConfig]
 
-// WithNumCodeFetchingWorkers overrides the number of concurrent workers.
-func WithNumCodeFetchingWorkers(n int) CodeSyncerOption {
-	return func(c *CodeSyncer) {
+// WithNumWorkers overrides the number of concurrent workers.
+func WithNumWorkers(n int) CodeSyncerOption {
+	return options.Func[codeSyncerConfig](func(c *codeSyncerConfig) {
 		if n > 0 {
 			c.numWorkers = n
 		}
-	}
+	})
 }
 
 // WithCodeHashesPerRequest sets the best-effort target batch size per request.
 // The final batch may contain fewer than the configured number if insufficient
 // hashes remain when the channel is closed.
 func WithCodeHashesPerRequest(n int) CodeSyncerOption {
-	return func(c *CodeSyncer) {
+	return options.Func[codeSyncerConfig](func(c *codeSyncerConfig) {
 		if n > 0 {
 			c.codeHashesPerReq = n
 		}
-	}
+	})
 }
 
 // NewCodeSyncer allows external packages (e.g., registry wiring) to create a code syncer
 // that consumes hashes from a provided fetcher queue.
 func NewCodeSyncer(client statesyncclient.Client, db ethdb.Database, codeHashes <-chan common.Hash, opts ...CodeSyncerOption) (*CodeSyncer, error) {
-	c := &CodeSyncer{
-		db:               db,
-		client:           client,
-		codeHashes:       codeHashes,
+	cfg := codeSyncerConfig{
 		numWorkers:       defaultNumCodeFetchingWorkers,
 		codeHashesPerReq: message.MaxCodeHashesPerRequest,
 	}
+	options.ApplyTo(&cfg, opts...)
 
-	for _, opt := range opts {
-		opt(c)
-	}
+	return &CodeSyncer{
+		db:               db,
+		client:           client,
+		codeHashes:       codeHashes,
+		numWorkers:       cfg.numWorkers,
+		codeHashesPerReq: cfg.codeHashesPerReq,
+	}, nil
+}
 
-	return c, nil
+// Name returns the human-readable name for this sync task.
+func (*CodeSyncer) Name() string {
+	return "Code Syncer"
+}
+
+// ID returns the stable identifier for this sync task.
+func (*CodeSyncer) ID() string {
+	return "state_code_sync"
 }
 
 // Sync starts the worker thread and populates the code hashes queue with active work.

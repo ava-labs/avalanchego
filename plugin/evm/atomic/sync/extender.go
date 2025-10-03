@@ -9,8 +9,8 @@ import (
 
 	"github.com/ava-labs/coreth/plugin/evm/atomic/state"
 	"github.com/ava-labs/coreth/plugin/evm/message"
+	"github.com/ava-labs/coreth/sync"
 
-	synccommon "github.com/ava-labs/coreth/sync"
 	syncclient "github.com/ava-labs/coreth/sync/client"
 )
 
@@ -29,17 +29,20 @@ func (a *Extender) Initialize(backend *state.AtomicBackend, trie *state.AtomicTr
 }
 
 // CreateSyncer creates the atomic syncer with the given client and verDB.
-func (a *Extender) CreateSyncer(client syncclient.LeafClient, verDB *versiondb.Database, summary message.Syncable) (synccommon.Syncer, error) {
+func (a *Extender) CreateSyncer(client syncclient.LeafClient, verDB *versiondb.Database, summary message.Syncable) (sync.Syncer, error) {
 	atomicSummary, ok := summary.(*Summary)
 	if !ok {
 		return nil, fmt.Errorf("expected *Summary, got %T", summary)
 	}
 
-	return newSyncer(client, verDB, a.trie, atomicSummary.AtomicRoot, &Config{
-		TargetHeight: atomicSummary.BlockNumber,
-		RequestSize:  a.requestSize,
-		NumWorkers:   defaultNumWorkers,
-	})
+	return NewSyncer(
+		client,
+		verDB,
+		a.trie,
+		atomicSummary.AtomicRoot,
+		atomicSummary.BlockNumber,
+		WithRequestSize(a.requestSize),
+	)
 }
 
 // OnFinishBeforeCommit implements the sync.Extender interface by marking the previously last accepted block for the shared memory cursor.
