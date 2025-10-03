@@ -146,7 +146,6 @@ func (vm *VM) Initialize(
 ) error {
 	vm.ctx = chainCtx
 	vm.db = versiondb.New(prefixdb.New(dbPrefix, db))
-
 	baseState, err := state.NewMetered(vm.db, "state", vm.Config.Registerer)
 	if err != nil {
 		return err
@@ -247,7 +246,6 @@ func (vm *VM) Shutdown(ctx context.Context) error {
 	return vm.ChainVM.Shutdown(ctx)
 }
 
-// overrides ChainVM.CreateHandlers to expose the proposervm API path
 func (vm *VM) CreateHandlers(ctx context.Context) (map[string]http.Handler, error) {
 	handlers, err := vm.ChainVM.CreateHandlers(ctx)
 	if err != nil {

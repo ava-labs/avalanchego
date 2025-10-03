@@ -547,7 +547,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	slb2, err := statelessblock.Build(
 		proVM.preferred,
 		blkTimestamp,
-		100, // pChainHeight,
+		200, // pChainHeight,
 		statelessblock.Epoch{},
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
