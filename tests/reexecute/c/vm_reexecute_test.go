@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/ava-labs/coreth/plugin/factory"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
@@ -94,6 +95,8 @@ var (
 )
 
 func TestMain(m *testing.M) {
+	evm.RegisterAllLibEVMExtras()
+
 	flag.StringVar(&blockDirArg, "block-dir", blockDirArg, "Block DB directory to read from during re-execution.")
 	flag.StringVar(&currentStateDirArg, "current-state-dir", currentStateDirArg, "Current state directory including VM DB and Chain Data Directory for re-execution.")
 	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (exclusive).")
