@@ -528,8 +528,6 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 		},
 	}
 
-	// set VM to be ready to build next block. We set it to generate unsigned blocks
-	// for simplicity.
 	parentBlkPChainHeight := parentBlk.(*postForkBlock).PChainHeight()
 	{
 		// child P-Chain height must not precede parent P-Chain height
