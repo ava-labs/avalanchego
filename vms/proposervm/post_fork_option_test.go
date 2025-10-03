@@ -106,13 +106,12 @@ func TestBlockVerify_PostForkOption_ParentChecks(t *testing.T) {
 
 	// show we can build on options
 	require.NoError(proVM.SetPreference(context.Background(), opts[0].ID()))
+	require.NoError(proVM.waitForProposerWindow())
 
 	childCoreBlk := snowmantest.BuildChild(preferredBlk)
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return childCoreBlk, nil
 	}
-	require.NoError(waitForProposerWindow(proVM, opts[0], postForkOracleBlk.PChainHeight()))
-
 	proChild, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 	require.IsType(&postForkBlock{}, proChild)
