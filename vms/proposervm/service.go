@@ -132,31 +132,28 @@ func (j *jsonrpcService) GetCurrentEpoch(r *http.Request, _ *struct{}, reply *Ge
 }
 
 func (vm *VM) getCurrentEpoch(ctx context.Context) (block.Epoch, error) {
-	// This will error if we haven't advanced past the genesis block.
-	lastAccepted, err := vm.GetLastAccepted()
+	vm.ctx.Lock.Lock()
+	defer vm.ctx.Lock.Unlock()
+
+	blk, err := vm.getBlock(ctx, vm.preferred)
 	if err != nil {
-		return block.Epoch{}, fmt.Errorf("couldn't get last accepted block ID: %w", err)
+		return block.Epoch{}, fmt.Errorf("couldn't get preferred block: %w", err)
 	}
 
-	latestBlock, err := vm.getPostForkBlock(ctx, lastAccepted)
+	epoch, err := blk.pChainEpoch(ctx)
 	if err != nil {
-		return block.Epoch{}, fmt.Errorf("couldn't get latest block: %w", err)
+		return block.Epoch{}, fmt.Errorf("couldn't get preferred block epoch: %w", err)
 	}
 
-	epoch, err := latestBlock.pChainEpoch(ctx)
+	pChainHeight, err := blk.pChainHeight(ctx)
 	if err != nil {
-		return block.Epoch{}, fmt.Errorf("couldn't get latest block epoch: %w", err)
-	}
-
-	pChainHeight, err := latestBlock.pChainHeight(ctx)
-	if err != nil {
-		return block.Epoch{}, fmt.Errorf("couldn't get latest block p-chain height: %w", err)
+		return block.Epoch{}, fmt.Errorf("couldn't get preferred block p-chain height: %w", err)
 	}
 
 	return nextPChainEpoch(
 		pChainHeight,
 		epoch,
-		latestBlock.Timestamp(),
+		blk.Timestamp(),
 		vm.Upgrades.GraniteEpochDuration,
 	), nil
 }
