@@ -22,11 +22,7 @@ func testBlockState(require *require.Assertions, bs BlockState) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
-	pChainEpoch := block.Epoch{
-		PChainHeight: 2,
-		Number:       1,
-		StartTime:    timestamp.Unix(),
-	}
+	pChainEpoch := block.Epoch{}
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
 
