@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
 
@@ -18,6 +19,8 @@ import (
 )
 
 func main() {
+	evm.RegisterAllLibEVMExtras()
+
 	fs := config.BuildFlagSet()
 	v, err := config.BuildViper(fs, os.Args[1:])
 
