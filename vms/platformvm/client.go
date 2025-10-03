@@ -503,7 +503,7 @@ func (c *Client) GetAllValidatorsAt(
 	err := c.Requester.SendRequest(ctx, "platform.getAllValidatorsAt", &GetAllValidatorsAtArgs{
 		Height: height,
 	}, res, options...)
-	return res.Validators, err
+	return res.ValidatorSets, err
 }
 
 // GetValidatorsAt returns the weights of the validator set of a provided subnet

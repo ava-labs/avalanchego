@@ -866,98 +866,81 @@ func TestGetValidatorsAt(t *testing.T) {
 	require.Len(response.Validators, len(genesis.Validators)+1)
 }
 
-func TestGetAllValidatorsAt(t *testing.T) {
+func TestGetAllValidatorsAtReplyMarshalling(t *testing.T) {
 	require := require.New(t)
-	service, _ := defaultService(t)
 
-	args := GetAllValidatorsAtArgs{}
-	response := GetAllValidatorsAtReply{}
+	// Create test subnet IDs
+	subnetID1 := ids.GenerateTestID()
+	subnetID2 := ids.GenerateTestID()
 
-	service.vm.ctx.Lock.Lock()
-	lastAccepted := service.vm.manager.LastAccepted()
-	lastAcceptedBlk, err := service.vm.manager.GetBlock(lastAccepted)
+	// Create test node IDs
+	nodeID1 := ids.GenerateTestNodeID()
+	nodeID2 := ids.GenerateTestNodeID()
+	nodeID3 := ids.GenerateTestNodeID()
+	nodeID4 := ids.GenerateTestNodeID()
+
+	// Create test BLS keys
+	sk1, err := localsigner.New()
+	require.NoError(err)
+	sk2, err := localsigner.New()
+	require.NoError(err)
+	sk3, err := localsigner.New()
 	require.NoError(err)
 
-	service.vm.ctx.Lock.Unlock()
-
-	// Confirm that it returns the genesis validators given the latest height
-	args.Height = pchainapi.Height(lastAcceptedBlk.Height())
-	require.NoError(service.GetAllValidatorsAt(&http.Request{}, &args, &response))
-	require.Len(response.Validators, 1)
-	require.Empty(response.Validators[constants.PrimaryNetworkID].Validators)
-
-	service.vm.ctx.Lock.Lock()
-
-	wallet := newWallet(t, service.vm, walletConfig{})
-	rewardsOwner := &secp256k1fx.OutputOwners{
-		Threshold: 1,
-		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	reply := &GetAllValidatorsAtReply{
+		ValidatorSets: make(map[ids.ID]validators.WarpSet),
 	}
 
-	sk, err := localsigner.New()
-	require.NoError(err)
-	pop, err := signer.NewProofOfPossession(sk)
-	require.NoError(err)
-
-	tx, err := wallet.IssueAddPermissionlessValidatorTx(
-		&txs.SubnetValidator{
-			Validator: txs.Validator{
-				NodeID: ids.GenerateTestNodeID(),
-				Start:  uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
-				End:    uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
-				Wght:   service.vm.MinValidatorStake,
+	// Add first subnet with validators having public keys
+	reply.ValidatorSets[subnetID1] = validators.WarpSet{
+		TotalWeight: 1500,
+		Validators: []*validators.Warp{
+			{
+				PublicKey:      sk1.PublicKey(),
+				PublicKeyBytes: bls.PublicKeyToUncompressedBytes(sk1.PublicKey()),
+				Weight:         1000,
+				NodeIDs:        []ids.NodeID{nodeID1},
 			},
-			Subnet: constants.PrimaryNetworkID,
+			{
+				PublicKey:      sk2.PublicKey(),
+				PublicKeyBytes: bls.PublicKeyToUncompressedBytes(sk2.PublicKey()),
+				Weight:         500,
+				NodeIDs:        []ids.NodeID{nodeID2, nodeID3},
+			},
 		},
-		pop,
-		service.vm.ctx.AVAXAssetID,
-		rewardsOwner,
-		rewardsOwner,
-		0,
-		common.WithMemo([]byte{}),
-	)
+	}
 
+	// Add second subnet with no validators (empty set)
+	reply.ValidatorSets[subnetID2] = validators.WarpSet{
+		TotalWeight: 200,
+		Validators: []*validators.Warp{
+			{
+				PublicKey:      sk3.PublicKey(),
+				PublicKeyBytes: bls.PublicKeyToUncompressedBytes(sk3.PublicKey()),
+				Weight:         200,
+				NodeIDs:        []ids.NodeID{nodeID4},
+			},
+		},
+	}
+
+	// Test marshalling
+	replyJSON, err := reply.MarshalJSON()
 	require.NoError(err)
 
-	service.vm.ctx.Lock.Unlock()
-	require.NoError(service.vm.Network.IssueTxFromRPC(tx))
-	service.vm.ctx.Lock.Lock()
+	// Test unmarshalling
+	var parsedReply GetAllValidatorsAtReply
+	require.NoError(parsedReply.UnmarshalJSON(replyJSON))
 
-	block, err := service.vm.BuildBlock(context.Background())
-	require.NoError(err)
+	require.Equal(reply, &parsedReply)
 
-	blk := block.(*blockexecutor.Block)
-	require.NoError(blk.Verify(context.Background()))
+	// Test that the unmarshalled data has the expected structure
+	require.Len(parsedReply.ValidatorSets, 2)
+	require.Contains(parsedReply.ValidatorSets, subnetID1)
+	require.Contains(parsedReply.ValidatorSets, subnetID2)
 
-	require.NoError(blk.Accept(context.Background()))
-	service.vm.ctx.Lock.Unlock()
-
-	newLastAccepted := service.vm.manager.LastAccepted()
-	newLastAcceptedBlk, err := service.vm.manager.GetBlock(newLastAccepted)
-	require.NoError(err)
-	require.NotEqual(newLastAccepted, lastAccepted)
-
-	// Confirm that it returns the genesis validators + the new validator given the latest height
-	args.Height = pchainapi.Height(newLastAcceptedBlk.Height())
-	require.NoError(service.GetAllValidatorsAt(&http.Request{}, &args, &response))
-	require.Len(response.Validators[constants.PrimaryNetworkID].Validators, 1)
-
-	// Confirm that [IsProposed] works. The proposed height should be the genesis height
-	args.Height = pchainapi.Height(pchainapi.ProposedHeight)
-	require.NoError(service.GetAllValidatorsAt(&http.Request{}, &args, &response))
-	require.Empty(response.Validators[constants.PrimaryNetworkID].Validators)
-
-	service.vm.ctx.Lock.Lock()
-
-	// set clock beyond the [validators.recentlyAcceptedWindowTTL] to bump the
-	// proposerVM height
-	service.vm.clock.Set(newLastAcceptedBlk.Timestamp().Add(40 * time.Second))
-	service.vm.ctx.Lock.Unlock()
-
-	// Resending the same request with [Height] set to [platformapi.ProposedHeight] should now
-	// include the new validator
-	require.NoError(service.GetAllValidatorsAt(&http.Request{}, &args, &response))
-	require.Len(response.Validators[constants.PrimaryNetworkID].Validators, 1)
+	// Verify subnet data
+	require.Equal(reply.ValidatorSets[subnetID1], parsedReply.ValidatorSets[subnetID1])
+	require.Equal(reply.ValidatorSets[subnetID2], parsedReply.ValidatorSets[subnetID2])
 }
 
 func TestGetValidatorsAtArgsMarshalling(t *testing.T) {

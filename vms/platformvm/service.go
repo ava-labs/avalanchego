@@ -1789,7 +1789,7 @@ type GetAllValidatorsAtArgs struct {
 
 // GetAllValidatorsAtReply is the response from GetAllValidatorsAt
 type GetAllValidatorsAtReply struct {
-	Validators map[ids.ID]validators.WarpSet `json:"validators"`
+	ValidatorSets map[ids.ID]validators.WarpSet `json:"validatorSets"`
 }
 
 type jsonWarpSet struct {
@@ -1826,7 +1826,7 @@ func (s *Service) GetAllValidatorsAt(r *http.Request, args *GetAllValidatorsAtAr
 		}
 	}
 
-	reply.Validators, err = s.vm.GetWarpValidatorSets(ctx, height)
+	reply.ValidatorSets, err = s.vm.GetWarpValidatorSets(ctx, height)
 	if err != nil {
 		return fmt.Errorf("failed to get validator set: %w", err)
 	}
@@ -1834,16 +1834,18 @@ func (s *Service) GetAllValidatorsAt(r *http.Request, args *GetAllValidatorsAtAr
 }
 
 func (v *GetAllValidatorsAtReply) MarshalJSON() ([]byte, error) {
-	m := make(map[ids.ID]*jsonWarpSet, len(v.Validators))
-	for subnetID, vdrs := range v.Validators {
-		vdrJSON := &jsonWarpSet{
+	m := make(map[ids.ID]*jsonWarpSet, len(v.ValidatorSets))
+	for subnetID, vdrs := range v.ValidatorSets {
+		jsonWarpSet := &jsonWarpSet{
 			TotalWeight: avajson.Uint64(vdrs.TotalWeight),
+			Validators:  make([]*jsonWarpValidatorOutput, len(vdrs.Validators)),
 		}
 
-		for _, vdr := range vdrs.Validators {
-			if vdrJSON.Validators == nil {
-				vdrJSON.Validators = make([]*jsonWarpValidatorOutput, len(vdrs.Validators))
+		for i, vdr := range vdrs.Validators {
+			if vdr == nil {
+				continue
 			}
+
 			vdrJ := &jsonWarpValidatorOutput{
 				Weight:  avajson.Uint64(vdr.Weight),
 				NodeIDs: vdr.NodeIDs,
@@ -1858,10 +1860,10 @@ func (v *GetAllValidatorsAtReply) MarshalJSON() ([]byte, error) {
 				vdrJ.PublicKey = &pk
 			}
 
-			vdrJSON.Validators = append(vdrJSON.Validators, vdrJ)
+			jsonWarpSet.Validators[i] = vdrJ
 		}
 
-		m[subnetID] = vdrJSON
+		m[subnetID] = jsonWarpSet
 	}
 	return json.Marshal(m)
 }
@@ -1873,38 +1875,45 @@ func (v *GetAllValidatorsAtReply) UnmarshalJSON(b []byte) error {
 	}
 
 	if m == nil {
-		v.Validators = nil
+		v.ValidatorSets = nil
 		return nil
 	}
 
-	v.Validators = make(map[ids.ID]validators.WarpSet, len(m))
+	v.ValidatorSets = make(map[ids.ID]validators.WarpSet, len(m))
 	for subnetID, vdrJSON := range m {
 		warpSet := validators.WarpSet{
 			TotalWeight: uint64(vdrJSON.TotalWeight),
 			Validators:  make([]*validators.Warp, len(vdrJSON.Validators)),
 		}
 
-		for _, vdr := range vdrJSON.Validators {
-			warp := &validators.Warp{
-				Weight:  uint64(vdr.Weight),
-				NodeIDs: vdr.NodeIDs,
+		for i, vdrJSON := range vdrJSON.Validators {
+			if vdrJSON == nil {
+				continue
 			}
 
-			if vdr.PublicKey != nil {
-				pkBytes, err := formatting.Decode(formatting.HexNC, *vdr.PublicKey)
+			warp := &validators.Warp{
+				Weight:  uint64(vdrJSON.Weight),
+				NodeIDs: vdrJSON.NodeIDs,
+			}
+
+			if vdrJSON.PublicKey != nil {
+				pkBytes, err := formatting.Decode(formatting.HexNC, *vdrJSON.PublicKey)
 				if err != nil {
 					return err
 				}
+
 				warp.PublicKey, err = bls.PublicKeyFromCompressedBytes(pkBytes)
 				if err != nil {
 					return err
 				}
+
+				warp.PublicKeyBytes = warp.PublicKey.Serialize()
 			}
 
-			warpSet.Validators = append(warpSet.Validators, warp)
+			warpSet.Validators[i] = warp
 		}
 
-		v.Validators[subnetID] = warpSet
+		v.ValidatorSets[subnetID] = warpSet
 	}
 	return nil
 }
