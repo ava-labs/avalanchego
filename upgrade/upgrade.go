@@ -37,6 +37,7 @@ var (
 		EtnaTime:                  time.Date(2024, time.December, 16, 17, 0, 0, 0, time.UTC),
 		FortunaTime:               time.Date(2025, time.April, 8, 15, 0, 0, 0, time.UTC),
 		GraniteTime:               UnscheduledActivationTime,
+		GraniteEpochDuration:      5 * time.Minute,
 	}
 	Fuji = Config{
 		ApricotPhase1Time:            time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
@@ -59,6 +60,7 @@ var (
 		EtnaTime:                  time.Date(2024, time.November, 25, 16, 0, 0, 0, time.UTC),
 		FortunaTime:               time.Date(2025, time.March, 13, 15, 0, 0, 0, time.UTC),
 		GraniteTime:               UnscheduledActivationTime,
+		GraniteEpochDuration:      5 * time.Minute,
 	}
 	Default = Config{
 		ApricotPhase1Time:            InitiallyActiveTime,
