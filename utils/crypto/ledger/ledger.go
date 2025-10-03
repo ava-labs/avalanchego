@@ -36,7 +36,9 @@ func retryOnHIDAPIError(fn func() error) error {
 			return nil
 		}
 
-		// Check if the error is HIDAPI failure message or APDU 0x6987
+		// These errors indicate transient USB communication issues that often resolve on retry:
+		// - "hidapi: unknown failure": USB communication error from the HIDAPI library
+		// - APDU 0x6987: "Interrupted execution" - occurs when the device is busy or communication is disrupted
 		if err.Error() == "hidapi: unknown failure" || err.Error() == "APDU Error Code from Ledger Device: 0x6987" {
 			if attempt < maxRetries {
 				// Calculate backoff delay: 200ms, 400ms, 600ms, 800ms
