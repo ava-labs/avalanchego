@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/ava-labs/coreth/ethclient"
-	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
@@ -26,19 +25,17 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
 
-	const txAmount = 10 * units.Avax // Arbitrary amount to send and transfer
-
 	ginkgo.It("should advance the proposervm epoch according to the upgrade config epoch duration", func() {
 		var (
-			env          = e2e.GetEnv(tc)
-			nodeURI      = env.GetRandomNodeURI()
-			senderKey    = env.PreFundedKey
-			recipientKey = e2e.NewPrivateKey(tc)
-			ethClient    = e2e.NewEthClient(tc, nodeURI)
-			infoClient   = info.NewClient(nodeURI.URI)
+			env        = e2e.GetEnv(tc)
+			nodeURI    = env.GetRandomNodeURI()
+			senderKey  = env.PreFundedKey
+			ethClient  = e2e.NewEthClient(tc, nodeURI)
+			infoClient = info.NewClient(nodeURI.URI)
 		)
 
-		upgrades, err := infoClient.Upgrades(tc.DefaultContext())
+		ctx := tc.DefaultContext()
+		upgrades, err := infoClient.Upgrades(ctx)
 		require.NoError(err)
 
 		if !upgrades.IsGraniteActivated(time.Now()) {
@@ -46,23 +43,26 @@ var _ = e2e.DescribeCChain("[ProposerVM Epoch]", func() {
 		}
 
 		// Issue a transaction to the C-Chain to advance past genesis block
-		issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
+		issueTransaction(tc, ethClient, senderKey)
 
 		proposerClient := proposervm.NewJSONRPCClient(nodeURI.URI, "C")
 
-		initialEpoch, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
+		initialEpoch, err := proposerClient.GetCurrentEpoch(ctx)
 		require.NoError(err)
-		tc.Log().Info("initial epoch", zap.Any("epoch", initialEpoch))
+		tc.Log().Info("initial epoch",
+			zap.Reflect("epoch", initialEpoch),
+		)
 
-		issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
-
+		issueTransaction(tc, ethClient, senderKey)
 		time.Sleep(upgrades.GraniteEpochDuration)
-		issueTransaction(tc, ethClient, senderKey, recipientKey.EthAddress(), txAmount)
+		issueTransaction(tc, ethClient, senderKey)
 
-		advancedEpoch, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
+		advancedEpoch, err := proposerClient.GetCurrentEpoch(ctx)
 		require.NoError(err)
 
-		tc.Log().Info("advanced epoch", zap.Any("epoch", advancedEpoch))
+		tc.Log().Info("advanced epoch",
+			zap.Reflect("epoch", advancedEpoch),
+		)
 
 		require.Greater(
 			advancedEpoch.Number,
@@ -82,24 +82,26 @@ func issueTransaction(
 	tc tests.TestContext,
 	ethClient *ethclient.Client,
 	senderKey *secp256k1.PrivateKey,
-	recipientEthAddress common.Address,
-	txAmount uint64,
 ) {
-	acceptedNonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), senderKey.EthAddress())
+	ctx := tc.DefaultContext()
+	addr := senderKey.EthAddress()
+	acceptedNonce, err := ethClient.AcceptedNonceAt(ctx, addr)
 	require.NoError(tc, err)
+
 	gasPrice := e2e.SuggestGasPrice(tc, ethClient)
+	const amount = 10 * units.Avax // Arbitrary amount to transfer
 	tx := types.NewTransaction(
 		acceptedNonce,
-		recipientEthAddress,
-		new(big.Int).SetUint64(txAmount),
+		addr,
+		new(big.Int).SetUint64(amount),
 		e2e.DefaultGasLimit,
 		gasPrice,
 		nil,
 	)
 
-	cChainID, err := ethClient.ChainID(tc.DefaultContext())
+	cChainID, err := ethClient.ChainID(ctx)
 	require.NoError(tc, err)
-	signer := types.NewEIP155Signer(cChainID)
+	signer := types.LatestSignerForChainID(cChainID)
 	signedTx, err := types.SignTx(tx, signer, senderKey.ToECDSA())
 	require.NoError(tc, err)
 
