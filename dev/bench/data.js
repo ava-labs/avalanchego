@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1759430135813,
+  "lastUpdate": 1759465968282,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -592,6 +592,64 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - ms/ggas",
             "value": 36886,
+            "unit": "ms/ggas",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "maru",
+            "username": "maru-ava",
+            "email": "maru.newby@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "23ace817fe84e8f9b20bf1155075f8d4541d4295",
+          "message": "[ci] Update run-monitored-tmpnet-cmd to not require tools/go.modfile (#4384)",
+          "timestamp": "2025-10-02T19:33:37Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/23ace817fe84e8f9b20bf1155075f8d4541d4295"
+        },
+        "date": 1759465966247,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-archive-Runner-avago-runner-m6i-4xlarge-ebs-fast-5ti",
+            "value": 64.15,
+            "unit": "block_accept_ms/ggas\t        75.37 block_parse_ms/ggas\t     56171 block_verify_ms/ggas\t        17.76 mgas/s\t     56315 ms/ggas",
+            "extra": "1 times\n16 procs"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-archive-Runner-avago-runner-m6i-4xlarge-ebs-fast-5ti - block_accept_ms/ggas",
+            "value": 64.15,
+            "unit": "block_accept_ms/ggas",
+            "extra": "1 times\n16 procs"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-archive-Runner-avago-runner-m6i-4xlarge-ebs-fast-5ti - block_parse_ms/ggas",
+            "value": 75.37,
+            "unit": "block_parse_ms/ggas",
+            "extra": "1 times\n16 procs"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-archive-Runner-avago-runner-m6i-4xlarge-ebs-fast-5ti - block_verify_ms/ggas",
+            "value": 56171,
+            "unit": "block_verify_ms/ggas",
+            "extra": "1 times\n16 procs"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-archive-Runner-avago-runner-m6i-4xlarge-ebs-fast-5ti - mgas/s",
+            "value": 17.76,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-archive-Runner-avago-runner-m6i-4xlarge-ebs-fast-5ti - ms/ggas",
+            "value": 56315,
             "unit": "ms/ggas",
             "extra": "1 times\n16 procs"
           }
