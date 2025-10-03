@@ -528,12 +528,8 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	slb1, err := statelessblock.Build(
 		proVM.preferred,
 		blkTimestamp,
-		100,
-		statelessblock.Epoch{
-			PChainHeight: 100,
-			Number:       10,
-			StartTime:    innerBlk.Timestamp().Unix(),
-		},
+		100, // pChainHeight,
+		statelessblock.Epoch{},
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,
@@ -551,12 +547,8 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	slb2, err := statelessblock.Build(
 		proVM.preferred,
 		blkTimestamp,
-		200,
-		statelessblock.Epoch{
-			PChainHeight: 200,
-			Number:       20,
-			StartTime:    innerBlk.Timestamp().Unix(),
-		},
+		100, // pChainHeight,
+		statelessblock.Epoch{},
 		proVM.StakingCertLeaf,
 		innerBlk.Bytes(),
 		proVM.ctx.ChainID,

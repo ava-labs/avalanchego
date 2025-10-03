@@ -54,11 +54,11 @@ func (c *connectrpcService) GetProposedHeight(ctx context.Context, r *connect.Re
 	}), nil
 }
 
-// GetCurrentEpoch implements proposervmconnect.ProposerVMHandler.
-func (c *connectrpcService) GetCurrentEpoch(ctx context.Context, _ *connect.Request[pb.GetCurrentEpochRequest]) (*connect.Response[pb.GetCurrentEpochReply], error) {
+func (c *connectrpcService) GetCurrentEpoch(ctx context.Context, r *connect.Request[pb.GetCurrentEpochRequest]) (*connect.Response[pb.GetCurrentEpochReply], error) {
 	c.vm.ctx.Log.Debug("API called",
 		zap.String("service", "proposervm"),
 		zap.String("method", "getCurrentEpoch"),
+		zap.Strings("route", r.Header()[server.HTTPHeaderRoute]),
 	)
 
 	epoch, err := c.vm.getCurrentEpoch(ctx)
@@ -111,7 +111,6 @@ type GetEpochResponse struct {
 	PChainHeight avajson.Uint64 `json:"pChainHeight"`
 }
 
-// Returns the epoch information that will be used for the next block to be proposed.
 func (j *jsonrpcService) GetCurrentEpoch(r *http.Request, _ *struct{}, reply *GetEpochResponse) error {
 	j.vm.ctx.Log.Debug("API called",
 		zap.String("service", "proposervm"),
@@ -123,11 +122,9 @@ func (j *jsonrpcService) GetCurrentEpoch(r *http.Request, _ *struct{}, reply *Ge
 		return fmt.Errorf("couldn't get current epoch: %w", err)
 	}
 
-	// Latest block sealed the epoch.
 	reply.Number = avajson.Uint64(epoch.Number)
 	reply.StartTime = avajson.Uint64(epoch.StartTime)
 	reply.PChainHeight = avajson.Uint64(epoch.PChainHeight)
-
 	return nil
 }
 
