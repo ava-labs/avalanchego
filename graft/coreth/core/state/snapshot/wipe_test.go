@@ -31,7 +31,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb/memorydb"
@@ -72,7 +72,8 @@ func TestWipe(t *testing.T) {
 	if items := count(); items != 128 {
 		t.Fatalf("snapshot size mismatch: have %d, want %d", items, 128)
 	}
-	if hash := customrawdb.ReadSnapshotBlockHash(db); hash == (common.Hash{}) {
+	hash, err := customrawdb.ReadSnapshotBlockHash(db)
+	if err != nil || hash == (common.Hash{}) {
 		t.Errorf("snapshot block hash marker mismatch: have %#x, want <not-nil>", hash)
 	}
 	if hash := rawdb.ReadSnapshotRoot(db); hash == (common.Hash{}) {
@@ -96,7 +97,8 @@ func TestWipe(t *testing.T) {
 		t.Fatalf("misc item count mismatch: have %d, want %d", items, 1000)
 	}
 
-	if hash := customrawdb.ReadSnapshotBlockHash(db); hash != (common.Hash{}) {
+	hash, err := customrawdb.ReadSnapshotBlockHash(db)
+	if err == nil && hash != (common.Hash{}) {
 		t.Errorf("snapshot block hash marker remained after wipe: %#x", hash)
 	}
 	if hash := rawdb.ReadSnapshotRoot(db); hash != (common.Hash{}) {

@@ -9,12 +9,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
-
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
 )
 
 const defaultQueueCapacity = 5000
@@ -136,7 +135,7 @@ func (q *CodeQueue) AddCode(ctx context.Context, codeHashes []common.Hash) error
 	// key rather than growing DB usage. The consumer deletes the marker after
 	// fulfilling the request (or when it detects code is already present).
 	for _, codeHash := range codeHashes {
-		customrawdb.AddCodeToFetch(batch, codeHash)
+		customrawdb.WriteCodeToFetch(batch, codeHash)
 	}
 
 	if err := batch.Write(); err != nil {

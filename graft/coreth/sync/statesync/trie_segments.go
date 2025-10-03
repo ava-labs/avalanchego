@@ -10,16 +10,16 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/graft/coreth/utils"
-	"github.com/ava-labs/avalanchego/utils/wrappers"
 
 	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 )
@@ -102,7 +102,7 @@ func (t *trieToSync) loadSegments() error {
 		// key immediately prior to the segment we found on disk.
 		// This is because we do not persist the beginning of
 		// the first segment.
-		_, segmentStart := customrawdb.UnpackSyncSegmentKey(it.Key())
+		_, segmentStart := customrawdb.ParseSyncSegmentKey(it.Key())
 		segmentStartPos := binary.BigEndian.Uint16(segmentStart[:wrappers.ShortLen])
 		t.addSegment(prevSegmentStart, addPadding(segmentStartPos-1, 0xff))
 

@@ -32,7 +32,6 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	mrand "math/rand"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -43,6 +42,8 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
+
+	mrand "math/rand"
 )
 
 func TestDeriveSha(t *testing.T) {

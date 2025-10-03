@@ -42,6 +42,9 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/rlp"
 
+	"github.com/ava-labs/coreth/internal/blocktest"
+	"github.com/ava-labs/coreth/params"
+
 	// This test file has to be in package types_test to avoid a circular
 	// dependency when importing `params`. We dot-import the package to mimic
 	// regular same-package behaviour.

@@ -45,12 +45,12 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/coreth/internal/version"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/triedb/firewood"
 	"github.com/ava-labs/avalanchego/graft/coreth/triedb/hashdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/triedb/pathdb"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/lru"
 	"github.com/ava-labs/libevm/consensus/misc/eip4844"
@@ -488,7 +488,10 @@ func NewBlockChain(
 
 	// if txlookup limit is 0 (uindexing disabled), we don't need to repair the tx index tail.
 	if bc.cacheConfig.TransactionHistory != 0 {
-		latestStateSynced := customrawdb.GetLatestSyncPerformed(bc.db)
+		latestStateSynced, err := customrawdb.GetLatestSyncPerformed(bc.db)
+		if err != nil {
+			return nil, err
+		}
 		bc.repairTxIndexTail(latestStateSynced)
 	}
 
@@ -2060,7 +2063,7 @@ func (bc *BlockChain) populateMissingTries() error {
 	// Write marker to DB to indicate populate missing tries finished successfully.
 	// Note: writing the marker here means that we do allow consecutive runs of re-populating
 	// missing tries if it does not finish during the prior run.
-	if err := customrawdb.WritePopulateMissingTries(bc.db); err != nil {
+	if err := customrawdb.WritePopulateMissingTries(bc.db, time.Now()); err != nil {
 		return fmt.Errorf("failed to write offline pruning success marker: %w", err)
 	}
 

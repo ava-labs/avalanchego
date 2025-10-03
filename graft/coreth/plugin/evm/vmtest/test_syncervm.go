@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database/prefixdb"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -20,14 +22,11 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/coreth/constants"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/coretest"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmsync"
@@ -43,6 +42,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"
@@ -653,16 +653,11 @@ func generateAndAcceptBlocks(t *testing.T, vm extension.InnerVM, numBlocks int, 
 	vm.Ethereum().BlockChain().DrainAcceptorQueue()
 }
 
-// requireSyncPerformedHeights iterates over all heights the VM has synced to and
-// verifies they all match the heights present in `expected`.
-func requireSyncPerformedHeights(t *testing.T, db ethdb.Iteratee, expected map[uint64]struct{}) {
-	it := customrawdb.NewSyncPerformedIterator(db)
-	defer it.Release()
-
-	found := make(map[uint64]struct{}, len(expected))
-	for it.Next() {
-		found[customrawdb.UnpackSyncPerformedKey(it.Key())] = struct{}{}
-	}
-	require.NoError(t, it.Error())
-	require.Equal(t, expected, found)
+// requireSyncPerformedHeight verifies the latest sync performed height matches expectations.
+// Pass 0 to verify no sync was performed.
+func requireSyncPerformedHeight(t *testing.T, db ethdb.KeyValueStore, expected uint64) {
+	t.Helper()
+	latest, err := customrawdb.GetLatestSyncPerformed(db)
+	require.NoError(t, err)
+	require.Equal(t, expected, latest, "sync performed height mismatch: expected %d, got %d", expected, latest)
 }
