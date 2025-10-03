@@ -106,7 +106,7 @@ func (j *jsonrpcService) GetProposedHeight(r *http.Request, _ *struct{}, reply *
 }
 
 type GetEpochResponse struct {
-	Number       avajson.Uint64 `json:"height"`
+	Number       avajson.Uint64 `json:"number"`
 	StartTime    avajson.Uint64 `json:"startTime"`
 	PChainHeight avajson.Uint64 `json:"pChainHeight"`
 }

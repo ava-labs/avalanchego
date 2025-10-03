@@ -10,7 +10,7 @@ The ProposerVM API allows clients to fetch information about a Snowman++ chain's
 
 ## Format
 
-This API uses the `json 2.0` RPC format.
+This API uses the `JSON-RPC 2.0` RPC format.
 
 ## Methods
 
@@ -83,7 +83,7 @@ curl -X POST --data '{
   "jsonrpc": "2.0",
   "result": {
     "number": "56",
-    "startTime":"1755802182", # unix time in seconds
+    "startTime":"1755802182",
     "pChainHeight": "21857141"
   },
   "id": 1
