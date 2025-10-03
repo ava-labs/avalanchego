@@ -9,19 +9,20 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
-// snapshotBlockHashKey tracks the block hash of the last snapshot.
-var snapshotBlockHashKey = []byte("SnapshotBlockHash")
+var (
+	// snapshotBlockHashKey tracks the block hash of the last snapshot.
+	snapshotBlockHashKey = []byte("SnapshotBlockHash")
 
-// TODO: uncomment in later migration PRs when this code is used
-//// offlinePruningKey tracks runs of offline pruning
-// offlinePruningKey = []byte("OfflinePruning")
-//// populateMissingTriesKey tracks runs of trie backfills
-// populateMissingTriesKey = []byte("PopulateMissingTries")
-//// pruningDisabledKey tracks whether the node has ever run in archival mode
-//// to ensure that a user does not accidentally corrupt an archival node.
-// pruningDisabledKey = []byte("PruningDisabled")
-//// acceptorTipKey tracks the tip of the last accepted block that has been fully processed.
-// acceptorTipKey = []byte("AcceptorTipKey")
+	// offlinePruningKey tracks runs of offline pruning
+	offlinePruningKey = []byte("OfflinePruning")
+	// populateMissingTriesKey tracks runs of trie backfills
+	populateMissingTriesKey = []byte("PopulateMissingTries")
+	// pruningDisabledKey tracks whether the node has ever run in archival mode
+	// to ensure that a user does not accidentally corrupt an archival node.
+	pruningDisabledKey = []byte("PruningDisabled")
+	// acceptorTipKey tracks the tip of the last accepted block that has been fully processed.
+	acceptorTipKey = []byte("AcceptorTipKey")
+)
 
 // State sync progress keys and prefixes
 var (
