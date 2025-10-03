@@ -14,6 +14,15 @@ service ValidatorState {
   rpc GetCurrentHeight(google.protobuf.Empty) returns (GetCurrentHeightResponse);
   // GetSubnetID returns the subnetID of the provided chain.
   rpc GetSubnetID(GetSubnetIDRequest) returns (GetSubnetIDResponse);
+  // GetWarpValidatorSets returns the canonical warp validator set for all
+  // subnets at the requested P-chain height. If a subnet doesn't have a valid
+  // canonical warp validator set, it is omitted from the response.
+  rpc GetWarpValidatorSets(GetWarpValidatorSetsRequest) returns (GetWarpValidatorSetsResponse);
+  // GetWarpValidatorSet returns the canonical warp validator set for the
+  // provided subnet at the requested P-chain height. If the subnet doesn't have
+  // a valid canonical warp validator set, either the returned set will be empty
+  // or an error may occur.
+  rpc GetWarpValidatorSet(GetWarpValidatorSetRequest) returns (GetWarpValidatorSetResponse);
   // GetValidatorSet returns the weights of the nodeIDs for the provided
   // subnet at the requested P-chain height.
   rpc GetValidatorSet(GetValidatorSetRequest) returns (GetValidatorSetResponse);
@@ -38,6 +47,15 @@ message GetSubnetIDResponse {
   bytes subnet_id = 1;
 }
 
+message GetWarpValidatorSetsRequest {
+  uint64 height = 1;
+}
+
+message GetWarpValidatorSetRequest {
+  uint64 height = 1;
+  bytes subnet_id = 2;
+}
+
 message GetValidatorSetRequest {
   uint64 height = 1;
   bytes subnet_id = 2;
@@ -56,6 +74,27 @@ message Validator {
   bool is_active = 6; // can be empty
   bytes validation_id = 7; // can be empty
   bool is_l1_validator = 8; // can be empty
+}
+
+message GetWarpValidatorSetsResponse {
+  repeated WarpValidatorSet validator_sets = 1;
+}
+
+message GetWarpValidatorSetResponse {
+  uint64 total_weight = 1;
+  repeated WarpValidator validators = 2;
+}
+
+message WarpValidatorSet {
+  bytes subnet_id = 1;
+  uint64 total_weight = 2;
+  repeated WarpValidator validators = 3;
+}
+
+message WarpValidator {
+  bytes public_key = 1; // Uncompressed public key, must not be empty
+  uint64 weight = 2;
+  repeated bytes node_ids = 3; // must not be empty
 }
 
 message GetValidatorSetResponse {

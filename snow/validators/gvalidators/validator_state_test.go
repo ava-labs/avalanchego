@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
@@ -24,42 +25,44 @@ import (
 
 var errCustom = errors.New("custom")
 
-type testState struct {
-	client *Client
-	server *validatorsmock.State
-}
-
-func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
-	require := require.New(t)
-
+func newClient(t testing.TB, state validators.State) *Client {
 	t.Helper()
 
-	state := &testState{
-		server: validatorsmock.NewState(ctrl),
-	}
+	require := require.New(t)
 
 	listener, err := grpcutils.NewListener()
 	require.NoError(err)
-	serverCloser := grpcutils.ServerCloser{}
 
 	server := grpcutils.NewServer()
-	pb.RegisterValidatorStateServer(server, NewServer(state.server))
-	serverCloser.Add(server)
+	pb.RegisterValidatorStateServer(server, NewServer(state))
 
 	go grpcutils.Serve(listener, server)
 
 	conn, err := grpcutils.Dial(listener.Addr().String())
 	require.NoError(err)
 
-	state.client = NewClient(pb.NewValidatorStateClient(conn))
-
 	t.Cleanup(func() {
-		serverCloser.Stop()
+		server.Stop()
 		_ = conn.Close()
 		_ = listener.Close()
 	})
 
-	return state
+	return NewClient(pb.NewValidatorStateClient(conn))
+}
+
+type testState struct {
+	client *Client
+	server *validatorsmock.State
+}
+
+func setupState(t testing.TB, ctrl *gomock.Controller) *testState {
+	t.Helper()
+
+	state := validatorsmock.NewState(ctrl)
+	return &testState{
+		client: newClient(t, state),
+		server: state,
+	}
 }
 
 func TestGetMinimumHeight(t *testing.T) {
@@ -235,4 +238,70 @@ func setupValidatorSet(b *testing.B, size int) map[ids.NodeID]*validators.GetVal
 		}
 	}
 	return set
+}
+
+func TestGetWarpValidatorSets(t *testing.T) {
+	const height uint64 = 1337
+	t.Run("error", func(t *testing.T) {
+		state := &validatorstest.State{
+			CantGetWarpValidatorSets: true,
+		}
+		c := newClient(t, state)
+
+		_, err := c.GetWarpValidatorSets(context.Background(), height)
+		require.Error(t, err) //nolint:forbidigo // returns grpc error
+	})
+
+	t.Run("valid", func(t *testing.T) {
+		require := require.New(t)
+
+		expectedVdrSets := map[ids.ID]validators.WarpSet{
+			ids.GenerateTestID(): validatorstest.NewWarpSet(t, 1),
+			ids.GenerateTestID(): validatorstest.NewWarpSet(t, 2),
+			ids.GenerateTestID(): validatorstest.NewWarpSet(t, 3),
+		}
+		state := &validatorstest.State{
+			GetWarpValidatorSetsF: func(_ context.Context, h uint64) (map[ids.ID]validators.WarpSet, error) {
+				require.Equal(height, h)
+				return expectedVdrSets, nil
+			},
+		}
+		c := newClient(t, state)
+
+		vdrSets, err := c.GetWarpValidatorSets(context.Background(), height)
+		require.NoError(err)
+		require.Equal(expectedVdrSets, vdrSets)
+	})
+}
+
+func TestGetWarpValidatorSet(t *testing.T) {
+	const height uint64 = 1337
+	t.Run("error", func(t *testing.T) {
+		state := &validatorstest.State{
+			CantGetWarpValidatorSets: true,
+		}
+		c := newClient(t, state)
+
+		_, err := c.GetWarpValidatorSet(context.Background(), height, ids.GenerateTestID())
+		require.Error(t, err) //nolint:forbidigo // returns grpc error
+	})
+
+	t.Run("valid", func(t *testing.T) {
+		require := require.New(t)
+
+		subnetID := ids.GenerateTestID()
+		expectedVdrSet := validatorstest.NewWarpSet(t, 3)
+		state := &validatorstest.State{
+			GetWarpValidatorSetF: func(_ context.Context, h uint64, s ids.ID) (validators.WarpSet, error) {
+				require.Equal(height, h)
+				require.Equal(subnetID, s)
+				return expectedVdrSet, nil
+			},
+		}
+		c := newClient(t, state)
+
+		vdrSet, err := c.GetWarpValidatorSet(context.Background(), height, subnetID)
+		require.NoError(err)
+		require.Equal(expectedVdrSet, vdrSet)
+	})
 }
