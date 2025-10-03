@@ -364,6 +364,7 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 		parentTimestamp          = time.Now().Truncate(time.Second)
 		parentEpoch              = statelessblock.Epoch{}
 	)
+
 	innerParentBlock := snowmantest.Genesis
 	innerChildBlock := snowmantest.BuildChild(innerParentBlock)
 
