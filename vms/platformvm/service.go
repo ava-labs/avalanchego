@@ -1842,22 +1842,9 @@ func (v *GetAllValidatorsAtReply) MarshalJSON() ([]byte, error) {
 		}
 
 		for i, vdr := range vdrs.Validators {
-			if vdr == nil {
-				continue
-			}
-
-			vdrJ := &jsonWarpValidatorOutput{
-				Weight:  avajson.Uint64(vdr.Weight),
-				NodeIDs: vdr.NodeIDs,
-			}
-
-			// If the validator has a public key, include it
-			if vdr.PublicKey != nil {
-				pk, err := formatting.Encode(formatting.HexNC, bls.PublicKeyToCompressedBytes(vdr.PublicKey))
-				if err != nil {
-					return nil, err
-				}
-				vdrJ.PublicKey = &pk
+			vdrJ, err := warpToJsonWarpValidatorOutput(vdr)
+			if err != nil {
+				return nil, err
 			}
 
 			jsonWarpSet.Validators[i] = vdrJ
@@ -1866,6 +1853,23 @@ func (v *GetAllValidatorsAtReply) MarshalJSON() ([]byte, error) {
 		m[subnetID] = jsonWarpSet
 	}
 	return json.Marshal(m)
+}
+
+func warpToJsonWarpValidatorOutput(vdr *validators.Warp) (*jsonWarpValidatorOutput, error) {
+	vdrJSON := &jsonWarpValidatorOutput{
+		Weight:  avajson.Uint64(vdr.Weight),
+		NodeIDs: vdr.NodeIDs,
+	}
+
+	if vdr.PublicKey != nil {
+		pk, err := formatting.Encode(formatting.HexNC, bls.PublicKeyToCompressedBytes(vdr.PublicKey))
+		if err != nil {
+			return nil, err
+		}
+		vdrJSON.PublicKey = &pk
+	}
+
+	return vdrJSON, nil
 }
 
 func (v *GetAllValidatorsAtReply) UnmarshalJSON(b []byte) error {
@@ -1887,23 +1891,9 @@ func (v *GetAllValidatorsAtReply) UnmarshalJSON(b []byte) error {
 		}
 
 		for i, vdrJSON := range vdrJSON.Validators {
-			vdr := &validators.Warp{
-				Weight:  uint64(vdrJSON.Weight),
-				NodeIDs: vdrJSON.NodeIDs,
-			}
-
-			if vdrJSON.PublicKey != nil {
-				pkBytes, err := formatting.Decode(formatting.HexNC, *vdrJSON.PublicKey)
-				if err != nil {
-					return err
-				}
-
-				vdr.PublicKey, err = bls.PublicKeyFromCompressedBytes(pkBytes)
-				if err != nil {
-					return err
-				}
-
-				vdr.PublicKeyBytes = vdr.PublicKey.Serialize()
+			vdr, err := jsonWarpValidatorOutputToWarp(vdrJSON)
+			if err != nil {
+				return err
 			}
 
 			warpSet.Validators[i] = vdr
@@ -1912,6 +1902,29 @@ func (v *GetAllValidatorsAtReply) UnmarshalJSON(b []byte) error {
 		v.ValidatorSets[subnetID] = warpSet
 	}
 	return nil
+}
+
+func jsonWarpValidatorOutputToWarp(vdrJSON *jsonWarpValidatorOutput) (*validators.Warp, error) {
+	vdr := &validators.Warp{
+		Weight:  uint64(vdrJSON.Weight),
+		NodeIDs: vdrJSON.NodeIDs,
+	}
+
+	if vdrJSON.PublicKey != nil {
+		pkBytes, err := formatting.Decode(formatting.HexNC, *vdrJSON.PublicKey)
+		if err != nil {
+			return nil, err
+		}
+
+		vdr.PublicKey, err = bls.PublicKeyFromCompressedBytes(pkBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		vdr.PublicKeyBytes = vdr.PublicKey.Serialize()
+	}
+
+	return vdr, nil
 }
 
 // GetValidatorsAtArgs is the response from GetValidatorsAt
