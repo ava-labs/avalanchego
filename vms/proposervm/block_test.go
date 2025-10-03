@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -112,11 +111,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.UnscheduledActivationTime
-	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -242,11 +237,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.UnscheduledActivationTime
-	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -422,11 +413,7 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 func TestPreGraniteBlock_NonZeroEpoch(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
-	)
-	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	_, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
