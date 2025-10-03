@@ -226,11 +226,12 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 	}
 
 	parentPChainHeight := parentBlk.(*postForkBlock).PChainHeight()
-	nextEpoch := nextPChainEpoch(
+	nextEpoch := makeEpoch(
+		proVM.Upgrades,
 		parentPChainHeight,
 		block.Epoch{},
 		parentBlk.Timestamp(),
-		proVM.Upgrades.GraniteEpochDuration,
+		proVM.Time(),
 	)
 
 	{
@@ -537,11 +538,12 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	}
 
 	parentBlkPChainHeight := parentBlk.(*postForkBlock).PChainHeight()
-	nextEpoch := nextPChainEpoch(
+	nextEpoch := makeEpoch(
+		proVM.Upgrades,
 		parentBlkPChainHeight,
 		block.Epoch{},
 		parentBlk.Timestamp(),
-		proVM.Upgrades.GraniteEpochDuration,
+		proVM.Time(),
 	)
 
 	{

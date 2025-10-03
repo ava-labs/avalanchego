@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"connectrpc.com/connect"
 	"go.uber.org/zap"
@@ -147,10 +148,17 @@ func (vm *VM) getCurrentEpoch(ctx context.Context) (block.Epoch, error) {
 		return block.Epoch{}, fmt.Errorf("couldn't get preferred block p-chain height: %w", err)
 	}
 
-	return nextPChainEpoch(
+	timestamp := blk.Timestamp()
+	newTimestamp := vm.Time().Truncate(time.Second)
+	if newTimestamp.Before(timestamp) {
+		newTimestamp = timestamp
+	}
+
+	return makeEpoch(
+		vm.Upgrades,
 		pChainHeight,
 		epoch,
-		blk.Timestamp(),
-		vm.Upgrades.GraniteEpochDuration,
+		timestamp,
+		newTimestamp,
 	), nil
 }

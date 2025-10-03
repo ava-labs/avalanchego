@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 
@@ -82,11 +83,21 @@ func (p *postForkCommonComponents) Height() uint64 {
 	return p.innerBlk.Height()
 }
 
-// Calculates a block's P-Chain epoch height based on its ancestor's epoch membership
-func nextPChainEpoch(parentPChainHeight uint64, parentEpoch block.Epoch, parentTimestamp time.Time, epochDuration time.Duration) block.Epoch {
-	if parentEpoch.Number == 0 {
-		// If the parent was not assigned an epoch, then the child is the first block of
-		// the initial epoch.
+// makeEpoch returns a child block's epoch based on its parent.
+func makeEpoch(
+	upgrades upgrade.Config,
+	parentPChainHeight uint64,
+	parentEpoch block.Epoch,
+	parentTimestamp time.Time,
+	childTimestamp time.Time,
+) block.Epoch {
+	if !upgrades.IsGraniteActivated(childTimestamp) {
+		return block.Epoch{}
+	}
+
+	if parentEpoch == (block.Epoch{}) {
+		// If the parent was not assigned an epoch, then the child is the first
+		// block of the initial epoch.
 		return block.Epoch{
 			PChainHeight: parentPChainHeight,
 			Number:       1,
@@ -94,20 +105,20 @@ func nextPChainEpoch(parentPChainHeight uint64, parentEpoch block.Epoch, parentT
 		}
 	}
 
-	if parentTimestamp.After(time.Unix(parentEpoch.StartTime, 0).Add(epochDuration)) {
-		// If the parent crossed the epoch boundary, then it sealed the previous epoch. The child
-		// is the first block of the new epoch, so should use the parent's P-Chain height, increment
-		// the epoch number, and set the epoch start time to the parent's timestamp.
-		return block.Epoch{
-			PChainHeight: parentPChainHeight,
-			Number:       parentEpoch.Number + 1,
-			StartTime:    parentTimestamp.Unix(),
-		}
+	epochEndTime := time.Unix(parentEpoch.StartTime, 0).Add(upgrades.GraniteEpochDuration)
+	if parentTimestamp.Before(epochEndTime) {
+		// If the parent was issued before the end of its epoch, then it did not
+		// seal the epoch.
+		return parentEpoch
 	}
-	// Otherwise, the parent did not seal the previous epoch, so the child should use the parent's
-	// epoch information. This is true even if the child crosses the epoch boundary, since sealing
-	// blocks are considered to be part of the epoch they seal.
-	return parentEpoch
+
+	// The parent sealed the epoch. So, the child is the first block of the new
+	// epoch.
+	return block.Epoch{
+		PChainHeight: parentPChainHeight,
+		Number:       parentEpoch.Number + 1,
+		StartTime:    parentTimestamp.Unix(),
+	}
 }
 
 // Verify returns nil if:
@@ -137,11 +148,6 @@ func (p *postForkCommonComponents) Verify(
 		return errPChainHeightNotMonotonic
 	}
 
-	// If granite is not activated, the child must not have an epoch.
-	if !p.vm.Upgrades.IsGraniteActivated(child.Timestamp()) && child.PChainEpoch() != (block.Epoch{}) {
-		return errEpochNotZero
-	}
-
 	expectedInnerParentID := p.innerBlk.ID()
 	innerParentID := child.innerBlk.Parent()
 	if innerParentID != expectedInnerParentID {
@@ -156,6 +162,11 @@ func (p *postForkCommonComponents) Verify(
 	maxTimestamp := p.vm.Time().Add(maxSkew)
 	if childTimestamp.After(maxTimestamp) {
 		return errTimeTooAdvanced
+	}
+
+	childEpoch := child.PChainEpoch()
+	if expected := makeEpoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, childTimestamp); childEpoch != expected {
+		return fmt.Errorf("epoch mismatch: epoch %v != expected %v", childEpoch, expected)
 	}
 
 	// If the node is currently syncing - we don't assume that the P-chain has
@@ -203,12 +214,6 @@ func (p *postForkCommonComponents) Verify(
 	var contextPChainHeight uint64
 	switch {
 	case p.vm.Upgrades.IsGraniteActivated(childTimestamp):
-		calculatedEpoch := nextPChainEpoch(parentPChainHeight, parentEpoch, parentTimestamp, p.vm.Upgrades.GraniteEpochDuration)
-
-		childEpoch := child.PChainEpoch()
-		if childEpoch != calculatedEpoch {
-			return fmt.Errorf("epoch mismatch: calculated epoch %v != epoch %v", calculatedEpoch, childEpoch)
-		}
 		contextPChainHeight = childEpoch.PChainHeight
 	case p.vm.Upgrades.IsEtnaActivated(childTimestamp):
 		contextPChainHeight = childPChainHeight
@@ -273,20 +278,11 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
-	var (
-		contextPChainHeight uint64
-		epoch               block.Epoch
-	)
+	epoch := makeEpoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, newTimestamp)
+
+	var contextPChainHeight uint64
 	switch {
 	case p.vm.Upgrades.IsGraniteActivated(newTimestamp):
-		epoch = nextPChainEpoch(parentPChainHeight, parentEpoch, parentTimestamp, p.vm.Upgrades.GraniteEpochDuration)
-		p.vm.ctx.Log.Debug(
-			"epoch",
-			zap.Uint64("pChainHeight", pChainHeight),
-			zap.Uint64("epochPChainHeight", epoch.PChainHeight),
-			zap.Uint64("epochNumber", epoch.Number),
-			zap.Time("epochStartTime", time.Unix(epoch.StartTime, 0)),
-		)
 		contextPChainHeight = epoch.PChainHeight
 	case p.vm.Upgrades.IsEtnaActivated(newTimestamp):
 		contextPChainHeight = pChainHeight
@@ -353,6 +349,9 @@ func (p *postForkCommonComponents) buildChild(
 		zap.Uint64("pChainHeight", pChainHeight),
 		zap.Time("parentTimestamp", parentTimestamp),
 		zap.Time("blockTimestamp", newTimestamp),
+		zap.Uint64("epochPChainHeight", epoch.PChainHeight),
+		zap.Uint64("epochNumber", epoch.Number),
+		zap.Time("epochStartTime", time.Unix(epoch.StartTime, 0)),
 	)
 	return child, nil
 }
