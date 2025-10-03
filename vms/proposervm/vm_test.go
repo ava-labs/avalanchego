@@ -217,13 +217,22 @@ func initTestProposerVM(
 	return coreVM, valState, proVM, db
 }
 
-func waitForProposerWindow(vm *VM, chainTip snowman.Block, pChainHeight uint64) error {
-	var (
-		ctx              = context.Background()
-		childBlockHeight = chainTip.Height() + 1
-		parentTimestamp  = chainTip.Timestamp()
-	)
+func (vm *VM) waitForProposerWindow() error {
+	ctx := context.Background()
+	preferred, err := vm.getBlock(ctx, vm.preferred)
+	if err != nil {
+		return fmt.Errorf("couldn't get preferred block: %w", err)
+	}
 
+	pChainHeight, err := preferred.pChainHeight(ctx)
+	if err != nil {
+		return fmt.Errorf("couldn't get P-Chain height from tip: %w", err)
+	}
+
+	var (
+		childBlockHeight = preferred.Height() + 1
+		parentTimestamp  = preferred.Timestamp()
+	)
 	for {
 		now := vm.Clock.Time().Truncate(time.Second)
 		slot := proposer.TimeToSlot(parentTimestamp, now)
@@ -378,6 +387,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	}
 
 	require.NoError(proVM.SetPreference(context.Background(), proBlk2.ID()))
+	require.NoError(proVM.waitForProposerWindow())
 
 	// build block...
 	coreBlk3 := snowmantest.BuildChild(prefcoreBlk)
@@ -385,7 +395,6 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 		return coreBlk3, nil
 	}
 
-	require.NoError(waitForProposerWindow(proVM, proBlk2, proBlk2.(*postForkBlock).PChainHeight()))
 	builtBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
@@ -446,6 +455,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	}
 
 	require.NoError(proVM.SetPreference(context.Background(), proBlk2.ID()))
+	require.NoError(proVM.waitForProposerWindow())
 
 	// build block...
 	coreBlk3 := snowmantest.BuildChild(wronglyPreferredcoreBlk)
@@ -453,7 +463,6 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 		return coreBlk3, nil
 	}
 
-	require.NoError(waitForProposerWindow(proVM, proBlk2, proBlk2.(*postForkBlock).PChainHeight()))
 	blk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 
