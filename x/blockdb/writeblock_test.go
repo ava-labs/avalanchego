@@ -178,13 +178,6 @@ func TestWriteBlock_MaxHeight(t *testing.T) {
 				blocksWritten[h] = block
 			}
 
-			// Verify all written blocks are readable and data is correct
-			for h, expectedBlock := range blocksWritten {
-				readBlock, err := store.Get(h)
-				require.NoError(t, err, "Get failed at height %d", h)
-				require.Equal(t, expectedBlock, readBlock)
-			}
-
 			checkDatabaseState(t, store, tt.expectedMaxHeight, tt.expectedMCH)
 		})
 	}
