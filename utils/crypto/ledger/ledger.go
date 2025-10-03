@@ -10,7 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/version"
 
-	ledger "github.com/ava-labs/ledger-avalanche/go"
+	ledger "github.com/ava-labs/ledger-avalanche-go"
 	bip32 "github.com/tyler-smith/go-bip32"
 )
 
