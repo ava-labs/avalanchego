@@ -16,9 +16,19 @@ import (
 )
 
 const (
-	rootPath          = "m/44'/9000'/0'" // BIP44: m / purpose' / coin_type' / account'
+	rootPath = "m/44'/9000'/0'" // BIP44: m / purpose' / coin_type' / account'
+	// ledgerBufferLimit corresponds to FLASH_BUFFER_SIZE for Nano S.
+	// Modern devices (Nano X, Nano S2, Stax, Flex) support up to 16384 bytes,
+	// but we use the conservative limit for universal compatibility.
+	//
+	// Ref: https://github.com/ava-labs/ledger-avalanche/blob/main/app/src/common/tx.c
 	ledgerBufferLimit = 8192
-	ledgerPathSize    = 9
+	// ledgerPathSize is the serialized size of a path suffix (e.g., "0/123") as produced
+	// by SerializePathSuffix in the ledger library. Format: 1 byte (component count) +
+	// 4 bytes (first component) + 4 bytes (second component) = 9 bytes total.
+	//
+	// Ref: https://github.com/ava-labs/ledger-avalanche-go/blob/main/common.go (SerializePathSuffix)
+	ledgerPathSize = 9
 )
 
 var _ keychain.Ledger = (*Ledger)(nil)
@@ -103,15 +113,15 @@ func (l *Ledger) SignHash(hash []byte, addressIndices []uint32) ([][]byte, error
 }
 
 func (l *Ledger) Sign(txBytes []byte, addressIndices []uint32) ([][]byte, error) {
-	// will pass to the ledger addressIndices both as signing paths and change paths
-	numSigningPaths := len(addressIndices)
-	numChangePaths := len(addressIndices)
-	if len(txBytes)+(numSigningPaths+numChangePaths)*ledgerPathSize > ledgerBufferLimit {
-		// There is a limit on the tx length that can be parsed by the ledger
-		// app. When the tx that is being signed is too large, we sign with hash
-		// instead.
-		//
-		// Ref: https://github.com/ava-labs/avalanche-wallet-sdk/blob/9a71f05e424e06b94eaccf21fd32d7983ed1b040/src/Wallet/Ledger/provider/ZondaxProvider.ts#L68
+	// We pass addressIndices both as signing paths and change paths.
+	// The ledger library deduplicates them, so the buffer contains len(addressIndices) paths.
+	// Buffer format: 1 byte (path count) + paths + transaction bytes
+	//
+	// Ref: https://github.com/ava-labs/ledger-avalanche-go/blob/main/common.go (ConcatMessageAndChangePath)
+	bufferSize := 1 + len(addressIndices)*ledgerPathSize + len(txBytes)
+	if bufferSize > ledgerBufferLimit {
+		// When the tx that is being signed is too large for the ledger buffer,
+		// we sign with hash instead.
 		unsignedHash := hashing.ComputeHash256(txBytes)
 		return l.SignHash(unsignedHash, addressIndices)
 	}
