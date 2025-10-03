@@ -11,6 +11,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/libevm/options"
 
 	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 )
@@ -39,43 +40,37 @@ type CodeQueue struct {
 	out           <-chan common.Hash // Invariant: never nil
 	chanLock      sync.RWMutex
 	closeChanOnce sync.Once // See usage in [CodeQueue.closeOutChannelOnce]
-}
 
-// TODO: this will be migrated to using libevm's options pattern in a follow-up PR.
-type codeQueueOptions struct {
 	capacity int
 }
 
-type CodeQueueOption func(*codeQueueOptions)
+type CodeQueueOption = options.Option[CodeQueue]
 
 // WithCapacity overrides the queue buffer capacity.
 func WithCapacity(n int) CodeQueueOption {
-	return func(o *codeQueueOptions) {
+	return options.Func[CodeQueue](func(q *CodeQueue) {
 		if n > 0 {
-			o.capacity = n
+			q.capacity = n
 		}
-	}
+	})
 }
 
 // NewCodeQueue creates a new code queue applying optional functional options.
 // The `quit` channel, if non-nil, MUST eventually be closed to avoid leaking a
 // goroutine.
 func NewCodeQueue(db ethdb.Database, quit <-chan struct{}, opts ...CodeQueueOption) (*CodeQueue, error) {
-	// Apply defaults then options.
-	o := codeQueueOptions{
+	// Create with defaults, then apply options.
+	q := &CodeQueue{
+		db:       db,
+		quit:     quit,
 		capacity: defaultQueueCapacity,
 	}
-	for _, opt := range opts {
-		opt(&o)
-	}
+	options.ApplyTo(q, opts...)
 
-	ch := make(chan common.Hash, o.capacity)
-	q := &CodeQueue{
-		db:   db,
-		in:   ch,
-		out:  ch,
-		quit: quit,
-	}
+	// Initialize the channel with the (potentially overridden) capacity.
+	ch := make(chan common.Hash, q.capacity)
+	q.in = ch
+	q.out = ch
 
 	if quit != nil {
 		// Close the output channel on early shutdown to unblock consumers.

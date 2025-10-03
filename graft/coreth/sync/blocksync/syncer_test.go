@@ -218,16 +218,18 @@ func (e *testEnvironment) prePopulateBlocks(blockHeights []int) error {
 }
 
 // createSyncer creates a block syncer with the given configuration
-func (e *testEnvironment) createSyncer(fromHeight uint64, blocksToFetch uint64) (*blockSyncer, error) {
+func (e *testEnvironment) createSyncer(fromHeight uint64, blocksToFetch uint64) (*BlockSyncer, error) {
 	if fromHeight > uint64(len(e.blocks)) {
 		return nil, fmt.Errorf("fromHeight %d exceeds available blocks %d", fromHeight, len(e.blocks))
 	}
 
-	return NewSyncer(e.client, e.chainDB, Config{
-		FromHash:      e.blocks[fromHeight].Hash(),
-		FromHeight:    fromHeight,
-		BlocksToFetch: blocksToFetch,
-	})
+	return NewSyncer(
+		e.client,
+		e.chainDB,
+		e.blocks[fromHeight].Hash(),
+		fromHeight,
+		blocksToFetch,
+	)
 }
 
 // verifyBlocksInDB checks that the expected blocks are present in the database (by block height)

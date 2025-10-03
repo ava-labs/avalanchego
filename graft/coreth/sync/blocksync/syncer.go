@@ -5,6 +5,7 @@ package blocksync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
@@ -12,38 +13,52 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 
-	synccommon "github.com/ava-labs/coreth/sync"
+	syncpkg "github.com/ava-labs/coreth/sync"
 	statesyncclient "github.com/ava-labs/coreth/sync/client"
 )
 
 const blocksPerRequest = 32
 
-var _ synccommon.Syncer = (*blockSyncer)(nil)
+var (
+	_                        syncpkg.Syncer = (*BlockSyncer)(nil)
+	errBlocksToFetchRequired                = errors.New("blocksToFetch must be > 0")
+	errFromHashRequired                     = errors.New("fromHash must be non-zero when fromHeight > 0")
+)
+
+type BlockSyncer struct {
+	db            ethdb.Database
+	client        statesyncclient.Client
+	fromHash      common.Hash
+	fromHeight    uint64
+	blocksToFetch uint64
+}
+
+func NewSyncer(client statesyncclient.Client, db ethdb.Database, fromHash common.Hash, fromHeight uint64, blocksToFetch uint64) (*BlockSyncer, error) {
+	if blocksToFetch == 0 {
+		return nil, errBlocksToFetchRequired
+	}
+
+	if (fromHash == common.Hash{}) && fromHeight > 0 {
+		return nil, errFromHashRequired
+	}
+
+	return &BlockSyncer{
+		client:        client,
+		db:            db,
+		fromHash:      fromHash,
+		fromHeight:    fromHeight,
+		blocksToFetch: blocksToFetch,
+	}, nil
+}
 
 // Name returns the human-readable name for this sync task.
-func (*blockSyncer) Name() string { return "Block Syncer" }
+func (*BlockSyncer) Name() string {
+	return "Block Syncer"
+}
 
 // ID returns the stable identifier for this sync task.
-func (*blockSyncer) ID() string { return "state_block_sync" }
-
-type Config struct {
-	FromHash      common.Hash // `FromHash` is the most recent
-	FromHeight    uint64
-	BlocksToFetch uint64 // Includes the `FromHash` block
-}
-
-type blockSyncer struct {
-	db     ethdb.Database
-	client statesyncclient.Client
-	config Config
-}
-
-func NewSyncer(client statesyncclient.Client, db ethdb.Database, config Config) (*blockSyncer, error) {
-	return &blockSyncer{
-		client: client,
-		db:     db,
-		config: config,
-	}, nil
+func (*BlockSyncer) ID() string {
+	return "state_block_sync"
 }
 
 // Sync fetches (up to) BlocksToFetch blocks from peers
@@ -55,10 +70,10 @@ func NewSyncer(client statesyncclient.Client, db ethdb.Database, config Config) 
 // any blocks that are locally available.
 // We could also prevent overrequesting blocks, if the number of blocks needed
 // to be fetched isn't a multiple of blocksPerRequest.
-func (s *blockSyncer) Sync(ctx context.Context) error {
-	nextHash := s.config.FromHash
-	nextHeight := s.config.FromHeight
-	blocksToFetch := s.config.BlocksToFetch
+func (s *BlockSyncer) Sync(ctx context.Context) error {
+	nextHash := s.fromHash
+	nextHeight := s.fromHeight
+	blocksToFetch := s.blocksToFetch
 
 	// first, check for blocks already available on disk so we don't
 	// request them from peers.

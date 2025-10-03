@@ -4,7 +4,6 @@
 package sync
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -13,12 +12,13 @@ import (
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/libevm/options"
 	"github.com/ava-labs/libevm/trie"
 
 	"github.com/ava-labs/coreth/plugin/evm/message"
+	"github.com/ava-labs/coreth/sync"
 
 	atomicstate "github.com/ava-labs/coreth/plugin/evm/atomic/state"
-	synccommon "github.com/ava-labs/coreth/sync"
 	syncclient "github.com/ava-labs/coreth/sync/client"
 )
 
@@ -31,53 +31,48 @@ const (
 )
 
 var (
-	errInvalidTargetHeight = errors.New("TargetHeight must be greater than 0")
-
-	// Pre-allocate zero bytes to avoid repeated allocations.
-	zeroBytes = bytes.Repeat([]byte{0x00}, common.HashLength)
-
-	_ synccommon.Syncer       = (*syncer)(nil)
+	_ sync.Syncer             = (*Syncer)(nil)
 	_ syncclient.LeafSyncTask = (*syncerLeafTask)(nil)
+
+	errTargetHeightRequired = errors.New("target height must be > 0")
 )
 
-// Name returns the human-readable name for this sync task.
-func (*syncer) Name() string { return "Atomic State Syncer" }
-
-// ID returns the stable identifier for this sync task.
-func (*syncer) ID() string { return "state_atomic_sync" }
-
-// Config holds the configuration for creating a new atomic syncer.
-type Config struct {
-	// TargetHeight is the target block height to sync to.
-	TargetHeight uint64
-
-	// RequestSize is the maximum number of leaves to request in a single network call.
+// config holds the configuration for creating a new atomic syncer.
+type config struct {
+	// requestSize is the maximum number of leaves to request in a single network call.
 	// NOTE: user facing option validated as the parameter [plugin/evm/config.Config.StateSyncRequestSize].
-	RequestSize uint16
+	requestSize uint16
 
-	// NumWorkers is the number of worker goroutines to use for syncing.
+	// numWorkers is the number of worker goroutines to use for syncing.
 	// If not set, [defaultNumWorkers] will be used.
-	NumWorkers int
+	numWorkers int
 }
 
-// WithUnsetDefaults returns a copy of the config with defaults applied for any
-// unset (zero) fields.
-func (c Config) WithUnsetDefaults() Config {
-	out := c
-	if out.NumWorkers == 0 {
-		out.NumWorkers = defaultNumWorkers
-	}
-	if out.RequestSize == 0 {
-		out.RequestSize = defaultRequestSize
-	}
+// SyncerOption configures the atomic syncer via functional options.
+type SyncerOption = options.Option[config]
 
-	return out
+// WithRequestSize sets the request size per network call.
+func WithRequestSize(n uint16) SyncerOption {
+	return options.Func[config](func(c *config) {
+		if n > 0 {
+			c.requestSize = n
+		}
+	})
 }
 
-// syncer is used to sync the atomic trie from the network. The CallbackLeafSyncer
-// is responsible for orchestrating the sync while syncer is responsible for maintaining
+// WithNumWorkers sets the number of worker goroutines for syncing.
+func WithNumWorkers(n int) SyncerOption {
+	return options.Func[config](func(c *config) {
+		if n > 0 {
+			c.numWorkers = n
+		}
+	})
+}
+
+// Syncer is used to sync the atomic trie from the network. The CallbackLeafSyncer
+// is responsible for orchestrating the sync while Syncer is responsible for maintaining
 // the state of progress and writing the actual atomic trie to the trieDB.
-type syncer struct {
+type Syncer struct {
 	db           *versiondb.Database
 	atomicTrie   *atomicstate.AtomicTrie
 	trie         *trie.Trie // used to update the atomic trie
@@ -92,22 +87,17 @@ type syncer struct {
 	lastHeight uint64
 }
 
-// addZeros adds [common.HashLenth] zeros to [height] and returns the result as []byte
-func addZeroes(height uint64) []byte {
-	packer := wrappers.Packer{Bytes: make([]byte, atomicstate.TrieKeyLength)}
-	packer.PackLong(height)
-	packer.PackFixedBytes(zeroBytes)
-	return packer.Bytes
-}
-
-// newSyncer returns a new syncer instance that will sync the atomic trie from the network.
-func newSyncer(client syncclient.LeafClient, db *versiondb.Database, atomicTrie *atomicstate.AtomicTrie, targetRoot common.Hash, config *Config) (*syncer, error) {
-	if config.TargetHeight == 0 {
-		return nil, errInvalidTargetHeight
+// NewSyncer returns a new syncer instance that will sync the atomic trie from the network.
+func NewSyncer(client syncclient.LeafClient, db *versiondb.Database, atomicTrie *atomicstate.AtomicTrie, targetRoot common.Hash, targetHeight uint64, opts ...SyncerOption) (*Syncer, error) {
+	if targetHeight == 0 {
+		return nil, errTargetHeightRequired
 	}
 
-	// Apply defaults for unset fields.
-	cfg := config.WithUnsetDefaults()
+	cfg := config{
+		numWorkers:  defaultNumWorkers,
+		requestSize: defaultRequestSize,
+	}
+	options.ApplyTo(&cfg, opts...)
 
 	lastCommittedRoot, lastCommit := atomicTrie.LastCommitted()
 	trie, err := atomicTrie.OpenTrie(lastCommittedRoot)
@@ -115,17 +105,17 @@ func newSyncer(client syncclient.LeafClient, db *versiondb.Database, atomicTrie 
 		return nil, err
 	}
 
-	syncer := &syncer{
+	syncer := &Syncer{
 		db:           db,
 		atomicTrie:   atomicTrie,
 		trie:         trie,
 		targetRoot:   targetRoot,
-		targetHeight: cfg.TargetHeight,
+		targetHeight: targetHeight,
 		lastHeight:   lastCommit,
 	}
 
 	// Create tasks channel with capacity for the number of workers.
-	tasks := make(chan syncclient.LeafSyncTask, cfg.NumWorkers)
+	tasks := make(chan syncclient.LeafSyncTask, cfg.numWorkers)
 
 	// For atomic trie syncing, we typically want a single task since the trie is sequential.
 	// But we can create multiple tasks if needed for parallel processing of different ranges.
@@ -133,21 +123,40 @@ func newSyncer(client syncclient.LeafClient, db *versiondb.Database, atomicTrie 
 	close(tasks)
 
 	syncer.syncer = syncclient.NewCallbackLeafSyncer(client, tasks, &syncclient.LeafSyncerConfig{
-		RequestSize: cfg.RequestSize,
-		NumWorkers:  cfg.NumWorkers,
+		RequestSize: cfg.requestSize,
+		NumWorkers:  cfg.numWorkers,
 		OnFailure:   func() {}, // No-op since we flush progress to disk at the regular commit interval.
 	})
 
 	return syncer, nil
 }
 
+// Name returns the human-readable name for this sync task.
+func (*Syncer) Name() string {
+	return "Atomic State Syncer"
+}
+
+// ID returns the stable identifier for this sync task.
+func (*Syncer) ID() string {
+	return "state_atomic_sync"
+}
+
 // Sync begins syncing the target atomic root with the configured number of worker goroutines.
-func (s *syncer) Sync(ctx context.Context) error {
+func (s *Syncer) Sync(ctx context.Context) error {
 	return s.syncer.Sync(ctx)
 }
 
+// addZeroes returns the big-endian representation of `height`, prefixed with [common.HashLength] zeroes.
+func addZeroes(height uint64) []byte {
+	// Key format is [height(8 bytes)][blockchainID(32 bytes)]. Start should be the
+	// smallest key for the given height, i.e., height followed by zeroed blockchainID.
+	b := make([]byte, wrappers.LongLen+common.HashLength)
+	binary.BigEndian.PutUint64(b[:wrappers.LongLen], height)
+	return b
+}
+
 // onLeafs is the callback for the leaf syncer, which will insert the key-value pairs into the trie.
-func (s *syncer) onLeafs(keys [][]byte, values [][]byte) error {
+func (s *Syncer) onLeafs(keys [][]byte, values [][]byte) error {
 	for i, key := range keys {
 		if len(key) != atomicstate.TrieKeyLength {
 			return fmt.Errorf("unexpected key len (%d) in atomic trie sync", len(key))
@@ -195,7 +204,7 @@ func (s *syncer) onLeafs(keys [][]byte, values [][]byte) error {
 
 // onFinish is called when sync for this trie is complete.
 // commit the trie to disk and perform the final checks that we synced the target root correctly.
-func (s *syncer) onFinish() error {
+func (s *Syncer) onFinish() error {
 	// commit the trie on finish
 	root, nodes, err := s.trie.Commit(false)
 	if err != nil {
@@ -220,7 +229,7 @@ func (s *syncer) onFinish() error {
 }
 
 type syncerLeafTask struct {
-	syncer *syncer
+	syncer *Syncer
 }
 
 func (a *syncerLeafTask) Start() []byte                  { return addZeroes(a.syncer.lastHeight + 1) }
