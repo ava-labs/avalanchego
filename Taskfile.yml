@@ -109,10 +109,10 @@ tasks:
   export-dir-to-s3:
     desc: Copies a directory to s3
     vars:
-      LOCAL_SRC: '{{.LOCAL_SRC}}'
-      S3_DST: '{{.S3_DST}}'
+      SRC: '{{.SRC}}'
+      DST: '{{.DST}}'
     cmds:
-      - cmd: bash -x ./scripts/copy_dir.sh {{.LOCAL_SRC}} {{.S3_DST}}
+      - cmd: bash -x ./scripts/copy_dir.sh {{.SRC}} {{.DST}}
 
   generate-mocks:
     desc: Generates testing mocks
