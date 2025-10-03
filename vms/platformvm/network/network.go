@@ -37,7 +37,6 @@ type Network struct {
 	txPushGossipFrequency time.Duration
 	txPullGossiper        gossip.Gossiper
 	txPullGossipFrequency time.Duration
-	peers                 *p2p.Peers
 }
 
 func New(
@@ -61,14 +60,13 @@ func New(
 		vdrs,
 		config.MaxValidatorSetStaleness,
 	)
-	peers := &p2p.Peers{}
+
 	p2pNetwork, err := p2p.NewNetwork(
 		log,
 		appSender,
 		registerer,
 		"p2p",
 		validators,
-		peers,
 	)
 	if err != nil {
 		return nil, err
@@ -191,7 +189,6 @@ func New(
 		txPushGossipFrequency:     config.PushGossipFrequency,
 		txPullGossiper:            txPullGossiper,
 		txPullGossipFrequency:     config.PullGossipFrequency,
-		peers:                     peers,
 	}, nil
 }
 
@@ -226,8 +223,4 @@ func (n *Network) IssueTxFromRPC(tx *txs.Tx) error {
 	}
 	n.txPushGossiper.Add(tx)
 	return nil
-}
-
-func (n *Network) Peers() *p2p.Peers {
-	return n.peers
 }
