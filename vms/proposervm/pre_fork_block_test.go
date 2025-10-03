@@ -651,11 +651,7 @@ func TestPreForkBlock_BuildBlockWithContext(t *testing.T) {
 func TestPreForkBlock_NonZeroEpoch(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = snowmantest.GenesisTimestamp.Add(-1 * time.Second)
-		durangoTime    = snowmantest.GenesisTimestamp.Add(-1 * time.Second)
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
