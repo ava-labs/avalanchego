@@ -866,6 +866,100 @@ func TestGetValidatorsAt(t *testing.T) {
 	require.Len(response.Validators, len(genesis.Validators)+1)
 }
 
+func TestGetAllValidatorsAt(t *testing.T) {
+	require := require.New(t)
+	service, _ := defaultService(t)
+
+	args := GetAllValidatorsAtArgs{}
+	response := GetAllValidatorsAtReply{}
+
+	service.vm.ctx.Lock.Lock()
+	lastAccepted := service.vm.manager.LastAccepted()
+	lastAcceptedBlk, err := service.vm.manager.GetBlock(lastAccepted)
+	require.NoError(err)
+
+	service.vm.ctx.Lock.Unlock()
+
+	// Confirm that it returns the genesis validators given the latest height
+	args.Height = pchainapi.Height(lastAcceptedBlk.Height())
+	require.NoError(service.GetAllValidatorsAt(&http.Request{}, &args, &response))
+	require.Len(response.Validators, 1)
+	require.Empty(response.Validators[constants.PrimaryNetworkID].Validators)
+
+	service.vm.ctx.Lock.Lock()
+
+	wallet := newWallet(t, service.vm, walletConfig{})
+	rewardsOwner := &secp256k1fx.OutputOwners{
+		Threshold: 1,
+		Addrs:     []ids.ShortID{ids.GenerateTestShortID()},
+	}
+
+	sk, err := localsigner.New()
+	require.NoError(err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(err)
+
+	tx, err := wallet.IssueAddPermissionlessValidatorTx(
+		&txs.SubnetValidator{
+			Validator: txs.Validator{
+				NodeID: ids.GenerateTestNodeID(),
+				Start:  uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Unix()),
+				End:    uint64(service.vm.clock.Time().Add(txexecutor.SyncBound).Add(defaultMinStakingDuration).Unix()),
+				Wght:   service.vm.MinValidatorStake,
+			},
+			Subnet: constants.PrimaryNetworkID,
+		},
+		pop,
+		service.vm.ctx.AVAXAssetID,
+		rewardsOwner,
+		rewardsOwner,
+		0,
+		common.WithMemo([]byte{}),
+	)
+
+	require.NoError(err)
+
+	service.vm.ctx.Lock.Unlock()
+	require.NoError(service.vm.Network.IssueTxFromRPC(tx))
+	service.vm.ctx.Lock.Lock()
+
+	block, err := service.vm.BuildBlock(context.Background())
+	require.NoError(err)
+
+	blk := block.(*blockexecutor.Block)
+	require.NoError(blk.Verify(context.Background()))
+
+	require.NoError(blk.Accept(context.Background()))
+	service.vm.ctx.Lock.Unlock()
+
+	newLastAccepted := service.vm.manager.LastAccepted()
+	newLastAcceptedBlk, err := service.vm.manager.GetBlock(newLastAccepted)
+	require.NoError(err)
+	require.NotEqual(newLastAccepted, lastAccepted)
+
+	// Confirm that it returns the genesis validators + the new validator given the latest height
+	args.Height = pchainapi.Height(newLastAcceptedBlk.Height())
+	require.NoError(service.GetAllValidatorsAt(&http.Request{}, &args, &response))
+	require.Len(response.Validators[constants.PrimaryNetworkID].Validators, 1)
+
+	// Confirm that [IsProposed] works. The proposed height should be the genesis height
+	args.Height = pchainapi.Height(pchainapi.ProposedHeight)
+	require.NoError(service.GetAllValidatorsAt(&http.Request{}, &args, &response))
+	require.Empty(response.Validators[constants.PrimaryNetworkID].Validators)
+
+	service.vm.ctx.Lock.Lock()
+
+	// set clock beyond the [validators.recentlyAcceptedWindowTTL] to bump the
+	// proposerVM height
+	service.vm.clock.Set(newLastAcceptedBlk.Timestamp().Add(40 * time.Second))
+	service.vm.ctx.Lock.Unlock()
+
+	// Resending the same request with [Height] set to [platformapi.ProposedHeight] should now
+	// include the new validator
+	require.NoError(service.GetAllValidatorsAt(&http.Request{}, &args, &response))
+	require.Len(response.Validators[constants.PrimaryNetworkID].Validators, 1)
+}
+
 func TestGetValidatorsAtArgsMarshalling(t *testing.T) {
 	subnetID, err := ids.FromString("u3Jjpzzj95827jdENvR1uc76f4zvvVQjGshbVWaSr2Ce5WV1H")
 	require.NoError(t, err)

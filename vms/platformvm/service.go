@@ -1782,6 +1782,133 @@ func (s *Service) GetTimestamp(_ *http.Request, _ *struct{}, reply *GetTimestamp
 	return nil
 }
 
+// GetAllValidatorsAtArgs are the arguments for GetAllValidatorsAt
+type GetAllValidatorsAtArgs struct {
+	Height platformapi.Height `json:"height"`
+}
+
+// GetAllValidatorsAtReply is the response from GetAllValidatorsAt
+type GetAllValidatorsAtReply struct {
+	Validators map[ids.ID]validators.WarpSet `json:"validators"`
+}
+
+type jsonWarpSet struct {
+	Validators  []*jsonWarpValidatorOutput `json:"validators"`
+	TotalWeight avajson.Uint64             `json:"totalWeight"`
+}
+
+type jsonWarpValidatorOutput struct {
+	PublicKey *string        `json:"publicKey"`
+	Weight    avajson.Uint64 `json:"weight"`
+	NodeIDs   []ids.NodeID   `json:"nodeIDs"`
+}
+
+// GetValidatorsAt returns the weights of the validator set of a provided subnet
+// at the specified height.
+func (s *Service) GetAllValidatorsAt(r *http.Request, args *GetAllValidatorsAtArgs, reply *GetAllValidatorsAtReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getValidatorsAt"),
+		zap.Uint64("height", uint64(args.Height)),
+		zap.Bool("isProposed", args.Height.IsProposed()),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	ctx := r.Context()
+	var err error
+	height := uint64(args.Height)
+	if args.Height.IsProposed() {
+		height, err = s.vm.GetMinimumHeight(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get proposed height: %w", err)
+		}
+	}
+
+	reply.Validators, err = s.vm.GetWarpValidatorSets(ctx, height)
+	if err != nil {
+		return fmt.Errorf("failed to get validator set: %w", err)
+	}
+	return nil
+}
+
+func (v *GetAllValidatorsAtReply) MarshalJSON() ([]byte, error) {
+	m := make(map[ids.ID]*jsonWarpSet, len(v.Validators))
+	for subnetID, vdrs := range v.Validators {
+		vdrJSON := &jsonWarpSet{
+			TotalWeight: avajson.Uint64(vdrs.TotalWeight),
+		}
+
+		for _, vdr := range vdrs.Validators {
+			if vdrJSON.Validators == nil {
+				vdrJSON.Validators = make([]*jsonWarpValidatorOutput, len(vdrs.Validators))
+			}
+			vdrJ := &jsonWarpValidatorOutput{
+				Weight:  avajson.Uint64(vdr.Weight),
+				NodeIDs: vdr.NodeIDs,
+			}
+
+			// If the validator has a public key, include it
+			if vdr.PublicKey != nil {
+				pk, err := formatting.Encode(formatting.HexNC, bls.PublicKeyToCompressedBytes(vdr.PublicKey))
+				if err != nil {
+					return nil, err
+				}
+				vdrJ.PublicKey = &pk
+			}
+
+			vdrJSON.Validators = append(vdrJSON.Validators, vdrJ)
+		}
+
+		m[subnetID] = vdrJSON
+	}
+	return json.Marshal(m)
+}
+
+func (v *GetAllValidatorsAtReply) UnmarshalJSON(b []byte) error {
+	var m map[ids.ID]*jsonWarpSet
+	if err := json.Unmarshal(b, &m); err != nil {
+		return err
+	}
+
+	if m == nil {
+		v.Validators = nil
+		return nil
+	}
+
+	v.Validators = make(map[ids.ID]validators.WarpSet, len(m))
+	for subnetID, vdrJSON := range m {
+		warpSet := validators.WarpSet{
+			TotalWeight: uint64(vdrJSON.TotalWeight),
+			Validators:  make([]*validators.Warp, len(vdrJSON.Validators)),
+		}
+
+		for _, vdr := range vdrJSON.Validators {
+			warp := &validators.Warp{
+				Weight:  uint64(vdr.Weight),
+				NodeIDs: vdr.NodeIDs,
+			}
+
+			if vdr.PublicKey != nil {
+				pkBytes, err := formatting.Decode(formatting.HexNC, *vdr.PublicKey)
+				if err != nil {
+					return err
+				}
+				warp.PublicKey, err = bls.PublicKeyFromCompressedBytes(pkBytes)
+				if err != nil {
+					return err
+				}
+			}
+
+			warpSet.Validators = append(warpSet.Validators, warp)
+		}
+
+		v.Validators[subnetID] = warpSet
+	}
+	return nil
+}
+
 // GetValidatorsAtArgs is the response from GetValidatorsAt
 type GetValidatorsAtArgs struct {
 	Height   platformapi.Height `json:"height"`
