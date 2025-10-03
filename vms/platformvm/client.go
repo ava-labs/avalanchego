@@ -491,7 +491,7 @@ func (c *Client) GetTimestamp(ctx context.Context, options ...rpc.Option) (time.
 	return res.Timestamp, err
 }
 
-// GetAllValidatorsAt returns the canonical validator set of
+// GetAllValidatorsAt returns the canonical validator sets of
 // all chains with at least one active validator at the specified
 // height or at proposerVM height if set to [platformapi.ProposedHeight].
 func (c *Client) GetAllValidatorsAt(
