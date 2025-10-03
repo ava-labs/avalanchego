@@ -7,10 +7,10 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/version"
 
+	ledgerkeychain "github.com/ava-labs/avalanchego/utils/crypto/keychain/ledger"
 	ledger "github.com/ava-labs/ledger-avalanche-go"
 	bip32 "github.com/tyler-smith/go-bip32"
 )
@@ -21,7 +21,7 @@ const (
 	ledgerPathSize    = 9
 )
 
-var _ keychain.Ledger = (*Ledger)(nil)
+var _ ledgerkeychain.Ledger = (*Ledger)(nil)
 
 // Ledger is a wrapper around the low-level Ledger Device interface that
 // provides Avalanche-specific access.
@@ -30,7 +30,7 @@ type Ledger struct {
 	epk    *bip32.Key
 }
 
-func New() (keychain.Ledger, error) {
+func New() (ledgerkeychain.Ledger, error) {
 	device, err := ledger.FindLedgerAvalancheApp()
 	return &Ledger{
 		device: device,
