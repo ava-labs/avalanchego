@@ -20,6 +20,41 @@ import (
 )
 
 func TestWriteBlock_Basic(t *testing.T) {
+	tests := []struct {
+		name  string
+		block []byte
+		want  []byte
+	}{
+		{
+			name:  "normal write",
+			block: []byte("hello"),
+			want:  []byte("hello"),
+		},
+		{
+			name:  "empty block",
+			block: []byte{},
+			want:  []byte{},
+		},
+		{
+			name:  "nil block",
+			block: nil,
+			want:  []byte{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, cleanup := newTestDatabase(t, DefaultConfig())
+			defer cleanup()
+			require.NoError(t, db.Put(0, tt.block))
+
+			got, err := db.Get(0)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestWriteBlock_MaxHeight(t *testing.T) {
 	customConfig := DefaultConfig().WithMinimumHeight(10)
 
 	tests := []struct {

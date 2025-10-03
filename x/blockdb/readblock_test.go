@@ -263,7 +263,7 @@ func TestHasBlock(t *testing.T) {
 		{
 			name:     "db_closed",
 			dbClosed: true,
-			wantErr:  ErrDatabaseClosed,
+			wantErr:  database.ErrClosed,
 		},
 	}
 
@@ -276,14 +276,14 @@ func TestHasBlock(t *testing.T) {
 				if i == gapHeight {
 					continue
 				}
-				require.NoError(t, store.WriteBlock(i, randomBlock(t)))
+				require.NoError(t, store.Put(i, randomBlock(t)))
 			}
 
 			if tc.dbClosed {
 				require.NoError(t, store.Close())
 			}
 
-			has, err := store.HasBlock(tc.height)
+			has, err := store.Has(tc.height)
 			if tc.wantErr != nil {
 				require.ErrorIs(t, err, tc.wantErr)
 			} else {
