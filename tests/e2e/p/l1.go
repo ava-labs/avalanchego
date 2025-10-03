@@ -350,9 +350,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 		require.NoError(err)
 
 		timeToAdvancePChainContext := (5 * platformvmvalidators.RecentlyAcceptedWindowTTL) / 4
-		if timeToAdvancePChainContext < upgrades.GraniteEpochDuration {
-			timeToAdvancePChainContext = upgrades.GraniteEpochDuration
-		}
+		timeToAdvancePChainContext = max(timeToAdvancePChainContext, upgrades.GraniteEpochDuration)
 
 		tc.By("advancing the P-Chain epoch", func() {
 			epochBefore, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
