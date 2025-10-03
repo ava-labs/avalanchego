@@ -19,7 +19,7 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-func TestWriteBlock_Basic(t *testing.T) {
+func TestPut_GetIntegrity(t *testing.T) {
 	tests := []struct {
 		name  string
 		block []byte
@@ -54,7 +54,7 @@ func TestWriteBlock_Basic(t *testing.T) {
 	}
 }
 
-func TestWriteBlock_MaxHeight(t *testing.T) {
+func TestPut_MaxHeightVerification(t *testing.T) {
 	customConfig := DefaultConfig().WithMinimumHeight(10)
 
 	tests := []struct {
