@@ -491,6 +491,21 @@ func (c *Client) GetTimestamp(ctx context.Context, options ...rpc.Option) (time.
 	return res.Timestamp, err
 }
 
+// GetAllValidatorsAt returns the canonical validator sets of
+// all chains with at least one active validator at the specified
+// height or at proposerVM height if set to [platformapi.ProposedHeight].
+func (c *Client) GetAllValidatorsAt(
+	ctx context.Context,
+	height platformapi.Height,
+	options ...rpc.Option,
+) (map[ids.ID]validators.WarpSet, error) {
+	res := &GetAllValidatorsAtReply{}
+	err := c.Requester.SendRequest(ctx, "platform.getAllValidatorsAt", &GetAllValidatorsAtArgs{
+		Height: height,
+	}, res, options...)
+	return res.ValidatorSets, err
+}
+
 // GetValidatorsAt returns the weights of the validator set of a provided subnet
 // at the specified height or at proposerVM height if set to
 // [platformapi.ProposedHeight].

@@ -1834,6 +1834,79 @@ curl -X POST --data '{
 {
   "jsonrpc": "2.0",
   "result": {
+    "2JcZwv2xXxiFHSpRjBaGMK93D61zdyKx2piP95K27ykyUgqhAY": {
+      "validators": [
+        {
+          "publicKey": "0x97c71318cde9fe6839c30e1832c70983dbe7c9b0b371b0f582f9889612bf08039e51025598b41fa46b45e2a3376f03f4",
+          "weight": "200",
+          "nodeIDs": [
+            "NodeID-ADfrGxnezauCF7kUrEoyLzbx5UFaJQc53"
+          ]
+        }
+      ],
+      "totalWeight": "200"
+    },
+    "u3Jjpzzj95827jdENvR1uc76f4zvvVQjGshbVWaSr2Ce5WV1H": {
+      "validators": [
+        {
+          "publicKey": "0xab0d56c98593744c5604a8ee4713ee139bf583eb2bc66bfaad66376f5d351ee657627cff184dfb27c278d9d6da9930d6",
+          "weight": "1000",
+          "nodeIDs": [
+            "NodeID-JEDBLtsdi2S8JvCjfStpcSLLaRmSPuApv"
+          ]
+        },
+        {
+          "publicKey": "0x96935382d34035816802ab6fc4eb29e60e2cf3164e8e9d3419339f3f09c8cd09ffe8c83c21c02f225a4b9e810453f729",
+          "weight": "500",
+          "nodeIDs": [
+            "NodeID-NmcC3gCqnCHUpWxLSmtvN9oCcBycZMfqM",
+            "NodeID-2XcmyLqKMPuCCZqfrWuqNQREKrwMwv4e8"
+          ]
+        }
+      ],
+      "totalWeight": "1500"
+    }
+  },
+  "id": 1
+}
+```
+
+### `platform.getAllValidatorsAt`
+
+Get the validators and their weights of all Subnets and the Primary Network at a given P-Chain height.
+
+**Signature:**
+
+```
+platform.getAllValidatorsAt(
+    {
+        height: [int|string],
+    }
+)
+```
+
+- `height` is the P-Chain height to get the validator set at, or the string literal "proposed"
+  to return the validator set at this node's ProposerVM height.
+
+**Example Call:**
+
+```bash
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getAllValidatorsAt",
+    "params": {
+        "height":1
+    },
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
     "validators": {
       "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg": 2000000000000000,
       "NodeID-GWPcbFJZFfZreETSoWjPimr846mXEKCtu": 2000000000000000,
