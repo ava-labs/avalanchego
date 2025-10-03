@@ -20,7 +20,7 @@ Returns this node's current proposer VM height.
 
 **Signature:**
 
-```go
+```
 proposervm.getProposedHeight() ->
 {
   height: int,
@@ -56,7 +56,7 @@ Returns the current epoch information.
 
 **Signature:**
 
-```go
+```
 proposervm.getCurrentEpoch() ->
 {
   number: int,
