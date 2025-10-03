@@ -13,10 +13,12 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/ava-labs/coreth/plugin/factory"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
@@ -42,6 +44,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -92,6 +95,8 @@ var (
 )
 
 func TestMain(m *testing.M) {
+	evm.RegisterAllLibEVMExtras()
+
 	flag.StringVar(&blockDirArg, "block-dir", blockDirArg, "Block DB directory to read from during re-execution.")
 	flag.StringVar(&currentStateDirArg, "current-state-dir", currentStateDirArg, "Current state directory including VM DB and Chain Data Directory for re-execution.")
 	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (exclusive).")
@@ -171,16 +176,19 @@ func benchmarkReexecuteRange(
 	vmMultiGatherer := metrics.NewPrefixGatherer()
 	r.NoError(prefixGatherer.Register("avalanche_evm", vmMultiGatherer))
 
+	meterVMRegistry := prometheus.NewRegistry()
+	r.NoError(prefixGatherer.Register("avalanche_meterchainvm", meterVMRegistry))
+
 	// consensusRegistry includes the chain="C" label and the prefix "avalanche_snowman".
 	// The consensus registry is passed to the executor to mimic a subset of consensus metrics.
 	consensusRegistry := prometheus.NewRegistry()
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
 
-	if metricsEnabled {
-		collectRegistry(b, "c-chain-reexecution", prefixGatherer, labels)
-	}
-
 	log := tests.NewDefaultLogger("c-chain-reexecution")
+
+	if metricsEnabled {
+		collectRegistry(b, log, "c-chain-reexecution", prefixGatherer, labels)
+	}
 
 	var (
 		vmDBDir      = filepath.Join(currentStateDir, "db")
@@ -214,6 +222,7 @@ func benchmarkReexecuteRange(
 		chainDataDir,
 		configBytes,
 		vmMultiGatherer,
+		meterVMRegistry,
 	)
 	r.NoError(err)
 	defer func() {
@@ -244,7 +253,8 @@ func newMainnetCChainVM(
 	vmAndSharedMemoryDB database.Database,
 	chainDataDir string,
 	configBytes []byte,
-	metricsGatherer metrics.MultiGatherer,
+	vmMultiGatherer metrics.MultiGatherer,
+	meterVMRegistry prometheus.Registerer,
 ) (block.ChainVM, error) {
 	factory := factory.Factory{}
 	vmIntf, err := factory.New(logging.NoLog{})
@@ -272,6 +282,8 @@ func newMainnetCChainVM(
 		ids.Empty:       constants.PrimaryNetworkID,
 	}
 
+	vm = metervm.NewBlockVM(vm, meterVMRegistry)
+
 	if err := vm.Initialize(
 		ctx,
 		&snow.Context{
@@ -289,7 +301,7 @@ func newMainnetCChainVM(
 			Log:          tests.NewDefaultLogger("mainnet-vm-reexecution"),
 			SharedMemory: atomicMemory.NewSharedMemory(mainnetCChainID),
 			BCLookup:     ids.NewAliaser(),
-			Metrics:      metricsGatherer,
+			Metrics:      vmMultiGatherer,
 
 			WarpSigner: warpSigner,
 
@@ -544,7 +556,7 @@ func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, err
 
 // collectRegistry starts prometheus and collects metrics from the provided gatherer.
 // Attaches the provided labels + GitHub labels if available to the collected metrics.
-func collectRegistry(tb testing.TB, name string, gatherer prometheus.Gatherer, labels map[string]string) {
+func collectRegistry(tb testing.TB, log logging.Logger, name string, gatherer prometheus.Gatherer, labels map[string]string) {
 	r := require.New(tb)
 
 	startPromCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
@@ -582,6 +594,19 @@ func collectRegistry(tb testing.TB, name string, gatherer prometheus.Gatherer, l
 		Labels:  labels,
 	}, true /* withGitHubLabels */)
 	r.NoError(err)
+
+	var (
+		dashboardPath = "d/Gl1I20mnk/c-chain"
+		grafanaURI    = tmpnet.DefaultBaseGrafanaURI + dashboardPath
+		startTime     = strconv.FormatInt(time.Now().UnixMilli(), 10)
+	)
+
+	log.Info("metrics available via grafana",
+		zap.String(
+			"url",
+			tmpnet.NewGrafanaURI(networkUUID, startTime, "", grafanaURI),
+		),
+	)
 }
 
 // parseCustomLabels parses a comma-separated list of key-value pairs into a map
@@ -599,28 +624,4 @@ func parseCustomLabels(labelsStr string) (map[string]string, error) {
 		labels[parts[0]] = parts[1]
 	}
 	return labels, nil
-}
-
-func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time.Duration) {
-	r := require.New(b)
-
-	gasUsed, err := getCounterMetricValue(registry, "avalanche_evm_eth_chain_block_gas_used_processed")
-	r.NoError(err)
-	mgasPerSecond := gasUsed / 1_000_000 / elapsed.Seconds()
-	b.ReportMetric(mgasPerSecond, "mgas/s")
-}
-
-func getCounterMetricValue(registry prometheus.Gatherer, query string) (float64, error) {
-	metricFamilies, err := registry.Gather()
-	if err != nil {
-		return 0, fmt.Errorf("failed to gather metrics: %w", err)
-	}
-
-	for _, mf := range metricFamilies {
-		if mf.GetName() == query {
-			return mf.GetMetric()[0].Counter.GetValue(), nil
-		}
-	}
-
-	return 0, fmt.Errorf("metric %s not found", query)
 }
