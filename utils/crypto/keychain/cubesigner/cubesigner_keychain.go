@@ -36,7 +36,7 @@ var (
 	ErrEmptySignatureFromServer = errors.New("empty signature obtained from server")
 	ErrChainAliasMissing        = errors.New("chainAlias must be specified in options for CubeSigner")
 	ErrInvalidChainAlias        = errors.New("chainAlias must be 'P', 'X' or 'C' for CubeSigner")
-	ErrNetworkIDMissing         = errors.New("network ID must be specified in options for CubeSigner")
+	ErrNetworkIDMissing         = errors.New("network ID must be specified in options for CubeSigner for P/X chain")
 	ErrUnsupportedKeyType       = errors.New("unsupported key type")
 	ErrInvalidPublicKey         = errors.New("invalid public key format")
 )
@@ -235,7 +235,7 @@ func (s *cubesignerSigner) Sign(b []byte, opts ...keychain.SigningOption) ([]byt
 	if options.ChainAlias != "P" && options.ChainAlias != "X" && options.ChainAlias != "C" {
 		return nil, fmt.Errorf("%w, got %q", ErrInvalidChainAlias, options.ChainAlias)
 	}
-	if options.NetworkID == 0 {
+	if options.ChainAlias != "C" && options.NetworkID == 0 {
 		return nil, ErrNetworkIDMissing
 	}
 	var materialID string
