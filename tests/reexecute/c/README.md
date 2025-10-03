@@ -173,15 +173,15 @@ After generating the `$EXECUTION_DATA_DIR/current-state` directory from executin
 
 Since we are already using the S3 bucket `s3://avalanchego-bootstrap-testing`, we'll re-use it here. We'll use the `export-dir-to-s3` task, which takes in two parameters:
 
-- `LOCAL_SRC` - local path to recursive copy contents from
-- `S3_DST` - S3 bucket destination path
+- `SRC` - local path to recursive copy contents from
+- `DST` - S3 bucket destination path
 
 To avoid clobbering useful data, `export-dir-to-s3` will first attempt to check that the destination does not yet exist and that the path does not have any nesting. For example, `s3://avalanchego-bootstrap-testing/target-dir/` is valid, but `s3://avalanchego-bootstrap-testing/nested/target-dir/` is invalid because it contains two levels of nesting.
 
 As a result, if you run into a warning using this command, check the current contents using either the AWS Console or `s5cmd ls` and pick a valid, unused prefix.
 
 ```bash
-task export-dir-to-s3 LOCAL_SRC=$EXECUTION_DATA_DIR/current-state/ S3_DST=s3://avalanchego-bootstrap-testing/cchain-current-state-test/
+task export-dir-to-s3 SRC=$EXECUTION_DATA_DIR/current-state/ DST=s3://avalanchego-bootstrap-testing/cchain-current-state-test/
 ```
 
 ### Re-Execute C-Chain Range
