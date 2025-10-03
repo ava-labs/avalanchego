@@ -20,7 +20,7 @@ func GetConfig(fork Fork) upgrade.Config {
 // be unscheduled.
 func GetConfigWithUpgradeTime(fork Fork, upgradeTime time.Time) upgrade.Config {
 	c := upgrade.Config{
-		GraniteEpochDuration: 30 * time.Second,
+		GraniteEpochDuration: upgrade.Default.GraniteEpochDuration,
 	}
 	// Initialize all forks to be unscheduled
 	SetTimesTo(&c, Latest, upgrade.UnscheduledActivationTime)
