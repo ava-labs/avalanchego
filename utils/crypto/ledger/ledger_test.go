@@ -34,16 +34,18 @@ func TestLedger(t *testing.T) {
 	t.Logf("version: %s\n", version)
 
 	// Get Fuji Address
-	addr, err := device.Address(hrp, 0)
+	pubKey, err := device.PubKey(0)
 	require.NoError(err)
+	addr := pubKey.Address()
 	paddr, err := address.Format(chainAlias, hrp, addr[:])
 	require.NoError(err)
 	t.Logf("address: %s shortID: %s\n", paddr, addr)
 
-	// Get Extended Addresses
-	addresses, err := device.Addresses([]uint32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
+	// Get Extended Public Keys
+	pubKeys, err := device.PubKeys([]uint32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9})
 	require.NoError(err)
-	for i, taddr := range addresses {
+	for i, pk := range pubKeys {
+		taddr := pk.Address()
 		paddr, err := address.Format(chainAlias, hrp, taddr[:])
 		require.NoError(err)
 		t.Logf("address(%d): %s shortID: %s\n", i, paddr, taddr)
@@ -66,7 +68,7 @@ func TestLedger(t *testing.T) {
 
 		pk, err := secp256k1.RecoverPublicKeyFromHash(rawHash, sig)
 		require.NoError(err)
-		require.Equal(addresses[addrIndex], pk.Address())
+		require.Equal(pubKeys[addrIndex].Address(), pk.Address())
 	}
 
 	// Disconnect

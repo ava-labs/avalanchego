@@ -6,8 +6,8 @@ package ledger
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
+	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/version"
 
@@ -41,15 +41,19 @@ func addressPath(index uint32) string {
 	return fmt.Sprintf("%s/0/%d", rootPath, index)
 }
 
-func (l *Ledger) Address(hrp string, addressIndex uint32) (ids.ShortID, error) {
-	resp, err := l.device.GetPubKey(addressPath(addressIndex), true, hrp, "")
+func (l *Ledger) PubKey(addressIndex uint32) (*secp256k1.PublicKey, error) {
+	resp, err := l.device.GetPubKey(addressPath(addressIndex), false, "", "")
 	if err != nil {
-		return ids.ShortEmpty, err
+		return nil, err
 	}
-	return ids.ToShortID(resp.Hash)
+	pubKey, err := secp256k1.ToPublicKey(resp.PublicKey)
+	if err != nil {
+		return nil, fmt.Errorf("failure parsing public key from ledger: %w", err)
+	}
+	return pubKey, nil
 }
 
-func (l *Ledger) Addresses(addressIndices []uint32) ([]ids.ShortID, error) {
+func (l *Ledger) PubKeys(addressIndices []uint32) ([]*secp256k1.PublicKey, error) {
 	if l.epk == nil {
 		pk, chainCode, err := l.device.GetExtPubKey(rootPath, false, "", "")
 		if err != nil {
@@ -65,16 +69,20 @@ func (l *Ledger) Addresses(addressIndices []uint32) ([]ids.ShortID, error) {
 	if err != nil {
 		return nil, err
 	}
-	addresses := make([]ids.ShortID, len(addressIndices))
+	pubKeys := make([]*secp256k1.PublicKey, len(addressIndices))
 	for i, addressIndex := range addressIndices {
 		// derivation path rootPath/0/v (BIP44 address index level)
 		address, err := externalChain.NewChildKey(addressIndex)
 		if err != nil {
 			return nil, err
 		}
-		copy(addresses[i][:], hashing.PubkeyBytesToAddress(address.Key))
+		pubKey, err := secp256k1.ToPublicKey(address.Key)
+		if err != nil {
+			return nil, fmt.Errorf("failure parsing public key for ledger child key %d: %w", addressIndex, err)
+		}
+		pubKeys[i] = pubKey
 	}
-	return addresses, nil
+	return pubKeys, nil
 }
 
 func convertToSigningPaths(input []uint32) []string {
