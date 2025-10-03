@@ -184,13 +184,13 @@ func BootstrapNewNetwork(
 	}
 
 	if err := checkVMBinaries(log, network.Subnets, network.DefaultRuntimeConfig.Process); err != nil {
-		return stacktrace.Wrap(fmt.Errorf("failed to check VM binaries: %w", err))
+		return stacktrace.Wrap(err)
 	}
 	if err := network.EnsureDefaultConfig(ctx, log); err != nil {
-		return stacktrace.Wrap(fmt.Errorf("failed to ensure default config: %w", err))
+		return stacktrace.Wrap(err)
 	}
 	if err := network.Create(rootNetworkDir); err != nil {
-		return stacktrace.Wrap(fmt.Errorf("failed to create network: %w", err))
+		return stacktrace.Wrap(err)
 	}
 	return network.Bootstrap(ctx, log)
 }
