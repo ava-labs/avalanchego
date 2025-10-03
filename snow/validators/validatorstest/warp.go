@@ -15,7 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 )
 
-func NewWarp(t *testing.T, weight uint64) *validators.Warp {
+func NewWarp(t testing.TB, weight uint64) *validators.Warp {
 	t.Helper()
 
 	sk, err := localsigner.New()
@@ -31,7 +31,7 @@ func NewWarp(t *testing.T, weight uint64) *validators.Warp {
 	}
 }
 
-func NewWarpSet(t *testing.T, n uint64) validators.WarpSet {
+func NewWarpSet(t testing.TB, n uint64) validators.WarpSet {
 	t.Helper()
 
 	vdrs := make([]*validators.Warp, n)
@@ -42,5 +42,13 @@ func NewWarpSet(t *testing.T, n uint64) validators.WarpSet {
 	return validators.WarpSet{
 		Validators:  vdrs,
 		TotalWeight: n,
+	}
+}
+
+func WarpToOutput(w *validators.Warp) *validators.GetValidatorOutput {
+	return &validators.GetValidatorOutput{
+		NodeID:    w.NodeIDs[0],
+		PublicKey: w.PublicKey,
+		Weight:    w.Weight,
 	}
 }

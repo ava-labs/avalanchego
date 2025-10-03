@@ -19,14 +19,6 @@ import (
 	. "github.com/ava-labs/avalanchego/snow/validators"
 )
 
-func warpToOutput(w *Warp) *GetValidatorOutput {
-	return &GetValidatorOutput{
-		NodeID:    w.NodeIDs[0],
-		PublicKey: w.PublicKey,
-		Weight:    w.Weight,
-	}
-}
-
 func TestFlattenValidatorSet(t *testing.T) {
 	var (
 		vdrs    = validatorstest.NewWarpSet(t, 3)
@@ -43,7 +35,7 @@ func TestFlattenValidatorSet(t *testing.T) {
 		{
 			name: "overflow",
 			validators: map[ids.NodeID]*GetValidatorOutput{
-				nodeID0: warpToOutput(vdrs.Validators[0]),
+				nodeID0: validatorstest.WarpToOutput(vdrs.Validators[0]),
 				nodeID1: {
 					NodeID:    nodeID1,
 					PublicKey: vdrs.Validators[1].PublicKey,
@@ -55,7 +47,7 @@ func TestFlattenValidatorSet(t *testing.T) {
 		{
 			name: "nil_public_key_skipped",
 			validators: map[ids.NodeID]*GetValidatorOutput{
-				nodeID0: warpToOutput(vdrs.Validators[0]),
+				nodeID0: validatorstest.WarpToOutput(vdrs.Validators[0]),
 				nodeID1: {
 					NodeID:    nodeID1,
 					PublicKey: nil,
@@ -70,9 +62,9 @@ func TestFlattenValidatorSet(t *testing.T) {
 		{
 			name: "sorted", // Would non-deterministically fail without sorting
 			validators: map[ids.NodeID]*GetValidatorOutput{
-				nodeID0: warpToOutput(vdrs.Validators[0]),
-				nodeID1: warpToOutput(vdrs.Validators[1]),
-				nodeID2: warpToOutput(vdrs.Validators[2]),
+				nodeID0: validatorstest.WarpToOutput(vdrs.Validators[0]),
+				nodeID1: validatorstest.WarpToOutput(vdrs.Validators[1]),
+				nodeID2: validatorstest.WarpToOutput(vdrs.Validators[2]),
 			},
 			want: vdrs,
 		},

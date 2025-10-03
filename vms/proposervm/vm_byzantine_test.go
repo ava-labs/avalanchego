@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -32,12 +32,7 @@ import (
 func TestInvalidByzantineProposerParent(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
-		graniteTime    = upgrade.InitiallyActiveTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -86,12 +81,7 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
-		graniteTime    = upgrade.InitiallyActiveTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	proVM.Set(snowmantest.GenesisTimestamp)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
@@ -171,12 +161,7 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
-		graniteTime    = upgrade.InitiallyActiveTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -239,12 +224,7 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
-		graniteTime    = upgrade.InitiallyActiveTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	proVM.Set(snowmantest.GenesisTimestamp)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
@@ -319,12 +299,7 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
-		graniteTime    = upgrade.InitiallyActiveTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	proVM.Set(snowmantest.GenesisTimestamp)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
@@ -450,12 +425,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 func TestGetBlock_MutatedSignature(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
-		graniteTime    = upgrade.InitiallyActiveTime
-	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()

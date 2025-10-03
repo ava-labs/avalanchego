@@ -29,6 +29,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/staking"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 
 	blockbuilder "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
@@ -36,12 +37,7 @@ import (
 func TestCoreVMNotRemote(t *testing.T) {
 	// if coreVM is not remote VM, a specific error is returned
 	require := require.New(t)
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
-		graniteTime    = upgrade.InitiallyActiveTime
-	)
-	_, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, graniteTime, 0)
+	_, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -67,12 +63,7 @@ func TestCoreVMNotRemote(t *testing.T) {
 
 func TestGetAncestorsPreForkOnly(t *testing.T) {
 	require := require.New(t)
-	var (
-		activationTime = upgrade.UnscheduledActivationTime
-		durangoTime    = upgrade.UnscheduledActivationTime
-		graniteTime    = upgrade.UnscheduledActivationTime
-	)
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime, graniteTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, upgradetest.NoUpgrades)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -191,12 +182,7 @@ func TestGetAncestorsPreForkOnly(t *testing.T) {
 
 func TestGetAncestorsPostForkOnly(t *testing.T) {
 	require := require.New(t)
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
-		graniteTime    = upgrade.InitiallyActiveTime
-	)
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime, graniteTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, upgradetest.Latest)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -327,13 +313,10 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 		preForkTime  = currentTime.Add(5 * time.Minute)
 		forkTime     = currentTime.Add(10 * time.Minute)
 		postForkTime = currentTime.Add(15 * time.Minute)
-
-		durangoTime = forkTime
-		graniteTime = forkTime
 	)
 
 	// enable ProBlks in next future
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, forkTime, durangoTime, graniteTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, upgradetest.Latest, forkTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -499,12 +482,7 @@ func TestGetAncestorsAtSnomanPlusPlusFork(t *testing.T) {
 
 func TestBatchedParseBlockPreForkOnly(t *testing.T) {
 	require := require.New(t)
-	var (
-		activationTime = upgrade.UnscheduledActivationTime
-		durangoTime    = upgrade.UnscheduledActivationTime
-		graniteTime    = upgrade.UnscheduledActivationTime
-	)
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime, graniteTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, upgradetest.NoUpgrades)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -700,12 +678,7 @@ func makeParseableBlocks(t *testing.T, parentID ids.ID, timestamp time.Time, pCh
 
 func TestBatchedParseBlockPostForkOnly(t *testing.T) {
 	require := require.New(t)
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.InitiallyActiveTime
-		graniteTime    = upgrade.InitiallyActiveTime
-	)
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, activationTime, durangoTime, graniteTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, upgradetest.Latest)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -793,13 +766,10 @@ func TestBatchedParseBlockAtSnomanPlusPlusFork(t *testing.T) {
 		preForkTime  = currentTime.Add(5 * time.Minute)
 		forkTime     = currentTime.Add(10 * time.Minute)
 		postForkTime = currentTime.Add(15 * time.Minute)
-
-		durangoTime = forkTime
-		graniteTime = forkTime
 	)
 
 	// enable ProBlks in next future
-	coreVM, proRemoteVM := initTestRemoteProposerVM(t, forkTime, durangoTime, graniteTime)
+	coreVM, proRemoteVM := initTestRemoteProposerVM(t, upgradetest.Latest, forkTime)
 	defer func() {
 		require.NoError(proRemoteVM.Shutdown(context.Background()))
 	}()
@@ -925,11 +895,13 @@ type TestRemoteProposerVM struct {
 	*blocktest.VM
 }
 
+// initTestRemoteProposerVM creates a proposerVM for testing.
+// If forkActivationTime is provided, the fork activates at that specific time.
+// If not provided, the fork is already activated at InitiallyActiveTime.
 func initTestRemoteProposerVM(
 	t *testing.T,
-	activationTime,
-	durangoTime time.Time,
-	graniteTime time.Time,
+	fork upgradetest.Fork,
+	forkActivationTime ...time.Time,
 ) (
 	TestRemoteProposerVM,
 	*VM,
@@ -976,15 +948,17 @@ func initTestRemoteProposerVM(
 		}
 	}
 
+	var upgrades upgrade.Config
+	if len(forkActivationTime) > 0 {
+		upgrades = upgradetest.GetConfigWithUpgradeTime(fork, forkActivationTime[0])
+	} else {
+		upgrades = upgradetest.GetConfig(fork)
+	}
+
 	proVM := New(
 		coreVM,
 		Config{
-			Upgrades: upgrade.Config{
-				ApricotPhase4Time:            activationTime,
-				ApricotPhase4MinPChainHeight: 0,
-				DurangoTime:                  durangoTime,
-				GraniteTime:                  graniteTime,
-			},
+			Upgrades:            upgrades,
 			MinBlkDelay:         DefaultMinBlockDelay,
 			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
 			StakingLeafSigner:   pTestSigner,
