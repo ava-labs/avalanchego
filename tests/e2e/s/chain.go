@@ -45,7 +45,7 @@ func NewSimplexSubnetOrPanic(name string, key *secp256k1.PrivateKey, nodes ...*t
 	return &tmpnet.Subnet{
 		Name: name,
 		Config: tmpnet.ConfigMap{
-			"consensusConfig": map[string]interface{}{
+			"consensusParameters": map[string]interface{}{
 				"simplexParameters": map[string]interface{}{},
 			},
 		},

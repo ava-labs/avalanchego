@@ -407,7 +407,7 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 		"invalid consensus parameters": {
 			fileName: "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
 			givenJSON: `{
-				"consensusConfig": {
+				"consensusParameters": {
 					"snowballParameters": {
 						"k": 111,
 						"alphaPreference": 1234
@@ -421,30 +421,30 @@ func TestGetSubnetConfigsFromFile(t *testing.T) {
 		},
 		"correct snowball config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"validatorOnly": true, "consensusConfig":{"snowballParameters":{"alphaConfidence":16}}}`,
+			givenJSON: `{"validatorOnly": true, "consensusParameters":{"snowballParameters":{"alphaConfidence":16}}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
 				require.True(ok)
 
 				require.True(config.ValidatorOnly)
-				require.Equal(16, config.ConsensusConfig.SnowballParams.AlphaConfidence)
+				require.Equal(16, config.ConsensusParameters.SnowballParams.AlphaConfidence)
 				// must still respect defaults
-				require.Equal(20, config.ConsensusConfig.SnowballParams.K)
+				require.Equal(20, config.ConsensusParameters.SnowballParams.K)
 			},
 			expectedErr: nil,
 		},
 		"correct simplex config": {
 			fileName:  "2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i.json",
-			givenJSON: `{"validatorOnly": true, "consensusConfig":{"simplexParameters":{"MaxProposalWait":1000,"MaxRebroadcastWait":1000}}}`,
+			givenJSON: `{"validatorOnly": true, "consensusParameters":{"simplexParameters":{"MaxProposalWait":1000,"MaxRebroadcastWait":1000}}}`,
 			testF: func(require *require.Assertions, given map[ids.ID]subnets.Config) {
 				id, _ := ids.FromString("2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i")
 				config, ok := given[id]
 				require.True(ok)
 
 				require.True(config.ValidatorOnly)
-				require.Equal(time.Duration(1000), config.ConsensusConfig.SimplexParams.MaxProposalWait)
-				require.Equal(time.Duration(1000), config.ConsensusConfig.SimplexParams.MaxRebroadcastWait)
+				require.Equal(time.Duration(1000), config.ConsensusParameters.SimplexParams.MaxProposalWait)
+				require.Equal(time.Duration(1000), config.ConsensusParameters.SimplexParams.MaxRebroadcastWait)
 			},
 			expectedErr: nil,
 		},
@@ -501,14 +501,14 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				config, ok := given[id]
 				require.True(ok)
 				// should respect defaults
-				require.Equal(20, config.ConsensusConfig.SnowballParams.K)
+				require.Equal(20, config.ConsensusParameters.SnowballParams.K)
 			},
 			expectedErr: nil,
 		},
 		"simplex enabled": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"consensusConfig": {
+					"consensusParameters": {
 						"simplexParameters": {
 							"MaxProposalWait":1000,
 							"MaxRebroadcastWait":1000
@@ -523,8 +523,8 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				config, ok := given[id]
 				require.True(ok)
 				// should respect defaults
-				require.Equal(time.Duration(1000), config.ConsensusConfig.SimplexParams.MaxProposalWait)
-				require.Equal(time.Duration(1000), config.ConsensusConfig.SimplexParams.MaxRebroadcastWait)
+				require.Equal(time.Duration(1000), config.ConsensusParameters.SimplexParams.MaxProposalWait)
+				require.Equal(time.Duration(1000), config.ConsensusParameters.SimplexParams.MaxRebroadcastWait)
 			},
 			expectedErr: nil,
 		},
@@ -538,7 +538,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 		"invalid consensus parameters": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"consensusConfig": {
+					"consensusParameters": {
 						"snowballParameters": {
 							"k": 111,
 							"alphaPreference": 1234
@@ -554,7 +554,7 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 		"correct config": {
 			givenJSON: `{
 				"2Ctt6eGAeo4MLqTmGa7AdRecuVMPGWEX9wSsCLBYrLhX4a394i": {
-					"consensusConfig": {
+					"consensusParameters": {
 						"snowballParameters": {
 							"k": 30,
 							"alphaPreference": 16,
@@ -569,11 +569,11 @@ func TestGetSubnetConfigsFromFlags(t *testing.T) {
 				config, ok := given[id]
 				require.True(ok)
 				require.True(config.ValidatorOnly)
-				require.Equal(16, config.ConsensusConfig.SnowballParams.AlphaPreference)
-				require.Equal(20, config.ConsensusConfig.SnowballParams.AlphaConfidence)
-				require.Equal(30, config.ConsensusConfig.SnowballParams.K)
+				require.Equal(16, config.ConsensusParameters.SnowballParams.AlphaPreference)
+				require.Equal(20, config.ConsensusParameters.SnowballParams.AlphaConfidence)
+				require.Equal(30, config.ConsensusParameters.SnowballParams.K)
 				// must still respect defaults
-				require.Equal(256, config.ConsensusConfig.SnowballParams.MaxOutstandingItems)
+				require.Equal(256, config.ConsensusParameters.SnowballParams.MaxOutstandingItems)
 			},
 			expectedErr: nil,
 		},

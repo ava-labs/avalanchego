@@ -20,7 +20,7 @@ var (
 	errTwoConfigs                       = errors.New("subnet config must have exactly one of snowball or simplex parameters set")
 )
 
-type ConsensusConfig struct {
+type ConsensusParameters struct {
 	SnowballParams *snowball.Parameters `json:"snowballParameters,omitempty" yaml:"snowballParameters,omitempty"`
 	SimplexParams  *simplex.Parameters  `json:"simplexParameters,omitempty"  yaml:"simplexParameters,omitempty"`
 }
@@ -33,8 +33,8 @@ type Config struct {
 	ValidatorOnly bool `json:"validatorOnly" yaml:"validatorOnly"`
 	// AllowedNodes is the set of node IDs that are explicitly allowed to connect to this Subnet when
 	// ValidatorOnly is enabled.
-	AllowedNodes    set.Set[ids.NodeID] `json:"allowedNodes"    yaml:"allowedNodes"`
-	ConsensusConfig ConsensusConfig     `json:"consensusConfig" yaml:"consensusConfig"`
+	AllowedNodes        set.Set[ids.NodeID] `json:"allowedNodes"        yaml:"allowedNodes"`
+	ConsensusParameters ConsensusParameters `json:"consensusParameters" yaml:"consensusParameters"`
 
 	// ProposerMinBlockDelay is the minimum delay this node will enforce when
 	// building a snowman++ block.
@@ -62,7 +62,7 @@ type Config struct {
 }
 
 func (c *Config) Valid() error {
-	if err := c.ConsensusConfig.Verify(); err != nil {
+	if err := c.ConsensusParameters.Verify(); err != nil {
 		return fmt.Errorf("consensus %w", err)
 	}
 	if !c.ValidatorOnly && c.AllowedNodes.Len() > 0 {
@@ -71,7 +71,7 @@ func (c *Config) Valid() error {
 	return nil
 }
 
-func (c *ConsensusConfig) Verify() error {
+func (c *ConsensusParameters) Verify() error {
 	if c.SnowballParams == nil && c.SimplexParams == nil {
 		return errMissingConsensusParameters
 	}

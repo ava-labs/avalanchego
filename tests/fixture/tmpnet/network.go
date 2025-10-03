@@ -790,7 +790,7 @@ func restartRequired(subnets []*Subnet) bool {
 	for _, subnet := range subnets {
 		// we need to restart if the subnet specifies simplex consensus, so it can
 		// initialize its chains using a simplex engine
-		if subnet.Config["consensusConfig"] != nil && subnet.Config["consensusConfig"].(map[string]interface{})["simplexParameters"] != nil {
+		if subnet.Config["consensusParameters"] != nil && subnet.Config["consensusParameters"].(map[string]interface{})["simplexParameters"] != nil {
 			return true
 		}
 	}

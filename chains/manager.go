@@ -567,7 +567,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		}
 	case block.ChainVM:
 		// handle simplex engine based off parameters
-		if sb.Config().ConsensusConfig.SimplexParams != nil {
+		if sb.Config().ConsensusParameters.SimplexParams != nil {
 			chain, err = m.createSimplexChain(ctx, vm, sb, chainParams.GenesisData, chainFxs)
 			if err != nil {
 				return nil, fmt.Errorf("error while creating simplex chain %w", err)
@@ -849,10 +849,10 @@ func (m *manager) createAvalancheChain(
 	}
 
 	// sanity check as this should be set by default
-	if sb.Config().ConsensusConfig.SnowballParams == nil {
+	if sb.Config().ConsensusParameters.SnowballParams == nil {
 		return nil, fmt.Errorf("snowball parameters not specified for subnet %s", ctx.SubnetID)
 	}
-	consensusParams := *sb.Config().ConsensusConfig.SnowballParams
+	consensusParams := *sb.Config().ConsensusParameters.SnowballParams
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)
@@ -1255,10 +1255,10 @@ func (m *manager) createSnowmanChain(
 	}
 
 	// sanity check as this should be set by default
-	if sb.Config().ConsensusConfig.SnowballParams == nil {
+	if sb.Config().ConsensusParameters.SnowballParams == nil {
 		return nil, fmt.Errorf("snowball parameters not specified for subnet %s", ctx.SubnetID)
 	}
-	consensusParams := *sb.Config().ConsensusConfig.SnowballParams
+	consensusParams := *sb.Config().ConsensusParameters.SnowballParams
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)
@@ -1776,7 +1776,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		WAL:                wal,
 		SignBLS:            m.ManagerConfig.StakingBLSKey.Sign,
 		DB:                 simplexDB,
-		Params:             sb.Config().ConsensusConfig.SimplexParams,
+		Params:             sb.Config().ConsensusParameters.SimplexParams,
 	}
 
 	engine, err := simplex.NewEngine(ctx, context.TODO(), config)

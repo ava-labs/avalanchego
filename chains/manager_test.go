@@ -113,7 +113,7 @@ func newTestSubnets(t *testing.T, subnetID ids.ID) *Subnets {
 	config := map[ids.ID]subnets.Config{
 		constants.PrimaryNetworkID: {},
 		subnetID: {
-			ConsensusConfig: subnets.ConsensusConfig{
+			ConsensusParameters: subnets.ConsensusParameters{
 				SimplexParams: &simplex.Parameters{},
 			},
 		},

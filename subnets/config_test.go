@@ -35,7 +35,7 @@ func TestValid(t *testing.T) {
 		{
 			name: "invalid snowball consensus parameters",
 			s: Config{
-				ConsensusConfig: ConsensusConfig{
+				ConsensusParameters: ConsensusParameters{
 					SnowballParams: &snowball.Parameters{
 						K:               2,
 						AlphaPreference: 1,
@@ -49,7 +49,7 @@ func TestValid(t *testing.T) {
 			s: Config{
 				AllowedNodes:  set.Of(ids.GenerateTestNodeID()),
 				ValidatorOnly: false,
-				ConsensusConfig: ConsensusConfig{
+				ConsensusParameters: ConsensusParameters{
 					SnowballParams: &validParameters,
 				},
 			},
@@ -58,7 +58,7 @@ func TestValid(t *testing.T) {
 		{
 			name: "valid snowball parameters",
 			s: Config{
-				ConsensusConfig: ConsensusConfig{
+				ConsensusParameters: ConsensusParameters{
 					SnowballParams: &validParameters,
 				},
 				ValidatorOnly: false,
@@ -68,7 +68,7 @@ func TestValid(t *testing.T) {
 		{
 			name: "valid simplex parameters",
 			s: Config{
-				ConsensusConfig: ConsensusConfig{
+				ConsensusParameters: ConsensusParameters{
 					SimplexParams: &simplex.Parameters{
 						MaxProposalWait:    1 * time.Second,
 						MaxRebroadcastWait: 1 * time.Second,
@@ -81,14 +81,14 @@ func TestValid(t *testing.T) {
 		{
 			name: "no consensus parameters",
 			s: Config{
-				ConsensusConfig: ConsensusConfig{},
+				ConsensusParameters: ConsensusParameters{},
 			},
 			expectedErr: errMissingConsensusParameters,
 		},
 		{
 			name: "both consensus parameters set",
 			s: Config{
-				ConsensusConfig: ConsensusConfig{
+				ConsensusParameters: ConsensusParameters{
 					SnowballParams: &validParameters,
 					SimplexParams:  &simplex.Parameters{},
 				},
@@ -98,7 +98,7 @@ func TestValid(t *testing.T) {
 		{
 			name: "invalid simplex parameters",
 			s: Config{
-				ConsensusConfig: ConsensusConfig{
+				ConsensusParameters: ConsensusParameters{
 					SimplexParams: &simplex.Parameters{
 						MaxProposalWait:    -1,
 						MaxRebroadcastWait: -10,
@@ -110,7 +110,7 @@ func TestValid(t *testing.T) {
 		{
 			name: "empty simplex parameters",
 			s: Config{
-				ConsensusConfig: ConsensusConfig{
+				ConsensusParameters: ConsensusParameters{
 					SimplexParams: &simplex.Parameters{
 						MaxProposalWait:    0,
 						MaxRebroadcastWait: 0,

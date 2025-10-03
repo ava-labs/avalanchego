@@ -12,7 +12,7 @@ Here is an example of Subnet config file:
 ```json
 {
   "validatorOnly": false,
-  "consensusConfig": {
+  "consensusParameters": {
     "snowballParameters": {
       "k": 25,
       "alpha": 18
@@ -62,7 +62,7 @@ this configuration in order to properly allow a node in the private Subnet.
 
 Subnet configs supports loading new consensus parameters or even consensus engines(Snowman or Simplex).
 JSON keys are different from their matching `CLI` keys. These parameters must be grouped under
-`consensusConfig` key. The consensus parameters of a Subnet default to the
+`consensusParameters` key. The consensus parameters of a Subnet default to the
 same values used for the Primary Network, which are given [CLI Snow Parameters](https://build.avax.network/docs/nodes/configure/configs-flags#snow-parameters).
 
 | CLI Key                      | JSON Key              |
