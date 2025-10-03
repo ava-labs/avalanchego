@@ -11,6 +11,12 @@ tasks:
     desc: Builds avalanchego
     cmd: ./scripts/build.sh
 
+  build-with-firewood:
+    desc: Builds avalanchego with Firewood FFI (specify version with FIREWOOD_VERSION)
+    vars:
+      FIREWOOD_VERSION: '{{.FIREWOOD_VERSION | default "ffi/v0.0.12"}}'
+    cmd: ./scripts/build.sh -f {{.FIREWOOD_VERSION}}
+
   build-antithesis-images-avalanchego:
     desc: Builds docker images for antithesis for the avalanchego test setup
     env:
