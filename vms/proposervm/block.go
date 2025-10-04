@@ -34,6 +34,7 @@ var (
 	errPChainHeightNotMonotonic = errors.New("non monotonically increasing P-chain height")
 	errPChainHeightNotReached   = errors.New("block P-chain height larger than current P-chain height")
 	errTimeTooAdvanced          = errors.New("time is too far advanced")
+	errEpochMismatch            = errors.New("epoch mismatch")
 	errProposerWindowNotStarted = errors.New("proposer window hasn't started")
 	errUnexpectedProposer       = errors.New("unexpected proposer for current window")
 	errProposerMismatch         = errors.New("proposer mismatch")
@@ -128,7 +129,7 @@ func (p *postForkCommonComponents) Verify(
 
 	childEpoch := child.PChainEpoch()
 	if expected := acp181.Epoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, childTimestamp); childEpoch != expected {
-		return fmt.Errorf("epoch mismatch: epoch %v != expected %v", childEpoch, expected)
+		return fmt.Errorf("%w: epoch %v != expected %v", errEpochMismatch, childEpoch, expected)
 	}
 
 	// If the node is currently syncing - we don't assume that the P-chain has
