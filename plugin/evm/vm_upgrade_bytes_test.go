@@ -411,3 +411,9 @@ func TestVMEtnaActivatesCancun(t *testing.T) {
 		})
 	}
 }
+
+// currentRules returns the chain rules for the current block.
+func (vm *VM) currentRules() extras.Rules {
+	header := vm.eth.APIBackend.CurrentHeader()
+	return vm.rules(header.Number, header.Time)
+}
