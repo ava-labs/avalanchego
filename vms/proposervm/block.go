@@ -131,7 +131,7 @@ func makeEpoch(
 // 7) [child]'s timestamp is within its proposer's window
 // 8) [child] has a valid signature from its proposer
 // 9) [child]'s inner block is valid
-// 10) [child] has the expected P-Chain epoch
+// 10) [child] has the expected epoch
 func (p *postForkCommonComponents) Verify(
 	ctx context.Context,
 	parentTimestamp time.Time,
@@ -349,9 +349,7 @@ func (p *postForkCommonComponents) buildChild(
 		zap.Uint64("pChainHeight", pChainHeight),
 		zap.Time("parentTimestamp", parentTimestamp),
 		zap.Time("blockTimestamp", newTimestamp),
-		zap.Uint64("epochPChainHeight", epoch.PChainHeight),
-		zap.Uint64("epochNumber", epoch.Number),
-		zap.Time("epochStartTime", time.Unix(epoch.StartTime, 0)),
+		zap.Reflect("epoch", epoch),
 	)
 	return child, nil
 }
