@@ -346,21 +346,28 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			})
 		})
 
-		upgrades, err := infoClient.Upgrades(tc.DefaultContext())
-		require.NoError(err)
+		advanceProposerVMPChainHeight := func() {
+			upgrades, err := infoClient.Upgrades(tc.DefaultContext())
+			require.NoError(err)
 
-		timeToAdvancePChainContext := (5 * platformvmvalidators.RecentlyAcceptedWindowTTL) / 4
-		timeToAdvancePChainContext = max(timeToAdvancePChainContext, upgrades.GraniteEpochDuration)
+			const timeToAdvancePChainWindow = 5 * platformvmvalidators.RecentlyAcceptedWindowTTL / 4
+			if !upgrades.IsGraniteActivated(time.Now()) {
+				// We must wait at least [RecentlyAcceptedWindowTTL] to ensure
+				// the next block will reference the last accepted P-chain
+				// height.
+				time.Sleep(timeToAdvancePChainWindow)
+				return
+			}
 
-		tc.By("advancing the P-Chain epoch", func() {
 			epochBefore, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
 			require.NoError(err)
 
-			tc.By("advancing the proposervm P-chain epoched height", func() {
-				time.Sleep(timeToAdvancePChainContext)
+			tc.By("waiting", func() {
+				timeToAdvanceEpoch := max(timeToAdvancePChainWindow, upgrades.GraniteEpochDuration)
+				time.Sleep(timeToAdvanceEpoch)
 			})
 
-			tc.By("issue a dummy tx to advance the epoch", func() {
+			tc.By("issuing a dummy tx to advance the epoch", func() {
 				tx, err := pWallet.IssueBaseTx(
 					[]*avax.TransferableOutput{
 						{
@@ -400,7 +407,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			epochAfter, err := proposerClient.GetCurrentEpoch(tc.DefaultContext())
 			require.NoError(err)
 			require.Greater(epochAfter.PChainHeight, epochBefore.PChainHeight)
-		})
+		}
+
+		tc.By("advancing the P-Chain epoch", advanceProposerVMPChainHeight)
 
 		tc.By("creating the validator to register")
 		subnetRegisterNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.NewEphemeralNode(tmpnet.FlagsMap{
@@ -756,11 +765,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			})
 		})
 
-		tc.By("advancing the proposervm P-chain height", func() {
-			// We must wait at least [RecentlyAcceptedWindowTTL] to ensure the
-			// next block will reference the last accepted P-chain height.
-			time.Sleep(timeToAdvancePChainContext)
-		})
+		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
 
 		tc.By("removing the registered validator", func() {
 			setWeight(registerValidationID, 0)
