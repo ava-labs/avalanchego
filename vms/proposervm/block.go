@@ -14,7 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/vms/proposervm/acp181"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 
@@ -83,44 +83,6 @@ func (p *postForkCommonComponents) Height() uint64 {
 	return p.innerBlk.Height()
 }
 
-// makeEpoch returns a child block's epoch based on its parent.
-func makeEpoch(
-	upgrades upgrade.Config,
-	parentPChainHeight uint64,
-	parentEpoch block.Epoch,
-	parentTimestamp time.Time,
-	childTimestamp time.Time,
-) block.Epoch {
-	if !upgrades.IsGraniteActivated(childTimestamp) {
-		return block.Epoch{}
-	}
-
-	if parentEpoch == (block.Epoch{}) {
-		// If the parent was not assigned an epoch, then the child is the first
-		// block of the initial epoch.
-		return block.Epoch{
-			PChainHeight: parentPChainHeight,
-			Number:       1,
-			StartTime:    parentTimestamp.Unix(),
-		}
-	}
-
-	epochEndTime := time.Unix(parentEpoch.StartTime, 0).Add(upgrades.GraniteEpochDuration)
-	if parentTimestamp.Before(epochEndTime) {
-		// If the parent was issued before the end of its epoch, then it did not
-		// seal the epoch.
-		return parentEpoch
-	}
-
-	// The parent sealed the epoch. So, the child is the first block of the new
-	// epoch.
-	return block.Epoch{
-		PChainHeight: parentPChainHeight,
-		Number:       parentEpoch.Number + 1,
-		StartTime:    parentTimestamp.Unix(),
-	}
-}
-
 // Verify returns nil if:
 // 1) [p]'s inner block is not an oracle block
 // 2) [child]'s P-Chain height >= [parentPChainHeight]
@@ -165,7 +127,7 @@ func (p *postForkCommonComponents) Verify(
 	}
 
 	childEpoch := child.PChainEpoch()
-	if expected := makeEpoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, childTimestamp); childEpoch != expected {
+	if expected := acp181.Epoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, childTimestamp); childEpoch != expected {
 		return fmt.Errorf("epoch mismatch: epoch %v != expected %v", childEpoch, expected)
 	}
 
@@ -278,7 +240,7 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
-	epoch := makeEpoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, newTimestamp)
+	epoch := acp181.Epoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, newTimestamp)
 
 	var contextPChainHeight uint64
 	switch {

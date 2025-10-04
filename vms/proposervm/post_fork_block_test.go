@@ -19,6 +19,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/vms/proposervm/acp181"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 )
@@ -226,7 +227,7 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 	}
 
 	parentPChainHeight := parentBlk.(*postForkBlock).PChainHeight()
-	nextEpoch := makeEpoch(
+	nextEpoch := acp181.Epoch(
 		proVM.Upgrades,
 		parentPChainHeight,
 		block.Epoch{},
@@ -538,7 +539,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	}
 
 	parentBlkPChainHeight := parentBlk.(*postForkBlock).PChainHeight()
-	nextEpoch := makeEpoch(
+	nextEpoch := acp181.Epoch(
 		proVM.Upgrades,
 		parentBlkPChainHeight,
 		block.Epoch{},

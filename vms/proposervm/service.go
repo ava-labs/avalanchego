@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/api/server"
 	"github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
+	"github.com/ava-labs/avalanchego/vms/proposervm/acp181"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 
 	pb "github.com/ava-labs/avalanchego/connectproto/pb/proposervm"
@@ -154,7 +155,7 @@ func (vm *VM) getCurrentEpoch(ctx context.Context) (block.Epoch, error) {
 		newTimestamp = timestamp
 	}
 
-	return makeEpoch(
+	return acp181.Epoch(
 		vm.Upgrades,
 		pChainHeight,
 		epoch,

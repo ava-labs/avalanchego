@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
@@ -412,109 +411,6 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 	)
 	require.NoError(err)
 	require.Equal(innerChildBlock, gotChild.(*postForkBlock).innerBlk)
-}
-
-func TestMakeEpoch(t *testing.T) {
-	var (
-		now            = time.Now().Truncate(time.Second)
-		nowPlusEpoch   = now.Add(upgrade.Default.GraniteEpochDuration)
-		nowPlus2Epochs = now.Add(2 * upgrade.Default.GraniteEpochDuration)
-		nowPlus3Epochs = now.Add(2 * upgrade.Default.GraniteEpochDuration)
-	)
-
-	tests := []struct {
-		name               string
-		fork               upgradetest.Fork
-		parentPChainHeight uint64
-		parentEpoch        statelessblock.Epoch
-		parentTimestamp    time.Time
-		childTimestamp     time.Time
-		expected           statelessblock.Epoch
-	}{
-		{
-			name:               "pre_granite",
-			fork:               upgradetest.NoUpgrades,
-			parentPChainHeight: 100,
-			parentTimestamp:    now,
-			childTimestamp:     now,
-			expected:           statelessblock.Epoch{},
-		},
-		{
-			name:               "first_post_granite_epoch",
-			fork:               upgradetest.Latest,
-			parentPChainHeight: 100,
-			parentTimestamp:    now,
-			childTimestamp:     now.Add(time.Second),
-			expected: statelessblock.Epoch{
-				PChainHeight: 100,
-				Number:       1,
-				StartTime:    now.Unix(),
-			},
-		},
-		{
-			name:               "keep_same_epoch",
-			fork:               upgradetest.Latest,
-			parentPChainHeight: 101,
-			parentEpoch: statelessblock.Epoch{
-				PChainHeight: 100,
-				Number:       1,
-				StartTime:    now.Unix(),
-			},
-			parentTimestamp: now.Add(upgrade.Default.GraniteEpochDuration / 2),
-			childTimestamp:  nowPlusEpoch,
-			expected: statelessblock.Epoch{
-				PChainHeight: 100,
-				Number:       1,
-				StartTime:    now.Unix(),
-			},
-		},
-		{
-			name:               "barely_transition_to_next_epoch",
-			fork:               upgradetest.Latest,
-			parentPChainHeight: 101,
-			parentEpoch: statelessblock.Epoch{
-				PChainHeight: 100,
-				Number:       1,
-				StartTime:    now.Unix(),
-			},
-			parentTimestamp: nowPlusEpoch,
-			childTimestamp:  nowPlusEpoch,
-			expected: statelessblock.Epoch{
-				PChainHeight: 101,
-				Number:       2,
-				StartTime:    nowPlusEpoch.Unix(),
-			},
-		},
-		{
-			name:               "transition_to_next_epoch",
-			fork:               upgradetest.Latest,
-			parentPChainHeight: 101,
-			parentEpoch: statelessblock.Epoch{
-				PChainHeight: 100,
-				Number:       1,
-				StartTime:    now.Unix(),
-			},
-			parentTimestamp: nowPlus2Epochs,
-			childTimestamp:  nowPlus3Epochs,
-			expected: statelessblock.Epoch{
-				PChainHeight: 101,
-				Number:       2,
-				StartTime:    nowPlus2Epochs.Unix(),
-			},
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			epoch := makeEpoch(
-				upgradetest.GetConfig(test.fork),
-				test.parentPChainHeight,
-				test.parentEpoch,
-				test.parentTimestamp,
-				test.childTimestamp,
-			)
-			require.Equal(t, test.expected, epoch)
-		})
-	}
 }
 
 // Confirm that VM rejects blocks with non-zero epoch prior to granite upgrade activation
