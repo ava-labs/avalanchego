@@ -1,6 +1,8 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
+// ACP181 implements the epoch logic specified here:
+// https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/181-p-chain-epoched-views/README.md
 package acp181
 
 import (
