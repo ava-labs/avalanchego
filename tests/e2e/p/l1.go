@@ -408,8 +408,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			require.NoError(err)
 			require.Greater(epochAfter.PChainHeight, epochBefore.PChainHeight)
 		}
-
-		tc.By("advancing the P-Chain epoch", advanceProposerVMPChainHeight)
+		tc.By("advancing the proposervm P-chain height", advanceProposerVMPChainHeight)
 
 		tc.By("creating the validator to register")
 		subnetRegisterNode := e2e.AddEphemeralNode(tc, env.GetNetwork(), tmpnet.NewEphemeralNode(tmpnet.FlagsMap{
