@@ -3,4 +3,4 @@
 
 package contract
 
-//go:generate go run go.uber.org/mock/mockgen -package=$GOPACKAGE -source=interfaces.go -destination=mocks.go -exclude_interfaces StatefulPrecompiledContract,StateReader,ConfigurationBlockContext,Configurator
+//go:generate go tool -modfile=../../tools/go.mod mockgen -package=$GOPACKAGE -source=interfaces.go -destination=mocks.go -exclude_interfaces StatefulPrecompiledContract,StateReader,ConfigurationBlockContext,Configurator

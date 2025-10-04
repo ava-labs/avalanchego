@@ -40,13 +40,13 @@ Mocks are auto-generated using [mockgen](https://pkg.go.dev/go.uber.org/mock/moc
 * To **re-generate all mocks**, use the command below from the root of the project:
 
     ```sh
-    go generate -run "go.uber.org/mock/mockgen" ./...
+    go generate -run mockgen ./...
     ```
 
 * To **add** an interface that needs a corresponding mock generated:
   * if the file `mocks_generate_test.go` exists in the package where the interface is located, either:
-    * modify its `//go:generate go run go.uber.org/mock/mockgen` to generate a mock for your interface (preferred); or
-    * add another `//go:generate go run go.uber.org/mock/mockgen` to generate a mock for your interface according to specific mock generation settings
+    * modify its `//go:generate go tool -modfile=tools/go.mod mockgen` to generate a mock for your interface (preferred); or
+    * add another `//go:generate go tool -modfile=tools/go.mod mockgen` to generate a mock for your interface according to specific mock generation settings
   * if the file `mocks_generate_test.go` does not exist in the package where the interface is located, create it with content (adapt as needed):
 
     ```go
@@ -55,7 +55,7 @@ Mocks are auto-generated using [mockgen](https://pkg.go.dev/go.uber.org/mock/moc
 
     package mypackage
 
-    //go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE} -destination=mocks_test.go . YourInterface
+    //go:generate go tool -modfile=tools/go.mod mockgen -package=${GOPACKAGE} -destination=mocks_test.go . YourInterface
     ```
 
     Notes:
@@ -66,3 +66,26 @@ Mocks are auto-generated using [mockgen](https://pkg.go.dev/go.uber.org/mock/moc
   1. If the `//go:generate` mockgen command line:
       * generates a mock file for multiple interfaces, remove your interface from the line
       * generates a mock file only for the interface, remove the entire line. If the file is empty, remove `mocks_generate_test.go` as well.
+
+## Tool Dependencies
+
+This project uses `go tool` to manage development tool dependencies in `tools/go.mod`. This isolates tool dependencies from the main application dependencies and provides consistent, version-locked tools across the team.
+
+### Managing Tools
+
+* To **add a new tool**:
+  ```sh
+  go get -tool -modfile=tools/go.mod example.com/tool/cmd/toolname@version
+  ```
+
+* To **upgrade a tool**:
+  ```sh
+  go get -tool -modfile=tools/go.mod example.com/tool/cmd/toolname@newversion
+  ```
+
+* To **run a tool manually**:
+  ```sh
+  go tool -modfile=tools/go.mod toolname [args...]
+  ```
+
+Note: `ginkgo` remains in the main `go.mod` as it is used directly in e2e test code.
