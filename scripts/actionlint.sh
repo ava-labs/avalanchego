@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.1 "${@}"
+go tool -modfile=tools/go.mod actionlint "${@}"
 
 echo "Checking use of scripts/* in GitHub Actions workflows..."
 SCRIPT_USAGE=
