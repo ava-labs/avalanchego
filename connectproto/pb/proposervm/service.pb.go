@@ -105,6 +105,104 @@ func (x *GetProposedHeightReply) GetHeight() uint64 {
 	return 0
 }
 
+// Request to get the current epoch.
+type GetCurrentEpochRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCurrentEpochRequest) Reset() {
+	*x = GetCurrentEpochRequest{}
+	mi := &file_proposervm_service_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCurrentEpochRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCurrentEpochRequest) ProtoMessage() {}
+
+func (x *GetCurrentEpochRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proposervm_service_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCurrentEpochRequest.ProtoReflect.Descriptor instead.
+func (*GetCurrentEpochRequest) Descriptor() ([]byte, []int) {
+	return file_proposervm_service_proto_rawDescGZIP(), []int{2}
+}
+
+// Response containing the current epoch.
+type GetCurrentEpochReply struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PChainHeight  uint64                 `protobuf:"varint,1,opt,name=p_chain_height,json=pChainHeight,proto3" json:"p_chain_height,omitempty"`
+	Number        uint64                 `protobuf:"varint,2,opt,name=number,proto3" json:"number,omitempty"`
+	StartTime     int64                  `protobuf:"varint,3,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCurrentEpochReply) Reset() {
+	*x = GetCurrentEpochReply{}
+	mi := &file_proposervm_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCurrentEpochReply) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCurrentEpochReply) ProtoMessage() {}
+
+func (x *GetCurrentEpochReply) ProtoReflect() protoreflect.Message {
+	mi := &file_proposervm_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCurrentEpochReply.ProtoReflect.Descriptor instead.
+func (*GetCurrentEpochReply) Descriptor() ([]byte, []int) {
+	return file_proposervm_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *GetCurrentEpochReply) GetPChainHeight() uint64 {
+	if x != nil {
+		return x.PChainHeight
+	}
+	return 0
+}
+
+func (x *GetCurrentEpochReply) GetNumber() uint64 {
+	if x != nil {
+		return x.Number
+	}
+	return 0
+}
+
+func (x *GetCurrentEpochReply) GetStartTime() int64 {
+	if x != nil {
+		return x.StartTime
+	}
+	return 0
+}
+
 var File_proposervm_service_proto protoreflect.FileDescriptor
 
 const file_proposervm_service_proto_rawDesc = "" +
@@ -113,10 +211,17 @@ const file_proposervm_service_proto_rawDesc = "" +
 	"proposervm\"\x1a\n" +
 	"\x18GetProposedHeightRequest\"0\n" +
 	"\x16GetProposedHeightReply\x12\x16\n" +
-	"\x06height\x18\x01 \x01(\x04R\x06height2k\n" +
+	"\x06height\x18\x01 \x01(\x04R\x06height\"\x18\n" +
+	"\x16GetCurrentEpochRequest\"s\n" +
+	"\x14GetCurrentEpochReply\x12$\n" +
+	"\x0ep_chain_height\x18\x01 \x01(\x04R\fpChainHeight\x12\x16\n" +
+	"\x06number\x18\x02 \x01(\x04R\x06number\x12\x1d\n" +
+	"\n" +
+	"start_time\x18\x03 \x01(\x03R\tstartTime2\xc4\x01\n" +
 	"\n" +
 	"ProposerVM\x12]\n" +
-	"\x11GetProposedHeight\x12$.proposervm.GetProposedHeightRequest\x1a\".proposervm.GetProposedHeightReplyB<Z:github.com/ava-labs/avalanchego/connectproto/pb/proposervmb\x06proto3"
+	"\x11GetProposedHeight\x12$.proposervm.GetProposedHeightRequest\x1a\".proposervm.GetProposedHeightReply\x12W\n" +
+	"\x0fGetCurrentEpoch\x12\".proposervm.GetCurrentEpochRequest\x1a .proposervm.GetCurrentEpochReplyB<Z:github.com/ava-labs/avalanchego/connectproto/pb/proposervmb\x06proto3"
 
 var (
 	file_proposervm_service_proto_rawDescOnce sync.Once
@@ -130,16 +235,20 @@ func file_proposervm_service_proto_rawDescGZIP() []byte {
 	return file_proposervm_service_proto_rawDescData
 }
 
-var file_proposervm_service_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_proposervm_service_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_proposervm_service_proto_goTypes = []any{
 	(*GetProposedHeightRequest)(nil), // 0: proposervm.GetProposedHeightRequest
 	(*GetProposedHeightReply)(nil),   // 1: proposervm.GetProposedHeightReply
+	(*GetCurrentEpochRequest)(nil),   // 2: proposervm.GetCurrentEpochRequest
+	(*GetCurrentEpochReply)(nil),     // 3: proposervm.GetCurrentEpochReply
 }
 var file_proposervm_service_proto_depIdxs = []int32{
 	0, // 0: proposervm.ProposerVM.GetProposedHeight:input_type -> proposervm.GetProposedHeightRequest
-	1, // 1: proposervm.ProposerVM.GetProposedHeight:output_type -> proposervm.GetProposedHeightReply
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
+	2, // 1: proposervm.ProposerVM.GetCurrentEpoch:input_type -> proposervm.GetCurrentEpochRequest
+	1, // 2: proposervm.ProposerVM.GetProposedHeight:output_type -> proposervm.GetProposedHeightReply
+	3, // 3: proposervm.ProposerVM.GetCurrentEpoch:output_type -> proposervm.GetCurrentEpochReply
+	2, // [2:4] is the sub-list for method output_type
+	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -156,7 +265,7 @@ func file_proposervm_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proposervm_service_proto_rawDesc), len(file_proposervm_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
