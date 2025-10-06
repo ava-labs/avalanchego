@@ -5,6 +5,8 @@
 // https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/226-dynamic-minimum-block-times/README.md
 package acp226
 
+import "github.com/ava-labs/avalanchego/vms/evm/excess"
+
 const (
 	// MinDelayMilliseconds (M) is the minimum block delay in milliseconds
 	MinDelayMilliseconds = 1 // ms
@@ -21,7 +23,7 @@ const (
 )
 
 // acp226Params is the params used for the acp226 upgrade.
-var acp226Params = excess.ExcessParams{
+var acp226Params = excess.Params{
 	MinValue:       MinDelayMilliseconds, // M
 	ConversionRate: ConversionRate,       // D
 	MaxExcessDiff:  MaxDelayExcessDiff,   // Q

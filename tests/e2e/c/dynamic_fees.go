@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/info"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/vms/evm/upgrades/acp176"
+	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 )
 
 // This test uses the compiled bytecode for `consume_gas.sol` as well as its ABI
