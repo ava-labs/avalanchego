@@ -30,7 +30,8 @@ var acp226Params = common.ExcessParams{
 	MaxExcess:      maxDelayExcess,
 }
 
-// DelayExcess represents the excess for delay calculation in the dynamic minimum block delay mechanism.
+// DelayExcess represents the excess for delay calculation in the dynamic
+// minimum block delay mechanism.
 type DelayExcess uint64
 
 // Delay returns the minimum block delay in milliseconds, `m`.
@@ -42,8 +43,8 @@ func (t DelayExcess) Delay() uint64 {
 
 // UpdateDelayExcess updates the DelayExcess to be as close as possible to the
 // desiredDelayExcess without exceeding the maximum DelayExcess change.
-func (t *DelayExcess) UpdateDelayExcess(desiredDelayExcess uint64) {
-	*t = DelayExcess(acp226Params.AdjustExcess(uint64(*t), desiredDelayExcess))
+func (t *DelayExcess) UpdateDelayExcess(desiredDelayExcess DelayExcess) {
+	*t = DelayExcess(acp226Params.AdjustExcess(uint64(*t), uint64(desiredDelayExcess)))
 }
 
 // DesiredDelayExcess calculates the optimal delay excess given the desired

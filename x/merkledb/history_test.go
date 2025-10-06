@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/maybe"
+	"github.com/ava-labs/avalanchego/x/sync"
 )
 
 func Test_History_Simple(t *testing.T) {
@@ -197,7 +198,7 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	require.ErrorIs(err, ErrInvalidMaxLength)
 
 	_, err = db.history.getValueChanges(root3, root2, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1)
-	require.ErrorIs(err, ErrInsufficientHistory)
+	require.ErrorIs(err, sync.ErrInsufficientHistory)
 
 	// Cause root1 to be removed from the history
 	batch = db.NewBatch()
@@ -205,7 +206,7 @@ func Test_History_Bad_GetValueChanges_Input(t *testing.T) {
 	require.NoError(batch.Write())
 
 	_, err = db.history.getValueChanges(root1, root3, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 1)
-	require.ErrorIs(err, ErrInsufficientHistory)
+	require.ErrorIs(err, sync.ErrInsufficientHistory)
 
 	// same start/end roots should yield an empty changelist
 	changes, err := db.history.getValueChanges(root3, root3, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 10)
@@ -271,7 +272,7 @@ func Test_History_Trigger_History_Queue_Looping(t *testing.T) {
 
 	// proof from first root shouldn't be generatable since it should have been removed from the history
 	_, err = db.GetRangeProofAtRoot(context.Background(), origRootID, maybe.Some([]byte("k")), maybe.Some([]byte("key3")), 10)
-	require.ErrorIs(err, ErrInsufficientHistory)
+	require.ErrorIs(err, sync.ErrInsufficientHistory)
 }
 
 func Test_History_Values_Lookup_Over_Queue_Break(t *testing.T) {
