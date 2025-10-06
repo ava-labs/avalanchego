@@ -8,8 +8,13 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/storage/memory"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tools/depctl/stacktrace"
@@ -35,6 +40,11 @@ type CloneResult struct {
 
 // Clone clones or updates a repository and sets up go mod replace directives
 func Clone(opts CloneOptions) (CloneResult, error) {
+	// Ensure logger is set
+	if opts.Logger == nil {
+		opts.Logger = logging.NoLog{}
+	}
+
 	// Default path to repo name if not specified
 	if opts.Path == "" {
 		opts.Path = string(opts.Target)
@@ -105,162 +115,291 @@ func Clone(opts CloneOptions) (CloneResult, error) {
 
 // cloneOrUpdate clones a repository if it doesn't exist, or updates it if it does
 func cloneOrUpdate(path, cloneURL, version string, shallow, updateExisting bool, log logging.Logger) error {
-	// Check if directory exists
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		log.Debug("Directory does not exist, cloning repository",
-			zap.String("path", path),
-		)
-		// Clone the repository at the specific version
-		args := []string{"-c", "advice.detachedHead=false", "clone", "--quiet"}
-		if shallow {
-			// For shallow clones, use --branch to clone at specific ref
-			args = append(args, "--depth", "1", "--branch", version)
+	var repo *git.Repository
+	var err error
+
+	// Check if directory exists and is already a git repository
+	if _, statErr := os.Stat(path); statErr == nil {
+		// Directory exists - try to open as git repo
+		repo, err = git.PlainOpen(path)
+		if err != nil {
+			return stacktrace.Errorf("directory exists but is not a git repository: %w", err)
 		}
-		args = append(args, cloneURL, path)
-		log.Debug("Executing git clone",
-			zap.Strings("args", args),
-		)
-		cmd := exec.Command("git", args...)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			// If shallow clone with --branch failed, fall back to full clone
-			if shallow {
-				log.Debug("Shallow clone failed, falling back to full clone",
-					zap.Error(err),
-				)
-				// Try again without shallow clone
-				args = []string{"-c", "advice.detachedHead=false", "clone", "--quiet", cloneURL, path}
-				log.Debug("Executing full git clone",
-					zap.Strings("args", args),
-				)
-				cmd = exec.Command("git", args...)
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				if err := cmd.Run(); err != nil {
-					return stacktrace.Errorf("failed to clone repository: %w", err)
-				}
-			} else {
-				return stacktrace.Errorf("failed to clone repository: %w", err)
-			}
-		}
-	} else {
-		// Directory exists
+
+		// Check if we're already at the correct version
 		if !updateExisting {
+			head, err := repo.Head()
+			if err == nil {
+				// Try to resolve the expected version
+				expectedHash, err := repo.ResolveRevision(plumbing.Revision(version))
+				if err == nil && head.Hash() == *expectedHash {
+					log.Info("Already at requested version",
+						zap.String("version", version),
+						zap.String("hash", head.Hash().String()[:8]),
+					)
+					return nil
+				}
+			}
 			log.Info("Clone directory already exists, skipping (use --update-existing to update)",
 				zap.String("path", path),
 			)
 			return nil
 		}
+
 		log.Debug("Directory already exists, will update",
 			zap.String("path", path),
 		)
-	}
 
-	// Change to the repository directory
-	originalDir, err := os.Getwd()
-	if err != nil {
-		return stacktrace.Errorf("failed to get working directory: %w", err)
-	}
-	defer func() {
-		_ = os.Chdir(originalDir)
-	}()
-
-	log.Debug("Changing to repository directory",
-		zap.String("from", originalDir),
-		zap.String("to", path),
-	)
-	if err := os.Chdir(path); err != nil {
-		return stacktrace.Errorf("failed to change to repository directory: %w", err)
-	}
-
-	// Fetch updates (if the directory already existed)
-	log.Debug("Fetching updates from remote")
-	cmd := exec.Command("git", "fetch", "--quiet")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	_ = cmd.Run() // Ignore errors - might not need to fetch if just cloned
-
-	// Resolve version to full commit SHA if it's a short ref
-	resolvedVersion := version
-	log.Debug("Resolving version to commit SHA",
-		zap.String("version", version),
-	)
-	resolveCmd := exec.Command("git", "rev-parse", "--verify", version+"^{commit}")
-	if output, err := resolveCmd.Output(); err == nil {
-		resolvedVersion = strings.TrimSpace(string(output))
-		log.Debug("Resolved version (with ^{commit})",
-			zap.String("resolvedVersion", resolvedVersion),
-		)
-	} else {
-		// Try without ^{commit} for branches/commit SHAs
-		resolveCmd = exec.Command("git", "rev-parse", "--verify", version)
-		if output, err := resolveCmd.Output(); err == nil {
-			resolvedVersion = strings.TrimSpace(string(output))
-			log.Debug("Resolved version (without ^{commit})",
-				zap.String("resolvedVersion", resolvedVersion),
-			)
-		} else {
-			log.Debug("Could not resolve version, will use as-is",
-				zap.Error(err),
-			)
+		// Fetch updates
+		log.Debug("Fetching updates from remote")
+		err = repo.Fetch(&git.FetchOptions{
+			RemoteName: "origin",
+			Tags:       git.AllTags,
+		})
+		if err != nil && err != git.NoErrAlreadyUpToDate {
+			log.Debug("Fetch completed with status", zap.Error(err))
 		}
-		// If resolution fails, use original version and let checkout fail with clear error
+	} else if os.IsNotExist(statErr) {
+		// Directory doesn't exist - need to clone
+		log.Debug("Directory does not exist, cloning repository",
+			zap.String("path", path),
+		)
+
+		// List remote refs to determine optimal clone strategy
+		log.Debug("Listing remote references",
+			zap.String("url", cloneURL),
+			zap.String("version", version),
+		)
+
+		// Create a temporary remote to list refs
+		rem := git.NewRemote(memory.NewStorage(), &config.RemoteConfig{
+			Name: "origin",
+			URLs: []string{cloneURL},
+		})
+
+		remoteRefs, err := rem.List(&git.ListOptions{})
+		if err != nil {
+			return stacktrace.Errorf("failed to list remote refs: %w", err)
+		}
+
+		// Determine what type of ref the version is
+		refToClone, refType := analyzeVersion(version, remoteRefs, log)
+
+		// Set up clone options
+		cloneOpts := &git.CloneOptions{
+			URL:      cloneURL,
+			Progress: os.Stdout,
+			Tags:     git.NoTags, // Fetch tags separately if needed
+		}
+
+		if shallow {
+			cloneOpts.Depth = 1
+
+			switch refType {
+			case refTypeBranch:
+				// Shallow clone specific branch
+				cloneOpts.SingleBranch = true
+				cloneOpts.ReferenceName = plumbing.NewBranchReferenceName(refToClone)
+				log.Debug("Shallow cloning branch",
+					zap.String("branch", refToClone),
+				)
+
+			case refTypeTag:
+				// Shallow clone specific tag
+				cloneOpts.SingleBranch = true
+				cloneOpts.ReferenceName = plumbing.NewTagReferenceName(refToClone)
+				log.Debug("Shallow cloning tag",
+					zap.String("tag", refToClone),
+				)
+
+			case refTypeSHA:
+				// For SHAs: clone default branch shallow, then fetch to find SHA
+				cloneOpts.SingleBranch = true
+				log.Debug("Shallow cloning default branch for SHA checkout",
+					zap.String("sha", version),
+				)
+
+			case refTypeUnknown:
+				// Version not found in remote refs - try full clone
+				cloneOpts.Depth = 0
+				cloneOpts.Tags = git.AllTags
+				log.Debug("Version not found in remote refs, attempting full clone",
+					zap.String("version", version),
+				)
+			}
+		} else {
+			// Full clone requested
+			cloneOpts.Tags = git.AllTags
+		}
+
+		log.Debug("Cloning repository",
+			zap.String("url", cloneURL),
+			zap.String("path", path),
+			zap.Bool("shallow", shallow),
+			zap.String("refType", string(refType)),
+		)
+
+		repo, err = git.PlainClone(path, false, cloneOpts)
+		if err != nil {
+			return stacktrace.Errorf("failed to clone repository: %w", err)
+		}
+
+		// For SHA references, we may need to fetch more to find the specific commit
+		if refType == refTypeSHA {
+			log.Debug("Fetching to locate SHA commit",
+				zap.String("sha", version),
+			)
+
+			// Try to resolve the SHA first
+			_, resolveErr := repo.ResolveRevision(plumbing.Revision(version))
+			if resolveErr != nil {
+				// SHA not found in shallow clone, need to fetch more
+				log.Debug("SHA not in shallow clone, fetching full history")
+				err = repo.Fetch(&git.FetchOptions{
+					RemoteName: "origin",
+					RefSpecs: []config.RefSpec{
+						config.RefSpec("+refs/heads/*:refs/remotes/origin/*"),
+					},
+					Depth: 0, // Full fetch to find the SHA
+					Tags:  git.AllTags,
+				})
+				if err != nil && err != git.NoErrAlreadyUpToDate {
+					return stacktrace.Errorf("failed to fetch for SHA: %w", err)
+				}
+			}
+		}
+	} else {
+		return stacktrace.Errorf("failed to check directory: %w", statErr)
 	}
 
-	// Create branch and checkout version
+	// Resolve version to commit hash
+	hash, err := repo.ResolveRevision(plumbing.Revision(version))
+	if err != nil {
+		return stacktrace.Errorf("failed to resolve version %s: %w", version, err)
+	}
+
+	log.Debug("Resolved version",
+		zap.String("version", version),
+		zap.String("hash", hash.String()),
+	)
+
+	// Get worktree and checkout
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return stacktrace.Errorf("failed to get worktree: %w", err)
+	}
+
 	branchName := fmt.Sprintf("local/%s", version)
-	log.Debug("Checking out version to branch",
-		zap.String("version", resolvedVersion),
+	branchRef := plumbing.NewBranchReferenceName(branchName)
+
+	log.Debug("Checking out version",
+		zap.String("hash", hash.String()),
 		zap.String("branch", branchName),
 	)
-	cmd = exec.Command("git", "checkout", "-q", "-B", branchName, resolvedVersion)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+
+	err = worktree.Checkout(&git.CheckoutOptions{
+		Hash:   *hash,
+		Branch: branchRef,
+		Create: true,
+		Force:  true,
+	})
+	if err != nil {
 		return stacktrace.Errorf("failed to checkout version %s: %w", version, err)
 	}
 
 	// Verify that we're at the correct version
-	if err := verifyCloneVersion(version); err != nil {
+	if err := verifyCloneVersion(repo, version, log); err != nil {
 		return stacktrace.Wrap(err)
 	}
 
-	// Print success message
-	log.Info("Checked out version to branch",
+	// Success message with full hash for verification
+	log.Info("Successfully checked out",
 		zap.String("version", version),
-		zap.String("branch", branchName),
+		zap.String("hash", hash.String()),
 	)
 
 	return nil
 }
 
-// verifyCloneVersion verifies that the current HEAD matches the expected version
-func verifyCloneVersion(version string) error {
-	// Get current HEAD commit
-	cmd := exec.Command("git", "rev-parse", "HEAD")
-	headOutput, err := cmd.Output()
-	if err != nil {
-		return stacktrace.Errorf("failed to get HEAD commit: %w", err)
-	}
-	headCommit := strings.TrimSpace(string(headOutput))
+// refType represents the type of git reference
+type refType string
 
-	// Get commit for expected version (dereference if it's an annotated tag)
-	cmd = exec.Command("git", "rev-parse", version+"^{commit}")
-	versionOutput, err := cmd.Output()
-	if err != nil {
-		// Try without ^{commit} in case it's a lightweight tag or branch
-		cmd = exec.Command("git", "rev-parse", version)
-		versionOutput, err = cmd.Output()
-		if err != nil {
-			return stacktrace.Errorf("failed to resolve version %s: %w", version, err)
+const (
+	refTypeBranch  refType = "branch"
+	refTypeTag     refType = "tag"
+	refTypeSHA     refType = "sha"
+	refTypeUnknown refType = "unknown"
+)
+
+// analyzeVersion determines what type of reference the version string represents
+func analyzeVersion(version string, refs []*plumbing.Reference, log logging.Logger) (string, refType) {
+	// Check if version matches a branch
+	for _, ref := range refs {
+		if ref.Name().IsBranch() {
+			branchName := ref.Name().Short()
+			if branchName == version {
+				log.Debug("Version matches branch", zap.String("branch", branchName))
+				return branchName, refTypeBranch
+			}
 		}
 	}
-	versionCommit := strings.TrimSpace(string(versionOutput))
 
-	// Compare commits
-	if headCommit != versionCommit {
-		return stacktrace.Errorf("verification failed: HEAD commit %s does not match version %s commit %s", headCommit, version, versionCommit)
+	// Check if version matches a tag
+	for _, ref := range refs {
+		if ref.Name().IsTag() {
+			tagName := ref.Name().Short()
+			if tagName == version {
+				log.Debug("Version matches tag", zap.String("tag", tagName))
+				return tagName, refTypeTag
+			}
+		}
+	}
+
+	// Check if version looks like a SHA (hex string, 7-40 chars)
+	if matched, _ := regexp.MatchString(`^[0-9a-f]{7,40}$`, version); matched {
+		log.Debug("Version appears to be SHA", zap.String("sha", version))
+		return version, refTypeSHA
+	}
+
+	// Check if version matches a SHA prefix
+	for _, ref := range refs {
+		if strings.HasPrefix(ref.Hash().String(), version) {
+			log.Debug("Version matches SHA prefix",
+				zap.String("prefix", version),
+				zap.String("full_sha", ref.Hash().String()),
+			)
+			return version, refTypeSHA
+		}
+	}
+
+	log.Debug("Version type unknown", zap.String("version", version))
+	return version, refTypeUnknown
+}
+
+// verifyCloneVersion verifies that the current HEAD matches the expected version
+func verifyCloneVersion(repo *git.Repository, version string, log logging.Logger) error {
+	// Get current HEAD
+	head, err := repo.Head()
+	if err != nil {
+		return stacktrace.Errorf("failed to get HEAD: %w", err)
+	}
+	headHash := head.Hash()
+
+	// Resolve expected version
+	expectedHash, err := repo.ResolveRevision(plumbing.Revision(version))
+	if err != nil {
+		return stacktrace.Errorf("failed to resolve version %s: %w", version, err)
+	}
+
+	log.Debug("Verifying clone version",
+		zap.String("headHash", headHash.String()),
+		zap.String("expectedHash", expectedHash.String()),
+	)
+
+	// Compare hashes
+	if headHash != *expectedHash {
+		return stacktrace.Errorf("verification failed: HEAD %s does not match version %s (%s)",
+			headHash.String(), version, expectedHash.String())
 	}
 
 	return nil
