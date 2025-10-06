@@ -4,7 +4,6 @@
 package c
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/ava-labs/libevm/core/types"
@@ -24,7 +23,7 @@ var _ = e2e.DescribeCChain("[Fetch Blocks]", func() {
 	ginkgo.It("fetches created blocks", func() {
 		env := e2e.GetEnv(tc)
 		nodeURI := env.GetRandomNodeURI()
-		cChainNodeURI := fmt.Sprintf("%s/ext/bc/C/rpc", nodeURI.URI)
+		cChainNodeURI := nodeURI.URI + "/ext/bc/C/rpc"
 
 		fetchBlocksDBDir, err := os.MkdirTemp("", "fetch-blocks-test")
 		require.NoError(err)
