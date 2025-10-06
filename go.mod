@@ -89,14 +89,10 @@ require (
 )
 
 require (
-	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
-	github.com/sagikazarmark/locafero v0.11.0 // indirect
-	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
-	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
