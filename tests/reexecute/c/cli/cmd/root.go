@@ -16,7 +16,7 @@ import (
 var (
 	cfgFile     string
 	logLevelKey = "log-level"
-	log         logging.Logger
+	cliLog      logging.Logger
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -49,7 +49,7 @@ func init() {
 		if err != nil {
 			return fmt.Errorf("failed to parse log-level flag %q: %w", logLevelStr, err)
 		}
-		log = logging.NewLogger(
+		cliLog = logging.NewLogger(
 			"argo",
 			logging.NewWrappedCore(
 				logLevel,

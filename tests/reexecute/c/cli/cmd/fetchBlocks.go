@@ -14,6 +14,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/tests/reexecute/blockdb"
+	"github.com/ava-labs/avalanchego/utils/logging"
 
 	ethclient "github.com/ava-labs/coreth/plugin/evm/customethclient"
 )
@@ -43,28 +44,7 @@ func init() {
 	fetchBlocksCmd.Flags().Int(concurrencyKey, 1000, "Number of concurrent fetches to make")
 }
 
-func runFetchBlocks(cmd *cobra.Command, _ []string) error {
-	dbDir, err := cmd.Flags().GetString(dbDirKey)
-	if err != nil {
-		return fmt.Errorf("failed to get db-dir flag: %w", err)
-	}
-	startBlock, err := cmd.Flags().GetUint64(startBlockKey)
-	if err != nil {
-		return fmt.Errorf("failed to get start-block flag: %w", err)
-	}
-	endBlock, err := cmd.Flags().GetUint64(endBlockKey)
-	if err != nil {
-		return fmt.Errorf("failed to get end-block flag: %w", err)
-	}
-	rpcURL, err := cmd.Flags().GetString(rpcURLKey)
-	if err != nil {
-		return fmt.Errorf("failed to get rpc-url flag: %w", err)
-	}
-	concurrency, err := cmd.Flags().GetInt(concurrencyKey)
-	if err != nil {
-		return fmt.Errorf("failed to get concurrency flag: %w", err)
-	}
-
+func fetchBlocks(ctx context.Context, log logging.Logger, dbDir string, startBlock, endBlock uint64, rpcURL string, concurrency int) error {
 	client, err := ethclient.Dial(rpcURL)
 	if err != nil {
 		return fmt.Errorf("failed to connect to RPC URL %s: %w", rpcURL, err)
@@ -86,11 +66,14 @@ func runFetchBlocks(cmd *cobra.Command, _ []string) error {
 	go func() {
 		defer close(blocksCh)
 		for i := startBlock; i <= endBlock; i++ {
-			blocksCh <- i
+			select {
+			case blocksCh <- i:
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
-	ctx := context.Background()
 	eg, ctx := errgroup.WithContext(ctx)
 	for i := 0; i < concurrency; i++ {
 		eg.Go(func() error {
@@ -117,4 +100,28 @@ func runFetchBlocks(cmd *cobra.Command, _ []string) error {
 		})
 	}
 	return eg.Wait()
+}
+
+func runFetchBlocks(cmd *cobra.Command, _ []string) error {
+	dbDir, err := cmd.Flags().GetString(dbDirKey)
+	if err != nil {
+		return fmt.Errorf("failed to get db-dir flag: %w", err)
+	}
+	startBlock, err := cmd.Flags().GetUint64(startBlockKey)
+	if err != nil {
+		return fmt.Errorf("failed to get start-block flag: %w", err)
+	}
+	endBlock, err := cmd.Flags().GetUint64(endBlockKey)
+	if err != nil {
+		return fmt.Errorf("failed to get end-block flag: %w", err)
+	}
+	rpcURL, err := cmd.Flags().GetString(rpcURLKey)
+	if err != nil {
+		return fmt.Errorf("failed to get rpc-url flag: %w", err)
+	}
+	concurrency, err := cmd.Flags().GetInt(concurrencyKey)
+	if err != nil {
+		return fmt.Errorf("failed to get concurrency flag: %w", err)
+	}
+	return fetchBlocks(context.Background(), cliLog, dbDir, startBlock, endBlock, rpcURL, concurrency)
 }
