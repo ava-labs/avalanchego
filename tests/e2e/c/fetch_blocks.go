@@ -57,7 +57,7 @@ var _ = e2e.DescribeCChain("[Fetch Blocks]", func() {
 
 			blockIter := blockDB.NewIteratorFromHeight(startBlock)
 
-			expectedBlock := startBlock
+			expectedBlock := uint64(startBlock)
 			for blockIter.Next() {
 				blockHeightKey := blockIter.Key()
 				blockBytes := blockIter.Value()
