@@ -603,7 +603,7 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash, ethConfig ethconfig.
 		vm.chaindb,
 		eth.Settings{MaxBlocksPerRequest: vm.config.MaxBlocksPerRequest},
 		lastAcceptedHash,
-		dummy.NewFakerWithClock(&vm.clock),
+		dummy.NewFaker(),
 		&vm.clock,
 	)
 	if err != nil {

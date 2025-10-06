@@ -32,6 +32,8 @@ import (
 var (
 	_ snowman.Block           = (*wrappedBlock)(nil)
 	_ block.WithVerifyContext = (*wrappedBlock)(nil)
+
+	errInvalidParent = errors.New("parent header not found")
 )
 
 // wrappedBlock implements the snowman.Block interface by wrapping a libevm block
@@ -216,9 +218,14 @@ func (b *wrappedBlock) verify(predicateContext *precompileconfig.PredicateContex
 
 // semanticVerify verifies that a *Block is internally consistent.
 func (b *wrappedBlock) semanticVerify() error {
-	// Ensure Time and TimeMilliseconds are consistent with rules.
 	extraConfig := params.GetExtra(b.vm.chainConfig)
-	if err := customheader.VerifyTime(extraConfig, b.ethBlock.Header(), b.vm.clock.Time()); err != nil {
+	parent := b.vm.blockChain.GetHeader(b.ethBlock.ParentHash(), b.ethBlock.NumberU64()-1)
+	if parent == nil {
+		return fmt.Errorf("%w: %s at height %d", errInvalidParent, b.ethBlock.ParentHash(), b.ethBlock.NumberU64()-1)
+	}
+
+	// Ensure Time and TimeMilliseconds are consistent with rules.
+	if err := customheader.VerifyTime(extraConfig, parent, b.ethBlock.Header(), b.vm.clock.Time()); err != nil {
 		return err
 	}
 
