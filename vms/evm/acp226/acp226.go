@@ -49,6 +49,6 @@ func (t *DelayExcess) UpdateDelayExcess(desiredDelayExcess DelayExcess) {
 
 // DesiredDelayExcess calculates the optimal delay excess given the desired
 // delay.
-func DesiredDelayExcess(desiredDelay uint64) uint64 {
-	return acp226Params.DesiredExcess(desiredDelay)
+func DesiredDelayExcess(desiredDelay uint64) DelayExcess {
+	return DelayExcess(acp226Params.DesiredExcess(desiredDelay))
 }

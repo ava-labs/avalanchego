@@ -4,7 +4,6 @@
 package excess
 
 import (
-	"math"
 	"sort"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -49,14 +48,4 @@ func (p Params) CalculateValue(excess uint64) uint64 {
 		excess,
 		p.ConversionRate,
 	)
-}
-
-// MulWithUpperBound multiplies two numbers and returns the result. If the
-// result overflows, it returns [math.MaxUint64].
-func MulWithUpperBound(a, b uint64) uint64 {
-	product, err := safemath.Mul(a, b)
-	if err != nil {
-		return math.MaxUint64
-	}
-	return product
 }

@@ -89,7 +89,7 @@ func (s *State) Target() gas.Gas {
 // MaxCapacity returns the maximum possible accrued gas capacity, `C`.
 func (s *State) MaxCapacity() gas.Gas {
 	targetPerSecond := s.Target()
-	return gas.Gas(excess.MulWithUpperBound(uint64(targetPerSecond), TargetToMaxCapacity))
+	return mulWithUpperBound(targetPerSecond, TargetToMaxCapacity)
 }
 
 // GasPrice returns the current required fee per gas.
@@ -97,8 +97,8 @@ func (s *State) MaxCapacity() gas.Gas {
 // GasPrice = MinGasPrice * e^(Excess / (Target() * TargetToPriceUpdateConversion))
 func (s *State) GasPrice() gas.Price {
 	targetPerSecond := s.Target()
-	priceUpdateConversion := excess.MulWithUpperBound(uint64(targetPerSecond), TargetToPriceUpdateConversion) // K
-	return gas.CalculatePrice(MinGasPrice, s.Gas.Excess, gas.Gas(priceUpdateConversion))
+	priceUpdateConversion := mulWithUpperBound(targetPerSecond, TargetToPriceUpdateConversion) // K
+	return gas.CalculatePrice(MinGasPrice, s.Gas.Excess, priceUpdateConversion)
 }
 
 // AdvanceSeconds increases the gas capacity and decreases the gas excess based on
@@ -106,8 +106,8 @@ func (s *State) GasPrice() gas.Price {
 // This is used in Fortuna.
 func (s *State) AdvanceSeconds(seconds uint64) {
 	targetPerSecond := s.Target()
-	maxPerSecond := gas.Gas(excess.MulWithUpperBound(uint64(targetPerSecond), TargetToMax))    // R
-	maxCapacity := gas.Gas(excess.MulWithUpperBound(uint64(maxPerSecond), TimeToFillCapacity)) // C
+	maxPerSecond := mulWithUpperBound(targetPerSecond, TargetToMax)    // R
+	maxCapacity := mulWithUpperBound(maxPerSecond, TimeToFillCapacity) // C
 	s.Gas = s.Gas.AdvanceTime(
 		maxCapacity,
 		maxPerSecond,
@@ -122,9 +122,9 @@ func (s *State) AdvanceSeconds(seconds uint64) {
 func (s *State) AdvanceMilliseconds(milliseconds uint64) {
 	targetPerSecond := s.Target()
 	targetPerMS := targetPerSecond / 1000
-	maxPerMS := targetPerMS * TargetToMax                                              // R - this can't overflow since 1000 > TargetToMax.
-	maxPerSecond := excess.MulWithUpperBound(uint64(targetPerSecond), TargetToMax)     // rate used for calculating maxCapacity
-	maxCapacity := gas.Gas(excess.MulWithUpperBound(maxPerSecond, TimeToFillCapacity)) // C
+	maxPerMS := targetPerMS * TargetToMax                              // R - this can't overflow since 1000 > TargetToMax.
+	maxPerSecond := mulWithUpperBound(targetPerSecond, TargetToMax)    // rate used for calculating maxCapacity
+	maxCapacity := mulWithUpperBound(maxPerSecond, TimeToFillCapacity) // C
 	s.Gas = s.Gas.AdvanceTime(
 		maxCapacity,
 		maxPerMS,
@@ -177,7 +177,7 @@ func (s *State) UpdateTargetExcess(desiredTargetExcess gas.Gas) {
 	)
 
 	// Ensure the gas capacity does not exceed the maximum capacity.
-	newMaxCapacity := gas.Gas(excess.MulWithUpperBound(uint64(newTargetPerSecond), TargetToMaxCapacity)) // C
+	newMaxCapacity := mulWithUpperBound(newTargetPerSecond, TargetToMaxCapacity) // C
 	s.Gas.Capacity = min(s.Gas.Capacity, newMaxCapacity)
 }
 
@@ -220,7 +220,7 @@ func scaleExcess(
 
 // mulWithUpperBound multiplies two numbers and returns the result. If the
 // result overflows, it returns [math.MaxUint64].
-func mulWithUpperBound(a, b uint64) uint64 {
+func mulWithUpperBound(a, b gas.Gas) gas.Gas {
 	product, err := safemath.Mul(a, b)
 	if err != nil {
 		return math.MaxUint64
