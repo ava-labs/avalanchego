@@ -75,6 +75,8 @@ var (
 var testChainConfig *params.ChainConfig
 
 func init() {
+	params.RegisterExtras()
+
 	testChainConfig = new(params.ChainConfig)
 	*testChainConfig = params.Copy(params.TestChainConfig)
 	params.GetExtra(testChainConfig).FeeConfig.MinBaseFee = new(big.Int).SetUint64(1)

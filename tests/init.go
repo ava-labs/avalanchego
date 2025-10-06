@@ -40,138 +40,65 @@ import (
 )
 
 // Forks table defines supported forks and their chain config.
-var Forks = map[string]*params.ChainConfig{
-	"Frontier": {
-		ChainID: big.NewInt(1),
-	},
-	"Homestead": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
-	},
-	"EIP150": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
-		EIP150Block:    big.NewInt(0),
-	},
-	"EIP158": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
-		EIP150Block:    big.NewInt(0),
-		EIP155Block:    big.NewInt(0),
-		EIP158Block:    big.NewInt(0),
-	},
-	"Byzantium": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
-		EIP150Block:    big.NewInt(0),
-		EIP155Block:    big.NewInt(0),
-		EIP158Block:    big.NewInt(0),
-		ByzantiumBlock: big.NewInt(0),
-	},
-	"Constantinople": {
-		ChainID:             big.NewInt(1),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(10000000),
-	},
-	"ConstantinopleFix": {
-		ChainID:             big.NewInt(1),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-	},
-	"Istanbul": {
-		ChainID:             big.NewInt(1),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-	},
-	"MuirGlacier": {
-		ChainID:             big.NewInt(1),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		MuirGlacierBlock:    big.NewInt(0),
-	},
-	"FrontierToHomesteadAt5": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(5),
-	},
-	"HomesteadToEIP150At5": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
-		EIP150Block:    big.NewInt(5),
-	},
-	"EIP158ToByzantiumAt5": {
-		ChainID:        big.NewInt(1),
-		HomesteadBlock: big.NewInt(0),
-		EIP150Block:    big.NewInt(0),
-		EIP155Block:    big.NewInt(0),
-		EIP158Block:    big.NewInt(0),
-		ByzantiumBlock: big.NewInt(5),
-	},
-	"ByzantiumToConstantinopleAt5": {
-		ChainID:             big.NewInt(1),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(5),
-	},
-	"ByzantiumToConstantinopleFixAt5": {
-		ChainID:             big.NewInt(1),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(5),
-		PetersburgBlock:     big.NewInt(5),
-	},
-	"ConstantinopleFixToIstanbulAt5": {
-		ChainID:             big.NewInt(1),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(5),
-	},
-	"Pre-SubnetEVM": {
-		ChainID:             big.NewInt(1),
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		MuirGlacierBlock:    big.NewInt(0),
-	},
-	"SubnetEVM": params.WithExtra(
-		&params.ChainConfig{
+var Forks map[string]*params.ChainConfig
+
+func init() {
+	params.WithTempRegisteredExtras(initializeForks)
+}
+
+// initializeForks MUST be called inside [params.WithTempRegisteredExtras] to
+// allow [params.WithExtra] to work without global registration of libevm
+// extras.
+func initializeForks() {
+	Forks = map[string]*params.ChainConfig{
+		"Frontier": {
+			ChainID: big.NewInt(1),
+		},
+		"Homestead": {
+			ChainID:        big.NewInt(1),
+			HomesteadBlock: big.NewInt(0),
+		},
+		"EIP150": {
+			ChainID:        big.NewInt(1),
+			HomesteadBlock: big.NewInt(0),
+			EIP150Block:    big.NewInt(0),
+		},
+		"EIP158": {
+			ChainID:        big.NewInt(1),
+			HomesteadBlock: big.NewInt(0),
+			EIP150Block:    big.NewInt(0),
+			EIP155Block:    big.NewInt(0),
+			EIP158Block:    big.NewInt(0),
+		},
+		"Byzantium": {
+			ChainID:        big.NewInt(1),
+			HomesteadBlock: big.NewInt(0),
+			EIP150Block:    big.NewInt(0),
+			EIP155Block:    big.NewInt(0),
+			EIP158Block:    big.NewInt(0),
+			ByzantiumBlock: big.NewInt(0),
+		},
+		"Constantinople": {
+			ChainID:             big.NewInt(1),
+			HomesteadBlock:      big.NewInt(0),
+			EIP150Block:         big.NewInt(0),
+			EIP155Block:         big.NewInt(0),
+			EIP158Block:         big.NewInt(0),
+			ByzantiumBlock:      big.NewInt(0),
+			ConstantinopleBlock: big.NewInt(0),
+			PetersburgBlock:     big.NewInt(10000000),
+		},
+		"ConstantinopleFix": {
+			ChainID:             big.NewInt(1),
+			HomesteadBlock:      big.NewInt(0),
+			EIP150Block:         big.NewInt(0),
+			EIP155Block:         big.NewInt(0),
+			EIP158Block:         big.NewInt(0),
+			ByzantiumBlock:      big.NewInt(0),
+			ConstantinopleBlock: big.NewInt(0),
+			PetersburgBlock:     big.NewInt(0),
+		},
+		"Istanbul": {
 			ChainID:             big.NewInt(1),
 			HomesteadBlock:      big.NewInt(0),
 			EIP150Block:         big.NewInt(0),
@@ -181,17 +108,8 @@ var Forks = map[string]*params.ChainConfig{
 			ConstantinopleBlock: big.NewInt(0),
 			PetersburgBlock:     big.NewInt(0),
 			IstanbulBlock:       big.NewInt(0),
-			BerlinBlock:         big.NewInt(0),
-			LondonBlock:         big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: utils.NewUint64(0),
-			},
-		},
-	),
-	"Durango": params.WithExtra(
-		&params.ChainConfig{
+		"MuirGlacier": {
 			ChainID:             big.NewInt(1),
 			HomesteadBlock:      big.NewInt(0),
 			EIP150Block:         big.NewInt(0),
@@ -201,18 +119,56 @@ var Forks = map[string]*params.ChainConfig{
 			ConstantinopleBlock: big.NewInt(0),
 			PetersburgBlock:     big.NewInt(0),
 			IstanbulBlock:       big.NewInt(0),
-			BerlinBlock:         big.NewInt(0),
-			LondonBlock:         big.NewInt(0),
+			MuirGlacierBlock:    big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: utils.NewUint64(0),
-				DurangoTimestamp:   utils.NewUint64(0),
-			},
+		"FrontierToHomesteadAt5": {
+			ChainID:        big.NewInt(1),
+			HomesteadBlock: big.NewInt(5),
 		},
-	),
-	"Cancun": params.WithExtra(
-		&params.ChainConfig{
+		"HomesteadToEIP150At5": {
+			ChainID:        big.NewInt(1),
+			HomesteadBlock: big.NewInt(0),
+			EIP150Block:    big.NewInt(5),
+		},
+		"EIP158ToByzantiumAt5": {
+			ChainID:        big.NewInt(1),
+			HomesteadBlock: big.NewInt(0),
+			EIP150Block:    big.NewInt(0),
+			EIP155Block:    big.NewInt(0),
+			EIP158Block:    big.NewInt(0),
+			ByzantiumBlock: big.NewInt(5),
+		},
+		"ByzantiumToConstantinopleAt5": {
+			ChainID:             big.NewInt(1),
+			HomesteadBlock:      big.NewInt(0),
+			EIP150Block:         big.NewInt(0),
+			EIP155Block:         big.NewInt(0),
+			EIP158Block:         big.NewInt(0),
+			ByzantiumBlock:      big.NewInt(0),
+			ConstantinopleBlock: big.NewInt(5),
+		},
+		"ByzantiumToConstantinopleFixAt5": {
+			ChainID:             big.NewInt(1),
+			HomesteadBlock:      big.NewInt(0),
+			EIP150Block:         big.NewInt(0),
+			EIP155Block:         big.NewInt(0),
+			EIP158Block:         big.NewInt(0),
+			ByzantiumBlock:      big.NewInt(0),
+			ConstantinopleBlock: big.NewInt(5),
+			PetersburgBlock:     big.NewInt(5),
+		},
+		"ConstantinopleFixToIstanbulAt5": {
+			ChainID:             big.NewInt(1),
+			HomesteadBlock:      big.NewInt(0),
+			EIP150Block:         big.NewInt(0),
+			EIP155Block:         big.NewInt(0),
+			EIP158Block:         big.NewInt(0),
+			ByzantiumBlock:      big.NewInt(0),
+			ConstantinopleBlock: big.NewInt(0),
+			PetersburgBlock:     big.NewInt(0),
+			IstanbulBlock:       big.NewInt(5),
+		},
+		"Pre-SubnetEVM": {
 			ChainID:             big.NewInt(1),
 			HomesteadBlock:      big.NewInt(0),
 			EIP150Block:         big.NewInt(0),
@@ -222,18 +178,73 @@ var Forks = map[string]*params.ChainConfig{
 			ConstantinopleBlock: big.NewInt(0),
 			PetersburgBlock:     big.NewInt(0),
 			IstanbulBlock:       big.NewInt(0),
-			BerlinBlock:         big.NewInt(0),
-			LondonBlock:         big.NewInt(0),
-			ShanghaiTime:        utils.NewUint64(0),
-			CancunTime:          utils.NewUint64(0),
+			MuirGlacierBlock:    big.NewInt(0),
 		},
-		&extras.ChainConfig{
-			NetworkUpgrades: extras.NetworkUpgrades{
-				SubnetEVMTimestamp: utils.NewUint64(0),
-				DurangoTimestamp:   utils.NewUint64(0),
+		"SubnetEVM": params.WithExtra(
+			&params.ChainConfig{
+				ChainID:             big.NewInt(1),
+				HomesteadBlock:      big.NewInt(0),
+				EIP150Block:         big.NewInt(0),
+				EIP155Block:         big.NewInt(0),
+				EIP158Block:         big.NewInt(0),
+				ByzantiumBlock:      big.NewInt(0),
+				ConstantinopleBlock: big.NewInt(0),
+				PetersburgBlock:     big.NewInt(0),
+				IstanbulBlock:       big.NewInt(0),
+				BerlinBlock:         big.NewInt(0),
+				LondonBlock:         big.NewInt(0),
 			},
-		},
-	),
+			&extras.ChainConfig{
+				NetworkUpgrades: extras.NetworkUpgrades{
+					SubnetEVMTimestamp: utils.NewUint64(0),
+				},
+			},
+		),
+		"Durango": params.WithExtra(
+			&params.ChainConfig{
+				ChainID:             big.NewInt(1),
+				HomesteadBlock:      big.NewInt(0),
+				EIP150Block:         big.NewInt(0),
+				EIP155Block:         big.NewInt(0),
+				EIP158Block:         big.NewInt(0),
+				ByzantiumBlock:      big.NewInt(0),
+				ConstantinopleBlock: big.NewInt(0),
+				PetersburgBlock:     big.NewInt(0),
+				IstanbulBlock:       big.NewInt(0),
+				BerlinBlock:         big.NewInt(0),
+				LondonBlock:         big.NewInt(0),
+			},
+			&extras.ChainConfig{
+				NetworkUpgrades: extras.NetworkUpgrades{
+					SubnetEVMTimestamp: utils.NewUint64(0),
+					DurangoTimestamp:   utils.NewUint64(0),
+				},
+			},
+		),
+		"Cancun": params.WithExtra(
+			&params.ChainConfig{
+				ChainID:             big.NewInt(1),
+				HomesteadBlock:      big.NewInt(0),
+				EIP150Block:         big.NewInt(0),
+				EIP155Block:         big.NewInt(0),
+				EIP158Block:         big.NewInt(0),
+				ByzantiumBlock:      big.NewInt(0),
+				ConstantinopleBlock: big.NewInt(0),
+				PetersburgBlock:     big.NewInt(0),
+				IstanbulBlock:       big.NewInt(0),
+				BerlinBlock:         big.NewInt(0),
+				LondonBlock:         big.NewInt(0),
+				ShanghaiTime:        utils.NewUint64(0),
+				CancunTime:          utils.NewUint64(0),
+			},
+			&extras.ChainConfig{
+				NetworkUpgrades: extras.NetworkUpgrades{
+					SubnetEVMTimestamp: utils.NewUint64(0),
+					DurangoTimestamp:   utils.NewUint64(0),
+				},
+			},
+		),
+	}
 }
 
 // AvailableForks returns the set of defined fork names

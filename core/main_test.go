@@ -7,11 +7,19 @@ import (
 	"testing"
 
 	"go.uber.org/goleak"
+
+	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 )
 
 // TestMain uses goleak to verify tests in this package do not leak unexpected
 // goroutines.
 func TestMain(m *testing.M) {
+	RegisterExtras()
+
+	customtypes.Register()
+	params.RegisterExtras()
+
 	opts := []goleak.Option{
 		// No good way to shut down these goroutines:
 		goleak.IgnoreTopFunction("github.com/ava-labs/subnet-evm/core/state/snapshot.(*diskLayer).generate"),

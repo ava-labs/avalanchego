@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"math/big"
+	"os"
 	"reflect"
 	"slices"
 	"testing"
@@ -22,6 +23,11 @@ import (
 	// noise during the refactoring.
 	. "github.com/ava-labs/libevm/core/types"
 )
+
+func TestMain(m *testing.M) {
+	Register()
+	os.Exit(m.Run())
+}
 
 func TestHeaderRLP(t *testing.T) {
 	t.Parallel()

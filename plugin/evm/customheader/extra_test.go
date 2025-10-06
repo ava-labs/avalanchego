@@ -5,6 +5,7 @@ package customheader
 
 import (
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/core/types"
@@ -15,6 +16,11 @@ import (
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/subnetevm"
 	"github.com/ava-labs/subnet-evm/utils"
 )
+
+func TestMain(m *testing.M) {
+	customtypes.Register()
+	os.Exit(m.Run())
+}
 
 const (
 	targetGas = 10_000_000

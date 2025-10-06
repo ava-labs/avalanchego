@@ -13,6 +13,8 @@ import (
 )
 
 func main() {
+	evm.RegisterAllLibEVMExtras()
+
 	versionString := fmt.Sprintf("Subnet-EVM/%s [AvalancheGo=%s, rpcchainvm=%d]", evm.Version, version.Current, version.RPCChainVMProtocol)
 	runner.Run(versionString)
 }

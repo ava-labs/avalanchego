@@ -54,6 +54,11 @@ import (
 	"github.com/holiman/uint256"
 )
 
+func TestMain(m *testing.M) {
+	params.RegisterExtras()
+	os.Exit(m.Run())
+}
+
 var (
 	// testTxPoolConfig is a transaction pool configuration without stateful disk
 	// sideeffects used during testing.

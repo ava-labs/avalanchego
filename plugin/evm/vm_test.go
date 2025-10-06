@@ -65,6 +65,11 @@ import (
 	avagoconstants "github.com/ava-labs/avalanchego/utils/constants"
 )
 
+func TestMain(m *testing.M) {
+	RegisterAllLibEVMExtras()
+	os.Exit(m.Run())
+}
+
 var (
 	schemes = []string{rawdb.HashScheme, customrawdb.FirewoodScheme}
 

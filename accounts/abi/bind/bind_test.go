@@ -37,7 +37,15 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 )
+
+func TestMain(m *testing.M) {
+	customtypes.Register()
+	params.RegisterExtras()
+	os.Exit(m.Run())
+}
 
 var bindTests = []struct {
 	name     string
@@ -2156,10 +2164,21 @@ func golangBindings(t *testing.T, overload bool) {
 
 			import (
 				"testing"
+
+				"github.com/ava-labs/subnet-evm/params"
+				"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
+				libevmparams "github.com/ava-labs/libevm/params"
+				libevmtypes "github.com/ava-labs/libevm/core/types"
+
 				%s
 			)
 
 			func Test%s(t *testing.T) {
+				customtypes.Register()
+				t.Cleanup(libevmtypes.TestOnlyClearRegisteredExtras)
+				params.RegisterExtras()
+				t.Cleanup(libevmparams.TestOnlyClearRegisteredExtras)
+
 				%s
 			}
 		`, tt.imports, tt.name, tt.tester)

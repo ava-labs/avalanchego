@@ -32,6 +32,7 @@ import (
 	"crypto/ecdsa"
 	"math/big"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
@@ -41,9 +42,16 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/subnet-evm/accounts/abi/bind"
 	"github.com/ava-labs/subnet-evm/params"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	customtypes.Register()
+	params.RegisterExtras()
+	os.Exit(m.Run())
+}
 
 var _ bind.ContractBackend = (Client)(nil)
 
