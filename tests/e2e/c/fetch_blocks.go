@@ -70,7 +70,7 @@ var _ = e2e.DescribeCChain("[Fetch Blocks]", func() {
 				require.Equal(expectedBlock, blockHeight)
 				expectedBlock++
 
-				block := &types.Block{}
+				block := new(types.Block)
 				require.NoError(rlp.DecodeBytes(blockBytes, block))
 				require.Equal(blockHeight, block.NumberU64())
 			}
