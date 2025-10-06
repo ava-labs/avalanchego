@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/coreth/ethclient"
+	ethclient "github.com/ava-labs/coreth/plugin/evm/customethclient"
 	"github.com/ava-labs/libevm/rlp"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
