@@ -111,7 +111,8 @@ func RunHardhatTestsCustomURI(ctx context.Context, chainURI string, execPath str
 		"ChainURI", chainURI,
 	)
 
-	cmd := exec.CommandContext(ctx, "npx", "hardhat", "test", testPath, "--network", "local")
+	// first run clean cache
+	cmd := exec.CommandContext(ctx, "npx", "hardhat", "test", testPath, "--network", "local", "--no-compile")
 	cmd.Dir = execPath
 
 	log.Info("Sleeping to wait for test ping", "rpcURI", chainURI)

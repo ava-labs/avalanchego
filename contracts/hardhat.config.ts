@@ -40,5 +40,8 @@ export default {
   },
   mocha: {
     timeout: 30000
+  },
+  gasReporter: {
+    enabled: (process.env.REPORT_GAS) ? true : false
   }
 }
