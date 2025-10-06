@@ -24,7 +24,7 @@ var _ = e2e.DescribeCChain("[Fetch Blocks]", func() {
 	ginkgo.It("fetches created blocks", func() {
 		env := e2e.GetEnv(tc)
 		nodeURI := env.GetRandomNodeURI()
-		cChainNodeURI := fmt.Sprintf("%s/ext/bc/C/rpc", nodeURI)
+		cChainNodeURI := fmt.Sprintf("%s/ext/bc/C/rpc", nodeURI.URI)
 
 		fetchBlocksDBDir, err := os.MkdirTemp("", "fetch-blocks-test")
 		require.NoError(err)
