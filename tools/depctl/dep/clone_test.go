@@ -139,7 +139,7 @@ func TestClone_Integration(t *testing.T) {
 			// For integration test, we'll use a shallow clone approach
 			// but since Clone doesn't support --depth, we'll just verify
 			// the basic functionality works
-			err = Clone(opts)
+			_, err = Clone(opts)
 
 			if tt.skipCheck {
 				// Just verify it didn't panic or cause major errors

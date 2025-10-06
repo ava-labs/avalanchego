@@ -113,33 +113,20 @@ If no path is provided, defaults to the repository name (e.g., "avalanchego", "f
 			Shallow: shallowFlag,
 		}
 
-		if err := dep.Clone(opts); err != nil {
+		result, err := dep.Clone(opts)
+		if err != nil {
 			return err
 		}
 
 		// Determine what version was used
 		var versionDisplay string
-		if versionFlag != "" {
-			versionDisplay = versionFlag
+		if result.VersionInfo.IsDefault {
+			versionDisplay = fmt.Sprintf("%s (default)", result.VersionInfo.Version)
 		} else {
-			versionInfo, err := dep.GetVersion(target)
-			if err != nil {
-				return fmt.Errorf("failed to get version: %w", err)
-			}
-			if versionInfo.IsDefault {
-				versionDisplay = fmt.Sprintf("%s (default)", versionInfo.Version)
-			} else {
-				versionDisplay = versionInfo.Version
-			}
+			versionDisplay = result.VersionInfo.Version
 		}
 
-		// Determine what path was used
-		path := pathFlag
-		if path == "" {
-			path = string(target)
-		}
-
-		fmt.Printf("Successfully cloned %s at version %s to %s\n", target, versionDisplay, path)
+		fmt.Printf("Successfully cloned %s at version %s to %s\n", target, versionDisplay, result.Path)
 		return nil
 	},
 }
