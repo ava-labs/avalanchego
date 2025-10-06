@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestGetCurrentModuleName(t *testing.T) {
@@ -129,11 +131,19 @@ func TestClone_Integration(t *testing.T) {
 				t.Fatalf("failed to change to temp directory: %v", err)
 			}
 
+			// Create a logger for the test
+			logFormat, err := logging.ToFormat(logging.AutoString, os.Stdout.Fd())
+			if err != nil {
+				t.Fatalf("Failed to create log format: %v", err)
+			}
+			log := logging.NewLogger("depctl-test", logging.NewWrappedCore(logging.Off, os.Stdout, logFormat.ConsoleEncoder()))
+
 			// Clone with depth 1 for speed
 			opts := CloneOptions{
 				Target:  tt.target,
 				Path:    filepath.Join(tmpDir, string(tt.target)),
 				Version: tt.version,
+				Logger:  log,
 			}
 
 			// For integration test, we'll use a shallow clone approach

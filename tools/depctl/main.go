@@ -7,15 +7,19 @@ import (
 	"fmt"
 	"os"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/tools/depctl/dep"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/spf13/cobra"
 )
 
 var (
-	depFlag     string
-	pathFlag    string
-	versionFlag string
-	shallowFlag bool
+	depFlag      string
+	pathFlag     string
+	versionFlag  string
+	shallowFlag  bool
+	logLevelFlag string
 )
 
 func main() {
@@ -99,18 +103,33 @@ If no path is provided, defaults to the repository name (e.g., "avalanchego", "f
   depctl clone --dep=firewood --version=mytag
   depctl clone --dep=coreth --path=../coreth
   depctl clone --version=v1.11.11
-  depctl clone --shallow=false --version=v1.11.11`,
+  depctl clone --shallow=false --version=v1.11.11
+  depctl clone --dep=firewood --log-level=debug`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		target := dep.ParseRepoTarget(depFlag)
 		if !target.IsValid() {
 			return fmt.Errorf("invalid repo target %q, must be one of: avalanchego, firewood, coreth", depFlag)
 		}
 
+		// Parse log level
+		logLevel, err := logging.ToLevel(logLevelFlag)
+		if err != nil {
+			return fmt.Errorf("invalid log level %q: %w", logLevelFlag, err)
+		}
+
+		// Create logger
+		logFormat, err := logging.ToFormat(logging.AutoString, os.Stdout.Fd())
+		if err != nil {
+			return fmt.Errorf("failed to create log format: %w", err)
+		}
+		log := logging.NewLogger("depctl", logging.NewWrappedCore(logLevel, os.Stdout, logFormat.ConsoleEncoder()))
+
 		opts := dep.CloneOptions{
 			Target:  target,
 			Path:    pathFlag,
 			Version: versionFlag,
 			Shallow: shallowFlag,
+			Logger:  log,
 		}
 
 		result, err := dep.Clone(opts)
@@ -126,7 +145,11 @@ If no path is provided, defaults to the repository name (e.g., "avalanchego", "f
 			versionDisplay = result.VersionInfo.Version
 		}
 
-		fmt.Printf("Successfully cloned %s at version %s to %s\n", target, versionDisplay, result.Path)
+		log.Info("Successfully cloned repository",
+			zap.String("repository", string(target)),
+			zap.String("version", versionDisplay),
+			zap.String("path", result.Path),
+		)
 		return nil
 	},
 }
@@ -143,6 +166,7 @@ func init() {
 	cloneCmd.Flags().StringVar(&pathFlag, "path", "", "Clone path (defaults to repository name)")
 	cloneCmd.Flags().StringVar(&versionFlag, "version", "", "Version to clone (defaults to version in go.mod)")
 	cloneCmd.Flags().BoolVar(&shallowFlag, "shallow", true, "Perform a shallow clone with --depth 1 (default: true)")
+	cloneCmd.Flags().StringVar(&logLevelFlag, "log-level", "info", "Log level (verbo, debug, trace, info, warn, error, fatal, off)")
 
 	// Add commands to root
 	rootCmd.AddCommand(getVersionCmd)
