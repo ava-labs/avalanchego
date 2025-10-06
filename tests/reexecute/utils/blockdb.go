@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package blockdb
+package utils
 
 import (
 	"encoding/binary"
@@ -18,7 +18,7 @@ type BlockDB struct {
 	db database.Database
 }
 
-func New(dbDir string) (*BlockDB, error) {
+func NewBlockDB(dbDir string) (*BlockDB, error) {
 	db, err := leveldb.New(dbDir, nil, logging.NoLog{}, prometheus.NewRegistry())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create leveldb block database from %q: %w", dbDir, err)

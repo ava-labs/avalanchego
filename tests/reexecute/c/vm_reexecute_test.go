@@ -38,7 +38,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/tests/reexecute/blockdb"
+	"github.com/ava-labs/avalanchego/tests/reexecute/utils"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
@@ -445,7 +445,7 @@ func createBlockChanFromLevelDB(tb testing.TB, sourceDir string, startBlock, end
 	r := require.New(tb)
 	ch := make(chan blockResult, chanSize)
 
-	blockDB, err := blockdb.New(sourceDir)
+	blockDB, err := utils.NewBlockDB(sourceDir)
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +508,7 @@ func exportBlockRange(tb testing.TB, blockDirSrc string, blockDirDst string, sta
 	blockChan, err := createBlockChanFromLevelDB(tb, blockDirSrc, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
-	blockDB, err := blockdb.New(blockDirDst)
+	blockDB, err := utils.NewBlockDB(blockDirDst)
 	r.NoError(err)
 	r.NoError(blockDB.Close())
 

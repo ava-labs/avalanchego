@@ -4,6 +4,7 @@
 package c
 
 import (
+	"fmt"
 	"math/big"
 
 	"connectrpc.com/connect"
@@ -19,6 +20,46 @@ import (
 	pb "github.com/ava-labs/avalanchego/connectproto/pb/proposervm/proposervmconnect"
 )
 
+func byAdvancingCChainHeight(tc *e2e.GinkgoTestContext, minBlocks int) {
+	require := require.New(tc)
+
+	tc.By(fmt.Sprintf("advance the C-Chain height minimum of %d blocks", minBlocks), func() {
+		env := e2e.GetEnv(tc)
+		nodeURI := env.GetRandomNodeURI()
+		ethClient := e2e.NewEthClient(tc, nodeURI)
+		senderKey := env.PreFundedKey
+		senderEthAddress := senderKey.EthAddress()
+		recipientKey := e2e.NewPrivateKey(tc)
+		recipientEthAddress := recipientKey.EthAddress()
+
+		for i := 0; i < minBlocks; i++ {
+			// Create and send a simple transaction to trigger block production
+			nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), senderEthAddress)
+			require.NoError(err)
+			gasPrice := e2e.SuggestGasPrice(tc, ethClient)
+			tx := types.NewTransaction(
+				nonce,
+				recipientEthAddress,
+				big.NewInt(1000000000000000),
+				e2e.DefaultGasLimit,
+				gasPrice,
+				nil,
+			)
+
+			// Sign transaction
+			cChainID, err := ethClient.ChainID(tc.DefaultContext())
+			require.NoError(err)
+			signer := types.NewEIP155Signer(cChainID)
+			signedTx, err := types.SignTx(tx, signer, senderKey.ToECDSA())
+			require.NoError(err)
+
+			// Send the transaction and wait for receipt
+			receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
+			require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
+		}
+	})
+}
+
 var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("proposervm"), func() {
 	tc := e2e.NewTestContext()
 	require := require.New(tc)
@@ -27,39 +68,7 @@ var _ = e2e.DescribeCChain("[ProposerVM API]", ginkgo.Label("proposervm"), func(
 		env := e2e.GetEnv(tc)
 		nodeURI := env.GetRandomNodeURI()
 
-		tc.By("advancing the C-chain height", func() {
-			ethClient := e2e.NewEthClient(tc, nodeURI)
-			senderKey := env.PreFundedKey
-			senderEthAddress := senderKey.EthAddress()
-			recipientKey := e2e.NewPrivateKey(tc)
-			recipientEthAddress := recipientKey.EthAddress()
-
-			for i := 0; i < 3; i++ {
-				// Create and send a simple transaction to trigger block production
-				nonce, err := ethClient.AcceptedNonceAt(tc.DefaultContext(), senderEthAddress)
-				require.NoError(err)
-				gasPrice := e2e.SuggestGasPrice(tc, ethClient)
-				tx := types.NewTransaction(
-					nonce,
-					recipientEthAddress,
-					big.NewInt(1000000000000000),
-					e2e.DefaultGasLimit,
-					gasPrice,
-					nil,
-				)
-
-				// Sign transaction
-				cChainID, err := ethClient.ChainID(tc.DefaultContext())
-				require.NoError(err)
-				signer := types.NewEIP155Signer(cChainID)
-				signedTx, err := types.SignTx(tx, signer, senderKey.ToECDSA())
-				require.NoError(err)
-
-				// Send the transaction and wait for receipt
-				receipt := e2e.SendEthTransaction(tc, ethClient, signedTx)
-				require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
-			}
-		})
+		byAdvancingCChainHeight(tc, 3)
 
 		// Get the proper C-chain ID for routing
 		keychain := env.NewKeychain()
