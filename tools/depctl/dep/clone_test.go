@@ -140,10 +140,11 @@ func TestClone_Integration(t *testing.T) {
 
 			// Clone with depth 1 for speed
 			opts := CloneOptions{
-				Target:  tt.target,
-				Path:    filepath.Join(tmpDir, string(tt.target)),
-				Version: tt.version,
-				Logger:  log,
+				Target:         tt.target,
+				Path:           filepath.Join(tmpDir, string(tt.target)),
+				Version:        tt.version,
+				UpdateExisting: false,
+				Logger:         log,
 			}
 
 			// For integration test, we'll use a shallow clone approach

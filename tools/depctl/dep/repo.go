@@ -3,7 +3,9 @@
 
 package dep
 
-import "fmt"
+import (
+	"github.com/ava-labs/avalanchego/tools/depctl/stacktrace"
+)
 
 // RepoTarget represents a supported repository target
 type RepoTarget string
@@ -24,7 +26,7 @@ type repoInfo struct {
 func (r RepoTarget) Resolve() (modulePath, cloneURL string, err error) {
 	info, ok := repoMap[r]
 	if !ok {
-		return "", "", fmt.Errorf("invalid repo target %q, must be one of: avalanchego, firewood, coreth", r)
+		return "", "", stacktrace.Errorf("invalid repo target %q, must be one of: avalanchego, firewood, coreth", r)
 	}
 	return info.modulePath, info.cloneURL, nil
 }

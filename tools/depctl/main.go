@@ -15,14 +15,18 @@ import (
 )
 
 var (
-	depFlag      string
-	pathFlag     string
-	versionFlag  string
-	shallowFlag  bool
-	logLevelFlag string
+	depFlag            string
+	pathFlag           string
+	versionFlag        string
+	shallowFlag        bool
+	updateExistingFlag bool
+	logLevelFlag       string
 )
 
 func main() {
+	// Enable stack traces for all errors
+	os.Setenv("STACK_TRACE_ERRORS", "1")
+
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
@@ -125,15 +129,18 @@ If no path is provided, defaults to the repository name (e.g., "avalanchego", "f
 		log := logging.NewLogger("depctl", logging.NewWrappedCore(logLevel, os.Stdout, logFormat.ConsoleEncoder()))
 
 		opts := dep.CloneOptions{
-			Target:  target,
-			Path:    pathFlag,
-			Version: versionFlag,
-			Shallow: shallowFlag,
-			Logger:  log,
+			Target:         target,
+			Path:           pathFlag,
+			Version:        versionFlag,
+			Shallow:        shallowFlag,
+			UpdateExisting: updateExistingFlag,
+			Logger:         log,
 		}
 
 		result, err := dep.Clone(opts)
 		if err != nil {
+			// Log the full error including stack trace before returning
+			log.Error("Clone failed", zap.Error(err))
 			return err
 		}
 
@@ -166,6 +173,7 @@ func init() {
 	cloneCmd.Flags().StringVar(&pathFlag, "path", "", "Clone path (defaults to repository name)")
 	cloneCmd.Flags().StringVar(&versionFlag, "version", "", "Version to clone (defaults to version in go.mod)")
 	cloneCmd.Flags().BoolVar(&shallowFlag, "shallow", true, "Perform a shallow clone with --depth 1 (default: true)")
+	cloneCmd.Flags().BoolVar(&updateExistingFlag, "update-existing", false, "Update existing clone if it already exists (default: false)")
 	cloneCmd.Flags().StringVar(&logLevelFlag, "log-level", "info", "Log level (verbo, debug, trace, info, warn, error, fatal, off)")
 
 	// Add commands to root

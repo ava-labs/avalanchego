@@ -12,17 +12,19 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/ava-labs/avalanchego/tools/depctl/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"golang.org/x/mod/modfile"
 )
 
 // CloneOptions contains options for the Clone operation
 type CloneOptions struct {
-	Target  RepoTarget
-	Path    string
-	Version string
-	Shallow bool
-	Logger  logging.Logger
+	Target         RepoTarget
+	Path           string
+	Version        string
+	Shallow        bool
+	UpdateExisting bool
+	Logger         logging.Logger
 }
 
 // CloneResult contains information about a completed clone operation
@@ -51,7 +53,7 @@ func Clone(opts CloneOptions) (CloneResult, error) {
 		var err error
 		versionInfo, err = GetVersion(opts.Target)
 		if err != nil {
-			return CloneResult{}, fmt.Errorf("failed to get version from go.mod: %w", err)
+			return CloneResult{}, stacktrace.Errorf("failed to get version from go.mod: %w", err)
 		}
 		version = versionInfo.Version
 		opts.Logger.Debug("Got version from go.mod",
@@ -69,7 +71,7 @@ func Clone(opts CloneOptions) (CloneResult, error) {
 	// Resolve target to get clone URL
 	_, cloneURL, err := opts.Target.Resolve()
 	if err != nil {
-		return CloneResult{}, err
+		return CloneResult{}, stacktrace.Wrap(err)
 	}
 	opts.Logger.Debug("Resolved clone URL",
 		zap.String("url", cloneURL),
@@ -78,7 +80,7 @@ func Clone(opts CloneOptions) (CloneResult, error) {
 	// Convert path to absolute for consistency
 	absPath, err := filepath.Abs(opts.Path)
 	if err != nil {
-		return CloneResult{}, fmt.Errorf("failed to resolve absolute path: %w", err)
+		return CloneResult{}, stacktrace.Errorf("failed to resolve absolute path: %w", err)
 	}
 	opts.Logger.Debug("Resolved absolute path",
 		zap.String("relativePath", opts.Path),
@@ -86,13 +88,13 @@ func Clone(opts CloneOptions) (CloneResult, error) {
 	)
 
 	// Clone or update the repository
-	if err := cloneOrUpdate(absPath, cloneURL, version, opts.Shallow, opts.Logger); err != nil {
-		return CloneResult{}, err
+	if err := cloneOrUpdate(absPath, cloneURL, version, opts.Shallow, opts.UpdateExisting, opts.Logger); err != nil {
+		return CloneResult{}, stacktrace.Wrap(err)
 	}
 
 	// Set up go mod replace directives
 	if err := setupModReplace(opts.Target, absPath, opts.Logger); err != nil {
-		return CloneResult{}, err
+		return CloneResult{}, stacktrace.Wrap(err)
 	}
 
 	return CloneResult{
@@ -102,7 +104,7 @@ func Clone(opts CloneOptions) (CloneResult, error) {
 }
 
 // cloneOrUpdate clones a repository if it doesn't exist, or updates it if it does
-func cloneOrUpdate(path, cloneURL, version string, shallow bool, log logging.Logger) error {
+func cloneOrUpdate(path, cloneURL, version string, shallow, updateExisting bool, log logging.Logger) error {
 	// Check if directory exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		log.Debug("Directory does not exist, cloning repository",
@@ -136,13 +138,20 @@ func cloneOrUpdate(path, cloneURL, version string, shallow bool, log logging.Log
 				cmd.Stdout = os.Stdout
 				cmd.Stderr = os.Stderr
 				if err := cmd.Run(); err != nil {
-					return fmt.Errorf("failed to clone repository: %w", err)
+					return stacktrace.Errorf("failed to clone repository: %w", err)
 				}
 			} else {
-				return fmt.Errorf("failed to clone repository: %w", err)
+				return stacktrace.Errorf("failed to clone repository: %w", err)
 			}
 		}
 	} else {
+		// Directory exists
+		if !updateExisting {
+			log.Info("Clone directory already exists, skipping (use --update-existing to update)",
+				zap.String("path", path),
+			)
+			return nil
+		}
 		log.Debug("Directory already exists, will update",
 			zap.String("path", path),
 		)
@@ -151,7 +160,7 @@ func cloneOrUpdate(path, cloneURL, version string, shallow bool, log logging.Log
 	// Change to the repository directory
 	originalDir, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
+		return stacktrace.Errorf("failed to get working directory: %w", err)
 	}
 	defer func() {
 		_ = os.Chdir(originalDir)
@@ -162,7 +171,7 @@ func cloneOrUpdate(path, cloneURL, version string, shallow bool, log logging.Log
 		zap.String("to", path),
 	)
 	if err := os.Chdir(path); err != nil {
-		return fmt.Errorf("failed to change to repository directory: %w", err)
+		return stacktrace.Errorf("failed to change to repository directory: %w", err)
 	}
 
 	// Fetch updates (if the directory already existed)
@@ -209,12 +218,12 @@ func cloneOrUpdate(path, cloneURL, version string, shallow bool, log logging.Log
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to checkout version %s: %w", version, err)
+		return stacktrace.Errorf("failed to checkout version %s: %w", version, err)
 	}
 
 	// Verify that we're at the correct version
 	if err := verifyCloneVersion(version); err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	// Print success message
@@ -232,7 +241,7 @@ func verifyCloneVersion(version string) error {
 	cmd := exec.Command("git", "rev-parse", "HEAD")
 	headOutput, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("failed to get HEAD commit: %w", err)
+		return stacktrace.Errorf("failed to get HEAD commit: %w", err)
 	}
 	headCommit := strings.TrimSpace(string(headOutput))
 
@@ -244,14 +253,14 @@ func verifyCloneVersion(version string) error {
 		cmd = exec.Command("git", "rev-parse", version)
 		versionOutput, err = cmd.Output()
 		if err != nil {
-			return fmt.Errorf("failed to resolve version %s: %w", version, err)
+			return stacktrace.Errorf("failed to resolve version %s: %w", version, err)
 		}
 	}
 	versionCommit := strings.TrimSpace(string(versionOutput))
 
 	// Compare commits
 	if headCommit != versionCommit {
-		return fmt.Errorf("verification failed: HEAD commit %s does not match version %s commit %s", headCommit, version, versionCommit)
+		return stacktrace.Errorf("verification failed: HEAD commit %s does not match version %s commit %s", headCommit, version, versionCommit)
 	}
 
 	return nil
@@ -262,7 +271,7 @@ func setupModReplace(target RepoTarget, clonedPath string, log logging.Logger) e
 	// Get current working directory (where we started)
 	originalDir, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
+		return stacktrace.Errorf("failed to get working directory: %w", err)
 	}
 
 	log.Debug("Setting up go mod replace directives",
@@ -273,7 +282,7 @@ func setupModReplace(target RepoTarget, clonedPath string, log logging.Logger) e
 	// Get current module name
 	currentModule, err := getCurrentModuleName()
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 	log.Debug("Current module",
 		zap.String("module", currentModule),
@@ -289,7 +298,7 @@ func setupModReplace(target RepoTarget, clonedPath string, log logging.Logger) e
 		modDir = clonedPath
 		relPath, err := filepath.Rel(clonedPath, originalDir)
 		if err != nil {
-			return fmt.Errorf("failed to compute relative path: %w", err)
+			return stacktrace.Errorf("failed to compute relative path: %w", err)
 		}
 		replacements = []replacement{
 			{old: "github.com/ava-labs/coreth", new: relPath},
@@ -300,7 +309,7 @@ func setupModReplace(target RepoTarget, clonedPath string, log logging.Logger) e
 		modDir = clonedPath
 		relPath, err := filepath.Rel(clonedPath, originalDir)
 		if err != nil {
-			return fmt.Errorf("failed to compute relative path: %w", err)
+			return stacktrace.Errorf("failed to compute relative path: %w", err)
 		}
 		replacements = []replacement{
 			{old: "github.com/ava-labs/firewood-go-ethhash/ffi", new: relPath},
@@ -313,7 +322,7 @@ func setupModReplace(target RepoTarget, clonedPath string, log logging.Logger) e
 		ffiPath := filepath.Join(clonedPath, "ffi")
 		relPath, err := filepath.Rel(originalDir, ffiPath)
 		if err != nil {
-			return fmt.Errorf("failed to compute relative path: %w", err)
+			return stacktrace.Errorf("failed to compute relative path: %w", err)
 		}
 		replacements = []replacement{
 			{old: "github.com/ava-labs/firewood-go-ethhash/ffi", new: relPath},
@@ -324,7 +333,7 @@ func setupModReplace(target RepoTarget, clonedPath string, log logging.Logger) e
 		modDir = originalDir
 		relPath, err := filepath.Rel(originalDir, clonedPath)
 		if err != nil {
-			return fmt.Errorf("failed to compute relative path: %w", err)
+			return stacktrace.Errorf("failed to compute relative path: %w", err)
 		}
 		replacements = []replacement{
 			{old: "github.com/ava-labs/coreth", new: relPath},
@@ -350,7 +359,7 @@ func setupModReplace(target RepoTarget, clonedPath string, log logging.Logger) e
 		zap.String("modDir", modDir),
 	)
 	if err := os.Chdir(modDir); err != nil {
-		return fmt.Errorf("failed to change to %s: %w", modDir, err)
+		return stacktrace.Errorf("failed to change to %s: %w", modDir, err)
 	}
 
 	for _, repl := range replacements {
@@ -367,7 +376,7 @@ func setupModReplace(target RepoTarget, clonedPath string, log logging.Logger) e
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to run go mod edit: %w", err)
+			return stacktrace.Errorf("failed to run go mod edit: %w", err)
 		}
 	}
 
@@ -396,16 +405,16 @@ type replacement struct {
 func getCurrentModuleName() (string, error) {
 	goModData, err := os.ReadFile("go.mod")
 	if err != nil {
-		return "", fmt.Errorf("failed to read go.mod: %w", err)
+		return "", stacktrace.Errorf("failed to read go.mod: %w", err)
 	}
 
 	modFile, err := modfile.Parse("go.mod", goModData, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse go.mod: %w", err)
+		return "", stacktrace.Errorf("failed to parse go.mod: %w", err)
 	}
 
 	if modFile.Module == nil {
-		return "", fmt.Errorf("no module declaration found in go.mod")
+		return "", stacktrace.Errorf("no module declaration found in go.mod")
 	}
 
 	return modFile.Module.Mod.Path, nil

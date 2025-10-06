@@ -4,6 +4,7 @@
 package dep
 
 import (
+	"github.com/ava-labs/avalanchego/tools/depctl/stacktrace"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -29,19 +30,19 @@ type VersionInfo struct {
 func GetVersion(target RepoTarget) (VersionInfo, error) {
 	modulePath, _, err := target.Resolve()
 	if err != nil {
-		return VersionInfo{}, err
+		return VersionInfo{}, stacktrace.Wrap(err)
 	}
 
 	// Read go.mod file
 	goModData, err := os.ReadFile("go.mod")
 	if err != nil {
-		return VersionInfo{}, fmt.Errorf("failed to read go.mod: %w", err)
+		return VersionInfo{}, stacktrace.Errorf("failed to read go.mod: %w", err)
 	}
 
 	// Parse go.mod
 	modFile, err := modfile.Parse("go.mod", goModData, nil)
 	if err != nil {
-		return VersionInfo{}, fmt.Errorf("failed to parse go.mod: %w", err)
+		return VersionInfo{}, stacktrace.Errorf("failed to parse go.mod: %w", err)
 	}
 
 	// Find the require directive for the module (check both direct and indirect)
@@ -119,7 +120,7 @@ func isPseudoVersion(version string) bool {
 func UpdateVersion(target RepoTarget, version string) error {
 	modulePath, _, err := target.Resolve()
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	// Run go get to update the version
@@ -127,7 +128,7 @@ func UpdateVersion(target RepoTarget, version string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to run go get: %w", err)
+		return stacktrace.Errorf("failed to run go get: %w", err)
 	}
 
 	// Run go mod tidy
@@ -135,13 +136,13 @@ func UpdateVersion(target RepoTarget, version string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to run go mod tidy: %w", err)
+		return stacktrace.Errorf("failed to run go mod tidy: %w", err)
 	}
 
 	// Only update workflow files if target is avalanchego
 	if target == TargetAvalanchego {
 		if err := updateWorkflowFiles(version); err != nil {
-			return fmt.Errorf("failed to update workflow files: %w", err)
+			return stacktrace.Wrap(err)
 		}
 	}
 
@@ -153,19 +154,19 @@ func updateWorkflowFiles(version string) error {
 	// Get full SHA for the version
 	fullSHA, err := getFullSHA(version)
 	if err != nil {
-		return err
+		return stacktrace.Wrap(err)
 	}
 
 	// Find all workflow files
 	workflowFiles, err := filepath.Glob(".github/workflows/*.yml")
 	if err != nil {
-		return fmt.Errorf("failed to find workflow files: %w", err)
+		return stacktrace.Errorf("failed to find workflow files: %w", err)
 	}
 
 	// Also check for .yaml extension
 	yamlFiles, err := filepath.Glob(".github/workflows/*.yaml")
 	if err != nil {
-		return fmt.Errorf("failed to find workflow yaml files: %w", err)
+		return stacktrace.Errorf("failed to find workflow yaml files: %w", err)
 	}
 	workflowFiles = append(workflowFiles, yamlFiles...)
 
@@ -175,7 +176,7 @@ func updateWorkflowFiles(version string) error {
 	for _, file := range workflowFiles {
 		content, err := os.ReadFile(file)
 		if err != nil {
-			return fmt.Errorf("failed to read %s: %w", file, err)
+			return stacktrace.Errorf("failed to read %s: %w", file, err)
 		}
 
 		// Replace all occurrences with the full SHA
@@ -184,7 +185,7 @@ func updateWorkflowFiles(version string) error {
 		// Only write if content changed
 		if newContent != string(content) {
 			if err := os.WriteFile(file, []byte(newContent), 0o644); err != nil {
-				return fmt.Errorf("failed to write %s: %w", file, err)
+				return stacktrace.Errorf("failed to write %s: %w", file, err)
 			}
 		}
 	}
@@ -198,7 +199,7 @@ func getFullSHA(version string) (string, error) {
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
+		return "", stacktrace.Errorf("failed to create request: %w", err)
 	}
 
 	// Use GITHUB_TOKEN if available to avoid rate limiting
@@ -209,23 +210,23 @@ func getFullSHA(version string) (string, error) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch commit info from GitHub: %w", err)
+		return "", stacktrace.Errorf("failed to fetch commit info from GitHub: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("GitHub API returned status %d for version %s", resp.StatusCode, version)
+		return "", stacktrace.Errorf("GitHub API returned status %d for version %s", resp.StatusCode, version)
 	}
 
 	var result struct {
 		SHA string `json:"sha"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("failed to decode GitHub response: %w", err)
+		return "", stacktrace.Errorf("failed to decode GitHub response: %w", err)
 	}
 
 	if result.SHA == "" {
-		return "", fmt.Errorf("no SHA found for version %s", version)
+		return "", stacktrace.Errorf("no SHA found for version %s", version)
 	}
 
 	return result.SHA, nil
