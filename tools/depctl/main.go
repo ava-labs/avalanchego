@@ -48,12 +48,16 @@ For pseudo-versions, extracts and returns the first 8 chars of the commit hash.`
 			return fmt.Errorf("invalid repo target %q, must be one of: avalanchego, firewood, coreth", depFlag)
 		}
 
-		version, err := dep.GetVersion(target)
+		versionInfo, err := dep.GetVersion(target)
 		if err != nil {
 			return err
 		}
 
-		fmt.Println(version)
+		if versionInfo.IsDefault {
+			fmt.Printf("%s (default)\n", versionInfo.Version)
+		} else {
+			fmt.Println(versionInfo.Version)
+		}
 		return nil
 	},
 }
@@ -114,12 +118,18 @@ If no path is provided, defaults to the repository name (e.g., "avalanchego", "f
 		}
 
 		// Determine what version was used
-		version := versionFlag
-		if version == "" {
-			var err error
-			version, err = dep.GetVersion(target)
+		var versionDisplay string
+		if versionFlag != "" {
+			versionDisplay = versionFlag
+		} else {
+			versionInfo, err := dep.GetVersion(target)
 			if err != nil {
 				return fmt.Errorf("failed to get version: %w", err)
+			}
+			if versionInfo.IsDefault {
+				versionDisplay = fmt.Sprintf("%s (default)", versionInfo.Version)
+			} else {
+				versionDisplay = versionInfo.Version
 			}
 		}
 
@@ -129,7 +139,7 @@ If no path is provided, defaults to the repository name (e.g., "avalanchego", "f
 			path = string(target)
 		}
 
-		fmt.Printf("Successfully cloned %s at version %s to %s\n", target, version, path)
+		fmt.Printf("Successfully cloned %s at version %s to %s\n", target, versionDisplay, path)
 		return nil
 	},
 }

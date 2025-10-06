@@ -31,11 +31,11 @@ func Clone(opts CloneOptions) error {
 	// If no version provided, get it from go.mod
 	version := opts.Version
 	if version == "" {
-		var err error
-		version, err = GetVersion(opts.Target)
+		versionInfo, err := GetVersion(opts.Target)
 		if err != nil {
 			return fmt.Errorf("failed to get version from go.mod: %w", err)
 		}
+		version = versionInfo.Version
 	}
 
 	// Resolve target to get clone URL

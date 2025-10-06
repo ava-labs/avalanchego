@@ -16,28 +16,35 @@ import (
 	"golang.org/x/mod/modfile"
 )
 
+// VersionInfo contains version information and whether it's a default value
+type VersionInfo struct {
+	Version   string
+	IsDefault bool
+}
+
 // GetVersion retrieves the version of the specified dependency from go.mod
 // For tagged versions, returns the version as-is
 // For pseudo-versions, extracts and returns the first 8 chars of the hash
-func GetVersion(target RepoTarget) (string, error) {
+// If module is not found, returns the default branch for the target
+func GetVersion(target RepoTarget) (VersionInfo, error) {
 	modulePath, _, err := target.Resolve()
 	if err != nil {
-		return "", err
+		return VersionInfo{}, err
 	}
 
 	// Read go.mod file
 	goModData, err := os.ReadFile("go.mod")
 	if err != nil {
-		return "", fmt.Errorf("failed to read go.mod: %w", err)
+		return VersionInfo{}, fmt.Errorf("failed to read go.mod: %w", err)
 	}
 
 	// Parse go.mod
 	modFile, err := modfile.Parse("go.mod", goModData, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse go.mod: %w", err)
+		return VersionInfo{}, fmt.Errorf("failed to parse go.mod: %w", err)
 	}
 
-	// Find the require directive for the module
+	// Find the require directive for the module (check both direct and indirect)
 	var version string
 	for _, req := range modFile.Require {
 		if req.Mod.Path == modulePath {
@@ -46,8 +53,13 @@ func GetVersion(target RepoTarget) (string, error) {
 		}
 	}
 
+	// If not found, return default branch
 	if version == "" {
-		return "", fmt.Errorf("module %q not found in go.mod", modulePath)
+		defaultBranch := getDefaultBranch(target)
+		return VersionInfo{
+			Version:   defaultBranch,
+			IsDefault: true,
+		}, nil
 	}
 
 	// Check if it's a pseudo-version (format: v0.0.0-YYYYMMDDHHMMSS-abcdefabcdef)
@@ -58,14 +70,26 @@ func GetVersion(target RepoTarget) (string, error) {
 			hash := parts[len(parts)-1]
 			// Return first 8 chars of hash
 			if len(hash) >= 8 {
-				return hash[:8], nil
+				return VersionInfo{Version: hash[:8], IsDefault: false}, nil
 			}
-			return hash, nil
+			return VersionInfo{Version: hash, IsDefault: false}, nil
 		}
 	}
 
 	// Return tagged version as-is
-	return version, nil
+	return VersionInfo{Version: version, IsDefault: false}, nil
+}
+
+// getDefaultBranch returns the default branch name for a repository target
+func getDefaultBranch(target RepoTarget) string {
+	switch target {
+	case TargetFirewood:
+		return "main"
+	case TargetAvalanchego, TargetCoreth:
+		return "master"
+	default:
+		return "master"
+	}
 }
 
 // isPseudoVersion checks if a version string is a pseudo-version

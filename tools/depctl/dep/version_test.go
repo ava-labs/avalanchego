@@ -69,12 +69,13 @@ func TestIsPseudoVersion(t *testing.T) {
 
 func TestGetVersion(t *testing.T) {
 	tests := []struct {
-		name       string
-		target     RepoTarget
-		goModData  string
-		wantVer    string
-		wantErr    bool
-		errContain string
+		name        string
+		target      RepoTarget
+		goModData   string
+		wantVer     string
+		wantDefault bool
+		wantErr     bool
+		errContain  string
 	}{
 		{
 			name:   "tagged version",
@@ -87,8 +88,9 @@ require (
 	github.com/ava-labs/avalanchego v1.11.11
 )
 `,
-			wantVer: "v1.11.11",
-			wantErr: false,
+			wantVer:     "v1.11.11",
+			wantDefault: false,
+			wantErr:     false,
 		},
 		{
 			name:   "pseudo-version",
@@ -101,8 +103,9 @@ require (
 	github.com/ava-labs/coreth v0.0.0-20240101120000-abcdef123456
 )
 `,
-			wantVer: "abcdef12",
-			wantErr: false,
+			wantVer:     "abcdef12",
+			wantDefault: false,
+			wantErr:     false,
 		},
 		{
 			name:   "pseudo-version short hash",
@@ -115,11 +118,31 @@ require (
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.0-20240101120000-abc123
 )
 `,
-			wantVer: "abc123",
-			wantErr: false,
+			wantVer:     "abc123",
+			wantDefault: false,
+			wantErr:     false,
 		},
 		{
-			name:   "module not found",
+			name:   "indirect dependency",
+			target: TargetFirewood,
+			goModData: `module github.com/ava-labs/test
+
+go 1.21
+
+require (
+	github.com/ava-labs/avalanchego v1.11.11
+)
+
+require (
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.0-20240101120000-def456789012 // indirect
+)
+`,
+			wantVer:     "def45678",
+			wantDefault: false,
+			wantErr:     false,
+		},
+		{
+			name:   "module not found - returns default for avalanchego",
 			target: TargetAvalanchego,
 			goModData: `module github.com/ava-labs/test
 
@@ -129,9 +152,24 @@ require (
 	github.com/ava-labs/coreth v1.2.3
 )
 `,
-			wantVer:    "",
-			wantErr:    true,
-			errContain: "not found in go.mod",
+			wantVer:     "master",
+			wantDefault: true,
+			wantErr:     false,
+		},
+		{
+			name:   "module not found - returns default for firewood",
+			target: TargetFirewood,
+			goModData: `module github.com/ava-labs/test
+
+go 1.21
+
+require (
+	github.com/ava-labs/coreth v1.2.3
+)
+`,
+			wantVer:     "main",
+			wantDefault: true,
+			wantErr:     false,
 		},
 		{
 			name:   "invalid target",
@@ -170,7 +208,7 @@ go 1.21
 			}
 
 			// Test GetVersion
-			gotVer, err := GetVersion(tt.target)
+			gotInfo, err := GetVersion(tt.target)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetVersion() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -180,8 +218,13 @@ go 1.21
 					t.Errorf("GetVersion() error = %v, should contain %q", err, tt.errContain)
 				}
 			}
-			if gotVer != tt.wantVer {
-				t.Errorf("GetVersion() = %v, want %v", gotVer, tt.wantVer)
+			if !tt.wantErr {
+				if gotInfo.Version != tt.wantVer {
+					t.Errorf("GetVersion().Version = %v, want %v", gotInfo.Version, tt.wantVer)
+				}
+				if gotInfo.IsDefault != tt.wantDefault {
+					t.Errorf("GetVersion().IsDefault = %v, want %v", gotInfo.IsDefault, tt.wantDefault)
+				}
 			}
 		})
 	}
