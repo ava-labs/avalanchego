@@ -15,6 +15,7 @@ var (
 	depFlag     string
 	pathFlag    string
 	versionFlag string
+	shallowFlag bool
 )
 
 func main() {
@@ -93,7 +94,8 @@ If no path is provided, defaults to the repository name (e.g., "avalanchego", "f
 	Example: `  depctl clone
   depctl clone --dep=firewood --version=mytag
   depctl clone --dep=coreth --path=../coreth
-  depctl clone --version=v1.11.11`,
+  depctl clone --version=v1.11.11
+  depctl clone --shallow --version=v1.11.11`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		target := dep.ParseRepoTarget(depFlag)
 		if !target.IsValid() {
@@ -104,6 +106,7 @@ If no path is provided, defaults to the repository name (e.g., "avalanchego", "f
 			Target:  target,
 			Path:    pathFlag,
 			Version: versionFlag,
+			Shallow: shallowFlag,
 		}
 
 		if err := dep.Clone(opts); err != nil {
@@ -142,6 +145,7 @@ func init() {
 	cloneCmd.Flags().StringVar(&depFlag, "dep", "", "Repository target (avalanchego, firewood, coreth)")
 	cloneCmd.Flags().StringVar(&pathFlag, "path", "", "Clone path (defaults to repository name)")
 	cloneCmd.Flags().StringVar(&versionFlag, "version", "", "Version to clone (defaults to version in go.mod)")
+	cloneCmd.Flags().BoolVar(&shallowFlag, "shallow", false, "Perform a shallow clone (--depth 1)")
 
 	// Add commands to root
 	rootCmd.AddCommand(getVersionCmd)

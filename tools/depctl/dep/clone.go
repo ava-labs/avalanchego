@@ -18,6 +18,7 @@ type CloneOptions struct {
 	Target  RepoTarget
 	Path    string
 	Version string
+	Shallow bool
 }
 
 // Clone clones or updates a repository and sets up go mod replace directives
@@ -50,7 +51,7 @@ func Clone(opts CloneOptions) error {
 	}
 
 	// Clone or update the repository
-	if err := cloneOrUpdate(absPath, cloneURL, version); err != nil {
+	if err := cloneOrUpdate(absPath, cloneURL, version, opts.Shallow); err != nil {
 		return err
 	}
 
@@ -63,11 +64,16 @@ func Clone(opts CloneOptions) error {
 }
 
 // cloneOrUpdate clones a repository if it doesn't exist, or updates it if it does
-func cloneOrUpdate(path, cloneURL, version string) error {
+func cloneOrUpdate(path, cloneURL, version string, shallow bool) error {
 	// Check if directory exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		// Clone the repository
-		cmd := exec.Command("git", "clone", cloneURL, path)
+		args := []string{"clone"}
+		if shallow {
+			args = append(args, "--depth", "1")
+		}
+		args = append(args, cloneURL, path)
+		cmd := exec.Command("git", args...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
