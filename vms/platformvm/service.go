@@ -1803,8 +1803,9 @@ type jsonWarpValidator struct {
 	NodeIDs   []ids.NodeID   `json:"nodeIDs"`
 }
 
-// GetValidatorsAt returns the weights of the validator set of a provided subnet
-// at the specified height.
+// GetAllValidatorsAt returns the canonical validator sets of
+// all chains with at least one active validator at the specified
+// height or at proposerVM height if set to [platformapi.ProposedHeight].
 func (s *Service) GetAllValidatorsAt(r *http.Request, args *GetAllValidatorsAtArgs, reply *GetAllValidatorsAtReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
