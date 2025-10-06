@@ -58,5 +58,5 @@ func CalculatePrice(
 	excess Gas,
 	excessConversionConstant Gas,
 ) Price {
-	return Price(safemath.CalculateExponential(uint64(minPrice), uint64(excess), uint64(excessConversionConstant)))
+	return Price(safemath.ApproximateExponential(uint64(minPrice), uint64(excess), uint64(excessConversionConstant)))
 }

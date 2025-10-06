@@ -1,8 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-// Package common provides shared utility functions for ACP implementations.
-package common
+package excess
 
 import (
 	"math"
@@ -11,17 +10,17 @@ import (
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-// ExcessParams contains the parameters needed for excess calculations.
-type ExcessParams struct {
-	MinValue       uint64 // Minimum value (P or M)
-	ConversionRate uint64 // Conversion factor for exponential calculations (D)
-	MaxExcessDiff  uint64 // Maximum change in excess per update (Q)
+// Params contains the parameters needed for excess calculations.
+type Params struct {
+	MinValue       uint64 // Minimum value
+	ConversionRate uint64 // Conversion factor for exponential calculations
+	MaxExcessDiff  uint64 // Maximum change in excess per update
 	MaxExcess      uint64 // Maximum possible excess value
 }
 
 // AdjustExcess calculates the optimal new excess given the current and desired excess values,
 // ensuring the change does not exceed the maximum excess difference.
-func (p ExcessParams) AdjustExcess(excess, desired uint64) uint64 {
+func (p Params) AdjustExcess(excess, desired uint64) uint64 {
 	change := safemath.AbsDiff(excess, desired)
 	change = min(change, p.MaxExcessDiff)
 	if excess < desired {
@@ -32,8 +31,8 @@ func (p ExcessParams) AdjustExcess(excess, desired uint64) uint64 {
 
 // DesiredExcess calculates the optimal desiredExcess given the
 // desired value using binary search.
-func (p ExcessParams) DesiredExcess(desiredValue uint64) uint64 {
-	// This could be solved directly by calculating D * ln(desiredValue / P)
+func (p Params) DesiredExcess(desiredValue uint64) uint64 {
+	// This could be solved directly by calculating ConversionRate * ln(desiredValue / MinValue)
 	// using floating point math. However, it introduces inaccuracies. So, we
 	// use a binary search to find the closest integer solution.
 	return uint64(sort.Search(int(p.MaxExcess), func(targetExcessGuess int) bool {
@@ -44,8 +43,8 @@ func (p ExcessParams) DesiredExcess(desiredValue uint64) uint64 {
 
 // CalculateValue calculates the value using exponential formula:
 // Value = MinValue * e^(Excess / ConversionRate)
-func (p ExcessParams) CalculateValue(excess uint64) uint64 {
-	return safemath.CalculateExponential(
+func (p Params) CalculateValue(excess uint64) uint64 {
+	return safemath.ApproximateExponential(
 		p.MinValue,
 		excess,
 		p.ConversionRate,

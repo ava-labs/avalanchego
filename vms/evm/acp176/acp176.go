@@ -16,7 +16,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
-	"github.com/ava-labs/avalanchego/vms/evm/upgrades/common"
+	"github.com/ava-labs/avalanchego/vms/evm/excess"
+
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
 const (
@@ -42,10 +44,10 @@ const (
 var (
 	ErrStateInsufficientLength = errors.New("insufficient length for fee state")
 
-	acp176Params = common.ExcessParams{
-		MinValue:       MinTargetPerSecond,
-		ConversionRate: TargetConversion,
-		MaxExcessDiff:  MaxTargetExcessDiff,
+	acp176Params = excess.Params{
+		MinValue:       MinTargetPerSecond,  // P
+		ConversionRate: TargetConversion,    // D
+		MaxExcessDiff:  MaxTargetExcessDiff, // Q
 		MaxExcess:      maxTargetExcess,
 	}
 )
@@ -87,7 +89,7 @@ func (s *State) Target() gas.Gas {
 // MaxCapacity returns the maximum possible accrued gas capacity, `C`.
 func (s *State) MaxCapacity() gas.Gas {
 	targetPerSecond := s.Target()
-	return gas.Gas(common.MulWithUpperBound(uint64(targetPerSecond), TargetToMaxCapacity))
+	return gas.Gas(excess.MulWithUpperBound(uint64(targetPerSecond), TargetToMaxCapacity))
 }
 
 // GasPrice returns the current required fee per gas.
@@ -95,7 +97,7 @@ func (s *State) MaxCapacity() gas.Gas {
 // GasPrice = MinGasPrice * e^(Excess / (Target() * TargetToPriceUpdateConversion))
 func (s *State) GasPrice() gas.Price {
 	targetPerSecond := s.Target()
-	priceUpdateConversion := common.MulWithUpperBound(uint64(targetPerSecond), TargetToPriceUpdateConversion) // K
+	priceUpdateConversion := excess.MulWithUpperBound(uint64(targetPerSecond), TargetToPriceUpdateConversion) // K
 	return gas.CalculatePrice(MinGasPrice, s.Gas.Excess, gas.Gas(priceUpdateConversion))
 }
 
@@ -104,8 +106,8 @@ func (s *State) GasPrice() gas.Price {
 // This is used in Fortuna.
 func (s *State) AdvanceSeconds(seconds uint64) {
 	targetPerSecond := s.Target()
-	maxPerSecond := gas.Gas(common.MulWithUpperBound(uint64(targetPerSecond), TargetToMax))    // R
-	maxCapacity := gas.Gas(common.MulWithUpperBound(uint64(maxPerSecond), TimeToFillCapacity)) // C
+	maxPerSecond := gas.Gas(excess.MulWithUpperBound(uint64(targetPerSecond), TargetToMax))    // R
+	maxCapacity := gas.Gas(excess.MulWithUpperBound(uint64(maxPerSecond), TimeToFillCapacity)) // C
 	s.Gas = s.Gas.AdvanceTime(
 		maxCapacity,
 		maxPerSecond,
@@ -121,8 +123,8 @@ func (s *State) AdvanceMilliseconds(milliseconds uint64) {
 	targetPerSecond := s.Target()
 	targetPerMS := targetPerSecond / 1000
 	maxPerMS := targetPerMS * TargetToMax                                              // R - this can't overflow since 1000 > TargetToMax.
-	maxPerSecond := common.MulWithUpperBound(uint64(targetPerSecond), TargetToMax)     // rate used for calculating maxCapacity
-	maxCapacity := gas.Gas(common.MulWithUpperBound(maxPerSecond, TimeToFillCapacity)) // C
+	maxPerSecond := excess.MulWithUpperBound(uint64(targetPerSecond), TargetToMax)     // rate used for calculating maxCapacity
+	maxCapacity := gas.Gas(excess.MulWithUpperBound(maxPerSecond, TimeToFillCapacity)) // C
 	s.Gas = s.Gas.AdvanceTime(
 		maxCapacity,
 		maxPerMS,
@@ -175,7 +177,7 @@ func (s *State) UpdateTargetExcess(desiredTargetExcess gas.Gas) {
 	)
 
 	// Ensure the gas capacity does not exceed the maximum capacity.
-	newMaxCapacity := gas.Gas(common.MulWithUpperBound(uint64(newTargetPerSecond), TargetToMaxCapacity)) // C
+	newMaxCapacity := gas.Gas(excess.MulWithUpperBound(uint64(newTargetPerSecond), TargetToMaxCapacity)) // C
 	s.Gas.Capacity = min(s.Gas.Capacity, newMaxCapacity)
 }
 
@@ -214,4 +216,14 @@ func scaleExcess(
 		return math.MaxUint64
 	}
 	return gas.Gas(bigExcess.Uint64())
+}
+
+// mulWithUpperBound multiplies two numbers and returns the result. If the
+// result overflows, it returns [math.MaxUint64].
+func mulWithUpperBound(a, b uint64) uint64 {
+	product, err := safemath.Mul(a, b)
+	if err != nil {
+		return math.MaxUint64
+	}
+	return product
 }
