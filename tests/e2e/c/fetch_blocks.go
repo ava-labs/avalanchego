@@ -6,7 +6,7 @@ package c
 import (
 	"os"
 
-	"github.com/ava-labs/coreth/plugin/evm/customtypes"
+	_ "github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/onsi/ginkgo/v2"
