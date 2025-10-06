@@ -1808,7 +1808,7 @@ type jsonWarpValidatorOutput struct {
 func (s *Service) GetAllValidatorsAt(r *http.Request, args *GetAllValidatorsAtArgs, reply *GetAllValidatorsAtReply) error {
 	s.vm.ctx.Log.Debug("API called",
 		zap.String("service", "platform"),
-		zap.String("method", "getValidatorsAt"),
+		zap.String("method", "getAllValidatorsAt"),
 		zap.Uint64("height", uint64(args.Height)),
 		zap.Bool("isProposed", args.Height.IsProposed()),
 	)
@@ -1817,20 +1817,26 @@ func (s *Service) GetAllValidatorsAt(r *http.Request, args *GetAllValidatorsAtAr
 	defer s.vm.ctx.Lock.Unlock()
 
 	ctx := r.Context()
-	var err error
-	height := uint64(args.Height)
-	if args.Height.IsProposed() {
-		height, err = s.vm.GetMinimumHeight(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get proposed height: %w", err)
-		}
+	height, err := s.getQueryHeight(ctx, args.Height)
+	if err != nil {
+		return fmt.Errorf("failed to get query height: %w", err)
 	}
 
 	reply.ValidatorSets, err = s.vm.GetWarpValidatorSets(ctx, height)
 	if err != nil {
-		return fmt.Errorf("failed to get validator set: %w", err)
+		return fmt.Errorf("failed to get validator sets: %w", err)
 	}
 	return nil
+}
+
+// If args.Height is the sentinel value for proposed height, gets the proposed height and return it,
+// else returns the input height.
+func (s *Service) getQueryHeight(ctx context.Context, heightArg platformapi.Height) (uint64, error) {
+	if heightArg.IsProposed() {
+		return s.vm.GetMinimumHeight(ctx)
+	}
+
+	return uint64(heightArg), nil
 }
 
 func (v *GetAllValidatorsAtReply) MarshalJSON() ([]byte, error) {
@@ -2012,13 +2018,9 @@ func (s *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, re
 	defer s.vm.ctx.Lock.Unlock()
 
 	ctx := r.Context()
-	var err error
-	height := uint64(args.Height)
-	if args.Height.IsProposed() {
-		height, err = s.vm.GetMinimumHeight(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get proposed height: %w", err)
-		}
+	height, err := s.getQueryHeight(ctx, args.Height)
+	if err != nil {
+		return fmt.Errorf("failed to get query height: %w", err)
 	}
 
 	reply.Validators, err = s.vm.GetValidatorSet(ctx, height, args.SubnetID)

@@ -1820,6 +1820,49 @@ platform.getValidatorsAt(
 ```bash
 curl -X POST --data '{
     "jsonrpc": "2.0",
+    "method": "platform.getAllValidatorsAt",
+    "params": {
+        "height":1
+    },
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "result": {
+    "validators": {
+      "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg": 2000000000000000,
+      "NodeID-GWPcbFJZFfZreETSoWjPimr846mXEKCtu": 2000000000000000,
+      "NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ": 2000000000000000,
+      "NodeID-NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN": 2000000000000000,
+      "NodeID-P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5": 2000000000000000
+    }
+  },
+  "id": 1
+}
+```
+
+### `platform.getAllValidatorsAt`
+
+Get the validators and their weights of all Subnets and the Primary Network at a given P-Chain height.
+
+**Signature:**
+
+```
+platform.getAllValidatorsAt(
+    {
+        height: [int|string],
+    }
+)
+```
+
+```bash
+curl -X POST --data '{
+    "jsonrpc": "2.0",
     "method": "platform.getValidatorsAt",
     "params": {
         "height":1
@@ -1871,53 +1914,10 @@ curl -X POST --data '{
 }
 ```
 
-### `platform.getAllValidatorsAt`
-
-Get the validators and their weights of all Subnets and the Primary Network at a given P-Chain height.
-
-**Signature:**
-
-```
-platform.getAllValidatorsAt(
-    {
-        height: [int|string],
-    }
-)
-```
-
 - `height` is the P-Chain height to get the validator set at, or the string literal "proposed"
   to return the validator set at this node's ProposerVM height.
 
 **Example Call:**
-
-```bash
-curl -X POST --data '{
-    "jsonrpc": "2.0",
-    "method": "platform.getAllValidatorsAt",
-    "params": {
-        "height":1
-    },
-    "id": 1
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
-```
-
-**Example Response:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "result": {
-    "validators": {
-      "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg": 2000000000000000,
-      "NodeID-GWPcbFJZFfZreETSoWjPimr846mXEKCtu": 2000000000000000,
-      "NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ": 2000000000000000,
-      "NodeID-NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN": 2000000000000000,
-      "NodeID-P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5": 2000000000000000
-    }
-  },
-  "id": 1
-}
-```
 
 ### `platform.getValidatorFeeConfig`
 
