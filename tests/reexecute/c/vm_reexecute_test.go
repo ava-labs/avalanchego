@@ -13,10 +13,12 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/ava-labs/coreth/plugin/factory"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
@@ -93,6 +95,8 @@ var (
 )
 
 func TestMain(m *testing.M) {
+	evm.RegisterAllLibEVMExtras()
+
 	flag.StringVar(&blockDirArg, "block-dir", blockDirArg, "Block DB directory to read from during re-execution.")
 	flag.StringVar(&currentStateDirArg, "current-state-dir", currentStateDirArg, "Current state directory including VM DB and Chain Data Directory for re-execution.")
 	flag.Uint64Var(&startBlockArg, "start-block", 101, "Start block to begin execution (exclusive).")
@@ -180,11 +184,11 @@ func benchmarkReexecuteRange(
 	consensusRegistry := prometheus.NewRegistry()
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
 
-	if metricsEnabled {
-		collectRegistry(b, "c-chain-reexecution", prefixGatherer, labels)
-	}
-
 	log := tests.NewDefaultLogger("c-chain-reexecution")
+
+	if metricsEnabled {
+		collectRegistry(b, log, "c-chain-reexecution", prefixGatherer, labels)
+	}
 
 	var (
 		vmDBDir      = filepath.Join(currentStateDir, "db")
@@ -538,7 +542,7 @@ func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, err
 
 // collectRegistry starts prometheus and collects metrics from the provided gatherer.
 // Attaches the provided labels + GitHub labels if available to the collected metrics.
-func collectRegistry(tb testing.TB, name string, gatherer prometheus.Gatherer, labels map[string]string) {
+func collectRegistry(tb testing.TB, log logging.Logger, name string, gatherer prometheus.Gatherer, labels map[string]string) {
 	r := require.New(tb)
 
 	startPromCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
@@ -576,6 +580,19 @@ func collectRegistry(tb testing.TB, name string, gatherer prometheus.Gatherer, l
 		Labels:  labels,
 	}, true /* withGitHubLabels */)
 	r.NoError(err)
+
+	var (
+		dashboardPath = "d/Gl1I20mnk/c-chain"
+		grafanaURI    = tmpnet.DefaultBaseGrafanaURI + dashboardPath
+		startTime     = strconv.FormatInt(time.Now().UnixMilli(), 10)
+	)
+
+	log.Info("metrics available via grafana",
+		zap.String(
+			"url",
+			tmpnet.NewGrafanaURI(networkUUID, startTime, "", grafanaURI),
+		),
+	)
 }
 
 // parseCustomLabels parses a comma-separated list of key-value pairs into a map

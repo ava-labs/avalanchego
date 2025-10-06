@@ -26,11 +26,12 @@ import (
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/staking"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer/proposermock"
+
+	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
 // Assert that when the underlying VM implements ChainVMWithBuildBlockContext
@@ -110,11 +111,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.UnscheduledActivationTime
-	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -240,11 +237,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	var (
-		activationTime = upgrade.InitiallyActiveTime
-		durangoTime    = upgrade.UnscheduledActivationTime
-	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -414,4 +407,40 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 	)
 	require.NoError(err)
 	require.Equal(innerChildBlock, gotChild.(*postForkBlock).innerBlk)
+}
+
+// Confirm that VM rejects blocks with non-zero epoch prior to granite upgrade activation
+func TestPreGraniteBlock_NonZeroEpoch(t *testing.T) {
+	require := require.New(t)
+
+	_, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	innerBlk := snowmantest.BuildChild(snowmantest.Genesis)
+	slb, err := statelessblock.Build(
+		proVM.preferred,
+		proVM.Time(),
+		100, // pChainHeight,
+		statelessblock.Epoch{
+			PChainHeight: 1,
+			Number:       1,
+			StartTime:    1,
+		},
+		proVM.StakingCertLeaf,
+		innerBlk.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.StakingLeafSigner,
+	)
+	require.NoError(err)
+	proBlk := postForkBlock{
+		SignedBlock: slb,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: innerBlk,
+		},
+	}
+	err = proBlk.Verify(context.Background())
+	require.ErrorIs(err, errEpochNotZero)
 }

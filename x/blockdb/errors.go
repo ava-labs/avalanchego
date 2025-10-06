@@ -7,9 +7,6 @@ import "errors"
 
 var (
 	ErrInvalidBlockHeight = errors.New("blockdb: invalid block height")
-	ErrBlockEmpty         = errors.New("blockdb: block is empty")
-	ErrDatabaseClosed     = errors.New("blockdb: database is closed")
 	ErrCorrupted          = errors.New("blockdb: unrecoverable corruption detected")
 	ErrBlockTooLarge      = errors.New("blockdb: block size too large")
-	ErrBlockNotFound      = errors.New("blockdb: block not found")
 )
