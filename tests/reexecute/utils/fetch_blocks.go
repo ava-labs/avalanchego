@@ -26,6 +26,7 @@ func FetchBlocksToBlockDB(ctx context.Context, log logging.Logger, dbDir string,
 	if err != nil {
 		return err
 	}
+	defer blockDB.Close()
 
 	log.Info("Fetching blocks",
 		zap.Uint64("startBlock", startBlock),
