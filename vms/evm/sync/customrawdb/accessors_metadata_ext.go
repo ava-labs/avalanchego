@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rlp"
 )
 
@@ -118,7 +118,8 @@ func ReadAcceptorTip(db ethdb.KeyValueReader) (common.Hash, error) {
 }
 
 // ReadChainConfig retrieves the consensus settings based on the given genesis hash.
-func ReadChainConfig(db ethdb.KeyValueReader, hash common.Hash) *params.ChainConfig {
+// The provided [upgradeConfig] (any JSON-unmarshalable type) will be populated if present on disk.
+func ReadChainConfig[T any](db ethdb.KeyValueReader, hash common.Hash, upgradeConfig *T) *params.ChainConfig {
 	config := rawdb.ReadChainConfig(db, hash)
 
 	upgrade, _ := db.Get(upgradeConfigKey(hash))
@@ -126,8 +127,7 @@ func ReadChainConfig(db ethdb.KeyValueReader, hash common.Hash) *params.ChainCon
 		return config
 	}
 
-	extra := params.GetExtra(config)
-	if err := json.Unmarshal(upgrade, &extra.UpgradeConfig); err != nil {
+	if err := json.Unmarshal(upgrade, upgradeConfig); err != nil {
 		log.Error("Invalid upgrade config JSON", "err", err)
 		return nil
 	}
@@ -136,14 +136,14 @@ func ReadChainConfig(db ethdb.KeyValueReader, hash common.Hash) *params.ChainCon
 }
 
 // WriteChainConfig writes the chain config settings to the database.
-func WriteChainConfig(db ethdb.KeyValueWriter, hash common.Hash, config *params.ChainConfig) {
+// The provided [upgradeConfig] (any JSON-marshalable type) will be stored alongside the chain config.
+func WriteChainConfig[T any](db ethdb.KeyValueWriter, hash common.Hash, config *params.ChainConfig, upgradeConfig T) {
 	rawdb.WriteChainConfig(db, hash, config)
 	if config == nil {
 		return
 	}
 
-	extra := params.GetExtra(config)
-	data, err := json.Marshal(extra.UpgradeConfig)
+	data, err := json.Marshal(upgradeConfig)
 	if err != nil {
 		log.Crit("Failed to JSON encode upgrade config", "err", err)
 	}
