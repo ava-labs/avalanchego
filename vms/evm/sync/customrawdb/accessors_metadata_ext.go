@@ -4,11 +4,15 @@
 package customrawdb
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/rlp"
 )
 
@@ -111,4 +115,39 @@ func ReadAcceptorTip(db ethdb.KeyValueReader) (common.Hash, error) {
 		return common.Hash{}, fmt.Errorf("value has incorrect length %d", len(h))
 	}
 	return common.BytesToHash(h), nil
+}
+
+// ReadChainConfig retrieves the consensus settings based on the given genesis hash.
+func ReadChainConfig(db ethdb.KeyValueReader, hash common.Hash) *params.ChainConfig {
+	config := rawdb.ReadChainConfig(db, hash)
+
+	upgrade, _ := db.Get(upgradeConfigKey(hash))
+	if len(upgrade) == 0 {
+		return config
+	}
+
+	extra := params.GetExtra(config)
+	if err := json.Unmarshal(upgrade, &extra.UpgradeConfig); err != nil {
+		log.Error("Invalid upgrade config JSON", "err", err)
+		return nil
+	}
+
+	return config
+}
+
+// WriteChainConfig writes the chain config settings to the database.
+func WriteChainConfig(db ethdb.KeyValueWriter, hash common.Hash, config *params.ChainConfig) {
+	rawdb.WriteChainConfig(db, hash, config)
+	if config == nil {
+		return
+	}
+
+	extra := params.GetExtra(config)
+	data, err := json.Marshal(extra.UpgradeConfig)
+	if err != nil {
+		log.Crit("Failed to JSON encode upgrade config", "err", err)
+	}
+	if err := db.Put(upgradeConfigKey(hash), data); err != nil {
+		log.Crit("Failed to store upgrade config", "err", err)
+	}
 }

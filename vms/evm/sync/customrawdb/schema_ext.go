@@ -22,6 +22,8 @@ var (
 	pruningDisabledKey = []byte("PruningDisabled")
 	// acceptorTipKey tracks the tip of the last accepted block that has been fully processed.
 	acceptorTipKey = []byte("AcceptorTipKey")
+	// upgradeConfigPrefix prefixes upgrade bytes passed to the chain
+	upgradeConfigPrefix = []byte("upgrade-config-")
 )
 
 // State sync progress keys and prefixes
@@ -55,3 +57,8 @@ var (
 )
 
 var FirewoodScheme = "firewood"
+
+// upgradeConfigKey = upgradeConfigPrefix + hash
+func upgradeConfigKey(hash common.Hash) []byte {
+	return append(upgradeConfigPrefix, hash.Bytes()...)
+}
