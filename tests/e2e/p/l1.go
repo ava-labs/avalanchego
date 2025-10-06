@@ -148,6 +148,22 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, platformapi.Height(height))
 			require.NoError(err)
 			require.Equal(expectedValidators, subnetValidators)
+
+			// Test GetAllValidatorsAt too, for coverage
+			flattenedExpectedValidators, err := snowvalidators.FlattenValidatorSet(expectedValidators) // for coverage
+			require.NoError(err)
+
+			allValidators, err := pClient.GetAllValidatorsAt(tc.DefaultContext(), platformapi.Height(height))
+			require.NoError(err)
+
+			if len(expectedValidators) > 0 {
+				require.Contains(allValidators, subnetID)
+				require.ElementsMatch(allValidators[subnetID].Validators, flattenedExpectedValidators.Validators)
+
+				require.Equal(allValidators[subnetID].TotalWeight, flattenedExpectedValidators.TotalWeight)
+			} else {
+				require.NotContains(allValidators, subnetID)
+			}
 		}
 		tc.By("verifying the Permissioned Subnet is configured as expected", func() {
 			tc.By("verifying the subnet reports as permissioned", func() {
