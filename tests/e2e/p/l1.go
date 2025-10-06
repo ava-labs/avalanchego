@@ -158,8 +158,7 @@ var _ = e2e.DescribePChain("[L1]", func() {
 
 			if len(expectedValidators) > 0 {
 				require.Contains(allValidators, subnetID)
-				require.ElementsMatch(allValidators[subnetID].Validators, flattenedExpectedValidators.Validators)
-
+				require.Equal(allValidators[subnetID].Validators, flattenedExpectedValidators.Validators)
 				require.Equal(allValidators[subnetID].TotalWeight, flattenedExpectedValidators.TotalWeight)
 			} else {
 				require.NotContains(allValidators, subnetID)
