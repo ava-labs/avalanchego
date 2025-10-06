@@ -1820,7 +1820,7 @@ platform.getValidatorsAt(
 ```bash
 curl -X POST --data '{
     "jsonrpc": "2.0",
-    "method": "platform.getAllValidatorsAt",
+    "method": "platform.getValidatorsAt",
     "params": {
         "height":1
     },
@@ -1863,7 +1863,7 @@ platform.getAllValidatorsAt(
 ```bash
 curl -X POST --data '{
     "jsonrpc": "2.0",
-    "method": "platform.getValidatorsAt",
+    "method": "platform.getAllValidatorsAt",
     "params": {
         "height":1
     },
