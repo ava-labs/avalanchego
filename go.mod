@@ -89,11 +89,8 @@ require (
 )
 
 require (
-	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/magiconair/properties v1.8.6 // indirect
-	github.com/pelletier/go-toml v1.9.5 // indirect
-	github.com/spf13/jwalterweatherman v1.1.0 // indirect
-	gopkg.in/ini.v1 v1.67.0 // indirect
+	github.com/sourcegraph/conc v0.3.0 // indirect
+	github.com/zondax/ledger-go v1.0.1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
@@ -188,13 +185,11 @@ require (
 	github.com/sagikazarmark/locafero v0.9.0 // indirect
 	github.com/sanity-io/litter v1.5.1 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
-<<<<<<< HEAD
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/status-im/keycard-go v0.2.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	github.com/tklauser/go-sysconf v0.3.12 // indirect
-	github.com/tklauser/numcpus v0.6.1 // indirect
-=======
+	github.com/tklauser/go-sysconf v0.3.15 // indirect
+	github.com/tklauser/numcpus v0.10.0 // indirect
 	github.com/tyler-smith/go-bip39 v1.1.0 // indirect
 	github.com/urfave/cli/v2 v2.25.7 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
