@@ -1842,7 +1842,7 @@ func (v *GetAllValidatorsAtReply) MarshalJSON() ([]byte, error) {
 		}
 
 		for i, vdr := range vdrs.Validators {
-			vdrJ, err := warpToJsonWarpValidatorOutput(vdr)
+			vdrJ, err := warpToJSONWarpValidatorOutput(vdr)
 			if err != nil {
 				return nil, err
 			}
@@ -1855,7 +1855,7 @@ func (v *GetAllValidatorsAtReply) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
-func warpToJsonWarpValidatorOutput(vdr *validators.Warp) (*jsonWarpValidatorOutput, error) {
+func warpToJSONWarpValidatorOutput(vdr *validators.Warp) (*jsonWarpValidatorOutput, error) {
 	vdrJSON := &jsonWarpValidatorOutput{
 		Weight:  avajson.Uint64(vdr.Weight),
 		NodeIDs: vdr.NodeIDs,
