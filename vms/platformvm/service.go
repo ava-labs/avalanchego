@@ -1793,11 +1793,11 @@ type GetAllValidatorsAtReply struct {
 }
 
 type jsonWarpSet struct {
-	Validators  []*jsonWarpValidatorOutput `json:"validators"`
-	TotalWeight avajson.Uint64             `json:"totalWeight"`
+	Validators  []*jsonWarpValidator `json:"validators"`
+	TotalWeight avajson.Uint64       `json:"totalWeight"`
 }
 
-type jsonWarpValidatorOutput struct {
+type jsonWarpValidator struct {
 	PublicKey *string        `json:"publicKey"`
 	Weight    avajson.Uint64 `json:"weight"`
 	NodeIDs   []ids.NodeID   `json:"nodeIDs"`
@@ -1844,11 +1844,11 @@ func (v *GetAllValidatorsAtReply) MarshalJSON() ([]byte, error) {
 	for subnetID, vdrs := range v.ValidatorSets {
 		jsonWarpSet := &jsonWarpSet{
 			TotalWeight: avajson.Uint64(vdrs.TotalWeight),
-			Validators:  make([]*jsonWarpValidatorOutput, len(vdrs.Validators)),
+			Validators:  make([]*jsonWarpValidator, len(vdrs.Validators)),
 		}
 
 		for i, vdr := range vdrs.Validators {
-			vdrJ, err := warpToJSONWarpValidatorOutput(vdr)
+			vdrJ, err := warpToJSONWarpValidator(vdr)
 			if err != nil {
 				return nil, err
 			}
@@ -1861,8 +1861,8 @@ func (v *GetAllValidatorsAtReply) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
-func warpToJSONWarpValidatorOutput(vdr *validators.Warp) (*jsonWarpValidatorOutput, error) {
-	vdrJSON := &jsonWarpValidatorOutput{
+func warpToJSONWarpValidator(vdr *validators.Warp) (*jsonWarpValidator, error) {
+	vdrJSON := &jsonWarpValidator{
 		Weight:  avajson.Uint64(vdr.Weight),
 		NodeIDs: vdr.NodeIDs,
 	}
@@ -1910,7 +1910,7 @@ func (v *GetAllValidatorsAtReply) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func jsonWarpValidatorOutputToWarp(vdrJSON *jsonWarpValidatorOutput) (*validators.Warp, error) {
+func jsonWarpValidatorOutputToWarp(vdrJSON *jsonWarpValidator) (*validators.Warp, error) {
 	vdr := &validators.Warp{
 		Weight:  uint64(vdrJSON.Weight),
 		NodeIDs: vdrJSON.NodeIDs,
