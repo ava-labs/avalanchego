@@ -8,12 +8,13 @@ import (
 	"fmt"
 	"math/big"
 
-	ethclient "github.com/ava-labs/coreth/plugin/evm/customethclient"
 	"github.com/ava-labs/libevm/rlp"
 	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	ethclient "github.com/ava-labs/coreth/plugin/evm/customethclient"
 )
 
 func FetchBlocksToBlockDB(ctx context.Context, log logging.Logger, dbDir string, startBlock, endBlock uint64, rpcURL string, concurrency int) error {
