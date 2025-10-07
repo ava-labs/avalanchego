@@ -150,7 +150,7 @@ func TestCachedState_GetWarpValidatorSets(t *testing.T) {
 			want:         allVdrs1,
 		},
 		{
-			name:         "cache_hit",
+			name:         "cache_after_miss_error",
 			expectCached: true,
 			height:       1,
 			want:         allVdrs1,
