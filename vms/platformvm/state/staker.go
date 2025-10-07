@@ -148,7 +148,6 @@ func NewPendingStaker(txID ids.ID, staker txs.ScheduledStaker) (*Staker, error) 
 	}, nil
 }
 
-// todo: test this
 func (s *Staker) ValidMutation(ms Staker) error {
 	if s.ContinuationPeriod != ms.ContinuationPeriod && ms.ContinuationPeriod != 0 {
 		// Only transition allowed for continuation period is setting it to 0.
@@ -182,27 +181,22 @@ func (s *Staker) ValidMutation(ms Staker) error {
 	return nil
 }
 
-// todo: test this
-func (s *Staker) resetContinuationStakerCycle(startTime time.Time, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64) error {
-	if s.ContinuationPeriod == 0 {
-		return fmt.Errorf("cannot reset a non-continuous validator")
-	}
-
+func (s *Staker) resetContinuationStakerCycle(weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64) error {
 	if totalAccruedRewards < s.AccruedRewards {
-		return fmt.Errorf("accrued rewards cannot be less than current value")
+		return errDecreasedAccruedRewards
 	}
 
 	if totalAccruedDelegateeRewards < s.AccruedDelegateeRewards {
-		return fmt.Errorf("accrued delegatee rewards cannot be less than current value")
+		return errDecreasedAccruedDelegateeRewards
 	}
 
 	if weight < s.Weight {
-		return fmt.Errorf("weight cannot be less than current value")
+		return errDecreasedWeight
 	}
 
-	endTime := startTime.Add(s.ContinuationPeriod)
+	endTime := s.EndTime.Add(s.ContinuationPeriod)
 
-	s.StartTime = startTime
+	s.StartTime = s.EndTime
 	s.EndTime = endTime
 	s.PotentialReward = potentialReward
 	s.AccruedRewards = totalAccruedRewards
@@ -212,9 +206,8 @@ func (s *Staker) resetContinuationStakerCycle(startTime time.Time, weight, poten
 	return nil
 }
 
-// todo: test this
 func (s Staker) immutableFieldsAreUnmodified(ms Staker) bool {
-	// Mutable fields: Weight, StartTime, EndTime, PotentialReward, AccruedRewards, ContinuationPeriod
+	// Mutable fields: Weight, StartTime, EndTime, PotentialReward, AccruedRewards, AccruedDelegateeRewards, ContinuationPeriod
 	return s.TxID == ms.TxID &&
 		s.NodeID == ms.NodeID &&
 		s.PublicKey.Equals(ms.PublicKey) &&

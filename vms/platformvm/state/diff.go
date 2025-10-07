@@ -311,7 +311,6 @@ func (d *diff) PutCurrentValidator(staker *Staker) error {
 	return d.currentStakerDiffs.PutValidator(staker)
 }
 
-// todo: add test for this
 func (d *diff) UpdateCurrentValidator(staker *Staker) error {
 	parentState, ok := d.stateVersions.GetState(d.parentID)
 	if !ok {
@@ -332,7 +331,7 @@ func (d *diff) StopContinuousValidator(subnetID ids.ID, nodeID ids.NodeID) error
 
 	return d.currentStakerDiffs.updateValidator(parentState, subnetID, nodeID, func(validator Staker) (*Staker, error) {
 		if validator.ContinuationPeriod == 0 {
-			return nil, fmt.Errorf("validator %s is not in a continuous staker cycle", nodeID)
+			return nil, errIncompatibleContinuousStaker
 		}
 
 		validator.ContinuationPeriod = 0
@@ -341,11 +340,9 @@ func (d *diff) StopContinuousValidator(subnetID ids.ID, nodeID ids.NodeID) error
 	})
 }
 
-// todo: add test for this
 func (d *diff) ResetContinuousValidatorCycle(
 	subnetID ids.ID,
 	nodeID ids.NodeID,
-	startTime time.Time,
 	weight uint64,
 	potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64,
 ) error {
@@ -355,7 +352,11 @@ func (d *diff) ResetContinuousValidatorCycle(
 	}
 
 	return d.currentStakerDiffs.updateValidator(parentState, subnetID, nodeID, func(validator Staker) (*Staker, error) {
-		if err := validator.resetContinuationStakerCycle(startTime, weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards); err != nil {
+		if validator.ContinuationPeriod == 0 {
+			return nil, errIncompatibleContinuousStaker
+		}
+
+		if err := validator.resetContinuationStakerCycle(weight, potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards); err != nil {
 			return nil, err
 		}
 
