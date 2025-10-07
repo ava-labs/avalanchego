@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/onsi/ginkgo/v2"
@@ -52,6 +53,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	upgrades := upgrade.Default
 	if flagVars.ActivateGranite() {
 		upgrades.GraniteTime = upgrade.InitiallyActiveTime
+		upgrades.GraniteEpochDuration = 4 * time.Second
 	} else {
 		upgrades.GraniteTime = upgrade.UnscheduledActivationTime
 	}
