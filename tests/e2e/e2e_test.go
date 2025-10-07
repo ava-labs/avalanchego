@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -28,6 +29,7 @@ import (
 )
 
 func TestE2E(t *testing.T) {
+	evm.RegisterAllLibEVMExtras()
 	ginkgo.RunSpecs(t, "e2e test suites")
 }
 
