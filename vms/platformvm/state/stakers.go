@@ -6,7 +6,6 @@ package state
 import (
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/google/btree"
 
@@ -15,7 +14,11 @@ import (
 	"github.com/ava-labs/avalanchego/utils/iterator"
 )
 
-var ErrAddingStakerAfterDeletion = errors.New("attempted to add a staker after deleting it")
+var (
+	ErrAddingStakerAfterDeletion    = errors.New("attempted to add a staker after deleting it")
+	errInvalidStakerMutation        = errors.New("invalid staker mutation")
+	errIncompatibleContinuousStaker = errors.New("incompatible continuous staker state")
+)
 
 type Stakers interface {
 	CurrentStakers
@@ -116,7 +119,6 @@ type ContinuousStakers interface {
 	ResetContinuousValidatorCycle(
 		subnetID ids.ID,
 		nodeID ids.NodeID,
-		startTime time.Time,
 		weight uint64,
 		potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64,
 	) error
@@ -181,14 +183,15 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 	v.stakers.Delete(staker)
 }
 
-func (v *baseStakers) UpdateValidator(
+// Invariant: [getMutatedValidator] returns a non-nil Staker.
+func (v *baseStakers) updateValidator(
 	subnetID ids.ID,
 	nodeID ids.NodeID,
 	getMutatedValidator func(Staker) (*Staker, error),
 ) error {
 	validator := v.getOrCreateValidator(subnetID, nodeID)
 	if validator.validator == nil {
-		return fmt.Errorf("validator %s does not exist", nodeID)
+		return database.ErrNotFound
 	}
 
 	mutatedValidator, err := getMutatedValidator(*validator.validator)
@@ -196,12 +199,8 @@ func (v *baseStakers) UpdateValidator(
 		return err
 	}
 
-	if mutatedValidator == nil {
-		return fmt.Errorf("mutated validator cannot be nil")
-	}
-
 	if err := validator.validator.ValidMutation(*mutatedValidator); err != nil {
-		return err
+		return fmt.Errorf("%w: %w", errInvalidStakerMutation, err)
 	}
 
 	validatorDiff := v.getOrCreateValidatorDiff(subnetID, nodeID)
@@ -431,21 +430,16 @@ func (s *diffStakers) updateValidator(
 
 	switch validatorDiff.validatorStatus {
 	case deleted:
-		return fmt.Errorf("validator %s updated after deletion", nodeID)
+		return database.ErrNotFound
 
 	case added, modified:
-		if validatorDiff.validator == nil {
-			// This shouldn't happen.
-			return fmt.Errorf("validator %s is missing for update", nodeID)
-		}
-
 		mutatedValidator, err := getMutatedValidator(*validatorDiff.validator)
 		if err != nil {
 			return err
 		}
 
 		if err := validatorDiff.validator.ValidMutation(*mutatedValidator); err != nil {
-			return err
+			return fmt.Errorf("%w: %w", errInvalidStakerMutation, err)
 		}
 
 		// Keep the same validatorDiff.validatorStatus.
@@ -470,7 +464,7 @@ func (s *diffStakers) updateValidator(
 		}
 
 		if err := validator.ValidMutation(*mutatedValidator); err != nil {
-			return err
+			return fmt.Errorf("%w: %w", errInvalidStakerMutation, err)
 		}
 
 		validatorDiff.validator = mutatedValidator
@@ -478,6 +472,7 @@ func (s *diffStakers) updateValidator(
 		validatorDiff.oldValidator = validator
 
 	default:
+		// This shouldn't happen.
 		return fmt.Errorf("unknown validator status (%s) for %s", validatorDiff.validatorStatus, nodeID)
 	}
 
