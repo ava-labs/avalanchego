@@ -81,11 +81,10 @@ var (
 		"archive": `{
 			"pruning-enabled": false
 		}`,
-		"firewood": `{
-			"state-scheme": "firewood",
-			"snapshot-cache": 0,
-			"pruning-enabled": true,
-			"state-sync-enabled": false
+		"blockdb": `{
+			"block-database-enabled": true,
+			"block-database-sync-to-disk": false,
+			"block-database-migration-disabled": true
 		}`,
 	}
 

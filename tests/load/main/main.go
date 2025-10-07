@@ -40,6 +40,7 @@ var (
 
 	loadTimeoutArg     time.Duration
 	firewoodEnabledArg bool
+	blockdbEnabledArg  bool
 	numWorkersArg      int
 )
 
@@ -59,6 +60,12 @@ func init() {
 		"firewood",
 		false,
 		"whether to use Firewood in Coreth",
+	)
+	flag.BoolVar(
+		&blockdbEnabledArg,
+		"blockdb",
+		false,
+		"whether to enable BlockDB on the C-Chain",
 	)
 	flag.IntVar(
 		&numWorkersArg,
@@ -85,10 +92,7 @@ func main() {
 	keys, err := tmpnet.NewPrivateKeys(numWorkersArg)
 	require.NoError(err)
 
-	primaryChainConfigs := tmpnet.DefaultChainConfigs()
-	if firewoodEnabledArg {
-		primaryChainConfigs = newPrimaryChainConfigsWithFirewood()
-	}
+	primaryChainConfigs := newPrimaryChainConfigs()
 	network := &tmpnet.Network{
 		Nodes:               nodes,
 		PreFundedKeys:       keys,
@@ -100,7 +104,6 @@ func main() {
 	ctx := tests.DefaultNotifyContext(0, tc.DeferCleanup)
 	wsURIs, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 	require.NoError(err)
-
 	registry := prometheus.NewRegistry()
 	metricsServer, err := tests.NewPrometheusServer(registry)
 	require.NoError(err)
@@ -213,25 +216,35 @@ func newTokenContract(
 	return contract, nil
 }
 
-// newPrimaryChainConfigsWithFirewood extends the default primary chain configs
-// by enabling Firewood on the C-Chain.
-func newPrimaryChainConfigsWithFirewood() map[string]tmpnet.ConfigMap {
+// newPrimaryChainConfigs extends the default primary chain configs
+// by enabling Firewood and/or BlockDB on the C-Chain based on the global flags.
+func newPrimaryChainConfigs() map[string]tmpnet.ConfigMap {
 	primaryChainConfigs := tmpnet.DefaultChainConfigs()
 	if _, ok := primaryChainConfigs[blockchainID]; !ok {
 		primaryChainConfigs[blockchainID] = make(tmpnet.ConfigMap)
 	}
 
-	// firewoodConfig represents the minimum configuration required to enable
-	// Firewood in Coreth.
-	//
-	// Ref: https://github.com/ava-labs/coreth/issues/1180
-	firewoodConfig := tmpnet.ConfigMap{
-		"state-scheme":       "firewood",
-		"snapshot-cache":     0,
-		"pruning-enabled":    true,
-		"state-sync-enabled": false,
+	if firewoodEnabledArg {
+		// firewoodConfig represents the minimum configuration required to enable
+		// Firewood in Coreth.
+		//
+		// Ref: https://github.com/ava-labs/coreth/issues/1180
+		firewoodConfig := tmpnet.ConfigMap{
+			"state-scheme":       "firewood",
+			"snapshot-cache":     0,
+			"pruning-enabled":    true,
+			"state-sync-enabled": false,
+		}
+		maps.Copy(primaryChainConfigs[blockchainID], firewoodConfig)
 	}
 
-	maps.Copy(primaryChainConfigs[blockchainID], firewoodConfig)
+	if blockdbEnabledArg {
+		blockdbConfig := tmpnet.ConfigMap{
+			"block-database-enabled":      true,
+			"block-database-sync-to-disk": false,
+		}
+		maps.Copy(primaryChainConfigs[blockchainID], blockdbConfig)
+	}
+
 	return primaryChainConfigs
 }
