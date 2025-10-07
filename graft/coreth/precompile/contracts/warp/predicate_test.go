@@ -188,8 +188,7 @@ type validatorRange struct {
 
 // createSnowCtx creates a snow.Context instance with a validator state specified by the given validatorRanges
 func createSnowCtx(tb testing.TB, validatorRanges []validatorRange) *snow.Context {
-	getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
-
+	validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput)
 	for _, validatorRange := range validatorRanges {
 		for i := validatorRange.start; i < validatorRange.end; i++ {
 			validatorOutput := &validators.GetValidatorOutput{
@@ -199,20 +198,19 @@ func createSnowCtx(tb testing.TB, validatorRanges []validatorRange) *snow.Contex
 			if validatorRange.publicKey {
 				validatorOutput.PublicKey = testVdrs[i].vdr.PublicKey
 			}
-			getValidatorsOutput[testVdrs[i].nodeID] = validatorOutput
+			validatorSet[testVdrs[i].nodeID] = validatorOutput
 		}
 	}
 
 	snowCtx := snowtest.Context(tb, snowtest.CChainID)
-	state := &validatorstest.State{
+	snowCtx.ValidatorState = &validatorstest.State{
 		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
 			return sourceSubnetID, nil
 		},
-		GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-			return getValidatorsOutput, nil
+		GetWarpValidatorSetF: func(context.Context, uint64, ids.ID) (validators.WarpSet, error) {
+			return validators.FlattenValidatorSet(validatorSet)
 		},
 	}
-	snowCtx.ValidatorState = state
 	return snowCtx
 }
 
@@ -247,20 +245,29 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 	unsignedMsg, err := avalancheWarp.NewUnsignedMessage(constants.UnitTestID, cChainID, addressedCall.Bytes())
 	require.NoError(err)
 
-	getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
-	blsSignatures := make([]*bls.Signature, 0, numKeys)
-	for i := 0; i < numKeys; i++ {
-		sig, err := testVdrs[i].sk.Sign(unsignedMsg.Bytes())
-		require.NoError(err)
-
-		validatorOutput := &validators.GetValidatorOutput{
-			NodeID:    testVdrs[i].nodeID,
-			Weight:    20,
-			PublicKey: testVdrs[i].vdr.PublicKey,
+	var (
+		warpValidators = validators.WarpSet{
+			Validators:  make([]*validators.Warp, 0, numKeys),
+			TotalWeight: 20 * uint64(numKeys),
 		}
-		getValidatorsOutput[testVdrs[i].nodeID] = validatorOutput
+		blsSignatures = make([]*bls.Signature, 0, numKeys)
+	)
+	for i := 0; i < numKeys; i++ {
+		vdr := testVdrs[i]
+		sig, err := vdr.sk.Sign(unsignedMsg.Bytes())
+		require.NoError(err)
 		blsSignatures = append(blsSignatures, sig)
+
+		pk := vdr.sk.PublicKey()
+		warpValidators.Validators = append(warpValidators.Validators, &validators.Warp{
+			PublicKey:      pk,
+			PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
+			Weight:         20,
+			NodeIDs:        []ids.NodeID{vdr.nodeID},
+		})
 	}
+	agoUtils.Sort(warpValidators.Validators)
+
 	aggregateSignature, err := bls.AggregateSignatures(blsSignatures)
 	require.NoError(err)
 	bitSet := set.NewBits()
@@ -284,13 +291,13 @@ func testWarpMessageFromPrimaryNetwork(t *testing.T, requirePrimaryNetworkSigner
 			require.Equal(chainID, cChainID)
 			return constants.PrimaryNetworkID, nil // Return Primary Network SubnetID
 		},
-		GetValidatorSetF: func(_ context.Context, _ uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		GetWarpValidatorSetF: func(_ context.Context, _ uint64, subnetID ids.ID) (validators.WarpSet, error) {
 			expectedSubnetID := snowCtx.SubnetID
 			if requirePrimaryNetworkSigners {
 				expectedSubnetID = constants.PrimaryNetworkID
 			}
 			require.Equal(expectedSubnetID, subnetID)
-			return getValidatorsOutput, nil
+			return warpValidators, nil
 		},
 	}
 
@@ -717,25 +724,26 @@ func makeWarpPredicateTests(tb testing.TB) map[string]precompiletest.PredicateTe
 		testName := fmt.Sprintf("%d validators w/ %d signers/repeated PublicKeys", totalNodes, numSigners)
 
 		pred := createPredicate(numSigners)
-		getValidatorsOutput := make(map[ids.NodeID]*validators.GetValidatorOutput, totalNodes)
+		validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, totalNodes)
 		for i := 0; i < totalNodes; i++ {
-			getValidatorsOutput[testVdrs[i].nodeID] = &validators.GetValidatorOutput{
+			validatorSet[testVdrs[i].nodeID] = &validators.GetValidatorOutput{
 				NodeID:    testVdrs[i].nodeID,
 				Weight:    20,
 				PublicKey: testVdrs[i%numSigners].vdr.PublicKey,
 			}
 		}
+		warpValidators, err := validators.FlattenValidatorSet(validatorSet)
+		require.NoError(tb, err)
 
 		snowCtx := snowtest.Context(tb, snowtest.CChainID)
-		state := &validatorstest.State{
+		snowCtx.ValidatorState = &validatorstest.State{
 			GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
 				return sourceSubnetID, nil
 			},
-			GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-				return getValidatorsOutput, nil
+			GetWarpValidatorSetF: func(context.Context, uint64, ids.ID) (validators.WarpSet, error) {
+				return warpValidators, nil
 			},
 		}
-		snowCtx.ValidatorState = state
 
 		predicateTests[testName] = createValidPredicateTest(snowCtx, uint64(numSigners), pred)
 	}
