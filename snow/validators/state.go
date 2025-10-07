@@ -13,7 +13,10 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-const validatorSetsCacheSize = 8
+const (
+	validatorSetsCacheSize = 8
+	subnetIDsCacheSize     = 4096 // At 64 bytes per entry, this is ~256 KB
+)
 
 var (
 	_ State = (*lockedState)(nil)
@@ -189,10 +192,15 @@ type cachedState struct {
 	// long as it is cached.
 	activation time.Time
 
+	// Caches the subnet ID for given blockchain IDs.
+	// Key: blockchain ID
+	// Value: subnet ID
+	subnetIDsCache cache.Cacher[ids.ID, ids.ID]
+
 	// Caches validators for all subnets at various heights.
 	// Key: height
 	// Value: mapping subnet ID -> validator set
-	cache cache.Cacher[uint64, map[ids.ID]WarpSet]
+	validatorsSetsCache cache.Cacher[uint64, map[ids.ID]WarpSet]
 }
 
 // TODO: Remove the graniteActivation parameter once all networks have
@@ -202,17 +210,30 @@ func NewCachedState(
 	graniteActivation time.Time,
 ) State {
 	return &cachedState{
-		State:      state,
-		activation: graniteActivation,
-		cache:      lru.NewCache[uint64, map[ids.ID]WarpSet](validatorSetsCacheSize),
+		State:               state,
+		activation:          graniteActivation,
+		validatorsSetsCache: lru.NewCache[uint64, map[ids.ID]WarpSet](validatorSetsCacheSize),
+		subnetIDsCache:      lru.NewCache[ids.ID, ids.ID](subnetIDsCacheSize),
 	}
+}
+
+func (c *cachedState) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, error) {
+	if s, ok := c.subnetIDsCache.Get(chainID); ok {
+		return s, nil
+	}
+	s, err := c.State.GetSubnetID(ctx, chainID)
+	if err != nil {
+		return ids.Empty, err
+	}
+	c.subnetIDsCache.Put(chainID, s)
+	return s, err
 }
 
 func (c *cachedState) GetWarpValidatorSets(
 	ctx context.Context,
 	height uint64,
 ) (map[ids.ID]WarpSet, error) {
-	if s, ok := c.cache.Get(height); ok {
+	if s, ok := c.validatorsSetsCache.Get(height); ok {
 		return s, nil
 	}
 
@@ -220,7 +241,7 @@ func (c *cachedState) GetWarpValidatorSets(
 	if err != nil {
 		return nil, err
 	}
-	c.cache.Put(height, s)
+	c.validatorsSetsCache.Put(height, s)
 	return s, nil
 }
 
