@@ -29,7 +29,7 @@ import (
 
 // invalidateDelegateTime is the Unix timestamp for August 2nd, 2025, midnight Eastern Time
 // (August 2nd, 2025, 04:00 UTC)
-const invalidateDelegateUnix = 1754107200
+const InvalidateDelegateUnix = 1754107200
 
 // P256VerifyAddress is the address of the p256 signature verification precompile
 var P256VerifyAddress = common.BytesToAddress([]byte{0x1, 0x00})
@@ -115,10 +115,15 @@ func makePrecompile(contract contract.StatefulPrecompiledContract) libevm.Precom
 			},
 		}
 
-		callType := env.IncomingCallType()
-		isDisallowedCallType := callType == vm.DelegateCall || callType == vm.CallCode
-		if env.BlockTime() >= invalidateDelegateUnix && isDisallowedCallType {
-			env.InvalidateExecution(fmt.Errorf("precompile cannot be called with %s", callType))
+		rules := GetRulesExtra(env.Rules()).AvalancheRules
+		switch call := env.IncomingCallType(); {
+		case call != vm.DelegateCall && call != vm.CallCode: // Others always allowed
+		case rules.IsGranite:
+			return nil, 0, vm.ErrExecutionReverted
+		case env.BlockTime() >= InvalidateDelegateUnix:
+			env.InvalidateExecution(fmt.Errorf("precompile cannot be called with %s", call))
+		default:
+			// Otherwise, we allow the precompile to be called
 		}
 
 		return contract.Run(accessibleState, env.Addresses().EVMSemantic.Caller, env.Addresses().EVMSemantic.Self, input, suppliedGas, env.ReadOnly())
