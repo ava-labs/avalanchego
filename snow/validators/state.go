@@ -226,7 +226,7 @@ func (c *cachedState) GetSubnetID(ctx context.Context, chainID ids.ID) (ids.ID, 
 		return ids.Empty, err
 	}
 	c.subnetIDsCache.Put(chainID, s)
-	return s, err
+	return s, nil
 }
 
 func (c *cachedState) GetWarpValidatorSets(
