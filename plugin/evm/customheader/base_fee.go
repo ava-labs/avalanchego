@@ -22,11 +22,12 @@ var errEstimateBaseFeeWithoutActivation = errors.New("cannot estimate base fee f
 func BaseFee(
 	config *extras.ChainConfig,
 	parent *types.Header,
-	timestamp uint64,
+	timeMS uint64,
 ) (*big.Int, error) {
+	timestamp := timeMS / 1000
 	switch {
 	case config.IsFortuna(timestamp):
-		state, err := feeStateBeforeBlock(config, parent, timestamp)
+		state, err := feeStateBeforeBlock(config, parent, timeMS)
 		if err != nil {
 			return nil, fmt.Errorf("calculating initial fee state: %w", err)
 		}
@@ -48,6 +49,8 @@ func BaseFee(
 //
 // Warning: This function should only be used in estimation and should not be
 // used when calculating the canonical base fee for a block.
+//
+// TODO(#1290): Adapt for Granite upgrade.
 func EstimateNextBaseFee(
 	config *extras.ChainConfig,
 	parent *types.Header,
@@ -58,5 +61,6 @@ func EstimateNextBaseFee(
 	}
 
 	timestamp = max(timestamp, parent.Time, *config.ApricotPhase3BlockTimestamp)
-	return BaseFee(config, parent, timestamp)
+	timeMS := timestamp * 1000
+	return BaseFee(config, parent, timeMS)
 }

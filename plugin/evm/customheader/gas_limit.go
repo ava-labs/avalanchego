@@ -29,11 +29,12 @@ var (
 func GasLimit(
 	config *extras.ChainConfig,
 	parent *types.Header,
-	timestamp uint64,
+	timeMS uint64,
 ) (uint64, error) {
+	timestamp := timeMS / 1000
 	switch {
 	case config.IsFortuna(timestamp):
-		state, err := feeStateBeforeBlock(config, parent, timestamp)
+		state, err := feeStateBeforeBlock(config, parent, timeMS)
 		if err != nil {
 			return 0, fmt.Errorf("calculating initial fee state: %w", err)
 		}
@@ -80,7 +81,9 @@ func VerifyGasUsed(
 		}
 	}
 
-	capacity, err := GasCapacity(config, parent, header.Time)
+	timeMS := customtypes.HeaderTimeMilliseconds(header)
+
+	capacity, err := GasCapacity(config, parent, timeMS)
 	if err != nil {
 		return fmt.Errorf("calculating gas capacity: %w", err)
 	}
@@ -102,7 +105,8 @@ func VerifyGasLimit(
 ) error {
 	switch {
 	case config.IsFortuna(header.Time):
-		state, err := feeStateBeforeBlock(config, parent, header.Time)
+		timeMS := customtypes.HeaderTimeMilliseconds(header)
+		state, err := feeStateBeforeBlock(config, parent, timeMS)
 		if err != nil {
 			return fmt.Errorf("calculating initial fee state: %w", err)
 		}
@@ -160,14 +164,15 @@ func VerifyGasLimit(
 func GasCapacity(
 	config *extras.ChainConfig,
 	parent *types.Header,
-	timestamp uint64,
+	timeMS uint64,
 ) (uint64, error) {
+	timestamp := timeMS / 1000
 	// Prior to the F upgrade, the gas capacity is equal to the gas limit.
 	if !config.IsFortuna(timestamp) {
-		return GasLimit(config, parent, timestamp)
+		return GasLimit(config, parent, timeMS)
 	}
 
-	state, err := feeStateBeforeBlock(config, parent, timestamp)
+	state, err := feeStateBeforeBlock(config, parent, timeMS)
 	if err != nil {
 		return 0, fmt.Errorf("calculating initial fee state: %w", err)
 	}
@@ -188,7 +193,9 @@ func RemainingAtomicGasCapacity(
 		return ap5.AtomicGasLimit, nil
 	}
 
-	state, err := feeStateBeforeBlock(config, parent, header.Time)
+	timeMS := customtypes.HeaderTimeMilliseconds(header)
+
+	state, err := feeStateBeforeBlock(config, parent, timeMS)
 	if err != nil {
 		return 0, fmt.Errorf("calculating initial fee state: %w", err)
 	}

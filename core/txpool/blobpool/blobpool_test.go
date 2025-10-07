@@ -44,6 +44,7 @@ import (
 	"github.com/ava-labs/coreth/core/txpool"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/customheader"
+	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap3"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/consensus/misc/eip4844"
@@ -74,6 +75,7 @@ var testChainConfig *params.ChainConfig
 
 func init() {
 	params.RegisterExtras()
+	customtypes.Register()
 
 	testChainConfig = new(params.ChainConfig)
 	*testChainConfig = params.Copy(params.TestChainConfig)
@@ -120,8 +122,12 @@ func (bc *testBlockChain) CurrentBlock() *types.Header {
 			Extra:    make([]byte, ap3.WindowSize),
 		}
 		config := params.GetExtra(bc.config)
+		timeMS := blockTime * 1000
+		if config.IsGranite(blockTime) {
+			customtypes.GetHeaderExtra(parent).TimeMilliseconds = &timeMS
+		}
 		baseFee, err := customheader.BaseFee(
-			config, parent, blockTime,
+			config, parent, timeMS,
 		)
 		if err != nil {
 			panic(err)
@@ -151,7 +157,7 @@ func (bc *testBlockChain) CurrentBlock() *types.Header {
 	}
 	excessBlobGas := lo.Uint64()
 
-	return &types.Header{
+	head := &types.Header{
 		Number:        blockNumber,
 		Time:          blockTime,
 		GasLimit:      gasLimit,
@@ -159,6 +165,11 @@ func (bc *testBlockChain) CurrentBlock() *types.Header {
 		ExcessBlobGas: &excessBlobGas,
 		Extra:         make([]byte, ap3.WindowSize),
 	}
+	if params.GetExtra(bc.config).IsGranite(blockTime) {
+		timeMS := blockTime * 1000
+		customtypes.GetHeaderExtra(head).TimeMilliseconds = &timeMS
+	}
+	return head
 }
 
 func (bc *testBlockChain) CurrentFinalBlock() *types.Header {
