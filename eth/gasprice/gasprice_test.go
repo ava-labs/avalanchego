@@ -237,12 +237,12 @@ func testGenBlock(t *testing.T, tip int64, numTx int) func(int, *core.BlockGen) 
 		b.SetCoinbase(common.Address{1})
 
 		txTip := big.NewInt(tip * params.GWei)
-		signer := types.LatestSigner(params.TestChainConfig)
+		signer := types.LatestSigner(params.TestFortunaChainConfig)
 		baseFee := b.BaseFee()
 		feeCap := new(big.Int).Add(baseFee, txTip)
 		for j := 0; j < numTx; j++ {
 			tx := types.NewTx(&types.DynamicFeeTx{
-				ChainID:   params.TestChainConfig.ChainID,
+				ChainID:   params.TestFortunaChainConfig.ChainID,
 				Nonce:     b.TxNonce(addr),
 				To:        &common.Address{},
 				Gas:       ethparams.TxGas,
@@ -274,7 +274,7 @@ func TestSuggestTipCapNetworkUpgrades(t *testing.T) {
 
 func TestSuggestTipCapSimple(t *testing.T) {
 	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig: params.TestChainConfig,
+		chainConfig: params.TestFortunaChainConfig,
 		numBlocks:   3,
 		genBlock:    testGenBlock(t, 55, 370),
 		expectedTip: big.NewInt(1_287_001_288),
@@ -283,7 +283,7 @@ func TestSuggestTipCapSimple(t *testing.T) {
 
 func TestSuggestTipCapSimpleFloor(t *testing.T) {
 	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig: params.TestChainConfig,
+		chainConfig: params.TestFortunaChainConfig,
 		numBlocks:   1,
 		genBlock:    testGenBlock(t, 55, 370),
 		expectedTip: big.NewInt(643_500_644),
@@ -293,17 +293,17 @@ func TestSuggestTipCapSimpleFloor(t *testing.T) {
 func TestSuggestTipCapSmallTips(t *testing.T) {
 	tip := big.NewInt(550 * params.GWei)
 	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig: params.TestChainConfig,
+		chainConfig: params.TestFortunaChainConfig,
 		numBlocks:   3,
 		genBlock: func(i int, b *core.BlockGen) {
 			b.SetCoinbase(common.Address{1})
 
-			signer := types.LatestSigner(params.TestChainConfig)
+			signer := types.LatestSigner(params.TestFortunaChainConfig)
 			baseFee := b.BaseFee()
 			feeCap := new(big.Int).Add(baseFee, tip)
 			for j := 0; j < 185; j++ {
 				tx := types.NewTx(&types.DynamicFeeTx{
-					ChainID:   params.TestChainConfig.ChainID,
+					ChainID:   params.TestFortunaChainConfig.ChainID,
 					Nonce:     b.TxNonce(addr),
 					To:        &common.Address{},
 					Gas:       ethparams.TxGas,
@@ -317,7 +317,7 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 				}
 				b.AddTx(tx)
 				tx = types.NewTx(&types.DynamicFeeTx{
-					ChainID:   params.TestChainConfig.ChainID,
+					ChainID:   params.TestFortunaChainConfig.ChainID,
 					Nonce:     b.TxNonce(addr),
 					To:        &common.Address{},
 					Gas:       ethparams.TxGas,
@@ -336,7 +336,7 @@ func TestSuggestTipCapSmallTips(t *testing.T) {
 
 func TestSuggestTipCapMinGas(t *testing.T) {
 	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig: params.TestChainConfig,
+		chainConfig: params.TestFortunaChainConfig,
 		numBlocks:   3,
 		genBlock:    testGenBlock(t, 500, 50),
 		expectedTip: DefaultMinPrice,
@@ -352,10 +352,10 @@ func TestSuggestGasPriceSubnetEVM(t *testing.T) {
 		Percentile: 60,
 	}
 
-	backend := newTestBackend(t, params.TestChainConfig, 3, func(i int, b *core.BlockGen) {
+	backend := newTestBackend(t, params.TestFortunaChainConfig, 3, func(i int, b *core.BlockGen) {
 		b.SetCoinbase(common.Address{1})
 
-		signer := types.LatestSigner(params.TestChainConfig)
+		signer := types.LatestSigner(params.TestFortunaChainConfig)
 		gasPrice := big.NewInt(legacy.BaseFee)
 		for j := 0; j < 50; j++ {
 			tx := types.NewTx(&types.LegacyTx{
@@ -379,18 +379,57 @@ func TestSuggestGasPriceSubnetEVM(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// NOTE: [Oracle.SuggestTipCap] does NOT simply return the "required" (minimum) tip.
+// The oracle computes a percentile of recent required tips (not observed on-chain tips)
+// within a time/blocks lookback window and applies a small floor (e.g., 1 wei in tests):
+//
+//	suggested = max(floor, recent-required-percentile)
+//
+// After Granite, BlockGasCost is 0 and per-block required tips are 0, so the oracle
+// suggestion equals the floor (1 wei) in steady state, regardless of high on-chain tips.
+// The cases below exercise behavior across forks using the same percentile logic and floor.
 func TestSuggestTipCapMaxBlocksLookback(t *testing.T) {
+	cases := []struct {
+		chainConfig *params.ChainConfig
+		expectedTip *big.Int
+	}{
+		// TODO: remove Fortuna case when we activate Granite
+		{
+			chainConfig: params.TestFortunaChainConfig,
+			expectedTip: big.NewInt(1),
+		},
+		{
+			chainConfig: params.TestChainConfig,
+			expectedTip: big.NewInt(1),
+		},
+	}
+	for _, c := range cases {
+		applyGasPriceTest(t, suggestTipCapTest{
+			chainConfig: c.chainConfig,
+			numBlocks:   200,
+			genBlock:    testGenBlock(t, 550, 80),
+			expectedTip: c.expectedTip,
+		}, defaultOracleConfig())
+	}
+}
+
+// Post-Granite, even very high observed tx tips should not affect SuggestTipCap, which
+// is computed from required tips. Since required tips are 0 in Granite, the returned
+// suggestion should be the floor (1 wei).
+func TestSuggestTipCapIgnoresObservedTipsPostGranite(t *testing.T) {
 	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig: params.TestChainConfig,
+		chainConfig: params.TestChainConfig, // Granite active in TestChainConfig
 		numBlocks:   20,
-		genBlock:    testGenBlock(t, 550, 370),
-		expectedTip: big.NewInt(5_807_226_111),
+		// Generate blocks with very high on-chain tips to ensure they wouldn't bias the result
+		// if the oracle looked at observed tips. Expectation remains 1 wei.
+		genBlock:    testGenBlock(t, 100_000, 80),
+		expectedTip: big.NewInt(1),
 	}, defaultOracleConfig())
 }
 
 func TestSuggestTipCapMaxBlocksSecondsLookback(t *testing.T) {
 	applyGasPriceTest(t, suggestTipCapTest{
-		chainConfig: params.TestChainConfig,
+		chainConfig: params.TestFortunaChainConfig,
 		numBlocks:   20,
 		genBlock:    testGenBlock(t, 550, 370),
 		expectedTip: big.NewInt(10_384_877_852),
@@ -407,14 +446,14 @@ func TestEstimateBaseFeeAfterFeeConfigUpdate(t *testing.T) {
 	}
 
 	// create a chain config with fee manager enabled at genesis with [addr] as the admin
-	chainConfig := params.Copy(params.TestChainConfig)
+	chainConfig := params.Copy(params.TestFortunaChainConfig)
 	chainConfigExtra := params.GetExtra(&chainConfig)
 	chainConfigExtra.GenesisPrecompiles = extras.Precompiles{
 		feemanager.ConfigKey: feemanager.NewConfig(utils.NewUint64(0), []common.Address{addr}, nil, nil, nil),
 	}
 
 	// create a fee config with higher MinBaseFee and prepare it for inclusion in a tx
-	signer := types.LatestSigner(params.TestChainConfig)
+	signer := types.LatestSigner(params.TestFortunaChainConfig)
 	highFeeConfig := chainConfigExtra.FeeConfig
 	highFeeConfig.MinBaseFee = big.NewInt(28_000_000_000)
 	data, err := feemanager.PackSetFeeConfig(highFeeConfig)

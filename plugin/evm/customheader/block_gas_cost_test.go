@@ -76,8 +76,8 @@ func BlockGasCostTest(t *testing.T, feeConfig commontype.FeeConfig) {
 			expected:   nil,
 		},
 		{
-			name:       "normal",
-			upgrades:   extras.TestChainConfig.NetworkUpgrades,
+			name:       "normal_pre_granite",
+			upgrades:   extras.TestFortunaChainConfig.NetworkUpgrades,
 			parentTime: 10,
 			parentCost: maxBlockGasCostBig,
 			timestamp:  10 + targetBlockRate + 1,
@@ -85,11 +85,19 @@ func BlockGasCostTest(t *testing.T, feeConfig commontype.FeeConfig) {
 		},
 		{
 			name:       "negative_time_elapsed",
-			upgrades:   extras.TestChainConfig.NetworkUpgrades,
+			upgrades:   extras.TestFortunaChainConfig.NetworkUpgrades,
 			parentTime: 10,
 			parentCost: feeConfig.MinBlockGasCost,
 			timestamp:  9,
 			expected:   new(big.Int).SetUint64(minBlockGasCost + blockGasCostStep*targetBlockRate),
+		},
+		{
+			name:       "granite_returns_zero",
+			upgrades:   extras.TestGraniteChainConfig.NetworkUpgrades,
+			parentTime: 10,
+			parentCost: big.NewInt(int64(maxBlockGasCost)),
+			timestamp:  10 + targetBlockRate + 1,
+			expected:   big.NewInt(0),
 		},
 	}
 
