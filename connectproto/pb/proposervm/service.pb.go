@@ -144,10 +144,13 @@ func (*GetCurrentEpochRequest) Descriptor() ([]byte, []int) {
 
 // Response containing the current epoch.
 type GetCurrentEpochReply struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PChainHeight  uint64                 `protobuf:"varint,1,opt,name=p_chain_height,json=pChainHeight,proto3" json:"p_chain_height,omitempty"`
-	Number        uint64                 `protobuf:"varint,2,opt,name=number,proto3" json:"number,omitempty"`
-	StartTime     int64                  `protobuf:"varint,3,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Number of the current epoch.
+	Number uint64 `protobuf:"varint,1,opt,name=number,proto3" json:"number,omitempty"`
+	// P-chain height which used to verify ICM messages for this epoch.
+	PChainHeight uint64 `protobuf:"varint,2,opt,name=p_chain_height,json=pChainHeight,proto3" json:"p_chain_height,omitempty"`
+	// Start time of this epoch in Unix time (seconds).
+	StartTime     int64 `protobuf:"varint,3,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -182,16 +185,16 @@ func (*GetCurrentEpochReply) Descriptor() ([]byte, []int) {
 	return file_proposervm_service_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *GetCurrentEpochReply) GetPChainHeight() uint64 {
+func (x *GetCurrentEpochReply) GetNumber() uint64 {
 	if x != nil {
-		return x.PChainHeight
+		return x.Number
 	}
 	return 0
 }
 
-func (x *GetCurrentEpochReply) GetNumber() uint64 {
+func (x *GetCurrentEpochReply) GetPChainHeight() uint64 {
 	if x != nil {
-		return x.Number
+		return x.PChainHeight
 	}
 	return 0
 }
@@ -213,9 +216,9 @@ const file_proposervm_service_proto_rawDesc = "" +
 	"\x16GetProposedHeightReply\x12\x16\n" +
 	"\x06height\x18\x01 \x01(\x04R\x06height\"\x18\n" +
 	"\x16GetCurrentEpochRequest\"s\n" +
-	"\x14GetCurrentEpochReply\x12$\n" +
-	"\x0ep_chain_height\x18\x01 \x01(\x04R\fpChainHeight\x12\x16\n" +
-	"\x06number\x18\x02 \x01(\x04R\x06number\x12\x1d\n" +
+	"\x14GetCurrentEpochReply\x12\x16\n" +
+	"\x06number\x18\x01 \x01(\x04R\x06number\x12$\n" +
+	"\x0ep_chain_height\x18\x02 \x01(\x04R\fpChainHeight\x12\x1d\n" +
 	"\n" +
 	"start_time\x18\x03 \x01(\x03R\tstartTime2\xc4\x01\n" +
 	"\n" +

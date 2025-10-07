@@ -227,7 +227,7 @@ func TestBlockVerify_PostForkBlock_PostDurango_ParentChecks(t *testing.T) {
 	}
 
 	parentPChainHeight := parentBlk.(*postForkBlock).PChainHeight()
-	nextEpoch := acp181.Epoch(
+	nextEpoch := acp181.NewEpoch(
 		proVM.Upgrades,
 		parentPChainHeight,
 		block.Epoch{},
@@ -539,7 +539,7 @@ func TestBlockVerify_PostForkBlock_PChainHeightChecks(t *testing.T) {
 	}
 
 	parentBlkPChainHeight := parentBlk.(*postForkBlock).PChainHeight()
-	nextEpoch := acp181.Epoch(
+	nextEpoch := acp181.NewEpoch(
 		proVM.Upgrades,
 		parentBlkPChainHeight,
 		block.Epoch{},

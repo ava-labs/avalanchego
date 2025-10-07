@@ -128,7 +128,7 @@ func (p *postForkCommonComponents) Verify(
 	}
 
 	childEpoch := child.PChainEpoch()
-	if expected := acp181.Epoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, childTimestamp); childEpoch != expected {
+	if expected := acp181.NewEpoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, childTimestamp); childEpoch != expected {
 		return fmt.Errorf("%w: epoch %v != expected %v", errEpochMismatch, childEpoch, expected)
 	}
 
@@ -241,7 +241,7 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
-	epoch := acp181.Epoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, newTimestamp)
+	epoch := acp181.NewEpoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, newTimestamp)
 
 	var contextPChainHeight uint64
 	switch {

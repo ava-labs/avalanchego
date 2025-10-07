@@ -15,12 +15,12 @@ import (
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-func TestEpoch(t *testing.T) {
+func TestNewEpoch(t *testing.T) {
 	var (
-		now            = time.Now().Truncate(time.Second)
+		now            = upgrade.InitiallyActiveTime.Add(24 * time.Hour) // Some arbitrary time after initial activations
 		nowPlusEpoch   = now.Add(upgrade.Default.GraniteEpochDuration)
 		nowPlus2Epochs = now.Add(2 * upgrade.Default.GraniteEpochDuration)
-		nowPlus3Epochs = now.Add(2 * upgrade.Default.GraniteEpochDuration)
+		nowPlus3Epochs = now.Add(3 * upgrade.Default.GraniteEpochDuration)
 	)
 
 	tests := []struct {
@@ -106,7 +106,7 @@ func TestEpoch(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			epoch := Epoch(
+			epoch := NewEpoch(
 				upgradetest.GetConfig(test.fork),
 				test.parentPChainHeight,
 				test.parentEpoch,

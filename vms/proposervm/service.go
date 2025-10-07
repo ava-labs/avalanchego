@@ -155,7 +155,7 @@ func (vm *VM) getCurrentEpoch(ctx context.Context) (block.Epoch, error) {
 		newTimestamp = timestamp
 	}
 
-	return acp181.Epoch(
+	return acp181.NewEpoch(
 		vm.Upgrades,
 		pChainHeight,
 		epoch,

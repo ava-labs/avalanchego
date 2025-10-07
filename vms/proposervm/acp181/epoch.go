@@ -12,8 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
-// Epoch returns a child block's epoch based on its parent.
-func Epoch(
+// NewEpoch returns a child block's epoch based on its parent.
+func NewEpoch(
 	upgrades upgrade.Config,
 	parentPChainHeight uint64,
 	parentEpoch block.Epoch,
@@ -41,7 +41,7 @@ func Epoch(
 		return parentEpoch
 	}
 
-	// The parent sealed the epoch. So, the child is the first block of the new
+	// The parent sealed the epoch, so the child is the first block of the new
 	// epoch.
 	return block.Epoch{
 		PChainHeight: parentPChainHeight,

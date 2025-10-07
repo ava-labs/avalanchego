@@ -29,7 +29,10 @@ message GetCurrentEpochRequest {}
 
 // Response containing the current epoch.
 message GetCurrentEpochReply {
-  uint64 p_chain_height = 1;
-  uint64 number = 2;
+  // Number of the current epoch.
+  uint64 number = 1;
+  // P-chain height which used to verify ICM messages for this epoch.
+  uint64 p_chain_height = 2;
+  // Start time of this epoch in Unix time (seconds).
   int64 start_time = 3;
 }

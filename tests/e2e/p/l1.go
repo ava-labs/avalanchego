@@ -62,6 +62,8 @@ const (
 	expiryDelay = 5 * time.Minute
 	// P2P message requests timeout after 10 seconds
 	p2pTimeout = 10 * time.Second
+
+	timeToAdvancePChainWindow = 5 * platformvmvalidators.RecentlyAcceptedWindowTTL / 4
 )
 
 var _ = e2e.DescribePChain("[L1]", func() {
@@ -350,11 +352,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			upgrades, err := infoClient.Upgrades(tc.DefaultContext())
 			require.NoError(err)
 
-			const timeToAdvancePChainWindow = 5 * platformvmvalidators.RecentlyAcceptedWindowTTL / 4
 			if !upgrades.IsGraniteActivated(time.Now()) {
-				// We must wait at least [RecentlyAcceptedWindowTTL] to ensure
-				// the next block will reference the last accepted P-chain
-				// height.
+				// Wait to ensure the next block will reference the last
+				// accepted P-chain height.
 				time.Sleep(timeToAdvancePChainWindow)
 				return
 			}
