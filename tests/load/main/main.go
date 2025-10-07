@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"math/big"
@@ -38,6 +39,8 @@ const (
 var (
 	flagVars *e2e.FlagVars
 
+	devnetConfigPath string
+
 	loadTimeoutArg     time.Duration
 	firewoodEnabledArg bool
 	numWorkersArg      int
@@ -46,6 +49,13 @@ var (
 func init() {
 	flagVars = e2e.RegisterFlags(
 		e2e.WithDefaultNodeCount(defaultNodeCount),
+	)
+
+	flag.StringVar(
+		&devnetConfigPath,
+		"devnet-config-path",
+		"",
+		"the file path for the devnet config",
 	)
 
 	flag.DurationVar(
@@ -77,29 +87,8 @@ func main() {
 
 	require := require.New(tc)
 
-	numNodes, err := flagVars.NodeCount()
-	require.NoError(err, "failed to get node count")
-
-	nodes := tmpnet.NewNodesOrPanic(numNodes)
-
-	keys, err := tmpnet.NewPrivateKeys(numWorkersArg)
-	require.NoError(err)
-
-	primaryChainConfigs := tmpnet.DefaultChainConfigs()
-	if firewoodEnabledArg {
-		primaryChainConfigs = newPrimaryChainConfigsWithFirewood()
-	}
-	network := &tmpnet.Network{
-		Nodes:               nodes,
-		PreFundedKeys:       keys,
-		PrimaryChainConfigs: primaryChainConfigs,
-	}
-
-	e2e.NewTestEnvironment(tc, flagVars, network)
-
 	ctx := tests.DefaultNotifyContext(0, tc.DeferCleanup)
-	wsURIs, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
-	require.NoError(err)
+	tc.SetDefaultContextParent(ctx)
 
 	registry := prometheus.NewRegistry()
 	metricsServer, err := tests.NewPrometheusServer(registry)
@@ -108,29 +97,17 @@ func main() {
 		require.NoError(metricsServer.Stop())
 	})
 
-	monitoringConfigFilePath, err := tmpnet.WritePrometheusSDConfig("load-test", tmpnet.SDConfig{
-		Targets: []string{metricsServer.Address()},
-		Labels:  network.GetMonitoringLabels(),
-	}, false)
-	require.NoError(err, "failed to generate monitoring config file")
-
-	tc.DeferCleanup(func() {
-		require.NoError(
-			os.Remove(monitoringConfigFilePath),
-			"failed †o remove monitoring config file",
-		)
-	})
-
-	workers := make([]load.Worker, len(keys))
-	for i := range len(keys) {
-		wsURI := wsURIs[i%len(wsURIs)]
-		client, err := ethclient.Dial(wsURI)
+	var workers []load.Worker
+	if devnetConfigPath != "" {
+		b, err := os.ReadFile(devnetConfigPath)
 		require.NoError(err)
 
-		workers[i] = load.Worker{
-			PrivKey: keys[i].ToECDSA(),
-			Client:  client,
-		}
+		var devnetConfig load.DevnetConfig
+		require.NoError(json.Unmarshal(b, &devnetConfig))
+
+		workers = load.ConnectNetwork(tc, metricsServer, devnetConfig)
+	} else {
+		workers = startNetwork(tc, metricsServer)
 	}
 
 	chainID, err := workers[0].Client.ChainID(ctx)
@@ -157,7 +134,67 @@ func main() {
 	)
 	require.NoError(err)
 
+	log.Info("starting load generator")
+
 	generator.Run(ctx, log, loadTimeoutArg, testTimeout)
+}
+
+// startNetwork starts a new network and returns a list of workers who can
+// interact with the network.
+//
+// Customization of the network and the number of workers can be set via flags.
+func startNetwork(tc tests.TestContext, metricsServer *tests.PrometheusServer) []load.Worker {
+	require := require.New(tc)
+
+	numNodes, err := flagVars.NodeCount()
+	require.NoError(err, "failed to get node count")
+
+	nodes := tmpnet.NewNodesOrPanic(numNodes)
+
+	keys, err := tmpnet.NewPrivateKeys(numWorkersArg)
+	require.NoError(err)
+
+	primaryChainConfigs := tmpnet.DefaultChainConfigs()
+	if firewoodEnabledArg {
+		primaryChainConfigs = newPrimaryChainConfigsWithFirewood()
+	}
+	network := &tmpnet.Network{
+		Nodes:               nodes,
+		PreFundedKeys:       keys,
+		PrimaryChainConfigs: primaryChainConfigs,
+	}
+
+	e2e.NewTestEnvironment(tc, flagVars, network)
+
+	wsURIs, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
+	require.NoError(err)
+
+	monitoringConfigFilePath, err := tmpnet.WritePrometheusSDConfig("load-test", tmpnet.SDConfig{
+		Targets: []string{metricsServer.Address()},
+		Labels:  network.GetMonitoringLabels(),
+	}, false)
+	require.NoError(err, "failed to generate monitoring config file")
+
+	tc.DeferCleanup(func() {
+		require.NoError(
+			os.Remove(monitoringConfigFilePath),
+			"failed †o remove monitoring config file",
+		)
+	})
+
+	workers := make([]load.Worker, len(keys))
+	for i := range len(keys) {
+		wsURI := wsURIs[i%len(wsURIs)]
+		client, err := ethclient.Dial(wsURI)
+		require.NoError(err)
+
+		workers[i] = load.Worker{
+			PrivKey: keys[i].ToECDSA(),
+			Client:  client,
+		}
+	}
+
+	return workers
 }
 
 // newTokenContract deploys an instance of an ERC20 token and distributes the
