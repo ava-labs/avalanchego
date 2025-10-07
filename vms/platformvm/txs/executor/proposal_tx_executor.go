@@ -494,8 +494,6 @@ func (e *proposalTxExecutor) RewardContinuousValidatorTx(tx *txs.RewardContinuou
 			return err
 		}
 
-		newStartTime := currentChainTime
-
 		{
 			// Set onAbortState.
 			delegateeReward, err := e.onCommitState.GetDelegateeReward(
@@ -515,7 +513,6 @@ func (e *proposalTxExecutor) RewardContinuousValidatorTx(tx *txs.RewardContinuou
 			newWeight := stakerToReward.Weight
 
 			if delegateeReward > 0 {
-				// todo: test this flow
 				newAccruedDelegateeRewards, err = math.Add(stakerToReward.AccruedDelegateeRewards, delegateeReward)
 				if err != nil {
 					return err
@@ -586,7 +583,6 @@ func (e *proposalTxExecutor) RewardContinuousValidatorTx(tx *txs.RewardContinuou
 			err = e.onAbortState.ResetContinuousValidatorCycle(
 				stakerToReward.SubnetID,
 				stakerToReward.NodeID,
-				newStartTime,
 				newWeight,
 				onAbortPotentialReward,
 				stakerToReward.AccruedRewards,
@@ -680,7 +676,6 @@ func (e *proposalTxExecutor) RewardContinuousValidatorTx(tx *txs.RewardContinuou
 			err = e.onCommitState.ResetContinuousValidatorCycle(
 				stakerToReward.SubnetID,
 				stakerToReward.NodeID,
-				newStartTime,
 				newWeight,
 				onCommitPotentialReward,
 				newAccruedRewards,

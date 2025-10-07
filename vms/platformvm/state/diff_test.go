@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/iterator"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -40,11 +41,15 @@ func TestDiffMissingState(t *testing.T) {
 func TestMutatedValidatorDiffState(t *testing.T) {
 	require := require.New(t)
 
+	blsKey, err := localsigner.New()
+	require.NoError(err)
+
 	state := newTestState(t, memdb.New())
 
 	// Put a current validator
 	currentValidator := &Staker{
 		TxID:               ids.GenerateTestID(),
+		PublicKey:          blsKey.PublicKey(),
 		SubnetID:           ids.GenerateTestID(),
 		NodeID:             ids.GenerateTestNodeID(),
 		Weight:             100,
@@ -1073,4 +1078,281 @@ func TestDiffStacking(t *testing.T) {
 	owner, err = state.GetSubnetOwner(subnetID)
 	require.NoError(err)
 	require.Equal(owner3, owner)
+}
+
+func TestDiffUpdateValidator(t *testing.T) {
+	tests := []struct {
+		name            string
+		updateValidator func(*Staker)
+		updateState     func(*require.Assertions, Diff)
+		expectedErr     error
+	}{
+		{
+			name: "invalid mutation",
+			updateValidator: func(validator *Staker) {
+				validator.Weight = 5
+			},
+			expectedErr: errInvalidStakerMutation,
+		},
+		{
+			name: "missing validator",
+			updateValidator: func(validator *Staker) {
+				validator.NodeID = ids.GenerateTestNodeID()
+			},
+			expectedErr: database.ErrNotFound,
+		},
+		{
+			name: "deleted validator",
+			updateState: func(require *require.Assertions, diff Diff) {
+				currentStakerIterator, err := diff.GetCurrentStakerIterator()
+				require.NoError(err)
+				require.True(currentStakerIterator.Next())
+
+				stakerToRemove := currentStakerIterator.Value()
+				currentStakerIterator.Release()
+
+				diff.DeleteCurrentValidator(stakerToRemove)
+			},
+			expectedErr: database.ErrNotFound,
+		},
+		{
+			name: "valid mutation",
+			updateValidator: func(validator *Staker) {
+				validator.Weight = 15
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+
+			state := newTestState(t, memdb.New())
+
+			blsKey, err := localsigner.New()
+			require.NoError(err)
+
+			currentValidator := &Staker{
+				TxID:      ids.GenerateTestID(),
+				NodeID:    ids.GenerateTestNodeID(),
+				PublicKey: blsKey.PublicKey(),
+				SubnetID:  ids.GenerateTestID(),
+				Weight:    10,
+				StartTime: time.Unix(1, 0),
+				EndTime:   time.Unix(2, 0),
+				Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+			}
+			require.NoError(state.PutCurrentValidator(currentValidator))
+
+			d, err := NewDiffOn(state)
+			require.NoError(err)
+
+			if test.updateState != nil {
+				test.updateState(require, d)
+			}
+
+			validator := *currentValidator
+			if test.updateValidator != nil {
+				test.updateValidator(&validator)
+			}
+
+			require.ErrorIs(d.UpdateCurrentValidator(&validator), test.expectedErr)
+		})
+	}
+}
+
+func TestDiffStopContinuousValidator(t *testing.T) {
+	require := require.New(t)
+
+	subnetID := ids.GenerateTestID()
+
+	state := newTestState(t, memdb.New())
+	d, err := NewDiffOn(state)
+
+	blsKey, err := localsigner.New()
+	require.NoError(err)
+
+	fixedValidator := &Staker{
+		TxID:      ids.GenerateTestID(),
+		NodeID:    ids.GenerateTestNodeID(),
+		PublicKey: blsKey.PublicKey(),
+		SubnetID:  subnetID,
+		Weight:    10,
+		StartTime: time.Unix(1, 0),
+		EndTime:   time.Unix(2, 0),
+		Priority:  txs.PrimaryNetworkValidatorCurrentPriority,
+	}
+	require.NoError(d.PutCurrentValidator(fixedValidator))
+
+	require.ErrorIs(d.StopContinuousValidator(subnetID, ids.GenerateTestNodeID()), database.ErrNotFound)
+	require.ErrorIs(d.StopContinuousValidator(subnetID, fixedValidator.NodeID), errIncompatibleContinuousStaker)
+
+	blsKey, err = localsigner.New()
+	require.NoError(err)
+
+	continuousValidator := &Staker{
+		TxID:               ids.GenerateTestID(),
+		NodeID:             ids.GenerateTestNodeID(),
+		PublicKey:          blsKey.PublicKey(),
+		SubnetID:           subnetID,
+		Weight:             10,
+		StartTime:          time.Unix(1, 0),
+		EndTime:            time.Unix(2, 0),
+		Priority:           txs.PrimaryNetworkValidatorCurrentPriority,
+		ContinuationPeriod: 14 * 24 * time.Hour,
+	}
+	require.NoError(d.PutCurrentValidator(continuousValidator))
+
+	require.NoError(d.StopContinuousValidator(subnetID, continuousValidator.NodeID))
+
+	validator, err := d.GetCurrentValidator(subnetID, continuousValidator.NodeID)
+	require.NoError(err)
+
+	require.Equal(continuousValidator.Weight, validator.Weight)
+	require.Equal(continuousValidator.PotentialReward, validator.PotentialReward)
+	require.Equal(continuousValidator.AccruedRewards, validator.AccruedRewards)
+	require.Equal(continuousValidator.AccruedDelegateeRewards, validator.AccruedDelegateeRewards)
+	require.Equal(continuousValidator.StartTime, validator.StartTime)
+	require.Equal(continuousValidator.EndTime, validator.EndTime)
+	require.Equal(time.Duration(0), validator.ContinuationPeriod)
+
+	require.ErrorIs(d.StopContinuousValidator(subnetID, continuousValidator.NodeID), errIncompatibleContinuousStaker)
+}
+
+func TestDiffResetContinuousValidatorCycleValidation(t *testing.T) {
+	require := require.New(t)
+
+	subnetID := ids.GenerateTestID()
+
+	state := newTestState(t, memdb.New())
+	d, err := NewDiffOn(state)
+
+	blsKey, err := localsigner.New()
+	require.NoError(err)
+
+	continuousValidator := &Staker{
+		TxID:                    ids.GenerateTestID(),
+		NodeID:                  ids.GenerateTestNodeID(),
+		PublicKey:               blsKey.PublicKey(),
+		SubnetID:                subnetID,
+		Weight:                  10,
+		StartTime:               time.Unix(1, 0),
+		EndTime:                 time.Unix(2, 0),
+		PotentialReward:         100,
+		AccruedRewards:          10,
+		AccruedDelegateeRewards: 5,
+		NextTime:                time.Time{},
+		Priority:                txs.PrimaryNetworkValidatorCurrentPriority,
+		ContinuationPeriod:      14 * 24 * time.Hour,
+	}
+	require.NoError(d.PutCurrentValidator(continuousValidator))
+
+	tests := []struct {
+		name                                                               string
+		expectedErr                                                        error
+		subnetID                                                           ids.ID
+		nodeID                                                             ids.NodeID
+		weight                                                             uint64
+		potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64
+	}{
+		{
+			name:                         "decreased accrued rewards",
+			subnetID:                     subnetID,
+			nodeID:                       continuousValidator.NodeID,
+			weight:                       continuousValidator.Weight,
+			potentialReward:              continuousValidator.PotentialReward,
+			totalAccruedRewards:          continuousValidator.AccruedRewards - 1,
+			totalAccruedDelegateeRewards: continuousValidator.AccruedDelegateeRewards,
+			expectedErr:                  errDecreasedAccruedRewards,
+		},
+		{
+			name:                         "decreased accrued delegatee rewards",
+			subnetID:                     subnetID,
+			nodeID:                       continuousValidator.NodeID,
+			weight:                       continuousValidator.Weight,
+			potentialReward:              continuousValidator.PotentialReward,
+			totalAccruedRewards:          continuousValidator.AccruedRewards,
+			totalAccruedDelegateeRewards: continuousValidator.AccruedDelegateeRewards - 1,
+			expectedErr:                  errDecreasedAccruedDelegateeRewards,
+		},
+		{
+			name:                         "decreased weight",
+			subnetID:                     subnetID,
+			nodeID:                       continuousValidator.NodeID,
+			weight:                       continuousValidator.Weight - 1,
+			potentialReward:              continuousValidator.PotentialReward,
+			totalAccruedRewards:          continuousValidator.AccruedRewards,
+			totalAccruedDelegateeRewards: continuousValidator.AccruedDelegateeRewards,
+			expectedErr:                  errDecreasedWeight,
+		},
+	}
+
+	for _, test := range tests {
+		err = d.ResetContinuousValidatorCycle(
+			subnetID,
+			test.nodeID,
+			test.weight,
+			test.potentialReward,
+			test.totalAccruedRewards,
+			test.totalAccruedDelegateeRewards,
+		)
+
+		require.ErrorIs(err, test.expectedErr)
+	}
+}
+
+func TestDiffResetContinuousValidatorCycle(t *testing.T) {
+	require := require.New(t)
+
+	subnetID := ids.GenerateTestID()
+
+	state := newTestState(t, memdb.New())
+	d, err := NewDiffOn(state)
+
+	blsKey, err := localsigner.New()
+	require.NoError(err)
+
+	continuousValidator := &Staker{
+		TxID:                    ids.GenerateTestID(),
+		NodeID:                  ids.GenerateTestNodeID(),
+		PublicKey:               blsKey.PublicKey(),
+		SubnetID:                subnetID,
+		Weight:                  10,
+		StartTime:               time.Unix(1, 0),
+		EndTime:                 time.Unix(2, 0),
+		PotentialReward:         100,
+		AccruedRewards:          10,
+		AccruedDelegateeRewards: 5,
+		NextTime:                time.Time{},
+		Priority:                txs.PrimaryNetworkValidatorCurrentPriority,
+		ContinuationPeriod:      14 * 24 * time.Hour,
+	}
+	require.NoError(d.PutCurrentValidator(continuousValidator))
+
+	newWeight := continuousValidator.Weight + 10
+	newPotentialReward := continuousValidator.PotentialReward + 15
+	newAccruedRewards := continuousValidator.AccruedRewards + 20
+	newAccruedDelegateeRewards := continuousValidator.AccruedDelegateeRewards + 25
+
+	expectedStartTime := continuousValidator.EndTime
+	expectedEndTime := continuousValidator.EndTime.Add(continuousValidator.ContinuationPeriod)
+	err = d.ResetContinuousValidatorCycle(
+		subnetID,
+		continuousValidator.NodeID,
+		newWeight,
+		newPotentialReward,
+		newAccruedRewards,
+		newAccruedDelegateeRewards,
+	)
+	require.NoError(err)
+
+	continuousValidator, err = d.GetCurrentValidator(subnetID, continuousValidator.NodeID)
+	require.NoError(err)
+
+	require.Equal(newWeight, continuousValidator.Weight)
+	require.Equal(newPotentialReward, continuousValidator.PotentialReward)
+	require.Equal(newAccruedRewards, continuousValidator.AccruedRewards)
+	require.Equal(newAccruedDelegateeRewards, continuousValidator.AccruedDelegateeRewards)
+	require.Equal(expectedStartTime, continuousValidator.StartTime)
+	require.Equal(expectedEndTime, continuousValidator.EndTime)
 }
