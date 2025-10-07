@@ -61,92 +61,78 @@ func TestPut_MaxHeight(t *testing.T) {
 		name               string
 		blockHeights       []uint64 // block heights to write, in order
 		config             DatabaseConfig
-		expectedMCH        uint64 // expected max contiguous height
 		expectedMaxHeight  uint64
 		syncToDisk         bool
 		checkpointInterval uint64
 	}{
 		{
 			name:              "no blocks to write",
-			expectedMCH:       unsetHeight,
 			expectedMaxHeight: unsetHeight,
 		},
 		{
 			name:              "single block at min height",
 			blockHeights:      []uint64{0},
-			expectedMCH:       0,
 			expectedMaxHeight: 0,
 		},
 		{
 			name:              "sequential blocks from min",
 			blockHeights:      []uint64{0, 1, 2, 3},
-			expectedMCH:       3,
 			expectedMaxHeight: 3,
 		},
 		{
 			name:              "out of order with no gaps",
 			blockHeights:      []uint64{3, 1, 2, 0, 4},
-			expectedMCH:       4,
 			expectedMaxHeight: 4,
 		},
 		{
 			name:              "blocks with gaps",
 			blockHeights:      []uint64{0, 1, 3, 5, 6},
-			expectedMCH:       1,
 			expectedMaxHeight: 6,
 		},
 		{
 			name:              "start with gap",
 			blockHeights:      []uint64{5, 6},
-			expectedMCH:       unsetHeight,
 			expectedMaxHeight: 6,
 		},
 		{
 			name:              "overwrite same height",
 			blockHeights:      []uint64{0, 1, 0}, // Write to height 0 twice
-			expectedMCH:       1,
 			expectedMaxHeight: 1,
 		},
 		{
 			name:              "custom min height single block",
 			blockHeights:      []uint64{10},
 			config:            customConfig,
-			expectedMCH:       10,
 			expectedMaxHeight: 10,
 		},
 		{
 			name:              "custom min height out of order",
 			blockHeights:      []uint64{13, 11, 10, 12},
 			config:            customConfig,
-			expectedMCH:       13,
 			expectedMaxHeight: 13,
 		},
 		{
 			name:              "custom min height with gaps",
 			blockHeights:      []uint64{10, 11, 13, 15},
 			config:            customConfig,
-			expectedMCH:       11,
 			expectedMaxHeight: 15,
 		},
 		{
 			name:              "custom min height start with gap",
 			blockHeights:      []uint64{11, 12},
 			config:            customConfig,
-			expectedMCH:       unsetHeight,
 			expectedMaxHeight: 12,
 		},
 		{
 			name:              "with sync to disk",
 			blockHeights:      []uint64{0, 1, 2, 5},
 			syncToDisk:        true,
-			expectedMCH:       2,
 			expectedMaxHeight: 5,
 		},
 		{
 			name:               "custom checkpoint interval",
 			blockHeights:       []uint64{0, 1, 2, 3, 4},
 			checkpointInterval: 2,
-			expectedMCH:        4,
 			expectedMaxHeight:  4,
 		},
 		{
@@ -154,7 +140,6 @@ func TestPut_MaxHeight(t *testing.T) {
 			blockHeights: []uint64{
 				10, 3, 2, 9, 35, 34, 30, 1, 9, 88, 83, 4, 43, 5, 0,
 			},
-			expectedMCH:       5,
 			expectedMaxHeight: 88,
 		},
 	}
@@ -178,7 +163,7 @@ func TestPut_MaxHeight(t *testing.T) {
 				blocksWritten[h] = block
 			}
 
-			checkDatabaseState(t, store, tt.expectedMaxHeight, tt.expectedMCH)
+			checkDatabaseState(t, store, tt.expectedMaxHeight)
 		})
 	}
 }
@@ -229,7 +214,7 @@ func TestWriteBlock_Concurrency(t *testing.T) {
 			require.Equal(t, blocks[i], block, "block mismatch at height %d", height)
 		}
 	}
-	checkDatabaseState(t, store, 19, 4)
+	checkDatabaseState(t, store, 19)
 }
 
 func TestWriteBlock_Errors(t *testing.T) {
@@ -333,7 +318,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 			} else {
 				require.ErrorIs(t, err, tt.wantErr)
 			}
-			checkDatabaseState(t, store, unsetHeight, unsetHeight)
+			checkDatabaseState(t, store, unsetHeight)
 		})
 	}
 }
