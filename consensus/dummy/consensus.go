@@ -106,9 +106,8 @@ func verifyHeaderGasFields(config *extras.ChainConfig, header *types.Header, par
 	if err != nil {
 		return err
 	}
-	if err := customheader.VerifyGasUsed(config, feeConfig, parent, header); err != nil {
-		return err
-	}
+	// Verifying the gas used occurs earlier in the block validation process in verifyIntrinsicGas, so
+	// customheader.VerifyGasUsed is not called here.
 	if err := customheader.VerifyGasLimit(config, feeConfig, parent, header); err != nil {
 		return err
 	}

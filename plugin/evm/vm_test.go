@@ -25,15 +25,21 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -63,6 +69,8 @@ import (
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	avagoconstants "github.com/ava-labs/avalanchego/utils/constants"
+	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	warpcontract "github.com/ava-labs/subnet-evm/precompile/contracts/warp"
 )
 
 func TestMain(m *testing.M) {
@@ -3830,5 +3838,171 @@ func TestCreateHandlers(t *testing.T) {
 	// All other elements should have an error indicating there's no response
 	for _, elem := range batch[1:] {
 		require.ErrorIs(t, elem.Error, rpc.ErrMissingBatchResponse)
+	}
+}
+
+// TestBlockGasValidation tests the two validation checks:
+// 1. invalid gas used relative to capacity
+// 2. total intrinsic gas cost is greater than claimed gas used
+func TestBlockGasValidation(t *testing.T) {
+	newBlock := func(
+		t *testing.T,
+		vm *VM,
+		claimedGasUsed uint64,
+	) *types.Block {
+		require := require.New(t)
+
+		chainExtra := params.GetExtra(vm.chainConfig)
+		parent := vm.eth.APIBackend.CurrentBlock()
+		const timeDelta = 5 // mocked block delay
+		timestamp := parent.Time + timeDelta
+		feeConfig, _, err := vm.blockChain.GetFeeConfigAt(parent)
+		require.NoError(err)
+		gasLimit, err := customheader.GasLimit(chainExtra, feeConfig, parent, timestamp)
+		require.NoError(err)
+		baseFee, err := customheader.BaseFee(chainExtra, feeConfig, parent, timestamp)
+		require.NoError(err)
+
+		callPayload, err := payload.NewAddressedCall(nil, nil)
+		require.NoError(err)
+		unsignedMessage, err := avalancheWarp.NewUnsignedMessage(
+			1,
+			ids.Empty,
+			callPayload.Bytes(),
+		)
+		require.NoError(err)
+		signersBitSet := set.NewBits()
+		warpSignature := &avalancheWarp.BitSetSignature{
+			Signers: signersBitSet.Bytes(),
+		}
+		signedMessage, err := avalancheWarp.NewMessage(
+			unsignedMessage,
+			warpSignature,
+		)
+		require.NoError(err)
+
+		// 9401 is the maximum number of predicates so that the block is less
+		// than 2 MiB.
+		const numPredicates = 9401
+		accessList := make(types.AccessList, 0, numPredicates)
+		predicate := predicate.New(signedMessage.Bytes())
+		for range numPredicates {
+			accessList = append(accessList, types.AccessTuple{
+				Address:     warpcontract.ContractAddress,
+				StorageKeys: predicate,
+			})
+		}
+
+		tx, err := types.SignTx(
+			types.NewTx(&types.DynamicFeeTx{
+				ChainID:    vm.chainConfig.ChainID,
+				Nonce:      1,
+				To:         &testEthAddrs[0],
+				Gas:        8_000_000, // block gas limit
+				GasFeeCap:  baseFee,
+				GasTipCap:  baseFee,
+				Value:      common.Big0,
+				AccessList: accessList,
+			}),
+			types.LatestSigner(vm.chainConfig),
+			testKeys[0].ToECDSA(),
+		)
+		require.NoError(err)
+
+		header := &types.Header{
+			ParentHash:       parent.Hash(),
+			Coinbase:         constants.BlackholeAddr,
+			Difficulty:       new(big.Int).Add(parent.Difficulty, common.Big1),
+			Number:           new(big.Int).Add(parent.Number, common.Big1),
+			GasLimit:         gasLimit,
+			GasUsed:          0,
+			Time:             timestamp,
+			BaseFee:          baseFee,
+			BlobGasUsed:      new(uint64),
+			ExcessBlobGas:    new(uint64),
+			ParentBeaconRoot: &common.Hash{},
+		}
+
+		configExtra := params.GetExtra(vm.chainConfig)
+		header.Extra, err = customheader.ExtraPrefix(configExtra, parent, header)
+		require.NoError(err)
+
+		// Set TimeMilliseconds if Granite is active
+		if configExtra.IsGranite(timestamp) {
+			headerExtra := customtypes.GetHeaderExtra(header)
+			timeMilliseconds := timestamp * 1000 // convert to milliseconds
+			headerExtra.TimeMilliseconds = &timeMilliseconds
+		}
+
+		// Set the gasUsed after calculating the extra prefix to support large
+		// claimed gas used values.
+		header.GasUsed = claimedGasUsed
+		return types.NewBlock(
+			header,
+			[]*types.Transaction{tx},
+			nil,
+			nil,
+			trie.NewStackTrie(nil),
+		)
+	}
+
+	tests := []struct {
+		name    string
+		gasUsed uint64
+		want    error
+	}{
+		{
+			name:    "gas_used_over_capacity",
+			gasUsed: math.MaxUint64,
+			want:    errInvalidGasUsedRelativeToCapacity,
+		},
+		{
+			name:    "intrinsic_gas_over_gas_used",
+			gasUsed: 0,
+			want:    errTotalIntrinsicGasCostExceedsClaimed,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+			ctx := context.Background()
+
+			// Configure genesis with warp precompile enabled since test uses warp predicates
+			genesis := &core.Genesis{}
+			require.NoError(genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
+			params.GetExtra(genesis.Config).GenesisPrecompiles = extras.Precompiles{
+				warpcontract.ConfigKey: warpcontract.NewDefaultConfig(utils.TimeToNewUint64(upgrade.InitiallyActiveTime)),
+			}
+			genesisJSON, err := genesis.MarshalJSON()
+			require.NoError(err)
+
+			tvm := newVM(t, testVMConfig{
+				genesisJSON: string(genesisJSON),
+			})
+			vm := tvm.vm
+			defer func() {
+				require.NoError(vm.Shutdown(ctx))
+			}()
+
+			blk := newBlock(t, vm, test.gasUsed)
+			blkBytes, err := rlp.EncodeToBytes(blk)
+			require.NoError(err)
+
+			parsedBlk, err := vm.ParseBlock(ctx, blkBytes)
+			require.NoError(err)
+
+			parsedBlkWithContext, ok := parsedBlk.(block.WithVerifyContext)
+			require.True(ok)
+
+			shouldVerify, err := parsedBlkWithContext.ShouldVerifyWithContext(ctx)
+			require.NoError(err)
+			require.True(shouldVerify)
+
+			err = parsedBlkWithContext.VerifyWithContext(
+				ctx,
+				&block.Context{},
+			)
+			require.ErrorIs(err, test.want)
+		})
 	}
 }
