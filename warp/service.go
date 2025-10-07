@@ -105,7 +105,7 @@ func (a *API) aggregateSignatures(ctx context.Context, unsignedMessage *warp.Uns
 		return nil, err
 	}
 
-	validatorSet, err := warp.GetCanonicalValidatorSetFromSubnetID(ctx, validatorState, pChainHeight, subnetID)
+	validatorSet, err := validatorState.GetWarpValidatorSet(ctx, pChainHeight, subnetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get validator set: %w", err)
 	}

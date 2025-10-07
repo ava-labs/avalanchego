@@ -343,22 +343,29 @@ func testWarpVMTransaction(t *testing.T, scheme string, unsignedMessage *avalanc
 		GetSubnetIDF: func(context.Context, ids.ID) (ids.ID, error) {
 			return ids.Empty, nil
 		},
-		GetValidatorSetF: func(_ context.Context, height uint64, _ ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		GetWarpValidatorSetF: func(_ context.Context, height uint64, _ ids.ID) (validators.WarpSet, error) {
 			if height < minimumValidPChainHeight {
-				return nil, getValidatorSetTestErr
+				return validators.WarpSet{}, getValidatorSetTestErr
 			}
-			return map[ids.NodeID]*validators.GetValidatorOutput{
-				nodeID1: {
-					NodeID:    nodeID1,
-					PublicKey: blsPublicKey1,
-					Weight:    50,
+			vdrs := validators.WarpSet{
+				Validators: []*validators.Warp{
+					{
+						PublicKey:      blsPublicKey1,
+						PublicKeyBytes: bls.PublicKeyToUncompressedBytes(blsPublicKey1),
+						Weight:         50,
+						NodeIDs:        []ids.NodeID{nodeID1},
+					},
+					{
+						PublicKey:      blsPublicKey2,
+						PublicKeyBytes: bls.PublicKeyToUncompressedBytes(blsPublicKey2),
+						Weight:         50,
+						NodeIDs:        []ids.NodeID{nodeID2},
+					},
 				},
-				nodeID2: {
-					NodeID:    nodeID2,
-					PublicKey: blsPublicKey2,
-					Weight:    50,
-				},
-			}, nil
+				TotalWeight: 100,
+			}
+			avagoUtils.Sort(vdrs.Validators)
+			return vdrs, nil
 		},
 	}
 
@@ -645,24 +652,28 @@ func testReceiveWarpMessage(
 			}
 			return vm.ctx.SubnetID, nil
 		},
-		GetValidatorSetF: func(_ context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+		GetWarpValidatorSetF: func(_ context.Context, height uint64, subnetID ids.ID) (validators.WarpSet, error) {
 			if height < minimumValidPChainHeight {
-				return nil, getValidatorSetTestErr
+				return validators.WarpSet{}, getValidatorSetTestErr
 			}
 			signers := subnetSigners
 			if subnetID == constants.PrimaryNetworkID {
 				signers = primarySigners
 			}
 
-			vdrOutput := make(map[ids.NodeID]*validators.GetValidatorOutput)
+			vdrs := validators.WarpSet{}
 			for _, s := range signers {
-				vdrOutput[s.nodeID] = &validators.GetValidatorOutput{
-					NodeID:    s.nodeID,
-					PublicKey: s.secret.PublicKey(),
-					Weight:    s.weight,
-				}
+				pk := s.secret.PublicKey()
+				vdrs.Validators = append(vdrs.Validators, &validators.Warp{
+					PublicKey:      pk,
+					PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
+					Weight:         s.weight,
+					NodeIDs:        []ids.NodeID{s.nodeID},
+				})
+				vdrs.TotalWeight += s.weight
 			}
-			return vdrOutput, nil
+			avagoUtils.Sort(vdrs.Validators)
+			return vdrs, nil
 		},
 	}
 
