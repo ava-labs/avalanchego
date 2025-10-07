@@ -7,4 +7,5 @@ TestResyncNewRootAfterDeletes
 TestTransactionSkipIndexing
 TestUpdatedKeyfileContents
 TestWaitDeployedCornerCases
+TestClientWebsocketLargeMessage
 TestWebsocketLargeRead
