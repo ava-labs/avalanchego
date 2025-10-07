@@ -25,7 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -39,7 +38,6 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
-	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -3852,15 +3850,7 @@ func TestBlockGasValidation(t *testing.T) {
 	) *types.Block {
 		require := require.New(t)
 
-		chainExtra := params.GetExtra(vm.chainConfig)
-		parent := vm.eth.APIBackend.CurrentBlock()
-		const timeDelta = 5 // mocked block delay
-		timestamp := parent.Time + timeDelta
-		feeConfig, _, err := vm.blockChain.GetFeeConfigAt(parent)
-		require.NoError(err)
-		gasLimit, err := customheader.GasLimit(chainExtra, feeConfig, parent, timestamp)
-		require.NoError(err)
-		baseFee, err := customheader.BaseFee(chainExtra, feeConfig, parent, timestamp)
+		blk, err := vm.BuildBlock(context.Background())
 		require.NoError(err)
 
 		callPayload, err := payload.NewAddressedCall(nil, nil)
@@ -3899,8 +3889,8 @@ func TestBlockGasValidation(t *testing.T) {
 				Nonce:      1,
 				To:         &testEthAddrs[0],
 				Gas:        8_000_000, // block gas limit
-				GasFeeCap:  baseFee,
-				GasTipCap:  baseFee,
+				GasFeeCap:  big.NewInt(10),
+				GasTipCap:  big.NewInt(10),
 				Value:      common.Big0,
 				AccessList: accessList,
 			}),
@@ -3909,36 +3899,14 @@ func TestBlockGasValidation(t *testing.T) {
 		)
 		require.NoError(err)
 
-		header := &types.Header{
-			ParentHash:       parent.Hash(),
-			Coinbase:         constants.BlackholeAddr,
-			Difficulty:       new(big.Int).Add(parent.Difficulty, common.Big1),
-			Number:           new(big.Int).Add(parent.Number, common.Big1),
-			GasLimit:         gasLimit,
-			GasUsed:          0,
-			Time:             timestamp,
-			BaseFee:          baseFee,
-			BlobGasUsed:      new(uint64),
-			ExcessBlobGas:    new(uint64),
-			ParentBeaconRoot: &common.Hash{},
-		}
-
-		configExtra := params.GetExtra(vm.chainConfig)
-		header.Extra, err = customheader.ExtraPrefix(configExtra, parent, header)
-		require.NoError(err)
-
-		// Set TimeMilliseconds if Granite is active
-		if configExtra.IsGranite(timestamp) {
-			headerExtra := customtypes.GetHeaderExtra(header)
-			timeMilliseconds := timestamp * 1000 // convert to milliseconds
-			headerExtra.TimeMilliseconds = &timeMilliseconds
-		}
+		ethBlock := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+		modifiedHeader := types.CopyHeader(ethBlock.Header())
 
 		// Set the gasUsed after calculating the extra prefix to support large
 		// claimed gas used values.
-		header.GasUsed = claimedGasUsed
+		modifiedHeader.GasUsed = claimedGasUsed
 		return types.NewBlock(
-			header,
+			modifiedHeader,
 			[]*types.Transaction{tx},
 			nil,
 			nil,
@@ -3984,24 +3952,22 @@ func TestBlockGasValidation(t *testing.T) {
 				require.NoError(vm.Shutdown(ctx))
 			}()
 
+			// Add a transaction to the pool so BuildBlock doesn't create an empty block
+			// (subnet-evm doesn't allow empty blocks)
+			tx := types.NewTransaction(uint64(0), testEthAddrs[1], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
+			signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
+			require.NoError(err)
+			errs := vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+			for i, err := range errs {
+				require.NoError(err, "Failed to add tx at index %d", i)
+			}
+
 			blk := newBlock(t, vm, test.gasUsed)
-			blkBytes, err := rlp.EncodeToBytes(blk)
+
+			modifiedBlk, err := wrapBlock(blk, vm)
 			require.NoError(err)
 
-			parsedBlk, err := vm.ParseBlock(ctx, blkBytes)
-			require.NoError(err)
-
-			parsedBlkWithContext, ok := parsedBlk.(block.WithVerifyContext)
-			require.True(ok)
-
-			shouldVerify, err := parsedBlkWithContext.ShouldVerifyWithContext(ctx)
-			require.NoError(err)
-			require.True(shouldVerify)
-
-			err = parsedBlkWithContext.VerifyWithContext(
-				ctx,
-				&block.Context{},
-			)
+			err = modifiedBlk.Verify(ctx)
 			require.ErrorIs(err, test.want)
 		})
 	}
