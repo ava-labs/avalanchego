@@ -156,8 +156,11 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.TimeMilliseconds = h.TimeMilliseconds
 }
 
+// NOTE: both generators currently do not support type aliases.
+// We are using custom versions of these programs for now to support type aliases,
+// see https://github.com/ava-labs/coreth/pull/746#discussion_r1969673252
 //go:generate go run github.com/fjl/gencodec -type HeaderSerializable -field-override headerMarshaling -out gen_header_serializable_json.go
-//go:generate go run github.com/ava-labs/libevm/rlp/rlpgen@739ba847f6f407f63fd6a24175b24e56fea583a1 -type HeaderSerializable -out gen_header_serializable_rlp.go
+//go:generate go run github.com/ava-labs/libevm/rlp/rlpgen -type HeaderSerializable -out gen_header_serializable_rlp.go
 
 // HeaderSerializable defines the header of a block in the Ethereum blockchain,
 // as it is to be serialized into RLP and JSON. Note it must be exported so that
