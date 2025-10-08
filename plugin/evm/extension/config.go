@@ -102,7 +102,7 @@ type BlockExtension interface {
 	SemanticVerify() error
 	// CleanupVerified is called when a block has passed SemanticVerify and SynctacticVerify,
 	// and should be cleaned up due to error or verification runs under non-write mode.
-	CleanupVerified() error
+	CleanupVerified()
 	// Accept is called when a block is accepted by the block manager. Accept takes a
 	// database.Batch that contains the changes that were made to the database as a result
 	// of accepting the block. The changes in the batch should be flushed to the database in this method.
