@@ -4,9 +4,11 @@
 
 - Removed deprecated flags `coreth-admin-api-enabled`, `coreth-admin-api-dir`, `tx-regossip-frequency`, `tx-lookup-limit`. Use `admin-api-enabled`, `admin-api-dir`, `regossip-frequency`, `transaction-history` instead.
 - Enabled RPC batch limits by default, and configurable with `batch-request-limit` and `batch-max-response-size`.
-- Implement ACP-226: Set expected block gas cost to 0 in Granite network upgrade, removing block gas cost requirements for block building.
-- Implement ACP-226: Add `timeMilliseconds` (Unix uint64) timestamp to block header for Granite upgrade.
-- Implement ACP-226: Add `minDelayExcess` (uint64) to block header for Granite upgrade.
+- ACP-226:
+  - Set expected block gas cost to 0 in Granite network upgrade, removing block gas cost requirements for block building.
+  - Add `timeMilliseconds` (Unix uint64) timestamp to block header for Granite upgrade.
+  - Add `minDelayExcess` (uint64) to block header for Granite upgrade.
+  - Add minimum block building delays to conform the block builder to ACP-226 requirements.
 - Update go version to 1.24.7
 
 ## [v0.15.3](https://github.com/ava-labs/coreth/releases/tag/v0.15.3)

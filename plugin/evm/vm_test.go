@@ -1549,8 +1549,10 @@ func TestBuildBlockLargeTxStarvation(t *testing.T) {
 }
 
 func TestWaitForEvent(t *testing.T) {
+	fortunaFork := upgradetest.Fortuna
 	for _, testCase := range []struct {
 		name     string
+		Fork     *upgradetest.Fork
 		testCase func(*testing.T, *VM)
 	}{
 		{
@@ -1614,8 +1616,10 @@ func TestWaitForEvent(t *testing.T) {
 				wg.Wait()
 			},
 		},
+		// TODO (ceyonur): remove this test after Granite is activated. (See https://github.com/ava-labs/coreth/issues/1318)
 		{
-			name: "WaitForEvent does not wait to build on a new block",
+			name: "WaitForEvent does not wait for new block to be built in fortuna",
+			Fork: &fortunaFork,
 			testCase: func(t *testing.T, vm *VM) {
 				signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
 				blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
@@ -1641,13 +1645,15 @@ func TestWaitForEvent(t *testing.T) {
 				wg.Wait()
 			},
 		},
+		// TODO (ceyonur): remove this test after Granite is activated. (See https://github.com/ava-labs/coreth/issues/1318)
 		{
-			name: "WaitForEvent waits for a delay with a retry",
+			name: "WaitForEvent waits for a delay with a retry in fortuna",
+			Fork: &fortunaFork,
 			testCase: func(t *testing.T, vm *VM) {
 				lastBuildBlockTime := time.Now()
 				_, err := vm.BuildBlock(context.Background())
 				require.NoError(t, err)
-				// we haven't advanced the tip to include the previous built block, so this is a retry
+				// we haven't accepted the previous built block, so this should be a retry
 				signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
 				for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
 					require.NoError(t, err)
@@ -1660,7 +1666,7 @@ func TestWaitForEvent(t *testing.T) {
 					msg, err := vm.WaitForEvent(context.Background())
 					assert.NoError(t, err)
 					assert.Equal(t, commonEng.PendingTxs, msg)
-					assert.GreaterOrEqual(t, time.Since(lastBuildBlockTime), MinBlockBuildingRetryDelay)
+					assert.GreaterOrEqual(t, time.Since(lastBuildBlockTime), RetryDelay)
 				}()
 				wg.Wait()
 			},
@@ -1668,6 +1674,9 @@ func TestWaitForEvent(t *testing.T) {
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
 			fork := upgradetest.Latest
+			if testCase.Fork != nil {
+				fork = *testCase.Fork
+			}
 			vm := newDefaultTestVM()
 			vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
 				Fork: &fork,
@@ -1901,14 +1910,9 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 			data := crypto.Keccak256([]byte("delegateSendHello()"))[:4]
 			nonce := vm.txPool.Nonce(vmtest.TestEthAddrs[0])
 			signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), nonce, &contractAddr, big.NewInt(0), 100000, tt.txGasPrice, data)
-			for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
-				require.NoError(t, err)
-			}
 
-			blk, err := vm.BuildBlock(ctx)
+			blk, err := vmtest.IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
 			require.NoError(t, err)
-			require.NoError(t, blk.Verify(ctx))
-			require.NoError(t, vm.SetPreference(ctx, blk.ID()))
 			require.NoError(t, blk.Accept(ctx))
 
 			ethBlock := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
