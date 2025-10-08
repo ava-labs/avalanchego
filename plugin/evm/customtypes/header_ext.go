@@ -38,6 +38,7 @@ func WithHeaderExtra(h *ethtypes.Header, extra *HeaderExtra) *ethtypes.Header {
 type HeaderExtra struct {
 	BlockGasCost     *big.Int
 	TimeMilliseconds *uint64
+	MinDelayExcess   *uint64
 }
 
 // EncodeRLP RLP encodes the given [ethtypes.Header] and [HeaderExtra] together
@@ -96,8 +97,12 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		cp.BlockGasCost = new(big.Int).Set(h.BlockGasCost)
 	}
 	if h.TimeMilliseconds != nil {
-		cpMs := *h.TimeMilliseconds
-		cp.TimeMilliseconds = &cpMs
+		m := *h.TimeMilliseconds
+		cp.TimeMilliseconds = &m
+	}
+	if h.MinDelayExcess != nil {
+		e := *h.MinDelayExcess
+		cp.MinDelayExcess = &e
 	}
 	SetHeaderExtra(dst, cp)
 }
@@ -149,11 +154,13 @@ func (h *HeaderSerializable) updateToEth(eth *ethtypes.Header) {
 func (h *HeaderSerializable) updateFromExtras(extras *HeaderExtra) {
 	h.BlockGasCost = extras.BlockGasCost
 	h.TimeMilliseconds = extras.TimeMilliseconds
+	h.MinDelayExcess = extras.MinDelayExcess
 }
 
 func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 	extras.BlockGasCost = h.BlockGasCost
 	extras.TimeMilliseconds = h.TimeMilliseconds
+	extras.MinDelayExcess = h.MinDelayExcess
 }
 
 // NOTE: both generators currently do not support type aliases.
@@ -202,6 +209,9 @@ type HeaderSerializable struct {
 
 	// TimeMilliseconds was added by Granite and is ignored in legacy headers.
 	TimeMilliseconds *uint64 `json:"timestampMilliseconds" rlp:"optional"`
+
+	// MinDelayExcess was added by Granite and is ignored in legacy headers.
+	MinDelayExcess *uint64 `json:"minDelayExcess" rlp:"optional"`
 }
 
 // field type overrides for gencodec
@@ -218,6 +228,7 @@ type headerMarshaling struct {
 	BlobGasUsed      *hexutil.Uint64
 	ExcessBlobGas    *hexutil.Uint64
 	TimeMilliseconds *hexutil.Uint64
+	MinDelayExcess   *hexutil.Uint64
 }
 
 // Hash returns the block hash of the header, which is simply the keccak256 hash of its

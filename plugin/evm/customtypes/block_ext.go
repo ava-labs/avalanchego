@@ -18,10 +18,19 @@ func BlockGasCost(b *ethtypes.Block) *big.Int {
 }
 
 func BlockTimeMilliseconds(b *ethtypes.Block) *uint64 {
-	var time *uint64
-	if t := GetHeaderExtra(b.Header()).TimeMilliseconds; t != nil {
-		time = new(uint64)
-		*time = *t
+	time := GetHeaderExtra(b.Header()).TimeMilliseconds
+	if time == nil {
+		return nil
 	}
-	return time
+	cp := *time
+	return &cp
+}
+
+func BlockMinDelayExcess(b *ethtypes.Block) *uint64 {
+	e := GetHeaderExtra(b.Header()).MinDelayExcess
+	if e == nil {
+		return nil
+	}
+	cp := *e
+	return &cp
 }
