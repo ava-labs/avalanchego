@@ -136,7 +136,7 @@ func extractMetricValues(metrics []*dto.MetricFamily, metricName string) map[str
 				case "calls":
 					result[method] = *m.Counter.Value
 				case "duration":
-					result[method] = *m.Gauge.Value
+					result[method] = *m.Histogram.SampleSum
 				case "size":
 					result[method] = *m.Counter.Value
 				}
