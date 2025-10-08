@@ -4,7 +4,6 @@ package vmtest
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"testing"
 
@@ -21,7 +20,6 @@ import (
 
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/params/paramstest"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap3"
 
@@ -126,12 +124,4 @@ func SetupGenesis(
 	prefixedDB := prefixdb.New([]byte{1}, baseDB)
 	genesisJSON := GenesisJSON(paramstest.ForkToChainConfig[fork])
 	return ctx, prefixedDB, []byte(genesisJSON), atomicMemory
-}
-
-func ForkToRules(fork upgradetest.Fork) *extras.Rules {
-	chainConfig, ok := paramstest.ForkToChainConfig[fork]
-	if !ok {
-		panic(fmt.Sprintf("unknown fork: %s", fork))
-	}
-	return params.GetRulesExtra(chainConfig.Rules(common.Big0, params.IsMergeTODO, 0))
 }
