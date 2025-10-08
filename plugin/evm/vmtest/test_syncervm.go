@@ -224,8 +224,7 @@ func StateSyncToggleEnabledToDisabledTest(t *testing.T, testSetup *SyncTestSetup
 	testSyncVMSetup.serverVM.AppSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
 		if test.responseIntercept == nil {
 			go func() {
-				err := syncReEnabledVM.AppResponse(ctx, nodeID, requestID, response)
-				require.NoError(err, "AppResponse failed")
+				require.NoError(syncReEnabledVM.AppResponse(ctx, nodeID, requestID, response), "AppResponse failed")
 			}()
 		} else {
 			go test.responseIntercept(syncReEnabledVM, nodeID, requestID, response)

@@ -32,8 +32,8 @@ func main() {
 		fmt.Printf("failed to set fd limit correctly due to: %s\n", err)
 		os.Exit(1)
 	}
-	err = rpcchainvm.Serve(context.Background(), factory.NewPluginVM())
-	if err != nil {
+
+	if err := rpcchainvm.Serve(context.Background(), factory.NewPluginVM()); err != nil {
 		fmt.Printf("failed to serve rpc chain vm: %s\n", err)
 		os.Exit(1)
 	}
