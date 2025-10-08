@@ -85,7 +85,7 @@ func WritePruningDisabled(db ethdb.KeyValueStore) error {
 }
 
 // HasPruningDisabled returns true if there is a marker present indicating that
-// the node has run with pruning disabled at some pooint.
+// the node has run with pruning disabled at some point.
 func HasPruningDisabled(db ethdb.KeyValueStore) (bool, error) {
 	return db.Has(pruningDisabledKey)
 }
