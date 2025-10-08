@@ -5,6 +5,7 @@ package params
 
 import (
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
@@ -13,6 +14,11 @@ import (
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/utils"
 )
+
+func TestMain(m *testing.M) {
+	RegisterExtras()
+	os.Exit(m.Run())
+}
 
 func TestSetEthUpgrades(t *testing.T) {
 	genesisBlock := big.NewInt(0)

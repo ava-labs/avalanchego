@@ -33,6 +33,7 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"os"
 	"reflect"
 	"runtime"
 	"testing"
@@ -44,6 +45,7 @@ import (
 	"github.com/ava-labs/coreth/internal/ethapi"
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
+	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/rpc"
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
@@ -53,6 +55,12 @@ import (
 	"github.com/ava-labs/libevm/event"
 	"github.com/stretchr/testify/require"
 )
+
+func TestMain(m *testing.M) {
+	customtypes.Register()
+	params.RegisterExtras()
+	os.Exit(m.Run())
+}
 
 type testBackend struct {
 	db                ethdb.Database

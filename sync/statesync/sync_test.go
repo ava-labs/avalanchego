@@ -67,13 +67,15 @@ func testSync(t *testing.T, test syncTest) {
 	codeSyncer, err := NewCodeSyncer(mockClient, clientDB, fetcher.CodeHashes())
 	require.NoError(t, err, "failed to create code syncer")
 
-	cfg := Config{
-		BatchSize:   1000, // Use a lower batch size in order to get test coverage of batches being written early.
-		RequestSize: testRequestSize,
-	}
-
 	// Create the state syncer.
-	stateSyncer, err := NewSyncer(mockClient, clientDB, root, fetcher, cfg)
+	stateSyncer, err := NewSyncer(
+		mockClient,
+		clientDB,
+		root,
+		fetcher,
+		testRequestSize,
+		WithBatchSize(1000), // Use a lower batch size in order to get test coverage of batches being written early.
+	)
 	require.NoError(t, err, "failed to create state syncer")
 
 	// Run both syncers concurrently and wait for the first error.

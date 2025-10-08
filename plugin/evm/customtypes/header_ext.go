@@ -44,6 +44,17 @@ type HeaderExtra struct {
 	MinDelayExcess   *acp226.DelayExcess
 }
 
+// HeaderTimeMilliseconds returns the header timestamp in milliseconds.
+// If the header has the Granite field TimeMilliseconds set in extras, it is used.
+// Otherwise, it falls back to seconds-based Time multiplied by 1000.
+func HeaderTimeMilliseconds(h *ethtypes.Header) uint64 {
+	extra := GetHeaderExtra(h)
+	if extra != nil && extra.TimeMilliseconds != nil {
+		return *extra.TimeMilliseconds
+	}
+	return h.Time * 1000
+}
+
 // EncodeRLP RLP encodes the given [ethtypes.Header] and [HeaderExtra] together
 // to the `writer`. It does merge both structs into a single [HeaderSerializable].
 func (h *HeaderExtra) EncodeRLP(eth *ethtypes.Header, writer io.Writer) error {
@@ -178,8 +189,8 @@ func (h *HeaderSerializable) updateToExtras(extras *HeaderExtra) {
 // NOTE: both generators currently do not support type aliases.
 // We are using custom versions of these programs for now to support type aliases,
 // see https://github.com/ava-labs/coreth/pull/746#discussion_r1969673252
-//go:generate go run github.com/fjl/gencodec -type HeaderSerializable -field-override headerMarshaling -out gen_header_serializable_json.go
-//go:generate go run github.com/ava-labs/libevm/rlp/rlpgen -type HeaderSerializable -out gen_header_serializable_rlp.go
+//go:generate go tool -modfile=../../../tools/go.mod gencodec -type HeaderSerializable -field-override headerMarshaling -out gen_header_serializable_json.go
+//go:generate go tool rlpgen -type HeaderSerializable -out gen_header_serializable_rlp.go
 
 // HeaderSerializable defines the header of a block in the Ethereum blockchain,
 // as it is to be serialized into RLP and JSON. Note it must be exported so that

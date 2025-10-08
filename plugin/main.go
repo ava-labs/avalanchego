@@ -17,6 +17,8 @@ import (
 )
 
 func main() {
+	evm.RegisterAllLibEVMExtras()
+
 	version, err := PrintVersion()
 	if err != nil {
 		fmt.Printf("couldn't get config: %s\n", err)

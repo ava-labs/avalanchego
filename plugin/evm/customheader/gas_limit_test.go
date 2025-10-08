@@ -20,16 +20,16 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap1"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
+	"github.com/ava-labs/coreth/utils"
 )
 
 func TestGasLimit(t *testing.T) {
 	tests := []struct {
-		name      string
-		upgrades  extras.NetworkUpgrades
-		parent    *types.Header
-		timestamp uint64
-		want      uint64
-		wantErr   error
+		name     string
+		upgrades extras.NetworkUpgrades
+		parent   *types.Header
+		want     uint64
+		wantErr  error
 	}{
 		{
 			name:     "fortuna_invalid_parent_header",
@@ -73,7 +73,7 @@ func TestGasLimit(t *testing.T) {
 			config := &extras.ChainConfig{
 				NetworkUpgrades: test.upgrades,
 			}
-			got, err := GasLimit(config, test.parent, test.timestamp)
+			got, err := GasLimit(config, test.parent, 0)
 			require.ErrorIs(err, test.wantErr)
 			require.Equal(test.want, got)
 		})
@@ -88,6 +88,22 @@ func TestVerifyGasUsed(t *testing.T) {
 		header   *types.Header
 		want     error
 	}{
+		{
+			name:     "granite_uses_milliseconds",
+			upgrades: extras.TestGraniteChainConfig.NetworkUpgrades,
+			parent: customtypes.WithHeaderExtra(&types.Header{
+				Number: big.NewInt(0),
+			}, &customtypes.HeaderExtra{
+				TimeMilliseconds: utils.NewUint64(0),
+			}),
+			header: customtypes.WithHeaderExtra(&types.Header{
+				Time:    1,
+				GasUsed: acp176.MinMaxPerSecond + 500,
+			}, &customtypes.HeaderExtra{
+				TimeMilliseconds: utils.NewUint64(1500),
+			}),
+			want: nil,
+		},
 		{
 			name:     "fortuna_massive_extra_gas_used",
 			upgrades: extras.TestFortunaChainConfig.NetworkUpgrades,
@@ -184,6 +200,35 @@ func TestVerifyGasLimit(t *testing.T) {
 		header   *types.Header
 		want     error
 	}{
+		{
+			name:     "granite_invalid",
+			upgrades: extras.TestGraniteChainConfig.NetworkUpgrades,
+			parent: customtypes.WithHeaderExtra(&types.Header{
+				Number: big.NewInt(0),
+			}, &customtypes.HeaderExtra{
+				TimeMilliseconds: utils.NewUint64(0),
+			}),
+			header: customtypes.WithHeaderExtra(&types.Header{
+				GasLimit: acp176.MinMaxPerSecond - 1,
+			}, &customtypes.HeaderExtra{
+				TimeMilliseconds: utils.NewUint64(0),
+			}),
+			want: errInvalidGasLimit,
+		},
+		{
+			name:     "granite_valid",
+			upgrades: extras.TestGraniteChainConfig.NetworkUpgrades,
+			parent: customtypes.WithHeaderExtra(&types.Header{
+				Number: big.NewInt(0),
+			}, &customtypes.HeaderExtra{
+				TimeMilliseconds: utils.NewUint64(0),
+			}),
+			header: customtypes.WithHeaderExtra(&types.Header{
+				GasLimit: acp176.MinMaxCapacity,
+			}, &customtypes.HeaderExtra{
+				TimeMilliseconds: utils.NewUint64(0),
+			}),
+		},
 		{
 			name:     "fortuna_invalid_header",
 			upgrades: extras.TestFortunaChainConfig.NetworkUpgrades,
@@ -327,8 +372,39 @@ func TestGasCapacity(t *testing.T) {
 			parent: &types.Header{
 				Number: big.NewInt(0),
 			},
-			timestamp: 1,
+			timestamp: 1000,
 			want:      acp176.MinMaxPerSecond,
+		},
+		{
+			name:     "fortuna_after_1.5s",
+			upgrades: extras.TestFortunaChainConfig.NetworkUpgrades,
+			parent: &types.Header{
+				Number: big.NewInt(0),
+			},
+			timestamp: 1500,
+			want:      acp176.MinMaxPerSecond, // unchanged, since this should be rounded down
+		},
+		{
+			name:     "granite_after_1s",
+			upgrades: extras.TestGraniteChainConfig.NetworkUpgrades,
+			parent: customtypes.WithHeaderExtra(&types.Header{
+				Number: big.NewInt(0),
+			}, &customtypes.HeaderExtra{
+				TimeMilliseconds: utils.NewUint64(0),
+			}),
+			timestamp: 1000,
+			want:      acp176.MinMaxPerSecond,
+		},
+		{
+			name:     "granite_after_1.5s",
+			upgrades: extras.TestGraniteChainConfig.NetworkUpgrades,
+			parent: customtypes.WithHeaderExtra(&types.Header{
+				Number: big.NewInt(0),
+			}, &customtypes.HeaderExtra{
+				TimeMilliseconds: utils.NewUint64(0),
+			}),
+			timestamp: 1500,
+			want:      acp176.MinMaxPerSecond * 3 / 2,
 		},
 	}
 	for _, test := range tests {
@@ -381,7 +457,7 @@ func TestRemainingAtomicGasCapacity(t *testing.T) {
 			wantErr: gas.ErrInsufficientCapacity,
 		},
 		{
-			name:     "f",
+			name:     "fortuna_valid",
 			upgrades: extras.TestFortunaChainConfig.NetworkUpgrades,
 			parent: &types.Header{
 				Number: big.NewInt(0),
@@ -391,6 +467,22 @@ func TestRemainingAtomicGasCapacity(t *testing.T) {
 				GasUsed: 1,
 			},
 			want: acp176.MinMaxPerSecond - 1,
+		},
+		{
+			name:     "granite_valid",
+			upgrades: extras.TestGraniteChainConfig.NetworkUpgrades,
+			parent: customtypes.WithHeaderExtra(&types.Header{
+				Number: big.NewInt(0),
+			}, &customtypes.HeaderExtra{
+				TimeMilliseconds: utils.NewUint64(0),
+			}),
+			header: customtypes.WithHeaderExtra(&types.Header{
+				Time:    1,
+				GasUsed: 1,
+			}, &customtypes.HeaderExtra{
+				TimeMilliseconds: utils.NewUint64(1500),
+			}),
+			want: acp176.MinMaxPerSecond*3/2 - 1,
 		},
 	}
 	for _, test := range tests {

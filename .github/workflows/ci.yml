@@ -33,6 +33,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: "go.mod"
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+            tools/legacy-golangci-lint.sum
       - name: change avalanchego dep
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
@@ -67,6 +71,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: "go.mod"
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
       - name: change avalanchego dep
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
@@ -96,11 +103,8 @@ jobs:
           ref: ${{ github.event.inputs.avalanchegoBranch }}
           path: avalanchego
           token: ${{ secrets.AVALANCHE_PAT }}
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: "go.mod"
       - name: Run e2e tests
-        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@8b8ac94577fec62b1dbd6636e116452b8b4208a5
+        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@84e9aebcfbc04602865f4c0a3e8b46a27409a3f5
         with:
           run: ./scripts/run_task.sh test-e2e-ci
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -120,10 +124,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "go.mod"
       - name: check out ${{ github.event.inputs.avalanchegoRepo }} ${{ github.event.inputs.avalanchegoBranch }}
         if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: actions/checkout@v4
@@ -132,7 +132,7 @@ jobs:
           ref: ${{ github.event.inputs.avalanchegoBranch }}
           path: avalanchego
       - name: Run Warp E2E Tests
-        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@8b8ac94577fec62b1dbd6636e116452b8b4208a5
+        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@84e9aebcfbc04602865f4c0a3e8b46a27409a3f5
         with:
           run: ./scripts/run_task.sh test-e2e-warp-ci
           artifact_prefix: warp

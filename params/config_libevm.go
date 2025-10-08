@@ -15,16 +15,35 @@ import (
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
-// libevmInit would ideally be a regular init() function, but it MUST be run
-// before any calls to [params.ChainConfig.Rules]. See `config.go` for its call site.
-//
-//nolint:unparam // must return to be run
-func libevmInit() any {
-	payloads = ethparams.RegisterExtras(ethparams.Extras[*extras.ChainConfig, RulesExtra]{
+func extrasToRegister() ethparams.Extras[*extras.ChainConfig, RulesExtra] {
+	return ethparams.Extras[*extras.ChainConfig, RulesExtra]{
 		ReuseJSONRoot: true, // Reuse the root JSON input when unmarshalling the extra payload.
 		NewRules:      constructRulesExtra,
+	}
+}
+
+// RegisterExtras registers hooks and payloads with libevm. It MUST NOT be
+// called more than once and therefore is only allowed to be used in tests and
+// `package main`, to avoid polluting other packages that transitively depend on
+// this one but don't need registration.
+//
+// Without a call to RegisterExtras, much of the functionality of this package
+// will work, and most will simply panic.
+func RegisterExtras() {
+	payloads = ethparams.RegisterExtras(extrasToRegister())
+}
+
+// WithTempRegisteredExtras runs `fn` with temporary registration otherwise
+// equivalent to a call to [RegisterExtras], but limited to the life of `fn`. It
+// is not threadsafe.
+func WithTempRegisteredExtras(fn func()) {
+	old := payloads
+	defer func() { payloads = old }()
+
+	ethparams.WithTempRegisteredExtras(extrasToRegister(), func(extras ethparams.ExtraPayloads[*extras.ChainConfig, RulesExtra]) {
+		payloads = extras
+		fn()
 	})
-	return nil
 }
 
 var payloads ethparams.ExtraPayloads[*extras.ChainConfig, RulesExtra]
