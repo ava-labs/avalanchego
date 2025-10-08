@@ -5,6 +5,7 @@ package extstate
 
 import (
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -19,6 +20,11 @@ import (
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 )
+
+func TestMain(m *testing.M) {
+	customtypes.Register()
+	os.Exit(m.Run())
+}
 
 func TestMultiCoinOperations(t *testing.T) {
 	memdb := rawdb.NewMemoryDatabase()

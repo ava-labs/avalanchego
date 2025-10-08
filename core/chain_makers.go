@@ -375,13 +375,14 @@ func GenerateChainWithGenesis(genesis *Genesis, engine consensus.Engine, n int, 
 
 func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.StateDB, engine consensus.Engine) *types.Header {
 	time := parent.Time() + gap // block time is fixed at [gap] seconds
+	timeMS := customtypes.HeaderTimeMilliseconds(parent.Header()) + gap*1000
 
 	config := params.GetExtra(cm.config)
-	gasLimit, err := customheader.GasLimit(config, parent.Header(), time)
+	gasLimit, err := customheader.GasLimit(config, parent.Header(), timeMS)
 	if err != nil {
 		panic(err)
 	}
-	baseFee, err := customheader.BaseFee(config, parent.Header(), time)
+	baseFee, err := customheader.BaseFee(config, parent.Header(), timeMS)
 	if err != nil {
 		panic(err)
 	}
@@ -414,8 +415,7 @@ func (cm *chainMaker) makeHeader(parent *types.Block, gap uint64, state *state.S
 
 	if config.IsGranite(header.Time) {
 		headerExtra := customtypes.GetHeaderExtra(header)
-		timeMilliseconds := header.Time * 1000 // convert to milliseconds
-		headerExtra.TimeMilliseconds = &timeMilliseconds
+		headerExtra.TimeMilliseconds = &timeMS
 	}
 	return header
 }

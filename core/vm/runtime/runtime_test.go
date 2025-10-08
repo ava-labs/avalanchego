@@ -52,6 +52,11 @@ import (
 	"github.com/holiman/uint256"
 )
 
+func TestMain(m *testing.M) {
+	params.RegisterExtras()
+	os.Exit(m.Run())
+}
+
 func TestDefaults(t *testing.T) {
 	cfg := new(Config)
 	setDefaults(cfg)

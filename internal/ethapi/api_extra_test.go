@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -18,10 +19,18 @@ import (
 	"github.com/ava-labs/coreth/consensus/dummy"
 	"github.com/ava-labs/coreth/core"
 	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/rpc"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
+
+func TestMain(m *testing.M) {
+	core.RegisterExtras()
+	customtypes.Register()
+	params.RegisterExtras()
+	os.Exit(m.Run())
+}
 
 func TestBlockchainAPI_GetChainConfig(t *testing.T) {
 	t.Parallel()

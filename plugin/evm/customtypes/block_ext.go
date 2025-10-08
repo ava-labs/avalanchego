@@ -6,6 +6,7 @@ package customtypes
 import (
 	"math/big"
 	"slices"
+	"time"
 
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
@@ -153,6 +154,13 @@ func CalcExtDataHash(extdata []byte) common.Hash {
 		return EmptyExtDataHash
 	}
 	return ethtypes.RLPHash(extdata)
+}
+
+func BlockTime(eth *ethtypes.Header) time.Time {
+	if t := GetHeaderExtra(eth).TimeMilliseconds; t != nil {
+		return time.UnixMilli(int64(*t))
+	}
+	return time.Unix(int64(eth.Time), 0)
 }
 
 func NewBlockWithExtData(
