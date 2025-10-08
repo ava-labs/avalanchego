@@ -8,11 +8,8 @@ import (
 	"testing"
 )
 
-func init() {
-	rand.Seed(1337) // for determinism
-}
-
 func BenchmarkBagListSmall(b *testing.B) {
+	rand := rand.New(rand.NewSource(1337)) //#nosec G404
 	smallLen := 5
 	bag := Bag[int]{}
 	for i := 0; i < smallLen; i++ {
@@ -25,6 +22,7 @@ func BenchmarkBagListSmall(b *testing.B) {
 }
 
 func BenchmarkBagListMedium(b *testing.B) {
+	rand := rand.New(rand.NewSource(1337)) //#nosec G404
 	mediumLen := 25
 	bag := Bag[int]{}
 	for i := 0; i < mediumLen; i++ {
@@ -38,6 +36,7 @@ func BenchmarkBagListMedium(b *testing.B) {
 }
 
 func BenchmarkBagListLarge(b *testing.B) {
+	rand := rand.New(rand.NewSource(1337)) //#nosec G404
 	largeLen := 100000
 	bag := Bag[int]{}
 	for i := 0; i < largeLen; i++ {

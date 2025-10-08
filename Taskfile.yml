@@ -84,6 +84,17 @@ tasks:
     cmds:
       - cmd: go mod tidy
       - task: check-clean-branch
+      - cmd: go mod tidy
+        dir: tools
+      - task: check-clean-branch
+
+  create-kind-cluster:
+    desc: Creates the default kind cluster
+    cmd: bash -x ./scripts/start_kind_cluster.sh {{.CLI_ARGS}}
+
+  delete-kind-cluster:
+    desc: Deletes the default kind cluster
+    cmd: kind delete cluster
 
   export-cchain-block-range:
     desc: Export range of C-Chain blocks from source to target directory.
@@ -98,10 +109,10 @@ tasks:
   export-dir-to-s3:
     desc: Copies a directory to s3
     vars:
-      LOCAL_SRC: '{{.LOCAL_SRC}}'
-      S3_DST: '{{.S3_DST}}'
+      SRC: '{{.SRC}}'
+      DST: '{{.DST}}'
     cmds:
-      - cmd: bash -x ./scripts/copy_dir.sh {{.LOCAL_SRC}} {{.S3_DST}}
+      - cmd: bash -x ./scripts/copy_dir.sh {{.SRC}} {{.DST}}
 
   generate-mocks:
     desc: Generates testing mocks
@@ -186,15 +197,17 @@ tasks:
     vars:
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
       BLOCK_DIR: '{{.BLOCK_DIR}}'
+      RUNNER_NAME: '{{.RUNNER_NAME | default "dev"}}'
       CONFIG: '{{.CONFIG | default ""}}'
       START_BLOCK: '{{.START_BLOCK}}'
       END_BLOCK: '{{.END_BLOCK}}'
       LABELS: '{{.LABELS | default ""}}'
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
-      METRICS_ENABLED: '{{.METRICS_ENABLED | default "true"}}'
+      METRICS_ENABLED: '{{.METRICS_ENABLED | default "false"}}'
     cmd: |
       CURRENT_STATE_DIR={{.CURRENT_STATE_DIR}} \
       BLOCK_DIR={{.BLOCK_DIR}} \
+      RUNNER_NAME='{{.RUNNER_NAME | default "dev"}}' \
       CONFIG={{.CONFIG}} \
       START_BLOCK={{.START_BLOCK}} \
       END_BLOCK={{.END_BLOCK}} \
@@ -209,11 +222,13 @@ tasks:
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
       BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**"}}'
       CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"}}'
+      RUNNER_NAME: '{{.RUNNER_NAME | default "dev"}}'
+      CONFIG: '{{.CONFIG | default ""}}'
       START_BLOCK: '{{.START_BLOCK | default "101"}}'
       END_BLOCK: '{{.END_BLOCK | default "250000"}}'
       LABELS: '{{.LABELS | default ""}}'
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
-      METRICS_ENABLED: '{{.METRICS_ENABLED | default "true"}}'
+      METRICS_ENABLED: '{{.METRICS_ENABLED | default "false"}}'
     cmds:
       - task: import-cchain-reexecute-range
         vars:
@@ -224,6 +239,7 @@ tasks:
         vars:
           BLOCK_DIR: '{{.EXECUTION_DATA_DIR}}/blocks'
           CURRENT_STATE_DIR: '{{.EXECUTION_DATA_DIR}}/current-state'
+          RUNNER_NAME: '{{.RUNNER_NAME}}'
           CONFIG: '{{.CONFIG}}'
           START_BLOCK: '{{.START_BLOCK}}'
           END_BLOCK: '{{.END_BLOCK}}'
@@ -351,6 +367,13 @@ tasks:
   test-unit:
     desc: Runs unit tests
     # Invoking with bash ensures compatibility with CI execution on Windows
+    cmd: bash ./scripts/build_test.sh
+
+  test-unit-fast:
+    desc: Runs unit tests
+    env:
+      NO_SHUFFLE: TRUE # Allows caching
+      NO_RACE: TRUE    # Tests are much faster without race detection
     cmd: bash ./scripts/build_test.sh
 
   test-upgrade:

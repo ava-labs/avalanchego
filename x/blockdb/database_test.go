@@ -18,8 +18,24 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
+	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/heightindexdb/dbtest"
+	"github.com/ava-labs/avalanchego/utils/compression"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
+
+func TestInterface(t *testing.T) {
+	for _, test := range dbtest.Tests {
+		t.Run(test.Name, func(t *testing.T) {
+			test.Test(t, func() database.HeightIndex {
+				tempDir := t.TempDir()
+				db, err := New(DefaultConfig().WithDir(tempDir), logging.NoLog{})
+				require.NoError(t, err)
+				return db
+			})
+		})
+	}
+}
 
 func TestNew_Params(t *testing.T) {
 	tempDir := t.TempDir()
@@ -192,8 +208,8 @@ func TestNew_IndexFileConfigPrecedence(t *testing.T) {
 
 	// Write a block at height 100 and close db
 	testBlock := []byte("test block data")
-	require.NoError(t, db.WriteBlock(100, testBlock, 0))
-	readBlock, err := db.ReadBlock(100)
+	require.NoError(t, db.Put(100, testBlock))
+	readBlock, err := db.Get(100)
 	require.NoError(t, err)
 	require.Equal(t, testBlock, readBlock)
 	require.NoError(t, db.Close())
@@ -207,20 +223,20 @@ func TestNew_IndexFileConfigPrecedence(t *testing.T) {
 
 	// The database should still accept blocks between 100 and 200
 	testBlock2 := []byte("test block data 2")
-	require.NoError(t, db2.WriteBlock(150, testBlock2, 0))
-	readBlock2, err := db2.ReadBlock(150)
+	require.NoError(t, db2.Put(150, testBlock2))
+	readBlock2, err := db2.Get(150)
 	require.NoError(t, err)
 	require.Equal(t, testBlock2, readBlock2)
 
 	// Verify that writing below initial minimum height fails
-	err = db2.WriteBlock(50, []byte("invalid block"), 0)
+	err = db2.Put(50, []byte("invalid block"))
 	require.ErrorIs(t, err, ErrInvalidBlockHeight)
 
 	// Write a large block that would exceed the new config's 512KB limit
 	// but should succeed because we use the original 1MB limit from index file
 	largeBlock := make([]byte, 768*1024) // 768KB block
-	require.NoError(t, db2.WriteBlock(200, largeBlock, 0))
-	readLargeBlock, err := db2.ReadBlock(200)
+	require.NoError(t, db2.Put(200, largeBlock))
+	readLargeBlock, err := db2.Get(200)
 	require.NoError(t, err)
 	require.Equal(t, largeBlock, readLargeBlock)
 }
@@ -241,7 +257,7 @@ func TestFileCache_Eviction(t *testing.T) {
 		// small max data file size to force multiple data files.
 		// When trying to write or read a block, all other file handlers will be evicted.
 		{
-			name:   "retry opening data file if its evicted",
+			name:   "retry opening data file if it's evicted",
 			config: DefaultConfig().WithMaxDataFiles(1),
 		},
 	}
@@ -249,6 +265,7 @@ func TestFileCache_Eviction(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			store, cleanup := newTestDatabase(t, tt.config.WithMaxDataFileSize(1024*1.5))
+			store.compressor = compression.NewNoCompressor()
 			defer cleanup()
 
 			// Override the file cache with specified size
@@ -286,7 +303,7 @@ func TestFileCache_Eviction(t *testing.T) {
 					defer wg.Done()
 					for i := range numBlocks {
 						height := uint64((i + goroutineID) % numBlocks)
-						err := store.WriteBlock(height, blocks[height], 0)
+						err := store.Put(height, blocks[height])
 						if err != nil {
 							writeErrors.Add(1)
 							errorMu.Lock()
@@ -315,7 +332,7 @@ func TestFileCache_Eviction(t *testing.T) {
 
 			// Verify again that all blocks are readable
 			for i := range numBlocks {
-				block, err := store.ReadBlock(uint64(i))
+				block, err := store.Get(uint64(i))
 				require.NoError(t, err, "failed to read block at height %d", i)
 				require.Equal(t, blocks[i], block, "block data mismatch at height %d", i)
 			}
@@ -339,12 +356,12 @@ func TestMaxDataFiles_CacheLimit(t *testing.T) {
 	// Write blocks to force multiple data files
 	for i := range numBlocks {
 		block := fixedSizeBlock(t, 512, uint64(i))
-		require.NoError(t, store.WriteBlock(uint64(i), block, 0))
+		require.NoError(t, store.Put(uint64(i), block))
 	}
 
 	// Verify all blocks are still readable despite evictions
 	for i := range numBlocks {
-		block, err := store.ReadBlock(uint64(i))
+		block, err := store.Get(uint64(i))
 		require.NoError(t, err, "failed to read block at height %d after eviction", i)
 		require.Len(t, block, 512, "block size mismatch at height %d", i)
 	}
@@ -376,10 +393,10 @@ func TestStructSizes(t *testing.T) {
 			name:                "blockEntryHeader",
 			memorySize:          unsafe.Sizeof(blockEntryHeader{}),
 			binarySize:          binary.Size(blockEntryHeader{}),
-			expectedMemorySize:  32, // 6 bytes padding due to version field being 2 bytes
-			expectedBinarySize:  26,
-			expectedMarshalSize: 26,
-			expectedPadding:     6,
+			expectedMemorySize:  32,
+			expectedBinarySize:  22,
+			expectedMarshalSize: 22,
+			expectedPadding:     10,
 			createInstance:      func() interface{} { return blockEntryHeader{} },
 		},
 		{
@@ -390,9 +407,7 @@ func TestStructSizes(t *testing.T) {
 			expectedBinarySize:  16,
 			expectedMarshalSize: 16,
 			expectedPadding:     0,
-			createInstance: func() interface{} {
-				return indexEntry{}
-			},
+			createInstance:      func() interface{} { return indexEntry{} },
 		},
 	}
 

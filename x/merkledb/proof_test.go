@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 
 	pb "github.com/ava-labs/avalanchego/proto/pb/sync"
+	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
 
 func Test_Proof_Empty(t *testing.T) {
@@ -246,6 +247,7 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 		db.rootID,
 		db.tokenSize,
 		db.hasher,
+		len(proof.KeyChanges),
 	))
 
 	proof.KeyChanges = append(proof.KeyChanges, KeyChange{Key: []byte{5}, Value: maybe.Some([]byte{5})})
@@ -257,6 +259,7 @@ func Test_RangeProof_Extra_Value(t *testing.T) {
 		db.rootID,
 		db.tokenSize,
 		db.hasher,
+		len(proof.KeyChanges),
 	)
 	require.ErrorIs(err, ErrExclusionProofInvalidNode)
 }
@@ -327,7 +330,7 @@ func Test_RangeProof_Verify_Bad_Data(t *testing.T) {
 
 			tt.malform(proof)
 
-			err = proof.Verify(context.Background(), maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), db.getMerkleRoot(), db.tokenSize, db.hasher)
+			err = proof.Verify(context.Background(), maybe.Some([]byte{2}), maybe.Some([]byte{3, 0}), db.getMerkleRoot(), db.tokenSize, db.hasher, len(proof.KeyChanges))
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
@@ -580,7 +583,7 @@ func Test_RangeProof_Syntactic_Verify(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.proof.Verify(context.Background(), tt.start, tt.end, ids.Empty, 4, DefaultHasher)
+			err := tt.proof.Verify(context.Background(), tt.start, tt.end, ids.Empty, 4, DefaultHasher, len(tt.proof.KeyChanges))
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -607,6 +610,7 @@ func Test_RangeProof(t *testing.T) {
 		db.rootID,
 		db.tokenSize,
 		db.hasher,
+		len(proof.KeyChanges),
 	))
 
 	proof, err = db.GetRangeProof(context.Background(), maybe.Some([]byte{1}), maybe.Some([]byte{3, 5}), 10)
@@ -637,6 +641,7 @@ func Test_RangeProof(t *testing.T) {
 		db.rootID,
 		db.tokenSize,
 		db.hasher,
+		len(proof.KeyChanges),
 	))
 }
 
@@ -692,6 +697,7 @@ func Test_RangeProof_NilStart(t *testing.T) {
 		db.rootID,
 		db.tokenSize,
 		db.hasher,
+		len(proof.KeyChanges),
 	))
 }
 
@@ -733,6 +739,7 @@ func Test_RangeProof_NilEnd(t *testing.T) {
 		db.rootID,
 		db.tokenSize,
 		db.hasher,
+		len(proof.KeyChanges),
 	))
 }
 
@@ -777,6 +784,7 @@ func Test_RangeProof_EmptyValues(t *testing.T) {
 		db.rootID,
 		db.tokenSize,
 		db.hasher,
+		len(proof.KeyChanges),
 	))
 }
 
@@ -813,8 +821,8 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 		maybe.Nothing[[]byte](),
 		50,
 	)
-	require.ErrorIs(err, ErrNoEndRoot)
-	require.ErrorIs(err, ErrInsufficientHistory)
+	require.ErrorIs(err, xsync.ErrNoEndRoot)
+	require.ErrorIs(err, xsync.ErrInsufficientHistory)
 
 	_, err = db.GetChangeProof(
 		context.Background(),
@@ -824,8 +832,8 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 		maybe.Nothing[[]byte](),
 		50,
 	)
-	require.NotErrorIs(err, ErrNoEndRoot)
-	require.ErrorIs(err, ErrInsufficientHistory)
+	require.NotErrorIs(err, xsync.ErrNoEndRoot)
+	require.ErrorIs(err, xsync.ErrInsufficientHistory)
 
 	_, err = db.GetChangeProof(
 		context.Background(),
@@ -913,22 +921,24 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Some([]byte("key21")), maybe.Some([]byte("key30")), db.getMerkleRoot()))
+	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Some([]byte("key21")), maybe.Some([]byte("key30")), db.getMerkleRoot(), len(proof.KeyChanges)))
 
 	// low maxLength
 	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 5)
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), db.getMerkleRoot()))
+	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), db.getMerkleRoot(), len(proof.KeyChanges)))
 
 	// nil start/end
 	proof, err = db.GetChangeProof(context.Background(), startRoot, endRoot, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), 50)
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), endRoot))
-	require.NoError(dbClone.CommitChangeProof(context.Background(), proof))
+	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Nothing[[]byte](), maybe.Nothing[[]byte](), endRoot, len(proof.KeyChanges)))
+	nextKey, err := dbClone.CommitChangeProof(context.Background(), maybe.Nothing[[]byte](), proof)
+	require.NoError(err)
+	require.True(nextKey.IsNothing())
 
 	newRoot, err := dbClone.GetMerkleRoot(context.Background())
 	require.NoError(err)
@@ -938,7 +948,7 @@ func Test_ChangeProof_Verify(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(proof)
 
-	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Some([]byte("key20")), maybe.Some([]byte("key30")), db.getMerkleRoot()))
+	require.NoError(dbClone.VerifyChangeProof(context.Background(), proof, maybe.Some([]byte("key20")), maybe.Some([]byte("key30")), db.getMerkleRoot(), len(proof.KeyChanges)))
 }
 
 func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
@@ -1015,6 +1025,7 @@ func Test_ChangeProof_Verify_Bad_Data(t *testing.T) {
 				maybe.Some([]byte{2}),
 				maybe.Some([]byte{3, 0}),
 				db.getMerkleRoot(),
+				len(proof.KeyChanges),
 			)
 			require.ErrorIs(err, tt.expectedErr)
 		})
@@ -1185,7 +1196,7 @@ func Test_ChangeProof_Syntactic_Verify(t *testing.T) {
 
 			db, err := getBasicDB()
 			require.NoError(err)
-			err = db.VerifyChangeProof(context.Background(), tt.proof, tt.start, tt.end, ids.Empty)
+			err = db.VerifyChangeProof(context.Background(), tt.proof, tt.start, tt.end, ids.Empty, 10)
 			require.ErrorIs(err, tt.expectedErr)
 		})
 	}
@@ -1479,39 +1490,20 @@ func TestVerifyProofPath(t *testing.T) {
 	}
 }
 
-func TestProofNodeUnmarshalProtoInvalidMaybe(t *testing.T) {
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
-
-	node := newRandomProofNode(rand)
-	protoNode := node.ToProto()
-
-	// It's invalid to have a value and be nothing.
-	protoNode.ValueOrHash = &pb.MaybeBytes{
-		Value:     []byte{1, 2, 3},
-		IsNothing: true,
-	}
-
-	var unmarshaledNode ProofNode
-	err := unmarshaledNode.UnmarshalProto(protoNode)
-	require.ErrorIs(t, err, ErrInvalidMaybe)
-}
-
 func TestProofNodeUnmarshalProtoInvalidChildBytes(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
 	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	node := newRandomProofNode(rand)
-	protoNode := node.ToProto()
+	protoNode := node.toProto()
 
 	protoNode.Children = map[uint32][]byte{
 		1: []byte("not 32 bytes"),
 	}
 
 	var unmarshaledNode ProofNode
-	err := unmarshaledNode.UnmarshalProto(protoNode)
+	err := unmarshaledNode.unmarshalProto(protoNode)
 	require.ErrorIs(t, err, hashing.ErrInvalidHashLen)
 }
 
@@ -1521,13 +1513,13 @@ func TestProofNodeUnmarshalProtoInvalidChildIndex(t *testing.T) {
 	rand := rand.New(rand.NewSource(now)) // #nosec G404
 
 	node := newRandomProofNode(rand)
-	protoNode := node.ToProto()
+	protoNode := node.toProto()
 
 	childID := ids.GenerateTestID()
 	protoNode.Children[256] = childID[:]
 
 	var unmarshaledNode ProofNode
-	err := unmarshaledNode.UnmarshalProto(protoNode)
+	err := unmarshaledNode.unmarshalProto(protoNode)
 	require.ErrorIs(t, err, errChildIndexTooLarge)
 }
 
@@ -1548,34 +1540,24 @@ func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
 			nodeFunc: func() *pb.ProofNode {
 				return nil
 			},
-			expectedErr: ErrNilProofNode,
-		},
-		{
-			name: "nil ValueOrHash",
-			nodeFunc: func() *pb.ProofNode {
-				node := newRandomProofNode(rand)
-				protoNode := node.ToProto()
-				protoNode.ValueOrHash = nil
-				return protoNode
-			},
-			expectedErr: ErrNilValueOrHash,
+			expectedErr: errNilProofNode,
 		},
 		{
 			name: "nil key",
 			nodeFunc: func() *pb.ProofNode {
 				node := newRandomProofNode(rand)
-				protoNode := node.ToProto()
+				protoNode := node.toProto()
 				protoNode.Key = nil
 				return protoNode
 			},
-			expectedErr: ErrNilKey,
+			expectedErr: errNilKey,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var node ProofNode
-			err := node.UnmarshalProto(tt.nodeFunc())
+			err := node.unmarshalProto(tt.nodeFunc())
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -1592,13 +1574,13 @@ func FuzzProofNodeProtoMarshalUnmarshal(f *testing.F) {
 
 		// Marshal and unmarshal it.
 		// Assert the unmarshaled one is the same as the original.
-		protoNode := node.ToProto()
+		protoNode := node.toProto()
 		var unmarshaledNode ProofNode
-		require.NoError(unmarshaledNode.UnmarshalProto(protoNode))
+		require.NoError(unmarshaledNode.unmarshalProto(protoNode))
 		require.Equal(node, unmarshaledNode)
 
 		// Marshaling again should yield same result.
-		protoUnmarshaledNode := unmarshaledNode.ToProto()
+		protoUnmarshaledNode := unmarshaledNode.toProto()
 		require.Equal(protoNode, protoUnmarshaledNode)
 	})
 }
@@ -1624,24 +1606,10 @@ func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
 			endProof[i] = newRandomProofNode(rand)
 		}
 
-		numKeyValues := rand.Intn(128)
-		keyValues := make([]KeyChange, numKeyValues)
-		for i := 0; i < numKeyValues; i++ {
-			keyLen := rand.Intn(32)
-			key := make([]byte, keyLen)
-			_, _ = rand.Read(key)
+		// Generate at least 1 key value, all maybe.Some
+		keyValues := generateKeyChanges(rand, rand.Intn(128), false)
 
-			valueLen := rand.Intn(32)
-			value := make([]byte, valueLen)
-			_, _ = rand.Read(value)
-
-			keyValues[i] = KeyChange{
-				Key:   key,
-				Value: maybe.Some(value),
-			}
-		}
-
-		proof := RangeProof{
+		proof := &RangeProof{
 			StartProof: startProof,
 			EndProof:   endProof,
 			KeyChanges: keyValues,
@@ -1649,14 +1617,11 @@ func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
 
 		// Marshal and unmarshal it.
 		// Assert the unmarshaled one is the same as the original.
-		var unmarshaledProof RangeProof
-		protoProof := proof.ToProto()
-		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
+		originalBytes, err := rangeProofMarshaler.Marshal(proof)
+		require.NoError(err)
+		unmarshaledProof, err := rangeProofMarshaler.Unmarshal(originalBytes)
+		require.NoError(err)
 		require.Equal(proof, unmarshaledProof)
-
-		// Marshaling again should yield same result.
-		protoUnmarshaledProof := unmarshaledProof.ToProto()
-		require.Equal(protoProof, protoUnmarshaledProof)
 	})
 }
 
@@ -1681,29 +1646,10 @@ func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
 			endProof[i] = newRandomProofNode(rand)
 		}
 
-		numKeyChanges := rand.Intn(128)
-		keyChanges := make([]KeyChange, numKeyChanges)
-		for i := 0; i < numKeyChanges; i++ {
-			keyLen := rand.Intn(32)
-			key := make([]byte, keyLen)
-			_, _ = rand.Read(key)
+		// Include any number of key changes, including deletions
+		keyChanges := generateKeyChanges(rand, rand.Intn(128), true)
 
-			value := maybe.Nothing[[]byte]()
-			hasValue := rand.Intn(2) == 0
-			if hasValue {
-				valueLen := rand.Intn(32)
-				valueBytes := make([]byte, valueLen)
-				_, _ = rand.Read(valueBytes)
-				value = maybe.Some(valueBytes)
-			}
-
-			keyChanges[i] = KeyChange{
-				Key:   key,
-				Value: value,
-			}
-		}
-
-		proof := ChangeProof{
+		proof := &ChangeProof{
 			StartProof: startProof,
 			EndProof:   endProof,
 			KeyChanges: keyChanges,
@@ -1711,54 +1657,35 @@ func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
 
 		// Marshal and unmarshal it.
 		// Assert the unmarshaled one is the same as the original.
-		var unmarshaledProof ChangeProof
-		protoProof := proof.ToProto()
-		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
+		originalBytes, err := changeProofMarshaler.Marshal(proof)
+		require.NoError(err)
+		unmarshaledProof, err := changeProofMarshaler.Unmarshal(originalBytes)
+		require.NoError(err)
 		require.Equal(proof, unmarshaledProof)
-
-		// Marshaling again should yield same result.
-		protoUnmarshaledProof := unmarshaledProof.ToProto()
-		require.Equal(protoProof, protoUnmarshaledProof)
 	})
 }
 
-func TestChangeProofUnmarshalProtoNil(t *testing.T) {
-	var proof ChangeProof
-	err := proof.UnmarshalProto(nil)
-	require.ErrorIs(t, err, ErrNilChangeProof)
-}
-
-func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
-	now := time.Now().UnixNano()
-	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
-
-	// Make a random change proof.
-	startProofLen := rand.Intn(32)
-	startProof := make([]ProofNode, startProofLen)
-	for i := 0; i < startProofLen; i++ {
-		startProof[i] = newRandomProofNode(rand)
-	}
-
-	endProofLen := rand.Intn(32)
-	endProof := make([]ProofNode, endProofLen)
-	for i := 0; i < endProofLen; i++ {
-		endProof[i] = newRandomProofNode(rand)
-	}
-
-	numKeyChanges := rand.Intn(128) + 1
+func generateKeyChanges(rand *rand.Rand, numKeyChanges int, includeNone bool) []KeyChange {
 	keyChanges := make([]KeyChange, numKeyChanges)
 	for i := 0; i < numKeyChanges; i++ {
-		keyLen := rand.Intn(32)
-		key := make([]byte, keyLen)
-		_, _ = rand.Read(key)
-
-		value := maybe.Nothing[[]byte]()
-		hasValue := rand.Intn(2) == 0
-		if hasValue {
-			valueLen := rand.Intn(32)
-			valueBytes := make([]byte, valueLen)
+		var key []byte
+		// length 0 is decoded as nil
+		if keyLen := rand.Intn(32); keyLen != 0 {
+			key = make([]byte, keyLen)
+			_, _ = rand.Read(key)
+		}
+		var valueBytes []byte
+		if valueLen := rand.Intn(32); valueLen != 0 {
+			valueBytes = make([]byte, valueLen)
 			_, _ = rand.Read(valueBytes)
+		}
+
+		// Replace the value if we want to include None values
+		var value maybe.Maybe[[]byte]
+		hasValue := rand.Intn(2) == 0
+		if hasValue && includeNone {
+			value = maybe.Nothing[[]byte]()
+		} else {
 			value = maybe.Some(valueBytes)
 		}
 
@@ -1767,123 +1694,7 @@ func TestChangeProofUnmarshalProtoNilValue(t *testing.T) {
 			Value: value,
 		}
 	}
-
-	proof := ChangeProof{
-		StartProof: startProof,
-		EndProof:   endProof,
-		KeyChanges: keyChanges,
-	}
-	protoProof := proof.ToProto()
-	// Make a value nil
-	protoProof.KeyChanges[0].Value = nil
-
-	var unmarshaledProof ChangeProof
-	err := unmarshaledProof.UnmarshalProto(protoProof)
-	require.ErrorIs(t, err, ErrNilMaybeBytes)
-}
-
-func TestChangeProofUnmarshalProtoInvalidMaybe(t *testing.T) {
-	protoProof := &pb.ChangeProof{
-		KeyChanges: []*pb.KeyChange{
-			{
-				Key: []byte{1},
-				Value: &pb.MaybeBytes{
-					Value:     []byte{1},
-					IsNothing: true,
-				},
-			},
-		},
-	}
-
-	var proof ChangeProof
-	err := proof.UnmarshalProto(protoProof)
-	require.ErrorIs(t, err, ErrInvalidMaybe)
-}
-
-func FuzzProofProtoMarshalUnmarshal(f *testing.F) {
-	f.Fuzz(func(
-		t *testing.T,
-		randSeed int64,
-	) {
-		require := require.New(t)
-		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
-
-		// Make a random proof.
-		proofLen := rand.Intn(32)
-		proofPath := make([]ProofNode, proofLen)
-		for i := 0; i < proofLen; i++ {
-			proofPath[i] = newRandomProofNode(rand)
-		}
-
-		keyLen := rand.Intn(32)
-		key := make([]byte, keyLen)
-		_, _ = rand.Read(key)
-
-		hasValue := rand.Intn(2) == 1
-		value := maybe.Nothing[[]byte]()
-		if hasValue {
-			valueLen := rand.Intn(32)
-			valueBytes := make([]byte, valueLen)
-			_, _ = rand.Read(valueBytes)
-			value = maybe.Some(valueBytes)
-		}
-
-		proof := Proof{
-			Key:   ToKey(key),
-			Value: value,
-			Path:  proofPath,
-		}
-
-		// Marshal and unmarshal it.
-		// Assert the unmarshaled one is the same as the original.
-		var unmarshaledProof Proof
-		protoProof := proof.ToProto()
-		require.NoError(unmarshaledProof.UnmarshalProto(protoProof))
-		require.Equal(proof, unmarshaledProof)
-
-		// Marshaling again should yield same result.
-		protoUnmarshaledProof := unmarshaledProof.ToProto()
-		require.Equal(protoProof, protoUnmarshaledProof)
-	})
-}
-
-func TestProofProtoUnmarshal(t *testing.T) {
-	type test struct {
-		name        string
-		proof       *pb.Proof
-		expectedErr error
-	}
-
-	tests := []test{
-		{
-			name:        "nil",
-			proof:       nil,
-			expectedErr: ErrNilProof,
-		},
-		{
-			name:        "nil value",
-			proof:       &pb.Proof{},
-			expectedErr: ErrNilValue,
-		},
-		{
-			name: "invalid maybe",
-			proof: &pb.Proof{
-				Value: &pb.MaybeBytes{
-					Value:     []byte{1},
-					IsNothing: true,
-				},
-			},
-			expectedErr: ErrInvalidMaybe,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var proof Proof
-			err := proof.UnmarshalProto(tt.proof)
-			require.ErrorIs(t, err, tt.expectedErr)
-		})
-	}
+	return keyChanges
 }
 
 func FuzzRangeProofInvariants(f *testing.F) {
@@ -1957,6 +1768,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			rootID,
 			db.tokenSize,
 			db.hasher,
+			int(maxProofLen),
 		))
 
 		// Make sure the start proof doesn't contain any nodes
@@ -2148,6 +1960,7 @@ func FuzzChangeProofVerification(f *testing.F) {
 			start,
 			end,
 			endRootID,
+			int(maxProofLen),
 		))
 	})
 }

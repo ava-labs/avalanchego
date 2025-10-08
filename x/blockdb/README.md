@@ -9,6 +9,7 @@ BlockDB is a specialized database optimized for blockchain blocks.
 - **Flexible Write Ordering**: Supports out-of-order block writes for bootstrapping
 - **Configurable Durability**: Optional `syncToDisk` mode guarantees immediate recoverability
 - **Automatic Recovery**: Detects and recovers unindexed blocks after unclean shutdowns
+- **Block Compression**: zstd compression for block data
 
 ## Design
 
@@ -66,7 +67,7 @@ Index Entry (16 bytes):
 ├────────────────────────────────┼─────────┤
 │ Data File Offset               │ 8 bytes │
 │ Block Data Size                │ 4 bytes │
-│ Header Size                    │ 4 bytes │
+│ Reserved                       │ 4 bytes │
 └────────────────────────────────┴─────────┘
 ```
 
@@ -75,14 +76,13 @@ Index Entry (16 bytes):
 Each block in the data file is stored with a block entry header followed by the raw block data:
 
 ```
-Block Entry Header (26 bytes):
+Block Entry Header (22 bytes):
 ┌────────────────────────────────┬─────────┐
 │ Field                          │ Size    │
 ├────────────────────────────────┼─────────┤
 │ Height                         │ 8 bytes │
 │ Size                           │ 4 bytes │
 │ Checksum                       │ 8 bytes │
-│ Header Size                    │ 4 bytes │
 │ Version                        │ 2 bytes │
 └────────────────────────────────┴─────────┘
 ```
@@ -93,7 +93,7 @@ BlockDB allows overwriting blocks at existing heights. When a block is overwritt
 
 ### Fixed-Size Index Entries
 
-Each index entry is exactly 16 bytes on disk, containing the offset, size, and header size. This fixed size enables direct calculation of where each block's index entry is located, providing O(1) lookups. For blockchains with high block heights, the index remains efficient, even at height 1 billion, the index file would only be ~16GB.
+Each index entry is exactly 16 bytes on disk, containing the offset, size, and reserved bytes for future use. This fixed size enables direct calculation of where each block's index entry is located, providing O(1) lookups. For blockchains with high block heights, the index remains efficient, even at height 1 billion, the index file would only be ~16GB.
 
 ### Durability and Fsync Behavior
 
@@ -145,44 +145,23 @@ defer db.Close()
 ### Writing and Reading Blocks
 
 ```go
-// Write a block with header size
+// Write a block
 height := uint64(100)
-blockData := []byte("header:block data")
-headerSize := uint32(7) // First 7 bytes are the header
-err := db.WriteBlock(height, blockData, headerSize)
+blockData := []byte("block data")
+err := db.Put(height, blockData)
 if err != nil {
     fmt.Println("Error writing block:", err)
     return
 }
 
 // Read a block
-blockData, err := db.ReadBlock(height)
+blockData, err := db.Get(height)
 if err != nil {
-    if errors.Is(err, blockdb.ErrBlockNotFound) {
+    if errors.Is(err, database.ErrNotFound) {
         fmt.Println("Block doesn't exist at this height")
         return
     }
     fmt.Println("Error reading block:", err)
-    return
-}
-
-// Read block components separately
-headerData, err := db.ReadHeader(height)
-if err != nil {
-    if errors.Is(err, blockdb.ErrBlockNotFound) {
-        fmt.Println("Block doesn't exist at this height")
-        return
-    }
-    fmt.Println("Error reading header:", err)
-    return
-}
-bodyData, err := db.ReadBody(height)
-if err != nil {
-    if errors.Is(err, blockdb.ErrBlockNotFound) {
-        fmt.Println("Block doesn't exist at this height")
-        return
-    }
-    fmt.Println("Error reading body:", err)
     return
 }
 ```
@@ -191,6 +170,5 @@ if err != nil {
 
 - Implement a block cache for recently accessed blocks
 - Use a buffered pool to avoid allocations on reads and writes
-- Add metrics
 - Add performance benchmarks
 - Consider supporting missing data files (currently we error if any data files are missing)

@@ -202,7 +202,7 @@ func TestGossiperGossip(t *testing.T) {
 			require.Len(requestSet.txs, tt.expectedLen)
 			require.Subset(tt.expectedPossibleValues, maps.Values(requestSet.txs))
 			require.Equal(len(tt.responder) > 0, testHistogram.observed)
-			require.InDelta(tt.expectedHitRate, testHistogram.observedVal, 0)
+			require.Equal(tt.expectedHitRate, testHistogram.observedVal)
 
 			// we should not receive anything that we already had before we
 			// requested the gossip

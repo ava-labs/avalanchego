@@ -23,7 +23,7 @@ The minimum recommended hardware specification for nodes connected to Mainnet is
 
 If you plan to build AvalancheGo from source, you will also need the following software:
 
-- [Go](https://golang.org/doc/install) version >= 1.23.9
+- [Go](https://golang.org/doc/install) version >= 1.24.8
 - [gcc](https://gcc.gnu.org/)
 - g++
 
