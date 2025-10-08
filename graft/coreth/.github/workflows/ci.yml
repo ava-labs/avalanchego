@@ -104,7 +104,7 @@ jobs:
           path: avalanchego
           token: ${{ secrets.AVALANCHE_PAT }}
       - name: Run e2e tests
-        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@b79eeab14be3b06041d8e3a33c87a29d22ec1154
+        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@fff1df9564d3fa86899780d73e887d9ee5b9b54e
         with:
           run: ./scripts/run_task.sh test-e2e-ci
           prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
@@ -132,7 +132,7 @@ jobs:
           ref: ${{ github.event.inputs.avalanchegoBranch }}
           path: avalanchego
       - name: Run Warp E2E Tests
-        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@b79eeab14be3b06041d8e3a33c87a29d22ec1154
+        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@fff1df9564d3fa86899780d73e887d9ee5b9b54e
         with:
           run: ./scripts/run_task.sh test-e2e-warp-ci
           artifact_prefix: warp
