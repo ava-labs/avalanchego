@@ -394,9 +394,11 @@ func (vm *VM) verifyTxAtTip(tx *atomic.Tx) error {
 	extraRules := params.GetRulesExtra(vm.InnerVM.ChainConfig().Rules(preferredBlock.Number, params.IsMergeTODO, preferredBlock.Time))
 	parentHeader := preferredBlock
 	var nextBaseFee *big.Int
-	timestamp := uint64(vm.clock.Time().Unix())
+	now := vm.clock.Time()
+	timestamp := uint64(now.Unix())
 	if extraConfig.IsApricotPhase3(timestamp) {
-		nextBaseFee, err = customheader.EstimateNextBaseFee(extraConfig, parentHeader, timestamp)
+		timeMS := uint64(now.UnixMilli())
+		nextBaseFee, err = customheader.EstimateNextBaseFee(extraConfig, parentHeader, timeMS)
 		if err != nil {
 			// Return extremely detailed error since CalcBaseFee should never encounter an issue here
 			return fmt.Errorf("failed to calculate base fee with parent timestamp (%d), parent ExtraData: (0x%x), and current timestamp (%d): %w", parentHeader.Time, parentHeader.Extra, timestamp, err)
