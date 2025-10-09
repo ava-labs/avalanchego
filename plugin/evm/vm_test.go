@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/holiman/uint256"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -1553,6 +1554,8 @@ func TestWaitForEvent(t *testing.T) {
 		err error
 	}
 
+	fortunaFork := upgradetest.Fortuna
+
 	for _, testCase := range []struct {
 		name     string
 		Fork     *upgradetest.Fork
@@ -1668,6 +1671,7 @@ func TestWaitForEvent(t *testing.T) {
 
 				var wg sync.WaitGroup
 				wg.Add(1)
+				resultCh := make(chan eventResult, 1)
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
@@ -1677,7 +1681,7 @@ func TestWaitForEvent(t *testing.T) {
 				result := <-resultCh
 				require.NoError(t, result.err)
 				require.Equal(t, commonEng.PendingTxs, result.msg)
-				require.GreaterOrEqual(t, time.Since(lastBuildBlockTime), MinBlockBuildingRetryDelay)
+				require.GreaterOrEqual(t, time.Since(lastBuildBlockTime), RetryDelay)
 			},
 		},
 	} {
