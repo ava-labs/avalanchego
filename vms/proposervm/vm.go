@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/tree"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/proposervm/acp181"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 
@@ -70,9 +71,10 @@ func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
 type VM struct {
 	block.ChainVM
 	Config
-	blockBuilderVM block.BuildBlockWithContextChainVM
-	batchedVM      block.BatchedChainVM
-	ssVM           block.StateSyncableVM
+	blockBuilderVM  block.BuildBlockWithContextChainVM
+	setPreferenceVM block.SetPreferenceWithContextChainVM
+	batchedVM       block.BatchedChainVM
+	ssVM            block.StateSyncableVM
 
 	state.State
 
@@ -123,14 +125,16 @@ func New(
 	config Config,
 ) *VM {
 	blockBuilderVM, _ := vm.(block.BuildBlockWithContextChainVM)
+	setPreferenceVM, _ := vm.(block.SetPreferenceWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VM{
-		ChainVM:        vm,
-		Config:         config,
-		blockBuilderVM: blockBuilderVM,
-		batchedVM:      batchedVM,
-		ssVM:           ssVM,
+		ChainVM:         vm,
+		Config:          config,
+		blockBuilderVM:  blockBuilderVM,
+		setPreferenceVM: setPreferenceVM,
+		batchedVM:       batchedVM,
+		ssVM:            ssVM,
 	}
 }
 
@@ -371,8 +375,36 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	}
 
 	innerBlkID := blk.getInnerBlk().ID()
-	if err := vm.ChainVM.SetPreference(ctx, innerBlkID); err != nil {
-		return err
+	if vm.setPreferenceVM != nil {
+		var nextPChainHeight uint64
+		// TODO(michaelkaplan13): Remove Granite activation check once Granite has been activated on all networks.
+		if vm.Upgrades.IsGraniteActivated(blk.Timestamp()) {
+			// The block context for a child block built on top of this preferred block will potentially
+			// use a different epoched P-Chain height if the preferred block seals the current epoch.
+			preferredPChainHeight, err := blk.pChainHeight(ctx)
+			if err != nil {
+				return err
+			}
+			preferredEpoch, err := blk.pChainEpoch(ctx)
+			if err != nil {
+				return err
+			}
+			nextPChainHeight = acp181.NewEpoch(vm.Upgrades, preferredPChainHeight, preferredEpoch, blk.Timestamp(), vm.Time()).PChainHeight
+		} else {
+			nextPChainHeight, err = blk.selectChildPChainHeight(ctx)
+			if err != nil {
+				return err
+			}
+		}
+		if err := vm.setPreferenceVM.SetPreferenceWithContext(ctx, innerBlkID, &block.Context{
+			PChainHeight: nextPChainHeight,
+		}); err != nil {
+			return err
+		}
+	} else {
+		if err := vm.ChainVM.SetPreference(ctx, innerBlkID); err != nil {
+			return err
+		}
 	}
 
 	vm.ctx.Log.Debug("set preference",

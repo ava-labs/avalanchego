@@ -19,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
+
+	snowmanblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 var (
@@ -35,6 +37,7 @@ type Manager interface {
 	LastAccepted() ids.ID
 
 	SetPreference(blkID ids.ID)
+	SetPreferenceWithContext(blkID ids.ID, blockCtx *snowmanblock.Context)
 	Preferred() ids.ID
 
 	GetBlock(blkID ids.ID) (snowman.Block, error)
@@ -88,6 +91,7 @@ type manager struct {
 	rejector block.Visitor
 
 	preferred         ids.ID
+	preferredCtx      *snowmanblock.Context
 	txExecutorBackend *executor.Backend
 }
 
@@ -114,6 +118,11 @@ func (m *manager) SetPreference(blkID ids.ID) {
 	m.preferred = blkID
 }
 
+func (m *manager) SetPreferenceWithContext(blkID ids.ID, blockCtx *snowmanblock.Context) {
+	m.preferred = blkID
+	m.preferredCtx = blockCtx
+}
+
 func (m *manager) Preferred() ids.ID {
 	return m.preferred
 }
@@ -132,9 +141,17 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 		}
 	}
 
-	recommendedPChainHeight, err := m.ctx.ValidatorState.GetMinimumHeight(context.TODO())
-	if err != nil {
-		return fmt.Errorf("failed to fetch P-chain height: %w", err)
+	var (
+		recommendedPChainHeight uint64
+		err                     error
+	)
+	if m.preferredCtx != nil {
+		recommendedPChainHeight = m.preferredCtx.PChainHeight
+	} else {
+		recommendedPChainHeight, err = m.ctx.ValidatorState.GetMinimumHeight(context.TODO())
+		if err != nil {
+			return fmt.Errorf("failed to fetch P-chain height: %w", err)
+		}
 	}
 	err = executor.VerifyWarpMessages(
 		context.TODO(),
