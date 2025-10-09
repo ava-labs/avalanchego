@@ -194,10 +194,11 @@ func (c *Client) serveHTTPSimple(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	err = convertWriteResponse(w, resp)
-	c.log.Debug("sent HTTP response",
-		zap.Error(err),
-	)
+	if err := convertWriteResponse(w, resp); err != nil {
+		c.log.Debug("failed sending HTTP response",
+			zap.Error(err),
+		)
+	}
 }
 
 // getHTTPSimpleRequest takes an http request as input and returns a gRPC HandleSimpleHTTPRequest.
