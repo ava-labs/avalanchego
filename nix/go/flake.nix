@@ -1,4 +1,8 @@
 {
+  # To use locally: nix run ./nix/go
+  # To use remotely: nix run 'github:ava-labs/avalanchego?dir=nix/go'
+  # To use remotely at a specific revision: nix run 'github:ava-labs/avalanchego?dir=nix/go&ref=[SHA]'
+
   description = "Go toolchain for Avalanche projects";
 
   # Flake inputs
