@@ -62,7 +62,8 @@ func New(
 				Namespace: namespace,
 				Name:      "duration",
 				Help:      "time spent in database calls (seconds)",
-				Buckets:   prometheus.DefBuckets,
+				// Buckets to cover the expected performance range of db operations (1μs-1s)
+				Buckets: []float64{.000001, .00001, .0001, .001, .005, .01, .05, .1, .5, 1},
 			},
 			methodLabels,
 		),
