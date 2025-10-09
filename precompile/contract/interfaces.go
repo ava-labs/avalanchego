@@ -60,6 +60,7 @@ type AccessibleState interface {
 	GetSnowContext() *snow.Context
 	GetChainConfig() precompileconfig.ChainConfig
 	GetPrecompileEnv() vm.PrecompileEnvironment
+	GetRules() precompileconfig.Rules
 }
 
 // ConfigurationBlockContext defines the interface required to configure a precompile.

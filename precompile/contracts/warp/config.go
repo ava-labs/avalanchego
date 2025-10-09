@@ -143,9 +143,11 @@ func (*Config) Accept(acceptCtx *precompileconfig.AcceptContext, blockHash commo
 // 4. TODO: Lookup of the validator set
 //
 // If the payload of the warp message fails parsing, return a non-nil error invalidating the transaction.
-func (*Config) PredicateGas(pred predicate.Predicate) (uint64, error) {
-	totalGas := GasCostPerSignatureVerification
-	bytesGasCost, overflow := math.SafeMul(GasCostPerWarpMessageChunk, uint64(len(pred)))
+func (*Config) PredicateGas(pred predicate.Predicate, rules precompileconfig.Rules) (uint64, error) {
+	gasConfig := CurrentGasConfig(rules)
+
+	totalGas := gasConfig.PerSignatureVerification
+	bytesGasCost, overflow := math.SafeMul(gasConfig.PerWarpMessageChunk, uint64(len(pred)))
 	if overflow {
 		return 0, fmt.Errorf("overflow calculating gas cost for %d warp message chunks", len(pred))
 	}
@@ -171,7 +173,7 @@ func (*Config) PredicateGas(pred predicate.Predicate) (uint64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errCannotGetNumSigners, err)
 	}
-	signerGas, overflow := math.SafeMul(uint64(numSigners), GasCostPerWarpSigner)
+	signerGas, overflow := math.SafeMul(uint64(numSigners), gasConfig.PerWarpSigner)
 	if overflow {
 		return 0, errOverflowSignersGasCost
 	}
