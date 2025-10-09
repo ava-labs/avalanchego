@@ -64,8 +64,7 @@ func BenchmarkParse(b *testing.B) {
 	require.NoError(b, err)
 	bytes := f.Marshal()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		_, _ = Parse(bytes)
 	}
 }
@@ -73,8 +72,7 @@ func BenchmarkParse(b *testing.B) {
 func BenchmarkContains(b *testing.B) {
 	f := NewMaliciousFilter(maxHashes, 1)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		f.Contains(1)
 	}
 }

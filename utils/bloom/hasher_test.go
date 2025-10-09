@@ -27,8 +27,7 @@ func BenchmarkHash(b *testing.B) {
 	key := ids.GenerateTestID()
 	salt := ids.GenerateTestID()
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		Hash(key[:], salt[:])
 	}
 }

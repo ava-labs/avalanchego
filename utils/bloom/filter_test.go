@@ -79,8 +79,7 @@ func BenchmarkAdd(b *testing.B) {
 	f, err := New(8, 16*units.KiB)
 	require.NoError(b, err)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		f.Add(1)
 	}
 }
@@ -89,8 +88,7 @@ func BenchmarkMarshal(b *testing.B) {
 	f, err := New(OptimalParameters(10_000, .01))
 	require.NoError(b, err)
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		f.Marshal()
 	}
 }
