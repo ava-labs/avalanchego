@@ -20,6 +20,7 @@ type PredicateTest struct {
 	PredicateContext *precompileconfig.PredicateContext
 
 	Predicate   predicate.Predicate
+	Rules       precompileconfig.Rules
 	Gas         uint64
 	GasErr      error
 	ExpectedErr error
@@ -30,7 +31,7 @@ func (test PredicateTest) Run(t testing.TB) {
 	require := require.New(t)
 	predicater := test.Config.(precompileconfig.Predicater)
 
-	predicateGas, predicateGasErr := predicater.PredicateGas(test.Predicate)
+	predicateGas, predicateGasErr := predicater.PredicateGas(test.Predicate, test.Rules)
 	require.ErrorIs(predicateGasErr, test.GasErr)
 	if test.GasErr != nil {
 		return
