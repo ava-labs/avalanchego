@@ -109,7 +109,7 @@ func TestCheckBlockPredicates(t *testing.T) {
 
 			rules := params.TestChainConfig.Rules(common.Big0, params.IsMergeTODO, 0)
 			predicater := precompileconfig.NewMockPredicater(gomock.NewController(t))
-			predicater.EXPECT().PredicateGas(gomock.Any()).Return(uint64(0), nil).AnyTimes()
+			predicater.EXPECT().PredicateGas(gomock.Any(), gomock.Any()).Return(uint64(0), nil).AnyTimes()
 			predicater.EXPECT().VerifyPredicate(gomock.Any(), gomock.Any()).DoAndReturn(verifyMockPredicate).AnyTimes()
 
 			rulesExtra := params.GetRulesExtra(rules)
@@ -311,7 +311,7 @@ func TestCheckTxPredicates(t *testing.T) {
 
 			rules := params.TestChainConfig.Rules(common.Big0, params.IsMergeTODO, 0)
 			predicater := precompileconfig.NewMockPredicater(gomock.NewController(t))
-			predicater.EXPECT().PredicateGas(gomock.Any()).Return(test.predicateGas, nil).AnyTimes()
+			predicater.EXPECT().PredicateGas(gomock.Any(), gomock.Any()).Return(test.predicateGas, nil).AnyTimes()
 			predicater.EXPECT().VerifyPredicate(gomock.Any(), gomock.Any()).DoAndReturn(verifyMockPredicate).AnyTimes()
 
 			rulesExtra := params.GetRulesExtra(rules)
