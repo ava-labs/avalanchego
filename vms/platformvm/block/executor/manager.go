@@ -148,6 +148,9 @@ func (m *manager) VerifyTx(tx *txs.Tx) error {
 	if m.preferredCtx != nil {
 		recommendedPChainHeight = m.preferredCtx.PChainHeight
 	} else {
+		// TODO: After Granite activation, what P-Chain height should be used
+		// if no preference has been set yet? This is the case immediately following
+		// initialization before any SetPreferenceWithContext calls have been made.
 		recommendedPChainHeight, err = m.ctx.ValidatorState.GetMinimumHeight(context.TODO())
 		if err != nil {
 			return fmt.Errorf("failed to fetch P-chain height: %w", err)

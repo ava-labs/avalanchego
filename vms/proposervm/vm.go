@@ -375,36 +375,49 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	}
 
 	innerBlkID := blk.getInnerBlk().ID()
-	if vm.setPreferenceVM != nil {
-		var nextPChainHeight uint64
-		// TODO(michaelkaplan13): Remove Granite activation check once Granite has been activated on all networks.
-		if vm.Upgrades.IsGraniteActivated(blk.Timestamp()) {
-			// The block context for a child block built on top of this preferred block will potentially
-			// use a different epoched P-Chain height if the preferred block seals the current epoch.
-			preferredPChainHeight, err := blk.pChainHeight(ctx)
-			if err != nil {
-				return err
-			}
-			preferredEpoch, err := blk.pChainEpoch(ctx)
-			if err != nil {
-				return err
-			}
-			nextPChainHeight = acp181.NewEpoch(vm.Upgrades, preferredPChainHeight, preferredEpoch, blk.Timestamp(), vm.Time()).PChainHeight
-		} else {
-			nextPChainHeight, err = blk.selectChildPChainHeight(ctx)
-			if err != nil {
-				return err
-			}
+
+	// If the inner VM implements SetPreferenceWithContext, use it to set the set the preference with the
+	// P-Chain height to be used to verify a child of the preferred block.
+	// TODO(michaelkaplan13): Remove Granite activation check once Granite has been activated on all networks.
+	if vm.setPreferenceVM != nil && vm.Upgrades.IsGraniteActivated(blk.Timestamp()) {
+		// The P-Chain height used to verify a child of the preferred will potentially
+		// be different than the P-Chain height used to verify the preferred block if
+		// the preferred block seals the current epoch.
+		preferredPChainHeight, err := blk.pChainHeight(ctx)
+		if err != nil {
+			return err
 		}
+		preferredEpoch, err := blk.pChainEpoch(ctx)
+		if err != nil {
+			return err
+		}
+		// The exact child timestamp doesn't matter here because we know Granite is already activated.
+		// Use the VM's current time as a placeholder approximation.
+		nextEpoch := acp181.NewEpoch(
+			vm.Upgrades,
+			preferredPChainHeight,
+			preferredEpoch,
+			blk.Timestamp(),
+			vm.Time(),
+		)
+		nextPChainHeight := nextEpoch.PChainHeight
+
 		if err := vm.setPreferenceVM.SetPreferenceWithContext(ctx, innerBlkID, &block.Context{
 			PChainHeight: nextPChainHeight,
 		}); err != nil {
 			return err
 		}
-	} else {
-		if err := vm.ChainVM.SetPreference(ctx, innerBlkID); err != nil {
-			return err
-		}
+
+		vm.ctx.Log.Debug("set preference with context",
+			zap.Stringer("blkID", preferred),
+			zap.Stringer("innerBlkID", innerBlkID),
+			zap.Uint64("pChainHeight", nextPChainHeight),
+		)
+		return nil
+	}
+
+	if err := vm.ChainVM.SetPreference(ctx, innerBlkID); err != nil {
+		return err
 	}
 
 	vm.ctx.Log.Debug("set preference",
