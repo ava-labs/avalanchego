@@ -8,7 +8,7 @@ module github.com/ava-labs/avalanchego
 //   - CONTRIBUTING.md
 //   - README.md
 //   - go.mod (here)
-//   - nix/go.nix (update version and sha256 for supported arches)
+//   - nix/go/default.nix (update version and sha256 for supported arches)
 //   - tools/go.mod
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
