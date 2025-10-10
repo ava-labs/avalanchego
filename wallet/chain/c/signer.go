@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
-	"github.com/ava-labs/avalanchego/utils/hashing"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
@@ -82,10 +81,10 @@ func (s *txSigner) SignAtomic(ctx context.Context, tx *atomic.Tx) error {
 		if err != nil {
 			return err
 		}
-		return sign(tx, true, signers, s.networkID)
+		return sign(tx, signers, s.networkID)
 	case *atomic.UnsignedExportTx:
 		signers := s.getExportSigners(utx.Ins)
-		return sign(tx, true, signers, s.networkID)
+		return sign(tx, signers, s.networkID)
 	default:
 		return fmt.Errorf("%w: %T", errUnknownTxType, tx)
 	}
@@ -158,13 +157,11 @@ func SignUnsignedAtomic(ctx context.Context, signer Signer, utx atomic.UnsignedA
 	return tx, signer.SignAtomic(ctx, tx)
 }
 
-// TODO: remove [signHash] after the ledger supports signing all transactions.
-func sign(tx *atomic.Tx, signHash bool, txSigners [][]keychain.Signer, networkID uint32) error {
+func sign(tx *atomic.Tx, txSigners [][]keychain.Signer, networkID uint32) error {
 	unsignedBytes, err := atomic.Codec.Marshal(version, &tx.UnsignedAtomicTx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal unsigned tx: %w", err)
 	}
-	unsignedHash := hashing.ComputeHash256(unsignedBytes)
 
 	if expectedLen := len(txSigners); expectedLen != len(tx.Creds) {
 		tx.Creds = make([]verify.Verifiable, expectedLen)
@@ -207,14 +204,9 @@ func sign(tx *atomic.Tx, signHash bool, txSigners [][]keychain.Signer, networkID
 				continue
 			}
 
-			var sig []byte
-			if signHash {
-				sig, err = signer.SignHash(unsignedHash)
-			} else {
-				sig, err = signer.Sign(unsignedBytes,
-					keychain.WithChainAlias(Alias),
-					keychain.WithNetworkID(networkID))
-			}
+			sig, err := signer.Sign(unsignedBytes,
+				keychain.WithChainAlias(Alias),
+				keychain.WithNetworkID(networkID))
 			if err != nil {
 				return fmt.Errorf("problem signing tx: %w", err)
 			}
