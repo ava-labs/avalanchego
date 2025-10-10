@@ -21,39 +21,61 @@ import (
 	"github.com/ava-labs/coreth/precompile/precompileconfig"
 )
 
-const (
-	GetVerifiedWarpMessageBaseCost uint64 = 2      // Base cost of entering getVerifiedWarpMessage
-	GetBlockchainIDGasCost         uint64 = 2      // Based on GasQuickStep used in existing EVM instructions
-	AddWarpMessageGasCost          uint64 = 20_000 // Cost of producing and serving a BLS Signature
-	// Sum of base log gas cost, cost of producing 4 topics, and producing + serving a BLS Signature (sign + trie write)
-	// Note: using trie write for the gas cost results in a conservative overestimate since the message is stored in a
-	// flat database that can be cleaned up after a period of time instead of the EVM trie.
-
-	SendWarpMessageGasCost uint64 = contract.LogGas + 3*contract.LogTopicGas + AddWarpMessageGasCost + contract.WriteGasCostPerSlot
-	// SendWarpMessageGasCostPerByte cost accounts for producing a signed message of a given size
-	SendWarpMessageGasCostPerByte uint64 = contract.LogDataGas
-)
+const addWarpMessageBaseGasCost uint64 = 20_000 // Cost of producing and serving a BLS Signature
 
 var (
 	preGraniteGasConfig = GasConfig{
-		PerWarpSigner:            500,
-		PerWarpMessageChunk:      3_200,
-		PerSignatureVerification: 200_000,
+		GetBlockchainID: 2,
+
+		GetVerifiedWarpMessageBase: 2,
+		PerWarpSigner:              500,
+		PerWarpMessageChunk:        3_200,
+		VerifyPredicateBase:        200_000,
+
+		// Sum of base log gas cost, cost of producing 3 topics, and
+		// producing + serving a BLS Signature (sign + trie write).
+		//
+		// Note: using trie write for the gas cost results in a conservative
+		// overestimate since the message is stored in a flat database that can
+		// be cleaned up after a period of time instead of the EVM trie.
+		SendWarpMessageBase: contract.LogGas + 3*contract.LogTopicGas + addWarpMessageBaseGasCost + contract.WriteGasCostPerSlot,
+		PerWarpMessageByte:  contract.LogDataGas,
 	}
+	// graniteGasConfig updated the gas costs of warp operations to target a
+	// processing speed of around 100 mgas/s after the introduction of epoching
+	// which allows for pre-calculating the warp validator sets for all active
+	// networks.
 	graniteGasConfig = GasConfig{
-		PerWarpSigner:            250,
-		PerWarpMessageChunk:      3_200,
-		PerSignatureVerification: 100_000,
+		GetBlockchainID: 200,
+
+		GetVerifiedWarpMessageBase: 750,
+		PerWarpSigner:              250,
+		PerWarpMessageChunk:        512, // matches call data byte cost
+		VerifyPredicateBase:        125_000,
+
+		// Unchanged during Granite.
+		SendWarpMessageBase: preGraniteGasConfig.SendWarpMessageBase,
+		PerWarpMessageByte:  preGraniteGasConfig.PerWarpMessageByte,
 	}
 )
 
 type GasConfig struct {
+	// Cost to call getBlockchainID
+	GetBlockchainID uint64
+
+	// Base cost of entering getVerifiedWarpMessage
+	GetVerifiedWarpMessageBase uint64
 	// Gas cost per warp signer in the validator set
 	PerWarpSigner uint64
-	// Gas cost per chunk of the warp message (each chunk is 128 bytes)
+	// Gas cost per chunk of the warp message (each chunk is 32 bytes)
 	PerWarpMessageChunk uint64
 	// Gas cost to verify a BLS signature
-	PerSignatureVerification uint64
+	VerifyPredicateBase uint64
+
+	// Base cost of entering sendWarpMessage
+	SendWarpMessageBase uint64
+	// PerWarpMessageByte cost accounts for producing a message of a given size
+	PerWarpMessageByte uint64
 }
 
 var (
@@ -115,7 +137,8 @@ func PackGetBlockchainIDOutput(blockchainID common.Hash) ([]byte, error) {
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func getBlockchainID(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	if remainingGas, err = contract.DeductGas(suppliedGas, GetBlockchainIDGasCost); err != nil {
+	warpGasConfig := CurrentGasConfig(accessibleState.GetRules())
+	if remainingGas, err = contract.DeductGas(suppliedGas, warpGasConfig.GetBlockchainID); err != nil {
 		return nil, 0, err
 	}
 	packedOutput, err := PackGetBlockchainIDOutput(common.Hash(accessibleState.GetSnowContext().ChainID))
@@ -256,12 +279,13 @@ func UnpackSendWarpMessageOutput(output []byte) (common.Hash, error) {
 //
 //nolint:revive // General-purpose types lose the meaning of args if unused ones are removed
 func sendWarpMessage(accessibleState contract.AccessibleState, caller common.Address, addr common.Address, input []byte, suppliedGas uint64, readOnly bool) (ret []byte, remainingGas uint64, err error) {
-	if remainingGas, err = contract.DeductGas(suppliedGas, SendWarpMessageGasCost); err != nil {
+	warpGasConfig := CurrentGasConfig(accessibleState.GetRules())
+	if remainingGas, err = contract.DeductGas(suppliedGas, warpGasConfig.SendWarpMessageBase); err != nil {
 		return nil, 0, err
 	}
 	// This gas cost includes buffer room because it is based off of the total size of the input instead of the produced payload.
 	// This ensures that we charge gas before we unpack the variable sized input.
-	payloadGas, overflow := math.SafeMul(SendWarpMessageGasCostPerByte, uint64(len(input)))
+	payloadGas, overflow := math.SafeMul(warpGasConfig.PerWarpMessageByte, uint64(len(input)))
 	if overflow {
 		return nil, 0, vm.ErrOutOfGas
 	}
