@@ -116,7 +116,6 @@ func (test PrecompileTest) setup(t testing.TB, module modules.Module, state *tes
 	accessibleState.EXPECT().GetStateDB().Return(state).AnyTimes()
 	accessibleState.EXPECT().GetBlockContext().Return(blockContext).AnyTimes()
 	accessibleState.EXPECT().GetSnowContext().Return(snowContext).AnyTimes()
-	accessibleState.EXPECT().GetChainConfig().Return(chainConfig).AnyTimes()
 	accessibleState.EXPECT().GetRules().Return(test.Rules).AnyTimes()
 
 	if test.Config != nil {
