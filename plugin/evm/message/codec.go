@@ -27,7 +27,7 @@ func init() {
 	errs := wrappers.Errs{}
 	errs.Add(
 		// Types for state sync frontier consensus
-		c.RegisterType(SyncSummary{}),
+		c.RegisterType(BlockSyncSummary{}),
 
 		// state sync types
 		c.RegisterType(BlockRequest{}),
