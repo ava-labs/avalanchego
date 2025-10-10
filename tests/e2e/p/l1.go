@@ -159,6 +159,9 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			// Test GetAllValidatorsAt too, for coverage
 			flattenedExpectedValidators, err := snowvalidators.FlattenValidatorSet(expectedValidators) // for coverage
 			require.NoError(err)
+
+			// require.Equal will complain if one has a nil slice and the other
+			// has an empty slice. This avoids that issue.
 			if len(flattenedExpectedValidators.Validators) == 0 {
 				flattenedExpectedValidators.Validators = nil
 			}
