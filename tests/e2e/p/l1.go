@@ -155,6 +155,20 @@ var _ = e2e.DescribePChain("[L1]", func() {
 			subnetValidators, err := pClient.GetValidatorsAt(tc.DefaultContext(), subnetID, platformapi.Height(height))
 			require.NoError(err)
 			require.Equal(expectedValidators, subnetValidators)
+
+			// Test GetAllValidatorsAt too, for coverage
+			flattenedExpectedValidators, err := snowvalidators.FlattenValidatorSet(expectedValidators) // for coverage
+			require.NoError(err)
+
+			// require.Equal will complain if one has a nil slice and the other
+			// has an empty slice. This avoids that issue.
+			if len(flattenedExpectedValidators.Validators) == 0 {
+				flattenedExpectedValidators.Validators = nil
+			}
+
+			allValidators, err := pClient.GetAllValidatorsAt(tc.DefaultContext(), platformapi.Height(height))
+			require.NoError(err)
+			require.Equal(flattenedExpectedValidators, allValidators[subnetID])
 		}
 		tc.By("verifying the Permissioned Subnet is configured as expected", func() {
 			tc.By("verifying the subnet reports as permissioned", func() {
