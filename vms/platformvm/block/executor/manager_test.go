@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/platformvm/block"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
+
+	snowmanblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 )
 
 func TestGetBlock(t *testing.T) {
@@ -84,4 +86,22 @@ func TestManagerSetPreference(t *testing.T) {
 	newPreference := ids.GenerateTestID()
 	manager.SetPreference(newPreference)
 	require.Equal(newPreference, manager.Preferred())
+}
+
+func TestManagerSetPreferenceWithContext(t *testing.T) {
+	require := require.New(t)
+
+	initialPreference := ids.GenerateTestID()
+	manager := &manager{
+		preferred: initialPreference,
+	}
+	require.Equal(initialPreference, manager.Preferred())
+	require.Nil(manager.preferredCtx)
+
+	newPreference := ids.GenerateTestID()
+	manager.SetPreferenceWithContext(newPreference, &snowmanblock.Context{
+		PChainHeight: 100,
+	})
+	require.Equal(newPreference, manager.Preferred())
+	require.Equal(100, manager.preferredCtx.PChainHeight)
 }
