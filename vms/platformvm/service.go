@@ -1792,17 +1792,6 @@ type GetAllValidatorsAtReply struct {
 	ValidatorSets map[ids.ID]validators.WarpSet `json:"validatorSets"`
 }
 
-type jsonWarpSet struct {
-	Validators  []*jsonWarpValidator `json:"validators"`
-	TotalWeight avajson.Uint64       `json:"totalWeight"`
-}
-
-type jsonWarpValidator struct {
-	PublicKey *string        `json:"publicKey"`
-	Weight    avajson.Uint64 `json:"weight"`
-	NodeIDs   []ids.NodeID   `json:"nodeIDs"`
-}
-
 // GetAllValidatorsAt returns the canonical validator sets of
 // all chains with at least one active validator at the specified
 // height or at proposerVM height if set to [platformapi.ProposedHeight].
@@ -1838,100 +1827,6 @@ func (s *Service) getQueryHeight(ctx context.Context, heightArg platformapi.Heig
 	}
 
 	return uint64(heightArg), nil
-}
-
-func (v *GetAllValidatorsAtReply) MarshalJSON() ([]byte, error) {
-	m := make(map[ids.ID]*jsonWarpSet, len(v.ValidatorSets))
-	for subnetID, vdrs := range v.ValidatorSets {
-		jsonWarpSet := &jsonWarpSet{
-			TotalWeight: avajson.Uint64(vdrs.TotalWeight),
-			Validators:  make([]*jsonWarpValidator, len(vdrs.Validators)),
-		}
-
-		for i, vdr := range vdrs.Validators {
-			vdrJ, err := warpToJSONWarpValidator(vdr)
-			if err != nil {
-				return nil, err
-			}
-
-			jsonWarpSet.Validators[i] = vdrJ
-		}
-
-		m[subnetID] = jsonWarpSet
-	}
-	return json.Marshal(m)
-}
-
-func warpToJSONWarpValidator(vdr *validators.Warp) (*jsonWarpValidator, error) {
-	vdrJSON := &jsonWarpValidator{
-		Weight:  avajson.Uint64(vdr.Weight),
-		NodeIDs: vdr.NodeIDs,
-	}
-
-	if vdr.PublicKey != nil {
-		pk, err := formatting.Encode(formatting.HexNC, bls.PublicKeyToCompressedBytes(vdr.PublicKey))
-		if err != nil {
-			return nil, err
-		}
-		vdrJSON.PublicKey = &pk
-	}
-
-	return vdrJSON, nil
-}
-
-func (v *GetAllValidatorsAtReply) UnmarshalJSON(b []byte) error {
-	var m map[ids.ID]*jsonWarpSet
-	if err := json.Unmarshal(b, &m); err != nil {
-		return err
-	}
-
-	if m == nil {
-		v.ValidatorSets = nil
-		return nil
-	}
-
-	v.ValidatorSets = make(map[ids.ID]validators.WarpSet, len(m))
-	for subnetID, vdrJSON := range m {
-		warpSet := validators.WarpSet{
-			TotalWeight: uint64(vdrJSON.TotalWeight),
-			Validators:  make([]*validators.Warp, len(vdrJSON.Validators)),
-		}
-
-		for i, vdrJSON := range vdrJSON.Validators {
-			vdr, err := jsonWarpValidatorOutputToWarp(vdrJSON)
-			if err != nil {
-				return err
-			}
-
-			warpSet.Validators[i] = vdr
-		}
-
-		v.ValidatorSets[subnetID] = warpSet
-	}
-	return nil
-}
-
-func jsonWarpValidatorOutputToWarp(vdrJSON *jsonWarpValidator) (*validators.Warp, error) {
-	vdr := &validators.Warp{
-		Weight:  uint64(vdrJSON.Weight),
-		NodeIDs: vdrJSON.NodeIDs,
-	}
-
-	if vdrJSON.PublicKey != nil {
-		pkBytes, err := formatting.Decode(formatting.HexNC, *vdrJSON.PublicKey)
-		if err != nil {
-			return nil, err
-		}
-
-		vdr.PublicKey, err = bls.PublicKeyFromCompressedBytes(pkBytes)
-		if err != nil {
-			return nil, err
-		}
-
-		vdr.PublicKeyBytes = vdr.PublicKey.Serialize()
-	}
-
-	return vdr, nil
 }
 
 // GetValidatorsAtArgs is the response from GetValidatorsAt
