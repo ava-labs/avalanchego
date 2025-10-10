@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
@@ -14,17 +15,6 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/utils"
 )
-
-func generateHeader(timeSeconds uint64, timeMilliseconds *uint64) *types.Header {
-	return customtypes.WithHeaderExtra(
-		&types.Header{
-			Time: timeSeconds,
-		},
-		&customtypes.HeaderExtra{
-			TimeMilliseconds: timeMilliseconds,
-		},
-	)
-}
 
 func TestVerifyTime(t *testing.T) {
 	var (
@@ -138,6 +128,110 @@ func TestVerifyTime(t *testing.T) {
 			parentHeader: generateHeader(timeSeconds, nil),
 			extraConfig:  extras.TestGraniteChainConfig,
 		},
+		// Min delay verification tests
+		{
+			name:         "pre_granite_no_min_delay_verification",
+			header:       generateHeader(timeSeconds, nil),
+			parentHeader: generateHeader(timeSeconds, nil),
+			extraConfig:  extras.TestFortunaChainConfig,
+		},
+		{
+			name: "granite_first_block_no_parent_min_delay_excess",
+			header: generateHeaderWithMinDelayExcessAndTime(
+				timeSeconds,
+				utils.NewUint64(timeMillis),
+				utils.NewUint64(acp226.InitialDelayExcess),
+			),
+			parentHeader: generateHeader(timeSeconds-1, nil), // Pre-Granite parent
+			extraConfig:  extras.TestGraniteChainConfig,
+		},
+		{
+			name: "granite_initial_delay_met",
+			header: generateHeaderWithMinDelayExcessAndTime(
+				timeSeconds,
+				utils.NewUint64(timeMillis),
+				utils.NewUint64(acp226.InitialDelayExcess),
+			),
+			parentHeader: generateHeaderWithMinDelayExcessAndTime(
+				timeSeconds-1,
+				utils.NewUint64(timeMillis-2000), // 2000 ms is the exact initial delay
+				utils.NewUint64(acp226.InitialDelayExcess),
+			),
+			extraConfig: extras.TestGraniteChainConfig,
+		},
+		{
+			name: "granite_initial_delay_not_met",
+			header: generateHeaderWithMinDelayExcessAndTime(
+				timeSeconds,
+				utils.NewUint64(timeMillis),
+				utils.NewUint64(acp226.InitialDelayExcess),
+			),
+			parentHeader: generateHeaderWithMinDelayExcessAndTime(
+				timeSeconds-1,
+				utils.NewUint64(timeMillis-1999), // 1 ms less than required
+				utils.NewUint64(acp226.InitialDelayExcess),
+			),
+			extraConfig: extras.TestGraniteChainConfig,
+			expectedErr: ErrMinDelayNotMet,
+		},
+		{
+			name: "granite_future_timestamp_within_limits",
+			header: generateHeaderWithMinDelayExcessAndTime(
+				timeSeconds+5, // 5 seconds in future
+				utils.NewUint64(timeMillis+5000),
+				utils.NewUint64(acp226.InitialDelayExcess),
+			),
+			parentHeader: generateHeaderWithMinDelayExcessAndTime(
+				timeSeconds-1,
+				utils.NewUint64(timeMillis-2000),
+				utils.NewUint64(acp226.InitialDelayExcess),
+			),
+			extraConfig: extras.TestGraniteChainConfig,
+		},
+		{
+			name: "granite_future_timestamp_abuse",
+			header: generateHeaderWithMinDelayExcessAndTime(
+				timeSeconds+15, // 15 seconds in future, exceeds MaxFutureBlockTime
+				utils.NewUint64(timeMillis+15000),
+				utils.NewUint64(acp226.InitialDelayExcess),
+			),
+			parentHeader: generateHeaderWithMinDelayExcessAndTime(
+				timeSeconds-1,
+				utils.NewUint64(timeMillis-2000),
+				utils.NewUint64(acp226.InitialDelayExcess),
+			),
+			extraConfig: extras.TestGraniteChainConfig,
+			expectedErr: ErrBlockTooFarInFuture,
+		},
+		{
+			name: "granite_zero_delay_excess",
+			header: generateHeaderWithMinDelayExcessAndTime(
+				timeSeconds,
+				utils.NewUint64(timeMillis),
+				utils.NewUint64(0),
+			),
+			parentHeader: generateHeaderWithMinDelayExcessAndTime(
+				timeSeconds,
+				utils.NewUint64(timeMillis-1), // 1ms delay, meets zero requirement
+				utils.NewUint64(0),            // Parent has zero delay excess
+			),
+			extraConfig: extras.TestGraniteChainConfig,
+		},
+		{
+			name: "granite_zero_delay_excess_but_zero_delay",
+			header: generateHeaderWithMinDelayExcessAndTime(
+				timeSeconds,
+				utils.NewUint64(timeMillis),
+				utils.NewUint64(0),
+			),
+			parentHeader: generateHeaderWithMinDelayExcessAndTime(
+				timeSeconds,
+				utils.NewUint64(timeMillis), // Same timestamp, zero delay
+				utils.NewUint64(0),          // Parent has zero delay excess
+			),
+			extraConfig: extras.TestGraniteChainConfig,
+			expectedErr: ErrMinDelayNotMet,
+		},
 	}
 
 	for _, test := range tests {
@@ -188,14 +282,7 @@ func TestGetNextTimestamp(t *testing.T) {
 			expectedMillis: nowSeconds * 1000, // parent.Time * 1000
 		},
 		{
-			name:           "current_time_equals_parent_time_with_milliseconds",
-			parent:         generateHeader(nowSeconds, utils.NewUint64(nowMillis)),
-			now:            now,
-			expectedSec:    nowSeconds,
-			expectedMillis: nowMillis, // parent's TimeMilliseconds
-		},
-		{
-			name:           "current_time_before_parent_time",
+			name:           "current_time_before_parent_time_no_milliseconds",
 			parent:         generateHeader(nowSeconds+10, nil),
 			now:            now,
 			expectedSec:    nowSeconds + 10,
@@ -205,23 +292,60 @@ func TestGetNextTimestamp(t *testing.T) {
 			name:           "current_time_before_parent_time_with_milliseconds",
 			parent:         generateHeader(nowSeconds+10, utils.NewUint64(nowMillis)),
 			now:            now,
-			expectedSec:    nowSeconds + 10,
-			expectedMillis: nowMillis, // parent's TimeMilliseconds
+			expectedSec:    nowSeconds,
+			expectedMillis: nowMillis,
 		},
 		{
 			name:           "current_time_milliseconds_before_parent_time_milliseconds",
 			parent:         generateHeader(nowSeconds, utils.NewUint64(nowMillis+10)),
 			now:            now,
 			expectedSec:    nowSeconds,
-			expectedMillis: nowMillis + 10, // parent's TimeMilliseconds
+			expectedMillis: nowMillis,
+		},
+		{
+			name:           "current_time_equals_parent_time_with_milliseconds_granite",
+			parent:         generateHeader(nowSeconds, utils.NewUint64(nowMillis)),
+			now:            now,
+			expectedSec:    nowSeconds,
+			expectedMillis: nowMillis,
+		},
+		{
+			name:           "current_timesec_equals_parent_time_with_less_milliseconds",
+			parent:         generateHeader(nowSeconds, utils.NewUint64(nowMillis-10)),
+			now:            now,
+			expectedSec:    nowSeconds,
+			expectedMillis: nowMillis,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			sec, millis := GetNextTimestamp(test.parent, test.now)
-			require.Equal(t, test.expectedSec, sec)
-			require.Equal(t, test.expectedMillis, millis)
+			time := GetNextTimestamp(test.parent, test.now)
+			require.Equal(t, test.expectedSec, uint64(time.Unix()))
+			require.Equal(t, test.expectedMillis, uint64(time.UnixMilli()))
 		})
 	}
+}
+
+func generateHeader(timeSeconds uint64, timeMilliseconds *uint64) *types.Header {
+	return customtypes.WithHeaderExtra(
+		&types.Header{
+			Time: timeSeconds,
+		},
+		&customtypes.HeaderExtra{
+			TimeMilliseconds: timeMilliseconds,
+		},
+	)
+}
+
+func generateHeaderWithMinDelayExcessAndTime(timeSeconds uint64, timeMilliseconds *uint64, minDelayExcess *uint64) *types.Header {
+	return customtypes.WithHeaderExtra(
+		&types.Header{
+			Time: timeSeconds,
+		},
+		&customtypes.HeaderExtra{
+			TimeMilliseconds: timeMilliseconds,
+			MinDelayExcess:   (*acp226.DelayExcess)(minDelayExcess),
+		},
+	)
 }
