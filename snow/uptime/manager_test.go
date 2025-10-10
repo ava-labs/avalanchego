@@ -230,13 +230,7 @@ func TestConnectAndDisconnect(t *testing.T) {
 
 	s.AddNode(nodeID0, startTime)
 
-	connected := up.IsConnected(nodeID0)
-	require.False(connected)
-
 	require.NoError(up.StartTracking([]ids.NodeID{nodeID0}))
-
-	connected = up.IsConnected(nodeID0)
-	require.False(connected)
 
 	duration, lastUpdated, err := up.CalculateUptime(nodeID0)
 	require.NoError(err)
@@ -244,9 +238,6 @@ func TestConnectAndDisconnect(t *testing.T) {
 	require.Equal(clk.UnixTime(), lastUpdated)
 
 	require.NoError(up.Connect(nodeID0))
-
-	connected = up.IsConnected(nodeID0)
-	require.True(connected)
 
 	currentTime = currentTime.Add(time.Second)
 	clk.Set(currentTime)
@@ -257,9 +248,6 @@ func TestConnectAndDisconnect(t *testing.T) {
 	require.Equal(clk.UnixTime(), lastUpdated)
 
 	require.NoError(up.Disconnect(nodeID0))
-
-	connected = up.IsConnected(nodeID0)
-	require.False(connected)
 
 	currentTime = currentTime.Add(time.Second)
 	clk.Set(currentTime)

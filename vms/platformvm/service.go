@@ -868,7 +868,7 @@ func (s *Service) getPrimaryOrSubnetValidators(subnetID ids.ID, nodeIDs set.Set[
 				if err != nil {
 					return nil, err
 				}
-				isConnected := s.vm.uptimeManager.IsConnected(currentStaker.NodeID)
+				isConnected := s.vm.Network.Peers().Has(currentStaker.NodeID)
 				connected = &isConnected
 				uptime = &currentUptime
 			}
