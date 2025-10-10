@@ -71,9 +71,14 @@ var statusCmd = &cobra.Command{
 }
 
 var syncCmd = &cobra.Command{
-	Use:   "sync [repos...]",
+	Use:   "sync [repo[@ref]...]",
 	Short: "Sync repositories for local development",
 	Long: `Clone or update repositories and add replace directives to go.mod.
+
+Repositories can be specified with an optional ref (branch, tag, or commit):
+  sync firewood@main
+  sync coreth@v0.13.8
+  sync avalanchego@57a74c3a7fd7dcdda24f49a237bfa9fa69f26a85
 
 If no repositories are specified, syncs based on the current directory:
 - From avalanchego: syncs coreth and firewood
@@ -93,16 +98,32 @@ Repositories will be cloned into the current directory with their repository nam
 		}
 
 		// Determine which repos to sync
-		var reposToSync []string
+		type repoWithRef struct {
+			name string
+			ref  string
+		}
+		var reposToSync []repoWithRef
+
 		if len(args) > 0 {
-			reposToSync = args
+			// Parse repo[@ref] format from args
+			for _, arg := range args {
+				repoName, ref, err := core.ParseRepoAndVersion(arg)
+				if err != nil {
+					return fmt.Errorf("invalid repo format %q: %w", arg, err)
+				}
+				reposToSync = append(reposToSync, repoWithRef{name: repoName, ref: ref})
+			}
 		} else {
 			// Auto-detect based on current repo
 			currentRepo, err := core.DetectCurrentRepo(baseDir)
 			if err != nil {
 				return fmt.Errorf("failed to detect current repo: %w", err)
 			}
-			reposToSync = core.GetReposToSync(currentRepo)
+			// Get repos to sync and use default branches
+			repos := core.GetReposToSync(currentRepo)
+			for _, repoName := range repos {
+				reposToSync = append(reposToSync, repoWithRef{name: repoName, ref: ""})
+			}
 		}
 
 		// Get path to go.mod
@@ -112,20 +133,30 @@ Repositories will be cloned into the current directory with their repository nam
 		}
 
 		// Sync each repository
-		for _, repoName := range reposToSync {
-			fmt.Printf("Syncing %s...\n", repoName)
+		for _, repo := range reposToSync {
+			if repo.ref != "" {
+				fmt.Printf("Syncing %s@%s...\n", repo.name, repo.ref)
+			} else {
+				fmt.Printf("Syncing %s...\n", repo.name)
+			}
 
-			config, err := core.GetRepoConfig(repoName)
+			config, err := core.GetRepoConfig(repo.name)
 			if err != nil {
 				return err
 			}
 
-			clonePath := core.GetRepoClonePath(repoName, baseDir)
+			clonePath := core.GetRepoClonePath(repo.name, baseDir)
+
+			// Use specified ref or default branch
+			refToUse := repo.ref
+			if refToUse == "" {
+				refToUse = config.DefaultBranch
+			}
 
 			// Clone or update the repo
-			err = core.CloneOrUpdateRepo(config.GitRepo, clonePath, config.DefaultBranch, depth, force)
+			err = core.CloneOrUpdateRepo(config.GitRepo, clonePath, refToUse, depth, force)
 			if err != nil {
-				return fmt.Errorf("failed to sync %s: %w", repoName, err)
+				return fmt.Errorf("failed to sync %s: %w", repo.name, err)
 			}
 
 			// Check if dirty (refuse unless forced)
@@ -138,26 +169,26 @@ Repositories will be cloned into the current directory with their repository nam
 
 			// Run nix build if required
 			if config.RequiresNixBuild {
-				fmt.Printf("Running nix build for %s...\n", repoName)
+				fmt.Printf("Running nix build for %s...\n", repo.name)
 				nixBuildPath := core.GetNixBuildPath(clonePath, config.NixBuildPath)
 				err = core.RunNixBuild(nixBuildPath)
 				if err != nil {
-					return fmt.Errorf("failed to run nix build for %s: %w", repoName, err)
+					return fmt.Errorf("failed to run nix build for %s: %w", repo.name, err)
 				}
 			}
 
 			// Add replace directive
-			replacePath := core.GetRepoClonePath(repoName, baseDir)
+			replacePath := core.GetRepoClonePath(repo.name, baseDir)
 			if config.ModuleReplacementPath != "." {
 				replacePath = replacePath + "/" + config.ModuleReplacementPath
 			}
 
 			err = core.AddReplaceDirective(goModPath, config.GoModule, replacePath)
 			if err != nil {
-				return fmt.Errorf("failed to add replace directive for %s: %w", repoName, err)
+				return fmt.Errorf("failed to add replace directive for %s: %w", repo.name, err)
 			}
 
-			fmt.Printf("Successfully synced %s\n", repoName)
+			fmt.Printf("Successfully synced %s\n", repo.name)
 		}
 
 		return nil
