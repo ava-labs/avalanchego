@@ -19,12 +19,12 @@ let
     };
 
   # Update the following to change the version:
-  goVersion = "1.24.7";
+  goVersion = "1.24.8";
   goSHA256s = {
-    "linux-amd64" = "da18191ddb7db8a9339816f3e2b54bdded8047cdc2a5d67059478f8d1595c43f";
-    "linux-arm64" = "fd2bccce882e29369f56c86487663bb78ba7ea9e02188a5b0269303a0c3d33ab";
-    "darwin-amd64" = "138b6be2138e83d2c90c23d3a2cc94fcb11864d8db0706bb1d1e0dde744dc46a";
-    "darwin-arm64" = "d06bad763f8820d3e29ee11f2c0c71438903c007e772a159c5760a300298302e";
+    "linux-amd64" = "6842c516ca66c89d648a7f1dbe28e28c47b61b59f8f06633eb2ceb1188e9251d";
+    "linux-arm64" = "38ac33b4cfa41e8a32132de7a87c6db49277ab5c0de1412512484db1ed77637e";
+    "darwin-amd64" = "ecb3cecb1e0bcfb24e50039701f9505b09744cc4730a8b9fc512b0a3b47cf232";
+    "darwin-arm64" = "0db27ff8c3e35fd93ccf9d31dd88a0f9c6454e8d9b30c28bd88a70b930cc4240";
   };
 
   targetSystem = parseSystem pkgs.system;

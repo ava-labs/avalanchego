@@ -36,6 +36,7 @@ func testBlockState(require *require.Assertions, bs BlockState) {
 		parentID,
 		timestamp,
 		pChainHeight,
+		block.Epoch{},
 		cert,
 		innerBlockBytes,
 		chainID,
