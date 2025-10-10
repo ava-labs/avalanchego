@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1760100253974,
+  "lastUpdate": 1760109037204,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -1520,6 +1520,64 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd - ms/ggas",
             "value": 13814,
+            "unit": "ms/ggas",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Stephen Buttolph",
+            "username": "StephenButtolph",
+            "email": "stephen@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "4c432d8b7ddf72b8eac57c32d6e13887cc083db8",
+          "message": "Remove duplicate header write (#4408)",
+          "timestamp": "2025-10-09T16:26:27Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/4c432d8b7ddf72b8eac57c32d6e13887cc083db8"
+        },
+        "date": 1760109035169,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
+            "value": 50.33,
+            "unit": "block_accept_ms/ggas\t        66.34 block_parse_ms/ggas\t     22722 block_verify_ms/ggas\t        43.78 mgas/s\t     22841 ms/ggas",
+            "extra": "1 times\n16 procs"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_accept_ms/ggas",
+            "value": 50.33,
+            "unit": "block_accept_ms/ggas",
+            "extra": "1 times\n16 procs"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_parse_ms/ggas",
+            "value": 66.34,
+            "unit": "block_parse_ms/ggas",
+            "extra": "1 times\n16 procs"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - block_verify_ms/ggas",
+            "value": 22722,
+            "unit": "block_verify_ms/ggas",
+            "extra": "1 times\n16 procs"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - mgas/s",
+            "value": 43.78,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          },
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast - ms/ggas",
+            "value": 22841,
             "unit": "ms/ggas",
             "extra": "1 times\n16 procs"
           }
