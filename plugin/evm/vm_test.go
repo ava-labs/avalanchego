@@ -36,7 +36,6 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/holiman/uint256"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -1610,7 +1609,7 @@ func TestWaitForEvent(t *testing.T) {
 		},
 		{
 			name: "WaitForEvent doesn't return if mempool is empty",
-			testCase: func(t *testing.T, vm *VM) {
+			testCase: func(_ *testing.T, vm *VM) {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
 				defer cancel()
 
@@ -1650,8 +1649,8 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(ctx)
-					assert.NoError(t, err)
-					assert.Equal(t, commonEng.PendingTxs, msg)
+					require.NoError(t, err)
+					require.Equal(t, commonEng.PendingTxs, msg)
 				}()
 				wg.Wait()
 			},
