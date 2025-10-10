@@ -327,3 +327,233 @@ The original spec uses `update-repo-a`, but with avalanchego/coreth/firewood nam
 - if the CWD has a go.mod file with the module name for avalanchego, sync firewood and coreth to the CWD and don't sync avalanchego
 - if the CWD has a go.mod file with the module name for coreth, sync avalanchego and firewood to the CWD and don't sync coreth
 - if the CWD has ./ffi/go.mod file with the module name for firewood/ffi, sync avalanchego and coreth to the CWD and don't sync firewood
+
+---
+
+## Final Implementation Plan
+
+### Project Structure
+```
+tests/fixture/polyrepo/
+├── main.go              # CLI entry point with Cobra commands
+└── core/
+    ├── config.go        # Hardcoded repo configurations
+    ├── repo.go          # Git operations using go-git
+    ├── gomod.go         # Go module manipulation using golang.org/x/mod/modfile
+    ├── status.go        # Status command implementation
+    ├── sync.go          # Sync command with mode detection
+    ├── reset.go         # Reset command implementation
+    ├── update.go        # Update-avalanchego command implementation
+    ├── nix.go           # Nix build operations for firewood
+    └── errors.go        # Custom error types and utilities
+```
+
+### Core Configuration
+
+**RepoConfig struct:**
+```go
+type RepoConfig struct {
+    Name                   string // "avalanchego", "coreth", "firewood"
+    GoModule               string // "github.com/ava-labs/avalanchego"
+    ModuleReplacementPath  string // "." or "./ffi/result/ffi"
+    GitRepo                string // "https://github.com/ava-labs/avalanchego"
+    DefaultBranch          string // "master" or "main"
+    GoModPath              string // "go.mod" or "ffi/go.mod"
+    RequiresNixBuild       bool   // true for firewood
+    NixBuildPath           string // "ffi" for firewood
+}
+```
+
+**Hardcoded configurations:**
+- **avalanchego**: module `github.com/ava-labs/avalanchego`, replacement path `.`, default branch `master`
+- **coreth**: module `github.com/ava-labs/coreth`, replacement path `.`, default branch `master`
+- **firewood**: module `github.com/ava-labs/firewood/ffi`, replacement path `./ffi/result/ffi`, default branch `main`, requires nix build in `ffi/`
+
+### Key Implementation Details
+
+#### 1. Mode Detection (Question 21)
+Detect current repository context by examining go.mod:
+- If CWD contains go.mod with `github.com/ava-labs/avalanchego`: sync coreth + firewood only
+- If CWD contains go.mod with `github.com/ava-labs/coreth`: sync avalanchego + firewood only
+- If CWD contains `./ffi/go.mod` with `github.com/ava-labs/firewood/ffi`: sync avalanchego + coreth only
+- Default (no matching go.mod): sync all 3 repos
+
+#### 2. Version Format Support (Question 12)
+- Git tags: `v1.2.3` ✓
+- Commit SHAs: Both full and short (error on ambiguous) ✓
+- Branch names: `main`, `feature-branch` ✓
+- Pseudo-versions: Not supported ✗
+
+#### 3. Firewood Special Handling (Question 11)
+1. Clone `https://github.com/ava-labs/firewood`
+2. Run `nix build` in `./firewood/ffi/` directory (shell out to nix CLI)
+3. Replace module `github.com/ava-labs/firewood/ffi` with `./firewood/ffi/result/ffi` in both avalanchego and coreth
+
+#### 4. Circular Dependency Handling (Question 19)
+- avalanchego ↔ coreth always get mutual replace directives
+- Automatic, no flag required
+- Applies whenever either repo is synced
+
+#### 5. Auto-sync Behavior (Question 18)
+- When syncing coreth or firewood, automatically include avalanchego (silent)
+- No messages, no confirmation required
+- Avalanchego is the integration point for testing
+
+#### 6. Clone Behavior
+- **Directory naming** (Q14): Use repo name directly (`avalanchego/`, `coreth/`, `firewood/`)
+- **Clone location** (Q7): Current working directory
+- **Shallow vs full** (Q8): Shallow by default (`--depth=1`), `--full` flag for full clones
+- **Existing clones** (Q15):
+  - Without `--force`: Error and refuse to sync
+  - With `--force`: Git fetch and checkout requested version (no re-clone)
+
+#### 7. Working Directory Checks (Question 16)
+- Check only repos being synced for dirty state
+- Do NOT check current repo where polyrepo is run from
+- Refuse to sync if any target repo is dirty
+
+#### 8. Replace Directive Paths (Question 17)
+- Use relative paths (e.g., `./coreth`, `./firewood/ffi/result/ffi`)
+- NOT absolute paths
+
+#### 9. Go Module Manipulation (Question 3)
+- Use `golang.org/x/mod/modfile` for both reading and writing
+- Run `go mod tidy` after making replace directive changes
+- No direct use of `go mod edit` commands
+
+#### 10. Git Operations (Question 10)
+- Use `go-git` library for all git operations
+- Support tags, branches, and commit SHAs
+- Proper error handling for ambiguous short SHAs
+
+### Commands Implementation
+
+#### `polyrepo status`
+Display current state:
+- List all known repos (avalanchego, coreth, firewood)
+- Show: version/ref checked out, local path, clean/dirty state
+- Show: active replace directives from go.mod
+- Detect current mode (which repo we're running from)
+
+#### `polyrepo sync [repo@version ...]`
+Sync dependencies for local development:
+
+**Behavior:**
+1. Detect current mode (which repos to sync)
+2. If no arguments: sync based on mode detection and go.mod versions
+3. If arguments provided: sync specified repos at specified versions
+4. Check for dirty working directories in target repos
+5. Clone repos if they don't exist (error if exist without `--force`)
+6. Auto-include avalanchego when syncing coreth/firewood (silent)
+7. Handle circular dependencies (mutual replaces for avalanchego ↔ coreth)
+8. For firewood: run `nix build` after clone/checkout
+9. Update go.mod with replace directives using `modfile`
+10. Run `go mod tidy` to update go.sum
+
+**Flags:**
+- `--full`: Full clone instead of shallow
+- `--force`: Update existing clones via fetch + checkout
+
+**Examples:**
+```bash
+polyrepo sync                           # sync based on mode detection
+polyrepo sync --full                    # sync with full clones
+polyrepo sync coreth@v0.13.8           # sync specific version
+polyrepo sync --force coreth firewood   # force update existing clones
+```
+
+#### `polyrepo reset [repo ...]`
+Remove local development setup:
+
+**Behavior:**
+1. Remove replace directives from go.mod using `modfile`
+2. If no arguments: remove all polyrepo-related replaces
+3. If arguments: remove only specified repo replaces
+4. Run `go mod tidy` to update go.sum
+
+**Examples:**
+```bash
+polyrepo reset           # remove all replaces
+polyrepo reset coreth    # remove only coreth replace
+```
+
+#### `polyrepo update-avalanchego [version]`
+Update avalanchego dependency (from coreth/firewood):
+
+**Behavior:**
+1. Error if run from avalanchego repo
+2. If version specified: update to that version
+3. If no version: use version currently in go.mod
+4. Update go.mod dependency using `modfile`
+5. Run `go mod tidy`
+6. (GitHub Actions update: ignore for now per Q9)
+
+**Examples:**
+```bash
+polyrepo update-avalanchego v1.11.11    # update to specific version
+polyrepo update-avalanchego              # update to current go.mod version
+```
+
+### Testing Strategy (Question 13)
+
+#### Unit Tests
+- **Config parsing**: Test repo configuration loading
+- **Go module operations**: Test modfile parsing and manipulation
+- **Version parsing**: Test parsing of tags, SHAs, branches
+
+#### Integration Tests - Git Operations
+Create test repo with 3 commits:
+1. First commit (tagged)
+2. Second commit (untagged)
+3. Third commit (on branch)
+
+**Tests:**
+- Clone with tag → verify first commit checked out
+- Clone with SHA → verify second commit checked out
+- Clone with branch → verify third commit checked out
+- Clone with branch, update to tag → verify tag commit
+- Clone with SHA, update to branch → verify branch commit
+- Clone with tag, update to different tag → verify new tag
+
+#### Integration Test - Full Workflow
+Test the complete sync workflow:
+1. Run `polyrepo sync` without arguments
+2. Verify `./avalanchego/.git` exists
+3. Verify coreth version determined from avalanchego's go.mod
+4. Verify `./coreth/.git` exists
+5. Verify both avalanchego and coreth have mutual replace directives
+6. Verify `go mod tidy` has run (go.sum updated)
+7. Verify firewood version determined from avalanchego's go.mod
+8. Verify `./firewood/.git` exists
+9. Verify `nix build` ran in `./firewood/ffi`
+10. Verify `./firewood/ffi/result/ffi` path exists
+11. Verify both avalanchego and coreth have firewood replace pointing to `./firewood/ffi/result/ffi`
+12. Run `cd avalanchego && ./scripts/run_task.sh test-unit` without error
+
+**No mocking** - use real git, nix, and modfile operations
+
+### Dependencies
+- `github.com/spf13/cobra` - CLI framework
+- `github.com/go-git/go-git/v5` - Git operations
+- `golang.org/x/mod/modfile` - Go module manipulation
+- `go.uber.org/zap` - Logging (if needed, following tmpnetctl pattern)
+
+### Error Handling
+- Clear error messages for:
+  - Dirty working directories
+  - Existing clones without `--force`
+  - Ambiguous short SHAs
+  - Network/authentication issues
+  - Nix build failures
+  - Invalid version formats
+  - Running update-avalanchego from avalanchego repo
+
+### Implementation Order
+1. **Core infrastructure**: config.go, errors.go
+2. **Go module operations**: gomod.go with modfile
+3. **Git operations**: repo.go with go-git
+4. **Nix operations**: nix.go for firewood builds
+5. **Command implementations**: status.go, sync.go, reset.go, update.go
+6. **CLI entry point**: main.go with Cobra
+7. **Unit tests**: Test each component
+8. **Integration tests**: Full workflow test
