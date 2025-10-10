@@ -1875,42 +1875,52 @@ curl -X POST --data '{
 
 ```json
 {
-  "jsonrpc": "2.0",
-  "result": {
-    "2JcZwv2xXxiFHSpRjBaGMK93D61zdyKx2piP95K27ykyUgqhAY": {
-      "validators": [
-        {
-          "publicKey": "0x97c71318cde9fe6839c30e1832c70983dbe7c9b0b371b0f582f9889612bf08039e51025598b41fa46b45e2a3376f03f4",
-          "weight": "200",
-          "nodeIDs": [
-            "NodeID-ADfrGxnezauCF7kUrEoyLzbx5UFaJQc53"
-          ]
+    "jsonrpc": "2.0",
+    "result": {
+        "validatorSets": {
+            "11111111111111111111111111111111LpoYY": {
+                "validators": [
+                    {
+                        "publicKey": "0x8048109c3da13de0700f9f3590c3270bfc42277417f6d0cc84282947e1a1f8b4980fd3e3fe223acf0f56a5838890814a",
+                        "weight": "2000000000000000",
+                        "nodeIDs": [
+                            "NodeID-P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5"
+                        ]
+                    },
+                    {
+                        "publicKey": "0xa058ff27a4c570664bfa28e34939368539a1340867951943d0f56fa8aac13bc09ff64f341acf8cc0cef74202c2d6f9c0",
+                        "weight": "2000000000000000",
+                        "nodeIDs": [
+                            "NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ"
+                        ]
+                    },
+                    {
+                        "publicKey": "0xa10b6955a85684a0f5c94b8381f04506f1bee60625927d372323f78b3d30196cc56c8618c77eaf429298e74673d832c3",
+                        "weight": "2000000000000000",
+                        "nodeIDs": [
+                            "NodeID-NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN"
+                        ]
+                    },
+                    {
+                        "publicKey": "0xaccd61ceb90c61628aa0fa34acab27ecb08f6897e9ccad283578c278c52109f9e10e4f8bc31aa6d7905c4e1623de367e",
+                        "weight": "2000000000000000",
+                        "nodeIDs": [
+                            "NodeID-GWPcbFJZFfZreETSoWjPimr846mXEKCtu"
+                        ]
+                    },
+                    {
+                        "publicKey": "0x900c9b119b5c82d781d4b49be78c3fc7ae65f2b435b7ed9e3a8b9a03e475edff86d8a64827fec8db23a6f236afbf127d",
+                        "weight": "2000000000000000",
+                        "nodeIDs": [
+                            "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg"
+                        ]
+                    }
+                ],
+                "totalWeight": "10000000000000000"
+            }
         }
-      ],
-      "totalWeight": "200"
     },
-    "u3Jjpzzj95827jdENvR1uc76f4zvvVQjGshbVWaSr2Ce5WV1H": {
-      "validators": [
-        {
-          "publicKey": "0xab0d56c98593744c5604a8ee4713ee139bf583eb2bc66bfaad66376f5d351ee657627cff184dfb27c278d9d6da9930d6",
-          "weight": "1000",
-          "nodeIDs": [
-            "NodeID-JEDBLtsdi2S8JvCjfStpcSLLaRmSPuApv"
-          ]
-        },
-        {
-          "publicKey": "0x96935382d34035816802ab6fc4eb29e60e2cf3164e8e9d3419339f3f09c8cd09ffe8c83c21c02f225a4b9e810453f729",
-          "weight": "500",
-          "nodeIDs": [
-            "NodeID-NmcC3gCqnCHUpWxLSmtvN9oCcBycZMfqM",
-            "NodeID-2XcmyLqKMPuCCZqfrWuqNQREKrwMwv4e8"
-          ]
-        }
-      ],
-      "totalWeight": "1500"
-    }
-  },
-  "id": 1
+    "id": 1
 }
 ```
 
