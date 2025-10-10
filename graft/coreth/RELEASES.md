@@ -9,7 +9,7 @@
   - Add `timeMilliseconds` (Unix uint64) timestamp to block header for Granite upgrade.
   - Add `minDelayExcess` (uint64) to block header for Granite upgrade.
   - Add minimum block building delays to conform the block builder to ACP-226 requirements.
-- Update go version to 1.24.7
+- Update go version to 1.24.8
 
 ## [v0.15.3](https://github.com/ava-labs/coreth/releases/tag/v0.15.3)
 
