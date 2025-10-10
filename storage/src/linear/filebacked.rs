@@ -25,6 +25,8 @@
 
 use std::fs::{File, OpenOptions};
 use std::io::Read;
+#[cfg(feature = "io-uring")]
+use std::mem::ManuallyDrop;
 use std::num::NonZero;
 #[cfg(unix)]
 use std::os::unix::fs::FileExt;
@@ -48,7 +50,32 @@ pub struct FileBacked {
     free_list_cache: Mutex<LruCache<LinearAddress, Option<LinearAddress>>>,
     cache_read_strategy: CacheReadStrategy,
     #[cfg(feature = "io-uring")]
-    pub(crate) ring: Mutex<io_uring::IoUring>,
+    pub(crate) ring: Mutex<ManuallyDrop<io_uring::IoUring>>,
+}
+
+impl Drop for FileBacked {
+    fn drop(&mut self) {
+        #[cfg(feature = "io-uring")]
+        {
+            // non-blocking because we have mutable access to self
+            let ring = self
+                .ring
+                .get_mut()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+
+            // We are manually dropping the ring here to ensure that it is
+            // flushed and dropped before we unlock the file descriptor.
+            #[expect(unsafe_code)]
+            // SAFETY: this is the only time `ring` is dropped. Furthermore,
+            // `Drop` ensures that this is only ever called once in a context
+            // where we are guaranteed to never use `ring` again.
+            unsafe {
+                ManuallyDrop::drop(ring);
+            }
+        }
+
+        _ = self.fd.unlock().ok();
+    }
 }
 
 // Manual implementation since ring doesn't implement Debug :(
@@ -149,7 +176,7 @@ impl FileBacked {
             cache_read_strategy,
             filename: path,
             #[cfg(feature = "io-uring")]
-            ring: ring.into(),
+            ring: Mutex::new(ManuallyDrop::new(ring)),
         })
     }
 }
