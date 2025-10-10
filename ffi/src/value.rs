@@ -11,12 +11,12 @@ mod results;
 pub use self::borrowed::{BorrowedBytes, BorrowedKeyValuePairs, BorrowedSlice};
 use self::display_hex::DisplayHex;
 pub use self::hash_key::HashKey;
-pub use self::kvp::KeyValuePair;
+pub use self::kvp::{KeyValuePair, OwnedKeyValuePair};
 pub use self::owned::{OwnedBytes, OwnedSlice};
 pub(crate) use self::results::{CResult, NullHandleResult};
 pub use self::results::{
-    ChangeProofResult, HandleResult, HashResult, NextKeyRangeResult, ProposalResult,
-    RangeProofResult, RevisionResult, ValueResult, VoidResult,
+    ChangeProofResult, HandleResult, HashResult, IteratorResult, KeyValueResult,
+    NextKeyRangeResult, ProposalResult, RangeProofResult, RevisionResult, ValueResult, VoidResult,
 };
 
 /// Maybe is a C-compatible optional type using a tagged union pattern.

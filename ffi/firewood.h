@@ -25,6 +25,11 @@ typedef struct ChangeProofContext ChangeProofContext;
 typedef struct DatabaseHandle DatabaseHandle;
 
 /**
+ * An opaque wrapper around a [`BoxKeyValueIter`].
+ */
+typedef struct IteratorHandle IteratorHandle;
+
+/**
  * An opaque wrapper around a Proposal that also retains a reference to the
  * database handle it was created from.
  */
@@ -648,6 +653,17 @@ typedef struct VerifyRangeProofArgs {
 } VerifyRangeProofArgs;
 
 /**
+ * Owned version of `KeyValuePair`, returned to ffi callers.
+ *
+ * C callers must free this using [`crate::fwd_free_owned_kv_pair`],
+ * not the C standard library's `free` function.
+ */
+typedef struct OwnedKeyValuePair {
+  OwnedBytes key;
+  OwnedBytes value;
+} OwnedKeyValuePair;
+
+/**
  * A result type returned from FFI functions that get a revision
  */
 typedef enum RevisionResult_Tag {
@@ -702,6 +718,94 @@ typedef struct RevisionResult {
     };
   };
 } RevisionResult;
+
+/**
+ * A result type returned from iterator FFI functions
+ */
+typedef enum KeyValueResult_Tag {
+  /**
+   * The caller provided a null pointer to an iterator handle.
+   */
+  KeyValueResult_NullHandlePointer,
+  /**
+   * The iterator is exhausted
+   */
+  KeyValueResult_None,
+  /**
+   * The next item is returned.
+   *
+   * The caller must call [`fwd_free_owned_bytes`] to free the memory
+   * associated with the key and the value of this pair.
+   *
+   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+   */
+  KeyValueResult_Some,
+  /**
+   * An error occurred and the message is returned as an [`OwnedBytes`]. The
+   * value is guaranteed to contain only valid UTF-8.
+   *
+   * The caller must call [`fwd_free_owned_bytes`] to free the memory
+   * associated with this error.
+   *
+   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+   */
+  KeyValueResult_Err,
+} KeyValueResult_Tag;
+
+typedef struct KeyValueResult {
+  KeyValueResult_Tag tag;
+  union {
+    struct {
+      struct OwnedKeyValuePair some;
+    };
+    struct {
+      OwnedBytes err;
+    };
+  };
+} KeyValueResult;
+
+/**
+ * A result type returned from FFI functions that create an iterator
+ */
+typedef enum IteratorResult_Tag {
+  /**
+   * The caller provided a null pointer to a revision/proposal handle.
+   */
+  IteratorResult_NullHandlePointer,
+  /**
+   * Building the iterator was successful and the iterator handle is returned
+   */
+  IteratorResult_Ok,
+  /**
+   * An error occurred and the message is returned as an [`OwnedBytes`].
+   *
+   * The caller must call [`fwd_free_owned_bytes`] to free the memory
+   * associated with this error.
+   *
+   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+   */
+  IteratorResult_Err,
+} IteratorResult_Tag;
+
+typedef struct IteratorResult_Ok_Body {
+  /**
+   * An opaque pointer to the [`IteratorHandle`].
+   * The value should be freed with [`fwd_free_iterator`]
+   *
+   * [`fwd_free_iterator`]: crate::fwd_free_iterator
+   */
+  struct IteratorHandle *handle;
+} IteratorResult_Ok_Body;
+
+typedef struct IteratorResult {
+  IteratorResult_Tag tag;
+  union {
+    IteratorResult_Ok_Body ok;
+    struct {
+      OwnedBytes err;
+    };
+  };
+} IteratorResult;
 
 /**
  * The result type returned from the open or create database functions.
@@ -1193,6 +1297,28 @@ struct VoidResult fwd_db_verify_range_proof(const struct DatabaseHandle *_db,
 struct VoidResult fwd_free_change_proof(struct ChangeProofContext *proof);
 
 /**
+ * Consumes the [`IteratorHandle`], destroys the iterator, and frees the memory.
+ *
+ * # Arguments
+ *
+ * * `iterator` - A pointer to a [`IteratorHandle`] previously returned from a
+ *   function from this library.
+ *
+ * # Returns
+ *
+ * - [`VoidResult::NullHandlePointer`] if the provided iterator handle is null.
+ * - [`VoidResult::Ok`] if the iterator was successfully freed.
+ * - [`VoidResult::Err`] if the process panics while freeing the memory.
+ *
+ * # Safety
+ *
+ * The caller must ensure that the `iterator` is not null and that it points to
+ * a valid [`IteratorHandle`] previously returned by a function from this library.
+ *
+ */
+struct VoidResult fwd_free_iterator(struct IteratorHandle *iterator);
+
+/**
  * Consumes the [`OwnedBytes`] and frees the memory associated with it.
  *
  * # Arguments
@@ -1212,6 +1338,25 @@ struct VoidResult fwd_free_change_proof(struct ChangeProofContext *proof);
  * this function does nothing.
  */
 struct VoidResult fwd_free_owned_bytes(OwnedBytes bytes);
+
+/**
+ * Consumes the [`OwnedKeyValuePair`] and frees the memory associated with it.
+ *
+ * # Arguments
+ *
+ * * `kv` - The [`OwnedKeyValuePair`] struct to free, previously returned from any
+ *   function from this library.
+ *
+ * # Returns
+ *
+ * - [`VoidResult::Ok`] if the memory was successfully freed.
+ * - [`VoidResult::Err`] if the process panics while freeing the memory.
+ *
+ * # Safety
+ *
+ * The caller must ensure that the `kv` struct is valid.
+ */
+struct VoidResult fwd_free_owned_kv_pair(struct OwnedKeyValuePair kv);
 
 /**
  * Consumes the [`ProposalHandle`], cancels the proposal, and frees the memory.
@@ -1428,6 +1573,82 @@ struct ValueResult fwd_get_latest(const struct DatabaseHandle *db, BorrowedBytes
  * [`RevisionHandle`]: crate::revision::RevisionHandle
  */
 struct RevisionResult fwd_get_revision(const struct DatabaseHandle *db, BorrowedBytes root);
+
+/**
+ * Retrieves the next item from the iterator
+ *
+ * # Arguments
+ *
+ * * `handle` - The iterator handle returned by [`fwd_iter_on_revision`] or
+ *   [`fwd_iter_on_proposal`].
+ *
+ * # Returns
+ *
+ * - [`KeyValueResult::NullHandlePointer`] if the provided iterator handle is null.
+ * - [`KeyValueResult::None`] if the iterator doesn't have any remaining values/exhausted.
+ * - [`KeyValueResult::Some`] if the next item on iterator was retrieved, with the associated
+ *   key value pair.
+ * - [`KeyValueResult::Err`] if an error occurred while retrieving the next item on iterator.
+ *
+ * # Safety
+ *
+ * The caller must:
+ * * ensure that `handle` is a valid pointer to a [`IteratorHandle`].
+ * * call [`fwd_free_owned_bytes`] on [`OwnedKeyValuePair::key`] and [`OwnedKeyValuePair::value`]
+ *   to free the memory associated with the returned error or value.
+ *
+ */
+struct KeyValueResult fwd_iter_next(struct IteratorHandle *handle);
+
+/**
+ * Returns an iterator on the provided proposal optionally starting from a key
+ *
+ * # Arguments
+ *
+ * * `handle` - The proposal handle returned by [`fwd_propose_on_db`] or
+ *   [`fwd_propose_on_proposal`].
+ * * `key` - The key to look up as a [`BorrowedBytes`]
+ *
+ * # Returns
+ *
+ * - [`IteratorResult::NullHandlePointer`] if the provided proposal handle is null.
+ * - [`IteratorResult::Ok`] if the iterator was created, with the iterator handle.
+ * - [`IteratorResult::Err`] if an error occurred while creating the iterator.
+ *
+ * # Safety
+ *
+ * The caller must:
+ * * ensure that `handle` is a valid pointer to a [`ProposalHandle`]
+ * * ensure that `key` is a valid for [`BorrowedBytes`]
+ * * call [`fwd_free_iterator`] to free the memory associated with the iterator.
+ *
+ */
+struct IteratorResult fwd_iter_on_proposal(const struct ProposalHandle *handle, BorrowedBytes key);
+
+/**
+ * Returns an iterator optionally starting from a key in the provided revision.
+ *
+ * # Arguments
+ *
+ * * `revision` - The revision handle returned by [`fwd_get_revision`].
+ * * `key` - The key to look up as a [`BorrowedBytes`]
+ *
+ * # Returns
+ *
+ * - [`IteratorResult::NullHandlePointer`] if the provided revision handle is null.
+ * - [`IteratorResult::Ok`] if the iterator was created, with the iterator handle.
+ * - [`IteratorResult::Err`] if an error occurred while creating the iterator.
+ *
+ * # Safety
+ *
+ * The caller must:
+ * * ensure that `revision` is a valid pointer to a [`RevisionHandle`]
+ * * ensure that `key` is a valid [`BorrowedBytes`]
+ * * call [`fwd_free_iterator`] to free the memory associated with the iterator.
+ *
+ */
+struct IteratorResult fwd_iter_on_revision(const struct RevisionHandle *revision,
+                                           BorrowedBytes key);
 
 /**
  * Open a database with the given arguments.

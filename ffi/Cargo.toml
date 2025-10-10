@@ -31,6 +31,7 @@ chrono = "0.4.42"
 oxhttp = "0.3.1"
 # Optional dependencies
 env_logger = { workspace = true, optional = true }
+derive-where = "1.6.0"
 
 [target.'cfg(unix)'.dependencies]
 tikv-jemallocator = "0.6.0"

@@ -24,6 +24,7 @@
 
 mod arc_cache;
 mod handle;
+mod iterator;
 mod logging;
 mod metrics_setup;
 mod proofs;
@@ -34,6 +35,7 @@ mod value;
 use firewood::v2::api::DbView;
 
 pub use crate::handle::*;
+pub use crate::iterator::*;
 pub use crate::logging::*;
 pub use crate::proofs::*;
 pub use crate::proposal::*;
@@ -107,6 +109,115 @@ pub unsafe extern "C" fn fwd_get_latest(
     key: BorrowedBytes,
 ) -> ValueResult {
     invoke_with_handle(db, move |db| db.get_latest(key))
+}
+
+/// Returns an iterator optionally starting from a key in the provided revision.
+///
+/// # Arguments
+///
+/// * `revision` - The revision handle returned by [`fwd_get_revision`].
+/// * `key` - The key to look up as a [`BorrowedBytes`]
+///
+/// # Returns
+///
+/// - [`IteratorResult::NullHandlePointer`] if the provided revision handle is null.
+/// - [`IteratorResult::Ok`] if the iterator was created, with the iterator handle.
+/// - [`IteratorResult::Err`] if an error occurred while creating the iterator.
+///
+/// # Safety
+///
+/// The caller must:
+/// * ensure that `revision` is a valid pointer to a [`RevisionHandle`]
+/// * ensure that `key` is a valid [`BorrowedBytes`]
+/// * call [`fwd_free_iterator`] to free the memory associated with the iterator.
+///
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fwd_iter_on_revision<'view>(
+    revision: Option<&'view RevisionHandle>,
+    key: BorrowedBytes,
+) -> IteratorResult<'view> {
+    invoke_with_handle(revision, move |rev| rev.iter_from(Some(key.as_slice())))
+}
+
+/// Returns an iterator on the provided proposal optionally starting from a key
+///
+/// # Arguments
+///
+/// * `handle` - The proposal handle returned by [`fwd_propose_on_db`] or
+///   [`fwd_propose_on_proposal`].
+/// * `key` - The key to look up as a [`BorrowedBytes`]
+///
+/// # Returns
+///
+/// - [`IteratorResult::NullHandlePointer`] if the provided proposal handle is null.
+/// - [`IteratorResult::Ok`] if the iterator was created, with the iterator handle.
+/// - [`IteratorResult::Err`] if an error occurred while creating the iterator.
+///
+/// # Safety
+///
+/// The caller must:
+/// * ensure that `handle` is a valid pointer to a [`ProposalHandle`]
+/// * ensure that `key` is a valid for [`BorrowedBytes`]
+/// * call [`fwd_free_iterator`] to free the memory associated with the iterator.
+///
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fwd_iter_on_proposal<'p>(
+    handle: Option<&'p ProposalHandle<'_>>,
+    key: BorrowedBytes,
+) -> IteratorResult<'p> {
+    invoke_with_handle(handle, move |p| p.iter_from(Some(key.as_slice())))
+}
+
+/// Retrieves the next item from the iterator
+///
+/// # Arguments
+///
+/// * `handle` - The iterator handle returned by [`fwd_iter_on_revision`] or
+///   [`fwd_iter_on_proposal`].
+///
+/// # Returns
+///
+/// - [`KeyValueResult::NullHandlePointer`] if the provided iterator handle is null.
+/// - [`KeyValueResult::None`] if the iterator doesn't have any remaining values/exhausted.
+/// - [`KeyValueResult::Some`] if the next item on iterator was retrieved, with the associated
+///   key value pair.
+/// - [`KeyValueResult::Err`] if an error occurred while retrieving the next item on iterator.
+///
+/// # Safety
+///
+/// The caller must:
+/// * ensure that `handle` is a valid pointer to a [`IteratorHandle`].
+/// * call [`fwd_free_owned_bytes`] on [`OwnedKeyValuePair::key`] and [`OwnedKeyValuePair::value`]
+///   to free the memory associated with the returned error or value.
+///
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fwd_iter_next(handle: Option<&mut IteratorHandle<'_>>) -> KeyValueResult {
+    invoke_with_handle(handle, |it| it.next())
+}
+
+/// Consumes the [`IteratorHandle`], destroys the iterator, and frees the memory.
+///
+/// # Arguments
+///
+/// * `iterator` - A pointer to a [`IteratorHandle`] previously returned from a
+///   function from this library.
+///
+/// # Returns
+///
+/// - [`VoidResult::NullHandlePointer`] if the provided iterator handle is null.
+/// - [`VoidResult::Ok`] if the iterator was successfully freed.
+/// - [`VoidResult::Err`] if the process panics while freeing the memory.
+///
+/// # Safety
+///
+/// The caller must ensure that the `iterator` is not null and that it points to
+/// a valid [`IteratorHandle`] previously returned by a function from this library.
+///
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fwd_free_iterator(
+    iterator: Option<Box<IteratorHandle<'_>>>,
+) -> VoidResult {
+    invoke_with_handle(iterator, drop)
 }
 
 /// Gets a handle to the revision identified by the provided root hash.
@@ -580,4 +691,24 @@ pub unsafe extern "C" fn fwd_close_db(db: Option<Box<DatabaseHandle>>) -> VoidRe
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_free_owned_bytes(bytes: OwnedBytes) -> VoidResult {
     invoke(move || drop(bytes))
+}
+
+/// Consumes the [`OwnedKeyValuePair`] and frees the memory associated with it.
+///
+/// # Arguments
+///
+/// * `kv` - The [`OwnedKeyValuePair`] struct to free, previously returned from any
+///   function from this library.
+///
+/// # Returns
+///
+/// - [`VoidResult::Ok`] if the memory was successfully freed.
+/// - [`VoidResult::Err`] if the process panics while freeing the memory.
+///
+/// # Safety
+///
+/// The caller must ensure that the `kv` struct is valid.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fwd_free_owned_kv_pair(kv: OwnedKeyValuePair) -> VoidResult {
+    invoke(move || drop(kv))
 }
