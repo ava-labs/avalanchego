@@ -1809,12 +1809,12 @@ func (s *Service) GetAllValidatorsAt(r *http.Request, args *GetAllValidatorsAtAr
 	ctx := r.Context()
 	height, err := s.getQueryHeight(ctx, args.Height)
 	if err != nil {
-		return fmt.Errorf("failed to get query height: %w", err)
+		return err
 	}
 
 	reply.ValidatorSets, err = s.vm.GetWarpValidatorSets(ctx, height)
 	if err != nil {
-		return fmt.Errorf("failed to get validator sets: %w", err)
+		return fmt.Errorf("failed to get validator sets at %d: %w", height, err)
 	}
 	return nil
 }
@@ -1822,11 +1822,15 @@ func (s *Service) GetAllValidatorsAt(r *http.Request, args *GetAllValidatorsAtAr
 // If args.Height is the sentinel value for proposed height, gets the proposed height and return it,
 // else returns the input height.
 func (s *Service) getQueryHeight(ctx context.Context, heightArg platformapi.Height) (uint64, error) {
-	if heightArg.IsProposed() {
-		return s.vm.GetMinimumHeight(ctx)
+	if !heightArg.IsProposed() {
+		return uint64(heightArg), nil
 	}
 
-	return uint64(heightArg), nil
+	height, err := s.vm.GetMinimumHeight(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get proposed height: %w", err)
+	}
+	return height, nil
 }
 
 // GetValidatorsAtArgs is the response from GetValidatorsAt
@@ -1916,12 +1920,12 @@ func (s *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, re
 	ctx := r.Context()
 	height, err := s.getQueryHeight(ctx, args.Height)
 	if err != nil {
-		return fmt.Errorf("failed to get query height: %w", err)
+		return err
 	}
 
 	reply.Validators, err = s.vm.GetValidatorSet(ctx, height, args.SubnetID)
 	if err != nil {
-		return fmt.Errorf("failed to get validator set: %w", err)
+		return fmt.Errorf("failed to get validator set at %d: %w", height, err)
 	}
 	return nil
 }
