@@ -363,7 +363,7 @@ mod test {
 
     #[test]
     fn test_proposal_reads() {
-        let db = testdb();
+        let db = TestDb::new();
         let batch = vec![BatchOp::Put {
             key: b"k",
             value: b"v",
@@ -388,7 +388,7 @@ mod test {
 
     #[test]
     fn reopen_test() {
-        let db = testdb();
+        let db = TestDb::new();
         let initial_root = db.root_hash().unwrap();
         let batch = vec![
             BatchOp::Put {
@@ -422,7 +422,7 @@ mod test {
     // R1 --> P2 - will get dropped
     //    \-> P3 - will get orphaned, but it's still known
     fn test_proposal_scope_historic() {
-        let db = testdb();
+        let db = TestDb::new();
         let batch1 = vec![BatchOp::Put {
             key: b"k1",
             value: b"v1",
@@ -474,7 +474,7 @@ mod test {
     //   \-> P2 - will get dropped
     //    \-> P3 - will get orphaned, but it's still known
     fn test_proposal_scope_orphan() {
-        let db = testdb();
+        let db = TestDb::new();
         let batch1 = vec![BatchOp::Put {
             key: b"k1",
             value: b"v1",
@@ -525,7 +525,7 @@ mod test {
 
     #[test]
     fn test_view_sync() {
-        let db = testdb();
+        let db = TestDb::new();
 
         // Create and commit some data to get a historical revision
         let batch = vec![BatchOp::Put {
@@ -564,7 +564,7 @@ mod test {
         // number of keys and values to create for this test
         const N: usize = 20;
 
-        let db = testdb();
+        let db = TestDb::new();
 
         // create N keys and values like (key0, value0)..(keyN, valueN)
         let (keys, vals): (Vec<_>, Vec<_>) = (0..N)
@@ -623,7 +623,7 @@ mod test {
     fn fuzz_checker() {
         let rng = firewood_storage::SeededRng::from_env_or_random();
 
-        let db = testdb();
+        let db = TestDb::new();
 
         // takes about 0.3s on a mac to run 50 times
         for _ in 0..50 {
@@ -670,7 +670,7 @@ mod test {
         const NUM_KEYS: NonZeroUsize = const { NonZeroUsize::new(2).unwrap() };
         const NUM_PROPOSALS: usize = 100;
 
-        let db = testdb();
+        let db = TestDb::new();
 
         let ops = (0..(NUM_KEYS.get() * NUM_PROPOSALS))
             .map(|i| (format!("key{i}"), format!("value{i}")))
@@ -723,7 +723,7 @@ mod test {
 
         const CHANNEL_CAPACITY: usize = 8;
 
-        let testdb = testdb();
+        let testdb = TestDb::new();
         let db = &testdb.db;
 
         let (tx, rx) = std::sync::mpsc::sync_channel::<Proposal<'_>>(CHANNEL_CAPACITY);
@@ -783,17 +783,17 @@ mod test {
         }
     }
 
-    fn testdb() -> TestDb {
-        let tmpdir = tempfile::tempdir().unwrap();
-        let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
-            .iter()
-            .collect();
-        let dbconfig = DbConfig::builder().build();
-        let db = Db::new(dbpath, dbconfig).unwrap();
-        TestDb { db, tmpdir }
-    }
-
     impl TestDb {
+        fn new() -> Self {
+            let tmpdir = tempfile::tempdir().unwrap();
+            let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
+                .iter()
+                .collect();
+            let dbconfig = DbConfig::builder().build();
+            let db = Db::new(dbpath, dbconfig).unwrap();
+            TestDb { db, tmpdir }
+        }
+
         fn path(&self) -> PathBuf {
             [self.tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
                 .iter()
