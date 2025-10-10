@@ -209,7 +209,7 @@ func sign(tx *atomic.Tx, signHash bool, txSigners [][]keychain.Signer) error {
 			if signHash {
 				sig, err = signer.SignHash(unsignedHash)
 			} else {
-				sig, err = signer.Sign(unsignedBytes)
+				sig, err = signer.Sign(unsignedBytes, keychain.WithChainAlias(Alias))
 			}
 			if err != nil {
 				return fmt.Errorf("problem signing tx: %w", err)

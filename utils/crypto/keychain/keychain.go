@@ -22,10 +22,10 @@ var (
 )
 
 // Signer implements functions for a keychain to return its main address and
-// to sign a hash
+// to sign a hash or transaction
 type Signer interface {
 	SignHash([]byte) ([]byte, error)
-	Sign([]byte) ([]byte, error)
+	Sign([]byte, ...SigningOption) ([]byte, error)
 	Address() ids.ShortID
 }
 
@@ -141,7 +141,8 @@ func (l *ledgerSigner) SignHash(b []byte) ([]byte, error) {
 }
 
 // expects to receive the unsigned tx bytes
-func (l *ledgerSigner) Sign(b []byte) ([]byte, error) {
+func (l *ledgerSigner) Sign(b []byte, _ ...SigningOption) ([]byte, error) {
+	// Ignore options - Ledger signing doesn't need chain/network context
 	// Sign using the address with index l.idx on the ledger device. The number
 	// of returned signatures should be the same length as the provided indices.
 	sigs, err := l.ledger.Sign(b, []uint32{l.idx})
