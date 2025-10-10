@@ -181,9 +181,9 @@ polyrepo update-repo-a v1.3.0
 
 ### 3. Go Module Parsing and Manipulation
 - Which library/approach should be used for parsing and modifying go.mod files?
-  - Research some options and present to me.
+  - Use golang.org/x/mod/modfile for both reading and writing
 - How should we handle go.sum files?
-  - What do you mean?
+  - Run `go mod tidy` after making replace directive changes
 
 ### 4. CLI Framework
 - Which CLI framework to use (cobra, flag package, urfave/cli, etc.)?
@@ -224,3 +224,106 @@ polyrepo update-repo-a v1.3.0
 
 ### 10. What tooling should be used for git interaction
  - go-git
+
+---
+
+## New Open Questions for Implementation
+
+### 11. Firewood Module Path Clarification
+When syncing firewood, the tool should:
+- Clone from: `https://github.com/ava-labs/firewood`
+- Replace module `github.com/ava-labs/firewood/ffi` with `<cloned-path>/ffi`
+
+Is this understanding correct?
+- !! Not quite:
+  - clone
+  - `nix build` in ffi path (e.g. cd ffi && nix build), invoke nix as a cli command
+  - replace module `github.com/ava-labs/firewood/ffi` in both coreth and avalanchego with `<cloned-path>/ffi/result/ffi`
+
+### 12. Version Format Support
+What version formats should be supported in `repo@version` syntax?
+- Git tags (e.g., `v1.2.3`): !! Yes
+- Commit SHAs (e.g., `abc123` or full SHA): !! Both, presumably an unresolveable/ambiguously short sha would result in an error?
+- Branch names (e.g., `main`, `feature-branch`): !! Yes
+- Pseudo-versions (e.g., `v0.0.0-20240101120000-abc123def456`): !! No
+
+### 13. Testing Strategy
+What level of testing is expected for the initial implementation?
+- Unit tests for config and go.mod parsing logic: !! Use `golang.org/x/mod/modfile`
+- Unit tests for git operations (mocked): !! Mocking is the devil, don't bother.
+- Integration tests with real git operations: !! Yes, but only for the git operations:
+    - create a test repo and make 3 commits
+    - tag first commit
+    - perform 3 tests of inital cloning, one for each supported format
+      - tag (should result in first commit)
+      - sha (should result in second commit)
+      - branch (should result in third commit)
+    - perform 3 tests of update,
+      - clone with branch, update to tag
+      - clone with sha, update to branch
+      - clone with tag, update to tag
+- !! Integration test with real repos and replace directives. This flow also indicates the desired behavior that must be implemented
+  - perform a `polyrepo sync` without arguments
+  - `cd avalanchego && ./scripts/run_task.sh test-unit` without error
+  - the intended behavior that should be observed. The part in bracket represents tests that should be performed after `polyrepo sync` but before unit test execution
+    - clone avalanchego@master (verify that ./avalanchego/.git exists)
+    - determine the version of coreth from the avalanchego clone's go.mod
+    - clone coreth@[avalanchego version] (verify that ./coreth/.git exists)
+    - Use golang.org/x/mod/modfile to 'go mod replace' both avalanchego and coreth to their local paths and `go tidy` (or modfile equivalent) to update go.sum
+    - determine the version of firewood from the avalanchego clone's go.mod
+    - clone firewood@[firewood version] (verify that ./firewood/.git exists)
+    - run `cd ./firewood/ffi & nix build`
+    - Use golang.org/x/mod/modfile to 'go mod replace' both avalanchego and coreth to firewood's ./ffi/result/ffi path
+- Manual testing only initially: !! No! The integration test should replace the need for manual testing
+
+### 14. Clone Directory Naming
+When cloning repos to the current working directory, what should the directory names be?
+- Use repo name (e.g., `avalanchego/`, `coreth/`, `firewood/`): !! For now, yes. Easy to change
+- Use a prefix (e.g., `polyrepo-avalanchego/`): !! No
+- Use a subdirectory (e.g., `.polyrepo/avalanchego/`): !! No
+- Other: !! No
+
+### 15. Existing Clone Behavior
+If a repo directory already exists:
+- Without `--force`: Error and refuse to sync: !! Yes, refuse to sync
+- With `--force`: What should happen?
+  - Delete and re-clone: !! No
+  - Git fetch and checkout the requested version: !! Yes
+  - Other: !! No
+
+### 16. Dirty Working Directory Check
+Should the dirty working directory check apply to:
+- Only the current repo (where polyrepo is run from): !! No
+- Only the repos being synced: !! Yes, because only the repos being synced are going to be updated
+- Both current repo and repos being synced: !! no
+
+### 17. Replace Directive Paths
+When adding replace directives, should the paths be:
+- Relative to the current directory (e.g., `./coreth`): !! Relative
+- Absolute paths: !! No
+
+### 18. Auto-sync Avalanchego Behavior
+The spec says "when syncing coreth, automatically include avalanchego" and "when syncing firewood from coreth, automatically clone avalanchego".
+
+Should this behavior:
+- Always happen automatically (silent): !! Yes - the idea is that avalanchego is the integration point without which the other 2 repos can't be tested
+- Happen automatically but print a message: !! No
+- Require user confirmation: !! No
+
+### 19. Circular Dependency Resolution
+When syncing avalanchego ↔ coreth:
+- Should both repos always get mutual replace directives: !! yes
+- Should this only happen if both repos are being synced: !! no
+- Should this be automatic or require a flag: !! automatic
+
+### 20. Command Naming
+The original spec uses `update-repo-a`, but with avalanchego/coreth/firewood naming:
+- Should the command be `update-avalanchego`: !! Yes
+- Should it be more generic like `update-dependency <repo> [version]`: !! No, only avalanchego needs more than `go get` for updating resources since there are github actions and maybe an entry in polyrepo tools/go.mod that need to be kept in sync with a change to go.mod for a given repo.
+- Keep as `update-avalanchego` for now: !! Yes
+
+### 21. Modes of execution !!
+- By default, sync (clone) all 3 repos to current working directory (CWD)
+- if the CWD has a go.mod file with the module name for avalanchego, sync firewood and coreth to the CWD and don't sync avalanchego
+- if the CWD has a go.mod file with the module name for coreth, sync avalanchego and firewood to the CWD and don't sync coreth
+- if the CWD has ./ffi/go.mod file with the module name for firewood/ffi, sync avalanchego and coreth to the CWD and don't sync firewood
