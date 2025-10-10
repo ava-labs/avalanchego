@@ -151,26 +151,55 @@ polyrepo update-repo-a v1.3.0
 
 ### 1. Project Structure
 - Where should the polyrepo tool live in the codebase?
+  - ./tests/fixture/polyrepo/main.go for the entrypoint
+  - ./tests/fixture/polyrepo/core/ for the implementation
 - Should it be a standalone binary or integrated into existing tooling?
+  - it should be a standalone tool
 
 ### 2. Hardcoded Configuration
-- What are the actual repository names and GitHub URLs?
-- What are the default refs (branches) for each repo?
-- What is the GoModPath for each repo (especially repo-c)?
+- What is the configuration for each repo?
+  - name: avalanchego
+    go-module: github.com/ava-labs/avalanchego
+    module-replacement-path: .
+    git-repo: https://[go-module]
+    default-branch: master
+    # for each of the other repos will need to be updated with `go mod edit -replace`
+    go-mod-path: go.mod
+  - name: coreth
+    go-module: github.com/ava-labs/coreth
+    module-replacement-path: .
+    repo: https://[go-module]
+    default-branch: master
+    # for each of the other repos will need to be updated with `go mod edit -replace`
+    go-mod-path: go.mod
+  - name: firewood
+    go-module: github.com/ava-labs/firewood/ffi
+    module-replacement-path: ./ffi
+    git-repo: https://github.com/ava-labs/firewood
+    default-branch: main
+    go-mod-path: # no go mod path necessary since it doesn't depend on the other 2 repos
 
 ### 3. Go Module Parsing and Manipulation
 - Which library/approach should be used for parsing and modifying go.mod files?
+  - Research some options and present to me.
 - How should we handle go.sum files?
+  - What do you mean?
 
 ### 4. CLI Framework
 - Which CLI framework to use (cobra, flag package, urfave/cli, etc.)?
+  - cobra
 - Preferred command structure and flag conventions?
+  - see tests/fixture/tmpnet/tmpnetctl.go
 
 ### 5. Error Handling and Edge Cases
 - How should the tool handle dirty working directories?
+  - Refuse to sync
 - What happens if a repo is already cloned but at the wrong version?
+  - Refuse to sync unless --force is provided
 - Should the tool verify network connectivity before attempting clones?
+  - No, the error should make that obvious
 - How to handle authentication issues with private repos?
+  - Private repos aren't supported
 
 ### 6. Testing Strategy
 - Unit tests for config and parsing logic?
@@ -179,12 +208,19 @@ polyrepo update-repo-a v1.3.0
 
 ### 7. Clone Location
 - Where should cloned repos be stored (relative to current repo, temp directory, user config directory)?
+  - for now, clone to the cwd
 - Should this be configurable?
+  - for now, no
 
 ### 8. Update Behavior
 - Should `polyrepo sync` update existing clones or skip them?
+  - Existing clones should be ignored without --force
 - Should there be a `--force` flag to re-clone?
+  - Not to reclone, only to update the version
 
-### 9. GitHub Actions Update Logic
+### 9. GitHub Actions Update Logic !Ignore this for now!
 - What specific GitHub Actions files need to be updated by `update-repo-a`?
 - What is the exact format/pattern for the references that need updating?
+
+### 10. What tooling should be used for git interaction
+ - go-git
