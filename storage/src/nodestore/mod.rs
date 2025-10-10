@@ -107,7 +107,7 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
         let mut header_bytes = vec![0u8; std::mem::size_of::<NodeStoreHeader>()];
         if let Err(e) = stream.read_exact(&mut header_bytes) {
             if e.kind() == std::io::ErrorKind::UnexpectedEof {
-                return Self::new_empty_committed(storage.clone());
+                return Ok(Self::new_empty_committed(storage.clone()));
             }
             return Err(storage.file_io_error(e, 0, Some("header read".to_string())));
         }
@@ -139,21 +139,17 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
 
     /// Create a new, empty, Committed [`NodeStore`] and clobber
     /// the underlying store with an empty freelist and no root node
-    ///
-    /// # Errors
-    ///
-    /// Returns a [`FileIoError`] if the storage cannot be accessed.
-    pub fn new_empty_committed(storage: Arc<S>) -> Result<Self, FileIoError> {
+    pub fn new_empty_committed(storage: Arc<S>) -> Self {
         let header = NodeStoreHeader::new();
 
-        Ok(Self {
+        Self {
             header,
             storage,
             kind: Committed {
                 deleted: Box::default(),
                 root: None,
             },
-        })
+        }
     }
 }
 
@@ -840,7 +836,7 @@ mod tests {
     fn test_reparent() {
         // create an empty base revision
         let memstore = MemStore::new(vec![]);
-        let base = NodeStore::new_empty_committed(memstore.into()).unwrap();
+        let base = NodeStore::new_empty_committed(memstore.into());
 
         // create an empty r1, check that it's parent is the empty committed version
         let r1 = NodeStore::new(&base).unwrap();

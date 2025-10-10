@@ -52,7 +52,7 @@ where
     V: AsRef<[u8]>,
 {
     let memstore = Arc::new(MemStore::new(Vec::with_capacity(64 * 1024)));
-    let base = Merkle::from(NodeStore::new_empty_committed(memstore.clone()).unwrap());
+    let base = Merkle::from(NodeStore::new_empty_committed(memstore.clone()));
     let mut merkle = base.fork().unwrap();
 
     for (k, v) in iter.clone() {

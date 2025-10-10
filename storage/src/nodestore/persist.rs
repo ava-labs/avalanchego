@@ -678,7 +678,7 @@ mod tests {
     fn test_into_committed_with_generic_storage() {
         // Create a base committed store with MemStore
         let mem_store = MemStore::new(vec![]);
-        let base_committed = NodeStore::new_empty_committed(mem_store.into()).unwrap();
+        let base_committed = NodeStore::new_empty_committed(mem_store.into());
 
         // Create a mutable proposal from the base
         let mut mutable_store = NodeStore::new(&base_committed).unwrap();
@@ -756,14 +756,14 @@ mod tests {
                 .unwrap(),
             );
 
-            let mut ns = NodeStore::new_empty_committed(fb.clone()).unwrap();
+            let mut ns = NodeStore::new_empty_committed(fb.clone());
 
             assert!(ns.downcast_to_file_backed().is_some());
         }
 
         {
             let ms = Arc::new(MemStore::new(vec![]));
-            let mut ns = NodeStore::new_empty_committed(ms.clone()).unwrap();
+            let mut ns = NodeStore::new_empty_committed(ms.clone());
             assert!(ns.downcast_to_file_backed().is_none());
         }
     }
