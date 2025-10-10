@@ -34,8 +34,8 @@ func TestWarpJSON(t *testing.T) {
 		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
 		Weight:         12345,
 		NodeIDs: []ids.NodeID{
-			ids.NodeID{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07},
-			ids.NodeID{0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f},
+			{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07},
+			{0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f},
 		},
 	}
 	wJSON, err := json.MarshalIndent(w, "", "\t")
@@ -49,7 +49,7 @@ func TestWarpJSON(t *testing.T) {
 		"NodeID-jVEbJZmHxdPnxBthD7v8dC96qyUrPMxg"
 	]
 }`
-	require.Equal(t, expectedJSON, string(wJSON))
+	require.JSONEq(t, expectedJSON, string(wJSON))
 
 	var parsedW Warp
 	require.NoError(t, json.Unmarshal(wJSON, &parsedW))
@@ -70,8 +70,8 @@ func TestWarpSetJSON(t *testing.T) {
 				PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
 				Weight:         12345,
 				NodeIDs: []ids.NodeID{
-					ids.NodeID{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07},
-					ids.NodeID{0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f},
+					{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07},
+					{0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f},
 				},
 			},
 		},
@@ -93,7 +93,7 @@ func TestWarpSetJSON(t *testing.T) {
 	],
 	"totalWeight": "54321"
 }`
-	require.Equal(t, expectedJSON, string(wsJSON))
+	require.JSONEq(t, expectedJSON, string(wsJSON))
 
 	var parsedWS WarpSet
 	require.NoError(t, json.Unmarshal(wsJSON, &parsedWS))
