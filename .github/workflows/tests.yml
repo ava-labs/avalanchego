@@ -97,7 +97,7 @@ jobs:
       - name: Setup Contracts
         run: ./scripts/run_task.sh setup-contracts
       - name: Run Warp E2E Tests
-        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@84e9aebcfbc04602865f4c0a3e8b46a27409a3f5
+        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@63cc1a166a56e749f3c02856babbde596757f1e1
         with:
           run: ./scripts/run_task.sh test-e2e-warp-ci
           artifact_prefix: warp
@@ -122,7 +122,7 @@ jobs:
         with:
           go-version-file: "go.mod"
       - name: Run E2E Load Tests
-        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@84e9aebcfbc04602865f4c0a3e8b46a27409a3f5
+        uses: ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd@63cc1a166a56e749f3c02856babbde596757f1e1
         with:
           run: ./scripts/run_task.sh test-e2e-load-ci
           artifact_prefix: load
