@@ -6,6 +6,7 @@ package core
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -206,5 +207,104 @@ require (
 	_, err = GetDependencyVersion(goModPath, "github.com/nonexistent/repo")
 	if err == nil {
 		t.Error("expected error for non-existent dependency")
+	}
+}
+
+func TestAddReplaceDirective_PreservesComments(t *testing.T) {
+	// Create a temporary go.mod file with comments
+	tmpDir := t.TempDir()
+	goModPath := filepath.Join(tmpDir, "go.mod")
+
+	goModContent := `// This is a test module
+module github.com/test/repo
+
+go 1.21
+
+// Production dependencies
+require (
+	github.com/ava-labs/avalanchego v1.11.11 // Main dependency
+	github.com/ava-labs/coreth v0.13.8
+)
+
+// Development tools
+require github.com/stretchr/testify v1.8.0
+`
+	err := os.WriteFile(goModPath, []byte(goModContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write test go.mod: %v", err)
+	}
+
+	// Add a replace directive
+	err = AddReplaceDirective(goModPath, "github.com/ava-labs/avalanchego", "./avalanchego")
+	if err != nil {
+		t.Fatalf("AddReplaceDirective failed: %v", err)
+	}
+
+	// Read back and verify comments are preserved
+	content, err := os.ReadFile(goModPath)
+	if err != nil {
+		t.Fatalf("failed to read go.mod: %v", err)
+	}
+
+	contentStr := string(content)
+
+	// Check that comments are preserved
+	if !strings.Contains(contentStr, "// This is a test module") {
+		t.Error("module comment was not preserved")
+	}
+	if !strings.Contains(contentStr, "// Production dependencies") {
+		t.Error("require block comment was not preserved")
+	}
+	if !strings.Contains(contentStr, "// Main dependency") {
+		t.Error("inline comment was not preserved")
+	}
+	if !strings.Contains(contentStr, "// Development tools") {
+		t.Error("development tools comment was not preserved")
+	}
+
+	// Verify the replace directive was added
+	if !strings.Contains(contentStr, "replace github.com/ava-labs/avalanchego => ./avalanchego") {
+		t.Error("replace directive was not added correctly")
+	}
+}
+
+func TestAddReplaceDirective_UpdatesExisting(t *testing.T) {
+	// Create a temporary go.mod file with an existing replace
+	tmpDir := t.TempDir()
+	goModPath := filepath.Join(tmpDir, "go.mod")
+
+	goModContent := `module github.com/test/repo
+
+go 1.21
+
+require github.com/ava-labs/avalanchego v1.11.11
+
+replace github.com/ava-labs/avalanchego => ./old-path
+`
+	err := os.WriteFile(goModPath, []byte(goModContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write test go.mod: %v", err)
+	}
+
+	// Add/update the replace directive
+	err = AddReplaceDirective(goModPath, "github.com/ava-labs/avalanchego", "./new-path")
+	if err != nil {
+		t.Fatalf("AddReplaceDirective failed: %v", err)
+	}
+
+	// Read back and verify
+	modFile, err := ReadGoMod(goModPath)
+	if err != nil {
+		t.Fatalf("ReadGoMod failed: %v", err)
+	}
+
+	// Should have exactly one replace directive
+	if len(modFile.Replace) != 1 {
+		t.Fatalf("expected 1 replace directive, got %d", len(modFile.Replace))
+	}
+
+	// Check that it points to the new path
+	if modFile.Replace[0].New.Path != "./new-path" {
+		t.Errorf("expected replace to point to './new-path', got '%s'", modFile.Replace[0].New.Path)
 	}
 }
