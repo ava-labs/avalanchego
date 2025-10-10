@@ -5,20 +5,18 @@
 version: '3'
 
 env:
-  BASEDIR: '{{.BASEDIR | default "/tmp/e2e-test"}}'
   AVALANCHEGO_BUILD_PATH: '{{.AVALANCHEGO_BUILD_PATH | default "/tmp/e2e-test/avalanchego"}}'
-  DATA_DIR: '{{.DATA_DIR | default "/tmp/e2e-test/precompile-data"}}'
 
 tasks:
   default: ./scripts/run_task.sh --list
 
   actionlint:
     desc: Validate GitHub Actions workflows and ensure scripts use run_task.sh for reproducibility
-    cmd: ./scripts/actionlint.sh # tests.yml
+    cmd: ./scripts/actionlint.sh # ci.yml
 
   build:
     desc: Compile Subnet EVM binary with git commit and static linking flags
-    cmd: ./scripts/build.sh # tests.yml
+    cmd: ./scripts/build.sh # ci.yml
 
   build-antithesis-images:
     desc: Build Docker images for antithesis testing including avalanchego node and subnet-evm builder images
@@ -34,7 +32,7 @@ tasks:
 
   build-test:
     desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
-    cmd: ./scripts/build_test.sh # tests.yml
+    cmd: ./scripts/build_test.sh # ci.yml
 
   check-avalanchego-version:
     desc: Ensure consistent avalanchego version by updating and checking for changes
@@ -76,7 +74,7 @@ tasks:
 
   coverage:
     desc: Display test coverage statistics from coverage.out file
-    cmd: ./scripts/coverage.sh # tests.yml
+    cmd: ./scripts/coverage.sh # ci.yml
 
   generate-codec:
     desc: Generates fjl/gencodec files
@@ -98,7 +96,7 @@ tasks:
 
   install-avalanchego-release:
     desc: Download and install AvalancheGo release binary for testing, with fallback to building from source
-    cmd: ./scripts/install_avalanchego_release.sh # tests.yml
+    cmd: ./scripts/install_avalanchego_release.sh # ci.yml
 
   lint:
     desc: Run golangci-lint and check for allowed Ethereum imports in Go code
@@ -134,7 +132,7 @@ tasks:
 
   shellcheck:
     desc: Run shellcheck static analysis on all shell scripts with version management
-    cmd: ./scripts/shellcheck.sh # tests.yml
+    cmd: ./scripts/shellcheck.sh # ci.yml
 
   test-build-antithesis-images:
     desc: Test antithesis images build
@@ -150,11 +148,11 @@ tasks:
 
   test-build-image:
     desc: Test docker image build
-    cmd: bash -x scripts/tests.build_docker_image.sh # tests.yml
+    cmd: bash -x scripts/tests.build_docker_image.sh # ci.yml
 
   test-e2e-load:
     desc: Run end-to-end load tests using Ginkgo test framework
-    cmd: ./scripts/run_ginkgo_load.sh # tests.yml
+    cmd: ./scripts/run_ginkgo_load.sh # ci.yml
 
   test-e2e-load-ci: # consolidated test-e2e-load
     desc: Run E2E load tests with CI setup
@@ -165,7 +163,7 @@ tasks:
 
   test-e2e-precompile:
     desc: Run end-to-end precompile tests using Ginkgo with parallel execution
-    cmd: bash ./scripts/run_ginkgo_precompile.sh # tests.yml
+    cmd: bash -x ./scripts/run_ginkgo_precompile.sh # ci.yml
 
   test-e2e-precompile-ci: # consolidated test-e2e-precompile
     desc: Run E2E precompile tests with CI setup
@@ -176,7 +174,7 @@ tasks:
 
   test-e2e-warp:
     desc: Run end-to-end warp tests using Ginkgo test framework
-    cmd: ./scripts/run_ginkgo_warp.sh # tests.yml
+    cmd: bash -x ./scripts/run_ginkgo_warp.sh # ci.yml
 
   test-e2e-warp-ci: # consolidated test-e2e-warp
     desc: Run E2E warp tests with CI setup
@@ -187,4 +185,4 @@ tasks:
 
   update-avalanchego-version:
     desc: Update AvalancheGo version in go.mod and sync GitHub Actions workflow custom action version
-    cmd: bash -x ./scripts/update_avalanchego_version.sh # tests.yml
+    cmd: bash -x ./scripts/update_avalanchego_version.sh # ci.yml

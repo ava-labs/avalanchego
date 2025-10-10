@@ -37,7 +37,7 @@ GIT_COMMIT=$("${CURL_ARGS[@]}" "https://api.github.com/repos/ava-labs/avalancheg
 FULL_AVALANCHE_VERSION="$(grep -m1 '"sha":' <<< "${GIT_COMMIT}" | cut -d'"' -f4)"
 
 # Ensure the custom action version matches the avalanche version
-WORKFLOW_PATH=".github/workflows/tests.yml"
+WORKFLOW_PATH=".github/workflows/ci.yml"
 CUSTOM_ACTION="ava-labs/avalanchego/.github/actions/run-monitored-tmpnet-cmd"
 echo "Ensuring AvalancheGo version ${FULL_AVALANCHE_VERSION} for ${CUSTOM_ACTION} custom action in ${WORKFLOW_PATH} "
 sed -i.bak "s|\(uses: ${CUSTOM_ACTION}\)@.*|\1@${FULL_AVALANCHE_VERSION}|g" "${WORKFLOW_PATH}" && rm -f "${WORKFLOW_PATH}.bak"
