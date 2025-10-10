@@ -28,6 +28,7 @@ mod logging;
 mod metrics_setup;
 mod proofs;
 mod proposal;
+mod revision;
 mod value;
 
 use firewood::v2::api::DbView;
@@ -36,6 +37,7 @@ pub use crate::handle::*;
 pub use crate::logging::*;
 pub use crate::proofs::*;
 pub use crate::proposal::*;
+pub use crate::revision::*;
 pub use crate::value::*;
 
 #[cfg(unix)]
@@ -105,6 +107,87 @@ pub unsafe extern "C" fn fwd_get_latest(
     key: BorrowedBytes,
 ) -> ValueResult {
     invoke_with_handle(db, move |db| db.get_latest(key))
+}
+
+/// Gets a handle to the revision identified by the provided root hash.
+///
+/// # Arguments
+///
+/// * `db` - The database handle returned by [`fwd_open_db`].
+/// * `root` - The hash of the revision as a [`BorrowedBytes`].
+///
+/// # Returns
+///
+/// - [`RevisionResult::NullHandlePointer`] if the provided database handle is null.
+/// - [`RevisionResult::Ok`] containing a [`RevisionHandle`] and root hash if the revision exists.
+/// - [`RevisionResult::Err`] if the revision cannot be fetched or the root hash is invalid.
+///
+/// # Safety
+///
+/// The caller must:
+/// * ensure that `db` is a valid pointer to a [`DatabaseHandle`].
+/// * ensure that `root` is valid for [`BorrowedBytes`].
+/// * call [`fwd_free_revision`] to free the returned handle when it is no longer needed.
+///
+/// [`BorrowedBytes`]: crate::value::BorrowedBytes
+/// [`RevisionHandle`]: crate::revision::RevisionHandle
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fwd_get_revision(
+    db: Option<&DatabaseHandle>,
+    root: BorrowedBytes,
+) -> RevisionResult {
+    invoke_with_handle(db, move |db| db.get_revision(root.as_ref().try_into()?))
+}
+
+/// Gets the value associated with the given key from the provided revision handle.
+///
+/// # Arguments
+///
+/// * `revision` - The revision handle returned by [`fwd_get_revision`].
+/// * `key` - The key to look up as a [`BorrowedBytes`].
+///
+/// # Returns
+///
+/// - [`ValueResult::NullHandlePointer`] if the provided revision handle is null.
+/// - [`ValueResult::None`] if the key was not found in the revision.
+/// - [`ValueResult::Some`] if the key was found with the associated value.
+/// - [`ValueResult::Err`] if an error occurred while retrieving the value.
+///
+/// # Safety
+///
+/// The caller must:
+/// * ensure that `revision` is a valid pointer to a [`RevisionHandle`].
+/// * ensure that `key` is valid for [`BorrowedBytes`].
+/// * call [`fwd_free_owned_bytes`] to free the memory associated with the [`OwnedBytes`]
+///   returned in the result.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fwd_get_from_revision(
+    revision: Option<&RevisionHandle>,
+    key: BorrowedBytes,
+) -> ValueResult {
+    invoke_with_handle(revision, move |rev| rev.val(key))
+}
+
+/// Consumes the [`RevisionHandle`] and frees the memory associated with it.
+///
+/// # Arguments
+///
+/// * `revision` - A pointer to a [`RevisionHandle`] previously returned by
+///   [`fwd_get_revision`].
+///
+/// # Returns
+///
+/// - [`VoidResult::NullHandlePointer`] if the provided revision handle is null.
+/// - [`VoidResult::Ok`] if the revision handle was successfully freed.
+/// - [`VoidResult::Err`] if the process panics while freeing the memory.
+///
+/// # Safety
+///
+/// The caller must ensure that the revision handle is valid and is not used again after
+/// this function is called.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn fwd_free_revision(revision: Option<Box<RevisionHandle>>) -> VoidResult {
+    invoke_with_handle(revision, drop)
 }
 
 /// Gets the value associated with the given key from the proposal provided.
@@ -468,6 +551,9 @@ pub extern "C" fn fwd_start_logs(args: LogArgs) -> VoidResult {
 /// - `db` is a valid pointer to a [`DatabaseHandle`] returned by [`fwd_open_db`].
 /// - There are no handles to any open proposals. If so, they must be freed first
 ///   using [`fwd_free_proposal`].
+/// - Freeing the database handle does not free outstanding [`RevisionHandle`]s
+///   returned by [`fwd_get_revision`]. To prevent leaks, free them separately
+///   with [`fwd_free_revision`].
 /// - The database handle is not used after this function is called.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_close_db(db: Option<Box<DatabaseHandle>>) -> VoidResult {

@@ -5,6 +5,7 @@ use std::fmt;
 
 use firewood::v2::api;
 
+use crate::revision::{GetRevisionResult, RevisionHandle};
 use crate::{
     ChangeProofContext, CreateProposalResult, HashKey, NextKeyRange, OwnedBytes, ProposalHandle,
     RangeProofContext,
@@ -306,6 +307,56 @@ pub enum ProposalResult<'db> {
     Err(OwnedBytes),
 }
 
+/// A result type returned from FFI functions that get a revision
+#[derive(Debug)]
+#[repr(C)]
+pub enum RevisionResult {
+    /// The caller provided a null pointer to a database handle.
+    NullHandlePointer,
+    /// The provided root was not found in the database.
+    RevisionNotFound(HashKey),
+    /// Getting the revision was successful and the revision handle and root
+    /// hash are returned.
+    Ok {
+        /// An opaque pointer to the [`RevisionHandle`].
+        /// The value should be freed with [`fwd_free_revision`]
+        ///
+        /// [`fwd_free_revision`]: crate::fwd_free_revision
+        handle: Box<RevisionHandle>,
+        /// The root hash of the revision.
+        root_hash: HashKey,
+    },
+    /// An error occurred and the message is returned as an [`OwnedBytes`]. The
+    /// value is guaranteed to contain only valid UTF-8.
+    ///
+    /// The caller must call [`fwd_free_owned_bytes`] to free the memory
+    /// associated with this error.
+    ///
+    /// [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+    Err(OwnedBytes),
+}
+
+impl From<GetRevisionResult> for RevisionResult {
+    fn from(value: GetRevisionResult) -> Self {
+        RevisionResult::Ok {
+            handle: Box::new(value.handle),
+            root_hash: HashKey::from(value.root_hash),
+        }
+    }
+}
+
+impl From<Result<GetRevisionResult, api::Error>> for RevisionResult {
+    fn from(value: Result<GetRevisionResult, api::Error>) -> Self {
+        match value {
+            Ok(res) => res.into(),
+            Err(api::Error::RevisionNotFound { provided }) => RevisionResult::RevisionNotFound(
+                HashKey::from(provided.unwrap_or_else(api::HashKey::empty)),
+            ),
+            Err(err) => RevisionResult::Err(err.to_string().into_bytes().into()),
+        }
+    }
+}
+
 impl<'db, E: fmt::Display> From<Result<CreateProposalResult<'db>, E>> for ProposalResult<'db> {
     fn from(value: Result<CreateProposalResult<'db>, E>) -> Self {
         match value {
@@ -383,6 +434,7 @@ impl_null_handle_result!(
     ChangeProofResult,
     NextKeyRangeResult,
     ProposalResult<'_>,
+    RevisionResult,
 );
 
 impl_cresult!(
@@ -394,6 +446,7 @@ impl_cresult!(
     ChangeProofResult,
     NextKeyRangeResult,
     ProposalResult<'_>,
+    RevisionResult,
 );
 
 enum Panic {

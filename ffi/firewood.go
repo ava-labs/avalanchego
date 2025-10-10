@@ -220,15 +220,18 @@ func (db *Database) Revision(root []byte) (*Revision, error) {
 		return nil, errInvalidRootLength
 	}
 
-	// Attempt to get any value from the root.
-	// This will verify that the root is valid and accessible.
-	// If the root is not valid, this will return an error.
-	_, err := db.GetFromRoot(root, []byte{})
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
+
+	rev, err := getRevisionFromResult(C.fwd_get_revision(
+		db.handle,
+		newBorrowedBytes(root, &pinner),
+	), db)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Revision{database: db, root: root}, nil
+	return rev, nil
 }
 
 // Close releases the memory associated with the Database.

@@ -35,6 +35,8 @@ typedef struct ProposalHandle ProposalHandle;
  */
 typedef struct RangeProofContext RangeProofContext;
 
+typedef struct RevisionHandle RevisionHandle;
+
 /**
  * A database hash key, used in FFI functions that require hashes.
  * This type requires no allocation and can be copied freely and
@@ -646,6 +648,62 @@ typedef struct VerifyRangeProofArgs {
 } VerifyRangeProofArgs;
 
 /**
+ * A result type returned from FFI functions that get a revision
+ */
+typedef enum RevisionResult_Tag {
+  /**
+   * The caller provided a null pointer to a database handle.
+   */
+  RevisionResult_NullHandlePointer,
+  /**
+   * The provided root was not found in the database.
+   */
+  RevisionResult_RevisionNotFound,
+  /**
+   * Getting the revision was successful and the revision handle and root
+   * hash are returned.
+   */
+  RevisionResult_Ok,
+  /**
+   * An error occurred and the message is returned as an [`OwnedBytes`]. The
+   * value is guaranteed to contain only valid UTF-8.
+   *
+   * The caller must call [`fwd_free_owned_bytes`] to free the memory
+   * associated with this error.
+   *
+   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+   */
+  RevisionResult_Err,
+} RevisionResult_Tag;
+
+typedef struct RevisionResult_Ok_Body {
+  /**
+   * An opaque pointer to the [`RevisionHandle`].
+   * The value should be freed with [`fwd_free_revision`]
+   *
+   * [`fwd_free_revision`]: crate::fwd_free_revision
+   */
+  struct RevisionHandle *handle;
+  /**
+   * The root hash of the revision.
+   */
+  struct HashKey root_hash;
+} RevisionResult_Ok_Body;
+
+typedef struct RevisionResult {
+  RevisionResult_Tag tag;
+  union {
+    struct {
+      struct HashKey revision_not_found;
+    };
+    RevisionResult_Ok_Body ok;
+    struct {
+      OwnedBytes err;
+    };
+  };
+} RevisionResult;
+
+/**
  * The result type returned from the open or create database functions.
  */
 typedef enum HandleResult_Tag {
@@ -919,6 +977,9 @@ struct ValueResult fwd_change_proof_to_bytes(const struct ChangeProofContext *_p
  * - `db` is a valid pointer to a [`DatabaseHandle`] returned by [`fwd_open_db`].
  * - There are no handles to any open proposals. If so, they must be freed first
  *   using [`fwd_free_proposal`].
+ * - Freeing the database handle does not free outstanding [`RevisionHandle`]s
+ *   returned by [`fwd_get_revision`]. To prevent leaks, free them separately
+ *   with [`fwd_free_revision`].
  * - The database handle is not used after this function is called.
  */
 struct VoidResult fwd_close_db(struct DatabaseHandle *db);
@@ -1191,6 +1252,27 @@ struct VoidResult fwd_free_proposal(struct ProposalHandle *proposal);
 struct VoidResult fwd_free_range_proof(struct RangeProofContext *proof);
 
 /**
+ * Consumes the [`RevisionHandle`] and frees the memory associated with it.
+ *
+ * # Arguments
+ *
+ * * `revision` - A pointer to a [`RevisionHandle`] previously returned by
+ *   [`fwd_get_revision`].
+ *
+ * # Returns
+ *
+ * - [`VoidResult::NullHandlePointer`] if the provided revision handle is null.
+ * - [`VoidResult::Ok`] if the revision handle was successfully freed.
+ * - [`VoidResult::Err`] if the process panics while freeing the memory.
+ *
+ * # Safety
+ *
+ * The caller must ensure that the revision handle is valid and is not used again after
+ * this function is called.
+ */
+struct VoidResult fwd_free_revision(struct RevisionHandle *revision);
+
+/**
  * Gather latest metrics for this process.
  *
  * # Returns
@@ -1233,6 +1315,31 @@ struct ValueResult fwd_gather(void);
  *   returned in the result.
  */
 struct ValueResult fwd_get_from_proposal(const struct ProposalHandle *handle, BorrowedBytes key);
+
+/**
+ * Gets the value associated with the given key from the provided revision handle.
+ *
+ * # Arguments
+ *
+ * * `revision` - The revision handle returned by [`fwd_get_revision`].
+ * * `key` - The key to look up as a [`BorrowedBytes`].
+ *
+ * # Returns
+ *
+ * - [`ValueResult::NullHandlePointer`] if the provided revision handle is null.
+ * - [`ValueResult::None`] if the key was not found in the revision.
+ * - [`ValueResult::Some`] if the key was found with the associated value.
+ * - [`ValueResult::Err`] if an error occurred while retrieving the value.
+ *
+ * # Safety
+ *
+ * The caller must:
+ * * ensure that `revision` is a valid pointer to a [`RevisionHandle`].
+ * * ensure that `key` is valid for [`BorrowedBytes`].
+ * * call [`fwd_free_owned_bytes`] to free the memory associated with the [`OwnedBytes`]
+ *   returned in the result.
+ */
+struct ValueResult fwd_get_from_revision(const struct RevisionHandle *revision, BorrowedBytes key);
 
 /**
  * Gets a value assoicated with the given root hash and key.
@@ -1295,6 +1402,32 @@ struct ValueResult fwd_get_from_root(const struct DatabaseHandle *db,
  * [`BorrowedBytes`]: crate::value::BorrowedBytes
  */
 struct ValueResult fwd_get_latest(const struct DatabaseHandle *db, BorrowedBytes key);
+
+/**
+ * Gets a handle to the revision identified by the provided root hash.
+ *
+ * # Arguments
+ *
+ * * `db` - The database handle returned by [`fwd_open_db`].
+ * * `root` - The hash of the revision as a [`BorrowedBytes`].
+ *
+ * # Returns
+ *
+ * - [`RevisionResult::NullHandlePointer`] if the provided database handle is null.
+ * - [`RevisionResult::Ok`] containing a [`RevisionHandle`] and root hash if the revision exists.
+ * - [`RevisionResult::Err`] if the revision cannot be fetched or the root hash is invalid.
+ *
+ * # Safety
+ *
+ * The caller must:
+ * * ensure that `db` is a valid pointer to a [`DatabaseHandle`].
+ * * ensure that `root` is valid for [`BorrowedBytes`].
+ * * call [`fwd_free_revision`] to free the returned handle when it is no longer needed.
+ *
+ * [`BorrowedBytes`]: crate::value::BorrowedBytes
+ * [`RevisionHandle`]: crate::revision::RevisionHandle
+ */
+struct RevisionResult fwd_get_revision(const struct DatabaseHandle *db, BorrowedBytes root);
 
 /**
  * Open a database with the given arguments.
