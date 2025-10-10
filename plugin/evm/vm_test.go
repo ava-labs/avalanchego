@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/upgrade"
@@ -2115,4 +2116,14 @@ func TestMinDelayExcessInHeader(t *testing.T) {
 			require.Equal(test.expectedMinDelayExcess, headerExtra.MinDelayExcess, "expected %s, got %s", test.expectedMinDelayExcess, headerExtra.MinDelayExcess)
 		})
 	}
+}
+
+func TestInspectDatabases(t *testing.T) {
+	var (
+		vm = newDefaultTestVM()
+		db = memdb.New()
+	)
+
+	vm.initializeDBs(db)
+	require.NoError(t, vm.inspectDatabases())
 }

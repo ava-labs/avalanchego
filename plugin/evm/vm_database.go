@@ -35,7 +35,7 @@ func (vm *VM) initializeDBs(db avalanchedatabase.Database) {
 func (vm *VM) inspectDatabases() error {
 	start := time.Now()
 	log.Info("Starting database inspection")
-	if err := rawdb.InspectDatabase(vm.chaindb, nil, nil); err != nil {
+	if err := rawdb.InspectDatabase(vm.chaindb, nil, nil, rawdb.WithSkipFreezers()); err != nil {
 		return err
 	}
 	if err := inspectDB(vm.acceptedBlockDB, "acceptedBlockDB"); err != nil {
