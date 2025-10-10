@@ -55,10 +55,9 @@ Index File Header (64 bytes):
 │ Version                        │ 8 bytes │
 │ Max Data File Size             │ 8 bytes │
 │ Min Block Height               │ 8 bytes │
-│ Max Contiguous Height          │ 8 bytes │
 │ Max Block Height               │ 8 bytes │
 │ Next Write Offset              │ 8 bytes │
-│ Reserved                       │ 16 bytes│
+│ Reserved                       │ 24 bytes│
 └────────────────────────────────┴─────────┘
 
 Index Entry (16 bytes):
@@ -119,8 +118,8 @@ On startup, BlockDB checks for signs of an unclean shutdown by comparing the dat
 2. For each unindexed block found:
    - Validates the block entry header and checksum
    - Writes the corresponding index entry
-3. Calculates the max contiguous height and max block height
-4. Updates the index header with the updated max contiguous height, max block height, and next write offset
+3. Calculates the max block height
+4. Updates the index header with the updated max block height and next write offset
 
 ## Usage
 
