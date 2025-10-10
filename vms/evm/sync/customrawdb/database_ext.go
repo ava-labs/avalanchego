@@ -69,7 +69,7 @@ func ParseStateSchemeExt(provided string, disk ethdb.Database) (string, error) {
 	if provided == FirewoodScheme {
 		if diskScheme := rawdb.ReadStateScheme(disk); diskScheme != "" {
 			// Valid scheme on disk mismatched
-			return "", fmt.Errorf("state scheme %s already set on disk, can't use Firewood", diskScheme)
+			return "", fmt.Errorf("state scheme %s already set on disk, cannot use Firewood", diskScheme)
 		}
 		// If no conflicting scheme is found, is valid.
 		return FirewoodScheme, nil

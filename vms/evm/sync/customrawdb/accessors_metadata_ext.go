@@ -5,6 +5,7 @@ package customrawdb
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -16,29 +17,17 @@ import (
 	"github.com/ava-labs/libevm/rlp"
 )
 
-// writeCurrentTimeMarker writes a marker of the current time in the db at `key`.
-func writeCurrentTimeMarker(db ethdb.KeyValueStore, key []byte) error {
-	data, err := rlp.EncodeToBytes(uint64(time.Now().Unix()))
-	if err != nil {
-		return err
-	}
-	return db.Put(key, data)
-}
+var (
+	// errMarkerNotFound is returned when a time marker key is missing or empty.
+	errMarkerNotFound = errors.New("time marker not found")
+	// errMarkerInvalid wraps cases where a marker exists but cannot be decoded.
+	errMarkerInvalid = errors.New("time marker invalid")
+	// errAcceptorTipInvalid indicates an invalid value stored for acceptor tip.
+	errAcceptorTipInvalid = errors.New("acceptor tip invalid")
 
-// readTimeMarker reads the timestamp stored at `key`
-func readTimeMarker(db ethdb.KeyValueStore, key []byte) (time.Time, error) {
-	data, err := db.Get(key)
-	if err != nil {
-		return time.Time{}, err
-	}
-
-	var unix uint64
-	if err := rlp.DecodeBytes(data, &unix); err != nil {
-		return time.Time{}, err
-	}
-
-	return time.Unix(int64(unix), 0), nil
-}
+	// upgradeConfigPrefix prefixes upgrade bytes passed to the chain.
+	upgradeConfigPrefix = []byte("upgrade-config-")
+)
 
 // WriteOfflinePruning writes a time marker of the last attempt to run offline pruning.
 // The marker is written when offline pruning completes and is deleted when the node
@@ -99,12 +88,12 @@ func WriteAcceptorTip(db ethdb.KeyValueWriter, hash common.Hash) error {
 // If there is no value present (the index is being initialized for the first time), then the
 // empty hash is returned.
 func ReadAcceptorTip(db ethdb.KeyValueReader) (common.Hash, error) {
-	has, err := db.Has(acceptorTipKey)
+	ok, err := db.Has(acceptorTipKey)
 	if err != nil {
 		return common.Hash{}, err
 	}
-	if !has {
-		// If the index is not present on disk, the [acceptorTipKey] index has not been initialized yet.
+	if !ok {
+		// If the index is not present on disk, the `acceptorTipKey` index ok not been initialized yet.
 		return common.Hash{}, nil
 	}
 	h, err := db.Get(acceptorTipKey)
@@ -112,13 +101,13 @@ func ReadAcceptorTip(db ethdb.KeyValueReader) (common.Hash, error) {
 		return common.Hash{}, err
 	}
 	if len(h) != common.HashLength {
-		return common.Hash{}, fmt.Errorf("value has incorrect length %d", len(h))
+		return common.Hash{}, fmt.Errorf("%w: length %d", errAcceptorTipInvalid, len(h))
 	}
 	return common.BytesToHash(h), nil
 }
 
 // ReadChainConfig retrieves the consensus settings based on the given genesis hash.
-// The provided [upgradeConfig] (any JSON-unmarshalable type) will be populated if present on disk.
+// The provided `upgradeConfig` (any JSON-unmarshalable type) will be populated if present on disk.
 func ReadChainConfig[T any](db ethdb.KeyValueReader, hash common.Hash, upgradeConfig *T) *params.ChainConfig {
 	config := rawdb.ReadChainConfig(db, hash)
 
@@ -136,7 +125,7 @@ func ReadChainConfig[T any](db ethdb.KeyValueReader, hash common.Hash, upgradeCo
 }
 
 // WriteChainConfig writes the chain config settings to the database.
-// The provided [upgradeConfig] (any JSON-marshalable type) will be stored alongside the chain config.
+// The provided `upgradeConfig` (any JSON-marshalable type) will be stored alongside the chain config.
 func WriteChainConfig[T any](db ethdb.KeyValueWriter, hash common.Hash, config *params.ChainConfig, upgradeConfig T) {
 	rawdb.WriteChainConfig(db, hash, config)
 	if config == nil {
@@ -150,4 +139,45 @@ func WriteChainConfig[T any](db ethdb.KeyValueWriter, hash common.Hash, config *
 	if err := db.Put(upgradeConfigKey(hash), data); err != nil {
 		log.Crit("Failed to store upgrade config", "err", err)
 	}
+}
+
+// writeCurrentTimeMarker writes a marker of the current time in the db at `key`.
+func writeCurrentTimeMarker(db ethdb.KeyValueStore, key []byte) error {
+	data, err := rlp.EncodeToBytes(uint64(time.Now().Unix()))
+	if err != nil {
+		return err
+	}
+	return db.Put(key, data)
+}
+
+// readTimeMarker reads the timestamp stored at `key`
+func readTimeMarker(db ethdb.KeyValueStore, key []byte) (time.Time, error) {
+	// Check existence first to map missing marker to a stable sentinel error.
+	ok, err := db.Has(key)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if !ok {
+		return time.Time{}, errMarkerNotFound
+	}
+
+	data, err := db.Get(key)
+	if err != nil {
+		return time.Time{}, err
+	}
+	if len(data) == 0 {
+		return time.Time{}, errMarkerNotFound
+	}
+
+	var unix uint64
+	if err := rlp.DecodeBytes(data, &unix); err != nil {
+		return time.Time{}, fmt.Errorf("%w: %w", errMarkerInvalid, err)
+	}
+
+	return time.Unix(int64(unix), 0), nil
+}
+
+// upgradeConfigKey = upgradeConfigPrefix + hash
+func upgradeConfigKey(hash common.Hash) []byte {
+	return append(upgradeConfigPrefix, hash.Bytes()...)
 }

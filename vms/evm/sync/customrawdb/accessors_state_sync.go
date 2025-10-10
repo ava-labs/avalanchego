@@ -17,8 +17,8 @@ import (
 // ReadSyncRoot reads the root corresponding to the main trie of an in-progress
 // sync and returns common.Hash{} if no in-progress sync was found.
 func ReadSyncRoot(db ethdb.KeyValueReader) (common.Hash, error) {
-	has, err := db.Has(syncRootKey)
-	if err != nil || !has {
+	ok, err := db.Has(syncRootKey)
+	if err != nil || !ok {
 		return common.Hash{}, err
 	}
 	root, err := db.Get(syncRootKey)
@@ -33,17 +33,17 @@ func WriteSyncRoot(db ethdb.KeyValueWriter, root common.Hash) error {
 	return db.Put(syncRootKey, root[:])
 }
 
-// AddCodeToFetch adds a marker that we need to fetch the code for `hash`.
-func AddCodeToFetch(db ethdb.KeyValueWriter, hash common.Hash) {
-	if err := db.Put(codeToFetchKey(hash), nil); err != nil {
-		log.Crit("Failed to put code to fetch", "codeHash", hash, "err", err)
+// WriteCodeToFetch adds a marker that we need to fetch the code for `hash`.
+func WriteCodeToFetch(db ethdb.KeyValueWriter, codeHash common.Hash) {
+	if err := db.Put(codeToFetchKey(codeHash), nil); err != nil {
+		log.Crit("Failed to put code to fetch", "codeHash", codeHash, "err", err)
 	}
 }
 
 // DeleteCodeToFetch removes the marker that the code corresponding to `hash` needs to be fetched.
-func DeleteCodeToFetch(db ethdb.KeyValueWriter, hash common.Hash) {
-	if err := db.Delete(codeToFetchKey(hash)); err != nil {
-		log.Crit("Failed to delete code to fetch", "codeHash", hash, "err", err)
+func DeleteCodeToFetch(db ethdb.KeyValueWriter, codeHash common.Hash) {
+	if err := db.Delete(codeToFetchKey(codeHash)); err != nil {
+		log.Crit("Failed to delete code to fetch", "codeHash", codeHash, "err", err)
 	}
 }
 
@@ -57,10 +57,10 @@ func NewCodeToFetchIterator(db ethdb.Iteratee) ethdb.Iterator {
 	)
 }
 
-func codeToFetchKey(hash common.Hash) []byte {
+func codeToFetchKey(codeHash common.Hash) []byte {
 	codeToFetchKey := make([]byte, codeToFetchKeyLength)
 	copy(codeToFetchKey, CodeToFetchPrefix)
-	copy(codeToFetchKey[len(CodeToFetchPrefix):], hash[:])
+	copy(codeToFetchKey[len(CodeToFetchPrefix):], codeHash[:])
 	return codeToFetchKey
 }
 
@@ -80,7 +80,12 @@ func NewSyncSegmentsIterator(db ethdb.Iteratee, root common.Hash) ethdb.Iterator
 
 // WriteSyncSegment adds a trie segment for root at the given start position.
 func WriteSyncSegment(db ethdb.KeyValueWriter, root common.Hash, start common.Hash) error {
-	return db.Put(packSyncSegmentKey(root, start), []byte{0x01})
+	// packs root and account into a key for storage in db.
+	bytes := make([]byte, syncSegmentsKeyLength)
+	copy(bytes, syncSegmentsPrefix)
+	copy(bytes[len(syncSegmentsPrefix):], root[:])
+	copy(bytes[len(syncSegmentsPrefix)+common.HashLength:], start.Bytes())
+	return db.Put(bytes, []byte{0x01})
 }
 
 // ClearSyncSegments removes segment markers for root from db
@@ -105,15 +110,6 @@ func UnpackSyncSegmentKey(keyBytes []byte) (common.Hash, []byte) {
 	return root, start
 }
 
-// packSyncSegmentKey packs root and account into a key for storage in db.
-func packSyncSegmentKey(root common.Hash, start common.Hash) []byte {
-	bytes := make([]byte, syncSegmentsKeyLength)
-	copy(bytes, syncSegmentsPrefix)
-	copy(bytes[len(syncSegmentsPrefix):], root[:])
-	copy(bytes[len(syncSegmentsPrefix)+common.HashLength:], start.Bytes())
-	return bytes
-}
-
 // NewSyncStorageTriesIterator returns a KeyLength iterator over all storage tries
 // added for syncing (beginning at seek). It is the caller's responsibility to unpack
 // the key and call Release on the returned iterator.
@@ -123,7 +119,11 @@ func NewSyncStorageTriesIterator(db ethdb.Iteratee, seek []byte) ethdb.Iterator 
 
 // WriteSyncStorageTrie adds a storage trie for account (with the given root) to be synced.
 func WriteSyncStorageTrie(db ethdb.KeyValueWriter, root common.Hash, account common.Hash) error {
-	return db.Put(packSyncStorageTrieKey(root, account), []byte{0x01})
+	bytes := make([]byte, 0, syncStorageTriesKeyLength)
+	bytes = append(bytes, syncStorageTriesPrefix...)
+	bytes = append(bytes, root[:]...)
+	bytes = append(bytes, account[:]...)
+	return db.Put(bytes, []byte{0x01})
 }
 
 // ClearSyncStorageTrie removes all storage trie accounts (with the given root) from db.
@@ -147,15 +147,6 @@ func UnpackSyncStorageTrieKey(keyBytes []byte) (common.Hash, common.Hash) {
 	root := common.BytesToHash(keyBytes[:common.HashLength])
 	account := common.BytesToHash(keyBytes[common.HashLength:])
 	return root, account
-}
-
-// packSyncStorageTrieKey packs root and account into a key for storage in db.
-func packSyncStorageTrieKey(root common.Hash, account common.Hash) []byte {
-	bytes := make([]byte, 0, syncStorageTriesKeyLength)
-	bytes = append(bytes, syncStorageTriesPrefix...)
-	bytes = append(bytes, root[:]...)
-	bytes = append(bytes, account[:]...)
-	return bytes
 }
 
 // WriteSyncPerformed logs an entry in `db` indicating the VM state synced to `blockNumber`.
