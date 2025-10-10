@@ -8,7 +8,7 @@ import (
 
 	"github.com/ava-labs/libevm/ethdb"
 
-	"github.com/ava-labs/avalanchego/database"
+	avalanchegodb "github.com/ava-labs/avalanchego/database"
 )
 
 var (
@@ -16,38 +16,38 @@ var (
 	errStatNotSupported     = errors.New("stat is not supported")
 
 	_ ethdb.Batch         = (*ethBatchWrapper)(nil)
-	_ ethdb.KeyValueStore = (*ethDBWrapper)(nil)
+	_ ethdb.KeyValueStore = (*database)(nil)
 )
 
-type ethDBWrapper struct {
-	db database.Database
+type database struct {
+	db avalanchegodb.Database
 }
 
-func New(db database.Database) ethdb.KeyValueStore { return ethDBWrapper{db} }
+func New(db avalanchegodb.Database) ethdb.KeyValueStore { return database{db} }
 
-func (ethDBWrapper) Stat(string) (string, error) { return "", errStatNotSupported }
+func (database) Stat(string) (string, error) { return "", errStatNotSupported }
 
-func (db ethDBWrapper) NewBatch() ethdb.Batch { return ethBatchWrapper{db.db.NewBatch()} }
+func (db database) NewBatch() ethdb.Batch { return ethBatchWrapper{db.db.NewBatch()} }
 
-func (db ethDBWrapper) Has(key []byte) (bool, error) { return db.db.Has(key) }
+func (db database) Has(key []byte) (bool, error) { return db.db.Has(key) }
 
-func (db ethDBWrapper) Get(key []byte) ([]byte, error) { return db.db.Get(key) }
+func (db database) Get(key []byte) ([]byte, error) { return db.db.Get(key) }
 
-func (db ethDBWrapper) Put(key, value []byte) error { return db.db.Put(key, value) }
+func (db database) Put(key, value []byte) error { return db.db.Put(key, value) }
 
-func (db ethDBWrapper) Delete(key []byte) error { return db.db.Delete(key) }
+func (db database) Delete(key []byte) error { return db.db.Delete(key) }
 
-func (db ethDBWrapper) Compact(start, limit []byte) error { return db.db.Compact(start, limit) }
+func (db database) Compact(start, limit []byte) error { return db.db.Compact(start, limit) }
 
-func (db ethDBWrapper) Close() error { return db.db.Close() }
+func (db database) Close() error { return db.db.Close() }
 
-func (db ethDBWrapper) NewBatchWithSize(int) ethdb.Batch { return db.NewBatch() }
+func (db database) NewBatchWithSize(int) ethdb.Batch { return db.NewBatch() }
 
-func (ethDBWrapper) NewSnapshot() (ethdb.Snapshot, error) {
+func (database) NewSnapshot() (ethdb.Snapshot, error) {
 	return nil, errSnapshotNotSupported
 }
 
-func (db ethDBWrapper) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
+func (db database) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 	newStart := make([]byte, len(prefix)+len(start))
 	copy(newStart, prefix)
 	copy(newStart[len(prefix):], start)
@@ -56,11 +56,11 @@ func (db ethDBWrapper) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 	return db.db.NewIteratorWithStartAndPrefix(start, prefix)
 }
 
-func (db ethDBWrapper) NewIteratorWithStart(start []byte) ethdb.Iterator {
+func (db database) NewIteratorWithStart(start []byte) ethdb.Iterator {
 	return db.db.NewIteratorWithStart(start)
 }
 
-type ethBatchWrapper struct{ database.Batch }
+type ethBatchWrapper struct{ avalanchegodb.Batch }
 
 func (e ethBatchWrapper) ValueSize() int { return e.Batch.Size() }
 
