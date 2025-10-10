@@ -214,6 +214,17 @@ func (db *Database) Root() ([]byte, error) {
 	return bytes, err
 }
 
+func (db *Database) LatestRevision() (*Revision, error) {
+	root, err := db.Root()
+	if err != nil {
+		return nil, err
+	}
+	if bytes.Equal(root, EmptyRoot) {
+		return nil, errRevisionNotFound
+	}
+	return db.Revision(root)
+}
+
 // Revision returns a historical revision of the database.
 func (db *Database) Revision(root []byte) (*Revision, error) {
 	if root == nil || len(root) != RootLength {

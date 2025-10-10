@@ -53,6 +53,21 @@ func (r *Revision) Get(key []byte) ([]byte, error) {
 	))
 }
 
+// Iter creates an iterator starting from the provided key on revision.
+// pass empty slice to start from beginning
+func (r *Revision) Iter(key []byte) (*Iterator, error) {
+	if r.handle == nil {
+		return nil, errDroppedRevision
+	}
+
+	var pinner runtime.Pinner
+	defer pinner.Unpin()
+
+	itResult := C.fwd_iter_on_revision(r.handle, newBorrowedBytes(key, &pinner))
+
+	return getIteratorFromIteratorResult(itResult)
+}
+
 // Drop releases the resources backed by the revision handle.
 //
 // It is safe to call Drop multiple times; subsequent calls after the first are no-ops.

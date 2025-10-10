@@ -309,6 +309,56 @@ func getValueFromValueResult(result C.ValueResult) ([]byte, error) {
 	}
 }
 
+type ownedKeyValue struct {
+	key   *ownedBytes
+	value *ownedBytes
+}
+
+func (kv *ownedKeyValue) Consume() ([]byte, []byte, error) {
+	key := kv.key.CopiedBytes()
+	if err := kv.key.Free(); err != nil {
+		return nil, nil, fmt.Errorf("%w: %w", errFreeingValue, err)
+	}
+	value := kv.value.CopiedBytes()
+	if err := kv.value.Free(); err != nil {
+		return nil, nil, fmt.Errorf("%w: %w", errFreeingValue, err)
+	}
+	return key, value, nil
+}
+
+// newOwnedKeyValue creates a ownedKeyValue from a C.OwnedKeyValuePair.
+//
+// The caller is responsible for calling Free() on the returned ownedKeyValue
+// when it is no longer needed otherwise memory will leak.
+func newOwnedKeyValue(owned C.OwnedKeyValuePair) *ownedKeyValue {
+	return &ownedKeyValue{
+		key:   newOwnedBytes(owned.key),
+		value: newOwnedBytes(owned.value),
+	}
+}
+
+// getKeyValueFromKeyValueResult converts a C.KeyValueResult to a key value pair or error.
+//
+// It returns nil, nil if the result is None.
+// It returns a *ownedKeyValue, nil if the result is Some.
+// It returns an error if the result is an error.
+func getKeyValueFromKeyValueResult(result C.KeyValueResult) (*ownedKeyValue, error) {
+	switch result.tag {
+	case C.KeyValueResult_NullHandlePointer:
+		return nil, errDBClosed
+	case C.KeyValueResult_None:
+		return nil, nil
+	case C.KeyValueResult_Some:
+		ownedKvp := newOwnedKeyValue(*(*C.OwnedKeyValuePair)(unsafe.Pointer(&result.anon0)))
+		return ownedKvp, nil
+	case C.ValueResult_Err:
+		err := newOwnedBytes(*(*C.OwnedBytes)(unsafe.Pointer(&result.anon0))).intoError()
+		return nil, err
+	default:
+		return nil, fmt.Errorf("unknown C.KeyValueResult tag: %d", result.tag)
+	}
+}
+
 // getDatabaseFromHandleResult converts a C.HandleResult to a Database or error.
 //
 // If the C.HandleResult is an error, it returns an error instead of a Database.

@@ -192,7 +192,7 @@ pub unsafe extern "C" fn fwd_iter_on_proposal<'p>(
 ///
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn fwd_iter_next(handle: Option<&mut IteratorHandle<'_>>) -> KeyValueResult {
-    invoke_with_handle(handle, |it| it.next())
+    invoke_with_handle(handle, Iterator::next)
 }
 
 /// Consumes the [`IteratorHandle`], destroys the iterator, and frees the memory.
