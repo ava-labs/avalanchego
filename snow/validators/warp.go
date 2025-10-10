@@ -63,20 +63,16 @@ func (w *Warp) Compare(o *Warp) int {
 }
 
 type jsonWarp struct {
-	PublicKey *string        `json:"publicKey"`
+	PublicKey string         `json:"publicKey"`
 	Weight    avajson.Uint64 `json:"weight"`
 	NodeIDs   []ids.NodeID   `json:"nodeIDs"`
 }
 
 func (w Warp) MarshalJSON() ([]byte, error) {
-	var pk *string
-	if w.PublicKey != nil {
-		pkBytes := bls.PublicKeyToCompressedBytes(w.PublicKey)
-		str, err := formatting.Encode(formatting.HexNC, pkBytes)
-		if err != nil {
-			return nil, err
-		}
-		pk = &str
+	pkBytes := bls.PublicKeyToCompressedBytes(w.PublicKey)
+	pk, err := formatting.Encode(formatting.HexNC, pkBytes)
+	if err != nil {
+		return nil, err
 	}
 	return json.Marshal(jsonWarp{
 		PublicKey: pk,
@@ -91,24 +87,17 @@ func (w *Warp) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	var (
-		pk      *bls.PublicKey
-		pkBytes []byte
-	)
-	if j.PublicKey != nil {
-		decoded, err := formatting.Decode(formatting.HexNC, *j.PublicKey)
-		if err != nil {
-			return err
-		}
-		pk, err = bls.PublicKeyFromCompressedBytes(decoded)
-		if err != nil {
-			return err
-		}
-		pkBytes = bls.PublicKeyToUncompressedBytes(pk)
+	pkBytes, err := formatting.Decode(formatting.HexNC, j.PublicKey)
+	if err != nil {
+		return err
+	}
+	pk, err := bls.PublicKeyFromCompressedBytes(pkBytes)
+	if err != nil {
+		return err
 	}
 	*w = Warp{
 		PublicKey:      pk,
-		PublicKeyBytes: pkBytes,
+		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
 		Weight:         uint64(j.Weight),
 		NodeIDs:        j.NodeIDs,
 	}
