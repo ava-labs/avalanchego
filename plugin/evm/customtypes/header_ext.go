@@ -116,12 +116,12 @@ func (h *HeaderExtra) PostCopy(dst *ethtypes.Header) {
 		cp.ExtDataGasUsed = new(big.Int).Set(h.ExtDataGasUsed)
 	}
 	if h.TimeMilliseconds != nil {
-		cpMs := *h.TimeMilliseconds
-		cp.TimeMilliseconds = &cpMs
+		m := *h.TimeMilliseconds
+		cp.TimeMilliseconds = &m
 	}
 	if h.MinDelayExcess != nil {
-		cpDelayExcess := *h.MinDelayExcess
-		cp.MinDelayExcess = &cpDelayExcess
+		e := *h.MinDelayExcess
+		cp.MinDelayExcess = &e
 	}
 	SetHeaderExtra(dst, cp)
 }

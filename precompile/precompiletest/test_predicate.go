@@ -15,6 +15,8 @@ import (
 
 // PredicateTest defines a unit test/benchmark for verifying a precompile predicate.
 type PredicateTest struct {
+	Name string
+
 	Config precompileconfig.Config
 
 	PredicateContext *precompileconfig.PredicateContext
@@ -43,11 +45,11 @@ func (test PredicateTest) Run(t testing.TB) {
 	require.ErrorIs(predicateRes, test.ExpectedErr)
 }
 
-func RunPredicateTests(t *testing.T, predicateTests map[string]PredicateTest) {
+func RunPredicateTests(t *testing.T, tests []PredicateTest) {
 	t.Helper()
 
-	for name, test := range predicateTests {
-		t.Run(name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
 			test.Run(t)
 		})
 	}
@@ -73,11 +75,11 @@ func (test PredicateTest) RunBenchmark(b *testing.B) {
 	b.ReportMetric(float64(mgasps)/100, "mgas/s")
 }
 
-func RunPredicateBenchmarks(b *testing.B, predicateTests map[string]PredicateTest) {
+func RunPredicateBenchmarks(b *testing.B, tests []PredicateTest) {
 	b.Helper()
 
-	for name, test := range predicateTests {
-		b.Run(name, func(b *testing.B) {
+	for _, test := range tests {
+		b.Run(test.Name, func(b *testing.B) {
 			test.RunBenchmark(b)
 		})
 	}

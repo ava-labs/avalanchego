@@ -1,6 +1,6 @@
 module github.com/ava-labs/coreth/tools
 
-go 1.24.7
+go 1.24.8
 
 tool (
 	github.com/fjl/gencodec

@@ -132,21 +132,21 @@ func BlockGasCost(b *ethtypes.Block) *big.Int {
 }
 
 func BlockTimeMilliseconds(b *ethtypes.Block) *uint64 {
-	var time *uint64
-	if t := GetHeaderExtra(b.Header()).TimeMilliseconds; t != nil {
-		time = new(uint64)
-		*time = *t
+	time := GetHeaderExtra(b.Header()).TimeMilliseconds
+	if time == nil {
+		return nil
 	}
-	return time
+	cp := *time
+	return &cp
 }
 
 func BlockMinDelayExcess(b *ethtypes.Block) *acp226.DelayExcess {
-	var excess *acp226.DelayExcess
-	if e := GetHeaderExtra(b.Header()).MinDelayExcess; e != nil {
-		excess = new(acp226.DelayExcess)
-		*excess = *e
+	e := GetHeaderExtra(b.Header()).MinDelayExcess
+	if e == nil {
+		return nil
 	}
-	return excess
+	cp := *e
+	return &cp
 }
 
 func CalcExtDataHash(extdata []byte) common.Hash {

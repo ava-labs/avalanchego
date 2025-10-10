@@ -24,30 +24,23 @@ var (
 	ErrTimeMillisecondsRequired      = errors.New("TimeMilliseconds is required after Granite activation")
 	ErrTimeMillisecondsMismatched    = errors.New("TimeMilliseconds does not match header.Time")
 	ErrTimeMillisecondsBeforeGranite = errors.New("TimeMilliseconds should be nil before Granite activation")
+	ErrMinDelayNotMet                = errors.New("minimum block delay not met")
+	ErrGraniteClockBehindParent      = errors.New("current timestamp is not allowed to be behind than parent timestamp in Granite")
 )
 
-// GetNextTimestamp calculates the timestamp (in seconds and milliseconds) for the next child block based on the parent's timestamp and the current time.
-// First return value is the timestamp in seconds, second return value is the timestamp in milliseconds.
-func GetNextTimestamp(parent *types.Header, now time.Time) (uint64, uint64) {
-	var (
-		timestamp   = uint64(now.Unix())
-		timestampMS = uint64(now.UnixMilli())
-	)
-	// Note: in order to support asynchronous block production, blocks are allowed to have
-	// the same timestamp as their parent. This allows more than one block to be produced
-	// per second.
+// GetNextTimestamp calculates the time for the next header based on the parent's timestamp and the current time.
+// This can return the parent time if now is before the parent time and TimeMilliseconds is not set (pre-Granite).
+func GetNextTimestamp(parent *types.Header, now time.Time) time.Time {
 	parentExtra := customtypes.GetHeaderExtra(parent)
-	if parent.Time >= timestamp ||
-		(parentExtra.TimeMilliseconds != nil && *parentExtra.TimeMilliseconds >= timestampMS) {
-		timestamp = parent.Time
-		// If the parent has a TimeMilliseconds, use it. Otherwise, use the parent time * 1000.
-		if parentExtra.TimeMilliseconds != nil {
-			timestampMS = *parentExtra.TimeMilliseconds
-		} else {
-			timestampMS = parent.Time * 1000 // TODO: establish minimum time
-		}
+	// In Granite, there is a minimum delay enforced, so we cannot adjust the time with the parent's timestamp.
+	// Instead we should have waited enough time before calling this function and before the block building.
+	// We return the current time instead regardless and defer the verification to VerifyTime.
+	if parent.Time < uint64(now.Unix()) || parentExtra.TimeMilliseconds != nil {
+		return now
 	}
-	return timestamp, timestampMS
+
+	// In pre-Granite, blocks are allowed to have the same timestamp as their parent.
+	return time.Unix(int64(parent.Time), 0)
 }
 
 // VerifyTime verifies that the header's Time and TimeMilliseconds fields are
@@ -58,26 +51,34 @@ func GetNextTimestamp(parent *types.Header, now time.Time) (uint64, uint64) {
 // - Time matches TimeMilliseconds/1000 after Granite activation
 // - Time/TimeMilliseconds is not too far in the future
 // - Time/TimeMilliseconds is non-decreasing
-// - (TODO) Minimum block delay is enforced
+// - Minimum block delay is enforced
 func VerifyTime(extraConfig *extras.ChainConfig, parent *types.Header, header *types.Header, now time.Time) error {
 	var (
 		headerExtra = customtypes.GetHeaderExtra(header)
 		parentExtra = customtypes.GetHeaderExtra(parent)
 	)
 
+	// These two variables are backward-compatible with Time (seconds) fields.
+	headerTimeMS := customtypes.HeaderTimeMilliseconds(header)
+	parentTimeMS := customtypes.HeaderTimeMilliseconds(parent)
+
 	// Verify the header's timestamp is not earlier than parent's
-	// it does include equality(==), so multiple blocks per second is ok
-	if header.Time < parent.Time {
-		return fmt.Errorf("%w: %d < parent %d", errBlockTooOld, header.Time, parent.Time)
+	// This includes equality(==), so multiple blocks per milliseconds is ok
+	// pre-Granite.
+	if headerTimeMS < parentTimeMS {
+		return fmt.Errorf("%w: %d < parent %d", errBlockTooOld, headerTimeMS, parentTimeMS)
 	}
 
-	// Do all checks that apply only before Granite
-	if !extraConfig.IsGranite(header.Time) {
-		// Make sure the block isn't too far in the future
-		if maxBlockTime := uint64(now.Add(MaxFutureBlockTime).Unix()); header.Time > maxBlockTime {
-			return fmt.Errorf("%w: %d > allowed %d", ErrBlockTooFarInFuture, header.Time, maxBlockTime)
-		}
+	// Verify if the header's timestamp is not too far in the future
+	if maxBlockTimeMS := uint64(now.Add(MaxFutureBlockTime).UnixMilli()); headerTimeMS > maxBlockTimeMS {
+		return fmt.Errorf("%w: %d > allowed %d",
+			ErrBlockTooFarInFuture,
+			headerTimeMS,
+			maxBlockTimeMS,
+		)
+	}
 
+	if !extraConfig.IsGranite(header.Time) {
 		// This field should not be set yet.
 		if headerExtra.TimeMilliseconds != nil {
 			return ErrTimeMillisecondsBeforeGranite
@@ -99,22 +100,23 @@ func VerifyTime(extraConfig *extras.ChainConfig, parent *types.Header, header *t
 		)
 	}
 
-	// Verify TimeMilliseconds is not earlier than parent's TimeMilliseconds
-	// TODO: Ensure minimum block delay is enforced
-	if parentExtra.TimeMilliseconds != nil && *headerExtra.TimeMilliseconds < *parentExtra.TimeMilliseconds {
-		return fmt.Errorf("%w: %d < parent %d",
-			errBlockTooOld,
-			*headerExtra.TimeMilliseconds,
-			*parentExtra.TimeMilliseconds,
-		)
+	// Verify minimum block delay is enforced
+	// Parent might not have a min delay excess if this is the first Granite block
+	// in this case we cannot verify the min delay,
+	// Otherwise parent should have been verified in VerifyMinDelayExcess
+	if parentExtra.MinDelayExcess == nil {
+		return nil
 	}
 
-	// Verify TimeMilliseconds is not too far in the future
-	if maxBlockTimeMillis := uint64(now.Add(MaxFutureBlockTime).UnixMilli()); *headerExtra.TimeMilliseconds > maxBlockTimeMillis {
-		return fmt.Errorf("%w: %d > allowed %d",
-			ErrBlockTooFarInFuture,
-			*headerExtra.TimeMilliseconds,
-			maxBlockTimeMillis,
+	// This should not be underflow as we have verified that the parent's
+	// TimeMilliseconds is earlier than the header's TimeMilliseconds above.
+	actualDelayMS := headerTimeMS - parentTimeMS
+	minRequiredDelayMS := parentExtra.MinDelayExcess.Delay()
+	if actualDelayMS < minRequiredDelayMS {
+		return fmt.Errorf("%w: actual delay %dms < required %dms",
+			ErrMinDelayNotMet,
+			actualDelayMS,
+			minRequiredDelayMS,
 		)
 	}
 
