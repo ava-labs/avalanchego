@@ -33,23 +33,26 @@ type Backend interface {
 }
 
 type txSigner struct {
-	kc      keychain.Keychain
-	backend Backend
+	kc        keychain.Keychain
+	backend   Backend
+	networkID uint32
 }
 
-func New(kc keychain.Keychain, backend Backend) Signer {
+func New(kc keychain.Keychain, backend Backend, networkID uint32) Signer {
 	return &txSigner{
-		kc:      kc,
-		backend: backend,
+		kc:        kc,
+		backend:   backend,
+		networkID: networkID,
 	}
 }
 
 func (s *txSigner) Sign(ctx stdcontext.Context, tx *txs.Tx) error {
 	return tx.Unsigned.Visit(&visitor{
-		kc:      s.kc,
-		backend: s.backend,
-		ctx:     ctx,
-		tx:      tx,
+		kc:        s.kc,
+		backend:   s.backend,
+		ctx:       ctx,
+		tx:        tx,
+		networkID: s.networkID,
 	})
 }
 
