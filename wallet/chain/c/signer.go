@@ -60,16 +60,18 @@ type SignerBackend interface {
 }
 
 type txSigner struct {
-	avaxKC  keychain.Keychain
-	ethKC   EthKeychain
-	backend SignerBackend
+	avaxKC    keychain.Keychain
+	ethKC     EthKeychain
+	backend   SignerBackend
+	networkID uint32
 }
 
-func NewSigner(avaxKC keychain.Keychain, ethKC EthKeychain, backend SignerBackend) Signer {
+func NewSigner(avaxKC keychain.Keychain, ethKC EthKeychain, backend SignerBackend, networkID uint32) Signer {
 	return &txSigner{
-		avaxKC:  avaxKC,
-		ethKC:   ethKC,
-		backend: backend,
+		avaxKC:    avaxKC,
+		ethKC:     ethKC,
+		backend:   backend,
+		networkID: networkID,
 	}
 }
 
@@ -80,10 +82,10 @@ func (s *txSigner) SignAtomic(ctx context.Context, tx *atomic.Tx) error {
 		if err != nil {
 			return err
 		}
-		return sign(tx, true, signers)
+		return sign(tx, true, signers, s.networkID)
 	case *atomic.UnsignedExportTx:
 		signers := s.getExportSigners(utx.Ins)
-		return sign(tx, true, signers)
+		return sign(tx, true, signers, s.networkID)
 	default:
 		return fmt.Errorf("%w: %T", errUnknownTxType, tx)
 	}
@@ -157,7 +159,7 @@ func SignUnsignedAtomic(ctx context.Context, signer Signer, utx atomic.UnsignedA
 }
 
 // TODO: remove [signHash] after the ledger supports signing all transactions.
-func sign(tx *atomic.Tx, signHash bool, txSigners [][]keychain.Signer) error {
+func sign(tx *atomic.Tx, signHash bool, txSigners [][]keychain.Signer, networkID uint32) error {
 	unsignedBytes, err := atomic.Codec.Marshal(version, &tx.UnsignedAtomicTx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal unsigned tx: %w", err)
@@ -209,7 +211,9 @@ func sign(tx *atomic.Tx, signHash bool, txSigners [][]keychain.Signer) error {
 			if signHash {
 				sig, err = signer.SignHash(unsignedHash)
 			} else {
-				sig, err = signer.Sign(unsignedBytes, keychain.WithChainAlias(Alias))
+				sig, err = signer.Sign(unsignedBytes,
+					keychain.WithChainAlias(Alias),
+					keychain.WithNetworkID(networkID))
 			}
 			if err != nil {
 				return fmt.Errorf("problem signing tx: %w", err)

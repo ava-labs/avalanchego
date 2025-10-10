@@ -118,7 +118,7 @@ func MakeWallet(
 	cUTXOs := common.NewChainUTXOs(cChainID, avaxState.UTXOs)
 	cBackend := c.NewBackend(cUTXOs, ethState.Accounts)
 	cBuilder := c.NewBuilder(avaxAddrs, ethAddrs, avaxState.CCTX, cBackend)
-	cSigner := c.NewSigner(avaxKeychain, ethKeychain, cBackend)
+	cSigner := c.NewSigner(avaxKeychain, ethKeychain, cBackend, avaxState.CCTX.NetworkID)
 
 	return NewWallet(
 		pwallet.New(pClient, pBuilder, pSigner),
