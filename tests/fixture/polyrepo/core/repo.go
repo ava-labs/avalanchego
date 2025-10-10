@@ -40,6 +40,8 @@ func GetRepoClonePath(repoName, baseDir string) string {
 
 // CloneRepo clones a repository to the specified path
 // depth: 0 for full clone, 1 for shallow clone (default), >1 for partial clone
+// ref can be a branch name, tag, or commit SHA. For SHAs, the repository is cloned
+// without SingleBranch and the ref is checked out after cloning.
 func CloneRepo(url, path, ref string, depth int) error {
 	opts := &git.CloneOptions{
 		URL: url,
@@ -50,7 +52,9 @@ func CloneRepo(url, path, ref string, depth int) error {
 		opts.Depth = depth
 	}
 
-	if ref != "" {
+	// If ref is specified and looks like a branch or tag (not a SHA),
+	// set it as the reference to clone. Otherwise, we'll checkout after cloning.
+	if ref != "" && !looksLikeSHA(ref) {
 		opts.ReferenceName = plumbing.NewBranchReferenceName(ref)
 		opts.SingleBranch = true
 	}
@@ -61,6 +65,21 @@ func CloneRepo(url, path, ref string, depth int) error {
 	}
 
 	return nil
+}
+
+// looksLikeSHA returns true if the ref looks like a git commit SHA
+func looksLikeSHA(ref string) bool {
+	// Git SHAs are 40 character hex strings (or 7+ for short SHAs)
+	// Check if it's at least 7 chars and all hex
+	if len(ref) < 7 {
+		return false
+	}
+	for _, c := range ref {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
 }
 
 // CheckoutRef checks out a specific ref (tag, branch, or commit) in a repository
@@ -89,6 +108,27 @@ func CheckoutRef(repoPath, ref string) error {
 	}
 
 	return nil
+}
+
+// GetCurrentRef returns the current ref (branch or commit) of a repository
+func GetCurrentRef(repoPath string) (string, error) {
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open repository: %w", err)
+	}
+
+	head, err := repo.Head()
+	if err != nil {
+		return "", fmt.Errorf("failed to get HEAD: %w", err)
+	}
+
+	// If HEAD is a branch, return the branch name
+	if head.Name().IsBranch() {
+		return head.Name().Short(), nil
+	}
+
+	// Otherwise return the commit hash (detached HEAD)
+	return head.Hash().String(), nil
 }
 
 // IsRepoDirty checks if a repository has uncommitted changes
@@ -140,8 +180,9 @@ func CloneOrUpdateRepo(url, path, ref string, depth int, force bool) error {
 		return err
 	}
 
-	// If we cloned successfully but need to checkout a specific ref
-	if ref != "" {
+	// If we cloned successfully and the ref looks like a SHA, we need to checkout
+	// (since CloneRepo doesn't set branch reference for SHAs)
+	if ref != "" && looksLikeSHA(ref) {
 		return CheckoutRef(path, ref)
 	}
 
