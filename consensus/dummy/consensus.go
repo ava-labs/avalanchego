@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/consensus/misc/eip4844"
 	"github.com/ava-labs/libevm/core/state"
@@ -31,17 +32,18 @@ type Mode struct {
 	ModeSkipCoinbase bool
 }
 
-type (
-	DummyEngine struct {
-		consensusMode Mode
-	}
-)
+type DummyEngine struct {
+	consensusMode      Mode
+	desiredDelayExcess *acp226.DelayExcess
+}
 
 func NewDummyEngine(
 	mode Mode,
+	desiredDelayExcess *acp226.DelayExcess, // Guides the min delay excess (ACP-226) toward the desired value
 ) *DummyEngine {
 	return &DummyEngine{
-		consensusMode: mode,
+		consensusMode:      mode,
+		desiredDelayExcess: desiredDelayExcess,
 	}
 }
 
@@ -305,6 +307,18 @@ func (eng *DummyEngine) FinalizeAndAssemble(chain consensus.ChainHeaderReader, h
 		return nil, fmt.Errorf("failed to calculate new header.Extra: %w", err)
 	}
 	header.Extra = append(extraPrefix, header.Extra...)
+
+	// Set the min delay excess
+	minDelayExcess, err := customheader.MinDelayExcess(
+		configExtra,
+		parent,
+		header.Time,
+		eng.desiredDelayExcess,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate min delay excess: %w", err)
+	}
+	headerExtra.MinDelayExcess = minDelayExcess
 
 	// commit the final state root
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))

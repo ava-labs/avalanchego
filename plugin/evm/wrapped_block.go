@@ -286,8 +286,13 @@ func (b *wrappedBlock) semanticVerify() error {
 		return fmt.Errorf("%w: %s at height %d", errInvalidParent, b.ethBlock.ParentHash(), b.ethBlock.NumberU64()-1)
 	}
 
+	header := b.ethBlock.Header()
+	// Ensure MinDelayExcess is consistent with rules and minimum block delay is enforced.
+	if err := customheader.VerifyMinDelayExcess(extraConfig, parent, header); err != nil {
+		return err
+	}
 	// Ensure Time and TimeMilliseconds are consistent with rules.
-	if err := customheader.VerifyTime(extraConfig, parent, b.ethBlock.Header(), b.vm.clock.Time()); err != nil {
+	if err := customheader.VerifyTime(extraConfig, parent, header, b.vm.clock.Time()); err != nil {
 		return err
 	}
 

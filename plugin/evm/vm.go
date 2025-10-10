@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -603,6 +604,13 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash, ethConfig ethconfig.
 	if err != nil {
 		return err
 	}
+
+	var desiredDelayExcess *acp226.DelayExcess
+	if vm.config.MinDelayTarget != nil {
+		desiredDelayExcess = new(acp226.DelayExcess)
+		*desiredDelayExcess = acp226.DesiredDelayExcess(*vm.config.MinDelayTarget)
+	}
+
 	vm.eth, err = eth.New(
 		node,
 		&vm.ethConfig,
@@ -610,7 +618,10 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash, ethConfig ethconfig.
 		vm.chaindb,
 		eth.Settings{MaxBlocksPerRequest: vm.config.MaxBlocksPerRequest},
 		lastAcceptedHash,
-		dummy.NewFaker(),
+		dummy.NewDummyEngine(
+			dummy.Mode{},
+			desiredDelayExcess,
+		),
 		vm.clock,
 	)
 	if err != nil {

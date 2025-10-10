@@ -33,6 +33,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/libevm/common"
@@ -4155,6 +4156,82 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 			receipts := vm.blockChain.GetReceiptsByHash(ethBlock.Hash())
 			require.Len(t, receipts, 1)
 			require.Equal(t, tt.wantReceiptStatus, receipts[0].Status)
+		})
+	}
+}
+
+func TestMinDelayExcessInHeader(t *testing.T) {
+	tests := []struct {
+		name                   string
+		fork                   upgradetest.Fork
+		desiredMinDelay        *uint64
+		expectedMinDelayExcess *acp226.DelayExcess
+	}{
+		{
+			name:                   "pre_granite_no_min_delay_excess",
+			fork:                   upgradetest.Fortuna,
+			desiredMinDelay:        nil,
+			expectedMinDelayExcess: nil,
+		},
+		{
+			name:                   "pre_granite_min_delay_excess",
+			fork:                   upgradetest.Fortuna,
+			desiredMinDelay:        utils.NewUint64(1000),
+			expectedMinDelayExcess: nil,
+		},
+		{
+			name:                   "granite_first_block_initial_delay_excess",
+			fork:                   upgradetest.Granite,
+			desiredMinDelay:        nil,
+			expectedMinDelayExcess: utilstest.PointerTo(acp226.DelayExcess(acp226.InitialDelayExcess)),
+		},
+		{
+			name:                   "granite_with_excessive_desired_min_delay_excess",
+			fork:                   upgradetest.Granite,
+			desiredMinDelay:        utils.NewUint64(4000),
+			expectedMinDelayExcess: utilstest.PointerTo(acp226.DelayExcess(acp226.InitialDelayExcess + acp226.MaxDelayExcessDiff)),
+		},
+		{
+			name:                   "granite_with_zero_desired_min_delay_excess",
+			fork:                   upgradetest.Granite,
+			desiredMinDelay:        utils.NewUint64(0),
+			expectedMinDelayExcess: utilstest.PointerTo(acp226.DelayExcess(acp226.InitialDelayExcess - acp226.MaxDelayExcessDiff)),
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require := require.New(t)
+			ctx := context.Background()
+			var configJSON string
+			if test.desiredMinDelay != nil {
+				// convert excess to delay
+				configJSON = fmt.Sprintf(`{"min-delay-target": %d}`, *test.desiredMinDelay)
+			}
+			vm := newVM(t, testVMConfig{
+				fork:       &test.fork,
+				configJSON: configJSON,
+			})
+
+			defer func() {
+				require.NoError(vm.vm.Shutdown(ctx))
+			}()
+
+			// Build a block
+			signedTx := newSignedLegacyTx(t, vm.vm.chainConfig, testKeys[0].ToECDSA(), 0, &testEthAddrs[1], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
+			txErrors := vm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})
+			for _, err := range txErrors {
+				require.NoError(err)
+			}
+
+			blk, err := vm.vm.BuildBlock(ctx)
+			require.NoError(err)
+
+			// Check the min delay excess in the header
+			ethBlock := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+			headerExtra := customtypes.GetHeaderExtra(ethBlock.Header())
+
+			require.Equal(test.expectedMinDelayExcess, headerExtra.MinDelayExcess, "expected %s, got %s", test.expectedMinDelayExcess, headerExtra.MinDelayExcess)
 		})
 	}
 }

@@ -9,11 +9,13 @@ import (
 	"testing"
 	"unsafe"
 
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/ava-labs/subnet-evm/internal/blocktest"
 	"github.com/ava-labs/subnet-evm/utils"
+	"github.com/ava-labs/subnet-evm/utils/utilstest"
 
 	// TODO(arr4n) These tests were originally part of the `subnet-evm/core/types`
 	// package so assume the presence of identifiers. A dot-import reduces PR
@@ -28,20 +30,24 @@ func TestBlockGetters(t *testing.T) {
 		headerExtra          *HeaderExtra
 		wantBlockGasCost     *big.Int
 		wantTimeMilliseconds *uint64
+		wantMinDelayExcess   *acp226.DelayExcess
 	}{
 		{
 			name:                 "empty",
 			headerExtra:          &HeaderExtra{},
 			wantTimeMilliseconds: nil,
+			wantMinDelayExcess:   nil,
 		},
 		{
 			name: "fields_set",
 			headerExtra: &HeaderExtra{
 				BlockGasCost:     big.NewInt(2),
 				TimeMilliseconds: utils.NewUint64(3),
+				MinDelayExcess:   utilstest.PointerTo(acp226.DelayExcess(4)),
 			},
 			wantBlockGasCost:     big.NewInt(2),
 			wantTimeMilliseconds: utils.NewUint64(3),
+			wantMinDelayExcess:   utilstest.PointerTo(acp226.DelayExcess(4)),
 		},
 	}
 	for _, test := range tests {
@@ -57,6 +63,9 @@ func TestBlockGetters(t *testing.T) {
 
 			timeMilliseconds := BlockTimeMilliseconds(block)
 			assert.Equal(t, test.wantTimeMilliseconds, timeMilliseconds, "BlockTimeMilliseconds()")
+
+			minDelayExcess := BlockMinDelayExcess(block)
+			assert.Equal(t, test.wantMinDelayExcess, minDelayExcess, "BlockMinDelayExcess()")
 		})
 	}
 }
@@ -127,6 +136,8 @@ func exportedFieldsPointToDifferentMemory[T interface {
 			case *big.Int:
 				assertDifferentPointers(t, f, fieldCp)
 			case *common.Hash:
+				assertDifferentPointers(t, f, fieldCp)
+			case *acp226.DelayExcess:
 				assertDifferentPointers(t, f, fieldCp)
 			case *uint64:
 				assertDifferentPointers(t, f, fieldCp)
