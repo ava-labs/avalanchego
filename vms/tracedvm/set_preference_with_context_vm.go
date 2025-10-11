@@ -15,14 +15,23 @@ import (
 )
 
 func (vm *blockVM) SetPreferenceWithContext(ctx context.Context, blkID ids.ID, blockCtx *block.Context) error {
-	if vm.setPreferenceVM == nil || blockCtx == nil {
+	if vm.setPreferenceVM == nil {
 		return vm.SetPreference(ctx, blkID)
 	}
 
-	ctx, span := vm.tracer.Start(ctx, vm.setPreferenceWithContextTag, oteltrace.WithAttributes(
-		attribute.Stringer("blkID", blkID),
-		attribute.Int64("pChainHeight", int64(blockCtx.PChainHeight)),
-	))
+	var option oteltrace.SpanStartEventOption
+	if blockCtx == nil {
+		option = oteltrace.WithAttributes(
+			attribute.Stringer("blkID", blkID),
+		)
+	} else {
+		option = oteltrace.WithAttributes(
+			attribute.Stringer("blkID", blkID),
+			attribute.Int64("pChainHeight", int64(blockCtx.PChainHeight)),
+		)
+	}
+
+	ctx, span := vm.tracer.Start(ctx, vm.setPreferenceWithContextTag, option)
 	defer span.End()
 
 	return vm.setPreferenceVM.SetPreferenceWithContext(ctx, blkID, blockCtx)
