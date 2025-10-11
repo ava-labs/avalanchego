@@ -300,6 +300,40 @@ func (w *withOptions) IssueAddPermissionlessDelegatorTx(
 	)
 }
 
+func (w *withOptions) IssueAddContinuousValidatorTx(
+	vdr *txs.Validator,
+	signer vmsigner.Signer,
+	assetID ids.ID,
+	validationRewardsOwner *secp256k1fx.OutputOwners,
+	delegationRewardsOwner *secp256k1fx.OutputOwners,
+	shares uint32,
+	period time.Duration,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	return w.wallet.IssueAddContinuousValidatorTx(
+		vdr,
+		signer,
+		assetID,
+		validationRewardsOwner,
+		delegationRewardsOwner,
+		shares,
+		period,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
+func (w *withOptions) IssueStopContinuousValidatorTx(
+	txID ids.ID,
+	signature [bls.SignatureLen]byte,
+	options ...common.Option,
+) (*txs.Tx, error) {
+	return w.wallet.IssueStopContinuousValidatorTx(
+		txID,
+		signature,
+		common.UnionOptions(w.options, options)...,
+	)
+}
+
 func (w *withOptions) IssueUnsignedTx(
 	utx txs.UnsignedTx,
 	options ...common.Option,
