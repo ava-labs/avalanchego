@@ -134,27 +134,15 @@ func (mr *ManagerMockRecorder) Preferred() *gomock.Call {
 }
 
 // SetPreference mocks base method.
-func (m *Manager) SetPreference(blkID ids.ID) {
+func (m *Manager) SetPreference(blkID ids.ID, blockCtx *block.Context) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetPreference", blkID)
+	m.ctrl.Call(m, "SetPreference", blkID, blockCtx)
 }
 
 // SetPreference indicates an expected call of SetPreference.
-func (mr *ManagerMockRecorder) SetPreference(blkID any) *gomock.Call {
+func (mr *ManagerMockRecorder) SetPreference(blkID, blockCtx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPreference", reflect.TypeOf((*Manager)(nil).SetPreference), blkID)
-}
-
-// SetPreferenceWithContext mocks base method.
-func (m *Manager) SetPreferenceWithContext(blkID ids.ID, blockCtx *block.Context) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetPreferenceWithContext", blkID, blockCtx)
-}
-
-// SetPreferenceWithContext indicates an expected call of SetPreferenceWithContext.
-func (mr *ManagerMockRecorder) SetPreferenceWithContext(blkID, blockCtx any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPreferenceWithContext", reflect.TypeOf((*Manager)(nil).SetPreferenceWithContext), blkID, blockCtx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPreference", reflect.TypeOf((*Manager)(nil).SetPreference), blkID, blockCtx)
 }
 
 // VerifyTx mocks base method.

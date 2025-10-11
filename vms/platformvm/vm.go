@@ -426,12 +426,12 @@ func (vm *VM) LastAccepted(context.Context) (ids.ID, error) {
 
 // SetPreference sets the preferred block to be the one with ID [blkID]
 func (vm *VM) SetPreference(_ context.Context, blkID ids.ID) error {
-	vm.manager.SetPreference(blkID)
+	vm.manager.SetPreference(blkID, nil)
 	return nil
 }
 
 func (vm *VM) SetPreferenceWithContext(_ context.Context, blkID ids.ID, blockCtx *snowmanblock.Context) error {
-	vm.manager.SetPreferenceWithContext(blkID, blockCtx)
+	vm.manager.SetPreference(blkID, blockCtx)
 	return nil
 }
 
