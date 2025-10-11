@@ -87,6 +87,8 @@ tasks:
       - cmd: go mod tidy
         dir: tools
       - task: check-clean-branch
+      - task: generate-gomod2nix
+      - task: check-clean-branch
 
   create-kind-cluster:
     desc: Creates the default kind cluster
@@ -124,6 +126,10 @@ tasks:
     desc: Generates canoto
     cmd: go generate -run "github.com/StephenButtolph/canoto/canoto" ./...
 
+  generate-gomod2nix:
+    desc: Generates nix/gomod2nix.toml
+    cmd: go tool -modfile=tools/go.mod gomod2nix --outdir nix/
+
   generate-load-contract-bindings:
     desc: Generates load contract bindings
     cmds:
@@ -137,6 +143,14 @@ tasks:
   ginkgo-build:
     desc: Runs ginkgo against the current working directory
     cmd: ./bin/ginkgo build {{.USER_WORKING_DIR}}
+
+  go-mod-tidy:
+    desc: Ensures go.mod and go.sum files and gomod2nix.toml are up-to-date
+    cmds:
+      - cmd: go mod tidy
+      - cmd: go mod tidy
+        dir: tools
+      - task: generate-gomod2nix
 
   import-cchain-reexecute-range:
     desc: Imports the C-Chain block and state data to re-execute. Defaults to import the first 200 and the current state created with the default config of the C-Chain (hashdb).
