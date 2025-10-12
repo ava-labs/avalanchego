@@ -25,7 +25,7 @@ cmd="go test -timeout=0 -v -benchtime=1x -bench=BenchmarkReexecuteRange -run=^$ 
   --start-block=\"${START_BLOCK}\" \
   --end-block=\"${END_BLOCK}\" \
   ${LABELS:+--labels=\"${LABELS}\"} \
-  ${METRICS_ENABLED:+--metrics-enabled=\"${METRICS_ENABLED}\"}"
+  ${METRICS_MODE:+--metrics-mode=\"${METRICS_MODE}\"}"
 
 if [ -n "${BENCHMARK_OUTPUT_FILE:-}" ]; then
   eval "$cmd" | tee "${BENCHMARK_OUTPUT_FILE}"

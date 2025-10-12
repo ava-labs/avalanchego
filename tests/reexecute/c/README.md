@@ -42,7 +42,18 @@ export AWS_REGION=us-east-2
 
 ### Metrics Collection
 
-If running with metrics collection, enabled in CI and configured locally with `METRICS_ENABLED=true`, follow the instructions in the e2e [README](../../e2e/README.md#monitoring) to set the required Prometheus environment variables.
+If running locally, there are three options for metrics collection:
+
+- `METRICS_MODE=disabled`: no metrics are available.
+- `METRICS_MODE=server-only`: starts a Prometheus server exporting VM metrics. A
+  link to the metrics endpoint is logged during execution.
+- `METRICS_MODE=full`: starts both a Prometheus server exporting VM metrics and
+  a Prometheus collector. A link to the corresponding Grafana dashboard is
+  logged during execution.
+
+When utilizing the `full` options, follow the instructions in the e2e [README](../../e2e/README.md#monitoring) to set the required Prometheus environment variables.
+
+Running the re-execution test in CI will always set `METRICS_MODE=full`.
 
 ## Quick Start
 
@@ -230,7 +241,7 @@ The `CONFIG` parameter currently only supports pre-defined configs and not passi
 
 The C-Chain benchmarks export VM metrics to the same Grafana instance as AvalancheGo CI: https://grafana-poc.avax-dev.network/.
 
-To export metrics for a local run, simply set the Taskfile variable `METRICS_ENABLED=true` either via environment variable or passing it at the command line.
+To export metrics for a local run, simply set the Taskfile variable `METRICS_MODE=full` either via environment variable or passing it at the command line.
 
 You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).
 

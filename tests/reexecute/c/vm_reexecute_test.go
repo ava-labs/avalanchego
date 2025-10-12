@@ -48,6 +48,12 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
+const (
+	MetricsDisabled metricsMode = iota
+	MetricsServerOnly
+	MetricsFull
+)
+
 var (
 	mainnetXChainID    = ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM")
 	mainnetCChainID    = ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5")
@@ -62,9 +68,10 @@ var (
 	startBlockArg      uint64
 	endBlockArg        uint64
 	chanSizeArg        int
-	metricsEnabledArg  bool
 	executionTimeout   time.Duration
 	labelsArg          string
+
+	metricsModeArg = MetricsDisabled
 
 	networkUUID string = uuid.NewString()
 	labels             = map[string]string{
@@ -94,6 +101,41 @@ var (
 	configBytesArg []byte
 )
 
+type metricsMode int
+
+func (m *metricsMode) Set(s string) error {
+	s = strings.ToLower(strings.TrimSpace(s))
+
+	switch s {
+	case "disabled":
+		*m = MetricsDisabled
+	case "server-only":
+		*m = MetricsServerOnly
+	case "full":
+		*m = MetricsFull
+	default:
+		return fmt.Errorf("invalid metrics mode: %s (valid options: disabled, server-only, full)", s)
+	}
+	return nil
+}
+
+func (m metricsMode) String() string {
+	switch m {
+	case MetricsDisabled:
+		return "disabled"
+	case MetricsServerOnly:
+		return "server-only"
+	case MetricsFull:
+		return "full"
+	default:
+		return "unknown"
+	}
+}
+
+func (m metricsMode) shouldStartServer() bool { return m >= MetricsServerOnly }
+
+func (m metricsMode) shouldStartCollector() bool { return m == MetricsFull }
+
 func TestMain(m *testing.M) {
 	evm.RegisterAllLibEVMExtras()
 
@@ -104,7 +146,7 @@ func TestMain(m *testing.M) {
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
-	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", false, "Enable metrics collection.")
+	flag.Var(&metricsModeArg, "metrics-mode", "Metrics mode: disabled (no metrics), server-only (creates Prometheus server), or full (creates Prometheus server and starts Prometheus collector)")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
@@ -151,7 +193,7 @@ func BenchmarkReexecuteRange(b *testing.B) {
 			startBlockArg,
 			endBlockArg,
 			chanSizeArg,
-			metricsEnabledArg,
+			metricsModeArg,
 		)
 	})
 }
@@ -164,7 +206,7 @@ func benchmarkReexecuteRange(
 	startBlock uint64,
 	endBlock uint64,
 	chanSize int,
-	metricsEnabled bool,
+	metricsMode metricsMode,
 ) {
 	r := require.New(b)
 	ctx := context.Background()
@@ -185,9 +227,8 @@ func benchmarkReexecuteRange(
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
 
 	log := tests.NewDefaultLogger("c-chain-reexecution")
-
-	if metricsEnabled {
-		collectRegistry(b, log, "c-chain-reexecution", prefixGatherer, labels)
+	if metricsMode.shouldStartServer() {
+		collectRegistry(b, log, "c-chain-reexecution", prefixGatherer, labels, metricsMode.shouldStartCollector())
 	}
 
 	var (
@@ -554,19 +595,39 @@ func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, err
 	return m, nil
 }
 
-// collectRegistry starts prometheus and collects metrics from the provided gatherer.
-// Attaches the provided labels + GitHub labels if available to the collected metrics.
-func collectRegistry(tb testing.TB, log logging.Logger, name string, gatherer prometheus.Gatherer, labels map[string]string) {
+// collectRegistry starts a Prometheus server for the provided gatherer. If
+// startCollector is true, then collectRegistry also starts a Prometheus
+// collector for the provided gatherer and attaches the provided labels + GitHub
+// labels if available to the collected metrics.
+func collectRegistry(
+	tb testing.TB,
+	log logging.Logger,
+	name string,
+	gatherer prometheus.Gatherer,
+	labels map[string]string,
+	startCollector bool,
+) {
 	r := require.New(tb)
+
+	server, err := tests.NewPrometheusServer(gatherer)
+	r.NoError(err)
+
+	if !startCollector {
+		log.Info("metrics endpoint available",
+			zap.String("url", fmt.Sprintf("http://%s/ext/metrics", server.Address())),
+		)
+
+		tb.Cleanup(func() {
+			r.NoError(server.Stop())
+		})
+		return
+	}
 
 	startPromCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
 	defer cancel()
 
 	logger := tests.NewDefaultLogger("prometheus")
 	r.NoError(tmpnet.StartPrometheus(startPromCtx, logger))
-
-	server, err := tests.NewPrometheusServer(gatherer)
-	r.NoError(err)
 
 	var sdConfigFilePath string
 	tb.Cleanup(func() {
