@@ -232,6 +232,7 @@ mod ethhash {
         fn eq(&self, other: &TrieHash) -> bool {
             match self {
                 HashOrRlp::Hash(h) => h == other,
+                #[expect(deprecated, reason = "transitive dependency on generic-array")]
                 HashOrRlp::Rlp(r) => Keccak256::digest(r.as_ref()).as_slice() == other.as_ref(),
             }
         }
@@ -241,6 +242,7 @@ mod ethhash {
         fn eq(&self, other: &HashOrRlp) -> bool {
             match other {
                 HashOrRlp::Hash(h) => h == self,
+                #[expect(deprecated, reason = "transitive dependency on generic-array")]
                 HashOrRlp::Rlp(r) => Keccak256::digest(r.as_ref()).as_slice() == self.as_ref(),
             }
         }
@@ -251,6 +253,7 @@ mod ethhash {
             match (self, other) {
                 (HashOrRlp::Hash(h1), HashOrRlp::Hash(h2)) => h1 == h2,
                 (HashOrRlp::Rlp(r1), HashOrRlp::Rlp(r2)) => r1 == r2,
+                #[expect(deprecated, reason = "transitive dependency on generic-array")]
                 (HashOrRlp::Hash(h), HashOrRlp::Rlp(r))
                 | (HashOrRlp::Rlp(r), HashOrRlp::Hash(h)) => {
                     Keccak256::digest(r.as_ref()).as_slice() == h.as_ref()
@@ -342,7 +345,7 @@ mod ethhash {
         type Target = [u8];
         fn deref(&self) -> &Self::Target {
             match self {
-                HashOrRlp::Hash(h) => h,
+                HashOrRlp::Hash(h) => h.as_slice(),
                 HashOrRlp::Rlp(r) => r,
             }
         }

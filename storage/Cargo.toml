@@ -33,14 +33,14 @@ smallvec = { workspace = true, features = ["write", "union"] }
 thiserror.workspace = true
 # Regular dependencies
 arc-swap = "1.7.1"
-bitfield = "0.19.2"
+bitfield = "0.19.3"
 bitflags = "2.9.4"
 derive-where = "1.6.0"
 enum-as-inner = "0.6.1"
 indicatif = "0.18.0"
 lru = "0.16.1"
 semver = "1.0.27"
-triomphe = "0.1.14"
+triomphe = "0.1.15"
 # Optional dependencies
 bytes = { version = "1.10.1", optional = true }
 io-uring = { version = "0.7.10", optional = true }

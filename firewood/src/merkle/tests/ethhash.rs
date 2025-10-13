@@ -34,6 +34,7 @@ impl Hasher for KeccakHasher {
         let mut hasher = Keccak256::new();
         hasher.update(x);
         let result = hasher.finalize();
+        #[expect(deprecated, reason = "transitive dependency on generic-array")]
         H256::from_slice(result.as_slice())
     }
 }
@@ -90,6 +91,7 @@ fn test_eth_compatible_accounts(
     let expected_key_hash = Keccak256::digest(&account);
 
     let items = once((
+        #[expect(deprecated, reason = "transitive dependency on generic-array")]
         Box::from(expected_key_hash.as_slice()),
         make_key(account_value),
     ))

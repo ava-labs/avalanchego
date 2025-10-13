@@ -35,12 +35,12 @@ rand.workspace = true
 rand_distr.workspace = true
 sha2.workspace = true
 # Regular dependencies
-fastrace-opentelemetry = { version = "0.13.0" }
+fastrace-opentelemetry = { version = "=0.14.0" }
 metrics-exporter-prometheus = { version = "0.17.2", optional = true }
-opentelemetry = "=0.30.0"
-opentelemetry-otlp = { version = "=0.30.0", features = ["grpc-tonic"] }
-opentelemetry-proto = "=0.30.0"
-opentelemetry_sdk = "=0.30.0"
+opentelemetry = "=0.31.0"
+opentelemetry-otlp = { version = "=0.31.0", features = ["grpc-tonic"] }
+opentelemetry-proto = "=0.31.0"
+opentelemetry_sdk = "=0.31.0"
 pretty-duration = "0.1.1"
 
 [dependencies.tokio]
