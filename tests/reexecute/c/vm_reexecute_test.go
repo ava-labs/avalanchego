@@ -105,10 +105,6 @@ func (m metricsMode) isValid() bool {
 	return m == metricsDisabled || m == metricsServerOnly || m == metricsFull
 }
 
-func (m metricsMode) shouldStartServer() bool { return m == metricsServerOnly || m == metricsFull }
-
-func (m metricsMode) shouldStartCollector() bool { return m == metricsFull }
-
 func TestMain(m *testing.M) {
 	evm.RegisterAllLibEVMExtras()
 
@@ -204,8 +200,13 @@ func benchmarkReexecuteRange(
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
 
 	log := tests.NewDefaultLogger("c-chain-reexecution")
-	if metricsMode.shouldStartServer() {
-		collectRegistry(b, log, "c-chain-reexecution", prefixGatherer, labels, metricsMode.shouldStartCollector())
+
+	switch metricsMode {
+	case metricsServerOnly:
+		startServer(b, log, prefixGatherer)
+	case metricsFull:
+		collectRegistry(b, log, "c-chain-reexecution", prefixGatherer, labels)
+	case metricsDisabled:
 	}
 
 	var (
@@ -568,39 +569,41 @@ func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, err
 	return m, nil
 }
 
-// collectRegistry starts a Prometheus server for the provided gatherer. If
-// startCollector is true, it also starts a Prometheus collector configured to
-// scrape the Prometheus server and attaches the provided labels + GitHub
-// labels if available to the collected metrics.
-func collectRegistry(
+// startServer starts a Prometheus server for the provided gatherer.
+func startServer(
 	tb testing.TB,
 	log logging.Logger,
-	name string,
 	gatherer prometheus.Gatherer,
-	labels map[string]string,
-	startCollector bool,
 ) {
 	r := require.New(tb)
 
 	server, err := tests.NewPrometheusServer(gatherer)
 	r.NoError(err)
 
-	if !startCollector {
-		log.Info("metrics endpoint available",
-			zap.String("url", fmt.Sprintf("http://%s/ext/metrics", server.Address())),
-		)
+	log.Info("metrics endpoint available",
+		zap.String("url", fmt.Sprintf("http://%s/ext/metrics", server.Address())),
+	)
 
-		tb.Cleanup(func() {
-			r.NoError(server.Stop())
-		})
-		return
-	}
+	tb.Cleanup(func() {
+		r.NoError(server.Stop())
+	})
+}
+
+// collectRegistry starts a Prometheus server for the provided gatherer and
+// starts a Prometheus collector configured to scrape the Prometheus server.
+// collectRegistry also attaches the provided labels + Github labels if
+// available to the collected metrics.
+func collectRegistry(tb testing.TB, log logging.Logger, name string, gatherer prometheus.Gatherer, labels map[string]string) {
+	r := require.New(tb)
 
 	startPromCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
 	defer cancel()
 
 	logger := tests.NewDefaultLogger("prometheus")
 	r.NoError(tmpnet.StartPrometheus(startPromCtx, logger))
+
+	server, err := tests.NewPrometheusServer(gatherer)
+	r.NoError(err)
 
 	var sdConfigFilePath string
 	tb.Cleanup(func() {
