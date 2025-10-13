@@ -72,7 +72,7 @@ linters:
     - nolintlint
     - perfsprint
     - prealloc
-    # - predeclared
+    - predeclared
     - revive
     - spancheck
     # - staticcheck
