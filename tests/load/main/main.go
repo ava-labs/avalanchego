@@ -193,6 +193,7 @@ func startNetwork(tc tests.TestContext) (*tmpnet.Network, []load.Worker) {
 		client, err := ethclient.Dial(wsURI)
 		require.NoError(err)
 
+		// nonce is zero on a new network
 		workers[i] = load.Worker{
 			PrivKey: keys[i].ToECDSA(),
 			Client:  client,
@@ -217,7 +218,7 @@ func startPrometheusMonitoring(tc tests.TestContext, labels map[string]string, s
 	tc.DeferCleanup(func() {
 		require.NoError(
 			os.Remove(monitoringConfigFilePath),
-			"failed †o remove monitoring config file",
+			"failed to remove monitoring config file",
 		)
 	})
 }

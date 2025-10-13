@@ -4,6 +4,8 @@
 package load
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/stretchr/testify/require"
 
@@ -26,7 +28,7 @@ func (d DevnetConfig) ParseKeys() ([]*secp256k1.PrivateKey, error) {
 	for i, pk := range d.PrivateKeys {
 		key := new(secp256k1.PrivateKey)
 		if err := key.UnmarshalText([]byte(pk)); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to unmarshal private key: %w", err)
 		}
 
 		keys[i] = key
