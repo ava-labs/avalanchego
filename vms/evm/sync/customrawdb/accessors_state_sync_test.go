@@ -272,7 +272,7 @@ func TestChainConfigReadWriteWithUpgrade(t *testing.T) {
 
 	hash := common.HexToHash("0xcafe")
 	cfg := &params.ChainConfig{ChainID: big.NewInt(123)}
-	WriteChainConfig(db, hash, cfg, upgradeCfg{X: 7})
+	require.NoError(t, WriteChainConfig(db, hash, cfg, upgradeCfg{X: 7}))
 
 	var out upgradeCfg
 	gotCfg, err := ReadChainConfig(db, hash, &out)
@@ -286,7 +286,7 @@ func TestChainConfigNilDoesNotWriteUpgrade(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	hash := common.HexToHash("0xadd")
 	// Passing nil config should not write upgrade bytes
-	WriteChainConfig(db, hash, nil, struct{}{})
+	require.NoError(t, WriteChainConfig(db, hash, nil, struct{}{}))
 
 	ok, err := db.Has(upgradeConfigKey(hash))
 	require.NoError(t, err)
