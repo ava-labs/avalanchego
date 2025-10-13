@@ -41,7 +41,7 @@ func TestWriteReadSyncRoot(t *testing.T) {
 
 	// No root written yet
 	root, err := ReadSyncRoot(db)
-	require.NoError(t, err)
+	require.ErrorIs(t, err, ErrEntryNotFound)
 	require.Equal(t, common.Hash{}, root)
 
 	// Write and read back
@@ -58,8 +58,8 @@ func TestCodeToFetchIteratorAndDelete(t *testing.T) {
 	h1 := common.HexToHash("0x11")
 	h2 := common.HexToHash("0x22")
 
-	WriteCodeToFetch(db, h1)
-	WriteCodeToFetch(db, h2)
+	require.NoError(t, WriteCodeToFetch(db, h1))
+	require.NoError(t, WriteCodeToFetch(db, h2))
 
 	// Insert a malformed key that should be ignored by the iterator (wrong length)
 	bad := append(append([]byte{}, CodeToFetchPrefix...), append(h1.Bytes(), 0x00)...)
@@ -74,17 +74,19 @@ func TestCodeToFetchIteratorAndDelete(t *testing.T) {
 		got := common.BytesToHash(key[len(CodeToFetchPrefix):])
 		seen[got] = true
 	}
+	require.NoError(t, it.Error())
 	require.True(t, seen[h1])
 	require.True(t, seen[h2])
 
 	// Delete one and confirm only one remains
-	DeleteCodeToFetch(db, h1)
+	require.NoError(t, DeleteCodeToFetch(db, h1))
 	count := 0
 	it = NewCodeToFetchIterator(db)
 	defer it.Release()
 	for it.Next() {
 		count++
 	}
+	require.NoError(t, it.Error())
 	require.Equal(t, 1, count)
 }
 
@@ -109,6 +111,7 @@ func TestSyncSegmentsIteratorUnpackAndClear(t *testing.T) {
 		require.Equal(t, rootA, root)
 		gotStarts[common.BytesToHash(start)] = true
 	}
+	require.NoError(t, it.Error())
 	require.True(t, gotStarts[start1])
 	require.True(t, gotStarts[start2])
 	require.False(t, gotStarts[start3])
@@ -121,6 +124,7 @@ func TestSyncSegmentsIteratorUnpackAndClear(t *testing.T) {
 	for it.Next() {
 		count++
 	}
+	require.NoError(t, it.Error())
 	require.Equal(t, 0, count)
 
 	// RootB remains
@@ -130,6 +134,7 @@ func TestSyncSegmentsIteratorUnpackAndClear(t *testing.T) {
 	for it.Next() {
 		count++
 	}
+	require.NoError(t, it.Error())
 	require.Equal(t, 1, count)
 }
 
@@ -150,6 +155,7 @@ func TestStorageTriesIteratorUnpackAndClear(t *testing.T) {
 		require.Equal(t, root, r)
 		seen[a] = true
 	}
+	require.NoError(t, it.Error())
 	require.True(t, seen[acct1])
 	require.True(t, seen[acct2])
 
@@ -160,6 +166,7 @@ func TestStorageTriesIteratorUnpackAndClear(t *testing.T) {
 	for it.Next() {
 		count++
 	}
+	require.NoError(t, it.Error())
 	require.Equal(t, 0, count)
 }
 
@@ -190,6 +197,43 @@ func TestClearAllSyncStorageTries(t *testing.T) {
 	require.Equal(t, 1, count)
 }
 
+func TestClear_NoKeys(t *testing.T) {
+	root := common.HexToHash("0xabc")
+	cases := []struct {
+		name  string
+		clear func(db ethdb.KeyValueStore) error
+		iter  func(db ethdb.Iteratee) ethdb.Iterator
+	}{
+		{
+			name:  "segments_no_keys",
+			clear: func(db ethdb.KeyValueStore) error { return ClearSyncSegments(db, root) },
+			iter:  func(db ethdb.Iteratee) ethdb.Iterator { return NewSyncSegmentsIterator(db, root) },
+		},
+		{
+			name:  "storage_no_keys",
+			clear: func(db ethdb.KeyValueStore) error { return ClearSyncStorageTrie(db, root) },
+			iter:  func(db ethdb.Iteratee) ethdb.Iterator { return NewSyncStorageTriesIterator(db, nil) },
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			db := rawdb.NewMemoryDatabase()
+
+			require.NoError(t, tc.clear(db))
+
+			it := tc.iter(db)
+			defer it.Release()
+			count := 0
+			for it.Next() {
+				count++
+			}
+			require.NoError(t, it.Error())
+			require.Equal(t, 0, count)
+		})
+	}
+}
+
 func TestSyncPerformedAndLatest(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 
@@ -204,15 +248,20 @@ func TestSyncPerformedAndLatest(t *testing.T) {
 	for it.Next() {
 		vals = append(vals, UnpackSyncPerformedKey(it.Key()))
 	}
+	require.NoError(t, it.Error())
 	require.ElementsMatch(t, []uint64{10, 20, 15}, vals)
 
 	// Latest is max
-	require.Equal(t, uint64(20), GetLatestSyncPerformed(db))
+	latest, err := GetLatestSyncPerformed(db)
+	require.NoError(t, err)
+	require.Equal(t, uint64(20), latest)
 }
 
 func TestGetLatestSyncPerformedEmpty(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
-	require.Equal(t, uint64(0), GetLatestSyncPerformed(db))
+	latest, err := GetLatestSyncPerformed(db)
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), latest)
 }
 
 func TestChainConfigReadWriteWithUpgrade(t *testing.T) {
@@ -226,7 +275,8 @@ func TestChainConfigReadWriteWithUpgrade(t *testing.T) {
 	WriteChainConfig(db, hash, cfg, upgradeCfg{X: 7})
 
 	var out upgradeCfg
-	gotCfg := ReadChainConfig(db, hash, &out)
+	gotCfg, err := ReadChainConfig(db, hash, &out)
+	require.NoError(t, err)
 	require.NotNil(t, gotCfg)
 	require.Equal(t, cfg.ChainID, gotCfg.ChainID)
 	require.Equal(t, 7, out.X)
@@ -252,7 +302,8 @@ func TestReadChainConfigInvalidUpgradeJSONReturnsNil(t *testing.T) {
 	require.NoError(t, db.Put(upgradeConfigKey(hash), []byte("{")))
 
 	var out struct{}
-	got := ReadChainConfig(db, hash, &out)
+	got, err := ReadChainConfig(db, hash, &out)
+	require.ErrorIs(t, err, ErrInvalidData)
 	require.Nil(t, got)
 }
 
@@ -272,7 +323,9 @@ func TestSyncPerformedLatestCases(t *testing.T) {
 			for _, n := range tc.writes {
 				require.NoError(t, WriteSyncPerformed(db, n))
 			}
-			require.Equal(t, tc.want, GetLatestSyncPerformed(db))
+			latest, err := GetLatestSyncPerformed(db)
+			require.NoError(t, err)
+			require.Equal(t, tc.want, latest)
 		})
 	}
 }
@@ -373,10 +426,10 @@ func TestCodeToFetchCases(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
 			for _, h := range tc.hashes {
-				WriteCodeToFetch(db, h)
+				require.NoError(t, WriteCodeToFetch(db, h))
 			}
 			if tc.del != nil {
-				DeleteCodeToFetch(db, *tc.del)
+				require.NoError(t, DeleteCodeToFetch(db, *tc.del))
 			}
 			it := NewCodeToFetchIterator(db)
 			defer it.Release()
@@ -394,54 +447,56 @@ func TestChainConfigCases(t *testing.T) {
 		X int `json:"x"`
 	}
 	cases := []struct {
-		name       string
-		cfg        *params.ChainConfig
-		up         any
-		mutate     func(db ethdb.KeyValueStore, h common.Hash)
-		wantCfgNil bool
-		wantUp     *upgrade
+		name        string
+		cfg         *params.ChainConfig
+		up          any
+		mutate      func(db ethdb.KeyValueStore, h common.Hash)
+		expectedErr error
+		wantUp      *upgrade
 	}{
 		{
-			name:       "valid-upgrade",
-			cfg:        &params.ChainConfig{ChainID: big.NewInt(1)},
-			up:         upgrade{X: 7},
-			mutate:     nil,
-			wantCfgNil: false,
-			wantUp:     &upgrade{X: 7},
+			name:        "valid-upgrade",
+			cfg:         &params.ChainConfig{ChainID: big.NewInt(1)},
+			up:          upgrade{X: 7},
+			mutate:      nil,
+			expectedErr: nil,
+			wantUp:      &upgrade{X: 7},
 		},
 		{
-			name:       "nil-config",
-			cfg:        nil,
-			up:         struct{}{},
-			mutate:     nil,
-			wantCfgNil: true,
-			wantUp:     nil,
+			name:        "nil-config",
+			cfg:         nil,
+			up:          struct{}{},
+			mutate:      nil,
+			expectedErr: ErrEntryNotFound,
+			wantUp:      nil,
 		},
 		{
-			name:       "invalid-upgrade-json",
-			cfg:        &params.ChainConfig{ChainID: big.NewInt(2)},
-			up:         upgrade{X: 1},
-			mutate:     func(db ethdb.KeyValueStore, h common.Hash) { _ = db.Put(upgradeConfigKey(h), []byte("{")) },
-			wantCfgNil: true,
-			wantUp:     nil,
+			name:        "invalid-upgrade-json",
+			cfg:         &params.ChainConfig{ChainID: big.NewInt(2)},
+			up:          upgrade{X: 1},
+			mutate:      func(db ethdb.KeyValueStore, h common.Hash) { _ = db.Put(upgradeConfigKey(h), []byte("{")) },
+			expectedErr: ErrInvalidData,
+			wantUp:      nil,
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
 			h := common.HexToHash("0x100")
-			WriteChainConfig(db, h, tc.cfg, upgrade{X: 0})
+			require.NoError(t, WriteChainConfig(db, h, tc.cfg, upgrade{X: 0}))
 			if tc.mutate != nil {
 				tc.mutate(db, h)
 			} else if tc.up != nil && tc.cfg != nil {
 				// If provided, overwrite with provided upgrade object
-				WriteChainConfig(db, h, tc.cfg, tc.up.(upgrade))
+				require.NoError(t, WriteChainConfig(db, h, tc.cfg, tc.up.(upgrade)))
 			}
 			var out upgrade
-			got := ReadChainConfig(db, h, &out)
-			if tc.wantCfgNil {
+			got, err := ReadChainConfig(db, h, &out)
+			if tc.expectedErr != nil {
+				require.ErrorIs(t, err, tc.expectedErr)
 				require.Nil(t, got)
 			} else {
+				require.NoError(t, err)
 				require.NotNil(t, got)
 			}
 			if tc.wantUp != nil {

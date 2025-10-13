@@ -40,7 +40,7 @@ func TestTimeMarkers(t *testing.T) {
 
 			// Not present initially.
 			_, err := tc.read(db)
-			require.ErrorIs(t, err, errMarkerNotFound)
+			require.ErrorIs(t, err, ErrEntryNotFound)
 
 			// Write marker and read back a reasonable recent time.
 			require.NoError(t, tc.write(db))
@@ -51,7 +51,7 @@ func TestTimeMarkers(t *testing.T) {
 			// Delete marker.
 			require.NoError(t, tc.delete(db))
 			_, err = tc.read(db)
-			require.ErrorIs(t, err, errMarkerNotFound)
+			require.ErrorIs(t, err, ErrEntryNotFound)
 		})
 	}
 }
@@ -75,29 +75,33 @@ func TestReadAcceptorTip_InvalidLength(t *testing.T) {
 	// Write an invalid value under acceptor tip key (wrong length).
 	require.NoError(t, db.Put(acceptorTipKey, []byte("short")))
 	_, err := ReadAcceptorTip(db)
-	require.ErrorIs(t, err, errAcceptorTipInvalid)
+	require.ErrorIs(t, err, ErrInvalidData)
 }
 
 func TestWriteAcceptorTip(t *testing.T) {
 	cases := []struct {
-		name   string
-		writes []common.Hash
-		want   common.Hash
+		name        string
+		writes      []common.Hash
+		want        common.Hash
+		expectedErr error
 	}{
 		{
-			name:   "none",
-			writes: nil,
-			want:   common.Hash{},
+			name:        "none",
+			writes:      nil,
+			want:        common.Hash{},
+			expectedErr: ErrEntryNotFound,
 		},
 		{
-			name:   "single_write",
-			writes: []common.Hash{common.HexToHash("0xabc1")},
-			want:   common.HexToHash("0xabc1"),
+			name:        "single_write",
+			writes:      []common.Hash{common.HexToHash("0xabc1")},
+			want:        common.HexToHash("0xabc1"),
+			expectedErr: nil,
 		},
 		{
-			name:   "overwrite",
-			writes: []common.Hash{common.HexToHash("0xabc1"), common.HexToHash("0xabc2")},
-			want:   common.HexToHash("0xabc2"),
+			name:        "overwrite",
+			writes:      []common.Hash{common.HexToHash("0xabc1"), common.HexToHash("0xabc2")},
+			want:        common.HexToHash("0xabc2"),
+			expectedErr: nil,
 		},
 	}
 
@@ -108,7 +112,11 @@ func TestWriteAcceptorTip(t *testing.T) {
 				require.NoError(t, WriteAcceptorTip(db, h))
 			}
 			tip, err := ReadAcceptorTip(db)
-			require.NoError(t, err)
+			if tc.expectedErr != nil {
+				require.ErrorIs(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
+			}
 			require.Equal(t, tc.want, tip)
 		})
 	}
@@ -138,7 +146,7 @@ func TestTimeMarkers_BadEncoding(t *testing.T) {
 			// Write invalid RLP bytes (0xB8 indicates a long string length with missing payload).
 			require.NoError(t, db.Put(tc.key, []byte{0xB8}))
 			_, err := tc.read(db)
-			require.ErrorIs(t, err, errMarkerInvalid)
+			require.ErrorIs(t, err, ErrInvalidData)
 		})
 	}
 }

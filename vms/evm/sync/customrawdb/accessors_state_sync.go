@@ -9,7 +9,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/log"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
@@ -18,8 +17,11 @@ import (
 // sync and returns common.Hash{} if no in-progress sync was found.
 func ReadSyncRoot(db ethdb.KeyValueReader) (common.Hash, error) {
 	ok, err := db.Has(syncRootKey)
-	if err != nil || !ok {
+	if err != nil {
 		return common.Hash{}, err
+	}
+	if !ok {
+		return common.Hash{}, ErrEntryNotFound
 	}
 	root, err := db.Get(syncRootKey)
 	if err != nil {
@@ -34,17 +36,13 @@ func WriteSyncRoot(db ethdb.KeyValueWriter, root common.Hash) error {
 }
 
 // WriteCodeToFetch adds a marker that we need to fetch the code for `hash`.
-func WriteCodeToFetch(db ethdb.KeyValueWriter, codeHash common.Hash) {
-	if err := db.Put(codeToFetchKey(codeHash), nil); err != nil {
-		log.Crit("Failed to put code to fetch", "codeHash", codeHash, "err", err)
-	}
+func WriteCodeToFetch(db ethdb.KeyValueWriter, codeHash common.Hash) error {
+	return db.Put(codeToFetchKey(codeHash), nil)
 }
 
 // DeleteCodeToFetch removes the marker that the code corresponding to `hash` needs to be fetched.
-func DeleteCodeToFetch(db ethdb.KeyValueWriter, codeHash common.Hash) {
-	if err := db.Delete(codeToFetchKey(codeHash)); err != nil {
-		log.Crit("Failed to delete code to fetch", "codeHash", codeHash, "err", err)
-	}
+func DeleteCodeToFetch(db ethdb.KeyValueWriter, codeHash common.Hash) error {
+	return db.Delete(codeToFetchKey(codeHash))
 }
 
 // NewCodeToFetchIterator returns a KeyLength iterator over all code
@@ -171,7 +169,7 @@ func UnpackSyncPerformedKey(key []byte) uint64 {
 }
 
 // GetLatestSyncPerformed returns the latest block number state synced performed to.
-func GetLatestSyncPerformed(db ethdb.Iteratee) uint64 {
+func GetLatestSyncPerformed(db ethdb.Iteratee) (uint64, error) {
 	it := NewSyncPerformedIterator(db)
 	defer it.Release()
 
@@ -182,7 +180,7 @@ func GetLatestSyncPerformed(db ethdb.Iteratee) uint64 {
 			latestSyncPerformed = syncPerformed
 		}
 	}
-	return latestSyncPerformed
+	return latestSyncPerformed, it.Error()
 }
 
 // clearPrefix removes all keys in db that begin with prefix and match an

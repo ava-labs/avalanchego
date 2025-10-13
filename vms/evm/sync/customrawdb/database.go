@@ -4,19 +4,17 @@
 package customrawdb
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 )
 
-// ParseStateSchemeExt parses the state scheme from the provided string.
-func ParseStateSchemeExt(provided string, disk ethdb.Database) (string, error) {
+// ParseStateScheme parses the state scheme from the provided string.
+func ParseStateScheme(provided string, disk ethdb.Database) (string, error) {
 	// Check for custom scheme
 	if provided == FirewoodScheme {
 		if diskScheme := rawdb.ReadStateScheme(disk); diskScheme != "" {
 			// Valid scheme on disk mismatched
-			return "", fmt.Errorf("state scheme %s already set on disk, cannot use Firewood", diskScheme)
+			return "", ErrStateSchemeConflict
 		}
 		// If no conflicting scheme is found, is valid.
 		return FirewoodScheme, nil

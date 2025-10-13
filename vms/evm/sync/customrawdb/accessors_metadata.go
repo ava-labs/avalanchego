@@ -5,29 +5,17 @@ package customrawdb
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rlp"
 )
 
-var (
-	// errMarkerNotFound is returned when a time marker key is missing or empty.
-	errMarkerNotFound = errors.New("time marker not found")
-	// errMarkerInvalid wraps cases where a marker exists but cannot be decoded.
-	errMarkerInvalid = errors.New("time marker invalid")
-	// errAcceptorTipInvalid indicates an invalid value stored for acceptor tip.
-	errAcceptorTipInvalid = errors.New("acceptor tip invalid")
-
-	// upgradeConfigPrefix prefixes upgrade bytes passed to the chain.
-	upgradeConfigPrefix = []byte("upgrade-config-")
-)
+var upgradeConfigPrefix = []byte("upgrade-config-")
 
 // WriteOfflinePruning writes a time marker of the last attempt to run offline pruning.
 // The marker is written when offline pruning completes and is deleted when the node
@@ -93,52 +81,54 @@ func ReadAcceptorTip(db ethdb.KeyValueReader) (common.Hash, error) {
 		return common.Hash{}, err
 	}
 	if !ok {
-		// If the index is not present on disk, the `acceptorTipKey` index ok not been initialized yet.
-		return common.Hash{}, nil
+		return common.Hash{}, ErrEntryNotFound
 	}
 	h, err := db.Get(acceptorTipKey)
 	if err != nil {
 		return common.Hash{}, err
 	}
 	if len(h) != common.HashLength {
-		return common.Hash{}, fmt.Errorf("%w: length %d", errAcceptorTipInvalid, len(h))
+		return common.Hash{}, fmt.Errorf("%w: length %d", ErrInvalidData, len(h))
 	}
 	return common.BytesToHash(h), nil
 }
 
 // ReadChainConfig retrieves the consensus settings based on the given genesis hash.
 // The provided `upgradeConfig` (any JSON-unmarshalable type) will be populated if present on disk.
-func ReadChainConfig[T any](db ethdb.KeyValueReader, hash common.Hash, upgradeConfig *T) *params.ChainConfig {
+func ReadChainConfig[T any](db ethdb.KeyValueReader, hash common.Hash, upgradeConfig *T) (*params.ChainConfig, error) {
 	config := rawdb.ReadChainConfig(db, hash)
+	if config == nil {
+		return nil, ErrEntryNotFound
+	}
 
 	upgrade, _ := db.Get(upgradeConfigKey(hash))
 	if len(upgrade) == 0 {
-		return config
+		return config, nil
 	}
 
 	if err := json.Unmarshal(upgrade, upgradeConfig); err != nil {
-		log.Error("Invalid upgrade config JSON", "err", err)
-		return nil
+		return nil, ErrInvalidData
 	}
 
-	return config
+	return config, nil
 }
 
 // WriteChainConfig writes the chain config settings to the database.
 // The provided `upgradeConfig` (any JSON-marshalable type) will be stored alongside the chain config.
-func WriteChainConfig[T any](db ethdb.KeyValueWriter, hash common.Hash, config *params.ChainConfig, upgradeConfig T) {
+func WriteChainConfig[T any](db ethdb.KeyValueWriter, hash common.Hash, config *params.ChainConfig, upgradeConfig T) error {
 	rawdb.WriteChainConfig(db, hash, config)
 	if config == nil {
-		return
+		return nil
 	}
 
 	data, err := json.Marshal(upgradeConfig)
 	if err != nil {
-		log.Crit("Failed to JSON encode upgrade config", "err", err)
+		return err
 	}
 	if err := db.Put(upgradeConfigKey(hash), data); err != nil {
-		log.Crit("Failed to store upgrade config", "err", err)
+		return err
 	}
+	return nil
 }
 
 // writeCurrentTimeMarker writes a marker of the current time in the db at `key`.
@@ -158,7 +148,7 @@ func readTimeMarker(db ethdb.KeyValueStore, key []byte) (time.Time, error) {
 		return time.Time{}, err
 	}
 	if !ok {
-		return time.Time{}, errMarkerNotFound
+		return time.Time{}, ErrEntryNotFound
 	}
 
 	data, err := db.Get(key)
@@ -166,12 +156,12 @@ func readTimeMarker(db ethdb.KeyValueStore, key []byte) (time.Time, error) {
 		return time.Time{}, err
 	}
 	if len(data) == 0 {
-		return time.Time{}, errMarkerNotFound
+		return time.Time{}, ErrEntryNotFound
 	}
 
 	var unix uint64
 	if err := rlp.DecodeBytes(data, &unix); err != nil {
-		return time.Time{}, fmt.Errorf("%w: %w", errMarkerInvalid, err)
+		return time.Time{}, fmt.Errorf("%w: %w", ErrInvalidData, err)
 	}
 
 	return time.Unix(int64(unix), 0), nil

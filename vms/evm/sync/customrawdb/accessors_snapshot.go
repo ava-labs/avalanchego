@@ -12,30 +12,45 @@ import (
 
 // ReadSnapshotBlockHash retrieves the hash of the block whose state is contained in
 // the persisted snapshot.
-func ReadSnapshotBlockHash(db ethdb.KeyValueReader) common.Hash {
-	data, _ := db.Get(snapshotBlockHashKey)
-	if len(data) != common.HashLength {
-		return common.Hash{}
+func ReadSnapshotBlockHash(db ethdb.KeyValueReader) (common.Hash, error) {
+	ok, err := db.Has(snapshotBlockHashKey)
+	if err != nil {
+		return common.Hash{}, err
 	}
-	return common.BytesToHash(data)
+	if !ok {
+		return common.Hash{}, ErrEntryNotFound
+	}
+
+	data, err := db.Get(snapshotBlockHashKey)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	if len(data) != common.HashLength {
+		return common.Hash{}, ErrInvalidData
+	}
+	return common.BytesToHash(data), nil
 }
 
 // WriteSnapshotBlockHash stores the root of the block whose state is contained in
 // the persisted snapshot.
-func WriteSnapshotBlockHash(db ethdb.KeyValueWriter, blockHash common.Hash) {
+func WriteSnapshotBlockHash(db ethdb.KeyValueWriter, blockHash common.Hash) error {
 	if err := db.Put(snapshotBlockHashKey, blockHash[:]); err != nil {
-		log.Crit("Failed to store snapshot block hash", "err", err)
+		log.Error("Failed to store snapshot block hash", "err", err)
+		return err
 	}
+	return nil
 }
 
 // DeleteSnapshotBlockHash deletes the hash of the block whose state is contained in
 // the persisted snapshot. Since snapshots are not immutable, this  method can
 // be used during updates, so a crash or failure will mark the entire snapshot
 // invalid.
-func DeleteSnapshotBlockHash(db ethdb.KeyValueWriter) {
+func DeleteSnapshotBlockHash(db ethdb.KeyValueWriter) error {
 	if err := db.Delete(snapshotBlockHashKey); err != nil {
-		log.Crit("Failed to remove snapshot block hash", "err", err)
+		log.Error("Failed to remove snapshot block hash", "err", err)
+		return err
 	}
+	return nil
 }
 
 // NewAccountSnapshotsIterator returns an iterator for walking all of the accounts in the snapshot
