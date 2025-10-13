@@ -48,9 +48,9 @@ import (
 )
 
 const (
-	MetricsDisabled   = "disabled"
-	MetricsServerOnly = "server-only"
-	MetricsFull       = "full"
+	metricsDisabled   = "disabled"
+	metricsServerOnly = "server-only"
+	metricsFull       = "full"
 )
 
 var (
@@ -102,12 +102,12 @@ var (
 type metricsMode string
 
 func (m metricsMode) isValid() bool {
-	return m == MetricsDisabled || m == MetricsServerOnly || m == MetricsFull
+	return m == metricsDisabled || m == metricsServerOnly || m == metricsFull
 }
 
-func (m metricsMode) shouldStartServer() bool { return m == MetricsServerOnly || m == MetricsFull }
+func (m metricsMode) shouldStartServer() bool { return m == metricsServerOnly || m == metricsFull }
 
-func (m metricsMode) shouldStartCollector() bool { return m == MetricsFull }
+func (m metricsMode) shouldStartCollector() bool { return m == metricsFull }
 
 func TestMain(m *testing.M) {
 	evm.RegisterAllLibEVMExtras()
@@ -119,8 +119,8 @@ func TestMain(m *testing.M) {
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
-	metricsModes := strings.Join([]string{MetricsDisabled, MetricsServerOnly, MetricsFull}, ", ")
-	flag.StringVar(&metricsModeArg, "metrics-mode", MetricsDisabled, fmt.Sprintf("Specifies the type of metrics configuration. Options include %s.", metricsModes))
+	metricsModes := strings.Join([]string{metricsDisabled, metricsServerOnly, metricsFull}, ", ")
+	flag.StringVar(&metricsModeArg, "metrics-mode", metricsDisabled, fmt.Sprintf("Specifies the type of metrics configuration. Options include %s.", metricsModes))
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
