@@ -4,14 +4,10 @@
 package load
 
 import (
-	"os"
-
 	"github.com/ava-labs/libevm/ethclient"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/tests"
-	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
@@ -28,10 +24,11 @@ type DevnetConfig struct {
 func (d DevnetConfig) ParseKeys() ([]*secp256k1.PrivateKey, error) {
 	keys := make([]*secp256k1.PrivateKey, len(d.PrivateKeys))
 	for i, pk := range d.PrivateKeys {
-		key, err := secp256k1.ToPrivateKey([]byte(pk))
-		if err != nil {
+		key := new(secp256k1.PrivateKey)
+		if err := key.UnmarshalText([]byte(pk)); err != nil {
 			return nil, err
 		}
+
 		keys[i] = key
 	}
 
@@ -40,11 +37,7 @@ func (d DevnetConfig) ParseKeys() ([]*secp256k1.PrivateKey, error) {
 
 // ConnectNetwork connects to an existing network and returns a list of workers
 // that can interact with the network.
-//
-// The function also configures Prometheus monitoring for any client-side
-// metrics defined in metricsServer and registers a cleanup function to remove the
-// monitoring configuration file when the test completes.
-func ConnectNetwork(tc tests.TestContext, metricsServer *tests.PrometheusServer, devnetConfig DevnetConfig) []Worker {
+func ConnectNetwork(tc tests.TestContext, devnetConfig DevnetConfig) []Worker {
 	require := require.New(tc)
 
 	keys, err := devnetConfig.ParseKeys()
@@ -66,28 +59,6 @@ func ConnectNetwork(tc tests.TestContext, metricsServer *tests.PrometheusServer,
 			Nonce:   nonce,
 		}
 	}
-
-	// XXX: we could probably remove this metrics code from ConnectNetwork
-	networkUUID := uuid.NewString()
-	labels := map[string]string{
-		"job":               "load-test",
-		"is_ephemeral_node": "false",
-		"chain":             "C",
-		"networkUUID":       networkUUID,
-	}
-
-	monitoringConfigFilePath, err := tmpnet.WritePrometheusSDConfig("load-test", tmpnet.SDConfig{
-		Targets: []string{metricsServer.Address()},
-		Labels:  labels,
-	}, false)
-	require.NoError(err, "failed to generate monitoring config file")
-
-	tc.DeferCleanup(func() {
-		require.NoError(
-			os.Remove(monitoringConfigFilePath),
-			"failed †o remove monitoring config file",
-		)
-	})
 
 	return workers
 }

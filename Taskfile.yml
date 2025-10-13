@@ -342,6 +342,12 @@ tasks:
       - task: build
       - cmd: go run ./tests/load/main --avalanchego-path=./build/avalanchego {{.CLI_ARGS}}
 
+  test-load-devnet: 
+    desc: Runs e2e test for load testing against an external network
+    cmds:
+      - task: build
+      - cmd: go test -run ^TestDevnetConnection ./tests/load --avalanchego-path=../../build/avalanchego
+
   test-load-exclusive:
     desc: Runs load tests against kube with exclusive scheduling
     cmds:
