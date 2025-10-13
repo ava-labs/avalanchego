@@ -49,9 +49,9 @@ import (
 )
 
 const (
-	MetricsDisabled metricsMode = iota
-	MetricsServerOnly
-	MetricsFull
+	MetricsDisabled   = "disabled"
+	MetricsServerOnly = "server-only"
+	MetricsFull       = "full"
 )
 
 var (
@@ -70,8 +70,7 @@ var (
 	chanSizeArg        int
 	executionTimeout   time.Duration
 	labelsArg          string
-
-	metricsModeArg = MetricsDisabled
+	metricsModeArg     string
 
 	networkUUID string = uuid.NewString()
 	labels             = map[string]string{
@@ -101,38 +100,13 @@ var (
 	configBytesArg []byte
 )
 
-type metricsMode int
+type metricsMode string
 
-func (m *metricsMode) Set(s string) error {
-	s = strings.ToLower(strings.TrimSpace(s))
-
-	switch s {
-	case "disabled":
-		*m = MetricsDisabled
-	case "server-only":
-		*m = MetricsServerOnly
-	case "full":
-		*m = MetricsFull
-	default:
-		return fmt.Errorf("invalid metrics mode: %s (valid options: disabled, server-only, full)", s)
-	}
-	return nil
+func (m metricsMode) isValid() bool {
+	return m == MetricsDisabled || m == MetricsServerOnly || m == MetricsFull
 }
 
-func (m metricsMode) String() string {
-	switch m {
-	case MetricsDisabled:
-		return "disabled"
-	case MetricsServerOnly:
-		return "server-only"
-	case MetricsFull:
-		return "full"
-	default:
-		return "unknown"
-	}
-}
-
-func (m metricsMode) shouldStartServer() bool { return m >= MetricsServerOnly }
+func (m metricsMode) shouldStartServer() bool { return m == MetricsServerOnly || m == MetricsFull }
 
 func (m metricsMode) shouldStartCollector() bool { return m == MetricsFull }
 
@@ -146,7 +120,8 @@ func TestMain(m *testing.M) {
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
-	flag.Var(&metricsModeArg, "metrics-mode", "Metrics mode: disabled (no metrics), server-only (creates Prometheus server), or full (creates Prometheus server and starts Prometheus collector)")
+	metricsModes := strings.Join([]string{MetricsDisabled, MetricsServerOnly, MetricsFull}, ", ")
+	flag.StringVar(&metricsModeArg, "metrics-mode", MetricsDisabled, fmt.Sprintf("Specifies the type of metrics configuration. Options include %s.", metricsModes))
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
@@ -159,6 +134,12 @@ func TestMain(m *testing.M) {
 	flag.StringVar(&blockDirDstArg, "block-dir-dst", blockDirDstArg, "Destination block directory to write blocks into when executing TestExportBlockRange.")
 
 	flag.Parse()
+
+	mode := metricsMode(metricsModeArg)
+	if !mode.isValid() {
+		fmt.Fprintf(os.Stderr, "invalid metrics mode %q. Valid options include %s. \n", metricsModeArg, metricsModes)
+		os.Exit(1)
+	}
 
 	customLabels, err := parseCustomLabels(labelsArg)
 	if err != nil {
@@ -193,7 +174,7 @@ func BenchmarkReexecuteRange(b *testing.B) {
 			startBlockArg,
 			endBlockArg,
 			chanSizeArg,
-			metricsModeArg,
+			metricsMode(metricsModeArg),
 		)
 	})
 }
