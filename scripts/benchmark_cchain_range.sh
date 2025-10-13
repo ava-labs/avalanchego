@@ -10,6 +10,7 @@ set -euo pipefail
 #   END_BLOCK: The ending block height (inclusive).
 #   LABELS (optional): Comma-separated key=value pairs for metric labels.
 #   BENCHMARK_OUTPUT_FILE (optional): If set, benchmark output is also written to this file.
+#   METRICS_MODE (optional): If set, determines the metrics mode (disabled, server-only, or full).
 
 : "${BLOCK_DIR:?BLOCK_DIR must be set}"
 : "${CURRENT_STATE_DIR:?CURRENT_STATE_DIR must be set}"
