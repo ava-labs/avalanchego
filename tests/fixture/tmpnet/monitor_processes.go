@@ -528,7 +528,7 @@ func startCollectorProcess(
 		zap.String("logPath", filepath.Join(workingDir, logFilename)),
 	)
 
-	cmd := exec.Command("bash", "-c", fullCmd)
+	cmd := exec.CommandContext(ctx, "bash", "-c", fullCmd)
 	configureDetachedProcess(cmd) // Ensure the child process will outlive its parent
 	cmd.Dir = workingDir
 	if err := cmd.Start(); err != nil {

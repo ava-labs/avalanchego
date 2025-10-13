@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -64,12 +65,12 @@ func main() {
 		fmt.Println(app.Header)
 	}
 
-	nodeApp, err := app.New(nodeConfig)
+	nodeApp, err := app.New(context.Background(), nodeConfig)
 	if err != nil {
 		fmt.Printf("couldn't start node: %s\n", err)
 		os.Exit(1)
 	}
 
-	exitCode := app.Run(nodeApp)
+	exitCode := app.Run(context.Background(), nodeApp)
 	os.Exit(exitCode)
 }

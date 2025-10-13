@@ -183,7 +183,14 @@ func benchmarkReexecuteRange(
 	log := tests.NewDefaultLogger("c-chain-reexecution")
 
 	if metricsEnabled {
-		collectRegistry(b, log, "c-chain-reexecution", prefixGatherer, labels)
+		collectRegistry(
+			ctx,
+			b,
+			log,
+			"c-chain-reexecution",
+			prefixGatherer,
+			labels,
+		)
 	}
 
 	var (
@@ -548,7 +555,14 @@ func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, err
 
 // collectRegistry starts prometheus and collects metrics from the provided gatherer.
 // Attaches the provided labels + GitHub labels if available to the collected metrics.
-func collectRegistry(tb testing.TB, log logging.Logger, name string, gatherer prometheus.Gatherer, labels map[string]string) {
+func collectRegistry(
+	ctx context.Context,
+	tb testing.TB,
+	log logging.Logger,
+	name string,
+	gatherer prometheus.Gatherer,
+	labels map[string]string,
+) {
 	r := require.New(tb)
 
 	startPromCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
@@ -557,7 +571,7 @@ func collectRegistry(tb testing.TB, log logging.Logger, name string, gatherer pr
 	logger := tests.NewDefaultLogger("prometheus")
 	r.NoError(tmpnet.StartPrometheus(startPromCtx, logger))
 
-	server, err := tests.NewPrometheusServer(gatherer)
+	server, err := tests.NewPrometheusServer(ctx, gatherer)
 	r.NoError(err)
 
 	var sdConfigFilePath string

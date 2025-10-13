@@ -183,7 +183,12 @@ func BootstrapNewNetwork(
 		return stacktrace.Wrap(errInsufficientNodes)
 	}
 
-	if err := checkVMBinaries(log, network.Subnets, network.DefaultRuntimeConfig.Process); err != nil {
+	if err := checkVMBinaries(
+		ctx,
+		log,
+		network.Subnets,
+		network.DefaultRuntimeConfig.Process,
+	); err != nil {
 		return stacktrace.Wrap(err)
 	}
 	if err := network.EnsureDefaultConfig(ctx, log); err != nil {
@@ -1023,7 +1028,12 @@ const invalidRPCVersion = 0
 
 // checkVMBinaries checks that VM binaries for the given subnets exist and optionally checks that VM
 // binaries have the same rpcchainvm version as the indicated avalanchego binary.
-func checkVMBinaries(log logging.Logger, subnets []*Subnet, config *ProcessRuntimeConfig) error {
+func checkVMBinaries(
+	ctx context.Context,
+	log logging.Logger,
+	subnets []*Subnet,
+	config *ProcessRuntimeConfig,
+) error {
 	if len(subnets) == 0 {
 		// Without subnets there are no VM binaries to check
 		return nil
@@ -1034,7 +1044,12 @@ func checkVMBinaries(log logging.Logger, subnets []*Subnet, config *ProcessRunti
 		return nil
 	}
 
-	avalanchegoRPCVersion, err := getRPCVersion(log, config.AvalancheGoPath, "--version-json")
+	avalanchegoRPCVersion, err := getRPCVersion(
+		ctx,
+		log,
+		config.AvalancheGoPath,
+		"--version-json",
+	)
 	if err != nil {
 		log.Warn("unable to check rpcchainvm version for avalanchego", zap.Error(err))
 		return nil
@@ -1060,7 +1075,7 @@ func checkVMBinaries(log logging.Logger, subnets []*Subnet, config *ProcessRunti
 			}
 
 			// Check that the VM's rpcchainvm version matches avalanchego's version
-			vmRPCVersion, err := getRPCVersion(log, vmPath, chain.VersionArgs...)
+			vmRPCVersion, err := getRPCVersion(ctx, log, vmPath, chain.VersionArgs...)
 			if err != nil {
 				log.Warn("unable to check rpcchainvm version for VM Binary",
 					zap.String("subnet", subnet.Name),
@@ -1091,8 +1106,13 @@ type RPCChainVMVersion struct {
 
 // getRPCVersion attempts to invoke the given command with the specified version arguments and
 // retrieve an rpcchainvm version from its output.
-func getRPCVersion(log logging.Logger, command string, versionArgs ...string) (uint64, error) {
-	cmd := exec.Command(command, versionArgs...)
+func getRPCVersion(
+	ctx context.Context,
+	log logging.Logger,
+	command string,
+	versionArgs ...string,
+) (uint64, error) {
+	cmd := exec.CommandContext(ctx, command, versionArgs...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return 0, stacktrace.Errorf("command %q failed with output: %s", command, output)

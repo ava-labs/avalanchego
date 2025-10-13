@@ -4,6 +4,7 @@
 package nat
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/netip"
@@ -40,8 +41,12 @@ func (r noRouter) ExternalIP() (netip.Addr, error) {
 	return r.ip, r.ipErr
 }
 
-func getOutboundIP() (netip.Addr, error) {
-	conn, err := net.Dial("udp", googleDNSServer)
+func getOutboundIP(ctx context.Context) (netip.Addr, error) {
+	conn, err := (&net.Dialer{}).DialContext(
+		ctx,
+		"udp",
+		googleDNSServer,
+	)
 	if err != nil {
 		return netip.Addr{}, err
 	}
@@ -63,8 +68,8 @@ func getOutboundIP() (netip.Addr, error) {
 }
 
 // NewNoRouter returns a router that assumes the network is public
-func NewNoRouter() Router {
-	ip, err := getOutboundIP()
+func NewNoRouter(ctx context.Context) Router {
+	ip, err := getOutboundIP(ctx)
 	return &noRouter{
 		ip:    ip,
 		ipErr: err,

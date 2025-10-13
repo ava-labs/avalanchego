@@ -61,14 +61,14 @@ var TestServerPluginMap = map[string]func(*testing.T, bool) block.ChainVM{
 }
 
 // helperProcess helps with creating the subnet binary for testing.
-func helperProcess(s ...string) *exec.Cmd {
+func helperProcess(ctx context.Context, s ...string) *exec.Cmd {
 	cs := []string{"-test.run=TestHelperProcess", "--"}
 	cs = append(cs, s...)
 	env := []string{
 		"TEST_PROCESS=1",
 	}
 	run := os.Args[0]
-	cmd := exec.Command(run, cs...)
+	cmd := exec.CommandContext(ctx, run, cs...)
 	env = append(env, os.Environ()...)
 	cmd.Env = env
 	return cmd
@@ -198,7 +198,7 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 			status, stopper, err := subprocess.Bootstrap(
 				context.Background(),
 				listener,
-				helperProcess("dummy"),
+				helperProcess(context.Background(), "dummy"),
 				test.config,
 			)
 			if err == nil {

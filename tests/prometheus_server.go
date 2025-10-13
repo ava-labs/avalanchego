@@ -27,12 +27,15 @@ type PrometheusServer struct {
 
 // NewPrometheusServer creates and starts a Prometheus server with the provided gatherer
 // listening on 127.0.0.1:0 and serving /ext/metrics.
-func NewPrometheusServer(gatherer prometheus.Gatherer) (*PrometheusServer, error) {
+func NewPrometheusServer(
+	ctx context.Context,
+	gatherer prometheus.Gatherer,
+) (*PrometheusServer, error) {
 	server := &PrometheusServer{
 		gatherer: gatherer,
 	}
 
-	if err := server.start(); err != nil {
+	if err := server.start(ctx); err != nil {
 		return nil, err
 	}
 
@@ -40,11 +43,15 @@ func NewPrometheusServer(gatherer prometheus.Gatherer) (*PrometheusServer, error
 }
 
 // start the Prometheus server on a dynamic port.
-func (s *PrometheusServer) start() error {
+func (s *PrometheusServer) start(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.Handle("/ext/metrics", promhttp.HandlerFor(s.gatherer, promhttp.HandlerOpts{}))
 
-	listener, err := net.Listen("tcp", defaultPrometheusListenAddr)
+	listener, err := (&net.ListenConfig{}).Listen(
+		ctx,
+		"tcp",
+		defaultPrometheusListenAddr,
+	)
 	if err != nil {
 		return err
 	}

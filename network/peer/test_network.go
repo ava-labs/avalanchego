@@ -4,6 +4,8 @@
 package peer
 
 import (
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/ips"
@@ -20,11 +22,11 @@ func (testNetwork) AllowConnection(ids.NodeID) bool {
 	return true
 }
 
-func (testNetwork) Track([]*ips.ClaimedIPPort) error {
+func (testNetwork) Track(context.Context, []*ips.ClaimedIPPort) error {
 	return nil
 }
 
-func (testNetwork) Disconnected(ids.NodeID) {}
+func (testNetwork) Disconnected(context.Context, ids.NodeID) {}
 
 func (testNetwork) KnownPeers() ([]byte, []byte) {
 	return bloom.EmptyFilter.Marshal(), nil
