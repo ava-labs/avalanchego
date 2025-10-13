@@ -14,7 +14,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/math"
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -424,15 +423,14 @@ func (b *wrappedBlock) verifyPredicates(predicateContext *precompileconfig.Predi
 		return nil
 	}
 
-	predicateResults := predicate.BlockResults{}
-	for _, tx := range b.ethBlock.Transactions() {
-		results, err := core.CheckPredicates(rules, predicateContext, tx)
-		if err != nil {
-			return err
-		}
-		predicateResults.Set(tx.Hash(), results)
+	predicateResults, err := core.CheckBlockPredicates(
+		rules,
+		predicateContext,
+		b.ethBlock.Transactions(),
+	)
+	if err != nil {
+		return err
 	}
-	// TODO: document required gas constraints to ensure marshalling predicate results does not error
 	predicateResultsBytes, err := predicateResults.Bytes()
 	if err != nil {
 		return fmt.Errorf("failed to marshal predicate results: %w", err)
