@@ -1,6 +1,10 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use smallvec::SmallVec;
+
+use super::{TriePath, TriePathFromUnpackedBytes};
+
 #[cfg(not(feature = "branch_factor_256"))]
 /// A path component in a hexary trie; which is only 4 bits (aka a nibble).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -149,5 +153,291 @@ impl std::fmt::LowerHex for PathComponent {
 impl std::fmt::UpperHex for PathComponent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::UpperHex::fmt(&self.0, f)
+    }
+}
+
+impl TriePath for PathComponent {
+    type Components<'a>
+        = std::option::IntoIter<Self>
+    where
+        Self: 'a;
+
+    fn len(&self) -> usize {
+        1
+    }
+
+    fn components(&self) -> Self::Components<'_> {
+        Some(*self).into_iter()
+    }
+}
+
+impl TriePath for Option<PathComponent> {
+    type Components<'a>
+        = std::option::IntoIter<PathComponent>
+    where
+        Self: 'a;
+
+    fn len(&self) -> usize {
+        usize::from(self.is_some())
+    }
+
+    fn components(&self) -> Self::Components<'_> {
+        (*self).into_iter()
+    }
+}
+
+impl TriePath for [PathComponent] {
+    type Components<'a>
+        = std::iter::Copied<std::slice::Iter<'a, PathComponent>>
+    where
+        Self: 'a;
+
+    fn len(&self) -> usize {
+        self.len()
+    }
+
+    fn components(&self) -> Self::Components<'_> {
+        self.iter().copied()
+    }
+}
+
+impl<const N: usize> TriePath for [PathComponent; N] {
+    type Components<'a>
+        = std::iter::Copied<std::slice::Iter<'a, PathComponent>>
+    where
+        Self: 'a;
+
+    fn len(&self) -> usize {
+        N
+    }
+
+    fn components(&self) -> Self::Components<'_> {
+        self.iter().copied()
+    }
+}
+
+impl TriePath for Vec<PathComponent> {
+    type Components<'a>
+        = std::iter::Copied<std::slice::Iter<'a, PathComponent>>
+    where
+        Self: 'a;
+
+    fn len(&self) -> usize {
+        self.len()
+    }
+
+    fn components(&self) -> Self::Components<'_> {
+        self.iter().copied()
+    }
+}
+
+impl<A: smallvec::Array<Item = PathComponent>> TriePath for SmallVec<A> {
+    type Components<'a>
+        = std::iter::Copied<std::slice::Iter<'a, PathComponent>>
+    where
+        Self: 'a;
+
+    fn len(&self) -> usize {
+        self.len()
+    }
+
+    fn components(&self) -> Self::Components<'_> {
+        self.iter().copied()
+    }
+}
+
+#[cfg(not(feature = "branch_factor_256"))]
+impl<'input> TriePathFromUnpackedBytes<'input> for &'input [PathComponent] {
+    type Error = crate::u4::TryFromIntError;
+
+    fn path_from_unpacked_bytes(bytes: &'input [u8]) -> Result<Self, Self::Error> {
+        if bytes.iter().all(|&b| b <= 0x0F) {
+            #[expect(unsafe_code)]
+            // SAFETY: we have verified that all bytes are in the valid range for
+            // `U4` (0x00 to 0x0F inclusive); therefore, it is now safe for us
+            // to reinterpret a &[u8] as a &[PathComponent].
+            Ok(unsafe { byte_slice_as_path_components_unchecked(bytes) })
+        } else {
+            Err(crate::u4::TryFromIntError)
+        }
+    }
+}
+
+#[cfg(not(feature = "branch_factor_256"))]
+impl TriePathFromUnpackedBytes<'_> for Vec<PathComponent> {
+    type Error = crate::u4::TryFromIntError;
+
+    fn path_from_unpacked_bytes(bytes: &[u8]) -> Result<Self, Self::Error> {
+        try_from_maybe_u4(bytes.iter().copied())
+    }
+}
+
+#[cfg(not(feature = "branch_factor_256"))]
+impl<A: smallvec::Array<Item = PathComponent>> TriePathFromUnpackedBytes<'_> for SmallVec<A> {
+    type Error = crate::u4::TryFromIntError;
+
+    fn path_from_unpacked_bytes(bytes: &[u8]) -> Result<Self, Self::Error> {
+        try_from_maybe_u4(bytes.iter().copied())
+    }
+}
+
+#[cfg(feature = "branch_factor_256")]
+impl<'input> TriePathFromUnpackedBytes<'input> for &'input [PathComponent] {
+    type Error = std::convert::Infallible;
+
+    fn path_from_unpacked_bytes(bytes: &'input [u8]) -> Result<Self, Self::Error> {
+        #[expect(unsafe_code)]
+        // SAFETY: u8 is always valid for PathComponent in 256-ary tries.
+        Ok(unsafe { byte_slice_as_path_components_unchecked(bytes) })
+    }
+}
+
+#[cfg(feature = "branch_factor_256")]
+impl TriePathFromUnpackedBytes<'_> for Vec<PathComponent> {
+    type Error = std::convert::Infallible;
+
+    fn path_from_unpacked_bytes(bytes: &[u8]) -> Result<Self, Self::Error> {
+        Ok(bytes.iter().copied().map(PathComponent).collect())
+    }
+}
+
+#[cfg(feature = "branch_factor_256")]
+impl<A: smallvec::Array<Item = PathComponent>> TriePathFromUnpackedBytes<'_> for SmallVec<A> {
+    type Error = std::convert::Infallible;
+
+    fn path_from_unpacked_bytes(bytes: &[u8]) -> Result<Self, Self::Error> {
+        Ok(bytes.iter().copied().map(PathComponent).collect())
+    }
+}
+
+impl<'input> TriePathFromUnpackedBytes<'input> for Box<[PathComponent]> {
+    type Error = <Vec<PathComponent> as TriePathFromUnpackedBytes<'input>>::Error;
+
+    fn path_from_unpacked_bytes(bytes: &'input [u8]) -> Result<Self, Self::Error> {
+        Vec::<PathComponent>::path_from_unpacked_bytes(bytes).map(Into::into)
+    }
+}
+
+impl<'input> TriePathFromUnpackedBytes<'input> for std::rc::Rc<[PathComponent]> {
+    type Error = <Vec<PathComponent> as TriePathFromUnpackedBytes<'input>>::Error;
+
+    fn path_from_unpacked_bytes(bytes: &'input [u8]) -> Result<Self, Self::Error> {
+        Vec::<PathComponent>::path_from_unpacked_bytes(bytes).map(Into::into)
+    }
+}
+
+impl<'input> TriePathFromUnpackedBytes<'input> for std::sync::Arc<[PathComponent]> {
+    type Error = <Vec<PathComponent> as TriePathFromUnpackedBytes<'input>>::Error;
+
+    fn path_from_unpacked_bytes(bytes: &'input [u8]) -> Result<Self, Self::Error> {
+        Vec::<PathComponent>::path_from_unpacked_bytes(bytes).map(Into::into)
+    }
+}
+
+#[inline]
+const unsafe fn byte_slice_as_path_components_unchecked(bytes: &[u8]) -> &[PathComponent] {
+    #![expect(unsafe_code)]
+
+    // SAFETY: The caller must ensure that all bytes are valid for `PathComponent`,
+    // which is trivially true for 256-ary tries. For hexary tries, the caller must
+    // ensure that each byte is in the range 0x00 to 0x0F inclusive.
+    //
+    // We also rely on the fact that `PathComponent` is a single element type
+    // over `u8` (or `u4` which looks like a `u8` for this purpose).
+    //
+    // borrow rules ensure that the pointer for `bytes` is not null and
+    // `bytes.len()` is always valid. The returned reference will have the same
+    // lifetime as `bytes` so it cannot outlive the original slice.
+    unsafe {
+        &*(std::ptr::slice_from_raw_parts(bytes.as_ptr().cast::<PathComponent>(), bytes.len()))
+    }
+}
+
+#[inline]
+#[cfg(not(feature = "branch_factor_256"))]
+fn try_from_maybe_u4<I: FromIterator<PathComponent>>(
+    bytes: impl IntoIterator<Item = u8>,
+) -> Result<I, crate::u4::TryFromIntError> {
+    bytes
+        .into_iter()
+        .map(PathComponent::try_new)
+        .collect::<Option<I>>()
+        .ok_or(crate::u4::TryFromIntError)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::marker::PhantomData;
+
+    use test_case::test_case;
+
+    use super::*;
+
+    #[cfg_attr(not(feature = "branch_factor_256"), test_case(PhantomData::<&[PathComponent]>; "slice"))]
+    #[cfg_attr(not(feature = "branch_factor_256"), test_case(PhantomData::<Box<[PathComponent]>>; "boxed slice"))]
+    #[cfg_attr(not(feature = "branch_factor_256"), test_case(PhantomData::<Vec<PathComponent>>; "vec"))]
+    #[cfg_attr(not(feature = "branch_factor_256"), test_case(PhantomData::<SmallVec<[PathComponent; 32]>>; "smallvec"))]
+    #[cfg_attr(feature = "branch_factor_256", test_case(PhantomData::<&[PathComponent]>; "slice"))]
+    #[cfg_attr(feature = "branch_factor_256", test_case(PhantomData::<Box<[PathComponent]>>; "boxed slice"))]
+    #[cfg_attr(feature = "branch_factor_256", test_case(PhantomData::<Vec<PathComponent>>; "vec"))]
+    #[cfg_attr(feature = "branch_factor_256", test_case(PhantomData::<SmallVec<[PathComponent; 32]>>; "smallvec"))]
+    fn test_path_from_unpacked_bytes_hexary<T>(_: PhantomData<T>)
+    where
+        T: TriePathFromUnpackedBytes<'static, Error: std::fmt::Debug>,
+    {
+        let input: &[u8; _] = &[0x00, 0x01, 0x0A, 0x0F];
+        let output = <T>::path_from_unpacked_bytes(input).expect("valid input");
+
+        assert_eq!(output.len(), input.len());
+        assert_eq!(
+            output
+                .components()
+                .map(PathComponent::as_u8)
+                .zip(input.iter().copied())
+                .take_while(|&(pc, b)| pc == b)
+                .count(),
+            input.len(),
+        );
+    }
+
+    #[cfg(not(feature = "branch_factor_256"))]
+    #[test_case(PhantomData::<&[PathComponent]>; "slice")]
+    #[test_case(PhantomData::<Box<[PathComponent]>>; "boxed slice")]
+    #[test_case(PhantomData::<Vec<PathComponent>>; "vec")]
+    #[test_case(PhantomData::<SmallVec<[PathComponent; 32]>>; "smallvec")]
+    fn test_path_from_unpacked_bytes_hexary_invalid<T>(_: PhantomData<T>)
+    where
+        T: TriePathFromUnpackedBytes<'static> + std::fmt::Debug,
+    {
+        let input: &[u8; _] = &[0x00, 0x10, 0x0A, 0x0F];
+        let _ = <T>::path_from_unpacked_bytes(input).expect_err("invalid input");
+    }
+
+    #[test]
+    fn test_joined_path() {
+        let path = <&[PathComponent] as TriePathFromUnpackedBytes>::path_from_unpacked_bytes(&[
+            0x0A, 0x0B, 0x0C,
+        ])
+        .expect("valid input");
+
+        let with_suffix = path.append(PathComponent::try_new(0x0D).expect("valid"));
+        assert_eq!(with_suffix.len(), 4);
+        assert_eq!(
+            with_suffix
+                .components()
+                .map(PathComponent::as_u8)
+                .collect::<Vec<_>>(),
+            vec![0x0A, 0x0B, 0x0C, 0x0D],
+        );
+
+        let with_prefix = with_suffix.prepend(PathComponent::try_new(0x09).expect("valid"));
+        assert_eq!(with_prefix.len(), 5);
+        assert_eq!(
+            with_prefix
+                .components()
+                .map(PathComponent::as_u8)
+                .collect::<Vec<_>>(),
+            vec![0x09, 0x0A, 0x0B, 0x0C, 0x0D],
+        );
     }
 }
