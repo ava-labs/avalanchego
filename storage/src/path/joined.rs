@@ -3,7 +3,7 @@
 
 use std::iter::Chain;
 
-use super::TriePath;
+use super::{SplitPath, TriePath};
 
 /// Joins two path segments into a single path, retaining the original segments
 /// without needing to allocate a new contiguous array.
@@ -44,5 +44,55 @@ impl<P: TriePath, S: TriePath> TriePath for JoinedPath<P, S> {
 
     fn components(&self) -> Self::Components<'_> {
         self.prefix.components().chain(self.suffix.components())
+    }
+}
+
+impl<P: SplitPath, S: SplitPath> SplitPath for JoinedPath<P, S> {
+    fn split_at(self, mid: usize) -> (Self, Self) {
+        if let Some(mid) = mid.checked_sub(self.prefix.len()) {
+            let (a_suffix, b_suffix) = self.suffix.split_at(mid);
+            let prefix: Self = Self {
+                prefix: self.prefix,
+                suffix: a_suffix,
+            };
+            let suffix = Self {
+                prefix: P::default(),
+                suffix: b_suffix,
+            };
+            (prefix, suffix)
+        } else {
+            let (a_prefix, b_prefix) = self.prefix.split_at(mid);
+            let prefix = Self {
+                prefix: a_prefix,
+                suffix: S::default(),
+            };
+            let suffix: Self = Self {
+                prefix: b_prefix,
+                suffix: self.suffix,
+            };
+            (prefix, suffix)
+        }
+    }
+
+    fn split_first(self) -> Option<(super::PathComponent, Self)> {
+        if let Some((first, prefix)) = self.prefix.split_first() {
+            Some((
+                first,
+                Self {
+                    prefix,
+                    suffix: self.suffix,
+                },
+            ))
+        } else if let Some((first, suffix)) = self.suffix.split_first() {
+            Some((
+                first,
+                Self {
+                    prefix: P::default(),
+                    suffix,
+                },
+            ))
+        } else {
+            None
+        }
     }
 }

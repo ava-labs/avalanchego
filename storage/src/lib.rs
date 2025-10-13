@@ -54,7 +54,10 @@ pub use nodestore::{
     AreaIndex, Committed, HashedNodeReader, ImmutableProposal, LinearAddress, MutableProposal,
     NodeReader, NodeStore, Parentable, RootReader, TrieReader,
 };
-pub use path::{JoinedPath, PathComponent, TriePath, TriePathFromUnpackedBytes};
+pub use path::{
+    IntoSplitPath, JoinedPath, PathCommonPrefix, PathComponent, SplitPath, TriePath,
+    TriePathFromUnpackedBytes,
+};
 pub use u4::{TryFromIntError, U4};
 
 pub use linear::filebacked::FileBacked;
