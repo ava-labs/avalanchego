@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -29,6 +30,7 @@ import (
 	"github.com/ava-labs/subnet-evm/utils/utilstest"
 
 	agoUtils "github.com/ava-labs/avalanchego/utils"
+	safemath "github.com/ava-labs/avalanchego/utils/math"
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -136,10 +138,6 @@ func newTestValidator() *testValidator {
 // createWarpMessage constructs a signed warp message using the global variable [unsignedMsg]
 // and the first [numKeys] signatures from [blsSignatures]
 func createWarpMessage(numKeys int) *avalancheWarp.Message {
-	aggregateSignature, err := bls.AggregateSignatures(blsSignatures[0:numKeys])
-	if err != nil {
-		panic(err)
-	}
 	bitSet := set.NewBits()
 	for i := 0; i < numKeys; i++ {
 		bitSet.Add(i)
@@ -147,7 +145,28 @@ func createWarpMessage(numKeys int) *avalancheWarp.Message {
 	warpSignature := &avalancheWarp.BitSetSignature{
 		Signers: bitSet.Bytes(),
 	}
-	copy(warpSignature.Signature[:], bls.SignatureToBytes(aggregateSignature))
+
+	var sig *bls.Signature
+	if numKeys > 0 {
+		aggregateSignature, err := bls.AggregateSignatures(blsSignatures[0:numKeys])
+		if err != nil {
+			panic(err)
+		}
+		sig = aggregateSignature
+	} else {
+		// Parsing an unpopulated signature fails, so instead we populate a
+		// random signature.
+		sk, err := localsigner.New()
+		if err != nil {
+			panic(err)
+		}
+		sig, err = sk.Sign(unsignedMsg.Bytes())
+		if err != nil {
+			panic(err)
+		}
+	}
+	copy(warpSignature.Signature[:], bls.SignatureToBytes(sig))
+
 	warpMsg, err := avalancheWarp.NewMessage(unsignedMsg, warpSignature)
 	if err != nil {
 		panic(err)
@@ -593,6 +612,50 @@ func TestWarpSignatureWeightsNonDefaultQuorumNumerator(t *testing.T) {
 	}
 
 	precompiletest.RunPredicateTests(t, tests)
+}
+
+func TestWarpNoValidatorsAndOverflowUseSameGas(t *testing.T) {
+	var (
+		config            = NewConfig(utils.NewUint64(0), 0, false)
+		proposervmContext = &block.Context{
+			PChainHeight: 1,
+		}
+		pred        = createPredicate(0)
+		expectedGas = GasCostPerSignatureVerification + uint64(len(pred))*GasCostPerWarpMessageChunk
+	)
+	noValidators := precompiletest.PredicateTest{
+		Config: config,
+		PredicateContext: &precompileconfig.PredicateContext{
+			SnowCtx:            createSnowCtx(t, nil /*=validators*/), // No validators in state
+			ProposerVMBlockCtx: proposervmContext,
+		},
+		Predicate:   pred,
+		Gas:         expectedGas,
+		GasErr:      nil,
+		ExpectedErr: bls.ErrNoPublicKeys,
+	}
+	weightOverflow := precompiletest.PredicateTest{
+		Config: config,
+		PredicateContext: &precompileconfig.PredicateContext{
+			SnowCtx: createSnowCtx(t, []validatorRange{
+				{
+					start:     0,
+					end:       2, // Generate two validators each with max weight to force overflow
+					weight:    math.MaxUint64,
+					publicKey: true,
+				},
+			}),
+			ProposerVMBlockCtx: proposervmContext,
+		},
+		Predicate:   pred,
+		Gas:         expectedGas,
+		GasErr:      nil,
+		ExpectedErr: safemath.ErrOverflow,
+	}
+	precompiletest.RunPredicateTests(t, map[string]precompiletest.PredicateTest{
+		"no_validators":   noValidators,
+		"weight_overflow": weightOverflow,
+	})
 }
 
 func makeWarpPredicateTests(tb testing.TB) map[string]precompiletest.PredicateTest {
