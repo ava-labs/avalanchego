@@ -596,8 +596,8 @@ func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, err
 }
 
 // collectRegistry starts a Prometheus server for the provided gatherer. If
-// startCollector is true, then collectRegistry also starts a Prometheus
-// collector for the provided gatherer and attaches the provided labels + GitHub
+// startCollector is true, it also starts a Prometheus collector configured to
+// scrape the Prometheus server and attaches the provided labels + GitHub
 // labels if available to the collected metrics.
 func collectRegistry(
 	tb testing.TB,
