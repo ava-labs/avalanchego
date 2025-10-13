@@ -32,6 +32,7 @@ mod nodestore;
 #[cfg(any(test, feature = "test_utils"))]
 mod test_utils;
 mod trie_hash;
+mod u4;
 
 /// Logger module for handling logging functionality
 pub mod logger;
@@ -52,6 +53,7 @@ pub use nodestore::{
     AreaIndex, Committed, HashedNodeReader, ImmutableProposal, LinearAddress, MutableProposal,
     NodeReader, NodeStore, Parentable, RootReader, TrieReader,
 };
+pub use u4::{TryFromIntError, U4};
 
 pub use linear::filebacked::FileBacked;
 pub use linear::memory::MemStore;
