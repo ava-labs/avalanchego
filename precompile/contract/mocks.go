@@ -142,6 +142,20 @@ func (mr *MockAccessibleStateMockRecorder) GetChainConfig() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChainConfig", reflect.TypeOf((*MockAccessibleState)(nil).GetChainConfig))
 }
 
+// GetRules mocks base method.
+func (m *MockAccessibleState) GetRules() precompileconfig.Rules {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRules")
+	ret0, _ := ret[0].(precompileconfig.Rules)
+	return ret0
+}
+
+// GetRules indicates an expected call of GetRules.
+func (mr *MockAccessibleStateMockRecorder) GetRules() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRules", reflect.TypeOf((*MockAccessibleState)(nil).GetRules))
+}
+
 // GetSnowContext mocks base method.
 func (m *MockAccessibleState) GetSnowContext() *snow.Context {
 	m.ctrl.T.Helper()

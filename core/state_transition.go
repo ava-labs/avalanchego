@@ -164,7 +164,7 @@ func accessListGas(rules params.Rules, accessList types.AccessList) (uint64, err
 			}
 			gas = totalGas
 		} else {
-			predicateGas, err := predicaterContract.PredicateGas(predicate.Predicate(accessTuple.StorageKeys))
+			predicateGas, err := predicaterContract.PredicateGas(predicate.Predicate(accessTuple.StorageKeys), rulesExtra)
 			if err != nil {
 				return 0, err
 			}

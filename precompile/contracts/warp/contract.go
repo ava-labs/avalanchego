@@ -18,6 +18,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/accounts/abi"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
+	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 )
 
 const (
@@ -31,11 +32,29 @@ const (
 	SendWarpMessageGasCost uint64 = contract.LogGas + 3*contract.LogTopicGas + AddWarpMessageGasCost + contract.WriteGasCostPerSlot
 	// SendWarpMessageGasCostPerByte cost accounts for producing a signed message of a given size
 	SendWarpMessageGasCostPerByte uint64 = contract.LogDataGas
-
-	GasCostPerWarpSigner            uint64 = 500
-	GasCostPerWarpMessageChunk      uint64 = 3_200
-	GasCostPerSignatureVerification uint64 = 200_000
 )
+
+var (
+	preGraniteGasConfig = GasConfig{
+		PerWarpSigner:            500,
+		PerWarpMessageChunk:      3_200,
+		PerSignatureVerification: 200_000,
+	}
+	graniteGasConfig = GasConfig{
+		PerWarpSigner:            250,
+		PerWarpMessageChunk:      3_200,
+		PerSignatureVerification: 100_000,
+	}
+)
+
+type GasConfig struct {
+	// Gas cost per warp signer in the validator set
+	PerWarpSigner uint64
+	// Gas cost per chunk of the warp message (each chunk is 128 bytes)
+	PerWarpMessageChunk uint64
+	// Gas cost to verify a BLS signature
+	PerSignatureVerification uint64
+}
 
 var (
 	errInvalidSendInput  = errors.New("invalid sendWarpMessage input")
@@ -340,4 +359,13 @@ func createWarpPrecompile() contract.StatefulPrecompiledContract {
 		panic(err)
 	}
 	return statefulContract
+}
+
+func CurrentGasConfig(rules precompileconfig.Rules) GasConfig {
+	switch {
+	case rules.IsGraniteActivated():
+		return graniteGasConfig
+	default:
+		return preGraniteGasConfig
+	}
 }
