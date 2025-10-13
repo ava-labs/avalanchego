@@ -1,4 +1,5 @@
 TestClientCancelWebsocket
+TestClientWebsocketLargeMessage
 TestGolangBindings
 TestMempoolAtmTxsAppGossipHandlingDiscardedTx
 TestMempoolEthTxsAppGossipHandling
@@ -7,5 +8,4 @@ TestResyncNewRootAfterDeletes
 TestTransactionSkipIndexing
 TestUpdatedKeyfileContents
 TestWaitDeployedCornerCases
-TestClientWebsocketLargeMessage
 TestWebsocketLargeRead
