@@ -318,10 +318,10 @@ mod test {
     use std::ops::{Deref, DerefMut};
     use std::path::PathBuf;
 
-    use firewood_storage::{CheckOpt, CheckerError};
+    use firewood_storage::{CheckOpt, CheckerError, HashedNodeReader, IntoHashType, NodeStore};
 
     use crate::db::{Db, Proposal};
-    use crate::v2::api::{Db as _, DbView as _, KeyValuePairIter, Proposal as _};
+    use crate::v2::api::{Db as _, DbView, KeyValuePairIter, Proposal as _};
 
     use super::{BatchOp, DbConfig};
 
@@ -764,6 +764,51 @@ mod test {
                 drop(tx);
             });
         });
+    }
+
+    #[test]
+    fn test_resurrect_unpersisted_root() {
+        let db = TestDb::new();
+
+        // First, create a revision to retrieve
+        let key = b"key";
+        let value = b"value";
+        let batch = vec![BatchOp::Put { key, value }];
+
+        let proposal = db.propose(batch).unwrap();
+        let root_hash = proposal.root_hash().unwrap().unwrap();
+        proposal.commit().unwrap();
+
+        let root_address = db
+            .revision(root_hash.clone())
+            .unwrap()
+            .root_address()
+            .unwrap();
+
+        // Next, overwrite the kv-pair with a new revision
+        let new_value = b"new_value";
+        let batch = vec![BatchOp::Put {
+            key,
+            value: new_value,
+        }];
+
+        let proposal = db.propose(batch).unwrap();
+        proposal.commit().unwrap();
+
+        // Finally, reopen the database and make sure that we can retrieve the first revision
+        let db = db.reopen();
+
+        let latest_root_hash = db.root_hash().unwrap().unwrap();
+        let latest_revision = db.revision(latest_root_hash).unwrap();
+
+        let latest_value = latest_revision.val(key).unwrap().unwrap();
+        assert_eq!(new_value, latest_value.as_ref());
+
+        let node_store =
+            NodeStore::with_root(root_hash.into_hash_type(), root_address, latest_revision);
+
+        let retrieved_value = node_store.val(key).unwrap().unwrap();
+        assert_eq!(value, retrieved_value.as_ref());
     }
 
     // Testdb is a helper struct for testing the Db. Once it's dropped, the directory and file disappear

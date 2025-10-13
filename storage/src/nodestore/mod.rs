@@ -151,6 +151,50 @@ impl<S: ReadableStorage> NodeStore<Committed, S> {
             },
         }
     }
+
+    /// Create a new Committed [`NodeStore`] with a specified root node.
+    ///
+    /// This constructor is used when you have an existing root node at a known
+    /// address and hash, typically when reconstructing a [`NodeStore`] from
+    /// a committed state. The `latest_nodestore` provides access to the underlying
+    /// storage backend containing the persisted trie data.
+    ///
+    /// ## Panics
+    ///
+    /// Panics in debug builds if the hash of the node at `root_address` does
+    /// not equal `root_hash`.
+    #[must_use]
+    pub fn with_root(
+        root_hash: HashType,
+        root_address: LinearAddress,
+        latest_nodestore: Arc<NodeStore<Committed, S>>,
+    ) -> Self {
+        let header = NodeStoreHeader::with_root(Some(root_address));
+        let storage = latest_nodestore.storage.clone();
+
+        let nodestore = NodeStore {
+            header,
+            kind: Committed {
+                deleted: Box::default(),
+                root: Some(Child::AddressWithHash(root_address, root_hash)),
+            },
+            storage,
+        };
+
+        debug_assert_eq!(
+            nodestore
+                .root_hash()
+                .expect("Nodestore should have root hash"),
+            hash_node(
+                &nodestore
+                    .read_node(root_address)
+                    .expect("Root node read should succeed"),
+                &Path(SmallVec::default())
+            )
+        );
+
+        nodestore
+    }
 }
 
 /// Some nodestore kinds implement Parentable.

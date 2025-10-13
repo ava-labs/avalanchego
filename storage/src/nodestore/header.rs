@@ -188,11 +188,15 @@ impl NodeStoreHeader {
     }
 
     pub fn new() -> Self {
+        Self::with_root(None)
+    }
+
+    pub fn with_root(root_address: Option<LinearAddress>) -> Self {
         Self {
             // The store just contains the header at this point
             size: Self::SIZE,
             endian_test: 1,
-            root_address: None,
+            root_address,
             version: Version::new(),
             free_lists: Default::default(),
             area_size_hash: area_size_hash()
