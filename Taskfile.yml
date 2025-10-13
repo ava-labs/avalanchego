@@ -203,7 +203,7 @@ tasks:
       END_BLOCK: '{{.END_BLOCK}}'
       LABELS: '{{.LABELS | default ""}}'
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
-      METRICS_MODE: '{{.METRICS_MODE | default "disabled"}}'
+      METRICS_MODE: '{{.METRICS_MODE | default ""}}'
     cmd: |
       CURRENT_STATE_DIR={{.CURRENT_STATE_DIR}} \
       BLOCK_DIR={{.BLOCK_DIR}} \
@@ -228,7 +228,7 @@ tasks:
       END_BLOCK: '{{.END_BLOCK | default "250000"}}'
       LABELS: '{{.LABELS | default ""}}'
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
-      METRICS_MODE: '{{.METRICS_MODE | default "disabled"}}'
+      METRICS_MODE: '{{.METRICS_MODE | default ""}}'
     cmds:
       - task: import-cchain-reexecute-range
         vars:
