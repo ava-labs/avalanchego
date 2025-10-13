@@ -5,7 +5,6 @@ package warp
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"testing"
@@ -34,12 +33,9 @@ import (
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-const pChainHeight uint64 = 1337
-
 var (
 	_ agoUtils.Sortable[*testValidator] = (*testValidator)(nil)
 
-	errTest        = errors.New("non-nil error")
 	sourceChainID  = ids.GenerateTestID()
 	sourceSubnetID = ids.GenerateTestID()
 
