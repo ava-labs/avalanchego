@@ -75,8 +75,8 @@ func TestRequest_HandleDispatchesToCorrectHandler(t *testing.T) {
 	const requestID uint32 = 42
 
 	tests := []struct {
-		name          string
-		req           Request
+		name string
+		req  Request
 	}{
 		{
 			name: "leafs_request",
