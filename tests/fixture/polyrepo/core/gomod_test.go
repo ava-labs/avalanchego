@@ -308,3 +308,70 @@ replace github.com/ava-labs/avalanchego => ./old-path
 		t.Errorf("expected replace to point to './new-path', got '%s'", modFile.Replace[0].New.Path)
 	}
 }
+
+func TestConvertVersionToGitRef(t *testing.T) {
+	tests := []struct {
+		name        string
+		version     string
+		expectedRef string
+		expectError bool
+	}{
+		{
+			name:        "pseudo-version with full timestamp",
+			version:     "v1.13.6-0.20251007213349-63cc1a166a56",
+			expectedRef: "63cc1a166a56",
+			expectError: false,
+		},
+		{
+			name:        "another pseudo-version",
+			version:     "v0.15.4-rc.3.0.20251002221438-a857a64c28ea",
+			expectedRef: "a857a64c28ea",
+			expectError: false,
+		},
+		{
+			name:        "semantic version tag",
+			version:     "v0.13.8",
+			expectedRef: "v0.13.8",
+			expectError: false,
+		},
+		{
+			name:        "semantic version with rc",
+			version:     "v1.11.11-rc.1",
+			expectedRef: "v1.11.11-rc.1",
+			expectError: false,
+		},
+		{
+			name:        "branch name",
+			version:     "main",
+			expectedRef: "main",
+			expectError: false,
+		},
+		{
+			name:        "commit hash directly",
+			version:     "63cc1a166a56",
+			expectedRef: "63cc1a166a56",
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gitRef, err := ConvertVersionToGitRef(tt.version)
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("expected error but got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if gitRef != tt.expectedRef {
+				t.Errorf("expected ref '%s', got '%s'", tt.expectedRef, gitRef)
+			}
+		})
+	}
+}

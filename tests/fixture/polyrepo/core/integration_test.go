@@ -341,3 +341,66 @@ func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
 		(len(s) > 0 && (s[0:len(substr)] == substr || contains(s[1:], substr))))
 }
+
+// TestGetDefaultRefForRepo_WithPseudoVersion tests that pseudo-versions from go.mod
+// are properly converted to commit hashes and can be used to clone repos
+func TestGetDefaultRefForRepo_WithPseudoVersion(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create a go.mod with a pseudo-version dependency on avalanchego
+	// Using a known commit from avalanchego's history
+	goModPath := filepath.Join(tmpDir, "go.mod")
+	goModContent := `module github.com/ava-labs/coreth
+
+go 1.21
+
+require github.com/ava-labs/avalanchego v1.13.6-0.20251007213349-63cc1a166a56
+`
+	err := os.WriteFile(goModPath, []byte(goModContent), 0644)
+	if err != nil {
+		t.Fatalf("failed to write go.mod: %v", err)
+	}
+
+	// Get the ref that should be used for syncing
+	ref, err := GetDefaultRefForRepo("coreth", "avalanchego", goModPath)
+	if err != nil {
+		t.Fatalf("GetDefaultRefForRepo failed: %v", err)
+	}
+
+	// The ref should be the extracted commit hash, not the full pseudo-version
+	expectedHash := "63cc1a166a56"
+	if ref != expectedHash {
+		t.Errorf("expected ref %s, got %s", expectedHash, ref)
+	}
+
+	// Now test that we can actually clone the repo with this ref
+	avalanchegoConfig, err := GetRepoConfig("avalanchego")
+	if err != nil {
+		t.Fatalf("failed to get avalanchego config: %v", err)
+	}
+
+	clonePath := filepath.Join(tmpDir, "avalanchego")
+
+	// Clone with the extracted commit hash (should work even with shallow clone attempt)
+	err = CloneOrUpdateRepo(avalanchegoConfig.GitRepo, clonePath, ref, 1, false)
+	if err != nil {
+		t.Fatalf("failed to clone avalanchego with pseudo-version ref: %v", err)
+	}
+
+	// Verify the repo was cloned
+	if _, err := os.Stat(filepath.Join(clonePath, ".git")); os.IsNotExist(err) {
+		t.Error("expected .git directory to exist")
+	}
+
+	// Verify we're at the correct commit (the hash should be a prefix of the full commit)
+	currentRef, err := GetCurrentRef(clonePath)
+	if err != nil {
+		t.Fatalf("failed to get current ref: %v", err)
+	}
+
+	// CurrentRef returns the full 40-char hash, our extracted hash is only 12 chars
+	// So we check if the current ref starts with our hash
+	if len(currentRef) < len(expectedHash) || currentRef[:len(expectedHash)] != expectedHash {
+		t.Errorf("expected commit starting with %s, got %s", expectedHash, currentRef)
+	}
+}
