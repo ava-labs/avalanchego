@@ -1046,7 +1046,6 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 			}
 
 			if config.ConsensusParameters.SimplexParams != nil {
-				fmt.Printf("setting simplex defaults in flags %+v\n", config.ConsensusParameters.SimplexParams)
 				setSimplexDefaults(&config.ConsensusParameters, v)
 			} else if config.ConsensusParameters.SnowballParams.Alpha != nil {
 				config.ConsensusParameters.SnowballParams.AlphaPreference = *config.ConsensusParameters.SnowballParams.Alpha
@@ -1107,7 +1106,6 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 		}
 
 		if config.ConsensusParameters.SimplexParams != nil {
-			fmt.Printf("setting simplex defaults in dir %+v\n", config.ConsensusParameters.SimplexParams)
 			setSimplexDefaults(&config.ConsensusParameters, v)
 		} else if config.ConsensusParameters.SnowballParams.Alpha != nil {
 			config.ConsensusParameters.SnowballParams.AlphaPreference = *config.ConsensusParameters.SnowballParams.Alpha

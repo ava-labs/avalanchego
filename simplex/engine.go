@@ -19,15 +19,13 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	pSimplex "github.com/ava-labs/avalanchego/snow/consensus/simplex"
 )
 
 var _ common.Engine = (*Engine)(nil)
 
-var (
-	tickInterval = time.Millisecond * 500
-
-	errUnknownMessageType = errors.New("unknown message type")
-)
+var errUnknownMessageType = errors.New("unknown message type")
 
 type Engine struct {
 	// nonValidator marks that this node is not a validator
@@ -59,7 +57,8 @@ type Engine struct {
 	vm                 block.ChainVM
 	consensusCtx       *snow.ConsensusContext
 
-	shutdown bool
+	tickInterval time.Duration
+	shutdown     bool
 }
 
 // The VM must be initialized before creating the engine
@@ -153,6 +152,7 @@ func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config 
 		ChitsHandler:                common.NewNoOpChitsHandler(config.Log),
 		Connector:                   config.VM,
 
+		tickInterval: getTickInterval(config.Params),
 		AppHandler:   config.VM,
 		vm:           config.VM,
 		consensusCtx: consensusCtx,
@@ -179,9 +179,14 @@ func (e *Engine) Start(ctx context.Context, _ uint32) error {
 	return e.vm.SetState(ctx, snow.NormalOp)
 }
 
+func getTickInterval(params *pSimplex.Parameters) time.Duration {
+	tick := min(int64(params.MaxProposalWait), int64(params.MaxRebroadcastWait)) / 10
+	return time.Duration(tick)
+}
+
 // tick periodically advances the engine's time.
 func (e *Engine) tick() {
-	ticker := time.NewTicker(tickInterval)
+	ticker := time.NewTicker(e.tickInterval)
 	for {
 		if e.shutdown {
 			return
@@ -194,13 +199,13 @@ func (e *Engine) tick() {
 
 func (e *Engine) SimplexMessage(ctx context.Context, nodeID ids.NodeID, msg *p2p.Simplex) error {
 	if e.nonValidator {
-		e.logger.Info("non-validator received simplex message; dropping")
+		e.logger.Debug("non-validator received simplex message; dropping")
 		return nil
 	}
 
 	simplexMsg, err := e.p2pToSimplexMessage(ctx, msg)
 	if err != nil {
-		e.logger.Info("failed to convert p2p message to simplex message", zap.Error(err))
+		e.logger.Debug("failed to convert p2p message to simplex message", zap.Error(err))
 		return nil
 	}
 

@@ -317,8 +317,8 @@ func addNodeFlags(fs *pflag.FlagSet) {
 	fs.Duration(SnowMaxTimeProcessingKey, snowball.DefaultParameters.MaxItemProcessingTime, "Maximum amount of time an item should be processing and still be healthy")
 
 	// Simplex Consensus
-	fs.Duration(SimplexMaxProposalWaitKey, simplex.DefaultParameters.MaxProposalWait, "Max amount of time to wait before timing out on a round")
-	fs.Duration(SimplexMaxRebroadcastWaitKey, simplex.DefaultParameters.MaxRebroadcastWait, "Max amount of time to wait before rebroadcasting empty votes")
+	fs.Duration(SimplexMaxProposalWaitKey, simplex.DefaultParameters.MaxProposalWait, "Time to wait for a block to undergo consensus before failing over so a different node will propose a block")
+	fs.Duration(SimplexMaxRebroadcastWaitKey, simplex.DefaultParameters.MaxRebroadcastWait, "ime to retry message transmission in case of network instability")
 
 	// ProposerVM
 	fs.Bool(ProposerVMUseCurrentHeightKey, false, "Have the ProposerVM always report the last accepted P-chain block height")

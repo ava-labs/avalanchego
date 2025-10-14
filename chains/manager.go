@@ -1835,6 +1835,6 @@ func (m *manager) createSimplexDBs(primaryAlias string, chainID ids.ID) (*prefix
 func getChainWALLocation(chainDataDir string, chainID ids.ID) string {
 	return filepath.Join(
 		chainDataDir,
-		chainID.String()+".wal",
+		chainID.String()+"_simplex.wal",
 	)
 }
