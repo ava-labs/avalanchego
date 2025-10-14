@@ -26,12 +26,11 @@ func TestGasLimit(t *testing.T) {
 
 func GasLimitTest(t *testing.T, feeConfig commontype.FeeConfig) {
 	tests := []struct {
-		name      string
-		upgrades  extras.NetworkUpgrades
-		parent    *types.Header
-		timestamp uint64
-		want      uint64
-		wantErr   error
+		name     string
+		upgrades extras.NetworkUpgrades
+		parent   *types.Header
+		want     uint64
+		wantErr  error
 	}{
 		{
 			name:     "subnet_evm",
@@ -54,7 +53,7 @@ func GasLimitTest(t *testing.T, feeConfig commontype.FeeConfig) {
 			config := &extras.ChainConfig{
 				NetworkUpgrades: test.upgrades,
 			}
-			got, err := GasLimit(config, feeConfig, test.parent, test.timestamp)
+			got, err := GasLimit(config, feeConfig, test.parent, 0)
 			require.ErrorIs(err, test.wantErr)
 			require.Equal(test.want, got)
 		})
@@ -159,12 +158,11 @@ func TestGasCapacity(t *testing.T) {
 
 func GasCapacityTest(t *testing.T, feeConfig commontype.FeeConfig) {
 	tests := []struct {
-		name      string
-		upgrades  extras.NetworkUpgrades
-		parent    *types.Header
-		timestamp uint64
-		want      uint64
-		wantErr   error
+		name     string
+		upgrades extras.NetworkUpgrades
+		parent   *types.Header
+		want     uint64
+		wantErr  error
 	}{
 		{
 			name:     "subnet_evm",
@@ -179,7 +177,7 @@ func GasCapacityTest(t *testing.T, feeConfig commontype.FeeConfig) {
 			config := &extras.ChainConfig{
 				NetworkUpgrades: test.upgrades,
 			}
-			got, err := GasCapacity(config, feeConfig, test.parent, test.timestamp)
+			got, err := GasCapacity(config, feeConfig, test.parent, 0)
 			require.ErrorIs(err, test.wantErr)
 			require.Equal(test.want, got)
 		})

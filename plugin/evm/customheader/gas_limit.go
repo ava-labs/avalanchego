@@ -12,6 +12,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/commontype"
 	"github.com/ava-labs/subnet-evm/params/extras"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )
@@ -29,8 +30,9 @@ func GasLimit(
 	config *extras.ChainConfig,
 	feeConfig commontype.FeeConfig,
 	parent *types.Header,
-	timestamp uint64,
+	timeMS uint64,
 ) (uint64, error) {
+	timestamp := timeMS / 1000
 	switch {
 	case config.IsSubnetEVM(timestamp):
 		return feeConfig.GasLimit.Uint64(), nil
@@ -52,7 +54,8 @@ func VerifyGasUsed(
 	header *types.Header,
 ) error {
 	gasUsed := header.GasUsed
-	capacity, err := GasCapacity(config, feeConfig, parent, header.Time)
+	timeMS := customtypes.HeaderTimeMilliseconds(header)
+	capacity, err := GasCapacity(config, feeConfig, parent, timeMS)
 	if err != nil {
 		return fmt.Errorf("calculating gas capacity: %w", err)
 	}
@@ -114,7 +117,7 @@ func GasCapacity(
 	config *extras.ChainConfig,
 	feeConfig commontype.FeeConfig,
 	parent *types.Header,
-	timestamp uint64,
+	timeMS uint64,
 ) (uint64, error) {
-	return GasLimit(config, feeConfig, parent, timestamp)
+	return GasLimit(config, feeConfig, parent, timeMS)
 }

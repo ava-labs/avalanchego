@@ -48,6 +48,7 @@ import (
 	"github.com/ava-labs/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 	"github.com/ava-labs/subnet-evm/plugin/evm/upgrade/legacy"
+	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/holiman/uint256"
 	"golang.org/x/crypto/sha3"
 )
@@ -357,14 +358,16 @@ func TestStateProcessorErrors(t *testing.T) {
 // - valid pow (fake), ancestry, difficulty, gaslimit etc
 func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Transactions, config *params.ChainConfig) *types.Block {
 	fakeChainReader := newChainMaker(nil, config, engine)
-	time := parent.Time() + 10
 	feeConfig, _, err := fakeChainReader.GetFeeConfigAt(parent.Header())
 	if err != nil {
 		panic(err)
 	}
 	configExtra := params.GetExtra(config)
-	gasLimit, _ := customheader.GasLimit(configExtra, feeConfig, parent.Header(), time)
-	baseFee, _ := customheader.BaseFee(configExtra, feeConfig, parent.Header(), time)
+	gap := uint64(10) // 10 seconds
+	time := parent.Time() + gap
+	timeMS := customtypes.HeaderTimeMilliseconds(parent.Header()) + gap*1000
+	gasLimit, _ := customheader.GasLimit(configExtra, feeConfig, parent.Header(), timeMS)
+	baseFee, _ := customheader.BaseFee(configExtra, feeConfig, parent.Header(), timeMS)
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Coinbase:   parent.Coinbase(),
@@ -379,6 +382,10 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 		Time:      time,
 		UncleHash: types.EmptyUncleHash,
 		BaseFee:   baseFee,
+	}
+	if configExtra.IsGranite(header.Time) {
+		headerExtra := customtypes.GetHeaderExtra(header)
+		headerExtra.TimeMilliseconds = utils.NewUint64(timeMS)
 	}
 
 	if params.GetExtra(config).IsSubnetEVM(header.Time) {
@@ -416,12 +423,6 @@ func GenerateBadBlock(parent *types.Block, engine consensus.Engine, txs types.Tr
 		header.BlobGasUsed = &used
 
 		header.ParentBeaconRoot = new(common.Hash)
-	}
-
-	if configExtra.IsGranite(header.Time) {
-		headerExtra := customtypes.GetHeaderExtra(header)
-		headerExtra.TimeMilliseconds = new(uint64)
-		*headerExtra.TimeMilliseconds = header.Time * 1000
 	}
 
 	// Assemble and return the final block for sealing

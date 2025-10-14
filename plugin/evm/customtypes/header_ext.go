@@ -42,6 +42,17 @@ type HeaderExtra struct {
 	MinDelayExcess   *acp226.DelayExcess
 }
 
+// HeaderTimeMilliseconds returns the header timestamp in milliseconds.
+// If the header has the Granite field TimeMilliseconds set in extras, it is used.
+// Otherwise, it falls back to seconds-based Time multiplied by 1000.
+func HeaderTimeMilliseconds(h *ethtypes.Header) uint64 {
+	extra := GetHeaderExtra(h)
+	if extra != nil && extra.TimeMilliseconds != nil {
+		return *extra.TimeMilliseconds
+	}
+	return h.Time * 1000
+}
+
 // EncodeRLP RLP encodes the given [ethtypes.Header] and [HeaderExtra] together
 // to the `writer`. It does merge both structs into a single [HeaderSerializable].
 func (h *HeaderExtra) EncodeRLP(eth *ethtypes.Header, writer io.Writer) error {

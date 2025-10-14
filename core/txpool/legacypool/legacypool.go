@@ -1852,7 +1852,7 @@ func (pool *LegacyPool) updateBaseFeeAt(head *types.Header) error {
 		return err
 	}
 	chainConfig := params.GetExtra(pool.chainconfig)
-	baseFeeEstimate, err := customheader.EstimateNextBaseFee(chainConfig, feeConfig, head, uint64(time.Now().Unix()))
+	baseFeeEstimate, err := customheader.EstimateNextBaseFee(chainConfig, feeConfig, head, uint64(time.Now().UnixMilli()))
 	if err != nil {
 		return err
 	}

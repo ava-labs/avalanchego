@@ -232,7 +232,7 @@ func applyLondonChecks(env *stEnv, chainConfig *params.ChainConfig) error {
 	}
 	configExtra := params.GetExtra(chainConfig)
 	var err error
-	env.BaseFee, err = customheader.BaseFee(configExtra, feeConfig, parent, env.Timestamp)
+	env.BaseFee, err = customheader.BaseFee(configExtra, feeConfig, parent, env.Timestamp*1000)
 	if err != nil {
 		return NewError(ErrorConfig, fmt.Errorf("failed calculating base fee: %v", err))
 	}

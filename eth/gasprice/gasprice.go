@@ -241,7 +241,7 @@ func (oracle *Oracle) estimateNextBaseFee(ctx context.Context) (*big.Int, error)
 	// based on the current time and add it to the tip to estimate the
 	// total gas price estimate.
 	chainConfig := params.GetExtra(oracle.backend.ChainConfig())
-	return customheader.EstimateNextBaseFee(chainConfig, feeConfig, header, oracle.clock.Unix())
+	return customheader.EstimateNextBaseFee(chainConfig, feeConfig, header, uint64(oracle.clock.Time().UnixMilli()))
 }
 
 // SuggestPrice returns an estimated price for legacy transactions.
