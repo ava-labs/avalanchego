@@ -66,3 +66,29 @@ func GetReposToSync(currentRepo string) []string {
 
 	return result
 }
+
+// GetDefaultRefForRepo determines the default ref to use for a target repo
+// when syncing from a current repo. If the current repo has a go.mod with a
+// dependency on the target repo, returns that version. Otherwise, returns
+// the target repo's default branch.
+func GetDefaultRefForRepo(currentRepo, targetRepo, goModPath string) (string, error) {
+	// Get the target repo's configuration
+	targetConfig, err := GetRepoConfig(targetRepo)
+	if err != nil {
+		return "", err
+	}
+
+	// If there's no go.mod or no current repo, use default branch
+	if goModPath == "" || currentRepo == "" {
+		return targetConfig.DefaultBranch, nil
+	}
+
+	// Try to get the dependency version from go.mod
+	version, err := GetDependencyVersion(goModPath, targetConfig.GoModule)
+	if err != nil {
+		// If dependency not found, use default branch
+		return targetConfig.DefaultBranch, nil
+	}
+
+	return version, nil
+}
