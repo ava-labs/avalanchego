@@ -1633,9 +1633,8 @@ func testUncleBlock(t *testing.T, scheme string) {
 	if _, err := vm1.ParseBlock(context.Background(), vm2BlkC.Bytes()); err != nil {
 		t.Fatalf("VM1 errored parsing blkC: %s", err)
 	}
-	if _, err := vm1.ParseBlock(context.Background(), uncleBlock.Bytes()); !errors.Is(err, errUnclesUnsupported) {
-		t.Fatalf("VM1 should have failed with %q but got %q", errUnclesUnsupported, err.Error())
-	}
+	_, err = vm1.ParseBlock(context.Background(), uncleBlock.Bytes())
+	require.ErrorIs(t, err, errUnclesUnsupported)
 }
 
 // Regression test to ensure that a VM that is not able to parse a block that
