@@ -4,12 +4,17 @@
 package message
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/libevm/crypto"
 
 	"github.com/ava-labs/avalanchego/ids"
 )
+
+// errInvalidBlockSyncSummary is returned when the provided bytes cannot be
+// parsed into a valid BlockSyncSummary.
+var errInvalidBlockSyncSummary = errors.New("invalid block sync summary")
 
 type BlockSyncSummaryParser struct{}
 
@@ -20,7 +25,7 @@ func NewBlockSyncSummaryParser() *BlockSyncSummaryParser {
 func (*BlockSyncSummaryParser) Parse(summaryBytes []byte, acceptImpl AcceptImplFn) (Syncable, error) {
 	summary := BlockSyncSummary{}
 	if _, err := Codec.Unmarshal(summaryBytes, &summary); err != nil {
-		return nil, fmt.Errorf("failed to parse syncable summary: %w", err)
+		return nil, fmt.Errorf("%w", errInvalidBlockSyncSummary)
 	}
 
 	summary.bytes = summaryBytes
