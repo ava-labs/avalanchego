@@ -173,6 +173,20 @@ func TestPrivateKeySECP256K1RUnmarshalJSONError(t *testing.T) {
 	}
 }
 
+func TestPrivateKeySECP256K1RUnmarshalText(t *testing.T) {
+	require := require.New(t)
+
+	key, err := NewPrivateKey()
+	require.NoError(err)
+
+	keyJSON, err := key.MarshalText()
+	require.NoError(err)
+
+	key2 := PrivateKey{}
+	require.NoError(key2.UnmarshalText(keyJSON))
+	require.Equal(key.PublicKey(), key2.PublicKey())
+}
+
 func TestSigning(t *testing.T) {
 	tests := []struct {
 		msg []byte
