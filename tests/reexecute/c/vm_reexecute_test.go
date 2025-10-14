@@ -70,6 +70,7 @@ var (
 	executionTimeout   time.Duration
 	labelsArg          string
 	metricsModeArg     string
+	metricsServerPort  uint64
 
 	networkUUID string = uuid.NewString()
 	labels             = map[string]string{
@@ -117,6 +118,7 @@ func TestMain(m *testing.M) {
 
 	metricsModes := strings.Join([]string{metricsDisabled, metricsServerOnly, metricsFull}, ", ")
 	flag.StringVar(&metricsModeArg, "metrics-mode", metricsDisabled, fmt.Sprintf("Specifies the type of metrics configuration. Options include %s.", metricsModes))
+	flag.Uint64Var(&metricsServerPort, "metrics-server-port", tests.DefaultMetricsPort, "Port which metrics server will listen to (metrics mode must be either server-only or full)")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
@@ -170,6 +172,7 @@ func BenchmarkReexecuteRange(b *testing.B) {
 			endBlockArg,
 			chanSizeArg,
 			metricsMode(metricsModeArg),
+			metricsServerPort,
 		)
 	})
 }
@@ -183,6 +186,7 @@ func benchmarkReexecuteRange(
 	endBlock uint64,
 	chanSize int,
 	metricsMode metricsMode,
+	metricsServerPort uint64,
 ) {
 	r := require.New(b)
 	ctx := context.Background()
@@ -203,9 +207,9 @@ func benchmarkReexecuteRange(
 
 	switch metricsMode {
 	case metricsServerOnly:
-		startServer(b, log, prefixGatherer)
+		startServer(b, log, prefixGatherer, metricsServerPort)
 	case metricsFull:
-		startServerAndCollector(b, log, "c-chain-reexecution", prefixGatherer, labels)
+		startServerAndCollector(b, log, "c-chain-reexecution", prefixGatherer, labels, metricsServerPort)
 	case metricsDisabled:
 	}
 
@@ -574,10 +578,11 @@ func startServer(
 	tb testing.TB,
 	log logging.Logger,
 	gatherer prometheus.Gatherer,
+	port uint64,
 ) {
 	r := require.New(tb)
 
-	server, err := tests.NewPrometheusServer(gatherer)
+	server, err := tests.NewPrometheusServer(gatherer, port)
 	r.NoError(err)
 
 	log.Info("metrics endpoint available",
@@ -593,7 +598,14 @@ func startServer(
 // starts a Prometheus collector configured to scrape the Prometheus server.
 // startServerAndCollector also attaches the provided labels + Github labels if
 // available to the collected metrics.
-func startServerAndCollector(tb testing.TB, log logging.Logger, name string, gatherer prometheus.Gatherer, labels map[string]string) {
+func startServerAndCollector(
+	tb testing.TB,
+	log logging.Logger,
+	name string,
+	gatherer prometheus.Gatherer,
+	labels map[string]string,
+	port uint64,
+) {
 	r := require.New(tb)
 
 	startPromCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
@@ -602,7 +614,7 @@ func startServerAndCollector(tb testing.TB, log logging.Logger, name string, gat
 	logger := tests.NewDefaultLogger("prometheus")
 	r.NoError(tmpnet.StartPrometheus(startPromCtx, logger))
 
-	server, err := tests.NewPrometheusServer(gatherer)
+	server, err := tests.NewPrometheusServer(gatherer, port)
 	r.NoError(err)
 
 	var sdConfigFilePath string
