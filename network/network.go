@@ -565,10 +565,11 @@ func (n *network) Peers(
 	salt []byte,
 ) []*ips.ClaimedIPPort {
 	_, areWeAPrimaryNetworkValidator := n.config.Validators.GetValidator(constants.PrimaryNetworkID, n.config.MyNodeID)
+	weHaveAllSubnetIPs := areWeAPrimaryNetworkValidator || n.config.ConnectToAllValidators
 
 	// Only return IPs for subnets that we are tracking.
 	var allowedSubnets func(ids.ID) bool
-	if areWeAPrimaryNetworkValidator {
+	if weHaveAllSubnetIPs {
 		allowedSubnets = func(ids.ID) bool { return true }
 	} else {
 		allowedSubnets = func(subnetID ids.ID) bool {
@@ -576,7 +577,7 @@ func (n *network) Peers(
 		}
 	}
 
-	if (areWeAPrimaryNetworkValidator || n.config.ConnectToAllValidators) && requestAllPeers {
+	if weHaveAllSubnetIPs && requestAllPeers {
 		// Return IPs for all subnets.
 		return getGossipableIPs(
 			n.ipTracker,
