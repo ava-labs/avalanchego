@@ -6,7 +6,6 @@ package vm
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"flag"
 	"fmt"
 	"maps"
@@ -192,11 +191,12 @@ func benchmarkReexecuteRange(
 
 	log := tests.NewDefaultLogger("c-chain-reexecution")
 
-	switch {
-	case metricsServerEnabled && metricsCollectorEnabled:
-		startServerAndCollector(b, log, "c-chain-reexecution", prefixGatherer, labels)
-	case metricsServerEnabled:
-		startServer(b, log, prefixGatherer)
+	if metricsServerEnabled {
+		serverAddr := startServer(b, log, prefixGatherer)
+
+		if metricsCollectorEnabled {
+			startCollector(b, log, "c-chain-reexecution", labels, serverAddr)
+		}
 	}
 
 	var (
@@ -559,12 +559,13 @@ func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, err
 	return m, nil
 }
 
-// startServer starts a Prometheus server for the provided gatherer.
+// startServer starts a Prometheus server for the provided gatherer and returns
+// the server address.
 func startServer(
 	tb testing.TB,
 	log logging.Logger,
 	gatherer prometheus.Gatherer,
-) {
+) string {
 	r := require.New(tb)
 
 	server, err := tests.NewPrometheusServer(gatherer)
@@ -577,13 +578,14 @@ func startServer(
 	tb.Cleanup(func() {
 		r.NoError(server.Stop())
 	})
+
+	return server.Address()
 }
 
-// startServerAndCollector starts a Prometheus server for the provided gatherer and
-// starts a Prometheus collector configured to scrape the Prometheus server.
-// startServerAndCollector also attaches the provided labels + Github labels if
-// available to the collected metrics.
-func startServerAndCollector(tb testing.TB, log logging.Logger, name string, gatherer prometheus.Gatherer, labels map[string]string) {
+// startCollector starts a Prometheus collector configured to scrape the server
+// listening on serverAddr. startCollector also attaches the provided labels +
+// Github labels if available to the collected metrics.
+func startCollector(tb testing.TB, log logging.Logger, name string, labels map[string]string, serverAddr string) {
 	r := require.New(tb)
 
 	startPromCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
@@ -592,32 +594,27 @@ func startServerAndCollector(tb testing.TB, log logging.Logger, name string, gat
 	logger := tests.NewDefaultLogger("prometheus")
 	r.NoError(tmpnet.StartPrometheus(startPromCtx, logger))
 
-	server, err := tests.NewPrometheusServer(gatherer)
-	r.NoError(err)
-
 	var sdConfigFilePath string
 	tb.Cleanup(func() {
 		// Ensure a final metrics scrape.
 		// This default delay is set above the default scrape interval used by StartPrometheus.
 		time.Sleep(tmpnet.NetworkShutdownDelay)
 
-		r.NoError(errors.Join(
-			server.Stop(),
-			func() error {
-				if sdConfigFilePath != "" {
-					return os.Remove(sdConfigFilePath)
-				}
-				return nil
-			}(),
-		))
+		r.NoError(func() error {
+			if sdConfigFilePath != "" {
+				return os.Remove(sdConfigFilePath)
+			}
+			return nil
+		}(),
+		)
 
 		checkMetricsCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
 		defer cancel()
 		r.NoError(tmpnet.CheckMetricsExist(checkMetricsCtx, logger, networkUUID))
 	})
 
-	sdConfigFilePath, err = tmpnet.WritePrometheusSDConfig(name, tmpnet.SDConfig{
-		Targets: []string{server.Address()},
+	sdConfigFilePath, err := tmpnet.WritePrometheusSDConfig(name, tmpnet.SDConfig{
+		Targets: []string{serverAddr},
 		Labels:  labels,
 	}, true /* withGitHubLabels */)
 	r.NoError(err)
