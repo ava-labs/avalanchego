@@ -146,3 +146,124 @@ func TestGetReposToSync(t *testing.T) {
 		})
 	}
 }
+
+func TestGetDefaultRefForRepo(t *testing.T) {
+	tests := []struct {
+		name         string
+		currentRepo  string
+		targetRepo   string
+		goModContent string
+		expectedRef  string
+		expectError  bool
+	}{
+		{
+			name:        "avalanchego depends on coreth",
+			currentRepo: "avalanchego",
+			targetRepo:  "coreth",
+			goModContent: `module github.com/ava-labs/avalanchego
+
+go 1.21
+
+require github.com/ava-labs/coreth v0.13.8
+`,
+			expectedRef: "v0.13.8",
+			expectError: false,
+		},
+		{
+			name:        "avalanchego depends on firewood",
+			currentRepo: "avalanchego",
+			targetRepo:  "firewood",
+			goModContent: `module github.com/ava-labs/avalanchego
+
+go 1.21
+
+require github.com/ava-labs/firewood/ffi v0.0.0-20240101120000-abc123def456
+`,
+			expectedRef: "v0.0.0-20240101120000-abc123def456",
+			expectError: false,
+		},
+		{
+			name:        "coreth depends on avalanchego",
+			currentRepo: "coreth",
+			targetRepo:  "avalanchego",
+			goModContent: `module github.com/ava-labs/coreth
+
+go 1.21
+
+require github.com/ava-labs/avalanchego v1.11.11
+`,
+			expectedRef: "v1.11.11",
+			expectError: false,
+		},
+		{
+			name:        "firewood has no dependency on avalanchego - uses default branch",
+			currentRepo: "firewood",
+			targetRepo:  "avalanchego",
+			goModContent: `module github.com/ava-labs/firewood/ffi
+
+go 1.21
+`,
+			expectedRef: "master",
+			expectError: false,
+		},
+		{
+			name:        "firewood has no dependency on coreth - uses default branch",
+			currentRepo: "firewood",
+			targetRepo:  "coreth",
+			goModContent: `module github.com/ava-labs/firewood/ffi
+
+go 1.21
+`,
+			expectedRef: "master",
+			expectError: false,
+		},
+		{
+			name:        "no go.mod path - uses default branch",
+			currentRepo: "avalanchego",
+			targetRepo:  "coreth",
+			goModContent: "",
+			expectedRef: "master",
+			expectError: false,
+		},
+		{
+			name:         "unknown target repo",
+			currentRepo:  "avalanchego",
+			targetRepo:   "unknown",
+			goModContent: "",
+			expectedRef:  "",
+			expectError:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			goModPath := ""
+
+			if tt.goModContent != "" {
+				goModPath = filepath.Join(tmpDir, "go.mod")
+				err := os.WriteFile(goModPath, []byte(tt.goModContent), 0644)
+				if err != nil {
+					t.Fatalf("failed to write go.mod: %v", err)
+				}
+			}
+
+			ref, err := GetDefaultRefForRepo(tt.currentRepo, tt.targetRepo, goModPath)
+
+			if tt.expectError {
+				if err == nil {
+					t.Error("expected error but got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if ref != tt.expectedRef {
+				t.Errorf("expected ref '%s', got '%s'", tt.expectedRef, ref)
+			}
+		})
+	}
+}

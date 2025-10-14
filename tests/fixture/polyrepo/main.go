@@ -80,11 +80,11 @@ Repositories can be specified with an optional ref (branch, tag, or commit):
   sync coreth@v0.13.8
   sync avalanchego@57a74c3a7fd7dcdda24f49a237bfa9fa69f26a85
 
-If no repositories are specified, syncs based on the current directory:
-- From avalanchego: syncs coreth and firewood
-- From coreth: syncs avalanchego and firewood
-- From firewood: syncs avalanchego and coreth
-- From unknown location: syncs all three
+If no repositories are specified, syncs based on the current directory and go.mod:
+- From avalanchego: syncs coreth and firewood at versions specified in go.mod
+- From coreth: syncs avalanchego and firewood at versions specified in go.mod
+- From firewood: syncs avalanchego and coreth at their default branches
+- From unknown location: syncs all three at their default branches
 
 Repositories will be cloned into the current directory with their repository names.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -95,6 +95,12 @@ Repositories will be cloned into the current directory with their repository nam
 		baseDir, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("failed to get current directory: %w", err)
+		}
+
+		// Get path to go.mod
+		goModPath := "go.mod"
+		if _, err := os.Stat(goModPath); err != nil {
+			return fmt.Errorf("go.mod not found in current directory")
 		}
 
 		// Determine which repos to sync
@@ -119,17 +125,16 @@ Repositories will be cloned into the current directory with their repository nam
 			if err != nil {
 				return fmt.Errorf("failed to detect current repo: %w", err)
 			}
-			// Get repos to sync and use default branches
+			// Get repos to sync and determine default refs from go.mod
 			repos := core.GetReposToSync(currentRepo)
 			for _, repoName := range repos {
-				reposToSync = append(reposToSync, repoWithRef{name: repoName, ref: ""})
+				// Determine the default ref for this repo
+				ref, err := core.GetDefaultRefForRepo(currentRepo, repoName, goModPath)
+				if err != nil {
+					return fmt.Errorf("failed to get default ref for %s: %w", repoName, err)
+				}
+				reposToSync = append(reposToSync, repoWithRef{name: repoName, ref: ref})
 			}
-		}
-
-		// Get path to go.mod
-		goModPath := "go.mod"
-		if _, err := os.Stat(goModPath); err != nil {
-			return fmt.Errorf("go.mod not found in current directory")
 		}
 
 		// Sync each repository
