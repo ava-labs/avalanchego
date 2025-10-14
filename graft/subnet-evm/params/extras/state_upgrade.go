@@ -6,6 +6,7 @@ package extras
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"reflect"
 
 	"github.com/ava-labs/libevm/common"
@@ -44,6 +45,7 @@ func (s *StateUpgrade) Equal(other *StateUpgrade) bool {
 
 // verifyStateUpgrades checks [c.StateUpgrades] is well formed:
 // - the specified blockTimestamps must monotonically increase
+// - all BalanceChange values must fit within uint256
 func (c *ChainConfig) verifyStateUpgrades() error {
 	var previousUpgradeTimestamp *uint64
 	for i, upgrade := range c.StateUpgrades {
@@ -61,6 +63,19 @@ func (c *ChainConfig) verifyStateUpgrades() error {
 			return fmt.Errorf("%w: StateUpgrade[%d] has timestamp %v, previous timestamp %v", errStateUpgradeTimestampNotMonotonic, i, *upgradeTimestamp, *previousUpgradeTimestamp)
 		}
 		previousUpgradeTimestamp = upgradeTimestamp
+
+		// Verify all BalanceChange values fit within uint256
+		for account, accountUpgrade := range upgrade.StateUpgradeAccounts {
+			if accountUpgrade.BalanceChange != nil {
+				bigChange := (*big.Int)(accountUpgrade.BalanceChange)
+				// Check if the absolute value fits in uint256
+				absChange := new(big.Int).Abs(bigChange)
+				if absChange.BitLen() > 256 {
+					return fmt.Errorf("StateUpgrade[%d]: account %s has BalanceChange %s that exceeds uint256 bit length",
+						i, account.Hex(), bigChange.String())
+				}
+			}
+		}
 	}
 	return nil
 }

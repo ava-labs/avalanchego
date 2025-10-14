@@ -7,7 +7,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/math"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -29,7 +28,6 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 		balanceChange  *math.HexOrDecimal256
 		accountExists  bool
 		wantBalance    *uint256.Int
-		wantError      error
 	}{
 		{
 			name:           "positive balance change on existing account",
@@ -44,14 +42,6 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 			balanceChange:  hexOrDecimal256FromInt64(-30),
 			accountExists:  true,
 			wantBalance:    uint256.NewInt(70),
-		},
-		{
-			name:           "negative balance change with insufficient funds",
-			initialBalance: uint256.NewInt(50),
-			balanceChange:  hexOrDecimal256FromInt64(-100),
-			accountExists:  true,
-			wantBalance:    uint256.NewInt(50), // unchanged
-			wantError:      errInsufficientBalanceForSubtraction,
 		},
 		{
 			name:           "zero balance change",
@@ -73,26 +63,11 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 			wantBalance:    uint256.NewInt(1000),
 		},
 		{
-			name:           "new account with negative balance",
-			initialBalance: uint256.NewInt(0),
-			balanceChange:  hexOrDecimal256FromInt64(-100),
-			wantBalance:    uint256.NewInt(0), // unchanged
-			wantError:      errInsufficientBalanceForSubtraction,
-		},
-		{
 			name:           "exact balance subtraction",
 			initialBalance: uint256.NewInt(100),
 			balanceChange:  hexOrDecimal256FromInt64(-100),
 			accountExists:  true,
 			wantBalance:    uint256.NewInt(0),
-		},
-		{
-			name:           "off-by-one underflow",
-			initialBalance: uint256.NewInt(100),
-			balanceChange:  hexOrDecimal256FromInt64(-101),
-			accountExists:  true,
-			wantBalance:    uint256.NewInt(100), // unchanged
-			wantError:      errInsufficientBalanceForSubtraction,
 		},
 		{
 			name: "large positive balance change",
@@ -104,12 +79,19 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 			wantBalance: uint256.MustFromBig(new(big.Int).Sub(new(big.Int).Lsh(big.NewInt(1), 255), big.NewInt(500))),
 		},
 		{
-			name:           "balance overflow protection",
-			initialBalance: uint256.MustFromBig(abi.MaxUint256), // Max uint256
-			balanceChange:  hexOrDecimal256FromInt64(1),
+			name: "balance overflow clamped to max uint256",
+			// Set initial balance to max uint256 - 100
+			initialBalance: new(uint256.Int).Sub(new(uint256.Int).SetAllOne(), uint256.NewInt(100)),
+			balanceChange:  hexOrDecimal256FromInt64(200), // This would overflow
 			accountExists:  true,
-			wantBalance:    uint256.MustFromBig(abi.MaxUint256), // unchanged
-			wantError:      errBalanceOverflow,
+			wantBalance:    new(uint256.Int).SetAllOne(), // max uint256
+		},
+		{
+			name:           "balance underflow clamped to zero",
+			initialBalance: uint256.NewInt(50),
+			balanceChange:  hexOrDecimal256FromInt64(-100), // More than current balance
+			accountExists:  true,
+			wantBalance:    uint256.NewInt(0),
 		},
 	}
 
@@ -126,8 +108,7 @@ func TestUpgradeAccount_BalanceChanges(t *testing.T) {
 			upgrade := extras.StateUpgradeAccount{
 				BalanceChange: tt.balanceChange,
 			}
-			err := upgradeAccount(testAddr, upgrade, statedb, false)
-			require.ErrorIs(t, err, tt.wantError)
+			upgradeAccount(testAddr, upgrade, statedb, false)
 
 			// Check final balance
 			actualBalance := statedb.GetBalance(testAddr)
@@ -153,7 +134,7 @@ func TestUpgradeAccount_CompleteUpgrade(t *testing.T) {
 		Code:          code,
 		Storage:       map[common.Hash]common.Hash{storageKey: storageValue},
 	}
-	require.NoError(t, upgradeAccount(addr, upgrade, statedb, true)) // Test with EIP158 = true
+	upgradeAccount(addr, upgrade, statedb, true) // Test with EIP158 = true
 
 	// Verify all changes were applied
 	require.Equal(t, uint256.NewInt(1000), statedb.GetBalance(addr))

@@ -22,6 +22,14 @@ func TestVerifyStateUpgrades(t *testing.T) {
 			BalanceChange: (*math.HexOrDecimal256)(common.Big1),
 		},
 	}
+	// Create a value that exceeds uint256 (2^256 + 1)
+	maxUint256 := new(big.Int).Lsh(big.NewInt(1), 256)
+	maxUint256.Sub(maxUint256, big.NewInt(1)) // 2^256 - 1
+	overflowValue := new(big.Int).Add(maxUint256, big.NewInt(2))
+
+	// Create a negative value that exceeds uint256 in absolute value
+	negativeOverflowValue := new(big.Int).Neg(overflowValue)
+
 	tests := []struct {
 		name          string
 		upgrades      []StateUpgrade
@@ -57,6 +65,60 @@ func TestVerifyStateUpgrades(t *testing.T) {
 				{BlockTimestamp: utils.NewUint64(0), StateUpgradeAccounts: modifiedAccounts},
 			},
 			expectedError: errStateUpgradeTimestampZero,
+		},
+		{
+			name: "balance change exceeds uint256",
+			upgrades: []StateUpgrade{
+				{
+					BlockTimestamp: utils.NewUint64(1),
+					StateUpgradeAccounts: map[common.Address]StateUpgradeAccount{
+						{1}: {
+							BalanceChange: (*math.HexOrDecimal256)(overflowValue),
+						},
+					},
+				},
+			},
+			expectedError: "exceeds uint256 bit length",
+		},
+		{
+			name: "negative balance change exceeds uint256",
+			upgrades: []StateUpgrade{
+				{
+					BlockTimestamp: utils.NewUint64(1),
+					StateUpgradeAccounts: map[common.Address]StateUpgradeAccount{
+						{1}: {
+							BalanceChange: (*math.HexOrDecimal256)(negativeOverflowValue),
+						},
+					},
+				},
+			},
+			expectedError: "exceeds uint256 bit length",
+		},
+		{
+			name: "max uint256 balance change is valid",
+			upgrades: []StateUpgrade{
+				{
+					BlockTimestamp: utils.NewUint64(1),
+					StateUpgradeAccounts: map[common.Address]StateUpgradeAccount{
+						{1}: {
+							BalanceChange: (*math.HexOrDecimal256)(maxUint256),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "negative max uint256 balance change is valid",
+			upgrades: []StateUpgrade{
+				{
+					BlockTimestamp: utils.NewUint64(1),
+					StateUpgradeAccounts: map[common.Address]StateUpgradeAccount{
+						{1}: {
+							BalanceChange: (*math.HexOrDecimal256)(new(big.Int).Neg(maxUint256)),
+						},
+					},
+				},
+			},
 		},
 	}
 	for _, tt := range tests {
