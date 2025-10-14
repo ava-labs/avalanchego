@@ -75,51 +75,26 @@ func TestRequest_HandleDispatchesToCorrectHandler(t *testing.T) {
 	const requestID uint32 = 42
 
 	tests := []struct {
-		name  string
-		build func() Request
-		check func(t *testing.T, h *recordingHandler, built Request)
+		name          string
+		req           Request
 	}{
 		{
 			name: "leafs_request",
-			build: func() Request {
-				return LeafsRequest{
-					Root:     common.Hash{1},
-					Start:    make([]byte, common.HashLength),
-					End:      make([]byte, common.HashLength),
-					Limit:    1,
-					NodeType: StateTrieNode,
-				}
-			},
-			check: func(t *testing.T, h *recordingHandler, built Request) {
-				require := require.New(t)
-				require.True(h.leafsCalled)
-				require.Equal(requestID, h.leafsArgs.requestID)
-				require.IsType(LeafsRequest{}, built)
+			req: LeafsRequest{
+				Root:     common.Hash{1},
+				Start:    make([]byte, common.HashLength),
+				End:      make([]byte, common.HashLength),
+				Limit:    1,
+				NodeType: StateTrieNode,
 			},
 		},
 		{
 			name: "block_request",
-			build: func() Request {
-				return BlockRequest{Hash: common.Hash{2}, Height: 3, Parents: 1}
-			},
-			check: func(t *testing.T, h *recordingHandler, built Request) {
-				require := require.New(t)
-				require.True(h.blockCalled)
-				require.Equal(requestID, h.blockArgs.requestID)
-				require.IsType(BlockRequest{}, built)
-			},
+			req:  BlockRequest{Hash: common.Hash{2}, Height: 3, Parents: 1},
 		},
 		{
 			name: "code_request",
-			build: func() Request {
-				return CodeRequest{Hashes: []common.Hash{{3}}}
-			},
-			check: func(t *testing.T, h *recordingHandler, built Request) {
-				require := require.New(t)
-				require.True(h.codeCalled)
-				require.Equal(requestID, h.codeArgs.requestID)
-				require.IsType(CodeRequest{}, built)
-			},
+			req:  CodeRequest{Hashes: []common.Hash{{3}}},
 		},
 	}
 
@@ -127,12 +102,20 @@ func TestRequest_HandleDispatchesToCorrectHandler(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			h := new(recordingHandler)
-			built := tc.build()
-
-			_, err := built.Handle(ctx, nodeID, requestID, h)
+			_, err := tc.req.Handle(ctx, nodeID, requestID, h)
 			require.NoError(t, err)
 
-			tc.check(t, h, built)
+			switch tc.req.(type) {
+			case LeafsRequest:
+				require.True(t, h.leafsCalled)
+				require.Equal(t, requestID, h.leafsArgs.requestID)
+			case BlockRequest:
+				require.True(t, h.blockCalled)
+				require.Equal(t, requestID, h.blockArgs.requestID)
+			case CodeRequest:
+				require.True(t, h.codeCalled)
+				require.Equal(t, requestID, h.codeArgs.requestID)
+			}
 		})
 	}
 }
