@@ -12,21 +12,21 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-// MaxCodeHashesPerRequest limits the number of code hashes per request to bound
-// bandwidth and CPU for verification.
-const MaxCodeHashesPerRequest = 5
+const (
+	// MaxCodeHashesPerRequest limits the number of code hashes per request to bound
+	// bandwidth and CPU for verification.
+	MaxCodeHashesPerRequest = 5
 
-var _ Request = LeafsRequest{}
+	StateTrieNode      = NodeType(1)
+	StateTrieKeyLength = common.HashLength
+)
+
+var _ Request = (*LeafsRequest)(nil)
 
 // NodeType outlines the trie that a leaf node belongs to
 // handlers.LeafsRequestHandler uses this information to determine
 // which trie type to fetch the information from
 type NodeType uint8
-
-const (
-	StateTrieNode      = NodeType(1)
-	StateTrieKeyLength = common.HashLength
-)
 
 // LeafsRequest is a request to receive trie leaves at specified Root within Start and End byte range
 // Limit outlines maximum number of leaves to returns starting at Start

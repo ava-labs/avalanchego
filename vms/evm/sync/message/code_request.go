@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ Request = CodeRequest{}
+var _ Request = (*CodeRequest)(nil)
 
 // CodeRequest is a request to retrieve a contract code with specified Hash
 type CodeRequest struct {
