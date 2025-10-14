@@ -38,7 +38,7 @@ var (
 // allowlist, readOnly behaviour, and gas cost. You should write your own
 // tests for specific cases.
 var(
-	tests = map[string]precompiletest.PrecompileTest{
+	tests = []precompiletest.PrecompileTest{
 		{{- $contract := .Contract}}
 		{{- $structs := .Structs}}
 		{{- range .Contract.Funcs}}
@@ -47,7 +47,8 @@ var(
 		{{- $roles := mkList "NoRole" "Enabled" "Manager" "Admin"}}
 		{{- range $role := $roles}}
 		{{- $fail := and (not $func.Original.IsConstant) (eq $role "NoRole")}}
-		"calling {{decapitalise $func.Normalized.Name}} from {{$role}} should {{- if $fail}} fail {{- else}} succeed{{- end}}":  {
+		{
+			Name:       "calling {{decapitalise $func.Normalized.Name}} from {{$role}} should {{- if $fail}} fail {{- else}} succeed{{- end}}",
 			Caller:     allowlisttest.Test{{$role}}Addr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -99,7 +100,8 @@ var(
 		{{- end}}
 		{{- end}}
 		{{- if not $func.Original.IsConstant}}
-		"readOnly {{decapitalise $func.Normalized.Name}} should fail": {
+		{
+			Name:   "readOnly {{decapitalise $func.Normalized.Name}} should fail",
 			Caller:	common.Address{1},
 			InputFn: func(t testing.TB) []byte {
 				{{- if len $func.Normalized.Inputs | lt 1}}
@@ -125,7 +127,8 @@ var(
 			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
 		{{- end}}
-		"insufficient gas for {{decapitalise $func.Normalized.Name}} should fail": {
+		{
+			Name:   "insufficient gas for {{decapitalise $func.Normalized.Name}} should fail",
 			Caller:	common.Address{1},
 			InputFn: func(t testing.TB) []byte {
 				{{- if len $func.Normalized.Inputs | lt 1}}
@@ -152,21 +155,24 @@ var(
 		},
 		{{- end}}
 		{{- if .Contract.Fallback}}
-		"insufficient gas for fallback should fail": {
+		{
+			Name:   "insufficient gas for fallback should fail",
 			Caller:	common.Address{1},
-			Input: []byte{},
+			Input:  []byte{},
 			SuppliedGas: {{.Contract.Type}}FallbackGasCost - 1,
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
-		"readOnly fallback should fail": {
+		{
+			Name:   "readOnly fallback should fail",
 			Caller:	common.Address{1},
 			Input: []byte{},
 			SuppliedGas: {{.Contract.Type}}FallbackGasCost,
 			ReadOnly:    true,
 			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
-		"fallback should succeed": {
+		{
+			Name: "fallback should succeed",
 			Caller:	common.Address{1},
 			Input: []byte{},
 			SuppliedGas: {{.Contract.Type}}FallbackGasCost,
@@ -191,8 +197,8 @@ func Test{{.Contract.Type}}Run(t *testing.T) {
 			allowlisttest.RunPrecompileWithAllowListTests(t, Module, tests)
 	{{- else}}
 	// Run tests.
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.Name, func(t *testing.T) {
 			test.Run(t, Module)
 		})
 	}

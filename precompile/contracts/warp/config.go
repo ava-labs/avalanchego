@@ -147,7 +147,7 @@ func (*Config) Accept(acceptCtx *precompileconfig.AcceptContext, blockHash commo
 func (*Config) PredicateGas(pred predicate.Predicate, rules precompileconfig.Rules) (uint64, error) {
 	gasConfig := CurrentGasConfig(rules)
 
-	totalGas := gasConfig.PerSignatureVerification
+	totalGas := gasConfig.VerifyPredicateBase
 	bytesGasCost, overflow := math.SafeMul(gasConfig.PerWarpMessageChunk, uint64(len(pred)))
 	if overflow {
 		return 0, fmt.Errorf("overflow calculating gas cost for %d warp message chunks", len(pred))

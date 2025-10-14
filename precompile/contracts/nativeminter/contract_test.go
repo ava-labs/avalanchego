@@ -22,8 +22,9 @@ import (
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
-var tests = map[string]precompiletest.PrecompileTest{
-	"calling mintNativeCoin from NoRole should fail": {
+var tests = []precompiletest.PrecompileTest{
+	{
+		Name:       "calling_mintNativeCoin_from_NoRole_should_fail",
 		Caller:     allowlisttest.TestNoRoleAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 		InputFn: func(t testing.TB) []byte {
@@ -36,7 +37,8 @@ var tests = map[string]precompiletest.PrecompileTest{
 		ReadOnly:    false,
 		ExpectedErr: ErrCannotMint.Error(),
 	},
-	"calling mintNativeCoin from Enabled should succeed": {
+	{
+		Name:       "calling_mintNativeCoin_from_Enabled_should_succeed",
 		Caller:     allowlisttest.TestEnabledAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 		InputFn: func(t testing.TB) []byte {
@@ -56,7 +58,8 @@ var tests = map[string]precompiletest.PrecompileTest{
 			assertNativeCoinMintedEvent(t, logs, allowlisttest.TestEnabledAddr, allowlisttest.TestEnabledAddr, common.Big1)
 		},
 	},
-	"initial mint funds": {
+	{
+		Name:       "initial_mint_funds",
 		Caller:     allowlisttest.TestEnabledAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 		Config: &Config{
@@ -69,7 +72,8 @@ var tests = map[string]precompiletest.PrecompileTest{
 			require.Equal(t, expected, stateDB.GetBalance(allowlisttest.TestEnabledAddr), "expected minted funds")
 		},
 	},
-	"calling mintNativeCoin from Manager should succeed": {
+	{
+		Name:       "calling_mintNativeCoin_from_Manager_should_succeed",
 		Caller:     allowlisttest.TestManagerAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 		InputFn: func(t testing.TB) []byte {
@@ -89,7 +93,8 @@ var tests = map[string]precompiletest.PrecompileTest{
 			assertNativeCoinMintedEvent(t, logs, allowlisttest.TestManagerAddr, allowlisttest.TestEnabledAddr, common.Big1)
 		},
 	},
-	"mint funds from admin address": {
+	{
+		Name:       "mint_funds_from_admin_address",
 		Caller:     allowlisttest.TestAdminAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 		InputFn: func(t testing.TB) []byte {
@@ -109,7 +114,8 @@ var tests = map[string]precompiletest.PrecompileTest{
 			assertNativeCoinMintedEvent(t, logs, allowlisttest.TestAdminAddr, allowlisttest.TestAdminAddr, common.Big1)
 		},
 	},
-	"mint max big funds": {
+	{
+		Name:       "mint_max_big_funds",
 		Caller:     allowlisttest.TestAdminAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 		InputFn: func(t testing.TB) []byte {
@@ -129,7 +135,8 @@ var tests = map[string]precompiletest.PrecompileTest{
 			assertNativeCoinMintedEvent(t, logs, allowlisttest.TestAdminAddr, allowlisttest.TestAdminAddr, math.MaxBig256)
 		},
 	},
-	"readOnly mint with noRole fails": {
+	{
+		Name:       "readOnly_mint_with_noRole_fails",
 		Caller:     allowlisttest.TestNoRoleAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 		InputFn: func(t testing.TB) []byte {
@@ -142,7 +149,8 @@ var tests = map[string]precompiletest.PrecompileTest{
 		ReadOnly:    true,
 		ExpectedErr: vm.ErrWriteProtection.Error(),
 	},
-	"readOnly mint with allow role fails": {
+	{
+		Name:       "readOnly_mint_with_allow_role_fails",
 		Caller:     allowlisttest.TestEnabledAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 		InputFn: func(t testing.TB) []byte {
@@ -155,7 +163,8 @@ var tests = map[string]precompiletest.PrecompileTest{
 		ReadOnly:    true,
 		ExpectedErr: vm.ErrWriteProtection.Error(),
 	},
-	"readOnly mint with admin role fails": {
+	{
+		Name:       "readOnly_mint_with_admin_role_fails",
 		Caller:     allowlisttest.TestAdminAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 		InputFn: func(t testing.TB) []byte {
@@ -168,7 +177,8 @@ var tests = map[string]precompiletest.PrecompileTest{
 		ReadOnly:    true,
 		ExpectedErr: vm.ErrWriteProtection.Error(),
 	},
-	"insufficient gas mint from admin": {
+	{
+		Name:       "insufficient_gas_mint_from_admin",
 		Caller:     allowlisttest.TestAdminAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 		InputFn: func(t testing.TB) []byte {
@@ -181,7 +191,8 @@ var tests = map[string]precompiletest.PrecompileTest{
 		ReadOnly:    false,
 		ExpectedErr: vm.ErrOutOfGas.Error(),
 	},
-	"mint doesn't log pre-Durango": {
+	{
+		Name:       "mint_does_not_log_pre_Durango",
 		Caller:     allowlisttest.TestEnabledAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 		ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
@@ -203,7 +214,8 @@ var tests = map[string]precompiletest.PrecompileTest{
 			require.Empty(t, logs)
 		},
 	},
-	"mint with extra padded bytes should fail pre-Durango": {
+	{
+		Name:       "mint_with_extra_padded_bytes_should_fail_pre_Durango",
 		Caller:     allowlisttest.TestEnabledAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 		ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
@@ -224,7 +236,8 @@ var tests = map[string]precompiletest.PrecompileTest{
 		ReadOnly:    false,
 		ExpectedErr: ErrInvalidLen.Error(),
 	},
-	"mint with extra padded bytes should succeed with Durango": {
+	{
+		Name:       "mint_with_extra_padded_bytes_should_succeed_with_Durango",
 		Caller:     allowlisttest.TestEnabledAddr,
 		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 		ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {

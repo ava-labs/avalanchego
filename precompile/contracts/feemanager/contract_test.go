@@ -57,8 +57,9 @@ var (
 		BlockGasCostStep: new(big.Int),
 	}
 	testBlockNumber = big.NewInt(7)
-	tests           = map[string]precompiletest.PrecompileTest{
-		"set config from no role fails": {
+	tests           = []precompiletest.PrecompileTest{
+		{
+			Name:       "set_config_from_no_role_fails",
 			Caller:     allowlisttest.TestNoRoleAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -71,7 +72,8 @@ var (
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotChangeFee.Error(),
 		},
-		"set config from enabled address succeeds and emits logs": {
+		{
+			Name:       "set_config_from_enabled_address_succeeds_and_emits_logs",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -91,7 +93,8 @@ var (
 				assertFeeEvent(t, logs, allowlisttest.TestEnabledAddr, zeroFeeConfig, testFeeConfig)
 			},
 		},
-		"set config from manager succeeds": {
+		{
+			Name:       "set_config_from_manager_succeeds",
 			Caller:     allowlisttest.TestManagerAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -111,7 +114,8 @@ var (
 				assertFeeEvent(t, logs, allowlisttest.TestManagerAddr, zeroFeeConfig, testFeeConfig)
 			},
 		},
-		"set invalid config from enabled address": {
+		{
+			Name:       "set_invalid_config_from_enabled_address",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -133,7 +137,8 @@ var (
 				require.Equal(t, testFeeConfig, feeConfig)
 			},
 		},
-		"set config from admin address": {
+		{
+			Name:       "set_config_from_admin_address",
 			Caller:     allowlisttest.TestAdminAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -159,7 +164,8 @@ var (
 				assertFeeEvent(t, logs, allowlisttest.TestAdminAddr, zeroFeeConfig, testFeeConfig)
 			},
 		},
-		"get fee config from non-enabled address": {
+		{
+			Name:   "get_fee_config_from_non_enabled_address",
 			Caller: allowlisttest.TestNoRoleAddr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
 				blockContext := contract.NewMockBlockContext(gomock.NewController(t))
@@ -189,7 +195,8 @@ var (
 				require.EqualValues(t, big.NewInt(6), lastChangedAt)
 			},
 		},
-		"get initial fee config": {
+		{
+			Name:       "get_initial_fee_config",
 			Caller:     allowlisttest.TestNoRoleAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -220,7 +227,8 @@ var (
 				require.EqualValues(t, testBlockNumber, lastChangedAt)
 			},
 		},
-		"get last changed at from non-enabled address": {
+		{
+			Name:   "get_last_changed_at_from_non_enabled_address",
 			Caller: allowlisttest.TestNoRoleAddr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
 				blockContext := contract.NewMockBlockContext(gomock.NewController(t))
@@ -250,7 +258,8 @@ var (
 				require.Equal(t, testBlockNumber, lastChangedAt)
 			},
 		},
-		"readOnly setFeeConfig with noRole fails": {
+		{
+			Name:       "readOnly_setFeeConfig_with_noRole_fails",
 			Caller:     allowlisttest.TestNoRoleAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -263,7 +272,8 @@ var (
 			ReadOnly:    true,
 			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
-		"readOnly setFeeConfig with allow role fails": {
+		{
+			Name:       "readOnly_setFeeConfig_with_allow_role_fails",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -276,7 +286,8 @@ var (
 			ReadOnly:    true,
 			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
-		"readOnly setFeeConfig with admin role fails": {
+		{
+			Name:       "readOnly_setFeeConfig_with_admin_role_fails",
 			Caller:     allowlisttest.TestAdminAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -289,7 +300,8 @@ var (
 			ReadOnly:    true,
 			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
-		"insufficient gas setFeeConfig from admin": {
+		{
+			Name:       "insufficient_gas_setFeeConfig_from_admin",
 			Caller:     allowlisttest.TestAdminAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -302,7 +314,8 @@ var (
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
-		"set config with extra padded bytes should fail before Durango": {
+		{
+			Name:       "set_config_with_extra_padded_bytes_should_fail_before_Durango",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -325,7 +338,8 @@ var (
 				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
 			},
 		},
-		"set config with extra padded bytes should succeed with Durango": {
+		{
+			Name:       "set_config_with_extra_padded_bytes_should_succeed_with_Durango",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -358,7 +372,8 @@ var (
 			},
 		},
 		// from https://github.com/ava-labs/subnet-evm/issues/487
-		"setFeeConfig regression test should fail before Durango": {
+		{
+			Name:       "setFeeConfig_regression_test_should_fail_before_Durango",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			Input:      common.Hex2Bytes(regressionBytes),
@@ -375,7 +390,8 @@ var (
 				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
 			},
 		},
-		"setFeeConfig regression test should succeed after Durango": {
+		{
+			Name:       "setFeeConfig_regression_test_should_succeed_after_Durango",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			Input:      common.Hex2Bytes(regressionBytes),
@@ -401,7 +417,8 @@ var (
 				assertFeeEvent(t, logs, allowlisttest.TestEnabledAddr, zeroFeeConfig, regressionFeeConfig)
 			},
 		},
-		"set config should not emit event before Durango": {
+		{
+			Name:       "set_config_should_not_emit_event_before_Durango",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {

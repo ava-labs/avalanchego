@@ -23,8 +23,9 @@ import (
 
 var (
 	rewardAddress = common.HexToAddress("0x0123")
-	tests         = map[string]precompiletest.PrecompileTest{
-		"set allow fee recipients from no role fails": {
+	tests         = []precompiletest.PrecompileTest{
+		{
+			Name:       "set_allow_fee_recipients_from_no_role_fails",
 			Caller:     allowlisttest.TestNoRoleAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -37,7 +38,8 @@ var (
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotAllowFeeRecipients.Error(),
 		},
-		"set reward address from no role fails": {
+		{
+			Name:       "set_reward_address_from_no_role_fails",
 			Caller:     allowlisttest.TestNoRoleAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -50,7 +52,8 @@ var (
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotSetRewardAddress.Error(),
 		},
-		"disable rewards from no role fails": {
+		{
+			Name:       "disable_rewards_from_no_role_fails",
 			Caller:     allowlisttest.TestNoRoleAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -63,7 +66,8 @@ var (
 			ReadOnly:    false,
 			ExpectedErr: ErrCannotDisableRewards.Error(),
 		},
-		"set allow fee recipients from enabled succeeds": {
+		{
+			Name:       "set_allow_fee_recipients_from_enabled_succeeds",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -83,7 +87,8 @@ var (
 				assertFeeRecipientsAllowed(t, logs, allowlisttest.TestEnabledAddr)
 			},
 		},
-		"set fee recipients should not emit events pre-Durango": {
+		{
+			Name:       "set_fee_recipients_should_not_emit_events_pre_Durango",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -108,7 +113,8 @@ var (
 				require.Empty(t, logs)
 			},
 		},
-		"set reward address from enabled succeeds": {
+		{
+			Name:       "set_reward_address_from_enabled_succeeds",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -129,7 +135,8 @@ var (
 				assertRewardAddressChanged(t, logs, allowlisttest.TestEnabledAddr, common.Address{}, rewardAddress)
 			},
 		},
-		"set allow fee recipients from manager succeeds": {
+		{
+			Name:       "set_allow_fee_recipients_from_manager_succeeds",
 			Caller:     allowlisttest.TestManagerAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -149,7 +156,8 @@ var (
 				assertFeeRecipientsAllowed(t, logs, allowlisttest.TestManagerAddr)
 			},
 		},
-		"set reward address from manager succeeds": {
+		{
+			Name:       "set_reward_address_from_manager_succeeds",
 			Caller:     allowlisttest.TestManagerAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -170,7 +178,8 @@ var (
 				assertRewardAddressChanged(t, logs, allowlisttest.TestManagerAddr, common.Address{}, rewardAddress)
 			},
 		},
-		"change reward address should not emit events pre-Durango": {
+		{
+			Name:       "change_reward_address_should_not_emit_events_pre_Durango",
 			Caller:     allowlisttest.TestManagerAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -195,7 +204,8 @@ var (
 				require.Empty(t, logs)
 			},
 		},
-		"disable rewards from manager succeeds": {
+		{
+			Name:       "disable_rewards_from_manager_succeeds",
 			Caller:     allowlisttest.TestManagerAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -216,7 +226,8 @@ var (
 				assertRewardsDisabled(t, logs, allowlisttest.TestManagerAddr)
 			},
 		},
-		"disable rewards from enabled succeeds": {
+		{
+			Name:       "disable_rewards_from_enabled_succeeds",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -237,7 +248,8 @@ var (
 				assertRewardsDisabled(t, logs, allowlisttest.TestEnabledAddr)
 			},
 		},
-		"disable rewards should not emit event pre-Durango": {
+		{
+			Name:       "disable_rewards_should_not_emit_event_pre_Durango",
 			Caller:     allowlisttest.TestManagerAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -262,7 +274,8 @@ var (
 				require.Empty(t, logs)
 			},
 		},
-		"get current reward address from no role succeeds": {
+		{
+			Name:   "get_current_reward_address_from_no_role_succeeds",
 			Caller: allowlisttest.TestNoRoleAddr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
 				allowlisttest.SetDefaultRoles(Module.Address)(t, state)
@@ -284,7 +297,8 @@ var (
 				return res
 			}(),
 		},
-		"get are fee recipients allowed from no role succeeds": {
+		{
+			Name:   "get_are_fee_recipients_allowed_from_no_role_succeeds",
 			Caller: allowlisttest.TestNoRoleAddr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
 				allowlisttest.SetDefaultRoles(Module.Address)(t, state)
@@ -305,7 +319,8 @@ var (
 				return res
 			}(),
 		},
-		"get initial config with address": {
+		{
+			Name:       "get_initial_config_with_address",
 			Caller:     allowlisttest.TestNoRoleAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -328,7 +343,8 @@ var (
 				return res
 			}(),
 		},
-		"get initial config with allow fee recipients enabled": {
+		{
+			Name:       "get_initial_config_with_allow_fee_recipients_enabled",
 			Caller:     allowlisttest.TestNoRoleAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -351,7 +367,8 @@ var (
 				return res
 			}(),
 		},
-		"readOnly allow fee recipients with allowed role fails": {
+		{
+			Name:       "readOnly_allow_fee_recipients_with_allowed_role_fails",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -364,7 +381,8 @@ var (
 			ReadOnly:    true,
 			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
-		"readOnly set reward address with allowed role fails": {
+		{
+			Name:       "readOnly_set_reward_address_with_allowed_role_fails",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -377,7 +395,8 @@ var (
 			ReadOnly:    true,
 			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
-		"insufficient gas set reward address from allowed role": {
+		{
+			Name:       "insufficient_gas_set_reward_address_from_allowed_role",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -390,7 +409,8 @@ var (
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
-		"insufficient gas allow fee recipients from allowed role": {
+		{
+			Name:       "insufficient_gas_allow_fee_recipients_from_allowed_role",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -403,7 +423,8 @@ var (
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
-		"insufficient gas read current reward address from allowed role": {
+		{
+			Name:       "insufficient_gas_read_current_reward_address_from_allowed_role",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
@@ -416,7 +437,8 @@ var (
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
-		"insufficient gas are fee recipients allowed from allowed role": {
+		{
+			Name:       "insufficient_gas_are_fee_recipients_allowed_from_allowed_role",
 			Caller:     allowlisttest.TestEnabledAddr,
 			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
 			InputFn: func(t testing.TB) []byte {
