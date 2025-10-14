@@ -205,7 +205,7 @@ func benchmarkReexecuteRange(
 	case metricsServerOnly:
 		startServer(b, log, prefixGatherer)
 	case metricsFull:
-		collectRegistry(b, log, "c-chain-reexecution", prefixGatherer, labels)
+		startServerAndCollector(b, log, "c-chain-reexecution", prefixGatherer, labels)
 	case metricsDisabled:
 	}
 
@@ -589,11 +589,11 @@ func startServer(
 	})
 }
 
-// collectRegistry starts a Prometheus server for the provided gatherer and
+// startServerAndCollector starts a Prometheus server for the provided gatherer and
 // starts a Prometheus collector configured to scrape the Prometheus server.
-// collectRegistry also attaches the provided labels + Github labels if
+// startServerAndCollector also attaches the provided labels + Github labels if
 // available to the collected metrics.
-func collectRegistry(tb testing.TB, log logging.Logger, name string, gatherer prometheus.Gatherer, labels map[string]string) {
+func startServerAndCollector(tb testing.TB, log logging.Logger, name string, gatherer prometheus.Gatherer, labels map[string]string) {
 	r := require.New(tb)
 
 	startPromCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
