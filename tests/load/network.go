@@ -4,8 +4,6 @@
 package load
 
 import (
-	"fmt"
-
 	"github.com/ava-labs/libevm/ethclient"
 	"github.com/stretchr/testify/require"
 
@@ -13,52 +11,41 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
-// DevnetConfig holds the configuration for connecting to an existing devnet.
-// It specifies the private keys to use for load generation and the WebSocket
-// URIs of the nodes to connect to.
-type DevnetConfig struct {
-	PrivateKeys []string `json:"private-keys"`
-	NodeWsURIs  []string `json:"node-ws-uris"`
+type WorkerConfig struct {
+	PrivateKey string `json:"private-key"`
+	NodeWsURI  string `json:"node-ws-uri"`
 }
 
-// ParseKeys converts the string representation of private keys into their
-// concrete types (*secp256k1.PrivateKeys). Returns an error if any key fails to parse.
-func (d DevnetConfig) ParseKeys() ([]*secp256k1.PrivateKey, error) {
-	keys := make([]*secp256k1.PrivateKey, len(d.PrivateKeys))
-	for i, pk := range d.PrivateKeys {
-		key := new(secp256k1.PrivateKey)
-		if err := key.UnmarshalText([]byte(pk)); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal private key: %w", err)
-		}
-
-		keys[i] = key
-	}
-
-	return keys, nil
+// NetworkConfig holds the configuration for connecting to an existing devnet.
+// It specifies the private keys to use for load generation and the WebSocket
+// URIs of the nodes to connect to.
+type NetworkConfig struct {
+	WorkerConfigs []WorkerConfig `json:"worker-configs"`
 }
 
 // ConnectNetwork connects to an existing network and returns a list of workers
-// that can interact with the network.
-func ConnectNetwork(tc tests.TestContext, devnetConfig DevnetConfig) []Worker {
+// who can interact with the network.
+func ConnectNetwork(tc tests.TestContext, networkCfg NetworkConfig) []Worker {
 	require := require.New(tc)
 
-	keys, err := devnetConfig.ParseKeys()
-	require.NoError(err)
+	workers := make([]Worker, len(networkCfg.WorkerConfigs))
 
-	wsURIs := devnetConfig.NodeWsURIs
-	workers := make([]Worker, len(keys))
-	for i, key := range keys {
-		wsURI := wsURIs[i%len(wsURIs)]
-		client, err := ethclient.Dial(wsURI)
+	ctx := tc.GetDefaultContextParent()
+	for i, workerCfg := range networkCfg.WorkerConfigs {
+		rawKey := workerCfg.PrivateKey
+		pk := new(secp256k1.PrivateKey)
+		require.NoError(pk.UnmarshalText([]byte(rawKey)))
+
+		client, err := ethclient.Dial(workerCfg.NodeWsURI)
 		require.NoError(err)
 
-		nonce, err := client.NonceAt(tc.DefaultContext(), key.EthAddress(), nil)
+		nonce, err := client.NonceAt(ctx, pk.EthAddress(), nil)
 		require.NoError(err)
 
 		workers[i] = Worker{
-			PrivKey: key.ToECDSA(),
-			Client:  client,
+			PrivKey: pk.ToECDSA(),
 			Nonce:   nonce,
+			Client:  client,
 		}
 	}
 

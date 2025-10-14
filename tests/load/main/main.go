@@ -107,7 +107,7 @@ func main() {
 		b, err := os.ReadFile(devnetConfigPath)
 		require.NoError(err)
 
-		var devnetConfig load.DevnetConfig
+		var devnetConfig load.NetworkConfig
 		require.NoError(json.Unmarshal(b, &devnetConfig))
 
 		workers = load.ConnectNetwork(tc, devnetConfig)

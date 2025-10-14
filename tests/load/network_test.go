@@ -34,7 +34,7 @@ var _ = ginkgo.Describe("[Devnet Connection]", func() {
 	require := require.New(tc)
 	ctx := context.Background()
 
-	var devnetConfig DevnetConfig
+	var devnetConfig NetworkConfig
 
 	ginkgo.BeforeEach(func() {
 		numNodes, err := flagVars.NodeCount()
@@ -55,18 +55,18 @@ var _ = ginkgo.Describe("[Devnet Connection]", func() {
 		wsURIs, err := tmpnet.GetNodeWebsocketURIs(network.Nodes, blockchainID)
 		require.NoError(err)
 
-		pks := make([]string, len(keys))
+		workerCfgs := make([]WorkerConfig, len(keys))
 		for i, key := range keys {
 			b, err := key.MarshalJSON()
 			require.NoError(err)
 
-			pks[i] = string(b)
+			workerCfgs[i] = WorkerConfig{
+				PrivateKey: string(b),
+				NodeWsURI:  wsURIs[i%len(workerCfgs)],
+			}
 		}
 
-		devnetConfig = DevnetConfig{
-			NodeWsURIs:  wsURIs,
-			PrivateKeys: pks,
-		}
+		devnetConfig = NetworkConfig{WorkerConfigs: workerCfgs}
 	})
 
 	ginkgo.It("can connect to an existing network", func() {
