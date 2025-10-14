@@ -544,7 +544,7 @@ func (n *network) KnownPeers() ([]byte, []byte) {
 // There are 3 types of responses:
 //
 // - Respond with subnet IPs tracked by both ourselves and the peer
-//   - We do not consider ourself to be a primary network validator
+//   - We do not consider ourself to be a primary network validator and do not track all subnets
 //
 // - Respond with all subnet IPs
 //   - The peer requests all peers
@@ -552,7 +552,7 @@ func (n *network) KnownPeers() ([]byte, []byte) {
 //
 // - Respond with subnet IPs tracked by the peer
 //   - The peer does not request all peers
-//   - We believe ourself to be a primary network validator
+//   - We believe ourself to be a primary network validator or we track all subnets
 //
 // The reason we allow the peer to request all peers is so that we can avoid
 // sending unnecessary data in the case that we consider them a primary network
