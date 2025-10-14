@@ -47,12 +47,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-const (
-	metricsDisabled   = "disabled"
-	metricsServerOnly = "server-only"
-	metricsFull       = "full"
-)
-
 var (
 	mainnetXChainID    = ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM")
 	mainnetCChainID    = ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5")
@@ -69,7 +63,9 @@ var (
 	chanSizeArg        int
 	executionTimeout   time.Duration
 	labelsArg          string
-	metricsModeArg     string
+
+	metricsServerEnabledArg    bool
+	metricsCollectorEnabledArg bool
 
 	networkUUID string = uuid.NewString()
 	labels             = map[string]string{
@@ -99,12 +95,6 @@ var (
 	configBytesArg []byte
 )
 
-type metricsMode string
-
-func (m metricsMode) isValid() bool {
-	return m == metricsDisabled || m == metricsServerOnly || m == metricsFull
-}
-
 func TestMain(m *testing.M) {
 	evm.RegisterAllLibEVMExtras()
 
@@ -115,8 +105,8 @@ func TestMain(m *testing.M) {
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
-	metricsModes := strings.Join([]string{metricsDisabled, metricsServerOnly, metricsFull}, ", ")
-	flag.StringVar(&metricsModeArg, "metrics-mode", metricsDisabled, fmt.Sprintf("Specifies the type of metrics configuration. Options include %s.", metricsModes))
+	flag.BoolVar(&metricsServerEnabledArg, "metrics-server-enabled", false, "Whether to enable the metrics server.")
+	flag.BoolVar(&metricsCollectorEnabledArg, "metrics-collector-enabled", false, "Whether to enable the metrics collector (if true, then metrics-server-enabled must be true as well).")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
@@ -130,9 +120,8 @@ func TestMain(m *testing.M) {
 
 	flag.Parse()
 
-	mode := metricsMode(metricsModeArg)
-	if !mode.isValid() {
-		fmt.Fprintf(os.Stderr, "invalid metrics mode %q. Valid options include %s. \n", metricsModeArg, metricsModes)
+	if metricsCollectorEnabledArg && !metricsServerEnabledArg {
+		fmt.Fprint(os.Stderr, "metrics collector is enabled but metrics server is disabled.\n")
 		os.Exit(1)
 	}
 
@@ -169,7 +158,8 @@ func BenchmarkReexecuteRange(b *testing.B) {
 			startBlockArg,
 			endBlockArg,
 			chanSizeArg,
-			metricsMode(metricsModeArg),
+			metricsServerEnabledArg,
+			metricsCollectorEnabledArg,
 		)
 	})
 }
@@ -182,7 +172,8 @@ func benchmarkReexecuteRange(
 	startBlock uint64,
 	endBlock uint64,
 	chanSize int,
-	metricsMode metricsMode,
+	metricsServerEnabled bool,
+	metricsCollectorEnabled bool,
 ) {
 	r := require.New(b)
 	ctx := context.Background()
@@ -201,12 +192,12 @@ func benchmarkReexecuteRange(
 
 	log := tests.NewDefaultLogger("c-chain-reexecution")
 
-	switch metricsMode {
-	case metricsServerOnly:
-		startServer(b, log, prefixGatherer)
-	case metricsFull:
-		startServerAndCollector(b, log, "c-chain-reexecution", prefixGatherer, labels)
-	case metricsDisabled:
+	if metricsServerEnabled {
+		if metricsCollectorEnabled {
+			startServerAndCollector(b, log, "c-chain-reexecution", prefixGatherer, labels)
+		} else {
+			startServer(b, log, prefixGatherer)
+		}
 	}
 
 	var (
