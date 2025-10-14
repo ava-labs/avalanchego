@@ -3566,8 +3566,10 @@ func restartVM(tvm *testVM, tvmConfig testVMConfig) (*testVM, error) {
 }
 
 func TestWaitForEvent(t *testing.T) {
+	fortunaFork := upgradetest.Fortuna
 	for _, testCase := range []struct {
 		name     string
+		Fork     *upgradetest.Fork
 		testCase func(*testing.T, *VM)
 	}{
 		{
@@ -3634,8 +3636,10 @@ func TestWaitForEvent(t *testing.T) {
 				wg.Wait()
 			},
 		},
+		// TODO (ceyonur): remove this test after Granite is activated.
 		{
-			name: "WaitForEvent does not wait to build on a new block",
+			name: "WaitForEvent does not wait for new block to be built in fortuna",
+			Fork: &fortunaFork,
 			testCase: func(t *testing.T, vm *VM) {
 				signedTx := newSignedLegacyTx(t, vm.chainConfig, testKeys[0].ToECDSA(), 0, &testEthAddrs[1], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
 				blk, err := IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
@@ -3661,8 +3665,10 @@ func TestWaitForEvent(t *testing.T) {
 				wg.Wait()
 			},
 		},
+		// TODO (ceyonur): remove this test after Granite is activated.
 		{
-			name: "WaitForEvent waits for a delay with a retry",
+			name: "WaitForEvent waits for a delay with a retry in fortuna",
+			Fork: &fortunaFork,
 			testCase: func(t *testing.T, vm *VM) {
 				lastBuildBlockTime := time.Now()
 				signedTx := newSignedLegacyTx(t, vm.chainConfig, testKeys[0].ToECDSA(), 0, &testEthAddrs[1], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
@@ -3682,23 +3688,22 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
-					require.NoError(t, err)
-					require.Equal(t, commonEng.PendingTxs, msg)
-					require.GreaterOrEqual(t, time.Since(lastBuildBlockTime), minBlockBuildingRetryDelay)
+					assert.NoError(t, err)
+					assert.Equal(t, commonEng.PendingTxs, msg)
+					assert.GreaterOrEqual(t, time.Since(lastBuildBlockTime), RetryDelay)
 				}()
 				wg.Wait()
 			},
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			genesis := &core.Genesis{}
-			require.NoError(t, genesis.UnmarshalJSON([]byte(genesisJSONSubnetEVM)))
-			genesisJSON, err := genesis.MarshalJSON()
-			require.NoError(t, err)
+			fork := upgradetest.Latest
+			if testCase.Fork != nil {
+				fork = *testCase.Fork
+			}
 			tvm := newVM(t, testVMConfig{
-				genesisJSON: string(genesisJSON),
+				fork: &fork,
 			}).vm
-
 			testCase.testCase(t, tvm)
 			tvm.Shutdown(context.Background())
 		})

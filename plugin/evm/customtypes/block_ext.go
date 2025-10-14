@@ -5,6 +5,7 @@ package customtypes
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 
@@ -35,4 +36,11 @@ func BlockMinDelayExcess(b *ethtypes.Block) *acp226.DelayExcess {
 	}
 	cp := *e
 	return &cp
+}
+
+func BlockTime(eth *ethtypes.Header) time.Time {
+	if t := GetHeaderExtra(eth).TimeMilliseconds; t != nil {
+		return time.UnixMilli(int64(*t))
+	}
+	return time.Unix(int64(eth.Time), 0)
 }

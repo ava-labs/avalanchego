@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/utils/lock"
+	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
@@ -18,18 +19,20 @@ import (
 
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/core/txpool"
+	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
 
 	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 const (
-	// Minimum amount of time to wait after building a block before attempting to build a block
-	// a second time without changing the contents of the mempool.
-	minBlockBuildingRetryDelay = 500 * time.Millisecond
+	// Minimum amount of time to wait to retry building a block after a failed attempt.
+	// It is assumed that the first block building attempt is already after the minimum delay time.
+	RetryDelay = 100 * time.Millisecond
 )
 
 type blockBuilder struct {
-	ctx *snow.Context
+	clock *mockable.Clock
+	ctx   *snow.Context
 
 	txPool *txpool.TxPool
 
@@ -52,6 +55,7 @@ func (vm *VM) NewBlockBuilder() *blockBuilder {
 		txPool:       vm.txPool,
 		shutdownChan: vm.shutdownChan,
 		shutdownWg:   &vm.shutdownWg,
+		clock:        vm.clock,
 	}
 	b.pendingSignal = lock.NewCond(&b.buildBlockLock)
 	return b
@@ -61,7 +65,7 @@ func (vm *VM) NewBlockBuilder() *blockBuilder {
 func (b *blockBuilder) handleGenerateBlock(currentParentHash common.Hash) {
 	b.buildBlockLock.Lock()
 	defer b.buildBlockLock.Unlock()
-	b.lastBuildTime = time.Now()
+	b.lastBuildTime = b.clock.Time()
 	b.lastBuildParentHash = currentParentHash
 }
 
@@ -113,21 +117,19 @@ func (b *blockBuilder) waitForEvent(ctx context.Context, currentHeader *types.He
 	if err != nil {
 		return 0, err
 	}
-	timeSinceLastBuildTime := time.Since(lastBuildTime)
-	isRetry := lastBuildParentHash == currentHeader.ParentHash
-	// 1. if this is not a retry
-	// 2. if this is the first time we try to build a block
-	// 3. if the time since the last build is greater than the minimum retry delay
-	// then we can build a block immediately.
-	if !isRetry || lastBuildTime.IsZero() || timeSinceLastBuildTime >= minBlockBuildingRetryDelay {
-		b.ctx.Log.Debug("Last time we built a block was long enough ago or this is not a retry, no need to wait",
-			zap.Duration("timeSinceLastBuildTime", timeSinceLastBuildTime),
-			zap.Bool("isRetry", isRetry),
-		)
+	timeUntilNextBuild := b.calculateBlockBuildingDelay(
+		lastBuildTime,
+		lastBuildParentHash,
+		currentHeader,
+	)
+	if timeUntilNextBuild <= 0 {
+		b.ctx.Log.Debug("Last time we built a block was long enough ago or this is not a retry, no need to wait")
 		return commonEng.PendingTxs, nil
 	}
-	timeUntilNextBuild := minBlockBuildingRetryDelay - timeSinceLastBuildTime
-	log.Debug("Last time we built a block was too recent, waiting", "timeUntilNextBuild", timeUntilNextBuild)
+
+	b.ctx.Log.Debug("Last time we built a block was too recent, waiting",
+		zap.Duration("timeUntilNextBuild", timeUntilNextBuild),
+	)
 	select {
 	case <-ctx.Done():
 		return 0, ctx.Err()
@@ -147,4 +149,40 @@ func (b *blockBuilder) waitForNeedToBuild(ctx context.Context) (time.Time, commo
 		}
 	}
 	return b.lastBuildTime, b.lastBuildParentHash, nil
+}
+
+// calculateBlockBuildingDelay calculates the delay needed before building the next block.
+func (b *blockBuilder) calculateBlockBuildingDelay(
+	lastBuildTime time.Time,
+	lastBuildParentHash common.Hash,
+	currentHeader *types.Header,
+) time.Duration {
+	var nextBuildTime time.Time
+	isRetry := lastBuildParentHash == currentHeader.ParentHash && !lastBuildTime.IsZero() // if last build time is zero, this is not a retry
+	// If this is a retry, we already have waited for the minimum next block time in a previous attempt,
+	// and only need to wait for the retry delay.
+	if isRetry {
+		nextBuildTime = lastBuildTime.Add(RetryDelay)
+	} else {
+		// If this is not a retry, we need to wait for the minimum next block time.
+		nextBuildTime = minNextBlockTime(currentHeader)
+	}
+	remainingDelay := nextBuildTime.Sub(b.clock.Time())
+	return max(remainingDelay, 0)
+}
+
+// minNextBlockTime calculates the minimum next block time based on the current header.
+func minNextBlockTime(parent *types.Header) time.Time {
+	parentExtra := customtypes.GetHeaderExtra(parent)
+	// If the parent header has no min delay excess, there is nothing to wait for, because the rule does not apply
+	// to the block to be built.
+	if parentExtra.MinDelayExcess == nil {
+		return time.Time{}
+	}
+	parentTime := customtypes.BlockTime(parent)
+	acp226DelayExcess := *parentExtra.MinDelayExcess
+	// parent's delay excess is already verified by consensus
+	// so this should not overflow
+	requiredDelay := time.Duration(acp226DelayExcess.Delay()) * time.Millisecond
+	return parentTime.Add(requiredDelay)
 }
