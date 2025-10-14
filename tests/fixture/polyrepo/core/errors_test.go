@@ -38,9 +38,14 @@ func TestErrRepoAlreadyExists(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 
-	expectedMsg := "repository avalanchego already exists at /some/path (use --force to update)"
+	expectedMsg := "repository already exists: avalanchego already exists at /some/path (use --force to update)"
 	if err.Error() != expectedMsg {
 		t.Errorf("expected message '%s', got '%s'", expectedMsg, err.Error())
+	}
+
+	// Also test the IsErrRepoAlreadyExists function
+	if !IsErrRepoAlreadyExists(err) {
+		t.Error("expected IsErrRepoAlreadyExists to return true")
 	}
 }
 
