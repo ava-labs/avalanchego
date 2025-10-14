@@ -192,12 +192,11 @@ func benchmarkReexecuteRange(
 
 	log := tests.NewDefaultLogger("c-chain-reexecution")
 
-	if metricsServerEnabled {
-		if metricsCollectorEnabled {
-			startServerAndCollector(b, log, "c-chain-reexecution", prefixGatherer, labels)
-		} else {
-			startServer(b, log, prefixGatherer)
-		}
+	switch {
+	case metricsServerEnabled && metricsCollectorEnabled:
+		startServerAndCollector(b, log, "c-chain-reexecution", prefixGatherer, labels)
+	case metricsServerEnabled:
+		startServer(b, log, prefixGatherer)
 	}
 
 	var (
