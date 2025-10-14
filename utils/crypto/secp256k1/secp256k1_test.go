@@ -179,11 +179,11 @@ func TestPrivateKeySECP256K1RUnmarshalText(t *testing.T) {
 	key, err := NewPrivateKey()
 	require.NoError(err)
 
-	keyJSON, err := key.MarshalText()
+	keyText, err := key.MarshalText()
 	require.NoError(err)
 
 	key2 := PrivateKey{}
-	require.NoError(key2.UnmarshalText(keyJSON))
+	require.NoError(key2.UnmarshalText(keyText))
 	require.Equal(key.PublicKey(), key2.PublicKey())
 }
 
