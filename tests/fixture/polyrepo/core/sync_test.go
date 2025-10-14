@@ -170,7 +170,7 @@ require github.com/ava-labs/coreth v0.13.8
 			expectError: false,
 		},
 		{
-			name:        "avalanchego depends on firewood",
+			name:        "avalanchego depends on firewood with pseudo-version",
 			currentRepo: "avalanchego",
 			targetRepo:  "firewood",
 			goModContent: `module github.com/ava-labs/avalanchego
@@ -179,7 +179,7 @@ go 1.21
 
 require github.com/ava-labs/firewood/ffi v0.0.0-20240101120000-abc123def456
 `,
-			expectedRef: "v0.0.0-20240101120000-abc123def456",
+			expectedRef: "abc123def456",
 			expectError: false,
 		},
 		{

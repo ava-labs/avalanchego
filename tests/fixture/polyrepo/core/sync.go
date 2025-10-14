@@ -69,7 +69,8 @@ func GetReposToSync(currentRepo string) []string {
 
 // GetDefaultRefForRepo determines the default ref to use for a target repo
 // when syncing from a current repo. If the current repo has a go.mod with a
-// dependency on the target repo, returns that version. Otherwise, returns
+// dependency on the target repo, returns that version converted to a git ref.
+// For pseudo-versions, this extracts the commit hash. Otherwise, returns
 // the target repo's default branch.
 func GetDefaultRefForRepo(currentRepo, targetRepo, goModPath string) (string, error) {
 	// Get the target repo's configuration
@@ -90,5 +91,11 @@ func GetDefaultRefForRepo(currentRepo, targetRepo, goModPath string) (string, er
 		return targetConfig.DefaultBranch, nil
 	}
 
-	return version, nil
+	// Convert the version to a git ref (handles pseudo-versions)
+	gitRef, err := ConvertVersionToGitRef(version)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert version %s to git ref: %w", version, err)
+	}
+
+	return gitRef, nil
 }

@@ -5,6 +5,7 @@ package core
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -183,7 +184,18 @@ func CloneOrUpdateRepo(url, path, ref string, depth int, force bool) error {
 	// If we cloned successfully and the ref looks like a SHA, we need to checkout
 	// (since CloneRepo doesn't set branch reference for SHAs)
 	if ref != "" && looksLikeSHA(ref) {
-		return CheckoutRef(path, ref)
+		err = CheckoutRef(path, ref)
+		if err != nil && depth > 0 {
+			// Checkout failed, likely because the SHA isn't in shallow history
+			// Remove the shallow clone and retry with full clone
+			os.RemoveAll(path)
+			err = CloneRepo(url, path, ref, 0)
+			if err != nil {
+				return err
+			}
+			return CheckoutRef(path, ref)
+		}
+		return err
 	}
 
 	return nil

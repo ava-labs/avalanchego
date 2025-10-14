@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/module"
 )
 
 // ReadGoMod reads and parses a go.mod file
@@ -117,4 +118,15 @@ func GetDependencyVersion(goModPath, modulePath string) (string, error) {
 	}
 
 	return "", fmt.Errorf("dependency %s not found in go.mod", modulePath)
+}
+
+// ConvertVersionToGitRef converts a Go module version to a git ref.
+// For pseudo-versions (e.g., v1.13.6-0.20251007213349-63cc1a166a56),
+// it extracts and returns the commit hash (e.g., 63cc1a166a56).
+// For regular versions (e.g., v0.13.8), it returns the version as-is.
+func ConvertVersionToGitRef(version string) (string, error) {
+	if module.IsPseudoVersion(version) {
+		return module.PseudoVersionRev(version)
+	}
+	return version, nil
 }
