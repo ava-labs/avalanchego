@@ -4,13 +4,16 @@
 package core
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/google/go-github/v68/github"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
@@ -254,7 +257,7 @@ func CloneOrUpdateRepo(log logging.Logger, url, path, ref string, depth int, for
 		}
 		log.Debug("proceeding to update existing repository")
 		// Update existing repo
-		return UpdateRepo(log, path, ref)
+		return UpdateRepo(log, url, path, ref, force)
 	}
 
 	log.Debug("repository does not exist, proceeding to clone")
@@ -311,16 +314,132 @@ func CloneOrUpdateRepo(log logging.Logger, url, path, ref string, depth int, for
 	return nil
 }
 
+// parseGitHubURL extracts owner and repo from a GitHub URL
+// Returns empty strings if not a GitHub URL
+func parseGitHubURL(url string) (owner, repo string) {
+	// Match patterns like:
+	// https://github.com/owner/repo
+	// https://github.com/owner/repo.git
+	// git@github.com:owner/repo.git
+	patterns := []string{
+		`github\.com[:/]([^/]+)/([^/\.]+)`,
+	}
+
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(url)
+		if len(matches) == 3 {
+			return matches[1], matches[2]
+		}
+	}
+	return "", ""
+}
+
+// findGitHubBranchForSHA queries GitHub API to find which branch has the SHA as HEAD
+// Returns empty string if not found or if there's an error
+func findGitHubBranchForSHA(log logging.Logger, url, sha string) string {
+	owner, repo := parseGitHubURL(url)
+	if owner == "" || repo == "" {
+		log.Debug("not a GitHub URL, skipping branch lookup",
+			zap.String("url", url),
+		)
+		return ""
+	}
+
+	log.Debug("querying GitHub API for branch containing SHA",
+		zap.String("owner", owner),
+		zap.String("repo", repo),
+		zap.String("sha", sha),
+	)
+
+	client := github.NewClient(nil)
+	ctx := context.Background()
+
+	branches, _, err := client.Repositories.ListBranchesHeadCommit(ctx, owner, repo, sha)
+	if err != nil {
+		log.Debug("failed to query GitHub API",
+			zap.Error(err),
+		)
+		return ""
+	}
+
+	if len(branches) == 0 {
+		log.Debug("no branches found with SHA as HEAD")
+		return ""
+	}
+
+	// Return the first branch found
+	branchName := branches[0].GetName()
+	log.Debug("found branch for SHA",
+		zap.String("branch", branchName),
+	)
+	return branchName
+}
+
 // UpdateRepo updates an existing repository to a specific ref
-func UpdateRepo(log logging.Logger, repoPath, ref string) error {
+// If force is true and trying to update a shallow clone to a SHA, it will
+// proactively remove the repo and re-clone it with full depth to avoid issues
+// with incomplete history (which can cause problems for tools like nix).
+func UpdateRepo(log logging.Logger, url, repoPath, ref string, force bool) error {
 	log.Debug("entering UpdateRepo",
+		zap.String("url", url),
 		zap.String("repoPath", repoPath),
 		zap.String("ref", ref),
+		zap.Bool("force", force),
 	)
 
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
 		return stacktrace.Errorf("failed to open repository: %w", err)
+	}
+
+	// Check if this is a shallow clone
+	isShallow := isShallowRepo(repoPath)
+	log.Debug("checked if repository is shallow",
+		zap.Bool("isShallow", isShallow),
+	)
+
+	// If we're updating a shallow clone to a SHA with --force, remove and re-clone
+	// to avoid inconsistent shallow boundaries. The issue: shallow cloning main then
+	// checking out a different SHA leaves the shallow file pointing to main's boundaries,
+	// causing "object not found" errors when tools like nix try to access parent commits.
+	if force && isShallow && looksLikeSHA(ref) {
+		log.Info("shallow clone with SHA detected, removing and re-cloning at target SHA",
+			zap.String("ref", ref),
+			zap.String("path", repoPath),
+		)
+		os.RemoveAll(repoPath)
+
+		// Try to find which branch has this SHA as HEAD (GitHub only)
+		// This allows us to do a single-branch shallow clone (much smaller)
+		branch := findGitHubBranchForSHA(log, url, ref)
+		if branch != "" {
+			log.Info("found branch for SHA, cloning with single-branch",
+				zap.String("branch", branch),
+			)
+			// Clone the specific branch shallow, then checkout the SHA
+			err = CloneRepo(log, url, repoPath, branch, 1)
+			if err == nil {
+				return CheckoutRef(log, repoPath, ref)
+			}
+			log.Info("single-branch clone failed, falling back to multi-branch",
+				zap.Error(err),
+			)
+		}
+
+		// Fallback: clone without single-branch (fetches all branches, larger but more reliable)
+		err = CloneRepo(log, url, repoPath, ref, 1)
+		if err != nil {
+			// If shallow clone fails, fallback to full clone
+			log.Info("shallow clone failed, retrying with full depth",
+				zap.Error(err),
+			)
+			err = CloneRepo(log, url, repoPath, ref, 0)
+			if err != nil {
+				return err
+			}
+		}
+		return CheckoutRef(log, repoPath, ref)
 	}
 
 	// Fetch latest changes
@@ -343,4 +462,11 @@ func UpdateRepo(log logging.Logger, repoPath, ref string) error {
 		zap.String("ref", ref),
 	)
 	return CheckoutRef(log, repoPath, ref)
+}
+
+// isShallowRepo checks if a repository is a shallow clone
+func isShallowRepo(repoPath string) bool {
+	shallowFile := filepath.Join(repoPath, ".git", "shallow")
+	_, err := os.Stat(shallowFile)
+	return err == nil
 }
