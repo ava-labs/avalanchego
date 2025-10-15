@@ -3,7 +3,9 @@
 
 package core
 
-import "fmt"
+import (
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
+)
 
 // RepoConfig contains the configuration for a repository
 type RepoConfig struct {
@@ -62,7 +64,7 @@ var (
 func GetRepoConfig(name string) (*RepoConfig, error) {
 	config, ok := allRepos[name]
 	if !ok {
-		return nil, fmt.Errorf("unknown repository: %s", name)
+		return nil, stacktrace.Errorf("unknown repository: %s", name)
 	}
 	return config, nil
 }

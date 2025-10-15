@@ -4,9 +4,9 @@
 package core
 
 import (
-	"fmt"
 	"os"
 
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 )
@@ -15,12 +15,12 @@ import (
 func ReadGoMod(path string) (*modfile.File, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read go.mod: %w", err)
+		return nil, stacktrace.Errorf("failed to read go.mod: %w", err)
 	}
 
 	modFile, err := modfile.Parse(path, data, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse go.mod: %w", err)
+		return nil, stacktrace.Errorf("failed to parse go.mod: %w", err)
 	}
 
 	return modFile, nil
@@ -34,7 +34,7 @@ func GetModulePath(goModPath string) (string, error) {
 	}
 
 	if modFile.Module == nil {
-		return "", fmt.Errorf("go.mod has no module declaration")
+		return "", stacktrace.Errorf("go.mod has no module declaration")
 	}
 
 	return modFile.Module.Mod.Path, nil
@@ -44,29 +44,29 @@ func GetModulePath(goModPath string) (string, error) {
 func AddReplaceDirective(goModPath, oldPath, newPath string) error {
 	data, err := os.ReadFile(goModPath)
 	if err != nil {
-		return fmt.Errorf("failed to read go.mod: %w", err)
+		return stacktrace.Errorf("failed to read go.mod: %w", err)
 	}
 
 	modFile, err := modfile.Parse(goModPath, data, nil)
 	if err != nil {
-		return fmt.Errorf("failed to parse go.mod: %w", err)
+		return stacktrace.Errorf("failed to parse go.mod: %w", err)
 	}
 
 	// Add the replace directive
 	err = modFile.AddReplace(oldPath, "", newPath, "")
 	if err != nil {
-		return fmt.Errorf("failed to add replace directive: %w", err)
+		return stacktrace.Errorf("failed to add replace directive: %w", err)
 	}
 
 	// Format and write back
 	formattedData, err := modFile.Format()
 	if err != nil {
-		return fmt.Errorf("failed to format go.mod: %w", err)
+		return stacktrace.Errorf("failed to format go.mod: %w", err)
 	}
 
 	err = os.WriteFile(goModPath, formattedData, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to write go.mod: %w", err)
+		return stacktrace.Errorf("failed to write go.mod: %w", err)
 	}
 
 	return nil
@@ -76,29 +76,29 @@ func AddReplaceDirective(goModPath, oldPath, newPath string) error {
 func RemoveReplaceDirective(goModPath, oldPath string) error {
 	data, err := os.ReadFile(goModPath)
 	if err != nil {
-		return fmt.Errorf("failed to read go.mod: %w", err)
+		return stacktrace.Errorf("failed to read go.mod: %w", err)
 	}
 
 	modFile, err := modfile.Parse(goModPath, data, nil)
 	if err != nil {
-		return fmt.Errorf("failed to parse go.mod: %w", err)
+		return stacktrace.Errorf("failed to parse go.mod: %w", err)
 	}
 
 	// Remove the replace directive
 	err = modFile.DropReplace(oldPath, "")
 	if err != nil {
-		return fmt.Errorf("failed to remove replace directive: %w", err)
+		return stacktrace.Errorf("failed to remove replace directive: %w", err)
 	}
 
 	// Format and write back
 	formattedData, err := modFile.Format()
 	if err != nil {
-		return fmt.Errorf("failed to format go.mod: %w", err)
+		return stacktrace.Errorf("failed to format go.mod: %w", err)
 	}
 
 	err = os.WriteFile(goModPath, formattedData, 0644)
 	if err != nil {
-		return fmt.Errorf("failed to write go.mod: %w", err)
+		return stacktrace.Errorf("failed to write go.mod: %w", err)
 	}
 
 	return nil
@@ -117,7 +117,7 @@ func GetDependencyVersion(goModPath, modulePath string) (string, error) {
 		}
 	}
 
-	return "", fmt.Errorf("dependency %s not found in go.mod", modulePath)
+	return "", stacktrace.Errorf("dependency %s not found in go.mod", modulePath)
 }
 
 // ConvertVersionToGitRef converts a Go module version to a git ref.

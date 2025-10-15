@@ -5,7 +5,8 @@ package core
 
 import (
 	"errors"
-	"fmt"
+
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 )
 
 var (
@@ -15,17 +16,17 @@ var (
 
 // ErrRepoNotFound returns an error for a repository that was not found
 func ErrRepoNotFound(name string) error {
-	return fmt.Errorf("%w: %s", errRepoNotFound, name)
+	return stacktrace.Errorf("%w: %s", errRepoNotFound, name)
 }
 
 // ErrDirtyWorkingDir returns an error for a dirty working directory
 func ErrDirtyWorkingDir(path string) error {
-	return fmt.Errorf("working directory is dirty: %s", path)
+	return stacktrace.Errorf("working directory is dirty: %s", path)
 }
 
 // ErrRepoAlreadyExists returns an error for a repository that already exists
 func ErrRepoAlreadyExists(name string, path string) error {
-	return fmt.Errorf("%w: %s already exists at %s (use --force to update)", errRepoAlreadyExists, name, path)
+	return stacktrace.Errorf("%w: %s already exists at %s (use --force to update)", errRepoAlreadyExists, name, path)
 }
 
 // IsErrRepoAlreadyExists checks if an error is a repository already exists error
