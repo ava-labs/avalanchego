@@ -84,7 +84,7 @@ func TestManagerSetPreference(t *testing.T) {
 	require.Equal(initialPreference, manager.Preferred())
 
 	newPreference := ids.GenerateTestID()
-	manager.SetPreference(newPreference)
+	manager.SetPreference(newPreference, nil)
 	require.Equal(newPreference, manager.Preferred())
 }
 
