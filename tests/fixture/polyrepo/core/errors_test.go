@@ -4,54 +4,45 @@
 package core
 
 import (
-	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestErrRepoNotFound(t *testing.T) {
 	err := ErrRepoNotFound("somerepo")
 	if err == nil {
-		t.Fatal("expected error, got nil")
+		require.Fail(t, "expected error")
 	}
 
 	expectedMsg := "repository not found: somerepo"
-	if err.Error() != expectedMsg {
-		t.Errorf("expected message '%s', got '%s'", expectedMsg, err.Error())
-	}
+	require.Equal(t, expectedMsg, err.Error())
 }
 
 func TestErrDirtyWorkingDir(t *testing.T) {
 	err := ErrDirtyWorkingDir("/path/to/repo")
 	if err == nil {
-		t.Fatal("expected error, got nil")
+		require.Fail(t, "expected error")
 	}
 
 	expectedMsg := "working directory is dirty: /path/to/repo"
-	if err.Error() != expectedMsg {
-		t.Errorf("expected message '%s', got '%s'", expectedMsg, err.Error())
-	}
+	require.Equal(t, expectedMsg, err.Error())
 }
 
 func TestErrRepoAlreadyExists(t *testing.T) {
 	err := ErrRepoAlreadyExists("avalanchego", "/some/path")
 	if err == nil {
-		t.Fatal("expected error, got nil")
+		require.Fail(t, "expected error")
 	}
 
 	expectedMsg := "repository already exists: avalanchego already exists at /some/path (use --force to update)"
-	if err.Error() != expectedMsg {
-		t.Errorf("expected message '%s', got '%s'", expectedMsg, err.Error())
-	}
+	require.Equal(t, expectedMsg, err.Error())
 
 	// Also test the IsErrRepoAlreadyExists function
-	if !IsErrRepoAlreadyExists(err) {
-		t.Error("expected IsErrRepoAlreadyExists to return true")
-	}
+	require.True(t, IsErrRepoAlreadyExists(err))
 }
 
 func TestIsErrRepoNotFound(t *testing.T) {
 	err := ErrRepoNotFound("test")
-	if !errors.Is(err, errRepoNotFound) {
-		t.Error("expected errors.Is to return true for ErrRepoNotFound")
-	}
+	require.ErrorIs(t, err, errRepoNotFound)
 }

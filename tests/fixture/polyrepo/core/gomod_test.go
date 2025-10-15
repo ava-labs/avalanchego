@@ -6,8 +6,11 @@ package core
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestReadGoMod(t *testing.T) {
@@ -24,20 +27,16 @@ require (
 	github.com/ava-labs/coreth v0.13.8
 )
 `
-	err := os.WriteFile(goModPath, []byte(goModContent), 0644)
-	if err != nil {
-		t.Fatalf("failed to write test go.mod: %v", err)
-	}
+	err := os.WriteFile(goModPath, []byte(goModContent), 0o600)
+	require.NoError(t, err, "failed to write test go.mod")
 
 	// Test reading the go.mod
-	modFile, err := ReadGoMod(goModPath)
-	if err != nil {
-		t.Fatalf("ReadGoMod failed: %v", err)
-	}
+	log := logging.NoLog{}
+	modFile, err := ReadGoMod(log, goModPath)
+	require.NoError(t, err, "ReadGoMod failed")
 
-	if modFile.Module == nil || modFile.Module.Mod.Path != "github.com/test/repo" {
-		t.Errorf("expected module 'github.com/test/repo', got '%v'", modFile.Module)
-	}
+	require.NotNil(t, modFile.Module, "module should not be nil")
+	require.Equal(t, "github.com/test/repo", modFile.Module.Mod.Path)
 
 	// Check that we can find dependencies
 	foundAvalanchego := false
@@ -45,24 +44,16 @@ require (
 	for _, req := range modFile.Require {
 		if req.Mod.Path == "github.com/ava-labs/avalanchego" {
 			foundAvalanchego = true
-			if req.Mod.Version != "v1.11.11" {
-				t.Errorf("expected avalanchego version 'v1.11.11', got '%s'", req.Mod.Version)
-			}
+			require.Equal(t, "v1.11.11", req.Mod.Version, "avalanchego version")
 		}
 		if req.Mod.Path == "github.com/ava-labs/coreth" {
 			foundCoreth = true
-			if req.Mod.Version != "v0.13.8" {
-				t.Errorf("expected coreth version 'v0.13.8', got '%s'", req.Mod.Version)
-			}
+			require.Equal(t, "v0.13.8", req.Mod.Version, "coreth version")
 		}
 	}
 
-	if !foundAvalanchego {
-		t.Error("did not find avalanchego requirement")
-	}
-	if !foundCoreth {
-		t.Error("did not find coreth requirement")
-	}
+	require.True(t, foundAvalanchego, "did not find avalanchego requirement")
+	require.True(t, foundCoreth, "did not find coreth requirement")
 }
 
 func TestGetModulePath(t *testing.T) {
@@ -74,20 +65,15 @@ func TestGetModulePath(t *testing.T) {
 
 go 1.21
 `
-	err := os.WriteFile(goModPath, []byte(goModContent), 0644)
-	if err != nil {
-		t.Fatalf("failed to write test go.mod: %v", err)
-	}
+	err := os.WriteFile(goModPath, []byte(goModContent), 0o600)
+	require.NoError(t, err, "failed to write test go.mod")
 
 	// Test getting the module path
-	modulePath, err := GetModulePath(goModPath)
-	if err != nil {
-		t.Fatalf("GetModulePath failed: %v", err)
-	}
+	log := logging.NoLog{}
+	modulePath, err := GetModulePath(log, goModPath)
+	require.NoError(t, err, "GetModulePath failed")
 
-	if modulePath != "github.com/test/myrepo" {
-		t.Errorf("expected module path 'github.com/test/myrepo', got '%s'", modulePath)
-	}
+	require.Equal(t, "github.com/test/myrepo", modulePath)
 }
 
 func TestAddReplaceDirective(t *testing.T) {
@@ -103,36 +89,27 @@ require (
 	github.com/ava-labs/avalanchego v1.11.11
 )
 `
-	err := os.WriteFile(goModPath, []byte(goModContent), 0644)
-	if err != nil {
-		t.Fatalf("failed to write test go.mod: %v", err)
-	}
+	err := os.WriteFile(goModPath, []byte(goModContent), 0o600)
+	require.NoError(t, err, "failed to write test go.mod")
 
 	// Add a replace directive
-	err = AddReplaceDirective(goModPath, "github.com/ava-labs/avalanchego", "./avalanchego")
-	if err != nil {
-		t.Fatalf("AddReplaceDirective failed: %v", err)
-	}
+	log := logging.NoLog{}
+	err = AddReplaceDirective(log, goModPath, "github.com/ava-labs/avalanchego", "./avalanchego")
+	require.NoError(t, err, "AddReplaceDirective failed")
 
 	// Read back and verify
-	modFile, err := ReadGoMod(goModPath)
-	if err != nil {
-		t.Fatalf("ReadGoMod failed: %v", err)
-	}
+	modFile, err := ReadGoMod(log, goModPath)
+	require.NoError(t, err, "ReadGoMod failed")
 
 	found := false
 	for _, replace := range modFile.Replace {
 		if replace.Old.Path == "github.com/ava-labs/avalanchego" {
 			found = true
-			if replace.New.Path != "./avalanchego" {
-				t.Errorf("expected replacement path './avalanchego', got '%s'", replace.New.Path)
-			}
+			require.Equal(t, "./avalanchego", replace.New.Path, "replacement path")
 		}
 	}
 
-	if !found {
-		t.Error("replace directive not found in go.mod")
-	}
+	require.True(t, found, "replace directive not found in go.mod")
 }
 
 func TestRemoveReplaceDirective(t *testing.T) {
@@ -150,27 +127,20 @@ require (
 
 replace github.com/ava-labs/avalanchego => ./avalanchego
 `
-	err := os.WriteFile(goModPath, []byte(goModContent), 0644)
-	if err != nil {
-		t.Fatalf("failed to write test go.mod: %v", err)
-	}
+	err := os.WriteFile(goModPath, []byte(goModContent), 0o600)
+	require.NoError(t, err, "failed to write test go.mod")
 
 	// Remove the replace directive
-	err = RemoveReplaceDirective(goModPath, "github.com/ava-labs/avalanchego")
-	if err != nil {
-		t.Fatalf("RemoveReplaceDirective failed: %v", err)
-	}
+	log := logging.NoLog{}
+	err = RemoveReplaceDirective(log, goModPath, "github.com/ava-labs/avalanchego")
+	require.NoError(t, err, "RemoveReplaceDirective failed")
 
 	// Read back and verify it's gone
-	modFile, err := ReadGoMod(goModPath)
-	if err != nil {
-		t.Fatalf("ReadGoMod failed: %v", err)
-	}
+	modFile, err := ReadGoMod(log, goModPath)
+	require.NoError(t, err, "ReadGoMod failed")
 
 	for _, replace := range modFile.Replace {
-		if replace.Old.Path == "github.com/ava-labs/avalanchego" {
-			t.Error("replace directive should have been removed")
-		}
+		require.NotEqual(t, "github.com/ava-labs/avalanchego", replace.Old.Path, "replace directive should have been removed")
 	}
 }
 
@@ -188,25 +158,20 @@ require (
 	github.com/ava-labs/coreth v0.13.8
 )
 `
-	err := os.WriteFile(goModPath, []byte(goModContent), 0644)
-	if err != nil {
-		t.Fatalf("failed to write test go.mod: %v", err)
-	}
+	err := os.WriteFile(goModPath, []byte(goModContent), 0o600)
+	require.NoError(t, err, "failed to write test go.mod")
 
 	// Test getting dependency version
-	version, err := GetDependencyVersion(goModPath, "github.com/ava-labs/avalanchego")
-	if err != nil {
-		t.Fatalf("GetDependencyVersion failed: %v", err)
-	}
+	log := logging.NoLog{}
+	version, err := GetDependencyVersion(log, goModPath, "github.com/ava-labs/avalanchego")
+	require.NoError(t, err, "GetDependencyVersion failed")
 
-	if version != "v1.11.11" {
-		t.Errorf("expected version 'v1.11.11', got '%s'", version)
-	}
+	require.Equal(t, "v1.11.11", version)
 
 	// Test getting version for non-existent dependency
-	_, err = GetDependencyVersion(goModPath, "github.com/nonexistent/repo")
+	_, err = GetDependencyVersion(log, goModPath, "github.com/nonexistent/repo")
 	if err == nil {
-		t.Error("expected error for non-existent dependency")
+		require.Fail(t, "expected error for non-existent dependency")
 	}
 }
 
@@ -229,43 +194,28 @@ require (
 // Development tools
 require github.com/stretchr/testify v1.8.0
 `
-	err := os.WriteFile(goModPath, []byte(goModContent), 0644)
-	if err != nil {
-		t.Fatalf("failed to write test go.mod: %v", err)
-	}
+	err := os.WriteFile(goModPath, []byte(goModContent), 0o600)
+	require.NoError(t, err, "failed to write test go.mod")
 
 	// Add a replace directive
-	err = AddReplaceDirective(goModPath, "github.com/ava-labs/avalanchego", "./avalanchego")
-	if err != nil {
-		t.Fatalf("AddReplaceDirective failed: %v", err)
-	}
+	log := logging.NoLog{}
+	err = AddReplaceDirective(log, goModPath, "github.com/ava-labs/avalanchego", "./avalanchego")
+	require.NoError(t, err, "AddReplaceDirective failed")
 
 	// Read back and verify comments are preserved
 	content, err := os.ReadFile(goModPath)
-	if err != nil {
-		t.Fatalf("failed to read go.mod: %v", err)
-	}
+	require.NoError(t, err, "failed to read go.mod")
 
 	contentStr := string(content)
 
 	// Check that comments are preserved
-	if !strings.Contains(contentStr, "// This is a test module") {
-		t.Error("module comment was not preserved")
-	}
-	if !strings.Contains(contentStr, "// Production dependencies") {
-		t.Error("require block comment was not preserved")
-	}
-	if !strings.Contains(contentStr, "// Main dependency") {
-		t.Error("inline comment was not preserved")
-	}
-	if !strings.Contains(contentStr, "// Development tools") {
-		t.Error("development tools comment was not preserved")
-	}
+	require.Contains(t, contentStr, "// This is a test module", "module comment was not preserved")
+	require.Contains(t, contentStr, "// Production dependencies", "require block comment was not preserved")
+	require.Contains(t, contentStr, "// Main dependency", "inline comment was not preserved")
+	require.Contains(t, contentStr, "// Development tools", "development tools comment was not preserved")
 
 	// Verify the replace directive was added
-	if !strings.Contains(contentStr, "replace github.com/ava-labs/avalanchego => ./avalanchego") {
-		t.Error("replace directive was not added correctly")
-	}
+	require.Contains(t, contentStr, "replace github.com/ava-labs/avalanchego => ./avalanchego", "replace directive was not added correctly")
 }
 
 func TestAddReplaceDirective_UpdatesExisting(t *testing.T) {
@@ -281,32 +231,23 @@ require github.com/ava-labs/avalanchego v1.11.11
 
 replace github.com/ava-labs/avalanchego => ./old-path
 `
-	err := os.WriteFile(goModPath, []byte(goModContent), 0644)
-	if err != nil {
-		t.Fatalf("failed to write test go.mod: %v", err)
-	}
+	err := os.WriteFile(goModPath, []byte(goModContent), 0o600)
+	require.NoError(t, err, "failed to write test go.mod")
 
 	// Add/update the replace directive
-	err = AddReplaceDirective(goModPath, "github.com/ava-labs/avalanchego", "./new-path")
-	if err != nil {
-		t.Fatalf("AddReplaceDirective failed: %v", err)
-	}
+	log := logging.NoLog{}
+	err = AddReplaceDirective(log, goModPath, "github.com/ava-labs/avalanchego", "./new-path")
+	require.NoError(t, err, "AddReplaceDirective failed")
 
 	// Read back and verify
-	modFile, err := ReadGoMod(goModPath)
-	if err != nil {
-		t.Fatalf("ReadGoMod failed: %v", err)
-	}
+	modFile, err := ReadGoMod(log, goModPath)
+	require.NoError(t, err, "ReadGoMod failed")
 
 	// Should have exactly one replace directive
-	if len(modFile.Replace) != 1 {
-		t.Fatalf("expected 1 replace directive, got %d", len(modFile.Replace))
-	}
+	require.Len(t, modFile.Replace, 1, "expected 1 replace directive")
 
 	// Check that it points to the new path
-	if modFile.Replace[0].New.Path != "./new-path" {
-		t.Errorf("expected replace to point to './new-path', got '%s'", modFile.Replace[0].New.Path)
-	}
+	require.Equal(t, "./new-path", modFile.Replace[0].New.Path, "replace should point to new path")
 }
 
 func TestConvertVersionToGitRef(t *testing.T) {
@@ -356,22 +297,18 @@ func TestConvertVersionToGitRef(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gitRef, err := ConvertVersionToGitRef(tt.version)
+			log := logging.NoLog{}
+			gitRef, err := ConvertVersionToGitRef(log, tt.version)
 
 			if tt.expectError {
 				if err == nil {
-					t.Error("expected error but got nil")
+					require.Fail(t, "expected error but got nil")
 				}
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if gitRef != tt.expectedRef {
-				t.Errorf("expected ref '%s', got '%s'", tt.expectedRef, gitRef)
-			}
+			require.NoError(t, err, "unexpected error")
+			require.Equal(t, tt.expectedRef, gitRef, "git ref mismatch")
 		})
 	}
 }

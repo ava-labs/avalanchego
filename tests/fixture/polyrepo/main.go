@@ -5,15 +5,19 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 
-	"github.com/ava-labs/avalanchego/tests/fixture/polyrepo/core"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/tests/fixture/polyrepo/core"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
+
+const goModFilename = "go.mod"
 
 var logLevel string
 
@@ -88,7 +92,7 @@ var statusCmd = &cobra.Command{
 - Current branch or commit
 - Whether working directory is dirty
 - Whether replace directives are active`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		log := getLogger(cmd)
 
 		// Get current directory
@@ -99,14 +103,14 @@ var statusCmd = &cobra.Command{
 
 		// Get path to go.mod if it exists
 		goModPath := ""
-		if _, err := os.Stat("go.mod"); err == nil {
-			goModPath = "go.mod"
+		if _, err := os.Stat(goModFilename); err == nil {
+			goModPath = goModFilename
 		}
 
 		// Get status for all repos
 		repos := []string{"avalanchego", "coreth", "firewood"}
 		for _, repoName := range repos {
-			status, err := core.GetRepoStatus(repoName, baseDir, goModPath)
+			status, err := core.GetRepoStatus(log, repoName, baseDir, goModPath)
 			if err != nil {
 				log.Warn("failed to get status for repository",
 					zap.String("repo", repoName),
@@ -158,9 +162,9 @@ Repositories will be cloned into the current directory with their repository nam
 		)
 
 		// Get path to go.mod
-		goModPath := "go.mod"
+		goModPath := goModFilename
 		if _, err := os.Stat(goModPath); err != nil {
-			return fmt.Errorf("go.mod not found in current directory")
+			return errors.New("go.mod not found in current directory")
 		}
 
 		// Determine which repos to sync
@@ -312,9 +316,9 @@ repositories (avalanchego, coreth, firewood).`,
 		log := getLogger(cmd)
 
 		// Get path to go.mod
-		goModPath := "go.mod"
+		goModPath := goModFilename
 		if _, err := os.Stat(goModPath); err != nil {
-			return fmt.Errorf("go.mod not found in current directory")
+			return errors.New("go.mod not found in current directory")
 		}
 
 		log.Info("resetting repositories",
@@ -359,9 +363,9 @@ This command cannot be run from the avalanchego repository itself.`,
 		)
 
 		// Get path to go.mod
-		goModPath := "go.mod"
+		goModPath := goModFilename
 		if _, err := os.Stat(goModPath); err != nil {
-			return fmt.Errorf("go.mod not found in current directory")
+			return errors.New("go.mod not found in current directory")
 		}
 
 		err := core.UpdateAvalanchego(log, goModPath, version)

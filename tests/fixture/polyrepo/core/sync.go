@@ -7,9 +7,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"go.uber.org/zap"
 )
 
 // DetectCurrentRepo detects which repository we're currently in based on go.mod
@@ -134,7 +135,7 @@ func GetDefaultRefForRepo(log logging.Logger, currentRepo, targetRepo, goModPath
 			zap.String("targetRepo", targetRepo),
 			zap.String("defaultBranch", targetConfig.DefaultBranch),
 		)
-		return targetConfig.DefaultBranch, nil
+		return targetConfig.DefaultBranch, nil //nolint:nilerr // Error is intentionally ignored - missing dependency is expected
 	}
 
 	log.Info("found dependency version in go.mod",

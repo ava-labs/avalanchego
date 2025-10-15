@@ -8,12 +8,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // ParseRepoAndVersion parses a string like "repo@version" and returns the repo name and version
@@ -107,7 +108,7 @@ func looksLikeSHA(ref string) bool {
 		return false
 	}
 	for _, c := range ref {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
 			return false
 		}
 	}

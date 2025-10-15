@@ -4,8 +4,9 @@
 package core
 
 import (
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"go.uber.org/zap"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // ResetRepos removes replace directives for specified repos (or all if none specified)
