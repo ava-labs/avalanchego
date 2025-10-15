@@ -5,6 +5,8 @@ package core
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseRepoAndVersion(t *testing.T) {
@@ -65,22 +67,14 @@ func TestParseRepoAndVersion(t *testing.T) {
 
 			if tt.expectedError {
 				if err == nil {
-					t.Error("expected error but got nil")
+					require.Fail(t, "expected error but got nil")
 				}
 				return
 			}
 
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if repo != tt.expectedRepo {
-				t.Errorf("expected repo '%s', got '%s'", tt.expectedRepo, repo)
-			}
-
-			if version != tt.expectedVer {
-				t.Errorf("expected version '%s', got '%s'", tt.expectedVer, version)
-			}
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedRepo, repo)
+			require.Equal(t, tt.expectedVer, version)
 		})
 	}
 }
@@ -109,9 +103,7 @@ func TestGetRepoClonePath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			path := GetRepoClonePath(tt.repoName, tt.baseDir)
-			if path != tt.expectedPath {
-				t.Errorf("expected path '%s', got '%s'", tt.expectedPath, path)
-			}
+			require.Equal(t, tt.expectedPath, path)
 		})
 	}
 }
