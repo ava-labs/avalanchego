@@ -7,7 +7,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"testing"
+	"time"
 
+	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -29,6 +31,7 @@ import (
 )
 
 func TestE2E(t *testing.T) {
+	evm.RegisterAllLibEVMExtras()
 	ginkgo.RunSpecs(t, "e2e test suites")
 }
 
@@ -52,6 +55,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	upgrades := upgrade.Default
 	if flagVars.ActivateGranite() {
 		upgrades.GraniteTime = upgrade.InitiallyActiveTime
+		upgrades.GraniteEpochDuration = 4 * time.Second
 	} else {
 		upgrades.GraniteTime = upgrade.UnscheduledActivationTime
 	}
