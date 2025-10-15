@@ -159,7 +159,7 @@ func (u *UptimeTracker) update(
 		}
 
 		// This validator was removed in the lastest update
-                 // we are guaranteed to have this node id
+		// we are guaranteed to have this node id
 		nodeID, _ := u.state.getNodeID(validationID)
 
 		if !u.state.deleteValidator(validationID) {
@@ -171,7 +171,7 @@ func (u *UptimeTracker) update(
 
 	// Add or update validators
 	for validationID, newValidator := range newValidators {
-		if _, ok := u.state.getValidatorByValidationID(validationID); ok {
+		if ok := u.state.hasValidationID(validationID); ok {
 			// Check if there was a status change
 			if !u.state.updateValidator(validationID, newValidator.IsActive) {
 				continue
@@ -199,31 +199,32 @@ func (u *UptimeTracker) update(
 					err,
 				)
 			}
-		} else {
-			// This is a new validator
-			u.state.addValidatorUpdate(&validator{
-				NodeID:        newValidator.NodeID,
-				validationID:  validationID,
-				IsActive:      newValidator.IsActive,
-				StartTime:     newValidator.StartTime,
-				UpDuration:    0,
-				LastUpdated:   newValidator.StartTime,
-				IsL1Validator: newValidator.IsL1Validator,
-				Weight:        newValidator.Weight,
-			})
+			continue
+		}
 
-			if newValidator.IsActive {
-				continue
-			}
+		// This is a new validator
+		u.state.addValidatorUpdate(&validator{
+			NodeID:        newValidator.NodeID,
+			validationID:  validationID,
+			IsActive:      newValidator.IsActive,
+			StartTime:     newValidator.StartTime,
+			UpDuration:    0,
+			LastUpdated:   newValidator.StartTime,
+			IsL1Validator: newValidator.IsL1Validator,
+			Weight:        newValidator.Weight,
+		})
 
-			// This validator is not active and is treated is offline
-			if err := u.deactivate(newValidator.NodeID); err != nil {
-				return fmt.Errorf(
-					"failed to deactivate validator %s: %w",
-					newValidator.NodeID,
-					err,
-				)
-			}
+		if newValidator.IsActive {
+			continue
+		}
+
+		// This validator is not active and is treated is offline
+		if err := u.deactivate(newValidator.NodeID); err != nil {
+			return fmt.Errorf(
+				"failed to deactivate validator %s: %w",
+				newValidator.NodeID,
+				err,
+			)
 		}
 	}
 

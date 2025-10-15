@@ -81,7 +81,7 @@ func newState(db database.Database) (*state, error) {
 		}
 
 		if _, err := codecManager.Unmarshal(it.Value(), vdr); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal validator validator: %w", err)
+			return nil, fmt.Errorf("failed to unmarshal validator: %w", err)
 		}
 
 		s.addValidator(validationID, vdr)
@@ -139,12 +139,12 @@ func (s *state) updateValidator(validationID ids.ID, isActive bool) bool {
 	v := s.validators[validationID]
 
 	if v.IsActive == isActive {
-	  return false
+		return false
 	}
 
 	v.IsActive = isActive
 	s.updatedValidators.Add(validationID)
-        return true
+	return true
 }
 
 func (s *state) deleteValidator(validationID ids.ID) bool {
@@ -206,11 +206,8 @@ func (s *state) getValidatorByNodeID(nodeID ids.NodeID) (*validator, bool) {
 		return nil, false
 	}
 
-	v, ok := s.validators[validationID]
-	if !ok {
-		return nil, false
-	}
-
+	// s.nodeIDsToValidationIDs is guaranteed to have the same data as in s.validators
+	v, _ := s.validators[validationID]
 	return v, true
 }
 
