@@ -4096,12 +4096,8 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 			data := crypto.Keccak256([]byte("delegateSendHello()"))[:4]
 			nonce := vm.txPool.Nonce(testEthAddrs[0])
 			signedTx := newSignedLegacyTx(t, vm.chainConfig, testKeys[0].ToECDSA(), nonce, &contractAddr, big.NewInt(0), 100000, tt.txGasPrice, data)
-			for _, err := range vm.txPool.AddRemotesSync([]*types.Transaction{signedTx}) {
-				require.NoError(t, err)
-			}
 
-			blk, err := vm.BuildBlock(ctx)
-
+			blk, err := IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
 			if !tt.wantIncluded {
 				// On subnet-evm, InvalidateExecution causes the transaction to be excluded from the block.
 				// BuildBlock will create a block but it will fail verification because it's empty
@@ -4110,13 +4106,11 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 				require.ErrorContains(t, err, "empty block", "Should fail with empty block error")
 				return
 			}
-
 			require.NoError(t, err)
-			require.NoError(t, blk.Verify(ctx))
-			require.NoError(t, vm.SetPreference(ctx, blk.ID()))
 			require.NoError(t, blk.Accept(ctx))
 
 			ethBlock := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+
 			require.Len(t, ethBlock.Transactions(), 1)
 			receipts := vm.blockChain.GetReceiptsByHash(ethBlock.Hash())
 			require.Len(t, receipts, 1)

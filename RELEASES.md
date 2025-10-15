@@ -9,6 +9,7 @@
   - Add `timeMilliseconds` (Unix uint64) timestamp to block header for Granite upgrade.
   - Add `minDelayExcess` (uint64) to block header for Granite upgrade.
   - Add minimum block building delays to conform the block builder to ACP-226 requirements.
+  - Add minimum delay verification.
 
 ## [v0.7.9](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.9)
 
