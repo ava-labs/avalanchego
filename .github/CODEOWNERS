@@ -30,6 +30,7 @@
 /tests/*.md @joshua-kim @maru-ava @meaghanfitzgerald
 /tests/reexecute/ @aaronbuchwald
 /tools/* @joshua-kim @maru-ava
+/vms/evm/ @ARR4N @joshua-kim @StephenButtolph
 /x/blockdb @DracoLi
 /x/merkledb @joshua-kim @rrazvan1
 /x/sync @joshua-kim @rrazvan1
