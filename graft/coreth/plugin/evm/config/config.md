@@ -290,4 +290,5 @@ Failing to set these options will result in errors on VM initialization. Additio
 |--------|------|-------------|---------|
 | `acceptor-queue-limit` | integer | Specifies the maximum number of blocks to queue during block acceptance before blocking on Accept. | `64` |
 | `gas-target` | integer | The target gas per second that this node will attempt to use when creating blocks | Parent block's target | 
+| `min-delay-target` | integer | The minimum delay between blocks (in milliseconds) that this node will attempt to use when creating blocks | Parent block's target |
 | `skip-upgrade-check` | bool | Skip checking that upgrades occur before last accepted block ⚠️ **Warning**: Only use when you understand the implications | `false` |

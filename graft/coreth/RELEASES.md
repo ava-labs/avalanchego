@@ -7,6 +7,7 @@
 - ACP-226 (Granite):
   - Set expected block gas cost to 0 in Granite network upgrade, removing block gas cost requirements for block building.
   - Add `timeMilliseconds` (Unix uint64) timestamp to block header for Granite upgrade.
+  - Add `min-delay-target` (uint64) flag to node configs.
   - Add `minDelayExcess` (uint64) to block header for Granite upgrade.
   - Add minimum block building delays to conform the block builder to ACP-226 requirements.
   - Add minimum delay verification.
