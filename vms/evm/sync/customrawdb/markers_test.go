@@ -82,7 +82,7 @@ func TestReadAcceptorTip_InvalidLength(t *testing.T) {
 }
 
 func TestWriteAcceptorTip(t *testing.T) {
-	cases := []struct {
+	tests := []struct {
 		name    string
 		writes  []common.Hash
 		want    common.Hash
@@ -106,7 +106,7 @@ func TestWriteAcceptorTip(t *testing.T) {
 		},
 	}
 
-	for _, tc := range cases {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
 			for _, h := range tc.writes {
@@ -121,7 +121,7 @@ func TestWriteAcceptorTip(t *testing.T) {
 
 func TestTimeMarkers_BadEncoding(t *testing.T) {
 	// Validate that decode errors are surfaced and are not the sentinel not-found error.
-	cases := []struct {
+	tests := []struct {
 		name string
 		key  []byte
 		read func(ethdb.KeyValueStore) (time.Time, error)
@@ -137,7 +137,7 @@ func TestTimeMarkers_BadEncoding(t *testing.T) {
 			read: ReadPopulateMissingTries,
 		},
 	}
-	for _, tc := range cases {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
 			// Write invalid RLP bytes (0xB8 indicates a long string length with missing payload).
@@ -208,7 +208,7 @@ func TestChainConfigCases(t *testing.T) {
 		X int `json:"x"`
 	}
 
-	cases := []struct {
+	tests := []struct {
 		name         string
 		cfg          *params.ChainConfig
 		inputUpgrade *upgrade // nil => no overwrite
@@ -225,7 +225,7 @@ func TestChainConfigCases(t *testing.T) {
 		},
 	}
 
-	for _, tc := range cases {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
 			h := common.HexToHash("0x100")

@@ -13,6 +13,8 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestClearAllSyncSegments(t *testing.T) {
@@ -27,7 +29,8 @@ func TestClearAllSyncSegments(t *testing.T) {
 	require.NoError(t, ClearAllSyncSegments(db))
 
 	// No well-formed segment keys should remain.
-	keys := collectIterKeys(t, rawdb.NewKeyLengthIterator(db.NewIterator(syncSegmentsPrefix, nil), syncSegmentsKeyLength))
+	iter := rawdb.NewKeyLengthIterator(db.NewIterator(syncSegmentsPrefix, nil), syncSegmentsKeyLength)
+	keys := mapIterator(t, iter, common.CopyBytes)
 	require.Empty(t, keys)
 	// The malformed key should still be present.
 	has, err := db.Has(key)
@@ -64,22 +67,19 @@ func TestCodeToFetchIteratorAndDelete(t *testing.T) {
 	bad := append(append([]byte{}, CodeToFetchPrefix...), append(h1.Bytes(), 0x00)...)
 	require.NoError(t, db.Put(bad, []byte("x")))
 
-	seen := map[common.Hash]bool{}
-	it := NewCodeToFetchIterator(db)
-	defer it.Release()
-	for it.Next() {
-		key := it.Key()
-		// Last common.HashLength bytes are the code hash
-		got := common.BytesToHash(key[len(CodeToFetchPrefix):])
-		seen[got] = true
-	}
-	require.NoError(t, it.Error())
-	require.True(t, seen[h1])
-	require.True(t, seen[h2])
+	// Collect hashes from iterator and assert presence.
+	vals := mapIterator(t, NewCodeToFetchIterator(db), func(key []byte) common.Hash {
+		return common.BytesToHash(key[len(CodeToFetchPrefix):])
+	})
+	seen := set.Set[common.Hash]{}
+	seen.Add(vals...)
+	require.True(t, seen.Contains(h1))
+	require.True(t, seen.Contains(h2))
 
 	// Delete one and confirm only one remains
 	require.NoError(t, DeleteCodeToFetch(db, h1))
-	keys := collectIterKeys(t, rawdb.NewKeyLengthIterator(db.NewIterator(CodeToFetchPrefix, nil), codeToFetchKeyLength))
+	iter := rawdb.NewKeyLengthIterator(db.NewIterator(CodeToFetchPrefix, nil), codeToFetchKeyLength)
+	keys := mapIterator(t, iter, common.CopyBytes)
 	require.Len(t, keys, 1)
 }
 
@@ -96,17 +96,19 @@ func TestSyncSegmentsIteratorUnpackAndClear(t *testing.T) {
 	require.NoError(t, WriteSyncSegment(db, rootB, start3))
 
 	// Iterate only over rootA and assert exact keys.
-	keys := collectIterKeys(t, NewSyncSegmentsIterator(db, rootA))
-	require.ElementsMatch(t, keys, buildSegmentKey(rootA, start1), buildSegmentKey(rootA, start2))
+	keys := mapIterator(t, NewSyncSegmentsIterator(db, rootA), common.CopyBytes)
+	expectedA := [][]byte{buildSegmentKey(rootA, start1), buildSegmentKey(rootA, start2)}
+	require.ElementsMatch(t, keys, expectedA)
 
-	// Clear only rootA
+	// Clear only rootA.
 	require.NoError(t, ClearSyncSegments(db, rootA))
-	keys = collectIterKeys(t, NewSyncSegmentsIterator(db, rootA))
+	keys = mapIterator(t, NewSyncSegmentsIterator(db, rootA), common.CopyBytes)
 	require.Empty(t, keys)
 
-	// RootB remains
-	keys = collectIterKeys(t, NewSyncSegmentsIterator(db, rootB))
-	require.ElementsMatch(t, keys, buildSegmentKey(rootB, start3))
+	// RootB remains.
+	keys = mapIterator(t, NewSyncSegmentsIterator(db, rootB), common.CopyBytes)
+	expectedB := [][]byte{buildSegmentKey(rootB, start3)}
+	require.ElementsMatch(t, keys, expectedB)
 }
 
 func TestStorageTriesIteratorUnpackAndClear(t *testing.T) {
@@ -118,12 +120,12 @@ func TestStorageTriesIteratorUnpackAndClear(t *testing.T) {
 	require.NoError(t, WriteSyncStorageTrie(db, root, acct1))
 	require.NoError(t, WriteSyncStorageTrie(db, root, acct2))
 
-	keys := collectIterKeys(t, NewSyncStorageTriesIterator(db, nil))
+	keys := mapIterator(t, NewSyncStorageTriesIterator(db, nil), common.CopyBytes)
 	expected := [][]byte{buildStorageTrieKey(root, acct1), buildStorageTrieKey(root, acct2)}
 	require.ElementsMatch(t, keys, expected)
 
 	require.NoError(t, ClearSyncStorageTrie(db, root))
-	keys = collectIterKeys(t, NewSyncStorageTriesIterator(db, nil))
+	keys = mapIterator(t, NewSyncStorageTriesIterator(db, nil), common.CopyBytes)
 	require.Empty(t, keys)
 }
 
@@ -143,20 +145,19 @@ func TestClearAllSyncStorageTries(t *testing.T) {
 
 	require.NoError(t, ClearAllSyncStorageTries(db))
 
-	// Only the malformed key should remain
-	count := 0
-	it := db.NewIterator(syncStorageTriesPrefix, nil)
-	defer it.Release()
-	for it.Next() {
-		count++
-	}
-	require.NoError(t, it.Error())
-	require.Equal(t, 1, count)
+	// No well-formed storage trie keys should remain.
+	iter := rawdb.NewKeyLengthIterator(db.NewIterator(syncStorageTriesPrefix, nil), syncStorageTriesKeyLength)
+	keys := mapIterator(t, iter, common.CopyBytes)
+	require.Empty(t, keys)
+	// The malformed key should still be present.
+	has, err := db.Has(bad)
+	require.NoError(t, err)
+	require.True(t, has)
 }
 
 func TestClear_NoKeys(t *testing.T) {
 	root := common.HexToHash("0xabc")
-	cases := []struct {
+	tests := []struct {
 		name  string
 		clear func(db ethdb.KeyValueStore) error
 		iter  func(db ethdb.Iteratee) ethdb.Iterator
@@ -173,20 +174,15 @@ func TestClear_NoKeys(t *testing.T) {
 		},
 	}
 
-	for _, tc := range cases {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
 
 			require.NoError(t, tc.clear(db))
 
 			it := tc.iter(db)
-			defer it.Release()
-			count := 0
-			for it.Next() {
-				count++
-			}
+			require.Empty(t, mapIterator(t, it, common.CopyBytes))
 			require.NoError(t, it.Error())
-			require.Equal(t, 0, count)
 		})
 	}
 }
@@ -199,13 +195,8 @@ func TestSyncPerformedAndLatest(t *testing.T) {
 	require.NoError(t, WriteSyncPerformed(db, 15))
 
 	// Iterator yields all
-	it := NewSyncPerformedIterator(db)
-	defer it.Release()
-	var vals []uint64
-	for it.Next() {
-		vals = append(vals, ParseSyncPerformedKey(it.Key()))
-	}
-	require.NoError(t, it.Error())
+	vals := mapIterator(t, NewSyncPerformedIterator(db), ParseSyncPerformedKey)
+
 	require.ElementsMatch(t, []uint64{10, 20, 15}, vals)
 
 	// Latest is max
@@ -218,7 +209,7 @@ func TestGetLatestSyncPerformedEmpty(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 	latest, err := GetLatestSyncPerformed(db)
 	require.NoError(t, err)
-	require.Equal(t, uint64(0), latest)
+	require.Zero(t, latest)
 }
 
 func TestChainConfigReadWriteWithUpgrade(t *testing.T) {
@@ -251,7 +242,7 @@ func TestChainConfigNilDoesNotWriteUpgrade(t *testing.T) {
 }
 
 func TestSyncPerformedLatestCases(t *testing.T) {
-	cases := []struct {
+	tests := []struct {
 		name   string
 		writes []uint64
 		want   uint64
@@ -260,7 +251,7 @@ func TestSyncPerformedLatestCases(t *testing.T) {
 		{name: "increasing", writes: []uint64{1, 2, 3}, want: 3},
 		{name: "unsorted", writes: []uint64{10, 5, 7}, want: 10},
 	}
-	for _, tc := range cases {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
 			for _, n := range tc.writes {
@@ -274,130 +265,126 @@ func TestSyncPerformedLatestCases(t *testing.T) {
 }
 
 func TestSyncSegmentsByRootTable(t *testing.T) {
-	type entry struct {
+	tests := []struct {
+		name   string
 		root   common.Hash
 		starts []common.Hash
+	}{
+		{
+			name:   "aaa",
+			root:   common.HexToHash("0xaaa"),
+			starts: []common.Hash{common.HexToHash("0x1"), common.HexToHash("0x2")},
+		},
+		{
+			name: "bbb", root: common.HexToHash("0xbbb"),
+			starts: []common.Hash{common.HexToHash("0x3")},
+		},
 	}
-	entries := []entry{
-		{root: common.HexToHash("0xaaa"), starts: []common.Hash{common.HexToHash("0x1"), common.HexToHash("0x2")}},
-		{root: common.HexToHash("0xbbb"), starts: []common.Hash{common.HexToHash("0x3")}},
-	}
-	db := rawdb.NewMemoryDatabase()
-	// seed
-	for _, e := range entries {
-		for _, s := range e.starts {
-			require.NoError(t, WriteSyncSegment(db, e.root, s))
-		}
-	}
-	for _, e := range entries {
-		t.Run("segments_"+e.root.Hex(), func(t *testing.T) {
-			it := NewSyncSegmentsIterator(db, e.root)
-			defer it.Release()
-			got := map[common.Hash]bool{}
-			for it.Next() {
-				_, start := ParseSyncSegmentKey(it.Key())
-				got[common.BytesToHash(start)] = true
+
+	for _, tc := range tests {
+		t.Run("segments_"+tc.name, func(t *testing.T) {
+			db := rawdb.NewMemoryDatabase()
+			for _, s := range tc.starts {
+				require.NoError(t, WriteSyncSegment(db, tc.root, s))
 			}
-			for _, s := range e.starts {
-				require.True(t, got[s])
-			}
+			got := mapIterator(t, NewSyncSegmentsIterator(db, tc.root), func(k []byte) common.Hash {
+				_, start := ParseSyncSegmentKey(k)
+				return common.BytesToHash(start)
+			})
+			require.ElementsMatch(t, tc.starts, got)
 		})
 	}
 }
 
 func TestSyncStorageTriesByRootTable(t *testing.T) {
-	type entry struct {
+	tests := []struct {
+		name     string
 		root     common.Hash
 		accounts []common.Hash
-	}
-	entries := []entry{
+	}{
 		{
+			name:     "abc",
 			root:     common.HexToHash("0xabc"),
 			accounts: []common.Hash{common.HexToHash("0x1"), common.HexToHash("0x2")},
 		},
 		{
-			root: common.HexToHash("0xdef"), accounts: []common.Hash{common.HexToHash("0x3")},
+			name:     "def",
+			root:     common.HexToHash("0xdef"),
+			accounts: []common.Hash{common.HexToHash("0x3")},
 		},
 	}
-	db := rawdb.NewMemoryDatabase()
-	// seed
-	for _, e := range entries {
-		for _, a := range e.accounts {
-			require.NoError(t, WriteSyncStorageTrie(db, e.root, a))
-		}
-	}
-	for _, e := range entries {
-		t.Run("storage_"+e.root.Hex(), func(t *testing.T) {
-			it := NewSyncStorageTriesIterator(db, nil)
-			defer it.Release()
-			got := map[common.Hash]bool{}
-			for it.Next() {
-				r, a := ParseSyncStorageTrieKey(it.Key())
-				if r == e.root {
-					got[a] = true
-				}
+
+	for _, tc := range tests {
+		t.Run("storage_"+tc.name, func(t *testing.T) {
+			db := rawdb.NewMemoryDatabase()
+			for _, a := range tc.accounts {
+				require.NoError(t, WriteSyncStorageTrie(db, tc.root, a))
 			}
-			for _, a := range e.accounts {
-				require.True(t, got[a])
-			}
+			got := mapIterator(t, NewSyncStorageTriesIterator(db, nil), func(k []byte) common.Hash {
+				_, a := ParseSyncStorageTrieKey(k)
+				return a
+			})
+			require.ElementsMatch(t, tc.accounts, got)
 		})
 	}
 }
 
 func TestCodeToFetchCases(t *testing.T) {
-	cases := []struct {
+	h1 := common.HexToHash("0x1")
+	h2 := common.HexToHash("0x2")
+	h3 := common.HexToHash("0x3")
+
+	tests := []struct {
 		name   string
 		hashes []common.Hash
-		del    *common.Hash
+		delIdx int // -1 => no delete
 		want   int
 	}{
 		{
 			name:   "none",
-			hashes: nil,
-			del:    nil,
+			delIdx: -1,
 			want:   0,
 		},
 		{
 			name:   "three_keep",
-			hashes: []common.Hash{common.HexToHash("0x1"), common.HexToHash("0x2"), common.HexToHash("0x3")},
-			del:    nil,
+			hashes: []common.Hash{h1, h2, h3},
+			delIdx: -1,
 			want:   3,
 		},
 		{
 			name:   "three_delete_one",
-			hashes: []common.Hash{common.HexToHash("0x1"), common.HexToHash("0x2"), common.HexToHash("0x3")},
-			del:    func() *common.Hash { h := common.HexToHash("0x2"); return &h }(),
+			hashes: []common.Hash{h1, h2, h3},
+			delIdx: 1,
 			want:   2,
 		},
 	}
-	for _, tc := range cases {
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
 			for _, h := range tc.hashes {
 				require.NoError(t, WriteCodeToFetch(db, h))
 			}
-			if tc.del != nil {
-				require.NoError(t, DeleteCodeToFetch(db, *tc.del))
+			if tc.delIdx >= 0 {
+				require.NoError(t, DeleteCodeToFetch(db, tc.hashes[tc.delIdx]))
 			}
-			keys := collectIterKeys(t, rawdb.NewKeyLengthIterator(db.NewIterator(CodeToFetchPrefix, nil), codeToFetchKeyLength))
+			iter := rawdb.NewKeyLengthIterator(db.NewIterator(CodeToFetchPrefix, nil), codeToFetchKeyLength)
+			keys := mapIterator(t, iter, common.CopyBytes)
 			require.Len(t, keys, tc.want)
 		})
 	}
 }
 
-// collectIterKeys consumes an iterator and returns its keys.
-func collectIterKeys(t *testing.T, it ethdb.Iterator) [][]byte {
+func mapIterator[T any](t *testing.T, it ethdb.Iterator, f func([]byte) T) []T {
 	t.Helper()
 	defer it.Release()
-	var keys [][]byte
+	var out []T
 	for it.Next() {
-		keys = append(keys, common.CopyBytes(it.Key()))
+		out = append(out, f(it.Key()))
 	}
 	require.NoError(t, it.Error())
-	return keys
+	return out
 }
 
-// build helpers to construct exact keys used by the storage
 func buildSegmentKey(root, start common.Hash) []byte {
 	return buildKey(syncSegmentsPrefix, root, start, syncSegmentsKeyLength)
 }

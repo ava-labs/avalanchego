@@ -115,7 +115,7 @@ func ReadAcceptorTip(db ethdb.KeyValueReader) (common.Hash, error) {
 
 // ReadChainConfig retrieves the consensus settings based on the given genesis hash.
 // The provided `upgradeConfig` (any JSON-unmarshalable type) will be populated if present on disk.
-func ReadChainConfig[T any](db ethdb.KeyValueReader, hash common.Hash, upgradeConfig *T) (*params.ChainConfig, error) {
+func ReadChainConfig[T any](db ethdb.KeyValueReader, hash common.Hash, upgradeConfig T) (*params.ChainConfig, error) {
 	config := rawdb.ReadChainConfig(db, hash)
 	if config == nil {
 		return nil, ErrEntryNotFound
@@ -139,7 +139,7 @@ func ReadChainConfig[T any](db ethdb.KeyValueReader, hash common.Hash, upgradeCo
 
 // WriteChainConfig writes the chain config settings to the database.
 // The provided `upgradeConfig` (any JSON-marshalable type) will be stored alongside the chain config.
-func WriteChainConfig(db ethdb.KeyValueWriter, hash common.Hash, config *params.ChainConfig, upgradeConfig any) error {
+func WriteChainConfig[T any](db ethdb.KeyValueWriter, hash common.Hash, config *params.ChainConfig, upgradeConfig T) error {
 	rawdb.WriteChainConfig(db, hash, config)
 	if config == nil {
 		return nil
