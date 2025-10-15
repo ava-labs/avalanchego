@@ -203,7 +203,7 @@ func (u *UptimeTracker) update(
 		}
 
 		// This is a new validator
-		u.state.addValidatorUpdate(&validator{
+		u.state.addNewValidator(&validator{
 			NodeID:        newValidator.NodeID,
 			validationID:  validationID,
 			IsActive:      newValidator.IsActive,

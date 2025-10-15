@@ -130,7 +130,7 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	return time.Unix(int64(v.LastUpdated), 0), nil
 }
 
-func (s *state) addValidatorUpdate(vdr *validator) {
+func (s *state) addNewValidator(vdr *validator) {
 	s.addValidator(vdr.validationID, vdr)
 	s.updatedValidators.Add(vdr.validationID)
 }
