@@ -60,8 +60,11 @@ const (
 	// eth address: 0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC
 	HardHatKeyStr = "56289e99c94b6912bfc12adc093c9b51124f0dc54ac7a766b2bc5ccf558d8027"
 
-	// grafanaURI is remote Grafana URI
-	grafanaURI = "grafana-poc.avax-dev.network"
+	// Default base grafana URI.
+	DefaultBaseGrafanaURI = "https://grafana-poc.avax-dev.network/"
+
+	// Default grafana URI used to construct metrics links. Can be overridden by setting GRAFANA_URI env var.
+	defaultGrafanaURI = DefaultBaseGrafanaURI + "d/kBQpRdWnk/avalanche-main-dashboard"
 )
 
 var (
@@ -1117,14 +1120,30 @@ func getRPCVersion(log logging.Logger, command string, versionArgs ...string) (u
 // with the given UUID. The start and end times are accepted as strings to support the
 // use of Grafana's time range syntax (e.g. `now`, `now-1h`).
 func MetricsLinkForNetwork(networkUUID string, startTime string, endTime string) string {
+	return NewGrafanaURI(
+		networkUUID,
+		startTime,
+		endTime,
+		GetEnvWithDefault("GRAFANA_URI", defaultGrafanaURI),
+	)
+}
+
+// NewGrafanaURI returns a Grafana dashboard URI.
+func NewGrafanaURI(
+	networkUUID string,
+	startTime string,
+	endTime string,
+	grafanaURI string,
+) string {
 	if startTime == "" {
 		startTime = "now-1h"
 	}
 	if endTime == "" {
 		endTime = "now"
 	}
+
 	return fmt.Sprintf(
-		"https://%s/d/kBQpRdWnk/avalanche-main-dashboard?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
+		"%s?&var-filter=network_uuid%%7C%%3D%%7C%s&var-filter=is_ephemeral_node%%7C%%3D%%7Cfalse&from=%s&to=%s",
 		grafanaURI,
 		networkUUID,
 		startTime,

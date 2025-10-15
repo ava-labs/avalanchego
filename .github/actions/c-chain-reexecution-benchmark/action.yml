@@ -30,6 +30,14 @@ inputs:
     description: 'The duration of the AWS role to assume for S3 access.'
     required: true
     default: '43200' # 12 hours
+  prometheus-url:
+    description: 'The URL of the prometheus instance.'
+    required: true
+    default: ''
+  prometheus-push-url:
+    description: 'The push URL of the prometheus instance.'
+    required: true
+    default: ''
   prometheus-username:
     description: 'The username for the Prometheus instance.'
     required: true
@@ -56,7 +64,6 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/setup-go-for-project
     - name: Set task env
       shell: bash
       run: |
@@ -77,7 +84,8 @@ runs:
     - name: Run C-Chain Re-Execution
       uses: ./.github/actions/run-monitored-tmpnet-cmd
       with:
-        run_env: |
+        run: |
+          ./scripts/run_task.sh reexecute-cchain-range-with-copied-data \
             CONFIG=${{ inputs.config }} \
             EXECUTION_DATA_DIR=${{ env.EXECUTION_DATA_DIR }} \
             BLOCK_DIR_SRC=${{ env.BLOCK_DIR_SRC }} \
@@ -88,8 +96,7 @@ runs:
             BENCHMARK_OUTPUT_FILE=${{ env.BENCHMARK_OUTPUT_FILE }} \
             RUNNER_NAME=${{ inputs.runner_name }} \
             METRICS_ENABLED=true
-        run: ./scripts/run_task.sh reexecute-cchain-range-with-copied-data
-
+        prometheus_url: ${{ inputs.prometheus-url }}
         prometheus_push_url: ${{ inputs.prometheus-push-url }}
         prometheus_username: ${{ inputs.prometheus-username }}
         prometheus_password: ${{ inputs.prometheus-password }}
@@ -101,15 +108,11 @@ runs:
       with:
         tool: 'go'
         output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
-        fail-on-alert: true
         summary-always: true
-        comment-on-alert: true
         github-token: ${{ inputs.github-token }}
         auto-push: ${{ inputs.push-github-action-benchmark }}
 
-    - uses: ./.github/actions/install-nix
-      if: ${{ inputs.push-post-state != '' }}
     - name: Push Post-State to S3 (if not exists)
       if: ${{ inputs.push-post-state != '' }}
       shell: nix develop --command bash -x {0}
-      run: ./scripts/run_task.sh export-dir-to-s3 LOCAL_SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ S3_DST=${{ inputs.push-post-state }}
+      run: ./scripts/run_task.sh export-dir-to-s3 SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ DST=${{ inputs.push-post-state }}

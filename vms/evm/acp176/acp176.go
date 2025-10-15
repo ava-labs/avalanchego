@@ -96,9 +96,10 @@ func (s *State) GasPrice() gas.Price {
 	return gas.CalculatePrice(MinGasPrice, s.Gas.Excess, priceUpdateConversion)
 }
 
-// AdvanceTime increases the gas capacity and decreases the gas excess based on
+// AdvanceSeconds increases the gas capacity and decreases the gas excess based on
 // the elapsed seconds.
-func (s *State) AdvanceTime(seconds uint64) {
+// This is used in Fortuna.
+func (s *State) AdvanceSeconds(seconds uint64) {
 	targetPerSecond := s.Target()
 	maxPerSecond := mulWithUpperBound(targetPerSecond, TargetToMax)    // R
 	maxCapacity := mulWithUpperBound(maxPerSecond, TimeToFillCapacity) // C
@@ -107,6 +108,23 @@ func (s *State) AdvanceTime(seconds uint64) {
 		maxPerSecond,
 		targetPerSecond,
 		seconds,
+	)
+}
+
+// AdvanceMilliseconds increases the gas capacity and decreases the gas excess based on
+// the elapsed milliseconds.
+// This is used in Granite.
+func (s *State) AdvanceMilliseconds(milliseconds uint64) {
+	targetPerSecond := s.Target()
+	targetPerMS := targetPerSecond / 1000
+	maxPerMS := targetPerMS * TargetToMax                              // R - this can't overflow since 1000 > TargetToMax.
+	maxPerSecond := mulWithUpperBound(targetPerSecond, TargetToMax)    // rate used for calculating maxCapacity
+	maxCapacity := mulWithUpperBound(maxPerSecond, TimeToFillCapacity) // C
+	s.Gas = s.Gas.AdvanceTime(
+		maxCapacity,
+		maxPerMS,
+		targetPerMS,
+		milliseconds,
 	)
 }
 
@@ -208,6 +226,9 @@ func scaleExcess(
 
 	bigTarget.SetUint64(uint64(previousTargetPerSecond))
 	bigExcess.Div(&bigExcess, &bigTarget)
+	if !bigExcess.IsUint64() {
+		return math.MaxUint64
+	}
 	return gas.Gas(bigExcess.Uint64())
 }
 

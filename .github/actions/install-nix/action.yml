@@ -15,3 +15,23 @@ runs:
         github_access_token: ${{ inputs.github_token }}
     - run: nix develop --command echo "dependencies installed"
       shell: bash
+    # Cache Go modules (architecture-independent)
+    - uses: actions/cache@v4
+      id: go-mod-cache
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum', 'tools/go.sum') }}
+        restore-keys: ${{ runner.os }}-go-mod-
+    # Cache Go build cache (architecture-specific)
+    - uses: actions/cache@v4
+      with:
+        path: ~/.cache/go-build
+        key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.sum', 'tools/go.sum') }}
+        restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
+    # Download modules only on cache miss
+    - run: nix develop --command go mod download
+      if: steps.go-mod-cache.outputs.cache-hit != 'true'
+      shell: bash
+    - run: nix develop --command go mod download -modfile=tools/go.mod
+      if: steps.go-mod-cache.outputs.cache-hit != 'true'
+      shell: bash

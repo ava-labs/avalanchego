@@ -70,12 +70,11 @@ func TestRecovery_Success(t *testing.T) {
 				firstBlockOffset := uint64(sizeOfBlockEntryHeader) + uint64(firstBlockCompressedSize)
 
 				header := indexFileHeader{
-					Version:             IndexFileVersion,
-					MaxDataFileSize:     4 * 10 * 1024, // 10KB per file
-					MinHeight:           0,
-					MaxContiguousHeight: 0,
-					MaxHeight:           0,
-					NextWriteOffset:     firstBlockOffset,
+					Version:         IndexFileVersion,
+					MaxDataFileSize: 4 * 10 * 1024, // 10KB per file
+					MinHeight:       0,
+					MaxHeight:       0,
+					NextWriteOffset: firstBlockOffset,
 				}
 
 				// Write the header
@@ -135,7 +134,6 @@ func TestRecovery_Success(t *testing.T) {
 				}
 				blockSize := uint64(sizeOfBlockEntryHeader) + uint64(lastBlockCompressedSize)
 				header.NextWriteOffset -= blockSize
-				header.MaxContiguousHeight = 3
 				header.MaxHeight = 8
 
 				// Write the corrupted header back
@@ -208,10 +206,10 @@ func TestRecovery_Success(t *testing.T) {
 				// Create 4KB blocks
 				block := fixedSizeBlock(t, 4*1024, height)
 
-				require.NoError(t, store.WriteBlock(height, block))
+				require.NoError(t, store.Put(height, block))
 				blocks[height] = block
 			}
-			checkDatabaseState(t, store, 8, 4)
+			checkDatabaseState(t, store, 8)
 			require.NoError(t, store.Close())
 
 			// Corrupt the index file according to the test case
@@ -225,11 +223,11 @@ func TestRecovery_Success(t *testing.T) {
 
 			// Verify blocks are readable
 			for _, height := range blockHeights {
-				readBlock, err := recoveredStore.ReadBlock(height)
+				readBlock, err := recoveredStore.Get(height)
 				require.NoError(t, err)
 				require.Equal(t, blocks[height], readBlock, "block %d should be the same", height)
 			}
-			checkDatabaseState(t, recoveredStore, 8, 4)
+			checkDatabaseState(t, recoveredStore, 8)
 		})
 	}
 }
@@ -534,7 +532,7 @@ func TestRecovery_CorruptionDetection(t *testing.T) {
 				} else {
 					blocks[i] = randomBlock(t)
 				}
-				require.NoError(t, store.WriteBlock(height, blocks[i]))
+				require.NoError(t, store.Put(height, blocks[i]))
 			}
 			require.NoError(t, store.Close())
 
@@ -559,12 +557,11 @@ func resetIndexToBlock(store *Database, blockSize uint64, minHeight uint64) erro
 	defer indexFile.Close()
 
 	header := indexFileHeader{
-		Version:             IndexFileVersion,
-		MaxDataFileSize:     DefaultMaxDataFileSize,
-		MinHeight:           minHeight,
-		MaxContiguousHeight: minHeight,
-		MaxHeight:           minHeight,
-		NextWriteOffset:     uint64(sizeOfBlockEntryHeader) + blockSize,
+		Version:         IndexFileVersion,
+		MaxDataFileSize: DefaultMaxDataFileSize,
+		MinHeight:       minHeight,
+		MaxHeight:       minHeight,
+		NextWriteOffset: uint64(sizeOfBlockEntryHeader) + blockSize,
 	}
 
 	headerBytes, err := header.MarshalBinary()
