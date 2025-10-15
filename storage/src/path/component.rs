@@ -15,6 +15,12 @@ pub struct PathComponent(pub crate::u4::U4);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PathComponent(pub u8);
 
+/// Extension methods for slices of path components.
+pub trait PathComponentSliceExt {
+    /// Casts this slice of path components to a byte slice.
+    fn as_byte_slice(&self) -> &[u8];
+}
+
 impl PathComponent {
     /// All possible path components.
     ///
@@ -116,12 +122,23 @@ impl PathComponent {
         }
     }
 
-    /// Creates a pair of path components from a single byte.
+    /// Creates a pair of path components from a single byte where the
+    /// upper 4 bits are the first component and the lower 4 bits are the
+    /// second component.
     #[cfg(not(feature = "branch_factor_256"))]
     #[must_use]
     pub const fn new_pair(v: u8) -> (Self, Self) {
         let (upper, lower) = crate::u4::U4::new_pair(v);
         (Self(upper), Self(lower))
+    }
+
+    /// Joins this [`PathComponent`] with another to create a single [`u8`] where
+    /// this component is the upper 4 bits and the provided component is the
+    /// lower 4 bits.
+    #[cfg(not(feature = "branch_factor_256"))]
+    #[must_use]
+    pub const fn join(self, other: Self) -> u8 {
+        self.0.join(other.0)
     }
 }
 
@@ -281,6 +298,34 @@ impl<A: smallvec::Array<Item = PathComponent>> TriePathFromUnpackedBytes<'_> for
     }
 }
 
+#[cfg(not(feature = "branch_factor_256"))]
+impl super::TriePathFromPackedBytes<'_> for Vec<PathComponent> {
+    fn path_from_packed_bytes(bytes: &'_ [u8]) -> Self {
+        let path = super::PackedPathRef::path_from_packed_bytes(bytes);
+        let mut this = Vec::new();
+        // reserve_exact is used because we trust that `TriePath::len` returns the exact
+        // length but `Vec::extend` won't trust `Iterator::size_hint` and may
+        // over/under-allocate.
+        this.reserve_exact(path.len());
+        this.extend(path.components());
+        this
+    }
+}
+
+#[cfg(not(feature = "branch_factor_256"))]
+impl<A: smallvec::Array<Item = PathComponent>> super::TriePathFromPackedBytes<'_> for SmallVec<A> {
+    fn path_from_packed_bytes(bytes: &'_ [u8]) -> Self {
+        let path = super::PackedPathRef::path_from_packed_bytes(bytes);
+        let mut this = SmallVec::<A>::new();
+        // reserve_exact is used because we trust that `TriePath::len` returns the exact
+        // length but `SmallVec::extend` won't trust `Iterator::size_hint` and may
+        // over/under-allocate.
+        this.reserve_exact(path.len());
+        this.extend(path.components());
+        this
+    }
+}
+
 #[cfg(feature = "branch_factor_256")]
 impl<'input> TriePathFromUnpackedBytes<'input> for &'input [PathComponent] {
     type Error = std::convert::Infallible;
@@ -334,6 +379,43 @@ impl<'input> TriePathFromUnpackedBytes<'input> for std::sync::Arc<[PathComponent
     }
 }
 
+// these must also only be included when `branch_factor_256` is not enabled otherwise
+// they would conflict with the blanket impl of TriePathFromPackedBytes over
+// TriePathFromUnpackedBytes
+
+#[cfg(not(feature = "branch_factor_256"))]
+impl super::TriePathFromPackedBytes<'_> for Box<[PathComponent]> {
+    fn path_from_packed_bytes(bytes: &[u8]) -> Self {
+        Vec::<PathComponent>::path_from_packed_bytes(bytes).into()
+    }
+}
+
+#[cfg(not(feature = "branch_factor_256"))]
+impl super::TriePathFromPackedBytes<'_> for std::rc::Rc<[PathComponent]> {
+    fn path_from_packed_bytes(bytes: &[u8]) -> Self {
+        Vec::<PathComponent>::path_from_packed_bytes(bytes).into()
+    }
+}
+
+#[cfg(not(feature = "branch_factor_256"))]
+impl super::TriePathFromPackedBytes<'_> for std::sync::Arc<[PathComponent]> {
+    fn path_from_packed_bytes(bytes: &[u8]) -> Self {
+        Vec::<PathComponent>::path_from_packed_bytes(bytes).into()
+    }
+}
+
+impl PathComponentSliceExt for [PathComponent] {
+    fn as_byte_slice(&self) -> &[u8] {
+        path_components_as_byte_slice(self)
+    }
+}
+
+impl<T: std::ops::Deref<Target = [PathComponent]>> PathComponentSliceExt for T {
+    fn as_byte_slice(&self) -> &[u8] {
+        path_components_as_byte_slice(self)
+    }
+}
+
 #[inline]
 const unsafe fn byte_slice_as_path_components_unchecked(bytes: &[u8]) -> &[PathComponent] {
     #![expect(unsafe_code)]
@@ -350,6 +432,21 @@ const unsafe fn byte_slice_as_path_components_unchecked(bytes: &[u8]) -> &[PathC
     // lifetime as `bytes` so it cannot outlive the original slice.
     unsafe {
         &*(std::ptr::slice_from_raw_parts(bytes.as_ptr().cast::<PathComponent>(), bytes.len()))
+    }
+}
+
+#[inline]
+const fn path_components_as_byte_slice(components: &[PathComponent]) -> &[u8] {
+    #![expect(unsafe_code)]
+
+    // SAFETY: We rely on the fact that `PathComponent` is a single element type
+    // over `u8` (or `u4` which looks like a `u8` for this purpose).
+    //
+    // borrow rules ensure that the pointer for `components` is not null and
+    // `components.len()` is always valid. The returned reference will have the same
+    // lifetime as `components` so it cannot outlive the original slice.
+    unsafe {
+        &*(std::ptr::slice_from_raw_parts(components.as_ptr().cast::<u8>(), components.len()))
     }
 }
 
