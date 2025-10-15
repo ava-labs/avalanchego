@@ -664,6 +664,22 @@ typedef struct OwnedKeyValuePair {
 } OwnedKeyValuePair;
 
 /**
+ * A Rust-owned vector of bytes that can be passed to C code.
+ *
+ * C callers must free this memory using the respective FFI function for the
+ * concrete type (but not using the `free` function from the C standard library).
+ */
+typedef struct OwnedSlice_OwnedKeyValuePair {
+  struct OwnedKeyValuePair *ptr;
+  size_t len;
+} OwnedSlice_OwnedKeyValuePair;
+
+/**
+ * A type alias for a rust-owned byte slice.
+ */
+typedef struct OwnedSlice_OwnedKeyValuePair OwnedKeyValueBatch;
+
+/**
  * A result type returned from FFI functions that get a revision
  */
 typedef enum RevisionResult_Tag {
@@ -763,6 +779,42 @@ typedef struct KeyValueResult {
     };
   };
 } KeyValueResult;
+
+/**
+ * A result type returned from iterator FFI functions
+ */
+typedef enum KeyValueBatchResult_Tag {
+  /**
+   * The caller provided a null pointer to an iterator handle.
+   */
+  KeyValueBatchResult_NullHandlePointer,
+  /**
+   * The next batch of items on iterator are returned.
+   */
+  KeyValueBatchResult_Some,
+  /**
+   * An error occurred and the message is returned as an [`OwnedBytes`]. If
+   * value is guaranteed to contain only valid UTF-8.
+   *
+   * The caller must call [`fwd_free_owned_bytes`] to free the memory
+   * associated with this error.
+   *
+   * [`fwd_free_owned_bytes`]: crate::fwd_free_owned_bytes
+   */
+  KeyValueBatchResult_Err,
+} KeyValueBatchResult_Tag;
+
+typedef struct KeyValueBatchResult {
+  KeyValueBatchResult_Tag tag;
+  union {
+    struct {
+      OwnedKeyValueBatch some;
+    };
+    struct {
+      OwnedBytes err;
+    };
+  };
+} KeyValueBatchResult;
 
 /**
  * A result type returned from FFI functions that create an iterator
@@ -1340,6 +1392,27 @@ struct VoidResult fwd_free_iterator(struct IteratorHandle *iterator);
 struct VoidResult fwd_free_owned_bytes(OwnedBytes bytes);
 
 /**
+ * Consumes the [`OwnedKeyValueBatch`] and frees the memory associated with it.
+ *
+ * # Arguments
+ *
+ * * `batch` - The [`OwnedKeyValueBatch`] struct to free, previously returned from any
+ *   function from this library.
+ *
+ * # Returns
+ *
+ * - [`VoidResult::Ok`] if the memory was successfully freed.
+ * - [`VoidResult::Err`] if the process panics while freeing the memory.
+ *
+ * # Safety
+ *
+ * The caller must ensure that the `batch` struct is valid and that the memory
+ * it points to is uniquely owned by this object. However, if `batch.ptr` is null,
+ * this function does nothing.
+ */
+struct VoidResult fwd_free_owned_key_value_batch(OwnedKeyValueBatch batch);
+
+/**
  * Consumes the [`OwnedKeyValuePair`] and frees the memory associated with it.
  *
  * # Arguments
@@ -1575,7 +1648,7 @@ struct ValueResult fwd_get_latest(const struct DatabaseHandle *db, BorrowedBytes
 struct RevisionResult fwd_get_revision(const struct DatabaseHandle *db, BorrowedBytes root);
 
 /**
- * Retrieves the next item from the iterator
+ * Retrieves the next item from the iterator.
  *
  * # Arguments
  *
@@ -1585,20 +1658,54 @@ struct RevisionResult fwd_get_revision(const struct DatabaseHandle *db, Borrowed
  * # Returns
  *
  * - [`KeyValueResult::NullHandlePointer`] if the provided iterator handle is null.
- * - [`KeyValueResult::None`] if the iterator doesn't have any remaining values/exhausted.
+ * - [`KeyValueResult::None`] if the iterator is exhausted (no remaining values). Once returned,
+ *   subsequent calls will continue returning [`KeyValueResult::None`]. You may still call this
+ *   safely, but freeing the iterator with [`fwd_free_iterator`] is recommended.
  * - [`KeyValueResult::Some`] if the next item on iterator was retrieved, with the associated
  *   key value pair.
- * - [`KeyValueResult::Err`] if an error occurred while retrieving the next item on iterator.
+ * - [`KeyValueResult::Err`] if an I/O error occurred while retrieving the next item. Most
+ *   iterator errors are non-reentrant. Once returned, the iterator should be considered
+ *   invalid and must be freed with [`fwd_free_iterator`].
  *
  * # Safety
  *
  * The caller must:
  * * ensure that `handle` is a valid pointer to a [`IteratorHandle`].
- * * call [`fwd_free_owned_bytes`] on [`OwnedKeyValuePair::key`] and [`OwnedKeyValuePair::value`]
- *   to free the memory associated with the returned error or value.
+ * * call [`fwd_free_owned_kv_pair`] on returned [`OwnedKeyValuePair`]
+ *   to free the memory associated with the returned value.
  *
  */
 struct KeyValueResult fwd_iter_next(struct IteratorHandle *handle);
+
+/**
+ * Retrieves the next batch of items from the iterator.
+ *
+ * # Arguments
+ *
+ * * `handle` - The iterator handle returned by [`fwd_iter_on_revision`] or
+ *   [`fwd_iter_on_proposal`].
+ *
+ * # Returns
+ *
+ * - [`KeyValueBatchResult::NullHandlePointer`] if the provided iterator handle is null.
+ * - [`KeyValueBatchResult::Some`] with up to `n` key/value pairs. If the iterator is
+ *   exhausted, this may be fewer than `n`, including zero items.
+ * - [`KeyValueBatchResult::Err`] if an I/O error occurred while retrieving items. Most
+ *   iterator errors are non-reentrant. Once returned, the iterator should be considered
+ *   invalid and must be freed with [`fwd_free_iterator`].
+ *
+ * Once an empty batch or items fewer than `n` is returned (iterator exhausted), subsequent calls
+ * will continue returning empty batches. You may still call this safely, but freeing the
+ * iterator with [`fwd_free_iterator`] is recommended.
+ *
+ * # Safety
+ *
+ * The caller must:
+ * * ensure that `handle` is a valid pointer to a [`IteratorHandle`].
+ * * call [`fwd_free_owned_key_value_batch`] on the returned batch to free any allocated memory.
+ *
+ */
+struct KeyValueBatchResult fwd_iter_next_n(struct IteratorHandle *handle, size_t n);
 
 /**
  * Returns an iterator on the provided proposal optionally starting from a key

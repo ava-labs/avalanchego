@@ -309,21 +309,83 @@ func getValueFromValueResult(result C.ValueResult) ([]byte, error) {
 	}
 }
 
+type ownedKeyValueBatch struct {
+	owned C.OwnedKeyValueBatch
+}
+
+func (b *ownedKeyValueBatch) copy() []*ownedKeyValue {
+	if b.owned.ptr == nil {
+		return nil
+	}
+	borrowed := b.borrow()
+	copied := make([]*ownedKeyValue, len(borrowed))
+	for i, borrow := range borrowed {
+		copied[i] = newOwnedKeyValue(borrow)
+	}
+	return copied
+}
+
+func (b *ownedKeyValueBatch) borrow() []C.OwnedKeyValuePair {
+	if b.owned.ptr == nil {
+		return nil
+	}
+
+	return unsafe.Slice((*C.OwnedKeyValuePair)(unsafe.Pointer(b.owned.ptr)), b.owned.len)
+}
+
+func (b *ownedKeyValueBatch) free() error {
+	if b == nil || b.owned.ptr == nil {
+		// we want ownedKeyValueBatch to be typed-nil safe
+		return nil
+	}
+
+	if err := getErrorFromVoidResult(C.fwd_free_owned_key_value_batch(b.owned)); err != nil {
+		return fmt.Errorf("%w: %w", errFreeingValue, err)
+	}
+
+	b.owned = C.OwnedKeyValueBatch{}
+
+	return nil
+}
+
+// newOwnedKeyValueBatch creates a ownedKeyValueBatch from a C.OwnedKeyValueBatch.
+//
+// The caller is responsible for calling Free() on the returned ownedKeyValue
+// when it is no longer needed otherwise memory will leak.
+func newOwnedKeyValueBatch(owned C.OwnedKeyValueBatch) *ownedKeyValueBatch {
+	return &ownedKeyValueBatch{
+		owned: owned,
+	}
+}
+
 type ownedKeyValue struct {
+	// owned holds the original C-provided pair so we can free it
+	// with fwd_free_owned_kv_pair instead of freeing key/value separately.
+	owned C.OwnedKeyValuePair
+	// key and value wrappers provide Borrowed/Copied accessors
 	key   *ownedBytes
 	value *ownedBytes
 }
 
-func (kv *ownedKeyValue) Consume() ([]byte, []byte, error) {
+func (kv *ownedKeyValue) copy() ([]byte, []byte) {
 	key := kv.key.CopiedBytes()
-	if err := kv.key.Free(); err != nil {
-		return nil, nil, fmt.Errorf("%w: %w", errFreeingValue, err)
-	}
 	value := kv.value.CopiedBytes()
-	if err := kv.value.Free(); err != nil {
-		return nil, nil, fmt.Errorf("%w: %w", errFreeingValue, err)
+	return key, value
+}
+
+func (kv *ownedKeyValue) free() error {
+	if kv == nil {
+		// we want ownedKeyValue to be typed-nil safe
+		return nil
 	}
-	return key, value, nil
+	if err := getErrorFromVoidResult(C.fwd_free_owned_kv_pair(kv.owned)); err != nil {
+		return fmt.Errorf("%w: %w", errFreeingValue, err)
+	}
+	// zero out fields to avoid accidental reuse/double free
+	kv.owned = C.OwnedKeyValuePair{}
+	kv.key = nil
+	kv.value = nil
+	return nil
 }
 
 // newOwnedKeyValue creates a ownedKeyValue from a C.OwnedKeyValuePair.
@@ -332,17 +394,18 @@ func (kv *ownedKeyValue) Consume() ([]byte, []byte, error) {
 // when it is no longer needed otherwise memory will leak.
 func newOwnedKeyValue(owned C.OwnedKeyValuePair) *ownedKeyValue {
 	return &ownedKeyValue{
+		owned: owned,
 		key:   newOwnedBytes(owned.key),
 		value: newOwnedBytes(owned.value),
 	}
 }
 
-// getKeyValueFromKeyValueResult converts a C.KeyValueResult to a key value pair or error.
+// getKeyValueFromResult converts a C.KeyValueResult to a key value pair or error.
 //
 // It returns nil, nil if the result is None.
 // It returns a *ownedKeyValue, nil if the result is Some.
 // It returns an error if the result is an error.
-func getKeyValueFromKeyValueResult(result C.KeyValueResult) (*ownedKeyValue, error) {
+func getKeyValueFromResult(result C.KeyValueResult) (*ownedKeyValue, error) {
 	switch result.tag {
 	case C.KeyValueResult_NullHandlePointer:
 		return nil, errDBClosed
@@ -351,11 +414,31 @@ func getKeyValueFromKeyValueResult(result C.KeyValueResult) (*ownedKeyValue, err
 	case C.KeyValueResult_Some:
 		ownedKvp := newOwnedKeyValue(*(*C.OwnedKeyValuePair)(unsafe.Pointer(&result.anon0)))
 		return ownedKvp, nil
-	case C.ValueResult_Err:
+	case C.KeyValueResult_Err:
 		err := newOwnedBytes(*(*C.OwnedBytes)(unsafe.Pointer(&result.anon0))).intoError()
 		return nil, err
 	default:
 		return nil, fmt.Errorf("unknown C.KeyValueResult tag: %d", result.tag)
+	}
+}
+
+// getKeyValueBatchFromResult converts a C.KeyValueBatchResult to a key value batch or error.
+//
+// It returns nil, nil if the result is None.
+// It returns a *ownedKeyValueBatch, nil if the result is Some.
+// It returns an error if the result is an error.
+func getKeyValueBatchFromResult(result C.KeyValueBatchResult) (*ownedKeyValueBatch, error) {
+	switch result.tag {
+	case C.KeyValueBatchResult_NullHandlePointer:
+		return nil, errDBClosed
+	case C.KeyValueBatchResult_Some:
+		ownedBatch := newOwnedKeyValueBatch(*(*C.OwnedKeyValueBatch)(unsafe.Pointer(&result.anon0)))
+		return ownedBatch, nil
+	case C.KeyValueBatchResult_Err:
+		err := newOwnedBytes(*(*C.OwnedBytes)(unsafe.Pointer(&result.anon0))).intoError()
+		return nil, err
+	default:
+		return nil, fmt.Errorf("unknown C.KeyValueBatchResult tag: %d", result.tag)
 	}
 }
 
