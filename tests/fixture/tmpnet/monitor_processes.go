@@ -33,7 +33,7 @@ const (
 
 	// Prometheus configuration
 	prometheusCmd            = "prometheus-3"
-	prometheusScrapeInterval = 10 * time.Second
+	prometheusScrapeInterval = 5 * time.Second
 	prometheusListenAddress  = "127.0.0.1:9095"
 	prometheusReadinessURL   = "http://" + prometheusListenAddress + "/-/ready"
 
@@ -192,6 +192,9 @@ scrape_configs:
     file_sd_configs:
       - files:
           - '%s/*.json'
+  - job_name: node
+	static_configs:
+	  - targets: ['localhost:9100']
 
 remote_write:
   - url: "%s"
