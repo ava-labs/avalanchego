@@ -8,7 +8,7 @@ module github.com/ava-labs/avalanchego
 //   - CONTRIBUTING.md
 //   - README.md
 //   - go.mod (here)
-//   - nix/go.nix (update version and sha256 for supported arches)
+//   - nix/go/default.nix (update version and sha256 for supported arches)
 //   - tools/go.mod
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
@@ -21,7 +21,7 @@ require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/StephenButtolph/canoto v0.17.2
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.15.4-rc.3.0.20251002221438-a857a64c28ea
+	github.com/ava-labs/coreth v0.15.4-rc.4
 	github.com/ava-labs/libevm v1.13.15-0.20251002164226-35926db4d661
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
@@ -85,6 +85,8 @@ require (
 	k8s.io/client-go v0.29.0
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
+
+require github.com/stretchr/objx v0.5.2 // indirect
 
 require (
 	github.com/Microsoft/go-winio v0.6.1 // indirect

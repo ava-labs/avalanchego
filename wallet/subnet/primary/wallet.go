@@ -106,19 +106,19 @@ func MakeWallet(
 	pBackend := pwallet.NewBackend(pUTXOs, owners)
 	pClient := p.NewClient(avaxState.PClient, pBackend)
 	pBuilder := pbuilder.New(avaxAddrs, avaxState.PCTX, pBackend)
-	pSigner := psigner.New(avaxKeychain, pBackend, avaxState.PCTX.NetworkID)
+	pSigner := psigner.New(avaxKeychain, pBackend)
 
 	xChainID := avaxState.XCTX.BlockchainID
 	xUTXOs := common.NewChainUTXOs(xChainID, avaxState.UTXOs)
 	xBackend := x.NewBackend(avaxState.XCTX, xUTXOs)
 	xBuilder := xbuilder.New(avaxAddrs, avaxState.XCTX, xBackend)
-	xSigner := xsigner.New(avaxKeychain, xBackend, avaxState.XCTX.NetworkID)
+	xSigner := xsigner.New(avaxKeychain, xBackend)
 
 	cChainID := avaxState.CCTX.BlockchainID
 	cUTXOs := common.NewChainUTXOs(cChainID, avaxState.UTXOs)
 	cBackend := c.NewBackend(cUTXOs, ethState.Accounts)
 	cBuilder := c.NewBuilder(avaxAddrs, ethAddrs, avaxState.CCTX, cBackend)
-	cSigner := c.NewSigner(avaxKeychain, ethKeychain, cBackend, avaxState.CCTX.NetworkID)
+	cSigner := c.NewSigner(avaxKeychain, ethKeychain, cBackend)
 
 	return NewWallet(
 		pwallet.New(pClient, pBuilder, pSigner),
@@ -157,6 +157,6 @@ func MakePWallet(
 	pBackend := pwallet.NewBackend(pUTXOs, owners)
 	pClient := p.NewClient(client, pBackend)
 	pBuilder := pbuilder.New(addrs, context, pBackend)
-	pSigner := psigner.New(keychain, pBackend, context.NetworkID)
+	pSigner := psigner.New(keychain, pBackend)
 	return pwallet.New(pClient, pBuilder, pSigner), nil
 }

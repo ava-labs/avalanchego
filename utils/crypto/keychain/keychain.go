@@ -12,7 +12,7 @@ import (
 // to sign a hash or transaction
 type Signer interface {
 	SignHash([]byte) ([]byte, error)
-	Sign([]byte, ...SigningOption) ([]byte, error)
+	Sign([]byte) ([]byte, error)
 	Address() ids.ShortID
 }
 

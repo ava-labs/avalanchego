@@ -16,7 +16,6 @@ import (
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/cb58"
-	"github.com/ava-labs/avalanchego/utils/crypto/keychain"
 	"github.com/ava-labs/avalanchego/utils/hashing"
 
 	stdecdsa "crypto/ecdsa"
@@ -213,8 +212,7 @@ func (k *PrivateKey) EthAddress() common.Address {
 	return crypto.PubkeyToAddress(*(k.PublicKey().ToECDSA()))
 }
 
-func (k *PrivateKey) Sign(msg []byte, _ ...keychain.SigningOption) ([]byte, error) {
-	// Ignore options - secp256k1 signing doesn't need chain/network context
+func (k *PrivateKey) Sign(msg []byte) ([]byte, error) {
 	return k.SignHash(hashing.ComputeHash256(msg))
 }
 

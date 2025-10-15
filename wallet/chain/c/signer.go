@@ -59,18 +59,16 @@ type SignerBackend interface {
 }
 
 type txSigner struct {
-	avaxKC    keychain.Keychain
-	ethKC     EthKeychain
-	backend   SignerBackend
-	networkID uint32
+	avaxKC  keychain.Keychain
+	ethKC   EthKeychain
+	backend SignerBackend
 }
 
-func NewSigner(avaxKC keychain.Keychain, ethKC EthKeychain, backend SignerBackend, networkID uint32) Signer {
+func NewSigner(avaxKC keychain.Keychain, ethKC EthKeychain, backend SignerBackend) Signer {
 	return &txSigner{
-		avaxKC:    avaxKC,
-		ethKC:     ethKC,
-		backend:   backend,
-		networkID: networkID,
+		avaxKC:  avaxKC,
+		ethKC:   ethKC,
+		backend: backend,
 	}
 }
 
@@ -81,10 +79,10 @@ func (s *txSigner) SignAtomic(ctx context.Context, tx *atomic.Tx) error {
 		if err != nil {
 			return err
 		}
-		return sign(tx, signers, s.networkID)
+		return sign(tx, signers)
 	case *atomic.UnsignedExportTx:
 		signers := s.getExportSigners(utx.Ins)
-		return sign(tx, signers, s.networkID)
+		return sign(tx, signers)
 	default:
 		return fmt.Errorf("%w: %T", errUnknownTxType, tx)
 	}
@@ -157,7 +155,7 @@ func SignUnsignedAtomic(ctx context.Context, signer Signer, utx atomic.UnsignedA
 	return tx, signer.SignAtomic(ctx, tx)
 }
 
-func sign(tx *atomic.Tx, txSigners [][]keychain.Signer, networkID uint32) error {
+func sign(tx *atomic.Tx, txSigners [][]keychain.Signer) error {
 	unsignedBytes, err := atomic.Codec.Marshal(version, &tx.UnsignedAtomicTx)
 	if err != nil {
 		return fmt.Errorf("couldn't marshal unsigned tx: %w", err)
@@ -204,9 +202,7 @@ func sign(tx *atomic.Tx, txSigners [][]keychain.Signer, networkID uint32) error 
 				continue
 			}
 
-			sig, err := signer.Sign(unsignedBytes,
-				keychain.WithChainAlias(Alias),
-				keychain.WithNetworkID(networkID))
+			sig, err := signer.Sign(unsignedBytes)
 			if err != nil {
 				return fmt.Errorf("problem signing tx: %w", err)
 			}
