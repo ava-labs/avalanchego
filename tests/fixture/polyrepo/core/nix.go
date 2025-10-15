@@ -4,9 +4,10 @@
 package core
 
 import (
-	"fmt"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 )
 
 // GetNixBuildPath returns the path where nix build should be run
@@ -29,7 +30,7 @@ func RunNixBuild(buildPath string) error {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("nix build failed: %w\nOutput: %s", err, string(output))
+		return stacktrace.Errorf("nix build failed: %w\nOutput: %s", err, string(output))
 	}
 
 	return nil
