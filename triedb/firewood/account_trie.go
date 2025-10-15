@@ -59,8 +59,7 @@ func (a *AccountTrie) GetAccount(addr common.Address) (*types.StateAccount, erro
 	key := crypto.Keccak256Hash(addr.Bytes()).Bytes()
 
 	// First check if there's a pending update for this account
-	keyStr := string(key)
-	if updateValue, exists := a.dirtyKeys[keyStr]; exists {
+	if updateValue, exists := a.dirtyKeys[string(key)]; exists {
 		// If the value is empty, it indicates deletion
 		// Invariant: All encoded values have length > 0
 		if len(updateValue) == 0 {
@@ -105,8 +104,7 @@ func (a *AccountTrie) GetStorage(addr common.Address, key []byte) ([]byte, error
 	copy(combinedKey[common.HashLength:], storageKey)
 
 	// Check if there's a pending update for this storage slot
-	keyStr := string(combinedKey[:])
-	if updateValue, exists := a.dirtyKeys[keyStr]; exists {
+	if updateValue, exists := a.dirtyKeys[string(combinedKey[:])]; exists {
 		// If the value is empty, it indicates deletion
 		if len(updateValue) == 0 {
 			return nil, nil

@@ -105,19 +105,19 @@ func (n *NetworkUpgrades) SetDefaults(agoUpgrades upgrade.Config) {
 func (n *NetworkUpgrades) verifyNetworkUpgrades(agoUpgrades upgrade.Config) error {
 	defaults := GetNetworkUpgrades(agoUpgrades)
 	if err := verifyWithDefault(n.SubnetEVMTimestamp, defaults.SubnetEVMTimestamp); err != nil {
-		return fmt.Errorf("SubnetEVM fork block timestamp is invalid: %w", err)
+		return fmt.Errorf("subnetEVM fork block timestamp is invalid: %w", err)
 	}
 	if err := verifyWithDefault(n.DurangoTimestamp, defaults.DurangoTimestamp); err != nil {
-		return fmt.Errorf("Durango fork block timestamp is invalid: %w", err)
+		return fmt.Errorf("durango fork block timestamp is invalid: %w", err)
 	}
 	if err := verifyWithDefault(n.EtnaTimestamp, defaults.EtnaTimestamp); err != nil {
-		return fmt.Errorf("Etna fork block timestamp is invalid: %w", err)
+		return fmt.Errorf("etna fork block timestamp is invalid: %w", err)
 	}
 	if err := verifyWithDefault(n.FortunaTimestamp, defaults.FortunaTimestamp); err != nil {
-		return fmt.Errorf("Fortuna fork block timestamp is invalid: %w", err)
+		return fmt.Errorf("fortuna fork block timestamp is invalid: %w", err)
 	}
 	if err := verifyWithDefault(n.GraniteTimestamp, defaults.GraniteTimestamp); err != nil {
-		return fmt.Errorf("Granite fork block timestamp is invalid: %w", err)
+		return fmt.Errorf("granite fork block timestamp is invalid: %w", err)
 	}
 	return nil
 }

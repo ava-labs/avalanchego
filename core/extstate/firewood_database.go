@@ -13,35 +13,35 @@ import (
 )
 
 var (
-	_ state.Database = (*firewoodAccessorDb)(nil)
+	_ state.Database = (*firewoodAccessorDB)(nil)
 	_ state.Trie     = (*firewood.AccountTrie)(nil)
 	_ state.Trie     = (*firewood.StorageTrie)(nil)
 )
 
-type firewoodAccessorDb struct {
+type firewoodAccessorDB struct {
 	state.Database
 	fw *firewood.Database
 }
 
 // OpenTrie opens the main account trie.
-func (db *firewoodAccessorDb) OpenTrie(root common.Hash) (state.Trie, error) {
+func (db *firewoodAccessorDB) OpenTrie(root common.Hash) (state.Trie, error) {
 	return firewood.NewAccountTrie(root, db.fw)
 }
 
 // OpenStorageTrie opens a wrapped version of the account trie.
 //
 //nolint:revive // removing names loses context.
-func (*firewoodAccessorDb) OpenStorageTrie(stateRoot common.Hash, addr common.Address, accountRoot common.Hash, self state.Trie) (state.Trie, error) {
+func (*firewoodAccessorDB) OpenStorageTrie(stateRoot common.Hash, addr common.Address, accountRoot common.Hash, self state.Trie) (state.Trie, error) {
 	accountTrie, ok := self.(*firewood.AccountTrie)
 	if !ok {
-		return nil, fmt.Errorf("Invalid account trie type: %T", self)
+		return nil, fmt.Errorf("invalid account trie type: %T", self)
 	}
 	return firewood.NewStorageTrie(accountTrie)
 }
 
 // CopyTrie returns a deep copy of the given trie.
 // It can be altered by the caller.
-func (*firewoodAccessorDb) CopyTrie(t state.Trie) state.Trie {
+func (*firewoodAccessorDB) CopyTrie(t state.Trie) state.Trie {
 	switch t := t.(type) {
 	case *firewood.AccountTrie:
 		return t.Copy()

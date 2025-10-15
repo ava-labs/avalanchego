@@ -30,10 +30,10 @@ func BlockGasCost(
 	}
 
 	var (
-		minBlockGasCost uint64 = feeConfig.MinBlockGasCost.Uint64()
-		maxBlockGasCost uint64 = feeConfig.MaxBlockGasCost.Uint64()
-		op                     = safemath.Add[uint64]
-		defaultCost     uint64 = feeConfig.MaxBlockGasCost.Uint64()
+		minBlockGasCost = feeConfig.MinBlockGasCost.Uint64()
+		maxBlockGasCost = feeConfig.MaxBlockGasCost.Uint64()
+		op              = safemath.Add[uint64]
+		defaultCost     = feeConfig.MaxBlockGasCost.Uint64()
 	)
 	if timeElapsed > feeConfig.TargetBlockRate {
 		op = safemath.Sub

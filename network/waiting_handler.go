@@ -49,12 +49,12 @@ func (w *waitingResponseHandler) OnFailure() error {
 	return nil
 }
 
-func (waitingHandler *waitingResponseHandler) WaitForResult(ctx context.Context) ([]byte, error) {
+func (w *waitingResponseHandler) WaitForResult(ctx context.Context) ([]byte, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
-	case response := <-waitingHandler.responseChan:
-		if waitingHandler.failed {
+	case response := <-w.responseChan:
+		if w.failed {
 			return nil, errRequestFailed
 		}
 		return response, nil
