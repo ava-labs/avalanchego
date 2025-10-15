@@ -19,7 +19,9 @@ import (
 
 var (
 	// errInvalidData indicates the stored value exists but is malformed or undecodable.
-	errInvalidData = errors.New("invalid data")
+	errInvalidData                  = errors.New("invalid data")
+	errFailedToGetUpgradeConfig     = errors.New("failed to get upgrade config")
+	errFailedToMarshalUpgradeConfig = errors.New("failed to marshal upgrade config")
 
 	upgradeConfigPrefix = []byte("upgrade-config-")
 	// offlinePruningKey tracks runs of offline pruning.
@@ -119,12 +121,16 @@ func ReadChainConfig[T any](db ethdb.KeyValueReader, hash common.Hash, upgradeCo
 		return nil, ErrEntryNotFound
 	}
 
-	upgrade, _ := db.Get(upgradeConfigKey(hash))
+	upgrade, err := db.Get(upgradeConfigKey(hash))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errFailedToGetUpgradeConfig, err)
+	}
+
 	if len(upgrade) == 0 {
 		return config, nil
 	}
 
-	if err := json.Unmarshal(upgrade, upgradeConfig); err != nil {
+	if err := json.Unmarshal(upgrade, &upgradeConfig); err != nil {
 		return nil, errInvalidData
 	}
 
@@ -133,7 +139,7 @@ func ReadChainConfig[T any](db ethdb.KeyValueReader, hash common.Hash, upgradeCo
 
 // WriteChainConfig writes the chain config settings to the database.
 // The provided `upgradeConfig` (any JSON-marshalable type) will be stored alongside the chain config.
-func WriteChainConfig[T any](db ethdb.KeyValueWriter, hash common.Hash, config *params.ChainConfig, upgradeConfig T) error {
+func WriteChainConfig(db ethdb.KeyValueWriter, hash common.Hash, config *params.ChainConfig, upgradeConfig any) error {
 	rawdb.WriteChainConfig(db, hash, config)
 	if config == nil {
 		return nil
@@ -141,7 +147,7 @@ func WriteChainConfig[T any](db ethdb.KeyValueWriter, hash common.Hash, config *
 
 	data, err := json.Marshal(upgradeConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", errFailedToMarshalUpgradeConfig, err)
 	}
 	if err := db.Put(upgradeConfigKey(hash), data); err != nil {
 		return err
@@ -199,7 +205,6 @@ func DeleteSnapshotBlockHash(db ethdb.KeyValueWriter) error {
 	return nil
 }
 
-// writeTimeMarker writes a marker of the provided time in the db at `key`.
 func writeTimeMarker(db ethdb.KeyValueStore, key []byte, ts time.Time) error {
 	data, err := rlp.EncodeToBytes(uint64(ts.Unix()))
 	if err != nil {
@@ -208,7 +213,6 @@ func writeTimeMarker(db ethdb.KeyValueStore, key []byte, ts time.Time) error {
 	return db.Put(key, data)
 }
 
-// readTimeMarker reads the timestamp stored at `key`
 func readTimeMarker(db ethdb.KeyValueStore, key []byte) (time.Time, error) {
 	// Check existence first to map missing marker to a stable sentinel error.
 	ok, err := db.Has(key)
@@ -235,7 +239,6 @@ func readTimeMarker(db ethdb.KeyValueStore, key []byte) (time.Time, error) {
 	return time.Unix(int64(unix), 0), nil
 }
 
-// upgradeConfigKey = upgradeConfigPrefix + hash
 func upgradeConfigKey(hash common.Hash) []byte {
 	return append(upgradeConfigPrefix, hash.Bytes()...)
 }

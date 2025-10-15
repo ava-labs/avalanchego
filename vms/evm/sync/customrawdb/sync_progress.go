@@ -69,7 +69,7 @@ func DeleteCodeToFetch(db ethdb.KeyValueWriter, codeHash common.Hash) error {
 
 // NewCodeToFetchIterator returns a KeyLength iterator over all code
 // hashes that are pending syncing. It is the caller's responsibility to
-// unpack the key and call Release on the returned iterator.
+// parse the key and call Release on the returned iterator.
 func NewCodeToFetchIterator(db ethdb.Iteratee) ethdb.Iterator {
 	return rawdb.NewKeyLengthIterator(
 		db.NewIterator(CodeToFetchPrefix, nil),
@@ -85,7 +85,7 @@ func codeToFetchKey(codeHash common.Hash) []byte {
 }
 
 // NewSyncSegmentsIterator returns a KeyLength iterator over all trie segments
-// added for root. It is the caller's responsibility to unpack the key and call
+// added for root. It is the caller's responsibility to parse the key and call
 // Release on the returned iterator.
 func NewSyncSegmentsIterator(db ethdb.Iteratee, root common.Hash) ethdb.Iterator {
 	segmentsPrefix := make([]byte, len(syncSegmentsPrefix)+common.HashLength)
@@ -121,9 +121,9 @@ func ClearAllSyncSegments(db ethdb.KeyValueStore) error {
 	return clearPrefix(db, syncSegmentsPrefix, syncSegmentsKeyLength)
 }
 
-// UnpackSyncSegmentKey returns the root and start position for a trie segment
+// ParseSyncSegmentKey returns the root and start position for a trie segment
 // key returned from NewSyncSegmentsIterator.
-func UnpackSyncSegmentKey(keyBytes []byte) (common.Hash, []byte) {
+func ParseSyncSegmentKey(keyBytes []byte) (common.Hash, []byte) {
 	keyBytes = keyBytes[len(syncSegmentsPrefix):] // skip prefix
 	root := common.BytesToHash(keyBytes[:common.HashLength])
 	start := keyBytes[common.HashLength:]
@@ -131,7 +131,7 @@ func UnpackSyncSegmentKey(keyBytes []byte) (common.Hash, []byte) {
 }
 
 // NewSyncStorageTriesIterator returns a KeyLength iterator over all storage tries
-// added for syncing (beginning at seek). It is the caller's responsibility to unpack
+// added for syncing (beginning at seek). It is the caller's responsibility to parse
 // the key and call Release on the returned iterator.
 func NewSyncStorageTriesIterator(db ethdb.Iteratee, seek []byte) ethdb.Iterator {
 	return rawdb.NewKeyLengthIterator(db.NewIterator(syncStorageTriesPrefix, seek), syncStorageTriesKeyLength)
@@ -160,9 +160,9 @@ func ClearAllSyncStorageTries(db ethdb.KeyValueStore) error {
 	return clearPrefix(db, syncStorageTriesPrefix, syncStorageTriesKeyLength)
 }
 
-// UnpackSyncStorageTrieKey returns the root and account for a storage trie
+// ParseSyncStorageTrieKey returns the root and account for a storage trie
 // key returned from NewSyncStorageTriesIterator.
-func UnpackSyncStorageTrieKey(keyBytes []byte) (common.Hash, common.Hash) {
+func ParseSyncStorageTrieKey(keyBytes []byte) (common.Hash, common.Hash) {
 	keyBytes = keyBytes[len(syncStorageTriesPrefix):] // skip prefix
 	root := common.BytesToHash(keyBytes[:common.HashLength])
 	account := common.BytesToHash(keyBytes[common.HashLength:])
@@ -184,9 +184,9 @@ func NewSyncPerformedIterator(db ethdb.Iteratee) ethdb.Iterator {
 	return rawdb.NewKeyLengthIterator(db.NewIterator(syncPerformedPrefix, nil), syncPerformedKeyLength)
 }
 
-// UnpackSyncPerformedKey returns the block number from keys the iterator returned
+// ParseSyncPerformedKey returns the block number from keys the iterator returned
 // from NewSyncPerformedIterator.
-func UnpackSyncPerformedKey(key []byte) uint64 {
+func ParseSyncPerformedKey(key []byte) uint64 {
 	return binary.BigEndian.Uint64(key[len(syncPerformedPrefix):])
 }
 
@@ -197,7 +197,7 @@ func GetLatestSyncPerformed(db ethdb.Iteratee) (uint64, error) {
 
 	var latestSyncPerformed uint64
 	for it.Next() {
-		syncPerformed := UnpackSyncPerformedKey(it.Key())
+		syncPerformed := ParseSyncPerformedKey(it.Key())
 		if syncPerformed > latestSyncPerformed {
 			latestSyncPerformed = syncPerformed
 		}
