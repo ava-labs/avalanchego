@@ -1,35 +1,47 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::{BranchNode, Children, HashType, IntoSplitPath, LeafNode, Node, Path, TriePath};
+use crate::{
+    Children, HashType, HashableShunt, IntoSplitPath, Node, Path, PathComponent, SplitPath,
+    TriePath,
+};
 use smallvec::SmallVec;
+
+impl<'a, P: SplitPath> HashableShunt<'a, P, &'a [PathComponent]> {
+    /// Creates a new [`HashableShunt`] from the given `node` at the given `prefix`.
+    pub fn from_node(prefix: P, node: &'a Node) -> Self {
+        match node {
+            Node::Branch(node) => {
+                // All child hashes should be filled in.
+                // TODO danlaine: Enforce this with the type system.
+                debug_assert!(
+                    node.children
+                        .iter()
+                        .all(|(_, c)| !matches!(c, Some(crate::Child::Node(_)))),
+                    "branch children: {:?}",
+                    node.children
+                );
+                Self::new(
+                    prefix,
+                    node.partial_path.as_components(),
+                    node.value.as_deref().map(ValueDigest::Value),
+                    node.children_hashes(),
+                )
+            }
+            Node::Leaf(node) => Self::new(
+                prefix,
+                node.partial_path.as_components(),
+                Some(ValueDigest::Value(&node.value)),
+                Children::new(),
+            ),
+        }
+    }
+}
 
 /// Returns the hash of `node`, which is at the given `path_prefix`.
 #[must_use]
 pub fn hash_node(node: &Node, path_prefix: &Path) -> HashType {
-    match node {
-        Node::Branch(node) => {
-            // All child hashes should be filled in.
-            // TODO danlaine: Enforce this with the type system.
-            debug_assert!(
-                node.children
-                    .iter()
-                    .all(|(_, c)| !matches!(c, Some(crate::Child::Node(_)))),
-                "branch children: {:?}",
-                node.children
-            );
-            NodeAndPrefix {
-                node: node.as_ref(),
-                prefix: path_prefix,
-            }
-            .into()
-        }
-        Node::Leaf(node) => NodeAndPrefix {
-            node,
-            prefix: path_prefix,
-        }
-        .into(),
-    }
+    HashableShunt::from_node(path_prefix.as_components(), node).to_hash()
 }
 
 /// Returns the serialized representation of `node` used as the pre-image
@@ -40,20 +52,7 @@ pub fn hash_preimage(node: &Node, path_prefix: &Path) -> Box<[u8]> {
     #[expect(clippy::arithmetic_side_effects)]
     let est_len = node.partial_path().len() + path_prefix.len() + 3 + HashType::empty().len();
     let mut buf = Vec::with_capacity(est_len);
-    match node {
-        Node::Branch(node) => {
-            NodeAndPrefix {
-                node: node.as_ref(),
-                prefix: path_prefix,
-            }
-            .write(&mut buf);
-        }
-        Node::Leaf(node) => NodeAndPrefix {
-            node,
-            prefix: path_prefix,
-        }
-        .write(&mut buf),
-    }
+    HashableShunt::from_node(path_prefix.as_components(), node).write(&mut buf);
     buf.into_boxed_slice()
 }
 
@@ -63,20 +62,13 @@ pub trait HasUpdate {
 
 impl HasUpdate for Vec<u8> {
     fn update<T: AsRef<[u8]>>(&mut self, data: T) {
-        self.extend(data.as_ref().iter().copied());
+        self.extend_from_slice(data.as_ref());
     }
 }
 
-// TODO: make it work with any size SmallVec
-// impl<T: AsRef<[u8]> + smallvec::Array> HasUpdate for SmallVec<T> {
-//     fn update<U: AsRef<[u8]>>(&mut self, data: U) {
-//         self.extend(data.as_ref());
-//     }
-// }
-
-impl HasUpdate for SmallVec<[u8; 32]> {
+impl<A: smallvec::Array<Item = u8>> HasUpdate for SmallVec<A> {
     fn update<T: AsRef<[u8]>>(&mut self, data: T) {
-        self.extend(data.as_ref().iter().copied());
+        self.extend_from_slice(data.as_ref());
     }
 }
 
@@ -138,6 +130,15 @@ impl<T: AsRef<[u8]>> ValueDigest<T> {
             ValueDigest::Hash(v) => ValueDigest::Hash(v),
         }
     }
+
+    /// Maps the value inside this `ValueDigest` to another value.
+    pub fn map<O>(self, f: impl FnOnce(T) -> O) -> ValueDigest<O> {
+        match self {
+            Self::Value(v) => ValueDigest::Value(f(v)),
+            #[cfg(not(feature = "ethhash"))]
+            Self::Hash(h) => ValueDigest::Hash(h),
+        }
+    }
 }
 
 impl<T: AsRef<[u8]>> AsRef<[u8]> for ValueDigest<T> {
@@ -174,70 +175,7 @@ pub trait Hashable: std::fmt::Debug {
 pub trait Preimage: std::fmt::Debug {
     /// Returns the hash of this preimage.
     fn to_hash(&self) -> HashType;
+
     /// Write this hash preimage to `buf`.
     fn write(&self, buf: &mut impl HasUpdate);
-}
-
-trait HashableNode: std::fmt::Debug {
-    fn partial_path(&self) -> impl IntoSplitPath + '_;
-    fn value(&self) -> Option<&[u8]>;
-    fn child_hashes(&self) -> Children<Option<HashType>>;
-}
-
-impl HashableNode for BranchNode {
-    fn partial_path(&self) -> impl IntoSplitPath + '_ {
-        self.partial_path.as_components()
-    }
-
-    fn value(&self) -> Option<&[u8]> {
-        self.value.as_deref()
-    }
-
-    fn child_hashes(&self) -> Children<Option<HashType>> {
-        self.children_hashes()
-    }
-}
-
-impl HashableNode for LeafNode {
-    fn partial_path(&self) -> impl IntoSplitPath + '_ {
-        self.partial_path.as_components()
-    }
-
-    fn value(&self) -> Option<&[u8]> {
-        Some(&self.value)
-    }
-
-    fn child_hashes(&self) -> Children<Option<HashType>> {
-        Children::new()
-    }
-}
-
-#[derive(Debug)]
-struct NodeAndPrefix<'a, N: HashableNode> {
-    node: &'a N,
-    prefix: &'a Path,
-}
-
-impl<'a, N: HashableNode> From<NodeAndPrefix<'a, N>> for HashType {
-    fn from(node: NodeAndPrefix<'a, N>) -> Self {
-        node.to_hash()
-    }
-}
-
-impl<'a, N: HashableNode> Hashable for NodeAndPrefix<'a, N> {
-    fn parent_prefix_path(&self) -> impl IntoSplitPath + '_ {
-        self.prefix.as_components()
-    }
-
-    fn partial_path(&self) -> impl IntoSplitPath + '_ {
-        self.node.partial_path()
-    }
-
-    fn value_digest(&self) -> Option<ValueDigest<&'a [u8]>> {
-        self.node.value().map(ValueDigest::Value)
-    }
-
-    fn children(&self) -> Children<Option<HashType>> {
-        self.node.child_hashes()
-    }
 }

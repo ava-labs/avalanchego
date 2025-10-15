@@ -24,6 +24,7 @@ use std::ops::Range;
 
 mod checker;
 mod hashednode;
+mod hashedshunt;
 mod hashers;
 mod iter;
 mod linear;
@@ -44,6 +45,7 @@ pub mod macros;
 // re-export these so callers don't need to know where they are
 pub use checker::{CheckOpt, CheckerReport, DBStats, FreeListsStats, TrieStats};
 pub use hashednode::{Hashable, Preimage, ValueDigest, hash_node, hash_preimage};
+pub use hashedshunt::HashableShunt;
 pub use linear::{FileIoError, ReadableStorage, WritableStorage};
 pub use node::path::{NibblesIterator, Path};
 pub use node::{
