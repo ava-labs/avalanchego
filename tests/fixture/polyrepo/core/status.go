@@ -3,21 +3,25 @@
 
 package core
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
+)
 
 // RepoStatus represents the status of a repository
 type RepoStatus struct {
-	Name          string
-	Path          string
-	Exists        bool
-	CurrentRef    string
-	IsDirty       bool
-	HasReplace    bool
-	ReplacePath   string
+	Name        string
+	Path        string
+	Exists      bool
+	CurrentRef  string
+	IsDirty     bool
+	HasReplace  bool
+	ReplacePath string
 }
 
 // GetRepoStatus returns the status of a repository
-func GetRepoStatus(repoName, baseDir, goModPath string) (*RepoStatus, error) {
+func GetRepoStatus(log logging.Logger, repoName, baseDir, goModPath string) (*RepoStatus, error) {
 	config, err := GetRepoConfig(repoName)
 	if err != nil {
 		return nil, err
@@ -30,13 +34,13 @@ func GetRepoStatus(repoName, baseDir, goModPath string) (*RepoStatus, error) {
 	}
 
 	// Check if repo exists
-	isDirty, err := IsRepoDirty(status.Path)
+	isDirty, err := IsRepoDirty(log, status.Path)
 	if err == nil {
 		status.Exists = true
 		status.IsDirty = isDirty
 
 		// Get current ref
-		currentRef, err := GetCurrentRef(status.Path)
+		currentRef, err := GetCurrentRef(log, status.Path)
 		if err == nil {
 			status.CurrentRef = currentRef
 		}
@@ -44,7 +48,7 @@ func GetRepoStatus(repoName, baseDir, goModPath string) (*RepoStatus, error) {
 
 	// Check for replace directive in go.mod
 	if goModPath != "" {
-		modFile, err := ReadGoMod(goModPath)
+		modFile, err := ReadGoMod(log, goModPath)
 		if err == nil {
 			for _, replace := range modFile.Replace {
 				if replace.Old.Path == config.GoModule {
@@ -62,7 +66,7 @@ func GetRepoStatus(repoName, baseDir, goModPath string) (*RepoStatus, error) {
 // FormatRepoStatus formats a repo status for display
 func FormatRepoStatus(status *RepoStatus) string {
 	if !status.Exists {
-		return fmt.Sprintf("%s: not cloned", status.Name)
+		return status.Name + ": not cloned"
 	}
 
 	result := fmt.Sprintf("%s: %s", status.Name, status.Path)

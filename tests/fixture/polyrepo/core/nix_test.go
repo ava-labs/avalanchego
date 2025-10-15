@@ -5,6 +5,8 @@ package core
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetNixBuildPath(t *testing.T) {
@@ -31,19 +33,17 @@ func TestGetNixBuildPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			path := GetNixBuildPath(tt.repoPath, tt.nixSubPath)
-			if path != tt.expectedPath {
-				t.Errorf("expected path '%s', got '%s'", tt.expectedPath, path)
-			}
+			require.Equal(t, tt.expectedPath, path)
 		})
 	}
 }
 
 func TestGetNixResultPath(t *testing.T) {
 	tests := []struct {
-		name         string
-		nixBuildPath string
+		name          string
+		nixBuildPath  string
 		resultSubPath string
-		expectedPath string
+		expectedPath  string
 	}{
 		{
 			name:          "firewood ffi result",
@@ -62,9 +62,7 @@ func TestGetNixResultPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			path := GetNixResultPath(tt.nixBuildPath, tt.resultSubPath)
-			if path != tt.expectedPath {
-				t.Errorf("expected path '%s', got '%s'", tt.expectedPath, path)
-			}
+			require.Equal(t, tt.expectedPath, path)
 		})
 	}
 }

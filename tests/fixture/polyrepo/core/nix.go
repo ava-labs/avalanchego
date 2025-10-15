@@ -7,9 +7,10 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"go.uber.org/zap"
 )
 
 // GetNixBuildPath returns the path where nix build should be run

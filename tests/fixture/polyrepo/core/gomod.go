@@ -7,11 +7,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"go.uber.org/zap"
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
+
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 // ReadGoMod reads and parses a go.mod file
@@ -126,7 +127,7 @@ func AddReplaceDirective(log logging.Logger, goModPath, oldPath, newPath string)
 	log.Debug("writing modified go.mod",
 		zap.String("path", goModPath),
 	)
-	err = os.WriteFile(goModPath, formattedData, 0644)
+	err = os.WriteFile(goModPath, formattedData, 0o600)
 	if err != nil {
 		return stacktrace.Errorf("failed to write go.mod: %w", err)
 	}
@@ -188,7 +189,7 @@ func RemoveReplaceDirective(log logging.Logger, goModPath, oldPath string) error
 	log.Debug("writing modified go.mod",
 		zap.String("path", goModPath),
 	)
-	err = os.WriteFile(goModPath, formattedData, 0644)
+	err = os.WriteFile(goModPath, formattedData, 0o600)
 	if err != nil {
 		return stacktrace.Errorf("failed to write go.mod: %w", err)
 	}

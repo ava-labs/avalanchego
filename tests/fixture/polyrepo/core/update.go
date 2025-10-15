@@ -4,9 +4,10 @@
 package core
 
 import (
+	"go.uber.org/zap"
+
 	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"go.uber.org/zap"
 )
 
 // UpdateAvalanchego updates the avalanchego dependency in the current repo's go.mod
