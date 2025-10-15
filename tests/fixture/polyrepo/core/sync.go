@@ -4,9 +4,10 @@
 package core
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 )
 
 // DetectCurrentRepo detects which repository we're currently in based on go.mod
@@ -16,7 +17,7 @@ func DetectCurrentRepo(dir string) (string, error) {
 	if _, err := os.Stat(goModPath); err == nil {
 		modulePath, err := GetModulePath(goModPath)
 		if err != nil {
-			return "", fmt.Errorf("failed to get module path: %w", err)
+			return "", stacktrace.Errorf("failed to get module path: %w", err)
 		}
 
 		// Check against known repos
@@ -34,7 +35,7 @@ func DetectCurrentRepo(dir string) (string, error) {
 		if _, err := os.Stat(subGoModPath); err == nil {
 			modulePath, err := GetModulePath(subGoModPath)
 			if err != nil {
-				return "", fmt.Errorf("failed to get module path: %w", err)
+				return "", stacktrace.Errorf("failed to get module path: %w", err)
 			}
 
 			if modulePath == firewoodConfig.GoModule {
@@ -94,7 +95,7 @@ func GetDefaultRefForRepo(currentRepo, targetRepo, goModPath string) (string, er
 	// Convert the version to a git ref (handles pseudo-versions)
 	gitRef, err := ConvertVersionToGitRef(version)
 	if err != nil {
-		return "", fmt.Errorf("failed to convert version %s to git ref: %w", version, err)
+		return "", stacktrace.Errorf("failed to convert version %s to git ref: %w", version, err)
 	}
 
 	return gitRef, nil

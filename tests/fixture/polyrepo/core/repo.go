@@ -4,11 +4,11 @@
 package core
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -17,12 +17,12 @@ import (
 // ParseRepoAndVersion parses a string like "repo@version" and returns the repo name and version
 func ParseRepoAndVersion(input string) (string, string, error) {
 	if input == "" {
-		return "", "", fmt.Errorf("empty input")
+		return "", "", stacktrace.Errorf("empty input")
 	}
 
 	parts := strings.Split(input, "@")
 	if len(parts) > 2 {
-		return "", "", fmt.Errorf("invalid format: multiple @ symbols")
+		return "", "", stacktrace.Errorf("invalid format: multiple @ symbols")
 	}
 
 	repo := parts[0]
@@ -62,7 +62,7 @@ func CloneRepo(url, path, ref string, depth int) error {
 
 	_, err := git.PlainClone(path, false, opts)
 	if err != nil {
-		return fmt.Errorf("failed to clone repository: %w", err)
+		return stacktrace.Errorf("failed to clone repository: %w", err)
 	}
 
 	return nil
@@ -87,25 +87,25 @@ func looksLikeSHA(ref string) bool {
 func CheckoutRef(repoPath, ref string) error {
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
-		return fmt.Errorf("failed to open repository: %w", err)
+		return stacktrace.Errorf("failed to open repository: %w", err)
 	}
 
 	w, err := repo.Worktree()
 	if err != nil {
-		return fmt.Errorf("failed to get worktree: %w", err)
+		return stacktrace.Errorf("failed to get worktree: %w", err)
 	}
 
 	// Try to resolve the ref
 	hash, err := repo.ResolveRevision(plumbing.Revision(ref))
 	if err != nil {
-		return fmt.Errorf("failed to resolve ref %s: %w", ref, err)
+		return stacktrace.Errorf("failed to resolve ref %s: %w", ref, err)
 	}
 
 	err = w.Checkout(&git.CheckoutOptions{
 		Hash: *hash,
 	})
 	if err != nil {
-		return fmt.Errorf("failed to checkout ref %s: %w", ref, err)
+		return stacktrace.Errorf("failed to checkout ref %s: %w", ref, err)
 	}
 
 	return nil
@@ -115,12 +115,12 @@ func CheckoutRef(repoPath, ref string) error {
 func GetCurrentRef(repoPath string) (string, error) {
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to open repository: %w", err)
+		return "", stacktrace.Errorf("failed to open repository: %w", err)
 	}
 
 	head, err := repo.Head()
 	if err != nil {
-		return "", fmt.Errorf("failed to get HEAD: %w", err)
+		return "", stacktrace.Errorf("failed to get HEAD: %w", err)
 	}
 
 	// If HEAD is a branch, return the branch name
@@ -136,17 +136,17 @@ func GetCurrentRef(repoPath string) (string, error) {
 func IsRepoDirty(repoPath string) (bool, error) {
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
-		return false, fmt.Errorf("failed to open repository: %w", err)
+		return false, stacktrace.Errorf("failed to open repository: %w", err)
 	}
 
 	w, err := repo.Worktree()
 	if err != nil {
-		return false, fmt.Errorf("failed to get worktree: %w", err)
+		return false, stacktrace.Errorf("failed to get worktree: %w", err)
 	}
 
 	status, err := w.Status()
 	if err != nil {
-		return false, fmt.Errorf("failed to get status: %w", err)
+		return false, stacktrace.Errorf("failed to get status: %w", err)
 	}
 
 	return !status.IsClean(), nil
@@ -205,7 +205,7 @@ func CloneOrUpdateRepo(url, path, ref string, depth int, force bool) error {
 func UpdateRepo(repoPath, ref string) error {
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
-		return fmt.Errorf("failed to open repository: %w", err)
+		return stacktrace.Errorf("failed to open repository: %w", err)
 	}
 
 	// Fetch latest changes
@@ -213,7 +213,7 @@ func UpdateRepo(repoPath, ref string) error {
 		RefSpecs: []config.RefSpec{"refs/*:refs/*"},
 	})
 	if err != nil && err != git.NoErrAlreadyUpToDate {
-		return fmt.Errorf("failed to fetch: %w", err)
+		return stacktrace.Errorf("failed to fetch: %w", err)
 	}
 
 	// Checkout the ref
