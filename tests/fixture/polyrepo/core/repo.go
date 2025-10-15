@@ -9,9 +9,11 @@ import (
 	"strings"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
+	"go.uber.org/zap"
 )
 
 // ParseRepoAndVersion parses a string like "repo@version" and returns the repo name and version
@@ -43,7 +45,14 @@ func GetRepoClonePath(repoName, baseDir string) string {
 // depth: 0 for full clone, 1 for shallow clone (default), >1 for partial clone
 // ref can be a branch name, tag, or commit SHA. For SHAs, the repository is cloned
 // without SingleBranch and the ref is checked out after cloning.
-func CloneRepo(url, path, ref string, depth int) error {
+func CloneRepo(log logging.Logger, url, path, ref string, depth int) error {
+	log.Debug("entering CloneRepo",
+		zap.String("url", url),
+		zap.String("path", path),
+		zap.String("ref", ref),
+		zap.Int("depth", depth),
+	)
+
 	opts := &git.CloneOptions{
 		URL: url,
 	}
@@ -51,19 +60,41 @@ func CloneRepo(url, path, ref string, depth int) error {
 	// depth of 0 means full clone, otherwise set depth
 	if depth > 0 {
 		opts.Depth = depth
+		log.Debug("setting clone depth",
+			zap.Int("depth", depth),
+		)
+	} else {
+		log.Debug("performing full clone (depth=0)")
 	}
 
 	// If ref is specified and looks like a branch or tag (not a SHA),
 	// set it as the reference to clone. Otherwise, we'll checkout after cloning.
-	if ref != "" && !looksLikeSHA(ref) {
+	isSHA := looksLikeSHA(ref)
+	log.Debug("checked if ref is SHA",
+		zap.String("ref", ref),
+		zap.Bool("isSHA", isSHA),
+	)
+
+	if ref != "" && !isSHA {
 		opts.ReferenceName = plumbing.NewBranchReferenceName(ref)
 		opts.SingleBranch = true
+		log.Debug("configuring git clone for branch/tag",
+			zap.String("referenceName", ref),
+			zap.Bool("singleBranch", true),
+		)
+	} else {
+		log.Debug("configuring git clone without single branch restriction")
 	}
 
+	log.Debug("executing git clone")
 	_, err := git.PlainClone(path, false, opts)
 	if err != nil {
 		return stacktrace.Errorf("failed to clone repository: %w", err)
 	}
+
+	log.Debug("git clone completed successfully",
+		zap.String("path", path),
+	)
 
 	return nil
 }
@@ -84,7 +115,12 @@ func looksLikeSHA(ref string) bool {
 }
 
 // CheckoutRef checks out a specific ref (tag, branch, or commit) in a repository
-func CheckoutRef(repoPath, ref string) error {
+func CheckoutRef(log logging.Logger, repoPath, ref string) error {
+	log.Debug("entering CheckoutRef",
+		zap.String("repoPath", repoPath),
+		zap.String("ref", ref),
+	)
+
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
 		return stacktrace.Errorf("failed to open repository: %w", err)
@@ -96,11 +132,22 @@ func CheckoutRef(repoPath, ref string) error {
 	}
 
 	// Try to resolve the ref
+	log.Debug("resolving revision",
+		zap.String("ref", ref),
+	)
 	hash, err := repo.ResolveRevision(plumbing.Revision(ref))
 	if err != nil {
 		return stacktrace.Errorf("failed to resolve ref %s: %w", ref, err)
 	}
 
+	log.Debug("resolved revision to hash",
+		zap.String("ref", ref),
+		zap.String("hash", hash.String()),
+	)
+
+	log.Debug("executing git checkout",
+		zap.String("hash", hash.String()),
+	)
 	err = w.Checkout(&git.CheckoutOptions{
 		Hash: *hash,
 	})
@@ -108,11 +155,17 @@ func CheckoutRef(repoPath, ref string) error {
 		return stacktrace.Errorf("failed to checkout ref %s: %w", ref, err)
 	}
 
+	log.Debug("checkout completed successfully")
+
 	return nil
 }
 
 // GetCurrentRef returns the current ref (branch or commit) of a repository
-func GetCurrentRef(repoPath string) (string, error) {
+func GetCurrentRef(log logging.Logger, repoPath string) (string, error) {
+	log.Debug("getting current ref",
+		zap.String("repoPath", repoPath),
+	)
+
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
 		return "", stacktrace.Errorf("failed to open repository: %w", err)
@@ -125,15 +178,28 @@ func GetCurrentRef(repoPath string) (string, error) {
 
 	// If HEAD is a branch, return the branch name
 	if head.Name().IsBranch() {
-		return head.Name().Short(), nil
+		branchName := head.Name().Short()
+		log.Debug("HEAD is branch reference",
+			zap.Bool("isBranch", true),
+			zap.String("branchName", branchName),
+		)
+		return branchName, nil
 	}
 
 	// Otherwise return the commit hash (detached HEAD)
-	return head.Hash().String(), nil
+	commitHash := head.Hash().String()
+	log.Debug("HEAD is detached (not a branch)",
+		zap.String("commitHash", commitHash),
+	)
+	return commitHash, nil
 }
 
 // IsRepoDirty checks if a repository has uncommitted changes
-func IsRepoDirty(repoPath string) (bool, error) {
+func IsRepoDirty(log logging.Logger, repoPath string) (bool, error) {
+	log.Debug("checking if repository is dirty",
+		zap.String("repoPath", repoPath),
+	)
+
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
 		return false, stacktrace.Errorf("failed to open repository: %w", err)
@@ -149,34 +215,70 @@ func IsRepoDirty(repoPath string) (bool, error) {
 		return false, stacktrace.Errorf("failed to get status: %w", err)
 	}
 
-	return !status.IsClean(), nil
+	isDirty := !status.IsClean()
+	log.Debug("repository dirty check complete",
+		zap.Bool("isDirty", isDirty),
+		zap.Int("modifiedFiles", len(status)),
+	)
+
+	return isDirty, nil
 }
 
 // CloneOrUpdateRepo clones a repository or updates an existing one
 // Handles the case where a SHA is requested with shallow clone by falling back to full clone
-func CloneOrUpdateRepo(url, path, ref string, depth int, force bool) error {
+func CloneOrUpdateRepo(log logging.Logger, url, path, ref string, depth int, force bool) error {
+	log.Debug("entering CloneOrUpdateRepo",
+		zap.String("url", url),
+		zap.String("path", path),
+		zap.String("ref", ref),
+		zap.Int("depth", depth),
+		zap.Bool("force", force),
+	)
+
 	// Check if repo already exists
 	_, err := git.PlainOpen(path)
-	if err == nil {
-		// Repo exists
+	repoExists := err == nil
+	log.Debug("checked if repository exists",
+		zap.String("path", path),
+		zap.Bool("exists", repoExists),
+	)
+
+	if repoExists {
+		log.Debug("repository exists, checking force flag",
+			zap.Bool("force", force),
+		)
 		if !force {
+			log.Debug("returning error: repo exists and force=false")
 			return ErrRepoAlreadyExists(filepath.Base(path), path)
 		}
+		log.Debug("proceeding to update existing repository")
 		// Update existing repo
-		return UpdateRepo(path, ref)
+		return UpdateRepo(log, path, ref)
 	}
+
+	log.Debug("repository does not exist, proceeding to clone")
 
 	// Repo doesn't exist, clone it
 	// First try with the requested depth
-	err = CloneRepo(url, path, ref, depth)
+	log.Debug("attempting clone with specified depth",
+		zap.Int("depth", depth),
+	)
+	err = CloneRepo(log, url, path, ref, depth)
 	if err != nil {
+		log.Debug("clone failed, checking if should retry with full clone",
+			zap.Int("requestedDepth", depth),
+			zap.String("ref", ref),
+			zap.Error(err),
+		)
+
 		// If shallow clone fails and we're trying to clone a specific ref,
 		// it might be a SHA that's not in the shallow history
 		// Try a full clone instead
 		if depth > 0 && ref != "" {
+			log.Debug("retrying with full clone (depth=0)")
 			// This will be tested in integration tests since it requires
 			// actual git operations with SHA resolution
-			return CloneRepo(url, path, ref, 0)
+			return CloneRepo(log, url, path, ref, 0)
 		}
 		return err
 	}
@@ -184,31 +286,44 @@ func CloneOrUpdateRepo(url, path, ref string, depth int, force bool) error {
 	// If we cloned successfully and the ref looks like a SHA, we need to checkout
 	// (since CloneRepo doesn't set branch reference for SHAs)
 	if ref != "" && looksLikeSHA(ref) {
-		err = CheckoutRef(path, ref)
+		log.Debug("ref is SHA, attempting checkout",
+			zap.String("ref", ref),
+		)
+		err = CheckoutRef(log, path, ref)
 		if err != nil && depth > 0 {
+			log.Debug("checkout failed with shallow clone, retrying with full clone",
+				zap.Error(err),
+			)
 			// Checkout failed, likely because the SHA isn't in shallow history
 			// Remove the shallow clone and retry with full clone
 			os.RemoveAll(path)
-			err = CloneRepo(url, path, ref, 0)
+			err = CloneRepo(log, url, path, ref, 0)
 			if err != nil {
 				return err
 			}
-			return CheckoutRef(path, ref)
+			return CheckoutRef(log, path, ref)
 		}
 		return err
 	}
 
+	log.Debug("clone completed successfully")
 	return nil
 }
 
 // UpdateRepo updates an existing repository to a specific ref
-func UpdateRepo(repoPath, ref string) error {
+func UpdateRepo(log logging.Logger, repoPath, ref string) error {
+	log.Debug("entering UpdateRepo",
+		zap.String("repoPath", repoPath),
+		zap.String("ref", ref),
+	)
+
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
 		return stacktrace.Errorf("failed to open repository: %w", err)
 	}
 
 	// Fetch latest changes
+	log.Debug("fetching latest changes from remote")
 	err = repo.Fetch(&git.FetchOptions{
 		RefSpecs: []config.RefSpec{"refs/*:refs/*"},
 	})
@@ -216,6 +331,15 @@ func UpdateRepo(repoPath, ref string) error {
 		return stacktrace.Errorf("failed to fetch: %w", err)
 	}
 
+	if err == git.NoErrAlreadyUpToDate {
+		log.Debug("repository already up to date")
+	} else {
+		log.Debug("fetch completed successfully")
+	}
+
 	// Checkout the ref
-	return CheckoutRef(repoPath, ref)
+	log.Debug("checking out ref after fetch",
+		zap.String("ref", ref),
+	)
+	return CheckoutRef(log, repoPath, ref)
 }
