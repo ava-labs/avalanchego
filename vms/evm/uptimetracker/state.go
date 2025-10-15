@@ -138,14 +138,13 @@ func (s *state) addValidatorUpdate(vdr *validator) {
 func (s *state) updateValidator(validationID ids.ID, isActive bool) bool {
 	v := s.validators[validationID]
 
-	updated := false
-	if v.IsActive != isActive {
-		v.IsActive = isActive
-		s.updatedValidators.Add(validationID)
-		updated = true
+	if v.IsActive == isActive {
+	  return false
 	}
 
-	return updated
+	v.IsActive = isActive
+	s.updatedValidators.Add(validationID)
+        return true
 }
 
 func (s *state) deleteValidator(validationID ids.ID) bool {
@@ -215,16 +214,9 @@ func (s *state) getValidatorByNodeID(nodeID ids.NodeID) (*validator, bool) {
 	return v, true
 }
 
-func (s *state) getValidatorByValidationID(validationID ids.ID) (
-	*validator,
-	bool,
-) {
-	v, ok := s.validators[validationID]
-	if !ok {
-		return &validator{}, false
-	}
-
-	return v, true
+func (s *state) hasValidationID(validationID ids.ID) bool {
+	_, ok := s.validators[validationID]
+	return ok
 }
 
 func (s *state) getNodeID(validationID ids.ID) (ids.NodeID, bool) {

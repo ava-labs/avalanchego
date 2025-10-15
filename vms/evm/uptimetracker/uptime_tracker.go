@@ -131,10 +131,7 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 
 	// Initialize uptimes if this is the first time Sync has been called
 	if !u.synced {
-		validationIDs := make([]ids.NodeID, 0)
-		validationIDs = append(validationIDs, u.state.getNodeIDs()...)
-
-		if err := u.manager.StartTracking(validationIDs); err != nil {
+		if err := u.manager.StartTracking(u.state.getNodeIDs()); err != nil {
 			return fmt.Errorf("failed to start tracking validators: %w", err)
 		}
 
@@ -162,10 +159,8 @@ func (u *UptimeTracker) update(
 		}
 
 		// This validator was removed in the lastest update
-		nodeID, ok := u.state.getNodeID(validationID)
-		if !ok {
-			return fmt.Errorf("failed to fetch validator %s", validationID)
-		}
+                 // we are guaranteed to have this node id
+		nodeID, _ := u.state.getNodeID(validationID)
 
 		if !u.state.deleteValidator(validationID) {
 			return fmt.Errorf("failed to delete validator %s", validationID)
