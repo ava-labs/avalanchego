@@ -206,7 +206,7 @@ func (s *state) getValidatorByNodeID(nodeID ids.NodeID) (*validator, bool) {
 		return nil, false
 	}
 
-	// s.nodeIDsToValidationIDs is guaranteed to have the same data as in s.validators
+	// we are guaranteed to have this validator
 	v, _ := s.validators[validationID]
 	return v, true
 }
