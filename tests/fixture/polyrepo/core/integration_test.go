@@ -146,6 +146,62 @@ func TestCloneOrUpdateRepo_ExistingRepoWithForce(t *testing.T) {
 	require.NoError(t, err, "expected success when cloning to existing path with force")
 }
 
+// TestCloneOrUpdateRepo_ShallowToSHAWithForce tests updating from a shallow clone to a specific SHA with force
+// This simulates: polyrepo sync firewood (shallow clone main) then polyrepo sync firewood@SHA --force
+func TestCloneOrUpdateRepo_ShallowToSHAWithForce(t *testing.T) {
+	// Use real logging to see what's happening
+	logFactory := logging.NewFactory(logging.Config{
+		DisplayLevel: logging.Debug,
+		LogLevel:     logging.Debug,
+	})
+	log, err := logFactory.Make("test")
+	require.NoError(t, err, "failed to create logger")
+
+	tmpDir := t.TempDir()
+	clonePath := filepath.Join(tmpDir, "firewood")
+
+	config, err := GetRepoConfig("firewood")
+	require.NoError(t, err, "failed to get config")
+
+	// Step 1: Clone with default branch and shallow depth (simulates: polyrepo sync firewood)
+	err = CloneOrUpdateRepo(log, config.GitRepo, clonePath, config.DefaultBranch, 1, false)
+	require.NoError(t, err, "failed to do initial shallow clone")
+
+	// Verify it's a shallow clone
+	require.True(t, isShallowRepo(clonePath), "expected shallow clone")
+
+	// Step 2: Update to a specific SHA with force (simulates: polyrepo sync firewood@SHA --force)
+	// Using a known commit from firewood that has the nix flake
+	commitSHA := "7cd05ccda8baba48617de19684db7da9ba73f8ba"
+	err = CloneOrUpdateRepo(log, config.GitRepo, clonePath, commitSHA, 1, true)
+	require.NoError(t, err, "failed to update shallow clone to SHA with force")
+
+	// Verify we're at the correct commit
+	currentRef, err := GetCurrentRef(log, clonePath)
+	require.NoError(t, err, "failed to get current ref")
+	require.Equal(t, commitSHA, currentRef, "expected to be at the specified SHA")
+
+	// Check shallow status and log details
+	isShallow := isShallowRepo(clonePath)
+	shallowPath := filepath.Join(clonePath, ".git", "shallow")
+	shallowFileInfo, _ := os.Stat(shallowPath)
+
+	// Read shallow file contents
+	shallowContents := []byte{}
+	if shallowFileInfo != nil {
+		shallowContents, _ = os.ReadFile(shallowPath)
+	}
+
+	t.Logf("isShallow=%v, shallowPath=%s, shallowFileExists=%v, shallowContents=%q",
+		isShallow, shallowPath, shallowFileInfo != nil, string(shallowContents))
+
+	// The key test: verify the SHA was successfully checked out
+	// Note: The repo may still be shallow if go-git's fetch was able to get the commit
+	// without needing to unshallow. This is actually fine - the important thing is that
+	// the operation succeeded when it previously would have failed.
+	t.Logf("Test passed: successfully updated shallow clone to SHA %s", commitSHA)
+}
+
 // TestGetRepoStatus_NotCloned tests status for a repo that hasn't been cloned
 func TestGetRepoStatus_NotCloned(t *testing.T) {
 	log := logging.NoLog{}
