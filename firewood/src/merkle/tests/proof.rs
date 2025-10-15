@@ -269,7 +269,7 @@ fn proof_path_construction_and_corruption() {
     let mut corrupt: Proof<Vec<ProofNode>> = proof.clone().into_mutable();
     if let Some(first) = (*corrupt).first_mut() {
         // Set all child hashes to empty so traversal fails
-        first.child_hashes = firewood_storage::BranchNode::empty_children();
+        first.child_hashes = Children::new();
     }
     let corrupt = corrupt.into_immutable();
     let err = corrupt

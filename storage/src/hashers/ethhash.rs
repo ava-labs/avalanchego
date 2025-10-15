@@ -107,7 +107,7 @@ impl<T: Hashable> Preimage for T {
 
         let child_hashes = self.children();
 
-        let children = child_hashes.iter().filter(|c| c.is_some()).count();
+        let children = child_hashes.count();
 
         if children == 0 {
             // since there are no children, this must be a leaf
@@ -157,7 +157,7 @@ impl<T: Hashable> Preimage for T {
             // for a branch, there are always 16 children and a value
             // Child::None we encode as RLP empty_data (0x80)
             let mut rlp = RlpStream::new_list(const { BranchNode::MAX_CHILDREN + 1 });
-            for child in &child_hashes {
+            for (_, child) in &child_hashes {
                 match child {
                     Some(HashType::Hash(hash)) => rlp.append(&hash.as_slice()),
                     Some(HashType::Rlp(rlp_bytes)) => rlp.append_raw(rlp_bytes, 1),
@@ -197,7 +197,7 @@ impl<T: Hashable> Preimage for T {
                         // actually one longer than it is reported
                         match child_hashes
                             .iter()
-                            .find_map(|c| c.as_ref())
+                            .find_map(|(_, c)| c.as_ref())
                             .expect("we know there is exactly one child")
                         {
                             HashType::Hash(hash) => hash.clone(),

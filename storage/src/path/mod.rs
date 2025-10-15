@@ -7,7 +7,7 @@ mod joined;
 mod packed;
 mod split;
 
-pub use self::component::{PathComponent, PathComponentSliceExt};
+pub use self::component::{ComponentIter, PathComponent, PathComponentSliceExt};
 pub use self::joined::JoinedPath;
 #[cfg(not(feature = "branch_factor_256"))]
 pub use self::packed::{PackedBytes, PackedPathComponents, PackedPathRef};

@@ -125,12 +125,8 @@ impl<'a, N: NodeReader + RootReader> UnPersistedNodeIterator<'a, N> {
                 // Create an iterator over unpersisted children
                 let unpersisted_children: Vec<MaybePersistedNode> = branch
                     .children
-                    .iter()
-                    .filter_map(|child_opt| {
-                        child_opt
-                            .as_ref()
-                            .and_then(|child| child.unpersisted().cloned())
-                    })
+                    .iter_present()
+                    .filter_map(|(_, child)| child.unpersisted().cloned())
                     .collect();
 
                 (
@@ -170,12 +166,8 @@ impl<N: NodeReader + RootReader> Iterator for UnPersistedNodeIterator<'_, N> {
                     // Create an iterator over unpersisted children
                     let unpersisted_children: Vec<MaybePersistedNode> = branch
                         .children
-                        .iter()
-                        .filter_map(|child_opt| {
-                            child_opt
-                                .as_ref()
-                                .and_then(|child| child.unpersisted().cloned())
-                        })
+                        .iter_present()
+                        .filter_map(|(_, child)| child.unpersisted().cloned())
                         .collect();
 
                     // Push new child iterator to the stack
@@ -494,7 +486,8 @@ impl NodeStore<Committed, FileBacked> {
 mod tests {
     use super::*;
     use crate::{
-        Child, HashType, ImmutableProposal, LinearAddress, NodeStore, Path, SharedNode,
+        Child, Children, HashType, ImmutableProposal, LinearAddress, NodeStore, Path,
+        PathComponent, SharedNode,
         linear::memory::MemStore,
         node::{BranchNode, LeafNode, Node},
         nodestore::MutableProposal,
@@ -529,18 +522,22 @@ mod tests {
     }
 
     /// Helper to create a branch node with children
-    fn create_branch(path: &[u8], value: Option<&[u8]>, children: Vec<(u8, Node)>) -> Node {
+    fn create_branch(
+        path: &[u8],
+        value: Option<&[u8]>,
+        children: Vec<(PathComponent, Node)>,
+    ) -> Node {
         let mut branch = BranchNode {
             partial_path: Path::from(path),
             value: value.map(|v| v.to_vec().into_boxed_slice()),
-            children: std::array::from_fn(|_| None),
+            children: Children::new(),
         };
 
         for (index, child) in children {
             let shared_child = SharedNode::new(child);
             let maybe_persisted = MaybePersistedNode::from(shared_child);
             let hash = HashType::empty();
-            branch.children[index as usize] = Some(Child::MaybePersisted(maybe_persisted, hash));
+            branch.children[index] = Some(Child::MaybePersisted(maybe_persisted, hash));
         }
 
         Node::Branch(Box::new(branch))
@@ -573,7 +570,11 @@ mod tests {
     #[test]
     fn test_branch_with_single_child() {
         let leaf = create_leaf(&[7, 8], &[9, 10]);
-        let branch = create_branch(&[1, 2], Some(&[3, 4]), vec![(5, leaf.clone())]);
+        let branch = create_branch(
+            &[1, 2],
+            Some(&[3, 4]),
+            vec![(PathComponent::ALL[5], leaf.clone())],
+        );
         let store = create_test_store_with_root(branch.clone());
         let mut iter =
             UnPersistedNodeIterator::new(&store).map(|node| node.as_shared_node(&store).unwrap());
@@ -603,9 +604,9 @@ mod tests {
             &[0],
             None,
             vec![
-                (1, leaves[0].clone()),
-                (5, leaves[1].clone()),
-                (10, leaves[2].clone()),
+                (PathComponent::ALL[1], leaves[0].clone()),
+                (PathComponent::ALL[5], leaves[1].clone()),
+                (PathComponent::ALL[10], leaves[2].clone()),
             ],
         );
         let store = create_test_store_with_root(branch.clone());
@@ -639,10 +640,14 @@ mod tests {
         // Create a nested structure: root -> branch1 -> leaf[0]
         //                                -> leaf[1]
         //                                -> branch2 -> leaf[2]
-        let inner_branch = create_branch(&[10], Some(&[50]), vec![(0, leaves[2].clone())]);
+        let inner_branch = create_branch(
+            &[10],
+            Some(&[50]),
+            vec![(PathComponent::ALL[0], leaves[2].clone())],
+        );
 
-        let mut children = BranchNode::empty_children();
-        for (value, slot) in [
+        let mut children = Children::new();
+        for (value, (_, slot)) in [
             // unpersisted leaves
             Child::MaybePersisted(
                 MaybePersistedNode::from(SharedNode::new(leaves[0].clone())),
@@ -715,7 +720,10 @@ mod tests {
         let branch = create_branch(
             &[0],
             Some(b"branch_value"),
-            vec![(1, leaf1.clone()), (2, leaf2.clone())],
+            vec![
+                (PathComponent::ALL[1], leaf1.clone()),
+                (PathComponent::ALL[2], leaf2.clone()),
+            ],
         );
 
         mutable_store.root_mut().replace(branch.clone());
@@ -737,12 +745,11 @@ mod tests {
         assert_eq!(root_node.value(), Some(&b"branch_value"[..]));
         assert!(root_node.is_branch());
         let root_branch = root_node.as_branch().unwrap();
-        assert_eq!(
-            root_branch.children.iter().filter(|c| c.is_some()).count(),
-            2
-        );
+        assert_eq!(root_branch.children.count(), 2);
 
-        let child1 = root_branch.children[1].as_ref().unwrap();
+        let child1 = root_branch.children[PathComponent::ALL[1]]
+            .as_ref()
+            .unwrap();
         let child1_maybe_persisted = child1.as_maybe_persisted_node();
         let child1_node = child1_maybe_persisted
             .as_shared_node(&committed_store)
@@ -750,7 +757,9 @@ mod tests {
         assert_eq!(*child1_node.partial_path(), Path::from(&[1, 2, 3]));
         assert_eq!(child1_node.value(), Some(&b"value1"[..]));
 
-        let child2 = root_branch.children[2].as_ref().unwrap();
+        let child2 = root_branch.children[PathComponent::ALL[2]]
+            .as_ref()
+            .unwrap();
         let child2_maybe_persisted = child2.as_maybe_persisted_node();
         let child2_node = child2_maybe_persisted
             .as_shared_node(&committed_store)

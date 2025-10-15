@@ -192,6 +192,7 @@ impl Iterator for NibblesIterator<'_> {
 
     #[cfg(feature = "branch_factor_256")]
     fn next(&mut self) -> Option<Self::Item> {
+        #![expect(clippy::indexing_slicing)]
         if self.is_empty() {
             return None;
         }

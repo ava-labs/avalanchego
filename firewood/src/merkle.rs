@@ -9,9 +9,10 @@ use crate::proof::{Proof, ProofCollection, ProofError, ProofNode};
 use crate::range_proof::RangeProof;
 use crate::v2::api::{self, FrozenProof, FrozenRangeProof, KeyType, ValueType};
 use firewood_storage::{
-    BranchNode, Child, FileIoError, HashType, HashedNodeReader, ImmutableProposal, IntoHashType,
-    LeafNode, MaybePersistedNode, MutableProposal, NibblesIterator, Node, NodeStore, Parentable,
-    Path, ReadableStorage, SharedNode, TrieHash, TrieReader, ValueDigest,
+    BranchNode, Child, Children, FileIoError, HashType, HashedNodeReader, ImmutableProposal,
+    IntoHashType, LeafNode, MaybePersistedNode, MutableProposal, NibblesIterator, Node, NodeStore,
+    Parentable, Path, PathComponent, ReadableStorage, SharedNode, TrieHash, TrieReader,
+    ValueDigest,
 };
 use metrics::counter;
 use std::collections::HashSet;
@@ -84,14 +85,11 @@ fn get_helper<T: TrieReader>(
         }
         (None, None) => Ok(Some(node.clone().into())), // 1. The node is at `key`
         (Some((child_index, remaining_key)), None) => {
+            let child_index = PathComponent::try_new(child_index).expect("index is in bounds");
             // 3. The key is below the node (i.e. its descendant)
             match node {
                 Node::Leaf(_) => Ok(None),
-                Node::Branch(node) => match node
-                    .children
-                    .get(child_index as usize)
-                    .expect("index is in bounds")
-                {
+                Node::Branch(node) => match node.children[child_index].as_ref() {
                     None => Ok(None),
                     Some(Child::Node(child)) => get_helper(nodestore, child, remaining_key),
                     Some(Child::AddressWithHash(addr, _)) => {
@@ -162,7 +160,7 @@ impl<T: TrieReader> Merkle<T> {
             let child_hashes = if let Some(branch) = root.as_branch() {
                 branch.children_hashes()
             } else {
-                BranchNode::empty_children()
+                Children::new()
             };
 
             proof.push(ProofNode {
@@ -473,7 +471,7 @@ impl<T: HashedNodeReader> Merkle<T> {
                 write_attributes!(writer, b, &b.value.clone().unwrap_or(Box::from([])));
                 writeln!(writer, "\"]")
                     .map_err(|e| FileIoError::from_generic_no_file(e, "write branch"))?;
-                for (childidx, child) in b.children.iter().enumerate() {
+                for (childidx, child) in &b.children {
                     let (child, child_hash) = match child {
                         None => continue,
                         Some(node) => (node.as_maybe_persisted_node(), node.hash()),
@@ -584,6 +582,14 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
         self.try_into().expect("failed to convert")
     }
 
+    fn read_for_update(&mut self, child: Child) -> Result<Node, FileIoError> {
+        match child {
+            Child::Node(node) => Ok(node),
+            Child::AddressWithHash(addr, _) => self.nodestore.read_for_update(addr.into()),
+            Child::MaybePersisted(node, _) => self.nodestore.read_for_update(node),
+        }
+    }
+
     /// Map `key` to `value` in the trie.
     /// Each element of key is 2 nibbles.
     pub fn insert(&mut self, key: &[u8], value: Value) -> Result<(), FileIoError> {
@@ -610,6 +616,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     /// Map `key` to `value` into the subtrie rooted at `node`.
     /// Each element of `key` is 1 nibble.
     /// Returns the new root of the subtrie.
+    #[expect(clippy::missing_panics_doc)]
     pub fn insert_helper(
         &mut self,
         mut node: Node,
@@ -641,6 +648,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 Ok(node)
             }
             (None, Some((child_index, partial_path))) => {
+                let child_index = PathComponent::try_new(child_index).expect("valid component");
                 // 2. The key is above the node (i.e. its ancestor)
                 // Make a new branch node and insert the current node as a child.
                 //    ...                ...
@@ -651,17 +659,18 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 let mut branch = BranchNode {
                     partial_path: path_overlap.shared.into(),
                     value: Some(value),
-                    children: BranchNode::empty_children(),
+                    children: Children::new(),
                 };
 
                 // Shorten the node's partial path since it has a new parent.
                 node.update_partial_path(partial_path);
-                branch.update_child(child_index, Some(Child::Node(node)));
+                branch.children[child_index] = Some(Child::Node(node));
                 counter!("firewood.insert", "merkle"=>"above").increment(1);
 
                 Ok(Node::Branch(Box::new(branch)))
             }
             (Some((child_index, partial_path)), None) => {
+                let child_index = PathComponent::try_new(child_index).expect("valid component");
                 // 3. The key is below the node (i.e. its descendant)
                 //    ...                         ...
                 //     |                           |
@@ -670,39 +679,28 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 //    ... (key may be below)       ... (key is below)
                 match node {
                     Node::Branch(ref mut branch) => {
-                        #[expect(clippy::indexing_slicing)]
-                        let child = match std::mem::take(&mut branch.children[child_index as usize])
-                        {
-                            None => {
-                                // There is no child at this index.
-                                // Create a new leaf and put it here.
-                                let new_leaf = Node::Leaf(LeafNode {
-                                    value,
-                                    partial_path,
-                                });
-                                branch.update_child(child_index, Some(Child::Node(new_leaf)));
-                                counter!("firewood.insert", "merkle"=>"below").increment(1);
-                                return Ok(node);
-                            }
-                            Some(Child::Node(child)) => child,
-                            Some(Child::AddressWithHash(addr, _)) => {
-                                self.nodestore.read_for_update(addr.into())?
-                            }
-                            Some(Child::MaybePersisted(maybe_persisted, _)) => {
-                                self.nodestore.read_for_update(maybe_persisted.clone())?
-                            }
+                        let Some(child) = branch.children.take(child_index) else {
+                            // There is no child at this index.
+                            // Create a new leaf and put it here.
+                            let new_leaf = Node::Leaf(LeafNode {
+                                value,
+                                partial_path,
+                            });
+                            branch.children[child_index] = Some(Child::Node(new_leaf));
+                            counter!("firewood.insert", "merkle"=>"below").increment(1);
+                            return Ok(node);
                         };
-
+                        let child = self.read_for_update(child)?;
                         let child = self.insert_helper(child, partial_path.as_ref(), value)?;
-                        branch.update_child(child_index, Some(Child::Node(child)));
+                        branch.children[child_index] = Some(Child::Node(child));
                         Ok(node)
                     }
-                    Node::Leaf(ref mut leaf) => {
+                    Node::Leaf(leaf) => {
                         // Turn this node into a branch node and put a new leaf as a child.
                         let mut branch = BranchNode {
-                            partial_path: std::mem::replace(&mut leaf.partial_path, Path::new()),
-                            value: Some(std::mem::take(&mut leaf.value)),
-                            children: BranchNode::empty_children(),
+                            partial_path: leaf.partial_path,
+                            value: Some(leaf.value),
+                            children: Children::new(),
                         };
 
                         let new_leaf = Node::Leaf(LeafNode {
@@ -710,7 +708,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                             partial_path,
                         });
 
-                        branch.update_child(child_index, Some(Child::Node(new_leaf)));
+                        branch.children[child_index] = Some(Child::Node(new_leaf));
 
                         counter!("firewood.insert", "merkle"=>"split").increment(1);
                         Ok(Node::Branch(Box::new(branch)))
@@ -718,6 +716,8 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 }
             }
             (Some((key_index, key_partial_path)), Some((node_index, node_partial_path))) => {
+                let key_index = PathComponent::try_new(key_index).expect("valid component");
+                let node_index = PathComponent::try_new(node_index).expect("valid component");
                 // 4. Neither is an ancestor of the other
                 //    ...                         ...
                 //     |                           |
@@ -728,17 +728,17 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 let mut branch = BranchNode {
                     partial_path: path_overlap.shared.into(),
                     value: None,
-                    children: BranchNode::empty_children(),
+                    children: Children::new(),
                 };
 
                 node.update_partial_path(node_partial_path);
-                branch.update_child(node_index, Some(Child::Node(node)));
+                branch.children[node_index] = Some(Child::Node(node));
 
                 let new_leaf = Node::Leaf(LeafNode {
                     value,
                     partial_path: key_partial_path,
                 });
-                branch.update_child(key_index, Some(Child::Node(new_leaf)));
+                branch.children[key_index] = Some(Child::Node(new_leaf));
 
                 counter!("firewood.insert", "merkle" => "split").increment(1);
                 Ok(Node::Branch(Box::new(branch)))
@@ -775,10 +775,9 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     /// Removes the value associated with the given `key` from the subtrie rooted at `node`.
     /// Returns the new root of the subtrie and the value that was removed, if any.
     /// Each element of `key` is 1 nibble.
-    #[expect(clippy::too_many_lines)]
     fn remove_helper(
         &mut self,
-        mut node: Node,
+        node: Node,
         key: &[u8],
     ) -> Result<(Option<Node>, Option<Value>), FileIoError> {
         // 4 possibilities for the position of the `key` relative to `node`:
@@ -803,179 +802,37 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
             }
             (None, None) => {
                 // 1. The node is at `key`
-                match &mut node {
-                    Node::Branch(branch) => {
+                match node {
+                    Node::Branch(mut branch) => {
                         let Some(removed_value) = branch.value.take() else {
                             // The branch has no value. Return the node as is.
-                            return Ok((Some(node), None));
+                            return Ok((Some(Node::Branch(branch)), None));
                         };
 
-                        // This branch node has a value.
-                        // If it has multiple children, return the node as is.
-                        // Otherwise, its only child becomes the root of this subtrie.
-                        let mut children_iter =
-                            branch
-                                .children
-                                .iter_mut()
-                                .enumerate()
-                                .filter_map(|(index, child)| {
-                                    child.as_mut().map(|child| (index, child))
-                                });
-
-                        let (child_index, child) = children_iter
-                            .next()
-                            .expect("branch node must have children");
-
-                        if children_iter.next().is_some() {
-                            // The branch has more than 1 child so it can't be removed.
-                            Ok((Some(node), Some(removed_value)))
-                        } else {
-                            // The branch's only child becomes the root of this subtrie.
-                            let mut child = match child {
-                                Child::Node(child_node) => std::mem::take(child_node),
-                                Child::AddressWithHash(addr, _) => {
-                                    self.nodestore.read_for_update((*addr).into())?
-                                }
-                                Child::MaybePersisted(maybe_persisted, _) => {
-                                    self.nodestore.read_for_update(maybe_persisted.clone())?
-                                }
-                            };
-
-                            // The child's partial path is the concatenation of its (now removed) parent,
-                            // its (former) child index, and its partial path.
-                            match child {
-                                Node::Branch(ref mut child_branch) => {
-                                    let partial_path = Path::from_nibbles_iterator(
-                                        branch
-                                            .partial_path
-                                            .iter()
-                                            .copied()
-                                            .chain(once(child_index as u8))
-                                            .chain(child_branch.partial_path.iter().copied()),
-                                    );
-                                    child_branch.partial_path = partial_path;
-                                }
-                                Node::Leaf(ref mut leaf) => {
-                                    let partial_path = Path::from_nibbles_iterator(
-                                        branch
-                                            .partial_path
-                                            .iter()
-                                            .copied()
-                                            .chain(once(child_index as u8))
-                                            .chain(leaf.partial_path.iter().copied()),
-                                    );
-                                    leaf.partial_path = partial_path;
-                                }
-                            }
-
-                            let node_partial_path =
-                                std::mem::replace(&mut branch.partial_path, Path::new());
-
-                            let partial_path = Path::from_nibbles_iterator(
-                                branch
-                                    .partial_path
-                                    .iter()
-                                    .chain(once(&(child_index as u8)))
-                                    .chain(node_partial_path.iter())
-                                    .copied(),
-                            );
-
-                            node.update_partial_path(partial_path);
-
-                            Ok((Some(child), Some(removed_value)))
-                        }
+                        Ok((self.flatten_branch(branch)?, Some(removed_value)))
                     }
-                    Node::Leaf(leaf) => {
-                        let removed_value = std::mem::take(&mut leaf.value);
-                        Ok((None, Some(removed_value)))
-                    }
+                    Node::Leaf(leaf) => Ok((None, Some(leaf.value))),
                 }
             }
             (Some((child_index, child_partial_path)), None) => {
+                let child_index = PathComponent::try_new(child_index).expect("valid component");
                 // 3. The key is below the node (i.e. its descendant)
                 match node {
                     // we found a non-matching leaf node, so the value does not exist
                     Node::Leaf(_) => Ok((Some(node), None)),
-                    Node::Branch(ref mut branch) => {
-                        #[expect(clippy::indexing_slicing)]
-                        let child = match std::mem::take(&mut branch.children[child_index as usize])
-                        {
-                            None => {
-                                return Ok((Some(node), None));
-                            }
-                            Some(Child::Node(node)) => node,
-                            Some(Child::AddressWithHash(addr, _)) => {
-                                self.nodestore.read_for_update(addr.into())?
-                            }
-                            Some(Child::MaybePersisted(maybe_persisted, _)) => {
-                                self.nodestore.read_for_update(maybe_persisted.clone())?
-                            }
+                    Node::Branch(mut branch) => {
+                        let Some(child) = branch.children.take(child_index) else {
+                            // child does not exist, so the value does not exist
+                            return Ok((Some(Node::Branch(branch)), None));
                         };
+                        let child = self.read_for_update(child)?;
 
                         let (child, removed_value) =
                             self.remove_helper(child, child_partial_path.as_ref())?;
 
-                        if let Some(child) = child {
-                            branch.update_child(child_index, Some(Child::Node(child)));
-                        } else {
-                            branch.update_child(child_index, None);
-                        }
+                        branch.children[child_index] = child.map(Child::Node);
 
-                        let mut children_iter =
-                            branch
-                                .children
-                                .iter_mut()
-                                .enumerate()
-                                .filter_map(|(index, child)| {
-                                    child.as_mut().map(|child| (index, child))
-                                });
-
-                        let Some((child_index, child)) = children_iter.next() else {
-                            // The branch has no children. Turn it into a leaf.
-                            let leaf = Node::Leaf(LeafNode {
-                                    value: branch.value.take().expect(
-                                        "branch node must have a value if it previously had only 1 child",
-                                    ),
-                                    partial_path: branch.partial_path.clone(), // TODO remove clone
-                                });
-                            return Ok((Some(leaf), removed_value));
-                        };
-
-                        // if there is more than one child or the branch has a value, return it
-                        if branch.value.is_some() || children_iter.next().is_some() {
-                            return Ok((Some(node), removed_value));
-                        }
-
-                        // The branch has only 1 child. Remove the branch and return the child.
-                        let mut child = match child {
-                            Child::Node(child_node) => std::mem::replace(
-                                child_node,
-                                Node::Leaf(LeafNode {
-                                    value: Box::default(),
-                                    partial_path: Path::new(),
-                                }),
-                            ),
-                            Child::AddressWithHash(addr, _) => {
-                                self.nodestore.read_for_update((*addr).into())?
-                            }
-                            Child::MaybePersisted(maybe_persisted, _) => {
-                                self.nodestore.read_for_update(maybe_persisted.clone())?
-                            }
-                        };
-
-                        // The child's partial path is the concatenation of its (now removed) parent,
-                        // its (former) child index, and its partial path.
-                        let child_partial_path = Path::from_nibbles_iterator(
-                            branch
-                                .partial_path
-                                .iter()
-                                .chain(once(&(child_index as u8)))
-                                .chain(child.partial_path().iter())
-                                .copied(),
-                        );
-                        child.update_partial_path(child_partial_path);
-
-                        Ok((Some(child), removed_value))
+                        Ok((self.flatten_branch(branch)?, removed_value))
                     }
                 }
             }
@@ -1004,7 +861,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
 
     fn remove_prefix_helper(
         &mut self,
-        mut node: Node,
+        node: Node,
         key: &[u8],
         deleted: &mut usize,
     ) -> Result<Option<Node>, FileIoError> {
@@ -1027,7 +884,7 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
             (None, _) => {
                 // 1. The node is at `key`, or we're just above it
                 // so we can start deleting below here
-                match &mut node {
+                match node {
                     Node::Branch(branch) => {
                         if branch.value.is_some() {
                             // a KV pair was in the branch itself
@@ -1047,89 +904,22 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
                 Ok(Some(node))
             }
             (Some((child_index, child_partial_path)), None) => {
+                let child_index = PathComponent::try_new(child_index).expect("valid component");
                 // 3. The key is below the node (i.e. its descendant)
                 match node {
                     Node::Leaf(_) => Ok(Some(node)),
-                    Node::Branch(ref mut branch) => {
-                        #[expect(clippy::indexing_slicing)]
-                        let child = match std::mem::take(&mut branch.children[child_index as usize])
-                        {
-                            None => {
-                                return Ok(Some(node));
-                            }
-                            Some(Child::Node(node)) => node,
-                            Some(Child::AddressWithHash(addr, _)) => {
-                                self.nodestore.read_for_update(addr.into())?
-                            }
-                            Some(Child::MaybePersisted(maybe_persisted, _)) => {
-                                self.nodestore.read_for_update(maybe_persisted.clone())?
-                            }
+                    Node::Branch(mut branch) => {
+                        let Some(child) = branch.children.take(child_index) else {
+                            return Ok(Some(Node::Branch(branch)));
                         };
+                        let child = self.read_for_update(child)?;
 
                         let child =
                             self.remove_prefix_helper(child, child_partial_path.as_ref(), deleted)?;
 
-                        if let Some(child) = child {
-                            branch.update_child(child_index, Some(Child::Node(child)));
-                        } else {
-                            branch.update_child(child_index, None);
-                        }
+                        branch.children[child_index] = child.map(Child::Node);
 
-                        let mut children_iter =
-                            branch
-                                .children
-                                .iter_mut()
-                                .enumerate()
-                                .filter_map(|(index, child)| {
-                                    child.as_mut().map(|child| (index, child))
-                                });
-
-                        let Some((child_index, child)) = children_iter.next() else {
-                            // The branch has no children. Turn it into a leaf.
-                            let leaf = Node::Leaf(LeafNode {
-                                    value: branch.value.take().expect(
-                                        "branch node must have a value if it previously had only 1 child",
-                                    ),
-                                    partial_path: branch.partial_path.clone(), // TODO remove clone
-                                });
-                            return Ok(Some(leaf));
-                        };
-
-                        // if there is more than one child or the branch has a value, return it
-                        if branch.value.is_some() || children_iter.next().is_some() {
-                            return Ok(Some(node));
-                        }
-
-                        // The branch has only 1 child. Remove the branch and return the child.
-                        let mut child = match child {
-                            Child::Node(child_node) => std::mem::replace(
-                                child_node,
-                                Node::Leaf(LeafNode {
-                                    value: Box::default(),
-                                    partial_path: Path::new(),
-                                }),
-                            ),
-                            Child::AddressWithHash(addr, _) => {
-                                self.nodestore.read_for_update((*addr).into())?
-                            }
-                            Child::MaybePersisted(maybe_persisted, _) => {
-                                self.nodestore.read_for_update(maybe_persisted.clone())?
-                            }
-                        };
-
-                        // The child's partial path is the concatenation of its (now removed) parent,
-                        // its (former) child index, and its partial path.
-                        let child_partial_path = Path::from_nibbles_iterator(
-                            branch
-                                .partial_path
-                                .iter()
-                                .chain(once(&(child_index as u8)))
-                                .chain(child.partial_path().iter())
-                                .copied(),
-                        );
-                        child.update_partial_path(child_partial_path);
-
-                        Ok(Some(child))
+                        self.flatten_branch(branch)
                     }
                 }
             }
@@ -1139,29 +929,18 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
     /// Recursively deletes all children of a branch node.
     fn delete_children(
         &mut self,
-        branch: &mut BranchNode,
+        mut branch: Box<BranchNode>,
         deleted: &mut usize,
     ) -> Result<(), FileIoError> {
         if branch.value.is_some() {
             // a KV pair was in the branch itself
             *deleted = deleted.saturating_add(1);
         }
-        for children in &mut branch.children {
-            // read the child node
-            let child = match children {
-                Some(Child::Node(node)) => node,
-                Some(Child::AddressWithHash(addr, _)) => {
-                    &mut self.nodestore.read_for_update((*addr).into())?
-                }
-                Some(Child::MaybePersisted(maybe_persisted, _)) => {
-                    // For MaybePersisted, we need to get the node to update it
-                    // We can't get a mutable reference from SharedNode, so we need to handle this differently
-                    // For now, we'll skip this child since we can't modify it
-                    let _shared_node = maybe_persisted.as_shared_node(&self.nodestore)?;
-                    continue;
-                }
-                None => continue,
+        for (_, child) in &mut branch.children {
+            let Some(child) = child.take() else {
+                continue;
             };
+            let child = self.read_for_update(child)?;
             match child {
                 Node::Branch(child_branch) => {
                     self.delete_children(child_branch, deleted)?;
@@ -1172,6 +951,69 @@ impl<S: ReadableStorage> Merkle<NodeStore<MutableProposal, S>> {
             }
         }
         Ok(())
+    }
+
+    /// Flattens a branch node into a new node.
+    ///
+    /// - If the branch has no value and no children, returns `None`.
+    /// - If the branch has a value and no children, it becomes a leaf node.
+    /// - If the branch has no value and exactly one child, it is replaced by that child
+    ///   with an updated partial path.
+    /// - If the branch has a value and any children, it is returned as-is.
+    /// - If the branch has no value and multiple children, it is returned as-is.
+    fn flatten_branch(
+        &mut self,
+        mut branch_node: Box<BranchNode>,
+    ) -> Result<Option<Node>, FileIoError> {
+        let mut children_iter = branch_node.children.each_mut().into_iter();
+
+        let (child_index, child) = loop {
+            let Some((child_index, child_slot)) = children_iter.next() else {
+                // The branch has no children. Turn it into a leaf.
+                return match branch_node.value {
+                    Some(value) => Ok(Some(Node::Leaf(LeafNode {
+                        value,
+                        partial_path: branch_node.partial_path,
+                    }))),
+                    None => Ok(None),
+                };
+            };
+
+            let Some(child) = child_slot.take() else {
+                continue;
+            };
+
+            if branch_node.value.is_some() || children_iter.any(|(_, slot)| slot.is_some()) {
+                // put the child back in its slot since we removed it
+                child_slot.replace(child);
+
+                // explicitly drop the iterator to release the mutable borrow on branch_node
+                drop(children_iter);
+
+                // The branch has a value or more than 1 child, so it can't be flattened.
+                return Ok(Some(Node::Branch(branch_node)));
+            }
+
+            // we have found the only child
+            break (child_index, child);
+        };
+
+        // The branch has only 1 child. Remove the branch and return the child.
+        let mut child = self.read_for_update(child)?;
+
+        // The child's partial path is the concatenation of its (now removed) parent,
+        // its (former) child index, and its partial path.
+        let child_partial_path = Path::from_nibbles_iterator(
+            branch_node
+                .partial_path
+                .iter()
+                .chain(once(&child_index.as_u8()))
+                .chain(child.partial_path().iter())
+                .copied(),
+        );
+        child.update_partial_path(child_partial_path);
+
+        Ok(Some(child))
     }
 }
 

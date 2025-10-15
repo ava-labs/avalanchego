@@ -11,7 +11,7 @@
 )]
 
 use firewood_storage::{
-    BranchNode, Children, FileIoError, HashType, Hashable, IntoHashType, NibblesIterator, Path,
+    Children, FileIoError, HashType, Hashable, IntoHashType, NibblesIterator, Path, PathComponent,
     PathIterItem, Preimage, TrieHash, ValueDigest,
 };
 use thiserror::Error;
@@ -91,18 +91,13 @@ pub struct ProofNode {
     /// Otherwise, the node's value or the hash of its value.
     pub value_digest: Option<ValueDigest<Value>>,
     /// The hash of each child, or None if the child does not exist.
-    pub child_hashes: Children<HashType>,
+    pub child_hashes: Children<Option<HashType>>,
 }
 
 impl std::fmt::Debug for ProofNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Filter the missing children and only show the present ones with their indices
-        let child_hashes = self
-            .child_hashes
-            .iter()
-            .enumerate()
-            .filter_map(|(i, h)| h.as_ref().map(|h| (i, h)))
-            .collect::<Vec<_>>();
+        let child_hashes = self.child_hashes.iter_present().collect::<Vec<_>>();
         // Compute the hash and render it as well
         let hash = firewood_storage::Preimage::to_hash(self);
 
@@ -133,7 +128,7 @@ impl Hashable for ProofNode {
         self.value_digest.as_ref().map(ValueDigest::as_ref)
     }
 
-    fn children(&self) -> Children<HashType> {
+    fn children(&self) -> Children<Option<HashType>> {
         self.child_hashes.clone()
     }
 }
@@ -143,7 +138,7 @@ impl From<PathIterItem> for ProofNode {
         let child_hashes = if let Some(branch) = item.node.as_branch() {
             branch.children_hashes()
         } else {
-            BranchNode::empty_children()
+            Children::new()
         };
 
         let partial_len = item
@@ -222,10 +217,9 @@ impl<T: ProofCollection + ?Sized> Proof<T> {
                     return Err(ProofError::ShouldBePrefixOfNextKey);
                 };
 
-                expected_hash = node
-                    .children()
-                    .get(usize::from(next_nibble))
-                    .ok_or(ProofError::ChildIndexOutOfBounds)?
+                let next_nibble =
+                    PathComponent::try_new(next_nibble).ok_or(ProofError::ChildIndexOutOfBounds)?;
+                expected_hash = node.children()[next_nibble]
                     .as_ref()
                     .ok_or(ProofError::NodeNotInTrie)?
                     .clone();

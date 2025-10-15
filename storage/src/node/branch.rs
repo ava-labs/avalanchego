@@ -5,13 +5,10 @@
     clippy::match_same_arms,
     reason = "Found 1 occurrences after enabling the lint."
 )]
-#![expect(
-    clippy::missing_panics_doc,
-    reason = "Found 2 occurrences after enabling the lint."
-)]
 
 use crate::node::ExtendableBytes;
-use crate::{LeafNode, LinearAddress, MaybePersistedNode, Node, Path, SharedNode};
+use crate::node::children::Children;
+use crate::{LeafNode, LinearAddress, MaybePersistedNode, Node, Path, PathComponent, SharedNode};
 use std::fmt::{Debug, Formatter};
 use std::io::Read;
 
@@ -92,7 +89,6 @@ pub(crate) trait ReadSerializable: Read {
 impl<T: Read> ReadSerializable for T {}
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-#[repr(C)]
 /// A child of a branch node.
 pub enum Child {
     /// There is a child at this index, but we haven't hashed it
@@ -289,7 +285,10 @@ mod ethhash {
                     Ok(HashOrRlp::Hash(TrieHash::from(bytes)))
                 }
                 len if len < 32 => {
-                    reader.read_exact(&mut bytes[0..len as usize])?;
+                    #[expect(clippy::indexing_slicing)]
+                    {
+                        reader.read_exact(&mut bytes[0..len as usize])?;
+                    }
                     Ok(HashOrRlp::Rlp(SmallVec::from_buf_and_len(
                         bytes,
                         len as usize,
@@ -364,9 +363,6 @@ mod ethhash {
     }
 }
 
-/// Type alias for a collection of children in a branch node.
-pub type Children<T> = [Option<T>; BranchNode::MAX_CHILDREN];
-
 #[derive(PartialEq, Eq, Clone)]
 /// A branch node
 pub struct BranchNode {
@@ -380,7 +376,7 @@ pub struct BranchNode {
     /// Element i is the child at index i, or None if there is no child at that index.
     /// Each element is (`child_hash`, `child_address`).
     /// `child_address` is None if we don't know the child's hash.
-    pub children: Children<Child>,
+    pub children: Children<Option<Child>>,
 }
 
 impl Debug for BranchNode {
@@ -388,7 +384,7 @@ impl Debug for BranchNode {
         write!(f, "[BranchNode")?;
         write!(f, r#" path="{:?}""#, self.partial_path)?;
 
-        for (i, c) in self.children.iter().enumerate() {
+        for (i, c) in &self.children {
             match c {
                 None => {}
                 Some(Child::Node(_)) => {} //TODO
@@ -417,68 +413,20 @@ impl Debug for BranchNode {
 }
 
 impl BranchNode {
-    /// The maximum number of children in a [`BranchNode`]
-    #[cfg(feature = "branch_factor_256")]
-    pub const MAX_CHILDREN: usize = 256;
+    /// The maximum number of children a branch node can have.
+    pub const MAX_CHILDREN: usize = PathComponent::LEN;
 
-    /// The maximum number of children in a [`BranchNode`]
-    #[cfg(not(feature = "branch_factor_256"))]
-    pub const MAX_CHILDREN: usize = 16;
-
-    /// Convenience function to create a new array of empty children.
-    #[must_use]
-    pub const fn empty_children<T>() -> Children<T> {
-        [const { None }; Self::MAX_CHILDREN]
-    }
-
-    /// Returns the address of the child at the given index.
-    /// Panics if `child_index` >= [`BranchNode::MAX_CHILDREN`].
-    #[must_use]
-    pub fn child(&self, child_index: u8) -> &Option<Child> {
-        self.children
-            .get(child_index as usize)
-            .expect("child_index is in bounds")
-    }
-
-    /// Update the child at `child_index` to be `new_child_addr`.
-    /// If `new_child_addr` is None, the child is removed.
-    pub fn update_child(&mut self, child_index: u8, new_child: Option<Child>) {
-        let child = self
-            .children
-            .get_mut(child_index as usize)
-            .expect("child_index is in bounds");
-
-        *child = new_child;
-    }
-
-    /// Helper to iterate over only valid children
+    /// Returns a set of persistence information (address and hash) for each child that
+    /// is persisted.
     ///
-    /// ## Panics
-    ///
-    /// Note: This function will panic if any child is a [`Child::Node`] variant
-    /// as it is still mutable and has not been hashed yet. Unlike
-    /// [`BranchNode::children_addresses`], this will _not_ panic if the child
-    /// is an unpersisted [`Child::MaybePersisted`].
-    #[track_caller]
-    pub(crate) fn children_iter(
-        &self,
-    ) -> impl Iterator<Item = (usize, (LinearAddress, &HashType))> + Clone {
+    /// This will skip any child that is a [`Child::Node`] variant (not yet hashed)
+    /// or a [`Child::MaybePersisted`] variant that does not have an address (not
+    /// yet persisted).
+    #[must_use]
+    pub fn persist_info(&self) -> Children<Option<(LinearAddress, &HashType)>> {
         self.children
-            .iter()
-            .enumerate()
-            .filter_map(|(i, child)| match child {
-                None => None,
-                Some(Child::Node(_)) => {
-                    panic!("attempted to iterate over an in-memory mutable node")
-                }
-                Some(Child::AddressWithHash(address, hash)) => Some((i, (*address, hash))),
-                Some(Child::MaybePersisted(maybe_persisted, hash)) => {
-                    // For MaybePersisted, we need the address if it's persisted
-                    maybe_persisted
-                        .as_linear_address()
-                        .map(|addr| (i, (addr, hash)))
-                }
-            })
+            .each_ref()
+            .map(|_, c| c.as_ref().and_then(Child::persist_info))
     }
 
     /// Returns a set of hashes for each child that has a hash set.
@@ -486,28 +434,16 @@ impl BranchNode {
     /// The index of the hash in the returned array corresponds to the index of the child
     /// in the branch node.
     ///
-    /// ## Panics
-    ///
-    /// Note: This function will panic if any child is a [`Child::Node`] variant
+    /// Note: This function will skip any child is a [`Child::Node`] variant
     /// as it is still mutable and has not been hashed yet.
     ///
     /// This is an unintentional side effect of the current implementation. Future
-    /// changes will have this check implemented structurally to prevent such panics.
+    /// changes will have this check implemented structurally to prevent such cases.
     #[must_use]
-    #[track_caller]
-    pub fn children_hashes(&self) -> Children<HashType> {
-        let mut hashes = Self::empty_children();
-        for (child, slot) in self.children.iter().zip(hashes.iter_mut()) {
-            match child {
-                None => {}
-                Some(Child::Node(_)) => {
-                    panic!("attempted to get the hash of an in-memory mutable node")
-                }
-                Some(Child::AddressWithHash(_, hash)) => _ = slot.replace(hash.clone()),
-                Some(Child::MaybePersisted(_, hash)) => _ = slot.replace(hash.clone()),
-            }
-        }
-        hashes
+    pub fn children_hashes(&self) -> Children<Option<HashType>> {
+        self.children
+            .each_ref()
+            .map(|_, c| c.as_ref().and_then(Child::hash).cloned())
     }
 
     /// Returns a set of addresses for each child that has an address set.
@@ -515,37 +451,18 @@ impl BranchNode {
     /// The index of the address in the returned array corresponds to the index of the child
     /// in the branch node.
     ///
-    /// ## Panics
-    ///
-    /// Note: This function will panic if:
+    /// Note: This function will skip:
     ///   - Any child is a [`Child::Node`] variant as it does not have an address.
     ///   - Any child is a [`Child::MaybePersisted`] variant that is not yet
     ///     persisted, as we do not yet know its address.
     ///
     /// This is an unintentional side effect of the current implementation. Future
-    /// changes will have this check implemented structurally to prevent such panics.
+    /// changes will have this check implemented structurally to prevent such cases.
     #[must_use]
-    #[track_caller]
-    pub fn children_addresses(&self) -> Children<LinearAddress> {
-        let mut addrs = Self::empty_children();
-        for (child, slot) in self.children.iter().zip(addrs.iter_mut()) {
-            match child {
-                None => {}
-                Some(Child::Node(_)) => {
-                    panic!("attempted to get the address of an in-memory mutable node")
-                }
-                Some(Child::AddressWithHash(address, _)) => _ = slot.replace(*address),
-                Some(Child::MaybePersisted(maybe_persisted, _)) => {
-                    // For MaybePersisted, we need the address if it's persisted
-                    if let Some(addr) = maybe_persisted.as_linear_address() {
-                        slot.replace(addr);
-                    } else {
-                        panic!("attempted to get the address of an unpersisted MaybePersistedNode")
-                    }
-                }
-            }
-        }
-        addrs
+    pub fn children_addresses(&self) -> Children<Option<LinearAddress>> {
+        self.children
+            .each_ref()
+            .map(|_, c| c.as_ref().and_then(Child::persisted_address))
     }
 }
 
@@ -554,7 +471,7 @@ impl From<&LeafNode> for BranchNode {
         BranchNode {
             partial_path: leaf.partial_path.clone(),
             value: Some(Box::from(&leaf.value[..])),
-            children: BranchNode::empty_children(),
+            children: Children::new(),
         }
     }
 }

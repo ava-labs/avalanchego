@@ -35,13 +35,13 @@ impl<T: Hashable> Preimage for T {
     fn write(&self, buf: &mut impl HasUpdate) {
         let children = self.children();
 
-        let num_children = children.iter().filter(|c| c.is_some()).count() as u64;
+        let num_children = children.count() as u64;
 
         add_varint_to_buf(buf, num_children);
 
-        for (index, hash) in children.iter().enumerate() {
+        for (index, hash) in &children {
             if let Some(hash) = hash {
-                add_varint_to_buf(buf, index as u64);
+                add_varint_to_buf(buf, u64::from(index.as_u8()));
                 buf.update(hash);
             }
         }

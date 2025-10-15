@@ -3,7 +3,7 @@
 
 #[cfg(feature = "ethhash")]
 use firewood_storage::HashType;
-use firewood_storage::{BranchNode, TrieHash, ValueDigest};
+use firewood_storage::{Children, TrieHash, ValueDigest};
 use integer_encoding::VarInt;
 
 use crate::{
@@ -91,12 +91,9 @@ impl Version0 for ProofNode {
 
         let children_map = reader.read_item::<ChildrenMap>()?;
 
-        let mut child_hashes = BranchNode::empty_children();
+        let mut child_hashes = Children::new();
         for idx in children_map.iter_indices() {
-            #[expect(clippy::indexing_slicing)]
-            {
-                child_hashes[idx] = Some(reader.read_item()?);
-            }
+            child_hashes[idx] = Some(reader.read_item()?);
         }
 
         Ok(ProofNode {

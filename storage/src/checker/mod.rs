@@ -386,7 +386,8 @@ where
         let mut errors = Vec::new();
         match node.as_ref() {
             Node::Branch(branch) => {
-                let num_children = branch.children_iter().count();
+                let persist_info = branch.persist_info();
+                let num_children = persist_info.count();
                 {
                     // update the branch area count
                     let branch_area_count = trie_stats
@@ -412,10 +413,13 @@ where
                 }
 
                 // this is an internal node, traverse the children
-                for (nibble, (address, hash)) in branch.children_iter() {
+                for (nibble, (address, hash)) in persist_info
+                    .into_iter()
+                    .filter_map(|(idx, slot)| slot.map(|child| (idx, child)))
+                {
                     let parent = TrieNodeParent::Parent(subtrie_root_address, nibble);
                     let mut child_path_prefix = current_path_prefix.clone();
-                    child_path_prefix.0.push(nibble as u8);
+                    child_path_prefix.0.push(nibble.as_u8());
                     let child_subtrie = SubTrieMetadata {
                         root_address: address,
                         root_hash: hash.clone(),
@@ -760,7 +764,8 @@ mod test {
     };
     use crate::nodestore::primitives::area_size_iter;
     use crate::{
-        BranchNode, Child, FreeListParent, LeafNode, NodeStore, Path, area_index, hash_node,
+        BranchNode, Child, Children, FreeListParent, LeafNode, NodeStore, Path, PathComponent,
+        area_index, hash_node,
     };
 
     #[derive(Debug)]
@@ -806,8 +811,8 @@ mod test {
         let area_count = leaf_area_counts.get_mut(&stored_area_size).unwrap();
         *area_count = area_count.saturating_add(1);
 
-        let mut branch_children = BranchNode::empty_children();
-        branch_children[1] = Some(Child::AddressWithHash(leaf_addr, leaf_hash));
+        let mut branch_children = Children::new();
+        branch_children[PathComponent::ALL[1]] = Some(Child::AddressWithHash(leaf_addr, leaf_hash));
         let branch = Node::Branch(Box::new(BranchNode {
             partial_path: Path::from([3]),
             value: None,
@@ -822,8 +827,9 @@ mod test {
         let area_count = branch_area_counts.get_mut(&stored_area_size).unwrap();
         *area_count = area_count.saturating_add(1);
 
-        let mut root_children = BranchNode::empty_children();
-        root_children[0] = Some(Child::AddressWithHash(branch_addr, branch_hash));
+        let mut root_children = Children::new();
+        root_children[PathComponent::ALL[0]] =
+            Some(Child::AddressWithHash(branch_addr, branch_hash));
         let root = Node::Branch(Box::new(BranchNode {
             partial_path: Path::from([2]),
             value: None,
@@ -1035,8 +1041,13 @@ mod test {
         let branch_addr = *branch_addr;
 
         // Replace branch hash with a wrong hash
-        let (leaf_addr, _) = branch.children[1].as_ref().unwrap().persist_info().unwrap();
-        branch.children[1] = Some(Child::AddressWithHash(leaf_addr, HashType::empty()));
+        let (leaf_addr, _) = branch.children[PathComponent::ALL[1]]
+            .as_ref()
+            .unwrap()
+            .persist_info()
+            .unwrap();
+        branch.children[PathComponent::ALL[1]] =
+            Some(Child::AddressWithHash(leaf_addr, HashType::empty()));
         test_write_new_node(&nodestore, branch_node, branch_addr.get());
 
         // Compute the current branch hash
@@ -1056,7 +1067,7 @@ mod test {
             .find(|(node, _)| matches!(node, Node::Branch(b) if *b.partial_path.0 == [2]))
             .unwrap();
         let root_branch = root_node.as_branch().unwrap();
-        let (_, parent_stored_hash) = root_branch.children[0]
+        let (_, parent_stored_hash) = root_branch.children[PathComponent::ALL[0]]
             .as_ref()
             .unwrap()
             .persist_info()
@@ -1076,7 +1087,7 @@ mod test {
         let expected_error = CheckerError::HashMismatch {
             address: branch_addr,
             path: Path::from([2, 0, 3]),
-            parent: TrieNodeParent::Parent(root_addr, 0),
+            parent: TrieNodeParent::Parent(root_addr, PathComponent::ALL[0]),
             parent_stored_hash,
             computed_hash,
         };

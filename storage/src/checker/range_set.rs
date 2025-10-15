@@ -591,7 +591,7 @@ mod test_range_set {
 #[expect(clippy::unwrap_used)]
 mod test_linear_address_range_set {
 
-    use crate::{FreeListParent, TrieNodeParent, area_index};
+    use crate::{FreeListParent, PathComponent, TrieNodeParent, area_index};
 
     use super::*;
     use test_case::test_case;
@@ -666,7 +666,8 @@ mod test_linear_address_range_set {
         let end1_addr = LinearAddress::new(start1 + size1).unwrap();
         let start2_addr = LinearAddress::new(start2).unwrap();
 
-        let parent1 = StoredAreaParent::TrieNode(TrieNodeParent::Parent(start1_addr, 5));
+        let parent1 =
+            StoredAreaParent::TrieNode(TrieNodeParent::Parent(start1_addr, PathComponent::ALL[5]));
         let parent2 = StoredAreaParent::FreeList(FreeListParent::FreeListHead(area_index!(3)));
 
         let mut visited = LinearAddressRangeSet::new(0x1000).unwrap();

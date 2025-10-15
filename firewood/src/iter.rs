@@ -8,7 +8,8 @@ use crate::merkle::{Key, Value};
 use crate::v2::api;
 
 use firewood_storage::{
-    BranchNode, Child, FileIoError, NibblesIterator, Node, PathIterItem, SharedNode, TrieReader,
+    BranchNode, Child, FileIoError, NibblesIterator, Node, PathComponent, PathIterItem, SharedNode,
+    TrieReader,
 };
 use std::cmp::Ordering;
 use std::iter::FusedIterator;
@@ -27,7 +28,7 @@ enum IterationNode {
         key: Key,
         /// Returns the non-empty children of this node and their positions
         /// in the node's children array.
-        children_iter: Box<dyn Iterator<Item = (u8, Child)> + Send>,
+        children_iter: Box<dyn Iterator<Item = (PathComponent, Child)> + Send>,
     },
 }
 
@@ -152,7 +153,7 @@ impl<T: TrieReader> Iterator for MerkleNodeIter<'_, T> {
                                 let child_key: Key = key
                                     .iter()
                                     .copied()
-                                    .chain(Some(pos))
+                                    .chain(Some(pos.as_u8()))
                                     .chain(child_partial_path)
                                     .collect();
 
@@ -240,6 +241,8 @@ fn get_iterator_intial_state<T: TrieReader>(
 
                         return Ok(NodeIterState::Iterating { iter_stack });
                     };
+                    let next_unmatched_key_nibble =
+                        PathComponent::try_new(next_unmatched_key_nibble).expect("valid nibble");
 
                     // There is no child at `next_unmatched_key_nibble`.
                     // We'll visit `node`'s first child at index > `next_unmatched_key_nibble`
@@ -252,8 +255,7 @@ fn get_iterator_intial_state<T: TrieReader>(
                         ),
                     });
 
-                    #[expect(clippy::indexing_slicing)]
-                    let child = &branch.children[next_unmatched_key_nibble as usize];
+                    let child = &branch.children[next_unmatched_key_nibble];
                     node = match child {
                         None => return Ok(NodeIterState::Iterating { iter_stack }),
                         Some(Child::AddressWithHash(addr, _)) => merkle.read_node(*addr)?,
@@ -264,7 +266,7 @@ fn get_iterator_intial_state<T: TrieReader>(
                         }
                     };
 
-                    matched_key_nibbles.push(next_unmatched_key_nibble);
+                    matched_key_nibbles.push(next_unmatched_key_nibble.as_u8());
                 }
             },
         }
@@ -425,9 +427,11 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                         next_nibble: None,
                                     }));
                                 };
+                                let next_unmatched_key_nibble =
+                                    PathComponent::try_new(next_unmatched_key_nibble)
+                                        .expect("valid nibble");
 
-                                #[expect(clippy::indexing_slicing)]
-                                let child = &branch.children[next_unmatched_key_nibble as usize];
+                                let child = &branch.children[next_unmatched_key_nibble];
                                 match child {
                                     None => {
                                         // There's no child at the index of the next nibble in the key.
@@ -446,7 +450,7 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                         };
 
                                         let node_key = matched_key.clone().into_boxed_slice();
-                                        matched_key.push(next_unmatched_key_nibble);
+                                        matched_key.push(next_unmatched_key_nibble.as_u8());
 
                                         *node = child;
 
@@ -458,7 +462,7 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                     }
                                     Some(Child::Node(child)) => {
                                         let node_key = matched_key.clone().into_boxed_slice();
-                                        matched_key.push(next_unmatched_key_nibble);
+                                        matched_key.push(next_unmatched_key_nibble.as_u8());
 
                                         *node = child.clone().into();
 
@@ -475,7 +479,7 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                         };
 
                                         let node_key = matched_key.clone().into_boxed_slice();
-                                        matched_key.push(next_unmatched_key_nibble);
+                                        matched_key.push(next_unmatched_key_nibble.as_u8());
                                         *node = child;
 
                                         Some(Ok(PathIterItem {
@@ -528,13 +532,14 @@ where
 
 /// Returns an iterator that returns (`pos`,`child`) for each non-empty child of `branch`,
 /// where `pos` is the position of the child in `branch`'s children array.
-fn as_enumerated_children_iter(branch: &BranchNode) -> impl Iterator<Item = (u8, Child)> + use<> {
+fn as_enumerated_children_iter(
+    branch: &BranchNode,
+) -> impl Iterator<Item = (PathComponent, Child)> + use<> {
     branch
         .children
         .clone()
         .into_iter()
-        .enumerate()
-        .filter_map(|(pos, child)| child.map(|child| (pos as u8, child)))
+        .filter_map(|(pos, child)| child.map(|child| (pos, child)))
 }
 
 #[cfg(feature = "branch_factor_256")]
@@ -631,7 +636,7 @@ mod tests {
         assert_eq!(node.key_nibbles, vec![0x00, 0x00].into_boxed_slice());
         #[cfg(feature = "branch_factor_256")]
         assert_eq!(node.key_nibbles, vec![0].into_boxed_slice());
-        assert_eq!(node.next_nibble, Some(0));
+        assert_eq!(node.next_nibble, Some(PathComponent::ALL[0]));
         assert!(node.node.as_branch().unwrap().value.is_none());
 
         let node = match iter.next() {
@@ -647,10 +652,7 @@ mod tests {
         #[cfg(feature = "branch_factor_256")]
         assert_eq!(node.key_nibbles, vec![0, 0, 0].into_boxed_slice());
 
-        #[cfg(not(feature = "branch_factor_256"))]
-        assert_eq!(node.next_nibble, Some(0x0F));
-        #[cfg(feature = "branch_factor_256")]
-        assert_eq!(node.next_nibble, Some(0xFF));
+        assert_eq!(node.next_nibble, PathComponent::ALL.last().copied());
 
         assert_eq!(
             node.node.as_branch().unwrap().value,
@@ -693,7 +695,7 @@ mod tests {
         assert_eq!(node.key_nibbles, vec![0x00, 0x00].into_boxed_slice());
 
         assert!(node.node.as_branch().unwrap().value.is_none());
-        assert_eq!(node.next_nibble, Some(0));
+        assert_eq!(node.next_nibble, Some(PathComponent::ALL[0]));
 
         let node = match iter.next() {
             Some(Ok(node)) => node,

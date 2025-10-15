@@ -11,11 +11,10 @@ pub fn hash_node(node: &Node, path_prefix: &Path) -> HashType {
         Node::Branch(node) => {
             // All child hashes should be filled in.
             // TODO danlaine: Enforce this with the type system.
-            #[cfg(debug_assertions)]
             debug_assert!(
                 node.children
                     .iter()
-                    .all(|c| !matches!(c, Some(crate::Child::Node(_)))),
+                    .all(|(_, c)| !matches!(c, Some(crate::Child::Node(_)))),
                 "branch children: {:?}",
                 node.children
             );
@@ -161,7 +160,7 @@ pub trait Hashable: std::fmt::Debug {
     fn value_digest(&self) -> Option<ValueDigest<&[u8]>>;
     /// Each element is a child's index and hash.
     /// Yields 0 elements if the node is a leaf.
-    fn children(&self) -> Children<HashType>;
+    fn children(&self) -> Children<Option<HashType>>;
 
     /// The full path of this node including the parent's prefix where each byte is a nibble.
     fn full_path(&self) -> impl Iterator<Item = u8> + Clone {
@@ -180,7 +179,7 @@ pub trait Preimage: std::fmt::Debug {
 trait HashableNode: std::fmt::Debug {
     fn partial_path(&self) -> impl Iterator<Item = u8> + Clone;
     fn value(&self) -> Option<&[u8]>;
-    fn child_hashes(&self) -> Children<HashType>;
+    fn child_hashes(&self) -> Children<Option<HashType>>;
 }
 
 impl HashableNode for BranchNode {
@@ -192,7 +191,7 @@ impl HashableNode for BranchNode {
         self.value.as_deref()
     }
 
-    fn child_hashes(&self) -> Children<HashType> {
+    fn child_hashes(&self) -> Children<Option<HashType>> {
         self.children_hashes()
     }
 }
@@ -206,8 +205,8 @@ impl HashableNode for LeafNode {
         Some(&self.value)
     }
 
-    fn child_hashes(&self) -> Children<HashType> {
-        BranchNode::empty_children()
+    fn child_hashes(&self) -> Children<Option<HashType>> {
+        Children::new()
     }
 }
 
@@ -236,7 +235,7 @@ impl<'a, N: HashableNode> Hashable for NodeAndPrefix<'a, N> {
         self.node.value().map(ValueDigest::Value)
     }
 
-    fn children(&self) -> Children<HashType> {
+    fn children(&self) -> Children<Option<HashType>> {
         self.node.child_hashes()
     }
 }

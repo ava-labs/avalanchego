@@ -6,13 +6,13 @@
 //! This module contains all node hashing functionality for the nodestore, including
 //! specialized support for Ethereum-compatible hash processing.
 
-#[cfg(feature = "ethhash")]
-use crate::Children;
 use crate::hashednode::hash_node;
 use crate::linear::FileIoError;
 use crate::logger::trace;
 use crate::node::Node;
 use crate::{Child, HashType, MaybePersistedNode, NodeStore, Path, ReadableStorage, SharedNode};
+#[cfg(feature = "ethhash")]
+use crate::{Children, PathComponent};
 
 use super::NodeReader;
 
@@ -64,8 +64,8 @@ impl DerefMut for PathGuard<'_> {
 /// Classified children for ethereum hash processing
 #[cfg(feature = "ethhash")]
 pub(super) struct ClassifiedChildren<'a> {
-    pub(super) unhashed: Vec<(usize, Node)>,
-    pub(super) hashed: Vec<(usize, (MaybePersistedNode, &'a mut HashType))>,
+    pub(super) unhashed: Vec<(PathComponent, Node)>,
+    pub(super) hashed: Vec<(PathComponent, (MaybePersistedNode, &'a mut HashType))>,
 }
 
 impl<T, S: ReadableStorage> NodeStore<T, S>
@@ -78,9 +78,9 @@ where
     #[cfg(feature = "ethhash")]
     pub(super) fn ethhash_classify_children<'a>(
         &self,
-        children: &'a mut Children<Child>,
+        children: &'a mut Children<Option<Child>>,
     ) -> ClassifiedChildren<'a> {
-        children.iter_mut().enumerate().fold(
+        children.into_iter().fold(
             ClassifiedChildren {
                 unhashed: Vec::new(),
                 hashed: Vec::new(),
@@ -163,11 +163,11 @@ where
                         path_guard.0.extend(b.partial_path.0.iter().copied());
                         if unhashed.is_empty() {
                             hashable_node.update_partial_path(Path::from_nibbles_iterator(
-                                std::iter::once(*child_idx as u8)
+                                std::iter::once(child_idx.as_u8())
                                     .chain(hashable_node.partial_path().0.iter().copied()),
                             ));
                         } else {
-                            path_guard.0.push(*child_idx as u8);
+                            path_guard.0.push(child_idx.as_u8());
                         }
                         hash_node(&hashable_node, &path_guard)
                     };
@@ -175,7 +175,7 @@ where
                 }
                 // handle the single-child case for an account special below
                 if hashed.is_empty() && unhashed.len() == 1 {
-                    Some(unhashed.last().expect("only one").0 as u8)
+                    Some(unhashed.last().expect("only one").0.as_u8())
                 } else {
                     None
                 }
@@ -192,7 +192,7 @@ where
             // 5. 1 hashed, >0 unhashed <-- rehash case
             // 6. everything already hashed
 
-            for (nibble, child) in b.children.iter_mut().enumerate() {
+            for (nibble, child) in &mut b.children {
                 // If this is empty or already hashed, we're done
                 // Empty matches None, and non-Node types match Some(None) here, so we want
                 // Some(Some(node))
@@ -212,10 +212,10 @@ where
                     if make_fake_root.is_none() {
                         // we don't push the nibble there is only one unhashed child and
                         // we're on an account
-                        child_path_prefix.0.push(nibble as u8);
+                        child_path_prefix.0.push(nibble.as_u8());
                     }
                     #[cfg(not(feature = "ethhash"))]
-                    child_path_prefix.0.push(nibble as u8);
+                    child_path_prefix.0.push(nibble.as_u8());
                     #[cfg(feature = "ethhash")]
                     let (child_node, child_hash) =
                         self.hash_helper_inner(child_node, child_path_prefix, make_fake_root)?;

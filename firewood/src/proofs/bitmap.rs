@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use firewood_storage::Children;
+use firewood_storage::{Children, PathComponent};
 
 #[derive(Clone, Copy, PartialEq, Eq, bytemuck_derive::Pod, bytemuck_derive::Zeroable)]
 #[repr(C)]
@@ -12,20 +12,14 @@ impl ChildrenMap {
     const SIZE: usize = firewood_storage::BranchNode::MAX_CHILDREN / 8;
 
     /// Create a new `ChildrenMap` from the given children array.
-    pub fn new<T>(children: &Children<T>) -> Self {
-        let mut map = [0_u8; Self::SIZE];
+    pub fn new<T>(children: &Children<Option<T>>) -> Self {
+        let mut map = Self([0_u8; Self::SIZE]);
 
-        for (i, child) in children.iter().enumerate() {
-            if child.is_some() {
-                let (idx, bit) = (i / 8, i % 8);
-                #[expect(clippy::indexing_slicing)]
-                {
-                    map[idx] |= 1 << bit;
-                }
-            }
+        for (i, _) in children.iter_present() {
+            map.set(i);
         }
 
-        Self(map)
+        map
     }
 
     #[cfg(test)]
@@ -33,11 +27,20 @@ impl ChildrenMap {
         self.0.iter().map(|b| b.count_ones() as usize).sum()
     }
 
-    pub fn iter_indices(self) -> impl Iterator<Item = usize> {
-        (0..firewood_storage::BranchNode::MAX_CHILDREN).filter(
-            #[expect(clippy::indexing_slicing)]
-            move |i| self.0[i / 8] & (1 << (i % 8)) != 0,
-        )
+    pub const fn get(self, index: PathComponent) -> bool {
+        #![expect(clippy::indexing_slicing)]
+        let i = index.as_usize();
+        self.0[i / 8] & (1 << (i % 8)) != 0
+    }
+
+    pub const fn set(&mut self, index: PathComponent) {
+        #![expect(clippy::indexing_slicing)]
+        let i = index.as_usize();
+        self.0[i / 8] |= 1 << (i % 8);
+    }
+
+    pub fn iter_indices(self) -> impl Iterator<Item = PathComponent> {
+        PathComponent::ALL.into_iter().filter(move |&i| self.get(i))
     }
 }
 
@@ -76,43 +79,45 @@ impl std::fmt::Debug for ChildrenMap {
 
 #[cfg(test)]
 mod tests {
+    #![expect(clippy::unwrap_used)]
+
     use super::*;
 
-    use firewood_storage::BranchNode;
+    use firewood_storage::{Children, PathComponent};
     use test_case::test_case;
 
-    #[test_case(BranchNode::empty_children(), &[]; "empty")]
+    #[test_case(Children::new(), &[]; "empty")]
     #[test_case({
-        let mut children = BranchNode::empty_children();
-        children[0] = Some(());
+        let mut children = Children::new();
+        children[PathComponent::ALL[0]] = Some(());
         children
-    }, &[0]; "first")]
+    }, &[PathComponent::ALL[0]]; "first")]
     #[test_case({
-        let mut children = BranchNode::empty_children();
-        children[1] = Some(());
+        let mut children = Children::new();
+        children[PathComponent::ALL[1]] = Some(());
         children
-    }, &[1]; "second")]
+    }, &[PathComponent::ALL[1]]; "second")]
     #[test_case({
-        let mut children = BranchNode::empty_children();
-        children[BranchNode::MAX_CHILDREN - 1] = Some(());
+        let mut children = Children::new();
+        children[PathComponent::ALL.last().copied().unwrap()] = Some(());
         children
-    }, &[BranchNode::MAX_CHILDREN - 1]; "last")]
+    }, &[PathComponent::ALL.last().copied().unwrap()]; "last")]
     #[test_case({
-        let mut children = BranchNode::empty_children();
-        for slot in children.iter_mut().step_by(2) {
+        let mut children = Children::new();
+        for (_, slot) in children.iter_mut().step_by(2) {
             *slot = Some(());
         }
         children
-    }, &(0..BranchNode::MAX_CHILDREN).step_by(2).collect::<Vec<_>>(); "evens")]
+    }, &PathComponent::ALL.into_iter().step_by(2).collect::<Vec<_>>(); "evens")]
     #[test_case({
-        let mut children = BranchNode::empty_children();
-        for slot in children.iter_mut().skip(1).step_by(2) {
+        let mut children = Children::new();
+        for (_, slot) in children.iter_mut().skip(1).step_by(2) {
             *slot = Some(());
         }
         children
-    }, &(1..BranchNode::MAX_CHILDREN).step_by(2).collect::<Vec<_>>(); "odds")]
-    #[test_case([Some(()); BranchNode::MAX_CHILDREN], &(0..BranchNode::MAX_CHILDREN).collect::<Vec<_>>(); "all")]
-    fn test_children_map(children: Children<()>, indicies: &[usize]) {
+    }, &PathComponent::ALL.into_iter().skip(1).step_by(2).collect::<Vec<_>>(); "odds")]
+    #[test_case(Children::from_fn(|_| Some(())), &PathComponent::ALL; "all")]
+    fn test_children_map(children: Children<Option<()>>, indicies: &[PathComponent]) {
         let map = ChildrenMap::new(&children);
         assert_eq!(map.len(), indicies.len());
 

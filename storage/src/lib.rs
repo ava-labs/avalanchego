@@ -47,7 +47,7 @@ pub use hashednode::{Hashable, Preimage, ValueDigest, hash_node, hash_preimage};
 pub use linear::{FileIoError, ReadableStorage, WritableStorage};
 pub use node::path::{NibblesIterator, Path};
 pub use node::{
-    BranchNode, Child, Children, LeafNode, Node, PathIterItem,
+    BranchNode, Child, Children, ChildrenSlots, LeafNode, Node, PathIterItem,
     branch::{HashType, IntoHashType},
 };
 pub use nodestore::{
@@ -55,8 +55,9 @@ pub use nodestore::{
     NodeReader, NodeStore, Parentable, RootReader, TrieReader,
 };
 pub use path::{
-    IntoSplitPath, JoinedPath, PathCommonPrefix, PathComponent, PathComponentSliceExt, SplitPath,
-    TriePath, TriePathAsPackedBytes, TriePathFromPackedBytes, TriePathFromUnpackedBytes,
+    ComponentIter, IntoSplitPath, JoinedPath, PathCommonPrefix, PathComponent,
+    PathComponentSliceExt, SplitPath, TriePath, TriePathAsPackedBytes, TriePathFromPackedBytes,
+    TriePathFromUnpackedBytes,
 };
 #[cfg(not(feature = "branch_factor_256"))]
 pub use path::{PackedBytes, PackedPathComponents, PackedPathRef};
@@ -110,7 +111,7 @@ pub enum TrieNodeParent {
     /// The stored area is the root of the trie, so the header points to it
     Root,
     /// The stored area is not the root of the trie, so a parent trie node points to it
-    Parent(LinearAddress, usize),
+    Parent(LinearAddress, PathComponent),
 }
 
 /// This enum encapsulates what points to the stored area allocated for a free list.

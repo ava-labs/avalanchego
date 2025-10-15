@@ -15,6 +15,9 @@ pub struct PathComponent(pub crate::u4::U4);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PathComponent(pub u8);
 
+/// An iterator over path components.
+pub type ComponentIter<'a> = std::iter::Copied<std::slice::Iter<'a, PathComponent>>;
+
 /// Extension methods for slices of path components.
 pub trait PathComponentSliceExt {
     /// Casts this slice of path components to a byte slice.
@@ -36,7 +39,7 @@ impl PathComponent {
     /// instead of using a raw range like (`0..16`) or  [`Iterator::enumerate`],
     /// which does not give a type-safe path component.
     #[cfg(not(feature = "branch_factor_256"))]
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; Self::LEN] = [
         Self(crate::u4::U4::new_masked(0x0)),
         Self(crate::u4::U4::new_masked(0x1)),
         Self(crate::u4::U4::new_masked(0x2)),
@@ -69,7 +72,7 @@ impl PathComponent {
     /// instead of using a raw range like (`0..256`) or  [`Iterator::enumerate`],
     /// which does not give a type-safe path component.
     #[cfg(feature = "branch_factor_256")]
-    pub const ALL: [Self; 256] = {
+    pub const ALL: [Self; Self::LEN] = {
         let mut all = [Self(0); 256];
         let mut i = 0;
         #[expect(clippy::indexing_slicing)]
@@ -78,6 +81,13 @@ impl PathComponent {
             i += 1;
         }
         all
+    };
+
+    /// The number of possible path components.
+    pub const LEN: usize = if cfg!(feature = "branch_factor_256") {
+        256
+    } else {
+        16
     };
 }
 
@@ -139,6 +149,20 @@ impl PathComponent {
     #[must_use]
     pub const fn join(self, other: Self) -> u8 {
         self.0.join(other.0)
+    }
+
+    pub(crate) const fn wrapping_next(self) -> Self {
+        #[cfg(not(feature = "branch_factor_256"))]
+        {
+            match crate::u4::U4::try_new(self.0.as_u8().wrapping_add(1)) {
+                Some(next) => Self(next),
+                None => Self(crate::u4::U4::MIN),
+            }
+        }
+        #[cfg(feature = "branch_factor_256")]
+        {
+            Self(self.0.wrapping_add(1))
+        }
     }
 }
 
@@ -205,7 +229,7 @@ impl TriePath for Option<PathComponent> {
 
 impl TriePath for [PathComponent] {
     type Components<'a>
-        = std::iter::Copied<std::slice::Iter<'a, PathComponent>>
+        = ComponentIter<'a>
     where
         Self: 'a;
 
@@ -220,7 +244,7 @@ impl TriePath for [PathComponent] {
 
 impl<const N: usize> TriePath for [PathComponent; N] {
     type Components<'a>
-        = std::iter::Copied<std::slice::Iter<'a, PathComponent>>
+        = ComponentIter<'a>
     where
         Self: 'a;
 
@@ -235,7 +259,7 @@ impl<const N: usize> TriePath for [PathComponent; N] {
 
 impl TriePath for Vec<PathComponent> {
     type Components<'a>
-        = std::iter::Copied<std::slice::Iter<'a, PathComponent>>
+        = ComponentIter<'a>
     where
         Self: 'a;
 
@@ -250,7 +274,7 @@ impl TriePath for Vec<PathComponent> {
 
 impl<A: smallvec::Array<Item = PathComponent>> TriePath for SmallVec<A> {
     type Components<'a>
-        = std::iter::Copied<std::slice::Iter<'a, PathComponent>>
+        = ComponentIter<'a>
     where
         Self: 'a;
 

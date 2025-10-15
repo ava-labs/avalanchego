@@ -102,7 +102,7 @@ impl WriteItem for ProofNode {
         out.push_var_int(self.partial_len);
         self.value_digest.write_item(out);
         ChildrenMap::new(&self.child_hashes).write_item(out);
-        for child in self.child_hashes.iter().flatten() {
+        for (_, child) in self.child_hashes.iter_present() {
             child.write_item(out);
         }
     }
