@@ -251,6 +251,10 @@ tasks:
           METRICS_SERVER_ENABLED: '{{.METRICS_SERVER_ENABLED}}'
           METRICS_COLLECTOR_ENABLED: '{{.METRICS_COLLECTOR_ENABLED}}'
 
+  run-polyrepo:
+    desc: Runs the polyrepo command. Remember to separate arguments with `--` e.g. `task run-polyrepo -- cmd`
+    cmd: ./scripts/run_polyrepo.sh
+
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests
     cmd: bash -x ./scripts/tests.e2e.bootstrap_monitor.sh
