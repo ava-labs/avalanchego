@@ -207,7 +207,7 @@ func (s *state) getValidatorByNodeID(nodeID ids.NodeID) (*validator, bool) {
 	}
 
 	// we are guaranteed to have this validator
-	v, _ := s.validators[validationID]
+	v := s.validators[validationID]
 	return v, true
 }
 
