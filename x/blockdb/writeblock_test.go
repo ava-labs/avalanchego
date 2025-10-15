@@ -13,104 +13,126 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/compression"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
 
-func TestWriteBlock_Basic(t *testing.T) {
+func TestPutGet(t *testing.T) {
+	tests := []struct {
+		name  string
+		block []byte
+		want  []byte
+	}{
+		{
+			name:  "normal write",
+			block: []byte("hello"),
+			want:  []byte("hello"),
+		},
+		{
+			name:  "empty block",
+			block: []byte{},
+			want:  []byte{},
+		},
+		{
+			name:  "nil block",
+			block: nil,
+			want:  []byte{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, cleanup := newTestDatabase(t, DefaultConfig())
+			defer cleanup()
+			require.NoError(t, db.Put(0, tt.block))
+
+			got, err := db.Get(0)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestPut_MaxHeight(t *testing.T) {
 	customConfig := DefaultConfig().WithMinimumHeight(10)
 
 	tests := []struct {
 		name               string
 		blockHeights       []uint64 // block heights to write, in order
 		config             DatabaseConfig
-		expectedMCH        uint64 // expected max contiguous height
 		expectedMaxHeight  uint64
 		syncToDisk         bool
 		checkpointInterval uint64
 	}{
 		{
 			name:              "no blocks to write",
-			expectedMCH:       unsetHeight,
 			expectedMaxHeight: unsetHeight,
 		},
 		{
 			name:              "single block at min height",
 			blockHeights:      []uint64{0},
-			expectedMCH:       0,
 			expectedMaxHeight: 0,
 		},
 		{
 			name:              "sequential blocks from min",
 			blockHeights:      []uint64{0, 1, 2, 3},
-			expectedMCH:       3,
 			expectedMaxHeight: 3,
 		},
 		{
 			name:              "out of order with no gaps",
 			blockHeights:      []uint64{3, 1, 2, 0, 4},
-			expectedMCH:       4,
 			expectedMaxHeight: 4,
 		},
 		{
 			name:              "blocks with gaps",
 			blockHeights:      []uint64{0, 1, 3, 5, 6},
-			expectedMCH:       1,
 			expectedMaxHeight: 6,
 		},
 		{
 			name:              "start with gap",
 			blockHeights:      []uint64{5, 6},
-			expectedMCH:       unsetHeight,
 			expectedMaxHeight: 6,
 		},
 		{
 			name:              "overwrite same height",
 			blockHeights:      []uint64{0, 1, 0}, // Write to height 0 twice
-			expectedMCH:       1,
 			expectedMaxHeight: 1,
 		},
 		{
 			name:              "custom min height single block",
 			blockHeights:      []uint64{10},
 			config:            customConfig,
-			expectedMCH:       10,
 			expectedMaxHeight: 10,
 		},
 		{
 			name:              "custom min height out of order",
 			blockHeights:      []uint64{13, 11, 10, 12},
 			config:            customConfig,
-			expectedMCH:       13,
 			expectedMaxHeight: 13,
 		},
 		{
 			name:              "custom min height with gaps",
 			blockHeights:      []uint64{10, 11, 13, 15},
 			config:            customConfig,
-			expectedMCH:       11,
 			expectedMaxHeight: 15,
 		},
 		{
 			name:              "custom min height start with gap",
 			blockHeights:      []uint64{11, 12},
 			config:            customConfig,
-			expectedMCH:       unsetHeight,
 			expectedMaxHeight: 12,
 		},
 		{
 			name:              "with sync to disk",
 			blockHeights:      []uint64{0, 1, 2, 5},
 			syncToDisk:        true,
-			expectedMCH:       2,
 			expectedMaxHeight: 5,
 		},
 		{
 			name:               "custom checkpoint interval",
 			blockHeights:       []uint64{0, 1, 2, 3, 4},
 			checkpointInterval: 2,
-			expectedMCH:        4,
 			expectedMaxHeight:  4,
 		},
 		{
@@ -118,7 +140,6 @@ func TestWriteBlock_Basic(t *testing.T) {
 			blockHeights: []uint64{
 				10, 3, 2, 9, 35, 34, 30, 1, 9, 88, 83, 4, 43, 5, 0,
 			},
-			expectedMCH:       5,
 			expectedMaxHeight: 88,
 		},
 	}
@@ -136,20 +157,13 @@ func TestWriteBlock_Basic(t *testing.T) {
 			blocksWritten := make(map[uint64][]byte)
 			for _, h := range tt.blockHeights {
 				block := randomBlock(t)
-				err := store.WriteBlock(h, block)
+				err := store.Put(h, block)
 				require.NoError(t, err, "unexpected error at height %d", h)
 
 				blocksWritten[h] = block
 			}
 
-			// Verify all written blocks are readable and data is correct
-			for h, expectedBlock := range blocksWritten {
-				readBlock, err := store.ReadBlock(h)
-				require.NoError(t, err, "ReadBlock failed at height %d", h)
-				require.Equal(t, expectedBlock, readBlock)
-			}
-
-			checkDatabaseState(t, store, tt.expectedMaxHeight, tt.expectedMCH)
+			checkDatabaseState(t, store, tt.expectedMaxHeight)
 		})
 	}
 }
@@ -179,7 +193,7 @@ func TestWriteBlock_Concurrency(t *testing.T) {
 				height = uint64(i)
 			}
 
-			err := store.WriteBlock(height, block)
+			err := store.Put(height, block)
 			if err != nil {
 				errors.Add(1)
 			}
@@ -192,15 +206,15 @@ func TestWriteBlock_Concurrency(t *testing.T) {
 	// Verify that all expected heights have blocks (except 5, 10)
 	for i := range 20 {
 		height := uint64(i)
-		block, err := store.ReadBlock(height)
+		block, err := store.Get(height)
 		if i == 5 || i == 10 {
-			require.ErrorIs(t, err, ErrBlockNotFound, "expected ErrBlockNotFound at gap height %d", height)
+			require.ErrorIs(t, err, database.ErrNotFound, "expected ErrNotFound at gap height %d", height)
 		} else {
 			require.NoError(t, err)
 			require.Equal(t, blocks[i], block, "block mismatch at height %d", height)
 		}
 	}
-	checkDatabaseState(t, store, 19, 4)
+	checkDatabaseState(t, store, 19)
 }
 
 func TestWriteBlock_Errors(t *testing.T) {
@@ -214,18 +228,6 @@ func TestWriteBlock_Errors(t *testing.T) {
 		wantErr            error
 		wantErrMsg         string
 	}{
-		{
-			name:    "empty block nil",
-			height:  0,
-			block:   nil,
-			wantErr: ErrBlockEmpty,
-		},
-		{
-			name:    "empty block zero length",
-			height:  0,
-			block:   []byte{},
-			wantErr: ErrBlockEmpty,
-		},
 		{
 			name:    "height below custom minimum",
 			height:  5,
@@ -246,7 +248,7 @@ func TestWriteBlock_Errors(t *testing.T) {
 			setup: func(db *Database) {
 				db.Close()
 			},
-			wantErr: ErrDatabaseClosed,
+			wantErr: database.ErrClosed,
 		},
 		{
 			name:               "exceed max data file size",
@@ -310,13 +312,13 @@ func TestWriteBlock_Errors(t *testing.T) {
 				tt.setup(store)
 			}
 
-			err := store.WriteBlock(tt.height, tt.block)
+			err := store.Put(tt.height, tt.block)
 			if tt.wantErrMsg != "" {
 				require.True(t, strings.HasPrefix(err.Error(), tt.wantErrMsg), "expected error message to start with %s, got %s", tt.wantErrMsg, err.Error())
 			} else {
 				require.ErrorIs(t, err, tt.wantErr)
 			}
-			checkDatabaseState(t, store, unsetHeight, unsetHeight)
+			checkDatabaseState(t, store, unsetHeight)
 		})
 	}
 }

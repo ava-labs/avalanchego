@@ -1782,6 +1782,57 @@ func (s *Service) GetTimestamp(_ *http.Request, _ *struct{}, reply *GetTimestamp
 	return nil
 }
 
+// GetAllValidatorsAtArgs are the arguments for GetAllValidatorsAt
+type GetAllValidatorsAtArgs struct {
+	Height platformapi.Height `json:"height"`
+}
+
+// GetAllValidatorsAtReply is the response from GetAllValidatorsAt
+type GetAllValidatorsAtReply struct {
+	ValidatorSets map[ids.ID]validators.WarpSet `json:"validatorSets"`
+}
+
+// GetAllValidatorsAt returns the canonical validator sets of
+// all chains with at least one active validator at the specified
+// height or at proposerVM height if set to [platformapi.ProposedHeight].
+func (s *Service) GetAllValidatorsAt(r *http.Request, args *GetAllValidatorsAtArgs, reply *GetAllValidatorsAtReply) error {
+	s.vm.ctx.Log.Debug("API called",
+		zap.String("service", "platform"),
+		zap.String("method", "getAllValidatorsAt"),
+		zap.Uint64("height", uint64(args.Height)),
+		zap.Bool("isProposed", args.Height.IsProposed()),
+	)
+
+	s.vm.ctx.Lock.Lock()
+	defer s.vm.ctx.Lock.Unlock()
+
+	ctx := r.Context()
+	height, err := s.getQueryHeight(ctx, args.Height)
+	if err != nil {
+		return err
+	}
+
+	reply.ValidatorSets, err = s.vm.GetWarpValidatorSets(ctx, height)
+	if err != nil {
+		return fmt.Errorf("failed to get validator sets at %d: %w", height, err)
+	}
+	return nil
+}
+
+// If args.Height is the sentinel value for proposed height, gets the proposed height and return it,
+// else returns the input height.
+func (s *Service) getQueryHeight(ctx context.Context, heightArg platformapi.Height) (uint64, error) {
+	if !heightArg.IsProposed() {
+		return uint64(heightArg), nil
+	}
+
+	height, err := s.vm.GetMinimumHeight(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get proposed height: %w", err)
+	}
+	return height, nil
+}
+
 // GetValidatorsAtArgs is the response from GetValidatorsAt
 type GetValidatorsAtArgs struct {
 	Height   platformapi.Height `json:"height"`
@@ -1867,18 +1918,14 @@ func (s *Service) GetValidatorsAt(r *http.Request, args *GetValidatorsAtArgs, re
 	defer s.vm.ctx.Lock.Unlock()
 
 	ctx := r.Context()
-	var err error
-	height := uint64(args.Height)
-	if args.Height.IsProposed() {
-		height, err = s.vm.GetMinimumHeight(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get proposed height: %w", err)
-		}
+	height, err := s.getQueryHeight(ctx, args.Height)
+	if err != nil {
+		return err
 	}
 
 	reply.Validators, err = s.vm.GetValidatorSet(ctx, height, args.SubnetID)
 	if err != nil {
-		return fmt.Errorf("failed to get validator set: %w", err)
+		return fmt.Errorf("failed to get validator set at %d: %w", height, err)
 	}
 	return nil
 }

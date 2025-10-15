@@ -529,6 +529,7 @@ func (p *peer) writeMessages() {
 	knownPeersFilter, knownPeersSalt := p.Network.KnownPeers()
 
 	_, areWeAPrimaryNetworkValidator := p.Validators.GetValidator(constants.PrimaryNetworkID, p.MyNodeID)
+	requestAllSubnetIPs := areWeAPrimaryNetworkValidator || p.Config.ConnectToAllValidators
 	msg, err := p.MessageCreator.Handshake(
 		p.NetworkID,
 		p.Clock.Unix(),
@@ -545,7 +546,7 @@ func (p *peer) writeMessages() {
 		p.ObjectedACPs,
 		knownPeersFilter,
 		knownPeersSalt,
-		areWeAPrimaryNetworkValidator,
+		requestAllSubnetIPs,
 	)
 	if err != nil {
 		p.Log.Error(failedToCreateMessageLog,
@@ -641,10 +642,11 @@ func (p *peer) sendNetworkMessages() {
 		case <-p.getPeerListChan:
 			knownPeersFilter, knownPeersSalt := p.Config.Network.KnownPeers()
 			_, areWeAPrimaryNetworkValidator := p.Validators.GetValidator(constants.PrimaryNetworkID, p.MyNodeID)
+			requestAllSubnetIPs := areWeAPrimaryNetworkValidator || p.Config.ConnectToAllValidators
 			msg, err := p.Config.MessageCreator.GetPeerList(
 				knownPeersFilter,
 				knownPeersSalt,
-				areWeAPrimaryNetworkValidator,
+				requestAllSubnetIPs,
 			)
 			if err != nil {
 				p.Log.Error(failedToCreateMessageLog,
