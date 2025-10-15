@@ -1,12 +1,14 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+mod buf;
 mod component;
 mod joined;
 #[cfg(not(feature = "branch_factor_256"))]
 mod packed;
 mod split;
 
+pub use self::buf::{PartialPath, PathBuf};
 pub use self::component::{ComponentIter, PathComponent, PathComponentSliceExt};
 pub use self::joined::JoinedPath;
 #[cfg(not(feature = "branch_factor_256"))]
@@ -34,6 +36,13 @@ pub trait TriePath {
 
     /// Returns an iterator over the components of this path.
     fn components(&self) -> Self::Components<'_>;
+
+    /// Returns a contiguous view of this path's components.
+    ///
+    /// If the underlying representation is already contiguous, this should be a
+    /// cheap operation (i.e. no allocations or copies). If not, this may allocate
+    /// and copy the components into a contiguous buffer.
+    fn as_component_slice(&self) -> PartialPath<'_>;
 
     /// Appends the provided path segment to this path, returning a new joined
     /// path that represents the concatenation of the two paths.
@@ -210,6 +219,10 @@ impl<T: TriePath + ?Sized> TriePath for &T {
     fn components(&self) -> Self::Components<'_> {
         (**self).components()
     }
+
+    fn as_component_slice(&self) -> PartialPath<'_> {
+        (**self).as_component_slice()
+    }
 }
 
 impl<T: TriePath + ?Sized> TriePath for &mut T {
@@ -224,6 +237,10 @@ impl<T: TriePath + ?Sized> TriePath for &mut T {
 
     fn components(&self) -> Self::Components<'_> {
         (**self).components()
+    }
+
+    fn as_component_slice(&self) -> PartialPath<'_> {
+        (**self).as_component_slice()
     }
 }
 
@@ -240,6 +257,10 @@ impl<T: TriePath + ?Sized> TriePath for Box<T> {
     fn components(&self) -> Self::Components<'_> {
         (**self).components()
     }
+
+    fn as_component_slice(&self) -> PartialPath<'_> {
+        (**self).as_component_slice()
+    }
 }
 
 impl<T: TriePath + ?Sized> TriePath for std::rc::Rc<T> {
@@ -255,6 +276,10 @@ impl<T: TriePath + ?Sized> TriePath for std::rc::Rc<T> {
     fn components(&self) -> Self::Components<'_> {
         (**self).components()
     }
+
+    fn as_component_slice(&self) -> PartialPath<'_> {
+        (**self).as_component_slice()
+    }
 }
 
 impl<T: TriePath + ?Sized> TriePath for std::sync::Arc<T> {
@@ -269,5 +294,9 @@ impl<T: TriePath + ?Sized> TriePath for std::sync::Arc<T> {
 
     fn components(&self) -> Self::Components<'_> {
         (**self).components()
+    }
+
+    fn as_component_slice(&self) -> PartialPath<'_> {
+        (**self).as_component_slice()
     }
 }

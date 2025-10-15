@@ -13,8 +13,8 @@
 
 use crate::logger::warn;
 use crate::{
-    BranchNode, HashType, Hashable, Preimage, TrieHash, ValueDigest, hashednode::HasUpdate,
-    logger::trace,
+    BranchNode, HashType, Hashable, Preimage, TrieHash, TriePath, ValueDigest,
+    hashednode::HasUpdate, logger::trace,
 };
 use bitfield::bitfield;
 use bytes::BytesMut;
@@ -40,7 +40,7 @@ impl HasUpdate for Keccak256 {
 // B is 1 if the input had an odd number of nibbles
 // CCCC is the first nibble if B is 1, otherwise it is all 0s
 
-fn nibbles_to_eth_compact<T: AsRef<[u8]>>(nibbles: T, is_leaf: bool) -> SmallVec<[u8; 32]> {
+fn nibbles_to_eth_compact<T: TriePath>(nibbles: T, is_leaf: bool) -> SmallVec<[u8; 32]> {
     // This is a bitfield that represents the first byte of the output, documented above
     bitfield! {
         struct CompactFirstByte(u8);
@@ -52,15 +52,7 @@ fn nibbles_to_eth_compact<T: AsRef<[u8]>>(nibbles: T, is_leaf: bool) -> SmallVec
         low_nibble, set_low_nibble: 3, 0;
     }
 
-    let nibbles = nibbles.as_ref();
-    if cfg!(debug_assertions) {
-        for &nibble in nibbles {
-            assert!(
-                nibble < 16,
-                "nibbles contains byte out of range: {nibbles:?}"
-            );
-        }
-    }
+    let nibbles = nibbles.as_component_slice();
 
     let mut first_byte = CompactFirstByte(0);
     first_byte.set_is_leaf(is_leaf);
@@ -69,7 +61,7 @@ fn nibbles_to_eth_compact<T: AsRef<[u8]>>(nibbles: T, is_leaf: bool) -> SmallVec
     if let &[low_nibble] = maybe_low_nibble {
         // we have an odd number of nibbles
         first_byte.set_odd_nibbles(true);
-        first_byte.set_low_nibble(low_nibble);
+        first_byte.set_low_nibble(low_nibble.as_u8());
     } else {
         // as_rchunks can only return 0 or 1 element in the first slice if N is 2
         debug_assert!(maybe_low_nibble.is_empty());
@@ -77,7 +69,7 @@ fn nibbles_to_eth_compact<T: AsRef<[u8]>>(nibbles: T, is_leaf: bool) -> SmallVec
 
     // now assemble everything: the first byte, and the nibble pairs compacted back together
     once(first_byte.0)
-        .chain(nibble_pairs.iter().map(|&[hi, lo]| (hi << 4) | lo))
+        .chain(nibble_pairs.iter().map(|&[hi, lo]| hi.join(lo)))
         .collect()
 }
 
@@ -90,7 +82,7 @@ impl<T: Hashable> Preimage for T {
 
         trace!(
             "SIZE WAS {} {}",
-            self.full_path().count(),
+            self.full_path().len(),
             hex::encode(&collector),
         );
 
@@ -102,7 +94,7 @@ impl<T: Hashable> Preimage for T {
     }
 
     fn write(&self, buf: &mut impl HasUpdate) {
-        let is_account = self.full_path().count() == 64;
+        let is_account = self.full_path().len() == 64;
         trace!("is_account: {is_account}");
 
         let child_hashes = self.children();
@@ -117,10 +109,7 @@ impl<T: Hashable> Preimage for T {
 
             let mut rlp = RlpStream::new_list(2);
 
-            rlp.append(&&*nibbles_to_eth_compact(
-                self.partial_path().collect::<Box<_>>(),
-                true,
-            ));
+            rlp.append(&&*nibbles_to_eth_compact(self.partial_path(), true));
 
             if is_account {
                 // we are a leaf that is at depth 32
@@ -147,10 +136,7 @@ impl<T: Hashable> Preimage for T {
             }
 
             let bytes = rlp.out();
-            trace!(
-                "partial path {:?}",
-                hex::encode(self.partial_path().collect::<Box<_>>())
-            );
+            trace!("partial path {:?}", self.partial_path().display());
             trace!("serialized leaf-rlp: {:?}", hex::encode(&bytes));
             buf.update(&bytes);
         } else {
@@ -203,10 +189,7 @@ impl<T: Hashable> Preimage for T {
                             HashType::Hash(hash) => hash.clone(),
                             HashType::Rlp(rlp_bytes) => {
                                 let mut rlp = RlpStream::new_list(2);
-                                rlp.append(&&*nibbles_to_eth_compact(
-                                    self.partial_path().collect::<Box<_>>(),
-                                    true,
-                                ));
+                                rlp.append(&&*nibbles_to_eth_compact(self.partial_path(), true));
                                 rlp.append_raw(rlp_bytes, 1);
                                 let bytes = rlp.out();
                                 TrieHash::from(Keccak256::digest(bytes))
@@ -225,7 +208,7 @@ impl<T: Hashable> Preimage for T {
                     // treat like non-account since it didn't have a value
                     warn!(
                         "Account node {:x?} without value",
-                        self.full_path().collect::<Vec<_>>()
+                        self.full_path().display(),
                     );
                     bytes.as_ref().into()
                 }
@@ -233,7 +216,7 @@ impl<T: Hashable> Preimage for T {
                 bytes.as_ref().into()
             };
 
-            let partial_path = self.partial_path().collect::<Box<_>>();
+            let partial_path = self.partial_path();
             if partial_path.is_empty() {
                 trace!("pass 2=bytes {:02X?}", hex::encode(&updated_bytes));
                 buf.update(updated_bytes);
@@ -282,6 +265,8 @@ fn replace_hash<T: AsRef<[u8]>, U: AsRef<[u8]>>(bytes: T, new_hash: U) -> Option
 mod test {
     use test_case::test_case;
 
+    use crate::{PathComponent, TriePathFromUnpackedBytes};
+
     #[test_case(&[], false, &[0x00])]
     #[test_case(&[], true, &[0x20])]
     #[test_case(&[1, 2, 3, 4, 5], false, &[0x11, 0x23, 0x45])]
@@ -289,8 +274,9 @@ mod test {
     #[test_case(&[15, 1, 12, 11, 8], true, &[0x3f, 0x1c, 0xb8])]
     #[test_case(&[0, 15, 1, 12, 11, 8], true, &[0x20, 0x0f, 0x1c, 0xb8])]
     fn test_hex_to_compact(hex: &[u8], has_value: bool, expected_compact: &[u8]) {
+        let path = <&[PathComponent]>::path_from_unpacked_bytes(hex).expect("valid path");
         assert_eq!(
-            &*super::nibbles_to_eth_compact(hex, has_value),
+            &*super::nibbles_to_eth_compact(path, has_value),
             expected_compact
         );
     }

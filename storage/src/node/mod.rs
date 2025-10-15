@@ -16,7 +16,7 @@
 
 use crate::node::branch::ReadSerializable;
 use crate::nodestore::AreaIndex;
-use crate::{HashType, LinearAddress, Path, PathComponent, SharedNode};
+use crate::{HashType, LinearAddress, Path, PathBuf, PathComponent, SharedNode};
 use bitfield::bitfield;
 use branch::Serializable as _;
 pub use branch::{BranchNode, Child};
@@ -410,7 +410,7 @@ impl Node {
 #[derive(Debug)]
 pub struct PathIterItem {
     /// The key of the node at `address` as nibbles.
-    pub key_nibbles: Box<[u8]>,
+    pub key_nibbles: PathBuf,
     /// A reference to the node
     pub node: SharedNode,
     /// The next item returned by the iterator is a child of `node`.

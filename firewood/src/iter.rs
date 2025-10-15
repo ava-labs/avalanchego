@@ -8,8 +8,8 @@ use crate::merkle::{Key, Value};
 use crate::v2::api;
 
 use firewood_storage::{
-    BranchNode, Child, FileIoError, NibblesIterator, Node, PathComponent, PathIterItem, SharedNode,
-    TrieReader,
+    BranchNode, Child, FileIoError, NibblesIterator, Node, PathBuf, PathComponent, PathIterItem,
+    SharedNode, TriePathFromUnpackedBytes, TrieReader,
 };
 use std::cmp::Ordering;
 use std::iter::FusedIterator;
@@ -401,7 +401,8 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                     }
                     Ordering::Equal => {
                         matched_key.extend(partial_path.iter());
-                        let node_key = matched_key.clone().into_boxed_slice();
+                        let node_key = PathBuf::path_from_unpacked_bytes(matched_key)
+                            .expect("valid components");
 
                         match &**node {
                             Node::Leaf(_) => {
@@ -409,7 +410,7 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                 let node = node.clone();
                                 self.state = PathIteratorState::Exhausted;
                                 Some(Ok(PathIterItem {
-                                    key_nibbles: node_key.clone(),
+                                    key_nibbles: node_key,
                                     node,
                                     next_nibble: None,
                                 }))
@@ -422,7 +423,7 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                     // We're at the node at `key` so we're done.
                                     self.state = PathIteratorState::Exhausted;
                                     return Some(Ok(PathIterItem {
-                                        key_nibbles: node_key.clone(),
+                                        key_nibbles: node_key,
                                         node: saved_node,
                                         next_nibble: None,
                                     }));
@@ -438,7 +439,7 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                         // There's no node at `key` in this trie so we're done.
                                         self.state = PathIteratorState::Exhausted;
                                         Some(Ok(PathIterItem {
-                                            key_nibbles: node_key.clone(),
+                                            key_nibbles: node_key,
                                             node: saved_node,
                                             next_nibble: None,
                                         }))
@@ -449,7 +450,6 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                             Err(e) => return Some(Err(e)),
                                         };
 
-                                        let node_key = matched_key.clone().into_boxed_slice();
                                         matched_key.push(next_unmatched_key_nibble.as_u8());
 
                                         *node = child;
@@ -461,7 +461,6 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                         }))
                                     }
                                     Some(Child::Node(child)) => {
-                                        let node_key = matched_key.clone().into_boxed_slice();
                                         matched_key.push(next_unmatched_key_nibble.as_u8());
 
                                         *node = child.clone().into();
@@ -478,7 +477,6 @@ impl<T: TrieReader> Iterator for PathIterator<'_, '_, T> {
                                             Err(e) => return Some(Err(e)),
                                         };
 
-                                        let node_key = matched_key.clone().into_boxed_slice();
                                         matched_key.push(next_unmatched_key_nibble.as_u8());
                                         *node = child;
 
@@ -571,6 +569,16 @@ mod tests {
     use std::sync::Arc;
     use test_case::test_case;
 
+    macro_rules! path {
+        ($($elem:expr),* $(,)?)=>{
+            [
+                $(
+                    PathComponent::ALL[$elem],
+                )*
+            ]
+        };
+    }
+
     pub(super) fn create_test_merkle() -> Merkle<NodeStore<MutableProposal, MemStore>> {
         let memstore = MemStore::new(vec![]);
         let memstore = Arc::new(memstore);
@@ -608,12 +616,9 @@ mod tests {
 
         assert!(should_yield_elt);
         #[cfg(not(feature = "branch_factor_256"))]
-        assert_eq!(
-            node.key_nibbles,
-            vec![0x0B, 0x0E, 0x0E, 0x0F].into_boxed_slice()
-        );
+        assert_eq!(*node.key_nibbles, path![0x0B, 0x0E, 0x0E, 0x0F]);
         #[cfg(feature = "branch_factor_256")]
-        assert_eq!(node.key_nibbles, vec![0xBE, 0xEF].into_boxed_slice());
+        assert_eq!(*node.key_nibbles, path![0xBE, 0xEF]);
         assert_eq!(node.node.as_leaf().unwrap().value, Box::from([0x42]));
         assert_eq!(node.next_nibble, None);
 
@@ -633,9 +638,9 @@ mod tests {
             None => panic!("unexpected end of iterator"),
         };
         #[cfg(not(feature = "branch_factor_256"))]
-        assert_eq!(node.key_nibbles, vec![0x00, 0x00].into_boxed_slice());
+        assert_eq!(*node.key_nibbles, path![0x00, 0x00]);
         #[cfg(feature = "branch_factor_256")]
-        assert_eq!(node.key_nibbles, vec![0].into_boxed_slice());
+        assert_eq!(*node.key_nibbles, path![0]);
         assert_eq!(node.next_nibble, Some(PathComponent::ALL[0]));
         assert!(node.node.as_branch().unwrap().value.is_none());
 
@@ -645,12 +650,9 @@ mod tests {
             None => panic!("unexpected end of iterator"),
         };
         #[cfg(not(feature = "branch_factor_256"))]
-        assert_eq!(
-            node.key_nibbles,
-            vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00].into_boxed_slice()
-        );
+        assert_eq!(*node.key_nibbles, path![0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         #[cfg(feature = "branch_factor_256")]
-        assert_eq!(node.key_nibbles, vec![0, 0, 0].into_boxed_slice());
+        assert_eq!(*node.key_nibbles, path![0, 0, 0]);
 
         assert_eq!(node.next_nibble, PathComponent::ALL.last().copied());
 
@@ -666,8 +668,8 @@ mod tests {
         };
         #[cfg(not(feature = "branch_factor_256"))]
         assert_eq!(
-            node.key_nibbles,
-            vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x0F].into_boxed_slice()
+            *node.key_nibbles,
+            path![0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0F, 0x0F]
         );
         assert_eq!(node.next_nibble, None);
         assert_eq!(
@@ -692,7 +694,7 @@ mod tests {
         };
         // TODO: make this branch factor 16 compatible
         #[cfg(not(feature = "branch_factor_256"))]
-        assert_eq!(node.key_nibbles, vec![0x00, 0x00].into_boxed_slice());
+        assert_eq!(*node.key_nibbles, path![0x00, 0x00]);
 
         assert!(node.node.as_branch().unwrap().value.is_none());
         assert_eq!(node.next_nibble, Some(PathComponent::ALL[0]));
@@ -703,10 +705,7 @@ mod tests {
             None => panic!("unexpected end of iterator"),
         };
         #[cfg(not(feature = "branch_factor_256"))]
-        assert_eq!(
-            node.key_nibbles,
-            vec![0x00, 0x00, 0x00, 0x00, 0x00, 0x00].into_boxed_slice()
-        );
+        assert_eq!(*node.key_nibbles, path![0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         assert_eq!(
             node.node.as_branch().unwrap().value,
             Some(vec![0x00, 0x00, 0x00].into_boxed_slice()),

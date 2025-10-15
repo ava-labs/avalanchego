@@ -165,7 +165,7 @@ impl<T: TrieReader> Merkle<T> {
 
             proof.push(ProofNode {
                 // key is expected to be in nibbles
-                key: root.partial_path().iter().copied().collect(),
+                key: root.partial_path().as_components().into(),
                 // partial len is the number of nibbles in the path leading to this node,
                 // which is always zero for the root node.
                 partial_len: 0,

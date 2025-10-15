@@ -10,7 +10,7 @@
 )]
 
 use crate::hashednode::{HasUpdate, Hashable, Preimage};
-use crate::{TrieHash, ValueDigest};
+use crate::{TrieHash, TriePath, TriePathAsPackedBytes, ValueDigest};
 /// Merkledb compatible hashing algorithm.
 use integer_encoding::VarInt;
 use sha2::{Digest, Sha256};
@@ -50,16 +50,11 @@ impl<T: Hashable> Preimage for T {
         add_value_digest_to_buf(buf, self.value_digest());
 
         // Add key length (in bits) to hash pre-image
-        let mut key = self.full_path();
-        let key_bit_len = BITS_PER_NIBBLE * key.clone().count() as u64;
+        let key = self.full_path();
+        let key_bit_len = BITS_PER_NIBBLE * key.len() as u64;
         add_varint_to_buf(buf, key_bit_len);
-
         // Add key to hash pre-image
-        while let Some(high_nibble) = key.next() {
-            let low_nibble = key.next().unwrap_or(0);
-            let byte = (high_nibble << 4) | low_nibble;
-            buf.update([byte]);
-        }
+        key.as_packed_bytes().for_each(|byte| buf.update([byte]));
     }
 }
 

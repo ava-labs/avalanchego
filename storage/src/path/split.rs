@@ -38,7 +38,7 @@ pub trait SplitPath: TriePath + Default + Copy {
 ///
 /// Like `IntoIterator`, a blanket implementation is provided for all types that
 /// already implement [`SplitPath`].
-pub trait IntoSplitPath {
+pub trait IntoSplitPath: TriePath {
     /// The splittable path type derived from this type.
     type Path: SplitPath;
 
@@ -82,6 +82,19 @@ impl<A: SplitPath, B: SplitPath> PathCommonPrefix<A, B> {
             a_suffix,
             b_suffix,
         }
+    }
+}
+
+impl<A: SplitPath, B: SplitPath, C> PathCommonPrefix<A, B, C> {
+    /// Converts this into its constituent parts, where the suffixes are
+    /// optionally empty.
+    #[expect(clippy::type_complexity)]
+    pub fn split_first_parts(self) -> (Option<(PathComponent, A)>, Option<(PathComponent, B)>, C) {
+        (
+            self.a_suffix.split_first(),
+            self.b_suffix.split_first(),
+            self.common,
+        )
     }
 }
 

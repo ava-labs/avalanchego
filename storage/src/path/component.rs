@@ -3,7 +3,7 @@
 
 use smallvec::SmallVec;
 
-use super::{TriePath, TriePathFromUnpackedBytes};
+use super::{PartialPath, TriePath, TriePathFromUnpackedBytes};
 
 #[cfg(not(feature = "branch_factor_256"))]
 /// A path component in a hexary trie; which is only 4 bits (aka a nibble).
@@ -210,6 +210,10 @@ impl TriePath for PathComponent {
     fn components(&self) -> Self::Components<'_> {
         Some(*self).into_iter()
     }
+
+    fn as_component_slice(&self) -> PartialPath<'_> {
+        PartialPath::Borrowed(std::slice::from_ref(self))
+    }
 }
 
 impl TriePath for Option<PathComponent> {
@@ -224,6 +228,10 @@ impl TriePath for Option<PathComponent> {
 
     fn components(&self) -> Self::Components<'_> {
         (*self).into_iter()
+    }
+
+    fn as_component_slice(&self) -> PartialPath<'_> {
+        PartialPath::Borrowed(self.as_slice())
     }
 }
 
@@ -240,6 +248,10 @@ impl TriePath for [PathComponent] {
     fn components(&self) -> Self::Components<'_> {
         self.iter().copied()
     }
+
+    fn as_component_slice(&self) -> PartialPath<'_> {
+        PartialPath::Borrowed(self)
+    }
 }
 
 impl<const N: usize> TriePath for [PathComponent; N] {
@@ -254,6 +266,10 @@ impl<const N: usize> TriePath for [PathComponent; N] {
 
     fn components(&self) -> Self::Components<'_> {
         self.iter().copied()
+    }
+
+    fn as_component_slice(&self) -> PartialPath<'_> {
+        PartialPath::Borrowed(self)
     }
 }
 
@@ -270,6 +286,10 @@ impl TriePath for Vec<PathComponent> {
     fn components(&self) -> Self::Components<'_> {
         self.iter().copied()
     }
+
+    fn as_component_slice(&self) -> PartialPath<'_> {
+        PartialPath::Borrowed(self.as_slice())
+    }
 }
 
 impl<A: smallvec::Array<Item = PathComponent>> TriePath for SmallVec<A> {
@@ -284,6 +304,10 @@ impl<A: smallvec::Array<Item = PathComponent>> TriePath for SmallVec<A> {
 
     fn components(&self) -> Self::Components<'_> {
         self.iter().copied()
+    }
+
+    fn as_component_slice(&self) -> PartialPath<'_> {
+        PartialPath::Borrowed(self.as_slice())
     }
 }
 

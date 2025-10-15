@@ -21,6 +21,8 @@ use std::fmt::{self, Debug, LowerHex};
 use std::iter::{FusedIterator, once};
 use std::ops::Add;
 
+use crate::{PathComponent, TriePathFromUnpackedBytes};
+
 static NIBBLES: [u8; 16] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
 /// Path is part or all of a node's path in the trie.
@@ -137,6 +139,13 @@ impl Path {
         BytesIterator {
             nibbles_iter: self.iter(),
         }
+    }
+
+    /// Casts the path to a slice of its components.
+    #[must_use]
+    pub fn as_components(&self) -> &[PathComponent] {
+        TriePathFromUnpackedBytes::path_from_unpacked_bytes(&self.0)
+            .expect("path should contain only nibbles")
     }
 }
 

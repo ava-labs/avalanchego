@@ -55,6 +55,26 @@ impl TriePath for PackedPathRef<'_> {
     fn components(&self) -> Self::Components<'_> {
         PackedPathComponents { path: *self }
     }
+
+    fn as_component_slice(&self) -> super::PartialPath<'_> {
+        if self.is_empty() {
+            super::PartialPath::Borrowed(&[])
+        } else {
+            let mut buf = super::PathBuf::with_capacity(self.len());
+            if let Some(prefix) = self.prefix {
+                buf.push(prefix);
+            }
+            for &byte in self.middle {
+                let (upper, lower) = PathComponent::new_pair(byte);
+                buf.push(upper);
+                buf.push(lower);
+            }
+            if let Some(suffix) = self.suffix {
+                buf.push(suffix);
+            }
+            super::PartialPath::Owned(buf)
+        }
+    }
 }
 
 impl SplitPath for PackedPathRef<'_> {

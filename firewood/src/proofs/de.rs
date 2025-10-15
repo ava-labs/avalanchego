@@ -3,7 +3,7 @@
 
 #[cfg(feature = "ethhash")]
 use firewood_storage::HashType;
-use firewood_storage::{Children, TrieHash, ValueDigest};
+use firewood_storage::{Children, PathBuf, TrieHash, TriePathFromUnpackedBytes, ValueDigest};
 use integer_encoding::VarInt;
 
 use crate::{
@@ -85,7 +85,7 @@ impl Version0 for FrozenRangeProof {
 
 impl Version0 for ProofNode {
     fn read_v0_item(reader: &mut V0Reader<'_>) -> Result<Self, ReadError> {
-        let key = reader.read_item()?;
+        let key = reader.read_v0_item()?;
         let partial_len = reader.read_item()?;
         let value_digest = reader.read_item()?;
 
@@ -101,6 +101,19 @@ impl Version0 for ProofNode {
             partial_len,
             value_digest,
             child_hashes,
+        })
+    }
+}
+
+impl Version0 for PathBuf {
+    fn read_v0_item(reader: &mut V0Reader<'_>) -> Result<Self, ReadError> {
+        let bytes = reader.read_item::<&[u8]>()?;
+        TriePathFromUnpackedBytes::path_from_unpacked_bytes(bytes).map_err(|_| {
+            reader.invalid_item(
+                "path",
+                "valid nibbles",
+                format!("invalid nibbles: {}", hex::encode(bytes)),
+            )
         })
     }
 }

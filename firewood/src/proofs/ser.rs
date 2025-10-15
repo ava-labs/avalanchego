@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use firewood_storage::ValueDigest;
+use firewood_storage::{PathBuf, PathComponentSliceExt, ValueDigest};
 use integer_encoding::VarInt;
 
 use crate::{
@@ -105,6 +105,13 @@ impl WriteItem for ProofNode {
         for (_, child) in self.child_hashes.iter_present() {
             child.write_item(out);
         }
+    }
+}
+
+impl WriteItem for PathBuf {
+    fn write_item(&self, out: &mut Vec<u8>) {
+        out.push_var_int(self.len());
+        out.extend_from_slice(self.as_byte_slice());
     }
 }
 

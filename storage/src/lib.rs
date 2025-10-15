@@ -55,9 +55,9 @@ pub use nodestore::{
     NodeReader, NodeStore, Parentable, RootReader, TrieReader,
 };
 pub use path::{
-    ComponentIter, IntoSplitPath, JoinedPath, PathCommonPrefix, PathComponent,
-    PathComponentSliceExt, SplitPath, TriePath, TriePathAsPackedBytes, TriePathFromPackedBytes,
-    TriePathFromUnpackedBytes,
+    ComponentIter, IntoSplitPath, JoinedPath, PartialPath, PathBuf, PathCommonPrefix,
+    PathComponent, PathComponentSliceExt, SplitPath, TriePath, TriePathAsPackedBytes,
+    TriePathFromPackedBytes, TriePathFromUnpackedBytes,
 };
 #[cfg(not(feature = "branch_factor_256"))]
 pub use path::{PackedBytes, PackedPathComponents, PackedPathRef};

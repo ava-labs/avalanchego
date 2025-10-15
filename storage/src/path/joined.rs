@@ -45,6 +45,19 @@ impl<P: TriePath, S: TriePath> TriePath for JoinedPath<P, S> {
     fn components(&self) -> Self::Components<'_> {
         self.prefix.components().chain(self.suffix.components())
     }
+
+    fn as_component_slice(&self) -> super::PartialPath<'_> {
+        if self.prefix.is_empty() {
+            self.suffix.as_component_slice()
+        } else if self.suffix.is_empty() {
+            self.prefix.as_component_slice()
+        } else {
+            let mut buf = super::PathBuf::with_capacity(self.len());
+            buf.extend(self.prefix.components());
+            buf.extend(self.suffix.components());
+            super::PartialPath::Owned(buf)
+        }
+    }
 }
 
 impl<P: SplitPath, S: SplitPath> SplitPath for JoinedPath<P, S> {
