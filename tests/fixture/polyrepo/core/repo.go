@@ -6,6 +6,7 @@ package core
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -72,7 +73,8 @@ func CloneRepo(log logging.Logger, url, path, ref string, depth int) error {
 	}
 
 	// If ref is specified and looks like a branch or tag (not a SHA),
-	// set it as the reference to clone. Otherwise, we'll checkout after cloning.
+	// set it as the reference to clone.
+	// For SHAs, we clone default branch then fetch the SHA separately
 	isSHA := looksLikeSHA(ref)
 	log.Debug("checked if ref is SHA",
 		zap.String("ref", ref),
@@ -87,7 +89,9 @@ func CloneRepo(log logging.Logger, url, path, ref string, depth int) error {
 			zap.Bool("singleBranch", true),
 		)
 	} else {
-		log.Debug("configuring git clone without single branch restriction")
+		// For SHA or no ref, clone default branch only
+		opts.SingleBranch = true
+		log.Debug("configuring git clone for default branch (single-branch)")
 	}
 
 	log.Debug("executing git clone")
@@ -262,52 +266,88 @@ func CloneOrUpdateRepo(log logging.Logger, url, path, ref string, depth int, for
 
 	log.Debug("repository does not exist, proceeding to clone")
 
-	// Repo doesn't exist, clone it
-	// First try with the requested depth
+	// Special case: if ref is a SHA with shallow clone, use direct fetch to avoid double-fetch
+	// This saves bandwidth by only fetching the specific SHA instead of default branch + SHA
+	if ref != "" && looksLikeSHA(ref) && depth > 0 {
+		log.Debug("ref is SHA with shallow clone, using direct fetch",
+			zap.String("ref", ref),
+		)
+
+		// Expand short SHA to full 40-char SHA using GitHub API
+		// GitHub's uploadpack.allowReachableSHA1InWant requires full SHA
+		fullSHA := ref
+		if len(ref) < 40 {
+			owner, repo := parseGitHubURL(url)
+			if owner != "" && repo != "" {
+				log.Debug("expanding short SHA to full SHA via GitHub API",
+					zap.String("shortSHA", ref),
+				)
+				client := github.NewClient(nil)
+				ctx := context.Background()
+				commit, _, apiErr := client.Repositories.GetCommit(ctx, owner, repo, ref, nil)
+				if apiErr != nil {
+					return stacktrace.Errorf("failed to expand SHA %s via GitHub API: %w", ref, apiErr)
+				}
+				fullSHA = commit.GetSHA()
+				log.Debug("expanded SHA",
+					zap.String("shortSHA", ref),
+					zap.String("fullSHA", fullSHA),
+				)
+			}
+		}
+
+		// Initialize empty repo
+		// We use exec.Command for git fetch because go-git doesn't support uploadpack.allowReachableSHA1InWant
+		// See: https://github.com/go-git/go-git/issues/323
+		log.Debug("initializing empty repository")
+		initCmd := exec.Command("git", "init")
+		initCmd.Dir = path
+		if err := os.MkdirAll(path, 0755); err != nil {
+			return stacktrace.Errorf("failed to create directory %s: %w", path, err)
+		}
+		if output, err := initCmd.CombinedOutput(); err != nil {
+			return stacktrace.Errorf("failed to init repository: %w (output: %s)", err, string(output))
+		}
+
+		// Add remote
+		log.Debug("adding remote origin",
+			zap.String("url", url),
+		)
+		remoteCmd := exec.Command("git", "remote", "add", "origin", url)
+		remoteCmd.Dir = path
+		if output, err := remoteCmd.CombinedOutput(); err != nil {
+			return stacktrace.Errorf("failed to add remote: %w (output: %s)", err, string(output))
+		}
+
+		// Fetch specific SHA with depth=1
+		// GitHub supports uploadpack.allowReachableSHA1InWant for fetching arbitrary reachable commits
+		// See: https://stackoverflow.com/questions/31278902/how-to-shallow-clone-a-specific-commit-with-depth-1
+		log.Debug("fetching SHA with git command",
+			zap.String("fullSHA", fullSHA),
+			zap.Int("depth", depth),
+		)
+		fetchCmd := exec.Command("git", "fetch", "--depth", "1", "origin", fullSHA)
+		fetchCmd.Dir = path
+		output, fetchErr := fetchCmd.CombinedOutput()
+		if fetchErr != nil {
+			return stacktrace.Errorf("failed to fetch SHA %s: %w (output: %s)", fullSHA, fetchErr, string(output))
+		}
+
+		log.Debug("fetch SHA succeeded",
+			zap.String("output", string(output)),
+		)
+
+		// Checkout the SHA
+		return CheckoutRef(log, path, ref)
+	}
+
+	// Standard clone for branches/tags or full clones
 	log.Debug("attempting clone with specified depth",
 		zap.Int("depth", depth),
 	)
 	err = CloneRepo(log, url, path, ref, depth)
 	if err != nil {
-		log.Debug("clone failed, checking if should retry with full clone",
-			zap.Int("requestedDepth", depth),
-			zap.String("ref", ref),
-			zap.Error(err),
-		)
-
-		// If shallow clone fails and we're trying to clone a specific ref,
-		// it might be a SHA that's not in the shallow history
-		// Try a full clone instead
-		if depth > 0 && ref != "" {
-			log.Debug("retrying with full clone (depth=0)")
-			// This will be tested in integration tests since it requires
-			// actual git operations with SHA resolution
-			return CloneRepo(log, url, path, ref, 0)
-		}
-		return err
-	}
-
-	// If we cloned successfully and the ref looks like a SHA, we need to checkout
-	// (since CloneRepo doesn't set branch reference for SHAs)
-	if ref != "" && looksLikeSHA(ref) {
-		log.Debug("ref is SHA, attempting checkout",
-			zap.String("ref", ref),
-		)
-		err = CheckoutRef(log, path, ref)
-		if err != nil && depth > 0 {
-			log.Debug("checkout failed with shallow clone, retrying with full clone",
-				zap.Error(err),
-			)
-			// Checkout failed, likely because the SHA isn't in shallow history
-			// Remove the shallow clone and retry with full clone
-			os.RemoveAll(path)
-			err = CloneRepo(log, url, path, ref, 0)
-			if err != nil {
-				return err
-			}
-			return CheckoutRef(log, path, ref)
-		}
-		return err
+		return stacktrace.Errorf("failed to clone repository: %w", err)
 	}
 
 	log.Debug("clone completed successfully")
