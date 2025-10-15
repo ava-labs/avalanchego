@@ -114,6 +114,15 @@ func buildBlock(tc *e2e.GinkgoTestContext, chain *tmpnet.Chain, nodes []*tmpnet.
 		zap.Stringer("leader", leader.NodeID),
 	)
 
+	// record the nonces of all nodes before issuing the tx
+	nonces := make(map[ids.NodeID]uint64)
+	for _, node := range nodes {
+		client = api.NewClient(node.GetAccessibleURI(), chain.ChainID.String())
+		nonce, err := client.Nonce(tc.DefaultContext(), chain.PreFundedKey.Address())
+		require.NoError(err)
+		nonces[node.NodeID] = nonce
+	}
+
 	// issue a transfer transaction to the leader
 	leaderURI := leader.GetAccessibleURI()
 	tc.Log().Info("issuing XSVM transfer transaction for simplex subnet",
@@ -124,24 +133,39 @@ func buildBlock(tc *e2e.GinkgoTestContext, chain *tmpnet.Chain, nodes []*tmpnet.
 	transferTxStatus, err := transfer.Transfer(
 		tc.DefaultContext(),
 		&transfer.Config{
-			URI:        leaderURI,
-			ChainID:    chain.ChainID,
-			AssetID:    chain.ChainID,
-			Amount:     units.Schmeckle,
-			To:         recipientKey.Address(),
-			PrivateKey: chain.PreFundedKey,
+			URI:               leaderURI,
+			ChainID:           chain.ChainID,
+			AssetID:           chain.ChainID,
+			Amount:            units.Schmeckle,
+			To:                recipientKey.Address(),
+			PrivateKey:        chain.PreFundedKey,
+			WaitForAcceptance: false,
 		},
 	)
 	require.NoError(err)
 
-	tc.Log().Info("successfully issued XSVM transfer transaction",
+	// issue txs to all other nodes to ensure they are aware of the tx
+	for i, node := range nodes {
+		if node.NodeID == leader.NodeID {
+			continue
+		}
+		client = api.NewClient(node.GetAccessibleURI(), chain.ChainID.String())
+		_, err := client.IssueTx(tc.DefaultContext(), transferTxStatus.Tx)
+		require.NoError(err, "node %d failed to issue tx", i)
+	}
+
+	tc.Log().Info("successfully issued XSVM transfer transactions",
 		zap.Stringer("txID", transferTxStatus.TxID),
 		zap.Uint64("round", round),
 	)
 
 	tc.By("checking all nodes have accepted the tx")
+	address := chain.PreFundedKey.Address()
 	for _, node := range nodes {
 		client = api.NewClient(node.GetAccessibleURI(), chain.ChainID.String())
+		err = api.AwaitTxAccepted(tc.DefaultContext(), client, address, nonces[node.NodeID], api.DefaultPollingInterval)
+		require.NoError(err, "node %s failed to accept tx in round %d", node.NodeID, round)
+
 		balance, err := client.Balance(tc.DefaultContext(), recipientKey.Address(), chain.ChainID)
 		require.NoError(err)
 		require.Equal(units.Schmeckle, balance)
