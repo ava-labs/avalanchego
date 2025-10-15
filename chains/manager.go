@@ -1115,6 +1115,10 @@ func (m *manager) createSnowmanChain(
 			return nil, fmt.Errorf("expected validators.State but got %T", vm)
 		}
 
+		// Wrap the validator state with a cached state so that P-chain lookups
+		// are cached.
+		valState = validators.NewCachedState(valState, m.Upgrades.GraniteTime)
+
 		if m.TracingEnabled {
 			valState = validators.Trace(valState, "platformvm", m.Tracer)
 		}
@@ -1124,16 +1128,21 @@ func (m *manager) createSnowmanChain(
 		// P-chain.
 		ctx.ValidatorState = valState
 
-		// Initialize the validator state for future chains.
-		m.validatorState = validators.NewLockedState(&ctx.Lock, valState)
+		// Initialize validatorState for future chains.
+		valState = validators.NewLockedState(&ctx.Lock, valState)
 		if m.TracingEnabled {
-			m.validatorState = validators.Trace(m.validatorState, "lockedState", m.Tracer)
+			valState = validators.Trace(valState, "lockedState", m.Tracer)
 		}
 
+		// Wrap the validator state with a cached state so that the P-chain lock
+		// isn't grabbed when lookups are cached.
+		valState = validators.NewCachedState(valState, m.Upgrades.GraniteTime)
+
 		if !m.ManagerConfig.SybilProtectionEnabled {
-			m.validatorState = validators.NewNoValidatorsState(m.validatorState)
+			valState = validators.NewNoValidatorsState(valState)
 			ctx.ValidatorState = validators.NewNoValidatorsState(ctx.ValidatorState)
 		}
+		m.validatorState = valState
 
 		// Set this func only for platform
 		//

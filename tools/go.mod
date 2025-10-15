@@ -13,12 +13,11 @@ module github.com/ava-labs/avalanchego/tools
 //   - go tool -modfile=tools/go.mod [tool] [args]
 //   - ./scripts/run_tool.sh [tool] [args]
 
-go 1.24.7
+go 1.24.8
 
 tool (
 	github.com/go-task/task/v3/cmd/task
 	github.com/golangci/golangci-lint/v2/cmd/golangci-lint
-	github.com/onsi/ginkgo/v2/ginkgo
 	github.com/palantir/go-license
 	github.com/rhysd/actionlint/cmd/actionlint
 )
@@ -105,7 +104,6 @@ require (
 	github.com/golangci/revgrep v0.8.0 // indirect
 	github.com/golangci/unconvert v0.0.0-20250410112200-a129a6e6413e // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/pprof v0.0.0-20241210010833-40e02aabc2ad // indirect
 	github.com/gordonklaus/ineffassign v0.1.0 // indirect
 	github.com/gostaticanalysis/analysisutil v0.7.1 // indirect
 	github.com/gostaticanalysis/comment v1.5.0 // indirect
@@ -160,7 +158,6 @@ require (
 	github.com/nmiyake/pkg/errorstringer v1.1.0 // indirect
 	github.com/nunnatsa/ginkgolinter v0.19.1 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/onsi/ginkgo/v2 v2.23.3 // indirect
 	github.com/palantir/go-license v1.25.0 // indirect
 	github.com/palantir/godel/v2 v2.82.0 // indirect
 	github.com/palantir/pkg v1.1.0 // indirect
