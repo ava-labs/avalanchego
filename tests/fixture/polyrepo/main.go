@@ -22,39 +22,7 @@ const goModFilename = "go.mod"
 var logLevel string
 
 func main() {
-	// Parse log level from flag
-	var level logging.Level
-	switch strings.ToLower(logLevel) {
-	case "debug":
-		level = logging.Debug
-	case "info":
-		level = logging.Info
-	case "warn":
-		level = logging.Warn
-	case "error":
-		level = logging.Error
-	default:
-		fmt.Fprintf(os.Stderr, "Invalid log level: %s (valid options: debug, info, warn, error)\n", logLevel)
-		os.Exit(1)
-	}
-
-	// Create logger
-	logFactory := logging.NewFactory(logging.Config{
-		DisplayLevel: level,
-		LogLevel:     level,
-	})
-	log, err := logFactory.Make("polyrepo")
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error creating logger: %v\n", err)
-		os.Exit(1)
-	}
-
-	// Store logger in context for command handlers
-	ctx := context.WithValue(context.Background(), loggerKey, log)
-	rootCmd.SetContext(ctx)
-
 	if err := rootCmd.Execute(); err != nil {
-		log.Error("command failed", zap.Error(err))
 		os.Exit(1)
 	}
 }
@@ -75,6 +43,38 @@ var rootCmd = &cobra.Command{
 	Long: `Polyrepo is a tool for managing local development across multiple interdependent
 repositories (avalanchego, coreth, firewood) by managing replace directives in go.mod files
 and coordinating git operations.`,
+	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		// Parse log level from flag (flags are now parsed)
+		var level logging.Level
+		switch strings.ToLower(logLevel) {
+		case "debug":
+			level = logging.Debug
+		case "info":
+			level = logging.Info
+		case "warn":
+			level = logging.Warn
+		case "error":
+			level = logging.Error
+		default:
+			return fmt.Errorf("invalid log level: %s (valid options: debug, info, warn, error)", logLevel)
+		}
+
+		// Create logger
+		logFactory := logging.NewFactory(logging.Config{
+			DisplayLevel: level,
+			LogLevel:     level,
+		})
+		log, err := logFactory.Make("polyrepo")
+		if err != nil {
+			return fmt.Errorf("error creating logger: %w", err)
+		}
+
+		// Store logger in context for command handlers
+		ctx := context.WithValue(cmd.Context(), loggerKey, log)
+		cmd.SetContext(ctx)
+
+		return nil
+	},
 }
 
 func init() {
@@ -169,8 +169,9 @@ Repositories will be cloned into the current directory with their repository nam
 
 		// Determine which repos to sync
 		type repoWithRef struct {
-			name string
-			ref  string
+			name        string
+			ref         string
+			wasExplicit bool // true if ref was explicitly specified, false if discovered
 		}
 		var reposToSync []repoWithRef
 
@@ -178,13 +179,31 @@ Repositories will be cloned into the current directory with their repository nam
 			log.Info("parsing repository arguments from command line",
 				zap.Int("count", len(args)),
 			)
+
+			// Detect current repo for determining default refs from go.mod
+			currentRepo, err := core.DetectCurrentRepo(log, baseDir)
+			if err != nil {
+				return fmt.Errorf("failed to detect current repo: %w", err)
+			}
+
 			// Parse repo[@ref] format from args
 			for _, arg := range args {
 				repoName, ref, err := core.ParseRepoAndVersion(arg)
 				if err != nil {
 					return fmt.Errorf("invalid repo format %q: %w", arg, err)
 				}
-				reposToSync = append(reposToSync, repoWithRef{name: repoName, ref: ref})
+
+				wasExplicit := ref != ""
+
+				// If no explicit ref provided, determine from go.mod
+				if ref == "" {
+					ref, err = core.GetDefaultRefForRepo(log, currentRepo, repoName, goModPath)
+					if err != nil {
+						return fmt.Errorf("failed to get default ref for %s: %w", repoName, err)
+					}
+				}
+
+				reposToSync = append(reposToSync, repoWithRef{name: repoName, ref: ref, wasExplicit: wasExplicit})
 			}
 		} else {
 			log.Info("no repositories specified, auto-detecting based on current directory")
@@ -211,7 +230,7 @@ Repositories will be cloned into the current directory with their repository nam
 				if err != nil {
 					return fmt.Errorf("failed to get default ref for %s: %w", repoName, err)
 				}
-				reposToSync = append(reposToSync, repoWithRef{name: repoName, ref: ref})
+				reposToSync = append(reposToSync, repoWithRef{name: repoName, ref: ref, wasExplicit: false})
 			}
 		}
 
@@ -239,16 +258,17 @@ Repositories will be cloned into the current directory with their repository nam
 
 			// Use specified ref or default branch
 			refToUse := repo.ref
-			wasDefaulted := false
 			if refToUse == "" {
 				refToUse = config.DefaultBranch
-				wasDefaulted = true
 			}
 
-			log.Info("using git reference",
+			log.Info("syncing repository",
 				zap.String("repo", repo.name),
 				zap.String("ref", refToUse),
-				zap.Bool("wasDefaulted", wasDefaulted),
+				zap.Bool("explicit", repo.wasExplicit),
+				zap.Int("depth", depth),
+				zap.String("url", config.GitRepo),
+				zap.String("path", clonePath),
 			)
 
 			// Clone or update the repo
