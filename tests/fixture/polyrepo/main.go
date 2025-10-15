@@ -4,18 +4,65 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/polyrepo/core"
+	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
+var logLevel string
+
 func main() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+	// Parse log level from flag
+	var level logging.Level
+	switch strings.ToLower(logLevel) {
+	case "debug":
+		level = logging.Debug
+	case "info":
+		level = logging.Info
+	case "warn":
+		level = logging.Warn
+	case "error":
+		level = logging.Error
+	default:
+		fmt.Fprintf(os.Stderr, "Invalid log level: %s (valid options: debug, info, warn, error)\n", logLevel)
 		os.Exit(1)
 	}
+
+	// Create logger
+	logFactory := logging.NewFactory(logging.Config{
+		DisplayLevel: level,
+		LogLevel:     level,
+	})
+	log, err := logFactory.Make("polyrepo")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating logger: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Store logger in context for command handlers
+	ctx := context.WithValue(context.Background(), loggerKey, log)
+	rootCmd.SetContext(ctx)
+
+	if err := rootCmd.Execute(); err != nil {
+		log.Error("command failed", zap.Error(err))
+		os.Exit(1)
+	}
+}
+
+// Key for storing logger in context
+type contextKey string
+
+const loggerKey contextKey = "logger"
+
+// getLogger retrieves the logger from the command context
+func getLogger(cmd *cobra.Command) logging.Logger {
+	return cmd.Context().Value(loggerKey).(logging.Logger)
 }
 
 var rootCmd = &cobra.Command{
@@ -42,6 +89,8 @@ var statusCmd = &cobra.Command{
 - Whether working directory is dirty
 - Whether replace directives are active`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		log := getLogger(cmd)
+
 		// Get current directory
 		baseDir, err := os.Getwd()
 		if err != nil {
@@ -59,7 +108,10 @@ var statusCmd = &cobra.Command{
 		for _, repoName := range repos {
 			status, err := core.GetRepoStatus(repoName, baseDir, goModPath)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: failed to get status for %s: %v\n", repoName, err)
+				log.Warn("failed to get status for repository",
+					zap.String("repo", repoName),
+					zap.Error(err),
+				)
 				continue
 			}
 
@@ -88,6 +140,7 @@ If no repositories are specified, syncs based on the current directory and go.mo
 
 Repositories will be cloned into the current directory with their repository names.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		log := getLogger(cmd)
 		depth, _ := cmd.Flags().GetInt("depth")
 		force, _ := cmd.Flags().GetBool("force")
 
@@ -96,6 +149,13 @@ Repositories will be cloned into the current directory with their repository nam
 		if err != nil {
 			return fmt.Errorf("failed to get current directory: %w", err)
 		}
+
+		log.Info("starting sync command",
+			zap.Strings("args", args),
+			zap.Int("depth", depth),
+			zap.Bool("force", force),
+			zap.String("baseDir", baseDir),
+		)
 
 		// Get path to go.mod
 		goModPath := "go.mod"
@@ -111,6 +171,9 @@ Repositories will be cloned into the current directory with their repository nam
 		var reposToSync []repoWithRef
 
 		if len(args) > 0 {
+			log.Info("parsing repository arguments from command line",
+				zap.Int("count", len(args)),
+			)
 			// Parse repo[@ref] format from args
 			for _, arg := range args {
 				repoName, ref, err := core.ParseRepoAndVersion(arg)
@@ -120,16 +183,27 @@ Repositories will be cloned into the current directory with their repository nam
 				reposToSync = append(reposToSync, repoWithRef{name: repoName, ref: ref})
 			}
 		} else {
+			log.Info("no repositories specified, auto-detecting based on current directory")
 			// Auto-detect based on current repo
-			currentRepo, err := core.DetectCurrentRepo(baseDir)
+			currentRepo, err := core.DetectCurrentRepo(log, baseDir)
 			if err != nil {
 				return fmt.Errorf("failed to detect current repo: %w", err)
 			}
+
+			log.Info("detected current repository",
+				zap.String("currentRepo", currentRepo),
+			)
+
 			// Get repos to sync and determine default refs from go.mod
 			repos := core.GetReposToSync(currentRepo)
+			log.Info("determined repositories to sync",
+				zap.Int("count", len(repos)),
+				zap.Strings("repos", repos),
+			)
+
 			for _, repoName := range repos {
 				// Determine the default ref for this repo
-				ref, err := core.GetDefaultRefForRepo(currentRepo, repoName, goModPath)
+				ref, err := core.GetDefaultRefForRepo(log, currentRepo, repoName, goModPath)
 				if err != nil {
 					return fmt.Errorf("failed to get default ref for %s: %w", repoName, err)
 				}
@@ -139,34 +213,49 @@ Repositories will be cloned into the current directory with their repository nam
 
 		// Sync each repository
 		for _, repo := range reposToSync {
-			if repo.ref != "" {
-				fmt.Printf("Syncing %s@%s...\n", repo.name, repo.ref)
-			} else {
-				fmt.Printf("Syncing %s...\n", repo.name)
-			}
+			log.Info("syncing repository",
+				zap.String("repo", repo.name),
+				zap.String("ref", repo.ref),
+			)
 
 			config, err := core.GetRepoConfig(repo.name)
 			if err != nil {
 				return err
 			}
 
+			log.Info("repository configuration",
+				zap.String("repo", repo.name),
+				zap.String("gitRepo", config.GitRepo),
+				zap.String("defaultBranch", config.DefaultBranch),
+				zap.String("goModule", config.GoModule),
+				zap.Bool("requiresNixBuild", config.RequiresNixBuild),
+			)
+
 			clonePath := core.GetRepoClonePath(repo.name, baseDir)
 
 			// Use specified ref or default branch
 			refToUse := repo.ref
+			wasDefaulted := false
 			if refToUse == "" {
 				refToUse = config.DefaultBranch
+				wasDefaulted = true
 			}
 
+			log.Info("using git reference",
+				zap.String("repo", repo.name),
+				zap.String("ref", refToUse),
+				zap.Bool("wasDefaulted", wasDefaulted),
+			)
+
 			// Clone or update the repo
-			err = core.CloneOrUpdateRepo(config.GitRepo, clonePath, refToUse, depth, force)
+			err = core.CloneOrUpdateRepo(log, config.GitRepo, clonePath, refToUse, depth, force)
 			if err != nil {
 				return fmt.Errorf("failed to sync %s: %w", repo.name, err)
 			}
 
 			// Check if dirty (refuse unless forced)
 			if !force {
-				isDirty, err := core.IsRepoDirty(clonePath)
+				isDirty, err := core.IsRepoDirty(log, clonePath)
 				if err == nil && isDirty {
 					return core.ErrDirtyWorkingDir(clonePath)
 				}
@@ -174,9 +263,12 @@ Repositories will be cloned into the current directory with their repository nam
 
 			// Run nix build if required
 			if config.RequiresNixBuild {
-				fmt.Printf("Running nix build for %s...\n", repo.name)
+				log.Info("running nix build",
+					zap.String("repo", repo.name),
+					zap.String("path", core.GetNixBuildPath(clonePath, config.NixBuildPath)),
+				)
 				nixBuildPath := core.GetNixBuildPath(clonePath, config.NixBuildPath)
-				err = core.RunNixBuild(nixBuildPath)
+				err = core.RunNixBuild(log, nixBuildPath)
 				if err != nil {
 					return fmt.Errorf("failed to run nix build for %s: %w", repo.name, err)
 				}
@@ -188,12 +280,21 @@ Repositories will be cloned into the current directory with their repository nam
 				replacePath = replacePath + "/" + config.ModuleReplacementPath
 			}
 
-			err = core.AddReplaceDirective(goModPath, config.GoModule, replacePath)
+			log.Info("adding replace directive",
+				zap.String("module", config.GoModule),
+				zap.String("path", replacePath),
+			)
+
+			err = core.AddReplaceDirective(log, goModPath, config.GoModule, replacePath)
 			if err != nil {
 				return fmt.Errorf("failed to add replace directive for %s: %w", repo.name, err)
 			}
 
-			fmt.Printf("Successfully synced %s\n", repo.name)
+			log.Info("successfully synced repository",
+				zap.String("repo", repo.name),
+				zap.String("path", clonePath),
+				zap.String("ref", refToUse),
+			)
 		}
 
 		return nil
@@ -208,21 +309,29 @@ var resetCmd = &cobra.Command{
 If no repositories are specified, removes replace directives for all polyrepo-managed
 repositories (avalanchego, coreth, firewood).`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		log := getLogger(cmd)
+
 		// Get path to go.mod
 		goModPath := "go.mod"
 		if _, err := os.Stat(goModPath); err != nil {
 			return fmt.Errorf("go.mod not found in current directory")
 		}
 
-		err := core.ResetRepos(goModPath, args)
+		log.Info("resetting repositories",
+			zap.Strings("repos", args),
+		)
+
+		err := core.ResetRepos(log, goModPath, args)
 		if err != nil {
 			return err
 		}
 
 		if len(args) == 0 {
-			fmt.Println("Removed all polyrepo replace directives")
+			log.Info("removed all polyrepo replace directives")
 		} else {
-			fmt.Printf("Removed replace directives for: %v\n", args)
+			log.Info("removed replace directives for repositories",
+				zap.Strings("repos", args),
+			)
 		}
 
 		return nil
@@ -238,10 +347,16 @@ If no version is specified, uses the current version from go.mod.
 
 This command cannot be run from the avalanchego repository itself.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		log := getLogger(cmd)
+
 		version := ""
 		if len(args) > 0 {
 			version = args[0]
 		}
+
+		log.Info("updating avalanchego dependency",
+			zap.String("version", version),
+		)
 
 		// Get path to go.mod
 		goModPath := "go.mod"
@@ -249,12 +364,14 @@ This command cannot be run from the avalanchego repository itself.`,
 			return fmt.Errorf("go.mod not found in current directory")
 		}
 
-		err := core.UpdateAvalanchego(goModPath, version)
+		err := core.UpdateAvalanchego(log, goModPath, version)
 		if err != nil {
 			return err
 		}
 
-		fmt.Printf("Updated avalanchego to version %s\n", version)
+		log.Info("updated avalanchego dependency",
+			zap.String("version", version),
+		)
 		return nil
 	},
 }
@@ -263,4 +380,7 @@ func init() {
 	// Add flags for sync command
 	syncCmd.Flags().IntP("depth", "d", 1, "Clone depth (0 for full clone, 1 for shallow, >1 for partial)")
 	syncCmd.Flags().BoolP("force", "f", false, "Force sync even if directory is dirty or already exists")
+
+	// Add persistent flag for log level (applies to all commands)
+	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "Set log level (debug, info, warn, error)")
 }
