@@ -114,7 +114,10 @@ func newTestSubnets(t *testing.T, subnetID ids.ID) *Subnets {
 		constants.PrimaryNetworkID: {},
 		subnetID: {
 			ConsensusParameters: subnets.ConsensusParameters{
-				SimplexParams: &simplex.Parameters{},
+				SimplexParams: &simplex.Parameters{
+					MaxProposalWait:    10 * time.Second,
+					MaxRebroadcastWait: 5 * time.Second,
+				},
 			},
 		},
 	}
