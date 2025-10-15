@@ -10,53 +10,64 @@ import (
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 )
 
-func TestTimeMarkers(t *testing.T) {
-	cases := []struct {
-		name   string
-		write  func(ethdb.KeyValueStore, time.Time) error
-		read   func(ethdb.KeyValueStore) (time.Time, error)
-		delete func(ethdb.KeyValueStore) error
-	}{
-		{
-			name:   "offline_pruning",
-			read:   ReadOfflinePruning,
-			write:  WriteOfflinePruning,
-			delete: DeleteOfflinePruning,
-		},
-		{
-			name:   "populate_missing_tries",
-			read:   ReadPopulateMissingTries,
-			write:  WritePopulateMissingTries,
-			delete: DeletePopulateMissingTries,
-		},
-	}
+func TestOfflinePruning(t *testing.T) {
+	db := rawdb.NewMemoryDatabase()
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			db := rawdb.NewMemoryDatabase()
+	// Not present initially.
+	_, err := ReadOfflinePruning(db)
+	require.ErrorIs(t, err, ErrEntryNotFound)
 
-			// Not present initially.
-			_, err := tc.read(db)
-			require.ErrorIs(t, err, ErrEntryNotFound)
+	// Write marker and read back fixed time.
+	fixed := time.Unix(1_700_000_000, 0)
+	require.NoError(t, WriteOfflinePruning(db, fixed))
+	ts, err := ReadOfflinePruning(db)
+	require.NoError(t, err)
+	require.Equal(t, fixed.Unix(), ts.Unix())
 
-			// Write marker and read back a reasonable recent time.
-			fixed := time.Unix(1_700_000_000, 0)
-			require.NoError(t, tc.write(db, fixed))
-			ts, err := tc.read(db)
-			require.NoError(t, err)
-			require.Equal(t, fixed.Unix(), ts.Unix())
+	// Delete marker.
+	require.NoError(t, DeleteOfflinePruning(db))
+	_, err = ReadOfflinePruning(db)
+	require.ErrorIs(t, err, ErrEntryNotFound)
+}
 
-			// Delete marker.
-			require.NoError(t, tc.delete(db))
-			_, err = tc.read(db)
-			require.ErrorIs(t, err, ErrEntryNotFound)
-		})
-	}
+func TestPopulateMissingTries(t *testing.T) {
+	db := rawdb.NewMemoryDatabase()
+
+	// Not present initially.
+	_, err := ReadPopulateMissingTries(db)
+	require.ErrorIs(t, err, ErrEntryNotFound)
+
+	// Write marker and read back fixed time.
+	fixed := time.Unix(1_700_000_000, 0)
+	require.NoError(t, WritePopulateMissingTries(db, fixed))
+	ts, err := ReadPopulateMissingTries(db)
+	require.NoError(t, err)
+	require.Equal(t, fixed.Unix(), ts.Unix())
+
+	// Delete marker.
+	require.NoError(t, DeletePopulateMissingTries(db))
+	_, err = ReadPopulateMissingTries(db)
+	require.ErrorIs(t, err, ErrEntryNotFound)
+}
+
+func TestOfflinePruning_BadEncoding(t *testing.T) {
+	db := rawdb.NewMemoryDatabase()
+	// Write invalid RLP bytes (0xB8 indicates a long string length with missing payload).
+	require.NoError(t, db.Put(offlinePruningKey, []byte{0xB8}))
+	_, err := ReadOfflinePruning(db)
+	require.ErrorIs(t, err, errInvalidData)
+}
+
+func TestPopulateMissingTries_BadEncoding(t *testing.T) {
+	db := rawdb.NewMemoryDatabase()
+	// Write invalid RLP bytes (0xB8 indicates a long string length with missing payload).
+	require.NoError(t, db.Put(populateMissingTriesKey, []byte{0xB8}))
+	_, err := ReadPopulateMissingTries(db)
+	require.ErrorIs(t, err, errInvalidData)
 }
 
 func TestPruningDisabledFlag(t *testing.T) {
@@ -115,35 +126,6 @@ func TestWriteAcceptorTip(t *testing.T) {
 			tip, err := ReadAcceptorTip(db)
 			require.ErrorIs(t, err, tc.wantErr)
 			require.Equal(t, tc.want, tip)
-		})
-	}
-}
-
-func TestTimeMarkers_BadEncoding(t *testing.T) {
-	// Validate that decode errors are surfaced and are not the sentinel not-found error.
-	tests := []struct {
-		name string
-		key  []byte
-		read func(ethdb.KeyValueStore) (time.Time, error)
-	}{
-		{
-			name: "offline_pruning",
-			key:  offlinePruningKey,
-			read: ReadOfflinePruning,
-		},
-		{
-			name: "populate_missing_tries",
-			key:  populateMissingTriesKey,
-			read: ReadPopulateMissingTries,
-		},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			db := rawdb.NewMemoryDatabase()
-			// Write invalid RLP bytes (0xB8 indicates a long string length with missing payload).
-			require.NoError(t, db.Put(tc.key, []byte{0xB8}))
-			_, err := tc.read(db)
-			require.ErrorIs(t, err, errInvalidData)
 		})
 	}
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rlp"
 )
@@ -187,7 +186,6 @@ func ReadSnapshotBlockHash(db ethdb.KeyValueReader) (common.Hash, error) {
 // the persisted snapshot.
 func WriteSnapshotBlockHash(db ethdb.KeyValueWriter, blockHash common.Hash) error {
 	if err := db.Put(snapshotBlockHashKey, blockHash[:]); err != nil {
-		log.Error("Failed to store snapshot block hash", "err", err)
 		return err
 	}
 	return nil
@@ -199,7 +197,6 @@ func WriteSnapshotBlockHash(db ethdb.KeyValueWriter, blockHash common.Hash) erro
 // invalid.
 func DeleteSnapshotBlockHash(db ethdb.KeyValueWriter) error {
 	if err := db.Delete(snapshotBlockHashKey); err != nil {
-		log.Error("Failed to remove snapshot block hash", "err", err)
 		return err
 	}
 	return nil
