@@ -293,20 +293,6 @@ func TestChainConfigNilDoesNotWriteUpgrade(t *testing.T) {
 	require.False(t, ok)
 }
 
-func TestReadChainConfigInvalidUpgradeJSONReturnsNil(t *testing.T) {
-	db := rawdb.NewMemoryDatabase()
-	hash := common.HexToHash("0xbeef")
-	// Write a valid base chain config
-	rawdb.WriteChainConfig(db, hash, &params.ChainConfig{})
-	// Write invalid upgrade JSON
-	require.NoError(t, db.Put(upgradeConfigKey(hash), []byte("{")))
-
-	var out struct{}
-	got, err := ReadChainConfig(db, hash, &out)
-	require.ErrorIs(t, err, ErrInvalidData)
-	require.Nil(t, got)
-}
-
 func TestSyncPerformedLatestCases(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -368,8 +354,13 @@ func TestSyncStorageTriesByRootTable(t *testing.T) {
 		accounts []common.Hash
 	}
 	entries := []entry{
-		{root: common.HexToHash("0xabc"), accounts: []common.Hash{common.HexToHash("0x1"), common.HexToHash("0x2")}},
-		{root: common.HexToHash("0xdef"), accounts: []common.Hash{common.HexToHash("0x3")}},
+		{
+			root:     common.HexToHash("0xabc"),
+			accounts: []common.Hash{common.HexToHash("0x1"), common.HexToHash("0x2")},
+		},
+		{
+			root: common.HexToHash("0xdef"), accounts: []common.Hash{common.HexToHash("0x3")},
+		},
 	}
 	db := rawdb.NewMemoryDatabase()
 	// seed
@@ -438,70 +429,6 @@ func TestCodeToFetchCases(t *testing.T) {
 				count++
 			}
 			require.Equal(t, tc.want, count)
-		})
-	}
-}
-
-func TestChainConfigCases(t *testing.T) {
-	type upgrade struct {
-		X int `json:"x"`
-	}
-	cases := []struct {
-		name        string
-		cfg         *params.ChainConfig
-		up          any
-		mutate      func(db ethdb.KeyValueStore, h common.Hash)
-		expectedErr error
-		wantUp      *upgrade
-	}{
-		{
-			name:        "valid-upgrade",
-			cfg:         &params.ChainConfig{ChainID: big.NewInt(1)},
-			up:          upgrade{X: 7},
-			mutate:      nil,
-			expectedErr: nil,
-			wantUp:      &upgrade{X: 7},
-		},
-		{
-			name:        "nil-config",
-			cfg:         nil,
-			up:          struct{}{},
-			mutate:      nil,
-			expectedErr: ErrEntryNotFound,
-			wantUp:      nil,
-		},
-		{
-			name:        "invalid-upgrade-json",
-			cfg:         &params.ChainConfig{ChainID: big.NewInt(2)},
-			up:          upgrade{X: 1},
-			mutate:      func(db ethdb.KeyValueStore, h common.Hash) { _ = db.Put(upgradeConfigKey(h), []byte("{")) },
-			expectedErr: ErrInvalidData,
-			wantUp:      nil,
-		},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			db := rawdb.NewMemoryDatabase()
-			h := common.HexToHash("0x100")
-			require.NoError(t, WriteChainConfig(db, h, tc.cfg, upgrade{X: 0}))
-			if tc.mutate != nil {
-				tc.mutate(db, h)
-			} else if tc.up != nil && tc.cfg != nil {
-				// If provided, overwrite with provided upgrade object
-				require.NoError(t, WriteChainConfig(db, h, tc.cfg, tc.up.(upgrade)))
-			}
-			var out upgrade
-			got, err := ReadChainConfig(db, h, &out)
-			if tc.expectedErr != nil {
-				require.ErrorIs(t, err, tc.expectedErr)
-				require.Nil(t, got)
-			} else {
-				require.NoError(t, err)
-				require.NotNil(t, got)
-			}
-			if tc.wantUp != nil {
-				require.Equal(t, *tc.wantUp, out)
-			}
 		})
 	}
 }

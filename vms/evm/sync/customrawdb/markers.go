@@ -5,25 +5,43 @@ package customrawdb
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rlp"
 )
 
-var upgradeConfigPrefix = []byte("upgrade-config-")
+var (
+	// errInvalidData indicates the stored value exists but is malformed or undecodable.
+	errInvalidData = errors.New("invalid data")
+
+	upgradeConfigPrefix = []byte("upgrade-config-")
+	// offlinePruningKey tracks runs of offline pruning.
+	offlinePruningKey = []byte("OfflinePruning")
+	// populateMissingTriesKey tracks runs of trie backfills.
+	populateMissingTriesKey = []byte("PopulateMissingTries")
+	// pruningDisabledKey tracks whether the node has ever run in archival mode
+	// to ensure that a user does not accidentally corrupt an archival node.
+	pruningDisabledKey = []byte("PruningDisabled")
+	// acceptorTipKey tracks the tip of the last accepted block that has been fully processed.
+	acceptorTipKey = []byte("AcceptorTipKey")
+	// snapshotBlockHashKey tracks the block hash of the last snapshot.
+	snapshotBlockHashKey = []byte("SnapshotBlockHash")
+)
 
 // WriteOfflinePruning writes a time marker of the last attempt to run offline pruning.
 // The marker is written when offline pruning completes and is deleted when the node
 // is started successfully with offline pruning disabled. This ensures users must
 // disable offline pruning and start their node successfully between runs of offline
 // pruning.
-func WriteOfflinePruning(db ethdb.KeyValueStore) error {
-	return writeCurrentTimeMarker(db, offlinePruningKey)
+func WriteOfflinePruning(db ethdb.KeyValueStore, ts time.Time) error {
+	return writeTimeMarker(db, offlinePruningKey, ts)
 }
 
 // ReadOfflinePruning reads the most recent timestamp of an attempt to run offline
@@ -39,8 +57,8 @@ func DeleteOfflinePruning(db ethdb.KeyValueStore) error {
 
 // WritePopulateMissingTries writes a marker for the current attempt to populate
 // missing tries.
-func WritePopulateMissingTries(db ethdb.KeyValueStore) error {
-	return writeCurrentTimeMarker(db, populateMissingTriesKey)
+func WritePopulateMissingTries(db ethdb.KeyValueStore, ts time.Time) error {
+	return writeTimeMarker(db, populateMissingTriesKey, ts)
 }
 
 // ReadPopulateMissingTries reads the most recent timestamp of an attempt to
@@ -88,7 +106,7 @@ func ReadAcceptorTip(db ethdb.KeyValueReader) (common.Hash, error) {
 		return common.Hash{}, err
 	}
 	if len(h) != common.HashLength {
-		return common.Hash{}, fmt.Errorf("%w: length %d", ErrInvalidData, len(h))
+		return common.Hash{}, fmt.Errorf("%w: length %d", errInvalidData, len(h))
 	}
 	return common.BytesToHash(h), nil
 }
@@ -107,7 +125,7 @@ func ReadChainConfig[T any](db ethdb.KeyValueReader, hash common.Hash, upgradeCo
 	}
 
 	if err := json.Unmarshal(upgrade, upgradeConfig); err != nil {
-		return nil, ErrInvalidData
+		return nil, errInvalidData
 	}
 
 	return config, nil
@@ -131,9 +149,59 @@ func WriteChainConfig[T any](db ethdb.KeyValueWriter, hash common.Hash, config *
 	return nil
 }
 
-// writeCurrentTimeMarker writes a marker of the current time in the db at `key`.
-func writeCurrentTimeMarker(db ethdb.KeyValueStore, key []byte) error {
-	data, err := rlp.EncodeToBytes(uint64(time.Now().Unix()))
+// NewAccountSnapshotsIterator returns an iterator for walking all of the accounts in the snapshot
+func NewAccountSnapshotsIterator(db ethdb.Iteratee) ethdb.Iterator {
+	it := db.NewIterator(rawdb.SnapshotAccountPrefix, nil)
+	keyLen := len(rawdb.SnapshotAccountPrefix) + common.HashLength
+	return rawdb.NewKeyLengthIterator(it, keyLen)
+}
+
+// ReadSnapshotBlockHash retrieves the hash of the block whose state is contained in
+// the persisted snapshot.
+func ReadSnapshotBlockHash(db ethdb.KeyValueReader) (common.Hash, error) {
+	ok, err := db.Has(snapshotBlockHashKey)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	if !ok {
+		return common.Hash{}, ErrEntryNotFound
+	}
+
+	data, err := db.Get(snapshotBlockHashKey)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	if len(data) != common.HashLength {
+		return common.Hash{}, fmt.Errorf("%w: length %d", errInvalidData, len(data))
+	}
+	return common.BytesToHash(data), nil
+}
+
+// WriteSnapshotBlockHash stores the root of the block whose state is contained in
+// the persisted snapshot.
+func WriteSnapshotBlockHash(db ethdb.KeyValueWriter, blockHash common.Hash) error {
+	if err := db.Put(snapshotBlockHashKey, blockHash[:]); err != nil {
+		log.Error("Failed to store snapshot block hash", "err", err)
+		return err
+	}
+	return nil
+}
+
+// DeleteSnapshotBlockHash deletes the hash of the block whose state is contained in
+// the persisted snapshot. Since snapshots are not immutable, this  method can
+// be used during updates, so a crash or failure will mark the entire snapshot
+// invalid.
+func DeleteSnapshotBlockHash(db ethdb.KeyValueWriter) error {
+	if err := db.Delete(snapshotBlockHashKey); err != nil {
+		log.Error("Failed to remove snapshot block hash", "err", err)
+		return err
+	}
+	return nil
+}
+
+// writeTimeMarker writes a marker of the provided time in the db at `key`.
+func writeTimeMarker(db ethdb.KeyValueStore, key []byte, ts time.Time) error {
+	data, err := rlp.EncodeToBytes(uint64(ts.Unix()))
 	if err != nil {
 		return err
 	}
@@ -161,7 +229,7 @@ func readTimeMarker(db ethdb.KeyValueStore, key []byte) (time.Time, error) {
 
 	var unix uint64
 	if err := rlp.DecodeBytes(data, &unix); err != nil {
-		return time.Time{}, fmt.Errorf("%w: %w", ErrInvalidData, err)
+		return time.Time{}, fmt.Errorf("%w: %w", errInvalidData, err)
 	}
 
 	return time.Unix(int64(unix), 0), nil

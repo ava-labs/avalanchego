@@ -13,6 +13,28 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
+var (
+	// syncRootKey indicates the root of the main account trie currently being synced.
+	syncRootKey = []byte("sync_root")
+	// syncStorageTriesPrefix + trie root + account hash indicates a storage trie must be fetched for the account.
+	syncStorageTriesPrefix = []byte("sync_storage")
+	// syncSegmentsPrefix + trie root + 32-byte start key indicates the trie at root has a segment starting at the specified key.
+	syncSegmentsPrefix = []byte("sync_segments")
+	// CodeToFetchPrefix + code hash -> empty value tracks the outstanding code hashes we need to fetch.
+	CodeToFetchPrefix = []byte("CP")
+
+	// === State sync progress key lengths ===
+	syncStorageTriesKeyLength = len(syncStorageTriesPrefix) + 2*common.HashLength
+	syncSegmentsKeyLength     = len(syncSegmentsPrefix) + 2*common.HashLength
+	codeToFetchKeyLength      = len(CodeToFetchPrefix) + common.HashLength
+
+	// === State sync metadata ===
+	syncPerformedPrefix = []byte("sync_performed")
+	// syncPerformedKeyLength is the length of the key for the sync performed metadata key,
+	// and is equal to [syncPerformedPrefix] + block number as uint64.
+	syncPerformedKeyLength = len(syncPerformedPrefix) + wrappers.LongLen
+)
+
 // ReadSyncRoot reads the root corresponding to the main trie of an in-progress
 // sync and returns common.Hash{} if no in-progress sync was found.
 func ReadSyncRoot(db ethdb.KeyValueReader) (common.Hash, error) {

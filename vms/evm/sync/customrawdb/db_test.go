@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseStateSchemeExt(t *testing.T) {
+func TestParseStateScheme(t *testing.T) {
 	db := rawdb.NewMemoryDatabase()
 
 	// Provided Firewood on empty disk -> allowed.
