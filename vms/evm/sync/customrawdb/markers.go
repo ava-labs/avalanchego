@@ -185,10 +185,7 @@ func ReadSnapshotBlockHash(db ethdb.KeyValueReader) (common.Hash, error) {
 // WriteSnapshotBlockHash stores the root of the block whose state is contained in
 // the persisted snapshot.
 func WriteSnapshotBlockHash(db ethdb.KeyValueWriter, blockHash common.Hash) error {
-	if err := db.Put(snapshotBlockHashKey, blockHash[:]); err != nil {
-		return err
-	}
-	return nil
+	return db.Put(snapshotBlockHashKey, blockHash[:])
 }
 
 // DeleteSnapshotBlockHash deletes the hash of the block whose state is contained in
@@ -196,10 +193,7 @@ func WriteSnapshotBlockHash(db ethdb.KeyValueWriter, blockHash common.Hash) erro
 // be used during updates, so a crash or failure will mark the entire snapshot
 // invalid.
 func DeleteSnapshotBlockHash(db ethdb.KeyValueWriter) error {
-	if err := db.Delete(snapshotBlockHashKey); err != nil {
-		return err
-	}
-	return nil
+	return db.Delete(snapshotBlockHashKey)
 }
 
 func writeTimeMarker(db ethdb.KeyValueStore, key []byte, ts time.Time) error {

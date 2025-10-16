@@ -71,10 +71,10 @@ func TestCodeToFetchIteratorAndDelete(t *testing.T) {
 	vals := mapIterator(t, NewCodeToFetchIterator(db), func(key []byte) common.Hash {
 		return common.BytesToHash(key[len(CodeToFetchPrefix):])
 	})
-	seen := set.Set[common.Hash]{}
-	seen.Add(vals...)
-	require.True(t, seen.Contains(h1))
-	require.True(t, seen.Contains(h2))
+
+	seen := set.Of(vals...)
+	require.Contains(t, seen, h1)
+	require.Contains(t, seen, h2)
 
 	// Delete one and confirm only one remains
 	require.NoError(t, DeleteCodeToFetch(db, h1))
@@ -197,7 +197,7 @@ func TestSyncPerformedAndLatest(t *testing.T) {
 	// Iterator yields all
 	vals := mapIterator(t, NewSyncPerformedIterator(db), ParseSyncPerformedKey)
 
-	require.ElementsMatch(t, []uint64{10, 20, 15}, vals)
+	require.Equal(t, []uint64{10, 15, 20}, vals)
 
 	// Latest is max
 	latest, err := GetLatestSyncPerformed(db)
@@ -247,9 +247,20 @@ func TestSyncPerformedLatestCases(t *testing.T) {
 		writes []uint64
 		want   uint64
 	}{
-		{name: "empty", writes: nil, want: 0},
-		{name: "increasing", writes: []uint64{1, 2, 3}, want: 3},
-		{name: "unsorted", writes: []uint64{10, 5, 7}, want: 10},
+		{
+			name: "empty",
+			want: 0,
+		},
+		{
+			name:   "increasing",
+			writes: []uint64{1, 2, 3},
+			want:   3,
+		},
+		{
+			name:   "unsorted",
+			writes: []uint64{10, 5, 7},
+			want:   10,
+		},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -271,18 +282,19 @@ func TestSyncSegmentsByRootTable(t *testing.T) {
 		starts []common.Hash
 	}{
 		{
-			name:   "aaa",
+			name:   "segments_multiple_starts",
 			root:   common.HexToHash("0xaaa"),
 			starts: []common.Hash{common.HexToHash("0x1"), common.HexToHash("0x2")},
 		},
 		{
-			name: "bbb", root: common.HexToHash("0xbbb"),
+			name:   "segments_single_start",
+			root:   common.HexToHash("0xbbb"),
 			starts: []common.Hash{common.HexToHash("0x3")},
 		},
 	}
 
 	for _, tc := range tests {
-		t.Run("segments_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
 			for _, s := range tc.starts {
 				require.NoError(t, WriteSyncSegment(db, tc.root, s))
@@ -303,19 +315,19 @@ func TestSyncStorageTriesByRootTable(t *testing.T) {
 		accounts []common.Hash
 	}{
 		{
-			name:     "abc",
+			name:     "storage_multiple_accounts",
 			root:     common.HexToHash("0xabc"),
 			accounts: []common.Hash{common.HexToHash("0x1"), common.HexToHash("0x2")},
 		},
 		{
-			name:     "def",
+			name:     "storage_single_account",
 			root:     common.HexToHash("0xdef"),
 			accounts: []common.Hash{common.HexToHash("0x3")},
 		},
 	}
 
 	for _, tc := range tests {
-		t.Run("storage_"+tc.name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
 			for _, a := range tc.accounts {
 				require.NoError(t, WriteSyncStorageTrie(db, tc.root, a))
