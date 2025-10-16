@@ -772,14 +772,19 @@ func TestPreFork_SetPreference(t *testing.T) {
 // TestPostFork_SetPreference tests the SetPreference functionality after the fork
 // when SetPreferenceWithContext may be called based on various conditions.
 func TestPostFork_SetPreference(t *testing.T) {
-	// Helper to create a block with the given epoch
-	createBlockWithEpoch := func(proVM *VM, epoch statelessblock.Epoch) PostForkBlock {
+	// Helper to create a block with the given epoch, P-Chain height, and optional custom timestamp
+	createBlockWithEpoch := func(proVM *VM, epoch statelessblock.Epoch, blockPChainHeight uint64, customTimestamp ...time.Time) PostForkBlock {
 		coreBlk := snowmantest.BuildChild(snowmantest.Genesis)
+
+		timestamp := coreBlk.Timestamp()
+		if len(customTimestamp) > 0 {
+			timestamp = customTimestamp[0]
+		}
 
 		statelessBlk, err := statelessblock.BuildUnsigned(
 			snowmantest.GenesisID,
-			coreBlk.Timestamp(),
-			defaultPChainHeight,
+			timestamp,
+			blockPChainHeight,
 			epoch,
 			coreBlk.Bytes(),
 		)
@@ -797,34 +802,48 @@ func TestPostFork_SetPreference(t *testing.T) {
 	tests := []struct {
 		name                           string
 		hasSetPreferenceWithContext    bool
-		hasEpoch                       bool
+		epochPChainHeight              *uint64 // nil = no epoch, otherwise epoch with this P-Chain height
+		blockPChainHeight              uint64  // P-Chain height of the block itself
+		sealEpoch                      bool    // whether block timestamp should seal the epoch
 		expectSetPreferenceWithContext bool
 		expectError                    bool
 	}{
 		{
 			name:                           "setPreferenceVM is nil - should call regular SetPreference",
 			hasSetPreferenceWithContext:    false,
-			hasEpoch:                       true,
+			epochPChainHeight:              &defaultPChainHeight,
+			blockPChainHeight:              defaultPChainHeight,
 			expectSetPreferenceWithContext: false,
 		},
 		{
 			name:                           "preferredEpoch is empty - should call regular SetPreference",
 			hasSetPreferenceWithContext:    true,
-			hasEpoch:                       false,
+			epochPChainHeight:              nil, // no epoch
+			blockPChainHeight:              defaultPChainHeight,
 			expectSetPreferenceWithContext: false,
 		},
 		{
 			name:                           "both conditions met - should call SetPreferenceWithContext",
 			hasSetPreferenceWithContext:    true,
-			hasEpoch:                       true,
+			epochPChainHeight:              &defaultPChainHeight,
+			blockPChainHeight:              defaultPChainHeight,
 			expectSetPreferenceWithContext: true,
 		},
 		{
 			name:                           "SetPreferenceWithContext returns error",
 			hasSetPreferenceWithContext:    true,
-			hasEpoch:                       true,
+			epochPChainHeight:              &defaultPChainHeight,
+			blockPChainHeight:              defaultPChainHeight,
 			expectSetPreferenceWithContext: true,
 			expectError:                    true,
+		},
+		{
+			name:                           "epoch sealed - next epoch has different PChainHeight",
+			hasSetPreferenceWithContext:    true,
+			epochPChainHeight:              func() *uint64 { h := defaultPChainHeight - 100; return &h }(), // older epoch height
+			blockPChainHeight:              defaultPChainHeight,                                            // newer block height
+			sealEpoch:                      true,
+			expectSetPreferenceWithContext: true,
 		},
 	}
 
@@ -848,11 +867,6 @@ func TestPostFork_SetPreference(t *testing.T) {
 				vmWithContext.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
 					return snowmantest.Genesis, nil
 				}
-				if test.expectError {
-					vmWithContext.SetPreferenceWithContextF = func(context.Context, ids.ID, *block.Context) error {
-						return errors.New("mock error")
-					}
-				}
 				_, _, proVM, _ = initTestProposerVM(t, vmWithContext, upgradetest.Latest, defaultPChainHeight)
 				coreVM = vmWithContext
 			} else {
@@ -867,21 +881,31 @@ func TestPostFork_SetPreference(t *testing.T) {
 
 			// Create block based on test requirements
 			var epoch statelessblock.Epoch
-			if test.hasEpoch {
+			expectedPChainHeight := test.blockPChainHeight
+
+			if test.epochPChainHeight != nil {
+				epochStartTime := snowmantest.GenesisTimestamp
 				epoch = statelessblock.Epoch{
-					PChainHeight: defaultPChainHeight,
+					PChainHeight: *test.epochPChainHeight,
 					Number:       1,
-					StartTime:    snowmantest.GenesisTimestamp.Unix(),
+					StartTime:    epochStartTime.Unix(),
 				}
 			}
-			postForkBlk := createBlockWithEpoch(proVM, epoch)
+
+			var postForkBlk PostForkBlock
+			if test.sealEpoch {
+				// Create a block timestamp that seals the epoch (at or after epoch end time)
+				epochSealingTimestamp := snowmantest.GenesisTimestamp.Add(5 * time.Minute)
+				postForkBlk = createBlockWithEpoch(proVM, epoch, test.blockPChainHeight, epochSealingTimestamp)
+			} else {
+				postForkBlk = createBlockWithEpoch(proVM, epoch, test.blockPChainHeight)
+			}
 
 			// Track method calls
 			var setPreferenceCalled bool
 			var setPreferenceWithContextCalled bool
-			var capturedPChainHeight uint64
 
-			// Set up call tracking
+			// Set up call tracking with validation
 			if fullVM, ok := coreVM.(*fullVM); ok {
 				fullVM.SetPreferenceF = func(context.Context, ids.ID) error {
 					setPreferenceCalled = true
@@ -892,14 +916,23 @@ func TestPostFork_SetPreference(t *testing.T) {
 					setPreferenceCalled = true
 					return nil
 				}
-				originalSetPreferenceWithContextF := vmWithContext.SetPreferenceWithContextF
-				vmWithContext.SetPreferenceWithContextF = func(ctx context.Context, blkID ids.ID, blockCtx *block.Context) error {
-					setPreferenceWithContextCalled = true
-					capturedPChainHeight = blockCtx.PChainHeight
-					if originalSetPreferenceWithContextF != nil {
-						return originalSetPreferenceWithContextF(ctx, blkID, blockCtx)
+
+				// Set up SetPreferenceWithContextF to validate the expected P-Chain height
+				if test.expectError {
+					vmWithContext.SetPreferenceWithContextF = func(context.Context, ids.ID, *block.Context) error {
+						setPreferenceWithContextCalled = true
+						return errors.New("mock error")
 					}
-					return nil
+				} else {
+					vmWithContext.SetPreferenceWithContextF = func(ctx context.Context, blkID ids.ID, blockCtx *block.Context) error {
+						setPreferenceWithContextCalled = true
+
+						// Validate that the correct P-Chain height is passed
+						require.Equal(t, expectedPChainHeight, blockCtx.PChainHeight,
+							"SetPreferenceWithContext called with incorrect P-Chain height")
+
+						return nil
+					}
 				}
 			}
 
@@ -916,10 +949,6 @@ func TestPostFork_SetPreference(t *testing.T) {
 			require.NoError(t, err)
 			require.NotEqual(t, test.expectSetPreferenceWithContext, setPreferenceCalled)
 			require.Equal(t, test.expectSetPreferenceWithContext, setPreferenceWithContextCalled)
-
-			if test.expectSetPreferenceWithContext {
-				require.Equal(t, defaultPChainHeight, capturedPChainHeight)
-			}
 		})
 	}
 }
