@@ -60,8 +60,8 @@ func TestBadTxAllowListBlock(t *testing.T) {
 
 		gspec = &Genesis{
 			Config: config,
-			Alloc: GenesisAlloc{
-				testAddr: GenesisAccount{
+			Alloc: types.GenesisAlloc{
+				testAddr: types.Account{
 					Balance: big.NewInt(1000000000000000000), // 1 ether
 					Nonce:   0,
 				},

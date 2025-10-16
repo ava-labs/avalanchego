@@ -44,7 +44,7 @@ func TestAcceptedLogsSubscription(t *testing.T) {
 		funds   = new(big.Int).Mul(big.NewInt(100), big.NewInt(params.Ether))
 		gspec   = &Genesis{
 			Config:  params.TestChainConfig,
-			Alloc:   GenesisAlloc{addr1: {Balance: funds}},
+			Alloc:   types.GenesisAlloc{addr1: {Balance: funds}},
 			BaseFee: big.NewInt(legacy.BaseFee),
 		}
 		contractAddress = crypto.CreateAddress(addr1, 0)

@@ -57,7 +57,7 @@ func TestTransactionIndices(t *testing.T) {
 		funds   = big.NewInt(10000000000000)
 		gspec   = &Genesis{
 			Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
-			Alloc:  GenesisAlloc{addr1: {Balance: funds}},
+			Alloc:  types.GenesisAlloc{addr1: {Balance: funds}},
 		}
 		signer = types.LatestSigner(gspec.Config)
 	)
@@ -177,7 +177,7 @@ func TestTransactionSkipIndexing(t *testing.T) {
 		funds   = big.NewInt(10000000000000)
 		gspec   = &Genesis{
 			Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
-			Alloc:  GenesisAlloc{addr1: {Balance: funds}},
+			Alloc:  types.GenesisAlloc{addr1: {Balance: funds}},
 		}
 		signer = types.LatestSigner(gspec.Config)
 	)

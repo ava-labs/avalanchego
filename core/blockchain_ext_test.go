@@ -242,7 +242,7 @@ func InsertChainAcceptSingleBlock(t *testing.T, create createFunc) {
 	genesisBalance := big.NewInt(1000000)
 	gspec := &Genesis{
 		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
-		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
+		Alloc:  types.GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}
 	blockchain, err := create(chainDB, gspec, common.Hash{}, t.TempDir())
 	if err != nil {
@@ -719,7 +719,7 @@ func BuildOnVariousStages(t *testing.T, create createFunc) {
 	genesisBalance := big.NewInt(1000000)
 	gspec := &Genesis{
 		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
-		Alloc: GenesisAlloc{
+		Alloc: types.GenesisAlloc{
 			addr1: {Balance: genesisBalance},
 			addr3: {Balance: genesisBalance},
 		},
@@ -876,7 +876,7 @@ func EmptyBlocks(t *testing.T, create createFunc) {
 
 	gspec := &Genesis{
 		Config: &params.ChainConfig{HomesteadBlock: new(big.Int)},
-		Alloc:  GenesisAlloc{},
+		Alloc:  types.GenesisAlloc{},
 	}
 
 	blockchain, err := create(chainDB, gspec, common.Hash{}, t.TempDir())
@@ -1397,7 +1397,7 @@ func GenerateChainInvalidBlockFee(t *testing.T, create createFunc) {
 	genesisBalance := new(big.Int).Mul(big.NewInt(1000000), big.NewInt(params.Ether))
 	gspec := &Genesis{
 		Config: params.TestFortunaChainConfig,
-		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
+		Alloc:  types.GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}
 
 	blockchain, err := create(chainDB, gspec, common.Hash{}, t.TempDir())
@@ -1438,7 +1438,7 @@ func InsertChainInvalidBlockFee(t *testing.T, create createFunc) {
 	genesisBalance := new(big.Int).Mul(big.NewInt(1000000), big.NewInt(params.Ether))
 	gspec := &Genesis{
 		Config: params.TestFortunaChainConfig,
-		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
+		Alloc:  types.GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}
 
 	blockchain, err := create(chainDB, gspec, common.Hash{}, t.TempDir())
@@ -1571,7 +1571,7 @@ func StatefulPrecompiles(t *testing.T, create createFunc) {
 	}
 	gspec := &Genesis{
 		Config: &config,
-		Alloc:  GenesisAlloc{addr1: {Balance: genesisBalance}},
+		Alloc:  types.GenesisAlloc{addr1: {Balance: genesisBalance}},
 	}
 
 	blockchain, err := create(chainDB, gspec, common.Hash{}, t.TempDir())

@@ -546,7 +546,7 @@ func testRepairWithScheme(t *testing.T, tt *rewindTest, snapshots bool, scheme s
 		gspec   = &Genesis{
 			BaseFee: feeConfig.MinBaseFee,
 			Config:  &chainConfig,
-			Alloc:   GenesisAlloc{addr1: {Balance: big.NewInt(params.Ether)}},
+			Alloc:   types.GenesisAlloc{addr1: {Balance: big.NewInt(params.Ether)}},
 		}
 		signer = types.LatestSigner(gspec.Config)
 		engine = dummy.NewFullFaker()
