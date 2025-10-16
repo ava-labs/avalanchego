@@ -5,6 +5,7 @@ package vmsync
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ava-labs/libevm/log"
@@ -14,6 +15,8 @@ import (
 
 	synccommon "github.com/ava-labs/coreth/sync"
 )
+
+var errSyncerAlreadyRegistered = errors.New("syncer already registered")
 
 // SyncerTask represents a single syncer with its name for identification.
 type SyncerTask struct {
@@ -39,7 +42,7 @@ func NewSyncerRegistry() *SyncerRegistry {
 func (r *SyncerRegistry) Register(syncer synccommon.Syncer) error {
 	id := syncer.ID()
 	if r.registeredNames[id] {
-		return fmt.Errorf("syncer with id '%s' is already registered", id)
+		return fmt.Errorf("%w with id '%s'", errSyncerAlreadyRegistered, id)
 	}
 
 	r.registeredNames[id] = true

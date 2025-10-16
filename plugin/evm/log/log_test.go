@@ -42,7 +42,7 @@ func TestInitLogger(t *testing.T) {
 			require := require.New(t)
 			_, err := InitLogger("alias", test.logLevel, true, os.Stderr)
 			if test.expectedErr {
-				require.ErrorContains(err, "unknown level")
+				require.ErrorContains(err, "unknown level") //nolint:forbidigo // uses upstream code
 			} else {
 				require.NoError(err)
 			}

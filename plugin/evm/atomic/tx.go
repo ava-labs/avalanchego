@@ -37,7 +37,7 @@ const (
 var (
 	ErrWrongNetworkID = errors.New("tx was issued with a different network ID")
 	ErrNilTx          = errors.New("tx is nil")
-	errNoValueOutput  = errors.New("output has no value")
+	ErrNoValueOutput  = errors.New("output has no value")
 	ErrNoValueInput   = errors.New("input has no value")
 	ErrNoGasUsed      = errors.New("no gas used")
 	errNilOutput      = errors.New("nil output")
@@ -97,7 +97,7 @@ func (out *EVMOutput) Verify() error {
 	case out == nil:
 		return errNilOutput
 	case out.Amount == 0:
-		return errNoValueOutput
+		return ErrNoValueOutput
 	case out.AssetID == ids.Empty:
 		return errEmptyAssetID
 	}
