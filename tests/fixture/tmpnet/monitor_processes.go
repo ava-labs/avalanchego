@@ -310,7 +310,7 @@ func WritePrometheusSDConfig(name string, sdConfig SDConfig, withGitHubLabels bo
 		return "", stacktrace.Errorf("failed to get %s service discovery dir: %w", prometheusCmd, err)
 	}
 
-	return WritePrometheusSDConfig(serviceDiscoveryDir, name, sdConfig, withGitHubLabels)
+	return WritePrometheusSDConfigD(serviceDiscoveryDir, name, sdConfig, withGitHubLabels)
 }
 
 func WritePrometheusSDConfigD(dir string, name string, sdConfig SDConfig, withGitHubLabels bool) (string, error) {
