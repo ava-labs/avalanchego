@@ -281,7 +281,7 @@ func getServiceDiscoveryDir(cmdName string) (string, error) {
 	return filepath.Join(tmpnetDir, cmdName, "file_sd_configs"), nil
 }
 
-func getNodeExporterServiceDiscoveryDir() (string, error) {
+func GetNodeExporterServiceDiscoveryDir() (string, error) {
 	dir, err := getServiceDiscoveryDir(prometheusCmd)
 	if err != nil {
 		return "", stacktrace.Wrap(err)
@@ -310,10 +310,10 @@ func WritePrometheusSDConfig(name string, sdConfig SDConfig, withGitHubLabels bo
 		return "", stacktrace.Errorf("failed to get %s service discovery dir: %w", prometheusCmd, err)
 	}
 
-	return writePrometheusSDConfig(serviceDiscoveryDir, name, sdConfig, withGitHubLabels)
+	return WritePrometheusSDConfig(serviceDiscoveryDir, name, sdConfig, withGitHubLabels)
 }
 
-func writePrometheusSDConfig(dir string, name string, sdConfig SDConfig, withGitHubLabels bool) (string, error) {
+func WritePrometheusSDConfigD(dir string, name string, sdConfig SDConfig, withGitHubLabels bool) (string, error) {
 	if err := os.MkdirAll(dir, perms.ReadWriteExecute); err != nil {
 		return "", stacktrace.Errorf("failed to create %s service discovery dir: %w", prometheusCmd, err)
 	}

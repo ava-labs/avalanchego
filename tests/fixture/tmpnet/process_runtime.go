@@ -438,12 +438,12 @@ func (p *ProcessRuntime) writeNodeExporterConfig(labels map[string]string) error
 	nodeLabels := map[string]string{}
 	maps.Copy(nodeLabels, labels)
 
-	dir, err := getNodeExporterServiceDiscoveryDir()
+	dir, err := GetNodeExporterServiceDiscoveryDir()
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
 
-	_, err = writePrometheusSDConfig(dir, p.nodeExporterConfigName(), SDConfig{
+	_, err = WritePrometheusSDConfigD(dir, p.nodeExporterConfigName(), SDConfig{
 		Targets: []string{"localhost:9100"},
 		Labels:  nodeLabels,
 	}, false)
@@ -455,7 +455,7 @@ func (p *ProcessRuntime) writeNodeExporterConfig(labels map[string]string) error
 }
 
 func (p *ProcessRuntime) getNodeExporterConfigPath() (string, error) {
-	dir, err := getNodeExporterServiceDiscoveryDir()
+	dir, err := GetNodeExporterServiceDiscoveryDir()
 	if err != nil {
 		return "", stacktrace.Wrap(err)
 	}
