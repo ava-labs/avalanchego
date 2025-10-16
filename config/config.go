@@ -1106,7 +1106,7 @@ func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
 	return subnets.Config{
 		ConsensusParameters:         getConsensusConfig(v),
 		ValidatorOnly:               false,
-		ProposerMinBlockDelay:       v.GetDuration(ProposerVMMinBlockDelayKey),
+		ProposerMinBlockDelay:       0,
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
 	}
 }
