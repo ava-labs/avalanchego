@@ -45,6 +45,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/platformvm/reward"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/proposervm"
@@ -1104,9 +1105,8 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 
 func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
 	subnetDefaults := getPrimaryNetworkConfig(v)
-	// L1s (other than Primary Network) do not have a min block delay
-	// to achive subsecond block times.
-	subnetDefaults.ProposerMinBlockDelay = 0
+	// L1s (other than Primary Network) should let ACP-226 handle block delay.
+	subnetDefaults.ProposerMinBlockDelay = acp226.MinDelayMilliseconds * time.Millisecond
 	return subnetDefaults
 }
 
