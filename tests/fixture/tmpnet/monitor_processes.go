@@ -193,16 +193,16 @@ scrape_configs:
       - files:
           - '%s/*.json'
   - job_name: "node"
-    static_configs:
-      - targets:
-          - 'localhost:9100'
+    file_sd_configs:
+      - files:
+          - '%s/node/*.json'
 
 remote_write:
   - url: "%s"
     basic_auth:
       username: "%s"
       password: "%s"
-`, prometheusScrapeInterval, serviceDiscoveryDir, collectorConfig.url, collectorConfig.username, collectorConfig.password)
+`, prometheusScrapeInterval, serviceDiscoveryDir, serviceDiscoveryDir, collectorConfig.url, collectorConfig.username, collectorConfig.password)
 
 	err = startCollector(ctx, log, cmdName, args, config)
 	if err != nil {
@@ -281,6 +281,14 @@ func getServiceDiscoveryDir(cmdName string) (string, error) {
 	return filepath.Join(tmpnetDir, cmdName, "file_sd_configs"), nil
 }
 
+func getNodeExporterServiceDiscoveryDir() (string, error) {
+	dir, err := getServiceDiscoveryDir(prometheusCmd)
+	if err != nil {
+		return "", stacktrace.Wrap(err)
+	}
+	return filepath.Join(dir, "node"), nil
+}
+
 // SDConfig represents a Prometheus service discovery config entry.
 //
 // file_sd_config docs: https://prometheus.io/docs/prometheus/latest/configuration/configuration/#file_sd_config
@@ -302,15 +310,23 @@ func WritePrometheusSDConfig(name string, sdConfig SDConfig, withGitHubLabels bo
 		return "", stacktrace.Errorf("failed to get %s service discovery dir: %w", prometheusCmd, err)
 	}
 
-	if err := os.MkdirAll(serviceDiscoveryDir, perms.ReadWriteExecute); err != nil {
+	return writePrometheusSDConfig(serviceDiscoveryDir, name, sdConfig, withGitHubLabels)
+}
+
+func writePrometheusSDConfig(dir string, name string, sdConfig SDConfig, withGitHubLabels bool) (string, error) {
+	if err := os.MkdirAll(dir, perms.ReadWriteExecute); err != nil {
 		return "", stacktrace.Errorf("failed to create %s service discovery dir: %w", prometheusCmd, err)
+	}
+
+	if sdConfig.Labels == nil {
+		sdConfig.Labels = map[string]string{}
 	}
 
 	if withGitHubLabels {
 		sdConfig = applyGitHubLabels(sdConfig)
 	}
 
-	configPath := filepath.Join(serviceDiscoveryDir, name+".json")
+	configPath := filepath.Join(dir, name+".json")
 	configData, err := DefaultJSONMarshal([]SDConfig{sdConfig})
 	if err != nil {
 		return "", stacktrace.Errorf("failed to marshal %s config: %w", prometheusCmd, err)

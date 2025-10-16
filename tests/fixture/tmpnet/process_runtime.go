@@ -357,6 +357,10 @@ func (p *ProcessRuntime) writeMonitoringConfig() error {
 		return stacktrace.Wrap(err)
 	}
 
+	if err := p.writeNodeExporterConfig(commonLabels); err != nil {
+		return stacktrace.Wrap(err)
+	}
+
 	promtailLabels := map[string]string{}
 	maps.Copy(promtailLabels, commonLabels)
 	promtailLabels["__path__"] = filepath.Join(p.node.DataDir, "logs", "*.log")
@@ -366,7 +370,11 @@ func (p *ProcessRuntime) writeMonitoringConfig() error {
 			"labels":  promtailLabels,
 		},
 	}
-	return p.writeMonitoringConfigFile(promtailCmd, promtailConfig)
+	if err := p.writeMonitoringConfigFile(promtailCmd, promtailConfig); err != nil {
+		return stacktrace.Wrap(err)
+	}
+
+	return nil
 }
 
 // Return the path for this node's prometheus configuration.
@@ -390,6 +398,14 @@ func (p *ProcessRuntime) removeMonitoringConfig() error {
 		if err := os.Remove(configPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return stacktrace.Errorf("failed to remove %s config: %w", name, err)
 		}
+	}
+
+	nodeExporterConfigPath, err := p.getNodeExporterConfigPath()
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+	if err := os.Remove(nodeExporterConfigPath); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return stacktrace.Errorf("failed to remove node exporter config: %w", err)
 	}
 	return nil
 }
@@ -416,6 +432,39 @@ func (p *ProcessRuntime) writeMonitoringConfigFile(name string, config []ConfigM
 	}
 
 	return nil
+}
+
+func (p *ProcessRuntime) writeNodeExporterConfig(labels map[string]string) error {
+	nodeLabels := map[string]string{}
+	maps.Copy(nodeLabels, labels)
+
+	dir, err := getNodeExporterServiceDiscoveryDir()
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+
+	_, err = writePrometheusSDConfig(dir, p.nodeExporterConfigName(), SDConfig{
+		Targets: []string{"localhost:9100"},
+		Labels:  nodeLabels,
+	}, false)
+	if err != nil {
+		return stacktrace.Wrap(err)
+	}
+
+	return nil
+}
+
+func (p *ProcessRuntime) getNodeExporterConfigPath() (string, error) {
+	dir, err := getNodeExporterServiceDiscoveryDir()
+	if err != nil {
+		return "", stacktrace.Wrap(err)
+	}
+
+	return filepath.Join(dir, p.nodeExporterConfigName()+".json"), nil
+}
+
+func (p *ProcessRuntime) nodeExporterConfigName() string {
+	return fmt.Sprintf("%s_%s", p.node.network.UUID, p.node.NodeID)
 }
 
 // GetAccessibleURI returns the URI that can be used to access the node's API.
