@@ -192,9 +192,10 @@ scrape_configs:
     file_sd_configs:
       - files:
           - '%s/*.json'
-  - job_name: node
-	static_configs:
-	  - targets: ['localhost:9100']
+  - job_name: "node"
+    static_configs:
+      - targets:
+          - 'localhost:9100'
 
 remote_write:
   - url: "%s"
