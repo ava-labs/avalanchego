@@ -59,7 +59,7 @@ func TestAddAndGetValidMessage(t *testing.T) {
 
 	expectedSig, err := warpSigner.Sign(testUnsignedMessage)
 	require.NoError(t, err)
-	require.Equal(t, expectedSig, signature[:])
+	require.Equal(t, expectedSig, signature)
 }
 
 func TestAddAndGetUnknownMessage(t *testing.T) {
@@ -100,7 +100,7 @@ func TestGetBlockSignature(t *testing.T) {
 
 	signature, err := backend.GetBlockSignature(context.TODO(), blkID)
 	require.NoError(err)
-	require.Equal(expectedSig, signature[:])
+	require.Equal(expectedSig, signature)
 
 	_, err = backend.GetBlockSignature(context.TODO(), ids.GenerateTestID())
 	require.Error(err)
@@ -127,7 +127,7 @@ func TestZeroSizedCache(t *testing.T) {
 
 	expectedSig, err := warpSigner.Sign(testUnsignedMessage)
 	require.NoError(t, err)
-	require.Equal(t, expectedSig, signature[:])
+	require.Equal(t, expectedSig, signature)
 }
 
 func TestOffChainMessages(t *testing.T) {
@@ -155,7 +155,7 @@ func TestOffChainMessages(t *testing.T) {
 				require.NoError(err)
 				expectedSignatureBytes, err := warpSigner.Sign(msg)
 				require.NoError(err)
-				require.Equal(expectedSignatureBytes, signature[:])
+				require.Equal(expectedSignatureBytes, signature)
 			},
 		},
 		"unknown message": {

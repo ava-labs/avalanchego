@@ -168,7 +168,7 @@ func testSendWarpMessage(t *testing.T, scheme string) {
 	// Verify the message signature after accepting the block.
 	rawSignatureBytes, err := tvm.vm.warpBackend.GetMessageSignature(context.TODO(), unsignedMessage)
 	require.NoError(err)
-	blsSignature, err := bls.SignatureFromBytes(rawSignatureBytes[:])
+	blsSignature, err := bls.SignatureFromBytes(rawSignatureBytes)
 	require.NoError(err)
 
 	select {
@@ -185,7 +185,7 @@ func testSendWarpMessage(t *testing.T, scheme string) {
 	// Verify the blockID will now be signed by the backend and produces a valid signature.
 	rawSignatureBytes, err = tvm.vm.warpBackend.GetBlockSignature(context.TODO(), blk.ID())
 	require.NoError(err)
-	blsSignature, err = bls.SignatureFromBytes(rawSignatureBytes[:])
+	blsSignature, err = bls.SignatureFromBytes(rawSignatureBytes)
 	require.NoError(err)
 
 	blockHashPayload, err := payload.NewHash(blk.ID())

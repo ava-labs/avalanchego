@@ -78,8 +78,7 @@ func (r RulesExtra) ActivePrecompiles(existing []common.Address) []common.Addres
 }
 
 func (r RulesExtra) currentPrecompiles() map[common.Address]vm.PrecompiledContract {
-	switch {
-	case r.IsGranite:
+	if r.IsGranite {
 		return PrecompiledContractsGranite
 	}
 	return nil

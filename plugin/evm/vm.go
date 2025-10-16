@@ -1248,7 +1248,7 @@ func (vm *VM) startContinuousProfiler() {
 		return
 	}
 	vm.profiler = profiler.NewContinuous(
-		filepath.Join(vm.config.ContinuousProfilerDir),
+		filepath.Clean(vm.config.ContinuousProfilerDir),
 		vm.config.ContinuousProfilerFrequency.Duration,
 		vm.config.ContinuousProfilerMaxFiles,
 	)

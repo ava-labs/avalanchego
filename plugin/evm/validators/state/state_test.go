@@ -95,7 +95,7 @@ func TestState(t *testing.T) {
 	require.ErrorIs(err, ErrImmutableField)
 
 	// set a different start time should fail
-	vdr.StartTimestamp = vdr.StartTimestamp + 100
+	vdr.StartTimestamp += 100
 	err = state.UpdateValidator(vdr)
 	require.ErrorIs(err, ErrImmutableField)
 

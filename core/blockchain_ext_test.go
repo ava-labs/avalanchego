@@ -6,6 +6,7 @@ package core
 import (
 	"fmt"
 	"math/big"
+	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
@@ -1853,7 +1854,7 @@ func ReexecBlocks(t *testing.T, create ReexecTestFunc) {
 
 	newChain, restartedChain := checkBlockChainState(t, blockchain, gspec, chainDB, checkCreate, checkState)
 
-	allTxs := append(foundTxs, missingTxs...)
+	allTxs := slices.Concat(foundTxs, missingTxs)
 	for _, bc := range []*BlockChain{newChain, restartedChain} {
 		// We should confirm that snapshots were properly initialized
 		if bc.snaps == nil && bc.cacheConfig.SnapshotLimit > 0 {
@@ -1985,7 +1986,7 @@ func ReexecMaxBlocks(t *testing.T, create ReexecTestFunc) {
 	}
 	newChain, restartedChain := checkBlockChainState(t, blockchain, gspec, chainDB, checkCreate, checkState)
 
-	allTxs := append(foundTxs, missingTxs...)
+	allTxs := slices.Concat(foundTxs, missingTxs)
 	for _, bc := range []*BlockChain{newChain, restartedChain} {
 		// We should confirm that snapshots were properly initialized
 		if bc.snaps == nil && bc.cacheConfig.SnapshotLimit > 0 {

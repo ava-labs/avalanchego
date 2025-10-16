@@ -59,7 +59,7 @@ linters:
     - errorlint
     # - forbidigo
     - goconst
-    # - gocritic
+    - gocritic
     - goprintffuncname
     # - gosec
     - govet

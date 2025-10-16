@@ -55,12 +55,14 @@ func (*configurator) Configure(chainConfig precompileconfig.ChainConfig, cfg pre
 		return fmt.Errorf("expected config type %T, got %T: %v", &Config{}, cfg, cfg)
 	}
 	// configure the RewardManager with the given initial configuration
-	if config.InitialRewardConfig != nil {
+
+	switch {
+	case config.InitialRewardConfig != nil:
 		config.InitialRewardConfig.Configure(state)
-	} else if chainConfig.AllowedFeeRecipients() {
+	case chainConfig.AllowedFeeRecipients():
 		// configure the RewardManager according to chainConfig
 		EnableAllowFeeRecipients(state)
-	} else {
+	default:
 		// chainConfig does not have any reward address
 		// if chainConfig does not enable fee recipients
 		// default to disabling rewards

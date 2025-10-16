@@ -209,7 +209,7 @@ func (fs *fuzzState) updateAccount(addrIndex int) {
 		fs.require.NoError(err, "failed to get account %s for update in %s", addr.Hex(), tr.name)
 		fs.require.NotNil(acc, "account %s is nil for update in %s", addr.Hex(), tr.name)
 		acc.Nonce++
-		acc.CodeHash = crypto.Keccak256Hash(acc.CodeHash[:]).Bytes()
+		acc.CodeHash = crypto.Keccak256Hash(acc.CodeHash).Bytes()
 		acc.Balance.Add(acc.Balance, uint256.NewInt(3))
 		fs.require.NoError(tr.accountTrie.UpdateAccount(addr, acc), "failed to update account %s in %s", addr.Hex(), tr.name)
 	}
@@ -286,7 +286,7 @@ func (fs *fuzzState) updateStorage(accountIndex int, storageIndexInput uint64) {
 	storageKeyHash := crypto.Keccak256Hash(storageKey[:])
 	fs.inputCounter++
 	updatedValInput := binary.BigEndian.AppendUint64(storageKeyHash[:], fs.inputCounter)
-	updatedVal := crypto.Keccak256Hash(updatedValInput[:])
+	updatedVal := crypto.Keccak256Hash(updatedValInput)
 
 	for _, tr := range fs.merkleTries {
 		str := fs.openStorageTrie(addr, tr)
@@ -324,7 +324,7 @@ func FuzzTree(f *testing.F) {
 		}
 
 		for _, step := range byteSteps {
-			step = step % maxStep
+			step %= maxStep
 			t.Log(stepMap[step])
 			switch step {
 			case commit:

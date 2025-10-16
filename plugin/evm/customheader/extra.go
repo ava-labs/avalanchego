@@ -50,20 +50,21 @@ func VerifyExtraPrefix(
 	parent *types.Header,
 	header *types.Header,
 ) error {
-	switch {
-	case config.IsSubnetEVM(header.Time):
-		feeWindow, err := feeWindow(config, parent, header.Time)
-		if err != nil {
-			return fmt.Errorf("calculating expected fee window: %w", err)
-		}
-		feeWindowBytes := feeWindow.Bytes()
-		if !bytes.HasPrefix(header.Extra, feeWindowBytes) {
-			return fmt.Errorf("%w: expected %x as prefix, found %x",
-				errInvalidExtraPrefix,
-				feeWindowBytes,
-				header.Extra,
-			)
-		}
+	if !config.IsSubnetEVM(header.Time) {
+		return nil
+	}
+
+	feeWindow, err := feeWindow(config, parent, header.Time)
+	if err != nil {
+		return fmt.Errorf("calculating expected fee window: %w", err)
+	}
+	feeWindowBytes := feeWindow.Bytes()
+	if !bytes.HasPrefix(header.Extra, feeWindowBytes) {
+		return fmt.Errorf("%w: expected %x as prefix, found %x",
+			errInvalidExtraPrefix,
+			feeWindowBytes,
+			header.Extra,
+		)
 	}
 	return nil
 }
