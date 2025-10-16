@@ -28,6 +28,7 @@ var (
 	ErrAssetIDMismatch            = errors.New("asset IDs in the input don't match the utxo")
 	ErrConflictingAtomicInputs    = errors.New("invalid block due to conflicting atomic inputs")
 	errFailedToFetchImportUTXOs   = errors.New("failed to fetch import UTXOs")
+	errFailedToUnmarshalUTXO      = errors.New("failed to unmarshal UTXO")
 	errRejectedParent             = errors.New("rejected parent")
 	errIncorrectNumCredentials    = errors.New("incorrect number of credentials")
 	errIncorrectNumSignatures     = errors.New("incorrect number of signatures")
@@ -120,7 +121,7 @@ func (s *semanticVerifier) ImportTx(utx *atomic.UnsignedImportTx) error {
 	}
 
 	if len(stx.Creds) != len(utx.ImportedInputs) {
-		return fmt.Errorf("import tx contained mismatched number of inputs/credentials (%d vs. %d)", len(utx.ImportedInputs), len(stx.Creds))
+		return fmt.Errorf("%w: (%d vs. %d)", errIncorrectNumCredentials, len(utx.ImportedInputs), len(stx.Creds))
 	}
 
 	if !backend.Bootstrapped {
@@ -144,7 +145,7 @@ func (s *semanticVerifier) ImportTx(utx *atomic.UnsignedImportTx) error {
 
 		utxo := &avax.UTXO{}
 		if _, err := atomic.Codec.Unmarshal(utxoBytes, utxo); err != nil {
-			return fmt.Errorf("failed to unmarshal UTXO: %w", err)
+			return fmt.Errorf("%w: %w", errFailedToUnmarshalUTXO, err)
 		}
 
 		cred := stx.Creds[i]

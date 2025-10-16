@@ -519,9 +519,9 @@ func testReorgProtection(t *testing.T, scheme string) {
 	// should NEVER happen. However, the VM defends against this
 	// just in case.
 	err = vm1.SetPreference(context.Background(), vm1BlkC.ID())
-	require.ErrorContains(err, "cannot orphan finalized block")
+	require.ErrorContains(err, "cannot orphan finalized block") //nolint:forbidigo // uses upstream code
 	err = vm1BlkC.Accept(context.Background())
-	require.ErrorContains(err, "expected accepted block to have parent")
+	require.ErrorContains(err, "expected accepted block to have parent") //nolint:forbidigo // uses upstream code
 }
 
 // Regression test to ensure that a VM that accepts block C while preferring
@@ -769,7 +769,7 @@ func testStickyPreference(t *testing.T, scheme string) {
 
 	// Attempt to accept out of order
 	err = vm1BlkD.Accept(context.Background())
-	require.ErrorContains(err, "expected accepted block to have parent")
+	require.ErrorContains(err, "expected accepted block to have parent") //nolint:forbidigo // uses upstream code
 
 	// Accept in order
 	require.NoError(vm1BlkC.Accept(context.Background()))
@@ -1265,7 +1265,7 @@ func TestSkipChainConfigCheckCompatible(t *testing.T) {
 	upgradetest.SetTimesTo(&newCTX.NetworkUpgrades, fork, upgrade.InitiallyActiveTime)
 	genesis := []byte(vmtest.GenesisJSON(paramstest.ForkToChainConfig[fork]))
 	err = reinitVM.Initialize(context.Background(), newCTX, tvm.DB, genesis, []byte{}, []byte{}, []*commonEng.Fx{}, tvm.AppSender)
-	require.ErrorContains(err, "mismatching Cancun fork timestamp in database")
+	require.ErrorContains(err, "mismatching Cancun fork timestamp in database") //nolint:forbidigo // uses upstream code
 
 	// try again with skip-upgrade-check
 	reinitVM = newDefaultTestVM()
@@ -1280,47 +1280,41 @@ func TestParentBeaconRootBlock(t *testing.T) {
 		name          string
 		fork          upgradetest.Fork
 		beaconRoot    *common.Hash
-		expectedError bool
-		errString     string
+		expectedError error
 	}{
 		{
 			name:          "non-empty parent beacon root in Durango",
 			fork:          upgradetest.Durango,
 			beaconRoot:    &common.Hash{0x01},
-			expectedError: true,
-			// err string wont work because it will also fail with blob gas is non-empty (zeroed)
+			expectedError: errInvalidParentBeaconRootBeforeCancun,
 		},
 		{
 			name:          "empty parent beacon root in Durango",
 			fork:          upgradetest.Durango,
 			beaconRoot:    &common.Hash{},
-			expectedError: true,
+			expectedError: errInvalidParentBeaconRootBeforeCancun,
 		},
 		{
-			name:          "nil parent beacon root in Durango",
-			fork:          upgradetest.Durango,
-			beaconRoot:    nil,
-			expectedError: false,
+			name:       "nil parent beacon root in Durango",
+			fork:       upgradetest.Durango,
+			beaconRoot: nil,
 		},
 		{
 			name:          "non-empty parent beacon root in E-Upgrade (Cancun)",
 			fork:          upgradetest.Etna,
 			beaconRoot:    &common.Hash{0x01},
-			expectedError: true,
-			errString:     "expected empty hash",
+			expectedError: errParentBeaconRootNonEmpty,
 		},
 		{
-			name:          "empty parent beacon root in E-Upgrade (Cancun)",
-			fork:          upgradetest.Etna,
-			beaconRoot:    &common.Hash{},
-			expectedError: false,
+			name:       "empty parent beacon root in E-Upgrade (Cancun)",
+			fork:       upgradetest.Etna,
+			beaconRoot: &common.Hash{},
 		},
 		{
 			name:          "nil parent beacon root in E-Upgrade (Cancun)",
 			fork:          upgradetest.Etna,
 			beaconRoot:    nil,
-			expectedError: true,
-			errString:     "header is missing parentBeaconRoot",
+			expectedError: errMissingParentBeaconRoot,
 		},
 	}
 
@@ -1350,18 +1344,10 @@ func TestParentBeaconRootBlock(t *testing.T) {
 			parentBeaconBlock, err := wrapBlock(parentBeaconEthBlock, vm)
 			require.NoError(err)
 
-			errCheck := func(err error) {
-				if test.expectedError {
-					require.ErrorContains(err, test.errString)
-				} else {
-					require.NoError(err)
-				}
-			}
-
 			_, err = vm.ParseBlock(context.Background(), parentBeaconBlock.Bytes())
-			errCheck(err)
+			require.ErrorIs(err, test.expectedError)
 			err = parentBeaconBlock.Verify(context.Background())
-			errCheck(err)
+			require.ErrorIs(err, test.expectedError)
 		})
 	}
 }
@@ -1759,7 +1745,7 @@ func TestCreateHandlers(t *testing.T) {
 		})
 	}
 	require.NoError(t, client.BatchCall(batch))
-	require.ErrorContains(t, batch[0].Error, "batch too large")
+	require.ErrorContains(t, batch[0].Error, "batch too large") //nolint:forbidigo // uses upstream code
 
 	// All other elements should have an error indicating there's no response
 	for _, elem := range batch[1:] {

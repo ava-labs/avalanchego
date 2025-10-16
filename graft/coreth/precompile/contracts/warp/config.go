@@ -32,6 +32,7 @@ var (
 )
 
 var (
+	ErrInvalidQuorumRatio         = errors.New("invalid warp quorum ratio")
 	errOverflowSignersGasCost     = errors.New("overflow calculating warp signers gas cost")
 	errInvalidPredicateBytes      = errors.New("cannot unpack predicate bytes")
 	errInvalidWarpMsg             = errors.New("cannot unpack warp message")
@@ -95,11 +96,11 @@ func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
 	}
 
 	if c.QuorumNumerator > WarpQuorumDenominator {
-		return fmt.Errorf("cannot specify quorum numerator (%d) > quorum denominator (%d)", c.QuorumNumerator, WarpQuorumDenominator)
+		return fmt.Errorf("%w: cannot specify numerator (%d) > denominator (%d)", ErrInvalidQuorumRatio, c.QuorumNumerator, WarpQuorumDenominator)
 	}
 	// If a non-default quorum numerator is specified and it is less than the minimum, return an error
 	if c.QuorumNumerator != 0 && c.QuorumNumerator < WarpQuorumNumeratorMinimum {
-		return fmt.Errorf("cannot specify quorum numerator (%d) < min quorum numerator (%d)", c.QuorumNumerator, WarpQuorumNumeratorMinimum)
+		return fmt.Errorf("%w: cannot specify numerator (%d) < min numerator (%d)", ErrInvalidQuorumRatio, c.QuorumNumerator, WarpQuorumNumeratorMinimum)
 	}
 	return nil
 }

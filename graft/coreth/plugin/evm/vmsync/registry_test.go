@@ -67,7 +67,7 @@ func TestSyncerRegistry_Register(t *testing.T) {
 	tests := []struct {
 		name          string
 		registrations []*mockSyncer
-		expectedError string
+		expectedError error
 		expectedCount int
 	}{
 		{
@@ -76,7 +76,6 @@ func TestSyncerRegistry_Register(t *testing.T) {
 				newMockSyncer("Syncer1", nil),
 				newMockSyncer("Syncer2", nil),
 			},
-			expectedError: "",
 			expectedCount: 2,
 		},
 		{
@@ -85,7 +84,7 @@ func TestSyncerRegistry_Register(t *testing.T) {
 				newMockSyncer("Syncer1", nil),
 				newMockSyncer("Syncer1", nil),
 			},
-			expectedError: "syncer with id 'Syncer1' is already registered",
+			expectedError: errSyncerAlreadyRegistered,
 			expectedCount: 1,
 		},
 		{
@@ -114,17 +113,13 @@ func TestSyncerRegistry_Register(t *testing.T) {
 			}
 
 			// Check error expectations.
-			if tt.expectedError != "" {
-				require.ErrorContains(t, errLast, tt.expectedError)
-			} else {
-				require.NoError(t, errLast)
-			}
+			require.ErrorIs(t, errLast, tt.expectedError)
 
 			// Verify registration count.
 			require.Len(t, registry.syncers, tt.expectedCount)
 
 			// Verify registration order for successful cases.
-			if tt.expectedError == "" {
+			if tt.expectedError == nil {
 				for i, reg := range tt.registrations {
 					require.Equal(t, reg.name, registry.syncers[i].name)
 					require.Equal(t, reg, registry.syncers[i].syncer)
@@ -135,10 +130,11 @@ func TestSyncerRegistry_Register(t *testing.T) {
 }
 
 func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
+	errFoo := errors.New("foo")
 	tests := []struct {
 		name          string
 		syncers       []syncerConfig
-		expectedError string
+		expectedError error
 		assertState   func(t *testing.T, mockSyncers []*mockSyncer)
 	}{
 		{
@@ -155,10 +151,10 @@ func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
 		}, {
 			name: "error returned",
 			syncers: []syncerConfig{
-				{"Syncer1", errors.New("wait failed")},
+				{"Syncer1", errFoo},
 				{"Syncer2", nil},
 			},
-			expectedError: "Syncer1 failed",
+			expectedError: errFoo,
 			assertState: func(t *testing.T, mockSyncers []*mockSyncer) {
 				// First syncer should be started and waited on (but wait failed).
 				require.True(t, mockSyncers[0].started, "First syncer should have been started")
@@ -184,11 +180,7 @@ func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
 
 			err := registry.RunSyncerTasks(ctx, newTestClientSummary(t))
 
-			if tt.expectedError != "" {
-				require.ErrorContains(t, err, tt.expectedError)
-			} else {
-				require.NoError(t, err)
-			}
+			require.ErrorIs(t, err, tt.expectedError)
 
 			// Use custom assertion function for each test case.
 			tt.assertState(t, mockSyncers)
