@@ -80,10 +80,12 @@ func init() {
 }
 
 // initTestProposerVM creates a proposerVM for testing.
+// If coreVM is nil, creates a default fullVM.
 // If forkActivationTime is provided, the fork activates at that specific time.
 // If not provided, the fork is already activated at InitiallyActiveTime.
 func initTestProposerVM(
 	t *testing.T,
+	coreVM block.ChainVM,
 	fork upgradetest.Fork,
 	minPChainHeight uint64,
 	forkActivationTime ...time.Time,
@@ -95,44 +97,50 @@ func initTestProposerVM(
 ) {
 	require := require.New(t)
 
-	initialState := []byte("genesis state")
-	coreVM := &fullVM{
-		VM: &blocktest.VM{
-			VM: enginetest.VM{
+	// Create default fullVM if none provided
+	var defaultFullVM *fullVM
+	if coreVM == nil {
+		defaultFullVM = &fullVM{
+			VM: &blocktest.VM{
+				VM: enginetest.VM{
+					T: t,
+				},
+			},
+			StateSyncableVM: &blocktest.StateSyncableVM{
 				T: t,
 			},
-		},
-		StateSyncableVM: &blocktest.StateSyncableVM{
-			T: t,
-		},
+		}
+
+		defaultFullVM.InitializeF = func(context.Context, *snow.Context, database.Database,
+			[]byte, []byte, []byte,
+			[]*common.Fx, common.AppSender,
+		) error {
+			return nil
+		}
+		defaultFullVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
+			[]*snowmantest.Block{snowmantest.Genesis},
+		)
+		defaultFullVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+			switch blkID {
+			case snowmantest.GenesisID:
+				return snowmantest.Genesis, nil
+			default:
+				return nil, errUnknownBlock
+			}
+		}
+		defaultFullVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+			switch {
+			case bytes.Equal(b, snowmantest.GenesisBytes):
+				return snowmantest.Genesis, nil
+			default:
+				return nil, errUnknownBlock
+			}
+		}
+
+		coreVM = defaultFullVM
 	}
 
-	coreVM.InitializeF = func(context.Context, *snow.Context, database.Database,
-		[]byte, []byte, []byte,
-		[]*common.Fx, common.AppSender,
-	) error {
-		return nil
-	}
-	coreVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
-		[]*snowmantest.Block{snowmantest.Genesis},
-	)
-	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
-		switch blkID {
-		case snowmantest.GenesisID:
-			return snowmantest.Genesis, nil
-		default:
-			return nil, errUnknownBlock
-		}
-	}
-	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
-		switch {
-		case bytes.Equal(b, snowmantest.GenesisBytes):
-			return snowmantest.Genesis, nil
-		default:
-			return nil, errUnknownBlock
-		}
-	}
-
+	// Configure upgrades
 	var upgrades upgrade.Config
 	if len(forkActivationTime) > 0 {
 		upgrades = upgradetest.GetConfigWithUpgradeTime(fork, forkActivationTime[0])
@@ -141,6 +149,8 @@ func initTestProposerVM(
 	}
 	upgrades.ApricotPhase4MinPChainHeight = minPChainHeight
 
+	// Initialize proposer VM
+	initialState := []byte("genesis state")
 	proVM := New(
 		coreVM,
 		Config{
@@ -206,15 +216,17 @@ func initTestProposerVM(
 		nil,
 	))
 
-	// Initialize shouldn't be called again
-	coreVM.InitializeF = nil
-
 	require.NoError(proVM.SetState(context.Background(), snow.NormalOp))
 	require.NoError(proVM.SetPreference(context.Background(), snowmantest.GenesisID))
 
 	proVM.Set(snowmantest.GenesisTimestamp)
 
-	return coreVM, valState, proVM, db
+	// Disable InitializeF for default fullVM to prevent re-initialization
+	if defaultFullVM != nil {
+		defaultFullVM.InitializeF = nil
+	}
+
+	return defaultFullVM, valState, proVM, db
 }
 
 func (vm *VM) waitForProposerWindow() error {
@@ -262,7 +274,7 @@ func TestBuildBlockTimestampAreRoundedToSeconds(t *testing.T) {
 	require := require.New(t)
 
 	// given the same core block, BuildBlock returns the same proposer block
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -286,7 +298,7 @@ func TestBuildBlockIsIdempotent(t *testing.T) {
 	require := require.New(t)
 
 	// given the same core block, BuildBlock returns the same proposer block
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -312,7 +324,7 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 	require := require.New(t)
 
 	// setup
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -337,7 +349,7 @@ func TestFirstProposerBlockIsBuiltOnTopOfGenesis(t *testing.T) {
 func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -405,7 +417,7 @@ func TestProposerBlocksAreBuiltOnPreferredProBlock(t *testing.T) {
 func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -474,7 +486,7 @@ func TestCoreBlocksMustBeBuiltOnPreferredCoreBlock(t *testing.T) {
 func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -511,7 +523,7 @@ func TestCoreBlockFailureCauseProposerBlockParseFailure(t *testing.T) {
 func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -579,7 +591,7 @@ func TestTwoProBlocksWrappingSameCoreBlockCanBeParsed(t *testing.T) {
 func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -637,7 +649,7 @@ func TestTwoProBlocksWithSameParentCanBothVerify(t *testing.T) {
 func TestPreFork_Initialize(t *testing.T) {
 	require := require.New(t)
 
-	_, _, proVM, _ := initTestProposerVM(t, upgradetest.NoUpgrades, 0)
+	_, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.NoUpgrades, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -656,7 +668,7 @@ func TestPreFork_Initialize(t *testing.T) {
 func TestPreFork_BuildBlock(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.NoUpgrades, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.NoUpgrades, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -685,7 +697,7 @@ func TestPreFork_BuildBlock(t *testing.T) {
 func TestPreFork_ParseBlock(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.NoUpgrades, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.NoUpgrades, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -714,7 +726,7 @@ func TestPreFork_ParseBlock(t *testing.T) {
 func TestPreFork_SetPreference(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.NoUpgrades, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.NoUpgrades, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -755,6 +767,161 @@ func TestPreFork_SetPreference(t *testing.T) {
 	nextBlk, err := proVM.BuildBlock(context.Background())
 	require.NoError(err)
 	require.Equal(builtBlk.ID(), nextBlk.Parent())
+}
+
+// TestPostFork_SetPreference tests the SetPreference functionality after the fork
+// when SetPreferenceWithContext may be called based on various conditions.
+func TestPostFork_SetPreference(t *testing.T) {
+	// Helper to create a block with the given epoch
+	createBlockWithEpoch := func(proVM *VM, epoch statelessblock.Epoch) PostForkBlock {
+		coreBlk := snowmantest.BuildChild(snowmantest.Genesis)
+
+		statelessBlk, err := statelessblock.BuildUnsigned(
+			snowmantest.GenesisID,
+			coreBlk.Timestamp(),
+			defaultPChainHeight,
+			epoch,
+			coreBlk.Bytes(),
+		)
+		require.NoError(t, err)
+
+		return &postForkBlock{
+			SignedBlock: statelessBlk,
+			postForkCommonComponents: postForkCommonComponents{
+				vm:       proVM,
+				innerBlk: coreBlk,
+			},
+		}
+	}
+
+	tests := []struct {
+		name                           string
+		hasSetPreferenceWithContext    bool
+		hasEpoch                       bool
+		expectSetPreferenceWithContext bool
+		expectError                    bool
+	}{
+		{
+			name:                           "setPreferenceVM is nil - should call regular SetPreference",
+			hasSetPreferenceWithContext:    false,
+			hasEpoch:                       true,
+			expectSetPreferenceWithContext: false,
+		},
+		{
+			name:                           "preferredEpoch is empty - should call regular SetPreference",
+			hasSetPreferenceWithContext:    true,
+			hasEpoch:                       false,
+			expectSetPreferenceWithContext: false,
+		},
+		{
+			name:                           "both conditions met - should call SetPreferenceWithContext",
+			hasSetPreferenceWithContext:    true,
+			hasEpoch:                       true,
+			expectSetPreferenceWithContext: true,
+		},
+		{
+			name:                           "SetPreferenceWithContext returns error",
+			hasSetPreferenceWithContext:    true,
+			hasEpoch:                       true,
+			expectSetPreferenceWithContext: true,
+			expectError:                    true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var coreVM interface{}
+			var proVM *VM
+
+			// Create VM based on test requirements
+			if test.hasSetPreferenceWithContext {
+				vmWithContext := &blocktest.VMWithSetPreferenceContext{
+					VM: &blocktest.VM{VM: enginetest.VM{T: t}},
+				}
+				// Set up basic VM functions
+				vmWithContext.InitializeF = func(context.Context, *snow.Context, database.Database, []byte, []byte, []byte, []*common.Fx, common.AppSender) error {
+					return nil
+				}
+				vmWithContext.LastAcceptedF = func(context.Context) (ids.ID, error) {
+					return snowmantest.GenesisID, nil
+				}
+				vmWithContext.GetBlockF = func(context.Context, ids.ID) (snowman.Block, error) {
+					return snowmantest.Genesis, nil
+				}
+				if test.expectError {
+					vmWithContext.SetPreferenceWithContextF = func(context.Context, ids.ID, *block.Context) error {
+						return errors.New("mock error")
+					}
+				}
+				_, _, proVM, _ = initTestProposerVM(t, vmWithContext, upgradetest.Latest, defaultPChainHeight)
+				coreVM = vmWithContext
+			} else {
+				var basicVM *fullVM
+				basicVM, _, proVM, _ = initTestProposerVM(t, nil, upgradetest.Latest, defaultPChainHeight)
+				coreVM = basicVM
+			}
+
+			defer func() {
+				require.NoError(t, proVM.Shutdown(context.Background()))
+			}()
+
+			// Create block based on test requirements
+			var epoch statelessblock.Epoch
+			if test.hasEpoch {
+				epoch = statelessblock.Epoch{
+					PChainHeight: defaultPChainHeight,
+					Number:       1,
+					StartTime:    snowmantest.GenesisTimestamp.Unix(),
+				}
+			}
+			postForkBlk := createBlockWithEpoch(proVM, epoch)
+
+			// Track method calls
+			var setPreferenceCalled bool
+			var setPreferenceWithContextCalled bool
+			var capturedPChainHeight uint64
+
+			// Set up call tracking
+			if fullVM, ok := coreVM.(*fullVM); ok {
+				fullVM.SetPreferenceF = func(context.Context, ids.ID) error {
+					setPreferenceCalled = true
+					return nil
+				}
+			} else if vmWithContext, ok := coreVM.(*blocktest.VMWithSetPreferenceContext); ok {
+				vmWithContext.SetPreferenceF = func(context.Context, ids.ID) error {
+					setPreferenceCalled = true
+					return nil
+				}
+				originalSetPreferenceWithContextF := vmWithContext.SetPreferenceWithContextF
+				vmWithContext.SetPreferenceWithContextF = func(ctx context.Context, blkID ids.ID, blockCtx *block.Context) error {
+					setPreferenceWithContextCalled = true
+					capturedPChainHeight = blockCtx.PChainHeight
+					if originalSetPreferenceWithContextF != nil {
+						return originalSetPreferenceWithContextF(ctx, blkID, blockCtx)
+					}
+					return nil
+				}
+			}
+
+			// Execute test
+			proVM.verifiedBlocks[postForkBlk.ID()] = postForkBlk
+			err := proVM.SetPreference(context.Background(), postForkBlk.ID())
+
+			// Verify results
+			if test.expectError {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.NotEqual(t, test.expectSetPreferenceWithContext, setPreferenceCalled)
+			require.Equal(t, test.expectSetPreferenceWithContext, setPreferenceWithContextCalled)
+
+			if test.expectSetPreferenceWithContext {
+				require.Equal(t, defaultPChainHeight, capturedPChainHeight)
+			}
+		})
+	}
 }
 
 func TestExpiredBuildBlock(t *testing.T) {
@@ -944,7 +1111,7 @@ func (b *wrappedBlock) Verify(ctx context.Context) error {
 func TestInnerBlockDeduplication(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1206,7 +1373,7 @@ func TestInnerVMRollback(t *testing.T) {
 func TestBuildBlockDuringWindow(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, nil, upgradetest.ApricotPhase4, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1292,7 +1459,7 @@ func TestBuildBlockDuringWindow(t *testing.T) {
 func TestTwoForks_OneIsAccepted(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.ApricotPhase4, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1361,7 +1528,7 @@ func TestTwoForks_OneIsAccepted(t *testing.T) {
 func TestTooFarAdvanced(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.ApricotPhase4, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1432,7 +1599,7 @@ func TestTooFarAdvanced(t *testing.T) {
 func TestTwoOptions_OneIsAccepted(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.ApricotPhase4, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -1476,7 +1643,7 @@ func TestTwoOptions_OneIsAccepted(t *testing.T) {
 func TestLaggedPChainHeight(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -2332,7 +2499,7 @@ func TestHistoricalBlockDeletion(t *testing.T) {
 func TestGetPostDurangoSlotTimeWithNoValidators(t *testing.T) {
 	require := require.New(t)
 
-	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, nil, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -2486,7 +2653,7 @@ func TestLocalParse(t *testing.T) {
 func TestTimestampMetrics(t *testing.T) {
 	ctx := context.Background()
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.ApricotPhase4, 0)
 
 	defer func() {
 		require.NoError(t, proVM.Shutdown(ctx))
@@ -2586,7 +2753,7 @@ func TestSelectChildPChainHeight(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
 
-			_, vdrState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+			_, vdrState, proVM, _ := initTestProposerVM(t, nil, upgradetest.Latest, 0)
 			defer func() {
 				require.NoError(proVM.Shutdown(context.Background()))
 			}()
