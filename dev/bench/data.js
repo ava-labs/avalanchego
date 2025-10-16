@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1760618787795,
+  "lastUpdate": 1760627952684,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -2066,6 +2066,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
             "value": 71.49,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Stephen Buttolph",
+            "username": "StephenButtolph",
+            "email": "stephen@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "578d0a915b83cd9ba1243591085ce192d93cdd06",
+          "message": "Add initial EVM codeowners (#4295)\n\nSigned-off-by: Joshua Kim <20001595+joshua-kim@users.noreply.github.com>\nCo-authored-by: Joshua Kim <20001595+joshua-kim@users.noreply.github.com>",
+          "timestamp": "2025-10-15T18:50:56Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/578d0a915b83cd9ba1243591085ce192d93cdd06"
+        },
+        "date": 1760627950602,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
+            "value": 42.74,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
