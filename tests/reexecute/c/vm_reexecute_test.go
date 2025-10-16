@@ -577,7 +577,7 @@ func collectRegistry(tb testing.TB, name string, timeout time.Duration, gatherer
 	dir, err := getNodeExporterServiceDiscoveryDir()
 	r.NoError(err)
 	_, err = tmpnet.writePrometheusSDConfig(dir, name, tmpnet.SDConfig{
-		Targets: []string{'localhost:9100'},
+		Targets: []string{"localhost:9100"},
 		Labels:  labels,
 	}, true /* withGitHubLabels */)
 	r.NoError(err)
