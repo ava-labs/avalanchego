@@ -255,19 +255,52 @@ func GetCommitSHA(log logging.Logger, repoPath string) (string, error) {
 	}
 
 	if isWorktree {
-		log.Debug("detected worktree, using git command",
+		log.Debug("detected worktree, trying to open from git directory",
 			zap.String("gitDir", gitDir),
 		)
-		// For worktrees, go-git can't read refs properly even with the git dir
-		// Use git command directly
-		cmd := exec.Command("git", "rev-parse", "--short=8", "HEAD")
-		cmd.Dir = repoPath
-		output, cmdErr := cmd.CombinedOutput()
-		if cmdErr != nil {
-			return "", stacktrace.Errorf("failed to get HEAD in worktree: %w", cmdErr)
+		// Try to open the repository using the git directory path
+		// For worktrees, we need to read HEAD from the worktree's git dir
+		headPath := filepath.Join(gitDir, "HEAD")
+		headContent, err := os.ReadFile(headPath)
+		if err != nil {
+			log.Debug("failed to read HEAD from worktree git dir, falling back to git command",
+				zap.Error(err),
+			)
+			return getCommitSHAViaGit(log, repoPath)
 		}
-		shortSHA := strings.TrimSpace(string(output))
-		log.Debug("got short commit SHA via git command",
+
+		headStr := strings.TrimSpace(string(headContent))
+		// HEAD file contains either a SHA or "ref: refs/heads/branch"
+		if strings.HasPrefix(headStr, "ref: ") {
+			// It's a branch reference, we need to resolve it
+			// The ref file might be in the worktree's git dir or the common dir
+			refPath := strings.TrimPrefix(headStr, "ref: ")
+
+			// Try worktree git dir first
+			refFilePath := filepath.Join(gitDir, refPath)
+			refContent, err := os.ReadFile(refFilePath)
+			if err != nil {
+				// Try common dir (where shared refs are stored)
+				commonDir := getCommonDir(gitDir)
+				refFilePath = filepath.Join(commonDir, refPath)
+				refContent, err = os.ReadFile(refFilePath)
+				if err != nil {
+					log.Debug("failed to resolve ref, falling back to git command",
+						zap.Error(err),
+					)
+					return getCommitSHAViaGit(log, repoPath)
+				}
+			}
+			headStr = strings.TrimSpace(string(refContent))
+		}
+
+		// headStr should now be a commit SHA
+		if len(headStr) < 8 {
+			return headStr, nil
+		}
+		shortSHA := headStr[:8]
+		log.Debug("got short commit SHA from worktree git dir",
+			zap.String("fullHash", headStr),
 			zap.String("shortSHA", shortSHA),
 		)
 		return shortSHA, nil
@@ -297,6 +330,21 @@ func GetCommitSHA(log logging.Logger, repoPath string) (string, error) {
 	return shortSHA, nil
 }
 
+// getCommitSHAViaGit is a fallback using git CLI
+func getCommitSHAViaGit(log logging.Logger, repoPath string) (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--short=8", "HEAD")
+	cmd.Dir = repoPath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", stacktrace.Errorf("failed to get HEAD via git command: %w", err)
+	}
+	shortSHA := strings.TrimSpace(string(output))
+	log.Debug("got short commit SHA via git command",
+		zap.String("shortSHA", shortSHA),
+	)
+	return shortSHA, nil
+}
+
 // GetTagsForCommit returns all tags that point to the given commit SHA
 func GetTagsForCommit(log logging.Logger, repoPath string, commitSHA string) ([]string, error) {
 	log.Debug("getting tags for commit",
@@ -305,14 +353,25 @@ func GetTagsForCommit(log logging.Logger, repoPath string, commitSHA string) ([]
 	)
 
 	// Check if this is a worktree
-	_, isWorktree, err := getGitDir(repoPath)
+	gitDir, isWorktree, err := getGitDir(repoPath)
 	if err != nil {
 		return nil, stacktrace.Errorf("failed to get git directory: %w", err)
 	}
 
 	if isWorktree {
-		log.Debug("detected worktree, using git command")
-		return getTagsViaGitCommand(log, repoPath, commitSHA)
+		log.Debug("detected worktree, trying to read tags from git directory")
+		// Get the common git directory (where tags are stored)
+		commonDir := getCommonDir(gitDir)
+
+		// Try to read tags from commonDir/refs/tags/
+		tags, err := getTagsFromGitDir(log, commonDir, commitSHA)
+		if err != nil {
+			log.Debug("failed to read tags from git dir, falling back to git command",
+				zap.Error(err),
+			)
+			return getTagsViaGitCommand(log, repoPath, commitSHA)
+		}
+		return tags, nil
 	}
 
 	repo, err := git.PlainOpen(repoPath)
@@ -363,6 +422,77 @@ func GetTagsForCommit(log logging.Logger, repoPath string, commitSHA string) ([]
 	return matchingTags, nil
 }
 
+// getCommonDir returns the common git directory for a worktree.
+// Worktrees have a "commondir" file that points to the main repository's .git directory.
+func getCommonDir(gitDir string) string {
+	commonDirPath := filepath.Join(gitDir, "commondir")
+	content, err := os.ReadFile(commonDirPath)
+	if err != nil {
+		// If no commondir file, gitDir itself is the common dir
+		return gitDir
+	}
+
+	commonDir := strings.TrimSpace(string(content))
+	// If relative, resolve it relative to gitDir
+	if !filepath.IsAbs(commonDir) {
+		commonDir = filepath.Join(gitDir, commonDir)
+	}
+
+	return commonDir
+}
+
+// getTagsFromGitDir reads tags directly from the git directory
+func getTagsFromGitDir(log logging.Logger, commonDir string, commitSHA string) ([]string, error) {
+	tagsDir := filepath.Join(commonDir, "refs", "tags")
+
+	// Check if tags directory exists
+	if _, err := os.Stat(tagsDir); os.IsNotExist(err) {
+		return []string{}, nil // No tags
+	}
+
+	var matchingTags []string
+
+	// Walk the tags directory
+	err := filepath.Walk(tagsDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		// Read the tag file to get the commit SHA it points to
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		tagSHA := strings.TrimSpace(string(content))
+
+		// Check if this tag points to our commit
+		if tagSHA == commitSHA || (len(tagSHA) >= 8 && tagSHA[:8] == commitSHA) {
+			// Get tag name from path
+			tagName := strings.TrimPrefix(path, tagsDir+string(filepath.Separator))
+			matchingTags = append(matchingTags, tagName)
+			log.Debug("found matching tag from git dir",
+				zap.String("tag", tagName),
+				zap.String("sha", tagSHA),
+			)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, stacktrace.Errorf("failed to walk tags directory: %w", err)
+	}
+
+	log.Debug("finished reading tags from git dir",
+		zap.Int("matchingCount", len(matchingTags)),
+	)
+
+	return matchingTags, nil
+}
+
 // getTagsViaGitCommand is a fallback for worktrees where go-git doesn't work properly
 func getTagsViaGitCommand(log logging.Logger, repoPath string, commitSHA string) ([]string, error) {
 	cmd := exec.Command("git", "tag", "--points-at", commitSHA)
@@ -406,14 +536,25 @@ func GetBranchesForCommit(log logging.Logger, repoPath string, commitSHA string)
 	)
 
 	// Check if this is a worktree
-	_, isWorktree, err := getGitDir(repoPath)
+	gitDir, isWorktree, err := getGitDir(repoPath)
 	if err != nil {
 		return nil, stacktrace.Errorf("failed to get git directory: %w", err)
 	}
 
 	if isWorktree {
-		log.Debug("detected worktree, using git command")
-		return getBranchesViaGitCommand(log, repoPath, commitSHA)
+		log.Debug("detected worktree, trying to read branches from git directory")
+		// Get the common git directory (where branches are stored)
+		commonDir := getCommonDir(gitDir)
+
+		// Try to read branches from commonDir/refs/heads/
+		branches, err := getBranchesFromGitDir(log, commonDir, commitSHA)
+		if err != nil {
+			log.Debug("failed to read branches from git dir, falling back to git command",
+				zap.Error(err),
+			)
+			return getBranchesViaGitCommand(log, repoPath, commitSHA)
+		}
+		return branches, nil
 	}
 
 	repo, err := git.PlainOpen(repoPath)
@@ -451,6 +592,58 @@ func GetBranchesForCommit(log logging.Logger, repoPath string, commitSHA string)
 	log.Debug("finished getting branches for commit",
 		zap.Int("matchingCount", len(matchingBranches)),
 		zap.Strings("branches", matchingBranches),
+	)
+
+	return matchingBranches, nil
+}
+
+// getBranchesFromGitDir reads branches directly from the git directory
+func getBranchesFromGitDir(log logging.Logger, commonDir string, commitSHA string) ([]string, error) {
+	branchesDir := filepath.Join(commonDir, "refs", "heads")
+
+	// Check if branches directory exists
+	if _, err := os.Stat(branchesDir); os.IsNotExist(err) {
+		return []string{}, nil // No branches
+	}
+
+	var matchingBranches []string
+
+	// Walk the branches directory
+	err := filepath.Walk(branchesDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		// Read the branch file to get the commit SHA it points to
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		branchSHA := strings.TrimSpace(string(content))
+
+		// Check if this branch points to our commit
+		if branchSHA == commitSHA || (len(branchSHA) >= 8 && branchSHA[:8] == commitSHA) {
+			// Get branch name from path
+			branchName := strings.TrimPrefix(path, branchesDir+string(filepath.Separator))
+			matchingBranches = append(matchingBranches, branchName)
+			log.Debug("found matching branch from git dir",
+				zap.String("branch", branchName),
+				zap.String("sha", branchSHA),
+			)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, stacktrace.Errorf("failed to walk branches directory: %w", err)
+	}
+
+	log.Debug("finished reading branches from git dir",
+		zap.Int("matchingCount", len(matchingBranches)),
 	)
 
 	return matchingBranches, nil
