@@ -54,6 +54,38 @@ Examples of knowledge to document immediately:
 
 5. **Refactor** - Improve code quality while keeping tests green
 
+### When Fixing Bugs: TEST FIRST, ALWAYS
+
+**CRITICAL LESSON**: When a bug is discovered (whether through manual testing, user report, or code review), the SECOND step after identifying the nature of the problem is to write a test that reproduces it. **DO NOT jump straight to fixing the code.**
+
+**Why this matters:**
+1. **Faster iteration** - A failing test provides immediate feedback when you fix the code, without needing to manually reproduce the issue
+2. **Prevents regression** - The test ensures this bug never comes back
+3. **Documents the bug** - The test serves as living documentation of what went wrong
+4. **Poor test coverage is the root cause** - If a bug reached production/manual testing, it means test coverage was inadequate
+
+**The Bug-Fix Workflow:**
+1. **Identify the bug** - Understand what's failing and why
+2. **Write a test that reproduces the bug** - The test should fail initially
+3. **Verify the test fails** - Run the test to confirm it catches the bug
+4. **Fix the code** - Make minimal changes to make the test pass
+5. **Verify the test passes** - Confirm the fix works
+6. **Add additional tests** - Cover related corner cases you may have missed
+
+**Example from this codebase:**
+- **Bug**: `polyrepo sync coreth` failed with "couldn't find remote ref refs/heads/v0.15.4-rc.4"
+- **Root cause**: Tags were being treated as branches (refs/heads/ vs refs/tags/)
+- **What went wrong**: No test coverage for cloning with tag references - only branches and SHAs were tested
+- **Correct approach**:
+  1. Identify that CloneRepo lacks tag handling
+  2. Write test: `TestCloneRepo_WithTag` that clones a repo using a tag reference
+  3. See it fail with the exact error from manual testing
+  4. Fix the code to detect and handle tags
+  5. See the test pass
+  6. Add more tag tests (annotated tags, lightweight tags, etc.)
+
+**Remember**: Every bug that makes it to manual testing or production represents a gap in test coverage. Fill that gap IMMEDIATELY with automated tests before fixing the bug.
+
 ### Proactive Detection Over Error-Based Fallbacks
 
 **Bad Pattern (Error-Based Detection):**

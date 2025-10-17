@@ -82,12 +82,23 @@ func CloneRepo(log logging.Logger, url, path, ref string, depth int) error {
 	)
 
 	if ref != "" && !isSHA {
-		opts.ReferenceName = plumbing.NewBranchReferenceName(ref)
+		// Proactively detect if this is a tag or branch based on naming convention
+		// Tags typically start with 'v' followed by a digit (v1.2.3, v0.15.4-rc.4)
+		isTag := looksLikeTag(ref)
+		if isTag {
+			opts.ReferenceName = plumbing.NewTagReferenceName(ref)
+			log.Debug("configuring git clone for tag",
+				zap.String("tag", ref),
+				zap.Bool("singleBranch", true),
+			)
+		} else {
+			opts.ReferenceName = plumbing.NewBranchReferenceName(ref)
+			log.Debug("configuring git clone for branch",
+				zap.String("branch", ref),
+				zap.Bool("singleBranch", true),
+			)
+		}
 		opts.SingleBranch = true
-		log.Debug("configuring git clone for branch/tag",
-			zap.String("referenceName", ref),
-			zap.Bool("singleBranch", true),
-		)
 	} else {
 		// For SHA or no ref, clone default branch only
 		opts.SingleBranch = true
@@ -120,6 +131,12 @@ func looksLikeSHA(ref string) bool {
 		}
 	}
 	return true
+}
+
+// looksLikeTag returns true if the ref looks like a version tag
+// Tags typically start with 'v' followed by a digit (e.g., v1.2.3, v0.15.4-rc.4)
+func looksLikeTag(ref string) bool {
+	return len(ref) >= 2 && ref[0] == 'v' && ref[1] >= '0' && ref[1] <= '9'
 }
 
 // CheckoutRef checks out a specific ref (tag, branch, or commit) in a repository
