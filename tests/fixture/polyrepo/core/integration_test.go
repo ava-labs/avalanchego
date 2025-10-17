@@ -207,7 +207,7 @@ func TestGetRepoStatus_NotCloned(t *testing.T) {
 	log := logging.NoLog{}
 	tmpDir := t.TempDir()
 
-	status, err := GetRepoStatus(log, "firewood", tmpDir, "")
+	status, err := GetRepoStatus(log, "firewood", tmpDir, "", false)
 	require.NoError(t, err, "failed to get status")
 	require.False(t, status.Exists, "expected repo to not exist")
 	require.Equal(t, "firewood", status.Name)
@@ -226,7 +226,7 @@ func TestGetRepoStatus_Cloned(t *testing.T) {
 	err = CloneRepo(log, config.GitRepo, clonePath, config.DefaultBranch, 1)
 	require.NoError(t, err, "failed to clone")
 
-	status, err := GetRepoStatus(log, "firewood", tmpDir, "")
+	status, err := GetRepoStatus(log, "firewood", tmpDir, "", false)
 	require.NoError(t, err, "failed to get status")
 	require.True(t, status.Exists, "expected repo to exist")
 	require.Equal(t, config.DefaultBranch, status.CurrentRef)
@@ -263,7 +263,7 @@ require github.com/ava-labs/firewood/ffi v0.0.0
 	require.NoError(t, err, "failed to add replace directive")
 
 	// Get status
-	status, err := GetRepoStatus(log, "firewood", tmpDir, goModPath)
+	status, err := GetRepoStatus(log, "firewood", tmpDir, goModPath, false)
 	require.NoError(t, err, "failed to get status")
 	require.True(t, status.HasReplace, "expected replace directive to be detected")
 	require.Equal(t, replacePath, status.ReplacePath)
@@ -386,8 +386,7 @@ require (
 
 	// Create coreth directory with go.mod
 	corethDir := filepath.Join(tmpDir, "coreth")
-	err = os.MkdirAll(corethDir, 0o755)
-	require.NoError(t, err, "failed to create coreth dir")
+	require.NoError(t, os.MkdirAll(corethDir, 0o755), "failed to create coreth dir")
 
 	corethGoModPath := filepath.Join(corethDir, "go.mod")
 	corethGoModContent := `module github.com/ava-labs/coreth
@@ -404,8 +403,7 @@ require (
 
 	// Create firewood directory with go.mod in ffi subdir
 	firewoodFFIDir := filepath.Join(tmpDir, "firewood", "ffi")
-	err = os.MkdirAll(firewoodFFIDir, 0o755)
-	require.NoError(t, err, "failed to create firewood ffi dir")
+	require.NoError(t, os.MkdirAll(firewoodFFIDir, 0o755), "failed to create firewood ffi dir")
 
 	firewoodGoModPath := filepath.Join(firewoodFFIDir, "go.mod")
 	firewoodGoModContent := `module github.com/ava-labs/firewood/ffi
@@ -591,13 +589,11 @@ func TestUpdateAllReplaceDirectives_MultipleRepos(t *testing.T) {
 				var goModPath string
 				if repoName == "firewood" {
 					repoDir = filepath.Join(tmpDir, "firewood", "ffi")
-					err = os.MkdirAll(repoDir, 0o755)
-					require.NoError(t, err)
+					require.NoError(t, os.MkdirAll(repoDir, 0o755))
 					goModPath = filepath.Join(repoDir, "go.mod")
 				} else {
 					repoDir = filepath.Join(tmpDir, repoName)
-					err = os.MkdirAll(repoDir, 0o755)
-					require.NoError(t, err)
+					require.NoError(t, os.MkdirAll(repoDir, 0o755))
 					goModPath = filepath.Join(repoDir, "go.mod")
 				}
 
@@ -624,4 +620,101 @@ func TestUpdateAllReplaceDirectives_MultipleRepos(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestDetectCurrentRepo_FromAvalanchego tests that DetectCurrentRepo correctly identifies avalanchego
+func TestDetectCurrentRepo_FromAvalanchego(t *testing.T) {
+	log := logging.NoLog{}
+	tmpDir := t.TempDir()
+
+	// Create avalanchego go.mod
+	goModPath := filepath.Join(tmpDir, "go.mod")
+	goModContent := `module github.com/ava-labs/avalanchego
+
+go 1.24
+`
+	err := os.WriteFile(goModPath, []byte(goModContent), 0o600)
+	require.NoError(t, err, "failed to write go.mod")
+
+	// Detect current repo
+	detectedRepo, err := DetectCurrentRepo(log, tmpDir)
+	require.NoError(t, err, "DetectCurrentRepo failed")
+	require.Equal(t, "avalanchego", detectedRepo, "expected to detect avalanchego")
+
+	// Test GetRepoStatus with isPrimary = true
+	status, err := GetRepoStatus(log, "avalanchego", tmpDir, goModPath, true)
+	require.NoError(t, err, "GetRepoStatus failed")
+	require.Equal(t, "avalanchego", status.Name)
+	require.Equal(t, tmpDir, status.Path, "expected path to be tmpDir for primary repo")
+}
+
+// TestDetectCurrentRepo_FromCoreth tests that DetectCurrentRepo correctly identifies coreth
+func TestDetectCurrentRepo_FromCoreth(t *testing.T) {
+	log := logging.NoLog{}
+	tmpDir := t.TempDir()
+
+	// Create coreth go.mod
+	goModPath := filepath.Join(tmpDir, "go.mod")
+	goModContent := `module github.com/ava-labs/coreth
+
+go 1.24
+`
+	err := os.WriteFile(goModPath, []byte(goModContent), 0o600)
+	require.NoError(t, err, "failed to write go.mod")
+
+	// Detect current repo
+	detectedRepo, err := DetectCurrentRepo(log, tmpDir)
+	require.NoError(t, err, "DetectCurrentRepo failed")
+	require.Equal(t, "coreth", detectedRepo, "expected to detect coreth")
+
+	// Test GetRepoStatus with isPrimary = true
+	status, err := GetRepoStatus(log, "coreth", tmpDir, goModPath, true)
+	require.NoError(t, err, "GetRepoStatus failed")
+	require.Equal(t, "coreth", status.Name)
+	require.Equal(t, tmpDir, status.Path, "expected path to be tmpDir for primary repo")
+}
+
+// TestDetectCurrentRepo_FromFirewood tests that DetectCurrentRepo correctly identifies firewood
+func TestDetectCurrentRepo_FromFirewood(t *testing.T) {
+	log := logging.NoLog{}
+	tmpDir := t.TempDir()
+
+	// Create firewood ffi/go.mod (special case)
+	ffiDir := filepath.Join(tmpDir, "ffi")
+	err := os.MkdirAll(ffiDir, 0o755)
+	require.NoError(t, err, "failed to create ffi dir")
+
+	goModPath := filepath.Join(ffiDir, "go.mod")
+	goModContent := `module github.com/ava-labs/firewood/ffi
+
+go 1.24
+`
+	err = os.WriteFile(goModPath, []byte(goModContent), 0o600)
+	require.NoError(t, err, "failed to write go.mod")
+
+	// Detect current repo
+	detectedRepo, err := DetectCurrentRepo(log, tmpDir)
+	require.NoError(t, err, "DetectCurrentRepo failed")
+	require.Equal(t, "firewood", detectedRepo, "expected to detect firewood")
+
+	// Test GetRepoStatus with isPrimary = true
+	// Note: goModPath for firewood is ffi/go.mod
+	status, err := GetRepoStatus(log, "firewood", tmpDir, goModPath, true)
+	require.NoError(t, err, "GetRepoStatus failed")
+	require.Equal(t, "firewood", status.Name)
+	require.Equal(t, tmpDir, status.Path, "expected path to be tmpDir for primary repo")
+}
+
+// TestDetectCurrentRepo_FromUnknownLocation tests that DetectCurrentRepo returns empty string
+// when not in a known repository
+func TestDetectCurrentRepo_FromUnknownLocation(t *testing.T) {
+	log := logging.NoLog{}
+	tmpDir := t.TempDir()
+
+	// Don't create any go.mod
+
+	// Detect current repo
+	detectedRepo, err := DetectCurrentRepo(log, tmpDir)
+	require.NoError(t, err, "DetectCurrentRepo failed")
+	require.Equal(t, "", detectedRepo, "expected empty string for unknown location")
 }

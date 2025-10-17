@@ -21,15 +21,25 @@ type RepoStatus struct {
 }
 
 // GetRepoStatus returns the status of a repository
-func GetRepoStatus(log logging.Logger, repoName, baseDir, goModPath string) (*RepoStatus, error) {
+// If isPrimary is true, the repo path is baseDir itself (we're currently in this repo)
+// If isPrimary is false, the repo path is baseDir/repoName (synced repo)
+func GetRepoStatus(log logging.Logger, repoName, baseDir, goModPath string, isPrimary bool) (*RepoStatus, error) {
 	config, err := GetRepoConfig(repoName)
 	if err != nil {
 		return nil, err
 	}
 
+	// Determine the path to the repository
+	var repoPath string
+	if isPrimary {
+		repoPath = baseDir
+	} else {
+		repoPath = GetRepoClonePath(repoName, baseDir)
+	}
+
 	status := &RepoStatus{
 		Name:   repoName,
-		Path:   GetRepoClonePath(repoName, baseDir),
+		Path:   repoPath,
 		Exists: false,
 	}
 

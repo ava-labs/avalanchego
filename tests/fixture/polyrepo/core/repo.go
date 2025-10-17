@@ -302,7 +302,7 @@ func CloneOrUpdateRepo(log logging.Logger, url, path, ref string, depth int, for
 		log.Debug("initializing empty repository")
 		initCmd := exec.Command("git", "init")
 		initCmd.Dir = path
-		if err := os.MkdirAll(path, 0755); err != nil {
+		if err := os.MkdirAll(path, 0o755); err != nil {
 			return stacktrace.Errorf("failed to create directory %s: %w", path, err)
 		}
 		if output, err := initCmd.CombinedOutput(); err != nil {
