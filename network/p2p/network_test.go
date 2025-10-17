@@ -983,3 +983,20 @@ func TestNetworkValidators_ConnectAndDisconnect(t *testing.T) {
 		})
 	}
 }
+
+func TestPeers_Has(t *testing.T) {
+	require := require.New(t)
+
+	peers := &Peers{}
+	network, err := NewNetwork(
+		logging.NoLog{},
+		&enginetest.Sender{},
+		prometheus.NewRegistry(),
+		"",
+		peers,
+	)
+	require.NoError(err)
+	require.NoError(network.Connected(context.Background(), ids.EmptyNodeID, nil))
+
+	require.True(peers.Has(ids.EmptyNodeID))
+}
