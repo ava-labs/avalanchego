@@ -235,6 +235,7 @@ Repositories will be cloned into the current directory with their repository nam
 		}
 
 		// Sync each repository
+		syncedRepoNames := make([]string, 0, len(reposToSync))
 		for _, repo := range reposToSync {
 			log.Info("syncing repository",
 				zap.String("repo", repo.name),
@@ -298,27 +299,22 @@ Repositories will be cloned into the current directory with their repository nam
 				}
 			}
 
-			// Add replace directive
-			replacePath := core.GetRepoClonePath(repo.name, baseDir)
-			if config.ModuleReplacementPath != "." {
-				replacePath = replacePath + "/" + config.ModuleReplacementPath
-			}
-
-			log.Info("adding replace directive",
-				zap.String("module", config.GoModule),
-				zap.String("path", replacePath),
-			)
-
-			err = core.AddReplaceDirective(log, goModPath, config.GoModule, replacePath)
-			if err != nil {
-				return fmt.Errorf("failed to add replace directive for %s: %w", repo.name, err)
-			}
-
 			log.Info("successfully synced repository",
 				zap.String("repo", repo.name),
 				zap.String("path", clonePath),
 				zap.String("ref", refToUse),
 			)
+
+			syncedRepoNames = append(syncedRepoNames, repo.name)
+		}
+
+		// Update all replace directives for the dependency graph
+		// This ensures that both the primary repo and all synced repos
+		// have replace directives for their locally cloned dependencies
+		log.Info("updating replace directives for all repos")
+		err = core.UpdateAllReplaceDirectives(log, baseDir, syncedRepoNames)
+		if err != nil {
+			return fmt.Errorf("failed to update replace directives: %w", err)
 		}
 
 		return nil
