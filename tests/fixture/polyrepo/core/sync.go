@@ -157,3 +157,182 @@ func GetDefaultRefForRepo(log logging.Logger, currentRepo, targetRepo, goModPath
 
 	return gitRef, nil
 }
+
+// UpdateAllReplaceDirectives updates go.mod files for all repos (primary and synced)
+// to add replace directives for any locally cloned dependencies.
+// This ensures the full dependency graph is properly configured with replace directives.
+func UpdateAllReplaceDirectives(log logging.Logger, baseDir string, syncedRepos []string) error {
+	log.Info("updating replace directives for all repos",
+		zap.String("baseDir", baseDir),
+		zap.Strings("syncedRepos", syncedRepos),
+	)
+
+	// Build a set of all repos we need to check (primary + synced)
+	allRepos := make(map[string]bool)
+
+	// Detect the primary repo
+	primaryRepo, err := DetectCurrentRepo(log, baseDir)
+	if err != nil {
+		return stacktrace.Errorf("failed to detect current repo: %w", err)
+	}
+
+	if primaryRepo != "" {
+		allRepos[primaryRepo] = true
+		log.Debug("detected primary repository",
+			zap.String("repo", primaryRepo),
+		)
+	}
+
+	// Add all synced repos
+	for _, repo := range syncedRepos {
+		allRepos[repo] = true
+	}
+
+	log.Info("identified all repos to update",
+		zap.Int("count", len(allRepos)),
+	)
+
+	// For each repo, check if it exists and has a go.mod
+	for repoName := range allRepos {
+		config, err := GetRepoConfig(repoName)
+		if err != nil {
+			log.Warn("failed to get config for repo, skipping",
+				zap.String("repo", repoName),
+				zap.Error(err),
+			)
+			continue
+		}
+
+		// Determine the go.mod path for this repo
+		var goModPath string
+		if repoName == primaryRepo {
+			// Primary repo - use go.mod in base directory
+			goModPath = filepath.Join(baseDir, config.GoModPath)
+		} else {
+			// Synced repo - use go.mod in the cloned directory
+			clonePath := GetRepoClonePath(repoName, baseDir)
+			goModPath = filepath.Join(clonePath, config.GoModPath)
+		}
+
+		// Check if go.mod exists
+		if _, err := os.Stat(goModPath); err != nil {
+			if os.IsNotExist(err) {
+				log.Debug("go.mod does not exist for repo, skipping",
+					zap.String("repo", repoName),
+					zap.String("goModPath", goModPath),
+				)
+				continue
+			}
+			return stacktrace.Errorf("failed to stat go.mod for %s: %w", repoName, err)
+		}
+
+		log.Debug("checking dependencies for repo",
+			zap.String("repo", repoName),
+			zap.String("goModPath", goModPath),
+		)
+
+		// For each other repo, check if this repo depends on it
+		for otherRepoName := range allRepos {
+			if otherRepoName == repoName {
+				continue // Skip self
+			}
+
+			otherConfig, err := GetRepoConfig(otherRepoName)
+			if err != nil {
+				log.Warn("failed to get config for other repo, skipping",
+					zap.String("otherRepo", otherRepoName),
+					zap.Error(err),
+				)
+				continue
+			}
+
+			// Check if this repo's go.mod depends on the other repo
+			_, err = GetDependencyVersion(log, goModPath, otherConfig.GoModule)
+			if err != nil {
+				// Dependency not found, skip
+				log.Debug("repo does not depend on other repo",
+					zap.String("repo", repoName),
+					zap.String("otherRepo", otherRepoName),
+					zap.String("module", otherConfig.GoModule),
+				)
+				continue
+			}
+
+			log.Info("found dependency, adding replace directive",
+				zap.String("repo", repoName),
+				zap.String("dependency", otherRepoName),
+				zap.String("module", otherConfig.GoModule),
+			)
+
+			// Calculate the replace path (always relative)
+			var replacePath string
+			if otherRepoName == primaryRepo {
+				// Dependency is the primary repo
+				// Path is relative from the synced repo to the base dir
+				if repoName == primaryRepo {
+					// This shouldn't happen (self-dependency), but handle it
+					log.Warn("unexpected self-dependency on primary repo",
+						zap.String("repo", repoName),
+					)
+					continue
+				}
+				// From synced repo back to base dir
+				replacePath = ".."
+				if otherConfig.ModuleReplacementPath != "." {
+					// Strip leading ./ from ModuleReplacementPath if present
+					modPath := otherConfig.ModuleReplacementPath
+					if len(modPath) >= 2 && modPath[0:2] == "./" {
+						modPath = modPath[2:]
+					}
+					replacePath = filepath.Join(replacePath, modPath)
+				}
+			} else {
+				// Dependency is another synced repo
+				if repoName == primaryRepo {
+					// From primary repo to synced repo
+					// filepath.Join normalizes away ./ so we build it manually
+					replacePath = otherRepoName
+					if otherConfig.ModuleReplacementPath != "." {
+						// Strip leading ./ from ModuleReplacementPath if present
+						modPath := otherConfig.ModuleReplacementPath
+						if len(modPath) >= 2 && modPath[0:2] == "./" {
+							modPath = modPath[2:]
+						}
+						replacePath = filepath.Join(replacePath, modPath)
+					}
+					// Prepend ./ after all joins to ensure valid go.mod syntax
+					replacePath = "./" + replacePath
+				} else {
+					// From synced repo to another synced repo (sibling)
+					replacePath = otherRepoName
+					if otherConfig.ModuleReplacementPath != "." {
+						// Strip leading ./ from ModuleReplacementPath if present
+						modPath := otherConfig.ModuleReplacementPath
+						if len(modPath) >= 2 && modPath[0:2] == "./" {
+							modPath = modPath[2:]
+						}
+						replacePath = filepath.Join(replacePath, modPath)
+					}
+					// Prepend ../ for sibling repos
+					replacePath = "../" + replacePath
+				}
+			}
+
+			log.Info("adding replace directive",
+				zap.String("repo", repoName),
+				zap.String("goModPath", goModPath),
+				zap.String("module", otherConfig.GoModule),
+				zap.String("replacePath", replacePath),
+			)
+
+			err = AddReplaceDirective(log, goModPath, otherConfig.GoModule, replacePath)
+			if err != nil {
+				return stacktrace.Errorf("failed to add replace directive for %s in %s: %w",
+					otherRepoName, repoName, err)
+			}
+		}
+	}
+
+	log.Info("successfully updated all replace directives")
+	return nil
+}

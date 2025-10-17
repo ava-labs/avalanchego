@@ -363,3 +363,265 @@ require github.com/ava-labs/avalanchego v1.13.6-0.20251007213349-63cc1a166a56
 	require.True(t, len(currentRef) >= len(expectedHash), "current ref too short")
 	require.Equal(t, expectedHash, currentRef[:len(expectedHash)], "expected commit starting with %s, got %s", expectedHash, currentRef)
 }
+
+// TestUpdateAllReplaceDirectives_FromAvalanchego tests that syncing from avalanchego
+// properly updates replace directives in all repos including synced repos
+func TestUpdateAllReplaceDirectives_FromAvalanchego(t *testing.T) {
+	log := logging.NoLog{}
+	tmpDir := t.TempDir()
+
+	// Create a primary avalanchego go.mod
+	primaryGoModPath := filepath.Join(tmpDir, "go.mod")
+	primaryGoModContent := `module github.com/ava-labs/avalanchego
+
+go 1.24
+
+require (
+	github.com/ava-labs/coreth v0.15.4
+	github.com/ava-labs/firewood/ffi v0.0.12
+)
+`
+	err := os.WriteFile(primaryGoModPath, []byte(primaryGoModContent), 0o600)
+	require.NoError(t, err, "failed to write primary go.mod")
+
+	// Create coreth directory with go.mod
+	corethDir := filepath.Join(tmpDir, "coreth")
+	err = os.MkdirAll(corethDir, 0o755)
+	require.NoError(t, err, "failed to create coreth dir")
+
+	corethGoModPath := filepath.Join(corethDir, "go.mod")
+	corethGoModContent := `module github.com/ava-labs/coreth
+
+go 1.24
+
+require (
+	github.com/ava-labs/avalanchego v1.13.6
+	github.com/ava-labs/firewood/ffi v0.0.12
+)
+`
+	err = os.WriteFile(corethGoModPath, []byte(corethGoModContent), 0o600)
+	require.NoError(t, err, "failed to write coreth go.mod")
+
+	// Create firewood directory with go.mod in ffi subdir
+	firewoodFFIDir := filepath.Join(tmpDir, "firewood", "ffi")
+	err = os.MkdirAll(firewoodFFIDir, 0o755)
+	require.NoError(t, err, "failed to create firewood ffi dir")
+
+	firewoodGoModPath := filepath.Join(firewoodFFIDir, "go.mod")
+	firewoodGoModContent := `module github.com/ava-labs/firewood/ffi
+
+go 1.24
+`
+	err = os.WriteFile(firewoodGoModPath, []byte(firewoodGoModContent), 0o600)
+	require.NoError(t, err, "failed to write firewood go.mod")
+
+	// Call UpdateAllReplaceDirectives
+	syncedRepos := []string{"coreth", "firewood"}
+	err = UpdateAllReplaceDirectives(log, tmpDir, syncedRepos)
+	require.NoError(t, err, "UpdateAllReplaceDirectives failed")
+
+	// Verify avalanchego go.mod has replace directives for coreth and firewood
+	avalanchegoMod, err := ReadGoMod(log, primaryGoModPath)
+	require.NoError(t, err, "failed to read avalanchego go.mod")
+
+	hasCorethReplace := false
+	hasFirewoodReplace := false
+	for _, r := range avalanchegoMod.Replace {
+		if r.Old.Path == "github.com/ava-labs/coreth" {
+			hasCorethReplace = true
+			require.Equal(t, "./coreth", r.New.Path, "unexpected coreth replace path")
+		}
+		if r.Old.Path == "github.com/ava-labs/firewood/ffi" {
+			hasFirewoodReplace = true
+			require.Equal(t, "./firewood/ffi/result/ffi", r.New.Path, "unexpected firewood replace path")
+		}
+	}
+	require.True(t, hasCorethReplace, "avalanchego should have replace for coreth")
+	require.True(t, hasFirewoodReplace, "avalanchego should have replace for firewood")
+
+	// Verify coreth go.mod has replace directives for avalanchego and firewood
+	corethMod, err := ReadGoMod(log, corethGoModPath)
+	require.NoError(t, err, "failed to read coreth go.mod")
+
+	hasAvalanchegoReplace := false
+	hasFirewoodReplaceInCoreth := false
+	for _, r := range corethMod.Replace {
+		if r.Old.Path == "github.com/ava-labs/avalanchego" {
+			hasAvalanchegoReplace = true
+			require.Equal(t, "..", r.New.Path, "unexpected avalanchego replace path from coreth")
+		}
+		if r.Old.Path == "github.com/ava-labs/firewood/ffi" {
+			hasFirewoodReplaceInCoreth = true
+			require.Equal(t, "../firewood/ffi/result/ffi", r.New.Path, "unexpected firewood replace path from coreth")
+		}
+	}
+	require.True(t, hasAvalanchegoReplace, "coreth should have replace for avalanchego")
+	require.True(t, hasFirewoodReplaceInCoreth, "coreth should have replace for firewood")
+}
+
+// TestUpdateAllReplaceDirectives_MultipleRepos tests all repo combinations
+func TestUpdateAllReplaceDirectives_MultipleRepos(t *testing.T) {
+	testCases := []struct {
+		name          string
+		primaryRepo   string
+		syncedRepos   []string
+		primaryModule string
+		primaryDeps   []string
+		corethDeps    []string
+		verifyFunc    func(t *testing.T, tmpDir string)
+	}{
+		{
+			name:          "sync from avalanchego",
+			primaryRepo:   "avalanchego",
+			syncedRepos:   []string{"coreth", "firewood"},
+			primaryModule: "github.com/ava-labs/avalanchego",
+			primaryDeps:   []string{"github.com/ava-labs/coreth", "github.com/ava-labs/firewood/ffi"},
+			corethDeps:    []string{"github.com/ava-labs/avalanchego", "github.com/ava-labs/firewood/ffi"},
+			verifyFunc: func(t *testing.T, tmpDir string) {
+				log := logging.NoLog{}
+
+				// Check avalanchego has replaces for coreth and firewood
+				avalanchegoMod, err := ReadGoMod(log, filepath.Join(tmpDir, "go.mod"))
+				require.NoError(t, err)
+
+				replaces := make(map[string]string)
+				for _, r := range avalanchegoMod.Replace {
+					replaces[r.Old.Path] = r.New.Path
+				}
+
+				require.Contains(t, replaces, "github.com/ava-labs/coreth", "avalanchego should have coreth replace")
+				require.Contains(t, replaces, "github.com/ava-labs/firewood/ffi", "avalanchego should have firewood replace")
+
+				// Check coreth has replaces for avalanchego and firewood
+				corethMod, err := ReadGoMod(log, filepath.Join(tmpDir, "coreth", "go.mod"))
+				require.NoError(t, err)
+
+				corethReplaces := make(map[string]string)
+				for _, r := range corethMod.Replace {
+					corethReplaces[r.Old.Path] = r.New.Path
+				}
+
+				require.Contains(t, corethReplaces, "github.com/ava-labs/avalanchego", "coreth should have avalanchego replace")
+				require.Contains(t, corethReplaces, "github.com/ava-labs/firewood/ffi", "coreth should have firewood replace")
+				require.Equal(t, "..", corethReplaces["github.com/ava-labs/avalanchego"], "coreth should point to parent dir for avalanchego")
+			},
+		},
+		{
+			name:          "sync firewood only from avalanchego",
+			primaryRepo:   "avalanchego",
+			syncedRepos:   []string{"firewood"},
+			primaryModule: "github.com/ava-labs/avalanchego",
+			primaryDeps:   []string{"github.com/ava-labs/firewood/ffi"},
+			corethDeps:    nil, // coreth not synced
+			verifyFunc: func(t *testing.T, tmpDir string) {
+				log := logging.NoLog{}
+
+				// Check avalanchego has replace for firewood
+				avalanchegoMod, err := ReadGoMod(log, filepath.Join(tmpDir, "go.mod"))
+				require.NoError(t, err)
+
+				hasFirewood := false
+				for _, r := range avalanchegoMod.Replace {
+					if r.Old.Path == "github.com/ava-labs/firewood/ffi" {
+						hasFirewood = true
+					}
+				}
+				require.True(t, hasFirewood, "avalanchego should have firewood replace")
+			},
+		},
+		{
+			name:          "sync coreth only from avalanchego",
+			primaryRepo:   "avalanchego",
+			syncedRepos:   []string{"coreth"},
+			primaryModule: "github.com/ava-labs/avalanchego",
+			primaryDeps:   []string{"github.com/ava-labs/coreth"},
+			corethDeps:    []string{"github.com/ava-labs/avalanchego"},
+			verifyFunc: func(t *testing.T, tmpDir string) {
+				log := logging.NoLog{}
+
+				// Check avalanchego has replace for coreth
+				avalanchegoMod, err := ReadGoMod(log, filepath.Join(tmpDir, "go.mod"))
+				require.NoError(t, err)
+
+				hasCoreth := false
+				for _, r := range avalanchegoMod.Replace {
+					if r.Old.Path == "github.com/ava-labs/coreth" {
+						hasCoreth = true
+					}
+				}
+				require.True(t, hasCoreth, "avalanchego should have coreth replace")
+
+				// Check coreth has replace for avalanchego
+				corethMod, err := ReadGoMod(log, filepath.Join(tmpDir, "coreth", "go.mod"))
+				require.NoError(t, err)
+
+				hasAvalanchego := false
+				for _, r := range corethMod.Replace {
+					if r.Old.Path == "github.com/ava-labs/avalanchego" {
+						hasAvalanchego = true
+						require.Equal(t, "..", r.New.Path)
+					}
+				}
+				require.True(t, hasAvalanchego, "coreth should have avalanchego replace")
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			log := logging.NoLog{}
+			tmpDir := t.TempDir()
+
+			// Create primary repo go.mod
+			primaryGoModPath := filepath.Join(tmpDir, "go.mod")
+			primaryGoModContent := "module " + tc.primaryModule + "\n\ngo 1.24\n\nrequire (\n"
+			for _, dep := range tc.primaryDeps {
+				primaryGoModContent += "\t" + dep + " v0.0.1\n"
+			}
+			primaryGoModContent += ")\n"
+			err := os.WriteFile(primaryGoModPath, []byte(primaryGoModContent), 0o600)
+			require.NoError(t, err, "failed to write primary go.mod")
+
+			// Create synced repos
+			for _, repoName := range tc.syncedRepos {
+				config, err := GetRepoConfig(repoName)
+				require.NoError(t, err)
+
+				var repoDir string
+				var goModPath string
+				if repoName == "firewood" {
+					repoDir = filepath.Join(tmpDir, "firewood", "ffi")
+					err = os.MkdirAll(repoDir, 0o755)
+					require.NoError(t, err)
+					goModPath = filepath.Join(repoDir, "go.mod")
+				} else {
+					repoDir = filepath.Join(tmpDir, repoName)
+					err = os.MkdirAll(repoDir, 0o755)
+					require.NoError(t, err)
+					goModPath = filepath.Join(repoDir, "go.mod")
+				}
+
+				goModContent := "module " + config.GoModule + "\n\ngo 1.24\n"
+				if repoName == "coreth" && tc.corethDeps != nil {
+					goModContent += "\nrequire (\n"
+					for _, dep := range tc.corethDeps {
+						goModContent += "\t" + dep + " v0.0.1\n"
+					}
+					goModContent += ")\n"
+				}
+
+				err = os.WriteFile(goModPath, []byte(goModContent), 0o600)
+				require.NoError(t, err, "failed to write %s go.mod", repoName)
+			}
+
+			// Call UpdateAllReplaceDirectives
+			err = UpdateAllReplaceDirectives(log, tmpDir, tc.syncedRepos)
+			require.NoError(t, err, "UpdateAllReplaceDirectives failed")
+
+			// Run custom verification
+			if tc.verifyFunc != nil {
+				tc.verifyFunc(t, tmpDir)
+			}
+		})
+	}
+}
