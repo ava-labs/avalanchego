@@ -65,3 +65,6 @@ vendor
 
 # debug files
 __debug_*
+
+# polyrepo binary - use ./scripts/run_polyrepo.sh to run the tool
+tests/fixture/polyrepo/polyrepo
