@@ -295,16 +295,6 @@ impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
         self.kind.deleted.push(node);
     }
 
-    /// Take the nodes that have been marked as deleted in this proposal.
-    pub fn take_deleted_nodes(&mut self) -> Vec<MaybePersistedNode> {
-        take(&mut self.kind.deleted)
-    }
-
-    /// Adds to the nodes deleted in this proposal.
-    pub fn delete_nodes(&mut self, nodes: &[MaybePersistedNode]) {
-        self.kind.deleted.extend_from_slice(nodes);
-    }
-
     /// Reads a node for update, marking it as deleted in this proposal.
     /// We get an arc from cache (reading it from disk if necessary) then
     /// copy/clone the node and return it.
@@ -321,28 +311,6 @@ impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
     /// Returns the root of this proposal.
     pub const fn root_mut(&mut self) -> &mut Option<Node> {
         &mut self.kind.root
-    }
-}
-
-impl<S: ReadableStorage> NodeStore<MutableProposal, S> {
-    /// Creates a new [`NodeStore`] from a root node.
-    #[must_use]
-    pub fn from_root(parent: &NodeStore<MutableProposal, S>, root: Option<Node>) -> Self {
-        NodeStore {
-            header: parent.header,
-            kind: MutableProposal {
-                root,
-                deleted: Vec::default(),
-                parent: parent.kind.parent.clone(),
-            },
-            storage: parent.storage.clone(),
-        }
-    }
-
-    /// Consumes the `NodeStore` and returns the root of the trie
-    #[must_use]
-    pub fn into_root(self) -> Option<Node> {
-        self.kind.root
     }
 }
 

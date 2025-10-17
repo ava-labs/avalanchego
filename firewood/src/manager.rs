@@ -13,11 +13,10 @@
 use std::collections::{HashMap, VecDeque};
 use std::num::NonZero;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex, OnceLock, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 use firewood_storage::logger::{trace, warn};
 use metrics::gauge;
-use rayon::{ThreadPool, ThreadPoolBuilder};
 use typed_builder::TypedBuilder;
 
 use crate::merkle::Merkle;
@@ -25,8 +24,7 @@ use crate::v2::api::{ArcDynDbView, HashKey, OptionalHashKeyExt};
 
 pub use firewood_storage::CacheReadStrategy;
 use firewood_storage::{
-    BranchNode, Committed, FileBacked, FileIoError, HashedNodeReader, ImmutableProposal, NodeStore,
-    TrieHash,
+    Committed, FileBacked, FileIoError, HashedNodeReader, ImmutableProposal, NodeStore, TrieHash,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, TypedBuilder)]
@@ -77,7 +75,6 @@ pub(crate) struct RevisionManager {
     proposals: Mutex<Vec<ProposedRevision>>,
     // committing_proposals: VecDeque<Arc<ProposedImmutable>>,
     by_hash: RwLock<HashMap<TrieHash, CommittedRevision>>,
-    threadpool: OnceLock<ThreadPool>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -118,7 +115,6 @@ impl RevisionManager {
             by_hash: RwLock::new(Default::default()),
             proposals: Mutex::new(Default::default()),
             // committing_proposals: Default::default(),
-            threadpool: OnceLock::new(),
         };
 
         if let Some(hash) = nodestore.root_hash().or_default_root_hash() {
@@ -312,23 +308,6 @@ impl RevisionManager {
             .back()
             .expect("there is always one revision")
             .clone()
-    }
-
-    /// Gets or creates a threadpool associated with the revision manager.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the it cannot create a thread pool.
-    pub fn threadpool(&self) -> &ThreadPool {
-        // Note that OnceLock currently doesn't support get_or_try_init (it is available in a
-        // nightly release). The get_or_init should be replaced with get_or_try_init once it
-        // is available to allow the error to be passed back to the caller.
-        self.threadpool.get_or_init(|| {
-            ThreadPoolBuilder::new()
-                .num_threads(BranchNode::MAX_CHILDREN)
-                .build()
-                .expect("Error in creating threadpool")
-        })
     }
 }
 

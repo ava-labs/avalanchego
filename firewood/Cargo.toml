@@ -35,7 +35,6 @@ metrics.workspace = true
 thiserror.workspace = true
 # Regular dependencies
 typed-builder = "0.22.0"
-rayon = "1.11.0"
 
 [features]
 default = []

@@ -27,8 +27,6 @@ use std::sync::Arc;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 
-use crate::merkle::parallel::ParallelMerkle;
-
 #[derive(Error, Debug)]
 #[non_exhaustive]
 /// Represents the different types of errors that can occur in the database.
@@ -200,26 +198,6 @@ impl Db {
     /// Synchronously get a view, either committed or proposed
     pub fn view(&self, root_hash: HashKey) -> Result<ArcDynDbView, api::Error> {
         self.manager.view(root_hash).map_err(Into::into)
-    }
-
-    /// Propose a new batch that is processed in parallel.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the revision manager cannot create a thread pool.
-    pub fn propose_parallel(
-        &self,
-        batch: impl IntoIterator<IntoIter: KeyValuePairIter>,
-    ) -> Result<Proposal<'_>, api::Error> {
-        let parent = self.manager.current_revision();
-        let mut parallel_merkle = ParallelMerkle::default();
-        let immutable =
-            parallel_merkle.create_proposal(&parent, batch, self.manager.threadpool())?;
-        self.manager.add_proposal(immutable.clone());
-        Ok(Proposal {
-            nodestore: immutable,
-            db: self,
-        })
     }
 
     /// Dump the Trie of the latest revision.
@@ -575,164 +553,6 @@ mod test {
         let proposal_view = db.view(proposal_hash).unwrap();
         let value = proposal_view.val(b"proposal_key").unwrap().unwrap();
         assert_eq!(&*value, b"proposal_value");
-    }
-
-    #[test]
-    fn test_propose_parallel_reopen() {
-        fn insert_commit(db: &TestDb, kv: u8) {
-            let keys: Vec<[u8; 1]> = vec![[kv; 1]];
-            let vals: Vec<Box<[u8]>> = vec![Box::new([kv; 1])];
-            let kviter = keys.iter().zip(vals.iter()).map_into_batch();
-            let proposal = db.propose_parallel(kviter).unwrap();
-            proposal.commit().unwrap();
-        }
-
-        // Create, insert, close, open, insert
-        let db = TestDb::new();
-        insert_commit(&db, 1);
-        let db = db.reopen();
-        insert_commit(&db, 2);
-        // Check that the keys are still there after the commits
-        let committed = db.revision(db.root_hash().unwrap().unwrap()).unwrap();
-        let keys: Vec<[u8; 1]> = vec![[1; 1], [2; 1]];
-        let vals: Vec<Box<[u8]>> = vec![Box::new([1; 1]), Box::new([2; 1])];
-        let kviter = keys.iter().zip(vals.iter());
-        for (k, v) in kviter {
-            assert_eq!(&committed.val(k).unwrap().unwrap(), v);
-        }
-        drop(db);
-
-        // Open-db1, insert, open-db2, insert
-        let db1 = TestDb::new();
-        insert_commit(&db1, 1);
-        let db2 = TestDb::new();
-        insert_commit(&db2, 2);
-        let committed1 = db1.revision(db1.root_hash().unwrap().unwrap()).unwrap();
-        let committed2 = db2.revision(db2.root_hash().unwrap().unwrap()).unwrap();
-        let keys: Vec<[u8; 1]> = vec![[1; 1], [2; 1]];
-        let vals: Vec<Box<[u8]>> = vec![Box::new([1; 1]), Box::new([2; 1])];
-        let mut kviter = keys.iter().zip(vals.iter());
-        let (k, v) = kviter.next().unwrap();
-        assert_eq!(&committed1.val(k).unwrap().unwrap(), v);
-        let (k, v) = kviter.next().unwrap();
-        assert_eq!(&committed2.val(k).unwrap().unwrap(), v);
-    }
-
-    #[test]
-    fn test_propose_parallel() {
-        const N: usize = 100;
-        let db = TestDb::new();
-
-        // Test an empty proposal
-        let keys: Vec<[u8; 0]> = Vec::new();
-        let vals: Vec<Box<[u8]>> = Vec::new();
-
-        let kviter = keys.iter().zip(vals.iter()).map_into_batch();
-        let proposal = db.propose_parallel(kviter).unwrap();
-        proposal.commit().unwrap();
-
-        // Create a proposal consisting of a single entry and an empty key.
-        let keys: Vec<[u8; 0]> = vec![[0; 0]];
-
-        // Note that if the value is [], then it is interpreted as a DeleteRange.
-        // Instead, set value to [0]
-        let vals: Vec<Box<[u8]>> = vec![Box::new([0; 1])];
-
-        let kviter = keys.iter().zip(vals.iter()).map_into_batch();
-        let proposal = db.propose_parallel(kviter).unwrap();
-
-        let kviter = keys.iter().zip(vals.iter());
-        for (k, v) in kviter {
-            assert_eq!(&proposal.val(k).unwrap().unwrap(), v);
-        }
-        proposal.commit().unwrap();
-
-        // Check that the key is still there after the commit
-        let committed = db.revision(db.root_hash().unwrap().unwrap()).unwrap();
-        let kviter = keys.iter().zip(vals.iter());
-        for (k, v) in kviter {
-            assert_eq!(&committed.val(k).unwrap().unwrap(), v);
-        }
-
-        // Create a proposal that deletes the previous entry
-        let vals: Vec<Box<[u8]>> = vec![Box::new([0; 0])];
-        let kviter = keys.iter().zip(vals.iter()).map_into_batch();
-        let proposal = db.propose_parallel(kviter).unwrap();
-
-        let kviter = keys.iter().zip(vals.iter());
-        for (k, _v) in kviter {
-            assert_eq!(proposal.val(k).unwrap(), None);
-        }
-        proposal.commit().unwrap();
-
-        // Create a proposal that inserts 0 to 999
-        let (keys, vals): (Vec<_>, Vec<_>) = (0..1000)
-            .map(|i| {
-                (
-                    format!("key{i}").into_bytes(),
-                    Box::from(format!("value{i}").as_bytes()),
-                )
-            })
-            .unzip();
-
-        let kviter = keys.iter().zip(vals.iter()).map_into_batch();
-        let proposal = db.propose_parallel(kviter).unwrap();
-        let kviter = keys.iter().zip(vals.iter());
-        for (k, v) in kviter {
-            assert_eq!(&proposal.val(k).unwrap().unwrap(), v);
-        }
-        proposal.commit().unwrap();
-
-        // Create a proposal that deletes all of the even entries
-        let (keys, vals): (Vec<_>, Vec<_>) = (0..1000)
-            .filter_map(|i| {
-                if i % 2 != 0 {
-                    Some::<(Vec<u8>, Box<[u8]>)>((format!("key{i}").into_bytes(), Box::new([])))
-                } else {
-                    None
-                }
-            })
-            .unzip();
-
-        let kviter = keys.iter().zip(vals.iter()).map_into_batch();
-        let proposal = db.propose_parallel(kviter).unwrap();
-        let kviter = keys.iter().zip(vals.iter());
-        for (k, _v) in kviter {
-            assert_eq!(proposal.val(k).unwrap(), None);
-        }
-        proposal.commit().unwrap();
-
-        // Create a proposal that deletes using empty prefix
-        let keys: Vec<[u8; 0]> = vec![[0; 0]];
-        let vals: Vec<Box<[u8]>> = vec![Box::new([0; 0])];
-        let kviter = keys.iter().zip(vals.iter()).map_into_batch();
-        let proposal = db.propose_parallel(kviter).unwrap();
-        proposal.commit().unwrap();
-
-        // Create N keys and values like (key0, value0)..(keyN, valueN)
-        let rng = firewood_storage::SeededRng::from_env_or_random();
-        let (keys, vals): (Vec<_>, Vec<_>) = (0..N)
-            .map(|i| {
-                (
-                    rng.random::<[u8; 32]>(),
-                    Box::from(format!("value{i}").as_bytes()),
-                )
-            })
-            .unzip();
-
-        // Looping twice to test that we are reusing the thread pool.
-        for _ in 0..2 {
-            let kviter = keys.iter().zip(vals.iter()).map_into_batch();
-            let proposal = db.propose_parallel(kviter).unwrap();
-
-            // iterate over the keys and values again, checking that the values are in the correct proposal
-            let kviter = keys.iter().zip(vals.iter());
-
-            for (k, v) in kviter {
-                assert_eq!(&proposal.val(k).unwrap().unwrap(), v);
-            }
-            proposal.commit().unwrap();
-        }
     }
 
     /// Test that proposing on a proposal works as expected
