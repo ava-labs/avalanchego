@@ -1058,6 +1058,7 @@ dependencies = [
  "plain_hasher",
  "pprof",
  "rand 0.9.2",
+ "rayon",
  "rlp",
  "sha3",
  "tempfile",

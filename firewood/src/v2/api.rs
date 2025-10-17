@@ -2,6 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use crate::manager::RevisionManagerError;
+use crate::merkle::parallel::CreateProposalError;
 use crate::merkle::{Key, Value};
 use crate::proof::{Proof, ProofError, ProofNode};
 use firewood_storage::{FileIoError, TrieHash};
@@ -156,6 +157,14 @@ pub enum Error {
     /// An invalid root hash was provided
     #[error(transparent)]
     InvalidRootHash(#[from] firewood_storage::InvalidTrieHashLength),
+
+    // Error sending to worker
+    #[error("send error to worker")]
+    SendErrorToWorker,
+
+    // Error converting a u8 index into a path component
+    #[error("error converting a u8 index into a path component")]
+    InvalidConversionToPathComponent,
 }
 
 impl From<RevisionManagerError> for Error {
@@ -175,6 +184,18 @@ impl From<crate::db::DbError> for Error {
     fn from(value: crate::db::DbError) -> Self {
         match value {
             crate::db::DbError::FileIo(err) => Error::FileIO(err),
+        }
+    }
+}
+
+impl From<CreateProposalError> for Error {
+    fn from(value: CreateProposalError) -> Self {
+        match value {
+            CreateProposalError::FileIoError(err) => Error::FileIO(err),
+            CreateProposalError::SendError => Error::SendErrorToWorker,
+            CreateProposalError::InvalidConversionToPathComponent => {
+                Error::InvalidConversionToPathComponent
+            }
         }
     }
 }

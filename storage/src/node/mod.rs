@@ -402,6 +402,53 @@ impl Node {
             }
         }
     }
+
+    /// Force the node (which should be a root of a trie) into a branch with no partial path
+    /// in preparation for a parallel insert. There are two cases to handle depending on whether
+    /// the node has a partial path.
+    ///
+    /// 1.  If the node has a partial path, then create a new node with an empty partial path
+    ///     and a None for a value. Push down the previous node as a child and return the
+    ///     branch.
+    /// 2.  If the existing node does not have a partial path, then there is nothing we need
+    ///     to do if it is a branch. If it is a leaf, then convert it into a branch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `Error` if it cannot create a `PathComponent` from a u8 index.
+    pub fn force_branch_for_insert(mut self) -> Result<Box<BranchNode>, Error> {
+        // If the `partial_path` is non-empty, then create a branch that will be the new
+        // root with the previous root as the child at the index returned from split_first.
+        if let Some((child_index, child_path)) = self
+            .partial_path()
+            .split_first()
+            .map(|(index, path)| (*index, path.into()))
+        {
+            let mut branch = BranchNode {
+                partial_path: Path::new(),
+                value: None,
+                children: Children::default(),
+            };
+            self.update_partial_path(child_path);
+            let child_path_component = PathComponent::try_new(child_index)
+                .ok_or_else(|| Error::other("invalid child index"))?;
+            *branch.children.get_mut(child_path_component) = Some(Child::Node(self));
+            Ok(branch.into())
+        } else {
+            Ok(match self {
+                Node::Leaf(leaf) => {
+                    // Root is a leaf with an empty partial path. Replace it with a branch.
+                    BranchNode {
+                        partial_path: Path::new(),
+                        value: Some(leaf.value),
+                        children: Children::default(),
+                    }
+                    .into()
+                }
+                Node::Branch(branch) => branch,
+            })
+        }
+    }
 }
 
 /// A path iterator item, which has the key nibbles up to this point,
