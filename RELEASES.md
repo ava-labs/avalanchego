@@ -2,9 +2,24 @@
 
 ## Pending
 
+## [v1.14.0-fuji](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0-fuji)
+
+**Please note that this release is unable to run mainnet - and will display "mainnet is not supported" if attempted to run with a mainnet configuration.**
+
+The plugin version is updated to `45` all plugins must update to be compatible.
+
+This release schuled the activation of the following Avalanche Community Proposals (ACPs):
+- [ACP-181](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/181-p-chain-epoched-views/README.md) P-Chain Epoched Views
+- [ACP-204](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/204-precompile-secp256r1/README.md) Precompile for secp256r1 Curve Support
+- [ACP-226](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/226-dynamic-minimum-block-times/README.md) Dynamic Minimum Block Times
+
 ### Configs
 
 - Changed default block delay for L1s (other than Primary Network) to 0.
+
+**All Fuji nodes must upgrade before 11 AM ET, October 29th 2025.**
+
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.13.5...v1.14.0-fuji
 
 ## [v1.13.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.5)
 
