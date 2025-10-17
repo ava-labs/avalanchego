@@ -155,36 +155,24 @@ func TestClearAllSyncStorageTries(t *testing.T) {
 	require.True(t, has)
 }
 
-func TestClear_NoKeys(t *testing.T) {
+func TestClearSyncSegments_NoKeys(t *testing.T) {
+	db := rawdb.NewMemoryDatabase()
 	root := common.HexToHash("0xabc")
-	tests := []struct {
-		name  string
-		clear func(db ethdb.KeyValueStore) error
-		iter  func(db ethdb.Iteratee) ethdb.Iterator
-	}{
-		{
-			name:  "segments_no_keys",
-			clear: func(db ethdb.KeyValueStore) error { return ClearSyncSegments(db, root) },
-			iter:  func(db ethdb.Iteratee) ethdb.Iterator { return NewSyncSegmentsIterator(db, root) },
-		},
-		{
-			name:  "storage_no_keys",
-			clear: func(db ethdb.KeyValueStore) error { return ClearSyncStorageTrie(db, root) },
-			iter:  func(db ethdb.Iteratee) ethdb.Iterator { return NewSyncStorageTriesIterator(db, nil) },
-		},
-	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			db := rawdb.NewMemoryDatabase()
+	require.NoError(t, ClearSyncSegments(db, root))
+	it := NewSyncSegmentsIterator(db, root)
+	require.Empty(t, mapIterator(t, it, common.CopyBytes))
+	require.NoError(t, it.Error())
+}
 
-			require.NoError(t, tc.clear(db))
+func TestClearSyncStorageTrie_NoKeys(t *testing.T) {
+	db := rawdb.NewMemoryDatabase()
+	root := common.HexToHash("0xabc")
 
-			it := tc.iter(db)
-			require.Empty(t, mapIterator(t, it, common.CopyBytes))
-			require.NoError(t, it.Error())
-		})
-	}
+	require.NoError(t, ClearSyncStorageTrie(db, root))
+	it := NewSyncStorageTriesIterator(db, nil)
+	require.Empty(t, mapIterator(t, it, common.CopyBytes))
+	require.NoError(t, it.Error())
 }
 
 func TestSyncPerformedAndLatest(t *testing.T) {
