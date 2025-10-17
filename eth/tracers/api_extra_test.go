@@ -423,6 +423,9 @@ func testTraceCallWithOverridesStateUpgrade(t *testing.T, scheme string) {
 			expect:    `{"gas":21000,"failed":true,"returnValue":"","structLogs":[]}`,
 		},
 		{
+			// Test that state upgrades are NOT applied when only time is overridden.
+			// Even though we override time to after the state upgrade, the upgrade
+			// should not be applied because it uses the original block time.
 			blockNumber: rpc.BlockNumber(activateStateUpgradeBlock - 1),
 			call: ethapi.TransactionArgs{
 				From:  &accounts[2].addr,
@@ -431,11 +434,12 @@ func testTraceCallWithOverridesStateUpgrade(t *testing.T, scheme string) {
 			},
 			config: &TraceCallConfig{
 				BlockOverrides: &ethapi.BlockOverrides{
-					Time: (*hexutil.Uint64)(&fastForwardTime),
+					Number: (*hexutil.Big)(big.NewInt(int64(activateStateUpgradeBlock - 1))),
+					Time:   (*hexutil.Uint64)(&fastForwardTime),
 				},
 			},
-			expectErr: core.ErrInsufficientFunds,
-			expect:    `{"gas":21000,"failed":true,"returnValue":"","structLogs":[]}`,
+			expectErr: nil,
+			expect:    `{"gas":21000,"failed":false,"returnValue":"","structLogs":[]}`,
 		},
 	}
 	for i, testspec := range testSuite {
