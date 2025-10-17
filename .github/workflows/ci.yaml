@@ -267,7 +267,14 @@ jobs:
         run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=ethhash go test -race ./...
       - name: Test Firewood <> Ethereum Differential Fuzz
         working-directory: ffi/tests/eth
-        run: go test -fuzz=. -fuzztime=1m
+        run: |
+          # Set memlock to unlimited for the shell invoking the fuzz tests
+          ulimit -Sa
+          ulimit -Ha
+          sudo prlimit --pid $$ --memlock=-1:-1 || echo "prlimit not available, locking kernel memory may fail when setting up io-uring"
+          ulimit -Sa
+          ulimit -Ha
+          go test -fuzz=. -fuzztime=1m
       - name: Upload Fuzz testdata
         if: failure()
         uses: actions/upload-artifact@v4
@@ -295,7 +302,14 @@ jobs:
           cache-dependency-path: "ffi/tests/firewood/go.sum"
       - name: Test Firewood <> MerkleDB Differential fuzz
         working-directory: ffi/tests/firewood
-        run: go test -fuzz=. -fuzztime=1m
+        run: |
+          # Set memlock to unlimited for the shell invoking the fuzz tests
+          ulimit -Sa
+          ulimit -Ha
+          sudo prlimit --pid $$ --memlock=-1:-1 || echo "prlimit not available, locking kernel memory may fail when setting up io-uring"
+          ulimit -Sa
+          ulimit -Ha
+          go test -fuzz=. -fuzztime=1m
       - name: Upload Fuzz testdata
         if: failure()
         uses: actions/upload-artifact@v4
