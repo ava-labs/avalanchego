@@ -168,6 +168,46 @@ func CheckoutRef(log logging.Logger, repoPath, ref string) error {
 	return nil
 }
 
+// getGitDir returns the git directory path and whether this is a worktree.
+// For normal repos, returns (repoPath/.git, false, nil)
+// For worktrees, returns (path-from-gitdir-file, true, nil)
+func getGitDir(repoPath string) (string, bool, error) {
+	gitPath := filepath.Join(repoPath, ".git")
+
+	// Check if .git exists and is a file or directory
+	info, err := os.Stat(gitPath)
+	if err != nil {
+		return "", false, stacktrace.Errorf("failed to stat .git: %w", err)
+	}
+
+	// If .git is a directory, this is a normal repo
+	if info.IsDir() {
+		return gitPath, false, nil
+	}
+
+	// If .git is a file, this is a worktree - read the gitdir reference
+	content, err := os.ReadFile(gitPath)
+	if err != nil {
+		return "", false, stacktrace.Errorf("failed to read .git file: %w", err)
+	}
+
+	// Parse "gitdir: /path/to/git/dir"
+	contentStr := strings.TrimSpace(string(content))
+	if !strings.HasPrefix(contentStr, "gitdir: ") {
+		return "", false, stacktrace.Errorf("invalid .git file format: %s", contentStr)
+	}
+
+	gitDir := strings.TrimPrefix(contentStr, "gitdir: ")
+	gitDir = strings.TrimSpace(gitDir)
+
+	// If gitDir is relative, resolve it relative to repoPath
+	if !filepath.IsAbs(gitDir) {
+		gitDir = filepath.Join(repoPath, gitDir)
+	}
+
+	return gitDir, true, nil
+}
+
 // GetCurrentRef returns the current ref (branch or commit) of a repository
 func GetCurrentRef(log logging.Logger, repoPath string) (string, error) {
 	log.Debug("getting current ref",
@@ -200,6 +240,255 @@ func GetCurrentRef(log logging.Logger, repoPath string) (string, error) {
 		zap.String("commitHash", commitHash),
 	)
 	return commitHash, nil
+}
+
+// GetCommitSHA returns the 8-digit short SHA of the current commit
+func GetCommitSHA(log logging.Logger, repoPath string) (string, error) {
+	log.Debug("getting commit SHA",
+		zap.String("repoPath", repoPath),
+	)
+
+	// Check if this is a worktree and get the actual git dir
+	gitDir, isWorktree, err := getGitDir(repoPath)
+	if err != nil {
+		return "", stacktrace.Errorf("failed to get git directory: %w", err)
+	}
+
+	if isWorktree {
+		log.Debug("detected worktree, using git command",
+			zap.String("gitDir", gitDir),
+		)
+		// For worktrees, go-git can't read refs properly even with the git dir
+		// Use git command directly
+		cmd := exec.Command("git", "rev-parse", "--short=8", "HEAD")
+		cmd.Dir = repoPath
+		output, cmdErr := cmd.CombinedOutput()
+		if cmdErr != nil {
+			return "", stacktrace.Errorf("failed to get HEAD in worktree: %w", cmdErr)
+		}
+		shortSHA := strings.TrimSpace(string(output))
+		log.Debug("got short commit SHA via git command",
+			zap.String("shortSHA", shortSHA),
+		)
+		return shortSHA, nil
+	}
+
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return "", stacktrace.Errorf("failed to open repository: %w", err)
+	}
+
+	head, err := repo.Head()
+	if err != nil {
+		return "", stacktrace.Errorf("failed to get HEAD: %w", err)
+	}
+
+	// Get the commit hash and return first 8 characters
+	commitHash := head.Hash().String()
+	if len(commitHash) < 8 {
+		return commitHash, nil
+	}
+
+	shortSHA := commitHash[:8]
+	log.Debug("got short commit SHA",
+		zap.String("fullHash", commitHash),
+		zap.String("shortSHA", shortSHA),
+	)
+	return shortSHA, nil
+}
+
+// GetTagsForCommit returns all tags that point to the given commit SHA
+func GetTagsForCommit(log logging.Logger, repoPath string, commitSHA string) ([]string, error) {
+	log.Debug("getting tags for commit",
+		zap.String("repoPath", repoPath),
+		zap.String("commitSHA", commitSHA),
+	)
+
+	// Check if this is a worktree
+	_, isWorktree, err := getGitDir(repoPath)
+	if err != nil {
+		return nil, stacktrace.Errorf("failed to get git directory: %w", err)
+	}
+
+	if isWorktree {
+		log.Debug("detected worktree, using git command")
+		return getTagsViaGitCommand(log, repoPath, commitSHA)
+	}
+
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return nil, stacktrace.Errorf("failed to open repository: %w", err)
+	}
+
+	// Get all tags
+	tags, err := repo.Tags()
+	if err != nil {
+		return nil, stacktrace.Errorf("failed to get tags: %w", err)
+	}
+
+	var matchingTags []string
+	err = tags.ForEach(func(ref *plumbing.Reference) error {
+		// Get the object the tag points to
+		tagHash := ref.Hash()
+
+		// Check if it's an annotated tag (need to dereference)
+		obj, err := repo.TagObject(tagHash)
+		if err == nil {
+			// This is an annotated tag, get the commit it points to
+			tagHash = obj.Target
+		}
+
+		// Check if this tag points to our commit (compare full or short hash)
+		hashStr := tagHash.String()
+		if hashStr == commitSHA || (len(hashStr) >= 8 && hashStr[:8] == commitSHA) {
+			tagName := ref.Name().Short()
+			matchingTags = append(matchingTags, tagName)
+			log.Debug("found matching tag",
+				zap.String("tag", tagName),
+				zap.String("hash", hashStr),
+			)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, stacktrace.Errorf("failed to iterate tags: %w", err)
+	}
+
+	log.Debug("finished getting tags for commit",
+		zap.Int("matchingCount", len(matchingTags)),
+		zap.Strings("tags", matchingTags),
+	)
+
+	return matchingTags, nil
+}
+
+// getTagsViaGitCommand is a fallback for worktrees where go-git doesn't work properly
+func getTagsViaGitCommand(log logging.Logger, repoPath string, commitSHA string) ([]string, error) {
+	cmd := exec.Command("git", "tag", "--points-at", commitSHA)
+	cmd.Dir = repoPath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// If short SHA doesn't work, try with full SHA
+		cmdFull := exec.Command("git", "rev-parse", commitSHA)
+		cmdFull.Dir = repoPath
+		fullOutput, fullErr := cmdFull.CombinedOutput()
+		if fullErr == nil {
+			fullSHA := strings.TrimSpace(string(fullOutput))
+			cmd = exec.Command("git", "tag", "--points-at", fullSHA)
+			cmd.Dir = repoPath
+			output, err = cmd.CombinedOutput()
+		}
+		if err != nil {
+			return nil, stacktrace.Errorf("failed to get tags via git command: %w", err)
+		}
+	}
+
+	outputStr := strings.TrimSpace(string(output))
+	if outputStr == "" {
+		return []string{}, nil
+	}
+
+	matchingTags := strings.Split(outputStr, "\n")
+	log.Debug("got tags via git command",
+		zap.Int("count", len(matchingTags)),
+		zap.Strings("tags", matchingTags),
+	)
+
+	return matchingTags, nil
+}
+
+// GetBranchesForCommit returns all branches that point to the given commit SHA
+func GetBranchesForCommit(log logging.Logger, repoPath string, commitSHA string) ([]string, error) {
+	log.Debug("getting branches for commit",
+		zap.String("repoPath", repoPath),
+		zap.String("commitSHA", commitSHA),
+	)
+
+	// Check if this is a worktree
+	_, isWorktree, err := getGitDir(repoPath)
+	if err != nil {
+		return nil, stacktrace.Errorf("failed to get git directory: %w", err)
+	}
+
+	if isWorktree {
+		log.Debug("detected worktree, using git command")
+		return getBranchesViaGitCommand(log, repoPath, commitSHA)
+	}
+
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return nil, stacktrace.Errorf("failed to open repository: %w", err)
+	}
+
+	// Get all branches
+	branches, err := repo.Branches()
+	if err != nil {
+		return nil, stacktrace.Errorf("failed to get branches: %w", err)
+	}
+
+	var matchingBranches []string
+	err = branches.ForEach(func(ref *plumbing.Reference) error {
+		// Get the commit hash this branch points to
+		branchHash := ref.Hash().String()
+		branchName := ref.Name().Short()
+
+		// Check if this branch points to our commit (compare full or short hash)
+		if branchHash == commitSHA || (len(branchHash) >= 8 && branchHash[:8] == commitSHA) {
+			matchingBranches = append(matchingBranches, branchName)
+			log.Debug("found matching branch",
+				zap.String("branch", branchName),
+				zap.String("hash", branchHash),
+			)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, stacktrace.Errorf("failed to iterate branches: %w", err)
+	}
+
+	log.Debug("finished getting branches for commit",
+		zap.Int("matchingCount", len(matchingBranches)),
+		zap.Strings("branches", matchingBranches),
+	)
+
+	return matchingBranches, nil
+}
+
+// getBranchesViaGitCommand is a fallback for worktrees where go-git doesn't work properly
+func getBranchesViaGitCommand(log logging.Logger, repoPath string, commitSHA string) ([]string, error) {
+	cmd := exec.Command("git", "branch", "--contains", commitSHA, "--format=%(refname:short)")
+	cmd.Dir = repoPath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// If short SHA doesn't work, try with full SHA
+		cmdFull := exec.Command("git", "rev-parse", commitSHA)
+		cmdFull.Dir = repoPath
+		fullOutput, fullErr := cmdFull.CombinedOutput()
+		if fullErr == nil {
+			fullSHA := strings.TrimSpace(string(fullOutput))
+			cmd = exec.Command("git", "branch", "--contains", fullSHA, "--format=%(refname:short)")
+			cmd.Dir = repoPath
+			output, err = cmd.CombinedOutput()
+		}
+		if err != nil {
+			return nil, stacktrace.Errorf("failed to get branches via git command: %w", err)
+		}
+	}
+
+	outputStr := strings.TrimSpace(string(output))
+	if outputStr == "" {
+		return []string{}, nil
+	}
+
+	matchingBranches := strings.Split(outputStr, "\n")
+	log.Debug("got branches via git command",
+		zap.Int("count", len(matchingBranches)),
+		zap.Strings("branches", matchingBranches),
+	)
+
+	return matchingBranches, nil
 }
 
 // IsRepoDirty checks if a repository has uncommitted changes
