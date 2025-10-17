@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestCloneRepo_ActualClone tests cloning a real repository
+// TestCloneRepo_ActualClone tests cloning a real repository with a branch
 func TestCloneRepo_ActualClone(t *testing.T) {
 	log := logging.NoLog{}
 	tmpDir := t.TempDir()
@@ -37,6 +37,42 @@ func TestCloneRepo_ActualClone(t *testing.T) {
 	currentRef, err := GetCurrentRef(log, clonePath)
 	require.NoError(t, err, "failed to get current ref")
 	require.Equal(t, config.DefaultBranch, currentRef)
+}
+
+// TestCloneRepo_WithTag tests cloning a real repository using a tag reference
+// This reproduces the bug where tags were treated as branches (refs/heads/ vs refs/tags/)
+func TestCloneRepo_WithTag(t *testing.T) {
+	log := logging.NoLog{}
+	tmpDir := t.TempDir()
+	clonePath := filepath.Join(tmpDir, "coreth")
+
+	// Get coreth config
+	config, err := GetRepoConfig("coreth")
+	require.NoError(t, err, "failed to get config")
+
+	// Use a known tag from coreth repository
+	// This was the actual tag that failed in the user's report
+	tag := "v0.15.4-rc.4"
+
+	// Clone with tag reference and shallow depth
+	// This should work but currently fails with "couldn't find remote ref refs/heads/v0.15.4-rc.4"
+	err = CloneRepo(log, config.GitRepo, clonePath, tag, 1)
+	require.NoError(t, err, "failed to clone with tag reference")
+
+	// Verify the repo was cloned
+	_, err = os.Stat(filepath.Join(clonePath, ".git"))
+	require.False(t, os.IsNotExist(err), "expected .git directory to exist")
+
+	// Verify we can get the current ref
+	// When checked out to a tag, GetCurrentRef returns the commit SHA, not the tag name
+	currentRef, err := GetCurrentRef(log, clonePath)
+	require.NoError(t, err, "failed to get current ref")
+	require.NotEmpty(t, currentRef, "expected non-empty current ref")
+
+	// Verify the commit has the expected tag
+	tags, err := GetTagsForCommit(log, clonePath, currentRef)
+	require.NoError(t, err, "failed to get tags for commit")
+	require.Contains(t, tags, tag, "expected commit to have tag %s", tag)
 }
 
 // TestCloneOrUpdateRepo_WithSHA tests cloning with a specific commit SHA
