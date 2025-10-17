@@ -21,6 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/subnets"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 const chainConfigFilenameExtension = ".ex"
@@ -563,7 +564,6 @@ func TestGetStakingSigner(t *testing.T) {
 
 	tests := []struct {
 		name                 string
-		viperKeys            string
 		config               map[string]any
 		expectedSignerConfig any
 		expectedErr          error
@@ -622,6 +622,9 @@ func TestGetStakingSigner(t *testing.T) {
 			require := require.New(t)
 			v := setupViperFlags()
 
+			// Avoid using the mainnet network name by default because not all
+			// builds support mainnet configurations.
+			v.Set(NetworkNameKey, constants.LocalName)
 			for key, value := range tt.config {
 				v.Set(key, value)
 			}
