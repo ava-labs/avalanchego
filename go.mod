@@ -21,7 +21,7 @@ require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/StephenButtolph/canoto v0.17.2
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.15.4-rc.3.0.20251013180746-346c5209e280
+	github.com/ava-labs/coreth v0.15.4-rc.3.0.20251017205202-8f5c1c224fe7
 	github.com/ava-labs/ledger-avalanche-go v1.1.0
 	github.com/ava-labs/libevm v1.13.15-0.20251002164226-35926db4d661
 	github.com/btcsuite/btcd/btcutil v1.1.3
@@ -86,6 +86,11 @@ require (
 	k8s.io/apimachinery v0.29.0
 	k8s.io/client-go v0.29.0
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
+)
+
+require (
+	github.com/fjl/gencodec v0.1.1 // indirect
+	github.com/garslo/gogen v0.0.0-20230926014519-f497ca02dd4c // indirect
 )
 
 require (
