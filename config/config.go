@@ -1105,8 +1105,8 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 
 func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
 	subnetDefaults := getPrimaryNetworkConfig(v)
-	// L1s (other than Primary Network) should let ACP-226 handle block delay.
-	subnetDefaults.ProposerMinBlockDelay = acp226.MinDelayMilliseconds * time.Millisecond
+	// Allow L1s (other than Primary Network) to use their own throttling mechanisms.  
+	subnetDefaults.ProposerMinBlockDelay = 0
 	return subnetDefaults
 }
 
