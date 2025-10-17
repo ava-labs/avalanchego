@@ -198,6 +198,34 @@ func RemoveReplaceDirective(log logging.Logger, goModPath, oldPath string) error
 	return nil
 }
 
+// GetAllReplaceDirectives returns all replace directives from a go.mod file
+// Returns a map of module path -> replacement path/version
+func GetAllReplaceDirectives(log logging.Logger, goModPath string) (map[string]string, error) {
+	log.Debug("getting all replace directives",
+		zap.String("goModPath", goModPath),
+	)
+
+	modFile, err := ReadGoMod(log, goModPath)
+	if err != nil {
+		return nil, err
+	}
+
+	replacements := make(map[string]string)
+	for _, replace := range modFile.Replace {
+		replacements[replace.Old.Path] = replace.New.Path
+		log.Debug("found replace directive",
+			zap.String("module", replace.Old.Path),
+			zap.String("path", replace.New.Path),
+		)
+	}
+
+	log.Debug("finished getting replace directives",
+		zap.Int("count", len(replacements)),
+	)
+
+	return replacements, nil
+}
+
 // GetDependencyVersion returns the version of a dependency from a go.mod file
 func GetDependencyVersion(log logging.Logger, goModPath, modulePath string) (string, error) {
 	log.Debug("looking up dependency version",
