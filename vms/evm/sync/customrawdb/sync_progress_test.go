@@ -98,7 +98,7 @@ func TestSyncSegmentsIteratorUnpackAndClear(t *testing.T) {
 	// Iterate only over rootA and assert exact keys.
 	keys := mapIterator(t, NewSyncSegmentsIterator(db, rootA), common.CopyBytes)
 	expectedA := [][]byte{buildSegmentKey(rootA, start1), buildSegmentKey(rootA, start2)}
-	require.ElementsMatch(t, keys, expectedA)
+	require.Equal(t, expectedA, keys)
 
 	// Clear only rootA.
 	require.NoError(t, ClearSyncSegments(db, rootA))
@@ -108,7 +108,7 @@ func TestSyncSegmentsIteratorUnpackAndClear(t *testing.T) {
 	// RootB remains.
 	keys = mapIterator(t, NewSyncSegmentsIterator(db, rootB), common.CopyBytes)
 	expectedB := [][]byte{buildSegmentKey(rootB, start3)}
-	require.ElementsMatch(t, keys, expectedB)
+	require.Equal(t, expectedB, keys)
 }
 
 func TestStorageTriesIteratorUnpackAndClear(t *testing.T) {
@@ -122,7 +122,7 @@ func TestStorageTriesIteratorUnpackAndClear(t *testing.T) {
 
 	keys := mapIterator(t, NewSyncStorageTriesIterator(db, nil), common.CopyBytes)
 	expected := [][]byte{buildStorageTrieKey(root, acct1), buildStorageTrieKey(root, acct2)}
-	require.ElementsMatch(t, keys, expected)
+	require.Equal(t, expected, keys)
 
 	require.NoError(t, ClearSyncStorageTrie(db, root))
 	keys = mapIterator(t, NewSyncStorageTriesIterator(db, nil), common.CopyBytes)
@@ -303,7 +303,7 @@ func TestSyncSegmentsByRootTable(t *testing.T) {
 				_, start := ParseSyncSegmentKey(k)
 				return common.BytesToHash(start)
 			})
-			require.ElementsMatch(t, tc.starts, got)
+			require.Equal(t, tc.starts, got)
 		})
 	}
 }
@@ -336,7 +336,7 @@ func TestSyncStorageTriesByRootTable(t *testing.T) {
 				_, a := ParseSyncStorageTrieKey(k)
 				return a
 			})
-			require.ElementsMatch(t, tc.accounts, got)
+			require.Equal(t, tc.accounts, got)
 		})
 	}
 }
