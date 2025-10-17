@@ -41,6 +41,9 @@ const (
 
 	// BlockEntryVersion is the version of the block entry.
 	BlockEntryVersion uint16 = 1
+
+	// defaultEntryCacheSize is the default number of entries to cache in memory
+	defaultEntryCacheSize = 256
 )
 
 // BlockHeight defines the type for block heights.
@@ -176,6 +179,7 @@ type Database struct {
 	log        logging.Logger
 	closed     bool
 	fileCache  *lru.Cache[int, *os.File]
+	entryCache *lru.Cache[BlockHeight, BlockData]
 	compressor compression.Compressor
 
 	// closeMu prevents the database from being closed while in use and prevents
@@ -223,6 +227,7 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 				f.Close()
 			}
 		}),
+		entryCache: lru.NewCache[BlockHeight, BlockData](defaultEntryCacheSize),
 		compressor: compressor,
 	}
 
@@ -372,6 +377,11 @@ func (s *Database) Put(height BlockHeight, block BlockData) error {
 		return err
 	}
 
+	// Store a copy in cache to prevent external modifications from affecting the cached data
+	blockCopy := make([]byte, len(block))
+	copy(blockCopy, block)
+	s.entryCache.Put(height, blockCopy)
+
 	s.log.Debug("Block written successfully",
 		zap.Uint64("height", height),
 		zap.Uint32("blockSize", blockDataLen),
@@ -385,12 +395,6 @@ func (s *Database) Put(height BlockHeight, block BlockData) error {
 // It returns database.ErrNotFound if the block does not exist.
 func (s *Database) readBlockIndex(height BlockHeight) (indexEntry, error) {
 	var entry indexEntry
-	if s.closed {
-		s.log.Error("Failed to read block index: database is closed",
-			zap.Uint64("height", height),
-		)
-		return entry, database.ErrClosed
-	}
 
 	// Skip the index entry read if we know the block is past the max height.
 	maxHeight := s.maxBlockHeight.Load()
@@ -435,6 +439,20 @@ func (s *Database) readBlockIndex(height BlockHeight) (indexEntry, error) {
 func (s *Database) Get(height BlockHeight) (BlockData, error) {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
+
+	if s.closed {
+		s.log.Error("Failed to read block: database is closed",
+			zap.Uint64("height", height),
+		)
+		return nil, database.ErrClosed
+	}
+
+	if cachedData, ok := s.entryCache.Get(height); ok {
+		// Return a copy to prevent external modifications from affecting the cache
+		dataCopy := make([]byte, len(cachedData))
+		copy(dataCopy, cachedData)
+		return dataCopy, nil
+	}
 
 	indexEntry, err := s.readBlockIndex(height)
 	if err != nil {
@@ -486,6 +504,10 @@ func (s *Database) Get(height BlockHeight) (BlockData, error) {
 		return nil, fmt.Errorf("checksum mismatch: calculated %d, stored %d", calculatedChecksum, bh.Checksum)
 	}
 
+	cacheCopy := make([]byte, len(decompressed))
+	copy(cacheCopy, decompressed)
+	s.entryCache.Put(height, cacheCopy)
+
 	return decompressed, nil
 }
 
@@ -493,6 +515,14 @@ func (s *Database) Get(height BlockHeight) (BlockData, error) {
 func (s *Database) Has(height BlockHeight) (bool, error) {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
+
+	if s.closed {
+		return false, database.ErrClosed
+	}
+
+	if _, ok := s.entryCache.Get(height); ok {
+		return true, nil
+	}
 
 	_, err := s.readBlockIndex(height)
 	if err != nil {
