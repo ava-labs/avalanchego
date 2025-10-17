@@ -262,11 +262,21 @@ require github.com/ava-labs/firewood/ffi v0.0.0
 	err = AddReplaceDirective(log, goModPath, config.GoModule, replacePath)
 	require.NoError(t, err, "failed to add replace directive")
 
-	// Get status
-	status, err := GetRepoStatus(log, "firewood", tmpDir, goModPath, false)
+	// Get status - note: for synced repos, GetRepoStatus reads go.mod from the cloned repo path
+	// So we need to create a go.mod in the cloned repo directory
+	repoGoModPath := filepath.Join(clonePath, config.GoModPath)
+	require.NoError(t, os.MkdirAll(filepath.Dir(repoGoModPath), 0o755))
+	err = os.WriteFile(repoGoModPath, []byte(goModContent), 0o600)
+	require.NoError(t, err, "failed to write repo go.mod")
+
+	// Add replace directive to the repo's go.mod
+	err = AddReplaceDirective(log, repoGoModPath, config.GoModule, replacePath)
+	require.NoError(t, err, "failed to add replace directive to repo go.mod")
+
+	status, err := GetRepoStatus(log, "firewood", tmpDir, "", false)
 	require.NoError(t, err, "failed to get status")
-	require.True(t, status.HasReplace, "expected replace directive to be detected")
-	require.Equal(t, replacePath, status.ReplacePath)
+	require.NotEmpty(t, status.Replacements, "expected replace directive to be detected")
+	require.Equal(t, replacePath, status.Replacements[config.GoModule])
 }
 
 // TestFormatRepoStatus tests the status formatting
@@ -287,13 +297,14 @@ func TestFormatRepoStatus(t *testing.T) {
 		{
 			name: "cloned with replace",
 			status: &RepoStatus{
-				Name:        "firewood",
-				Path:        "/tmp/firewood",
-				Exists:      true,
-				HasReplace:  true,
-				ReplacePath: "./firewood",
+				Name:   "firewood",
+				Path:   "/tmp/firewood",
+				Exists: true,
+				Replacements: map[string]string{
+					"github.com/ava-labs/firewood/ffi": "./firewood",
+				},
 			},
-			contains: "replace:",
+			contains: "replacements:",
 		},
 	}
 
