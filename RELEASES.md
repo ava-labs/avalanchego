@@ -4,7 +4,7 @@
 
 ### Configs
 
-- Changed default block delay for L1s (other than Primary Network) to 1 milliseconds.
+- Changed default block delay for L1s (other than Primary Network) to 0.
 
 ## [v1.13.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.5)
 
