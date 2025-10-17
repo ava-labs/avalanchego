@@ -6,7 +6,7 @@
 
 **Please note that this release is unable to run mainnet - and will display "mainnet is not supported" if attempted to run with a mainnet configuration.**
 
-The plugin version is updated to `45` all plugins must update to be compatible.
+The plugin version is updated to `44` all plugins must update to be compatible.
 
 This release schuled the activation of the following Avalanche Community Proposals (ACPs):
 - [ACP-181](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/181-p-chain-epoched-views/README.md) P-Chain Epoched Views
