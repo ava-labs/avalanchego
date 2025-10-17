@@ -1,0 +1,68 @@
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package core
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+)
+
+// DetectCurrentRepo detects which repository we're currently in based on go.mod
+func DetectCurrentRepo(dir string) (string, error) {
+	// Check for regular go.mod in current directory
+	goModPath := filepath.Join(dir, "go.mod")
+	if _, err := os.Stat(goModPath); err == nil {
+		modulePath, err := GetModulePath(goModPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to get module path: %w", err)
+		}
+
+		// Check against known repos
+		for _, config := range GetAllRepoConfigs() {
+			if config.GoModule == modulePath {
+				return config.Name, nil
+			}
+		}
+	}
+
+	// Check for firewood's special case (ffi/go.mod)
+	firewoodConfig, _ := GetRepoConfig("firewood")
+	if firewoodConfig.GoModPath != "" && firewoodConfig.GoModPath != "go.mod" {
+		subGoModPath := filepath.Join(dir, firewoodConfig.GoModPath)
+		if _, err := os.Stat(subGoModPath); err == nil {
+			modulePath, err := GetModulePath(subGoModPath)
+			if err != nil {
+				return "", fmt.Errorf("failed to get module path: %w", err)
+			}
+
+			if modulePath == firewoodConfig.GoModule {
+				return "firewood", nil
+			}
+		}
+	}
+
+	// Not in a known repo
+	return "", nil
+}
+
+// GetReposToSync returns the list of repos to sync based on the current repo
+func GetReposToSync(currentRepo string) []string {
+	allRepos := []string{"avalanchego", "coreth", "firewood"}
+
+	// If we're not in a known repo, sync all
+	if currentRepo == "" {
+		return allRepos
+	}
+
+	// Otherwise, sync all repos except the current one
+	result := make([]string, 0, len(allRepos)-1)
+	for _, repo := range allRepos {
+		if repo != currentRepo {
+			result = append(result, repo)
+		}
+	}
+
+	return result
+}
