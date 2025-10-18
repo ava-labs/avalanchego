@@ -43,8 +43,8 @@ var (
 
 	firewoodConfig = &RepoConfig{
 		Name:                  "firewood",
-		GoModule:              "github.com/ava-labs/firewood-go-ethhash", // Module name used by importers
-		InternalGoModule:      "github.com/ava-labs/firewood/ffi",        // Module name in firewood's own go.mod
+		GoModule:              "github.com/ava-labs/firewood-go-ethhash/ffi", // Module name used by importers
+		InternalGoModule:      "github.com/ava-labs/firewood/ffi",            // Module name in firewood's own go.mod
 		ModuleReplacementPath: "./ffi/result/ffi",
 		GitRepo:               "https://github.com/ava-labs/firewood",
 		DefaultBranch:         "main",
