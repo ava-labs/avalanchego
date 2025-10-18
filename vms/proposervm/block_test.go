@@ -114,7 +114,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	coreVM, valState, proVM, _ := initTestProposerVM(t, nil, upgradetest.ApricotPhase4, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -240,7 +240,7 @@ func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
 	ctx := context.Background()
 
-	coreVM, valState, proVM, _ := initTestProposerVM(t, nil, upgradetest.ApricotPhase4, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(ctx))
 	}()
@@ -418,7 +418,7 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 func TestPreGraniteBlock_NonZeroEpoch(t *testing.T) {
 	require := require.New(t)
 
-	_, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.Latest, 0)
+	_, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -455,7 +455,7 @@ func TestPreGraniteBlock_NonZeroEpoch(t *testing.T) {
 func TestPostGraniteBlock_EpochMatches(t *testing.T) {
 	ctx := context.Background()
 
-	coreVM, _, proVM, _ := initTestProposerVM(t, nil, upgradetest.Latest, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
 		require.NoError(t, proVM.Shutdown(ctx))
 	}()

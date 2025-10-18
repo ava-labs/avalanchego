@@ -24,7 +24,7 @@ func TestConnectRPCService_GetProposedHeight(t *testing.T) {
 	require := require.New(t)
 
 	const pChainHeight = 123
-	_, _, vm, _ := initTestProposerVM(t, nil, upgradetest.Latest, pChainHeight)
+	_, _, vm, _ := initTestProposerVM(t, upgradetest.Latest, pChainHeight)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
@@ -62,7 +62,7 @@ func TestJSONRPCService_GetProposedHeight(t *testing.T) {
 	require := require.New(t)
 
 	const pChainHeight = 123
-	_, _, vm, _ := initTestProposerVM(t, nil, upgradetest.Latest, pChainHeight)
+	_, _, vm, _ := initTestProposerVM(t, upgradetest.Latest, pChainHeight)
 	defer func() {
 		require.NoError(vm.Shutdown(context.Background()))
 	}()
