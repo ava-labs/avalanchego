@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	errRepoNotFound      = errors.New("repository not found")
-	errRepoAlreadyExists = errors.New("repository already exists")
+	errRepoNotFound             = errors.New("repository not found")
+	errRepoAlreadyExists        = errors.New("repository already exists")
+	errStandaloneModeNeedsRepos = errors.New("must specify repos when no go.mod exists (standalone mode)")
 )
 
 // ErrRepoNotFound returns an error for a repository that was not found

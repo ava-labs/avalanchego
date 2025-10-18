@@ -607,3 +607,284 @@ func DiscoverFirewoodVersion(
 	)
 	return firewoodConfig.DefaultBranch, nil
 }
+
+// Sync orchestrates the complete repository synchronization workflow.
+// It handles both Primary Repo Mode (with go.mod) and Standalone Mode (without go.mod).
+//
+// Primary Repo Mode (go.mod exists in baseDir):
+//   - Detects current repo from go.mod
+//   - Discovers versions from go.mod dependencies using GetDefaultRefForRepo()
+//   - Updates replace directives after syncing
+//   - If no repoArgs provided, auto-detects repos to sync based on current repo
+//
+// Standalone Mode (no go.mod in baseDir):
+//   - No primary repo detected
+//   - Uses version discovery functions (DiscoverAvalanchegoCorethVersions, DiscoverFirewoodVersion)
+//   - No replace directives updated
+//   - If no repoArgs provided, returns error "must specify repos"
+//
+// Parameters:
+//   - log: Logger instance
+//   - baseDir: Directory to operate in (already validated by caller)
+//   - repoArgs: CLI arguments (e.g., ["avalanchego", "coreth@v0.13.8"])
+//   - depth: Clone depth (0=full, 1=shallow, >1=partial)
+//   - force: Force sync even if dirty or already exists
+//
+// Returns error if sync fails (fail fast - stop on first error).
+func Sync(
+	log logging.Logger,
+	baseDir string,
+	repoArgs []string,
+	depth int,
+	force bool,
+) error {
+	log.Info("starting sync",
+		zap.String("baseDir", baseDir),
+		zap.Int("repoArgsCount", len(repoArgs)),
+		zap.Int("depth", depth),
+		zap.Bool("force", force),
+	)
+
+	// Step 1: Detect operating mode by checking for go.mod
+	goModPath := filepath.Join(baseDir, "go.mod")
+	_, err := os.Stat(goModPath)
+	hasPrimaryRepo := err == nil
+
+	var currentRepo string
+	if hasPrimaryRepo {
+		log.Info("detected primary repo mode (go.mod exists)")
+		currentRepo, err = DetectCurrentRepo(log, baseDir)
+		if err != nil {
+			return stacktrace.Errorf("failed to detect current repo: %w", err)
+		}
+		log.Info("detected current repository",
+			zap.String("currentRepo", currentRepo),
+		)
+	} else {
+		log.Info("detected standalone mode (no go.mod)")
+		currentRepo = ""
+	}
+
+	// Step 2: Determine repos to sync
+	type repoWithRef struct {
+		name        string
+		ref         string
+		wasExplicit bool
+	}
+	var reposToSync []repoWithRef
+
+	if len(repoArgs) > 0 {
+		log.Info("parsing repository arguments from command line",
+			zap.Int("count", len(repoArgs)),
+		)
+
+		// Parse each repo[@ref] argument
+		for _, arg := range repoArgs {
+			repoName, ref, err := ParseRepoAndVersion(arg)
+			if err != nil {
+				return stacktrace.Errorf("invalid repo format %q: %w", arg, err)
+			}
+
+			// Step 4: Validation - cannot sync a repo into itself (Primary mode only)
+			if hasPrimaryRepo && currentRepo != "" && repoName == currentRepo {
+				return stacktrace.Errorf("cannot sync %s into itself (you are currently in %s)", repoName, currentRepo)
+			}
+
+			wasExplicit := ref != ""
+			reposToSync = append(reposToSync, repoWithRef{
+				name:        repoName,
+				ref:         ref,
+				wasExplicit: wasExplicit,
+			})
+		}
+	} else {
+		// No repos specified
+		if !hasPrimaryRepo {
+			// Standalone mode requires explicit repos
+			return errStandaloneModeNeedsRepos
+		}
+
+		// Primary mode - auto-detect repos to sync
+		log.Info("no repositories specified, auto-detecting based on current directory")
+		repos := GetReposToSync(currentRepo)
+		log.Info("determined repositories to sync",
+			zap.Int("count", len(repos)),
+			zap.Strings("repos", repos),
+		)
+
+		for _, repoName := range repos {
+			reposToSync = append(reposToSync, repoWithRef{
+				name:        repoName,
+				ref:         "",
+				wasExplicit: false,
+			})
+		}
+	}
+
+	// Step 3: Determine ref for each repo
+	// We need to handle version discovery differently for Primary vs Standalone mode
+	if hasPrimaryRepo {
+		// Primary Mode: Use GetDefaultRefForRepo for discovery
+		for i := range reposToSync {
+			if reposToSync[i].ref == "" {
+				log.Info("discovering ref for repo from go.mod",
+					zap.String("repo", reposToSync[i].name),
+				)
+				ref, err := GetDefaultRefForRepo(log, currentRepo, reposToSync[i].name, goModPath)
+				if err != nil {
+					return stacktrace.Errorf("failed to get default ref for %s: %w", reposToSync[i].name, err)
+				}
+				reposToSync[i].ref = ref
+			}
+		}
+	} else {
+		// Standalone Mode: Use version discovery functions
+		log.Info("standalone mode: using version discovery")
+
+		// Collect repos and explicit refs
+		requestedRepos := make([]string, len(reposToSync))
+		explicitRefs := make(map[string]string)
+		for i, repo := range reposToSync {
+			requestedRepos[i] = repo.name
+			if repo.wasExplicit {
+				explicitRefs[repo.name] = repo.ref
+			}
+		}
+
+		// Discover avalanchego and coreth versions
+		discoveredVersions, err := DiscoverAvalanchegoCorethVersions(log, baseDir, requestedRepos, explicitRefs)
+		if err != nil {
+			return stacktrace.Errorf("failed to discover avalanchego/coreth versions: %w", err)
+		}
+
+		// Apply discovered versions for avalanchego and coreth
+		const (
+			repoAvalanchego = "avalanchego"
+			repoCoreth      = "coreth"
+			repoFirewood    = "firewood"
+		)
+		for i := range reposToSync {
+			if reposToSync[i].ref == "" {
+				if reposToSync[i].name == repoAvalanchego || reposToSync[i].name == repoCoreth {
+					if ref, ok := discoveredVersions[reposToSync[i].name]; ok {
+						reposToSync[i].ref = ref
+						log.Info("using discovered version",
+							zap.String("repo", reposToSync[i].name),
+							zap.String("ref", ref),
+						)
+					}
+				}
+			}
+		}
+
+		// Discover firewood version separately
+		for i := range reposToSync {
+			if reposToSync[i].name == repoFirewood && reposToSync[i].ref == "" {
+				explicitRef := ""
+				if reposToSync[i].wasExplicit {
+					explicitRef = reposToSync[i].ref
+				}
+				ref, err := DiscoverFirewoodVersion(log, baseDir, explicitRef, requestedRepos, discoveredVersions)
+				if err != nil {
+					return stacktrace.Errorf("failed to discover firewood version: %w", err)
+				}
+				reposToSync[i].ref = ref
+				log.Info("using discovered firewood version",
+					zap.String("ref", ref),
+				)
+			}
+		}
+	}
+
+	// Step 5: Execute sync loop
+	syncedRepoNames := make([]string, 0, len(reposToSync))
+	for _, repo := range reposToSync {
+		log.Info("syncing repository",
+			zap.String("repo", repo.name),
+			zap.String("ref", repo.ref),
+			zap.Bool("explicit", repo.wasExplicit),
+		)
+
+		config, err := GetRepoConfig(repo.name)
+		if err != nil {
+			return err
+		}
+
+		log.Info("repository configuration",
+			zap.String("repo", repo.name),
+			zap.String("gitRepo", config.GitRepo),
+			zap.String("defaultBranch", config.DefaultBranch),
+			zap.String("goModule", config.GoModule),
+			zap.Bool("requiresNixBuild", config.RequiresNixBuild),
+		)
+
+		clonePath := GetRepoClonePath(repo.name, baseDir)
+
+		// Use specified ref or default branch
+		refToUse := repo.ref
+		if refToUse == "" {
+			refToUse = config.DefaultBranch
+		}
+
+		log.Info("cloning or updating repository",
+			zap.String("repo", repo.name),
+			zap.String("ref", refToUse),
+			zap.Int("depth", depth),
+			zap.String("url", config.GitRepo),
+			zap.String("path", clonePath),
+		)
+
+		// Clone or update the repo
+		err = CloneOrUpdateRepo(log, config.GitRepo, clonePath, refToUse, depth, force)
+		if err != nil {
+			return stacktrace.Errorf("failed to sync %s: %w", repo.name, err)
+		}
+
+		// Check if dirty (refuse unless forced)
+		if !force {
+			isDirty, err := IsRepoDirty(log, clonePath)
+			if err == nil && isDirty {
+				return ErrDirtyWorkingDir(clonePath)
+			}
+		}
+
+		// Run nix build if required
+		if config.RequiresNixBuild {
+			log.Info("running nix build",
+				zap.String("repo", repo.name),
+				zap.String("path", GetNixBuildPath(clonePath, config.NixBuildPath)),
+			)
+			nixBuildPath := GetNixBuildPath(clonePath, config.NixBuildPath)
+			err = RunNixBuild(log, nixBuildPath)
+			if err != nil {
+				return stacktrace.Errorf("failed to run nix build for %s: %w", repo.name, err)
+			}
+		}
+
+		log.Info("successfully synced repository",
+			zap.String("repo", repo.name),
+			zap.String("path", clonePath),
+			zap.String("ref", refToUse),
+		)
+
+		syncedRepoNames = append(syncedRepoNames, repo.name)
+	}
+
+	// Step 6: Update replace directives (Primary mode only)
+	if hasPrimaryRepo {
+		log.Info("updating replace directives for all repos")
+		err = UpdateAllReplaceDirectives(log, baseDir, syncedRepoNames)
+		if err != nil {
+			return stacktrace.Errorf("failed to update replace directives: %w", err)
+		}
+	} else {
+		log.Info("skipping replace directives (standalone mode)")
+	}
+
+	log.Info("sync completed successfully",
+		zap.Int("syncedCount", len(syncedRepoNames)),
+		zap.Strings("syncedRepos", syncedRepoNames),
+	)
+
+	return nil
+}
