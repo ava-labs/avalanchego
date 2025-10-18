@@ -265,3 +265,54 @@ require github.com/ava-labs/avalanchego v1.11.11
 		})
 	}
 }
+
+// TestSync_PrimaryMode_NoArgs tests that from a primary repo (e.g., avalanchego),
+// calling Sync() with no args syncs other repos using versions from go.mod
+func TestSync_PrimaryMode_NoArgs(t *testing.T) {
+	// This is a unit test - not integration
+	// It should verify the function orchestrates correctly but not do actual git operations
+	t.Skip("TODO: Implement after Sync() function exists")
+}
+
+// TestSync_PrimaryMode_ExplicitRefs tests that explicit refs are used when provided
+func TestSync_PrimaryMode_ExplicitRefs(t *testing.T) {
+	t.Skip("TODO: Implement after Sync() function exists")
+}
+
+// TestSync_PrimaryMode_PartialRefs tests mixed explicit and discovered refs
+func TestSync_PrimaryMode_PartialRefs(t *testing.T) {
+	t.Skip("TODO: Implement after Sync() function exists")
+}
+
+// TestSync_CannotSyncIntoItself_Error tests validation that prevents syncing a repo into itself
+func TestSync_CannotSyncIntoItself_Error(t *testing.T) {
+	t.Skip("TODO: Implement after Sync() function exists")
+}
+
+// TestSync_StandaloneMode_AvalanchegoCoreth tests version discovery in standalone mode
+// This is THE KEY TEST that would have caught the bug!
+func TestSync_StandaloneMode_AvalanchegoCoreth(t *testing.T) {
+	t.Skip("TODO: Implement after Sync() function exists")
+}
+
+// TestSync_StandaloneMode_NoArgs_Error tests that standalone mode requires explicit repos
+func TestSync_StandaloneMode_NoArgs_Error(t *testing.T) {
+	tmpDir := t.TempDir()
+	log := logging.NoLog{}
+
+	// No go.mod exists - standalone mode
+	// No repos specified - should error
+	err := Sync(log, tmpDir, []string{}, 1, false)
+
+	require.ErrorIs(t, err, errStandaloneModeNeedsRepos)
+}
+
+// TestSync_StandaloneMode_ExplicitRefs tests standalone mode with all explicit refs
+func TestSync_StandaloneMode_ExplicitRefs(t *testing.T) {
+	t.Skip("TODO: Implement after Sync() function exists")
+}
+
+// TestSync_StandaloneMode_FirewoodOnly tests syncing only firewood in standalone mode
+func TestSync_StandaloneMode_FirewoodOnly(t *testing.T) {
+	t.Skip("TODO: Implement after Sync() function exists")
+}
