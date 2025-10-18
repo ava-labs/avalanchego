@@ -17,8 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-const goModFilename = "go.mod"
-
 var (
 	logLevel  string
 	targetDir string
@@ -120,78 +118,12 @@ var statusCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		log := getLogger(cmd)
 
-		// Get current directory
 		baseDir, err := os.Getwd()
 		if err != nil {
 			return fmt.Errorf("failed to get current directory: %w", err)
 		}
 
-		// Detect which repo we're currently in
-		primaryRepo, err := core.DetectCurrentRepo(log, baseDir)
-		if err != nil {
-			return fmt.Errorf("failed to detect current repository: %w", err)
-		}
-
-		// Get path to go.mod based on primary repo
-		goModPath := ""
-		if primaryRepo != "" {
-			config, err := core.GetRepoConfig(primaryRepo)
-			if err == nil {
-				goModPath = config.GoModPath
-				if _, err := os.Stat(goModPath); err != nil {
-					goModPath = ""
-				}
-			}
-		} else {
-			// Not in a known repo, check for go.mod in current directory
-			if _, err := os.Stat(goModFilename); err == nil {
-				goModPath = goModFilename
-			}
-		}
-
-		// Display primary repository section
-		if primaryRepo != "" {
-			fmt.Printf("Primary Repository: %s\n", primaryRepo)
-
-			// Get status for primary repo (isPrimary = true)
-			status, err := core.GetRepoStatus(log, primaryRepo, baseDir, goModPath, true)
-			if err != nil {
-				log.Warn("failed to get status for primary repository",
-					zap.String("repo", primaryRepo),
-					zap.Error(err),
-				)
-			} else {
-				fmt.Printf("  %s\n", core.FormatRepoStatus(status))
-			}
-			fmt.Println()
-		} else {
-			fmt.Println("Primary Repository: none (not in a known repository)")
-			fmt.Println()
-		}
-
-		// Display other repositories section
-		fmt.Println("Other Repositories:")
-		repos := []string{"avalanchego", "coreth", "firewood"}
-		for _, repoName := range repos {
-			// Skip the primary repo since we already displayed it
-			if repoName == primaryRepo {
-				continue
-			}
-
-			// Get status for synced repo (isPrimary = false)
-			status, err := core.GetRepoStatus(log, repoName, baseDir, goModPath, false)
-			if err != nil {
-				log.Warn("failed to get status for repository",
-					zap.String("repo", repoName),
-					zap.Error(err),
-				)
-				continue
-			}
-
-			fmt.Printf("  %s\n", core.FormatRepoStatus(status))
-		}
-
-		return nil
+		return core.Status(log, baseDir, os.Stdout)
 	},
 }
 
