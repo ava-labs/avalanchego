@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -19,7 +20,10 @@ import (
 
 const goModFilename = "go.mod"
 
-var logLevel string
+var (
+	logLevel  string
+	targetDir string
+)
 
 func main() {
 	if err := rootCmd.Execute(); err != nil {
@@ -44,6 +48,28 @@ var rootCmd = &cobra.Command{
 repositories (avalanchego, coreth, firewood) by managing replace directives in go.mod files
 and coordinating git operations.`,
 	PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+		// Change to target directory if specified
+		if targetDir != "" {
+			absPath, err := filepath.Abs(targetDir)
+			if err != nil {
+				return fmt.Errorf("failed to resolve target directory %q: %w", targetDir, err)
+			}
+
+			// Verify it's a directory
+			info, err := os.Stat(absPath)
+			if err != nil {
+				return fmt.Errorf("failed to access target directory %q: %w", absPath, err)
+			}
+			if !info.IsDir() {
+				return fmt.Errorf("target path %q is not a directory", absPath)
+			}
+
+			// Change to the target directory
+			if err := os.Chdir(absPath); err != nil {
+				return fmt.Errorf("failed to change to target directory %q: %w", absPath, err)
+			}
+		}
+
 		// Parse log level from flag (flags are now parsed)
 		var level logging.Level
 		switch strings.ToLower(logLevel) {
@@ -450,6 +476,7 @@ func init() {
 	syncCmd.Flags().IntP("depth", "d", 1, "Clone depth (0 for full clone, 1 for shallow, >1 for partial)")
 	syncCmd.Flags().BoolP("force", "f", false, "Force sync even if directory is dirty or already exists")
 
-	// Add persistent flag for log level (applies to all commands)
+	// Add persistent flags (apply to all commands)
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "Set log level (debug, info, warn, error)")
+	rootCmd.PersistentFlags().StringVar(&targetDir, "target-dir", "", "Target directory to operate in (defaults to current directory)")
 }
