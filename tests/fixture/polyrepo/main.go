@@ -237,6 +237,11 @@ Repositories will be cloned into the current directory with their repository nam
 					return fmt.Errorf("invalid repo format %q: %w", arg, err)
 				}
 
+				// Don't allow syncing a repo into itself
+				if currentRepo != "" && repoName == currentRepo {
+					return fmt.Errorf("cannot sync %s into itself (you are currently in %s)", repoName, currentRepo)
+				}
+
 				wasExplicit := ref != ""
 
 				// If no explicit ref provided, determine from go.mod
