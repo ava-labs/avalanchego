@@ -474,14 +474,14 @@ go 1.24
 
 require (
 	github.com/ava-labs/coreth v0.15.4
-	github.com/ava-labs/firewood/ffi v0.0.12
+	github.com/ava-labs/firewood-go-ethhash v0.0.12
 )
 `
 	require.NoError(t, os.WriteFile(goModPath, []byte(content), 0o600))
 
 	// Add replace directives for local paths
 	addReplaceDirectiveToFile(t, goModPath, "github.com/ava-labs/coreth", "./coreth")
-	addReplaceDirectiveToFile(t, goModPath, "github.com/ava-labs/firewood/ffi", "./firewood/ffi")
+	addReplaceDirectiveToFile(t, goModPath, "github.com/ava-labs/firewood-go-ethhash", "./firewood/ffi")
 
 	// Get status
 	status, err := GetRepoStatus(log, "test-repo", repoPath, goModPath, true)
@@ -491,7 +491,7 @@ require (
 	assert.True(t, status.Exists)
 	assert.Len(t, status.Replacements, 2)
 	assert.Equal(t, "./coreth", status.Replacements["github.com/ava-labs/coreth"])
-	assert.Equal(t, "./firewood/ffi", status.Replacements["github.com/ava-labs/firewood/ffi"])
+	assert.Equal(t, "./firewood/ffi", status.Replacements["github.com/ava-labs/firewood-go-ethhash"])
 }
 
 // TestGetRepoStatus_WithVersionReplaces tests status with version replace directives
@@ -537,14 +537,14 @@ go 1.24
 
 require (
 	github.com/ava-labs/coreth v0.15.4
-	github.com/ava-labs/firewood/ffi v0.0.12
+	github.com/ava-labs/firewood-go-ethhash v0.0.12
 )
 `
 	require.NoError(t, os.WriteFile(goModPath, []byte(content), 0o600))
 
 	// Add mixed replace directives
 	addReplaceDirectiveToFile(t, goModPath, "github.com/ava-labs/coreth", "./coreth")
-	addReplaceDirectiveToFile(t, goModPath, "github.com/ava-labs/firewood/ffi", "github.com/ava-labs/firewood/ffi v0.0.13")
+	addReplaceDirectiveToFile(t, goModPath, "github.com/ava-labs/firewood-go-ethhash", "github.com/ava-labs/firewood-go-ethhash v0.0.13")
 
 	// Get status
 	status, err := GetRepoStatus(log, "test-repo", repoPath, goModPath, true)
@@ -554,7 +554,7 @@ require (
 	assert.True(t, status.Exists)
 	assert.Len(t, status.Replacements, 2)
 	assert.Equal(t, "./coreth", status.Replacements["github.com/ava-labs/coreth"])
-	assert.Equal(t, "github.com/ava-labs/firewood/ffi v0.0.13", status.Replacements["github.com/ava-labs/firewood/ffi"])
+	assert.Equal(t, "github.com/ava-labs/firewood-go-ethhash v0.0.13", status.Replacements["github.com/ava-labs/firewood-go-ethhash"])
 }
 
 // TestGetRepoStatus_PrimaryVsSyncedReplacements tests that primary and synced repos

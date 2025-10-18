@@ -288,7 +288,7 @@ func TestGetRepoStatus_WithReplaceDirective(t *testing.T) {
 
 go 1.21
 
-require github.com/ava-labs/firewood/ffi v0.0.0
+require github.com/ava-labs/firewood-go-ethhash v0.0.0
 `
 	err = os.WriteFile(goModPath, []byte(goModContent), 0o600)
 	require.NoError(t, err, "failed to write go.mod")
@@ -337,7 +337,7 @@ func TestFormatRepoStatus(t *testing.T) {
 				Path:   "/tmp/firewood",
 				Exists: true,
 				Replacements: map[string]string{
-					"github.com/ava-labs/firewood/ffi": "./firewood",
+					"github.com/ava-labs/firewood-go-ethhash": "./firewood",
 				},
 			},
 			contains: "replacements:",
@@ -425,7 +425,7 @@ go 1.24
 
 require (
 	github.com/ava-labs/coreth v0.15.4
-	github.com/ava-labs/firewood/ffi v0.0.12
+	github.com/ava-labs/firewood-go-ethhash v0.0.12
 )
 `
 	err := os.WriteFile(primaryGoModPath, []byte(primaryGoModContent), 0o600)
@@ -442,7 +442,7 @@ go 1.24
 
 require (
 	github.com/ava-labs/avalanchego v1.13.6
-	github.com/ava-labs/firewood/ffi v0.0.12
+	github.com/ava-labs/firewood-go-ethhash v0.0.12
 )
 `
 	err = os.WriteFile(corethGoModPath, []byte(corethGoModContent), 0o600)
@@ -476,7 +476,7 @@ go 1.24
 			hasCorethReplace = true
 			require.Equal(t, "./coreth", r.New.Path, "unexpected coreth replace path")
 		}
-		if r.Old.Path == "github.com/ava-labs/firewood/ffi" {
+		if r.Old.Path == "github.com/ava-labs/firewood-go-ethhash" {
 			hasFirewoodReplace = true
 			require.Equal(t, "./firewood/ffi/result/ffi", r.New.Path, "unexpected firewood replace path")
 		}
@@ -495,7 +495,7 @@ go 1.24
 			hasAvalanchegoReplace = true
 			require.Equal(t, "..", r.New.Path, "unexpected avalanchego replace path from coreth")
 		}
-		if r.Old.Path == "github.com/ava-labs/firewood/ffi" {
+		if r.Old.Path == "github.com/ava-labs/firewood-go-ethhash" {
 			hasFirewoodReplaceInCoreth = true
 			require.Equal(t, "../firewood/ffi/result/ffi", r.New.Path, "unexpected firewood replace path from coreth")
 		}
@@ -520,8 +520,8 @@ func TestUpdateAllReplaceDirectives_MultipleRepos(t *testing.T) {
 			primaryRepo:   "avalanchego",
 			syncedRepos:   []string{"coreth", "firewood"},
 			primaryModule: "github.com/ava-labs/avalanchego",
-			primaryDeps:   []string{"github.com/ava-labs/coreth", "github.com/ava-labs/firewood/ffi"},
-			corethDeps:    []string{"github.com/ava-labs/avalanchego", "github.com/ava-labs/firewood/ffi"},
+			primaryDeps:   []string{"github.com/ava-labs/coreth", "github.com/ava-labs/firewood-go-ethhash"},
+			corethDeps:    []string{"github.com/ava-labs/avalanchego", "github.com/ava-labs/firewood-go-ethhash"},
 			verifyFunc: func(t *testing.T, tmpDir string) {
 				log := logging.NoLog{}
 
@@ -535,7 +535,7 @@ func TestUpdateAllReplaceDirectives_MultipleRepos(t *testing.T) {
 				}
 
 				require.Contains(t, replaces, "github.com/ava-labs/coreth", "avalanchego should have coreth replace")
-				require.Contains(t, replaces, "github.com/ava-labs/firewood/ffi", "avalanchego should have firewood replace")
+				require.Contains(t, replaces, "github.com/ava-labs/firewood-go-ethhash", "avalanchego should have firewood replace")
 
 				// Check coreth has replaces for avalanchego and firewood
 				corethMod, err := ReadGoMod(log, filepath.Join(tmpDir, "coreth", "go.mod"))
@@ -547,7 +547,7 @@ func TestUpdateAllReplaceDirectives_MultipleRepos(t *testing.T) {
 				}
 
 				require.Contains(t, corethReplaces, "github.com/ava-labs/avalanchego", "coreth should have avalanchego replace")
-				require.Contains(t, corethReplaces, "github.com/ava-labs/firewood/ffi", "coreth should have firewood replace")
+				require.Contains(t, corethReplaces, "github.com/ava-labs/firewood-go-ethhash", "coreth should have firewood replace")
 				require.Equal(t, "..", corethReplaces["github.com/ava-labs/avalanchego"], "coreth should point to parent dir for avalanchego")
 			},
 		},
@@ -556,7 +556,7 @@ func TestUpdateAllReplaceDirectives_MultipleRepos(t *testing.T) {
 			primaryRepo:   "avalanchego",
 			syncedRepos:   []string{"firewood"},
 			primaryModule: "github.com/ava-labs/avalanchego",
-			primaryDeps:   []string{"github.com/ava-labs/firewood/ffi"},
+			primaryDeps:   []string{"github.com/ava-labs/firewood-go-ethhash"},
 			corethDeps:    nil, // coreth not synced
 			verifyFunc: func(t *testing.T, tmpDir string) {
 				log := logging.NoLog{}
@@ -567,7 +567,7 @@ func TestUpdateAllReplaceDirectives_MultipleRepos(t *testing.T) {
 
 				hasFirewood := false
 				for _, r := range avalanchegoMod.Replace {
-					if r.Old.Path == "github.com/ava-labs/firewood/ffi" {
+					if r.Old.Path == "github.com/ava-labs/firewood-go-ethhash" {
 						hasFirewood = true
 					}
 				}

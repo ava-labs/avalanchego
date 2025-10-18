@@ -169,7 +169,7 @@ require github.com/ava-labs/coreth v0.13.8
 
 go 1.21
 
-require github.com/ava-labs/firewood/ffi v0.0.0-20240101120000-abc123def456
+require github.com/ava-labs/firewood-go-ethhash v0.0.0-20240101120000-abc123def456
 `,
 			expectedRef: "abc123def456",
 			expectError: false,
@@ -188,26 +188,38 @@ require github.com/ava-labs/avalanchego v1.11.11
 			expectError: false,
 		},
 		{
-			name:        "firewood has no dependency on avalanchego - uses default branch",
-			currentRepo: "firewood",
-			targetRepo:  "avalanchego",
-			goModContent: `module github.com/ava-labs/firewood/ffi
+			name:        "avalanchego without firewood dependency - should error",
+			currentRepo: "avalanchego",
+			targetRepo:  "firewood",
+			goModContent: `module github.com/ava-labs/avalanchego
 
 go 1.21
+
+require github.com/ava-labs/coreth v0.13.8
 `,
-			expectedRef: "master",
-			expectError: false,
+			expectedRef: "",
+			expectError: true,
 		},
 		{
-			name:        "firewood has no dependency on coreth - uses default branch",
-			currentRepo: "firewood",
-			targetRepo:  "coreth",
-			goModContent: `module github.com/ava-labs/firewood/ffi
+			name:        "coreth without firewood dependency - should error",
+			currentRepo: "coreth",
+			targetRepo:  "firewood",
+			goModContent: `module github.com/ava-labs/coreth
 
 go 1.21
+
+require github.com/ava-labs/avalanchego v1.11.11
 `,
-			expectedRef: "master",
-			expectError: false,
+			expectedRef: "",
+			expectError: true,
+		},
+		{
+			name:         "no current repo - uses default branch",
+			currentRepo:  "",
+			targetRepo:   "firewood",
+			goModContent: "",
+			expectedRef:  "main",
+			expectError:  false,
 		},
 		{
 			name:         "no go.mod path - uses default branch",
