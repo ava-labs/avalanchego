@@ -4,16 +4,30 @@
 package core
 
 import (
+	"os"
+	"path/filepath"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-// UpdateAvalanchego updates the avalanchego dependency in the current repo's go.mod
-// This should NOT be run from avalanchego itself
-func UpdateAvalanchego(log logging.Logger, goModPath, version string) error {
+// UpdateAvalanchego updates the avalanchego dependency version in go.mod.
+// If version is empty, uses the current version from go.mod.
+// Returns error if go.mod doesn't exist in baseDir or operation fails.
+func UpdateAvalanchego(log logging.Logger, baseDir string, version string) error {
+	// Validate go.mod exists in baseDir
+	goModPath := filepath.Join(baseDir, "go.mod")
+	if _, err := os.Stat(goModPath); err != nil {
+		if os.IsNotExist(err) {
+			return stacktrace.Errorf("go.mod not found in current directory")
+		}
+		return stacktrace.Errorf("failed to stat go.mod: %w", err)
+	}
+
 	log.Debug("updating avalanchego dependency",
+		zap.String("baseDir", baseDir),
 		zap.String("goModPath", goModPath),
 		zap.String("version", version),
 	)

@@ -5,7 +5,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -279,13 +278,12 @@ This command cannot be run from the avalanchego repository itself.`,
 			zap.String("version", version),
 		)
 
-		// Get path to go.mod
-		goModPath := goModFilename
-		if _, err := os.Stat(goModPath); err != nil {
-			return errors.New("go.mod not found in current directory")
+		baseDir, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
 		}
 
-		err := core.UpdateAvalanchego(log, goModPath, version)
+		err = core.UpdateAvalanchego(log, baseDir, version)
 		if err != nil {
 			return err
 		}
