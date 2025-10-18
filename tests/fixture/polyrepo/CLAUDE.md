@@ -470,13 +470,35 @@ polyrepo update-avalanchego
 
 ### Core Files
 
-- **main.go**: CLI commands and command handlers
-- **core/sync.go**: Sync logic and `UpdateAllReplaceDirectives()`
+- **main.go**: CLI argument parsing and routing to core functions (thin layer, minimal business logic)
+- **core/sync.go**: Sync orchestration (`Sync()`), version discovery, and `UpdateAllReplaceDirectives()`
 - **core/repo.go**: Git operations (clone, checkout, status)
 - **core/gomod.go**: go.mod parsing and manipulation
+- **core/reset.go**: Reset directive removal (`Reset()`)
+- **core/update.go**: Dependency version updates (`UpdateAvalanchego()`)
 - **core/config.go**: Repository configurations
-- **core/status.go**: Status reporting
+- **core/status.go**: Status reporting and display (`Status()`)
 - **core/errors.go**: Custom error types
+
+### Architecture: Separation of Concerns
+
+**Design Principle**: All business logic lives in the `core/` package. The `main.go` file contains only:
+- CLI command definitions (cobra commands)
+- Argument parsing and validation
+- Routing to appropriate core functions
+- Minimal logic (typically 5-10 lines per command)
+
+**Benefits**:
+- **Testability**: Business logic can be unit tested without invoking the CLI
+- **Reusability**: Core functions can be called from other Go code, not just the CLI
+- **Maintainability**: Clear separation makes code easier to understand and modify
+- **Bug Prevention**: Unit tests catch bugs that previously required integration tests
+
+**Pattern for Adding New Commands**:
+1. Write unit tests first for the core function (TDD)
+2. Implement business logic in a `core/` function
+3. Create a thin CLI command handler in `main.go` that just calls the core function
+4. The CLI handler should only handle: argument parsing, getting baseDir, calling core function
 
 ### Key Functions
 
@@ -515,6 +537,87 @@ Returns the status of a repository including whether it exists, current ref, dir
 - `isPrimary`: If true, the repo path is `baseDir` itself (we're currently in this repo). If false, the repo path is `baseDir/repoName` (synced repo).
 
 This allows the status command to correctly check the primary repository (current directory) vs synced repositories (subdirectories).
+
+#### `Sync(log, baseDir, repoArgs, depth, force)`
+**Location**: core/sync.go
+
+Orchestrates the complete repository synchronization workflow. This is the main entry point for the sync command.
+
+**Modes:**
+- **Primary Repo Mode** (go.mod exists): Detects current repo, discovers versions from go.mod, updates replace directives
+- **Standalone Mode** (no go.mod): Uses version discovery functions, no replace directives
+
+**Algorithm:**
+1. Detect operating mode (check if go.mod exists)
+2. Parse repo arguments (`repo[@ref]` format)
+3. Determine refs for each repo (explicit, from go.mod, or via version discovery)
+4. Validate (cannot sync repo into itself in primary mode)
+5. Execute sync loop (clone/update, nix build)
+6. Update replace directives (primary mode only)
+
+**Version Discovery Integration:**
+- Calls `DiscoverAvalanchegoCorethVersions()` in standalone mode
+- Calls `DiscoverFirewoodVersion()` in standalone mode
+- These functions were previously unused but are now integrated
+
+**Error Handling**: Fails fast on first error
+
+#### `Reset(log, baseDir, repoNames)`
+**Location**: core/reset.go
+
+Removes replace directives from go.mod for specified repositories.
+
+**Behavior:**
+- If `repoNames` is empty: removes all polyrepo replace directives
+- If `repoNames` provided: removes only specified repos' replace directives
+- Validates that go.mod exists in baseDir (returns error if missing)
+
+**Usage:**
+- Called by reset command in main.go
+- Can be unit tested without CLI
+
+#### `UpdateAvalanchego(log, baseDir, version)`
+**Location**: core/update.go
+
+Updates the avalanchego dependency version in go.mod.
+
+**Behavior:**
+- If `version` is empty: uses current version from go.mod
+- If `version` provided: updates to specified version
+- Validates that go.mod exists in baseDir
+- Cannot be run from avalanchego repository itself
+
+**Usage:**
+- Called by update-avalanchego command in main.go
+- Can be unit tested without CLI
+
+#### `Status(log, baseDir, writer)`
+**Location**: core/status.go
+
+Displays the status of all polyrepo-managed repositories.
+
+**Algorithm:**
+1. Detect primary repository via `DetectCurrentRepo()`
+2. Determine go.mod path (primary repo's go.mod or baseDir/go.mod)
+3. Display "Primary Repository" section with status
+4. Display "Other Repositories" section (all repos except primary)
+
+**Parameters:**
+- `writer io.Writer`: Allows testing without stdout (can use bytes.Buffer)
+
+**Output Format:**
+```
+Primary Repository: avalanchego
+  avalanchego: /path/to/avalanchego (branch: master, clean)
+
+Other Repositories:
+  coreth: not cloned
+  firewood: not cloned
+```
+
+**Usage:**
+- Called by status command in main.go with `os.Stdout`
+- Can be unit tested with `bytes.Buffer` to capture output
 
 #### `DetectCurrentRepo(log, dir)`
 **Location**: core/sync.go:16-76
@@ -885,6 +988,73 @@ git worktree remove ../test-worktree
 
 ## Recent Fixes
 
+### Main.go Refactoring: Business Logic Moved to Core (2025-10)
+
+**Problem**: Business logic was embedded in main.go CLI command handlers (~350 lines total), making it:
+- Impossible to unit test without invoking the CLI
+- Difficult to reuse functionality outside the CLI
+- Error-prone (bugs could only be caught by integration tests)
+- Hard to maintain and understand
+
+**Example Bug Caught**: The standalone mode (--target-dir with empty directory) was documented in CLAUDE.md and had helper functions implemented, but the main.go sync command still required go.mod to exist, causing "go.mod not found" errors. This bug would have been caught immediately by unit tests if the logic was in core/.
+
+**Solution**: Refactored all four CLI commands to move business logic into testable core functions:
+
+1. **Sync Command** → `core.Sync()`
+   - Moved ~180 lines of logic from main.go to core/sync.go
+   - Integrated previously unused version discovery functions
+   - Fixed standalone mode bug (now works without go.mod)
+   - Added unit test that would have caught the bug
+
+2. **Reset Command** → `core.Reset()`
+   - Moved go.mod validation from main.go into core/reset.go
+   - Updated signature: `goModPath` parameter → `baseDir` parameter
+   - Added unit tests for error handling
+
+3. **Update-Avalanchego Command** → `core.UpdateAvalanchego()`
+   - Moved go.mod validation from main.go into core/update.go
+   - Updated signature: `goModPath` parameter → `baseDir` parameter
+   - Added 5 comprehensive unit tests
+
+4. **Status Command** → `core.Status()`
+   - Moved ~85 lines of display logic from main.go to core/status.go
+   - Added `io.Writer` parameter to enable testing without stdout
+   - Added 7 comprehensive unit tests
+
+**Architecture Change**:
+- **Before**: main.go contained ~350 lines of untestable business logic
+- **After**: main.go contains ~40 lines total (each command is 5-10 lines)
+- **Pattern**: CLI handler only does: parse args, get baseDir, call core function
+
+**Testing Strategy**:
+- All business logic is now unit testable in the core/ package
+- Unit tests use TDD approach (write tests first, verify they fail, then implement)
+- Integration tests remain but are no longer the only way to catch bugs
+
+**Test Coverage Added**:
+- `TestSync_StandaloneMode_*`: Tests standalone mode (caught the bug!)
+- `TestReset_NoGoMod_Error`: Tests error handling
+- `TestUpdateAvalanchego_*`: 5 tests covering all scenarios
+- `TestStatus_*`: 7 tests covering all output scenarios
+
+**Benefits**:
+- **Faster development**: Unit tests run instantly, no need to build and invoke CLI
+- **Better bug prevention**: Logic bugs caught by unit tests instead of integration tests
+- **Easier maintenance**: Clear separation of concerns
+- **Reusability**: Core functions can be called from other Go code
+- **Documentation**: Function signatures and tests serve as API documentation
+
+**Development Process**:
+- Followed strict TDD (Test-Driven Development)
+- Each refactoring done in separate commit for easy review
+- All changes verified with linter and full test suite
+
+**Hard-Won Knowledge**:
+- **ALWAYS put business logic in core/**, not in main.go
+- **ALWAYS write unit tests for core functions** before implementation
+- If you find yourself unable to test something without invoking the CLI, that's a sign the logic belongs in core/
+- Integration tests are valuable but should not be the ONLY tests for business logic
+
 ### Target Directory Flag Support (2025-10)
 
 **Enhancement**: Added `--target-dir` flag to allow running polyrepo commands on any directory without having to `cd` into it first.
@@ -1006,6 +1176,112 @@ This fix demonstrates the importance of:
 
 ## Common Patterns
 
+### Adding a New CLI Command
+
+**CRITICAL**: Always follow this pattern when adding new commands. ALL business logic must be in core/, not in main.go.
+
+**Pattern**:
+
+1. **Write unit tests FIRST** (TDD - Red phase):
+   ```go
+   // In core/myfeature_test.go
+   func TestMyFeature_SuccessCase(t *testing.T) {
+       // Test the core function, not the CLI
+   }
+
+   func TestMyFeature_ErrorCase(t *testing.T) {
+       // Test error handling
+   }
+   ```
+
+2. **Run tests - verify they FAIL** (TDD - Red phase):
+   ```bash
+   go test ./core/... -v -run=TestMyFeature
+   # Should see: undefined: MyFeature
+   ```
+
+3. **Implement core function** (TDD - Green phase):
+   ```go
+   // In core/myfeature.go
+   func MyFeature(log logging.Logger, baseDir string, params ...string) error {
+       // ALL business logic goes here
+       // - Validation
+       // - File operations
+       // - Git operations
+       // - Error handling
+       return nil
+   }
+   ```
+
+4. **Run tests - verify they PASS** (TDD - Green phase):
+   ```bash
+   go test ./core/... -v -run=TestMyFeature
+   # All tests should pass
+   ```
+
+5. **Create thin CLI command handler** in main.go:
+   ```go
+   var myFeatureCmd = &cobra.Command{
+       Use:   "myfeature [args]",
+       Short: "Description",
+       RunE: func(cmd *cobra.Command, args []string) error {
+           log := getLogger(cmd)
+
+           baseDir, err := os.Getwd()
+           if err != nil {
+               return fmt.Errorf("failed to get current directory: %w", err)
+           }
+
+           return core.MyFeature(log, baseDir, args...)
+       },
+   }
+   ```
+
+6. **Register command** in `init()`:
+   ```go
+   func init() {
+       rootCmd.AddCommand(myFeatureCmd)
+   }
+   ```
+
+**Key Rules**:
+- **main.go should be ~10 lines per command**: parse args, get baseDir, call core function
+- **core/ contains ALL business logic**: validation, operations, error handling
+- **Write tests FIRST**: Unit tests in core/ catch bugs without needing integration tests
+- **Use io.Writer for output**: Pass `os.Stdout` from CLI, use `bytes.Buffer` in tests
+- **Fail fast**: Return first error, don't collect multiple errors
+
+**Anti-Patterns (DO NOT DO THIS)**:
+```go
+// ❌ BAD: Business logic in main.go
+RunE: func(cmd *cobra.Command, args []string) error {
+    // Validation logic
+    if len(args) == 0 {
+        return errors.New("missing args")
+    }
+
+    // File operations
+    if _, err := os.Stat(goModPath); err != nil {
+        return err
+    }
+
+    // More logic...
+    // This is UNTESTABLE without invoking the CLI!
+}
+```
+
+```go
+// ✅ GOOD: Thin CLI handler, business logic in core
+RunE: func(cmd *cobra.Command, args []string) error {
+    log := getLogger(cmd)
+    baseDir, err := os.Getwd()
+    if err != nil {
+        return fmt.Errorf("failed to get current directory: %w", err)
+    }
+    return core.MyFeature(log, baseDir, args...)
+}
+```
+
 ### Adding a New Repository
 
 1. Add config to core/config.go:
@@ -1063,12 +1339,29 @@ This error means a replace directive doesn't start with `./`, `../`, or `/`.
 ## Notes for Future Development
 
 ### Process Requirements
+
+**Architecture (MOST IMPORTANT)**:
+- **ALL business logic MUST live in core/**, not in main.go
+- **main.go is ONLY for CLI argument parsing and routing** - Keep command handlers to 5-10 lines
+- **If you can't unit test it without invoking the CLI, it's in the wrong place** - Move it to core/
+- **Every core function MUST have unit tests** - No exceptions
+
+**Test-Driven Development (TDD)**:
+- **ALWAYS write tests FIRST** - Before any implementation code
+- **ALWAYS verify tests FAIL** - Run tests and confirm they fail with expected errors (e.g., "undefined: FunctionName")
+- **Only then implement** - Write minimal code to make tests pass
+- **Enumerate corner cases first** - List all scenarios before writing tests
+- **Manual testing is for discovering corner cases** - Then convert to automated tests immediately
+
+**Documentation**:
 - **ALWAYS document ALL changes in CLAUDE.md** - This is MANDATORY, not optional. New features, bug fixes, new functions, and new tests must all be documented in the appropriate sections
 - **ALWAYS document hard-won knowledge immediately** - Don't wait until implementation is complete
-- **Write tests before implementation** - Enumerate corner cases first, then write tests
+- **Document WHY, not just WHAT** - Explain the reasoning behind decisions
+
+**Code Quality**:
 - **Run linter immediately after code changes, before execution** - Catch errors at compile-time, not runtime
 - **Use proactive detection, not error-based fallbacks** - Detect special cases upfront
-- **Manual testing is for discovering corner cases** - Then convert to automated tests
+- **Fail fast** - Return first error, don't collect multiple errors
 
 ### Technical Knowledge
 - **Git worktrees require direct filesystem access** - go-git doesn't support them
