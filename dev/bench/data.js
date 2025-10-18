@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1760713690012,
+  "lastUpdate": 1760791038399,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -2150,6 +2150,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
             "value": 44.1,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Ceyhun Onur",
+            "username": "ceyonur",
+            "email": "ceyhun.onur@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "eca34322f967c07d59c714341cd6c46c99fc2ea6",
+          "message": "change subnet proposervm delay default to 0 (#4422)\n\nSigned-off-by: Ceyhun Onur <ceyhun.onur@avalabs.org>",
+          "timestamp": "2025-10-17T16:07:30Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/eca34322f967c07d59c714341cd6c46c99fc2ea6"
+        },
+        "date": 1760791037692,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
+            "value": 74.69,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
