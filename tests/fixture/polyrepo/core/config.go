@@ -8,7 +8,8 @@ import "github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 // RepoConfig contains the configuration for a repository
 type RepoConfig struct {
 	Name                  string
-	GoModule              string
+	GoModule              string // Module name used by external importers
+	InternalGoModule      string // Module name in repo's own go.mod (if different from GoModule)
 	ModuleReplacementPath string
 	GitRepo               string
 	DefaultBranch         string
@@ -42,7 +43,8 @@ var (
 
 	firewoodConfig = &RepoConfig{
 		Name:                  "firewood",
-		GoModule:              "github.com/ava-labs/firewood/ffi",
+		GoModule:              "github.com/ava-labs/firewood-go-ethhash", // Module name used by importers
+		InternalGoModule:      "github.com/ava-labs/firewood/ffi",        // Module name in firewood's own go.mod
 		ModuleReplacementPath: "./ffi/result/ffi",
 		GitRepo:               "https://github.com/ava-labs/firewood",
 		DefaultBranch:         "main",

@@ -38,7 +38,7 @@ func TestGetRepoConfig_Firewood(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, "firewood", config.Name)
-	require.Equal(t, "github.com/ava-labs/firewood/ffi", config.GoModule)
+	require.Equal(t, "github.com/ava-labs/firewood-go-ethhash", config.GoModule)
 	require.Equal(t, "main", config.DefaultBranch)
 	require.Equal(t, "./ffi/result/ffi", config.ModuleReplacementPath)
 	require.True(t, config.RequiresNixBuild)
