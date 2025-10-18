@@ -5,6 +5,10 @@ package core
 
 import (
 	"fmt"
+	"io"
+	"os"
+
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
@@ -147,4 +151,89 @@ func joinStrings(strs []string) string {
 		result += ", " + strs[i]
 	}
 	return result
+}
+
+// Status displays the status of all polyrepo-managed repositories.
+// It detects the primary repository, retrieves status for all repos,
+// and formats the output.
+//
+// Parameters:
+//   - log: Logger instance
+//   - baseDir: Directory to operate in (already validated by caller)
+//   - writer: io.Writer to write output to (allows testing without stdout)
+//
+// Returns error if status retrieval fails.
+func Status(
+	log logging.Logger,
+	baseDir string,
+	writer io.Writer,
+) error {
+	const goModFilename = "go.mod"
+
+	// Detect which repo we're currently in
+	primaryRepo, err := DetectCurrentRepo(log, baseDir)
+	if err != nil {
+		return fmt.Errorf("failed to detect current repository: %w", err)
+	}
+
+	// Get path to go.mod based on primary repo
+	goModPath := ""
+	if primaryRepo != "" {
+		config, err := GetRepoConfig(primaryRepo)
+		if err == nil {
+			goModPath = config.GoModPath
+			if _, err := os.Stat(goModPath); err != nil {
+				goModPath = ""
+			}
+		}
+	} else {
+		// Not in a known repo, check for go.mod in current directory
+		if _, err := os.Stat(goModFilename); err == nil {
+			goModPath = goModFilename
+		}
+	}
+
+	// Display primary repository section
+	if primaryRepo != "" {
+		fmt.Fprintf(writer, "Primary Repository: %s\n", primaryRepo)
+
+		// Get status for primary repo (isPrimary = true)
+		status, err := GetRepoStatus(log, primaryRepo, baseDir, goModPath, true)
+		if err != nil {
+			log.Warn("failed to get status for primary repository",
+				zap.String("repo", primaryRepo),
+				zap.Error(err),
+			)
+		} else {
+			fmt.Fprintf(writer, "  %s\n", FormatRepoStatus(status))
+		}
+		fmt.Fprintln(writer)
+	} else {
+		fmt.Fprintln(writer, "Primary Repository: none (not in a known repository)")
+		fmt.Fprintln(writer)
+	}
+
+	// Display other repositories section
+	fmt.Fprintln(writer, "Other Repositories:")
+	repos := []string{"avalanchego", "coreth", "firewood"}
+	for _, repoName := range repos {
+		// Skip the primary repo since we already displayed it
+		if repoName == primaryRepo {
+			continue
+		}
+
+		// Get status for synced repo (isPrimary = false)
+		status, err := GetRepoStatus(log, repoName, baseDir, goModPath, false)
+		if err != nil {
+			log.Warn("failed to get status for repository",
+				zap.String("repo", repoName),
+				zap.Error(err),
+			)
+			continue
+		}
+
+		fmt.Fprintf(writer, "  %s\n", FormatRepoStatus(status))
+	}
+
+	return nil
 }
