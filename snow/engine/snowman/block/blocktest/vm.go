@@ -16,15 +16,13 @@ import (
 )
 
 var (
-	errBuildBlock               = errors.New("unexpectedly called BuildBlock")
-	errParseBlock               = errors.New("unexpectedly called ParseBlock")
-	errGetBlock                 = errors.New("unexpectedly called GetBlock")
-	errLastAccepted             = errors.New("unexpectedly called LastAccepted")
-	errGetBlockIDAtHeight       = errors.New("unexpectedly called GetBlockIDAtHeight")
-	errSetPreferenceWithContext = errors.New("unexpectedly called SetPreferenceWithContext")
+	errBuildBlock         = errors.New("unexpectedly called BuildBlock")
+	errParseBlock         = errors.New("unexpectedly called ParseBlock")
+	errGetBlock           = errors.New("unexpectedly called GetBlock")
+	errLastAccepted       = errors.New("unexpectedly called LastAccepted")
+	errGetBlockIDAtHeight = errors.New("unexpectedly called GetBlockIDAtHeight")
 
-	_ block.ChainVM                         = (*VM)(nil)
-	_ block.SetPreferenceWithContextChainVM = (*VMWithSetPreferenceContext)(nil)
+	_ block.ChainVM = (*VM)(nil)
 )
 
 // VM is a ChainVM that is useful for testing.
@@ -114,27 +112,4 @@ func (vm *VM) GetBlockIDAtHeight(ctx context.Context, height uint64) (ids.ID, er
 		require.FailNow(vm.T, errGetAncestor.Error())
 	}
 	return ids.Empty, errGetBlockIDAtHeight
-}
-
-// VMWithSetPreferenceContext extends VM to implement SetPreferenceWithContextChainVM
-type VMWithSetPreferenceContext struct {
-	*VM
-
-	CantSetPreferenceWithContext bool
-	SetPreferenceWithContextF    func(context.Context, ids.ID, *block.Context) error
-}
-
-func (vm *VMWithSetPreferenceContext) Default(cant bool) {
-	vm.VM.Default(cant)
-	vm.CantSetPreferenceWithContext = cant
-}
-
-func (vm *VMWithSetPreferenceContext) SetPreferenceWithContext(ctx context.Context, id ids.ID, blockCtx *block.Context) error {
-	if vm.SetPreferenceWithContextF != nil {
-		return vm.SetPreferenceWithContextF(ctx, id, blockCtx)
-	}
-	if vm.CantSetPreferenceWithContext && vm.T != nil {
-		require.FailNow(vm.T, errSetPreferenceWithContext.Error())
-	}
-	return errSetPreferenceWithContext
 }

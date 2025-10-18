@@ -99,9 +99,10 @@ func TestManagerSetPreferenceWithContext(t *testing.T) {
 	require.Nil(manager.preferredCtx)
 
 	newPreference := ids.GenerateTestID()
-	manager.SetPreferenceWithContext(newPreference, &snowmanblock.Context{
+	newContext := &snowmanblock.Context{
 		PChainHeight: 100,
-	})
+	}
+	manager.SetPreference(newPreference, newContext)
 	require.Equal(newPreference, manager.Preferred())
-	require.Equal(100, manager.preferredCtx.PChainHeight)
+	require.Equal(newContext, manager.preferredCtx)
 }
