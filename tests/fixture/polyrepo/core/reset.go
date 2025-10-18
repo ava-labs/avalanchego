@@ -4,14 +4,34 @@
 package core
 
 import (
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-// ResetRepos removes replace directives for specified repos (or all if none specified)
-func ResetRepos(log logging.Logger, goModPath string, repoNames []string) error {
+// ErrGoModNotFound is returned when go.mod is not found in the specified directory
+var ErrGoModNotFound = errors.New("go.mod not found in current directory")
+
+// Reset removes replace directives from go.mod for specified repositories.
+// If repoNames is empty, removes replace directives for all polyrepo-managed repositories.
+// Returns error if go.mod doesn't exist in baseDir.
+func Reset(log logging.Logger, baseDir string, repoNames []string) error {
+	// Validate go.mod exists in baseDir
+	goModPath := filepath.Join(baseDir, "go.mod")
+	if _, err := os.Stat(goModPath); err != nil {
+		if os.IsNotExist(err) {
+			return ErrGoModNotFound
+		}
+		return fmt.Errorf("failed to stat go.mod: %w", err)
+	}
+
 	log.Debug("resetting repositories",
+		zap.String("baseDir", baseDir),
 		zap.String("goModPath", goModPath),
 		zap.Strings("repos", repoNames),
 	)
@@ -37,11 +57,10 @@ func ResetRepos(log logging.Logger, goModPath string, repoNames []string) error 
 			return err
 		}
 
+		// Try to remove replace directive for the primary module name
 		log.Debug("removing replace directive for module",
 			zap.String("module", config.GoModule),
 		)
-
-		// Remove the replace directive
 		err = RemoveReplaceDirective(log, goModPath, config.GoModule)
 		if err != nil {
 			// Ignore error if replace doesn't exist
@@ -49,7 +68,21 @@ func ResetRepos(log logging.Logger, goModPath string, repoNames []string) error 
 				zap.String("module", config.GoModule),
 				zap.Error(err),
 			)
-			continue
+		}
+
+		// If the repo has an InternalGoModule (like firewood), also try to remove that
+		if config.InternalGoModule != "" && config.InternalGoModule != config.GoModule {
+			log.Debug("removing replace directive for internal module",
+				zap.String("module", config.InternalGoModule),
+			)
+			err = RemoveReplaceDirective(log, goModPath, config.InternalGoModule)
+			if err != nil {
+				// Ignore error if replace doesn't exist
+				log.Debug("ignoring error (replace may not exist)",
+					zap.String("module", config.InternalGoModule),
+					zap.Error(err),
+				)
+			}
 		}
 	}
 

@@ -237,17 +237,12 @@ repositories (avalanchego, coreth, firewood).`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		log := getLogger(cmd)
 
-		// Get path to go.mod
-		goModPath := goModFilename
-		if _, err := os.Stat(goModPath); err != nil {
-			return errors.New("go.mod not found in current directory")
+		baseDir, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get current directory: %w", err)
 		}
 
-		log.Info("resetting repositories",
-			zap.Strings("repos", args),
-		)
-
-		err := core.ResetRepos(log, goModPath, args)
+		err = core.Reset(log, baseDir, args)
 		if err != nil {
 			return err
 		}
