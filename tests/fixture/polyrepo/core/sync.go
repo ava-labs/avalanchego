@@ -342,3 +342,268 @@ func UpdateAllReplaceDirectives(log logging.Logger, baseDir string, syncedRepos 
 	log.Info("successfully updated all replace directives")
 	return nil
 }
+
+// DiscoverAvalanchegoCorethVersions handles version discovery for avalanchego and coreth when
+// they cannot be discovered from a primary repo's go.mod (firewood as primary, or no primary repo).
+// Returns a map of repo names to git refs.
+func DiscoverAvalanchegoCorethVersions(
+	log logging.Logger,
+	baseDir string,
+	requestedRepos []string,
+	explicitRefs map[string]string,
+) (map[string]string, error) {
+	log.Info("discovering avalanchego and coreth versions",
+		zap.String("baseDir", baseDir),
+		zap.Strings("requestedRepos", requestedRepos),
+		zap.Int("explicitRefsCount", len(explicitRefs)),
+	)
+
+	versions := make(map[string]string)
+
+	// Check if repos are in requested list
+	avalanchegoRequested := false
+	corethRequested := false
+	for _, repo := range requestedRepos {
+		if repo == "avalanchego" {
+			avalanchegoRequested = true
+		}
+		if repo == "coreth" {
+			corethRequested = true
+		}
+	}
+
+	// Handle explicit refs first
+	if explicitRefs["avalanchego"] != "" {
+		versions["avalanchego"] = explicitRefs["avalanchego"]
+		log.Info("using explicit avalanchego version",
+			zap.String("ref", explicitRefs["avalanchego"]),
+		)
+	}
+	if explicitRefs["coreth"] != "" {
+		versions["coreth"] = explicitRefs["coreth"]
+		log.Info("using explicit coreth version",
+			zap.String("ref", explicitRefs["coreth"]),
+		)
+	}
+
+	// Check if repos are already cloned locally
+	avalanchegoPath := filepath.Join(baseDir, "avalanchego")
+	corethPath := filepath.Join(baseDir, "coreth")
+
+	avalanchegoCloned := false
+	corethCloned := false
+
+	if _, err := os.Stat(filepath.Join(avalanchegoPath, ".git")); err == nil {
+		avalanchegoCloned = true
+		log.Debug("avalanchego is already cloned locally")
+	}
+	if _, err := os.Stat(filepath.Join(corethPath, ".git")); err == nil {
+		corethCloned = true
+		log.Debug("coreth is already cloned locally")
+	}
+
+	// Discover avalanchego version if needed and requested
+	if avalanchegoRequested && versions["avalanchego"] == "" {
+		if corethCloned {
+			// Discover from coreth
+			log.Info("discovering avalanchego version from cloned coreth")
+			corethGoMod := filepath.Join(corethPath, "go.mod")
+			avalanchegoConfig, err := GetRepoConfig("avalanchego")
+			if err != nil {
+				return nil, stacktrace.Errorf("failed to get avalanchego config: %w", err)
+			}
+
+			version, err := GetDependencyVersion(log, corethGoMod, avalanchegoConfig.GoModule)
+			if err != nil {
+				return nil, stacktrace.Errorf("failed to get avalanchego version from coreth go.mod: %w", err)
+			}
+
+			gitRef, err := ConvertVersionToGitRef(log, version)
+			if err != nil {
+				return nil, stacktrace.Errorf("failed to convert avalanchego version to git ref: %w", err)
+			}
+
+			versions["avalanchego"] = gitRef
+			log.Info("discovered avalanchego version from coreth",
+				zap.String("version", version),
+				zap.String("gitRef", gitRef),
+			)
+		} else {
+			// Use default branch (master)
+			avalanchegoConfig, err := GetRepoConfig("avalanchego")
+			if err != nil {
+				return nil, stacktrace.Errorf("failed to get avalanchego config: %w", err)
+			}
+
+			versions["avalanchego"] = avalanchegoConfig.DefaultBranch
+			log.Info("using default branch for avalanchego",
+				zap.String("branch", avalanchegoConfig.DefaultBranch),
+			)
+
+			// Clone avalanchego if coreth is also requested and doesn't have explicit ref
+			if corethRequested && versions["coreth"] == "" {
+				log.Info("cloning avalanchego to discover coreth version")
+				err = CloneRepo(log, avalanchegoConfig.GitRepo, avalanchegoPath, avalanchegoConfig.DefaultBranch, 1)
+				if err != nil {
+					return nil, stacktrace.Errorf("failed to clone avalanchego: %w", err)
+				}
+				avalanchegoCloned = true
+			}
+		}
+	}
+
+	// Discover coreth version if needed and requested
+	if corethRequested && versions["coreth"] == "" {
+		if avalanchegoCloned {
+			// Discover from avalanchego
+			log.Info("discovering coreth version from cloned avalanchego")
+			avalanchegoGoMod := filepath.Join(avalanchegoPath, "go.mod")
+			corethConfig, err := GetRepoConfig("coreth")
+			if err != nil {
+				return nil, stacktrace.Errorf("failed to get coreth config: %w", err)
+			}
+
+			version, err := GetDependencyVersion(log, avalanchegoGoMod, corethConfig.GoModule)
+			if err != nil {
+				return nil, stacktrace.Errorf("failed to get coreth version from avalanchego go.mod: %w", err)
+			}
+
+			gitRef, err := ConvertVersionToGitRef(log, version)
+			if err != nil {
+				return nil, stacktrace.Errorf("failed to convert coreth version to git ref: %w", err)
+			}
+
+			versions["coreth"] = gitRef
+			log.Info("discovered coreth version from avalanchego",
+				zap.String("version", version),
+				zap.String("gitRef", gitRef),
+			)
+		} else {
+			// Use default branch (main)
+			corethConfig, err := GetRepoConfig("coreth")
+			if err != nil {
+				return nil, stacktrace.Errorf("failed to get coreth config: %w", err)
+			}
+
+			versions["coreth"] = corethConfig.DefaultBranch
+			log.Info("using default branch for coreth",
+				zap.String("branch", corethConfig.DefaultBranch),
+			)
+		}
+	}
+
+	log.Info("completed avalanchego and coreth version discovery",
+		zap.Int("versionsCount", len(versions)),
+	)
+
+	return versions, nil
+}
+
+// DiscoverFirewoodVersion handles version discovery for firewood following the dependency chain.
+// Priority: explicit ref > coreth's go.mod (direct) > avalanchego's go.mod (indirect) > default branch
+func DiscoverFirewoodVersion(
+	log logging.Logger,
+	baseDir string,
+	explicitRef string,
+	requestedRepos []string,
+	_ map[string]string, // discoveredVersions - reserved for future use
+) (string, error) {
+	log.Info("discovering firewood version",
+		zap.String("baseDir", baseDir),
+		zap.String("explicitRef", explicitRef),
+		zap.Strings("requestedRepos", requestedRepos),
+	)
+
+	// If explicit ref provided, use it
+	if explicitRef != "" {
+		log.Info("using explicit firewood version",
+			zap.String("ref", explicitRef),
+		)
+		return explicitRef, nil
+	}
+
+	firewoodConfig, err := GetRepoConfig("firewood")
+	if err != nil {
+		return "", stacktrace.Errorf("failed to get firewood config: %w", err)
+	}
+
+	// Check if coreth is requested or already cloned
+	corethInvolved := false
+	for _, repo := range requestedRepos {
+		if repo == "coreth" {
+			corethInvolved = true
+			break
+		}
+	}
+
+	corethPath := filepath.Join(baseDir, "coreth")
+	if _, err := os.Stat(filepath.Join(corethPath, ".git")); err == nil {
+		corethInvolved = true
+		log.Debug("coreth is already cloned locally")
+	}
+
+	// Priority 1: Discover from coreth (direct dependency)
+	if corethInvolved {
+		log.Info("discovering firewood version from coreth (direct dependency)")
+		corethGoMod := filepath.Join(corethPath, "go.mod")
+
+		version, err := GetDependencyVersion(log, corethGoMod, firewoodConfig.GoModule)
+		if err != nil {
+			return "", stacktrace.Errorf("failed to get firewood version from coreth go.mod: %w", err)
+		}
+
+		gitRef, err := ConvertVersionToGitRef(log, version)
+		if err != nil {
+			return "", stacktrace.Errorf("failed to convert firewood version to git ref: %w", err)
+		}
+
+		log.Info("discovered firewood version from coreth",
+			zap.String("version", version),
+			zap.String("gitRef", gitRef),
+		)
+		return gitRef, nil
+	}
+
+	// Check if avalanchego is requested or already cloned
+	avalanchegoInvolved := false
+	for _, repo := range requestedRepos {
+		if repo == "avalanchego" {
+			avalanchegoInvolved = true
+			break
+		}
+	}
+
+	avalanchegoPath := filepath.Join(baseDir, "avalanchego")
+	if _, err := os.Stat(filepath.Join(avalanchegoPath, ".git")); err == nil {
+		avalanchegoInvolved = true
+		log.Debug("avalanchego is already cloned locally")
+	}
+
+	// Priority 2: Discover from avalanchego (indirect dependency)
+	if avalanchegoInvolved {
+		log.Info("discovering firewood version from avalanchego (indirect dependency)")
+		avalanchegoGoMod := filepath.Join(avalanchegoPath, "go.mod")
+
+		version, err := GetDependencyVersion(log, avalanchegoGoMod, firewoodConfig.GoModule)
+		if err != nil {
+			return "", stacktrace.Errorf("failed to get firewood version from avalanchego go.mod: %w", err)
+		}
+
+		gitRef, err := ConvertVersionToGitRef(log, version)
+		if err != nil {
+			return "", stacktrace.Errorf("failed to convert firewood version to git ref: %w", err)
+		}
+
+		log.Info("discovered firewood version from avalanchego",
+			zap.String("version", version),
+			zap.String("gitRef", gitRef),
+		)
+		return gitRef, nil
+	}
+
+	// Priority 3: Use default branch (firewood alone, no primary repo)
+	log.Info("using default branch for firewood (standalone mode)",
+		zap.String("branch", firewoodConfig.DefaultBranch),
+	)
+	return firewoodConfig.DefaultBranch, nil
+}

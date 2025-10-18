@@ -48,7 +48,7 @@ This documentation is more valuable than the code itself because code shows "wha
 
 ### Test-Driven Development (TDD)
 
-**ALWAYS follow a test-first approach:**
+**ALWAYS follow a test-first approach (Red-Green-Refactor cycle):**
 
 1. **Enumerate corner cases FIRST** - Before writing any implementation code, list all the scenarios your code must handle:
    - Normal cases
@@ -59,14 +59,29 @@ This documentation is more valuable than the code itself because code shows "wha
 
 2. **Write integration tests for corner cases** - For each corner case, write an automated test that verifies the behavior
 
-3. **Use manual testing to inform test design** - Manual testing is expensive and should primarily serve to:
+3. **🔴 RED: Verify tests FAIL** - **CRITICAL AND MANDATORY STEP:**
+   - Run the tests you just wrote
+   - Verify they fail with appropriate errors (e.g., "undefined: FunctionName" for missing functions)
+   - **DO NOT SKIP THIS STEP** - This confirms your tests actually test something
+   - If tests pass when they should fail, the tests are broken
+   - Document the failure output to confirm tests are correctly written
+
+   **Example:**
+   ```bash
+   go test ./path/to/tests -v -run=TestMyNewFeature
+   # Should see: undefined: MyNewFeature
+   ```
+
+4. **Use manual testing to inform test design** - Manual testing is expensive and should primarily serve to:
    - Discover corner cases you didn't anticipate
    - Validate that tests match real-world behavior
    - Immediately convert manual test steps into automated integration tests
 
-4. **Implement the code** - Write the minimal code needed to make tests pass
+5. **🟢 GREEN: Implement the code** - Write the minimal code needed to make tests pass
 
-5. **Refactor** - Improve code quality while keeping tests green
+6. **🟢 GREEN: Verify tests PASS** - Run tests again to confirm they now pass with your implementation
+
+7. **♻️ REFACTOR: Improve code quality** - Refactor while keeping tests green
 
 ### When Fixing Bugs: TEST FIRST, ALWAYS
 
@@ -314,9 +329,15 @@ All commands support these flags:
 
 1. **Document corner cases** - List all scenarios your change must handle, including edge cases
 2. **Write tests first** - Create integration tests for each corner case identified
-3. **Capture hard-won knowledge** - If you discover something non-obvious during manual testing, add it to CLAUDE.md immediately
-4. **Implement your code changes** - Write the minimal code to make tests pass
-5. **Run the linter BEFORE executing code** (must pass without errors):
+3. **🔴 RED: Verify tests FAIL** - **MANDATORY STEP**:
+   ```bash
+   go test ./path/to/tests -v -run=TestYourNewFeature
+   # Verify you see "undefined" or appropriate failure messages
+   ```
+   This confirms tests actually test something. If tests pass when they should fail, the tests are broken.
+4. **Capture hard-won knowledge** - If you discover something non-obvious during manual testing, add it to CLAUDE.md immediately
+5. **🟢 GREEN: Implement your code changes** - Write the minimal code to make tests pass
+6. **Run the linter BEFORE executing code** (must pass without errors):
    ```bash
    ./scripts/run_task.sh lint
    ```
@@ -328,9 +349,10 @@ All commands support these flags:
 
    Running the linter first saves time by catching errors at compile-time rather than discovering them at runtime. Never skip this step.
 
-6. **Verify with manual testing** - Use manual testing to discover corner cases you missed, then add tests for them
-7. **Convert manual tests to automated tests** - Any manual test you perform should be converted to an integration test
-8. **Update CLAUDE.md documentation** - **MANDATORY for ALL changes**:
+7. **🟢 GREEN: Run tests to verify they PASS** - Confirm your implementation makes the tests pass
+8. **Verify with manual testing** - Use manual testing to discover corner cases you missed, then add tests for them
+9. **Convert manual tests to automated tests** - Any manual test you perform should be converted to an integration test
+10. **Update CLAUDE.md documentation** - **MANDATORY for ALL changes**:
    - **New features/flags/capabilities**: Document in "Usage" → relevant command section, add to "Global Flags" or command-specific flags, and create entry in "Recent Fixes" section
    - **Bug fixes**: Document in "Recent Fixes" section with problem description, solution, test coverage, and root cause analysis
    - **New core functions**: Update "Implementation Details" → "Key Functions" section
