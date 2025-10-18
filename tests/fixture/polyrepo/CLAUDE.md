@@ -23,14 +23,28 @@ avalanchego ←→ coreth
 
 ### Document Knowledge First
 
-**CRITICAL**: When you discover hard-won knowledge through debugging, manual testing, or implementation challenges, **DOCUMENT IT IMMEDIATELY** before continuing with implementation. This documentation is more valuable than the code itself because it prevents future developers (including yourself) from making the same mistakes.
+**CRITICAL**: ALL changes to the codebase MUST be documented in CLAUDE.md. This is not optional. Documentation is as important as the code itself because it prevents future developers (including yourself) from:
+- Repeating mistakes
+- Breaking working code due to lack of context
+- Spending time re-discovering knowledge you already learned
 
-Examples of knowledge to document immediately:
-- Edge cases discovered during manual testing
-- Quirks in third-party libraries (e.g., go-git doesn't support worktrees)
-- Non-obvious git internals (e.g., worktree `.git` file structure)
-- Error patterns that required special handling
-- Why certain approaches were rejected
+**What to document:**
+- **All features/capabilities/flags** - Even simple additions like command-line flags must be documented in the relevant sections
+- **All bug fixes** - With root cause analysis and what was learned
+- **Hard-won knowledge from debugging** - Edge cases, quirks, non-obvious behavior
+- **New functions and their purpose** - Update Implementation Details section
+- **New tests** - Add to the test list so others know what coverage exists
+- **Quirks in third-party libraries** - (e.g., go-git doesn't support worktrees)
+- **Non-obvious internals** - (e.g., worktree `.git` file structure)
+- **Error patterns that required special handling**
+- **Why certain approaches were rejected**
+
+**When to document:**
+- **IMMEDIATELY after completing any change** - Don't wait until "later"
+- **As you discover non-obvious behavior** - Document during manual testing
+- **After writing tests** - Add test names to the documentation
+
+This documentation is more valuable than the code itself because code shows "what" but documentation explains "why" and "how we got here".
 
 ### Test-Driven Development (TDD)
 
@@ -154,6 +168,32 @@ avalanchego/              # Primary repo
 
 This is the ONLY supported way to run the tool. It builds and runs the binary in a temporary location without leaving artifacts in the working tree.
 
+### Global Flags
+
+All commands support these flags:
+
+- `--target-dir <path>`: Target directory to operate in (defaults to current directory)
+  - Accepts both absolute and relative paths
+  - The tool will change to this directory before executing any command
+  - Useful for running polyrepo commands on a different directory without `cd`ing into it
+
+- `--log-level <level>`: Set logging level (debug, info, warn, error). Default: info
+
+**Examples:**
+```bash
+# Run status on a different directory (absolute path)
+./scripts/run_polyrepo.sh --target-dir /path/to/avalanchego status
+
+# Run status on a different directory (relative path)
+./scripts/run_polyrepo.sh --target-dir ../other-project status
+
+# Sync with a specific target directory
+./scripts/run_polyrepo.sh --target-dir /path/to/repo sync coreth
+
+# Reset in a different directory
+./scripts/run_polyrepo.sh --target-dir /path/to/repo reset
+```
+
 ### Development Workflow
 
 **IMPORTANT**: Follow this workflow for all changes:
@@ -176,6 +216,13 @@ This is the ONLY supported way to run the tool. It builds and runs the binary in
 
 6. **Verify with manual testing** - Use manual testing to discover corner cases you missed, then add tests for them
 7. **Convert manual tests to automated tests** - Any manual test you perform should be converted to an integration test
+8. **Update CLAUDE.md documentation** - **MANDATORY for ALL changes**:
+   - **New features/flags/capabilities**: Document in "Usage" → relevant command section, add to "Global Flags" or command-specific flags, and create entry in "Recent Fixes" section
+   - **Bug fixes**: Document in "Recent Fixes" section with problem description, solution, test coverage, and root cause analysis
+   - **New core functions**: Update "Implementation Details" → "Key Functions" section
+   - **New tests**: Add test names to "Testing" → "Key integration tests" list
+   - **Hard-won knowledge**: Add to relevant sections (e.g., "Git Worktree Implementation Notes")
+   - **This step is MANDATORY, not optional** - If you skip this, future developers (including yourself) will lack critical context
 
 **NEVER run `go build` directly in the polyrepo directory.**
 
@@ -203,6 +250,7 @@ polyrepo sync
 **Flags:**
 - `--depth, -d`: Clone depth (0=full, 1=shallow, >1=partial). Default: 1
 - `--force, -f`: Force sync even if directory is dirty or already exists
+- `--target-dir`: Target directory to operate in (defaults to current directory)
 - `--log-level`: Set logging level (debug, info, warn, error). Default: info
 
 ### Status Command
@@ -379,6 +427,7 @@ go test ./tests/fixture/polyrepo/core/... -v -tags=integration
 - `TestDetectCurrentRepo_FromFirewood`: Tests repo detection from firewood (ffi/go.mod)
 - `TestDetectCurrentRepo_FromUnknownLocation`: Tests repo detection from unknown location
 - `TestGetRepoStatus_*`: Tests status reporting for primary and synced repos
+- `TestTargetDir_*`: Tests --target-dir flag functionality with various paths and validation
 
 ### Corner Cases and Test Coverage
 
@@ -550,7 +599,72 @@ git worktree remove ../test-worktree
    ./scripts/run_polyrepo.sh status
    ```
 
+4. **Test --target-dir flag:**
+   ```bash
+   # Create a test directory with go.mod
+   mkdir -p /tmp/test-polyrepo
+   cat > /tmp/test-polyrepo/go.mod << 'EOF'
+   module github.com/ava-labs/avalanchego
+   go 1.24
+   EOF
+
+   # Run status on the test directory
+   ./scripts/run_polyrepo.sh --target-dir /tmp/test-polyrepo status
+
+   # Test with non-existent directory (should fail)
+   ./scripts/run_polyrepo.sh --target-dir /tmp/does-not-exist status
+
+   # Cleanup
+   rm -rf /tmp/test-polyrepo
+   ```
+
+   Verify:
+   - `--target-dir` with valid directory works correctly
+   - Error message when directory doesn't exist
+   - Error message when path is a file, not a directory
+
 ## Recent Fixes
+
+### Target Directory Flag Support (2025-10)
+
+**Enhancement**: Added `--target-dir` flag to allow running polyrepo commands on any directory without having to `cd` into it first.
+
+**Changes**:
+- Added `--target-dir` persistent flag that applies to all commands
+- The tool validates the target directory exists and is a directory (not a file)
+- Changes to the target directory before executing any command
+- Accepts both absolute and relative paths
+- Relative paths are resolved from the current working directory, not from where the script is located
+
+**Implementation**:
+- Added validation in `PersistentPreRunE` to check directory exists and is valid
+- Uses `os.Chdir()` to change to the target directory before command execution
+- All existing commands (status, sync, reset, update-avalanchego) automatically work with `--target-dir`
+
+**Test Coverage**:
+- `TestTargetDir_AbsolutePath`: Tests with absolute path
+- `TestTargetDir_RelativePath`: Tests with relative path
+- `TestTargetDir_NonExistentDir`: Tests validation for non-existent directory
+- `TestTargetDir_FileNotDir`: Tests validation when path is a file, not directory
+- `TestTargetDir_DefaultBehavior`: Tests default behavior (uses current directory)
+- `TestTargetDir_WithResetCommand`: Tests integration with reset command
+
+**Use Cases**:
+```bash
+# Check status of a different project
+./scripts/run_polyrepo.sh --target-dir /path/to/other/project status
+
+# Sync repositories in a different directory
+./scripts/run_polyrepo.sh --target-dir /path/to/avalanchego sync coreth
+
+# Reset replace directives in another project
+./scripts/run_polyrepo.sh --target-dir ../other-workspace reset
+```
+
+**Benefits**:
+- No need to `cd` into the target directory first
+- Useful for automation scripts that need to operate on multiple directories
+- Cleaner workflow when working with multiple projects simultaneously
 
 ### Status Command Primary Repo Detection (2025-10)
 
@@ -688,11 +802,15 @@ This error means a replace directive doesn't start with `./`, `../`, or `/`.
 
 ## Notes for Future Development
 
+### Process Requirements
+- **ALWAYS document ALL changes in CLAUDE.md** - This is MANDATORY, not optional. New features, bug fixes, new functions, and new tests must all be documented in the appropriate sections
 - **ALWAYS document hard-won knowledge immediately** - Don't wait until implementation is complete
 - **Write tests before implementation** - Enumerate corner cases first, then write tests
 - **Run linter immediately after code changes, before execution** - Catch errors at compile-time, not runtime
 - **Use proactive detection, not error-based fallbacks** - Detect special cases upfront
 - **Manual testing is for discovering corner cases** - Then convert to automated tests
+
+### Technical Knowledge
 - **Git worktrees require direct filesystem access** - go-git doesn't support them
 - **Worktree .git file contains `gitdir:` reference** - Parse it to find worktree's git directory
 - **Worktree refs are in commondir, not worktree git dir** - Read commondir file to find main repo
