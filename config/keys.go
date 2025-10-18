@@ -143,6 +143,8 @@ const (
 	SnowOptimalProcessingKey                           = "snow-optimal-processing"
 	SnowMaxProcessingKey                               = "snow-max-processing"
 	SnowMaxTimeProcessingKey                           = "snow-max-time-processing"
+	SimplexMaxProposalWaitKey                          = "simplex-max-proposal-wait"
+	SimplexMaxRebroadcastWaitKey                       = "simplex-max-rebroadcast-wait"
 	PartialSyncPrimaryNetworkKey                       = "partial-sync-primary-network"
 	TrackSubnetsKey                                    = "track-subnets"
 	AdminAPIEnabledKey                                 = "api-admin-enabled"
