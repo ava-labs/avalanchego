@@ -35,7 +35,7 @@ func DetectCurrentRepo(log logging.Logger, dir string) (string, error) {
 
 		// Check against known repos
 		for _, config := range GetAllRepoConfigs() {
-			if config.GoModule == modulePath {
+			if config.GoModule == modulePath || config.InternalGoModule == modulePath {
 				log.Debug("matched known repository",
 					zap.String("repoName", config.Name),
 					zap.String("module", modulePath),
@@ -63,7 +63,7 @@ func DetectCurrentRepo(log logging.Logger, dir string) (string, error) {
 				return "", stacktrace.Errorf("failed to get module path: %w", err)
 			}
 
-			if modulePath == firewoodConfig.GoModule {
+			if modulePath == firewoodConfig.GoModule || modulePath == firewoodConfig.InternalGoModule {
 				log.Debug("detected firewood repository")
 				return "firewood", nil
 			}
@@ -130,12 +130,18 @@ func GetDefaultRefForRepo(log logging.Logger, currentRepo, targetRepo, goModPath
 	// Try to get the dependency version from go.mod
 	version, err := GetDependencyVersion(log, goModPath, targetConfig.GoModule)
 	if err != nil {
-		// If dependency not found, use default branch
-		log.Info("using default branch (dependency not found in go.mod)",
+		// If dependency not found and we have a primary repo, this is an error
+		// Default branch should only be used when there's no primary repo
+		if currentRepo != "" {
+			return "", stacktrace.Errorf("dependency %s not found in go.mod for %s", targetConfig.GoModule, currentRepo)
+		}
+
+		// No primary repo - use default branch
+		log.Info("using default branch (no primary repo)",
 			zap.String("targetRepo", targetRepo),
 			zap.String("defaultBranch", targetConfig.DefaultBranch),
 		)
-		return targetConfig.DefaultBranch, nil //nolint:nilerr // Error is intentionally ignored - missing dependency is expected
+		return targetConfig.DefaultBranch, nil
 	}
 
 	log.Info("found dependency version in go.mod",
