@@ -8,8 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
 func TestDiscoverAvalanchegoCorethVersions(t *testing.T) {
@@ -153,10 +154,8 @@ require github.com/ava-labs/coreth v0.13.8-0.20251007213349-63cc1a166a56
 			// Create mock files
 			for path, content := range tt.setupFiles {
 				fullPath := filepath.Join(tmpDir, path)
-				err := os.MkdirAll(filepath.Dir(fullPath), 0o755)
-				require.NoError(t, err)
-				err = os.WriteFile(fullPath, []byte(content), 0o644)
-				require.NoError(t, err)
+				require.NoError(t, os.MkdirAll(filepath.Dir(fullPath), 0o755))
+				require.NoError(t, os.WriteFile(fullPath, []byte(content), 0o600))
 			}
 
 			// Call function
@@ -164,7 +163,7 @@ require github.com/ava-labs/coreth v0.13.8-0.20251007213349-63cc1a166a56
 
 			// Validate
 			if tt.expectError {
-				require.Error(t, err)
+				require.Error(t, err) //nolint:forbidigo // checking that an error occurred without checking type
 			} else {
 				require.NoError(t, err)
 				// Only check expected versions (function may return more if it clones repos)
@@ -315,10 +314,8 @@ go 1.24
 			// Create mock files
 			for path, content := range tt.setupFiles {
 				fullPath := filepath.Join(tmpDir, path)
-				err := os.MkdirAll(filepath.Dir(fullPath), 0o755)
-				require.NoError(t, err)
-				err = os.WriteFile(fullPath, []byte(content), 0o644)
-				require.NoError(t, err)
+				require.NoError(t, os.MkdirAll(filepath.Dir(fullPath), 0o755))
+				require.NoError(t, os.WriteFile(fullPath, []byte(content), 0o600))
 			}
 
 			// Call function
@@ -326,7 +323,7 @@ go 1.24
 
 			// Validate
 			if tt.expectError {
-				require.Error(t, err)
+				require.Error(t, err) //nolint:forbidigo // checking that an error occurred without checking type
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tt.expectedVersion, version)

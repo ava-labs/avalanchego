@@ -83,6 +83,67 @@ This documentation is more valuable than the code itself because code shows "wha
 
 7. **♻️ REFACTOR: Improve code quality** - Refactor while keeping tests green
 
+### Using Subagents for TODO Tasks
+
+**CRITICAL**: When working with TODO lists containing multiple tasks, use the Task tool to delegate work to specialized subagents. This improves efficiency and allows parallel execution of independent tasks.
+
+**When to use subagents:**
+- Multiple independent TODO items that can be worked on separately
+- Complex tasks that require focused attention (e.g., fixing linter errors, implementing a feature)
+- Tasks where you need to provide specific context and get a summary back
+- Any task that would benefit from having its own focused context
+
+**How to use subagents:**
+1. **Break down the work** - Identify TODO items that can be delegated to subagents
+2. **Provide clear context** - Give the subagent:
+   - The specific task to complete
+   - Relevant file paths and code context
+   - Expected outcomes and acceptance criteria
+   - Any constraints or requirements (e.g., "must pass linter", "follow TDD")
+3. **Run subagents in parallel** - When tasks are independent, launch multiple subagents in a single message
+4. **Get summaries back** - Request that subagents provide:
+   - What they did
+   - What files they changed
+   - What issues they encountered (if any)
+   - Whether the task is complete or needs follow-up
+5. **Update TODO list** - Mark tasks as completed based on subagent reports
+
+**Example workflow:**
+```
+Main agent creates TODO list:
+1. Fix linter errors in nix.go
+2. Update sync.go to use new build function
+3. Write unit tests for new functionality
+4. Update CLAUDE.md with changes
+
+Main agent delegates to subagent:
+- Task: "Fix all linter errors in tests/fixture/polyrepo/core/nix.go.
+  The errors are about gosec warnings for G204 (subprocess with tainted input) and G306 (file permissions).
+  Add #nosec comments where appropriate and fix file permissions to 0600.
+  Provide a summary of changes made."
+
+Subagent completes work and reports back:
+- Summary: "Fixed 7 gosec warnings in nix.go:
+  - Added #nosec G204 comments for 3 git command invocations (controlled input)
+  - Changed file permissions from 0644 to 0600 for 2 WriteFile calls
+  - Linter now passes for nix.go"
+
+Main agent updates TODO list:
+✅ 1. Fix linter errors in nix.go - COMPLETED
+```
+
+**Benefits:**
+- **Parallel execution** - Multiple subagents can work simultaneously
+- **Focused context** - Each subagent has only the information needed for its task
+- **Clear handoffs** - Summaries make it easy to track progress
+- **Better organization** - Complex work is broken into manageable pieces
+- **Token efficiency** - Subagents don't carry the full conversation history
+
+**When NOT to use subagents:**
+- Simple, single-step tasks that take less than a minute
+- Tasks that require continuous back-and-forth interaction
+- Tasks where you need to see intermediate results before proceeding
+
 ### Testing Best Practices and Philosophy
 
 **CRITICAL**: This section documents lessons learned from testing oversights and establishes principles to prevent future gaps in test coverage.
@@ -1233,6 +1294,79 @@ git worktree remove ../test-worktree
    - Error message when path is a file, not a directory
 
 ## Recent Fixes
+
+### Firewood Build Fallback: Cargo Build from Nix Shell (2025-10)
+
+**Problem**: Firewood's ffi/flake.nix file may not exist at older revisions, causing nix build to fail. This prevented syncing older firewood commits that lacked the flake.nix file.
+
+**Solution**: Implemented intelligent build fallback that detects if flake.nix exists at the current revision and uses nix's git reference feature to access a known-good flake for the dev shell environment.
+
+**Implementation**:
+
+1. **FileExistsAtRevision()** (nix.go:30-59)
+   - Uses `git cat-file -e` to check if a file exists at a specific git revision
+   - Returns true/false without checking out the file
+   - Used to detect if ffi/flake.nix exists before attempting build
+
+2. **RunCargoBuildInNixShell()** (nix.go:94-154)
+   - Fallback build method when flake.nix is missing at checked-out revision
+   - Uses nix's git+https:// URL syntax to reference GitHub repo at specific revision
+   - Command format: `nix develop git+https://github.com/ava-labs/firewood?ref=<revision>#ffi --command cargo build --release`
+   - Uses **GitHub URL** not local path (local clone may be shallow and lack the revision)
+   - The fallback revision (bdf58f91b8efda6b6778a1da548d589f152f677d) provides ONLY the dev shell environment
+   - Builds the CURRENTLY CHECKED-OUT code (not the fallback revision code)
+   - Creates symlink `result -> target/release` to mimic nix build output structure
+
+3. **BuildFirewood()** (nix.go:159-198)
+   - Main build orchestration function for firewood
+   - Checks if ffi/flake.nix exists at current revision (HEAD)
+   - If exists: uses normal `nix build` (fast path)
+   - If missing: uses `RunCargoBuildInNixShell()` with fallback revision
+   - Fallback revision: bdf58f91b8efda6b6778a1da548d589f152f677d (known good revision with flake.nix)
+
+4. **Updated Sync()** (sync.go:851-872)
+   - Calls `BuildFirewood()` for firewood repos instead of generic `RunNixBuild()`
+   - Maintains backward compatibility for other repos requiring nix builds
+
+**Behavior**:
+- **Normal case** (flake.nix exists): Standard nix build, no performance impact
+- **Fallback case** (flake.nix missing):
+  1. Constructs git+file:// URL pointing to firewood repo at fallback revision
+  2. Nix fetches flake.nix from that revision for dev shell setup
+  3. Builds the currently checked-out code using that dev shell environment
+  4. Result structure matches nix build output
+
+**Key Insight**: The fallback revision is NOT a replacement for the code being built - it only provides the flake.nix for setting up the build environment. This allows building ANY firewood revision using a known-good build environment.
+
+**Benefits**:
+- Enables syncing any firewood revision, even those without flake.nix
+- No manual intervention required - fully automatic fallback
+- No temporary files or file extraction needed - nix handles git references natively
+- Cleaner implementation: ~29 fewer lines of code vs initial approach
+- Maintains compatibility with nix build output structure
+- Clear logging to distinguish between build methods
+
+**Security Notes**:
+- Added `#nosec G204` comment for nix develop command (controlled input, not user input)
+
+**Test Coverage**:
+- All existing unit tests pass (46s total runtime)
+- No new unit tests added (functions require git operations and nix)
+- Integration tests would require a firewood revision without flake.nix
+
+**Files Changed**:
+- `tests/fixture/polyrepo/core/nix.go`: Added 3 new functions, ~140 net new lines
+- `tests/fixture/polyrepo/core/sync.go`: Updated build logic for firewood (lines 851-872)
+
+**Hard-Won Knowledge**:
+- Git's `cat-file -e` command checks file existence without checking it out
+- Nix's `git+https://` URL syntax allows referencing remote GitHub repos at specific revisions
+- The `?ref=` parameter in nix flake URLs specifies which git revision to use for the flake
+- The `#ffi` fragment selects the ffi package from the flake's outputs
+- The fallback flake provides ONLY the dev shell environment, NOT the code being built
+- Cargo build from nix shell creates artifacts in `target/release/`, not `result/`
+- Creating symlink `result -> target/release` maintains compatibility with go.mod replace paths
+- **CRITICAL**: Must use GitHub URL (git+https://) not local path (git+file://) for the fallback revision because shallow clones (depth=1) don't have the full git history - nix needs to fetch from GitHub where all revisions exist
 
 ### Main.go Refactoring: Business Logic Moved to Core (2025-10)
 
