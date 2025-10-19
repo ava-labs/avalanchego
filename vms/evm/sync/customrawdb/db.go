@@ -11,8 +11,6 @@ import (
 )
 
 var (
-	// ErrEntryNotFound indicates the requested key/value was not present in the DB.
-	ErrEntryNotFound = errors.New("entry not found")
 	// errStateSchemeConflict indicates the provided state scheme conflicts with what is on disk.
 	errStateSchemeConflict = errors.New("state scheme conflict")
 	// FirewoodScheme is the scheme for the Firewood storage scheme.

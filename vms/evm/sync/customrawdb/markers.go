@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/libevm/rlp"
+
+	"github.com/ava-labs/avalanchego/database"
 )
 
 var (
@@ -100,7 +102,7 @@ func ReadAcceptorTip(db ethdb.KeyValueReader) (common.Hash, error) {
 		return common.Hash{}, err
 	}
 	if !ok {
-		return common.Hash{}, ErrEntryNotFound
+		return common.Hash{}, database.ErrNotFound
 	}
 	h, err := db.Get(acceptorTipKey)
 	if err != nil {
@@ -117,7 +119,7 @@ func ReadAcceptorTip(db ethdb.KeyValueReader) (common.Hash, error) {
 func ReadChainConfig[T any](db ethdb.KeyValueReader, hash common.Hash, upgradeConfig T) (*params.ChainConfig, error) {
 	config := rawdb.ReadChainConfig(db, hash)
 	if config == nil {
-		return nil, ErrEntryNotFound
+		return nil, database.ErrNotFound
 	}
 
 	upgrade, err := db.Get(upgradeConfigKey(hash))
@@ -169,7 +171,7 @@ func ReadSnapshotBlockHash(db ethdb.KeyValueReader) (common.Hash, error) {
 		return common.Hash{}, err
 	}
 	if !ok {
-		return common.Hash{}, ErrEntryNotFound
+		return common.Hash{}, database.ErrNotFound
 	}
 
 	data, err := db.Get(snapshotBlockHashKey)
@@ -189,7 +191,7 @@ func WriteSnapshotBlockHash(db ethdb.KeyValueWriter, blockHash common.Hash) erro
 }
 
 // DeleteSnapshotBlockHash deletes the hash of the block whose state is contained in
-// the persisted snapshot. Since snapshots are not immutable, this  method can
+// the persisted snapshot. Since snapshots are not immutable, this method can
 // be used during updates, so a crash or failure will mark the entire snapshot
 // invalid.
 func DeleteSnapshotBlockHash(db ethdb.KeyValueWriter) error {
@@ -211,15 +213,16 @@ func readTimeMarker(db ethdb.KeyValueStore, key []byte) (time.Time, error) {
 		return time.Time{}, err
 	}
 	if !ok {
-		return time.Time{}, ErrEntryNotFound
+		return time.Time{}, database.ErrNotFound
 	}
 
 	data, err := db.Get(key)
 	if err != nil {
 		return time.Time{}, err
 	}
+
 	if len(data) == 0 {
-		return time.Time{}, ErrEntryNotFound
+		return time.Time{}, fmt.Errorf("%w: empty value", errInvalidData)
 	}
 
 	var unix uint64

@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
@@ -43,7 +44,7 @@ func TestWriteReadSyncRoot(t *testing.T) {
 
 	// No root written yet
 	root, err := ReadSyncRoot(db)
-	require.ErrorIs(t, err, ErrEntryNotFound)
+	require.ErrorIs(t, err, database.ErrNotFound)
 	require.Zero(t, root)
 
 	// Write and read back

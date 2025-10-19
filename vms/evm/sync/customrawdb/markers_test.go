@@ -12,6 +12,8 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/params"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/database"
 )
 
 func TestOfflinePruning(t *testing.T) {
@@ -19,7 +21,7 @@ func TestOfflinePruning(t *testing.T) {
 
 	// Not present initially.
 	_, err := ReadOfflinePruning(db)
-	require.ErrorIs(t, err, ErrEntryNotFound)
+	require.ErrorIs(t, err, database.ErrNotFound)
 
 	// Write marker and read back fixed time.
 	fixed := time.Unix(1_700_000_000, 0)
@@ -31,7 +33,7 @@ func TestOfflinePruning(t *testing.T) {
 	// Delete marker.
 	require.NoError(t, DeleteOfflinePruning(db))
 	_, err = ReadOfflinePruning(db)
-	require.ErrorIs(t, err, ErrEntryNotFound)
+	require.ErrorIs(t, err, database.ErrNotFound)
 }
 
 func TestPopulateMissingTries(t *testing.T) {
@@ -39,7 +41,7 @@ func TestPopulateMissingTries(t *testing.T) {
 
 	// Not present initially.
 	_, err := ReadPopulateMissingTries(db)
-	require.ErrorIs(t, err, ErrEntryNotFound)
+	require.ErrorIs(t, err, database.ErrNotFound)
 
 	// Write marker and read back fixed time.
 	fixed := time.Unix(1_700_000_000, 0)
@@ -51,7 +53,7 @@ func TestPopulateMissingTries(t *testing.T) {
 	// Delete marker.
 	require.NoError(t, DeletePopulateMissingTries(db))
 	_, err = ReadPopulateMissingTries(db)
-	require.ErrorIs(t, err, ErrEntryNotFound)
+	require.ErrorIs(t, err, database.ErrNotFound)
 }
 
 func TestOfflinePruning_BadEncoding(t *testing.T) {
@@ -103,7 +105,7 @@ func TestWriteAcceptorTip(t *testing.T) {
 			name:    "none",
 			writes:  nil,
 			want:    common.Hash{},
-			wantErr: ErrEntryNotFound,
+			wantErr: database.ErrNotFound,
 		},
 		{
 			name:   "single_write",
@@ -135,7 +137,7 @@ func TestSnapshotBlockHashReadWriteDelete(t *testing.T) {
 
 	// Initially empty.
 	got, err := ReadSnapshotBlockHash(db)
-	require.ErrorIs(t, err, ErrEntryNotFound)
+	require.ErrorIs(t, err, database.ErrNotFound)
 	require.Equal(t, common.Hash{}, got)
 
 	// Write and read back.
@@ -148,7 +150,7 @@ func TestSnapshotBlockHashReadWriteDelete(t *testing.T) {
 	// Delete and verify empty.
 	require.NoError(t, DeleteSnapshotBlockHash(db))
 	got, err = ReadSnapshotBlockHash(db)
-	require.ErrorIs(t, err, ErrEntryNotFound)
+	require.ErrorIs(t, err, database.ErrNotFound)
 	require.Equal(t, common.Hash{}, got)
 }
 
@@ -203,7 +205,7 @@ func TestChainConfigCases(t *testing.T) {
 		},
 		{
 			name:    "nil_config",
-			wantErr: ErrEntryNotFound,
+			wantErr: database.ErrNotFound,
 		},
 	}
 

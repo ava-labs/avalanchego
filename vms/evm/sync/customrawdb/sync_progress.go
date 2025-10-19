@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 )
 
@@ -43,7 +44,7 @@ func ReadSyncRoot(db ethdb.KeyValueReader) (common.Hash, error) {
 		return common.Hash{}, err
 	}
 	if !ok {
-		return common.Hash{}, ErrEntryNotFound
+		return common.Hash{}, database.ErrNotFound
 	}
 	root, err := db.Get(syncRootKey)
 	if err != nil {
@@ -172,7 +173,7 @@ func ParseSyncStorageTrieKey(keyBytes []byte) (common.Hash, common.Hash) {
 // WriteSyncPerformed logs an entry in `db` indicating the VM state synced to `blockNumber`.
 func WriteSyncPerformed(db ethdb.KeyValueWriter, blockNumber uint64) error {
 	syncPerformedPrefixLen := len(syncPerformedPrefix)
-	bytes := make([]byte, syncPerformedPrefixLen+wrappers.LongLen)
+	bytes := make([]byte, syncPerformedKeyLength)
 	copy(bytes[:syncPerformedPrefixLen], syncPerformedPrefix)
 	binary.BigEndian.PutUint64(bytes[syncPerformedPrefixLen:], blockNumber)
 	return db.Put(bytes, []byte{0x01})
