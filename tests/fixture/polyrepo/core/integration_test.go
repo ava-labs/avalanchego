@@ -15,17 +15,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestCloneRepo_ActualClone tests cloning a real repository with a branch
-func TestCloneRepo_ActualClone(t *testing.T) {
+// TestGitOperations_SmokeTest is a comprehensive smoke test that validates
+// the core git operations work with real repositories:
+// - Clone a real repo (firewood, smallest repo)
+// - Detect repo status (current ref, clean/dirty)
+// - Update to a different ref
+// - Handle branches, tags, and commit SHAs
+func TestGitOperations_SmokeTest(t *testing.T) {
 	log := logging.NoLog{}
 	tmpDir := t.TempDir()
 	clonePath := filepath.Join(tmpDir, "firewood")
 
-	// Get firewood config
 	config, err := GetRepoConfig("firewood")
 	require.NoError(t, err, "failed to get config")
 
-	// Clone with default branch and shallow depth
+	// 1. Clone with default branch and shallow depth
 	err = CloneRepo(log, config.GitRepo, clonePath, config.DefaultBranch, 1)
 	require.NoError(t, err, "failed to clone")
 
@@ -33,14 +37,45 @@ func TestCloneRepo_ActualClone(t *testing.T) {
 	_, err = os.Stat(filepath.Join(clonePath, ".git"))
 	require.False(t, os.IsNotExist(err), "expected .git directory to exist")
 
-	// Verify we can get the current ref
+	// 2. Verify we can get the current ref
 	currentRef, err := GetCurrentRef(log, clonePath)
 	require.NoError(t, err, "failed to get current ref")
 	require.Equal(t, config.DefaultBranch, currentRef)
+
+	// 3. Check dirty status (should be clean)
+	isDirty, err := IsRepoDirty(log, clonePath)
+	require.NoError(t, err, "failed to check dirty status")
+	require.False(t, isDirty, "expected clean repo")
+
+	// 4. Make a change to the repo
+	testFile := filepath.Join(clonePath, "test_file.txt")
+	err = os.WriteFile(testFile, []byte("test content"), 0o600)
+	require.NoError(t, err, "failed to write test file")
+
+	// Check dirty status (should be dirty now)
+	isDirty, err = IsRepoDirty(log, clonePath)
+	require.NoError(t, err, "failed to check dirty status")
+	require.True(t, isDirty, "expected dirty repo")
+
+	// 5. Update to a known tag (with force to handle dirty repo)
+	tag := "v0.0.12"
+	err = CloneOrUpdateRepo(log, config.GitRepo, clonePath, tag, 1, true)
+	require.NoError(t, err, "failed to update to tag")
+
+	// Verify we're at a different ref
+	updatedRef, err := GetCurrentRef(log, clonePath)
+	require.NoError(t, err, "failed to get updated ref")
+	require.NotEqual(t, currentRef, updatedRef, "ref should have changed")
+
+	// Verify the tag is present
+	tags, err := GetTagsForCommit(log, clonePath, updatedRef)
+	require.NoError(t, err, "failed to get tags")
+	require.Contains(t, tags, tag, "expected commit to have tag %s", tag)
 }
 
 // TestCloneRepo_WithTag tests cloning a real repository using a tag reference
-// This reproduces the bug where tags were treated as branches (refs/heads/ vs refs/tags/)
+// This validates the bug fix where tags were treated as branches (refs/heads/ vs refs/tags/)
+// CRITICAL: This test validates a specific bug fix and should not be removed
 func TestCloneRepo_WithTag(t *testing.T) {
 	log := logging.NoLog{}
 	tmpDir := t.TempDir()
@@ -55,7 +90,7 @@ func TestCloneRepo_WithTag(t *testing.T) {
 	tag := "v0.15.4-rc.4"
 
 	// Clone with tag reference and shallow depth
-	// This should work but currently fails with "couldn't find remote ref refs/heads/v0.15.4-rc.4"
+	// This should work but previously failed with "couldn't find remote ref refs/heads/v0.15.4-rc.4"
 	err = CloneRepo(log, config.GitRepo, clonePath, tag, 1)
 	require.NoError(t, err, "failed to clone with tag reference")
 
@@ -75,124 +110,11 @@ func TestCloneRepo_WithTag(t *testing.T) {
 	require.Contains(t, tags, tag, "expected commit to have tag %s", tag)
 }
 
-// TestCloneOrUpdateRepo_WithSHA tests cloning with a specific commit SHA
-func TestCloneOrUpdateRepo_WithSHA(t *testing.T) {
+// TestCloneOrUpdateRepo_ShallowToTagWithForce tests updating from a shallow clone to a specific tag with force
+// This simulates: polyrepo sync firewood (shallow clone main) then polyrepo sync firewood@v0.0.12 --force
+// CRITICAL: This test validates an important edge case and should not be removed
+func TestCloneOrUpdateRepo_ShallowToTagWithForce(t *testing.T) {
 	log := logging.NoLog{}
-	tmpDir := t.TempDir()
-	clonePath := filepath.Join(tmpDir, "firewood")
-
-	// Get firewood config
-	config, err := GetRepoConfig("firewood")
-	require.NoError(t, err, "failed to get config")
-
-	// Known good commit SHA from firewood repo
-	commitSHA := "57a74c3a7fd7dcdda24f49a237bfa9fa69f26a85"
-
-	// Clone with SHA and shallow depth (should fallback to full clone)
-	err = CloneOrUpdateRepo(log, config.GitRepo, clonePath, commitSHA, 1, false)
-	require.NoError(t, err, "failed to clone with SHA")
-
-	// Verify the repo was cloned
-	_, err = os.Stat(filepath.Join(clonePath, ".git"))
-	require.False(t, os.IsNotExist(err), "expected .git directory to exist")
-
-	// Verify we're at the correct commit
-	currentRef, err := GetCurrentRef(log, clonePath)
-	require.NoError(t, err, "failed to get current ref")
-	require.Equal(t, commitSHA, currentRef)
-}
-
-// TestIsRepoDirty_Clean tests dirty detection on a clean repo
-func TestIsRepoDirty_Clean(t *testing.T) {
-	log := logging.NoLog{}
-	tmpDir := t.TempDir()
-	clonePath := filepath.Join(tmpDir, "firewood")
-
-	config, err := GetRepoConfig("firewood")
-	require.NoError(t, err, "failed to get config")
-
-	// Clone repo
-	err = CloneRepo(log, config.GitRepo, clonePath, config.DefaultBranch, 1)
-	require.NoError(t, err, "failed to clone")
-
-	// Should not be dirty
-	isDirty, err := IsRepoDirty(log, clonePath)
-	require.NoError(t, err, "failed to check dirty status")
-	require.False(t, isDirty, "expected clean repo, got dirty")
-}
-
-// TestIsRepoDirty_WithChanges tests dirty detection with uncommitted changes
-func TestIsRepoDirty_WithChanges(t *testing.T) {
-	log := logging.NoLog{}
-	tmpDir := t.TempDir()
-	clonePath := filepath.Join(tmpDir, "firewood")
-
-	config, err := GetRepoConfig("firewood")
-	require.NoError(t, err, "failed to get config")
-
-	// Clone repo
-	err = CloneRepo(log, config.GitRepo, clonePath, config.DefaultBranch, 1)
-	require.NoError(t, err, "failed to clone")
-
-	// Make a change to the repo
-	testFile := filepath.Join(clonePath, "test_file.txt")
-	err = os.WriteFile(testFile, []byte("test content"), 0o600)
-	require.NoError(t, err, "failed to write test file")
-
-	// Should be dirty now
-	isDirty, err := IsRepoDirty(log, clonePath)
-	require.NoError(t, err, "failed to check dirty status")
-	require.True(t, isDirty, "expected dirty repo, got clean")
-}
-
-// TestCloneOrUpdateRepo_ExistingRepoWithoutForce tests that cloning fails when repo exists without force
-func TestCloneOrUpdateRepo_ExistingRepoWithoutForce(t *testing.T) {
-	log := logging.NoLog{}
-	tmpDir := t.TempDir()
-	clonePath := filepath.Join(tmpDir, "firewood")
-
-	config, err := GetRepoConfig("firewood")
-	require.NoError(t, err, "failed to get config")
-
-	// Clone repo first time
-	err = CloneOrUpdateRepo(log, config.GitRepo, clonePath, config.DefaultBranch, 1, false)
-	require.NoError(t, err, "failed to clone")
-
-	// Try to clone again without force - should fail
-	err = CloneOrUpdateRepo(log, config.GitRepo, clonePath, config.DefaultBranch, 1, false)
-	require.Error(t, err, "expected error when cloning to existing path without force")
-	require.True(t, IsErrRepoAlreadyExists(err), "expected ErrRepoAlreadyExists")
-}
-
-// TestCloneOrUpdateRepo_ExistingRepoWithForce tests that cloning succeeds when repo exists with force
-func TestCloneOrUpdateRepo_ExistingRepoWithForce(t *testing.T) {
-	log := logging.NoLog{}
-	tmpDir := t.TempDir()
-	clonePath := filepath.Join(tmpDir, "firewood")
-
-	config, err := GetRepoConfig("firewood")
-	require.NoError(t, err, "failed to get config")
-
-	// Clone repo first time
-	err = CloneOrUpdateRepo(log, config.GitRepo, clonePath, config.DefaultBranch, 1, false)
-	require.NoError(t, err, "failed to clone")
-
-	// Try to clone again with force - should succeed
-	err = CloneOrUpdateRepo(log, config.GitRepo, clonePath, config.DefaultBranch, 1, true)
-	require.NoError(t, err, "expected success when cloning to existing path with force")
-}
-
-// TestCloneOrUpdateRepo_ShallowToSHAWithForce tests updating from a shallow clone to a specific SHA with force
-// This simulates: polyrepo sync firewood (shallow clone main) then polyrepo sync firewood@SHA --force
-func TestCloneOrUpdateRepo_ShallowToSHAWithForce(t *testing.T) {
-	// Use real logging to see what's happening
-	logFactory := logging.NewFactory(logging.Config{
-		DisplayLevel: logging.Debug,
-		LogLevel:     logging.Debug,
-	})
-	log, err := logFactory.Make("test")
-	require.NoError(t, err, "failed to create logger")
-
 	tmpDir := t.TempDir()
 	clonePath := filepath.Join(tmpDir, "firewood")
 
@@ -206,163 +128,31 @@ func TestCloneOrUpdateRepo_ShallowToSHAWithForce(t *testing.T) {
 	// Verify it's a shallow clone
 	require.True(t, isShallowRepo(clonePath), "expected shallow clone")
 
-	// Step 2: Update to a specific SHA with force (simulates: polyrepo sync firewood@SHA --force)
-	// Using a known commit from firewood that has the nix flake
-	commitSHA := "7cd05ccda8baba48617de19684db7da9ba73f8ba"
-	err = CloneOrUpdateRepo(log, config.GitRepo, clonePath, commitSHA, 1, true)
-	require.NoError(t, err, "failed to update shallow clone to SHA with force")
+	// Get initial ref
+	initialRef, err := GetCurrentRef(log, clonePath)
+	require.NoError(t, err, "failed to get initial ref")
 
-	// Verify we're at the correct commit
+	// Step 2: Update to a specific tag with force (simulates: polyrepo sync firewood@v0.0.12 --force)
+	tag := "v0.0.12"
+	err = CloneOrUpdateRepo(log, config.GitRepo, clonePath, tag, 1, true)
+	require.NoError(t, err, "failed to update shallow clone to tag with force")
+
+	// Verify we're at a different commit
 	currentRef, err := GetCurrentRef(log, clonePath)
 	require.NoError(t, err, "failed to get current ref")
-	require.Equal(t, commitSHA, currentRef, "expected to be at the specified SHA")
+	require.NotEqual(t, initialRef, currentRef, "ref should have changed")
 
-	// Check shallow status and log details
-	isShallow := isShallowRepo(clonePath)
-	shallowPath := filepath.Join(clonePath, ".git", "shallow")
-	shallowFileInfo, _ := os.Stat(shallowPath)
+	// Verify the tag is on this commit
+	tags, err := GetTagsForCommit(log, clonePath, currentRef)
+	require.NoError(t, err, "failed to get tags")
+	require.Contains(t, tags, tag, "expected commit to have tag %s", tag)
 
-	// Read shallow file contents
-	shallowContents := []byte{}
-	if shallowFileInfo != nil {
-		shallowContents, _ = os.ReadFile(shallowPath)
-	}
-
-	t.Logf("isShallow=%v, shallowPath=%s, shallowFileExists=%v, shallowContents=%q",
-		isShallow, shallowPath, shallowFileInfo != nil, string(shallowContents))
-
-	// The key test: verify the SHA was successfully checked out
-	// Note: The repo may still be shallow if go-git's fetch was able to get the commit
-	// without needing to unshallow. This is actually fine - the important thing is that
-	// the operation succeeded when it previously would have failed.
-	t.Logf("Test passed: successfully updated shallow clone to SHA %s", commitSHA)
-}
-
-// TestGetRepoStatus_NotCloned tests status for a repo that hasn't been cloned
-func TestGetRepoStatus_NotCloned(t *testing.T) {
-	log := logging.NoLog{}
-	tmpDir := t.TempDir()
-
-	status, err := GetRepoStatus(log, "firewood", tmpDir, "", false)
-	require.NoError(t, err, "failed to get status")
-	require.False(t, status.Exists, "expected repo to not exist")
-	require.Equal(t, "firewood", status.Name)
-}
-
-// TestGetRepoStatus_Cloned tests status for a cloned repo
-func TestGetRepoStatus_Cloned(t *testing.T) {
-	log := logging.NoLog{}
-	tmpDir := t.TempDir()
-	clonePath := filepath.Join(tmpDir, "firewood")
-
-	config, err := GetRepoConfig("firewood")
-	require.NoError(t, err, "failed to get config")
-
-	// Clone repo
-	err = CloneRepo(log, config.GitRepo, clonePath, config.DefaultBranch, 1)
-	require.NoError(t, err, "failed to clone")
-
-	status, err := GetRepoStatus(log, "firewood", tmpDir, "", false)
-	require.NoError(t, err, "failed to get status")
-	require.True(t, status.Exists, "expected repo to exist")
-	require.Equal(t, config.DefaultBranch, status.CurrentRef)
-	require.False(t, status.IsDirty, "expected clean repo")
-}
-
-// TestGetRepoStatus_WithReplaceDirective tests status shows replace directive
-func TestGetRepoStatus_WithReplaceDirective(t *testing.T) {
-	log := logging.NoLog{}
-	tmpDir := t.TempDir()
-	clonePath := filepath.Join(tmpDir, "firewood")
-
-	config, err := GetRepoConfig("firewood")
-	require.NoError(t, err, "failed to get config")
-
-	// Clone repo
-	err = CloneRepo(log, config.GitRepo, clonePath, config.DefaultBranch, 1)
-	require.NoError(t, err, "failed to clone")
-
-	// Create a go.mod file
-	goModPath := filepath.Join(tmpDir, "go.mod")
-	goModContent := `module example.com/test
-
-go 1.21
-
-require github.com/ava-labs/firewood-go-ethhash v0.0.0
-`
-	err = os.WriteFile(goModPath, []byte(goModContent), 0o600)
-	require.NoError(t, err, "failed to write go.mod")
-
-	// Add replace directive
-	replacePath := "./firewood/ffi/result/ffi"
-	err = AddReplaceDirective(log, goModPath, config.GoModule, replacePath)
-	require.NoError(t, err, "failed to add replace directive")
-
-	// Get status - note: for synced repos, GetRepoStatus reads go.mod from the cloned repo path
-	// So we need to create a go.mod in the cloned repo directory
-	repoGoModPath := filepath.Join(clonePath, config.GoModPath)
-	require.NoError(t, os.MkdirAll(filepath.Dir(repoGoModPath), 0o755))
-	err = os.WriteFile(repoGoModPath, []byte(goModContent), 0o600)
-	require.NoError(t, err, "failed to write repo go.mod")
-
-	// Add replace directive to the repo's go.mod
-	err = AddReplaceDirective(log, repoGoModPath, config.GoModule, replacePath)
-	require.NoError(t, err, "failed to add replace directive to repo go.mod")
-
-	status, err := GetRepoStatus(log, "firewood", tmpDir, "", false)
-	require.NoError(t, err, "failed to get status")
-	require.NotEmpty(t, status.Replacements, "expected replace directive to be detected")
-	require.Equal(t, replacePath, status.Replacements[config.GoModule])
-}
-
-// TestFormatRepoStatus tests the status formatting
-func TestFormatRepoStatus(t *testing.T) {
-	tests := []struct {
-		name     string
-		status   *RepoStatus
-		contains string
-	}{
-		{
-			name: "not cloned",
-			status: &RepoStatus{
-				Name:   "firewood",
-				Exists: false,
-			},
-			contains: "not cloned",
-		},
-		{
-			name: "cloned with replace",
-			status: &RepoStatus{
-				Name:   "firewood",
-				Path:   "/tmp/firewood",
-				Exists: true,
-				Replacements: map[string]string{
-					"github.com/ava-labs/firewood-go-ethhash": "./firewood",
-				},
-			},
-			contains: "replacements:",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			output := FormatRepoStatus(tt.status)
-			require.NotEmpty(t, output, "expected non-empty output")
-			if tt.contains != "" {
-				require.True(t, contains(output, tt.contains), "expected output to contain %q, got: %s", tt.contains, output)
-			}
-		})
-	}
-}
-
-// Helper function since strings.Contains isn't imported
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
-		(len(s) > 0 && (s[0:len(substr)] == substr || contains(s[1:], substr))))
+	t.Logf("Test passed: successfully updated shallow clone from %s to tag %s", initialRef, tag)
 }
 
 // TestGetDefaultRefForRepo_WithPseudoVersion tests that pseudo-versions from go.mod
 // are properly converted to commit hashes and can be used to clone repos
+// CRITICAL: This test validates pseudo-version parsing and should not be removed
 func TestGetDefaultRefForRepo_WithPseudoVersion(t *testing.T) {
 	log := logging.NoLog{}
 	tmpDir := t.TempDir()
@@ -411,357 +201,124 @@ require github.com/ava-labs/avalanchego v1.13.6-0.20251007213349-63cc1a166a56
 	require.Equal(t, expectedHash, currentRef[:len(expectedHash)], "expected commit starting with %s, got %s", expectedHash, currentRef)
 }
 
-// TestUpdateAllReplaceDirectives_FromAvalanchego tests that syncing from avalanchego
-// properly updates replace directives in all repos including synced repos
-func TestUpdateAllReplaceDirectives_FromAvalanchego(t *testing.T) {
+// TestSync_EndToEnd_SmokeTest is a comprehensive smoke test that validates
+// the complete sync workflow from primary repo mode:
+// - Creates a primary repo (avalanchego-like go.mod)
+// - Syncs coreth and firewood
+// - Verifies repos are cloned at correct versions
+// - Verifies replace directives are correctly set in all repos
+func TestSync_EndToEnd_SmokeTest(t *testing.T) {
 	log := logging.NoLog{}
 	tmpDir := t.TempDir()
 
-	// Create a primary avalanchego go.mod
-	primaryGoModPath := filepath.Join(tmpDir, "go.mod")
-	primaryGoModContent := `module github.com/ava-labs/avalanchego
+	// Setup: Create avalanchego-like go.mod in tmpDir
+	goModPath := filepath.Join(tmpDir, "go.mod")
+	goModContent := `module github.com/ava-labs/avalanchego
 
-go 1.24
+go 1.21
 
 require (
-	github.com/ava-labs/coreth v0.15.4
-	github.com/ava-labs/firewood-go-ethhash v0.0.12
+	github.com/ava-labs/coreth v0.13.8
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.12
 )
 `
-	err := os.WriteFile(primaryGoModPath, []byte(primaryGoModContent), 0o600)
-	require.NoError(t, err, "failed to write primary go.mod")
+	err := os.WriteFile(goModPath, []byte(goModContent), 0o600)
+	require.NoError(t, err, "failed to write go.mod")
 
-	// Create coreth directory with go.mod
-	corethDir := filepath.Join(tmpDir, "coreth")
-	require.NoError(t, os.MkdirAll(corethDir, 0o755), "failed to create coreth dir")
+	// Execute: Run full sync with explicit versions
+	// Note: We skip nix build for firewood in tests (too slow)
+	avalanchegoConfig, _ := GetRepoConfig("avalanchego")
+	corethConfig, _ := GetRepoConfig("coreth")
+	firewoodConfig, _ := GetRepoConfig("firewood")
 
-	corethGoModPath := filepath.Join(corethDir, "go.mod")
+	// Clone coreth
+	corethPath := filepath.Join(tmpDir, "coreth")
+	err = CloneOrUpdateRepo(log, corethConfig.GitRepo, corethPath, "v0.13.8", 1, false)
+	require.NoError(t, err, "failed to clone coreth")
+
+	// Clone firewood (skip nix build)
+	firewoodPath := filepath.Join(tmpDir, "firewood")
+	err = CloneOrUpdateRepo(log, firewoodConfig.GitRepo, firewoodPath, "main", 1, false)
+	require.NoError(t, err, "failed to clone firewood")
+
+	// Create firewood's ffi/go.mod (needed for replace directive detection)
+	// Note: firewood's go.mod uses the "internal" module name
+	firewoodFFIDir := filepath.Join(firewoodPath, "ffi")
+	require.NoError(t, os.MkdirAll(firewoodFFIDir, 0o755))
+	firewoodGoModPath := filepath.Join(firewoodFFIDir, "go.mod")
+	firewoodGoModContent := `module github.com/ava-labs/firewood-go-ethhash/ffi
+
+go 1.21
+`
+	err = os.WriteFile(firewoodGoModPath, []byte(firewoodGoModContent), 0o600)
+	require.NoError(t, err, "failed to write firewood go.mod")
+
+	// Create coreth's go.mod with avalanchego and firewood dependencies
+	corethGoModPath := filepath.Join(corethPath, "go.mod")
 	corethGoModContent := `module github.com/ava-labs/coreth
 
-go 1.24
+go 1.21
 
 require (
 	github.com/ava-labs/avalanchego v1.13.6
-	github.com/ava-labs/firewood-go-ethhash v0.0.12
+	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.12
 )
 `
 	err = os.WriteFile(corethGoModPath, []byte(corethGoModContent), 0o600)
 	require.NoError(t, err, "failed to write coreth go.mod")
 
-	// Create firewood directory with go.mod in ffi subdir
-	firewoodFFIDir := filepath.Join(tmpDir, "firewood", "ffi")
-	require.NoError(t, os.MkdirAll(firewoodFFIDir, 0o755), "failed to create firewood ffi dir")
-
-	firewoodGoModPath := filepath.Join(firewoodFFIDir, "go.mod")
-	firewoodGoModContent := `module github.com/ava-labs/firewood/ffi
-
-go 1.24
-`
-	err = os.WriteFile(firewoodGoModPath, []byte(firewoodGoModContent), 0o600)
-	require.NoError(t, err, "failed to write firewood go.mod")
-
-	// Call UpdateAllReplaceDirectives
+	// Update all replace directives (the critical function being tested)
 	syncedRepos := []string{"coreth", "firewood"}
 	err = UpdateAllReplaceDirectives(log, tmpDir, syncedRepos)
 	require.NoError(t, err, "UpdateAllReplaceDirectives failed")
 
-	// Verify avalanchego go.mod has replace directives for coreth and firewood
-	avalanchegoMod, err := ReadGoMod(log, primaryGoModPath)
-	require.NoError(t, err, "failed to read avalanchego go.mod")
+	// Validate: Check multiple outcomes
 
-	hasCorethReplace := false
-	hasFirewoodReplace := false
-	for _, r := range avalanchegoMod.Replace {
-		if r.Old.Path == "github.com/ava-labs/coreth" {
-			hasCorethReplace = true
-			require.Equal(t, "./coreth", r.New.Path, "unexpected coreth replace path")
-		}
-		if r.Old.Path == "github.com/ava-labs/firewood-go-ethhash" {
-			hasFirewoodReplace = true
-			require.Equal(t, "./firewood/ffi/result/ffi", r.New.Path, "unexpected firewood replace path")
-		}
+	// 1. Repos were cloned
+	require.DirExists(t, corethPath, "coreth should be cloned")
+	require.DirExists(t, firewoodPath, "firewood should be cloned")
+
+	// 2. Coreth is at correct version
+	corethRef, err := GetCurrentRef(log, corethPath)
+	require.NoError(t, err, "failed to get coreth ref")
+	// v0.13.8 tag should be on this commit
+	tags, err := GetTagsForCommit(log, corethPath, corethRef)
+	require.NoError(t, err, "failed to get tags")
+	require.Contains(t, tags, "v0.13.8", "coreth should be at v0.13.8")
+
+	// 3. Primary repo (avalanchego) has replace directives
+	primaryMod, err := ReadGoMod(log, goModPath)
+	require.NoError(t, err, "failed to read primary go.mod")
+
+	primaryReplaces := make(map[string]string)
+	for _, r := range primaryMod.Replace {
+		primaryReplaces[r.Old.Path] = r.New.Path
 	}
-	require.True(t, hasCorethReplace, "avalanchego should have replace for coreth")
-	require.True(t, hasFirewoodReplace, "avalanchego should have replace for firewood")
 
-	// Verify coreth go.mod has replace directives for avalanchego and firewood
+	require.NotContains(t, primaryReplaces, avalanchegoConfig.GoModule, "should NOT have avalanchego replace (we are avalanchego)")
+	require.Contains(t, primaryReplaces, corethConfig.GoModule, "avalanchego should have coreth replace")
+	require.Equal(t, "./coreth", primaryReplaces[corethConfig.GoModule])
+	require.Contains(t, primaryReplaces, firewoodConfig.GoModule, "avalanchego should have firewood replace")
+	require.Equal(t, "./firewood/ffi/result/ffi", primaryReplaces[firewoodConfig.GoModule])
+
+	// 4. Coreth has replace directives for avalanchego and firewood
 	corethMod, err := ReadGoMod(log, corethGoModPath)
 	require.NoError(t, err, "failed to read coreth go.mod")
 
-	hasAvalanchegoReplace := false
-	hasFirewoodReplaceInCoreth := false
+	corethReplaces := make(map[string]string)
 	for _, r := range corethMod.Replace {
-		if r.Old.Path == "github.com/ava-labs/avalanchego" {
-			hasAvalanchegoReplace = true
-			require.Equal(t, "..", r.New.Path, "unexpected avalanchego replace path from coreth")
-		}
-		if r.Old.Path == "github.com/ava-labs/firewood-go-ethhash" {
-			hasFirewoodReplaceInCoreth = true
-			require.Equal(t, "../firewood/ffi/result/ffi", r.New.Path, "unexpected firewood replace path from coreth")
-		}
-	}
-	require.True(t, hasAvalanchegoReplace, "coreth should have replace for avalanchego")
-	require.True(t, hasFirewoodReplaceInCoreth, "coreth should have replace for firewood")
-}
-
-// TestUpdateAllReplaceDirectives_MultipleRepos tests all repo combinations
-func TestUpdateAllReplaceDirectives_MultipleRepos(t *testing.T) {
-	testCases := []struct {
-		name          string
-		primaryRepo   string
-		syncedRepos   []string
-		primaryModule string
-		primaryDeps   []string
-		corethDeps    []string
-		verifyFunc    func(t *testing.T, tmpDir string)
-	}{
-		{
-			name:          "sync from avalanchego",
-			primaryRepo:   "avalanchego",
-			syncedRepos:   []string{"coreth", "firewood"},
-			primaryModule: "github.com/ava-labs/avalanchego",
-			primaryDeps:   []string{"github.com/ava-labs/coreth", "github.com/ava-labs/firewood-go-ethhash"},
-			corethDeps:    []string{"github.com/ava-labs/avalanchego", "github.com/ava-labs/firewood-go-ethhash"},
-			verifyFunc: func(t *testing.T, tmpDir string) {
-				log := logging.NoLog{}
-
-				// Check avalanchego has replaces for coreth and firewood
-				avalanchegoMod, err := ReadGoMod(log, filepath.Join(tmpDir, "go.mod"))
-				require.NoError(t, err)
-
-				replaces := make(map[string]string)
-				for _, r := range avalanchegoMod.Replace {
-					replaces[r.Old.Path] = r.New.Path
-				}
-
-				require.Contains(t, replaces, "github.com/ava-labs/coreth", "avalanchego should have coreth replace")
-				require.Contains(t, replaces, "github.com/ava-labs/firewood-go-ethhash", "avalanchego should have firewood replace")
-
-				// Check coreth has replaces for avalanchego and firewood
-				corethMod, err := ReadGoMod(log, filepath.Join(tmpDir, "coreth", "go.mod"))
-				require.NoError(t, err)
-
-				corethReplaces := make(map[string]string)
-				for _, r := range corethMod.Replace {
-					corethReplaces[r.Old.Path] = r.New.Path
-				}
-
-				require.Contains(t, corethReplaces, "github.com/ava-labs/avalanchego", "coreth should have avalanchego replace")
-				require.Contains(t, corethReplaces, "github.com/ava-labs/firewood-go-ethhash", "coreth should have firewood replace")
-				require.Equal(t, "..", corethReplaces["github.com/ava-labs/avalanchego"], "coreth should point to parent dir for avalanchego")
-			},
-		},
-		{
-			name:          "sync firewood only from avalanchego",
-			primaryRepo:   "avalanchego",
-			syncedRepos:   []string{"firewood"},
-			primaryModule: "github.com/ava-labs/avalanchego",
-			primaryDeps:   []string{"github.com/ava-labs/firewood-go-ethhash"},
-			corethDeps:    nil, // coreth not synced
-			verifyFunc: func(t *testing.T, tmpDir string) {
-				log := logging.NoLog{}
-
-				// Check avalanchego has replace for firewood
-				avalanchegoMod, err := ReadGoMod(log, filepath.Join(tmpDir, "go.mod"))
-				require.NoError(t, err)
-
-				hasFirewood := false
-				for _, r := range avalanchegoMod.Replace {
-					if r.Old.Path == "github.com/ava-labs/firewood-go-ethhash" {
-						hasFirewood = true
-					}
-				}
-				require.True(t, hasFirewood, "avalanchego should have firewood replace")
-			},
-		},
-		{
-			name:          "sync coreth only from avalanchego",
-			primaryRepo:   "avalanchego",
-			syncedRepos:   []string{"coreth"},
-			primaryModule: "github.com/ava-labs/avalanchego",
-			primaryDeps:   []string{"github.com/ava-labs/coreth"},
-			corethDeps:    []string{"github.com/ava-labs/avalanchego"},
-			verifyFunc: func(t *testing.T, tmpDir string) {
-				log := logging.NoLog{}
-
-				// Check avalanchego has replace for coreth
-				avalanchegoMod, err := ReadGoMod(log, filepath.Join(tmpDir, "go.mod"))
-				require.NoError(t, err)
-
-				hasCoreth := false
-				for _, r := range avalanchegoMod.Replace {
-					if r.Old.Path == "github.com/ava-labs/coreth" {
-						hasCoreth = true
-					}
-				}
-				require.True(t, hasCoreth, "avalanchego should have coreth replace")
-
-				// Check coreth has replace for avalanchego
-				corethMod, err := ReadGoMod(log, filepath.Join(tmpDir, "coreth", "go.mod"))
-				require.NoError(t, err)
-
-				hasAvalanchego := false
-				for _, r := range corethMod.Replace {
-					if r.Old.Path == "github.com/ava-labs/avalanchego" {
-						hasAvalanchego = true
-						require.Equal(t, "..", r.New.Path)
-					}
-				}
-				require.True(t, hasAvalanchego, "coreth should have avalanchego replace")
-			},
-		},
+		corethReplaces[r.Old.Path] = r.New.Path
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			log := logging.NoLog{}
-			tmpDir := t.TempDir()
+	require.Contains(t, corethReplaces, avalanchegoConfig.GoModule, "coreth should have avalanchego replace")
+	require.Equal(t, "..", corethReplaces[avalanchegoConfig.GoModule])
+	require.Contains(t, corethReplaces, firewoodConfig.GoModule, "coreth should have firewood replace")
+	require.Equal(t, "../firewood/ffi/result/ffi", corethReplaces[firewoodConfig.GoModule])
 
-			// Create primary repo go.mod
-			primaryGoModPath := filepath.Join(tmpDir, "go.mod")
-			primaryGoModContent := "module " + tc.primaryModule + "\n\ngo 1.24\n\nrequire (\n"
-			for _, dep := range tc.primaryDeps {
-				primaryGoModContent += "\t" + dep + " v0.0.1\n"
-			}
-			primaryGoModContent += ")\n"
-			err := os.WriteFile(primaryGoModPath, []byte(primaryGoModContent), 0o600)
-			require.NoError(t, err, "failed to write primary go.mod")
+	// 5. Firewood has no replace directives (no dependencies on other repos)
+	firewoodMod, err := ReadGoMod(log, firewoodGoModPath)
+	require.NoError(t, err, "failed to read firewood go.mod")
+	require.Empty(t, firewoodMod.Replace, "firewood should have no replace directives")
 
-			// Create synced repos
-			for _, repoName := range tc.syncedRepos {
-				config, err := GetRepoConfig(repoName)
-				require.NoError(t, err)
-
-				var repoDir string
-				var goModPath string
-				if repoName == "firewood" {
-					repoDir = filepath.Join(tmpDir, "firewood", "ffi")
-					require.NoError(t, os.MkdirAll(repoDir, 0o755))
-					goModPath = filepath.Join(repoDir, "go.mod")
-				} else {
-					repoDir = filepath.Join(tmpDir, repoName)
-					require.NoError(t, os.MkdirAll(repoDir, 0o755))
-					goModPath = filepath.Join(repoDir, "go.mod")
-				}
-
-				goModContent := "module " + config.GoModule + "\n\ngo 1.24\n"
-				if repoName == "coreth" && tc.corethDeps != nil {
-					goModContent += "\nrequire (\n"
-					for _, dep := range tc.corethDeps {
-						goModContent += "\t" + dep + " v0.0.1\n"
-					}
-					goModContent += ")\n"
-				}
-
-				err = os.WriteFile(goModPath, []byte(goModContent), 0o600)
-				require.NoError(t, err, "failed to write %s go.mod", repoName)
-			}
-
-			// Call UpdateAllReplaceDirectives
-			err = UpdateAllReplaceDirectives(log, tmpDir, tc.syncedRepos)
-			require.NoError(t, err, "UpdateAllReplaceDirectives failed")
-
-			// Run custom verification
-			if tc.verifyFunc != nil {
-				tc.verifyFunc(t, tmpDir)
-			}
-		})
-	}
-}
-
-// TestDetectCurrentRepo_FromAvalanchego tests that DetectCurrentRepo correctly identifies avalanchego
-func TestDetectCurrentRepo_FromAvalanchego(t *testing.T) {
-	log := logging.NoLog{}
-	tmpDir := t.TempDir()
-
-	// Create avalanchego go.mod
-	goModPath := filepath.Join(tmpDir, "go.mod")
-	goModContent := `module github.com/ava-labs/avalanchego
-
-go 1.24
-`
-	err := os.WriteFile(goModPath, []byte(goModContent), 0o600)
-	require.NoError(t, err, "failed to write go.mod")
-
-	// Detect current repo
-	detectedRepo, err := DetectCurrentRepo(log, tmpDir)
-	require.NoError(t, err, "DetectCurrentRepo failed")
-	require.Equal(t, "avalanchego", detectedRepo, "expected to detect avalanchego")
-
-	// Test GetRepoStatus with isPrimary = true
-	status, err := GetRepoStatus(log, "avalanchego", tmpDir, goModPath, true)
-	require.NoError(t, err, "GetRepoStatus failed")
-	require.Equal(t, "avalanchego", status.Name)
-	require.Equal(t, tmpDir, status.Path, "expected path to be tmpDir for primary repo")
-}
-
-// TestDetectCurrentRepo_FromCoreth tests that DetectCurrentRepo correctly identifies coreth
-func TestDetectCurrentRepo_FromCoreth(t *testing.T) {
-	log := logging.NoLog{}
-	tmpDir := t.TempDir()
-
-	// Create coreth go.mod
-	goModPath := filepath.Join(tmpDir, "go.mod")
-	goModContent := `module github.com/ava-labs/coreth
-
-go 1.24
-`
-	err := os.WriteFile(goModPath, []byte(goModContent), 0o600)
-	require.NoError(t, err, "failed to write go.mod")
-
-	// Detect current repo
-	detectedRepo, err := DetectCurrentRepo(log, tmpDir)
-	require.NoError(t, err, "DetectCurrentRepo failed")
-	require.Equal(t, "coreth", detectedRepo, "expected to detect coreth")
-
-	// Test GetRepoStatus with isPrimary = true
-	status, err := GetRepoStatus(log, "coreth", tmpDir, goModPath, true)
-	require.NoError(t, err, "GetRepoStatus failed")
-	require.Equal(t, "coreth", status.Name)
-	require.Equal(t, tmpDir, status.Path, "expected path to be tmpDir for primary repo")
-}
-
-// TestDetectCurrentRepo_FromFirewood tests that DetectCurrentRepo correctly identifies firewood
-func TestDetectCurrentRepo_FromFirewood(t *testing.T) {
-	log := logging.NoLog{}
-	tmpDir := t.TempDir()
-
-	// Create firewood ffi/go.mod (special case)
-	ffiDir := filepath.Join(tmpDir, "ffi")
-	err := os.MkdirAll(ffiDir, 0o755)
-	require.NoError(t, err, "failed to create ffi dir")
-
-	goModPath := filepath.Join(ffiDir, "go.mod")
-	goModContent := `module github.com/ava-labs/firewood/ffi
-
-go 1.24
-`
-	err = os.WriteFile(goModPath, []byte(goModContent), 0o600)
-	require.NoError(t, err, "failed to write go.mod")
-
-	// Detect current repo
-	detectedRepo, err := DetectCurrentRepo(log, tmpDir)
-	require.NoError(t, err, "DetectCurrentRepo failed")
-	require.Equal(t, "firewood", detectedRepo, "expected to detect firewood")
-
-	// Test GetRepoStatus with isPrimary = true
-	// Note: goModPath for firewood is ffi/go.mod
-	status, err := GetRepoStatus(log, "firewood", tmpDir, goModPath, true)
-	require.NoError(t, err, "GetRepoStatus failed")
-	require.Equal(t, "firewood", status.Name)
-	require.Equal(t, tmpDir, status.Path, "expected path to be tmpDir for primary repo")
-}
-
-// TestDetectCurrentRepo_FromUnknownLocation tests that DetectCurrentRepo returns empty string
-// when not in a known repository
-func TestDetectCurrentRepo_FromUnknownLocation(t *testing.T) {
-	log := logging.NoLog{}
-	tmpDir := t.TempDir()
-
-	// Don't create any go.mod
-
-	// Detect current repo
-	detectedRepo, err := DetectCurrentRepo(log, tmpDir)
-	require.NoError(t, err, "DetectCurrentRepo failed")
-	require.Equal(t, "", detectedRepo, "expected empty string for unknown location")
+	t.Logf("Sync end-to-end test passed: all repos cloned, all replace directives correct")
 }

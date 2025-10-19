@@ -169,7 +169,7 @@ require github.com/ava-labs/coreth v0.13.8
 
 go 1.21
 
-require github.com/ava-labs/firewood-go-ethhash v0.0.0-20240101120000-abc123def456
+require github.com/ava-labs/firewood-go-ethhash/ffi v0.0.0-20240101120000-abc123def456
 `,
 			expectedRef: "abc123def456",
 			expectError: false,
@@ -266,33 +266,202 @@ require github.com/ava-labs/avalanchego v1.11.11
 	}
 }
 
-// TestSync_PrimaryMode_NoArgs tests that from a primary repo (e.g., avalanchego),
-// calling Sync() with no args syncs other repos using versions from go.mod
-func TestSync_PrimaryMode_NoArgs(t *testing.T) {
-	// This is a unit test - not integration
-	// It should verify the function orchestrates correctly but not do actual git operations
-	t.Skip("TODO: Implement after Sync() function exists")
-}
+// TestSync_PrimaryMode_RefDetermination tests that Sync() correctly determines refs in primary mode.
+// This test validates the orchestration logic without doing actual git operations by testing with
+// a dependency that doesn't exist (forcing early exit before git clone).
+func TestSync_PrimaryMode_RefDetermination(t *testing.T) {
+	tests := []struct {
+		name         string
+		goModContent string
+		repoArgs     []string
+		expectError  string
+	}{
+		{
+			name: "no args - auto-detect repos (firewood dependency missing)",
+			goModContent: `module github.com/ava-labs/avalanchego
 
-// TestSync_PrimaryMode_ExplicitRefs tests that explicit refs are used when provided
-func TestSync_PrimaryMode_ExplicitRefs(t *testing.T) {
-	t.Skip("TODO: Implement after Sync() function exists")
-}
+go 1.21
 
-// TestSync_PrimaryMode_PartialRefs tests mixed explicit and discovered refs
-func TestSync_PrimaryMode_PartialRefs(t *testing.T) {
-	t.Skip("TODO: Implement after Sync() function exists")
+require github.com/ava-labs/coreth v0.13.8
+`,
+			repoArgs: []string{},
+			// Will auto-detect repos to sync (coreth, firewood)
+			// Will try to get firewood version from go.mod but it's missing
+			expectError: "not found in go.mod",
+		},
+		{
+			name: "explicit refs - all explicit",
+			goModContent: `module github.com/ava-labs/avalanchego
+
+go 1.21
+
+require github.com/ava-labs/coreth v0.13.8
+`,
+			repoArgs:    []string{"coreth@v0.15.0"},
+			expectError: "", // Should reach git clone (no early error)
+		},
+		{
+			name: "partial refs - explicit and discovered (firewood missing)",
+			goModContent: `module github.com/ava-labs/avalanchego
+
+go 1.21
+
+require github.com/ava-labs/coreth v0.13.8
+`,
+			repoArgs:    []string{"coreth@v0.15.0", "firewood"},
+			expectError: "not found in go.mod",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+
+			// Create go.mod in temp directory
+			goModPath := filepath.Join(tmpDir, "go.mod")
+			err := os.WriteFile(goModPath, []byte(tt.goModContent), 0o600)
+			require.NoError(t, err, "failed to write go.mod")
+
+			log := logging.NoLog{}
+
+			// Run sync - should fail during ref determination or git operations
+			err = Sync(log, tmpDir, tt.repoArgs, 1, false)
+
+			// Check for expected error or success behavior
+			if tt.expectError != "" {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tt.expectError)
+			}
+			// Note: If expectError is empty, the test will error at git clone
+			// which is acceptable - we're testing that validation passes
+
+			// Validate that go.mod still exists (wasn't corrupted by our logic)
+			content, err := os.ReadFile(goModPath)
+			require.NoError(t, err)
+			require.Contains(t, string(content), "module github.com/ava-labs/avalanchego")
+		})
+	}
 }
 
 // TestSync_CannotSyncIntoItself_Error tests validation that prevents syncing a repo into itself
 func TestSync_CannotSyncIntoItself_Error(t *testing.T) {
-	t.Skip("TODO: Implement after Sync() function exists")
+	tmpDir := t.TempDir()
+
+	// Create go.mod for avalanchego (primary repo)
+	goModContent := `module github.com/ava-labs/avalanchego
+
+go 1.21
+
+require github.com/ava-labs/coreth v0.13.8
+`
+	goModPath := filepath.Join(tmpDir, "go.mod")
+	err := os.WriteFile(goModPath, []byte(goModContent), 0o600)
+	require.NoError(t, err, "failed to write go.mod")
+
+	log := logging.NoLog{}
+
+	// Try to sync avalanchego into itself - should error
+	err = Sync(log, tmpDir, []string{"avalanchego"}, 1, false)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "cannot sync avalanchego into itself")
 }
 
-// TestSync_StandaloneMode_AvalanchegoCoreth tests version discovery in standalone mode
-// This is THE KEY TEST that would have caught the bug!
-func TestSync_StandaloneMode_AvalanchegoCoreth(t *testing.T) {
-	t.Skip("TODO: Implement after Sync() function exists")
+// TestSync_StandaloneMode_Validation tests validation in standalone mode (no go.mod).
+// This is THE KEY TEST GROUP that would have caught the standalone mode bug documented in CLAUDE.md.
+// These tests validate that standalone mode correctly validates inputs without trying to read
+// from a non-existent go.mod file.
+func TestSync_StandaloneMode_Validation(t *testing.T) {
+	tests := []struct {
+		name        string
+		repoArgs    []string
+		expectError string
+	}{
+		{
+			name:        "no args - should error immediately",
+			repoArgs:    []string{},
+			expectError: "must specify repos when no go.mod exists",
+		},
+		{
+			name:        "invalid repo format",
+			repoArgs:    []string{"invalid@@format"},
+			expectError: "invalid repo format",
+		},
+		{
+			name:        "unknown repo",
+			repoArgs:    []string{"unknownrepo"},
+			expectError: "unknown repository",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+
+			// No go.mod exists - this is standalone mode
+			log := logging.NoLog{}
+
+			// Run sync
+			err := Sync(log, tmpDir, tt.repoArgs, 1, false)
+
+			// Should error with expected message
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tt.expectError)
+
+			// Verify no go.mod was created (standalone mode shouldn't create one)
+			goModPath := filepath.Join(tmpDir, "go.mod")
+			_, err = os.Stat(goModPath)
+			require.True(t, os.IsNotExist(err), "go.mod should not be created in standalone mode")
+		})
+	}
+}
+
+// TestSync_StandaloneMode_MultiRepo tests various multi-repo scenarios in standalone mode.
+// These tests validate that standalone mode works correctly without trying to read from go.mod.
+func TestSync_StandaloneMode_MultiRepo(t *testing.T) {
+	tests := []struct {
+		name     string
+		repoArgs []string
+	}{
+		{
+			name:     "avalanchego and coreth - KEY TEST that would have caught the bug",
+			repoArgs: []string{"avalanchego", "coreth"},
+		},
+		{
+			name:     "explicit refs for multiple repos",
+			repoArgs: []string{"avalanchego@v1.11.0", "coreth@v0.13.8"},
+		},
+		{
+			name:     "firewood only",
+			repoArgs: []string{"firewood@main"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			log := logging.NoLog{}
+
+			// No go.mod exists - standalone mode
+			err := Sync(log, tmpDir, tt.repoArgs, 1, false)
+
+			// Tests will fail at git clone (network required), but the KEY is that
+			// they should NOT fail with validation errors about missing go.mod
+			// The error should be from git operations, not from our orchestration logic
+
+			// The critical validation: should NOT error about missing go.mod
+			if err != nil {
+				require.NotContains(t, err.Error(), "must specify repos when no go.mod exists")
+				require.NotContains(t, err.Error(), "go.mod not found")
+				require.NotContains(t, err.Error(), "no go.mod")
+			}
+
+			// Verify no go.mod was created (standalone mode shouldn't create one)
+			goModPath := filepath.Join(tmpDir, "go.mod")
+			_, statErr := os.Stat(goModPath)
+			require.True(t, os.IsNotExist(statErr), "go.mod should not be created in standalone mode")
+		})
+	}
 }
 
 // TestSync_StandaloneMode_NoArgs_Error tests that standalone mode requires explicit repos
@@ -305,14 +474,4 @@ func TestSync_StandaloneMode_NoArgs_Error(t *testing.T) {
 	err := Sync(log, tmpDir, []string{}, 1, false)
 
 	require.ErrorIs(t, err, errStandaloneModeNeedsRepos)
-}
-
-// TestSync_StandaloneMode_ExplicitRefs tests standalone mode with all explicit refs
-func TestSync_StandaloneMode_ExplicitRefs(t *testing.T) {
-	t.Skip("TODO: Implement after Sync() function exists")
-}
-
-// TestSync_StandaloneMode_FirewoodOnly tests syncing only firewood in standalone mode
-func TestSync_StandaloneMode_FirewoodOnly(t *testing.T) {
-	t.Skip("TODO: Implement after Sync() function exists")
 }

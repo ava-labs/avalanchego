@@ -174,301 +174,262 @@ func getCurrentCommitSHA(t *testing.T, repoPath string) string {
 
 // High Priority Test Cases - Normal Repositories
 
-// TestGetRepoStatus_NormalRepo_DetachedHead tests status on a normal repo with detached HEAD
-func TestGetRepoStatus_NormalRepo_DetachedHead(t *testing.T) {
+// TestGetRepoStatus_NormalRepo tests status on normal repositories with various git states
+func TestGetRepoStatus_NormalRepo(t *testing.T) {
 	log := logging.NoLog{}
-	repoPath, cleanup := setupTempRepo(t)
-	defer cleanup()
 
-	// Get current commit SHA
-	commitSHA := getCurrentCommitSHA(t, repoPath)
+	tests := []struct {
+		name           string
+		setupGit       func(t *testing.T, repoPath string) string // Returns expected commitSHA
+		validateStatus func(t *testing.T, status *RepoStatus, commitSHA string)
+	}{
+		{
+			name: "detached HEAD",
+			setupGit: func(t *testing.T, repoPath string) string {
+				commitSHA := getCurrentCommitSHA(t, repoPath)
+				checkoutDetached(t, repoPath, commitSHA)
+				return commitSHA
+			},
+			validateStatus: func(t *testing.T, status *RepoStatus, commitSHA string) {
+				assert.True(t, status.Exists)
+				assert.Equal(t, commitSHA[:8], status.CommitSHA)
+				assert.Equal(t, commitSHA, status.CurrentRef) // Detached HEAD shows full SHA
+				assert.Empty(t, status.Tags)
+				assert.NotEmpty(t, status.Branches) // Should have at least master/main
+			},
+		},
+		{
+			name: "on branch",
+			setupGit: func(t *testing.T, repoPath string) string {
+				// No setup needed - default state is on master/main
+				return getCurrentCommitSHA(t, repoPath)
+			},
+			validateStatus: func(t *testing.T, status *RepoStatus, commitSHA string) {
+				assert.True(t, status.Exists)
+				assert.Equal(t, commitSHA[:8], status.CommitSHA)
+				assert.True(t, status.CurrentRef == "master" || status.CurrentRef == "main")
+				assert.Empty(t, status.Tags)
+				assert.NotEmpty(t, status.Branches) // Should show the current branch
+			},
+		},
+		{
+			name: "with single tag",
+			setupGit: func(t *testing.T, repoPath string) string {
+				addTag(t, repoPath, "v1.0.0")
+				return getCurrentCommitSHA(t, repoPath)
+			},
+			validateStatus: func(t *testing.T, status *RepoStatus, commitSHA string) {
+				assert.True(t, status.Exists)
+				assert.Equal(t, commitSHA[:8], status.CommitSHA)
+				assert.Contains(t, status.Tags, "v1.0.0")
+			},
+		},
+		{
+			name: "with multiple tags",
+			setupGit: func(t *testing.T, repoPath string) string {
+				addTag(t, repoPath, "v1.0.0")
+				addTag(t, repoPath, "v1.0.1")
+				addTag(t, repoPath, "latest")
+				return getCurrentCommitSHA(t, repoPath)
+			},
+			validateStatus: func(t *testing.T, status *RepoStatus, commitSHA string) {
+				assert.True(t, status.Exists)
+				assert.Equal(t, commitSHA[:8], status.CommitSHA)
+				assert.Len(t, status.Tags, 3)
+				assert.Contains(t, status.Tags, "v1.0.0")
+				assert.Contains(t, status.Tags, "v1.0.1")
+				assert.Contains(t, status.Tags, "latest")
+			},
+		},
+		{
+			name: "no tags",
+			setupGit: func(t *testing.T, repoPath string) string {
+				// No tags added
+				return getCurrentCommitSHA(t, repoPath)
+			},
+			validateStatus: func(t *testing.T, status *RepoStatus, commitSHA string) {
+				assert.True(t, status.Exists)
+				assert.Equal(t, commitSHA[:8], status.CommitSHA)
+				assert.Empty(t, status.Tags)
+			},
+		},
+		{
+			name: "with multiple branches",
+			setupGit: func(t *testing.T, repoPath string) string {
+				createBranch(t, repoPath, "feature1")
+				createBranch(t, repoPath, "feature2")
+				return getCurrentCommitSHA(t, repoPath)
+			},
+			validateStatus: func(t *testing.T, status *RepoStatus, commitSHA string) {
+				assert.True(t, status.Exists)
+				assert.Equal(t, commitSHA[:8], status.CommitSHA)
+				assert.GreaterOrEqual(t, len(status.Branches), 3) // At least master/main, feature1, feature2
+				assert.Contains(t, status.Branches, "feature1")
+				assert.Contains(t, status.Branches, "feature2")
+			},
+		},
+		{
+			name: "no branches (orphan commit)",
+			setupGit: func(t *testing.T, repoPath string) string {
+				// Create a commit and move all branches away from it
+				commitSHA := getCurrentCommitSHA(t, repoPath)
 
-	// Checkout to detached HEAD
-	checkoutDetached(t, repoPath, commitSHA)
+				// Create a new commit
+				testFile := filepath.Join(repoPath, "test.txt")
+				require.NoError(t, os.WriteFile(testFile, []byte("new content"), 0o600))
+				commitAll(t, repoPath, "New commit")
 
-	// Get status
-	status, err := GetRepoStatus(log, "test-repo", repoPath, "", true)
-	require.NoError(t, err)
+				// Now checkout back to the old commit (detached)
+				checkoutDetached(t, repoPath, commitSHA)
 
-	// Verify
-	assert.True(t, status.Exists)
-	assert.Equal(t, commitSHA[:8], status.CommitSHA)
-	assert.Equal(t, commitSHA, status.CurrentRef) // Detached HEAD shows full SHA
-	assert.Empty(t, status.Tags)
-	assert.NotEmpty(t, status.Branches) // Should have at least master/main
-}
+				return commitSHA
+			},
+			validateStatus: func(t *testing.T, status *RepoStatus, commitSHA string) {
+				assert.True(t, status.Exists)
+				assert.Equal(t, commitSHA[:8], status.CommitSHA)
+				// This commit should have no branches pointing to it now
+				assert.Empty(t, status.Branches)
+			},
+		},
+	}
 
-// TestGetRepoStatus_NormalRepo_OnBranch tests status on a normal repo on a branch
-func TestGetRepoStatus_NormalRepo_OnBranch(t *testing.T) {
-	log := logging.NoLog{}
-	repoPath, cleanup := setupTempRepo(t)
-	defer cleanup()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repoPath, cleanup := setupTempRepo(t)
+			defer cleanup()
 
-	// Get current commit SHA
-	commitSHA := getCurrentCommitSHA(t, repoPath)
+			commitSHA := tt.setupGit(t, repoPath)
 
-	// Should be on master or main branch by default
-	status, err := GetRepoStatus(log, "test-repo", repoPath, "", true)
-	require.NoError(t, err)
+			status, err := GetRepoStatus(log, "avalanchego", repoPath, "", true)
+			require.NoError(t, err)
 
-	// Verify
-	assert.True(t, status.Exists)
-	assert.Equal(t, commitSHA[:8], status.CommitSHA)
-	assert.True(t, status.CurrentRef == "master" || status.CurrentRef == "main")
-	assert.Empty(t, status.Tags)
-	assert.NotEmpty(t, status.Branches) // Should show the current branch
-}
-
-// TestGetRepoStatus_NormalRepo_WithSingleTag tests status with one tag
-func TestGetRepoStatus_NormalRepo_WithSingleTag(t *testing.T) {
-	log := logging.NoLog{}
-	repoPath, cleanup := setupTempRepo(t)
-	defer cleanup()
-
-	// Add a tag
-	addTag(t, repoPath, "v1.0.0")
-
-	commitSHA := getCurrentCommitSHA(t, repoPath)
-
-	// Get status
-	status, err := GetRepoStatus(log, "test-repo", repoPath, "", true)
-	require.NoError(t, err)
-
-	// Verify
-	assert.True(t, status.Exists)
-	assert.Equal(t, commitSHA[:8], status.CommitSHA)
-	assert.Contains(t, status.Tags, "v1.0.0")
-}
-
-// TestGetRepoStatus_NormalRepo_WithMultipleTags tests status with multiple tags
-func TestGetRepoStatus_NormalRepo_WithMultipleTags(t *testing.T) {
-	log := logging.NoLog{}
-	repoPath, cleanup := setupTempRepo(t)
-	defer cleanup()
-
-	// Add multiple tags at same commit
-	addTag(t, repoPath, "v1.0.0")
-	addTag(t, repoPath, "v1.0.1")
-	addTag(t, repoPath, "latest")
-
-	commitSHA := getCurrentCommitSHA(t, repoPath)
-
-	// Get status
-	status, err := GetRepoStatus(log, "test-repo", repoPath, "", true)
-	require.NoError(t, err)
-
-	// Verify
-	assert.True(t, status.Exists)
-	assert.Equal(t, commitSHA[:8], status.CommitSHA)
-	assert.Len(t, status.Tags, 3)
-	assert.Contains(t, status.Tags, "v1.0.0")
-	assert.Contains(t, status.Tags, "v1.0.1")
-	assert.Contains(t, status.Tags, "latest")
-}
-
-// TestGetRepoStatus_NormalRepo_NoTags tests status with no tags
-func TestGetRepoStatus_NormalRepo_NoTags(t *testing.T) {
-	log := logging.NoLog{}
-	repoPath, cleanup := setupTempRepo(t)
-	defer cleanup()
-
-	commitSHA := getCurrentCommitSHA(t, repoPath)
-
-	// Get status (no tags created)
-	status, err := GetRepoStatus(log, "test-repo", repoPath, "", true)
-	require.NoError(t, err)
-
-	// Verify
-	assert.True(t, status.Exists)
-	assert.Equal(t, commitSHA[:8], status.CommitSHA)
-	assert.Empty(t, status.Tags)
-}
-
-// TestGetRepoStatus_NormalRepo_WithMultipleBranches tests status with multiple branches at same commit
-func TestGetRepoStatus_NormalRepo_WithMultipleBranches(t *testing.T) {
-	log := logging.NoLog{}
-	repoPath, cleanup := setupTempRepo(t)
-	defer cleanup()
-
-	// Create additional branches at current HEAD
-	createBranch(t, repoPath, "feature1")
-	createBranch(t, repoPath, "feature2")
-
-	commitSHA := getCurrentCommitSHA(t, repoPath)
-
-	// Get status
-	status, err := GetRepoStatus(log, "test-repo", repoPath, "", true)
-	require.NoError(t, err)
-
-	// Verify
-	assert.True(t, status.Exists)
-	assert.Equal(t, commitSHA[:8], status.CommitSHA)
-	assert.GreaterOrEqual(t, len(status.Branches), 3) // At least master/main, feature1, feature2
-	assert.Contains(t, status.Branches, "feature1")
-	assert.Contains(t, status.Branches, "feature2")
-}
-
-// TestGetRepoStatus_NormalRepo_NoBranches tests orphan commit with no branches
-func TestGetRepoStatus_NormalRepo_NoBranches(t *testing.T) {
-	log := logging.NoLog{}
-	repoPath, cleanup := setupTempRepo(t)
-	defer cleanup()
-
-	// Create a commit and move all branches away from it
-	commitSHA := getCurrentCommitSHA(t, repoPath)
-
-	// Create a new commit
-	testFile := filepath.Join(repoPath, "test.txt")
-	require.NoError(t, os.WriteFile(testFile, []byte("new content"), 0o600))
-	commitAll(t, repoPath, "New commit")
-
-	// Now checkout back to the old commit (detached)
-	checkoutDetached(t, repoPath, commitSHA)
-
-	// Get status for the old commit (orphaned)
-	status, err := GetRepoStatus(log, "test-repo", repoPath, "", true)
-	require.NoError(t, err)
-
-	// Verify
-	assert.True(t, status.Exists)
-	assert.Equal(t, commitSHA[:8], status.CommitSHA)
-	// This commit should have no branches pointing to it now
-	assert.Empty(t, status.Branches)
+			tt.validateStatus(t, status, commitSHA)
+		})
+	}
 }
 
 // High Priority Test Cases - Git Worktrees
 
-// TestGetRepoStatus_Worktree_DetachedHead tests status on a worktree with detached HEAD
-func TestGetRepoStatus_Worktree_DetachedHead(t *testing.T) {
+// TestGetRepoStatus_Worktree tests status on git worktrees with various configurations
+func TestGetRepoStatus_Worktree(t *testing.T) {
 	log := logging.NoLog{}
-	repoPath, cleanup := setupTempRepo(t)
-	defer cleanup()
 
-	commitSHA := getCurrentCommitSHA(t, repoPath)
+	tests := []struct {
+		name           string
+		setupGit       func(t *testing.T, repoPath string) (worktreePath string, cleanup func())
+		validateStatus func(t *testing.T, status *RepoStatus, repoPath string)
+	}{
+		{
+			name: "detached HEAD",
+			setupGit: func(t *testing.T, repoPath string) (string, func()) {
+				commitSHA := getCurrentCommitSHA(t, repoPath)
+				worktreePath, cleanup := createWorktree(t, repoPath, "test-worktree", commitSHA)
+				return worktreePath, cleanup
+			},
+			validateStatus: func(t *testing.T, status *RepoStatus, repoPath string) {
+				commitSHA := getCurrentCommitSHA(t, repoPath)
+				assert.True(t, status.Exists)
+				assert.Equal(t, commitSHA[:8], status.CommitSHA)
+				assert.Equal(t, commitSHA, status.CurrentRef) // Detached HEAD
+			},
+		},
+		{
+			name: "on branch",
+			setupGit: func(t *testing.T, repoPath string) (string, func()) {
+				createBranch(t, repoPath, "worktree-branch")
+				worktreePath, cleanup := createWorktree(t, repoPath, "test-worktree", "worktree-branch")
+				return worktreePath, cleanup
+			},
+			validateStatus: func(t *testing.T, status *RepoStatus, repoPath string) {
+				commitSHA := getCurrentCommitSHA(t, repoPath)
+				assert.True(t, status.Exists)
+				assert.Equal(t, commitSHA[:8], status.CommitSHA)
+				assert.Equal(t, "worktree-branch", status.CurrentRef)
+				assert.Contains(t, status.Branches, "worktree-branch")
+			},
+		},
+		{
+			name: "with tags visible from commondir",
+			setupGit: func(t *testing.T, repoPath string) (string, func()) {
+				addTag(t, repoPath, "v1.0.0")
+				addTag(t, repoPath, "v1.0.1")
+				worktreePath, cleanup := createWorktree(t, repoPath, "test-worktree", "HEAD")
+				return worktreePath, cleanup
+			},
+			validateStatus: func(t *testing.T, status *RepoStatus, repoPath string) {
+				commitSHA := getCurrentCommitSHA(t, repoPath)
+				assert.True(t, status.Exists)
+				assert.Equal(t, commitSHA[:8], status.CommitSHA)
+				assert.Contains(t, status.Tags, "v1.0.0")
+				assert.Contains(t, status.Tags, "v1.0.1")
+			},
+		},
+		{
+			name: "commondir resolution",
+			setupGit: func(t *testing.T, repoPath string) (string, func()) {
+				worktreePath, cleanup := createWorktree(t, repoPath, "test-worktree", "HEAD")
+				return worktreePath, cleanup
+			},
+			validateStatus: func(t *testing.T, status *RepoStatus, repoPath string) {
+				// Verify .git is a file in worktree
+				gitPath := filepath.Join(status.Path, ".git")
+				info, err := os.Stat(gitPath)
+				require.NoError(t, err)
+				assert.False(t, info.IsDir(), ".git should be a file in worktree, not a directory")
 
-	// Create worktree at current commit
-	worktreePath, cleanupWorktree := createWorktree(t, repoPath, "test-worktree", commitSHA)
-	defer cleanupWorktree()
+				// Read .git file content
+				content, err := os.ReadFile(gitPath)
+				require.NoError(t, err)
+				assert.True(t, strings.HasPrefix(string(content), "gitdir:"), ".git file should contain gitdir reference")
 
-	// Get status from worktree
-	status, err := GetRepoStatus(log, "test-repo", worktreePath, "", true)
-	require.NoError(t, err)
+				// Status should work despite worktree structure
+				assert.True(t, status.Exists)
+			},
+		},
+	}
 
-	// Verify
-	assert.True(t, status.Exists)
-	assert.Equal(t, commitSHA[:8], status.CommitSHA)
-	assert.Equal(t, commitSHA, status.CurrentRef) // Detached HEAD
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repoPath, cleanup := setupTempRepo(t)
+			defer cleanup()
 
-// TestGetRepoStatus_Worktree_OnBranch tests status on a worktree on a branch
-func TestGetRepoStatus_Worktree_OnBranch(t *testing.T) {
-	log := logging.NoLog{}
-	repoPath, cleanup := setupTempRepo(t)
-	defer cleanup()
+			worktreePath, cleanupWorktree := tt.setupGit(t, repoPath)
+			defer cleanupWorktree()
 
-	// Create a new branch
-	createBranch(t, repoPath, "worktree-branch")
+			status, err := GetRepoStatus(log, "avalanchego", worktreePath, "", true)
+			require.NoError(t, err)
 
-	// Create worktree on the new branch
-	worktreePath, cleanupWorktree := createWorktree(t, repoPath, "test-worktree", "worktree-branch")
-	defer cleanupWorktree()
-
-	commitSHA := getCurrentCommitSHA(t, worktreePath)
-
-	// Get status from worktree
-	status, err := GetRepoStatus(log, "test-repo", worktreePath, "", true)
-	require.NoError(t, err)
-
-	// Verify
-	assert.True(t, status.Exists)
-	assert.Equal(t, commitSHA[:8], status.CommitSHA)
-	assert.Equal(t, "worktree-branch", status.CurrentRef)
-	assert.Contains(t, status.Branches, "worktree-branch")
-}
-
-// TestGetRepoStatus_Worktree_WithTags tests that tags are correctly resolved from commondir
-func TestGetRepoStatus_Worktree_WithTags(t *testing.T) {
-	log := logging.NoLog{}
-	repoPath, cleanup := setupTempRepo(t)
-	defer cleanup()
-
-	// Add tags in main repo
-	addTag(t, repoPath, "v1.0.0")
-	addTag(t, repoPath, "v1.0.1")
-
-	commitSHA := getCurrentCommitSHA(t, repoPath)
-
-	// Create worktree
-	worktreePath, cleanupWorktree := createWorktree(t, repoPath, "test-worktree", "HEAD")
-	defer cleanupWorktree()
-
-	// Get status from worktree
-	status, err := GetRepoStatus(log, "test-repo", worktreePath, "", true)
-	require.NoError(t, err)
-
-	// Verify tags are visible from worktree
-	assert.True(t, status.Exists)
-	assert.Equal(t, commitSHA[:8], status.CommitSHA)
-	assert.Contains(t, status.Tags, "v1.0.0")
-	assert.Contains(t, status.Tags, "v1.0.1")
-}
-
-// TestGetRepoStatus_Worktree_CommonDirResolution tests that commondir is correctly found
-func TestGetRepoStatus_Worktree_CommonDirResolution(t *testing.T) {
-	log := logging.NoLog{}
-	repoPath, cleanup := setupTempRepo(t)
-	defer cleanup()
-
-	// Create worktree
-	worktreePath, cleanupWorktree := createWorktree(t, repoPath, "test-worktree", "HEAD")
-	defer cleanupWorktree()
-
-	// Verify .git is a file in worktree
-	gitPath := filepath.Join(worktreePath, ".git")
-	info, err := os.Stat(gitPath)
-	require.NoError(t, err)
-	assert.False(t, info.IsDir(), ".git should be a file in worktree, not a directory")
-
-	// Read .git file content
-	content, err := os.ReadFile(gitPath)
-	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(string(content), "gitdir:"), ".git file should contain gitdir reference")
-
-	// Get status should work despite worktree structure
-	status, err := GetRepoStatus(log, "test-repo", worktreePath, "", true)
-	require.NoError(t, err)
-	assert.True(t, status.Exists)
+			tt.validateStatus(t, status, repoPath)
+		})
+	}
 }
 
 // High Priority Test Cases - Replace Directives
 
-// TestGetRepoStatus_NoReplaces tests status with no replace directives
-func TestGetRepoStatus_NoReplaces(t *testing.T) {
+// TestGetRepoStatus_ReplaceDirectives tests status with various replace directive configurations
+func TestGetRepoStatus_ReplaceDirectives(t *testing.T) {
 	log := logging.NoLog{}
-	repoPath, cleanup := setupTempRepo(t)
-	defer cleanup()
 
-	// Create go.mod without replace directives
-	goModPath := createGoModWithModule(t, repoPath, "github.com/example/test")
-
-	// Get status
-	status, err := GetRepoStatus(log, "test-repo", repoPath, goModPath, true)
-	require.NoError(t, err)
-
-	// Verify
-	assert.True(t, status.Exists)
-	assert.Empty(t, status.Replacements)
-}
-
-// TestGetRepoStatus_WithLocalReplaces tests status with local path replace directives
-func TestGetRepoStatus_WithLocalReplaces(t *testing.T) {
-	log := logging.NoLog{}
-	repoPath, cleanup := setupTempRepo(t)
-	defer cleanup()
-
-	// Create go.mod with dependencies
-	goModPath := filepath.Join(repoPath, "go.mod")
-	content := `module github.com/example/test
+	tests := []struct {
+		name           string
+		setupGoMod     func(t *testing.T, repoPath string) string // Returns goModPath
+		validateStatus func(t *testing.T, status *RepoStatus)
+	}{
+		{
+			name: "no replaces",
+			setupGoMod: func(t *testing.T, repoPath string) string {
+				return createGoModWithModule(t, repoPath, "github.com/example/test")
+			},
+			validateStatus: func(t *testing.T, status *RepoStatus) {
+				assert.True(t, status.Exists)
+				assert.Empty(t, status.Replacements)
+			},
+		},
+		{
+			name: "with local replaces",
+			setupGoMod: func(t *testing.T, repoPath string) string {
+				goModPath := filepath.Join(repoPath, "go.mod")
+				content := `module github.com/example/test
 
 go 1.24
 
@@ -477,61 +438,49 @@ require (
 	github.com/ava-labs/firewood-go-ethhash v0.0.12
 )
 `
-	require.NoError(t, os.WriteFile(goModPath, []byte(content), 0o600))
+				require.NoError(t, os.WriteFile(goModPath, []byte(content), 0o600))
 
-	// Add replace directives for local paths
-	addReplaceDirectiveToFile(t, goModPath, "github.com/ava-labs/coreth", "./coreth")
-	addReplaceDirectiveToFile(t, goModPath, "github.com/ava-labs/firewood-go-ethhash", "./firewood/ffi")
+				// Add replace directives for local paths
+				addReplaceDirectiveToFile(t, goModPath, "github.com/ava-labs/coreth", "./coreth")
+				addReplaceDirectiveToFile(t, goModPath, "github.com/ava-labs/firewood-go-ethhash", "./firewood/ffi")
 
-	// Get status
-	status, err := GetRepoStatus(log, "test-repo", repoPath, goModPath, true)
-	require.NoError(t, err)
-
-	// Verify
-	assert.True(t, status.Exists)
-	assert.Len(t, status.Replacements, 2)
-	assert.Equal(t, "./coreth", status.Replacements["github.com/ava-labs/coreth"])
-	assert.Equal(t, "./firewood/ffi", status.Replacements["github.com/ava-labs/firewood-go-ethhash"])
-}
-
-// TestGetRepoStatus_WithVersionReplaces tests status with version replace directives
-func TestGetRepoStatus_WithVersionReplaces(t *testing.T) {
-	log := logging.NoLog{}
-	repoPath, cleanup := setupTempRepo(t)
-	defer cleanup()
-
-	// Create go.mod with dependencies
-	goModPath := filepath.Join(repoPath, "go.mod")
-	content := `module github.com/example/test
+				return goModPath
+			},
+			validateStatus: func(t *testing.T, status *RepoStatus) {
+				assert.True(t, status.Exists)
+				assert.Len(t, status.Replacements, 2)
+				assert.Equal(t, "./coreth", status.Replacements["github.com/ava-labs/coreth"])
+				assert.Equal(t, "./firewood/ffi", status.Replacements["github.com/ava-labs/firewood-go-ethhash"])
+			},
+		},
+		{
+			name: "with version replaces",
+			setupGoMod: func(t *testing.T, repoPath string) string {
+				goModPath := filepath.Join(repoPath, "go.mod")
+				content := `module github.com/example/test
 
 go 1.24
 
 require github.com/ava-labs/coreth v0.15.4
 `
-	require.NoError(t, os.WriteFile(goModPath, []byte(content), 0o600))
+				require.NoError(t, os.WriteFile(goModPath, []byte(content), 0o600))
 
-	// Add replace directive with version
-	addReplaceDirectiveToFile(t, goModPath, "github.com/ava-labs/coreth", "github.com/ava-labs/coreth v0.15.5")
+				// Add replace directive with version
+				addReplaceDirectiveToFile(t, goModPath, "github.com/ava-labs/coreth", "github.com/ava-labs/coreth v0.15.5")
 
-	// Get status
-	status, err := GetRepoStatus(log, "test-repo", repoPath, goModPath, true)
-	require.NoError(t, err)
-
-	// Verify
-	assert.True(t, status.Exists)
-	assert.Len(t, status.Replacements, 1)
-	assert.Equal(t, "github.com/ava-labs/coreth v0.15.5", status.Replacements["github.com/ava-labs/coreth"])
-}
-
-// TestGetRepoStatus_MixedReplaces tests status with both local and version replace directives
-func TestGetRepoStatus_MixedReplaces(t *testing.T) {
-	log := logging.NoLog{}
-	repoPath, cleanup := setupTempRepo(t)
-	defer cleanup()
-
-	// Create go.mod with dependencies
-	goModPath := filepath.Join(repoPath, "go.mod")
-	content := `module github.com/example/test
+				return goModPath
+			},
+			validateStatus: func(t *testing.T, status *RepoStatus) {
+				assert.True(t, status.Exists)
+				assert.Len(t, status.Replacements, 1)
+				assert.Equal(t, "github.com/ava-labs/coreth v0.15.5", status.Replacements["github.com/ava-labs/coreth"])
+			},
+		},
+		{
+			name: "mixed replaces",
+			setupGoMod: func(t *testing.T, repoPath string) string {
+				goModPath := filepath.Join(repoPath, "go.mod")
+				content := `module github.com/example/test
 
 go 1.24
 
@@ -540,21 +489,36 @@ require (
 	github.com/ava-labs/firewood-go-ethhash v0.0.12
 )
 `
-	require.NoError(t, os.WriteFile(goModPath, []byte(content), 0o600))
+				require.NoError(t, os.WriteFile(goModPath, []byte(content), 0o600))
 
-	// Add mixed replace directives
-	addReplaceDirectiveToFile(t, goModPath, "github.com/ava-labs/coreth", "./coreth")
-	addReplaceDirectiveToFile(t, goModPath, "github.com/ava-labs/firewood-go-ethhash", "github.com/ava-labs/firewood-go-ethhash v0.0.13")
+				// Add mixed replace directives
+				addReplaceDirectiveToFile(t, goModPath, "github.com/ava-labs/coreth", "./coreth")
+				addReplaceDirectiveToFile(t, goModPath, "github.com/ava-labs/firewood-go-ethhash", "github.com/ava-labs/firewood-go-ethhash v0.0.13")
 
-	// Get status
-	status, err := GetRepoStatus(log, "test-repo", repoPath, goModPath, true)
-	require.NoError(t, err)
+				return goModPath
+			},
+			validateStatus: func(t *testing.T, status *RepoStatus) {
+				assert.True(t, status.Exists)
+				assert.Len(t, status.Replacements, 2)
+				assert.Equal(t, "./coreth", status.Replacements["github.com/ava-labs/coreth"])
+				assert.Equal(t, "github.com/ava-labs/firewood-go-ethhash v0.0.13", status.Replacements["github.com/ava-labs/firewood-go-ethhash"])
+			},
+		},
+	}
 
-	// Verify
-	assert.True(t, status.Exists)
-	assert.Len(t, status.Replacements, 2)
-	assert.Equal(t, "./coreth", status.Replacements["github.com/ava-labs/coreth"])
-	assert.Equal(t, "github.com/ava-labs/firewood-go-ethhash v0.0.13", status.Replacements["github.com/ava-labs/firewood-go-ethhash"])
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repoPath, cleanup := setupTempRepo(t)
+			defer cleanup()
+
+			goModPath := tt.setupGoMod(t, repoPath)
+
+			status, err := GetRepoStatus(log, "avalanchego", repoPath, goModPath, true)
+			require.NoError(t, err)
+
+			tt.validateStatus(t, status)
+		})
+	}
 }
 
 // TestGetRepoStatus_PrimaryVsSyncedReplacements tests that primary and synced repos
