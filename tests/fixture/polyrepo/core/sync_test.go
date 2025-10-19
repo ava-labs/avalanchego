@@ -329,7 +329,7 @@ require github.com/ava-labs/coreth v0.13.8
 
 			// Check for expected error or success behavior
 			if tt.expectError != "" {
-				require.Error(t, err)
+				require.Error(t, err) //nolint:forbidigo // checking error message content, not error type
 				require.Contains(t, err.Error(), tt.expectError)
 			}
 			// Note: If expectError is empty, the test will error at git clone
@@ -363,7 +363,7 @@ require github.com/ava-labs/coreth v0.13.8
 	// Try to sync avalanchego into itself - should error
 	err = Sync(log, tmpDir, []string{"avalanchego"}, 1, false)
 
-	require.Error(t, err)
+	require.Error(t, err) //nolint:forbidigo // checking error message content, not error type
 	require.Contains(t, err.Error(), "cannot sync avalanchego into itself")
 }
 
@@ -373,14 +373,15 @@ require github.com/ava-labs/coreth v0.13.8
 // from a non-existent go.mod file.
 func TestSync_StandaloneMode_Validation(t *testing.T) {
 	tests := []struct {
-		name        string
-		repoArgs    []string
-		expectError string
+		name         string
+		repoArgs     []string
+		expectError  string
+		expectErrVar error
 	}{
 		{
-			name:        "no args - should error immediately",
-			repoArgs:    []string{},
-			expectError: "must specify repos when no go.mod exists",
+			name:         "no args - should error immediately",
+			repoArgs:     []string{},
+			expectErrVar: errStandaloneModeNeedsRepos,
 		},
 		{
 			name:        "invalid repo format",
@@ -405,8 +406,12 @@ func TestSync_StandaloneMode_Validation(t *testing.T) {
 			err := Sync(log, tmpDir, tt.repoArgs, 1, false)
 
 			// Should error with expected message
-			require.Error(t, err)
-			require.Contains(t, err.Error(), tt.expectError)
+			if tt.expectErrVar != nil {
+				require.ErrorIs(t, err, tt.expectErrVar)
+			} else {
+				require.Error(t, err) //nolint:forbidigo // checking error message content, not error type
+				require.Contains(t, err.Error(), tt.expectError)
+			}
 
 			// Verify no go.mod was created (standalone mode shouldn't create one)
 			goModPath := filepath.Join(tmpDir, "go.mod")
@@ -444,11 +449,9 @@ func TestSync_StandaloneMode_MultiRepo(t *testing.T) {
 
 			// No go.mod exists - standalone mode
 			err := Sync(log, tmpDir, tt.repoArgs, 1, false)
-
 			// Tests will fail at git clone (network required), but the KEY is that
 			// they should NOT fail with validation errors about missing go.mod
 			// The error should be from git operations, not from our orchestration logic
-
 			// The critical validation: should NOT error about missing go.mod
 			if err != nil {
 				require.NotContains(t, err.Error(), "must specify repos when no go.mod exists")

@@ -850,14 +850,24 @@ func Sync(
 
 		// Run nix build if required
 		if config.RequiresNixBuild {
-			log.Info("running nix build",
+			log.Info("building repository",
 				zap.String("repo", repo.name),
-				zap.String("path", GetNixBuildPath(clonePath, config.NixBuildPath)),
+				zap.String("path", clonePath),
 			)
-			nixBuildPath := GetNixBuildPath(clonePath, config.NixBuildPath)
-			err = RunNixBuild(log, nixBuildPath)
-			if err != nil {
-				return stacktrace.Errorf("failed to run nix build for %s: %w", repo.name, err)
+
+			// Use specialized build function for firewood
+			if repo.name == "firewood" {
+				err = BuildFirewood(log, clonePath, refToUse)
+				if err != nil {
+					return stacktrace.Errorf("failed to build firewood: %w", err)
+				}
+			} else {
+				// Default nix build for other repos
+				nixBuildPath := GetNixBuildPath(clonePath, config.NixBuildPath)
+				err = RunNixBuild(log, nixBuildPath)
+				if err != nil {
+					return stacktrace.Errorf("failed to run nix build for %s: %w", repo.name, err)
+				}
 			}
 		}
 
