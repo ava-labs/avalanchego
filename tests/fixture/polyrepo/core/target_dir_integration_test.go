@@ -11,25 +11,56 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	// polyrepoSourceDir is the absolute path to the polyrepo source directory
+	polyrepoSourceDir     string
+	polyrepoSourceDirOnce sync.Once
+)
+
+// getPolyrepoSourceDir returns the absolute path to the polyrepo source directory
+// It's calculated once and cached for all tests in the package
+func getPolyrepoSourceDir(t *testing.T) string {
+	t.Helper()
+
+	polyrepoSourceDirOnce.Do(func() {
+		// Get current working directory (should be tests/fixture/polyrepo/core/)
+		cwd, err := os.Getwd()
+		require.NoError(t, err, "failed to get current working directory")
+
+		// Go up one directory to tests/fixture/polyrepo/
+		polyrepoSourceDir = filepath.Join(cwd, "..")
+	})
+
+	return polyrepoSourceDir
+}
 
 // runPolyrepo runs the polyrepo command with the given arguments
 // Returns stdout, stderr, and error
 func runPolyrepo(t *testing.T, args ...string) (string, string, error) {
 	t.Helper()
 
+	// Create a single temp directory for the binary
+	tmpDir := t.TempDir()
+	polyrepoBin := filepath.Join(tmpDir, "polyrepo")
+
+	// Get the polyrepo source directory (cached, calculated once)
+	polyrepoDir := getPolyrepoSourceDir(t)
+
 	// Build the polyrepo binary
-	polyrepoDir := filepath.Join("..", "..", "..", "..", "tests", "fixture", "polyrepo")
-	cmd := exec.Command("go", "build", "-o", filepath.Join(t.TempDir(), "polyrepo"), ".")
+	cmd := exec.Command("go", "build", "-o", polyrepoBin, ".")
 	cmd.Dir = polyrepoDir
+	var buildStderr strings.Builder
+	cmd.Stderr = &buildStderr
 	err := cmd.Run()
-	require.NoError(t, err, "failed to build polyrepo")
+	require.NoError(t, err, "failed to build polyrepo: %s", buildStderr.String())
 
 	// Run the polyrepo command
-	polyrepoBin := filepath.Join(t.TempDir(), "polyrepo")
 	runCmd := exec.Command(polyrepoBin, args...)
 
 	var stdout, stderr strings.Builder

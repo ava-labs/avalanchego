@@ -83,6 +83,252 @@ This documentation is more valuable than the code itself because code shows "wha
 
 7. **♻️ REFACTOR: Improve code quality** - Refactor while keeping tests green
 
+### Testing Best Practices and Philosophy
+
+**CRITICAL**: This section documents lessons learned from testing oversights and establishes principles to prevent future gaps in test coverage.
+
+#### 1. Unit Tests vs Integration Tests
+
+**Philosophy**: Unit tests should be the PRIMARY testing strategy. Integration tests should be MINIMAL and RARE.
+
+**Unit Tests** (default - no build tags):
+- Test business logic without network or external dependencies
+- Create specific filesystem states (temporary directories, test files) to exercise code paths
+- Fast execution (milliseconds)
+- No network calls, no real git clones
+- **Example**: If you need to read a go.mod file, create a temporary test file - don't clone a real repo
+
+**Integration Tests** (`//go:build integration` tag):
+- ONLY for smoke tests that ABSOLUTELY require real git operations or network
+- Expensive and slow (seconds to minutes)
+- Should validate end-to-end workflows that require real external operations (git, network)
+- **Target**: <100 lines of integration test code per feature
+
+**Anti-Pattern**:
+```go
+// ❌ BAD: Integration test cloning real repo just to read a file
+func TestReadGoMod_Integration(t *testing.T) {
+    // Clones real avalanchego repo (slow, requires network)
+    CloneRepo("https://github.com/ava-labs/avalanchego", "/tmp/test", "master")
+    content := ReadGoMod("/tmp/test/go.mod")
+    // assertions...
+}
+```
+
+**Good Pattern**:
+```go
+// ✅ GOOD: Unit test with test fixture (creates specific filesystem state)
+func TestReadGoMod(t *testing.T) {
+    tmpDir := t.TempDir()
+    goModPath := filepath.Join(tmpDir, "go.mod")
+    os.WriteFile(goModPath, []byte("module example.com\ngo 1.21"), 0644)
+
+    content := ReadGoMod(goModPath)
+    // assertions...
+}
+```
+
+#### 2. What to Validate in Tests
+
+**✅ DO: Validate Function Outputs and Side Effects**
+- Return values (strings, objects, data structures)
+- Error types and error messages
+- Files created or modified (check file existence, content, permissions)
+- Directory structure (check directories created, hierarchy)
+- go.mod content (check replace directives, dependencies)
+- State changes (repo cloned, git refs updated, working directory state)
+
+**Example**:
+```go
+// ✅ GOOD: Validate side effects
+func TestSync_CreatesReplaceDirectives(t *testing.T) {
+    tmpDir := t.TempDir()
+    // Run sync
+    err := Sync(log, tmpDir, []string{"coreth"}, 1, false)
+    require.NoError(t, err)
+
+    // Validate file was modified
+    content, err := os.ReadFile(filepath.Join(tmpDir, "go.mod"))
+    require.NoError(t, err)
+    assert.Contains(t, string(content), "replace github.com/ava-labs/coreth")
+}
+```
+
+**❌ DON'T: Rely on Log Output for Test Assertions**
+- Log messages are implementation details and can change
+- Tests should not break when you improve logging
+- Logs are for debugging, not for test validation
+
+**Anti-Pattern**:
+```go
+// ❌ BAD: Testing implementation details (log messages)
+func TestSync_LogsCorrectMessage(t *testing.T) {
+    var buf bytes.Buffer
+    log := logger.New(&buf)
+
+    Sync(log, tmpDir, []string{"coreth"}, 1, false)
+
+    // Fragile: breaks when log message changes
+    assert.Contains(t, buf.String(), "Syncing coreth at version")
+}
+```
+
+**❌ DON'T: Test Implementation Details**
+- Don't test internal function calls or execution order
+- Test behavior and outcomes, not how the code achieves them
+- Internal refactoring should not break tests
+
+#### 3. Table-Driven Tests
+
+**When to Use**: When you have multiple similar tests with different inputs/outputs.
+
+**Benefits**:
+- Reduces code duplication
+- Makes it easy to add new test cases
+- Improves test readability and maintainability
+- Easier to identify patterns in test coverage
+
+**Example**:
+```go
+// ✅ GOOD: Table-driven test consolidating 7 similar tests
+func TestDetectCurrentRepo(t *testing.T) {
+    tests := []struct {
+        name           string
+        setupFunc      func(t *testing.T) string // Returns test directory
+        expectedRepo   string
+    }{
+        {
+            name: "from avalanchego",
+            setupFunc: func(t *testing.T) string {
+                dir := t.TempDir()
+                os.WriteFile(filepath.Join(dir, "go.mod"),
+                    []byte("module github.com/ava-labs/avalanchego\n"), 0644)
+                return dir
+            },
+            expectedRepo: "avalanchego",
+        },
+        {
+            name: "from coreth",
+            setupFunc: func(t *testing.T) string {
+                dir := t.TempDir()
+                os.WriteFile(filepath.Join(dir, "go.mod"),
+                    []byte("module github.com/ava-labs/coreth\n"), 0644)
+                return dir
+            },
+            expectedRepo: "coreth",
+        },
+        {
+            name: "from unknown location",
+            setupFunc: func(t *testing.T) string {
+                return t.TempDir() // Empty directory
+            },
+            expectedRepo: "",
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            dir := tt.setupFunc(t)
+            result := DetectCurrentRepo(log, dir)
+            assert.Equal(t, tt.expectedRepo, result)
+        })
+    }
+}
+```
+
+**Before**: 7 separate test functions with duplicated setup code
+**After**: 1 table-driven test with 7 test cases
+
+**See Also**: `TestDetectCurrentRepo()` in sync_test.go as a real example from this codebase
+
+#### 4. Test Organization
+
+**File Naming Conventions**:
+- Unit tests: `*_test.go` (no build tags) - these run by default
+- Integration tests: `*_integration_test.go` with `//go:build integration` tag at top of file
+
+**Example Integration Test File**:
+```go
+//go:build integration
+
+package core
+
+import "testing"
+
+func TestCloneRealRepo_Integration(t *testing.T) {
+    // Test that requires real network and git operations
+}
+```
+
+**Running Tests**:
+```bash
+# Unit tests only (fast, no network)
+go test ./tests/fixture/polyrepo/core/... -v
+
+# Integration tests only
+go test ./tests/fixture/polyrepo/core/... -v -tags=integration
+
+# All tests
+go test ./tests/fixture/polyrepo/core/... -v -tags=integration
+```
+
+**Rule of Thumb**: Integration tests should be RARE. Most logic should be unit testable through dependency injection, interfaces, or filesystem abstractions.
+
+#### 5. Skipped Tests Are Technical Debt
+
+**CRITICAL LESSON**: The issue that prompted this documentation update was 8 tests marked with `t.Skip()` as "TODO" that were never implemented, causing a significant gap in test coverage.
+
+**Rules for t.Skip()**:
+1. **ONLY use t.Skip() for tests that require expensive resources** (network, long execution time, specific hardware)
+2. **NEVER use t.Skip() for TODO tests** - Either write the test or don't add it at all
+3. **ALL skipped tests MUST have**:
+   - Clear explanation of WHY it's skipped
+   - A plan and timeline for implementation
+   - A tracking issue or comment with next steps
+
+**Good Use of t.Skip()**:
+```go
+// ✅ GOOD: Skipping an expensive test with clear reason
+func TestFullRepositoryMigration_Integration(t *testing.T) {
+    if testing.Short() {
+        t.Skip("Skipping expensive integration test in short mode - takes 5 minutes")
+    }
+    // Test implementation...
+}
+```
+
+**Anti-Pattern**:
+```go
+// ❌ BAD: Skipping a TODO test without plan
+func TestSyncWithRetry(t *testing.T) {
+    t.Skip("TODO: Implement this test")
+    // No implementation, no plan, creates technical debt
+}
+```
+
+**What to Do Instead**:
+1. If you know how to write the test: Write it now (TDD)
+2. If you're not sure how to test it: That's a sign the code is not testable - refactor first
+3. If it's truly complex: Create a tracking issue, document the gap in CLAUDE.md, and write simpler tests for parts of the functionality
+
+**Skipped Tests = Test Coverage Gaps**: Every skipped test is a potential bug waiting to happen. Treat them with the same seriousness as bugs.
+
+#### 6. Testing Checklist - Before Marking Work Complete
+
+Before considering any feature or bug fix complete, verify:
+
+- [ ] **All new code has unit tests** - Every new function in core/ has corresponding unit tests
+- [ ] **Unit tests validate outputs and side-effects, not logs** - Tests check return values, files created, state changes
+- [ ] **Similar tests are consolidated into table-driven tests** - Reduces duplication and improves maintainability
+- [ ] **Integration tests are minimal** - Only smoke tests if absolutely necessary, target <100 lines per feature
+- [ ] **No t.Skip() tests without explicit reason and plan** - Every skipped test has a clear explanation and timeline
+- [ ] **Unit tests pass**: `go test ./tests/fixture/polyrepo/core/... -v`
+- [ ] **Integration tests pass**: `go test ./tests/fixture/polyrepo/core/... -v -tags=integration`
+- [ ] **Linter passes**: `./scripts/run_task.sh lint`
+- [ ] **Documentation updated** - CLAUDE.md reflects new tests, functions, and lessons learned
+
+**This checklist is MANDATORY, not optional.** Skipping any of these steps creates technical debt and increases the risk of bugs.
+
 ### When Fixing Bugs: TEST FIRST, ALWAYS
 
 **CRITICAL LESSON**: When a bug is discovered (whether through manual testing, user report, or code review), the SECOND step after identifying the nature of the problem is to write a test that reproduces it. **DO NOT jump straight to fixing the code.**
