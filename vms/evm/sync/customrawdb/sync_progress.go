@@ -106,7 +106,7 @@ func WriteSyncSegment(db ethdb.KeyValueWriter, root common.Hash, start common.Ha
 	copy(bytes, syncSegmentsPrefix)
 	copy(bytes[len(syncSegmentsPrefix):], root[:])
 	copy(bytes[len(syncSegmentsPrefix)+common.HashLength:], start.Bytes())
-	return db.Put(bytes, []byte{0x01})
+	return db.Put(bytes, nil)
 }
 
 // ClearSyncSegments removes segment markers for root from db
@@ -140,11 +140,11 @@ func NewSyncStorageTriesIterator(db ethdb.Iteratee, seek []byte) ethdb.Iterator 
 
 // WriteSyncStorageTrie adds a storage trie for account (with the given root) to be synced.
 func WriteSyncStorageTrie(db ethdb.KeyValueWriter, root common.Hash, account common.Hash) error {
-	bytes := make([]byte, 0, syncStorageTriesKeyLength)
-	bytes = append(bytes, syncStorageTriesPrefix...)
-	bytes = append(bytes, root[:]...)
-	bytes = append(bytes, account[:]...)
-	return db.Put(bytes, []byte{0x01})
+	bytes := make([]byte, syncStorageTriesKeyLength)
+	copy(bytes, syncStorageTriesPrefix)
+	copy(bytes[len(syncStorageTriesPrefix):], root[:])
+	copy(bytes[len(syncStorageTriesPrefix)+common.HashLength:], account[:])
+	return db.Put(bytes, nil)
 }
 
 // ClearSyncStorageTrie removes all storage trie accounts (with the given root) from db.
@@ -162,7 +162,9 @@ func ClearAllSyncStorageTries(db ethdb.KeyValueStore) error {
 }
 
 // ParseSyncStorageTrieKey returns the root and account for a storage trie
-// key returned from NewSyncStorageTriesIterator.
+// key returned from NewSyncStorageTriesIterator. It assumes the key has the
+// `syncStorageTriesPrefix` followed by a 32-byte root and 32-byte account hash,
+// and panics if the key is shorter than len(syncStorageTriesPrefix)+2*common.HashLength.
 func ParseSyncStorageTrieKey(keyBytes []byte) (common.Hash, common.Hash) {
 	keyBytes = keyBytes[len(syncStorageTriesPrefix):] // skip prefix
 	root := common.BytesToHash(keyBytes[:common.HashLength])
@@ -172,11 +174,10 @@ func ParseSyncStorageTrieKey(keyBytes []byte) (common.Hash, common.Hash) {
 
 // WriteSyncPerformed logs an entry in `db` indicating the VM state synced to `blockNumber`.
 func WriteSyncPerformed(db ethdb.KeyValueWriter, blockNumber uint64) error {
-	syncPerformedPrefixLen := len(syncPerformedPrefix)
 	bytes := make([]byte, syncPerformedKeyLength)
-	copy(bytes[:syncPerformedPrefixLen], syncPerformedPrefix)
-	binary.BigEndian.PutUint64(bytes[syncPerformedPrefixLen:], blockNumber)
-	return db.Put(bytes, []byte{0x01})
+	copy(bytes, syncPerformedPrefix)
+	binary.BigEndian.PutUint64(bytes[len(syncPerformedPrefix):], blockNumber)
+	return db.Put(bytes, nil)
 }
 
 // NewSyncPerformedIterator returns an iterator over all block numbers the VM
@@ -186,7 +187,9 @@ func NewSyncPerformedIterator(db ethdb.Iteratee) ethdb.Iterator {
 }
 
 // ParseSyncPerformedKey returns the block number from keys the iterator returned
-// from NewSyncPerformedIterator.
+// from NewSyncPerformedIterator. It assumes the key has the syncPerformedPrefix
+// followed by an 8-byte big-endian block number, and panics if the key is shorter
+// than len(syncPerformedPrefix)+wrappers.LongLen.
 func ParseSyncPerformedKey(key []byte) uint64 {
 	return binary.BigEndian.Uint64(key[len(syncPerformedPrefix):])
 }
@@ -214,10 +217,12 @@ func clearPrefix(db ethdb.KeyValueStore, prefix []byte, keyLen int) error {
 
 	batch := db.NewBatch()
 	for it.Next() {
-		key := common.CopyBytes(it.Key())
+		key := it.Key()
 		if len(key) != keyLen {
 			continue
 		}
+		key = common.CopyBytes(key)
+
 		if err := batch.Delete(key); err != nil {
 			return err
 		}

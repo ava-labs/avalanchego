@@ -65,7 +65,7 @@ func TestCodeToFetchIteratorAndDelete(t *testing.T) {
 	require.NoError(t, WriteCodeToFetch(db, h2))
 
 	// Insert a malformed key that should be ignored by the iterator (wrong length)
-	bad := append(append([]byte{}, CodeToFetchPrefix...), append(h1.Bytes(), 0x00)...)
+	bad := slices.Concat(CodeToFetchPrefix, h1.Bytes(), []byte{0x00})
 	require.NoError(t, db.Put(bad, []byte("x")))
 
 	// Collect hashes from iterator and assert presence.
@@ -137,11 +137,12 @@ func TestClearAllSyncStorageTries(t *testing.T) {
 	require.NoError(t, WriteSyncStorageTrie(db, root, common.HexToHash("0x01")))
 	require.NoError(t, WriteSyncStorageTrie(db, root, common.HexToHash("0x02")))
 	// Key that should not be cleared due to wrong length.
-	bad := make([]byte, 0, len(syncStorageTriesPrefix)+2*common.HashLength+1)
-	bad = append(bad, syncStorageTriesPrefix...)
-	bad = append(bad, root.Bytes()...)
-	bad = append(bad, common.HexToHash("0xff").Bytes()...)
-	bad = append(bad, byte(0x00))
+	bad := slices.Concat(
+		syncStorageTriesPrefix,
+		root.Bytes(),
+		common.HexToHash("0xff").Bytes(),
+		[]byte{0x00},
+	)
 	require.NoError(t, db.Put(bad, []byte("x")))
 
 	require.NoError(t, ClearAllSyncStorageTries(db))
@@ -387,17 +388,9 @@ func mapIterator[T any](t *testing.T, it ethdb.Iterator, f func([]byte) T) []T {
 }
 
 func buildSegmentKey(root, start common.Hash) []byte {
-	return buildKey(syncSegmentsPrefix, root, start, syncSegmentsKeyLength)
+	return slices.Concat(syncSegmentsPrefix, root[:], start[:])
 }
 
 func buildStorageTrieKey(root, account common.Hash) []byte {
-	return buildKey(syncStorageTriesPrefix, root, account, syncStorageTriesKeyLength)
-}
-
-func buildKey(prefix []byte, h1, h2 common.Hash, keyLen int) []byte {
-	b := make([]byte, keyLen)
-	copy(b, prefix)
-	copy(b[len(prefix):], h1[:])
-	copy(b[len(prefix)+common.HashLength:], h2[:])
-	return b
+	return slices.Concat(syncStorageTriesPrefix, root[:], account[:])
 }

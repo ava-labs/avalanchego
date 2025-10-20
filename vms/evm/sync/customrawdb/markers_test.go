@@ -5,6 +5,7 @@ package customrawdb
 
 import (
 	"math/big"
+	"slices"
 	"testing"
 	"time"
 
@@ -160,10 +161,10 @@ func TestNewAccountSnapshotsIterator(t *testing.T) {
 	// Keys that match and don't match the iterator length filter.
 	a1 := common.HexToHash("0x01")
 	a2 := common.HexToHash("0x02")
-	key1 := append(append([]byte{}, rawdb.SnapshotAccountPrefix...), a1.Bytes()...)
-	key2 := append(append([]byte{}, rawdb.SnapshotAccountPrefix...), a2.Bytes()...)
+	key1 := slices.Concat(rawdb.SnapshotAccountPrefix, a1.Bytes())
+	key2 := slices.Concat(rawdb.SnapshotAccountPrefix, a2.Bytes())
 	// Non-matching: extra byte appended.
-	bad := append(append([]byte{}, rawdb.SnapshotAccountPrefix...), append(a1.Bytes(), 0x00)...)
+	bad := slices.Concat(key1, []byte{0x00})
 
 	require.NoError(t, db.Put(key1, []byte("v1")))
 	require.NoError(t, db.Put(key2, []byte("v2")))
