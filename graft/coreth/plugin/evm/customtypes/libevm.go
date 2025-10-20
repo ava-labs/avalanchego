@@ -3,9 +3,7 @@
 
 package customtypes
 
-import (
-	ethtypes "github.com/ava-labs/libevm/core/types"
-)
+import ethtypes "github.com/ava-labs/libevm/core/types"
 
 var extras ethtypes.ExtraPayloads[*HeaderExtra, *BlockBodyExtra, isMultiCoin]
 
@@ -22,5 +20,4 @@ func Register() {
 		BlockBodyExtra, *BlockBodyExtra,
 		isMultiCoin,
 	]()
-	IsMultiCoinPayloads = extras.StateAccount
 }
