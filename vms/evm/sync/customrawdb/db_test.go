@@ -20,12 +20,13 @@ func TestParseStateScheme(t *testing.T) {
 
 	// Simulate disk has non-empty path scheme by writing persistent state id.
 	rawdb.WritePersistentStateID(db, 1)
-	scheme2, _ := ParseStateScheme(FirewoodScheme, db)
-	require.Empty(t, scheme2)
+	scheme, err = ParseStateScheme(FirewoodScheme, db)
+	require.ErrorIs(t, err, errStateSchemeConflict)
+	require.Empty(t, scheme)
 
 	// Pass-through to rawdb for non-Firewood using a fresh empty DB.
 	db2 := rawdb.NewMemoryDatabase()
-	scheme, err = ParseStateScheme("hash", db2)
+	scheme, err = ParseStateScheme(rawdb.HashScheme, db2)
 	require.NoError(t, err)
-	require.Equal(t, "hash", scheme)
+	require.Equal(t, rawdb.HashScheme, scheme)
 }

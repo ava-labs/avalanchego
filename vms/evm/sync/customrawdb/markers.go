@@ -43,48 +43,48 @@ var (
 // is started successfully with offline pruning disabled. This ensures users must
 // disable offline pruning and start their node successfully between runs of offline
 // pruning.
-func WriteOfflinePruning(db ethdb.KeyValueStore, ts time.Time) error {
+func WriteOfflinePruning(db ethdb.KeyValueWriter, ts time.Time) error {
 	return writeTimeMarker(db, offlinePruningKey, ts)
 }
 
 // ReadOfflinePruning reads the most recent timestamp of an attempt to run offline
 // pruning if present.
-func ReadOfflinePruning(db ethdb.KeyValueStore) (time.Time, error) {
+func ReadOfflinePruning(db ethdb.KeyValueReader) (time.Time, error) {
 	return readTimeMarker(db, offlinePruningKey)
 }
 
 // DeleteOfflinePruning deletes any marker of the last attempt to run offline pruning.
-func DeleteOfflinePruning(db ethdb.KeyValueStore) error {
+func DeleteOfflinePruning(db ethdb.KeyValueWriter) error {
 	return db.Delete(offlinePruningKey)
 }
 
 // WritePopulateMissingTries writes a marker for the current attempt to populate
 // missing tries.
-func WritePopulateMissingTries(db ethdb.KeyValueStore, ts time.Time) error {
+func WritePopulateMissingTries(db ethdb.KeyValueWriter, ts time.Time) error {
 	return writeTimeMarker(db, populateMissingTriesKey, ts)
 }
 
 // ReadPopulateMissingTries reads the most recent timestamp of an attempt to
 // re-populate missing trie nodes.
-func ReadPopulateMissingTries(db ethdb.KeyValueStore) (time.Time, error) {
+func ReadPopulateMissingTries(db ethdb.KeyValueReader) (time.Time, error) {
 	return readTimeMarker(db, populateMissingTriesKey)
 }
 
 // DeletePopulateMissingTries deletes any marker of the last attempt to
 // re-populate missing trie nodes.
-func DeletePopulateMissingTries(db ethdb.KeyValueStore) error {
+func DeletePopulateMissingTries(db ethdb.KeyValueWriter) error {
 	return db.Delete(populateMissingTriesKey)
 }
 
 // WritePruningDisabled writes a marker to track whether the node has ever run
 // with pruning disabled.
-func WritePruningDisabled(db ethdb.KeyValueStore) error {
+func WritePruningDisabled(db ethdb.KeyValueWriter) error {
 	return db.Put(pruningDisabledKey, nil)
 }
 
 // HasPruningDisabled returns true if there is a marker present indicating that
 // the node has run with pruning disabled at some point.
-func HasPruningDisabled(db ethdb.KeyValueStore) (bool, error) {
+func HasPruningDisabled(db ethdb.KeyValueReader) (bool, error) {
 	return db.Has(pruningDisabledKey)
 }
 
@@ -116,7 +116,7 @@ func ReadAcceptorTip(db ethdb.KeyValueReader) (common.Hash, error) {
 
 // ReadChainConfig retrieves the consensus settings based on the given genesis hash.
 // The provided `upgradeConfig` (any JSON-unmarshalable type) will be populated if present on disk.
-func ReadChainConfig[T any](db ethdb.KeyValueReader, hash common.Hash, upgradeConfig T) (*params.ChainConfig, error) {
+func ReadChainConfig[T any](db ethdb.KeyValueReader, hash common.Hash, upgradeConfig *T) (*params.ChainConfig, error) {
 	config := rawdb.ReadChainConfig(db, hash)
 	if config == nil {
 		return nil, database.ErrNotFound
@@ -131,7 +131,7 @@ func ReadChainConfig[T any](db ethdb.KeyValueReader, hash common.Hash, upgradeCo
 		return config, nil
 	}
 
-	if err := json.Unmarshal(upgrade, &upgradeConfig); err != nil {
+	if err := json.Unmarshal(upgrade, upgradeConfig); err != nil {
 		return nil, errInvalidData
 	}
 
@@ -198,7 +198,7 @@ func DeleteSnapshotBlockHash(db ethdb.KeyValueWriter) error {
 	return db.Delete(snapshotBlockHashKey)
 }
 
-func writeTimeMarker(db ethdb.KeyValueStore, key []byte, ts time.Time) error {
+func writeTimeMarker(db ethdb.KeyValueWriter, key []byte, ts time.Time) error {
 	data, err := rlp.EncodeToBytes(uint64(ts.Unix()))
 	if err != nil {
 		return err
@@ -206,7 +206,7 @@ func writeTimeMarker(db ethdb.KeyValueStore, key []byte, ts time.Time) error {
 	return db.Put(key, data)
 }
 
-func readTimeMarker(db ethdb.KeyValueStore, key []byte) (time.Time, error) {
+func readTimeMarker(db ethdb.KeyValueReader, key []byte) (time.Time, error) {
 	// Check existence first to map missing marker to a stable sentinel error.
 	ok, err := db.Has(key)
 	if err != nil {

@@ -10,12 +10,12 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 )
 
-var (
-	// errStateSchemeConflict indicates the provided state scheme conflicts with what is on disk.
-	errStateSchemeConflict = errors.New("state scheme conflict")
-	// FirewoodScheme is the scheme for the Firewood storage scheme.
-	FirewoodScheme = "firewood"
-)
+// FirewoodScheme is the scheme for the Firewood storage scheme.
+const FirewoodScheme = "firewood"
+
+// errStateSchemeConflict indicates the provided state scheme conflicts with
+// what is on disk.
+var errStateSchemeConflict = errors.New("state scheme conflict")
 
 // ParseStateScheme parses the state scheme from the provided string.
 func ParseStateScheme(provided string, db ethdb.Database) (string, error) {
