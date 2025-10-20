@@ -178,7 +178,7 @@ func newEnvironment(t *testing.T, f upgradetest.Fork) *environment { //nolint:un
 		res.blkManager,
 	)
 
-	res.blkManager.SetPreference(genesisID)
+	res.blkManager.SetPreference(genesisID, nil)
 	addSubnet(t, res)
 
 	t.Cleanup(func() {
