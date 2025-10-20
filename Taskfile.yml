@@ -203,7 +203,8 @@ tasks:
       END_BLOCK: '{{.END_BLOCK}}'
       LABELS: '{{.LABELS | default ""}}'
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
-      METRICS_MODE: '{{.METRICS_MODE | default ""}}'
+      METRICS_SERVER_ENABLED: '{{.METRICS_SERVER_ENABLED | default "false"}}'
+      METRICS_COLLECTOR_ENABLED: '{{.METRICS_COLLECTOR_ENABLED | default "false"}}'
       METRICS_SERVER_PORT: '{{.METRICS_SERVER_PORT}}'
     cmd: |
       CURRENT_STATE_DIR={{.CURRENT_STATE_DIR}} \
@@ -214,8 +215,9 @@ tasks:
       END_BLOCK={{.END_BLOCK}} \
       LABELS={{.LABELS}} \
       BENCHMARK_OUTPUT_FILE={{.BENCHMARK_OUTPUT_FILE}} \
-      METRICS_MODE={{.METRICS_MODE}} \
-      METRICS_SERVER_PORT={{.METRICS_SERVER_PORT}} \
+      METRICS_SERVER_ENABLED={{.METRICS_SERVER_ENABLED}} \
+      METRICS_COLLECTOR_ENABLED={{.METRICS_COLLECTOR_ENABLED}} \
+      METRICS_SERVER_PORT={{.METRICS_COLLECTOR_SERVER_PORT}} \
       bash -x ./scripts/benchmark_cchain_range.sh
 
   reexecute-cchain-range-with-copied-data:
@@ -230,7 +232,8 @@ tasks:
       END_BLOCK: '{{.END_BLOCK | default "250000"}}'
       LABELS: '{{.LABELS | default ""}}'
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
-      METRICS_MODE: '{{.METRICS_MODE | default ""}}'
+      METRICS_SERVER_ENABLED: '{{.METRICS_SERVER_ENABLED | default "false"}}'
+      METRICS_COLLECTOR_ENABLED: '{{.METRICS_COLLECTOR_ENABLED | default "false"}}'
       METRICS_SERVER_PORT: '{{.METRICS_SERVER_PORT}}'
     cmds:
       - task: import-cchain-reexecute-range
@@ -248,8 +251,9 @@ tasks:
           END_BLOCK: '{{.END_BLOCK}}'
           LABELS: '{{.LABELS}}'
           BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE}}'
-          METRICS_MODE: '{{.METRICS_MODE}}'
-          METRICS_SERVER_PORT: '{{.METRICS_SERVER_PORT}}'
+          METRICS_SERVER_ENABLED: '{{.METRICS_SERVER_ENABLED}}'
+          METRICS_COLLECTOR_ENABLED: '{{.METRICS_COLLECTOR_ENABLED}}'
+          METRICS_SERVER_PORT: '{{.METRICS_COLLECTOR_SERVER_PORT}}'
 
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests
