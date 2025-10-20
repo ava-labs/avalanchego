@@ -196,14 +196,30 @@ impl ParallelMerkle {
                 break; // Stop handling additional requests
             }
         }
-        // The main thread has closed the channel. Send back the worker's response.
+        // The main thread has closed the channel. Hash this subtrie and send back the worker's
+        // response where the root is a Child::MaybePersisted.
         let mut nodestore = merkle.into_inner();
-        let response = Response {
-            first_path_component,
-            root: nodestore.root_mut().take().map(Child::Node),
-            deleted_nodes: nodestore.take_deleted_nodes(),
-        };
-        response_sender.send(Ok(response))?;
+        let response = nodestore
+            .root_mut()
+            .take()
+            .map(|root| {
+                #[cfg(not(feature = "ethhash"))]
+                let (root_node, root_hash) = NodeStore::<MutableProposal, FileBacked>::hash_helper(
+                    root,
+                    Path::from(&[first_path_component.as_u8()]),
+                )?;
+                #[cfg(feature = "ethhash")]
+                let (root_node, root_hash) =
+                    nodestore.hash_helper(root, Path::from(&[first_path_component.as_u8()]))?;
+                Ok(Child::MaybePersisted(root_node, root_hash))
+            })
+            .transpose()
+            .map(|hashed_root| Response {
+                first_path_component,
+                root: hashed_root,
+                deleted_nodes: nodestore.take_deleted_nodes(),
+            });
+        response_sender.send(response)?;
         Ok(())
     }
 
