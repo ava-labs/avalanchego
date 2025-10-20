@@ -145,6 +145,9 @@ pub use firewood_macros::metrics;
 /// Range proof module
 pub mod range_proof;
 
+/// Root store module
+pub mod root_store;
+
 /// Version 2 API
 pub mod v2;
 

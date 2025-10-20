@@ -8,6 +8,7 @@
 
 use crate::iter::MerkleKeyValueIter;
 use crate::merkle::{Merkle, Value};
+use crate::root_store::{NoOpStore, RootStore};
 pub use crate::v2::api::BatchOp;
 use crate::v2::api::{
     self, ArcDynDbView, FrozenProof, FrozenRangeProof, HashKey, KeyType, KeyValuePair,
@@ -112,16 +113,16 @@ pub struct DbConfig {
 
 #[derive(Debug)]
 /// A database instance.
-pub struct Db {
+pub struct Db<RS = NoOpStore> {
     metrics: Arc<DbMetrics>,
-    manager: RevisionManager,
+    manager: RevisionManager<RS>,
 }
 
-impl api::Db for Db {
+impl<RS: RootStore> api::Db for Db<RS> {
     type Historical = NodeStore<Committed, FileBacked>;
 
     type Proposal<'db>
-        = Proposal<'db>
+        = Proposal<'db, RS>
     where
         Self: 'db;
 
@@ -180,9 +181,19 @@ impl api::Db for Db {
     }
 }
 
-impl Db {
+impl Db<NoOpStore> {
     /// Create a new database instance.
     pub fn new<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, api::Error> {
+        Self::with_root_store(db_path, cfg, NoOpStore {})
+    }
+}
+
+impl<RS: RootStore> Db<RS> {
+    fn with_root_store<P: AsRef<Path>>(
+        db_path: P,
+        cfg: DbConfig,
+        root_store: RS,
+    ) -> Result<Self, api::Error> {
         let metrics = Arc::new(DbMetrics {
             proposals: counter!("firewood.proposals"),
         });
@@ -192,7 +203,9 @@ impl Db {
             .truncate(cfg.truncate)
             .manager(cfg.manager)
             .build();
-        let manager = RevisionManager::new(db_path.as_ref().to_path_buf(), config_manager)?;
+
+        let manager =
+            RevisionManager::new(db_path.as_ref().to_path_buf(), config_manager, root_store)?;
         let db = Self { metrics, manager };
         Ok(db)
     }
@@ -201,27 +214,9 @@ impl Db {
     pub fn view(&self, root_hash: HashKey) -> Result<ArcDynDbView, api::Error> {
         self.manager.view(root_hash).map_err(Into::into)
     }
+}
 
-    /// Propose a new batch that is processed in parallel.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the revision manager cannot create a thread pool.
-    pub fn propose_parallel(
-        &self,
-        batch: impl IntoIterator<IntoIter: KeyValuePairIter>,
-    ) -> Result<Proposal<'_>, api::Error> {
-        let parent = self.manager.current_revision();
-        let mut parallel_merkle = ParallelMerkle::default();
-        let immutable =
-            parallel_merkle.create_proposal(&parent, batch, self.manager.threadpool())?;
-        self.manager.add_proposal(immutable.clone());
-        Ok(Proposal {
-            nodestore: immutable,
-            db: self,
-        })
-    }
-
+impl<RS> Db<RS> {
     /// Dump the Trie of the latest revision.
     pub fn dump(&self, w: &mut dyn Write) -> Result<(), std::io::Error> {
         let latest_rev_nodestore = self.manager.current_revision();
@@ -239,16 +234,36 @@ impl Db {
         let latest_rev_nodestore = self.manager.current_revision();
         latest_rev_nodestore.check(opt)
     }
+
+    /// Propose a new batch that is processed in parallel.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the revision manager cannot create a thread pool.
+    pub fn propose_parallel(
+        &self,
+        batch: impl IntoIterator<IntoIter: KeyValuePairIter>,
+    ) -> Result<Proposal<'_, RS>, api::Error> {
+        let parent = self.manager.current_revision();
+        let mut parallel_merkle = ParallelMerkle::default();
+        let immutable =
+            parallel_merkle.create_proposal(&parent, batch, self.manager.threadpool())?;
+        self.manager.add_proposal(immutable.clone());
+        Ok(Proposal {
+            nodestore: immutable,
+            db: self,
+        })
+    }
 }
 
 #[derive(Debug)]
 /// A user-visible database proposal
-pub struct Proposal<'db> {
+pub struct Proposal<'db, RS> {
     nodestore: Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>>,
-    db: &'db Db,
+    db: &'db Db<RS>,
 }
 
-impl api::DbView for Proposal<'_> {
+impl<RS> api::DbView for Proposal<'_, RS> {
     type Iter<'view>
         = MerkleKeyValueIter<'view, NodeStore<Arc<ImmutableProposal>, FileBacked>>
     where
@@ -280,8 +295,8 @@ impl api::DbView for Proposal<'_> {
     }
 }
 
-impl<'db> api::Proposal for Proposal<'db> {
-    type Proposal = Proposal<'db>;
+impl<'db, RS: RootStore> api::Proposal for Proposal<'db, RS> {
+    type Proposal = Proposal<'db, RS>;
 
     #[fastrace::trace(short_name = true)]
     fn propose(
@@ -296,7 +311,7 @@ impl<'db> api::Proposal for Proposal<'db> {
     }
 }
 
-impl Proposal<'_> {
+impl<RS> Proposal<'_, RS> {
     #[crate::metrics("firewood.proposal.create", "database proposal creation")]
     fn create_proposal(
         &self,
@@ -340,9 +355,12 @@ mod test {
     use std::ops::{Deref, DerefMut};
     use std::path::PathBuf;
 
-    use firewood_storage::{CheckOpt, CheckerError, HashedNodeReader, IntoHashType, NodeStore};
+    use firewood_storage::{
+        CheckOpt, CheckerError, HashedNodeReader, IntoHashType, NodeStore, TrieHash,
+    };
 
     use crate::db::{Db, Proposal};
+    use crate::root_store::{MockStore, NoOpStore, RootStore};
     use crate::v2::api::{Db as _, DbView, KeyValuePairIter, Proposal as _};
 
     use super::{BatchOp, DbConfig};
@@ -858,7 +876,7 @@ mod test {
 
         let proposals = ops.iter().chunk_fold(
             NUM_KEYS,
-            Vec::<Proposal<'_>>::with_capacity(NUM_PROPOSALS),
+            Vec::<Proposal<'_, _>>::with_capacity(NUM_PROPOSALS),
             |mut proposals, ops| {
                 let proposal = if let Some(parent) = proposals.last() {
                     parent.propose(ops).unwrap()
@@ -906,7 +924,7 @@ mod test {
         let testdb = TestDb::new();
         let db = &testdb.db;
 
-        let (tx, rx) = std::sync::mpsc::sync_channel::<Proposal<'_>>(CHANNEL_CAPACITY);
+        let (tx, rx) = std::sync::mpsc::sync_channel::<Proposal<'_, _>>(CHANNEL_CAPACITY);
         let (result_tx, result_rx) = std::sync::mpsc::sync_channel(CHANNEL_CAPACITY);
 
         // scope will block until all scope-spawned threads finish
@@ -991,18 +1009,75 @@ mod test {
         assert_eq!(value, retrieved_value.as_ref());
     }
 
+    #[test]
+    fn test_root_store() {
+        let mock_store = MockStore::default();
+        let db = TestDb::with_mockstore(mock_store);
+
+        // First, create a revision to retrieve
+        let key = b"key";
+        let value = b"value";
+        let batch = vec![BatchOp::Put { key, value }];
+
+        let proposal = db.propose(batch).unwrap();
+        let root_hash = proposal.root_hash().unwrap().unwrap();
+        proposal.commit().unwrap();
+
+        // Next, overwrite the kv-pair with a new revision
+        let new_value = b"new_value";
+        let batch = vec![BatchOp::Put {
+            key,
+            value: new_value,
+        }];
+
+        let proposal = db.propose(batch).unwrap();
+        proposal.commit().unwrap();
+
+        // Reopen the database and verify that the database can access a persisted revision
+        let db = db.reopen();
+
+        let view = db.view(root_hash).unwrap();
+        let retrieved_value = view.val(key).unwrap().unwrap();
+        assert_eq!(value, retrieved_value.as_ref());
+    }
+
+    #[test]
+    fn test_root_store_errs() {
+        let mock_store = MockStore::with_failures();
+        let db = TestDb::with_mockstore(mock_store);
+
+        let view = db.view(TrieHash::empty());
+        assert!(view.is_err());
+
+        let batch = vec![BatchOp::Put {
+            key: b"k",
+            value: b"v",
+        }];
+
+        let proposal = db.propose(batch).unwrap();
+        assert!(proposal.commit().is_err());
+    }
+
+    #[test]
+    fn test_rootstore_empty_db_reopen() {
+        let mock_store = MockStore::default();
+        let db = TestDb::with_mockstore(mock_store);
+
+        db.reopen();
+    }
+
     // Testdb is a helper struct for testing the Db. Once it's dropped, the directory and file disappear
-    struct TestDb {
-        db: Db,
+    struct TestDb<RS = NoOpStore> {
+        db: Db<RS>,
         tmpdir: tempfile::TempDir,
     }
-    impl Deref for TestDb {
-        type Target = Db;
+    impl<RS> Deref for TestDb<RS> {
+        type Target = Db<RS>;
         fn deref(&self) -> &Self::Target {
             &self.db
         }
     }
-    impl DerefMut for TestDb {
+    impl<RS> DerefMut for TestDb<RS> {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.db
         }
@@ -1018,18 +1093,28 @@ mod test {
             let db = Db::new(dbpath, dbconfig).unwrap();
             TestDb { db, tmpdir }
         }
+    }
 
-        fn path(&self) -> PathBuf {
-            [self.tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
+    impl TestDb<MockStore> {
+        fn with_mockstore(mock_store: MockStore) -> Self {
+            let tmpdir = tempfile::tempdir().unwrap();
+            let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
                 .iter()
-                .collect()
+                .collect();
+            let dbconfig = DbConfig::builder().build();
+            let db = Db::with_root_store(dbpath, dbconfig, mock_store).unwrap();
+            TestDb { db, tmpdir }
         }
+    }
+
+    impl<RS: Clone + RootStore> TestDb<RS> {
         fn reopen(self) -> Self {
             let path = self.path();
+            let root_store = self.manager.root_store();
             drop(self.db);
             let dbconfig = DbConfig::builder().truncate(false).build();
 
-            let db = Db::new(path, dbconfig).unwrap();
+            let db = Db::with_root_store(path, dbconfig, root_store).unwrap();
             TestDb {
                 db,
                 tmpdir: self.tmpdir,
@@ -1037,14 +1122,23 @@ mod test {
         }
         fn replace(self) -> Self {
             let path = self.path();
+            let root_store = self.manager.root_store();
             drop(self.db);
             let dbconfig = DbConfig::builder().truncate(true).build();
 
-            let db = Db::new(path, dbconfig).unwrap();
+            let db = Db::with_root_store(path, dbconfig, root_store).unwrap();
             TestDb {
                 db,
                 tmpdir: self.tmpdir,
             }
+        }
+    }
+
+    impl<RS> TestDb<RS> {
+        fn path(&self) -> PathBuf {
+            [self.tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
+                .iter()
+                .collect()
         }
     }
 }

@@ -1,7 +1,10 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use firewood::v2::api::{self, BoxKeyValueIter, DbView, HashKey, Proposal as _};
+use firewood::{
+    root_store::NoOpStore,
+    v2::api::{self, BoxKeyValueIter, DbView, HashKey, Proposal as _},
+};
 
 use crate::value::KeyValuePair;
 
@@ -13,13 +16,13 @@ use metrics::counter;
 #[derive(Debug)]
 pub struct ProposalHandle<'db> {
     hash_key: Option<HashKey>,
-    proposal: firewood::db::Proposal<'db>,
+    proposal: firewood::db::Proposal<'db, NoOpStore>,
     handle: &'db crate::DatabaseHandle,
 }
 
 impl<'db> DbView for ProposalHandle<'db> {
     type Iter<'view>
-        = <firewood::db::Proposal<'db> as DbView>::Iter<'view>
+        = <firewood::db::Proposal<'db, NoOpStore> as DbView>::Iter<'view>
     where
         Self: 'view;
 
@@ -143,7 +146,7 @@ pub trait CView<'db> {
     fn create_proposal<'kvp>(
         self,
         values: impl AsRef<[KeyValuePair<'kvp>]> + 'kvp,
-    ) -> Result<firewood::db::Proposal<'db>, api::Error>;
+    ) -> Result<firewood::db::Proposal<'db, NoOpStore>, api::Error>;
 
     /// Create a [`ProposalHandle`] from the values and return it with timing
     /// information.
@@ -188,7 +191,7 @@ impl<'db> CView<'db> for &ProposalHandle<'db> {
     fn create_proposal<'kvp>(
         self,
         values: impl AsRef<[KeyValuePair<'kvp>]> + 'kvp,
-    ) -> Result<firewood::db::Proposal<'db>, api::Error> {
+    ) -> Result<firewood::db::Proposal<'db, NoOpStore>, api::Error> {
         self.proposal.propose(values.as_ref())
     }
 }
