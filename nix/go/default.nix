@@ -19,12 +19,13 @@ let
     };
 
   # Update the following to change the version:
-  goVersion = "1.24.8";
+  goVersion = "1.24.9";
+  # The sha256 checksums can fetched from https://go.dev/dl/ for new versions.
   goSHA256s = {
-    "linux-amd64" = "6842c516ca66c89d648a7f1dbe28e28c47b61b59f8f06633eb2ceb1188e9251d";
-    "linux-arm64" = "38ac33b4cfa41e8a32132de7a87c6db49277ab5c0de1412512484db1ed77637e";
-    "darwin-amd64" = "ecb3cecb1e0bcfb24e50039701f9505b09744cc4730a8b9fc512b0a3b47cf232";
-    "darwin-arm64" = "0db27ff8c3e35fd93ccf9d31dd88a0f9c6454e8d9b30c28bd88a70b930cc4240";
+    "linux-amd64" = "5b7899591c2dd6e9da1809fde4a2fad842c45d3f6b9deb235ba82216e31e34a6";
+    "linux-arm64" = "9aa1243d51d41e2f93e895c89c0a2daf7166768c4a4c3ac79db81029d295a540";
+    "darwin-amd64" = "961aa2ae2b97e428d6d8991367e7c98cb403bac54276b8259aead42a0081591c";
+    "darwin-arm64" = "af451b40651d7fb36db1bbbd9c66ddbed28b96d7da48abea50a19f82c6e9d1d6";
   };
 
   targetSystem = parseSystem pkgs.system;
