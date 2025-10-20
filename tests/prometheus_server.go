@@ -16,8 +16,9 @@ import (
 )
 
 const (
-	localhostAddr      = "127.0.0.1"
 	DefaultMetricsPort = 0
+
+	localhostAddr = "127.0.0.1"
 )
 
 // PrometheusServer is a HTTP server that serves Prometheus metrics from the provided
@@ -36,22 +37,22 @@ func NewPrometheusServer(gatherer prometheus.Gatherer, port uint64) (*Prometheus
 		gatherer: gatherer,
 	}
 
-	prometheusListenAddr := fmt.Sprintf("%s:%d", localhostAddr, port)
-	if err := server.start(prometheusListenAddr); err != nil {
+	serverAddress := fmt.Sprintf("%s:%d", localhostAddr, port)
+	if err := server.start(serverAddress); err != nil {
 		return nil, err
 	}
 
 	return server, nil
 }
 
-// start the Prometheus server on prometheusListenAddr.
-func (s *PrometheusServer) start(prometheusListenAddr string) error {
+// start the Prometheus server on address.
+func (s *PrometheusServer) start(address string) error {
 	mux := http.NewServeMux()
 	mux.Handle("/ext/metrics", promhttp.HandlerFor(s.gatherer, promhttp.HandlerOpts{}))
 
-	listener, err := net.Listen("tcp", prometheusListenAddr)
+	listener, err := net.Listen("tcp", address)
 	if err != nil {
-		return fmt.Errorf("failed to listen on %s: %w", prometheusListenAddr, err)
+		return fmt.Errorf("failed to listen on %s: %w", address, err)
 	}
 
 	s.server = http.Server{
