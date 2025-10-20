@@ -622,7 +622,9 @@ func TestGetStakingSigner(t *testing.T) {
 			require := require.New(t)
 			v := setupViperFlags()
 
-			v.Set(NetworkNameKey, constants.LocalName)
+			// Avoid using the mainnet network name by default because not all
+			// builds support mainnet configurations.
+			v.Set(NetworkNameKey, constants.UnitTestName)
 			for key, value := range tt.config {
 				v.Set(key, value)
 			}
