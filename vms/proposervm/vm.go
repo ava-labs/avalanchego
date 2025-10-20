@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/utils/tree"
 	"github.com/ava-labs/avalanchego/utils/units"
+	"github.com/ava-labs/avalanchego/vms/proposervm/acp181"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 	"github.com/ava-labs/avalanchego/vms/proposervm/state"
 
@@ -70,9 +71,10 @@ func cachedBlockSize(_ ids.ID, blk snowman.Block) int {
 type VM struct {
 	block.ChainVM
 	Config
-	blockBuilderVM block.BuildBlockWithContextChainVM
-	batchedVM      block.BatchedChainVM
-	ssVM           block.StateSyncableVM
+	blockBuilderVM  block.BuildBlockWithContextChainVM
+	setPreferenceVM block.SetPreferenceWithContextChainVM
+	batchedVM       block.BatchedChainVM
+	ssVM            block.StateSyncableVM
 
 	state.State
 
@@ -123,14 +125,16 @@ func New(
 	config Config,
 ) *VM {
 	blockBuilderVM, _ := vm.(block.BuildBlockWithContextChainVM)
+	setPreferenceVM, _ := vm.(block.SetPreferenceWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &VM{
-		ChainVM:        vm,
-		Config:         config,
-		blockBuilderVM: blockBuilderVM,
-		batchedVM:      batchedVM,
-		ssVM:           ssVM,
+		ChainVM:         vm,
+		Config:          config,
+		blockBuilderVM:  blockBuilderVM,
+		setPreferenceVM: setPreferenceVM,
+		batchedVM:       batchedVM,
+		ssVM:            ssVM,
 	}
 }
 
@@ -370,7 +374,51 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 		return vm.ChainVM.SetPreference(ctx, preferred)
 	}
 
+	preferredEpoch, err := blk.pChainEpoch(ctx)
+	if err != nil {
+		return err
+	}
+
 	innerBlkID := blk.getInnerBlk().ID()
+
+	// If the inner VM implements SetPreferenceWithContext, use it to set the
+	// preference with the P-Chain height to be used to verify a child of the
+	// preferred block.
+	if vm.setPreferenceVM != nil && preferredEpoch != (statelessblock.Epoch{}) {
+		// The P-Chain height used to verify a child of the preferred block will
+		// potentially be different than the P-Chain height used to verify the
+		// preferred block if the preferred block seals the current epoch.
+		preferredPChainHeight, err := blk.pChainHeight(ctx)
+		if err != nil {
+			return err
+		}
+
+		// The exact child timestamp doesn't matter here because we know Granite
+		// is already activated.
+		timestamp := blk.Timestamp()
+		nextEpoch := acp181.NewEpoch(
+			vm.Upgrades,
+			preferredPChainHeight,
+			preferredEpoch,
+			timestamp,
+			timestamp,
+		)
+		nextPChainHeight := nextEpoch.PChainHeight
+
+		if err := vm.setPreferenceVM.SetPreferenceWithContext(ctx, innerBlkID, &block.Context{
+			PChainHeight: nextPChainHeight,
+		}); err != nil {
+			return err
+		}
+
+		vm.ctx.Log.Debug("set preference with context",
+			zap.Stringer("blkID", preferred),
+			zap.Stringer("innerBlkID", innerBlkID),
+			zap.Uint64("pChainHeight", nextPChainHeight),
+		)
+		return nil
+	}
+
 	if err := vm.ChainVM.SetPreference(ctx, innerBlkID); err != nil {
 		return err
 	}

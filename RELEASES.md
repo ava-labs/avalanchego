@@ -1,5 +1,11 @@
 # Release Notes
 
+## Pending
+
+### Configs
+
+- Changed default block delay for L1s (other than Primary Network) to 0.
+
 ## [v1.13.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.5)
 
 This version is backwards compatible to [v1.13.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0). It is optional, but encouraged.

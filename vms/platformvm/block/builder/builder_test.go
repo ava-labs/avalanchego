@@ -157,7 +157,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 	require.Equal([]*txs.Tx{tx}, blk.(*blockexecutor.Block).Block.Txs())
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(blk.Accept(context.Background()))
-	env.blkManager.SetPreference(blk.ID())
+	env.blkManager.SetPreference(blk.ID(), nil)
 
 	// Validator should now be current
 	staker, err := env.state.GetCurrentValidator(constants.PrimaryNetworkID, nodeID)
@@ -196,7 +196,7 @@ func TestBuildBlockShouldReward(t *testing.T) {
 		require.NoError(blk.Accept(context.Background()))
 		require.NoError(commit.Verify(context.Background()))
 		require.NoError(commit.Accept(context.Background()))
-		env.blkManager.SetPreference(commit.ID())
+		env.blkManager.SetPreference(commit.ID(), nil)
 
 		// Stop rewarding once our staker is rewarded
 		if staker.TxID == txID {
@@ -459,7 +459,7 @@ func TestNoErrorOnUnexpectedSetPreferenceDuringBootstrapping(t *testing.T) {
 	defer env.ctx.Lock.Unlock()
 
 	env.isBootstrapped.Set(false)
-	env.blkManager.SetPreference(ids.GenerateTestID()) // should not panic
+	env.blkManager.SetPreference(ids.GenerateTestID(), nil) // should not panic
 }
 
 func TestGetNextStakerToReward(t *testing.T) {
