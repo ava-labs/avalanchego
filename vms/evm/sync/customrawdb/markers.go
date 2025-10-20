@@ -150,10 +150,7 @@ func WriteChainConfig[T any](db ethdb.KeyValueWriter, hash common.Hash, config *
 	if err != nil {
 		return fmt.Errorf("%w: %w", errFailedToMarshalUpgradeConfig, err)
 	}
-	if err := db.Put(upgradeConfigKey(hash), data); err != nil {
-		return err
-	}
-	return nil
+	return db.Put(upgradeConfigKey(hash), data)
 }
 
 // NewAccountSnapshotsIterator returns an iterator for walking all of the accounts in the snapshot
@@ -219,10 +216,6 @@ func readTimeMarker(db ethdb.KeyValueReader, key []byte) (time.Time, error) {
 	data, err := db.Get(key)
 	if err != nil {
 		return time.Time{}, err
-	}
-
-	if len(data) == 0 {
-		return time.Time{}, fmt.Errorf("%w: empty value", errInvalidData)
 	}
 
 	var unix uint64
