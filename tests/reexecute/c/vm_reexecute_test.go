@@ -107,7 +107,7 @@ func TestMain(m *testing.M) {
 
 	flag.BoolVar(&metricsServerEnabledArg, "metrics-server-enabled", false, "Whether to enable the metrics server.")
 	flag.BoolVar(&metricsCollectorEnabledArg, "metrics-collector-enabled", false, "Whether to enable the metrics collector (if true, then metrics-server-enabled must be true as well).")
-	flag.Uint64Var(&metricsServerPort, "metrics-server-port", metricsServerPort, "Port which metrics server will listen to (metrics mode must be either server-only or full)")
+	flag.Uint64Var(&metricsServerPort, "metrics-server-port", metricsServerPort, "Port which the metrics server will listen to")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
