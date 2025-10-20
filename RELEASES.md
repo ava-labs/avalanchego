@@ -6,18 +6,34 @@
 
 **Please note that this release is unable to run mainnet - and will display "mainnet is not supported" if attempted to run with a mainnet configuration.**
 
-The plugin version is updated to `44` all plugins must update to be compatible.
-
-This release schuled the activation of the following Avalanche Community Proposals (ACPs):
+This release schedules the activation of the following Avalanche Community Proposals (ACPs):
 - [ACP-181](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/181-p-chain-epoched-views/README.md) P-Chain Epoched Views
 - [ACP-204](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/204-precompile-secp256r1/README.md) Precompile for secp256r1 Curve Support
 - [ACP-226](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/226-dynamic-minimum-block-times/README.md) Dynamic Minimum Block Times
 
-### Configs
-
-- Changed default block delay for L1s (other than Primary Network) to 0.
+The ACPs in this upgrade go into effect at 11 AM ET (3 PM UTC) on Wednesday, October 29th, 2025 on the Fuji testnet.
 
 **All Fuji nodes must upgrade before 11 AM ET, October 29th 2025.**
+
+### LibEVM Hook Registration
+
+This release includes changes for how EVM modifications are registered with libevm. For consumers of avalanchego as a library, manual registration of libevm callbacks is now required.
+
+The plugin version is updated to `44` all plugins must update to be compatible.
+
+### APIs
+
+- Added support for specifying multiple `Avalanche-Api-Route` headers for more complex routing.
+- Added proposervm gRPC, connectrpc, and jsonrpc APIs for `GetProposedHeight` and `GetCurrentEpoch`.
+- Added platformvm `platform.GetAllValidatorsAt` API.
+
+### Configs
+
+- Changed default `proposerMinBlockDelay` for L1s (other than Primary Network) to 0.
+
+### Fixes
+
+- Improved bootstrapping ETA predications.
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.13.5...v1.14.0-fuji
 
