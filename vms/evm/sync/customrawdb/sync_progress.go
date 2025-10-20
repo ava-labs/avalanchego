@@ -186,14 +186,6 @@ func NewSyncPerformedIterator(db ethdb.Iteratee) ethdb.Iterator {
 	return rawdb.NewKeyLengthIterator(db.NewIterator(syncPerformedPrefix, nil), syncPerformedKeyLength)
 }
 
-// ParseSyncPerformedKey returns the block number from keys the iterator returned
-// from NewSyncPerformedIterator. It assumes the key has the syncPerformedPrefix
-// followed by an 8-byte big-endian block number, and panics if the key is shorter
-// than len(syncPerformedPrefix)+wrappers.LongLen.
-func ParseSyncPerformedKey(key []byte) uint64 {
-	return binary.BigEndian.Uint64(key[len(syncPerformedPrefix):])
-}
-
 // GetLatestSyncPerformed returns the latest block number state synced performed to.
 func GetLatestSyncPerformed(db ethdb.Iteratee) (uint64, error) {
 	it := NewSyncPerformedIterator(db)
@@ -201,7 +193,7 @@ func GetLatestSyncPerformed(db ethdb.Iteratee) (uint64, error) {
 
 	var latestSyncPerformed uint64
 	for it.Next() {
-		syncPerformed := ParseSyncPerformedKey(it.Key())
+		syncPerformed := parseSyncPerformedKey(it.Key())
 		if syncPerformed > latestSyncPerformed {
 			latestSyncPerformed = syncPerformed
 		}
@@ -237,4 +229,12 @@ func clearPrefix(db ethdb.KeyValueStore, prefix []byte, keyLen int) error {
 		return err
 	}
 	return batch.Write()
+}
+
+// parseSyncPerformedKey returns the block number from keys the iterator returned
+// from NewSyncPerformedIterator. It assumes the key has the syncPerformedPrefix
+// followed by an 8-byte big-endian block number, and panics if the key is shorter
+// than len(syncPerformedPrefix)+wrappers.LongLen.
+func parseSyncPerformedKey(key []byte) uint64 {
+	return binary.BigEndian.Uint64(key[len(syncPerformedPrefix):])
 }
