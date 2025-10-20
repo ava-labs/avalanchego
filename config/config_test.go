@@ -624,7 +624,7 @@ func TestGetStakingSigner(t *testing.T) {
 
 			// Avoid using the mainnet network name by default because not all
 			// builds support mainnet configurations.
-			v.Set(NetworkNameKey, constants.LocalName)
+			v.Set(NetworkNameKey, constants.UnitTestName)
 			for key, value := range tt.config {
 				v.Set(key, value)
 			}
