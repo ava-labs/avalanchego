@@ -243,3 +243,5 @@ To officially support a new platform, one must satisfy the following requirement
 **We and our community welcome responsible disclosures.**
 
 Please refer to our [Security Policy](SECURITY.md) and [Security Advisories](https://github.com/ava-labs/avalanchego/security/advisories).
+Welcome to Subnet Deployment<br>Avalanche's subnets enable 4.5k TPS for custom chains—new contributors, start with the CLI for your first VM. Tip: Use AvalancheJS for JS SDK integration! 
+
