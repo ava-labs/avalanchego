@@ -385,7 +385,7 @@ func (vm *VM) SetPreference(ctx context.Context, preferred ids.ID) error {
 	// preference with the P-Chain height to be used to verify a child of the
 	// preferred block.
 	if vm.setPreferenceVM != nil && preferredEpoch != (statelessblock.Epoch{}) {
-		// The P-Chain height used to verify a child of the preferred will
+		// The P-Chain height used to verify a child of the preferred block will
 		// potentially be different than the P-Chain height used to verify the
 		// preferred block if the preferred block seals the current epoch.
 		preferredPChainHeight, err := blk.pChainHeight(ctx)
