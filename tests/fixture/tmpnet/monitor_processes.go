@@ -33,7 +33,7 @@ const (
 
 	// Prometheus configuration
 	prometheusCmd            = "prometheus-3"
-	prometheusScrapeInterval = 5 * time.Second
+	prometheusScrapeInterval = 10 * time.Second
 	prometheusListenAddress  = "127.0.0.1:9095"
 	prometheusReadinessURL   = "http://" + prometheusListenAddress + "/-/ready"
 
