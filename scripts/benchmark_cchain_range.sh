@@ -30,7 +30,7 @@ cmd="go test -timeout=0 -v -benchtime=1x -bench=BenchmarkReexecuteRange -run=^$ 
   ${LABELS:+--labels=\"${LABELS}\"} \
   ${METRICS_SERVER_ENABLED:+--metrics-server-enabled=\"${METRICS_SERVER_ENABLED}\"} \
   ${METRICS_COLLECTOR_ENABLED:+--metrics-collector-enabled=\"${METRICS_COLLECTOR_ENABLED}\"} \
-  ${METRICS_SERVER_PORT:+--metrics-collector-server-port=\"${METRICS_COLLECTOR_SERVER_PORT}\"}"
+  ${METRICS_SERVER_PORT:+--metrics-server-port=\"${METRICS_SERVER_PORT}\"}"
 
 if [ -n "${BENCHMARK_OUTPUT_FILE:-}" ]; then
   eval "$cmd" | tee "${BENCHMARK_OUTPUT_FILE}"
