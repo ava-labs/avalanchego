@@ -4,8 +4,10 @@
 package core
 
 import (
+	"os"
 	"testing"
 
+	"github.com/ava-labs/libevm/log"
 	"go.uber.org/goleak"
 
 	"github.com/ava-labs/coreth/core/extstate"
@@ -21,6 +23,9 @@ func TestMain(m *testing.M) {
 	customtypes.Register()
 	extstate.RegisterExtras()
 	params.RegisterExtras()
+
+	// May of these tests are likely to fail due to `log.Crit` in goroutines.
+	log.SetDefault(log.NewLogger(log.NewTerminalHandlerWithLevel(os.Stderr, log.LevelCrit, true)))
 
 	opts := []goleak.Option{
 		// No good way to shut down these goroutines:
