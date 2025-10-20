@@ -16,9 +16,8 @@ import (
 )
 
 const (
-	DefaultMetricsPort = 0
-
-	localhostAddr = "127.0.0.1"
+	localhostAddr      = "127.0.0.1"
+	defaultMetricsPort = 0
 )
 
 // PrometheusServer is a HTTP server that serves Prometheus metrics from the provided
@@ -31,8 +30,14 @@ type PrometheusServer struct {
 }
 
 // NewPrometheusServer creates and starts a Prometheus server with the provided gatherer
+// listening on 127.0.0.1:0 and serving /ext/metrics.
+func NewPrometheusServer(gatherer prometheus.Gatherer) (*PrometheusServer, error) {
+	return NewPrometheusServerWithPort(gatherer, defaultMetricsPort)
+}
+
+// NewPrometheusServer creates and starts a Prometheus server with the provided gatherer
 // listening on 127.0.0.1:port and serving /ext/metrics.
-func NewPrometheusServer(gatherer prometheus.Gatherer, port uint64) (*PrometheusServer, error) {
+func NewPrometheusServerWithPort(gatherer prometheus.Gatherer, port uint64) (*PrometheusServer, error) {
 	server := &PrometheusServer{
 		gatherer: gatherer,
 	}

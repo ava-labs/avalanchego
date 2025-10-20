@@ -102,7 +102,7 @@ func main() {
 	require.NoError(err)
 
 	registry := prometheus.NewRegistry()
-	metricsServer, err := tests.NewPrometheusServer(registry, tests.DefaultMetricsPort)
+	metricsServer, err := tests.NewPrometheusServer(registry)
 	require.NoError(err)
 	tc.DeferCleanup(func() {
 		require.NoError(metricsServer.Stop())
