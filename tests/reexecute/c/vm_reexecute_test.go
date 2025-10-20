@@ -46,12 +46,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
-const (
-	metricsDisabled   = "disabled"
-	metricsServerOnly = "server-only"
-	metricsFull       = "full"
-)
-
 var (
 	mainnetXChainID    = ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM")
 	mainnetCChainID    = ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5")
@@ -100,12 +94,6 @@ var (
 	runnerNameArg  string
 	configBytesArg []byte
 )
-
-type metricsMode string
-
-func (m metricsMode) isValid() bool {
-	return m == metricsDisabled || m == metricsServerOnly || m == metricsFull
-}
 
 func TestMain(m *testing.M) {
 	evm.RegisterAllLibEVMExtras()
@@ -173,6 +161,7 @@ func BenchmarkReexecuteRange(b *testing.B) {
 			chanSizeArg,
 			metricsServerEnabledArg,
 			metricsCollectorEnabledArg,
+			metricsServerPort,
 		)
 	})
 }
@@ -187,6 +176,7 @@ func benchmarkReexecuteRange(
 	chanSize int,
 	metricsServerEnabled bool,
 	metricsCollectorEnabled bool,
+	metricsPort uint64,
 ) {
 	r := require.New(b)
 	ctx := context.Background()
@@ -206,7 +196,7 @@ func benchmarkReexecuteRange(
 	log := tests.NewDefaultLogger("c-chain-reexecution")
 
 	if metricsServerEnabled {
-		serverAddr := startServer(b, log, prefixGatherer)
+		serverAddr := startServer(b, log, prefixGatherer, metricsPort)
 
 		if metricsCollectorEnabled {
 			startCollector(b, log, "c-chain-reexecution", labels, serverAddr)
@@ -579,10 +569,11 @@ func startServer(
 	tb testing.TB,
 	log logging.Logger,
 	gatherer prometheus.Gatherer,
+	port uint64,
 ) string {
 	r := require.New(tb)
 
-	server, err := tests.NewPrometheusServer(gatherer)
+	server, err := tests.NewPrometheusServer(gatherer, port)
 	r.NoError(err)
 
 	log.Info("metrics endpoint available",
