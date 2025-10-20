@@ -25,6 +25,8 @@ The plugin version is updated to `44` all plugins must update to be compatible.
 
 - Added support for specifying multiple `Avalanche-Api-Route` headers for more complex routing.
 - Added proposervm gRPC, connectrpc, and jsonrpc APIs for `GetProposedHeight` and `GetCurrentEpoch`.
+  - The gRPC and connectrpc APIs are routed by adding a second `Avalanche-Api-Route` header with the value `proposervm`.
+  - The jsonrpc APIs are added to all chains with the base endpoint `/proposervm`.
 - Added platformvm `platform.GetAllValidatorsAt` API.
 
 ### Configs
