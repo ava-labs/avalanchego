@@ -90,8 +90,8 @@ func (s *StateDB) AddBalanceMultiCoin(addr common.Address, coinID common.Hash, a
 		return
 	}
 
-	if !state.GetExtra(s.StateDB, customtypes.IsMultiCoinPayloads, addr) {
-		state.SetExtra(s.StateDB, customtypes.IsMultiCoinPayloads, addr, true)
+	if !customtypes.IsMultiCoin(s.StateDB, addr) {
+		customtypes.SetMultiCoin(s.StateDB, addr, true)
 	}
 
 	newAmount := new(big.Int).Add(s.GetBalanceMultiCoin(addr, coinID), amount)
@@ -107,8 +107,8 @@ func (s *StateDB) SubBalanceMultiCoin(addr common.Address, coinID common.Hash, a
 	// Note: It's not needed to set the IsMultiCoin (extras) flag here, as this
 	// call would always be preceded by a call to AddBalanceMultiCoin, which would
 	// set the extra flag. Seems we should remove the redundant code.
-	if !state.GetExtra(s.StateDB, customtypes.IsMultiCoinPayloads, addr) {
-		state.SetExtra(s.StateDB, customtypes.IsMultiCoinPayloads, addr, true)
+	if !customtypes.IsMultiCoin(s.StateDB, addr) {
+		customtypes.SetMultiCoin(s.StateDB, addr, true)
 	}
 	newAmount := new(big.Int).Sub(s.GetBalanceMultiCoin(addr, coinID), amount)
 	normalizeCoinID(&coinID)

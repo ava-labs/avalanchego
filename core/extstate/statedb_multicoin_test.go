@@ -169,7 +169,7 @@ func TestGenerateMultiCoinAccounts(t *testing.T) {
 	snap := snaps.Snapshot(root)
 	snapAccount, err := snap.Account(addrHash)
 	require.NoError(t, err, "getting account from snapshot")
-	require.True(t, customtypes.IsMultiCoin(snapAccount), "snap account must be multi-coin")
+	require.True(t, customtypes.IsAccountMultiCoin(snapAccount), "snap account must be multi-coin")
 
 	normalizeCoinID(&assetID)
 	assetHash := crypto.Keccak256Hash(assetID.Bytes())
