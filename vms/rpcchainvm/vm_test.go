@@ -186,8 +186,7 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 
 			require.NoError(os.Setenv(runtime.EngineAddressKey, listener.Addr().String()))
 
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
+			ctx := t.Context()
 
 			if test.serveVM {
 				go func() {
