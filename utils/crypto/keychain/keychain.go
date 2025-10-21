@@ -9,9 +9,8 @@ import (
 )
 
 // Signer implements functions for a keychain to return its main address and
-// to sign a hash or transaction
+// to sign a transaction
 type Signer interface {
-	SignHash([]byte) ([]byte, error)
 	Sign([]byte) ([]byte, error)
 	Address() ids.ShortID
 }
