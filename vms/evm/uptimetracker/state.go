@@ -84,7 +84,7 @@ func newState(db database.Database) (*state, error) {
 			return nil, fmt.Errorf("failed to unmarshal validator: %w", err)
 		}
 
-		s.addValidator(validationID, vdr)
+		s.addValidatorToMemory(validationID, vdr)
 	}
 
 	if err := it.Error(); err != nil {
@@ -130,8 +130,11 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	return time.Unix(int64(v.LastUpdated), 0), nil
 }
 
+// addNewValidator adds a new validator to the state and marks it
+// for persistence to the database. This should be used when adding validators during
+// runtime operations.
 func (s *state) addNewValidator(vdr *validator) {
-	s.addValidator(vdr.validationID, vdr)
+	s.addValidatorToMemory(vdr.validationID, vdr)
 	s.updatedValidators.Add(vdr.validationID)
 }
 
@@ -197,7 +200,10 @@ func (s *state) writeModifications() error {
 	return nil
 }
 
-func (s *state) addValidator(validationID ids.ID, validator *validator) {
+// addValidatorToMemory adds a validator to the in-memory data structures only.
+// This is used during initialization when loading from the database and does not
+// mark the validator for persistence.
+func (s *state) addValidatorToMemory(validationID ids.ID, validator *validator) {
 	s.validators[validationID] = validator
 	s.nodeIDsToValidationIDs[validator.NodeID] = validationID
 }
