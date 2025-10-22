@@ -45,7 +45,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 				{
 					timestamp: time.Time{}.Add(10 * time.Second),
 					connectedValidators: []ids.NodeID{
-						ids.NodeID{1},
+						{1},
 					},
 					validators: []validators.GetCurrentValidatorOutput{
 						{
@@ -68,7 +68,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 				{
 					timestamp: time.Time{}.Add(10 * time.Second),
 					connectedValidators: []ids.NodeID{
-						ids.NodeID{1},
+						{1},
 					},
 					validators: []validators.GetCurrentValidatorOutput{
 						{
@@ -90,7 +90,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			steps: []testStep{
 				{
 					connectedValidators: []ids.NodeID{
-						ids.NodeID{1},
+						{1},
 					},
 					validators: []validators.GetCurrentValidatorOutput{
 						{
@@ -123,7 +123,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			steps: []testStep{
 				{
 					connectedValidators: []ids.NodeID{
-						ids.NodeID{1},
+						{1},
 					},
 					validators: []validators.GetCurrentValidatorOutput{
 						{
@@ -167,7 +167,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			steps: []testStep{
 				{
 					connectedValidators: []ids.NodeID{
-						ids.NodeID{1},
+						{1},
 					},
 					validators: []validators.GetCurrentValidatorOutput{
 						{
@@ -181,7 +181,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 				{
 					timestamp: time.Time{}.Add(10 * time.Second),
 					disconnectedValidators: []ids.NodeID{
-						ids.NodeID{1},
+						{1},
 					},
 					validators: []validators.GetCurrentValidatorOutput{
 						{
@@ -203,7 +203,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			steps: []testStep{
 				{
 					connectedValidators: []ids.NodeID{
-						ids.NodeID{1},
+						{1},
 					},
 					validators: []validators.GetCurrentValidatorOutput{
 						{
@@ -217,7 +217,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 				{
 					timestamp: time.Time{}.Add(10 * time.Second),
 					disconnectedValidators: []ids.NodeID{
-						ids.NodeID{1},
+						{1},
 					},
 					validators: []validators.GetCurrentValidatorOutput{
 						{
@@ -267,7 +267,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			steps: []testStep{
 				{
 					connectedValidators: []ids.NodeID{
-						ids.NodeID{1},
+						{1},
 					},
 					validators: []validators.GetCurrentValidatorOutput{
 						{
@@ -292,7 +292,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			steps: []testStep{
 				{
 					connectedValidators: []ids.NodeID{
-						ids.NodeID{1},
+						{1},
 					},
 					validators: []validators.GetCurrentValidatorOutput{
 						{
@@ -333,7 +333,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 				{
 					timestamp: time.Time{}.Add(10 * time.Second),
 					connectedValidators: []ids.NodeID{
-						ids.NodeID{1},
+						{1},
 					},
 					validators: []validators.GetCurrentValidatorOutput{
 						{
@@ -354,7 +354,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			steps: []testStep{
 				{
 					connectedValidators: []ids.NodeID{
-						ids.NodeID{1},
+						{1},
 					},
 					validators: []validators.GetCurrentValidatorOutput{
 						{
@@ -375,7 +375,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			steps: []testStep{
 				{
 					connectedValidators: []ids.NodeID{
-						ids.NodeID{1},
+						{1},
 					},
 					validators: []validators.GetCurrentValidatorOutput{
 						{
@@ -419,7 +419,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			steps: []testStep{
 				{
 					connectedValidators: []ids.NodeID{
-						ids.NodeID{1},
+						{1},
 					},
 					validators: []validators.GetCurrentValidatorOutput{
 						{
