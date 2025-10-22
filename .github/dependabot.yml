@@ -12,3 +12,8 @@ updates:
       time: "05:00"
       timezone: "America/Los_Angeles"
     open-pull-requests-limit: 0 # Disable non-security version updates
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0 # Disable non-security version updates

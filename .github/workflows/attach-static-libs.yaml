@@ -63,7 +63,7 @@ jobs:
         run: cargo fetch --locked --verbose
 
       - name: Build for ${{ matrix.target }}
-        run: cargo build --frozen --profile maxperf --features ethhash,logger --target ${{ matrix.target }} -p firewood-ffi
+        run: cargo build-static-ffi --target ${{ matrix.target }}
 
       - name: Upload binary
         uses: actions/upload-artifact@v4

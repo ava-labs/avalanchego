@@ -1,2 +1,5 @@
 dbtest
 _obj
+
+# Nix output
+result
