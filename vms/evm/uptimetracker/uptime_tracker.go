@@ -149,24 +149,19 @@ func (u *UptimeTracker) update(
 	height uint64,
 	currentValidatorSet map[ids.ID]*validators.GetCurrentValidatorOutput,
 ) error {
-	currentValidationIDs := u.state.getValidationIDs()
 	newValidators := currentValidatorSet
 
-	for _, validationID := range currentValidationIDs {
+	for validationID, validator := range u.state.validators {
 		// This validator is still in the latest update
 		if _, ok := newValidators[validationID]; ok {
 			continue
 		}
 
-		// This validator was removed in the lastest update
-		// we are guaranteed to have this node id
-		nodeID, _ := u.state.getNodeID(validationID)
-
 		if !u.state.deleteValidator(validationID) {
 			return fmt.Errorf("failed to delete validator %s", validationID)
 		}
 
-		u.deactivatedValidators.Remove(nodeID)
+		u.deactivatedValidators.Remove(validator.NodeID)
 	}
 
 	// Add or update validators
