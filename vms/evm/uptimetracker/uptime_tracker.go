@@ -122,11 +122,9 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 		return fmt.Errorf("failed to get current validator set: %w", err)
 	}
 
-	// We are behind and need to update our local state
-	if u.height < height {
-		if err := u.update(height, currentValidatorSet); err != nil {
-			return fmt.Errorf("failed to update validator set: %w", err)
-		}
+	// Update validator set if we're behind
+	if err := u.update(height, currentValidatorSet); err != nil {
+		return fmt.Errorf("failed to update validator set: %w", err)
 	}
 
 	// Initialize uptimes if this is the first time Sync has been called
@@ -149,6 +147,11 @@ func (u *UptimeTracker) update(
 	height uint64,
 	currentValidatorSet map[ids.ID]*validators.GetCurrentValidatorOutput,
 ) error {
+	// We are behind and need to update our local state
+	if u.synced && u.height >= height {
+		return nil
+	}
+
 	newValidators := currentValidatorSet
 
 	for validationID, validator := range u.state.validators {
