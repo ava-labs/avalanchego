@@ -135,6 +135,9 @@ func (s *state) addNewValidator(vdr *validator) {
 	s.updatedValidators.Add(vdr.validationID)
 }
 
+// updateValidator updates the validator with the given validationID to the
+// given isActive state -- this function does assume that a validator with t
+// he given validationID exists.
 func (s *state) updateValidator(validationID ids.ID, isActive bool) bool {
 	v := s.validators[validationID]
 
@@ -147,11 +150,11 @@ func (s *state) updateValidator(validationID ids.ID, isActive bool) bool {
 	return true
 }
 
+// deleteValidator deletes the validator with the given validationID -- this function does assume that a validator with the given validationID exists.
+// given isActive state -- this function does assume that a validator with t
+// he given validationID exists.
 func (s *state) deleteValidator(validationID ids.ID) bool {
-	v, ok := s.validators[validationID]
-	if !ok {
-		return false
-	}
+	v := s.validators[validationID]
 
 	delete(s.validators, v.validationID)
 	delete(s.nodeIDsToValidationIDs, v.NodeID)
