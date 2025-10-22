@@ -138,7 +138,7 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 		u.synced = true
 	}
 
-	if err := u.state.writeState(); err != nil {
+	if err := u.state.writeModifications(); err != nil {
 		return fmt.Errorf("failed to write state: %w", err)
 	}
 
@@ -259,5 +259,5 @@ func (u *UptimeTracker) Shutdown() error {
 		return fmt.Errorf("failed to stop uptime tracking: %w", err)
 	}
 
-	return u.state.writeState()
+	return u.state.writeModifications()
 }
