@@ -161,7 +161,7 @@ func (s *state) deleteValidator(validationID ids.ID) bool {
 	return true
 }
 
-func (s *state) writeState() error {
+func (s *state) writeModifications() error {
 	batch := s.db.NewBatch()
 
 	for validationID := range s.updatedValidators {
