@@ -24,7 +24,7 @@ type UptimeTracker struct {
 	manager        uptime.Manager
 
 	lock                sync.Mutex
-	height              int
+	height              uint64
 	state               *state
 	synced              bool
 	connectedValidators set.Set[ids.NodeID]
@@ -48,7 +48,7 @@ func New(
 		validatorState: validatorState,
 		subnetID:       subnetID,
 		manager:        uptime.NewManager(s, clock),
-		height:         -1,
+		synced:         false,
 		state:          s,
 	}, nil
 }
@@ -123,7 +123,7 @@ func (u *UptimeTracker) Sync(ctx context.Context) error {
 	}
 
 	// We are behind and need to update our local state
-	if u.height < int(height) {
+	if u.height < height {
 		if err := u.update(height, currentValidatorSet); err != nil {
 			return fmt.Errorf("failed to update validator set: %w", err)
 		}
@@ -228,7 +228,7 @@ func (u *UptimeTracker) update(
 		}
 	}
 
-	u.height = int(height)
+	u.height = height
 	return nil
 }
 

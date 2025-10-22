@@ -150,9 +150,8 @@ func (s *state) updateValidator(validationID ids.ID, isActive bool) bool {
 	return true
 }
 
-// deleteValidator deletes the validator with the given validationID -- this function does assume that a validator with the given validationID exists.
-// given isActive state -- this function does assume that a validator with t
-// he given validationID exists.
+// deleteValidator deletes the validator with the given validationID -- this
+// function does assume that a validator with the given validationID exists.
 func (s *state) deleteValidator(validationID ids.ID) bool {
 	v := s.validators[validationID]
 
