@@ -1,0 +1,86 @@
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package extstate
+
+import (
+	"testing"
+
+	"github.com/ava-labs/libevm/common"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestStateKeyPartition(t *testing.T) {
+	tests := []struct {
+		key          common.Hash
+		wantCoinID   common.Hash
+		wantStateKey common.Hash
+	}{
+		{
+			key:          common.Hash{},
+			wantCoinID:   common.Hash{0x01},
+			wantStateKey: common.Hash{0x00},
+		},
+		{
+			key:          common.Hash{0x0f},
+			wantCoinID:   common.Hash{0x0f},
+			wantStateKey: common.Hash{0x0e},
+		},
+		{
+			key:          common.Hash{0xf0},
+			wantCoinID:   common.Hash{0xf1},
+			wantStateKey: common.Hash{0xf0},
+		},
+		{
+			key:          common.Hash{0xff},
+			wantCoinID:   common.Hash{0xff},
+			wantStateKey: common.Hash{0xfe},
+		},
+		{
+			key: common.Hash{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			wantCoinID: common.Hash{
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+			wantStateKey: common.Hash{
+				0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.key.Hex(), func(t *testing.T) {
+			coin := test.key
+			normalizeCoinID(&coin)
+			assert.Equal(t, test.wantCoinID, coin)
+
+			state := test.key
+			normalizeStateKey(&state)
+			assert.Equal(t, test.wantStateKey, state)
+		})
+	}
+}
+
+func FuzzStateKeyPartition(f *testing.F) {
+	f.Fuzz(func(t *testing.T, keyBytes []byte) {
+		var key common.Hash
+		copy(key[:], keyBytes)
+
+		var (
+			coin  = key
+			state = key
+		)
+		normalizeCoinID(&coin)
+		normalizeStateKey(&state)
+		assert.NotEqual(t, coin, state)
+	})
+}
