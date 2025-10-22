@@ -17,11 +17,15 @@ import (
 	dto "github.com/prometheus/client_model/go"
 )
 
+const metricsNamespace = "meterdb"
+
 func setup(t *testing.T) (*prometheus.Registry, *Database) {
+	t.Helper()
+
 	reg := prometheus.NewRegistry()
 	memDB := &memdb.Database{}
 
-	db, err := New(reg, "meterdb", memDB)
+	db, err := New(reg, metricsNamespace, memDB)
 	require.NoError(t, err)
 	require.NotNil(t, db)
 
@@ -29,6 +33,8 @@ func setup(t *testing.T) (*prometheus.Registry, *Database) {
 }
 
 func writeBlocks(t *testing.T, db *Database, blockCount int, blockSize int) [][]byte {
+	t.Helper()
+
 	blocks := make([][]byte, blockCount)
 	for i := range blockCount {
 		blockData := make([]byte, blockSize)
@@ -114,7 +120,7 @@ func gatherMetrics(t *testing.T, reg *prometheus.Registry) (map[string]float64, 
 
 func extractMetricValues(metrics []*dto.MetricFamily, metricName string) map[string]float64 {
 	result := make(map[string]float64)
-	namespacedMetricName := "meterdb_" + metricName
+	namespacedMetricName := fmt.Sprintf("%s_%s", metricsNamespace, metricName)
 
 	for _, metric := range metrics {
 		if *metric.Name == namespacedMetricName {
