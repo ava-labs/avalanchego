@@ -3,7 +3,11 @@
 
 package customtypes
 
-import ethtypes "github.com/ava-labs/libevm/core/types"
+import (
+	"github.com/ava-labs/libevm/libevm"
+
+	ethtypes "github.com/ava-labs/libevm/core/types"
+)
 
 var extras ethtypes.ExtraPayloads[*HeaderExtra, *BlockBodyExtra, isMultiCoin]
 
@@ -20,4 +24,23 @@ func Register() {
 		BlockBodyExtra, *BlockBodyExtra,
 		isMultiCoin,
 	]()
+}
+
+// WithTempRegisteredExtras runs `fn` with temporary registration otherwise
+// equivalent to a call to [RegisterExtras], but limited to the life of `fn`.
+//
+// This function is not intended for direct use. Use
+// `evm.WithTempRegisteredLibEVMExtras()` instead as it calls this along with
+// all other temporary-registration functions.
+func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
+	old := extras
+	defer func() { extras = old }()
+
+	return ethtypes.WithTempRegisteredExtras[HeaderExtra, BlockBodyExtra, isMultiCoin](
+		lock,
+		func(e ethtypes.ExtraPayloads[*HeaderExtra, *BlockBodyExtra, isMultiCoin]) error {
+			extras = e
+			return fn()
+		},
+	)
 }
