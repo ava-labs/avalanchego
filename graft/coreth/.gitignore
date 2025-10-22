@@ -1,0 +1,55 @@
+./main
+
+*.log
+*~
+.DS_Store
+
+awscpu
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.profile
+
+# Test binary, build with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# ignore GoLand metafiles directory
+.idea/
+
+*logs/
+!*customlogs/
+
+.vscode*
+
+*.pb*
+
+*cpu[0-9]*
+*mem[0-9]*
+*lock[0-9]*
+*.profile
+*.swp
+*.aux
+*.fdb*
+*.fls
+*.gz
+*.pdf
+
+.coverage
+
+bin/
+build/
+
+# Used for e2e testing
+avalanchego
+
+.direnv
+
+cmd/simulator/.simulator/*
+cmd/simulator/simulator
