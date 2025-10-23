@@ -16,11 +16,6 @@ import (
 	"github.com/ava-labs/subnet-evm/internal/blocktest"
 	"github.com/ava-labs/subnet-evm/utils"
 	"github.com/ava-labs/subnet-evm/utils/utilstest"
-
-	// TODO(arr4n) These tests were originally part of the `subnet-evm/core/types`
-	// package so assume the presence of identifiers. A dot-import reduces PR
-	// noise during the refactoring.
-	. "github.com/ava-labs/libevm/core/types"
 )
 
 func TestBlockGetters(t *testing.T) {

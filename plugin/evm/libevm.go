@@ -4,6 +4,8 @@
 package evm
 
 import (
+	"github.com/ava-labs/libevm/libevm"
+
 	"github.com/ava-labs/subnet-evm/core"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
@@ -21,4 +23,21 @@ func RegisterAllLibEVMExtras() {
 	core.RegisterExtras()
 	customtypes.Register()
 	params.RegisterExtras()
+}
+
+// WithTempRegisteredLibEVMExtras runs `fn` with temporary registration
+// otherwise equivalent to a call to [RegisterAllLibEVMExtras], but limited to
+// the life of `fn`.
+func WithTempRegisteredLibEVMExtras(fn func() error) error {
+	return libevm.WithTemporaryExtrasLock(func(lock libevm.ExtrasLock) error {
+		for _, wrap := range []func(libevm.ExtrasLock, func() error) error{
+			core.WithTempRegisteredExtras,
+			customtypes.WithTempRegisteredExtras,
+			params.WithTempRegisteredExtras,
+		} {
+			inner := fn
+			fn = func() error { return wrap(lock, inner) }
+		}
+		return fn()
+	})
 }

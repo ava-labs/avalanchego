@@ -30,13 +30,19 @@ package params
 import (
 	"math/big"
 
+	"github.com/ava-labs/libevm/libevm"
 	ethparams "github.com/ava-labs/libevm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/utils"
 )
 
 func init() {
-	WithTempRegisteredExtras(initialiseChainConfigs)
+	libevm.WithTemporaryExtrasLock(func(l libevm.ExtrasLock) error {
+		return WithTempRegisteredExtras(l, func() error {
+			initialiseChainConfigs()
+			return nil
+		})
+	})
 }
 
 var (

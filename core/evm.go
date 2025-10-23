@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
+	"github.com/ava-labs/libevm/libevm"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/subnet-evm/consensus"
 	"github.com/ava-labs/subnet-evm/core/extstate"
@@ -55,6 +56,16 @@ func RegisterExtras() {
 	// will be changed in the future to standardise across libevm, hence the
 	// name of the function we're in.
 	vm.RegisterHooks(hooks{})
+}
+
+// WithTempRegisteredExtras runs `fn` with temporary registration otherwise
+// equivalent to a call to [RegisterExtras], but limited to the life of `fn`.
+//
+// This function is not intended for direct use. Use
+// `evm.WithTempRegisteredLibEVMExtras()` instead as it calls this along with
+// all other temporary-registration functions.
+func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
+	return vm.WithTempRegisteredHooks(lock, hooks{}, fn)
 }
 
 type hooks struct{}

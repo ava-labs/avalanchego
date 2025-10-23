@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/libevm"
 
 	"github.com/ava-labs/subnet-evm/params/extras"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
@@ -34,16 +35,22 @@ func RegisterExtras() {
 }
 
 // WithTempRegisteredExtras runs `fn` with temporary registration otherwise
-// equivalent to a call to [RegisterExtras], but limited to the life of `fn`. It
-// is not threadsafe.
-func WithTempRegisteredExtras(fn func()) {
+// equivalent to a call to [RegisterExtras], but limited to the life of `fn`.
+//
+// This function is not intended for direct use. Use
+// `evm.WithTempRegisteredLibEVMExtras()` instead as it calls this along with
+// all other temporary-registration functions.
+func WithTempRegisteredExtras(lock libevm.ExtrasLock, fn func() error) error {
 	old := payloads
 	defer func() { payloads = old }()
 
-	ethparams.WithTempRegisteredExtras(extrasToRegister(), func(extras ethparams.ExtraPayloads[*extras.ChainConfig, RulesExtra]) {
-		payloads = extras
-		fn()
-	})
+	return ethparams.WithTempRegisteredExtras(
+		lock, extrasToRegister(),
+		func(extras ethparams.ExtraPayloads[*extras.ChainConfig, RulesExtra]) error {
+			payloads = extras
+			return fn()
+		},
+	)
 }
 
 var payloads ethparams.ExtraPayloads[*extras.ChainConfig, RulesExtra]
