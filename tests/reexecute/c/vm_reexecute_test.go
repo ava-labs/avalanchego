@@ -6,7 +6,6 @@ package vm
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"flag"
 	"fmt"
 	"maps"
@@ -44,7 +43,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
-	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
@@ -62,9 +60,11 @@ var (
 	startBlockArg      uint64
 	endBlockArg        uint64
 	chanSizeArg        int
-	metricsEnabledArg  bool
 	executionTimeout   time.Duration
 	labelsArg          string
+
+	metricsServerEnabledArg    bool
+	metricsCollectorEnabledArg bool
 
 	networkUUID string = uuid.NewString()
 	labels             = map[string]string{
@@ -104,7 +104,8 @@ func TestMain(m *testing.M) {
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
-	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", false, "Enable metrics collection.")
+	flag.BoolVar(&metricsServerEnabledArg, "metrics-server-enabled", false, "Whether to enable the metrics server.")
+	flag.BoolVar(&metricsCollectorEnabledArg, "metrics-collector-enabled", false, "Whether to enable the metrics collector (if true, then metrics-server-enabled must be true as well).")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
@@ -117,6 +118,11 @@ func TestMain(m *testing.M) {
 	flag.StringVar(&blockDirDstArg, "block-dir-dst", blockDirDstArg, "Destination block directory to write blocks into when executing TestExportBlockRange.")
 
 	flag.Parse()
+
+	if metricsCollectorEnabledArg && !metricsServerEnabledArg {
+		fmt.Fprint(os.Stderr, "metrics collector is enabled but metrics server is disabled.\n")
+		os.Exit(1)
+	}
 
 	customLabels, err := parseCustomLabels(labelsArg)
 	if err != nil {
@@ -151,7 +157,8 @@ func BenchmarkReexecuteRange(b *testing.B) {
 			startBlockArg,
 			endBlockArg,
 			chanSizeArg,
-			metricsEnabledArg,
+			metricsServerEnabledArg,
+			metricsCollectorEnabledArg,
 		)
 	})
 }
@@ -164,7 +171,8 @@ func benchmarkReexecuteRange(
 	startBlock uint64,
 	endBlock uint64,
 	chanSize int,
-	metricsEnabled bool,
+	metricsServerEnabled bool,
+	metricsCollectorEnabled bool,
 ) {
 	r := require.New(b)
 	ctx := context.Background()
@@ -176,9 +184,6 @@ func benchmarkReexecuteRange(
 	vmMultiGatherer := metrics.NewPrefixGatherer()
 	r.NoError(prefixGatherer.Register("avalanche_evm", vmMultiGatherer))
 
-	meterVMRegistry := prometheus.NewRegistry()
-	r.NoError(prefixGatherer.Register("avalanche_meterchainvm", meterVMRegistry))
-
 	// consensusRegistry includes the chain="C" label and the prefix "avalanche_snowman".
 	// The consensus registry is passed to the executor to mimic a subset of consensus metrics.
 	consensusRegistry := prometheus.NewRegistry()
@@ -186,8 +191,12 @@ func benchmarkReexecuteRange(
 
 	log := tests.NewDefaultLogger("c-chain-reexecution")
 
-	if metricsEnabled {
-		collectRegistry(b, log, "c-chain-reexecution", prefixGatherer, labels)
+	if metricsServerEnabled {
+		serverAddr := startServer(b, log, prefixGatherer)
+
+		if metricsCollectorEnabled {
+			startCollector(b, log, "c-chain-reexecution", labels, serverAddr)
+		}
 	}
 
 	var (
@@ -222,7 +231,6 @@ func benchmarkReexecuteRange(
 		chainDataDir,
 		configBytes,
 		vmMultiGatherer,
-		meterVMRegistry,
 	)
 	r.NoError(err)
 	defer func() {
@@ -253,8 +261,7 @@ func newMainnetCChainVM(
 	vmAndSharedMemoryDB database.Database,
 	chainDataDir string,
 	configBytes []byte,
-	vmMultiGatherer metrics.MultiGatherer,
-	meterVMRegistry prometheus.Registerer,
+	metricsGatherer metrics.MultiGatherer,
 ) (block.ChainVM, error) {
 	factory := factory.Factory{}
 	vmIntf, err := factory.New(logging.NoLog{})
@@ -282,8 +289,6 @@ func newMainnetCChainVM(
 		ids.Empty:       constants.PrimaryNetworkID,
 	}
 
-	vm = metervm.NewBlockVM(vm, meterVMRegistry)
-
 	if err := vm.Initialize(
 		ctx,
 		&snow.Context{
@@ -301,7 +306,7 @@ func newMainnetCChainVM(
 			Log:          tests.NewDefaultLogger("mainnet-vm-reexecution"),
 			SharedMemory: atomicMemory.NewSharedMemory(mainnetCChainID),
 			BCLookup:     ids.NewAliaser(),
-			Metrics:      vmMultiGatherer,
+			Metrics:      metricsGatherer,
 
 			WarpSigner: warpSigner,
 
@@ -554,9 +559,33 @@ func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, err
 	return m, nil
 }
 
-// collectRegistry starts prometheus and collects metrics from the provided gatherer.
-// Attaches the provided labels + GitHub labels if available to the collected metrics.
-func collectRegistry(tb testing.TB, log logging.Logger, name string, gatherer prometheus.Gatherer, labels map[string]string) {
+// startServer starts a Prometheus server for the provided gatherer and returns
+// the server address.
+func startServer(
+	tb testing.TB,
+	log logging.Logger,
+	gatherer prometheus.Gatherer,
+) string {
+	r := require.New(tb)
+
+	server, err := tests.NewPrometheusServer(gatherer)
+	r.NoError(err)
+
+	log.Info("metrics endpoint available",
+		zap.String("url", fmt.Sprintf("http://%s/ext/metrics", server.Address())),
+	)
+
+	tb.Cleanup(func() {
+		r.NoError(server.Stop())
+	})
+
+	return server.Address()
+}
+
+// startCollector starts a Prometheus collector configured to scrape the server
+// listening on serverAddr. startCollector also attaches the provided labels +
+// Github labels if available to the collected metrics.
+func startCollector(tb testing.TB, log logging.Logger, name string, labels map[string]string, serverAddr string) {
 	r := require.New(tb)
 
 	startPromCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
@@ -565,32 +594,27 @@ func collectRegistry(tb testing.TB, log logging.Logger, name string, gatherer pr
 	logger := tests.NewDefaultLogger("prometheus")
 	r.NoError(tmpnet.StartPrometheus(startPromCtx, logger))
 
-	server, err := tests.NewPrometheusServer(gatherer)
-	r.NoError(err)
-
 	var sdConfigFilePath string
 	tb.Cleanup(func() {
 		// Ensure a final metrics scrape.
 		// This default delay is set above the default scrape interval used by StartPrometheus.
 		time.Sleep(tmpnet.NetworkShutdownDelay)
 
-		r.NoError(errors.Join(
-			server.Stop(),
-			func() error {
-				if sdConfigFilePath != "" {
-					return os.Remove(sdConfigFilePath)
-				}
-				return nil
-			}(),
-		))
+		r.NoError(func() error {
+			if sdConfigFilePath != "" {
+				return os.Remove(sdConfigFilePath)
+			}
+			return nil
+		}(),
+		)
 
 		checkMetricsCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
 		defer cancel()
 		r.NoError(tmpnet.CheckMetricsExist(checkMetricsCtx, logger, networkUUID))
 	})
 
-	sdConfigFilePath, err = tmpnet.WritePrometheusSDConfig(name, tmpnet.SDConfig{
-		Targets: []string{server.Address()},
+	sdConfigFilePath, err := tmpnet.WritePrometheusSDConfig(name, tmpnet.SDConfig{
+		Targets: []string{serverAddr},
 		Labels:  labels,
 	}, true /* withGitHubLabels */)
 	r.NoError(err)
@@ -624,4 +648,28 @@ func parseCustomLabels(labelsStr string) (map[string]string, error) {
 		labels[parts[0]] = parts[1]
 	}
 	return labels, nil
+}
+
+func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time.Duration) {
+	r := require.New(b)
+
+	gasUsed, err := getCounterMetricValue(registry, "avalanche_evm_eth_chain_block_gas_used_processed")
+	r.NoError(err)
+	mgasPerSecond := gasUsed / 1_000_000 / elapsed.Seconds()
+	b.ReportMetric(mgasPerSecond, "mgas/s")
+}
+
+func getCounterMetricValue(registry prometheus.Gatherer, query string) (float64, error) {
+	metricFamilies, err := registry.Gather()
+	if err != nil {
+		return 0, fmt.Errorf("failed to gather metrics: %w", err)
+	}
+
+	for _, mf := range metricFamilies {
+		if mf.GetName() == query {
+			return mf.GetMetric()[0].Counter.GetValue(), nil
+		}
+	}
+
+	return 0, fmt.Errorf("metric %s not found", query)
 }
