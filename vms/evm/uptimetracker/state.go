@@ -138,9 +138,9 @@ func (s *state) addNewValidator(vdr *validator) {
 	s.updatedValidators.Add(vdr.validationID)
 }
 
-// updateValidator updates the validator with the given validationID to the
-// given isActive state -- this function does assume that a validator with t
-// he given validationID exists.
+// updateValidator sets the isActive state of the validator with the given
+// validationID -- this function assumes that a validator with the given
+// validationID exists.
 func (s *state) updateValidator(validationID ids.ID, isActive bool) bool {
 	v := s.validators[validationID]
 
