@@ -19,10 +19,7 @@ import (
 // emulating either `coreth` or `subnet-evm`. If the respective emulation isn't
 // active then it will cause `libevm` to panic. In addition to the panicking
 // behaviour, it asserts that it is the only active emulation.
-func setAndGetMillis[T interface {
-	any
-	*cchain.HeaderExtra | *subnet.HeaderExtra
-}](
+func setAndGetMillis[T *cchain.HeaderExtra | *subnet.HeaderExtra](
 	t *testing.T,
 	active *atomic.Int64,
 	withExtra func(*types.Header, T) *types.Header,
