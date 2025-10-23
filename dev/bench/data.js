@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1761223067176,
+  "lastUpdate": 1761232448120,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -2402,6 +2402,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
             "value": 74.49,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jonathan Oppenheimer",
+            "username": "JonathanOppenheimer",
+            "email": "jonathan.oppenheimer@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "7d60acaddc22ff5341eca103cb50041ae7890dc3",
+          "message": "uplift: (validators) - refactor uptime tracking from evm repos (#4166)\n\nSigned-off-by: Jonathan Oppenheimer <147infiniti@gmail.com>\nSigned-off-by: Joshua Kim <20001595+joshua-kim@users.noreply.github.com>\nCo-authored-by: Copilot <175728472+Copilot@users.noreply.github.com>\nCo-authored-by: Joshua Kim <20001595+joshua-kim@users.noreply.github.com>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>",
+          "timestamp": "2025-10-23T13:56:56Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/7d60acaddc22ff5341eca103cb50041ae7890dc3"
+        },
+        "date": 1761232446006,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
+            "value": 43.28,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
