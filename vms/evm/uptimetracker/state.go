@@ -154,16 +154,14 @@ func (s *state) updateValidator(validationID ids.ID, isActive bool) bool {
 }
 
 // deleteValidator deletes the validator with the given validationID -- this
-// function does assume that a validator with the given validationID exists.
-func (s *state) deleteValidator(validationID ids.ID) bool {
+// function assumes that a validator with the given validationID exists.
+func (s *state) deleteValidator(validationID ids.ID) {
 	v := s.validators[validationID]
 
 	delete(s.validators, v.validationID)
 	delete(s.nodeIDsToValidationIDs, v.NodeID)
 
 	s.deletedValidators.Add(v.validationID)
-
-	return true
 }
 
 func (s *state) writeModifications() error {
@@ -235,8 +233,4 @@ func (s *state) getNodeID(validationID ids.ID) (ids.NodeID, bool) {
 
 func (s *state) getNodeIDs() []ids.NodeID {
 	return maps.Keys(s.nodeIDsToValidationIDs)
-}
-
-func (s *state) getValidationIDs() []ids.ID {
-	return maps.Keys(s.validators)
 }

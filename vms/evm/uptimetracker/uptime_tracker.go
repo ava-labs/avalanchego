@@ -160,10 +160,7 @@ func (u *UptimeTracker) update(
 			continue
 		}
 
-		if !u.state.deleteValidator(validationID) {
-			return fmt.Errorf("failed to delete validator %s", validationID)
-		}
-
+		u.state.deleteValidator(validationID)
 		u.deactivatedValidators.Remove(validator.NodeID)
 	}
 
