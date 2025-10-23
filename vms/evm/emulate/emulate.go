@@ -32,7 +32,10 @@ func SubnetEVMVal[T any](fn func() (T, error)) (T, error) {
 	return val(SubnetEVM, fn)
 }
 
-func val[T any](wrap func(func() error) error, fn func() (T, error)) (T, error) {
+func val[T any](
+	wrap func(func() error) error, 
+	fn func() (T, error),
+) (T, error) {
 	var v T
 	err := wrap(func() error {
 		var err error
