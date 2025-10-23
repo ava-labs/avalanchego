@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 // Package emulate provides temporary emulation of coreth (C-Chain) and
 // subnet-evm (EVM L1) behaviours. All functions are safe for concurrent use
 // with each other, but all hold the same mutex so their execution SHOULD be
