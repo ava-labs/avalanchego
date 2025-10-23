@@ -4,24 +4,18 @@
 package warp
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 
-	"golang.org/x/exp/maps"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/math"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var (
-	_ utils.Sortable[*Validator] = (*Validator)(nil)
-
 	ErrUnknownValidator = errors.New("unknown validator")
 	ErrWeightOverflow   = errors.New("weight overflowed")
 )
@@ -32,79 +26,35 @@ type ValidatorState interface {
 	GetValidatorSet(ctx context.Context, height uint64, subnetID ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error)
 }
 
-type CanonicalValidatorSet struct {
-	// Validators slice in canonical ordering of the validators that has public key
-	Validators []*Validator
-	// The total weight of all the validators, including the ones that doesn't have a public key
-	TotalWeight uint64
-}
+type (
+	// Deprecated: use [validators.WarpSet] instead.
+	CanonicalValidatorSet = validators.WarpSet
+	// Deprecated: use [validators.Warp] instead.
+	Validator = validators.Warp
+)
 
-type Validator struct {
-	PublicKey      *bls.PublicKey
-	PublicKeyBytes []byte
-	Weight         uint64
-	NodeIDs        []ids.NodeID
-}
-
-func (v *Validator) Compare(o *Validator) int {
-	return bytes.Compare(v.PublicKeyBytes, o.PublicKeyBytes)
-}
+// Deprecated: use [validators.FlattenValidatorSet] instead.
+var FlattenValidatorSet = validators.FlattenValidatorSet
 
 // GetCanonicalValidatorSetFromSubnetID returns the CanonicalValidatorSet of [subnetID] at
-// [pChcainHeight]. The returned CanonicalValidatorSet includes the validator set in a canonical ordering
+// [pChainHeight]. The returned CanonicalValidatorSet includes the validator set in a canonical ordering
 // and the total weight.
+//
+// Deprecated: Use [validators.State.GetWarpValidatorSet] instead.
 func GetCanonicalValidatorSetFromSubnetID(
 	ctx context.Context,
 	pChainState ValidatorState,
 	pChainHeight uint64,
 	subnetID ids.ID,
-) (CanonicalValidatorSet, error) {
+) (validators.WarpSet, error) {
 	// Get the validator set at the given height.
 	vdrSet, err := pChainState.GetValidatorSet(ctx, pChainHeight, subnetID)
 	if err != nil {
-		return CanonicalValidatorSet{}, err
+		return validators.WarpSet{}, err
 	}
 
 	// Convert the validator set into the canonical ordering.
-	return FlattenValidatorSet(vdrSet)
-}
-
-// FlattenValidatorSet converts the provided [vdrSet] into a canonical ordering.
-// Also returns the total weight of the validator set.
-func FlattenValidatorSet(vdrSet map[ids.NodeID]*validators.GetValidatorOutput) (CanonicalValidatorSet, error) {
-	var (
-		vdrs        = make(map[string]*Validator, len(vdrSet))
-		totalWeight uint64
-		err         error
-	)
-	for _, vdr := range vdrSet {
-		totalWeight, err = math.Add(totalWeight, vdr.Weight)
-		if err != nil {
-			return CanonicalValidatorSet{}, fmt.Errorf("%w: %w", ErrWeightOverflow, err)
-		}
-
-		if vdr.PublicKey == nil {
-			continue
-		}
-
-		pkBytes := bls.PublicKeyToUncompressedBytes(vdr.PublicKey)
-		uniqueVdr, ok := vdrs[string(pkBytes)]
-		if !ok {
-			uniqueVdr = &Validator{
-				PublicKey:      vdr.PublicKey,
-				PublicKeyBytes: pkBytes,
-			}
-			vdrs[string(pkBytes)] = uniqueVdr
-		}
-
-		uniqueVdr.Weight += vdr.Weight // Impossible to overflow here
-		uniqueVdr.NodeIDs = append(uniqueVdr.NodeIDs, vdr.NodeID)
-	}
-
-	// Sort validators by public key
-	vdrList := maps.Values(vdrs)
-	utils.Sort(vdrList)
-	return CanonicalValidatorSet{Validators: vdrList, TotalWeight: totalWeight}, nil
+	return validators.FlattenValidatorSet(vdrSet)
 }
 
 // FilterValidators returns the validators in [vdrs] whose bit is set to 1 in
@@ -113,8 +63,8 @@ func FlattenValidatorSet(vdrSet map[ids.NodeID]*validators.GetValidatorOutput) (
 // Returns an error if [indices] references an unknown validator.
 func FilterValidators(
 	indices set.Bits,
-	vdrs []*Validator,
-) ([]*Validator, error) {
+	vdrs []*validators.Warp,
+) ([]*validators.Warp, error) {
 	// Verify that all alleged signers exist
 	if indices.BitLen() > len(vdrs) {
 		return nil, fmt.Errorf(
@@ -125,7 +75,7 @@ func FilterValidators(
 		)
 	}
 
-	filteredVdrs := make([]*Validator, 0, len(vdrs))
+	filteredVdrs := make([]*validators.Warp, 0, len(vdrs))
 	for i, vdr := range vdrs {
 		if !indices.Contains(i) {
 			continue
@@ -137,7 +87,7 @@ func FilterValidators(
 }
 
 // SumWeight returns the total weight of the provided validators.
-func SumWeight(vdrs []*Validator) (uint64, error) {
+func SumWeight(vdrs []*validators.Warp) (uint64, error) {
 	var (
 		weight uint64
 		err    error
@@ -154,7 +104,7 @@ func SumWeight(vdrs []*Validator) (uint64, error) {
 // AggregatePublicKeys returns the public key of the provided validators.
 //
 // Invariant: All of the public keys in [vdrs] are valid.
-func AggregatePublicKeys(vdrs []*Validator) (*bls.PublicKey, error) {
+func AggregatePublicKeys(vdrs []*validators.Warp) (*bls.PublicKey, error) {
 	pks := make([]*bls.PublicKey, len(vdrs))
 	for i, vdr := range vdrs {
 		pks[i] = vdr.PublicKey
@@ -167,10 +117,10 @@ func GetCanonicalValidatorSetFromChainID(ctx context.Context,
 	pChainState validators.State,
 	pChainHeight uint64,
 	sourceChainID ids.ID,
-) (CanonicalValidatorSet, error) {
+) (validators.WarpSet, error) {
 	subnetID, err := pChainState.GetSubnetID(ctx, sourceChainID)
 	if err != nil {
-		return CanonicalValidatorSet{}, err
+		return validators.WarpSet{}, err
 	}
 
 	return GetCanonicalValidatorSetFromSubnetID(ctx, pChainState, pChainHeight, subnetID)

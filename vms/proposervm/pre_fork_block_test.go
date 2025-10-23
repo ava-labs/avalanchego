@@ -22,6 +22,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	statelessblock "github.com/ava-labs/avalanchego/vms/proposervm/block"
@@ -52,11 +53,7 @@ func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
 func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = upgrade.UnscheduledActivationTime
-		durangoTime    = upgrade.UnscheduledActivationTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.NoUpgrades, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -118,11 +115,8 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-		durangoTime    = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -192,11 +186,8 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-		durangoTime    = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -254,11 +245,8 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-		durangoTime    = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -284,6 +272,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		snowmantest.GenesisID,
 		coreBlk.Timestamp(),
 		0, // pChainHeight
+		statelessblock.Epoch{},
 		proVM.StakingCertLeaf,
 		coreBlk.Bytes(),
 		proVM.ctx.ChainID,
@@ -363,11 +352,8 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = snowmantest.GenesisTimestamp.Add(-1 * time.Second)
-		durangoTime    = snowmantest.GenesisTimestamp.Add(-1 * time.Second)
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	activationTime := snowmantest.GenesisTimestamp.Add(-1 * time.Second)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	proVM.Set(activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
@@ -399,11 +385,7 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 	require := require.New(t)
 
 	// setup
-	var (
-		activationTime = upgrade.UnscheduledActivationTime
-		durangoTime    = upgrade.UnscheduledActivationTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.NoUpgrades, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -454,11 +436,7 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = upgrade.UnscheduledActivationTime
-		durangoTime    = upgrade.UnscheduledActivationTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.NoUpgrades, 0)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -480,11 +458,8 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-		durangoTime    = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -550,11 +525,8 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-		durangoTime    = snowmantest.GenesisTimestamp.Add(10 * time.Second)
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	defer func() {
 		require.NoError(proVM.Shutdown(context.Background()))
 	}()
@@ -610,6 +582,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 		firstBlock.ID(), // refer unknown parent
 		firstBlock.Timestamp(),
 		0, // pChainHeight,
+		statelessblock.Epoch{},
 		proVM.StakingCertLeaf,
 		coreBlk.opts[0].Bytes(),
 		proVM.ctx.ChainID,
@@ -673,4 +646,71 @@ func TestPreForkBlock_BuildBlockWithContext(t *testing.T) {
 	gotChild, err = blk.buildChild(context.Background())
 	require.NoError(err)
 	require.Equal(builtBlk, gotChild.(*preForkBlock).Block)
+}
+
+func TestPreForkBlock_NonZeroEpoch(t *testing.T) {
+	require := require.New(t)
+
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
+	defer func() {
+		require.NoError(proVM.Shutdown(context.Background()))
+	}()
+
+	firstBlockTime := snowmantest.GenesisTimestamp.Add(time.Second)
+
+	coreBlk := snowmantest.BuildChild(snowmantest.Genesis)
+	coreBlk.TimestampV = firstBlockTime
+
+	coreVM.GetBlockF = func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+		switch blkID {
+		case snowmantest.GenesisID:
+			return snowmantest.Genesis, nil
+		case coreBlk.ID():
+			return coreBlk, nil
+		default:
+			return nil, database.ErrNotFound
+		}
+	}
+	coreVM.ParseBlockF = func(_ context.Context, b []byte) (snowman.Block, error) {
+		switch {
+		case bytes.Equal(b, snowmantest.GenesisBytes):
+			return snowmantest.Genesis, nil
+		case bytes.Equal(b, coreBlk.Bytes()):
+			return coreBlk, nil
+		default:
+			return nil, errUnknownBlock
+		}
+	}
+
+	proVM.Set(firstBlockTime)
+	// Create a post-fork child block with a non-zero epoch
+	nonZeroEpoch := statelessblock.Epoch{
+		PChainHeight: 100,
+		Number:       1,
+		StartTime:    firstBlockTime.Unix(),
+	}
+
+	postForkStatelessChild, err := statelessblock.Build(
+		snowmantest.GenesisID,
+		firstBlockTime,
+		100,
+		nonZeroEpoch,
+		proVM.StakingCertLeaf,
+		coreBlk.Bytes(),
+		proVM.ctx.ChainID,
+		proVM.StakingLeafSigner,
+	)
+	require.NoError(err)
+
+	postForkChild := &postForkBlock{
+		SignedBlock: postForkStatelessChild,
+		postForkCommonComponents: postForkCommonComponents{
+			vm:       proVM,
+			innerBlk: coreBlk,
+		},
+	}
+
+	// Verify that the child block is rejected due to non-zero epoch
+	err = postForkChild.Verify(context.Background())
+	require.ErrorIs(err, errEpochNotZero)
 }

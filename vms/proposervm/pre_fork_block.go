@@ -148,6 +148,11 @@ func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkB
 		return errTimeTooAdvanced
 	}
 
+	// The first block after the fork should not have an epoch even if granite is activated.
+	if child.PChainEpoch() != (block.Epoch{}) {
+		return errEpochNotZero
+	}
+
 	// Verify the lack of signature on the node
 	if child.SignedBlock.Proposer() != ids.EmptyNodeID {
 		return errChildOfPreForkBlockHasProposer
@@ -215,6 +220,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 		parentID,
 		newTimestamp,
 		pChainHeight,
+		block.Epoch{},
 		innerBlock.Bytes(),
 	)
 	if err != nil {
@@ -241,4 +247,8 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 
 func (*preForkBlock) pChainHeight(context.Context) (uint64, error) {
 	return 0, nil
+}
+
+func (*preForkBlock) pChainEpoch(context.Context) (block.Epoch, error) {
+	return block.Epoch{}, nil
 }

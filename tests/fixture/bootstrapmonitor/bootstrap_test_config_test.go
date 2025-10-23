@@ -299,7 +299,7 @@ func TestStateSyncEnabledFromEnvVars(t *testing.T) {
 			chainConfigContent: marshalAndEncode(t,
 				map[string]chains.ChainConfig{
 					"C": {
-						Config: []byte("{\"state-sync-enabled\":1234}"),
+						Config: []byte("{\"state-sync-enabled\":{}}"),
 					},
 				},
 			),

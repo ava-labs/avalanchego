@@ -34,7 +34,7 @@ var (
 type testValidator struct {
 	nodeID ids.NodeID
 	sk     bls.Signer
-	vdr    *Validator
+	vdr    *validators.Warp
 }
 
 func (v *testValidator) Compare(o *testValidator) int {
@@ -52,7 +52,7 @@ func newTestValidator() *testValidator {
 	return &testValidator{
 		nodeID: nodeID,
 		sk:     sk,
-		vdr: &Validator{
+		vdr: &validators.Warp{
 			PublicKey:      pk,
 			PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
 			Weight:         3,
@@ -160,7 +160,7 @@ func TestSignatureVerification(t *testing.T) {
 	tests := []struct {
 		name       string
 		networkID  uint32
-		validators CanonicalValidatorSet
+		validators validators.WarpSet
 		quorumDen  uint64
 		signature  *BitSetSignature
 		wantErr    error
@@ -168,8 +168,8 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name:      "wrong_networkID",
 			networkID: constants.UnitTestID + 1,
-			validators: CanonicalValidatorSet{
-				Validators: []*Validator{
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
 					testVdrs[0].vdr,
 					testVdrs[2].vdr,
 				},
@@ -187,8 +187,8 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name:      "inefficient_bitset",
 			networkID: constants.UnitTestID,
-			validators: CanonicalValidatorSet{
-				Validators: []*Validator{
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
 					testVdrs[0].vdr,
 				},
 				TotalWeight: testVdrs[0].vdr.Weight +
@@ -205,8 +205,8 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name:      "unknown_index",
 			networkID: constants.UnitTestID,
-			validators: CanonicalValidatorSet{
-				Validators: []*Validator{
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
 					testVdrs[0].vdr,
 				},
 				TotalWeight: testVdrs[0].vdr.Weight +
@@ -223,8 +223,8 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name:      "insufficient_weight",
 			networkID: constants.UnitTestID,
-			validators: CanonicalValidatorSet{
-				Validators: []*Validator{
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
 					testVdrs[0].vdr,
 					testVdrs[1].vdr,
 					testVdrs[2].vdr,
@@ -243,8 +243,8 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name:      "impossible_to_have_sufficient_weight",
 			networkID: constants.UnitTestID,
-			validators: CanonicalValidatorSet{
-				Validators: []*Validator{
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
 					testVdrs[0].vdr,
 				},
 				TotalWeight: testVdrs[0].vdr.Weight +
@@ -261,8 +261,8 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name:      "malformed_signature",
 			networkID: constants.UnitTestID,
-			validators: CanonicalValidatorSet{
-				Validators: []*Validator{
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
 					testVdrs[0].vdr,
 				},
 				TotalWeight: testVdrs[0].vdr.Weight +
@@ -279,8 +279,8 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name:      "invalid_signature",
 			networkID: constants.UnitTestID,
-			validators: CanonicalValidatorSet{
-				Validators: []*Validator{
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
 					testVdrs[0].vdr,
 				},
 				TotalWeight: testVdrs[0].vdr.Weight +
@@ -297,8 +297,8 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name:      "valid",
 			networkID: constants.UnitTestID,
-			validators: CanonicalValidatorSet{
-				Validators: []*Validator{
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
 					testVdrs[0].vdr,
 					testVdrs[2].vdr,
 				},
@@ -315,8 +315,8 @@ func TestSignatureVerification(t *testing.T) {
 		{
 			name:      "valid_partial_signers",
 			networkID: constants.UnitTestID,
-			validators: CanonicalValidatorSet{
-				Validators: []*Validator{
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
 					testVdrs[0].vdr,
 					testVdrs[1].vdr,
 					testVdrs[2].vdr,
@@ -386,7 +386,7 @@ func BenchmarkSignatureVerification(b *testing.B) {
 			aggSigBytes := [bls.SignatureLen]byte{}
 			copy(aggSigBytes[:], bls.SignatureToBytes(aggSig))
 
-			canonicalValidators, err := FlattenValidatorSet(vdrs)
+			canonicalValidators, err := validators.FlattenValidatorSet(vdrs)
 			require.NoError(b, err)
 
 			sig := &BitSetSignature{

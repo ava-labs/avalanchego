@@ -20,6 +20,11 @@ func TestBuild(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
+	pChainEpoch := Epoch{
+		PChainHeight: 2,
+		Number:       1,
+		StartTime:    timestamp.Unix(),
+	}
 	innerBlockBytes := []byte{3}
 	chainID := ids.ID{4}
 
@@ -35,6 +40,7 @@ func TestBuild(t *testing.T) {
 		parentID,
 		timestamp,
 		pChainHeight,
+		pChainEpoch,
 		cert,
 		innerBlockBytes,
 		chainID,
@@ -47,17 +53,63 @@ func TestBuild(t *testing.T) {
 	require.Equal(timestamp, builtBlock.Timestamp())
 	require.Equal(innerBlockBytes, builtBlock.Block())
 	require.Equal(nodeID, builtBlock.Proposer())
+	require.Equal(pChainEpoch, builtBlock.PChainEpoch())
+	require.IsType(&statelessGraniteBlock{}, builtBlock)
+}
+
+func TestBuildPreGranite(t *testing.T) {
+	require := require.New(t)
+
+	parentID := ids.ID{1}
+	timestamp := time.Unix(123, 0)
+	pChainHeight := uint64(2)
+	pChainEpoch := Epoch{}
+	innerBlockBytes := []byte{3}
+	chainID := ids.ID{4}
+
+	tlsCert, err := staking.NewTLSCert()
+	require.NoError(err)
+
+	cert, err := staking.ParseCertificate(tlsCert.Leaf.Raw)
+	require.NoError(err)
+	key := tlsCert.PrivateKey.(crypto.Signer)
+	nodeID := ids.NodeIDFromCert(cert)
+
+	builtBlock, err := Build(
+		parentID,
+		timestamp,
+		pChainHeight,
+		pChainEpoch,
+		cert,
+		innerBlockBytes,
+		chainID,
+		key,
+	)
+	require.NoError(err)
+
+	require.Equal(parentID, builtBlock.ParentID())
+	require.Equal(pChainHeight, builtBlock.PChainHeight())
+	require.Equal(timestamp, builtBlock.Timestamp())
+	require.Equal(innerBlockBytes, builtBlock.Block())
+	require.Equal(nodeID, builtBlock.Proposer())
+	require.Equal(pChainEpoch, builtBlock.PChainEpoch())
+	require.IsType(&statelessBlock{}, builtBlock)
 }
 
 func TestBuildUnsigned(t *testing.T) {
 	parentID := ids.ID{1}
 	timestamp := time.Unix(123, 0)
 	pChainHeight := uint64(2)
+	pChainEpoch := Epoch{
+		PChainHeight: 2,
+		Number:       1,
+		StartTime:    timestamp.Unix(),
+	}
 	innerBlockBytes := []byte{3}
 
 	require := require.New(t)
 
-	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, innerBlockBytes)
+	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, pChainEpoch, innerBlockBytes)
 	require.NoError(err)
 
 	require.Equal(parentID, builtBlock.ParentID())
@@ -65,6 +117,29 @@ func TestBuildUnsigned(t *testing.T) {
 	require.Equal(timestamp, builtBlock.Timestamp())
 	require.Equal(innerBlockBytes, builtBlock.Block())
 	require.Equal(ids.EmptyNodeID, builtBlock.Proposer())
+	require.Equal(pChainEpoch, builtBlock.PChainEpoch())
+	require.IsType(&statelessGraniteBlock{}, builtBlock)
+}
+
+func TestBuildUnsignedPreGranite(t *testing.T) {
+	parentID := ids.ID{1}
+	timestamp := time.Unix(123, 0)
+	pChainHeight := uint64(2)
+	pChainEpoch := Epoch{}
+	innerBlockBytes := []byte{3}
+
+	require := require.New(t)
+
+	builtBlock, err := BuildUnsigned(parentID, timestamp, pChainHeight, pChainEpoch, innerBlockBytes)
+	require.NoError(err)
+
+	require.Equal(parentID, builtBlock.ParentID())
+	require.Equal(pChainHeight, builtBlock.PChainHeight())
+	require.Equal(timestamp, builtBlock.Timestamp())
+	require.Equal(innerBlockBytes, builtBlock.Block())
+	require.Equal(ids.EmptyNodeID, builtBlock.Proposer())
+	require.Equal(pChainEpoch, builtBlock.PChainEpoch())
+	require.IsType(&statelessBlock{}, builtBlock)
 }
 
 func TestBuildHeader(t *testing.T) {

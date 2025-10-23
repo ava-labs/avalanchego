@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	"github.com/ava-labs/avalanchego/vms/proposervm/acp181"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 	"github.com/ava-labs/avalanchego/vms/proposervm/proposer"
 
@@ -33,11 +34,13 @@ var (
 	errPChainHeightNotMonotonic = errors.New("non monotonically increasing P-chain height")
 	errPChainHeightNotReached   = errors.New("block P-chain height larger than current P-chain height")
 	errTimeTooAdvanced          = errors.New("time is too far advanced")
+	errEpochMismatch            = errors.New("epoch mismatch")
 	errProposerWindowNotStarted = errors.New("proposer window hasn't started")
 	errUnexpectedProposer       = errors.New("unexpected proposer for current window")
 	errProposerMismatch         = errors.New("proposer mismatch")
 	errProposersNotActivated    = errors.New("proposers haven't been activated yet")
 	errPChainHeightTooLow       = errors.New("block P-chain height is too low")
+	errEpochNotZero             = errors.New("epoch must not be provided prior to granite")
 )
 
 type Block interface {
@@ -59,6 +62,7 @@ type Block interface {
 	buildChild(context.Context) (Block, error)
 
 	pChainHeight(context.Context) (uint64, error)
+	pChainEpoch(context.Context) (block.Epoch, error)
 	selectChildPChainHeight(context.Context) (uint64, error)
 }
 
@@ -90,10 +94,12 @@ func (p *postForkCommonComponents) Height() uint64 {
 // 7) [child]'s timestamp is within its proposer's window
 // 8) [child] has a valid signature from its proposer
 // 9) [child]'s inner block is valid
+// 10) [child] has the expected epoch
 func (p *postForkCommonComponents) Verify(
 	ctx context.Context,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
+	parentEpoch block.Epoch,
 	child *postForkBlock,
 ) error {
 	if err := verifyIsNotOracleBlock(ctx, p.innerBlk); err != nil {
@@ -119,6 +125,11 @@ func (p *postForkCommonComponents) Verify(
 	maxTimestamp := p.vm.Time().Add(maxSkew)
 	if childTimestamp.After(maxTimestamp) {
 		return errTimeTooAdvanced
+	}
+
+	childEpoch := child.PChainEpoch()
+	if expected := acp181.NewEpoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, childTimestamp); childEpoch != expected {
+		return fmt.Errorf("%w: epoch %v != expected %v", errEpochMismatch, childEpoch, expected)
 	}
 
 	// If the node is currently syncing - we don't assume that the P-chain has
@@ -164,9 +175,12 @@ func (p *postForkCommonComponents) Verify(
 	}
 
 	var contextPChainHeight uint64
-	if p.vm.Upgrades.IsEtnaActivated(childTimestamp) {
+	switch {
+	case p.vm.Upgrades.IsGraniteActivated(childTimestamp):
+		contextPChainHeight = childEpoch.PChainHeight
+	case p.vm.Upgrades.IsEtnaActivated(childTimestamp):
 		contextPChainHeight = childPChainHeight
-	} else {
+	default:
 		contextPChainHeight = parentPChainHeight
 	}
 
@@ -185,6 +199,7 @@ func (p *postForkCommonComponents) buildChild(
 	parentID ids.ID,
 	parentTimestamp time.Time,
 	parentPChainHeight uint64,
+	parentEpoch block.Epoch,
 ) (Block, error) {
 	// Child's timestamp is the later of now and this block's timestamp
 	newTimestamp := p.vm.Time().Truncate(time.Second)
@@ -226,10 +241,15 @@ func (p *postForkCommonComponents) buildChild(
 		return nil, err
 	}
 
+	epoch := acp181.NewEpoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, newTimestamp)
+
 	var contextPChainHeight uint64
-	if p.vm.Upgrades.IsEtnaActivated(newTimestamp) {
+	switch {
+	case p.vm.Upgrades.IsGraniteActivated(newTimestamp):
+		contextPChainHeight = epoch.PChainHeight
+	case p.vm.Upgrades.IsEtnaActivated(newTimestamp):
 		contextPChainHeight = pChainHeight
-	} else {
+	default:
 		contextPChainHeight = parentPChainHeight
 	}
 
@@ -252,6 +272,7 @@ func (p *postForkCommonComponents) buildChild(
 			parentID,
 			newTimestamp,
 			pChainHeight,
+			epoch,
 			p.vm.StakingCertLeaf,
 			innerBlock.Bytes(),
 			p.vm.ctx.ChainID,
@@ -262,6 +283,7 @@ func (p *postForkCommonComponents) buildChild(
 			parentID,
 			newTimestamp,
 			pChainHeight,
+			epoch,
 			innerBlock.Bytes(),
 		)
 	}
@@ -290,6 +312,7 @@ func (p *postForkCommonComponents) buildChild(
 		zap.Uint64("pChainHeight", pChainHeight),
 		zap.Time("parentTimestamp", parentTimestamp),
 		zap.Time("blockTimestamp", newTimestamp),
+		zap.Reflect("epoch", epoch),
 	)
 	return child, nil
 }
