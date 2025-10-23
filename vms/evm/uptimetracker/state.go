@@ -130,9 +130,9 @@ func (s *state) GetStartTime(nodeID ids.NodeID) (time.Time, error) {
 	return time.Unix(int64(v.LastUpdated), 0), nil
 }
 
-// addNewValidator adds a new validator to the state and marks it
-// for persistence to the database. This should be used when adding validators during
-// runtime operations.
+// addNewValidator adds a new validator to the state and marks it for
+// persistence to the database. This should be used when adding validators
+// during runtime operations.
 func (s *state) addNewValidator(vdr *validator) {
 	s.addValidatorToMemory(vdr.validationID, vdr)
 	s.updatedValidators.Add(vdr.validationID)
