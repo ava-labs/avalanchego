@@ -16,7 +16,7 @@ import (
 )
 
 // setAndGetMillis is an arbitrary function that can be run if and only if
-// emulating either `coreth` or `subnet-evm`. If the resepective emulation isn't
+// emulating either `coreth` or `subnet-evm`. If the respective emulation isn't
 // active then it will cause `libevm` to panic. In addition to the panicking
 // behaviour, it asserts that it is the only active emulation.
 func setAndGetMillis[T interface {
