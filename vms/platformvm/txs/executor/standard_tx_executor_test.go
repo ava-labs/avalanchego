@@ -2392,9 +2392,9 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		)
 	)
 
-	testAddresses := make([]ids.ShortID, 0)
-	for _, testKey := range genesistest.DefaultFundedKeys {
-		testAddresses = append(testAddresses, testKey.Address())
+	testAddresses := make([]ids.ShortID, len(genesistest.DefaultFundedKeys))
+	for i, testKey := range genesistest.DefaultFundedKeys {
+		testAddresses[i] = testKey.Address()
 	}
 
 	// Create the subnet
