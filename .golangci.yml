@@ -216,6 +216,11 @@ linters:
       - common-false-positives
       - legacy
       - std-error-handling
+    rules:
+      # Exclude some linters from running on test files.
+      - path: ".*test.*"
+        linters:
+          - prealloc
 formatters:
   enable:
     - gci
