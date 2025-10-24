@@ -186,9 +186,7 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 
 			t.Setenv(runtime.EngineAddressKey, listener.Addr().String())
 
-			ctx, cancel := context.WithCancel(t.Context())
-			defer cancel()
-
+			ctx := t.Context()
 			if test.serveVM {
 				go func() {
 					_ = Serve(ctx, vm)
