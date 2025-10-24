@@ -43,7 +43,7 @@ func (db testDatabase) NewSnapshot() (ethdb.Snapshot, error) {
 	return &testSnapshot{data: snapshotData}, nil
 }
 
-// testSnapshot implements ethdb.Snapshot by storing a copy of the database state.
+// testSnapshot implements [ethdb.Snapshot] by storing a copy of the database state.
 type testSnapshot struct {
 	data map[string][]byte
 }
@@ -137,16 +137,16 @@ func TestInterface(t *testing.T) {
 	})
 }
 
-func TestProductionErrors(t *testing.T) {
+func TestUnimplemented(t *testing.T) {
 	t.Run("NewSnapshot_ReturnsError", func(t *testing.T) {
-		wrappedDB := New(memdb.New())
-		_, err := wrappedDB.NewSnapshot()
+		db := New(memdb.New())
+		_, err := db.NewSnapshot()
 		require.ErrorIs(t, err, errSnapshotNotSupported)
 	})
 
 	t.Run("Stat_ReturnsError", func(t *testing.T) {
-		wrappedDB := New(memdb.New())
-		_, err := wrappedDB.Stat("test")
+		db := New(memdb.New())
+		_, err := db.Stat("test")
 		require.ErrorIs(t, err, errStatNotSupported)
 	})
 }
