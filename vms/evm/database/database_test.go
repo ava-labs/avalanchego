@@ -4,108 +4,151 @@
 package database
 
 import (
-	"context"
+	"bytes"
+	"slices"
 	"testing"
 
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/ava-labs/libevm/ethdb/dbtest"
 	"github.com/stretchr/testify/require"
 
 	avalanchegodb "github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/database/dbtest"
 	"github.com/ava-labs/avalanchego/database/memdb"
 )
 
-// databaseAdapter adapts our ethdb.KeyValueStore to the avalanchego database.Database interface
-type databaseAdapter struct {
-	ethdb.KeyValueStore
-	baseDB avalanchegodb.Database
+// testDatabase wraps the production database with test-only snapshot functionality
+type testDatabase struct {
+	database
 }
 
-func (d *databaseAdapter) NewBatch() avalanchegodb.Batch {
-	return d.baseDB.NewBatch()
+// NewSnapshot creates a test-only snapshot that captures the current database state.
+// This implementation is designed for test suite compliance only and is NOT suitable
+// for production use as it loads the entire database into memory.
+func (db testDatabase) NewSnapshot() (ethdb.Snapshot, error) {
+	// Create a snapshot by iterating over the entire database and copying key-value pairs
+	snapshotData := make(map[string][]byte)
+
+	// Iterate over all keys in the database
+	iter := db.db.NewIterator()
+	defer iter.Release()
+
+	for iter.Next() {
+		key := iter.Key()
+		value := iter.Value()
+		// Make copies to ensure the snapshot is independent
+		keyCopy := make([]byte, len(key))
+		valueCopy := make([]byte, len(value))
+		copy(keyCopy, key)
+		copy(valueCopy, value)
+		snapshotData[string(keyCopy)] = valueCopy
+	}
+
+	if err := iter.Error(); err != nil {
+		return nil, err
+	}
+
+	return &testSnapshot{data: snapshotData}, nil
 }
 
-func (d *databaseAdapter) NewIterator() avalanchegodb.Iterator {
-	return d.baseDB.NewIterator()
+// testSnapshot implements ethdb.Snapshot by storing a copy of the database state.
+// This is a test-only implementation that loads the entire database into memory
+// for the purpose of satisfying the dbtest.TestDatabaseSuite interface requirements.
+// It is NOT suitable for production use due to memory and performance implications.
+type testSnapshot struct {
+	data map[string][]byte
 }
 
-func (d *databaseAdapter) NewIteratorWithStart(start []byte) avalanchegodb.Iterator {
-	return d.baseDB.NewIteratorWithStart(start)
+func (s *testSnapshot) Get(key []byte) ([]byte, error) {
+	value, exists := s.data[string(key)]
+	if !exists {
+		return nil, avalanchegodb.ErrNotFound
+	}
+	return value, nil
 }
 
-func (d *databaseAdapter) NewIteratorWithPrefix(prefix []byte) avalanchegodb.Iterator {
-	return d.baseDB.NewIteratorWithPrefix(prefix)
+func (s *testSnapshot) Has(key []byte) (bool, error) {
+	_, exists := s.data[string(key)]
+	return exists, nil
 }
 
-func (d *databaseAdapter) NewIteratorWithStartAndPrefix(start, prefix []byte) avalanchegodb.Iterator {
-	return d.baseDB.NewIteratorWithStartAndPrefix(start, prefix)
+func (*testSnapshot) Release() {
+	// No cleanup needed for snapshot
 }
 
-func (d *databaseAdapter) Compact(start, limit []byte) error {
-	return d.baseDB.Compact(start, limit)
+func (s *testSnapshot) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
+	// Create a slice of key-value pairs that match the prefix and start criteria
+	pairs := make([]kvPair, 0, len(s.data))
+
+	for keyStr, value := range s.data {
+		key := []byte(keyStr)
+
+		// Check prefix match
+		if prefix != nil && len(key) < len(prefix) {
+			continue
+		}
+		if prefix != nil && !bytes.HasPrefix(key, prefix) {
+			continue
+		}
+
+		// Check start criteria
+		if start != nil && bytes.Compare(key, start) < 0 {
+			continue
+		}
+
+		pairs = append(pairs, kvPair{key: key, value: value})
+	}
+
+	// Sort by key for consistent iteration
+	slices.SortFunc(pairs, func(a, b kvPair) int {
+		return bytes.Compare(a.key, b.key)
+	})
+
+	return &testSnapshotIterator{pairs: pairs, index: -1}
 }
 
-func (d *databaseAdapter) HealthCheck(ctx context.Context) (interface{}, error) {
-	return d.baseDB.HealthCheck(ctx)
+type kvPair struct {
+	key   []byte
+	value []byte
+}
+
+type testSnapshotIterator struct {
+	pairs []kvPair
+	index int
+}
+
+func (it *testSnapshotIterator) Next() bool {
+	it.index++
+	return it.index < len(it.pairs)
+}
+
+func (it *testSnapshotIterator) Key() []byte {
+	if it.index < 0 || it.index >= len(it.pairs) {
+		return nil
+	}
+	return it.pairs[it.index].key
+}
+
+func (it *testSnapshotIterator) Value() []byte {
+	if it.index < 0 || it.index >= len(it.pairs) {
+		return nil
+	}
+	return it.pairs[it.index].value
+}
+
+func (*testSnapshotIterator) Release() {
+	// No cleanup needed for snapshot iterator
+}
+
+func (*testSnapshotIterator) Error() error {
+	return nil
 }
 
 func TestInterface(t *testing.T) {
-	for name, test := range dbtest.TestsBasic {
-		t.Run(name, func(t *testing.T) {
-			baseDB := memdb.New()
-			test(t, New(baseDB))
-		})
-	}
-}
-
-func TestInterfaceFull(t *testing.T) {
-	for name, test := range dbtest.Tests {
-		t.Run(name, func(t *testing.T) {
-			baseDB := memdb.New()
-			wrappedDB := New(baseDB)
-			testDB := &testDatabase{database: wrappedDB.(database)}
-
-			// Create adapter to satisfy database.Database interface
-			adapter := &databaseAdapter{
-				KeyValueStore: testDB,
-				baseDB:        baseDB,
-			}
-			test(t, adapter)
-		})
-	}
-}
-
-func FuzzKeyValue(f *testing.F) {
-	baseDB := memdb.New()
-	wrappedDB := New(baseDB)
-	testDB := &testDatabase{database: wrappedDB.(database)}
-	adapter := &databaseAdapter{
-		KeyValueStore: testDB,
-		baseDB:        baseDB,
-	}
-	dbtest.FuzzKeyValue(f, adapter)
-}
-
-func FuzzNewIteratorWithPrefix(f *testing.F) {
-	baseDB := memdb.New()
-	wrappedDB := New(baseDB)
-	testDB := &testDatabase{database: wrappedDB.(database)}
-	adapter := &databaseAdapter{
-		KeyValueStore: testDB,
-		baseDB:        baseDB,
-	}
-	dbtest.FuzzNewIteratorWithPrefix(f, adapter)
-}
-
-func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
-	baseDB := memdb.New()
-	wrappedDB := New(baseDB)
-	testDB := &testDatabase{database: wrappedDB.(database)}
-	adapter := &databaseAdapter{
-		KeyValueStore: testDB,
-		baseDB:        baseDB,
-	}
-	dbtest.FuzzNewIteratorWithStartAndPrefix(f, adapter)
+	dbtest.TestDatabaseSuite(t, func() ethdb.KeyValueStore {
+		baseDB := memdb.New()
+		wrappedDB := New(baseDB)
+		return &testDatabase{database: wrappedDB.(database)}
+	})
 }
 
 func TestProductionErrors(t *testing.T) {
