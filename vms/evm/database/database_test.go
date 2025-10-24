@@ -31,11 +31,9 @@ func (db testDatabase) NewSnapshot() (ethdb.Snapshot, error) {
 	for iter.Next() {
 		key := iter.Key()
 		value := iter.Value()
-		keyCopy := make([]byte, len(key))
 		valueCopy := make([]byte, len(value))
-		copy(keyCopy, key)
 		copy(valueCopy, value)
-		snapshotData[string(keyCopy)] = valueCopy
+		snapshotData[string(key)] = valueCopy
 	}
 
 	if err := iter.Error(); err != nil {
