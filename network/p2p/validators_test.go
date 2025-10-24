@@ -172,16 +172,18 @@ func TestValidatorsSample(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			mockValidators := validatorsmock.NewState(ctrl)
 
-			calls := make([]any, 0)
+			calls := make([]any, 0, 2*len(tt.calls))
 			for _, call := range tt.calls {
-				calls = append(calls, mockValidators.EXPECT().
-					GetCurrentHeight(gomock.Any()).Return(call.height, call.getCurrentHeightErr))
+				calls = append(
+					calls,
+					mockValidators.EXPECT().GetCurrentHeight(gomock.Any()).Return(call.height, call.getCurrentHeightErr),
+				)
 
 				if call.getCurrentHeightErr != nil {
 					continue
 				}
 
-				validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, 0)
+				validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(call.validators))
 				for _, validator := range call.validators {
 					validatorSet[validator] = &validators.GetValidatorOutput{
 						NodeID: validator,
@@ -189,10 +191,10 @@ func TestValidatorsSample(t *testing.T) {
 					}
 				}
 
-				calls = append(calls,
-					mockValidators.EXPECT().
-						GetValidatorSet(gomock.Any(), gomock.Any(), subnetID).
-						Return(validatorSet, call.getValidatorSetErr))
+				calls = append(
+					calls,
+					mockValidators.EXPECT().GetValidatorSet(gomock.Any(), gomock.Any(), subnetID).Return(validatorSet, call.getValidatorSetErr),
+				)
 			}
 			gomock.InOrder(calls...)
 
@@ -337,7 +339,7 @@ func TestValidatorsTop(t *testing.T) {
 			require := require.New(t)
 			ctrl := gomock.NewController(t)
 
-			validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, 0)
+			validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput, len(test.validators))
 			for _, validator := range test.validators {
 				validatorSet[validator.nodeID] = &validators.GetValidatorOutput{
 					NodeID: validator.nodeID,
