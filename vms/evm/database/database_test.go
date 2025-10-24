@@ -61,9 +61,7 @@ func (t *testSnapshot) Has(key []byte) (bool, error) {
 	return exists, nil
 }
 
-func (*testSnapshot) Release() {
-	// No cleanup needed for snapshot
-}
+func (*testSnapshot) Release() {}
 
 func (t *testSnapshot) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 	// Create a slice of key-value pairs that match the prefix and start criteria
