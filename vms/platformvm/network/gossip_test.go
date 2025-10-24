@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
@@ -62,12 +63,11 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 func TestMempoolDuplicate(t *testing.T) {
 	require := require.New(t)
 
-	avaxAssetID := ids.GenerateTestID()
 	testMempool, err := pmempool.New(
 		"",
 		gas.Dimensions{1, 1, 1, 1},
 		1_000_000,
-		avaxAssetID,
+		snowtest.AVAXAssetID,
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
@@ -83,7 +83,7 @@ func TestMempoolDuplicate(t *testing.T) {
 							TxID: ids.GenerateTestID(),
 						},
 						Asset: avax.Asset{
-							ID: avaxAssetID,
+							ID: snowtest.AVAXAssetID,
 						},
 						In: &secp256k1fx.TransferInput{
 							Amt: 1,
@@ -116,7 +116,6 @@ func TestMempoolDuplicate(t *testing.T) {
 func TestGossipAddBloomFilter(t *testing.T) {
 	require := require.New(t)
 
-	avaxAssetID := ids.GenerateTestID()
 	txID := ids.GenerateTestID()
 	tx := &txs.Tx{
 		Unsigned: &txs.BaseTx{
@@ -127,7 +126,7 @@ func TestGossipAddBloomFilter(t *testing.T) {
 							TxID: ids.GenerateTestID(),
 						},
 						Asset: avax.Asset{
-							ID: avaxAssetID,
+							ID: snowtest.AVAXAssetID,
 						},
 						In: &secp256k1fx.TransferInput{
 							Amt: 1,
@@ -144,7 +143,7 @@ func TestGossipAddBloomFilter(t *testing.T) {
 		"",
 		gas.Dimensions{1, 1, 1, 1},
 		1_000_000,
-		avaxAssetID,
+		snowtest.AVAXAssetID,
 		prometheus.NewRegistry(),
 	)
 	require.NoError(err)
