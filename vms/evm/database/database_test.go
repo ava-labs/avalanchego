@@ -134,9 +134,7 @@ func (t *testSnapshotIterator) Error() error {
 
 func TestInterface(t *testing.T) {
 	dbtest.TestDatabaseSuite(t, func() ethdb.KeyValueStore {
-		baseDB := memdb.New()
-		wrappedDB := New(baseDB)
-		return &testDatabase{database: wrappedDB.(database)}
+		return &testDatabase{KeyValueStore: New(memdb.New())}
 	})
 }
 
