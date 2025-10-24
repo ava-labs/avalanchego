@@ -121,9 +121,7 @@ func (it *testSnapshotIterator) Value() []byte {
 	return it.pairs[it.index].value
 }
 
-func (*testSnapshotIterator) Release() {
-	// No cleanup needed for snapshot iterator
-}
+func (*testSnapshotIterator) Release() {}
 
 func (*testSnapshotIterator) Error() error {
 	return nil
