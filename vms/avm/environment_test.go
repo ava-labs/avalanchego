@@ -172,7 +172,8 @@ func setup(tb testing.TB, c *envConfig) *environment {
 		env.vm.ctx.Lock.Lock()
 		defer env.vm.ctx.Lock.Unlock()
 
-		require.NoError(env.vm.Shutdown(tb.Context()))
+		//nolint:usetesting // t.Context() is already canceled inside the cleanup function
+		require.NoError(env.vm.Shutdown(context.Background()))
 	})
 
 	return env

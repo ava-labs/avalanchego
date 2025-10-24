@@ -608,7 +608,8 @@ func startCollector(tb testing.TB, log logging.Logger, name string, labels map[s
 		}(),
 		)
 
-		checkMetricsCtx, cancel := context.WithTimeout(tb.Context(), tests.DefaultTimeout)
+		//nolint:usetesting // t.Context() is already canceled inside the cleanup function
+		checkMetricsCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
 		defer cancel()
 		r.NoError(tmpnet.CheckMetricsExist(checkMetricsCtx, logger, networkUUID))
 	})
