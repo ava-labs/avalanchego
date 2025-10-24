@@ -645,8 +645,10 @@ func TestSignatureAggregator_AggregateSignatures(t *testing.T) {
 			bitSet := set.BitsFromBytes(gotSignature.Signers)
 			require.Equal(tt.wantSigners, bitSet.Len())
 
-			pks := make([]*bls.PublicKey, 0)
-			wantAggregatedStake := uint64(0)
+			var (
+				pks                 []*bls.PublicKey
+				wantAggregatedStake uint64
+			)
 			for i := 0; i < bitSet.BitLen(); i++ {
 				if !bitSet.Contains(i) {
 					continue
