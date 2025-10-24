@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/ethdb"
+	"github.com/stretchr/testify/require"
 
 	avalanchegodb "github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/dbtest"
@@ -105,4 +106,19 @@ func FuzzNewIteratorWithStartAndPrefix(f *testing.F) {
 		baseDB:        baseDB,
 	}
 	dbtest.FuzzNewIteratorWithStartAndPrefix(f, adapter)
+}
+
+func TestProductionErrors(t *testing.T) {
+	baseDB := memdb.New()
+	wrappedDB := New(baseDB)
+
+	t.Run("NewSnapshot_ReturnsError", func(t *testing.T) {
+		_, err := wrappedDB.NewSnapshot()
+		require.ErrorIs(t, err, ErrSnapshotNotSupported)
+	})
+
+	t.Run("Stat_ReturnsError", func(t *testing.T) {
+		_, err := wrappedDB.Stat("test")
+		require.ErrorIs(t, err, ErrStatNotSupported)
+	})
 }
