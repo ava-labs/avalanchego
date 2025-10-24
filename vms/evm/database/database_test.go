@@ -5,6 +5,7 @@ package database
 
 import (
 	"bytes"
+	"errors"
 	"slices"
 	"testing"
 
@@ -13,8 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database/memdb"
-
-	avalanchegodb "github.com/ava-labs/avalanchego/database"
 )
 
 // testDatabase wraps the production database with test-only snapshot functionality
@@ -22,13 +21,8 @@ type testDatabase struct {
 	database
 }
 
-// NewSnapshot creates a test-only snapshot that captures the current database state.
-// This implementation is designed for test suite compliance only and is NOT suitable
-// for production use as it loads the entire database into memory.
-//
 // Creates a snapshot by iterating over the entire database and copying key-value pairs.
 func (db testDatabase) NewSnapshot() (ethdb.Snapshot, error) {
-
 	snapshotData := make(map[string][]byte)
 
 	iter := db.db.NewIterator()
@@ -39,7 +33,6 @@ func (db testDatabase) NewSnapshot() (ethdb.Snapshot, error) {
 		value := iter.Value()
 		keyCopy := make([]byte, len(key))
 		valueCopy := make([]byte, len(value))
-		copy(keyCopy, key)
 		copy(valueCopy, value)
 		snapshotData[string(keyCopy)] = valueCopy
 	}
@@ -52,27 +45,24 @@ func (db testDatabase) NewSnapshot() (ethdb.Snapshot, error) {
 }
 
 // testSnapshot implements ethdb.Snapshot by storing a copy of the database state.
-// This is a test-only implementation that loads the entire database into memory
-// for the purpose of satisfying the dbtest.TestDatabaseSuite interface requirements.
-// It is NOT suitable for production use due to memory and performance implications.
 type testSnapshot struct {
 	data map[string][]byte
 }
 
-func (s *testSnapshot) Get(key []byte) ([]byte, error) {
-	value, exists := s.data[string(key)]
-	if !exists {
-		return nil, avalanchegodb.ErrNotFound
+func (t *testSnapshot) Get(key []byte) ([]byte, error) {
+	value, ok := t.data[string(key)]
+	if !ok {
+		return nil, errors.New("not found")
 	}
 	return value, nil
 }
 
-func (s *testSnapshot) Has(key []byte) (bool, error) {
-	_, exists := s.data[string(key)]
+func (t *testSnapshot) Has(key []byte) (bool, error) {
+	_, exists := t.data[string(key)]
 	return exists, nil
 }
 
-func (*testSnapshot) Release() {
+func (t *testSnapshot) Release() {
 	// No cleanup needed for snapshot
 }
 
@@ -134,11 +124,11 @@ func (it *testSnapshotIterator) Value() []byte {
 	return it.pairs[it.index].value
 }
 
-func (*testSnapshotIterator) Release() {
+func (t *testSnapshotIterator) Release() {
 	// No cleanup needed for snapshot iterator
 }
 
-func (*testSnapshotIterator) Error() error {
+func (t *testSnapshotIterator) Error() error {
 	return nil
 }
 
@@ -151,16 +141,15 @@ func TestInterface(t *testing.T) {
 }
 
 func TestProductionErrors(t *testing.T) {
-	baseDB := memdb.New()
-	wrappedDB := New(baseDB)
-
 	t.Run("NewSnapshot_ReturnsError", func(t *testing.T) {
+		wrappedDB := New(memdb.New())
 		_, err := wrappedDB.NewSnapshot()
-		require.ErrorIs(t, err, ErrSnapshotNotSupported)
+		require.ErrorIs(t, err, errSnapshotNotSupported)
 	})
 
 	t.Run("Stat_ReturnsError", func(t *testing.T) {
+		wrappedDB := New(memdb.New())
 		_, err := wrappedDB.Stat("test")
-		require.ErrorIs(t, err, ErrStatNotSupported)
+		require.ErrorIs(t, err, errStatNotSupported)
 	})
 }

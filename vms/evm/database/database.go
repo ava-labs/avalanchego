@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	ErrSnapshotNotSupported = errors.New("snapshot is not supported")
-	ErrStatNotSupported     = errors.New("stat is not supported")
+	errSnapshotNotSupported = errors.New("snapshot is not supported")
+	errStatNotSupported     = errors.New("stat is not supported")
 
 	_ ethdb.Batch         = (*batch)(nil)
 	_ ethdb.KeyValueStore = (*database)(nil)
@@ -25,7 +25,7 @@ type database struct {
 
 func New(db avalanchegodb.Database) ethdb.KeyValueStore { return database{db} }
 
-func (database) Stat(string) (string, error) { return "", ErrStatNotSupported }
+func (database) Stat(string) (string, error) { return "", errStatNotSupported }
 
 func (db database) NewBatch() ethdb.Batch { return batch{batch: db.db.NewBatch()} }
 
@@ -44,7 +44,7 @@ func (db database) Close() error { return db.db.Close() }
 func (db database) NewBatchWithSize(int) ethdb.Batch { return db.NewBatch() }
 
 func (database) NewSnapshot() (ethdb.Snapshot, error) {
-	return nil, ErrSnapshotNotSupported
+	return nil, errSnapshotNotSupported
 }
 
 func (db database) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
