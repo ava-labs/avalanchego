@@ -222,7 +222,7 @@ linters:
       # 2. Exclude any file prefixed with test_ in any directory.
       # 3. Exclude any directory suffixed with test.
       # 4. Exclude any file suffixed with _test.go.
-      - path: "(^tests/)|(^(.*/)*test_)|(.*test/.*)|(.*_test\\.go$)"
+      - path: "(^tests/)|(^(.*/)*test_[^/]*.go$)|(.*test/.*)|(.*_test\\.go$)"
         linters:
           - prealloc
 formatters:
