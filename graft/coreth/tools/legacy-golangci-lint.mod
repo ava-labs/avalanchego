@@ -11,7 +11,7 @@ module github.com/ava-labs/coreth/tools/legacy-golangci-lint
 // go tool -modfile=tools/legacy-golangci-lint.mod golangci-lint [args]
 //
 
-go 1.24.8
+go 1.24.9
 
 tool github.com/golangci/golangci-lint/cmd/golangci-lint
 
