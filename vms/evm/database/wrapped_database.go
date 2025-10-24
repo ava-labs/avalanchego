@@ -15,7 +15,7 @@ var (
 	errSnapshotNotSupported = errors.New("snapshot is not supported")
 	errStatNotSupported     = errors.New("stat is not supported")
 
-	_ ethdb.Batch         = (*ethBatchWrapper)(nil)
+	_ ethdb.Batch         = (*batch)(nil)
 	_ ethdb.KeyValueStore = (*database)(nil)
 )
 
@@ -27,7 +27,7 @@ func New(db avalanchegodb.Database) ethdb.KeyValueStore { return database{db} }
 
 func (database) Stat(string) (string, error) { return "", errStatNotSupported }
 
-func (db database) NewBatch() ethdb.Batch { return ethBatchWrapper{batch: db.db.NewBatch()} }
+func (db database) NewBatch() ethdb.Batch { return batch{batch: db.db.NewBatch()} }
 
 func (db database) Has(key []byte) (bool, error) { return db.db.Has(key) }
 
@@ -56,24 +56,18 @@ func (db database) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 	return db.db.NewIteratorWithStartAndPrefix(start, prefix)
 }
 
-func (db database) NewIteratorWithStart(start []byte) ethdb.Iterator {
-	return db.db.NewIteratorWithStart(start)
-}
-
-type ethBatchWrapper struct {
+type batch struct {
 	batch avalanchegodb.Batch
 }
 
-func (e ethBatchWrapper) Put(key, value []byte) error { return e.batch.Put(key, value) }
+func (e batch) Put(key, value []byte) error { return e.batch.Put(key, value) }
 
-func (e ethBatchWrapper) Delete(key []byte) error { return e.batch.Delete(key) }
+func (e batch) Delete(key []byte) error { return e.batch.Delete(key) }
 
-func (e ethBatchWrapper) ValueSize() int { return e.batch.Size() }
+func (e batch) ValueSize() int { return e.batch.Size() }
 
-func (e ethBatchWrapper) Write() error { return e.batch.Write() }
+func (e batch) Write() error { return e.batch.Write() }
 
-func (e ethBatchWrapper) Reset() { e.batch.Reset() }
+func (e batch) Reset() { e.batch.Reset() }
 
-func (e ethBatchWrapper) Replay(w ethdb.KeyValueWriter) error { return e.batch.Replay(w) }
-
-func (e ethBatchWrapper) Inner() avalanchegodb.Batch { return e.batch.Inner() }
+func (e batch) Replay(w ethdb.KeyValueWriter) error { return e.batch.Replay(w) }
