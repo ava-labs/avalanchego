@@ -4,7 +4,6 @@
 package merkledb
 
 import (
-	"context"
 	"math/rand"
 	"testing"
 	"time"
@@ -29,7 +28,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 
 	smallTrieDB, err := generateTrieWithMinKeyLen(t, r, xsync.DefaultRequestKeyLimit, 1)
 	require.NoError(t, err)
-	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(context.Background())
+	smallTrieRoot, err := smallTrieDB.GetMerkleRoot(t.Context())
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -120,7 +119,7 @@ func Test_Server_GetRangeProof(t *testing.T) {
 			handler := xsync.NewGetRangeProofHandler(smallTrieDB, rangeProofMarshaler)
 			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)
-			responseBytes, err := handler.AppRequest(context.Background(), test.nodeID, time.Time{}, requestBytes)
+			responseBytes, err := handler.AppRequest(t.Context(), test.nodeID, time.Time{}, requestBytes)
 			require.ErrorIs(err, test.expectedErr)
 			if test.expectedErr != nil {
 				return
@@ -153,12 +152,12 @@ func Test_Server_GetChangeProof(t *testing.T) {
 	r := rand.New(rand.NewSource(now)) // #nosec G404
 
 	serverDB, err := New(
-		context.Background(),
+		t.Context(),
 		memdb.New(),
 		newDefaultDBConfig(),
 	)
 	require.NoError(t, err)
-	startRoot, err := serverDB.GetMerkleRoot(context.Background())
+	startRoot, err := serverDB.GetMerkleRoot(t.Context())
 	require.NoError(t, err)
 
 	// create changes
@@ -190,14 +189,14 @@ func Test_Server_GetChangeProof(t *testing.T) {
 		it.Release()
 
 		view, err := serverDB.NewView(
-			context.Background(),
+			t.Context(),
 			ViewChanges{BatchOps: ops},
 		)
 		require.NoError(t, err)
-		require.NoError(t, view.CommitToDB(context.Background()))
+		require.NoError(t, view.CommitToDB(t.Context()))
 	}
 
-	endRoot, err := serverDB.GetMerkleRoot(context.Background())
+	endRoot, err := serverDB.GetMerkleRoot(t.Context())
 	require.NoError(t, err)
 
 	fakeRootID := ids.GenerateTestID()
@@ -339,7 +338,7 @@ func Test_Server_GetChangeProof(t *testing.T) {
 
 			requestBytes, err := proto.Marshal(test.request)
 			require.NoError(err)
-			proofBytes, err := handler.AppRequest(context.Background(), test.nodeID, time.Time{}, requestBytes)
+			proofBytes, err := handler.AppRequest(t.Context(), test.nodeID, time.Time{}, requestBytes)
 			require.ErrorIs(err, test.expectedErr)
 
 			if test.expectedErr != nil {

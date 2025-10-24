@@ -72,7 +72,7 @@ func TestHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			ctx := context.Background()
+			ctx := t.Context()
 			sk, err := localsigner.New()
 			require.NoError(err)
 			pk := sk.PublicKey()

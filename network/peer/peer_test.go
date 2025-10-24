@@ -159,7 +159,7 @@ func awaitReady(t *testing.T, peers ...Peer) {
 	require := require.New(t)
 
 	for _, peer := range peers {
-		require.NoError(peer.AwaitReady(context.Background()))
+		require.NoError(peer.AwaitReady(t.Context()))
 		require.True(peer.Ready())
 	}
 }
@@ -189,8 +189,8 @@ func TestReady(t *testing.T) {
 	awaitReady(t, peer0, peer1)
 
 	peer0.StartClose()
-	require.NoError(peer0.AwaitClosed(context.Background()))
-	require.NoError(peer1.AwaitClosed(context.Background()))
+	require.NoError(peer0.AwaitClosed(t.Context()))
+	require.NoError(peer1.AwaitClosed(t.Context()))
 }
 
 func TestSend(t *testing.T) {
@@ -208,14 +208,14 @@ func TestSend(t *testing.T) {
 	outboundGetMsg, err := config0.MessageCreator.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(err)
 
-	require.True(peer0.Send(context.Background(), outboundGetMsg))
+	require.True(peer0.Send(t.Context(), outboundGetMsg))
 
 	inboundGetMsg := <-peer1.inboundMsgChan
 	require.Equal(message.GetOp, inboundGetMsg.Op())
 
 	peer1.StartClose()
-	require.NoError(peer0.AwaitClosed(context.Background()))
-	require.NoError(peer1.AwaitClosed(context.Background()))
+	require.NoError(peer0.AwaitClosed(t.Context()))
+	require.NoError(peer1.AwaitClosed(t.Context()))
 }
 
 func TestPingUptimes(t *testing.T) {
@@ -234,12 +234,12 @@ func TestPingUptimes(t *testing.T) {
 	defer func() {
 		peer1.StartClose()
 		peer0.StartClose()
-		require.NoError(peer0.AwaitClosed(context.Background()))
-		require.NoError(peer1.AwaitClosed(context.Background()))
+		require.NoError(peer0.AwaitClosed(t.Context()))
+		require.NoError(peer1.AwaitClosed(t.Context()))
 	}()
 	pingMsg, err := config0.MessageCreator.Ping(1)
 	require.NoError(err)
-	require.True(peer0.Send(context.Background(), pingMsg))
+	require.True(peer0.Send(t.Context(), pingMsg))
 
 	// we send Get message after ping to ensure Ping is handled by the
 	// time Get is handled. This is because Get is routed to the handler
@@ -297,16 +297,16 @@ func TestTrackedSubnets(t *testing.T) {
 			rawPeer0.config.MySubnets = set.Of(test.trackedSubnets...)
 			peer0, peer1 := startTestPeers(rawPeer0, rawPeer1)
 			if test.shouldDisconnect {
-				require.NoError(peer0.AwaitClosed(context.Background()))
-				require.NoError(peer1.AwaitClosed(context.Background()))
+				require.NoError(peer0.AwaitClosed(t.Context()))
+				require.NoError(peer1.AwaitClosed(t.Context()))
 				return
 			}
 
 			defer func() {
 				peer1.StartClose()
 				peer0.StartClose()
-				require.NoError(peer0.AwaitClosed(context.Background()))
-				require.NoError(peer1.AwaitClosed(context.Background()))
+				require.NoError(peer0.AwaitClosed(t.Context()))
+				require.NoError(peer1.AwaitClosed(t.Context()))
 			}()
 
 			awaitReady(t, peer0, peer1)
@@ -352,8 +352,8 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 
 	// Because peer1 thinks that peer0 is using the wrong BLS key, they should
 	// disconnect from each other.
-	require.NoError(peer0.AwaitClosed(context.Background()))
-	require.NoError(peer1.AwaitClosed(context.Background()))
+	require.NoError(peer0.AwaitClosed(t.Context()))
+	require.NoError(peer1.AwaitClosed(t.Context()))
 }
 
 func TestShouldDisconnect(t *testing.T) {
@@ -665,7 +665,7 @@ func sendAndFlush(t *testing.T, sender *testPeer, receiver *testPeer) {
 	mc := newMessageCreator(t)
 	outboundGetMsg, err := mc.Get(ids.Empty, 1, time.Second, ids.Empty)
 	require.NoError(t, err)
-	require.True(t, sender.Send(context.Background(), outboundGetMsg))
+	require.True(t, sender.Send(t.Context(), outboundGetMsg))
 	inboundGetMsg := <-receiver.inboundMsgChan
 	require.Equal(t, message.GetOp, inboundGetMsg.Op())
 }

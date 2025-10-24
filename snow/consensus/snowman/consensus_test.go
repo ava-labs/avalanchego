@@ -4,7 +4,6 @@
 package snowman
 
 import (
-	"context"
 	"errors"
 	"path"
 	"reflect"
@@ -141,7 +140,7 @@ func NumProcessingTest(t *testing.T, factory Factory) {
 	require.Equal(1, sm.NumProcessing())
 
 	votes := bag.Of(block.ID())
-	require.NoError(sm.RecordPoll(context.Background(), votes))
+	require.NoError(sm.RecordPoll(t.Context(), votes))
 	require.Zero(sm.NumProcessing())
 }
 
@@ -323,7 +322,7 @@ func StatusOrProcessingPreviouslyRejectedTest(t *testing.T, factory Factory) {
 	))
 
 	block := snowmantest.BuildChild(snowmantest.Genesis)
-	require.NoError(block.Reject(context.Background()))
+	require.NoError(block.Reject(t.Context()))
 
 	require.Equal(snowtest.Rejected, block.Status)
 	require.False(sm.Processing(block.ID()))
@@ -435,12 +434,12 @@ func RecordPollAcceptSingleBlockTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Add(block))
 
 	votes := bag.Of(block.ID())
-	require.NoError(sm.RecordPoll(context.Background(), votes))
+	require.NoError(sm.RecordPoll(t.Context(), votes))
 	require.Equal(block.ID(), sm.Preference())
 	require.Equal(1, sm.NumProcessing())
 	require.Equal(snowtest.Undecided, block.Status)
 
-	require.NoError(sm.RecordPoll(context.Background(), votes))
+	require.NoError(sm.RecordPoll(t.Context(), votes))
 	require.Equal(block.ID(), sm.Preference())
 	require.Zero(sm.NumProcessing())
 	require.Equal(snowtest.Accepted, block.Status)
@@ -479,13 +478,13 @@ func RecordPollAcceptAndRejectTest(t *testing.T, factory Factory) {
 
 	votes := bag.Of(firstBlock.ID())
 
-	require.NoError(sm.RecordPoll(context.Background(), votes))
+	require.NoError(sm.RecordPoll(t.Context(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
 	require.Equal(2, sm.NumProcessing())
 	require.Equal(snowtest.Undecided, firstBlock.Status)
 	require.Equal(snowtest.Undecided, secondBlock.Status)
 
-	require.NoError(sm.RecordPoll(context.Background(), votes))
+	require.NoError(sm.RecordPoll(t.Context(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
 	require.Zero(sm.NumProcessing())
 	require.Equal(snowtest.Accepted, firstBlock.Status)
@@ -532,7 +531,7 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	votes := bag.Of(firstBlock.ID(), secondBlock.ID())
 
 	// The first poll will accept shared bits
-	require.NoError(sm.RecordPoll(context.Background(), votes))
+	require.NoError(sm.RecordPoll(t.Context(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
 	require.Equal(2, sm.NumProcessing())
 
@@ -541,7 +540,7 @@ func RecordPollSplitVoteNoChangeTest(t *testing.T, factory Factory) {
 	require.Equal(float64(1), metrics["polls_successful"])
 
 	// The second poll will do nothing
-	require.NoError(sm.RecordPoll(context.Background(), votes))
+	require.NoError(sm.RecordPoll(t.Context(), votes))
 	require.Equal(firstBlock.ID(), sm.Preference())
 	require.Equal(2, sm.NumProcessing())
 
@@ -576,7 +575,7 @@ func RecordPollWhenFinalizedTest(t *testing.T, factory Factory) {
 	))
 
 	votes := bag.Of(snowmantest.GenesisID)
-	require.NoError(sm.RecordPoll(context.Background(), votes))
+	require.NoError(sm.RecordPoll(t.Context(), votes))
 	require.Zero(sm.NumProcessing())
 	require.Equal(snowmantest.GenesisID, sm.Preference())
 }
@@ -623,7 +622,7 @@ func RecordPollRejectTransitivelyTest(t *testing.T, factory Factory) {
 	// Tail = 0
 
 	votes := bag.Of(block0.ID())
-	require.NoError(sm.RecordPoll(context.Background(), votes))
+	require.NoError(sm.RecordPoll(t.Context(), votes))
 
 	// Current graph structure:
 	// 0
@@ -679,25 +678,25 @@ func RecordPollTransitivelyResetConfidenceTest(t *testing.T, factory Factory) {
 	//   2   3
 
 	votesFor2 := bag.Of(block2.ID())
-	require.NoError(sm.RecordPoll(context.Background(), votesFor2))
+	require.NoError(sm.RecordPoll(t.Context(), votesFor2))
 	require.Equal(4, sm.NumProcessing())
 	require.Equal(block2.ID(), sm.Preference())
 
 	emptyVotes := bag.Bag[ids.ID]{}
-	require.NoError(sm.RecordPoll(context.Background(), emptyVotes))
+	require.NoError(sm.RecordPoll(t.Context(), emptyVotes))
 	require.Equal(4, sm.NumProcessing())
 	require.Equal(block2.ID(), sm.Preference())
 
-	require.NoError(sm.RecordPoll(context.Background(), votesFor2))
+	require.NoError(sm.RecordPoll(t.Context(), votesFor2))
 	require.Equal(4, sm.NumProcessing())
 	require.Equal(block2.ID(), sm.Preference())
 
 	votesFor3 := bag.Of(block3.ID())
-	require.NoError(sm.RecordPoll(context.Background(), votesFor3))
+	require.NoError(sm.RecordPoll(t.Context(), votesFor3))
 	require.Equal(2, sm.NumProcessing())
 	require.Equal(block3.ID(), sm.Preference())
 
-	require.NoError(sm.RecordPoll(context.Background(), votesFor3))
+	require.NoError(sm.RecordPoll(t.Context(), votesFor3))
 	require.Zero(sm.NumProcessing())
 	require.Equal(block3.ID(), sm.Preference())
 	require.Equal(snowtest.Rejected, block0.Status)
@@ -737,11 +736,11 @@ func RecordPollInvalidVoteTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Add(block))
 
 	validVotes := bag.Of(block.ID())
-	require.NoError(sm.RecordPoll(context.Background(), validVotes))
+	require.NoError(sm.RecordPoll(t.Context(), validVotes))
 
 	invalidVotes := bag.Of(unknownBlockID)
-	require.NoError(sm.RecordPoll(context.Background(), invalidVotes))
-	require.NoError(sm.RecordPoll(context.Background(), validVotes))
+	require.NoError(sm.RecordPoll(t.Context(), invalidVotes))
+	require.NoError(sm.RecordPoll(t.Context(), validVotes))
 	require.Equal(1, sm.NumProcessing())
 	require.Equal(block.ID(), sm.Preference())
 }
@@ -794,7 +793,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	// Tail = 2
 
 	votes0_2_4 := bag.Of(block0.ID(), block2.ID(), block4.ID())
-	require.NoError(sm.RecordPoll(context.Background(), votes0_2_4))
+	require.NoError(sm.RecordPoll(t.Context(), votes0_2_4))
 
 	// Current graph structure:
 	//   0
@@ -813,7 +812,7 @@ func RecordPollTransitiveVotingTest(t *testing.T, factory Factory) {
 	require.Equal(snowtest.Undecided, block4.Status)
 
 	dep2_2_2 := bag.Of(block2.ID(), block2.ID(), block2.ID())
-	require.NoError(sm.RecordPoll(context.Background(), dep2_2_2))
+	require.NoError(sm.RecordPoll(t.Context(), dep2_2_2))
 
 	// Current graph structure:
 	//   2
@@ -886,7 +885,7 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	// the following bits have been decided to follow the 254 remaining bits of
 	// [block0].
 	votes0 := bag.Of(block0.ID())
-	require.NoError(sm.RecordPoll(context.Background(), votes0))
+	require.NoError(sm.RecordPoll(t.Context(), votes0))
 
 	// Although we are adding in [block2] here - the underlying snowball
 	// instance has already decided it is rejected. Snowman doesn't actually
@@ -921,7 +920,7 @@ func RecordPollDivergedVotingWithNoConflictingBitTest(t *testing.T, factory Fact
 	// only be marked as accepted after [block2] is marked as accepted; which
 	// will never happen.
 	votes3 := bag.Of(block3.ID())
-	require.NoError(sm.RecordPoll(context.Background(), votes3))
+	require.NoError(sm.RecordPoll(t.Context(), votes3))
 
 	require.Equal(4, sm.NumProcessing())
 	require.Equal(snowtest.Undecided, block0.Status)
@@ -981,7 +980,7 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	require.Equal(a2Block.ID(), pref)
 
 	b2Votes := bag.Of(b2Block.ID())
-	require.NoError(sm.RecordPoll(context.Background(), b2Votes))
+	require.NoError(sm.RecordPoll(t.Context(), b2Votes))
 
 	require.Equal(b2Block.ID(), sm.Preference())
 	require.False(sm.IsPreferred(a1Block.ID()))
@@ -998,8 +997,8 @@ func RecordPollChangePreferredChainTest(t *testing.T, factory Factory) {
 	require.Equal(b2Block.ID(), pref)
 
 	a1Votes := bag.Of(a1Block.ID())
-	require.NoError(sm.RecordPoll(context.Background(), a1Votes))
-	require.NoError(sm.RecordPoll(context.Background(), a1Votes))
+	require.NoError(sm.RecordPoll(t.Context(), a1Votes))
+	require.NoError(sm.RecordPoll(t.Context(), a1Votes))
 
 	require.Equal(a2Block.ID(), sm.Preference())
 	require.True(sm.IsPreferred(a1Block.ID()))
@@ -1058,31 +1057,31 @@ func LastAcceptedTest(t *testing.T, factory Factory) {
 	require.Equal(snowmantest.GenesisID, lastAcceptedID)
 	require.Equal(snowmantest.GenesisHeight, lastAcceptedHeight)
 
-	require.NoError(sm.RecordPoll(context.Background(), bag.Of(block0.IDV)))
+	require.NoError(sm.RecordPoll(t.Context(), bag.Of(block0.IDV)))
 
 	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
 	require.Equal(snowmantest.GenesisID, lastAcceptedID)
 	require.Equal(snowmantest.GenesisHeight, lastAcceptedHeight)
 
-	require.NoError(sm.RecordPoll(context.Background(), bag.Of(block1.IDV)))
+	require.NoError(sm.RecordPoll(t.Context(), bag.Of(block1.IDV)))
 
 	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
 	require.Equal(block0.IDV, lastAcceptedID)
 	require.Equal(block0.HeightV, lastAcceptedHeight)
 
-	require.NoError(sm.RecordPoll(context.Background(), bag.Of(block1.IDV)))
+	require.NoError(sm.RecordPoll(t.Context(), bag.Of(block1.IDV)))
 
 	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
 	require.Equal(block1.IDV, lastAcceptedID)
 	require.Equal(block1.HeightV, lastAcceptedHeight)
 
-	require.NoError(sm.RecordPoll(context.Background(), bag.Of(block2.IDV)))
+	require.NoError(sm.RecordPoll(t.Context(), bag.Of(block2.IDV)))
 
 	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
 	require.Equal(block1.IDV, lastAcceptedID)
 	require.Equal(block1.HeightV, lastAcceptedHeight)
 
-	require.NoError(sm.RecordPoll(context.Background(), bag.Of(block2.IDV)))
+	require.NoError(sm.RecordPoll(t.Context(), bag.Of(block2.IDV)))
 
 	lastAcceptedID, lastAcceptedHeight = sm.LastAccepted()
 	require.Equal(block2.IDV, lastAcceptedID)
@@ -1223,7 +1222,7 @@ func ErrorOnAcceptTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Add(block))
 
 	votes := bag.Of(block.ID())
-	err := sm.RecordPoll(context.Background(), votes)
+	err := sm.RecordPoll(t.Context(), votes)
 	require.ErrorIs(err, errTest)
 }
 
@@ -1261,7 +1260,7 @@ func ErrorOnRejectSiblingTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Add(block1))
 
 	votes := bag.Of(block0.ID())
-	err := sm.RecordPoll(context.Background(), votes)
+	err := sm.RecordPoll(t.Context(), votes)
 	require.ErrorIs(err, errTest)
 }
 
@@ -1301,7 +1300,7 @@ func ErrorOnTransitiveRejectionTest(t *testing.T, factory Factory) {
 	require.NoError(sm.Add(block2))
 
 	votes := bag.Of(block0.ID())
-	err := sm.RecordPoll(context.Background(), votes)
+	err := sm.RecordPoll(t.Context(), votes)
 	require.ErrorIs(err, errTest)
 }
 
@@ -1420,7 +1419,7 @@ func RecordPollWithDefaultParameters(t *testing.T, factory Factory) {
 	for i := 0; i < params.Beta; i++ {
 		// should not finalize with less than beta rounds
 		require.Equal(2, sm.NumProcessing())
-		require.NoError(sm.RecordPoll(context.Background(), votes))
+		require.NoError(sm.RecordPoll(t.Context(), votes))
 	}
 	require.Zero(sm.NumProcessing())
 }
@@ -1464,7 +1463,7 @@ func RecordPollRegressionCalculateInDegreeIndegreeCalculation(t *testing.T, fact
 	votes := bag.Bag[ids.ID]{}
 	votes.AddCount(blk2.ID(), 1)
 	votes.AddCount(blk3.ID(), 2)
-	require.NoError(sm.RecordPoll(context.Background(), votes))
+	require.NoError(sm.RecordPoll(t.Context(), votes))
 	require.Equal(snowtest.Accepted, blk1.Status)
 	require.Equal(snowtest.Accepted, blk2.Status)
 	require.Equal(snowtest.Accepted, blk3.Status)

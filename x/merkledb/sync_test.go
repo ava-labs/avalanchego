@@ -34,13 +34,13 @@ func Test_Creation(t *testing.T) {
 	require := require.New(t)
 
 	db, err := New(
-		context.Background(),
+		t.Context(),
 		memdb.New(),
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	syncer, err := xsync.NewManager(
 		db,
 		xsync.ManagerConfig[*RangeProof, *ChangeProof]{
@@ -55,8 +55,8 @@ func Test_Creation(t *testing.T) {
 	)
 	require.NoError(err)
 	require.NotNil(syncer)
-	require.NoError(syncer.Start(context.Background()))
-	require.NoError(syncer.Wait(context.Background()))
+	require.NoError(syncer.Start(t.Context()))
+	require.NoError(syncer.Wait(t.Context()))
 }
 
 // Tests that we are able to sync to the correct root while the server is
@@ -79,7 +79,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = append(response.KeyChanges, KeyChange{})
 				})
 
-				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
+				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -89,7 +89,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
 
-				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
+				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -115,7 +115,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					}
 				})
 
-				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
+				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -126,7 +126,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
 
-				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
+				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -137,7 +137,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.EndProof = nil
 				})
 
-				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
+				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -147,7 +147,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.EndProof = nil
 				})
 
-				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
+				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -159,13 +159,13 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = nil
 				})
 
-				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
+				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "range proof server flake",
 			rangeProofClient: func(db MerkleDB) *p2p.Client {
-				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, &flakyHandler{
+				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
 					Handler: xsync.NewGetRangeProofHandler(db, rangeProofMarshaler),
 					c:       &counter{m: 2},
 				})
@@ -178,7 +178,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = append(response.KeyChanges, make([]KeyChange, xsync.DefaultRequestKeyLimit)...)
 				})
 
-				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
+				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -188,7 +188,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.KeyChanges = response.KeyChanges[min(1, len(response.KeyChanges)):]
 				})
 
-				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
+				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -199,7 +199,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
 
-				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
+				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
@@ -210,13 +210,13 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 					response.EndProof = nil
 				})
 
-				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, handler)
+				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, handler)
 			},
 		},
 		{
 			name: "change proof flaky server",
 			changeProofClient: func(db MerkleDB) *p2p.Client {
-				return p2ptest.NewSelfClient(t, context.Background(), ids.EmptyNodeID, &flakyHandler{
+				return p2ptest.NewSelfClient(t, t.Context(), ids.EmptyNodeID, &flakyHandler{
 					Handler: xsync.NewGetChangeProofHandler(db, rangeProofMarshaler, changeProofMarshaler),
 					c:       &counter{m: 2},
 				})
@@ -228,7 +228,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			ctx := context.Background()
+			ctx := t.Context()
 			dbToSync, err := generateTrie(t, r, 3*xsync.MaxKeyValuesLimit)
 			require.NoError(err)
 
@@ -306,10 +306,10 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			require.NoError(syncer.Wait(ctx))
 
 			// We should have the same resulting root as the server
-			wantRoot, err := dbToSync.GetMerkleRoot(context.Background())
+			wantRoot, err := dbToSync.GetMerkleRoot(t.Context())
 			require.NoError(err)
 
-			gotRoot, err := db.GetMerkleRoot(context.Background())
+			gotRoot, err := db.GetMerkleRoot(t.Context())
 			require.NoError(err)
 			require.Equal(wantRoot, gotRoot)
 		})
@@ -324,17 +324,17 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	r := rand.New(rand.NewSource(now)) // #nosec G404
 	dbToSync, err := generateTrie(t, r, 3*xsync.MaxKeyValuesLimit)
 	require.NoError(err)
-	syncRoot, err := dbToSync.GetMerkleRoot(context.Background())
+	syncRoot, err := dbToSync.GetMerkleRoot(t.Context())
 	require.NoError(err)
 
 	db, err := New(
-		context.Background(),
+		t.Context(),
 		memdb.New(),
 		newDefaultDBConfig(),
 	)
 	require.NoError(err)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	syncer, err := xsync.NewManager(
 		db,
 		xsync.ManagerConfig[*RangeProof, *ChangeProof]{
@@ -376,11 +376,11 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(newSyncer)
 
-	require.NoError(newSyncer.Start(context.Background()))
+	require.NoError(newSyncer.Start(t.Context()))
 	require.NoError(newSyncer.Error())
-	require.NoError(newSyncer.Wait(context.Background()))
+	require.NoError(newSyncer.Wait(t.Context()))
 
-	newRoot, err := db.GetMerkleRoot(context.Background())
+	newRoot, err := db.GetMerkleRoot(t.Context())
 	require.NoError(err)
 	require.Equal(syncRoot, newRoot)
 }
@@ -397,7 +397,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 	dbToSync, err := generateTrie(t, r, 3*xsync.MaxKeyValuesLimit)
 	require.NoError(err)
 
-	firstSyncRoot, err := dbToSync.GetMerkleRoot(context.Background())
+	firstSyncRoot, err := dbToSync.GetMerkleRoot(t.Context())
 	require.NoError(err)
 
 	for x := 0; x < 100; x++ {
@@ -423,11 +423,11 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		it.Release()
 	}
 
-	secondSyncRoot, err := dbToSync.GetMerkleRoot(context.Background())
+	secondSyncRoot, err := dbToSync.GetMerkleRoot(t.Context())
 	require.NoError(err)
 
 	db, err := New(
-		context.Background(),
+		t.Context(),
 		memdb.New(),
 		newDefaultDBConfig(),
 	)
@@ -435,7 +435,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 	actionHandler := &p2p.TestHandler{}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	syncer, err := xsync.NewManager(
 		db,
 		xsync.ManagerConfig[*RangeProof, *ChangeProof]{
@@ -469,18 +469,18 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 		return rangeProofHandler.AppRequest(ctx, nodeID, deadline, requestBytes)
 	}
 
-	require.NoError(syncer.Start(context.Background()))
-	require.NoError(syncer.Wait(context.Background()))
+	require.NoError(syncer.Start(t.Context()))
+	require.NoError(syncer.Wait(t.Context()))
 	require.NoError(syncer.Error())
 
-	newRoot, err := db.GetMerkleRoot(context.Background())
+	newRoot, err := db.GetMerkleRoot(t.Context())
 	require.NoError(err)
 	require.Equal(secondSyncRoot, newRoot)
 }
 
 func Test_Sync_UpdateSyncTarget(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
@@ -541,7 +541,7 @@ func generateTrieWithMinKeyLen(t *testing.T, r *rand.Rand, count int, minKeyLen 
 	require := require.New(t)
 
 	db, err := New(
-		context.Background(),
+		t.Context(),
 		memdb.New(),
 		newDefaultDBConfig(),
 	)

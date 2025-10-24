@@ -15,7 +15,7 @@ func TestRenameIfExists(t *testing.T) {
 
 	t.Parallel()
 
-	f, err := os.CreateTemp(os.TempDir(), "test-rename")
+	f, err := os.CreateTemp(t.TempDir(), "test-rename")
 	require.NoError(err)
 
 	a := f.Name()

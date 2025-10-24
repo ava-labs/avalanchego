@@ -5,7 +5,6 @@ package merkledb
 
 import (
 	"bytes"
-	"context"
 	"math/rand"
 	"slices"
 	"testing"
@@ -33,7 +32,7 @@ func Test_View_Iterator(t *testing.T) {
 	require.NoError(db.Put(key1, value1))
 	require.NoError(db.Put(key2, value2))
 
-	view, err := db.NewView(context.Background(), ViewChanges{})
+	view, err := db.NewView(t.Context(), ViewChanges{})
 	require.NoError(err)
 	iterator := view.NewIterator()
 	require.NotNil(iterator)
@@ -65,7 +64,7 @@ func Test_View_Iterator_DBClosed(t *testing.T) {
 
 	require.NoError(db.Put(key1, value1))
 
-	view, err := db.NewView(context.Background(), ViewChanges{})
+	view, err := db.NewView(t.Context(), ViewChanges{})
 	require.NoError(err)
 	iterator := view.NewIterator()
 	require.NotNil(iterator)
@@ -97,7 +96,7 @@ func Test_View_IteratorStart(t *testing.T) {
 	require.NoError(db.Put(key1, value1))
 	require.NoError(db.Put(key2, value2))
 
-	view, err := db.NewView(context.Background(), ViewChanges{})
+	view, err := db.NewView(t.Context(), ViewChanges{})
 	require.NoError(err)
 	iterator := view.NewIteratorWithStart(key2)
 	require.NotNil(iterator)
@@ -134,7 +133,7 @@ func Test_View_IteratorPrefix(t *testing.T) {
 	require.NoError(db.Put(key2, value2))
 	require.NoError(db.Put(key3, value3))
 
-	view, err := db.NewView(context.Background(), ViewChanges{})
+	view, err := db.NewView(t.Context(), ViewChanges{})
 	require.NoError(err)
 	iterator := view.NewIteratorWithPrefix([]byte("h"))
 	require.NotNil(iterator)
@@ -171,7 +170,7 @@ func Test_View_IteratorStartPrefix(t *testing.T) {
 	require.NoError(db.Put(key2, value2))
 	require.NoError(db.Put(key3, value3))
 
-	view, err := db.NewView(context.Background(), ViewChanges{})
+	view, err := db.NewView(t.Context(), ViewChanges{})
 	require.NoError(err)
 	iterator := view.NewIteratorWithStartAndPrefix(key1, []byte("h"))
 	require.NotNil(iterator)
@@ -231,7 +230,7 @@ func Test_View_Iterator_Random(t *testing.T) {
 		ops = append(ops, database.BatchOp{Key: keyChanges[i].Key, Value: keyChanges[i].Value.Value()})
 	}
 
-	view1, err := db.NewView(context.Background(), ViewChanges{BatchOps: ops})
+	view1, err := db.NewView(t.Context(), ViewChanges{BatchOps: ops})
 	require.NoError(err)
 
 	ops = make([]database.BatchOp, 0, numKeyChanges/4)
@@ -239,7 +238,7 @@ func Test_View_Iterator_Random(t *testing.T) {
 		ops = append(ops, database.BatchOp{Key: keyChanges[i].Key, Value: keyChanges[i].Value.Value()})
 	}
 
-	view2, err := view1.NewView(context.Background(), ViewChanges{BatchOps: ops})
+	view2, err := view1.NewView(t.Context(), ViewChanges{BatchOps: ops})
 	require.NoError(err)
 
 	ops = make([]database.BatchOp, 0, numKeyChanges/4)
@@ -247,7 +246,7 @@ func Test_View_Iterator_Random(t *testing.T) {
 		ops = append(ops, database.BatchOp{Key: keyChanges[i].Key, Value: keyChanges[i].Value.Value()})
 	}
 
-	view3, err := view2.NewView(context.Background(), ViewChanges{BatchOps: ops})
+	view3, err := view2.NewView(t.Context(), ViewChanges{BatchOps: ops})
 	require.NoError(err)
 
 	// Might have introduced duplicates, so only expect the latest value.

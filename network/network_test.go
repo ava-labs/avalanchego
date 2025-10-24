@@ -337,7 +337,7 @@ func TestIngressConnCount(t *testing.T) {
 	for _, net := range networks {
 		connCount := net.IngressConnCount()
 		ingressConnCount.Add(connCount)
-		_, err := net.HealthCheck(context.Background())
+		_, err := net.HealthCheck(t.Context())
 		if connCount == 0 {
 			require.ErrorContains(err, ErrNoIngressConnections.Error()) //nolint
 		} else {

@@ -122,7 +122,7 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		InboundMessage: message.InboundGetAcceptedFrontier(chainID, reqID, 0*time.Second, nodeID),
 		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
-	handler.Push(context.Background(), msg)
+	handler.Push(t.Context(), msg)
 
 	currentTime := time.Now().Add(time.Second)
 	handler.clock.Set(currentTime)
@@ -132,13 +132,13 @@ func TestHandlerDropsTimedOutMessages(t *testing.T) {
 		InboundMessage: message.InboundGetAccepted(chainID, reqID, 1*time.Second, nil, nodeID),
 		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
-	handler.Push(context.Background(), msg)
+	handler.Push(t.Context(), msg)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
 
-	handler.Start(context.Background(), false)
+	handler.Start(t.Context(), false)
 
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -240,7 +240,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		return nil
 	}
 
-	handler.Start(context.Background(), false)
+	handler.Start(t.Context(), false)
 
 	nodeID := ids.EmptyNodeID
 	reqID := uint32(1)
@@ -249,7 +249,7 @@ func TestHandlerClosesOnError(t *testing.T) {
 		InboundMessage: message.InboundGetAcceptedFrontier(ids.Empty, reqID, deadline, nodeID),
 		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
-	handler.Push(context.Background(), msg)
+	handler.Push(t.Context(), msg)
 
 	ticker := time.NewTicker(time.Second)
 	select {
@@ -333,7 +333,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		return nil
 	}
 
-	handler.Start(context.Background(), false)
+	handler.Start(t.Context(), false)
 
 	nodeID := ids.EmptyNodeID
 	chainID := ids.Empty
@@ -342,7 +342,7 @@ func TestHandlerDropsGossipDuringBootstrapping(t *testing.T) {
 		InboundMessage: message.InternalGetFailed(nodeID, chainID, reqID),
 		EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 	}
-	handler.Push(context.Background(), inInboundMessage)
+	handler.Push(t.Context(), inInboundMessage)
 
 	ticker := time.NewTicker(time.Second)
 	select {
@@ -436,7 +436,7 @@ func TestHandlerDispatchInternal(t *testing.T) {
 		return nil
 	}
 
-	handler.Start(context.Background(), false)
+	handler.Start(t.Context(), false)
 	messages <- common.PendingTxs
 	select {
 	case msg := <-notified:
@@ -612,8 +612,8 @@ func TestDynamicEngineTypeDispatch(t *testing.T) {
 				return nil
 			}
 
-			handler.Start(context.Background(), false)
-			handler.Push(context.Background(), Message{
+			handler.Start(t.Context(), false)
+			handler.Push(t.Context(), Message{
 				InboundMessage: message.InboundChits(
 					ids.Empty,
 					uint32(0),
@@ -677,9 +677,9 @@ func TestHandlerStartError(t *testing.T) {
 		Type:  p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 		State: snow.Initializing,
 	})
-	handler.Start(context.Background(), false)
+	handler.Start(t.Context(), false)
 
-	_, err = handler.AwaitStopped(context.Background())
+	_, err = handler.AwaitStopped(t.Context())
 	require.NoError(err)
 }
 

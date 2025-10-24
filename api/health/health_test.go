@@ -125,7 +125,7 @@ func TestPassingChecks(t *testing.T) {
 	require.NoError(h.RegisterHealthCheck("check", check))
 	require.NoError(h.RegisterLivenessCheck("check", check))
 
-	h.Start(context.Background(), checkFreq)
+	h.Start(t.Context(), checkFreq)
 	defer h.Stop()
 
 	{
@@ -189,7 +189,7 @@ func TestPassingThenFailingChecks(t *testing.T) {
 	require.NoError(h.RegisterHealthCheck("check", check))
 	require.NoError(h.RegisterLivenessCheck("check", check))
 
-	h.Start(context.Background(), checkFreq)
+	h.Start(t.Context(), checkFreq)
 	defer h.Stop()
 
 	awaitReadiness(t, h, true)
@@ -240,7 +240,7 @@ func TestDeadlockRegression(t *testing.T) {
 		return "", nil
 	})
 
-	h.Start(context.Background(), time.Nanosecond)
+	h.Start(t.Context(), time.Nanosecond)
 	defer h.Stop()
 
 	for i := 0; i < 100; i++ {
@@ -307,7 +307,7 @@ func TestTags(t *testing.T) {
 		require.False(health)
 	}
 
-	h.Start(context.Background(), checkFreq)
+	h.Start(t.Context(), checkFreq)
 
 	awaitHealthy(t, h, true)
 

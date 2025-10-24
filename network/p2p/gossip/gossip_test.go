@@ -26,7 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-func TestGossiperShutdown(*testing.T) {
+func TestGossiperShutdown(t *testing.T) {
 	gossiper := NewPullGossiper[*testTx](
 		logging.NoLog{},
 		nil,
@@ -35,7 +35,7 @@ func TestGossiperShutdown(*testing.T) {
 		Metrics{},
 		0,
 	)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
@@ -108,7 +108,7 @@ func TestGossiperGossip(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			responseSender := &enginetest.SenderStub{
 				SentAppResponse: make(chan []byte, 1),
@@ -163,7 +163,7 @@ func TestGossiperGossip(t *testing.T) {
 				peers,
 			)
 			require.NoError(err)
-			require.NoError(requestNetwork.Connected(context.Background(), ids.EmptyNodeID, nil))
+			require.NoError(requestNetwork.Connected(t.Context(), ids.EmptyNodeID, nil))
 
 			bloom, err := NewBloomFilter(prometheus.NewRegistry(), "", 1000, 0.01, 0.05)
 			require.NoError(err)
@@ -213,8 +213,8 @@ func TestGossiperGossip(t *testing.T) {
 	}
 }
 
-func TestEvery(*testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+func TestEvery(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
 	calls := 0
 	gossiper := &TestGossiper{
 		GossipF: func(context.Context) error {
@@ -254,12 +254,12 @@ func TestValidatorGossiper(t *testing.T) {
 	}
 
 	// we are a validator, so we should request gossip
-	require.NoError(gossiper.Gossip(context.Background()))
+	require.NoError(gossiper.Gossip(t.Context()))
 	require.Equal(1, calls)
 
 	// we are not a validator, so we should not request gossip
 	validators.validators = set.Set[ids.NodeID]{}
-	require.NoError(gossiper.Gossip(context.Background()))
+	require.NoError(gossiper.Gossip(t.Context()))
 	require.Equal(1, calls)
 }
 
@@ -536,7 +536,7 @@ func TestPushGossiper(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			sender := &enginetest.SenderStub{
 				SentAppGossip: make(chan []byte, 2),

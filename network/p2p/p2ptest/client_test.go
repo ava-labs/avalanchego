@@ -18,7 +18,7 @@ import (
 
 func TestClient_AppGossip(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	appGossipChan := make(chan struct{})
 	testHandler := p2p.TestHandler{
@@ -84,7 +84,7 @@ func TestClient_AppRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			appRequestChan := make(chan struct{})
 			testHandler := p2p.TestHandler{

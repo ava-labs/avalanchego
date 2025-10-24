@@ -206,7 +206,7 @@ func TestValidatorsSample(t *testing.T) {
 			)
 			require.NoError(err)
 
-			ctx := context.Background()
+			ctx := t.Context()
 			require.NoError(network.Connected(ctx, nodeID1, nil))
 			require.NoError(network.Connected(ctx, nodeID2, nil))
 
@@ -361,7 +361,7 @@ func TestValidatorsTop(t *testing.T) {
 			)
 			require.NoError(err)
 
-			ctx := context.Background()
+			ctx := t.Context()
 			require.NoError(network.Connected(ctx, nodeID1, nil))
 			require.NoError(network.Connected(ctx, nodeID2, nil))
 
@@ -391,5 +391,5 @@ func TestValidatorsLock(t *testing.T) {
 	mockValidators.EXPECT().GetValidatorSet(gomock.Any(), uint64(1), subnetID).Return(nil, nil)
 
 	v = NewValidators(logging.NoLog{}, subnetID, mockValidators, time.Second)
-	_ = v.Len(context.Background())
+	_ = v.Len(t.Context())
 }

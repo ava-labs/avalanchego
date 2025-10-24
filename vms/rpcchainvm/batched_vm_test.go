@@ -4,7 +4,6 @@
 package rpcchainvm
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -77,21 +76,21 @@ func TestBatchedParseBlockCaching(t *testing.T) {
 
 	// Create and start the plugin
 	vm := buildClientHelper(require, testKey)
-	defer vm.runtime.Stop(context.Background())
+	defer vm.runtime.Stop(t.Context())
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
 
-	require.NoError(vm.Initialize(context.Background(), ctx, memdb.New(), nil, nil, nil, nil, nil))
+	require.NoError(vm.Initialize(t.Context(), ctx, memdb.New(), nil, nil, nil, nil, nil))
 
 	// Call should parse the first block
-	blk, err := vm.ParseBlock(context.Background(), blkBytes1)
+	blk, err := vm.ParseBlock(t.Context(), blkBytes1)
 	require.NoError(err)
 	require.Equal(blkID1, blk.ID())
 
 	require.IsType(&chain.BlockWrapper{}, blk)
 
 	// Call should cache the first block and parse the second block
-	blks, err := vm.BatchedParseBlock(context.Background(), [][]byte{blkBytes1, blkBytes2})
+	blks, err := vm.BatchedParseBlock(t.Context(), [][]byte{blkBytes1, blkBytes2})
 	require.NoError(err)
 	require.Len(blks, 2)
 	require.Equal(blkID1, blks[0].ID())
@@ -101,7 +100,7 @@ func TestBatchedParseBlockCaching(t *testing.T) {
 	require.IsType(&chain.BlockWrapper{}, blks[1])
 
 	// Call should be fully cached and not result in a grpc call
-	blks, err = vm.BatchedParseBlock(context.Background(), [][]byte{blkBytes1, blkBytes2})
+	blks, err = vm.BatchedParseBlock(t.Context(), [][]byte{blkBytes1, blkBytes2})
 	require.NoError(err)
 	require.Len(blks, 2)
 	require.Equal(blkID1, blks[0].ID())

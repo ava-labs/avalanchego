@@ -48,12 +48,12 @@ func newSchedulerWithJob[T comparable](
 	abandoned []T,
 ) *Scheduler[T] {
 	s := NewScheduler[T]()
-	require.NoError(t, s.Schedule(context.Background(), job, dependencies...))
+	require.NoError(t, s.Schedule(t.Context(), job, dependencies...))
 	for _, d := range fulfilled {
-		require.NoError(t, s.Fulfill(context.Background(), d))
+		require.NoError(t, s.Fulfill(t.Context(), d))
 	}
 	for _, d := range abandoned {
-		require.NoError(t, s.Abandon(context.Background(), d))
+		require.NoError(t, s.Abandon(t.Context(), d))
 	}
 	return s
 }
@@ -155,7 +155,7 @@ func TestScheduler_Schedule(t *testing.T) {
 			// Reset the variable between tests
 			userJob.reset()
 
-			require.NoError(test.scheduler.Schedule(context.Background(), userJob, test.dependencies...))
+			require.NoError(test.scheduler.Schedule(t.Context(), userJob, test.dependencies...))
 			require.Equal(test.expectedNumDependencies, test.scheduler.NumDependencies())
 			require.Equal(test.expectedExecuted, userJob.calledExecute)
 			require.Empty(userJob.fulfilled)
@@ -242,7 +242,7 @@ func TestScheduler_Fulfill(t *testing.T) {
 			// Reset the variable between tests
 			userJob.reset()
 
-			require.NoError(test.scheduler.Fulfill(context.Background(), depToResolve))
+			require.NoError(test.scheduler.Fulfill(t.Context(), depToResolve))
 			require.Equal(test.expectedExecuted, userJob.calledExecute)
 			require.Equal(test.expectedFulfilled, userJob.fulfilled)
 			require.Equal(test.expectedAbandoned, userJob.abandoned)
@@ -328,7 +328,7 @@ func TestScheduler_Abandon(t *testing.T) {
 			// Reset the variable between tests
 			userJob.reset()
 
-			require.NoError(test.scheduler.Abandon(context.Background(), depToResolve))
+			require.NoError(test.scheduler.Abandon(t.Context(), depToResolve))
 			require.Equal(test.expectedExecuted, userJob.calledExecute)
 			require.Equal(test.expectedFulfilled, userJob.fulfilled)
 			require.Equal(test.expectedAbandoned, userJob.abandoned)

@@ -4,7 +4,6 @@
 package validators
 
 import (
-	"context"
 	"math/rand"
 	"testing"
 	"time"
@@ -87,7 +86,7 @@ func BenchmarkGetValidatorSet(b *testing.B) {
 		require.NoError(addSubnetDelegator(s, subnetID, genesistest.DefaultValidatorStartTime, genesistest.DefaultValidatorEndTime, nodeIDs, currentHeight))
 	}
 
-	ctx := context.Background()
+	ctx := b.Context()
 	height, err := m.GetCurrentHeight(ctx)
 	require.NoError(err)
 	require.Equal(currentHeight, height)

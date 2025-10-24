@@ -5,7 +5,6 @@ package validators_test
 
 import (
 	"bytes"
-	"context"
 	"math"
 	"testing"
 	"time"
@@ -125,7 +124,7 @@ func TestGetValidatorSet_AfterEtna(t *testing.T) {
 		{}, // Subnet staker was removed at height 2
 	}
 	for height, expected := range expectedValidators {
-		actual, err := m.GetValidatorSet(context.Background(), uint64(height), subnetID)
+		actual, err := m.GetValidatorSet(t.Context(), uint64(height), subnetID)
 		require.NoError(err)
 		require.Equal(expected, actual)
 	}
@@ -301,15 +300,15 @@ func TestGetWarpValidatorSets(t *testing.T) {
 		}, // Subnet was removed at height 3
 	}
 	for height, expected := range expectedValidators {
-		actual, err := m.GetWarpValidatorSets(context.Background(), uint64(height))
+		actual, err := m.GetWarpValidatorSets(t.Context(), uint64(height))
 		require.NoError(err)
 		require.Equal(expected, actual)
 
-		actualPrimaryNetwork, err := m.GetWarpValidatorSet(context.Background(), uint64(height), constants.PrimaryNetworkID)
+		actualPrimaryNetwork, err := m.GetWarpValidatorSet(t.Context(), uint64(height), constants.PrimaryNetworkID)
 		require.NoError(err)
 		require.Equal(expected[constants.PrimaryNetworkID], actualPrimaryNetwork)
 
-		actualSubnet, err := m.GetWarpValidatorSet(context.Background(), uint64(height), subnetID)
+		actualSubnet, err := m.GetWarpValidatorSet(t.Context(), uint64(height), subnetID)
 		if err != nil {
 			require.NotContains(expected, subnetID)
 			continue

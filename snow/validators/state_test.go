@@ -96,7 +96,7 @@ func TestCachedState_GetWarpValidatorSets(t *testing.T) {
 			uncached.GetWarpValidatorSetsF = nil
 		}
 
-		got, err := cached.GetWarpValidatorSets(context.Background(), test.height)
+		got, err := cached.GetWarpValidatorSets(t.Context(), test.height)
 		require.ErrorIs(err, test.wantErr)
 		require.Equal(test.want, got)
 		require.Equal(test.expectCached, !cacheMiss)
@@ -148,7 +148,7 @@ func TestCachedState_GetWarpValidatorSet_Inactive(t *testing.T) {
 				cached = NewCachedState(uncached, upgrade.UnscheduledActivationTime)
 			)
 
-			got, err := cached.GetWarpValidatorSet(context.Background(), height, subnetID)
+			got, err := cached.GetWarpValidatorSet(t.Context(), height, subnetID)
 			require.ErrorIs(err, test.wantErr)
 			require.Equal(test.want, got)
 		})
@@ -239,7 +239,7 @@ func TestCachedState_GetWarpValidatorSet_Active(t *testing.T) {
 			uncached.GetWarpValidatorSetsF = nil
 		}
 
-		got, err := cached.GetWarpValidatorSet(context.Background(), test.height, test.subnetID)
+		got, err := cached.GetWarpValidatorSet(t.Context(), test.height, test.subnetID)
 		require.ErrorIs(err, test.wantErr)
 		require.Equal(test.want, got)
 		require.Equal(expectCached, !cacheMiss)
@@ -265,7 +265,7 @@ func BenchmarkCachedState_GetWarpValidatorSet_Active(b *testing.B) {
 			}
 			cached := NewCachedState(uncached, upgrade.InitiallyActiveTime)
 
-			ctx := context.Background()
+			ctx := b.Context()
 			subnetID := ids.GenerateTestID()
 			for b.Loop() {
 				_, err := cached.GetWarpValidatorSet(ctx, 0, subnetID)

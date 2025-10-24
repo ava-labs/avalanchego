@@ -170,6 +170,10 @@ tasks:
     desc: Runs static analysis tests of golang code
     cmd: ./scripts/lint.sh
 
+  lint-fix:
+    desc: Runs automated fixing for failing static analysis of golang code
+    cmd: ./scripts/run_tool.sh golangci-lint run --config .golangci.yml --fix
+
   lint-action:
     desc: Runs actionlint to check sanity of github action configuration
     cmd: ./scripts/actionlint.sh

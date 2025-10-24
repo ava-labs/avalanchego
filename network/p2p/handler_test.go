@@ -73,7 +73,7 @@ func TestValidatorHandlerAppGossip(t *testing.T) {
 				logging.NoLog{},
 			)
 
-			handler.AppGossip(context.Background(), tt.nodeID, []byte("foobar"))
+			handler.AppGossip(t.Context(), tt.nodeID, []byte("foobar"))
 			require.Equal(tt.expected, called)
 		})
 	}
@@ -114,7 +114,7 @@ func TestValidatorHandlerAppRequest(t *testing.T) {
 				logging.NoLog{},
 			)
 
-			_, err := handler.AppRequest(context.Background(), tt.nodeID, time.Time{}, []byte("foobar"))
+			_, err := handler.AppRequest(t.Context(), tt.nodeID, time.Time{}, []byte("foobar"))
 			require.ErrorIs(err, tt.expected)
 		})
 	}
@@ -304,7 +304,7 @@ func TestNewDynamicThrottlerHandler_AppRequest(t *testing.T) {
 
 				for _, r := range tt.requests[i] {
 					_, err := handler.AppRequest(
-						context.Background(),
+						t.Context(),
 						r.nodeID,
 						time.Time{},
 						[]byte("foobar"),

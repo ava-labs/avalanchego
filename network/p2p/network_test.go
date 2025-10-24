@@ -33,7 +33,7 @@ var errFoo = &common.AppError{
 
 func TestMessageRouting(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	wantNodeID := ids.GenerateTestNodeID()
 	wantMsg := []byte("message")
 
@@ -85,7 +85,7 @@ func TestMessageRouting(t *testing.T) {
 // Tests that the Client prefixes messages with the handler prefix
 func TestClientPrefixesMessages(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	sender := enginetest.SenderStub{
 		SentAppRequest: make(chan []byte, 1),
@@ -140,7 +140,7 @@ func TestClientPrefixesMessages(t *testing.T) {
 // Tests that the Client callback is called on a successful response
 func TestAppRequestResponse(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	sender := enginetest.SenderStub{
 		SentAppRequest: make(chan []byte, 1),
@@ -179,7 +179,7 @@ func TestAppRequestResponse(t *testing.T) {
 // Tests that the Client does not provide a cancelled context to the AppSender.
 func TestAppRequestCancelledContext(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	sentMessages := make(chan []byte, 1)
 	sender := &enginetest.Sender{
@@ -226,7 +226,7 @@ func TestAppRequestCancelledContext(t *testing.T) {
 // Tests that the Client callback is given an error if the request fails
 func TestAppRequestFailed(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	sender := enginetest.SenderStub{
 		SentAppRequest: make(chan []byte, 1),
@@ -281,7 +281,7 @@ func TestAppGossipMessageForUnregisteredHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctx := context.Background()
+			ctx := t.Context()
 			handler := &TestHandler{
 				AppGossipF: func(context.Context, ids.NodeID, []byte) {
 					require.Fail("should not be called")
@@ -324,7 +324,7 @@ func TestAppRequestMessageForUnregisteredHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctx := context.Background()
+			ctx := t.Context()
 			handler := &TestHandler{
 				AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
 					require.Fail("should not be called")
@@ -365,7 +365,7 @@ func TestAppRequestMessageForUnregisteredHandler(t *testing.T) {
 // A handler that errors should send an AppError to the requesting peer
 func TestAppError(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	appError := &common.AppError{
 		Code:    123,
 		Message: "foo",
@@ -428,7 +428,7 @@ func TestResponseForUnrequestedRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctx := context.Background()
+			ctx := t.Context()
 			handler := &TestHandler{
 				AppGossipF: func(context.Context, ids.NodeID, []byte) {
 					require.Fail("should not be called")
@@ -460,7 +460,7 @@ func TestResponseForUnrequestedRequest(t *testing.T) {
 // not attempt to issue another request until the previous one has cleared.
 func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	sender := &enginetest.SenderStub{
 		SentAppRequest: make(chan []byte, 1),
@@ -483,7 +483,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 
 	// force the network to use the same requestID
 	network.router.requestID = 1
-	err = client.AppRequest(context.Background(), set.Of(ids.EmptyNodeID), []byte{}, noOpCallback)
+	err = client.AppRequest(t.Context(), set.Of(ids.EmptyNodeID), []byte{}, noOpCallback)
 	require.ErrorIs(err, ErrRequestPending)
 }
 
@@ -564,11 +564,11 @@ func TestPeersSample(t *testing.T) {
 			require.NoError(err)
 
 			for connected := range tt.connected {
-				require.NoError(network.Connected(context.Background(), connected, nil))
+				require.NoError(network.Connected(t.Context(), connected, nil))
 			}
 
 			for disconnected := range tt.disconnected {
-				require.NoError(network.Disconnected(context.Background(), disconnected))
+				require.NoError(network.Disconnected(t.Context(), disconnected))
 			}
 
 			sampleable := set.Set[ids.NodeID]{}
@@ -620,12 +620,12 @@ func TestAppRequestAnyWithPeerSampling(t *testing.T) {
 			)
 			require.NoError(err)
 			for _, peer := range tt.peers {
-				require.NoError(n.Connected(context.Background(), peer, &version.Application{}))
+				require.NoError(n.Connected(t.Context(), peer, &version.Application{}))
 			}
 
 			client := n.NewClient(1, PeerSampler{Peers: peers})
 
-			err = client.AppRequestAny(context.Background(), []byte("foobar"), nil)
+			err = client.AppRequestAny(t.Context(), []byte("foobar"), nil)
 			require.ErrorIs(err, tt.expected)
 			require.Subset(tt.peers, sent.List())
 		})
@@ -700,7 +700,7 @@ func TestAppRequestAnyWithValidatorSampling(t *testing.T) {
 				validators,
 			)
 			require.NoError(err)
-			ctx := context.Background()
+			ctx := t.Context()
 			for _, peer := range tt.peers {
 				require.NoError(network.Connected(ctx, peer, nil))
 			}
@@ -952,32 +952,32 @@ func TestNetworkValidators_ConnectAndDisconnect(t *testing.T) {
 				}
 
 				for _, nodeID := range tt.connectedPeers[i] {
-					require.NoError(n.Connected(context.Background(), nodeID, nil))
+					require.NoError(n.Connected(t.Context(), nodeID, nil))
 				}
 
 				for _, nodeID := range tt.disconnectedPeers[i] {
-					require.NoError(n.Disconnected(context.Background(), nodeID))
+					require.NoError(n.Disconnected(t.Context(), nodeID))
 				}
 
 				require.Equal(
 					len(tt.wantConnectedValidators[i]),
-					validatorSet.Len(context.Background()),
+					validatorSet.Len(t.Context()),
 				)
 
 				for _, nodeID := range tt.wantConnectedValidators[i] {
-					require.True(validatorSet.Has(context.Background(), nodeID))
+					require.True(validatorSet.Has(t.Context(), nodeID))
 				}
 
 				wantDisconnectedValidators := set.Of(nodeIDs...)
 				wantDisconnectedValidators.Difference(set.Of(tt.wantConnectedValidators[i]...))
 
 				for nodeID := range wantDisconnectedValidators {
-					require.False(validatorSet.Has(context.Background(), nodeID))
+					require.False(validatorSet.Has(t.Context(), nodeID))
 				}
 
 				require.Equal(
 					len(tt.wantConnectedValidators[i]),
-					validatorSet.Len(context.Background()),
+					validatorSet.Len(t.Context()),
 				)
 			}
 		})
@@ -996,7 +996,7 @@ func TestPeers_Has(t *testing.T) {
 		peers,
 	)
 	require.NoError(err)
-	require.NoError(network.Connected(context.Background(), ids.EmptyNodeID, nil))
+	require.NoError(network.Connected(t.Context(), ids.EmptyNodeID, nil))
 
 	require.True(peers.Has(ids.EmptyNodeID))
 }

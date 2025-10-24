@@ -4,7 +4,6 @@
 package executor
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -510,7 +509,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 
 	// Verify the block.
 	blk := manager.NewBlock(apricotBlk)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 
 	// Assert expected state.
 	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
@@ -519,7 +518,7 @@ func TestVerifierVisitCommitBlock(t *testing.T) {
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 }
 
 func TestVerifierVisitAbortBlock(t *testing.T) {
@@ -584,7 +583,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 
 	// Verify the block.
 	blk := manager.NewBlock(apricotBlk)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 
 	// Assert expected state.
 	require.Contains(manager.backend.blkIDToState, apricotBlk.ID())
@@ -593,7 +592,7 @@ func TestVerifierVisitAbortBlock(t *testing.T) {
 	require.Equal(timestamp, gotBlkState.timestamp)
 
 	// Visiting again should return nil without using dependencies.
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 }
 
 // Assert that a block with an unverified parent fails verification.

@@ -4,7 +4,6 @@
 package corruptabledb
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -73,7 +72,7 @@ func TestCorruption(t *testing.T) {
 			return corruptableBatch.Write()
 		},
 		"corrupted healthcheck": func(db database.Database) error {
-			_, err := db.HealthCheck(context.Background())
+			_, err := db.HealthCheck(t.Context())
 			return err
 		},
 	}

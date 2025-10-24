@@ -77,7 +77,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
 
 	require.NoError(vm.Initialize(
-		context.Background(),
+		t.Context(),
 		ctx,
 		prefixdb.New([]byte{}, memdb.New()),
 		snowmantest.GenesisBytes,
@@ -86,7 +86,7 @@ func helperBuildStateSyncTestObjects(t *testing.T) (*fullVM, *VM) {
 		nil,
 		nil,
 	))
-	require.NoError(vm.SetState(context.Background(), snow.StateSyncing))
+	require.NoError(vm.SetState(t.Context(), snow.StateSyncing))
 
 	return innerVM, vm
 }
@@ -96,14 +96,14 @@ func TestStateSyncEnabled(t *testing.T) {
 
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	// ProposerVM State Sync disabled if innerVM State sync is disabled
 	innerVM.StateSyncEnabledF = func(context.Context) (bool, error) {
 		return false, nil
 	}
-	enabled, err := vm.StateSyncEnabled(context.Background())
+	enabled, err := vm.StateSyncEnabled(t.Context())
 	require.NoError(err)
 	require.False(enabled)
 
@@ -111,7 +111,7 @@ func TestStateSyncEnabled(t *testing.T) {
 	innerVM.StateSyncEnabledF = func(context.Context) (bool, error) {
 		return true, nil
 	}
-	enabled, err = vm.StateSyncEnabled(context.Background())
+	enabled, err = vm.StateSyncEnabled(t.Context())
 	require.NoError(err)
 	require.True(enabled)
 }
@@ -121,7 +121,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	innerSummary := &blocktest.StateSummary{
@@ -134,7 +134,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 	innerVM.GetOngoingSyncStateSummaryF = func(context.Context) (block.StateSummary, error) {
 		return nil, database.ErrNotFound
 	}
-	summary, err := vm.GetOngoingSyncStateSummary(context.Background())
+	summary, err := vm.GetOngoingSyncStateSummary(t.Context())
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Nil(summary)
 
@@ -144,7 +144,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 	}
 	_, err = vm.GetForkHeight()
 	require.ErrorIs(err, database.ErrNotFound)
-	summary, err = vm.GetOngoingSyncStateSummary(context.Background())
+	summary, err = vm.GetOngoingSyncStateSummary(t.Context())
 	require.NoError(err)
 	require.Equal(innerSummary.ID(), summary.ID())
 	require.Equal(innerSummary.Height(), summary.Height())
@@ -155,7 +155,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 		return innerSummary, nil
 	}
 	require.NoError(vm.SetForkHeight(innerSummary.Height() + 1))
-	summary, err = vm.GetOngoingSyncStateSummary(context.Background())
+	summary, err = vm.GetOngoingSyncStateSummary(t.Context())
 	require.NoError(err)
 	require.Equal(innerSummary.ID(), summary.ID())
 	require.Equal(innerSummary.Height(), summary.Height())
@@ -195,7 +195,7 @@ func TestStateSyncGetOngoingSyncStateSummary(t *testing.T) {
 	}
 	require.NoError(vm.acceptPostForkBlock(proBlk))
 
-	summary, err = vm.GetOngoingSyncStateSummary(context.Background())
+	summary, err = vm.GetOngoingSyncStateSummary(t.Context())
 	require.NoError(err)
 	require.Equal(innerSummary.Height(), summary.Height())
 }
@@ -205,7 +205,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	innerSummary := &blocktest.StateSummary{
@@ -218,7 +218,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 	innerVM.GetLastStateSummaryF = func(context.Context) (block.StateSummary, error) {
 		return nil, database.ErrNotFound
 	}
-	summary, err := vm.GetLastStateSummary(context.Background())
+	summary, err := vm.GetLastStateSummary(t.Context())
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Nil(summary)
 
@@ -228,7 +228,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 	}
 	_, err = vm.GetForkHeight()
 	require.ErrorIs(err, database.ErrNotFound)
-	summary, err = vm.GetLastStateSummary(context.Background())
+	summary, err = vm.GetLastStateSummary(t.Context())
 	require.NoError(err)
 	require.Equal(innerSummary.ID(), summary.ID())
 	require.Equal(innerSummary.Height(), summary.Height())
@@ -239,7 +239,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 		return innerSummary, nil
 	}
 	require.NoError(vm.SetForkHeight(innerSummary.Height() + 1))
-	summary, err = vm.GetLastStateSummary(context.Background())
+	summary, err = vm.GetLastStateSummary(t.Context())
 	require.NoError(err)
 	require.Equal(innerSummary.ID(), summary.ID())
 	require.Equal(innerSummary.Height(), summary.Height())
@@ -279,7 +279,7 @@ func TestStateSyncGetLastStateSummary(t *testing.T) {
 	}
 	require.NoError(vm.acceptPostForkBlock(proBlk))
 
-	summary, err = vm.GetLastStateSummary(context.Background())
+	summary, err = vm.GetLastStateSummary(t.Context())
 	require.NoError(err)
 	require.Equal(innerSummary.Height(), summary.Height())
 }
@@ -289,7 +289,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 	reqHeight := uint64(1969)
 
@@ -303,7 +303,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 	innerVM.GetStateSummaryF = func(context.Context, uint64) (block.StateSummary, error) {
 		return nil, database.ErrNotFound
 	}
-	summary, err := vm.GetStateSummary(context.Background(), reqHeight)
+	summary, err := vm.GetStateSummary(t.Context(), reqHeight)
 	require.ErrorIs(err, database.ErrNotFound)
 	require.Nil(summary)
 
@@ -314,7 +314,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 	}
 	_, err = vm.GetForkHeight()
 	require.ErrorIs(err, database.ErrNotFound)
-	summary, err = vm.GetStateSummary(context.Background(), reqHeight)
+	summary, err = vm.GetStateSummary(t.Context(), reqHeight)
 	require.NoError(err)
 	require.Equal(innerSummary.ID(), summary.ID())
 	require.Equal(innerSummary.Height(), summary.Height())
@@ -326,7 +326,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 		return innerSummary, nil
 	}
 	require.NoError(vm.SetForkHeight(innerSummary.Height() + 1))
-	summary, err = vm.GetStateSummary(context.Background(), reqHeight)
+	summary, err = vm.GetStateSummary(t.Context(), reqHeight)
 	require.NoError(err)
 	require.Equal(innerSummary.ID(), summary.ID())
 	require.Equal(innerSummary.Height(), summary.Height())
@@ -366,7 +366,7 @@ func TestStateSyncGetStateSummary(t *testing.T) {
 	}
 	require.NoError(vm.acceptPostForkBlock(proBlk))
 
-	summary, err = vm.GetStateSummary(context.Background(), reqHeight)
+	summary, err = vm.GetStateSummary(t.Context(), reqHeight)
 	require.NoError(err)
 	require.Equal(innerSummary.Height(), summary.Height())
 }
@@ -375,7 +375,7 @@ func TestParseStateSummary(t *testing.T) {
 	require := require.New(t)
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 	reqHeight := uint64(1969)
 
@@ -395,10 +395,10 @@ func TestParseStateSummary(t *testing.T) {
 
 	// Get a pre fork block than parse it
 	require.NoError(vm.SetForkHeight(innerSummary.Height() + 1))
-	summary, err := vm.GetStateSummary(context.Background(), reqHeight)
+	summary, err := vm.GetStateSummary(t.Context(), reqHeight)
 	require.NoError(err)
 
-	parsedSummary, err := vm.ParseStateSummary(context.Background(), summary.Bytes())
+	parsedSummary, err := vm.ParseStateSummary(t.Context(), summary.Bytes())
 	require.NoError(err)
 	require.Equal(summary.ID(), parsedSummary.ID())
 	require.Equal(summary.Height(), parsedSummary.Height())
@@ -438,10 +438,10 @@ func TestParseStateSummary(t *testing.T) {
 	}
 	require.NoError(vm.acceptPostForkBlock(proBlk))
 	require.NoError(vm.SetForkHeight(innerSummary.Height() - 1))
-	summary, err = vm.GetStateSummary(context.Background(), reqHeight)
+	summary, err = vm.GetStateSummary(t.Context(), reqHeight)
 	require.NoError(err)
 
-	parsedSummary, err = vm.ParseStateSummary(context.Background(), summary.Bytes())
+	parsedSummary, err = vm.ParseStateSummary(t.Context(), summary.Bytes())
 	require.NoError(err)
 	require.Equal(summary.ID(), parsedSummary.ID())
 	require.Equal(summary.Height(), parsedSummary.Height())
@@ -453,7 +453,7 @@ func TestStateSummaryAccept(t *testing.T) {
 
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 	reqHeight := uint64(1969)
 
@@ -496,14 +496,14 @@ func TestStateSummaryAccept(t *testing.T) {
 		return innerBlk, nil
 	}
 
-	summary, err := vm.ParseStateSummary(context.Background(), statelessSummary.Bytes())
+	summary, err := vm.ParseStateSummary(t.Context(), statelessSummary.Bytes())
 	require.NoError(err)
 
 	// test Accept accepted
 	innerSummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
 		return block.StateSyncStatic, nil
 	}
-	status, err := summary.Accept(context.Background())
+	status, err := summary.Accept(t.Context())
 	require.NoError(err)
 	require.Equal(block.StateSyncStatic, status)
 
@@ -511,7 +511,7 @@ func TestStateSummaryAccept(t *testing.T) {
 	innerSummary.AcceptF = func(context.Context) (block.StateSyncMode, error) {
 		return block.StateSyncSkipped, nil
 	}
-	status, err = summary.Accept(context.Background())
+	status, err = summary.Accept(t.Context())
 	require.NoError(err)
 	require.Equal(block.StateSyncSkipped, status)
 }
@@ -521,7 +521,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 	reqHeight := uint64(1969)
 
@@ -572,7 +572,7 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 	}
 	require.NoError(vm.acceptPostForkBlock(proBlk))
 
-	summary, err := vm.GetStateSummary(context.Background(), reqHeight)
+	summary, err := vm.GetStateSummary(t.Context(), reqHeight)
 	require.NoError(err)
 	require.Equal(summary.Height(), reqHeight)
 
@@ -588,14 +588,14 @@ func TestStateSummaryAcceptOlderBlock(t *testing.T) {
 		calledInnerAccept = true
 		return block.StateSyncStatic, nil
 	}
-	status, err := summary.Accept(context.Background())
+	status, err := summary.Accept(t.Context())
 	require.NoError(err)
 	require.Equal(block.StateSyncStatic, status)
 	require.True(calledInnerAccept)
 
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(t.Context(), snow.Bootstrapping))
 	require.Equal(summary.Height(), vm.lastAcceptedHeight)
-	lastAcceptedID, err := vm.LastAccepted(context.Background())
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
 	require.NoError(err)
 	require.Equal(proBlk.ID(), lastAcceptedID)
 }
@@ -610,7 +610,7 @@ func TestStateSummaryAcceptOlderBlockSkipStateSync(t *testing.T) {
 
 	innerVM, vm := helperBuildStateSyncTestObjects(t)
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	// store post fork block associated with summary
@@ -714,7 +714,7 @@ func TestStateSummaryAcceptOlderBlockSkipStateSync(t *testing.T) {
 	}
 	require.NoError(vm.acceptPostForkBlock(proBlk2))
 
-	summary, err := vm.GetStateSummary(context.Background(), innerBlk1.Height())
+	summary, err := vm.GetStateSummary(t.Context(), innerBlk1.Height())
 	require.NoError(err)
 	require.Equal(innerBlk1.Height(), summary.Height())
 
@@ -723,14 +723,14 @@ func TestStateSummaryAcceptOlderBlockSkipStateSync(t *testing.T) {
 	// notify the innerVM.
 	// This can result in the ProposerVM and innerVM diverging their last accepted block.
 	// These are re-aligned in SetState before transitioning to consensus.
-	status, err := summary.Accept(context.Background())
+	status, err := summary.Accept(t.Context())
 	require.NoError(err)
 	require.Equal(block.StateSyncSkipped, status)
 	require.True(calledInnerAccept)
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(t.Context(), snow.Bootstrapping))
 
 	require.Equal(innerBlk2.Height(), vm.lastAcceptedHeight)
-	lastAcceptedID, err := vm.LastAccepted(context.Background())
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
 	require.NoError(err)
 	require.Equal(proBlk2.ID(), lastAcceptedID)
 }

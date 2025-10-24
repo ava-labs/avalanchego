@@ -37,7 +37,7 @@ func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
 	}
 
 	// test
-	_, err := proBlk.Options(context.Background())
+	_, err := proBlk.Options(t.Context())
 	require.Equal(snowman.ErrNotOracle, err)
 
 	// setup
@@ -46,7 +46,7 @@ func TestOracle_PreForkBlkImplementsInterface(t *testing.T) {
 	}
 
 	// test
-	_, err = proBlk.Options(context.Background())
+	_, err = proBlk.Options(t.Context())
 	require.NoError(err)
 }
 
@@ -55,7 +55,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 
 	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.NoUpgrades, 0)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	// create pre fork oracle block ...
@@ -87,18 +87,18 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 		}
 	}
 
-	parentBlk, err := proVM.BuildBlock(context.Background())
+	parentBlk, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 
 	// retrieve options ...
 	require.IsType(&preForkBlock{}, parentBlk)
 	preForkOracleBlk := parentBlk.(*preForkBlock)
-	opts, err := preForkOracleBlk.Options(context.Background())
+	opts, err := preForkOracleBlk.Options(t.Context())
 	require.NoError(err)
-	require.NoError(opts[0].Verify(context.Background()))
+	require.NoError(opts[0].Verify(t.Context()))
 
 	// ... show a block can be built on top of an option
-	require.NoError(proVM.SetPreference(context.Background(), opts[0].ID()))
+	require.NoError(proVM.SetPreference(t.Context(), opts[0].ID()))
 
 	lastCoreBlk := &TestOptionsBlock{
 		Block: *snowmantest.BuildChild(preferredTestBlk),
@@ -107,7 +107,7 @@ func TestOracle_PreForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 		return lastCoreBlk, nil
 	}
 
-	preForkChild, err := proVM.BuildBlock(context.Background())
+	preForkChild, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 	require.IsType(&preForkBlock{}, preForkChild)
 }
@@ -118,7 +118,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
 	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	// create pre fork oracle block pre activation time...
@@ -158,18 +158,18 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 		}
 	}
 
-	parentBlk, err := proVM.BuildBlock(context.Background())
+	parentBlk, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 
 	// retrieve options ...
 	require.IsType(&preForkBlock{}, parentBlk)
 	preForkOracleBlk := parentBlk.(*preForkBlock)
-	opts, err := preForkOracleBlk.Options(context.Background())
+	opts, err := preForkOracleBlk.Options(t.Context())
 	require.NoError(err)
-	require.NoError(opts[0].Verify(context.Background()))
+	require.NoError(opts[0].Verify(t.Context()))
 
 	// ... show a block can be built on top of an option
-	require.NoError(proVM.SetPreference(context.Background(), opts[0].ID()))
+	require.NoError(proVM.SetPreference(t.Context(), opts[0].ID()))
 
 	lastCoreBlk := &TestOptionsBlock{
 		Block: *snowmantest.BuildChild(preferredBlk),
@@ -178,7 +178,7 @@ func TestOracle_PostForkBlkCanBuiltOnPreForkOption(t *testing.T) {
 		return lastCoreBlk, nil
 	}
 
-	postForkChild, err := proVM.BuildBlock(context.Background())
+	postForkChild, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 	require.IsType(&postForkBlock{}, postForkChild)
 }
@@ -189,7 +189,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
 	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	// create parent block ...
@@ -218,7 +218,7 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 		}
 	}
 
-	parentBlk, err := proVM.BuildBlock(context.Background())
+	parentBlk, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 
 	// .. create child block ...
@@ -231,14 +231,14 @@ func TestBlockVerify_PreFork_ParentChecks(t *testing.T) {
 	{
 		// child block referring unknown parent does not verify
 		childCoreBlk.ParentV = ids.Empty
-		err = childBlk.Verify(context.Background())
+		err = childBlk.Verify(t.Context())
 		require.ErrorIs(err, database.ErrNotFound)
 	}
 
 	{
 		// child block referring known parent does verify
 		childCoreBlk.ParentV = parentBlk.ID()
-		require.NoError(childBlk.Verify(context.Background()))
+		require.NoError(childBlk.Verify(t.Context()))
 	}
 }
 
@@ -248,7 +248,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
 	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	preActivationTime := activationTime.Add(-1 * time.Second)
@@ -261,11 +261,11 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	}
 
 	// preFork block verifies if parent is before fork activation time
-	preForkChild, err := proVM.BuildBlock(context.Background())
+	preForkChild, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 	require.IsType(&preForkBlock{}, preForkChild)
 
-	require.NoError(preForkChild.Verify(context.Background()))
+	require.NoError(preForkChild.Verify(t.Context()))
 
 	// postFork block does NOT verify if parent is before fork activation time
 	postForkStatelessChild, err := statelessblock.Build(
@@ -288,7 +288,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	}
 
 	require.True(postForkChild.Timestamp().Before(activationTime))
-	err = postForkChild.Verify(context.Background())
+	err = postForkChild.Verify(t.Context())
 	require.ErrorIs(err, errProposersNotActivated)
 
 	// once activation time is crossed postForkBlock are produced
@@ -298,7 +298,7 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 	coreVM.SetPreferenceF = func(context.Context, ids.ID) error {
 		return nil
 	}
-	require.NoError(proVM.SetPreference(context.Background(), preForkChild.ID()))
+	require.NoError(proVM.SetPreference(t.Context(), preForkChild.ID()))
 
 	secondCoreBlk := snowmantest.BuildChild(coreBlk)
 	secondCoreBlk.TimestampV = postActivationTime
@@ -317,13 +317,13 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		}
 	}
 
-	lastPreForkBlk, err := proVM.BuildBlock(context.Background())
+	lastPreForkBlk, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 	require.IsType(&preForkBlock{}, lastPreForkBlk)
 
-	require.NoError(lastPreForkBlk.Verify(context.Background()))
+	require.NoError(lastPreForkBlk.Verify(t.Context()))
 
-	require.NoError(proVM.SetPreference(context.Background(), lastPreForkBlk.ID()))
+	require.NoError(proVM.SetPreference(t.Context(), lastPreForkBlk.ID()))
 	thirdCoreBlk := snowmantest.BuildChild(secondCoreBlk)
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return thirdCoreBlk, nil
@@ -342,11 +342,11 @@ func TestBlockVerify_BlocksBuiltOnPreForkGenesis(t *testing.T) {
 		}
 	}
 
-	firstPostForkBlk, err := proVM.BuildBlock(context.Background())
+	firstPostForkBlk, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 	require.IsType(&postForkBlock{}, firstPostForkBlk)
 
-	require.NoError(firstPostForkBlk.Verify(context.Background()))
+	require.NoError(firstPostForkBlk.Verify(t.Context()))
 }
 
 func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
@@ -356,7 +356,7 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	proVM.Set(activationTime)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	// build parent block after fork activation time ...
@@ -366,18 +366,18 @@ func TestBlockVerify_BlocksBuiltOnPostForkGenesis(t *testing.T) {
 	}
 
 	// postFork block verifies if parent is after fork activation time
-	postForkChild, err := proVM.BuildBlock(context.Background())
+	postForkChild, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 	require.IsType(&postForkBlock{}, postForkChild)
 
-	require.NoError(postForkChild.Verify(context.Background()))
+	require.NoError(postForkChild.Verify(t.Context()))
 
 	// preFork block does NOT verify if parent is after fork activation time
 	preForkChild := preForkBlock{
 		Block: coreBlock,
 		vm:    proVM,
 	}
-	err = preForkChild.Verify(context.Background())
+	err = preForkChild.Verify(t.Context())
 	require.ErrorIs(err, errUnexpectedBlockType)
 }
 
@@ -387,7 +387,7 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 	// setup
 	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.NoUpgrades, 0)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	coreBlk := snowmantest.BuildChild(snowmantest.Genesis)
@@ -415,11 +415,11 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 		}
 	}
 
-	builtBlk, err := proVM.BuildBlock(context.Background())
+	builtBlk, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 
 	// test
-	require.NoError(builtBlk.Accept(context.Background()))
+	require.NoError(builtBlk.Accept(t.Context()))
 
 	coreVM.LastAcceptedF = snowmantest.MakeLastAcceptedBlockF(
 		[]*snowmantest.Block{
@@ -427,7 +427,7 @@ func TestBlockAccept_PreFork_SetsLastAcceptedBlock(t *testing.T) {
 			coreBlk,
 		},
 	)
-	acceptedID, err := proVM.LastAccepted(context.Background())
+	acceptedID, err := proVM.LastAccepted(t.Context())
 	require.NoError(err)
 	require.Equal(builtBlk.ID(), acceptedID)
 }
@@ -438,7 +438,7 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 
 	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.NoUpgrades, 0)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	coreBlk := snowmantest.BuildChild(snowmantest.Genesis)
@@ -446,12 +446,12 @@ func TestBlockReject_PreForkBlock_InnerBlockIsRejected(t *testing.T) {
 		return coreBlk, nil
 	}
 
-	sb, err := proVM.BuildBlock(context.Background())
+	sb, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 	require.IsType(&preForkBlock{}, sb)
 	proBlk := sb.(*preForkBlock)
 
-	require.NoError(proBlk.Reject(context.Background()))
+	require.NoError(proBlk.Reject(t.Context()))
 	require.Equal(snowtest.Rejected, coreBlk.Status)
 }
 
@@ -461,7 +461,7 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
 	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	postActivationTime := activationTime.Add(time.Second)
@@ -506,20 +506,20 @@ func TestBlockVerify_ForkBlockIsOracleBlock(t *testing.T) {
 		}
 	}
 
-	firstBlock, err := proVM.ParseBlock(context.Background(), coreBlk.Bytes())
+	firstBlock, err := proVM.ParseBlock(t.Context(), coreBlk.Bytes())
 	require.NoError(err)
 
-	require.NoError(firstBlock.Verify(context.Background()))
+	require.NoError(firstBlock.Verify(t.Context()))
 
 	oracleBlock, ok := firstBlock.(snowman.OracleBlock)
 	require.True(ok)
 
-	options, err := oracleBlock.Options(context.Background())
+	options, err := oracleBlock.Options(t.Context())
 	require.NoError(err)
 
-	require.NoError(options[0].Verify(context.Background()))
+	require.NoError(options[0].Verify(t.Context()))
 
-	require.NoError(options[1].Verify(context.Background()))
+	require.NoError(options[1].Verify(t.Context()))
 }
 
 func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
@@ -528,7 +528,7 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 	activationTime := snowmantest.GenesisTimestamp.Add(10 * time.Second)
 	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0, activationTime)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	postActivationTime := activationTime.Add(time.Second)
@@ -573,10 +573,10 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 		}
 	}
 
-	firstBlock, err := proVM.ParseBlock(context.Background(), coreBlk.Bytes())
+	firstBlock, err := proVM.ParseBlock(t.Context(), coreBlk.Bytes())
 	require.NoError(err)
 
-	require.NoError(firstBlock.Verify(context.Background()))
+	require.NoError(firstBlock.Verify(t.Context()))
 
 	slb, err := statelessblock.Build(
 		firstBlock.ID(), // refer unknown parent
@@ -590,13 +590,13 @@ func TestBlockVerify_ForkBlockIsOracleBlockButChildrenAreSigned(t *testing.T) {
 	)
 	require.NoError(err)
 
-	invalidChild, err := proVM.ParseBlock(context.Background(), slb.Bytes())
+	invalidChild, err := proVM.ParseBlock(t.Context(), slb.Bytes())
 	if err != nil {
 		// A failure to parse is okay here
 		return
 	}
 
-	err = invalidChild.Verify(context.Background())
+	err = invalidChild.Verify(t.Context())
 	require.ErrorIs(err, errUnexpectedBlockType)
 }
 
@@ -619,7 +619,7 @@ func TestPreForkBlock_BuildBlockWithContext(t *testing.T) {
 	innerVM := blockmock.NewChainVM(ctrl)
 	innerVM.EXPECT().BuildBlock(gomock.Any()).Return(builtBlk, nil).AnyTimes()
 	vdrState := validatorsmock.NewState(ctrl)
-	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
+	vdrState.EXPECT().GetMinimumHeight(t.Context()).Return(pChainHeight, nil).AnyTimes()
 
 	vm := &VM{
 		ChainVM: innerVM,
@@ -635,7 +635,7 @@ func TestPreForkBlock_BuildBlockWithContext(t *testing.T) {
 	}
 
 	// Should call BuildBlock since proposervm won't have a P-chain height
-	gotChild, err := blk.buildChild(context.Background())
+	gotChild, err := blk.buildChild(t.Context())
 	require.NoError(err)
 	require.Equal(builtBlk, gotChild.(*postForkBlock).innerBlk)
 
@@ -643,7 +643,7 @@ func TestPreForkBlock_BuildBlockWithContext(t *testing.T) {
 	innerBlk.EXPECT().Timestamp().Return(time.Time{})
 	vm.Upgrades.ApricotPhase4Time = upgrade.UnscheduledActivationTime
 
-	gotChild, err = blk.buildChild(context.Background())
+	gotChild, err = blk.buildChild(t.Context())
 	require.NoError(err)
 	require.Equal(builtBlk, gotChild.(*preForkBlock).Block)
 }
@@ -653,7 +653,7 @@ func TestPreForkBlock_NonZeroEpoch(t *testing.T) {
 
 	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	firstBlockTime := snowmantest.GenesisTimestamp.Add(time.Second)
@@ -711,6 +711,6 @@ func TestPreForkBlock_NonZeroEpoch(t *testing.T) {
 	}
 
 	// Verify that the child block is rejected due to non-zero epoch
-	err = postForkChild.Verify(context.Background())
+	err = postForkChild.Verify(t.Context())
 	require.ErrorIs(err, errEpochNotZero)
 }
