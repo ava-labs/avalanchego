@@ -60,8 +60,6 @@ func (t testTxVerifier) VerifyTx(*txs.Tx) error {
 }
 
 func TestNetworkIssueTxFromRPC(t *testing.T) {
-	avaxAssetID := ids.GenerateTestID()
-
 	type test struct {
 		name          string
 		mempool       *pmempool.Mempool
@@ -79,7 +77,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 					"",
 					gas.Dimensions{1, 1, 1, 1},
 					1_000_000,
-					avaxAssetID,
+					snowtest.AVAXAssetID,
 					prometheus.NewRegistry(),
 				)
 				require.NoError(t, err)
@@ -89,7 +87,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 							Ins: []*avax.TransferableInput{
 								{
 									Asset: avax.Asset{
-										ID: avaxAssetID,
+										ID: snowtest.AVAXAssetID,
 									},
 									In: &secp256k1fx.TransferInput{
 										Amt: 1,
@@ -110,7 +108,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 						Ins: []*avax.TransferableInput{
 							{
 								Asset: avax.Asset{
-									ID: avaxAssetID,
+									ID: snowtest.AVAXAssetID,
 								},
 								In: &secp256k1fx.TransferInput{
 									Amt: 1,
@@ -129,7 +127,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 					"",
 					gas.Dimensions{1, 1, 1, 1},
 					1_000_000,
-					avaxAssetID,
+					snowtest.AVAXAssetID,
 					prometheus.NewRegistry(),
 				)
 				require.NoError(t, err)
@@ -146,7 +144,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 						Ins: []*avax.TransferableInput{
 							{
 								Asset: avax.Asset{
-									ID: avaxAssetID,
+									ID: snowtest.AVAXAssetID,
 								},
 								In: &secp256k1fx.TransferInput{
 									Amt: 1,
@@ -165,7 +163,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 					"",
 					gas.Dimensions{1, 1, 1, 1},
 					1_000_000,
-					avaxAssetID,
+					snowtest.AVAXAssetID,
 					prometheus.NewRegistry(),
 				)
 				require.NoError(t, err)
@@ -182,7 +180,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 						Ins: []*avax.TransferableInput{
 							{
 								Asset: avax.Asset{
-									ID: avaxAssetID,
+									ID: snowtest.AVAXAssetID,
 								},
 								In: &secp256k1fx.TransferInput{
 									Amt: 1,
@@ -201,7 +199,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 					"",
 					gas.Dimensions{1, 1, 1, 1},
 					1_000_000,
-					avaxAssetID,
+					snowtest.AVAXAssetID,
 					prometheus.NewRegistry(),
 				)
 				require.NoError(t, err)
@@ -212,7 +210,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 							Ins: []*avax.TransferableInput{
 								{
 									Asset: avax.Asset{
-										ID: avaxAssetID,
+										ID: snowtest.AVAXAssetID,
 									},
 									In: &secp256k1fx.TransferInput{
 										Amt: 1,
@@ -237,7 +235,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 							Ins: []*avax.TransferableInput{
 								{
 									Asset: avax.Asset{
-										ID: avaxAssetID,
+										ID: snowtest.AVAXAssetID,
 									},
 									In: &secp256k1fx.TransferInput{
 										Amt: 1,
@@ -259,7 +257,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 					"",
 					gas.Dimensions{1, 1, 1, 1},
 					0,
-					avaxAssetID,
+					snowtest.AVAXAssetID,
 					prometheus.NewRegistry(),
 				)
 				require.NoError(t, err)
@@ -277,7 +275,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 							Ins: []*avax.TransferableInput{
 								{
 									Asset: avax.Asset{
-										ID: avaxAssetID,
+										ID: snowtest.AVAXAssetID,
 									},
 									In: &secp256k1fx.TransferInput{
 										Amt: 1,
@@ -297,7 +295,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 					"",
 					gas.Dimensions{1, 1, 1, 1},
 					1_000_000,
-					avaxAssetID,
+					snowtest.AVAXAssetID,
 					prometheus.NewRegistry(),
 				)
 				require.NoError(t, err)
@@ -314,7 +312,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 						Ins: []*avax.TransferableInput{
 							{
 								Asset: avax.Asset{
-									ID: avaxAssetID,
+									ID: snowtest.AVAXAssetID,
 								},
 								In: &secp256k1fx.TransferInput{
 									Amt: 1,
