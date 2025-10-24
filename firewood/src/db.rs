@@ -113,16 +113,16 @@ pub struct DbConfig {
 
 #[derive(Debug)]
 /// A database instance.
-pub struct Db<RS = NoOpStore> {
+pub struct Db {
     metrics: Arc<DbMetrics>,
-    manager: RevisionManager<RS>,
+    manager: RevisionManager,
 }
 
-impl<RS: RootStore> api::Db for Db<RS> {
+impl api::Db for Db {
     type Historical = NodeStore<Committed, FileBacked>;
 
     type Proposal<'db>
-        = Proposal<'db, RS>
+        = Proposal<'db>
     where
         Self: 'db;
 
@@ -181,18 +181,16 @@ impl<RS: RootStore> api::Db for Db<RS> {
     }
 }
 
-impl Db<NoOpStore> {
+impl Db {
     /// Create a new database instance.
     pub fn new<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, api::Error> {
-        Self::with_root_store(db_path, cfg, NoOpStore {})
+        Self::with_root_store(db_path, cfg, Box::new(NoOpStore {}))
     }
-}
 
-impl<RS: RootStore> Db<RS> {
     fn with_root_store<P: AsRef<Path>>(
         db_path: P,
         cfg: DbConfig,
-        root_store: RS,
+        root_store: Box<dyn RootStore + Send + Sync>,
     ) -> Result<Self, api::Error> {
         let metrics = Arc::new(DbMetrics {
             proposals: counter!("firewood.proposals"),
@@ -214,9 +212,7 @@ impl<RS: RootStore> Db<RS> {
     pub fn view(&self, root_hash: HashKey) -> Result<ArcDynDbView, api::Error> {
         self.manager.view(root_hash).map_err(Into::into)
     }
-}
 
-impl<RS> Db<RS> {
     /// Dump the Trie of the latest revision.
     pub fn dump(&self, w: &mut dyn Write) -> Result<(), std::io::Error> {
         let latest_rev_nodestore = self.manager.current_revision();
@@ -243,7 +239,7 @@ impl<RS> Db<RS> {
     pub fn propose_parallel(
         &self,
         batch: impl IntoIterator<IntoIter: KeyValuePairIter>,
-    ) -> Result<Proposal<'_, RS>, api::Error> {
+    ) -> Result<Proposal<'_>, api::Error> {
         let parent = self.manager.current_revision();
         let mut parallel_merkle = ParallelMerkle::default();
         let immutable =
@@ -258,12 +254,12 @@ impl<RS> Db<RS> {
 
 #[derive(Debug)]
 /// A user-visible database proposal
-pub struct Proposal<'db, RS> {
+pub struct Proposal<'db> {
     nodestore: Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>>,
-    db: &'db Db<RS>,
+    db: &'db Db,
 }
 
-impl<RS> api::DbView for Proposal<'_, RS> {
+impl api::DbView for Proposal<'_> {
     type Iter<'view>
         = MerkleKeyValueIter<'view, NodeStore<Arc<ImmutableProposal>, FileBacked>>
     where
@@ -295,8 +291,8 @@ impl<RS> api::DbView for Proposal<'_, RS> {
     }
 }
 
-impl<'db, RS: RootStore> api::Proposal for Proposal<'db, RS> {
-    type Proposal = Proposal<'db, RS>;
+impl<'db> api::Proposal for Proposal<'db> {
+    type Proposal = Proposal<'db>;
 
     #[fastrace::trace(short_name = true)]
     fn propose(
@@ -311,7 +307,7 @@ impl<'db, RS: RootStore> api::Proposal for Proposal<'db, RS> {
     }
 }
 
-impl<RS> Proposal<'_, RS> {
+impl Proposal<'_> {
     #[crate::metrics("firewood.proposal.create", "database proposal creation")]
     fn create_proposal(
         &self,
@@ -360,7 +356,7 @@ mod test {
     };
 
     use crate::db::{Db, Proposal};
-    use crate::root_store::{MockStore, NoOpStore, RootStore};
+    use crate::root_store::{MockStore, RootStore};
     use crate::v2::api::{Db as _, DbView, KeyValuePairIter, Proposal as _};
 
     use super::{BatchOp, DbConfig};
@@ -400,6 +396,15 @@ mod test {
     }
 
     impl<T: Iterator> IterExt for T {}
+
+    #[cfg(test)]
+    impl Db {
+        /// Extract the root store by consuming the database instance.
+        /// This is primarily used for reopening or replacing the database with the same root store.
+        pub fn into_root_store(self) -> Box<dyn RootStore + Send + Sync> {
+            self.manager.into_root_store()
+        }
+    }
 
     #[test]
     fn test_proposal_reads() {
@@ -876,7 +881,7 @@ mod test {
 
         let proposals = ops.iter().chunk_fold(
             NUM_KEYS,
-            Vec::<Proposal<'_, _>>::with_capacity(NUM_PROPOSALS),
+            Vec::<Proposal<'_>>::with_capacity(NUM_PROPOSALS),
             |mut proposals, ops| {
                 let proposal = if let Some(parent) = proposals.last() {
                     parent.propose(ops).unwrap()
@@ -924,7 +929,7 @@ mod test {
         let testdb = TestDb::new();
         let db = &testdb.db;
 
-        let (tx, rx) = std::sync::mpsc::sync_channel::<Proposal<'_, _>>(CHANNEL_CAPACITY);
+        let (tx, rx) = std::sync::mpsc::sync_channel::<Proposal<'_>>(CHANNEL_CAPACITY);
         let (result_tx, result_rx) = std::sync::mpsc::sync_channel(CHANNEL_CAPACITY);
 
         // scope will block until all scope-spawned threads finish
@@ -1067,17 +1072,17 @@ mod test {
     }
 
     // Testdb is a helper struct for testing the Db. Once it's dropped, the directory and file disappear
-    struct TestDb<RS = NoOpStore> {
-        db: Db<RS>,
+    struct TestDb {
+        db: Db,
         tmpdir: tempfile::TempDir,
     }
-    impl<RS> Deref for TestDb<RS> {
-        type Target = Db<RS>;
+    impl Deref for TestDb {
+        type Target = Db;
         fn deref(&self) -> &Self::Target {
             &self.db
         }
     }
-    impl<RS> DerefMut for TestDb<RS> {
+    impl DerefMut for TestDb {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.db
         }
@@ -1093,48 +1098,38 @@ mod test {
             let db = Db::new(dbpath, dbconfig).unwrap();
             TestDb { db, tmpdir }
         }
-    }
 
-    impl TestDb<MockStore> {
         fn with_mockstore(mock_store: MockStore) -> Self {
             let tmpdir = tempfile::tempdir().unwrap();
             let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
                 .iter()
                 .collect();
             let dbconfig = DbConfig::builder().build();
-            let db = Db::with_root_store(dbpath, dbconfig, mock_store).unwrap();
+            let db = Db::with_root_store(dbpath, dbconfig, Box::new(mock_store)).unwrap();
             TestDb { db, tmpdir }
         }
-    }
 
-    impl<RS: Clone + RootStore> TestDb<RS> {
         fn reopen(self) -> Self {
             let path = self.path();
-            let root_store = self.manager.root_store();
-            drop(self.db);
-            let dbconfig = DbConfig::builder().truncate(false).build();
+            let TestDb { db, tmpdir } = self;
 
+            let root_store = db.into_root_store();
+
+            let dbconfig = DbConfig::builder().truncate(false).build();
             let db = Db::with_root_store(path, dbconfig, root_store).unwrap();
-            TestDb {
-                db,
-                tmpdir: self.tmpdir,
-            }
+            TestDb { db, tmpdir }
         }
         fn replace(self) -> Self {
             let path = self.path();
-            let root_store = self.manager.root_store();
-            drop(self.db);
+            let TestDb { db, tmpdir } = self;
+
+            let root_store = db.into_root_store();
+
             let dbconfig = DbConfig::builder().truncate(true).build();
-
             let db = Db::with_root_store(path, dbconfig, root_store).unwrap();
-            TestDb {
-                db,
-                tmpdir: self.tmpdir,
-            }
+            TestDb { db, tmpdir }
         }
-    }
 
-    impl<RS> TestDb<RS> {
         fn path(&self) -> PathBuf {
             [self.tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
                 .iter()

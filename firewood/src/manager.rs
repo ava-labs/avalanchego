@@ -68,7 +68,7 @@ type CommittedRevision = Arc<NodeStore<Committed, FileBacked>>;
 type ProposedRevision = Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>>;
 
 #[derive(Debug)]
-pub(crate) struct RevisionManager<RS> {
+pub(crate) struct RevisionManager {
     /// Maximum number of revisions to keep on disk
     max_revisions: usize,
 
@@ -79,7 +79,7 @@ pub(crate) struct RevisionManager<RS> {
     // committing_proposals: VecDeque<Arc<ProposedImmutable>>,
     by_hash: RwLock<HashMap<TrieHash, CommittedRevision>>,
     threadpool: OnceLock<ThreadPool>,
-    root_store: RS,
+    root_store: Box<dyn RootStore + Send + Sync>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -101,11 +101,11 @@ pub(crate) enum RevisionManagerError {
     RootStoreError(#[from] RootStoreError),
 }
 
-impl<RS: RootStore> RevisionManager<RS> {
+impl RevisionManager {
     pub fn new(
         filename: PathBuf,
         config: ConfigManager,
-        root_store: RS,
+        root_store: Box<dyn RootStore + Send + Sync>,
     ) -> Result<Self, RevisionManagerError> {
         let fb = FileBacked::new(
             filename,
@@ -315,9 +315,7 @@ impl<RS: RootStore> RevisionManager<RS> {
 
         Ok(Arc::new(node_store))
     }
-}
 
-impl<RS> RevisionManager<RS> {
     pub fn add_proposal(&self, proposal: ProposedRevision) {
         self.proposals.lock().expect("poisoned lock").push(proposal);
     }
@@ -388,9 +386,11 @@ mod tests {
     use crate::root_store::NoOpStore;
     use tempfile::NamedTempFile;
 
-    impl<RS: Clone> RevisionManager<RS> {
-        pub fn root_store(&self) -> RS {
-            self.root_store.clone()
+    #[cfg(test)]
+    impl RevisionManager {
+        /// Extract the root store by consuming the revision manager instance.
+        pub fn into_root_store(self) -> Box<dyn RootStore + Send + Sync> {
+            self.root_store
         }
     }
 
@@ -406,14 +406,16 @@ mod tests {
             .build();
 
         // First database instance should open successfully
-        let first_manager = RevisionManager::new(db_path.clone(), config.clone(), NoOpStore {});
+        let first_manager =
+            RevisionManager::new(db_path.clone(), config.clone(), Box::new(NoOpStore {}));
         assert!(
             first_manager.is_ok(),
             "First database should open successfully"
         );
 
         // Second database instance should fail to open due to file locking
-        let second_manager = RevisionManager::new(db_path.clone(), config.clone(), NoOpStore {});
+        let second_manager =
+            RevisionManager::new(db_path.clone(), config.clone(), Box::new(NoOpStore {}));
         assert!(
             second_manager.is_err(),
             "Second database should fail to open"
@@ -433,7 +435,7 @@ mod tests {
         drop(first_manager.unwrap());
 
         // Now the second database should open successfully
-        let third_manager = RevisionManager::new(db_path, config, NoOpStore {});
+        let third_manager = RevisionManager::new(db_path, config, Box::new(NoOpStore {}));
         assert!(
             third_manager.is_ok(),
             "Database should open after first instance is dropped"

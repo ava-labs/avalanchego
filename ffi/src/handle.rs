@@ -4,7 +4,6 @@
 use firewood::{
     db::{Db, DbConfig},
     manager::RevisionManagerConfig,
-    root_store::NoOpStore,
     v2::api::{self, ArcDynDbView, Db as _, DbView, HashKey, HashKeyExt, KeyType},
 };
 
@@ -231,7 +230,7 @@ impl<'db> CView<'db> for &'db crate::DatabaseHandle {
     fn create_proposal<'kvp>(
         self,
         values: impl AsRef<[KeyValuePair<'kvp>]> + 'kvp,
-    ) -> Result<firewood::db::Proposal<'db, NoOpStore>, api::Error> {
+    ) -> Result<firewood::db::Proposal<'db>, api::Error> {
         self.db.propose(values.as_ref().iter())
     }
 }

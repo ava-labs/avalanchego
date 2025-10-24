@@ -1,8 +1,12 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use std::fmt::Debug;
 #[cfg(test)]
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use firewood_storage::{LinearAddress, TrieHash};
 
@@ -20,7 +24,7 @@ pub struct RootStoreError {
     pub source: Box<dyn std::error::Error + Send + Sync>,
 }
 
-pub trait RootStore {
+pub trait RootStore: Debug {
     /// `add_root` persists a revision's address to `RootStore`.
     ///
     /// Args:
@@ -44,7 +48,6 @@ pub trait RootStore {
     fn get(&self, hash: &TrieHash) -> Result<Option<LinearAddress>, RootStoreError>;
 }
 
-#[cfg_attr(test, derive(Clone))]
 #[derive(Debug)]
 pub struct NoOpStore {}
 
@@ -59,10 +62,9 @@ impl RootStore for NoOpStore {
 }
 
 #[cfg(test)]
-#[cfg_attr(test, derive(Clone))]
 #[derive(Debug, Default)]
 pub struct MockStore {
-    roots: Rc<RefCell<HashMap<TrieHash, LinearAddress>>>,
+    roots: Arc<Mutex<HashMap<TrieHash, LinearAddress>>>,
     should_fail: bool,
 }
 
@@ -88,7 +90,10 @@ impl RootStore for MockStore {
             });
         }
 
-        self.roots.borrow_mut().insert(hash.clone(), *address);
+        self.roots
+            .lock()
+            .expect("poisoned lock")
+            .insert(hash.clone(), *address);
         Ok(())
     }
 
@@ -100,6 +105,6 @@ impl RootStore for MockStore {
             });
         }
 
-        Ok(self.roots.borrow().get(hash).copied())
+        Ok(self.roots.lock().expect("poisoned lock").get(hash).copied())
     }
 }
