@@ -171,16 +171,16 @@ func TestShutdown(t *testing.T) {
 		State: snow.NormalOp, // assumed bootstrapping is done
 	})
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
-	chainRouter.Shutdown(context.Background())
+	chainRouter.Shutdown(t.Context())
 
-	ctx, cancel := context.WithTimeout(context.Background(), 250*time.Millisecond)
+	ctx, cancel := context.WithTimeout(t.Context(), 250*time.Millisecond)
 	defer cancel()
 
 	select {
@@ -289,13 +289,13 @@ func TestConnectedAfterShutdownErrorLogRegression(t *testing.T) {
 		State: snow.NormalOp, // assumed bootstrapping is done
 	})
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
-	chainRouter.Shutdown(context.Background())
+	chainRouter.Shutdown(t.Context())
 
-	shutdownDuration, err := h.AwaitStopped(context.Background())
+	shutdownDuration, err := h.AwaitStopped(t.Context())
 	require.NoError(err)
 	require.GreaterOrEqual(shutdownDuration, time.Duration(0))
 
@@ -431,12 +431,12 @@ func TestShutdownTimesOut(t *testing.T) {
 		State: snow.NormalOp, // assumed bootstrapping is done
 	})
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
 	shutdownFinished := make(chan struct{}, 1)
 
@@ -446,11 +446,11 @@ func TestShutdownTimesOut(t *testing.T) {
 			InboundMessage: message.InboundPullQuery(chainID, 1, time.Hour, ids.GenerateTestID(), 0, nodeID),
 			EngineType:     p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED,
 		}
-		h.Push(context.Background(), msg)
+		h.Push(t.Context(), msg)
 
 		time.Sleep(50 * time.Millisecond) // Pause to ensure message gets processed
 
-		chainRouter.Shutdown(context.Background())
+		chainRouter.Shutdown(t.Context())
 		shutdownFinished <- struct{}{}
 	}()
 
@@ -498,7 +498,7 @@ func TestRouterTimeout(t *testing.T) {
 		HealthConfig{},
 		prometheus.NewRegistry(),
 	))
-	defer chainRouter.Shutdown(context.Background())
+	defer chainRouter.Shutdown(t.Context())
 
 	// Create bootstrapper, engine and handler
 	var (
@@ -613,7 +613,7 @@ func TestRouterTimeout(t *testing.T) {
 		State: snow.Bootstrapping, // assumed bootstrapping is ongoing
 	})
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
@@ -630,14 +630,14 @@ func TestRouterTimeout(t *testing.T) {
 			Consensus:    nil,
 		},
 	})
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
 	nodeID := ids.GenerateTestNodeID()
 	requestID := uint32(0)
 	{
 		wg.Add(1)
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -655,7 +655,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg.Add(1)
 		requestID++
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -673,7 +673,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg.Add(1)
 		requestID++
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -691,7 +691,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg.Add(1)
 		requestID++
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -709,7 +709,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg.Add(1)
 		requestID++
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -728,7 +728,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg.Add(1)
 		requestID++
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -746,7 +746,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg.Add(1)
 		requestID++
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -764,7 +764,7 @@ func TestRouterTimeout(t *testing.T) {
 		wg.Add(1)
 		requestID++
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -831,7 +831,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		HealthConfig{},
 		prometheus.NewRegistry(),
 	))
-	defer chainRouter.Shutdown(context.Background())
+	defer chainRouter.Shutdown(t.Context())
 
 	h := handlermock.NewHandler(ctrl)
 
@@ -843,7 +843,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 	h.EXPECT().AwaitStopped(gomock.Any()).AnyTimes()
 
 	h.EXPECT().Push(gomock.Any(), gomock.Any()).Times(1)
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
 	h.EXPECT().ShouldHandle(gomock.Any()).Return(true).AnyTimes()
 
@@ -851,7 +851,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 	requestID := uint32(0)
 	{
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -873,13 +873,13 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		h.EXPECT().Push(gomock.Any(), gomock.Any()).Do(func(_ context.Context, msg handler.Message) {
 			require.Equal(p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED, msg.EngineType)
 		})
-		chainRouter.HandleInbound(context.Background(), msg)
+		chainRouter.HandleInbound(t.Context(), msg)
 	}
 
 	{
 		requestID++
 		chainRouter.RegisterRequest(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			ctx.ChainID,
 			requestID,
@@ -901,7 +901,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		h.EXPECT().Push(gomock.Any(), gomock.Any()).Do(func(_ context.Context, msg handler.Message) {
 			require.Equal(engineType, msg.EngineType)
 		})
-		chainRouter.HandleInbound(context.Background(), msg)
+		chainRouter.HandleInbound(t.Context(), msg)
 	}
 
 	{
@@ -918,7 +918,7 @@ func TestRouterHonorsRequestedEngine(t *testing.T) {
 		h.EXPECT().Push(gomock.Any(), gomock.Any()).Do(func(_ context.Context, msg handler.Message) {
 			require.Equal(p2ppb.EngineType_ENGINE_TYPE_UNSPECIFIED, msg.EngineType)
 		})
-		chainRouter.HandleInbound(context.Background(), msg)
+		chainRouter.HandleInbound(t.Context(), msg)
 	}
 
 	chainRouter.lock.Lock()
@@ -986,7 +986,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 			chainRouter, _ := newChainRouterTest(t)
 
 			chainRouter.RegisterRequest(
-				context.Background(),
+				t.Context(),
 				ids.EmptyNodeID,
 				ids.Empty,
 				requestID,
@@ -995,7 +995,7 @@ func TestRouterClearTimeouts(t *testing.T) {
 				engineType,
 			)
 
-			chainRouter.HandleInbound(context.Background(), tt.responseMsg)
+			chainRouter.HandleInbound(t.Context(), tt.responseMsg)
 
 			chainRouter.lock.Lock()
 			require.Zero(chainRouter.timedRequests.Len())
@@ -1040,7 +1040,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		HealthConfig{},
 		prometheus.NewRegistry(),
 	))
-	defer chainRouter.Shutdown(context.Background())
+	defer chainRouter.Shutdown(t.Context())
 
 	// Create bootstrapper, engine and handler
 	calledF := false
@@ -1122,12 +1122,12 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		},
 	})
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
 	var inMsg message.InboundMessage
 	dummyContainerID := ids.GenerateTestID()
@@ -1145,7 +1145,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		0,
 		nID,
 	)
-	chainRouter.HandleInbound(context.Background(), inMsg)
+	chainRouter.HandleInbound(t.Context(), inMsg)
 
 	require.False(calledF) // should not be called
 
@@ -1161,7 +1161,7 @@ func TestValidatorOnlyMessageDrops(t *testing.T) {
 		vID,
 	)
 	wg.Add(1)
-	chainRouter.HandleInbound(context.Background(), inMsg)
+	chainRouter.HandleInbound(t.Context(), inMsg)
 
 	wg.Wait()
 	require.True(calledF) // should be called since this is a validator request
@@ -1203,7 +1203,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		HealthConfig{},
 		prometheus.NewRegistry(),
 	))
-	defer chainRouter.Shutdown(context.Background())
+	defer chainRouter.Shutdown(t.Context())
 
 	// Create bootstrapper, engine and handler
 	calledF := false
@@ -1283,12 +1283,12 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		},
 	})
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
 	var inMsg message.InboundMessage
 	dummyContainerID := ids.GenerateTestID()
@@ -1306,7 +1306,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		0,
 		nID,
 	)
-	chainRouter.HandleInbound(context.Background(), inMsg)
+	chainRouter.HandleInbound(t.Context(), inMsg)
 
 	require.False(calledF) // should not be called for unallowed node ID
 
@@ -1322,7 +1322,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		allowedID,
 	)
 	wg.Add(1)
-	chainRouter.HandleInbound(context.Background(), inMsg)
+	chainRouter.HandleInbound(t.Context(), inMsg)
 
 	wg.Wait()
 	require.True(calledF) // should be called since this is a allowed node request
@@ -1339,7 +1339,7 @@ func TestValidatorOnlyAllowedNodeMessageDrops(t *testing.T) {
 		vID,
 	)
 	wg.Add(1)
-	chainRouter.HandleInbound(context.Background(), inMsg)
+	chainRouter.HandleInbound(t.Context(), inMsg)
 
 	wg.Wait()
 	require.True(calledF) // should be called since this is a validator request
@@ -1418,7 +1418,7 @@ func TestAppRequest(t *testing.T) {
 				}
 			}
 
-			ctx := context.Background()
+			ctx := t.Context()
 			chainRouter.RegisterRequest(ctx, ids.EmptyNodeID, ids.Empty, wantRequestID, tt.responseOp, tt.timeoutMsg, engineType)
 			chainRouter.lock.Lock()
 			require.Equal(1, chainRouter.timedRequests.Len())
@@ -1537,17 +1537,17 @@ func newChainRouterTest(t *testing.T) (*ChainRouter, *enginetest.Engine) {
 		State: snow.NormalOp, // assumed bootstrapping is done
 	})
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
 
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
 	t.Cleanup(func() {
 		tm.Stop()
-		chainRouter.Shutdown(context.Background())
+		chainRouter.Shutdown(t.Context())
 	})
 
 	return chainRouter, engine
@@ -1571,7 +1571,7 @@ func TestHandleSimplexMessage(t *testing.T) {
 			HealthConfig{},
 			prometheus.NewRegistry(),
 		))
-	defer chainRouter.Shutdown(context.Background())
+	defer chainRouter.Shutdown(t.Context())
 
 	chainRouter.log = log
 	testID := ids.GenerateTestID()
@@ -1606,9 +1606,9 @@ func TestHandleSimplexMessage(t *testing.T) {
 			}
 		}).AnyTimes()
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 	h.EXPECT().ShouldHandle(gomock.Any()).Return(true).Times(1)
-	chainRouter.HandleInbound(context.Background(), inboundMsg)
+	chainRouter.HandleInbound(t.Context(), inboundMsg)
 	require.True(t, receivedMsg)
 }
 

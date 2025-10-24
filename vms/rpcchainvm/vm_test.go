@@ -100,7 +100,7 @@ func TestHelperProcess(t *testing.T) {
 	}
 
 	mockedVM := TestServerPluginMap[testKey](t, true /*loadExpectations*/)
-	err := Serve(context.Background(), mockedVM)
+	err := Serve(t.Context(), mockedVM)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -184,9 +184,9 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 			listener, err := grpcutils.NewListener()
 			require.NoError(err)
 
-			require.NoError(os.Setenv(runtime.EngineAddressKey, listener.Addr().String()))
+			t.Setenv(runtime.EngineAddressKey, listener.Addr().String())
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
 			if test.serveVM {
@@ -196,7 +196,7 @@ func TestRuntimeSubprocessBootstrap(t *testing.T) {
 			}
 
 			status, stopper, err := subprocess.Bootstrap(
-				context.Background(),
+				t.Context(),
 				listener,
 				helperProcess("dummy"),
 				test.config,
@@ -233,7 +233,7 @@ func TestNewHTTPHandler(t *testing.T) {
 		_ = grpcServer.Serve(listener)
 	}()
 
-	cc, err := grpc.DialContext(context.Background(), "bufnet",
+	cc, err := grpc.DialContext(t.Context(), "bufnet",
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return listener.Dial()
 		}),
@@ -250,7 +250,7 @@ func TestNewHTTPHandler(t *testing.T) {
 		logging.NoLog{},
 	)
 
-	handler, err := client.NewHTTPHandler(context.Background())
+	handler, err := client.NewHTTPHandler(t.Context())
 	require.NoError(err)
 
 	w := httptest.NewRecorder()
