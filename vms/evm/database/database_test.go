@@ -12,8 +12,9 @@ import (
 	"github.com/ava-labs/libevm/ethdb/dbtest"
 	"github.com/stretchr/testify/require"
 
-	avalanchegodb "github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+
+	avalanchegodb "github.com/ava-labs/avalanchego/database"
 )
 
 // testDatabase wraps the production database with test-only snapshot functionality
@@ -24,18 +25,18 @@ type testDatabase struct {
 // NewSnapshot creates a test-only snapshot that captures the current database state.
 // This implementation is designed for test suite compliance only and is NOT suitable
 // for production use as it loads the entire database into memory.
+//
+// Creates a snapshot by iterating over the entire database and copying key-value pairs.
 func (db testDatabase) NewSnapshot() (ethdb.Snapshot, error) {
-	// Create a snapshot by iterating over the entire database and copying key-value pairs
+
 	snapshotData := make(map[string][]byte)
 
-	// Iterate over all keys in the database
 	iter := db.db.NewIterator()
 	defer iter.Release()
 
 	for iter.Next() {
 		key := iter.Key()
 		value := iter.Value()
-		// Make copies to ensure the snapshot is independent
 		keyCopy := make([]byte, len(key))
 		valueCopy := make([]byte, len(value))
 		copy(keyCopy, key)
@@ -82,7 +83,6 @@ func (s *testSnapshot) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 	for keyStr, value := range s.data {
 		key := []byte(keyStr)
 
-		// Check prefix match
 		if prefix != nil && len(key) < len(prefix) {
 			continue
 		}
@@ -90,7 +90,6 @@ func (s *testSnapshot) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 			continue
 		}
 
-		// Check start criteria
 		if start != nil && bytes.Compare(key, start) < 0 {
 			continue
 		}
