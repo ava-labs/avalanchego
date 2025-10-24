@@ -57,8 +57,8 @@ func (t *testSnapshot) Get(key []byte) ([]byte, error) {
 }
 
 func (t *testSnapshot) Has(key []byte) (bool, error) {
-	_, exists := t.data[string(key)]
-	return exists, nil
+	_, ok := t.data[string(key)]
+	return ok, nil
 }
 
 func (*testSnapshot) Release() {}
