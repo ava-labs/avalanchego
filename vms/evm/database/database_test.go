@@ -18,14 +18,14 @@ import (
 
 // testDatabase wraps the production database with test-only snapshot functionality
 type testDatabase struct {
-	database
+	ethdb.KeyValueStore
 }
 
 // Creates a snapshot by iterating over the entire database and copying key-value pairs.
 func (db testDatabase) NewSnapshot() (ethdb.Snapshot, error) {
 	snapshotData := make(map[string][]byte)
 
-	iter := db.db.NewIterator()
+	iter := db.NewIterator(nil, nil)
 	defer iter.Release()
 
 	for iter.Next() {
@@ -33,6 +33,7 @@ func (db testDatabase) NewSnapshot() (ethdb.Snapshot, error) {
 		value := iter.Value()
 		keyCopy := make([]byte, len(key))
 		valueCopy := make([]byte, len(value))
+		copy(keyCopy, key)
 		copy(valueCopy, value)
 		snapshotData[string(keyCopy)] = valueCopy
 	}
@@ -62,15 +63,15 @@ func (t *testSnapshot) Has(key []byte) (bool, error) {
 	return exists, nil
 }
 
-func (t *testSnapshot) Release() {
+func (*testSnapshot) Release() {
 	// No cleanup needed for snapshot
 }
 
-func (s *testSnapshot) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
+func (t *testSnapshot) NewIterator(prefix []byte, start []byte) ethdb.Iterator {
 	// Create a slice of key-value pairs that match the prefix and start criteria
-	pairs := make([]kvPair, 0, len(s.data))
+	pairs := make([]kvPair, 0, len(t.data))
 
-	for keyStr, value := range s.data {
+	for keyStr, value := range t.data {
 		key := []byte(keyStr)
 
 		if prefix != nil && len(key) < len(prefix) {
@@ -124,11 +125,11 @@ func (it *testSnapshotIterator) Value() []byte {
 	return it.pairs[it.index].value
 }
 
-func (t *testSnapshotIterator) Release() {
+func (*testSnapshotIterator) Release() {
 	// No cleanup needed for snapshot iterator
 }
 
-func (t *testSnapshotIterator) Error() error {
+func (*testSnapshotIterator) Error() error {
 	return nil
 }
 

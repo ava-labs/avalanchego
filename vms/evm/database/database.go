@@ -60,14 +60,14 @@ type batch struct {
 	batch avalanchegodb.Batch
 }
 
-func (e batch) Put(key, value []byte) error { return e.batch.Put(key, value) }
+func (b batch) Put(key, value []byte) error { return b.batch.Put(key, value) }
 
-func (e batch) Delete(key []byte) error { return e.batch.Delete(key) }
+func (b batch) Delete(key []byte) error { return b.batch.Delete(key) }
 
-func (e batch) ValueSize() int { return e.batch.Size() }
+func (b batch) ValueSize() int { return b.batch.Size() }
 
-func (e batch) Write() error { return e.batch.Write() }
+func (b batch) Write() error { return b.batch.Write() }
 
-func (e batch) Reset() { e.batch.Reset() }
+func (b batch) Reset() { b.batch.Reset() }
 
-func (e batch) Replay(w ethdb.KeyValueWriter) error { return e.batch.Replay(w) }
+func (b batch) Replay(w ethdb.KeyValueWriter) error { return b.batch.Replay(w) }
