@@ -14,11 +14,16 @@ import (
 	"github.com/ava-labs/avalanchego/utils/iterator"
 )
 
-var ErrAddingStakerAfterDeletion = errors.New("attempted to add a staker after deleting it")
+var (
+	ErrAddingStakerAfterDeletion    = errors.New("attempted to add a staker after deleting it")
+	errInvalidStakerMutation        = errors.New("invalid staker mutation")
+	errIncompatibleContinuousStaker = errors.New("incompatible continuous staker state")
+)
 
 type Stakers interface {
 	CurrentStakers
 	PendingStakers
+	ContinuousStakers
 }
 
 type CurrentStakers interface {
@@ -38,6 +43,10 @@ type CurrentStakers interface {
 	//
 	// Invariant: [staker] is currently a CurrentValidator
 	DeleteCurrentValidator(staker *Staker)
+
+	// UpdateCurrentValidator updates the [staker] describing a validator to the
+	// staker set. Only specific mutable fields can be updated.
+	UpdateCurrentValidator(staker *Staker) error
 
 	// SetDelegateeReward sets the accrued delegation rewards for [nodeID] on
 	// [subnetID] to [amount].
@@ -101,6 +110,20 @@ type PendingStakers interface {
 	GetPendingStakerIterator() (iterator.Iterator[*Staker], error)
 }
 
+type ContinuousStakers interface {
+	// StopContinuousValidator sets the continuation period to 0.
+	// It is used to stop the continuous staker at the end of the cycle.
+	StopContinuousValidator(subnetID ids.ID, nodeID ids.NodeID) error
+
+	// ResetContinuousValidatorCycle is updating the potentialReward and startTime for the new cycle.
+	ResetContinuousValidatorCycle(
+		subnetID ids.ID,
+		nodeID ids.NodeID,
+		weight uint64,
+		potentialReward, totalAccruedRewards, totalAccruedDelegateeRewards uint64,
+	) error
+}
+
 type baseStakers struct {
 	// subnetID --> nodeID --> current state for the validator of the subnet
 	validators map[ids.ID]map[ids.NodeID]*baseStaker
@@ -158,6 +181,37 @@ func (v *baseStakers) DeleteValidator(staker *Staker) {
 	validatorDiff.validator = staker
 
 	v.stakers.Delete(staker)
+}
+
+// Invariant: [getMutatedValidator] returns a non-nil Staker.
+func (v *baseStakers) updateValidator(
+	subnetID ids.ID,
+	nodeID ids.NodeID,
+	getMutatedValidator func(Staker) (*Staker, error),
+) error {
+	validator := v.getOrCreateValidator(subnetID, nodeID)
+	if validator.validator == nil {
+		return database.ErrNotFound
+	}
+
+	mutatedValidator, err := getMutatedValidator(*validator.validator)
+	if err != nil {
+		return err
+	}
+
+	if err := validator.validator.ValidMutation(*mutatedValidator); err != nil {
+		return fmt.Errorf("%w: %w", errInvalidStakerMutation, err)
+	}
+
+	validatorDiff := v.getOrCreateValidatorDiff(subnetID, nodeID)
+	validatorDiff.validatorStatus = modified
+	validatorDiff.validator = mutatedValidator
+	validatorDiff.oldValidator = validator.validator
+
+	validator.validator = mutatedValidator
+
+	v.stakers.ReplaceOrInsert(mutatedValidator)
+	return nil
 }
 
 func (v *baseStakers) GetDelegatorIterator(subnetID ids.ID, nodeID ids.NodeID) iterator.Iterator[*Staker] {
@@ -269,6 +323,7 @@ type diffValidator struct {
 	// mean that diffValidator hasn't change, since delegators may have changed.
 	validatorStatus diffValidatorStatus
 	validator       *Staker
+	oldValidator    *Staker // this is set iff validatorStatus is modified
 
 	addedDelegators   *btree.BTreeG[*Staker]
 	deletedDelegators map[ids.ID]*Staker
@@ -280,6 +335,11 @@ func (d *diffValidator) WeightDiff() (ValidatorWeightDiff, error) {
 	}
 	if d.validatorStatus != unmodified {
 		weightDiff.Amount = d.validator.Weight
+
+		if d.validatorStatus == modified {
+			// if the validator is modified, we need to subtract the old weight in order to get the weight diff.
+			weightDiff.Amount -= d.oldValidator.Weight
+		}
 	}
 
 	for _, staker := range d.deletedDelegators {
@@ -316,10 +376,12 @@ func (s *diffStakers) GetValidator(subnetID ids.ID, nodeID ids.NodeID) (*Staker,
 		return nil, unmodified
 	}
 
-	if validatorDiff.validatorStatus == added {
-		return validatorDiff.validator, added
+	switch validatorDiff.validatorStatus {
+	case added, modified:
+		return validatorDiff.validator, validatorDiff.validatorStatus
+	default:
+		return nil, validatorDiff.validatorStatus
 	}
-	return nil, validatorDiff.validatorStatus
 }
 
 func (s *diffStakers) PutValidator(staker *Staker) error {
@@ -356,6 +418,65 @@ func (s *diffStakers) DeleteValidator(staker *Staker) {
 		}
 		s.deletedStakers[staker.TxID] = staker
 	}
+}
+
+func (s *diffStakers) updateValidator(
+	state Chain,
+	subnetID ids.ID,
+	nodeID ids.NodeID,
+	getMutatedValidator func(Staker) (*Staker, error),
+) error {
+	validatorDiff := s.getOrCreateDiff(subnetID, nodeID)
+
+	switch validatorDiff.validatorStatus {
+	case deleted:
+		return database.ErrNotFound
+
+	case added, modified:
+		mutatedValidator, err := getMutatedValidator(*validatorDiff.validator)
+		if err != nil {
+			return err
+		}
+
+		if err := validatorDiff.validator.ValidMutation(*mutatedValidator); err != nil {
+			return fmt.Errorf("%w: %w", errInvalidStakerMutation, err)
+		}
+
+		// Keep the same validatorDiff.validatorStatus.
+		validatorDiff.validator = mutatedValidator
+
+		if s.addedStakers == nil {
+			// This shouldn't happen, since the current validator was already added/modified.
+			s.addedStakers = btree.NewG(defaultTreeDegree, (*Staker).Less)
+		}
+
+		s.addedStakers.ReplaceOrInsert(mutatedValidator)
+
+	case unmodified:
+		validator, err := state.GetCurrentValidator(subnetID, nodeID)
+		if err != nil {
+			return err
+		}
+
+		mutatedValidator, err := getMutatedValidator(*validator)
+		if err != nil {
+			return err
+		}
+
+		if err := validator.ValidMutation(*mutatedValidator); err != nil {
+			return fmt.Errorf("%w: %w", errInvalidStakerMutation, err)
+		}
+
+		validatorDiff.validator = mutatedValidator
+		validatorDiff.validatorStatus = modified
+		validatorDiff.oldValidator = validator
+
+	default:
+		// This shouldn't happen.
+		return fmt.Errorf("unknown validator status (%s) for %s", validatorDiff.validatorStatus, nodeID)
+	}
+
+	return nil
 }
 
 func (s *diffStakers) GetDelegatorIterator(
