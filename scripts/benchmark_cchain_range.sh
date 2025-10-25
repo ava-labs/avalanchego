@@ -12,6 +12,7 @@ set -euo pipefail
 #   BENCHMARK_OUTPUT_FILE (optional): If set, benchmark output is also written to this file.
 #   METRICS_SERVER_ENABLED (optional): If set, enables the metrics server.
 #   METRICS_COLLECTOR_ENABLED (optional): If set, enables the metrics collector.
+#   METRICS_SERVER_PORT (optional): If set, determines the port the metrics server will listen to.
 
 : "${BLOCK_DIR:?BLOCK_DIR must be set}"
 : "${CURRENT_STATE_DIR:?CURRENT_STATE_DIR must be set}"
@@ -28,7 +29,8 @@ cmd="go test -timeout=0 -v -benchtime=1x -bench=BenchmarkReexecuteRange -run=^$ 
   --end-block=\"${END_BLOCK}\" \
   ${LABELS:+--labels=\"${LABELS}\"} \
   ${METRICS_SERVER_ENABLED:+--metrics-server-enabled=\"${METRICS_SERVER_ENABLED}\"} \
-  ${METRICS_COLLECTOR_ENABLED:+--metrics-collector-enabled=\"${METRICS_COLLECTOR_ENABLED}\"}"
+  ${METRICS_COLLECTOR_ENABLED:+--metrics-collector-enabled=\"${METRICS_COLLECTOR_ENABLED}\"} \
+  ${METRICS_SERVER_PORT:+--metrics-server-port=\"${METRICS_SERVER_PORT}\"}"
 
 if [ -n "${BENCHMARK_OUTPUT_FILE:-}" ]; then
   eval "$cmd" | tee "${BENCHMARK_OUTPUT_FILE}"

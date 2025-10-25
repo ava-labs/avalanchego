@@ -65,6 +65,7 @@ var (
 
 	metricsServerEnabledArg    bool
 	metricsCollectorEnabledArg bool
+	metricsServerPort          uint64
 
 	networkUUID string = uuid.NewString()
 	labels             = map[string]string{
@@ -106,6 +107,7 @@ func TestMain(m *testing.M) {
 
 	flag.BoolVar(&metricsServerEnabledArg, "metrics-server-enabled", false, "Whether to enable the metrics server.")
 	flag.BoolVar(&metricsCollectorEnabledArg, "metrics-collector-enabled", false, "Whether to enable the metrics collector (if true, then metrics-server-enabled must be true as well).")
+	flag.Uint64Var(&metricsServerPort, "metrics-server-port", metricsServerPort, "Port which the metrics server will listen to")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
@@ -159,6 +161,7 @@ func BenchmarkReexecuteRange(b *testing.B) {
 			chanSizeArg,
 			metricsServerEnabledArg,
 			metricsCollectorEnabledArg,
+			metricsServerPort,
 		)
 	})
 }
@@ -173,6 +176,7 @@ func benchmarkReexecuteRange(
 	chanSize int,
 	metricsServerEnabled bool,
 	metricsCollectorEnabled bool,
+	metricsPort uint64,
 ) {
 	r := require.New(b)
 	ctx := context.Background()
@@ -192,7 +196,7 @@ func benchmarkReexecuteRange(
 	log := tests.NewDefaultLogger("c-chain-reexecution")
 
 	if metricsServerEnabled {
-		serverAddr := startServer(b, log, prefixGatherer)
+		serverAddr := startServer(b, log, prefixGatherer, metricsPort)
 
 		if metricsCollectorEnabled {
 			startCollector(b, log, "c-chain-reexecution", labels, serverAddr)
@@ -565,10 +569,11 @@ func startServer(
 	tb testing.TB,
 	log logging.Logger,
 	gatherer prometheus.Gatherer,
+	port uint64,
 ) string {
 	r := require.New(tb)
 
-	server, err := tests.NewPrometheusServer(gatherer)
+	server, err := tests.NewPrometheusServerWithPort(gatherer, port)
 	r.NoError(err)
 
 	log.Info("metrics endpoint available",

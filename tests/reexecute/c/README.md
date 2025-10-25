@@ -46,6 +46,7 @@ If running locally, metrics collection can be customized via the following param
 
 - `METRICS_SERVER_ENABLED`: starts a Prometheus server exporting VM metrics.
 - `METRICS_COLLECTOR_ENABLED`: starts a Prometheus collector (if enabled, then `METRICS_SERVER_ENABLED` must be enabled as well).
+- `METRICS_SERVER_PORT`: determines the port the metrics server will listen to (set to `0` by default)
 
 When utilizing the metrics collector feature, follow the instructions in the e2e [README](../../e2e/README.md#monitoring) to set the required Prometheus environment variables.
 

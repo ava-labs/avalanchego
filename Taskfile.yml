@@ -205,6 +205,7 @@ tasks:
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
       METRICS_SERVER_ENABLED: '{{.METRICS_SERVER_ENABLED | default "false"}}'
       METRICS_COLLECTOR_ENABLED: '{{.METRICS_COLLECTOR_ENABLED | default "false"}}'
+      METRICS_SERVER_PORT: '{{.METRICS_SERVER_PORT}}'
     cmd: |
       CURRENT_STATE_DIR={{.CURRENT_STATE_DIR}} \
       BLOCK_DIR={{.BLOCK_DIR}} \
@@ -216,6 +217,7 @@ tasks:
       BENCHMARK_OUTPUT_FILE={{.BENCHMARK_OUTPUT_FILE}} \
       METRICS_SERVER_ENABLED={{.METRICS_SERVER_ENABLED}} \
       METRICS_COLLECTOR_ENABLED={{.METRICS_COLLECTOR_ENABLED}} \
+      METRICS_SERVER_PORT={{.METRICS_SERVER_PORT}} \
       bash -x ./scripts/benchmark_cchain_range.sh
 
   reexecute-cchain-range-with-copied-data:
@@ -232,6 +234,7 @@ tasks:
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
       METRICS_SERVER_ENABLED: '{{.METRICS_SERVER_ENABLED | default "false"}}'
       METRICS_COLLECTOR_ENABLED: '{{.METRICS_COLLECTOR_ENABLED | default "false"}}'
+      METRICS_SERVER_PORT: '{{.METRICS_SERVER_PORT}}'
     cmds:
       - task: import-cchain-reexecute-range
         vars:
@@ -250,6 +253,7 @@ tasks:
           BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE}}'
           METRICS_SERVER_ENABLED: '{{.METRICS_SERVER_ENABLED}}'
           METRICS_COLLECTOR_ENABLED: '{{.METRICS_COLLECTOR_ENABLED}}'
+          METRICS_SERVER_PORT: '{{.METRICS_SERVER_PORT}}'
 
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests
