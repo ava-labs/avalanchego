@@ -9,11 +9,21 @@ import (
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow/consensus/simplex"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowball"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-var errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
+var (
+	errAllowedNodesWhenNotValidatorOnly = errors.New("allowedNodes can only be set when ValidatorOnly is true")
+	errMissingConsensusParameters       = errors.New("consensus config must have either snowball or simplex parameters set")
+	errTwoConfigs                       = errors.New("subnet config must have exactly one of snowball or simplex parameters set")
+)
+
+type ConsensusParameters struct {
+	SnowballParams *snowball.Parameters `json:"snowballParameters,omitempty" yaml:"snowballParameters,omitempty"`
+	SimplexParams  *simplex.Parameters  `json:"simplexParameters,omitempty"  yaml:"simplexParameters,omitempty"`
+}
 
 type Config struct {
 	// ValidatorOnly indicates that this Subnet's Chains are available to only subnet validators.
@@ -24,7 +34,7 @@ type Config struct {
 	// AllowedNodes is the set of node IDs that are explicitly allowed to connect to this Subnet when
 	// ValidatorOnly is enabled.
 	AllowedNodes        set.Set[ids.NodeID] `json:"allowedNodes"        yaml:"allowedNodes"`
-	ConsensusParameters snowball.Parameters `json:"consensusParameters" yaml:"consensusParameters"`
+	ConsensusParameters ConsensusParameters `json:"consensusParameters" yaml:"consensusParameters"`
 
 	// ProposerMinBlockDelay is the minimum delay this node will enforce when
 	// building a snowman++ block.
@@ -59,4 +69,19 @@ func (c *Config) Valid() error {
 		return errAllowedNodesWhenNotValidatorOnly
 	}
 	return nil
+}
+
+func (c *ConsensusParameters) Verify() error {
+	if c.SnowballParams == nil && c.SimplexParams == nil {
+		return errMissingConsensusParameters
+	}
+	if c.SnowballParams != nil && c.SimplexParams != nil {
+		return errTwoConfigs
+	}
+
+	if c.SimplexParams != nil {
+		return c.SimplexParams.Verify()
+	}
+
+	return c.SnowballParams.Verify()
 }
