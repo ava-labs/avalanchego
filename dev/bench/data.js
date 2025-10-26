@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1761407049640,
+  "lastUpdate": 1761491400846,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -2514,6 +2514,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
             "value": 39.84,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jonathan Oppenheimer",
+            "username": "JonathanOppenheimer",
+            "email": "jonathan.oppenheimer@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "37747dd9bfdd97a4917c69327a36ad22115ef5f8",
+          "message": "uplift `database` package from evm repositories (#4331)\n\nSigned-off-by: Jonathan Oppenheimer <147infiniti@gmail.com>\nCo-authored-by: rodrigo <77309055+RodrigoVillar@users.noreply.github.com>\nCo-authored-by: Joshua Kim <20001595+joshua-kim@users.noreply.github.com>",
+          "timestamp": "2025-10-24T19:15:46Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/37747dd9bfdd97a4917c69327a36ad22115ef5f8"
+        },
+        "date": 1761491398774,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
+            "value": 43.7,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
