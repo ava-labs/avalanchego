@@ -4,7 +4,6 @@
 package rpcchainvm
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -95,21 +94,21 @@ func TestContextVMSummary(t *testing.T) {
 
 	// Create and start the plugin
 	vm := buildClientHelper(require, testKey)
-	defer vm.runtime.Stop(context.Background())
+	defer vm.runtime.Stop(t.Context())
 
 	ctx := snowtest.Context(t, snowtest.CChainID)
 
-	require.NoError(vm.Initialize(context.Background(), ctx, memdb.New(), nil, nil, nil, nil, nil))
+	require.NoError(vm.Initialize(t.Context(), ctx, memdb.New(), nil, nil, nil, nil, nil))
 
-	blkIntf, err := vm.BuildBlockWithContext(context.Background(), blockContext)
+	blkIntf, err := vm.BuildBlockWithContext(t.Context(), blockContext)
 	require.NoError(err)
 
 	blk, ok := blkIntf.(block.WithVerifyContext)
 	require.True(ok)
 
-	shouldVerify, err := blk.ShouldVerifyWithContext(context.Background())
+	shouldVerify, err := blk.ShouldVerifyWithContext(t.Context())
 	require.NoError(err)
 	require.True(shouldVerify)
 
-	require.NoError(blk.VerifyWithContext(context.Background(), blockContext))
+	require.NoError(blk.VerifyWithContext(t.Context(), blockContext))
 }

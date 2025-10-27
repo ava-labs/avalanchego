@@ -18,7 +18,7 @@ import (
 )
 
 func TestBlockBuilder(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	genesis := newTestBlock(t, newBlockConfig{})
 	child := newTestBlock(t, newBlockConfig{
 		prev: genesis,
@@ -93,7 +93,7 @@ func TestBlockBuilder(t *testing.T) {
 }
 
 func TestBlockBuilderCancelContext(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	vm := newTestVM()
 	genesis := newTestBlock(t, newBlockConfig{})
 	child := newTestBlock(t, newBlockConfig{
@@ -118,7 +118,7 @@ func TestBlockBuilderCancelContext(t *testing.T) {
 }
 
 func TestWaitForPendingBlock(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	vm := newTestVM()
 	genesis := newTestBlock(t, newBlockConfig{})
 	count := 0
@@ -141,7 +141,7 @@ func TestWaitForPendingBlock(t *testing.T) {
 }
 
 func TestBlockBuildingExponentialBackoff(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	vm := newTestVM()
 	genesis := newTestBlock(t, newBlockConfig{})
 	child := newTestBlock(t, newBlockConfig{
@@ -185,7 +185,7 @@ func TestBlockBuildingExponentialBackoff(t *testing.T) {
 }
 
 func TestWaitForPendingBlockBackoff(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	vm := newTestVM()
 	const (
 		failedAttempts       = 7

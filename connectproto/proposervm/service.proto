@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package proposervm;
+
+option go_package = "github.com/ava-labs/avalanchego/connectproto/pb/proposervm";
+
+// ProposerVM service provides RPCs for querying ProposerVM state.
+service ProposerVM {
+  // GetProposedHeight returns the P-Chain height that would be included in a
+  // block if it were proposed right now.
+  rpc GetProposedHeight(GetProposedHeightRequest) returns (GetProposedHeightReply);
+  // GetCurrentEpoch returns the epoch that would be included in a block if it
+  // were proposed right now.
+  rpc GetCurrentEpoch(GetCurrentEpochRequest) returns (GetCurrentEpochReply);
+}
+
+// Request to get the current proposed block height.
+message GetProposedHeightRequest {}
+
+// Response containing the current proposed P-chain block height.
+message GetProposedHeightReply {
+  // The P-chain height that would be included in a block if it were proposed
+  // right now.
+  uint64 height = 1;
+}
+
+// Request to get the current epoch.
+message GetCurrentEpochRequest {}
+
+// Response containing the current epoch.
+message GetCurrentEpochReply {
+  // Number of the current epoch.
+  uint64 number = 1;
+  // P-chain height which used to verify ICM messages for this epoch.
+  uint64 p_chain_height = 2;
+  // Start time of this epoch in Unix time (seconds).
+  int64 start_time = 3;
+}

@@ -60,6 +60,7 @@ linters:
     - tagalign
     - testifylint
     - unconvert
+    - usetesting
     - unparam
     - unused
     - usestdlibvars
@@ -199,6 +200,14 @@ linters:
       disable:
         - go-require
         - float-compare
+    usetesting:
+      os-create-temp:     true # Disallow `os.CreateTemp("", ...)`
+      os-mkdir-temp:      true # Disallow `os.MkdirTemp()`
+      os-setenv:          true # Disallow `os.Setenv()`
+      os-temp-dir:        true # Disallow `os.TempDir()`
+      os-chdir:           true # Disallow `os.Chdir()`
+      context-background: true # Disallow `context.Background()`
+      context-todo:       true # Disallow `context.TODO()`
     unused:
       # Mark all struct fields that have been written to as used.
       # Default: true
@@ -216,6 +225,15 @@ linters:
       - common-false-positives
       - legacy
       - std-error-handling
+    rules:
+      # Exclude some linters from running on test files.
+      # 1. Exclude the top level tests/ directory.
+      # 2. Exclude any file prefixed with test_ in any directory.
+      # 3. Exclude any directory suffixed with test.
+      # 4. Exclude any file suffixed with _test.go.
+      - path: "(^tests/)|(^(.*/)*test_[^/]*\\.go$)|(.*test/.*)|(.*_test\\.go$)"
+        linters:
+          - prealloc
 formatters:
   enable:
     - gci

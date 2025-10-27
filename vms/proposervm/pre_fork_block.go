@@ -148,6 +148,11 @@ func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkB
 		return errTimeTooAdvanced
 	}
 
+	// The first block after the fork should not have an epoch even if granite is activated.
+	if child.PChainEpoch() != (block.Epoch{}) {
+		return errEpochNotZero
+	}
+
 	// Verify the lack of signature on the node
 	if child.SignedBlock.Proposer() != ids.EmptyNodeID {
 		return errChildOfPreForkBlockHasProposer
@@ -159,6 +164,10 @@ func (b *preForkBlock) verifyPostForkChild(ctx context.Context, child *postForkB
 
 func (*preForkBlock) verifyPostForkOption(context.Context, *postForkOption) error {
 	return errUnexpectedBlockType
+}
+
+func (b *preForkBlock) selectChildPChainHeight(ctx context.Context) (uint64, error) {
+	return b.vm.selectChildPChainHeight(ctx, b.vm.Upgrades.ApricotPhase4MinPChainHeight)
 }
 
 func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
@@ -192,7 +201,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 
 	// The child's P-Chain height is proposed as the optimal P-Chain height that
 	// is at least the minimum height
-	pChainHeight, err := b.vm.selectChildPChainHeight(ctx, b.vm.Upgrades.ApricotPhase4MinPChainHeight)
+	pChainHeight, err := b.selectChildPChainHeight(ctx)
 	if err != nil {
 		b.vm.ctx.Log.Error("unexpected build block failure",
 			zap.String("reason", "failed to calculate optimal P-chain height"),
@@ -211,6 +220,7 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 		parentID,
 		newTimestamp,
 		pChainHeight,
+		block.Epoch{},
 		innerBlock.Bytes(),
 	)
 	if err != nil {
@@ -237,4 +247,8 @@ func (b *preForkBlock) buildChild(ctx context.Context) (Block, error) {
 
 func (*preForkBlock) pChainHeight(context.Context) (uint64, error) {
 	return 0, nil
+}
+
+func (*preForkBlock) pChainEpoch(context.Context) (block.Epoch, error) {
+	return block.Epoch{}, nil
 }

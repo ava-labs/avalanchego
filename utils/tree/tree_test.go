@@ -4,7 +4,6 @@
 package tree
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,7 +26,7 @@ func TestAcceptSingleBlock(t *testing.T) {
 	_, contains = tr.Get(block)
 	require.True(contains)
 
-	require.NoError(tr.Accept(context.Background(), block))
+	require.NoError(tr.Accept(t.Context(), block))
 	require.Equal(snowtest.Accepted, block.Status)
 
 	_, contains = tr.Get(block)
@@ -52,7 +51,7 @@ func TestAcceptBlockConflict(t *testing.T) {
 	require.True(contains)
 
 	// accept one of them
-	require.NoError(tr.Accept(context.Background(), blockToAccept))
+	require.NoError(tr.Accept(t.Context(), blockToAccept))
 
 	// check their statuses and that they are removed from the tree
 	require.Equal(snowtest.Accepted, blockToAccept.Status)
@@ -87,7 +86,7 @@ func TestAcceptChainConflict(t *testing.T) {
 	require.True(contains)
 
 	// accept one of them
-	require.NoError(tr.Accept(context.Background(), blockToAccept))
+	require.NoError(tr.Accept(t.Context(), blockToAccept))
 
 	// check their statuses and whether they are removed from tree
 	require.Equal(snowtest.Accepted, blockToAccept.Status)
