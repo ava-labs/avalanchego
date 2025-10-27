@@ -171,6 +171,12 @@ func verifyAddValidatorTx(
 	if err != nil {
 		return nil, err
 	}
+
+	producedAVAX, err = safemath.Add(fee, producedAVAX)
+	if err != nil {
+		return nil, fmt.Errorf("calculating total produced AVAX: %w", err)
+	}
+
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -178,7 +184,7 @@ func verifyAddValidatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: fee + producedAVAX,
+			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -269,6 +275,12 @@ func verifyAddSubnetValidatorTx(
 	if err != nil {
 		return err
 	}
+
+	producedAVAX, err = safemath.Add(fee, producedAVAX)
+	if err != nil {
+		return fmt.Errorf("calculating total produced AVAX: %w", err)
+	}
+
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -276,7 +288,7 @@ func verifyAddSubnetValidatorTx(
 		outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: fee + producedAVAX,
+			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -354,6 +366,12 @@ func verifyRemoveSubnetValidatorTx(
 	if err != nil {
 		return nil, false, err
 	}
+
+	producedAVAX, err = safemath.Add(fee, producedAVAX)
+	if err != nil {
+		return nil, false, fmt.Errorf("calculating total produced AVAX: %w", err)
+	}
+
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -361,7 +379,7 @@ func verifyRemoveSubnetValidatorTx(
 		outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: fee + producedAVAX,
+			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
 		return nil, false, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -475,6 +493,12 @@ func verifyAddDelegatorTx(
 	if err != nil {
 		return nil, err
 	}
+
+	producedAVAX, err = safemath.Add(producedAVAX, fee)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get total produced AVAX: %w", err)
+	}
+
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -482,7 +506,7 @@ func verifyAddDelegatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: fee + producedAVAX,
+			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -598,6 +622,12 @@ func verifyAddPermissionlessValidatorTx(
 	if err != nil {
 		return err
 	}
+
+	producedAVAX, err = safemath.Add(producedAVAX, fee)
+	if err != nil {
+		return fmt.Errorf("failed to get total produced AVAX: %w", err)
+	}
+
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -605,7 +635,7 @@ func verifyAddPermissionlessValidatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: fee + producedAVAX,
+			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -746,6 +776,12 @@ func verifyAddPermissionlessDelegatorTx(
 	if err != nil {
 		return err
 	}
+
+	producedAVAX, err = safemath.Add(producedAVAX, fee)
+	if err != nil {
+		return fmt.Errorf("failed to get total produced AVAX: %w", err)
+	}
+
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -753,7 +789,7 @@ func verifyAddPermissionlessDelegatorTx(
 		outs,
 		sTx.Creds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: fee + producedAVAX,
+			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
@@ -811,6 +847,12 @@ func verifyTransferSubnetOwnershipTx(
 	if err != nil {
 		return err
 	}
+
+	producedAVAX, err = safemath.Add(producedAVAX, fee)
+	if err != nil {
+		return fmt.Errorf("failed to get total produced AVAX: %w", err)
+	}
+
 	if err := backend.FlowChecker.VerifySpend(
 		tx,
 		chainState,
@@ -818,7 +860,7 @@ func verifyTransferSubnetOwnershipTx(
 		outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			backend.Ctx.AVAXAssetID: fee + producedAVAX,
+			backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
 		return fmt.Errorf("%w: %w", ErrFlowCheckFailed, err)
