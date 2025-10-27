@@ -5,6 +5,7 @@ package uptimetracker
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -16,6 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
+
+var errValidationIDNotFound = errors.New("validationID not found")
 
 // UptimeTracker tracks uptime information for validators
 type UptimeTracker struct {
@@ -64,7 +67,11 @@ func (u *UptimeTracker) GetUptime(validationID ids.ID) (
 
 	nodeID, ok := u.state.getNodeID(validationID)
 	if !ok {
-		return 0, time.Time{}, fmt.Errorf("validator %s not found", validationID)
+		return 0, time.Time{}, fmt.Errorf(
+			"validationID %s: %w",
+			validationID,
+			errValidationIDNotFound,
+		)
 	}
 
 	uptime, lastUpdated, err := u.manager.CalculateUptime(nodeID)
