@@ -476,7 +476,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			}
 
 			// nil out non subnet validators
-			subnetIndexes := make([]int, 0)
+			subnetIndexes := make([]int, 0, len(validatorsTimes))
 			for idx, ev := range validatorsTimes {
 				if ev.eventType == startSubnetValidator {
 					subnetIndexes = append(subnetIndexes, idx)
@@ -527,7 +527,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			}
 
 			// nil out non subnet validators
-			nonSubnetIndexes := make([]int, 0)
+			nonSubnetIndexes := make([]int, 0, len(validatorsTimes))
 			for idx, ev := range validatorsTimes {
 				if ev.eventType != startSubnetValidator {
 					nonSubnetIndexes = append(nonSubnetIndexes, idx)
