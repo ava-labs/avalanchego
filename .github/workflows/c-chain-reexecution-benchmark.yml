@@ -1,0 +1,364 @@
+name: C-Chain Re-Execution Benchmark
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task name to run'
+        required: false
+        default: 'c-chain-reexecution-hashdb-101-250k'
+        type: choice
+        options:
+          - c-chain-reexecution-hashdb-101-250k
+          - c-chain-reexecution-hashdb-archive-101-250k
+          - c-chain-reexecution-hashdb-33m-33m500k
+          - c-chain-reexecution-firewood-101-250k
+          - c-chain-reexecution-firewood-33m-33m500k
+      runner:
+        description: 'Runner to execute the benchmark'
+        required: false
+        default: 'ubuntu-latest'
+      self-hosted:
+        description: 'Use self-hosted runner with ARC container'
+        required: false
+        default: false
+        type: boolean
+      timeout-minutes:
+        description: 'Timeout in minutes for the job'
+        required: false
+        default: 30
+        type: number
+  schedule:
+    - cron: '0 9 * * *'
+
+jobs:
+  define-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix-native: ${{ steps.define-matrix.outputs.matrix-native }}
+      matrix-self-hosted: ${{ steps.define-matrix.outputs.matrix-self-hosted }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Define Matrix
+        id: define-matrix
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ github.event.inputs.self-hosted }}" == "true" ]]; then
+              {
+                echo "matrix-native<<EOF"
+                echo '{"include":[]}'
+                echo EOF
+                echo "matrix-self-hosted<<EOF"
+                printf '{"include":[{"task":"%s","runner":"%s","timeout-minutes":%s}]}\n' \
+                  "${{ github.event.inputs.task }}" \
+                  "${{ github.event.inputs.runner }}" \
+                  "${{ github.event.inputs.timeout-minutes }}"
+                echo EOF
+              } >> "$GITHUB_OUTPUT"
+            else
+              {
+                echo "matrix-native<<EOF"
+                printf '{"include":[{"task":"%s","runner":"%s","timeout-minutes":%s}]}\n' \
+                  "${{ github.event.inputs.task }}" \
+                  "${{ github.event.inputs.runner }}" \
+                  "${{ github.event.inputs.timeout-minutes }}"
+                echo EOF
+                echo "matrix-self-hosted<<EOF"
+                echo '{"include":[]}'
+                echo EOF
+              } >> "$GITHUB_OUTPUT"
+            fi
+          else
+            full_matrix=$(jq -r ".\"${{ github.event_name }}\"" .github/workflows/c-chain-reexecution-benchmark.json)
+            native_matrix=$(echo "$full_matrix" | jq '{include: [.include[] | select(.self_hosted == false)]})
+            self_hosted_matrix=$(echo "$full_matrix" | jq '{include: [.include[] | select(.self_hosted == true)]})
+            {
+              echo "matrix-native<<EOF"
+              echo "$native_matrix"
+              echo EOF
+              echo "matrix-self-hosted<<EOF"
+              echo "$self_hosted_matrix"
+              echo EOF
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+  c-chain-reexecution-native:
+    needs: define-matrix
+    if: ${{ fromJSON(needs.define-matrix.outputs.matrix-native).include[0] != null }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix-native) }}
+    timeout-minutes: ${{ matrix.timeout-minutes }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Nix
+        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify Nix installation
+        shell: bash
+        run: nix develop --command echo "Nix dependencies installed"
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        id: go-mod-cache
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum', 'tools/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-mod-
+      - name: Cache Go build
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/go-build
+          key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.sum', 'tools/go.sum') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
+      - name: Download Go modules
+        if: steps.go-mod-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: nix develop --command go mod download
+      - name: Download tools Go modules
+        if: steps.go-mod-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          if [[ -f tools/go.mod ]]; then
+            nix develop --command go mod download -modfile=tools/go.mod
+          fi
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: us-east-2
+      - name: Show Grafana Dashboard Link
+        if: ${{ secrets.PROMETHEUS_URL != '' }}
+        shell: bash
+        run: |
+          from_timestamp="$(date '+%s')"
+          monitoring_period=900
+          to_timestamp="$((from_timestamp + monitoring_period))"
+          grafana_url="https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain"
+          grafana_url="${grafana_url}?orgId=1&refresh=10s"
+          grafana_url="${grafana_url}&var-filter=is_ephemeral_node%7C%3D%7Cfalse"
+          grafana_url="${grafana_url}&var-filter=gh_repo%7C%3D%7C${{ github.repository }}"
+          grafana_url="${grafana_url}&var-filter=gh_run_id%7C%3D%7C${{ github.run_id }}"
+          grafana_url="${grafana_url}&var-filter=gh_run_attempt%7C%3D%7C${{ github.run_attempt }}"
+          grafana_url="${grafana_url}&var-filter=gh_job_id%7C%3D%7C${{ github.job }}"
+          grafana_url="${grafana_url}&from=${from_timestamp}000&to=${to_timestamp}000"
+          echo "Grafana: ${grafana_url}"
+          echo "🔗 [View Grafana Dashboard](${grafana_url})" >> "$GITHUB_STEP_SUMMARY"
+      - name: Warn about missing monitoring credentials
+        if: ${{ secrets.PROMETHEUS_URL == '' }}
+        shell: bash
+        run: echo "::warning::Monitoring credentials not found. Metrics collection will be skipped. Is this a PR from a fork?"
+      - name: Set execution data directory
+        id: exec-dir
+        shell: bash
+        run: |
+          TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
+          EXEC_DIR="${{ github.workspace }}/reexecution-data-${TIMESTAMP}"
+          echo "EXECUTION_DATA_DIR=${EXEC_DIR}" >> $GITHUB_OUTPUT
+          echo "Using execution directory: ${EXEC_DIR}"
+      - name: Run C-Chain Re-execution Benchmark
+        shell: nix develop --impure --command bash -x {0}
+        run: |
+          ./scripts/run_task.sh ${{ matrix.task }} \
+            RUNNER_NAME="${{ matrix.runner }}" \
+            BENCHMARK_OUTPUT_FILE="${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}/benchmark-output.txt" \
+            EXECUTION_DATA_DIR="${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}"
+        env:
+          TMPNET_START_METRICS_COLLECTOR: ${{ secrets.PROMETHEUS_URL != '' }}
+          TMPNET_START_LOGS_COLLECTOR: ${{ secrets.LOKI_URL != '' }}
+          TMPNET_CHECK_METRICS_COLLECTED: ${{ secrets.PROMETHEUS_URL != '' }}
+          TMPNET_CHECK_LOGS_COLLECTED: ${{ secrets.LOKI_URL != '' }}
+          PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
+          PROMETHEUS_PUSH_URL: ${{ secrets.PROMETHEUS_PUSH_URL }}
+          PROMETHEUS_USERNAME: ${{ secrets.PROMETHEUS_USERNAME }}
+          PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
+          LOKI_URL: ${{ secrets.LOKI_URL }}
+          LOKI_PUSH_URL: ${{ secrets.LOKI_PUSH_URL }}
+          LOKI_USERNAME: ${{ secrets.LOKI_USERNAME }}
+          LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
+          GH_REPO: ${{ github.repository }}
+          GH_WORKFLOW: ${{ github.workflow }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_RUN_NUMBER: ${{ github.run_number }}
+          GH_RUN_ATTEMPT: ${{ github.run_attempt }}
+          GH_JOB_ID: ${{ github.job }}
+          AWS_REGION: us-east-2
+          AWS_DEFAULT_REGION: us-east-2
+      - name: Upload monitoring data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.task }}-${{ matrix.runner }}-monitoring
+          path: |
+            ~/.tmpnet/networks
+            ~/.tmpnet/prometheus/prometheus.log
+            ~/.tmpnet/promtail/promtail.log
+          if-no-files-found: warn
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.task }}-${{ matrix.runner }}-results
+          path: |
+            ${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}/benchmark-output.txt
+            ${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}
+          if-no-files-found: warn
+      - name: Compare Benchmark Results
+        if: always()
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'go'
+          output-file-path: ${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}/benchmark-output.txt
+          summary-always: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: ${{ github.event_name == 'schedule' }}
+
+  c-chain-reexecution-self-hosted:
+    needs: define-matrix
+    if: ${{ fromJSON(needs.define-matrix.outputs.matrix-self-hosted).include[0] != null }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix-self-hosted) }}
+    timeout-minutes: ${{ matrix.timeout-minutes }}
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: ghcr.io/actions/actions-runner:2.325.0
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ARC Dependencies
+        shell: bash
+        run: |
+          if ! command -v xz &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y xz-utils
+          fi
+      - name: Install Nix
+        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Verify Nix installation
+        shell: bash
+        run: nix develop --command echo "Nix dependencies installed"
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        id: go-mod-cache
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum', 'tools/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-mod-
+      - name: Cache Go build
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/go-build
+          key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.sum', 'tools/go.sum') }}
+          restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
+      - name: Download Go modules
+        if: steps.go-mod-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: nix develop --command go mod download
+      - name: Download tools Go modules
+        if: steps.go-mod-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          if [[ -f tools/go.mod ]]; then
+            nix develop --command go mod download -modfile=tools/go.mod
+          fi
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: us-east-2
+      - name: Show Grafana Dashboard Link
+        if: ${{ secrets.PROMETHEUS_URL != '' }}
+        shell: bash
+        run: |
+          from_timestamp="$(date '+%s')"
+          monitoring_period=900
+          to_timestamp="$((from_timestamp + monitoring_period))"
+          grafana_url="https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain"
+          grafana_url="${grafana_url}?orgId=1&refresh=10s"
+          grafana_url="${grafana_url}&var-filter=is_ephemeral_node%7C%3D%7Cfalse"
+          grafana_url="${grafana_url}&var-filter=gh_repo%7C%3D%7C${{ github.repository }}"
+          grafana_url="${grafana_url}&var-filter=gh_run_id%7C%3D%7C${{ github.run_id }}"
+          grafana_url="${grafana_url}&var-filter=gh_run_attempt%7C%3D%7C${{ github.run_attempt }}"
+          grafana_url="${grafana_url}&var-filter=gh_job_id%7C%3D%7C${{ github.job }}"
+          grafana_url="${grafana_url}&from=${from_timestamp}000&to=${to_timestamp}000"
+          echo "Grafana: ${grafana_url}"
+          echo "🔗 [View Grafana Dashboard](${grafana_url})" >> "$GITHUB_STEP_SUMMARY"
+      - name: Warn about missing monitoring credentials
+        if: ${{ secrets.PROMETHEUS_URL == '' }}
+        shell: bash
+        run: echo "::warning::Monitoring credentials not found. Metrics collection will be skipped. Is this a PR from a fork?"
+      - name: Set execution data directory
+        id: exec-dir
+        shell: bash
+        run: |
+          TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
+          EXEC_DIR="${{ github.workspace }}/reexecution-data-${TIMESTAMP}"
+          echo "EXECUTION_DATA_DIR=${EXEC_DIR}" >> $GITHUB_OUTPUT
+          echo "Using execution directory: ${EXEC_DIR}"
+      - name: Run C-Chain Re-execution Benchmark
+        shell: nix develop --impure --command bash -x {0}
+        run: |
+          ./scripts/run_task.sh ${{ matrix.task }} \
+            RUNNER_NAME="${{ matrix.runner }}" \
+            BENCHMARK_OUTPUT_FILE="${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}/benchmark-output.txt" \
+            EXECUTION_DATA_DIR="${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}"
+        env:
+          TMPNET_START_METRICS_COLLECTOR: ${{ secrets.PROMETHEUS_URL != '' }}
+          TMPNET_START_LOGS_COLLECTOR: ${{ secrets.LOKI_URL != '' }}
+          TMPNET_CHECK_METRICS_COLLECTED: ${{ secrets.PROMETHEUS_URL != '' }}
+          TMPNET_CHECK_LOGS_COLLECTED: ${{ secrets.LOKI_URL != '' }}
+          PROMETHEUS_URL: ${{ secrets.PROMETHEUS_URL }}
+          PROMETHEUS_PUSH_URL: ${{ secrets.PROMETHEUS_PUSH_URL }}
+          PROMETHEUS_USERNAME: ${{ secrets.PROMETHEUS_USERNAME }}
+          PROMETHEUS_PASSWORD: ${{ secrets.PROMETHEUS_PASSWORD }}
+          LOKI_URL: ${{ secrets.LOKI_URL }}
+          LOKI_PUSH_URL: ${{ secrets.LOKI_PUSH_URL }}
+          LOKI_USERNAME: ${{ secrets.LOKI_USERNAME }}
+          LOKI_PASSWORD: ${{ secrets.LOKI_PASSWORD }}
+          GH_REPO: ${{ github.repository }}
+          GH_WORKFLOW: ${{ github.workflow }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_RUN_NUMBER: ${{ github.run_number }}
+          GH_RUN_ATTEMPT: ${{ github.run_attempt }}
+          GH_JOB_ID: ${{ github.job }}
+          AWS_REGION: us-east-2
+          AWS_DEFAULT_REGION: us-east-2
+      - name: Upload monitoring data
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.task }}-${{ matrix.runner }}-monitoring
+          path: |
+            ~/.tmpnet/networks
+            ~/.tmpnet/prometheus/prometheus.log
+            ~/.tmpnet/promtail/promtail.log
+          if-no-files-found: warn
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.task }}-${{ matrix.runner }}-results
+          path: |
+            ${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}/benchmark-output.txt
+            ${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}
+          if-no-files-found: warn
+      - name: Compare Benchmark Results
+        if: always()
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'go'
+          output-file-path: ${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}/benchmark-output.txt
+          summary-always: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: ${{ github.event_name == 'schedule' }}

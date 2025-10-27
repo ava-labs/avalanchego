@@ -272,6 +272,25 @@ tasks:
           METRICS_SERVER_ENABLED: '{{.MONITORING_ENABLED}}'
           METRICS_COLLECTOR_ENABLED: '{{.MONITORING_ENABLED}}'
 
+  c-chain-reexecution-hashdb-archive-101-250k:
+    desc: C-Chain re-execution from block 101 to 250k with hashdb archive
+    vars:
+      MONITORING_ENABLED: '{{if or .PROMETHEUS_URL .LOKI_URL}}true{{else}}false{{end}}'
+      TIMESTAMP: '{{now | date "20060102-150405"}}'
+      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/cchain-reexecution-hashdb-archive-101-250k-%s" .TIMESTAMP)}}'
+    cmds:
+      - task: reexecute-cchain-range-with-copied-data
+        vars:
+          AWS_REGION: us-east-2
+          EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+          START_BLOCK: 101
+          END_BLOCK: 250000
+          BLOCK_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**
+          CURRENT_STATE_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-archive-100/**
+          CONFIG: archive
+          METRICS_SERVER_ENABLED: '{{.MONITORING_ENABLED}}'
+          METRICS_COLLECTOR_ENABLED: '{{.MONITORING_ENABLED}}'
+
   c-chain-reexecution-hashdb-33m-33m500k:
     desc: C-Chain re-execution from block 33m to 33.5m with hashdb
     vars:
@@ -290,7 +309,7 @@ tasks:
           METRICS_COLLECTOR_ENABLED: '{{.MONITORING_ENABLED}}'
 
   c-chain-reexecution-firewood-101-250k:
-    desc: C-Chain re-execution from block 101 to 250k with hashdb
+    desc: C-Chain re-execution from block 101 to 250k with Firewood
     vars:
       MONITORING_ENABLED: '{{if or .PROMETHEUS_URL .LOKI_URL}}true{{else}}false{{end}}'
       TIMESTAMP: '{{now | date "20060102-150405"}}'
@@ -309,7 +328,7 @@ tasks:
           METRICS_COLLECTOR_ENABLED: '{{.MONITORING_ENABLED}}'
 
   c-chain-reexecution-firewood-33m-33m500k:
-    desc: C-Chain re-execution from block 33m to 33.5m with hashdb
+    desc: C-Chain re-execution from block 33m to 33.5m with Firewood
     vars:
       MONITORING_ENABLED: '{{if or .PROMETHEUS_URL .LOKI_URL}}true{{else}}false{{end}}'
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/c-chain-reexecution-firewood-33m-33m500k-%s" .TIMESTAMP)}}'
