@@ -2157,20 +2157,10 @@ func golangBindings(t *testing.T, overload bool) {
 			import (
 				"testing"
 
-				"github.com/ava-labs/coreth/params"
-				"github.com/ava-labs/coreth/plugin/evm/customtypes"
-				libevmparams "github.com/ava-labs/libevm/params"
-				libevmtypes "github.com/ava-labs/libevm/core/types"
-
 				%s
 			)
 
 			func Test%s(t *testing.T) {
-				customtypes.Register()
-				t.Cleanup(libevmtypes.TestOnlyClearRegisteredExtras)
-				params.RegisterExtras()
-				t.Cleanup(libevmparams.TestOnlyClearRegisteredExtras)
-
 				%s
 			}
 		`, tt.imports, tt.name, tt.tester)
@@ -2179,6 +2169,30 @@ func golangBindings(t *testing.T, overload bool) {
 			}
 		})
 	}
+
+	// We must also write a main_test.go file for libevm registrations.
+	mainTest := `
+		package bindtest
+
+		import (
+			"os"
+			"testing"
+
+			"github.com/ava-labs/coreth/params"
+			"github.com/ava-labs/coreth/plugin/evm/customtypes"
+		)
+
+		func TestMain(m *testing.M) {
+			customtypes.Register()
+			params.RegisterExtras()
+			os.Exit(m.Run())
+		}
+	`
+	mainPath := filepath.Join(pkg, "main_test.go")
+	if err := os.WriteFile(mainPath, []byte(mainTest), 0600); err != nil {
+		t.Fatalf("os.WriteFile(%q, 0600): %v", mainPath, err)
+	}
+
 	// Convert the package to go modules and use the current source for go-ethereum
 	moder := exec.Command(gocmd, "mod", "init", "bindtest")
 	moder.Dir = pkg
@@ -2197,7 +2211,7 @@ func golangBindings(t *testing.T, overload bool) {
 		t.Fatalf("failed to tidy Go module file: %v\n%s", err, out)
 	}
 	// Test the entire package and report any failures
-	cmd := exec.Command(gocmd, "test", "-v", "-count", "1")
+	cmd := exec.Command(gocmd, "test", "-v", "-count", "1", "-race")
 	cmd.Dir = pkg
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("failed to run binding test: %v\n%s", err, out)
