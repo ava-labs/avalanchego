@@ -7,5 +7,4 @@ TestResumeSyncAccountsTrieInterrupted
 TestResyncNewRootAfterDeletes
 TestTransactionSkipIndexing
 TestUpdatedKeyfileContents
-TestWaitDeployedCornerCases
 TestWebsocketLargeRead
