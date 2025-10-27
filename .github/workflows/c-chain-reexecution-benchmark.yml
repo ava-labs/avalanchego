@@ -72,8 +72,8 @@ jobs:
             fi
           else
             full_matrix=$(jq -r ".\"${{ github.event_name }}\"" .github/workflows/c-chain-reexecution-benchmark.json)
-            native_matrix=$(echo "$full_matrix" | jq '{include: [.include[] | select(.self_hosted == false)]})
-            self_hosted_matrix=$(echo "$full_matrix" | jq '{include: [.include[] | select(.self_hosted == true)]})
+            native_matrix=$(echo "$full_matrix" | jq '{include: [.include[] | select(.self_hosted == false)]}')
+            self_hosted_matrix=$(echo "$full_matrix" | jq '{include: [.include[] | select(.self_hosted == true)]}')
             {
               echo "matrix-native<<EOF"
               echo "$native_matrix"
@@ -86,7 +86,7 @@ jobs:
 
   c-chain-reexecution-native:
     needs: define-matrix
-    if: ${{ fromJSON(needs.define-matrix.outputs.matrix-native).include[0] != null }}
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix-native) }}
@@ -221,7 +221,7 @@ jobs:
 
   c-chain-reexecution-self-hosted:
     needs: define-matrix
-    if: ${{ fromJSON(needs.define-matrix.outputs.matrix-self-hosted).include[0] != null }}
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix-self-hosted) }}
