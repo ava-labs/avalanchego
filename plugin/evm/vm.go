@@ -34,6 +34,7 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
+	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -71,8 +72,6 @@ import (
 	"github.com/ava-labs/subnet-evm/plugin/evm/extension"
 	"github.com/ava-labs/subnet-evm/plugin/evm/gossip"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
-	"github.com/ava-labs/subnet-evm/plugin/evm/validators"
-	"github.com/ava-labs/subnet-evm/plugin/evm/validators/interfaces"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ava-labs/subnet-evm/sync/client/stats"
@@ -107,6 +106,8 @@ const (
 	unverifiedCacheSize    = 5 * units.MiB
 	bytesToIDCacheSize     = 5 * units.MiB
 	warpSignatureCacheSize = 500
+
+	syncFrequency = 1 * time.Minute
 
 	// Prefixes for metrics gatherers
 	ethMetricsPrefix        = "eth"
@@ -257,7 +258,7 @@ type VM struct {
 	ethTxPushGossiper  avalancheUtils.Atomic[*avalanchegossip.PushGossiper[*GossipEthTx]]
 	ethTxPullGossiper  avalanchegossip.Gossiper
 
-	validatorsManager interfaces.Manager
+	uptimeTracker *uptimetracker.UptimeTracker
 
 	chainAlias string
 	// RPC handlers (should be stopped before closing chaindb)
@@ -456,9 +457,9 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to create network: %w", err)
 	}
 
-	vm.validatorsManager, err = validators.NewManager(vm.ctx, vm.validatorsDB, vm.clock)
+	vm.uptimeTracker, err = uptimetracker.New(vm.ctx.ValidatorState, vm.ctx.SubnetID, vm.validatorsDB, vm.clock)
 	if err != nil {
-		return fmt.Errorf("failed to initialize validators manager: %w", err)
+		return fmt.Errorf("failed to initialize uptime tracker: %w", err)
 	}
 
 	// Initialize warp backend
@@ -484,7 +485,7 @@ func (vm *VM) Initialize(
 		vm.ctx.ChainID,
 		vm.ctx.WarpSigner,
 		vm,
-		validators.NewLockedValidatorReader(vm.validatorsManager, &vm.vmLock),
+		vm.uptimeTracker,
 		vm.warpDB,
 		meteredCache,
 		offchainWarpMessages,
@@ -776,16 +777,26 @@ func (vm *VM) onNormalOperationsStarted() error {
 	ctx, cancel := context.WithCancel(context.TODO())
 	vm.cancel = cancel
 
-	// Start the validators manager
-	if err := vm.validatorsManager.Initialize(ctx); err != nil {
-		return fmt.Errorf("failed to initialize validators manager: %w", err)
-	}
+	// Initially sync the uptime tracker so that APIs expose recent data even if
+	// called immediately after bootstrapping.
+	vm.uptimeTracker.Sync(ctx)
 
-	// dispatch validator set update
 	vm.shutdownWg.Add(1)
 	go func() {
-		vm.validatorsManager.DispatchSync(ctx, &vm.vmLock)
-		vm.shutdownWg.Done()
+		defer vm.shutdownWg.Done()
+		ticker := time.NewTicker(syncFrequency)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := vm.uptimeTracker.Sync(ctx); err != nil {
+					log.Error("failed to sync uptime tracker", "err", err)
+				}
+			}
+		}
 	}()
 
 	// Initialize goroutines related to block building
@@ -947,8 +958,8 @@ func (vm *VM) Shutdown(context.Context) error {
 		vm.cancel()
 	}
 	if vm.bootstrapped.Get() {
-		if err := vm.validatorsManager.Shutdown(); err != nil {
-			return fmt.Errorf("failed to shutdown validators manager: %w", err)
+		if err := vm.uptimeTracker.Shutdown(); err != nil {
+			return fmt.Errorf("failed to shutdown uptime tracker: %w", err)
 		}
 	}
 	vm.Network.Shutdown()
@@ -1343,9 +1354,10 @@ func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version
 	vm.vmLock.Lock()
 	defer vm.vmLock.Unlock()
 
-	if err := vm.validatorsManager.Connect(nodeID); err != nil {
-		return fmt.Errorf("uptime manager failed to connect node %s: %w", nodeID, err)
+	if err := vm.uptimeTracker.Connect(nodeID); err != nil {
+		return fmt.Errorf("uptime tracker failed to connect node %s: %w", nodeID, err)
 	}
+
 	return vm.Network.Connected(ctx, nodeID, version)
 }
 
@@ -1353,8 +1365,8 @@ func (vm *VM) Disconnected(ctx context.Context, nodeID ids.NodeID) error {
 	vm.vmLock.Lock()
 	defer vm.vmLock.Unlock()
 
-	if err := vm.validatorsManager.Disconnect(nodeID); err != nil {
-		return fmt.Errorf("uptime manager failed to disconnect node %s: %w", nodeID, err)
+	if err := vm.uptimeTracker.Disconnect(nodeID); err != nil {
+		return fmt.Errorf("uptime tracker failed to disconnect node %s: %w", nodeID, err)
 	}
 
 	return vm.Network.Disconnected(ctx, nodeID)

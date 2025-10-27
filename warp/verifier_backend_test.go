@@ -5,7 +5,7 @@ package warp
 
 import (
 	"context"
-	"sync"
+	"fmt"
 	"testing"
 	"time"
 
@@ -16,19 +16,20 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
+	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/evm/metrics/metricstest"
+	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ava-labs/subnet-evm/plugin/evm/validators"
 	"github.com/ava-labs/subnet-evm/utils/utilstest"
 	"github.com/ava-labs/subnet-evm/warp/messages"
 	"github.com/ava-labs/subnet-evm/warp/warptest"
 
 	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	stateinterfaces "github.com/ava-labs/subnet-evm/plugin/evm/validators/state/interfaces"
 )
 
 func TestAddressedCallSignatures(t *testing.T) {
@@ -228,7 +229,7 @@ func TestBlockSignatures(t *testing.T) {
 					snowCtx.ChainID,
 					snowCtx.WarpSigner,
 					blockClient,
-					warptest.NoOpValidatorReader{},
+					nil,
 					database,
 					sigCache,
 					nil,
@@ -274,6 +275,10 @@ func TestUptimeSignatures(t *testing.T) {
 	database := memdb.New()
 	snowCtx := utilstest.NewTestSnowContext(t)
 
+	validationID := ids.GenerateTestID()
+	nodeID := ids.GenerateTestNodeID()
+	startTime := uint64(time.Now().Unix())
+
 	getUptimeMessageBytes := func(sourceAddress []byte, vID ids.ID) ([]byte, *avalancheWarp.UnsignedMessage) {
 		uptimePayload, err := messages.NewValidatorUptime(vID, 80)
 		require.NoError(t, err)
@@ -295,19 +300,42 @@ func TestUptimeSignatures(t *testing.T) {
 		} else {
 			sigCache = &cache.Empty[ids.ID, []byte]{}
 		}
-		chainCtx := utilstest.NewTestSnowContext(t)
+
+		// Create a validator state that includes our test validator
+		// TODO(JonathanOppenheimer): see func NewTestValidatorState() -- this should be examined
+		// when we address the issue of that function.
+		validatorState := &validatorstest.State{
+			GetCurrentValidatorSetF: func(context.Context, ids.ID) (map[ids.ID]*validators.GetCurrentValidatorOutput, uint64, error) {
+				return map[ids.ID]*validators.GetCurrentValidatorOutput{
+					validationID: {
+						ValidationID:  validationID,
+						NodeID:        nodeID,
+						Weight:        1,
+						StartTime:     startTime,
+						IsActive:      true,
+						IsL1Validator: true,
+					},
+				}, 0, nil
+			},
+		}
+
 		clk := &mockable.Clock{}
-		validatorsManager, err := validators.NewManager(chainCtx, memdb.New(), clk)
+		uptimeTracker, err := uptimetracker.New(
+			validatorState,
+			snowCtx.SubnetID,
+			memdb.New(),
+			clk,
+		)
 		require.NoError(t, err)
-		lock := &sync.RWMutex{}
-		newLockedValidatorManager := validators.NewLockedValidatorReader(validatorsManager, lock)
-		validatorsManager.StartTracking([]ids.NodeID{})
+
+		require.NoError(t, uptimeTracker.Sync(context.Background()))
+
 		warpBackend, err := NewBackend(
 			snowCtx.NetworkID,
 			snowCtx.ChainID,
 			snowCtx.WarpSigner,
 			warptest.EmptyBlockClient,
-			newLockedValidatorManager,
+			uptimeTracker,
 			database,
 			sigCache,
 			nil,
@@ -319,40 +347,30 @@ func TestUptimeSignatures(t *testing.T) {
 		protoBytes, _ := getUptimeMessageBytes([]byte{1, 2, 3}, ids.GenerateTestID())
 		_, appErr := handler.AppRequest(context.Background(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
 		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
-		require.Contains(t, appErr.Error(), "source address should be empty")
+		require.Equal(t, "2: source address should be empty for offchain addressed messages", appErr.Error())
 
 		// not existing validationID
 		vID := ids.GenerateTestID()
 		protoBytes, _ = getUptimeMessageBytes([]byte{}, vID)
 		_, appErr = handler.AppRequest(context.Background(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
 		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
-		require.Contains(t, appErr.Error(), "failed to get validator")
+		require.Equal(t, fmt.Sprintf("2: validator not found for validationID %s", vID), appErr.Error())
 
 		// uptime is less than requested (not connected)
-		validationID := ids.GenerateTestID()
-		nodeID := ids.GenerateTestNodeID()
-		require.NoError(t, validatorsManager.AddValidator(stateinterfaces.Validator{
-			ValidationID:   validationID,
-			NodeID:         nodeID,
-			Weight:         1,
-			StartTimestamp: clk.Unix(),
-			IsActive:       true,
-			IsL1Validator:  true,
-		}))
 		protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID)
 		_, appErr = handler.AppRequest(context.Background(), nodeID, time.Time{}, protoBytes)
 		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
-		require.Contains(t, appErr.Error(), "current uptime 0 is less than queried uptime 80")
+		require.Equal(t, fmt.Sprintf("2: current uptime 0 is less than queried uptime 80 for validationID %s", validationID), appErr.Error())
 
-		// uptime is less than requested (not enough)
-		require.NoError(t, validatorsManager.Connect(nodeID))
+		// uptime is less than requested (not enough time)
+		require.NoError(t, uptimeTracker.Connect(nodeID))
 		clk.Set(clk.Time().Add(40 * time.Second))
 		protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID)
 		_, appErr = handler.AppRequest(context.Background(), nodeID, time.Time{}, protoBytes)
 		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
-		require.Contains(t, appErr.Error(), "current uptime 40 is less than queried uptime 80")
+		require.Equal(t, fmt.Sprintf("2: current uptime 40 is less than queried uptime 80 for validationID %s", validationID), appErr.Error())
 
-		// valid uptime
+		// valid uptime (enough time has passed)
 		clk.Set(clk.Time().Add(40 * time.Second))
 		protoBytes, msg := getUptimeMessageBytes([]byte{}, validationID)
 		responseBytes, appErr := handler.AppRequest(context.Background(), nodeID, time.Time{}, protoBytes)

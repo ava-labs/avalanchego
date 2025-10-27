@@ -18,61 +18,65 @@ type ValidatorsAPI struct {
 	vm *VM
 }
 
-func (api *ValidatorsAPI) GetCurrentValidators(_ *http.Request, req *client.GetCurrentValidatorsRequest, reply *client.GetCurrentValidatorsResponse) error {
+func (api *ValidatorsAPI) GetCurrentValidators(httpReq *http.Request, req *client.GetCurrentValidatorsRequest, reply *client.GetCurrentValidatorsResponse) error {
 	api.vm.vmLock.RLock()
 	defer api.vm.vmLock.RUnlock()
+	ctx := httpReq.Context()
 
-	var vIDs set.Set[ids.ID]
-	if len(req.NodeIDs) > 0 {
-		vIDs = set.NewSet[ids.ID](len(req.NodeIDs))
-		for _, nodeID := range req.NodeIDs {
-			vID, err := api.vm.validatorsManager.GetValidationID(nodeID)
-			if err != nil {
-				return fmt.Errorf("couldn't find validator with node ID %s", nodeID)
-			}
-			vIDs.Add(vID)
-		}
-	} else {
-		vIDs = api.vm.validatorsManager.GetValidationIDs()
+	validatorSet, _, err := api.vm.ctx.ValidatorState.GetCurrentValidatorSet(ctx, api.vm.ctx.SubnetID)
+	if err != nil {
+		return fmt.Errorf("failed to get current validator set: %w", err)
 	}
 
-	reply.Validators = make([]client.CurrentValidator, 0, vIDs.Len())
+	// Filter by requested nodeIDs if specified
+	requestedNodeIDs := set.NewSet[ids.NodeID](len(req.NodeIDs))
+	if len(req.NodeIDs) > 0 {
+		for _, nodeID := range req.NodeIDs {
+			requestedNodeIDs.Add(nodeID)
+		}
+	}
 
-	for _, vID := range vIDs.List() {
-		validator, err := api.vm.validatorsManager.GetValidator(vID)
-		if err != nil {
-			return fmt.Errorf("couldn't find validator with validation ID %s", vID)
+	reply.Validators = make([]client.CurrentValidator, 0, len(validatorSet))
+	for validationID, validator := range validatorSet {
+		// Skip if specific nodeIDs were requested and this isn't one of them
+		if requestedNodeIDs.Len() > 0 && !requestedNodeIDs.Contains(validator.NodeID) {
+			continue
 		}
 
-		isConnected := api.vm.validatorsManager.IsConnected(validator.NodeID)
-
-		upDuration, lastUpdated, err := api.vm.validatorsManager.CalculateUptime(validator.NodeID)
+		upDuration, lastUpdated, found, err := api.vm.uptimeTracker.GetUptime(validationID)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get uptime for validation ID %s: %w", validationID, err)
 		}
+		if !found {
+			return fmt.Errorf("validator not found for validation ID %s", validationID)
+		}
+
 		var uptimeFloat float64
-		startTime := time.Unix(int64(validator.StartTimestamp), 0)
+
+		startTime := time.Unix(int64(validator.StartTime), 0)
 		bestPossibleUpDuration := lastUpdated.Sub(startTime)
 		if bestPossibleUpDuration == 0 {
 			uptimeFloat = 1
 		} else {
 			uptimeFloat = float64(upDuration) / float64(bestPossibleUpDuration)
 		}
-
 		// Transform this to a percentage (0-100) to make it consistent
 		// with currentValidators in PlatformVM API
 		uptimePercentage := float32(uptimeFloat * 100)
+		uptimeSeconds := uint64(upDuration.Seconds())
+
+		isConnected := api.vm.P2PValidators().Has(ctx, validator.NodeID)
 
 		reply.Validators = append(reply.Validators, client.CurrentValidator{
-			ValidationID:     validator.ValidationID,
+			ValidationID:     validationID,
 			NodeID:           validator.NodeID,
-			StartTimestamp:   validator.StartTimestamp,
+			StartTimestamp:   validator.StartTime,
 			Weight:           validator.Weight,
 			IsActive:         validator.IsActive,
 			IsL1Validator:    validator.IsL1Validator,
 			IsConnected:      isConnected,
 			UptimePercentage: uptimePercentage,
-			UptimeSeconds:    uint64(upDuration.Seconds()),
+			UptimeSeconds:    uptimeSeconds,
 		})
 	}
 	return nil
