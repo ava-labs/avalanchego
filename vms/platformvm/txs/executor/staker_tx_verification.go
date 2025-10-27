@@ -172,7 +172,7 @@ func verifyAddValidatorTx(
 		return nil, err
 	}
 
-	producedAVAX, err = safemath.Add(fee, producedAVAX)
+	producedAVAX, err = safemath.Add(producedAVAX, fee)
 	if err != nil {
 		return nil, fmt.Errorf("calculating total produced AVAX: %w", err)
 	}
@@ -276,7 +276,7 @@ func verifyAddSubnetValidatorTx(
 		return err
 	}
 
-	producedAVAX, err = safemath.Add(fee, producedAVAX)
+	producedAVAX, err = safemath.Add(producedAVAX, fee)
 	if err != nil {
 		return fmt.Errorf("calculating total produced AVAX: %w", err)
 	}
@@ -367,7 +367,7 @@ func verifyRemoveSubnetValidatorTx(
 		return nil, false, err
 	}
 
-	producedAVAX, err = safemath.Add(fee, producedAVAX)
+	producedAVAX, err = safemath.Add(producedAVAX, fee)
 	if err != nil {
 		return nil, false, fmt.Errorf("calculating total produced AVAX: %w", err)
 	}
