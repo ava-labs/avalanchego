@@ -71,7 +71,7 @@ jobs:
               } >> "$GITHUB_OUTPUT"
             fi
           else
-            full_matrix=$(jq -r ".\"${{ github.event_name }}\"" .github/workflows/c-chain-reexecution-benchmark.json)
+            full_matrix=$(jq -r ".\"${{ github.event_name }}\"" .github/workflows/c-chain-reexecution-benchmark-config.json)
             native_matrix=$(echo "$full_matrix" | jq '{include: [.include[] | select(.self_hosted == false)]}')
             self_hosted_matrix=$(echo "$full_matrix" | jq '{include: [.include[] | select(.self_hosted == true)]}')
             {
