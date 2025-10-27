@@ -487,7 +487,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 					return validatorsMap, pChainHeight, nil
 				}
 
-				require.NoError(uptimeTracker.Sync(context.Background()))
+				require.NoError(uptimeTracker.Sync(t.Context()))
 			}
 
 			gotUptime, gotLastUpdated, err := uptimeTracker.GetUptime(
@@ -528,7 +528,7 @@ func TestUptimeTracker_Restart(t *testing.T) {
 	uptimeTracker, err := New(validatorState, subnetID, db, clock)
 	require.NoError(err)
 
-	require.NoError(uptimeTracker.Sync(context.Background()))
+	require.NoError(uptimeTracker.Sync(t.Context()))
 	require.NoError(uptimeTracker.Connect(nodeID))
 
 	clock.Set(start.Add(10 * time.Second))
@@ -542,7 +542,7 @@ func TestUptimeTracker_Restart(t *testing.T) {
 	clock.Set(start.Add(20 * time.Second))
 	uptimeTracker, err = New(validatorState, subnetID, db, clock)
 	require.NoError(err)
-	require.NoError(uptimeTracker.Sync(context.Background()))
+	require.NoError(uptimeTracker.Sync(t.Context()))
 
 	uptime, lastUpdated, err = uptimeTracker.GetUptime(validationID)
 	require.NoError(err)

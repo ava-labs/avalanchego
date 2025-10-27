@@ -140,7 +140,7 @@ func TestGetCanonicalValidatorSet(t *testing.T) {
 
 			state := tt.stateF(ctrl)
 
-			validators, err := GetCanonicalValidatorSetFromSubnetID(context.Background(), state, pChainHeight, subnetID)
+			validators, err := GetCanonicalValidatorSetFromSubnetID(t.Context(), state, pChainHeight, subnetID)
 			require.ErrorIs(err, tt.expectedErr)
 			if err != nil {
 				return
@@ -340,7 +340,7 @@ func BenchmarkGetCanonicalValidatorSet(b *testing.B) {
 
 		b.Run(strconv.Itoa(size), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, err := GetCanonicalValidatorSetFromSubnetID(context.Background(), validatorState, pChainHeight, subnetID)
+				_, err := GetCanonicalValidatorSetFromSubnetID(b.Context(), validatorState, pChainHeight, subnetID)
 				require.NoError(b, err)
 			}
 		})
