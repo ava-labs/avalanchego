@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1761578737763,
+  "lastUpdate": 1761594165675,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -2570,6 +2570,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
             "value": 41.99,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Stephen Buttolph",
+            "username": "StephenButtolph",
+            "email": "stephen@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "987bf538ddffdc9d625fd78bb5d16e1a1362377f",
+          "message": "Add usetesting linter (#4433)",
+          "timestamp": "2025-10-27T17:33:16Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/987bf538ddffdc9d625fd78bb5d16e1a1362377f"
+        },
+        "date": 1761594165110,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
+            "value": 73.79,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
