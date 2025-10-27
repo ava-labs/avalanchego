@@ -3,8 +3,12 @@
 
 package main
 
-import "github.com/ava-labs/avalanchego/tests/reexecute/c/cli/cmd"
+import (
+	"github.com/ava-labs/avalanchego/tests/reexecute/c/cli/cmd"
+	"github.com/ava-labs/coreth/plugin/evm"
+)
 
 func main() {
+	evm.RegisterAllLibEVMExtras()
 	cmd.Execute()
 }
