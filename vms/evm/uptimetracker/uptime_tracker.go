@@ -68,9 +68,9 @@ func (u *UptimeTracker) GetUptime(validationID ids.ID) (
 	nodeID, ok := u.state.getNodeID(validationID)
 	if !ok {
 		return 0, time.Time{}, fmt.Errorf(
-			"validationID %s: %w",
-			validationID,
+			"%w: %s",
 			errValidationIDNotFound,
+			validationID,
 		)
 	}
 
