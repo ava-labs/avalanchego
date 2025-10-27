@@ -4,7 +4,6 @@
 package bootstrapper
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -13,11 +12,11 @@ import (
 func TestNoop(t *testing.T) {
 	require := require.New(t)
 
-	require.Empty(Noop.GetPeers(context.Background()))
+	require.Empty(Noop.GetPeers(t.Context()))
 
-	require.NoError(Noop.RecordOpinion(context.Background(), nodeID0, nil))
+	require.NoError(Noop.RecordOpinion(t.Context(), nodeID0, nil))
 
-	blkIDs, finalized := Noop.Result(context.Background())
+	blkIDs, finalized := Noop.Result(t.Context())
 	require.Empty(blkIDs)
 	require.False(finalized)
 }
