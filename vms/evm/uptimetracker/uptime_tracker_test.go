@@ -33,9 +33,11 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 
 		wantUptime      time.Duration
 		wantLastUpdated time.Time
+		wantError       bool
 	}{
 		{
-			name: "no validators",
+			name:      "no validators",
+			wantError: true,
 		},
 		{
 			name: "one validator",
@@ -81,6 +83,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 				},
 			},
 			validationID: ids.ID{1},
+			wantError:    true,
 		},
 		{
 			name: "one validator deactivated",
@@ -278,6 +281,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 				},
 			},
 			validationID: ids.ID{1},
+			wantError:    true,
 		},
 		{
 			name: "connected inactive validator becomes active",
@@ -359,6 +363,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 				},
 			},
 			validationID: ids.ID{1},
+			wantError:    true,
 		},
 		{
 			name: "validator has no updates",
@@ -488,9 +493,13 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 			gotUptime, gotLastUpdated, err := uptimeTracker.GetUptime(
 				tt.validationID,
 			)
-			require.NoError(err)
-			require.Equal(tt.wantLastUpdated, gotLastUpdated)
-			require.Equal(tt.wantUptime, gotUptime)
+			if tt.wantError {
+				require.Error(err)
+			} else {
+				require.NoError(err)
+				require.Equal(tt.wantLastUpdated, gotLastUpdated)
+				require.Equal(tt.wantUptime, gotUptime)
+			}
 
 			require.NoError(uptimeTracker.Shutdown())
 		})
