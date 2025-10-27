@@ -38,7 +38,7 @@ type Database struct {
 	heightDB database.HeightIndex
 
 	calls    *prometheus.CounterVec
-	duration *prometheus.HistogramVec
+	duration *prometheus.GaugeVec
 	size     *prometheus.CounterVec
 }
 
@@ -57,13 +57,11 @@ func New(
 			},
 			methodLabels,
 		),
-		duration: prometheus.NewHistogramVec(
-			prometheus.HistogramOpts{
+		duration: prometheus.NewGaugeVec(
+			prometheus.GaugeOpts{
 				Namespace: namespace,
 				Name:      "duration",
-				Help:      "time spent in database calls (seconds)",
-				// Buckets to cover the expected performance range of db operations (1μs-1s)
-				Buckets: []float64{.000001, .00001, .0001, .001, .005, .01, .05, .1, .5, 1},
+				Help:      "time spent in database calls (ns)",
 			},
 			methodLabels,
 		),
@@ -89,7 +87,7 @@ func (db *Database) Put(height uint64, block []byte) error {
 	duration := time.Since(start)
 
 	db.calls.With(putLabel).Inc()
-	db.duration.With(putLabel).Observe(duration.Seconds())
+	db.duration.With(putLabel).Add(float64(duration.Nanoseconds()))
 	db.size.With(putLabel).Add(float64(len(block)))
 	return err
 }
@@ -100,7 +98,7 @@ func (db *Database) Get(height uint64) ([]byte, error) {
 	duration := time.Since(start)
 
 	db.calls.With(getLabel).Inc()
-	db.duration.With(getLabel).Observe(duration.Seconds())
+	db.duration.With(getLabel).Add(float64(duration.Nanoseconds()))
 	db.size.With(getLabel).Add(float64(len(block)))
 	return block, err
 }
@@ -111,7 +109,7 @@ func (db *Database) Has(height uint64) (bool, error) {
 	duration := time.Since(start)
 
 	db.calls.With(hasLabel).Inc()
-	db.duration.With(hasLabel).Observe(duration.Seconds())
+	db.duration.With(hasLabel).Add(float64(duration.Nanoseconds()))
 	return has, err
 }
 
@@ -121,6 +119,6 @@ func (db *Database) Close() error {
 	duration := time.Since(start)
 
 	db.calls.With(closeLabel).Inc()
-	db.duration.With(closeLabel).Observe(duration.Seconds())
+	db.duration.With(closeLabel).Add(float64(duration.Nanoseconds()))
 	return err
 }
