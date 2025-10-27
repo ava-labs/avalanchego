@@ -86,7 +86,7 @@ jobs:
 
   c-chain-reexecution-native:
     needs: define-matrix
-#    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ fromJSON(needs.define-matrix.outputs.matrix-native).include[0] != null }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix-native) }}
@@ -221,7 +221,7 @@ jobs:
 
   c-chain-reexecution-self-hosted:
     needs: define-matrix
-#    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ fromJSON(needs.define-matrix.outputs.matrix-self-hosted).include[0] != null }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix-self-hosted) }}
