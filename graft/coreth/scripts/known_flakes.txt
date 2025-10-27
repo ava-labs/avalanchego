@@ -1,6 +1,5 @@
 TestClientCancelWebsocket
 TestClientWebsocketLargeMessage
-TestGolangBindings
 TestMempoolAtmTxsAppGossipHandlingDiscardedTx
 TestMempoolEthTxsAppGossipHandling
 TestResumeSyncAccountsTrieInterrupted
