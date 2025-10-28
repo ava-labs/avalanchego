@@ -90,8 +90,6 @@ func (m *Mempool) Peek() (*txs.Tx, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	m.initTxs()
-
 	for _, tx := range m.txs {
 		return tx, true
 	}
