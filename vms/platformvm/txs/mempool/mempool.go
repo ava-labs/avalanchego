@@ -24,7 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/fee"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 
-	txsmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
+	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 var (
@@ -133,7 +133,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 	defer m.lock.Unlock()
 
 	if m.consumedUTXOs.HasOverlap(tx.InputIDs()) {
-		return txsmempool.ErrConflictsWithOtherTx
+		return txmempool.ErrConflictsWithOtherTx
 	}
 
 	meteredTx, err := m.meter(tx)

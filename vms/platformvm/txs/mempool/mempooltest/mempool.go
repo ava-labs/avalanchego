@@ -5,6 +5,7 @@ package mempooltest
 
 import (
 	"context"
+	"sync"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -20,6 +21,8 @@ var _ mempool.Mempool = (*FakeMempool)(nil)
 type FakeMempool struct {
 	txs  map[ids.ID]*txs.Tx
 	drop map[ids.ID]error
+
+	mu   sync.Mutex
 	cond lock.Cond
 }
 
@@ -32,11 +35,17 @@ func (f *FakeMempool) initTxs() {
 }
 
 func (f *FakeMempool) Add(tx *txs.Tx) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	f.txs[tx.ID()] = tx
 	return nil
 }
 
 func (f *FakeMempool) Get(txID ids.ID) (*txs.Tx, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	f.initTxs()
 
 	tx, ok := f.txs[txID]
@@ -44,6 +53,9 @@ func (f *FakeMempool) Get(txID ids.ID) (*txs.Tx, bool) {
 }
 
 func (f *FakeMempool) GetDropReason(txID ids.ID) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	if f.drop == nil {
 		f.drop = make(map[ids.ID]error)
 	}
@@ -53,6 +65,9 @@ func (f *FakeMempool) GetDropReason(txID ids.ID) error {
 }
 
 func (f *FakeMempool) Iterate(fn func(tx *txs.Tx) bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	for _, tx := range f.txs {
 		if !fn(tx) {
 			return
@@ -65,10 +80,16 @@ func (f *FakeMempool) Len() int {
 }
 
 func (f *FakeMempool) MarkDropped(txID ids.ID, reason error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	f.drop[txID] = reason
 }
 
 func (f *FakeMempool) Peek() (*txs.Tx, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	f.initTxs()
 
 	for _, tx := range f.txs {
@@ -79,10 +100,16 @@ func (f *FakeMempool) Peek() (*txs.Tx, bool) {
 }
 
 func (f *FakeMempool) Remove(txID ids.ID) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	delete(f.txs, txID)
 }
 
 func (f *FakeMempool) RemoveConflicts(utxos set.Set[ids.ID]) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	for _, tx := range f.txs {
 		if inputs := tx.Unsigned.InputIDs(); !inputs.Overlaps(utxos) {
 			continue
@@ -93,6 +120,9 @@ func (f *FakeMempool) RemoveConflicts(utxos set.Set[ids.ID]) {
 }
 
 func (f *FakeMempool) WaitForEvent(ctx context.Context) (common.Message, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
 	for len(f.txs) == 0 {
 		if err := f.cond.Wait(ctx); err != nil {
 			return 0, err

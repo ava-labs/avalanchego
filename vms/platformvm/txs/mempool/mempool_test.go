@@ -21,7 +21,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
-	txsmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
+	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 func newAVAXInput(txID ids.ID, amount uint64) *avax.TransferableInput {
@@ -255,7 +255,7 @@ func TestMempoolAdd(t *testing.T) {
 				},
 				0,
 			),
-			wantErr: txsmempool.ErrConflictsWithOtherTx,
+			wantErr: txmempool.ErrConflictsWithOtherTx,
 			wantTxIDs: []ids.ID{
 				{1},
 				{2},
@@ -341,7 +341,7 @@ func TestMempoolAdd(t *testing.T) {
 			wantTxIDs: []ids.ID{
 				{1},
 			},
-			wantErr: txsmempool.ErrConflictsWithOtherTx,
+			wantErr: txmempool.ErrConflictsWithOtherTx,
 		},
 		{
 			name:           "conflict - equal paying tx is dropped",
@@ -362,7 +362,7 @@ func TestMempoolAdd(t *testing.T) {
 			wantTxIDs: []ids.ID{
 				{1},
 			},
-			wantErr: txsmempool.ErrConflictsWithOtherTx,
+			wantErr: txmempool.ErrConflictsWithOtherTx,
 		},
 		{
 			name:           "conflict - lower paying tx is dropped",
@@ -383,7 +383,7 @@ func TestMempoolAdd(t *testing.T) {
 			wantTxIDs: []ids.ID{
 				{1},
 			},
-			wantErr: txsmempool.ErrConflictsWithOtherTx,
+			wantErr: txmempool.ErrConflictsWithOtherTx,
 		},
 		{
 			name:           "AVAX minted",
