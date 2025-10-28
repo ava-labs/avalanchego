@@ -19,11 +19,13 @@ on:
         description: 'Runner to execute the benchmark'
         required: false
         default: 'ubuntu-latest'
-      self-hosted:
-        description: 'Use self-hosted runner with ARC container'
-        required: false
-        default: false
-        type: boolean
+        type: choice
+        options:
+          - ubuntu-latest
+          - avalanche-avalanchego-runner-2ti
+          - avago-runner-m6i-4xlarge-ebs-fast
+          - avago-runner-i4i-4xlarge-local-ssd
+          - blacksmith-4vcpu-ubuntu-2404
       timeout-minutes:
         description: 'Timeout in minutes for the job'
         required: false
@@ -134,26 +136,31 @@ jobs:
           role-to-assume: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: us-east-2
       - name: Show Grafana Dashboard Link
-        if: ${{ secrets.PROMETHEUS_URL != '' }}
         shell: bash
         run: |
+          set -euo pipefail
+
+          # Timestamps are in seconds
           from_timestamp="$(date '+%s')"
-          monitoring_period=900
+          monitoring_period=900 # 15 minutes
           to_timestamp="$((from_timestamp + monitoring_period))"
-          grafana_url="https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain"
-          grafana_url="${grafana_url}?orgId=1&refresh=10s"
-          grafana_url="${grafana_url}&var-filter=is_ephemeral_node%7C%3D%7Cfalse"
-          grafana_url="${grafana_url}&var-filter=gh_repo%7C%3D%7C${{ github.repository }}"
-          grafana_url="${grafana_url}&var-filter=gh_run_id%7C%3D%7C${{ github.run_id }}"
-          grafana_url="${grafana_url}&var-filter=gh_run_attempt%7C%3D%7C${{ github.run_attempt }}"
-          grafana_url="${grafana_url}&var-filter=gh_job_id%7C%3D%7C${{ github.job }}"
-          grafana_url="${grafana_url}&from=${from_timestamp}000&to=${to_timestamp}000"
-          echo "Grafana: ${grafana_url}"
-          echo "🔗 [View Grafana Dashboard](${grafana_url})" >> "$GITHUB_STEP_SUMMARY"
-      - name: Warn about missing monitoring credentials
-        if: ${{ secrets.PROMETHEUS_URL == '' }}
-        shell: bash
-        run: echo "::warning::Monitoring credentials not found. Metrics collection will be skipped. Is this a PR from a fork?"
+
+          # Grafana expects microseconds, so pad timestamps with 3 zeros
+          metrics_url="${GRAFANA_URL}&var-filter=gh_job_id%7C%3D%7C${GH_JOB_ID}&from=${from_timestamp}000&to=${to_timestamp}000"
+
+          # Optionally ensure that the link displays metrics only for the shared
+          # network rather than mixing it with the results for private networks.
+          if [[ -n "${FILTER_BY_OWNER:-}" ]]; then
+            metrics_url="${metrics_url}&var-filter=network_owner%7C%3D%7C${FILTER_BY_OWNER}"
+          fi
+
+          echo "Grafana: ${metrics_url}"
+          echo "${metrics_url}" >> "$GITHUB_OUTPUT"
+          echo "🔗 [View Grafana Dashboard](${metrics_url})" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          GRAFANA_URL: https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ github.repository }}&var-filter=gh_run_id%7C%3D%7C${{ github.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ github.run_attempt }}
+          GH_JOB_ID: ${{ github.job }}
+          FILTER_BY_OWNER: ${{ github.repository_owner }}
       - name: Set execution data directory
         id: exec-dir
         shell: bash
@@ -218,6 +225,10 @@ jobs:
           summary-always: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: ${{ github.event_name == 'schedule' }}
+      - name: Push Post-State to S3 (if not exists)
+        if: ${{ inputs.push-post-state != '' }}
+        shell: nix develop --command bash -x {0}
+        run: ./scripts/run_task.sh export-dir-to-s3 SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ DST=${{ inputs.push-post-state }}
 
   c-chain-reexecution-self-hosted:
     needs: define-matrix
@@ -234,13 +245,6 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Install ARC Dependencies
-        shell: bash
-        run: |
-          if ! command -v xz &> /dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y xz-utils
-          fi
       - name: Install Nix
         uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f
         with:
@@ -278,26 +282,31 @@ jobs:
           role-to-assume: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: us-east-2
       - name: Show Grafana Dashboard Link
-        if: ${{ secrets.PROMETHEUS_URL != '' }}
         shell: bash
         run: |
+          set -euo pipefail
+
+          # Timestamps are in seconds
           from_timestamp="$(date '+%s')"
-          monitoring_period=900
+          monitoring_period=900 # 15 minutes
           to_timestamp="$((from_timestamp + monitoring_period))"
-          grafana_url="https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain"
-          grafana_url="${grafana_url}?orgId=1&refresh=10s"
-          grafana_url="${grafana_url}&var-filter=is_ephemeral_node%7C%3D%7Cfalse"
-          grafana_url="${grafana_url}&var-filter=gh_repo%7C%3D%7C${{ github.repository }}"
-          grafana_url="${grafana_url}&var-filter=gh_run_id%7C%3D%7C${{ github.run_id }}"
-          grafana_url="${grafana_url}&var-filter=gh_run_attempt%7C%3D%7C${{ github.run_attempt }}"
-          grafana_url="${grafana_url}&var-filter=gh_job_id%7C%3D%7C${{ github.job }}"
-          grafana_url="${grafana_url}&from=${from_timestamp}000&to=${to_timestamp}000"
-          echo "Grafana: ${grafana_url}"
-          echo "🔗 [View Grafana Dashboard](${grafana_url})" >> "$GITHUB_STEP_SUMMARY"
-      - name: Warn about missing monitoring credentials
-        if: ${{ secrets.PROMETHEUS_URL == '' }}
-        shell: bash
-        run: echo "::warning::Monitoring credentials not found. Metrics collection will be skipped. Is this a PR from a fork?"
+
+          # Grafana expects microseconds, so pad timestamps with 3 zeros
+          metrics_url="${GRAFANA_URL}&var-filter=gh_job_id%7C%3D%7C${GH_JOB_ID}&from=${from_timestamp}000&to=${to_timestamp}000"
+
+          # Optionally ensure that the link displays metrics only for the shared
+          # network rather than mixing it with the results for private networks.
+          if [[ -n "${FILTER_BY_OWNER:-}" ]]; then
+            metrics_url="${metrics_url}&var-filter=network_owner%7C%3D%7C${FILTER_BY_OWNER}"
+          fi
+
+          echo "Grafana: ${metrics_url}"
+          echo "${metrics_url}" >> "$GITHUB_OUTPUT"
+          echo "🔗 [View Grafana Dashboard](${metrics_url})" >> "$GITHUB_STEP_SUMMARY"
+        env:
+          GRAFANA_URL: https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ github.repository }}&var-filter=gh_run_id%7C%3D%7C${{ github.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ github.run_attempt }}
+          GH_JOB_ID: ${{ github.job }}
+          FILTER_BY_OWNER: ${{ github.repository_owner }}
       - name: Set execution data directory
         id: exec-dir
         shell: bash
@@ -362,3 +371,7 @@ jobs:
           summary-always: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: ${{ github.event_name == 'schedule' }}
+      - name: Push Post-State to S3 (if not exists)
+        if: ${{ inputs.push-post-state != '' }}
+        shell: nix develop --command bash -x {0}
+        run: ./scripts/run_task.sh export-dir-to-s3 SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ DST=${{ inputs.push-post-state }}
