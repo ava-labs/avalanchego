@@ -245,6 +245,14 @@ jobs:
       id-token: write
       contents: write
     steps:
+      - name: Install dependencies
+        shell: bash
+        # The xz-utils might be present on some containers
+        run: |
+          if ! command -v xz &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y xz-utils
+          fi
       - uses: actions/checkout@v4
       - name: Install Nix
         uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f
