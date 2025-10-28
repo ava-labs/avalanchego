@@ -60,6 +60,8 @@ var (
 	_ block.ChainVM                      = (*VM)(nil)
 	_ block.BuildBlockWithContextChainVM = (*VM)(nil)
 	_ block.StateSyncableVM              = (*VM)(nil)
+
+	errAtomicGasExceedsLimit = errors.New("atomic gas used exceeds atomic gas limit")
 )
 
 const (
@@ -719,7 +721,7 @@ func (vm *VM) onExtraStateChange(block *types.Block, parent *types.Header, state
 		}
 
 		if !utils.BigLessOrEqualUint64(batchGasUsed, atomicGasLimit) {
-			return nil, nil, fmt.Errorf("atomic gas used (%d) by block (%s), exceeds atomic gas limit (%d)", batchGasUsed, block.Hash().Hex(), atomicGasLimit)
+			return nil, nil, fmt.Errorf("%w: (%d) by block (%s), limit (%d)", errAtomicGasExceedsLimit, batchGasUsed, block.Hash().Hex(), atomicGasLimit)
 		}
 	}
 	return batchContribution, batchGasUsed, nil

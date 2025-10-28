@@ -4,6 +4,7 @@
 package modules
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 
@@ -32,6 +33,9 @@ var (
 			End:   common.HexToAddress("0x03000000000000000000000000000000000000ff"),
 		},
 	}
+
+	errBlackholeAddress          = fmt.Errorf("cannot register module that overlaps with blackhole address %s", constants.BlackholeAddr)
+	errAddressNotInReservedRange = errors.New("address is not in a reserved range for custom precompiles")
 )
 
 // ReservedAddress returns true if [addr] is in a reserved range for custom precompiles
@@ -51,10 +55,10 @@ func RegisterModule(stm Module) error {
 	key := stm.ConfigKey
 
 	if address == constants.BlackholeAddr {
-		return fmt.Errorf("address %s overlaps with blackhole address", address)
+		return fmt.Errorf("%w: address %s ", errBlackholeAddress, address)
 	}
 	if !ReservedAddress(address) {
-		return fmt.Errorf("address %s not in a reserved range", address)
+		return fmt.Errorf("%w: address %s ", errAddressNotInReservedRange, address)
 	}
 
 	for _, registeredModule := range registeredModules {

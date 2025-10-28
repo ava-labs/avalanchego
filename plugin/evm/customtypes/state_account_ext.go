@@ -4,15 +4,22 @@
 package customtypes
 
 import (
-	"github.com/ava-labs/libevm/libevm/pseudo"
+	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/state"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )
 
 type isMultiCoin bool
 
-var IsMultiCoinPayloads pseudo.Accessor[ethtypes.StateOrSlimAccount, isMultiCoin]
+func IsMultiCoin(s *state.StateDB, addr common.Address) bool {
+	return bool(state.GetExtra(s, extras.StateAccount, addr))
+}
 
-func IsMultiCoin(s ethtypes.StateOrSlimAccount) bool {
-	return bool(IsMultiCoinPayloads.Get(s))
+func SetMultiCoin(s *state.StateDB, addr common.Address, to bool) {
+	state.SetExtra(s, extras.StateAccount, addr, isMultiCoin(to))
+}
+
+func IsAccountMultiCoin(s ethtypes.StateOrSlimAccount) bool {
+	return bool(extras.StateAccount.Get(s))
 }

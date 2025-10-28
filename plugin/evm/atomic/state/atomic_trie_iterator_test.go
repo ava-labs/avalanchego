@@ -100,5 +100,6 @@ func TestIteratorHandlesInvalidData(t *testing.T) {
 	require.NoError(err)
 	for iter.Next() {
 	}
-	require.Error(iter.Error())
+	err = iter.Error()
+	require.ErrorIs(err, errKeyLength)
 }

@@ -52,7 +52,7 @@ type PrecompileTest struct {
 	// ExpectedRes is the expected raw byte result returned by the precompile
 	ExpectedRes []byte
 	// ExpectedErr is the expected error returned by the precompile
-	ExpectedErr string
+	ExpectedErr error
 	// ChainConfig is the chain config to use for the precompile's block context
 	// If nil, the default chain config will be used.
 	ChainConfig precompileconfig.ChainConfig
@@ -77,11 +77,7 @@ func (test PrecompileTest) Run(t *testing.T, module modules.Module) {
 
 	if runParams.Input != nil {
 		ret, remainingGas, err := module.Contract.Run(runParams.AccessibleState, runParams.Caller, runParams.ContractAddress, runParams.Input, runParams.SuppliedGas, runParams.ReadOnly)
-		if len(test.ExpectedErr) != 0 {
-			require.ErrorContains(t, err, test.ExpectedErr)
-		} else {
-			require.NoError(t, err)
-		}
+		require.ErrorIs(t, err, test.ExpectedErr)
 		require.Equal(t, uint64(0), remainingGas)
 		require.Equal(t, test.ExpectedRes, ret)
 	}
@@ -105,11 +101,7 @@ func (test PrecompileTest) Bench(b *testing.B, module modules.Module) {
 	snapshot := stateDB.Snapshot()
 
 	ret, remainingGas, err := module.Contract.Run(runParams.AccessibleState, runParams.Caller, runParams.ContractAddress, runParams.Input, runParams.SuppliedGas, runParams.ReadOnly)
-	if len(test.ExpectedErr) != 0 {
-		require.ErrorContains(b, err, test.ExpectedErr)
-	} else {
-		require.NoError(b, err)
-	}
+	require.ErrorIs(b, err, test.ExpectedErr)
 	require.Equal(b, uint64(0), remainingGas)
 	require.Equal(b, test.ExpectedRes, ret)
 
@@ -145,11 +137,7 @@ func (test PrecompileTest) Bench(b *testing.B, module modules.Module) {
 	// the benchmark should catch the error here.
 	stateDB.RevertToSnapshot(snapshot)
 	ret, remainingGas, err = module.Contract.Run(runParams.AccessibleState, runParams.Caller, runParams.ContractAddress, runParams.Input, runParams.SuppliedGas, runParams.ReadOnly)
-	if len(test.ExpectedErr) != 0 {
-		require.ErrorContains(b, err, test.ExpectedErr)
-	} else {
-		require.NoError(b, err)
-	}
+	require.ErrorIs(b, err, test.ExpectedErr)
 	require.Equal(b, uint64(0), remainingGas)
 	require.Equal(b, test.ExpectedRes, ret)
 

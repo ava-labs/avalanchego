@@ -6,6 +6,8 @@ package core
 import (
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
@@ -164,6 +166,30 @@ func copyMemDB(db ethdb.Database) (ethdb.Database, error) {
 	return newDB, nil
 }
 
+// This copies all files from a flat directory [src] to a new temporary directory and returns
+// the path to the new directory.
+func copyFlatDir(t *testing.T, src string) string {
+	t.Helper()
+	if src == "" {
+		return ""
+	}
+
+	dst := t.TempDir()
+	ents, err := os.ReadDir(src)
+	require.NoError(t, err)
+
+	for _, e := range ents {
+		require.False(t, e.IsDir(), "expected flat directory")
+		name := e.Name()
+		data, err := os.ReadFile(filepath.Join(src, name))
+		require.NoError(t, err)
+		info, err := e.Info()
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(filepath.Join(dst, name), data, info.Mode().Perm()))
+	}
+	return dst
+}
+
 // checkBlockChainState creates a new BlockChain instance and checks that exporting each block from
 // genesis to last accepted from the original instance yields the same last accepted block and state
 // root.
@@ -211,7 +237,8 @@ func checkBlockChainState(
 	// Copy the database over to prevent any issues when re-using [originalDB] after this call.
 	originalDB, err = copyMemDB(originalDB)
 	require.NoError(err)
-	restartedChain, err := create(originalDB, gspec, lastAcceptedBlock.Hash(), oldChainDataDir)
+	newChainDataDir := copyFlatDir(t, oldChainDataDir)
+	restartedChain, err := create(originalDB, gspec, lastAcceptedBlock.Hash(), newChainDataDir)
 	require.NoError(err)
 	defer restartedChain.Stop()
 	currentBlock := restartedChain.CurrentBlock()

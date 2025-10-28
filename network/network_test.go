@@ -262,10 +262,8 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 	}
 
 	// ensure empty nodeID is not allowed
-	require.ErrorContains(t,
-		net.SendAppRequest(context.Background(), ids.EmptyNodeID, []byte("hello there"), nil),
-		"cannot send request to empty nodeID",
-	)
+	err = net.SendAppRequest(context.Background(), ids.EmptyNodeID, []byte("hello there"), nil)
+	require.ErrorIs(t, err, errEmptyNodeID)
 }
 
 func TestAppRequestOnShutdown(t *testing.T) {
@@ -577,7 +575,8 @@ func TestNetworkPropagatesRequestHandlerError(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.CChainID)
 	clientNetwork, err := NewNetwork(ctx, sender, codecManager, 1, prometheus.NewRegistry())
 	require.NoError(t, err)
-	clientNetwork.SetRequestHandler(&testRequestHandler{err: errors.New("fail")}) // Return an error from the request handler
+	errTest := errors.New("test error")
+	clientNetwork.SetRequestHandler(&testRequestHandler{err: errTest}) // Return an error from the request handler
 
 	require.NoError(t, clientNetwork.Connected(context.Background(), nodeID, defaultPeerVersion))
 
@@ -588,7 +587,8 @@ func TestNetworkPropagatesRequestHandlerError(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that if the request handler returns an error, it is propagated as a fatal error.
-	require.ErrorContains(t, clientNetwork.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(time.Second), requestMessage), "fail")
+	err = clientNetwork.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(time.Second), requestMessage)
+	require.ErrorIs(t, err, errTest)
 }
 
 func TestNetworkAppRequestAfterShutdown(t *testing.T) {
