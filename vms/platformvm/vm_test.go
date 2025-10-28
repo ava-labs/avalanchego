@@ -124,10 +124,10 @@ var (
 
 type Option func(vm *VM)
 
-func WithFakeMempool() Option {
+func WithTestMempool() Option {
 	return func(vm *VM) {
 		vm.MempoolFunc = func() mempool.Mempool {
-			return &mempooltest.FakeMempool{}
+			return &mempooltest.Mempool{}
 		}
 	}
 }
@@ -434,7 +434,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 // Reject attempt to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Cortina, WithFakeMempool())
+	vm, _, _ := defaultVM(t, upgradetest.Cortina, WithTestMempool())
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 

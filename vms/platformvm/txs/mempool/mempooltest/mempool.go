@@ -15,10 +15,10 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
-var _ mempool.Mempool = (*FakeMempool)(nil)
+var _ mempool.Mempool = (*Mempool)(nil)
 
-// FakeMempool performs no verification and has no upper bound on txs
-type FakeMempool struct {
+// Mempool performs no verification and has no upper bound on txs
+type Mempool struct {
 	txs  map[ids.ID]*txs.Tx
 	drop map[ids.ID]error
 
@@ -26,105 +26,105 @@ type FakeMempool struct {
 	cond lock.Cond
 }
 
-func (f *FakeMempool) initTxs() {
-	if f.txs != nil {
+func (m *Mempool) initTxs() {
+	if m.txs != nil {
 		return
 	}
 
-	f.txs = make(map[ids.ID]*txs.Tx)
+	m.txs = make(map[ids.ID]*txs.Tx)
 }
 
-func (f *FakeMempool) Add(tx *txs.Tx) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+func (m *Mempool) Add(tx *txs.Tx) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	f.txs[tx.ID()] = tx
+	m.txs[tx.ID()] = tx
 	return nil
 }
 
-func (f *FakeMempool) Get(txID ids.ID) (*txs.Tx, bool) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+func (m *Mempool) Get(txID ids.ID) (*txs.Tx, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	f.initTxs()
+	m.initTxs()
 
-	tx, ok := f.txs[txID]
+	tx, ok := m.txs[txID]
 	return tx, ok
 }
 
-func (f *FakeMempool) GetDropReason(txID ids.ID) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+func (m *Mempool) GetDropReason(txID ids.ID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	if f.drop == nil {
-		f.drop = make(map[ids.ID]error)
+	if m.drop == nil {
+		m.drop = make(map[ids.ID]error)
 	}
 
-	err := f.drop[txID]
+	err := m.drop[txID]
 	return err
 }
 
-func (f *FakeMempool) Iterate(fn func(tx *txs.Tx) bool) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+func (m *Mempool) Iterate(fn func(tx *txs.Tx) bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	for _, tx := range f.txs {
+	for _, tx := range m.txs {
 		if !fn(tx) {
 			return
 		}
 	}
 }
 
-func (f *FakeMempool) Len() int {
-	return len(f.txs)
+func (m *Mempool) Len() int {
+	return len(m.txs)
 }
 
-func (f *FakeMempool) MarkDropped(txID ids.ID, reason error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+func (m *Mempool) MarkDropped(txID ids.ID, reason error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	f.drop[txID] = reason
+	m.drop[txID] = reason
 }
 
-func (f *FakeMempool) Peek() (*txs.Tx, bool) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+func (m *Mempool) Peek() (*txs.Tx, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	f.initTxs()
+	m.initTxs()
 
-	for _, tx := range f.txs {
+	for _, tx := range m.txs {
 		return tx, true
 	}
 
 	return nil, false
 }
 
-func (f *FakeMempool) Remove(txID ids.ID) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+func (m *Mempool) Remove(txID ids.ID) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	delete(f.txs, txID)
+	delete(m.txs, txID)
 }
 
-func (f *FakeMempool) RemoveConflicts(utxos set.Set[ids.ID]) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+func (m *Mempool) RemoveConflicts(utxos set.Set[ids.ID]) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	for _, tx := range f.txs {
+	for _, tx := range m.txs {
 		if inputs := tx.Unsigned.InputIDs(); !inputs.Overlaps(utxos) {
 			continue
 		}
 
-		delete(f.txs, tx.ID())
+		delete(m.txs, tx.ID())
 	}
 }
 
-func (f *FakeMempool) WaitForEvent(ctx context.Context) (common.Message, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
+func (m *Mempool) WaitForEvent(ctx context.Context) (common.Message, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
-	for len(f.txs) == 0 {
-		if err := f.cond.Wait(ctx); err != nil {
+	for len(m.txs) == 0 {
+		if err := m.cond.Wait(ctx); err != nil {
 			return 0, err
 		}
 	}
