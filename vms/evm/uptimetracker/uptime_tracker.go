@@ -18,7 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-var errValidationIDNotFound = errors.New("validationID not found")
+var ErrValidationIDNotFound = errors.New("validationID not found")
 
 // UptimeTracker tracks uptime information for validators
 type UptimeTracker struct {
@@ -69,7 +69,7 @@ func (u *UptimeTracker) GetUptime(validationID ids.ID) (
 	if !ok {
 		return 0, time.Time{}, fmt.Errorf(
 			"%w: %s",
-			errValidationIDNotFound,
+			ErrValidationIDNotFound,
 			validationID,
 		)
 	}
