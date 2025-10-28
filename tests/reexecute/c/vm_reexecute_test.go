@@ -104,7 +104,7 @@ func TestMain(m *testing.M) {
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
-	flag.Func("metrics-server-port", "Port which the metrics server will listen to", func(s string) error {
+	flag.Func("metrics-server-port", "Starts a metrics server and sets the port it will listen to", func(s string) error {
 		port, err := strconv.ParseUint(s, 10, 64)
 		if err != nil {
 			return err
