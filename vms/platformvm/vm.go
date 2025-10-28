@@ -64,6 +64,7 @@ type VM struct {
 	blockbuilder.Builder
 	*network.Network
 	validators.State
+	// TODO remove this once vm lazy initialize is removed
 	MempoolFunc func() pmempool.Mempool
 
 	metrics platformvmmetrics.Metrics
