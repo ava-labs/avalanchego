@@ -49,12 +49,12 @@ topics, data, err := PackMyEvent(
 if err != nil {
 	return nil, remainingGas, err
 }
-accessibleState.GetStateDB().AddLog(
-	ContractAddress,
-	topics,
-	data,
-	accessibleState.GetBlockContext().Number().Uint64(),
-)
+accessibleState.GetStateDB().AddLog(&types.Log{
+	Address:     ContractAddress,
+	Topics:      topics,
+	Data:        data,
+	BlockNumber: accessibleState.GetBlockContext().Number().Uint64(),
+})
 */
 {{range .Contract.Events}}
 	{{$event := .}}

@@ -42,6 +42,7 @@ import (
 	_ "embed"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 )
 {{$contract := .Contract}}
@@ -70,6 +71,7 @@ var (
 	_ = big.NewInt
 	_ = vm.ErrOutOfGas
 	_ = common.Big0
+	_ = types.Log{}
 )
 
 // Singleton StatefulPrecompiledContract and signatures.
