@@ -37,7 +37,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 	}{
 		{
 			name:    "no validators",
-			wantErr: errValidationIDNotFound,
+			wantErr: ErrValidationIDNotFound,
 		},
 		{
 			name: "one validator",
@@ -83,7 +83,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 				},
 			},
 			validationID: ids.ID{1},
-			wantErr:      errValidationIDNotFound,
+			wantErr:      ErrValidationIDNotFound,
 		},
 		{
 			name: "one validator deactivated",
@@ -281,7 +281,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 				},
 			},
 			validationID: ids.ID{1},
-			wantErr:      errValidationIDNotFound,
+			wantErr:      ErrValidationIDNotFound,
 		},
 		{
 			name: "connected inactive validator becomes active",
@@ -363,7 +363,7 @@ func TestUptimeTracker_GetUptime(t *testing.T) {
 				},
 			},
 			validationID: ids.ID{1},
-			wantErr:      errValidationIDNotFound,
+			wantErr:      ErrValidationIDNotFound,
 		},
 		{
 			name: "validator has no updates",
