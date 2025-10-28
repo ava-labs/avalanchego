@@ -303,20 +303,27 @@ jobs:
           GH_JOB_ID: ${{ github.job }}
       - name: Set execution data directory
         id: exec-dir
+        shell: bash
         run: |
           set -euo pipefail
-          TS=$(date '+%Y%m%d-%H%M%S')
+          TS="$(date '+%Y%m%d-%H%M%S')"
           REL_DIR="reexecution-data-${TS}"
-          mkdir -p "$GITHUB_WORKSPACE/$REL_DIR"
+          ABS_DIR="${GITHUB_WORKSPACE}/${REL_DIR}"
+          mkdir -p "${ABS_DIR}"
+
+          # outputs
           echo "REL_EXECUTION_DATA_DIR=${REL_DIR}" >> "$GITHUB_OUTPUT"
-          echo "Using dir: $REL_DIR"
+          echo "EXECUTION_DATA_DIR=${ABS_DIR}"     >> "$GITHUB_OUTPUT"
+
+          echo "Using dir (REL): ${REL_DIR}"
+          echo "Using dir (ABS): ${ABS_DIR}"
       - name: Run C-Chain Re-execution Benchmark
         shell: nix develop --impure --command bash -x {0}
         run: |
           ./scripts/run_task.sh ${{ matrix.task }} \
             RUNNER_NAME="${{ matrix.runner }}" \
-            BENCHMARK_OUTPUT_FILE="$GITHUB_WORKSPACE/${{ steps.exec-dir.outputs.REL_EXECUTION_DATA_DIR }}/benchmark-output.txt" \
-            EXECUTION_DATA_DIR="$GITHUB_WORKSPACE/${{ steps.exec-dir.outputs.REL_EXECUTION_DATA_DIR }}"
+            BENCHMARK_OUTPUT_FILE="${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}/benchmark-output.txt" \
+            EXECUTION_DATA_DIR="${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}"
         env:
           TMPNET_START_METRICS_COLLECTOR: ${{ secrets.PROMETHEUS_URL != '' }}
           TMPNET_START_LOGS_COLLECTOR: ${{ secrets.LOKI_URL != '' }}
@@ -354,7 +361,7 @@ jobs:
         with:
           name: ${{ matrix.task }}-${{ matrix.runner }}-results
           path: ${{ steps.exec-dir.outputs.REL_EXECUTION_DATA_DIR }}
-          if-no-files-found: warn
+          if-no-files-found: error
       - name: Compare Benchmark Results
         if: always()
         uses: benchmark-action/github-action-benchmark@v1
@@ -364,6 +371,13 @@ jobs:
           summary-always: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: ${{ github.event_name == 'schedule' }}
+      - name: debug list reexecution dir
+        if: always()
+        shell: bash
+        run: |
+          set -x
+          ls -la "${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}" || true
+          find "${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}" -maxdepth 2 -type f -name 'benchmark-output.txt' -print || true
       - name: Push Post-State to S3 (if not exists)
         if: ${{ inputs.push-post-state != '' }}
         shell: nix develop --command bash -x {0}
