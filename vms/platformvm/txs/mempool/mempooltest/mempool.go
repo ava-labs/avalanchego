@@ -73,6 +73,10 @@ func (m *Mempool) MarkDropped(txID ids.ID, reason error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if m.drop == nil {
+		m.drop = make(map[ids.ID]error)
+	}
+
 	m.drop[txID] = reason
 }
 
