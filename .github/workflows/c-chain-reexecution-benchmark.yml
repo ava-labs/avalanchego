@@ -353,7 +353,7 @@ jobs:
         with:
           name: ${{ matrix.task }}-${{ matrix.runner }}-results
           path: |
-            ${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}/benchmark-output.txt
+#            ${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}/benchmark-output.txt
             ${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}
           if-no-files-found: warn
       - name: Compare Benchmark Results
