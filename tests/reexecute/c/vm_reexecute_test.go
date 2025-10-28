@@ -179,7 +179,7 @@ func benchmarkReexecuteRange(
 	metricsPort uint64,
 ) {
 	r := require.New(b)
-	ctx := context.Background()
+	ctx := b.Context()
 
 	// Create the prefix gatherer passed to the VM and register it with the top-level,
 	// labeled gatherer.
@@ -593,7 +593,7 @@ func startServer(
 func startCollector(tb testing.TB, log logging.Logger, name string, labels map[string]string, serverAddr string) {
 	r := require.New(tb)
 
-	startPromCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
+	startPromCtx, cancel := context.WithTimeout(tb.Context(), tests.DefaultTimeout)
 	defer cancel()
 
 	logger := tests.NewDefaultLogger("prometheus")
@@ -613,6 +613,7 @@ func startCollector(tb testing.TB, log logging.Logger, name string, labels map[s
 		}(),
 		)
 
+		//nolint:usetesting // t.Context() is already canceled inside the cleanup function
 		checkMetricsCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
 		defer cancel()
 		r.NoError(tmpnet.CheckMetricsExist(checkMetricsCtx, logger, networkUUID))

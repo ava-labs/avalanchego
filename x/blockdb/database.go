@@ -681,9 +681,12 @@ func (s *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error {
 		zap.Uint64("endOffset", endOffset),
 	)
 
-	// Start scan from where the index left off.
-	currentScanOffset := startOffset
-	recoveredHeights := make([]BlockHeight, 0)
+	var (
+		// Start scan from where the index left off.
+		currentScanOffset   = startOffset
+		numRecoveredHeights int
+		maxRecoveredHeight  BlockHeight
+	)
 	for currentScanOffset < endOffset {
 		bh, err := s.recoverBlockAtOffset(currentScanOffset, endOffset)
 		if err != nil {
@@ -706,7 +709,8 @@ func (s *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error {
 			zap.Uint32("blockSize", bh.Size),
 			zap.Uint64("dataOffset", currentScanOffset),
 		)
-		recoveredHeights = append(recoveredHeights, bh.Height)
+		numRecoveredHeights++
+		maxRecoveredHeight = max(maxRecoveredHeight, bh.Height)
 		blockTotalSize, err := safemath.Add(uint64(sizeOfBlockEntryHeader), uint64(bh.Size))
 		if err != nil {
 			return fmt.Errorf("recovery: overflow in block size calculation: %w", err)
@@ -720,14 +724,7 @@ func (s *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error {
 
 	// Update the max block height if max recovered height is greater than
 	// the current max height.
-	if len(recoveredHeights) > 0 {
-		maxRecoveredHeight := recoveredHeights[0]
-		for _, height := range recoveredHeights[1:] {
-			if height > maxRecoveredHeight {
-				maxRecoveredHeight = height
-			}
-		}
-
+	if numRecoveredHeights > 0 {
 		currentMaxHeight := s.maxBlockHeight.Load()
 		if maxRecoveredHeight > currentMaxHeight || currentMaxHeight == unsetHeight {
 			s.maxBlockHeight.Store(maxRecoveredHeight)
@@ -740,7 +737,7 @@ func (s *Database) recoverUnindexedBlocks(startOffset, endOffset uint64) error {
 
 	maxHeight := s.maxBlockHeight.Load()
 	s.log.Info("Recovery: Scan finished",
-		zap.Int("recoveredBlocks", len(recoveredHeights)),
+		zap.Int("recoveredBlocks", numRecoveredHeights),
 		zap.Uint64("finalNextWriteOffset", s.nextDataWriteOffset.Load()),
 		zap.Uint64("maxBlockHeight", maxHeight),
 	)

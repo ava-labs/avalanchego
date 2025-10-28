@@ -4,7 +4,6 @@
 package tracker
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -25,7 +24,7 @@ func TestPeers(t *testing.T) {
 	p.OnValidatorAdded(nodeID, nil, ids.Empty, 5)
 	require.Zero(p.ConnectedWeight())
 
-	require.NoError(p.Connected(context.Background(), nodeID, version.CurrentApp))
+	require.NoError(p.Connected(t.Context(), nodeID, version.CurrentApp))
 	require.Equal(uint64(5), p.ConnectedWeight())
 
 	p.OnValidatorWeightChanged(nodeID, 5, 10)
@@ -37,6 +36,6 @@ func TestPeers(t *testing.T) {
 	p.OnValidatorAdded(nodeID, nil, ids.Empty, 5)
 	require.Equal(uint64(5), p.ConnectedWeight())
 
-	require.NoError(p.Disconnected(context.Background(), nodeID))
+	require.NoError(p.Disconnected(t.Context(), nodeID))
 	require.Zero(p.ConnectedWeight())
 }

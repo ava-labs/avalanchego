@@ -110,7 +110,7 @@ Mocks are auto-generated using [mockgen](https://pkg.go.dev/go.uber.org/mock/moc
 - Run the linter
 
 ```sh
-./scipts/run_task.sh lint
+./scripts/run_task.sh lint
 ```
 
 ### Continuous Integration (CI)

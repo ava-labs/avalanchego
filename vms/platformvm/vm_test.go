@@ -172,7 +172,7 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 
 	dynamicConfigBytes := []byte(`{"network":{"max-validator-set-staleness":0}}`)
 	require.NoError(vm.Initialize(
-		context.Background(),
+		t.Context(),
 		ctx,
 		chainDB,
 		genesistest.NewBytes(t, genesistest.Config{}),
@@ -188,7 +188,7 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 		Capacity: defaultDynamicFeeConfig.MaxCapacity,
 	})
 
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(t.Context(), snow.NormalOp))
 
 	wallet := newWallet(t, vm, walletConfig{
 		keys: []*secp256k1.PrivateKey{genesistest.DefaultFundedKeys[0]},
@@ -219,7 +219,7 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 		vm.ctx.Lock.Lock()
 		defer vm.ctx.Lock.Unlock()
 
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	})
 
 	return vm, db, msm
@@ -254,7 +254,7 @@ func TestGenesis(t *testing.T) {
 	defer vm.ctx.Lock.Unlock()
 
 	// Ensure the genesis block has been accepted and stored
-	genesisBlockID, err := vm.LastAccepted(context.Background()) // lastAccepted should be ID of genesis block
+	genesisBlockID, err := vm.LastAccepted(t.Context()) // lastAccepted should be ID of genesis block
 	require.NoError(err)
 
 	// Ensure the genesis block can be retrieved
@@ -400,10 +400,10 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 
 	blkBytes := statelessBlk.Bytes()
 
-	parsedBlock, err := vm.ParseBlock(context.Background(), blkBytes)
+	parsedBlock, err := vm.ParseBlock(t.Context(), blkBytes)
 	require.NoError(err)
 
-	err = parsedBlock.Verify(context.Background())
+	err = parsedBlock.Verify(t.Context())
 	require.ErrorIs(err, txexecutor.ErrTimestampNotBeforeStartTime)
 
 	txID := statelessBlk.Txs()[0].ID()
@@ -448,11 +448,11 @@ func TestAddValidatorReject(t *testing.T) {
 	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
 
-	blk, err := vm.Builder.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(t.Context())
 	require.NoError(err)
 
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Reject(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
+	require.NoError(blk.Reject(t.Context()))
 
 	_, _, err = vm.state.GetTx(tx.ID())
 	require.ErrorIs(err, database.ErrNotFound)
@@ -600,11 +600,11 @@ func TestAddSubnetValidatorReject(t *testing.T) {
 	require.NoError(vm.issueTxFromRPC(tx))
 	vm.ctx.Lock.Lock()
 
-	blk, err := vm.Builder.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(t.Context())
 	require.NoError(err)
 
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Reject(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
+	require.NoError(blk.Reject(t.Context()))
 
 	_, _, err = vm.state.GetTx(tx.ID())
 	require.ErrorIs(err, database.ErrNotFound)
@@ -625,12 +625,12 @@ func TestRewardValidatorAccept(t *testing.T) {
 	vm.clock.Set(genesistest.DefaultValidatorEndTime)
 
 	// Advance time and create proposal to reward a genesis validator
-	blk, err := vm.Builder.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(t.Context())
 	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 
 	// Assert preferences are correct
-	options, err := blk.(smcon.OracleBlock).Options(context.Background())
+	options, err := blk.(smcon.OracleBlock).Options(t.Context())
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
@@ -643,8 +643,8 @@ func TestRewardValidatorAccept(t *testing.T) {
 	require.IsType(&txs.RewardValidatorTx{}, rewardTx)
 
 	// Verify options and accept commit block
-	require.NoError(commit.Verify(context.Background()))
-	require.NoError(abort.Verify(context.Background()))
+	require.NoError(commit.Verify(t.Context()))
+	require.NoError(abort.Verify(t.Context()))
 	txID := blk.(block.Block).Txs()[0].ID()
 	{
 		onAbort, ok := vm.manager.GetState(abort.ID())
@@ -655,8 +655,8 @@ func TestRewardValidatorAccept(t *testing.T) {
 		require.Equal(status.Aborted, txStatus)
 	}
 
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(commit.Accept(context.Background()))
+	require.NoError(blk.Accept(t.Context()))
+	require.NoError(commit.Accept(t.Context()))
 
 	// Verify that chain's timestamp has advanced
 	timestamp := vm.state.GetTimestamp()
@@ -693,13 +693,13 @@ func TestRewardValidatorReject(t *testing.T) {
 	vm.clock.Set(genesistest.DefaultValidatorEndTime)
 
 	// Advance time and create proposal to reward a genesis validator
-	blk, err := vm.Builder.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(t.Context())
 	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 
 	// Assert preferences are correct
 	oracleBlk := blk.(smcon.OracleBlock)
-	options, err := oracleBlk.Options(context.Background())
+	options, err := oracleBlk.Options(t.Context())
 	require.NoError(err)
 
 	commit := options[0].(*blockexecutor.Block)
@@ -713,8 +713,8 @@ func TestRewardValidatorReject(t *testing.T) {
 	require.IsType(&txs.RewardValidatorTx{}, rewardTx)
 
 	// Verify options and accept abort block
-	require.NoError(commit.Verify(context.Background()))
-	require.NoError(abort.Verify(context.Background()))
+	require.NoError(commit.Verify(t.Context()))
+	require.NoError(abort.Verify(t.Context()))
 	txID := blk.(block.Block).Txs()[0].ID()
 	{
 		onAccept, ok := vm.manager.GetState(commit.ID())
@@ -725,8 +725,8 @@ func TestRewardValidatorReject(t *testing.T) {
 		require.Equal(status.Committed, txStatus)
 	}
 
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(abort.Accept(context.Background()))
+	require.NoError(blk.Accept(t.Context()))
+	require.NoError(abort.Accept(t.Context()))
 
 	// Verify that chain's timestamp has advanced
 	timestamp := vm.state.GetTimestamp()
@@ -759,7 +759,7 @@ func TestUnneededBuildBlock(t *testing.T) {
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 
-	_, err := vm.Builder.BuildBlock(context.Background())
+	_, err := vm.Builder.BuildBlock(t.Context())
 	require.ErrorIs(err, blockbuilder.ErrNoPendingBlocks)
 }
 
@@ -1004,16 +1004,16 @@ func TestOptimisticAtomicImport(t *testing.T) {
 
 	blk := vm.manager.NewBlock(statelessBlk)
 
-	err = blk.Verify(context.Background())
+	err = blk.Verify(t.Context())
 	require.ErrorIs(err, database.ErrNotFound) // erred due to missing shared memory UTXOs
 
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(t.Context(), snow.Bootstrapping))
 
-	require.NoError(blk.Verify(context.Background())) // skips shared memory UTXO verification during bootstrapping
+	require.NoError(blk.Verify(t.Context())) // skips shared memory UTXO verification during bootstrapping
 
-	require.NoError(blk.Accept(context.Background()))
+	require.NoError(blk.Accept(t.Context()))
 
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(t.Context(), snow.NormalOp))
 
 	_, txStatus, err := vm.state.GetTx(tx.ID())
 	require.NoError(err)
@@ -1051,7 +1051,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 	firstCtx.Lock.Lock()
 
 	require.NoError(firstVM.Initialize(
-		context.Background(),
+		t.Context(),
 		firstCtx,
 		firstDB,
 		genesisBytes,
@@ -1061,7 +1061,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		nil,
 	))
 
-	genesisID, err := firstVM.LastAccepted(context.Background())
+	genesisID, err := firstVM.LastAccepted(t.Context())
 	require.NoError(err)
 
 	// include a tx to make the block be accepted
@@ -1104,10 +1104,10 @@ func TestRestartFullyAccepted(t *testing.T) {
 
 	nextChainTime = nextChainTime.Add(2 * time.Second)
 	firstVM.clock.Set(nextChainTime)
-	require.NoError(firstAdvanceTimeBlk.Verify(context.Background()))
-	require.NoError(firstAdvanceTimeBlk.Accept(context.Background()))
+	require.NoError(firstAdvanceTimeBlk.Verify(t.Context()))
+	require.NoError(firstAdvanceTimeBlk.Accept(t.Context()))
 
-	require.NoError(firstVM.Shutdown(context.Background()))
+	require.NoError(firstVM.Shutdown(t.Context()))
 	firstCtx.Lock.Unlock()
 
 	secondVM := &VM{Internal: config.Internal{
@@ -1125,13 +1125,13 @@ func TestRestartFullyAccepted(t *testing.T) {
 	secondVM.clock.Set(initialClkTime)
 	secondCtx.Lock.Lock()
 	defer func() {
-		require.NoError(secondVM.Shutdown(context.Background()))
+		require.NoError(secondVM.Shutdown(t.Context()))
 		secondCtx.Lock.Unlock()
 	}()
 
 	secondDB := prefixdb.New([]byte{}, db)
 	require.NoError(secondVM.Initialize(
-		context.Background(),
+		t.Context(),
 		secondCtx,
 		secondDB,
 		genesisBytes,
@@ -1141,7 +1141,7 @@ func TestRestartFullyAccepted(t *testing.T) {
 		nil,
 	))
 
-	lastAccepted, err := secondVM.LastAccepted(context.Background())
+	lastAccepted, err := secondVM.LastAccepted(t.Context())
 	require.NoError(err)
 	require.Equal(genesisID, lastAccepted)
 }
@@ -1173,7 +1173,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	ctx.Lock.Lock()
 
 	require.NoError(vm.Initialize(
-		context.Background(),
+		t.Context(),
 		ctx,
 		vmDB,
 		genesistest.NewBytes(t, genesistest.Config{}),
@@ -1368,10 +1368,10 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	})
 
 	// Allow incoming messages to be routed to the new chain
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 	ctx.Lock.Unlock()
 
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
 	ctx.Lock.Lock()
 
@@ -1390,7 +1390,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	peerTracker.Connected(vdrID, version.CurrentApp)
-	require.NoError(bootstrapper.Connected(context.Background(), vdrID, version.CurrentApp))
+	require.NoError(bootstrapper.Connected(t.Context(), vdrID, version.CurrentApp))
 
 	// Create a valid block to remove the first genesis validator that is not
 	// related to the VM.
@@ -1428,7 +1428,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return config.NodeIDs
 	}
 
-	require.NoError(bootstrapper.AcceptedFrontier(context.Background(), vdrID, reqID, rewardValidatorBlk.ID()))
+	require.NoError(bootstrapper.AcceptedFrontier(t.Context(), vdrID, reqID, rewardValidatorBlk.ID()))
 
 	// Report the validator removal as accepted. We should request the validator
 	// removal block and any ancestors of it.
@@ -1447,7 +1447,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	}
 
 	frontier := set.Of(rewardValidatorBlk.ID())
-	require.NoError(bootstrapper.Accepted(context.Background(), vdrID, reqID, frontier))
+	require.NoError(bootstrapper.Accepted(t.Context(), vdrID, reqID, frontier))
 
 	// Provide the validator removal block. We should process this block and
 	// then do another round of bootstrapping.
@@ -1463,7 +1463,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return config.NodeIDs
 	}
 
-	require.NoError(bootstrapper.Ancestors(context.Background(), vdrID, reqID, [][]byte{rewardValidatorBlk.Bytes()}))
+	require.NoError(bootstrapper.Ancestors(t.Context(), vdrID, reqID, [][]byte{rewardValidatorBlk.Bytes()}))
 
 	// We should again report the validator removal block as the last accepted
 	// block.
@@ -1477,7 +1477,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return config.NodeIDs
 	}
 
-	require.NoError(bootstrapper.AcceptedFrontier(context.Background(), vdrID, reqID, rewardValidatorBlk.ID()))
+	require.NoError(bootstrapper.AcceptedFrontier(t.Context(), vdrID, reqID, rewardValidatorBlk.ID()))
 
 	// Again confirming the validator removal block as accepted should
 	// transition us out of bootstrapping. At this point we should check for
@@ -1485,7 +1485,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	externalSender.SendF = nil
 	externalSender.CantSend = false
 
-	require.NoError(bootstrapper.Accepted(context.Background(), vdrID, reqID, frontier))
+	require.NoError(bootstrapper.Accepted(t.Context(), vdrID, reqID, frontier))
 
 	// Verify the locally preferred option on the validator removal aligns with
 	// our consensus preference.
@@ -1501,7 +1501,7 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 	require.Equal(commitBlock.ID(), vm.manager.Preferred())
 
 	ctx.Lock.Unlock()
-	chainRouter.Shutdown(context.Background())
+	chainRouter.Shutdown(t.Context())
 }
 
 func TestUnverifiedParent(t *testing.T) {
@@ -1522,12 +1522,12 @@ func TestUnverifiedParent(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.PChainID)
 	ctx.Lock.Lock()
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 		ctx.Lock.Unlock()
 	}()
 
 	require.NoError(vm.Initialize(
-		context.Background(),
+		t.Context(),
 		ctx,
 		memdb.New(),
 		genesistest.NewBytes(t, genesistest.Config{}),
@@ -1572,7 +1572,7 @@ func TestUnverifiedParent(t *testing.T) {
 	)
 	require.NoError(err)
 	firstAdvanceTimeBlk := vm.manager.NewBlock(statelessBlk)
-	require.NoError(firstAdvanceTimeBlk.Verify(context.Background()))
+	require.NoError(firstAdvanceTimeBlk.Verify(t.Context()))
 
 	// include a tx2 to make the block be accepted
 	tx2 := &txs.Tx{Unsigned: &txs.ImportTx{
@@ -1605,7 +1605,7 @@ func TestUnverifiedParent(t *testing.T) {
 	secondAdvanceTimeBlk := vm.manager.NewBlock(statelessSecondAdvanceTimeBlk)
 
 	require.Equal(secondAdvanceTimeBlk.Parent(), firstAdvanceTimeBlk.ID())
-	require.NoError(secondAdvanceTimeBlk.Verify(context.Background()))
+	require.NoError(secondAdvanceTimeBlk.Verify(t.Context()))
 }
 
 func TestMaxStakeAmount(t *testing.T) {
@@ -1677,7 +1677,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	genesisBytes := genesistest.NewBytes(t, genesistest.Config{})
 
 	require.NoError(firstVM.Initialize(
-		context.Background(),
+		t.Context(),
 		firstCtx,
 		firstDB,
 		genesisBytes,
@@ -1691,8 +1691,8 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	firstVM.clock.Set(initialClkTime)
 
 	// Set VM state to NormalOp, to start tracking validators' uptime
-	require.NoError(firstVM.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(firstVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(firstVM.SetState(t.Context(), snow.Bootstrapping))
+	require.NoError(firstVM.SetState(t.Context(), snow.NormalOp))
 
 	// Fast forward clock so that validators meet 20% uptime required for reward
 	durationForReward := genesistest.DefaultValidatorEndTime.Sub(genesistest.DefaultValidatorStartTime) * firstUptimePercentage / 100
@@ -1701,7 +1701,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 
 	// Shutdown VM to stop all genesis validator uptime.
 	// At this point they have been validating for the 20% uptime needed to be rewarded
-	require.NoError(firstVM.Shutdown(context.Background()))
+	require.NoError(firstVM.Shutdown(t.Context()))
 	firstCtx.Lock.Unlock()
 
 	// Restart the VM with a larger uptime requirement
@@ -1718,7 +1718,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondCtx := snowtest.Context(t, snowtest.PChainID)
 	secondCtx.Lock.Lock()
 	defer func() {
-		require.NoError(secondVM.Shutdown(context.Background()))
+		require.NoError(secondVM.Shutdown(t.Context()))
 		secondCtx.Lock.Unlock()
 	}()
 
@@ -1727,7 +1727,7 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondCtx.SharedMemory = m.NewSharedMemory(secondCtx.ChainID)
 
 	require.NoError(secondVM.Initialize(
-		context.Background(),
+		t.Context(),
 		secondCtx,
 		secondDB,
 		genesisBytes,
@@ -1740,21 +1740,21 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	secondVM.clock.Set(vmStopTime)
 
 	// Set VM state to NormalOp, to start tracking validators' uptime
-	require.NoError(secondVM.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(secondVM.SetState(context.Background(), snow.NormalOp))
+	require.NoError(secondVM.SetState(t.Context(), snow.Bootstrapping))
+	require.NoError(secondVM.SetState(t.Context(), snow.NormalOp))
 
 	// after restart and change of uptime required for reward, push validators to their end of life
 	secondVM.clock.Set(genesistest.DefaultValidatorEndTime)
 
 	// evaluate a genesis validator for reward
-	blk, err := secondVM.Builder.BuildBlock(context.Background())
+	blk, err := secondVM.Builder.BuildBlock(t.Context())
 	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 
 	// Assert preferences are correct.
 	// secondVM should prefer abort since uptime requirements are not met anymore
 	oracleBlk := blk.(smcon.OracleBlock)
-	options, err := oracleBlk.Options(context.Background())
+	options, err := oracleBlk.Options(t.Context())
 	require.NoError(err)
 
 	abort := options[0].(*blockexecutor.Block)
@@ -1769,11 +1769,11 @@ func TestUptimeDisallowedWithRestart(t *testing.T) {
 	txID := blk.(block.Block).Txs()[0].ID()
 
 	// Verify options and accept abort block
-	require.NoError(commit.Verify(context.Background()))
-	require.NoError(abort.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(abort.Accept(context.Background()))
-	require.NoError(secondVM.SetPreference(context.Background(), secondVM.manager.LastAccepted()))
+	require.NoError(commit.Verify(t.Context()))
+	require.NoError(abort.Verify(t.Context()))
+	require.NoError(blk.Accept(t.Context()))
+	require.NoError(abort.Accept(t.Context()))
+	require.NoError(secondVM.SetPreference(t.Context(), secondVM.manager.LastAccepted()))
 
 	// Verify that rewarded validator has been removed.
 	// Note that test genesis has multiple validators
@@ -1819,7 +1819,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 
 	appSender := &enginetest.Sender{T: t}
 	require.NoError(vm.Initialize(
-		context.Background(),
+		t.Context(),
 		ctx,
 		db,
 		genesistest.NewBytes(t, genesistest.Config{}),
@@ -1830,7 +1830,7 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	))
 
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 		ctx.Lock.Unlock()
 	}()
 
@@ -1838,21 +1838,21 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	vm.clock.Set(initialClkTime)
 
 	// Set VM state to NormalOp, to start tracking validators' uptime
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(t.Context(), snow.Bootstrapping))
+	require.NoError(vm.SetState(t.Context(), snow.NormalOp))
 
 	// Fast forward clock to time for genesis validators to leave
 	vm.clock.Set(genesistest.DefaultValidatorEndTime)
 
 	// evaluate a genesis validator for reward
-	blk, err := vm.Builder.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(t.Context())
 	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 
 	// Assert preferences are correct.
 	// vm should prefer abort since uptime requirements are not met.
 	oracleBlk := blk.(smcon.OracleBlock)
-	options, err := oracleBlk.Options(context.Background())
+	options, err := oracleBlk.Options(t.Context())
 	require.NoError(err)
 
 	abort := options[0].(*blockexecutor.Block)
@@ -1867,11 +1867,11 @@ func TestUptimeDisallowedAfterNeverConnecting(t *testing.T) {
 	txID := blk.(block.Block).Txs()[0].ID()
 
 	// Verify options and accept abort block
-	require.NoError(commit.Verify(context.Background()))
-	require.NoError(abort.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
-	require.NoError(abort.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(commit.Verify(t.Context()))
+	require.NoError(abort.Verify(t.Context()))
+	require.NoError(blk.Accept(t.Context()))
+	require.NoError(abort.Accept(t.Context()))
+	require.NoError(vm.SetPreference(t.Context(), vm.manager.LastAccepted()))
 
 	// Verify that rewarded validator has been removed.
 	// Note that test genesis has multiple validators
@@ -1973,7 +1973,7 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(err)
 
 	lastAcceptedID := vm.state.GetLastAccepted()
-	lastAcceptedHeight, err := vm.GetCurrentHeight(context.Background())
+	lastAcceptedHeight, err := vm.GetCurrentHeight(t.Context())
 	require.NoError(err)
 	statelessBlock, err := block.NewBanffStandardBlock(
 		vm.state.GetTimestamp(),
@@ -1987,11 +1987,11 @@ func TestRemovePermissionedValidatorDuringAddPending(t *testing.T) {
 	require.NoError(err)
 
 	blockBytes := statelessBlock.Bytes()
-	block, err := vm.ParseBlock(context.Background(), blockBytes)
+	block, err := vm.ParseBlock(t.Context(), blockBytes)
 	require.NoError(err)
-	require.NoError(block.Verify(context.Background()))
-	require.NoError(block.Accept(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), vm.manager.LastAccepted()))
+	require.NoError(block.Verify(t.Context()))
+	require.NoError(block.Accept(t.Context()))
+	require.NoError(vm.SetPreference(t.Context(), vm.manager.LastAccepted()))
 
 	_, err = vm.state.GetPendingValidator(subnetID, nodeID)
 	require.ErrorIs(err, database.ErrNotFound)
@@ -2207,7 +2207,7 @@ func TestThrottleBlockBuildingUntilNormalOperationsStart(t *testing.T) {
 	ctx.Lock.Lock()
 
 	require.NoError(vm.Initialize(
-		context.Background(),
+		t.Context(),
 		ctx,
 		memdb.New(),
 		genesistest.NewBytes(t, genesistest.Config{}),
@@ -2227,10 +2227,10 @@ func TestThrottleBlockBuildingUntilNormalOperationsStart(t *testing.T) {
 		vm.ctx.Lock.Lock()
 		defer vm.ctx.Lock.Unlock()
 
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(t.Context(), snow.Bootstrapping))
 
 	// Advance the time so that the block builder would be willing to remove the
 	// genesis validators.
@@ -2239,7 +2239,7 @@ func TestThrottleBlockBuildingUntilNormalOperationsStart(t *testing.T) {
 
 	ctx.Lock.Unlock()
 
-	impatientContext, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+	impatientContext, cancel := context.WithTimeout(t.Context(), time.Millisecond*100)
 	defer cancel()
 
 	msg, err := vm.WaitForEvent(impatientContext)
@@ -2247,10 +2247,10 @@ func TestThrottleBlockBuildingUntilNormalOperationsStart(t *testing.T) {
 	require.Zero(msg)
 
 	ctx.Lock.Lock()
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(t.Context(), snow.NormalOp))
 	ctx.Lock.Unlock()
 
-	impatientContext, cancel = context.WithTimeout(context.Background(), time.Minute)
+	impatientContext, cancel = context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
 
 	msg, err = vm.WaitForEvent(impatientContext)
