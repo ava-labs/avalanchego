@@ -339,6 +339,32 @@ jobs:
           GH_JOB_ID: ${{ github.job }}
           AWS_REGION: us-east-2
           AWS_DEFAULT_REGION: us-east-2
+      - name: Debug workspace & files
+        shell: bash
+        run: |
+          set -x
+          echo "ctx github.workspace: ${{ github.workspace }}"
+          echo "env  GITHUB_WORKSPACE: ${GITHUB_WORKSPACE:-<unset>}"
+          echo "pwd:"
+          pwd
+          echo "ls -la (repo root):"
+          ls -la
+
+          echo "exec-dir outputs:"
+          echo "  REL_EXECUTION_DATA_DIR=${{ steps.exec-dir.outputs.REL_EXECUTION_DATA_DIR }}"
+          echo "  EXECUTION_DATA_DIR=${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}"
+
+          echo "ls -la (relative dir): ${{ steps.exec-dir.outputs.REL_EXECUTION_DATA_DIR }}"
+          ls -la "${{ steps.exec-dir.outputs.REL_EXECUTION_DATA_DIR }}" || true
+
+          echo "ls -la (absolute dir): ${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}"
+          ls -la "${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}" || true
+
+          echo "find benchmark-output.txt from repo root:"
+          find . -maxdepth 5 -type f -name 'benchmark-output.txt' -print || true
+
+          echo "env dump (short):"
+          env | sort | egrep 'GITHUB|RUNNER|WORK|PWD|HOME' || true
       - name: Upload monitoring data
         if: always()
         uses: actions/upload-artifact@v4

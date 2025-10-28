@@ -3,26 +3,8 @@
     "include": [
       {
         "task": "c-chain-reexecution-hashdb-101-250k",
-        "runner": "ubuntu-latest",
-        "self_hosted": false,
-        "timeout-minutes": 30
-      },
-      {
-        "task": "c-chain-reexecution-hashdb-101-250k",
         "runner": "avalanche-avalanchego-runner-2ti",
         "self_hosted": true,
-        "timeout-minutes": 30
-      },
-      {
-        "task": "c-chain-reexecution-hashdb-archive-101-250k",
-        "runner": "blacksmith-4vcpu-ubuntu-2404",
-        "self_hosted": false,
-        "timeout-minutes": 30
-      },
-      {
-        "task": "c-chain-reexecution-hashdb-101-250k",
-        "runner": "blacksmith-4vcpu-ubuntu-2404",
-        "self_hosted": false,
         "timeout-minutes": 30
       }
     ]
