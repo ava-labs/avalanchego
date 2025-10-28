@@ -56,12 +56,7 @@ func (m *Mempool) GetDropReason(txID ids.ID) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if m.drop == nil {
-		m.drop = make(map[ids.ID]error)
-	}
-
-	err := m.drop[txID]
-	return err
+	return m.drop[txID]
 }
 
 func (m *Mempool) Iterate(fn func(tx *txs.Tx) bool) {
