@@ -707,8 +707,8 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 			}
 
 			conflictsToRemove := set.Set[ids.ID]{}
-			for conflict := range tt.conflictsToRemove {
-				conflictsToRemove.Add(conflict.Prefix(0))
+			for _, conflict := range tt.conflictsToRemove {
+				conflictsToRemove.Add(conflict.InputID())
 			}
 
 			m.RemoveConflicts(conflictsToRemove)
