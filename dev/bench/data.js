@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1761594165675,
+  "lastUpdate": 1761655191396,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -2598,6 +2598,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
             "value": 73.79,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jonathan Oppenheimer",
+            "username": "JonathanOppenheimer",
+            "email": "jonathan.oppenheimer@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "6afe371e3b8600986f92432e7da477614c78331b",
+          "message": "Remove bool return from `uptimetracker.GetUptime`  (#4434)\n\nSigned-off-by: Jonathan Oppenheimer <147infiniti@gmail.com>\nCo-authored-by: Joshua Kim <20001595+joshua-kim@users.noreply.github.com>",
+          "timestamp": "2025-10-28T02:38:47Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/6afe371e3b8600986f92432e7da477614c78331b"
+        },
+        "date": 1761655191001,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
+            "value": 73.19,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
