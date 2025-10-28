@@ -35,7 +35,7 @@ func NewPrometheusServer(gatherer prometheus.Gatherer) (*PrometheusServer, error
 	return NewPrometheusServerWithPort(gatherer, defaultMetricsPort)
 }
 
-// NewPrometheusServer creates and starts a Prometheus server with the provided gatherer
+// NewPrometheusServerWithPort creates and starts a Prometheus server with the provided gatherer
 // listening on 127.0.0.1:port and serving /ext/metrics.
 func NewPrometheusServerWithPort(gatherer prometheus.Gatherer, port uint64) (*PrometheusServer, error) {
 	server := &PrometheusServer{
