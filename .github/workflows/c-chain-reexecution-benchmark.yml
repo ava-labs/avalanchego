@@ -150,19 +150,12 @@ jobs:
           # Grafana expects microseconds, so pad timestamps with 3 zeros
           metrics_url="${GRAFANA_URL}&var-filter=gh_job_id%7C%3D%7C${GH_JOB_ID}&from=${from_timestamp}000&to=${to_timestamp}000"
 
-          # Optionally ensure that the link displays metrics only for the shared
-          # network rather than mixing it with the results for private networks.
-          if [[ -n "${FILTER_BY_OWNER:-}" ]]; then
-            metrics_url="${metrics_url}&var-filter=network_owner%7C%3D%7C${FILTER_BY_OWNER}"
-          fi
-
           echo "Grafana: ${metrics_url}"
           echo "${metrics_url}" >> "$GITHUB_OUTPUT"
           echo "🔗 [View Grafana Dashboard](${metrics_url})" >> "$GITHUB_STEP_SUMMARY"
         env:
           GRAFANA_URL: https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ github.repository }}&var-filter=gh_run_id%7C%3D%7C${{ github.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ github.run_attempt }}
           GH_JOB_ID: ${{ github.job }}
-          FILTER_BY_OWNER: ${{ github.repository_owner }}
       - name: Set execution data directory
         id: exec-dir
         shell: bash
@@ -247,7 +240,6 @@ jobs:
     steps:
       - name: Install dependencies
         shell: bash
-        # The xz-utils might be present on some containers
         run: |
           if ! command -v xz &> /dev/null; then
             sudo apt-get update
@@ -303,19 +295,12 @@ jobs:
           # Grafana expects microseconds, so pad timestamps with 3 zeros
           metrics_url="${GRAFANA_URL}&var-filter=gh_job_id%7C%3D%7C${GH_JOB_ID}&from=${from_timestamp}000&to=${to_timestamp}000"
 
-          # Optionally ensure that the link displays metrics only for the shared
-          # network rather than mixing it with the results for private networks.
-          if [[ -n "${FILTER_BY_OWNER:-}" ]]; then
-            metrics_url="${metrics_url}&var-filter=network_owner%7C%3D%7C${FILTER_BY_OWNER}"
-          fi
-
           echo "Grafana: ${metrics_url}"
           echo "${metrics_url}" >> "$GITHUB_OUTPUT"
           echo "🔗 [View Grafana Dashboard](${metrics_url})" >> "$GITHUB_STEP_SUMMARY"
         env:
           GRAFANA_URL: https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ github.repository }}&var-filter=gh_run_id%7C%3D%7C${{ github.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ github.run_attempt }}
           GH_JOB_ID: ${{ github.job }}
-          FILTER_BY_OWNER: ${{ github.repository_owner }}
       - name: Set execution data directory
         id: exec-dir
         shell: bash
