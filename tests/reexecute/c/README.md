@@ -44,7 +44,6 @@ export AWS_REGION=us-east-2
 
 If running locally, metrics collection can be customized via the following parameters:
 
-
 - `METRICS_SERVER_PORT`: if set, starts a metrics server and sets the port the server will listen to.
 - `METRICS_COLLECTOR_ENABLED`: starts a Prometheus collector. If `METRICS_SERVER_PORT` is not set, enabling the collector implicitly sets `METRICS_SERVER_PORT` to `0`.
 
