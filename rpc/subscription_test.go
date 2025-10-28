@@ -35,20 +35,13 @@ import (
 	"io"
 	"math/big"
 	"net"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 )
-
-func TestMain(m *testing.M) {
-	customtypes.Register()
-	os.Exit(m.Run())
-}
 
 func TestNewID(t *testing.T) {
 	hexchars := "0123456789ABCDEFabcdef"
