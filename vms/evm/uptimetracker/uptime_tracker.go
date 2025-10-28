@@ -69,7 +69,7 @@ func (u *UptimeTracker) GetUptime(validationID ids.ID) (
 	if !ok {
 		return 0, time.Time{}, fmt.Errorf(
 			"%w: %s",
-			errValidationIDNotFound,
+			ErrValidationIDNotFound,
 			validationID,
 		)
 	}
