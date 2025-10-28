@@ -24,7 +24,7 @@ require (
 	github.com/ava-labs/coreth v0.15.5-0.20251022172030-6c57d8ace537
 	github.com/ava-labs/ledger-avalanche-go v1.1.0
 	github.com/ava-labs/libevm v1.13.15-0.20251016142715-1bccf4f2ddb2
-	github.com/ava-labs/subnet-evm v0.8.0-fuji-rc.0.0.20251023113800-bfb24bf46cec
+	github.com/ava-labs/subnet-evm v0.8.0-fuji-rc.0.0.20251027210823-862e7c831230
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
