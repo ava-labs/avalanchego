@@ -20,11 +20,11 @@ func init() {
 	lc := linearcodec.NewDefault()
 
 	err := errors.Join(
-		lc.RegisterType(&ValidatorUptime{}),
 		lc.RegisterType(&SubnetToL1Conversion{}),
 		lc.RegisterType(&RegisterL1Validator{}),
 		lc.RegisterType(&L1ValidatorRegistration{}),
 		lc.RegisterType(&L1ValidatorWeight{}),
+		lc.RegisterType(&ValidatorUptime{}),
 		Codec.RegisterCodec(CodecVersion, lc),
 	)
 	if err != nil {
