@@ -10,8 +10,8 @@ set -euo pipefail
 #   END_BLOCK: The ending block height (inclusive).
 #   LABELS (optional): Comma-separated key=value pairs for metric labels.
 #   BENCHMARK_OUTPUT_FILE (optional): If set, benchmark output is also written to this file.
-#   METRICS_COLLECTOR_ENABLED (optional): If set, enables the metrics collector.
 #   METRICS_SERVER_PORT (optional): If set, determines the port the metrics server will listen to.
+#   METRICS_COLLECTOR_ENABLED (optional): If set, enables the metrics collector.
 
 : "${BLOCK_DIR:?BLOCK_DIR must be set}"
 : "${CURRENT_STATE_DIR:?CURRENT_STATE_DIR must be set}"
