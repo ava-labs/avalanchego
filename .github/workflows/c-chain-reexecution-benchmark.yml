@@ -314,9 +314,6 @@ jobs:
           # outputs
           echo "REL_EXECUTION_DATA_DIR=${REL_DIR}" >> "$GITHUB_OUTPUT"
           echo "EXECUTION_DATA_DIR=${ABS_DIR}"     >> "$GITHUB_OUTPUT"
-
-          echo "Using dir (REL): ${REL_DIR}"
-          echo "Using dir (ABS): ${ABS_DIR}"
       - name: Run C-Chain Re-execution Benchmark
         shell: nix develop --impure --command bash -x {0}
         run: |
@@ -371,13 +368,6 @@ jobs:
           summary-always: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: ${{ github.event_name == 'schedule' }}
-      - name: debug list reexecution dir
-        if: always()
-        shell: bash
-        run: |
-          set -x
-          ls -la "${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}" || true
-          find "${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}" -maxdepth 2 -type f -name 'benchmark-output.txt' -print || true
       - name: Push Post-State to S3 (if not exists)
         if: ${{ inputs.push-post-state != '' }}
         shell: nix develop --command bash -x {0}
