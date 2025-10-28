@@ -207,7 +207,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.task }}-${{ matrix.runner }}-results
-          path: ${{ github.workspace }}/${{ steps.exec-dir.outputs.REL_EXECUTION_DATA_DIR }}
+          path: |
+            ${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}/benchmark-output.txt
+            ${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}
           if-no-files-found: warn
       - name: Compare Benchmark Results
         if: always()
@@ -352,7 +354,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.task }}-${{ matrix.runner }}-results
-          path: $GITHUB_WORKSPACE/${{ steps.exec-dir.outputs.REL_EXECUTION_DATA_DIR }}
+          path: ${{ github.workspace }}/${{ steps.exec-dir.outputs.REL_EXECUTION_DATA_DIR }}
           if-no-files-found: warn
       - name: Compare Benchmark Results
         if: always()
