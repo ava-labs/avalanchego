@@ -169,7 +169,7 @@ func (m *mempool) allocateSpace(txToAdd meteredTx) error {
 
 	gasToFree := txToAdd.gasUsed - m.gasAvailable
 	gasFreed := gas.Gas(0)
-	toEvict := make([]ids.ID, 0)
+	var toEvict []ids.ID
 
 	m.tree.Ascend(func(item meteredTx) bool {
 		// Try to evict lower priced txs to make room for the new tx
