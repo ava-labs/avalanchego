@@ -95,7 +95,7 @@ runs:
             LABELS=${{ env.LABELS }} \
             BENCHMARK_OUTPUT_FILE=${{ env.BENCHMARK_OUTPUT_FILE }} \
             RUNNER_NAME=${{ inputs.runner_name }} \
-            METRICS_SERVER_ENABLED=true \
+            METRICS_SERVER_PORT=0 \
             METRICS_COLLECTOR_ENABLED=true
         prometheus_url: ${{ inputs.prometheus-url }}
         prometheus_push_url: ${{ inputs.prometheus-push-url }}
