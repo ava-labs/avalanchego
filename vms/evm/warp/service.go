@@ -11,7 +11,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow"
-	"github.com/ava-labs/avalanchego/vms/evm/warp/validators"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -23,23 +22,21 @@ var errNoValidators = errors.New("cannot aggregate signatures from subnet with n
 
 // API introduces snowman specific functionality to the evm
 type API struct {
-	chainContext                 *snow.Context
-	backend                      Backend
-	signatureAggregator          *acp118.SignatureAggregator
-	requirePrimaryNetworkSigners func() bool
+	chainContext        *snow.Context
+	backend             Backend
+	signatureAggregator *acp118.SignatureAggregator
 }
 
-func NewAPI(chainCtx *snow.Context, backend Backend, signatureAggregator *acp118.SignatureAggregator, requirePrimaryNetworkSigners func() bool) *API {
+func NewAPI(chainCtx *snow.Context, backend Backend, signatureAggregator *acp118.SignatureAggregator) *API {
 	return &API{
-		backend:                      backend,
-		chainContext:                 chainCtx,
-		signatureAggregator:          signatureAggregator,
-		requirePrimaryNetworkSigners: requirePrimaryNetworkSigners,
+		backend:             backend,
+		chainContext:        chainCtx,
+		signatureAggregator: signatureAggregator,
 	}
 }
 
 // GetMessage returns the Warp message associated with a messageID.
-func (a *API) GetMessage(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
+func (a *API) GetMessage(_ context.Context, messageID ids.ID) (hexutil.Bytes, error) {
 	message, err := a.backend.GetMessage(messageID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get message %s with error %w", messageID, err)
@@ -57,7 +54,7 @@ func (a *API) GetMessageSignature(ctx context.Context, messageID ids.ID) (hexuti
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signature for message %s with error %w", messageID, err)
 	}
-	return signature[:], nil
+	return signature, nil
 }
 
 // GetBlockSignature returns the BLS signature associated with a blockID.
@@ -66,7 +63,7 @@ func (a *API) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexutil.By
 	if err != nil {
 		return nil, fmt.Errorf("failed to get signature for block %s with error %w", blockID, err)
 	}
-	return signature[:], nil
+	return signature, nil
 }
 
 // GetMessageAggregateSignature fetches the aggregate signature for the requested [messageID]
@@ -107,8 +104,7 @@ func (a *API) aggregateSignatures(ctx context.Context, unsignedMessage *warp.Uns
 		return nil, err
 	}
 
-	state := validators.NewState(validatorState, a.chainContext.SubnetID, a.chainContext.ChainID, a.requirePrimaryNetworkSigners())
-	validatorSet, err := warp.GetCanonicalValidatorSetFromSubnetID(ctx, state, pChainHeight, subnetID)
+	validatorSet, err := validatorState.GetWarpValidatorSet(ctx, pChainHeight, subnetID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get validator set: %w", err)
 	}

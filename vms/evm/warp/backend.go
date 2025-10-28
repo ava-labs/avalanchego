@@ -12,17 +12,19 @@ import (
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
-	"github.com/ava-labs/avalanchego/vms/evm/warp/warptest"
-	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/libevm/log"
+
+	avalancheWarp "github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
 
 var (
 	_                         Backend = (*backend)(nil)
+	ErrValidateBlock                  = errors.New("failed to validate block message")
+	ErrVerifyWarpMessage              = errors.New("failed to verify warp message")
 	errParsingOffChainMessage         = errors.New("failed to parse off-chain message")
 
 	messageCacheSize = 500
@@ -57,7 +59,7 @@ type backend struct {
 	db                        database.Database
 	warpSigner                avalancheWarp.Signer
 	blockClient               BlockClient
-	validatorReader           warptest.ValidatorReader
+	uptimeTracker             *uptimetracker.UptimeTracker
 	signatureCache            cache.Cacher[ids.ID, []byte]
 	messageCache              *lru.Cache[ids.ID, *avalancheWarp.UnsignedMessage]
 	offchainAddressedCallMsgs map[ids.ID]*avalancheWarp.UnsignedMessage
@@ -70,7 +72,7 @@ func NewBackend(
 	sourceChainID ids.ID,
 	warpSigner avalancheWarp.Signer,
 	blockClient BlockClient,
-	validatorReader warptest.ValidatorReader,
+	uptimeTracker *uptimetracker.UptimeTracker,
 	db database.Database,
 	signatureCache cache.Cacher[ids.ID, []byte],
 	offchainMessages [][]byte,
@@ -82,7 +84,7 @@ func NewBackend(
 		warpSigner:                warpSigner,
 		blockClient:               blockClient,
 		signatureCache:            signatureCache,
-		validatorReader:           validatorReader,
+		uptimeTracker:             uptimeTracker,
 		messageCache:              lru.NewCache[ids.ID, *avalancheWarp.UnsignedMessage](messageCacheSize),
 		stats:                     newVerifierStats(),
 		offchainAddressedCallMsgs: make(map[ids.ID]*avalancheWarp.UnsignedMessage),
@@ -141,8 +143,9 @@ func (b *backend) GetMessageSignature(ctx context.Context, unsignedMessage *aval
 	}
 
 	if err := b.Verify(ctx, unsignedMessage, nil); err != nil {
-		return nil, fmt.Errorf("failed to validate warp message: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrVerifyWarpMessage, err)
 	}
+
 	return b.signMessage(unsignedMessage)
 }
 
@@ -164,7 +167,7 @@ func (b *backend) GetBlockSignature(ctx context.Context, blockID ids.ID) ([]byte
 	}
 
 	if err := b.verifyBlockMessage(ctx, blockHashPayload); err != nil {
-		return nil, fmt.Errorf("failed to validate block message: %w", err)
+		return nil, fmt.Errorf("%w: %w", ErrValidateBlock, err)
 	}
 
 	sig, err := b.signMessage(unsignedMessage)

@@ -110,11 +110,11 @@ func (b *backend) verifyOffchainAddressedCall(addressedCall *payload.AddressedCa
 }
 
 func (b *backend) verifyUptimeMessage(uptimeMsg *message.ValidatorUptime) *common.AppError {
-	vdr, currentUptime, _, err := b.validatorReader.GetValidatorAndUptime(uptimeMsg.ValidationID)
+	currentUptime, _, err := b.uptimeTracker.GetUptime(uptimeMsg.ValidationID)
 	if err != nil {
 		return &common.AppError{
 			Code:    VerifyErrCode,
-			Message: fmt.Sprintf("failed to get uptime for validationID %s: %s", uptimeMsg.ValidationID, err.Error()),
+			Message: "failed to get uptime: " + err.Error(),
 		}
 	}
 
@@ -123,7 +123,7 @@ func (b *backend) verifyUptimeMessage(uptimeMsg *message.ValidatorUptime) *commo
 	if currentUptimeSeconds < uptimeMsg.TotalUptime {
 		return &common.AppError{
 			Code:    VerifyErrCode,
-			Message: fmt.Sprintf("current uptime %d is less than queried uptime %d for nodeID %s", currentUptimeSeconds, uptimeMsg.TotalUptime, vdr.NodeID),
+			Message: fmt.Sprintf("current uptime %d is less than queried uptime %d for validationID %s", currentUptimeSeconds, uptimeMsg.TotalUptime, uptimeMsg.ValidationID),
 		}
 	}
 
