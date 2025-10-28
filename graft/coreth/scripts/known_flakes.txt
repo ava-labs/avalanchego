@@ -1,6 +1,3 @@
-TestMempoolAtmTxsAppGossipHandlingDiscardedTx
-TestMempoolEthTxsAppGossipHandling
 TestResumeSyncAccountsTrieInterrupted
 TestResyncNewRootAfterDeletes
 TestTransactionSkipIndexing
-TestUpdatedKeyfileContents

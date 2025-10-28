@@ -257,8 +257,8 @@ func TestAtomicTxPushGossipOutbound(t *testing.T) {
 	require.Equal(tx.ID(), gossipedTx.ID())
 }
 
-// Tests that a tx is gossiped when it is issued
-func TestAtomicTxPushGossipInbound(t *testing.T) {
+// Tests that a tx is gossiped when it is issued and valid
+func TestAtomicTxPushGossipInboundValid(t *testing.T) {
 	require := require.New(t)
 	ctx, cancel := utilstest.NewTestContext(t)
 	defer cancel()
@@ -311,18 +311,61 @@ func TestAtomicTxPushGossipInbound(t *testing.T) {
 	require.NoError(err)
 	require.NoError(vm.AtomicMempool.AddLocalTx(tx))
 
-	marshaller := atomic.TxMarshaller{}
-	gossipBytes, err := marshaller.MarshalGossip(tx)
-	require.NoError(err)
-
-	inboundGossip := &sdk.PushGossip{
-		Gossip: [][]byte{gossipBytes},
-	}
-	inboundGossipBytes, err := proto.Marshal(inboundGossip)
-	require.NoError(err)
-
-	inboundGossipMsg := append(binary.AppendUvarint(nil, p2p.AtomicTxGossipHandlerID), inboundGossipBytes...)
-
+	inboundGossipMsg := buildAtomicPushGossip(t, tx)
 	require.NoError(vm.AppGossip(ctx, ids.EmptyNodeID, inboundGossipMsg))
 	require.True(vm.AtomicMempool.Has(tx.ID()))
+}
+
+// Tests that conflicting txs are handled, based on whether the original tx is
+// valid or not.
+func TestAtomicTxPushGossipInboundConflicting(t *testing.T) {
+	require := require.New(t)
+	vm := newAtomicTestVM()
+	tvm := vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{})
+	tvm.Ctx.Lock.Unlock()
+	defer func() {
+		tvm.Ctx.Lock.Lock()
+		require.NoError(vm.Shutdown(context.Background()))
+	}()
+
+	nodeID := ids.GenerateTestNodeID()
+
+	// Create conflicting transactions
+	importTxs := createImportTxOptions(t, vm, tvm.AtomicMemory)
+	tx, conflictingTx, overridingTx := importTxs[0], importTxs[1], importTxs[2]
+
+	msgBytes := buildAtomicPushGossip(t, tx)
+
+	// show that no txID is requested
+	require.NoError(vm.AppGossip(context.Background(), nodeID, msgBytes))
+	require.True(vm.AtomicMempool.Has(tx.ID()))
+
+	// Try to add a conflicting tx
+	msgBytes = buildAtomicPushGossip(t, conflictingTx)
+	require.NoError(vm.AppGossip(context.Background(), nodeID, msgBytes))
+	require.False(vm.AtomicMempool.Has(conflictingTx.ID()), "conflicting tx should not be in the atomic mempool")
+
+	// Now, show tx as discarded.
+	vm.AtomicMempool.NextTx()
+	vm.AtomicMempool.DiscardCurrentTx(tx.ID())
+	require.False(vm.AtomicMempool.Has(tx.ID()))
+
+	// A conflicting tx can now be added to the mempool
+	msgBytes = buildAtomicPushGossip(t, overridingTx)
+	require.NoError(vm.AppGossip(context.Background(), nodeID, msgBytes))
+	require.True(vm.AtomicMempool.Has(overridingTx.ID()), "overriding tx should be in the atomic mempool")
+}
+
+func buildAtomicPushGossip(t *testing.T, tx *atomic.Tx) []byte {
+	marshaller := atomic.TxMarshaller{}
+	txBytes, err := marshaller.MarshalGossip(tx)
+	require.NoError(t, err)
+	inboundGossip := &sdk.PushGossip{
+		Gossip: [][]byte{txBytes},
+	}
+	inboundGossipBytes, err := proto.Marshal(inboundGossip)
+	require.NoError(t, err)
+
+	inboundGossipMsg := append(binary.AppendUvarint(nil, p2p.AtomicTxGossipHandlerID), inboundGossipBytes...)
+	return inboundGossipMsg
 }
