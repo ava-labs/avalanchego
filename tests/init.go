@@ -37,13 +37,19 @@ import (
 	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/utils"
+	"github.com/ava-labs/libevm/libevm"
 )
 
 // Forks table defines supported forks and their chain config.
 var Forks map[string]*params.ChainConfig
 
 func init() {
-	params.WithTempRegisteredExtras(initializeForks)
+	libevm.WithTemporaryExtrasLock(func(l libevm.ExtrasLock) error {
+		return params.WithTempRegisteredExtras(l, func() error {
+			initializeForks()
+			return nil
+		})
+	})
 }
 
 // initializeForks MUST be called inside [params.WithTempRegisteredExtras] to

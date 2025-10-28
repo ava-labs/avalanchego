@@ -32,6 +32,7 @@ var (
 )
 
 var (
+	ErrInvalidQuorumRatio         = errors.New("invalid warp quorum ratio")
 	errOverflowSignersGasCost     = errors.New("overflow calculating warp signers gas cost")
 	errInvalidPredicateBytes      = errors.New("cannot unpack predicate bytes")
 	errInvalidWarpMsg             = errors.New("cannot unpack warp message")
@@ -95,11 +96,11 @@ func (c *Config) Verify(chainConfig precompileconfig.ChainConfig) error {
 	}
 
 	if c.QuorumNumerator > WarpQuorumDenominator {
-		return fmt.Errorf("cannot specify quorum numerator (%d) > quorum denominator (%d)", c.QuorumNumerator, WarpQuorumDenominator)
+		return fmt.Errorf("%w: cannot specify numerator (%d) > denominator (%d)", ErrInvalidQuorumRatio, c.QuorumNumerator, WarpQuorumDenominator)
 	}
 	// If a non-default quorum numerator is specified and it is less than the minimum, return an error
 	if c.QuorumNumerator != 0 && c.QuorumNumerator < WarpQuorumNumeratorMinimum {
-		return fmt.Errorf("cannot specify quorum numerator (%d) < min quorum numerator (%d)", c.QuorumNumerator, WarpQuorumNumeratorMinimum)
+		return fmt.Errorf("%w: cannot specify numerator (%d) < min numerator (%d)", ErrInvalidQuorumRatio, c.QuorumNumerator, WarpQuorumNumeratorMinimum)
 	}
 	return nil
 }
@@ -143,9 +144,11 @@ func (*Config) Accept(acceptCtx *precompileconfig.AcceptContext, blockHash commo
 // 4. TODO: Lookup of the validator set
 //
 // If the payload of the warp message fails parsing, return a non-nil error invalidating the transaction.
-func (*Config) PredicateGas(pred predicate.Predicate) (uint64, error) {
-	totalGas := GasCostPerSignatureVerification
-	bytesGasCost, overflow := math.SafeMul(GasCostPerWarpMessageChunk, uint64(len(pred)))
+func (*Config) PredicateGas(pred predicate.Predicate, rules precompileconfig.Rules) (uint64, error) {
+	gasConfig := CurrentGasConfig(rules)
+
+	totalGas := gasConfig.VerifyPredicateBase
+	bytesGasCost, overflow := math.SafeMul(gasConfig.PerWarpMessageChunk, uint64(len(pred)))
 	if overflow {
 		return 0, fmt.Errorf("overflow calculating gas cost for %d warp message chunks", len(pred))
 	}
@@ -171,7 +174,7 @@ func (*Config) PredicateGas(pred predicate.Predicate) (uint64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("%w: %w", errCannotGetNumSigners, err)
 	}
-	signerGas, overflow := math.SafeMul(uint64(numSigners), GasCostPerWarpSigner)
+	signerGas, overflow := math.SafeMul(uint64(numSigners), gasConfig.PerWarpSigner)
 	if overflow {
 		return 0, errOverflowSignersGasCost
 	}

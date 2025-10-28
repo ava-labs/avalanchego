@@ -36,10 +36,10 @@ var (
 	_                           secp256k1fx.UnsignedTx = (*UnsignedExportTx)(nil)
 	ErrExportNonAVAXInputBanff                         = errors.New("export input cannot contain non-AVAX in Banff")
 	ErrExportNonAVAXOutputBanff                        = errors.New("export output cannot contain non-AVAX in Banff")
+	ErrInsufficientFunds                               = errors.New("insufficient funds")
 	ErrInvalidNonce                                    = errors.New("invalid nonce")
 	ErrNoExportOutputs                                 = errors.New("tx has no export outputs")
 	errOverflowExport                                  = errors.New("overflow when computing export amount + txFee")
-	errInsufficientFunds                               = errors.New("insufficient funds")
 )
 
 // UnsignedExportTx is an unsigned ExportTx
@@ -323,14 +323,14 @@ func (utx *UnsignedExportTx) EVMStateTransfer(ctx *snow.Context, state StateDB) 
 				uint256.NewInt(X2CRate.Uint64()),
 			)
 			if state.GetBalance(from.Address).Cmp(amount) < 0 {
-				return errInsufficientFunds
+				return ErrInsufficientFunds
 			}
 			state.SubBalance(from.Address, amount)
 		} else {
 			log.Debug("export_tx", "dest", utx.DestinationChain, "addr", from.Address, "amount", from.Amount, "assetID", from.AssetID)
 			amount := new(big.Int).SetUint64(from.Amount)
 			if state.GetBalanceMultiCoin(from.Address, common.Hash(from.AssetID)).Cmp(amount) < 0 {
-				return errInsufficientFunds
+				return ErrInsufficientFunds
 			}
 			state.SubBalanceMultiCoin(from.Address, common.Hash(from.AssetID), amount)
 		}
@@ -393,7 +393,7 @@ func getSpendableFunds(
 	}
 
 	if amount > 0 {
-		return nil, nil, errInsufficientFunds
+		return nil, nil, ErrInsufficientFunds
 	}
 
 	return inputs, signers, nil
@@ -487,7 +487,7 @@ func getSpendableAVAXWithFee(
 	}
 
 	if amount > 0 {
-		return nil, nil, errInsufficientFunds
+		return nil, nil, ErrInsufficientFunds
 	}
 
 	return inputs, signers, nil

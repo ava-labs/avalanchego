@@ -16,7 +16,7 @@ import (
 type ConfigVerifyTest struct {
 	Config        precompileconfig.Config
 	ChainConfig   precompileconfig.ChainConfig
-	ExpectedError string
+	ExpectedError error
 }
 
 // ConfigEqualTest is a test case for comparing two configs
@@ -40,11 +40,7 @@ func RunVerifyTests(t *testing.T, tests map[string]ConfigVerifyTest) {
 				chainConfig = mockChainConfig
 			}
 			err := test.Config.Verify(chainConfig)
-			if test.ExpectedError == "" {
-				require.NoError(err)
-			} else {
-				require.ErrorContains(err, test.ExpectedError)
-			}
+			require.ErrorIs(err, test.ExpectedError)
 		})
 	}
 }

@@ -1026,7 +1026,7 @@ func TestExtraStateChangeAtomicGasLimitExceeded(t *testing.T) {
 
 	// Hack: test [onExtraStateChange] directly to ensure it catches the atomic gas limit error correctly.
 	_, _, err = vm2.onExtraStateChange(ethBlk2, nil, state)
-	require.ErrorContains(err, "exceeds atomic gas limit")
+	require.ErrorIs(err, errAtomicGasExceedsLimit)
 }
 
 // Regression test to ensure that a VM that is not able to parse a block that

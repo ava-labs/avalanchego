@@ -119,7 +119,7 @@ func TestUnmarshalConfig(t *testing.T) {
 			var tmp Config
 			err := json.Unmarshal(tt.givenJSON, &tmp)
 			if tt.expectedErr {
-				require.Error(t, err)
+				require.Error(t, err) //nolint:forbidigo // uses standard library
 			} else {
 				require.NoError(t, err)
 				tmp.deprecate()
@@ -131,11 +131,10 @@ func TestUnmarshalConfig(t *testing.T) {
 
 func TestGetConfig(t *testing.T) {
 	tests := []struct {
-		name        string
-		configJSON  []byte
-		networkID   uint32
-		expected    func(*testing.T, Config)
-		expectError bool
+		name       string
+		configJSON []byte
+		networkID  uint32
+		expected   func(*testing.T, Config)
 	}{
 		{
 			name:       "custom config values",
@@ -172,10 +171,6 @@ func TestGetConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config, _, err := GetConfig(tt.configJSON, tt.networkID)
-			if tt.expectError {
-				require.Error(t, err)
-				return
-			}
 			require.NoError(t, err)
 			tt.expected(t, config)
 		})

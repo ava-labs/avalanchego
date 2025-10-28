@@ -144,12 +144,12 @@ func (w *worker) commitNewWork(predicateContext *precompileconfig.PredicateConte
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 	var (
-		parent     = w.chain.CurrentBlock()
-		tstart     = w.clock.Time()
-		chainExtra = params.GetExtra(w.chainConfig)
+		parent      = w.chain.CurrentBlock()
+		chainExtra  = params.GetExtra(w.chainConfig)
+		tstart      = customheader.GetNextTimestamp(parent, w.clock.Time())
+		timestamp   = uint64(tstart.Unix())
+		timestampMS = uint64(tstart.UnixMilli())
 	)
-
-	timestamp, timestampMS := customheader.GetNextTimestamp(parent, tstart)
 
 	header := &types.Header{
 		ParentHash: parent.Hash(),

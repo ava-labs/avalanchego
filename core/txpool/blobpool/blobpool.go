@@ -415,7 +415,7 @@ func (p *BlobPool) Init(gasTip uint64, head *types.Header, reserve txpool.Addres
 	baseFee, err := customheader.EstimateNextBaseFee(
 		params.GetExtra(p.chain.Config()),
 		p.head,
-		uint64(time.Now().Unix()),
+		uint64(time.Now().UnixMilli()),
 	)
 	if err != nil {
 		p.Close()
@@ -845,7 +845,7 @@ func (p *BlobPool) Reset(oldHead, newHead *types.Header) {
 	baseFeeBig, err := customheader.EstimateNextBaseFee(
 		params.GetExtra(p.chain.Config()),
 		p.head,
-		uint64(time.Now().Unix()),
+		uint64(time.Now().UnixMilli()),
 	)
 	if err != nil {
 		log.Error("Failed to estimate next base fee to reset blobpool fees", "err", err)

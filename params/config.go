@@ -32,6 +32,7 @@ import (
 
 	"github.com/ava-labs/coreth/params/extras"
 	"github.com/ava-labs/coreth/utils"
+	"github.com/ava-labs/libevm/libevm"
 	ethparams "github.com/ava-labs/libevm/params"
 )
 
@@ -46,7 +47,12 @@ var (
 )
 
 func init() {
-	WithTempRegisteredExtras(initialiseChainConfigs)
+	libevm.WithTemporaryExtrasLock(func(l libevm.ExtrasLock) error {
+		return WithTempRegisteredExtras(l, func() error {
+			initialiseChainConfigs()
+			return nil
+		})
+	})
 }
 
 var (

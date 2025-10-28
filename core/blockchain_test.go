@@ -1043,7 +1043,7 @@ func TestEIP3651(t *testing.T) {
 		gspec   = &Genesis{
 			Config:    params.TestChainConfig,
 			Timestamp: uint64(upgrade.InitiallyActiveTime.Unix()),
-			Alloc: GenesisAlloc{
+			Alloc: types.GenesisAlloc{
 				addr1: {Balance: funds},
 				addr2: {Balance: funds},
 				// The address 0xAAAA sloads 0x00 and 0x01

@@ -81,7 +81,7 @@ func TestUnpackInputIntoInterface(t *testing.T) {
 				err = abi.UnpackInputIntoInterface(&v, "receive", data, test.strictMode) // skips 4 byte selector
 
 				if test.expectedErrorSubstring != "" {
-					require.ErrorContains(t, err, test.expectedErrorSubstring)
+					require.ErrorContains(t, err, test.expectedErrorSubstring) //nolint:forbidigo // uses upstream code
 				} else {
 					require.NoError(t, err)
 					require.Equal(t, input, v)

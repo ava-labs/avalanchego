@@ -45,7 +45,8 @@ type messageHandler interface {
 }
 
 func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, suppliedGas uint64, handler messageHandler) ([]byte, uint64, error) {
-	remainingGas, err := contract.DeductGas(suppliedGas, GetVerifiedWarpMessageBaseCost)
+	warpGasConfig := CurrentGasConfig(accessibleState.GetRules())
+	remainingGas, err := contract.DeductGas(suppliedGas, warpGasConfig.GetVerifiedWarpMessageBase)
 	if err != nil {
 		return nil, remainingGas, err
 	}
@@ -68,7 +69,7 @@ func handleWarpMessage(accessibleState contract.AccessibleState, input []byte, s
 
 	// Note: we charge for the size of the message during both predicate verification and each time the message is read during
 	// EVM execution because each execution incurs an additional read cost.
-	msgBytesGas, overflow := math.SafeMul(GasCostPerWarpMessageChunk, uint64(len(pred)))
+	msgBytesGas, overflow := math.SafeMul(warpGasConfig.PerWarpMessageChunk, uint64(len(pred)))
 	if overflow {
 		return nil, 0, vm.ErrOutOfGas
 	}

@@ -60,6 +60,8 @@ var (
 	_ block.ChainVM                      = (*VM)(nil)
 	_ block.BuildBlockWithContextChainVM = (*VM)(nil)
 	_ block.StateSyncableVM              = (*VM)(nil)
+
+	errAtomicGasExceedsLimit = errors.New("atomic gas used exceeds atomic gas limit")
 )
 
 const (
@@ -394,9 +396,11 @@ func (vm *VM) verifyTxAtTip(tx *atomic.Tx) error {
 	extraRules := params.GetRulesExtra(vm.InnerVM.ChainConfig().Rules(preferredBlock.Number, params.IsMergeTODO, preferredBlock.Time))
 	parentHeader := preferredBlock
 	var nextBaseFee *big.Int
-	timestamp := uint64(vm.clock.Time().Unix())
+	now := vm.clock.Time()
+	timestamp := uint64(now.Unix())
 	if extraConfig.IsApricotPhase3(timestamp) {
-		nextBaseFee, err = customheader.EstimateNextBaseFee(extraConfig, parentHeader, timestamp)
+		timeMS := uint64(now.UnixMilli())
+		nextBaseFee, err = customheader.EstimateNextBaseFee(extraConfig, parentHeader, timeMS)
 		if err != nil {
 			// Return extremely detailed error since CalcBaseFee should never encounter an issue here
 			return fmt.Errorf("failed to calculate base fee with parent timestamp (%d), parent ExtraData: (0x%x), and current timestamp (%d): %w", parentHeader.Time, parentHeader.Extra, timestamp, err)
@@ -717,7 +721,7 @@ func (vm *VM) onExtraStateChange(block *types.Block, parent *types.Header, state
 		}
 
 		if !utils.BigLessOrEqualUint64(batchGasUsed, atomicGasLimit) {
-			return nil, nil, fmt.Errorf("atomic gas used (%d) by block (%s), exceeds atomic gas limit (%d)", batchGasUsed, block.Hash().Hex(), atomicGasLimit)
+			return nil, nil, fmt.Errorf("%w: (%d) by block (%s), limit (%d)", errAtomicGasExceedsLimit, batchGasUsed, block.Hash().Hex(), atomicGasLimit)
 		}
 	}
 	return batchContribution, batchGasUsed, nil
