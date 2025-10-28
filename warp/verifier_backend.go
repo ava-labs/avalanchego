@@ -111,17 +111,11 @@ func (b *backend) verifyOffchainAddressedCall(addressedCall *payload.AddressedCa
 }
 
 func (b *backend) verifyUptimeMessage(uptimeMsg *messages.ValidatorUptime) *common.AppError {
-	currentUptime, _, found, err := b.uptimeTracker.GetUptime(uptimeMsg.ValidationID)
+	currentUptime, _, err := b.uptimeTracker.GetUptime(uptimeMsg.ValidationID)
 	if err != nil {
 		return &common.AppError{
 			Code:    VerifyErrCode,
-			Message: fmt.Sprintf("failed to get uptime for validationID %s: %s", uptimeMsg.ValidationID, err.Error()),
-		}
-	}
-	if !found {
-		return &common.AppError{
-			Code:    VerifyErrCode,
-			Message: fmt.Sprintf("validator not found for validationID %s", uptimeMsg.ValidationID),
+			Message: "failed to get uptime: " + err.Error(),
 		}
 	}
 

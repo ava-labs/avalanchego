@@ -43,12 +43,9 @@ func (api *ValidatorsAPI) GetCurrentValidators(httpReq *http.Request, req *clien
 			continue
 		}
 
-		upDuration, lastUpdated, found, err := api.vm.uptimeTracker.GetUptime(validationID)
+		upDuration, lastUpdated, err := api.vm.uptimeTracker.GetUptime(validationID)
 		if err != nil {
 			return fmt.Errorf("failed to get uptime for validation ID %s: %w", validationID, err)
-		}
-		if !found {
-			return fmt.Errorf("validator not found for validation ID %s", validationID)
 		}
 
 		var uptimeFloat float64

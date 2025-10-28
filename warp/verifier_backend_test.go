@@ -354,7 +354,7 @@ func TestUptimeSignatures(t *testing.T) {
 		protoBytes, _ = getUptimeMessageBytes([]byte{}, vID)
 		_, appErr = handler.AppRequest(context.Background(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
 		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
-		require.Equal(t, fmt.Sprintf("2: validator not found for validationID %s", vID), appErr.Error())
+		require.Equal(t, fmt.Sprintf("2: failed to get uptime: validationID not found: %s", vID), appErr.Error())
 
 		// uptime is less than requested (not connected)
 		protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID)
