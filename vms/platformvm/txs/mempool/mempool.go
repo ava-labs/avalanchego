@@ -309,7 +309,7 @@ func (m *mempool) Iterate(f func(tx *txs.Tx) bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
-	m.tree.Ascend(func(item meteredTx) bool {
+	m.tree.Descend(func(item meteredTx) bool {
 		return f(item.Tx)
 	})
 }
