@@ -26,27 +26,22 @@ type Mempool struct {
 	cond lock.Cond
 }
 
-func (m *Mempool) initTxs() {
-	if m.txs != nil {
-		return
-	}
-
-	m.txs = make(map[ids.ID]*txs.Tx)
-}
-
 func (m *Mempool) Add(tx *txs.Tx) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if m.txs == nil {
+		m.txs = make(map[ids.ID]*txs.Tx)
+	}
+
 	m.txs[tx.ID()] = tx
+
 	return nil
 }
 
 func (m *Mempool) Get(txID ids.ID) (*txs.Tx, bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-
-	m.initTxs()
 
 	tx, ok := m.txs[txID]
 	return tx, ok
