@@ -29,7 +29,7 @@ type newBlockConfig struct {
 	round uint64
 }
 
-func newBlock(t *testing.T, config newBlockConfig) *Block {
+func newTestBlock(t *testing.T, config newBlockConfig) *Block {
 	if config.prev == nil {
 		block := &Block{
 			vmBlock: &wrappedBlock{
@@ -139,7 +139,7 @@ func generateTestNodes(t *testing.T, num uint64) []*testNode {
 	return nodes
 }
 
-// newFinalization creates a new finalization over the BlockHeader, by collecting a
+// newTestFinalization creates a new finalization over the BlockHeader, by collecting a
 // quorum of signatures from the provided configs.
 func newTestFinalization(t *testing.T, configs []*Config, bh simplex.BlockHeader) simplex.Finalization {
 	quorum := simplex.Quorum(len(configs))

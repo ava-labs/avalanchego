@@ -27,7 +27,7 @@ function copy_source() {
     if [[ "$source" == s3://* || "$dest" == s3://* ]]; then
         # Use s5cmd to copy from S3
         echo "Copying from S3: $source to $dest"
-        time s5cmd cp "$source" "$dest"
+        time s5cmd cp --show-progress "$source" "$dest"
     else
         # Use cp for local filesystem with recursive support
         
@@ -65,7 +65,7 @@ function check_dst_not_exists() {
         # from s5cmd ls.
         # If the error message changes, this script would be expected to fail
         # by misreporting non-existent directories as existing, which means
-        # a change in beahvior would cause the script to fail to copy rather
+        # a change in behavior would cause the script to fail to copy rather
         # than allow accidental overwrites.
         echo "Checking if S3 path exists: $dst"
         if ! OUTPUT=$(s5cmd ls "$dst" 2>&1); then

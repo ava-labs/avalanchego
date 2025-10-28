@@ -4,7 +4,6 @@
 package network
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -41,7 +40,7 @@ var (
 		PullGossipPollSize:                          1,
 		PullGossipFrequency:                         time.Second,
 		PullGossipThrottlingPeriod:                  time.Second,
-		PullGossipThrottlingLimit:                   1,
+		PullGossipRequestsPerValidator:              1,
 		ExpectedBloomFilterElements:                 10,
 		ExpectedBloomFilterFalsePositiveProbability: .1,
 		MaxBloomFilterFalsePositiveProbability:      .5,
@@ -244,7 +243,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			err = n.IssueTxFromRPC(tt.tx)
 			require.ErrorIs(err, tt.expectedErr)
 
-			require.NoError(n.txPushGossiper.Gossip(context.Background()))
+			require.NoError(n.txPushGossiper.Gossip(t.Context()))
 		})
 	}
 }

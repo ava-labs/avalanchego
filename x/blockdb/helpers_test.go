@@ -17,7 +17,13 @@ import (
 func newTestDatabase(t *testing.T, opts DatabaseConfig) (*Database, func()) {
 	t.Helper()
 	dir := t.TempDir()
-	config := opts.WithDir(dir)
+	config := opts
+	if config.IndexDir == "" {
+		config = config.WithIndexDir(dir)
+	}
+	if config.DataDir == "" {
+		config = config.WithDataDir(dir)
+	}
 	db, err := New(config, logging.NoLog{})
 	require.NoError(t, err, "failed to create database")
 
@@ -51,20 +57,11 @@ func fixedSizeBlock(t *testing.T, size int, height uint64) []byte {
 	return b
 }
 
-func checkDatabaseState(t *testing.T, db *Database, maxHeight uint64, maxContiguousHeight uint64) {
-	heights := db.blockHeights.Load()
-	if heights != nil {
-		require.Equal(t, maxHeight, heights.maxBlockHeight, "maxBlockHeight mismatch")
-	} else {
-		require.Equal(t, uint64(unsetHeight), maxHeight, "maxBlockHeight mismatch")
-	}
-	gotMCH, ok := db.MaxContiguousHeight()
-	if maxContiguousHeight != unsetHeight {
-		require.True(t, ok, "MaxContiguousHeight is not set, want %d", maxContiguousHeight)
-		require.Equal(t, maxContiguousHeight, gotMCH, "maxContiguousHeight mismatch")
-	} else {
-		require.False(t, ok)
-	}
+func checkDatabaseState(t *testing.T, db *Database, maxHeight uint64) {
+	t.Helper()
+
+	actualMaxHeight := db.maxBlockHeight.Load()
+	require.Equal(t, maxHeight, actualMaxHeight, "maxBlockHeight mismatch")
 }
 
 // Helper function to create a pointer to uint64

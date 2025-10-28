@@ -25,34 +25,19 @@ var (
 	_ validators.Connector = (*Network)(nil)
 	_ common.AppHandler    = (*Network)(nil)
 	_ NodeSampler          = (*PeerSampler)(nil)
+	_ ConnectionHandler    = (*Peers)(nil)
 
 	opLabel      = "op"
 	handlerLabel = "handlerID"
 	labelNames   = []string{opLabel, handlerLabel}
 )
 
-// ClientOption configures Client
-type ClientOption interface {
-	apply(options *clientOptions)
-}
-
-type clientOptionFunc func(options *clientOptions)
-
-func (o clientOptionFunc) apply(options *clientOptions) {
-	o(options)
-}
-
-// WithValidatorSampling configures Client.AppRequestAny to sample validators
-func WithValidatorSampling(validators *Validators) ClientOption {
-	return clientOptionFunc(func(options *clientOptions) {
-		options.nodeSampler = validators
-	})
-}
-
-// clientOptions holds client-configurable values
-type clientOptions struct {
-	// nodeSampler is used to select nodes to route Client.AppRequestAny to
-	nodeSampler NodeSampler
+// ConnectionHandler handles peer connection events
+type ConnectionHandler interface {
+	// Connected is called when we connect to nodeID
+	Connected(nodeID ids.NodeID)
+	// Disconnected is called when we disconnect from nodeID
+	Disconnected(nodeID ids.NodeID)
 }
 
 // NewNetwork returns an instance of Network
@@ -61,6 +46,7 @@ func NewNetwork(
 	sender common.AppSender,
 	registerer prometheus.Registerer,
 	namespace string,
+	connectionHandlers ...ConnectionHandler,
 ) (*Network, error) {
 	metrics := metrics{
 		msgTime: prometheus.NewGaugeVec(
@@ -90,20 +76,17 @@ func NewNetwork(
 	}
 
 	return &Network{
-		Peers:  &Peers{},
-		log:    log,
-		sender: sender,
-		router: newRouter(log, sender, metrics),
+		sender:             sender,
+		connectionHandlers: connectionHandlers,
+		router:             newRouter(log, sender, metrics),
 	}, nil
 }
 
 // Network exposes networking state and supports building p2p application
 // protocols
 type Network struct {
-	Peers *Peers
-
-	log    logging.Logger
-	sender common.AppSender
+	sender             common.AppSender
+	connectionHandlers []ConnectionHandler
 
 	router *router
 }
@@ -125,35 +108,31 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msg []byte) 
 }
 
 func (n *Network) Connected(_ context.Context, nodeID ids.NodeID, _ *version.Application) error {
-	n.Peers.add(nodeID)
+	for _, c := range n.connectionHandlers {
+		c.Connected(nodeID)
+	}
+
 	return nil
 }
 
 func (n *Network) Disconnected(_ context.Context, nodeID ids.NodeID) error {
-	n.Peers.remove(nodeID)
+	for _, c := range n.connectionHandlers {
+		c.Disconnected(nodeID)
+	}
+
 	return nil
 }
 
 // NewClient returns a Client that can be used to send messages for the
 // corresponding protocol.
-func (n *Network) NewClient(handlerID uint64, options ...ClientOption) *Client {
-	client := &Client{
+func (n *Network) NewClient(handlerID uint64, nodeSampler NodeSampler) *Client {
+	return &Client{
 		handlerIDStr:  strconv.FormatUint(handlerID, 10),
 		handlerPrefix: ProtocolPrefix(handlerID),
 		sender:        n.sender,
 		router:        n.router,
-		options: &clientOptions{
-			nodeSampler: &PeerSampler{
-				Peers: n.Peers,
-			},
-		},
+		nodeSampler:   nodeSampler,
 	}
-
-	for _, option := range options {
-		option.apply(client.options)
-	}
-
-	return client
 }
 
 // AddHandler reserves an identifier for an application protocol
@@ -167,21 +146,21 @@ type Peers struct {
 	set  set.SampleableSet[ids.NodeID]
 }
 
-func (p *Peers) add(nodeID ids.NodeID) {
+func (p *Peers) Connected(nodeID ids.NodeID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	p.set.Add(nodeID)
 }
 
-func (p *Peers) remove(nodeID ids.NodeID) {
+func (p *Peers) Disconnected(nodeID ids.NodeID) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
 	p.set.Remove(nodeID)
 }
 
-func (p *Peers) has(nodeID ids.NodeID) bool {
+func (p *Peers) Has(nodeID ids.NodeID) bool {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 

@@ -106,7 +106,7 @@ func TestTimeout(t *testing.T) {
 		externalSender,
 		&chainRouter,
 		tm,
-		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+		p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		prometheus.NewRegistry(),
 	)
@@ -160,28 +160,28 @@ func TestTimeout(t *testing.T) {
 		return nil
 	}
 	h.SetEngineManager(&handler.EngineManager{
-		Avalanche: &handler.Engine{
+		DAG: &handler.Engine{
 			StateSyncer:  nil,
 			Bootstrapper: bootstrapper,
 			Consensus:    nil,
 		},
-		Snowman: &handler.Engine{
+		Chain: &handler.Engine{
 			StateSyncer:  nil,
 			Bootstrapper: bootstrapper,
 			Consensus:    nil,
 		},
 	})
 	ctx2.State.Set(snow.EngineState{
-		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 		State: snow.Bootstrapping, // assumed bootstrap is ongoing
 	})
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
 	var (
 		wg           = sync.WaitGroup{}
@@ -193,7 +193,7 @@ func TestTimeout(t *testing.T) {
 		failedChains = set.Set[ids.ID]{}
 	)
 
-	cancelledCtx, cancel := context.WithCancel(context.Background())
+	cancelledCtx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	failed := func(ctx context.Context, nodeID ids.NodeID, _ uint32) error {
@@ -365,7 +365,7 @@ func TestReliableMessages(t *testing.T) {
 		externalSender,
 		&chainRouter,
 		tm,
-		p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+		p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 		subnets.New(ctx.NodeID, subnets.Config{}),
 		prometheus.NewRegistry(),
 	)
@@ -429,34 +429,34 @@ func TestReliableMessages(t *testing.T) {
 	}
 	bootstrapper.CantGossip = false
 	h.SetEngineManager(&handler.EngineManager{
-		Avalanche: &handler.Engine{
+		DAG: &handler.Engine{
 			StateSyncer:  nil,
 			Bootstrapper: bootstrapper,
 			Consensus:    nil,
 		},
-		Snowman: &handler.Engine{
+		Chain: &handler.Engine{
 			StateSyncer:  nil,
 			Bootstrapper: bootstrapper,
 			Consensus:    nil,
 		},
 	})
 	ctx2.State.Set(snow.EngineState{
-		Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+		Type:  p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 		State: snow.Bootstrapping, // assumed bootstrap is ongoing
 	})
 
-	chainRouter.AddChain(context.Background(), h)
+	chainRouter.AddChain(t.Context(), h)
 
 	bootstrapper.StartF = func(context.Context, uint32) error {
 		return nil
 	}
-	h.Start(context.Background(), false)
+	h.Start(t.Context(), false)
 
 	go func() {
 		for i := 0; i < queriesToSend; i++ {
 			vdrIDs := set.Of(ids.BuildTestNodeID([]byte{1}))
 
-			sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty, 0)
+			sender.SendPullQuery(t.Context(), vdrIDs, uint32(i), ids.Empty, 0)
 			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
 		}
 	}()
@@ -527,7 +527,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 				externalSender,
 				&chainRouter,
 				tm,
-				p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+				p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 				subnet,
 				prometheus.NewRegistry(),
 			)
@@ -590,28 +590,28 @@ func TestReliableMessagesToMyself(t *testing.T) {
 				return nil
 			}
 			h.SetEngineManager(&handler.EngineManager{
-				Avalanche: &handler.Engine{
+				DAG: &handler.Engine{
 					StateSyncer:  nil,
 					Bootstrapper: bootstrapper,
 					Consensus:    nil,
 				},
-				Snowman: &handler.Engine{
+				Chain: &handler.Engine{
 					StateSyncer:  nil,
 					Bootstrapper: bootstrapper,
 					Consensus:    nil,
 				},
 			})
 			ctx2.State.Set(snow.EngineState{
-				Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+				Type:  p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 				State: snow.Bootstrapping, // assumed bootstrap is ongoing
 			})
 
-			chainRouter.AddChain(context.Background(), h)
+			chainRouter.AddChain(t.Context(), h)
 
 			bootstrapper.StartF = func(context.Context, uint32) error {
 				return nil
 			}
-			h.Start(context.Background(), false)
+			h.Start(t.Context(), false)
 
 			go func() {
 				for i := 0; i < queriesToSend; i++ {
@@ -619,7 +619,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 					// because they don't exist. This will almost immediately trigger
 					// a query failed message
 					vdrIDs := set.Of(ids.GenerateTestNodeID())
-					sender.SendPullQuery(context.Background(), vdrIDs, uint32(i), ids.Empty, 0)
+					sender.SendPullQuery(t.Context(), vdrIDs, uint32(i), ids.Empty, 0)
 				}
 			}()
 
@@ -690,7 +690,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
 				sender.SendGetStateSummaryFrontier(
-					context.Background(),
+					t.Context(),
 					nodeIDs,
 					requestID,
 				)
@@ -734,7 +734,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				).Return(set.Of(successNodeID))
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
-				sender.SendGetAcceptedStateSummary(context.Background(), nodeIDs, requestID, heights)
+				sender.SendGetAcceptedStateSummary(t.Context(), nodeIDs, requestID, heights)
 			},
 		},
 		{
@@ -773,7 +773,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				).Return(set.Of(successNodeID))
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
-				sender.SendGetAcceptedFrontier(context.Background(), nodeIDs, requestID)
+				sender.SendGetAcceptedFrontier(t.Context(), nodeIDs, requestID)
 			},
 		},
 		{
@@ -813,7 +813,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				).Return(set.Of(successNodeID))
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeIDs set.Set[ids.NodeID]) {
-				sender.SendGetAccepted(context.Background(), nodeIDs, requestID, containerIDs)
+				sender.SendGetAccepted(t.Context(), nodeIDs, requestID, containerIDs)
 			},
 		},
 	}
@@ -843,7 +843,7 @@ func TestSender_Bootstrap_Requests(t *testing.T) {
 				externalSender,
 				router,
 				timeoutManager,
-				p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+				p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 				subnets.New(ctx.NodeID, subnets.Config{}),
 				prometheus.NewRegistry(),
 			)
@@ -933,7 +933,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				).Return(nil)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
-				sender.SendStateSummaryFrontier(context.Background(), nodeID, requestID, summary)
+				sender.SendStateSummaryFrontier(t.Context(), nodeID, requestID, summary)
 			},
 		},
 		{
@@ -965,7 +965,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				).Return(nil)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
-				sender.SendAcceptedStateSummary(context.Background(), nodeID, requestID, summaryIDs)
+				sender.SendAcceptedStateSummary(t.Context(), nodeID, requestID, summaryIDs)
 			},
 		},
 		{
@@ -995,7 +995,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				).Return(nil)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
-				sender.SendAcceptedFrontier(context.Background(), nodeID, requestID, summaryIDs[0])
+				sender.SendAcceptedFrontier(t.Context(), nodeID, requestID, summaryIDs[0])
 			},
 		},
 		{
@@ -1027,7 +1027,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				).Return(nil)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
-				sender.SendAccepted(context.Background(), nodeID, requestID, summaryIDs)
+				sender.SendAccepted(t.Context(), nodeID, requestID, summaryIDs)
 			},
 		},
 	}
@@ -1050,7 +1050,7 @@ func TestSender_Bootstrap_Responses(t *testing.T) {
 				externalSender,
 				router,
 				timeoutManager,
-				p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+				p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 				subnets.New(ctx.NodeID, subnets.Config{}),
 				prometheus.NewRegistry(),
 			)
@@ -1089,7 +1089,7 @@ func TestSender_Single_Request(t *testing.T) {
 		deadline          = time.Second
 		requestID         = uint32(1337)
 		containerID       = ids.GenerateTestID()
-		engineType        = p2ppb.EngineType_ENGINE_TYPE_SNOWMAN
+		engineType        = p2ppb.EngineType_ENGINE_TYPE_CHAIN
 	)
 	snowCtx := snowtest.Context(t, snowtest.PChainID)
 	ctx := snowtest.ConsensusContext(snowCtx)
@@ -1146,7 +1146,7 @@ func TestSender_Single_Request(t *testing.T) {
 				).Return(sentTo)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
-				sender.SendGetAncestors(context.Background(), nodeID, requestID, containerID)
+				sender.SendGetAncestors(t.Context(), nodeID, requestID, containerID)
 			},
 			expectedEngineType: engineType,
 		},
@@ -1186,7 +1186,7 @@ func TestSender_Single_Request(t *testing.T) {
 				).Return(sentTo)
 			},
 			sendF: func(_ *require.Assertions, sender common.Sender, nodeID ids.NodeID) {
-				sender.SendGet(context.Background(), nodeID, requestID, containerID)
+				sender.SendGet(t.Context(), nodeID, requestID, containerID)
 			},
 		},
 	}

@@ -4,17 +4,14 @@
 package warp
 
 import (
-	"context"
 	"errors"
-	"math"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/validators"
-	"github.com/ava-labs/avalanchego/snow/validators/validatorsmock"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
@@ -37,7 +34,7 @@ var (
 type testValidator struct {
 	nodeID ids.NodeID
 	sk     bls.Signer
-	vdr    *Validator
+	vdr    *validators.Warp
 }
 
 func (v *testValidator) Compare(o *testValidator) int {
@@ -55,7 +52,7 @@ func newTestValidator() *testValidator {
 	return &testValidator{
 		nodeID: nodeID,
 		sk:     sk,
-		vdr: &Validator{
+		vdr: &validators.Warp{
 			PublicKey:      pk,
 			PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
 			Weight:         3,
@@ -137,757 +134,268 @@ func TestNumSigners(t *testing.T) {
 }
 
 func TestSignatureVerification(t *testing.T) {
-	vdrs := map[ids.NodeID]*validators.GetValidatorOutput{
-		testVdrs[0].nodeID: {
-			NodeID:    testVdrs[0].nodeID,
-			PublicKey: testVdrs[0].vdr.PublicKey,
-			Weight:    testVdrs[0].vdr.Weight,
-		},
-		testVdrs[1].nodeID: {
-			NodeID:    testVdrs[1].nodeID,
-			PublicKey: testVdrs[1].vdr.PublicKey,
-			Weight:    testVdrs[1].vdr.Weight,
-		},
-		testVdrs[2].nodeID: {
-			NodeID:    testVdrs[2].nodeID,
-			PublicKey: testVdrs[2].vdr.PublicKey,
-			Weight:    testVdrs[2].vdr.Weight,
-		},
+	unsignedMsg, err := NewUnsignedMessage(
+		constants.UnitTestID,
+		sourceChainID,
+		nil,
+	)
+	require.NoError(t, err)
+	unsignedBytes := unsignedMsg.Bytes()
+
+	sign := func(signers ...bls.Signer) [bls.SignatureLen]byte {
+		sigs := make([]*bls.Signature, 0, len(signers))
+		for _, vdr := range signers {
+			sig, err := vdr.Sign(unsignedBytes)
+			require.NoError(t, err)
+			sigs = append(sigs, sig)
+		}
+		aggSig, err := bls.AggregateSignatures(sigs)
+		require.NoError(t, err)
+		aggSigBytes := [bls.SignatureLen]byte{}
+		copy(aggSigBytes[:], bls.SignatureToBytes(aggSig))
+		return aggSigBytes
 	}
 
+	const quorumNum = 1
 	tests := []struct {
-		name         string
-		networkID    uint32
-		stateF       func(*gomock.Controller) validators.State
-		quorumNum    uint64
-		quorumDen    uint64
-		msgF         func(*require.Assertions) *Message
-		verifyErr    error
-		canonicalErr error
+		name       string
+		networkID  uint32
+		validators validators.WarpSet
+		quorumDen  uint64
+		signature  *BitSetSignature
+		wantErr    error
 	}{
 		{
-			name:      "can't get subnetID",
-			networkID: constants.UnitTestID,
-			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validatorsmock.NewState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, errTest)
-				return state
+			name:      "wrong_networkID",
+			networkID: constants.UnitTestID + 1,
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
+					testVdrs[0].vdr,
+					testVdrs[2].vdr,
+				},
+				TotalWeight: testVdrs[0].vdr.Weight +
+					testVdrs[1].vdr.Weight +
+					testVdrs[2].vdr.Weight,
 			},
-			quorumNum: 1,
 			quorumDen: 2,
-			msgF: func(require *require.Assertions) *Message {
-				unsignedMsg, err := NewUnsignedMessage(
-					constants.UnitTestID,
-					sourceChainID,
-					nil,
-				)
-				require.NoError(err)
-
-				msg, err := NewMessage(
-					unsignedMsg,
-					&BitSetSignature{},
-				)
-				require.NoError(err)
-				return msg
+			signature: &BitSetSignature{
+				Signers:   set.NewBits(0, 1).Bytes(),
+				Signature: sign(testVdrs[0].sk, testVdrs[2].sk),
 			},
-			canonicalErr: errTest,
+			wantErr: ErrWrongNetworkID,
 		},
 		{
-			name:      "can't get validator set",
+			name:      "inefficient_bitset",
 			networkID: constants.UnitTestID,
-			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validatorsmock.NewState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(nil, errTest)
-				return state
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
+					testVdrs[0].vdr,
+				},
+				TotalWeight: testVdrs[0].vdr.Weight +
+					testVdrs[1].vdr.Weight +
+					testVdrs[2].vdr.Weight,
 			},
-			quorumNum: 1,
+			quorumDen: 10000,
+			signature: &BitSetSignature{
+				Signers:   []byte{0x00, 0x01}, // padded byte
+				Signature: sign(testVdrs[0].sk),
+			},
+			wantErr: ErrInvalidBitSet,
+		},
+		{
+			name:      "unknown_index",
+			networkID: constants.UnitTestID,
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
+					testVdrs[0].vdr,
+				},
+				TotalWeight: testVdrs[0].vdr.Weight +
+					testVdrs[1].vdr.Weight +
+					testVdrs[2].vdr.Weight,
+			},
+			quorumDen: 10000,
+			signature: &BitSetSignature{
+				Signers:   set.NewBits(1).Bytes(),
+				Signature: sign(testVdrs[0].sk),
+			},
+			wantErr: ErrUnknownValidator,
+		},
+		{
+			name:      "insufficient_weight",
+			networkID: constants.UnitTestID,
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
+					testVdrs[0].vdr,
+					testVdrs[1].vdr,
+					testVdrs[2].vdr,
+				},
+				TotalWeight: testVdrs[0].vdr.Weight +
+					testVdrs[1].vdr.Weight +
+					testVdrs[2].vdr.Weight,
+			},
 			quorumDen: 2,
-			msgF: func(require *require.Assertions) *Message {
-				unsignedMsg, err := NewUnsignedMessage(
-					constants.UnitTestID,
-					sourceChainID,
-					nil,
-				)
-				require.NoError(err)
-
-				msg, err := NewMessage(
-					unsignedMsg,
-					&BitSetSignature{},
-				)
-				require.NoError(err)
-				return msg
+			signature: &BitSetSignature{
+				Signers:   set.NewBits(0).Bytes(),
+				Signature: sign(testVdrs[0].sk),
 			},
-			canonicalErr: errTest,
+			wantErr: ErrInsufficientWeight,
 		},
 		{
-			name:      "weight overflow",
+			name:      "impossible_to_have_sufficient_weight",
 			networkID: constants.UnitTestID,
-			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validatorsmock.NewState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(map[ids.NodeID]*validators.GetValidatorOutput{
-					testVdrs[0].nodeID: {
-						NodeID:    testVdrs[0].nodeID,
-						PublicKey: testVdrs[0].vdr.PublicKey,
-						Weight:    math.MaxUint64,
-					},
-					testVdrs[1].nodeID: {
-						NodeID:    testVdrs[1].nodeID,
-						PublicKey: testVdrs[1].vdr.PublicKey,
-						Weight:    math.MaxUint64,
-					},
-				}, nil)
-				return state
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
+					testVdrs[0].vdr,
+				},
+				TotalWeight: testVdrs[0].vdr.Weight +
+					testVdrs[1].vdr.Weight +
+					testVdrs[2].vdr.Weight,
 			},
-			quorumNum: 1,
 			quorumDen: 2,
-			msgF: func(*require.Assertions) *Message {
-				return &Message{
-					UnsignedMessage: UnsignedMessage{
-						NetworkID:     constants.UnitTestID,
-						SourceChainID: sourceChainID,
-					},
-					Signature: &BitSetSignature{
-						Signers: make([]byte, 8),
-					},
-				}
+			signature: &BitSetSignature{
+				Signers:   set.NewBits(0).Bytes(),
+				Signature: sign(testVdrs[0].sk),
 			},
-			canonicalErr: ErrWeightOverflow,
+			wantErr: ErrInsufficientWeight,
 		},
 		{
-			name:      "invalid bit set index",
+			name:      "malformed_signature",
 			networkID: constants.UnitTestID,
-			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validatorsmock.NewState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(vdrs, nil)
-				return state
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
+					testVdrs[0].vdr,
+				},
+				TotalWeight: testVdrs[0].vdr.Weight +
+					testVdrs[1].vdr.Weight +
+					testVdrs[2].vdr.Weight,
 			},
-			quorumNum: 1,
+			quorumDen: 10000,
+			signature: &BitSetSignature{
+				Signers:   set.NewBits(0).Bytes(),
+				Signature: [bls.SignatureLen]byte{},
+			},
+			wantErr: ErrParseSignature,
+		},
+		{
+			name:      "invalid_signature",
+			networkID: constants.UnitTestID,
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
+					testVdrs[0].vdr,
+				},
+				TotalWeight: testVdrs[0].vdr.Weight +
+					testVdrs[1].vdr.Weight +
+					testVdrs[2].vdr.Weight,
+			},
+			quorumDen: 10000,
+			signature: &BitSetSignature{
+				Signers:   set.NewBits(0).Bytes(),
+				Signature: sign(testVdrs[1].sk),
+			},
+			wantErr: ErrInvalidSignature,
+		},
+		{
+			name:      "valid",
+			networkID: constants.UnitTestID,
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
+					testVdrs[0].vdr,
+					testVdrs[2].vdr,
+				},
+				TotalWeight: testVdrs[0].vdr.Weight +
+					testVdrs[1].vdr.Weight +
+					testVdrs[2].vdr.Weight,
+			},
 			quorumDen: 2,
-			msgF: func(require *require.Assertions) *Message {
-				unsignedMsg, err := NewUnsignedMessage(
-					constants.UnitTestID,
-					sourceChainID,
-					[]byte{1, 2, 3},
-				)
-				require.NoError(err)
-
-				msg, err := NewMessage(
-					unsignedMsg,
-					&BitSetSignature{
-						Signers:   make([]byte, 1),
-						Signature: [bls.SignatureLen]byte{},
-					},
-				)
-				require.NoError(err)
-				return msg
+			signature: &BitSetSignature{
+				Signers:   set.NewBits(0, 1).Bytes(),
+				Signature: sign(testVdrs[0].sk, testVdrs[2].sk),
 			},
-			verifyErr: ErrInvalidBitSet,
 		},
 		{
-			name:      "unknown index",
+			name:      "valid_partial_signers",
 			networkID: constants.UnitTestID,
-			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validatorsmock.NewState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(vdrs, nil)
-				return state
+			validators: validators.WarpSet{
+				Validators: []*validators.Warp{
+					testVdrs[0].vdr,
+					testVdrs[1].vdr,
+					testVdrs[2].vdr,
+				},
+				TotalWeight: testVdrs[0].vdr.Weight +
+					testVdrs[1].vdr.Weight +
+					testVdrs[2].vdr.Weight,
 			},
-			quorumNum: 1,
 			quorumDen: 2,
-			msgF: func(require *require.Assertions) *Message {
-				unsignedMsg, err := NewUnsignedMessage(
-					constants.UnitTestID,
-					sourceChainID,
-					[]byte{1, 2, 3},
-				)
-				require.NoError(err)
-
-				signers := set.NewBits()
-				signers.Add(3) // vdr oob
-
-				msg, err := NewMessage(
-					unsignedMsg,
-					&BitSetSignature{
-						Signers:   signers.Bytes(),
-						Signature: [bls.SignatureLen]byte{},
-					},
-				)
-				require.NoError(err)
-				return msg
+			signature: &BitSetSignature{
+				Signers:   set.NewBits(0, 2).Bytes(),
+				Signature: sign(testVdrs[0].sk, testVdrs[2].sk),
 			},
-			verifyErr: ErrUnknownValidator,
-		},
-		{
-			name:      "insufficient weight",
-			networkID: constants.UnitTestID,
-			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validatorsmock.NewState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(vdrs, nil)
-				return state
-			},
-			quorumNum: 1,
-			quorumDen: 1,
-			msgF: func(require *require.Assertions) *Message {
-				unsignedMsg, err := NewUnsignedMessage(
-					constants.UnitTestID,
-					sourceChainID,
-					[]byte{1, 2, 3},
-				)
-				require.NoError(err)
-
-				// [signers] has weight from [vdr[0], vdr[1]],
-				// which is 6, which is less than 9
-				signers := set.NewBits()
-				signers.Add(0)
-				signers.Add(1)
-
-				unsignedBytes := unsignedMsg.Bytes()
-				vdr0Sig, err := testVdrs[0].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				vdr1Sig, err := testVdrs[1].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr0Sig, vdr1Sig})
-				require.NoError(err)
-				aggSigBytes := [bls.SignatureLen]byte{}
-				copy(aggSigBytes[:], bls.SignatureToBytes(aggSig))
-
-				msg, err := NewMessage(
-					unsignedMsg,
-					&BitSetSignature{
-						Signers:   signers.Bytes(),
-						Signature: aggSigBytes,
-					},
-				)
-				require.NoError(err)
-				return msg
-			},
-			verifyErr: ErrInsufficientWeight,
-		},
-		{
-			name:      "can't parse sig",
-			networkID: constants.UnitTestID,
-			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validatorsmock.NewState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(vdrs, nil)
-				return state
-			},
-			quorumNum: 1,
-			quorumDen: 2,
-			msgF: func(require *require.Assertions) *Message {
-				unsignedMsg, err := NewUnsignedMessage(
-					constants.UnitTestID,
-					sourceChainID,
-					[]byte{1, 2, 3},
-				)
-				require.NoError(err)
-
-				signers := set.NewBits()
-				signers.Add(0)
-				signers.Add(1)
-
-				msg, err := NewMessage(
-					unsignedMsg,
-					&BitSetSignature{
-						Signers:   signers.Bytes(),
-						Signature: [bls.SignatureLen]byte{},
-					},
-				)
-				require.NoError(err)
-				return msg
-			},
-			verifyErr: ErrParseSignature,
-		},
-		{
-			name:      "no validators",
-			networkID: constants.UnitTestID,
-			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validatorsmock.NewState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(nil, nil)
-				return state
-			},
-			quorumNum: 1,
-			quorumDen: 2,
-			msgF: func(require *require.Assertions) *Message {
-				unsignedMsg, err := NewUnsignedMessage(
-					constants.UnitTestID,
-					sourceChainID,
-					[]byte{1, 2, 3},
-				)
-				require.NoError(err)
-
-				unsignedBytes := unsignedMsg.Bytes()
-				vdr0Sig, err := testVdrs[0].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				aggSigBytes := [bls.SignatureLen]byte{}
-				copy(aggSigBytes[:], bls.SignatureToBytes(vdr0Sig))
-
-				msg, err := NewMessage(
-					unsignedMsg,
-					&BitSetSignature{
-						Signers:   nil,
-						Signature: aggSigBytes,
-					},
-				)
-				require.NoError(err)
-				return msg
-			},
-			verifyErr: bls.ErrNoPublicKeys,
-		},
-		{
-			name:      "invalid signature (substitute)",
-			networkID: constants.UnitTestID,
-			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validatorsmock.NewState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(vdrs, nil)
-				return state
-			},
-			quorumNum: 3,
-			quorumDen: 5,
-			msgF: func(require *require.Assertions) *Message {
-				unsignedMsg, err := NewUnsignedMessage(
-					constants.UnitTestID,
-					sourceChainID,
-					[]byte{1, 2, 3},
-				)
-				require.NoError(err)
-
-				signers := set.NewBits()
-				signers.Add(0)
-				signers.Add(1)
-
-				unsignedBytes := unsignedMsg.Bytes()
-				vdr0Sig, err := testVdrs[0].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				// Give sig from vdr[2] even though the bit vector says it
-				// should be from vdr[1]
-				vdr2Sig, err := testVdrs[2].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr0Sig, vdr2Sig})
-				require.NoError(err)
-				aggSigBytes := [bls.SignatureLen]byte{}
-				copy(aggSigBytes[:], bls.SignatureToBytes(aggSig))
-
-				msg, err := NewMessage(
-					unsignedMsg,
-					&BitSetSignature{
-						Signers:   signers.Bytes(),
-						Signature: aggSigBytes,
-					},
-				)
-				require.NoError(err)
-				return msg
-			},
-			verifyErr: ErrInvalidSignature,
-		},
-		{
-			name:      "invalid signature (missing one)",
-			networkID: constants.UnitTestID,
-			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validatorsmock.NewState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(vdrs, nil)
-				return state
-			},
-			quorumNum: 3,
-			quorumDen: 5,
-			msgF: func(require *require.Assertions) *Message {
-				unsignedMsg, err := NewUnsignedMessage(
-					constants.UnitTestID,
-					sourceChainID,
-					[]byte{1, 2, 3},
-				)
-				require.NoError(err)
-
-				signers := set.NewBits()
-				signers.Add(0)
-				signers.Add(1)
-
-				unsignedBytes := unsignedMsg.Bytes()
-				vdr0Sig, err := testVdrs[0].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				// Don't give the sig from vdr[1]
-				aggSigBytes := [bls.SignatureLen]byte{}
-				copy(aggSigBytes[:], bls.SignatureToBytes(vdr0Sig))
-
-				msg, err := NewMessage(
-					unsignedMsg,
-					&BitSetSignature{
-						Signers:   signers.Bytes(),
-						Signature: aggSigBytes,
-					},
-				)
-				require.NoError(err)
-				return msg
-			},
-			verifyErr: ErrInvalidSignature,
-		},
-		{
-			name:      "invalid signature (extra one)",
-			networkID: constants.UnitTestID,
-			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validatorsmock.NewState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(vdrs, nil)
-				return state
-			},
-			quorumNum: 3,
-			quorumDen: 5,
-			msgF: func(require *require.Assertions) *Message {
-				unsignedMsg, err := NewUnsignedMessage(
-					constants.UnitTestID,
-					sourceChainID,
-					[]byte{1, 2, 3},
-				)
-				require.NoError(err)
-
-				signers := set.NewBits()
-				signers.Add(0)
-				signers.Add(1)
-
-				unsignedBytes := unsignedMsg.Bytes()
-				vdr0Sig, err := testVdrs[0].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				vdr1Sig, err := testVdrs[1].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				// Give sig from vdr[2] even though the bit vector doesn't have
-				// it
-				vdr2Sig, err := testVdrs[2].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr0Sig, vdr1Sig, vdr2Sig})
-				require.NoError(err)
-				aggSigBytes := [bls.SignatureLen]byte{}
-				copy(aggSigBytes[:], bls.SignatureToBytes(aggSig))
-
-				msg, err := NewMessage(
-					unsignedMsg,
-					&BitSetSignature{
-						Signers:   signers.Bytes(),
-						Signature: aggSigBytes,
-					},
-				)
-				require.NoError(err)
-				return msg
-			},
-			verifyErr: ErrInvalidSignature,
-		},
-		{
-			name:      "valid signature",
-			networkID: constants.UnitTestID,
-			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validatorsmock.NewState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(vdrs, nil)
-				return state
-			},
-			quorumNum: 1,
-			quorumDen: 2,
-			msgF: func(require *require.Assertions) *Message {
-				unsignedMsg, err := NewUnsignedMessage(
-					constants.UnitTestID,
-					sourceChainID,
-					[]byte{1, 2, 3},
-				)
-				require.NoError(err)
-
-				// [signers] has weight from [vdr[1], vdr[2]],
-				// which is 6, which is greater than 4.5
-				signers := set.NewBits()
-				signers.Add(1)
-				signers.Add(2)
-
-				unsignedBytes := unsignedMsg.Bytes()
-				vdr1Sig, err := testVdrs[1].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				vdr2Sig, err := testVdrs[2].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr1Sig, vdr2Sig})
-				require.NoError(err)
-				aggSigBytes := [bls.SignatureLen]byte{}
-				copy(aggSigBytes[:], bls.SignatureToBytes(aggSig))
-
-				msg, err := NewMessage(
-					unsignedMsg,
-					&BitSetSignature{
-						Signers:   signers.Bytes(),
-						Signature: aggSigBytes,
-					},
-				)
-				require.NoError(err)
-				return msg
-			},
-			verifyErr: nil,
-		},
-		{
-			name:      "valid signature (boundary)",
-			networkID: constants.UnitTestID,
-			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validatorsmock.NewState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(vdrs, nil)
-				return state
-			},
-			quorumNum: 2,
-			quorumDen: 3,
-			msgF: func(require *require.Assertions) *Message {
-				unsignedMsg, err := NewUnsignedMessage(
-					constants.UnitTestID,
-					sourceChainID,
-					[]byte{1, 2, 3},
-				)
-				require.NoError(err)
-
-				// [signers] has weight from [vdr[1], vdr[2]],
-				// which is 6, which meets the minimum 6
-				signers := set.NewBits()
-				signers.Add(1)
-				signers.Add(2)
-
-				unsignedBytes := unsignedMsg.Bytes()
-				vdr1Sig, err := testVdrs[1].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				vdr2Sig, err := testVdrs[2].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr1Sig, vdr2Sig})
-				require.NoError(err)
-				aggSigBytes := [bls.SignatureLen]byte{}
-				copy(aggSigBytes[:], bls.SignatureToBytes(aggSig))
-
-				msg, err := NewMessage(
-					unsignedMsg,
-					&BitSetSignature{
-						Signers:   signers.Bytes(),
-						Signature: aggSigBytes,
-					},
-				)
-				require.NoError(err)
-				return msg
-			},
-			verifyErr: nil,
-		},
-		{
-			name:      "valid signature (missing key)",
-			networkID: constants.UnitTestID,
-			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validatorsmock.NewState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(map[ids.NodeID]*validators.GetValidatorOutput{
-					testVdrs[0].nodeID: {
-						NodeID:    testVdrs[0].nodeID,
-						PublicKey: nil,
-						Weight:    testVdrs[0].vdr.Weight,
-					},
-					testVdrs[1].nodeID: {
-						NodeID:    testVdrs[1].nodeID,
-						PublicKey: testVdrs[1].vdr.PublicKey,
-						Weight:    testVdrs[1].vdr.Weight,
-					},
-					testVdrs[2].nodeID: {
-						NodeID:    testVdrs[2].nodeID,
-						PublicKey: testVdrs[2].vdr.PublicKey,
-						Weight:    testVdrs[2].vdr.Weight,
-					},
-				}, nil)
-				return state
-			},
-			quorumNum: 1,
-			quorumDen: 3,
-			msgF: func(require *require.Assertions) *Message {
-				unsignedMsg, err := NewUnsignedMessage(
-					constants.UnitTestID,
-					sourceChainID,
-					[]byte{1, 2, 3},
-				)
-				require.NoError(err)
-
-				// [signers] has weight from [vdr2, vdr3],
-				// which is 6, which is greater than 3
-				signers := set.NewBits()
-				// Note: the bits are shifted because vdr[0]'s key was zeroed
-				signers.Add(0) // vdr[1]
-				signers.Add(1) // vdr[2]
-
-				unsignedBytes := unsignedMsg.Bytes()
-				vdr1Sig, err := testVdrs[1].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				vdr2Sig, err := testVdrs[2].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr1Sig, vdr2Sig})
-				require.NoError(err)
-				aggSigBytes := [bls.SignatureLen]byte{}
-				copy(aggSigBytes[:], bls.SignatureToBytes(aggSig))
-
-				msg, err := NewMessage(
-					unsignedMsg,
-					&BitSetSignature{
-						Signers:   signers.Bytes(),
-						Signature: aggSigBytes,
-					},
-				)
-				require.NoError(err)
-				return msg
-			},
-			verifyErr: nil,
-		},
-		{
-			name:      "valid signature (duplicate key)",
-			networkID: constants.UnitTestID,
-			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validatorsmock.NewState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(map[ids.NodeID]*validators.GetValidatorOutput{
-					testVdrs[0].nodeID: {
-						NodeID:    testVdrs[0].nodeID,
-						PublicKey: nil,
-						Weight:    testVdrs[0].vdr.Weight,
-					},
-					testVdrs[1].nodeID: {
-						NodeID:    testVdrs[1].nodeID,
-						PublicKey: testVdrs[2].vdr.PublicKey,
-						Weight:    testVdrs[1].vdr.Weight,
-					},
-					testVdrs[2].nodeID: {
-						NodeID:    testVdrs[2].nodeID,
-						PublicKey: testVdrs[2].vdr.PublicKey,
-						Weight:    testVdrs[2].vdr.Weight,
-					},
-				}, nil)
-				return state
-			},
-			quorumNum: 2,
-			quorumDen: 3,
-			msgF: func(require *require.Assertions) *Message {
-				unsignedMsg, err := NewUnsignedMessage(
-					constants.UnitTestID,
-					sourceChainID,
-					[]byte{1, 2, 3},
-				)
-				require.NoError(err)
-
-				// [signers] has weight from [vdr2, vdr3],
-				// which is 6, which meets the minimum 6
-				signers := set.NewBits()
-				// Note: the bits are shifted because vdr[0]'s key was zeroed
-				// Note: vdr[1] and vdr[2] were combined because of a shared pk
-				signers.Add(0) // vdr[1] + vdr[2]
-
-				unsignedBytes := unsignedMsg.Bytes()
-				// Because vdr[1] and vdr[2] share a key, only one of them sign.
-				vdr2Sig, err := testVdrs[2].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				aggSigBytes := [bls.SignatureLen]byte{}
-				copy(aggSigBytes[:], bls.SignatureToBytes(vdr2Sig))
-
-				msg, err := NewMessage(
-					unsignedMsg,
-					&BitSetSignature{
-						Signers:   signers.Bytes(),
-						Signature: aggSigBytes,
-					},
-				)
-				require.NoError(err)
-				return msg
-			},
-			verifyErr: nil,
-		},
-		{
-			name:      "incorrect networkID",
-			networkID: constants.UnitTestID,
-			stateF: func(ctrl *gomock.Controller) validators.State {
-				state := validatorsmock.NewState(ctrl)
-				state.EXPECT().GetSubnetID(gomock.Any(), sourceChainID).Return(subnetID, nil)
-				state.EXPECT().GetValidatorSet(gomock.Any(), pChainHeight, subnetID).Return(map[ids.NodeID]*validators.GetValidatorOutput{
-					testVdrs[0].nodeID: {
-						NodeID:    testVdrs[0].nodeID,
-						PublicKey: nil,
-						Weight:    testVdrs[0].vdr.Weight,
-					},
-					testVdrs[1].nodeID: {
-						NodeID:    testVdrs[1].nodeID,
-						PublicKey: testVdrs[1].vdr.PublicKey,
-						Weight:    testVdrs[1].vdr.Weight,
-					},
-					testVdrs[2].nodeID: {
-						NodeID:    testVdrs[2].nodeID,
-						PublicKey: testVdrs[2].vdr.PublicKey,
-						Weight:    testVdrs[2].vdr.Weight,
-					},
-				}, nil)
-				return state
-			},
-			quorumNum: 1,
-			quorumDen: 2,
-			msgF: func(require *require.Assertions) *Message {
-				unsignedMsg, err := NewUnsignedMessage(
-					constants.UnitTestID+1,
-					sourceChainID,
-					[]byte{1, 2, 3},
-				)
-				require.NoError(err)
-
-				// [signers] has weight from [vdr[1], vdr[2]],
-				// which is 6, which is greater than 4.5
-				signers := set.NewBits()
-				signers.Add(1)
-				signers.Add(2)
-
-				unsignedBytes := unsignedMsg.Bytes()
-				vdr1Sig, err := testVdrs[1].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				vdr2Sig, err := testVdrs[2].sk.Sign(unsignedBytes)
-				require.NoError(err)
-				aggSig, err := bls.AggregateSignatures([]*bls.Signature{vdr1Sig, vdr2Sig})
-				require.NoError(err)
-				aggSigBytes := [bls.SignatureLen]byte{}
-				copy(aggSigBytes[:], bls.SignatureToBytes(aggSig))
-
-				msg, err := NewMessage(
-					unsignedMsg,
-					&BitSetSignature{
-						Signers:   signers.Bytes(),
-						Signature: aggSigBytes,
-					},
-				)
-				require.NoError(err)
-				return msg
-			},
-			verifyErr: ErrWrongNetworkID,
 		},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-			ctrl := gomock.NewController(t)
-
-			msg := tt.msgF(require)
-			pChainState := tt.stateF(ctrl)
-
-			validators, err := GetCanonicalValidatorSetFromChainID(
-				context.Background(),
-				pChainState,
-				pChainHeight,
-				msg.SourceChainID,
-			)
-			require.ErrorIs(err, tt.canonicalErr)
-			if tt.canonicalErr != nil {
-				return
-			}
-
-			err = msg.Signature.Verify(
-				&msg.UnsignedMessage,
+			err = tt.signature.Verify(
+				unsignedMsg,
 				tt.networkID,
-				validators,
-				tt.quorumNum,
+				tt.validators,
+				quorumNum,
 				tt.quorumDen,
 			)
-			require.ErrorIs(err, tt.verifyErr)
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+	}
+}
+
+func BenchmarkSignatureVerification(b *testing.B) {
+	unsignedMsg, err := NewUnsignedMessage(
+		constants.UnitTestID,
+		sourceChainID,
+		[]byte{1, 2, 3},
+	)
+	require.NoError(b, err)
+	unsignedBytes := unsignedMsg.Bytes()
+
+	for size := 1; size <= 1<<10; size *= 2 {
+		b.Run(strconv.Itoa(size), func(b *testing.B) {
+			vdrs := make(
+				map[ids.NodeID]*validators.GetValidatorOutput,
+				size,
+			)
+			signers := set.NewBits()
+			var signatures []*bls.Signature
+			for i := range size {
+				nodeID := ids.GenerateTestNodeID()
+				secretKey, err := localsigner.New()
+				require.NoError(b, err)
+				publicKey := secretKey.PublicKey()
+				vdrs[nodeID] = &validators.GetValidatorOutput{
+					NodeID:    nodeID,
+					PublicKey: publicKey,
+					Weight:    1,
+				}
+
+				sig, err := secretKey.Sign(unsignedBytes)
+				require.NoError(b, err)
+
+				signers.Add(i)
+				signatures = append(signatures, sig)
+			}
+
+			aggSig, err := bls.AggregateSignatures(signatures)
+			require.NoError(b, err)
+			aggSigBytes := [bls.SignatureLen]byte{}
+			copy(aggSigBytes[:], bls.SignatureToBytes(aggSig))
+
+			canonicalValidators, err := validators.FlattenValidatorSet(vdrs)
+			require.NoError(b, err)
+
+			sig := &BitSetSignature{
+				Signers:   signers.Bytes(),
+				Signature: aggSigBytes,
+			}
+			for b.Loop() {
+				require.NoError(b, sig.Verify(unsignedMsg, constants.UnitTestID, canonicalValidators, 1, 1))
+			}
 		})
 	}
 }

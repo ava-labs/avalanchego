@@ -15,9 +15,17 @@ inputs:
     default: ''
   artifact_prefix:
     default: ''
+  prometheus_url:
+    required: true
+  prometheus_push_url:
+    required: true
   prometheus_username:
     required: true
   prometheus_password:
+    required: true
+  loki_url:
+    required: true
+  loki_push_url:
     required: true
   loki_username:
     required: true
@@ -51,15 +59,43 @@ runs:
     # - Avoid using the install-nix custom action since a relative
     #   path wouldn't be resolveable from other repos and an absolute
     #   path would require setting a version.
+    # - TODO(marun) Switch to a relative reference to the install-nix
+    #   custom action if/when no external repos use this action.
     - uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f #v31
       with:
         github_access_token: ${{ inputs.github_token }}
     - run: $GITHUB_ACTION_PATH/nix-develop.sh --command echo "dependencies installed"
       shell: bash
+    # Cache Go modules (architecture-independent)
+    - uses: actions/cache@v4
+      id: go-mod-cache
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum', 'tools/go.sum') }}
+        restore-keys: ${{ runner.os }}-go-mod-
+    # Cache Go build cache (architecture-specific)
+    - uses: actions/cache@v4
+      with:
+        path: ~/.cache/go-build
+        key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.sum', 'tools/go.sum') }}
+        restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
+    # Download modules only on cache miss
+    - run: $GITHUB_ACTION_PATH/nix-develop.sh --command go mod download
+      if: steps.go-mod-cache.outputs.cache-hit != 'true'
+      shell: bash
+    - run: |
+        if [[ -f tools/go.mod ]]; then
+          $GITHUB_ACTION_PATH/nix-develop.sh --command go mod download -modfile=tools/go.mod
+        fi
+      if: steps.go-mod-cache.outputs.cache-hit != 'true'
+      shell: bash
     - name: Notify of metrics availability
       if: (inputs.prometheus_username != '')
       shell: bash
-      run: $GITHUB_ACTION_PATH/notify-metrics-availability.sh
+      run: |
+        metrics_url=$($GITHUB_ACTION_PATH/output-metrics-url.sh)
+        echo "Grafana: ${metrics_url}"
+        echo "🔗 [View Grafana Dashboard](${metrics_url})" >> "$GITHUB_STEP_SUMMARY"
       env:
         GRAFANA_URL: https://grafana-poc.avax-dev.network/d/${{ inputs.grafana_dashboard_id }}?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
@@ -79,8 +115,12 @@ runs:
         TMPNET_START_LOGS_COLLECTOR: ${{ inputs.loki_username != '' && inputs.runtime == 'process' }}
         TMPNET_CHECK_METRICS_COLLECTED: ${{ inputs.prometheus_username != '' }}
         TMPNET_CHECK_LOGS_COLLECTED: ${{ inputs.loki_username != '' }}
+        LOKI_URL: ${{ inputs.loki_url }}
+        LOKI_PUSH_URL: ${{ inputs.loki_push_url }}
         LOKI_USERNAME: ${{ inputs.loki_username }}
         LOKI_PASSWORD: ${{ inputs.loki_password }}
+        PROMETHEUS_URL: ${{ inputs.prometheus_url }}
+        PROMETHEUS_PUSH_URL: ${{ inputs.prometheus_push_url }}
         PROMETHEUS_USERNAME: ${{ inputs.prometheus_username }}
         PROMETHEUS_PASSWORD: ${{ inputs.prometheus_password }}
         GH_REPO: ${{ inputs.repository_owner }}/${{ inputs.repository_name }}

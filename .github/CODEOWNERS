@@ -22,11 +22,15 @@
 /flake.nix @joshua-kim @maru-ava
 /network/p2p/ @joshua-kim
 /network/p2p/*.md @joshua-kim @meaghanfitzgerald
+/nix/* @joshua-kim @maru-ava
 /scripts/ @joshua-kim @maru-ava
 /scripts/*.md @joshua-kim @maru-ava @meaghanfitzgerald
 /scripts/benchmark_cchain_range.sh @aaronbuchwald
 /tests/ @joshua-kim @maru-ava
 /tests/*.md @joshua-kim @maru-ava @meaghanfitzgerald
 /tests/reexecute/ @aaronbuchwald
+/tools/* @joshua-kim @maru-ava
+/vms/evm/ @ARR4N @joshua-kim @StephenButtolph
+/x/blockdb @DracoLi
 /x/merkledb @joshua-kim @rrazvan1
 /x/sync @joshua-kim @rrazvan1

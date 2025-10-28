@@ -49,7 +49,7 @@ func TestParseConfig(t *testing.T) {
 					PullGossipPollSize:                          network.DefaultConfig.PullGossipPollSize,
 					PullGossipFrequency:                         network.DefaultConfig.PullGossipFrequency,
 					PullGossipThrottlingPeriod:                  network.DefaultConfig.PullGossipThrottlingPeriod,
-					PullGossipThrottlingLimit:                   network.DefaultConfig.PullGossipThrottlingLimit,
+					PullGossipRequestsPerValidator:              network.DefaultConfig.PullGossipRequestsPerValidator,
 					ExpectedBloomFilterElements:                 network.DefaultConfig.ExpectedBloomFilterElements,
 					ExpectedBloomFilterFalsePositiveProbability: network.DefaultConfig.ExpectedBloomFilterFalsePositiveProbability,
 					MaxBloomFilterFalsePositiveProbability:      network.DefaultConfig.MaxBloomFilterFalsePositiveProbability,
