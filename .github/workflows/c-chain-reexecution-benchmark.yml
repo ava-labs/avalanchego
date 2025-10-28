@@ -303,21 +303,20 @@ jobs:
           GH_JOB_ID: ${{ github.job }}
       - name: Set execution data directory
         id: exec-dir
-        shell: bash
         run: |
-          TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
-          REL_DIR="reexecution-data-${TIMESTAMP}"
-          ABS_DIR="${{ github.workspace }}/${REL_DIR}"
-          echo "REL_EXECUTION_DATA_DIR=${REL_DIR}" >> "$GITHUB_OUTPUT" # Relative path so action see it correctly we need this because a job runs in a container and Docker actions run in their own container and mount workspace from the host under a fixed path
-          echo "EXECUTION_DATA_DIR=${ABS_DIR}" >> "$GITHUB_OUTPUT"
-          echo "Using execution directory (abs): ${ABS_DIR}"
+          set -euo pipefail
+          TS=$(date '+%Y%m%d-%H%M%S')
+          REL_DIR="reexecution-data-${TS}"
+          mkdir -p "$GITHUB_WORKSPACE/$REL_DIR"
+          echo "REL_EXECUTION_DATA_DIR=${REL_DIR}" >> "$GITHUB_OUTPUT"
+          echo "Using dir: $REL_DIR"
       - name: Run C-Chain Re-execution Benchmark
         shell: nix develop --impure --command bash -x {0}
         run: |
           ./scripts/run_task.sh ${{ matrix.task }} \
             RUNNER_NAME="${{ matrix.runner }}" \
-            BENCHMARK_OUTPUT_FILE="${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}/benchmark-output.txt" \
-            EXECUTION_DATA_DIR="${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}"
+            BENCHMARK_OUTPUT_FILE="$GITHUB_WORKSPACE/${{ steps.exec-dir.outputs.REL_EXECUTION_DATA_DIR }}/benchmark-output.txt" \
+            EXECUTION_DATA_DIR="$GITHUB_WORKSPACE/${{ steps.exec-dir.outputs.REL_EXECUTION_DATA_DIR }}"
         env:
           TMPNET_START_METRICS_COLLECTOR: ${{ secrets.PROMETHEUS_URL != '' }}
           TMPNET_START_LOGS_COLLECTOR: ${{ secrets.LOKI_URL != '' }}
@@ -339,32 +338,6 @@ jobs:
           GH_JOB_ID: ${{ github.job }}
           AWS_REGION: us-east-2
           AWS_DEFAULT_REGION: us-east-2
-      - name: Debug workspace & files
-        shell: bash
-        run: |
-          set -x
-          echo "ctx github.workspace: ${{ github.workspace }}"
-          echo "env  GITHUB_WORKSPACE: ${GITHUB_WORKSPACE:-<unset>}"
-          echo "pwd:"
-          pwd
-          echo "ls -la (repo root):"
-          ls -la
-
-          echo "exec-dir outputs:"
-          echo "  REL_EXECUTION_DATA_DIR=${{ steps.exec-dir.outputs.REL_EXECUTION_DATA_DIR }}"
-          echo "  EXECUTION_DATA_DIR=${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}"
-
-          echo "ls -la (relative dir): ${{ steps.exec-dir.outputs.REL_EXECUTION_DATA_DIR }}"
-          ls -la "${{ steps.exec-dir.outputs.REL_EXECUTION_DATA_DIR }}" || true
-
-          echo "ls -la (absolute dir): ${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}"
-          ls -la "${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}" || true
-
-          echo "find benchmark-output.txt from repo root:"
-          find . -maxdepth 5 -type f -name 'benchmark-output.txt' -print || true
-
-          echo "env dump (short):"
-          env | sort | egrep 'GITHUB|RUNNER|WORK|PWD|HOME' || true
       - name: Upload monitoring data
         if: always()
         uses: actions/upload-artifact@v4
@@ -380,7 +353,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.task }}-${{ matrix.runner }}-results
-          path: ${{ github.workspace }}/${{ steps.exec-dir.outputs.REL_EXECUTION_DATA_DIR }}
+          path: ${{ steps.exec-dir.outputs.REL_EXECUTION_DATA_DIR }}
           if-no-files-found: warn
       - name: Compare Benchmark Results
         if: always()
