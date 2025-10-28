@@ -36,7 +36,6 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
-	"github.com/ava-labs/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
@@ -1181,10 +1180,6 @@ func testBuildApricotPhase5Block(t *testing.T, scheme string) {
 	eExtDataGasUsed := customtypes.BlockExtDataGasUsed(ethBlk)
 	require.NotNil(eExtDataGasUsed)
 	require.Zero(eExtDataGasUsed.Cmp(big.NewInt(11230)), "expected extDataGasUsed to be 11230 but got %d", eExtDataGasUsed)
-	minRequiredTip, err := customheader.EstimateRequiredTip(vm.chainConfigExtra(), ethBlk.Header())
-	require.NoError(err)
-	require.NotNil(minRequiredTip)
-	require.Zero(minRequiredTip.Cmp(common.Big0), "expected minRequiredTip to be greater than 0 but got %d", minRequiredTip)
 
 	newHead := <-newTxPoolHeadChan
 	require.Equal(common.Hash(blk.ID()), newHead.Head.Hash())
@@ -1220,10 +1215,6 @@ func testBuildApricotPhase5Block(t *testing.T, scheme string) {
 	eDataGasUsed := customtypes.BlockExtDataGasUsed(ethBlk)
 	require.NotNil(eDataGasUsed)
 	require.Zero(eDataGasUsed.Cmp(common.Big0), "expected extDataGasUsed to be 0 but got %d", eDataGasUsed)
-	minRequiredTip, err = customheader.EstimateRequiredTip(vm.chainConfigExtra(), ethBlk.Header())
-	require.NoError(err)
-	require.NotNil(minRequiredTip)
-	require.LessOrEqualf(0, minRequiredTip.Cmp(big.NewInt(0.05*params.GWei)), "expected minRequiredTip to be at least 0.05 gwei but got %d", minRequiredTip)
 
 	lastAcceptedID, err := vm.LastAccepted(context.Background())
 	require.NoError(err)
@@ -1317,10 +1308,6 @@ func testBuildApricotPhase4Block(t *testing.T, scheme string) {
 	eExtDataGasUsed := customtypes.BlockExtDataGasUsed(ethBlk)
 	require.NotNil(eExtDataGasUsed)
 	require.Zerof(eExtDataGasUsed.Cmp(big.NewInt(1230)), "expected extDataGasUsed to be 1000 but got %d", eExtDataGasUsed)
-	minRequiredTip, err := customheader.EstimateRequiredTip(vm.chainConfigExtra(), ethBlk.Header())
-	require.NoError(err)
-	require.NotNil(minRequiredTip)
-	require.Zero(minRequiredTip.Cmp(common.Big0), "expected minRequiredTip to be 0 but got %d", minRequiredTip)
 
 	newHead := <-newTxPoolHeadChan
 	require.Equal(common.Hash(blk.ID()), newHead.Head.Hash())
@@ -1352,10 +1339,6 @@ func testBuildApricotPhase4Block(t *testing.T, scheme string) {
 	eDataGasUsed := customtypes.BlockExtDataGasUsed(ethBlk)
 	require.NotNil(eDataGasUsed)
 	require.Zero(eDataGasUsed.Cmp(common.Big0), "expected extDataGasUsed to be 0 but got %d", eDataGasUsed)
-	minRequiredTip, err = customheader.EstimateRequiredTip(vm.chainConfigExtra(), ethBlk.Header())
-	require.NoError(err)
-	require.NotNil(minRequiredTip)
-	require.GreaterOrEqualf(minRequiredTip.Cmp(big.NewInt(0.05*params.GWei)), 0, "expected minRequiredTip to be at least 0.05 gwei but got %d", minRequiredTip)
 
 	lastAcceptedID, err := vm.LastAccepted(context.Background())
 	require.NoError(err)
