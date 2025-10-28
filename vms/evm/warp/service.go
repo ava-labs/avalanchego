@@ -8,14 +8,15 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/libevm/common/hexutil"
+	"github.com/ava-labs/libevm/log"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/executor"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/ava-labs/libevm/common/hexutil"
-	"github.com/ava-labs/libevm/log"
 )
 
 var errNoValidators = errors.New("cannot aggregate signatures from subnet with no validators")

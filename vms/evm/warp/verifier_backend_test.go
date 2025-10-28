@@ -9,6 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database/memdb"
@@ -22,14 +25,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/evm/metrics/metricstest"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/ava-labs/avalanchego/vms/evm/warp/warptest"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
-
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
+	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
 func TestAddressedCallSignatures(t *testing.T) {
@@ -58,8 +57,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 				require.NoError(t, err)
 				signature, err := snowCtx.WarpSigner.Sign(msg)
 				require.NoError(t, err)
-
-				backend.AddMessage(msg)
+				require.NoError(t, backend.AddMessage(msg))
 				return msg.Bytes(), signature
 			},
 			verifyStats: func(t *testing.T, stats *verifierStats) {
@@ -114,7 +112,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 				protoMsg := &sdk.SignatureRequest{Message: requestBytes}
 				protoBytes, err := proto.Marshal(protoMsg)
 				require.NoError(t, err)
-				responseBytes, appErr := handler.AppRequest(context.Background(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
+				responseBytes, appErr := handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
 				require.ErrorIs(t, appErr, test.err)
 				test.verifyStats(t, warpBackend.(*backend).stats)
 
@@ -226,7 +224,7 @@ func TestBlockSignatures(t *testing.T) {
 				protoMsg := &sdk.SignatureRequest{Message: requestBytes}
 				protoBytes, err := proto.Marshal(protoMsg)
 				require.NoError(t, err)
-				responseBytes, appErr := handler.AppRequest(context.Background(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
+				responseBytes, appErr := handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
 				require.ErrorIs(t, appErr, test.err)
 
 				test.verifyStats(t, warpBackend.(*backend).stats)
@@ -308,7 +306,7 @@ func TestUptimeSignatures(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		require.NoError(t, uptimeTracker.Sync(context.Background()))
+		require.NoError(t, uptimeTracker.Sync(t.Context()))
 
 		warpBackend, err := NewBackend(
 			snowCtx.NetworkID,
@@ -325,20 +323,20 @@ func TestUptimeSignatures(t *testing.T) {
 
 		// sourceAddress nonZero
 		protoBytes, _ := getUptimeMessageBytes([]byte{1, 2, 3}, ids.GenerateTestID())
-		_, appErr := handler.AppRequest(context.Background(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
+		_, appErr := handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
 		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
 		require.Equal(t, "2: source address should be empty for offchain addressed messages", appErr.Error())
 
 		// not existing validationID
 		vID := ids.GenerateTestID()
 		protoBytes, _ = getUptimeMessageBytes([]byte{}, vID)
-		_, appErr = handler.AppRequest(context.Background(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
+		_, appErr = handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
 		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
 		require.Equal(t, fmt.Sprintf("2: failed to get uptime: validationID not found: %s", vID), appErr.Error())
 
 		// uptime is less than requested (not connected)
 		protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID)
-		_, appErr = handler.AppRequest(context.Background(), nodeID, time.Time{}, protoBytes)
+		_, appErr = handler.AppRequest(t.Context(), nodeID, time.Time{}, protoBytes)
 		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
 		require.Equal(t, fmt.Sprintf("2: current uptime 0 is less than queried uptime 80 for validationID %s", validationID), appErr.Error())
 
@@ -346,14 +344,14 @@ func TestUptimeSignatures(t *testing.T) {
 		require.NoError(t, uptimeTracker.Connect(nodeID))
 		clk.Set(clk.Time().Add(40 * time.Second))
 		protoBytes, _ = getUptimeMessageBytes([]byte{}, validationID)
-		_, appErr = handler.AppRequest(context.Background(), nodeID, time.Time{}, protoBytes)
+		_, appErr = handler.AppRequest(t.Context(), nodeID, time.Time{}, protoBytes)
 		require.ErrorIs(t, appErr, &common.AppError{Code: VerifyErrCode})
 		require.Equal(t, fmt.Sprintf("2: current uptime 40 is less than queried uptime 80 for validationID %s", validationID), appErr.Error())
 
 		// valid uptime (enough time has passed)
 		clk.Set(clk.Time().Add(40 * time.Second))
 		protoBytes, msg := getUptimeMessageBytes([]byte{}, validationID)
-		responseBytes, appErr := handler.AppRequest(context.Background(), nodeID, time.Time{}, protoBytes)
+		responseBytes, appErr := handler.AppRequest(t.Context(), nodeID, time.Time{}, protoBytes)
 		require.Nil(t, appErr)
 		expectedSignature, err := snowCtx.WarpSigner.Sign(msg)
 		require.NoError(t, err)
