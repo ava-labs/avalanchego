@@ -540,7 +540,7 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 	}{
 		{
 			name:              "remove conflicts from empty mempool",
-			conflictsToRemove: set.Of[ids.ID](ids.ID{1}),
+			conflictsToRemove: set.Of(ids.ID{1}),
 		},
 		{
 			name: "remove conflicts in mempool",
