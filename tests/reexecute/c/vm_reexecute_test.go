@@ -129,8 +129,7 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 
 	if metricsCollectorEnabledArg && metricsServerPort == nil {
-		fmt.Fprint(os.Stderr, "metrics collector is enabled but metrics server is disabled.\n")
-		os.Exit(1)
+		metricsServerPort = new(uint64)
 	}
 
 	customLabels, err := parseCustomLabels(labelsArg)
