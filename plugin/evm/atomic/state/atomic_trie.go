@@ -10,6 +10,7 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
+	"github.com/ava-labs/avalanchego/vms/evm/database"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -20,7 +21,6 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/coreth/plugin/evm/database"
 	"github.com/ava-labs/coreth/triedb/hashdb"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -72,7 +72,7 @@ func newAtomicTrie(
 	}
 
 	trieDB := triedb.NewDatabase(
-		rawdb.NewDatabase(database.WrapDatabase(atomicTrieDB)),
+		rawdb.NewDatabase(database.New(atomicTrieDB)),
 		&triedb.Config{
 			DBOverride: hashdb.Config{
 				CleanCacheSize: 64 * units.MiB, // Allocate 64MB of memory for clean cache
