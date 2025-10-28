@@ -4,24 +4,24 @@
 package mempooltest
 
 import (
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"context"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/set"
-	"context"
 	"github.com/ava-labs/avalanchego/utils/lock"
+	"github.com/ava-labs/avalanchego/utils/set"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
 
-var _ mempool.Interface = (*FakeMempool)(nil)
+var _ mempool.Mempool = (*FakeMempool)(nil)
 
 // FakeMempool performs no verification and has no upper bound on txs
-type FakeMempool struct{
-	txs map[ids.ID]*txs.Tx
+type FakeMempool struct {
+	txs  map[ids.ID]*txs.Tx
 	drop map[ids.ID]error
-	cond               lock.Cond
+	cond lock.Cond
 }
-
 
 func (f *FakeMempool) initTxs() {
 	if f.txs != nil {
@@ -44,7 +44,7 @@ func (f *FakeMempool) Get(txID ids.ID) (*txs.Tx, bool) {
 }
 
 func (f *FakeMempool) GetDropReason(txID ids.ID) error {
-	if f.txs == nil {
+	if f.drop == nil {
 		f.drop = make(map[ids.ID]error)
 	}
 
@@ -71,7 +71,7 @@ func (f *FakeMempool) MarkDropped(txID ids.ID, reason error) {
 func (f *FakeMempool) Peek() (*txs.Tx, bool) {
 	f.initTxs()
 
-	for _, tx := range  f.txs {
+	for _, tx := range f.txs {
 		return tx, true
 	}
 
@@ -83,7 +83,7 @@ func (f *FakeMempool) Remove(txID ids.ID) {
 }
 
 func (f *FakeMempool) RemoveConflicts(utxos set.Set[ids.ID]) {
-	for _, tx := range  f.txs {
+	for _, tx := range f.txs {
 		if inputs := tx.Unsigned.InputIDs(); !inputs.Overlaps(utxos) {
 			continue
 		}

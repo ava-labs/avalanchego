@@ -4,7 +4,6 @@
 package mempool
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -21,7 +20,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/vms/txs/mempool"
+
+	txsmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 func newAVAXInput(txID ids.ID, amount uint64) *avax.TransferableInput {
@@ -255,7 +255,7 @@ func TestMempoolAdd(t *testing.T) {
 				},
 				0,
 			),
-			wantErr: mempool.ErrConflictsWithOtherTx,
+			wantErr: txsmempool.ErrConflictsWithOtherTx,
 			wantTxIDs: []ids.ID{
 				{1},
 				{2},
@@ -341,7 +341,7 @@ func TestMempoolAdd(t *testing.T) {
 			wantTxIDs: []ids.ID{
 				{1},
 			},
-			wantErr: mempool.ErrConflictsWithOtherTx,
+			wantErr: txsmempool.ErrConflictsWithOtherTx,
 		},
 		{
 			name:           "conflict - equal paying tx is dropped",
@@ -362,7 +362,7 @@ func TestMempoolAdd(t *testing.T) {
 			wantTxIDs: []ids.ID{
 				{1},
 			},
-			wantErr: mempool.ErrConflictsWithOtherTx,
+			wantErr: txsmempool.ErrConflictsWithOtherTx,
 		},
 		{
 			name:           "conflict - lower paying tx is dropped",
@@ -383,7 +383,7 @@ func TestMempoolAdd(t *testing.T) {
 			wantTxIDs: []ids.ID{
 				{1},
 			},
-			wantErr: mempool.ErrConflictsWithOtherTx,
+			wantErr: txsmempool.ErrConflictsWithOtherTx,
 		},
 		{
 			name:           "AVAX minted",
@@ -803,7 +803,7 @@ func TestMempool_WaitForEvent(t *testing.T) {
 		return m.Add(tx)
 	})
 
-	gotMsg, err := m.WaitForEvent(context.Background())
+	gotMsg, err := m.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(common.PendingTxs, gotMsg)
 

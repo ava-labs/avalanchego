@@ -68,7 +68,7 @@ func (txMarshaller) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
 }
 
 func newGossipMempool(
-	mempool *mempool.Mempool,
+	mempool mempool.Mempool,
 	registerer prometheus.Registerer,
 	log logging.Logger,
 	txVerifier TxVerifier,
@@ -86,7 +86,7 @@ func newGossipMempool(
 }
 
 type gossipMempool struct {
-	*mempool.Mempool
+	mempool.Mempool
 	log        logging.Logger
 	txVerifier TxVerifier
 
@@ -127,7 +127,10 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 	defer g.lock.Unlock()
 
 	g.bloom.Add(tx)
-	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len()*bloomChurnMultiplier)
+	reset, err := gossip.ResetBloomFilterIfNeeded(
+		g.bloom,
+		g.Mempool.Len()*bloomChurnMultiplier,
+	)
 	if err != nil {
 		return err
 	}

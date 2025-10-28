@@ -342,7 +342,7 @@ func GetInputOutputs(tx txs.UnsignedTx) (
 ) {
 	getter := &inputOutputGetter{}
 	if err := tx.Visit(getter); err != nil {
-		return nil, nil, 0, fmt.Errorf("failed to get utxos: %w", err)
+		return nil, nil, 0, fmt.Errorf("getting utxos %w", err)
 	}
 
 	return getter.InputUTXOs, getter.OutputUTXOs, getter.ProducedAVAX, nil

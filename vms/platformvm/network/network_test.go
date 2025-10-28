@@ -62,7 +62,7 @@ func (t testTxVerifier) VerifyTx(*txs.Tx) error {
 func TestNetworkIssueTxFromRPC(t *testing.T) {
 	type test struct {
 		name          string
-		mempool       *pmempool.Mempool
+		mempool       pmempool.Mempool
 		txVerifier    testTxVerifier
 		appSenderFunc func(*gomock.Controller) common.AppSender
 		tx            *txs.Tx
@@ -72,7 +72,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 	tests := []test{
 		{
 			name: "mempool has transaction",
-			mempool: func() *pmempool.Mempool {
+			mempool: func() pmempool.Mempool {
 				mempool, err := pmempool.New(
 					"",
 					gas.Dimensions{1, 1, 1, 1},
@@ -122,7 +122,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		},
 		{
 			name: "transaction marked as dropped in mempool",
-			mempool: func() *pmempool.Mempool {
+			mempool: func() pmempool.Mempool {
 				mempool, err := pmempool.New(
 					"",
 					gas.Dimensions{1, 1, 1, 1},
@@ -158,7 +158,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		},
 		{
 			name: "tx dropped",
-			mempool: func() *pmempool.Mempool {
+			mempool: func() pmempool.Mempool {
 				mempool, err := pmempool.New(
 					"",
 					gas.Dimensions{1, 1, 1, 1},
@@ -194,7 +194,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		},
 		{
 			name: "tx conflicts",
-			mempool: func() *pmempool.Mempool {
+			mempool: func() pmempool.Mempool {
 				mempool, err := pmempool.New(
 					"",
 					gas.Dimensions{1, 1, 1, 1},
@@ -252,7 +252,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		},
 		{
 			name: "mempool gas capacity exceeded",
-			mempool: func() *pmempool.Mempool {
+			mempool: func() pmempool.Mempool {
 				m, err := pmempool.New(
 					"",
 					gas.Dimensions{1, 1, 1, 1},
@@ -290,7 +290,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 		},
 		{
 			name: "happy path",
-			mempool: func() *pmempool.Mempool {
+			mempool: func() pmempool.Mempool {
 				mempool, err := pmempool.New(
 					"",
 					gas.Dimensions{1, 1, 1, 1},

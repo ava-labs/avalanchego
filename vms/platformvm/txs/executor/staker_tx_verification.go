@@ -139,7 +139,7 @@ func verifyAddValidatorTx(
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get utxos: %w", err)
+		return nil, fmt.Errorf("getting utxos %w", err)
 	}
 
 	if !backend.Bootstrapped.Get() {
@@ -166,7 +166,6 @@ func verifyAddValidatorTx(
 		)
 	}
 
-	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return nil, err
@@ -174,7 +173,7 @@ func verifyAddValidatorTx(
 
 	producedAVAX, err = safemath.Add(producedAVAX, fee)
 	if err != nil {
-		return nil, fmt.Errorf("calculating total produced AVAX: %w", err)
+		return nil, fmt.Errorf("adding fee: %w", err)
 	}
 
 	if err := backend.FlowChecker.VerifySpend(
@@ -267,10 +266,9 @@ func verifyAddSubnetValidatorTx(
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("failed to get utxos: %w", err)
+		return fmt.Errorf("getting utxos %w", err)
 	}
 
-	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -278,7 +276,7 @@ func verifyAddSubnetValidatorTx(
 
 	producedAVAX, err = safemath.Add(producedAVAX, fee)
 	if err != nil {
-		return fmt.Errorf("calculating total produced AVAX: %w", err)
+		return fmt.Errorf("adding fee: %w", err)
 	}
 
 	if err := backend.FlowChecker.VerifySpend(
@@ -358,10 +356,9 @@ func verifyRemoveSubnetValidatorTx(
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return nil, false, fmt.Errorf("failed to get utxos: %w", err)
+		return nil, false, fmt.Errorf("getting utxos: %w", err)
 	}
 
-	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return nil, false, err
@@ -369,7 +366,7 @@ func verifyRemoveSubnetValidatorTx(
 
 	producedAVAX, err = safemath.Add(producedAVAX, fee)
 	if err != nil {
-		return nil, false, fmt.Errorf("calculating total produced AVAX: %w", err)
+		return nil, false, fmt.Errorf("adding fee: %w", err)
 	}
 
 	if err := backend.FlowChecker.VerifySpend(
@@ -436,7 +433,7 @@ func verifyAddDelegatorTx(
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get utxos: %w", err)
+		return nil, fmt.Errorf("getting utxos: %w", err)
 	}
 
 	if !backend.Bootstrapped.Get() {
@@ -496,7 +493,7 @@ func verifyAddDelegatorTx(
 
 	producedAVAX, err = safemath.Add(producedAVAX, fee)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get total produced AVAX: %w", err)
+		return nil, fmt.Errorf("adding fee: %w", err)
 	}
 
 	if err := backend.FlowChecker.VerifySpend(
@@ -614,10 +611,9 @@ func verifyAddPermissionlessValidatorTx(
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("failed to get utxos: %w", err)
+		return fmt.Errorf("getting utxos %w", err)
 	}
 
-	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -625,7 +621,7 @@ func verifyAddPermissionlessValidatorTx(
 
 	producedAVAX, err = safemath.Add(producedAVAX, fee)
 	if err != nil {
-		return fmt.Errorf("failed to get total produced AVAX: %w", err)
+		return fmt.Errorf("adding fee: %w", err)
 	}
 
 	if err := backend.FlowChecker.VerifySpend(
@@ -768,10 +764,9 @@ func verifyAddPermissionlessDelegatorTx(
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("failed to get utxos: %w", err)
+		return fmt.Errorf("getting utxos %w", err)
 	}
 
-	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -779,7 +774,7 @@ func verifyAddPermissionlessDelegatorTx(
 
 	producedAVAX, err = safemath.Add(producedAVAX, fee)
 	if err != nil {
-		return fmt.Errorf("failed to get total produced AVAX: %w", err)
+		return fmt.Errorf("adding fee: %w", err)
 	}
 
 	if err := backend.FlowChecker.VerifySpend(
@@ -839,10 +834,9 @@ func verifyTransferSubnetOwnershipTx(
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("failed to get utxos: %w", err)
+		return fmt.Errorf("getting utxos %w", err)
 	}
 
-	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -850,7 +844,7 @@ func verifyTransferSubnetOwnershipTx(
 
 	producedAVAX, err = safemath.Add(producedAVAX, fee)
 	if err != nil {
-		return fmt.Errorf("failed to get total produced AVAX: %w", err)
+		return fmt.Errorf("adding fee: %w", err)
 	}
 
 	if err := backend.FlowChecker.VerifySpend(

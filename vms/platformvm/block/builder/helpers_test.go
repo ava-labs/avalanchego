@@ -68,7 +68,7 @@ type mutableSharedMemory struct {
 type environment struct {
 	Builder
 	blkManager blockexecutor.Manager
-	mempool    *mempool.Mempool
+	mempool    mempool.Mempool
 	network    *network.Network
 	sender     *enginetest.Sender
 

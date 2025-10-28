@@ -210,10 +210,9 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("failed to get utxos: %w", err)
+		return fmt.Errorf("getting utxos %w", err)
 	}
 
-	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -221,7 +220,7 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 
 	producedAVAX, err = math.Add(producedAVAX, fee)
 	if err != nil {
-		return fmt.Errorf("failed to get total produced AVAX: %w", err)
+		return fmt.Errorf("adding fee: %w", err)
 	}
 
 	if err := e.backend.FlowChecker.VerifySpend(
@@ -270,10 +269,9 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("failed to get utxos: %w", err)
+		return fmt.Errorf("getting utxos %w", err)
 	}
 
-	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -281,7 +279,7 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 
 	producedAVAX, err = math.Add(producedAVAX, fee)
 	if err != nil {
-		return fmt.Errorf("failed to get total produced AVAX: %w", err)
+		return fmt.Errorf("adding fee: %w", err)
 	}
 
 	if err := e.backend.FlowChecker.VerifySpend(
@@ -361,10 +359,9 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 
 		ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 		if err != nil {
-			return fmt.Errorf("failed to get utxos: %w", err)
+			return fmt.Errorf("getting utxos %w", err)
 		}
 
-		// Verify the flowcheck
 		fee, err := e.feeCalculator.CalculateFee(tx)
 		if err != nil {
 			return err
@@ -372,7 +369,7 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 
 		producedAVAX, err = math.Add(producedAVAX, fee)
 		if err != nil {
-			return fmt.Errorf("failed to get total produced AVAX: %w", err)
+			return fmt.Errorf("adding fee: %w", err)
 		}
 
 		if err := e.backend.FlowChecker.VerifySpendUTXOs(
@@ -428,10 +425,9 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("failed to get utxos: %w", err)
+		return fmt.Errorf("getting utxos %w", err)
 	}
 
-	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -439,7 +435,7 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 
 	producedAVAX, err = math.Add(producedAVAX, fee)
 	if err != nil {
-		return fmt.Errorf("failed to get total produced AVAX: %w", err)
+		return fmt.Errorf("adding fee: %w", err)
 	}
 
 	if err := e.backend.FlowChecker.VerifySpend(
@@ -559,10 +555,9 @@ func (e *standardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("failed to get utxos: %w", err)
+		return fmt.Errorf("getting utxos %w", err)
 	}
 
-	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -570,7 +565,7 @@ func (e *standardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 
 	producedAVAX, err = math.Add(producedAVAX, fee)
 	if err != nil {
-		return fmt.Errorf("failed to get total produced AVAX: %w", err)
+		return fmt.Errorf("adding fee: %w", err)
 	}
 
 	totalRewardAmount := tx.MaximumSupply - tx.InitialSupply
@@ -701,10 +696,9 @@ func (e *standardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("failed to get utxos: %w", err)
+		return fmt.Errorf("getting utxos %w", err)
 	}
 
-	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -712,7 +706,7 @@ func (e *standardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 
 	producedAVAX, err = math.Add(producedAVAX, fee)
 	if err != nil {
-		return fmt.Errorf("failed to get total produced AVAX: %w", err)
+		return fmt.Errorf("adding fee: %w", err)
 	}
 
 	if err := e.backend.FlowChecker.VerifySpend(
@@ -820,16 +814,15 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("failed to get utxos: %w", err)
+		return fmt.Errorf("getting utxos %w", err)
 	}
 
-	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
 
-	fee, err = math.Add(fee, producedAVAX)
+	producedAVAX, err = math.Add(producedAVAX, fee)
 	if err != nil {
 		return err
 	}
@@ -841,7 +834,7 @@ func (e *standardTxExecutor) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) er
 		outs,
 		baseTxCreds,
 		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: fee,
+			e.backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
 		return err
@@ -889,16 +882,15 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("failed to get utxos: %w", err)
+		return fmt.Errorf("getting utxos %w", err)
 	}
 
-	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
 
-	fee, err = math.Add(fee, producedAVAX)
+	producedAVAX, err = math.Add(producedAVAX, fee)
 	if err != nil {
 		return err
 	}
@@ -910,7 +902,7 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx
 		outs,
 		e.tx.Creds,
 		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: fee,
+			e.backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
 		return err
@@ -1047,10 +1039,9 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeight
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("failed to get utxos: %w", err)
+		return fmt.Errorf("getting utxos %w", err)
 	}
 
-	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -1058,7 +1049,7 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeight
 
 	producedAVAX, err = math.Add(producedAVAX, fee)
 	if err != nil {
-		return fmt.Errorf("failed to get total produced AVAX: %w", err)
+		return fmt.Errorf("adding fee: %w", err)
 	}
 
 	if err := e.backend.FlowChecker.VerifySpend(
@@ -1193,18 +1184,17 @@ func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1Vali
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("failed to get utxos: %w", err)
+		return fmt.Errorf("getting utxos %w", err)
 	}
 
-	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
 	}
 
-	fee, err = math.Add(fee, producedAVAX)
+	producedAVAX, err = math.Add(producedAVAX, fee)
 	if err != nil {
-		return err
+		return fmt.Errorf("adding fee: %w", err)
 	}
 
 	if err := e.backend.FlowChecker.VerifySpend(
@@ -1214,7 +1204,7 @@ func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1Vali
 		outs,
 		e.tx.Creds,
 		map[ids.ID]uint64{
-			e.backend.Ctx.AVAXAssetID: fee,
+			e.backend.Ctx.AVAXAssetID: producedAVAX,
 		},
 	); err != nil {
 		return err
@@ -1293,10 +1283,9 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx)
 	if err != nil {
-		return fmt.Errorf("failed to get utxos: %w", err)
+		return fmt.Errorf("getting utxos %w", err)
 	}
 
-	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -1304,7 +1293,7 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 
 	producedAVAX, err = math.Add(producedAVAX, fee)
 	if err != nil {
-		return fmt.Errorf("failed to get total produced AVAX: %w", err)
+		return fmt.Errorf("adding fee: %w", err)
 	}
 
 	if err := e.backend.FlowChecker.VerifySpend(
