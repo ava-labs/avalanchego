@@ -300,6 +300,7 @@ tasks:
     vars:
       MONITORING_ENABLED: '{{if or .PROMETHEUS_URL .LOKI_URL}}true{{else}}false{{end}}'
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/c-chain-reexecution-hashdb-33m-33m500k-%s" .TIMESTAMP)}}'
+      TIMESTAMP: '{{now | date "20060102-150405"}}'
     cmds:
       - task: reexecute-cchain-range-with-copied-data
         vars:
@@ -335,6 +336,7 @@ tasks:
     desc: C-Chain re-execution from block 33m to 33.5m with Firewood
     vars:
       MONITORING_ENABLED: '{{if or .PROMETHEUS_URL .LOKI_URL}}true{{else}}false{{end}}'
+      TIMESTAMP: '{{now | date "20060102-150405"}}'
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/c-chain-reexecution-firewood-33m-33m500k-%s" .TIMESTAMP)}}'
     cmds:
       - task: reexecute-cchain-range-with-copied-data

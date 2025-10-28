@@ -49,45 +49,60 @@ jobs:
         id: define-matrix
         shell: bash
         run: |
+          set -euo pipefail
+
+          # Runners considered "native" (not self-hosted)
+          NATIVE_RUNNERS=("ubuntu-latest" "blacksmith-4vcpu-ubuntu-2404")
+
+          is_native_runner () {
+            local r="$1"
+            for n in "${NATIVE_RUNNERS[@]}"; do
+              [[ "$r" == "$n" ]] && return 0
+            done
+            return 1
+          }
+
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            if [[ "${{ github.event.inputs.self-hosted }}" == "true" ]]; then
-              {
-                echo "matrix-native<<EOF"
-                echo '{"include":[]}'
-                echo EOF
-                echo "matrix-self-hosted<<EOF"
-                printf '{"include":[{"task":"%s","runner":"%s","timeout-minutes":%s}]}\n' \
-                  "${{ github.event.inputs.task }}" \
-                  "${{ github.event.inputs.runner }}" \
-                  "${{ github.event.inputs.timeout-minutes }}"
-                echo EOF
-              } >> "$GITHUB_OUTPUT"
+            task="${{ inputs.task }}"
+            runner="${{ inputs.runner }}"
+            timeout="${{ inputs['timeout-minutes'] }}"
+
+            if is_native_runner "$runner"; then
+              native=$(jq -c --arg t "$task" --arg r "$runner" --argjson tm "$timeout" \
+                '{include:[{task:$t,runner:$r,"timeout-minutes":$tm}]}' )
+              selfh='{"include":[]}'
             else
-              {
-                echo "matrix-native<<EOF"
-                printf '{"include":[{"task":"%s","runner":"%s","timeout-minutes":%s}]}\n' \
-                  "${{ github.event.inputs.task }}" \
-                  "${{ github.event.inputs.runner }}" \
-                  "${{ github.event.inputs.timeout-minutes }}"
-                echo EOF
-                echo "matrix-self-hosted<<EOF"
-                echo '{"include":[]}'
-                echo EOF
-              } >> "$GITHUB_OUTPUT"
+              native='{"include":[]}'
+              selfh=$(jq -c --arg t "$task" --arg r "$runner" --argjson tm "$timeout" \
+                '{include:[{task:$t,runner:$r,"timeout-minutes":$tm}]}' )
             fi
+
+            {
+              echo "matrix-native<<EOF"
+              echo "$native"
+              echo "EOF"
+              echo "matrix-self-hosted<<EOF"
+              echo "$selfh"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+
           else
+            # PR / schedule: read from config and split by the 'self_hosted' flag
             full_matrix=$(jq -r ".\"${{ github.event_name }}\"" .github/workflows/c-chain-reexecution-benchmark-config.json)
-            native_matrix=$(echo "$full_matrix" | jq '{include: [.include[] | select(.self_hosted == false)]}')
-            self_hosted_matrix=$(echo "$full_matrix" | jq '{include: [.include[] | select(.self_hosted == true)]}')
+
+            native_matrix=$(echo "$full_matrix" | jq -c '{include: [.include[] | select(.self_hosted == false)]}')
+            self_hosted_matrix=$(echo "$full_matrix" | jq -c '{include: [.include[] | select(.self_hosted == true)]}')
+
             {
               echo "matrix-native<<EOF"
               echo "$native_matrix"
-              echo EOF
+              echo "EOF"
               echo "matrix-self-hosted<<EOF"
               echo "$self_hosted_matrix"
-              echo EOF
+              echo "EOF"
             } >> "$GITHUB_OUTPUT"
           fi
+
   c-chain-reexecution-native:
     needs: define-matrix
     if: ${{ fromJSON(needs.define-matrix.outputs.matrix-native).include[0] != null }}
@@ -162,12 +177,12 @@ jobs:
         run: |
           TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
           EXEC_DIR="${{ github.workspace }}/reexecution-data-${TIMESTAMP}"
-          echo "EXECUTION_DATA_DIR=${EXEC_DIR}" >> $GITHUB_OUTPUT
+          echo "EXECUTION_DATA_DIR=${EXEC_DIR}" >> "$GITHUB_OUTPUT"
           echo "Using execution directory: ${EXEC_DIR}"
       - name: Run C-Chain Re-execution Benchmark
         shell: nix develop --impure --command bash -x {0}
         run: |
-          ./scripts/run_task.sh ${{ matrix.task }} \
+          ./scripts/run_task.sh "${{ matrix.task }}" \
             RUNNER_NAME="${{ matrix.runner }}" \
             BENCHMARK_OUTPUT_FILE="${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}/benchmark-output.txt" \
             EXECUTION_DATA_DIR="${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}"
@@ -223,7 +238,7 @@ jobs:
       - name: Push Post-State to S3 (if not exists)
         if: ${{ inputs.push-post-state != '' }}
         shell: nix develop --command bash -x {0}
-        run: ./scripts/run_task.sh export-dir-to-s3 SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ DST=${{ inputs.push-post-state }}
+        run: ./scripts/run_task.sh export-dir-to-s3 SRC=${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}/current-state/ DST=${{ inputs.push-post-state }}
   c-chain-reexecution-self-hosted:
     needs: define-matrix
     if: ${{ fromJSON(needs.define-matrix.outputs.matrix-self-hosted).include[0] != null }}
@@ -371,4 +386,4 @@ jobs:
       - name: Push Post-State to S3 (if not exists)
         if: ${{ inputs.push-post-state != '' }}
         shell: nix develop --command bash -x {0}
-        run: ./scripts/run_task.sh export-dir-to-s3 SRC=${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}/current-state/ DST=${{ github.event.inputs.push-post-state }}
+        run: ./scripts/run_task.sh export-dir-to-s3 SRC=${{ steps.exec-dir.outputs.EXECUTION_DATA_DIR }}/current-state/ DST=${{ inputs.push-post-state }}
