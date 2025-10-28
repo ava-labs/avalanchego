@@ -31,6 +31,9 @@ on:
         required: false
         default: 30
         type: number
+      push-post-state:
+        description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
+        default: ''
   schedule:
     - cron: '0 9 * * *'
 
@@ -85,7 +88,6 @@ jobs:
               echo EOF
             } >> "$GITHUB_OUTPUT"
           fi
-
   c-chain-reexecution-native:
     needs: define-matrix
     if: ${{ fromJSON(needs.define-matrix.outputs.matrix-native).include[0] != null }}
@@ -229,7 +231,6 @@ jobs:
         if: ${{ inputs.push-post-state != '' }}
         shell: nix develop --command bash -x {0}
         run: ./scripts/run_task.sh export-dir-to-s3 SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ DST=${{ inputs.push-post-state }}
-
   c-chain-reexecution-self-hosted:
     needs: define-matrix
     if: ${{ fromJSON(needs.define-matrix.outputs.matrix-self-hosted).include[0] != null }}
