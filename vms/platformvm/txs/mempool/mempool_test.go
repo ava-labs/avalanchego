@@ -836,9 +836,9 @@ func TestMempool_Iterate(t *testing.T) {
 				newTx(ids.ID{3}),
 			},
 			wantTxs: []ids.ID{
-				{1},
-				{2},
 				{3},
+				{2},
+				{1},
 			},
 		},
 	}

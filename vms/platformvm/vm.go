@@ -65,7 +65,6 @@ type VM struct {
 	*network.Network
 	validators.State
 	MempoolFunc func() pmempool.Mempool
-	mempool     pmempool.Mempool
 
 	metrics platformvmmetrics.Metrics
 
@@ -169,10 +168,11 @@ func (vm *VM) Initialize(
 		Bootstrapped: &vm.bootstrapped,
 	}
 
+	var mempool pmempool.Mempool
 	if vm.MempoolFunc != nil {
-		vm.mempool = vm.MempoolFunc()
+		mempool = vm.MempoolFunc()
 	} else {
-		vm.mempool, err = pmempool.New(
+		mempool, err = pmempool.New(
 			"mempool",
 			vm.Internal.DynamicFeeConfig.Weights,
 			execConfig.MempoolGasCapacity,
@@ -185,7 +185,7 @@ func (vm *VM) Initialize(
 	}
 
 	vm.manager = blockexecutor.NewManager(
-		vm.mempool,
+		mempool,
 		vm.metrics,
 		vm.state,
 		txExecutorBackend,
@@ -202,7 +202,7 @@ func (vm *VM) Initialize(
 			validatorManager,
 		),
 		txVerifier,
-		vm.mempool,
+		mempool,
 		txExecutorBackend.Config.PartialSyncPrimaryNetwork,
 		appSender,
 		chainCtx.Lock.RLocker(),
@@ -222,7 +222,7 @@ func (vm *VM) Initialize(
 	go vm.Network.PullGossip(vm.onShutdownCtx)
 
 	vm.Builder = blockbuilder.New(
-		vm.mempool,
+		mempool,
 		txExecutorBackend,
 		vm.manager,
 	)
