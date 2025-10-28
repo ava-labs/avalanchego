@@ -858,7 +858,6 @@ func (s *Database) listDataFiles() (map[int]string, int, error) {
 		var index int
 		n, err := fmt.Sscanf(file.Name(), dataFileNameFormat, &index)
 		if err != nil || n != 1 {
-			s.log.Debug("non-data file found in data directory", zap.String("fileName", file.Name()), zap.Error(err))
 			continue
 		}
 		dataFiles[index] = filepath.Join(s.config.DataDir, file.Name())

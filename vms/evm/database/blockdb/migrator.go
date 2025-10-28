@@ -198,12 +198,12 @@ func (m *migrator) run(ctx context.Context) error {
 		}
 
 		processingTime := time.Since(start)
-		m.logger.Info("blockdb migration finished",
+		m.logger.Info("block data migration finished",
 			zap.Uint64("blocks_processed", m.processed.Load()),
 			zap.Duration("total_processing_time", processingTime))
 	}()
 
-	m.logger.Info("blockdb migration started")
+	m.logger.Info("block data migration started")
 
 	// iterate over all block bodies in ascending order by block number
 	for iter.Next() {
@@ -303,7 +303,7 @@ func (m *migrator) run(ctx context.Context) error {
 				}
 			}
 
-			m.logger.Info("blockdb migration status", logFields...)
+			m.logger.Info("block data migration status", logFields...)
 			nextLog = now.Add(logProgressInterval)
 		}
 	}
