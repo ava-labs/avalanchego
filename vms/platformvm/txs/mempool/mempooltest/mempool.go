@@ -9,10 +9,10 @@ import (
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/lock"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/utils/lock"
 )
 
 var _ mempool.Mempool = (*Mempool)(nil)
@@ -23,7 +23,7 @@ type Mempool struct {
 	drop map[ids.ID]error
 
 	mu   sync.Mutex
-	cond lock.Cond
+	cond *lock.Cond
 }
 
 func (m *Mempool) Add(tx *txs.Tx) error {
@@ -34,7 +34,12 @@ func (m *Mempool) Add(tx *txs.Tx) error {
 		m.txs = make(map[ids.ID]*txs.Tx)
 	}
 
+	if m.cond == nil {
+		m.cond = lock.NewCond(&m.mu)
+	}
+
 	m.txs[tx.ID()] = tx
+	m.cond.Broadcast()
 
 	return nil
 }
@@ -66,6 +71,9 @@ func (m *Mempool) Iterate(fn func(tx *txs.Tx) bool) {
 }
 
 func (m *Mempool) Len() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	return len(m.txs)
 }
 
@@ -114,6 +122,10 @@ func (m *Mempool) RemoveConflicts(utxos set.Set[ids.ID]) {
 func (m *Mempool) WaitForEvent(ctx context.Context) (common.Message, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	if m.cond == nil {
+		m.cond = lock.NewCond(&m.mu)
+	}
 
 	for len(m.txs) == 0 {
 		if err := m.cond.Wait(ctx); err != nil {
