@@ -224,7 +224,8 @@ tasks:
   reexecute-cchain-range-with-copied-data:
     desc: Combines import-cchain-reexecute-range and reexecute-cchain-range
     vars:
-      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+      TIMESTAMP: '{{.TIMESTAMP | default (now | date "20060102-150405")}}'
+      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/%s-%s" .TASK_NAME .TIMESTAMP)}}'
       BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**"}}'
       CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"}}'
       RUNNER_NAME: '{{.RUNNER_NAME | default "dev"}}'
@@ -256,27 +257,34 @@ tasks:
 
   c-chain-reexecution-hashdb-101-250k:
     desc: C-Chain re-execution from block 101 to 250k with hashdb
-    vars:
-      TIMESTAMP: '{{now | date "20060102-150405"}}'
-      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/cchain-reexecution-hashdb-101-250k-%s" .TIMESTAMP)}}'
     cmds:
       - task: reexecute-cchain-range-with-copied-data
         vars:
-          EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+          TASK_NAME: c-chain-reexecution-hashdb-101-250k
           START_BLOCK: 101
           END_BLOCK: 250000
           BLOCK_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**
           CURRENT_STATE_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**
           CONFIG: default
 
-  c-chain-reexecution-hashdb-33m-33m500k:
-    desc: C-Chain re-execution from block 33m to 33.5m with hashdb
-    vars:
-      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/c-chain-reexecution-hashdb-33m-33m500k-%s" .TIMESTAMP)}}'
+  c-chain-reexecution-hashdb-archive-101-250k:
+    desc: C-Chain re-execution from block 101 to 250k with hashdb archive
     cmds:
       - task: reexecute-cchain-range-with-copied-data
         vars:
-          EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+          TASK_NAME: c-chain-reexecution-hashdb-archive-101-250k
+          START_BLOCK: 101
+          END_BLOCK: 250000
+          BLOCK_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**
+          CURRENT_STATE_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-archive-100/**
+          CONFIG: archive
+
+  c-chain-reexecution-hashdb-33m-33m500k:
+    desc: C-Chain re-execution from block 33m to 33.5m with hashdb
+    cmds:
+      - task: reexecute-cchain-range-with-copied-data
+        vars:
+          TASK_NAME: c-chain-reexecution-hashdb-33m-33m500k
           START_BLOCK: 33000001
           END_BLOCK: 33500000
           BLOCK_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-30m-40m-ldb/**
@@ -285,13 +293,10 @@ tasks:
 
   c-chain-reexecution-firewood-101-250k:
     desc: C-Chain re-execution from block 101 to 250k with hashdb
-    vars:
-      TIMESTAMP: '{{now | date "20060102-150405"}}'
-      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/cchain-reexecution-firewood-101-250k-%s" .TIMESTAMP)}}'
     cmds:
       - task: reexecute-cchain-range-with-copied-data
         vars:
-          EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+          TASK_NAME: c-chain-reexecution-firewood-101-250k
           START_BLOCK: 101
           END_BLOCK: 250000
           BLOCK_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**
@@ -300,12 +305,10 @@ tasks:
 
   c-chain-reexecution-firewood-33m-33m500k:
     desc: C-Chain re-execution from block 33m to 33.5m with hashdb
-    vars:
-      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/c-chain-reexecution-firewood-33m-33m500k-%s" .TIMESTAMP)}}'
     cmds:
       - task: reexecute-cchain-range-with-copied-data
         vars:
-          EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+          TASK_NAME: c-chain-reexecution-firewood-33m-33m500k
           START_BLOCK: 33000001
           END_BLOCK: 33500000
           BLOCK_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-30m-40m-ldb/**
