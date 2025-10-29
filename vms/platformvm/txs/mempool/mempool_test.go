@@ -587,7 +587,7 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 				},
 			},
 			conflictsToRemove: []avax.UTXOID{{TxID: ids.ID{1}}},
-			wantTxs: []ids.ID{{2}},
+			wantTxs:           []ids.ID{{2}},
 		},
 		{
 			name: "remove multiple conflicts in mempool",
@@ -685,7 +685,7 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 			conflictsToRemove: []avax.UTXOID{
 				{TxID: ids.ID{123}},
 			},
-			wantTxs:           []ids.ID{{1}, {2}},
+			wantTxs: []ids.ID{{1}, {2}},
 		},
 	}
 
