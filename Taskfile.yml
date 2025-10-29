@@ -207,6 +207,7 @@ tasks:
       END_BLOCK: '{{.END_BLOCK}}'
       LABELS: '{{.LABELS | default ""}}'
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
+      METRICS_SERVER_ENABLED: '{{.METRICS_SERVER_ENABLED | default "false"}}'
       METRICS_SERVER_PORT: '{{.METRICS_SERVER_PORT}}'
       METRICS_COLLECTOR_ENABLED: '{{.METRICS_COLLECTOR_ENABLED | default "false"}}'
     cmd: |
@@ -218,6 +219,7 @@ tasks:
       END_BLOCK={{.END_BLOCK}} \
       LABELS={{.LABELS}} \
       BENCHMARK_OUTPUT_FILE={{.BENCHMARK_OUTPUT_FILE}} \
+      METRICS_SERVER_ENABLED={{.METRICS_SERVER_ENABLED}} \
       METRICS_SERVER_PORT={{.METRICS_SERVER_PORT}} \
       METRICS_COLLECTOR_ENABLED={{.METRICS_COLLECTOR_ENABLED}} \
       bash -x ./scripts/benchmark_cchain_range.sh
@@ -234,6 +236,7 @@ tasks:
       END_BLOCK: '{{.END_BLOCK | default "250000"}}'
       LABELS: '{{.LABELS | default ""}}'
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
+      METRICS_SERVER_ENABLED: '{{.METRICS_SERVER_ENABLED | default "false"}}'
       METRICS_SERVER_PORT: '{{.METRICS_SERVER_PORT}}'
       METRICS_COLLECTOR_ENABLED: '{{.METRICS_COLLECTOR_ENABLED | default "false"}}'
     cmds:
@@ -252,6 +255,7 @@ tasks:
           END_BLOCK: '{{.END_BLOCK}}'
           LABELS: '{{.LABELS}}'
           BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE}}'
+          METRICS_SERVER_ENABLED: '{{.METRICS_SERVER_ENABLED}}'
           METRICS_SERVER_PORT: '{{.METRICS_SERVER_PORT}}'
           METRICS_COLLECTOR_ENABLED: '{{.METRICS_COLLECTOR_ENABLED}}'
 

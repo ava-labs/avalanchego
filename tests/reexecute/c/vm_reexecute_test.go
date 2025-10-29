@@ -63,7 +63,8 @@ var (
 	executionTimeout   time.Duration
 	labelsArg          string
 
-	metricsServerPort          *uint64
+	metricsServerEnabledArg    bool
+	metricsServerPortArg       uint64
 	metricsCollectorEnabledArg bool
 
 	networkUUID string = uuid.NewString()
@@ -104,16 +105,8 @@ func TestMain(m *testing.M) {
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
-	flag.Func("metrics-server-port", "Starts a metrics server and sets the port it will listen to", func(s string) error {
-		port, err := strconv.ParseUint(s, 10, 64)
-		if err != nil {
-			return err
-		}
-
-		metricsServerPort = new(uint64)
-		*metricsServerPort = port
-		return nil
-	})
+	flag.BoolVar(&metricsServerEnabledArg, "metrics-server-enabled", false, "Whether to enable the metrics server.")
+	flag.Uint64Var(&metricsServerPortArg, "metrics-server-port", 0, "The port the metrics server will listen to.")
 	flag.BoolVar(&metricsCollectorEnabledArg, "metrics-collector-enabled", false, "Whether to enable the metrics collector (if true, then metrics-server-enabled must be true as well).")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
@@ -128,8 +121,8 @@ func TestMain(m *testing.M) {
 
 	flag.Parse()
 
-	if metricsCollectorEnabledArg && metricsServerPort == nil {
-		metricsServerPort = new(uint64)
+	if metricsCollectorEnabledArg {
+		metricsServerEnabledArg = true
 	}
 
 	customLabels, err := parseCustomLabels(labelsArg)
@@ -165,7 +158,8 @@ func BenchmarkReexecuteRange(b *testing.B) {
 			startBlockArg,
 			endBlockArg,
 			chanSizeArg,
-			metricsServerPort,
+			metricsServerEnabledArg,
+			metricsServerPortArg,
 			metricsCollectorEnabledArg,
 		)
 	})
@@ -179,7 +173,8 @@ func benchmarkReexecuteRange(
 	startBlock uint64,
 	endBlock uint64,
 	chanSize int,
-	metricsPort *uint64,
+	metricsServerEnabled bool,
+	metricsPort uint64,
 	metricsCollectorEnabled bool,
 ) {
 	r := require.New(b)
@@ -199,8 +194,8 @@ func benchmarkReexecuteRange(
 
 	log := tests.NewDefaultLogger("c-chain-reexecution")
 
-	if metricsPort != nil {
-		serverAddr := startServer(b, log, prefixGatherer, *metricsPort)
+	if metricsServerEnabled {
+		serverAddr := startServer(b, log, prefixGatherer, metricsPort)
 
 		if metricsCollectorEnabled {
 			startCollector(b, log, "c-chain-reexecution", labels, serverAddr)
