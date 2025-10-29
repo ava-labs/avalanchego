@@ -15,9 +15,9 @@ import (
 func NewTestContext(t *testing.T) (context.Context, context.CancelFunc) {
 	t.Helper()
 	if d, ok := t.Deadline(); ok {
-		return context.WithDeadline(context.Background(), d)
+		return context.WithDeadline(t.Context(), d)
 	}
-	return context.WithTimeout(context.Background(), 30*time.Second)
+	return context.WithTimeout(t.Context(), 30*time.Second)
 }
 
 func WaitGroupWithContext(t *testing.T, ctx context.Context, wg *sync.WaitGroup) {

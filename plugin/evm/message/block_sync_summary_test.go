@@ -4,7 +4,6 @@
 package message
 
 import (
-	"context"
 	"encoding/base64"
 	"testing"
 
@@ -37,7 +36,7 @@ func TestMarshalBlockSyncSummary(t *testing.T) {
 	require.Equal(t, blockSyncSummary.GetBlockRoot(), s.GetBlockRoot())
 	require.Equal(t, blockSyncSummary.Bytes(), s.Bytes())
 
-	mode, err := s.Accept(context.TODO())
+	mode, err := s.Accept(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, block.StateSyncSkipped, mode)
 	require.True(t, called)

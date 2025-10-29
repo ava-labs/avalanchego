@@ -46,7 +46,7 @@ type syncTest struct {
 
 func testSync(t *testing.T, test syncTest) {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	if test.ctx != nil {
 		ctx = test.ctx
 	}
@@ -205,7 +205,7 @@ func TestCancelSync(t *testing.T) {
 	serverTrieDB := triedb.NewDatabase(serverDB, nil)
 	// Create trie with 2000 accounts (more than one leaf request)
 	root := fillAccountsWithStorage(t, r, serverDB, serverTrieDB, common.Hash{}, 2000)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
 	testSync(t, syncTest{
