@@ -1,6 +1,6 @@
---- .github/.golangci.yaml	2025-09-10 10:51:41
-+++ ffi/.golangci.yaml	2025-08-22 11:42:25
-@@ -69,8 +69,6 @@
+--- .github/.golangci.yaml	2025-10-29 08:30:25
++++ ffi/.golangci.yaml	2025-10-29 08:30:25
+@@ -70,8 +70,6 @@
        rules:
          packages:
            deny:
@@ -9,7 +9,7 @@
              - pkg: github.com/golang/mock/gomock
                desc: go.uber.org/mock/gomock should be used instead.
              - pkg: github.com/stretchr/testify/assert
-@@ -85,29 +83,10 @@
+@@ -86,29 +84,10 @@
      forbidigo:
        # Forbid the following identifiers (list of regexp).
        forbid:
@@ -39,7 +39,7 @@
      revive:
        rules:
          # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
-@@ -171,17 +150,6 @@
+@@ -172,17 +151,6 @@
          # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#useless-break
          - name: useless-break
            disabled: false
@@ -57,7 +57,7 @@
      tagalign:
        align: true
        sort: true
-@@ -227,7 +195,7 @@
+@@ -245,7 +213,7 @@
          - standard
          - default
          - blank

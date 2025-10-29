@@ -4,7 +4,6 @@
 package ffi
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,7 +21,7 @@ import (
 // This lives under one test as we can only instantiate the global recorder once
 func TestMetrics(t *testing.T) {
 	r := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// test params
 	var (
