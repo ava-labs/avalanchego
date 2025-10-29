@@ -62,6 +62,8 @@ var (
 	chanSizeArg        int
 	executionTimeout   time.Duration
 	labelsArg          string
+	logLevelArg        string
+	logLevel           logging.Level
 
 	metricsServerEnabledArg    bool
 	metricsCollectorEnabledArg bool
@@ -107,6 +109,7 @@ func TestMain(m *testing.M) {
 	flag.BoolVar(&metricsServerEnabledArg, "metrics-server-enabled", false, "Whether to enable the metrics server.")
 	flag.BoolVar(&metricsCollectorEnabledArg, "metrics-collector-enabled", false, "Whether to enable the metrics collector (if true, then metrics-server-enabled must be true as well).")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
+	flag.StringVar(&logLevelArg, "log-level", "info", "Log level for the benchmark (verbo, debug, trace, info, warn, error, fatal, off).")
 
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
 	predefinedConfigOptionsStr := fmt.Sprintf("[%s]", strings.Join(predefinedConfigKeys, ", "))
@@ -118,6 +121,14 @@ func TestMain(m *testing.M) {
 	flag.StringVar(&blockDirDstArg, "block-dir-dst", blockDirDstArg, "Destination block directory to write blocks into when executing TestExportBlockRange.")
 
 	flag.Parse()
+
+	// Parse the log level
+	var err error
+	logLevel, err = logging.ToLevel(logLevelArg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "invalid log level %q: %v\n", logLevelArg, err)
+		os.Exit(1)
+	}
 
 	if metricsCollectorEnabledArg && !metricsServerEnabledArg {
 		fmt.Fprint(os.Stderr, "metrics collector is enabled but metrics server is disabled.\n")
@@ -144,6 +155,16 @@ func TestMain(m *testing.M) {
 	labels["runner"] = runnerNameArg
 
 	m.Run()
+}
+
+// newLogger creates a named logger with the configured log level.
+func newLogger(name string) logging.Logger {
+	logFormat, err := logging.ToFormat(logging.AutoString, os.Stdout.Fd())
+	if err != nil {
+		// This should never happen since auto is a valid log format
+		panic(err)
+	}
+	return logging.NewLogger(name, logging.NewWrappedCore(logLevel, os.Stdout, logFormat.ConsoleEncoder()))
 }
 
 func BenchmarkReexecuteRange(b *testing.B) {
@@ -189,7 +210,7 @@ func benchmarkReexecuteRange(
 	consensusRegistry := prometheus.NewRegistry()
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
 
-	log := tests.NewDefaultLogger("c-chain-reexecution")
+	log := newLogger("c-chain-reexecution")
 
 	if metricsServerEnabled {
 		serverAddr := startServer(b, log, prefixGatherer)
@@ -216,7 +237,7 @@ func benchmarkReexecuteRange(
 	blockChan, err := createBlockChanFromLevelDB(b, blockDir, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
-	dbLogger := tests.NewDefaultLogger("db")
+	dbLogger := newLogger("db")
 
 	db, err := leveldb.New(vmDBDir, nil, dbLogger, prometheus.NewRegistry())
 	r.NoError(err)
@@ -239,7 +260,7 @@ func benchmarkReexecuteRange(
 	}()
 
 	config := vmExecutorConfig{
-		Log:              tests.NewDefaultLogger("vm-executor"),
+		Log:              newLogger("vm-executor"),
 		Registry:         consensusRegistry,
 		ExecutionTimeout: executionTimeout,
 		StartBlock:       startBlock,
@@ -303,7 +324,7 @@ func newMainnetCChainVM(
 			CChainID:    mainnetCChainID,
 			AVAXAssetID: mainnetAvaxAssetID,
 
-			Log:          tests.NewDefaultLogger("mainnet-vm-reexecution"),
+			Log:          newLogger("mainnet-vm-reexecution"),
 			SharedMemory: atomicMemory.NewSharedMemory(mainnetCChainID),
 			BCLookup:     ids.NewAliaser(),
 			Metrics:      metricsGatherer,
@@ -595,7 +616,7 @@ func startCollector(tb testing.TB, log logging.Logger, name string, labels map[s
 	startPromCtx, cancel := context.WithTimeout(tb.Context(), tests.DefaultTimeout)
 	defer cancel()
 
-	logger := tests.NewDefaultLogger("prometheus")
+	logger := newLogger("prometheus")
 	r.NoError(tmpnet.StartPrometheus(startPromCtx, logger))
 
 	var sdConfigFilePath string
