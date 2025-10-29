@@ -25,9 +25,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/chains"
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
@@ -217,16 +219,30 @@ func benchmarkReexecuteRange(
 
 	dbLogger := tests.NewDefaultLogger("db")
 
-	db, err := leveldb.New(vmDBDir, nil, dbLogger, prometheus.NewRegistry())
+	dbReg, err := metrics.MakeAndRegister(
+		prefixGatherer,
+		"avalanche_db",
+	)
 	r.NoError(err)
+	db, err := leveldb.New(vmDBDir, nil, dbLogger, dbReg)
+	r.NoError(err)
+
 	defer func() {
 		log.Info("shutting down DB")
 		r.NoError(db.Close())
 	}()
 
+	meterDBReg, err := metrics.MakeAndRegister(
+		prefixGatherer,
+		"avalanche_meterdb",
+	)
+	r.NoError(err)
+	meterDB, err := meterdb.New(meterDBReg, db)
+	r.NoError(err)
+
 	vm, err := newMainnetCChainVM(
 		ctx,
-		db,
+		meterDB,
 		chainDataDir,
 		configBytes,
 		vmMultiGatherer,
@@ -320,7 +336,7 @@ func newMainnetCChainVM(
 			},
 			ChainDataDir: chainDataDir,
 		},
-		prefixdb.New([]byte("vm"), vmAndSharedMemoryDB),
+		prefixdb.New(chains.VMDBPrefix, vmAndSharedMemoryDB),
 		[]byte(genesisConfig.CChainGenesis),
 		nil,
 		configBytes,
