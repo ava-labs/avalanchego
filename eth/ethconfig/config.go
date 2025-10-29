@@ -42,7 +42,7 @@ import (
 // DefaultFullGPOConfig contains default gasprice oracle settings for full node.
 var DefaultFullGPOConfig = gasprice.Config{
 	Blocks:              40,
-	Percentile:          60,
+	Percentile:          40,
 	MaxLookbackSeconds:  gasprice.DefaultMaxLookbackSeconds,
 	MaxCallBlockHistory: gasprice.DefaultMaxCallBlockHistory,
 	MaxBlockHistory:     gasprice.DefaultMaxBlockHistory,

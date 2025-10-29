@@ -11,6 +11,9 @@
   - Add `minDelayExcess` (uint64) to block header for Granite upgrade.
   - Add minimum block building delays to conform the block builder to ACP-226 requirements.
   - Add minimum delay verification.
+- Updated gas price estimation to use median of transactions in the last 20 seconds/40 blocks instead of estimation with block gas cost:
+  - Changed default percentile from 60 to 40
+  - This impacts `eth_suggestGasPrice` and `eth_suggestGasTipCap` , `eth_suggestPriceOptions`, `eth_maxPriorityFeePerGas`, `eth_gasPrice` APIs
 
 ## [v0.7.9](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.9)
 

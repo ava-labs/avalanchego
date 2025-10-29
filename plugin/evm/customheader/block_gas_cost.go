@@ -18,13 +18,9 @@ import (
 )
 
 var (
-	errBaseFeeNil      = errors.New("base fee is nil")
-	errBlockGasCostNil = errors.New("block gas cost is nil")
-	errNoGasUsed       = errors.New("no gas used")
-
 	ErrInsufficientBlockGas                = errors.New("insufficient gas to cover the block cost")
-	errInvalidExtraStateChangeContribution = errors.New("invalid extra state change contribution")
 	errInvalidBaseFee                      = errors.New("invalid base fee")
+	errInvalidExtraStateChangeContribution = errors.New("invalid extra state change contribution")
 	errInvalidRequiredBlockGasCost         = errors.New("invalid block gas cost")
 )
 
@@ -86,48 +82,6 @@ func BlockGasCostWithStep(
 		step,
 		timeElapsed,
 	)
-}
-
-// EstimateRequiredTip is the estimated tip a transaction would have needed to
-// pay to be included in a given block (assuming it paid a tip proportional to
-// its gas usage).
-//
-// In reality, the consensus engine does not enforce a minimum tip on individual
-// transactions. The only correctness check performed is that the sum of all
-// tips is >= the required block fee.
-//
-// This function will return nil for all return values prior to SubnetEVM.
-func EstimateRequiredTip(
-	config *extras.ChainConfig,
-	header *types.Header,
-) (*big.Int, error) {
-	extra := customtypes.GetHeaderExtra(header)
-	switch {
-	case !config.IsSubnetEVM(header.Time):
-		return nil, nil
-	case header.BaseFee == nil:
-		return nil, errBaseFeeNil
-	case extra.BlockGasCost == nil:
-		return nil, errBlockGasCostNil
-	}
-
-	totalGasUsed := new(big.Int).SetUint64(header.GasUsed)
-	if totalGasUsed.Sign() == 0 {
-		return nil, errNoGasUsed
-	}
-
-	// totalRequiredTips = blockGasCost * baseFee + totalGasUsed - 1
-	//
-	// We add totalGasUsed - 1 to ensure that the total required tips
-	// calculation rounds up.
-	totalRequiredTips := new(big.Int)
-	totalRequiredTips.Mul(extra.BlockGasCost, header.BaseFee)
-	totalRequiredTips.Add(totalRequiredTips, totalGasUsed)
-	totalRequiredTips.Sub(totalRequiredTips, common.Big1)
-
-	// estimatedTip = totalRequiredTips / totalGasUsed
-	estimatedTip := totalRequiredTips.Div(totalRequiredTips, totalGasUsed)
-	return estimatedTip, nil
 }
 
 func VerifyBlockFee(
