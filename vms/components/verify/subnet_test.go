@@ -4,7 +4,6 @@
 package verify
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -91,7 +90,7 @@ func TestSameSubnet(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			ctx := test.ctxF(ctrl)
 
-			result := SameSubnet(context.Background(), ctx, test.chainID)
+			result := SameSubnet(t.Context(), ctx, test.chainID)
 			require.ErrorIs(t, result, test.result)
 		})
 	}

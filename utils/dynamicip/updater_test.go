@@ -79,7 +79,7 @@ func TestNewUpdater(t *testing.T) {
 	// Make sure stopChan and doneChan are closed when stop is called
 	updater.Stop()
 
-	ctx, cancel := context.WithTimeout(context.Background(), stopTimeout)
+	ctx, cancel := context.WithTimeout(t.Context(), stopTimeout)
 	defer cancel()
 	select {
 	case <-updater.rootCtx.Done():
