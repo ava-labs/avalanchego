@@ -4,6 +4,9 @@
 
 version: '3'
 
+env:
+  AWS_REGION: '{{.AWS_REGION | default "us-east-2"}}'
+
 tasks:
   default: ./scripts/run_task.sh --list
 
@@ -159,8 +162,6 @@ tasks:
     vars:
       SRC: '{{.SRC}}'
       DST: '{{.DST}}'
-    env:
-      AWS_REGION: '{{.AWS_REGION | default "us-east-2"}}'
     cmds:
       - cmd: bash -x ./scripts/copy_dir.sh {{.SRC}} {{.DST}}
 
@@ -256,26 +257,21 @@ tasks:
   c-chain-reexecution-hashdb-101-250k:
     desc: C-Chain re-execution from block 101 to 250k with hashdb
     vars:
-      MONITORING_ENABLED: '{{if or .PROMETHEUS_URL .LOKI_URL}}true{{else}}false{{end}}'
       TIMESTAMP: '{{now | date "20060102-150405"}}'
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/cchain-reexecution-hashdb-101-250k-%s" .TIMESTAMP)}}'
     cmds:
       - task: reexecute-cchain-range-with-copied-data
         vars:
-          AWS_REGION: us-east-2
           EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
           START_BLOCK: 101
           END_BLOCK: 250000
           BLOCK_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**
           CURRENT_STATE_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**
           CONFIG: default
-          METRICS_SERVER_ENABLED: '{{.MONITORING_ENABLED}}'
-          METRICS_COLLECTOR_ENABLED: '{{.MONITORING_ENABLED}}'
 
   c-chain-reexecution-hashdb-33m-33m500k:
     desc: C-Chain re-execution from block 33m to 33.5m with hashdb
     vars:
-      MONITORING_ENABLED: '{{if or .PROMETHEUS_URL .LOKI_URL}}true{{else}}false{{end}}'
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/c-chain-reexecution-hashdb-33m-33m500k-%s" .TIMESTAMP)}}'
     cmds:
       - task: reexecute-cchain-range-with-copied-data
@@ -286,32 +282,25 @@ tasks:
           BLOCK_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-30m-40m-ldb/**
           CURRENT_STATE_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-33m/**
           CONFIG: default
-          METRICS_SERVER_ENABLED: '{{.MONITORING_ENABLED}}'
-          METRICS_COLLECTOR_ENABLED: '{{.MONITORING_ENABLED}}'
 
   c-chain-reexecution-firewood-101-250k:
     desc: C-Chain re-execution from block 101 to 250k with hashdb
     vars:
-      MONITORING_ENABLED: '{{if or .PROMETHEUS_URL .LOKI_URL}}true{{else}}false{{end}}'
       TIMESTAMP: '{{now | date "20060102-150405"}}'
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/cchain-reexecution-firewood-101-250k-%s" .TIMESTAMP)}}'
     cmds:
       - task: reexecute-cchain-range-with-copied-data
         vars:
-          AWS_REGION: us-east-2
           EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
           START_BLOCK: 101
           END_BLOCK: 250000
           BLOCK_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**
           CURRENT_STATE_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**
           CONFIG: firewood
-          METRICS_SERVER_ENABLED: '{{.MONITORING_ENABLED}}'
-          METRICS_COLLECTOR_ENABLED: '{{.MONITORING_ENABLED}}'
 
   c-chain-reexecution-firewood-33m-33m500k:
     desc: C-Chain re-execution from block 33m to 33.5m with hashdb
     vars:
-      MONITORING_ENABLED: '{{if or .PROMETHEUS_URL .LOKI_URL}}true{{else}}false{{end}}'
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/c-chain-reexecution-firewood-33m-33m500k-%s" .TIMESTAMP)}}'
     cmds:
       - task: reexecute-cchain-range-with-copied-data
@@ -322,8 +311,6 @@ tasks:
           BLOCK_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-30m-40m-ldb/**
           CURRENT_STATE_DIR_SRC: s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-33m/**
           CONFIG: firewood
-          METRICS_SERVER_ENABLED: '{{.MONITORING_ENABLED}}'
-          METRICS_COLLECTOR_ENABLED: '{{.MONITORING_ENABLED}}'
 
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests
