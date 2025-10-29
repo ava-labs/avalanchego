@@ -74,6 +74,11 @@ type ClientConfig struct {
 	RequestSize        uint16 // number of key/value pairs to ask peers for per request
 	Enabled            bool
 	SkipResume         bool
+	// DynamicStateSyncEnabled toggles dynamic vs static state sync orchestration.
+	DynamicStateSyncEnabled bool
+
+	// PivotInterval advances the sync target every N blocks.
+	PivotInterval uint64
 }
 
 type client struct {
@@ -100,6 +105,8 @@ type Client interface {
 	ClearOngoingSummary() error
 	Shutdown() error
 	Error() error
+	// OnEngineAccept should be called by the engine when a block is accepted.
+	OnEngineAccept(EthBlockWrapper) error
 }
 
 // StateSyncEnabled returns [client.enabled], which is set in the chain's config file.

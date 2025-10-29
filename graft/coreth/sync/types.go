@@ -29,6 +29,9 @@ type Syncer interface {
 	// "state_evm_state_sync", "state_atomic_sync"). Implementations should ensure this is unique and
 	// stable across renames for logging/metrics/deduplication.
 	ID() string
+
+	// UpdateTarget updates the syncer's target while running to support dynamic state sync.
+	UpdateTarget(newTarget message.Syncable) error
 }
 
 // SummaryProvider is an interface for providing state summaries.

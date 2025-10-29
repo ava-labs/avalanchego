@@ -17,6 +17,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 
 	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
 	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
@@ -165,6 +166,10 @@ func (t *stateSync) Sync(ctx context.Context) error {
 	// The errgroup wait will take care of returning the first error that occurs, or returning
 	// nil if syncing finish without an error.
 	return eg.Wait()
+}
+
+func (*stateSync) UpdateTarget(_ message.Syncable) error {
+	return nil
 }
 
 // onStorageTrieFinished is called after a storage trie finishes syncing.

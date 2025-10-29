@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+
 	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
 )
 
@@ -22,8 +24,9 @@ type FuncSyncer struct {
 func (f FuncSyncer) Sync(ctx context.Context) error { return f.fn(ctx) }
 
 // Name returns the provided name or a default if unspecified.
-func (FuncSyncer) Name() string { return "Test Name" }
-func (FuncSyncer) ID() string   { return "test_id" }
+func (FuncSyncer) Name() string                          { return "Test Name" }
+func (FuncSyncer) ID() string                            { return "test_id" }
+func (FuncSyncer) UpdateTarget(_ message.Syncable) error { return nil }
 
 var _ syncpkg.Syncer = FuncSyncer{}
 

@@ -146,6 +146,10 @@ func (s *Syncer) Sync(ctx context.Context) error {
 	return s.syncer.Sync(ctx)
 }
 
+func (*Syncer) UpdateTarget(_ message.Syncable) error {
+	return nil
+}
+
 // addZeroes returns the big-endian representation of `height`, prefixed with [common.HashLength] zeroes.
 func addZeroes(height uint64) []byte {
 	// Key format is [height(8 bytes)][blockchainID(32 bytes)]. Start should be the

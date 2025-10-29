@@ -102,3 +102,15 @@ func (r *SyncerRegistry) StartAsync(ctx context.Context, summary message.Syncabl
 
 	return g
 }
+
+// UpdateSyncTarget updates the sync target for all syncers.
+func (r *SyncerRegistry) UpdateSyncTarget(newTarget message.Syncable) error {
+	for _, task := range r.syncers {
+		if err := task.syncer.UpdateTarget(newTarget); err != nil {
+			log.Error("failed updating sync target", "name", task.name, "err", err)
+			return err
+		}
+		log.Info("updated sync target", "name", task.name, "new_target", newTarget.GetBlockHash().Hex(), "height", newTarget.Height())
+	}
+	return nil
+}

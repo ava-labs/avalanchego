@@ -130,11 +130,25 @@ func (b *wrappedBlock) Accept(context.Context) error {
 		// Apply any changes atomically with other pending changes to
 		// the vm's versionDB.
 		// Accept flushes the changes in the batch to the database.
-		return b.extension.Accept(vdbBatch)
+		if err := b.extension.Accept(vdbBatch); err != nil {
+			return err
+		}
+	} else {
+		// If there is no extension, we still need to apply the changes to the versionDB
+		if err := vdbBatch.Write(); err != nil {
+			return err
+		}
 	}
 
-	// If there is no extension, we still need to apply the changes to the versionDB
-	return vdbBatch.Write()
+	// Notify sync client that engine accepted a block
+	// TODO(powerslider): probably there could be a better way to do this, but it should be wired here for now.
+	if client := vm.SyncerClient(); client != nil {
+		if err := client.OnEngineAccept(b); err != nil {
+			return fmt.Errorf("could not notify sync client that engine accepted a block: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // handlePrecompileAccept calls Accept on any logs generated with an active precompile address that implements

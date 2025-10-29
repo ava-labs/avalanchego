@@ -115,6 +115,10 @@ func (c *CodeSyncer) Sync(ctx context.Context) error {
 	return eg.Wait()
 }
 
+func (*CodeSyncer) UpdateTarget(_ message.Syncable) error {
+	return nil
+}
+
 // work fulfills any incoming requests from the producer channel by fetching code bytes from the network
 // and fulfilling them by updating the database.
 func (c *CodeSyncer) work(ctx context.Context) error {
