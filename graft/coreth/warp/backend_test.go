@@ -4,7 +4,6 @@
 package warp
 
 import (
-	"context"
 	"testing"
 
 	"github.com/ava-labs/avalanchego/cache/lru"
@@ -54,7 +53,7 @@ func TestAddAndGetValidMessage(t *testing.T) {
 	require.NoError(t, backend.AddMessage(testUnsignedMessage))
 
 	// Verify that a signature is returned successfully, and compare to expected signature.
-	signature, err := backend.GetMessageSignature(context.TODO(), testUnsignedMessage)
+	signature, err := backend.GetMessageSignature(t.Context(), testUnsignedMessage)
 	require.NoError(t, err)
 
 	expectedSig, err := warpSigner.Sign(testUnsignedMessage)
@@ -73,7 +72,7 @@ func TestAddAndGetUnknownMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try getting a signature for a message that was not added.
-	_, err = backend.GetMessageSignature(context.TODO(), testUnsignedMessage)
+	_, err = backend.GetMessageSignature(t.Context(), testUnsignedMessage)
 	require.ErrorIs(t, err, ErrVerifyWarpMessage)
 }
 
@@ -98,11 +97,11 @@ func TestGetBlockSignature(t *testing.T) {
 	expectedSig, err := warpSigner.Sign(unsignedMessage)
 	require.NoError(err)
 
-	signature, err := backend.GetBlockSignature(context.TODO(), blkID)
+	signature, err := backend.GetBlockSignature(t.Context(), blkID)
 	require.NoError(err)
 	require.Equal(expectedSig, signature)
 
-	_, err = backend.GetBlockSignature(context.TODO(), ids.GenerateTestID())
+	_, err = backend.GetBlockSignature(t.Context(), ids.GenerateTestID())
 	require.ErrorIs(err, ErrValidateBlock)
 }
 
@@ -122,7 +121,7 @@ func TestZeroSizedCache(t *testing.T) {
 	require.NoError(t, backend.AddMessage(testUnsignedMessage))
 
 	// Verify that a signature is returned successfully, and compare to expected signature.
-	signature, err := backend.GetMessageSignature(context.TODO(), testUnsignedMessage)
+	signature, err := backend.GetMessageSignature(t.Context(), testUnsignedMessage)
 	require.NoError(t, err)
 
 	expectedSig, err := warpSigner.Sign(testUnsignedMessage)
@@ -151,7 +150,7 @@ func TestOffChainMessages(t *testing.T) {
 				require.NoError(err)
 				require.Equal(testUnsignedMessage.Bytes(), msg.Bytes())
 
-				signature, err := b.GetMessageSignature(context.TODO(), testUnsignedMessage)
+				signature, err := b.GetMessageSignature(t.Context(), testUnsignedMessage)
 				require.NoError(err)
 				expectedSignatureBytes, err := warpSigner.Sign(msg)
 				require.NoError(err)

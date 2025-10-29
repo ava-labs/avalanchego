@@ -4,7 +4,6 @@
 package vm
 
 import (
-	"context"
 	"math/big"
 	"testing"
 
@@ -1239,17 +1238,17 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 	if test.bootstrapping {
 		return
 	}
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, commonEng.PendingTxs, msg)
 
 	// If we've reached this point, we expect to be able to build and verify the block without any errors
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.BuildBlock(t.Context())
 	require.NoError(t, err)
 
-	require.NoError(t, blk.Verify(context.Background()))
+	require.NoError(t, blk.Verify(t.Context()))
 
-	err = blk.Accept(context.Background())
+	err = blk.Accept(t.Context())
 	require.ErrorIs(t, err, test.acceptErr)
 
 	if test.acceptErr != nil {
