@@ -5,7 +5,7 @@ set -euo pipefail
 # Define Matrix - Generates job matrix based on event type and inputs
 #
 # Usage:
-#   ./define-matrix.sh
+#   ./c-chain-reexecution-matrix.sh
 #
 # Environment Variables:
 #   GITHUB_EVENT_NAME - The event that triggered the workflow (workflow_dispatch, pull_request, schedule)
