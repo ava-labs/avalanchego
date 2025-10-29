@@ -8,7 +8,7 @@ mod joined;
 mod packed;
 mod split;
 
-pub use self::buf::{PartialPath, PathBuf};
+pub use self::buf::{PartialPath, PathBuf, PathGuard};
 pub use self::component::{ComponentIter, PathComponent, PathComponentSliceExt};
 pub use self::joined::JoinedPath;
 #[cfg(not(feature = "branch_factor_256"))]

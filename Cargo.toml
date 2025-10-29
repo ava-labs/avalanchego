@@ -76,7 +76,7 @@ metrics-util = "0.20.0"
 nonzero_ext = "0.3.0"
 rand_distr = "0.5.1"
 sha2 = "0.10.9"
-smallvec = "1.15.1"
+smallvec = { version = "1.15.1", features = ["write", "union", "const_new"] }
 test-case = "3.3.1"
 thiserror = "2.0.17"
 

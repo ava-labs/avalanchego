@@ -222,6 +222,12 @@ mod ethhash {
         pub fn into_triehash(self) -> TrieHash {
             self.into()
         }
+
+        // used in PartialEq and Hash impls and is to trick clippy into not caring
+        // about creating an owned instance for comparison
+        fn as_triehash(&self) -> TrieHash {
+            self.into()
+        }
     }
 
     impl PartialEq<TrieHash> for HashOrRlp {
@@ -247,18 +253,26 @@ mod ethhash {
     impl PartialEq for HashOrRlp {
         fn eq(&self, other: &Self) -> bool {
             match (self, other) {
+                // if both are hash or rlp, we can skip hashing
                 (HashOrRlp::Hash(h1), HashOrRlp::Hash(h2)) => h1 == h2,
                 (HashOrRlp::Rlp(r1), HashOrRlp::Rlp(r2)) => r1 == r2,
-                #[expect(deprecated, reason = "transitive dependency on generic-array")]
-                (HashOrRlp::Hash(h), HashOrRlp::Rlp(r))
-                | (HashOrRlp::Rlp(r), HashOrRlp::Hash(h)) => {
-                    Keccak256::digest(r.as_ref()).as_slice() == h.as_ref()
-                }
+                // otherwise, one is a hash and the other isn't, so convert both
+                // to hash and compare
+                _ => self.as_triehash() == other.as_triehash(),
             }
         }
     }
 
     impl Eq for HashOrRlp {}
+
+    impl std::hash::Hash for HashOrRlp {
+        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+            // contract on `Hash` and `PartialEq` requires that if `a == b` then `hash(a) == hash(b)`
+            // and since `PartialEq` may require hashing, we must always convert to `TrieHash` here
+            // and use it's hash implementation
+            self.as_triehash().hash(state);
+        }
+    }
 
     impl Serializable for HashOrRlp {
         fn write_to<W: ExtendableBytes>(&self, vec: &mut W) {
@@ -307,6 +321,15 @@ mod ethhash {
             match val {
                 HashOrRlp::Hash(h) => h,
                 HashOrRlp::Rlp(r) => Keccak256::digest(&r).into(),
+            }
+        }
+    }
+
+    impl From<&HashOrRlp> for TrieHash {
+        fn from(val: &HashOrRlp) -> Self {
+            match val {
+                HashOrRlp::Hash(h) => h.clone(),
+                HashOrRlp::Rlp(r) => Keccak256::digest(r).into(),
             }
         }
     }

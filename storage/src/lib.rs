@@ -34,6 +34,7 @@ mod path;
 #[cfg(any(test, feature = "test_utils"))]
 mod test_utils;
 mod trie_hash;
+mod tries;
 mod u4;
 
 /// Logger module for handling logging functionality
@@ -58,11 +59,15 @@ pub use nodestore::{
 };
 pub use path::{
     ComponentIter, IntoSplitPath, JoinedPath, PartialPath, PathBuf, PathCommonPrefix,
-    PathComponent, PathComponentSliceExt, SplitPath, TriePath, TriePathAsPackedBytes,
+    PathComponent, PathComponentSliceExt, PathGuard, SplitPath, TriePath, TriePathAsPackedBytes,
     TriePathFromPackedBytes, TriePathFromUnpackedBytes,
 };
 #[cfg(not(feature = "branch_factor_256"))]
 pub use path::{PackedBytes, PackedPathComponents, PackedPathRef};
+pub use tries::{
+    DuplicateKeyError, HashedTrieNode, IterAscending, IterDescending, KeyValueTrieRoot,
+    TrieEdgeIter, TrieEdgeState, TrieNode, TrieValueIter,
+};
 pub use u4::{TryFromIntError, U4};
 
 pub use linear::filebacked::FileBacked;
