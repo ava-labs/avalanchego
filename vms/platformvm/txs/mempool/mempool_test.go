@@ -535,12 +535,12 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 	tests := []struct {
 		name              string
 		txs               []*txs.Tx
-		conflictsToRemove set.Set[ids.ID]
+		conflictsToRemove []avax.UTXOID
 		wantTxs           []ids.ID
 	}{
 		{
 			name:              "remove conflicts from empty mempool",
-			conflictsToRemove: set.Of(ids.ID{1}),
+			conflictsToRemove: []avax.UTXOID{{TxID: ids.ID{1}}},
 		},
 		{
 			name: "remove conflicts in mempool",
@@ -586,9 +586,7 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 					TxID: ids.ID{2},
 				},
 			},
-			conflictsToRemove: set.Of(
-				ids.ID{1},
-			),
+			conflictsToRemove: []avax.UTXOID{{TxID: ids.ID{1}}},
 			wantTxs: []ids.ID{{2}},
 		},
 		{
@@ -635,10 +633,10 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 					TxID: ids.ID{2},
 				},
 			},
-			conflictsToRemove: set.Of(
-				ids.ID{1},
-				ids.ID{2},
-			),
+			conflictsToRemove: []avax.UTXOID{
+				{TxID: ids.ID{1}},
+				{TxID: ids.ID{2}},
+			},
 		},
 		{
 			name: "remove conflicts not in mempool",
@@ -684,7 +682,9 @@ func TestMempool_RemoveConflicts(t *testing.T) {
 					TxID: ids.ID{2},
 				},
 			},
-			conflictsToRemove: set.Of(ids.ID{123}),
+			conflictsToRemove: []avax.UTXOID{
+				{TxID: ids.ID{123}},
+			},
 			wantTxs:           []ids.ID{{1}, {2}},
 		},
 	}
