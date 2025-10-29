@@ -253,7 +253,7 @@ func benchmarkReexecuteRange(
 	r.NoError(err)
 
 	start := time.Now()
-	r.NoError(executor.indexBlockSequence(ctx, db, blockChan))
+	r.NoError(executor.indexBlockSequence(ctx, prefixdb.New([]byte("vm"), db), blockChan))
 	// r.NoError(executor.executeSequence(ctx, blockChan))
 	elapsed := time.Since(start)
 
