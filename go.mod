@@ -7,7 +7,6 @@ module github.com/ava-labs/coreth
 // - Changes to the minimum golang version must also be replicated in:
 //   - go.mod (here)
 //   - tools/go.mod
-//   - tools/legacy-golangci-lint.mod
 //   - RELEASES.md
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):

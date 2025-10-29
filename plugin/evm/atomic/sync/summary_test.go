@@ -4,7 +4,6 @@
 package sync
 
 import (
-	"context"
 	"encoding/base64"
 	"testing"
 
@@ -43,7 +42,7 @@ func TestMarshalSummary(t *testing.T) {
 	require.Equal(t, atomicSummary.AtomicRoot, s.(*Summary).AtomicRoot)
 	require.Equal(t, atomicSummary.Bytes(), s.Bytes())
 
-	mode, err := s.Accept(context.TODO())
+	mode, err := s.Accept(t.Context())
 	require.NoError(t, err, "failed to accept summary")
 	require.Equal(t, block.StateSyncSkipped, mode)
 	require.True(t, called)

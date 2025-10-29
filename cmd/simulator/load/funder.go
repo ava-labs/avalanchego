@@ -73,7 +73,7 @@ func DistributeFunds(ctx context.Context, client *ethclient.Client, keys []*key.
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch chainID: %w", err)
 	}
-	gasFeeCap, err := client.EstimateBaseFee(ctx)
+	baseFee, err := client.EstimateBaseFee(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch estimated base fee: %w", err)
 	}
@@ -91,7 +91,7 @@ func DistributeFunds(ctx context.Context, client *ethclient.Client, keys []*key.
 			ChainID:   chainID,
 			Nonce:     nonce,
 			GasTipCap: gasTipCap,
-			GasFeeCap: gasFeeCap,
+			GasFeeCap: new(big.Int).Add(baseFee, gasTipCap),
 			Gas:       ethparams.TxGas,
 			To:        &needFundsAddrs[i],
 			Data:      nil,

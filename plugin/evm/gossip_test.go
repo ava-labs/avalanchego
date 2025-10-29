@@ -62,7 +62,7 @@ func TestGossipSubscribe(t *testing.T) {
 	// use a custom bloom filter to test the bloom filter reset
 	gossipTxPool.bloom, err = gossip.NewBloomFilter(prometheus.NewRegistry(), "", 1, 0.01, 0.0000000000000001) // maxCount =1
 	require.NoError(err)
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	go gossipTxPool.Subscribe(ctx)
 

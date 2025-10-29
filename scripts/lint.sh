@@ -93,11 +93,7 @@ function read_dirs {
 TESTS=${TESTS:-"golangci_lint avalanche_golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
 
 function test_golangci_lint {
-  # Since there are 2 versions of golangci-lint in play, and only one
-  # can be managed by a given go.mod file, we use a separate mod file
-  # for the older version.
-  # TODO(marun) Switch everything to v2 when possible
-  go tool -modfile=tools/legacy-golangci-lint.mod golangci-lint run --config .golangci.yml
+  go tool -modfile=tools/go.mod golangci-lint run --config .golangci.yml
 }
 
 function test_avalanche_golangci_lint {

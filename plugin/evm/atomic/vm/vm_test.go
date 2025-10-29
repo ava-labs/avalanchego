@@ -4,7 +4,6 @@
 package vm
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
@@ -36,7 +35,6 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/atomic/txpool"
-	"github.com/ava-labs/coreth/plugin/evm/customheader"
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
@@ -143,16 +141,16 @@ func testImportMissingUTXOs(t *testing.T, scheme string) {
 		vmtest.TestShortIDAddrs[0]: importAmount,
 	}))
 	defer func() {
-		require.NoError(vm1.Shutdown(context.Background()))
+		require.NoError(vm1.Shutdown(t.Context()))
 	}()
 
 	importTx, err := vm1.newImportTx(vm1.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, vmtest.TestKeys[0:1])
 	require.NoError(err)
 	require.NoError(vm1.AtomicMempool.AddLocalTx(importTx))
-	msg, err := vm1.WaitForEvent(context.Background())
+	msg, err := vm1.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
-	blk, err := vm1.BuildBlock(context.Background())
+	blk, err := vm1.BuildBlock(t.Context())
 	require.NoError(err)
 
 	// make another VM which is missing the UTXO in shared memory
@@ -162,12 +160,12 @@ func testImportMissingUTXOs(t *testing.T, scheme string) {
 		Scheme: scheme,
 	})
 	defer func() {
-		require.NoError(vm2.Shutdown(context.Background()))
+		require.NoError(vm2.Shutdown(t.Context()))
 	}()
 
-	vm2Blk, err := vm2.ParseBlock(context.Background(), blk.Bytes())
+	vm2Blk, err := vm2.ParseBlock(t.Context(), blk.Bytes())
 	require.NoError(err)
-	err = vm2Blk.Verify(context.Background())
+	err = vm2Blk.Verify(t.Context())
 	require.ErrorIs(err, ErrMissingUTXOs)
 
 	// This should not result in a bad block since the missing UTXO should
@@ -200,24 +198,24 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 	}
 	require.NoError(addUTXOs(tvm.AtomicMemory, vm.Ctx, utxos))
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	importTx, err := vm.newImportTx(vm.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, vmtest.TestKeys[0:1])
 	require.NoError(err)
 	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
 
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), blk.ID()))
 	require.NoError(blk.Accept(context.Background()))
 
-	lastAcceptedID, err := vm.LastAccepted(context.Background())
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
 	require.NoError(err)
 	require.Equal(lastAcceptedID, blk.ID())
 	vm.Ethereum().BlockChain().DrainAcceptorQueue()
@@ -230,16 +228,16 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 	require.NoError(err)
 	require.NoError(vm.AtomicMempool.AddLocalTx(exportTx))
 
-	msg, err = vm.WaitForEvent(context.Background())
+	msg, err = vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 
-	blk2, err := vm.BuildBlock(context.Background())
+	blk2, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
 	require.NoError(blk2.Verify(context.Background()))
 	require.NoError(blk2.Accept(context.Background()))
 
-	lastAcceptedID, err = vm.LastAccepted(context.Background())
+	lastAcceptedID, err = vm.LastAccepted(t.Context())
 	require.NoError(err)
 	require.Equal(lastAcceptedID, blk2.ID())
 
@@ -272,7 +270,7 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork, scheme string
 	}))
 
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	importTxs := make([]*atomic.Tx, 0, 3)
@@ -288,24 +286,24 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork, scheme string
 		conflictTxs = append(conflictTxs, conflictTx)
 	}
 
-	expectedParentBlkID, err := vm.LastAccepted(context.Background())
+	expectedParentBlkID, err := vm.LastAccepted(t.Context())
 	require.NoError(err)
 	for _, tx := range importTxs[:2] {
 		require.NoError(vm.AtomicMempool.AddLocalTx(tx))
 
-		msg, err := vm.WaitForEvent(context.Background())
+		msg, err := vm.WaitForEvent(t.Context())
 		require.NoError(err)
 		require.Equal(commonEng.PendingTxs, msg)
 
 		vm.clock.Set(vm.clock.Time().Add(2 * time.Second))
-		blk, err := vm.BuildBlock(context.Background())
+		blk, err := vm.BuildBlock(t.Context())
 		require.NoError(err)
-		require.NoError(blk.Verify(context.Background()))
+		require.NoError(blk.Verify(t.Context()))
 
 		require.Equal(expectedParentBlkID, blk.Parent())
 
 		expectedParentBlkID = blk.ID()
-		require.NoError(vm.SetPreference(context.Background(), blk.ID()))
+		require.NoError(vm.SetPreference(t.Context(), blk.ID()))
 	}
 
 	// Check that for each conflict tx (whose conflict is in the chain ancestry)
@@ -316,12 +314,12 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork, scheme string
 		require.ErrorIsf(err, ErrConflictingAtomicInputs, "tx index %d", i)
 		// Force issue transaction directly to the mempool
 		require.NoErrorf(vm.AtomicMempool.ForceAddTx(tx), "force issue failed for tx index %d", i)
-		msg, err := vm.WaitForEvent(context.Background())
+		msg, err := vm.WaitForEvent(t.Context())
 		require.NoErrorf(err, "wait for event failed for tx index %d", i)
 		require.Equal(commonEng.PendingTxs, msg)
 
 		vm.clock.Set(vm.clock.Time().Add(2 * time.Second))
-		_, err = vm.BuildBlock(context.Background())
+		_, err = vm.BuildBlock(t.Context())
 		// The new block is verified in BuildBlock, so
 		// BuildBlock should fail due to an attempt to
 		// double spend an atomic UTXO.
@@ -332,14 +330,14 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork, scheme string
 	// with modified extra data. This new block will be invalid for more than one reason (invalid merkle root)
 	// so we check to make sure that the expected error is returned from block verification.
 	require.NoError(vm.AtomicMempool.AddLocalTx(importTxs[2]))
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 	vm.clock.Set(vm.clock.Time().Add(2 * time.Second))
 
-	validBlock, err := vm.BuildBlock(context.Background())
+	validBlock, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
-	require.NoError(validBlock.Verify(context.Background()))
+	require.NoError(validBlock.Verify(t.Context()))
 
 	validEthBlock := validBlock.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 
@@ -364,9 +362,9 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork, scheme string
 
 	blockBytes, err := rlp.EncodeToBytes(conflictingAtomicTxBlock)
 	require.NoError(err)
-	parsedBlock, err := vm.ParseBlock(context.Background(), blockBytes)
+	parsedBlock, err := vm.ParseBlock(t.Context(), blockBytes)
 	require.NoError(err)
-	err = parsedBlock.Verify(context.Background())
+	err = parsedBlock.Verify(t.Context())
 	require.ErrorIs(err, ErrConflictingAtomicInputs)
 
 	if !rules.IsApricotPhase5 {
@@ -391,9 +389,9 @@ func testConflictingImportTxs(t *testing.T, fork upgradetest.Fork, scheme string
 
 	blockBytes, err = rlp.EncodeToBytes(internalConflictBlock)
 	require.NoError(err)
-	parsedBlock, err = vm.ParseBlock(context.Background(), blockBytes)
+	parsedBlock, err = vm.ParseBlock(t.Context(), blockBytes)
 	require.NoError(err)
-	err = parsedBlock.Verify(context.Background())
+	err = parsedBlock.Verify(t.Context())
 	require.ErrorIs(err, ErrConflictingAtomicInputs)
 }
 
@@ -536,7 +534,7 @@ func testConflictingTransitiveAncestryWithGap(t *testing.T, scheme string) {
 	}))
 
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
@@ -549,15 +547,15 @@ func testConflictingTransitiveAncestryWithGap(t *testing.T, scheme string) {
 	require.NoError(err)
 	require.NoError(vm.AtomicMempool.AddLocalTx(importTx0A))
 
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 
-	blk0, err := vm.BuildBlock(context.Background())
+	blk0, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
 
-	require.NoError(blk0.Verify(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), blk0.ID()))
+	require.NoError(blk0.Verify(t.Context()))
+	require.NoError(vm.SetPreference(t.Context(), blk0.ID()))
 
 	newHead := <-newTxPoolHeadChan
 	require.Equal(common.Hash(blk0.ID()), newHead.Head.Hash())
@@ -574,25 +572,25 @@ func testConflictingTransitiveAncestryWithGap(t *testing.T, scheme string) {
 	require.NoError(err)
 	require.NoError(vm.AtomicMempool.AddLocalTx(importTx1))
 
-	msg, err = vm.WaitForEvent(context.Background())
+	msg, err = vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 
-	blk2, err := vm.BuildBlock(context.Background())
+	blk2, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
-	require.NoError(blk2.Verify(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), blk2.ID()))
+	require.NoError(blk2.Verify(t.Context()))
+	require.NoError(vm.SetPreference(t.Context(), blk2.ID()))
 
 	err = vm.AtomicMempool.AddLocalTx(importTx0B)
 	require.ErrorIs(err, ErrConflictingAtomicInputs)
 
 	// Force issue transaction directly into the mempool
 	require.NoError(vm.AtomicMempool.ForceAddTx(importTx0B))
-	msg, err = vm.WaitForEvent(context.Background())
+	msg, err = vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 
-	_, err = vm.BuildBlock(context.Background())
+	_, err = vm.BuildBlock(t.Context())
 	require.ErrorIs(err, ErrEmptyBlock)
 }
 
@@ -613,7 +611,7 @@ func testBonusBlocksTxs(t *testing.T, scheme string) {
 		Scheme: scheme,
 	})
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	importAmount := uint64(10000000)
@@ -646,11 +644,11 @@ func testBonusBlocksTxs(t *testing.T, scheme string) {
 	require.NoError(err)
 	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
 
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
 	// Make [blk] a bonus block.
 	vm.AtomicBackend.AddBonusBlock(blk.Height(), blk.ID())
@@ -658,13 +656,13 @@ func testBonusBlocksTxs(t *testing.T, scheme string) {
 	// Remove the UTXOs from shared memory, so that non-bonus blocks will fail verification
 	require.NoError(vm.Ctx.SharedMemory.Apply(map[ids.ID]*avalancheatomic.Requests{vm.Ctx.XChainID: {RemoveRequests: [][]byte{inputID[:]}}}))
 
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 
-	require.NoError(vm.SetPreference(context.Background(), blk.ID()))
+	require.NoError(vm.SetPreference(t.Context(), blk.ID()))
 
-	require.NoError(blk.Accept(context.Background()))
+	require.NoError(blk.Accept(t.Context()))
 
-	lastAcceptedID, err := vm.LastAccepted(context.Background())
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
 	require.NoError(err)
 	require.Equal(blk.ID(), lastAcceptedID)
 }
@@ -694,50 +692,50 @@ func testReissueAtomicTx(t *testing.T, scheme string) {
 	}))
 
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
-	genesisBlkID, err := vm.LastAccepted(context.Background())
+	genesisBlkID, err := vm.LastAccepted(t.Context())
 	require.NoError(err)
 	importTx, err := vm.newImportTx(vm.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, []*secp256k1.PrivateKey{vmtest.TestKeys[0]})
 	require.NoError(err)
 	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
 
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 
-	blkA, err := vm.BuildBlock(context.Background())
+	blkA, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
-	require.NoError(blkA.Verify(context.Background()))
+	require.NoError(blkA.Verify(t.Context()))
 
-	require.NoError(vm.SetPreference(context.Background(), blkA.ID()))
+	require.NoError(vm.SetPreference(t.Context(), blkA.ID()))
 
 	// SetPreference to parent before rejecting (will rollback state to genesis
 	// so that atomic transaction can be reissued, otherwise current block will
 	// conflict with UTXO to be reissued)
-	require.NoError(vm.SetPreference(context.Background(), genesisBlkID))
+	require.NoError(vm.SetPreference(t.Context(), genesisBlkID))
 
 	// Rejecting [blkA] should cause [importTx] to be re-issued into the mempool.
-	require.NoError(blkA.Reject(context.Background()))
+	require.NoError(blkA.Reject(t.Context()))
 	// Sleep for a minimum of two seconds to ensure that [blkB] will have a different timestamp
 	// than [blkA] so that the block will be unique. This is necessary since we have marked [blkA]
 	// as Rejected.
 	time.Sleep(2 * time.Second)
-	msg, err = vm.WaitForEvent(context.Background())
+	msg, err = vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
-	blkB, err := vm.BuildBlock(context.Background())
+	blkB, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
 	require.Equal(blkA.Height(), blkB.Height())
 
-	require.NoError(blkB.Verify(context.Background()))
+	require.NoError(blkB.Verify(t.Context()))
 
-	require.NoError(vm.SetPreference(context.Background(), blkB.ID()))
+	require.NoError(vm.SetPreference(t.Context(), blkB.ID()))
 
-	require.NoError(blkB.Accept(context.Background()))
+	require.NoError(blkB.Accept(t.Context()))
 
-	lastAcceptedID, err := vm.LastAccepted(context.Background())
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
 	require.NoError(err)
 	require.Equal(blkB.ID(), lastAcceptedID)
 
@@ -769,21 +767,21 @@ func testAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T, scheme string) {
 	}))
 
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	exportTxs := createExportTxOptions(t, vm, tvm.AtomicMemory)
 	exportTx1, exportTx2 := exportTxs[0], exportTxs[1]
 
 	require.NoError(vm.AtomicMempool.AddLocalTx(exportTx1))
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
-	exportBlk1, err := vm.BuildBlock(context.Background())
+	exportBlk1, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
-	require.NoError(exportBlk1.Verify(context.Background()))
+	require.NoError(exportBlk1.Verify(t.Context()))
 
-	require.NoError(vm.SetPreference(context.Background(), exportBlk1.ID()))
+	require.NoError(vm.SetPreference(t.Context(), exportBlk1.ID()))
 
 	err = vm.AtomicMempool.AddLocalTx(exportTx2)
 	require.ErrorIs(err, atomic.ErrInvalidNonce)
@@ -793,11 +791,11 @@ func testAtomicTxFailsEVMStateTransferBuildBlock(t *testing.T, scheme string) {
 
 	// Manually add transaction to mempool to bypass validation
 	require.NoError(vm.AtomicMempool.ForceAddTx(exportTx2))
-	msg, err = vm.WaitForEvent(context.Background())
+	msg, err = vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 
-	_, err = vm.BuildBlock(context.Background())
+	_, err = vm.BuildBlock(t.Context())
 	require.ErrorIs(err, ErrEmptyBlock)
 }
 
@@ -817,7 +815,7 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 	}))
 
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
@@ -829,11 +827,11 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 	// Issue the first import transaction, build, and accept the block.
 	require.NoError(vm.AtomicMempool.AddLocalTx(importTxs[0]))
 
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
 	require.NoError(blk.Verify(context.Background()))
 	require.NoError(vm.SetPreference(context.Background(), blk.ID()))
@@ -847,7 +845,7 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 	require.NoError(vm.AtomicMempool.ForceAddTx(importTxs[1]))
 	require.NoError(vm.AtomicMempool.ForceAddTx(importTxs[2]))
 
-	_, err = vm.BuildBlock(context.Background())
+	_, err = vm.BuildBlock(t.Context())
 	require.ErrorIs(err, ErrEmptyBlock)
 }
 
@@ -867,7 +865,7 @@ func TestAtomicTxBuildBlockDropsConflicts(t *testing.T) {
 	conflictKey := utilstest.NewKey(t)
 
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	// Create a conflict set for each pair of transactions
@@ -885,12 +883,12 @@ func TestAtomicTxBuildBlockDropsConflicts(t *testing.T) {
 		require.NoError(vm.AtomicMempool.ForceAddTx(conflictTx))
 		conflictSets[index].Add(conflictTx.ID())
 	}
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 	// Note: this only checks the path through OnFinalizeAndAssemble, we should make sure to add a test
 	// that verifies blocks received from the network will also fail verification
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
 	wrappedBlk, ok := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock)
 	require.True(ok, "expected block to be a ExtendedBlock")
@@ -911,8 +909,8 @@ func TestAtomicTxBuildBlockDropsConflicts(t *testing.T) {
 		require.Equal(1, conflictSet.Len())
 	}
 
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(blk.Accept(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
+	require.NoError(blk.Accept(t.Context()))
 }
 
 func TestBuildBlockDoesNotExceedAtomicGasLimit(t *testing.T) {
@@ -925,7 +923,7 @@ func TestBuildBlockDoesNotExceedAtomicGasLimit(t *testing.T) {
 	})
 
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	kc := secp256k1fx.NewKeychain(vmtest.TestKeys[0])
@@ -942,10 +940,10 @@ func TestBuildBlockDoesNotExceedAtomicGasLimit(t *testing.T) {
 		require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
 	}
 
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
 	wrappedBlk, ok := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock)
 	require.True(ok, "expected block to be a ExtendedBlock")
@@ -975,8 +973,8 @@ func TestExtraStateChangeAtomicGasLimitExceeded(t *testing.T) {
 		Fork: &fork2,
 	})
 	defer func() {
-		require.NoError(vm1.Shutdown(context.Background()))
-		require.NoError(vm2.Shutdown(context.Background()))
+		require.NoError(vm1.Shutdown(t.Context()))
+		require.NoError(vm2.Shutdown(t.Context()))
 	}()
 
 	txID, err := ids.ToID(hashing.ComputeHash256(vmtest.TestShortIDAddrs[0][:]))
@@ -998,12 +996,12 @@ func TestExtraStateChangeAtomicGasLimitExceeded(t *testing.T) {
 	require.NoError(err)
 	require.NoError(vm1.AtomicMempool.ForceAddTx(importTx))
 
-	msg, err := vm1.WaitForEvent(context.Background())
+	msg, err := vm1.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
-	blk1, err := vm1.BuildBlock(context.Background())
+	blk1, err := vm1.BuildBlock(t.Context())
 	require.NoError(err)
-	require.NoError(blk1.Verify(context.Background()))
+	require.NoError(blk1.Verify(t.Context()))
 
 	wrappedBlk, ok := blk1.(*chain.BlockWrapper).Block.(extension.ExtendedBlock)
 	require.True(ok, "expected block to be a ExtendedBlock")
@@ -1053,18 +1051,18 @@ func testEmptyBlock(t *testing.T, scheme string) {
 	}))
 
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	importTx, err := vm.newImportTx(vm.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, []*secp256k1.PrivateKey{vmtest.TestKeys[0]})
 	require.NoError(err)
 	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
 
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
 
 	// Create empty block from blkA
@@ -1088,7 +1086,7 @@ func testEmptyBlock(t *testing.T, scheme string) {
 	emptyBlockBytes, err := rlp.EncodeToBytes(emptyEthBlock)
 	require.NoError(err)
 
-	_, err = vm.ParseBlock(context.Background(), emptyBlockBytes)
+	_, err = vm.ParseBlock(t.Context(), emptyBlockBytes)
 	require.ErrorIs(err, ErrEmptyBlock)
 }
 
@@ -1112,7 +1110,7 @@ func testBuildApricotPhase5Block(t *testing.T, scheme string) {
 	})
 
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
@@ -1151,17 +1149,17 @@ func testBuildApricotPhase5Block(t *testing.T, scheme string) {
 	require.NoError(err)
 	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
 
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 
-	require.NoError(vm.SetPreference(context.Background(), blk.ID()))
+	require.NoError(vm.SetPreference(t.Context(), blk.ID()))
 
-	require.NoError(blk.Accept(context.Background()))
+	require.NoError(blk.Accept(t.Context()))
 
 	wrappedBlk, ok := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock)
 	require.True(ok, "expected block to be a ExtendedBlock")
@@ -1172,10 +1170,6 @@ func testBuildApricotPhase5Block(t *testing.T, scheme string) {
 	eExtDataGasUsed := customtypes.BlockExtDataGasUsed(ethBlk)
 	require.NotNil(eExtDataGasUsed)
 	require.Zero(eExtDataGasUsed.Cmp(big.NewInt(11230)), "expected extDataGasUsed to be 11230 but got %d", eExtDataGasUsed)
-	minRequiredTip, err := customheader.EstimateRequiredTip(vm.chainConfigExtra(), ethBlk.Header())
-	require.NoError(err)
-	require.NotNil(minRequiredTip)
-	require.Zero(minRequiredTip.Cmp(common.Big0), "expected minRequiredTip to be greater than 0 but got %d", minRequiredTip)
 
 	newHead := <-newTxPoolHeadChan
 	require.Equal(common.Hash(blk.ID()), newHead.Head.Hash())
@@ -1192,15 +1186,15 @@ func testBuildApricotPhase5Block(t *testing.T, scheme string) {
 		require.NoError(err)
 	}
 
-	msg, err = vm.WaitForEvent(context.Background())
+	msg, err = vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 
-	blk, err = vm.BuildBlock(context.Background())
+	blk, err = vm.BuildBlock(t.Context())
 	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 
-	require.NoError(blk.Accept(context.Background()))
+	require.NoError(blk.Accept(t.Context()))
 
 	wrappedBlk, ok = blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock)
 	require.True(ok, "expected block to be a ExtendedBlock")
@@ -1211,12 +1205,8 @@ func testBuildApricotPhase5Block(t *testing.T, scheme string) {
 	eDataGasUsed := customtypes.BlockExtDataGasUsed(ethBlk)
 	require.NotNil(eDataGasUsed)
 	require.Zero(eDataGasUsed.Cmp(common.Big0), "expected extDataGasUsed to be 0 but got %d", eDataGasUsed)
-	minRequiredTip, err = customheader.EstimateRequiredTip(vm.chainConfigExtra(), ethBlk.Header())
-	require.NoError(err)
-	require.NotNil(minRequiredTip)
-	require.LessOrEqualf(0, minRequiredTip.Cmp(big.NewInt(0.05*params.GWei)), "expected minRequiredTip to be at least 0.05 gwei but got %d", minRequiredTip)
 
-	lastAcceptedID, err := vm.LastAccepted(context.Background())
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
 	require.NoError(err)
 	require.Equal(blk.ID(), lastAcceptedID)
 
@@ -1248,7 +1238,7 @@ func testBuildApricotPhase4Block(t *testing.T, scheme string) {
 	})
 
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
@@ -1287,17 +1277,17 @@ func testBuildApricotPhase4Block(t *testing.T, scheme string) {
 	require.NoError(err)
 	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
 
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
 
-	require.NoError(vm.SetPreference(context.Background(), blk.ID()))
+	require.NoError(vm.SetPreference(t.Context(), blk.ID()))
 
-	require.NoError(blk.Accept(context.Background()))
+	require.NoError(blk.Accept(t.Context()))
 
 	wrappedBlk, ok := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock)
 	require.True(ok, "expected block to be a ExtendedBlock")
@@ -1308,10 +1298,6 @@ func testBuildApricotPhase4Block(t *testing.T, scheme string) {
 	eExtDataGasUsed := customtypes.BlockExtDataGasUsed(ethBlk)
 	require.NotNil(eExtDataGasUsed)
 	require.Zerof(eExtDataGasUsed.Cmp(big.NewInt(1230)), "expected extDataGasUsed to be 1000 but got %d", eExtDataGasUsed)
-	minRequiredTip, err := customheader.EstimateRequiredTip(vm.chainConfigExtra(), ethBlk.Header())
-	require.NoError(err)
-	require.NotNil(minRequiredTip)
-	require.Zero(minRequiredTip.Cmp(common.Big0), "expected minRequiredTip to be 0 but got %d", minRequiredTip)
 
 	newHead := <-newTxPoolHeadChan
 	require.Equal(common.Hash(blk.ID()), newHead.Head.Hash())
@@ -1332,7 +1318,7 @@ func testBuildApricotPhase4Block(t *testing.T, scheme string) {
 	}
 	blk, err = vmtest.IssueTxsAndBuild(txs, vm)
 	require.NoError(err)
-	require.NoError(blk.Accept(context.Background()))
+	require.NoError(blk.Accept(t.Context()))
 
 	wrappedBlk, ok = blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock)
 	require.True(ok, "expected block to be a ExtendedBlock")
@@ -1343,12 +1329,8 @@ func testBuildApricotPhase4Block(t *testing.T, scheme string) {
 	eDataGasUsed := customtypes.BlockExtDataGasUsed(ethBlk)
 	require.NotNil(eDataGasUsed)
 	require.Zero(eDataGasUsed.Cmp(common.Big0), "expected extDataGasUsed to be 0 but got %d", eDataGasUsed)
-	minRequiredTip, err = customheader.EstimateRequiredTip(vm.chainConfigExtra(), ethBlk.Header())
-	require.NoError(err)
-	require.NotNil(minRequiredTip)
-	require.GreaterOrEqualf(minRequiredTip.Cmp(big.NewInt(0.05*params.GWei)), 0, "expected minRequiredTip to be at least 0.05 gwei but got %d", minRequiredTip)
 
-	lastAcceptedID, err := vm.LastAccepted(context.Background())
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
 	require.NoError(err)
 	require.Equal(blk.ID(), lastAcceptedID)
 
@@ -1378,7 +1360,7 @@ func testBuildInvalidBlockHead(t *testing.T, scheme string) {
 	})
 
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	key0 := vmtest.TestKeys[0]
@@ -1418,11 +1400,11 @@ func testBuildInvalidBlockHead(t *testing.T, scheme string) {
 	// Force issue the transaction directly to the mempool
 	require.NoError(vm.AtomicMempool.ForceAddTx(tx))
 
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(err)
 	require.Equal(commonEng.PendingTxs, msg)
 
-	_, err = vm.BuildBlock(context.Background())
+	_, err = vm.BuildBlock(t.Context())
 	require.ErrorIs(err, ErrEmptyBlock)
 
 	newCurrentBlock := vm.Ethereum().BlockChain().CurrentBlock()
@@ -1444,7 +1426,7 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 				Fork: &fork,
 			})
 			defer func() {
-				require.NoError(vm.Shutdown(context.Background()))
+				require.NoError(vm.Shutdown(t.Context()))
 			}()
 			mempool := vm.AtomicMempool
 
@@ -1473,7 +1455,7 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 			has = mempool.Has(conflictingTxID)
 			require.False(has, "conflicting tx in mempool")
 
-			msg, err := vm.WaitForEvent(context.Background())
+			msg, err := vm.WaitForEvent(t.Context())
 			require.NoError(err)
 			require.Equal(commonEng.PendingTxs, msg)
 
@@ -1482,7 +1464,7 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 
 			// Show that BuildBlock generates a block containing [txID] and that it is
 			// still present in the mempool.
-			blk, err := vm.BuildBlock(context.Background())
+			blk, err := vm.BuildBlock(t.Context())
 			require.NoError(err, "could not build block out of mempool")
 
 			wrappedBlock, ok := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock)
@@ -1497,8 +1479,8 @@ func TestMempoolAddLocallyCreateAtomicTx(t *testing.T) {
 			has = mempool.Has(txID)
 			require.True(has, "tx should stay in mempool until block is accepted")
 
-			require.NoError(blk.Verify(context.Background()))
-			require.NoError(blk.Accept(context.Background()))
+			require.NoError(blk.Verify(t.Context()))
+			require.NoError(blk.Accept(t.Context()))
 
 			has = mempool.Has(txID)
 			require.False(has, "tx shouldn't be in mempool after block is accepted")
@@ -1514,7 +1496,7 @@ func TestWaitForEvent(t *testing.T) {
 		{
 			name: "WaitForEvent with context cancelled returns 0",
 			testCase: func(t *testing.T, vm *VM, _ common.Address, _ *ecdsa.PrivateKey) {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+				ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*100)
 				defer cancel()
 
 				var wg sync.WaitGroup
@@ -1542,7 +1524,7 @@ func TestWaitForEvent(t *testing.T) {
 
 				go func() {
 					defer wg.Done()
-					msg, err := vm.WaitForEvent(context.Background())
+					msg, err := vm.WaitForEvent(t.Context())
 					assert.NoError(t, err)
 					assert.Equal(t, commonEng.PendingTxs, msg)
 				}()
@@ -1555,7 +1537,7 @@ func TestWaitForEvent(t *testing.T) {
 		{
 			name: "WaitForEvent doesn't return if both mempool is empty",
 			testCase: func(t *testing.T, vm *VM, address common.Address, key *ecdsa.PrivateKey) {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+				ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*100)
 				defer cancel()
 
 				var wg sync.WaitGroup
@@ -1590,7 +1572,7 @@ func TestWaitForEvent(t *testing.T) {
 
 				go func() {
 					defer wg.Done()
-					msg, err := vm.WaitForEvent(context.Background())
+					msg, err := vm.WaitForEvent(t.Context())
 					assert.NoError(t, err)
 					assert.Equal(t, commonEng.PendingTxs, msg)
 				}()
@@ -1598,14 +1580,14 @@ func TestWaitForEvent(t *testing.T) {
 				wg.Wait()
 
 				// Build a block again to wipe out the subscription
-				blk, err := vm.BuildBlock(context.Background())
+				blk, err := vm.BuildBlock(t.Context())
 				require.NoError(t, err)
 
-				require.NoError(t, blk.Verify(context.Background()))
+				require.NoError(t, blk.Verify(t.Context()))
 
-				require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
+				require.NoError(t, vm.SetPreference(t.Context(), blk.ID()))
 
-				require.NoError(t, blk.Accept(context.Background()))
+				require.NoError(t, blk.Accept(t.Context()))
 			},
 		},
 	} {
@@ -1645,7 +1627,7 @@ func TestWaitForEvent(t *testing.T) {
 				},
 			}}}}))
 			testCase.testCase(t, vm, address, key)
-			require.NoError(t, vm.Shutdown(context.Background()))
+			require.NoError(t, vm.Shutdown(t.Background()))
 		})
 	}
 }

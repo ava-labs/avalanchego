@@ -162,7 +162,7 @@ func TestSuggestPriceOptions(t *testing.T) {
 			}
 			api := NewEthereumAPI(backend)
 
-			got, err := api.SuggestPriceOptions(context.Background())
+			got, err := api.SuggestPriceOptions(t.Context())
 			require.NoError(err)
 			require.Equal(test.want, got)
 		})

@@ -57,7 +57,7 @@ func TestNetworkDoesNotConnectToItself(t *testing.T) {
 	ctx := snowtest.Context(t, snowtest.CChainID)
 	n, err := NewNetwork(ctx, nil, nil, 1, prometheus.NewRegistry())
 	require.NoError(t, err)
-	require.NoError(t, n.Connected(context.Background(), ctx.NodeID, defaultPeerVersion))
+	require.NoError(t, n.Connected(t.Context(), ctx.NodeID, defaultPeerVersion))
 	require.Zero(t, n.Size())
 }
 
@@ -71,7 +71,7 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 			senderWg.Add(1)
 			go func() {
 				defer senderWg.Done()
-				if err := net.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(5*time.Second), requestBytes); err != nil {
+				if err := net.AppRequest(t.Context(), nodeID, requestID, time.Now().Add(5*time.Second), requestBytes); err != nil {
 					panic(err)
 				}
 			}()
@@ -81,7 +81,7 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 			senderWg.Add(1)
 			go func() {
 				defer senderWg.Done()
-				if err := net.AppResponse(context.Background(), nodeID, requestID, responseBytes); err != nil {
+				if err := net.AppResponse(t.Context(), nodeID, requestID, responseBytes); err != nil {
 					panic(err)
 				}
 				atomic.AddUint32(&callNum, 1)
@@ -96,12 +96,12 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 	require.NoError(t, err)
 	net.SetRequestHandler(&HelloGreetingRequestHandler{codec: codecManager})
 	nodeID := ids.GenerateTestNodeID()
-	require.NoError(t, net.Connected(context.Background(), nodeID, defaultPeerVersion))
+	require.NoError(t, net.Connected(t.Context(), nodeID, defaultPeerVersion))
 
 	requestMessage := HelloRequest{Message: "this is a request"}
 
 	defer net.Shutdown()
-	require.NoError(t, net.Connected(context.Background(), nodeID, defaultPeerVersion))
+	require.NoError(t, net.Connected(t.Context(), nodeID, defaultPeerVersion))
 
 	totalRequests := 5000
 	numCallsPerRequest := 1 // on sending response
@@ -114,7 +114,7 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 			defer wg.Done()
 			requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
 			assert.NoError(t, err)
-			responseBytes, _, err := net.SendSyncedAppRequestAny(context.Background(), defaultPeerVersion, requestBytes)
+			responseBytes, _, err := net.SendSyncedAppRequestAny(t.Context(), defaultPeerVersion, requestBytes)
 			assert.NoError(t, err)
 			assert.NotNil(t, responseBytes)
 
@@ -153,7 +153,7 @@ func TestAppRequestOnCtxCancellation(t *testing.T) {
 	require.NoError(t, err)
 
 	nodeID := ids.GenerateTestNodeID()
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	// cancel context prior to sending
 	cancel()
 	err = net.SendAppRequest(ctx, nodeID, requestBytes, nil)
@@ -175,7 +175,7 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 			senderWg.Add(1)
 			go func() {
 				defer senderWg.Done()
-				if err := net.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(5*time.Second), requestBytes); err != nil {
+				if err := net.AppRequest(t.Context(), nodeID, requestID, time.Now().Add(5*time.Second), requestBytes); err != nil {
 					panic(err)
 				}
 			}()
@@ -185,7 +185,7 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 			senderWg.Add(1)
 			go func() {
 				defer senderWg.Done()
-				if err := net.AppResponse(context.Background(), nodeID, requestID, responseBytes); err != nil {
+				if err := net.AppResponse(t.Context(), nodeID, requestID, responseBytes); err != nil {
 					panic(err)
 				}
 				atomic.AddUint32(&callNum, 1)
@@ -208,7 +208,7 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 		ids.GenerateTestNodeID(),
 	}
 	for _, nodeID := range nodes {
-		require.NoError(t, net.Connected(context.Background(), nodeID, defaultPeerVersion))
+		require.NoError(t, net.Connected(t.Context(), nodeID, defaultPeerVersion))
 	}
 
 	requestMessage := HelloRequest{Message: "this is a request"}
@@ -228,7 +228,7 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 			defer wg.Done()
 			requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
 			assert.NoError(t, err)
-			responseBytes, err := net.SendSyncedAppRequest(context.Background(), nodeID, requestBytes)
+			responseBytes, err := net.SendSyncedAppRequest(t.Context(), nodeID, requestBytes)
 			assert.NoError(t, err)
 			assert.NotNil(t, responseBytes)
 
@@ -248,7 +248,7 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 	}
 
 	// ensure empty nodeID is not allowed
-	err = net.SendAppRequest(context.Background(), ids.EmptyNodeID, []byte("hello there"), nil)
+	err = net.SendAppRequest(t.Context(), ids.EmptyNodeID, []byte("hello there"), nil)
 	require.ErrorIs(t, err, errEmptyNodeID)
 }
 
@@ -276,17 +276,17 @@ func TestAppRequestOnShutdown(t *testing.T) {
 	net, err := NewNetwork(ctx, sender, codecManager, 1, prometheus.NewRegistry())
 	require.NoError(t, err)
 	nodeID := ids.GenerateTestNodeID()
-	require.NoError(t, net.Connected(context.Background(), nodeID, defaultPeerVersion))
+	require.NoError(t, net.Connected(t.Context(), nodeID, defaultPeerVersion))
 
 	requestMessage := HelloRequest{Message: "this is a request"}
-	require.NoError(t, net.Connected(context.Background(), nodeID, defaultPeerVersion))
+	require.NoError(t, net.Connected(t.Context(), nodeID, defaultPeerVersion))
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
 		assert.NoError(t, err)
-		responseBytes, _, err := net.SendSyncedAppRequestAny(context.Background(), defaultPeerVersion, requestBytes)
+		responseBytes, _, err := net.SendSyncedAppRequestAny(t.Context(), defaultPeerVersion, requestBytes)
 		assert.ErrorIs(t, err, errRequestFailed)
 		assert.Nil(t, responseBytes)
 	}()
@@ -326,7 +326,7 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 	net.SetRequestHandler(&HelloGreetingRequestHandler{codec: codecManager})
 	require.NoError(t,
 		net.Connected(
-			context.Background(),
+			t.Context(),
 			ids.GenerateTestNodeID(),
 			version.CurrentApp,
 		),
@@ -337,7 +337,7 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 	require.NoError(t, err)
 
 	// cancel context prior to sending
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, _, err = net.SendSyncedAppRequestAny(ctx, defaultPeerVersion, requestBytes)
 	require.ErrorIs(t, err, context.Canceled)
@@ -350,7 +350,7 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 
 	// Cancel context after sending
 	require.Empty(t, net.(*network).outstandingRequestHandlers) // no outstanding requests
-	ctx, cancel = context.WithCancel(context.Background())
+	ctx, cancel = context.WithCancel(t.Context())
 	doneChan := make(chan struct{})
 	go func() {
 		_, _, err = net.SendSyncedAppRequestAny(ctx, defaultPeerVersion, requestBytes)
@@ -366,7 +366,7 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 	// Should still be able to process a response after cancelling.
 	require.Len(t, net.(*network).outstandingRequestHandlers, 1) // context cancellation SendAppRequestAny failure doesn't clear
 	require.NoError(t, net.AppResponse(
-		context.Background(),
+		t.Context(),
 		sentAppRequestInfo.nodeID,
 		sentAppRequestInfo.requestID,
 		[]byte{}))
@@ -392,7 +392,7 @@ func TestRequestMinVersion(t *testing.T) {
 				if err != nil {
 					panic(err)
 				}
-				assert.NoError(t, net.AppResponse(context.Background(), nodeID, reqID, responseBytes))
+				assert.NoError(t, net.AppResponse(t.Context(), nodeID, reqID, responseBytes))
 			}()
 			return nil
 		},
@@ -407,7 +407,7 @@ func TestRequestMinVersion(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t,
 		net.Connected(
-			context.Background(),
+			t.Context(),
 			nodeID,
 			&version.Application{
 				Name:  version.Client,
@@ -420,7 +420,7 @@ func TestRequestMinVersion(t *testing.T) {
 
 	// ensure version does not match
 	responseBytes, _, err := net.SendSyncedAppRequestAny(
-		context.Background(),
+		t.Context(),
 		&version.Application{
 			Name:  version.Client,
 			Major: 2,
@@ -433,7 +433,7 @@ func TestRequestMinVersion(t *testing.T) {
 	require.Nil(t, responseBytes)
 
 	// ensure version matches and the request goes through
-	responseBytes, _, err = net.SendSyncedAppRequestAny(context.Background(), defaultPeerVersion, requestBytes)
+	responseBytes, _, err = net.SendSyncedAppRequestAny(t.Context(), defaultPeerVersion, requestBytes)
 	require.NoError(t, err)
 
 	var response TestMessage
@@ -471,12 +471,12 @@ func TestOnRequestHonoursDeadline(t *testing.T) {
 
 	requestHandler.response, err = marshalStruct(codecManager, TestMessage{Message: "hi there"})
 	require.NoError(t, err)
-	require.NoError(t, net.AppRequest(context.Background(), nodeID, 0, time.Now().Add(1*time.Millisecond), requestBytes))
+	require.NoError(t, net.AppRequest(t.Context(), nodeID, 0, time.Now().Add(1*time.Millisecond), requestBytes))
 	// ensure the handler didn't get called (as peer.Network would've dropped the request)
 	require.Zero(t, requestHandler.calls)
 
 	requestHandler.processingDuration = 0
-	require.NoError(t, net.AppRequest(context.Background(), nodeID, 2, time.Now().Add(250*time.Millisecond), requestBytes))
+	require.NoError(t, net.AppRequest(t.Context(), nodeID, 2, time.Now().Add(250*time.Millisecond), requestBytes))
 	require.True(t, responded)
 	require.Equal(t, uint32(1), requestHandler.calls)
 }
@@ -495,7 +495,7 @@ func TestHandleInvalidMessages(t *testing.T) {
 	require.NoError(t, err)
 	clientNetwork.SetRequestHandler(&testRequestHandler{})
 
-	require.NoError(t, clientNetwork.Connected(context.Background(), nodeID, defaultPeerVersion))
+	require.NoError(t, clientNetwork.Connected(t.Context(), nodeID, defaultPeerVersion))
 
 	defer clientNetwork.Shutdown()
 
@@ -516,30 +516,30 @@ func TestHandleInvalidMessages(t *testing.T) {
 	var nilResponse []byte
 
 	// Check for edge cases
-	require.NoError(t, clientNetwork.AppGossip(context.Background(), nodeID, gossipMsg))
-	require.NoError(t, clientNetwork.AppGossip(context.Background(), nodeID, requestMessage))
-	require.NoError(t, clientNetwork.AppGossip(context.Background(), nodeID, garbageResponse))
-	require.NoError(t, clientNetwork.AppGossip(context.Background(), nodeID, emptyResponse))
-	require.NoError(t, clientNetwork.AppGossip(context.Background(), nodeID, nilResponse))
-	require.NoError(t, clientNetwork.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(time.Second), gossipMsg))
-	require.NoError(t, clientNetwork.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(time.Second), requestMessage))
-	require.NoError(t, clientNetwork.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(time.Second), garbageResponse))
-	require.NoError(t, clientNetwork.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(time.Second), emptyResponse))
-	require.NoError(t, clientNetwork.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(time.Second), nilResponse))
+	require.NoError(t, clientNetwork.AppGossip(t.Context(), nodeID, gossipMsg))
+	require.NoError(t, clientNetwork.AppGossip(t.Context(), nodeID, requestMessage))
+	require.NoError(t, clientNetwork.AppGossip(t.Context(), nodeID, garbageResponse))
+	require.NoError(t, clientNetwork.AppGossip(t.Context(), nodeID, emptyResponse))
+	require.NoError(t, clientNetwork.AppGossip(t.Context(), nodeID, nilResponse))
+	require.NoError(t, clientNetwork.AppRequest(t.Context(), nodeID, requestID, time.Now().Add(time.Second), gossipMsg))
+	require.NoError(t, clientNetwork.AppRequest(t.Context(), nodeID, requestID, time.Now().Add(time.Second), requestMessage))
+	require.NoError(t, clientNetwork.AppRequest(t.Context(), nodeID, requestID, time.Now().Add(time.Second), garbageResponse))
+	require.NoError(t, clientNetwork.AppRequest(t.Context(), nodeID, requestID, time.Now().Add(time.Second), emptyResponse))
+	require.NoError(t, clientNetwork.AppRequest(t.Context(), nodeID, requestID, time.Now().Add(time.Second), nilResponse))
 
-	err = clientNetwork.AppResponse(context.Background(), nodeID, requestID, gossipMsg)
+	err = clientNetwork.AppResponse(t.Context(), nodeID, requestID, gossipMsg)
 	require.ErrorIs(t, err, p2p.ErrUnrequestedResponse)
 
-	err = clientNetwork.AppResponse(context.Background(), nodeID, requestID, requestMessage)
+	err = clientNetwork.AppResponse(t.Context(), nodeID, requestID, requestMessage)
 	require.ErrorIs(t, err, p2p.ErrUnrequestedResponse)
 
-	err = clientNetwork.AppResponse(context.Background(), nodeID, requestID, garbageResponse)
+	err = clientNetwork.AppResponse(t.Context(), nodeID, requestID, garbageResponse)
 	require.ErrorIs(t, err, p2p.ErrUnrequestedResponse)
 
-	err = clientNetwork.AppResponse(context.Background(), nodeID, requestID, emptyResponse)
+	err = clientNetwork.AppResponse(t.Context(), nodeID, requestID, emptyResponse)
 	require.ErrorIs(t, err, p2p.ErrUnrequestedResponse)
 
-	err = clientNetwork.AppResponse(context.Background(), nodeID, requestID, nilResponse)
+	err = clientNetwork.AppResponse(t.Context(), nodeID, requestID, nilResponse)
 	require.ErrorIs(t, err, p2p.ErrUnrequestedResponse)
 }
 
@@ -555,7 +555,7 @@ func TestNetworkPropagatesRequestHandlerError(t *testing.T) {
 	errTest := errors.New("test error")
 	clientNetwork.SetRequestHandler(&testRequestHandler{err: errTest}) // Return an error from the request handler
 
-	require.NoError(t, clientNetwork.Connected(context.Background(), nodeID, defaultPeerVersion))
+	require.NoError(t, clientNetwork.Connected(t.Context(), nodeID, defaultPeerVersion))
 
 	defer clientNetwork.Shutdown()
 
@@ -564,7 +564,7 @@ func TestNetworkPropagatesRequestHandlerError(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check that if the request handler returns an error, it is propagated as a fatal error.
-	err = clientNetwork.AppRequest(context.Background(), nodeID, requestID, time.Now().Add(time.Second), requestMessage)
+	err = clientNetwork.AppRequest(t.Context(), nodeID, requestID, time.Now().Add(time.Second), requestMessage)
 	require.ErrorIs(t, err, errTest)
 }
 
@@ -576,8 +576,8 @@ func TestNetworkAppRequestAfterShutdown(t *testing.T) {
 	require.NoError(err)
 	net.Shutdown()
 
-	require.NoError(net.SendAppRequest(context.Background(), ids.GenerateTestNodeID(), nil, nil))
-	require.NoError(net.SendAppRequest(context.Background(), ids.GenerateTestNodeID(), nil, nil))
+	require.NoError(net.SendAppRequest(t.Context(), ids.GenerateTestNodeID(), nil, nil))
+	require.NoError(net.SendAppRequest(t.Context(), ids.GenerateTestNodeID(), nil, nil))
 }
 
 func TestNetworkRouting(t *testing.T) {
@@ -602,13 +602,13 @@ func TestNetworkRouting(t *testing.T) {
 	nodeID := ids.GenerateTestNodeID()
 	foobar := append([]byte{byte(protocol)}, []byte("foobar")...)
 	// forward it to the sdk handler
-	require.NoError(network.AppRequest(context.Background(), nodeID, 1, time.Now().Add(5*time.Second), foobar))
+	require.NoError(network.AppRequest(t.Context(), nodeID, 1, time.Now().Add(5*time.Second), foobar))
 	require.True(handler.appRequested)
 
-	err = network.AppResponse(context.Background(), ids.GenerateTestNodeID(), 1, foobar)
+	err = network.AppResponse(t.Context(), ids.GenerateTestNodeID(), 1, foobar)
 	require.ErrorIs(err, p2p.ErrUnrequestedResponse)
 
-	err = network.AppRequestFailed(context.Background(), nodeID, 1, common.ErrTimeout)
+	err = network.AppRequestFailed(t.Context(), nodeID, 1, common.ErrTimeout)
 	require.ErrorIs(err, p2p.ErrUnrequestedResponse)
 }
 
