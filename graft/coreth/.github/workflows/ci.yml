@@ -36,7 +36,6 @@ jobs:
           cache-dependency-path: |
             go.sum
             tools/go.sum
-            tools/legacy-golangci-lint.sum
       - name: change avalanchego dep
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
