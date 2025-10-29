@@ -299,7 +299,7 @@ pub enum CheckerError {
     },
 
     /// IO error
-    #[error("IO error")]
+    #[error("IO error reading pointer stored at {parent:#x}: {error}")]
     #[derive_where(skip_inner)]
     IO {
         /// The error
