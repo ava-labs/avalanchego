@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	logProgressInterval = 5 * time.Minute
+	logProgressInterval = 1 * time.Minute
 	compactionInterval  = 250_000
 	stopTimeout         = 10 * time.Second
 	etaSampleInterval   = 100
@@ -73,6 +73,7 @@ func newMigrator(
 	// Check if there's anything to migrate
 	if _, ok := minBlockHeightToMigrate(kvDB); !ok {
 		m.completed.Store(true)
+		m.logger.Info("No block data to migrate; migration already complete")
 		return m, nil
 	}
 
@@ -88,6 +89,8 @@ func newMigrator(
 			if err := writeTargetBlockHeight(stateDB, endHeight); err != nil {
 				return nil, err
 			}
+			m.logger.Info("Migration target height set",
+				zap.Uint64("targetHeight", endHeight))
 		}
 	}
 	m.endHeight = endHeight
@@ -117,7 +120,7 @@ func (m *migrator) stop() {
 		case <-done:
 			// Worker finished cleanup
 		case <-time.After(stopTimeout):
-			m.logger.Warn("migration shutdown timeout exceeded")
+			m.logger.Warn("Migration shutdown timeout exceeded")
 		}
 	}
 }
@@ -198,12 +201,12 @@ func (m *migrator) run(ctx context.Context) error {
 		}
 
 		processingTime := time.Since(start)
-		m.logger.Info("block data migration finished",
-			zap.Uint64("blocks_processed", m.processed.Load()),
-			zap.Duration("total_processing_time", processingTime))
+		m.logger.Info("Block data migration ended",
+			zap.Uint64("blocksProcessed", m.processed.Load()),
+			zap.Duration("totalProcessingTime", processingTime))
 	}()
 
-	m.logger.Info("block data migration started")
+	m.logger.Info("Block data migration started")
 
 	// iterate over all block bodies in ascending order by block number
 	for iter.Next() {
@@ -211,8 +214,8 @@ func (m *migrator) run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			m.logger.Info(
-				"migration stopped",
-				zap.Uint64("blocks_processed", m.processed.Load()),
+				"Block data migration stopped",
+				zap.Uint64("blocksProcessed", m.processed.Load()),
 			)
 			return ctx.Err()
 		default:
@@ -289,9 +292,9 @@ func (m *migrator) run(ctx context.Context) error {
 		// Log progress every logProgressInterval
 		if now := time.Now(); now.After(nextLog) {
 			logFields := []zap.Field{
-				zap.Uint64("blocks_processed", processed),
-				zap.Uint64("last_processed_height", blockNum),
-				zap.Duration("time_elapsed", time.Since(start)),
+				zap.Uint64("blocksProcessed", processed),
+				zap.Uint64("lastProcessedHeight", blockNum),
+				zap.Duration("timeElapsed", time.Since(start)),
 			}
 			if etaTarget > 0 {
 				eta, pct := etaTracker.AddSample(processed, etaTarget, now)
@@ -303,7 +306,7 @@ func (m *migrator) run(ctx context.Context) error {
 				}
 			}
 
-			m.logger.Info("block data migration status", logFields...)
+			m.logger.Info("Block data migration progress", logFields...)
 			nextLog = now.Add(logProgressInterval)
 		}
 	}
@@ -323,9 +326,9 @@ func (m *migrator) compactBlockRange(startNum, endNum uint64) {
 	compactRange(m.kvDB, blockBodyKey, startNum, endNum, m.logger)
 	compactRange(m.kvDB, receiptsKey, startNum, endNum, m.logger)
 
-	m.logger.Info("compaction of block range completed",
-		zap.Uint64("start_block", startNum),
-		zap.Uint64("end_block", endNum),
+	m.logger.Info("Compaction of block range completed",
+		zap.Uint64("startHeight", startNum),
+		zap.Uint64("endHeight", endNum),
 		zap.Duration("duration", time.Since(startTime)))
 }
 
@@ -482,8 +485,8 @@ func compactRange(
 	endKey := keyFunc(endNum+1, common.Hash{})
 	if err := db.Compact(startKey, endKey); err != nil {
 		logger.Error("failed to compact data in range",
-			zap.Uint64("start_block", startNum),
-			zap.Uint64("end_block", endNum),
+			zap.Uint64("startHeight", startNum),
+			zap.Uint64("endHeight", endNum),
 			zap.Error(err))
 	}
 }

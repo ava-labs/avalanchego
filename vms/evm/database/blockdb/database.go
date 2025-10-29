@@ -138,8 +138,7 @@ func New(
 	}
 
 	db.logger.Info(
-		"Deferring database initialization until min block height for " +
-			"state sync is known",
+		"Deferring block database initialization until state sync min height is known",
 	)
 	return db, false, nil
 }
@@ -184,7 +183,7 @@ func (db *Database) InitBlockDBs(minHeight uint64) error {
 	db.minHeight = minHeight
 
 	db.logger.Info(
-		"Initialized database with height-indexed block databases",
+		"Initialized height-indexed block databases",
 		zap.Uint64("minHeight", db.minHeight),
 	)
 

@@ -280,8 +280,6 @@ func (s *Database) Close() error {
 	}
 
 	s.closeFiles()
-
-	s.log.Info("Block database closed successfully")
 	return err
 }
 
