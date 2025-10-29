@@ -408,7 +408,16 @@ func (e *vmExecutor) indexBlockSequence(ctx context.Context, vmDB database.Datab
 		if err := rlp.DecodeBytes(blkResult.BlockBytes, ethBlock); err != nil {
 			return err
 		}
+		rawdb.WriteCanonicalHash(chainDB, ethBlock.Hash(), ethBlock.NumberU64())
 		rawdb.WriteBlock(chainDB, ethBlock)
+
+		if _, err := e.vm.GetBlock(ctx, ids.ID(ethBlock.Hash())); err != nil {
+			return fmt.Errorf("failed to get block %s at height %d after indexing: %w", ethBlock.Hash(), ethBlock.NumberU64(), err)
+		}
+		e.config.Log.Info("indexed block",
+			zap.Uint64("height", ethBlock.NumberU64()),
+			zap.String("hash", ethBlock.Hash().String()),
+		)
 	}
 
 	return nil
