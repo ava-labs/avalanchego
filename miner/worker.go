@@ -523,7 +523,6 @@ func (w *worker) handleResult(env *environment, block *types.Block, createdAt ti
 	var (
 		hash     = block.Hash()
 		receipts = make([]*types.Receipt, len(unfinishedReceipts))
-		logs     []*types.Log
 	)
 	for i, unfinishedReceipt := range unfinishedReceipts {
 		receipt := new(types.Receipt)
@@ -544,7 +543,6 @@ func (w *worker) handleResult(env *environment, block *types.Block, createdAt ti
 			*log = *unfinishedLog
 			log.BlockHash = hash
 		}
-		logs = append(logs, receipt.Logs...)
 	}
 	fees := totalFees(block, receipts)
 	feesInEther := new(big.Float).Quo(new(big.Float).SetInt(fees), big.NewFloat(ethparams.Ether))

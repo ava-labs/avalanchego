@@ -4,7 +4,6 @@
 package vm
 
 import (
-	"context"
 	"math/big"
 	"testing"
 
@@ -69,18 +68,18 @@ func createExportTxOptions(t *testing.T, vm *VM, sharedMemory *avalancheatomic.M
 
 	require.NoError(t, vm.AtomicMempool.AddLocalTx(importTx))
 
-	msg, err := vm.WaitForEvent(context.Background())
+	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, commonEng.PendingTxs, msg)
 
-	blk, err := vm.BuildBlock(context.Background())
+	blk, err := vm.BuildBlock(t.Context())
 	require.NoError(t, err)
 
-	require.NoError(t, blk.Verify(context.Background()))
+	require.NoError(t, blk.Verify(t.Context()))
 
-	require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
+	require.NoError(t, vm.SetPreference(t.Context(), blk.ID()))
 
-	require.NoError(t, blk.Accept(context.Background()))
+	require.NoError(t, blk.Accept(t.Context()))
 
 	statedb, err := vm.Ethereum().BlockChain().State()
 	require.NoError(t, err)
@@ -320,7 +319,7 @@ func TestExportTxEVMStateTransfer(t *testing.T) {
 				Fork: &fork,
 			})
 			defer func() {
-				require.NoError(t, vm.Shutdown(context.Background()))
+				require.NoError(t, vm.Shutdown(t.Context()))
 			}()
 
 			avaxUTXO := &avax.UTXO{
@@ -366,18 +365,18 @@ func TestExportTxEVMStateTransfer(t *testing.T) {
 
 			require.NoError(t, vm.AtomicMempool.AddLocalTx(tx))
 
-			msg, err := tvm.VM.WaitForEvent(context.Background())
+			msg, err := tvm.VM.WaitForEvent(t.Context())
 			require.NoError(t, err)
 			require.Equal(t, commonEng.PendingTxs, msg)
 
-			blk, err := vm.BuildBlock(context.Background())
+			blk, err := vm.BuildBlock(t.Context())
 			require.NoError(t, err)
 
-			require.NoError(t, blk.Verify(context.Background()))
+			require.NoError(t, blk.Verify(t.Context()))
 
-			require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
+			require.NoError(t, vm.SetPreference(t.Context(), blk.ID()))
 
-			require.NoError(t, blk.Accept(context.Background()))
+			require.NoError(t, blk.Accept(t.Context()))
 
 			newTx := atomic.UnsignedExportTx{
 				Ins: test.tx,
@@ -413,7 +412,7 @@ func TestExportTxSemanticVerify(t *testing.T) {
 		Fork: &fork,
 	})
 	defer func() {
-		require.NoError(t, vm.Shutdown(context.Background()))
+		require.NoError(t, vm.Shutdown(t.Context()))
 	}()
 
 	parent := vm.LastAcceptedExtendedBlock()
@@ -872,7 +871,7 @@ func TestExportTxAccept(t *testing.T) {
 		Fork: &fork,
 	})
 	defer func() {
-		require.NoError(t, vm.Shutdown(context.Background()))
+		require.NoError(t, vm.Shutdown(t.Context()))
 	}()
 
 	xChainSharedMemory := tvm.AtomicMemory.NewSharedMemory(vm.Ctx.XChainID)
@@ -1575,7 +1574,7 @@ func TestNewExportTx(t *testing.T) {
 				Fork: &test.fork,
 			})
 			defer func() {
-				require.NoError(t, vm.Shutdown(context.Background()))
+				require.NoError(t, vm.Shutdown(t.Context()))
 			}()
 
 			importAmount := uint64(50000000)
@@ -1612,18 +1611,18 @@ func TestNewExportTx(t *testing.T) {
 
 			require.NoError(t, vm.AtomicMempool.AddLocalTx(tx))
 
-			msg, err := tvm.VM.WaitForEvent(context.Background())
+			msg, err := tvm.VM.WaitForEvent(t.Context())
 			require.NoError(t, err)
 			require.Equal(t, commonEng.PendingTxs, msg)
 
-			blk, err := vm.BuildBlock(context.Background())
+			blk, err := vm.BuildBlock(t.Context())
 			require.NoError(t, err)
 
-			require.NoError(t, blk.Verify(context.Background()))
+			require.NoError(t, blk.Verify(t.Context()))
 
-			require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
+			require.NoError(t, vm.SetPreference(t.Context(), blk.ID()))
 
-			require.NoError(t, blk.Accept(context.Background()))
+			require.NoError(t, blk.Accept(t.Context()))
 
 			parent := vm.LastAcceptedExtendedBlock()
 			exportAmount := uint64(5000000)
@@ -1698,7 +1697,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 				Fork: &test.fork,
 			})
 			defer func() {
-				require.NoError(t, vm.Shutdown(context.Background()))
+				require.NoError(t, vm.Shutdown(t.Context()))
 			}()
 
 			importAmount := uint64(50000000)
@@ -1763,18 +1762,18 @@ func TestNewExportTxMulticoin(t *testing.T) {
 
 			require.NoError(t, vm.AtomicMempool.AddRemoteTx(tx))
 
-			msg, err := tvm.VM.WaitForEvent(context.Background())
+			msg, err := tvm.VM.WaitForEvent(t.Context())
 			require.NoError(t, err)
 			require.Equal(t, commonEng.PendingTxs, msg)
 
-			blk, err := vm.BuildBlock(context.Background())
+			blk, err := vm.BuildBlock(t.Context())
 			require.NoError(t, err)
 
-			require.NoError(t, blk.Verify(context.Background()))
+			require.NoError(t, blk.Verify(t.Context()))
 
-			require.NoError(t, vm.SetPreference(context.Background(), blk.ID()))
+			require.NoError(t, vm.SetPreference(t.Context(), blk.ID()))
 
-			require.NoError(t, blk.Accept(context.Background()))
+			require.NoError(t, blk.Accept(t.Context()))
 
 			parent := vm.LastAcceptedExtendedBlock()
 			exportAmount := uint64(5000000)

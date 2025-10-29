@@ -4,7 +4,6 @@
 package ethapi
 
 import (
-	"context"
 	"errors"
 	"math/big"
 	"os"
@@ -46,7 +45,7 @@ func TestBlockchainAPI_GetChainConfig(t *testing.T) {
 
 	api := NewBlockChainAPI(backend)
 
-	gotConfig := api.GetChainConfig(context.Background())
+	gotConfig := api.GetChainConfig(t.Context())
 	require.Equal(t, wantConfig, gotConfig)
 }
 
@@ -76,7 +75,7 @@ func TestBlockchainAPI_CallDetailed(t *testing.T) {
 	}))
 
 	result, err := api.CallDetailed(
-		context.Background(),
+		t.Context(),
 		TransactionArgs{
 			From:  &accounts[0].addr,
 			To:    &accounts[1].addr,

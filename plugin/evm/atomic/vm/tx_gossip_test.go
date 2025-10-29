@@ -325,7 +325,7 @@ func TestAtomicTxPushGossipInboundConflicting(t *testing.T) {
 	tvm.Ctx.Lock.Unlock()
 	defer func() {
 		tvm.Ctx.Lock.Lock()
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	nodeID := ids.GenerateTestNodeID()
@@ -337,12 +337,12 @@ func TestAtomicTxPushGossipInboundConflicting(t *testing.T) {
 	msgBytes := buildAtomicPushGossip(t, tx)
 
 	// show that no txID is requested
-	require.NoError(vm.AppGossip(context.Background(), nodeID, msgBytes))
+	require.NoError(vm.AppGossip(t.Context(), nodeID, msgBytes))
 	require.True(vm.AtomicMempool.Has(tx.ID()))
 
 	// Try to add a conflicting tx
 	msgBytes = buildAtomicPushGossip(t, conflictingTx)
-	require.NoError(vm.AppGossip(context.Background(), nodeID, msgBytes))
+	require.NoError(vm.AppGossip(t.Context(), nodeID, msgBytes))
 	require.False(vm.AtomicMempool.Has(conflictingTx.ID()), "conflicting tx should not be in the atomic mempool")
 
 	// Now, show tx as discarded.
@@ -352,7 +352,7 @@ func TestAtomicTxPushGossipInboundConflicting(t *testing.T) {
 
 	// A conflicting tx can now be added to the mempool
 	msgBytes = buildAtomicPushGossip(t, overridingTx)
-	require.NoError(vm.AppGossip(context.Background(), nodeID, msgBytes))
+	require.NoError(vm.AppGossip(t.Context(), nodeID, msgBytes))
 	require.True(vm.AtomicMempool.Has(overridingTx.ID()), "overriding tx should be in the atomic mempool")
 }
 

@@ -344,7 +344,7 @@ func testSyncer(t *testing.T, serverTrieDB *triedb.Database, targetHeight uint64
 // setupTestInfrastructure creates the common test infrastructure components.
 // It returns the context, mock client, atomic backend, and client database.
 func setupTestInfrastructure(t *testing.T, serverTrieDB *triedb.Database) (context.Context, *syncclient.TestClient, *state.AtomicBackend, *versiondb.Database) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
 
 	mockClient := syncclient.NewTestClient(
