@@ -427,6 +427,10 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan blockRe
 				zap.Uint64("height", blkResult.Height),
 				zap.Duration("eta", eta),
 			)
+		} else {
+			e.config.Log.Debug("executing block",
+				zap.Uint64("height", blkResult.Height),
+			)
 		}
 		if err := e.execute(ctx, blkResult.BlockBytes); err != nil {
 			return err
