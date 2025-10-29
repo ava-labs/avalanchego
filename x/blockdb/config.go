@@ -11,6 +11,9 @@ const DefaultMaxDataFileSize = 500 * 1024 * 1024 * 1024
 // DefaultMaxDataFiles is the default maximum number of data files descriptors cached.
 const DefaultMaxDataFiles = 10
 
+// DefaultEntryCacheSize is the default size of the entry cache.
+const DefaultEntryCacheSize = 256
+
 // DatabaseConfig contains configuration parameters for BlockDB.
 type DatabaseConfig struct {
 	// IndexDir is the directory where the index file is stored.
@@ -28,6 +31,9 @@ type DatabaseConfig struct {
 	// MaxDataFiles is the maximum number of data files descriptors cached.
 	MaxDataFiles int
 
+	// EntryCacheSize is the size of the entry cache (default: 256).
+	EntryCacheSize int
+
 	// CheckpointInterval defines how frequently (in blocks) the index file header is updated (default: 1024).
 	CheckpointInterval uint64
 
@@ -43,6 +49,7 @@ func DefaultConfig() DatabaseConfig {
 		MinimumHeight:      0,
 		MaxDataFileSize:    DefaultMaxDataFileSize,
 		MaxDataFiles:       DefaultMaxDataFiles,
+		EntryCacheSize:     DefaultEntryCacheSize,
 		CheckpointInterval: 1024,
 		SyncToDisk:         true,
 	}
@@ -91,6 +98,12 @@ func (c DatabaseConfig) WithMaxDataFiles(maxFiles int) DatabaseConfig {
 	return c
 }
 
+// WithEntryCacheSize returns a copy of the config with EntryCacheSize set to the given value.
+func (c DatabaseConfig) WithEntryCacheSize(size int) DatabaseConfig {
+	c.EntryCacheSize = size
+	return c
+}
+
 // WithCheckpointInterval returns a copy of the config with CheckpointInterval set to the given value.
 func (c DatabaseConfig) WithCheckpointInterval(interval uint64) DatabaseConfig {
 	c.CheckpointInterval = interval
@@ -113,6 +126,9 @@ func (c DatabaseConfig) Validate() error {
 	}
 	if c.MaxDataFileSize == 0 {
 		return errors.New("MaxDataFileSize must be positive")
+	}
+	if c.EntryCacheSize < 1 {
+		return errors.New("EntryCacheSize cannot be less than 1")
 	}
 	return nil
 }
