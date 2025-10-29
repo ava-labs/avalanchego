@@ -229,7 +229,7 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 			require.NoError(t, err)
 			responseBytes, err := net.SendSyncedAppRequest(t.Context(), nodeID, requestBytes)
 			require.NoError(t, err)
-			rquire.NotNil(t, responseBytes)
+			require.NotNil(t, responseBytes)
 
 			var response TestMessage
 			if _, err = codecManager.Unmarshal(responseBytes, &response); err != nil {
@@ -352,7 +352,7 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 	// Cancel context after sending
 	require.Empty(t, net.(*network).outstandingRequestHandlers) // no outstanding requests
 	ctx, cancel = context.WithCancel(t.Context())
-	doneChan := make(chan struct{})
+	errChan := make(chan error, 1)
 	go func() {
 		_, _, err = net.SendSyncedAppRequestAny(ctx, defaultPeerVersion, requestBytes)
 		errChan <- err
