@@ -4,6 +4,7 @@
 package vm
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
@@ -211,9 +212,9 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 
 	blk, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), blk.ID()))
-	require.NoError(blk.Accept(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
+	require.NoError(vm.SetPreference(t.Context(), blk.ID()))
+	require.NoError(blk.Accept(t.Context()))
 
 	lastAcceptedID, err := vm.LastAccepted(t.Context())
 	require.NoError(err)
@@ -234,8 +235,8 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 
 	blk2, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
-	require.NoError(blk2.Verify(context.Background()))
-	require.NoError(blk2.Accept(context.Background()))
+	require.NoError(blk2.Verify(t.Context()))
+	require.NoError(blk2.Accept(t.Context()))
 
 	lastAcceptedID, err = vm.LastAccepted(t.Context())
 	require.NoError(err)
@@ -833,9 +834,9 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 
 	blk, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
-	require.NoError(blk.Verify(context.Background()))
-	require.NoError(vm.SetPreference(context.Background(), blk.ID()))
-	require.NoError(blk.Accept(context.Background()))
+	require.NoError(blk.Verify(t.Context()))
+	require.NoError(vm.SetPreference(t.Context(), blk.ID()))
+	require.NoError(blk.Accept(t.Context()))
 
 	newHead := <-newTxPoolHeadChan
 	require.Equal(common.Hash(blk.ID()), newHead.Head.Hash())
@@ -1627,7 +1628,7 @@ func TestWaitForEvent(t *testing.T) {
 				},
 			}}}}))
 			testCase.testCase(t, vm, address, key)
-			require.NoError(t, vm.Shutdown(t.Background()))
+			require.NoError(t, vm.Shutdown(t.Context()))
 		})
 	}
 }
