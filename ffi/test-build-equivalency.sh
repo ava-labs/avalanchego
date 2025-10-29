@@ -15,8 +15,9 @@ CARGO_LIB="target/maxperf/libfirewood_ffi.a"
 TMPDIR=$(mktemp -d)
 trap "rm -rf $TMPDIR" EXIT
 
+# Build serially with MAKEFLAGS='-j1' for consistency with the flake build
 echo "Building with cargo (using nix dev shell)..."
-nix develop ./ffi#default --command bash -c "cargo fetch --locked --verbose && cargo build-static-ffi"
+nix develop ./ffi#default --command bash -c "export MAKEFLAGS='-j1' && cargo fetch --locked --verbose && cargo build-static-ffi"
 
 echo "Building with nix..."
 cd ffi && nix build .#firewood-ffi && cd ..
