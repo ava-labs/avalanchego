@@ -7,7 +7,7 @@ mod kvp;
 use crate::{HashType, PathComponent, SplitPath};
 
 pub use self::iter::{IterAscending, IterDescending, TrieEdgeIter, TrieValueIter};
-pub use self::kvp::{DuplicateKeyError, KeyValueTrieRoot};
+pub use self::kvp::{DuplicateKeyError, HashedKeyValueTrieRoot, KeyValueTrieRoot};
 
 /// The state of an edge from a parent node to a child node in a trie.
 #[derive(Debug, PartialEq, Eq, Hash)]

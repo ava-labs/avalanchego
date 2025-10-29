@@ -65,8 +65,8 @@ pub use path::{
 #[cfg(not(feature = "branch_factor_256"))]
 pub use path::{PackedBytes, PackedPathComponents, PackedPathRef};
 pub use tries::{
-    DuplicateKeyError, HashedTrieNode, IterAscending, IterDescending, KeyValueTrieRoot,
-    TrieEdgeIter, TrieEdgeState, TrieNode, TrieValueIter,
+    DuplicateKeyError, HashedKeyValueTrieRoot, HashedTrieNode, IterAscending, IterDescending,
+    KeyValueTrieRoot, TrieEdgeIter, TrieEdgeState, TrieNode, TrieValueIter,
 };
 pub use u4::{TryFromIntError, U4};
 

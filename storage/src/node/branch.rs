@@ -193,12 +193,24 @@ mod ethhash {
 
     use super::Serializable;
 
-    #[derive(Clone, Debug)]
+    #[derive(Clone)]
     pub enum HashOrRlp {
         Hash(TrieHash),
         // TODO: this slice is never larger than 32 bytes so smallvec is probably not our best container
         // the length is stored in a `usize` but it could be in a `u8` and it will never overflow
         Rlp(SmallVec<[u8; 32]>),
+    }
+
+    /// Manual implementation of [`Debug`](std::fmt::Debug) so that the RLP bytes
+    /// are displayed as hex rather than raw bytes, which is more useful for
+    /// debugging purposes.
+    impl std::fmt::Debug for HashOrRlp {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            match self {
+                HashOrRlp::Hash(h) => write!(f, "Hash({h})"),
+                HashOrRlp::Rlp(r) => write!(f, "Rlp({})", hex::encode(r)),
+            }
+        }
     }
 
     impl HashOrRlp {
