@@ -19,6 +19,9 @@ import (
 
 	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/ava-labs/coreth/plugin/factory"
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/rlp"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -44,6 +47,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
+	evmdb "github.com/ava-labs/coreth/plugin/evm/database"
 )
 
 var (
@@ -249,7 +253,8 @@ func benchmarkReexecuteRange(
 	r.NoError(err)
 
 	start := time.Now()
-	r.NoError(executor.executeSequence(ctx, blockChan))
+	r.NoError(executor.indexBlockSequence(ctx, db, blockChan))
+	// r.NoError(executor.executeSequence(ctx, blockChan))
 	elapsed := time.Since(start)
 
 	b.ReportMetric(0, "ns/op")                     // Set default ns/op to 0 to hide from the output
@@ -386,6 +391,25 @@ func (e *vmExecutor) execute(ctx context.Context, blockBytes []byte) error {
 		return fmt.Errorf("failed to accept block %s at height %d: %w", blk.ID(), blk.Height(), err)
 	}
 	e.metrics.lastAcceptedHeight.Set(float64(blk.Height()))
+
+	return nil
+}
+
+func (e *vmExecutor) indexBlockSequence(ctx context.Context, vmDB database.Database, blkChan <-chan blockResult) error {
+	ethDBPrefix := []byte("ethdb")
+	chainDB := rawdb.NewDatabase(evmdb.WrapDatabase(prefixdb.NewNested(ethDBPrefix, vmDB)))
+
+	for blkResult := range blkChan {
+		if blkResult.Err != nil {
+			return blkResult.Err
+		}
+
+		ethBlock := new(types.Block)
+		if err := rlp.DecodeBytes(blkResult.BlockBytes, ethBlock); err != nil {
+			return err
+		}
+		rawdb.WriteBlock(chainDB, ethBlock)
+	}
 
 	return nil
 }
