@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# WARNING: This file is duplicated at:
-#   - .github/actions/c-chain-reexecution-benchmark/output-metrics-url.sh (copy)
+# WARNING: This file is duplication of:
+#   - .github/actions/run-monitored-tmpnet-cmd/output-metrics-url.sh (source of truth)
 # Changes must be made to BOTH files.
 
 set -euo pipefail
