@@ -204,7 +204,7 @@ func TestVerifyWarpMessages(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			err := VerifyWarpMessages(
-				context.Background(),
+				t.Context(),
 				constants.UnitTestID,
 				state,
 				0,

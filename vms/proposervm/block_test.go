@@ -69,7 +69,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 	}).Return(builtBlk, nil).AnyTimes()
 
 	vdrState := validatorsmock.NewState(ctrl)
-	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
+	vdrState.EXPECT().GetMinimumHeight(t.Context()).Return(pChainHeight, nil).AnyTimes()
 
 	windower := proposermock.NewWindower(ctrl)
 	windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nodeID, nil).AnyTimes()
@@ -100,7 +100,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 
 	// Should call BuildBlockWithContext since proposervm is activated
 	gotChild, err := blk.buildChild(
-		context.Background(),
+		t.Context(),
 		parentID,
 		parentTimestamp,
 		pChainHeight,
@@ -112,7 +112,7 @@ func TestPostForkCommonComponents_buildChild(t *testing.T) {
 
 func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
 	defer func() {
@@ -238,7 +238,7 @@ func TestPreDurangoValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 
 func TestPreDurangoNonValidatorNodeBlockBuiltDelaysTests(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.ApricotPhase4, 0)
 	defer func() {
@@ -376,7 +376,7 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 	}).Return(innerChildBlock, nil).AnyTimes()
 
 	vdrState := validatorsmock.NewState(ctrl)
-	vdrState.EXPECT().GetMinimumHeight(context.Background()).Return(pChainHeight, nil).AnyTimes()
+	vdrState.EXPECT().GetMinimumHeight(t.Context()).Return(pChainHeight, nil).AnyTimes()
 
 	windower := proposermock.NewWindower(ctrl)
 	windower.EXPECT().ExpectedProposer(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nodeID, nil).AnyTimes()
@@ -404,7 +404,7 @@ func TestPreEtnaContextPChainHeight(t *testing.T) {
 
 	// Should call BuildBlockWithContext since proposervm is activated
 	gotChild, err := blk.buildChild(
-		context.Background(),
+		t.Context(),
 		parentID,
 		parentTimestamp,
 		parentPChainHeght,
@@ -420,7 +420,7 @@ func TestPreGraniteBlock_NonZeroEpoch(t *testing.T) {
 
 	_, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	innerBlk := snowmantest.BuildChild(snowmantest.Genesis)
@@ -446,14 +446,14 @@ func TestPreGraniteBlock_NonZeroEpoch(t *testing.T) {
 			innerBlk: innerBlk,
 		},
 	}
-	err = proBlk.Verify(context.Background())
+	err = proBlk.Verify(t.Context())
 	require.ErrorIs(err, errEpochNotZero)
 }
 
 // Verify that post-fork blocks are validated to contain the correct epoch
 // information.
 func TestPostGraniteBlock_EpochMatches(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {

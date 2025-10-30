@@ -170,6 +170,10 @@ tasks:
     desc: Runs static analysis tests of golang code
     cmd: ./scripts/lint.sh
 
+  lint-fix:
+    desc: Runs automated fixing for failing static analysis of golang code
+    cmd: ./scripts/run_tool.sh golangci-lint run --config .golangci.yml --fix
+
   lint-action:
     desc: Runs actionlint to check sanity of github action configuration
     cmd: ./scripts/actionlint.sh
@@ -204,6 +208,7 @@ tasks:
       LABELS: '{{.LABELS | default ""}}'
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
       METRICS_SERVER_ENABLED: '{{.METRICS_SERVER_ENABLED | default "false"}}'
+      METRICS_SERVER_PORT: '{{.METRICS_SERVER_PORT}}'
       METRICS_COLLECTOR_ENABLED: '{{.METRICS_COLLECTOR_ENABLED | default "false"}}'
     cmd: |
       CURRENT_STATE_DIR={{.CURRENT_STATE_DIR}} \
@@ -215,6 +220,7 @@ tasks:
       LABELS={{.LABELS}} \
       BENCHMARK_OUTPUT_FILE={{.BENCHMARK_OUTPUT_FILE}} \
       METRICS_SERVER_ENABLED={{.METRICS_SERVER_ENABLED}} \
+      METRICS_SERVER_PORT={{.METRICS_SERVER_PORT}} \
       METRICS_COLLECTOR_ENABLED={{.METRICS_COLLECTOR_ENABLED}} \
       bash -x ./scripts/benchmark_cchain_range.sh
 
@@ -231,6 +237,7 @@ tasks:
       LABELS: '{{.LABELS | default ""}}'
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
       METRICS_SERVER_ENABLED: '{{.METRICS_SERVER_ENABLED | default "false"}}'
+      METRICS_SERVER_PORT: '{{.METRICS_SERVER_PORT}}'
       METRICS_COLLECTOR_ENABLED: '{{.METRICS_COLLECTOR_ENABLED | default "false"}}'
     cmds:
       - task: import-cchain-reexecute-range
@@ -249,6 +256,7 @@ tasks:
           LABELS: '{{.LABELS}}'
           BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE}}'
           METRICS_SERVER_ENABLED: '{{.METRICS_SERVER_ENABLED}}'
+          METRICS_SERVER_PORT: '{{.METRICS_SERVER_PORT}}'
           METRICS_COLLECTOR_ENABLED: '{{.METRICS_COLLECTOR_ENABLED}}'
 
   test-bootstrap-monitor-e2e:
