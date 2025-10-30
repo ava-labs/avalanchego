@@ -64,6 +64,7 @@ var (
 	labelsArg          string
 
 	metricsServerEnabledArg    bool
+	metricsServerPortArg       uint64
 	metricsCollectorEnabledArg bool
 
 	networkUUID string = uuid.NewString()
@@ -105,6 +106,7 @@ func TestMain(m *testing.M) {
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
 	flag.BoolVar(&metricsServerEnabledArg, "metrics-server-enabled", false, "Whether to enable the metrics server.")
+	flag.Uint64Var(&metricsServerPortArg, "metrics-server-port", 0, "The port the metrics server will listen to.")
 	flag.BoolVar(&metricsCollectorEnabledArg, "metrics-collector-enabled", false, "Whether to enable the metrics collector (if true, then metrics-server-enabled must be true as well).")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
@@ -119,9 +121,8 @@ func TestMain(m *testing.M) {
 
 	flag.Parse()
 
-	if metricsCollectorEnabledArg && !metricsServerEnabledArg {
-		fmt.Fprint(os.Stderr, "metrics collector is enabled but metrics server is disabled.\n")
-		os.Exit(1)
+	if metricsCollectorEnabledArg {
+		metricsServerEnabledArg = true
 	}
 
 	customLabels, err := parseCustomLabels(labelsArg)
@@ -158,6 +159,7 @@ func BenchmarkReexecuteRange(b *testing.B) {
 			endBlockArg,
 			chanSizeArg,
 			metricsServerEnabledArg,
+			metricsServerPortArg,
 			metricsCollectorEnabledArg,
 		)
 	})
@@ -172,6 +174,7 @@ func benchmarkReexecuteRange(
 	endBlock uint64,
 	chanSize int,
 	metricsServerEnabled bool,
+	metricsPort uint64,
 	metricsCollectorEnabled bool,
 ) {
 	r := require.New(b)
@@ -192,7 +195,7 @@ func benchmarkReexecuteRange(
 	log := tests.NewDefaultLogger("c-chain-reexecution")
 
 	if metricsServerEnabled {
-		serverAddr := startServer(b, log, prefixGatherer)
+		serverAddr := startServer(b, log, prefixGatherer, metricsPort)
 
 		if metricsCollectorEnabled {
 			startCollector(b, log, "c-chain-reexecution", labels, serverAddr)
@@ -565,10 +568,11 @@ func startServer(
 	tb testing.TB,
 	log logging.Logger,
 	gatherer prometheus.Gatherer,
+	port uint64,
 ) string {
 	r := require.New(tb)
 
-	server, err := tests.NewPrometheusServer(gatherer)
+	server, err := tests.NewPrometheusServerWithPort(gatherer, port)
 	r.NoError(err)
 
 	log.Info("metrics endpoint available",
