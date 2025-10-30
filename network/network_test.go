@@ -286,10 +286,20 @@ func TestAppRequestOnShutdown(t *testing.T) {
 	errChan := make(chan error, 1)
 	go func() {
 		requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
-		require.NoError(t, err)
+		if err != nil {
+			errChan <- err
+			return
+		}
 		responseBytes, _, err := net.SendSyncedAppRequestAny(t.Context(), defaultPeerVersion, requestBytes)
-		require.ErrorIs(t, err, errRequestFailed)
-		require.Nil(t, responseBytes)
+		if err != errRequestFailed {
+			errChan <- fmt.Errorf("expected errRequestFailed, got %v", err)
+			return
+		}
+		if responseBytes != nil {
+			errChan <- fmt.Errorf("expected nil response, got %v", responseBytes)
+			return
+		}
+		errChan <- nil
 	}()
 	require.NoError(t, <-errChan)
 	require.True(t, called)

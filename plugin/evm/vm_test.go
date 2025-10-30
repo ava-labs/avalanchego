@@ -1579,8 +1579,7 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(t.Context())
-					require.NoError(t, err)
-					require.Equal(t, commonEng.PendingTxs, msg)
+					resultCh <- eventResult{msg: msg, err: err}
 				}()
 
 				signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
@@ -1662,9 +1661,7 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(t.Context())
-					require.NoError(t, err)
-					require.Equal(t, commonEng.PendingTxs, msg)
-					require.GreaterOrEqual(t, time.Since(lastBuildBlockTime), RetryDelay)
+					resultCh <- eventResult{msg: msg, err: err}
 				}()
 				wg.Wait()
 				result := <-resultCh
