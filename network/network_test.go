@@ -292,7 +292,7 @@ func TestAppRequestOnShutdown(t *testing.T) {
 		}
 		responseBytes, _, err := net.SendSyncedAppRequestAny(t.Context(), defaultPeerVersion, requestBytes)
 		if err != errRequestFailed {
-			errChan <- fmt.Errorf("expected errRequestFailed, got %v", err)
+			errChan <- fmt.Errorf("expected errRequestFailed, got %w", err)
 			return
 		}
 		if responseBytes != nil {
