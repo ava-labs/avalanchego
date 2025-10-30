@@ -117,11 +117,13 @@ runs:
       run: |
         TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
         EXEC_DIR="/tmp/reexecution-data-${TIMESTAMP}"
+        BENCHMARK_FILE="${GITHUB_WORKSPACE}/benchmark-output.txt"
         echo "EXECUTION_DATA_DIR=${EXEC_DIR}" >> "$GITHUB_ENV"
+        echo "BENCHMARK_OUTPUT_FILE=${BENCHMARK_FILE}" >> "$GITHUB_ENV"
     - name: Run C-Chain Re-execution Benchmark
       shell: nix develop --impure --command bash -x {0}
       run: ./scripts/run_task.sh ${{ inputs.task }} \
-        BENCHMARK_OUTPUT_FILE="benchmark-output.txt" \
+        BENCHMARK_OUTPUT_FILE="${{ env.BENCHMARK_OUTPUT_FILE }}" \
         EXECUTION_DATA_DIR="${{ env.EXECUTION_DATA_DIR }}"
       env:
         RUNNER_NAME: ${{ inputs.runner_name }}
