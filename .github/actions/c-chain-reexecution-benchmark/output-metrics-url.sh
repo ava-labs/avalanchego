@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# WARNING: This file is duplication of:
+# WARNING: This file is a duplication of:
 #   - .github/actions/run-monitored-tmpnet-cmd/output-metrics-url.sh (source of truth)
 # Changes must be made to BOTH files.
 

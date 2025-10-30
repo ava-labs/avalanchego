@@ -122,7 +122,7 @@ runs:
       shell: nix develop --impure --command bash -x {0}
       run: ./scripts/run_task.sh ${{ inputs.task }} \
         BENCHMARK_OUTPUT_FILE="benchmark-output.txt" \
-        EXECUTION_DATA_DIR="${EXEC_DIR}"
+        EXECUTION_DATA_DIR="${{ env.EXECUTION_DATA_DIR }}"
       env:
         RUNNER_NAME: ${{ inputs.runner_name }}
         TMPNET_START_METRICS_COLLECTOR: ${{ inputs.prometheus-username != '' }}
