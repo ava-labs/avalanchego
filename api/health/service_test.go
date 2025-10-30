@@ -64,7 +64,7 @@ func TestServiceResponses(t *testing.T) {
 		require.False(reply.Healthy)
 	}
 
-	h.Start(context.Background(), checkFreq)
+	h.Start(t.Context(), checkFreq)
 	defer h.Stop()
 
 	awaitReadiness(t, h, true)
@@ -190,7 +190,7 @@ func TestServiceTagResponse(t *testing.T) {
 				require.False(reply.Healthy)
 			}
 
-			h.Start(context.Background(), checkFreq)
+			h.Start(t.Context(), checkFreq)
 
 			test.await(t, h, true)
 
