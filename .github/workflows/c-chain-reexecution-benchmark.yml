@@ -1,0 +1,116 @@
+name: C-Chain Re-Execution Benchmark
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: 'Task name to run'
+        required: false
+        default: 'c-chain-reexecution-hashdb-101-250k'
+        type: choice
+        options:
+          - c-chain-reexecution-hashdb-101-250k
+          - c-chain-reexecution-hashdb-archive-101-250k
+          - c-chain-reexecution-hashdb-33m-33m500k
+          - c-chain-reexecution-firewood-101-250k
+          - c-chain-reexecution-firewood-33m-33m500k
+      runner:
+        description: 'Runner to execute the benchmark'
+        required: false
+        default: 'ubuntu-latest'
+        type: choice
+        options:
+          - ubuntu-latest
+          - avalanche-avalanchego-runner-2ti
+          - avago-runner-m6i-4xlarge-ebs-fast
+          - avago-runner-i4i-4xlarge-local-ssd
+          - blacksmith-4vcpu-ubuntu-2404
+      timeout-minutes:
+        description: 'Timeout in minutes for the job'
+        required: false
+        default: 30
+        type: number
+      push-post-state:
+        description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
+        default: ''
+  schedule:
+    - cron: '0 9 * * *'
+
+jobs:
+  define-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix-native: ${{ steps.define-matrix.outputs.matrix-native }}
+      matrix-self-hosted: ${{ steps.define-matrix.outputs.matrix-self-hosted }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Define Matrix
+        id: define-matrix
+        shell: bash
+        run: .github/workflows/c-chain-reexecution-matrix.sh
+        env:
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          WORKFLOW_DISPATCH_TASK: ${{ inputs.task }}
+          WORKFLOW_DISPATCH_RUNNER: ${{ inputs.runner }}
+          WORKFLOW_DISPATCH_TIMEOUT: ${{ inputs.timeout-minutes }}
+          CONFIG_FILE: .github/workflows/c-chain-reexecution-benchmark-config.json
+  c-chain-reexecution-native:
+    needs: define-matrix
+    if: ${{ fromJSON(needs.define-matrix.outputs.matrix-native).include[0] != null }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix-native) }}
+    timeout-minutes: ${{ matrix.timeout-minutes }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/c-chain-reexecution-benchmark
+        with:
+          task: ${{ matrix.task }}
+          runner_name: ${{ matrix.runner }}
+          prometheus-url: ${{ secrets.PROMETHEUS_URL }}
+          prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL }}
+          prometheus-username: ${{ secrets.PROMETHEUS_USERNAME }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          push-post-state: ${{ inputs.push-post-state }}
+          push-github-action-benchmark: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master') }}
+          aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
+  c-chain-reexecution-self-hosted:
+    needs: define-matrix
+    if: ${{ fromJSON(needs.define-matrix.outputs.matrix-self-hosted).include[0] != null }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.define-matrix.outputs.matrix-self-hosted) }}
+    timeout-minutes: ${{ matrix.timeout-minutes }}
+    runs-on: ${{ matrix.runner }}
+    container:
+      image: ghcr.io/actions/actions-runner:2.325.0
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - name: Install dependencies
+        shell: bash
+        run: |
+          if ! command -v xz &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y xz-utils
+          fi
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/c-chain-reexecution-benchmark
+        with:
+          task: ${{ matrix.task }}
+          runner_name: ${{ matrix.runner }}
+          prometheus-url: ${{ secrets.PROMETHEUS_URL }}
+          prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL }}
+          prometheus-username: ${{ secrets.PROMETHEUS_USERNAME }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          push-post-state: ${{ inputs.push-post-state }}
+          push-github-action-benchmark: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master') }}
+          aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
