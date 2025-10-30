@@ -71,7 +71,7 @@ func TestAcceptedFrontier(t *testing.T) {
 		accepted = containerID
 	}
 
-	require.NoError(bs.GetAcceptedFrontier(context.Background(), ids.EmptyNodeID, 0))
+	require.NoError(bs.GetAcceptedFrontier(t.Context(), ids.EmptyNodeID, 0))
 	require.Equal(blkID, accepted)
 }
 
@@ -80,7 +80,7 @@ func TestFilterAccepted(t *testing.T) {
 	bs, vm, sender := newTest(t)
 
 	acceptedBlk := snowmantest.BuildChild(snowmantest.Genesis)
-	require.NoError(acceptedBlk.Accept(context.Background()))
+	require.NoError(acceptedBlk.Accept(t.Context()))
 
 	var (
 		allBlocks = []*snowmantest.Block{
@@ -109,7 +109,7 @@ func TestFilterAccepted(t *testing.T) {
 	}
 
 	blkIDs := set.Of(snowmantest.GenesisID, acceptedBlk.ID(), unknownBlkID)
-	require.NoError(bs.GetAccepted(context.Background(), ids.EmptyNodeID, 0, blkIDs))
+	require.NoError(bs.GetAccepted(t.Context(), ids.EmptyNodeID, 0, blkIDs))
 
 	require.Len(accepted, 2)
 	require.Contains(accepted, snowmantest.GenesisID)

@@ -4,7 +4,6 @@
 package rpcdb
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -126,7 +125,7 @@ func TestHealthCheck(t *testing.T) {
 			require.NoError(scenario.testFn(db))
 
 			// check db HealthCheck
-			_, err := db.HealthCheck(context.Background())
+			_, err := db.HealthCheck(t.Context())
 			if scenario.wantErr {
 				require.Error(err) //nolint:forbidigo
 				require.Contains(err.Error(), scenario.wantErrMsg)
@@ -135,7 +134,7 @@ func TestHealthCheck(t *testing.T) {
 			require.NoError(err)
 
 			// check rpc HealthCheck
-			_, err = baseDB.client.HealthCheck(context.Background())
+			_, err = baseDB.client.HealthCheck(t.Context())
 			require.NoError(err)
 		})
 	}

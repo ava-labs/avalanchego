@@ -18,17 +18,19 @@ import (
 )
 
 var (
-	_ block.ChainVM                      = (*blockVM)(nil)
-	_ block.BuildBlockWithContextChainVM = (*blockVM)(nil)
-	_ block.BatchedChainVM               = (*blockVM)(nil)
-	_ block.StateSyncableVM              = (*blockVM)(nil)
+	_ block.ChainVM                         = (*blockVM)(nil)
+	_ block.BuildBlockWithContextChainVM    = (*blockVM)(nil)
+	_ block.SetPreferenceWithContextChainVM = (*blockVM)(nil)
+	_ block.BatchedChainVM                  = (*blockVM)(nil)
+	_ block.StateSyncableVM                 = (*blockVM)(nil)
 )
 
 type blockVM struct {
 	block.ChainVM
-	buildBlockVM block.BuildBlockWithContextChainVM
-	batchedVM    block.BatchedChainVM
-	ssVM         block.StateSyncableVM
+	buildBlockVM    block.BuildBlockWithContextChainVM
+	setPreferenceVM block.SetPreferenceWithContextChainVM
+	batchedVM       block.BatchedChainVM
+	ssVM            block.StateSyncableVM
 
 	blockMetrics
 	registry prometheus.Registerer
@@ -39,14 +41,16 @@ func NewBlockVM(
 	reg prometheus.Registerer,
 ) block.ChainVM {
 	buildBlockVM, _ := vm.(block.BuildBlockWithContextChainVM)
+	setPreferenceVM, _ := vm.(block.SetPreferenceWithContextChainVM)
 	batchedVM, _ := vm.(block.BatchedChainVM)
 	ssVM, _ := vm.(block.StateSyncableVM)
 	return &blockVM{
-		ChainVM:      vm,
-		buildBlockVM: buildBlockVM,
-		batchedVM:    batchedVM,
-		ssVM:         ssVM,
-		registry:     reg,
+		ChainVM:         vm,
+		buildBlockVM:    buildBlockVM,
+		setPreferenceVM: setPreferenceVM,
+		batchedVM:       batchedVM,
+		ssVM:            ssVM,
+		registry:        reg,
 	}
 }
 
@@ -62,6 +66,7 @@ func (vm *blockVM) Initialize(
 ) error {
 	err := vm.blockMetrics.Initialize(
 		vm.buildBlockVM != nil,
+		vm.setPreferenceVM != nil,
 		vm.batchedVM != nil,
 		vm.ssVM != nil,
 		vm.registry,

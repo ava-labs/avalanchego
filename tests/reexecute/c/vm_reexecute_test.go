@@ -6,7 +6,6 @@ package vm
 import (
 	"context"
 	"encoding/binary"
-	"errors"
 	"flag"
 	"fmt"
 	"maps"
@@ -61,9 +60,12 @@ var (
 	startBlockArg      uint64
 	endBlockArg        uint64
 	chanSizeArg        int
-	metricsEnabledArg  bool
 	executionTimeout   time.Duration
 	labelsArg          string
+
+	metricsServerEnabledArg    bool
+	metricsServerPortArg       uint64
+	metricsCollectorEnabledArg bool
 
 	networkUUID string = uuid.NewString()
 	labels             = map[string]string{
@@ -103,7 +105,9 @@ func TestMain(m *testing.M) {
 	flag.IntVar(&chanSizeArg, "chan-size", 100, "Size of the channel to use for block processing.")
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
-	flag.BoolVar(&metricsEnabledArg, "metrics-enabled", false, "Enable metrics collection.")
+	flag.BoolVar(&metricsServerEnabledArg, "metrics-server-enabled", false, "Whether to enable the metrics server.")
+	flag.Uint64Var(&metricsServerPortArg, "metrics-server-port", 0, "The port the metrics server will listen to.")
+	flag.BoolVar(&metricsCollectorEnabledArg, "metrics-collector-enabled", false, "Whether to enable the metrics collector (if true, then metrics-server-enabled must be true as well).")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
 	predefinedConfigKeys := slices.Collect(maps.Keys(predefinedConfigs))
@@ -116,6 +120,10 @@ func TestMain(m *testing.M) {
 	flag.StringVar(&blockDirDstArg, "block-dir-dst", blockDirDstArg, "Destination block directory to write blocks into when executing TestExportBlockRange.")
 
 	flag.Parse()
+
+	if metricsCollectorEnabledArg {
+		metricsServerEnabledArg = true
+	}
 
 	customLabels, err := parseCustomLabels(labelsArg)
 	if err != nil {
@@ -150,7 +158,9 @@ func BenchmarkReexecuteRange(b *testing.B) {
 			startBlockArg,
 			endBlockArg,
 			chanSizeArg,
-			metricsEnabledArg,
+			metricsServerEnabledArg,
+			metricsServerPortArg,
+			metricsCollectorEnabledArg,
 		)
 	})
 }
@@ -163,10 +173,12 @@ func benchmarkReexecuteRange(
 	startBlock uint64,
 	endBlock uint64,
 	chanSize int,
-	metricsEnabled bool,
+	metricsServerEnabled bool,
+	metricsPort uint64,
+	metricsCollectorEnabled bool,
 ) {
 	r := require.New(b)
-	ctx := context.Background()
+	ctx := b.Context()
 
 	// Create the prefix gatherer passed to the VM and register it with the top-level,
 	// labeled gatherer.
@@ -182,8 +194,12 @@ func benchmarkReexecuteRange(
 
 	log := tests.NewDefaultLogger("c-chain-reexecution")
 
-	if metricsEnabled {
-		collectRegistry(b, log, "c-chain-reexecution", prefixGatherer, labels)
+	if metricsServerEnabled {
+		serverAddr := startServer(b, log, prefixGatherer, metricsPort)
+
+		if metricsCollectorEnabled {
+			startCollector(b, log, "c-chain-reexecution", labels, serverAddr)
+		}
 	}
 
 	var (
@@ -546,19 +562,41 @@ func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, err
 	return m, nil
 }
 
-// collectRegistry starts prometheus and collects metrics from the provided gatherer.
-// Attaches the provided labels + GitHub labels if available to the collected metrics.
-func collectRegistry(tb testing.TB, log logging.Logger, name string, gatherer prometheus.Gatherer, labels map[string]string) {
+// startServer starts a Prometheus server for the provided gatherer and returns
+// the server address.
+func startServer(
+	tb testing.TB,
+	log logging.Logger,
+	gatherer prometheus.Gatherer,
+	port uint64,
+) string {
 	r := require.New(tb)
 
-	startPromCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
+	server, err := tests.NewPrometheusServerWithPort(gatherer, port)
+	r.NoError(err)
+
+	log.Info("metrics endpoint available",
+		zap.String("url", fmt.Sprintf("http://%s/ext/metrics", server.Address())),
+	)
+
+	tb.Cleanup(func() {
+		r.NoError(server.Stop())
+	})
+
+	return server.Address()
+}
+
+// startCollector starts a Prometheus collector configured to scrape the server
+// listening on serverAddr. startCollector also attaches the provided labels +
+// Github labels if available to the collected metrics.
+func startCollector(tb testing.TB, log logging.Logger, name string, labels map[string]string, serverAddr string) {
+	r := require.New(tb)
+
+	startPromCtx, cancel := context.WithTimeout(tb.Context(), tests.DefaultTimeout)
 	defer cancel()
 
 	logger := tests.NewDefaultLogger("prometheus")
 	r.NoError(tmpnet.StartPrometheus(startPromCtx, logger))
-
-	server, err := tests.NewPrometheusServer(gatherer)
-	r.NoError(err)
 
 	var sdConfigFilePath string
 	tb.Cleanup(func() {
@@ -566,23 +604,22 @@ func collectRegistry(tb testing.TB, log logging.Logger, name string, gatherer pr
 		// This default delay is set above the default scrape interval used by StartPrometheus.
 		time.Sleep(tmpnet.NetworkShutdownDelay)
 
-		r.NoError(errors.Join(
-			server.Stop(),
-			func() error {
-				if sdConfigFilePath != "" {
-					return os.Remove(sdConfigFilePath)
-				}
-				return nil
-			}(),
-		))
+		r.NoError(func() error {
+			if sdConfigFilePath != "" {
+				return os.Remove(sdConfigFilePath)
+			}
+			return nil
+		}(),
+		)
 
+		//nolint:usetesting // t.Context() is already canceled inside the cleanup function
 		checkMetricsCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
 		defer cancel()
 		r.NoError(tmpnet.CheckMetricsExist(checkMetricsCtx, logger, networkUUID))
 	})
 
-	sdConfigFilePath, err = tmpnet.WritePrometheusSDConfig(name, tmpnet.SDConfig{
-		Targets: []string{server.Address()},
+	sdConfigFilePath, err := tmpnet.WritePrometheusSDConfig(name, tmpnet.SDConfig{
+		Targets: []string{serverAddr},
 		Labels:  labels,
 	}, true /* withGitHubLabels */)
 	r.NoError(err)
