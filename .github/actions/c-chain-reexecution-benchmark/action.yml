@@ -44,47 +44,28 @@ inputs:
   push-github-action-benchmark:
     description: 'Whether to push the benchmark result to GitHub.'
     required: true
-    default: false
   push-post-state:
     description: 'S3 destination to copy the current-state directory after completing re-execution. If empty, this will be skipped.'
-    required: false
     default: ''
-  repository_owner:
-    description: 'Repository owner for monitoring labels'
-    required: false
+  # The following inputs need never be provided by the caller. They
+  # default to context values that the action's steps are unable to
+  # access directly.
+  repository-owner:
     default: ${{ github.repository_owner }}
-  repository_name:
-    description: 'Repository name for monitoring labels'
-    required: false
+  repository-name:
     default: ${{ github.event.repository.name }}
   workflow:
-    description: 'Workflow name for monitoring labels'
-    required: false
     default: ${{ github.workflow }}
-  run_id:
-    description: 'Run ID for monitoring labels'
-    required: false
+  run-id:
     default: ${{ github.run_id }}
-  run_number:
-    description: 'Run number for monitoring labels'
-    required: false
+  run-number:
     default: ${{ github.run_number }}
-  run_attempt:
-    description: 'Run attempt for monitoring labels'
-    required: false
+  run-attempt:
     default: ${{ github.run_attempt }}
   job:
-    description: 'Job ID for monitoring labels'
-    required: false
     default: ${{ github.job }}
-  grafana_dashboard_id:
-    description: 'The identifier of the Grafana dashboard to use, in the format <UID>/<dashboard-name>.'
-    required: false
+  grafana-dashboard-id:
     default: 'Gl1I20mnk/c-chain'
-  filter_by_owner:
-    description: 'Filter metrics by network owner'
-    required: false
-    default: ''
 
 runs:
   using: composite
@@ -99,13 +80,13 @@ runs:
       id: go-mod-cache
       with:
         path: ~/go/pkg/mod
-        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum', 'tools/go.sum') }}
+        key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum') }}
         restore-keys: ${{ runner.os }}-go-mod-
     # Cache Go build cache (architecture-specific)
     - uses: actions/cache@v4
       with:
         path: ~/.cache/go-build
-        key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.sum', 'tools/go.sum') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-go-build-${{ hashFiles('go.sum') }}
         restore-keys: ${{ runner.os }}-${{ runner.arch }}-go-build-
     # Download modules only on cache miss
     - run: $GITHUB_ACTION_PATH/nix-develop.sh --command go mod download
@@ -127,7 +108,6 @@ runs:
       env:
         GRAFANA_URL: https://grafana-poc.avax-dev.network/d/${{ inputs.grafana_dashboard_id }}?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
-        FILTER_BY_OWNER: ${{ inputs.filter_by_owner }}
     - name: Warn that collection of metrics and logs will not be performed
       if: inputs.prometheus-username == ''
       shell: bash
@@ -141,21 +121,19 @@ runs:
     - name: Set task env
       shell: bash
       run: |
-        {
-          echo "EXECUTION_DATA_DIR=${{ inputs.workspace }}/reexecution-data"
-          echo "BENCHMARK_OUTPUT_FILE=output.txt"
-        } >> $GITHUB_ENV
+        TIMESTAMP=$(date '+%Y%m%d-%H%M%S')
+        EXEC_DIR="/tmp/reexecution-data-${TIMESTAMP}"
+        echo "EXECUTION_DATA_DIR=${EXEC_DIR}" >> "$GITHUB_ENV"
     - name: Run C-Chain Re-execution Benchmark
       shell: bash
       run: |
         $GITHUB_ACTION_PATH/nix-develop.sh --impure --command bash -x ./scripts/run_task.sh ${{ inputs.task }} \
-          RUNNER_NAME="${{ inputs.runner_name }}" \
-          BENCHMARK_OUTPUT_FILE="${{ env.BENCHMARK_OUTPUT_FILE }}" \
-          EXECUTION_DATA_DIR="${{ env.EXECUTION_DATA_DIR }}"
+          BENCHMARK_OUTPUT_FILE="benchmark-output.txt" \
+          EXECUTION_DATA_DIR="${EXEC_DIR}"
       env:
+        RUNNER_NAME: ${{ inputs.runner_name }}
         TMPNET_START_METRICS_COLLECTOR: ${{ inputs.prometheus-username != '' }}
         TMPNET_CHECK_METRICS_COLLECTED: ${{ inputs.prometheus-username != '' }}
-        TMPNET_START_LOGS_COLLECTOR: "" # Set to empty string to disable log collection
         METRICS_SERVER_ENABLED: ${{ inputs.prometheus-username != '' }}
         METRICS_COLLECTOR_ENABLED: ${{ inputs.prometheus-username != '' }}
         PROMETHEUS_URL: ${{ inputs.prometheus-url }}
@@ -172,7 +150,7 @@ runs:
       uses: benchmark-action/github-action-benchmark@v1
       with:
         tool: 'go'
-        output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
+        output-file-path: benchmark-output.txt
         summary-always: true
         github-token: ${{ inputs.github-token }}
         auto-push: ${{ inputs.push-github-action-benchmark }}
