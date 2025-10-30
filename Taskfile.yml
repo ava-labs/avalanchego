@@ -270,8 +270,8 @@ tasks:
           TASK_NAME: '{{.TASK}}'
           START_BLOCK: 101
           END_BLOCK: 250000
-          BLOCK_DIR_SRC: '{{.S3_BOOTSTRAP_TESTING_PREFIX}}/cchain-mainnet-blocks-1m-ldb/**'
-          CURRENT_STATE_DIR_SRC: '{{.S3_BOOTSTRAP_TESTING_PREFIX}}/cchain-current-state-hashdb-full-100/**'
+          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-1m-ldb'
+          CURRENT_STATE_DIR_SRC: 'cchain-current-state-hashdb-full-100'
           CONFIG: default
 
   c-chain-reexecution-hashdb-archive-101-250k:
@@ -282,8 +282,8 @@ tasks:
           TASK_NAME: '{{.TASK}}'
           START_BLOCK: 101
           END_BLOCK: 250000
-          BLOCK_DIR_SRC: '{{.S3_BOOTSTRAP_TESTING_PREFIX}}/cchain-mainnet-blocks-1m-ldb/**'
-          CURRENT_STATE_DIR_SRC: '{{.S3_BOOTSTRAP_TESTING_PREFIX}}/cchain-current-state-hashdb-archive-100/**'
+          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-1m-ldb'
+          CURRENT_STATE_DIR_SRC: 'cchain-current-state-hashdb-archive-100'
           CONFIG: archive
 
   c-chain-reexecution-hashdb-33m-33m500k:
@@ -294,8 +294,8 @@ tasks:
           TASK_NAME: '{{.TASK}}'
           START_BLOCK: 33000001
           END_BLOCK: 33500000
-          BLOCK_DIR_SRC: '{{.S3_BOOTSTRAP_TESTING_PREFIX}}/cchain-mainnet-blocks-30m-40m-ldb/**'
-          CURRENT_STATE_DIR_SRC: '{{.S3_BOOTSTRAP_TESTING_PREFIX}}/cchain-current-state-hashdb-full-33m/**'
+          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-30m-40m-ldb'
+          CURRENT_STATE_DIR_SRC: 'cchain-current-state-hashdb-full-33m'
           CONFIG: default
 
   c-chain-reexecution-firewood-101-250k:
@@ -306,8 +306,8 @@ tasks:
           TASK_NAME: '{{.TASK}}'
           START_BLOCK: 101
           END_BLOCK: 250000
-          BLOCK_DIR_SRC: '{{.S3_BOOTSTRAP_TESTING_PREFIX}}/cchain-mainnet-blocks-1m-ldb/**'
-          CURRENT_STATE_DIR_SRC: '{{.S3_BOOTSTRAP_TESTING_PREFIX}}/cchain-current-state-firewood-100/**'
+          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-1m-ldb'
+          CURRENT_STATE_DIR_SRC: 'cchain-current-state-firewood-100'
           CONFIG: firewood
 
   c-chain-reexecution-firewood-33m-33m500k:
@@ -318,8 +318,8 @@ tasks:
           TASK_NAME: '{{.TASK}}'
           START_BLOCK: 33000001
           END_BLOCK: 33500000
-          BLOCK_DIR_SRC: '{{.S3_BOOTSTRAP_TESTING_PREFIX}}/cchain-mainnet-blocks-30m-40m-ldb/**'
-          CURRENT_STATE_DIR_SRC: '{{.S3_BOOTSTRAP_TESTING_PREFIX}}/cchain-current-state-firewood-33m/**'
+          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-30m-40m-ldb'
+          CURRENT_STATE_DIR_SRC: 'cchain-current-state-firewood-33m'
           CONFIG: firewood
 
   test-bootstrap-monitor-e2e:
