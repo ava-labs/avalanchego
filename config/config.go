@@ -1254,6 +1254,10 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, err
 	}
 
+	if nodeConfig.NetworkID == constants.MainnetID {
+		return node.Config{}, errors.New("mainnet is not supported")
+	}
+
 	// Database
 	nodeConfig.DatabaseConfig, err = getDatabaseConfig(v, nodeConfig.NetworkID)
 	if err != nil {
