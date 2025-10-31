@@ -59,9 +59,6 @@ type BenchmarkExecutorConfig struct {
 	// from (e.g. VM metrics, consensus metrics). If MetricsServerEnabled is
 	// true, then the metrics server will export metrics from this gatherer.
 	PrefixGatherer metrics.MultiGatherer
-	// ConsensusRegistry is the registry where a subset of the metrics from snowman consensus
-	// [engine](../../snow/engine/snowman/metrics.go) will be registered.
-	ConsensusRegistry prometheus.Registerer
 
 	// MetricsServerEnabled determines whether to enable a Prometheus server
 	// exporting VM metrics.
@@ -126,10 +123,13 @@ func (e BenchmarkExecutor) Run(b testing.TB, log logging.Logger, vm block.ChainV
 	)
 	r.NoError(err)
 
+	consensusRegistry := prometheus.NewRegistry()
+	r.NoError(e.config.PrefixGatherer.Register("avalanche_snowman", consensusRegistry))
+
 	vmExecutor, err := newVMExecutor(
 		tests.NewDefaultLogger("vm-executor"),
 		vm,
-		e.config.ConsensusRegistry,
+		consensusRegistry,
 		e.config.ExecutionTimeout,
 		e.config.StartBlock,
 		e.config.EndBlock,
