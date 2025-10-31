@@ -232,7 +232,6 @@ func benchmarkReexecuteRange(
 		NetworkUUID:             networkUUID,
 		DashboardPath:           "d/Gl1I20mnk/c-chain",
 	}
-
 	executor := reexecute.NewBenchmarkExecutor(config)
 
 	start := time.Now()
