@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1761914343839,
+  "lastUpdate": 1761923272687,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -2850,6 +2850,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
             "value": 73.38,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "crStiv",
+            "username": "crStiv",
+            "email": "cryptostiv7@gmail.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "9bba5debb27453c988787a0ab9803822a2ed42e6",
+          "message": "Fix typos in config.md (#4449)",
+          "timestamp": "2025-10-31T14:56:15Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/9bba5debb27453c988787a0ab9803822a2ed42e6"
+        },
+        "date": 1761923270999,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
+            "value": 44.09,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
