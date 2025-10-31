@@ -201,44 +201,42 @@ tasks:
     vars:
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
       BLOCK_DIR: '{{.BLOCK_DIR}}'
-      RUNNER_NAME: '{{.RUNNER_NAME | default "dev"}}'
       CONFIG: '{{.CONFIG | default ""}}'
       START_BLOCK: '{{.START_BLOCK}}'
       END_BLOCK: '{{.END_BLOCK}}'
       LABELS: '{{.LABELS | default ""}}'
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
-      METRICS_SERVER_ENABLED: '{{.METRICS_SERVER_ENABLED | default "false"}}'
-      METRICS_SERVER_PORT: '{{.METRICS_SERVER_PORT}}'
-      METRICS_COLLECTOR_ENABLED: '{{.METRICS_COLLECTOR_ENABLED | default "false"}}'
+      TIMESTAMP: '{{.TIMESTAMP | default (now | date "20060102-150405")}}'
+      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/%s-%s" .TASK_NAME .TIMESTAMP)}}'
     cmd: |
       CURRENT_STATE_DIR={{.CURRENT_STATE_DIR}} \
       BLOCK_DIR={{.BLOCK_DIR}} \
-      RUNNER_NAME='{{.RUNNER_NAME | default "dev"}}' \
       CONFIG={{.CONFIG}} \
       START_BLOCK={{.START_BLOCK}} \
       END_BLOCK={{.END_BLOCK}} \
       LABELS={{.LABELS}} \
       BENCHMARK_OUTPUT_FILE={{.BENCHMARK_OUTPUT_FILE}} \
-      METRICS_SERVER_ENABLED={{.METRICS_SERVER_ENABLED}} \
-      METRICS_SERVER_PORT={{.METRICS_SERVER_PORT}} \
-      METRICS_COLLECTOR_ENABLED={{.METRICS_COLLECTOR_ENABLED}} \
+      EXECUTION_DATA_DIR={{.EXECUTION_DATA_DIR}} \
       bash -x ./scripts/benchmark_cchain_range.sh
+    # Runtime context variables are read from environment by the script:
+    # - RUNNER_NAME (execution environment)
+    # - METRICS_SERVER_PORT (monitoring config)
+    # - METRICS_SERVER_ENABLED (runtime monitoring decision)
+    # - METRICS_COLLECTOR_ENABLED (runtime monitoring decision)
+    # - PROMETHEUS_URL, PROMETHEUS_USERNAME, PROMETHEUS_PASSWORD (monitoring config)
+    # - GH_REPO, GH_WORKFLOW, GH_RUN_ID, etc. (GitHub context)
 
   reexecute-cchain-range-with-copied-data:
     desc: Combines import-cchain-reexecute-range and reexecute-cchain-range
     vars:
-      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
-      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**"}}'
-      CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"}}'
-      RUNNER_NAME: '{{.RUNNER_NAME | default "dev"}}'
-      CONFIG: '{{.CONFIG | default ""}}'
-      START_BLOCK: '{{.START_BLOCK | default "101"}}'
-      END_BLOCK: '{{.END_BLOCK | default "250000"}}'
-      LABELS: '{{.LABELS | default ""}}'
-      BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
-      METRICS_SERVER_ENABLED: '{{.METRICS_SERVER_ENABLED | default "false"}}'
-      METRICS_SERVER_PORT: '{{.METRICS_SERVER_PORT}}'
-      METRICS_COLLECTOR_ENABLED: '{{.METRICS_COLLECTOR_ENABLED | default "false"}}'
+      TASK_NAME: '{{.TASK_NAME}}'
+      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC}}'
+      CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC}}'
+      CONFIG: '{{.CONFIG}}'
+      START_BLOCK: '{{.START_BLOCK}}'
+      END_BLOCK: '{{.END_BLOCK}}'
+      TIMESTAMP: '{{.TIMESTAMP | default (now | date "20060102-150405")}}'
+      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/%s-%s" .TASK_NAME .TIMESTAMP)}}'
     cmds:
       - task: import-cchain-reexecute-range
         vars:
@@ -247,17 +245,71 @@ tasks:
           EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
       - task: reexecute-cchain-range
         vars:
+          TASK_NAME: '{{.TASK_NAME}}'
           BLOCK_DIR: '{{.EXECUTION_DATA_DIR}}/blocks'
           CURRENT_STATE_DIR: '{{.EXECUTION_DATA_DIR}}/current-state'
-          RUNNER_NAME: '{{.RUNNER_NAME}}'
           CONFIG: '{{.CONFIG}}'
           START_BLOCK: '{{.START_BLOCK}}'
           END_BLOCK: '{{.END_BLOCK}}'
-          LABELS: '{{.LABELS}}'
-          BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE}}'
-          METRICS_SERVER_ENABLED: '{{.METRICS_SERVER_ENABLED}}'
-          METRICS_SERVER_PORT: '{{.METRICS_SERVER_PORT}}'
-          METRICS_COLLECTOR_ENABLED: '{{.METRICS_COLLECTOR_ENABLED}}'
+          EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
+
+  c-chain-reexecution-hashdb-101-250k:
+    desc: C-Chain re-execution from block 101 to 250k with hashdb
+    cmds:
+      - task: reexecute-cchain-range-with-copied-data
+        vars:
+          TASK_NAME: '{{.TASK}}'
+          START_BLOCK: 101
+          END_BLOCK: 250000
+          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-1m-ldb'
+          CURRENT_STATE_DIR_SRC: 'cchain-current-state-hashdb-full-100'
+
+  c-chain-reexecution-hashdb-archive-101-250k:
+    desc: C-Chain re-execution from block 101 to 250k with hashdb archive
+    cmds:
+      - task: reexecute-cchain-range-with-copied-data
+        vars:
+          TASK_NAME: '{{.TASK}}'
+          START_BLOCK: 101
+          END_BLOCK: 250000
+          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-1m-ldb'
+          CURRENT_STATE_DIR_SRC: 'cchain-current-state-hashdb-archive-100'
+          CONFIG: archive
+
+  c-chain-reexecution-hashdb-33m-33m500k:
+    desc: C-Chain re-execution from block 33m to 33.5m with hashdb
+    cmds:
+      - task: reexecute-cchain-range-with-copied-data
+        vars:
+          TASK_NAME: '{{.TASK}}'
+          START_BLOCK: 33000001
+          END_BLOCK: 33500000
+          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-30m-40m-ldb'
+          CURRENT_STATE_DIR_SRC: 'cchain-current-state-hashdb-full-33m'
+
+  c-chain-reexecution-firewood-33m-33m500k:
+    desc: C-Chain re-execution from block 33m to 33.5m with firewood
+    cmds:
+      - task: reexecute-cchain-range-with-copied-data
+        vars:
+          TASK_NAME: '{{.TASK}}'
+          START_BLOCK: 33000001
+          END_BLOCK: 33500000
+          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-30m-40m-ldb'
+          CURRENT_STATE_DIR_SRC: 'cchain-current-state-firewood-33m'
+          CONFIG: firewood
+
+  c-chain-reexecution-firewood-101-250k:
+    desc: C-Chain re-execution from block 101 to 250k with firewood
+    cmds:
+      - task: reexecute-cchain-range-with-copied-data
+        vars:
+          TASK_NAME: '{{.TASK}}'
+          START_BLOCK: 101
+          END_BLOCK: 250000
+          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-1m-ldb'
+          CURRENT_STATE_DIR_SRC: 'cchain-current-state-firewood-100'
+          CONFIG: firewood
 
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests

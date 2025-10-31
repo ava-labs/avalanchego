@@ -4,30 +4,13 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
-      config:
-        description: 'The config to pass to the VM for the benchmark. See BenchmarkReexecuteRange for details.'
-        required: false
-        default: ''
-      start-block:
-        description: 'The start block for the benchmark.'
-        required: false
-        default: 101
-      end-block:
-        description: 'The end block for the benchmark.'
-        required: false
-        default: 250000
-      block-dir-src:
-        description: 'The source block directory. Supports S3 directory/zip and local directories.'
-        required: false
-        default: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**
-      current-state-dir-src:
-        description: 'The current state directory. Supports S3 directory/zip and local directories.'
-        required: false
-        default: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**
       runner:
         description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
         required: false
         default: ubuntu-latest
+      task:
+        description: 'Taskfile task to execute (e.g., c-chain-reexecution-hashdb-101-250k)'
+        required: true
       push-post-state:
         description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
         default: ''
@@ -55,12 +38,8 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             {
               echo "matrix<<EOF"
-              printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
-                "${{ github.event.inputs.start-block }}" \
-                "${{ github.event.inputs.end-block }}" \
-                "${{ github.event.inputs.block-dir-src }}" \
-                "${{ github.event.inputs.current-state-dir-src }}" \
-                "${{ github.event.inputs.config }}" \
+              printf '{ "include": [{ "task": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
+                "${{ github.event.inputs.task }}" \
                 "${{ github.event.inputs.runner }}" \
                 "${{ github.event.inputs.timeout-minutes }}"
               echo EOF
@@ -100,18 +79,14 @@ jobs:
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
-          config: ${{ matrix.config }}
-          start-block: ${{ matrix.start-block }}
-          end-block: ${{ matrix.end-block }}
-          block-dir-src: ${{ matrix.block-dir-src }}
-          current-state-dir-src: ${{ matrix.current-state-dir-src }}
+          task: ${{ matrix.task }}
+          runner_name: ${{ matrix.runner }}
+          aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: 'us-east-2'
           prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          push-github-action-benchmark: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master') }}
-          aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
-          aws-region: 'us-east-2'
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          push-post-state: ${{ github.event.inputs.push-post-state }}
-          runner_name: ${{ matrix.runner }}
+          push-github-action-benchmark: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master') }}
+          push-post-state: ${{ github.event.inputs.push-post-state || '' }}
