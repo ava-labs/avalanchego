@@ -142,7 +142,7 @@ func allFieldsSet[T interface {
 				if fieldValue.Kind() == reflect.Ptr {
 					require.Falsef(t, fieldValue.IsNil(), "field %q is nil", field.Name)
 				}
-				fieldValue = reflect.NewAt(fieldValue.Type(), unsafe.Pointer(fieldValue.UnsafeAddr())).Elem() //nolint:gosec
+				fieldValue = reflect.NewAt(fieldValue.Type(), unsafe.Pointer(fieldValue.UnsafeAddr())).Elem()
 			}
 
 			switch f := fieldValue.Interface().(type) {

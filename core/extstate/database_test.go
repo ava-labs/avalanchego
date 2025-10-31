@@ -311,7 +311,7 @@ func (fs *fuzzState) deleteStorage(accountIndex int, storageIndexInput uint64) {
 func FuzzTree(f *testing.F) {
 	f.Fuzz(func(t *testing.T, randSeed int64, byteSteps []byte) {
 		fuzzState := newFuzzState(t)
-		rand := rand.New(rand.NewSource(randSeed))
+		rand := rand.New(rand.NewSource(randSeed)) // this isn't a good fuzz test, but it is reproducible.
 
 		for range 10 {
 			fuzzState.createAccount()
