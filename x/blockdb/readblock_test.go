@@ -51,7 +51,7 @@ func TestReadOperations(t *testing.T) {
 				MaxDataFileSize:    DefaultMaxDataFileSize,
 				CheckpointInterval: 1024,
 				MaxDataFiles:       DefaultMaxDataFileSize,
-				EntryCacheSize:     DefaultEntryCacheSize,
+				BlockCacheSize:     DefaultBlockCacheSize,
 			},
 		},
 		{
@@ -70,7 +70,7 @@ func TestReadOperations(t *testing.T) {
 				MaxDataFileSize:    DefaultMaxDataFileSize,
 				CheckpointInterval: 1024,
 				MaxDataFiles:       DefaultMaxDataFileSize,
-				EntryCacheSize:     DefaultEntryCacheSize,
+				BlockCacheSize:     DefaultBlockCacheSize,
 			},
 			wantErr: ErrInvalidBlockHeight,
 		},

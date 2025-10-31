@@ -11,8 +11,8 @@ const DefaultMaxDataFileSize = 500 * 1024 * 1024 * 1024
 // DefaultMaxDataFiles is the default maximum number of data files descriptors cached.
 const DefaultMaxDataFiles = 10
 
-// DefaultEntryCacheSize is the default size of the entry cache.
-const DefaultEntryCacheSize = 256
+// DefaultBlockCacheSize is the default size of the block cache.
+const DefaultBlockCacheSize = 256
 
 // DatabaseConfig contains configuration parameters for BlockDB.
 type DatabaseConfig struct {
@@ -31,8 +31,8 @@ type DatabaseConfig struct {
 	// MaxDataFiles is the maximum number of data files descriptors cached.
 	MaxDataFiles int
 
-	// EntryCacheSize is the size of the entry cache (default: 256).
-	EntryCacheSize int
+	// BlockCacheSize is the size of the block cache (default: 256).
+	BlockCacheSize int
 
 	// CheckpointInterval defines how frequently (in blocks) the index file header is updated (default: 1024).
 	CheckpointInterval uint64
@@ -49,7 +49,7 @@ func DefaultConfig() DatabaseConfig {
 		MinimumHeight:      0,
 		MaxDataFileSize:    DefaultMaxDataFileSize,
 		MaxDataFiles:       DefaultMaxDataFiles,
-		EntryCacheSize:     DefaultEntryCacheSize,
+		BlockCacheSize:     DefaultBlockCacheSize,
 		CheckpointInterval: 1024,
 		SyncToDisk:         true,
 	}
@@ -98,9 +98,9 @@ func (c DatabaseConfig) WithMaxDataFiles(maxFiles int) DatabaseConfig {
 	return c
 }
 
-// WithEntryCacheSize returns a copy of the config with EntryCacheSize set to the given value.
-func (c DatabaseConfig) WithEntryCacheSize(size int) DatabaseConfig {
-	c.EntryCacheSize = size
+// WithBlockCacheSize returns a copy of the config with BlockCacheSize set to the given value.
+func (c DatabaseConfig) WithBlockCacheSize(size int) DatabaseConfig {
+	c.BlockCacheSize = size
 	return c
 }
 
@@ -127,8 +127,8 @@ func (c DatabaseConfig) Validate() error {
 	if c.MaxDataFileSize == 0 {
 		return errors.New("MaxDataFileSize must be positive")
 	}
-	if c.EntryCacheSize < 1 {
-		return errors.New("EntryCacheSize cannot be less than 1")
+	if c.BlockCacheSize < 1 {
+		return errors.New("BlockCacheSize cannot be less than 1")
 	}
 	return nil
 }

@@ -17,13 +17,13 @@ func TestCacheOnMiss(t *testing.T) {
 	require.NoError(t, db.Put(height, block))
 
 	// Evict the entry from cache to simulate a cache miss
-	db.entryCache.Evict(height)
+	db.blockCache.Evict(height)
 
 	// Read the block - should populate the cache on cache miss
 	_, err := db.Get(height)
 	require.NoError(t, err)
 
-	_, ok := db.entryCache.Get(height)
+	_, ok := db.blockCache.Get(height)
 	require.True(t, ok)
 }
 
@@ -33,7 +33,7 @@ func TestCacheGet(t *testing.T) {
 	block := randomBlock(t)
 
 	// Populate cache directly without writing to database
-	db.entryCache.Put(height, block)
+	db.blockCache.Put(height, block)
 
 	// Get should return the block from cache
 	data, err := db.Get(height)
@@ -47,7 +47,7 @@ func TestCacheHas(t *testing.T) {
 	block := randomBlock(t)
 
 	// Populate cache directly without writing to database
-	db.entryCache.Put(height, block)
+	db.blockCache.Put(height, block)
 
 	// Has should return true from cache even though block is not in database
 	has, err := db.Has(height)
@@ -66,7 +66,7 @@ func TestCachePutStoresClone(t *testing.T) {
 	clone[0] = 99
 
 	// Cache should have the original unmodified data
-	cached, ok := db.entryCache.Get(height)
+	cached, ok := db.blockCache.Get(height)
 	require.True(t, ok)
 	require.Equal(t, block, cached)
 }
@@ -83,7 +83,7 @@ func TestCacheGetReturnsClone(t *testing.T) {
 	data[0] = 99
 
 	// Cache should still have the original unmodified data
-	cached, ok := db.entryCache.Get(height)
+	cached, ok := db.blockCache.Get(height)
 	require.True(t, ok)
 	require.Equal(t, block, cached)
 
@@ -100,14 +100,14 @@ func TestCachePutOverridesSameHeight(t *testing.T) {
 	require.NoError(t, db.Put(height, b1))
 
 	// Verify first block is in cache
-	cached, ok := db.entryCache.Get(height)
+	cached, ok := db.blockCache.Get(height)
 	require.True(t, ok)
 	require.Equal(t, b1, cached)
 
 	// Put second block at same height and verify it overrides the first one
 	b2 := randomBlock(t)
 	require.NoError(t, db.Put(height, b2))
-	cached, ok = db.entryCache.Get(height)
+	cached, ok = db.blockCache.Get(height)
 	require.True(t, ok)
 	require.Equal(t, b2, cached)
 	require.NotEqual(t, b1, cached)

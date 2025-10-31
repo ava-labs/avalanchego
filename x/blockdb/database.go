@@ -177,7 +177,7 @@ type Database struct {
 	log        logging.Logger
 	closed     bool
 	fileCache  *lru.Cache[int, *os.File]
-	entryCache *lru.Cache[BlockHeight, BlockData]
+	blockCache *lru.Cache[BlockHeight, BlockData]
 	compressor compression.Compressor
 
 	// closeMu prevents the database from being closed while in use and prevents
@@ -225,7 +225,7 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 				f.Close()
 			}
 		}),
-		entryCache: lru.NewCache[BlockHeight, BlockData](config.EntryCacheSize),
+		blockCache: lru.NewCache[BlockHeight, BlockData](config.BlockCacheSize),
 		compressor: compressor,
 	}
 
@@ -234,7 +234,7 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 		zap.String("dataDir", config.DataDir),
 		zap.Uint64("maxDataFileSize", config.MaxDataFileSize),
 		zap.Int("maxDataFiles", config.MaxDataFiles),
-		zap.Int("entryCacheSize", config.EntryCacheSize),
+		zap.Int("blockCacheSize", config.BlockCacheSize),
 	)
 
 	if err := s.openAndInitializeIndex(); err != nil {
@@ -279,7 +279,7 @@ func (s *Database) Close() error {
 	}
 
 	s.closeFiles()
-	s.entryCache.Flush()
+	s.blockCache.Flush()
 
 	s.log.Info("Block database closed successfully")
 	return err
@@ -376,7 +376,7 @@ func (s *Database) Put(height BlockHeight, block BlockData) error {
 		)
 		return err
 	}
-	s.entryCache.Put(height, slices.Clone(block))
+	s.blockCache.Put(height, slices.Clone(block))
 
 	s.log.Debug("Block written successfully",
 		zap.Uint64("height", height),
@@ -441,7 +441,7 @@ func (s *Database) Get(height BlockHeight) (BlockData, error) {
 		return nil, database.ErrClosed
 	}
 
-	if c, ok := s.entryCache.Get(height); ok {
+	if c, ok := s.blockCache.Get(height); ok {
 		return slices.Clone(c), nil
 	}
 
@@ -495,7 +495,7 @@ func (s *Database) Get(height BlockHeight) (BlockData, error) {
 		return nil, fmt.Errorf("checksum mismatch: calculated %d, stored %d", calculatedChecksum, bh.Checksum)
 	}
 
-	s.entryCache.Put(height, slices.Clone(decompressed))
+	s.blockCache.Put(height, slices.Clone(decompressed))
 	return decompressed, nil
 }
 
@@ -509,7 +509,7 @@ func (s *Database) Has(height BlockHeight) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	if _, ok := s.entryCache.Get(height); ok {
+	if _, ok := s.blockCache.Get(height); ok {
 		return true, nil
 	}
 	_, err := s.readBlockIndex(height)
