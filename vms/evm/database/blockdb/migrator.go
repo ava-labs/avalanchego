@@ -301,7 +301,7 @@ func (m *migrator) run(ctx context.Context) error {
 				if eta != nil {
 					logFields = slices.Concat(logFields, []zap.Field{
 						zap.Duration("eta", *eta),
-						zap.Float64("pctComplete", pct),
+						zap.String("progress", fmt.Sprintf("%.2f%%", pct)),
 					})
 				}
 			}
@@ -326,7 +326,7 @@ func (m *migrator) compactBlockRange(startNum, endNum uint64) {
 	compactRange(m.kvDB, blockBodyKey, startNum, endNum, m.logger)
 	compactRange(m.kvDB, receiptsKey, startNum, endNum, m.logger)
 
-	m.logger.Info("Compaction of block range completed",
+	m.logger.Info("compaction of block range completed",
 		zap.Uint64("startHeight", startNum),
 		zap.Uint64("endHeight", endNum),
 		zap.Duration("duration", time.Since(startTime)))
