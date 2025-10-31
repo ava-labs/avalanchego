@@ -52,7 +52,7 @@ impl<T> OwnedSlice<T> {
             // it from when we originally created the `OwnedSlice`. The owned slice was created
             // from a `Box::leak`, so we can safely convert it back using `Box::from_raw`.
             Some(ptr) => unsafe {
-                Box::from_raw(std::slice::from_raw_parts_mut(ptr.as_ptr(), self.len))
+                Box::from_raw(std::ptr::slice_from_raw_parts_mut(ptr.as_ptr(), self.len))
             },
             None => Box::new([]),
         }
