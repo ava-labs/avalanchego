@@ -4,6 +4,8 @@
 package avax
 
 import (
+	"iter"
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/cache"
@@ -14,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/linkeddb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/metric"
 )
 
 const (
@@ -21,11 +24,7 @@ const (
 	indexCacheSize = 64
 )
 
-var (
-	utxoPrefix  = []byte("utxo")
-	indexPrefix = []byte("index")
-)
-
+var _ UTXODB = (*UTXODatabase)(nil)
 // UTXOState is a thin wrapper around a database to provide, caching,
 // serialization, and de-serialization for UTXOs.
 type UTXOState interface {
@@ -33,7 +32,8 @@ type UTXOState interface {
 	UTXOWriter
 
 	// Checksum returns the current UTXOChecksum.
-	Checksum() ids.ID
+	Checksum() (ids.ID, error)
+	Close() error
 }
 
 // UTXOReader is a thin wrapper around a database to provide fetching of UTXOs.
@@ -71,12 +71,23 @@ type UTXOWriter interface {
 	DeleteUTXO(utxoID ids.ID) error
 }
 
+type UTXODB interface {
+	Get(key []byte) ([]byte, error)
+	Put(key []byte, value []byte) error
+	Delete(key []byte) error
+	InitChecksum() error
+	UpdateChecksum(utxoID ids.ID)
+	Checksum() (ids.ID, error)
+	Flush() error
+	Close() error
+}
+
 type utxoState struct {
 	codec codec.Manager
 
 	// UTXO ID -> *UTXO. If the *UTXO is nil the UTXO doesn't exist
 	utxoCache cache.Cacher[ids.ID, *UTXO]
-	utxoDB    database.Database
+	utxoDB UTXODB
 
 	indexDB    database.Database
 	indexCache cache.Cacher[string, linkeddb.LinkedDB]
@@ -86,32 +97,32 @@ type utxoState struct {
 }
 
 func NewUTXOState(
-	db database.Database,
+	utxoDB database.Database,
+	indexDB database.Database,
 	codec codec.Manager,
 	trackChecksum bool,
 ) (UTXOState, error) {
 	s := &utxoState{
-		codec: codec,
-
-		utxoCache: lru.NewCache[ids.ID, *UTXO](utxoCacheSize),
-		utxoDB:    prefixdb.New(utxoPrefix, db),
-
-		indexDB:    prefixdb.New(indexPrefix, db),
-		indexCache: lru.NewCache[string, linkeddb.LinkedDB](indexCacheSize),
-
+		codec:         codec,
+		utxoCache:     lru.NewCache[ids.ID, *UTXO](utxoCacheSize),
+		utxoDB: NewUTXODatabase(utxoDB),
+		indexDB:       indexDB,
+		indexCache:    lru.NewCache[string, linkeddb.LinkedDB](indexCacheSize),
 		trackChecksum: trackChecksum,
 	}
 	return s, s.initChecksum()
 }
 
 func NewMeteredUTXOState(
-	db database.Database,
+	namespace string,
+	utxoDB UTXODB,
+	indexDB database.Database,
 	codec codec.Manager,
 	metrics prometheus.Registerer,
 	trackChecksum bool,
 ) (UTXOState, error) {
 	utxoCache, err := metercacher.New[ids.ID, *UTXO](
-		"utxo_cache",
+		metric.AppendNamespace(namespace, "utxo_cache"),
 		metrics,
 		lru.NewCache[ids.ID, *UTXO](utxoCacheSize),
 	)
@@ -120,7 +131,7 @@ func NewMeteredUTXOState(
 	}
 
 	indexCache, err := metercacher.New[string, linkeddb.LinkedDB](
-		"index_cache",
+		metric.AppendNamespace(namespace, "index_cache"),
 		metrics,
 		lru.NewCache[string, linkeddb.LinkedDB](indexCacheSize),
 	)
@@ -129,17 +140,14 @@ func NewMeteredUTXOState(
 	}
 
 	s := &utxoState{
-		codec: codec,
-
-		utxoCache: utxoCache,
-		utxoDB:    prefixdb.New(utxoPrefix, db),
-
-		indexDB:    prefixdb.New(indexPrefix, db),
-		indexCache: indexCache,
-
+		codec:         codec,
+		utxoCache:     utxoCache,
+		utxoDB:        utxoDB,
+		indexDB:       indexDB,
+		indexCache:    indexCache,
 		trackChecksum: trackChecksum,
 	}
-	return s, s.initChecksum()
+	return s, utxoDB.InitChecksum()
 }
 
 func (s *utxoState) GetUTXO(utxoID ids.ID) (*UTXO, error) {
@@ -250,8 +258,8 @@ func (s *utxoState) UTXOIDs(addr []byte, start ids.ID, limit int) ([]ids.ID, err
 	return utxoIDs, iter.Error()
 }
 
-func (s *utxoState) Checksum() ids.ID {
-	return s.checksum
+func (s *utxoState) Checksum() (ids.ID, error) {
+	return s.utxoDB.Checksum()
 }
 
 func (s *utxoState) getIndexDB(addr []byte) linkeddb.LinkedDB {
@@ -271,17 +279,7 @@ func (s *utxoState) initChecksum() error {
 		return nil
 	}
 
-	it := s.utxoDB.NewIterator()
-	defer it.Release()
-
-	for it.Next() {
-		utxoID, err := ids.ToID(it.Key())
-		if err != nil {
-			return err
-		}
-		s.updateChecksum(utxoID)
-	}
-	return it.Error()
+	return s.utxoDB.InitChecksum()
 }
 
 func (s *utxoState) updateChecksum(modifiedID ids.ID) {
@@ -289,5 +287,100 @@ func (s *utxoState) updateChecksum(modifiedID ids.ID) {
 		return
 	}
 
-	s.checksum = s.checksum.XOR(modifiedID)
+	s.utxoDB.UpdateChecksum(modifiedID)
+}
+
+func (s *utxoState) Close() error {
+	if err := s.utxoDB.Close(); err != nil {
+		return err
+	}
+
+	if err := s.indexDB.Close(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type UTXODatabase struct {
+	db       database.Database
+	checksum ids.ID
+}
+
+func NewUTXODatabase(db database.Database) *UTXODatabase {
+	return &UTXODatabase{
+		db: db,
+	}
+}
+
+func (u *UTXODatabase) Get(key []byte) ([]byte, error) {
+	return u.db.Get(key)
+}
+
+func (u *UTXODatabase) Put(key []byte, value []byte) error {
+	return u.db.Put(key, value)
+}
+
+func (u *UTXODatabase) Delete(key []byte) error {
+	return u.db.Delete(key)
+}
+
+func (u *UTXODatabase) UTXOs(
+	startingUTXOID ids.ID,
+	codec codec.Manager,
+) iter.Seq2[*UTXO, error] {
+	return func(yield func(*UTXO, error) bool) {
+		var itr database.Iterator
+
+		if startingUTXOID != ids.Empty {
+			itr = u.db.NewIteratorWithStart(startingUTXOID[:])
+		} else {
+			itr = u.db.NewIterator()
+		}
+
+		defer itr.Release()
+
+		for itr.Next() {
+			u := &UTXO{}
+			_, err := codec.Unmarshal(itr.Value(), u)
+			if err != nil {
+				return
+			}
+
+			if !yield(u, itr.Error()) {
+				return
+			}
+		}
+	}
+}
+
+func (u *UTXODatabase) InitChecksum() error {
+	it := u.db.NewIterator()
+	defer it.Release()
+
+	for it.Next() {
+		utxoID, err := ids.ToID(it.Key())
+		if err != nil {
+			return err
+		}
+		u.UpdateChecksum(utxoID)
+	}
+	return it.Error()
+}
+
+func (u *UTXODatabase) UpdateChecksum(modifiedID ids.ID) {
+	u.checksum = u.checksum.XOR(modifiedID)
+}
+
+func (u *UTXODatabase) Checksum() (ids.ID, error) {
+	return u.checksum, nil
+}
+
+func (u *UTXODatabase) Flush() error {
+	// VMs using this implementation are expected to use version db
+	return nil
+}
+
+func (u *UTXODatabase) Close() error {
+	return u.db.Close()
 }
