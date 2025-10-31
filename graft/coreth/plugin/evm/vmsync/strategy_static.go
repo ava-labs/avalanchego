@@ -20,19 +20,33 @@ type staticStrategy struct {
 	summary   message.Syncable
 }
 
-func newStaticStrategy(registry *SyncerRegistry, finalizer *finalizer, summary message.Syncable) *staticStrategy {
+func newStaticStrategy(registry *SyncerRegistry, finalizer *finalizer) *staticStrategy {
 	return &staticStrategy{
 		registry:  registry,
 		finalizer: finalizer,
-		summary:   summary,
 	}
 }
 
 // Start begins the sync process and blocks until completion or error.
 // For static sync, this runs all syncers and then finalizes the VM state.
-func (s *staticStrategy) Start(ctx context.Context) error {
+func (s *staticStrategy) Start(ctx context.Context, summary message.Syncable) error {
 	if err := s.registry.RunSyncerTasks(ctx, s.summary); err != nil {
 		return err
 	}
 	return s.finalizer.finalize(ctx, s.summary)
+}
+
+// OnBlockAccepted is a no-op for static sync since blocks are not queued.
+func (s *staticStrategy) OnBlockAccepted(EthBlockWrapper) (bool, error) {
+	return false, nil
+}
+
+// OnBlockRejected is a no-op for static sync since blocks are not queued.
+func (s *staticStrategy) OnBlockRejected(EthBlockWrapper) (bool, error) {
+	return false, nil
+}
+
+// OnBlockVerified is a no-op for static sync since blocks are not queued.
+func (s *staticStrategy) OnBlockVerified(EthBlockWrapper) (bool, error) {
+	return false, nil
 }

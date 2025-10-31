@@ -44,10 +44,19 @@ type BlockAcceptor interface {
 }
 
 // SyncStrategy defines how state sync is executed.
-// Implementations handle the sync lifecycle differently based on sync mode.
+// Implementations handle syncer orchestration and block processing during sync.
 type SyncStrategy interface {
-	// Start begins the sync process and blocks until completion or error.
-	Start(ctx context.Context) error
+	// Start begins sync and blocks until completion or error.
+	Start(ctx context.Context, summary message.Syncable) error
+
+	// OnBlockAccepted handles a block accepted during sync.
+	OnBlockAccepted(EthBlockWrapper) (bool, error)
+
+	// OnBlockRejected handles a block rejected during sync.
+	OnBlockRejected(EthBlockWrapper) (bool, error)
+
+	// OnBlockVerified handles a block verified during sync.
+	OnBlockVerified(EthBlockWrapper) (bool, error)
 }
 
 type ClientConfig struct {
@@ -84,6 +93,7 @@ type ClientConfig struct {
 type client struct {
 	config           *ClientConfig
 	resumableSummary message.Syncable
+	strategy         SyncStrategy // strategy manages sync execution (static or dynamic)
 	cancel           context.CancelFunc
 	wg               sync.WaitGroup
 	err              error
@@ -106,7 +116,14 @@ type Client interface {
 	Shutdown() error
 	Error() error
 	// OnEngineAccept should be called by the engine when a block is accepted.
-	OnEngineAccept(EthBlockWrapper) error
+	// Returns true if the block was enqueued for deferred processing, false otherwise.
+	OnEngineAccept(EthBlockWrapper) (bool, error)
+	// OnEngineReject should be called by the engine when a block is rejected.
+	// Returns true if the block was enqueued for deferred processing, false otherwise.
+	OnEngineReject(EthBlockWrapper) (bool, error)
+	// OnEngineVerify should be called by the engine when a block is verified.
+	// Returns true if the block was enqueued for deferred processing, false otherwise.
+	OnEngineVerify(EthBlockWrapper) (bool, error)
 }
 
 // StateSyncEnabled returns [client.enabled], which is set in the chain's config file.
@@ -152,6 +169,31 @@ func (c *client) ParseStateSummary(_ context.Context, summaryBytes []byte) (bloc
 	return c.config.Parser.Parse(summaryBytes, c.acceptSyncSummary)
 }
 
+// OnEngineAccept delegates to the strategy if active.
+func (c *client) OnEngineAccept(b EthBlockWrapper) (bool, error) {
+	if c.strategy == nil {
+		return false, nil
+	}
+	return c.strategy.OnBlockAccepted(b)
+}
+
+// OnEngineReject delegates to the strategy if active.
+func (c *client) OnEngineReject(b EthBlockWrapper) (bool, error) {
+	if c.strategy == nil {
+		return false, nil
+	}
+	return c.strategy.OnBlockRejected(b)
+}
+
+// OnEngineVerify delegates to the strategy if active.
+func (c *client) OnEngineVerify(b EthBlockWrapper) (bool, error) {
+	if c.strategy == nil {
+		return false, nil
+	}
+	return c.strategy.OnBlockVerified(b)
+}
+
+
 // acceptSyncSummary returns true if sync will be performed and launches the state sync process
 // in a goroutine.
 func (c *client) acceptSyncSummary(summary message.Syncable) (block.StateSyncMode, error) {
@@ -177,7 +219,7 @@ func (c *client) acceptSyncSummary(summary message.Syncable) (block.StateSyncMod
 		c.config.LastAcceptedHeight,
 	)
 
-	strategy := newStaticStrategy(registry, finalizer, summary)
+	strategy := newStaticStrategy(registry, finalizer)
 
 	return c.startAsync(strategy), nil
 }
@@ -235,7 +277,7 @@ func (c *client) startAsync(strategy SyncStrategy) block.StateSyncMode {
 		defer c.wg.Done()
 		defer cancel()
 
-		if err := strategy.Start(ctx); err != nil {
+		if err := strategy.Start(ctx, c.resumableSummary); err != nil {
 			c.err = err
 		}
 		// notify engine regardless of whether err == nil,

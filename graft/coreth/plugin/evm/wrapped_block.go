@@ -97,6 +97,14 @@ func (b *wrappedBlock) Accept(context.Context) error {
 	// practice to cleanup the batch we were modifying in the case of an error.
 	defer vm.versiondb.Abort()
 
+	// Notify sync client that engine accepted a block
+	// TODO(powerslider): probably there could be a better way to do this, but it should be wired here for now.
+	if client := vm.SyncerClient(); client != nil {
+		if err := client.OnEngineAccept(b); err != nil {
+			return fmt.Errorf("could not notify sync client that engine accepted a block: %w", err)
+		}
+	}
+
 	blkID := b.ID()
 	log.Debug("accepting block",
 		"hash", blkID.Hex(),
@@ -140,13 +148,7 @@ func (b *wrappedBlock) Accept(context.Context) error {
 		}
 	}
 
-	// Notify sync client that engine accepted a block
-	// TODO(powerslider): probably there could be a better way to do this, but it should be wired here for now.
-	if client := vm.SyncerClient(); client != nil {
-		if err := client.OnEngineAccept(b); err != nil {
-			return fmt.Errorf("could not notify sync client that engine accepted a block: %w", err)
-		}
-	}
+
 
 	return nil
 }
