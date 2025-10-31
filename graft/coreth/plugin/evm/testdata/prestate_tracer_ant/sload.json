@@ -1,0 +1,76 @@
+{
+  "context": {
+    "difficulty": "3755480783",
+    "gasLimit": "5401723",
+    "miner": "0xd049bfd667cb46aa3ef5df0da3e57db3be39e511",
+    "number": "2294702",
+    "timestamp": "1513676146"
+  },
+  "genesis": {
+    "alloc": {
+      "0xe296F389F90f3cF5EdeFb63690eb7a6257B69203": {
+        "balance": "0xcf3e0938579f00000",
+        "code": "0x",
+        "nonce": "0",
+        "storage": {}
+      },
+      "0x7dc9c9730689ff0b0fd506c67db815f12d90a448": {
+        "balance": "0x0",
+        "code": "0x600154",
+        "nonce": "0",
+        "storage": {}
+      }
+    },
+    "config": {
+      "chainId": 1,
+      "homesteadBlock": 0,
+      "eip150Block": 0,
+      "eip150Hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "eip155Block": 0,
+      "eip158Block": 0,
+      "byzantiumBlock": 0,
+      "constantinopleBlock": 0,
+      "petersburgBlock": 0,
+      "istanbulBlock": 0,
+      "muirGlacierBlock": 0,
+      "berlinBlock": 0,
+      "apricotPhase1BlockTimestamp": 0,
+      "apricotPhase2BlockTimestamp": 0
+    },
+    "difficulty": "3757315409",
+    "extraData": "0x566961425443",
+    "gasLimit": "5406414",
+    "hash": "0xae107f592eebdd9ff8d6ba00363676096e6afb0e1007a7d3d0af88173077378d",
+    "miner": "0xd049bfd667cb46aa3ef5df0da3e57db3be39e511",
+    "mixHash": "0xc927aa05a38bc3de864e95c33b3ae559d3f39c4ccd51cef6f113f9c50ba0caf1",
+    "nonce": "0x93363bbd2c95f410",
+    "number": "2294701",
+    "stateRoot": "0x6b6737d5bde8058990483e915866bd1578014baeff57bd5e4ed228a2bfad635c",
+    "timestamp": "1513676127",
+    "totalDifficulty": "7160808139332585"
+  },
+  "input": "0xf8ba808534630b8a00834c4b4094010000000000000000000000000000000000000280b8547dc9c9730689ff0b0fd506c67db815f12d90a4480000000000000000000000007dc9c9730689ff0b0fd506c67db815f12d90a448000000000000000000000000000000000000000000000000000000000000000026a0b441b733b17156dee3ff2107978a4238bfcb5874a36d008a1bcc5b22617a3232a04212c6b26069068d604be380ace25133dab677f9d18c2010d6f92cc7491fef86",
+  "tracerConfig": {
+    "onlyTopCall": false,
+    "diffMode": true
+  },
+  "result": {
+    "post": {
+      "0xd049bfd667cb46aa3ef5df0da3e57db3be39e511": {
+        "balance": "0x231b6c08a01600"
+      },
+      "0xe296f389f90f3cf5edefb63690eb7a6257b69203": {
+        "balance": "0xcf3bd7819714fea00",
+        "nonce": 1
+      }
+    },
+    "pre": {
+      "0xd049bfd667cb46aa3ef5df0da3e57db3be39e511": {
+        "balance": "0x0"
+      },
+      "0xe296f389f90f3cf5edefb63690eb7a6257b69203": {
+        "balance": "0xcf3e0938579f00000"
+      }
+    }
+  }
+}
