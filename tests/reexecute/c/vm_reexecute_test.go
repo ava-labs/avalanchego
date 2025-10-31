@@ -169,15 +169,24 @@ func benchmarkReexecuteRange(
 	consensusRegistry := prometheus.NewRegistry()
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
 
-	genesisConfig := genesis.GetConfig(constants.MainnetID)
-
 	log := tests.NewDefaultLogger("c-chain-reexecution")
-	dbLogger := tests.NewDefaultLogger("db")
 
 	var (
 		vmDBDir      = filepath.Join(currentStateDir, "db")
 		chainDataDir = filepath.Join(currentStateDir, "chain-data-dir")
 	)
+
+	log.Info("re-executing block range with params",
+		zap.String("block-dir", blockDir),
+		zap.String("vm-db-dir", vmDBDir),
+		zap.String("chain-data-dir", chainDataDir),
+		zap.Uint64("start-block", startBlock),
+		zap.Uint64("end-block", endBlock),
+		zap.Int("chan-size", chanSize),
+	)
+
+	dbLogger := tests.NewDefaultLogger("db")
+
 	db, err := leveldb.New(vmDBDir, nil, dbLogger, prometheus.NewRegistry())
 	r.NoError(err)
 	defer func() {
@@ -185,6 +194,7 @@ func benchmarkReexecuteRange(
 		r.NoError(db.Close())
 	}()
 
+	genesisConfig := genesis.GetConfig(constants.MainnetID)
 	vmParams := reexecute.VMParams{
 		GenesisBytes: []byte(genesisConfig.CChainGenesis),
 		ConfigBytes:  configBytes,
@@ -222,15 +232,6 @@ func benchmarkReexecuteRange(
 		NetworkUUID:             networkUUID,
 		DashboardPath:           "d/Gl1I20mnk/c-chain",
 	}
-
-	log.Info("re-executing block range with params",
-		zap.String("block-dir", blockDir),
-		zap.String("vm-db-dir", vmDBDir),
-		zap.String("chain-data-dir", chainDataDir),
-		zap.Uint64("start-block", startBlock),
-		zap.Uint64("end-block", endBlock),
-		zap.Int("chan-size", chanSize),
-	)
 
 	executor := reexecute.NewBenchmarkExecutor(config)
 
