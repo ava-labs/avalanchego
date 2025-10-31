@@ -17,20 +17,23 @@ const (
 	// bandwidth and CPU for verification.
 	MaxCodeHashesPerRequest = 5
 
-	StateTrieNode      = NodeType(1)
+	// StateTrieNode represents a node in the state trie.
+	StateTrieNode = NodeType(1)
+
+	// StateTrieKeyLength is the length of a state trie key.
 	StateTrieKeyLength = common.HashLength
 )
 
 var _ Request = (*LeafsRequest)(nil)
 
-// NodeType outlines the trie that a leaf node belongs to
-// handlers.LeafsRequestHandler uses this information to determine
-// which trie type to fetch the information from
+// NodeType indicates which trie a leaf node belongs to.
+// This is used by handlers to determine which trie to read from (state/atomic).
 type NodeType uint8
 
-// LeafsRequest is a request to receive trie leaves at specified Root within Start and End byte range
-// Limit outlines maximum number of leaves to returns starting at Start
-// NodeType outlines which trie to read from state/atomic.
+// LeafsRequest is a request to retrieve trie leaves at the specified root
+// within the Start and End byte range.
+// Limit specifies the maximum number of leaves to return starting at Start.
+// NodeType indicates which trie to read from (state/atomic).
 type LeafsRequest struct {
 	Root     common.Hash `serialize:"true"`
 	Account  common.Hash `serialize:"true"`

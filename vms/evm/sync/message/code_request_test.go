@@ -21,12 +21,12 @@ func TestMarshalCodeRequest(t *testing.T) {
 
 	base64CodeRequest := "AAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAHNvbWUgY29kZSBwbHM="
 
-	codeRequestBytes, err := Codec.Marshal(Version, codeRequest)
+	codeRequestBytes, err := Codec().Marshal(Version, codeRequest)
 	require.NoError(t, err)
 	require.Equal(t, base64CodeRequest, base64.StdEncoding.EncodeToString(codeRequestBytes))
 
 	var c CodeRequest
-	_, err = Codec.Unmarshal(codeRequestBytes, &c)
+	_, err = Codec().Unmarshal(codeRequestBytes, &c)
 	require.NoError(t, err)
 	require.Equal(t, codeRequest.Hashes, c.Hashes)
 }
@@ -47,12 +47,12 @@ func TestMarshalCodeResponse(t *testing.T) {
 
 	base64CodeResponse := "AAAAAAABAAAAMlL9/AchgmVPFj9fD5piHXKVZsdNEAN8TXu7BAfR4sZJgYVa2GgdDYbR6R4AFnk5y2aU"
 
-	codeResponseBytes, err := Codec.Marshal(Version, codeResponse)
+	codeResponseBytes, err := Codec().Marshal(Version, codeResponse)
 	require.NoError(t, err)
 	require.Equal(t, base64CodeResponse, base64.StdEncoding.EncodeToString(codeResponseBytes))
 
 	var c CodeResponse
-	_, err = Codec.Unmarshal(codeResponseBytes, &c)
+	_, err = Codec().Unmarshal(codeResponseBytes, &c)
 	require.NoError(t, err)
 	require.Equal(t, codeResponse.Data, c.Data)
 }
