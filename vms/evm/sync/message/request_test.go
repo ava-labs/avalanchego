@@ -70,7 +70,7 @@ func (r *recordingHandler) HandleCodeRequest(ctx context.Context, nodeID ids.Nod
 func TestRequest_HandleDispatchesToCorrectHandler(t *testing.T) {
 	t.Parallel()
 
-	ctx := context.TODO()
+	ctx := t.Context()
 	nodeID := ids.EmptyNodeID
 	const requestID uint32 = 42
 
@@ -155,13 +155,39 @@ func TestRequestToBytes_InterfaceRoundTrip(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			b, err := RequestToBytes(Codec, c.req)
+			b, err := RequestToBytes(Codec(), c.req)
 			require.NoError(t, err)
 
 			var out Request
-			_, err = Codec.Unmarshal(b, &out)
+			_, err = Codec().Unmarshal(b, &out)
 			require.NoError(t, err)
 			require.IsType(t, c.req, out)
 		})
 	}
+}
+
+func TestNoopRequestHandler(t *testing.T) {
+	t.Parallel()
+
+	handler := NoopRequestHandler{}
+	ctx := t.Context()
+	nodeID := ids.EmptyNodeID
+
+	t.Run("HandleLeafsRequest", func(t *testing.T) {
+		resp, err := handler.HandleLeafsRequest(ctx, nodeID, 1, LeafsRequest{})
+		require.NoError(t, err)
+		require.Nil(t, resp)
+	})
+
+	t.Run("HandleBlockRequest", func(t *testing.T) {
+		resp, err := handler.HandleBlockRequest(ctx, nodeID, 1, BlockRequest{})
+		require.NoError(t, err)
+		require.Nil(t, resp)
+	})
+
+	t.Run("HandleCodeRequest", func(t *testing.T) {
+		resp, err := handler.HandleCodeRequest(ctx, nodeID, 1, CodeRequest{})
+		require.NoError(t, err)
+		require.Nil(t, resp)
+	})
 }
