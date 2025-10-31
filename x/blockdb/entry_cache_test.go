@@ -27,20 +27,32 @@ func TestCacheOnMiss(t *testing.T) {
 	require.True(t, ok)
 }
 
-func TestCacheHas(t *testing.T) {
+func TestCacheGet(t *testing.T) {
 	db, _ := newTestDatabase(t, DefaultConfig())
 	height := uint64(30)
 	block := randomBlock(t)
-	require.NoError(t, db.Put(height, block))
 
+	// Populate cache directly without writing to database
+	db.entryCache.Put(height, block)
+
+	// Get should return the block from cache
+	data, err := db.Get(height)
+	require.NoError(t, err)
+	require.Equal(t, block, data)
+}
+
+func TestCacheHas(t *testing.T) {
+	db, _ := newTestDatabase(t, DefaultConfig())
+	height := uint64(40)
+	block := randomBlock(t)
+
+	// Populate cache directly without writing to database
+	db.entryCache.Put(height, block)
+
+	// Has should return true from cache even though block is not in database
 	has, err := db.Has(height)
 	require.NoError(t, err)
 	require.True(t, has)
-
-	// Verify block is in cache
-	cached, ok := db.entryCache.Get(height)
-	require.True(t, ok)
-	require.Equal(t, block, cached)
 }
 
 func TestCachePutStoresClone(t *testing.T) {
