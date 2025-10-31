@@ -1154,6 +1154,7 @@ dependencies = [
  "arc-swap",
  "bitfield",
  "bitflags 2.9.4",
+ "bumpalo",
  "bytemuck",
  "bytemuck_derive",
  "bytes",

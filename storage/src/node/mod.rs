@@ -149,6 +149,21 @@ impl ExtendableBytes for Vec<u8> {
     }
 }
 
+impl ExtendableBytes for bumpalo::collections::Vec<'_, u8> {
+    fn extend<T: IntoIterator<Item = u8>>(&mut self, other: T) {
+        std::iter::Extend::extend(self, other);
+    }
+    fn reserve(&mut self, reserve: usize) {
+        bumpalo::collections::Vec::reserve(self, reserve);
+    }
+    fn push(&mut self, value: u8) {
+        bumpalo::collections::Vec::push(self, value);
+    }
+    fn extend_from_slice(&mut self, other: &[u8]) {
+        bumpalo::collections::Vec::extend_from_slice(self, other);
+    }
+}
+
 impl Node {
     /// Returns the partial path of the node.
     #[must_use]

@@ -42,6 +42,8 @@ pub(crate) mod alloc;
 pub(crate) mod hash;
 pub(crate) mod header;
 pub(crate) mod persist;
+#[cfg(feature = "io-uring")]
+pub(crate) mod persist_io_uring;
 pub(crate) mod primitives;
 
 use crate::linear::OffsetReader;
@@ -94,6 +96,10 @@ use crate::{
 };
 
 use super::linear::WritableStorage;
+
+/// Initial size for the bump allocator used in node serialization batches.
+/// Set to the maximum area size to minimize allocations for large nodes.
+const INITIAL_BUMP_SIZE: usize = AreaIndex::MAX_AREA_SIZE as usize;
 
 impl<S: ReadableStorage> NodeStore<Committed, S> {
     /// Open an existing [`NodeStore`]

@@ -358,6 +358,13 @@ impl<S: WritableStorage> NodeAllocator<'_, S> {
 
         Ok(())
     }
+
+    pub fn flush_freelist(&mut self) -> Result<(), FileIoError> {
+        let free_list_bytes = bytemuck::bytes_of(self.header.free_lists());
+        let free_list_offset = NodeStoreHeader::free_lists_offset();
+        self.storage.write(free_list_offset, free_list_bytes)?;
+        Ok(())
+    }
 }
 
 /// Iterator over free lists in the nodestore
