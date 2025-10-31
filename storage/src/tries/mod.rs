@@ -4,7 +4,7 @@
 mod iter;
 mod kvp;
 
-use crate::{HashType, PathComponent, SplitPath};
+use crate::{HashType, IntoSplitPath, PathComponent};
 
 pub use self::iter::{IterAscending, IterDescending, TrieEdgeIter, TrieValueIter};
 pub use self::kvp::{DuplicateKeyError, HashedKeyValueTrieRoot, KeyValueTrieRoot};
@@ -38,8 +38,13 @@ pub enum TrieEdgeState<'a, N: ?Sized> {
 
 /// A node in a fixed-arity radix trie.
 pub trait TrieNode<V: AsRef<[u8]> + ?Sized> {
+    /// The type of path from this node's parent to this node.
+    type PartialPath<'a>: IntoSplitPath + 'a
+    where
+        Self: 'a;
+
     /// The path from this node's parent to this node.
-    fn partial_path(&self) -> impl SplitPath + '_;
+    fn partial_path(&self) -> Self::PartialPath<'_>;
 
     /// The value stored at this node, if any.
     fn value(&self) -> Option<&V>;

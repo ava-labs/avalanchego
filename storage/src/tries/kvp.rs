@@ -4,8 +4,8 @@
 #[cfg(not(feature = "branch_factor_256"))]
 use crate::PackedPathRef;
 use crate::{
-    Children, HashType, Hashable, HashableShunt, HashedTrieNode, PathBuf, PathComponent, PathGuard,
-    SplitPath, TrieNode, TriePath, TriePathFromPackedBytes, ValueDigest,
+    Children, HashType, Hashable, HashableShunt, HashedTrieNode, JoinedPath, PathBuf,
+    PathComponent, PathGuard, SplitPath, TrieNode, TriePath, TriePathFromPackedBytes, ValueDigest,
 };
 
 #[cfg(feature = "branch_factor_256")]
@@ -280,7 +280,12 @@ impl<'a, T: AsRef<[u8]> + ?Sized> HashedKeyValueTrieRoot<'a, T> {
 }
 
 impl<T: AsRef<[u8]> + ?Sized> TrieNode<T> for KeyValueTrieRoot<'_, T> {
-    fn partial_path(&self) -> impl SplitPath + '_ {
+    type PartialPath<'a>
+        = PackedPathRef<'a>
+    where
+        Self: 'a;
+
+    fn partial_path(&self) -> Self::PartialPath<'_> {
         self.partial_path
     }
 
@@ -305,7 +310,12 @@ impl<T: AsRef<[u8]> + ?Sized> TrieNode<T> for KeyValueTrieRoot<'_, T> {
 }
 
 impl<T: AsRef<[u8]> + ?Sized> TrieNode<T> for HashedKeyValueTrieRoot<'_, T> {
-    fn partial_path(&self) -> impl SplitPath + '_ {
+    type PartialPath<'a>
+        = PackedPathRef<'a>
+    where
+        Self: 'a;
+
+    fn partial_path(&self) -> Self::PartialPath<'_> {
         self.partial_path
     }
 
@@ -334,13 +344,32 @@ impl<T: AsRef<[u8]> + ?Sized> HashedTrieNode<T> for HashedKeyValueTrieRoot<'_, T
     }
 }
 
-impl<T: AsRef<[u8]> + ?Sized> Hashable for HashedKeyValueTrieRoot<'_, T> {
-    fn parent_prefix_path(&self) -> impl crate::IntoSplitPath + '_ {
-        self.leading_path.as_slice()
+impl<'a, T: AsRef<[u8]> + ?Sized> Hashable for HashedKeyValueTrieRoot<'a, T> {
+    type LeadingPath<'b>
+        = &'b [PathComponent]
+    where
+        Self: 'b;
+
+    type PartialPath<'b>
+        = PackedPathRef<'a>
+    where
+        Self: 'b;
+
+    type FullPath<'b>
+        = JoinedPath<&'b [PathComponent], PackedPathRef<'a>>
+    where
+        Self: 'b;
+
+    fn parent_prefix_path(&self) -> Self::LeadingPath<'_> {
+        &self.leading_path
     }
 
-    fn partial_path(&self) -> impl crate::IntoSplitPath + '_ {
+    fn partial_path(&self) -> Self::PartialPath<'_> {
         self.partial_path
+    }
+
+    fn full_path(&self) -> Self::FullPath<'_> {
+        self.parent_prefix_path().append(self.partial_path)
     }
 
     fn value_digest(&self) -> Option<ValueDigest<&[u8]>> {

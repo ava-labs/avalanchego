@@ -108,17 +108,32 @@ impl std::fmt::Debug for ProofNode {
 }
 
 impl Hashable for ProofNode {
-    fn parent_prefix_path(&self) -> impl IntoSplitPath + '_ {
+    type LeadingPath<'a>
+        = &'a [PathComponent]
+    where
+        Self: 'a;
+
+    type PartialPath<'a>
+        = &'a [PathComponent]
+    where
+        Self: 'a;
+
+    type FullPath<'a>
+        = &'a [PathComponent]
+    where
+        Self: 'a;
+
+    fn parent_prefix_path(&self) -> Self::LeadingPath<'_> {
         let (prefix, _) = self.key.split_at(self.partial_len);
         prefix
     }
 
-    fn partial_path(&self) -> impl IntoSplitPath + '_ {
+    fn partial_path(&self) -> Self::PartialPath<'_> {
         let (_, suffix) = self.key.split_at(self.partial_len);
         suffix
     }
 
-    fn full_path(&self) -> impl IntoSplitPath + '_ {
+    fn full_path(&self) -> Self::FullPath<'_> {
         &self.key
     }
 

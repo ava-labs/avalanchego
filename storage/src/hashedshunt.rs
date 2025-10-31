@@ -1,7 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use crate::{Children, HashType, Hashable, IntoSplitPath, SplitPath, ValueDigest};
+use crate::{Children, HashType, Hashable, JoinedPath, SplitPath, ValueDigest};
 
 /// A shunt for a hasheable trie that we can use to compute the hash of a node
 /// using component parts.
@@ -51,12 +51,31 @@ impl<P1: SplitPath, P2: SplitPath> std::fmt::Debug for HashableShunt<'_, P1, P2>
 }
 
 impl<P1: SplitPath, P2: SplitPath> Hashable for HashableShunt<'_, P1, P2> {
-    fn parent_prefix_path(&self) -> impl IntoSplitPath + '_ {
+    type LeadingPath<'a>
+        = P1
+    where
+        Self: 'a;
+
+    type PartialPath<'a>
+        = P2
+    where
+        Self: 'a;
+
+    type FullPath<'a>
+        = JoinedPath<P1, P2>
+    where
+        Self: 'a;
+
+    fn parent_prefix_path(&self) -> Self::LeadingPath<'_> {
         self.parent_prefix
     }
 
-    fn partial_path(&self) -> impl IntoSplitPath + '_ {
+    fn partial_path(&self) -> Self::PartialPath<'_> {
         self.partial_path
+    }
+
+    fn full_path(&self) -> Self::FullPath<'_> {
+        self.parent_prefix_path().append(self.partial_path())
     }
 
     fn value_digest(&self) -> Option<ValueDigest<&[u8]>> {

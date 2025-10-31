@@ -3,7 +3,6 @@
 
 use crate::{
     Children, HashType, HashableShunt, IntoSplitPath, Node, Path, PathComponent, SplitPath,
-    TriePath,
 };
 use smallvec::SmallVec;
 
@@ -153,22 +152,32 @@ impl<T: AsRef<[u8]>> AsRef<[u8]> for ValueDigest<T> {
 
 /// A node in the trie that can be hashed.
 pub trait Hashable: std::fmt::Debug {
+    /// The type of the leading path.
+    type LeadingPath<'a>: IntoSplitPath + 'a
+    where
+        Self: 'a;
+
+    /// The type of the partial path.
+    type PartialPath<'a>: IntoSplitPath + 'a
+    where
+        Self: 'a;
+
+    /// The type of the full path.
+    type FullPath<'a>: IntoSplitPath + 'a
+    where
+        Self: 'a;
+
     /// The full path of this node's parent where each byte is a nibble.
-    fn parent_prefix_path(&self) -> impl IntoSplitPath + '_;
+    fn parent_prefix_path(&self) -> Self::LeadingPath<'_>;
     /// The partial path of this node where each byte is a nibble.
-    fn partial_path(&self) -> impl IntoSplitPath + '_;
+    fn partial_path(&self) -> Self::PartialPath<'_>;
+    /// The full path of this node including the parent's prefix where each byte is a nibble.
+    fn full_path(&self) -> Self::FullPath<'_>;
     /// The node's value or hash.
     fn value_digest(&self) -> Option<ValueDigest<&[u8]>>;
     /// Each element is a child's index and hash.
     /// Yields 0 elements if the node is a leaf.
     fn children(&self) -> Children<Option<HashType>>;
-
-    /// The full path of this node including the parent's prefix where each byte is a nibble.
-    fn full_path(&self) -> impl IntoSplitPath + '_ {
-        self.parent_prefix_path()
-            .into_split_path()
-            .append(self.partial_path().into_split_path())
-    }
 }
 
 /// A preimage of a hash.
