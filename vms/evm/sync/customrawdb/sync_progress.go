@@ -193,7 +193,7 @@ func GetLatestSyncPerformed(db ethdb.Iteratee) (uint64, error) {
 
 	var latestSyncPerformed uint64
 	for it.Next() {
-		syncPerformed := parseSyncPerformedKey(it.Key())
+		syncPerformed := ParseSyncPerformedKey(it.Key())
 		if syncPerformed > latestSyncPerformed {
 			latestSyncPerformed = syncPerformed
 		}
@@ -231,10 +231,10 @@ func clearPrefix(db ethdb.KeyValueStore, prefix []byte, keyLen int) error {
 	return batch.Write()
 }
 
-// parseSyncPerformedKey returns the block number from keys the iterator returned
+// ParseSyncPerformedKey returns the block number from keys the iterator returned
 // from NewSyncPerformedIterator. It assumes the key has the syncPerformedPrefix
 // followed by an 8-byte big-endian block number, and panics if the key is shorter
 // than len(syncPerformedPrefix)+wrappers.LongLen.
-func parseSyncPerformedKey(key []byte) uint64 {
+func ParseSyncPerformedKey(key []byte) uint64 {
 	return binary.BigEndian.Uint64(key[len(syncPerformedPrefix):])
 }
