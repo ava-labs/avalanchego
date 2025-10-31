@@ -4,6 +4,7 @@
 package blockdb
 
 import (
+	"bytes"
 	"math"
 	"os"
 	"strings"
@@ -38,7 +39,7 @@ func TestPutGet(t *testing.T) {
 		{
 			name:  "nil block",
 			block: nil,
-			want:  []byte{},
+			want:  nil,
 		},
 	}
 	for _, tt := range tests {
@@ -49,7 +50,7 @@ func TestPutGet(t *testing.T) {
 
 			got, err := db.Get(0)
 			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
+			require.True(t, bytes.Equal(tt.want, got))
 		})
 	}
 }
