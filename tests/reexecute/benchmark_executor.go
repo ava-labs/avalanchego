@@ -135,6 +135,14 @@ func (e BenchmarkExecutor) Run(b testing.TB, log logging.Logger, vm block.ChainV
 	r.NoError(vmExecutor.executeSequence(ctx, blockChan))
 }
 
+type VMParams struct {
+	GenesisBytes []byte
+	UpgradeBytes []byte
+	ConfigBytes  []byte
+	SubnetID     ids.ID
+	ChainID      ids.ID
+}
+
 // NewMainnetVM creates and initializes a VM configured for mainnet block
 // reexecution tests. The VM is initialized with mainnet-specific settings
 // including the mainnet network ID, upgrade schedule, and chain configurations.
@@ -144,12 +152,8 @@ func NewMainnetVM(
 	factory vms.Factory,
 	db database.Database,
 	chainDataDir string,
-	genesisBytes []byte,
-	upgradeBytes []byte,
-	configBytes []byte,
-	subnetID ids.ID,
-	chainID ids.ID,
 	metricsGatherer metrics.MultiGatherer,
+	vmParams VMParams,
 ) (block.ChainVM, error) {
 	vmIntf, err := factory.New(logging.NoLog{})
 	if err != nil {
@@ -163,24 +167,24 @@ func NewMainnetVM(
 	}
 
 	blsPublicKey := blsKey.PublicKey()
-	warpSigner := warp.NewSigner(blsKey, constants.MainnetID, chainID)
+	warpSigner := warp.NewSigner(blsKey, constants.MainnetID, vmParams.ChainID)
 
 	sharedMemoryDB := prefixdb.New([]byte("sharedmemory"), db)
 	atomicMemory := atomic.NewMemory(sharedMemoryDB)
 
 	chainIDToSubnetID := map[ids.ID]ids.ID{
-		mainnetXChainID: constants.PrimaryNetworkID,
-		MainnetCChainID: constants.PrimaryNetworkID,
-		chainID:         subnetID,
-		ids.Empty:       constants.PrimaryNetworkID,
+		mainnetXChainID:  constants.PrimaryNetworkID,
+		MainnetCChainID:  constants.PrimaryNetworkID,
+		vmParams.ChainID: vmParams.SubnetID,
+		ids.Empty:        constants.PrimaryNetworkID,
 	}
 
 	if err := vm.Initialize(
 		ctx,
 		&snow.Context{
 			NetworkID:       constants.MainnetID,
-			SubnetID:        subnetID,
-			ChainID:         chainID,
+			SubnetID:        vmParams.SubnetID,
+			ChainID:         vmParams.ChainID,
 			NodeID:          ids.GenerateTestNodeID(),
 			PublicKey:       blsPublicKey,
 			NetworkUpgrades: upgrade.Mainnet,
@@ -190,7 +194,7 @@ func NewMainnetVM(
 			AVAXAssetID: mainnetAvaxAssetID,
 
 			Log:          tests.NewDefaultLogger("mainnet-vm-reexecution"),
-			SharedMemory: atomicMemory.NewSharedMemory(chainID),
+			SharedMemory: atomicMemory.NewSharedMemory(vmParams.ChainID),
 			BCLookup:     ids.NewAliaser(),
 			Metrics:      metricsGatherer,
 
@@ -208,9 +212,9 @@ func NewMainnetVM(
 			ChainDataDir: chainDataDir,
 		},
 		prefixdb.New([]byte("vm"), db),
-		genesisBytes,
-		upgradeBytes,
-		configBytes,
+		vmParams.GenesisBytes,
+		vmParams.UpgradeBytes,
+		vmParams.ConfigBytes,
 		nil,
 		&enginetest.Sender{},
 	); err != nil {

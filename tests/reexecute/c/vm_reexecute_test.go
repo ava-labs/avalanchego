@@ -185,17 +185,20 @@ func benchmarkReexecuteRange(
 		r.NoError(db.Close())
 	}()
 
+	vmParams := reexecute.VMParams{
+		GenesisBytes: []byte(genesisConfig.CChainGenesis),
+		ConfigBytes:  configBytes,
+		SubnetID:     constants.PrimaryNetworkID,
+		ChainID:      reexecute.MainnetCChainID,
+	}
+
 	vm, err := reexecute.NewMainnetVM(
 		ctx,
 		&factory.Factory{},
 		db,
 		chainDataDir,
-		[]byte(genesisConfig.CChainGenesis),
-		nil,
-		configBytes,
-		constants.PrimaryNetworkID,
-		reexecute.MainnetCChainID,
 		vmMultiGatherer,
+		vmParams,
 	)
 	r.NoError(err)
 	defer func() {
