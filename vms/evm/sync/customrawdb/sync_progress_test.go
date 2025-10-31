@@ -185,7 +185,7 @@ func TestSyncPerformedAndLatest(t *testing.T) {
 	require.NoError(t, WriteSyncPerformed(db, 15))
 
 	// Iterator yields all
-	vals := mapIterator(t, NewSyncPerformedIterator(db), parseSyncPerformedKey)
+	vals := mapIterator(t, NewSyncPerformedIterator(db), ParseSyncPerformedKey)
 
 	require.Equal(t, []uint64{10, 15, 20}, vals)
 
