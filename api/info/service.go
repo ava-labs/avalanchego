@@ -254,7 +254,9 @@ type PeersReply struct {
 	Peers []Peer `json:"peers"`
 }
 
-// Peers returns the list of current validators
+// Peers returns the current peers this node is connected to. If nodeIDs are
+// provided, the response is filtered to just include peers that match those
+// IDs.
 func (i *Info) Peers(_ *http.Request, args *PeersArgs, reply *PeersReply) error {
 	i.log.Debug("API called",
 		zap.String("service", "info"),
