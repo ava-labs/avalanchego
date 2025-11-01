@@ -191,6 +191,9 @@ type peer struct {
 	// Must only be accessed atomically
 	lastSent, lastReceived int64
 
+	// lastPingSent is the milliseconds since 1970-01-01 UTC when the last ping was sent
+	lastPingSent int64
+
 	// getPeerListChan signals that we should attempt to send a GetPeerList to
 	// this peer
 	getPeerListChan chan struct{}
@@ -626,6 +629,10 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	now := p.Clock.Time()
 	p.storeLastSent(now)
 	p.Metrics.Sent(msg)
+
+	if msg.Op() == message.PingOp {
+		atomic.StoreInt64(&p.lastPingSent, now.UnixMilli())
+	}
 }
 
 func (p *peer) sendNetworkMessages() {
@@ -819,7 +826,17 @@ func (p *peer) getUptime() uint32 {
 	return primaryUptimePercent
 }
 
-func (*peer) handlePong(*p2p.Pong) {}
+func (p *peer) handlePong(*p2p.Pong) {
+	lastPing := atomic.LoadInt64(&p.lastPingSent)
+	if lastPing == 0 {
+		return
+	}
+
+	elapsed := p.Clock.Time().UnixMilli() - lastPing
+
+	p.Metrics.RTTCount.Inc()
+	p.Metrics.RTTSum.Add(float64(elapsed))
+}
 
 func (p *peer) handleHandshake(msg *p2p.Handshake) {
 	if p.gotHandshake.Get() {
