@@ -56,6 +56,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/status"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool/mempooltest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/txstest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/validators/fee"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
@@ -120,11 +122,25 @@ var (
 	testSubnet1 *txs.Tx
 )
 
+type Option func(vm *VM)
+
+func WithTestMempool() Option {
+	return func(vm *VM) {
+		vm.MempoolFunc = func() mempool.Mempool {
+			return &mempooltest.Mempool{}
+		}
+	}
+}
+
 type mutableSharedMemory struct {
 	atomic.SharedMemory
 }
 
-func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutableSharedMemory) {
+func defaultVM(t *testing.T, f upgradetest.Fork, options ...Option) (
+	*VM,
+	database.Database,
+	*mutableSharedMemory,
+) {
 	require := require.New(t)
 
 	// always reset latestForkTime (a package level variable)
@@ -145,6 +161,10 @@ func defaultVM(t *testing.T, f upgradetest.Fork) (*VM, database.Database, *mutab
 		RewardConfig:           defaultRewardConfig,
 		UpgradeConfig:          upgradetest.GetConfigWithUpgradeTime(f, latestForkTime),
 	}}
+
+	for _, o := range options {
+		o(vm)
+	}
 
 	db := memdb.New()
 	chainDB := prefixdb.New([]byte{0}, db)
@@ -414,7 +434,7 @@ func TestInvalidAddValidatorCommit(t *testing.T) {
 // Reject attempt to add validator to primary network
 func TestAddValidatorReject(t *testing.T) {
 	require := require.New(t)
-	vm, _, _ := defaultVM(t, upgradetest.Cortina)
+	vm, _, _ := defaultVM(t, upgradetest.Cortina, WithTestMempool())
 	vm.ctx.Lock.Lock()
 	defer vm.ctx.Lock.Unlock()
 

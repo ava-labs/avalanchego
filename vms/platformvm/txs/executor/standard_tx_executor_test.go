@@ -47,6 +47,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/vms/types"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
@@ -2391,9 +2392,17 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		)
 	)
 
+	testAddresses := make([]ids.ShortID, len(genesistest.DefaultFundedKeys))
+	for i, testKey := range genesistest.DefaultFundedKeys {
+		testAddresses[i] = testKey.Address()
+	}
+
 	// Create the subnet
 	createSubnetTx, err := wallet.IssueCreateSubnetTx(
-		&secp256k1fx.OutputOwners{},
+		&secp256k1fx.OutputOwners{
+			Threshold: 1,
+			Addrs:     testAddresses,
+		},
 	)
 	require.NoError(t, err)
 
@@ -2416,18 +2425,50 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 	require.NoError(t, diff.Apply(baseState))
 	require.NoError(t, baseState.Commit())
 
-	var (
-		subnetID = createSubnetTx.ID()
-		nodeID   = ids.GenerateTestNodeID()
+	subnetID := createSubnetTx.ID()
+	nodeID := ids.GenerateTestNodeID()
+	chainID := ids.GenerateTestID()
+	address := utils.RandomBytes(32)
+
+	sk, err := localsigner.New()
+	require.NoError(t, err)
+	pop, err := signer.NewProofOfPossession(sk)
+	require.NoError(t, err)
+
+	const weight = 1
+
+	validator := &txs.ConvertSubnetToL1Validator{
+		NodeID:  nodeID.Bytes(),
+		Weight:  weight,
+		Balance: 1,
+		Signer:  *pop,
+		RemainingBalanceOwner: message.PChainOwner{
+			Threshold: 1,
+			Addresses: testAddresses,
+		},
+		DeactivationOwner: message.PChainOwner{
+			Threshold: 1,
+			Addresses: testAddresses,
+		},
+	}
+
+	convertSubnetToL1Tx, err := wallet.IssueConvertSubnetToL1Tx(
+		subnetID,
+		chainID,
+		address,
+		[]*txs.ConvertSubnetToL1Validator{validator},
 	)
+	require.NoError(t, err)
+
 	tests := []struct {
 		name           string
-		builderOptions []common.Option
+		tx             *txs.Tx
 		updateExecutor func(executor *standardTxExecutor) error
 		expectedErr    error
 	}{
 		{
 			name: "invalid prior to E-Upgrade",
+			tx:   convertSubnetToL1Tx,
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.backend.Config = &config.Internal{
 					UpgradeConfig: upgradetest.GetConfig(upgradetest.Durango),
@@ -2438,6 +2479,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		},
 		{
 			name: "tx fails syntactic verification",
+			tx:   convertSubnetToL1Tx,
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.backend.Ctx = snowtest.Context(t, ids.GenerateTestID())
 				return nil
@@ -2446,13 +2488,23 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		},
 		{
 			name: "invalid memo length",
-			builderOptions: []common.Option{
-				common.WithMemo([]byte("memo!")),
-			},
+			tx: func() *txs.Tx {
+				tx, err := wallet.IssueConvertSubnetToL1Tx(
+					subnetID,
+					chainID,
+					address,
+					[]*txs.ConvertSubnetToL1Validator{validator},
+					common.WithMemo([]byte("memo!")),
+				)
+				require.NoError(t, err)
+
+				return tx
+			}(),
 			expectedErr: avax.ErrMemoTooLarge,
 		},
 		{
 			name: "fail subnet authorization",
+			tx:   convertSubnetToL1Tx,
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.state.SetSubnetOwner(subnetID, &secp256k1fx.OutputOwners{
 					Threshold: 1,
@@ -2466,6 +2518,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		},
 		{
 			name: "invalid if subnet is transformed",
+			tx:   convertSubnetToL1Tx,
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.state.AddSubnetTransformation(&txs.Tx{Unsigned: &txs.TransformSubnetTx{
 					Subnet: subnetID,
@@ -2476,6 +2529,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		},
 		{
 			name: "invalid if subnet is converted",
+			tx:   convertSubnetToL1Tx,
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.state.SetSubnetToL1Conversion(
 					subnetID,
@@ -2491,6 +2545,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		},
 		{
 			name: "too many active validators",
+			tx:   convertSubnetToL1Tx,
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.backend.Config = &config.Internal{
 					DynamicFeeConfig: genesis.LocalParams.DynamicFeeConfig,
@@ -2508,6 +2563,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		},
 		{
 			name: "invalid L1 validator",
+			tx:   convertSubnetToL1Tx,
 			updateExecutor: func(e *standardTxExecutor) error {
 				return e.state.PutL1Validator(state.L1Validator{
 					ValidationID: ids.GenerateTestID(),
@@ -2520,6 +2576,7 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 		},
 		{
 			name: "insufficient fee",
+			tx:   convertSubnetToL1Tx,
 			updateExecutor: func(e *standardTxExecutor) error {
 				e.feeCalculator = txfee.NewDynamicCalculator(
 					e.backend.Config.DynamicFeeConfig.Weights,
@@ -2530,55 +2587,59 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 			expectedErr: utxo.ErrInsufficientUnlockedFunds,
 		},
 		{
+			name: "validators balance overflow",
+			tx: func() *txs.Tx {
+				convertSubnetToL1Tx := &txs.ConvertSubnetToL1Tx{
+					BaseTx: txs.BaseTx{
+						BaseTx: avax.BaseTx{
+							NetworkID:    ctx.NetworkID,
+							BlockchainID: ctx.ChainID,
+							Ins: []*avax.TransferableInput{
+								{
+									Asset: avax.Asset{
+										ID: ctx.AVAXAssetID,
+									},
+									In: &secp256k1fx.TransferInput{
+										Amt: units.NanoAvax,
+									},
+								},
+							},
+						},
+					},
+					Subnet: subnetID,
+					Validators: []*txs.ConvertSubnetToL1Validator{
+						{
+							NodeID:  types.JSONByteSlice(ids.ShortID{1}.Bytes()),
+							Weight:  1,
+							Balance: math.MaxUint64,
+							Signer:  *pop,
+						},
+						validator,
+					},
+					SubnetAuth: &secp256k1fx.Input{
+						SigIndices: []uint32{0},
+					},
+				}
+
+				tx, err := txs.NewSigned(
+					convertSubnetToL1Tx,
+					txs.Codec,
+					[][]*secp256k1.PrivateKey{{genesistest.DefaultFundedKeys[3]}},
+				)
+				require.NoError(t, err)
+
+				return tx
+			}(),
+			expectedErr: safemath.ErrOverflow,
+		},
+		{
 			name: "valid tx",
+			tx:   convertSubnetToL1Tx,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			require := require.New(t)
-
-			sk, err := localsigner.New()
-			require.NoError(err)
-			pop, err := signer.NewProofOfPossession(sk)
-			require.NoError(err)
-
-			// Create the ConvertSubnetToL1Tx
-			const (
-				weight  = 1
-				balance = 1
-			)
-			var (
-				wallet = txstest.NewWallet(
-					t,
-					ctx,
-					defaultConfig,
-					baseState,
-					secp256k1fx.NewKeychain(genesistest.DefaultFundedKeys...),
-					[]ids.ID{subnetID},
-					nil, // validationIDs
-					nil, // chainIDs
-				)
-				chainID   = ids.GenerateTestID()
-				address   = utils.RandomBytes(32)
-				validator = &txs.ConvertSubnetToL1Validator{
-					NodeID:                nodeID.Bytes(),
-					Weight:                weight,
-					Balance:               balance,
-					Signer:                *pop,
-					RemainingBalanceOwner: message.PChainOwner{},
-					DeactivationOwner:     message.PChainOwner{},
-				}
-			)
-			convertSubnetToL1Tx, err := wallet.IssueConvertSubnetToL1Tx(
-				subnetID,
-				chainID,
-				address,
-				[]*txs.ConvertSubnetToL1Validator{
-					validator,
-				},
-				test.builderOptions...,
-			)
-			require.NoError(err)
 
 			diff, err := state.NewDiffOn(baseState)
 			require.NoError(err)
@@ -2592,25 +2653,26 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 					Ctx:          ctx,
 				},
 				feeCalculator: state.PickFeeCalculator(defaultConfig, baseState),
-				tx:            convertSubnetToL1Tx,
+				tx:            test.tx,
 				state:         diff,
 			}
+			require.NoError(executor.backend.Fx.Bootstrapped())
 			if test.updateExecutor != nil {
 				require.NoError(test.updateExecutor(executor))
 			}
 
-			err = convertSubnetToL1Tx.Unsigned.Visit(executor)
+			err = test.tx.Unsigned.Visit(executor)
 			require.ErrorIs(err, test.expectedErr)
 			if err != nil {
 				return
 			}
 
-			for utxoID := range convertSubnetToL1Tx.InputIDs() {
+			for utxoID := range test.tx.InputIDs() {
 				_, err := diff.GetUTXO(utxoID)
 				require.ErrorIs(err, database.ErrNotFound)
 			}
 
-			for _, expectedUTXO := range convertSubnetToL1Tx.UTXOs() {
+			for _, expectedUTXO := range test.tx.UTXOs() {
 				utxoID := expectedUTXO.InputID()
 				utxo, err := diff.GetUTXO(utxoID)
 				require.NoError(err)
@@ -4155,7 +4217,7 @@ func TestStandardExecutorDisableL1ValidatorTx(t *testing.T) {
 			name:         "not authorized",
 			validationID: validationID,
 			updateTx: func(tx *txs.DisableL1ValidatorTx) {
-				tx.DisableAuth.(*secp256k1fx.Input).SigIndices[0]++
+				tx.DisableAuth.(*secp256k1fx.Input).SigIndices[0] = 123456789
 			},
 			expectedErr: errUnauthorizedModification,
 		},

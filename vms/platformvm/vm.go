@@ -64,6 +64,8 @@ type VM struct {
 	blockbuilder.Builder
 	*network.Network
 	validators.State
+	// TODO remove this once vm lazy initialize is removed
+	MempoolFunc func() pmempool.Mempool
 
 	metrics platformvmmetrics.Metrics
 
@@ -167,9 +169,20 @@ func (vm *VM) Initialize(
 		Bootstrapped: &vm.bootstrapped,
 	}
 
-	mempool, err := pmempool.New("mempool", registerer)
-	if err != nil {
-		return fmt.Errorf("failed to create mempool: %w", err)
+	var mempool pmempool.Mempool
+	if vm.MempoolFunc != nil {
+		mempool = vm.MempoolFunc()
+	} else {
+		mempool, err = pmempool.New(
+			"mempool",
+			vm.Internal.DynamicFeeConfig.Weights,
+			execConfig.MempoolGasCapacity,
+			vm.ctx.AVAXAssetID,
+			registerer,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create mempool: %w", err)
+		}
 	}
 
 	vm.manager = blockexecutor.NewManager(
