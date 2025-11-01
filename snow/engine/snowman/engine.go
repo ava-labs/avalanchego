@@ -5,6 +5,7 @@ package snowman
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -429,6 +430,10 @@ func (e *Engine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID u
 		return err
 	}
 	return e.executeDeferredWork(ctx)
+}
+
+func (*Engine) SimplexMessage(_ context.Context, _ ids.NodeID, _ *p2p.Simplex) error {
+	return errors.New("unsupported call to SimplexMessage")
 }
 
 func (e *Engine) Shutdown(ctx context.Context) error {

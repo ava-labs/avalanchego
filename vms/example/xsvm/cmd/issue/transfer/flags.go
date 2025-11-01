@@ -14,13 +14,14 @@ import (
 )
 
 const (
-	URIKey        = "uri"
-	ChainIDKey    = "chain-id"
-	MaxFeeKey     = "max-fee"
-	AssetIDKey    = "asset-id"
-	AmountKey     = "amount"
-	ToKey         = "to"
-	PrivateKeyKey = "private-key"
+	URIKey               = "uri"
+	ChainIDKey           = "chain-id"
+	MaxFeeKey            = "max-fee"
+	AssetIDKey           = "asset-id"
+	AmountKey            = "amount"
+	ToKey                = "to"
+	PrivateKeyKey        = "private-key"
+	WaitForAcceptanceKey = "wait-for-acceptance"
 )
 
 func AddFlags(flags *pflag.FlagSet) {
@@ -31,16 +32,18 @@ func AddFlags(flags *pflag.FlagSet) {
 	flags.Uint64(AmountKey, units.Schmeckle, "Amount to send")
 	flags.String(ToKey, genesis.EWOQKey.Address().String(), "Destination address")
 	flags.String(PrivateKeyKey, genesis.EWOQKeyFormattedStr, "Private key to sign the transaction")
+	flags.Bool(WaitForAcceptanceKey, true, "Whether to wait for acceptance in the mempool")
 }
 
 type Config struct {
-	URI        string
-	ChainID    ids.ID
-	MaxFee     uint64
-	AssetID    ids.ID
-	Amount     uint64
-	To         ids.ShortID
-	PrivateKey *secp256k1.PrivateKey
+	URI               string
+	ChainID           ids.ID
+	MaxFee            uint64
+	AssetID           ids.ID
+	Amount            uint64
+	To                ids.ShortID
+	PrivateKey        *secp256k1.PrivateKey
+	WaitForAcceptance bool
 }
 
 func ParseFlags(flags *pflag.FlagSet, args []string) (*Config, error) {
@@ -101,6 +104,11 @@ func ParseFlags(flags *pflag.FlagSet, args []string) (*Config, error) {
 		return nil, err
 	}
 
+	waitForAcceptance, err := flags.GetBool(WaitForAcceptanceKey)
+	if err != nil {
+		return nil, err
+	}
+
 	var sk secp256k1.PrivateKey
 	err = sk.UnmarshalText([]byte(`"` + skStr + `"`))
 	if err != nil {
@@ -108,12 +116,13 @@ func ParseFlags(flags *pflag.FlagSet, args []string) (*Config, error) {
 	}
 
 	return &Config{
-		URI:        uri,
-		ChainID:    chainID,
-		MaxFee:     maxFee,
-		AssetID:    assetID,
-		Amount:     amount,
-		To:         to,
-		PrivateKey: &sk,
+		URI:               uri,
+		ChainID:           chainID,
+		MaxFee:            maxFee,
+		AssetID:           assetID,
+		Amount:            amount,
+		To:                to,
+		PrivateKey:        &sk,
+		WaitForAcceptance: waitForAcceptance,
 	}, nil
 }
