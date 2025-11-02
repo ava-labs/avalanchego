@@ -55,30 +55,9 @@ type BenchmarkExecutorConfig struct {
 	// termininating (without error). If 0, no timeout is applied.
 	ExecutionTimeout time.Duration
 
-	// PrefixGatherer is the top-most gatherer where all metrics can be derived
-	// from (e.g. VM metrics, consensus metrics). If MetricsServerEnabled is
-	// true, then the metrics server will export metrics from this gatherer.
+	// PrefixGatherer is the gatherer where consensus metrics from the benchmark
+	// test will be attached to.
 	PrefixGatherer metrics.MultiGatherer
-
-	// MetricsServerEnabled determines whether to enable a Prometheus server
-	// exporting VM metrics.
-	MetricsServerEnabled bool
-	// MetricsPort is the port where the metrics server will listen to.
-	MetricsPort uint64
-	// MetricsCollectorEnabled determines whether to start a Prometheus
-	// collector.
-	MetricsCollectorEnabled bool
-	// MetricsLabels represents the set of labels that will be attached to all
-	// exported metrics.
-	MetricsLabels map[string]string
-	// SDConfigName is the name of the SDConfig file.
-	SDConfigName string
-	// NetworkUUID is the unique identifier corresponding to the benchmark.
-	NetworkUUID string
-	// DashboardPath is the relative Grafana dashboard path used to construct
-	// the metrics visualization URL when MetricsCollectorEnabled is true.
-	// Expected format: "d/dashboard-id/dashboard-name" (e.g., "d/Gl1I20mnk/c-chain").
-	DashboardPath string
 }
 
 // BenchmarkExecutor is a tool for executing a sequence of blocks against a VM.
@@ -94,25 +73,9 @@ func NewBenchmarkExecutor(config BenchmarkExecutorConfig) BenchmarkExecutor {
 // provided VM. It also manages metrics collection and reporting by optionally
 // starting a Prometheus server and collector based on the executor's
 // configuration.
-func (e BenchmarkExecutor) Run(b testing.TB, log logging.Logger, vm block.ChainVM) {
+func (e BenchmarkExecutor) Run(b testing.TB, vm block.ChainVM) {
 	r := require.New(b)
 	ctx := b.Context()
-
-	if e.config.MetricsServerEnabled {
-		serverAddr := startServer(b, log, e.config.PrefixGatherer, e.config.MetricsPort)
-
-		if e.config.MetricsCollectorEnabled {
-			startCollector(
-				b,
-				log,
-				e.config.SDConfigName,
-				e.config.MetricsLabels,
-				serverAddr,
-				e.config.NetworkUUID,
-				e.config.DashboardPath,
-			)
-		}
-	}
 
 	blockChan, err := createBlockChanFromLevelDB(
 		b,
@@ -228,9 +191,9 @@ func NewMainnetVM(
 	return vm, nil
 }
 
-// startServer starts a Prometheus server for the provided gatherer and returns
+// StartServer starts a Prometheus server for the provided gatherer and returns
 // the server address.
-func startServer(
+func StartServer(
 	tb testing.TB,
 	log logging.Logger,
 	gatherer prometheus.Gatherer,
@@ -252,13 +215,13 @@ func startServer(
 	return server.Address()
 }
 
-// startCollector starts a Prometheus collector configured to scrape the server
-// listening on serverAddr. startCollector also attaches the provided labels +
+// StartCollector starts a Prometheus collector configured to scrape the server
+// listening on serverAddr. StartCollector also attaches the provided labels +
 // Github labels if available to the collected metrics.
-func startCollector(
+func StartCollector(
 	tb testing.TB,
 	log logging.Logger,
-	name string,
+	sdConfigName string,
 	labels map[string]string,
 	serverAddr string,
 	networkUUID string,
@@ -292,7 +255,7 @@ func startCollector(
 		r.NoError(tmpnet.CheckMetricsExist(checkMetricsCtx, logger, networkUUID))
 	})
 
-	sdConfigFilePath, err := tmpnet.WritePrometheusSDConfig(name, tmpnet.SDConfig{
+	sdConfigFilePath, err := tmpnet.WritePrometheusSDConfig(sdConfigName, tmpnet.SDConfig{
 		Targets: []string{serverAddr},
 		Labels:  labels,
 	}, true /* withGitHubLabels */)

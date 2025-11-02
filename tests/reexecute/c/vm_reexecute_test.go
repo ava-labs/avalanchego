@@ -166,6 +166,23 @@ func benchmarkReexecuteRange(
 
 	log := tests.NewDefaultLogger("c-chain-reexecution")
 
+	if metricsServerEnabled {
+		serverAddr := reexecute.StartServer(b, log, prefixGatherer, metricsPort)
+
+		if metricsCollectorEnabled {
+			dashboardPath := "d/Gl1I20mnk/c-chain"
+			reexecute.StartCollector(
+				b,
+				log,
+				"c-chain-reexecution",
+				labels,
+				serverAddr,
+				networkUUID,
+				dashboardPath,
+			)
+		}
+	}
+
 	var (
 		vmDBDir      = filepath.Join(currentStateDir, "db")
 		chainDataDir = filepath.Join(currentStateDir, "chain-data-dir")
@@ -212,24 +229,17 @@ func benchmarkReexecuteRange(
 	}()
 
 	config := reexecute.BenchmarkExecutorConfig{
-		BlockDir:                blockDir,
-		StartBlock:              startBlock,
-		EndBlock:                endBlock,
-		ChanSize:                chanSize,
-		ExecutionTimeout:        executionTimeout,
-		PrefixGatherer:          prefixGatherer,
-		MetricsServerEnabled:    metricsServerEnabled,
-		MetricsPort:             metricsPort,
-		MetricsCollectorEnabled: metricsCollectorEnabled,
-		MetricsLabels:           labels,
-		SDConfigName:            "c-chain-reexecution",
-		NetworkUUID:             networkUUID,
-		DashboardPath:           "d/Gl1I20mnk/c-chain",
+		BlockDir:         blockDir,
+		StartBlock:       startBlock,
+		EndBlock:         endBlock,
+		ChanSize:         chanSize,
+		ExecutionTimeout: executionTimeout,
+		PrefixGatherer:   prefixGatherer,
 	}
 	executor := reexecute.NewBenchmarkExecutor(config)
 
 	start := time.Now()
-	executor.Run(b, log, vm)
+	executor.Run(b, vm)
 	elapsed := time.Since(start)
 
 	b.ReportMetric(0, "ns/op")                     // Set default ns/op to 0 to hide from the output
