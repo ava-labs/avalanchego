@@ -94,23 +94,6 @@ func NewVMExecutor(
 	}
 }
 
-func (e *VMExecutor) execute(ctx context.Context, blockBytes []byte) error {
-	blk, err := e.vm.ParseBlock(ctx, blockBytes)
-	if err != nil {
-		return fmt.Errorf("failed to parse block: %w", err)
-	}
-	if err := blk.Verify(ctx); err != nil {
-		return fmt.Errorf("failed to verify block %s at height %d: %w", blk.ID(), blk.Height(), err)
-	}
-
-	if err := blk.Accept(ctx); err != nil {
-		return fmt.Errorf("failed to accept block %s at height %d: %w", blk.ID(), blk.Height(), err)
-	}
-	e.metrics.lastAcceptedHeight.Set(float64(blk.Height()))
-
-	return nil
-}
-
 func (e *VMExecutor) Run(ctx context.Context) error {
 	blkID, err := e.vm.LastAccepted(ctx)
 	if err != nil {
@@ -172,6 +155,23 @@ func (e *VMExecutor) Run(ctx context.Context) error {
 		}
 	}
 	e.log.Info("finished executing sequence")
+
+	return nil
+}
+
+func (e *VMExecutor) execute(ctx context.Context, blockBytes []byte) error {
+	blk, err := e.vm.ParseBlock(ctx, blockBytes)
+	if err != nil {
+		return fmt.Errorf("failed to parse block: %w", err)
+	}
+	if err := blk.Verify(ctx); err != nil {
+		return fmt.Errorf("failed to verify block %s at height %d: %w", blk.ID(), blk.Height(), err)
+	}
+
+	if err := blk.Accept(ctx); err != nil {
+		return fmt.Errorf("failed to accept block %s at height %d: %w", blk.ID(), blk.Height(), err)
+	}
+	e.metrics.lastAcceptedHeight.Set(float64(blk.Height()))
 
 	return nil
 }
