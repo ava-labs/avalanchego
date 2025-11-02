@@ -228,18 +228,19 @@ func benchmarkReexecuteRange(
 		r.NoError(vm.Shutdown(ctx))
 	}()
 
-	config := reexecute.BenchmarkExecutorConfig{
-		BlockDir:         blockDir,
-		StartBlock:       startBlock,
-		EndBlock:         endBlock,
-		ChanSize:         chanSize,
-		ExecutionTimeout: executionTimeout,
-		PrefixGatherer:   prefixGatherer,
-	}
-	executor := reexecute.NewBenchmarkExecutor(config)
+	executor := reexecute.NewVMExecutor(
+		b,
+		vm,
+		blockDir,
+		startBlock,
+		endBlock,
+		chanSize,
+		executionTimeout,
+		prefixGatherer,
+	)
 
 	start := time.Now()
-	executor.Run(b, vm)
+	r.NoError(executor.Run(ctx))
 	elapsed := time.Since(start)
 
 	b.ReportMetric(0, "ns/op")                     // Set default ns/op to 0 to hide from the output
