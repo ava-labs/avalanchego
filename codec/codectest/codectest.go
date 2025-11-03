@@ -770,7 +770,7 @@ func TestSliceWithEmptySerialization(t testing.TB, codec codecpkg.GeneralCodec) 
 	require.NoError(manager.RegisterCodec(0, codec))
 
 	val := &nestedSliceStruct{
-		Arr: make([]emptyStruct, 0),
+		Arr: []emptyStruct{},
 	}
 	expected := []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00} // codec version (0x00, 0x00) then (0x00, 0x00, 0x00, 0x00) for numElts
 	result, err := manager.Marshal(0, val)
