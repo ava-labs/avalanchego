@@ -12,9 +12,28 @@ The goal of this guide is to lay out best practices regarding writing, testing a
 
 ## Prerequisites
 
-### NodeJS and NPM
+### Go
 
-First, install the LTS (long-term support) version of [nodejs](https://nodejs.org/en). This is `18.16.0` at the time of writing. NodeJS bundles `npm`.
+This project requires Go 1.21 or later. Install from [golang.org](https://golang.org/dl/).
+
+### Solidity Compiler (solc)
+
+The Solidity compiler version 0.8.30 is required to compile contracts. In CI, this is installed automatically via the [setup-solc](https://github.com/ARR4N/setup-solc) GitHub Action.
+
+For local development, install solc 0.8.30:
+- **macOS**: `brew install solidity` 
+- **Linux**: Follow instructions at [solidity docs](https://docs.soliditylang.org/en/latest/installing-solidity.html)
+- **CI**: Automatically installed via GitHub Actions
+
+After installation, create a version-specific alias or symlink:
+```bash
+# Option 1: Symlink (works in all contexts including go generate)
+sudo ln -sf $(which solc) /usr/local/bin/solc-v0.8.30  # Linux
+sudo ln -sf $(which solc) /opt/homebrew/bin/solc-v0.8.30  # macOS (Homebrew)
+
+# Option 2: Shell alias (interactive shells only)
+echo "alias solc-v0.8.30='solc'" >> ~/.bashrc  # or ~/.zshrc
+```
 
 ### Solidity and Avalanche
 
@@ -22,13 +41,46 @@ It is also helpful to have a basic understanding of [Solidity](https://docs.soli
 
 ## Dependencies
 
-Clone the repo and install the necessary packages via `yarn`.
+Clone the repo and install dependencies:
 
 ```bash
 git clone https://github.com/ava-labs/subnet-evm.git
-cd contracts
-npm install
+cd subnet-evm/contracts
+npm ci  # Installs OpenZeppelin and other Node.js dependencies
 ```
+
+## Compiling Contracts
+
+Contracts are compiled using `solc` directly, and Go bindings are generated using `abigen` from [libevm](https://github.com/ava-labs/libevm).
+
+OpenZeppelin contracts are included as a git submodule at `contracts/lib/openzeppelin-contracts/` (pinned to v5.4.0).
+
+From the repository root, run:
+
+```bash
+./scripts/run_task.sh setup-contracts
+```
+
+This will:
+1. Compile all Solidity contracts in `contracts/contracts/` to ABIs and bytecode
+2. Generate Go bindings in `contracts/bindings/`
+
+The compilation artifacts (`.abi` and `.bin` files) are stored in `contracts/artifacts/` (gitignored).
+The generated Go bindings in `contracts/bindings/` are committed to the repository.
+
+### Manual Compilation
+
+To manually compile contracts and generate bindings:
+
+```bash
+cd contracts
+npm ci  # Install dependencies if not already done
+go generate ./...  # Compile contracts and generate bindings
+```
+
+All compilation and code generation is configured in `contracts/contracts/compile.go` using `go:generate` directives. The directives execute in order:
+1. First, `solc` compiles `.sol` files to `.abi` and `.bin` files in `artifacts/`
+2. Then, `abigen` generates Go bindings from the artifacts to `bindings/*.go`
 
 ## Write Contracts
 
