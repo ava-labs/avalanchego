@@ -151,6 +151,7 @@ func TestBlockRequestHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			executeBlockRequestTest(t, test, blocks)
 		})
 	}
@@ -208,12 +209,14 @@ func TestBlockRequestHandlerLargeBlocks(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			executeBlockRequestTest(t, test, blocks)
 		})
 	}
 }
 
 func TestBlockRequestHandlerCtxExpires(t *testing.T) {
+	t.Parallel()
 	gspec := &core.Genesis{
 		Config: params.TestChainConfig,
 	}
