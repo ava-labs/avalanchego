@@ -143,8 +143,8 @@ func (m *mempool) Add(tx *txs.Tx) error {
 
 	// Try to evict lower gas priced txs if we do not have enough remaining gas
 	// capacity
-	if err := m.allocateSpace(meteredTx); err != nil {
-		return err
+	if !m.allocateSpace(meteredTx) {
+		return ErrNotEnoughGas
 	}
 
 	m.tree.ReplaceOrInsert(meteredTx)
@@ -160,11 +160,11 @@ func (m *mempool) Add(tx *txs.Tx) error {
 }
 
 // Try to evict transactions until there is enough capacity for the tx.
-// Returns if any txs were evicted.
-func (m *mempool) allocateSpace(txToAdd meteredTx) error {
+// Returns if we are able to fit this tx.
+func (m *mempool) allocateSpace(txToAdd meteredTx) bool {
 	// We have enough space for this tx
 	if txToAdd.gasUsed <= m.gasAvailable {
-		return nil
+		return true
 	}
 
 	gasToFree := txToAdd.gasUsed - m.gasAvailable
@@ -186,14 +186,14 @@ func (m *mempool) allocateSpace(txToAdd meteredTx) error {
 
 	// We do not have enough space for this tx
 	if gasFreed < gasToFree {
-		return ErrNotEnoughGas
+		return false
 	}
 
 	for _, txID := range toEvict {
 		m.remove(txID)
 	}
 
-	return nil
+	return true
 }
 
 func (m *mempool) meter(tx *txs.Tx) (meteredTx, error) {
