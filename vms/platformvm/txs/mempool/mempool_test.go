@@ -829,11 +829,24 @@ func TestMempool_Iterate(t *testing.T) {
 			},
 		},
 		{
+			// txs should be ordered in descending gas price
 			name: "multiple txs",
 			txs: []*txs.Tx{
-				newTx(ids.ID{1}),
-				newTx(ids.ID{2}),
-				newTx(ids.ID{3}),
+				newTxWithUTXOs(
+					ids.ID{1},
+					[]*avax.TransferableInput{newAVAXInput(ids.GenerateTestID(), 10)},
+					0,
+				),
+				newTxWithUTXOs(
+					ids.ID{3},
+					[]*avax.TransferableInput{newAVAXInput(ids.GenerateTestID(), 1000)},
+					0,
+				),
+				newTxWithUTXOs(
+					ids.ID{2},
+					[]*avax.TransferableInput{newAVAXInput(ids.GenerateTestID(), 100)},
+					0,
+				),
 			},
 			wantTxs: []ids.ID{
 				{3},
