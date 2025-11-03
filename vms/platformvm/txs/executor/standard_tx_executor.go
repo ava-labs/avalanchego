@@ -213,6 +213,7 @@ func (e *standardTxExecutor) CreateChainTx(tx *txs.CreateChainTx) error {
 		return fmt.Errorf("getting utxos %w", err)
 	}
 
+	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -272,6 +273,7 @@ func (e *standardTxExecutor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		return fmt.Errorf("getting utxos %w", err)
 	}
 
+	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -362,6 +364,7 @@ func (e *standardTxExecutor) ImportTx(tx *txs.ImportTx) error {
 			return fmt.Errorf("getting utxos %w", err)
 		}
 
+		// Verify the flowcheck
 		fee, err := e.feeCalculator.CalculateFee(tx)
 		if err != nil {
 			return err
@@ -428,6 +431,7 @@ func (e *standardTxExecutor) ExportTx(tx *txs.ExportTx) error {
 		return fmt.Errorf("getting utxos %w", err)
 	}
 
+	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -558,6 +562,7 @@ func (e *standardTxExecutor) TransformSubnetTx(tx *txs.TransformSubnetTx) error 
 		return fmt.Errorf("getting utxos %w", err)
 	}
 
+	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -699,6 +704,7 @@ func (e *standardTxExecutor) BaseTx(tx *txs.BaseTx) error {
 		return fmt.Errorf("getting utxos %w", err)
 	}
 
+	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -885,6 +891,7 @@ func (e *standardTxExecutor) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx
 		return fmt.Errorf("getting utxos %w", err)
 	}
 
+	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -1042,6 +1049,7 @@ func (e *standardTxExecutor) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeight
 		return fmt.Errorf("getting utxos %w", err)
 	}
 
+	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -1187,6 +1195,7 @@ func (e *standardTxExecutor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1Vali
 		return fmt.Errorf("getting utxos %w", err)
 	}
 
+	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -1286,6 +1295,7 @@ func (e *standardTxExecutor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) 
 		return fmt.Errorf("getting utxos %w", err)
 	}
 
+	// Verify the flowcheck
 	fee, err := e.feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err

@@ -166,6 +166,7 @@ func verifyAddValidatorTx(
 		)
 	}
 
+	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return nil, err
@@ -269,6 +270,7 @@ func verifyAddSubnetValidatorTx(
 		return fmt.Errorf("getting utxos %w", err)
 	}
 
+	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -614,6 +616,7 @@ func verifyAddPermissionlessValidatorTx(
 		return fmt.Errorf("getting utxos %w", err)
 	}
 
+	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -767,6 +770,7 @@ func verifyAddPermissionlessDelegatorTx(
 		return fmt.Errorf("getting utxos %w", err)
 	}
 
+	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
@@ -837,6 +841,7 @@ func verifyTransferSubnetOwnershipTx(
 		return fmt.Errorf("getting utxos %w", err)
 	}
 
+	// Verify the flowcheck
 	fee, err := feeCalculator.CalculateFee(tx)
 	if err != nil {
 		return err
