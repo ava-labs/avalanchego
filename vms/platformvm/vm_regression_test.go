@@ -286,9 +286,6 @@ func TestAddDelegatorTxHeapCorruption(t *testing.T) {
 			)
 			require.NoError(err)
 
-			blk0, err = vm.GetBlock(t.Context(), blk1.ID())
-			require.NoError(err)
-
 			acceptedBlk2, err := block.NewBanffStandardBlock(
 				blk1.Timestamp().Add(time.Second),
 				blk1.ID(),
@@ -1231,6 +1228,7 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 		},
 		rewardsOwner,
 	)
+	require.NoError(err)
 
 	acceptedBlk3, err := block.NewBanffStandardBlock(
 		blk2.Timestamp().Add(time.Second),
