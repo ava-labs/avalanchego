@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1762096904311,
+  "lastUpdate": 1762173508917,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -2990,6 +2990,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
             "value": 42.28,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Arran Schlosberg",
+            "username": "ARR4N",
+            "email": "519948+ARR4N@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "55b655be963cd4a2fbb9ff5d20fe947246ecafe5",
+          "message": "feat: `emulate` package for temporary `libevm` registration (#4430)\n\nSigned-off-by: Arran Schlosberg <519948+ARR4N@users.noreply.github.com>\nCo-authored-by: Copilot <175728472+Copilot@users.noreply.github.com>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>",
+          "timestamp": "2025-10-31T16:32:39Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/55b655be963cd4a2fbb9ff5d20fe947246ecafe5"
+        },
+        "date": 1762173508421,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
+            "value": 73.63,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
