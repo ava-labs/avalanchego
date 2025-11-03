@@ -5,7 +5,6 @@ package network
 
 import (
 	"math"
-	"math/rand"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -13,6 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/metrics"
+
+	"github.com/ava-labs/coreth/utils/rand"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -66,17 +67,21 @@ func NewPeerTracker() *peerTracker {
 
 // shouldTrackNewPeer returns true if we are not connected to enough peers.
 // otherwise returns true probabilistically based on the number of tracked peers.
-func (p *peerTracker) shouldTrackNewPeer() bool {
+func (p *peerTracker) shouldTrackNewPeer() (bool, error) {
 	numResponsivePeers := p.responsivePeers.Len()
 	if numResponsivePeers < desiredMinResponsivePeers {
-		return true
+		return true, nil
 	}
 	if len(p.trackedPeers) >= len(p.peers) {
 		// already tracking all the peers
-		return false
+		return false, nil
 	}
 	newPeerProbability := math.Exp(-float64(numResponsivePeers) * newPeerConnectFactor)
-	return rand.Float64() < newPeerProbability
+	randomValue, err := rand.SecureFloat64()
+	if err != nil {
+		return false, err
+	}
+	return randomValue < newPeerProbability, nil
 }
 
 // getResponsivePeer returns a random [ids.NodeID] of a peer that has responded
@@ -94,8 +99,12 @@ func (p *peerTracker) getResponsivePeer() (ids.NodeID, safemath.Averager, bool) 
 	return nodeID, peer.bandwidth, true
 }
 
-func (p *peerTracker) GetAnyPeer(minVersion *version.Application) (ids.NodeID, bool) {
-	if p.shouldTrackNewPeer() {
+func (p *peerTracker) GetAnyPeer(minVersion *version.Application) (ids.NodeID, bool, error) {
+	shouldTrackNewPeer, err := p.shouldTrackNewPeer()
+	if err != nil {
+		return ids.NodeID{}, false, err
+	}
+	if shouldTrackNewPeer {
 		for nodeID := range p.peers {
 			// if minVersion is specified and peer's version is less, skip
 			if minVersion != nil && p.peers[nodeID].version.Compare(minVersion) < 0 {
@@ -106,7 +115,7 @@ func (p *peerTracker) GetAnyPeer(minVersion *version.Application) (ids.NodeID, b
 				continue
 			}
 			log.Debug("peer tracking: connecting to new peer", "trackedPeers", len(p.trackedPeers), "nodeID", nodeID)
-			return nodeID, true
+			return nodeID, true, nil
 		}
 	}
 	var (
@@ -115,18 +124,23 @@ func (p *peerTracker) GetAnyPeer(minVersion *version.Application) (ids.NodeID, b
 		random   bool
 		averager safemath.Averager
 	)
-	if rand.Float64() < randomPeerProbability {
+	randomValue, err := rand.SecureFloat64()
+	switch {
+	case err != nil:
+		return ids.NodeID{}, false, err
+	case randomValue < randomPeerProbability:
 		random = true
 		nodeID, averager, ok = p.getResponsivePeer()
-	} else {
+	default:
 		nodeID, averager, ok = p.bandwidthHeap.Pop()
 	}
 	if ok {
 		log.Debug("peer tracking: popping peer", "nodeID", nodeID, "bandwidth", averager.Read(), "random", random)
-		return nodeID, true
+		return nodeID, true, err
 	}
 	// if no nodes found in the bandwidth heap, return a tracked node at random
-	return p.trackedPeers.Peek()
+	nodeID, ok = p.trackedPeers.Peek()
+	return nodeID, ok, nil
 }
 
 func (p *peerTracker) TrackPeer(nodeID ids.NodeID) {
