@@ -201,6 +201,12 @@ func GetLatestSyncPerformed(db ethdb.Iteratee) (uint64, error) {
 	return latestSyncPerformed, it.Error()
 }
 
+// ParseSyncPerformedKey returns the block number from keys returned by
+// NewSyncPerformedIterator. It panics if the key is shorter than `syncPerformedKeyLength`.
+func ParseSyncPerformedKey(key []byte) uint64 {
+	return binary.BigEndian.Uint64(key[len(syncPerformedPrefix):])
+}
+
 // clearPrefix removes all keys in db that begin with prefix and match an
 // expected key length. `keyLen` must include the length of the prefix.
 func clearPrefix(db ethdb.KeyValueStore, prefix []byte, keyLen int) error {
@@ -229,10 +235,4 @@ func clearPrefix(db ethdb.KeyValueStore, prefix []byte, keyLen int) error {
 		return err
 	}
 	return batch.Write()
-}
-
-// ParseSyncPerformedKey returns the block number from keys returned by
-// NewSyncPerformedIterator. It panics if the key is shorter than `syncPerformedKeyLength`.
-func ParseSyncPerformedKey(key []byte) uint64 {
-	return binary.BigEndian.Uint64(key[len(syncPerformedPrefix):])
 }
