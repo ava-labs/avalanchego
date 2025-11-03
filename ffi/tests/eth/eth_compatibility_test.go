@@ -4,6 +4,7 @@
 package eth
 
 import (
+	"context"
 	"encoding/binary"
 	"math/rand"
 	"path"
@@ -78,7 +79,7 @@ func newMerkleTriePair(t *testing.T) *merkleTriePair {
 	tr, err := tdb.OpenTrie(ethRoot)
 	r.NoError(err)
 	t.Cleanup(func() {
-		r.NoError(db.Close())
+		r.NoError(db.Close(context.Background())) //nolint:usetesting // t.Context() will already be cancelled
 	})
 
 	return &merkleTriePair{

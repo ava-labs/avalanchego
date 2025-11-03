@@ -38,9 +38,6 @@ type kVBackend interface {
 	// commits happen on a rolling basis.
 	// Length of the root slice is guaranteed to be common.HashLength.
 	Commit(root []byte) error
-
-	// Close closes the backend and releases all held resources.
-	Close() error
 }
 
 // Prefetch is a no-op since we don't need to prefetch for Firewood.

@@ -5,6 +5,7 @@ package ffi
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -59,14 +60,14 @@ var (
 	expectedRoots map[string]string
 )
 
-func inferHashingMode() (string, error) {
+func inferHashingMode(ctx context.Context) (string, error) {
 	dbFile := filepath.Join(os.TempDir(), "test.db")
-	db, closeDB, err := newDatabase(dbFile)
+	db, err := newDatabase(dbFile)
 	if err != nil {
 		return "", err
 	}
 	defer func() {
-		_ = closeDB()
+		_ = db.Close(ctx)
 		_ = os.Remove(dbFile)
 	}()
 
@@ -111,7 +112,7 @@ func TestMain(m *testing.M) {
 	// Otherwise, infer the hash mode from an empty database.
 	hashMode := os.Getenv("TEST_FIREWOOD_HASH_MODE")
 	if hashMode == "" {
-		inferredHashMode, err := inferHashingMode()
+		inferredHashMode, err := inferHashingMode(context.Background())
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "failed to infer hash mode %v\n", err)
 			os.Exit(1)
@@ -133,15 +134,15 @@ func newTestDatabase(t *testing.T, configureFns ...func(*Config)) *Database {
 	r := require.New(t)
 
 	dbFile := filepath.Join(t.TempDir(), "test.db")
-	db, closeDB, err := newDatabase(dbFile, configureFns...)
+	db, err := newDatabase(dbFile, configureFns...)
 	r.NoError(err)
 	t.Cleanup(func() {
-		r.NoError(closeDB())
+		r.NoError(db.Close(context.Background())) //nolint:usetesting // t.Context() will already be cancelled
 	})
 	return db
 }
 
-func newDatabase(dbFile string, configureFns ...func(*Config)) (*Database, func() error, error) {
+func newDatabase(dbFile string, configureFns ...func(*Config)) (*Database, error) {
 	conf := DefaultConfig()
 	conf.Truncate = true // in tests, we use filepath.Join, which creates an empty file
 	for _, fn := range configureFns {
@@ -150,9 +151,9 @@ func newDatabase(dbFile string, configureFns ...func(*Config)) (*Database, func(
 
 	f, err := New(dbFile, conf)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create new database at filepath %q: %w", dbFile, err)
+		return nil, fmt.Errorf("failed to create new database at filepath %q: %w", dbFile, err)
 	}
-	return f, f.Close, nil
+	return f, nil
 }
 
 func TestUpdateSingleKV(t *testing.T) {
@@ -196,7 +197,7 @@ func TestTruncateDatabase(t *testing.T) {
 	r.NoError(err)
 
 	// Close the database.
-	r.NoError(db.Close())
+	r.NoError(db.Close(t.Context()))
 
 	// Reopen the database with truncate enabled.
 	db, err = New(dbFile, config)
@@ -210,16 +211,16 @@ func TestTruncateDatabase(t *testing.T) {
 	r.NoError(err)
 	r.Equal(expectedHash, hash, "Root hash mismatch after truncation")
 
-	r.NoError(db.Close())
+	r.NoError(db.Close(t.Context()))
 }
 
 func TestClosedDatabase(t *testing.T) {
 	r := require.New(t)
 	dbFile := filepath.Join(t.TempDir(), "test.db")
-	db, _, err := newDatabase(dbFile)
+	db, err := newDatabase(dbFile)
 	r.NoError(err)
 
-	r.NoError(db.Close())
+	r.NoError(db.Close(t.Context()))
 
 	_, err = db.Root()
 	r.ErrorIs(err, errDBClosed)
@@ -231,7 +232,7 @@ func TestClosedDatabase(t *testing.T) {
 	r.Empty(root)
 	r.ErrorIs(err, errDBClosed)
 
-	r.NoError(db.Close())
+	r.NoError(db.Close(t.Context()))
 }
 
 func keyForTest(i int) []byte {
@@ -1168,6 +1169,63 @@ func TestGetFromRootParallel(t *testing.T) {
 	for i := 0; i < numReaders; i++ {
 		err := <-results
 		r.NoError(err, "Parallel operation failed")
+	}
+}
+
+func TestProposalHandlesFreed(t *testing.T) {
+	t.Parallel()
+
+	db, err := newDatabase(filepath.Join(t.TempDir(), "test_GC_drops_proposal.db"))
+	require.NoError(t, err)
+
+	// These MUST NOT be committed nor dropped as they demonstrate that the GC
+	// finalizer does it for us.
+	p0, err := db.Propose(kvForTest(1))
+	require.NoErrorf(t, err, "%T.Propose(...)", db)
+	p1, err := p0.Propose(kvForTest(1))
+	require.NoErrorf(t, err, "%T.Propose(...)", p0)
+
+	// Demonstrates that explicit [Proposal.Commit] and [Proposal.Drop] calls
+	// are sufficient to unblock [Database.Close].
+	var keep []*Proposal
+	for name, free := range map[string](func(*Proposal) error){
+		"Commit": (*Proposal).Commit,
+		"Drop":   (*Proposal).Drop,
+	} {
+		p, err := db.Propose(kvForTest(1))
+		require.NoErrorf(t, err, "%T.Propose(...)", db)
+		require.NoErrorf(t, free(p), "%T.%s()", p, name)
+		keep = append(keep, p)
+	}
+
+	done := make(chan struct{})
+	go func() {
+		require.NoErrorf(t, db.Close(t.Context()), "%T.Close()", db)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		t.Errorf("%T.Close() returned with undropped %T", db, p0) //nolint:forbidigo // Use of require is impossible without a hack like require.False(true)
+	case <-time.After(300 * time.Millisecond):
+		// TODO(arr4n) use `synctest` package when at Go 1.25
+	}
+
+	runtime.KeepAlive(p0)
+	runtime.KeepAlive(p1)
+	p0 = nil
+	p1 = nil //nolint:ineffassign // Makes the value unreachable, allowing the finalizer to call Drop()
+
+	// In practice there's no need to call [runtime.GC] if [Database.Close] is
+	// called after all proposals are unreachable, as it does it itself.
+	runtime.GC()
+	// Note that [Database.Close] waits for outstanding proposals, so this would
+	// block permanently if the unreachability of `p0` and `p1` didn't result in
+	// their [Proposal.Drop] methods being called.
+	<-done
+
+	for _, p := range keep {
+		runtime.KeepAlive(p)
 	}
 }
 
