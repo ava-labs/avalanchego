@@ -33,12 +33,15 @@ function setup_lint {
     -type f
     -name '*.go'
     ! -name '*.pb.go'
+    ! -name '*.connect.go' \
     ! -name 'mock_*.go'
     ! -name 'mocks_*.go'
     ! -name 'mocks.go'
     ! -name 'mock.go'
     ! -name 'gen_*.go'
     ! -path './**/*mock/*.go'
+    ! -name '*.canoto.go' \
+    ! -name '*.bindings.go'
   )
 
   # Combined loop: build both upstream licensed find and exclude args
@@ -82,7 +85,7 @@ function setup_lint {
   trap 'rm -rf -- "$TMP_DIR"' EXIT
 
   AVALANCHE_LINT_FILE="${TMP_DIR}/.avalanche-golangci.yml"
-  cp .avalanche-golangci.yml "$AVALANCHE_LINT_FILE"
+  cp .golangci.yml "$AVALANCHE_LINT_FILE"
 
   # Exclude all upstream files dynamically
   echo "    paths-except:" >> "$AVALANCHE_LINT_FILE"
