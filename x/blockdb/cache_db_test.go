@@ -11,29 +11,29 @@ import (
 )
 
 func TestCacheOnMiss(t *testing.T) {
-	db, _ := newTestDatabase(t, DefaultConfig())
+	db := newCacheDatabase(t, DefaultConfig())
 	height := uint64(20)
 	block := randomBlock(t)
 	require.NoError(t, db.Put(height, block))
 
 	// Evict the entry from cache to simulate a cache miss
-	db.blockCache.Evict(height)
+	db.cache.Evict(height)
 
 	// Read the block - should populate the cache on cache miss
 	_, err := db.Get(height)
 	require.NoError(t, err)
 
-	_, ok := db.blockCache.Get(height)
+	_, ok := db.cache.Get(height)
 	require.True(t, ok)
 }
 
 func TestCacheGet(t *testing.T) {
-	db, _ := newTestDatabase(t, DefaultConfig())
+	db := newCacheDatabase(t, DefaultConfig())
 	height := uint64(30)
 	block := randomBlock(t)
 
 	// Populate cache directly without writing to database
-	db.blockCache.Put(height, block)
+	db.cache.Put(height, block)
 
 	// Get should return the block from cache
 	data, err := db.Get(height)
@@ -42,12 +42,12 @@ func TestCacheGet(t *testing.T) {
 }
 
 func TestCacheHas(t *testing.T) {
-	db, _ := newTestDatabase(t, DefaultConfig())
+	db := newCacheDatabase(t, DefaultConfig())
 	height := uint64(40)
 	block := randomBlock(t)
 
 	// Populate cache directly without writing to database
-	db.blockCache.Put(height, block)
+	db.cache.Put(height, block)
 
 	// Has should return true from cache even though block is not in database
 	has, err := db.Has(height)
@@ -56,7 +56,7 @@ func TestCacheHas(t *testing.T) {
 }
 
 func TestCachePutStoresClone(t *testing.T) {
-	db, _ := newTestDatabase(t, DefaultConfig())
+	db := newCacheDatabase(t, DefaultConfig())
 	height := uint64(40)
 	block := randomBlock(t)
 	clone := slices.Clone(block)
@@ -66,13 +66,13 @@ func TestCachePutStoresClone(t *testing.T) {
 	clone[0] = 99
 
 	// Cache should have the original unmodified data
-	cached, ok := db.blockCache.Get(height)
+	cached, ok := db.cache.Get(height)
 	require.True(t, ok)
 	require.Equal(t, block, cached)
 }
 
 func TestCacheGetReturnsClone(t *testing.T) {
-	db, _ := newTestDatabase(t, DefaultConfig())
+	db := newCacheDatabase(t, DefaultConfig())
 	height := uint64(50)
 	block := randomBlock(t)
 	require.NoError(t, db.Put(height, block))
@@ -83,7 +83,7 @@ func TestCacheGetReturnsClone(t *testing.T) {
 	data[0] = 99
 
 	// Cache should still have the original unmodified data
-	cached, ok := db.blockCache.Get(height)
+	cached, ok := db.cache.Get(height)
 	require.True(t, ok)
 	require.Equal(t, block, cached)
 
@@ -94,20 +94,20 @@ func TestCacheGetReturnsClone(t *testing.T) {
 }
 
 func TestCachePutOverridesSameHeight(t *testing.T) {
-	db, _ := newTestDatabase(t, DefaultConfig())
+	db := newCacheDatabase(t, DefaultConfig())
 	height := uint64(60)
 	b1 := randomBlock(t)
 	require.NoError(t, db.Put(height, b1))
 
 	// Verify first block is in cache
-	cached, ok := db.blockCache.Get(height)
+	cached, ok := db.cache.Get(height)
 	require.True(t, ok)
 	require.Equal(t, b1, cached)
 
 	// Put second block at same height and verify it overrides the first one
 	b2 := randomBlock(t)
 	require.NoError(t, db.Put(height, b2))
-	cached, ok = db.blockCache.Get(height)
+	cached, ok = db.cache.Get(height)
 	require.True(t, ok)
 	require.Equal(t, b2, cached)
 	require.NotEqual(t, b1, cached)

@@ -44,8 +44,7 @@ func TestPutGet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			db, cleanup := newTestDatabase(t, DefaultConfig())
-			defer cleanup()
+			db := newDatabase(t, DefaultConfig())
 			require.NoError(t, db.Put(0, tt.block))
 
 			got, err := db.Get(0)
@@ -151,9 +150,7 @@ func TestPut_MaxHeight(t *testing.T) {
 			if config.CheckpointInterval == 0 {
 				config = DefaultConfig()
 			}
-
-			store, cleanup := newTestDatabase(t, config)
-			defer cleanup()
+			store := newDatabase(t, config)
 
 			blocksWritten := make(map[uint64][]byte)
 			for _, h := range tt.blockHeights {
@@ -170,8 +167,7 @@ func TestPut_MaxHeight(t *testing.T) {
 }
 
 func TestWriteBlock_Concurrency(t *testing.T) {
-	store, cleanup := newTestDatabase(t, DefaultConfig())
-	defer cleanup()
+	store := newDatabase(t, DefaultConfig())
 
 	var wg sync.WaitGroup
 	var errors atomic.Int32
@@ -303,11 +299,10 @@ func TestWriteBlock_Errors(t *testing.T) {
 				config = DefaultConfig()
 			}
 
-			store, cleanup := newTestDatabase(t, config)
+			store := newDatabase(t, config)
 			if tt.disableCompression {
 				store.compressor = compression.NewNoCompressor()
 			}
-			defer cleanup()
 
 			if tt.setup != nil {
 				tt.setup(store)

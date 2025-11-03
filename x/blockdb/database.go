@@ -12,7 +12,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -177,7 +176,6 @@ type Database struct {
 	log        logging.Logger
 	closed     bool
 	fileCache  *lru.Cache[int, *os.File]
-	blockCache *lru.Cache[BlockHeight, BlockData]
 	compressor compression.Compressor
 
 	// closeMu prevents the database from being closed while in use and prevents
@@ -199,7 +197,7 @@ type Database struct {
 // Parameters:
 //   - config: Configuration parameters
 //   - log: Logger instance for structured logging
-func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
+func New(config DatabaseConfig, log logging.Logger) (database.HeightIndex, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
@@ -225,7 +223,6 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 				f.Close()
 			}
 		}),
-		blockCache: lru.NewCache[BlockHeight, BlockData](config.BlockCacheSize),
 		compressor: compressor,
 	}
 
@@ -234,7 +231,7 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 		zap.String("dataDir", config.DataDir),
 		zap.Uint64("maxDataFileSize", config.MaxDataFileSize),
 		zap.Int("maxDataFiles", config.MaxDataFiles),
-		zap.Int("blockCacheSize", config.BlockCacheSize),
+		zap.Uint16("blockCacheSize", config.BlockCacheSize),
 	)
 
 	if err := s.openAndInitializeIndex(); err != nil {
@@ -260,6 +257,9 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 		zap.Uint64("maxBlockHeight", maxHeight),
 	)
 
+	if config.BlockCacheSize > 0 {
+		return newCacheDB(s, config.BlockCacheSize), nil
+	}
 	return s, nil
 }
 
@@ -279,7 +279,6 @@ func (s *Database) Close() error {
 	}
 
 	s.closeFiles()
-	s.blockCache.Flush()
 
 	s.log.Info("Block database closed successfully")
 	return err
@@ -291,9 +290,7 @@ func (s *Database) Put(height BlockHeight, block BlockData) error {
 	defer s.closeMu.RUnlock()
 
 	if s.closed {
-		s.log.Error("Failed to write block: database is closed",
-			zap.Uint64("height", height),
-		)
+		s.log.Error("Failed Put: database closed", zap.Uint64("height", height))
 		return database.ErrClosed
 	}
 
@@ -376,7 +373,6 @@ func (s *Database) Put(height BlockHeight, block BlockData) error {
 		)
 		return err
 	}
-	s.blockCache.Put(height, slices.Clone(block))
 
 	s.log.Debug("Block written successfully",
 		zap.Uint64("height", height),
@@ -441,10 +437,10 @@ func (s *Database) Get(height BlockHeight) (BlockData, error) {
 		return nil, database.ErrClosed
 	}
 
-	if c, ok := s.blockCache.Get(height); ok {
-		return slices.Clone(c), nil
-	}
+	return s.getWithoutLock(height)
+}
 
+func (s *Database) getWithoutLock(height BlockHeight) (BlockData, error) {
 	indexEntry, err := s.readBlockIndex(height)
 	if err != nil {
 		return nil, err
@@ -495,7 +491,6 @@ func (s *Database) Get(height BlockHeight) (BlockData, error) {
 		return nil, fmt.Errorf("checksum mismatch: calculated %d, stored %d", calculatedChecksum, bh.Checksum)
 	}
 
-	s.blockCache.Put(height, slices.Clone(decompressed))
 	return decompressed, nil
 }
 
@@ -509,9 +504,10 @@ func (s *Database) Has(height BlockHeight) (bool, error) {
 		return false, database.ErrClosed
 	}
 
-	if _, ok := s.blockCache.Get(height); ok {
-		return true, nil
-	}
+	return s.hasWithoutLock(height)
+}
+
+func (s *Database) hasWithoutLock(height BlockHeight) (bool, error) {
 	_, err := s.readBlockIndex(height)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) || errors.Is(err, ErrInvalidBlockHeight) {
