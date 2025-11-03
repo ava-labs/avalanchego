@@ -64,8 +64,6 @@ inputs:
     default: ${{ github.run_attempt }}
   job:
     default: ${{ github.job }}
-  grafana-dashboard-id:
-    default: 'Gl1I20mnk/c-chain'
 
 runs:
   using: composite
@@ -100,7 +98,7 @@ runs:
         echo "Grafana: ${metrics_url}"
         echo "🔗 [View Grafana Dashboard](${metrics_url})" >> "$GITHUB_STEP_SUMMARY"
       env:
-        GRAFANA_URL: https://grafana-poc.avax-dev.network/d/${{ inputs.grafana_dashboard_id }}?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
+        GRAFANA_URL: https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
     - name: Warn that collection of metrics and logs will not be performed
       if: inputs.prometheus-username == ''
@@ -128,8 +126,6 @@ runs:
       env:
         RUNNER_NAME: ${{ inputs.runner_name }}
         TMPNET_START_METRICS_COLLECTOR: ${{ inputs.prometheus-username != '' }}
-        TMPNET_CHECK_METRICS_COLLECTED: ${{ inputs.prometheus-username != '' }}
-        METRICS_SERVER_ENABLED: ${{ inputs.prometheus-username != '' }}
         METRICS_COLLECTOR_ENABLED: ${{ inputs.prometheus-username != '' }}
         PROMETHEUS_URL: ${{ inputs.prometheus-url }}
         PROMETHEUS_PUSH_URL: ${{ inputs.prometheus-push-url }}
@@ -151,7 +147,7 @@ runs:
         auto-push: ${{ inputs.push-github-action-benchmark }}
     - name: Push Post-State to S3
       if: inputs.push-post-state != ''
-      shell: nix develop --impure --command bash -x {0}
+      shell: nix develop --command bash -x {0}
       run: |
         ./scripts/run_task.sh export-dir-to-s3 \
           SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ \

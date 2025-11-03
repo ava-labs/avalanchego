@@ -4,13 +4,13 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      task:
+        description: 'Taskfile task to execute (e.g., c-chain-reexecution-hashdb-101-250k)'
+        required: true
       runner:
         description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
         required: false
         default: ubuntu-latest
-      task:
-        description: 'Taskfile task to execute (e.g., c-chain-reexecution-hashdb-101-250k)'
-        required: true
       push-post-state:
         description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
         default: ''
@@ -80,13 +80,13 @@ jobs:
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
           task: ${{ matrix.task }}
-          runner_name: ${{ matrix.runner }}
-          aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
-          aws-region: 'us-east-2'
           prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
           push-github-action-benchmark: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.repository == 'ava-labs/avalanchego' && github.ref_name == 'master') }}
-          push-post-state: ${{ github.event.inputs.push-post-state || '' }}
+          aws-role: ${{ github.event.inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: 'us-east-2'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          push-post-state: ${{ github.event.inputs.push-post-state }}
+          runner_name: ${{ matrix.runner }}
