@@ -80,7 +80,7 @@ func newTxWithUTXOs(
 	}
 }
 
-// Txs should be prioritized by highest gas price during after Etna
+// Txs should be prioritized by highest gas price
 func TestMempoolOrdering(t *testing.T) {
 	require := require.New(t)
 
