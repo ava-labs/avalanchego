@@ -217,9 +217,9 @@ You can configure your node to continuously run memory/CPU profiles and save the
 | Flag | Env Var | Type | Default | Description |
 |--------|--------|------|----|--------------------|
 | `--profile-continuous-enabled` | `AVAGO_PROFILE_CONTINUOUS_ENABLED` | boolean | `false` | Whether the app should continuously produce performance profiles. |
-| `--profile-dir` | `AVAGO_PROFILE_DIR` | string | `$HOME/.avalanchego/profiles/` | If profiling enabled, node continuously runs memory/CPU profiles and puts them at this directory. |
+| `--profile-dir` | `AVAGO_PROFILE_DIR` | string | `$HOME/.avalanchego/profiles/` | If profiling is enabled, node continuously runs memory/CPU profiles and puts them at this directory. |
 | `--profile-continuous-freq` | `AVAGO_PROFILE_CONTINUOUS_FREQ` | duration | `15m` | How often a new CPU/memory profile is created. |
-| `--profile-continuous-max-files` | `AVAGO_PROFILE_CONTINUOUS_MAX_FILES` | int | `5` | Maximum number of CPU/memory profiles files to keep. |
+| `--profile-continuous-max-files` | `AVAGO_PROFILE_CONTINUOUS_MAX_FILES` | int | `5` | Maximum number of CPU/memory profile files to keep. |
 
 ### Network
 
