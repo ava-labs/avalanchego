@@ -447,16 +447,24 @@ func TestAddValidatorReject(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// trigger block creation
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(tx))
-	vm.ctx.Lock.Lock()
-
-	blk, err := vm.Builder.BuildBlock(t.Context())
+	blk0ID, err := vm.LastAccepted(t.Context())
+	require.NoError(err)
+	blk0, err := vm.GetBlock(t.Context(), blk0ID)
 	require.NoError(err)
 
-	require.NoError(blk.Verify(t.Context()))
-	require.NoError(blk.Reject(t.Context()))
+	acceptedBlk1, err := block.NewBanffStandardBlock(
+		blk0.Timestamp().Add(time.Second),
+		blk0.ID(),
+		blk0.Height()+1,
+		[]*txs.Tx{tx},
+	)
+	require.NoError(err)
+
+	blk1, err := vm.ParseBlock(t.Context(), acceptedBlk1.Bytes())
+	require.NoError(err)
+
+	require.NoError(blk1.Verify(t.Context()))
+	require.NoError(blk1.Reject(t.Context()))
 
 	_, _, err = vm.state.GetTx(tx.ID())
 	require.ErrorIs(err, database.ErrNotFound)
