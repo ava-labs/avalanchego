@@ -616,6 +616,10 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 		return
 	}
 
+	if msg.Op() == message.PingOp {
+		atomic.StoreInt64(&p.lastPingSent, p.Clock.Time().UnixMilli())
+	}
+
 	// Write the message
 	var buf net.Buffers = [][]byte{msgLenBytes[:], msgBytes}
 	if _, err := io.CopyN(writer, &buf, int64(wrappers.IntLen+msgLen)); err != nil {
@@ -629,10 +633,6 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 	now := p.Clock.Time()
 	p.storeLastSent(now)
 	p.Metrics.Sent(msg)
-
-	if msg.Op() == message.PingOp {
-		atomic.StoreInt64(&p.lastPingSent, now.UnixMilli())
-	}
 }
 
 func (p *peer) sendNetworkMessages() {
@@ -827,12 +827,18 @@ func (p *peer) getUptime() uint32 {
 }
 
 func (p *peer) handlePong(*p2p.Pong) {
-	lastPing := atomic.LoadInt64(&p.lastPingSent)
-	if lastPing == 0 {
+	pingSent := atomic.SwapInt64(&p.lastPingSent, 0)
+	if pingSent == 0 {
+		p.Log.Debug(malformedMessageLog,
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.PongOp),
+			zap.String("reason", "received unexpected pong"),
+		)
+		p.StartClose()
 		return
 	}
 
-	elapsed := p.Clock.Time().UnixMilli() - lastPing
+	elapsed := p.Clock.Time().UnixMilli() - pingSent
 
 	p.Metrics.RTTCount.Inc()
 	p.Metrics.RTTSum.Add(float64(elapsed))
