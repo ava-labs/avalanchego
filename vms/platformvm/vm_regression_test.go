@@ -187,7 +187,8 @@ func TestAddDelegatorTxOverDelegatedRegression(t *testing.T) {
 
 	blk4, err := vm.ParseBlock(t.Context(), acceptedBlk4.Bytes())
 	require.NoError(err)
-	require.ErrorIs(blk4.Verify(t.Context()), executor.ErrOverDelegated)
+	err = blk4.Verify(t.Context())
+	require.ErrorIs(err, executor.ErrOverDelegated)
 }
 
 func TestAddDelegatorTxHeapCorruption(t *testing.T) {
@@ -1242,7 +1243,8 @@ func TestAddDelegatorTxAddBeforeRemove(t *testing.T) {
 	require.NoError(err)
 	// attempting to verify the second add delegator tx should fail because the
 	// total stake weight would go over the limit.
-	require.ErrorIs(blk3.Verify(t.Context()), executor.ErrOverDelegated)
+	err = blk3.Verify(t.Context())
+	require.ErrorIs(err, executor.ErrOverDelegated)
 }
 
 func TestRemovePermissionedValidatorDuringPendingToCurrentTransitionNotTracked(t *testing.T) {
