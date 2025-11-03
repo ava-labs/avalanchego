@@ -147,7 +147,7 @@ runs:
         auto-push: ${{ inputs.push-github-action-benchmark }}
     - name: Push Post-State to S3
       if: inputs.push-post-state != ''
-      shell: nix develop --command bash -x {0}
+      shell: nix develop --impure --command bash -x {0}
       run: |
         ./scripts/run_task.sh export-dir-to-s3 \
           SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ \
