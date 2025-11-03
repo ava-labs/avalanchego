@@ -32,7 +32,7 @@ func TestErrIOEOF(t *testing.T) {
 		_ = server.Serve(listener)
 	}()
 
-	conn, err := grpc.DialContext(context.Background(), "bufnet",
+	conn, err := grpc.DialContext(t.Context(), "bufnet",
 		grpc.WithContextDialer(func(context.Context, string) (net.Conn, error) {
 			return listener.Dial()
 		}),

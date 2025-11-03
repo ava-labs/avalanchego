@@ -12,10 +12,10 @@ import (
 )
 
 func TestNaturalDescSortingForSameKey(t *testing.T) {
-	key0, _ := newDBKeyFromUser(make([]byte, 0), 0)
-	key1, _ := newDBKeyFromUser(make([]byte, 0), 1)
-	key2, _ := newDBKeyFromUser(make([]byte, 0), 2)
-	key3, _ := newDBKeyFromUser(make([]byte, 0), 3)
+	key0, _ := newDBKeyFromUser(nil, 0)
+	key1, _ := newDBKeyFromUser(nil, 1)
+	key2, _ := newDBKeyFromUser(nil, 2)
+	key3, _ := newDBKeyFromUser(nil, 3)
 
 	entry := [][]byte{key0, key1, key2, key3}
 	expected := [][]byte{key3, key2, key1, key0}
