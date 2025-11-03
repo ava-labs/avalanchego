@@ -231,10 +231,8 @@ func clearPrefix(db ethdb.KeyValueStore, prefix []byte, keyLen int) error {
 	return batch.Write()
 }
 
-// ParseSyncPerformedKey returns the block number from keys the iterator returned
-// from NewSyncPerformedIterator. It assumes the key has the syncPerformedPrefix
-// followed by an 8-byte big-endian block number, and panics if the key is shorter
-// than len(syncPerformedPrefix)+wrappers.LongLen.
+// ParseSyncPerformedKey returns the block number from keys returned by
+// NewSyncPerformedIterator. It panics if the key is shorter than `syncPerformedKeyLength`.
 func ParseSyncPerformedKey(key []byte) uint64 {
 	return binary.BigEndian.Uint64(key[len(syncPerformedPrefix):])
 }
