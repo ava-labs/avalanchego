@@ -1682,7 +1682,8 @@ func ReexecCorruptedStateTest(t *testing.T, create ReexecTestFunc) {
 	blockchain.Stop()
 
 	// Restart blockchain with existing state
-	restartedBlockchain, err := create(chainDB, gspec, chain[1].Hash(), tempDir, 4096)
+	newDir := copyFlatDir(t, tempDir) // avoid file lock
+	restartedBlockchain, err := create(chainDB, gspec, chain[1].Hash(), newDir, 4096)
 	require.NoError(t, err)
 	defer restartedBlockchain.Stop()
 
