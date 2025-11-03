@@ -231,13 +231,6 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 		compressor: compressor,
 	}
 
-	s.log.Info("Initializing BlockDB",
-		zap.String("indexDir", config.IndexDir),
-		zap.String("dataDir", config.DataDir),
-		zap.Uint64("maxDataFileSize", config.MaxDataFileSize),
-		zap.Int("maxDataFiles", config.MaxDataFiles),
-	)
-
 	if err := s.openAndInitializeIndex(); err != nil {
 		s.log.Error("Failed to initialize database: failed to initialize index", zap.Error(err))
 		return nil, err
@@ -257,6 +250,11 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 
 	maxHeight := s.maxBlockHeight.Load()
 	s.log.Info("BlockDB initialized successfully",
+		zap.String("indexDir", config.IndexDir),
+		zap.String("dataDir", config.DataDir),
+		zap.Uint64("maxDataFileSize", config.MaxDataFileSize),
+		zap.Int("maxDataFiles", config.MaxDataFiles),
+
 		zap.Uint64("nextWriteOffset", s.nextDataWriteOffset.Load()),
 		zap.Uint64("maxBlockHeight", maxHeight),
 	)
@@ -905,7 +903,7 @@ func (s *Database) loadOrInitializeHeader() error {
 
 	// reset index file if its empty
 	if fileInfo.Size() == 0 {
-		s.log.Info("Index file is empty, writing initial index file header")
+		s.log.Debug("Index file is empty, writing initial index file header")
 		s.header = indexFileHeader{
 			Version:         IndexFileVersion,
 			MinHeight:       s.config.MinimumHeight,

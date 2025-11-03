@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	logProgressInterval = 15 * time.Second
+	logProgressInterval = 30 * time.Second
 	compactionInterval  = 250_000
 	stopTimeout         = 5 * time.Second
 	etaSampleInterval   = 100
