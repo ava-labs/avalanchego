@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1762260257454,
+  "lastUpdate": 1762268975225,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -3074,6 +3074,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
             "value": 73.21,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "yacovm",
+            "username": "yacovm",
+            "email": "yacovm@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "0ecd4c2f20fda2f0c21be646973bea8e93535112",
+          "message": "Implement RTT measurement (#4454)\n\nSigned-off-by: Yacov Manevich <yacov.manevich@avalabs.org>",
+          "timestamp": "2025-11-03T22:58:14Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/0ecd4c2f20fda2f0c21be646973bea8e93535112"
+        },
+        "date": 1762268973350,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
+            "value": 44.17,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
