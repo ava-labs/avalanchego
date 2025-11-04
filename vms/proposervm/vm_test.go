@@ -2746,6 +2746,140 @@ func TestSelectChildPChainHeight(t *testing.T) {
 	}
 }
 
+// This tests the case where a chain missed the Granite activation and continued
+// producing blocks without epochs. When a new node joins the network, it needs
+// to allow the delayed activation of Granite.
+func TestBootstrappingWithDelayedGraniteActivation(t *testing.T) {
+	require := require.New(t)
+
+	// innerVMBlks is appended to throughout the test, which modifies the
+	// behavior of coreVM.
+	innerVMBlks := []*snowmantest.Block{
+		snowmantest.Genesis,
+	}
+
+	coreVM := &blocktest.VM{
+		VM: enginetest.VM{
+			T: t,
+			InitializeF: func(context.Context, *snow.Context, database.Database, []byte, []byte, []byte, []*common.Fx, common.AppSender) error {
+				return nil
+			},
+		},
+		ParseBlockF: func(_ context.Context, blkBytes []byte) (snowman.Block, error) {
+			for _, blk := range innerVMBlks {
+				if bytes.Equal(blk.Bytes(), blkBytes) {
+					return blk, nil
+				}
+			}
+			return nil, errUnknownBlock
+		},
+		GetBlockF: func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
+			for _, blk := range innerVMBlks {
+				if blk.Status == snowtest.Accepted && blk.ID() == blkID {
+					return blk, nil
+				}
+			}
+			return nil, database.ErrNotFound
+		},
+		LastAcceptedF: func(context.Context) (ids.ID, error) {
+			var (
+				lastAcceptedID     ids.ID
+				lastAcceptedHeight uint64
+			)
+			for _, blk := range innerVMBlks {
+				if blk.Status == snowtest.Accepted && blk.Height() >= lastAcceptedHeight {
+					lastAcceptedID = blk.ID()
+					lastAcceptedHeight = blk.Height()
+				}
+			}
+			return lastAcceptedID, nil
+		},
+	}
+
+	proVM := New(
+		coreVM,
+		Config{
+			Upgrades:            upgradetest.GetConfig(upgradetest.Latest),
+			MinBlkDelay:         DefaultMinBlockDelay,
+			NumHistoricalBlocks: DefaultNumHistoricalBlocks,
+			StakingLeafSigner:   pTestSigner,
+			StakingCertLeaf:     pTestCert,
+			Registerer:          prometheus.NewRegistry(),
+		},
+	)
+	proVM.Set(snowmantest.GenesisTimestamp)
+
+	// We mark the P-chain as having synced to height=1.
+	const currentPChainHeight = 1
+	valState := &validatorstest.State{
+		T: t,
+		GetCurrentHeightF: func(context.Context) (uint64, error) {
+			return currentPChainHeight, nil
+		},
+	}
+
+	ctx := snowtest.Context(t, ids.ID{1})
+	ctx.NodeID = ids.NodeIDFromCert(pTestCert)
+	ctx.ValidatorState = valState
+
+	require.NoError(proVM.Initialize(
+		t.Context(),
+		ctx,
+		memdb.New(),
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	))
+	defer func() {
+		require.NoError(proVM.Shutdown(t.Context()))
+	}()
+
+	require.NoError(proVM.SetState(t.Context(), snow.Bootstrapping))
+
+	// During bootstrapping, the first post-fork block is verified against the
+	// P-chain height, so we provide a valid height.
+	innerBlock1 := snowmantest.BuildChild(snowmantest.Genesis)
+	innerVMBlks = append(innerVMBlks, innerBlock1)
+	statelessBlock1, err := statelessblock.BuildUnsigned(
+		snowmantest.GenesisID,
+		snowmantest.GenesisTimestamp,
+		currentPChainHeight,
+		statelessblock.Epoch{},
+		innerBlock1.Bytes(),
+	)
+	require.NoError(err)
+
+	block1, err := proVM.ParseBlock(t.Context(), statelessBlock1.Bytes())
+	require.NoError(err)
+
+	require.NoError(block1.Verify(t.Context()))
+	require.NoError(block1.Accept(t.Context()))
+
+	// This block should include an epoch. But since the node is still
+	// bootstrapping, it should allow the block.
+	innerBlock2 := snowmantest.BuildChild(innerBlock1)
+	innerVMBlks = append(innerVMBlks, innerBlock2)
+	statelessBlock2, err := statelessblock.Build(
+		statelessBlock1.ID(),
+		statelessBlock1.Timestamp(),
+		currentPChainHeight,
+		statelessblock.Epoch{},
+		pTestCert,
+		innerBlock2.Bytes(),
+		ctx.ChainID,
+		pTestSigner,
+	)
+	require.NoError(err)
+
+	block2, err := proVM.ParseBlock(t.Context(), statelessBlock2.Bytes())
+	require.NoError(err)
+
+	require.NoError(block2.Verify(t.Context()))
+	require.NoError(block2.Accept(t.Context()))
+}
+
 // This tests the case where a chain has bootstrapped to a last accepted block
 // which references a P-Chain height that is not locally accepted yet.
 func TestBootstrappingAheadOfPChainBuildBlockRegression(t *testing.T) {
