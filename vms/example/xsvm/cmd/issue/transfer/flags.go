@@ -32,7 +32,7 @@ func AddFlags(flags *pflag.FlagSet) {
 	flags.Uint64(AmountKey, units.Schmeckle, "Amount to send")
 	flags.String(ToKey, genesis.EWOQKey.Address().String(), "Destination address")
 	flags.String(PrivateKeyKey, genesis.EWOQKeyFormattedStr, "Private key to sign the transaction")
-	flags.Bool(WaitForAcceptanceKey, true, "Whether to wait for acceptance in the mempool")
+	flags.Bool(WaitForAcceptanceKey, true, "Whether to wait for acceptance")
 }
 
 type Config struct {
