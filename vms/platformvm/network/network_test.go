@@ -4,7 +4,6 @@
 package network
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -244,7 +243,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			err = n.IssueTxFromRPC(tt.tx)
 			require.ErrorIs(err, tt.expectedErr)
 
-			require.NoError(n.txPushGossiper.Gossip(context.Background()))
+			require.NoError(n.txPushGossiper.Gossip(t.Context()))
 		})
 	}
 }

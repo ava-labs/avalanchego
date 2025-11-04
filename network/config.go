@@ -181,4 +181,8 @@ type Config struct {
 	// Specifies how much disk usage each peer can cause before
 	// we rate-limit them.
 	DiskTargeter tracker.Targeter `json:"-"`
+
+	// If true, connects to all validators regardless of primary network validator
+	// status or of configured tracked subnets.
+	ConnectToAllValidators bool `json:"connectToAllValidators"`
 }

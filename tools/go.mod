@@ -13,7 +13,7 @@ module github.com/ava-labs/avalanchego/tools
 //   - go tool -modfile=tools/go.mod [tool] [args]
 //   - ./scripts/run_tool.sh [tool] [args]
 
-go 1.24.7
+go 1.24.9
 
 tool (
 	github.com/go-task/task/v3/cmd/task

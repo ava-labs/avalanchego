@@ -153,12 +153,11 @@ func TestNew_IndexFileErrors(t *testing.T) {
 				// Create a valid index file with wrong version
 				indexPath := filepath.Join(indexDir, indexFileName)
 				header := indexFileHeader{
-					Version:             999, // Wrong version
-					MinHeight:           0,
-					MaxDataFileSize:     DefaultMaxDataFileSize,
-					MaxHeight:           unsetHeight,
-					MaxContiguousHeight: unsetHeight,
-					NextWriteOffset:     0,
+					Version:         999, // Wrong version
+					MinHeight:       0,
+					MaxDataFileSize: DefaultMaxDataFileSize,
+					MaxHeight:       unsetHeight,
+					NextWriteOffset: 0,
 				}
 
 				headerBytes, err := header.MarshalBinary()
