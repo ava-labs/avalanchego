@@ -254,7 +254,6 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 		zap.String("dataDir", config.DataDir),
 		zap.Uint64("maxDataFileSize", config.MaxDataFileSize),
 		zap.Int("maxDataFiles", config.MaxDataFiles),
-
 		zap.Uint64("nextWriteOffset", s.nextDataWriteOffset.Load()),
 		zap.Uint64("maxBlockHeight", maxHeight),
 	)

@@ -73,7 +73,7 @@ func newMigrator(
 	// Check if there's anything to migrate
 	if _, ok := minBlockHeightToMigrate(kvDB); !ok {
 		m.completed.Store(true)
-		m.logger.Info("No block data to migrate; migration already complete")
+		m.logger.Info("no block data to migrate; migration already complete")
 		return m, nil
 	}
 
@@ -89,7 +89,7 @@ func newMigrator(
 			if err := writeTargetBlockHeight(stateDB, endHeight); err != nil {
 				return nil, err
 			}
-			m.logger.Info("Migration target height set",
+			m.logger.Info("migration target height set",
 				zap.Uint64("targetHeight", endHeight))
 		}
 	}
@@ -120,7 +120,7 @@ func (m *migrator) stop() {
 		case <-done:
 			// Worker finished cleanup
 		case <-time.After(stopTimeout):
-			m.logger.Warn("Migration shutdown timeout exceeded")
+			m.logger.Warn("migration shutdown timeout exceeded")
 		}
 	}
 }
@@ -201,12 +201,12 @@ func (m *migrator) run(ctx context.Context) error {
 		}
 
 		processingTime := time.Since(start)
-		m.logger.Info("Block data migration ended",
+		m.logger.Info("block data migration ended",
 			zap.Uint64("blocksProcessed", m.processed.Load()),
 			zap.Duration("totalProcessingTime", processingTime))
 	}()
 
-	m.logger.Info("Block data migration started")
+	m.logger.Info("block data migration started")
 
 	// iterate over all block bodies in ascending order by block number
 	for iter.Next() {
@@ -214,7 +214,7 @@ func (m *migrator) run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			m.logger.Info(
-				"Block data migration stopped",
+				"block data migration stopped",
 				zap.Uint64("blocksProcessed", m.processed.Load()),
 			)
 			return ctx.Err()
@@ -306,7 +306,7 @@ func (m *migrator) run(ctx context.Context) error {
 				}
 			}
 
-			m.logger.Info("Block data migration progress", logFields...)
+			m.logger.Info("block data migration progress", logFields...)
 			nextLog = now.Add(logProgressInterval)
 		}
 	}
