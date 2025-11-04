@@ -58,7 +58,7 @@ type Engine struct {
 	consensusCtx       *snow.ConsensusContext
 
 	tickInterval time.Duration
-	shutdown     bool
+	shutdown     chan struct{}
 }
 
 // The VM must be initialized before creating the engine
@@ -166,12 +166,12 @@ func (e *Engine) Start(ctx context.Context, _ uint32) error {
 	}
 
 	e.logger.Info("Starting simplex engine")
-	go e.tick()
 	err := e.epoch.Start()
 	if err != nil {
 		return fmt.Errorf("failed to start simplex epoch: %w", err)
 	}
 
+	go e.tick()
 	e.consensusCtx.State.Set(snow.EngineState{
 		Type:  p2p.EngineType_ENGINE_TYPE_CHAIN,
 		State: snow.NormalOp,
@@ -187,13 +187,16 @@ func getTickInterval(params *pSimplex.Parameters) time.Duration {
 // tick periodically advances the engine's time.
 func (e *Engine) tick() {
 	ticker := time.NewTicker(e.tickInterval)
+	defer ticker.Stop()
+
 	for {
-		if e.shutdown {
+		select {
+		case tick := <-ticker.C:
+			e.epoch.AdvanceTime(tick)
+		case <-e.shutdown:
+			ticker.Stop()
 			return
 		}
-
-		tick := <-ticker.C
-		e.epoch.AdvanceTime(tick)
 	}
 }
 
@@ -244,7 +247,7 @@ func (e *Engine) p2pToSimplexMessage(ctx context.Context, msg *p2p.Simplex) (*si
 func (e *Engine) Shutdown(_ context.Context) error {
 	e.epoch.Stop()
 	e.logger.Info("Stopped simplex engine")
-	e.shutdown = true
+	close(e.shutdown)
 	return nil
 }
 

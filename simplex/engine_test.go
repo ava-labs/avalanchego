@@ -22,7 +22,7 @@ import (
 // various types of Simplex messages without errors. The contents of the messages do not have
 // to be valid, as long as they can be parsed and processed by the engine.
 func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	engine, configs := setupEngine(t)
 
 	qcBytes := buildQCBytes(t, configs)
@@ -46,7 +46,7 @@ func TestSimplexEngineHandlesSimplexMessages(t *testing.T) {
 
 func TestSimplexEngineRejectsMalformedSimplexMessages(t *testing.T) {
 	configs := newNetworkConfigs(t, 4)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	config := configs[0]
 	config.Sender.(*sendermock.ExternalSender).
@@ -484,7 +484,7 @@ func NewReplicationResponseMessage(qcBytes []byte) *p2p.Simplex {
 func FuzzSimplexVotes(f *testing.F) {
 	f.Add(digest[:], signer, uint64(1), uint64(1), uint64(1), uint32(1))
 	f.Fuzz(func(t *testing.T, blockDigest []byte, signer []byte, epoch, round, seq uint64, version uint32) {
-		ctx := context.Background()
+		ctx := t.Context()
 		engine, configs := setupEngine(t)
 
 		msg := &p2p.Simplex{
@@ -512,7 +512,7 @@ func FuzzSimplexVotes(f *testing.F) {
 func FuzzSimplexEmptyVotes(f *testing.F) {
 	f.Add(signer, uint64(1), uint64(1), []byte("emptyvote-sig"))
 	f.Fuzz(func(t *testing.T, signer []byte, epoch, round uint64, signerValue []byte) {
-		ctx := context.Background()
+		ctx := t.Context()
 		engine, configs := setupEngine(t)
 
 		msg := &p2p.Simplex{
@@ -531,7 +531,7 @@ func FuzzSimplexEmptyVotes(f *testing.F) {
 func FuzzSimplexFinalizeVotes(f *testing.F) {
 	f.Add(digest[:], signer, []byte("signervalue"), uint64(2), uint64(5), uint64(50), uint32(1))
 	f.Fuzz(func(t *testing.T, signer []byte, signerValue []byte, blockDigest []byte, epoch, round, seq uint64, version uint32) {
-		ctx := context.Background()
+		ctx := t.Context()
 		engine, configs := setupEngine(t)
 
 		msg := &p2p.Simplex{
@@ -559,7 +559,7 @@ func FuzzSimplexFinalizeVotes(f *testing.F) {
 func FuzzSimplexNotarizations(f *testing.F) {
 	f.Add([]byte("qc-data"), digest[:], uint64(3), uint64(8), uint64(75), uint32(1))
 	f.Fuzz(func(t *testing.T, qcData, blockDigest []byte, epoch, round, seq uint64, version uint32) {
-		ctx := context.Background()
+		ctx := t.Context()
 		engine, configs := setupEngine(t)
 		qc := buildQCWithBytes(t, configs, qcData)
 
@@ -588,7 +588,7 @@ func FuzzSimplexNotarizations(f *testing.F) {
 func FuzzSimplexFinalizations(f *testing.F) {
 	f.Add([]byte("qc-data"), digest[:], uint64(5), uint64(11), uint64(120), uint32(1))
 	f.Fuzz(func(t *testing.T, qcData, blockDigest []byte, epoch, round, seq uint64, version uint32) {
-		ctx := context.Background()
+		ctx := t.Context()
 		engine, configs := setupEngine(t)
 		qc := buildQCWithBytes(t, configs, qcData)
 
@@ -617,7 +617,7 @@ func FuzzSimplexFinalizations(f *testing.F) {
 func FuzzSimplexReplicationRequests(f *testing.F) {
 	f.Add(uint64(1), uint64(2), uint64(3), uint64(42))
 	f.Fuzz(func(t *testing.T, seq1, seq2, seq3, latestRound uint64) {
-		ctx := context.Background()
+		ctx := t.Context()
 		engine, configs := setupEngine(t)
 
 		msg := &p2p.Simplex{
@@ -638,7 +638,7 @@ func FuzzSimplexReplicationResponses(f *testing.F) {
 	f.Add([]byte("qc-data"), digest[:], uint64(6), uint64(13), uint64(150), uint32(1))
 	f.Fuzz(func(t *testing.T, qcData, blockDigest []byte, epoch, round, seq uint64, version uint32) {
 		t.Log("!!FuzzSimplexReplicationResponses called with:", qcData, blockDigest, epoch, round, seq, version)
-		ctx := context.Background()
+		ctx := t.Context()
 		engine, configs := setupEngine(t)
 		qc := buildQCWithBytes(t, configs, qcData)
 
@@ -675,7 +675,7 @@ func FuzzSimplexReplicationResponses(f *testing.F) {
 func FuzzSimplexBlockProposals(f *testing.F) {
 	f.Add(blockBytes, digest[:], uint64(112), uint64(18), uint64(7), uint32(1))
 	f.Fuzz(func(t *testing.T, blockBytes []byte, blockDigest []byte, round, epoch, seq uint64, version uint32) {
-		ctx := context.Background()
+		ctx := t.Context()
 		engine, configs := setupEngine(t)
 		msg := &p2p.Simplex{
 			ChainId: []byte("chain-1"),
@@ -706,7 +706,7 @@ func FuzzSimplexBlockProposals(f *testing.F) {
 func FuzzSimplexEmptyNotarizations(f *testing.F) {
 	f.Add([]byte("random msg data i am passing into QC"), uint64(112), uint64(18))
 	f.Fuzz(func(t *testing.T, data []byte, round uint64, epoch uint64) {
-		ctx := context.Background()
+		ctx := t.Context()
 		engine, configs := setupEngine(t)
 		qc := buildQCWithBytes(t, configs, data)
 		msg := &p2p.Simplex{
@@ -724,7 +724,7 @@ func FuzzSimplexEmptyNotarizations(f *testing.F) {
 
 func setupEngine(t *testing.T) (*Engine, []*Config) {
 	configs := newNetworkConfigs(t, 4)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	config := configs[0]
 	config.Sender.(*sendermock.ExternalSender).EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes()
