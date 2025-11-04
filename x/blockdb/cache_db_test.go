@@ -110,7 +110,6 @@ func TestCachePutOverridesSameHeight(t *testing.T) {
 	cached, ok = db.cache.Get(height)
 	require.True(t, ok)
 	require.Equal(t, b2, cached)
-	require.NotEqual(t, b1, cached)
 
 	// Get should also return the new block
 	data, err := db.Get(height)
