@@ -54,7 +54,7 @@ func StartCollector(
 	labels map[string]string,
 	serverAddr string,
 	networkUUID string,
-	dashboardPath string,
+	grafanaDashboardPath string,
 ) {
 	r := require.New(tb)
 
@@ -91,7 +91,7 @@ func StartCollector(
 	r.NoError(err)
 
 	var (
-		grafanaURI = tmpnet.DefaultBaseGrafanaURI + dashboardPath
+		grafanaURI = tmpnet.DefaultBaseGrafanaURI + grafanaDashboardPath
 		startTime  = strconv.FormatInt(time.Now().UnixMilli(), 10)
 	)
 

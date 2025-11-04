@@ -170,7 +170,9 @@ func benchmarkReexecuteRange(
 		serverAddr := reexecute.StartServer(b, log, prefixGatherer, metricsPort)
 
 		if metricsCollectorEnabled {
-			dashboardPath := "d/Gl1I20mnk/c-chain"
+			// cChainDashboardPath is the Grafana dashboard path for the C-Chain
+			// metrics visualization.
+			cChainDashboardPath := "d/Gl1I20mnk/c-chain"
 			reexecute.StartCollector(
 				b,
 				log,
@@ -178,7 +180,7 @@ func benchmarkReexecuteRange(
 				labels,
 				serverAddr,
 				networkUUID,
-				dashboardPath,
+				cChainDashboardPath,
 			)
 		}
 	}

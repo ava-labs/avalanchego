@@ -52,6 +52,9 @@ type VMExecutor struct {
 	etaTracker       *timer.EtaTracker
 }
 
+// NewVMExecutor creates a VMExecutor that reexecutes blocks from startBlock to
+// endBlock. NewVMExecutor starts reading blocks from blockDir and sets up
+// metrics for the reexecution test.
 func NewVMExecutor(
 	tb testing.TB,
 	vm block.ChainVM,
@@ -93,6 +96,8 @@ func NewVMExecutor(
 	}
 }
 
+// Run reexecutes the blocks against the VM. It parses, verifies, and accepts
+// each block while tracking progress and respecting the execution timeout if configured.
 func (e *VMExecutor) Run(ctx context.Context) error {
 	blkID, err := e.vm.LastAccepted(ctx)
 	if err != nil {
