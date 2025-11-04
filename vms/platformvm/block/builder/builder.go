@@ -53,7 +53,15 @@ var (
 
 type Builder interface {
 	smblock.BuildBlockWithContextChainVM
-	mempool.Mempool
+	// Add adds `tx` to the mempool and clears its dropped status.
+	Add(tx *txs.Tx) error
+	// Get returns the tx corresponding to `txID` and if it was present
+	Get(txID ids.ID) (*txs.Tx, bool)
+	// GetDropReason returns why `txID` was dropped
+	GetDropReason(txID ids.ID) error
+	// WaitForEvent blocks until the mempool has txs that are ready to build into
+	// a block.
+	WaitForEvent(ctx context.Context) (common.Message, error)
 
 	// BuildBlock can be called to attempt to create a new block
 	BuildBlock(context.Context) (snowman.Block, error)
@@ -68,14 +76,14 @@ type Builder interface {
 
 // builder implements a simple builder to convert txs into valid blocks
 type builder struct {
-	mempool.Mempool
+	*mempool.Mempool
 
 	txExecutorBackend *txexecutor.Backend
 	blkManager        blockexecutor.Manager
 }
 
 func New(
-	mempool mempool.Mempool,
+	mempool *mempool.Mempool,
 	txExecutorBackend *txexecutor.Backend,
 	blkManager blockexecutor.Manager,
 ) Builder {
@@ -348,7 +356,7 @@ func packDurangoBlockTxs(
 	ctx context.Context,
 	parentID ids.ID,
 	parentState state.Chain,
-	mempool mempool.Mempool,
+	mempool *mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
@@ -409,7 +417,7 @@ func packEtnaBlockTxs(
 	ctx context.Context,
 	parentID ids.ID,
 	parentState state.Chain,
-	mempool mempool.Mempool,
+	mempool *mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	timestamp time.Time,
@@ -509,7 +517,7 @@ func executeTx(
 	ctx context.Context,
 	parentID ids.ID,
 	stateDiff state.Diff,
-	mempool mempool.Mempool,
+	mempool *mempool.Mempool,
 	backend *txexecutor.Backend,
 	manager blockexecutor.Manager,
 	pChainHeight uint64,

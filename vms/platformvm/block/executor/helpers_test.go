@@ -80,7 +80,7 @@ type test struct {
 
 type environment struct {
 	blkManager Manager
-	mempool    mempool.Mempool
+	mempool    *mempool.Mempool
 
 	isBootstrapped *utils.Atomic[bool]
 	config         *config.Internal

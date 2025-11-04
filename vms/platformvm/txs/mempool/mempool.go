@@ -33,30 +33,6 @@ var (
 	errAVAXMinted   = errors.New("AVAX minted")
 )
 
-type Mempool interface {
-	// Add adds `tx` to the mempool and clears its dropped status.
-	Add(tx *txs.Tx) error
-	// Get returns the tx corresponding to `txID` and if it was present
-	Get(txID ids.ID) (*txs.Tx, bool)
-	// GetDropReason returns why `txID` was dropped
-	GetDropReason(txID ids.ID) error
-	// Iterate calls `f` over each tx in the mempool
-	Iterate(f func(tx *txs.Tx) bool)
-	// len returns the number of txs in the mempool
-	Len() int
-	// MarkDropped marks `txID` as dropped
-	MarkDropped(txID ids.ID, reason error)
-	// Peek returns a tx in the mempool and if it was present
-	Peek() (*txs.Tx, bool)
-	// Remove removes `txID` from the mempool
-	Remove(txID ids.ID)
-	// RemoveConflicts removes all txs conflicting with `utxos`
-	RemoveConflicts(utxos set.Set[ids.ID])
-	// WaitForEvent blocks until the mempool has txs that are ready to build into
-	// a block.
-	WaitForEvent(ctx context.Context) (common.Message, error)
-}
-
 type meteredTx struct {
 	*txs.Tx
 	// gasPrice is the amount of AVAX burned per unit of gas used by this tx
@@ -64,7 +40,7 @@ type meteredTx struct {
 	gasUsed  gas.Gas
 }
 
-type mempool struct {
+type Mempool struct {
 	weights     gas.Dimensions
 	avaxAssetID ids.ID
 
@@ -85,7 +61,7 @@ func New(
 	gasCapacity gas.Gas,
 	avaxAssetID ids.ID,
 	registerer prometheus.Registerer,
-) (Mempool, error) {
+) (*Mempool, error) {
 	numTxsMetric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Namespace: namespace,
 		Name:      "count",
@@ -105,7 +81,7 @@ func New(
 		return nil, fmt.Errorf("failed to register metrics: %w", err)
 	}
 
-	m := &mempool{
+	m := &Mempool{
 		weights:     weights,
 		avaxAssetID: avaxAssetID,
 		tree: btree.NewG[meteredTx](2, func(a, b meteredTx) bool {
@@ -128,7 +104,8 @@ func New(
 	return m, nil
 }
 
-func (m *mempool) Add(tx *txs.Tx) error {
+// Add adds `tx` to the mempool and clears its dropped status.
+func (m *Mempool) Add(tx *txs.Tx) error {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -161,7 +138,7 @@ func (m *mempool) Add(tx *txs.Tx) error {
 
 // Try to evict transactions until there is enough capacity for the tx.
 // Returns if we are able to fit this tx.
-func (m *mempool) allocateSpace(txToAdd meteredTx) bool {
+func (m *Mempool) allocateSpace(txToAdd meteredTx) bool {
 	// We have enough space for this tx
 	if txToAdd.gasUsed <= m.gasAvailable {
 		return true
@@ -196,7 +173,7 @@ func (m *mempool) allocateSpace(txToAdd meteredTx) bool {
 	return true
 }
 
-func (m *mempool) meter(tx *txs.Tx) (meteredTx, error) {
+func (m *Mempool) meter(tx *txs.Tx) (meteredTx, error) {
 	ins, outs, producedAVAX, err := utxo.GetInputOutputs(tx.Unsigned)
 	if err != nil {
 		return meteredTx{}, fmt.Errorf("getting utxos %w", err)
@@ -253,12 +230,13 @@ func (m *mempool) meter(tx *txs.Tx) (meteredTx, error) {
 	}, nil
 }
 
-func (m *mempool) updateMetrics() {
+func (m *Mempool) updateMetrics() {
 	m.numTxsMetric.Set(float64(m.tree.Len()))
 	m.gasAvailableMetric.Set(float64(m.gasAvailable))
 }
 
-func (m *mempool) Get(txID ids.ID) (*txs.Tx, bool) {
+// Get returns the tx corresponding to `txID` and if it was present
+func (m *Mempool) Get(txID ids.ID) (*txs.Tx, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -266,14 +244,15 @@ func (m *mempool) Get(txID ids.ID) (*txs.Tx, bool) {
 	return tx.Tx, ok
 }
 
-func (m *mempool) Remove(txID ids.ID) {
+// Remove removes `txID` from the mempool
+func (m *Mempool) Remove(txID ids.ID) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
 	m.remove(txID)
 }
 
-func (m *mempool) remove(txID ids.ID) {
+func (m *Mempool) remove(txID ids.ID) {
 	removedTx, ok := m.txs[txID]
 	if !ok {
 		return
@@ -288,7 +267,8 @@ func (m *mempool) remove(txID ids.ID) {
 	m.updateMetrics()
 }
 
-func (m *mempool) RemoveConflicts(utxos set.Set[ids.ID]) {
+// RemoveConflicts removes all txs conflicting with `utxos`
+func (m *Mempool) RemoveConflicts(utxos set.Set[ids.ID]) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -297,7 +277,8 @@ func (m *mempool) RemoveConflicts(utxos set.Set[ids.ID]) {
 	}
 }
 
-func (m *mempool) Peek() (*txs.Tx, bool) {
+// Peek returns a tx in the mempool and if it was present
+func (m *Mempool) Peek() (*txs.Tx, bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -305,7 +286,8 @@ func (m *mempool) Peek() (*txs.Tx, bool) {
 	return tx.Tx, ok
 }
 
-func (m *mempool) Iterate(f func(tx *txs.Tx) bool) {
+// Iterate calls `f` over each tx in the mempool
+func (m *Mempool) Iterate(f func(tx *txs.Tx) bool) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -314,7 +296,8 @@ func (m *mempool) Iterate(f func(tx *txs.Tx) bool) {
 	})
 }
 
-func (m *mempool) MarkDropped(txID ids.ID, reason error) {
+// MarkDropped marks `txID` as dropped
+func (m *Mempool) MarkDropped(txID ids.ID, reason error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -325,7 +308,8 @@ func (m *mempool) MarkDropped(txID ids.ID, reason error) {
 	m.droppedTxIDs.Put(txID, reason)
 }
 
-func (m *mempool) GetDropReason(txID ids.ID) error {
+// GetDropReason returns why `txID` was dropped
+func (m *Mempool) GetDropReason(txID ids.ID) error {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
@@ -333,14 +317,17 @@ func (m *mempool) GetDropReason(txID ids.ID) error {
 	return err
 }
 
-func (m *mempool) Len() int {
+// Len returns the number of txs in the mempool
+func (m *Mempool) Len() int {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 
 	return m.tree.Len()
 }
 
-func (m *mempool) WaitForEvent(ctx context.Context) (common.Message, error) {
+// WaitForEvent blocks until the mempool has txs that are ready to build into
+// a block.
+func (m *Mempool) WaitForEvent(ctx context.Context) (common.Message, error) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
