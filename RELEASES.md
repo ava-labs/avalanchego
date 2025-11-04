@@ -13,11 +13,11 @@ The ACPs in this upgrade go into effect at 11 AM ET (4 PM UTC) on Wednesday, Nov
 
 **All Mainnet nodes must upgrade before 11 AM ET, November 19th 2025.**
 
+The plugin version is updated to `44`; all plugins must update to be compatible.
+
 ### LibEVM Hook Registration
 
 This release includes changes for how EVM modifications are registered with libevm. For consumers of avalanchego as a library, manual registration of libevm callbacks is now required.
-
-The plugin version is updated to `44` all plugins must update to be compatible.
 
 ### APIs
 
