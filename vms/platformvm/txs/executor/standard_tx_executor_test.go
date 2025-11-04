@@ -2621,6 +2621,10 @@ func TestStandardExecutorConvertSubnetToL1Tx(t *testing.T) {
 					},
 				}
 
+				// Guarantee the validators are sorted by node id so that this tx is
+				// valid.
+				utils.Sort(convertSubnetToL1Tx.Validators)
+
 				tx, err := txs.NewSigned(
 					convertSubnetToL1Tx,
 					txs.Codec,
