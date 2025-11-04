@@ -22,14 +22,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/coreth/core/state/snapshot"
-	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
-	"github.com/ava-labs/coreth/plugin/evm/message"
-	"github.com/ava-labs/coreth/sync/handlers"
-	"github.com/ava-labs/coreth/sync/statesync/statesynctest"
+	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync/statesynctest"
 
-	statesyncclient "github.com/ava-labs/coreth/sync/client"
-	handlerstats "github.com/ava-labs/coreth/sync/handlers/stats"
+	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
+	handlerstats "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
 )
 
 const testRequestSize = 1024

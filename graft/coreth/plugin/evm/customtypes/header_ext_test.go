@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/coreth/utils/utilstest"
+	"github.com/ava-labs/avalanchego/graft/coreth/utils/utilstest"
 )
 
 func TestHeaderRLP(t *testing.T) {

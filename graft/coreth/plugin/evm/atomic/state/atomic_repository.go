@@ -19,7 +19,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/log"
 
-	"github.com/ava-labs/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
 )
 
 const (
