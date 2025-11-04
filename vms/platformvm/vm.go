@@ -167,7 +167,13 @@ func (vm *VM) Initialize(
 		Bootstrapped: &vm.bootstrapped,
 	}
 
-	mempool, err := pmempool.New("mempool", registerer)
+	mempool, err := pmempool.New(
+		"mempool",
+		vm.Internal.DynamicFeeConfig.Weights,
+		execConfig.MempoolGasCapacity,
+		vm.ctx.AVAXAssetID,
+		registerer,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to create mempool: %w", err)
 	}
