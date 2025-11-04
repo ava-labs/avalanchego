@@ -2,18 +2,16 @@
 
 ## Pending
 
-## [v1.14.0-fuji](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0-fuji)
-
-**Please note that this release is unable to run mainnet - and will display "mainnet is not supported" if attempted to run with a mainnet configuration.**
+## [v1.14.0](https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0)
 
 This release schedules the activation of the following Avalanche Community Proposals (ACPs):
 - [ACP-181](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/181-p-chain-epoched-views/README.md) P-Chain Epoched Views
 - [ACP-204](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/204-precompile-secp256r1/README.md) Precompile for secp256r1 Curve Support
 - [ACP-226](https://github.com/avalanche-foundation/ACPs/blob/main/ACPs/226-dynamic-minimum-block-times/README.md) Dynamic Minimum Block Times
 
-The ACPs in this upgrade go into effect at 11 AM ET (3 PM UTC) on Wednesday, October 29th, 2025 on the Fuji testnet.
+The ACPs in this upgrade go into effect at 11 AM ET (4 PM UTC) on Wednesday, November 19th, 2025 on Mainnet.
 
-**All Fuji nodes must upgrade before 11 AM ET, October 29th 2025.**
+**All Mainnet nodes must upgrade before 11 AM ET, November 19th 2025.**
 
 ### LibEVM Hook Registration
 
@@ -37,7 +35,7 @@ The plugin version is updated to `44` all plugins must update to be compatible.
 
 - Improved bootstrapping ETA predications.
 
-**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.13.5...v1.14.0-fuji
+**Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.13.5...v1.14.0
 
 ## [v1.13.5](https://github.com/ava-labs/avalanchego/releases/tag/v1.13.5)
 
