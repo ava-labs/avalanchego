@@ -191,6 +191,9 @@ type peer struct {
 	// Must only be accessed atomically
 	lastSent, lastReceived int64
 
+	// lastPingSent is the milliseconds since 1970-01-01 UTC when the last ping was sent
+	lastPingSent int64
+
 	// getPeerListChan signals that we should attempt to send a GetPeerList to
 	// this peer
 	getPeerListChan chan struct{}
@@ -613,6 +616,10 @@ func (p *peer) writeMessage(writer io.Writer, msg message.OutboundMessage) {
 		return
 	}
 
+	if msg.Op() == message.PingOp {
+		atomic.StoreInt64(&p.lastPingSent, p.Clock.Time().UnixMilli())
+	}
+
 	// Write the message
 	var buf net.Buffers = [][]byte{msgLenBytes[:], msgBytes}
 	if _, err := io.CopyN(writer, &buf, int64(wrappers.IntLen+msgLen)); err != nil {
@@ -819,7 +826,23 @@ func (p *peer) getUptime() uint32 {
 	return primaryUptimePercent
 }
 
-func (*peer) handlePong(*p2p.Pong) {}
+func (p *peer) handlePong(*p2p.Pong) {
+	pingSent := atomic.SwapInt64(&p.lastPingSent, 0)
+	if pingSent == 0 {
+		p.Log.Debug(malformedMessageLog,
+			zap.Stringer("nodeID", p.id),
+			zap.Stringer("messageOp", message.PongOp),
+			zap.String("reason", "received unexpected pong"),
+		)
+		p.StartClose()
+		return
+	}
+
+	elapsed := p.Clock.Time().UnixMilli() - pingSent
+
+	p.Metrics.RTTCount.Inc()
+	p.Metrics.RTTSum.Add(float64(elapsed))
+}
 
 func (p *peer) handleHandshake(msg *p2p.Handshake) {
 	if p.gotHandshake.Get() {

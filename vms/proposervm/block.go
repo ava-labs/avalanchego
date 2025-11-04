@@ -128,13 +128,16 @@ func (p *postForkCommonComponents) Verify(
 	}
 
 	childEpoch := child.PChainEpoch()
-	if expected := acp181.NewEpoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, childTimestamp); childEpoch != expected {
-		return fmt.Errorf("%w: epoch %v != expected %v", errEpochMismatch, childEpoch, expected)
-	}
-
-	// If the node is currently syncing - we don't assume that the P-chain has
-	// been synced up to this point yet.
 	if p.vm.consensusState == snow.NormalOp {
+		// Some L1s that missed the Granite upgrade accepted blocks without
+		// epochs enabled. By enforcing this check only after syncing, new nodes
+		// are able to join the network.
+		if expected := acp181.NewEpoch(p.vm.Upgrades, parentPChainHeight, parentEpoch, parentTimestamp, childTimestamp); childEpoch != expected {
+			return fmt.Errorf("%w: epoch %v != expected %v", errEpochMismatch, childEpoch, expected)
+		}
+
+		// If the node is currently syncing - we don't assume that the P-chain
+		// has been synced up to this point yet.
 		currentPChainHeight, err := p.vm.ctx.ValidatorState.GetCurrentHeight(ctx)
 		if err != nil {
 			p.vm.ctx.Log.Error("block verification failed",
