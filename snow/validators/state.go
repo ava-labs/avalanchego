@@ -200,7 +200,7 @@ type cachedState struct {
 	// Caches validators for all subnets at various heights.
 	// Key: height
 	// Value: mapping subnet ID -> validator set
-	validatorsSetsCache cache.Cacher[uint64, map[ids.ID]WarpSet]
+	validatorSetsCache cache.Cacher[uint64, map[ids.ID]WarpSet]
 }
 
 // TODO: Remove the graniteActivation parameter once all networks have
@@ -210,10 +210,10 @@ func NewCachedState(
 	graniteActivation time.Time,
 ) State {
 	return &cachedState{
-		State:               state,
-		activation:          graniteActivation,
-		validatorsSetsCache: lru.NewCache[uint64, map[ids.ID]WarpSet](validatorSetsCacheSize),
-		subnetIDsCache:      lru.NewCache[ids.ID, ids.ID](subnetIDsCacheSize),
+		State:              state,
+		activation:         graniteActivation,
+		validatorSetsCache: lru.NewCache[uint64, map[ids.ID]WarpSet](validatorSetsCacheSize),
+		subnetIDsCache:     lru.NewCache[ids.ID, ids.ID](subnetIDsCacheSize),
 	}
 }
 
@@ -233,7 +233,7 @@ func (c *cachedState) GetWarpValidatorSets(
 	ctx context.Context,
 	height uint64,
 ) (map[ids.ID]WarpSet, error) {
-	if s, ok := c.validatorsSetsCache.Get(height); ok {
+	if s, ok := c.validatorSetsCache.Get(height); ok {
 		return s, nil
 	}
 
@@ -241,7 +241,7 @@ func (c *cachedState) GetWarpValidatorSets(
 	if err != nil {
 		return nil, err
 	}
-	c.validatorsSetsCache.Put(height, s)
+	c.validatorSetsCache.Put(height, s)
 	return s, nil
 }
 
