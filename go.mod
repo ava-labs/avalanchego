@@ -22,7 +22,6 @@ require (
 	github.com/StephenButtolph/canoto v0.17.2
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
 	github.com/ava-labs/coreth v0.15.5-0.20251022172030-6c57d8ace537
-	github.com/ava-labs/ledger-avalanche-go v1.1.0
 	github.com/ava-labs/libevm v1.13.15-0.20251016142715-1bccf4f2ddb2
 	github.com/ava-labs/subnet-evm v0.8.0-fuji-rc.0.0.20251028200304-b91527f73c61
 	github.com/btcsuite/btcd/btcutil v1.1.3
@@ -59,7 +58,6 @@ require (
 	github.com/supranational/blst v0.3.14
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a
 	github.com/thepudds/fzgen v0.4.3
-	github.com/tyler-smith/go-bip32 v1.0.0
 	go.opentelemetry.io/otel v1.37.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.37.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.37.0
@@ -90,8 +88,6 @@ require (
 )
 
 require (
-	github.com/FactomProject/basen v0.0.0-20150613233007-fe3947df716e // indirect
-	github.com/FactomProject/btcutilecc v0.0.0-20130527213604-d3a63a5752ec // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.12.1 // indirect
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.13 // indirect
@@ -186,9 +182,6 @@ require (
 	github.com/urfave/cli/v2 v2.25.7 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	github.com/zondax/golem v0.27.0 // indirect
-	github.com/zondax/hid v0.9.2 // indirect
-	github.com/zondax/ledger-go v1.0.1 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/otel/metric v1.37.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.7.0 // indirect
