@@ -33,7 +33,7 @@ The plugin version is updated to `44` all plugins must update to be compatible.
 
 ### Fixes
 
-- Improved bootstrapping ETA predications.
+- Improved bootstrapping ETA predictions.
 
 **Full Changelog**: https://github.com/ava-labs/avalanchego/compare/v1.13.5...v1.14.0
 
