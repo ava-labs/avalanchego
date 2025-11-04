@@ -200,3 +200,7 @@ require (
 )
 
 tool github.com/onsi/ginkgo/v2/ginkgo
+
+replace github.com/ava-labs/coreth => ../coreth
+
+replace github.com/ava-labs/firewood-go-ethhash/ffi => ../firewood/ffi

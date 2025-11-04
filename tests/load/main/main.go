@@ -226,9 +226,10 @@ func newPrimaryChainConfigsWithFirewood() map[string]tmpnet.ConfigMap {
 	//
 	// Ref: https://github.com/ava-labs/coreth/issues/1180
 	firewoodConfig := tmpnet.ConfigMap{
-		"state-scheme":       "firewood",
-		"snapshot-cache":     0,
-		"pruning-enabled":    true,
+		"state-scheme":   "firewood",
+		"snapshot-cache": 0,
+		// XXX: purposely set to false to use Firewood's archival support
+		"pruning-enabled":    false,
 		"state-sync-enabled": false,
 	}
 
