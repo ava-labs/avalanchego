@@ -18,8 +18,7 @@ import (
 // destination LevelDB directory for the specified block range [startBlock, endBlock].
 func ExportBlockRange(tb testing.TB, blockDirSrc string, blockDirDst string, startBlock, endBlock uint64, chanSize int) {
 	r := require.New(tb)
-	blockChan, err := createBlockChanFromLevelDB(tb, blockDirSrc, startBlock, endBlock, chanSize)
-	r.NoError(err)
+	blockChan := createBlockChanFromLevelDB(tb, blockDirSrc, startBlock, endBlock, chanSize)
 
 	db, err := leveldb.New(blockDirDst, nil, logging.NoLog{}, prometheus.NewRegistry())
 	r.NoError(err)

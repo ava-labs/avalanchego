@@ -64,14 +64,13 @@ func NewVMExecutor(
 ) *VMExecutor {
 	r := require.New(tb)
 
-	blockChan, err := createBlockChanFromLevelDB(
+	blockChan := createBlockChanFromLevelDB(
 		tb,
 		blockDir,
 		startBlock,
 		endBlock,
 		chanSize,
 	)
-	r.NoError(err)
 
 	consensusRegistry := prometheus.NewRegistry()
 	r.NoError(prefixGatherer.Register("avalanche_snowman", consensusRegistry))
@@ -271,14 +270,12 @@ type blockResult struct {
 	err        error
 }
 
-func createBlockChanFromLevelDB(tb testing.TB, sourceDir string, startBlock, endBlock uint64, chanSize int) (<-chan blockResult, error) {
+func createBlockChanFromLevelDB(tb testing.TB, sourceDir string, startBlock, endBlock uint64, chanSize int) <-chan blockResult {
 	r := require.New(tb)
 	ch := make(chan blockResult, chanSize)
 
 	db, err := leveldb.New(sourceDir, nil, logging.NoLog{}, prometheus.NewRegistry())
-	if err != nil {
-		return nil, fmt.Errorf("failed to create leveldb database from %q: %w", sourceDir, err)
-	}
+	r.NoError(err, "failed to create leveldb database from %q", sourceDir)
 	tb.Cleanup(func() {
 		r.NoError(db.Close())
 	})
@@ -326,7 +323,7 @@ func createBlockChanFromLevelDB(tb testing.TB, sourceDir string, startBlock, end
 		}
 	}()
 
-	return ch, nil
+	return ch
 }
 
 func blockKey(height uint64) []byte {
