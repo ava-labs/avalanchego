@@ -1483,3 +1483,71 @@ func TestIterDone(t *testing.T) {
 	r.False(it.Next())
 	r.NoError(it.Err())
 }
+
+// TestNilVsEmptyValue tests that nil values cause delete operations while
+// empty []byte{} values result in inserts with empty values.
+func TestNilVsEmptyValue(t *testing.T) {
+	r := require.New(t)
+	db := newTestDatabase(t)
+
+	// Insert a key with a non-empty value
+	key1 := []byte("key1")
+	value1 := []byte("value1")
+	_, err := db.Update([][]byte{key1}, [][]byte{value1})
+	r.NoError(err, "Insert key1 with value1")
+
+	// Verify the key exists
+	got, err := db.Get(key1)
+	r.NoError(err, "Get key1")
+	r.Equal(value1, got, "key1 should have value1")
+
+	// Insert another key with an empty value (not nil)
+	key2 := []byte("key2")
+	emptyValue := []byte{} // empty slice, not nil
+	_, err = db.Update([][]byte{key2}, [][]byte{emptyValue})
+	r.NoError(err, "Insert key2 with empty value")
+
+	// Verify key2 exists with empty value
+	got, err = db.Get(key2)
+	r.NoError(err, "Get key2")
+	r.NotNil(got, "key2 should exist (not be nil)")
+	r.Empty(got, "key2 should have empty value")
+
+	// Now use nil value to delete key1 (DeleteRange operation)
+	var nilValue []byte = nil
+	_, err = db.Update([][]byte{key1}, [][]byte{nilValue})
+	r.NoError(err, "Delete key1 with nil value")
+
+	// Verify key1 is deleted
+	got, err = db.Get(key1)
+	r.NoError(err, "Get key1 after delete")
+	r.Nil(got, "key1 should be deleted")
+
+	// Verify key2 still exists with empty value
+	got, err = db.Get(key2)
+	r.NoError(err, "Get key2 after key1 delete")
+	r.NotNil(got, "key2 should still exist")
+	r.Empty(got, "key2 should still have empty value")
+
+	// Test with batch operations
+	key3 := []byte("key3")
+	value3 := []byte("value3")
+	key4 := []byte("key4")
+	emptyValue4 := []byte{}
+
+	_, err = db.Update(
+		[][]byte{key3, key4},
+		[][]byte{value3, emptyValue4},
+	)
+	r.NoError(err, "Batch insert key3 and key4")
+
+	// Verify both keys exist
+	got, err = db.Get(key3)
+	r.NoError(err, "Get key3")
+	r.Equal(value3, got, "key3 should have value3")
+
+	got, err = db.Get(key4)
+	r.NoError(err, "Get key4")
+	r.NotNil(got, "key4 should exist")
+	r.Empty(got, "key4 should have empty value")
+}

@@ -44,7 +44,9 @@ impl<'a> api::KeyValuePair for KeyValuePair<'a> {
 
     #[inline]
     fn into_batch(self) -> api::BatchOp<Self::Key, Self::Value> {
-        if self.value.is_empty() {
+        // Check if the value pointer is null (nil slice in Go)
+        // vs non-null but empty (empty slice []byte{} in Go)
+        if self.value.is_null() {
             api::BatchOp::DeleteRange { prefix: self.key }
         } else {
             api::BatchOp::Put {

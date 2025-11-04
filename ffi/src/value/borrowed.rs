@@ -75,6 +75,13 @@ impl<'a, T> BorrowedSlice<'a, T> {
             marker: std::marker::PhantomData,
         }
     }
+
+    /// Returns true if the pointer is null.
+    /// This is used to differentiate between a nil slice and an empty slice.
+    #[must_use]
+    pub const fn is_null(&self) -> bool {
+        self.ptr.is_null()
+    }
 }
 
 impl<T> std::ops::Deref for BorrowedSlice<'_, T> {

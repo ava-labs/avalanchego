@@ -125,8 +125,13 @@ func New(filePath string, conf *Config) (*Database, error) {
 // Update applies a batch of updates to the database, returning the hash of the
 // root node after the batch is applied.
 //
-// WARNING: a consequence of prefix deletion is that calling Update with an empty
-// key and value will delete the entire database.
+// Value Semantics:
+//   - nil value (vals[i] == nil): Performs a DeleteRange operation using the key as a prefix
+//   - empty slice (vals[i] != nil && len(vals[i]) == 0): Inserts/updates the key with an empty value
+//   - non-empty value: Inserts/updates the key with the provided value
+//
+// WARNING: Calling Update with an empty key and nil value will delete the entire database
+// due to prefix deletion semantics.
 func (db *Database) Update(keys, vals [][]byte) ([]byte, error) {
 	if db.handle == nil {
 		return nil, errDBClosed
@@ -146,6 +151,11 @@ func (db *Database) Update(keys, vals [][]byte) ([]byte, error) {
 // Propose creates a new proposal with the given keys and values. The proposal
 // is not committed until [Proposal.Commit] is called. See [Database.Close] re
 // freeing proposals.
+//
+// Value Semantics:
+//   - nil value (vals[i] == nil): Performs a DeleteRange operation using the key as a prefix
+//   - empty slice (vals[i] != nil && len(vals[i]) == 0): Inserts/updates the key with an empty value
+//   - non-empty value: Inserts/updates the key with the provided value
 func (db *Database) Propose(keys, vals [][]byte) (*Proposal, error) {
 	if db.handle == nil {
 		return nil, errDBClosed

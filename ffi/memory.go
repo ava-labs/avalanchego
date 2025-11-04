@@ -63,17 +63,20 @@ var _ Borrower = (*ownedBytes)(nil)
 //
 // Provide a Pinner to ensure the memory is pinned while the BorrowedBytes is in use.
 func newBorrowedBytes(slice []byte, pinner Pinner) C.BorrowedBytes {
-	sliceLen := len(slice)
-	if sliceLen == 0 {
-		return C.BorrowedBytes{ptr: nil, len: 0}
-	}
-
+	// Get the pointer first to distinguish between nil slice and empty slice
 	ptr := unsafe.SliceData(slice)
+	sliceLen := len(slice)
+
+	// If ptr is nil (which means the slice itself is nil), return nil pointer
 	if ptr == nil {
 		return C.BorrowedBytes{ptr: nil, len: 0}
 	}
 
-	pinner.Pin(ptr)
+	// For non-nil slices (including empty slices like []byte{}),
+	// pin the pointer if the slice has data
+	if sliceLen > 0 {
+		pinner.Pin(ptr)
+	}
 
 	return C.BorrowedBytes{
 		ptr: (*C.uint8_t)(ptr),
