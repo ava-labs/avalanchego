@@ -5,7 +5,6 @@ package blockdb
 
 import (
 	"slices"
-	"sync"
 
 	"go.uber.org/zap"
 
@@ -13,17 +12,17 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 )
 
-// numShards is the number of mutex shards used to reduce lock contention for
-// concurrent Put operations. Using 256 shards provides a good balance between
-// memory usage (~2KB) and concurrency.
-const numShards = 256
-
 var _ database.HeightIndex = (*cacheDB)(nil)
 
+// cacheDB caches data from the underlying database.
+//
+// Operations (Get, Has, Put) are not atomic with the underlying database.
+// Concurrent writes to the same height can result in cache inconsistencies where
+// the cache and database contain different values. This limitation is acceptable
+// because concurrent writes to the same height are not an intended use case.
 type cacheDB struct {
-	db     *Database
-	cache  *lru.Cache[BlockHeight, BlockData]
-	shards [numShards]sync.Mutex
+	db    *Database
+	cache *lru.Cache[BlockHeight, BlockData]
 }
 
 func newCacheDB(db *Database, size uint16) *cacheDB {
@@ -53,18 +52,7 @@ func (c *cacheDB) Get(height BlockHeight) (BlockData, error) {
 	return data, nil
 }
 
-// Put writes block data at the specified height to both the underlying database
-// and the cache.
-//
-// Concurrent calls to Put with the same height are serialized using sharded
-// locking to ensure cache consistency with the underlying database.
-// This allows concurrent writes to different heights while preventing race
-// conditions for writes to the same height.
 func (c *cacheDB) Put(height BlockHeight, data BlockData) error {
-	shard := &c.shards[height%numShards]
-	shard.Lock()
-	defer shard.Unlock()
-
 	if err := c.db.Put(height, data); err != nil {
 		return err
 	}
