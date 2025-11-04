@@ -443,24 +443,24 @@ func TestAddValidatorReject(t *testing.T) {
 	)
 	require.NoError(err)
 
-	blk0ID, err := vm.LastAccepted(t.Context())
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
 	require.NoError(err)
-	blk0, err := vm.GetBlock(t.Context(), blk0ID)
+	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
 	require.NoError(err)
 
-	acceptedBlk1, err := block.NewBanffStandardBlock(
-		blk0.Timestamp().Add(time.Second),
-		blk0.ID(),
-		blk0.Height()+1,
+	statelessBlk, err := block.NewBanffStandardBlock(
+		lastAccepted.Timestamp().Add(time.Second),
+		lastAccepted.ID(),
+		lastAccepted.Height()+1,
 		[]*txs.Tx{tx},
 	)
 	require.NoError(err)
 
-	blk1, err := vm.ParseBlock(t.Context(), acceptedBlk1.Bytes())
+	blk, err := vm.ParseBlock(t.Context(), statelessBlk.Bytes())
 	require.NoError(err)
 
-	require.NoError(blk1.Verify(t.Context()))
-	require.NoError(blk1.Reject(t.Context()))
+	require.NoError(blk.Verify(t.Context()))
+	require.NoError(blk.Reject(t.Context()))
 
 	_, _, err = vm.state.GetTx(tx.ID())
 	require.ErrorIs(err, database.ErrNotFound)
