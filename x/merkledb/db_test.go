@@ -81,6 +81,8 @@ func Test_MerkleDB_GetValues_Safety(t *testing.T) {
 }
 
 func Test_MerkleDB_DB_Interface(t *testing.T) {
+	t.Skip("FLAKY: panic: test timed out after 2m0s")
+
 	for _, bf := range validBranchFactors {
 		for name, test := range dbtest.Tests {
 			t.Run(fmt.Sprintf("%s_%d", name, bf), func(t *testing.T) {
@@ -153,6 +155,8 @@ func Test_MerkleDB_DB_Load_Root_From_DB(t *testing.T) {
 }
 
 func Test_MerkleDB_DB_Rebuild(t *testing.T) {
+	t.Skip("FLAKY: panic: test timed out after 2m0s")
+
 	require := require.New(t)
 
 	initialSize := 5_000
@@ -1637,6 +1641,8 @@ func Test_FindNextKey_DifferentChild(t *testing.T) {
 // Test findNextKey by computing the expected result in a naive, inefficient
 // way and comparing it to the actual result
 func TestFindNextKeyRandom(t *testing.T) {
+	t.Skip("FLAKY: panic: test timed out after 2m0s")
+
 	now := time.Now().UnixNano()
 	ctx := t.Context()
 	t.Logf("seed: %d", now)
