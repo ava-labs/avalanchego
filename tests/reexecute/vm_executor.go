@@ -344,7 +344,7 @@ type consensusMetrics struct {
 //
 // The registry passed in is expected to be registered with the prefix
 // "avalanche_snowman" and the chain label (ex. chain="C") that would be handled
-// by the[chain manager](../../../chains/manager.go).
+// by the [chain manager](../../chains/manager.go).
 func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, error) {
 	m := &consensusMetrics{
 		lastAcceptedHeight: prometheus.NewGauge(prometheus.GaugeOpts{
