@@ -96,7 +96,7 @@ func TestCachedState_GetSubnetID(t *testing.T) {
 			uncached.GetSubnetIDF = nil
 		}
 
-		got, err := cached.GetSubnetID(context.Background(), test.blockchainID)
+		got, err := cached.GetSubnetID(t.Context(), test.blockchainID)
 		require.ErrorIs(err, test.wantErr)
 		require.Equal(test.want, got)
 		require.Equal(test.expectCached, !cacheMiss)
