@@ -8,15 +8,16 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/libevm/common"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
-var _ Request = CodeRequest{}
+var _ Request = (*CodeRequest)(nil)
 
-// CodeRequest is a request to retrieve a contract code with specified Hash
+// CodeRequest is a request to retrieve contract code for the specified hashes.
 type CodeRequest struct {
-	// Hashes is a list of contract code hashes
+	// Hashes is a list of contract code hashes to retrieve.
 	Hashes []common.Hash `serialize:"true"`
 }
 
@@ -32,16 +33,16 @@ func (c CodeRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID ui
 	return handler.HandleCodeRequest(ctx, nodeID, requestID, c)
 }
 
+// NewCodeRequest creates a new CodeRequest with the given hashes.
 func NewCodeRequest(hashes []common.Hash) CodeRequest {
 	return CodeRequest{
 		Hashes: hashes,
 	}
 }
 
-// CodeResponse is a response to a CodeRequest
-// crypto.Keccak256Hash of each element in Data is expected to equal
-// the corresponding element in CodeRequest.Hashes
-// handler: handlers.CodeRequestHandler
+// CodeResponse is a response to a CodeRequest.
+// The crypto.Keccak256Hash of each element in Data is expected to equal
+// the corresponding element in CodeRequest.Hashes.
 type CodeResponse struct {
 	Data [][]byte `serialize:"true"`
 }

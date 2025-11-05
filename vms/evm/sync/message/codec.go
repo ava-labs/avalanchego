@@ -4,6 +4,9 @@
 package message
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
 	"github.com/ava-labs/avalanchego/utils/units"
@@ -15,32 +18,43 @@ const (
 	maxMessageSize = 2*units.MiB - 64*units.KiB // Subtract 64 KiB from p2p network cap to leave room for encoding overhead from AvalancheGo
 )
 
-var Codec codec.Manager
+var (
+	codecOnce sync.Once
+	manager   codec.Manager
+)
 
-func init() {
-	Codec = codec.NewManager(maxMessageSize)
-	c := linearcodec.NewDefault()
+// Codec returns the codec manager for this package, initializing it lazily on first access.
+// This avoids using init() and initializes the codec only when needed.
+// NOTE: Panics if codec initialization fails (e.g., duplicate type registration).
+// Such errors indicate programming bugs and should never occur at runtime.
+func Codec() codec.Manager {
+	codecOnce.Do(func() {
+		c := codec.NewManager(maxMessageSize)
+		lc := linearcodec.NewDefault()
 
-	errs := wrappers.Errs{}
-	// Gossip types and sync summary type removed from codec
-	c.SkipRegistrations(3)
-	errs.Add(
-		// state sync types
-		c.RegisterType(BlockRequest{}),
-		c.RegisterType(BlockResponse{}),
-		c.RegisterType(LeafsRequest{}),
-		c.RegisterType(LeafsResponse{}),
-		c.RegisterType(CodeRequest{}),
-		c.RegisterType(CodeResponse{}),
-	)
+		errs := wrappers.Errs{}
+		// Gossip types and sync summary type removed from codec
+		lc.SkipRegistrations(3)
+		errs.Add(
+			// state sync types
+			lc.RegisterType(BlockRequest{}),
+			lc.RegisterType(BlockResponse{}),
+			lc.RegisterType(LeafsRequest{}),
+			lc.RegisterType(LeafsResponse{}),
+			lc.RegisterType(CodeRequest{}),
+			lc.RegisterType(CodeResponse{}),
+		)
 
-	// Deprecated Warp request/responde types are skipped
-	// See https://github.com/ava-labs/avalanchego/graft/coreth/pull/999
-	c.SkipRegistrations(3)
+		// Deprecated Warp request/response types are skipped
+		// See https://github.com/ava-labs/coreth/pull/999
+		lc.SkipRegistrations(3)
 
-	Codec.RegisterCodec(Version, c)
+		errs.Add(c.RegisterCodec(Version, lc))
 
-	if errs.Errored() {
-		panic(errs.Err)
-	}
+		if errs.Errored() {
+			panic(fmt.Errorf("failed to initialize message codec: %w", errs.Err))
+		}
+		manager = c
+	})
+	return manager
 }
