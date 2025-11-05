@@ -197,6 +197,14 @@ jobs:
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
         run: ./scripts/run_task.sh check-generate-canoto
+  check_codec:
+    name: Up-to-date codec
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - shell: bash
+        run: ./scripts/run_task.sh check-generate-codec
   check_contract_bindings:
     name: Up-to-date contract bindings
     runs-on: ubuntu-latest
