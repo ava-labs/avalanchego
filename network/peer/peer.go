@@ -143,8 +143,8 @@ type peer struct {
 	// version is the claimed version the peer is running that we received in
 	// the Handshake message.
 	version *version.Application
-	// upgradeTime is the Unix timestamp (in seconds) of the most recently
-	// scheduled network upgrade according to the peer.
+	// upgradeTime is the claimed Unix timestamp (in seconds) of the most
+	// recently scheduled network upgrade from the Handshake message.
 	upgradeTime uint64
 	// trackedSubnets are the subnetIDs the peer sent us in the Handshake
 	// message. The primary network ID is always included.
