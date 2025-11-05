@@ -1,8 +1,19 @@
 # Release Notes
 
-## [v0.7.10](https://github.com/ava-labs/subnet-evm/releases/tag/v0.7.10)
+## [v0.8.1](https://github.com/ava-labs/subnet-evm/releases/tag/v0.8.1)
 
 - Add pending releases here
+
+## [v0.8.0](https://github.com/ava-labs/subnet-evm/releases/tag/v0.8.0)
+
+This version is compatible with the Avalanche Granite upgrade. All mainnet nodes **MUST** update to a Granite compatible version prior to the upgrade activation time: November 19th, 2025 16:00 UTC.
+
+### AvalancheGo Compatibility
+
+The plugin version is **updated** to 44 and is compatible with AvalancheGo version v1.14.0.
+
+### Updates
+
 - Upgrade to Go version 1.24
 - ACP-226:
   - Set expected block gas cost to 0 in Granite network upgrade, removing block gas cost requirements for block building.
