@@ -3,4 +3,4 @@
 
 package block
 
-//go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE} -destination=mock_block.go . Block
+//go:generate go tool -modfile=../../../tools/go.mod mockgen -package=${GOPACKAGE} -destination=mock_block.go . Block

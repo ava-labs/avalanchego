@@ -3,4 +3,4 @@
 
 package signer
 
-//go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE}mock -source=signer.go -destination=${GOPACKAGE}mock/signer.go -mock_names=Signer=Signer
+//go:generate go tool -modfile=../../../tools/go.mod mockgen -package=${GOPACKAGE}mock -source=signer.go -destination=${GOPACKAGE}mock/signer.go -mock_names=Signer=Signer

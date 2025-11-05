@@ -3,4 +3,4 @@
 
 package sender
 
-//go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/external_sender.go -mock_names=ExternalSender=ExternalSender . ExternalSender
+//go:generate go tool -modfile=../../../tools/go.mod mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/external_sender.go -mock_names=ExternalSender=ExternalSender . ExternalSender

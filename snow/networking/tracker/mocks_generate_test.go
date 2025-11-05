@@ -3,5 +3,5 @@
 
 package tracker
 
-//go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/targeter.go -mock_names=Targeter=Targeter . Targeter
-//go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/tracker.go -mock_names=Tracker=Tracker . Tracker
+//go:generate go tool -modfile=../../../tools/go.mod mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/targeter.go -mock_names=Targeter=Targeter . Targeter
+//go:generate go tool -modfile=../../../tools/go.mod mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/tracker.go -mock_names=Tracker=Tracker . Tracker

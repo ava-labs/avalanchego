@@ -3,5 +3,5 @@
 
 package database
 
-//go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/batch.go -mock_names=Batch=Batch . Batch
-//go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/iterator.go -mock_names=Iterator=Iterator . Iterator
+//go:generate go tool -modfile=../tools/go.mod mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/batch.go -mock_names=Batch=Batch . Batch
+//go:generate go tool -modfile=../tools/go.mod mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/iterator.go -mock_names=Iterator=Iterator . Iterator
