@@ -46,7 +46,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 
 	tests := map[string]struct {
 		setup       func(backend Backend) (request []byte, expectedResponse []byte)
-		verifyStats func(t *testing.T, stats *verifierStats)
+		verifyStats func(t *testing.T, b *backend)
 		err         *common.AppError
 	}{
 		"known message": {
@@ -60,18 +60,18 @@ func TestAddressedCallSignatures(t *testing.T) {
 				require.NoError(t, backend.AddMessage(msg))
 				return msg.Bytes(), signature
 			},
-			verifyStats: func(t *testing.T, stats *verifierStats) {
-				require.Zero(t, stats.messageParseFail.Snapshot().Count())
-				require.Zero(t, stats.blockValidationFail.Snapshot().Count())
+			verifyStats: func(t *testing.T, b *backend) {
+				require.Zero(t, b.messageParseFail.Snapshot().Count())
+				require.Zero(t, b.blockValidationFail.Snapshot().Count())
 			},
 		},
 		"offchain message": {
 			setup: func(_ Backend) (request []byte, expectedResponse []byte) {
 				return offchainMessage.Bytes(), offchainSignature
 			},
-			verifyStats: func(t *testing.T, stats *verifierStats) {
-				require.Zero(t, stats.messageParseFail.Snapshot().Count())
-				require.Zero(t, stats.blockValidationFail.Snapshot().Count())
+			verifyStats: func(t *testing.T, b *backend) {
+				require.Zero(t, b.messageParseFail.Snapshot().Count())
+				require.Zero(t, b.blockValidationFail.Snapshot().Count())
 			},
 		},
 		"unknown message": {
@@ -82,9 +82,9 @@ func TestAddressedCallSignatures(t *testing.T) {
 				require.NoError(t, err)
 				return unknownMessage.Bytes(), nil
 			},
-			verifyStats: func(t *testing.T, stats *verifierStats) {
-				require.Equal(t, int64(1), stats.messageParseFail.Snapshot().Count())
-				require.Zero(t, stats.blockValidationFail.Snapshot().Count())
+			verifyStats: func(t *testing.T, b *backend) {
+				require.Equal(t, int64(1), b.messageParseFail.Snapshot().Count())
+				require.Zero(t, b.blockValidationFail.Snapshot().Count())
 			},
 			err: &common.AppError{Code: ParseErrCode},
 		},
@@ -114,7 +114,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 				require.NoError(t, err)
 				responseBytes, appErr := handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
 				require.ErrorIs(t, appErr, test.err)
-				test.verifyStats(t, warpBackend.(*backend).stats)
+				test.verifyStats(t, warpBackend.(*backend))
 
 				// If the expected response is empty, assert that the handler returns an empty response and return early.
 				if len(expectedResponse) == 0 {
@@ -162,7 +162,7 @@ func TestBlockSignatures(t *testing.T) {
 
 	tests := map[string]struct {
 		setup       func() (request []byte, expectedResponse []byte)
-		verifyStats func(t *testing.T, stats *verifierStats)
+		verifyStats func(t *testing.T, b *backend)
 		err         *common.AppError
 	}{
 		"known block": {
@@ -175,9 +175,9 @@ func TestBlockSignatures(t *testing.T) {
 				require.NoError(t, err)
 				return toMessageBytes(knownBlkID), signature
 			},
-			verifyStats: func(t *testing.T, stats *verifierStats) {
-				require.Zero(t, stats.blockValidationFail.Snapshot().Count())
-				require.Zero(t, stats.messageParseFail.Snapshot().Count())
+			verifyStats: func(t *testing.T, b *backend) {
+				require.Zero(t, b.blockValidationFail.Snapshot().Count())
+				require.Zero(t, b.messageParseFail.Snapshot().Count())
 			},
 		},
 		"unknown block": {
@@ -185,9 +185,9 @@ func TestBlockSignatures(t *testing.T) {
 				unknownBlockID := ids.GenerateTestID()
 				return toMessageBytes(unknownBlockID), nil
 			},
-			verifyStats: func(t *testing.T, stats *verifierStats) {
-				require.Equal(t, int64(1), stats.blockValidationFail.Snapshot().Count())
-				require.Zero(t, stats.messageParseFail.Snapshot().Count())
+			verifyStats: func(t *testing.T, b *backend) {
+				require.Equal(t, int64(1), b.blockValidationFail.Snapshot().Count())
+				require.Zero(t, b.messageParseFail.Snapshot().Count())
 			},
 			err: &common.AppError{Code: VerifyErrCode},
 		},
@@ -227,7 +227,7 @@ func TestBlockSignatures(t *testing.T) {
 				responseBytes, appErr := handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
 				require.ErrorIs(t, appErr, test.err)
 
-				test.verifyStats(t, warpBackend.(*backend).stats)
+				test.verifyStats(t, warpBackend.(*backend))
 
 				// If the expected response is empty, require that the handler returns an empty response and return early.
 				if len(expectedResponse) == 0 {

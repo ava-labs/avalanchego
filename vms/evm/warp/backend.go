@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/ava-labs/libevm/log"
+	"github.com/ava-labs/libevm/metrics"
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/lru"
@@ -57,7 +58,11 @@ type backend struct {
 	signatureCache            cache.Cacher[ids.ID, []byte]
 	messageCache              *lru.Cache[ids.ID, *warp.UnsignedMessage]
 	offchainAddressedCallMsgs map[ids.ID]*warp.UnsignedMessage
-	stats                     *verifierStats
+
+	messageParseFail            metrics.Counter
+	addressedCallValidationFail metrics.Counter
+	blockValidationFail         metrics.Counter
+	uptimeValidationFail        metrics.Counter
 }
 
 // NewBackend creates a new Backend, and initializes the signature cache and message tracking database.
@@ -72,16 +77,19 @@ func NewBackend(
 	offchainMessages [][]byte,
 ) (Backend, error) {
 	b := &backend{
-		networkID:                 networkID,
-		sourceChainID:             sourceChainID,
-		db:                        db,
-		warpSigner:                warpSigner,
-		blockClient:               blockClient,
-		signatureCache:            signatureCache,
-		uptimeTracker:             uptimeTracker,
-		messageCache:              lru.NewCache[ids.ID, *warp.UnsignedMessage](messageCacheSize),
-		stats:                     newVerifierStats(),
-		offchainAddressedCallMsgs: make(map[ids.ID]*warp.UnsignedMessage),
+		networkID:                   networkID,
+		sourceChainID:               sourceChainID,
+		db:                          db,
+		warpSigner:                  warpSigner,
+		blockClient:                 blockClient,
+		signatureCache:              signatureCache,
+		uptimeTracker:               uptimeTracker,
+		messageCache:                lru.NewCache[ids.ID, *warp.UnsignedMessage](messageCacheSize),
+		offchainAddressedCallMsgs:   make(map[ids.ID]*warp.UnsignedMessage),
+		messageParseFail:            metrics.NewRegisteredCounter("warp_backend_message_parse_fail", nil),
+		addressedCallValidationFail: metrics.NewRegisteredCounter("warp_backend_addressed_call_validation_fail", nil),
+		blockValidationFail:         metrics.NewRegisteredCounter("warp_backend_block_validation_fail", nil),
+		uptimeValidationFail:        metrics.NewRegisteredCounter("warp_backend_uptime_validation_fail", nil),
 	}
 	return b, b.initOffChainMessages(offchainMessages)
 }
