@@ -25,6 +25,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
+const (
+	ParseErrCode = iota + 1
+	VerifyErrCode
+)
+
 var (
 	_ Backend         = (*backend)(nil)
 	_ acp118.Verifier = (*backend)(nil)
@@ -35,11 +40,6 @@ var (
 	errParsingOffChainMessage = errors.New("failed to parse off-chain message")
 	ErrValidateBlock          = errors.New("failed to validate block message")
 	ErrVerifyWarpMessage      = errors.New("failed to verify warp message")
-)
-
-const (
-	ParseErrCode = iota + 1
-	VerifyErrCode
 )
 
 // BlockStore provides access to accepted blocks.
