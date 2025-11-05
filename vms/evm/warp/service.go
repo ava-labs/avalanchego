@@ -25,12 +25,16 @@ var errNoValidators = errors.New("cannot aggregate signatures from subnet with n
 type API struct {
 	chainContext        *snow.Context
 	backend             Backend
+	signer              *Signer
+	blockClient         BlockStore
 	signatureAggregator *acp118.SignatureAggregator
 }
 
-func NewAPI(chainCtx *snow.Context, backend Backend, signatureAggregator *acp118.SignatureAggregator) *API {
+func NewAPI(chainCtx *snow.Context, backend Backend, signer *Signer, blockClient BlockStore, signatureAggregator *acp118.SignatureAggregator) *API {
 	return &API{
 		backend:             backend,
+		signer:              signer,
+		blockClient:         blockClient,
 		chainContext:        chainCtx,
 		signatureAggregator: signatureAggregator,
 	}
@@ -51,18 +55,40 @@ func (a *API) GetMessageSignature(ctx context.Context, messageID ids.ID) (hexuti
 	if err != nil {
 		return nil, fmt.Errorf("failed to get message %s with error %w", messageID, err)
 	}
-	signature, err := a.backend.GetMessageSignature(ctx, unsignedMessage)
+
+	signature, err := a.signer.Sign(ctx, unsignedMessage)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get signature for message %s with error %w", messageID, err)
+		return nil, fmt.Errorf("failed to sign message %s with error %w", messageID, err)
 	}
 	return signature, nil
 }
 
 // GetBlockSignature returns the BLS signature associated with a blockID.
+// It constructs a warp message with a Hash payload containing the blockID,
+// then returns the signature for that message.
 func (a *API) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexutil.Bytes, error) {
-	signature, err := a.backend.GetBlockSignature(ctx, blockID)
+	// Verify the block exists before signing
+	if _, err := a.blockClient.GetBlock(ctx, blockID); err != nil {
+		return nil, fmt.Errorf("failed to get block %s: %w", blockID, err)
+	}
+
+	blockHashPayload, err := payload.NewHash(blockID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get signature for block %s with error %w", blockID, err)
+		return nil, fmt.Errorf("failed to create block hash payload: %w", err)
+	}
+
+	unsignedMessage, err := warp.NewUnsignedMessage(
+		a.chainContext.NetworkID,
+		a.chainContext.ChainID,
+		blockHashPayload.Bytes(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create unsigned warp message: %w", err)
+	}
+
+	signature, err := a.signer.Sign(ctx, unsignedMessage)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign block %s with error %w", blockID, err)
 	}
 	return signature, nil
 }
