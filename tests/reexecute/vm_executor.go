@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
+	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -267,6 +268,31 @@ func NewMainnetVM(
 	}
 
 	return vm, nil
+}
+
+// ExportBlockRange copies blocks from a source LevelDB directory to a
+// destination LevelDB directory for the specified block range [startBlock, endBlock].
+func ExportBlockRange(tb testing.TB, blockDirSrc string, blockDirDst string, startBlock, endBlock uint64, chanSize int) {
+	r := require.New(tb)
+	blockChan := createBlockChanFromLevelDB(tb, blockDirSrc, startBlock, endBlock, chanSize)
+
+	db, err := leveldb.New(blockDirDst, nil, logging.NoLog{}, prometheus.NewRegistry())
+	r.NoError(err)
+	tb.Cleanup(func() {
+		r.NoError(db.Close())
+	})
+
+	batch := db.NewBatch()
+	for blkResult := range blockChan {
+		r.NoError(batch.Put(blockKey(blkResult.height), blkResult.blockBytes))
+
+		if batch.Size() > 10*units.MiB {
+			r.NoError(batch.Write())
+			batch = db.NewBatch()
+		}
+	}
+
+	r.NoError(batch.Write())
 }
 
 type blockResult struct {
