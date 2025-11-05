@@ -1,4 +1,4 @@
-module github.com/ava-labs/firewood/ffi/tests
+module github.com/ava-labs/firewood/ffi/tests/firewood
 
 go 1.24
 

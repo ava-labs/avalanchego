@@ -82,6 +82,15 @@ check-nix:
         exit 1
     fi
 
+# Adds go workspace for user experience consistency
+setup-go-workspace:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [ -f "go.work" ]; then
+        rm go.work go.work.sum
+    fi
+    go work init ./ffi ./ffi/tests/eth ./ffi/tests/firewood
+
 # Run all checks of ffi built with nix
 test-ffi-nix: test-ffi-nix-build-equivalency test-ffi-nix-go-bindings
 
