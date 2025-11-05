@@ -760,7 +760,7 @@ func (n *Node) initDatabase() error {
 	case leveldb.Name:
 		// Prior to v1.10.15, the only on-disk database was leveldb, and its
 		// files went to [dbPath]/[networkID]/v1.4.5.
-		dbFolderName = version.CurrentDatabase.String()
+		dbFolderName = version.CurrentDatabase
 	case pebbledb.Name:
 		dbFolderName = "pebble"
 	default:
