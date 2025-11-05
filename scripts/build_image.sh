@@ -117,7 +117,7 @@ if [[ -z "${SKIP_BUILD_RACE}" ]]; then
 fi
 
 # Tag latest when pushing to a registry and the tag is a release (vMAJOR.MINOR.PATCH), or when forced
-if [[ "${DOCKER_IMAGE}" == *"/"* && ( $image_tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ || -n "${FORCE_TAG_LATEST}" ) ]]; then
+if [[ "${DOCKER_IMAGE}" == *"/"* && ( "$image_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ || -n "${FORCE_TAG_LATEST}" ) ]]; then
   echo "Tagging current avalanchego images as $DOCKER_IMAGE:latest"
   docker buildx imagetools create -t "$DOCKER_IMAGE:latest" "$DOCKER_IMAGE:$commit_hash"
 fi
