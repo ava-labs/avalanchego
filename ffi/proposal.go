@@ -33,7 +33,7 @@ type Proposal struct {
 	// [Database.Close] blocks on this WaitGroup, which is incremented by
 	// [getProposalFromProposalResult], and decremented by either
 	// [Proposal.Commit] or [Proposal.Drop] (when the handle is disowned).
-	openProposals *sync.WaitGroup
+	outstandingHandles *sync.WaitGroup
 
 	// The proposal root hash.
 	root []byte
@@ -93,7 +93,7 @@ func (p *Proposal) Propose(keys, vals [][]byte) (*Proposal, error) {
 	if err != nil {
 		return nil, err
 	}
-	return getProposalFromProposalResult(C.fwd_propose_on_proposal(p.handle, kvp), p.openProposals)
+	return getProposalFromProposalResult(C.fwd_propose_on_proposal(p.handle, kvp), p.outstandingHandles)
 }
 
 // disownHandle is the common path of [Proposal.Commit] and [Proposal.Drop], the
@@ -108,7 +108,7 @@ func (p *Proposal) disownHandle(fn func(*C.ProposalHandle) error, disownEvenOnEr
 	err := fn(p.handle)
 	if disownEvenOnErr || err == nil {
 		p.handle = nil
-		p.openProposals.Done()
+		p.outstandingHandles.Done()
 	}
 	return err
 }
@@ -146,7 +146,7 @@ func dropProposal(h *C.ProposalHandle) error {
 }
 
 // getProposalFromProposalResult converts a C.ProposalResult to a Proposal or error.
-func getProposalFromProposalResult(result C.ProposalResult, openProposals *sync.WaitGroup) (*Proposal, error) {
+func getProposalFromProposalResult(result C.ProposalResult, outstandingHandles *sync.WaitGroup) (*Proposal, error) {
 	switch result.tag {
 	case C.ProposalResult_NullHandlePointer:
 		return nil, errDBClosed
@@ -154,11 +154,11 @@ func getProposalFromProposalResult(result C.ProposalResult, openProposals *sync.
 		body := (*C.ProposalResult_Ok_Body)(unsafe.Pointer(&result.anon0))
 		hashKey := *(*[32]byte)(unsafe.Pointer(&body.root_hash._0))
 		proposal := &Proposal{
-			handle:        body.handle,
-			root:          hashKey[:],
-			openProposals: openProposals,
+			handle:             body.handle,
+			root:               hashKey[:],
+			outstandingHandles: outstandingHandles,
 		}
-		openProposals.Add(1)
+		outstandingHandles.Add(1)
 		runtime.SetFinalizer(proposal, (*Proposal).Drop)
 		return proposal, nil
 	case C.ProposalResult_Err:

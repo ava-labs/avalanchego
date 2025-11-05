@@ -52,8 +52,8 @@ type Database struct {
 	// handle is returned and accepted by cgo functions. It MUST be treated as
 	// an opaque value without special meaning.
 	// https://en.wikipedia.org/wiki/Blinkenlights
-	handle    *C.DatabaseHandle
-	proposals sync.WaitGroup
+	handle             *C.DatabaseHandle
+	outstandingHandles sync.WaitGroup
 }
 
 // Config configures the opening of a [Database].
@@ -168,7 +168,7 @@ func (db *Database) Propose(keys, vals [][]byte) (*Proposal, error) {
 	if err != nil {
 		return nil, err
 	}
-	return getProposalFromProposalResult(C.fwd_propose_on_db(db.handle, kvp), &db.proposals)
+	return getProposalFromProposalResult(C.fwd_propose_on_db(db.handle, kvp), &db.outstandingHandles)
 }
 
 // Get retrieves the value for the given key. It always returns a nil error.
@@ -253,7 +253,7 @@ func (db *Database) Revision(root []byte) (*Revision, error) {
 	rev, err := getRevisionFromResult(C.fwd_get_revision(
 		db.handle,
 		newBorrowedBytes(root, &pinner),
-	), db)
+	), &db.outstandingHandles)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +286,7 @@ func (db *Database) Close(ctx context.Context) error {
 
 	done := make(chan struct{})
 	go func() {
-		db.proposals.Wait()
+		db.outstandingHandles.Wait()
 		close(done)
 	}()
 

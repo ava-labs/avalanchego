@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
+	"sync"
 	"unsafe"
 )
 
@@ -29,10 +30,13 @@ var (
 type Revision struct {
 	// The database this revision is associated with. Holding this ensures
 	// the DB outlives the revision for cleanup ordering.
-	db     *Database
 	handle *C.RevisionHandle
+	disown sync.Mutex
 	// The revision root
 	root []byte
+	// outstandingHandles is the WaitGroup in Database that tracks open Rust handles.
+	// This is incremented when the revision is created, and decremented when Drop is called.
+	outstandingHandles *sync.WaitGroup
 }
 
 // Get reads the value stored at the provided key within the revision.
@@ -72,6 +76,9 @@ func (r *Revision) Iter(key []byte) (*Iterator, error) {
 //
 // It is safe to call Drop multiple times; subsequent calls after the first are no-ops.
 func (r *Revision) Drop() error {
+	r.disown.Lock()
+	defer r.disown.Unlock()
+
 	if r.handle == nil {
 		return nil
 	}
@@ -80,6 +87,7 @@ func (r *Revision) Drop() error {
 		return fmt.Errorf("%w: %w", errFreeingValue, err)
 	}
 
+	r.outstandingHandles.Done()
 	r.handle = nil // Prevent double free
 
 	return nil
@@ -90,7 +98,7 @@ func (r *Revision) Root() []byte {
 }
 
 // getRevisionFromResult converts a C.RevisionResult to a Revision or error.
-func getRevisionFromResult(result C.RevisionResult, db *Database) (*Revision, error) {
+func getRevisionFromResult(result C.RevisionResult, openProposals *sync.WaitGroup) (*Revision, error) {
 	switch result.tag {
 	case C.RevisionResult_NullHandlePointer:
 		return nil, errDBClosed
@@ -100,10 +108,12 @@ func getRevisionFromResult(result C.RevisionResult, db *Database) (*Revision, er
 		body := (*C.RevisionResult_Ok_Body)(unsafe.Pointer(&result.anon0))
 		hashKey := *(*[32]byte)(unsafe.Pointer(&body.root_hash._0))
 		rev := &Revision{
-			db:     db,
-			handle: body.handle,
-			root:   hashKey[:],
+			handle:             body.handle,
+			root:               hashKey[:],
+			outstandingHandles: openProposals,
 		}
+		openProposals.Add(1)
+		runtime.SetFinalizer(rev, (*Revision).Drop)
 		return rev, nil
 	case C.RevisionResult_Err:
 		err := newOwnedBytes(*(*C.OwnedBytes)(unsafe.Pointer(&result.anon0))).intoError()
