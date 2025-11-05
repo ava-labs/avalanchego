@@ -23,11 +23,12 @@ import (
 
 var (
 	_                         Backend = (*backend)(nil)
+	
+	messageCacheSize = 500
+	
+	errParsingOffChainMessage         = errors.New("failed to parse off-chain message")
 	ErrValidateBlock                  = errors.New("failed to validate block message")
 	ErrVerifyWarpMessage              = errors.New("failed to verify warp message")
-	errParsingOffChainMessage         = errors.New("failed to parse off-chain message")
-
-	messageCacheSize = 500
 )
 
 type BlockClient interface {
