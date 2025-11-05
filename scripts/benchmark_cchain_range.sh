@@ -8,6 +8,7 @@ set -euo pipefail
 #   CURRENT_STATE_DIR: Path or S3 URL to the current state directory or zip.
 #   START_BLOCK: The starting block height (exclusive).
 #   END_BLOCK: The ending block height (inclusive).
+#   RUNNER_NAME (optional): Runner name for the benchmark (defaults to "dev" in Go code).
 #   LABELS (optional): Comma-separated key=value pairs for metric labels.
 #   BENCHMARK_OUTPUT_FILE (optional): If set, benchmark output is also written to this file.
 #   METRICS_SERVER_ENABLED (optional): If set, enables the metrics server.
@@ -19,13 +20,10 @@ set -euo pipefail
 : "${START_BLOCK:?START_BLOCK must be set}"
 : "${END_BLOCK:?END_BLOCK must be set}"
 
-# Defaults to "dev" set at vm_reexecute_test.go `runnerNameArg`
-: "${RUNNER_NAME:=dev}"
-
 cmd="go test -timeout=0 -v -benchtime=1x -bench=BenchmarkReexecuteRange -run=^$ github.com/ava-labs/avalanchego/tests/reexecute/c \
   --block-dir=\"${BLOCK_DIR}\" \
   --current-state-dir=\"${CURRENT_STATE_DIR}\" \
-  --runner=\"${RUNNER_NAME}\" \
+  ${RUNNER_NAME:+--runner=\"${RUNNER_NAME}\"} \
   ${CONFIG:+--config=\"${CONFIG}\"} \
   --start-block=\"${START_BLOCK}\" \
   --end-block=\"${END_BLOCK}\" \
