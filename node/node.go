@@ -148,7 +148,7 @@ func New(
 	}
 
 	logger.Info("initializing node",
-		zap.Stringer("version", version.CurrentApp),
+		zap.Stringer("version", version.Current),
 		zap.String("commit", version.GitCommit),
 		zap.Stringer("nodeID", n.ID),
 		zap.Stringer("stakingKeyType", tlsCert.PublicKeyAlgorithm),
@@ -1360,7 +1360,7 @@ func (n *Node) initInfoAPI() error {
 
 	service, err := info.NewService(
 		info.Parameters{
-			Version:   version.CurrentApp,
+			Version:   version.Current,
 			NodeID:    n.ID,
 			NodePOP:   pop,
 			NetworkID: n.Config.NetworkID,
