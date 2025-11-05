@@ -126,7 +126,7 @@ func TestTimeout(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		nil,
-		version.CurrentApp,
+		version.Current,
 	)
 	require.NoError(err)
 
@@ -385,7 +385,7 @@ func TestReliableMessages(t *testing.T) {
 		"",
 		prometheus.NewRegistry(),
 		nil,
-		version.CurrentApp,
+		version.Current,
 	)
 	require.NoError(err)
 
@@ -547,7 +547,7 @@ func TestReliableMessagesToMyself(t *testing.T) {
 				"",
 				prometheus.NewRegistry(),
 				nil,
-				version.CurrentApp,
+				version.Current,
 			)
 			require.NoError(err)
 
