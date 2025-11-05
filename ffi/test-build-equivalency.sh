@@ -28,14 +28,27 @@ ls -lh "$CARGO_LIB" "$NIX_LIB"
 
 echo ""
 echo "=== Symbol Count Comparison ==="
-NIX_SYMBOLS=$(nm "$NIX_LIB" | wc -l)
-CARGO_SYMBOLS=$(nm "$CARGO_LIB" | wc -l)
+# Extract symbols to temporary files for comparison
+nm "$NIX_LIB" | sort > "$TMPDIR/nix-symbols.txt"
+nm "$CARGO_LIB" | sort > "$TMPDIR/cargo-symbols.txt"
+
+NIX_SYMBOLS=$(wc -l < "$TMPDIR/nix-symbols.txt")
+CARGO_SYMBOLS=$(wc -l < "$TMPDIR/cargo-symbols.txt")
 echo "Nix build:   $NIX_SYMBOLS symbols"
 echo "Cargo build: $CARGO_SYMBOLS symbols"
 if [ "$NIX_SYMBOLS" -eq "$CARGO_SYMBOLS" ]; then
     echo "✅ Symbol counts match"
 else
     echo "❌ Symbol counts differ"
+    echo ""
+    echo "=== Symbol Differences ==="
+    echo "Symbols only in Nix build:"
+    # Show lines that exist in the old file (nix) but not in the new file (cargo)
+    diff --unchanged-line-format="" --old-line-format="%L" --new-line-format="" "$TMPDIR/nix-symbols.txt" "$TMPDIR/cargo-symbols.txt" || true
+    echo ""
+    echo "Symbols only in Cargo build:"
+    # Show lines that exist in the new file (cargo) but not in the old file (nix)
+    diff --unchanged-line-format="" --old-line-format="" --new-line-format="%L" "$TMPDIR/nix-symbols.txt" "$TMPDIR/cargo-symbols.txt" || true
 fi
 
 echo ""
