@@ -356,6 +356,34 @@ func TestInvalidBLSKeyDisconnects(t *testing.T) {
 	require.NoError(peer1.AwaitClosed(t.Context()))
 }
 
+// Test that the upgrade time is exchanged and exposed correctly after the
+// handshake finishes.
+func TestUpgradeTime(t *testing.T) {
+	require := require.New(t)
+
+	sharedConfig0 := newConfig(t)
+	sharedConfig0.VersionCompatibility.UpgradeTime = time.Unix(123, 0)
+
+	sharedConfig1 := newConfig(t)
+	sharedConfig1.VersionCompatibility.UpgradeTime = time.Unix(1234, 0)
+
+	peer0, peer1 := startTestPeers(
+		newRawTestPeer(t, sharedConfig0),
+		newRawTestPeer(t, sharedConfig1),
+	)
+	require.NoError(peer0.AwaitReady(t.Context()))
+	require.NoError(peer1.AwaitReady(t.Context()))
+
+	require.Equal(uint64(sharedConfig1.VersionCompatibility.UpgradeTime.Unix()), peer0.Info().UpgradeTime)
+	require.Equal(uint64(sharedConfig0.VersionCompatibility.UpgradeTime.Unix()), peer1.Info().UpgradeTime)
+
+	peer0.StartClose()
+	peer1.StartClose()
+
+	require.NoError(peer0.AwaitClosed(t.Context()))
+	require.NoError(peer1.AwaitClosed(t.Context()))
+}
+
 func TestShouldDisconnect(t *testing.T) {
 	peerID := ids.GenerateTestNodeID()
 	txID := ids.GenerateTestID()
