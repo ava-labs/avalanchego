@@ -258,7 +258,11 @@ func TestUptimeSignatures(t *testing.T) {
 	startTime := uint64(time.Now().Unix())
 
 	getUptimeMessageBytes := func(sourceAddress []byte, vID ids.ID) ([]byte, *warp.UnsignedMessage) {
-		uptimePayload, err := message.NewValidatorUptime(vID, 80)
+		uptimePayload := &message.ValidatorUptime{
+			ValidationID: vID,
+			TotalUptime:  80,
+		}
+		err := message.Initialize(uptimePayload)
 		require.NoError(t, err)
 		addressedCall, err := payload.NewAddressedCall(sourceAddress, uptimePayload.Bytes())
 		require.NoError(t, err)

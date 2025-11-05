@@ -18,15 +18,6 @@ type ValidatorUptime struct {
 	TotalUptime  uint64 `serialize:"true"` // in seconds
 }
 
-// NewValidatorUptime creates a new *ValidatorUptime and initializes it.
-func NewValidatorUptime(validationID ids.ID, totalUptime uint64) (*ValidatorUptime, error) {
-	vu := &ValidatorUptime{
-		ValidationID: validationID,
-		TotalUptime:  totalUptime,
-	}
-	return vu, Initialize(vu)
-}
-
 // ParseValidatorUptime converts a slice of bytes into an initialized ValidatorUptime.
 func ParseValidatorUptime(b []byte) (*ValidatorUptime, error) {
 	payloadIntf, err := Parse(b)
