@@ -180,20 +180,14 @@ func WriteSyncPerformed(db ethdb.KeyValueWriter, blockNumber uint64) error {
 	return db.Put(bytes, nil)
 }
 
-// NewSyncPerformedIterator returns an iterator over all block numbers the VM
-// has state synced to.
-func NewSyncPerformedIterator(db ethdb.Iteratee) ethdb.Iterator {
-	return rawdb.NewKeyLengthIterator(db.NewIterator(syncPerformedPrefix, nil), syncPerformedKeyLength)
-}
-
 // GetLatestSyncPerformed returns the latest block number state synced performed to.
 func GetLatestSyncPerformed(db ethdb.Iteratee) (uint64, error) {
-	it := NewSyncPerformedIterator(db)
+	it := newSyncPerformedIterator(db)
 	defer it.Release()
 
 	var latestSyncPerformed uint64
 	for it.Next() {
-		syncPerformed := ParseSyncPerformedKey(it.Key())
+		syncPerformed := parseSyncPerformedKey(it.Key())
 		if syncPerformed > latestSyncPerformed {
 			latestSyncPerformed = syncPerformed
 		}
@@ -201,9 +195,15 @@ func GetLatestSyncPerformed(db ethdb.Iteratee) (uint64, error) {
 	return latestSyncPerformed, it.Error()
 }
 
-// ParseSyncPerformedKey returns the block number from keys returned by
+// newSyncPerformedIterator returns an iterator over all block numbers the VM
+// has state synced to.
+func newSyncPerformedIterator(db ethdb.Iteratee) ethdb.Iterator {
+	return rawdb.NewKeyLengthIterator(db.NewIterator(syncPerformedPrefix, nil), syncPerformedKeyLength)
+}
+
+// parseSyncPerformedKey returns the block number from keys returned by
 // NewSyncPerformedIterator. It panics if the key is shorter than `syncPerformedKeyLength`.
-func ParseSyncPerformedKey(key []byte) uint64 {
+func parseSyncPerformedKey(key []byte) uint64 {
 	return binary.BigEndian.Uint64(key[len(syncPerformedPrefix):])
 }
 
