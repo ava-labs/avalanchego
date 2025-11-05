@@ -432,7 +432,7 @@ func (e *Engine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID u
 }
 
 func (e *Engine) SimplexMessage(_ context.Context, _ ids.NodeID, _ *p2p.Simplex) error {
-	e.Ctx.Log.Warn("received unsupported SimplexMessage call")
+	e.Ctx.Log.Debug("received unsupported SimplexMessage call")
 	return nil
 }
 

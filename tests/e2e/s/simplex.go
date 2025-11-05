@@ -18,8 +18,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
-	"github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
+	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
 )
 
 var simplexSubnetName = "simplex-a"
@@ -130,32 +130,30 @@ func issueAndConfirmTx(tc *e2e.GinkgoTestContext, chain *tmpnet.Chain, nodes []*
 		zap.String("leaderURI", leaderURI),
 	)
 	recipientKey := e2e.NewPrivateKey(tc)
-	transferTxStatus, err := transfer.Transfer(
-		tc.DefaultContext(),
-		&transfer.Config{
-			URI:               leaderURI,
-			ChainID:           chain.ChainID,
-			AssetID:           chain.ChainID,
-			Amount:            units.Schmeckle,
-			To:                recipientKey.Address(),
-			PrivateKey:        chain.PreFundedKey,
-			WaitForAcceptance: false,
-		},
-	)
+
+	// create and sign the transaction
+	utx := &tx.Transfer{
+		ChainID: chain.ChainID,
+		Nonce:   nonces[leader.NodeID],
+		MaxFee:  0,
+		AssetID: chain.ChainID,
+		Amount:  units.Schmeckle,
+		To:      recipientKey.Address(),
+	}
+	stx, err := tx.Sign(utx, chain.PreFundedKey)
+	require.NoError(err)
+	txID, err := stx.ID()
 	require.NoError(err)
 
-	// issue txs to all other nodes to ensure they are aware of the tx
+	// issue txs to all nodes, because XSVM does not have mempool gossiping
 	for i, node := range nodes {
-		if node.NodeID == leader.NodeID {
-			continue
-		}
 		client = api.NewClient(node.GetAccessibleURI(), chain.ChainID.String())
-		_, err := client.IssueTx(tc.DefaultContext(), transferTxStatus.Tx)
+		_, err := client.IssueTx(tc.DefaultContext(), stx)
 		require.NoError(err, "node %d failed to issue tx", i)
 	}
 
 	tc.Log().Info("successfully issued XSVM transfer transactions",
-		zap.Stringer("txID", transferTxStatus.TxID),
+		zap.Stringer("txID", txID),
 		zap.Uint64("round", round),
 	)
 
@@ -174,11 +172,11 @@ func issueAndConfirmTx(tc *e2e.GinkgoTestContext, chain *tmpnet.Chain, nodes []*
 		require.NoError(err)
 
 		require.Len(statelessBlock.Txs, 1)
-		require.Equal(statelessBlock.Txs[0], transferTxStatus.Tx)
+		require.Equal(statelessBlock.Txs[0], stx)
 
 		tc.Log().Info("node has accepted the tx",
 			zap.Stringer("node", node.NodeID),
-			zap.Stringer("txID", transferTxStatus.TxID),
+			zap.Stringer("txID", txID),
 			zap.Uint64("height", statelessBlock.Height),
 			zap.Uint64("round", round),
 		)

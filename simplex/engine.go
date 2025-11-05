@@ -90,6 +90,10 @@ func NewEngine(consensusCtx *snow.ConsensusContext, ctx context.Context, config 
 		return nil, err
 	}
 
+	if storage.NumBlocks() == 0 {
+		return nil, errors.New("storage has no blocks")
+	}
+
 	lastBlock, _, err := storage.Retrieve(storage.NumBlocks() - 1)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't find last block at height %d: %w", storage.NumBlocks()-1, err)
