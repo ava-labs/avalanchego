@@ -40,7 +40,7 @@ formatters:
         - standard
         - default
         - blank
-        - prefix(github.com/ava-labs/coreth)
+        - prefix(github.com/ava-labs/avalanchego/graft/coreth)
         - alias
         - dot
       custom-order: true

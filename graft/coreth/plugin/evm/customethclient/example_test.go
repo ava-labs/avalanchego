@@ -7,7 +7,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ava-labs/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 )
 
 const FujiAPIURI = "https://api.avax-test.network"

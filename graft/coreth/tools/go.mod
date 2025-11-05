@@ -1,4 +1,4 @@
-module github.com/ava-labs/coreth/tools
+module github.com/ava-labs/avalanchego/graft/coreth/tools
 
 go 1.24.9
 

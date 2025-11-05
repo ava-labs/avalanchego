@@ -31,7 +31,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ava-labs/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 )
 
 func TestMain(m *testing.M) {

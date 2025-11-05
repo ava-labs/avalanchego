@@ -35,7 +35,7 @@ export VERSION=v0.15.0
 1. Create a pull request (PR) from your branch targeting master, for example using [`gh`](https://cli.github.com/):
 
     ```bash
-    gh pr create --repo github.com/ava-labs/coreth --base master --title "chore: release $VERSION_RC"
+    gh pr create --repo github.com/ava-labs/avalanchego/graft/coreth --base master --title "chore: release $VERSION_RC"
     ```
 
 1. Wait for the PR checks to pass with
@@ -83,7 +83,7 @@ Following the previous example in the [Release candidate section](#release-candi
     ```
 
 1. Create a new release on Github, either using:
-    - the [Github web interface](https://github.com/ava-labs/coreth/releases/new)
+    - the [Github web interface](https://github.com/ava-labs/avalanchego/graft/coreth/releases/new)
         1. In the "Choose a tag" box, select the tag previously created `$VERSION` (`v0.15.0`)
         1. Pick the previous tag, for example as `v0.14.0`.
         1. Set the "Release title" to `$VERSION` (`v0.15.0`)
@@ -125,29 +125,42 @@ Following the previous example in the [Release candidate section](#release-candi
 Note this release will likely never be used in AvalancheGo, which should always be using release candidates to accelerate the development process. However it is still useful to have a release to indicate the last stable version of coreth.
 
 ### Post-release
+
 After you have successfully released a new coreth version, you need to bump all of the versions again in preperation for the next release. Note that the release here is not final, and will be reassessed, and possibly changer prior to release. Some releases require a major version update, but this will usually be `$VERSION` + `0.0.1`. For example:
+
 ```bash
 export P_VERSION=v1.15.1
 ```
+
 1. Create a branch, from the tip of the `master` branch after the release PR has been merged:
+
     ```bash
     git fetch origin master:master
     git checkout master
     git checkout -b "prep-$P_VERSION-release"
     ```
+
 1. Bump the version number to the next pending release version, `$P_VERSION`
-  - Update the [RELEASES.md](../../RELEASES.md) file with `$P_VERSION`, creating a space for maintainers to place their changes as they make them. 
-  - Modify the [plugin/evm/version.go](../../plugin/evm/version.go) `Version` global string variable and set it to `$P_VERSION`.
+
+- Update the [RELEASES.md](../../RELEASES.md) file with `$P_VERSION`, creating a space for maintainers to place their changes as they make them.
+- Modify the [plugin/evm/version.go](../../plugin/evm/version.go) `Version` global string variable and set it to `$P_VERSION`.
+
 1. Create a pull request (PR) from your branch targeting master, for example using [`gh`](https://cli.github.com/):
+
     ```bash
-    gh pr create --repo github.com/ava-labs/coreth --base master --title "chore: prep next release $P_VERSION"
+    gh pr create --repo github.com/ava-labs/avalanchego/graft/coreth --base master --title "chore: prep next release $P_VERSION"
     ```
+
 1. Wait for the PR checks to pass with
+
     ```bash
     gh pr checks --watch
     ```
+
 1. Squash and merge your branch into `master`, for example:
+
     ```bash
     gh pr merge "prep-$P_VERSION-release" --squash --subject "chore: prep next release $P_VERSION"
     ```
+
 1. Pat yourself on the back for a job well done.

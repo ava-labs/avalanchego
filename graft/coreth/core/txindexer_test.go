@@ -32,9 +32,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/ava-labs/coreth/consensus/dummy"
-	"github.com/ava-labs/coreth/core/coretest"
-	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
+	"github.com/ava-labs/avalanchego/graft/coreth/core/coretest"
+	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"

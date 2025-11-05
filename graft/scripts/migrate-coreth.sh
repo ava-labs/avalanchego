@@ -13,7 +13,7 @@ set -euo pipefail
 REPO_ROOT=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
 cd "${REPO_ROOT}"
 
-CORETH_REPO=https://github.com/ava-labs/coreth.git
+CORETH_REPO=https://github.com/ava-labs/avalanchego/graft/coreth.git
 CORETH_REMOTE="coreth"
 GRAFT_PATH=graft/coreth
 
@@ -21,7 +21,7 @@ if [ -d "${REPO_ROOT}/${GRAFT_PATH}" ]; then
   echo "coreth already grafted at ${GRAFT_PATH}, skipping grafting process"
 else
   echo "getting coreth module details from go.mod to ensure a compatible version is used"
-  MODULE_DETAILS="$(go list -m "github.com/ava-labs/coreth" 2>/dev/null)"
+  MODULE_DETAILS="$(go list -m "github.com/ava-labs/avalanchego/graft/coreth" 2>/dev/null)"
 
   echo "extracting coreth version from ${MODULE_DETAILS}"
   CORETH_VERSION="$(echo "${MODULE_DETAILS}" | awk '{print $2}')"
@@ -51,7 +51,7 @@ else
   git remote remove coreth
 fi
 
-echo "rewriting github.com/ava-labs/coreth imports to github.com/ava-labs/avalanchego/graft/coreth in all go files"
+echo "rewriting github.com/ava-labs/avalanchego/graft/coreth imports to github.com/ava-labs/avalanchego/graft/coreth in all go files"
 rg "github\.com/ava-labs/coreth" -t go --files-with-matches --null | xargs -0 sed -i.bak 's|github\.com/ava-labs/coreth|github.com/ava-labs/avalanchego/graft/coreth|g' && find . -name "*.go.bak" -delete
 
 if [ -f "graft/coreth/go.mod" ]; then
@@ -71,7 +71,7 @@ echo "committing mechanical migration changes"
 git add -A
 git commit -m "Post-graft mechanical migration
 
-- Rewrite imports from github.com/ava-labs/coreth to github.com/ava-labs/avalanchego/graft/coreth
+- Rewrite imports from github.com/ava-labs/avalanchego/graft/coreth to github.com/ava-labs/avalanchego/graft/coreth
 - Remove coreth module config files
 - Remove coreth .envrc file"
 

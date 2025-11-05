@@ -29,4 +29,4 @@ CORETH_COMMIT=${CORETH_COMMIT:-$(git rev-list -1 HEAD)}
 
 # Build Coreth, which runs as a subprocess
 echo "Building Coreth @ GitCommit: $CORETH_COMMIT at $BINARY_PATH"
-go build -ldflags "-X github.com/ava-labs/coreth/plugin/evm.GitCommit=$CORETH_COMMIT" -o "$BINARY_PATH" "plugin/"*.go
+go build -ldflags "-X github.com/ava-labs/avalanchego/graft/coreth/plugin/evm.GitCommit=$CORETH_COMMIT" -o "$BINARY_PATH" "plugin/"*.go
