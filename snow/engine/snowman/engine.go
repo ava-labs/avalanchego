@@ -431,6 +431,11 @@ func (e *Engine) QueryFailed(ctx context.Context, nodeID ids.NodeID, requestID u
 	return e.executeDeferredWork(ctx)
 }
 
+func (e *Engine) SimplexMessage(_ context.Context, _ ids.NodeID, _ *p2p.Simplex) error {
+	e.Ctx.Log.Debug("received unsupported SimplexMessage call")
+	return nil
+}
+
 func (e *Engine) Shutdown(ctx context.Context) error {
 	e.Ctx.Log.Info("shutting down consensus engine")
 

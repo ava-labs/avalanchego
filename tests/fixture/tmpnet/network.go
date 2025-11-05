@@ -458,7 +458,7 @@ func (n *Network) Bootstrap(ctx context.Context, log logging.Logger) error {
 	}
 
 	// Don't restart the node during subnet creation since it will always be restarted afterwards.
-	if err := n.CreateSubnets(ctx, log, bootstrapNode, false /* restartRequired */); err != nil {
+	if err := n.CreateSubnets(ctx, log, bootstrapNode); err != nil {
 		return stacktrace.Wrap(err)
 	}
 
@@ -617,9 +617,8 @@ func (n *Network) GetSubnet(name string) *Subnet {
 
 // Ensure that each subnet on the network is created. If restartRequired is false, node restart
 // to pick up configuration changes becomes the responsibility of the caller.
-func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode *Node, restartRequired bool) error {
+func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode *Node) error {
 	createdSubnets := make([]*Subnet, 0, len(n.Subnets))
-	apiURI := apiNode.GetAccessibleURI()
 	for _, subnet := range n.Subnets {
 		if len(subnet.ValidatorIDs) == 0 {
 			return stacktrace.Errorf("subnet %s needs at least one validator", subnet.SubnetID)
@@ -644,7 +643,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		}
 
 		// Create the subnet on the network
-		if err := subnet.Create(ctx, apiURI); err != nil {
+		if err := subnet.Create(ctx, apiNode.GetAccessibleURI()); err != nil {
 			return stacktrace.Wrap(err)
 		}
 
@@ -685,8 +684,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		reconfiguredNodes = append(reconfiguredNodes, node)
 	}
 
-	// TODO(samliok): remove the restart required parameter, and check if subnet configuration requires
-	// a restart instead.
+	restartRequired := restartRequired(createdSubnets)
 	if restartRequired {
 		log.Info("restarting node(s) to enable them to track the new subnet(s)")
 
@@ -706,7 +704,6 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		}
 
 		// since we have restarted nodes, refetch the api uri in case it changed
-		apiURI = apiNode.GetAccessibleURI()
 	}
 
 	// Add validators for the subnet
@@ -726,13 +723,15 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 			validatorNodes = append(validatorNodes, node)
 		}
 
-		if err := subnet.AddValidators(ctx, log, apiURI, validatorNodes...); err != nil {
+		if err := subnet.AddValidators(ctx, log, apiNode.GetAccessibleURI(), validatorNodes...); err != nil {
 			return stacktrace.Wrap(err)
 		}
 	}
 
+	log.Info("finished adding validators for new subnet(s)")
+
 	// Wait for nodes to become subnet validators
-	pChainClient := platformvm.NewClient(apiURI)
+	pChainClient := platformvm.NewClient(apiNode.GetAccessibleURI())
 	validatorsToRestart := set.Set[ids.NodeID]{}
 	for _, subnet := range createdSubnets {
 		if err := WaitForActiveValidators(ctx, log, pChainClient, subnet); err != nil {
@@ -740,7 +739,7 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 		}
 
 		// It should now be safe to create chains for the subnet
-		if err := subnet.CreateChains(ctx, log, apiURI); err != nil {
+		if err := subnet.CreateChains(ctx, log, apiNode.GetAccessibleURI()); err != nil {
 			return stacktrace.Wrap(err)
 		}
 
@@ -783,6 +782,19 @@ func (n *Network) CreateSubnets(ctx context.Context, log logging.Logger, apiNode
 	}
 
 	return nil
+}
+
+// restartRequired determines whether any of the provided subnets require
+// node restart to pick up configuration changes.
+func restartRequired(subnets []*Subnet) bool {
+	for _, subnet := range subnets {
+		// we need to restart if the subnet specifies simplex consensus, so it can
+		// initialize its chains using a simplex engine
+		if subnet.Config["consensusParameters"] != nil && subnet.Config["consensusParameters"].(map[string]interface{})["simplexParameters"] != nil {
+			return true
+		}
+	}
+	return false
 }
 
 func (n *Network) GetNode(nodeID ids.NodeID) (*Node, error) {

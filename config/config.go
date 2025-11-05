@@ -83,8 +83,8 @@ var (
 	errInvalidSignerConfig                    = fmt.Errorf("only one of the following flags can be set: %s, %s, %s, %s", StakingEphemeralSignerEnabledKey, StakingSignerKeyContentKey, StakingSignerKeyPathKey, StakingRPCSignerEndpointKey)
 )
 
-func getConsensusConfig(v *viper.Viper) snowball.Parameters {
-	p := snowball.Parameters{
+func getConsensusParams(v *viper.Viper) subnets.ConsensusParameters {
+	p := &snowball.Parameters{
 		K:                     v.GetInt(SnowSampleSizeKey),
 		AlphaPreference:       v.GetInt(SnowPreferenceQuorumSizeKey),
 		AlphaConfidence:       v.GetInt(SnowConfidenceQuorumSizeKey),
@@ -98,7 +98,20 @@ func getConsensusConfig(v *viper.Viper) snowball.Parameters {
 		p.AlphaPreference = v.GetInt(SnowQuorumSizeKey)
 		p.AlphaConfidence = p.AlphaPreference
 	}
-	return p
+
+	return subnets.ConsensusParameters{
+		SnowballParams: p,
+	}
+}
+
+func setSimplexDefaults(config *subnets.ConsensusParameters, v *viper.Viper) {
+	config.SnowballParams = nil
+	if config.SimplexParams.MaxProposalWait == 0 {
+		config.SimplexParams.MaxProposalWait = v.GetDuration(SimplexMaxProposalWaitKey)
+	}
+	if config.SimplexParams.MaxRebroadcastWait == 0 {
+		config.SimplexParams.MaxRebroadcastWait = v.GetDuration(SimplexMaxRebroadcastWaitKey)
+	}
 }
 
 func getLoggingConfig(v *viper.Viper) (logging.Config, error) {
@@ -414,12 +427,15 @@ func getNetworkConfig(
 	return config, nil
 }
 
-func getBenchlistConfig(v *viper.Viper, consensusParameters snowball.Parameters) (benchlist.Config, error) {
+func getBenchlistConfig(v *viper.Viper, snowballParameters *snowball.Parameters) (benchlist.Config, error) {
+	if snowballParameters == nil {
+		return benchlist.Config{}, errors.New("pChain snowball parameters must be non-nil")
+	}
 	// AlphaConfidence is used here to ensure that benching can't cause a
 	// liveness failure. If AlphaPreference were used, the benchlist may grow to
 	// a point that committing would be extremely unlikely to happen.
-	alpha := consensusParameters.AlphaConfidence
-	k := consensusParameters.K
+	alpha := snowballParameters.AlphaConfidence
+	k := snowballParameters.K
 	config := benchlist.Config{
 		Threshold:              v.GetInt(BenchlistFailThresholdKey),
 		Duration:               v.GetDuration(BenchlistDurationKey),
@@ -1029,9 +1045,11 @@ func getSubnetConfigsFromFlags(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]s
 				return nil, err
 			}
 
-			if config.ConsensusParameters.Alpha != nil {
-				config.ConsensusParameters.AlphaPreference = *config.ConsensusParameters.Alpha
-				config.ConsensusParameters.AlphaConfidence = config.ConsensusParameters.AlphaPreference
+			if config.ConsensusParameters.SimplexParams != nil {
+				setSimplexDefaults(&config.ConsensusParameters, v)
+			} else if config.ConsensusParameters.SnowballParams.Alpha != nil {
+				config.ConsensusParameters.SnowballParams.AlphaPreference = *config.ConsensusParameters.SnowballParams.Alpha
+				config.ConsensusParameters.SnowballParams.AlphaConfidence = config.ConsensusParameters.SnowballParams.AlphaPreference
 			}
 
 			if err := config.Valid(); err != nil {
@@ -1087,9 +1105,11 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 			return nil, fmt.Errorf("%w: %w", errUnmarshalling, err)
 		}
 
-		if config.ConsensusParameters.Alpha != nil {
-			config.ConsensusParameters.AlphaPreference = *config.ConsensusParameters.Alpha
-			config.ConsensusParameters.AlphaConfidence = config.ConsensusParameters.AlphaPreference
+		if config.ConsensusParameters.SimplexParams != nil {
+			setSimplexDefaults(&config.ConsensusParameters, v)
+		} else if config.ConsensusParameters.SnowballParams.Alpha != nil {
+			config.ConsensusParameters.SnowballParams.AlphaPreference = *config.ConsensusParameters.SnowballParams.Alpha
+			config.ConsensusParameters.SnowballParams.AlphaConfidence = config.ConsensusParameters.SnowballParams.AlphaPreference
 		}
 
 		if err := config.Valid(); err != nil {
@@ -1111,7 +1131,7 @@ func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
 
 func getPrimaryNetworkConfig(v *viper.Viper) subnets.Config {
 	return subnets.Config{
-		ConsensusParameters:         getConsensusConfig(v),
+		ConsensusParameters:         getConsensusParams(v),
 		ValidatorOnly:               false,
 		ProposerMinBlockDelay:       v.GetDuration(ProposerVMMinBlockDelayKey),
 		ProposerNumHistoricalBlocks: proposervm.DefaultNumHistoricalBlocks,
@@ -1342,7 +1362,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.SubnetConfigs = subnetConfigs
 
 	// Benchlist
-	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, primaryNetworkConfig.ConsensusParameters)
+	nodeConfig.BenchlistConfig, err = getBenchlistConfig(v, primaryNetworkConfig.ConsensusParameters.SnowballParams)
 	if err != nil {
 		return node.Config{}, err
 	}
