@@ -9,7 +9,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 )
 
-// Compatibility a utility for checking the Compatibility of peer versions.
+// Compatibility is a utility for checking whether a peers version is
+// compatible to the local version.
 type Compatibility struct {
 	// Ordering expectations are:
 	// version >= minCompatibleAfterUpgrade >= minCompatible
