@@ -20,8 +20,8 @@ var EmptyBlockClient BlockClient = MakeBlockClient()
 
 type BlockClient func(ctx context.Context, blockID ids.ID) (snowman.Block, error)
 
-func (f BlockClient) GetAcceptedBlock(ctx context.Context, blockID ids.ID) (snowman.Block, error) {
-	return f(ctx, blockID)
+func (b BlockClient) GetAcceptedBlock(ctx context.Context, blockID ids.ID) (snowman.Block, error) {
+	return b(ctx, blockID)
 }
 
 // MakeBlockClient returns a new BlockClient that returns the provided blocks.
