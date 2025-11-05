@@ -55,6 +55,28 @@ type DB struct {
 	offchainAddressedCallMsgs map[ids.ID]*warp.UnsignedMessage
 }
 
+// NewDB creates a new warp message database.
+func NewDB(
+	networkID uint32,
+	sourceChainID ids.ID,
+	db database.Database,
+	offchainMessages [][]byte,
+) (*DB, error) {
+	messageDB := &DB{
+		networkID:                 networkID,
+		sourceChainID:             sourceChainID,
+		db:                        db,
+		messageCache:              lru.NewCache[ids.ID, *warp.UnsignedMessage](messageCacheSize),
+		offchainAddressedCallMsgs: make(map[ids.ID]*warp.UnsignedMessage),
+	}
+
+	if err := initOffChainMessages(messageDB, networkID, sourceChainID, offchainMessages); err != nil {
+		return nil, err
+	}
+
+	return messageDB, nil
+}
+
 // Add stores a warp message in the database and cache.
 func (d *DB) Add(unsignedMsg *warp.UnsignedMessage) error {
 	msgID := unsignedMsg.ID()
@@ -100,6 +122,19 @@ type Signer struct {
 	signatureCache cache.Cacher[ids.ID, []byte]
 }
 
+// NewSigner creates a new warp message signer.
+func NewSigner(
+	warpSigner warp.Signer,
+	verifier acp118.Verifier,
+	signatureCache cache.Cacher[ids.ID, []byte],
+) *Signer {
+	return &Signer{
+		warpSigner:     warpSigner,
+		verifier:       verifier,
+		signatureCache: signatureCache,
+	}
+}
+
 // Sign verifies the warp message, signs it, and caches the signature.
 func (s *Signer) Sign(ctx context.Context, msg *warp.UnsignedMessage) ([]byte, error) {
 	// Check cache first
@@ -138,13 +173,6 @@ func NewHandler(
 	}
 }
 
-// Components bundles the warp message handling components.
-type Components struct {
-	DB      *DB
-	Signer  *Signer
-	Handler p2p.Handler
-}
-
 // verifier implements acp118.Verifier and validates whether a warp message should be signed.
 type verifier struct {
 	db            *DB
@@ -160,31 +188,18 @@ type verifier struct {
 	uptimeValidationFail        metrics.Counter
 }
 
-// New creates warp backend components and initializes the signature cache and message tracking database.
-func New(
-	networkID uint32,
-	sourceChainID ids.ID,
-	warpSigner warp.Signer,
+var _ acp118.Verifier = (*verifier)(nil)
+
+// NewVerifier creates a new warp message verifier.
+func NewVerifier(
+	db *DB,
 	blockClient BlockStore,
 	uptimeTracker *uptimetracker.UptimeTracker,
-	db database.Database,
-	signatureCache cache.Cacher[ids.ID, []byte],
-	offchainMessages [][]byte,
-) (*Components, error) {
-	messageDB := &DB{
-		networkID:                 networkID,
-		sourceChainID:             sourceChainID,
-		db:                        db,
-		messageCache:              lru.NewCache[ids.ID, *warp.UnsignedMessage](messageCacheSize),
-		offchainAddressedCallMsgs: make(map[ids.ID]*warp.UnsignedMessage),
-	}
-
-	if err := initOffChainMessages(messageDB, networkID, sourceChainID, offchainMessages); err != nil {
-		return nil, err
-	}
-
-	v := &verifier{
-		db:                          messageDB,
+	networkID uint32,
+	sourceChainID ids.ID,
+) acp118.Verifier {
+	return &verifier{
+		db:                          db,
 		blockClient:                 blockClient,
 		uptimeTracker:               uptimeTracker,
 		networkID:                   networkID,
@@ -194,35 +209,6 @@ func New(
 		blockValidationFail:         metrics.NewRegisteredCounter("warp_backend_block_validation_fail", nil),
 		uptimeValidationFail:        metrics.NewRegisteredCounter("warp_backend_uptime_validation_fail", nil),
 	}
-
-	signer := &Signer{
-		warpSigner:     warpSigner,
-		verifier:       v,
-		signatureCache: signatureCache,
-	}
-
-	handler := NewHandler(signatureCache, v, warpSigner)
-
-	return &Components{
-		DB:      messageDB,
-		Signer:  signer,
-		Handler: handler,
-	}, nil
-}
-
-// AddAndSign adds a warp message to the database and signs it.
-// This is the typical entry point when a message is created on-chain (e.g., via the warp precompile).
-func AddAndSign(ctx context.Context, db *DB, signer *Signer, unsignedMessage *warp.UnsignedMessage) error {
-	if err := db.Add(unsignedMessage); err != nil {
-		return err
-	}
-
-	// Fill the signature cache now so subsequent requests can serve the
-	// signature without repeating verification or signing work.
-	if _, err := signer.Sign(ctx, unsignedMessage); err != nil {
-		return err
-	}
-	return nil
 }
 
 // Verify implements acp118.Verifier and validates whether a warp message should be signed.
@@ -331,6 +317,21 @@ func (v *verifier) verifyUptimeMessage(uptimeMsg *message.ValidatorUptime) *comm
 		}
 	}
 
+	return nil
+}
+
+// AddAndSign adds a warp message to the database and signs it.
+// This is the typical entry point when a message is created on-chain (e.g., via the warp precompile).
+func AddAndSign(ctx context.Context, db *DB, signer *Signer, unsignedMessage *warp.UnsignedMessage) error {
+	if err := db.Add(unsignedMessage); err != nil {
+		return err
+	}
+
+	// Fill the signature cache now so subsequent requests can serve the
+	// signature without repeating verification or signing work.
+	if _, err := signer.Sign(ctx, unsignedMessage); err != nil {
+		return err
+	}
 	return nil
 }
 
