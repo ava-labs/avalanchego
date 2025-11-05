@@ -14,10 +14,10 @@ import (
 
 var _ database.HeightIndex = (*cacheDB)(nil)
 
-// cacheDB caches data from the underlying database.
+// cacheDB caches data from the underlying [Database].
 //
 // Operations (Get, Has, Put) are not atomic with the underlying database.
-// Concurrent writes to the same height can result in cache inconsistencies where
+// Concurrent access to the same height can result in cache inconsistencies where
 // the cache and database contain different values. This limitation is acceptable
 // because concurrent writes to the same height are not an intended use case.
 type cacheDB struct {
