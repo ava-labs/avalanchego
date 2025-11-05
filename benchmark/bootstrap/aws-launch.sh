@@ -6,7 +6,7 @@ INSTANCE_TYPE=i4g.large
 FIREWOOD_BRANCH=""
 AVALANCHEGO_BRANCH=""
 CORETH_BRANCH=""
-LIBEVM_BRANCH=""
+LIBEVM_COMMIT=""
 NBLOCKS="1m"
 REGION="us-west-2"
 DRY_RUN=false
@@ -58,7 +58,7 @@ show_usage() {
     echo "  --firewood-branch BRANCH    Firewood git branch to checkout"
     echo "  --avalanchego-branch BRANCH AvalancheGo git branch to checkout"
     echo "  --coreth-branch BRANCH      Coreth git branch to checkout"
-    echo "  --libevm-branch BRANCH      LibEVM git branch to checkout"
+    echo "  --libevm-commit COMMIT      LibEVM git commit to checkout"
     echo "  --nblocks BLOCKS            Number of blocks to download (default: 1m)"
     echo "  --region REGION             AWS region (default: us-west-2)"
     echo "  --spot                      Use spot instance pricing (default depends on instance type)"
@@ -108,8 +108,8 @@ while [[ $# -gt 0 ]]; do
             CORETH_BRANCH="$2"
             shift 2
             ;;
-        --libevm-branch)
-            LIBEVM_BRANCH="$2"
+        --libevm-commit)
+            LIBEVM_COMMIT="$2"
             shift 2
             ;;
         --nblocks)
@@ -154,7 +154,7 @@ echo "  Instance Type: $INSTANCE_TYPE ($TYPE)"
 echo "  Firewood Branch: ${FIREWOOD_BRANCH:-default}"
 echo "  AvalancheGo Branch: ${AVALANCHEGO_BRANCH:-default}"
 echo "  Coreth Branch: ${CORETH_BRANCH:-default}"
-echo "  LibEVM Branch: ${LIBEVM_BRANCH:-default}"
+echo "  LibEVM Commit: ${LIBEVM_COMMIT:-default}"
 echo "  Number of Blocks: $NBLOCKS"
 echo "  Region: $REGION"
 if [ "$SPOT_INSTANCE" = true ]; then
@@ -188,7 +188,6 @@ if [ "$DRY_RUN" = false ]; then
 FIREWOOD_BRANCH_ARG=""
 AVALANCHEGO_BRANCH_ARG=""
 CORETH_BRANCH_ARG=""
-LIBEVM_BRANCH_ARG=""
 
 if [ -n "$FIREWOOD_BRANCH" ]; then
     FIREWOOD_BRANCH_ARG="--branch $FIREWOOD_BRANCH"
@@ -199,9 +198,9 @@ fi
 if [ -n "$CORETH_BRANCH" ]; then
     CORETH_BRANCH_ARG="--branch $CORETH_BRANCH"
 fi
-if [ -n "$LIBEVM_BRANCH" ]; then
-    LIBEVM_BRANCH_ARG="--branch $LIBEVM_BRANCH"
-fi
+
+# For libevm, default to main branch if no commit specified
+LIBEVM_COMMIT_CHECKOUT="${LIBEVM_COMMIT:-main}"
 
 # set up this script to run at startup, installing a few packages, creating user accounts,
 # and downloading the blocks for the C-chain
@@ -323,7 +322,19 @@ runcmd:
     git clone --depth 100 __CORETH_BRANCH_ARG__ https://github.com/ava-labs/coreth.git
   - >
     sudo -u ubuntu -D /mnt/nvme/ubuntu
-    git clone --depth 100 __LIBEVM_BRANCH_ARG__ https://github.com/ava-labs/libevm.git
+    git clone https://github.com/ava-labs/libevm.git
+  - >
+    sudo -u ubuntu -D /mnt/nvme/ubuntu/libevm
+    git checkout __LIBEVM_COMMIT__
+  # force coreth to use the checked-out versions of libevm and firewood
+  - >
+    sudo -u ubuntu -D /mnt/nvme/ubuntu/coreth
+    /usr/local/go/bin/go mod edit -replace
+    github.com/ava-labs/firewood-go-ethhash/ffi=../firewood/ffi
+  - >
+    sudo -u ubuntu -D /mnt/nvme/ubuntu/coreth
+    /usr/local/go/bin/go mod edit -replace
+    github.com/ava-labs/libevm=../libevm
   # force avalanchego to use the checked-out versions of coreth, libevm, and firewood
   - >
     sudo -u ubuntu -D /mnt/nvme/ubuntu/avalanchego
@@ -343,8 +354,10 @@ runcmd:
     --profile maxperf
     --features ethhash,logger
     > /mnt/nvme/ubuntu/firewood/build.log 2>&1
-  # build avalanchego
+  # run go mod tidy for coreth and avalanchego
+  - sudo -u ubuntu --login -D /mnt/nvme/ubuntu/coreth go mod tidy
   - sudo -u ubuntu --login -D /mnt/nvme/ubuntu/avalanchego go mod tidy
+  # build avalanchego
   - >
     sudo -u ubuntu --login -D /mnt/nvme/ubuntu/avalanchego time scripts/build.sh
     > /mnt/nvme/ubuntu/avalanchego/build.log 2>&1 &
@@ -377,7 +390,7 @@ USERDATA=$(echo "$USERDATA_TEMPLATE" | \
   sed "s|__FIREWOOD_BRANCH_ARG__|$FIREWOOD_BRANCH_ARG|g" | \
   sed "s|__AVALANCHEGO_BRANCH_ARG__|$AVALANCHEGO_BRANCH_ARG|g" | \
   sed "s|__CORETH_BRANCH_ARG__|$CORETH_BRANCH_ARG|g" | \
-  sed "s|__LIBEVM_BRANCH_ARG__|$LIBEVM_BRANCH_ARG|g" | \
+  sed "s|__LIBEVM_COMMIT__|$LIBEVM_COMMIT_CHECKOUT|g" | \
   sed "s|__NBLOCKS__|$NBLOCKS|g" | \
   sed "s|__END_BLOCK__|$END_BLOCK|g" | \
   base64)
@@ -399,8 +412,8 @@ fi
 if [ -n "$CORETH_BRANCH" ]; then
     INSTANCE_NAME="$INSTANCE_NAME-ce-$CORETH_BRANCH"
 fi
-if [ -n "$LIBEVM_BRANCH" ]; then
-    INSTANCE_NAME="$INSTANCE_NAME-le-$LIBEVM_BRANCH"
+if [ -n "$LIBEVM_COMMIT" ]; then
+    INSTANCE_NAME="$INSTANCE_NAME-le-$LIBEVM_COMMIT"
 fi
 
 # Build spot instance market options if requested
@@ -456,6 +469,7 @@ else
 
     INSTANCE_ID=$(eval "$AWS_CMD")
     echo "instance id $INSTANCE_ID started"
+    echo -e "\033[33mREMINDER: Please manually shut down your EC2 instance after running the benchmark to avoid unexpected costs!\033[0m"
 fi
 
 if [ "$DRY_RUN" = false ]; then
