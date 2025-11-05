@@ -22,17 +22,17 @@ import (
 )
 
 var (
-	_                         Backend = (*backend)(nil)
-	
+	_ Backend = (*backend)(nil)
+
 	messageCacheSize = 500
-	
-	errParsingOffChainMessage         = errors.New("failed to parse off-chain message")
-	ErrValidateBlock                  = errors.New("failed to validate block message")
-	ErrVerifyWarpMessage              = errors.New("failed to verify warp message")
+
+	errParsingOffChainMessage = errors.New("failed to parse off-chain message")
+	ErrValidateBlock          = errors.New("failed to validate block message")
+	ErrVerifyWarpMessage      = errors.New("failed to verify warp message")
 )
 
-type BlockClient interface {
-	GetAcceptedBlock(ctx context.Context, blockID ids.ID) (snowman.Block, error)
+type BlockStore interface {
+	GetBlock(ctx context.Context, blockID ids.ID) (snowman.Block, error)
 }
 
 // Backend tracks signature-eligible warp messages and provides an interface to fetch them.
@@ -52,7 +52,7 @@ type backend struct {
 	sourceChainID             ids.ID
 	db                        database.Database
 	warpSigner                warp.Signer
-	blockClient               BlockClient
+	blockClient               BlockStore
 	uptimeTracker             *uptimetracker.UptimeTracker
 	signatureCache            cache.Cacher[ids.ID, []byte]
 	messageCache              *lru.Cache[ids.ID, *warp.UnsignedMessage]
@@ -65,7 +65,7 @@ func NewBackend(
 	networkID uint32,
 	sourceChainID ids.ID,
 	warpSigner warp.Signer,
-	blockClient BlockClient,
+	blockClient BlockStore,
 	uptimeTracker *uptimetracker.UptimeTracker,
 	db database.Database,
 	signatureCache cache.Cacher[ids.ID, []byte],

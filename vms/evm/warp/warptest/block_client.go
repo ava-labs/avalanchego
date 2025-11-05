@@ -15,19 +15,19 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 )
 
-// EmptyBlockClient returns an error if a block is requested
-var EmptyBlockClient BlockClient = MakeBlockClient()
+// EmptyBlockStore returns an error if a block is requested
+var EmptyBlockStore BlockStore = MakeBlockStore()
 
-type BlockClient func(ctx context.Context, blockID ids.ID) (snowman.Block, error)
+type BlockStore func(ctx context.Context, blockID ids.ID) (snowman.Block, error)
 
-func (b BlockClient) GetAcceptedBlock(ctx context.Context, blockID ids.ID) (snowman.Block, error) {
+func (b BlockStore) GetBlock(ctx context.Context, blockID ids.ID) (snowman.Block, error) {
 	return b(ctx, blockID)
 }
 
-// MakeBlockClient returns a new BlockClient that returns the provided blocks.
+// MakeBlockStore returns a new BlockStore that returns the provided blocks.
 // If a block is requested that isn't part of the provided blocks, an error is
 // returned.
-func MakeBlockClient(blkIDs ...ids.ID) BlockClient {
+func MakeBlockStore(blkIDs ...ids.ID) BlockStore {
 	return func(_ context.Context, blkID ids.ID) (snowman.Block, error) {
 		if !slices.Contains(blkIDs, blkID) {
 			return nil, database.ErrNotFound

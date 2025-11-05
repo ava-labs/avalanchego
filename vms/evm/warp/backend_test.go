@@ -79,14 +79,14 @@ func TestGetBlockSignature(t *testing.T) {
 	require := require.New(t)
 
 	blkID := ids.GenerateTestID()
-	blockClient := warptest.MakeBlockClient(blkID)
+	blockStore := warptest.MakeBlockStore(blkID)
 	db := memdb.New()
 
 	sk, err := localsigner.New()
 	require.NoError(err)
 	warpSigner := warp.NewSigner(sk, networkID, sourceChainID)
 	messageSignatureCache := lru.NewCache[ids.ID, []byte](500)
-	backend, err := NewBackend(networkID, sourceChainID, warpSigner, blockClient, nil, db, messageSignatureCache, nil)
+	backend, err := NewBackend(networkID, sourceChainID, warpSigner, blockStore, nil, db, messageSignatureCache, nil)
 	require.NoError(err)
 
 	blockHashPayload, err := payload.NewHash(blkID)

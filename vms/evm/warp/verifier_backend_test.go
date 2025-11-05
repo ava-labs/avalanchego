@@ -104,7 +104,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 				} else {
 					sigCache = &cache.Empty[ids.ID, []byte]{}
 				}
-				warpBackend, err := NewBackend(snowCtx.NetworkID, snowCtx.ChainID, snowCtx.WarpSigner, warptest.EmptyBlockClient, nil, database, sigCache, [][]byte{offchainMessage.Bytes()})
+				warpBackend, err := NewBackend(snowCtx.NetworkID, snowCtx.ChainID, snowCtx.WarpSigner, warptest.EmptyBlockStore, nil, database, sigCache, [][]byte{offchainMessage.Bytes()})
 				require.NoError(t, err)
 				handler := acp118.NewCachedHandler(sigCache, warpBackend, snowCtx.WarpSigner)
 
@@ -144,7 +144,7 @@ func TestBlockSignatures(t *testing.T) {
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 
 	knownBlkID := ids.GenerateTestID()
-	blockClient := warptest.MakeBlockClient(knownBlkID)
+	blockStore := warptest.MakeBlockStore(knownBlkID)
 
 	toMessageBytes := func(id ids.ID) []byte {
 		idPayload, err := payload.NewHash(id)
@@ -211,7 +211,7 @@ func TestBlockSignatures(t *testing.T) {
 					snowCtx.NetworkID,
 					snowCtx.ChainID,
 					snowCtx.WarpSigner,
-					blockClient,
+					blockStore,
 					nil,
 					database,
 					sigCache,
@@ -262,8 +262,7 @@ func TestUptimeSignatures(t *testing.T) {
 			ValidationID: vID,
 			TotalUptime:  80,
 		}
-		err := message.Initialize(uptimePayload)
-		require.NoError(t, err)
+		require.NoError(t, message.Initialize(uptimePayload))
 		addressedCall, err := payload.NewAddressedCall(sourceAddress, uptimePayload.Bytes())
 		require.NoError(t, err)
 		unsignedMessage, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, addressedCall.Bytes())
@@ -316,7 +315,7 @@ func TestUptimeSignatures(t *testing.T) {
 			snowCtx.NetworkID,
 			snowCtx.ChainID,
 			snowCtx.WarpSigner,
-			warptest.EmptyBlockClient,
+			warptest.EmptyBlockStore,
 			uptimeTracker,
 			database,
 			sigCache,

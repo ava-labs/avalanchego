@@ -60,7 +60,7 @@ func (b *backend) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMess
 // of an accepted block indicating it should be signed by the VM.
 func (b *backend) verifyBlockMessage(ctx context.Context, blockHashPayload *payload.Hash) *common.AppError {
 	blockID := blockHashPayload.Hash
-	_, err := b.blockClient.GetAcceptedBlock(ctx, blockID)
+	_, err := b.blockClient.GetBlock(ctx, blockID)
 	if err != nil {
 		b.stats.IncBlockValidationFail()
 		return &common.AppError{
