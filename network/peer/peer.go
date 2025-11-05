@@ -897,7 +897,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		Patch: int(msg.Client.GetPatch()),
 	}
 
-	if myVersion := p.VersionCompatibility.Current; myVersion.Before(p.version) {
+	if myVersion := p.VersionCompatibility.Current; myVersion.Compare(p.version) < 0 {
 		log := p.Log.Debug
 		if _, ok := p.Beacons.GetValidator(constants.PrimaryNetworkID, p.id); ok {
 			log = p.Log.Info

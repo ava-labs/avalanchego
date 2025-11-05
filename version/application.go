@@ -21,8 +21,6 @@ type Application struct {
 	str         string
 }
 
-// The only difference here between Application and Semantic is that Application
-// prepends the client name rather than "v".
 func (a *Application) String() string {
 	a.makeStrOnce.Do(a.initString)
 	return a.str
@@ -36,10 +34,6 @@ func (a *Application) initString() {
 		a.Minor,
 		a.Patch,
 	)
-}
-
-func (a *Application) Before(o *Application) bool {
-	return a.Compare(o) < 0
 }
 
 // Compare returns
