@@ -114,9 +114,7 @@ tasks:
   
   lint-fix:
     desc: Run golangci-lint with auto-fix where possible
-    # TODO(alarso16): Create a script to run the avalanchego linter as well.
-    # See https://github.com/ava-labs/coreth/issues/1374
-    cmd: go tool -modfile=tools/go.mod golangci-lint run --config .golangci.yml --fix
+    cmd: ./scripts/lint_fix.sh
 
   shellcheck:
     desc: Run shellcheck static analysis on all shell scripts with version management
