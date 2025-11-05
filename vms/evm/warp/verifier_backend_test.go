@@ -229,7 +229,7 @@ func TestBlockSignatures(t *testing.T) {
 
 				test.verifyStats(t, warpBackend.(*backend).stats)
 
-				// If the expected response is empty, assert that the handler returns an empty response and return early.
+				// If the expected response is empty, require that the handler returns an empty response and return early.
 				if len(expectedResponse) == 0 {
 					require.Empty(t, responseBytes, "expected response to be empty")
 					return
