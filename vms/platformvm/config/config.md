@@ -4,23 +4,24 @@ This document provides details about the configuration options available for the
 
 In order to specify a configuration for the PlatformVM, you need to define a `Config` struct and its parameters. The default values for these parameters are:
 
-| Option                   | Type     | Default |
-| ------------------------ | -------- | ------- |
-| `network`                          | `Network`       | `DefaultNetwork` |
-| `block-cache-size`                 | `int`          | `64 * units.MiB` |
-| `tx-cache-size`                    | `int`          | `128 * units.MiB` |
-| `transformed-subnet-tx-cache-size` | `int`          | `4 * units.MiB` |
-| `reward-utxos-cache-size`         | `int`          | `2048` |
-| `chain-cache-size`                | `int`          | `2048` |
-| `chain-db-cache-size`             | `int`          | `2048` |
-| `block-id-cache-size`             | `int`          | `8192` |
-| `fx-owner-cache-size`             | `int`          | `4 * units.MiB` |
-| `subnet-to-l1-conversion-cache-size` | `int`          | `4 * units.MiB` |
-| `l1-weights-cache-size`           | `int`          | `16 * units.KiB` |
-| `l1-inactive-validators-cache-size` | `int`          | `256 * units.KiB` |
-| `l1-subnet-id-node-id-cache-size` | `int`          | `16 * units.KiB` |
-| `checksums-enabled`               | `bool`         | `false` |
-| `mempool-prune-frequency`         | `time.Duration` | `30 * time.Minute` |
+| Option                               | Type            | Default            |
+| ------------------------------------ | --------------- | ------------------ |
+| `network`                            | `Network`       | `DefaultNetwork`   |
+| `block-cache-size`                   | `int`           | `64 * units.MiB`   |
+| `tx-cache-size`                      | `int`           | `128 * units.MiB`  |
+| `transformed-subnet-tx-cache-size`   | `int`           | `4 * units.MiB`    |
+| `reward-utxos-cache-size`            | `int`           | `2048`             |
+| `chain-cache-size`                   | `int`           | `2048`             |
+| `chain-db-cache-size`                | `int`           | `2048`             |
+| `block-id-cache-size`                | `int`           | `8192`             |
+| `fx-owner-cache-size`                | `int`           | `4 * units.MiB`    |
+| `subnet-to-l1-conversion-cache-size` | `int`           | `4 * units.MiB`    |
+| `l1-weights-cache-size`              | `int`           | `16 * units.KiB`   |
+| `l1-inactive-validators-cache-size`  | `int`           | `256 * units.KiB`  |
+| `l1-subnet-id-node-id-cache-size`    | `int`           | `16 * units.KiB`   |
+| `checksums-enabled`                  | `bool`          | `false`            |
+| `mempool-prune-frequency`            | `time.Duration` | `30 * time.Minute` |
+| `mempool-gas-capacity`               | `gas.Gas`       | `1_000_000`        |
 
 Default values are overridden only if explicitly specified in the config.
 
