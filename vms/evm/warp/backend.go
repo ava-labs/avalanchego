@@ -37,16 +37,9 @@ type BlockClient interface {
 // Backend tracks signature-eligible warp messages and provides an interface to fetch them.
 // The backend is also used to query for warp message signatures by the signature request handler.
 type Backend interface {
-	// AddMessage signs [unsignedMessage] and adds it to the warp backend database
 	AddMessage(unsignedMessage *warp.UnsignedMessage) error
-
-	// GetMessageSignature validates the message and returns the signature of the requested message.
 	GetMessageSignature(ctx context.Context, message *warp.UnsignedMessage) ([]byte, error)
-
-	// GetBlockSignature returns the signature of a hash payload containing blockID if it's the ID of an accepted block.
 	GetBlockSignature(ctx context.Context, blockID ids.ID) ([]byte, error)
-
-	// GetMessage retrieves the [unsignedMessage] from the warp backend database if available
 	GetMessage(messageHash ids.ID) (*warp.UnsignedMessage, error)
 
 	acp118.Verifier

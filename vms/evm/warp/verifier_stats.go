@@ -6,13 +6,10 @@ package warp
 import "github.com/ava-labs/libevm/metrics"
 
 type verifierStats struct {
-	messageParseFail metrics.Counter
-	// AddressedCall metrics
+	messageParseFail            metrics.Counter
 	addressedCallValidationFail metrics.Counter
-	// BlockRequest metrics
-	blockValidationFail metrics.Counter
-	// Uptime metrics
-	uptimeValidationFail metrics.Counter
+	blockValidationFail         metrics.Counter
+	uptimeValidationFail        metrics.Counter
 }
 
 func newVerifierStats() *verifierStats {

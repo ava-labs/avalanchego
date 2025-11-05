@@ -23,12 +23,12 @@ type Client interface {
 	GetBlockAggregateSignature(ctx context.Context, blockID ids.ID, quorumNum uint64, subnetIDStr string) ([]byte, error)
 }
 
-// client implementation for interacting with EVM [chain]
+// client implementation for interacting with EVM chain
 type client struct {
 	client *rpc.Client
 }
 
-// NewClient returns a Client for interacting with EVM [chain]
+// NewClient returns a Client for interacting with EVM chain
 func NewClient(uri, chain string) (Client, error) {
 	innerClient, err := rpc.Dial(fmt.Sprintf("%s/ext/bc/%s/rpc", uri, chain))
 	if err != nil {
