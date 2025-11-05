@@ -10,25 +10,52 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewDefaultApplication(t *testing.T) {
-	require := require.New(t)
-
-	v := &Application{
-		Name:  Client,
-		Major: 1,
-		Minor: 2,
-		Patch: 3,
+func TestApplicationString(t *testing.T) {
+	tests := []struct {
+		app      *Application
+		expected string
+	}{
+		{
+			app: &Application{
+				Name:  Client,
+				Major: 0,
+				Minor: 0,
+				Patch: 1,
+			},
+			expected: "avalanchego/0.0.1",
+		},
+		{
+			app: &Application{
+				Name:  Client,
+				Major: 1,
+				Minor: 2,
+				Patch: 3,
+			},
+			expected: "avalanchego/1.2.3",
+		},
+		{
+			app: &Application{
+				Name:  "myClient",
+				Major: 10,
+				Minor: 20,
+				Patch: 30,
+			},
+			expected: "myClient/10.20.30",
+		},
 	}
 
-	require.Equal("avalanchego/1.2.3", v.String())
-	require.False(v.Before(v))
+	for _, test := range tests {
+		t.Run(test.expected, func(t *testing.T) {
+			require.Equal(t, test.expected, test.app.String())
+		})
+	}
 }
 
-func TestComparingVersions(t *testing.T) {
+func TestApplicationCompare(t *testing.T) {
 	tests := []struct {
 		myVersion   *Application
 		peerVersion *Application
-		before      bool
+		expected    int
 	}{
 		{
 			myVersion: &Application{
@@ -43,7 +70,7 @@ func TestComparingVersions(t *testing.T) {
 				Minor: 2,
 				Patch: 3,
 			},
-			before: false,
+			expected: 0,
 		},
 		{
 			myVersion: &Application{
@@ -58,22 +85,7 @@ func TestComparingVersions(t *testing.T) {
 				Minor: 2,
 				Patch: 3,
 			},
-			before: false,
-		},
-		{
-			myVersion: &Application{
-				Name:  Client,
-				Major: 1,
-				Minor: 2,
-				Patch: 3,
-			},
-			peerVersion: &Application{
-				Name:  Client,
-				Major: 1,
-				Minor: 2,
-				Patch: 4,
-			},
-			before: true,
+			expected: 1,
 		},
 		{
 			myVersion: &Application{
@@ -88,22 +100,7 @@ func TestComparingVersions(t *testing.T) {
 				Minor: 2,
 				Patch: 3,
 			},
-			before: false,
-		},
-		{
-			myVersion: &Application{
-				Name:  Client,
-				Major: 1,
-				Minor: 2,
-				Patch: 3,
-			},
-			peerVersion: &Application{
-				Name:  Client,
-				Major: 1,
-				Minor: 3,
-				Patch: 3,
-			},
-			before: true,
+			expected: 1,
 		},
 		{
 			myVersion: &Application{
@@ -118,28 +115,14 @@ func TestComparingVersions(t *testing.T) {
 				Minor: 2,
 				Patch: 3,
 			},
-			before: false,
-		},
-		{
-			myVersion: &Application{
-				Name:  Client,
-				Major: 1,
-				Minor: 2,
-				Patch: 3,
-			},
-			peerVersion: &Application{
-				Name:  Client,
-				Major: 2,
-				Minor: 2,
-				Patch: 3,
-			},
-			before: true,
+			expected: 1,
 		},
 	}
 	for _, test := range tests {
-		t.Run(fmt.Sprintf("%s %s", test.myVersion, test.peerVersion), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s_%s", test.myVersion, test.peerVersion), func(t *testing.T) {
 			require := require.New(t)
-			require.Equal(test.before, test.myVersion.Before(test.peerVersion))
+			require.Equal(test.expected, test.myVersion.Compare(test.peerVersion))
+			require.Equal(-test.expected, test.peerVersion.Compare(test.myVersion))
 		})
 	}
 }
