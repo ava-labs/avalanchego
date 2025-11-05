@@ -51,7 +51,7 @@ While it may at first seem like a trivial problem, it isn't always so:
 
 The epoch management for ICM is defined as follows:
 Let $E$ be the current epoch with a start time of $T_{E}$ and end time of $T_{E} + D$.
-The first block whose build time is later than $T_{E} + D$ and is denoted B<sup>E</sup><sub>end</sub>, is the last block of epoch $E$.
+The first block whose build time is at least $T_{E} + D$ and is denoted B<sup>E</sup><sub>end</sub>, is the last block of epoch $E$.
 The next block belongs to epoch $E + 1$ and its P-chain height is defined to be the P-chain height of B<sup>E</sup><sub>end</sub>.
 The start time of epoch $E + 1$ is defined to be the build time of B<sup>E</sup><sub>end</sub>.
 
@@ -77,10 +77,9 @@ message SimplexEpochInfo {
    uint64 epoch_number = 2;
    uint64 next_p_chain_reference_height = 3;
    uint64 prev_vm_block_seq = 4; // The sequence of the previous VM block
-   repeated ObservedPChainHeight observed_p_chain_height = 5;
-   uint64 sealing_block_seq = 6; // The sequence number of the sealing block
-   BlockValidationDescriptor block_validation_descriptor = 7; // Describes how to validate the blocks of the next epoch
-   NextEpochApprovals next_epoch_approvals = 8; // The epoch change approvals of the next epoch by at least n-f nodes.
+   uint64 sealing_block_seq = 5; // The sequence number of the sealing block
+   BlockValidationDescriptor block_validation_descriptor = 6; // Describes how to validate the blocks of the next epoch
+   NextEpochApprovals next_epoch_approvals = 7; // The epoch change approvals of the next epoch by at least n-f nodes.
 }
 ```
 
@@ -90,10 +89,6 @@ message SimplexEpochInfo {
 - The `next_p_chain_reference_height` is the P-chain height of the next epoch and is only encoded in the last block of epoch `epoch_number` (the sealing block), otherwise it is set to `0`.
 
 - The `prev_vm_block_seq` is the sequence number of the previous VM block, and it is used to efficiently find the last VM block upon startup.
-
-- The `observed_p_chain_height` is a deterministically encoded map that contains the P-chain heights that were observed by the nodes of the current epoch.
-  The key of the map is the node index that proposed the block, and the value is the P-chain height that was sampled by that node.
-  It's used to determine what would be the `next_p_chain_reference_height` of the next epoch, based on the P-chain heights sampled by the nodes so far.
 
 - The `sealing_block_seq` is the sequence number of the sealing block of the epoch, and it is set to `0` in all blocks that are not sealing blocks.
   It is used to determine when the Simplex instance can transition to the next epoch.
@@ -138,16 +133,14 @@ block is finalized. If a block contains incorrect epoch information, the block w
 Whenever the `i`'th node builds a block $B_{k+1}$ built on top of block $B_k$, it adopts the `p_chain_reference_height` of block $B_k$, since $B_{k+1}$ is in the same epoch.
 It then samples its P-chain height and if it detects that the validator set
 is different from the validator set that is derived from the P-chain height of `p_chain_reference_height`,
-it sets `observed_p_chain_height[i]` to the sampled P-chain height.
+it sets `next_p_chain_reference_height` to the sampled P-chain height.
 
 When the block $B_{k+1}$ built by the `i`'th node is verified by nodes other than the block proposer, they ensure that:
 
 - The `p_chain_reference_height` hasn't changed from the previous block $B_k$.
 - `next_p_chain_reference_height > p_chain_reference_height` or `next_p_chain_reference_height == 0`.
-- The validator set derived from the P-chain height corresponding to `next_p_chain_reference_height` is different from the validator set derived by the P-chain height corresponding to `p_chain_reference_height`.
-- If `next_p_chain_reference_height > 0`, then `observed_p_chain_height` contains at least `n-f` entries where `n` is the number of nodes in the epoch and `f` is the maximum number of faulty nodes that can be tolerated by the Simplex consensus protocol for `n` nodes.
-- If `next_p_chain_reference_height > 0`, then `next_p_chain_reference_height` is the median among the `observed_p_chain_height` values.
-- If `observed_p_chain_height` changed from the previous block, then the only entry that changed is `observed_p_chain_height[i]`.
+- If `next_p_chain_reference_height > 0`, the node has observed the P-chain height exists in the P-chain.
+- If `next_p_chain_reference_height > 0`, the validator set derived from the P-chain height corresponding to is different from the validator set derived by the P-chain height corresponding to `p_chain_reference_height`.
 
 If block $B_{k+1}$ is the sealing block of the current epoch, then `next_p_chain_reference_height > 0`, otherwise it is set to `0`.
 If block $B_{k+1}$ is considered to be the sealing block its epoch, then the next block - block $B_{k+2}$ belongs to epoch `k+1`.
@@ -210,13 +203,9 @@ In order to create the sealing block, the following criteria need to be met:
 2. At least `n-f` nodes belonging to the next epoch have approved the epoch change.
 
 
-The first criterion is satisfied by the `observed_p_chain_height` field having at least `n-f` entries,
-and the `next_p_chain_reference_height` being set to the median of the `observed_p_chain_height` values.
-This ensures that even if all `f` malicious nodes want to stall the validator set change and suggest low P-chain heights,
-their suggestions will be disregarded. Similarly, even if all `f` malicious nodes suggest abnormally high P-chain heights,
-even those that do not exist in the P-chain, their suggestions will be disregarded as well.
-The addition of a new `observed_p_chain_height` is done by a node that builds a block and encodes its own sampled P-chain height in the `observed_p_chain_height` field.
-When a node verifies a block, it ensures that the only entry that changed in the `observed_p_chain_height` field is the entry corresponding to the node that built the block.
+The first criterion is satisfied by the `next_p_chain_reference_height` being greater than `0`.
+Since nodes check their P-chain possess the P-chain height corresponding to `next_p_chain_reference_height`,
+a block containing a specific `next_p_chain_reference_height` indicates that at least `f+1` correct nodes have observed that P-chain height in the P-chain.
 
 The second criterion is satisfied by the `next_epoch_approvals` field containing an aggregated BLS signature from at least `n-f` nodes
 belonging to the next epoch. Unlike the previous field, this field also needs to be updated by nodes in the next epoch that might not be in the current epoch.
@@ -286,29 +275,19 @@ Suppose the current epoch information is as follows (fields with zero values are
 ```
 
 Then, a block with sequence of 30 is built and a higher P-chain height (151) at which the validator set is different from the epoch's validator set is sampled.
-A block builder with id of `2` then marks its observed P-chain height, and encodes the following epoch information in the block:
-```
-{
-    p_chain_reference_height: 100
-    epoch_number: 20
-    next_p_chain_reference_height:
-    observed_p_chain_height: [{2, 151}]
-}
-```
-
-Later some other nodes build blocks and sample higher P-chain heights, and the `observed_p_chain_height` field is updated accordingly.
-Once enough nodes (`n-f`) have sampled a P-chain height, the `next_p_chain_reference_height` is set to the median of the sampled P-chain heights
-and the `block_validation_descriptor` is set to the public keys of the validator set derived from the P-chain height of `151`:
-
+Therefore, the `next_p_chain_reference_height` is set to `151` and accordingly the `block_validation_descriptor`
+is set to the public keys of the validator set derived from the P-chain height of `151`:
 ```
 {
     p_chain_reference_height: 100
     epoch_number: 20
     next_p_chain_reference_height: 151
-    observed_p_chain_height: [{2, 151}, {3, 160}, {4, 151}]
     block_validation_descriptor: [TGVhcm4gdG8g==, dmFsdWUgeW91cnNlbGY==, ... , XBwaW5lc3MuCg==]
 }
 ```
+
+Later some other nodes build blocks and sample higher P-chain heights, however the `next_p_chain_reference_height` remains `151` since it is the first
+sampled P-chain height that indicates a different validator set. The same applies for the `block_validation_descriptor`.
 
 At this point, the block builders start collecting approvals from the nodes belonging to the next epoch:
 
@@ -317,10 +296,9 @@ At this point, the block builders start collecting approvals from the nodes belo
     p_chain_reference_height: 100
     epoch_number: 20
     next_p_chain_reference_height: 151
-    observed_p_chain_height: [{2, 151}, {3, 160}, {4, 151}]
     block_validation_descriptor: [TGVhcm4gdG8g==, dmFsdWUgeW91cnNlbGY==, ... , XBwaW5lc3MuCg==]
     next_epoch_approvals: {
-        node_ids: [2, 3, 5, 7]
+        node_ids: 00110101
         aux_info_digest: "VGhlIGhhcmRlc3Q=="
         signature: "iBpcyB0aGUgZ2x=="
     }
@@ -335,10 +313,9 @@ Once enough approvals are gathered, the sealing block can be built:
     epoch_number: 20
     next_p_chain_reference_height: 151
     sealing_block_seq: 40
-    observed_p_chain_height: [{2, 151}, {3, 160}, {4, 151}]
     block_validation_descriptor: [TGVhcm4gdG8g==, dmFsdWUgeW91cnNlbGY==, ... , XBwaW5lc3MuCg==]
     next_epoch_approvals: {
-        node_ids: [2, 3, 5, 7]
+        node_ids: 00110101
         aux_info_digest: "VGhlIGhhcmRlc3Q=="
         signature: "iBpcyB0aGUgZ2x=="
     }
@@ -462,11 +439,6 @@ message ICMEpochInfo {
 The Simplex epoch information is a canoto encoded message with the following schema:
 
 ```proto
-message ObservedPChainHeight {
-   uint32 node_index = 1; // The index of the node that proposed the block
-   uint64 p_chain_height = 2; // The P-chain height sampled by the node
-}
-
 message NodeBLSMapping {
     bytes node_id = 1; // The nodeID
     bytes bls_key = 2; // The BLS key of the node
@@ -474,12 +446,18 @@ message NodeBLSMapping {
 
 message BlockValidationDescriptor {
   oneof BlockValidationType {
-      repeated NodeBLSMapping aggregated_membership = 1; // The BLS keys of the nodes in the next epoch
+      AggregatedMembership aggregated_membership = 1;
+      // Future types can be added here
   }
 }
 
+type AggregatedMembership {
+  repeated NodeBLSMapping members = 1; // The BLS keys of the nodes in the next epoch
+}
+
 message NextEpochApprovals {
-  repeated bytes node_ids = 1; // The nodeIDs of nodes belonging to the next epoch that approve the epoch change.
+  bytes node_ids = 1; // The nodeIDs of nodes belonging to the next epoch that approve the epoch change.
+                      // In practice, this is a bit-map that corresponds to the nodes in the block_validation_descriptor.
   bytes aux_info_digest = 2; // The digest of the auxiliary information that is approved by the nodes.
   bytes signature = 3; // The signature of the nodes that approve the epoch change.
 }
@@ -489,9 +467,8 @@ message SimplexEpochInfo {
    uint64 epoch_number = 2;
    uint64 next_p_chain_reference_height = 3;
    uint64 prev_vm_block_seq = 4; // The sequence of the previous VM block
-   repeated ObservedPChainHeight observed_p_chain_height = 5;
-   uint64 sealing_block_seq = 6; // The sequence number of the sealing block
-   BlockValidationDescriptor block_validation_descriptor = 7; // Describes how to validate the blocks of the next epoch
-   NextEpochApprovals next_epoch_approvals = 8; // The epoch change approvals of the next epoch by at least n-f nodes.
+   uint64 sealing_block_seq = 5; // The sequence number of the sealing block
+   BlockValidationDescriptor block_validation_descriptor = 6; // Describes how to validate the blocks of the next epoch
+   NextEpochApprovals next_epoch_approvals = 7; // The epoch change approvals of the next epoch by at least n-f nodes.
 }
 ```
