@@ -528,7 +528,7 @@ func (p *peer) writeMessages() {
 		return
 	}
 
-	myVersion := p.VersionCompatibility.Version()
+	myVersion := p.VersionCompatibility.Current
 	knownPeersFilter, knownPeersSalt := p.Network.KnownPeers()
 
 	_, areWeAPrimaryNetworkValidator := p.Validators.GetValidator(constants.PrimaryNetworkID, p.MyNodeID)
@@ -713,7 +713,7 @@ func (p *peer) shouldDisconnect() bool {
 		p.Log.Debug(disconnectingLog,
 			zap.String("reason", "version not compatible"),
 			zap.Stringer("nodeID", p.id),
-			zap.Stringer("myVersion", p.VersionCompatibility.Version()),
+			zap.Stringer("myVersion", p.VersionCompatibility.Current),
 			zap.Stringer("peerVersion", p.version),
 		)
 		return true
@@ -897,7 +897,7 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		Patch: int(msg.Client.GetPatch()),
 	}
 
-	if myVersion := p.VersionCompatibility.Version(); myVersion.Before(p.version) {
+	if myVersion := p.VersionCompatibility.Current; myVersion.Before(p.version) {
 		log := p.Log.Debug
 		if _, ok := p.Beacons.GetValidator(constants.PrimaryNetworkID, p.id); ok {
 			log = p.Log.Info

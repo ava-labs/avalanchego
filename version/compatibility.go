@@ -13,33 +13,13 @@ import (
 // compatible to the local version.
 type Compatibility struct {
 	// Ordering expectations are:
-	// version >= minCompatibleAfterUpgrade >= minCompatible
-	version                   *Application
-	minCompatibleAfterUpgrade *Application
-	minCompatible             *Application
+	// Current >= minCompatibleAfterUpgrade >= minCompatible
+	Current                   *Application
+	MinCompatibleAfterUpgrade *Application
+	MinCompatible             *Application
 
-	upgradeTime time.Time
+	UpgradeTime time.Time
 	clock       mockable.Clock
-}
-
-// NewCompatibility returns a compatibility checker with the provided options.
-func NewCompatibility(
-	version *Application,
-	minCompatibleAfterUpgrade *Application,
-	minCompatible *Application,
-	upgradeTime time.Time,
-) *Compatibility {
-	return &Compatibility{
-		version:                   version,
-		minCompatibleAfterUpgrade: minCompatibleAfterUpgrade,
-		minCompatible:             minCompatible,
-		upgradeTime:               upgradeTime,
-	}
-}
-
-// Version returns the locally running version
-func (c *Compatibility) Version() *Application {
-	return c.version
 }
 
 // Compatible returns whether if the provided version is compatible with the
@@ -48,13 +28,13 @@ func (c *Compatibility) Version() *Application {
 // This means that the version is connectable and that consensus messages can be
 // made to the peer.
 func (c *Compatibility) Compatible(peer *Application) bool {
-	if c.version.Major < peer.Major {
+	if c.Current.Major < peer.Major {
 		return false // If we are on an older major version, we are incompatible.
 	}
 
-	minCompatibleVersion := c.minCompatibleAfterUpgrade
-	if now := c.clock.Time(); now.Before(c.upgradeTime) {
-		minCompatibleVersion = c.minCompatible
+	minCompatibleVersion := c.MinCompatibleAfterUpgrade
+	if now := c.clock.Time(); now.Before(c.UpgradeTime) {
+		minCompatibleVersion = c.MinCompatible
 	}
 	return peer.Compare(minCompatibleVersion) >= 0 // Peer must be at least the min compatible version
 }

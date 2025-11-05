@@ -32,13 +32,12 @@ func TestCompatibility(t *testing.T) {
 		Patch: 0,
 	}
 
-	compatibility := NewCompatibility(
-		v,
-		minCompatibleAfterUpgrade,
-		minCompatible,
-		upgradeTime,
-	)
-	require.Equal(t, v, compatibility.Version())
+	compatibility := &Compatibility{
+		Current:                   v,
+		MinCompatibleAfterUpgrade: minCompatibleAfterUpgrade,
+		MinCompatible:             minCompatible,
+		UpgradeTime:               upgradeTime,
+	}
 
 	tests := []struct {
 		peer     *Application
