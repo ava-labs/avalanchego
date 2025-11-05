@@ -143,6 +143,9 @@ type peer struct {
 	// version is the claimed version the peer is running that we received in
 	// the Handshake message.
 	version *version.Application
+	// upgradeTime is the Unix timestamp (in seconds) of the most recently
+	// scheduled network upgrade according to the peer.
+	upgradeTime uint64
 	// trackedSubnets are the subnetIDs the peer sent us in the Handshake
 	// message. The primary network ID is always included.
 	trackedSubnets set.Set[ids.ID]
@@ -288,6 +291,7 @@ func (p *peer) Info() Info {
 		PublicIP:       p.ip.AddrPort,
 		ID:             p.id,
 		Version:        p.version.String(),
+		UpgradeTime:    p.upgradeTime,
 		LastSent:       p.LastSent(),
 		LastReceived:   p.LastReceived(),
 		ObservedUptime: json.Uint32(primaryUptime),
@@ -541,6 +545,7 @@ func (p *peer) writeMessages() {
 		uint32(myVersion.Major),
 		uint32(myVersion.Minor),
 		uint32(myVersion.Patch),
+		uint64(p.VersionCompatibility.UpgradeTime.Unix()),
 		mySignedIP.Timestamp,
 		mySignedIP.TLSSignature,
 		mySignedIP.BLSSignatureBytes,
@@ -908,6 +913,8 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 			zap.Stringer("peerVersion", p.version),
 		)
 	}
+
+	p.upgradeTime = msg.UpgradeTime
 
 	// handle subnet IDs
 	if numTrackedSubnets := len(msg.TrackedSubnets); numTrackedSubnets > maxNumTrackedSubnets {
