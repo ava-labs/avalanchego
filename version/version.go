@@ -4,8 +4,9 @@
 package version
 
 import (
+	"cmp"
 	"fmt"
-	"sync/atomic"
+	"sync"
 )
 
 var (
@@ -24,35 +25,37 @@ type Semantic struct {
 	Minor int `json:"minor" yaml:"minor"`
 	Patch int `json:"patch" yaml:"patch"`
 
-	str atomic.Value
+	makeStrOnce sync.Once
+	str         string
 }
 
 // The only difference here between Semantic and Application is that Semantic
 // prepends "v" rather than the client name.
 func (s *Semantic) String() string {
-	strIntf := s.str.Load()
-	if strIntf != nil {
-		return strIntf.(string)
-	}
+	s.makeStrOnce.Do(s.initString)
+	return s.str
+}
 
-	str := fmt.Sprintf(
+func (s *Semantic) initString() {
+	s.str = fmt.Sprintf(
 		"v%d.%d.%d",
 		s.Major,
 		s.Minor,
 		s.Patch,
 	)
-	s.str.Store(str)
-	return str
 }
 
-// Compare returns a positive number if s > o, 0 if s == o, or a negative number
-// if s < o.
-func (s *Semantic) Compare(o *Semantic) int {
-	if s.Major != o.Major {
-		return s.Major - o.Major
+// Compare returns
+//
+//	-1 if s is less than o,
+//	 0 if s equals o,
+//	+1 if s is greater than o.
+func (s *Semantic) Compare(o *Application) int {
+	if c := cmp.Compare(s.Major, o.Major); c != 0 {
+		return c
 	}
-	if s.Minor != o.Minor {
-		return s.Minor - o.Minor
+	if c := cmp.Compare(s.Minor, o.Minor); c != 0 {
+		return c
 	}
-	return s.Patch - o.Patch
+	return cmp.Compare(s.Patch, o.Patch)
 }

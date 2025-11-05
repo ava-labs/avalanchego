@@ -33,7 +33,7 @@ type Config struct {
 	InboundMsgThrottler  throttling.InboundMsgThrottler
 	Network              Network
 	Router               router.InboundHandler
-	VersionCompatibility version.Compatibility
+	VersionCompatibility *version.Compatibility
 	MyNodeID             ids.NodeID
 	// MySubnets does not include the primary network ID
 	MySubnets          set.Set[ids.ID]

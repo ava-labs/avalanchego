@@ -21,7 +21,6 @@ func TestNewDefaultApplication(t *testing.T) {
 	}
 
 	require.Equal("avalanchego/1.2.3", v.String())
-	require.NoError(v.Compatible(v))
 	require.False(v.Before(v))
 }
 
@@ -29,7 +28,6 @@ func TestComparingVersions(t *testing.T) {
 	tests := []struct {
 		myVersion   *Application
 		peerVersion *Application
-		compatible  bool
 		before      bool
 	}{
 		{
@@ -45,8 +43,7 @@ func TestComparingVersions(t *testing.T) {
 				Minor: 2,
 				Patch: 3,
 			},
-			compatible: true,
-			before:     false,
+			before: false,
 		},
 		{
 			myVersion: &Application{
@@ -61,8 +58,7 @@ func TestComparingVersions(t *testing.T) {
 				Minor: 2,
 				Patch: 3,
 			},
-			compatible: true,
-			before:     false,
+			before: false,
 		},
 		{
 			myVersion: &Application{
@@ -77,8 +73,7 @@ func TestComparingVersions(t *testing.T) {
 				Minor: 2,
 				Patch: 4,
 			},
-			compatible: true,
-			before:     true,
+			before: true,
 		},
 		{
 			myVersion: &Application{
@@ -93,8 +88,7 @@ func TestComparingVersions(t *testing.T) {
 				Minor: 2,
 				Patch: 3,
 			},
-			compatible: true,
-			before:     false,
+			before: false,
 		},
 		{
 			myVersion: &Application{
@@ -109,8 +103,7 @@ func TestComparingVersions(t *testing.T) {
 				Minor: 3,
 				Patch: 3,
 			},
-			compatible: true,
-			before:     true,
+			before: true,
 		},
 		{
 			myVersion: &Application{
@@ -125,8 +118,7 @@ func TestComparingVersions(t *testing.T) {
 				Minor: 2,
 				Patch: 3,
 			},
-			compatible: false,
-			before:     false,
+			before: false,
 		},
 		{
 			myVersion: &Application{
@@ -141,19 +133,12 @@ func TestComparingVersions(t *testing.T) {
 				Minor: 2,
 				Patch: 3,
 			},
-			compatible: true,
-			before:     true,
+			before: true,
 		},
 	}
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%s %s", test.myVersion, test.peerVersion), func(t *testing.T) {
 			require := require.New(t)
-			err := test.myVersion.Compatible(test.peerVersion)
-			if test.compatible {
-				require.NoError(err)
-			} else {
-				require.ErrorIs(err, errDifferentMajor)
-			}
 			require.Equal(test.before, test.myVersion.Before(test.peerVersion))
 		})
 	}

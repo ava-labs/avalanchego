@@ -4,16 +4,12 @@
 package version
 
 import (
-	"errors"
+	"cmp"
 	"fmt"
 	"sync"
 )
 
-var (
-	errDifferentMajor = errors.New("different major version")
-
-	_ fmt.Stringer = (*Application)(nil)
-)
+var _ fmt.Stringer = (*Application)(nil)
 
 type Application struct {
 	Name  string `json:"name"  yaml:"name"`
@@ -42,27 +38,21 @@ func (a *Application) initString() {
 	)
 }
 
-func (a *Application) Compatible(o *Application) error {
-	switch {
-	case a.Major > o.Major:
-		return errDifferentMajor
-	default:
-		return nil
-	}
-}
-
 func (a *Application) Before(o *Application) bool {
 	return a.Compare(o) < 0
 }
 
-// Compare returns a positive number if s > o, 0 if s == o, or a negative number
-// if s < o.
+// Compare returns
+//
+//	-1 if a is less than o,
+//	 0 if a equals o,
+//	+1 if a is greater than o.
 func (a *Application) Compare(o *Application) int {
-	if a.Major != o.Major {
-		return a.Major - o.Major
+	if c := cmp.Compare(a.Major, o.Major); c != 0 {
+		return c
 	}
-	if a.Minor != o.Minor {
-		return a.Minor - o.Minor
+	if c := cmp.Compare(a.Minor, o.Minor); c != 0 {
+		return c
 	}
-	return a.Patch - o.Patch
+	return cmp.Compare(a.Patch, o.Patch)
 }

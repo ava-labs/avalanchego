@@ -87,11 +87,11 @@ func init() {
 	}
 }
 
-func GetCompatibility(minCompatibleTime time.Time) Compatibility {
+func GetCompatibility(minCompatibleTime time.Time) *Compatibility {
 	return NewCompatibility(
 		CurrentApp,
 		MinimumCompatibleVersion,
-		minCompatibleTime,
 		PrevMinimumCompatibleVersion,
+		minCompatibleTime,
 	)
 }
