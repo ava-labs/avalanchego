@@ -50,7 +50,7 @@ func (s *Semantic) initString() {
 //	-1 if s is less than o,
 //	 0 if s equals o,
 //	+1 if s is greater than o.
-func (s *Semantic) Compare(o *Application) int {
+func (s *Semantic) Compare(o *Semantic) int {
 	if c := cmp.Compare(s.Major, o.Major); c != 0 {
 		return c
 	}
