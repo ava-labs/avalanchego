@@ -31,9 +31,8 @@ const (
 )
 
 var (
-	_ Backend         = (*backend)(nil)
-	_ acp118.Verifier = (*backend)(nil)
 	_ p2p.Handler     = (*Handler)(nil)
+	_ acp118.Verifier = (*verifier)(nil)
 
 	messageCacheSize = 500
 
@@ -139,17 +138,16 @@ func NewHandler(
 	}
 }
 
-// Backend tracks signature-eligible warp messages and provides an interface to fetch them.
-// The backend is used by the warp API service to retrieve messages.
-type Backend interface {
-	AddMessage(ctx context.Context, unsignedMessage *warp.UnsignedMessage) error
-	GetMessage(messageHash ids.ID) (*warp.UnsignedMessage, error)
+// Components bundles the warp message handling components.
+type Components struct {
+	DB      *DB
+	Signer  *Signer
+	Handler p2p.Handler
 }
 
-// backend implements Backend and keeps track of warp messages.
-type backend struct {
+// verifier implements acp118.Verifier and validates whether a warp message should be signed.
+type verifier struct {
 	db            *DB
-	signer        *Signer
 	blockClient   BlockStore
 	uptimeTracker *uptimetracker.UptimeTracker
 	networkID     uint32
@@ -162,8 +160,8 @@ type backend struct {
 	uptimeValidationFail        metrics.Counter
 }
 
-// NewBackend creates a new Backend, and initializes the signature cache and message tracking database.
-func NewBackend(
+// New creates warp backend components and initializes the signature cache and message tracking database.
+func New(
 	networkID uint32,
 	sourceChainID ids.ID,
 	warpSigner warp.Signer,
@@ -172,7 +170,7 @@ func NewBackend(
 	db database.Database,
 	signatureCache cache.Cacher[ids.ID, []byte],
 	offchainMessages [][]byte,
-) (Backend, *Signer, p2p.Handler, error) {
+) (*Components, error) {
 	messageDB := &DB{
 		networkID:                 networkID,
 		sourceChainID:             sourceChainID,
@@ -182,10 +180,10 @@ func NewBackend(
 	}
 
 	if err := initOffChainMessages(messageDB, networkID, sourceChainID, offchainMessages); err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
-	b := &backend{
+	v := &verifier{
 		db:                          messageDB,
 		blockClient:                 blockClient,
 		uptimeTracker:               uptimeTracker,
@@ -199,38 +197,39 @@ func NewBackend(
 
 	signer := &Signer{
 		warpSigner:     warpSigner,
-		verifier:       b,
+		verifier:       v,
 		signatureCache: signatureCache,
 	}
-	b.signer = signer
 
-	handler := NewHandler(signatureCache, b, warpSigner)
+	handler := NewHandler(signatureCache, v, warpSigner)
 
-	return b, signer, handler, nil
+	return &Components{
+		DB:      messageDB,
+		Signer:  signer,
+		Handler: handler,
+	}, nil
 }
 
-func (b *backend) AddMessage(ctx context.Context, unsignedMessage *warp.UnsignedMessage) error {
-	if err := b.db.Add(unsignedMessage); err != nil {
+// AddAndSign adds a warp message to the database and signs it.
+// This is the typical entry point when a message is created on-chain (e.g., via the warp precompile).
+func AddAndSign(ctx context.Context, db *DB, signer *Signer, unsignedMessage *warp.UnsignedMessage) error {
+	if err := db.Add(unsignedMessage); err != nil {
 		return err
 	}
 
 	// Fill the signature cache now so subsequent requests can serve the
 	// signature without repeating verification or signing work.
-	if _, err := b.signer.Sign(ctx, unsignedMessage); err != nil {
+	if _, err := signer.Sign(ctx, unsignedMessage); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (b *backend) GetMessage(messageHash ids.ID) (*warp.UnsignedMessage, error) {
-	return b.db.Get(messageHash)
-}
-
 // Verify implements acp118.Verifier and validates whether a warp message should be signed.
-func (b *backend) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMessage, _ []byte) *common.AppError {
+func (v *verifier) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMessage, _ []byte) *common.AppError {
 	messageID := unsignedMessage.ID()
 	// Known on-chain messages should be signed
-	if _, err := b.db.Get(messageID); err == nil {
+	if _, err := v.db.Get(messageID); err == nil {
 		return nil
 	} else if err != database.ErrNotFound {
 		return &common.AppError{
@@ -241,7 +240,7 @@ func (b *backend) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMess
 
 	parsed, err := payload.Parse(unsignedMessage.Payload)
 	if err != nil {
-		b.messageParseFail.Inc(1)
+		v.messageParseFail.Inc(1)
 		return &common.AppError{
 			Code:    ParseErrCode,
 			Message: "failed to parse payload: " + err.Error(),
@@ -250,11 +249,11 @@ func (b *backend) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMess
 
 	switch p := parsed.(type) {
 	case *payload.AddressedCall:
-		return b.verifyOffchainAddressedCall(p)
+		return v.verifyOffchainAddressedCall(p)
 	case *payload.Hash:
-		return b.verifyBlockMessage(ctx, p)
+		return v.verifyBlockMessage(ctx, p)
 	default:
-		b.messageParseFail.Inc(1)
+		v.messageParseFail.Inc(1)
 		return &common.AppError{
 			Code:    ParseErrCode,
 			Message: fmt.Sprintf("unknown payload type: %T", p),
@@ -264,11 +263,11 @@ func (b *backend) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMess
 
 // verifyBlockMessage returns nil if blockHashPayload contains the ID
 // of an accepted block indicating it should be signed by the VM.
-func (b *backend) verifyBlockMessage(ctx context.Context, blockHashPayload *payload.Hash) *common.AppError {
+func (v *verifier) verifyBlockMessage(ctx context.Context, blockHashPayload *payload.Hash) *common.AppError {
 	blockID := blockHashPayload.Hash
-	_, err := b.blockClient.GetBlock(ctx, blockID)
+	_, err := v.blockClient.GetBlock(ctx, blockID)
 	if err != nil {
-		b.blockValidationFail.Inc(1)
+		v.blockValidationFail.Inc(1)
 		return &common.AppError{
 			Code:    VerifyErrCode,
 			Message: fmt.Sprintf("failed to get block %s: %s", blockID, err.Error()),
@@ -279,11 +278,11 @@ func (b *backend) verifyBlockMessage(ctx context.Context, blockHashPayload *payl
 }
 
 // verifyOffchainAddressedCall verifies the addressed call message
-func (b *backend) verifyOffchainAddressedCall(addressedCall *payload.AddressedCall) *common.AppError {
+func (v *verifier) verifyOffchainAddressedCall(addressedCall *payload.AddressedCall) *common.AppError {
 	// Further, parse the payload to see if it is a known type.
 	parsed, err := message.Parse(addressedCall.Payload)
 	if err != nil {
-		b.messageParseFail.Inc(1)
+		v.messageParseFail.Inc(1)
 		return &common.AppError{
 			Code:    ParseErrCode,
 			Message: "failed to parse addressed call message: " + err.Error(),
@@ -299,12 +298,12 @@ func (b *backend) verifyOffchainAddressedCall(addressedCall *payload.AddressedCa
 
 	switch p := parsed.(type) {
 	case *message.ValidatorUptime:
-		if err := b.verifyUptimeMessage(p); err != nil {
-			b.uptimeValidationFail.Inc(1)
+		if err := v.verifyUptimeMessage(p); err != nil {
+			v.uptimeValidationFail.Inc(1)
 			return err
 		}
 	default:
-		b.messageParseFail.Inc(1)
+		v.messageParseFail.Inc(1)
 		return &common.AppError{
 			Code:    ParseErrCode,
 			Message: fmt.Sprintf("unknown message type: %T", p),
@@ -314,8 +313,8 @@ func (b *backend) verifyOffchainAddressedCall(addressedCall *payload.AddressedCa
 	return nil
 }
 
-func (b *backend) verifyUptimeMessage(uptimeMsg *message.ValidatorUptime) *common.AppError {
-	currentUptime, _, err := b.uptimeTracker.GetUptime(uptimeMsg.ValidationID)
+func (v *verifier) verifyUptimeMessage(uptimeMsg *message.ValidatorUptime) *common.AppError {
+	currentUptime, _, err := v.uptimeTracker.GetUptime(uptimeMsg.ValidationID)
 	if err != nil {
 		return &common.AppError{
 			Code:    VerifyErrCode,

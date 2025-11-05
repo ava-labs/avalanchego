@@ -24,15 +24,15 @@ var errNoValidators = errors.New("cannot aggregate signatures from subnet with n
 // API introduces snowman specific functionality to the evm
 type API struct {
 	chainContext        *snow.Context
-	backend             Backend
+	db                  *DB
 	signer              *Signer
 	blockClient         BlockStore
 	signatureAggregator *acp118.SignatureAggregator
 }
 
-func NewAPI(chainCtx *snow.Context, backend Backend, signer *Signer, blockClient BlockStore, signatureAggregator *acp118.SignatureAggregator) *API {
+func NewAPI(chainCtx *snow.Context, db *DB, signer *Signer, blockClient BlockStore, signatureAggregator *acp118.SignatureAggregator) *API {
 	return &API{
-		backend:             backend,
+		db:                  db,
 		signer:              signer,
 		blockClient:         blockClient,
 		chainContext:        chainCtx,
@@ -42,7 +42,7 @@ func NewAPI(chainCtx *snow.Context, backend Backend, signer *Signer, blockClient
 
 // GetMessage returns the Warp message associated with a messageID.
 func (a *API) GetMessage(_ context.Context, messageID ids.ID) (hexutil.Bytes, error) {
-	message, err := a.backend.GetMessage(messageID)
+	message, err := a.db.Get(messageID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get message %s with error %w", messageID, err)
 	}
@@ -51,7 +51,7 @@ func (a *API) GetMessage(_ context.Context, messageID ids.ID) (hexutil.Bytes, er
 
 // GetMessageSignature returns the BLS signature associated with a messageID.
 func (a *API) GetMessageSignature(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
-	unsignedMessage, err := a.backend.GetMessage(messageID)
+	unsignedMessage, err := a.db.Get(messageID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get message %s with error %w", messageID, err)
 	}
@@ -95,7 +95,7 @@ func (a *API) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexutil.By
 
 // GetMessageAggregateSignature fetches the aggregate signature for the requested [messageID]
 func (a *API) GetMessageAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64, subnetIDStr string) (signedMessageBytes hexutil.Bytes, err error) {
-	unsignedMessage, err := a.backend.GetMessage(messageID)
+	unsignedMessage, err := a.db.Get(messageID)
 	if err != nil {
 		return nil, err
 	}
