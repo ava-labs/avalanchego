@@ -188,8 +188,6 @@ type verifier struct {
 	uptimeValidationFail        metrics.Counter
 }
 
-var _ acp118.Verifier = (*verifier)(nil)
-
 // NewVerifier creates a new warp message verifier.
 func NewVerifier(
 	db *DB,
