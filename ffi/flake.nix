@@ -116,13 +116,25 @@
         program = "${go}/bin/go";
       };
 
+      apps.jq = {
+        type = "app";
+        program = "${pkgs.jq}/bin/jq";
+      };
+
+      apps.just = {
+        type = "app";
+        program = "${pkgs.just}/bin/just";
+      };
+
       devShells.default = craneLib.devShell {
         inputsFrom = [ firewood-ffi ];
 
         packages = with pkgs; [
           firewood-ffi
-          rustToolchain
           go
+          jq
+          just
+          rustToolchain
         ];
 
         shellHook = ''

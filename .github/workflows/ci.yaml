@@ -251,18 +251,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: DeterminateSystems/nix-installer-action@786fff0690178f1234e4e1fe9b536e94f5433196 #v20
       - uses: DeterminateSystems/magic-nix-cache-action@565684385bcd71bad329742eefe8d12f2e765b39 #v13
-      - name: Test build equivalency between Nix and Cargo
-        run: bash -x ./ffi/test-build-equivalency.sh
-      - name: Test Go FFI bindings
-        working-directory: ffi
-        # - cgocheck2 is expensive but provides complete pointer checks
-        # - use hash mode ethhash since the flake builds with `--features ethhash,logger`
-        # - run golang outside a nix shell to validate viability without the env setup performed by a nix shell
-        run: |
-          GOLANG="nix run $PWD#go"
-          cd result/ffi
-          GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=ethhash ${GOLANG} test ./...
-        shell: bash
+      - name: Check that FFI flake is up-to-date
+        run: ./scripts/run-just.sh check-ffi-flake
+      - name: Test nix build of Golang FFI bindings
+        run: ./scripts/run-just.sh test-ffi-nix
 
   firewood-ethhash-differential-fuzz:
     needs: build
