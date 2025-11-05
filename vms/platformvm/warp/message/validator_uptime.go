@@ -12,19 +12,19 @@ import (
 // ValidatorUptime is signed when the ValidationID is known and the validator
 // has been up for TotalUptime seconds.
 type ValidatorUptime struct {
+	payload
+
 	ValidationID ids.ID `serialize:"true"`
 	TotalUptime  uint64 `serialize:"true"` // in seconds
-
-	bytes []byte
 }
 
 // NewValidatorUptime creates a new *ValidatorUptime and initializes it.
 func NewValidatorUptime(validationID ids.ID, totalUptime uint64) (*ValidatorUptime, error) {
-	bhp := &ValidatorUptime{
+	vu := &ValidatorUptime{
 		ValidationID: validationID,
 		TotalUptime:  totalUptime,
 	}
-	return bhp, Initialize(bhp)
+	return vu, Initialize(vu)
 }
 
 // ParseValidatorUptime converts a slice of bytes into an initialized ValidatorUptime.
@@ -38,14 +38,4 @@ func ParseValidatorUptime(b []byte) (*ValidatorUptime, error) {
 		return nil, fmt.Errorf("%w: %T", ErrWrongType, payloadIntf)
 	}
 	return payload, nil
-}
-
-// Bytes returns the binary representation of this payload. It assumes that the
-// payload is initialized from either NewValidatorUptime or Parse.
-func (b *ValidatorUptime) Bytes() []byte {
-	return b.bytes
-}
-
-func (b *ValidatorUptime) initialize(bytes []byte) {
-	b.bytes = bytes
 }
