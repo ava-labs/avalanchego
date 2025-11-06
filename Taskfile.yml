@@ -243,8 +243,8 @@ tasks:
     cmds:
       - task: import-cchain-reexecute-range
         vars:
-          BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC}}'
-          CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC}}'
+          BLOCK_DIR_SRC: '{{.S3_BOOTSTRAP_BUCKET}}/{{.BLOCK_DIR_SRC}}/**'
+          CURRENT_STATE_DIR_SRC: '{{.S3_BOOTSTRAP_BUCKET}}/{{.CURRENT_STATE_DIR_SRC}}/**'
           EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
       - task: reexecute-cchain-range
         vars:
