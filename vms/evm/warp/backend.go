@@ -46,8 +46,6 @@ type BlockStore interface {
 
 // DB stores and retrieves warp messages.
 type DB struct {
-	networkID                 uint32
-	sourceChainID             ids.ID
 	db                        database.Database
 	messageCache              *lru.Cache[ids.ID, *warp.UnsignedMessage]
 	offchainAddressedCallMsgs map[ids.ID]*warp.UnsignedMessage
@@ -61,8 +59,6 @@ func NewDB(
 	offchainMessages [][]byte,
 ) (*DB, error) {
 	messageDB := &DB{
-		networkID:                 networkID,
-		sourceChainID:             sourceChainID,
 		db:                        db,
 		messageCache:              lru.NewCache[ids.ID, *warp.UnsignedMessage](messageCacheSize),
 		offchainAddressedCallMsgs: make(map[ids.ID]*warp.UnsignedMessage),
@@ -159,8 +155,6 @@ type Verifier struct {
 	db            *DB
 	blockClient   BlockStore
 	uptimeTracker *uptimetracker.UptimeTracker
-	networkID     uint32
-	sourceChainID ids.ID
 
 	// Metrics
 	messageParseFail            metrics.Counter
@@ -174,15 +168,11 @@ func NewVerifier(
 	db *DB,
 	blockClient BlockStore,
 	uptimeTracker *uptimetracker.UptimeTracker,
-	networkID uint32,
-	sourceChainID ids.ID,
 ) *Verifier {
 	return &Verifier{
 		db:                          db,
 		blockClient:                 blockClient,
 		uptimeTracker:               uptimeTracker,
-		networkID:                   networkID,
-		sourceChainID:               sourceChainID,
 		messageParseFail:            metrics.NewRegisteredCounter("warp_backend_message_parse_fail", nil),
 		addressedCallValidationFail: metrics.NewRegisteredCounter("warp_backend_addressed_call_validation_fail", nil),
 		blockValidationFail:         metrics.NewRegisteredCounter("warp_backend_block_validation_fail", nil),
@@ -255,6 +245,7 @@ func (v *Verifier) verifyOffchainAddressedCall(addressedCall *payload.AddressedC
 	}
 
 	if len(addressedCall.SourceAddress) != 0 {
+		v.addressedCallValidationFail.Inc(1)
 		return &common.AppError{
 			Code:    VerifyErrCode,
 			Message: "source address should be empty for offchain addressed messages",
