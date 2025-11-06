@@ -405,7 +405,7 @@ func TestShouldDisconnect(t *testing.T) {
 					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 					Validators:           validators.NewManager(),
 				},
-				version: version.CurrentApp,
+				version: version.Current,
 			},
 			expectedPeer: &peer{
 				Config: &Config{
@@ -413,7 +413,7 @@ func TestShouldDisconnect(t *testing.T) {
 					VersionCompatibility: version.GetCompatibility(upgrade.InitiallyActiveTime),
 					Validators:           validators.NewManager(),
 				},
-				version: version.CurrentApp,
+				version: version.Current,
 			},
 			expectedShouldDisconnect: false,
 		},
@@ -436,7 +436,7 @@ func TestShouldDisconnect(t *testing.T) {
 					}(),
 				},
 				id:      peerID,
-				version: version.CurrentApp,
+				version: version.Current,
 			},
 			expectedPeer: &peer{
 				Config: &Config{
@@ -455,7 +455,7 @@ func TestShouldDisconnect(t *testing.T) {
 					}(),
 				},
 				id:      peerID,
-				version: version.CurrentApp,
+				version: version.Current,
 			},
 			expectedShouldDisconnect: false,
 		},
@@ -478,7 +478,7 @@ func TestShouldDisconnect(t *testing.T) {
 					}(),
 				},
 				id:                   peerID,
-				version:              version.CurrentApp,
+				version:              version.Current,
 				txIDOfVerifiedBLSKey: txID,
 			},
 			expectedPeer: &peer{
@@ -498,7 +498,7 @@ func TestShouldDisconnect(t *testing.T) {
 					}(),
 				},
 				id:                   peerID,
-				version:              version.CurrentApp,
+				version:              version.Current,
 				txIDOfVerifiedBLSKey: txID,
 			},
 			expectedShouldDisconnect: false,
@@ -522,7 +522,7 @@ func TestShouldDisconnect(t *testing.T) {
 					}(),
 				},
 				id:      peerID,
-				version: version.CurrentApp,
+				version: version.Current,
 				ip:      &SignedIP{},
 			},
 			expectedPeer: &peer{
@@ -542,7 +542,7 @@ func TestShouldDisconnect(t *testing.T) {
 					}(),
 				},
 				id:      peerID,
-				version: version.CurrentApp,
+				version: version.Current,
 				ip:      &SignedIP{},
 			},
 			expectedShouldDisconnect: true,
@@ -566,7 +566,7 @@ func TestShouldDisconnect(t *testing.T) {
 					}(),
 				},
 				id:      peerID,
-				version: version.CurrentApp,
+				version: version.Current,
 				ip: &SignedIP{
 					BLSSignature: must(blsKey.SignProofOfPossession([]byte("wrong message"))),
 				},
@@ -588,7 +588,7 @@ func TestShouldDisconnect(t *testing.T) {
 					}(),
 				},
 				id:      peerID,
-				version: version.CurrentApp,
+				version: version.Current,
 				ip: &SignedIP{
 					BLSSignature: must(blsKey.SignProofOfPossession([]byte("wrong message"))),
 				},
@@ -614,7 +614,7 @@ func TestShouldDisconnect(t *testing.T) {
 					}(),
 				},
 				id:      peerID,
-				version: version.CurrentApp,
+				version: version.Current,
 				ip: &SignedIP{
 					BLSSignature: must(blsKey.SignProofOfPossession((&UnsignedIP{}).bytes())),
 				},
@@ -636,7 +636,7 @@ func TestShouldDisconnect(t *testing.T) {
 					}(),
 				},
 				id:      peerID,
-				version: version.CurrentApp,
+				version: version.Current,
 				ip: &SignedIP{
 					BLSSignature: must(blsKey.SignProofOfPossession((&UnsignedIP{}).bytes())),
 				},
