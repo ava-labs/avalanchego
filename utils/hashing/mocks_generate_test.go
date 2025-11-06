@@ -3,4 +3,4 @@
 
 package hashing
 
-//go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/hasher.go -mock_names=Hasher=Hasher . Hasher
+//go:generate go tool mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/hasher.go -mock_names=Hasher=Hasher . Hasher
