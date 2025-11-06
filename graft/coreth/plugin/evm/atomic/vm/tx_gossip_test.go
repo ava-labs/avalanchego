@@ -10,7 +10,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
+	"github.com/ava-labs/avalanchego/graft/coreth/utils"
+	"github.com/ava-labs/avalanchego/graft/coreth/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -24,15 +33,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
-
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils/utilstest"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	agoUtils "github.com/ava-labs/avalanchego/utils"

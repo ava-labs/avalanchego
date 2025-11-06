@@ -10,8 +10,12 @@ import (
 	"math/big"
 	"sort"
 
+	"github.com/ava-labs/libevm/common"
+	"github.com/holiman/uint256"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow"
@@ -21,10 +25,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/libevm/common"
-	"github.com/holiman/uint256"
-
-	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
 )
 
 var _ gossip.Gossipable = (*Tx)(nil)

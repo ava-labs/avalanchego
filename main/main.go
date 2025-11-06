@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/spf13/pflag"
 	"golang.org/x/term"
 
 	"github.com/ava-labs/avalanchego/app"
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/version"
 )
 
