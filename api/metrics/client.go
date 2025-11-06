@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 
@@ -52,6 +53,10 @@ func (c *Client) GetMetrics(ctx context.Context) (map[string]*dto.MetricFamily, 
 
 	// Return an error for any non successful status code
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		// Avoid sending unnecessary RST_STREAM and PING frames by ensuring the whole body is read.
+		// See https://blog.cloudflare.com/go-and-enhance-your-calm/#reading-bodies-in-go-can-be-unintuitive
+		_, _ = io.Copy(io.Discard, resp.Body)
+
 		// Drop any error during close to report the original error
 		_ = resp.Body.Close()
 		return nil, fmt.Errorf("received status code: %d", resp.StatusCode)
@@ -60,9 +65,17 @@ func (c *Client) GetMetrics(ctx context.Context) (map[string]*dto.MetricFamily, 
 	var parser expfmt.TextParser
 	metrics, err := parser.TextToMetricFamilies(resp.Body)
 	if err != nil {
+		// Avoid sending unnecessary RST_STREAM and PING frames by ensuring the whole body is read.
+		// See https://blog.cloudflare.com/go-and-enhance-your-calm/#reading-bodies-in-go-can-be-unintuitive
+		_, _ = io.Copy(io.Discard, resp.Body)
+
 		// Drop any error during close to report the original error
 		_ = resp.Body.Close()
 		return nil, err
 	}
+
+	// Avoid sending unnecessary RST_STREAM and PING frames by ensuring the whole body is read.
+	// See https://blog.cloudflare.com/go-and-enhance-your-calm/#reading-bodies-in-go-can-be-unintuitive
+	_, _ = io.Copy(io.Discard, resp.Body)
 	return metrics, resp.Body.Close()
 }

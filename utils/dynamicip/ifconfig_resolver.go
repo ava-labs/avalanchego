@@ -31,7 +31,12 @@ func (r *ifConfigResolver) Resolve(ctx context.Context) (netip.Addr, error) {
 	if err != nil {
 		return netip.Addr{}, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		// Avoid sending unnecessary RST_STREAM and PING frames by ensuring the whole body is read.
+		// See https://blog.cloudflare.com/go-and-enhance-your-calm/#reading-bodies-in-go-can-be-unintuitive
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
 
 	ipBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
