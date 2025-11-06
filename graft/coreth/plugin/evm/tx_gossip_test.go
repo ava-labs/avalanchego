@@ -20,7 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
-	"github.com/ava-labs/avalanchego/graft/coreth/utils"
+	"github.com/ava-labs/avalanchego/graft/coreth/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
@@ -40,7 +40,7 @@ func TestEthTxGossip(t *testing.T) {
 	require := require.New(t)
 	ctx := t.Context()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	validatorState := utils.NewTestValidatorState()
+	validatorState := utilstest.NewTestValidatorState()
 	snowCtx.ValidatorState = validatorState
 
 	pk, err := secp256k1.NewPrivateKey()
