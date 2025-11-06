@@ -770,7 +770,7 @@ func (n *Node) initDatabase() error {
 	// dbFolderName is appended to the database path given in the config
 	dbFullPath := filepath.Join(n.Config.DatabaseConfig.Path, dbFolderName)
 
-	dbRegisterer, err := metrics.MakeAndRegister(
+	dbReg, err := metrics.MakeAndRegister(
 		n.MetricsGatherer,
 		dbNamespace,
 	)
@@ -783,7 +783,7 @@ func (n *Node) initDatabase() error {
 		dbFullPath,
 		n.Config.DatabaseConfig.ReadOnly,
 		n.Config.DatabaseConfig.Config,
-		dbRegisterer,
+		dbReg,
 		n.Log,
 	)
 	if err != nil {
