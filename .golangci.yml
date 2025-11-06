@@ -29,6 +29,24 @@ issues:
   # Maximum count of issues with the same text.
   max-same-issues: 0
 
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - blank
+        - prefix(github.com/ava-labs/avalanchego)
+        - alias
+        - dot
+      custom-order: true
+  exclusions:
+    generated: lax
+
 linters:
   default: none
   enable:
@@ -236,24 +254,7 @@ linters:
       # 2. Exclude any file prefixed with test_ in any directory.
       # 3. Exclude any directory suffixed with test.
       # 4. Exclude any file suffixed with _test.go.
-      - path: "(^tests/)|(^(.*/)*test_[^/]*\\.go$)|(.*test/.*)|(.*_test\\.go$)"
+      - path: "/[^/]*tests?/|(^|.*/)(test_[^/]*\\.go$)|(_test\\.go$)"
         linters:
           - gosec
           - prealloc
-formatters:
-  enable:
-    - gci
-    - gofmt
-    - gofumpt
-  settings:
-    gci:
-      sections:
-        - standard
-        - default
-        - blank
-        - prefix(github.com/ava-labs/avalanchego)
-        - alias
-        - dot
-      custom-order: true
-  exclusions:
-    generated: lax
