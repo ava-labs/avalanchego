@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Avalanche root directory
+CORETH_PATH=$(
+  cd "$(dirname "${BASH_SOURCE[0]}")"
+  cd .. && pwd
+)
+
+# Load the constants
+source "$CORETH_PATH"/scripts/constants.sh
+
+# We pass in the arguments to this script directly to enable easily passing parameters such as enabling race detection,
+# parallelism, and test coverage.
+# DO NOT RUN tests from the top level "tests" directory since they are run by ginkgo
+race="-race"
+if [[ -n "${NO_RACE:-}" ]]; then
+    race=""
+fi
+
+# shellcheck disable=SC2046
+go test -shuffle=on ${race:-} -timeout="${TIMEOUT:-600s}" -coverprofile=coverage.out -covermode=atomic "$@" $(go list ./... | grep -v github.com/ava-labs/coreth/tests) 
