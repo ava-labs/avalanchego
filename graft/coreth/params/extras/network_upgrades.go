@@ -8,9 +8,8 @@ import (
 	"reflect"
 	"strconv"
 
-	"github.com/ava-labs/avalanchego/upgrade"
-
 	"github.com/ava-labs/avalanchego/graft/coreth/utils"
+	"github.com/ava-labs/avalanchego/upgrade"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )

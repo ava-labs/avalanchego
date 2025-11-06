@@ -9,7 +9,6 @@ import (
 	"math/big"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/math"
