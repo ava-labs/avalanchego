@@ -134,6 +134,12 @@ func benchmarkReexecuteRange(
 		GenesisBytes: genesisBytes,
 		SubnetID:     constants.PrimaryNetworkID,
 		ChainID:      mainnetPChainID,
+		ChainToSubnet: map[ids.ID]ids.ID{
+			reexecute.MainnetXChainID: constants.PrimaryNetworkID,
+			reexecute.MainnetCChainID: constants.PrimaryNetworkID,
+			mainnetPChainID:           constants.PrimaryNetworkID,
+			ids.Empty:                 constants.PrimaryNetworkID,
+		},
 	}
 
 	vm, err := reexecute.NewMainnetVM(
