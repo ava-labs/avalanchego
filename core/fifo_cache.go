@@ -44,7 +44,7 @@ func (f *BufferFIFOCache[K, V]) Put(key K, val V) {
 	f.l.Lock()
 	defer f.l.Unlock()
 
-	f.buffer.Insert(key) // Insert will remove the oldest [K] if we are at the [limit]
+	_ = f.buffer.Insert(key) // Insert will remove the oldest [K] if we are at the [limit]
 	f.m[key] = val
 }
 

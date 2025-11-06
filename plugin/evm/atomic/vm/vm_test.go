@@ -196,14 +196,13 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 	utxos := map[ids.ShortID]uint64{
 		vmtest.TestShortIDAddrs[0]: importAmount,
 	}
-	addUTXOs(tvm.AtomicMemory, vm.Ctx, utxos)
+	require.NoError(addUTXOs(tvm.AtomicMemory, vm.Ctx, utxos))
 	defer func() {
 		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	importTx, err := vm.newImportTx(vm.Ctx.XChainID, vmtest.TestEthAddrs[0], vmtest.InitialBaseFee, vmtest.TestKeys[0:1])
 	require.NoError(err)
-
 	require.NoError(vm.AtomicMempool.AddLocalTx(importTx))
 
 	msg, err := vm.WaitForEvent(t.Context())
@@ -212,11 +211,8 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 
 	blk, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
-
 	require.NoError(blk.Verify(t.Context()))
-
 	require.NoError(vm.SetPreference(t.Context(), blk.ID()))
-
 	require.NoError(blk.Accept(t.Context()))
 
 	lastAcceptedID, err := vm.LastAccepted(t.Context())
@@ -230,7 +226,6 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 	wrappedState := extstate.New(state)
 	exportTx, err := atomic.NewExportTx(vm.Ctx, vm.CurrentRules(), wrappedState, vm.Ctx.AVAXAssetID, importAmount-(2*ap0.AtomicTxFee), vm.Ctx.XChainID, vmtest.TestShortIDAddrs[0], vmtest.InitialBaseFee, vmtest.TestKeys[0:1])
 	require.NoError(err)
-
 	require.NoError(vm.AtomicMempool.AddLocalTx(exportTx))
 
 	msg, err = vm.WaitForEvent(t.Context())
@@ -239,9 +234,7 @@ func testIssueAtomicTxs(t *testing.T, scheme string) {
 
 	blk2, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
-
 	require.NoError(blk2.Verify(t.Context()))
-
 	require.NoError(blk2.Accept(t.Context()))
 
 	lastAcceptedID, err = vm.LastAccepted(t.Context())
@@ -841,9 +834,7 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 	blk, err := vm.BuildBlock(t.Context())
 	require.NoError(err)
 	require.NoError(blk.Verify(t.Context()))
-
 	require.NoError(vm.SetPreference(t.Context(), blk.ID()))
-
 	require.NoError(blk.Accept(t.Context()))
 
 	newHead := <-newTxPoolHeadChan
@@ -851,8 +842,8 @@ func TestConsecutiveAtomicTransactionsRevertSnapshot(t *testing.T) {
 
 	// Add the two conflicting transactions directly to the mempool, so that two consecutive transactions
 	// will fail verification when build block is called.
-	vm.AtomicMempool.AddRemoteTx(importTxs[1])
-	vm.AtomicMempool.AddRemoteTx(importTxs[2])
+	require.NoError(vm.AtomicMempool.ForceAddTx(importTxs[1]))
+	require.NoError(vm.AtomicMempool.ForceAddTx(importTxs[2]))
 
 	_, err = vm.BuildBlock(t.Context())
 	require.ErrorIs(err, ErrEmptyBlock)
@@ -889,7 +880,7 @@ func TestAtomicTxBuildBlockDropsConflicts(t *testing.T) {
 		err = vm.AtomicMempool.AddLocalTx(conflictTx)
 		require.ErrorIs(err, txpool.ErrConflict)
 		// force add the tx
-		vm.AtomicMempool.ForceAddTx(conflictTx)
+		require.NoError(vm.AtomicMempool.ForceAddTx(conflictTx))
 		conflictSets[index].Add(conflictTx.ID())
 	}
 	msg, err := vm.WaitForEvent(t.Context())
@@ -1676,7 +1667,7 @@ func TestWaitForEvent(t *testing.T) {
 				},
 			}}}}))
 			testCase.testCase(t, vm, address, key)
-			vm.Shutdown(t.Context())
+			require.NoError(t, vm.Shutdown(t.Context()))
 		})
 	}
 }

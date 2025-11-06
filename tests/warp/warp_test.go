@@ -365,7 +365,7 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 	numSigners, err := parsedWarpMessage.Signature.NumSigners()
 	require.NoError(err)
 	require.Len(warpValidators.Validators, numSigners)
-	parsedWarpMessage.Signature.Verify(&parsedWarpMessage.UnsignedMessage, w.networkID, warpValidators, warp.WarpQuorumDenominator, warp.WarpQuorumDenominator)
+	err = parsedWarpMessage.Signature.Verify(&parsedWarpMessage.UnsignedMessage, w.networkID, warpValidators, warp.WarpQuorumDenominator, warp.WarpQuorumDenominator)
 	require.NoError(err)
 	w.addressedCallSignedMessage = parsedWarpMessage
 
@@ -377,7 +377,7 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 	numSigners, err = parsedWarpBlockMessage.Signature.NumSigners()
 	require.NoError(err)
 	require.Len(warpValidators.Validators, numSigners)
-	parsedWarpBlockMessage.Signature.Verify(&parsedWarpBlockMessage.UnsignedMessage, w.networkID, warpValidators, warp.WarpQuorumDenominator, warp.WarpQuorumDenominator)
+	err = parsedWarpBlockMessage.Signature.Verify(&parsedWarpBlockMessage.UnsignedMessage, w.networkID, warpValidators, warp.WarpQuorumDenominator, warp.WarpQuorumDenominator)
 	require.NoError(err)
 	w.blockPayloadSignedMessage = parsedWarpBlockMessage
 }
