@@ -326,6 +326,23 @@ tasks:
     cmds:
       - cmd: bash -x ./scripts/tests.e2e.kube.sh --ginkgo.focus-file=xsvm.go {{.CLI_ARGS}}
 
+  test-e2e-warp:
+    desc: Run end-to-end warp tests using Ginkgo test framework
+    env:
+      E2E_TARGET: ./graft/coreth/tests/warp
+    cmds:
+      - task: build
+      - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
+
+  test-e2e-warp-ci:
+    desc: Run E2E warp tests with CI setup (race detection enabled)
+    env:
+      E2E_TARGET: ./graft/coreth/tests/warp
+      E2E_SERIAL: 1
+    cmds:
+      - task: build-race
+      - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
+
   # To use a different fuzz time, run `task test-fuzz FUZZTIME=[value in seconds]`.
   # A value of `-1` will run until it encounters a failing output.
 
