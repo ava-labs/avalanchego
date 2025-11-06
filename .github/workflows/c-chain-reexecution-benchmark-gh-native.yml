@@ -4,19 +4,39 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
-      runner:
-        description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
-        required: false
-        default: ubuntu-latest
+      config:
+        description: 'The config to pass to the VM for the benchmark. See BenchmarkReexecuteRange for details.'
+        default: ''
+      start-block:
+        description: 'The start block for the benchmark.'
+        default: ''
+      end-block:
+        description: 'The end block for the benchmark.'
+        default: ''
+      block-dir-src:
+        description: 'The source block directory. Supports S3 directory/zip and local directories.'
+        default: ''
+      current-state-dir-src:
+        description: 'The current state directory. Supports S3 directory/zip and local directories.'
+        default: ''
       task:
         description: 'Taskfile task to execute (e.g., c-chain-reexecution-hashdb-101-250k)'
-        required: true
+        default: ''
+      runner:
+        description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
+        default: ubuntu-latest
+        type: choice
+        options:
+          - ubuntu-latest
+          - blacksmith-4vcpu-ubuntu-2404
+          - avalanche-avalanchego-runner-2ti
+          - avago-runner-m6i-4xlarge-ebs-fast
+          - avago-runner-i4i-4xlarge-local-ssd
       push-post-state:
         description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
         default: ''
       timeout-minutes:
         description: 'Timeout in minutes for the job.'
-        required: false
         default: 30
 
   # Disabled because scheduled trigger is empty. To enable, uncomment and add at least one vector to the schedule
@@ -70,6 +90,11 @@ jobs:
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
           task: ${{ matrix.task }}
+          config: ${{ inputs.config }}
+          start-block: ${{ inputs.start-block }}
+          end-block: ${{ inputs.end-block }}
+          block-dir-src: ${{ inputs.block-dir-src }}
+          current-state-dir-src: ${{ inputs.current-state-dir-src }}
           prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
