@@ -55,6 +55,7 @@ var (
 	errParentBeaconRootNonEmpty            = errors.New("invalid non-empty parentBeaconRoot")
 	errBlobGasUsedNilInCancun              = errors.New("blob gas used must not be nil in Cancun")
 	errBlobsNotEnabled                     = errors.New("blobs not enabled on avalanche networks")
+	errCouldNotNotifySyncClient            = errors.New("could not notify sync client")
 )
 
 var (
@@ -91,15 +92,9 @@ func wrapBlock(ethBlock *types.Block, vm *VM) (*wrappedBlock, error) {
 func (b *wrappedBlock) ID() ids.ID { return b.id }
 
 // Accept implements the snowman.Block interface
-func (b *wrappedBlock) Accept(context.Context) error {
-	vm := b.vm
-	// Although returning an error from Accept is considered fatal, it is good
-	// practice to cleanup the batch we were modifying in the case of an error.
-	defer vm.versiondb.Abort()
-
-	// Notify sync client that engine accepted a block
-	// TODO(powerslider): probably there could be a better way to do this, but it should be wired here for now.
-	if client := vm.SyncerClient(); client != nil {
+func (b *wrappedBlock) Accept(ctx context.Context) error {
+	// Notify sync client that engine accepted a block.
+	if client := b.vm.SyncerClient(); client != nil {
 		if err := client.OnEngineAccept(b); err != nil {
 			return fmt.Errorf("could not notify sync client that engine accepted a block: %w", err)
 		}
@@ -119,17 +114,17 @@ func (b *wrappedBlock) Accept(context.Context) error {
 	if err := b.handlePrecompileAccept(rules); err != nil {
 		return err
 	}
-	if err := vm.blockChain.Accept(b.ethBlock); err != nil {
+	if err := b.vm.blockChain.Accept(b.ethBlock); err != nil {
 		return fmt.Errorf("chain could not accept %s: %w", blkID, err)
 	}
 
-	if err := vm.PutLastAcceptedID(blkID); err != nil {
+	if err := b.vm.PutLastAcceptedID(blkID); err != nil {
 		return fmt.Errorf("failed to put %s as the last accepted block: %w", blkID, err)
 	}
 
 	// Get pending operations on the vm's versionDB so we can apply them atomically
 	// with the block extension's changes.
-	vdbBatch, err := vm.versiondb.CommitBatch()
+	vdbBatch, err := b.vm.versiondb.CommitBatch()
 	if err != nil {
 		return fmt.Errorf("could not create commit batch processing block[%s]: %w", blkID, err)
 	}
@@ -147,8 +142,6 @@ func (b *wrappedBlock) Accept(context.Context) error {
 			return err
 		}
 	}
-
-
 
 	return nil
 }
@@ -189,7 +182,14 @@ func (b *wrappedBlock) handlePrecompileAccept(rules extras.Rules) error {
 
 // Reject implements the snowman.Block interface
 // If [b] contains an atomic transaction, attempt to re-issue it
-func (b *wrappedBlock) Reject(context.Context) error {
+func (b *wrappedBlock) Reject(ctx context.Context) error {
+	// Notify sync client that engine rejected a block.
+	if client := b.vm.SyncerClient(); client != nil {
+		if err := client.OnEngineReject(b); err != nil {
+			return fmt.Errorf("%w: %w", errCouldNotNotifySyncClient, err)
+		}
+	}
+
 	blkID := b.ID()
 	log.Debug("rejecting block",
 		"hash", blkID.Hex(),
@@ -221,7 +221,14 @@ func (b *wrappedBlock) Timestamp() time.Time {
 }
 
 // Verify implements the snowman.Block interface
-func (b *wrappedBlock) Verify(context.Context) error {
+func (b *wrappedBlock) Verify(ctx context.Context) error {
+	// Notify sync client that engine verified a block.
+	if client := b.vm.SyncerClient(); client != nil {
+		if err := client.OnEngineVerify(b); err != nil {
+			return fmt.Errorf("%w: %w", errCouldNotNotifySyncClient, err)
+		}
+	}
+
 	return b.verify(&precompileconfig.PredicateContext{
 		SnowCtx:            b.vm.ctx,
 		ProposerVMBlockCtx: nil,
@@ -253,7 +260,14 @@ func (b *wrappedBlock) ShouldVerifyWithContext(context.Context) (bool, error) {
 }
 
 // VerifyWithContext implements the block.WithVerifyContext interface
-func (b *wrappedBlock) VerifyWithContext(_ context.Context, proposerVMBlockCtx *block.Context) error {
+func (b *wrappedBlock) VerifyWithContext(ctx context.Context, proposerVMBlockCtx *block.Context) error {
+	// Notify sync client that engine verified a block.
+	if client := b.vm.SyncerClient(); client != nil {
+		if err := client.OnEngineVerify(b); err != nil {
+			return fmt.Errorf("could not notify sync client that engine verified a block: %w", err)
+		}
+	}
+
 	return b.verify(&precompileconfig.PredicateContext{
 		SnowCtx:            b.vm.ctx,
 		ProposerVMBlockCtx: proposerVMBlockCtx,

@@ -36,9 +36,6 @@ var (
 type Callbacks struct {
 	// FinalizeVM performs the same actions as finishSync/commitVMMarkers in the client.
 	FinalizeVM func(target message.Syncable) error
-	// ApplyBlock processes a single block via the normal import path.
-	// Uses ExecutableBlock to allow extension-aware execution while avoiding imports here.
-	ApplyBlock func(EthBlockWrapper) error
 	// OnDone is called when the coordinator finishes (successfully or with error).
 	OnDone func(err error)
 }
@@ -108,7 +105,7 @@ func (co *Coordinator) Start(ctx context.Context, initial message.Syncable) {
 			return
 		}
 		// All syncers finished successfully: finalize VM and execute the queued batch.
-		if err := co.ApplyQueuedBatch(); err != nil {
+		if err := co.ApplyQueuedBatch(cctx); err != nil {
 			co.finish(err)
 			return
 		}
@@ -116,10 +113,10 @@ func (co *Coordinator) Start(ctx context.Context, initial message.Syncable) {
 	}()
 }
 
-// ApplyQueuedBatch finalizes the VM at the current target and applies the
-// current queued batch from the queue. Intended to be called after a
-// target update cycle when it's time to apply the queued blocks.
-func (co *Coordinator) ApplyQueuedBatch() error {
+// ApplyQueuedBatch finalizes the VM at the current target and processes the
+// queued operations in FIFO order. Intended to be called after a target update
+// cycle when it's time to process the queued operations.
+func (co *Coordinator) ApplyQueuedBatch(ctx context.Context) error {
 	co.state.Store(int32(StateFinalizing))
 	if co.callbacks.FinalizeVM != nil {
 		loaded := co.target.Load()
@@ -132,11 +129,9 @@ func (co *Coordinator) ApplyQueuedBatch() error {
 		}
 	}
 	co.state.Store(int32(StateExecutingBatch))
-	if co.queue != nil && co.callbacks.ApplyBlock != nil {
-		for _, b := range co.queue.DequeueBatch() {
-			if err := co.callbacks.ApplyBlock(b); err != nil {
-				return err
-			}
+	if co.queue != nil {
+		if err := co.queue.ProcessQueue(ctx); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -154,6 +149,12 @@ func (co *Coordinator) UpdateSyncTarget(newTarget message.Syncable) error {
 	if co.pivot != nil && !co.pivot.shouldForward(newTarget.Height()) {
 		return nil
 	}
+
+	// Remove blocks from queue that will never be executed (behind the new target).
+	if co.queue != nil {
+		co.queue.RemoveBlocksBelowHeight(newTarget.Height())
+	}
+
 	co.target.Store(newTarget)
 
 	if err := co.syncerRegistry.UpdateSyncTarget(newTarget); err != nil {
@@ -168,11 +169,11 @@ func (co *Coordinator) UpdateSyncTarget(newTarget message.Syncable) error {
 // AddBlock appends the block to the queue only while in the Running state.
 // Returns true if the block was queued, false if the queue was already sealed
 // or the block is nil.
-func (co *Coordinator) AddBlock(b EthBlockWrapper) bool {
+func (co *Coordinator) AddBlockOperation(b EthBlockWrapper, op BlockOperation) bool {
 	if b == nil || co.CurrentState() != StateRunning {
 		return false
 	}
-	return co.queue.Enqueue(b)
+	return co.queue.Enqueue(b, op)
 }
 
 func (co *Coordinator) CurrentState() State {

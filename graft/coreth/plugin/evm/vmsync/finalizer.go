@@ -21,13 +21,6 @@ import (
 	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
 )
 
-// EthBlockWrapper can be implemented by a concrete block wrapper type to
-// return *types.Block, which is needed to update chain pointers at the
-// end of the sync operation.
-type EthBlockWrapper interface {
-	GetEthBlock() *types.Block
-}
-
 var (
 	errBlockNotFound       = errors.New("block not found in state")
 	errInvalidBlockType    = errors.New("invalid block wrapper type")

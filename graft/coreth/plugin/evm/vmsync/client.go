@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 
@@ -57,6 +58,17 @@ type SyncStrategy interface {
 
 	// OnBlockVerified handles a block verified during sync.
 	OnBlockVerified(EthBlockWrapper) (bool, error)
+}
+
+// EthBlockWrapper can be implemented by a concrete block wrapper type to
+// return *types.Block, which is needed to update chain pointers at the
+// end of the sync operation. It also provides Accept/Reject/Verify operations
+// for deferred processing during dynamic state sync.
+type EthBlockWrapper interface {
+	GetEthBlock() *types.Block
+	Accept(context.Context) error
+	Reject(context.Context) error
+	Verify(context.Context) error
 }
 
 type ClientConfig struct {
