@@ -38,7 +38,7 @@ var (
 		FortunaTime:               time.Date(2025, time.April, 8, 15, 0, 0, 0, time.UTC),
 		GraniteTime:               time.Date(2025, time.November, 19, 16, 0, 0, 0, time.UTC),
 		GraniteEpochDuration:      5 * time.Minute,
-		HeliconTime:               UnscheduledActivationTime, // naming credit to @bernard-avalabs!
+		HeliconTime:               UnscheduledActivationTime,
 	}
 	Fuji = Config{
 		ApricotPhase1Time:            time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),

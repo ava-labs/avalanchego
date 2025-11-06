@@ -19,9 +19,9 @@ const (
 	Etna
 	Fortuna
 	Granite
-	Helicon
+	Helicon // naming credit to @bernard-avalabs!
 
-	Latest = Helicon
+	Latest = Granite
 )
 
 // Fork is an enum of all the major network upgrades.
