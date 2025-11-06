@@ -11,6 +11,8 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/ava-labs/libevm/log"
 
+	"github.com/ava-labs/avalanchego/cache"
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow"
@@ -21,45 +23,113 @@ import (
 
 var errNoValidators = errors.New("cannot aggregate signatures from subnet with no validators")
 
-// API introduces snowman specific functionality to the evm
+// API introduces snowman specific functionality to the evm.
+// It provides caching and orchestration over the core warp primitives.
 type API struct {
 	chainContext        *snow.Context
 	db                  *DB
 	signer              *Signer
-	blockClient         BlockStore
+	verifier            *Verifier
 	signatureAggregator *acp118.SignatureAggregator
+
+	// Caching
+	messageCache     *lru.Cache[ids.ID, *warp.UnsignedMessage]
+	signatureCache   cache.Cacher[ids.ID, []byte]
+	offchainMessages map[ids.ID]*warp.UnsignedMessage
 }
 
-func NewAPI(chainCtx *snow.Context, db *DB, signer *Signer, blockClient BlockStore, signatureAggregator *acp118.SignatureAggregator) *API {
+func NewAPI(
+	chainCtx *snow.Context,
+	db *DB,
+	signer *Signer,
+	verifier *Verifier,
+	signatureCache cache.Cacher[ids.ID, []byte],
+	signatureAggregator *acp118.SignatureAggregator,
+	offchainMessages [][]byte,
+) (*API, error) {
+	offchainMsgs := make(map[ids.ID]*warp.UnsignedMessage)
+	for i, offchainMsg := range offchainMessages {
+		unsignedMsg, err := warp.ParseUnsignedMessage(offchainMsg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse off-chain message at index %d: %w", i, err)
+		}
+
+		if unsignedMsg.NetworkID != chainCtx.NetworkID {
+			return nil, fmt.Errorf("wrong network ID at index %d", i)
+		}
+
+		if unsignedMsg.SourceChainID != chainCtx.ChainID {
+			return nil, fmt.Errorf("wrong source chain ID at index %d", i)
+		}
+
+		_, err = payload.ParseAddressedCall(unsignedMsg.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse off-chain message at index %d as AddressedCall: %w", i, err)
+		}
+		offchainMsgs[unsignedMsg.ID()] = unsignedMsg
+	}
+
 	return &API{
 		db:                  db,
 		signer:              signer,
-		blockClient:         blockClient,
+		verifier:            verifier,
 		chainContext:        chainCtx,
 		signatureAggregator: signatureAggregator,
-	}
+		messageCache:        lru.NewCache[ids.ID, *warp.UnsignedMessage](500),
+		signatureCache:      signatureCache,
+		offchainMessages:    offchainMsgs,
+	}, nil
 }
 
 // GetMessage returns the Warp message associated with a messageID.
 func (a *API) GetMessage(_ context.Context, messageID ids.ID) (hexutil.Bytes, error) {
-	message, err := a.db.Get(messageID)
+	message, err := a.getMessage(messageID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get message %s with error %w", messageID, err)
 	}
 	return hexutil.Bytes(message.Bytes()), nil
 }
 
+// getMessage retrieves a message from cache, offchain messages, or database.
+func (a *API) getMessage(messageID ids.ID) (*warp.UnsignedMessage, error) {
+	if msg, ok := a.messageCache.Get(messageID); ok {
+		return msg, nil
+	}
+
+	if msg, ok := a.offchainMessages[messageID]; ok {
+		return msg, nil
+	}
+
+	msg, err := a.db.Get(messageID)
+	if err != nil {
+		return nil, err
+	}
+
+	a.messageCache.Put(messageID, msg)
+	return msg, nil
+}
+
 // GetMessageSignature returns the BLS signature associated with a messageID.
 func (a *API) GetMessageSignature(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
-	unsignedMessage, err := a.db.Get(messageID)
+	if sig, ok := a.signatureCache.Get(messageID); ok {
+		return sig, nil
+	}
+
+	unsignedMessage, err := a.getMessage(messageID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get message %s with error %w", messageID, err)
 	}
 
-	signature, err := a.signer.Sign(ctx, unsignedMessage)
+	if err := a.verifier.Verify(ctx, unsignedMessage, nil); err != nil {
+		return nil, fmt.Errorf("failed to verify message %s: %w", messageID, err)
+	}
+
+	signature, err := a.signer.Sign(unsignedMessage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign message %s with error %w", messageID, err)
 	}
+
+	a.signatureCache.Put(messageID, signature)
 	return signature, nil
 }
 
@@ -67,11 +137,6 @@ func (a *API) GetMessageSignature(ctx context.Context, messageID ids.ID) (hexuti
 // It constructs a warp message with a Hash payload containing the blockID,
 // then returns the signature for that message.
 func (a *API) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexutil.Bytes, error) {
-	// Verify the block exists before signing
-	if _, err := a.blockClient.GetBlock(ctx, blockID); err != nil {
-		return nil, fmt.Errorf("failed to get block %s: %w", blockID, err)
-	}
-
 	blockHashPayload, err := payload.NewHash(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create block hash payload: %w", err)
@@ -86,16 +151,31 @@ func (a *API) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexutil.By
 		return nil, fmt.Errorf("failed to create unsigned warp message: %w", err)
 	}
 
-	signature, err := a.signer.Sign(ctx, unsignedMessage)
+	msgID := unsignedMessage.ID()
+	// Check signature cache first
+	if sig, ok := a.signatureCache.Get(msgID); ok {
+		return sig, nil
+	}
+
+	// Verify before signing
+	if err := a.verifier.Verify(ctx, unsignedMessage, nil); err != nil {
+		return nil, fmt.Errorf("failed to verify block %s: %w", blockID, err)
+	}
+
+	// Sign
+	signature, err := a.signer.Sign(unsignedMessage)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign block %s with error %w", blockID, err)
 	}
+
+	// Cache the signature
+	a.signatureCache.Put(msgID, signature)
 	return signature, nil
 }
 
 // GetMessageAggregateSignature fetches the aggregate signature for the requested [messageID]
 func (a *API) GetMessageAggregateSignature(ctx context.Context, messageID ids.ID, quorumNum uint64, subnetIDStr string) (signedMessageBytes hexutil.Bytes, err error) {
-	unsignedMessage, err := a.db.Get(messageID)
+	unsignedMessage, err := a.getMessage(messageID)
 	if err != nil {
 		return nil, err
 	}

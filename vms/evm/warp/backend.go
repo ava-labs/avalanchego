@@ -11,8 +11,6 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/metrics"
 
-	"github.com/ava-labs/avalanchego/cache"
-	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
@@ -32,11 +30,8 @@ const (
 var (
 	_ acp118.Verifier = (*Verifier)(nil)
 
-	messageCacheSize = 500
-
-	errParsingOffChainMessage = errors.New("failed to parse off-chain message")
-	ErrValidateBlock          = errors.New("failed to validate block message")
-	ErrVerifyWarpMessage      = errors.New("failed to verify warp message")
+	ErrValidateBlock     = errors.New("failed to validate block message")
+	ErrVerifyWarpMessage = errors.New("failed to verify warp message")
 )
 
 // BlockStore provides access to accepted blocks.
@@ -44,31 +39,16 @@ type BlockStore interface {
 	GetBlock(ctx context.Context, blockID ids.ID) (snowman.Block, error)
 }
 
-// DB stores and retrieves warp messages.
+// DB stores and retrieves warp messages from the underlying database.
 type DB struct {
-	db                        database.Database
-	messageCache              *lru.Cache[ids.ID, *warp.UnsignedMessage]
-	offchainAddressedCallMsgs map[ids.ID]*warp.UnsignedMessage
+	db database.Database
 }
 
 // NewDB creates a new warp message database.
-func NewDB(
-	networkID uint32,
-	sourceChainID ids.ID,
-	db database.Database,
-	offchainMessages [][]byte,
-) (*DB, error) {
-	messageDB := &DB{
-		db:                        db,
-		messageCache:              lru.NewCache[ids.ID, *warp.UnsignedMessage](messageCacheSize),
-		offchainAddressedCallMsgs: make(map[ids.ID]*warp.UnsignedMessage),
+func NewDB(db database.Database) *DB {
+	return &DB{
+		db: db,
 	}
-
-	if err := initOffChainMessages(messageDB, networkID, sourceChainID, offchainMessages); err != nil {
-		return nil, err
-	}
-
-	return messageDB, nil
 }
 
 // Add stores a warp message in the database and cache.
@@ -86,15 +66,8 @@ func (d *DB) Add(unsignedMsg *warp.UnsignedMessage) error {
 	return nil
 }
 
-// Get retrieves a warp message from cache, offchain messages, or database.
+// Get retrieves a warp message from the database.
 func (d *DB) Get(msgID ids.ID) (*warp.UnsignedMessage, error) {
-	if msg, ok := d.messageCache.Get(msgID); ok {
-		return msg, nil
-	}
-	if msg, ok := d.offchainAddressedCallMsgs[msgID]; ok {
-		return msg, nil
-	}
-
 	unsignedMessageBytes, err := d.db.Get(msgID[:])
 	if err != nil {
 		return nil, err
@@ -104,49 +77,29 @@ func (d *DB) Get(msgID ids.ID) (*warp.UnsignedMessage, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse unsigned message %s: %w", msgID.String(), err)
 	}
-	d.messageCache.Put(msgID, unsignedMessage)
 
 	return unsignedMessage, nil
 }
 
-// Signer signs warp messages and caches the signatures.
+// Signer signs warp messages.
 type Signer struct {
-	warpSigner     warp.Signer
-	verifier       acp118.Verifier
-	signatureCache cache.Cacher[ids.ID, []byte]
+	warpSigner warp.Signer
 }
 
 // NewSigner creates a new warp message signer.
-func NewSigner(
-	warpSigner warp.Signer,
-	verifier acp118.Verifier,
-	signatureCache cache.Cacher[ids.ID, []byte],
-) *Signer {
+func NewSigner(warpSigner warp.Signer) *Signer {
 	return &Signer{
-		warpSigner:     warpSigner,
-		verifier:       verifier,
-		signatureCache: signatureCache,
+		warpSigner: warpSigner,
 	}
 }
 
-// Sign verifies the warp message, signs it, and caches the signature.
-func (s *Signer) Sign(ctx context.Context, msg *warp.UnsignedMessage) ([]byte, error) {
-	// Check cache first
-	msgID := msg.ID()
-	if sig, ok := s.signatureCache.Get(msgID); ok {
-		return sig, nil
-	}
-
-	if err := s.verifier.Verify(ctx, msg, nil); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrVerifyWarpMessage, err)
-	}
-
+// Sign signs a warp message.
+// Callers are responsible for verification and caching.
+func (s *Signer) Sign(msg *warp.UnsignedMessage) ([]byte, error) {
 	sig, err := s.warpSigner.Sign(msg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to sign warp message: %w", err)
 	}
-
-	s.signatureCache.Put(msgID, sig)
 	return sig, nil
 }
 
@@ -285,31 +238,6 @@ func (v *Verifier) verifyUptimeMessage(uptimeMsg *message.ValidatorUptime) *comm
 			Code:    VerifyErrCode,
 			Message: fmt.Sprintf("current uptime %d is less than queried uptime %d for validationID %s", currentUptimeSeconds, uptimeMsg.TotalUptime, uptimeMsg.ValidationID),
 		}
-	}
-
-	return nil
-}
-
-func initOffChainMessages(db *DB, networkID uint32, sourceChainID ids.ID, offchainMessages [][]byte) error {
-	for i, offchainMsg := range offchainMessages {
-		unsignedMsg, err := warp.ParseUnsignedMessage(offchainMsg)
-		if err != nil {
-			return fmt.Errorf("%w at index %d: %w", errParsingOffChainMessage, i, err)
-		}
-
-		if unsignedMsg.NetworkID != networkID {
-			return fmt.Errorf("%w at index %d", warp.ErrWrongNetworkID, i)
-		}
-
-		if unsignedMsg.SourceChainID != sourceChainID {
-			return fmt.Errorf("%w at index %d", warp.ErrWrongSourceChainID, i)
-		}
-
-		_, err = payload.ParseAddressedCall(unsignedMsg.Payload)
-		if err != nil {
-			return fmt.Errorf("%w at index %d as AddressedCall: %w", errParsingOffChainMessage, i, err)
-		}
-		db.offchainAddressedCallMsgs[unsignedMsg.ID()] = unsignedMsg
 	}
 
 	return nil

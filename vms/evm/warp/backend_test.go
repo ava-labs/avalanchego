@@ -14,7 +14,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/lru"
-	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
@@ -59,18 +58,15 @@ func TestAddAndGetValidMessage(t *testing.T) {
 	sk, err := localsigner.New()
 	require.NoError(t, err)
 	warpSigner := warp.NewSigner(sk, networkID, sourceChainID)
-	messageSignatureCache := lru.NewCache[ids.ID, []byte](500)
 
-	messageDB, err := NewDB(networkID, sourceChainID, db, nil)
-	require.NoError(t, err)
-	verifier := NewVerifier(messageDB, nil, nil)
-	signer := NewSigner(warpSigner, verifier, messageSignatureCache)
+	messageDB := NewDB(db)
+	signer := NewSigner(warpSigner)
 
 	// Add testUnsignedMessage to the warp backend
 	require.NoError(t, messageDB.Add(testUnsignedMessage))
 
 	// Verify that a signature is returned successfully, and compare to expected signature.
-	signature, err := signer.Sign(t.Context(), testUnsignedMessage)
+	signature, err := signer.Sign(testUnsignedMessage)
 	require.NoError(t, err)
 
 	expectedSig, err := warpSigner.Sign(testUnsignedMessage)
@@ -81,18 +77,12 @@ func TestAddAndGetValidMessage(t *testing.T) {
 func TestAddAndGetUnknownMessage(t *testing.T) {
 	db := memdb.New()
 
-	sk, err := localsigner.New()
-	require.NoError(t, err)
-	warpSigner := warp.NewSigner(sk, networkID, sourceChainID)
-	messageSignatureCache := lru.NewCache[ids.ID, []byte](500)
-
-	messageDB, err := NewDB(networkID, sourceChainID, db, nil)
-	require.NoError(t, err)
+	messageDB := NewDB(db)
 	verifier := NewVerifier(messageDB, nil, nil)
-	signer := NewSigner(warpSigner, verifier, messageSignatureCache)
 
-	_, err = signer.Sign(t.Context(), testUnsignedMessage)
-	require.ErrorIs(t, err, ErrVerifyWarpMessage)
+	// Try to verify an unknown message - should fail
+	appErr := verifier.Verify(t.Context(), testUnsignedMessage, nil)
+	require.ErrorIs(t, appErr, &common.AppError{Code: ParseErrCode})
 }
 
 func TestGetBlockSignature(t *testing.T) {
@@ -105,12 +95,10 @@ func TestGetBlockSignature(t *testing.T) {
 	sk, err := localsigner.New()
 	require.NoError(err)
 	warpSigner := warp.NewSigner(sk, networkID, sourceChainID)
-	messageSignatureCache := lru.NewCache[ids.ID, []byte](500)
 
-	messageDB, err := NewDB(networkID, sourceChainID, db, nil)
-	require.NoError(err)
+	messageDB := NewDB(db)
 	verifier := NewVerifier(messageDB, blockStore, nil)
-	signer := NewSigner(warpSigner, verifier, messageSignatureCache)
+	signer := NewSigner(warpSigner)
 
 	blockHashPayload, err := payload.NewHash(blkID)
 	require.NoError(err)
@@ -119,8 +107,12 @@ func TestGetBlockSignature(t *testing.T) {
 	expectedSig, err := warpSigner.Sign(unsignedMessage)
 	require.NoError(err)
 
-	// Callers construct the block message and use Signer.Sign
-	signature, err := signer.Sign(t.Context(), unsignedMessage)
+	// Verify the block message
+	appErr := verifier.Verify(t.Context(), unsignedMessage, nil)
+	require.Nil(appErr)
+
+	// Then sign it
+	signature, err := signer.Sign(unsignedMessage)
 	require.NoError(err)
 	require.Equal(expectedSig, signature)
 
@@ -129,30 +121,30 @@ func TestGetBlockSignature(t *testing.T) {
 	require.NoError(err)
 	unknownUnsignedMessage, err := warp.NewUnsignedMessage(networkID, sourceChainID, unknownBlockHashPayload.Bytes())
 	require.NoError(err)
-	_, err = signer.Sign(t.Context(), unknownUnsignedMessage)
-	require.ErrorIs(err, ErrVerifyWarpMessage)
+	unknownAppErr := verifier.Verify(t.Context(), unknownUnsignedMessage, nil)
+	require.ErrorIs(unknownAppErr, &common.AppError{Code: VerifyErrCode})
 }
 
-func TestZeroSizedCache(t *testing.T) {
+func TestVerifierKnownMessage(t *testing.T) {
 	db := memdb.New()
 
 	sk, err := localsigner.New()
 	require.NoError(t, err)
 	warpSigner := warp.NewSigner(sk, networkID, sourceChainID)
 
-	// Verify zero sized cache works normally, because the lru cache will be initialized to size 1 for any size parameter <= 0.
-	messageSignatureCache := lru.NewCache[ids.ID, []byte](0)
-
-	messageDB, err := NewDB(networkID, sourceChainID, db, nil)
-	require.NoError(t, err)
+	messageDB := NewDB(db)
 	verifier := NewVerifier(messageDB, nil, nil)
-	signer := NewSigner(warpSigner, verifier, messageSignatureCache)
+	signer := NewSigner(warpSigner)
 
-	// Add testUnsignedMessage to the warp backend
+	// Add testUnsignedMessage to the database
 	require.NoError(t, messageDB.Add(testUnsignedMessage))
 
-	// Verify that a signature is returned successfully, and compare to expected signature.
-	signature, err := signer.Sign(t.Context(), testUnsignedMessage)
+	// Known messages in the DB should pass verification
+	appErr := verifier.Verify(t.Context(), testUnsignedMessage, nil)
+	require.Nil(t, appErr)
+
+	// And can be signed
+	signature, err := signer.Sign(testUnsignedMessage)
 	require.NoError(t, err)
 
 	expectedSig, err := warpSigner.Sign(testUnsignedMessage)
@@ -160,84 +152,19 @@ func TestZeroSizedCache(t *testing.T) {
 	require.Equal(t, expectedSig, signature)
 }
 
-func TestOffChainMessages(t *testing.T) {
-	type test struct {
-		offchainMessages [][]byte
-		check            func(require *require.Assertions, db *DB, signer *Signer)
-		err              error
-	}
-	sk, err := localsigner.New()
-	require.NoError(t, err)
-	warpSigner := warp.NewSigner(sk, networkID, sourceChainID)
-
-	for name, test := range map[string]test{
-		"no offchain messages": {},
-		"single off-chain message": {
-			offchainMessages: [][]byte{
-				testUnsignedMessage.Bytes(),
-			},
-			check: func(require *require.Assertions, db *DB, signer *Signer) {
-				msg, err := db.Get(testUnsignedMessage.ID())
-				require.NoError(err)
-				require.Equal(testUnsignedMessage.Bytes(), msg.Bytes())
-
-				signature, err := signer.Sign(t.Context(), testUnsignedMessage)
-				require.NoError(err)
-				expectedSignatureBytes, err := warpSigner.Sign(msg)
-				require.NoError(err)
-				require.Equal(expectedSignatureBytes, signature)
-			},
-		},
-		"unknown message": {
-			check: func(require *require.Assertions, db *DB, signer *Signer) {
-				_, err := db.Get(testUnsignedMessage.ID())
-				require.ErrorIs(err, database.ErrNotFound)
-
-				_, err = signer.Sign(t.Context(), testUnsignedMessage)
-				require.ErrorIs(err, ErrVerifyWarpMessage)
-			},
-		},
-		"invalid message": {
-			offchainMessages: [][]byte{{1, 2, 3}},
-			err:              errParsingOffChainMessage,
-		},
-	} {
-		t.Run(name, func(t *testing.T) {
-			require := require.New(t)
-			db := memdb.New()
-
-			messageSignatureCache := lru.NewCache[ids.ID, []byte](0)
-			messageDB, err := NewDB(networkID, sourceChainID, db, test.offchainMessages)
-			require.ErrorIs(err, test.err)
-			if test.check != nil {
-				verifier := NewVerifier(messageDB, nil, nil)
-				signer := NewSigner(warpSigner, verifier, messageSignatureCache)
-				test.check(require, messageDB, signer)
-			}
-		})
-	}
-}
-
-func TestAddressedCallSignatures(t *testing.T) {
+func TestKnownMessageSignature(t *testing.T) {
 	metricstest.WithMetrics(t)
 
 	database := memdb.New()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 
-	offChainPayload, err := payload.NewAddressedCall([]byte{1, 2, 3}, []byte{1, 2, 3})
-	require.NoError(t, err)
-	offchainMessage, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, offChainPayload.Bytes())
-	require.NoError(t, err)
-	offchainSignature, err := snowCtx.WarpSigner.Sign(offchainMessage)
-	require.NoError(t, err)
-
 	tests := map[string]struct {
-		setup       func(db *DB, signer *Signer) (request []byte, expectedResponse []byte)
+		setup       func(db *DB) (request []byte, expectedResponse []byte)
 		verifyStats func(t *testing.T, v *Verifier)
 		err         *common.AppError
 	}{
 		"known message": {
-			setup: func(db *DB, _ *Signer) (request []byte, expectedResponse []byte) {
+			setup: func(db *DB) (request []byte, expectedResponse []byte) {
 				knownPayload, err := payload.NewAddressedCall([]byte{0, 0, 0}, []byte("test"))
 				require.NoError(t, err)
 				msg, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, knownPayload.Bytes())
@@ -252,17 +179,8 @@ func TestAddressedCallSignatures(t *testing.T) {
 				require.Zero(t, v.blockValidationFail.Snapshot().Count())
 			},
 		},
-		"offchain message": {
-			setup: func(_ *DB, _ *Signer) (request []byte, expectedResponse []byte) {
-				return offchainMessage.Bytes(), offchainSignature
-			},
-			verifyStats: func(t *testing.T, v *Verifier) {
-				require.Zero(t, v.messageParseFail.Snapshot().Count())
-				require.Zero(t, v.blockValidationFail.Snapshot().Count())
-			},
-		},
 		"unknown message": {
-			setup: func(_ *DB, _ *Signer) (request []byte, expectedResponse []byte) {
+			setup: func(_ *DB) (request []byte, expectedResponse []byte) {
 				unknownPayload, err := payload.NewAddressedCall([]byte{0, 0, 0}, []byte("unknown message"))
 				require.NoError(t, err)
 				unknownMessage, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, unknownPayload.Bytes())
@@ -291,13 +209,11 @@ func TestAddressedCallSignatures(t *testing.T) {
 				} else {
 					sigCache = &cache.Empty[ids.ID, []byte]{}
 				}
-				db, err := NewDB(snowCtx.NetworkID, snowCtx.ChainID, database, [][]byte{offchainMessage.Bytes()})
-				require.NoError(t, err)
+				db := NewDB(database)
 				v := NewVerifier(db, warptest.EmptyBlockStore, nil)
-				signer := NewSigner(snowCtx.WarpSigner, v, sigCache)
 				handler := acp118.NewCachedHandler(sigCache, v, snowCtx.WarpSigner)
 
-				requestBytes, expectedResponse := test.setup(db, signer)
+				requestBytes, expectedResponse := test.setup(db)
 				protoMsg := &sdk.SignatureRequest{Message: requestBytes}
 				protoBytes, err := proto.Marshal(protoMsg)
 				require.NoError(t, err)
@@ -310,11 +226,11 @@ func TestAddressedCallSignatures(t *testing.T) {
 					require.Empty(t, responseBytes, "expected response to be empty")
 					return
 				}
-				// check cache is populated
+				// check cache is populated (handler's cache)
 				if withCache {
-					require.NotZero(t, signer.signatureCache.Len())
+					require.NotZero(t, sigCache.Len())
 				} else {
-					require.Zero(t, signer.signatureCache.Len())
+					require.Zero(t, sigCache.Len())
 				}
 				response := &sdk.SignatureResponse{}
 				require.NoError(t, proto.Unmarshal(responseBytes, response))
@@ -396,10 +312,8 @@ func TestBlockSignatures(t *testing.T) {
 				} else {
 					sigCache = &cache.Empty[ids.ID, []byte]{}
 				}
-				db, err := NewDB(snowCtx.NetworkID, snowCtx.ChainID, database, nil)
-				require.NoError(t, err)
+				db := NewDB(database)
 				v := NewVerifier(db, blockStore, nil)
-				signer := NewSigner(snowCtx.WarpSigner, v, sigCache)
 				handler := acp118.NewCachedHandler(sigCache, v, snowCtx.WarpSigner)
 
 				requestBytes, expectedResponse := test.setup()
@@ -416,11 +330,11 @@ func TestBlockSignatures(t *testing.T) {
 					require.Empty(t, responseBytes, "expected response to be empty")
 					return
 				}
-				// check cache is populated
+				// check cache is populated (handler's cache)
 				if withCache {
-					require.NotZero(t, signer.signatureCache.Len())
+					require.NotZero(t, sigCache.Len())
 				} else {
-					require.Zero(t, signer.signatureCache.Len())
+					require.Zero(t, sigCache.Len())
 				}
 				var response sdk.SignatureResponse
 				err = proto.Unmarshal(responseBytes, &response)
@@ -493,11 +407,9 @@ func TestUptimeSignatures(t *testing.T) {
 
 		require.NoError(t, uptimeTracker.Sync(t.Context()))
 
-		db, err := NewDB(snowCtx.NetworkID, snowCtx.ChainID, database, nil)
-		require.NoError(t, err)
+		db := NewDB(database)
 		verifier := NewVerifier(db, warptest.EmptyBlockStore, uptimeTracker)
 		handler := acp118.NewCachedHandler(sigCache, verifier, snowCtx.WarpSigner)
-		require.NoError(t, err)
 
 		// sourceAddress nonZero
 		protoBytes, _ := getUptimeMessageBytes([]byte{1, 2, 3}, ids.GenerateTestID())
