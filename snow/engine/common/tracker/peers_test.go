@@ -24,7 +24,7 @@ func TestPeers(t *testing.T) {
 	p.OnValidatorAdded(nodeID, nil, ids.Empty, 5)
 	require.Zero(p.ConnectedWeight())
 
-	require.NoError(p.Connected(t.Context(), nodeID, version.CurrentApp))
+	require.NoError(p.Connected(t.Context(), nodeID, version.Current))
 	require.Equal(uint64(5), p.ConnectedWeight())
 
 	p.OnValidatorWeightChanged(nodeID, 5, 10)
