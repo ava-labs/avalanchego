@@ -1591,6 +1591,7 @@ func (n *Node) initHealthAPI() error {
 
 		if time.Since(lastLogTime) >= logFrequency {
 			log("unknown upgrade detected - this node should be updated to a compatible version",
+				zap.String("latestReleaseURL", "https://github.com/ava-labs/avalanchego/releases/latest"),
 				zap.Time("upgradeTime", modeUpgradeTime),
 				zap.Duration("timeUntilUpgrade", timeUntilUpgrade),
 				zap.Error(err),
