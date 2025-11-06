@@ -19,8 +19,9 @@ const (
 	Etna
 	Fortuna
 	Granite
+	Helicon
 
-	Latest = Granite
+	Latest = Helicon
 )
 
 // Fork is an enum of all the major network upgrades.
@@ -28,6 +29,8 @@ type Fork int
 
 func (f Fork) String() string {
 	switch f {
+	case Helicon:
+		return "Helicon"
 	case Granite:
 		return "Granite"
 	case Fortuna:

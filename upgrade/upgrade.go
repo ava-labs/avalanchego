@@ -38,6 +38,7 @@ var (
 		FortunaTime:               time.Date(2025, time.April, 8, 15, 0, 0, 0, time.UTC),
 		GraniteTime:               time.Date(2025, time.November, 19, 16, 0, 0, 0, time.UTC),
 		GraniteEpochDuration:      5 * time.Minute,
+		HeliconTime:               UnscheduledActivationTime, // naming credit to @bernard-avalabs!
 	}
 	Fuji = Config{
 		ApricotPhase1Time:            time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
@@ -61,6 +62,7 @@ var (
 		FortunaTime:               time.Date(2025, time.March, 13, 15, 0, 0, 0, time.UTC),
 		GraniteTime:               time.Date(2025, time.October, 29, 15, 0, 0, 0, time.UTC),
 		GraniteEpochDuration:      5 * time.Minute,
+		HeliconTime:               UnscheduledActivationTime,
 	}
 	Default = Config{
 		ApricotPhase1Time:            InitiallyActiveTime,
@@ -80,6 +82,7 @@ var (
 		FortunaTime:                  InitiallyActiveTime,
 		GraniteTime:                  InitiallyActiveTime,
 		GraniteEpochDuration:         30 * time.Second,
+		HeliconTime:                  InitiallyActiveTime,
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
@@ -103,6 +106,7 @@ type Config struct {
 	FortunaTime                  time.Time     `json:"fortunaTime"`
 	GraniteTime                  time.Time     `json:"graniteTime"`
 	GraniteEpochDuration         time.Duration `json:"graniteEpochDuration"`
+	HeliconTime                  time.Time     `json:"heliconTime"`
 }
 
 func (c *Config) Validate() error {
@@ -121,6 +125,7 @@ func (c *Config) Validate() error {
 		c.EtnaTime,
 		c.FortunaTime,
 		c.GraniteTime,
+		c.HeliconTime,
 	}
 	for i := 0; i < len(upgrades)-1; i++ {
 		if upgrades[i].After(upgrades[i+1]) {
@@ -190,6 +195,10 @@ func (c *Config) IsFortunaActivated(t time.Time) bool {
 
 func (c *Config) IsGraniteActivated(t time.Time) bool {
 	return !t.Before(c.GraniteTime)
+}
+
+func (c *Config) IsHeliconActivated(t time.Time) bool {
+	return !t.Before(c.HeliconTime)
 }
 
 func GetConfig(networkID uint32) Config {
