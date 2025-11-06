@@ -9,5 +9,5 @@ fi
 
 source ./scripts/lint_setup.sh
 setup_lint
-./scripts/run_tool.sh golangci-lint run --config .legacy-golangci.yml --fix
+./scripts/run_tool.sh golangci-lint run --config .legacy-golangci.yml --fix ./graft/...
 ./scripts/run_tool.sh golangci-lint run --config "$AVALANCHE_LINT_FILE" --fix

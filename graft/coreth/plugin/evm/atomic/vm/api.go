@@ -8,17 +8,17 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/ava-labs/libevm/log"
+
 	"github.com/ava-labs/avalanchego/api"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/txpool"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/client"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/libevm/log"
-
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/txpool"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/client"
 )
 
 const (

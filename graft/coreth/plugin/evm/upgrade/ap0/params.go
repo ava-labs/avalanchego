@@ -5,9 +5,8 @@
 package ap0
 
 import (
-	"github.com/ava-labs/avalanchego/utils/units"
-
 	"github.com/ava-labs/avalanchego/graft/coreth/utils"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
 const (

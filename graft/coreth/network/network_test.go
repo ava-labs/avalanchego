@@ -12,8 +12,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -21,11 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/version"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 )
 
 const (
@@ -113,10 +113,10 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 		go func(wg *sync.WaitGroup) {
 			defer wg.Done()
 			requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			responseBytes, _, err := net.SendSyncedAppRequestAny(t.Context(), defaultPeerVersion, requestBytes)
-			assert.NoError(t, err)
-			assert.NotNil(t, responseBytes)
+			require.NoError(t, err)
+			require.NotNil(t, responseBytes)
 
 			var response TestMessage
 			if _, err = codecManager.Unmarshal(responseBytes, &response); err != nil {
@@ -227,16 +227,15 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 		go func(wg *sync.WaitGroup, nodeID ids.NodeID) {
 			defer wg.Done()
 			requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			responseBytes, err := net.SendSyncedAppRequest(t.Context(), nodeID, requestBytes)
-			assert.NoError(t, err)
-			assert.NotNil(t, responseBytes)
+			require.NoError(t, err)
+			require.NotNil(t, responseBytes)
 
 			var response TestMessage
-			if _, err = codecManager.Unmarshal(responseBytes, &response); err != nil {
-				panic(fmt.Errorf("unexpected error during unmarshal: %w", err))
-			}
-			assert.Equal(t, "Hi", response.Message)
+			_, err = codecManager.Unmarshal(responseBytes, &response)
+			require.NoError(t, err)
+			require.Equal(t, "Hi", response.Message)
 		}(requestWg, nodeID)
 	}
 

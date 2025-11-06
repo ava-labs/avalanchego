@@ -6,9 +6,10 @@ package atomic
 import (
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/vms/components/verify"
-	"github.com/stretchr/testify/require"
 )
 
 func TestGossipAtomicTxMarshaller(t *testing.T) {

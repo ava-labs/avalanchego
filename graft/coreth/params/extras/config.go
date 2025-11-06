@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/utils"
+	"github.com/ava-labs/avalanchego/snow"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )

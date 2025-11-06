@@ -5,8 +5,9 @@ package rpc
 import (
 	"net/http"
 
-	"github.com/ava-labs/avalanchego/utils/json"
 	"github.com/gorilla/rpc/v2"
+
+	"github.com/ava-labs/avalanchego/utils/json"
 )
 
 // NewHandler returns a new Handler for a service where:

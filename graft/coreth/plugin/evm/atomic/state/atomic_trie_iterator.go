@@ -8,11 +8,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/libevm/trie"
+
 	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/wrappers"
-	"github.com/ava-labs/libevm/trie"
 )
 
 var errKeyLength = errors.New("atomic trie key length invalid")
