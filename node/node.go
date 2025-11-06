@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"math"
 	"net"
 	"net/netip"
 	"os"
@@ -1494,14 +1495,9 @@ func (n *Node) initHealthAPI() error {
 
 	timeUntilUpgradeMetric := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name: "time_until",
-		Help: "Time until an upcoming network upgrade (ns). Negative values indicate the upgrade time has passed.",
+		Help: "Time until an upcoming network upgrade (ns). +Inf means the upgrade is unscheduled.",
 	})
-	const (
-		day                         = 24 * time.Hour
-		week                        = 7 * day
-		month                       = 30 * day
-		timeUntilUnscheduledUpgrade = float64(month)
-	)
+	timeUntilUnscheduledUpgrade := math.Inf(1)
 	timeUntilUpgradeMetric.Set(timeUntilUnscheduledUpgrade)
 	if err := upgradeReg.Register(timeUntilUpgradeMetric); err != nil {
 		return fmt.Errorf("couldn't register time until upgrade metric: %w", err)
@@ -1557,6 +1553,10 @@ func (n *Node) initHealthAPI() error {
 			return result, nil
 		}
 
+		const (
+			day  = 24 * time.Hour
+			week = 7 * day
+		)
 		modeUpgradeTime := time.Unix(int64(modeUpgradeTimeUnix), 0)
 		timeUntilUpgrade := time.Until(modeUpgradeTime)
 		timeUntilUpgradeMetric.Set(float64(timeUntilUpgrade))
