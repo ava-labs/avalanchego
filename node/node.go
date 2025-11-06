@@ -118,6 +118,7 @@ var (
 	errInvalidTLSKey        = errors.New("invalid TLS key")
 	errShuttingDown         = errors.New("server shutting down")
 	errNoValidators         = errors.New("no validators in the current validator set")
+	errUpgradeNeeded        = errors.New("unknown network upgrade detected")
 	errUpgradeWithinTheDay  = errors.New("unknown network upgrade detected - update as soon as possible")
 	errUpgradeWithinTheHour = errors.New("imminent network upgrade detected - update immediately")
 )
@@ -1577,7 +1578,7 @@ func (n *Node) initHealthAPI() error {
 		case timeUntilUpgrade > day:
 			logFrequency = time.Hour
 			log = n.Log.Warn
-			err = fmt.Errorf("unknown network upgrade detected in %s", timeUntilUpgrade)
+			err = errUpgradeNeeded
 		case timeUntilUpgrade > time.Hour:
 			logFrequency = time.Hour
 			log = n.Log.Error
