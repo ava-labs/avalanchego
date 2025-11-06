@@ -15,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
@@ -31,7 +30,6 @@ const (
 )
 
 var (
-	_ p2p.Handler     = (*Handler)(nil)
 	_ acp118.Verifier = (*verifier)(nil)
 
 	messageCacheSize = 500
@@ -154,23 +152,6 @@ func (s *Signer) Sign(ctx context.Context, msg *warp.UnsignedMessage) ([]byte, e
 
 	s.signatureCache.Put(msgID, sig)
 	return sig, nil
-}
-
-// Handler implements p2p.Handler and handles warp signature requests.
-// It hides the acp118.Verifier implementation as an implementation detail.
-type Handler struct {
-	*acp118.Handler
-}
-
-// NewHandler creates a new p2p warp signature request handler.
-func NewHandler(
-	signatureCache cache.Cacher[ids.ID, []byte],
-	verifier acp118.Verifier,
-	signer warp.Signer,
-) p2p.Handler {
-	return &Handler{
-		Handler: acp118.NewCachedHandler(signatureCache, verifier, signer),
-	}
 }
 
 // verifier implements acp118.Verifier and validates whether a warp message should be signed.

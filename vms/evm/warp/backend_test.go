@@ -17,6 +17,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -300,7 +301,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 				require.NoError(t, err)
 				v := NewVerifier(db, warptest.EmptyBlockStore, nil, snowCtx.NetworkID, snowCtx.ChainID)
 				signer := NewSigner(snowCtx.WarpSigner, v, sigCache)
-				handler := NewHandler(sigCache, v, snowCtx.WarpSigner)
+				handler := acp118.NewCachedHandler(sigCache, v, snowCtx.WarpSigner)
 
 				requestBytes, expectedResponse := test.setup(db, signer)
 				protoMsg := &sdk.SignatureRequest{Message: requestBytes}
@@ -405,7 +406,7 @@ func TestBlockSignatures(t *testing.T) {
 				require.NoError(t, err)
 				v := NewVerifier(db, blockStore, nil, snowCtx.NetworkID, snowCtx.ChainID)
 				signer := NewSigner(snowCtx.WarpSigner, v, sigCache)
-				handler := NewHandler(sigCache, v, snowCtx.WarpSigner)
+				handler := acp118.NewCachedHandler(sigCache, v, snowCtx.WarpSigner)
 
 				requestBytes, expectedResponse := test.setup()
 				protoMsg := &sdk.SignatureRequest{Message: requestBytes}
@@ -501,7 +502,7 @@ func TestUptimeSignatures(t *testing.T) {
 		db, err := NewDB(snowCtx.NetworkID, snowCtx.ChainID, database, nil)
 		require.NoError(t, err)
 		verifier := NewVerifier(db, warptest.EmptyBlockStore, uptimeTracker, snowCtx.NetworkID, snowCtx.ChainID)
-		handler := NewHandler(sigCache, verifier, snowCtx.WarpSigner)
+		handler := acp118.NewCachedHandler(sigCache, verifier, snowCtx.WarpSigner)
 		require.NoError(t, err)
 
 		// sourceAddress nonZero
