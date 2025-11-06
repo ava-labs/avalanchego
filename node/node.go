@@ -105,6 +105,7 @@ const (
 	responsesNamespace       = constants.PlatformName + metric.NamespaceSeparator + "responses"
 	rpcchainvmNamespace      = constants.PlatformName + metric.NamespaceSeparator + "rpcchainvm"
 	systemResourcesNamespace = constants.PlatformName + metric.NamespaceSeparator + "system_resources"
+	upgradeNamespace         = constants.PlatformName + metric.NamespaceSeparator + "upgrade"
 )
 
 var (
@@ -1483,6 +1484,29 @@ func (n *Node) initHealthAPI() error {
 		return fmt.Errorf("couldn't register bls health check: %w", err)
 	}
 
+	upgradeReg, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		upgradeNamespace,
+	)
+	if err != nil {
+		return fmt.Errorf("couldn't create upgrade metrics register: %w", err)
+	}
+
+	timeUntilUpgradeMetric := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name: "time_until",
+		Help: "Time until an upcoming network upgrade (ns). Negative values indicate the upgrade time has passed.",
+	})
+	const (
+		day                         = 24 * time.Hour
+		week                        = 7 * day
+		month                       = 30 * day
+		timeUntilUnscheduledUpgrade = float64(month)
+	)
+	timeUntilUpgradeMetric.Set(timeUntilUnscheduledUpgrade)
+	if err := upgradeReg.Register(timeUntilUpgradeMetric); err != nil {
+		return fmt.Errorf("couldn't register time until upgrade metric: %w", err)
+	}
+
 	// TODO: This healthcheck calls both n.vdrs.GetMap and n.Net.PeerInfo which
 	// are expensive calls. This could be rewritten as an event based monitor to
 	// avoid expensive iteration.
@@ -1529,15 +1553,13 @@ func (n *Node) initHealthAPI() error {
 			"numUpgradeTimes":             len(upgradeTimes),
 		}
 		if localUpgradeTimeUnix >= modeUpgradeTimeUnix || modeUpgradeWeightPortion < .5 {
+			timeUntilUpgradeMetric.Set(timeUntilUnscheduledUpgrade)
 			return result, nil
 		}
 
-		const (
-			day  = 24 * time.Hour
-			week = 7 * day
-		)
 		modeUpgradeTime := time.Unix(int64(modeUpgradeTimeUnix), 0)
 		timeUntilUpgrade := time.Until(modeUpgradeTime)
+		timeUntilUpgradeMetric.Set(float64(timeUntilUpgrade))
 		result["timeUntilUpgrade"] = timeUntilUpgrade
 
 		var (
