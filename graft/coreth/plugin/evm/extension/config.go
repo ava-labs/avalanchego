@@ -27,8 +27,8 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 
-	avalanchecommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	synccommon "github.com/ava-labs/avalanchego/graft/coreth/sync"
+	avalanchecommon "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 var (
