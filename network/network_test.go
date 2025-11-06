@@ -111,10 +111,18 @@ func TestRequestAnyRequestsRoutingAndResponse(t *testing.T) {
 	for i := 0; i < totalCalls; i++ {
 		eg.Go(func() error {
 			requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
-			require.NoError(t, err)
+			if err != nil {
+				return fmt.Errorf("unexpected error during marshal: %w", err)
+			}
+
 			responseBytes, _, err := net.SendSyncedAppRequestAny(t.Context(), defaultPeerVersion, requestBytes)
-			require.NoError(t, err)
-			require.NotNil(t, responseBytes)
+			if err != nil {
+				return fmt.Errorf("unexpected error during send: %w", err)
+			}
+
+			if responseBytes == nil {
+				return fmt.Errorf("expected response bytes, got nil")
+			}
 
 			var response TestMessage
 			if _, err = codecManager.Unmarshal(responseBytes, &response); err != nil {
@@ -223,13 +231,20 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 	nodeIdx := 0
 	for i := 0; i < totalCalls; i++ {
 		nodeIdx = (nodeIdx + 1) % (len(nodes))
-		nodeID := nodes[nodeIdx]
 		eg.Go(func() error {
 			requestBytes, err := message.RequestToBytes(codecManager, requestMessage)
-			require.NoError(t, err)
-			responseBytes, err := net.SendSyncedAppRequest(t.Context(), nodeID, requestBytes)
-			require.NoError(t, err)
-			require.NotNil(t, responseBytes)
+			if err != nil {
+				return fmt.Errorf("unexpected error during marshal: %w", err)
+			}
+
+			responseBytes, _, err := net.SendSyncedAppRequestAny(t.Context(), defaultPeerVersion, requestBytes)
+			if err != nil {
+				return fmt.Errorf("unexpected error during send: %w", err)
+			}
+
+			if responseBytes == nil {
+				return fmt.Errorf("expected response bytes, got nil")
+			}
 
 			var response TestMessage
 			if _, err = codecManager.Unmarshal(responseBytes, &response); err != nil {
@@ -390,6 +405,7 @@ func TestRequestMinVersion(t *testing.T) {
 	codecManager := buildCodec(t, TestMessage{})
 
 	var net Network
+	errChan := make(chan error, 1)
 	sender := testAppSender{
 		sendAppRequestFn: func(_ context.Context, nodes set.Set[ids.NodeID], reqID uint32, _ []byte) error {
 			atomic.AddUint32(&callNum, 1)
@@ -401,9 +417,13 @@ func TestRequestMinVersion(t *testing.T) {
 				atomic.AddUint32(&callNum, 1)
 				responseBytes, err := codecManager.Marshal(codecVersion, TestMessage{Message: "this is a response"})
 				if err != nil {
-					panic(err)
+					errChan <- err
+					return
 				}
-				require.NoError(t, net.AppResponse(t.Context(), nodeID, reqID, responseBytes))
+				if err := net.AppResponse(t.Context(), nodeID, reqID, responseBytes); err != nil {
+					errChan <- err
+					return
+				}
 			}()
 			return nil
 		},
@@ -451,6 +471,15 @@ func TestRequestMinVersion(t *testing.T) {
 	_, err = codecManager.Unmarshal(responseBytes, &response)
 	require.NoError(t, err)
 	require.Equal(t, "this is a response", response.Message)
+
+	// Check for errors from the goroutine (non-blocking since SendSyncedAppRequestAny
+	// already waited for the response, so the goroutine has completed)
+	select {
+	case err := <-errChan:
+		require.NoError(t, err)
+	default:
+		// No error, which is expected
+	}
 }
 
 func TestOnRequestHonoursDeadline(t *testing.T) {
