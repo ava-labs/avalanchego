@@ -13,6 +13,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/factory"
+	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
@@ -222,19 +223,37 @@ func newStandaloneDatabase(dbConfig DatabaseConfig, gatherer metrics.MultiGather
 		}
 	}
 
+	dbReg, err := metrics.MakeAndRegister(
+		gatherer,
+		dbMetricsPrefix,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	db, err := factory.New(
 		dbConfig.Name,
 		dbPath,
 		dbConfig.ReadOnly,
 		dbConfigBytes,
-		gatherer,
+		dbReg,
 		logger,
-		dbMetricsPrefix,
-		meterDBGatherer,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("couldn't create database: %w", err)
 	}
 
-	return db, nil
+	meterDBReg, err := metrics.MakeAndRegister(
+		gatherer,
+		meterDBGatherer,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	meterDB, err := meterdb.New(meterDBReg, db)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't create meterdb: %w", err)
+	}
+	return meterDB, nil
 }
