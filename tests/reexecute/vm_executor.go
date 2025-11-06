@@ -37,8 +37,8 @@ import (
 
 var (
 	MainnetCChainID = ids.FromStringOrPanic("2q9e4r6Mu3U68nU1fYjgbR6JvwrRx36CohpAX5UQxse55x1Q5")
+	MainnetXChainID = ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM")
 
-	mainnetXChainID    = ids.FromStringOrPanic("2oYMBNV4eNHyqk2fjjV5nVQLDbtmNJzq5s3qs3Lo6ftnC6FByM")
 	mainnetAvaxAssetID = ids.FromStringOrPanic("FvwEAhmxKfeiG8SnEvq42hc6whRyY3EFYAvebMqDNDGCgxN5Z")
 )
 
@@ -187,6 +187,9 @@ type VMParams struct {
 	ConfigBytes  []byte
 	SubnetID     ids.ID
 	ChainID      ids.ID
+	// ChainToSubnet maps chain IDs to their subnet IDs. This mapping is used by
+	// the VM to validate cross-chain operations and warp messages.
+	ChainToSubnet map[ids.ID]ids.ID
 }
 
 // NewMainnetVM creates and initializes a VM configured for mainnet block
@@ -218,13 +221,6 @@ func NewMainnetVM(
 	sharedMemoryDB := prefixdb.New([]byte("sharedmemory"), db)
 	atomicMemory := atomic.NewMemory(sharedMemoryDB)
 
-	chainIDToSubnetID := map[ids.ID]ids.ID{
-		mainnetXChainID:  constants.PrimaryNetworkID,
-		MainnetCChainID:  constants.PrimaryNetworkID,
-		vmParams.ChainID: vmParams.SubnetID,
-		ids.Empty:        constants.PrimaryNetworkID,
-	}
-
 	if err := vm.Initialize(
 		ctx,
 		&snow.Context{
@@ -235,7 +231,7 @@ func NewMainnetVM(
 			PublicKey:       blsPublicKey,
 			NetworkUpgrades: upgrade.Mainnet,
 
-			XChainID:    mainnetXChainID,
+			XChainID:    MainnetXChainID,
 			CChainID:    MainnetCChainID,
 			AVAXAssetID: mainnetAvaxAssetID,
 
@@ -248,7 +244,7 @@ func NewMainnetVM(
 
 			ValidatorState: &validatorstest.State{
 				GetSubnetIDF: func(_ context.Context, chainID ids.ID) (ids.ID, error) {
-					subnetID, ok := chainIDToSubnetID[chainID]
+					subnetID, ok := vmParams.ChainToSubnet[chainID]
 					if ok {
 						return subnetID, nil
 					}

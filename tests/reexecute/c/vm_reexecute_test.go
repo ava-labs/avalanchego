@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/genesis"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/tests"
 	"github.com/ava-labs/avalanchego/tests/reexecute"
 	"github.com/ava-labs/avalanchego/utils/constants"
@@ -214,6 +215,11 @@ func benchmarkReexecuteRange(
 		ConfigBytes:  configBytes,
 		SubnetID:     constants.PrimaryNetworkID,
 		ChainID:      reexecute.MainnetCChainID,
+		ChainToSubnet: map[ids.ID]ids.ID{
+			reexecute.MainnetXChainID: constants.PrimaryNetworkID,
+			reexecute.MainnetCChainID: constants.PrimaryNetworkID,
+			ids.Empty:                 constants.PrimaryNetworkID,
+		},
 	}
 
 	vm, err := reexecute.NewMainnetVM(
