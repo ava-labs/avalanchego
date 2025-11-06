@@ -25,6 +25,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
+	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/api/admin"
 	"github.com/ava-labs/avalanchego/api/health"
@@ -112,8 +113,10 @@ var (
 
 	indexerDBPrefix = []byte{0x00}
 
-	errInvalidTLSKey = errors.New("invalid TLS key")
-	errShuttingDown  = errors.New("server shutting down")
+	errInvalidTLSKey        = errors.New("invalid TLS key")
+	errShuttingDown         = errors.New("server shutting down")
+	errUpgradeWithinTheDay  = errors.New("unknown network upgrade detected - update as soon as possible")
+	errUpgradeWithinTheHour = errors.New("imminent network upgrade detected - update immediately")
 )
 
 // New returns an instance of Node
@@ -1477,6 +1480,105 @@ func (n *Node) initHealthAPI() error {
 	err = n.health.RegisterHealthCheck("bls", wrongBLSKeyCheck, health.ApplicationTag)
 	if err != nil {
 		return fmt.Errorf("couldn't register bls health check: %w", err)
+	}
+
+	// TODO: This healthcheck calls both n.vdrs.GetMap and n.Net.PeerInfo which
+	// are expensive calls. This could be rewritten as an event based monitor to
+	// avoid expensive iteration.
+	var (
+		localUpgradeTime     = n.Config.UpgradeConfig.GraniteTime
+		localUpgradeTimeUnix = uint64(localUpgradeTime.Unix())
+		lastLogTime          time.Time
+	)
+	futureUpgradeCheck := health.CheckerFunc(func(context.Context) (interface{}, error) {
+		var (
+			currentValidators = n.vdrs.GetMap(constants.PrimaryNetworkID)
+			totalWeight       uint64
+		)
+		for _, vdr := range currentValidators {
+			totalWeight += vdr.Weight
+		}
+		if totalWeight == 0 {
+			return nil, fmt.Errorf("no validators in the current validator set")
+		}
+
+		var (
+			peers               = n.Net.PeerInfo(maps.Keys(currentValidators))
+			upgradeTimes        = make(map[uint64]uint64) // upgrade time -> stake weight
+			modeUpgradeTimeUnix uint64
+			modeUpgradeWeight   uint64
+		)
+		for _, peer := range peers {
+			vdr := currentValidators[peer.ID]
+			upgradeWeight := upgradeTimes[peer.UpgradeTime]
+			upgradeWeight += vdr.Weight
+			upgradeTimes[peer.UpgradeTime] = upgradeWeight
+
+			if upgradeWeight > modeUpgradeWeight {
+				modeUpgradeTimeUnix = peer.UpgradeTime
+				modeUpgradeWeight = upgradeWeight
+			}
+		}
+
+		modeUpgradeWeightPortion := float64(modeUpgradeWeight) / float64(totalWeight)
+		result := map[string]interface{}{
+			"localUpgradeTime":            localUpgradeTime,
+			"modeUpgradeTime":             modeUpgradeTimeUnix,
+			"modeUpgradeWeightPercentage": 100 * modeUpgradeWeightPortion,
+			"numUpgradeTimes":             len(upgradeTimes),
+		}
+		if localUpgradeTimeUnix >= modeUpgradeTimeUnix || modeUpgradeWeightPortion < .5 {
+			return result, nil
+		}
+
+		const (
+			day  = 24 * time.Hour
+			week = 7 * day
+		)
+		modeUpgradeTime := time.Unix(int64(modeUpgradeTimeUnix), 0)
+		timeUntilUpgrade := time.Until(modeUpgradeTime)
+		result["timeUntilUpgrade"] = timeUntilUpgrade
+
+		var (
+			logFrequency time.Duration
+			log          func(msg string, fields ...zap.Field)
+			err          error
+		)
+		switch {
+		case timeUntilUpgrade > week:
+			logFrequency = 12 * time.Hour
+			log = n.Log.Info
+		case timeUntilUpgrade > 3*day:
+			logFrequency = 12 * time.Hour
+			log = n.Log.Warn
+		case timeUntilUpgrade > day:
+			logFrequency = time.Hour
+			log = n.Log.Warn
+			err = fmt.Errorf("unknown network upgrade detected in %s", timeUntilUpgrade)
+		case timeUntilUpgrade > time.Hour:
+			logFrequency = time.Hour
+			log = n.Log.Error
+			err = errUpgradeWithinTheDay
+		default:
+			logFrequency = 0 // log at the rate of the health check
+			log = n.Log.Error
+			err = errUpgradeWithinTheHour
+		}
+
+		if time.Since(lastLogTime) >= logFrequency {
+			log("unknown upgrade detected - this node should be updated to a compatible version",
+				zap.Time("upgradeTime", modeUpgradeTime),
+				zap.Duration("timeUntilUpgrade", timeUntilUpgrade),
+				zap.Error(err),
+			)
+			lastLogTime = time.Now()
+		}
+		return result, err
+	})
+
+	err = n.health.RegisterHealthCheck("futureupgrade", futureUpgradeCheck, health.ApplicationTag)
+	if err != nil {
+		return fmt.Errorf("couldn't register future upgrade health check: %w", err)
 	}
 
 	handler, err := health.NewGetAndPostHandler(n.Log, n.health)
