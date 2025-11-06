@@ -39,8 +39,6 @@ func TestMain(m *testing.M) {
 }
 
 func TestGetCode(t *testing.T) {
-	testNetClient := &testNetwork{}
-
 	tests := map[string]struct {
 		setupRequest func() (requestHashes []common.Hash, testResponse message.CodeResponse, expectedCode [][]byte)
 		expectedErr  error
@@ -92,16 +90,17 @@ func TestGetCode(t *testing.T) {
 		},
 	}
 
-	stateSyncClient := NewClient(&ClientConfig{
-		NetworkClient:    testNetClient,
-		Codec:            message.Codec,
-		Stats:            clientstats.NewNoOpStats(),
-		StateSyncNodeIDs: nil,
-		BlockParser:      newTestBlockParser(),
-	})
-
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			testNetClient := &testNetwork{}
+			stateSyncClient := NewClient(&ClientConfig{
+				NetworkClient:    testNetClient,
+				Codec:            message.Codec,
+				Stats:            clientstats.NewNoOpStats(),
+				StateSyncNodeIDs: nil,
+				BlockParser:      newTestBlockParser(),
+			})
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			codeHashes, res, expectedCode := test.setupRequest()
@@ -152,17 +151,6 @@ func TestGetBlocks(t *testing.T) {
 	blocks, _, err := core.GenerateChain(params.TestChainConfig, genesis, engine, memdb, numBlocks, 0, func(_ int, _ *core.BlockGen) {})
 	require.NoError(t, err)
 	require.Len(t, blocks, numBlocks)
-
-	// Construct client
-	testNetClient := &testNetwork{}
-	stateSyncClient := NewClient(&ClientConfig{
-		NetworkClient:    testNetClient,
-		Codec:            message.Codec,
-		Stats:            clientstats.NewNoOpStats(),
-		StateSyncNodeIDs: nil,
-		BlockParser:      newTestBlockParser(),
-	})
-
 	blocksRequestHandler := handlers.NewBlockRequestHandler(buildGetter(blocks), message.Codec, handlerstats.NewNoopHandlerStats())
 
 	// encodeBlockSlice takes a slice of blocks that are ordered in increasing height order
@@ -332,6 +320,17 @@ func TestGetBlocks(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			// Construct client
+			testNetClient := &testNetwork{}
+			stateSyncClient := NewClient(&ClientConfig{
+				NetworkClient:    testNetClient,
+				Codec:            message.Codec,
+				Stats:            clientstats.NewNoOpStats(),
+				StateSyncNodeIDs: nil,
+				BlockParser:      newTestBlockParser(),
+			})
+
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
@@ -381,13 +380,6 @@ func TestGetLeafs(t *testing.T) {
 	smallTrieRoot, _, _ := statesynctest.GenerateTrie(t, r, trieDB, leafsLimit, common.HashLength)
 
 	handler := handlers.NewLeafsRequestHandler(trieDB, message.StateTrieKeyLength, nil, message.Codec, handlerstats.NewNoopHandlerStats())
-	client := NewClient(&ClientConfig{
-		NetworkClient:    &testNetwork{},
-		Codec:            message.Codec,
-		Stats:            clientstats.NewNoOpStats(),
-		StateSyncNodeIDs: nil,
-		BlockParser:      newTestBlockParser(),
-	})
 
 	tests := map[string]struct {
 		request         message.LeafsRequest
@@ -668,6 +660,14 @@ func TestGetLeafs(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			client := NewClient(&ClientConfig{
+				NetworkClient:    &testNetwork{},
+				Codec:            message.Codec,
+				Stats:            clientstats.NewNoOpStats(),
+				StateSyncNodeIDs: nil,
+				BlockParser:      newTestBlockParser(),
+			})
 			responseBytes := test.getResponse(t, test.request)
 
 			response, _, err := parseLeafsResponse(client.codec, test.request, responseBytes)
@@ -684,6 +684,7 @@ func TestGetLeafs(t *testing.T) {
 }
 
 func TestGetLeafsRetries(t *testing.T) {
+	t.Parallel()
 	r := rand.New(rand.NewSource(1))
 	trieDB := triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)
 	root, _, _ := statesynctest.GenerateTrie(t, r, trieDB, 100_000, common.HashLength)
@@ -741,6 +742,7 @@ func TestGetLeafsRetries(t *testing.T) {
 }
 
 func TestStateSyncNodes(t *testing.T) {
+	t.Parallel()
 	testNetClient := &testNetwork{}
 
 	stateSyncNodes := []ids.NodeID{

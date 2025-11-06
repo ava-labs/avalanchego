@@ -18,74 +18,8 @@ grep -P 'lint.sh' scripts/lint.sh &>/dev/null || (
   exit 255
 )
 
-# Read excluded directories into arrays
-DEFAULT_FILES=()
-UPSTREAM_FILES=()
-AVALANCHE_LINT_FILE=""
-function read_dirs {
-  local upstream_folders_file="./scripts/upstream_files.txt"
-  # Read the upstream_folders file into an array
-  mapfile -t upstream_folders <"$upstream_folders_file"
-
-  # Shared find filters
-  local -a find_filters=(
-    -type f
-    -name '*.go'
-    ! -name '*.pb.go'
-    ! -name 'mock_*.go'
-    ! -name 'mocks_*.go'
-    ! -name 'mocks.go'
-    ! -name 'mock.go'
-    ! -name 'gen_*.go'
-    ! -path './**/*mock/*.go'
-  )
-
-  # Combined loop: build both upstream licensed find and exclude args
-  local -a upstream_find_args=()
-  local -a upstream_exclude_args=()
-  for line in "${upstream_folders[@]}"; do
-    # Skip empty lines
-    [[ -z "$line" ]] && continue
-
-    if [[ "$line" == !* ]]; then
-      # Excluding files with !
-      upstream_exclude_args+=(! -path "./${line:1}")
-    else
-      upstream_find_args+=(-path "./${line}" -o)
-    fi
-  done
-  # Remove the last '-o' from the arrays
-  unset 'upstream_find_args[${#upstream_find_args[@]}-1]'
-
-  # Find upstream files
-  mapfile -t UPSTREAM_FILES < <(
-    find . \
-      \( "${upstream_find_args[@]}" \) \
-      -a \( "${find_filters[@]}" \) \
-      "${upstream_exclude_args[@]}"
-  )
-
-  # Build exclusion args from upstream files
-  default_exclude_args=()
-  for f in "${UPSTREAM_FILES[@]}"; do
-    default_exclude_args+=(! -path "$f")
-  done
-
-  # Now find default files (exclude already licensed ones)
-  mapfile -t DEFAULT_FILES < <(find . "${find_filters[@]}" "${default_exclude_args[@]}")
-
-  # copy avalanche file to temp directory to edit
-  AVALANCHE_LINT_FILE="$(mktemp -d)/.avalanche-golangci.yml"
-  echo "Avalanche lint file at: $AVALANCHE_LINT_FILE"
-  cp .avalanche-golangci.yml "$AVALANCHE_LINT_FILE"
-
-  # Exclude all upstream files dynamically
-  echo "    paths-except:" >> "$AVALANCHE_LINT_FILE"
-  for f in "${UPSTREAM_FILES[@]}"; do
-    # exclude pre-pended "./"
-    echo "      - \"${f:2}\$\"" >> "$AVALANCHE_LINT_FILE"
-  done
-}
+# Library for file list generation.
+source ./scripts/lint_setup.sh
 
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
@@ -122,26 +56,26 @@ function test_license_header {
       || return 1
   fi
 
-  if [[ ${#DEFAULT_FILES[@]} -gt 0 ]]; then
+  if [[ ${#AVALANCHE_FILES[@]} -gt 0 ]]; then
     echo "Running license tool on remaining files with default header..."
     # shellcheck disable=SC2086
     go tool -modfile=tools/go.mod go-license \
       --config=./license_header.yml \
       ${_addlicense_flags} \
-      "${DEFAULT_FILES[@]}" \
+      "${AVALANCHE_FILES[@]}" \
       || return 1
   fi
 }
 
 function test_single_import {
-  if grep -R -zo -P 'import \(\n\t".*"\n\)' "${DEFAULT_FILES[@]}"; then
+  if grep -R -zo -P 'import \(\n\t".*"\n\)' "${AVALANCHE_FILES[@]}"; then
     echo ""
     return 1
   fi
 }
 
 function test_require_error_is_no_funcs_as_params {
-  if grep -R -zo -P 'require.ErrorIs\(.+?\)[^\n]*\)\n' "${DEFAULT_FILES[@]}"; then
+  if grep -R -zo -P 'require.ErrorIs\(.+?\)[^\n]*\)\n' "${AVALANCHE_FILES[@]}"; then
     echo ""
     return 1
   fi
@@ -156,7 +90,7 @@ function test_require_no_error_inline_func {
   #
   # Capture the variable name and enforce it matches in the subsequent require.NoError.
   local -r pattern='^\s*([A-Za-z_][A-Za-z0-9_]*[eE]rr[A-Za-z0-9_]*)\s*:?=\s*[^,\n]*\([^)]*\).*\n(?:(?!^\s*(?:if|require)).*\n)*^\s*require\.NoError\((?:t,\s*)?\1\)'
-  if grep -R -zo -P "$pattern" "${DEFAULT_FILES[@]}"; then
+  if grep -R -zo -P "$pattern" "${AVALANCHE_FILES[@]}"; then
     echo ""
     echo "Checking that a function with a single error return doesn't error should be done in-line (single LHS var containing 'err')."
     echo ""
@@ -166,7 +100,7 @@ function test_require_no_error_inline_func {
 
 # Ref: https://go.dev/doc/effective_go#blank_implements
 function test_interface_compliance_nil {
-  if grep -R -o -P '_ .+? = &.+?\{\}' "${DEFAULT_FILES[@]}"; then
+  if grep -R -o -P '_ .+? = &.+?\{\}' "${AVALANCHE_FILES[@]}"; then
     echo ""
     echo "Interface compliance checks need to be of the form:"
     echo "  var _ json.Marshaler = (*RawMessage)(nil)"
@@ -177,7 +111,7 @@ function test_interface_compliance_nil {
 
 function test_import_testing_only_in_tests {
   NON_TEST_GO_FILES=$(
-    echo "${DEFAULT_FILES[@]}" | tr ' ' '\n' |
+    echo "${AVALANCHE_FILES[@]}" | tr ' ' '\n' |
       grep -i '\.go$' |
       grep -vi '_test\.go$' |
       grep -v '^./tests/'
@@ -221,9 +155,9 @@ function run {
 }
 
 echo "Running '$TESTS' at: $(date)"
-read_dirs
+setup_lint
 for test in $TESTS; do
-  run "${test}" "${DEFAULT_FILES[@]}"
+  run "${test}" "${AVALANCHE_FILES[@]}"
 done
 
 echo "ALL SUCCESS!"

@@ -109,6 +109,7 @@ func TestBlockSyncer_ParameterizedTests(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			env := newTestEnvironment(t, tt.numBlocks)
 			require.NoError(t, env.prePopulateBlocks(tt.prePopulateBlocks))
 
@@ -128,6 +129,7 @@ func TestBlockSyncer_ParameterizedTests(t *testing.T) {
 }
 
 func TestBlockSyncer_ContextCancellation(t *testing.T) {
+	t.Parallel()
 	env := newTestEnvironment(t, 10)
 	syncer, err := env.createSyncer(5, 3)
 	require.NoError(t, err)
