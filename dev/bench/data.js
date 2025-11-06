@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1762356312997,
+  "lastUpdate": 1762432926507,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -3158,6 +3158,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
             "value": 41.97,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Stephen Buttolph",
+            "username": "StephenButtolph",
+            "email": "stephen@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "3d3a5944c50cee84df2b8b81e4807a1c9b06d104",
+          "message": "Cleanup the version package (#4465)\n\nSigned-off-by: Stephen Buttolph <stephen@avalabs.org>\nCo-authored-by: Copilot <175728472+Copilot@users.noreply.github.com>",
+          "timestamp": "2025-11-05T22:05:51Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/3d3a5944c50cee84df2b8b81e4807a1c9b06d104"
+        },
+        "date": 1762432926043,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
+            "value": 72.35,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
