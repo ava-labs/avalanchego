@@ -45,8 +45,8 @@ import (
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"
-	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 	statesyncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
+	commonEng "github.com/ava-labs/avalanchego/snow/engine/common"
 )
 
 type SyncerVMTest struct {

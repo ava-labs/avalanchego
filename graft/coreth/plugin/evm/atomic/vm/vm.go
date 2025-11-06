@@ -48,11 +48,11 @@ import (
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 
 	avalanchedatabase "github.com/ava-labs/avalanchego/database"
+	atomicstate "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
+	atomicsync "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/sync"
 	avalanchegossip "github.com/ava-labs/avalanchego/network/p2p/gossip"
 	avalanchecommon "github.com/ava-labs/avalanchego/snow/engine/common"
 	avalancheutils "github.com/ava-labs/avalanchego/utils"
-	atomicstate "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
-	atomicsync "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/sync"
 )
 
 var (
