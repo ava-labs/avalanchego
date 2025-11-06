@@ -15,64 +15,10 @@ on:
         default: ''
       block-dir-src:
         description: 'The source block directory. Supports S3 directory/zip and local directories.'
-        type: choice
         default: ''
-        options:
-          - ''
-          - cchain-mainnet-blocks-200-ldb
-          - cchain-mainnet-blocks-10k-ldb
-          - cchain-mainnet-blocks-1m-ldb
-          - cchain-mainnet-blocks-1-10m-ldb
-          - cchain-mainnet-blocks-10m-20m-ldb
-          - cchain-mainnet-blocks-20m-30m-ldb
-          - cchain-mainnet-blocks-30m-40m-ldb
-          - cchain-mainnet-blocks-40m-50m-ldb
-          - cchain-mainnet-blocks-50m-ldb
-          - cchain-mainnet-blocks-50m-60m-ldb
-          - cchain-mainnet-blocks-60m-69m-ldb
-          - cchain-mainnet-blocks-69m-ldb
-          - cchain-mainnet-blocks-69m-70m-ldb
       current-state-dir-src:
         description: 'The current state directory. Supports S3 directory/zip and local directories.'
         default: ''
-        type: choice
-        options:
-          - ''
-          - cchain-current-state-firewood-100
-          - cchain-current-state-firewood-1m
-          - cchain-current-state-firewood-10m
-          - cchain-current-state-firewood-20m
-          - cchain-current-state-firewood-30m
-          - cchain-current-state-firewood-33m
-          - cchain-current-state-firewood-40m
-          - cchain-current-state-firewood-50m
-          - cchain-current-state-hashdb-full-100
-          - cchain-current-state-hashdb-full-1k
-          - cchain-current-state-hashdb-full-1m
-          - cchain-current-state-hashdb-full-10m
-          - cchain-current-state-hashdb-full-20m
-          - cchain-current-state-hashdb-full-30m
-          - cchain-current-state-hashdb-full-33m
-          - cchain-current-state-hashdb-full-40m
-          - cchain-current-state-hashdb-full-50m
-          - cchain-current-state-hashdb-full-55m
-          - cchain-current-state-hashdb-full-60m
-          - cchain-current-state-hashdb-full-65m
-          - cchain-current-state-hashdb-full-68m
-          - cchain-current-state-hashdb-full-69m
-          - cchain-current-state-hashdb-archive-100
-          - cchain-current-state-hashdb-archive-1k
-          - cchain-current-state-hashdb-archive-2k
-          - cchain-current-state-hashdb-archive-3k
-          - cchain-current-state-hashdb-archive-1m
-          - cchain-current-state-hashdb-archive-10m
-          - cchain-current-state-hashdb-archive-20m
-          - cchain-current-state-hashdb-archive-30m
-          - cchain-current-state-hashdb-archive-33m
-          - cchain-current-state-hashdb-archive-40m
-          - cchain-current-state-hashdb-archive-50m
-          - cchain-current-state-hashdb-archive-60m
-          - cchain-current-state-hashdb-archive-69m
       task:
         description: 'Taskfile task to execute (e.g., c-chain-reexecution-hashdb-101-250k)'
         default: ''

@@ -3,7 +3,7 @@ description: 'Run C-Chain re-execution benchmark'
 
 inputs:
   task:
-    description: 'Task name to execute from Taskfile.yml. Leave empty to use granular inputs below.'
+    description: 'Task name to execute from Taskfile.yml. Leave empty to use custom inputs below.'
     default: ''
   # Custom inputs (alternative to task-based approach)
   config:
