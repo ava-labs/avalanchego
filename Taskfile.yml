@@ -4,6 +4,9 @@
 
 version: '3'
 
+env:
+  S3_BOOTSTRAP_BUCKET: 's3://avalanchego-bootstrap-testing'
+
 tasks:
   default: ./scripts/run_task.sh --list
 
@@ -142,8 +145,8 @@ tasks:
     desc: Imports the C-Chain block and state data to re-execute. Defaults to import the first 200 and the current state created with the default config of the C-Chain (hashdb).
     vars:
       EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR}}'
-      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-200-ldb/**"}}'
-      CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC | default "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**"}}'
+      BLOCK_DIR_SRC: '{{.BLOCK_DIR_SRC | default (printf "%s/cchain-mainnet-blocks-200-ldb/**" .S3_BOOTSTRAP_BUCKET)}}'
+      CURRENT_STATE_DIR_SRC: '{{.CURRENT_STATE_DIR_SRC | default (printf "%s/cchain-current-state-hashdb-full-100/**" .S3_BOOTSTRAP_BUCKET)}}'
     cmds:
       - task: import-s3-to-dir
         vars:
@@ -295,6 +298,18 @@ tasks:
           TASK_NAME: '{{.TASK}}'
           START_BLOCK: 33000001
           END_BLOCK: 33500000
+          BLOCK_DIR_SRC: 'cchain-mainnet-blocks-30m-40m-ldb'
+          CURRENT_STATE_DIR_SRC: 'cchain-current-state-firewood-33m'
+          CONFIG: firewood
+
+  c-chain-reexecution-firewood-33m-40m:
+    desc: C-Chain re-execution from block 33m to 40m with firewood
+    cmds:
+      - task: reexecute-cchain-range-with-copied-data
+        vars:
+          TASK_NAME: '{{.TASK}}'
+          START_BLOCK: 33000001
+          END_BLOCK: 40000000
           BLOCK_DIR_SRC: 'cchain-mainnet-blocks-30m-40m-ldb'
           CURRENT_STATE_DIR_SRC: 'cchain-current-state-firewood-33m'
           CONFIG: firewood

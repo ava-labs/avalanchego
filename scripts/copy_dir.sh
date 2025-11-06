@@ -3,10 +3,6 @@
 set -euo pipefail
 
 # Usage: ./scripts/copy_dir.sh source_directory destination_directory
-# Sources can be:
-#   - S3 URLs (s3://bucket/path)
-#   - S3 object keys (will be expanded to s3://avalanchego-bootstrap-testing/<key>/**)
-#   - Local file paths
 # Assumes s5cmd has been installed and is available in the PATH.
 # s5cmd is included in the nix dev shell.
 
@@ -24,8 +20,9 @@ DST="$2"
 
 # If SRC doesn't start with s3:// or /, assume it's an S3 object key
 if [[ "$SRC" != s3://* ]] && [[ "$SRC" != /* ]]; then
-    SRC="s3://avalanchego-bootstrap-testing/${SRC}/**"
-    echo "Expanded object key to: $SRC"
+    echo "Error: SRC must be either an S3 URL (s3://...), a local path (/...), or already expanded"
+    echo "If using an object key, expand it before calling this script"
+    exit 1
 fi
 
 # Function to copy from a single source to destination
