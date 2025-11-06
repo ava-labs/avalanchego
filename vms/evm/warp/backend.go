@@ -30,7 +30,7 @@ const (
 )
 
 var (
-	_ acp118.Verifier = (*verifier)(nil)
+	_ acp118.Verifier = (*Verifier)(nil)
 
 	messageCacheSize = 500
 
@@ -154,8 +154,8 @@ func (s *Signer) Sign(ctx context.Context, msg *warp.UnsignedMessage) ([]byte, e
 	return sig, nil
 }
 
-// verifier implements acp118.Verifier and validates whether a warp message should be signed.
-type verifier struct {
+// Verifier implements acp118.Verifier and validates whether a warp message should be signed.
+type Verifier struct {
 	db            *DB
 	blockClient   BlockStore
 	uptimeTracker *uptimetracker.UptimeTracker
@@ -176,8 +176,8 @@ func NewVerifier(
 	uptimeTracker *uptimetracker.UptimeTracker,
 	networkID uint32,
 	sourceChainID ids.ID,
-) acp118.Verifier {
-	return &verifier{
+) *Verifier {
+	return &Verifier{
 		db:                          db,
 		blockClient:                 blockClient,
 		uptimeTracker:               uptimeTracker,
@@ -191,7 +191,7 @@ func NewVerifier(
 }
 
 // Verify implements acp118.Verifier and validates whether a warp message should be signed.
-func (v *verifier) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMessage, _ []byte) *common.AppError {
+func (v *Verifier) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMessage, _ []byte) *common.AppError {
 	messageID := unsignedMessage.ID()
 	// Known on-chain messages should be signed
 	if _, err := v.db.Get(messageID); err == nil {
@@ -228,7 +228,7 @@ func (v *verifier) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMes
 
 // verifyBlockMessage returns nil if blockHashPayload contains the ID
 // of an accepted block indicating it should be signed by the VM.
-func (v *verifier) verifyBlockMessage(ctx context.Context, blockHashPayload *payload.Hash) *common.AppError {
+func (v *Verifier) verifyBlockMessage(ctx context.Context, blockHashPayload *payload.Hash) *common.AppError {
 	blockID := blockHashPayload.Hash
 	_, err := v.blockClient.GetBlock(ctx, blockID)
 	if err != nil {
@@ -243,7 +243,7 @@ func (v *verifier) verifyBlockMessage(ctx context.Context, blockHashPayload *pay
 }
 
 // verifyOffchainAddressedCall verifies the addressed call message
-func (v *verifier) verifyOffchainAddressedCall(addressedCall *payload.AddressedCall) *common.AppError {
+func (v *Verifier) verifyOffchainAddressedCall(addressedCall *payload.AddressedCall) *common.AppError {
 	// Further, parse the payload to see if it is a known type.
 	parsed, err := message.Parse(addressedCall.Payload)
 	if err != nil {
@@ -278,7 +278,7 @@ func (v *verifier) verifyOffchainAddressedCall(addressedCall *payload.AddressedC
 	return nil
 }
 
-func (v *verifier) verifyUptimeMessage(uptimeMsg *message.ValidatorUptime) *common.AppError {
+func (v *Verifier) verifyUptimeMessage(uptimeMsg *message.ValidatorUptime) *common.AppError {
 	currentUptime, _, err := v.uptimeTracker.GetUptime(uptimeMsg.ValidationID)
 	if err != nil {
 		return &common.AppError{
@@ -296,21 +296,6 @@ func (v *verifier) verifyUptimeMessage(uptimeMsg *message.ValidatorUptime) *comm
 		}
 	}
 
-	return nil
-}
-
-// AddAndSign adds a warp message to the database and signs it.
-// This is the typical entry point when a message is created on-chain (e.g., via the warp precompile).
-func AddAndSign(ctx context.Context, db *DB, signer *Signer, unsignedMessage *warp.UnsignedMessage) error {
-	if err := db.Add(unsignedMessage); err != nil {
-		return err
-	}
-
-	// Fill the signature cache now so subsequent requests can serve the
-	// signature without repeating verification or signing work.
-	if _, err := signer.Sign(ctx, unsignedMessage); err != nil {
-		return err
-	}
 	return nil
 }
 

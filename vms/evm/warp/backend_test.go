@@ -69,7 +69,7 @@ func TestAddAndGetValidMessage(t *testing.T) {
 	ctx := context.Background()
 
 	// Add testUnsignedMessage to the warp backend
-	require.NoError(t, AddAndSign(ctx, messageDB, signer, testUnsignedMessage))
+	require.NoError(t, messageDB.Add(testUnsignedMessage))
 
 	// Verify that a signature is returned successfully, and compare to expected signature.
 	signature, err := signer.Sign(ctx, testUnsignedMessage)
@@ -155,7 +155,7 @@ func TestZeroSizedCache(t *testing.T) {
 	ctx := context.Background()
 
 	// Add testUnsignedMessage to the warp backend
-	require.NoError(t, AddAndSign(ctx, messageDB, signer, testUnsignedMessage))
+	require.NoError(t, messageDB.Add(testUnsignedMessage))
 
 	// Verify that a signature is returned successfully, and compare to expected signature.
 	signature, err := signer.Sign(ctx, testUnsignedMessage)
@@ -239,7 +239,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 
 	tests := map[string]struct {
 		setup       func(db *DB, signer *Signer) (request []byte, expectedResponse []byte)
-		verifyStats func(t *testing.T, v *verifier)
+		verifyStats func(t *testing.T, v *Verifier)
 		err         *common.AppError
 	}{
 		"known message": {
@@ -250,10 +250,10 @@ func TestAddressedCallSignatures(t *testing.T) {
 				require.NoError(t, err)
 				signature, err := snowCtx.WarpSigner.Sign(msg)
 				require.NoError(t, err)
-				require.NoError(t, AddAndSign(context.Background(), db, signer, msg))
+				require.NoError(t, db.Add(msg))
 				return msg.Bytes(), signature
 			},
-			verifyStats: func(t *testing.T, v *verifier) {
+			verifyStats: func(t *testing.T, v *Verifier) {
 				require.Zero(t, v.messageParseFail.Snapshot().Count())
 				require.Zero(t, v.blockValidationFail.Snapshot().Count())
 			},
@@ -262,7 +262,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 			setup: func(_ *DB, _ *Signer) (request []byte, expectedResponse []byte) {
 				return offchainMessage.Bytes(), offchainSignature
 			},
-			verifyStats: func(t *testing.T, v *verifier) {
+			verifyStats: func(t *testing.T, v *Verifier) {
 				require.Zero(t, v.messageParseFail.Snapshot().Count())
 				require.Zero(t, v.blockValidationFail.Snapshot().Count())
 			},
@@ -275,7 +275,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 				require.NoError(t, err)
 				return unknownMessage.Bytes(), nil
 			},
-			verifyStats: func(t *testing.T, v *verifier) {
+			verifyStats: func(t *testing.T, v *Verifier) {
 				require.Equal(t, int64(1), v.messageParseFail.Snapshot().Count())
 				require.Zero(t, v.blockValidationFail.Snapshot().Count())
 			},
@@ -309,7 +309,7 @@ func TestAddressedCallSignatures(t *testing.T) {
 				require.NoError(t, err)
 				responseBytes, appErr := handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
 				require.ErrorIs(t, appErr, test.err)
-				test.verifyStats(t, v.(*verifier))
+				test.verifyStats(t, v)
 
 				// If the expected response is empty, assert that the handler returns an empty response and return early.
 				if len(expectedResponse) == 0 {
@@ -357,7 +357,7 @@ func TestBlockSignatures(t *testing.T) {
 
 	tests := map[string]struct {
 		setup       func() (request []byte, expectedResponse []byte)
-		verifyStats func(t *testing.T, v *verifier)
+		verifyStats func(t *testing.T, v *Verifier)
 		err         *common.AppError
 	}{
 		"known block": {
@@ -370,7 +370,7 @@ func TestBlockSignatures(t *testing.T) {
 				require.NoError(t, err)
 				return toMessageBytes(knownBlkID), signature
 			},
-			verifyStats: func(t *testing.T, v *verifier) {
+			verifyStats: func(t *testing.T, v *Verifier) {
 				require.Zero(t, v.blockValidationFail.Snapshot().Count())
 				require.Zero(t, v.messageParseFail.Snapshot().Count())
 			},
@@ -380,7 +380,7 @@ func TestBlockSignatures(t *testing.T) {
 				unknownBlockID := ids.GenerateTestID()
 				return toMessageBytes(unknownBlockID), nil
 			},
-			verifyStats: func(t *testing.T, v *verifier) {
+			verifyStats: func(t *testing.T, v *Verifier) {
 				require.Equal(t, int64(1), v.blockValidationFail.Snapshot().Count())
 				require.Zero(t, v.messageParseFail.Snapshot().Count())
 			},
@@ -415,7 +415,7 @@ func TestBlockSignatures(t *testing.T) {
 				responseBytes, appErr := handler.AppRequest(t.Context(), ids.GenerateTestNodeID(), time.Time{}, protoBytes)
 				require.ErrorIs(t, appErr, test.err)
 
-				test.verifyStats(t, v.(*verifier))
+				test.verifyStats(t, v)
 
 				// If the expected response is empty, require that the handler returns an empty response and return early.
 				if len(expectedResponse) == 0 {
