@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 
-	"github.com/ava-labs/coreth/triedb/firewood"
+	"github.com/ava-labs/avalanchego/graft/coreth/triedb/firewood"
 )
 
 var (

@@ -10,9 +10,9 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/libevm/core/types"
 
-	"github.com/ava-labs/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 
-	syncclient "github.com/ava-labs/coreth/sync/client"
+	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 )
 
 // Syncer is the common interface for all sync operations.

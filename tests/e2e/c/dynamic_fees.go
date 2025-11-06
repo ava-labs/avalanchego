@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/cortina"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/cortina"
 	"github.com/ava-labs/libevm/accounts/abi"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"

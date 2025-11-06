@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/libevm/common/hexutil"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/params"
 )
 
 type testSuggestPriceOptionsBackend struct {

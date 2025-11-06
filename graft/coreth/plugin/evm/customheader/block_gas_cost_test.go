@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/coreth/params/extras"
-	"github.com/ava-labs/coreth/plugin/evm/customtypes"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap4"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap4"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 )
 
 func TestBlockGasCost(t *testing.T) {

@@ -12,8 +12,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/ulimit"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm"
 
-	"github.com/ava-labs/coreth/plugin/evm"
-	"github.com/ava-labs/coreth/plugin/factory"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/factory"
 )
 
 func main() {

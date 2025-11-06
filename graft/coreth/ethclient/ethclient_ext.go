@@ -13,11 +13,11 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 
 	// Force-load precompiles to trigger registration
-	_ "github.com/ava-labs/coreth/precompile/registry"
+	_ "github.com/ava-labs/avalanchego/graft/coreth/precompile/registry"
 
-	"github.com/ava-labs/coreth/accounts/abi/bind"
-	"github.com/ava-labs/coreth/interfaces"
-	"github.com/ava-labs/coreth/rpc"
+	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
+	"github.com/ava-labs/avalanchego/graft/coreth/interfaces"
+	"github.com/ava-labs/avalanchego/graft/coreth/rpc"
 
 	ethereum "github.com/ava-labs/libevm"
 )

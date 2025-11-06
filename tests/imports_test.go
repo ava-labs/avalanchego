@@ -24,8 +24,8 @@ func TestMustNotImport(t *testing.T) {
 
 	// These packages configure libevm globally by registering custom types and extras.
 	illegalPaths := []string{
-		"github.com/ava-labs/coreth/params",
-		"github.com/ava-labs/coreth/plugin/evm/customtypes",
+		"github.com/ava-labs/avalanchego/graft/coreth/params",
+		"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes",
 	}
 	mustNotImport := map[string][]string{
 		"tests/":            illegalPaths,
