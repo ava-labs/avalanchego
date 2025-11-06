@@ -3,8 +3,24 @@ description: 'Run C-Chain re-execution benchmark'
 
 inputs:
   task:
-    description: 'Task name to execute from Taskfile.yml'
-    required: true
+    description: 'Task name to execute from Taskfile.yml. Leave empty to use granular inputs below.'
+    default: ''
+  # Custom inputs (alternative to task-based approach)
+  config:
+    description: 'The config to pass to the VM for the benchmark. See BenchmarkReexecuteRange for details.'
+    default: ''
+  start-block:
+    description: 'The start block for the benchmark.'
+    default: ''
+  end-block:
+    description: 'The end block for the benchmark.'
+    default: ''
+  block-dir-src:
+    description: 'The source block directory. Supports S3 directory/zip and local directories.'
+    default: ''
+  current-state-dir-src:
+    description: 'The current state directory. Supports S3 directory/zip and local directories.'
+    default: ''
   runner_name:
     description: 'The name of the runner to use and include in the Golang Benchmark name.'
     required: true
@@ -110,6 +126,22 @@ runs:
         role-to-assume: ${{ inputs.aws-role }}
         aws-region: ${{ inputs.aws-region }}
         role-duration-seconds: ${{ inputs.aws-role-duration-seconds }}
+    - name: Validate inputs
+      shell: bash
+      run: |
+        if [[ -z "${{ inputs.task }}" ]]; then
+          # Granular mode - validate required inputs
+          missing=()
+          [[ -z "${{ inputs.block-dir-src }}" ]] && missing+=("block-dir-src")
+          [[ -z "${{ inputs.current-state-dir-src }}" ]] && missing+=("current-state-dir-src")
+          [[ -z "${{ inputs.start-block }}" ]] && missing+=("start-block")
+          [[ -z "${{ inputs.end-block }}" ]] && missing+=("end-block")
+
+          if [[ ${#missing[@]} -gt 0 ]]; then
+            echo "::error::When 'task' is empty, the following inputs are required: ${missing[*]}"
+            exit 1
+          fi
+        fi
     - name: Set task env
       shell: bash
       run: |
@@ -118,9 +150,24 @@ runs:
         echo "BENCHMARK_OUTPUT_FILE=${GITHUB_WORKSPACE}/benchmark-output.txt" >> "$GITHUB_ENV"
     - name: Run C-Chain Re-execution Benchmark
       shell: nix develop --impure --command bash -x {0}
-      run: ./scripts/run_task.sh ${{ inputs.task }} \
-        BENCHMARK_OUTPUT_FILE="${{ env.BENCHMARK_OUTPUT_FILE }}" \
-        EXECUTION_DATA_DIR="${{ env.EXECUTION_DATA_DIR }}"
+      run: |
+        if [[ -n "${{ inputs.task }}" ]]; then
+          # Task-based approach
+          ./scripts/run_task.sh ${{ inputs.task }} \
+            BENCHMARK_OUTPUT_FILE="${{ env.BENCHMARK_OUTPUT_FILE }}" \
+            EXECUTION_DATA_DIR="${{ env.EXECUTION_DATA_DIR }}"
+        else
+          # Granular approach
+          ./scripts/run_task.sh reexecute-cchain-range-with-copied-data \
+            CONFIG=${{ inputs.config }} \
+            EXECUTION_DATA_DIR=${{ env.EXECUTION_DATA_DIR }} \
+            BLOCK_DIR_SRC=${{ inputs.block-dir-src }} \
+            CURRENT_STATE_DIR_SRC=${{ inputs.current-state-dir-src }} \
+            START_BLOCK=${{ inputs.start-block }} \
+            END_BLOCK=${{ inputs.end-block }} \
+            BENCHMARK_OUTPUT_FILE="${{ env.BENCHMARK_OUTPUT_FILE }}" \
+            TASK_NAME="custom-reexecution"
+        fi
       env:
         RUNNER_NAME: ${{ inputs.runner_name }}
         METRICS_COLLECTOR_ENABLED: ${{ inputs.prometheus-username != '' }}
