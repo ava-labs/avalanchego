@@ -28,7 +28,6 @@ require (
 	github.com/cockroachdb/pebble v0.0.0-20230928194634-aa077af62593
 	github.com/compose-spec/compose-go v1.20.2
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.4.0
-	github.com/fjl/gencodec v0.1.1
 	github.com/go-cmd/cmd v1.4.3
 	github.com/google/btree v1.1.2
 	github.com/google/go-cmp v0.7.0
@@ -92,7 +91,6 @@ require (
 require (
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.1.0 // indirect
-	github.com/garslo/gogen v0.0.0-20230926014519-f497ca02dd4c // indirect
 )
 
 require (
