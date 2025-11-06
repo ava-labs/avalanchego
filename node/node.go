@@ -788,7 +788,12 @@ func (n *Node) initDatabase() error {
 		n.Log,
 	)
 	if err != nil {
-		return fmt.Errorf("couldn't create database: %w", err)
+		return err
+	}
+
+	n.DB, err = meterdb.New(meterDBReg, db)
+	if err != nil {
+		return err
 	}
 
 	meterDBReg, err := metrics.MakeAndRegister(
