@@ -791,7 +791,7 @@ func Test_ChangeProof_Missing_History_For_EndRoot(t *testing.T) {
 	require := require.New(t)
 	seed := time.Now().UnixNano()
 	t.Logf("Seed: %d", seed)
-	rand := rand.New(rand.NewSource(seed)) // #nosec G404
+	rand := rand.New(rand.NewSource(seed))
 
 	config := NewConfig()
 	db, err := newDatabase(
@@ -1492,7 +1492,7 @@ func TestVerifyProofPath(t *testing.T) {
 func TestProofNodeUnmarshalProtoInvalidChildBytes(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
+	rand := rand.New(rand.NewSource(now))
 
 	node := newRandomProofNode(rand)
 	protoNode := node.toProto()
@@ -1509,7 +1509,7 @@ func TestProofNodeUnmarshalProtoInvalidChildBytes(t *testing.T) {
 func TestProofNodeUnmarshalProtoInvalidChildIndex(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
+	rand := rand.New(rand.NewSource(now))
 
 	node := newRandomProofNode(rand)
 	protoNode := node.toProto()
@@ -1525,7 +1525,7 @@ func TestProofNodeUnmarshalProtoInvalidChildIndex(t *testing.T) {
 func TestProofNodeUnmarshalProtoMissingFields(t *testing.T) {
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
+	rand := rand.New(rand.NewSource(now))
 
 	type test struct {
 		name        string
@@ -1568,7 +1568,7 @@ func FuzzProofNodeProtoMarshalUnmarshal(f *testing.F) {
 		randSeed int64,
 	) {
 		require := require.New(t)
-		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
+		rand := rand.New(rand.NewSource(randSeed))
 		node := newRandomProofNode(rand)
 
 		// Marshal and unmarshal it.
@@ -1590,7 +1590,7 @@ func FuzzRangeProofProtoMarshalUnmarshal(f *testing.F) {
 		randSeed int64,
 	) {
 		require := require.New(t)
-		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
+		rand := rand.New(rand.NewSource(randSeed))
 
 		// Make a random range proof.
 		startProofLen := rand.Intn(32)
@@ -1630,7 +1630,7 @@ func FuzzChangeProofProtoMarshalUnmarshal(f *testing.F) {
 		randSeed int64,
 	) {
 		require := require.New(t)
-		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
+		rand := rand.New(rand.NewSource(randSeed))
 
 		// Make a random change proof.
 		startProofLen := rand.Intn(32)
@@ -1721,7 +1721,7 @@ func FuzzRangeProofInvariants(f *testing.F) {
 			t.SkipNow()
 		}
 
-		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
+		rand := rand.New(rand.NewSource(randSeed))
 
 		db, err := getBasicDB()
 		require.NoError(err)
@@ -1841,7 +1841,7 @@ func FuzzProofVerification(f *testing.F) {
 		randSeed int64,
 		numKeyValues uint,
 	) {
-		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
+		rand := rand.New(rand.NewSource(randSeed))
 		require := require.New(t)
 		db, err := getBasicDB()
 		require.NoError(err)
@@ -1873,9 +1873,9 @@ func FuzzProofVerification(f *testing.F) {
 
 		// Insert a new key-value pair
 		newKey := make([]byte, 32)
-		_, _ = rand.Read(newKey) // #nosec G404
+		_, _ = rand.Read(newKey)
 		newValue := make([]byte, 32)
-		_, _ = rand.Read(newValue) // #nosec G404
+		_, _ = rand.Read(newValue)
 		require.NoError(db.Put(newKey, newValue))
 
 		// Delete a key-value pair so database doesn't grow unbounded
@@ -1897,7 +1897,7 @@ func FuzzChangeProofVerification(f *testing.F) {
 		randSeed int64,
 	) {
 		require := require.New(t)
-		rand := rand.New(rand.NewSource(randSeed)) // #nosec G404
+		rand := rand.New(rand.NewSource(randSeed))
 
 		config := NewConfig()
 		db, err := newDatabase(
@@ -1972,7 +1972,7 @@ func Benchmark_RangeProofs(b *testing.B) {
 		maxLengthChangeProofPercentage = 0.1
 	)
 
-	rand := rand.New(rand.NewSource(time.Now().Unix())) // #nosec G404
+	rand := rand.New(rand.NewSource(time.Now().Unix()))
 
 	db, err := getBasicDB()
 	require.NoError(b, err)
@@ -2027,7 +2027,7 @@ func Benchmark_ChangeProofs(b *testing.B) {
 	)
 
 	b.StopTimer()
-	rand := rand.New(rand.NewSource(time.Now().Unix())) // #nosec G404
+	rand := rand.New(rand.NewSource(time.Now().Unix()))
 
 	db, err := getBasicDB()
 	require.NoError(b, err)

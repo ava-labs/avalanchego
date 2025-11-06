@@ -457,7 +457,7 @@ func TestReliableMessages(t *testing.T) {
 			vdrIDs := set.Of(ids.BuildTestNodeID([]byte{1}))
 
 			sender.SendPullQuery(t.Context(), vdrIDs, uint32(i), ids.Empty, 0)
-			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond))) // #nosec G404
+			time.Sleep(time.Duration(rand.Float64() * float64(time.Microsecond)))
 		}
 	}()
 
