@@ -48,17 +48,17 @@ func DialContext(ctx context.Context, rawurl string) (*Client, error) {
 // extBlockHook is a hook that is called when a block is decoded.
 type extBlockHook struct{}
 
-// extRpcBlock is the structure of the block extra data in the RPC response.
+// extRPCBlock is the structure of the block extra data in the RPC response.
 // It contains the version and the block extra data.
-type extRpcBlock struct {
+type extRPCBlock struct {
 	Version        uint32         `json:"version"`
 	BlockExtraData *hexutil.Bytes `json:"blockExtraData"`
 }
 
 // OnBlockDecoded is called when a block is decoded. It unmarshals the
 // extra data from the RPC response and sets it in the block with libevm extras.
-func (h *extBlockHook) OnBlockDecoded(raw json.RawMessage, block *types.Block) error {
-	var body extRpcBlock
+func (*extBlockHook) OnBlockDecoded(raw json.RawMessage, block *types.Block) error {
+	var body extRPCBlock
 	if err := json.Unmarshal(raw, &body); err != nil {
 		return fmt.Errorf("failed to unmarshal block extra data: %w", err)
 	}
