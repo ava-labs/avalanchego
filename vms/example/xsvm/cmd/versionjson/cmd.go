@@ -16,10 +16,10 @@ import (
 )
 
 type vmVersions struct {
-	Name       string            `json:"name"`
-	VMID       ids.ID            `json:"vmid"`
-	Version    *version.Semantic `json:"version"`
-	RPCChainVM uint64            `json:"rpcchainvm"`
+	Name       string `json:"name"`
+	VMID       ids.ID `json:"vmid"`
+	Version    string `json:"version"`
+	RPCChainVM uint64 `json:"rpcchainvm"`
 }
 
 func Command() *cobra.Command {
