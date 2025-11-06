@@ -115,6 +115,7 @@ var (
 
 	errInvalidTLSKey        = errors.New("invalid TLS key")
 	errShuttingDown         = errors.New("server shutting down")
+	errNoValidators         = errors.New("no validators in the current validator set")
 	errUpgradeWithinTheDay  = errors.New("unknown network upgrade detected - update as soon as possible")
 	errUpgradeWithinTheHour = errors.New("imminent network upgrade detected - update immediately")
 )
@@ -1499,7 +1500,7 @@ func (n *Node) initHealthAPI() error {
 			totalWeight += vdr.Weight
 		}
 		if totalWeight == 0 {
-			return nil, fmt.Errorf("no validators in the current validator set")
+			return nil, errNoValidators
 		}
 
 		var (
