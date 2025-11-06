@@ -7,6 +7,8 @@ if ! [[ "$0" =~ scripts/lint.sh ]]; then
   exit 255
 fi
 
+source ./scripts/lint_setup.sh
+
 # The -P option is not supported by the grep version installed by
 # default on macos. Since `-o errexit` is ignored in an if
 # conditional, triggering the problem here ensures script failure when
@@ -29,10 +31,20 @@ fi
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
 # TESTS='license_header' ./scripts/lint.sh
-TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
+TESTS=${TESTS:-"legacy_golangci_lint avalanche_golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
 
-function test_golangci_lint {
-  ./scripts/run_tool.sh golangci-lint run --config .golangci.yml
+function test_legacy_golangci_lint {
+  ./scripts/run_tool.sh golangci-lint run --config .legacy-golangci.yml ./graft/...
+}
+
+function test_avalanche_golangci_lint {
+  if [[ ! -f $AVALANCHE_LINT_FILE ]]; then
+    return 0
+  fi
+
+  ./scripts/run_tool.sh golangci-lint run \
+  --config "$AVALANCHE_LINT_FILE" \
+  || return 1
 }
 
 # automatically checks license headers
@@ -40,23 +52,26 @@ function test_golangci_lint {
 # TESTS='license_header' ADDLICENSE_FLAGS="--debug" ./scripts/lint.sh
 _addlicense_flags=${ADDLICENSE_FLAGS:-"--verify --debug"}
 function test_license_header {
-  local files=()
-  while IFS= read -r line; do files+=("$line"); done < <(
-    find . -type f -name '*.go' \
-      ! -name '*.pb.go' \
-      ! -name '*.connect.go' \
-      ! -name 'mock_*.go' \
-      ! -name 'mocks_*.go' \
-      ! -path './**/*mock/*.go' \
-      ! -name '*.canoto.go' \
-      ! -name '*.bindings.go'
-    )
+  # Run license tool
+  if [[ ${#UPSTREAM_FILES[@]} -gt 0 ]]; then
+    echo "Running license tool on upstream files with header for upstream..."
+    # shellcheck disable=SC2086
+   ./scripts/run_tool.sh go-license \
+      --config=./license_header_for_upstream.yml \
+      ${_addlicense_flags} \
+      "${UPSTREAM_FILES[@]}" \
+      || return 1
+  fi
 
-  # shellcheck disable=SC2086
-  ./scripts/run_tool.sh go-license \
-  --config=./header.yml \
-  ${_addlicense_flags} \
-  "${files[@]}"
+  if [[ ${#AVALANCHE_FILES[@]} -gt 0 ]]; then
+    echo "Running license tool on remaining files with default header..."
+    # shellcheck disable=SC2086
+    ./scripts/run_tool.sh go-license \
+      --config=./license_header.yml \
+      ${_addlicense_flags} \
+      "${AVALANCHE_FILES[@]}" \
+      || return 1
+  fi
 }
 
 function test_single_import {
@@ -137,6 +152,7 @@ function run {
 }
 
 echo "Running '$TESTS' at: $(date)"
+setup_lint
 for test in $TESTS; do
   run "${test}" "${TARGET}"
 done
