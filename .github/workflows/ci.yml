@@ -216,6 +216,14 @@ jobs:
       - uses: ./.github/actions/install-nix
       - shell: nix develop --command bash -x {0}
         run: task check-generate-load-contract-bindings
+  check_rlp:
+    name: Up-to-date rlp
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - shell: bash
+        run: ./scripts/run_task.sh check-generate-rlp
   go_mod_tidy:
     name: Up-to-date go.mod and go.sum
     runs-on: ubuntu-latest
