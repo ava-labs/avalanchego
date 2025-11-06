@@ -407,9 +407,9 @@ func applyManifest(
 ) error {
 	// Split the manifest into individual resources
 	decoder := yaml.NewDecodingSerializer(unstructured.UnstructuredJSONScheme)
-	documents := strings.Split(string(manifest), "\n---\n")
+	documents := strings.SplitSeq(string(manifest), "\n---\n")
 
-	for _, doc := range documents {
+	for doc := range documents {
 		doc := strings.TrimSpace(doc)
 		if strings.TrimSpace(doc) == "" || strings.HasPrefix(doc, "#") {
 			continue
