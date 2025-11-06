@@ -528,7 +528,7 @@ func (p *peer) writeMessages() {
 		return
 	}
 
-	myVersion := p.VersionCompatibility.Version()
+	myVersion := p.VersionCompatibility.Current
 	knownPeersFilter, knownPeersSalt := p.Network.KnownPeers()
 
 	_, areWeAPrimaryNetworkValidator := p.Validators.GetValidator(constants.PrimaryNetworkID, p.MyNodeID)
@@ -709,12 +709,12 @@ func (p *peer) sendNetworkMessages() {
 // changes. It's called when sending a Ping rather than in a validator set
 // callback to avoid signature verification on the P-chain accept path.
 func (p *peer) shouldDisconnect() bool {
-	if err := p.VersionCompatibility.Compatible(p.version); err != nil {
+	if !p.VersionCompatibility.Compatible(p.version) {
 		p.Log.Debug(disconnectingLog,
 			zap.String("reason", "version not compatible"),
 			zap.Stringer("nodeID", p.id),
+			zap.Stringer("myVersion", p.VersionCompatibility.Current),
 			zap.Stringer("peerVersion", p.version),
-			zap.Error(err),
 		)
 		return true
 	}
@@ -897,13 +897,14 @@ func (p *peer) handleHandshake(msg *p2p.Handshake) {
 		Patch: int(msg.Client.GetPatch()),
 	}
 
-	if p.VersionCompatibility.Version().Before(p.version) {
+	if myVersion := p.VersionCompatibility.Current; myVersion.Compare(p.version) < 0 {
 		log := p.Log.Debug
 		if _, ok := p.Beacons.GetValidator(constants.PrimaryNetworkID, p.id); ok {
 			log = p.Log.Info
 		}
 		log("peer attempting to connect with newer version. You may want to update your client",
 			zap.Stringer("nodeID", p.id),
+			zap.Stringer("myVersion", myVersion),
 			zap.Stringer("peerVersion", p.version),
 		)
 	}
