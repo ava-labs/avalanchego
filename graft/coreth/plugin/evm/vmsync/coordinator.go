@@ -6,6 +6,7 @@ package vmsync
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -35,7 +36,8 @@ var (
 // Callbacks allows the coordinator to delegate VM-specific work back to the client.
 type Callbacks struct {
 	// FinalizeVM performs the same actions as finishSync/commitVMMarkers in the client.
-	FinalizeVM func(target message.Syncable) error
+	// The context is used for cancellation checks during finalization.
+	FinalizeVM func(ctx context.Context, target message.Syncable) error
 	// OnDone is called when the coordinator finishes (successfully or with error).
 	OnDone func(err error)
 }
@@ -51,11 +53,11 @@ type Coordinator struct {
 	callbacks      Callbacks
 	// doneOnce ensures [Callbacks.OnDone] is invoked at most once.
 	doneOnce sync.Once
-	// cancel cancels the syncers' context (with cause) when aborting or finishing.
-	cancel context.CancelCauseFunc
 
 	// pivot policy to throttle [Coordinator.UpdateSyncTarget] calls.
-	pivot *pivot
+	pivot *pivotPolicy
+
+	pivotInterval uint64
 }
 
 // CoordinatorOption follows the functional options pattern for Coordinator.
@@ -64,11 +66,7 @@ type CoordinatorOption = options.Option[Coordinator]
 // WithPivotInterval configures the interval-based pivot policy. 0 disables it.
 func WithPivotInterval(interval uint64) CoordinatorOption {
 	return options.Func[Coordinator](func(co *Coordinator) {
-		if interval == 0 {
-			co.pivot = nil
-			return
-		}
-		co.pivot = newPivotPolicy(interval)
+		co.pivotInterval = interval
 	})
 }
 
@@ -82,6 +80,7 @@ func NewCoordinator(syncerRegistry *SyncerRegistry, cbs Callbacks, opts ...Coord
 
 	options.ApplyTo(co, opts...)
 
+	co.pivot = newPivotPolicy(co.pivotInterval)
 	co.state.Store(int32(StateIdle))
 
 	return co
@@ -94,46 +93,57 @@ func (co *Coordinator) Start(ctx context.Context, initial message.Syncable) {
 	co.target.Store(initial)
 
 	cctx, cancel := context.WithCancelCause(ctx)
-	co.cancel = cancel
 	g := co.syncerRegistry.StartAsync(cctx, initial)
 
 	co.state.Store(int32(StateRunning))
 
 	go func() {
 		if err := g.Wait(); err != nil {
-			co.finish(err)
+			co.finish(cancel, err)
 			return
 		}
 		// All syncers finished successfully: finalize VM and execute the queued batch.
-		if err := co.ApplyQueuedBatch(cctx); err != nil {
-			co.finish(err)
+		if err := co.ProcessQueuedBlockOperations(cctx); err != nil {
+			co.finish(cancel, err)
 			return
 		}
-		co.finish(nil)
+		co.finish(cancel, nil)
 	}()
 }
 
-// ApplyQueuedBatch finalizes the VM at the current target and processes the
+// ProcessQueuedBlockOperations finalizes the VM at the current target and processes the
 // queued operations in FIFO order. Intended to be called after a target update
 // cycle when it's time to process the queued operations.
-func (co *Coordinator) ApplyQueuedBatch(ctx context.Context) error {
+func (co *Coordinator) ProcessQueuedBlockOperations(ctx context.Context) error {
+	// Check for cancellation before starting finalization phase.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	co.state.Store(int32(StateFinalizing))
+
 	if co.callbacks.FinalizeVM != nil {
 		loaded := co.target.Load()
 		current, ok := loaded.(message.Syncable)
 		if !ok {
 			return errInvalidTargetType
 		}
-		if err := co.callbacks.FinalizeVM(current); err != nil {
+		// FinalizeVM should complete atomically. The context is passed for internal
+		// cancellation checks, but the coordinator expects completion or an error.
+		if err := co.callbacks.FinalizeVM(ctx, current); err != nil {
 			return err
 		}
 	}
+
 	co.state.Store(int32(StateExecutingBatch))
-	if co.queue != nil {
-		if err := co.queue.ProcessQueue(ctx); err != nil {
-			return err
-		}
+
+	// Execute queued block operations sequentially. Each operation can be
+	// cancelled individually, but the batch execution itself is not atomic - partial completion
+	// is acceptable as operations are idempotent.
+	if err := co.executeBlockOperationBatch(ctx); err != nil {
+		return err
 	}
+
 	return nil
 }
 
@@ -141,6 +151,7 @@ func (co *Coordinator) ApplyQueuedBatch(ctx context.Context) error {
 // It is only valid in the [StateRunning] state.
 // Note: no batch execution occurs here. Batches are only executed after
 // finalization.
+// Note: Syncers manage cancellation themselves through their Sync() contexts.
 func (co *Coordinator) UpdateSyncTarget(newTarget message.Syncable) error {
 	if co.CurrentState() != StateRunning {
 		return errInvalidState
@@ -151,9 +162,7 @@ func (co *Coordinator) UpdateSyncTarget(newTarget message.Syncable) error {
 	}
 
 	// Remove blocks from queue that will never be executed (behind the new target).
-	if co.queue != nil {
-		co.queue.RemoveBlocksBelowHeight(newTarget.Height())
-	}
+	co.queue.removeBelowHeight(newTarget.Height())
 
 	co.target.Store(newTarget)
 
@@ -173,21 +182,49 @@ func (co *Coordinator) AddBlockOperation(b EthBlockWrapper, op BlockOperation) b
 	if b == nil || co.CurrentState() != StateRunning {
 		return false
 	}
-	return co.queue.Enqueue(b, op)
+	return co.queue.enqueue(b, op)
 }
 
 func (co *Coordinator) CurrentState() State {
 	return State(co.state.Load())
 }
 
-func (co *Coordinator) finish(err error) {
+// executeBlockOperationBatch executes all queued block operations in FIFO order.
+// Each operation can be cancelled individually, but the batch execution itself
+// is not atomic - partial completion is acceptable as operations are idempotent.
+func (co *Coordinator) executeBlockOperationBatch(ctx context.Context) error {
+	operations := co.queue.dequeueBatch()
+	for i, op := range operations {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("executeBlockOperationBatch cancelled at operation %d/%d: %w", i, len(operations), ctx.Err())
+		default:
+		}
+
+		var err error
+		switch op.operation {
+		case OpAccept:
+			err = op.block.Accept(ctx)
+		case OpReject:
+			err = op.block.Reject(ctx)
+		case OpVerify:
+			err = op.block.Verify(ctx)
+		}
+		if err != nil {
+			return fmt.Errorf("executeBlockOperationBatch failed at operation %d/%d (%v): %w", i, len(operations), op.operation, err)
+		}
+	}
+	return nil
+}
+
+func (co *Coordinator) finish(cancel context.CancelCauseFunc, err error) {
 	if err != nil {
 		co.state.Store(int32(StateAborted))
 	} else {
 		co.state.Store(int32(StateCompleted))
 	}
-	if co.cancel != nil {
-		co.cancel(err)
+	if cancel != nil {
+		cancel(err)
 	}
 	if co.callbacks.OnDone != nil {
 		co.doneOnce.Do(func() { co.callbacks.OnDone(err) })

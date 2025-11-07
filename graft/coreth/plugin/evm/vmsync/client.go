@@ -5,7 +5,6 @@ package vmsync
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 
@@ -18,31 +17,21 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/blocksync"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/blocksync"
 	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync"
 )
 
 // BlocksToFetch is the number of the block parents the state syncs to.
 // The last 256 block hashes are necessary to support the BLOCKHASH opcode.
 const BlocksToFetch = 256
 
-var (
-	errSkipSync         = fmt.Errorf("skip sync")
-	stateSyncSummaryKey = []byte("stateSyncSummary")
-)
-
-// BlockAcceptor provides a mechanism to update the last accepted block ID during state synchronization.
-// This interface is used by the state sync process to ensure the blockchain state
-// is properly updated when new blocks are synchronized from the network.
-type BlockAcceptor interface {
-	PutLastAcceptedID(ids.ID) error
-}
+var stateSyncSummaryKey = []byte("stateSyncSummary")
 
 // SyncStrategy defines how state sync is executed.
 // Implementations handle syncer orchestration and block processing during sync.
@@ -58,6 +47,11 @@ type SyncStrategy interface {
 
 	// OnBlockVerified handles a block verified during sync.
 	OnBlockVerified(EthBlockWrapper) (bool, error)
+}
+
+// BlockAcceptor provides a mechanism to update the last accepted block ID during state synchronization.
+type BlockAcceptor interface {
+	PutLastAcceptedID(ids.ID) error
 }
 
 // EthBlockWrapper can be implemented by a concrete block wrapper type to
@@ -105,10 +99,11 @@ type ClientConfig struct {
 type client struct {
 	config           *ClientConfig
 	resumableSummary message.Syncable
-	strategy         SyncStrategy // strategy manages sync execution (static or dynamic)
 	cancel           context.CancelFunc
 	wg               sync.WaitGroup
 	err              error
+	stateSyncOnce    sync.Once
+	strategy         SyncStrategy // strategy manages sync execution (static or dynamic)
 }
 
 func NewClient(config *ClientConfig) Client {
@@ -205,52 +200,40 @@ func (c *client) OnEngineVerify(b EthBlockWrapper) (bool, error) {
 	return c.strategy.OnBlockVerified(b)
 }
 
+func (c *client) Shutdown() error {
+	c.signalDone(context.Canceled)
+	c.wg.Wait()
+	return nil
+}
+
+// Error returns a non-nil error if one occurred during the sync.
+func (c *client) Error() error {
+	return c.err
+}
 
 // acceptSyncSummary returns true if sync will be performed and launches the state sync process
 // in a goroutine.
-func (c *client) acceptSyncSummary(summary message.Syncable) (block.StateSyncMode, error) {
-	if err := c.prepareForSync(summary); err != nil {
-		if errors.Is(err, errSkipSync) {
-			return block.StateSyncSkipped, nil
-		}
-		return block.StateSyncSkipped, err
-	}
+func (c *client) acceptSyncSummary(proposedSummary message.Syncable) (block.StateSyncMode, error) {
+	// If dynamic sync is already running, treat new summaries as target updates.
+	// if ds, ok := c.strategy.(*dynamicStrategy); ok && ds.CurrentState() == StateRunning {
+	// 	if err := ds.UpdateSyncTarget(proposedSummary); err != nil {
+	// 		return block.StateSyncSkipped, err
+	// 	}
+	// 	return block.StateSyncDynamic, nil
+	// }
 
-	registry, err := c.newSyncerRegistry(summary)
-	if err != nil {
-		return block.StateSyncSkipped, fmt.Errorf("failed to create syncer registry: %w", err)
-	}
-
-	finalizer := newFinalizer(
-		c.config.Chain,
-		c.config.State,
-		c.config.Acceptor,
-		c.config.VerDB,
-		c.config.MetadataDB,
-		c.config.Extender,
-		c.config.LastAcceptedHeight,
-	)
-
-	strategy := newStaticStrategy(registry, finalizer)
-
-	return c.startAsync(strategy), nil
-}
-
-// prepareForSync handles resume check and snapshot wipe before sync starts.
-func (c *client) prepareForSync(summary message.Syncable) error {
 	isResume := c.resumableSummary != nil &&
-		summary.GetBlockHash() == c.resumableSummary.GetBlockHash()
+		proposedSummary.GetBlockHash() == c.resumableSummary.GetBlockHash()
 	if !isResume {
 		// Skip syncing if the blockchain is not significantly ahead of local state,
 		// since bootstrapping would be faster.
-		// (Also ensures we don't sync to a height prior to local state.)
-		if c.config.LastAcceptedHeight+c.config.MinBlocks > summary.Height() {
+		if c.config.LastAcceptedHeight+c.config.MinBlocks > proposedSummary.Height() {
 			log.Info(
 				"last accepted too close to most recent syncable block, skipping state sync",
 				"lastAccepted", c.config.LastAcceptedHeight,
-				"syncableHeight", summary.Height(),
+				"syncableHeight", proposedSummary.Height(),
 			)
-			return errSkipSync
+			return block.StateSyncSkipped, nil
 		}
 
 		// Wipe the snapshot completely if we are not resuming from an existing sync, so that we do not
@@ -266,53 +249,67 @@ func (c *client) prepareForSync(summary message.Syncable) error {
 		snapshot.ResetSnapshotGeneration(c.config.ChainDB)
 	}
 
-	// Update the current state sync summary key in the database
-	// Note: this must be performed after WipeSnapshot finishes so that we do not start a state sync
-	// session from a partially wiped snapshot.
-	if err := c.config.MetadataDB.Put(stateSyncSummaryKey, summary.Bytes()); err != nil {
-		return fmt.Errorf("failed to write state sync summary key to disk: %w", err)
+	// Update the current state sync summary key in the database.
+	if err := c.config.MetadataDB.Put(stateSyncSummaryKey, proposedSummary.Bytes()); err != nil {
+		return block.StateSyncSkipped, fmt.Errorf("failed to write state sync summary key to disk: %w", err)
 	}
 	if err := c.config.VerDB.Commit(); err != nil {
-		return fmt.Errorf("failed to commit db: %w", err)
+		return block.StateSyncSkipped, fmt.Errorf("failed to commit db: %w", err)
 	}
 
-	return nil
-}
-
-// startAsync launches the sync strategy in a background goroutine.
-func (c *client) startAsync(strategy SyncStrategy) block.StateSyncMode {
+	log.Info("Starting state sync", "summary", proposedSummary.GetBlockHash().Hex(), "height", proposedSummary.Height())
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel
 
+	registry, err := c.newSyncerRegistry(proposedSummary)
+	if err != nil {
+		return block.StateSyncSkipped, err
+	}
+
+	finalizer := newFinalizer(
+		c.config.Chain,
+		c.config.State,
+		c.config.Acceptor,
+		c.config.VerDB,
+		c.config.MetadataDB,
+		c.config.Extender,
+		c.config.LastAcceptedHeight,
+	)
+
+	var (
+		strategy SyncStrategy
+		mode     block.StateSyncMode
+	)
+	if c.config.DynamicStateSyncEnabled {
+		// strategy = newDynamicStrategy(registry, finalizer, c.PivotInterval)
+		// mode = block.StateSyncDynamic
+	} else {
+		strategy = newStaticStrategy(registry, finalizer)
+		mode = block.StateSyncStatic
+	}
+
+	c.strategy = strategy
 	c.wg.Add(1)
 	go func() {
 		defer c.wg.Done()
-		defer cancel()
-
-		if err := strategy.Start(ctx, c.resumableSummary); err != nil {
-			c.err = err
-		}
-		// notify engine regardless of whether err == nil,
-		// this error will be propagated to the engine when it calls
-		// vm.SetState(snow.Bootstrapping)
-		log.Info("state sync completed, notifying engine", "err", c.err)
-		close(c.config.StateSyncDone)
+		err := strategy.Start(ctx, proposedSummary)
+		c.signalDone(err)
 	}()
 
-	log.Info("state sync started", "mode", block.StateSyncStatic)
-	return block.StateSyncStatic
+	log.Info("state sync started", "mode", mode.String(), "summary", proposedSummary.GetBlockHash().Hex(), "height", proposedSummary.Height())
+	return mode, nil
 }
 
-func (c *client) Shutdown() error {
-	if c.cancel != nil {
-		c.cancel()
-	}
-	c.wg.Wait() // wait for the background goroutine to exit
-	return nil
+// signalDone sets the terminal error exactly once, signals completion to the engine.
+func (c *client) signalDone(err error) {
+	c.stateSyncOnce.Do(func() {
+		c.err = err
+		if c.cancel != nil {
+			c.cancel()
+		}
+		close(c.config.StateSyncDone)
+	})
 }
-
-// Error returns a non-nil error if one occurred during the sync.
-func (c *client) Error() error { return c.err }
 
 // newSyncerRegistry creates a registry with all required syncers for the given summary.
 func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, error) {

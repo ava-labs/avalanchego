@@ -3,10 +3,7 @@
 
 package vmsync
 
-import (
-	"context"
-	"sync"
-)
+import "sync"
 
 // BlockOperation represents the type of operation to perform on a block.
 type BlockOperation int
@@ -40,9 +37,9 @@ func newBlockQueue() *blockQueue {
 	return &blockQueue{}
 }
 
-// Enqueue appends a block operation to the buffer. Returns true if the operation
+// enqueue appends a block operation to the buffer. Returns true if the operation
 // was queued, false if the block is nil.
-func (q *blockQueue) Enqueue(b EthBlockWrapper, op BlockOperation) bool {
+func (q *blockQueue) enqueue(b EthBlockWrapper, op BlockOperation) bool {
 	if b == nil {
 		return false
 	}
@@ -65,10 +62,10 @@ func (q *blockQueue) dequeueBatch() []blockOperation {
 	return out
 }
 
-// RemoveBlocksBelowHeight removes all queued blocks with height <= targetHeight.
+// removeBelowHeight removes all queued blocks with height <= targetHeight.
 // This is called after UpdateSyncTarget to remove blocks that will never be executed
 // because the sync target has advanced past them.
-func (q *blockQueue) RemoveBlocksBelowHeight(targetHeight uint64) {
+func (q *blockQueue) removeBelowHeight(targetHeight uint64) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 
@@ -80,24 +77,4 @@ func (q *blockQueue) RemoveBlocksBelowHeight(targetHeight uint64) {
 		}
 	}
 	q.items = filtered
-}
-
-// ProcessQueue processes all queued operations in FIFO order.
-func (q *blockQueue) ProcessQueue(ctx context.Context) error {
-	operations := q.dequeueBatch()
-	for _, op := range operations {
-		var err error
-		switch op.operation {
-		case OpAccept:
-			err = op.block.Accept(ctx)
-		case OpReject:
-			err = op.block.Reject(ctx)
-		case OpVerify:
-			err = op.block.Verify(ctx)
-		}
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }

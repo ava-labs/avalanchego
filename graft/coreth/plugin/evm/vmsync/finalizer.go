@@ -8,8 +8,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/libevm/core/types"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"

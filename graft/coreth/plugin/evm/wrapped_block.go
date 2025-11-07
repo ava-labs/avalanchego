@@ -92,11 +92,19 @@ func wrapBlock(ethBlock *types.Block, vm *VM) (*wrappedBlock, error) {
 func (b *wrappedBlock) ID() ids.ID { return b.id }
 
 // Accept implements the snowman.Block interface
-func (b *wrappedBlock) Accept(ctx context.Context) error {
+// TODO(powerslider): Propagate context to the sync client.
+func (b *wrappedBlock) Accept(_ context.Context) error {
 	// Notify sync client that engine accepted a block.
+	// If the block was enqueued for deferred processing, skip immediate execution.
 	if client := b.vm.SyncerClient(); client != nil {
-		if err := client.OnEngineAccept(b); err != nil {
-			return fmt.Errorf("could not notify sync client that engine accepted a block: %w", err)
+		deferred, err := client.OnEngineAccept(b)
+		if err != nil {
+			return fmt.Errorf("%w: %w", errCouldNotNotifySyncClient, err)
+		}
+		if deferred {
+			// Block was enqueued for deferred processing during dynamic state sync.
+			// It will be processed later from the queue, so skip immediate execution.
+			return nil
 		}
 	}
 
@@ -182,11 +190,18 @@ func (b *wrappedBlock) handlePrecompileAccept(rules extras.Rules) error {
 
 // Reject implements the snowman.Block interface
 // If [b] contains an atomic transaction, attempt to re-issue it
-func (b *wrappedBlock) Reject(ctx context.Context) error {
+func (b *wrappedBlock) Reject(_ context.Context) error {
 	// Notify sync client that engine rejected a block.
+	// If the block was enqueued for deferred processing, skip immediate execution.
 	if client := b.vm.SyncerClient(); client != nil {
-		if err := client.OnEngineReject(b); err != nil {
+		deferred, err := client.OnEngineReject(b)
+		if err != nil {
 			return fmt.Errorf("%w: %w", errCouldNotNotifySyncClient, err)
+		}
+		if deferred {
+			// Block was enqueued for deferred processing during dynamic state sync.
+			// It will be processed later from the queue, so skip immediate execution.
+			return nil
 		}
 	}
 
@@ -221,11 +236,21 @@ func (b *wrappedBlock) Timestamp() time.Time {
 }
 
 // Verify implements the snowman.Block interface
-func (b *wrappedBlock) Verify(ctx context.Context) error {
+// TODO(powerslider): Propagate context to the sync client.
+func (b *wrappedBlock) Verify(_ context.Context) error {
 	// Notify sync client that engine verified a block.
+	// If the block was enqueued for deferred processing, skip immediate execution.
 	if client := b.vm.SyncerClient(); client != nil {
-		if err := client.OnEngineVerify(b); err != nil {
+		deferred, err := client.OnEngineVerify(b)
+		if err != nil {
 			return fmt.Errorf("%w: %w", errCouldNotNotifySyncClient, err)
+		}
+		if deferred {
+			// Block was enqueued for deferred processing during dynamic state sync.
+			// It will be processed later from the queue, so skip immediate execution.
+			// Note: Verify may be called multiple times with different contexts, but
+			// we only enqueue once and process once from the queue.
+			return nil
 		}
 	}
 
@@ -259,12 +284,22 @@ func (b *wrappedBlock) ShouldVerifyWithContext(context.Context) (bool, error) {
 	return false, nil
 }
 
-// VerifyWithContext implements the block.WithVerifyContext interface
-func (b *wrappedBlock) VerifyWithContext(ctx context.Context, proposerVMBlockCtx *block.Context) error {
+// VerifyWithContext implements the block.WithVerifyContext interface.
+// TODO(powerslider): Propagate context to the sync client.
+func (b *wrappedBlock) VerifyWithContext(_ context.Context, proposerVMBlockCtx *block.Context) error {
 	// Notify sync client that engine verified a block.
+	// If the block was enqueued for deferred processing, skip immediate execution.
 	if client := b.vm.SyncerClient(); client != nil {
-		if err := client.OnEngineVerify(b); err != nil {
-			return fmt.Errorf("could not notify sync client that engine verified a block: %w", err)
+		deferred, err := client.OnEngineVerify(b)
+		if err != nil {
+			return fmt.Errorf("%w: %w", errCouldNotNotifySyncClient, err)
+		}
+		if deferred {
+			// Block was enqueued for deferred processing during dynamic state sync.
+			// It will be processed later from the queue, so skip immediate execution.
+			// Note: VerifyWithContext may be called multiple times with different contexts, but
+			// we only enqueue once and process once from the queue.
+			return nil
 		}
 	}
 

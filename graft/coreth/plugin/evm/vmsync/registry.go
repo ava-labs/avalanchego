@@ -104,6 +104,7 @@ func (r *SyncerRegistry) StartAsync(ctx context.Context, summary message.Syncabl
 }
 
 // UpdateSyncTarget updates the sync target for all syncers.
+// Note: Syncers manage cancellation themselves through their Sync() contexts.
 func (r *SyncerRegistry) UpdateSyncTarget(newTarget message.Syncable) error {
 	for _, task := range r.syncers {
 		if err := task.syncer.UpdateTarget(newTarget); err != nil {
