@@ -202,8 +202,10 @@ func (m *migrator) run(ctx context.Context) error {
 
 		processingTime := time.Since(start)
 		m.logger.Info("block data migration ended",
+			zap.Bool("completed", m.completed.Load()),
 			zap.Uint64("blocksProcessed", m.processed.Load()),
-			zap.Duration("totalProcessingTime", processingTime))
+			zap.Uint64("lastProcessedHeight", endBlockNum),
+			zap.Duration("totalTime", processingTime))
 	}()
 
 	m.logger.Info("block data migration started")
