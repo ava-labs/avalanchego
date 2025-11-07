@@ -286,18 +286,18 @@ func (mr *OutboundMsgBuilderMockRecorder) GetStateSummaryFrontier(chainID, reque
 }
 
 // Handshake mocks base method.
-func (m *OutboundMsgBuilder) Handshake(networkID uint32, myTime uint64, ip netip.AddrPort, client string, major, minor, patch uint32, ipSigningTime uint64, ipNodeIDSig, ipBLSSig []byte, trackedSubnets []ids.ID, supportedACPs, objectedACPs []uint32, knownPeersFilter, knownPeersSalt []byte, requestAllSubnetIPs bool) (message.OutboundMessage, error) {
+func (m *OutboundMsgBuilder) Handshake(networkID uint32, myTime uint64, ip netip.AddrPort, client string, major, minor, patch uint32, upgradeTime, ipSigningTime uint64, ipNodeIDSig, ipBLSSig []byte, trackedSubnets []ids.ID, supportedACPs, objectedACPs []uint32, knownPeersFilter, knownPeersSalt []byte, requestAllSubnetIPs bool) (message.OutboundMessage, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Handshake", networkID, myTime, ip, client, major, minor, patch, ipSigningTime, ipNodeIDSig, ipBLSSig, trackedSubnets, supportedACPs, objectedACPs, knownPeersFilter, knownPeersSalt, requestAllSubnetIPs)
+	ret := m.ctrl.Call(m, "Handshake", networkID, myTime, ip, client, major, minor, patch, upgradeTime, ipSigningTime, ipNodeIDSig, ipBLSSig, trackedSubnets, supportedACPs, objectedACPs, knownPeersFilter, knownPeersSalt, requestAllSubnetIPs)
 	ret0, _ := ret[0].(message.OutboundMessage)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // Handshake indicates an expected call of Handshake.
-func (mr *OutboundMsgBuilderMockRecorder) Handshake(networkID, myTime, ip, client, major, minor, patch, ipSigningTime, ipNodeIDSig, ipBLSSig, trackedSubnets, supportedACPs, objectedACPs, knownPeersFilter, knownPeersSalt, requestAllSubnetIPs any) *gomock.Call {
+func (mr *OutboundMsgBuilderMockRecorder) Handshake(networkID, myTime, ip, client, major, minor, patch, upgradeTime, ipSigningTime, ipNodeIDSig, ipBLSSig, trackedSubnets, supportedACPs, objectedACPs, knownPeersFilter, knownPeersSalt, requestAllSubnetIPs any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Handshake", reflect.TypeOf((*OutboundMsgBuilder)(nil).Handshake), networkID, myTime, ip, client, major, minor, patch, ipSigningTime, ipNodeIDSig, ipBLSSig, trackedSubnets, supportedACPs, objectedACPs, knownPeersFilter, knownPeersSalt, requestAllSubnetIPs)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Handshake", reflect.TypeOf((*OutboundMsgBuilder)(nil).Handshake), networkID, myTime, ip, client, major, minor, patch, upgradeTime, ipSigningTime, ipNodeIDSig, ipBLSSig, trackedSubnets, supportedACPs, objectedACPs, knownPeersFilter, knownPeersSalt, requestAllSubnetIPs)
 }
 
 // PeerList mocks base method.
