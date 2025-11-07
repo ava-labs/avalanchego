@@ -121,3 +121,9 @@ if [[ "${DOCKER_IMAGE}" == *"/"* && ( "$image_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ 
   echo "Tagging current avalanchego images as $DOCKER_IMAGE:latest"
   docker buildx imagetools create -t "$DOCKER_IMAGE:latest" "$DOCKER_IMAGE:$commit_hash"
 fi
+
+# Also tag master builds as latest-unstable when images are pushed to a registry
+if [[ "${DOCKER_IMAGE}" == *"/"* && "$image_tag" == "master" ]]; then
+  echo "Tagging current avalanchego images as $DOCKER_IMAGE:latest-unstable"
+  docker buildx imagetools create -t "$DOCKER_IMAGE:latest-unstable" "$DOCKER_IMAGE:$commit_hash"
+fi
