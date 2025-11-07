@@ -199,6 +199,7 @@ func (vm *VMClient) Initialize(
 		EtnaTime:                      grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.EtnaTime),
 		FortunaTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.FortunaTime),
 		GraniteTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.GraniteTime),
+		HeliconTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.HeliconTime),
 	}
 
 	resp, err := vm.client.Initialize(ctx, &vmpb.InitializeRequest{

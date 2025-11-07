@@ -136,6 +136,7 @@ message NetworkUpgrades {
   google.protobuf.Timestamp etna_time = 14;
   google.protobuf.Timestamp fortuna_time = 15;
   google.protobuf.Timestamp granite_time = 16;
+  google.protobuf.Timestamp helicon_time = 17;
 }
 
 message InitializeResponse {

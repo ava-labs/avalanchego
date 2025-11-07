@@ -39,6 +39,7 @@ var (
 		GraniteTime:               time.Date(2025, time.November, 19, 16, 0, 0, 0, time.UTC),
 		GraniteEpochDuration:      5 * time.Minute,
 		HeliconTime:               UnscheduledActivationTime,
+		HeliconEpochDuration:      5 * time.Minute,
 	}
 	Fuji = Config{
 		ApricotPhase1Time:            time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
@@ -63,6 +64,7 @@ var (
 		GraniteTime:               time.Date(2025, time.October, 29, 15, 0, 0, 0, time.UTC),
 		GraniteEpochDuration:      5 * time.Minute,
 		HeliconTime:               UnscheduledActivationTime,
+		HeliconEpochDuration:      5 * time.Minute,
 	}
 	Default = Config{
 		ApricotPhase1Time:            InitiallyActiveTime,
@@ -83,6 +85,7 @@ var (
 		GraniteTime:                  InitiallyActiveTime,
 		GraniteEpochDuration:         30 * time.Second,
 		HeliconTime:                  InitiallyActiveTime,
+		HeliconEpochDuration:         30 * time.Second,
 	}
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
@@ -107,6 +110,7 @@ type Config struct {
 	GraniteTime                  time.Time     `json:"graniteTime"`
 	GraniteEpochDuration         time.Duration `json:"graniteEpochDuration"`
 	HeliconTime                  time.Time     `json:"heliconTime"`
+	HeliconEpochDuration         time.Duration `json:"heliconEpochDuration"`
 }
 
 func (c *Config) Validate() error {

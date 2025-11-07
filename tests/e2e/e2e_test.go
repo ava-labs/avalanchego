@@ -51,11 +51,11 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	subnets := vms.XSVMSubnetsOrPanic(nodes...)
 
 	upgrades := upgrade.Default
-	if flagVars.ActivateGranite() {
-		upgrades.GraniteTime = upgrade.InitiallyActiveTime
-		upgrades.GraniteEpochDuration = 4 * time.Second
+	if flagVars.ActivateHelicon() {
+		upgrades.HeliconTime = upgrade.InitiallyActiveTime
+		upgrades.HeliconEpochDuration = 4 * time.Second
 	} else {
-		upgrades.GraniteTime = upgrade.UnscheduledActivationTime
+		upgrades.HeliconTime = upgrade.UnscheduledActivationTime
 	}
 	tc.Log().Info("setting upgrades",
 		zap.Reflect("upgrades", upgrades),
