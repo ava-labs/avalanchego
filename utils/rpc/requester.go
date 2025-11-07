@@ -5,8 +5,8 @@ package rpc
 
 import (
 	"context"
-	"net/url"
 	"net/http"
+	"net/url"
 )
 
 var (
@@ -26,7 +26,7 @@ type avalancheEndpointRequester struct {
 func NewEndpointRequester(uri string) EndpointRequester {
 	return &avalancheEndpointRequester{
 		client: &httpClient{c: http.DefaultClient},
-		uri: uri,
+		uri:    uri,
 	}
 }
 

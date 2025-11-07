@@ -6,14 +6,15 @@ package rpc
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 
 	rpc "github.com/gorilla/rpc/v2/json2"
-	"errors"
 )
+
 // CleanlyCloseBody avoids sending unnecessary RST_STREAM and PING frames by ensuring
 // the whole body is read before being closed.
 // See https://blog.cloudflare.com/go-and-enhance-your-calm/#reading-bodies-in-go-can-be-unintuitive

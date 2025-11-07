@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 )
@@ -18,7 +19,7 @@ var _ client = (*testClient)(nil)
 // respects context cancellation when draining a long response
 func TestEndpointRequesterLongResponse(t *testing.T) {
 	server := httptest.NewServer(
-		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
 
 			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":1,"result":"foobar"}`))
@@ -43,7 +44,8 @@ func TestEndpointRequesterLongResponse(t *testing.T) {
 		},
 		uri: server.URL,
 	}
-	ctx, cancel := context.WithCancel(context.Background())
+
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	eg := errgroup.Group{}
