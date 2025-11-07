@@ -24,6 +24,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
 type getCountFunc func() (int, error)
@@ -114,12 +115,7 @@ func queryLoki(
 	if err != nil {
 		return 0, stacktrace.Errorf("failed to execute request: %w", err)
 	}
-	defer func() {
-		// Avoid sending unnecessary RST_STREAM and PING frames by ensuring the whole body is read.
-		// See https://blog.cloudflare.com/go-and-enhance-your-calm/#reading-bodies-in-go-can-be-unintuitive
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
+	defer func() { _ = rpc.CleanlyCloseBody(resp.Body) }()
 
 	// Read and parse response
 	body, err := io.ReadAll(resp.Body)

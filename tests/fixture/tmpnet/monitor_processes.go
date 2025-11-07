@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/perms"
+	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
 const (
@@ -591,12 +592,7 @@ func checkReadiness(ctx context.Context, url string) (bool, string, error) {
 	if err != nil {
 		return false, "", stacktrace.Errorf("request failed: %w", err)
 	}
-	defer func() {
-		// Avoid sending unnecessary RST_STREAM and PING frames by ensuring the whole body is read.
-		// See https://blog.cloudflare.com/go-and-enhance-your-calm/#reading-bodies-in-go-can-be-unintuitive
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
+	defer func() { _ = rpc.CleanlyCloseBody(resp.Body) }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

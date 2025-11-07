@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/ava-labs/avalanchego/utils/ips"
+	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
 var _ Resolver = (*ifConfigResolver)(nil)
@@ -31,12 +32,7 @@ func (r *ifConfigResolver) Resolve(ctx context.Context) (netip.Addr, error) {
 	if err != nil {
 		return netip.Addr{}, err
 	}
-	defer func() {
-		// Avoid sending unnecessary RST_STREAM and PING frames by ensuring the whole body is read.
-		// See https://blog.cloudflare.com/go-and-enhance-your-calm/#reading-bodies-in-go-can-be-unintuitive
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
+	defer func() { _ = rpc.CleanlyCloseBody(resp.Body) }()
 
 	ipBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
