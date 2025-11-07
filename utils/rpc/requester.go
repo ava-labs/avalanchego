@@ -6,20 +6,26 @@ package rpc
 import (
 	"context"
 	"net/url"
+	"net/http"
 )
 
-var _ EndpointRequester = (*avalancheEndpointRequester)(nil)
+var (
+	_ EndpointRequester = (*avalancheEndpointRequester)(nil)
+	_ client            = (*httpClient)(nil)
+)
 
 type EndpointRequester interface {
 	SendRequest(ctx context.Context, method string, params interface{}, reply interface{}, options ...Option) error
 }
 
 type avalancheEndpointRequester struct {
-	uri string
+	client client
+	uri    string
 }
 
 func NewEndpointRequester(uri string) EndpointRequester {
 	return &avalancheEndpointRequester{
+		client: &httpClient{c: http.DefaultClient},
 		uri: uri,
 	}
 }
@@ -37,6 +43,7 @@ func (e *avalancheEndpointRequester) SendRequest(
 	}
 
 	return SendJSONRequest(
+		e.client,
 		ctx,
 		uri,
 		method,
@@ -44,4 +51,16 @@ func (e *avalancheEndpointRequester) SendRequest(
 		reply,
 		options...,
 	)
+}
+
+type client interface {
+	Send(req *http.Request) (*http.Response, error)
+}
+
+type httpClient struct {
+	c *http.Client
+}
+
+func (h httpClient) Send(req *http.Request) (*http.Response, error) {
+	return h.c.Do(req)
 }

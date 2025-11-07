@@ -12,17 +12,18 @@ import (
 	"net/url"
 
 	rpc "github.com/gorilla/rpc/v2/json2"
+	"errors"
 )
-
 // CleanlyCloseBody avoids sending unnecessary RST_STREAM and PING frames by ensuring
 // the whole body is read before being closed.
 // See https://blog.cloudflare.com/go-and-enhance-your-calm/#reading-bodies-in-go-can-be-unintuitive
 func CleanlyCloseBody(body io.ReadCloser) error {
-	_, _ = io.Copy(io.Discard, body)
-	return body.Close()
+	_, err := io.Copy(io.Discard, body)
+	return errors.Join(err, body.Close())
 }
 
 func SendJSONRequest(
+	client client,
 	ctx context.Context,
 	uri *url.URL,
 	method string,
@@ -51,8 +52,9 @@ func SendJSONRequest(
 	request.Header = ops.headers
 	request.Header.Set("Content-Type", "application/json")
 
+	// TODO interface
 	//nolint:bodyclose // body is closed via CleanlyCloseBody in all code paths
-	resp, err := http.DefaultClient.Do(request)
+	resp, err := client.Send(request)
 	if err != nil {
 		return fmt.Errorf("failed to issue request: %w", err)
 	}
