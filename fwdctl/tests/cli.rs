@@ -2,7 +2,6 @@
 // See the file LICENSE.md for licensing terms.
 
 use anyhow::{Result, anyhow};
-use assert_cmd::Command;
 use predicates::prelude::*;
 use serial_test::serial;
 use std::fs::{self, remove_file};
@@ -10,6 +9,12 @@ use std::path::{Path, PathBuf};
 
 const PRG: &str = "fwdctl";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+macro_rules! cargo_bin_cmd {
+    () => {
+        ::assert_cmd::cargo::cargo_bin_cmd!("fwdctl")
+    };
+}
 
 // Removes the firewood database on disk
 fn fwdctl_delete_db() -> Result<()> {
@@ -27,7 +32,7 @@ fn fwdctl_prints_version() -> Result<()> {
     let expected_version_output: String = format!("{PRG} {VERSION}");
 
     // version is defined and succeeds with the desired output
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .args(["-V"])
         .assert()
         .success()
@@ -39,7 +44,7 @@ fn fwdctl_prints_version() -> Result<()> {
 #[test]
 #[serial]
 fn fwdctl_creates_database() -> Result<()> {
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("create")
         .arg("--db")
         .arg(tmpdb::path())
@@ -53,7 +58,7 @@ fn fwdctl_creates_database() -> Result<()> {
 #[serial]
 fn fwdctl_insert_successful() -> Result<()> {
     // Create db
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("create")
         .arg("--db")
         .arg(tmpdb::path())
@@ -61,7 +66,7 @@ fn fwdctl_insert_successful() -> Result<()> {
         .success();
 
     // Insert data
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("insert")
         .args(["year"])
         .args(["2023"])
@@ -78,14 +83,14 @@ fn fwdctl_insert_successful() -> Result<()> {
 #[serial]
 fn fwdctl_get_successful() -> Result<()> {
     // Create db and insert data
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("create")
         .arg("--db")
         .arg(tmpdb::path())
         .assert()
         .success();
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("insert")
         .args(["year"])
         .args(["2023"])
@@ -96,7 +101,7 @@ fn fwdctl_get_successful() -> Result<()> {
         .stdout(predicate::str::contains("year"));
 
     // Get value back out
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("get")
         .args(["year"])
         .arg("--db")
@@ -111,14 +116,14 @@ fn fwdctl_get_successful() -> Result<()> {
 #[test]
 #[serial]
 fn fwdctl_delete_successful() -> Result<()> {
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("create")
         .arg("--db")
         .arg(tmpdb::path())
         .assert()
         .success();
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("insert")
         .args(["year"])
         .args(["2023"])
@@ -129,7 +134,7 @@ fn fwdctl_delete_successful() -> Result<()> {
         .stdout(predicate::str::contains("year"));
 
     // Delete key -- prints raw data of deleted value
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("delete")
         .args(["year"])
         .arg("--db")
@@ -144,14 +149,14 @@ fn fwdctl_delete_successful() -> Result<()> {
 #[test]
 #[serial]
 fn fwdctl_root_hash() -> Result<()> {
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("create")
         .arg("--db")
         .arg(tmpdb::path())
         .assert()
         .success();
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("insert")
         .args(["year"])
         .args(["2023"])
@@ -162,7 +167,7 @@ fn fwdctl_root_hash() -> Result<()> {
         .stdout(predicate::str::contains("year"));
 
     // Get root
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("root")
         .arg("--db")
         .arg(tmpdb::path())
@@ -176,14 +181,14 @@ fn fwdctl_root_hash() -> Result<()> {
 #[test]
 #[serial]
 fn fwdctl_dump() -> Result<()> {
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("create")
         .arg("--db")
         .arg(tmpdb::path())
         .assert()
         .success();
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("insert")
         .args(["year"])
         .args(["2023"])
@@ -194,7 +199,7 @@ fn fwdctl_dump() -> Result<()> {
         .stdout(predicate::str::contains("year"));
 
     // Get root
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("dump")
         .arg("--db")
         .arg(tmpdb::path())
@@ -208,14 +213,14 @@ fn fwdctl_dump() -> Result<()> {
 #[test]
 #[serial]
 fn fwdctl_dump_with_start_stop_and_max() -> Result<()> {
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("create")
         .arg("--db")
         .arg(tmpdb::path())
         .assert()
         .success();
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("insert")
         .arg("--db")
         .arg(tmpdb::path())
@@ -225,7 +230,7 @@ fn fwdctl_dump_with_start_stop_and_max() -> Result<()> {
         .success()
         .stdout(predicate::str::contains("a"));
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("insert")
         .arg("--db")
         .arg(tmpdb::path())
@@ -235,7 +240,7 @@ fn fwdctl_dump_with_start_stop_and_max() -> Result<()> {
         .success()
         .stdout(predicate::str::contains("b"));
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("insert")
         .arg("--db")
         .arg(tmpdb::path())
@@ -246,7 +251,7 @@ fn fwdctl_dump_with_start_stop_and_max() -> Result<()> {
         .stdout(predicate::str::contains("c"));
 
     // Test stop in the middle
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("dump")
         .arg("--db")
         .arg(tmpdb::path())
@@ -259,7 +264,7 @@ fn fwdctl_dump_with_start_stop_and_max() -> Result<()> {
         ));
 
     // Test stop in the end
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("dump")
         .arg("--db")
         .arg(tmpdb::path())
@@ -272,7 +277,7 @@ fn fwdctl_dump_with_start_stop_and_max() -> Result<()> {
         ));
 
     // Test start in the middle
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("dump")
         .arg("--db")
         .arg(tmpdb::path())
@@ -283,7 +288,7 @@ fn fwdctl_dump_with_start_stop_and_max() -> Result<()> {
         .stdout(predicate::str::starts_with("\'b"));
 
     // Test start and stop
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("dump")
         .arg("--db")
         .arg(tmpdb::path())
@@ -299,7 +304,7 @@ fn fwdctl_dump_with_start_stop_and_max() -> Result<()> {
         ));
 
     // Test start and stop
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("dump")
         .arg("--db")
         .arg(tmpdb::path())
@@ -320,14 +325,14 @@ fn fwdctl_dump_with_start_stop_and_max() -> Result<()> {
 #[test]
 #[serial]
 fn fwdctl_dump_with_csv_and_json() -> Result<()> {
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("create")
         .arg("--db")
         .arg(tmpdb::path())
         .assert()
         .success();
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("insert")
         .arg("--db")
         .arg(tmpdb::path())
@@ -337,7 +342,7 @@ fn fwdctl_dump_with_csv_and_json() -> Result<()> {
         .success()
         .stdout(predicate::str::contains("a"));
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("insert")
         .arg("--db")
         .arg(tmpdb::path())
@@ -347,7 +352,7 @@ fn fwdctl_dump_with_csv_and_json() -> Result<()> {
         .success()
         .stdout(predicate::str::contains("b"));
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("insert")
         .arg("--db")
         .arg(tmpdb::path())
@@ -358,7 +363,7 @@ fn fwdctl_dump_with_csv_and_json() -> Result<()> {
         .stdout(predicate::str::contains("c"));
 
     // Test output csv
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("dump")
         .arg("--db")
         .arg(tmpdb::path())
@@ -373,7 +378,7 @@ fn fwdctl_dump_with_csv_and_json() -> Result<()> {
     fs::remove_file("dump.csv").expect("Should remove dump.csv file");
 
     // Test output json
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("dump")
         .arg("--db")
         .arg(tmpdb::path())
@@ -396,14 +401,14 @@ fn fwdctl_dump_with_csv_and_json() -> Result<()> {
 #[test]
 #[serial]
 fn fwdctl_dump_with_file_name() -> Result<()> {
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("create")
         .arg("--db")
         .arg(tmpdb::path())
         .assert()
         .success();
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("insert")
         .arg("--db")
         .arg(tmpdb::path())
@@ -414,7 +419,7 @@ fn fwdctl_dump_with_file_name() -> Result<()> {
         .stdout(predicate::str::contains("a"));
 
     // Test without output format
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("dump")
         .arg("--db")
         .arg(tmpdb::path())
@@ -425,7 +430,7 @@ fn fwdctl_dump_with_file_name() -> Result<()> {
         .stderr(predicate::str::contains("--output-format"));
 
     // Test output csv
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("dump")
         .arg("--db")
         .arg(tmpdb::path())
@@ -442,7 +447,7 @@ fn fwdctl_dump_with_file_name() -> Result<()> {
     fs::remove_file("test.csv").expect("Should remove test.csv file");
 
     // Test output json
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("dump")
         .arg("--db")
         .arg(tmpdb::path())
@@ -464,14 +469,14 @@ fn fwdctl_dump_with_file_name() -> Result<()> {
 #[test]
 #[serial]
 fn fwdctl_dump_with_hex() -> Result<()> {
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("create")
         .arg("--db")
         .arg(tmpdb::path())
         .assert()
         .success();
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("insert")
         .arg("--db")
         .arg(tmpdb::path())
@@ -481,7 +486,7 @@ fn fwdctl_dump_with_hex() -> Result<()> {
         .success()
         .stdout(predicate::str::contains("a"));
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("insert")
         .arg("--db")
         .arg(tmpdb::path())
@@ -491,7 +496,7 @@ fn fwdctl_dump_with_hex() -> Result<()> {
         .success()
         .stdout(predicate::str::contains("b"));
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("insert")
         .arg("--db")
         .arg(tmpdb::path())
@@ -502,7 +507,7 @@ fn fwdctl_dump_with_hex() -> Result<()> {
         .stdout(predicate::str::contains("c"));
 
     // Test without output format
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("dump")
         .arg("--db")
         .arg(tmpdb::path())
@@ -516,7 +521,7 @@ fn fwdctl_dump_with_hex() -> Result<()> {
         .stderr(predicate::str::contains("--start-key-hex"));
 
     // Test start with hex value
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("dump")
         .arg("--db")
         .arg(tmpdb::path())
@@ -527,7 +532,7 @@ fn fwdctl_dump_with_hex() -> Result<()> {
         .stdout(predicate::str::starts_with("\'b"));
 
     // Test stop with hex value
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("dump")
         .arg("--db")
         .arg(tmpdb::path())
@@ -546,14 +551,14 @@ fn fwdctl_dump_with_hex() -> Result<()> {
 #[test]
 #[serial]
 fn fwdctl_check_empty_db() -> Result<()> {
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("create")
         .arg("--db")
         .arg(tmpdb::path())
         .assert()
         .success();
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("check")
         .arg("--db")
         .arg(tmpdb::path())
@@ -570,7 +575,7 @@ fn fwdctl_check_db_with_data() -> Result<()> {
     let rng = firewood_storage::SeededRng::from_env_or_random();
     let mut sample_iter = rng.sample_iter(Alphanumeric).map(char::from);
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("create")
         .arg("--db")
         .arg(tmpdb::path())
@@ -581,7 +586,7 @@ fn fwdctl_check_db_with_data() -> Result<()> {
     for _ in 0..4 {
         let key = sample_iter.by_ref().take(64).collect::<String>();
         let value = sample_iter.by_ref().take(10).collect::<String>();
-        Command::cargo_bin(PRG)?
+        cargo_bin_cmd!()
             .arg("insert")
             .arg("--db")
             .arg(tmpdb::path())
@@ -591,7 +596,7 @@ fn fwdctl_check_db_with_data() -> Result<()> {
             .success();
     }
 
-    Command::cargo_bin(PRG)?
+    cargo_bin_cmd!()
         .arg("check")
         .arg("--db")
         .arg(tmpdb::path())

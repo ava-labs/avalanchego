@@ -2,6 +2,79 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.14] - 2025-11-07
+
+### 🚀 Features
+
+- *(monitoring)* Grafana automatic dashboard and auth provisioning ([#1307](https://github.com/ava-labs/firewood/pull/1307))
+- *(ffi)* Implement revision handles and expose to FFI layer ([#1326](https://github.com/ava-labs/firewood/pull/1326))
+- *(ffi-iterator)* Implementation of Iterator in Rust (1/4) ([#1255](https://github.com/ava-labs/firewood/pull/1255))
+- *(ffi-iterator)* Implementation of Iterator in Go (2/4) ([#1256](https://github.com/ava-labs/firewood/pull/1256))
+- *(1/7)* Add U4 type to be used as a path component ([#1336](https://github.com/ava-labs/firewood/pull/1336))
+- *(2/7)* Add newtype for PathComponent ([#1337](https://github.com/ava-labs/firewood/pull/1337))
+- *(3/7)* Add TriePath trait and path abstraction ([#1338](https://github.com/ava-labs/firewood/pull/1338))
+- *(4/7)* Add SplitPath trait ([#1339](https://github.com/ava-labs/firewood/pull/1339))
+- *(ffi-iterator)* Batching support for Iterator (3/4) ([#1257](https://github.com/ava-labs/firewood/pull/1257))
+- *(5/7)* Add PackedPathRef type ([#1341](https://github.com/ava-labs/firewood/pull/1341))
+- *(6/7)* Children newtype ([#1344](https://github.com/ava-labs/firewood/pull/1344))
+- Use PathComponent in proofs ([#1359](https://github.com/ava-labs/firewood/pull/1359))
+- Replace NodeAndPrefix with HashableShunt ([#1362](https://github.com/ava-labs/firewood/pull/1362))
+- Parallel updates to Merkle trie (v2) ([#1258](https://github.com/ava-labs/firewood/pull/1258))
+- Parallel hashing of Merkle trie ([#1303](https://github.com/ava-labs/firewood/pull/1303))
+- Add nix flake for ffi ([#1319](https://github.com/ava-labs/firewood/pull/1319))
+- Add more info for IO error message ([#1378](https://github.com/ava-labs/firewood/pull/1378))
+- Add TrieNode trait and related functionality ([#1363](https://github.com/ava-labs/firewood/pull/1363))
+- Add hashed key-value trie implementation ([#1365](https://github.com/ava-labs/firewood/pull/1365))
+- Define explicit associated types on Hashable ([#1366](https://github.com/ava-labs/firewood/pull/1366))
+- *(ffi)* `Database.Close()` guarantees proposals committed or freed ([#1349](https://github.com/ava-labs/firewood/pull/1349))
+- *(ffi)* [**breaking**] Support empty values in Update operations ([#1420](https://github.com/ava-labs/firewood/pull/1420))
+- Add just task runner to ensure reproducibility of CI ([#1345](https://github.com/ava-labs/firewood/pull/1345))
+- *(ffi)* [**breaking**] Add finalization logic for Revisions ([#1435](https://github.com/ava-labs/firewood/pull/1435))
+- *(benchmark/bootstrap)* Add config param ([#1438](https://github.com/ava-labs/firewood/pull/1438))
+
+### 🐛 Bug Fixes
+
+- Explicitly release advisory lock on drop ([#1352](https://github.com/ava-labs/firewood/pull/1352))
+- EINTR during iouring calls ([#1354](https://github.com/ava-labs/firewood/pull/1354))
+- Revert "feat: Parallel updates to Merkle trie (v2)" ([#1372](https://github.com/ava-labs/firewood/pull/1372))
+- Revert "fix: Revert "feat: Parallel updates to Merkle trie (v2)"" ([#1374](https://github.com/ava-labs/firewood/pull/1374))
+- *(storage)* Flush freelist early to prevent corruption ([#1389](https://github.com/ava-labs/firewood/pull/1389))
+- *(benchmark/bootstrap)* Consistent go deps ([#1436](https://github.com/ava-labs/firewood/pull/1436))
+
+### 🚜 Refactor
+
+- Unify root storage using Child enum ([#1330](https://github.com/ava-labs/firewood/pull/1330))
+- *(db)* `TestDb` constructor ([#1351](https://github.com/ava-labs/firewood/pull/1351))
+
+### 📚 Documentation
+
+- *(benchmark/bootstrap)* Expand README.md ([#1421](https://github.com/ava-labs/firewood/pull/1421))
+
+### 🧪 Testing
+
+- Show symbol diff when ffi-nix build equivalency test fails ([#1423](https://github.com/ava-labs/firewood/pull/1423))
+
+### ⚙️ Miscellaneous Tasks
+
+- Include dependency lockfile ([#1321](https://github.com/ava-labs/firewood/pull/1321))
+- Add race detection in Go ([#1323](https://github.com/ava-labs/firewood/pull/1323))
+- *(nodestore)* Remove empty committed err ([#1353](https://github.com/ava-labs/firewood/pull/1353))
+- Upgrade dependencies ([#1360](https://github.com/ava-labs/firewood/pull/1360))
+- *(nodestore)* Access persisted nodestores ([#1355](https://github.com/ava-labs/firewood/pull/1355))
+- Update Go to 1.24.8 ([#1361](https://github.com/ava-labs/firewood/pull/1361))
+- Print ulimits and set memlock to unlimited before fuzz tests ([#1375](https://github.com/ava-labs/firewood/pull/1375))
+- *(db/manager)* Add `MockStore` ([#1346](https://github.com/ava-labs/firewood/pull/1346))
+- Update Go to 1.24.9 ([#1380](https://github.com/ava-labs/firewood/pull/1380))
+- *(ffi/firewood)* Remove `RootStore` generics ([#1388](https://github.com/ava-labs/firewood/pull/1388))
+- Update .golangci.yaml ([#1394](https://github.com/ava-labs/firewood/pull/1394))
+- Update ffi build check to configure cargo with same MAKEFLAGS as nix ([#1392](https://github.com/ava-labs/firewood/pull/1392))
+- Fix new lint warning from 1.91 update ([#1417](https://github.com/ava-labs/firewood/pull/1417))
+- Update .golangci.yaml ([#1419](https://github.com/ava-labs/firewood/pull/1419))
+- [**breaking**] Drop binary support for macos 13/14 ([#1425](https://github.com/ava-labs/firewood/pull/1425))
+- *(ci)* Disable ffi-nix job pending reliable build equivalency ([#1426](https://github.com/ava-labs/firewood/pull/1426))
+- Added helper to reduce code duplication between Db.propose and Proposal.create_proposal ([#1343](https://github.com/ava-labs/firewood/pull/1343))
+- Add guidance on Go workspaces ([#1434](https://github.com/ava-labs/firewood/pull/1434))
+
 ## [0.0.13] - 2025-09-26
 
 ### 🚀 Features

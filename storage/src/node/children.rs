@@ -46,14 +46,14 @@ impl<T> Children<T> {
 
     /// Borrows each element and returns a [`Children`] wrapping the references.
     #[must_use]
-    pub fn each_ref(&self) -> Children<&T> {
+    pub const fn each_ref(&self) -> Children<&T> {
         Children(self.0.each_ref())
     }
 
     /// Borrows each element mutably and returns a [`Children`] wrapping the
     /// mutable references.
     #[must_use]
-    pub fn each_mut(&mut self) -> Children<&mut T> {
+    pub const fn each_mut(&mut self) -> Children<&mut T> {
         Children(self.0.each_mut())
     }
 

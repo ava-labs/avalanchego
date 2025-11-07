@@ -34,7 +34,7 @@ env_logger = { workspace = true, optional = true }
 derive-where = "1.6.0"
 
 [target.'cfg(unix)'.dependencies]
-tikv-jemallocator = "0.6.0"
+tikv-jemallocator = "0.6.1"
 
 [dev-dependencies]
 # Workspace dependencies
@@ -45,7 +45,7 @@ logger = ["dep:env_logger", "firewood/logger"]
 ethhash = ["firewood/ethhash"]
 
 [build-dependencies]
-cbindgen = "0.29.0"
+cbindgen = "0.29.2"
 
 [lints]
 workspace = true

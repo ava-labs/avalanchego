@@ -34,7 +34,7 @@ integer-encoding.workspace = true
 metrics.workspace = true
 thiserror.workspace = true
 # Regular dependencies
-typed-builder = "0.22.0"
+typed-builder = "0.23.0"
 rayon = "1.11.0"
 
 [features]
@@ -59,7 +59,7 @@ rand.workspace = true
 tempfile.workspace = true
 test-case.workspace = true
 # Regular dependencies
-ctor = "0.6.0"
+ctor = "0.6.1"
 hash-db = "0.16.0"
 plain_hasher = "0.2.3"
 rlp = "0.6.1"

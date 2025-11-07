@@ -1,5 +1,5 @@
---- .github/.golangci.yaml	2025-10-31 18:45:07.201781593 +0000
-+++ ffi/.golangci.yaml	2025-10-31 18:45:07.200643422 +0000
+--- .github/.golangci.yaml	2025-11-07 11:52:50
++++ ffi/.golangci.yaml	2025-11-07 11:52:50
 @@ -75,8 +75,6 @@
        rules:
          packages:
@@ -57,7 +57,7 @@
      tagalign:
        align: true
        sort: true
-@@ -250,7 +218,7 @@
+@@ -251,7 +219,7 @@
          - standard
          - default
          - blank

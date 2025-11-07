@@ -45,11 +45,11 @@ pretty-duration = "0.1.1"
 
 [dependencies.tokio]
 optional = true
-version = "1.47.1"
+version = "1.48.0"
 features = ["mio", "net", "parking_lot", "rt", "time"]
 
 [target.'cfg(unix)'.dependencies]
-tikv-jemallocator = "0.6.0"
+tikv-jemallocator = "0.6.1"
 
 [features]
 default = ["prometheus"]

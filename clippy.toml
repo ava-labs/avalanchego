@@ -1,7 +1,7 @@
 # See https://doc.rust-lang.org/clippy/lint_configuration.html
 # for full configuration options.
 
-msrv = "1.89"
+msrv = "1.91"
 
 doc-valid-idents = [
   "MerkleDB",
