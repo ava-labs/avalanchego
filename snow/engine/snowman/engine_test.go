@@ -74,7 +74,7 @@ func setup(t *testing.T, config Config) (ids.NodeID, validators.Manager, *engine
 
 	vdr := ids.GenerateTestNodeID()
 	require.NoError(config.Validators.AddStaker(config.Ctx.SubnetID, vdr, nil, ids.Empty, 1))
-	require.NoError(config.ConnectedValidators.Connected(t.Context(), vdr, version.CurrentApp))
+	require.NoError(config.ConnectedValidators.Connected(t.Context(), vdr, version.Current))
 	config.Validators.RegisterSetCallbackListener(config.Ctx.SubnetID, config.ConnectedValidators)
 
 	sender := &enginetest.Sender{T: t}

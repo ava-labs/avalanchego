@@ -66,6 +66,7 @@ var (
 	labelsArg          string
 
 	metricsServerEnabledArg    bool
+	metricsServerPortArg       uint64
 	metricsCollectorEnabledArg bool
 
 	networkUUID string = uuid.NewString()
@@ -106,6 +107,7 @@ func TestMain(m *testing.M) {
 	flag.DurationVar(&executionTimeout, "execution-timeout", 0, "Benchmark execution timeout. After this timeout has elapsed, terminate the benchmark without error. If 0, no timeout is applied.")
 
 	flag.BoolVar(&metricsServerEnabledArg, "metrics-server-enabled", false, "Whether to enable the metrics server.")
+	flag.Uint64Var(&metricsServerPortArg, "metrics-server-port", 0, "The port the metrics server will listen to.")
 	flag.BoolVar(&metricsCollectorEnabledArg, "metrics-collector-enabled", false, "Whether to enable the metrics collector (if true, then metrics-server-enabled must be true as well).")
 	flag.StringVar(&labelsArg, "labels", "", "Comma separated KV list of metric labels to attach to all exported metrics. Ex. \"owner=tim,runner=snoopy\"")
 
@@ -120,9 +122,8 @@ func TestMain(m *testing.M) {
 
 	flag.Parse()
 
-	if metricsCollectorEnabledArg && !metricsServerEnabledArg {
-		fmt.Fprint(os.Stderr, "metrics collector is enabled but metrics server is disabled.\n")
-		os.Exit(1)
+	if metricsCollectorEnabledArg {
+		metricsServerEnabledArg = true
 	}
 
 	customLabels, err := parseCustomLabels(labelsArg)
@@ -159,6 +160,7 @@ func BenchmarkReexecuteRange(b *testing.B) {
 			endBlockArg,
 			chanSizeArg,
 			metricsServerEnabledArg,
+			metricsServerPortArg,
 			metricsCollectorEnabledArg,
 		)
 	})
@@ -173,6 +175,7 @@ func benchmarkReexecuteRange(
 	endBlock uint64,
 	chanSize int,
 	metricsServerEnabled bool,
+	metricsPort uint64,
 	metricsCollectorEnabled bool,
 ) {
 	r := require.New(b)
@@ -193,7 +196,7 @@ func benchmarkReexecuteRange(
 	log := tests.NewDefaultLogger("c-chain-reexecution")
 
 	if metricsServerEnabled {
-		serverAddr := startServer(b, log, prefixGatherer)
+		serverAddr := startServer(b, log, prefixGatherer, metricsPort)
 
 		if metricsCollectorEnabled {
 			startCollector(b, log, "c-chain-reexecution", labels, serverAddr)
@@ -370,9 +373,10 @@ type vmExecutorConfig struct {
 }
 
 type vmExecutor struct {
-	config  vmExecutorConfig
-	vm      block.ChainVM
-	metrics *consensusMetrics
+	config     vmExecutorConfig
+	vm         block.ChainVM
+	metrics    *consensusMetrics
+	etaTracker *timer.EtaTracker
 }
 
 func newVMExecutor(vm block.ChainVM, config vmExecutorConfig) (*vmExecutor, error) {
@@ -385,6 +389,10 @@ func newVMExecutor(vm block.ChainVM, config vmExecutorConfig) (*vmExecutor, erro
 		vm:      vm,
 		metrics: metrics,
 		config:  config,
+		// ETA tracker uses a 10-sample moving window to smooth rate estimates,
+		// and a 1.2 slowdown factor to slightly pad ETA early in the run,
+		// tapering to 1.0 as progress approaches 100%.
+		etaTracker: timer.NewEtaTracker(10, 1.2),
 	}, nil
 }
 
@@ -421,6 +429,10 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan blockRe
 		zap.Uint64("height", blk.Height()),
 	)
 
+	// Initialize ETA tracking with a baseline sample at 0 progress
+	totalWork := e.config.EndBlock - e.config.StartBlock
+	e.etaTracker.AddSample(0, totalWork, start)
+
 	if e.config.ExecutionTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, e.config.ExecutionTimeout)
@@ -433,15 +445,20 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan blockRe
 		}
 
 		if blkResult.Height%1000 == 0 {
-			eta := timer.EstimateETA(
-				start,
-				blkResult.Height-e.config.StartBlock,
-				e.config.EndBlock-e.config.StartBlock,
-			)
-			e.config.Log.Info("executing block",
-				zap.Uint64("height", blkResult.Height),
-				zap.Duration("eta", eta),
-			)
+			completed := blkResult.Height - e.config.StartBlock
+			etaPtr, progressPercentage := e.etaTracker.AddSample(completed, totalWork, time.Now())
+			if etaPtr != nil {
+				e.config.Log.Info("executing block",
+					zap.Uint64("height", blkResult.Height),
+					zap.Float64("progress_pct", progressPercentage),
+					zap.Duration("eta", *etaPtr),
+				)
+			} else {
+				e.config.Log.Info("executing block",
+					zap.Uint64("height", blkResult.Height),
+					zap.Float64("progress_pct", progressPercentage),
+				)
+			}
 		}
 		if err := e.execute(ctx, blkResult.BlockBytes); err != nil {
 			return err
@@ -580,10 +597,11 @@ func startServer(
 	tb testing.TB,
 	log logging.Logger,
 	gatherer prometheus.Gatherer,
+	port uint64,
 ) string {
 	r := require.New(tb)
 
-	server, err := tests.NewPrometheusServer(gatherer)
+	server, err := tests.NewPrometheusServerWithPort(gatherer, port)
 	r.NoError(err)
 
 	log.Info("metrics endpoint available",
