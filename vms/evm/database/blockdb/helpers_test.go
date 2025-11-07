@@ -23,8 +23,9 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/utils/logging"
+
+	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 	heightindexdb "github.com/ava-labs/avalanchego/x/blockdb"
-	evmdb "github.com/ava-labs/coreth/plugin/evm/database"
 )
 
 var (
@@ -53,7 +54,7 @@ func newDatabasesFromDir(t *testing.T, dataDir string) (*Database, ethdb.Databas
 
 	base, err := leveldb.New(dataDir, nil, logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(t, err)
-	kvDB := rawdb.NewDatabase(evmdb.WrapDatabase(base))
+	kvDB := rawdb.NewDatabase(evmdb.New(base))
 	db, _, err := New(base, kvDB, dataDir, false, heightindexdb.DefaultConfig(), logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(t, err)
 

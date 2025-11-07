@@ -23,8 +23,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
+	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 	heightindexdb "github.com/ava-labs/avalanchego/x/blockdb"
-	evmdb "github.com/ava-labs/coreth/plugin/evm/database"
 )
 
 func TestMain(m *testing.M) {
@@ -349,7 +349,7 @@ func TestDatabaseNewScenarios(t *testing.T) {
 			dataDir := t.TempDir()
 			base, err := leveldb.New(dataDir, nil, logging.NoLog{}, prometheus.NewRegistry())
 			require.NoError(t, err)
-			kvDB := rawdb.NewDatabase(evmdb.WrapDatabase(base))
+			kvDB := rawdb.NewDatabase(evmdb.New(base))
 
 			// Create block databases with existing min height if needed
 			if tc.dbMinHeight > 0 {
@@ -412,7 +412,7 @@ func TestDatabaseInitMinHeight(t *testing.T) {
 	dataDir := t.TempDir()
 	base, err := leveldb.New(dataDir, nil, logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(t, err)
-	kvDB := rawdb.NewDatabase(evmdb.WrapDatabase(base))
+	kvDB := rawdb.NewDatabase(evmdb.New(base))
 
 	// Initially not enabled
 	enabled, err := IsEnabled(base)
@@ -448,7 +448,7 @@ func TestDatabaseMinHeightGating(t *testing.T) {
 	dataDir := t.TempDir()
 	base, err := leveldb.New(dataDir, nil, logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(t, err)
-	kvDB := rawdb.NewDatabase(evmdb.WrapDatabase(base))
+	kvDB := rawdb.NewDatabase(evmdb.New(base))
 
 	db, _, err := New(
 		base, kvDB, dataDir, true,

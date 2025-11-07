@@ -17,8 +17,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
+	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
 	heightindexdb "github.com/ava-labs/avalanchego/x/blockdb"
-	evmdb "github.com/ava-labs/coreth/plugin/evm/database"
 )
 
 func TestMigrationCompletion(t *testing.T) {
@@ -50,7 +50,7 @@ func TestMigrationCompletion(t *testing.T) {
 			dataDir := t.TempDir()
 			base, err := leveldb.New(dataDir, nil, logging.NoLog{}, prometheus.NewRegistry())
 			require.NoError(t, err)
-			kvDB := rawdb.NewDatabase(evmdb.WrapDatabase(base))
+			kvDB := rawdb.NewDatabase(evmdb.New(base))
 
 			if test.dataToMigrate {
 				blocks, receipts := createBlocks(t, 5)
@@ -260,7 +260,7 @@ func TestMigrationSkipsGenesis(t *testing.T) {
 	dataDir := t.TempDir()
 	base, err := leveldb.New(dataDir, nil, logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(t, err)
-	kvDB := rawdb.NewDatabase(evmdb.WrapDatabase(base))
+	kvDB := rawdb.NewDatabase(evmdb.New(base))
 	blocks, receipts := createBlocks(t, 10)
 	writeBlocks(kvDB, blocks[0:1], receipts[0:1])
 	writeBlocks(kvDB, blocks[5:10], receipts[5:10])
@@ -291,7 +291,7 @@ func TestMigrationWithoutReceipts(t *testing.T) {
 	dataDir := t.TempDir()
 	base, err := leveldb.New(dataDir, nil, logging.NoLog{}, prometheus.NewRegistry())
 	require.NoError(t, err)
-	kvDB := rawdb.NewDatabase(evmdb.WrapDatabase(base))
+	kvDB := rawdb.NewDatabase(evmdb.New(base))
 	blocks, _ := createBlocks(t, 5)
 
 	// Write blocks without receipts to kvDB
