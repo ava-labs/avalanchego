@@ -53,7 +53,6 @@ func SendJSONRequest(
 	request.Header = ops.headers
 	request.Header.Set("Content-Type", "application/json")
 
-	// TODO interface
 	//nolint:bodyclose // body is closed via CleanlyCloseBody in all code paths
 	resp, err := client.Send(request)
 	if err != nil {
