@@ -60,10 +60,5 @@ func (c *Client) GetMetrics(ctx context.Context) (map[string]*dto.MetricFamily, 
 	}
 
 	var parser expfmt.TextParser
-	metrics, err := parser.TextToMetricFamilies(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	return metrics, nil
+	return parser.TextToMetricFamilies(resp.Body)
 }
