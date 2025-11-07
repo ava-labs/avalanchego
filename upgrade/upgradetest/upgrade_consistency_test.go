@@ -40,7 +40,7 @@ func TestUpgradeConsistency(t *testing.T) {
 
 	require.NotEmpty(timeFields, "upgrade.Config should have time.Time fields")
 
-	t.Run("all time fields have activation methods", func(t *testing.T) {
+	t.Run("all time fields have activation methods", func(*testing.T) {
 		configValueType := reflect.TypeOf(&upgrade.Config{})
 
 		for _, fieldName := range timeFields {
@@ -60,7 +60,7 @@ func TestUpgradeConsistency(t *testing.T) {
 		}
 	})
 
-	t.Run("all time fields are in Validate method", func(t *testing.T) {
+	t.Run("all time fields are in Validate method", func(*testing.T) {
 		// Test that Validate() doesn't return an error when all times are equal
 		testConfig := upgrade.Config{}
 		configValue := reflect.ValueOf(&testConfig).Elem()
@@ -88,7 +88,8 @@ func TestUpgradeConsistency(t *testing.T) {
 		if len(timeFields) >= 2 {
 			lastField := configValue.FieldByName(timeFields[len(timeFields)-1])
 			lastField.Set(reflect.ValueOf(testTime.Add(-time.Hour)))
-			require.Error(testConfig.Validate(), "Validate should fail when upgrade times are out of order")
+			err := testConfig.Validate()
+			require.ErrorIs(err, upgrade.ErrInvalidUpgradeTimes, "Validate should fail when upgrade times are out of order")
 		}
 	})
 
@@ -101,7 +102,7 @@ func TestUpgradeConsistency(t *testing.T) {
 			{"Fuji", upgrade.Fuji},
 			{"Default", upgrade.Default},
 		} {
-			t.Run(tc.name, func(t *testing.T) {
+			t.Run(tc.name, func(*testing.T) {
 				configValue := reflect.ValueOf(tc.config)
 				for _, fieldName := range timeFields {
 					field := configValue.FieldByName(fieldName)
@@ -113,7 +114,7 @@ func TestUpgradeConsistency(t *testing.T) {
 		}
 	})
 
-	t.Run("upgradetest Fork constants match config fields", func(t *testing.T) {
+	t.Run("upgradetest Fork constants match config fields", func(*testing.T) {
 		// For each time field in upgrade.Config (except Apricot phases and special cases),
 		// there should be a corresponding Fork constant
 		expectedForks := make(map[string]bool)
@@ -150,7 +151,7 @@ func TestUpgradeConsistency(t *testing.T) {
 		for fork := ApricotPhase1; fork <= Latest; fork++ {
 			forkName := fork.String()
 
-			t.Run(forkName, func(t *testing.T) {
+			t.Run(forkName, func(*testing.T) {
 				config := upgrade.Config{}
 				SetTimesTo(&config, fork, testTime)
 
@@ -172,13 +173,13 @@ func TestUpgradeConsistency(t *testing.T) {
 		}
 	})
 
-	t.Run("Latest fork is properly defined", func(t *testing.T) {
+	t.Run("Latest fork is properly defined", func(*testing.T) {
 		// Latest should be a valid fork constant
 		require.NotEqual(NoUpgrades, Latest, "Latest should not be NoUpgrades")
 		require.NotEqual("Unknown", Latest.String(), "Latest should have a valid string representation")
 
 		// Latest should be >= all other named forks
-		require.True(Latest >= Granite, "Latest should be >= Granite")
+		require.GreaterOrEqual(Latest, Granite, "Latest should be >= Granite")
 	})
 }
 
@@ -188,7 +189,7 @@ func TestUpgradeFieldNaming(t *testing.T) {
 
 	configType := reflect.TypeOf(upgrade.Config{})
 
-	t.Run("time fields end with Time suffix", func(t *testing.T) {
+	t.Run("time fields end with Time suffix", func(*testing.T) {
 		for i := 0; i < configType.NumField(); i++ {
 			field := configType.Field(i)
 			if field.Type == reflect.TypeOf(time.Time{}) {
@@ -201,7 +202,7 @@ func TestUpgradeFieldNaming(t *testing.T) {
 		}
 	})
 
-	t.Run("duration fields end with Duration or Height suffix", func(t *testing.T) {
+	t.Run("duration fields end with Duration or Height suffix", func(*testing.T) {
 		for i := 0; i < configType.NumField(); i++ {
 			field := configType.Field(i)
 			if field.Type == reflect.TypeOf(time.Duration(0)) {
@@ -214,7 +215,7 @@ func TestUpgradeFieldNaming(t *testing.T) {
 		}
 	})
 
-	t.Run("json tags use camelCase", func(t *testing.T) {
+	t.Run("json tags use camelCase", func(*testing.T) {
 		for i := 0; i < configType.NumField(); i++ {
 			field := configType.Field(i)
 			jsonTag := field.Tag.Get("json")
