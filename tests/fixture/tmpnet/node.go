@@ -221,11 +221,12 @@ func (n *Node) SaveMetricsSnapshot(ctx context.Context) error {
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
+	//nolint:bodyclose // body is closed via rpc.CleanlyCloseBody
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
-	defer func() { _ = rpc.CleanlyCloseBody(resp.Body) }()
+	defer rpc.CleanlyCloseBody(resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

@@ -14,12 +14,12 @@ import (
 	rpc "github.com/gorilla/rpc/v2/json2"
 )
 
-// CleanlyCloseBody avoids sending unnecessary RST_STREAM and PING frames by ensuring
-// the whole body is read before being closed.
+// CleanlyCloseBody avoids sending unnecessary RST_STREAM and PING frames by
+// ensuring the whole body is read before being closed.
 // See https://blog.cloudflare.com/go-and-enhance-your-calm/#reading-bodies-in-go-can-be-unintuitive
-func CleanlyCloseBody(body io.ReadCloser) error {
+func CleanlyCloseBody(body io.ReadCloser) {
 	_, _ = io.Copy(io.Discard, body)
-	return body.Close()
+	_ = body.Close()
 }
 
 func SendJSONRequest(
@@ -51,24 +51,21 @@ func SendJSONRequest(
 	request.Header = ops.headers
 	request.Header.Set("Content-Type", "application/json")
 
-	//nolint:bodyclose // body is closed via CleanlyCloseBody in all code paths
+	//nolint:bodyclose // body is closed via CleanlyCloseBody
 	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return fmt.Errorf("failed to issue request: %w", err)
 	}
+	defer CleanlyCloseBody(resp.Body)
 
 	// Return an error for any non successful status code
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		// Drop any error during close to report the original error
-		_ = CleanlyCloseBody(resp.Body)
 		return fmt.Errorf("received status code: %d", resp.StatusCode)
 	}
 
 	if err := rpc.DecodeClientResponse(resp.Body, reply); err != nil {
-		// Drop any error during close to report the original error
-		_ = CleanlyCloseBody(resp.Body)
 		return fmt.Errorf("failed to decode client response: %w", err)
 	}
 
-	return CleanlyCloseBody(resp.Body)
+	return nil
 }

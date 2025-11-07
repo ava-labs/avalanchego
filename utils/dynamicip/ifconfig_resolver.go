@@ -28,11 +28,12 @@ func (r *ifConfigResolver) Resolve(ctx context.Context) (netip.Addr, error) {
 		return netip.Addr{}, err
 	}
 
+	//nolint:bodyclose // body is closed via rpc.CleanlyCloseBody
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return netip.Addr{}, err
 	}
-	defer func() { _ = rpc.CleanlyCloseBody(resp.Body) }()
+	defer rpc.CleanlyCloseBody(resp.Body)
 
 	ipBytes, err := io.ReadAll(resp.Body)
 	if err != nil {

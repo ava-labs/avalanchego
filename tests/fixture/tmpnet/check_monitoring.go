@@ -111,11 +111,12 @@ func queryLoki(
 	req.Header.Set("Authorization", "Basic "+auth)
 
 	// Execute request
+	//nolint:bodyclose // body is closed via rpc.CleanlyCloseBody
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return 0, stacktrace.Errorf("failed to execute request: %w", err)
 	}
-	defer func() { _ = rpc.CleanlyCloseBody(resp.Body) }()
+	defer rpc.CleanlyCloseBody(resp.Body)
 
 	// Read and parse response
 	body, err := io.ReadAll(resp.Body)
