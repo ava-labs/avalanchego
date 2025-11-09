@@ -33,9 +33,9 @@ import (
 const (
 	// Retry configuration
 	maxRetries              = 5
-	maxRetryTime            = 10 * time.Minute
-	baseRetryDelay          = 1 * time.Second
-	maxEmptyResponseRetries = 3 // Max retries for empty/null responses
+	maxRetryTime            = 45 * time.Minute // Total retry time: ~45 minutes
+	baseRetryDelay          = 2 * time.Minute  // Base delay for exponential backoff
+	maxEmptyResponseRetries = 3                // Max retries for empty/null responses
 
 	// Progress reporting default
 	defaultProgressInterval = 100 // Log progress every N blocks
@@ -698,9 +698,7 @@ func (v *Verifier) sendRPCRequestWithRetry(url string, req RPCRequest, res *RPCR
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		// Check if we've exceeded max retry time
 		if time.Since(startTime) > maxRetryTime {
-			errMsg := fmt.Sprintf("Exceeded maximum retry time of %v for %s, last error: %v", maxRetryTime, req.Method, lastErr)
-			v.logConnectionIssue(errMsg)
-			return fmt.Errorf("%s", errMsg)
+			return fmt.Errorf("exceeded maximum retry time of %v for %s, last error: %v", maxRetryTime, req.Method, lastErr)
 		}
 
 		// Check if context is cancelled
@@ -721,7 +719,7 @@ func (v *Verifier) sendRPCRequestWithRetry(url string, req RPCRequest, res *RPCR
 			if res.Result == nil || string(res.Result) == "null" || string(res.Result) == `""` {
 				// Handle empty response with specific retry logic
 				if attempt < maxEmptyResponseRetries {
-					log.Printf("Empty response for %s (attempt %d/%d), retrying in 2s", req.Method, attempt+1, maxEmptyResponseRetries)
+					// Retry without logging to avoid clutter
 					select {
 					case <-time.After(2 * time.Second):
 					case <-v.ctx.Done():
@@ -730,9 +728,7 @@ func (v *Verifier) sendRPCRequestWithRetry(url string, req RPCRequest, res *RPCR
 					continue
 				} else {
 					// After maxEmptyResponseRetries, return error indicating empty response
-					errMsg := fmt.Sprintf("Empty response from node for %s after %d retries", req.Method, maxEmptyResponseRetries)
-					v.logConnectionIssue(errMsg)
-					return fmt.Errorf("%s", errMsg)
+					return fmt.Errorf("empty response from node for %s after %d retries", req.Method, maxEmptyResponseRetries)
 				}
 			}
 			return nil
@@ -746,22 +742,14 @@ func (v *Verifier) sendRPCRequestWithRetry(url string, req RPCRequest, res *RPCR
 			return err
 		}
 
-		// Calculate backoff delay
+		// Calculate backoff delay using exponential backoff
 		delay := time.Duration(1<<uint(attempt)) * baseRetryDelay
 		if delay > maxRetryTime/2 {
 			delay = maxRetryTime / 2
 		}
 
-		if attempt == 0 {
-			// First failure, just log to stdout
-			log.Printf("Request failed for %s (attempt %d/%d), retrying in %v", req.Method, attempt+1, maxRetries, delay)
-		} else if attempt >= 2 {
-			// Multiple failures, log to error file as well
-			msg := fmt.Sprintf("Request failed for %s (attempt %d/%d), retrying in %v: %v", req.Method, attempt+1, maxRetries, delay, err)
-			v.logConnectionIssue(msg)
-		} else {
-			log.Printf("Request failed for %s (attempt %d/%d), retrying in %v", req.Method, attempt+1, maxRetries, delay)
-		}
+		// Don't log individual retry attempts to avoid clutter
+		// Only final failure will be logged after all retries exhausted
 
 		// Wait with context cancellation support
 		select {
@@ -771,9 +759,7 @@ func (v *Verifier) sendRPCRequestWithRetry(url string, req RPCRequest, res *RPCR
 		}
 	}
 
-	errMsg := fmt.Sprintf("Failed after %d attempts for %s, last error: %v", maxRetries, req.Method, lastErr)
-	v.logConnectionIssue(errMsg)
-	return fmt.Errorf("%s", errMsg)
+	return fmt.Errorf("failed after %d attempts for %s, last error: %v", maxRetries, req.Method, lastErr)
 }
 
 func (v *Verifier) sendRPCRequest(url string, req RPCRequest, res *RPCResponse) error {
@@ -797,6 +783,15 @@ func (v *Verifier) sendRPCRequest(url string, req RPCRequest, res *RPCResponse) 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
+	}
+
+	// Validate response is JSON before attempting to unmarshal
+	if len(body) > 0 && body[0] != '{' && body[0] != '[' {
+		preview := string(body)
+		if len(preview) > 100 {
+			preview = preview[:100] + "..."
+		}
+		return fmt.Errorf("received non-JSON response (starts with '%c'): %s", body[0], preview)
 	}
 
 	return json.Unmarshal(body, res)
