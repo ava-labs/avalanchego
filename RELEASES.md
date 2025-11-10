@@ -16,7 +16,6 @@
   - Changed default percentile from 60 to 40
   - This impacts `eth_suggestGasPrice` and `eth_suggestGasTipCap` , `eth_suggestPriceOptions`, `eth_maxPriorityFeePerGas`, `eth_gasPrice` APIs
 
-
 ## [v0.15.3](https://github.com/ava-labs/coreth/releases/tag/v0.15.3)
 
 - Removed legacy warp message handlers in favor of ACP-118 SDK handlers.

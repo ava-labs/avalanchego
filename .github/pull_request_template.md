@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD041 -->
 ## Why this should be merged
 
 ## How this works

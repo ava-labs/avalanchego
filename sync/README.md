@@ -1,6 +1,7 @@
 # State sync
 
 ## Overview
+
 Normally, a node joins the network through bootstrapping: First it fetches all blocks from genesis to the chain's last accepted block from peers, then it applies the state transition specified in each block to reach the state necessary to join consensus.
 
 State sync is an alternative in which a node downloads the state of the chain from its peers at a specific _syncable_ block height. Then, the node processes the rest of the chain's blocks (from syncable block to tip) via normal bootstrapping.
@@ -8,19 +9,23 @@ Blocks at heights divisible by `defaultSyncableInterval` (= 16,384 or 2**14) are
 _Note: `defaultSyncableInterval` must be divisible by `CommitInterval` (= 4096). This is so the state corresponding to syncable blocks is available on nodes with pruning enabled._
 
 State sync is faster than bootstrapping and uses less bandwidth and computation:
+
 - Nodes joining the network do not process all the state transitions.
 - The amount of data sent over the network is proportionate to the amount of state not the chain's length
 
 _Note: nodes joining the network through state sync will not have historical state prior to the syncable block._
 
 ## What is the chain state?
+
 The node needs the following data from its peers to continue processing blocks from a syncable block:
+
 - Accounts trie & storage tries for all accounts (at the state root corresponding to the syncable block),
 - State of the cross-chain shared memory (this data is fetched from peers as a merkelized trie containing add/remove operations from Import and Export Txs, known as the _atomic trie_),
 - Contract code referenced in the account trie,
 - 256 parents of the syncable block (required for the BLOCKHASH opcode)
 
 ## Code structure
+
 State sync code is structured as follows:
 
 - `sync/handlers`: Nodes that have joined the network are expected to respond to valid requests for the chain state:
@@ -37,8 +42,8 @@ State sync code is structured as follows:
 - `peer`: Contains abstractions used by `sync/statesync` to send requests to peers (`AppRequest`) and receive responses from peers (`AppResponse`).
 - `message`: Contains structs that are serialized and sent over the network during state sync.
 
-
 ## Sync summaries & engine involvement
+
 When a new node wants to join the network via state sync, it will need a few pieces of information as a starting point so it can make valid requests to its peers:
 
 - Number (height) and hash of the latest available syncable block,
@@ -47,16 +52,17 @@ When a new node wants to join the network via state sync, it will need a few pie
 
 The above information is called a _state summary_, and each syncable block corresponds to one such summary (see `message.Summary`). The engine and VM interact as follows to find a syncable state summary:
 
-
 1. The engine calls `StateSyncEnabled`. The VM returns `true` to initiate state sync, or `false` to start  bootstrapping. In `coreth`, this is controlled by the `state-sync-enabled` flag.
 1. The engine calls `GetOngoingSyncStateSummary`. If the VM has a previously interrupted sync to resume it returns that summary. Otherwise, it returns `ErrNotFound`.  By default, `coreth` will resume an interrupted sync.
-1. The engine samples peers for their latest available summaries, then verifies the correctness and availability of each sampled summary with validators. The messaging flow is documented [here](https://github.com/ava-labs/avalanchego/blob/master/snow/engine/snowman/block/README.md).
+1. The engine samples peers for their latest available summaries, then verifies the correctness and availability of each sampled summary with validators. The messaging flow is documented in the [block engine README](https://github.com/ava-labs/avalanchego/blob/master/snow/engine/snowman/block/README.md).
 1. The engine calls `Accept` on the chosen summary. The VM may return `false` to skip syncing to this summary (`coreth` skips state sync for less than `defaultStateSyncMinBlocks = 300_000` blocks). If the VM decides to perform the sync, it must return `true` without blocking and fetch the state from its peers asynchronously.
 1. The VM sends `common.StateSyncDone` on the `toEngine` channel on completion.
 1. The engine calls `VM.SetState(Bootstrapping)`. Then, blocks after the syncable block are processed one by one.
 
 ## Syncing state
+
 The following steps are executed by the VM to sync its state from peers (see `stateSyncClient.StateSync`):
+
 1. Wipe snapshot data
 1. Sync 256 parents of the syncable block (see `BlockRequest`),
 1. Sync the atomic trie,
@@ -64,6 +70,7 @@ The following steps are executed by the VM to sync its state from peers (see `st
 1. Update in-memory and on-disk pointers.
 
 Steps 3 and 4 involve syncing tries. To sync trie data, the VM will send a series of `LeafRequests` to its peers. Each request specifies:
+
 - Type of trie (`NodeType`):
   - `statesync.StateTrieNode` (account trie and storage tries share the same database)
   - `atomic.TrieNode` (atomic trie has an independent database)
@@ -73,17 +80,20 @@ Steps 3 and 4 involve syncing tries. To sync trie data, the VM will send a serie
 Peers responding to these requests send back trie leafs (key/value pairs) beginning at `Start` and up to `End` (or a maximum number of leafs). The response must also contain include a merkle proof for the range of leafs it contains. Nodes serving state sync data are responsible for constructing these proofs (see `sync/handlers/leafs_request.go`)
 
 `client.GetLeafs` handles sending a single request and validating the response. This method will retry the request from a different peer up to `maxRetryAttempts` (= 32) times if the peer's response is:
+
 - malformed,
 - does not contain a valid merkle proof,
 - or is not received in time.
 
-
 If there are more leafs in a trie than can be returned in a single response,  the client will make successive requests to continue fetching data (with `Start` set to the last key received) until the trie is complete.  `CallbackLeafSyncer` manages this process and does a callback on each batch of received leafs.
 
 ### EVM state: Account trie, code, and storage tries
+
 `sync/statesync.stateSyncer` uses `CallbackLeafSyncer` to sync the account trie. When the leaf callback is invoked, each leaf represents an account:
+
 - If the account has contract code, it is requested from peers using `client.GetCode`
 - If the account has a storage root, it is added to the list of trie roots returned from the callback. `CallbackLeafSyncer` has `defaultNumThreads` (= 4) goroutines to fetch these tries concurrently.
+
 If the account trie encounters a new storage trie task and there are already 4 in-progress trie tasks (1 for the account trie and 3 for in-progress storage trie tasks), then the account trie worker will block until one of the storage trie tasks finishes and it can create a new task.
 
 When an account leaf is received, it is converted to `SlimRLP` format and written to the snapshot.
@@ -93,13 +103,16 @@ When the trie is complete, an `OnFinish` callback is called and we hash any rema
 When a storage trie leaf is received, it is stored in the account's storage snapshot. A `StackTrie` is used here to reconstruct intermediary trie nodes & root as well.
 
 ### Atomic trie
+
 `plugin/evm.syncer` uses `CallbackLeafSyncer` to sync the atomic trie. In this trie, each leaf represents a set of put or remove shared memory operations and is structured as follows:
+
 - Key: block height + peer blockchain ID
 - Value: codec serialized `atomic.Requests` (includes `PutRequests` and `RemoveRequests`)
 
 For each 4096 blocks (`commitHeightInterval`)  inserted in the atomic trie, a root is constructed and the trie is persisted. There is no concurrency in sycing this trie.
 
 ### Updating in-memory and on-disk pointers
+
 `plugin/evm.stateSyncClient.StateSyncSetLastSummaryBlock` is the last step in state sync.
 Once the tries have been synced, this method:
 
@@ -109,8 +122,8 @@ Once the tries have been synced, this method:
 - Updates VM's last accepted block.
 - Applies the atomic operations from the atomic trie to shared memory. (Note: the VM will resume applying these operations even if the VM is shutdown prior to completing this step)
 
-
 ## Resuming a partial sync operation
+
 While state sync is faster than normal bootstrapping, the process may take several hours to complete. In case the node is shut down in the middle of a state sync, progress on syncing the account trie and storage tries is preserved:
 
 - When starting a sync, `stateSyncClient` persists the state summary to disk. This is so if the node is shut down while the sync is ongoing, this summary can be found and returned to the engine from `GetOngoingSyncStateSummary` upon node restart.

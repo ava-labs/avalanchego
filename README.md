@@ -31,11 +31,11 @@ test run, require binary dependencies. One way of making these dependencies avai
 to use a nix shell which will give access to the dependencies expected by the test
 tooling:
 
- - Install [nix](https://nixos.org/). The [determinate systems
-   installer](https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix)
-   is recommended.
- - Use `./scripts/dev_shell.sh` to start a nix shell
- - Execute the dependency-requiring command (e.g. `./scripts/tests.e2e.sh --start-collectors`)
+- Install [nix](https://nixos.org/). The [determinate systems
+  installer](https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix)
+  is recommended.
+- Use `./scripts/dev_shell.sh` to start a nix shell
+- Execute the dependency-requiring command (e.g. `./scripts/tests.e2e.sh --start-collectors`)
 
 This repo also defines a `.envrc` file to configure [devenv](https://direnv.net/). With
 `devenv` and `nix` installed, a shell at the root of the repo will automatically start a nix
@@ -50,13 +50,13 @@ The C-Chain supports the following API namespaces:
 - `txpool`
 - `debug`
 
-Only the `eth` namespace is enabled by default. 
-To enable the other namespaces see the instructions for passing the C-Chain config to AvalancheGo [here.](https://docs.avax.network/nodes/configure/chain-config-flags#enabling-evm-apis)
-Full documentation for the C-Chain's API can be found [here.](https://docs.avax.network/reference/avalanchego/c-chain/api)
+Only the `eth` namespace is enabled by default.
+To enable the other namespaces see the instructions for passing the C-Chain config to AvalancheGo in the [chain-config-flags documentation](https://build.avax.network/docs/nodes/chain-configs/c-chain#api-configuration).
+Full documentation for the C-Chain's API can be found in the [C-Chain API documentation](https://build.avax.network/docs/nodes/chain-configs/c-chain).
 
 ## Compatibility
 
-The C-Chain is compatible with almost all Ethereum tooling, including [Core,](https://docs.avax.network/build/dapp/launch-dapp#through-core) [Metamask,](https://docs.avax.network/build/dapp/launch-dapp#through-metamask) [Remix](https://docs.avax.network/dapps/smart-contract-dev/deploy-with-remix-ide) and [Truffle.](https://docs.avax.network/build/tutorials/smart-contracts/using-truffle-with-the-avalanche-c-chain)
+The C-Chain is compatible with almost all Ethereum tooling, including [Core,](https://docs.avax.network/build/dapp/launch-dapp#through-core) [Metamask,](https://docs.avax.network/build/dapp/launch-dapp#through-metamask) and [Remix](https://docs.avax.network/dapps/smart-contract-dev/deploy-with-remix-ide).
 
 ## Differences Between Avalanche C-Chain and Ethereum
 
@@ -82,15 +82,15 @@ To support these changes, there have been a number of changes to the C-Chain blo
 
 ### Block Body
 
-* `Version`: provides version of the `ExtData` in the block. Currently, this field is always 0.
-* `ExtData`: extra data field within the block body to store atomic transaction bytes.
+- `Version`: provides version of the `ExtData` in the block. Currently, this field is always 0.
+- `ExtData`: extra data field within the block body to store atomic transaction bytes.
 
 ### Block Header
 
-* `ExtDataHash`: the hash of the bytes in the `ExtDataHash` field
-* `BaseFee`: Added by EIP-1559 to represent the base fee of the block (present in Ethereum as of EIP-1559)
-* `ExtDataGasUsed`: amount of gas consumed by the atomic transactions in the block
-* `BlockGasCost`: surcharge for producing a block faster than the target rate
+- `ExtDataHash`: the hash of the bytes in the `ExtDataHash` field
+- `BaseFee`: Added by EIP-1559 to represent the base fee of the block (present in Ethereum as of EIP-1559)
+- `ExtDataGasUsed`: amount of gas consumed by the atomic transactions in the block
+- `BlockGasCost`: surcharge for producing a block faster than the target rate
 
 ## Releasing
 
