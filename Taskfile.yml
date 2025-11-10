@@ -92,6 +92,10 @@ tasks:
     desc: Creates the default kind cluster
     cmd: bash -x ./scripts/start_kind_cluster.sh {{.CLI_ARGS}}
 
+  coverage:
+    desc: Display test coverage statistics from coverage.out file
+    cmd: ./scripts/coverage.sh
+
   delete-kind-cluster:
     desc: Deletes the default kind cluster
     cmd: kind delete cluster
@@ -378,8 +382,11 @@ tasks:
 
   test-unit:
     desc: Runs unit tests
-    # Invoking with bash ensures compatibility with CI execution on Windows
     cmd: bash ./scripts/build_test.sh
+
+  test-unit-coreth:
+    desc: Runs unit tests for coreth
+    cmd: bash ./scripts/tests.unit.coreth.sh
 
   test-unit-fast:
     desc: Runs unit tests

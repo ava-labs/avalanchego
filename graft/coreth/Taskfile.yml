@@ -22,10 +22,6 @@ tasks:
     desc: Build AvalancheGo binary with Coreth dependency pointing to local Coreth path
     cmd: ./scripts/build_avalanchego_with_coreth.sh # ci.yml
 
-  build-test:
-    desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
-    cmd: ./scripts/build_test.sh # ci.yml
-
   check-avalanchego-version:
     desc: Ensure consistent avalanchego version by updating and checking for changes
     cmds:
@@ -65,10 +61,6 @@ tasks:
       - task: check-clean-branch
       - cmd: cd tools && go mod tidy
       - task: check-clean-branch
-
-  coverage:
-    desc: Display test coverage statistics from coverage.out file
-    cmd: ./scripts/coverage.sh # ci.yml
 
   generate-codec:
     desc: Generates fjl/gencodec files
@@ -111,7 +103,7 @@ tasks:
       - task: check-generate-codec
       - task: check-generate-mocks
       - task: check-generate-rlp
-  
+
   lint-fix:
     desc: Run golangci-lint with auto-fix where possible
     cmd: ./scripts/lint_fix.sh
