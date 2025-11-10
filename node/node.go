@@ -1498,8 +1498,8 @@ func (n *Node) initHealthAPI() error {
 		Name: "time_until",
 		Help: "Time until an upcoming network upgrade (ns). +Inf means the upgrade is unscheduled.",
 	})
-	timeUntilUnscheduledUpgrade := math.Inf(1)
-	timeUntilUpgradeMetric.Set(timeUntilUnscheduledUpgrade)
+	infinity := math.Inf(1)
+	timeUntilUpgradeMetric.Set(infinity)
 	if err := upgradeReg.Register(timeUntilUpgradeMetric); err != nil {
 		return fmt.Errorf("couldn't register time until upgrade metric: %w", err)
 	}
@@ -1550,7 +1550,7 @@ func (n *Node) initHealthAPI() error {
 			"numUpgradeTimes":             len(upgradeTimes),
 		}
 		if localUpgradeTimeUnix >= modeUpgradeTimeUnix || modeUpgradeWeightPortion < .5 {
-			timeUntilUpgradeMetric.Set(timeUntilUnscheduledUpgrade)
+			timeUntilUpgradeMetric.Set(infinity)
 			return result, nil
 		}
 
