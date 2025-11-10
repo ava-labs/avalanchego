@@ -378,8 +378,11 @@ tasks:
 
   test-unit:
     desc: Runs unit tests
-    # Invoking with bash ensures compatibility with CI execution on Windows
     cmd: bash ./scripts/build_test.sh
+
+  test-unit-coreth:
+    desc: Runs unit tests for coreth
+    cmd: bash ./scripts/tests.unit.coreth.sh
 
   test-unit-fast:
     desc: Runs unit tests

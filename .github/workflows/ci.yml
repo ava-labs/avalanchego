@@ -32,8 +32,18 @@ jobs:
       - name: test-unit
         shell: bash
         run: ./scripts/run_task.sh test-unit
-        env:
-          TIMEOUT: ${{ env.TIMEOUT }}
+  Unit-coreth:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-22.04, ubuntu-24.04, custom-arm64-jammy, custom-arm64-noble]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: test-unit
+        shell: bash
+        run: ./scripts/run_task.sh test-unit-coreth
   Fuzz:
     runs-on: ubuntu-latest
     steps:
