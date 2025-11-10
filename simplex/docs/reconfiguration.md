@@ -41,7 +41,7 @@ While it may at first seem like a trivial problem, it isn't always so:
 - In Simplex, a block may be notarized but only finalized at a later round once a descendant block is finalized.
   This phenomenon is possible when in a round, a few nodes collect a notarization on the block, but a quorum or more of the nodes vote that no block will be finalized
   in that round, due to network conditions or the leader being faulty. As a result, if the block ends up being finalized it is only once a descendant block is finalized.
-  This behavior makes reconfiguration challenging as in a reconfiguration, the protocol needs to change its voting logic for descendant blocks
+  This behavior makes reconfiguration challenging, since in a reconfiguration, the protocol needs to change its voting logic for descendant blocks
   based on a predecessor block which may not end up part of the chain.
 
 ## 2. Epoch management
@@ -83,7 +83,6 @@ message SimplexEpochInfo {
 ```
 
 - The validator set of the epoch numbered `epoch_number` is derived from `p_chain_reference_height`.
-  Even though it is sufficient to know `epoch_number` to calculate `p_chain_reference_height`, it is encoded in the block for convenience.
 
 - The `next_p_chain_reference_height` is the P-chain height of the next epoch, otherwise it is set to `0`.
 
@@ -93,7 +92,7 @@ message SimplexEpochInfo {
   It is used to determine when the Simplex instance can transition to the next epoch. It is safe to transition to the next epoch once the sealing block is finalized.
 
 - The `block_validation_descriptor` describes how to validate the blocks of the next epoch.
-  It is encoded starting from the block that has `next_p_chain_reference_height > 0`.
+  It is encoded in blocks starting from the block that has `next_p_chain_reference_height > 0` until and including the sealing block.
   It is used to verify the quorum certificates of blocks that are built in the next epoch.
 
 - The `next_epoch_approvals` is a canoto message that contains the approvals of the next epoch by at least `n-f` nodes.
@@ -141,7 +140,7 @@ When the block $B_{k+1}$ built by the `i`'th node is verified by nodes other tha
 - If `next_p_chain_reference_height > 0`, the node has observed the P-chain height exists in the P-chain.
 - If `next_p_chain_reference_height > 0`, the validator set derived from the P-chain height corresponding to is different from the validator set derived by the P-chain height corresponding to `p_chain_reference_height`.
 
-If block $B_{k+1}$ is considered to be the sealing block its epoch, then the next block - block $B_{k+2}$ belongs to epoch `k+1`.
+If block $B_{k+1}$ is considered to be the sealing block of its epoch, then the next block - block $B_{k+2}$ belongs to epoch `k+1`.
 When block $B_{k+2}$ is built, it will have its `epoch_number` set to $k+1$ and its `p_chain_reference_height` set to the `next_p_chain_reference_height` of $B_{k+1}$ and
 its `next_p_chain_reference_height` set to `0`.
 
@@ -208,7 +207,7 @@ a block containing a specific `next_p_chain_reference_height` indicates that at 
 The second criterion is satisfied by the `next_epoch_approvals` field containing an aggregated BLS signature from at least `n-f` nodes
 belonging to the next epoch. Unlike the previous field, this field also needs to be updated by nodes in the next epoch that might not be in the current epoch.
 To that end, nodes in the next epoch create a `NextEpochApprovals` message with `node_ids` belonging only to themselves, and broadcast it to the nodes in the current epoch.
-Then, when a node in the current epoch builds a block, it sets the bit corresponding to approving nodes in the `node_ids` field, and aggregates the signatures of the nodes.
+Then, when a node in the current epoch builds a block, it sets the bits in the `node_ids` field corresponding to the union of the existing and new approving nodes, and aggregates the signatures of the nodes.
 The signature is over the `aux_info_digest` and the `next_p_chain_reference_height` fields, to ensure that the nodes in the next epoch agree not only on the validator set,
 but also on any kind of application specific auxiliary information that might be needed by the next epoch. One example for such auxiliary information
 can be messages in a cryptographic protocol that are to be used in the next epoch.
@@ -223,8 +222,8 @@ The `NextEpochApprovals` may only change from block to block as long as the foll
 
 The aforementioned rules imply that in order to ensure liveness, the MSM needs to keep in its memory various combinations of different `aux_info_digest` and `next_p_chain_reference_height` values,
 and always try to propose the one that has the most signatures supporting it. A node may sign multiple different combinations of `aux_info_digest` and `next_p_chain_reference_height` values.
-Therefore, if the application that relies on the auxiliary information is sensitive to malicious nodes permuting the combinations,
-it needs to have measures in place to ensure the uniqueness of the `aux_info_digest`.
+Therefore, if an application that relies on the auxiliary information is susceptible to malicious nodes picking the combinations,
+it needs to have measures put in place.
 
 
 ### Epoch change using the MSM
