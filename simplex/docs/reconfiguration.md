@@ -89,12 +89,12 @@ message SimplexEpochInfo {
 
 - The `prev_vm_block_seq` is the sequence number of the previous VM block, and it is used to efficiently find the last VM block upon startup.
 
-- The `sealing_block_seq` is the sequence number of the sealing block of the epoch, and it is set to `0` in all blocks that are not sealing blocks.
-  It is used to determine when the Simplex instance can transition to the next epoch.
+- The `sealing_block_seq` is the sequence number of the sealing block of the epoch, and it is set to `0` before the sealing block is created.
+  It is used to determine when the Simplex instance can transition to the next epoch. It is safe to transition to the next epoch once the sealing block is finalized.
 
 - The `block_validation_descriptor` describes how to validate the blocks of the next epoch.
-  It is only encoded in the sealing block of the epoch, and it is empty in all other blocks.
-  It is used to verify the finalization certificates of blocks that were built in the next epoch.
+  It is encoded starting from the block that has `next_p_chain_reference_height > 0`.
+  It is used to verify the quorum certificates of blocks that are built in the next epoch.
 
 - The `next_epoch_approvals` is a canoto message that contains the approvals of the next epoch by at least `n-f` nodes.
   It is required in order to create the sealing block of the epoch and indicates that the nodes comprising the next epoch's validator set
@@ -141,7 +141,6 @@ When the block $B_{k+1}$ built by the `i`'th node is verified by nodes other tha
 - If `next_p_chain_reference_height > 0`, the node has observed the P-chain height exists in the P-chain.
 - If `next_p_chain_reference_height > 0`, the validator set derived from the P-chain height corresponding to is different from the validator set derived by the P-chain height corresponding to `p_chain_reference_height`.
 
-If block $B_{k+1}$ is the sealing block of the current epoch, then `next_p_chain_reference_height > 0`, otherwise it is set to `0`.
 If block $B_{k+1}$ is considered to be the sealing block its epoch, then the next block - block $B_{k+2}$ belongs to epoch `k+1`.
 When block $B_{k+2}$ is built, it will have its `epoch_number` set to $k+1$ and its `p_chain_reference_height` set to the `next_p_chain_reference_height` of $B_{k+1}$ and
 its `next_p_chain_reference_height` set to `0`.
@@ -173,7 +172,7 @@ Similarly to the proposerVM, the MSM wraps the inner VM block with its own block
 
 However, it is important to distinguish between the MSM and a VM. The MSM is a very simple construction and in most cases it is simple enough
 to be implemented as a state transition function that receives as input the previous state along with auxiliary information, and outputs the new state.
-Unlike the VM, it has no transaction memory-pool, and it cannot perform any DB lookup, nor it can do any disk or network I/O.
+Unlike the VM, it has no transaction memory-pool, and it cannot perform any DB lookup, nor can it do any disk or network I/O.
 
 When building a block $B_{i+1}$, the MSM has access to {$B_i$, $B_{i-1}$, ...} and to the corresponding finalization certificates, if applicable.
 The MSM intercepts all interaction between the Simplex consensus instance and the VM, namely the `BlockBuilder`, `Storage`, as well as the verification functions of blocks.
@@ -209,18 +208,18 @@ a block containing a specific `next_p_chain_reference_height` indicates that at 
 The second criterion is satisfied by the `next_epoch_approvals` field containing an aggregated BLS signature from at least `n-f` nodes
 belonging to the next epoch. Unlike the previous field, this field also needs to be updated by nodes in the next epoch that might not be in the current epoch.
 To that end, nodes in the next epoch create a `NextEpochApprovals` message with `node_ids` belonging only to themselves, and broadcast it to the nodes in the current epoch.
-Then, when a node in the current epoch builds a block, it appends the id of the nodes to the `node_ids` field, and aggregates the signatures of the nodes.
+Then, when a node in the current epoch builds a block, it sets the bit corresponding to approving nodes in the `node_ids` field, and aggregates the signatures of the nodes.
 The signature is over the `aux_info_digest` and the `next_p_chain_reference_height` fields, to ensure that the nodes in the next epoch agree not only on the validator set,
 but also on any kind of application specific auxiliary information that might be needed by the next epoch. One example for such auxiliary information
 can be messages in a cryptographic protocol that are to be used in the next epoch.
 
 The `NextEpochApprovals` may only change from block to block as long as the following rules are followed:
 
-- Additional node ids may be added to the `node_ids` field, but a node id may only be removed as long as the total number of node ids doesn't decrease.
+- Additional nodes may be added to the `node_ids` field, but a node may only be removed as long as the total number of node ids doesn't decrease.
 
 - The `aux_info_digest` and the `next_p_chain_reference_height` fields may only change if the number of `node_ids` increases.
 
-- The `signature` field should always match the aggregated signature of the nodes in the `node_ids` field over the `aux_info_digest` and the `next_p_chain_reference_height` fields.
+- The `signature` field should always match the aggregated signature of the nodes corresponding to the `node_ids` field over the `aux_info_digest` and the `next_p_chain_reference_height` fields.
 
 The aforementioned rules imply that in order to ensure liveness, the MSM needs to keep in its memory various combinations of different `aux_info_digest` and `next_p_chain_reference_height` values,
 and always try to propose the one that has the most signatures supporting it. A node may sign multiple different combinations of `aux_info_digest` and `next_p_chain_reference_height` values.
@@ -297,7 +296,7 @@ At this point, the block builders start collecting approvals from the nodes belo
     next_p_chain_reference_height: 151
     block_validation_descriptor: [TGVhcm4gdG8g==, dmFsdWUgeW91cnNlbGY==, ... , XBwaW5lc3MuCg==]
     next_epoch_approvals: {
-        node_ids: 00110101
+        node_ids: 00000101
         aux_info_digest: "VGhlIGhhcmRlc3Q=="
         signature: "iBpcyB0aGUgZ2x=="
     }
@@ -316,7 +315,7 @@ Once enough approvals are gathered, the sealing block can be built:
     next_epoch_approvals: {
         node_ids: 00110101
         aux_info_digest: "VGhlIGhhcmRlc3Q=="
-        signature: "iBpcyB0aGUgZ2x=="
+        signature: "erpcyBqaGUg05z=="
     }
 }
 ```
@@ -349,22 +348,22 @@ of previous epochs.
 
 The block validation descriptor, describes how to validate the blocks of the next epoch.
 It contains the public keys of the validator set of the next epoch.
-For storage and bandwidth efficiency reasons, the block validation descriptor is only encoded in epoch sealing blocks, and in the rest of the blocks it is empty.
+For storage and bandwidth efficiency reasons, the block validation descriptor is only encoded in blocks that have the `next_p_chain_reference_height`
+defined, as a preparation for the creation of the epoch sealing block, and in the rest of the blocks it is empty.
 
 ### Replicating a Simplex chain
 
 When replicating a chain driven by Simplex, the onboarding node first replicates the P-chain and acquires the latest validator set of the chain.
-It then proceeds to replicate only the sealing blocks of all epochs by querying a majority of nodes for the sealing blocks, and dropping candidate responses
+It then proceeds to replicate only the latest sealing blocks by querying a majority of nodes for the sealing blocks, and dropping candidate responses
 that aren't found in the responses of enough nodes.
 
-Once all sealing blocks are replicated and their content (but not finalization certificate) is verified by querying multiple nodes,
-it is possible for the onboarding node to discern whether it has missed replicating some sealing blocks among the sealing blocks it has replicated,
-thanks to the fact that a sealing block $B_l$ will have the epoch number $k$ of its previous sealing block $B_k$.
-
-Therefore, it is only required to query for the latest block in order to be able to recursively find out the block sequences of all previous sealing blocks.
+Thanks to the fact that a sealing block $B_l$ will have the epoch number $k$ of its previous sealing block $B_k$, it is possible to recursively find out the sealing blocks
+of all previous epochs once the latest sealing block has been verified by a majority poll.
 
 After replicating the sealing blocks, the onboarding node has the public key(s) of the validator set for each epoch.
 It can thereafter parallelize the replication and finalization certificate verification of all blocks in the chain that reside in between the sealing blocks.
+
+After replicating the blocks for the L1, the node can then proceed to process the blocks in-order using the VM.
 
 
 ## 4. Simplex block encoding
