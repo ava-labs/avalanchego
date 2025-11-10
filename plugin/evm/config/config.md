@@ -1,3 +1,4 @@
+<!-- markdownlint-disable MD041 MD033 -->
 > **Note**: These are the configuration options available in the coreth codebase. To set these values, you need to create a configuration file at `{chain-config-dir}/C/config.json`. This file does not exist by default.
 >
 > For example if `chain-config-dir` has the default value which is `$HOME/.avalanchego/configs/chains`, then `config.json` should be placed at `$HOME/.avalanchego/configs/chains/C/config.json`.
@@ -40,10 +41,10 @@ Configuration is provided as a JSON object. All fields are optional unless other
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
 | `eth-apis` | array of strings | List of Ethereum services that should be enabled | `["eth", "eth-filter", "net", "web3", "internal-eth", "internal-blockchain", "internal-transaction"]` |
-| `eth` | bool | Adds the `eth_coinbase` and `eth_etherbase` RPC calls to the `eth_*` namespace. | `true` | 
-| `eth-filter` | bool |  Enables the public filter API for the `eth_*` namespace and adds the following RPC calls (see [here](https://eth.wiki/json-rpc/API) for complete documentation): <br/> - `eth_newPendingTransactionFilter` <br/> - `eth_newPendingTransactions` <br/> - `eth_newAcceptedTransactions` <br/> - `eth_newBlockFilter` <br/> - `eth_newHeads` <br/> - `eth_logs` <br/> - `eth_newFilter` <br/> - `eth_getLogs` <br/> - `eth_uninstallFilter` <br/> - `eth_getFilterLogs` <br/> - `eth_getFilterChanges` <br/> |   `true` | 
-| `admin` | bool | Adds the `admin_importChain` and `admin_exportChain` RPC calls to the `admin_*` namespace | `false` | 
-| `debug` | bool | Adds the following RPC calls to the `debug_*` namespace. <br/> - `debug_dumpBlock` <br/> - `debug_accountRange` <br/> - `debug_preimage` <br/> - `debug_getBadBlocks` <br/> - `debug_storageRangeAt` <br/> - `debug_getModifiedAccountsByNumber` <br/> - `debug_getModifiedAccountsByHash` <br/> - `debug_getAccessibleState` <br/> The following RPC calls are disabled for any nodes with `state-scheme = firewood`: <br/> - `debug_storageRangeAt` <br/> - `debug_getModifiedAccountsByNumber` <br/> - `debug_getModifiedAccountsByHash` <br/> | `false`.
+| `eth` | bool | Adds the `eth_coinbase` and `eth_etherbase` RPC calls to the `eth_*` namespace. | `true` |
+| `eth-filter` | bool |  Enables the public filter API for the `eth_*` namespace and adds the following RPC calls (see [Ethereum JSON-RPC API documentation](https://eth.wiki/json-rpc/API) for complete documentation): <br/> - `eth_newPendingTransactionFilter` <br/> - `eth_newPendingTransactions` <br/> - `eth_newAcceptedTransactions` <br/> - `eth_newBlockFilter` <br/> - `eth_newHeads` <br/> - `eth_logs` <br/> - `eth_newFilter` <br/> - `eth_getLogs` <br/> - `eth_uninstallFilter` <br/> - `eth_getFilterLogs` <br/> - `eth_getFilterChanges` <br/> | `true` |
+| `admin` | bool | Adds the `admin_importChain` and `admin_exportChain` RPC calls to the `admin_*` namespace | `false` |
+| `debug` | bool | Adds the following RPC calls to the `debug_*` namespace. <br/> - `debug_dumpBlock` <br/> - `debug_accountRange` <br/> - `debug_preimage` <br/> - `debug_getBadBlocks` <br/> - `debug_storageRangeAt` <br/> - `debug_getModifiedAccountsByNumber` <br/> - `debug_getModifiedAccountsByHash` <br/> - `debug_getAccessibleState` <br/> The following RPC calls are disabled for any nodes with `state-scheme = firewood`: <br/> - `debug_storageRangeAt` <br/> - `debug_getModifiedAccountsByNumber` <br/> - `debug_getModifiedAccountsByHash` <br/> | `false` |
 | `net` | bool | Adds the following RPC calls to the `net_*` namespace. <br/> - `net_listening` <br/> - `net_peerCount` <br/> - `net_version` <br/> Note: Coreth is a virtual machine and does not have direct access to the networking layer, so `net_listening` always returns true and `net_peerCount` always returns 0. For accurate metrics on the network layer, users should use the AvalancheGo APIs. | `true` |
 | `debug-tracer` | bool | Adds the following RPC calls to the `debug_*` namespace. <br/> - `debug_traceChain` <br/> - `debug_traceBlockByNumber` <br/> - `debug_traceBlockByHash` <br/> - `debug_traceBlock` <br/> - `debug_traceBadBlock` <br/> - `debug_intermediateRoots` <br/> - `debug_traceTransaction` <br/> - `debug_traceCall` | `false` |
 | `web3` | bool | Adds the `web3_clientVersion` and `web3_sha3` RPC calls to the `web3_*` namespace | `true` |
@@ -60,8 +61,8 @@ Configuration is provided as a JSON object. All fields are optional unless other
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
-| `admin-api-enabled` | bool | Enables the Admin API |  `false` | 
-| `admin-api-dir` | string | Specifies the directory for the Admin API to use to store CPU/Mem/Lock Profiles | `""` | 
+| `admin-api-enabled` | bool | Enables the Admin API |  `false` |
+| `admin-api-dir` | string | Specifies the directory for the Admin API to use to store CPU/Mem/Lock Profiles | `""` |
 | `warp-api-enabled` | bool | Enable the Warp API for cross-chain messaging | `false` |
 
 ### API Limits and Security
@@ -73,7 +74,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 | `api-max-duration` | duration | Maximum duration for API calls (0 = no limit) | `0` |
 | `api-max-blocks-per-request` | int64 | Maximum number of blocks per getLogs request (0 = no limit) | `0` |
 | `http-body-limit` | uint64 | Maximum size of HTTP request bodies (0 = no limit) | `0` |
-| `batch-request-limit` | uint64 | Maximum number of requests that can be batched in an RPC call. For no limit, set either this or `batch-response-max-size` to 0 | `1000` | 
+| `batch-request-limit` | uint64 | Maximum number of requests that can be batched in an RPC call. For no limit, set either this or `batch-response-max-size` to 0 | `1000` |
 | `batch-response-max-size` | uint64 | Maximum size (in bytes) of response that can be returned from a batched RPC call. For no limit, set either this or `batch-request-limit` to 0. Defaults to `25 MB`| `1000` |
 
 ### WebSocket Settings
@@ -126,7 +127,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 
 ## Pruning and State Management
 
- > **Note**: If a node is ever run with `pruning-enabled` as `false` (archival mode), setting `pruning-enabled` to `true` will result in a warning and the node will shut down. This is to protect against unintentional misconfigurations of an archival node. To override this and switch to pruning mode, in addition to `pruning-enabled: true`, `allow-missing-tries` should be set to `true` as well. 
+ > **Note**: If a node is ever run with `pruning-enabled` as `false` (archival mode), setting `pruning-enabled` to `true` will result in a warning and the node will shut down. This is to protect against unintentional misconfigurations of an archival node. To override this and switch to pruning mode, in addition to `pruning-enabled: true`, `allow-missing-tries` should be set to `true` as well.
 
 ### Basic Pruning
 
@@ -146,7 +147,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 
 ### Offline Pruning
 
-> **Note**: If offline pruning is enabled it will  run on startup and block until it completes (approximately one hour on Mainnet). This will reduce the size of the database by deleting old trie nodes. **While performing offline pruning, your node will not be able to process blocks and will be considered offline.** While ongoing, the pruning process consumes a small amount of additional disk space (for deletion markers and the bloom filter). For more information see [here.](https://build.avax.network/docs/nodes/maintain/reduce-disk-usage#disk-space-considerations). Since offline pruning deletes old state data, this should not be run on nodes that need to support archival API requests. This is meant to be run manually, so after running with this flag once, it must be toggled back to false before running the node again. Therefore, you should run with this flag set to true and then set it to false on the subsequent run.
+> **Note**: If offline pruning is enabled it will  run on startup and block until it completes (approximately one hour on Mainnet). This will reduce the size of the database by deleting old trie nodes. **While performing offline pruning, your node will not be able to process blocks and will be considered offline.** While ongoing, the pruning process consumes a small amount of additional disk space (for deletion markers and the bloom filter). For more information see the [disk space considerations documentation](https://build.avax.network/docs/nodes/maintain/reduce-disk-usage#disk-space-considerations). Since offline pruning deletes old state data, this should not be run on nodes that need to support archival API requests. This is meant to be run manually, so after running with this flag once, it must be toggled back to false before running the node again. Therefore, you should run with this flag set to true and then set it to false on the subsequent run.
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
@@ -242,7 +243,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 
 ### State Sync
 
-> **Note:** If state-sync is enabled, the peer will download chain state from peers up to a recent block near tip, then proceed with normal bootstrapping. Please note that if you need historical data, state sync isn't the right option. However, it is sufficient if you are just running a validator. 
+> **Note:** If state-sync is enabled, the peer will download chain state from peers up to a recent block near tip, then proceed with normal bootstrapping. Please note that if you need historical data, state sync isn't the right option. However, it is sufficient if you are just running a validator.
 
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
@@ -266,7 +267,7 @@ Failing to set these options will result in errors on VM initialization. Additio
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
 | `inspect-database` | bool | Inspect database on startup | `false` |
-| `state-scheme` | string |  EXPERIMENTAL: specifies the database scheme to store state data; can be one of `hash`, `firewood`, or `path` | `hash` | 
+| `state-scheme` | string |  EXPERIMENTAL: specifies the database scheme to store state data; can be one of `hash`, `firewood`, or `path` | `hash` |
 
 ## Transaction Indexing
 
@@ -289,6 +290,6 @@ Failing to set these options will result in errors on VM initialization. Additio
 | Option | Type | Description | Default |
 |--------|------|-------------|---------|
 | `acceptor-queue-limit` | integer | Specifies the maximum number of blocks to queue during block acceptance before blocking on Accept. | `64` |
-| `gas-target` | integer | The target gas per second that this node will attempt to use when creating blocks | Parent block's target | 
+| `gas-target` | integer | The target gas per second that this node will attempt to use when creating blocks | Parent block's target |
 | `min-delay-target` | integer | The minimum delay between blocks (in milliseconds) that this node will attempt to use when creating blocks | Parent block's target |
 | `skip-upgrade-check` | bool | Skip checking that upgrades occur before last accepted block ⚠️ **Warning**: Only use when you understand the implications | `false` |
