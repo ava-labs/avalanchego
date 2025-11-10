@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 
@@ -51,17 +50,14 @@ func SendJSONRequest(
 	// Return an error for any non successful status code
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		// Drop any error during close to report the original error
-		io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 		return fmt.Errorf("received status code: %d", resp.StatusCode)
 	}
 
 	if err := rpc.DecodeClientResponse(resp.Body, reply); err != nil {
 		// Drop any error during close to report the original error
-		io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 		return fmt.Errorf("failed to decode client response: %w", err)
 	}
-	io.Copy(io.Discard, resp.Body)
 	return resp.Body.Close()
 }
