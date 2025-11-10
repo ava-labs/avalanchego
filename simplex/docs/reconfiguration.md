@@ -1,6 +1,5 @@
 # Reconfiguring a Simplex L1
 
-
 In this document, we describe the reconfiguration technique of Simplex.
 We start by briefly recalling the Simplex consensus protocol, following by describing the challenges of reconfiguring a consensus system,
 after which we describe how epochs address these challenges.
