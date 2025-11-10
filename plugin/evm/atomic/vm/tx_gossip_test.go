@@ -31,7 +31,6 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/atomic"
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/vmtest"
-	"github.com/ava-labs/coreth/utils"
 	"github.com/ava-labs/coreth/utils/utilstest"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
@@ -45,7 +44,7 @@ func TestAtomicTxGossip(t *testing.T) {
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	snowCtx.AVAXAssetID = ids.GenerateTestID()
-	validatorState := utils.NewTestValidatorState()
+	validatorState := utilstest.NewTestValidatorState()
 	snowCtx.ValidatorState = validatorState
 	memory := avalancheatomic.NewMemory(memdb.New())
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowCtx.ChainID)
@@ -195,7 +194,7 @@ func TestAtomicTxPushGossipOutbound(t *testing.T) {
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	snowCtx.AVAXAssetID = ids.GenerateTestID()
-	validatorState := utils.NewTestValidatorState()
+	validatorState := utilstest.NewTestValidatorState()
 	snowCtx.ValidatorState = validatorState
 	memory := avalancheatomic.NewMemory(memdb.New())
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowCtx.ChainID)
@@ -265,7 +264,7 @@ func TestAtomicTxPushGossipInboundValid(t *testing.T) {
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 	snowCtx.AVAXAssetID = ids.GenerateTestID()
-	validatorState := utils.NewTestValidatorState()
+	validatorState := utilstest.NewTestValidatorState()
 	snowCtx.ValidatorState = validatorState
 	memory := avalancheatomic.NewMemory(memdb.New())
 	snowCtx.SharedMemory = memory.NewSharedMemory(snowCtx.ChainID)

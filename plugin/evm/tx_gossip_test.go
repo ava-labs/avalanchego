@@ -31,7 +31,7 @@ import (
 	"github.com/ava-labs/coreth/plugin/evm/config"
 	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap0"
 	"github.com/ava-labs/coreth/plugin/evm/vmtest"
-	"github.com/ava-labs/coreth/utils"
+	"github.com/ava-labs/coreth/utils/utilstest"
 
 	agoUtils "github.com/ava-labs/avalanchego/utils"
 )
@@ -40,7 +40,7 @@ func TestEthTxGossip(t *testing.T) {
 	require := require.New(t)
 	ctx := t.Context()
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	validatorState := utils.NewTestValidatorState()
+	validatorState := utilstest.NewTestValidatorState()
 	snowCtx.ValidatorState = validatorState
 
 	pk, err := secp256k1.NewPrivateKey()
