@@ -38,32 +38,48 @@ impl fmt::Display for KeyValuePair<'_> {
     }
 }
 
-impl<'a> api::KeyValuePair for KeyValuePair<'a> {
+impl<'a> api::TryIntoBatch for KeyValuePair<'a> {
     type Key = BorrowedBytes<'a>;
     type Value = BorrowedBytes<'a>;
+    type Error = std::convert::Infallible;
 
     #[inline]
-    fn into_batch(self) -> api::BatchOp<Self::Key, Self::Value> {
+    fn try_into_batch(self) -> Result<api::BatchOp<Self::Key, Self::Value>, Self::Error> {
         // Check if the value pointer is null (nil slice in Go)
         // vs non-null but empty (empty slice []byte{} in Go)
-        if self.value.is_null() {
+        Ok(if self.value.is_null() {
             api::BatchOp::DeleteRange { prefix: self.key }
         } else {
             api::BatchOp::Put {
                 key: self.key,
                 value: self.value,
             }
-        }
+        })
     }
 }
 
-impl<'a> api::KeyValuePair for &KeyValuePair<'a> {
+impl api::KeyValuePair for KeyValuePair<'_> {
+    #[inline]
+    fn try_into_tuple(self) -> Result<(Self::Key, Self::Value), Self::Error> {
+        Ok((self.key, self.value))
+    }
+}
+
+impl<'a> api::TryIntoBatch for &KeyValuePair<'a> {
     type Key = BorrowedBytes<'a>;
     type Value = BorrowedBytes<'a>;
+    type Error = std::convert::Infallible;
 
     #[inline]
-    fn into_batch(self) -> api::BatchOp<Self::Key, Self::Value> {
-        (*self).into_batch()
+    fn try_into_batch(self) -> Result<api::BatchOp<Self::Key, Self::Value>, Self::Error> {
+        (*self).try_into_batch()
+    }
+}
+
+impl api::KeyValuePair for &KeyValuePair<'_> {
+    #[inline]
+    fn try_into_tuple(self) -> Result<(Self::Key, Self::Value), Self::Error> {
+        (*self).try_into_tuple()
     }
 }
 

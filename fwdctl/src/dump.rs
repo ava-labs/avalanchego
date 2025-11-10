@@ -5,6 +5,7 @@ use firewood::db::{Db, DbConfig};
 use firewood::iter::MerkleKeyValueIter;
 use firewood::merkle::{Key, Value};
 use firewood::v2::api::{self, Db as _};
+use firewood_storage::FileIoError;
 use std::borrow::Cow;
 use std::error::Error;
 use std::fs::File;
@@ -13,7 +14,7 @@ use std::path::PathBuf;
 
 use crate::DatabasePath;
 
-type KeyFromStream = Option<Result<(Key, Value), api::Error>>;
+type KeyFromStream = Option<Result<(Key, Value), FileIoError>>;
 
 #[derive(Debug, clap::ValueEnum, Clone, PartialEq)]
 pub enum OutputFormat {
@@ -181,7 +182,7 @@ pub(super) fn run(opts: &Options) -> Result<(), api::Error> {
                     break;
                 }
             }
-            Err(e) => return Err(e),
+            Err(e) => return Err(e.into()),
         }
     }
     output_handler.flush()?;

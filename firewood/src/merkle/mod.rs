@@ -4,13 +4,16 @@
 #[cfg(test)]
 pub(crate) mod tests;
 
+mod merge;
 /// Parallel merkle
 pub mod parallel;
 
 use crate::iter::{MerkleKeyValueIter, PathIterator, TryExtend};
 use crate::proof::{Proof, ProofCollection, ProofError, ProofNode};
 use crate::range_proof::RangeProof;
-use crate::v2::api::{self, FrozenProof, FrozenRangeProof, KeyType, ValueType};
+use crate::v2::api::{
+    self, BatchIter, FrozenProof, FrozenRangeProof, KeyType, KeyValuePair, ValueType,
+};
 use firewood_storage::{
     BranchNode, Child, Children, FileIoError, HashType, HashedNodeReader, ImmutableProposal,
     IntoHashType, LeafNode, MaybePersistedNode, MutableProposal, NibblesIterator, Node, NodeStore,
@@ -132,7 +135,6 @@ impl<T: TrieReader> Merkle<T> {
         self.nodestore.root_node()
     }
 
-    #[cfg(test)]
     pub(crate) const fn nodestore(&self) -> &T {
         &self.nodestore
     }
@@ -264,6 +266,36 @@ impl<T: TrieReader> Merkle<T> {
         _proof: &RangeProof<impl KeyType, impl ValueType, impl ProofCollection>,
     ) -> Result<(), api::Error> {
         todo!()
+    }
+
+    /// Merges a sequence of key-value pairs with the base merkle trie, yielding
+    /// a sequence of [`BatchOp`]s that describe the changes.
+    ///
+    /// The key-value range is considered total, meaning keys within the inclusive
+    /// bounds that are present within the base trie but not in the key-value iterator
+    /// will be yielded as [`BatchOp::Delete`] or [`BatchOp::DeleteRange`] operations.
+    ///
+    /// # Invariant
+    ///
+    /// The key-value pairs provided by the `key_values` iterator must be sorted in
+    /// ascending order, not contain duplicates, and must lie within the specified
+    /// `first_key` and `last_key` bounds (if provided). Behavior is unspecified if
+    /// this invariant is violated and no verification is performed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there is an issue reading from the underlying trie storage.
+    ///
+    /// [`BatchOp`]: crate::db::BatchOp
+    /// [`BatchOp::Delete`]: crate::db::BatchOp::Delete
+    /// [`BatchOp::DeleteRange`]: crate::db::BatchOp::DeleteRange
+    pub fn merge_key_value_range<V: ValueType>(
+        &self,
+        first_key: Option<impl KeyType>,
+        last_key: Option<impl KeyType>,
+        key_values: impl IntoIterator<Item: KeyValuePair<Value = V>>,
+    ) -> impl BatchIter {
+        merge::MergeKeyValueIter::new(self, first_key, last_key, key_values)
     }
 
     pub(crate) fn path_iter<'a>(

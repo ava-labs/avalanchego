@@ -3,7 +3,7 @@
 
 use crate::db::BatchOp;
 use crate::merkle::{Key, Merkle, Value};
-use crate::v2::api::KeyValuePairIter;
+use crate::v2::api::IntoBatchIter;
 use firewood_storage::logger::error;
 use firewood_storage::{
     BranchNode, Child, Children, FileBacked, FileIoError, ImmutableProposal, LeafNode,
@@ -240,13 +240,15 @@ impl ParallelMerkle {
             .children
             .get_mut(first_path_component)
             .take()
-            .map(|child| match child {
-                Child::Node(node) => Ok(node),
-                Child::AddressWithHash(address, _) => {
-                    Ok(proposal.read_node(address)?.deref().clone())
-                }
-                Child::MaybePersisted(maybe_persisted, _) => {
-                    Ok(maybe_persisted.as_shared_node(proposal)?.deref().clone())
+            .map(|child| -> Result<_, FileIoError> {
+                match child {
+                    Child::Node(node) => Ok(node),
+                    Child::AddressWithHash(address, _) => {
+                        Ok(proposal.read_node(address)?.deref().clone())
+                    }
+                    Child::MaybePersisted(maybe_persisted, _) => {
+                        Ok(maybe_persisted.as_shared_node(proposal)?.deref().clone())
+                    }
                 }
             })
             .transpose()?;
@@ -375,7 +377,7 @@ impl ParallelMerkle {
     pub fn create_proposal<T: Parentable>(
         &mut self,
         parent: &NodeStore<T, FileBacked>,
-        batch: impl IntoIterator<IntoIter: KeyValuePairIter>,
+        batch: impl IntoBatchIter,
         pool: &ThreadPool,
     ) -> Result<Arc<NodeStore<Arc<ImmutableProposal>, FileBacked>>, CreateProposalError> {
         // Create a mutable nodestore from the parent
@@ -390,7 +392,8 @@ impl ParallelMerkle {
 
         // Split step: for each operation in the batch, send a request to the worker that is
         // responsible for the sub-trie corresponding to the operation's first nibble.
-        for op in batch.into_iter().map_into_batch() {
+        for res in batch.into_batch_iter::<CreateProposalError>() {
+            let op = res?;
             // Get the first nibble of the key to determine which worker to send the request to.
             //
             // Need to handle an empty key. Since the partial_path of the root must be empty, an

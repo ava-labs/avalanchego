@@ -1,6 +1,8 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use firewood_storage::FileIoError;
+
 use crate::v2::api::{KeyType, ValueType};
 
 /// A key/value pair operation.
@@ -117,67 +119,140 @@ impl<K: KeyType, V: ValueType> std::hash::Hash for BatchOp<K, V> {
     }
 }
 
+/// A key/value pair that can be converted into a batch operation.
+///
+/// The difference between this trait and [`TryIntoBatch`] is that this trait
+/// is only used in places where the operations are expected to all be `Put`
+/// operations. Empty values are not treated as `DeleteRange` operations here.
+pub trait KeyValuePair: TryIntoBatch {
+    /// Convert this into a tuple of key and value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the conversion fails. E.g., if a read from storage
+    /// is required to obtain the key or value.
+    fn try_into_tuple(self) -> Result<(Self::Key, Self::Value), Self::Error>;
+}
+
+impl<K: KeyType, V: ValueType> KeyValuePair for (K, V) {
+    fn try_into_tuple(self) -> Result<(Self::Key, Self::Value), Self::Error> {
+        Ok(self)
+    }
+}
+
+impl<K: KeyType, V: ValueType> KeyValuePair for &(K, V) {
+    fn try_into_tuple(self) -> Result<(Self::Key, Self::Value), Self::Error> {
+        let (key, value) = self;
+        Ok((key, value))
+    }
+}
+
+impl<T: KeyValuePair<Error = std::convert::Infallible>, E: Into<FileIoError>> KeyValuePair
+    for Result<T, E>
+{
+    fn try_into_tuple(self) -> Result<(Self::Key, Self::Value), Self::Error> {
+        match self {
+            Ok(t) => t.try_into_tuple().map_err(|e| match e {}),
+            Err(e) => Err(e),
+        }
+    }
+}
+
 /// A key/value pair that can be used in a batch.
-pub trait KeyValuePair {
+pub trait TryIntoBatch {
     /// The key type
     type Key: KeyType;
 
     /// The value type
     type Value: ValueType;
 
+    /// The error type. It is preferable to use an error that is convertible into
+    /// [`FileIoError`] instead of the type directly to allow for better compiler
+    /// optimizations.
+    ///
+    /// E.g., [`std::convert::Infallible`] is preferred over [`FileIoError`] when
+    /// there is no possibility of error so that the compiler can optimize away
+    /// error handling.
+    type Error: Into<FileIoError>;
+
     /// Convert this key-value pair into a [`BatchOp`].
-    #[must_use]
-    fn into_batch(self) -> BatchOp<Self::Key, Self::Value>;
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the conversion fails. E.g., if a read from storage
+    /// is required to obtain the key or value.
+    fn try_into_batch(self) -> Result<BatchOp<Self::Key, Self::Value>, Self::Error>;
 }
 
-impl<'a, K: KeyType, V: ValueType> KeyValuePair for &'a (K, V) {
+impl<'a, K: KeyType, V: ValueType> TryIntoBatch for &'a (K, V) {
     type Key = &'a K;
     type Value = &'a V;
+    type Error = std::convert::Infallible;
 
     #[inline]
-    fn into_batch(self) -> BatchOp<Self::Key, Self::Value> {
+    fn try_into_batch(self) -> Result<BatchOp<Self::Key, Self::Value>, Self::Error> {
         // this converting `&'a (K, V)` into `(&'a K, &'a V)`
         let (key, value) = self;
-        (key, value).into_batch()
+        (key, value).try_into_batch()
     }
 }
 
-impl<K: KeyType, V: ValueType> KeyValuePair for (K, V) {
+impl<K: KeyType, V: ValueType> TryIntoBatch for (K, V) {
     type Key = K;
     type Value = V;
+    type Error = std::convert::Infallible;
 
     #[inline]
-    fn into_batch(self) -> BatchOp<Self::Key, Self::Value> {
+    fn try_into_batch(self) -> Result<BatchOp<Self::Key, Self::Value>, Self::Error> {
         let (key, value) = self;
         if value.as_ref().is_empty() {
-            BatchOp::DeleteRange { prefix: key }
+            Ok(BatchOp::DeleteRange { prefix: key })
         } else {
-            BatchOp::Put { key, value }
+            Ok(BatchOp::Put { key, value })
         }
     }
 }
 
-impl<K: KeyType, V: ValueType> KeyValuePair for BatchOp<K, V> {
+impl<K: KeyType, V: ValueType> TryIntoBatch for BatchOp<K, V> {
     type Key = K;
     type Value = V;
+    type Error = std::convert::Infallible;
 
-    fn into_batch(self) -> BatchOp<Self::Key, Self::Value> {
-        self
+    fn try_into_batch(self) -> Result<BatchOp<Self::Key, Self::Value>, Self::Error> {
+        Ok(self)
     }
 }
 
-impl<'a, K: KeyType, V: ValueType> KeyValuePair for &'a BatchOp<K, V> {
+impl<'a, K: KeyType, V: ValueType> TryIntoBatch for &'a BatchOp<K, V> {
     type Key = &'a K;
     type Value = &'a V;
+    type Error = std::convert::Infallible;
 
-    fn into_batch(self) -> BatchOp<Self::Key, Self::Value> {
-        self.borrowed()
+    fn try_into_batch(self) -> Result<BatchOp<Self::Key, Self::Value>, Self::Error> {
+        Ok(self.borrowed())
     }
 }
 
-/// An extension trait for iterators that yield [`KeyValuePair`]s.
-pub trait KeyValuePairIter:
-    Iterator<Item: KeyValuePair<Key = Self::Key, Value = Self::Value>>
+impl<T, E> TryIntoBatch for Result<T, E>
+where
+    T: TryIntoBatch<Error = std::convert::Infallible>,
+    E: Into<FileIoError>,
+{
+    type Key = T::Key;
+    type Value = T::Value;
+    type Error = E;
+
+    fn try_into_batch(self) -> Result<BatchOp<Self::Key, Self::Value>, Self::Error> {
+        match self {
+            Ok(t) => t.try_into_batch().map_err(|e| match e {}),
+            Err(e) => Err(e),
+        }
+    }
+}
+
+/// An extension trait for iterators that yield [`TryIntoBatch`]s.
+pub trait BatchIter:
+    Iterator<Item: TryIntoBatch<Key = Self::Key, Value = Self::Value, Error = Self::Error>>
 {
     /// An associated type for the iterator item's key type. This is a convenience
     /// requirement to avoid needing to build up nested generic associated types.
@@ -189,26 +264,46 @@ pub trait KeyValuePairIter:
     /// E.g., `<<Self as Iterator>::Item as KeyValuePair>::Value`
     type Value: ValueType;
 
-    /// Maps the items of this iterator into [`BatchOp`]s.
-    #[inline]
-    fn map_into_batch(self) -> MapIntoBatch<Self>
+    /// An associated type for the iterator item's error type. This is a convenience
+    /// requirement to avoid needing to build up nested generic associated types.
+    /// E.g., `<<Self as Iterator>::Item as KeyValuePair>::Error`
+    type Error: Into<FileIoError>;
+}
+
+impl<I: Iterator<Item: TryIntoBatch>> BatchIter for I {
+    type Key = <I::Item as TryIntoBatch>::Key;
+    type Value = <I::Item as TryIntoBatch>::Value;
+    type Error = <I::Item as TryIntoBatch>::Error;
+}
+
+/// An extension trait for types that can be converted into an iterator of batch
+/// operations.
+pub trait IntoBatchIter: IntoIterator<IntoIter: BatchIter> {
+    /// Convert this type into an iterator of batch operations.
+    ///
+    /// This is a convenience method that maps over the iterator returned by
+    /// [`IntoIterator::into_iter`] and calls [`TryIntoBatch::try_into_batch`]
+    /// on each item. Additionally, the error type is converted into the specified
+    /// error type `E` using the `Into` trait.
+    ///
+    /// The pass-through of the error type `E` allows for better compiler optimizations
+    /// by allowing error handling to be omitted during monomorphization when the error
+    /// type is `Infallible` or another type that can be optimized away.
+    fn into_batch_iter<E>(self) -> std::iter::Map<Self::IntoIter, MapIntoBatchFn<Self::Item, E>>
     where
         Self: Sized,
-        Self::Item: KeyValuePair,
+        FileIoError: Into<E>,
     {
-        self.map(KeyValuePair::into_batch)
+        self.into_iter().map(|item| {
+            item.try_into_batch()
+                .map_err(Into::<FileIoError>::into)
+                .map_err(Into::<E>::into)
+        })
     }
 }
 
-impl<I: Iterator<Item: KeyValuePair>> KeyValuePairIter for I {
-    type Key = <I::Item as KeyValuePair>::Key;
-    type Value = <I::Item as KeyValuePair>::Value;
-}
+impl<T: IntoIterator<IntoIter: BatchIter>> IntoBatchIter for T {}
 
-/// An iterator that maps a [`KeyValuePair`] into a [`BatchOp`] on yielded items.
-pub type MapIntoBatch<I> = std::iter::Map<
-    I,
-    fn(
-        <I as Iterator>::Item,
-    ) -> BatchOp<<I as KeyValuePairIter>::Key, <I as KeyValuePairIter>::Value>,
->;
+/// Type alias for `fn(T) -> Result<BatchOp<K, V>, E>` where `T: TryIntoBatch<Key = K, Value = V>`.
+pub type MapIntoBatchFn<T, E> =
+    fn(T) -> Result<BatchOp<<T as TryIntoBatch>::Key, <T as TryIntoBatch>::Value>, E>;

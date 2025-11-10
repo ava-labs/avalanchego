@@ -40,6 +40,12 @@ pub struct FileIoError {
     context: Option<String>,
 }
 
+impl From<std::convert::Infallible> for FileIoError {
+    fn from(error: std::convert::Infallible) -> Self {
+        match error {}
+    }
+}
+
 impl FileIoError {
     /// Create a new [`FileIoError`] from a generic error
     ///

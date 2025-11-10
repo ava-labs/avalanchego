@@ -29,7 +29,7 @@ impl Iterator for IteratorHandle<'_> {
             // iterator exhausted; drop it so the NodeStore can be released
             self.0 = None;
         }
-        out
+        out.map(|res| res.map_err(api::Error::from))
     }
 }
 

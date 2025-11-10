@@ -147,8 +147,9 @@ mod tests {
     #![expect(clippy::unwrap_used, reason = "Tests can use unwrap")]
     #![expect(clippy::indexing_slicing, reason = "Tests can use indexing")]
 
+    use crate::v2::api::TryIntoBatch;
+
     use super::*;
-    use crate::v2::api::KeyValuePairIter;
 
     #[test]
     fn test_range_proof_iterator() {
@@ -221,8 +222,8 @@ mod tests {
         let iter = range_proof.iter();
 
         // Verify we can call methods from KeyValuePairIter
-        let batch_iter = iter.map_into_batch();
-        let batches: Vec<_> = batch_iter.collect();
+        let batch_iter = iter.map(TryIntoBatch::try_into_batch);
+        let batches: Vec<_> = batch_iter.collect::<Result<_, _>>().unwrap();
 
         assert_eq!(batches.len(), 1);
         // The batch should be a Put operation since value is non-empty

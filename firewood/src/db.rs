@@ -6,13 +6,16 @@
     reason = "Found 12 occurrences after enabling the lint."
 )]
 
+#[cfg(test)]
+mod tests;
+
 use crate::iter::MerkleKeyValueIter;
 use crate::merkle::{Merkle, Value};
 use crate::root_store::{NoOpStore, RootStore};
 pub use crate::v2::api::BatchOp;
 use crate::v2::api::{
-    self, ArcDynDbView, FrozenProof, FrozenRangeProof, HashKey, KeyType, KeyValuePairIter,
-    OptionalHashKeyExt,
+    self, ArcDynDbView, FrozenProof, FrozenRangeProof, HashKey, IntoBatchIter, KeyType,
+    KeyValuePair, OptionalHashKeyExt,
 };
 
 use crate::manager::{ConfigManager, RevisionManager, RevisionManagerConfig};
@@ -153,10 +156,7 @@ impl api::Db for Db {
         Ok(self.manager.all_hashes())
     }
 
-    fn propose(
-        &self,
-        batch: impl IntoIterator<IntoIter: KeyValuePairIter>,
-    ) -> Result<Self::Proposal<'_>, api::Error> {
+    fn propose(&self, batch: impl IntoBatchIter) -> Result<Self::Proposal<'_>, api::Error> {
         self.propose_with_parent(batch, &self.manager.current_revision())
     }
 }
@@ -224,7 +224,7 @@ impl Db {
     #[fastrace::trace(name = "propose")]
     fn propose_with_parent<F: Parentable>(
         &self,
-        batch: impl IntoIterator<IntoIter: KeyValuePairIter>,
+        batch: impl IntoBatchIter,
         parent: &NodeStore<F, FileBacked>,
     ) -> Result<Proposal<'_>, api::Error> {
         // If use_parallel is BatchSize, then perform parallel proposal creation if the batch
@@ -243,8 +243,8 @@ impl Db {
             let proposal = NodeStore::new(parent)?;
             let mut merkle = Merkle::from(proposal);
             let span = fastrace::Span::enter_with_local_parent("merkleops");
-            for op in batch.into_iter().map_into_batch() {
-                match op {
+            for res in batch.into_batch_iter::<api::Error>() {
+                match res? {
                     BatchOp::Put { key, value } => {
                         merkle.insert(key.as_ref(), value.as_ref().into())?;
                     }
@@ -270,6 +270,54 @@ impl Db {
             nodestore: immutable,
             db: self,
         })
+    }
+
+    /// Merge a range of key-values into a new proposal on top of the current
+    /// root revision.
+    ///
+    /// All items within the range `(first_key..=last_key)` will be replaced with
+    /// the provided key-values from the iterator. I.e., any existing keys within
+    /// the range that are not present in the provided key-values will be deleted,
+    /// any duplicate keys will be overwritten, and any new keys will be inserted.
+    ///
+    /// Invariant: `key_values` must be sorted by key in ascending order; however,
+    /// because debug assertions are disabled, this is not checked.
+    pub fn merge_key_value_range(
+        &self,
+        first_key: Option<impl KeyType>,
+        last_key: Option<impl KeyType>,
+        key_values: impl IntoIterator<Item: KeyValuePair>,
+    ) -> Result<Proposal<'_>, api::Error> {
+        self.merge_key_value_range_with_parent(
+            first_key,
+            last_key,
+            key_values,
+            &self.manager.current_revision(),
+        )
+    }
+
+    /// Merge a range of key-values into a new proposal on top of a specified parent.
+    ///
+    /// All items within the range `(first_key..=last_key)` will be replaced with
+    /// the provided key-values from the iterator. I.e., any existing keys within
+    /// the range that are not present in the provided key-values will be deleted,
+    /// any duplicate keys will be overwritten, and any new keys will be inserted.
+    ///
+    /// Invariant: `key_values` must be sorted by key in ascending order; however,
+    /// because debug assertions are disabled, this is not checked.
+    pub fn merge_key_value_range_with_parent<F: Parentable>(
+        &self,
+        first_key: Option<impl KeyType>,
+        last_key: Option<impl KeyType>,
+        key_values: impl IntoIterator<Item: KeyValuePair>,
+        parent: &NodeStore<F, FileBacked>,
+    ) -> Result<Proposal<'_>, api::Error>
+    where
+        NodeStore<F, FileBacked>: TrieReader,
+    {
+        let merkle = Merkle::from(parent);
+        let merge_ops = merkle.merge_key_value_range(first_key, last_key, key_values);
+        self.propose_with_parent(merge_ops, merkle.nodestore())
     }
 }
 
@@ -315,11 +363,7 @@ impl api::DbView for Proposal<'_> {
 impl<'db> api::Proposal for Proposal<'db> {
     type Proposal = Proposal<'db>;
 
-    #[fastrace::trace(short_name = true)]
-    fn propose(
-        &self,
-        batch: impl IntoIterator<IntoIter: KeyValuePairIter>,
-    ) -> Result<Self::Proposal, api::Error> {
+    fn propose(&self, batch: impl IntoBatchIter) -> Result<Self::Proposal, api::Error> {
         self.create_proposal(batch)
     }
 
@@ -330,10 +374,7 @@ impl<'db> api::Proposal for Proposal<'db> {
 
 impl Proposal<'_> {
     #[crate::metrics("firewood.proposal.create", "database proposal creation")]
-    fn create_proposal(
-        &self,
-        batch: impl IntoIterator<IntoIter: KeyValuePairIter>,
-    ) -> Result<Self, api::Error> {
+    fn create_proposal(&self, batch: impl IntoBatchIter) -> Result<Self, api::Error> {
         self.db.propose_with_parent(batch, &self.nodestore)
     }
 }
@@ -354,7 +395,7 @@ mod test {
 
     use crate::db::{Db, Proposal, UseParallel};
     use crate::root_store::{MockStore, RootStore};
-    use crate::v2::api::{Db as _, DbView, KeyValuePairIter, Proposal as _};
+    use crate::v2::api::{Db as _, DbView, Proposal as _};
 
     use super::{BatchOp, DbConfig};
 
@@ -602,7 +643,7 @@ mod test {
         fn insert_commit(db: &TestDb, kv: u8) {
             let keys: Vec<[u8; 1]> = vec![[kv; 1]];
             let vals: Vec<Box<[u8]>> = vec![Box::new([kv; 1])];
-            let kviter = keys.iter().zip(vals.iter()).map_into_batch();
+            let kviter = keys.iter().zip(vals.iter());
             let proposal = db.propose(kviter).unwrap();
             proposal.commit().unwrap();
         }
@@ -668,7 +709,7 @@ mod test {
         let keys: Vec<[u8; 0]> = Vec::new();
         let vals: Vec<Box<[u8]>> = Vec::new();
 
-        let kviter = keys.iter().zip(vals.iter()).map_into_batch();
+        let kviter = keys.iter().zip(vals.iter());
         let proposal = db.propose(kviter).unwrap();
         proposal.commit().unwrap();
 
@@ -679,7 +720,7 @@ mod test {
         // Instead, set value to [0]
         let vals: Vec<Box<[u8]>> = vec![Box::new([0; 1])];
 
-        let kviter = keys.iter().zip(vals.iter()).map_into_batch();
+        let kviter = keys.iter().zip(vals.iter());
         let proposal = db.propose(kviter).unwrap();
 
         let kviter = keys.iter().zip(vals.iter());
@@ -697,7 +738,7 @@ mod test {
 
         // Create a proposal that deletes the previous entry
         let vals: Vec<Box<[u8]>> = vec![Box::new([0; 0])];
-        let kviter = keys.iter().zip(vals.iter()).map_into_batch();
+        let kviter = keys.iter().zip(vals.iter());
         let proposal = db.propose(kviter).unwrap();
 
         let kviter = keys.iter().zip(vals.iter());
@@ -716,7 +757,7 @@ mod test {
             })
             .unzip();
 
-        let kviter = keys.iter().zip(vals.iter()).map_into_batch();
+        let kviter = keys.iter().zip(vals.iter());
         let proposal = db.propose(kviter).unwrap();
         let kviter = keys.iter().zip(vals.iter());
         for (k, v) in kviter {
@@ -735,7 +776,7 @@ mod test {
             })
             .unzip();
 
-        let kviter = keys.iter().zip(vals.iter()).map_into_batch();
+        let kviter = keys.iter().zip(vals.iter());
         let proposal = db.propose(kviter).unwrap();
         let kviter = keys.iter().zip(vals.iter());
         for (k, _v) in kviter {
@@ -746,7 +787,7 @@ mod test {
         // Create a proposal that deletes using empty prefix
         let keys: Vec<[u8; 0]> = vec![[0; 0]];
         let vals: Vec<Box<[u8]>> = vec![Box::new([0; 0])];
-        let kviter = keys.iter().zip(vals.iter()).map_into_batch();
+        let kviter = keys.iter().zip(vals.iter());
         let proposal = db.propose(kviter).unwrap();
         proposal.commit().unwrap();
 
@@ -763,7 +804,7 @@ mod test {
 
         // Looping twice to test that we are reusing the thread pool.
         for _ in 0..2 {
-            let kviter = keys.iter().zip(vals.iter()).map_into_batch();
+            let kviter = keys.iter().zip(vals.iter());
             let proposal = db.propose(kviter).unwrap();
 
             // iterate over the keys and values again, checking that the values are in the correct proposal
@@ -798,7 +839,7 @@ mod test {
             .unzip();
 
         // create two batches, one with the first half of keys and values, and one with the last half keys and values
-        let mut kviter = keys.iter().zip(vals.iter()).map_into_batch();
+        let mut kviter = keys.iter().zip(vals.iter());
 
         // create two proposals, second one has a base of the first one
         let proposal1 = db.propose(kviter.by_ref().take(N / 2)).unwrap();
@@ -1090,7 +1131,7 @@ mod test {
     }
 
     // Testdb is a helper struct for testing the Db. Once it's dropped, the directory and file disappear
-    struct TestDb {
+    pub(super) struct TestDb {
         db: Db,
         tmpdir: tempfile::TempDir,
     }
@@ -1107,11 +1148,11 @@ mod test {
     }
 
     impl TestDb {
-        fn new() -> Self {
+        pub fn new() -> Self {
             TestDb::new_with_config(DbConfig::builder().build())
         }
 
-        fn new_with_config(dbconfig: DbConfig) -> Self {
+        pub fn new_with_config(dbconfig: DbConfig) -> Self {
             let tmpdir = tempfile::tempdir().unwrap();
             let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
                 .iter()
@@ -1120,7 +1161,7 @@ mod test {
             TestDb { db, tmpdir }
         }
 
-        fn with_mockstore(mock_store: MockStore) -> Self {
+        pub fn with_mockstore(mock_store: MockStore) -> Self {
             let tmpdir = tempfile::tempdir().unwrap();
             let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
                 .iter()
@@ -1130,11 +1171,11 @@ mod test {
             TestDb { db, tmpdir }
         }
 
-        fn reopen(self) -> Self {
+        pub fn reopen(self) -> Self {
             self.reopen_with_config(DbConfig::builder().truncate(false).build())
         }
 
-        fn reopen_with_config(self, dbconfig: DbConfig) -> Self {
+        pub fn reopen_with_config(self, dbconfig: DbConfig) -> Self {
             let path = self.path();
             let TestDb { db, tmpdir } = self;
 
@@ -1144,7 +1185,7 @@ mod test {
             TestDb { db, tmpdir }
         }
 
-        fn replace(self) -> Self {
+        pub fn replace(self) -> Self {
             let path = self.path();
             let TestDb { db, tmpdir } = self;
 
@@ -1155,7 +1196,7 @@ mod test {
             TestDb { db, tmpdir }
         }
 
-        fn path(&self) -> PathBuf {
+        pub fn path(&self) -> PathBuf {
             [self.tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
                 .iter()
                 .collect()

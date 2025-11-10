@@ -5,7 +5,6 @@ mod try_extend;
 
 pub(crate) use self::try_extend::TryExtend;
 use crate::merkle::{Key, Value};
-use crate::v2::api;
 
 use firewood_storage::{
     BranchNode, Child, FileIoError, NibblesIterator, Node, PathBuf, PathComponent, PathIterItem,
@@ -298,7 +297,7 @@ impl<'a, T: TrieReader> MerkleKeyValueIter<'a, T> {
 }
 
 impl<T: TrieReader> Iterator for MerkleKeyValueIter<'_, T> {
-    type Item = Result<(Key, Value), api::Error>;
+    type Item = Result<(Key, Value), FileIoError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.find_map(|result| {
@@ -316,7 +315,6 @@ impl<T: TrieReader> Iterator for MerkleKeyValueIter<'_, T> {
                         Node::Leaf(leaf) => Some((key, leaf.value.clone())),
                     }
                 })
-                .map_err(Into::into)
                 .transpose()
         })
     }
