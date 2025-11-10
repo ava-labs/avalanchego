@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1762778424615,
+  "lastUpdate": 1762789345189,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -1482,6 +1482,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
             "value": 73.01,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Stephen Buttolph",
+            "username": "StephenButtolph",
+            "email": "stephen@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "8ebe57a20bba73840804778d44f714aa821b4131",
+          "message": "Fix meterdb metrics for root db (#4476)",
+          "timestamp": "2025-11-06T20:29:10Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/8ebe57a20bba73840804778d44f714aa821b4131"
+        },
+        "date": 1762789343142,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
+            "value": 40.04,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
