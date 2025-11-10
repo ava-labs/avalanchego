@@ -32,8 +32,19 @@ jobs:
       - name: test-unit
         shell: bash
         run: ./scripts/run_task.sh test-unit
-        env:
-          TIMEOUT: ${{ env.TIMEOUT }}
+  Unit-coreth:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-22.04, ubuntu-24.04, custom-arm64-jammy, custom-arm64-noble]
+        run_number: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - name: test-unit
+        shell: bash
+        run: ./scripts/run_task.sh test-unit-coreth
   Fuzz:
     runs-on: ubuntu-latest
     steps:
@@ -113,6 +124,22 @@ jobs:
           loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
           loki_username: ${{ secrets.LOKI_USERNAME || '' }}
           loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
+  e2e_warp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/run-monitored-tmpnet-cmd
+        with:
+          run: ./scripts/run_task.sh test-e2e-warp-ci
+          artifact_prefix: e2e-warp
+          prometheus_url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus_push_url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus_username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus_password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          loki_url: ${{ secrets.LOKI_URL || '' }}
+          loki_push_url: ${{ secrets.LOKI_PUSH_URL || '' }}
+          loki_username: ${{ secrets.LOKI_USERNAME || '' }}
+          loki_password: ${{ secrets.LOKI_PASSWORD || '' }}
   Upgrade:
     runs-on: ubuntu-latest
     steps:
@@ -171,6 +198,14 @@ jobs:
       - uses: ./.github/actions/setup-go-for-project
       - shell: bash
         run: ./scripts/run_task.sh check-generate-canoto
+  check_codec:
+    name: Up-to-date codec
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - shell: bash
+        run: ./scripts/run_task.sh check-generate-codec
   check_contract_bindings:
     name: Up-to-date contract bindings
     runs-on: ubuntu-latest
@@ -179,6 +214,14 @@ jobs:
       - uses: ./.github/actions/install-nix
       - shell: nix develop --command bash -x {0}
         run: task check-generate-load-contract-bindings
+  check_rlp:
+    name: Up-to-date rlp
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
+      - shell: bash
+        run: ./scripts/run_task.sh check-generate-rlp
   go_mod_tidy:
     name: Up-to-date go.mod and go.sum
     runs-on: ubuntu-latest

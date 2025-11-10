@@ -3,4 +3,4 @@
 
 package resource
 
-//go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/user.go -mock_names=User=User . User
+//go:generate go tool mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/user.go -mock_names=User=User . User

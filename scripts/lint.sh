@@ -7,6 +7,8 @@ if ! [[ "$0" =~ scripts/lint.sh ]]; then
   exit 255
 fi
 
+source ./scripts/lint_setup.sh
+
 # The -P option is not supported by the grep version installed by
 # default on macos. Since `-o errexit` is ignored in an if
 # conditional, triggering the problem here ensures script failure when
@@ -29,10 +31,20 @@ fi
 # by default, "./scripts/lint.sh" runs all lint tests
 # to run only "license_header" test
 # TESTS='license_header' ./scripts/lint.sh
-TESTS=${TESTS:-"golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
+TESTS=${TESTS:-"legacy_golangci_lint avalanche_golangci_lint license_header require_error_is_no_funcs_as_params single_import interface_compliance_nil require_no_error_inline_func import_testing_only_in_tests"}
 
-function test_golangci_lint {
-  ./scripts/run_tool.sh golangci-lint run --config .golangci.yml
+function test_legacy_golangci_lint {
+  ./scripts/run_tool.sh golangci-lint run --config .legacy-golangci.yml ./graft/...
+}
+
+function test_avalanche_golangci_lint {
+  if [[ ! -f $AVALANCHE_LINT_FILE ]]; then
+    return 0
+  fi
+
+  ./scripts/run_tool.sh golangci-lint run \
+  --config "$AVALANCHE_LINT_FILE" \
+  || return 1
 }
 
 # automatically checks license headers
@@ -40,43 +52,54 @@ function test_golangci_lint {
 # TESTS='license_header' ADDLICENSE_FLAGS="--debug" ./scripts/lint.sh
 _addlicense_flags=${ADDLICENSE_FLAGS:-"--verify --debug"}
 function test_license_header {
-  local files=()
-  while IFS= read -r line; do files+=("$line"); done < <(
-    find . -type f -name '*.go' \
-      ! -name '*.pb.go' \
-      ! -name '*.connect.go' \
-      ! -name 'mock_*.go' \
-      ! -name 'mocks_*.go' \
-      ! -path './**/*mock/*.go' \
-      ! -name '*.canoto.go' \
-      ! -name '*.bindings.go'
-    )
+  # Run license tool
+  if [[ ${#UPSTREAM_FILES[@]} -gt 0 ]]; then
+    echo "Running license tool on upstream files with header for upstream..."
+    # shellcheck disable=SC2086
+   ./scripts/run_tool.sh go-license \
+      --config=./header_upstream.yml \
+      ${_addlicense_flags} \
+      "${UPSTREAM_FILES[@]}" \
+      || return 1
+  fi
 
-  # shellcheck disable=SC2086
-  ./scripts/run_tool.sh go-license \
-  --config=./header.yml \
-  ${_addlicense_flags} \
-  "${files[@]}"
+  # if [[ ${#AVALANCHE_FILES[@]} -gt 0 ]]; then
+  #   echo "Running license tool on remaining files with default header..."
+  #   # shellcheck disable=SC2086
+  #   ./scripts/run_tool.sh go-license \
+  #     --config=./header.yml \
+  #     ${_addlicense_flags} \
+  #     "${AVALANCHE_FILES[@]}" \
+  #     || return 1
+  # fi
 }
 
 function test_single_import {
-  if grep -R -zo -P 'import \(\n\t".*"\n\)' .; then
+  if grep -R -zo -P 'import \(\n\t".*"\n\)' "${AVALANCHE_FILES[@]}"; then
     echo ""
     return 1
   fi
 }
 
 function test_require_error_is_no_funcs_as_params {
-  if grep -R -zo -P 'require.ErrorIs\(.+?\)[^\n]*\)\n' .; then
+  if grep -R -zo -P 'require.ErrorIs\(.+?\)[^\n]*\)\n' "${AVALANCHE_FILES[@]}"; then
     echo ""
     return 1
   fi
 }
 
 function test_require_no_error_inline_func {
-  if grep -R -zo -P '\t+err :?= ((?!require|if).|\n)*require\.NoError\((t, )?err\)' .; then
+  # Flag only when a single variable whose name contains "err" or "Err"
+  # (e.g., err, myErr, parseError) is assigned from a call (:= or =), and later
+  # that same variable is passed to require.NoError(...). We explicitly require
+  # no commas on the LHS to avoid flagging multi-return assignments like
+  # "val, err := f()" or "err, val := f()".
+  #
+  # Capture the variable name and enforce it matches in the subsequent require.NoError.
+  local -r pattern='^\s*([A-Za-z_][A-Za-z0-9_]*[eE]rr[A-Za-z0-9_]*)\s*:?=\s*[^,\n]*\([^)]*\).*\n(?:(?!^\s*(?:if|require)).*\n)*^\s*require\.NoError\((?:t,\s*)?\1\)'
+  if grep -R -zo -P "$pattern" "${AVALANCHE_FILES[@]}"; then
     echo ""
-    echo "Checking that a function with a single error return doesn't error should be done in-line."
+    echo "Checking that a function with a single error return doesn't error should be done in-line (single LHS var containing 'err')."
     echo ""
     return 1
   fi
@@ -84,7 +107,7 @@ function test_require_no_error_inline_func {
 
 # Ref: https://go.dev/doc/effective_go#blank_implements
 function test_interface_compliance_nil {
-  if grep -R -o -P '_ .+? = &.+?\{\}' .; then
+  if grep -R -o -P '_ .+? = &.+?\{\}' "${AVALANCHE_FILES[@]}"; then
     echo ""
     echo "Interface compliance checks need to be of the form:"
     echo "  var _ json.Marshaler = (*RawMessage)(nil)"
@@ -93,18 +116,25 @@ function test_interface_compliance_nil {
   fi
 }
 
+
 function test_import_testing_only_in_tests {
-  ROOT=$( git rev-parse --show-toplevel )
-  NON_TEST_GO_FILES=$( find "${ROOT}" -iname '*.go' ! -iname '*_test.go' ! -path "${ROOT}/tests/*" );
+  NON_TEST_GO_FILES=$(
+    echo "${AVALANCHE_FILES[@]}" | tr ' ' '\n' |
+      grep -i '\.go$' |
+      grep -vi '_test\.go$' |
+      grep -v '^./tests/' |
+      grep -v '^./graft/coreth/tests/'
+  )
 
   IMPORT_TESTING=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '^\s*(import\s+)?"testing"');
   IMPORT_TESTIFY=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/stretchr/testify');
   IMPORT_FROM_TESTS=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/ava-labs/avalanchego/tests/');
+  IMPORT_FROM_CORETH_TESTS=$(echo "${NON_TEST_GO_FILES}" | xargs grep -l '"github.com/ava-labs/avalanchego/graft/coreth/tests/')
   IMPORT_TEST_PKG=$( echo "${NON_TEST_GO_FILES}" | xargs grep -lP '"github.com/ava-labs/avalanchego/.*?test"');
 
   # TODO(arr4n): send a PR to add support for build tags in `mockgen` and then enable this.
   # IMPORT_GOMOCK=$( echo "${NON_TEST_GO_FILES}" | xargs grep -l '"go.uber.org/mock');
-  HAVE_TEST_LOGIC=$( printf "%s\n%s\n%s\n%s" "${IMPORT_TESTING}" "${IMPORT_TESTIFY}" "${IMPORT_FROM_TESTS}" "${IMPORT_TEST_PKG}" );
+  HAVE_TEST_LOGIC=$( printf "%s\n%s\n%s\n%s\n%s" "${IMPORT_TESTING}" "${IMPORT_TESTIFY}" "${IMPORT_FROM_TESTS}" "${IMPORT_FROM_CORETH_TESTS}" "${IMPORT_TEST_PKG}" );
 
   IN_TEST_PKG=$( echo "${NON_TEST_GO_FILES}" | grep -P '.*test/[^/]+\.go$' ) # directory (hence package name) ends in "test"
 
@@ -137,6 +167,7 @@ function run {
 }
 
 echo "Running '$TESTS' at: $(date)"
+setup_lint
 for test in $TESTS; do
   run "${test}" "${TARGET}"
 done

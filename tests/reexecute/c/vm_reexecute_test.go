@@ -17,8 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/coreth/plugin/evm"
-	"github.com/ava-labs/coreth/plugin/factory"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -30,6 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/factory"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"

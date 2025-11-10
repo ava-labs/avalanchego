@@ -3,4 +3,4 @@
 
 package snowman
 
-//go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/block.go -mock_names=Block=Block . Block
+//go:generate go tool mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/block.go -mock_names=Block=Block . Block

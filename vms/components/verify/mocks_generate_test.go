@@ -3,4 +3,4 @@
 
 package verify
 
-//go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/verifiable.go -mock_names=Verifiable=Verifiable . Verifiable
+//go:generate go tool mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/verifiable.go -mock_names=Verifiable=Verifiable . Verifiable
