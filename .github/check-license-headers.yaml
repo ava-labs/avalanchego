@@ -50,6 +50,8 @@
       "CONTRIBUTING.md",
       "triehash/**",
       "CHANGELOG.md",
+      "AGENTS.md",
+      "CLAUDE.md",
       "cliff.toml",
       "clippy.toml",
       "**/tests/compile_*/**",
