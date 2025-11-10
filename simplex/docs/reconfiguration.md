@@ -85,7 +85,7 @@ message SimplexEpochInfo {
 - The validator set of the epoch numbered `epoch_number` is derived from `p_chain_reference_height`.
   Even though it is sufficient to know `epoch_number` to calculate `p_chain_reference_height`, it is encoded in the block for convenience.
 
-- The `next_p_chain_reference_height` is the P-chain height of the next epoch and is only encoded in the last block of epoch `epoch_number` (the sealing block), otherwise it is set to `0`.
+- The `next_p_chain_reference_height` is the P-chain height of the next epoch, otherwise it is set to `0`.
 
 - The `prev_vm_block_seq` is the sequence number of the previous VM block, and it is used to efficiently find the last VM block upon startup.
 
