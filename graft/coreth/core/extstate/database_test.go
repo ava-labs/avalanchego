@@ -21,8 +21,8 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/coreth/triedb/firewood"
-	"github.com/ava-labs/coreth/triedb/hashdb"
+	"github.com/ava-labs/avalanchego/graft/coreth/triedb/firewood"
+	"github.com/ava-labs/avalanchego/graft/coreth/triedb/hashdb"
 )
 
 const (

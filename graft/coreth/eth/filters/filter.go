@@ -33,8 +33,8 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ava-labs/coreth/plugin/evm/customlogs"
-	"github.com/ava-labs/coreth/rpc"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customlogs"
+	"github.com/ava-labs/avalanchego/graft/coreth/rpc"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/bloombits"
 	"github.com/ava-labs/libevm/core/types"

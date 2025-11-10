@@ -12,7 +12,7 @@ import (
 
 	"golang.org/x/exp/slog"
 
-	"github.com/ava-labs/coreth/log"
+	"github.com/ava-labs/avalanchego/graft/coreth/log"
 
 	ethlog "github.com/ava-labs/libevm/log"
 )
