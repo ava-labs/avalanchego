@@ -54,7 +54,7 @@ linters:
     - asciicheck
     - bodyclose
     - copyloopvar
-    # - depguard
+    - depguard
     - errcheck
     - errorlint
     - forbidigo
@@ -236,7 +236,7 @@ linters:
       os-temp-dir:        true # Disallow `os.TempDir()`
       os-chdir:           true # Disallow `os.Chdir()`
       context-background: true # Disallow `context.Background()`
-      context-todo:       true # Disallow `context.TODO()` 
+      context-todo:       true # Disallow `context.TODO()`
   exclusions:
     generated: lax
     presets:

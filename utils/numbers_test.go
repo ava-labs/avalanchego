@@ -7,7 +7,7 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBigEqual(t *testing.T) {
@@ -44,10 +44,10 @@ func TestBigEqual(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			assert := assert.New(t)
+			require := require.New(t)
 
-			assert.Equal(test.want, BigEqual(test.a, test.b))
-			assert.Equal(test.want, BigEqual(test.b, test.a))
+			require.Equal(test.want, BigEqual(test.a, test.b))
+			require.Equal(test.want, BigEqual(test.b, test.a))
 		})
 	}
 }
@@ -87,7 +87,7 @@ func TestBigEqualUint64(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			got := BigEqualUint64(test.a, test.b)
-			assert.Equal(t, test.want, got)
+			require.Equal(t, test.want, got)
 		})
 	}
 }
@@ -133,7 +133,7 @@ func TestLessOrEqualUint64(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			got := BigLessOrEqualUint64(test.a, test.b)
-			assert.Equal(t, test.want, got)
+			require.Equal(t, test.want, got)
 		})
 	}
 }

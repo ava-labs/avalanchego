@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -79,19 +78,17 @@ func TestGossipSubscribe(t *testing.T) {
 		require.NoError(err, "failed adding tx to remote mempool")
 	}
 
-	require.EventuallyWithTf(
-		func(c *assert.CollectT) {
-			gossipTxPool.lock.RLock()
-			defer gossipTxPool.lock.RUnlock()
+	require.Eventually(func() bool {
+		gossipTxPool.lock.RLock()
+		defer gossipTxPool.lock.RUnlock()
 
-			for i, tx := range ethTxs {
-				assert.Truef(c, gossipTxPool.bloom.Has(&GossipEthTx{Tx: tx}), "expected tx[%d] to be in bloom filter", i)
+		for _, tx := range ethTxs {
+			if !gossipTxPool.bloom.Has(&GossipEthTx{Tx: tx}) {
+				return false
 			}
-		},
-		30*time.Second,
-		500*time.Millisecond,
-		"expected all transactions to eventually be in the bloom filter",
-	)
+		}
+		return true
+	}, 30*time.Second, 500*time.Millisecond, "expected all transactions to eventually be in the bloom filter")
 }
 
 func setupPoolWithConfig(t *testing.T, config *params.ChainConfig, fundedAddress common.Address) *txpool.TxPool {

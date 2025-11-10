@@ -27,7 +27,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/core"
@@ -1504,15 +1503,25 @@ func TestWaitForEvent(t *testing.T) {
 				var wg sync.WaitGroup
 				wg.Add(1)
 
+				resultChan := make(chan struct {
+					msg commonEng.Message
+					err error
+				}, 1)
+
 				// We run WaitForEvent in a goroutine to ensure it can be safely called concurrently.
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(ctx)
-					assert.ErrorIs(t, err, context.DeadlineExceeded)
-					assert.Zero(t, msg)
+					resultChan <- struct {
+						msg commonEng.Message
+						err error
+					}{msg: msg, err: err}
 				}()
 
 				wg.Wait()
+				result := <-resultChan
+				require.ErrorIs(t, result.err, context.DeadlineExceeded)
+				require.Zero(t, result.msg)
 			},
 		},
 		{
@@ -1524,16 +1533,26 @@ func TestWaitForEvent(t *testing.T) {
 				var wg sync.WaitGroup
 				wg.Add(1)
 
+				resultChan := make(chan struct {
+					msg commonEng.Message
+					err error
+				}, 1)
+
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(t.Context())
-					assert.NoError(t, err)
-					assert.Equal(t, commonEng.PendingTxs, msg)
+					resultChan <- struct {
+						msg commonEng.Message
+						err error
+					}{msg: msg, err: err}
 				}()
 
 				require.NoError(t, vm.AtomicMempool.AddLocalTx(importTx))
 
 				wg.Wait()
+				result := <-resultChan
+				require.NoError(t, result.err)
+				require.Equal(t, commonEng.PendingTxs, result.msg)
 			},
 		},
 		{
@@ -1545,15 +1564,25 @@ func TestWaitForEvent(t *testing.T) {
 				var wg sync.WaitGroup
 				wg.Add(1)
 
+				resultChan := make(chan struct {
+					msg commonEng.Message
+					err error
+				}, 1)
+
 				// We run WaitForEvent in a goroutine to ensure it can be safely called concurrently.
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(ctx)
-					assert.ErrorIs(t, err, context.DeadlineExceeded)
-					assert.Zero(t, msg)
+					resultChan <- struct {
+						msg commonEng.Message
+						err error
+					}{msg: msg, err: err}
 				}()
 
 				wg.Wait()
+				result := <-resultChan
+				require.ErrorIs(t, result.err, context.DeadlineExceeded)
+				require.Zero(t, result.msg)
 
 				t.Log("WaitForEvent returns when regular transactions are added to the mempool")
 
@@ -1572,14 +1601,24 @@ func TestWaitForEvent(t *testing.T) {
 
 				wg.Add(1)
 
+				resultChan2 := make(chan struct {
+					msg commonEng.Message
+					err error
+				}, 1)
+
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(t.Context())
-					assert.NoError(t, err)
-					assert.Equal(t, commonEng.PendingTxs, msg)
+					resultChan2 <- struct {
+						msg commonEng.Message
+						err error
+					}{msg: msg, err: err}
 				}()
 
 				wg.Wait()
+				result2 := <-resultChan2
+				require.NoError(t, result2.err)
+				require.Equal(t, commonEng.PendingTxs, result2.msg)
 
 				// Build a block again to wipe out the subscription
 				blk, err := vm.BuildBlock(t.Context())
