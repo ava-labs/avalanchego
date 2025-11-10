@@ -1669,7 +1669,7 @@ func TestWaitForEvent(t *testing.T) {
 				Fork: &fork,
 			})
 			testCase.testCase(t, vm)
-			vm.Shutdown(t.Context())
+			require.NoError(t, vm.Shutdown(t.Context()))
 		})
 	}
 }
@@ -1872,7 +1872,9 @@ func TestDelegatePrecompile_BehaviorAcrossUpgrades(t *testing.T) {
 			vmtest.SetupTestVM(t, vm, vmtest.TestVMConfig{
 				Fork: &tt.fork,
 			})
-			defer vm.Shutdown(ctx)
+			defer func() {
+				require.NoError(t, vm.Shutdown(ctx))
+			}()
 
 			if tt.preDeployTime != 0 {
 				vm.clock.Set(time.Unix(tt.preDeployTime, 0))

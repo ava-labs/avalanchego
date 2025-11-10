@@ -236,7 +236,9 @@ func TestQuitAndAddCodeRace(t *testing.T) {
 				in := []common.Hash{{}}
 				ready.Done()
 				<-start
-				q.AddCode(in)
+				// Due to the race condition, AddCode may either succeed or fail
+				// depending on whether the quit channel is closed first
+				_ = q.AddCode(in)
 			}()
 
 			ready.Wait()
