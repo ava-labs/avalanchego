@@ -5,13 +5,17 @@ package validators
 
 import (
 	"bytes"
+	"encoding/json"
 
 	"golang.org/x/exp/maps"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
+	"github.com/ava-labs/avalanchego/utils/formatting"
 	"github.com/ava-labs/avalanchego/utils/math"
+
+	avajson "github.com/ava-labs/avalanchego/utils/json"
 )
 
 var _ utils.Sortable[*Warp] = (*Warp)(nil)
@@ -24,6 +28,28 @@ type WarpSet struct {
 	TotalWeight uint64
 }
 
+type jsonWarpSet struct {
+	Validators  []*Warp        `json:"validators"`
+	TotalWeight avajson.Uint64 `json:"totalWeight"`
+}
+
+func (w WarpSet) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonWarpSet{
+		Validators:  w.Validators,
+		TotalWeight: avajson.Uint64(w.TotalWeight),
+	})
+}
+
+func (w *WarpSet) UnmarshalJSON(b []byte) error {
+	var j jsonWarpSet
+	if err := json.Unmarshal(b, &j); err != nil {
+		return err
+	}
+	w.TotalWeight = uint64(j.TotalWeight)
+	w.Validators = j.Validators
+	return nil
+}
+
 type Warp struct {
 	PublicKey *bls.PublicKey
 	// PublicKeyBytes is expected to be in the uncompressed form.
@@ -34,6 +60,48 @@ type Warp struct {
 
 func (w *Warp) Compare(o *Warp) int {
 	return bytes.Compare(w.PublicKeyBytes, o.PublicKeyBytes)
+}
+
+type jsonWarp struct {
+	PublicKey string         `json:"publicKey"`
+	Weight    avajson.Uint64 `json:"weight"`
+	NodeIDs   []ids.NodeID   `json:"nodeIDs"`
+}
+
+func (w Warp) MarshalJSON() ([]byte, error) {
+	pkBytes := bls.PublicKeyToCompressedBytes(w.PublicKey)
+	pk, err := formatting.Encode(formatting.HexNC, pkBytes)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(jsonWarp{
+		PublicKey: pk,
+		Weight:    avajson.Uint64(w.Weight),
+		NodeIDs:   w.NodeIDs,
+	})
+}
+
+func (w *Warp) UnmarshalJSON(b []byte) error {
+	var j jsonWarp
+	if err := json.Unmarshal(b, &j); err != nil {
+		return err
+	}
+
+	pkBytes, err := formatting.Decode(formatting.HexNC, j.PublicKey)
+	if err != nil {
+		return err
+	}
+	pk, err := bls.PublicKeyFromCompressedBytes(pkBytes)
+	if err != nil {
+		return err
+	}
+	*w = Warp{
+		PublicKey:      pk,
+		PublicKeyBytes: bls.PublicKeyToUncompressedBytes(pk),
+		Weight:         uint64(j.Weight),
+		NodeIDs:        j.NodeIDs,
+	}
+	return nil
 }
 
 // FlattenValidatorSet converts the provided vdrSet into a canonical ordering.

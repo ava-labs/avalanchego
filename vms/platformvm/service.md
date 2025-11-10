@@ -1846,6 +1846,89 @@ curl -X POST --data '{
 }
 ```
 
+### `platform.getAllValidatorsAt`
+
+Get the validators and their weights of all Subnets and the Primary Network at a given P-Chain height.
+
+**Signature:**
+
+```
+platform.getAllValidatorsAt(
+    {
+        height: [int|string],
+    }
+)
+```
+
+```bash
+curl -X POST --data '{
+    "jsonrpc": "2.0",
+    "method": "platform.getAllValidatorsAt",
+    "params": {
+        "height":1
+    },
+    "id": 1
+}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/P
+```
+
+**Example Response:**
+
+```json
+{
+    "jsonrpc": "2.0",
+    "result": {
+        "validatorSets": {
+            "11111111111111111111111111111111LpoYY": {
+                "validators": [
+                    {
+                        "publicKey": "0x8048109c3da13de0700f9f3590c3270bfc42277417f6d0cc84282947e1a1f8b4980fd3e3fe223acf0f56a5838890814a",
+                        "weight": "2000000000000000",
+                        "nodeIDs": [
+                            "NodeID-P7oB2McjBGgW2NXXWVYjV8JEDFoW9xDE5"
+                        ]
+                    },
+                    {
+                        "publicKey": "0xa058ff27a4c570664bfa28e34939368539a1340867951943d0f56fa8aac13bc09ff64f341acf8cc0cef74202c2d6f9c0",
+                        "weight": "2000000000000000",
+                        "nodeIDs": [
+                            "NodeID-MFrZFVCXPv5iCn6M9K6XduxGTYp891xXZ"
+                        ]
+                    },
+                    {
+                        "publicKey": "0xa10b6955a85684a0f5c94b8381f04506f1bee60625927d372323f78b3d30196cc56c8618c77eaf429298e74673d832c3",
+                        "weight": "2000000000000000",
+                        "nodeIDs": [
+                            "NodeID-NFBbbJ4qCmNaCzeW7sxErhvWqvEQMnYcN"
+                        ]
+                    },
+                    {
+                        "publicKey": "0xaccd61ceb90c61628aa0fa34acab27ecb08f6897e9ccad283578c278c52109f9e10e4f8bc31aa6d7905c4e1623de367e",
+                        "weight": "2000000000000000",
+                        "nodeIDs": [
+                            "NodeID-GWPcbFJZFfZreETSoWjPimr846mXEKCtu"
+                        ]
+                    },
+                    {
+                        "publicKey": "0x900c9b119b5c82d781d4b49be78c3fc7ae65f2b435b7ed9e3a8b9a03e475edff86d8a64827fec8db23a6f236afbf127d",
+                        "weight": "2000000000000000",
+                        "nodeIDs": [
+                            "NodeID-7Xhw2mDxuDS44j42TCB6U5579esbSt3Lg"
+                        ]
+                    }
+                ],
+                "totalWeight": "10000000000000000"
+            }
+        }
+    },
+    "id": 1
+}
+```
+
+- `height` is the P-Chain height to get the validator set at, or the string literal "proposed"
+  to return the validator set at this node's ProposerVM height.
+
+**Example Call:**
+
 ### `platform.getValidatorFeeConfig`
 
 Returns the validator fee configuration of the P-Chain.

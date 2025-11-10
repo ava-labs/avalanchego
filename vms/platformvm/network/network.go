@@ -22,8 +22,8 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/config"
 	"github.com/ava-labs/avalanchego/vms/platformvm/state"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
+	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 type Network struct {
@@ -37,6 +37,7 @@ type Network struct {
 	txPushGossipFrequency time.Duration
 	txPullGossiper        gossip.Gossiper
 	txPullGossipFrequency time.Duration
+	peers                 *p2p.Peers
 }
 
 func New(
@@ -45,7 +46,7 @@ func New(
 	subnetID ids.ID,
 	vdrs validators.State,
 	txVerifier TxVerifier,
-	mempool mempool.Mempool[*txs.Tx],
+	mempool *mempool.Mempool,
 	partialSyncPrimaryNetwork bool,
 	appSender common.AppSender,
 	stateLock sync.Locker,
@@ -60,13 +61,14 @@ func New(
 		vdrs,
 		config.MaxValidatorSetStaleness,
 	)
-
+	peers := &p2p.Peers{}
 	p2pNetwork, err := p2p.NewNetwork(
 		log,
 		appSender,
 		registerer,
 		"p2p",
 		validators,
+		peers,
 	)
 	if err != nil {
 		return nil, err
@@ -189,6 +191,7 @@ func New(
 		txPushGossipFrequency:     config.PushGossipFrequency,
 		txPullGossiper:            txPullGossiper,
 		txPullGossipFrequency:     config.PullGossipFrequency,
+		peers:                     peers,
 	}, nil
 }
 
@@ -223,4 +226,8 @@ func (n *Network) IssueTxFromRPC(tx *txs.Tx) error {
 	}
 	n.txPushGossiper.Add(tx)
 	return nil
+}
+
+func (n *Network) Peers() *p2p.Peers {
+	return n.peers
 }

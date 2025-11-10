@@ -36,6 +36,7 @@ import (
 	"github.com/ava-labs/avalanchego/config/node"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/database/meterdb"
 	"github.com/ava-labs/avalanchego/database/pebbledb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
@@ -148,7 +149,7 @@ func New(
 	}
 
 	logger.Info("initializing node",
-		zap.Stringer("version", version.CurrentApp),
+		zap.Stringer("version", version.Current),
 		zap.String("commit", version.GitCommit),
 		zap.Stringer("nodeID", n.ID),
 		zap.Stringer("stakingKeyType", tlsCert.PublicKeyAlgorithm),
@@ -629,7 +630,7 @@ func (n *Node) initNetworking(reg prometheus.Registerer) error {
 
 	n.Net, err = network.NewNetwork(
 		&n.Config.NetworkConfig,
-		n.Config.UpgradeConfig.FortunaTime,
+		n.Config.UpgradeConfig.GraniteTime,
 		n.msgCreator,
 		reg,
 		n.Log,
@@ -760,7 +761,7 @@ func (n *Node) initDatabase() error {
 	case leveldb.Name:
 		// Prior to v1.10.15, the only on-disk database was leveldb, and its
 		// files went to [dbPath]/[networkID]/v1.4.5.
-		dbFolderName = version.CurrentDatabase.String()
+		dbFolderName = version.CurrentDatabase
 	case pebbledb.Name:
 		dbFolderName = "pebble"
 	default:
@@ -769,19 +770,37 @@ func (n *Node) initDatabase() error {
 	// dbFolderName is appended to the database path given in the config
 	dbFullPath := filepath.Join(n.Config.DatabaseConfig.Path, dbFolderName)
 
-	var err error
-	n.DB, err = databasefactory.New(
+	dbReg, err := metrics.MakeAndRegister(
+		n.MetricsGatherer,
+		dbNamespace,
+	)
+	if err != nil {
+		return err
+	}
+
+	db, err := databasefactory.New(
 		n.Config.DatabaseConfig.Name,
 		dbFullPath,
 		n.Config.DatabaseConfig.ReadOnly,
 		n.Config.DatabaseConfig.Config,
-		n.MetricsGatherer,
+		dbReg,
 		n.Log,
-		dbNamespace,
-		"all",
 	)
 	if err != nil {
 		return fmt.Errorf("couldn't create database: %w", err)
+	}
+
+	meterDBReg, err := metrics.MakeAndRegister(
+		n.MeterDBMetricsGatherer,
+		"all",
+	)
+	if err != nil {
+		return err
+	}
+
+	n.DB, err = meterdb.New(meterDBReg, db)
+	if err != nil {
+		return err
 	}
 
 	rawExpectedGenesisHash := hashing.ComputeHash256(n.Config.GenesisBytes)
@@ -1360,7 +1379,7 @@ func (n *Node) initInfoAPI() error {
 
 	service, err := info.NewService(
 		info.Parameters{
-			Version:   version.CurrentApp,
+			Version:   version.Current,
 			NodeID:    n.ID,
 			NodePOP:   pop,
 			NetworkID: n.Config.NetworkID,
