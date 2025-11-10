@@ -7,8 +7,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/libevm/common"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 const MaxCodeHashesPerRequest = 5

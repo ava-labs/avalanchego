@@ -4,12 +4,11 @@
 package factory
 
 import (
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms"
-
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 
 	atomicvm "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/vm"
 )

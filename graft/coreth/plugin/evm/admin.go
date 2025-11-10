@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ava-labs/avalanchego/api"
-	"github.com/ava-labs/avalanchego/utils/profiler"
 	"github.com/ava-labs/libevm/log"
 
+	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/client"
+	"github.com/ava-labs/avalanchego/utils/profiler"
 )
 
 // Admin is the API service for admin API calls

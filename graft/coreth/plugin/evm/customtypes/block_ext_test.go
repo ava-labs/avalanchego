@@ -10,7 +10,6 @@ import (
 	"testing"
 	"unsafe"
 
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/google/go-cmp/cmp"
@@ -19,6 +18,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/utils"
 	"github.com/ava-labs/avalanchego/graft/coreth/utils/utilstest"
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 )
 
 func TestCopyHeader(t *testing.T) {

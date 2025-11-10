@@ -81,8 +81,8 @@ function setup_lint {
   TMP_DIR="$(mktemp -d)"
   trap 'rm -rf -- "$TMP_DIR"' EXIT
 
-  AVALANCHE_LINT_FILE="${TMP_DIR}/.avalanche-golangci.yml"
-  cp .avalanche-golangci.yml "$AVALANCHE_LINT_FILE"
+  AVALANCHE_LINT_FILE="${TMP_DIR}/.golangci.yml"
+  cp .golangci.yml "$AVALANCHE_LINT_FILE"
 
   # Exclude all upstream files dynamically
   echo "    paths-except:" >> "$AVALANCHE_LINT_FILE"

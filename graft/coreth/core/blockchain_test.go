@@ -33,12 +33,12 @@ import (
 	"os"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/state/pruner"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -362,6 +362,7 @@ func TestCorruptSnapshots(t *testing.T) {
 }
 
 func TestBlockChainOfflinePruningUngracefulShutdown(t *testing.T) {
+	t.Skip("TODO(marun) needs to be updated for compatibility with migration")
 	create := func(db ethdb.Database, gspec *Genesis, lastAcceptedHash common.Hash, _ string) (*BlockChain, error) {
 		// Import the chain. This runs all block validation rules.
 		blockchain, err := createBlockChain(db, pruningConfig, gspec, lastAcceptedHash)

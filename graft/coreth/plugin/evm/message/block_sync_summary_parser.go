@@ -5,8 +5,9 @@ package message
 import (
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/libevm/crypto"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 type BlockSyncSummaryParser struct{}

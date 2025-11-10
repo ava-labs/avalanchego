@@ -8,11 +8,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/avalanchego/database"
-	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/libevm/log"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
+	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 
 	synccommon "github.com/ava-labs/avalanchego/graft/coreth/sync"
 )

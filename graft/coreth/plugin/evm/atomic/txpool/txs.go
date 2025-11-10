@@ -6,12 +6,12 @@ package txpool
 import (
 	"sync"
 
-	"github.com/ava-labs/avalanchego/cache/lru"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/libevm/log"
 
+	"github.com/ava-labs/avalanchego/cache/lru"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/snow"
 )
 
 const discardedTxsCacheSize = 50
