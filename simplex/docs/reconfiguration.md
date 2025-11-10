@@ -255,8 +255,8 @@ For example, if in epoch `e` the sealing block is $B_k$, there can be several te
 In the successive epoch $k$, the first block will have a sequence of $B_{k+1}$, the second block will have a sequence of $B_{k+2}$ and so on and so forth.
 
 In order to know when the current epoch can be terminated and the next epoch can be instantiated, the MSM uses the `sealing_block_seq` field of the Simplex epoch information.
-The `sealing_block_seq` is set to `0` in all blocks that are built except from when the block builder detects that the sealing block of the current epoch has been finalized.
-A telock with a `sealing_block_seq > 0` that is notarized, indicates that at least `f+1` correct nodes have finalized the sealing block of the current epoch.
+The `sealing_block_seq` is set to `0` in all blocks that are built except from when the block builder detects that the criteria for the creation of the sealing block of the current epoch have been met.
+A telock with a `sealing_block_seq > 0` that is finalized, indicates that at least `f+1` correct nodes have finalized the sealing block of the current epoch.
 This means that under the assumption of up to `f` failures, the sealing block and its corresponding finalization certificate can always be replicated by nodes that haven't finalized it
 and by doing so, move to the next epoch.
 
