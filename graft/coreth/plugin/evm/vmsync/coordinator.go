@@ -29,8 +29,10 @@ const (
 )
 
 var (
-	errInvalidTargetType = errors.New("invalid target type")
-	errInvalidState      = errors.New("invalid coordinator state")
+	errInvalidTargetType    = errors.New("invalid target type")
+	errInvalidState         = errors.New("invalid coordinator state")
+	errBatchCancelled       = errors.New("batch execution cancelled")
+	errBatchOperationFailed = errors.New("batch operation failed")
 )
 
 // Callbacks allows the coordinator to delegate VM-specific work back to the client.
@@ -157,7 +159,7 @@ func (co *Coordinator) UpdateSyncTarget(newTarget message.Syncable) error {
 		return errInvalidState
 	}
 	// Respect pivot policy if configured.
-	if co.pivot != nil && !co.pivot.shouldForward(newTarget.Height()) {
+	if !co.pivot.shouldForward(newTarget.Height()) {
 		return nil
 	}
 
@@ -169,16 +171,14 @@ func (co *Coordinator) UpdateSyncTarget(newTarget message.Syncable) error {
 	if err := co.syncerRegistry.UpdateSyncTarget(newTarget); err != nil {
 		return err
 	}
-	if co.pivot != nil {
-		co.pivot.advance()
-	}
+	co.pivot.advance()
 	return nil
 }
 
 // AddBlock appends the block to the queue only while in the Running state.
 // Returns true if the block was queued, false if the queue was already sealed
 // or the block is nil.
-func (co *Coordinator) AddBlockOperation(b EthBlockWrapper, op BlockOperation) bool {
+func (co *Coordinator) AddBlockOperation(b EthBlockWrapper, op BlockOperationType) bool {
 	if b == nil || co.CurrentState() != StateRunning {
 		return false
 	}
@@ -197,7 +197,7 @@ func (co *Coordinator) executeBlockOperationBatch(ctx context.Context) error {
 	for i, op := range operations {
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("executeBlockOperationBatch cancelled at operation %d/%d: %w", i, len(operations), ctx.Err())
+			return fmt.Errorf("operation %d/%d: %w", i+1, len(operations), errors.Join(errBatchCancelled, ctx.Err()))
 		default:
 		}
 
@@ -211,7 +211,7 @@ func (co *Coordinator) executeBlockOperationBatch(ctx context.Context) error {
 			err = op.block.Verify(ctx)
 		}
 		if err != nil {
-			return fmt.Errorf("executeBlockOperationBatch failed at operation %d/%d (%v): %w", i, len(operations), op.operation, err)
+			return fmt.Errorf("operation %d/%d (%v): %w", i+1, len(operations), op.operation, errors.Join(errBatchOperationFailed, err))
 		}
 	}
 	return nil

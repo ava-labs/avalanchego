@@ -15,7 +15,7 @@ type pivotPolicy struct {
 	interval uint64
 	// nextHeight is the next height threshold at or beyond which we
 	// should forward an update. A value of 0 means uninitialized.
-	nextHeight uint64 // accessed atomically
+	nextHeight atomic.Uint64
 }
 
 // newPivotPolicy creates a new pivot policy with the given interval.
@@ -34,15 +34,15 @@ func (p *pivotPolicy) shouldForward(height uint64) bool {
 	if p == nil || p.interval == 0 {
 		return true
 	}
-	next := atomic.LoadUint64(&p.nextHeight)
+	next := p.nextHeight.Load()
 	if next == 0 {
 		// Round up the initial height to the next multiple of interval.
 		// Ceil division: ((h + interval - 1) / interval) * interval
 		h := height
 		init := ((h + p.interval - 1) / p.interval) * p.interval
 		// Initialize once - if another goroutine wins, read the established value.
-		if !atomic.CompareAndSwapUint64(&p.nextHeight, 0, init) {
-			next = atomic.LoadUint64(&p.nextHeight)
+		if !p.nextHeight.CompareAndSwap(0, init) {
+			next = p.nextHeight.Load()
 		} else {
 			next = init
 		}
@@ -56,5 +56,5 @@ func (p *pivotPolicy) advance() {
 	if p == nil || p.interval == 0 {
 		return
 	}
-	atomic.AddUint64(&p.nextHeight, p.interval)
+	p.nextHeight.Add(p.interval)
 }

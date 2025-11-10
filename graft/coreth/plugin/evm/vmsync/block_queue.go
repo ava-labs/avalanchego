@@ -5,19 +5,33 @@ package vmsync
 
 import "sync"
 
-// BlockOperation represents the type of operation to perform on a block.
-type BlockOperation int
+// BlockOperationType represents the type of operation to perform on a block.
+type BlockOperationType int
 
 const (
-	OpAccept BlockOperation = iota
+	OpAccept BlockOperationType = iota
 	OpReject
 	OpVerify
 )
 
+// String returns the string representation of the block operation.
+func (op BlockOperationType) String() string {
+	switch op {
+	case OpAccept:
+		return "accept"
+	case OpReject:
+		return "reject"
+	case OpVerify:
+		return "verify"
+	default:
+		return "unknown"
+	}
+}
+
 // blockOperation represents a queued block operation.
 type blockOperation struct {
 	block     EthBlockWrapper
-	operation BlockOperation
+	operation BlockOperationType
 }
 
 // blockQueue buffers block operations (accept/reject/verify) that arrive while
@@ -39,7 +53,7 @@ func newBlockQueue() *blockQueue {
 
 // enqueue appends a block operation to the buffer. Returns true if the operation
 // was queued, false if the block is nil.
-func (q *blockQueue) enqueue(b EthBlockWrapper, op BlockOperation) bool {
+func (q *blockQueue) enqueue(b EthBlockWrapper, op BlockOperationType) bool {
 	if b == nil {
 		return false
 	}
