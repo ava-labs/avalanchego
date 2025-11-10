@@ -127,8 +127,8 @@ type ImageDetails struct {
 	Versions *version.Versions
 }
 
-// GetLatestImageDetails retrieves the image details for the avalanchego image with tag `latest`.
-func getLatestImageDetails(
+// GetMasterImageDetails retrieves the image details for the avalanchego image with tag `master`.
+func getMasterImageDetails(
 	ctx context.Context,
 	log logging.Logger,
 	clientset *kubernetes.Clientset,
@@ -141,7 +141,7 @@ func getLatestImageDetails(
 		return nil, err
 	}
 
-	// Start a new pod with the `latest`-tagged avalanchego image to discover its image ID
+	// Start a new pod with the `master`-tagged avalanchego image to discover its image ID
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "avalanchego-version-check-",
@@ -152,7 +152,7 @@ func getLatestImageDetails(
 					Name:    containerName,
 					Command: []string{"./avalanchego"},
 					Args:    []string{"--version-json"},
-					Image:   baseImageName + ":latest",
+					Image:   baseImageName + ":master",
 				},
 			},
 			RestartPolicy: corev1.RestartPolicyNever,
