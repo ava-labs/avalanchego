@@ -175,11 +175,16 @@ func (co *Coordinator) UpdateSyncTarget(newTarget message.Syncable) error {
 	return nil
 }
 
-// AddBlock appends the block to the queue only while in the Running state.
-// Returns true if the block was queued, false if the queue was already sealed
-// or the block is nil.
+// AddBlockOperation appends the block to the queue while in the Running or
+// StateExecutingBatch state. Blocks enqueued during batch execution will be
+// processed in the next batch. Returns true if the block was queued, false
+// if the queue was already sealed or the block is nil.
 func (co *Coordinator) AddBlockOperation(b EthBlockWrapper, op BlockOperationType) bool {
-	if b == nil || co.CurrentState() != StateRunning {
+	if b == nil {
+		return false
+	}
+	state := co.CurrentState()
+	if state != StateRunning && state != StateExecutingBatch {
 		return false
 	}
 	return co.queue.enqueue(b, op)
