@@ -1545,7 +1545,7 @@ func (n *Node) initHealthAPI() error {
 		modeUpgradeWeightPortion := float64(modeUpgradeWeight) / float64(totalWeight)
 		result := map[string]interface{}{
 			"localUpgradeTime":            localUpgradeTime,
-			"modeUpgradeTime":             modeUpgradeTimeUnix,
+			"modeUpgradeTime":             time.Unix(int64(modeUpgradeTimeUnix), 0).UTC(),
 			"modeUpgradeWeightPercentage": 100 * modeUpgradeWeightPortion,
 			"numUpgradeTimes":             len(upgradeTimes),
 		}
@@ -1561,7 +1561,7 @@ func (n *Node) initHealthAPI() error {
 		modeUpgradeTime := time.Unix(int64(modeUpgradeTimeUnix), 0)
 		timeUntilUpgrade := time.Until(modeUpgradeTime)
 		timeUntilUpgradeMetric.Set(float64(timeUntilUpgrade))
-		result["timeUntilUpgrade"] = timeUntilUpgrade
+		result["timeUntilUpgrade"] = timeUntilUpgrade.String()
 
 		var (
 			logFrequency time.Duration
