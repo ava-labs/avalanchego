@@ -84,7 +84,7 @@ var (
 		FortunaTime:                  InitiallyActiveTime,
 		GraniteTime:                  InitiallyActiveTime,
 		GraniteEpochDuration:         30 * time.Second,
-		HeliconTime:                  InitiallyActiveTime,
+		HeliconTime:                  UnscheduledActivationTime,
 		HeliconEpochDuration:         30 * time.Second,
 	}
 
