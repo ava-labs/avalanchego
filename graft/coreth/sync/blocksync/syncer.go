@@ -118,3 +118,7 @@ func (s *BlockSyncer) Sync(ctx context.Context) error {
 func (*BlockSyncer) UpdateTarget(_ message.Syncable) error {
 	return nil
 }
+
+func (*BlockSyncer) Finalize(_ context.Context) error {
+	return nil
+}

@@ -172,6 +172,10 @@ func (*stateSync) UpdateTarget(_ message.Syncable) error {
 	return nil
 }
 
+func (*stateSync) Finalize(_ context.Context) error {
+	return nil
+}
+
 // onStorageTrieFinished is called after a storage trie finishes syncing.
 func (t *stateSync) onStorageTrieFinished(root common.Hash) error {
 	<-t.triesInProgressSem // allow another trie to start (release the semaphore)

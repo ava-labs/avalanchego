@@ -115,3 +115,17 @@ func (r *SyncerRegistry) UpdateSyncTarget(newTarget message.Syncable) error {
 	}
 	return nil
 }
+
+// FinalizeAll calls Finalize on all registered syncers.
+// This should be called after all syncers have completed their Sync() operations
+// and before finalizing the VM state.
+func (r *SyncerRegistry) FinalizeAll(ctx context.Context) error {
+	for _, task := range r.syncers {
+		if err := task.syncer.Finalize(ctx); err != nil {
+			log.Error("failed finalizing syncer", "name", task.name, "err", err)
+			return fmt.Errorf("%s finalize failed: %w", task.name, err)
+		}
+		log.Info("finalized syncer", "name", task.name)
+	}
+	return nil
+}

@@ -32,6 +32,9 @@ type Syncer interface {
 
 	// UpdateTarget updates the syncer's target while running to support dynamic state sync.
 	UpdateTarget(newTarget message.Syncable) error
+
+	// Finalize is called when the syncer is finished.
+	Finalize(ctx context.Context) error
 }
 
 // SummaryProvider is an interface for providing state summaries.
