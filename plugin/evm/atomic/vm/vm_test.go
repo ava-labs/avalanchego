@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -27,7 +26,6 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/rlp"
 	"github.com/ava-labs/libevm/trie"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/core"
@@ -1498,21 +1496,12 @@ func TestWaitForEvent(t *testing.T) {
 		{
 			name: "WaitForEvent with context cancelled returns 0",
 			testCase: func(t *testing.T, vm *VM, _ common.Address, _ *ecdsa.PrivateKey) {
-				ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*100)
+				ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 				defer cancel()
 
-				var wg sync.WaitGroup
-				wg.Add(1)
-
-				// We run WaitForEvent in a goroutine to ensure it can be safely called concurrently.
-				go func() {
-					defer wg.Done()
-					msg, err := vm.WaitForEvent(ctx)
-					assert.ErrorIs(t, err, context.DeadlineExceeded)
-					assert.Zero(t, msg)
-				}()
-
-				wg.Wait()
+				msg, err := vm.WaitForEvent(ctx)
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+				require.Zero(t, msg)
 			},
 		},
 		{
@@ -1521,19 +1510,24 @@ func TestWaitForEvent(t *testing.T) {
 				importTx, err := vm.newImportTx(vm.Ctx.XChainID, address, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{vmtest.TestKeys[0]})
 				require.NoError(t, err)
 
-				var wg sync.WaitGroup
-				wg.Add(1)
-
+				type result struct {
+					msg commonEng.Message
+					err error
+				}
+				results := make(chan result)
 				go func() {
-					defer wg.Done()
 					msg, err := vm.WaitForEvent(t.Context())
-					assert.NoError(t, err)
-					assert.Equal(t, commonEng.PendingTxs, msg)
+					results <- result{
+						msg: msg,
+						err: err,
+					}
 				}()
 
 				require.NoError(t, vm.AtomicMempool.AddLocalTx(importTx))
 
-				wg.Wait()
+				r := <-results
+				require.NoError(t, r.err)
+				require.Equal(t, commonEng.PendingTxs, r.msg)
 			},
 		},
 		{
@@ -1542,18 +1536,9 @@ func TestWaitForEvent(t *testing.T) {
 				ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*100)
 				defer cancel()
 
-				var wg sync.WaitGroup
-				wg.Add(1)
-
-				// We run WaitForEvent in a goroutine to ensure it can be safely called concurrently.
-				go func() {
-					defer wg.Done()
-					msg, err := vm.WaitForEvent(ctx)
-					assert.ErrorIs(t, err, context.DeadlineExceeded)
-					assert.Zero(t, msg)
-				}()
-
-				wg.Wait()
+				msg, err := vm.WaitForEvent(ctx)
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+				require.Zero(t, msg)
 
 				t.Log("WaitForEvent returns when regular transactions are added to the mempool")
 
@@ -1570,16 +1555,9 @@ func TestWaitForEvent(t *testing.T) {
 					require.NoError(t, err)
 				}
 
-				wg.Add(1)
-
-				go func() {
-					defer wg.Done()
-					msg, err := vm.WaitForEvent(t.Context())
-					assert.NoError(t, err)
-					assert.Equal(t, commonEng.PendingTxs, msg)
-				}()
-
-				wg.Wait()
+				msg, err = vm.WaitForEvent(t.Context())
+				require.NoError(t, err)
+				require.Equal(t, commonEng.PendingTxs, msg)
 
 				// Build a block again to wipe out the subscription
 				blk, err := vm.BuildBlock(t.Context())

@@ -54,7 +54,7 @@ linters:
     - asciicheck
     - bodyclose
     - copyloopvar
-    # - depguard
+    - depguard
     - errcheck
     - errorlint
     - forbidigo

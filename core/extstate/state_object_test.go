@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestStateKeyPartition(t *testing.T) {
@@ -61,11 +61,11 @@ func TestStateKeyPartition(t *testing.T) {
 		t.Run(test.key.Hex(), func(t *testing.T) {
 			coin := test.key
 			normalizeCoinID(&coin)
-			assert.Equal(t, test.wantCoinID, coin)
+			require.Equal(t, test.wantCoinID, coin)
 
 			state := test.key
 			normalizeStateKey(&state)
-			assert.Equal(t, test.wantStateKey, state)
+			require.Equal(t, test.wantStateKey, state)
 		})
 	}
 }
@@ -81,6 +81,6 @@ func FuzzStateKeyPartition(f *testing.F) {
 		)
 		normalizeCoinID(&coin)
 		normalizeStateKey(&state)
-		assert.NotEqual(t, coin, state)
+		require.NotEqual(t, coin, state)
 	})
 }

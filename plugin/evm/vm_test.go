@@ -11,7 +11,6 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
 	"time"
 
@@ -36,7 +35,6 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
 	"github.com/holiman/uint256"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/coreth/consensus/dummy"
@@ -1548,31 +1546,25 @@ func TestWaitForEvent(t *testing.T) {
 				ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*100)
 				defer cancel()
 
-				var wg sync.WaitGroup
-				wg.Add(1)
-
-				// We run WaitForEvent in a goroutine to ensure it can be safely called concurrently.
-				go func() {
-					defer wg.Done()
-					msg, err := vm.WaitForEvent(ctx)
-					assert.ErrorIs(t, err, context.DeadlineExceeded)
-					assert.Zero(t, msg)
-				}()
-
-				wg.Wait()
+				msg, err := vm.WaitForEvent(ctx)
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+				require.Zero(t, msg)
 			},
 		},
 		{
 			name: "WaitForEvent returns when a transaction is added to the mempool",
 			testCase: func(t *testing.T, vm *VM) {
-				var wg sync.WaitGroup
-				wg.Add(1)
-
+				type result struct {
+					msg commonEng.Message
+					err error
+				}
+				results := make(chan result)
 				go func() {
-					defer wg.Done()
 					msg, err := vm.WaitForEvent(t.Context())
-					assert.NoError(t, err)
-					assert.Equal(t, commonEng.PendingTxs, msg)
+					results <- result{
+						msg: msg,
+						err: err,
+					}
 				}()
 
 				signedTx := newSignedLegacyTx(t, vm.chainConfig, vmtest.TestKeys[0].ToECDSA(), 0, &vmtest.TestEthAddrs[1], big.NewInt(1), 21000, vmtest.InitialBaseFee, nil)
@@ -1580,7 +1572,9 @@ func TestWaitForEvent(t *testing.T) {
 					require.NoError(t, err)
 				}
 
-				wg.Wait()
+				r := <-results
+				require.NoError(t, r.err)
+				require.Equal(t, commonEng.PendingTxs, r.msg)
 			},
 		},
 		{
@@ -1589,18 +1583,9 @@ func TestWaitForEvent(t *testing.T) {
 				ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*100)
 				defer cancel()
 
-				var wg sync.WaitGroup
-				wg.Add(1)
-
-				// We run WaitForEvent in a goroutine to ensure it can be safely called concurrently.
-				go func() {
-					defer wg.Done()
-					msg, err := vm.WaitForEvent(ctx)
-					assert.ErrorIs(t, err, context.DeadlineExceeded)
-					assert.Zero(t, msg)
-				}()
-
-				wg.Wait()
+				msg, err := vm.WaitForEvent(ctx)
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+				require.Zero(t, msg)
 			},
 		},
 		// TODO (ceyonur): remove this test after Granite is activated. (See https://github.com/ava-labs/coreth/issues/1318)
@@ -1618,18 +1603,9 @@ func TestWaitForEvent(t *testing.T) {
 					require.NoError(t, err)
 				}
 
-				ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*100)
-				defer cancel()
-
-				var wg sync.WaitGroup
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					msg, err := vm.WaitForEvent(ctx)
-					assert.NoError(t, err)
-					assert.Equal(t, commonEng.PendingTxs, msg)
-				}()
-				wg.Wait()
+				msg, err := vm.WaitForEvent(t.Context())
+				require.NoError(t, err)
+				require.Equal(t, commonEng.PendingTxs, msg)
 			},
 		},
 		// TODO (ceyonur): remove this test after Granite is activated. (See https://github.com/ava-labs/coreth/issues/1318)
@@ -1646,16 +1622,10 @@ func TestWaitForEvent(t *testing.T) {
 					require.NoError(t, err)
 				}
 
-				var wg sync.WaitGroup
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					msg, err := vm.WaitForEvent(t.Context())
-					assert.NoError(t, err)
-					assert.Equal(t, commonEng.PendingTxs, msg)
-					assert.GreaterOrEqual(t, time.Since(lastBuildBlockTime), RetryDelay)
-				}()
-				wg.Wait()
+				msg, err := vm.WaitForEvent(t.Context())
+				require.NoError(t, err)
+				require.Equal(t, commonEng.PendingTxs, msg)
+				require.GreaterOrEqual(t, time.Since(lastBuildBlockTime), RetryDelay)
 			},
 		},
 	} {
