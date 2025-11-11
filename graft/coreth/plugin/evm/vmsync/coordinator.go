@@ -129,16 +129,30 @@ func (co *Coordinator) ProcessQueuedBlockOperations(ctx context.Context) error {
 	co.state.Store(int32(StateFinalizing))
 
 	if co.callbacks.FinalizeVM != nil {
+		// Check context again before expensive FinalizeVM operation.
+		if err := ctx.Err(); err != nil {
+			co.state.Store(int32(StateAborted))
+			return err
+		}
+
 		loaded := co.target.Load()
 		current, ok := loaded.(message.Syncable)
 		if !ok {
+			co.state.Store(int32(StateAborted))
 			return errInvalidTargetType
 		}
 		// FinalizeVM should complete atomically. The context is passed for internal
 		// cancellation checks, but the coordinator expects completion or an error.
 		if err := co.callbacks.FinalizeVM(ctx, current); err != nil {
+			co.state.Store(int32(StateAborted))
 			return err
 		}
+	}
+
+	// Check context before transitioning to batch execution state.
+	if err := ctx.Err(); err != nil {
+		co.state.Store(int32(StateAborted))
+		return err
 	}
 
 	co.state.Store(int32(StateExecutingBatch))
@@ -147,6 +161,7 @@ func (co *Coordinator) ProcessQueuedBlockOperations(ctx context.Context) error {
 	// cancelled individually, but the batch execution itself is not atomic - partial completion
 	// is acceptable as operations are idempotent.
 	if err := co.executeBlockOperationBatch(ctx); err != nil {
+		// State will be set to StateAborted by finish() when error is returned.
 		return err
 	}
 
@@ -154,17 +169,25 @@ func (co *Coordinator) ProcessQueuedBlockOperations(ctx context.Context) error {
 }
 
 // UpdateSyncTarget broadcasts a new target to all updatable syncers.
-// It is only valid in the [StateRunning] state.
+// It is only valid in the [StateRunning] state. It cannot be called during
+// batch execution to prevent removing blocks that are currently being processed.
 // Note: no batch execution occurs here. Batches are only executed after
 // finalization.
 // Note: Syncers manage cancellation themselves through their Sync() contexts.
 func (co *Coordinator) UpdateSyncTarget(newTarget message.Syncable) error {
+	// Re-check state after each operation to handle concurrent state transitions.
 	if co.CurrentState() != StateRunning {
 		return errInvalidState
 	}
 	// Respect pivot policy if configured.
 	if !co.pivot.shouldForward(newTarget.Height()) {
 		return nil
+	}
+
+	// Re-check state before modifying queue to ensure we're still in Running state
+	// and not in batch execution (which would cause a race with removeBelowHeight).
+	if co.CurrentState() != StateRunning {
+		return errInvalidState
 	}
 
 	// Remove blocks from queue that will never be executed (behind the new target).
