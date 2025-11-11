@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1762789345189,
+  "lastUpdate": 1762865700203,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -1510,6 +1510,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
             "value": 40.04,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Michael Kaplan",
+            "username": "michaelkaplan13",
+            "email": "55204436+michaelkaplan13@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "55652312c02869c5f4c202e73e90de9083420500",
+          "message": "Avoid unnecessary RST_STREAM and PING frames causing GOAWAY messages (#4480)\n\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>",
+          "timestamp": "2025-11-10T20:13:35Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/55652312c02869c5f4c202e73e90de9083420500"
+        },
+        "date": 1762865699840,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
+            "value": 67.99,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
