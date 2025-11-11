@@ -3,4 +3,4 @@
 
 package metrics
 
-//go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/metrics.go -mock_names=Metrics=Metrics . Metrics
+//go:generate go tool mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/metrics.go -mock_names=Metrics=Metrics . Metrics
