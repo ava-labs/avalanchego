@@ -4,6 +4,7 @@
 package version
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,5 +12,9 @@ import (
 
 func TestCurrentRPCChainVMCompatible(t *testing.T) {
 	compatibleVersions := RPCChainVMProtocolCompatibility[RPCChainVMProtocol]
-	require.Contains(t, compatibleVersions, Current)
+	require.Contains(
+		t,
+		compatibleVersions,
+		fmt.Sprintf("v%d.%d.%d", Current.Major, Current.Minor, Current.Patch),
+	)
 }

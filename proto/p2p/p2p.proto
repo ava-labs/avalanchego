@@ -83,7 +83,6 @@ message Pong {
 //
 // Peers should drop connections to peers with incompatible versions.
 message Handshake {
-  reserved 5; // Until E upgrade is activated.
   // Network the peer is running on (e.g local, testnet, mainnet)
   uint32 network_id = 1;
   // Unix timestamp when this Handshake message was created
@@ -92,6 +91,9 @@ message Handshake {
   bytes ip_addr = 3;
   // IP port of the peer
   uint32 ip_port = 4;
+  // Unix timestamp (in seconds) of the most recently scheduled network upgrade.
+  // This timestamp may be the past upgrade or a future upgrade.
+  uint64 upgrade_time = 5;
   // Timestamp of the IP
   uint64 ip_signing_time = 6;
   // Signature of the peer IP port pair at a provided timestamp with the TLS
@@ -214,9 +216,9 @@ message AcceptedStateSummary {
 // The consensus engine that should be used when handling a consensus request.
 enum EngineType {
   ENGINE_TYPE_UNSPECIFIED = 0;
-  // Only the X-Chain uses avalanche consensus
-  ENGINE_TYPE_AVALANCHE = 1;
-  ENGINE_TYPE_SNOWMAN = 2;
+  // Only the X-Chain uses DAG consensus
+  ENGINE_TYPE_DAG = 1;
+  ENGINE_TYPE_CHAIN = 2;
 }
 
 // GetAcceptedFrontier requests the accepted frontier from a peer.
@@ -450,13 +452,19 @@ message ProtocolMetadata {
   // Epoch returns the epoch in which the block was proposed
   uint64 epoch = 2;
   // Round returns the round number in which the block was proposed.
-  // Can also be an empty block.
   uint64 round = 3;
   // Seq is the order of the block among all blocks in the blockchain.
   // Cannot correspond to an empty block.
   uint64 seq = 4;
   // Prev returns the digest of the previous data block
   bytes prev = 5;
+}
+
+message EmptyVoteMetadata {
+  // Epoch returns the epoch in which the empty block was proposed
+  uint64 epoch = 1;
+  // Round returns the round number in which the empty block was proposed.
+  uint64 round = 2;
 }
 
 message BlockHeader {
@@ -478,7 +486,7 @@ message Vote {
 }
 
 message EmptyVote {
-  ProtocolMetadata metadata = 1;
+  EmptyVoteMetadata metadata = 1;
   Signature signature = 2;
 }
 
@@ -488,7 +496,7 @@ message QuorumCertificate {
 }
 
 message EmptyNotarization {
-  ProtocolMetadata metadata = 1;
+  EmptyVoteMetadata metadata = 1;
   bytes quorum_certificate = 2;
 }
 

@@ -33,7 +33,7 @@ type Config struct {
 	InboundMsgThrottler  throttling.InboundMsgThrottler
 	Network              Network
 	Router               router.InboundHandler
-	VersionCompatibility version.Compatibility
+	VersionCompatibility *version.Compatibility
 	MyNodeID             ids.NodeID
 	// MySubnets does not include the primary network ID
 	MySubnets          set.Set[ids.ID]
@@ -62,4 +62,8 @@ type Config struct {
 
 	// IngressConnectionCount counts the ingress (to us) connections.
 	IngressConnectionCount atomic.Int64
+
+	// If true, connects to all validators regardless of primary network validator
+	// status or of configured tracked subnets.
+	ConnectToAllValidators bool
 }

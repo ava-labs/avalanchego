@@ -71,7 +71,7 @@ func TestCPUTracker(t *testing.T) {
 
 	cumulative := cpuTracker.TotalUsage()
 	sum := node1Utilization + node2Utilization
-	require.InDelta(sum, cumulative, 0)
+	require.Equal(sum, cumulative)
 
 	mockUser.EXPECT().CPUUsage().Return(.5).Times(3)
 

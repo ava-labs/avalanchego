@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/api/health"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 )
 
@@ -36,12 +37,12 @@ func CheckNodeHealth(ctx context.Context, uri string) (*health.APIReply, error) 
 	case *net.OpError:
 		if t.Op == "read" {
 			// Connection refused - potentially recoverable
-			return nil, err
+			return nil, stacktrace.Wrap(err)
 		}
 	case syscall.Errno:
 		if t == syscall.ECONNREFUSED {
 			// Connection refused - potentially recoverable
-			return nil, err
+			return nil, stacktrace.Wrap(err)
 		}
 	}
 
@@ -49,11 +50,11 @@ func CheckNodeHealth(ctx context.Context, uri string) (*health.APIReply, error) 
 	// for the node not being ready.
 	// TODO(marun) Update Client.Health() to return a typed error
 	if err != nil && err.Error() == "received status code: 503" {
-		return nil, err
+		return nil, stacktrace.Wrap(err)
 	}
 
 	// Assume all other errors are not recoverable
-	return nil, fmt.Errorf("%w: %w", ErrUnrecoverableNodeHealthCheck, err)
+	return nil, stacktrace.Errorf("%w: %w", ErrUnrecoverableNodeHealthCheck, err)
 }
 
 // NodeURI associates a node ID with its API URI.
@@ -76,7 +77,7 @@ func GetNodeURIs(nodes []*Node) []NodeURI {
 	return uris
 }
 
-// FilteredAvailableNodes filters the provided nodes by whether they are running and not ephemeral.
+// FilterAvailableNodes filters the provided nodes by whether they are running and not ephemeral.
 func FilterAvailableNodes(nodes []*Node) []*Node {
 	filteredNodes := []*Node{}
 	for _, node := range nodes {
@@ -105,7 +106,7 @@ func GetNodeWebsocketURIs(
 	for i := range nodeURIs {
 		uri, err := url.Parse(nodeURIs[i].URI)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse node URI: %w", err)
+			return nil, stacktrace.Errorf("failed to parse node URI: %w", err)
 		}
 		uri.Scheme = "ws" // use websocket to be able to stream events
 		wsURIs[i] = fmt.Sprintf("%s/ext/bc/%s/ws", uri, blockchainID)
@@ -115,7 +116,11 @@ func GetNodeWebsocketURIs(
 
 // Marshal to json with default prefix and indent.
 func DefaultJSONMarshal(v interface{}) ([]byte, error) {
-	return json.MarshalIndent(v, "", "  ")
+	bytes, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return nil, stacktrace.Errorf("failed to marshal to json: %w", err)
+	}
+	return bytes, nil
 }
 
 // Helper simplifying creation of a set of private keys
@@ -124,7 +129,7 @@ func NewPrivateKeys(keyCount int) ([]*secp256k1.PrivateKey, error) {
 	for i := 0; i < keyCount; i++ {
 		key, err := secp256k1.NewPrivateKey()
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate private key: %w", err)
+			return nil, stacktrace.Errorf("failed to generate private key: %w", err)
 		}
 		keys = append(keys, key)
 	}

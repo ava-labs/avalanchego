@@ -33,7 +33,7 @@ var errFoo = &common.AppError{
 
 func TestMessageRouting(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	wantNodeID := ids.GenerateTestNodeID()
 	wantMsg := []byte("message")
 
@@ -57,10 +57,15 @@ func TestMessageRouting(t *testing.T) {
 		SentAppRequest: make(chan []byte, 1),
 	}
 
-	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	network, err := NewNetwork(
+		logging.NoLog{},
+		sender,
+		prometheus.NewRegistry(),
+		"",
+	)
 	require.NoError(err)
 	require.NoError(network.AddHandler(1, testHandler))
-	client := network.NewClient(1)
+	client := network.NewClient(1, PeerSampler{Peers: &Peers{}})
 
 	require.NoError(client.AppGossip(
 		ctx,
@@ -80,17 +85,24 @@ func TestMessageRouting(t *testing.T) {
 // Tests that the Client prefixes messages with the handler prefix
 func TestClientPrefixesMessages(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	sender := enginetest.SenderStub{
 		SentAppRequest: make(chan []byte, 1),
 		SentAppGossip:  make(chan []byte, 1),
 	}
 
-	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	peers := &Peers{}
+	network, err := NewNetwork(
+		logging.NoLog{},
+		sender,
+		prometheus.NewRegistry(),
+		"",
+		peers,
+	)
 	require.NoError(err)
 	require.NoError(network.Connected(ctx, ids.EmptyNodeID, nil))
-	client := network.NewClient(handlerID)
+	client := network.NewClient(handlerID, PeerSampler{Peers: peers})
 
 	want := []byte("message")
 
@@ -128,14 +140,19 @@ func TestClientPrefixesMessages(t *testing.T) {
 // Tests that the Client callback is called on a successful response
 func TestAppRequestResponse(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	sender := enginetest.SenderStub{
 		SentAppRequest: make(chan []byte, 1),
 	}
-	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	network, err := NewNetwork(
+		logging.NoLog{},
+		sender,
+		prometheus.NewRegistry(),
+		"",
+	)
 	require.NoError(err)
-	client := network.NewClient(handlerID)
+	client := network.NewClient(handlerID, PeerSampler{Peers: &Peers{}})
 
 	wantResponse := []byte("response")
 	wantNodeID := ids.GenerateTestNodeID()
@@ -162,7 +179,7 @@ func TestAppRequestResponse(t *testing.T) {
 // Tests that the Client does not provide a cancelled context to the AppSender.
 func TestAppRequestCancelledContext(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	sentMessages := make(chan []byte, 1)
 	sender := &enginetest.Sender{
@@ -172,9 +189,14 @@ func TestAppRequestCancelledContext(t *testing.T) {
 			return nil
 		},
 	}
-	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	network, err := NewNetwork(
+		logging.NoLog{},
+		sender,
+		prometheus.NewRegistry(),
+		"",
+	)
 	require.NoError(err)
-	client := network.NewClient(handlerID)
+	client := network.NewClient(handlerID, PeerSampler{Peers: &Peers{}})
 
 	wantResponse := []byte("response")
 	wantNodeID := ids.GenerateTestNodeID()
@@ -204,14 +226,19 @@ func TestAppRequestCancelledContext(t *testing.T) {
 // Tests that the Client callback is given an error if the request fails
 func TestAppRequestFailed(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	sender := enginetest.SenderStub{
 		SentAppRequest: make(chan []byte, 1),
 	}
-	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	network, err := NewNetwork(
+		logging.NoLog{},
+		sender,
+		prometheus.NewRegistry(),
+		"",
+	)
 	require.NoError(err)
-	client := network.NewClient(handlerID)
+	client := network.NewClient(handlerID, PeerSampler{Peers: &Peers{}})
 
 	wantNodeID := ids.GenerateTestNodeID()
 	done := make(chan struct{})
@@ -254,13 +281,18 @@ func TestAppGossipMessageForUnregisteredHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctx := context.Background()
+			ctx := t.Context()
 			handler := &TestHandler{
 				AppGossipF: func(context.Context, ids.NodeID, []byte) {
 					require.Fail("should not be called")
 				},
 			}
-			network, err := NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
+			network, err := NewNetwork(
+				logging.NoLog{},
+				nil,
+				prometheus.NewRegistry(),
+				"",
+			)
 			require.NoError(err)
 			require.NoError(network.AddHandler(handlerID, handler))
 			require.NoError(network.AppGossip(ctx, ids.EmptyNodeID, tt.msg))
@@ -292,7 +324,7 @@ func TestAppRequestMessageForUnregisteredHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctx := context.Background()
+			ctx := t.Context()
 			handler := &TestHandler{
 				AppRequestF: func(context.Context, ids.NodeID, time.Time, []byte) ([]byte, *common.AppError) {
 					require.Fail("should not be called")
@@ -315,7 +347,12 @@ func TestAppRequestMessageForUnregisteredHandler(t *testing.T) {
 
 				return nil
 			}
-			network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+			network, err := NewNetwork(
+				logging.NoLog{},
+				sender,
+				prometheus.NewRegistry(),
+				"",
+			)
 			require.NoError(err)
 			require.NoError(network.AddHandler(handlerID, handler))
 
@@ -328,7 +365,7 @@ func TestAppRequestMessageForUnregisteredHandler(t *testing.T) {
 // A handler that errors should send an AppError to the requesting peer
 func TestAppError(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 	appError := &common.AppError{
 		Code:    123,
 		Message: "foo",
@@ -354,7 +391,12 @@ func TestAppError(t *testing.T) {
 
 		return nil
 	}
-	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	network, err := NewNetwork(
+		logging.NoLog{},
+		sender,
+		prometheus.NewRegistry(),
+		"",
+	)
 	require.NoError(err)
 	require.NoError(network.AddHandler(handlerID, handler))
 	msg := PrefixMessage(ProtocolPrefix(handlerID), []byte("message"))
@@ -386,7 +428,7 @@ func TestResponseForUnrequestedRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			ctx := context.Background()
+			ctx := t.Context()
 			handler := &TestHandler{
 				AppGossipF: func(context.Context, ids.NodeID, []byte) {
 					require.Fail("should not be called")
@@ -396,7 +438,12 @@ func TestResponseForUnrequestedRequest(t *testing.T) {
 					return nil, nil
 				},
 			}
-			network, err := NewNetwork(logging.NoLog{}, nil, prometheus.NewRegistry(), "")
+			network, err := NewNetwork(
+				logging.NoLog{},
+				nil,
+				prometheus.NewRegistry(),
+				"",
+			)
 			require.NoError(err)
 			require.NoError(network.AddHandler(handlerID, handler))
 
@@ -413,15 +460,20 @@ func TestResponseForUnrequestedRequest(t *testing.T) {
 // not attempt to issue another request until the previous one has cleared.
 func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 	require := require.New(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	sender := &enginetest.SenderStub{
 		SentAppRequest: make(chan []byte, 1),
 	}
 
-	network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+	network, err := NewNetwork(
+		logging.NoLog{},
+		sender,
+		prometheus.NewRegistry(),
+		"",
+	)
 	require.NoError(err)
-	client := network.NewClient(0x1)
+	client := network.NewClient(0x1, PeerSampler{Peers: &Peers{}})
 
 	noOpCallback := func(context.Context, ids.NodeID, []byte, error) {}
 	// create a request that never gets a response
@@ -431,7 +483,7 @@ func TestAppRequestDuplicateRequestIDs(t *testing.T) {
 
 	// force the network to use the same requestID
 	network.router.requestID = 1
-	err = client.AppRequest(context.Background(), set.Of(ids.EmptyNodeID), []byte{}, noOpCallback)
+	err = client.AppRequest(t.Context(), set.Of(ids.EmptyNodeID), []byte{}, noOpCallback)
 	require.ErrorIs(err, ErrRequestPending)
 }
 
@@ -501,29 +553,36 @@ func TestPeersSample(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
 
-			network, err := NewNetwork(logging.NoLog{}, &enginetest.SenderStub{}, prometheus.NewRegistry(), "")
+			peers := &Peers{}
+			network, err := NewNetwork(
+				logging.NoLog{},
+				&enginetest.SenderStub{},
+				prometheus.NewRegistry(),
+				"",
+				peers,
+			)
 			require.NoError(err)
 
 			for connected := range tt.connected {
-				require.NoError(network.Connected(context.Background(), connected, nil))
+				require.NoError(network.Connected(t.Context(), connected, nil))
 			}
 
 			for disconnected := range tt.disconnected {
-				require.NoError(network.Disconnected(context.Background(), disconnected))
+				require.NoError(network.Disconnected(t.Context(), disconnected))
 			}
 
 			sampleable := set.Set[ids.NodeID]{}
 			sampleable.Union(tt.connected)
 			sampleable.Difference(tt.disconnected)
 
-			sampled := network.Peers.Sample(tt.limit)
+			sampled := peers.Sample(tt.limit)
 			require.Len(sampled, min(tt.limit, len(sampleable)))
 			require.Subset(sampleable, sampled)
 		})
 	}
 }
 
-func TestAppRequestAnyNodeSelection(t *testing.T) {
+func TestAppRequestAnyWithPeerSampling(t *testing.T) {
 	tests := []struct {
 		name     string
 		peers    []ids.NodeID
@@ -551,85 +610,49 @@ func TestAppRequestAnyNodeSelection(t *testing.T) {
 				},
 			}
 
-			n, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+			peers := &Peers{}
+			n, err := NewNetwork(
+				logging.NoLog{},
+				sender,
+				prometheus.NewRegistry(),
+				"",
+				peers,
+			)
 			require.NoError(err)
 			for _, peer := range tt.peers {
-				require.NoError(n.Connected(context.Background(), peer, &version.Application{}))
+				require.NoError(n.Connected(t.Context(), peer, &version.Application{}))
 			}
 
-			client := n.NewClient(1)
+			client := n.NewClient(1, PeerSampler{Peers: peers})
 
-			err = client.AppRequestAny(context.Background(), []byte("foobar"), nil)
+			err = client.AppRequestAny(t.Context(), []byte("foobar"), nil)
 			require.ErrorIs(err, tt.expected)
 			require.Subset(tt.peers, sent.List())
 		})
 	}
 }
 
-func TestNodeSamplerClientOption(t *testing.T) {
+func TestAppRequestAnyWithValidatorSampling(t *testing.T) {
 	nodeID0 := ids.GenerateTestNodeID()
 	nodeID1 := ids.GenerateTestNodeID()
-	nodeID2 := ids.GenerateTestNodeID()
 
 	tests := []struct {
 		name        string
 		peers       []ids.NodeID
-		option      func(t *testing.T, n *Network) ClientOption
+		validators  []ids.NodeID
 		expected    []ids.NodeID
 		expectedErr error
 	}{
 		{
-			name:  "default",
-			peers: []ids.NodeID{nodeID0, nodeID1, nodeID2},
-			option: func(*testing.T, *Network) ClientOption {
-				return clientOptionFunc(func(*clientOptions) {})
-			},
-			expected: []ids.NodeID{nodeID0, nodeID1, nodeID2},
+			name:       "validator connected",
+			peers:      []ids.NodeID{nodeID0, nodeID1},
+			validators: []ids.NodeID{nodeID1},
+			expected:   []ids.NodeID{nodeID1},
 		},
 		{
-			name:  "validator connected",
-			peers: []ids.NodeID{nodeID0, nodeID1},
-			option: func(_ *testing.T, n *Network) ClientOption {
-				state := &validatorstest.State{
-					GetCurrentHeightF: func(context.Context) (uint64, error) {
-						return 0, nil
-					},
-					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-						return map[ids.NodeID]*validators.GetValidatorOutput{
-							nodeID1: {
-								NodeID: nodeID1,
-								Weight: 1,
-							},
-						}, nil
-					},
-				}
-
-				validators := NewValidators(n.Peers, n.log, ids.Empty, state, 0)
-				return WithValidatorSampling(validators)
-			},
-			expected: []ids.NodeID{nodeID1},
-		},
-		{
-			name:  "validator disconnected",
-			peers: []ids.NodeID{nodeID0},
-			option: func(_ *testing.T, n *Network) ClientOption {
-				state := &validatorstest.State{
-					GetCurrentHeightF: func(context.Context) (uint64, error) {
-						return 0, nil
-					},
-					GetValidatorSetF: func(context.Context, uint64, ids.ID) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
-						return map[ids.NodeID]*validators.GetValidatorOutput{
-							nodeID1: {
-								NodeID: nodeID1,
-								Weight: 1,
-							},
-						}, nil
-					},
-				}
-
-				validators := NewValidators(n.Peers, n.log, ids.Empty, state, 0)
-				return WithValidatorSampling(validators)
-			},
+			name:        "validator disconnected",
+			peers:       []ids.NodeID{nodeID0},
+			validators:  []ids.NodeID{nodeID1},
 			expectedErr: ErrNoPeers,
 		},
 	}
@@ -637,6 +660,29 @@ func TestNodeSamplerClientOption(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
+
+			validatorSet := make(map[ids.NodeID]*validators.GetValidatorOutput)
+			for _, nodeID := range tt.validators {
+				validatorSet[nodeID] = &validators.GetValidatorOutput{
+					NodeID: nodeID,
+					Weight: 1,
+				}
+			}
+
+			state := &validatorstest.State{
+				GetCurrentHeightF: func(context.Context) (uint64, error) {
+					return 0, nil
+				},
+				GetValidatorSetF: func(
+					context.Context,
+					uint64,
+					ids.ID,
+				) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+					return validatorSet, nil
+				},
+			}
+
+			validators := NewValidators(logging.NoLog{}, ids.Empty, state, 0)
 
 			done := make(chan struct{})
 			sender := &enginetest.Sender{
@@ -646,14 +692,20 @@ func TestNodeSamplerClientOption(t *testing.T) {
 					return nil
 				},
 			}
-			network, err := NewNetwork(logging.NoLog{}, sender, prometheus.NewRegistry(), "")
+			network, err := NewNetwork(
+				logging.NoLog{},
+				sender,
+				prometheus.NewRegistry(),
+				"",
+				validators,
+			)
 			require.NoError(err)
-			ctx := context.Background()
+			ctx := t.Context()
 			for _, peer := range tt.peers {
 				require.NoError(network.Connected(ctx, peer, nil))
 			}
 
-			client := network.NewClient(0, tt.option(t, network))
+			client := network.NewClient(0, validators)
 
 			if err = client.AppRequestAny(ctx, []byte("request"), nil); err != nil {
 				close(done)
@@ -669,8 +721,282 @@ func TestNodeSamplerClientOption(t *testing.T) {
 func TestMultipleClients(t *testing.T) {
 	require := require.New(t)
 
-	n, err := NewNetwork(logging.NoLog{}, &enginetest.Sender{}, prometheus.NewRegistry(), "")
+	n, err := NewNetwork(
+		logging.NoLog{},
+		&enginetest.Sender{},
+		prometheus.NewRegistry(),
+		"",
+	)
 	require.NoError(err)
-	_ = n.NewClient(0)
-	_ = n.NewClient(0)
+	_ = n.NewClient(0, PeerSampler{Peers: &Peers{}})
+	_ = n.NewClient(0, PeerSampler{Peers: &Peers{}})
+}
+
+func TestNetworkValidators_ConnectAndDisconnect(t *testing.T) {
+	tests := []struct {
+		name                     string
+		maxValidatorSetStaleness time.Duration
+		// These arrays must be of the same length
+		validators              [][]ids.NodeID
+		connectedPeers          [][]ids.NodeID
+		disconnectedPeers       [][]ids.NodeID
+		wantConnectedValidators [][]ids.NodeID
+	}{
+		{
+			name: "has validators and no peers",
+			validators: [][]ids.NodeID{
+				{{1}, {2}, {3}},
+			},
+			connectedPeers: [][]ids.NodeID{
+				{},
+			},
+			disconnectedPeers: [][]ids.NodeID{
+				{},
+			},
+			wantConnectedValidators: [][]ids.NodeID{
+				{},
+			},
+		},
+		{
+			name: "has no validators and peers",
+			validators: [][]ids.NodeID{
+				{},
+			},
+			connectedPeers: [][]ids.NodeID{
+				{{1}, {2}, {3}},
+			},
+			disconnectedPeers: [][]ids.NodeID{
+				{},
+			},
+			wantConnectedValidators: [][]ids.NodeID{
+				{},
+			},
+		},
+		{
+			name: "has connected validator",
+			validators: [][]ids.NodeID{
+				{{1}, {2}, {3}},
+			},
+			connectedPeers: [][]ids.NodeID{
+				{{1}},
+			},
+			disconnectedPeers: [][]ids.NodeID{
+				{},
+			},
+			wantConnectedValidators: [][]ids.NodeID{
+				{{1}},
+			},
+		},
+		{
+			name: "connected validator disconnects",
+			validators: [][]ids.NodeID{
+				{{1}, {2}, {3}},
+			},
+			connectedPeers: [][]ids.NodeID{
+				{{1}},
+			},
+			disconnectedPeers: [][]ids.NodeID{
+				{{1}},
+			},
+			wantConnectedValidators: [][]ids.NodeID{
+				{},
+			},
+		},
+		{
+			name: "one connected validator + one connected validator disconnects + one disconnected validator",
+			validators: [][]ids.NodeID{
+				{{1}, {2}, {3}},
+			},
+			connectedPeers: [][]ids.NodeID{
+				{{1}, {2}},
+			},
+			disconnectedPeers: [][]ids.NodeID{
+				{{2}},
+			},
+			wantConnectedValidators: [][]ids.NodeID{
+				{{1}},
+			},
+		},
+		{
+			name: "disconnected validator added",
+			validators: [][]ids.NodeID{
+				{{1}},
+				{{1}, {2}},
+			},
+			connectedPeers: [][]ids.NodeID{
+				{{1}},
+				{},
+			},
+			disconnectedPeers: [][]ids.NodeID{
+				{},
+				{},
+			},
+			wantConnectedValidators: [][]ids.NodeID{
+				{{1}},
+				{{1}},
+			},
+		},
+		{
+			name: "connected validator added",
+			validators: [][]ids.NodeID{
+				{{1}},
+				{{1}, {2}},
+			},
+			connectedPeers: [][]ids.NodeID{
+				{{1}, {2}},
+				{},
+			},
+			disconnectedPeers: [][]ids.NodeID{
+				{},
+				{},
+			},
+			wantConnectedValidators: [][]ids.NodeID{
+				{{1}},
+				{{1}, {2}},
+			},
+		},
+		{
+			name:                     "no refresh - connected validator not added",
+			maxValidatorSetStaleness: time.Hour,
+			validators: [][]ids.NodeID{
+				{{1}},
+				{{1}, {2}},
+			},
+			connectedPeers: [][]ids.NodeID{
+				{{1}},
+				{{2}},
+			},
+			disconnectedPeers: [][]ids.NodeID{
+				{},
+				{},
+			},
+			wantConnectedValidators: [][]ids.NodeID{
+				{{1}},
+				{{1}},
+			},
+		},
+		{
+			name:                     "no refresh - disconnected validator not removed",
+			maxValidatorSetStaleness: time.Hour,
+			validators: [][]ids.NodeID{
+				{{1}},
+				{{1}, {2}},
+			},
+			connectedPeers: [][]ids.NodeID{
+				{{1}, {2}},
+				{},
+			},
+			disconnectedPeers: [][]ids.NodeID{
+				{},
+				{{2}},
+			},
+			wantConnectedValidators: [][]ids.NodeID{
+				{{1}},
+				{{1}},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			if s := set.Of(
+				len(tt.validators),
+				len(tt.connectedPeers),
+				len(tt.disconnectedPeers),
+				len(tt.wantConnectedValidators),
+			); s.Len() != 1 {
+				require.Fail("tests vectors must be of same length")
+			}
+
+			validatorState := &validatorstest.State{}
+			validatorSet := NewValidators(
+				logging.NoLog{},
+				ids.GenerateTestID(),
+				validatorState,
+				tt.maxValidatorSetStaleness,
+			)
+
+			n, err := NewNetwork(
+				logging.NoLog{},
+				&enginetest.Sender{},
+				prometheus.NewRegistry(),
+				"",
+				validatorSet,
+			)
+			require.NoError(err)
+
+			for i, nodeIDs := range tt.validators {
+				validatorState.GetCurrentHeightF = func(_ context.Context) (
+					uint64,
+					error,
+				) {
+					return uint64(i), nil
+				}
+
+				validatorState.GetValidatorSetF = func(
+					context.Context,
+					uint64,
+					ids.ID,
+				) (map[ids.NodeID]*validators.GetValidatorOutput, error) {
+					result := make(map[ids.NodeID]*validators.GetValidatorOutput)
+
+					for _, nodeID := range nodeIDs {
+						result[nodeID] = &validators.GetValidatorOutput{
+							NodeID: nodeID,
+						}
+					}
+
+					return result, nil
+				}
+
+				for _, nodeID := range tt.connectedPeers[i] {
+					require.NoError(n.Connected(t.Context(), nodeID, nil))
+				}
+
+				for _, nodeID := range tt.disconnectedPeers[i] {
+					require.NoError(n.Disconnected(t.Context(), nodeID))
+				}
+
+				require.Equal(
+					len(tt.wantConnectedValidators[i]),
+					validatorSet.Len(t.Context()),
+				)
+
+				for _, nodeID := range tt.wantConnectedValidators[i] {
+					require.True(validatorSet.Has(t.Context(), nodeID))
+				}
+
+				wantDisconnectedValidators := set.Of(nodeIDs...)
+				wantDisconnectedValidators.Difference(set.Of(tt.wantConnectedValidators[i]...))
+
+				for nodeID := range wantDisconnectedValidators {
+					require.False(validatorSet.Has(t.Context(), nodeID))
+				}
+
+				require.Equal(
+					len(tt.wantConnectedValidators[i]),
+					validatorSet.Len(t.Context()),
+				)
+			}
+		})
+	}
+}
+
+func TestPeers_Has(t *testing.T) {
+	require := require.New(t)
+
+	peers := &Peers{}
+	network, err := NewNetwork(
+		logging.NoLog{},
+		&enginetest.Sender{},
+		prometheus.NewRegistry(),
+		"",
+		peers,
+	)
+	require.NoError(err)
+	require.NoError(network.Connected(t.Context(), ids.EmptyNodeID, nil))
+
+	require.True(peers.Has(ids.EmptyNodeID))
 }

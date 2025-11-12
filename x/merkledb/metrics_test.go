@@ -4,7 +4,6 @@
 package merkledb
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -20,7 +19,7 @@ func Test_Metrics_Basic_Usage(t *testing.T) {
 	config.Reg = nil
 
 	db, err := newDB(
-		context.Background(),
+		t.Context(),
 		memdb.New(),
 		config,
 	)
@@ -52,7 +51,7 @@ func Test_Metrics_Basic_Usage(t *testing.T) {
 
 func Test_Metrics_Initialize(t *testing.T) {
 	db, err := New(
-		context.Background(),
+		t.Context(),
 		memdb.New(),
 		NewConfig(),
 	)

@@ -74,7 +74,7 @@ func TestConfigUnmarshal(t *testing.T) {
 				PullGossipPollSize:                          11,
 				PullGossipFrequency:                         12,
 				PullGossipThrottlingPeriod:                  13,
-				PullGossipThrottlingLimit:                   14,
+				PullGossipRequestsPerValidator:              14,
 				ExpectedBloomFilterElements:                 15,
 				ExpectedBloomFilterFalsePositiveProbability: 16,
 				MaxBloomFilterFalsePositiveProbability:      17,
@@ -93,6 +93,7 @@ func TestConfigUnmarshal(t *testing.T) {
 			L1SubnetIDNodeIDCacheSize:     13,
 			ChecksumsEnabled:              true,
 			MempoolPruneFrequency:         time.Minute,
+			MempoolGasCapacity:            14,
 		}
 		verifyInitializedStruct(t, *expected)
 		verifyInitializedStruct(t, expected.Network)

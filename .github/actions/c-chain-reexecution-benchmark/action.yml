@@ -2,24 +2,42 @@ name: 'C-Chain Re-Execution Benchmark'
 description: 'Run C-Chain re-execution benchmark'
 
 inputs:
+  runner_name:
+    description: 'The name of the runner to use and include in the Golang Benchmark name.'
+    required: true
+  config:
+    description: 'The config to pass to the VM for the benchmark. See BenchmarkReexecuteRange for details.'
+    default: ''
   start-block:
     description: 'The start block for the benchmark.'
     default: '101'
   end-block:
     description: 'The end block for the benchmark.'
     default: '250000'
-  source-block-dir:
+  block-dir-src:
     description: 'The source block directory. Supports S3 directory/zip and local directories.'
-    default: 's3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb.zip'
-  current-state-dir:
+    default: 's3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**'
+  current-state-dir-src:
     description: 'The current state directory. Supports S3 directory/zip and local directories.'
-    default: 's3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100.zip'
+    default: 's3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**'
   aws-role:
     description: 'AWS role to assume for S3 access.'
     required: true
   aws-region:
     description: 'AWS region to use for S3 access.'
     required: true
+  aws-role-duration-seconds:
+    description: 'The duration of the AWS role to assume for S3 access.'
+    required: true
+    default: '43200' # 12 hours
+  prometheus-url:
+    description: 'The URL of the prometheus instance.'
+    required: true
+    default: ''
+  prometheus-push-url:
+    description: 'The push URL of the prometheus instance.'
+    required: true
+    default: ''
   prometheus-username:
     description: 'The username for the Prometheus instance.'
     required: true
@@ -28,10 +46,6 @@ inputs:
     description: 'The password for the Prometheus instance.'
     required: true
     default: ''
-  external-data-json-cache-key:
-    description: 'Cache key for the external data JSON file provided for comparison to GitHub Action Benchmark.'
-    required: true
-    default: 'c-chain-reexecution-benchmark-data.json'
   workspace:
     description: 'Working directory to use for the benchmark.'
     required: true
@@ -43,60 +57,63 @@ inputs:
     description: 'Whether to push the benchmark result to GitHub.'
     required: true
     default: false
+  push-post-state:
+    description: 'S3 destination to copy the current-state directory after completing re-execution. If empty, this will be skipped.'
+    default: ''
 
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/setup-go-for-project
     - name: Set task env
       shell: bash
       run: |
         {
           echo "EXECUTION_DATA_DIR=${{ inputs.workspace }}/reexecution-data"
-          echo "BENCHMARK_OUTPUT_FILE=${{ inputs.workspace }}/reexecute-cchain-range-benchmark-res.txt"
+          echo "BENCHMARK_OUTPUT_FILE=output.txt"
           echo "START_BLOCK=${{ inputs.start-block }}"
           echo "END_BLOCK=${{ inputs.end-block }}"
-          echo "SOURCE_BLOCK_DIR=${{ inputs.source-block-dir }}"
-          echo "CURRENT_STATE_DIR=${{ inputs.current-state-dir }}"
+          echo "BLOCK_DIR_SRC=${{ inputs.block-dir-src }}"
+          echo "CURRENT_STATE_DIR_SRC=${{ inputs.current-state-dir-src }}"
         } >> $GITHUB_ENV
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: ${{ inputs.aws-role }}
         aws-region: ${{ inputs.aws-region }}
+        role-duration-seconds: ${{ inputs.aws-role-duration-seconds }}
     - name: Run C-Chain Re-Execution
       uses: ./.github/actions/run-monitored-tmpnet-cmd
       with:
-        run: ./scripts/run_task.sh reexecute-cchain-range-with-copied-data
+        run: |
+          ./scripts/run_task.sh reexecute-cchain-range-with-copied-data \
+            CONFIG=${{ inputs.config }} \
+            EXECUTION_DATA_DIR=${{ env.EXECUTION_DATA_DIR }} \
+            BLOCK_DIR_SRC=${{ env.BLOCK_DIR_SRC }} \
+            CURRENT_STATE_DIR_SRC=${{ env.CURRENT_STATE_DIR_SRC }} \
+            START_BLOCK=${{ env.START_BLOCK }} \
+            END_BLOCK=${{ env.END_BLOCK }} \
+            LABELS=${{ env.LABELS }} \
+            BENCHMARK_OUTPUT_FILE=${{ env.BENCHMARK_OUTPUT_FILE }} \
+            RUNNER_NAME=${{ inputs.runner_name }} \
+            METRICS_SERVER_ENABLED=true \
+            METRICS_COLLECTOR_ENABLED=true
+        prometheus_url: ${{ inputs.prometheus-url }}
         prometheus_push_url: ${{ inputs.prometheus-push-url }}
         prometheus_username: ${{ inputs.prometheus-username }}
         prometheus_password: ${{ inputs.prometheus-password }}
         grafana_dashboard_id: 'Gl1I20mnk/c-chain'
         runtime: "" # Set runtime input to empty string to disable log collection
 
-    - name: Download Previous Benchmark Result
-      uses: actions/cache@v4
-      with:
-        path: ./cache
-        key: ${{ inputs.external-data-json-cache-key }}
-
-    - name: Compare Benchmark Result
+    - name: Compare Benchmark Results
       uses: benchmark-action/github-action-benchmark@v1
       with:
         tool: 'go'
         output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
-        external-data-json-path: ./cache/${{ inputs.external-data-json-cache-key }}
-        fail-on-alert: true
-        github-token: ${{ inputs.github-token }}
         summary-always: true
-        comment-on-alert: true
-        auto-push: false
-
-    - name: Push Benchmark Result
-      if: ${{ inputs.push-github-action-benchmark }}
-      uses: benchmark-action/github-action-benchmark@v1
-      with:
-        tool: 'go'
-        output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
         github-token: ${{ inputs.github-token }}
         auto-push: ${{ inputs.push-github-action-benchmark }}
+
+    - name: Push Post-State to S3 (if not exists)
+      if: ${{ inputs.push-post-state != '' }}
+      shell: nix develop --command bash -x {0}
+      run: ./scripts/run_task.sh export-dir-to-s3 SRC=${{ env.EXECUTION_DATA_DIR }}/current-state/ DST=${{ inputs.push-post-state }}

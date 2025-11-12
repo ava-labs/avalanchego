@@ -3,7 +3,7 @@
 
 package simplex
 
-//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+//go:generate go tool canoto $GOFILE
 
 import (
 	"context"
@@ -39,6 +39,20 @@ type Block struct {
 	vmBlock snowman.Block
 
 	blockTracker *blockTracker
+}
+
+func newBlock(metadata simplex.ProtocolMetadata, vmBlock snowman.Block, blockTracker *blockTracker) (*Block, error) {
+	block := &Block{
+		metadata:     metadata,
+		vmBlock:      vmBlock,
+		blockTracker: blockTracker,
+	}
+	bytes, err := block.Bytes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize block: %w", err)
+	}
+	block.digest = computeDigest(bytes)
+	return block, nil
 }
 
 // CanotoSimplexBlock is the Canoto representation of a block
@@ -105,7 +119,8 @@ func computeDigest(bytes []byte) simplex.Digest {
 }
 
 type blockDeserializer struct {
-	parser block.Parser
+	parser       block.Parser
+	blockTracker *blockTracker
 }
 
 func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) (simplex.Block, error) {
@@ -125,11 +140,7 @@ func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) 
 		return nil, err
 	}
 
-	return &Block{
-		metadata: *md,
-		vmBlock:  vmblock,
-		digest:   computeDigest(bytes),
-	}, nil
+	return newBlock(*md, vmblock, d.blockTracker)
 }
 
 // blockTracker is used to ensure that blocks are properly rejected, if competing blocks are accepted.

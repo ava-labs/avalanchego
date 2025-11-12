@@ -79,7 +79,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 				"",
 				prometheus.NewRegistry(),
 				nil,
-				version.CurrentApp,
+				version.Current,
 			)
 			require.NoError(err)
 
@@ -115,14 +115,14 @@ func TestHealthCheckSubnet(t *testing.T) {
 			}
 
 			handlerIntf.SetEngineManager(&EngineManager{
-				Snowman: &Engine{
+				Chain: &Engine{
 					Bootstrapper: bootstrapper,
 					Consensus:    engine,
 				},
 			})
 
 			ctx.State.Set(snow.EngineState{
-				Type:  p2ppb.EngineType_ENGINE_TYPE_SNOWMAN,
+				Type:  p2ppb.EngineType_ENGINE_TYPE_CHAIN,
 				State: snow.NormalOp, // assumed bootstrap is done
 			})
 
@@ -130,7 +130,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 				return nil
 			}
 
-			handlerIntf.Start(context.Background(), false)
+			handlerIntf.Start(t.Context(), false)
 
 			testVdrCount := 4
 			vdrIDs := set.NewSet[ids.NodeID](testVdrCount)
@@ -142,9 +142,9 @@ func TestHealthCheckSubnet(t *testing.T) {
 			}
 			vdrIDsList := vdrIDs.List()
 			for index, nodeID := range vdrIDsList {
-				require.NoError(peerTracker.Connected(context.Background(), nodeID, nil))
+				require.NoError(peerTracker.Connected(t.Context(), nodeID, nil))
 
-				details, err := handlerIntf.HealthCheck(context.Background())
+				details, err := handlerIntf.HealthCheck(t.Context())
 				expectedPercentConnected := float64(index+1) / float64(testVdrCount)
 				conf := sb.Config()
 				minPercentConnected := conf.ConsensusParameters.MinPercentConnectedHealthy()
