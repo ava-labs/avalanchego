@@ -38,7 +38,7 @@ var (
 func main() {
 	ctx := context.Background()
 	const (
-		chainUUID = "2Cex182D5NukWTzzHzMX8mqmZWtUMfcrRPEKUXn5YUHcoSWUaj"
+		chainUUID = "C"
 		uri       = primary.LocalAPIURI + "/ext/bc/" + chainUUID + "/sae/http"
 	)
 	c, err := ethclient.DialContext(ctx, uri)
@@ -61,13 +61,11 @@ func main() {
 	}
 
 	for {
-		tx := types.NewTx(&types.DynamicFeeTx{
-			ChainID:   chainID,
-			Nonce:     nonce,
-			GasTipCap: gasTipCap,
-			GasFeeCap: gasFeeCap,
-			Gas:       1_000_000, // params.TxGas,
-			To:        &eoa,
+		tx := types.NewTx(&types.LegacyTx{
+			Nonce:    nonce,
+			GasPrice: gasFeeCap,
+			Gas:      1_000_000, // params.TxGas,
+			To:       &eoa,
 		})
 
 		tx, err = types.SignTx(tx, signer, ecdsaKey)

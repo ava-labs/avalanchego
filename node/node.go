@@ -86,7 +86,7 @@ import (
 	databasefactory "github.com/ava-labs/avalanchego/database/factory"
 	avmconfig "github.com/ava-labs/avalanchego/vms/avm/config"
 	platformconfig "github.com/ava-labs/avalanchego/vms/platformvm/config"
-	coreth "github.com/ava-labs/coreth/plugin/factory"
+	coreth "github.com/ava-labs/coreth/sae/factory"
 )
 
 const (
