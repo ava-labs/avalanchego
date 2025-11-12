@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/proto/pb/sdk"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
@@ -111,7 +110,7 @@ func TestAddAndGetUnknownMessage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Try to verify an unknown message - should fail with parse error
-	appErr := verifier.Verify(t.Context(), unknownMessage, nil)
+	appErr := verifier.Verify(t.Context(), unknownMessage)
 	require.ErrorIs(t, appErr, &common.AppError{Code: ParseErrCode})
 }
 
@@ -137,7 +136,7 @@ func TestGetBlockSignature(t *testing.T) {
 	require.NoError(err)
 
 	// Verify the block message
-	appErr := verifier.Verify(t.Context(), unsignedMessage, nil)
+	appErr := verifier.Verify(t.Context(), unsignedMessage)
 	require.Nil(appErr)
 
 	// Then sign it
@@ -150,7 +149,7 @@ func TestGetBlockSignature(t *testing.T) {
 	require.NoError(err)
 	unknownUnsignedMessage, err := warp.NewUnsignedMessage(networkID, sourceChainID, unknownBlockHashPayload.Bytes())
 	require.NoError(err)
-	unknownAppErr := verifier.Verify(t.Context(), unknownUnsignedMessage, nil)
+	unknownAppErr := verifier.Verify(t.Context(), unknownUnsignedMessage)
 	require.ErrorIs(unknownAppErr, &common.AppError{Code: VerifyErrCode})
 }
 
@@ -168,7 +167,7 @@ func TestVerifierKnownMessage(t *testing.T) {
 	require.NoError(t, messageDB.Add(testUnsignedMessage))
 
 	// Known messages in the DB should pass verification
-	appErr := verifier.Verify(t.Context(), testUnsignedMessage, nil)
+	appErr := verifier.Verify(t.Context(), testUnsignedMessage)
 	require.Nil(t, appErr)
 
 	// And can be signed
@@ -239,7 +238,7 @@ func TestKnownMessageSignature(t *testing.T) {
 				}
 				db := NewDB(database)
 				v := NewVerifier(db, emptyBlockStore, nil)
-				handler := acp118.NewCachedHandler(sigCache, v, snowCtx.WarpSigner)
+				handler := NewHandler(sigCache, v, snowCtx.WarpSigner)
 
 				requestBytes, expectedResponse := test.setup(db)
 				protoMsg := &sdk.SignatureRequest{Message: requestBytes}
@@ -342,7 +341,7 @@ func TestBlockSignatures(t *testing.T) {
 				}
 				db := NewDB(database)
 				v := NewVerifier(db, blockStore, nil)
-				handler := acp118.NewCachedHandler(sigCache, v, snowCtx.WarpSigner)
+				handler := NewHandler(sigCache, v, snowCtx.WarpSigner)
 
 				requestBytes, expectedResponse := test.setup()
 				protoMsg := &sdk.SignatureRequest{Message: requestBytes}
@@ -434,7 +433,7 @@ func TestUptimeSignatures(t *testing.T) {
 
 		db := NewDB(database)
 		verifier := NewVerifier(db, emptyBlockStore, uptimeTracker)
-		handler := acp118.NewCachedHandler(sigCache, verifier, snowCtx.WarpSigner)
+		handler := NewHandler(sigCache, verifier, snowCtx.WarpSigner)
 
 		// sourceAddress nonZero
 		protoBytes, _ := getUptimeMessageBytes([]byte{1, 2, 3}, ids.GenerateTestID())

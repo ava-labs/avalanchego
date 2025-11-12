@@ -9,6 +9,7 @@ import (
 
 	"github.com/ava-labs/libevm/metrics"
 
+	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
@@ -24,7 +25,7 @@ const (
 	VerifyErrCode
 )
 
-var _ acp118.Verifier = (*Verifier)(nil)
+var _ acp118.Verifier = (*acp118Adapter)(nil)
 
 // BlockStore provides access to accepted blocks.
 type BlockStore interface {
@@ -102,8 +103,8 @@ func NewVerifier(
 	}
 }
 
-// Verify implements acp118.Verifier and validates whether a warp message should be signed.
-func (v *Verifier) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMessage, _ []byte) *common.AppError {
+// Verify validates whether a warp message should be signed.
+func (v *Verifier) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMessage) *common.AppError {
 	messageID := unsignedMessage.ID()
 	// Known on-chain messages should be signed
 	if _, err := v.db.Get(messageID); err == nil {
@@ -199,4 +200,31 @@ func (v *Verifier) verifyUptimeMessage(uptimeMsg *message.ValidatorUptime) *comm
 	}
 
 	return nil
+}
+
+// acp118Adapter adapts the EVM warp Verifier to the acp118.Verifier interface.
+// This adapter ignores the justification parameter since the EVM verifier doesn't use it.
+type acp118Adapter struct {
+	verifier *Verifier
+}
+
+// Verify implements acp118.Verifier by delegating to the wrapped Verifier.
+// The justification parameter is ignored as it's not used by the EVM warp verifier.
+func (a *acp118Adapter) Verify(ctx context.Context, message *warp.UnsignedMessage, _ []byte) *common.AppError {
+	return a.verifier.Verify(ctx, message)
+}
+
+// NewHandler creates a new acp118.Handler for signing warp messages.
+// This is a convenience function that wraps the verifier in an acp118Adapter
+// and creates a cached handler.
+func NewHandler(
+	signatureCache cache.Cacher[ids.ID, []byte],
+	verifier *Verifier,
+	signer warp.Signer,
+) *acp118.Handler {
+	return acp118.NewCachedHandler(
+		signatureCache,
+		&acp118Adapter{verifier: verifier},
+		signer,
+	)
 }

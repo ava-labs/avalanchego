@@ -220,7 +220,7 @@ func (a *API) signMessage(ctx context.Context, unsignedMessage *warp.UnsignedMes
 		return sig, nil
 	}
 
-	if err := a.verifier.Verify(ctx, unsignedMessage, nil); err != nil {
+	if err := a.verifier.Verify(ctx, unsignedMessage); err != nil {
 		return nil, fmt.Errorf("failed to verify message %s: %w", msgID, err)
 	}
 
