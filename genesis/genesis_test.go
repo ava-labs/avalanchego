@@ -330,8 +330,6 @@ func TestGenesisFromFlag(t *testing.T) {
 				case constants.LocalID:
 					genBytes, err = json.Marshal(&LocalConfig)
 					require.NoError(err)
-				default:
-					genBytes = make([]byte, 0)
 				}
 			} else {
 				genBytes = test.customConfig

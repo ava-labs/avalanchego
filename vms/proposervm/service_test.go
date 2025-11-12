@@ -4,7 +4,6 @@
 package proposervm
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -26,11 +25,11 @@ func TestConnectRPCService_GetProposedHeight(t *testing.T) {
 	const pChainHeight = 123
 	_, _, vm, _ := initTestProposerVM(t, upgradetest.Latest, pChainHeight)
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	// Test through the exported NewHTTPHandler API
-	handler, err := vm.NewHTTPHandler(context.Background())
+	handler, err := vm.NewHTTPHandler(t.Context())
 	require.NoError(err)
 	require.NotNil(handler)
 
@@ -49,7 +48,7 @@ func TestConnectRPCService_GetProposedHeight(t *testing.T) {
 
 	// Test the GetProposedHeight endpoint
 	req := connect.NewRequest(&proposervm.GetProposedHeightRequest{})
-	resp, err := client.GetProposedHeight(context.Background(), req)
+	resp, err := client.GetProposedHeight(t.Context(), req)
 	require.NoError(err)
 	require.NotNil(resp)
 	require.NotNil(resp.Msg)
@@ -64,7 +63,7 @@ func TestJSONRPCService_GetProposedHeight(t *testing.T) {
 	const pChainHeight = 123
 	_, _, vm, _ := initTestProposerVM(t, upgradetest.Latest, pChainHeight)
 	defer func() {
-		require.NoError(vm.Shutdown(context.Background()))
+		require.NoError(vm.Shutdown(t.Context()))
 	}()
 
 	s := &jsonrpcService{vm: vm}
