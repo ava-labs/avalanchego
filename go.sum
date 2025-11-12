@@ -15,8 +15,8 @@ github.com/Joker/hpp v1.0.0/go.mod h1:8x5n+M1Hp5hC0g8okX3sR3vFQwynaX/UgSOM9MeBKz
 github.com/Microsoft/go-winio v0.6.1 h1:9/kr64B9VUZrLm5YYwbGtUJnMgqWVOdUAXu6Migciow=
 github.com/Microsoft/go-winio v0.6.1/go.mod h1:LRdKpFKfdobln8UmuiYcKPot9D2v6svN5+sAH+4kjUM=
 github.com/Shopify/goreferrer v0.0.0-20181106222321-ec9c9a553398/go.mod h1:a1uqRtAwp2Xwc6WNPJEufxJ7fx3npB4UV/JOLmbu5I0=
-github.com/StephenButtolph/canoto v0.17.2 h1:kRLJwtYk0bzdGEeEvwHaVmmDm0HFHxrS0VlVN5Hyo7U=
-github.com/StephenButtolph/canoto v0.17.2/go.mod h1:IcnAHC6nJUfQFVR9y60ko2ecUqqHHSB6UwI9NnBFZnE=
+github.com/StephenButtolph/canoto v0.17.3 h1:lvsnYD4b96vD1knnmp1xCmZqfYpY/jSeRozGdOfdvGI=
+github.com/StephenButtolph/canoto v0.17.3/go.mod h1:IcnAHC6nJUfQFVR9y60ko2ecUqqHHSB6UwI9NnBFZnE=
 github.com/VictoriaMetrics/fastcache v1.12.1 h1:i0mICQuojGDL3KblA7wUNlY5lOK6a4bwt3uRKnkZU40=
 github.com/VictoriaMetrics/fastcache v1.12.1/go.mod h1:tX04vaqcNoQeGLD+ra5pU5sWkuxnzWhEzLwhP9w653o=
 github.com/aead/siphash v1.0.1/go.mod h1:Nywa3cDsYNNK3gaciGTWPwHt0wlpNV15vwmswBAUSII=
@@ -28,8 +28,8 @@ github.com/antithesishq/antithesis-sdk-go v0.3.8/go.mod h1:IUpT2DPAKh6i/YhSbt6Gl
 github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6/go.mod h1:grANhF5doyWs3UAsr3K4I6qtAmlQcZDesFNEHPZAzj8=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5 h1:0CwZNZbxp69SHPdPJAN/hZIm0C4OItdklCFmMRWYpio=
 github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5/go.mod h1:wHh0iHkYZB8zMSxRWpUBQtwG5a7fFgvEO+odwuTv2gs=
-github.com/ava-labs/avalanchego v1.14.1-db-metrics-fix h1:urul9QaWdulG5w4jl0xujnbzz+kOy2ZPMcaiTuPOP+c=
-github.com/ava-labs/avalanchego v1.14.1-db-metrics-fix/go.mod h1:7sYTcQknONY5x5qzS+GrN+UtyB8kX7Q5ClHhGj1DgXg=
+github.com/ava-labs/avalanchego v1.14.1-0.20251111165133-29b4e6bc541b h1:0bvt1wODWB3huJi564M1xlsBUj3llKZxumIjp0yKt/c=
+github.com/ava-labs/avalanchego v1.14.1-0.20251111165133-29b4e6bc541b/go.mod h1:Q5f/x4BxM8r4vQE/aZPkQyT8l/HS12/oNrfxjRd8uZU=
 github.com/ava-labs/coreth v0.16.0-rc.0 h1:nPvkDbxaH8N9f/wQe7B+IGMhPISMuW5CU0cDYuU8iCw=
 github.com/ava-labs/coreth v0.16.0-rc.0/go.mod h1:uGr1C7BP0+dWhvsIouhuH0yCyI8YDgS6sfEFIExs0iI=
 github.com/ava-labs/firewood-go-ethhash/ffi v0.0.13 h1:obPwnVCkF5+B2f8WbTepHj0ZgiW21vKUgFCtATuAYNY=

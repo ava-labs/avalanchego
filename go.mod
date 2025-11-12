@@ -5,7 +5,7 @@ go 1.24.9
 require (
 	github.com/VictoriaMetrics/fastcache v1.12.1
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/avalanchego v1.14.1-db-metrics-fix
+	github.com/ava-labs/avalanchego v1.14.1-0.20251111165133-29b4e6bc541b
 	github.com/ava-labs/firewood-go-ethhash/ffi v0.0.13
 	github.com/ava-labs/libevm v1.13.15-0.20251016142715-1bccf4f2ddb2
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -47,7 +47,7 @@ require (
 	connectrpc.com/grpcreflect v1.3.0 // indirect
 	github.com/DataDog/zstd v1.5.2 // indirect
 	github.com/Microsoft/go-winio v0.6.1 // indirect
-	github.com/StephenButtolph/canoto v0.17.2 // indirect
+	github.com/StephenButtolph/canoto v0.17.3 // indirect
 	github.com/ava-labs/coreth v0.16.0-rc.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
