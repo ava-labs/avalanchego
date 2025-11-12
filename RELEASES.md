@@ -2,6 +2,10 @@
 
 ## Pending Release
 
+- Removes `avax.version` API
+
+## [v0.16.0](https://github.com/ava-labs/coreth/releases/tag/v0.16.0)
+
 - Removed deprecated flags `coreth-admin-api-enabled`, `coreth-admin-api-dir`, `tx-regossip-frequency`, `tx-lookup-limit`. Use `admin-api-enabled`, `admin-api-dir`, `regossip-frequency`, `transaction-history` instead.
 - Enabled RPC batch limits by default, and configurable with `batch-request-limit` and `batch-max-response-size`.
 - ACP-226 (Granite):

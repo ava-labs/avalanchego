@@ -443,26 +443,3 @@ curl -X POST --data '{
     }]
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/avax
 ```
-
-#### `avax.version`
-
-Returns the version of the VM.
-
-**Signature:**
-
-```sh
-avax.version() -> {
-    version: string
-}
-```
-
-**Example Call:**
-
-```sh
-curl -X POST --data '{
-    "jsonrpc":"2.0",
-    "id"     :1,
-    "method" :"avax.version",
-    "params" :[]
-}' -H 'content-type:application/json;' 127.0.0.1:9650/ext/bc/C/avax
-```
