@@ -6,6 +6,7 @@ package warp
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/cache"
 	"github.com/ava-labs/avalanchego/cache/lru"
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
@@ -27,7 +29,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/evm/metrics/metricstest"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
-	"github.com/ava-labs/avalanchego/vms/evm/warp/warptest"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
@@ -39,6 +40,11 @@ var (
 	testSourceAddress          = utils.RandomBytes(20)
 	testPayload                = []byte("test")
 	testUnsignedMessage *warp.UnsignedMessage
+
+	// emptyBlockStore returns an error if a block is requested
+	emptyBlockStore BlockStore = testBlockStore(func(_ context.Context, _ ids.ID) error {
+		return database.ErrNotFound
+	})
 )
 
 func init() {
@@ -50,6 +56,25 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+}
+
+// testBlockStore implements BlockStore for testing
+type testBlockStore func(ctx context.Context, blockID ids.ID) error
+
+func (t testBlockStore) GetBlock(ctx context.Context, blockID ids.ID) error {
+	return t(ctx, blockID)
+}
+
+// makeBlockStore returns a new BlockStore that returns the provided blocks.
+// If a block is requested that isn't part of the provided blocks, an error is
+// returned.
+func makeBlockStore(blkIDs ...ids.ID) BlockStore {
+	return testBlockStore(func(_ context.Context, blkID ids.ID) error {
+		if !slices.Contains(blkIDs, blkID) {
+			return database.ErrNotFound
+		}
+		return nil
+	})
 }
 
 func TestAddAndGetValidMessage(t *testing.T) {
@@ -89,7 +114,7 @@ func TestGetBlockSignature(t *testing.T) {
 	require := require.New(t)
 
 	blkID := ids.GenerateTestID()
-	blockStore := warptest.MakeBlockStore(blkID)
+	blockStore := makeBlockStore(blkID)
 	db := memdb.New()
 
 	sk, err := localsigner.New()
@@ -210,7 +235,7 @@ func TestKnownMessageSignature(t *testing.T) {
 					sigCache = &cache.Empty[ids.ID, []byte]{}
 				}
 				db := NewDB(database)
-				v := NewVerifier(db, warptest.EmptyBlockStore, nil)
+				v := NewVerifier(db, emptyBlockStore, nil)
 				handler := acp118.NewCachedHandler(sigCache, v, snowCtx.WarpSigner)
 
 				requestBytes, expectedResponse := test.setup(db)
@@ -249,7 +274,7 @@ func TestBlockSignatures(t *testing.T) {
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
 
 	knownBlkID := ids.GenerateTestID()
-	blockStore := warptest.MakeBlockStore(knownBlkID)
+	blockStore := makeBlockStore(knownBlkID)
 
 	toMessageBytes := func(id ids.ID) []byte {
 		idPayload, err := payload.NewHash(id)
@@ -408,7 +433,7 @@ func TestUptimeSignatures(t *testing.T) {
 		require.NoError(t, uptimeTracker.Sync(t.Context()))
 
 		db := NewDB(database)
-		verifier := NewVerifier(db, warptest.EmptyBlockStore, uptimeTracker)
+		verifier := NewVerifier(db, emptyBlockStore, uptimeTracker)
 		handler := acp118.NewCachedHandler(sigCache, verifier, snowCtx.WarpSigner)
 
 		// sourceAddress nonZero

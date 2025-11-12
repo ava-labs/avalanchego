@@ -5,16 +5,13 @@ package warp
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
-	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/metrics"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
-	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -27,16 +24,11 @@ const (
 	VerifyErrCode
 )
 
-var (
-	_ acp118.Verifier = (*Verifier)(nil)
-
-	ErrValidateBlock     = errors.New("failed to validate block message")
-	ErrVerifyWarpMessage = errors.New("failed to verify warp message")
-)
+var _ acp118.Verifier = (*Verifier)(nil)
 
 // BlockStore provides access to accepted blocks.
 type BlockStore interface {
-	GetBlock(ctx context.Context, blockID ids.ID) (snowman.Block, error)
+	GetBlock(ctx context.Context, blockID ids.ID) error
 }
 
 // DB stores and retrieves warp messages from the underlying database.
@@ -54,7 +46,6 @@ func NewDB(db database.Database) *DB {
 // Add stores a warp message in the database and cache.
 func (d *DB) Add(unsignedMsg *warp.UnsignedMessage) error {
 	msgID := unsignedMsg.ID()
-	log.Debug("Adding warp message to backend", "messageID", msgID)
 
 	// In the case when a node restarts, and possibly changes its bls key, the cache gets emptied but the database does not.
 	// So to avoid having incorrect signatures saved in the database after a bls key change, we save the full message in the database.
@@ -173,8 +164,7 @@ func (v *Verifier) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMes
 // of an accepted block indicating it should be signed by the VM.
 func (v *Verifier) verifyBlockMessage(ctx context.Context, blockHashPayload *payload.Hash) *common.AppError {
 	blockID := blockHashPayload.Hash
-	_, err := v.blockClient.GetBlock(ctx, blockID)
-	if err != nil {
+	if err := v.blockClient.GetBlock(ctx, blockID); err != nil {
 		v.blockValidationFail.Inc(1)
 		return &common.AppError{
 			Code:    VerifyErrCode,
@@ -205,18 +195,18 @@ func (v *Verifier) verifyOffchainAddressedCall(addressedCall *payload.AddressedC
 		}
 	}
 
-	switch p := parsed.(type) {
-	case *message.ValidatorUptime:
-		if err := v.verifyUptimeMessage(p); err != nil {
-			v.uptimeValidationFail.Inc(1)
-			return err
-		}
-	default:
+	uptimeMsg, ok := parsed.(*message.ValidatorUptime)
+	if !ok {
 		v.messageParseFail.Inc(1)
 		return &common.AppError{
 			Code:    ParseErrCode,
-			Message: fmt.Sprintf("unknown message type: %T", p),
+			Message: fmt.Sprintf("unknown message type: %T", parsed),
 		}
+	}
+
+	if err := v.verifyUptimeMessage(uptimeMsg); err != nil {
+		v.uptimeValidationFail.Inc(1)
+		return err
 	}
 
 	return nil
