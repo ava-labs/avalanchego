@@ -5,7 +5,6 @@ use crate::manager::RevisionManagerError;
 use crate::merkle::parallel::CreateProposalError;
 use crate::merkle::{Key, Value};
 use crate::proof::{Proof, ProofError, ProofNode};
-use crate::root_store::RootStoreError;
 use firewood_storage::{FileIoError, TrieHash};
 use std::fmt::Debug;
 use std::num::NonZeroUsize;
@@ -133,7 +132,7 @@ pub enum Error {
 
     #[error("RootStore error: {0}")]
     /// A `RootStore` error occurred
-    RootStoreError(#[from] RootStoreError),
+    RootStoreError(#[source] Box<dyn std::error::Error + Send + Sync>),
 
     /// Cannot commit a committed proposal
     #[error("Cannot commit a committed proposal")]

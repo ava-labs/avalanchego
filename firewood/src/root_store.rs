@@ -10,20 +10,6 @@ use std::{
 
 use firewood_storage::{LinearAddress, TrieHash};
 
-#[derive(Debug)]
-pub enum RootStoreMethod {
-    Add,
-    Get,
-}
-
-#[derive(Debug, thiserror::Error)]
-#[error("A RootStore error occurred.")]
-pub struct RootStoreError {
-    pub method: RootStoreMethod,
-    #[source]
-    pub source: Box<dyn std::error::Error + Send + Sync>,
-}
-
 pub trait RootStore: Debug {
     /// `add_root` persists a revision's address to `RootStore`.
     ///
@@ -35,7 +21,11 @@ pub trait RootStore: Debug {
     ///
     /// Will return an error if unable to persist the revision address to the
     /// underlying datastore
-    fn add_root(&self, hash: &TrieHash, address: &LinearAddress) -> Result<(), RootStoreError>;
+    fn add_root(
+        &self,
+        hash: &TrieHash,
+        address: &LinearAddress,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
     /// `get` returns the address of a revision.
     ///
@@ -45,18 +35,28 @@ pub trait RootStore: Debug {
     /// # Errors
     ///
     ///  Will return an error if unable to query the underlying datastore.
-    fn get(&self, hash: &TrieHash) -> Result<Option<LinearAddress>, RootStoreError>;
+    fn get(
+        &self,
+        hash: &TrieHash,
+    ) -> Result<Option<LinearAddress>, Box<dyn std::error::Error + Send + Sync>>;
 }
 
 #[derive(Debug)]
 pub struct NoOpStore {}
 
 impl RootStore for NoOpStore {
-    fn add_root(&self, _hash: &TrieHash, _address: &LinearAddress) -> Result<(), RootStoreError> {
+    fn add_root(
+        &self,
+        _hash: &TrieHash,
+        _address: &LinearAddress,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         Ok(())
     }
 
-    fn get(&self, _hash: &TrieHash) -> Result<Option<LinearAddress>, RootStoreError> {
+    fn get(
+        &self,
+        _hash: &TrieHash,
+    ) -> Result<Option<LinearAddress>, Box<dyn std::error::Error + Send + Sync>> {
         Ok(None)
     }
 }
@@ -82,12 +82,13 @@ impl MockStore {
 
 #[cfg(test)]
 impl RootStore for MockStore {
-    fn add_root(&self, hash: &TrieHash, address: &LinearAddress) -> Result<(), RootStoreError> {
+    fn add_root(
+        &self,
+        hash: &TrieHash,
+        address: &LinearAddress,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         if self.should_fail {
-            return Err(RootStoreError {
-                method: RootStoreMethod::Add,
-                source: "Adding roots should fail".into(),
-            });
+            return Err("Adding roots should fail".into());
         }
 
         self.roots
@@ -97,12 +98,12 @@ impl RootStore for MockStore {
         Ok(())
     }
 
-    fn get(&self, hash: &TrieHash) -> Result<Option<LinearAddress>, RootStoreError> {
+    fn get(
+        &self,
+        hash: &TrieHash,
+    ) -> Result<Option<LinearAddress>, Box<dyn std::error::Error + Send + Sync>> {
         if self.should_fail {
-            return Err(RootStoreError {
-                method: RootStoreMethod::Get,
-                source: "Getting roots should fail".into(),
-            });
+            return Err("Getting roots should fail".into());
         }
 
         Ok(self.roots.lock().expect("poisoned lock").get(hash).copied())

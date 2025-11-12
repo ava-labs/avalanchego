@@ -21,7 +21,7 @@ use rayon::{ThreadPool, ThreadPoolBuilder};
 use typed_builder::TypedBuilder;
 
 use crate::merkle::Merkle;
-use crate::root_store::{RootStore, RootStoreError};
+use crate::root_store::RootStore;
 use crate::v2::api::{ArcDynDbView, HashKey, OptionalHashKeyExt};
 
 pub use firewood_storage::CacheReadStrategy;
@@ -97,8 +97,8 @@ pub(crate) enum RevisionManagerError {
     },
     #[error("An IO error occurred during the commit: {0}")]
     FileIoError(#[from] FileIoError),
-    #[error("A RootStore error occurred")]
-    RootStoreError(#[from] RootStoreError),
+    #[error("A RootStore error occurred: {0}")]
+    RootStoreError(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl RevisionManager {
@@ -152,7 +152,10 @@ impl RevisionManager {
                 },
             )?;
 
-            manager.root_store.add_root(&root_hash, &root_address)?;
+            manager
+                .root_store
+                .add_root(&root_hash, &root_address)
+                .map_err(RevisionManagerError::RootStoreError)?;
         }
 
         Ok(manager)
@@ -236,7 +239,9 @@ impl RevisionManager {
 
         // 5. Persist revision to root store
         if let (Some(hash), Some(address)) = (committed.root_hash(), committed.root_address()) {
-            self.root_store.add_root(&hash, &address)?;
+            self.root_store
+                .add_root(&hash, &address)
+                .map_err(RevisionManagerError::RootStoreError)?;
         }
 
         // 6. Set last committed revision
@@ -300,12 +305,13 @@ impl RevisionManager {
         }
 
         // 3. Try to find it in `RootStore`.
-        let revision_addr =
-            self.root_store
-                .get(&root_hash)?
-                .ok_or(RevisionManagerError::RevisionNotFound {
-                    provided: root_hash.clone(),
-                })?;
+        let revision_addr = self
+            .root_store
+            .get(&root_hash)
+            .map_err(RevisionManagerError::RootStoreError)?
+            .ok_or(RevisionManagerError::RevisionNotFound {
+                provided: root_hash.clone(),
+            })?;
 
         let node_store = NodeStore::with_root(
             root_hash.into_hash_type(),
