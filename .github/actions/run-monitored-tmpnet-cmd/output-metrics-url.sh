@@ -16,4 +16,9 @@ if [[ -n "${FILTER_BY_OWNER:-}" ]]; then
   metrics_url="${metrics_url}&var-filter=network_owner%7C%3D%7C${FILTER_BY_OWNER}"
 fi
 
+# Optionally filter by network_uuid to differentiate matrix jobs
+if [[ -n "${NETWORK_UUID:-}" ]]; then
+  metrics_url="${metrics_url}&var-filter=network_uuid%7C%3D%7C${NETWORK_UUID}"
+fi
+
 echo "${metrics_url}"

@@ -51,6 +51,9 @@ inputs:
   grafana_dashboard_id:
     description: 'The identifier of the Grafana dashboard to use, in the format <UID>/<dashboard-name>.'
     default: 'kBQpRdWnk/avalanche-main-dashboard'
+  network_uuid:
+    description: 'The network UUID to filter metrics by. If not provided, no network_uuid filter is applied.'
+    default: ''
 
 runs:
   using: composite
@@ -100,6 +103,7 @@ runs:
         GRAFANA_URL: https://grafana-poc.avax-dev.network/d/${{ inputs.grafana_dashboard_id }}?orgId=1&refresh=10s&var-filter=is_ephemeral_node%7C%3D%7Cfalse&var-filter=gh_repo%7C%3D%7C${{ inputs.repository_owner }}%2F${{ inputs.repository_name }}&var-filter=gh_run_id%7C%3D%7C${{ inputs.run_id }}&var-filter=gh_run_attempt%7C%3D%7C${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
         FILTER_BY_OWNER: ${{ inputs.filter_by_owner }}
+        NETWORK_UUID: ${{ inputs.network_uuid }}
     - name: Warn that collection of metrics and logs will not be performed
       if: (inputs.prometheus_username == '')
       shell: bash

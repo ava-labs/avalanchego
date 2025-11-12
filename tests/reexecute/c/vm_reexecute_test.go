@@ -67,12 +67,11 @@ var (
 	metricsServerPortArg       uint64
 	metricsCollectorEnabledArg bool
 
-	networkUUID string = uuid.NewString()
-	labels             = map[string]string{
+	networkUUID string
+	labels      = map[string]string{
 		"job":               "c-chain-reexecution",
 		"is_ephemeral_node": "false",
 		"chain":             "C",
-		"network_uuid":      networkUUID,
 	}
 
 	configKey         = "config"
@@ -144,7 +143,20 @@ func TestMain(m *testing.M) {
 	// Set the runner name label on the metrics.
 	labels["runner"] = runnerNameArg
 
+	// Get or create the network UUID
+	networkUUID = getOrCreateNetworkUUID()
+	labels["network_uuid"] = networkUUID
+
 	m.Run()
+}
+
+// getOrCreateNetworkUUID returns the network UUID from the NETWORK_UUID environment
+// variable if set, otherwise it generates a new UUID.
+func getOrCreateNetworkUUID() string {
+	if envUUID := os.Getenv("NETWORK_UUID"); envUUID != "" {
+		return envUUID
+	}
+	return uuid.NewString()
 }
 
 func BenchmarkReexecuteRange(b *testing.B) {
