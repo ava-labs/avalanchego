@@ -73,3 +73,14 @@ func BenchmarkInterface(b *testing.B) {
 		}
 	}
 }
+
+func TestRandomizeCompactionParams(t *testing.T) {
+	var cfg config
+	randomizeCompactionParams(&cfg)
+
+	require.GreaterOrEqual(t, cfg.CompactionL0Trigger, minCompactionL0Trigger)
+	require.LessOrEqual(t, cfg.CompactionL0Trigger, maxCompactionL0Trigger)
+
+	require.GreaterOrEqual(t, cfg.CompactionTableSize, minCompactionTableSize)
+	require.LessOrEqual(t, cfg.CompactionTableSize, maxCompactionTableSize)
+}

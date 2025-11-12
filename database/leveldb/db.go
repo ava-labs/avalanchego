@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/rand"
 	"slices"
 	"sync"
 	"time"
@@ -60,6 +61,18 @@ const (
 	// levelDBByteOverhead is the number of bytes of constant overhead that
 	// should be added to a batch size per operation.
 	levelDBByteOverhead = 8
+
+	// minCompactionL0Trigger is the minimum value for CompactionL0Trigger.
+	minCompactionL0Trigger = 3
+
+	// maxCompactionL0Trigger is the maximum value for CompactionL0Trigger.
+	maxCompactionL0Trigger = 7
+
+	// minCompactionTableSize is the minimum value for CompactionTableSize.
+	minCompactionTableSize = 2 * opt.MiB
+
+	// maxCompactionTableSize is the maximum value for CompactionTableSize.
+	maxCompactionTableSize = 4 * opt.MiB
 )
 
 var (
@@ -98,40 +111,40 @@ type config struct {
 	// BlockSize is the minimum uncompressed size in bytes of each 'sorted table'
 	// block.
 	//
-	// The default value is 4KiB.
+	// The default value is [opt.DefaultBlockSize].
 	BlockSize int `json:"blockSize"`
 	// CompactionExpandLimitFactor limits compaction size after expanded.
 	// This will be multiplied by table size limit at compaction target level.
 	//
-	// The default value is 25.
+	// The default value is [opt.DefaultCompactionExpandLimitFactor].
 	CompactionExpandLimitFactor int `json:"compactionExpandLimitFactor"`
 	// CompactionGPOverlapsFactor limits overlaps in grandparent (Level + 2)
 	// that a single 'sorted table' generates.  This will be multiplied by
 	// table size limit at grandparent level.
 	//
-	// The default value is 10.
+	// The default value is [opt.DefaultCompactionGPOverlapsFactor].
 	CompactionGPOverlapsFactor int `json:"compactionGPOverlapsFactor"`
 	// CompactionL0Trigger defines number of 'sorted table' at level-0 that will
 	// trigger compaction.
 	//
-	// The default value is 4.
+	// The default value is a random value between [minCompactionL0Trigger] and [maxCompactionL0Trigger].
 	CompactionL0Trigger int `json:"compactionL0Trigger"`
 	// CompactionSourceLimitFactor limits compaction source size. This doesn't apply to
 	// level-0.
 	// This will be multiplied by table size limit at compaction target level.
 	//
-	// The default value is 1.
+	// The default value is [opt.DefaultCompactionSourceLimitFactor].
 	CompactionSourceLimitFactor int `json:"compactionSourceLimitFactor"`
 	// CompactionTableSize limits size of 'sorted table' that compaction generates.
 	// The limits for each level will be calculated as:
 	//   CompactionTableSize * (CompactionTableSizeMultiplier ^ Level)
 	// The multiplier for each level can also fine-tuned using CompactionTableSizeMultiplierPerLevel.
 	//
-	// The default value is 2MiB.
+	// The default value is a random value between [minCompactionTableSize] and [maxCompactionTableSize].
 	CompactionTableSize int `json:"compactionTableSize"`
 	// CompactionTableSizeMultiplier defines multiplier for CompactionTableSize.
 	//
-	// The default value is 1.
+	// The default value is [opt.DefaultCompactionTableSizeMultiplier].
 	CompactionTableSizeMultiplier float64 `json:"compactionTableSizeMultiplier"`
 	// CompactionTableSizeMultiplierPerLevel defines per-level multiplier for
 	// CompactionTableSize.
@@ -145,11 +158,11 @@ type config struct {
 	// The multiplier for each level can also fine-tuned using
 	// CompactionTotalSizeMultiplierPerLevel.
 	//
-	// The default value is 10MiB.
+	// The default value is [opt.DefaultCompactionTotalSize].
 	CompactionTotalSize int `json:"compactionTotalSize"`
 	// CompactionTotalSizeMultiplier defines multiplier for CompactionTotalSize.
 	//
-	// The default value is 10.
+	// The default value is [opt.DefaultCompactionTotalSizeMultiplier].
 	CompactionTotalSizeMultiplier float64 `json:"compactionTotalSizeMultiplier"`
 	// DisableSeeksCompaction allows disabling 'seeks triggered compaction'.
 	// The purpose of 'seeks triggered compaction' is to optimize database so
@@ -185,6 +198,19 @@ type config struct {
 	MetricUpdateFrequency time.Duration `json:"metricUpdateFrequency"`
 }
 
+// randomizeCompactionParams sets compaction parameters in cfg to random values
+// to spread out compaction behavior across different nodes.
+//
+// #nosec G404 // non-crypto randomness is fine here
+func randomizeCompactionParams(cfg *config) {
+	const (
+		rangeCompactionL0Trigger = maxCompactionL0Trigger - minCompactionL0Trigger + 1
+		rangeCompactionTableSize = maxCompactionTableSize - minCompactionTableSize + 1
+	)
+	cfg.CompactionL0Trigger = rand.Intn(rangeCompactionL0Trigger) + minCompactionL0Trigger
+	cfg.CompactionTableSize = rand.Intn(rangeCompactionTableSize) + minCompactionTableSize
+}
+
 // New returns a wrapped LevelDB object.
 func New(file string, configBytes []byte, log logging.Logger, reg prometheus.Registerer) (database.Database, error) {
 	parsedConfig := config{
@@ -196,6 +222,9 @@ func New(file string, configBytes []byte, log logging.Logger, reg prometheus.Reg
 		MaxManifestFileSize:    DefaultMaxManifestFileSize,
 		MetricUpdateFrequency:  DefaultMetricUpdateFrequency,
 	}
+
+	randomizeCompactionParams(&parsedConfig)
+
 	if len(configBytes) > 0 {
 		if err := json.Unmarshal(configBytes, &parsedConfig); err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
