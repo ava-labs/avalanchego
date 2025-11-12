@@ -28,7 +28,7 @@ var errNoValidators = errors.New("cannot aggregate signatures from subnet with n
 type API struct {
 	chainContext        *snow.Context
 	db                  *DB
-	signer              *Signer
+	signer              warp.Signer
 	verifier            *Verifier
 	signatureAggregator *acp118.SignatureAggregator
 
@@ -41,7 +41,7 @@ type API struct {
 func NewAPI(
 	chainCtx *snow.Context,
 	db *DB,
-	signer *Signer,
+	signer warp.Signer,
 	verifier *Verifier,
 	signatureCache cache.Cacher[ids.ID, []byte],
 	signatureAggregator *acp118.SignatureAggregator,

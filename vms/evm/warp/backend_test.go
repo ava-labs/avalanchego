@@ -85,13 +85,12 @@ func TestAddAndGetValidMessage(t *testing.T) {
 	warpSigner := warp.NewSigner(sk, networkID, sourceChainID)
 
 	messageDB := NewDB(db)
-	signer := NewSigner(warpSigner)
 
 	// Add testUnsignedMessage to the warp backend
 	require.NoError(t, messageDB.Add(testUnsignedMessage))
 
 	// Verify that a signature is returned successfully, and compare to expected signature.
-	signature, err := signer.Sign(testUnsignedMessage)
+	signature, err := warpSigner.Sign(testUnsignedMessage)
 	require.NoError(t, err)
 
 	expectedSig, err := warpSigner.Sign(testUnsignedMessage)
@@ -123,7 +122,6 @@ func TestGetBlockSignature(t *testing.T) {
 
 	messageDB := NewDB(db)
 	verifier := NewVerifier(messageDB, blockStore, nil)
-	signer := NewSigner(warpSigner)
 
 	blockHashPayload, err := payload.NewHash(blkID)
 	require.NoError(err)
@@ -137,7 +135,7 @@ func TestGetBlockSignature(t *testing.T) {
 	require.Nil(appErr)
 
 	// Then sign it
-	signature, err := signer.Sign(unsignedMessage)
+	signature, err := warpSigner.Sign(unsignedMessage)
 	require.NoError(err)
 	require.Equal(expectedSig, signature)
 
@@ -159,7 +157,6 @@ func TestVerifierKnownMessage(t *testing.T) {
 
 	messageDB := NewDB(db)
 	verifier := NewVerifier(messageDB, nil, nil)
-	signer := NewSigner(warpSigner)
 
 	// Add testUnsignedMessage to the database
 	require.NoError(t, messageDB.Add(testUnsignedMessage))
@@ -169,7 +166,7 @@ func TestVerifierKnownMessage(t *testing.T) {
 	require.Nil(t, appErr)
 
 	// And can be signed
-	signature, err := signer.Sign(testUnsignedMessage)
+	signature, err := warpSigner.Sign(testUnsignedMessage)
 	require.NoError(t, err)
 
 	expectedSig, err := warpSigner.Sign(testUnsignedMessage)

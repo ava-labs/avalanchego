@@ -72,28 +72,6 @@ func (d *DB) Get(msgID ids.ID) (*warp.UnsignedMessage, error) {
 	return unsignedMessage, nil
 }
 
-// Signer signs warp messages.
-type Signer struct {
-	warpSigner warp.Signer
-}
-
-// NewSigner creates a new warp message signer.
-func NewSigner(warpSigner warp.Signer) *Signer {
-	return &Signer{
-		warpSigner: warpSigner,
-	}
-}
-
-// Sign signs a warp message.
-// Callers are responsible for verification and caching.
-func (s *Signer) Sign(msg *warp.UnsignedMessage) ([]byte, error) {
-	sig, err := s.warpSigner.Sign(msg)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign warp message: %w", err)
-	}
-	return sig, nil
-}
-
 // Verifier implements acp118.Verifier and validates whether a warp message should be signed.
 type Verifier struct {
 	db            *DB
