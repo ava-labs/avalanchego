@@ -185,7 +185,7 @@ runs:
       uses: benchmark-action/github-action-benchmark@v1
       with:
         tool: 'go'
-        output-file-path: benchmark-output.txt
+        output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
         summary-always: true
         github-token: ${{ inputs.github-token }}
         auto-push: ${{ inputs.push-github-action-benchmark }}
