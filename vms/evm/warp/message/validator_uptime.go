@@ -3,9 +3,7 @@
 
 package message
 
-import (
-	"github.com/ava-labs/avalanchego/ids"
-)
+import "github.com/ava-labs/avalanchego/ids"
 
 // ValidatorUptime is signed when the ValidationID is known and the validator
 // has been up for TotalUptime seconds.
