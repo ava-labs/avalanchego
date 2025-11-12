@@ -165,8 +165,7 @@ runs:
             CURRENT_STATE_DIR_SRC=${{ inputs.current-state-dir-src }} \
             START_BLOCK=${{ inputs.start-block }} \
             END_BLOCK=${{ inputs.end-block }} \
-            BENCHMARK_OUTPUT_FILE="${{ env.BENCHMARK_OUTPUT_FILE }}" \
-            TASK_NAME="custom-reexecution"
+            BENCHMARK_OUTPUT_FILE="${{ env.BENCHMARK_OUTPUT_FILE }}"
         fi
       env:
         RUNNER_NAME: ${{ inputs.runner_name }}
