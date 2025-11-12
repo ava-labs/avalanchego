@@ -24,14 +24,7 @@ on:
         default: ''
       runner:
         description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
-        default: ubuntu-latest
-        type: choice
-        options:
-          - ubuntu-latest
-          - blacksmith-4vcpu-ubuntu-2404
-          - avalanche-avalanchego-runner-2ti
-          - avago-runner-m6i-4xlarge-ebs-fast
-          - avago-runner-i4i-4xlarge-local-ssd
+        required: true
       push-post-state:
         description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
         default: ''
