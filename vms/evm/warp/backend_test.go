@@ -104,8 +104,14 @@ func TestAddAndGetUnknownMessage(t *testing.T) {
 	messageDB := NewDB(db)
 	verifier := NewVerifier(messageDB, nil, nil)
 
-	// Try to verify an unknown message - should fail
-	appErr := verifier.Verify(t.Context(), testUnsignedMessage, nil)
+	// Create an unknown message with empty source address to test parse failure
+	unknownPayload, err := payload.NewAddressedCall([]byte{}, []byte("unknown message"))
+	require.NoError(t, err)
+	unknownMessage, err := warp.NewUnsignedMessage(networkID, sourceChainID, unknownPayload.Bytes())
+	require.NoError(t, err)
+
+	// Try to verify an unknown message - should fail with parse error
+	appErr := verifier.Verify(t.Context(), unknownMessage, nil)
 	require.ErrorIs(t, appErr, &common.AppError{Code: ParseErrCode})
 }
 
@@ -203,7 +209,7 @@ func TestKnownMessageSignature(t *testing.T) {
 		},
 		"unknown message": {
 			setup: func(_ *DB) (request []byte, expectedResponse []byte) {
-				unknownPayload, err := payload.NewAddressedCall([]byte{0, 0, 0}, []byte("unknown message"))
+				unknownPayload, err := payload.NewAddressedCall([]byte{}, []byte("unknown message"))
 				require.NoError(t, err)
 				unknownMessage, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, unknownPayload.Bytes())
 				require.NoError(t, err)

@@ -85,7 +85,7 @@ func NewAPI(
 func (a *API) GetMessage(_ context.Context, messageID ids.ID) (hexutil.Bytes, error) {
 	message, err := a.getMessage(messageID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get message %s with error %w", messageID, err)
+		return nil, fmt.Errorf("failed to get message %s: %w", messageID, err)
 	}
 	return hexutil.Bytes(message.Bytes()), nil
 }
@@ -111,26 +111,11 @@ func (a *API) getMessage(messageID ids.ID) (*warp.UnsignedMessage, error) {
 
 // GetMessageSignature returns the BLS signature associated with a messageID.
 func (a *API) GetMessageSignature(ctx context.Context, messageID ids.ID) (hexutil.Bytes, error) {
-	if sig, ok := a.signatureCache.Get(messageID); ok {
-		return sig, nil
-	}
-
 	unsignedMessage, err := a.getMessage(messageID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get message %s with error %w", messageID, err)
+		return nil, fmt.Errorf("failed to get message %s: %w", messageID, err)
 	}
-
-	if err := a.verifier.Verify(ctx, unsignedMessage, nil); err != nil {
-		return nil, fmt.Errorf("failed to verify message %s: %w", messageID, err)
-	}
-
-	signature, err := a.signer.Sign(unsignedMessage)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign message %s with error %w", messageID, err)
-	}
-
-	a.signatureCache.Put(messageID, signature)
-	return signature, nil
+	return a.signMessage(ctx, unsignedMessage)
 }
 
 // GetBlockSignature returns the BLS signature associated with a blockID.
@@ -151,26 +136,7 @@ func (a *API) GetBlockSignature(ctx context.Context, blockID ids.ID) (hexutil.By
 		return nil, fmt.Errorf("failed to create unsigned warp message: %w", err)
 	}
 
-	msgID := unsignedMessage.ID()
-	// Check signature cache first
-	if sig, ok := a.signatureCache.Get(msgID); ok {
-		return sig, nil
-	}
-
-	// Verify before signing
-	if err := a.verifier.Verify(ctx, unsignedMessage, nil); err != nil {
-		return nil, fmt.Errorf("failed to verify block %s: %w", blockID, err)
-	}
-
-	// Sign
-	signature, err := a.signer.Sign(unsignedMessage)
-	if err != nil {
-		return nil, fmt.Errorf("failed to sign block %s with error %w", blockID, err)
-	}
-
-	// Cache the signature
-	a.signatureCache.Put(msgID, signature)
-	return signature, nil
+	return a.signMessage(ctx, unsignedMessage)
 }
 
 // GetMessageAggregateSignature fetches the aggregate signature for the requested [messageID]
@@ -244,4 +210,25 @@ func (a *API) aggregateSignatures(ctx context.Context, unsignedMessage *warp.Uns
 	// Need to decide on the best UI for this and write up documentation with the potential
 	// gotchas that could impact signed messages becoming invalid.
 	return hexutil.Bytes(signedMessage.Bytes()), nil
+}
+
+// signMessage verifies, signs, and caches a signature for the given unsigned message.
+func (a *API) signMessage(ctx context.Context, unsignedMessage *warp.UnsignedMessage) (hexutil.Bytes, error) {
+	msgID := unsignedMessage.ID()
+
+	if sig, ok := a.signatureCache.Get(msgID); ok {
+		return sig, nil
+	}
+
+	if err := a.verifier.Verify(ctx, unsignedMessage, nil); err != nil {
+		return nil, fmt.Errorf("failed to verify message %s: %w", msgID, err)
+	}
+
+	signature, err := a.signer.Sign(unsignedMessage)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sign message %s: %w", msgID, err)
+	}
+
+	a.signatureCache.Put(msgID, signature)
+	return signature, nil
 }
