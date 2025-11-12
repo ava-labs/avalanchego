@@ -185,7 +185,7 @@ func TestWorkHeapMergeInsertRandom(t *testing.T) {
 	var (
 		require   = require.New(t)
 		seed      = time.Now().UnixNano()
-		rand      = rand.New(rand.NewSource(seed)) // #nosec G404
+		rand      = rand.New(rand.NewSource(seed))
 		numRanges = 1_000
 		bounds    = [][]byte{}
 		rootID    = ids.GenerateTestID()
