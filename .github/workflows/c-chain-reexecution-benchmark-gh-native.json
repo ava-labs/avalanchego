@@ -5,7 +5,7 @@
                 "runner": "ubuntu-latest",
                 "config": "default",
                 "start-block": 101,
-                "end-block": 250000,
+                "end-block": 400,
                 "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**",
                 "timeout-minutes": 30
@@ -14,7 +14,7 @@
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
                 "config": "default",
                 "start-block": 101,
-                "end-block": 250000,
+                "end-block": 400,
                 "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**",
                 "timeout-minutes": 30
@@ -23,7 +23,7 @@
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
                 "config": "archive",
                 "start-block": 101,
-                "end-block": 250000,
+                "end-block": 400,
                 "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-archive-100/**",
                 "timeout-minutes": 30
@@ -32,7 +32,7 @@
                 "runner": "blacksmith-2vcpu-ubuntu-2404",
                 "config": "firewood",
                 "start-block": 101,
-                "end-block": 250000,
+                "end-block": 400,
                 "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**",
                 "timeout-minutes": 30
@@ -41,7 +41,7 @@
                 "runner": "blacksmith-4vcpu-ubuntu-2404",
                 "config": "firewood",
                 "start-block": 101,
-                "end-block": 250000,
+                "end-block": 400,
                 "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**",
                 "timeout-minutes": 30
@@ -50,7 +50,7 @@
                 "runner": "blacksmith-8vcpu-ubuntu-2404",
                 "config": "firewood",
                 "start-block": 101,
-                "end-block": 250000,
+                "end-block": 400,
                 "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**",
                 "timeout-minutes": 30
@@ -59,7 +59,7 @@
                 "runner": "blacksmith-16vcpu-ubuntu-2404",
                 "config": "firewood",
                 "start-block": 101,
-                "end-block": 250000,
+                "end-block": 400,
                 "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**",
                 "timeout-minutes": 30
@@ -68,7 +68,7 @@
                 "runner": "blacksmith-32vcpu-ubuntu-2404",
                 "config": "firewood",
                 "start-block": 101,
-                "end-block": 250000,
+                "end-block": 400,
                 "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**",
                 "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**",
                 "timeout-minutes": 30
