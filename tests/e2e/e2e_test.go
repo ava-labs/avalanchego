@@ -53,7 +53,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	upgrades := upgrade.Default
 	if flagVars.ActivateHelicon() {
 		upgrades.HeliconTime = upgrade.InitiallyActiveTime
-		upgrades.HeliconEpochDuration = 4 * time.Second
+		upgrades.GraniteEpochDuration = 4 * time.Second
 	} else {
 		upgrades.HeliconTime = upgrade.UnscheduledActivationTime
 	}
