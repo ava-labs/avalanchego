@@ -29,8 +29,8 @@ import (
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	"github.com/ava-labs/avalanchego/vms/evm/metrics/metricstest"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
+	"github.com/ava-labs/avalanchego/vms/evm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
@@ -379,11 +379,8 @@ func TestUptimeSignatures(t *testing.T) {
 	startTime := uint64(time.Now().Unix())
 
 	getUptimeMessageBytes := func(sourceAddress []byte, vID ids.ID) ([]byte, *warp.UnsignedMessage) {
-		uptimePayload := &message.ValidatorUptime{
-			ValidationID: vID,
-			TotalUptime:  80,
-		}
-		require.NoError(t, message.Initialize(uptimePayload))
+		uptimePayload, err := message.NewValidatorUptime(vID, 80)
+		require.NoError(t, err)
 		addressedCall, err := payload.NewAddressedCall(sourceAddress, uptimePayload.Bytes())
 		require.NoError(t, err)
 		unsignedMessage, err := warp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, addressedCall.Bytes())

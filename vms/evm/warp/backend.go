@@ -14,8 +14,8 @@ import (
 	"github.com/ava-labs/avalanchego/network/p2p/acp118"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
+	"github.com/ava-labs/avalanchego/vms/evm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
-	"github.com/ava-labs/avalanchego/vms/platformvm/warp/message"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 )
 
@@ -133,7 +133,7 @@ func (v *Verifier) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMes
 	} else if err != database.ErrNotFound {
 		return &common.AppError{
 			Code:    ParseErrCode,
-			Message: fmt.Sprintf("failed to get message %s: %s", messageID, err.Error()),
+			Message: fmt.Sprintf("failed to get message %s: %s", messageID, err),
 		}
 	}
 
@@ -142,7 +142,7 @@ func (v *Verifier) Verify(ctx context.Context, unsignedMessage *warp.UnsignedMes
 		v.messageParseFail.Inc(1)
 		return &common.AppError{
 			Code:    ParseErrCode,
-			Message: "failed to parse payload: " + err.Error(),
+			Message: fmt.Sprintf("failed to parse payload: %s", err),
 		}
 	}
 
@@ -168,7 +168,7 @@ func (v *Verifier) verifyBlockMessage(ctx context.Context, blockHashPayload *pay
 		v.blockValidationFail.Inc(1)
 		return &common.AppError{
 			Code:    VerifyErrCode,
-			Message: fmt.Sprintf("failed to get block %s: %s", blockID, err.Error()),
+			Message: fmt.Sprintf("failed to get block %s: %s", blockID, err),
 		}
 	}
 
@@ -177,16 +177,6 @@ func (v *Verifier) verifyBlockMessage(ctx context.Context, blockHashPayload *pay
 
 // verifyOffchainAddressedCall verifies the addressed call message
 func (v *Verifier) verifyOffchainAddressedCall(addressedCall *payload.AddressedCall) *common.AppError {
-	// Further, parse the payload to see if it is a known type.
-	parsed, err := message.Parse(addressedCall.Payload)
-	if err != nil {
-		v.messageParseFail.Inc(1)
-		return &common.AppError{
-			Code:    ParseErrCode,
-			Message: "failed to parse addressed call message: " + err.Error(),
-		}
-	}
-
 	if len(addressedCall.SourceAddress) != 0 {
 		v.addressedCallValidationFail.Inc(1)
 		return &common.AppError{
@@ -195,12 +185,12 @@ func (v *Verifier) verifyOffchainAddressedCall(addressedCall *payload.AddressedC
 		}
 	}
 
-	uptimeMsg, ok := parsed.(*message.ValidatorUptime)
-	if !ok {
+	uptimeMsg, err := message.ParseValidatorUptime(addressedCall.Payload)
+	if err != nil {
 		v.messageParseFail.Inc(1)
 		return &common.AppError{
 			Code:    ParseErrCode,
-			Message: fmt.Sprintf("unknown message type: %T", parsed),
+			Message: fmt.Sprintf("failed to parse addressed call message: %s", err),
 		}
 	}
 
@@ -217,7 +207,7 @@ func (v *Verifier) verifyUptimeMessage(uptimeMsg *message.ValidatorUptime) *comm
 	if err != nil {
 		return &common.AppError{
 			Code:    VerifyErrCode,
-			Message: "failed to get uptime: " + err.Error(),
+			Message: fmt.Sprintf("failed to get uptime: %s", err),
 		}
 	}
 

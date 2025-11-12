@@ -5,25 +5,26 @@ package message
 
 import (
 	"errors"
-	"math"
 
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/codec/linearcodec"
+	"github.com/ava-labs/avalanchego/utils/units"
 )
 
-const CodecVersion = 0
+const (
+	CodecVersion = 0
+
+	MaxMessageSize = 24 * units.KiB
+)
 
 var Codec codec.Manager
 
 func init() {
-	Codec = codec.NewManager(math.MaxInt)
+	Codec = codec.NewManager(MaxMessageSize)
 	lc := linearcodec.NewDefault()
 
 	err := errors.Join(
-		lc.RegisterType(&SubnetToL1Conversion{}),
-		lc.RegisterType(&RegisterL1Validator{}),
-		lc.RegisterType(&L1ValidatorRegistration{}),
-		lc.RegisterType(&L1ValidatorWeight{}),
+		lc.RegisterType(&ValidatorUptime{}),
 		Codec.RegisterCodec(CodecVersion, lc),
 	)
 	if err != nil {
