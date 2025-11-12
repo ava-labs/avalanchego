@@ -134,7 +134,7 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	// attempt starting bootstrapper with not enough stake connected. Bootstrapper should stall.
 	vdr0 := ids.GenerateTestNodeID()
 	require.NoError(beacons.AddStaker(ctx.SubnetID, vdr0, nil, ids.Empty, startupAlpha/2))
-	require.NoError(syncer.Connected(t.Context(), vdr0, version.CurrentApp))
+	require.NoError(syncer.Connected(t.Context(), vdr0, version.Current))
 
 	require.False(startup.ShouldStart())
 	require.NoError(syncer.Start(t.Context(), startReqID))
@@ -143,7 +143,7 @@ func TestStateSyncingStartsOnlyIfEnoughStakeIsConnected(t *testing.T) {
 	// finally attempt starting bootstrapper with enough stake connected. Frontiers should be requested.
 	vdr := ids.GenerateTestNodeID()
 	require.NoError(beacons.AddStaker(ctx.SubnetID, vdr, nil, ids.Empty, startupAlpha))
-	require.NoError(syncer.Connected(t.Context(), vdr, version.CurrentApp))
+	require.NoError(syncer.Connected(t.Context(), vdr, version.Current))
 
 	require.True(startup.ShouldStart())
 	require.NoError(syncer.Start(t.Context(), startReqID))
@@ -178,7 +178,7 @@ func TestStateSyncLocalSummaryIsIncludedAmongFrontiersIfAvailable(t *testing.T) 
 
 	// Connect enough stake to start syncer
 	for _, nodeID := range beacons.GetValidatorIDs(ctx.SubnetID) {
-		require.NoError(syncer.Connected(t.Context(), nodeID, version.CurrentApp))
+		require.NoError(syncer.Connected(t.Context(), nodeID, version.Current))
 	}
 
 	require.Equal(localSummary, syncer.locallyAvailableSummary)
@@ -211,7 +211,7 @@ func TestStateSyncNotFoundOngoingSummaryIsNotIncludedAmongFrontiers(t *testing.T
 
 	// Connect enough stake to start syncer
 	for _, nodeID := range beacons.GetValidatorIDs(ctx.SubnetID) {
-		require.NoError(syncer.Connected(t.Context(), nodeID, version.CurrentApp))
+		require.NoError(syncer.Connected(t.Context(), nodeID, version.Current))
 	}
 
 	require.Nil(syncer.locallyAvailableSummary)
@@ -243,7 +243,7 @@ func TestBeaconsAreReachedForFrontiersUponStartup(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, nodeID := range beacons.GetValidatorIDs(ctx.SubnetID) {
-		require.NoError(syncer.Connected(t.Context(), nodeID, version.CurrentApp))
+		require.NoError(syncer.Connected(t.Context(), nodeID, version.Current))
 	}
 
 	// check that vdrs are reached out for frontiers
@@ -284,7 +284,7 @@ func TestUnRequestedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, nodeID := range beacons.GetValidatorIDs(ctx.SubnetID) {
-		require.NoError(syncer.Connected(t.Context(), nodeID, version.CurrentApp))
+		require.NoError(syncer.Connected(t.Context(), nodeID, version.Current))
 	}
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
@@ -374,7 +374,7 @@ func TestMalformedStateSummaryFrontiersAreDropped(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, nodeID := range beacons.GetValidatorIDs(ctx.SubnetID) {
-		require.NoError(syncer.Connected(t.Context(), nodeID, version.CurrentApp))
+		require.NoError(syncer.Connected(t.Context(), nodeID, version.Current))
 	}
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
@@ -443,7 +443,7 @@ func TestLateResponsesFromUnresponsiveFrontiersAreNotRecorded(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, nodeID := range beacons.GetValidatorIDs(ctx.SubnetID) {
-		require.NoError(syncer.Connected(t.Context(), nodeID, version.CurrentApp))
+		require.NoError(syncer.Connected(t.Context(), nodeID, version.Current))
 	}
 
 	initiallyReachedOutBeaconsSize := len(contactedFrontiersProviders)
@@ -551,7 +551,7 @@ func TestStateSyncIsRestartedIfTooManyFrontierSeedersTimeout(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, nodeID := range beacons.GetValidatorIDs(ctx.SubnetID) {
-		require.NoError(syncer.Connected(t.Context(), nodeID, version.CurrentApp))
+		require.NoError(syncer.Connected(t.Context(), nodeID, version.Current))
 	}
 	require.NotEmpty(syncer.pendingSeeders)
 
@@ -634,7 +634,7 @@ func TestVoteRequestsAreSentAsAllFrontierBeaconsResponded(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, nodeID := range beacons.GetValidatorIDs(ctx.SubnetID) {
-		require.NoError(syncer.Connected(t.Context(), nodeID, version.CurrentApp))
+		require.NoError(syncer.Connected(t.Context(), nodeID, version.Current))
 	}
 	require.NotEmpty(syncer.pendingSeeders)
 
@@ -704,7 +704,7 @@ func TestUnRequestedVotesAreDropped(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, nodeID := range beacons.GetValidatorIDs(ctx.SubnetID) {
-		require.NoError(syncer.Connected(t.Context(), nodeID, version.CurrentApp))
+		require.NoError(syncer.Connected(t.Context(), nodeID, version.Current))
 	}
 	require.NotEmpty(syncer.pendingSeeders)
 
@@ -821,7 +821,7 @@ func TestVotesForUnknownSummariesAreDropped(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, nodeID := range beacons.GetValidatorIDs(ctx.SubnetID) {
-		require.NoError(syncer.Connected(t.Context(), nodeID, version.CurrentApp))
+		require.NoError(syncer.Connected(t.Context(), nodeID, version.Current))
 	}
 	require.NotEmpty(syncer.pendingSeeders)
 
@@ -941,7 +941,7 @@ func TestStateSummaryIsPassedToVMAsMajorityOfVotesIsCastedForIt(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, nodeID := range beacons.GetValidatorIDs(ctx.SubnetID) {
-		require.NoError(syncer.Connected(t.Context(), nodeID, version.CurrentApp))
+		require.NoError(syncer.Connected(t.Context(), nodeID, version.Current))
 	}
 	require.NotEmpty(syncer.pendingSeeders)
 
@@ -1072,7 +1072,7 @@ func TestVotingIsRestartedIfMajorityIsNotReachedDueToTimeouts(t *testing.T) {
 
 	// Connect enough stake to start syncer
 	for _, nodeID := range beacons.GetValidatorIDs(ctx.SubnetID) {
-		require.NoError(syncer.Connected(t.Context(), nodeID, version.CurrentApp))
+		require.NoError(syncer.Connected(t.Context(), nodeID, version.Current))
 	}
 	require.NotEmpty(syncer.pendingSeeders)
 
@@ -1192,7 +1192,7 @@ func TestStateSyncIsStoppedIfEnoughVotesAreCastedWithNoClearMajority(t *testing.
 
 	// Connect enough stake to start syncer
 	for _, nodeID := range beacons.GetValidatorIDs(ctx.SubnetID) {
-		require.NoError(syncer.Connected(t.Context(), nodeID, version.CurrentApp))
+		require.NoError(syncer.Connected(t.Context(), nodeID, version.Current))
 	}
 	require.NotEmpty(syncer.pendingSeeders)
 

@@ -721,7 +721,7 @@ func Test_MerkleDB_Random_Insert_Ordering(t *testing.T) {
 	for i := 0; i < numRuns; i++ {
 		now := time.Now().UnixNano()
 		t.Logf("seed for iter %d: %d", i, now)
-		r := rand.New(rand.NewSource(now)) // #nosec G404
+		r := rand.New(rand.NewSource(now))
 
 		// Insert key-value pairs into a database.
 		ops := make([]database.BatchOp, 0, numKeyValues)
@@ -780,7 +780,7 @@ func TestMerkleDBClear(t *testing.T) {
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now)) // #nosec G404
+	r := rand.New(rand.NewSource(now))
 
 	insertRandomKeyValues(
 		require,
@@ -823,7 +823,7 @@ func FuzzMerkleDBEmptyRandomizedActions(f *testing.F) {
 				t.SkipNow()
 			}
 			require := require.New(t)
-			r := rand.New(rand.NewSource(randSeed)) // #nosec G404
+			r := rand.New(rand.NewSource(randSeed))
 			for _, ts := range validTokenSizes {
 				runRandDBTest(
 					require,
@@ -851,7 +851,7 @@ func FuzzMerkleDBInitialValuesRandomizedActions(f *testing.F) {
 			t.SkipNow()
 		}
 		require := require.New(t)
-		r := rand.New(rand.NewSource(randSeed)) // #nosec G404
+		r := rand.New(rand.NewSource(randSeed))
 		for _, ts := range validTokenSizes {
 			runRandDBTest(
 				require,
@@ -1106,7 +1106,7 @@ func generateRandTestWithKeys(
 	genEnd := func(key []byte) []byte {
 		// got is defined because if a rand method is used
 		// in an if statement, the nosec directive doesn't work.
-		got := r.Float64() // #nosec G404
+		got := r.Float64()
 		if got < nilEndProbability {
 			return nil
 		}
@@ -1194,7 +1194,7 @@ func generateInitialValues(
 		}
 		// got is defined because if a rand method is used
 		// in an if statement, the nosec directive doesn't work.
-		got := r.Float64() // #nosec G404
+		got := r.Float64()
 		if got < nilValueProbability {
 			step.value = nil
 		} else {
@@ -1400,7 +1400,7 @@ func Test_FindNextKey_InSync(t *testing.T) {
 	now := time.Now().UnixNano()
 
 	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now)) // #nosec G404
+	r := rand.New(rand.NewSource(now))
 	dbToSync, err := generateTrie(t, r, 1000)
 	require.NoError(err)
 
@@ -1533,7 +1533,7 @@ func Test_FindNextKey_ExtraValues(t *testing.T) {
 	ctx := t.Context()
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now)) // #nosec G404
+	r := rand.New(rand.NewSource(now))
 	dbToSync, err := generateTrie(t, r, 1000)
 	require.NoError(err)
 
@@ -1602,7 +1602,7 @@ func Test_FindNextKey_DifferentChild(t *testing.T) {
 	ctx := t.Context()
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now)) // #nosec G404
+	r := rand.New(rand.NewSource(now))
 	dbToSync, err := generateTrie(t, r, 500)
 	require.NoError(err)
 
@@ -1646,7 +1646,7 @@ func TestFindNextKeyRandom(t *testing.T) {
 	now := time.Now().UnixNano()
 	ctx := t.Context()
 	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
+	rand := rand.New(rand.NewSource(now))
 	require := require.New(t)
 
 	// Create a "remote" database and "local" database

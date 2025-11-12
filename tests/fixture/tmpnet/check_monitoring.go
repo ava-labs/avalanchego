@@ -24,6 +24,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/rpc"
 )
 
 type getCountFunc func() (int, error)
@@ -110,11 +111,12 @@ func queryLoki(
 	req.Header.Set("Authorization", "Basic "+auth)
 
 	// Execute request
+	//nolint:bodyclose // body is closed via rpc.CleanlyCloseBody
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return 0, stacktrace.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer rpc.CleanlyCloseBody(resp.Body)
 
 	// Read and parse response
 	body, err := io.ReadAll(resp.Body)

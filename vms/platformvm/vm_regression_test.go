@@ -2296,7 +2296,7 @@ func TestValidatorSetRaceCondition(t *testing.T) {
 	defer vm.ctx.Lock.Unlock()
 
 	nodeID := ids.GenerateTestNodeID()
-	require.NoError(vm.Connected(t.Context(), nodeID, version.CurrentApp))
+	require.NoError(vm.Connected(t.Context(), nodeID, version.Current))
 
 	protocolAppRequestBytest, err := gossip.MarshalAppRequest(
 		bloom.EmptyFilter.Marshal(),

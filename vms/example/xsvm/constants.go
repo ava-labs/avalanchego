@@ -3,10 +3,4 @@
 
 package xsvm
 
-import "github.com/ava-labs/avalanchego/version"
-
-var Version = &version.Semantic{
-	Major: 1,
-	Minor: 0,
-	Patch: 4,
-}
+const Version = "v1.0.4"

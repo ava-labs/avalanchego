@@ -102,7 +102,7 @@ func Test_History_Large(t *testing.T) {
 
 		now := time.Now().UnixNano()
 		t.Logf("seed for iter %d: %d", i, now)
-		r := rand.New(rand.NewSource(now)) // #nosec G404
+		r := rand.New(rand.NewSource(now))
 		// make sure they stay in sync
 		for x := 0; x < numIters; x++ {
 			batch := db.NewBatch()

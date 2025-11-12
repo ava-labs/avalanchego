@@ -1397,8 +1397,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return config.NodeIDs
 	}
 
-	peerTracker.Connected(vdrID, version.CurrentApp)
-	require.NoError(bootstrapper.Connected(t.Context(), vdrID, version.CurrentApp))
+	peerTracker.Connected(vdrID, version.Current)
+	require.NoError(bootstrapper.Connected(t.Context(), vdrID, version.Current))
 
 	// Create a valid block to remove the first genesis validator that is not
 	// related to the VM.

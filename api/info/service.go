@@ -140,7 +140,7 @@ func (i *Info) GetNodeVersion(_ *http.Request, _ *struct{}, reply *GetNodeVersio
 	}
 
 	reply.Version = i.Version.String()
-	reply.DatabaseVersion = version.CurrentDatabase.String()
+	reply.DatabaseVersion = version.CurrentDatabase
 	reply.RPCProtocolVersion = json.Uint32(version.RPCChainVMProtocol)
 	reply.GitCommit = version.GitCommit
 	reply.VMVersions = vmVersions

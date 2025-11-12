@@ -198,7 +198,7 @@ func Test_View_Iterator_Random(t *testing.T) {
 	require := require.New(t)
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	rand := rand.New(rand.NewSource(now)) // #nosec G404
+	rand := rand.New(rand.NewSource(now))
 
 	var (
 		numKeyChanges = 5_000

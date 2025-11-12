@@ -3,7 +3,7 @@
 
 package simplex
 
-//go:generate go run github.com/StephenButtolph/canoto/canoto $GOFILE
+//go:generate go tool canoto $GOFILE
 
 import (
 	"context"

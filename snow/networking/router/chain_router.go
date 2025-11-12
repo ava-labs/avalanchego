@@ -118,7 +118,7 @@ func (cr *ChainRouter) Initialize(
 	// Mark myself as connected
 	cr.myNodeID = nodeID
 	myself := &peer{
-		version: version.CurrentApp,
+		version: version.Current,
 	}
 	myself.trackedSubnets.Union(trackedSubnets)
 	myself.trackedSubnets.Add(constants.PrimaryNetworkID)

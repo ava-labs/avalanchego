@@ -27,8 +27,8 @@ type Versions struct {
 
 func GetVersions() *Versions {
 	return &Versions{
-		Application: CurrentApp.String(),
-		Database:    CurrentDatabase.String(),
+		Application: Current.String(),
+		Database:    CurrentDatabase,
 		RPCChainVM:  uint64(RPCChainVMProtocol),
 		Commit:      GitCommit,
 		Go:          strings.TrimPrefix(runtime.Version(), "go"),

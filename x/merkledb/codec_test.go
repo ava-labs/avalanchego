@@ -489,22 +489,22 @@ func FuzzCodecDBNodeDeterministic(f *testing.F) {
 		) {
 			require := require.New(t)
 			for _, bf := range validBranchFactors {
-				r := rand.New(rand.NewSource(int64(randSeed))) // #nosec G404
+				r := rand.New(rand.NewSource(int64(randSeed)))
 
 				value := maybe.Nothing[[]byte]()
 				if hasValue {
 					value = maybe.Some(valueBytes)
 				}
 
-				numChildren := r.Intn(int(bf)) // #nosec G404
+				numChildren := r.Intn(int(bf))
 
 				children := map[byte]*child{}
 				for i := 0; i < numChildren; i++ {
 					var childID ids.ID
-					_, _ = r.Read(childID[:]) // #nosec G404
+					_, _ = r.Read(childID[:])
 
-					childKeyBytes := make([]byte, r.Intn(32)) // #nosec G404
-					_, _ = r.Read(childKeyBytes)              // #nosec G404
+					childKeyBytes := make([]byte, r.Intn(32))
+					_, _ = r.Read(childKeyBytes)
 
 					children[byte(i)] = &child{
 						compressedKey: ToKey(childKeyBytes),

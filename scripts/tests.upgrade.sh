@@ -16,8 +16,8 @@ fi
 # local network, this flag must be updated to the last compatible
 # version with the latest code.
 #
-# v1.13.0 is the earliest version that supports Fortuna.
-DEFAULT_VERSION="1.13.0"
+# v1.14.0 is the earliest version that supports Granite.
+DEFAULT_VERSION="1.14.0"
 
 VERSION="${1:-${DEFAULT_VERSION}}"
 if [[ -z "${VERSION}" ]]; then
