@@ -12,6 +12,8 @@ import (
 
 	"github.com/prometheus/common/expfmt"
 
+	"github.com/ava-labs/avalanchego/utils/rpc"
+
 	dto "github.com/prometheus/client_model/go"
 )
 
@@ -45,24 +47,18 @@ func (c *Client) GetMetrics(ctx context.Context) (map[string]*dto.MetricFamily, 
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
+	//nolint:bodyclose // body is closed via rpc.CleanlyCloseBody
 	resp, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("failed to issue request: %w", err)
 	}
+	defer rpc.CleanlyCloseBody(resp.Body)
 
 	// Return an error for any non successful status code
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		// Drop any error during close to report the original error
-		_ = resp.Body.Close()
 		return nil, fmt.Errorf("received status code: %d", resp.StatusCode)
 	}
 
 	var parser expfmt.TextParser
-	metrics, err := parser.TextToMetricFamilies(resp.Body)
-	if err != nil {
-		// Drop any error during close to report the original error
-		_ = resp.Body.Close()
-		return nil, err
-	}
-	return metrics, resp.Body.Close()
+	return parser.TextToMetricFamilies(resp.Body)
 }
