@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2024, Ava Labs, Inc. All rights reserved.
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
 package main
@@ -10,7 +10,6 @@ import (
 	"math/big"
 	"time"
 
-	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethclient"
@@ -18,22 +17,14 @@ import (
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
+
+	ethereum "github.com/ava-labs/libevm"
 )
 
-const (
-	// maxFeePerGas is the maximum fee that transactions issued by this test
-	// will be willing to pay. The actual value doesn't really matter, it
-	// just needs to be higher than the `targetGasPrice` calculated below.
-	maxFeePerGas = 1000 * params.GWei
-	// minFeePerGas is the minimum fee that transactions issued by this test
-	// will pay. The mempool enforces that this value is non-zero.
-	minFeePerGas = 1 * params.Wei
-)
+// maxFeePerGas is the fee that transactions issued by this test will pay.
+const maxFeePerGas = 1000 * params.GWei
 
-var (
-	gasFeeCap = big.NewInt(maxFeePerGas)
-	gasTipCap = big.NewInt(minFeePerGas)
-)
+var gasPrice = big.NewInt(maxFeePerGas)
 
 func main() {
 	ctx := context.Background()
@@ -63,7 +54,7 @@ func main() {
 	for {
 		tx := types.NewTx(&types.LegacyTx{
 			Nonce:    nonce,
-			GasPrice: gasFeeCap,
+			GasPrice: gasPrice,
 			Gas:      1_000_000, // params.TxGas,
 			To:       &eoa,
 		})
