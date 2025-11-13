@@ -437,10 +437,6 @@ func (s *Database) Get(height BlockHeight) (BlockData, error) {
 		return nil, database.ErrClosed
 	}
 
-	return s.getWithoutLock(height)
-}
-
-func (s *Database) getWithoutLock(height BlockHeight) (BlockData, error) {
 	indexEntry, err := s.readBlockIndex(height)
 	if err != nil {
 		return nil, err
