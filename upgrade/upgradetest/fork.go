@@ -131,17 +131,17 @@ func GetActivationTime(fork Fork, networkID uint32) time.Time {
 	case ApricotPhasePost6:
 		return upgrade.Configs[networkID].ApricotPhasePost6Time
 	case ApricotPhase6:
-		return upgrade.Configs[networkID].ApricotPhase1Time
+		return upgrade.Configs[networkID].ApricotPhase6Time
 	case ApricotPhasePre6:
-		return upgrade.Configs[networkID].ApricotPhase1Time
+		return upgrade.Configs[networkID].ApricotPhasePre6Time
 	case ApricotPhase5:
-		return upgrade.Configs[networkID].ApricotPhase1Time
+		return upgrade.Configs[networkID].ApricotPhase5Time
 	case ApricotPhase4:
-		return upgrade.Configs[networkID].ApricotPhase1Time
+		return upgrade.Configs[networkID].ApricotPhase4Time
 	case ApricotPhase3:
-		return upgrade.Configs[networkID].ApricotPhase1Time
+		return upgrade.Configs[networkID].ApricotPhase3Time
 	case ApricotPhase2:
-		return upgrade.Configs[networkID].ApricotPhase1Time
+		return upgrade.Configs[networkID].ApricotPhase2Time
 	case ApricotPhase1:
 		return upgrade.Configs[networkID].ApricotPhase1Time
 	default:
