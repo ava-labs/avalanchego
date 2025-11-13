@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/database"
 )
 
 func TestCacheOnMiss(t *testing.T) {
@@ -115,4 +117,28 @@ func TestCachePutOverridesSameHeight(t *testing.T) {
 	data, err := db.Get(height)
 	require.NoError(t, err)
 	require.Equal(t, b2, data)
+}
+
+func TestCacheClose(t *testing.T) {
+	db := newCacheDatabase(t, DefaultConfig())
+	height := uint64(70)
+	block := randomBlock(t)
+	require.NoError(t, db.Put(height, block))
+
+	_, ok := db.cache.Get(height)
+	require.True(t, ok)
+	require.NoError(t, db.Close())
+
+	// cache is flushed
+	require.Zero(t, db.cache.Len())
+
+	// db operations now fails
+	_, err := db.Get(height)
+	require.ErrorIs(t, err, database.ErrClosed)
+	_, err = db.Has(height)
+	require.ErrorIs(t, err, database.ErrClosed)
+	err = db.Put(height+1, block)
+	require.ErrorIs(t, err, database.ErrClosed)
+	err = db.Close()
+	require.ErrorIs(t, err, database.ErrClosed)
 }

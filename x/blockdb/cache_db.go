@@ -5,6 +5,7 @@ package blockdb
 
 import (
 	"slices"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -23,6 +24,9 @@ var _ database.HeightIndex = (*cacheDB)(nil)
 type cacheDB struct {
 	db    *Database
 	cache *lru.Cache[BlockHeight, BlockData]
+
+	closeMu sync.RWMutex
+	closed  bool
 }
 
 func newCacheDB(db *Database, size uint16) *cacheDB {
@@ -33,10 +37,10 @@ func newCacheDB(db *Database, size uint16) *cacheDB {
 }
 
 func (c *cacheDB) Get(height BlockHeight) (BlockData, error) {
-	c.db.closeMu.RLock()
-	defer c.db.closeMu.RUnlock()
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
 
-	if c.db.closed {
+	if c.closed {
 		c.db.log.Error("Failed Get: database closed", zap.Uint64("height", height))
 		return nil, database.ErrClosed
 	}
@@ -44,7 +48,7 @@ func (c *cacheDB) Get(height BlockHeight) (BlockData, error) {
 	if cached, ok := c.cache.Get(height); ok {
 		return slices.Clone(cached), nil
 	}
-	data, err := c.db.getWithoutLock(height)
+	data, err := c.db.Get(height)
 	if err != nil {
 		return nil, err
 	}
@@ -53,6 +57,14 @@ func (c *cacheDB) Get(height BlockHeight) (BlockData, error) {
 }
 
 func (c *cacheDB) Put(height BlockHeight, data BlockData) error {
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
+
+	if c.closed {
+		c.db.log.Error("Failed Put: database closed", zap.Uint64("height", height))
+		return database.ErrClosed
+	}
+
 	if err := c.db.Put(height, data); err != nil {
 		return err
 	}
@@ -62,10 +74,10 @@ func (c *cacheDB) Put(height BlockHeight, data BlockData) error {
 }
 
 func (c *cacheDB) Has(height BlockHeight) (bool, error) {
-	c.db.closeMu.RLock()
-	defer c.db.closeMu.RUnlock()
+	c.closeMu.RLock()
+	defer c.closeMu.RUnlock()
 
-	if c.db.closed {
+	if c.closed {
 		c.db.log.Error("Failed Has: database closed", zap.Uint64("height", height))
 		return false, database.ErrClosed
 	}
@@ -73,13 +85,17 @@ func (c *cacheDB) Has(height BlockHeight) (bool, error) {
 	if _, ok := c.cache.Get(height); ok {
 		return true, nil
 	}
-	return c.db.hasWithoutLock(height)
+	return c.db.Has(height)
 }
 
 func (c *cacheDB) Close() error {
-	if err := c.db.Close(); err != nil {
-		return err
+	c.closeMu.Lock()
+	defer c.closeMu.Unlock()
+
+	if c.closed {
+		return database.ErrClosed
 	}
+	c.closed = true
 	c.cache.Flush()
-	return nil
+	return c.db.Close()
 }
