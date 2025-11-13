@@ -3,4 +3,4 @@
 
 package router
 
-//go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/router.go -mock_names=Router=Router . Router
+//go:generate go tool mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/router.go -mock_names=Router=Router . Router
