@@ -11,6 +11,12 @@ from_timestamp="$(date '+%s')"
 monitoring_period=900 # 15 minutes
 to_timestamp="$((from_timestamp + monitoring_period))"
 
+# Export timestamps to GitHub environment
+if [ -n "${GITHUB_ENV:-}" ]; then
+  echo "METRICS_FROM_TIMESTAMP=${from_timestamp}" >> "$GITHUB_ENV"
+  echo "METRICS_TO_TIMESTAMP=${to_timestamp}" >> "$GITHUB_ENV"
+fi
+
 # Grafana expects microseconds, so pad timestamps with 3 zeros
 metrics_url="${GRAFANA_URL}&var-filter=gh_job_id%7C%3D%7C${GH_JOB_ID}&from=${from_timestamp}000&to=${to_timestamp}000"
 
