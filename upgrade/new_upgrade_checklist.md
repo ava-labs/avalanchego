@@ -19,10 +19,6 @@ This checklist ists all the required steps when when adding a new network upgrad
   - `Default` config
 - [ ] Add field to `Validate()` method's `upgrades` slice
 - [ ] Add `IsXActivated(time.Time) bool` method
-- [ ] If the upgrade has associated configuration (like `GraniteEpochDuration`):
-  - [ ] Add configuration field(s) to `Config` struct
-  - [ ] Add to all three configs (`Mainnet`, `Fuji`, `Default`)
-  - [ ] Update `Validate()` if validation is needed
 
 ## 2. Test Helper Files
 
