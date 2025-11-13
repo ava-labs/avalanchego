@@ -155,15 +155,17 @@ func TestGetFirewoodReplacementPath(t *testing.T) {
 	tests := []struct {
 		name         string
 		repoName     string
+		isPrimary    bool
 		setupFunc    func(t *testing.T) string // Returns baseDir
 		expectedPath string
 	}{
 		{
-			name:     "firewood with nix build output",
-			repoName: "firewood",
+			name:      "synced firewood with nix build output",
+			repoName:  "firewood",
+			isPrimary: false,
 			setupFunc: func(t *testing.T) string {
 				dir := t.TempDir()
-				// Create nix build structure
+				// Create nix build structure for synced repo
 				nixPath := filepath.Join(dir, "firewood", "ffi", "result", "ffi")
 				require.NoError(t, os.MkdirAll(nixPath, 0o755))
 				require.NoError(t, os.WriteFile(
@@ -176,8 +178,9 @@ func TestGetFirewoodReplacementPath(t *testing.T) {
 			expectedPath: "./ffi/result/ffi",
 		},
 		{
-			name:     "firewood with cargo build output",
-			repoName: "firewood",
+			name:      "synced firewood with cargo build output",
+			repoName:  "firewood",
+			isPrimary: false,
 			setupFunc: func(t *testing.T) string {
 				dir := t.TempDir()
 				// Create cargo build structure (no result/ffi directory)
@@ -188,8 +191,40 @@ func TestGetFirewoodReplacementPath(t *testing.T) {
 			expectedPath: "./ffi",
 		},
 		{
-			name:     "firewood not yet cloned",
-			repoName: "firewood",
+			name:      "primary firewood with nix build output",
+			repoName:  "firewood",
+			isPrimary: true,
+			setupFunc: func(t *testing.T) string {
+				dir := t.TempDir()
+				// Create nix build structure for primary repo (baseDir IS firewood)
+				nixPath := filepath.Join(dir, "ffi", "result", "ffi")
+				require.NoError(t, os.MkdirAll(nixPath, 0o755))
+				require.NoError(t, os.WriteFile(
+					filepath.Join(nixPath, "go.mod"),
+					[]byte("module github.com/ava-labs/firewood/ffi\n"),
+					0o644,
+				))
+				return dir
+			},
+			expectedPath: "./ffi/result/ffi",
+		},
+		{
+			name:      "primary firewood with cargo build output",
+			repoName:  "firewood",
+			isPrimary: true,
+			setupFunc: func(t *testing.T) string {
+				dir := t.TempDir()
+				// Create cargo build structure for primary repo (no result/ffi directory)
+				cargoPath := filepath.Join(dir, "ffi")
+				require.NoError(t, os.MkdirAll(cargoPath, 0o755))
+				return dir
+			},
+			expectedPath: "./ffi",
+		},
+		{
+			name:      "firewood not yet cloned",
+			repoName:  "firewood",
+			isPrimary: false,
 			setupFunc: func(t *testing.T) string {
 				// Empty directory, no firewood clone
 				return t.TempDir()
@@ -197,16 +232,18 @@ func TestGetFirewoodReplacementPath(t *testing.T) {
 			expectedPath: "./ffi", // Default to cargo path
 		},
 		{
-			name:     "non-firewood repo uses config default",
-			repoName: "coreth",
+			name:      "non-firewood repo uses config default",
+			repoName:  "coreth",
+			isPrimary: false,
 			setupFunc: func(t *testing.T) string {
 				return t.TempDir()
 			},
 			expectedPath: ".",
 		},
 		{
-			name:     "avalanchego uses config default",
-			repoName: "avalanchego",
+			name:      "avalanchego uses config default",
+			repoName:  "avalanchego",
+			isPrimary: false,
 			setupFunc: func(t *testing.T) string {
 				return t.TempDir()
 			},
@@ -217,7 +254,7 @@ func TestGetFirewoodReplacementPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			baseDir := tt.setupFunc(t)
-			result := GetFirewoodReplacementPath(log, baseDir, tt.repoName)
+			result := GetFirewoodReplacementPath(log, baseDir, tt.repoName, tt.isPrimary)
 			require.Equal(t, tt.expectedPath, result)
 		})
 	}
