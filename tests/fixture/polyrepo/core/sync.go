@@ -106,24 +106,44 @@ func DetectCurrentRepo(log logging.Logger, dir string) (string, error) {
 	return "", nil
 }
 
-// GetReposToSync returns the list of repos to sync based on the current repo
-func GetReposToSync(currentRepo string) []string {
-	allRepos := []string{"avalanchego", "coreth", "firewood"}
+// GetDirectDependencies determines which repos to sync when no explicit repos
+// are specified. For non-avalanchego repos (firewood, coreth), only avalanchego
+// is synced if it's a direct dependency. For avalanchego (root repo), returns an
+// error since it requires explicit repository arguments.
+func GetDirectDependencies(log logging.Logger, currentRepo, goModPath string) ([]string, error) {
+	log.Debug("determining repositories to sync",
+		zap.String("currentRepo", currentRepo),
+		zap.String("goModPath", goModPath),
+	)
 
-	// If we're not in a known repo, sync all
-	if currentRepo == "" {
-		return allRepos
+	// Special case: avalanchego is a root repo and requires explicit args
+	if currentRepo == "avalanchego" {
+		log.Debug("avalanchego is the primary repository and requires explicit arguments")
+		return nil, errRootRepoNeedsExplicitArgs
 	}
 
-	// Otherwise, sync all repos except the current one
-	result := make([]string, 0, len(allRepos)-1)
-	for _, repo := range allRepos {
-		if repo != currentRepo {
-			result = append(result, repo)
-		}
+	// For non-avalanchego repos (firewood, coreth), only sync avalanchego
+	// Check if avalanchego is a direct dependency
+	avalanchegoConfig, err := GetRepoConfig("avalanchego")
+	if err != nil {
+		return []string{}, stacktrace.Errorf("failed to get avalanchego config: %w", err)
 	}
 
-	return result
+	// Check if avalanchego is a direct dependency
+	_, err = GetDependencyVersion(log, goModPath, avalanchegoConfig.GoModule)
+	if err == nil {
+		// avalanchego found as direct dependency
+		log.Debug("found avalanchego as direct dependency")
+		log.Info("determined repositories to sync: only avalanchego (primary dependency)")
+		return []string{"avalanchego"}, nil
+	}
+
+	// avalanchego is not a direct dependency (unusual case)
+	log.Debug("avalanchego is not a direct dependency",
+		zap.String("currentRepo", currentRepo),
+	)
+	log.Info("no repositories to sync (avalanchego not found as dependency)")
+	return []string{}, nil
 }
 
 // GetDefaultRefForRepo determines the default ref to use for a target repo
@@ -735,9 +755,13 @@ func Sync(
 			return errStandaloneModeNeedsRepos
 		}
 
-		// Primary mode - auto-detect repos to sync
-		log.Info("no repositories specified, auto-detecting based on current directory")
-		repos := GetReposToSync(currentRepo)
+		// Primary mode - auto-detect direct dependencies to sync
+		log.Info("no repositories specified, auto-detecting direct dependencies")
+		repos, err := GetDirectDependencies(log, currentRepo, goModPath)
+		if err != nil {
+			return stacktrace.Errorf("failed to determine direct dependencies: %w", err)
+		}
+
 		log.Info("determined repositories to sync",
 			zap.Int("count", len(repos)),
 			zap.Strings("repos", repos),

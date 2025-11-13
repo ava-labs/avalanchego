@@ -36,7 +36,7 @@ polyrepo --log-level=debug sync
 ```
 
 **Expected Debug-Level Output:**
-- ✓ Can trace: DetectCurrentRepo → GetReposToSync → GetDefaultRefForRepo
+- ✓ Can trace: DetectCurrentRepo → GetDirectDependencies → GetDefaultRefForRepo
 - ✓ Can see go.mod parsing steps (file read, size, require count)
 - ✓ Can see dependency lookup and results
 - ✓ Can see pseudo-version parsing (split parts, hash extraction)
@@ -276,7 +276,7 @@ polyrepo --log-level=debug sync
 
 **Expected Debug-Level Output:**
 - ✓ DetectCurrentRepo returns "" or not in known repo
-- ✓ GetReposToSync returns all three
+- ✓ Standalone mode requires explicit repos (error path)
 - ✓ GetDefaultRefForRepo uses default branches (no version from go.mod)
 
 **Evaluation Criteria:**
@@ -348,6 +348,77 @@ polyrepo --log-level=debug sync
 - [ ] Pseudo-version handling is transparent
 - [ ] User can see exact hash being used
 - [ ] Conversion logic is traceable
+
+---
+
+## Scenario 11: Direct Dependencies Sync (No Args)
+
+**Setup:** Run sync without arguments from coreth or firewood
+
+```bash
+cd /path/to/coreth
+polyrepo --log-level=info sync
+```
+
+**Expected Info-Level Output:**
+- ✓ Shows detected primary repo mode (go.mod exists)
+- ✓ Shows detected current repository (coreth)
+- ✓ Shows "no repositories specified, auto-detecting direct dependencies"
+- ✓ Shows "determined repositories to sync: only avalanchego (primary dependency)"
+- ✓ Shows count=1, repos=["avalanchego"]
+- ✓ Does NOT sync firewood (even though coreth depends on it)
+
+**From Firewood:**
+```bash
+cd /path/to/firewood
+polyrepo --log-level=info sync
+```
+
+**Expected Info-Level Output:**
+- ✓ Shows detected primary repo mode (go.mod exists)
+- ✓ Shows detected current repository (firewood)
+- ✓ Shows either:
+  - "determined repositories to sync: only avalanchego (primary dependency)" (if firewood depends on avalanchego)
+  - "no repositories to sync (avalanchego not found as dependency)" (if firewood doesn't depend on avalanchego)
+- ✓ Does NOT sync coreth (transitive dependency only)
+
+**From Avalanchego (Error Case):**
+```bash
+cd /path/to/avalanchego
+polyrepo --log-level=info sync
+```
+
+**Expected Info-Level Output:**
+- ✓ Shows detected primary repo mode (go.mod exists)
+- ✓ Shows detected current repository (avalanchego)
+- ✓ Shows "no repositories specified, auto-detecting direct dependencies"
+- ✓ Error: "failed to determine direct dependencies: avalanchego is a root repository and requires explicit repository arguments"
+
+**Debug-Level Test:**
+```bash
+polyrepo --log-level=debug sync
+```
+
+**Expected Debug-Level Output:**
+- ✓ DetectCurrentRepo execution and result
+- ✓ GetDirectDependencies execution
+- ✓ Go.mod path determination for current repo
+- ✓ Avalanchego config lookup
+- ✓ GetDependencyVersion execution to check if avalanchego is in go.mod
+- ✓ Decision: found avalanchego → return ["avalanchego"], or not found → return []
+- ✓ For avalanchego: immediate error before checking dependencies
+
+**Evaluation Criteria:**
+- [ ] Clear that only direct dependency (avalanchego) is synced, not transitive dependencies
+- [ ] User understands that coreth and firewood only sync avalanchego by default
+- [ ] Error message for avalanchego makes it clear explicit repos are required
+- [ ] Can trace dependency detection logic through GetDirectDependencies
+
+**Test Coverage:**
+- Unit tests: `TestGetDirectDependencies` (4 test cases)
+- Integration tests: `TestSync_FromFirewood_NoArgs_OnlyAvalanchego`
+- Integration tests: `TestSync_FromCoreth_NoArgs_OnlyAvalanchego`
+- Integration tests: `TestSync_FromAvalanchego_NoArgs_ReturnsError`
 
 ---
 
