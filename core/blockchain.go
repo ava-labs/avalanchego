@@ -47,7 +47,6 @@ import (
 	"github.com/ava-labs/coreth/core/state/snapshot"
 	"github.com/ava-labs/coreth/internal/version"
 	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/plugin/evm/customlogs"
 	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/triedb/firewood"
@@ -624,7 +623,10 @@ func (bc *BlockChain) startAcceptor() {
 		bc.acceptorTipLock.Unlock()
 
 		// Update accepted feeds
-		flattenedLogs := customlogs.FlattenLogs(logs)
+		var flattenedLogs []*types.Log
+		for _, txLogs := range logs {
+			flattenedLogs = append(flattenedLogs, txLogs...)
+		}
 		bc.chainAcceptedFeed.Send(ChainEvent{Block: next, Hash: next.Hash(), Logs: flattenedLogs})
 		if len(flattenedLogs) > 0 {
 			bc.logsAcceptedFeed.Send(flattenedLogs)
@@ -1478,7 +1480,11 @@ func (bc *BlockChain) collectUnflattenedLogs(b *types.Block, removed bool) [][]*
 // the processing of a block. These logs are later announced as deleted or reborn.
 func (bc *BlockChain) collectLogs(b *types.Block, removed bool) []*types.Log {
 	unflattenedLogs := bc.collectUnflattenedLogs(b, removed)
-	return customlogs.FlattenLogs(unflattenedLogs)
+	var logs []*types.Log
+	for _, txLogs := range unflattenedLogs {
+		logs = append(logs, txLogs...)
+	}
+	return logs
 }
 
 // reorg takes two blocks, an old chain and a new chain and will reconstruct the
