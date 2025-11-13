@@ -105,3 +105,7 @@ func FromString(name string) Fork {
 		return -1
 	}
 }
+
+// func GetActivationTime(fork Fork) (error, time.Time) {
+
+// }
