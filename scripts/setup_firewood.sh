@@ -41,9 +41,9 @@ echo "Setting up Firewood FFI version: ${FIREWOOD_VERSION}" >&2
 echo "Using workspace: ${WORKSPACE_PATH}" >&2
 
 git clone https://github.com/ava-labs/firewood "${FIREWOOD_CLONE_DIR}" \
-  --quiet --depth 1 --branch composable-ci-action
+  --quiet --depth 1
 
-SETUP_FIREWOOD_SCRIPT="${FIREWOOD_CLONE_DIR}/benchmark/setup-scripts/build-firewood.sh"
+SETUP_FIREWOOD_SCRIPT="${FIREWOOD_CLONE_DIR}/scripts/build-firewood.sh"
 
 if [ ! -f "${SETUP_FIREWOOD_SCRIPT}" ]; then
   echo "Error: Setup Firewood script not found at ${SETUP_FIREWOOD_SCRIPT}" >&2
