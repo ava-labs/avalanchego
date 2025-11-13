@@ -6,7 +6,6 @@ package upgrade
 import (
 	"errors"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -17,7 +16,7 @@ var (
 	InitiallyActiveTime       = time.Date(2020, time.December, 5, 5, 0, 0, 0, time.UTC)
 	UnscheduledActivationTime = time.Date(9999, time.December, 1, 0, 0, 0, 0, time.UTC)
 
-	configs = map[uint32]Config{
+	Configs = map[uint32]Config{
 		constants.MainnetID: {
 			ApricotPhase1Time:            time.Date(2021, time.March, 31, 14, 0, 0, 0, time.UTC),
 			ApricotPhase2Time:            time.Date(2021, time.May, 10, 11, 0, 0, 0, time.UTC),
@@ -88,9 +87,9 @@ var (
 		},
 	}
 
-	Mainnet = configs[constants.MainnetID]
-	Fuji    = configs[constants.FujiID]
-	Default = configs[constants.LocalID]
+	Mainnet = Configs[constants.MainnetID]
+	Fuji    = Configs[constants.FujiID]
+	Default = Configs[constants.LocalID]
 
 	ErrInvalidUpgradeTimes = errors.New("invalid upgrade configuration")
 )
@@ -146,24 +145,6 @@ func (c *Config) Validate() error {
 		}
 	}
 	return nil
-}
-
-// Takes in one of Mainnet, Fuji, or Default, and a provided field, return the
-// activation time for the field if it exists.
-func GetActivationTime(config any, fieldName string) (time.Time, error) {
-	val := reflect.ValueOf(config)
-
-	if val.Kind() != reflect.Struct {
-		return time.Time{}, fmt.Errorf("want a struct but got %s", val.Kind())
-	}
-
-	field := val.FieldByName(fieldName)
-
-	if !field.IsValid() {
-		return time.Time{}, fmt.Errorf("field '%s' not found in struct", fieldName)
-	}
-
-	return field.Interface().(time.Time), nil
 }
 
 func (c *Config) IsApricotPhase1Activated(t time.Time) bool {
@@ -227,7 +208,7 @@ func (c *Config) IsHeliconActivated(t time.Time) bool {
 }
 
 func GetConfig(networkID uint32) Config {
-	if config, ok := configs[networkID]; ok {
+	if config, ok := Configs[networkID]; ok {
 		return config
 	}
 	return Default

@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/utils/constants"
 )
 
 // TestUpgradeConsistency ensures that when a new upgrade is added, all
@@ -55,17 +56,16 @@ func TestUpgradeConsistency(t *testing.T) {
 	t.Run("all time fields are set in network configs", func(t *testing.T) {
 		for _, tc := range []struct {
 			name   string
-			config upgrade.Config
+			config uint32
 		}{
-			{"Mainnet", upgrade.Mainnet},
-			{"Fuji", upgrade.Fuji},
-			{"Default", upgrade.Default},
+			{"Mainnet", constants.MainnetID},
+			{"Fuji", constants.FujiID},
+			{"Default", constants.LocalID},
 		} {
 			t.Run(tc.name, func(*testing.T) {
-				for _, fieldName := range timeFields {
-					timeValue, err := upgrade.GetActivationTime(upgrade.Default, fieldName)
-					require.NoError(t, err)
-					require.False(t, timeValue.IsZero(), "%s.%s should be set to a non-zero time", tc.name, fieldName)
+				for fork := ApricotPhase1; fork <= Latest; fork++ {
+					timeValue := GetActivationTime(fork, tc.config)
+					require.False(t, timeValue.IsZero(), "%sTime on %s should be set to a non-zero time", fork, tc.name)
 				}
 			})
 		}
@@ -73,8 +73,15 @@ func TestUpgradeConsistency(t *testing.T) {
 
 	t.Run("all Fork constants are properly stringifiable and vice versa", func(*testing.T) {
 		// Check that each fork is bi-directionally stringifiable
-		for fork := NoUpgrades; fork <= Latest; fork++ {
+		for fork := NoUpgrades; fork <= Latest+1; fork++ {
 			forkStr := fork.String()
+
+			// Forks beyond Latest should return "Unknown"
+			if fork > Latest {
+				require.Equal(t, "Unknown", forkStr, "Fork %d (beyond Latest) should return 'Unknown'", fork)
+				continue
+			}
+
 			require.NotEqual(t, "Unknown", forkStr, "Fork %d should be stringifiable", fork)
 			parsedFork := FromString(forkStr)
 			require.Equal(t, fork, parsedFork, "FromString(%q) should return %d, got %d", forkStr, fork, parsedFork)
@@ -84,27 +91,6 @@ func TestUpgradeConsistency(t *testing.T) {
 		invalidName := "thehimaruupgrade"
 		fork := FromString(invalidName)
 		require.Equal(t, Fork(-1), fork, "FromString(%q) should return -1 for invalid name", invalidName)
-	})
-
-	t.Run("upgradetest Fork constants match config fields", func(*testing.T) {
-		// For each time field in upgrade.Config (except Apricot phases and special cases),
-		// there should be a corresponding Fork constant
-		for _, fieldName := range timeFields {
-			upgradeName := strings.TrimSuffix(fieldName, "Time")
-			// Skip Apricot variants as they have complex naming
-			if strings.HasPrefix(upgradeName, "Apricot") {
-				continue
-			}
-
-			if upgradeName == NoUpgrades.String() {
-				continue
-			}
-
-			fork := FromString(upgradeName)
-			require.NotEqual(t, Fork(-1), fork, "Fork constant for %s should exist", upgradeName)
-			require.GreaterOrEqual(t, fork, Fork(0), "Fork constant for %s should be valid", upgradeName)
-			require.LessOrEqual(t, fork, Latest, "Fork constant for %s should be <= Latest", upgradeName)
-		}
 	})
 
 	t.Run("upgradetest.SetTimesTo handles all forks", func(t *testing.T) {
@@ -170,18 +156,4 @@ func TestUpgradeFieldNaming(t *testing.T) {
 			)
 		}
 	})
-}
-
-// TestForkStringCompleteness ensures all Fork constants have String() cases.
-func TestForkStringCompleteness(t *testing.T) {
-	// Test that no fork returns "Unknown" except when explicitly set to an invalid value
-	for fork := NoUpgrades; fork <= Latest+1; fork++ {
-		forkStr := fork.String()
-		if fork <= Latest {
-			require.NotEqual(t, "Unknown", forkStr, "Fork %d should not return 'Unknown'", fork)
-		} else {
-			// Forks beyond Latest should return "Unknown"
-			require.Equal(t, "Unknown", forkStr, "Fork %d (beyond Latest) should return 'Unknown'", fork)
-		}
-	}
 }

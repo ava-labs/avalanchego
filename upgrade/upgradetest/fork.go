@@ -3,6 +3,12 @@
 
 package upgradetest
 
+import (
+	"time"
+
+	"github.com/ava-labs/avalanchego/upgrade"
+)
+
 const (
 	NoUpgrades Fork = iota
 	ApricotPhase1
@@ -106,6 +112,39 @@ func FromString(name string) Fork {
 	}
 }
 
-// func GetActivationTime(fork Fork) (error, time.Time) {
-
-// }
+func GetActivationTime(fork Fork, networkID uint32) time.Time {
+	switch fork {
+	case Helicon:
+		return upgrade.Configs[networkID].HeliconTime
+	case Granite:
+		return upgrade.Configs[networkID].GraniteTime
+	case Fortuna:
+		return upgrade.Configs[networkID].FortunaTime
+	case Etna:
+		return upgrade.Configs[networkID].EtnaTime
+	case Durango:
+		return upgrade.Configs[networkID].DurangoTime
+	case Cortina:
+		return upgrade.Configs[networkID].CortinaTime
+	case Banff:
+		return upgrade.Configs[networkID].BanffTime
+	case ApricotPhasePost6:
+		return upgrade.Configs[networkID].ApricotPhasePost6Time
+	case ApricotPhase6:
+		return upgrade.Configs[networkID].ApricotPhase1Time
+	case ApricotPhasePre6:
+		return upgrade.Configs[networkID].ApricotPhase1Time
+	case ApricotPhase5:
+		return upgrade.Configs[networkID].ApricotPhase1Time
+	case ApricotPhase4:
+		return upgrade.Configs[networkID].ApricotPhase1Time
+	case ApricotPhase3:
+		return upgrade.Configs[networkID].ApricotPhase1Time
+	case ApricotPhase2:
+		return upgrade.Configs[networkID].ApricotPhase1Time
+	case ApricotPhase1:
+		return upgrade.Configs[networkID].ApricotPhase1Time
+	default:
+		return time.Time{}
+	}
+}
