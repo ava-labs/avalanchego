@@ -139,6 +139,80 @@ func TestGetReposToSync(t *testing.T) {
 	}
 }
 
+func TestGetFirewoodReplacementPath(t *testing.T) {
+	log := logging.NoLog{}
+
+	tests := []struct {
+		name         string
+		repoName     string
+		setupFunc    func(t *testing.T) string // Returns baseDir
+		expectedPath string
+	}{
+		{
+			name:     "firewood with nix build output",
+			repoName: "firewood",
+			setupFunc: func(t *testing.T) string {
+				dir := t.TempDir()
+				// Create nix build structure
+				nixPath := filepath.Join(dir, "firewood", "ffi", "result", "ffi")
+				require.NoError(t, os.MkdirAll(nixPath, 0o755))
+				require.NoError(t, os.WriteFile(
+					filepath.Join(nixPath, "go.mod"),
+					[]byte("module github.com/ava-labs/firewood/ffi\n"),
+					0o644,
+				))
+				return dir
+			},
+			expectedPath: "./ffi/result/ffi",
+		},
+		{
+			name:     "firewood with cargo build output",
+			repoName: "firewood",
+			setupFunc: func(t *testing.T) string {
+				dir := t.TempDir()
+				// Create cargo build structure (no result/ffi directory)
+				cargoPath := filepath.Join(dir, "firewood", "ffi")
+				require.NoError(t, os.MkdirAll(cargoPath, 0o755))
+				return dir
+			},
+			expectedPath: "./ffi",
+		},
+		{
+			name:     "firewood not yet cloned",
+			repoName: "firewood",
+			setupFunc: func(t *testing.T) string {
+				// Empty directory, no firewood clone
+				return t.TempDir()
+			},
+			expectedPath: "./ffi", // Default to cargo path
+		},
+		{
+			name:     "non-firewood repo uses config default",
+			repoName: "coreth",
+			setupFunc: func(t *testing.T) string {
+				return t.TempDir()
+			},
+			expectedPath: ".",
+		},
+		{
+			name:     "avalanchego uses config default",
+			repoName: "avalanchego",
+			setupFunc: func(t *testing.T) string {
+				return t.TempDir()
+			},
+			expectedPath: ".",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			baseDir := tt.setupFunc(t)
+			result := GetFirewoodReplacementPath(log, baseDir, tt.repoName)
+			require.Equal(t, tt.expectedPath, result)
+		})
+	}
+}
+
 func TestGetDefaultRefForRepo(t *testing.T) {
 	tests := []struct {
 		name         string

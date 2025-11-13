@@ -13,6 +13,37 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+// GetFirewoodReplacementPath returns the correct replacement path for firewood
+// based on which build method was used (nix build or cargo build).
+// For non-firewood repos, returns the config default.
+func GetFirewoodReplacementPath(log logging.Logger, baseDir, repoName string) string {
+	// For non-firewood repos, return the config default
+	//nolint:goconst // "firewood" constant is local to Sync() function
+	if repoName != "firewood" {
+		config, err := GetRepoConfig(repoName)
+		if err != nil {
+			// Shouldn't happen for known repos, but handle gracefully
+			return "."
+		}
+		return config.ModuleReplacementPath
+	}
+
+	// Check if nix build output exists
+	nixPath := filepath.Join(baseDir, repoName, "ffi", "result", "ffi", "go.mod")
+	if _, err := os.Stat(nixPath); err == nil {
+		log.Info("detected nix build output for firewood",
+			zap.String("path", "./ffi/result/ffi"),
+		)
+		return "./ffi/result/ffi" // Nix build
+	}
+
+	log.Info("using cargo build path for firewood (nix output not found)",
+		zap.String("path", "./ffi"),
+	)
+	// Otherwise, cargo build (or not yet built)
+	return "./ffi"
+}
+
 // DetectCurrentRepo detects which repository we're currently in based on go.mod
 func DetectCurrentRepo(log logging.Logger, dir string) (string, error) {
 	log.Debug("detecting current repository",
@@ -284,9 +315,9 @@ func UpdateAllReplaceDirectives(log logging.Logger, baseDir string, syncedRepos 
 				}
 				// From synced repo back to base dir
 				replacePath = ".."
-				if otherConfig.ModuleReplacementPath != "." {
+				modPath := GetFirewoodReplacementPath(log, baseDir, otherRepoName)
+				if modPath != "." {
 					// Strip leading ./ from ModuleReplacementPath if present
-					modPath := otherConfig.ModuleReplacementPath
 					if len(modPath) >= 2 && modPath[0:2] == "./" {
 						modPath = modPath[2:]
 					}
@@ -298,9 +329,9 @@ func UpdateAllReplaceDirectives(log logging.Logger, baseDir string, syncedRepos 
 					// From primary repo to synced repo
 					// filepath.Join normalizes away ./ so we build it manually
 					replacePath = otherRepoName
-					if otherConfig.ModuleReplacementPath != "." {
+					modPath := GetFirewoodReplacementPath(log, baseDir, otherRepoName)
+					if modPath != "." {
 						// Strip leading ./ from ModuleReplacementPath if present
-						modPath := otherConfig.ModuleReplacementPath
 						if len(modPath) >= 2 && modPath[0:2] == "./" {
 							modPath = modPath[2:]
 						}
@@ -311,9 +342,9 @@ func UpdateAllReplaceDirectives(log logging.Logger, baseDir string, syncedRepos 
 				} else {
 					// From synced repo to another synced repo (sibling)
 					replacePath = otherRepoName
-					if otherConfig.ModuleReplacementPath != "." {
+					modPath := GetFirewoodReplacementPath(log, baseDir, otherRepoName)
+					if modPath != "." {
 						// Strip leading ./ from ModuleReplacementPath if present
-						modPath := otherConfig.ModuleReplacementPath
 						if len(modPath) >= 2 && modPath[0:2] == "./" {
 							modPath = modPath[2:]
 						}
