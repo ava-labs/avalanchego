@@ -41,7 +41,7 @@ echo "Setting up Firewood FFI version: ${FIREWOOD_VERSION}" >&2
 echo "Using workspace: ${WORKSPACE_PATH}" >&2
 
 git clone https://github.com/ava-labs/firewood "${FIREWOOD_CLONE_DIR}" \
-  --quiet --depth 1
+  --quiet --depth 1 --branch composable-ci-action
 
 SETUP_FIREWOOD_SCRIPT="${FIREWOOD_CLONE_DIR}/scripts/build-firewood.sh"
 
