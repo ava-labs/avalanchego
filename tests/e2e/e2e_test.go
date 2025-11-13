@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/tests/e2e/vms"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 )
 
@@ -51,15 +50,12 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	nodes := tmpnet.NewNodesOrPanic(nodeCount)
 	subnets := vms.XSVMSubnetsOrPanic(nodes...)
 
-	upgrades := upgrade.Default
-	if flagVars.ActivateLatest() {
-		// Activate all upgrades up to and including the latest
-		upgradetest.SetTimesTo(&upgrades, upgradetest.Latest, upgrade.InitiallyActiveTime)
-		upgrades.GraniteEpochDuration = 4 * time.Second
-	} else {
-		// Keep the default config but ensure the latest upgrade is not activated
-		upgradetest.SetTimeOnly(&upgrades, upgradetest.Latest, upgrade.UnscheduledActivationTime)
+	upgradeToActivate := upgradetest.Latest
+	if !flagVars.ActivateLatest() {
+		upgradeToActivate--
 	}
+	upgrades := upgradetest.GetConfig(upgradeToActivate)
+	upgrades.GraniteEpochDuration = 4 * time.Second
 	tc.Log().Info("setting upgrades",
 		zap.Reflect("upgrades", upgrades),
 	)
