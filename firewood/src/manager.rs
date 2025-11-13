@@ -165,18 +165,14 @@ impl RevisionManager {
     /// To commit a proposal involves a few steps:
     /// 1. Commit check.
     ///    The proposal's parent must be the last committed revision, otherwise the commit fails.
-    /// 2. Persist delete list.
-    ///    The list of all nodes that were to be deleted for this proposal must be fully flushed to disk.
-    ///    The address of the root node and the root hash is also persisted.
-    ///    Note that this is *not* a write ahead log.
     ///    It only contains the address of the nodes that are deleted, which should be very small.
-    /// 3. Revision reaping. If more than the maximum number of revisions are kept in memory, the
+    /// 2. Revision reaping. If more than the maximum number of revisions are kept in memory, the
     ///    oldest revision is reaped.
-    /// 4. Persist to disk. This includes flushing everything to disk.
-    /// 5. Persist the revision to `RootStore`.
-    /// 6. Set last committed revision.
+    /// 3. Persist to disk. This includes flushing everything to disk.
+    /// 4. Persist the revision to `RootStore`.
+    /// 5. Set last committed revision.
     ///    Set last committed revision in memory.
-    /// 7. Proposal Cleanup.
+    /// 6. Proposal Cleanup.
     ///    Any other proposals that have this proposal as a parent should be reparented to the committed version.
     #[fastrace::trace(short_name = true)]
     #[crate::metrics("firewood.proposal.commit", "proposal commit to storage")]
@@ -192,9 +188,8 @@ impl RevisionManager {
 
         let mut committed = proposal.as_committed(&current_revision);
 
-        // 2. Persist delete list for this committed revision to disk for recovery
-
-        // 3 Take the deleted entries from the oldest revision and mark them as free for this revision
+        // 2. Revision reaping
+        // Take the deleted entries from the oldest revision and mark them as free for this revision
         // If you crash after freeing some of these, then the free list will point to nodes that are not actually free.
         // TODO: Handle the case where we get something off the free list that is not free
         while self.historical.read().expect("poisoned lock").len() >= self.max_revisions {
@@ -232,19 +227,19 @@ impl RevisionManager {
             gauge!("firewood.max_revisions").set(self.max_revisions as f64);
         }
 
-        // 4. Persist to disk.
+        // 3. Persist to disk.
         // TODO: We can probably do this in another thread, but it requires that
         // we move the header out of NodeStore, which is in a future PR.
         committed.persist()?;
 
-        // 5. Persist revision to root store
+        // 4. Persist revision to root store
         if let (Some(hash), Some(address)) = (committed.root_hash(), committed.root_address()) {
             self.root_store
                 .add_root(&hash, &address)
                 .map_err(RevisionManagerError::RootStoreError)?;
         }
 
-        // 6. Set last committed revision
+        // 5. Set last committed revision
         let committed: CommittedRevision = committed.into();
         self.historical
             .write()
@@ -257,7 +252,7 @@ impl RevisionManager {
                 .insert(hash, committed.clone());
         }
 
-        // 7. Proposal Cleanup
+        // 6. Proposal Cleanup
         // Free proposal that is being committed as well as any proposals no longer
         // referenced by anyone else.
         self.proposals
