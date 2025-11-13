@@ -29,7 +29,6 @@ This checklist ists all the required steps when when adding a new network upgrad
 ### [`upgrade/upgradetest/fork.go`](./upgradetest/fork.go)
 
 - [ ] Add new fork constant before `Latest`
-- [ ] Update `Latest` constant to point to the new fork
 - [ ] Add case to `String()` and `FromString()` method
 
 ### [`upgrade/upgradetest/config.go`](./upgradetest/config.go)
