@@ -386,6 +386,7 @@ Before considering any feature or bug fix complete, verify:
 - [ ] **Unit tests pass**: `go test ./tests/fixture/polyrepo/core/... -v`
 - [ ] **Integration tests pass**: `go test ./tests/fixture/polyrepo/core/... -v -tags=integration`
 - [ ] **Linter passes**: `./scripts/run_task.sh lint`
+- [ ] **Logging added** - All significant operations and decision points have appropriate INFO/DEBUG logging
 - [ ] **Documentation updated** - CLAUDE.md reflects new tests, functions, and lessons learned
 
 **This checklist is MANDATORY, not optional.** Skipping any of these steps creates technical debt and increases the risk of bugs.
@@ -446,6 +447,96 @@ if isSpecialCase() {
 **Why**: Error-based fallbacks hide bugs and make it unclear when each code path executes. Proactive detection makes the code self-documenting and catches errors earlier.
 
 **Example from polyrepo**: Instead of trying go-git and falling back to git CLI on any error, we detect worktrees by checking if `.git` is a file, then read git data directly from the filesystem.
+
+### Logging Best Practices
+
+**CRITICAL**: All significant operations and decision points MUST include appropriate logging. Logging is not optional - it's essential for debugging, monitoring, and understanding system behavior.
+
+**When to Add Logging:**
+- **All significant operations** - Clone, build, sync, etc.
+- **Decision points** - When code chooses between different paths (e.g., nix vs cargo build)
+- **State changes** - When modifying files, directories, or git state
+- **Error paths** - Always log errors with context before returning them
+- **Version/ref discovery** - Log which versions were discovered and from where
+
+**Log Levels:**
+- **INFO**: User-facing operations and decisions
+  - "syncing repository", "building firewood", "detected nix build output"
+  - Use for anything a user would want to know about
+- **DEBUG**: Internal state and detailed flow
+  - "checking if file exists at revision", "parsing go.mod"
+  - Use for troubleshooting and development
+- **WARN**: Unexpected but recoverable conditions
+  - "unexpected self-dependency", "file not found, using fallback"
+- **ERROR**: Fatal errors that cause operation failure
+  - Should be immediately followed by returning the error
+
+**Structured Logging with Zap:**
+Always use structured logging with context fields, not string formatting:
+
+```go
+// ✅ GOOD: Structured logging with context
+log.Info("detected nix build output for firewood",
+    zap.String("path", "./ffi/result/ffi"),
+)
+
+log.Info("syncing repository",
+    zap.String("repo", repoName),
+    zap.String("ref", refToUse),
+    zap.Int("depth", depth),
+)
+
+// ❌ BAD: String formatting loses structure
+log.Info(fmt.Sprintf("syncing %s at %s with depth %d", repoName, refToUse, depth))
+```
+
+**What to Log:**
+- **Operation start**: "starting sync", "building firewood"
+- **Decision made**: "using cargo build path (nix output not found)", "detected primary repo mode"
+- **Operation complete**: "successfully synced repository", "sync completed successfully"
+- **Discovered values**: "discovered coreth version from avalanchego/go.mod"
+- **Paths used**: Show which paths were selected for operations
+
+**What NOT to Log:**
+- Sensitive information (credentials, tokens)
+- Excessive detail that obscures important information
+- Implementation details that change frequently
+- Every function entry/exit (use DEBUG judiciously)
+
+**Testing and Logging:**
+- Use `logging.NoLog{}` in unit tests to suppress logging
+- Do NOT test log messages in assertions (they are implementation details)
+- Validate behavior and side effects, not what was logged
+
+**Example - Decision Point Logging:**
+The firewood path detection is a good example:
+```go
+func GetFirewoodReplacementPath(log logging.Logger, baseDir, repoName string) string {
+    // Check if nix build output exists
+    nixPath := filepath.Join(baseDir, repoName, "ffi", "result", "ffi", "go.mod")
+    if _, err := os.Stat(nixPath); err == nil {
+        log.Info("detected nix build output for firewood",
+            zap.String("path", "./ffi/result/ffi"),
+        )
+        return "./ffi/result/ffi"
+    }
+
+    log.Info("using cargo build path for firewood (nix output not found)",
+        zap.String("path", "./ffi"),
+    )
+    return "./ffi"
+}
+```
+
+This makes it immediately clear which path was chosen and why, which is essential for debugging.
+
+**Checklist for New Code:**
+- [ ] All significant operations have INFO-level logging
+- [ ] All decision points log which path was chosen
+- [ ] All errors are logged with context before returning
+- [ ] Structured logging with zap fields (not string formatting)
+- [ ] Log messages are clear and actionable
+- [ ] No sensitive information in logs
 
 ## Key Concepts
 
@@ -659,7 +750,14 @@ All commands support these flags:
 7. **🟢 GREEN: Run tests to verify they PASS** - Confirm your implementation makes the tests pass
 8. **Verify with manual testing** - Use manual testing to discover corner cases you missed, then add tests for them
 9. **Convert manual tests to automated tests** - Any manual test you perform should be converted to an integration test
-10. **Update CLAUDE.md documentation** - **MANDATORY for ALL changes**:
+10. **Add appropriate logging** - **MANDATORY for ALL changes**:
+   - **All significant operations**: Add INFO-level logging showing what's happening
+   - **Decision points**: Log which path was chosen (e.g., nix vs cargo build)
+   - **State changes**: Log when modifying files, directories, or git state
+   - **Use structured logging**: Always use zap fields, not string formatting
+   - See "Logging Best Practices" section for detailed guidelines
+
+11. **Update CLAUDE.md documentation** - **MANDATORY for ALL changes**:
    - **New features/flags/capabilities**: Document in "Usage" → relevant command section, add to "Global Flags" or command-specific flags, and create entry in "Recent Fixes" section
    - **Bug fixes**: Document in "Recent Fixes" section with problem description, solution, test coverage, and root cause analysis
    - **New core functions**: Update "Implementation Details" → "Key Functions" section
@@ -1295,6 +1393,65 @@ git worktree remove ../test-worktree
 
 ## Recent Fixes
 
+### Firewood Build Path Detection: Dynamic Nix vs Cargo Path Selection (2025-11)
+
+**Problem**: Firewood has two build methods that produce different output paths:
+- **Nix build**: Creates `firewood/ffi/result/ffi/` directory with built artifacts
+- **Cargo build** (fallback): Creates `firewood/ffi/target/release/` with symlink `result -> target/release`
+
+The hardcoded `ModuleReplacementPath = "./ffi/result/ffi"` in the firewood config only worked for nix builds, causing build failures when cargo build was used (no flake.nix at older revisions).
+
+**Solution**: Implemented dynamic path detection via `GetFirewoodReplacementPath()` function:
+1. Checks if `firewood/ffi/result/ffi/go.mod` exists (nix build output)
+2. Returns `./ffi/result/ffi` for nix builds, `./ffi` for cargo builds
+3. Updated `UpdateAllReplaceDirectives()` to call detection function at all 3 path calculation sites
+
+**Implementation**:
+- **GetFirewoodReplacementPath(log, baseDir, repoName)** (sync.go:16-45)
+  - Detects build method by checking for nix output directory
+  - Returns appropriate module replacement path
+  - Logs which path was chosen for transparency
+  - For non-firewood repos, returns config default
+
+**Key Changes**:
+- Modified all 3 locations in `UpdateAllReplaceDirectives()` to use dynamic detection
+- Added logger parameter to enable informative logging
+- Logs show which build method was detected: "detected nix build output" or "using cargo build path"
+
+**Test Coverage**:
+- `TestGetFirewoodReplacementPath`: 5 comprehensive test cases
+  - Nix build output present
+  - Cargo build output (no nix result directory)
+  - Firewood not yet cloned
+  - Non-firewood repos use config default
+- All existing unit tests pass (73 seconds)
+- Integration test: clean sync + build succeeds
+
+**Logging Example**:
+```
+INFO core/sync.go:40 using cargo build path for firewood (nix output not found) {"path": "./ffi"}
+INFO core/sync.go:358 adding replace directive ... "replacePath": "./firewood/ffi"
+```
+
+**Benefits**:
+- **Automatic detection**: No manual configuration needed
+- **Backward compatible**: Works with existing nix builds
+- **Forward compatible**: Works with cargo build fallback
+- **Transparent**: Logging shows which path was chosen and why
+- **Simple implementation**: Just checks for presence of nix build output
+
+**Files Changed**:
+- `tests/fixture/polyrepo/core/sync.go`: Added detection function, updated replace logic (lines 16-45, 318, 332, 345)
+- `tests/fixture/polyrepo/core/sync_test.go`: Added 5 test cases
+- `go.mod`: Updated during sync to use correct path automatically
+
+**Hard-Won Knowledge**:
+- Nix build creates `firewood/ffi/result/ffi/` directory structure
+- Cargo build with nix shell creates `firewood/ffi/target/release/` with symlink
+- The `ModuleReplacementPath` in config should be dynamic based on build output
+- Decision points should always have logging showing which path was chosen
+- Testing with `logging.NoLog{}` suppresses log output in unit tests
+
 ### Firewood Build Fallback: Cargo Build from Nix Shell (2025-10)
 
 **Problem**: Firewood's ffi/flake.nix file may not exist at older revisions, causing nix build to fail. This prevented syncing older firewood commits that lacked the flake.nix file.
@@ -1742,6 +1899,7 @@ This error means a replace directive doesn't start with `./`, `../`, or `/`.
 - **Run linter immediately after code changes, before execution** - Catch errors at compile-time, not runtime
 - **Use proactive detection, not error-based fallbacks** - Detect special cases upfront
 - **Fail fast** - Return first error, don't collect multiple errors
+- **Add logging to all significant operations** - See "Logging Best Practices" section for guidelines
 
 ### Technical Knowledge
 - **Git worktrees require direct filesystem access** - go-git doesn't support them
