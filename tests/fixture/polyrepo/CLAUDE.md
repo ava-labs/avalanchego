@@ -1835,9 +1835,7 @@ RunE: func(cmd *cobra.Command, args []string) error {
 
 2. Add to `allRepos` map in config.go
 
-3. Update `GetReposToSync()` in core/sync.go if needed
-
-4. Add integration tests
+3. Add integration tests
 
 ### Debugging
 
@@ -1900,6 +1898,42 @@ This error means a replace directive doesn't start with `./`, `../`, or `/`.
 - **Use proactive detection, not error-based fallbacks** - Detect special cases upfront
 - **Fail fast** - Return first error, don't collect multiple errors
 - **Add logging to all significant operations** - See "Logging Best Practices" section for guidelines
+
+**Cleanup After Task Completion**:
+- **ALWAYS identify and remove unused code after completing a task** - This is MANDATORY
+- **Check for functions, tests, and documentation that are no longer needed**
+- **Use grep to find all references before removing**:
+  ```bash
+  # Check if a function is still used
+  grep -r "FunctionName" tests/fixture/polyrepo/
+  ```
+- **Remove in this order**:
+  1. The unused function(s) from source files
+  2. The tests for those functions
+  3. Documentation references in CLAUDE.md and other docs
+- **Verify tests still pass after removal**:
+  ```bash
+  go test ./tests/fixture/polyrepo/core/... -v
+  ```
+
+**Example - Removing Replaced Function**:
+When you replace a function like `GetReposToSync()` with `GetDirectDependencies()`:
+1. Search for all references: `grep -r "GetReposToSync"`
+2. Verify it's only in:
+   - The function definition itself
+   - Its test
+   - Documentation
+3. Remove the function from `core/sync.go`
+4. Remove `TestGetReposToSync` from `core/sync_test.go`
+5. Update documentation references to mention the new function
+6. Run tests to verify nothing broke
+
+**Why This Matters**:
+- Unused code creates confusion for future developers
+- It makes the codebase harder to maintain
+- It can hide bugs or security issues
+- It increases the cognitive load when reading code
+- It makes refactoring more difficult
 
 ### Technical Knowledge
 - **Git worktrees require direct filesystem access** - go-git doesn't support them
