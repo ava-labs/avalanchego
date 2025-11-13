@@ -159,20 +159,16 @@ func GetDefaultRefForRepo(log logging.Logger, currentRepo, targetRepo, goModPath
 	}
 
 	// Try to get the dependency version from go.mod
-	version, err := GetDependencyVersion(log, goModPath, targetConfig.GoModule)
-	if err != nil {
-		// If dependency not found and we have a primary repo, this is an error
-		// Default branch should only be used when there's no primary repo
-		if currentRepo != "" {
-			return "", stacktrace.Errorf("dependency %s not found in go.mod for %s", targetConfig.GoModule, currentRepo)
-		}
-
-		// No primary repo - use default branch
-		log.Info("using default branch (no primary repo)",
+	version, depErr := GetDependencyVersion(log, goModPath, targetConfig.GoModule)
+	if depErr != nil {
+		// If dependency not found, use default branch
+		// This is a valid scenario - you can sync a repo that isn't in your dependencies
+		log.Info("dependency not found in go.mod, using default branch",
 			zap.String("targetRepo", targetRepo),
+			zap.String("currentRepo", currentRepo),
 			zap.String("defaultBranch", targetConfig.DefaultBranch),
 		)
-		return targetConfig.DefaultBranch, nil
+		return targetConfig.DefaultBranch, nil //nolint:nilerr // Dependency not found is an expected case, not an error
 	}
 
 	log.Info("found dependency version in go.mod",
@@ -676,24 +672,28 @@ func Sync(
 		zap.Bool("force", force),
 	)
 
-	// Step 1: Detect operating mode by checking for go.mod
-	goModPath := filepath.Join(baseDir, "go.mod")
-	_, err := os.Stat(goModPath)
-	hasPrimaryRepo := err == nil
+	// Step 1: Detect operating mode by checking if we're in a known repo
+	currentRepo, err := DetectCurrentRepo(log, baseDir)
+	if err != nil {
+		return stacktrace.Errorf("failed to detect current repo: %w", err)
+	}
 
-	var currentRepo string
+	hasPrimaryRepo := currentRepo != ""
+	var goModPath string
 	if hasPrimaryRepo {
 		log.Info("detected primary repo mode (go.mod exists)")
-		currentRepo, err = DetectCurrentRepo(log, baseDir)
-		if err != nil {
-			return stacktrace.Errorf("failed to detect current repo: %w", err)
-		}
 		log.Info("detected current repository",
 			zap.String("currentRepo", currentRepo),
 		)
+
+		// Get the go.mod path for the current repo (handles special cases like firewood's ffi/go.mod)
+		config, err := GetRepoConfig(currentRepo)
+		if err != nil {
+			return stacktrace.Errorf("failed to get config for repo %s: %w", currentRepo, err)
+		}
+		goModPath = filepath.Join(baseDir, config.GoModPath)
 	} else {
 		log.Info("detected standalone mode (no go.mod)")
-		currentRepo = ""
 	}
 
 	// Step 2: Determine repos to sync
