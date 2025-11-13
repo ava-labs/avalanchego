@@ -780,7 +780,7 @@ polyrepo sync firewood@7cd05ccda8baba48617de19684db7da9ba73f8ba coreth --force
 cd avalanchego/
 polyrepo sync coreth firewood
 
-# Primary repo mode: Auto-sync based on current repo
+# Primary repo mode: Auto-sync based on current repo (syncs firewood when in avalanchego)
 cd avalanchego/
 polyrepo sync
 
@@ -1392,6 +1392,54 @@ git worktree remove ../test-worktree
    - Error message when path is a file, not a directory
 
 ## Recent Fixes
+
+### Avalanchego Default Sync Behavior: Auto-Sync Firewood (2025-11)
+
+**Change**: When running `polyrepo sync` from avalanchego with no arguments, the tool now defaults to syncing firewood instead of requiring explicit repository arguments.
+
+**Rationale**:
+- Firewood is a critical dependency of avalanchego
+- Other repos (coreth, firewood) already auto-sync avalanchego when no args provided
+- Provides consistent user experience: all primary repos have sensible defaults
+
+**Implementation**:
+- **GetDirectDependencies(log, currentRepo)** (sync.go:130-144)
+  - For avalanchego: returns `["firewood"]`
+  - For coreth/firewood: returns `["avalanchego"]`
+  - Uses firewood version from avalanchego's go.mod
+- Removed unused `errRootRepoNeedsExplicitArgs` error
+- Updated help text in main.go to reflect new behavior
+- Updated test `TestGetDirectDependencies` to verify firewood is returned
+
+**Behavior**:
+```bash
+cd avalanchego/
+./scripts/run_polyrepo.sh sync
+# Now syncs firewood at version from go.mod (previously: error)
+
+cd coreth/
+./scripts/run_polyrepo.sh sync
+# Syncs avalanchego at version from go.mod (unchanged)
+
+cd firewood/
+./scripts/run_polyrepo.sh sync
+# Syncs avalanchego at default branch (unchanged - firewood doesn't depend on avalanchego)
+```
+
+**Test Coverage**:
+- `TestGetDirectDependencies/from_avalanchego_-_defaults_to_syncing_firewood`: Verifies firewood is returned
+- All existing tests pass (73 seconds total runtime)
+
+**Files Changed**:
+- `tests/fixture/polyrepo/core/sync.go`: Updated GetDirectDependencies logic
+- `tests/fixture/polyrepo/core/errors.go`: Removed errRootRepoNeedsExplicitArgs
+- `tests/fixture/polyrepo/core/sync_test.go`: Updated test expectations
+- `tests/fixture/polyrepo/main.go`: Updated help text
+
+**Benefits**:
+- Faster workflow for avalanchego development (no need to specify firewood explicitly)
+- Consistent with existing behavior for other repos
+- Still allows explicit repos to be specified when needed
 
 ### Firewood Build Path Detection: Dynamic Nix vs Cargo Path Selection (2025-11)
 
