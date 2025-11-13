@@ -17,8 +17,6 @@ import (
 // TestUpgradeConsistency ensures that when a new upgrade is added, all
 // necessary locations are updated.
 func TestUpgradeConsistency(t *testing.T) {
-	require := require.New(t)
-
 	configType := reflect.TypeOf(upgrade.Config{})
 	var (
 		timeFields     []string
@@ -43,12 +41,12 @@ func TestUpgradeConsistency(t *testing.T) {
 		testTime := time.Date(2025, time.January, 1, 0, 0, 0, 0, time.UTC)
 		for _, fieldName := range timeFields {
 			field := configValue.FieldByName(fieldName)
-			require.True(field.IsValid(), "Field %s should exist", fieldName)
+			require.True(t, field.IsValid(), "Field %s should exist", fieldName)
 			field.Set(reflect.ValueOf(testTime))
 		}
 
 		// If all times are equal, Validate should pass
-		require.NoError(testConfig.Validate(), "Validate should pass when all upgrade times are equal")
+		require.NoError(t, testConfig.Validate(), "Validate should pass when all upgrade times are equal")
 
 		// Now test that Validate catches out-of-order times
 		// Set the last time field to before the first
@@ -56,7 +54,7 @@ func TestUpgradeConsistency(t *testing.T) {
 			lastField := configValue.FieldByName(timeFields[len(timeFields)-1])
 			lastField.Set(reflect.ValueOf(testTime.Add(-time.Hour)))
 			err := testConfig.Validate()
-			require.ErrorIs(err, upgrade.ErrInvalidUpgradeTimes, "Validate should fail when upgrade times are out of order")
+			require.ErrorIs(t, err, upgrade.ErrInvalidUpgradeTimes, "Validate should fail when upgrade times are out of order")
 		}
 	})
 
@@ -72,27 +70,26 @@ func TestUpgradeConsistency(t *testing.T) {
 			t.Run(tc.name, func(*testing.T) {
 				for _, fieldName := range timeFields {
 					timeValue, err := upgrade.GetActivationTime(upgrade.Default, fieldName)
-					require.NoError(err)
-					require.False(timeValue.IsZero(), "%s.%s should be set to a non-zero time", tc.name, fieldName)
+					require.NoError(t, err)
+					require.False(t, timeValue.IsZero(), "%s.%s should be set to a non-zero time", tc.name, fieldName)
 				}
 			})
 		}
 	})
 
 	t.Run("all Fork constants are properly stringifiable and vice versa", func(*testing.T) {
-
 		// Check that each fork is bi-directionally stringifiable
 		for fork := NoUpgrades; fork <= Latest; fork++ {
 			forkStr := fork.String()
-			require.NotEqual("Unknown", forkStr, "Fork %d should be stringifiable", fork)
+			require.NotEqual(t, "Unknown", forkStr, "Fork %d should be stringifiable", fork)
 			parsedFork := FromString(forkStr)
-			require.Equal(fork, parsedFork, "FromString(%q) should return %d, got %d", forkStr, fork, parsedFork)
+			require.Equal(t, fork, parsedFork, "FromString(%q) should return %d, got %d", forkStr, fork, parsedFork)
 		}
 
 		// Check that an invalid string fails
 		invalidName := "thehimaruupgrade"
 		fork := FromString(invalidName)
-		require.Equal(Fork(-1), fork, "FromString(%q) should return -1 for invalid name", invalidName)
+		require.Equal(t, Fork(-1), fork, "FromString(%q) should return -1 for invalid name", invalidName)
 
 	})
 
@@ -111,9 +108,9 @@ func TestUpgradeConsistency(t *testing.T) {
 			}
 
 			fork := FromString(upgradeName)
-			require.NotEqual(Fork(-1), fork, "Fork constant for %s should exist", upgradeName)
-			require.GreaterOrEqual(fork, Fork(0), "Fork constant for %s should be valid", upgradeName)
-			require.LessOrEqual(fork, Latest, "Fork constant for %s should be <= Latest", upgradeName)
+			require.NotEqual(t, Fork(-1), fork, "Fork constant for %s should exist", upgradeName)
+			require.GreaterOrEqual(t, fork, Fork(0), "Fork constant for %s should be valid", upgradeName)
+			require.LessOrEqual(t, fork, Latest, "Fork constant for %s should be <= Latest", upgradeName)
 		}
 	})
 
@@ -127,7 +124,6 @@ func TestUpgradeConsistency(t *testing.T) {
 			t.Run(forkName, func(*testing.T) {
 				config := upgrade.Config{}
 				SetTimesTo(&config, targetFork, testTime)
-
 				configValue := reflect.ValueOf(config)
 
 				// Verify that the target fork and all prior forks are set to testTime
@@ -137,10 +133,10 @@ func TestUpgradeConsistency(t *testing.T) {
 					field := configValue.FieldByName(fieldName)
 
 					if field.IsValid() {
-						require.Equal(reflect.TypeOf(time.Time{}), field.Type(),
+						require.Equal(t, reflect.TypeOf(time.Time{}), field.Type(),
 							"Field %s should be time.Time type", fieldName)
 						timeVal := field.Interface().(time.Time)
-						require.True(timeVal.Equal(testTime),
+						require.True(t, timeVal.Equal(testTime),
 							"SetTimesTo(%s, testTime) should set %s to testTime, but got %v",
 							forkName, fieldName, timeVal)
 					}
@@ -154,7 +150,7 @@ func TestUpgradeConsistency(t *testing.T) {
 
 					if field.IsValid() {
 						timeVal := field.Interface().(time.Time)
-						require.False(timeVal.Equal(testTime),
+						require.False(t, timeVal.Equal(testTime),
 							"SetTimesTo(%s, testTime) should NOT set %s to testTime, but it did",
 							forkName, fieldName)
 					}
@@ -166,15 +162,13 @@ func TestUpgradeConsistency(t *testing.T) {
 
 // TestUpgradeFieldNaming ensures consistent naming conventions across the codebase.
 func TestUpgradeFieldNaming(t *testing.T) {
-	require := require.New(t)
-
 	configType := reflect.TypeOf(upgrade.Config{})
 
 	t.Run("json tags use camelCase", func(*testing.T) {
 		for i := 0; i < configType.NumField(); i++ {
 			field := configType.Field(i)
 			jsonTag := field.Tag.Get("json")
-			require.NotEmpty(jsonTag, "Field %s must have a json tag", field.Name)
+			require.NotEmpty(t, jsonTag, "Field %s must have a json tag", field.Name)
 			require.Equal(t,
 				strings.ToLower(field.Name[:1])+field.Name[1:],
 				jsonTag,
@@ -187,16 +181,14 @@ func TestUpgradeFieldNaming(t *testing.T) {
 
 // TestForkStringCompleteness ensures all Fork constants have String() cases.
 func TestForkStringCompleteness(t *testing.T) {
-	require := require.New(t)
-
 	// Test that no fork returns "Unknown" except when explicitly set to an invalid value
 	for fork := NoUpgrades; fork <= Latest+1; fork++ {
 		forkStr := fork.String()
 		if fork <= Latest {
-			require.NotEqual("Unknown", forkStr, "Fork %d should not return 'Unknown'", fork)
+			require.NotEqual(t, "Unknown", forkStr, "Fork %d should not return 'Unknown'", fork)
 		} else {
 			// Forks beyond Latest should return "Unknown"
-			require.Equal("Unknown", forkStr, "Fork %d (beyond Latest) should return 'Unknown'", fork)
+			require.Equal(t, "Unknown", forkStr, "Fork %d (beyond Latest) should return 'Unknown'", fork)
 		}
 	}
 }
