@@ -180,6 +180,10 @@ runs:
         GH_RUN_NUMBER: ${{ inputs.run_number }}
         GH_RUN_ATTEMPT: ${{ inputs.run_attempt }}
         GH_JOB_ID: ${{ inputs.job }}
+    - name: Stash local changes before benchmark comparison
+      shell: bash
+      run: |
+        git stash --include-untracked || true
     - name: Compare Benchmark Results
       uses: benchmark-action/github-action-benchmark@v1
       with:
