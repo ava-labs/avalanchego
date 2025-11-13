@@ -57,7 +57,8 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 		upgradetest.SetTimesTo(&upgrades, upgradetest.Latest, upgrade.InitiallyActiveTime)
 		upgrades.GraniteEpochDuration = 4 * time.Second
 	} else {
-		upgradetest.SetTimesTo(&upgrades, upgradetest.Latest, upgrade.UnscheduledActivationTime)
+		// Keep the default config but ensure the latest upgrade is not activated
+		upgradetest.SetTimeOnly(&upgrades, upgradetest.Latest, upgrade.UnscheduledActivationTime)
 	}
 	tc.Log().Info("setting upgrades",
 		zap.Reflect("upgrades", upgrades),
