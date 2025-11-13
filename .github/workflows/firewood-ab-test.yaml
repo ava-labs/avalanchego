@@ -1,7 +1,6 @@
 name: Firewood A/B Test
 
 on:
-  pull_request:
   workflow_dispatch:
     inputs:
       firewood-version:
