@@ -52,10 +52,18 @@ runs:
         go get github.com/ava-labs/libevm@${{ inputs.libevm }}
     - name: Setup Firewood FFI
       if: inputs.firewood != ''
+      id: setup-firewood
+      uses: ava-labs/firewood/.github/actions/build-action@composable-ci-action
+      with:
+        version: ${{ inputs.firewood }}
+        workspace-path: ${{ inputs.firewood-path }}
+    - name: Configure Go modules with Firewood FFI
+      if: inputs.firewood != ''
       shell: bash
+      working-directory: ${{ inputs.checkout-path }}
       run: |
-        if [ -n "${{ inputs.firewood-path }}" ]; then
-          "${{ inputs.checkout-path }}/scripts/setup_firewood.sh" "${{ inputs.firewood }}" "${{ inputs.firewood-path }}"
-        else
-          "${{ inputs.checkout-path }}/scripts/setup_firewood.sh" "${{ inputs.firewood }}"
-        fi
+        FFI_PATH="${{ steps.setup-firewood.outputs.ffi-path }}"
+        echo "Updating go.mod with FFI path: ${FFI_PATH}"
+        go mod edit -replace github.com/ava-labs/firewood-go-ethhash/ffi="${FFI_PATH}"
+        go mod tidy
+        go mod download
