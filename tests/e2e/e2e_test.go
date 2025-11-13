@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 )
 
 func TestE2E(t *testing.T) {
@@ -50,10 +51,11 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	subnets := vms.XSVMSubnetsOrPanic(nodes...)
 
 	upgrades := upgrade.Default
-	if flagVars.ActivateHelicon() {
-		upgrades.HeliconTime = upgrade.InitiallyActiveTime
+	if flagVars.ActivateLatest() {
+		// Activate all upgrades up to and including the latest
+		upgradetest.SetTimesTo(&upgrades, upgradetest.Latest, upgrade.InitiallyActiveTime)
 	} else {
-		upgrades.HeliconTime = upgrade.UnscheduledActivationTime
+		upgradetest.SetTimesTo(&upgrades, upgradetest.Latest, upgrade.UnscheduledActivationTime)
 	}
 	tc.Log().Info("setting upgrades",
 		zap.Reflect("upgrades", upgrades),

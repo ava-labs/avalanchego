@@ -65,3 +65,43 @@ func (f Fork) String() string {
 		return "Unknown"
 	}
 }
+
+// FromString returns the Fork constant for the given name, or -1 if not found.
+func FromString(name string) Fork {
+	switch name {
+	case "Helicon":
+		return Helicon
+	case "Granite":
+		return Granite
+	case "Fortuna":
+		return Fortuna
+	case "Etna":
+		return Etna
+	case "Durango":
+		return Durango
+	case "Cortina":
+		return Cortina
+	case "Banff":
+		return Banff
+	case "ApricotPhasePost6":
+		return ApricotPhasePost6
+	case "ApricotPhase6":
+		return ApricotPhase6
+	case "ApricotPhasePre6":
+		return ApricotPhasePre6
+	case "ApricotPhase5":
+		return ApricotPhase5
+	case "ApricotPhase4":
+		return ApricotPhase4
+	case "ApricotPhase3":
+		return ApricotPhase3
+	case "ApricotPhase2":
+		return ApricotPhase2
+	case "ApricotPhase1":
+		return ApricotPhase1
+	case "NoUpgrades":
+		return NoUpgrades
+	default:
+		return -1
+	}
+}

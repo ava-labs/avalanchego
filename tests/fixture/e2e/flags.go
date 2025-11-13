@@ -40,7 +40,7 @@ type FlagVars struct {
 	stopNetwork    bool
 	restartNetwork bool
 
-	activateHelicon bool
+	activateLatest bool
 }
 
 func (v *FlagVars) NetworkCmd() (NetworkCmd, error) {
@@ -120,8 +120,8 @@ func (v *FlagVars) NetworkShutdownDelay() time.Duration {
 	return 0
 }
 
-func (v *FlagVars) ActivateHelicon() bool {
-	return v.activateHelicon
+func (v *FlagVars) ActivateLatest() bool {
+	return v.activateLatest
 }
 
 type DefaultOption func(*DefaultOptions)
@@ -215,10 +215,10 @@ func RegisterFlags(ops ...DefaultOption) *FlagVars {
 	)
 
 	flag.BoolVar(
-		&vars.activateHelicon,
-		"activate-helicon",
+		&vars.activateLatest,
+		"activate-latest",
 		false,
-		"[optional] activate the helicon upgrade",
+		"[optional] activate all upgrades up to and including the latest upgrade",
 	)
 
 	return &vars
