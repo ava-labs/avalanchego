@@ -107,13 +107,12 @@ func DetectCurrentRepo(log logging.Logger, dir string) (string, error) {
 }
 
 // GetDirectDependencies determines which repos to sync when no explicit repos
-// are specified. For non-avalanchego repos (firewood, coreth), only avalanchego
-// is synced if it's a direct dependency. For avalanchego (root repo), returns an
-// error since it requires explicit repository arguments.
+// are specified. For non-avalanchego repos (firewood, coreth), avalanchego is
+// always synced unconditionally. For avalanchego (root repo), returns an error
+// since it requires explicit repository arguments.
 func GetDirectDependencies(log logging.Logger, currentRepo, goModPath string) ([]string, error) {
 	log.Debug("determining repositories to sync",
 		zap.String("currentRepo", currentRepo),
-		zap.String("goModPath", goModPath),
 	)
 
 	// Special case: avalanchego is a root repo and requires explicit args
@@ -122,28 +121,9 @@ func GetDirectDependencies(log logging.Logger, currentRepo, goModPath string) ([
 		return nil, errRootRepoNeedsExplicitArgs
 	}
 
-	// For non-avalanchego repos (firewood, coreth), only sync avalanchego
-	// Check if avalanchego is a direct dependency
-	avalanchegoConfig, err := GetRepoConfig("avalanchego")
-	if err != nil {
-		return []string{}, stacktrace.Errorf("failed to get avalanchego config: %w", err)
-	}
-
-	// Check if avalanchego is a direct dependency
-	_, err = GetDependencyVersion(log, goModPath, avalanchegoConfig.GoModule)
-	if err == nil {
-		// avalanchego found as direct dependency
-		log.Debug("found avalanchego as direct dependency")
-		log.Info("determined repositories to sync: only avalanchego (primary dependency)")
-		return []string{"avalanchego"}, nil
-	}
-
-	// avalanchego is not a direct dependency (unusual case)
-	log.Debug("avalanchego is not a direct dependency",
-		zap.String("currentRepo", currentRepo),
-	)
-	log.Info("no repositories to sync (avalanchego not found as dependency)")
-	return []string{}, nil
+	// For non-avalanchego repos (firewood, coreth), always sync avalanchego
+	log.Info("determined repositories to sync: only avalanchego (primary dependency)")
+	return []string{"avalanchego"}, nil
 }
 
 // GetDefaultRefForRepo determines the default ref to use for a target repo

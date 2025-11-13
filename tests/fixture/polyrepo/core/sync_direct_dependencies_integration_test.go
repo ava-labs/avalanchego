@@ -65,22 +65,17 @@ func TestSync_FromFirewood_NoArgs_OnlyAvalanchego(t *testing.T) {
 
 	require.NoError(t, err, "polyrepo sync failed from firewood directory: %s", syncStderr.String())
 
-	// Check if avalanchego was synced or not
-	// Note: The real firewood repo might not depend on avalanchego at the default branch
+	// Validate: avalanchego should be synced (always, unconditionally)
 	avalanchegoPath := filepath.Join(firewoodPath, "avalanchego")
-	_, avalanchegoErr := os.Stat(avalanchegoPath)
+	_, err = os.Stat(avalanchegoPath)
+	require.NoError(t, err, "expected avalanchego to be synced (always synced from firewood)")
 
-	// Validate: coreth should NOT be cloned (would be transitive)
+	// Validate: coreth should NOT be cloned (only avalanchego is synced)
 	corethPath := filepath.Join(firewoodPath, "coreth")
-	_, corethErr := os.Stat(corethPath)
-	require.True(t, os.IsNotExist(corethErr), "coreth should NOT be cloned (transitive dependency only)")
+	_, err = os.Stat(corethPath)
+	require.True(t, os.IsNotExist(err), "coreth should NOT be cloned (only avalanchego is synced)")
 
-	if avalanchegoErr == nil {
-		t.Logf("Test passed: only direct dependency (avalanchego) was synced, not transitive dependency (coreth)")
-	} else {
-		t.Logf("Test passed: firewood does not depend on avalanchego, so nothing was synced (correct behavior)")
-		t.Logf("This is correct - if there are no direct dependencies, nothing should be synced")
-	}
+	t.Logf("Test passed: only avalanchego was synced from firewood, not coreth")
 }
 
 // TestSync_FromCoreth_NoArgs_OnlyAvalanchego tests that when running

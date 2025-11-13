@@ -100,91 +100,33 @@ go 1.21
 
 func TestGetDirectDependencies(t *testing.T) {
 	tests := []struct {
-		name           string
-		currentRepo    string
-		setupGoMod     func(t *testing.T) string // Returns tmpDir with go.mod
-		expectedRepos  []string
-		expectedError  error
+		name          string
+		currentRepo   string
+		expectedRepos []string
+		expectedError error
 	}{
 		{
-			name:        "from firewood - should only sync avalanchego",
-			currentRepo: "firewood",
-			setupGoMod: func(t *testing.T) string {
-				tmpDir := t.TempDir()
-				// Create ffi/go.mod for firewood
-				ffiDir := filepath.Join(tmpDir, "ffi")
-				err := os.MkdirAll(ffiDir, 0o755)
-				require.NoError(t, err)
-				goModContent := `module github.com/ava-labs/firewood/ffi
-
-go 1.21
-
-require (
-	github.com/ava-labs/avalanchego v1.11.0
-)
-`
-				err = os.WriteFile(filepath.Join(ffiDir, "go.mod"), []byte(goModContent), 0o600)
-				require.NoError(t, err)
-				return tmpDir
-			},
+			name:          "from firewood - always syncs avalanchego",
+			currentRepo:   "firewood",
 			expectedRepos: []string{"avalanchego"},
 			expectedError: nil,
 		},
 		{
-			name:        "from coreth - should only sync avalanchego",
-			currentRepo: "coreth",
-			setupGoMod: func(t *testing.T) string {
-				tmpDir := t.TempDir()
-				goModContent := `module github.com/ava-labs/coreth
-
-go 1.21
-
-require (
-	github.com/ava-labs/avalanchego v1.11.0
-	github.com/ava-labs/firewood/ffi v0.2.0
-)
-`
-				err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goModContent), 0o600)
-				require.NoError(t, err)
-				return tmpDir
-			},
+			name:          "from coreth - always syncs avalanchego",
+			currentRepo:   "coreth",
 			expectedRepos: []string{"avalanchego"},
 			expectedError: nil,
 		},
 		{
-			name:        "from avalanchego - should error (root repo requires explicit args)",
-			currentRepo: "avalanchego",
-			setupGoMod: func(t *testing.T) string {
-				tmpDir := t.TempDir()
-				goModContent := `module github.com/ava-labs/avalanchego
-
-go 1.21
-
-require (
-	github.com/ava-labs/coreth v0.13.8
-)
-`
-				err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goModContent), 0o600)
-				require.NoError(t, err)
-				return tmpDir
-			},
+			name:          "from avalanchego - error (root repo requires explicit args)",
+			currentRepo:   "avalanchego",
 			expectedRepos: nil,
 			expectedError: errRootRepoNeedsExplicitArgs,
 		},
 		{
-			name:        "from unknown repo with no dependencies",
-			currentRepo: "unknown",
-			setupGoMod: func(t *testing.T) string {
-				tmpDir := t.TempDir()
-				goModContent := `module github.com/example/unknown
-
-go 1.21
-`
-				err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goModContent), 0o600)
-				require.NoError(t, err)
-				return tmpDir
-			},
-			expectedRepos: []string{},
+			name:          "from unknown repo - always syncs avalanchego",
+			currentRepo:   "unknown",
+			expectedRepos: []string{"avalanchego"},
 			expectedError: nil,
 		},
 	}
@@ -192,15 +134,9 @@ go 1.21
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			log := logging.NoLog{}
-			tmpDir := tt.setupGoMod(t)
 
-			// Determine go.mod path based on repo
-			goModPath := filepath.Join(tmpDir, "go.mod")
-			if tt.currentRepo == "firewood" {
-				goModPath = filepath.Join(tmpDir, "ffi", "go.mod")
-			}
-
-			repos, err := GetDirectDependencies(log, tt.currentRepo, goModPath)
+			// goModPath is no longer used by GetDirectDependencies, but we pass it for API compatibility
+			repos, err := GetDirectDependencies(log, tt.currentRepo, "")
 
 			if tt.expectedError != nil {
 				require.ErrorIs(t, err, tt.expectedError)
