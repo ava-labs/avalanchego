@@ -208,14 +208,13 @@ The second criterion is satisfied by the `next_epoch_approvals` field containing
 belonging to the next epoch. Unlike the previous field, this field also needs to be updated by nodes in the next epoch that might not be in the current epoch.
 To that end, nodes in the next epoch create a `NextEpochApprovals` message with `node_ids` belonging only to themselves, and broadcast it to the nodes in the current epoch.
 Then, when a node in the current epoch builds a block, it sets the bits in the `node_ids` field corresponding to the union of the existing and new approving nodes, and aggregates the signatures of the nodes.
-The signature is over the `aux_info_digest` and the `next_p_chain_reference_height` fields, to ensure that the nodes in the next epoch agree not only on the validator set,
+The signature is over the `info` field of the `AuxiliaryInfo` and the `next_p_chain_reference_height` fields, to ensure that the nodes in the next epoch agree not only on the validator set,
 but also on any kind of application specific auxiliary information that might be needed by the next epoch. One example for such auxiliary information
 can be messages in a cryptographic protocol that are to be used in the next epoch.
 
-When validating the block, the MSM ensures that the `aux_info_digest` corresponds to the digest of the `info` field in the `AuxiliaryInfo` encoded in the block.
 However, it is up to the application that inspects the auxiliary information to decide when a `NextEpochApprovals` message should be sent or not.
 In fact, in order to avoid denial-of-service attacks, the application verification logic should be built in such a manner that refuses to mutate the auxiliary information
-once it is considered ready to be signed by node. This ensures that the `aux_info_digest` and the `next_p_chain_reference_height` are constant once both of them are encoded in a block.
+once it is considered ready for the epoch being sealed. This ensures that the `info` of the `AuxiliaryInfo` and the `next_p_chain_reference_height` are constant once both of them are encoded in a block.
 
 
 ### Epoch change using the MSM
@@ -288,7 +287,6 @@ Once enough approvals are gathered, the sealing block at sequence 40 can be buil
     block_validation_descriptor: [TGVhcm4gdG8g==, dmFsdWUgeW91cnNlbGY==, ... , XBwaW5lc3MuCg==]
     next_epoch_approvals: {
         node_ids: 10111101
-        aux_info_digest: "VGhlIGhhcmRlc3Q=="
         signature: "erpcyBqaGUg05z=="
     }
 }
@@ -444,8 +442,7 @@ type AggregatedMembership {
 message NextEpochApprovals {
   bytes node_ids = 1; // The nodeIDs of nodes belonging to the next epoch that approve the epoch change.
                       // In practice, this is a bit-map that corresponds to the nodes in the block_validation_descriptor.
-  bytes aux_info_digest = 2; // The digest of the auxiliary information that is approved by the nodes.
-  bytes signature = 3; // The signature of the nodes that approve the epoch change.
+  bytes signature = 2; // An aggregated signature over the `info` of AuxiliaryInfo` and the `next_p_chain_reference_height`.
 }
 
 message SimplexEpochInfo {
