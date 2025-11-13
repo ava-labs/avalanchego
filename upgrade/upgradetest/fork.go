@@ -27,7 +27,7 @@ const (
 	Granite
 	Helicon
 
-	Latest = Helicon
+	Latest = iota - 1
 )
 
 // Fork is an enum of all the major network upgrades.
