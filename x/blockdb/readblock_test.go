@@ -51,6 +51,7 @@ func TestReadOperations(t *testing.T) {
 				MaxDataFileSize:    DefaultMaxDataFileSize,
 				CheckpointInterval: 1024,
 				MaxDataFiles:       DefaultMaxDataFileSize,
+				BlockCacheSize:     DefaultBlockCacheSize,
 			},
 		},
 		{
@@ -69,6 +70,7 @@ func TestReadOperations(t *testing.T) {
 				MaxDataFileSize:    DefaultMaxDataFileSize,
 				CheckpointInterval: 1024,
 				MaxDataFiles:       DefaultMaxDataFileSize,
+				BlockCacheSize:     DefaultBlockCacheSize,
 			},
 			wantErr: ErrInvalidBlockHeight,
 		},
@@ -92,8 +94,7 @@ func TestReadOperations(t *testing.T) {
 				config = &defaultConfig
 			}
 
-			store, cleanup := newTestDatabase(t, *config)
-			defer cleanup()
+			store := newDatabase(t, *config)
 
 			// Seed database with blocks based on config (unless skipSeed is true)
 			seededBlocks := make(map[uint64][]byte)
@@ -137,8 +138,7 @@ func TestReadOperations(t *testing.T) {
 }
 
 func TestReadOperations_Concurrency(t *testing.T) {
-	store, cleanup := newTestDatabase(t, DefaultConfig())
-	defer cleanup()
+	store := newDatabase(t, DefaultConfig())
 
 	// Pre-generate blocks and write them
 	numBlocks := 50
@@ -269,8 +269,7 @@ func TestHasBlock(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			store, cleanup := newTestDatabase(t, DefaultConfig().WithMinimumHeight(minHeight))
-			defer cleanup()
+			store := newDatabase(t, DefaultConfig().WithMinimumHeight(minHeight))
 
 			for i := minHeight; i <= minHeight+blocksCount; i++ {
 				if i == gapHeight {
