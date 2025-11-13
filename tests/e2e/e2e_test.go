@@ -55,7 +55,6 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	if flagVars.ActivateLatest() {
 		// Activate all upgrades up to and including the latest
 		upgradetest.SetTimesTo(&upgrades, upgradetest.Latest, upgrade.InitiallyActiveTime)
-		// Use shorter epoch duration for faster testing
 		upgrades.GraniteEpochDuration = 4 * time.Second
 	} else {
 		upgradetest.SetTimesTo(&upgrades, upgradetest.Latest, upgrade.UnscheduledActivationTime)

@@ -18,18 +18,12 @@ import (
 // necessary locations are updated.
 func TestUpgradeConsistency(t *testing.T) {
 	configType := reflect.TypeOf(upgrade.Config{})
-	var (
-		timeFields     []string
-		durationFields []string
-	)
+	var timeFields []string
 
 	for i := 0; i < configType.NumField(); i++ {
 		field := configType.Field(i)
 		if field.Type == reflect.TypeOf(time.Time{}) {
 			timeFields = append(timeFields, field.Name)
-		}
-		if field.Type == reflect.TypeOf(time.Duration(0)) {
-			durationFields = append(durationFields, field.Name)
 		}
 	}
 
@@ -90,7 +84,6 @@ func TestUpgradeConsistency(t *testing.T) {
 		invalidName := "thehimaruupgrade"
 		fork := FromString(invalidName)
 		require.Equal(t, Fork(-1), fork, "FromString(%q) should return -1 for invalid name", invalidName)
-
 	})
 
 	t.Run("upgradetest Fork constants match config fields", func(*testing.T) {
@@ -169,7 +162,7 @@ func TestUpgradeFieldNaming(t *testing.T) {
 			field := configType.Field(i)
 			jsonTag := field.Tag.Get("json")
 			require.NotEmpty(t, jsonTag, "Field %s must have a json tag", field.Name)
-			require.Equal(t,
+			require.Equal(t, //nolint:testifylint // these are not json strings
 				strings.ToLower(field.Name[:1])+field.Name[1:],
 				jsonTag,
 				"json tag %s must be the lower-camel version of field %s",

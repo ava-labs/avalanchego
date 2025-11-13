@@ -148,13 +148,13 @@ func GetActivationTime(config any, fieldName string) (time.Time, error) {
 	val := reflect.ValueOf(config)
 
 	if val.Kind() != reflect.Struct {
-		return time.Time{}, fmt.Errorf("Error: Expected a struct but got %s", val.Kind())
+		return time.Time{}, fmt.Errorf("want a struct but got %s", val.Kind())
 	}
 
 	field := val.FieldByName(fieldName)
 
 	if !field.IsValid() {
-		return time.Time{}, fmt.Errorf("Error: Field '%s' not found in struct.\n", fieldName)
+		return time.Time{}, fmt.Errorf("field '%s' not found in struct", fieldName)
 	}
 
 	return field.Interface().(time.Time), nil
