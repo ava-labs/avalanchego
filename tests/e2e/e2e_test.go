@@ -54,7 +54,7 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	if !flagVars.ActivateLatest() {
 		upgradeToActivate--
 	}
-	upgrades := upgradetest.GetConfig(upgradeToActivate)
+	upgrades := upgradetest.GetConfig(upgradetest.Fork(upgradeToActivate))
 	upgrades.GraniteEpochDuration = 4 * time.Second
 	tc.Log().Info("setting upgrades",
 		zap.Reflect("upgrades", upgrades),
