@@ -36,13 +36,21 @@ func TestSync_FromFirewood_CLI_PrimaryRepoMode(t *testing.T) {
 	firewoodConfig, err := GetRepoConfig("firewood")
 	require.NoError(t, err, "failed to get firewood config")
 
-	// Use exec.Command to clone firewood (can't use CloneRepo because it's not available in this test context)
-	cloneCmd := exec.Command("git", "clone", "--depth", "1", "--branch", firewoodConfig.DefaultBranch, firewoodConfig.GitRepo, "firewood")
+	// Clone firewood at a specific commit that's compatible with available Rust version
+	// Using an older commit that works with Rust 1.80 (avoiding main which requires 1.91)
+	cloneCmd := exec.Command("git", "clone", firewoodConfig.GitRepo, "firewood")
 	cloneCmd.Dir = tmpDir
 	var cloneStderr strings.Builder
 	cloneCmd.Stderr = &cloneStderr
 	err = cloneCmd.Run()
 	require.NoError(t, err, "failed to clone firewood: %s", cloneStderr.String())
+
+	// Checkout a known-good commit (has ffi/flake.nix, compatible with Rust 1.80)
+	// This commit is from before the Rust 1.91 requirement
+	checkoutCmd := exec.Command("git", "checkout", "bdf58f91b8efda6b6778a1da548d589f152f677d")
+	checkoutCmd.Dir = filepath.Join(tmpDir, "firewood")
+	err = checkoutCmd.Run()
+	require.NoError(t, err, "failed to checkout firewood commit")
 
 	firewoodPath := filepath.Join(tmpDir, "firewood")
 
@@ -100,14 +108,33 @@ func TestSync_FromFirewood_CLI_PrimaryRepoMode(t *testing.T) {
 	require.Contains(t, goModStr, "replace github.com/ava-labs/firewood-go-ethhash/ffi",
 		"expected replace directive for firewood in avalanchego/go.mod")
 
-	// The replace should point to ../ffi (since avalanchego is synced into firewood/avalanchego)
-	// OR ../ffi/result/ffi if nix build was run
-	require.True(t,
-		strings.Contains(goModStr, "=> ../ffi\n") ||
-			strings.Contains(goModStr, "=> ../ffi/result/ffi\n") ||
-			strings.Contains(goModStr, "=> ../ffi\r\n") ||
-			strings.Contains(goModStr, "=> ../ffi/result/ffi\r\n"),
-		"expected replace directive to point to ../ffi or ../ffi/result/ffi, got:\n%s", goModStr)
+	// Check if ffi/flake.nix exists (determines if nix build should run)
+	flakeNixPath := filepath.Join(firewoodPath, "ffi", "flake.nix")
+	_, flakeNixErr := os.Stat(flakeNixPath)
+	hasFlakeNix := flakeNixErr == nil
 
-	t.Logf("Test passed: firewood was correctly detected as primary repo, avalanchego was synced with correct replace directive")
+	if hasFlakeNix {
+		// If flake.nix exists, nix build should have run
+		// Verify that ffi/result/ffi/ directory exists (nix build output)
+		nixOutputPath := filepath.Join(firewoodPath, "ffi", "result", "ffi")
+		_, err = os.Stat(nixOutputPath)
+		require.NoError(t, err, "expected ffi/result/ffi/ to exist after nix build (flake.nix present)")
+
+		// Verify replace directive uses the nix output path
+		require.True(t,
+			strings.Contains(goModStr, "=> ../ffi/result/ffi\n") ||
+				strings.Contains(goModStr, "=> ../ffi/result/ffi\r\n"),
+			"expected replace directive to point to ../ffi/result/ffi (nix build output), got:\n%s", goModStr)
+
+		t.Logf("Test passed: firewood was correctly detected as primary repo, nix build ran, avalanchego uses correct nix output path")
+	} else {
+		// If no flake.nix, cargo build fallback should be used
+		// The replace should point to ../ffi (cargo build path)
+		require.True(t,
+			strings.Contains(goModStr, "=> ../ffi\n") ||
+				strings.Contains(goModStr, "=> ../ffi\r\n"),
+			"expected replace directive to point to ../ffi (cargo build path), got:\n%s", goModStr)
+
+		t.Logf("Test passed: firewood was correctly detected as primary repo, cargo build used (no flake.nix), avalanchego uses correct cargo path")
+	}
 }

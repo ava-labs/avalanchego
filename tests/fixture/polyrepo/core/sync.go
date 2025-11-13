@@ -16,7 +16,8 @@ import (
 // GetFirewoodReplacementPath returns the correct replacement path for firewood
 // based on which build method was used (nix build or cargo build).
 // For non-firewood repos, returns the config default.
-func GetFirewoodReplacementPath(log logging.Logger, baseDir, repoName string) string {
+// isPrimary indicates if this repo is the primary repo (baseDir IS the repo) vs synced (baseDir contains repo/).
+func GetFirewoodReplacementPath(log logging.Logger, baseDir, repoName string, isPrimary bool) string {
 	// For non-firewood repos, return the config default
 	//nolint:goconst // "firewood" constant is local to Sync() function
 	if repoName != "firewood" {
@@ -29,16 +30,26 @@ func GetFirewoodReplacementPath(log logging.Logger, baseDir, repoName string) st
 	}
 
 	// Check if nix build output exists
-	nixPath := filepath.Join(baseDir, repoName, "ffi", "result", "ffi", "go.mod")
+	var nixPath string
+	if isPrimary {
+		// Primary repo: baseDir IS the firewood directory
+		nixPath = filepath.Join(baseDir, "ffi", "result", "ffi", "go.mod")
+	} else {
+		// Synced repo: baseDir contains firewood/ subdirectory
+		nixPath = filepath.Join(baseDir, repoName, "ffi", "result", "ffi", "go.mod")
+	}
+
 	if _, err := os.Stat(nixPath); err == nil {
 		log.Info("detected nix build output for firewood",
 			zap.String("path", "./ffi/result/ffi"),
+			zap.Bool("isPrimary", isPrimary),
 		)
 		return "./ffi/result/ffi" // Nix build
 	}
 
 	log.Info("using cargo build path for firewood (nix output not found)",
 		zap.String("path", "./ffi"),
+		zap.Bool("isPrimary", isPrimary),
 	)
 	// Otherwise, cargo build (or not yet built)
 	return "./ffi"
@@ -311,7 +322,7 @@ func UpdateAllReplaceDirectives(log logging.Logger, baseDir string, syncedRepos 
 				}
 				// From synced repo back to base dir
 				replacePath = ".."
-				modPath := GetFirewoodReplacementPath(log, baseDir, otherRepoName)
+				modPath := GetFirewoodReplacementPath(log, baseDir, otherRepoName, otherRepoName == primaryRepo)
 				if modPath != "." {
 					// Strip leading ./ from ModuleReplacementPath if present
 					if len(modPath) >= 2 && modPath[0:2] == "./" {
@@ -325,7 +336,7 @@ func UpdateAllReplaceDirectives(log logging.Logger, baseDir string, syncedRepos 
 					// From primary repo to synced repo
 					// filepath.Join normalizes away ./ so we build it manually
 					replacePath = otherRepoName
-					modPath := GetFirewoodReplacementPath(log, baseDir, otherRepoName)
+					modPath := GetFirewoodReplacementPath(log, baseDir, otherRepoName, otherRepoName == primaryRepo)
 					if modPath != "." {
 						// Strip leading ./ from ModuleReplacementPath if present
 						if len(modPath) >= 2 && modPath[0:2] == "./" {
@@ -338,7 +349,7 @@ func UpdateAllReplaceDirectives(log logging.Logger, baseDir string, syncedRepos 
 				} else {
 					// From synced repo to another synced repo (sibling)
 					replacePath = otherRepoName
-					modPath := GetFirewoodReplacementPath(log, baseDir, otherRepoName)
+					modPath := GetFirewoodReplacementPath(log, baseDir, otherRepoName, otherRepoName == primaryRepo)
 					if modPath != "." {
 						// Strip leading ./ from ModuleReplacementPath if present
 						if len(modPath) >= 2 && modPath[0:2] == "./" {
@@ -913,6 +924,18 @@ func Sync(
 		)
 
 		syncedRepoNames = append(syncedRepoNames, repo.name)
+	}
+
+	// Build firewood if it's the primary repo (not synced)
+	// This ensures firewood is built before replace directives are updated
+	if currentRepo == "firewood" {
+		log.Info("building primary repository (firewood)",
+			zap.String("path", baseDir),
+		)
+		err = BuildFirewood(log, baseDir, "HEAD")
+		if err != nil {
+			return stacktrace.Errorf("failed to build primary firewood: %w", err)
+		}
 	}
 
 	// Step 6: Update replace directives (Primary mode only)
