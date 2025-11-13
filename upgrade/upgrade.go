@@ -6,6 +6,7 @@ package upgrade
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -139,6 +140,24 @@ func (c *Config) Validate() error {
 		}
 	}
 	return nil
+}
+
+// Takes in one of Mainnet, Fuji, or Default, and a provided field, return the
+// activation time for the field if it exists.
+func GetActivationTime(config any, fieldName string) (time.Time, error) {
+	val := reflect.ValueOf(config)
+
+	if val.Kind() != reflect.Struct {
+		return time.Time{}, fmt.Errorf("Error: Expected a struct but got %s", val.Kind())
+	}
+
+	field := val.FieldByName(fieldName)
+
+	if !field.IsValid() {
+		return time.Time{}, fmt.Errorf("Error: Field '%s' not found in struct.\n", fieldName)
+	}
+
+	return field.Interface().(time.Time), nil
 }
 
 func (c *Config) IsApricotPhase1Activated(t time.Time) bool {

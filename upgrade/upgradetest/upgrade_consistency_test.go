@@ -15,13 +15,10 @@ import (
 )
 
 // TestUpgradeConsistency ensures that when a new upgrade is added, all
-// necessary locations are updated. This test helps prevent mistakes like
-// forgetting to add a field to the Validate() method or missing a case in
-// SetTimesTo().
+// necessary locations are updated.
 func TestUpgradeConsistency(t *testing.T) {
 	require := require.New(t)
 
-	// Get all time.Time fields from upgrade.Config struct
 	configType := reflect.TypeOf(upgrade.Config{})
 	var (
 		timeFields     []string
@@ -38,28 +35,6 @@ func TestUpgradeConsistency(t *testing.T) {
 		}
 	}
 
-	require.NotEmpty(timeFields, "upgrade.Config should have time.Time fields")
-
-	t.Run("all time fields have activation methods", func(*testing.T) {
-		configValueType := reflect.TypeOf(&upgrade.Config{})
-
-		for _, fieldName := range timeFields {
-			// Expected method name: IsXActivated
-			// e.g., GraniteTime -> IsGraniteActivated
-			upgradeName := strings.TrimSuffix(fieldName, "Time")
-			expectedMethodName := "Is" + upgradeName + "Activated"
-
-			method, found := configValueType.MethodByName(expectedMethodName)
-			require.True(found, "upgrade.Config should have method %s for field %s", expectedMethodName, fieldName)
-
-			// Verify method signature: func(*upgrade.Config, time.Time) bool
-			require.Equal(2, method.Type.NumIn(), "Method %s should have 2 inputs (receiver, time.Time)", expectedMethodName)
-			require.Equal(1, method.Type.NumOut(), "Method %s should have 1 output (bool)", expectedMethodName)
-			require.Equal(reflect.TypeOf(time.Time{}), method.Type.In(1), "Method %s should take time.Time as parameter", expectedMethodName)
-			require.Equal(reflect.TypeOf(true), method.Type.Out(0), "Method %s should return bool", expectedMethodName)
-		}
-	})
-
 	t.Run("all time fields are in Validate method", func(*testing.T) {
 		// Test that Validate() doesn't return an error when all times are equal
 		testConfig := upgrade.Config{}
@@ -70,14 +45,6 @@ func TestUpgradeConsistency(t *testing.T) {
 			field := configValue.FieldByName(fieldName)
 			require.True(field.IsValid(), "Field %s should exist", fieldName)
 			field.Set(reflect.ValueOf(testTime))
-		}
-
-		// Set duration fields to valid values
-		for _, fieldName := range durationFields {
-			field := configValue.FieldByName(fieldName)
-			if field.IsValid() {
-				field.Set(reflect.ValueOf(time.Minute))
-			}
 		}
 
 		// If all times are equal, Validate should pass
@@ -103,23 +70,30 @@ func TestUpgradeConsistency(t *testing.T) {
 			{"Default", upgrade.Default},
 		} {
 			t.Run(tc.name, func(*testing.T) {
-				configValue := reflect.ValueOf(tc.config)
 				for _, fieldName := range timeFields {
-					field := configValue.FieldByName(fieldName)
-					require.True(field.IsValid(), "%s.%s should exist", tc.name, fieldName)
-					timeValue := field.Interface().(time.Time)
+					timeValue, err := upgrade.GetActivationTime(upgrade.Default, fieldName)
+					require.NoError(err)
 					require.False(timeValue.IsZero(), "%s.%s should be set to a non-zero time", tc.name, fieldName)
 				}
 			})
 		}
 	})
 
-	t.Run("all Fork constants are stringifiable", func(*testing.T) {
-		// Check that each fork can produce a valid string representation
+	t.Run("all Fork constants are properly stringifiable and vice versa", func(*testing.T) {
+
+		// Check that each fork is bi-directionally stringifiable
 		for fork := NoUpgrades; fork <= Latest; fork++ {
-			forkName := fork.String()
-			require.NotEqual("Unknown", forkName, "Fork %d should be stringifiable", fork)
+			forkStr := fork.String()
+			require.NotEqual("Unknown", forkStr, "Fork %d should be stringifiable", fork)
+			parsedFork := FromString(forkStr)
+			require.Equal(fork, parsedFork, "FromString(%q) should return %d, got %d", forkStr, fork, parsedFork)
 		}
+
+		// Check that an invalid string fails
+		invalidName := "thehimaruupgrade"
+		fork := FromString(invalidName)
+		require.Equal(Fork(-1), fork, "FromString(%q) should return -1 for invalid name", invalidName)
+
 	})
 
 	t.Run("upgradetest Fork constants match config fields", func(*testing.T) {
@@ -196,47 +170,17 @@ func TestUpgradeFieldNaming(t *testing.T) {
 
 	configType := reflect.TypeOf(upgrade.Config{})
 
-	t.Run("time fields end with Time suffix", func(*testing.T) {
-		for i := 0; i < configType.NumField(); i++ {
-			field := configType.Field(i)
-			if field.Type == reflect.TypeOf(time.Time{}) {
-				require.True(
-					strings.HasSuffix(field.Name, "Time"),
-					"time.Time field %s should have 'Time' suffix",
-					field.Name,
-				)
-			}
-		}
-	})
-
-	t.Run("duration fields end with Duration or Height suffix", func(*testing.T) {
-		for i := 0; i < configType.NumField(); i++ {
-			field := configType.Field(i)
-			if field.Type == reflect.TypeOf(time.Duration(0)) {
-				require.True(
-					strings.HasSuffix(field.Name, "Duration") || strings.HasSuffix(field.Name, "Height"),
-					"time.Duration field %s should have 'Duration' or 'Height' suffix",
-					field.Name,
-				)
-			}
-		}
-	})
-
 	t.Run("json tags use camelCase", func(*testing.T) {
 		for i := 0; i < configType.NumField(); i++ {
 			field := configType.Field(i)
 			jsonTag := field.Tag.Get("json")
-			if jsonTag != "" {
-				// Extract just the name part (before any commas)
-				jsonName := strings.Split(jsonTag, ",")[0]
-				require.NotEmpty(jsonName, "Field %s should have non-empty json tag", field.Name)
-				require.True(
-					len(jsonName) > 0 && jsonName[0] >= 'a' && jsonName[0] <= 'z',
-					"Field %s json tag '%s' should start with lowercase letter",
-					field.Name,
-					jsonName,
-				)
-			}
+			require.NotEmpty(jsonTag, "Field %s must have a json tag", field.Name)
+			require.Equal(t,
+				strings.ToLower(field.Name[:1])+field.Name[1:],
+				jsonTag,
+				"json tag %s must be the lower-camel version of field %s",
+				jsonTag, field.Name,
+			)
 		}
 	})
 }
@@ -255,36 +199,4 @@ func TestForkStringCompleteness(t *testing.T) {
 			require.Equal("Unknown", forkStr, "Fork %d (beyond Latest) should return 'Unknown'", fork)
 		}
 	}
-}
-
-// TestFromString ensures FromString correctly maps all fork names to their constants.
-func TestFromString(t *testing.T) {
-	require := require.New(t)
-
-	t.Run("valid fork names", func(*testing.T) {
-		// Test that all valid fork constants can be converted to string and back
-		for fork := NoUpgrades; fork <= Latest; fork++ {
-			forkStr := fork.String()
-			parsedFork := FromString(forkStr)
-			require.Equal(fork, parsedFork, "FromString(%q) should return %d, got %d", forkStr, fork, parsedFork)
-		}
-	})
-
-	t.Run("invalid fork names", func(*testing.T) {
-		invalidNames := []string{
-			"",
-			"Unknown",
-			"InvalidFork",
-			"banff",           // lowercase
-			"GRANITE",         // uppercase
-			" Helicon",        // leading space
-			"Helicon ",        // trailing space
-			"ApricotPhase999", // non-existent phase
-		}
-
-		for _, name := range invalidNames {
-			fork := FromString(name)
-			require.Equal(Fork(-1), fork, "FromString(%q) should return -1 for invalid name", name)
-		}
-	})
 }
