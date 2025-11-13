@@ -118,10 +118,10 @@ func TestGetDirectDependencies(t *testing.T) {
 			expectedError: nil,
 		},
 		{
-			name:          "from avalanchego - error (root repo requires explicit args)",
+			name:          "from avalanchego - defaults to syncing firewood",
 			currentRepo:   "avalanchego",
-			expectedRepos: nil,
-			expectedError: errRootRepoNeedsExplicitArgs,
+			expectedRepos: []string{"firewood"},
+			expectedError: nil,
 		},
 		{
 			name:          "from unknown repo - always syncs avalanchego",
@@ -135,8 +135,7 @@ func TestGetDirectDependencies(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			log := logging.NoLog{}
 
-			// goModPath is no longer used by GetDirectDependencies, but we pass it for API compatibility
-			repos, err := GetDirectDependencies(log, tt.currentRepo, "")
+			repos, err := GetDirectDependencies(log, tt.currentRepo)
 
 			if tt.expectedError != nil {
 				require.ErrorIs(t, err, tt.expectedError)

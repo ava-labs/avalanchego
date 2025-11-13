@@ -138,10 +138,10 @@ Repositories can be specified with an optional ref (branch, tag, or commit):
   sync avalanchego@57a74c3a7fd7dcdda24f49a237bfa9fa69f26a85
 
 If no repositories are specified, syncs based on the current directory and go.mod:
-- From avalanchego: syncs coreth and firewood at versions specified in go.mod
-- From coreth: syncs avalanchego and firewood at versions specified in go.mod
-- From firewood: syncs avalanchego and coreth at their default branches
-- From unknown location: syncs all three at their default branches
+- From avalanchego: syncs firewood at version specified in go.mod
+- From coreth: syncs avalanchego at version specified in go.mod
+- From firewood: syncs avalanchego at default branch (master)
+- From unknown location: must specify repositories explicitly
 
 Repositories will be cloned into the current directory with their repository names.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

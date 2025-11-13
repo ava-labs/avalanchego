@@ -13,14 +13,19 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
+const (
+	repoAvalanchego = "avalanchego"
+	repoCoreth      = "coreth"
+	repoFirewood    = "firewood"
+)
+
 // GetFirewoodReplacementPath returns the correct replacement path for firewood
 // based on which build method was used (nix build or cargo build).
 // For non-firewood repos, returns the config default.
 // isPrimary indicates if this repo is the primary repo (baseDir IS the repo) vs synced (baseDir contains repo/).
 func GetFirewoodReplacementPath(log logging.Logger, baseDir, repoName string, isPrimary bool) string {
 	// For non-firewood repos, return the config default
-	//nolint:goconst // "firewood" constant is local to Sync() function
-	if repoName != "firewood" {
+	if repoName != repoFirewood {
 		config, err := GetRepoConfig(repoName)
 		if err != nil {
 			// Shouldn't happen for known repos, but handle gracefully
@@ -118,23 +123,23 @@ func DetectCurrentRepo(log logging.Logger, dir string) (string, error) {
 }
 
 // GetDirectDependencies determines which repos to sync when no explicit repos
-// are specified. For non-avalanchego repos (firewood, coreth), avalanchego is
-// always synced unconditionally. For avalanchego (root repo), returns an error
-// since it requires explicit repository arguments.
-func GetDirectDependencies(log logging.Logger, currentRepo, goModPath string) ([]string, error) {
+// are specified. For avalanchego (root repo), defaults to syncing firewood.
+// For non-avalanchego repos (firewood, coreth), avalanchego is always synced
+// unconditionally.
+func GetDirectDependencies(log logging.Logger, currentRepo string) ([]string, error) {
 	log.Debug("determining repositories to sync",
 		zap.String("currentRepo", currentRepo),
 	)
 
-	// Special case: avalanchego is a root repo and requires explicit args
-	if currentRepo == "avalanchego" {
-		log.Debug("avalanchego is the primary repository and requires explicit arguments")
-		return nil, errRootRepoNeedsExplicitArgs
+	// Special case: avalanchego defaults to syncing firewood
+	if currentRepo == repoAvalanchego {
+		log.Info("determined repositories to sync: only firewood (default for avalanchego)")
+		return []string{repoFirewood}, nil
 	}
 
 	// For non-avalanchego repos (firewood, coreth), always sync avalanchego
 	log.Info("determined repositories to sync: only avalanchego (primary dependency)")
-	return []string{"avalanchego"}, nil
+	return []string{repoAvalanchego}, nil
 }
 
 // GetDefaultRefForRepo determines the default ref to use for a target repo
@@ -748,7 +753,7 @@ func Sync(
 
 		// Primary mode - auto-detect direct dependencies to sync
 		log.Info("no repositories specified, auto-detecting direct dependencies")
-		repos, err := GetDirectDependencies(log, currentRepo, goModPath)
+		repos, err := GetDirectDependencies(log, currentRepo)
 		if err != nil {
 			return stacktrace.Errorf("failed to determine direct dependencies: %w", err)
 		}
@@ -804,11 +809,6 @@ func Sync(
 		}
 
 		// Apply discovered versions for avalanchego and coreth
-		const (
-			repoAvalanchego = "avalanchego"
-			repoCoreth      = "coreth"
-			repoFirewood    = "firewood"
-		)
 		for i := range reposToSync {
 			if reposToSync[i].ref == "" {
 				if reposToSync[i].name == repoAvalanchego || reposToSync[i].name == repoCoreth {
@@ -902,7 +902,7 @@ func Sync(
 			)
 
 			// Use specialized build function for firewood
-			if repo.name == "firewood" {
+			if repo.name == repoFirewood {
 				err = BuildFirewood(log, clonePath, refToUse)
 				if err != nil {
 					return stacktrace.Errorf("failed to build firewood: %w", err)
@@ -928,7 +928,7 @@ func Sync(
 
 	// Build firewood if it's the primary repo (not synced)
 	// This ensures firewood is built before replace directives are updated
-	if currentRepo == "firewood" {
+	if currentRepo == repoFirewood {
 		log.Info("building primary repository (firewood)",
 			zap.String("path", baseDir),
 		)
