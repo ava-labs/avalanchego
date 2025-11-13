@@ -98,43 +98,117 @@ go 1.21
 	}
 }
 
-func TestGetReposToSync(t *testing.T) {
+func TestGetDirectDependencies(t *testing.T) {
 	tests := []struct {
-		name          string
-		currentRepo   string
-		expectedRepos []string
+		name           string
+		currentRepo    string
+		setupGoMod     func(t *testing.T) string // Returns tmpDir with go.mod
+		expectedRepos  []string
+		expectedError  error
 	}{
 		{
-			name:          "from avalanchego",
-			currentRepo:   "avalanchego",
-			expectedRepos: []string{"coreth", "firewood"},
+			name:        "from firewood - should only sync avalanchego",
+			currentRepo: "firewood",
+			setupGoMod: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				// Create ffi/go.mod for firewood
+				ffiDir := filepath.Join(tmpDir, "ffi")
+				err := os.MkdirAll(ffiDir, 0o755)
+				require.NoError(t, err)
+				goModContent := `module github.com/ava-labs/firewood/ffi
+
+go 1.21
+
+require (
+	github.com/ava-labs/avalanchego v1.11.0
+)
+`
+				err = os.WriteFile(filepath.Join(ffiDir, "go.mod"), []byte(goModContent), 0o600)
+				require.NoError(t, err)
+				return tmpDir
+			},
+			expectedRepos: []string{"avalanchego"},
+			expectedError: nil,
 		},
 		{
-			name:          "from coreth",
-			currentRepo:   "coreth",
-			expectedRepos: []string{"avalanchego", "firewood"},
+			name:        "from coreth - should only sync avalanchego",
+			currentRepo: "coreth",
+			setupGoMod: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				goModContent := `module github.com/ava-labs/coreth
+
+go 1.21
+
+require (
+	github.com/ava-labs/avalanchego v1.11.0
+	github.com/ava-labs/firewood/ffi v0.2.0
+)
+`
+				err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goModContent), 0o600)
+				require.NoError(t, err)
+				return tmpDir
+			},
+			expectedRepos: []string{"avalanchego"},
+			expectedError: nil,
 		},
 		{
-			name:          "from firewood",
-			currentRepo:   "firewood",
-			expectedRepos: []string{"avalanchego", "coreth"},
+			name:        "from avalanchego - should error (root repo requires explicit args)",
+			currentRepo: "avalanchego",
+			setupGoMod: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				goModContent := `module github.com/ava-labs/avalanchego
+
+go 1.21
+
+require (
+	github.com/ava-labs/coreth v0.13.8
+)
+`
+				err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goModContent), 0o600)
+				require.NoError(t, err)
+				return tmpDir
+			},
+			expectedRepos: nil,
+			expectedError: errRootRepoNeedsExplicitArgs,
 		},
 		{
-			name:          "from unknown/none",
-			currentRepo:   "",
-			expectedRepos: []string{"avalanchego", "coreth", "firewood"},
+			name:        "from unknown repo with no dependencies",
+			currentRepo: "unknown",
+			setupGoMod: func(t *testing.T) string {
+				tmpDir := t.TempDir()
+				goModContent := `module github.com/example/unknown
+
+go 1.21
+`
+				err := os.WriteFile(filepath.Join(tmpDir, "go.mod"), []byte(goModContent), 0o600)
+				require.NoError(t, err)
+				return tmpDir
+			},
+			expectedRepos: []string{},
+			expectedError: nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			repos := GetReposToSync(tt.currentRepo)
+			log := logging.NoLog{}
+			tmpDir := tt.setupGoMod(t)
 
-			require.Len(t, repos, len(tt.expectedRepos))
-
-			for i, expectedRepo := range tt.expectedRepos {
-				require.Equal(t, expectedRepo, repos[i])
+			// Determine go.mod path based on repo
+			goModPath := filepath.Join(tmpDir, "go.mod")
+			if tt.currentRepo == "firewood" {
+				goModPath = filepath.Join(tmpDir, "ffi", "go.mod")
 			}
+
+			repos, err := GetDirectDependencies(log, tt.currentRepo, goModPath)
+
+			if tt.expectedError != nil {
+				require.ErrorIs(t, err, tt.expectedError)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.expectedRepos, repos)
 		})
 	}
 }
@@ -262,7 +336,7 @@ require github.com/ava-labs/avalanchego v1.11.11
 			expectError: false,
 		},
 		{
-			name:        "avalanchego without firewood dependency - should error",
+			name:        "avalanchego without firewood dependency - uses default branch",
 			currentRepo: "avalanchego",
 			targetRepo:  "firewood",
 			goModContent: `module github.com/ava-labs/avalanchego
@@ -271,11 +345,11 @@ go 1.21
 
 require github.com/ava-labs/coreth v0.13.8
 `,
-			expectedRef: "",
-			expectError: true,
+			expectedRef: "main",
+			expectError: false,
 		},
 		{
-			name:        "coreth without firewood dependency - should error",
+			name:        "coreth without firewood dependency - uses default branch",
 			currentRepo: "coreth",
 			targetRepo:  "firewood",
 			goModContent: `module github.com/ava-labs/coreth
@@ -284,8 +358,8 @@ go 1.21
 
 require github.com/ava-labs/avalanchego v1.11.11
 `,
-			expectedRef: "",
-			expectError: true,
+			expectedRef: "main",
+			expectError: false,
 		},
 		{
 			name:         "no current repo - uses default branch",
@@ -351,7 +425,7 @@ func TestSync_PrimaryMode_RefDetermination(t *testing.T) {
 		expectError  string
 	}{
 		{
-			name: "no args - auto-detect repos (firewood dependency missing)",
+			name: "no args - avalanchego root repo requires explicit args",
 			goModContent: `module github.com/ava-labs/avalanchego
 
 go 1.21
@@ -359,9 +433,8 @@ go 1.21
 require github.com/ava-labs/coreth v0.13.8
 `,
 			repoArgs: []string{},
-			// Will auto-detect repos to sync (coreth, firewood)
-			// Will try to get firewood version from go.mod but it's missing
-			expectError: "not found in go.mod",
+			// avalanchego is a root repo and requires explicit arguments
+			expectError: "requires explicit repository arguments",
 		},
 		{
 			name: "explicit refs - all explicit",
@@ -375,7 +448,7 @@ require github.com/ava-labs/coreth v0.13.8
 			expectError: "", // Should reach git clone (no early error)
 		},
 		{
-			name: "partial refs - explicit and discovered (firewood missing)",
+			name: "partial refs - explicit and discovered (firewood falls back to default)",
 			goModContent: `module github.com/ava-labs/avalanchego
 
 go 1.21
@@ -383,7 +456,7 @@ go 1.21
 require github.com/ava-labs/coreth v0.13.8
 `,
 			repoArgs:    []string{"coreth@v0.15.0", "firewood"},
-			expectError: "not found in go.mod",
+			expectError: "", // Will use default branch for firewood and proceed to git clone
 		},
 	}
 
