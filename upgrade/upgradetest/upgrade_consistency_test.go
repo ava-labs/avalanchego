@@ -131,8 +131,8 @@ func TestUpgradeConsistency(t *testing.T) {
 			if strings.HasPrefix(upgradeName, "Apricot") {
 				continue
 			}
-			// Skip NoUpgrades as it's a special case
-			if upgradeName == "NoUpgrades" {
+
+			if upgradeName == NoUpgrades.String() {
 				continue
 			}
 
@@ -188,7 +188,6 @@ func TestUpgradeConsistency(t *testing.T) {
 			})
 		}
 	})
-
 }
 
 // TestUpgradeFieldNaming ensures consistent naming conventions across the codebase.
