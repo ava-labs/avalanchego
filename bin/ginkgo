@@ -1,10 +1,1 @@
-#!/usr/bin/env bash
-
-set -euo pipefail
-
-# Ensure the go command is run from the root of the repository so that its go.mod file is used
-REPO_ROOT=$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )
-cd "${REPO_ROOT}"
-
-# If an explicit version is not specified, go run uses the ginkgo version from go.mod
-go run github.com/onsi/ginkgo/v2/ginkgo "${@}"
+../scripts/run_ginkgo.sh

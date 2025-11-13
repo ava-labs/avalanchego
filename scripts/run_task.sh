@@ -6,5 +6,5 @@ set -euo pipefail
 if command -v task > /dev/null 2>&1; then
   exec task "${@}"
 else
-  go run github.com/go-task/task/v3/cmd/task@v3.39.2 "${@}"
-fi
+  go tool -modfile=tools/go.mod task "${@}"
+fi 

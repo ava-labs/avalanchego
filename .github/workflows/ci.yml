@@ -19,6 +19,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: "go.mod"
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
+            tools/legacy-golangci-lint.sum
       - name: Run all lint checks
         run: ./scripts/run_task.sh lint-all-ci
       - name: Check go.mod and go.sum are up-to-date
@@ -40,6 +44,9 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: "go.mod"
+          cache-dependency-path: |
+            go.sum
+            tools/go.sum
       - run: go mod download
       - name: Check generated codec files are up to date
         run: ./scripts/run_task.sh check-generate-codec
@@ -60,10 +67,6 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "go.mod"
       - name: Set up solc
         uses: ARR4N/setup-solc@v0.2.0
         with:
