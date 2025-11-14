@@ -287,8 +287,7 @@ func newNodeStatefulSet(name string, flags tmpnet.FlagsMap) *appsv1.StatefulSet 
 }
 
 func defaultPodFlags() map[string]string {
-	tmpnetFlags := tmpnet.DefaultTmpnetFlags()
-	tmpnetFlags.SetDefaults(tmpnet.FlagsMap{
+	flags := tmpnet.FlagsMap{
 		config.DataDirKey:                nodeDataDir,
 		config.NetworkNameKey:            constants.LocalName,
 		config.SybilProtectionEnabledKey: "false",
@@ -296,8 +295,9 @@ func defaultPodFlags() map[string]string {
 		config.LogDisplayLevelKey:        logging.Debug.String(),
 		config.LogLevelKey:               logging.Debug.String(),
 		config.HTTPHostKey:               "0.0.0.0", // Need to bind to pod IP to ensure kubelet can access the http port for the readiness
-	})
-	return tmpnetFlags
+	}
+	flags.SetDefaults(tmpnet.DefaultTmpnetFlags())
+	return flags
 }
 
 // waitForPodCondition waits until the specified pod reports the specified condition
