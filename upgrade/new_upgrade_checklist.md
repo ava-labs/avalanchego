@@ -27,7 +27,6 @@ This checklist ists all the required steps when when adding a new network upgrad
 ### [`vms/rpcchainvm/vm_server.go`](../vms/rpcchainvm/vm_server.go)
 
 - [ ] Add a new `grpcutils.TimestampAsTime` block to `convertNetworkUpgrades()` function
-- [ ] Return the new time in the same function (e.g., `IonoTime time.Time`)
 
 ## 2. Test Helper Files
 

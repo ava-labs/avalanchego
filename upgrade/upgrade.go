@@ -40,7 +40,6 @@ var (
 		GraniteEpochDuration:      5 * time.Minute,
 		HeliconTime:               UnscheduledActivationTime,
 	}
-
 	Fuji = Config{
 		ApricotPhase1Time:            time.Date(2021, time.March, 26, 14, 0, 0, 0, time.UTC),
 		ApricotPhase2Time:            time.Date(2021, time.May, 5, 14, 0, 0, 0, time.UTC),
@@ -65,7 +64,6 @@ var (
 		GraniteEpochDuration:      5 * time.Minute,
 		HeliconTime:               UnscheduledActivationTime,
 	}
-
 	Default = Config{
 		ApricotPhase1Time:            InitiallyActiveTime,
 		ApricotPhase2Time:            InitiallyActiveTime,
