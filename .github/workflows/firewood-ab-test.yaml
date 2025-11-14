@@ -1,0 +1,77 @@
+name: Firewood A/B Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      firewood-version:
+        description: 'Firewood version (commit, branch, tag, or ffi/vX.Y.Z)'
+        required: true
+        default: 'composable-ci-action'
+      coreth-version:
+        description: 'Coreth version (optional)'
+        required: false
+        default: ''
+      task-name:
+        description: 'Reexecution task to run'
+        required: true
+        default: 'c-chain-reexecution-firewood-101-250k'
+        type: choice
+        options:
+          - c-chain-reexecution-firewood-101-250k
+          - c-chain-reexecution-firewood-33m-33m500k
+          - c-chain-reexecution-firewood-33m-40m
+      runner:
+        description: 'GitHub runner type'
+        required: true
+
+env:
+  AVALANCHEGO_CHECKOUT_PATH: '.'
+  FIREWOOD_WORKSPACE_PATH: '${{ github.workspace }}/firewood-workspace'
+
+jobs:
+  test:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 180
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - name: Checkout AvalancheGo
+        uses: actions/checkout@v4
+      
+      - name: Setup AvalancheGo with Custom Firewood
+        uses: ./.github/actions/avalanchego-setup-action
+        with:
+          checkout-path: ${{ env.AVALANCHEGO_CHECKOUT_PATH }}
+          avalanchego: ${{ github.ref_name }}
+          firewood: ${{ inputs.firewood-version }}
+          firewood-path: ${{ env.FIREWOOD_WORKSPACE_PATH }}
+          coreth: ${{ inputs.coreth-version }}
+
+      - name: Run C-Chain Reexecution Benchmark
+        uses: ./.github/actions/c-chain-reexecution-benchmark
+        with:
+          task: ${{ inputs.task-name }}
+          runner_name: ${{ inputs.runner }}
+          aws-role: ${{ secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: 'us-east-2'
+          prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          push-github-action-benchmark: false
+
+      - name: Upload benchmark output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-output-${{ inputs.task-name }}-${{ github.run_id }}
+          path: |
+            benchmark-output.txt
+            **/*.log
+            **/*.prof
+            /tmp/reexecution-data-*/**/*.log
+          retention-days: 7
+          if-no-files-found: ignore
+

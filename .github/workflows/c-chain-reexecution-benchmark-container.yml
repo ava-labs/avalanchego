@@ -1,39 +1,35 @@
 name: C-Chain Re-Execution Benchmark w/ Container
 
 on:
-  pull_request:
+  # pull_request:
   workflow_dispatch:
     inputs:
       config:
         description: 'The config to pass to the VM for the benchmark. See BenchmarkReexecuteRange for details.'
-        required: false
         default: ''
       start-block:
         description: 'The start block for the benchmark.'
-        required: false
-        default: 101
+        default: ''
       end-block:
         description: 'The end block for the benchmark.'
-        required: false
-        default: 250000
+        default: ''
       block-dir-src:
         description: 'The source block directory. Supports S3 directory/zip and local directories.'
-        required: false
-        default: s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-1m-ldb/**
+        default: ''
       current-state-dir-src:
         description: 'The current state directory. Supports S3 directory/zip and local directories.'
-        required: false
-        default: s3://avalanchego-bootstrap-testing/cchain-current-state-hashdb-full-100/**
+        default: ''
+      task:
+        description: 'Taskfile task to execute (e.g., c-chain-reexecution-hashdb-101-250k)'
+        default: ''
       runner:
         description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
-        required: false
-        default: ubuntu-latest
+        required: true
       push-post-state:
         description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
         default: ''
       timeout-minutes:
         description: 'Timeout in minutes for the job.'
-        required: false
         default: 30
 
   # Disabled because scheduled trigger is empty. To enable, uncomment and add at least one vector to the schedule
@@ -55,12 +51,8 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             {
               echo "matrix<<EOF"
-              printf '{ "include": [{ "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
-                "${{ github.event.inputs.start-block }}" \
-                "${{ github.event.inputs.end-block }}" \
-                "${{ github.event.inputs.block-dir-src }}" \
-                "${{ github.event.inputs.current-state-dir-src }}" \
-                "${{ github.event.inputs.config }}" \
+              printf '{ "include": [{ "task": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
+                "${{ github.event.inputs.task }}" \
                 "${{ github.event.inputs.runner }}" \
                 "${{ github.event.inputs.timeout-minutes }}"
               echo EOF
@@ -100,11 +92,12 @@ jobs:
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
-          config: ${{ matrix.config }}
-          start-block: ${{ matrix.start-block }}
-          end-block: ${{ matrix.end-block }}
-          block-dir-src: ${{ matrix.block-dir-src }}
-          current-state-dir-src: ${{ matrix.current-state-dir-src }}
+          task: ${{ matrix.task }}
+          config: ${{ inputs.config }}
+          start-block: ${{ inputs.start-block }}
+          end-block: ${{ inputs.end-block }}
+          block-dir-src: ${{ inputs.block-dir-src }}
+          current-state-dir-src: ${{ inputs.current-state-dir-src }}
           prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
