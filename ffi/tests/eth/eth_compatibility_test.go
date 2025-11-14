@@ -134,7 +134,7 @@ func (tr *merkleTriePair) commit() {
 
 	fwdRoot, err := tr.fwdDB.Update(tr.pendingFwdKeys, tr.pendingFwdVals)
 	tr.require.NoError(err)
-	tr.require.Equal(fwdRoot, updatedRoot[:])
+	tr.require.Equal(updatedRoot, common.Hash(fwdRoot))
 
 	tr.pendingFwdKeys = nil
 	tr.pendingFwdVals = nil

@@ -41,8 +41,8 @@ func TestRangeProofEmptyDB(t *testing.T) {
 	r := require.New(t)
 	db := newTestDatabase(t)
 
-	proof, err := db.RangeProof(nothing(), nothing(), nothing(), 0)
-	r.ErrorIs(err, errEmptyTrie)
+	proof, err := db.RangeProof(EmptyRoot, nothing(), nothing(), 0)
+	r.ErrorIs(err, errRevisionNotFound)
 	r.Nil(proof)
 }
 
@@ -54,14 +54,11 @@ func TestRangeProofNonExistentRoot(t *testing.T) {
 	keys, vals := kvForTest(100)
 	root, err := db.Update(keys, vals)
 	r.NoError(err)
-	r.NotNil(root)
 
 	// create a bogus root
-	bogusRoot := make([]byte, len(root))
-	copy(bogusRoot, root)
-	bogusRoot[0] ^= 0xFF
+	root[0] ^= 0xFF
 
-	proof, err := db.RangeProof(something(bogusRoot), nothing(), nothing(), 0)
+	proof, err := db.RangeProof(root, nothing(), nothing(), 0)
 	r.ErrorIs(err, errRevisionNotFound)
 	r.Nil(proof)
 }
@@ -76,10 +73,10 @@ func TestRangeProofPartialRange(t *testing.T) {
 	r.NoError(err)
 
 	// get a proof over some partial range
-	proof1 := rangeProofWithAndWithoutRoot(t, db, root, nothing(), nothing())
+	proof1 := rangeProof(t, db, root, nothing(), nothing())
 
 	// get a proof over a different range
-	proof2 := rangeProofWithAndWithoutRoot(t, db, root, something([]byte("key2")), something([]byte("key3")))
+	proof2 := rangeProof(t, db, root, something([]byte("key2")), something([]byte("key3")))
 
 	// ensure the proofs are different
 	r.NotEqual(proof1, proof2)
@@ -97,7 +94,7 @@ func TestRangeProofDiffersAfterUpdate(t *testing.T) {
 	r.NoError(err)
 
 	// get a proof
-	proof := rangeProofWithAndWithoutRoot(t, db, root1, nothing(), nothing())
+	proof := rangeProof(t, db, root1, nothing(), nothing())
 
 	// insert more data
 	root2, err := db.Update(keys[50:], vals[50:])
@@ -105,7 +102,7 @@ func TestRangeProofDiffersAfterUpdate(t *testing.T) {
 	r.NotEqual(root1, root2)
 
 	// get a proof again
-	proof2 := rangeProofWithAndWithoutRoot(t, db, root2, nothing(), nothing())
+	proof2 := rangeProof(t, db, root2, nothing(), nothing())
 
 	// ensure the proofs are different
 	r.NotEqual(proof, proof2)
@@ -121,7 +118,7 @@ func TestRoundTripSerialization(t *testing.T) {
 	r.NoError(err)
 
 	// get a proof
-	proofBytes := rangeProofWithAndWithoutRoot(t, db, root, nothing(), nothing())
+	proofBytes := rangeProof(t, db, root, nothing(), nothing())
 
 	// Deserialize the proof.
 	proof := new(RangeProof)
@@ -136,32 +133,21 @@ func TestRoundTripSerialization(t *testing.T) {
 	r.NoError(proof.Free())
 }
 
-// rangeProofWithAndWithoutRoot checks that requesting a range proof with and
-// without the root, when the default root is the same as the provided root,
-// yields the same proof and returns the proof bytes.
-func rangeProofWithAndWithoutRoot(
+// rangeProof generates a range proof for the given parameters.
+func rangeProof(
 	t *testing.T,
 	db *Database,
-	root []byte,
+	root Hash,
 	startKey, endKey maybe,
 ) []byte {
 	r := require.New(t)
 
-	proof1, err := db.RangeProof(maybe{hasValue: false}, startKey, endKey, maxProofLen)
+	proof, err := db.RangeProof(root, startKey, endKey, maxProofLen)
 	r.NoError(err)
-	r.NotNil(proof1)
-	proof1Bytes, err := proof1.MarshalBinary()
+	r.NotNil(proof)
+	proofBytes, err := proof.MarshalBinary()
 	r.NoError(err)
-	r.NoError(proof1.Free())
+	r.NoError(proof.Free())
 
-	proof2, err := db.RangeProof(maybe{hasValue: true, value: root}, startKey, endKey, maxProofLen)
-	r.NoError(err)
-	r.NotNil(proof2)
-	proof2Bytes, err := proof2.MarshalBinary()
-	r.NoError(err)
-	r.NoError(proof2.Free())
-
-	r.Equal(proof1Bytes, proof2Bytes)
-
-	return proof1Bytes
+	return proofBytes
 }

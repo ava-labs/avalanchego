@@ -36,13 +36,13 @@ type Proposal struct {
 	outstandingHandles *sync.WaitGroup
 
 	// The proposal root hash.
-	root []byte
+	root Hash
 }
 
 // Root retrieves the root hash of the proposal.
 // If the proposal is empty (i.e. no keys in database),
 // it returns nil, nil.
-func (p *Proposal) Root() ([]byte, error) {
+func (p *Proposal) Root() (Hash, error) {
 	return p.root, nil
 }
 
@@ -152,10 +152,10 @@ func getProposalFromProposalResult(result C.ProposalResult, outstandingHandles *
 		return nil, errDBClosed
 	case C.ProposalResult_Ok:
 		body := (*C.ProposalResult_Ok_Body)(unsafe.Pointer(&result.anon0))
-		hashKey := *(*[32]byte)(unsafe.Pointer(&body.root_hash._0))
+		hashKey := *(*Hash)(unsafe.Pointer(&body.root_hash._0))
 		proposal := &Proposal{
 			handle:             body.handle,
-			root:               hashKey[:],
+			root:               hashKey,
 			outstandingHandles: outstandingHandles,
 		}
 		outstandingHandles.Add(1)

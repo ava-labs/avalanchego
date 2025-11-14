@@ -19,9 +19,8 @@ import (
 )
 
 var (
-	errRevisionNotFound  = errors.New("revision not found")
-	errInvalidRootLength = fmt.Errorf("root hash must be %d bytes", RootLength)
-	errDroppedRevision   = errors.New("revision already dropped")
+	errRevisionNotFound = errors.New("revision not found")
+	errDroppedRevision  = errors.New("revision already dropped")
 )
 
 // Revision is an immutable view over the database at a specific root hash.
@@ -33,7 +32,7 @@ type Revision struct {
 	handle *C.RevisionHandle
 	disown sync.Mutex
 	// The revision root
-	root []byte
+	root Hash
 	// outstandingHandles is the WaitGroup in Database that tracks open Rust handles.
 	// This is incremented when the revision is created, and decremented when Drop is called.
 	outstandingHandles *sync.WaitGroup
@@ -93,7 +92,7 @@ func (r *Revision) Drop() error {
 	return nil
 }
 
-func (r *Revision) Root() []byte {
+func (r *Revision) Root() Hash {
 	return r.root
 }
 
@@ -106,10 +105,10 @@ func getRevisionFromResult(result C.RevisionResult, openProposals *sync.WaitGrou
 		return nil, errRevisionNotFound
 	case C.RevisionResult_Ok:
 		body := (*C.RevisionResult_Ok_Body)(unsafe.Pointer(&result.anon0))
-		hashKey := *(*[32]byte)(unsafe.Pointer(&body.root_hash._0))
+		hashKey := *(*Hash)(unsafe.Pointer(&body.root_hash._0))
 		rev := &Revision{
 			handle:             body.handle,
-			root:               hashKey[:],
+			root:               hashKey,
 			outstandingHandles: openProposals,
 		}
 		openProposals.Add(1)

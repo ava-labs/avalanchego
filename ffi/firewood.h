@@ -459,13 +459,13 @@ typedef struct CreateChangeProofArgs {
    * If the root is not found in the database, the function will return
    * [`ChangeProofResult::RevisionNotFound`].
    */
-  BorrowedBytes start_root;
+  struct HashKey start_root;
   /**
    * The root hash of the ending revision. This must be provided.
    * If the root is not found in the database, the function will return
    * [`ChangeProofResult::RevisionNotFound`].
    */
-  BorrowedBytes end_root;
+  struct HashKey end_root;
   /**
    * The start key of the range to create the proof for. If `None`, the range
    * starts from the beginning of the keyspace.
@@ -547,10 +547,9 @@ typedef struct RangeProofResult {
  */
 typedef struct CreateRangeProofArgs {
   /**
-   * The root hash of the revision to prove. If `None`, the latest revision
-   * is used.
+   * The root hash of the revision to prove.
    */
-  struct Maybe_BorrowedBytes root;
+  struct HashKey root;
   /**
    * The start key of the range to prove. If `None`, the range starts from the
    * beginning of the keyspace.
@@ -589,12 +588,12 @@ typedef struct VerifyChangeProofArgs {
    * The root hash of the starting revision. This must match the starting
    * root of the proof.
    */
-  BorrowedBytes start_root;
+  struct HashKey start_root;
   /**
    * The root hash of the ending revision. This must match the ending root of
    * the proof.
    */
-  BorrowedBytes end_root;
+  struct HashKey end_root;
   /**
    * The lower bound of the key range that the proof is expected to cover. If
    * `None`, the proof is expected to cover from the start of the keyspace.
@@ -627,7 +626,7 @@ typedef struct VerifyRangeProofArgs {
    * The root hash to verify the proof against. This must match the calculated
    * hash of the root of the proof.
    */
-  BorrowedBytes root;
+  struct HashKey root;
   /**
    * The lower bound of the key range that the proof is expected to cover. If
    * `None`, the proof is expected to cover from the start of the keyspace.
@@ -1588,7 +1587,7 @@ struct ValueResult fwd_get_from_revision(const struct RevisionHandle *revision, 
  *   returned in the result.
  */
 struct ValueResult fwd_get_from_root(const struct DatabaseHandle *db,
-                                     BorrowedBytes root,
+                                     struct HashKey root,
                                      BorrowedBytes key);
 
 /**
@@ -1645,7 +1644,7 @@ struct ValueResult fwd_get_latest(const struct DatabaseHandle *db, BorrowedBytes
  * [`BorrowedBytes`]: crate::value::BorrowedBytes
  * [`RevisionHandle`]: crate::revision::RevisionHandle
  */
-struct RevisionResult fwd_get_revision(const struct DatabaseHandle *db, BorrowedBytes root);
+struct RevisionResult fwd_get_revision(const struct DatabaseHandle *db, struct HashKey root);
 
 /**
  * Retrieves the next item from the iterator.

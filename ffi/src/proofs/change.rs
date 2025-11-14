@@ -2,7 +2,7 @@
 // See the file LICENSE.md for licensing terms.
 
 use crate::{
-    BorrowedBytes, CResult, ChangeProofResult, DatabaseHandle, HashResult, Maybe,
+    BorrowedBytes, CResult, ChangeProofResult, DatabaseHandle, HashKey, HashResult, Maybe,
     NextKeyRangeResult, OwnedBytes, ValueResult, VoidResult,
 };
 
@@ -13,11 +13,11 @@ pub struct CreateChangeProofArgs<'a> {
     /// The root hash of the starting revision. This must be provided.
     /// If the root is not found in the database, the function will return
     /// [`ChangeProofResult::RevisionNotFound`].
-    pub start_root: BorrowedBytes<'a>,
+    pub start_root: HashKey,
     /// The root hash of the ending revision. This must be provided.
     /// If the root is not found in the database, the function will return
     /// [`ChangeProofResult::RevisionNotFound`].
-    pub end_root: BorrowedBytes<'a>,
+    pub end_root: HashKey,
     /// The start key of the range to create the proof for. If `None`, the range
     /// starts from the beginning of the keyspace.
     pub start_key: Maybe<BorrowedBytes<'a>>,
@@ -41,10 +41,10 @@ pub struct VerifyChangeProofArgs<'a> {
     pub proof: Option<&'a mut ChangeProofContext>,
     /// The root hash of the starting revision. This must match the starting
     /// root of the proof.
-    pub start_root: BorrowedBytes<'a>,
+    pub start_root: HashKey,
     /// The root hash of the ending revision. This must match the ending root of
     /// the proof.
-    pub end_root: BorrowedBytes<'a>,
+    pub end_root: HashKey,
     /// The lower bound of the key range that the proof is expected to cover. If
     /// `None`, the proof is expected to cover from the start of the keyspace.
     pub start_key: Maybe<BorrowedBytes<'a>>,

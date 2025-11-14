@@ -60,6 +60,14 @@ var (
 	expectedRoots map[string]string
 )
 
+func stringToHash(t *testing.T, s string) Hash {
+	t.Helper()
+	b, err := hex.DecodeString(s)
+	require.NoError(t, err)
+	require.Len(t, b, RootLength)
+	return Hash(b)
+}
+
 func inferHashingMode(ctx context.Context) (string, error) {
 	dbFile := filepath.Join(os.TempDir(), "test.db")
 	db, err := newDatabase(dbFile)
@@ -75,7 +83,7 @@ func inferHashingMode(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get root of empty database: %w", err)
 	}
-	actualEmptyRootHex := hex.EncodeToString(actualEmptyRoot)
+	actualEmptyRootHex := hex.EncodeToString(actualEmptyRoot[:])
 
 	actualFwMode, ok := expectedEmptyRootToMode[actualEmptyRootHex]
 	if !ok {
@@ -206,9 +214,7 @@ func TestTruncateDatabase(t *testing.T) {
 	// Check that the database is empty after truncation.
 	hash, err := db.Root()
 	r.NoError(err)
-	emptyRootStr := expectedRoots[emptyKey]
-	expectedHash, err := hex.DecodeString(emptyRootStr)
-	r.NoError(err)
+	expectedHash := stringToHash(t, expectedRoots[emptyKey])
 	r.Equal(expectedHash, hash, "Root hash mismatch after truncation")
 
 	r.NoError(db.Close(t.Context()))
@@ -294,7 +300,7 @@ func TestInsert100(t *testing.T) {
 	type dbView interface {
 		Get(key []byte) ([]byte, error)
 		Propose(keys, vals [][]byte) (*Proposal, error)
-		Root() ([]byte, error)
+		Root() (Hash, error)
 	}
 
 	tests := []struct {
@@ -358,18 +364,12 @@ func TestInsert100(t *testing.T) {
 			hash, err := newDB.Root()
 			r.NoError(err)
 
-			rootFromInsert, err := newDB.Root()
-			r.NoError(err)
-
 			// Assert the hash is exactly as expected. Test failure indicates a
 			// non-hash compatible change has been made since the string was set.
 			// If that's expected, update the string at the top of the file to
 			// fix this test.
-			expectedHashHex := expectedRoots[insert100Key]
-			expectedHash, err := hex.DecodeString(expectedHashHex)
-			r.NoError(err)
+			expectedHash := stringToHash(t, expectedRoots[insert100Key])
 			r.Equal(expectedHash, hash, "Root hash mismatch.\nExpected (hex): %x\nActual (hex): %x", expectedHash, hash)
-			r.Equal(rootFromInsert, hash)
 		})
 	}
 }
@@ -405,9 +405,7 @@ func TestInvariants(t *testing.T) {
 	hash, err := db.Root()
 	r.NoError(err)
 
-	emptyRootStr := expectedRoots[emptyKey]
-	expectedHash, err := hex.DecodeString(emptyRootStr)
-	r.NoError(err)
+	expectedHash := stringToHash(t, expectedRoots[emptyKey])
 	r.Equalf(expectedHash, hash, "expected %x, got %x", expectedHash, hash)
 
 	got, err := db.Get([]byte("non-existent"))
@@ -514,10 +512,7 @@ func TestDeleteAll(t *testing.T) {
 		r.Empty(got, "Get(%d)", i)
 	}
 
-	emptyRootStr := expectedRoots[emptyKey]
-	expectedHash, err := hex.DecodeString(emptyRootStr)
-	r.NoError(err, "Decode expected empty root hash")
-
+	expectedHash := stringToHash(t, expectedRoots[emptyKey])
 	hash, err := proposal.Root()
 	r.NoError(err, "%T.Root() after commit", proposal)
 	r.Equalf(expectedHash, hash, "%T.Root() of empty trie", db)
@@ -937,19 +932,9 @@ func TestInvalidRevision(t *testing.T) {
 	r := require.New(t)
 	db := newTestDatabase(t)
 
-	// Create a nil revision.
-	_, err := db.Revision(nil)
-	r.ErrorIs(err, errInvalidRootLength)
-
-	// Create a fake revision with an invalid root.
-	invalidRoot := []byte("not a valid root")
-	_, err = db.Revision(invalidRoot)
-	r.ErrorIs(err, errInvalidRootLength)
-
 	// Create a fake revision with an valid root.
-	validRoot := []byte("counting 32 bytes to make a hash")
-	r.Len(validRoot, 32, "valid root")
-	_, err = db.Revision(validRoot)
+	validRoot := Hash([]byte("counting 32 bytes to make a hash"))
+	_, err := db.Revision(validRoot)
 	r.ErrorIs(err, errRevisionNotFound, "Revision(valid root)")
 }
 
@@ -1088,13 +1073,8 @@ func TestGetFromRoot(t *testing.T) {
 		r.Equal(vals[i+5], got, "GetFromRoot root1 newer key %d", i)
 	}
 
-	// Test with invalid root hash
-	invalidRoot := []byte("this is not a valid 32-byte hash")
-	_, err = db.GetFromRoot(invalidRoot, []byte("key"))
-	r.Error(err, "GetFromRoot with invalid root should return error")
-
 	// Test with valid-length but non-existent root
-	nonExistentRoot := make([]byte, RootLength)
+	var nonExistentRoot Hash
 	for i := range nonExistentRoot {
 		nonExistentRoot[i] = 0xFF // All 1's, very unlikely to exist
 	}

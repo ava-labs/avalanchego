@@ -15,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/x/merkledb"
 	"github.com/stretchr/testify/require"
 )
@@ -235,7 +236,7 @@ func (tr *tree) checkDBHash() {
 	tr.require.NoError(err)
 
 	// Compare the root hashes.
-	tr.require.Equal(merkleRoot[:], fwdRoot)
+	tr.require.Equal(merkleRoot, ids.ID(fwdRoot))
 }
 
 func (tr *tree) createProposalOnProposal() {
@@ -268,7 +269,7 @@ func (tr *tree) createProposalOnProposal() {
 	tr.require.NoError(err)
 	merkleRoot, err := merkleChildView.GetMerkleRoot(context.Background())
 	tr.require.NoError(err)
-	tr.require.Equal(fwdRoot, merkleRoot[:])
+	tr.require.Equal(merkleRoot, ids.ID(fwdRoot))
 
 	tr.nextID++
 	newProposal := &proposal{
@@ -301,7 +302,7 @@ func (tr *tree) createProposalOnDB() {
 	tr.require.NoError(err)
 	merkleRoot, err := merkleChildView.GetMerkleRoot(context.Background())
 	tr.require.NoError(err)
-	tr.require.Equal(fwdRoot, merkleRoot[:])
+	tr.require.Equal(merkleRoot, ids.ID(fwdRoot))
 
 	tr.nextID++
 	newProposal := &proposal{
