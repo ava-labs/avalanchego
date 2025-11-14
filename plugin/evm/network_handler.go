@@ -9,7 +9,7 @@ import (
 	"github.com/ava-labs/avalanchego/codec"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/libevm/ethdb"
-	"github.com/ava-labs/libevm/metrics"
+	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/triedb"
 
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
@@ -20,29 +20,51 @@ import (
 
 var _ message.RequestHandler = (*networkHandler)(nil)
 
+type LeafHandlers map[message.NodeType]syncHandlers.LeafRequestHandler
+
 type networkHandler struct {
-	leafRequestHandler  *syncHandlers.LeafsRequestHandler
+	leafRequestHandlers LeafHandlers
 	blockRequestHandler *syncHandlers.BlockRequestHandler
 	codeRequestHandler  *syncHandlers.CodeRequestHandler
+}
+
+type LeafRequestTypeConfig struct {
+	NodeType     message.NodeType
+	NodeKeyLen   int
+	TrieDB       *triedb.Database
+	UseSnapshots bool
+	MetricName   string
 }
 
 // newNetworkHandler constructs the handler for serving network requests.
 func newNetworkHandler(
 	provider syncHandlers.SyncDataProvider,
 	diskDB ethdb.KeyValueReader,
-	evmTrieDB *triedb.Database,
 	networkCodec codec.Manager,
-) message.RequestHandler {
-	syncStats := syncStats.NewHandlerStats(metrics.Enabled)
+	leafRequestHandlers LeafHandlers,
+	syncStats syncStats.HandlerStats,
+) *networkHandler {
 	return &networkHandler{
-		leafRequestHandler:  syncHandlers.NewLeafsRequestHandler(evmTrieDB, nil, networkCodec, syncStats),
+		leafRequestHandlers: leafRequestHandlers,
 		blockRequestHandler: syncHandlers.NewBlockRequestHandler(provider, networkCodec, syncStats),
 		codeRequestHandler:  syncHandlers.NewCodeRequestHandler(diskDB, networkCodec, syncStats),
 	}
 }
 
-func (n networkHandler) HandleStateTrieLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest message.LeafsRequest) ([]byte, error) {
-	return n.leafRequestHandler.OnLeafsRequest(ctx, nodeID, requestID, leafsRequest)
+func (n networkHandler) HandleLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest message.LeafsRequest) ([]byte, error) {
+	nodeType := leafsRequest.NodeType
+	// TODO(JonathanOppenheimer):Handle legacy requests where NodeType was not serialized (defaults to 0)
+	// In this interim period, we treat NodeType 0 as StateTrieNode
+	if nodeType == 0 {
+		nodeType = message.StateTrieNode
+	}
+
+	handler, ok := n.leafRequestHandlers[nodeType]
+	if !ok {
+		log.Debug("node type is not recognised, dropping request", "nodeID", nodeID, "requestID", requestID, "nodeType", leafsRequest.NodeType)
+		return nil, nil
+	}
+	return handler.OnLeafsRequest(ctx, nodeID, requestID, leafsRequest)
 }
 
 func (n networkHandler) HandleBlockRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, blockRequest message.BlockRequest) ([]byte, error) {

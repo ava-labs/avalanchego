@@ -4,15 +4,11 @@
 package message
 
 import (
-	"bytes"
-	"context"
 	"encoding/base64"
 	"math/rand"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/libevm/common"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -52,6 +48,7 @@ func TestMarshalLeafsRequest(t *testing.T) {
 	require.Equal(t, leafsRequest.Start, l.Start)
 	require.Equal(t, leafsRequest.End, l.End)
 	require.Equal(t, leafsRequest.Limit, l.Limit)
+	require.Equal(t, NodeType(0), l.NodeType) // make sure it is not serialized
 }
 
 // TestMarshalLeafsResponse requires that the structure or serialization logic hasn't changed, primarily to
@@ -107,61 +104,53 @@ func TestMarshalLeafsResponse(t *testing.T) {
 	require.Equal(t, leafsResponse.ProofVals, l.ProofVals)
 }
 
-func TestLeafsRequestValidation(t *testing.T) {
-	mockRequestHandler := &mockHandler{}
+// TestLeafsRequestNodeTypeNotSerialized verifies that NodeType is not serialized
+// and does not affect the encoded output. This ensures backward compatibility.
+func TestLeafsRequestNodeTypeNotSerialized(t *testing.T) {
+	// set random seed for deterministic random
+	rand := rand.New(rand.NewSource(1))
 
-	tests := map[string]struct {
-		request        LeafsRequest
-		assertResponse func(t *testing.T)
-	}{
-		"node type StateTrieNode": {
-			request: LeafsRequest{
-				Root:  common.BytesToHash([]byte("some hash goes here")),
-				Start: bytes.Repeat([]byte{0x00}, common.HashLength),
-				End:   bytes.Repeat([]byte{0xff}, common.HashLength),
-				Limit: 10,
-			},
-			assertResponse: func(t *testing.T) {
-				assert.True(t, mockRequestHandler.handleStateTrieCalled)
-				assert.False(t, mockRequestHandler.handleBlockRequestCalled)
-				assert.False(t, mockRequestHandler.handleCodeRequestCalled)
-			},
-		},
+	startBytes := make([]byte, common.HashLength)
+	endBytes := make([]byte, common.HashLength)
+
+	_, err := rand.Read(startBytes)
+	require.NoError(t, err)
+
+	_, err = rand.Read(endBytes)
+	require.NoError(t, err)
+
+	// Create request without explicit NodeType (defaults to 0)
+	leafsRequestDefault := LeafsRequest{
+		Root:  common.BytesToHash([]byte("test root")),
+		Start: startBytes,
+		End:   endBytes,
+		Limit: 512,
 	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			_, _ = test.request.Handle(context.Background(), ids.GenerateTestNodeID(), 1, mockRequestHandler)
-			test.assertResponse(t)
-			mockRequestHandler.reset()
-		})
+
+	// Create request with explicit NodeType
+	leafsRequestWithNodeType := LeafsRequest{
+		Root:     common.BytesToHash([]byte("test root")),
+		Start:    startBytes,
+		End:      endBytes,
+		Limit:    512,
+		NodeType: StateTrieNode,
 	}
-}
 
-var _ RequestHandler = (*mockHandler)(nil)
+	bytesDefault, err := Codec.Marshal(Version, leafsRequestDefault)
+	require.NoError(t, err)
 
-type mockHandler struct {
-	handleStateTrieCalled,
-	handleBlockRequestCalled,
-	handleCodeRequestCalled bool
-}
+	bytesWithNodeType, err := Codec.Marshal(Version, leafsRequestWithNodeType)
+	require.NoError(t, err)
 
-func (m *mockHandler) HandleStateTrieLeafsRequest(context.Context, ids.NodeID, uint32, LeafsRequest) ([]byte, error) {
-	m.handleStateTrieCalled = true
-	return nil, nil
-}
+	require.Equal(t, bytesDefault, bytesWithNodeType, "NodeType should not affect serialization")
 
-func (m *mockHandler) HandleBlockRequest(context.Context, ids.NodeID, uint32, BlockRequest) ([]byte, error) {
-	m.handleBlockRequestCalled = true
-	return nil, nil
-}
+	var unmarshaled LeafsRequest
+	_, err = Codec.Unmarshal(bytesWithNodeType, &unmarshaled)
+	require.NoError(t, err)
 
-func (m *mockHandler) HandleCodeRequest(context.Context, ids.NodeID, uint32, CodeRequest) ([]byte, error) {
-	m.handleCodeRequestCalled = true
-	return nil, nil
-}
-
-func (m *mockHandler) reset() {
-	m.handleStateTrieCalled = false
-	m.handleBlockRequestCalled = false
-	m.handleCodeRequestCalled = false
+	require.Equal(t, NodeType(0), unmarshaled.NodeType, "NodeType should not be serialized")
+	require.Equal(t, leafsRequestDefault.Root, unmarshaled.Root)
+	require.Equal(t, leafsRequestDefault.Start, unmarshaled.Start)
+	require.Equal(t, leafsRequestDefault.End, unmarshaled.End)
+	require.Equal(t, leafsRequestDefault.Limit, unmarshaled.Limit)
 }

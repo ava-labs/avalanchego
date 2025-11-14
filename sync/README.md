@@ -60,6 +60,8 @@ The following steps are executed by the VM to sync its state from peers (see `st
 1. Update in-memory and on-disk pointers.
 
 Steps 3 and 4 involve syncing tries. To sync trie data, the VM will send a series of `LeafRequests` to its peers. Each request specifies:
+- Type of trie (`NodeType`):
+  - `statesync.StateTrieNode` (account trie and storage tries share the same database)
 - `Root` of the trie to sync,
 - `Start` and `End` specify a range of keys.
 

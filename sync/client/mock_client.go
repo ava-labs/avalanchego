@@ -26,7 +26,7 @@ var (
 // TODO replace with gomock library
 type MockClient struct {
 	codec          codec.Manager
-	leafsHandler   *handlers.LeafsRequestHandler
+	leafsHandler   handlers.LeafRequestHandler
 	leavesReceived int32
 	codesHandler   *handlers.CodeRequestHandler
 	codeReceived   int32
@@ -45,13 +45,13 @@ type MockClient struct {
 
 func NewMockClient(
 	codec codec.Manager,
-	leafHandler *handlers.LeafsRequestHandler,
+	leafsHandler handlers.LeafRequestHandler,
 	codesHandler *handlers.CodeRequestHandler,
 	blocksHandler *handlers.BlockRequestHandler,
 ) *MockClient {
 	return &MockClient{
 		codec:         codec,
-		leafsHandler:  leafHandler,
+		leafsHandler:  leafsHandler,
 		codesHandler:  codesHandler,
 		blocksHandler: blocksHandler,
 	}

@@ -15,9 +15,8 @@ var _ RequestHandler = NoopRequestHandler{}
 // Must have methods in format of handleType(context.Context, ids.NodeID, uint32, request Type) error
 // so that the Request object of relevant Type can invoke its respective handle method
 // on this struct.
-// Also see GossipHandler for implementation style.
 type RequestHandler interface {
-	HandleStateTrieLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest LeafsRequest) ([]byte, error)
+	HandleLeafsRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, leafsRequest LeafsRequest) ([]byte, error)
 	HandleBlockRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, request BlockRequest) ([]byte, error)
 	HandleCodeRequest(ctx context.Context, nodeID ids.NodeID, requestID uint32, codeRequest CodeRequest) ([]byte, error)
 }
@@ -33,7 +32,7 @@ type ResponseHandler interface {
 
 type NoopRequestHandler struct{}
 
-func (NoopRequestHandler) HandleStateTrieLeafsRequest(context.Context, ids.NodeID, uint32, LeafsRequest) ([]byte, error) {
+func (NoopRequestHandler) HandleLeafsRequest(context.Context, ids.NodeID, uint32, LeafsRequest) ([]byte, error) {
 	return nil, nil
 }
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/subnet-evm/plugin/evm/sync"
+	"github.com/ava-labs/subnet-evm/sync/handlers"
 )
 
 var (
@@ -18,6 +19,17 @@ var (
 	errNilSyncableParser      = errors.New("nil syncable parser")
 	errNilClock               = errors.New("nil clock")
 )
+
+// LeafRequestConfig is the configuration to handle leaf requests
+// in the network and syncer
+type LeafRequestConfig struct {
+	// LeafType is the type of the leaf node
+	LeafType message.NodeType
+	// MetricName is the name of the metric to use for the leaf request
+	MetricName string
+	// Handler is the handler to use for the leaf request
+	Handler handlers.LeafRequestHandler
+}
 
 // Config is the configuration for the VM extension
 type Config struct {

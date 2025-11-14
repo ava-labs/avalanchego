@@ -75,6 +75,7 @@ import (
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/rpc"
 	"github.com/ava-labs/subnet-evm/sync/client/stats"
+	"github.com/ava-labs/subnet-evm/sync/handlers"
 	"github.com/ava-labs/subnet-evm/triedb/hashdb"
 	"github.com/ava-labs/subnet-evm/warp"
 
@@ -87,6 +88,7 @@ import (
 	subnetevmlog "github.com/ava-labs/subnet-evm/plugin/evm/log"
 	vmsync "github.com/ava-labs/subnet-evm/plugin/evm/sync"
 	statesyncclient "github.com/ava-labs/subnet-evm/sync/client"
+	handlerstats "github.com/ava-labs/subnet-evm/sync/handlers/stats"
 	avalancheRPC "github.com/gorilla/rpc/v2"
 )
 
@@ -504,11 +506,9 @@ func (vm *VM) Initialize(
 	warpHandler := acp118.NewCachedHandler(meteredCache, vm.warpBackend, vm.ctx.WarpSigner)
 	vm.Network.AddHandler(p2p.SignatureRequestHandlerID, warpHandler)
 
-	vm.setAppRequestHandlers()
-
 	vm.stateSyncDone = make(chan struct{})
 
-	return vm.initializeStateSyncClient(lastAcceptedHeight)
+	return vm.initializeStateSync(lastAcceptedHeight)
 }
 
 func parseGenesis(ctx *snow.Context, genesisBytes []byte, upgradeBytes []byte, airdropFile string) (*core.Genesis, error) {
@@ -652,7 +652,44 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash, ethConfig ethconfig.
 // initializeStateSyncClient initializes the client for performing state sync.
 // If state sync is disabled, this function will wipe any ongoing summary from
 // disk to ensure that we do not continue syncing from an invalid snapshot.
-func (vm *VM) initializeStateSyncClient(lastAcceptedHeight uint64) error {
+func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
+	// Create standalone EVM TrieDB (read only) for serving leafs requests.
+	// We create a standalone TrieDB here, so that it has a standalone cache from the one
+	// used by the node when processing blocks.
+	evmTrieDB := triedb.NewDatabase(
+		vm.chaindb,
+		&triedb.Config{
+			DBOverride: hashdb.Config{
+				CleanCacheSize: vm.config.StateSyncServerTrieCache * units.MiB,
+			}.BackendConstructor,
+		},
+	)
+
+	// register default leaf request handler for state trie
+	syncStats := handlerstats.GetOrRegisterHandlerStats(metrics.Enabled)
+	stateLeafRequestConfig := &extension.LeafRequestConfig{
+		LeafType:   message.StateTrieNode,
+		MetricName: "sync_state_trie_leaves",
+		Handler: handlers.NewLeafsRequestHandler(evmTrieDB,
+			message.StateTrieKeyLength,
+			vm.blockChain, vm.networkCodec,
+			syncStats,
+		),
+	}
+
+	leafHandlers := make(LeafHandlers)
+	leafHandlers[stateLeafRequestConfig.LeafType] = stateLeafRequestConfig.Handler
+
+	networkHandler := newNetworkHandler(
+		vm.blockChain,
+		vm.chaindb,
+		vm.networkCodec,
+		leafHandlers,
+		syncStats,
+	)
+	vm.Network.SetRequestHandler(networkHandler)
+
+	vm.Server = vmsync.NewServer(vm.blockChain, vm.extensionConfig.SyncSummaryProvider, vm.config.StateSyncCommitInterval) // parse nodeIDs from state sync IDs in vm config
 	// parse nodeIDs from state sync IDs in vm config
 	var stateSyncIDs []ids.NodeID
 	if vm.config.StateSyncEnabled && len(vm.config.StateSyncIDs) > 0 {
@@ -667,15 +704,19 @@ func (vm *VM) initializeStateSyncClient(lastAcceptedHeight uint64) error {
 		}
 	}
 
+	// Initialize the state sync client
+	leafMetricsNames := make(map[message.NodeType]string)
+	leafMetricsNames[stateLeafRequestConfig.LeafType] = stateLeafRequestConfig.MetricName
+
 	vm.Client = vmsync.NewClient(&vmsync.ClientConfig{
+		StateSyncDone: vm.stateSyncDone,
 		Chain:         vm.eth,
 		State:         vm.State,
-		StateSyncDone: vm.stateSyncDone,
 		Client: statesyncclient.NewClient(
 			&statesyncclient.ClientConfig{
 				NetworkClient:    vm.Network,
 				Codec:            vm.networkCodec,
-				Stats:            stats.NewClientSyncerStats(),
+				Stats:            stats.NewClientSyncerStats(leafMetricsNames),
 				StateSyncNodeIDs: stateSyncIDs,
 				BlockParser:      vm,
 			},
@@ -904,27 +945,6 @@ func (vm *VM) onNormalOperationsStarted() error {
 	}()
 
 	return nil
-}
-
-// setAppRequestHandlers sets the request handlers for the VM to serve state sync
-// requests.
-func (vm *VM) setAppRequestHandlers() {
-	// Create standalone EVM TrieDB (read only) for serving leafs requests.
-	// We create a standalone TrieDB here, so that it has a standalone cache from the one
-	// used by the node when processing blocks.
-	evmTrieDB := triedb.NewDatabase(
-		vm.chaindb,
-		&triedb.Config{
-			DBOverride: hashdb.Config{
-				CleanCacheSize: vm.config.StateSyncServerTrieCache * units.MiB,
-			}.BackendConstructor,
-		},
-	)
-
-	networkHandler := newNetworkHandler(vm.blockChain, vm.chaindb, evmTrieDB, vm.networkCodec)
-	vm.Network.SetRequestHandler(networkHandler)
-
-	vm.Server = vmsync.NewServer(vm.blockChain, vm.extensionConfig.SyncSummaryProvider, vm.config.StateSyncCommitInterval)
 }
 
 func (vm *VM) WaitForEvent(ctx context.Context) (commonEng.Message, error) {

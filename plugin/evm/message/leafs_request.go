@@ -13,27 +13,38 @@ import (
 
 const MaxCodeHashesPerRequest = 5
 
-var _ Request = LeafsRequest{}
+// NodeType outlines the trie that a leaf node belongs to
+// handlers.LeafsRequestHandler uses this information to determine
+// which trie type to fetch the information from
+type NodeType uint8
+
+const (
+	StateTrieNode      = NodeType(1)
+	StateTrieKeyLength = common.HashLength
+)
 
 // LeafsRequest is a request to receive trie leaves at specified Root within Start and End byte range
 // Limit outlines maximum number of leaves to returns starting at Start
+// NodeType outlines which trie to read from state/atomic.
+// NOTE: NodeType is not serialized to avoid breaking changes. We rely on the single used node type (StateTrieNode).
 type LeafsRequest struct {
-	Root    common.Hash `serialize:"true"`
-	Account common.Hash `serialize:"true"`
-	Start   []byte      `serialize:"true"`
-	End     []byte      `serialize:"true"`
-	Limit   uint16      `serialize:"true"`
+	Root     common.Hash `serialize:"true"`
+	Account  common.Hash `serialize:"true"`
+	Start    []byte      `serialize:"true"`
+	End      []byte      `serialize:"true"`
+	Limit    uint16      `serialize:"true"`
+	NodeType NodeType    // TODO(JonathanOppenheimer): Not serialized to avoid breaking changes. We rely on the single used node type (StateTrieNode).
 }
 
 func (l LeafsRequest) String() string {
 	return fmt.Sprintf(
-		"LeafsRequest(Root=%s, Account=%s, Start=%s, End %s, Limit=%d)",
-		l.Root, l.Account, common.Bytes2Hex(l.Start), common.Bytes2Hex(l.End), l.Limit,
+		"LeafsRequest(Root=%s, Account=%s, Start=%s, End=%s, Limit=%d, NodeType=%d)",
+		l.Root, l.Account, common.Bytes2Hex(l.Start), common.Bytes2Hex(l.End), l.Limit, l.NodeType,
 	)
 }
 
 func (l LeafsRequest) Handle(ctx context.Context, nodeID ids.NodeID, requestID uint32, handler RequestHandler) ([]byte, error) {
-	return handler.HandleStateTrieLeafsRequest(ctx, nodeID, requestID, l)
+	return handler.HandleLeafsRequest(ctx, nodeID, requestID, l)
 }
 
 // LeafsResponse is a response to a LeafsRequest
