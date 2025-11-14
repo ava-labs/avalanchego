@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet/flags"
 	"github.com/ava-labs/avalanchego/utils/constants"
+	"github.com/ava-labs/avalanchego/utils/logging"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -286,7 +287,17 @@ func newNodeStatefulSet(name string, flags tmpnet.FlagsMap) *appsv1.StatefulSet 
 }
 
 func defaultPodFlags() map[string]string {
-	return tmpnet.DefaultPodFlags(constants.LocalName, nodeDataDir)
+	flags := tmpnet.FlagsMap{
+		config.DataDirKey:                nodeDataDir,
+		config.NetworkNameKey:            constants.LocalName,
+		config.SybilProtectionEnabledKey: "false",
+		config.HealthCheckFreqKey:        "500ms", // Ensure rapid detection of a healthy state
+		config.LogDisplayLevelKey:        logging.Debug.String(),
+		config.LogLevelKey:               logging.Debug.String(),
+		config.HTTPHostKey:               "0.0.0.0", // Need to bind to pod IP to ensure kubelet can access the http port for the readiness
+	}
+	flags.SetDefaults(tmpnet.DefaultTmpnetFlags())
+	return flags
 }
 
 // waitForPodCondition waits until the specified pod reports the specified condition
