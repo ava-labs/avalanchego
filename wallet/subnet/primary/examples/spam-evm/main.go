@@ -30,7 +30,7 @@ func main() {
 	ctx := context.Background()
 	const (
 		chainUUID = "C"
-		uri       = primary.LocalAPIURI + "/ext/bc/" + chainUUID + "/sae/http"
+		uri       = primary.LocalAPIURI + "/ext/bc/" + chainUUID + "/rpc"
 	)
 	c, err := ethclient.DialContext(ctx, uri)
 	if err != nil {
