@@ -62,9 +62,6 @@ const (
 	// levelDBByteOverhead is the number of bytes of constant overhead that
 	// should be added to a batch size per operation.
 	levelDBByteOverhead = 8
-
-	// compactionInterval is the duration between automatic compactions.
-	compactionInterval = 2 * time.Hour
 )
 
 var (
@@ -188,6 +185,11 @@ type config struct {
 	// MetricUpdateFrequency is the frequency to poll LevelDB metrics.
 	// If <= 0, LevelDB metrics aren't polled.
 	MetricUpdateFrequency time.Duration `json:"metricUpdateFrequency"`
+
+	// ManualCompationFrequency is the frequency to run manual compactions.
+	// If <= 0, manual compactions aren't performed.
+	// By default, manual compactions are disabled.
+	ManualCompationFrequency time.Duration `json:"manualCompationFrequency"`
 }
 
 // New returns a wrapped LevelDB object.
@@ -272,7 +274,9 @@ func New(file string, configBytes []byte, log logging.Logger, reg prometheus.Reg
 		}()
 	}
 
-	wrappedDB.startCompactions()
+	if parsedConfig.ManualCompationFrequency > 0 {
+		wrappedDB.startCompactions(parsedConfig.ManualCompationFrequency)
+	}
 
 	return wrappedDB, nil
 }
@@ -360,7 +364,7 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 	return updateError(db.DB.CompactRange(util.Range{Start: start, Limit: limit}))
 }
 
-func (db *Database) startCompactions() {
+func (db *Database) startCompactions(compactionInterval time.Duration) {
 	db.closeWg.Add(1)
 	go func() {
 		defer db.closeWg.Done()
