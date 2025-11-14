@@ -5,6 +5,7 @@ package core
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"go.uber.org/zap"
@@ -383,6 +384,60 @@ func UpdateAllReplaceDirectives(log logging.Logger, baseDir string, syncedRepos 
 	}
 
 	log.Info("successfully updated all replace directives")
+
+	// Run go mod tidy for all repos to clean up indirect dependencies
+	for repoName := range allRepos {
+		config, err := GetRepoConfig(repoName)
+		if err != nil {
+			log.Warn("failed to get config for repo, skipping go mod tidy",
+				zap.String("repo", repoName),
+				zap.Error(err),
+			)
+			continue
+		}
+
+		// Determine the go.mod path for this repo
+		var goModPath string
+		if repoName == primaryRepo {
+			// Primary repo - use go.mod in base directory
+			goModPath = filepath.Join(baseDir, config.GoModPath)
+		} else {
+			// Synced repo - use go.mod in the cloned directory
+			clonePath := GetRepoClonePath(repoName, baseDir)
+			goModPath = filepath.Join(clonePath, config.GoModPath)
+		}
+
+		// Check if go.mod exists before running tidy
+		if _, err := os.Stat(goModPath); err != nil {
+			if os.IsNotExist(err) {
+				log.Debug("go.mod does not exist for repo, skipping go mod tidy",
+					zap.String("repo", repoName),
+					zap.String("goModPath", goModPath),
+				)
+				continue
+			}
+			return stacktrace.Errorf("failed to stat go.mod for %s: %w", repoName, err)
+		}
+
+		log.Info("running go mod tidy",
+			zap.String("repo", repoName),
+			zap.String("goModPath", goModPath),
+		)
+
+		// Run go mod tidy in the directory containing go.mod
+		goModDir := filepath.Dir(goModPath)
+		tidyCmd := exec.Command("go", "mod", "tidy")
+		tidyCmd.Dir = goModDir
+		if output, err := tidyCmd.CombinedOutput(); err != nil {
+			return stacktrace.Errorf("failed to run go mod tidy for %s: %w\nOutput: %s",
+				repoName, err, string(output))
+		}
+
+		log.Info("successfully ran go mod tidy",
+			zap.String("repo", repoName),
+		)
+	}
+
 	return nil
 }
 
