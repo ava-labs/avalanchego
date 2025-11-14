@@ -39,8 +39,9 @@ const RootLength = C.sizeof_HashKey
 type Hash [RootLength]byte
 
 var (
-	EmptyRoot   Hash
-	errDBClosed = errors.New("firewood database already closed")
+	EmptyRoot                 Hash
+	errDBClosed               = errors.New("firewood database already closed")
+	ErrActiveKeepAliveHandles = errors.New("cannot close database with active keep-alive handles")
 )
 
 // A Database is a handle to a Firewood database.
@@ -252,10 +253,11 @@ var defaultCloseTimeout = time.Minute
 
 // Close releases the memory associated with the Database.
 //
-// This blocks until all outstanding Proposals are either unreachable or one of
-// [Proposal.Commit] or [Proposal.Drop] has been called on them. Unreachable
-// proposals will be automatically dropped before Close returns, unless an
-// alternate GC finalizer is set on them.
+// This blocks until all outstanding keep-alive handles are disowned. That is,
+// until all Revisions and Proposals created from this Database are either
+// unreachable or one of [Proposal.Commit], [Proposal.Drop], or [Revision.Drop]
+// has been called on them. Unreachable objects will be automatically dropped
+// before Close returns, unless an alternate GC finalizer is set on them.
 //
 // This is safe to call if the handle pointer is nil, in which case it does
 // nothing. The pointer will be set to nil after freeing to prevent double free.
@@ -279,7 +281,7 @@ func (db *Database) Close(ctx context.Context) error {
 	select {
 	case <-done:
 	case <-ctx.Done():
-		return fmt.Errorf("at least one reachable %T neither dropped nor committed", &Proposal{})
+		return ErrActiveKeepAliveHandles
 	}
 
 	if err := getErrorFromVoidResult(C.fwd_close_db(db.handle)); err != nil {
