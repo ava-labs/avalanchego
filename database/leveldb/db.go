@@ -26,7 +26,6 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
-	"github.com/ava-labs/libevm/log"
 )
 
 const (
@@ -275,7 +274,7 @@ func New(file string, configBytes []byte, log logging.Logger, reg prometheus.Reg
 	}
 
 	if parsedConfig.ManualCompationFrequency > 0 {
-		wrappedDB.startCompactions(parsedConfig.ManualCompationFrequency)
+		wrappedDB.startCompactions(log, parsedConfig.ManualCompationFrequency)
 	}
 
 	return wrappedDB, nil
@@ -364,7 +363,7 @@ func (db *Database) Compact(start []byte, limit []byte) error {
 	return updateError(db.DB.CompactRange(util.Range{Start: start, Limit: limit}))
 }
 
-func (db *Database) startCompactions(compactionInterval time.Duration) {
+func (db *Database) startCompactions(log logging.Logger, compactionInterval time.Duration) {
 	db.closeWg.Add(1)
 	go func() {
 		defer db.closeWg.Done()
@@ -385,7 +384,7 @@ func (db *Database) startCompactions(compactionInterval time.Duration) {
 
 		for {
 			if err := db.Compact(nil, nil); err != nil {
-				log.Error("failed to compact leveldb",
+				log.Warn("failed to compact leveldb",
 					zap.Error(err),
 				)
 			}
