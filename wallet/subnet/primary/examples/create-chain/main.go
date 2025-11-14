@@ -5,44 +5,52 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
-	"math"
+	"math/big"
 	"time"
+
+	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/coreth/params"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/ava-labs/libevm/crypto"
+	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/genesis"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary"
-
-	xsgenesis "github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 )
 
 func main() {
 	key := genesis.EWOQKey
 	uri := primary.LocalAPIURI
 	kc := secp256k1fx.NewKeychain(key)
-	subnetIDStr := "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL"
-	genesis := &xsgenesis.Genesis{
-		Timestamp: time.Now().Unix(),
-		Allocations: []xsgenesis.Allocation{
-			{
-				Address: genesis.EWOQKey.Address(),
-				Balance: math.MaxUint64,
+	subnetIDStr := "BKBZ6xXTnT86B4L5fp8rvtcmNSpvtNz8En9jG61ywV2uWyeHy"
+
+	eoa := crypto.PubkeyToAddress(*key.PublicKey().ToECDSA())
+	genesis := &core.Genesis{
+		Config:     params.TestChainConfig,
+		Timestamp:  1749420951,
+		Difficulty: big.NewInt(0), // required by geth
+		Alloc: types.GenesisAlloc{
+			eoa: {
+				Balance: new(uint256.Int).Not(uint256.NewInt(0)).ToBig(),
 			},
 		},
 	}
-	vmID := constants.XSVMID
-	name := "let there"
+	genesisBytes, err := json.Marshal(genesis)
+	if err != nil {
+		log.Fatalf("failed to marshal genesis: %s\n", err)
+	}
+
+	vmID := constants.StrEVMID
+	name := "gofast"
 
 	subnetID, err := ids.FromString(subnetIDStr)
 	if err != nil {
 		log.Fatalf("failed to parse subnet ID: %s\n", err)
-	}
-
-	genesisBytes, err := xsgenesis.Codec.Marshal(xsgenesis.CodecVersion, genesis)
-	if err != nil {
-		log.Fatalf("failed to create genesis bytes: %s\n", err)
 	}
 
 	ctx := context.Background()
