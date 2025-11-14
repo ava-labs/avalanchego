@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1763123478872,
+  "lastUpdate": 1763133771524,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -1706,6 +1706,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
             "value": 76.17,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Draco",
+            "username": "DracoLi",
+            "email": "draco@dracoli.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "7f188ab398461a6b33bd37d76d3246dc8550bae5",
+          "message": "feat(blockdb): add lru cache for block entries (#4425)\n\nCo-authored-by: yacovm <yacovm@users.noreply.github.com>",
+          "timestamp": "2025-11-13T21:46:49Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/7f188ab398461a6b33bd37d76d3246dc8550bae5"
+        },
+        "date": 1763133769516,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
+            "value": 42.23,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
