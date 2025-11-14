@@ -314,6 +314,7 @@ func createBootstrapTester(tc tests.TestContext, clientset *kubernetes.Clientset
 	flags := defaultPodFlags()
 	flags[config.BootstrapIPsKey] = fmt.Sprintf("%s:%d", bootstrapIP, config.DefaultStakingPort)
 	flags[config.BootstrapIDsKey] = bootstrapNodeID.String()
+	flags[config.SystemTrackerWarningThresholdAvailableDiskSpaceKey] = "2GB"
 
 	statefulSet := newNodeStatefulSet("bootstrap-tester", flags)
 
