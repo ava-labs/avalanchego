@@ -291,5 +291,5 @@ func assertNativeCoinMintedEvent(t testing.TB,
 	require.NotEmpty(t, log.Data)
 	amount, err := UnpackNativeCoinMintedEventData(log.Data)
 	require.NoError(t, err)
-	require.True(t, expectedAmount.Cmp(amount) == 0, "expected", expectedAmount, "got", amount)
+	require.Zero(t, expectedAmount.Cmp(amount), "expected", expectedAmount, "got", amount)
 }

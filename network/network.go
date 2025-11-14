@@ -36,6 +36,7 @@ const (
 var (
 	errAcquiringSemaphore                      = errors.New("error acquiring semaphore")
 	errExpiredRequest                          = errors.New("expired request")
+	errNoPeersFound                            = errors.New("no peers found matching version")
 	_                     Network              = (*network)(nil)
 	_                     validators.Connector = (*network)(nil)
 	_                     common.AppHandler    = (*network)(nil)
@@ -180,7 +181,7 @@ func (n *network) SendAppRequestAny(ctx context.Context, minVersion *version.App
 	}
 
 	n.activeAppRequests.Release(1)
-	return ids.EmptyNodeID, fmt.Errorf("no peers found matching version %s out of %d peers", minVersion, n.peers.Size())
+	return ids.EmptyNodeID, fmt.Errorf("%w: version: %s, numPeers: %d", errNoPeersFound, minVersion, n.peers.Size())
 }
 
 // SendAppRequest sends request message bytes to specified nodeID, notifying the responseHandler on response or failure

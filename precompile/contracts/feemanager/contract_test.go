@@ -158,7 +158,7 @@ var (
 				feeConfig := GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
-				require.EqualValues(t, testBlockNumber, lastChangedAt)
+				require.Equal(t, testBlockNumber, lastChangedAt)
 
 				logs := state.Logs()
 				assertFeeEvent(t, logs, allowlisttest.TestAdminAddr, zeroFeeConfig, testFeeConfig)
@@ -192,7 +192,7 @@ var (
 				feeConfig := GetStoredFeeConfig(state)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
 				require.Equal(t, testFeeConfig, feeConfig)
-				require.EqualValues(t, big.NewInt(6), lastChangedAt)
+				require.Equal(t, big.NewInt(6), lastChangedAt)
 			},
 		},
 		{
@@ -224,7 +224,7 @@ var (
 				feeConfig := GetStoredFeeConfig(state)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
 				require.Equal(t, testFeeConfig, feeConfig)
-				require.EqualValues(t, testBlockNumber, lastChangedAt)
+				require.Equal(t, testBlockNumber, lastChangedAt)
 			},
 		},
 		{
@@ -365,7 +365,7 @@ var (
 				feeConfig := GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
-				require.EqualValues(t, testBlockNumber, lastChangedAt)
+				require.Equal(t, testBlockNumber, lastChangedAt)
 
 				logs := state.Logs()
 				assertFeeEvent(t, logs, allowlisttest.TestEnabledAddr, zeroFeeConfig, testFeeConfig)
@@ -411,7 +411,7 @@ var (
 				feeConfig := GetStoredFeeConfig(state)
 				require.Equal(t, regressionFeeConfig, feeConfig)
 				lastChangedAt := GetFeeConfigLastChangedAt(state)
-				require.EqualValues(t, testBlockNumber, lastChangedAt)
+				require.Equal(t, testBlockNumber, lastChangedAt)
 
 				logs := state.Logs()
 				assertFeeEvent(t, logs, allowlisttest.TestEnabledAddr, zeroFeeConfig, regressionFeeConfig)

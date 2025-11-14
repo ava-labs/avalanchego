@@ -404,7 +404,7 @@ func (w *warpTest) aggregateSignaturesViaAPI() {
 		validators, err = pChainClient.GetValidatorsAt(ctx, w.sendingSubnet.SubnetID, api.Height(pChainHeight))
 	}
 	require.NoError(err)
-	require.NotZero(len(validators))
+	require.NotEmpty(validators)
 
 	totalWeight := uint64(0)
 	warpValidators := make([]*avalancheWarp.Validator, 0, len(validators))
@@ -511,10 +511,10 @@ func (w *warpTest) deliverAddressedCallToReceivingSubnet() {
 		Addresses: []common.Address{warp.Module.Address},
 	})
 	require.NoError(err)
-	require.Len(logs, 0)
+	require.Empty(logs)
 	receipt, err := client.TransactionReceipt(ctx, signedTx.Hash())
 	require.NoError(err)
-	require.Equal(receipt.Status, types.ReceiptStatusSuccessful)
+	require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
 }
 
 func (w *warpTest) deliverBlockHashPayload() {
@@ -568,10 +568,10 @@ func (w *warpTest) deliverBlockHashPayload() {
 		Addresses: []common.Address{warp.Module.Address},
 	})
 	require.NoError(err)
-	require.Len(logs, 0)
+	require.Empty(logs)
 	receipt, err := client.TransactionReceipt(ctx, signedTx.Hash())
 	require.NoError(err)
-	require.Equal(receipt.Status, types.ReceiptStatusSuccessful)
+	require.Equal(types.ReceiptStatusSuccessful, receipt.Status)
 }
 
 func (w *warpTest) executeHardHatTest() {

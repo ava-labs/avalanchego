@@ -77,7 +77,7 @@ linters:
     - spancheck
     - staticcheck
     - tagalign
-    # - testifylint
+    - testifylint
     - unconvert
     - unparam
     - unused
@@ -208,16 +208,16 @@ linters:
         - serialize
       strict: true
     testifylint:
-    # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
-    # Default: false
-    enable-all: true
-    # Disable checkers by name
-    # (in addition to default
-    #   suite-thelper
-    # ).
-    disable:
-      - go-require
-      - float-compare
+      # Enable all checkers (https://github.com/Antonboom/testifylint#checkers).
+      # Default: false
+      enable-all: true
+      # Disable checkers by name
+      # (in addition to default
+      #   suite-thelper
+      # ).
+      disable:
+        - go-require
+        - float-compare
     unused:
       # Mark all struct fields that have been written to as used.
       # Default: true

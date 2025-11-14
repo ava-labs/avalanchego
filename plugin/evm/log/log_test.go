@@ -28,7 +28,7 @@ func TestInitLogger(t *testing.T) {
 			require := require.New(t)
 			_, err := InitLogger("alias", test.logLevel, true, os.Stderr)
 			if test.expectedErr {
-				require.Error(err)
+				require.ErrorContains(err, "unknown level")
 			} else {
 				require.NoError(err)
 			}

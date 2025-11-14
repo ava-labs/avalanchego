@@ -361,9 +361,9 @@ func testOldPackGetLastChangedAtOutputEqual(t *testing.T, blockNumber *big.Int, 
 			return
 		}
 		require.NoError(t, err2)
-		require.True(t, value.Cmp(unpacked) == 0, "not equal: value %v, unpacked %v", value, unpacked)
+		require.Zero(t, value.Cmp(unpacked), "not equal: value %v, unpacked %v", value, unpacked)
 		if checkOutputs {
-			require.True(t, blockNumber.Cmp(unpacked) == 0, "not equal: blockNumber %v, unpacked %v", blockNumber, unpacked)
+			require.Zero(t, blockNumber.Cmp(unpacked), "not equal: blockNumber %v, unpacked %v", blockNumber, unpacked)
 		}
 	})
 }

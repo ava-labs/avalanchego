@@ -346,9 +346,9 @@ func TestSetDefaultsTreatsZeroAsUnset(t *testing.T) {
 
 	defaults := GetNetworkUpgrades(agoUpgrades)
 
-	require.EqualValues(t, defaults.SubnetEVMTimestamp, upgrades.SubnetEVMTimestamp)
-	require.EqualValues(t, defaults.DurangoTimestamp, upgrades.DurangoTimestamp)
-	require.EqualValues(t, defaults.EtnaTimestamp, upgrades.EtnaTimestamp)
-	require.EqualValues(t, defaults.FortunaTimestamp, upgrades.FortunaTimestamp)
-	require.EqualValues(t, defaults.GraniteTimestamp, upgrades.GraniteTimestamp)
+	require.Equal(t, defaults.SubnetEVMTimestamp, upgrades.SubnetEVMTimestamp)
+	require.Equal(t, defaults.DurangoTimestamp, upgrades.DurangoTimestamp)
+	require.Equal(t, defaults.EtnaTimestamp, upgrades.EtnaTimestamp)
+	require.Equal(t, defaults.FortunaTimestamp, upgrades.FortunaTimestamp)
+	require.Equal(t, defaults.GraniteTimestamp, upgrades.GraniteTimestamp)
 }

@@ -325,7 +325,7 @@ func TestPrecompileUpgradeUnmarshalJSON(t *testing.T) {
 	require.Len(upgradeConfig.PrecompileUpgrades, 2)
 
 	rewardManagerConf := upgradeConfig.PrecompileUpgrades[0]
-	require.Equal(rewardManagerConf.Key(), rewardmanager.ConfigKey)
+	require.Equal(rewardmanager.ConfigKey, rewardManagerConf.Key())
 	testRewardManagerConfig := rewardmanager.NewConfig(
 		utils.NewUint64(1671542573),
 		[]common.Address{common.HexToAddress("0x8db97C7cEcE249c2b98bDC0226Cc4C2A57BF52FC")},
@@ -337,7 +337,7 @@ func TestPrecompileUpgradeUnmarshalJSON(t *testing.T) {
 	require.True(rewardManagerConf.Equal(testRewardManagerConfig))
 
 	nativeMinterConfig := upgradeConfig.PrecompileUpgrades[1]
-	require.Equal(nativeMinterConfig.Key(), nativeminter.ConfigKey)
+	require.Equal(nativeminter.ConfigKey, nativeMinterConfig.Key())
 	expectedNativeMinterConfig := nativeminter.NewConfig(utils.NewUint64(1671543172), nil, nil, nil, nil)
 	require.True(nativeMinterConfig.Equal(expectedNativeMinterConfig))
 

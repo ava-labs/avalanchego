@@ -68,7 +68,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 	// Submit a successful transaction
 	tx0 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx0, err := types.SignTx(tx0, types.NewEIP155Signer(tvm.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	errs := tvm.vm.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
 	if err := errs[0]; err != nil {
@@ -220,7 +220,7 @@ func TestNetworkUpgradesOverridden(t *testing.T) {
 	// Submit a successful transaction
 	tx0 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
 	signedTx0, err := types.SignTx(tx0, types.NewEIP155Signer(restartedVM.chainConfig.ChainID), testKeys[0].ToECDSA())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	errs := restartedVM.txPool.AddRemotesSync([]*types.Transaction{signedTx0})
 	if err := errs[0]; err != nil {
 		t.Fatalf("Failed to add tx at index: %s", err)
@@ -349,19 +349,19 @@ func TestVMStateUpgrade(t *testing.T) {
 			(*big.Int)(genesisAccountUpgrade.BalanceChange),
 		),
 	)
-	require.Equal(t, state.GetBalance(testEthAddrs[0]), expectedGenesisAccountBalance)
-	require.Equal(t, state.GetState(testEthAddrs[0], storageKey), genesisAccountUpgrade.Storage[storageKey])
-	require.Equal(t, state.GetCode(testEthAddrs[0]), upgradedCode)
-	require.Equal(t, state.GetCodeHash(testEthAddrs[0]), crypto.Keccak256Hash(upgradedCode))
-	require.Equal(t, state.GetNonce(testEthAddrs[0]), genesisAccount.Nonce) // Nonce should be preserved since it was non-zero
+	require.Equal(t, expectedGenesisAccountBalance, state.GetBalance(testEthAddrs[0]))
+	require.Equal(t, genesisAccountUpgrade.Storage[storageKey], state.GetState(testEthAddrs[0], storageKey))
+	require.Equal(t, upgradedCode, state.GetCode(testEthAddrs[0]))
+	require.Equal(t, crypto.Keccak256Hash(upgradedCode), state.GetCodeHash(testEthAddrs[0]))
+	require.Equal(t, genesisAccount.Nonce, state.GetNonce(testEthAddrs[0])) // Nonce should be preserved since it was non-zero
 
 	// New account
 	expectedNewAccountBalance := uint256.MustFromBig((*big.Int)(newAccountUpgrade.BalanceChange))
-	require.Equal(t, state.GetBalance(newAccount), expectedNewAccountBalance)
-	require.Equal(t, state.GetCode(newAccount), upgradedCode)
-	require.Equal(t, state.GetCodeHash(newAccount), crypto.Keccak256Hash(upgradedCode))
-	require.Equal(t, state.GetNonce(newAccount), uint64(1)) // Nonce should be set to 1 when code is set if nonce was 0
-	require.Equal(t, state.GetState(newAccount, storageKey), newAccountUpgrade.Storage[storageKey])
+	require.Equal(t, expectedNewAccountBalance, state.GetBalance(newAccount))
+	require.Equal(t, upgradedCode, state.GetCode(newAccount))
+	require.Equal(t, crypto.Keccak256Hash(upgradedCode), state.GetCodeHash(newAccount))
+	require.Equal(t, uint64(1), state.GetNonce(newAccount)) // Nonce should be set to 1 when code is set if nonce was 0
+	require.Equal(t, newAccountUpgrade.Storage[storageKey], state.GetState(newAccount, storageKey))
 }
 
 func TestVMEtnaActivatesCancun(t *testing.T) {

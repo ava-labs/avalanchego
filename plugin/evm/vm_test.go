@@ -2667,7 +2667,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	// Contract is initialized but no preconfig is given, reader should return genesis fee config
 	feeConfig, lastChangedAt, err := tvm.vm.blockChain.GetFeeConfigAt(tvm.vm.blockChain.Genesis().Header())
 	require.NoError(t, err)
-	require.EqualValues(t, feeConfig, testLowFeeConfig)
+	require.Equal(t, testLowFeeConfig, feeConfig)
 	require.Zero(t, tvm.vm.blockChain.CurrentBlock().Number.Cmp(lastChangedAt))
 
 	// set a different fee config now
@@ -2708,8 +2708,8 @@ func TestFeeManagerChangeFee(t *testing.T) {
 
 	feeConfig, lastChangedAt, err = tvm.vm.blockChain.GetFeeConfigAt(block.Header())
 	require.NoError(t, err)
-	require.EqualValues(t, testHighFeeConfig, feeConfig)
-	require.EqualValues(t, tvm.vm.blockChain.CurrentBlock().Number, lastChangedAt)
+	require.Equal(t, testHighFeeConfig, feeConfig)
+	require.Equal(t, tvm.vm.blockChain.CurrentBlock().Number, lastChangedAt)
 
 	// should fail, with same params since fee is higher now
 	tx2 := types.NewTx(&types.DynamicFeeTx{
@@ -3469,8 +3469,8 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	// return the chain config fee config and lastChangedAt as zero, which is not correct after activation.
 	feeConfig, lastChangedAt, err := restartedVM.blockChain.GetFeeConfigAt(restartedVM.blockChain.CurrentBlock())
 	require.NoError(t, err)
-	require.EqualValues(t, feeConfig, testHighFeeConfig)
-	require.EqualValues(t, restartedVM.blockChain.CurrentBlock().Number, lastChangedAt)
+	require.Equal(t, testHighFeeConfig, feeConfig)
+	require.Equal(t, restartedVM.blockChain.CurrentBlock().Number, lastChangedAt)
 
 	// set a lower fee config now through feemanager
 	testLowFeeConfig := testHighFeeConfig
@@ -3500,8 +3500,8 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	block := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
 	feeConfig, lastChangedAt, err = restartedVM.blockChain.GetFeeConfigAt(block.Header())
 	require.NoError(t, err)
-	require.EqualValues(t, restartedVM.blockChain.CurrentBlock().Number, lastChangedAt)
-	require.EqualValues(t, testLowFeeConfig, feeConfig)
+	require.Equal(t, restartedVM.blockChain.CurrentBlock().Number, lastChangedAt)
+	require.Equal(t, testLowFeeConfig, feeConfig)
 
 	// send another tx with low fee
 	tx = types.NewTransaction(uint64(2), testEthAddrs[0], common.Big0, 21000, big.NewInt(testLowFeeConfig.MinBaseFee.Int64()), nil)
@@ -3584,8 +3584,8 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(ctx)
-					require.ErrorIs(t, err, context.DeadlineExceeded)
-					require.Zero(t, msg)
+					assert.ErrorIs(t, err, context.DeadlineExceeded)
+					assert.Zero(t, msg)
 				}()
 
 				wg.Wait()
@@ -3600,8 +3600,8 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(context.Background())
-					require.NoError(t, err)
-					require.Equal(t, commonEng.PendingTxs, msg)
+					assert.NoError(t, err)
+					assert.Equal(t, commonEng.PendingTxs, msg)
 				}()
 
 				tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
@@ -3628,8 +3628,8 @@ func TestWaitForEvent(t *testing.T) {
 				go func() {
 					defer wg.Done()
 					msg, err := vm.WaitForEvent(ctx)
-					require.ErrorIs(t, err, context.DeadlineExceeded)
-					require.Zero(t, msg)
+					assert.ErrorIs(t, err, context.DeadlineExceeded)
+					assert.Zero(t, msg)
 				}()
 
 				wg.Wait()

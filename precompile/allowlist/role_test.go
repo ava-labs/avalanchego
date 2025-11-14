@@ -4,7 +4,6 @@
 package allowlist
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -35,7 +34,7 @@ func TestIsNoRole(t *testing.T) {
 
 	for index, test := range tests {
 		isNoRole := test.role.IsNoRole()
-		require.Equal(t, test.expected, isNoRole, fmt.Sprintf("test index: %d", index))
+		require.Equal(t, test.expected, isNoRole, "test index: %d", index)
 	}
 }
 
@@ -64,7 +63,7 @@ func TestIsEnabled(t *testing.T) {
 
 	for index, test := range tests {
 		isEnabled := test.role.IsEnabled()
-		require.Equal(t, test.expected, isEnabled, fmt.Sprintf("test index: %d", index))
+		require.Equal(t, test.expected, isEnabled, "test index: %d", index)
 	}
 }
 
@@ -144,6 +143,6 @@ func TestCanModify(t *testing.T) {
 	}
 	for index, test := range tests {
 		canModify := test.role.CanModify(test.from, test.target)
-		require.Equal(t, test.expected, canModify, fmt.Sprintf("test index: %d", index))
+		require.Equal(t, test.expected, canModify, "test index: %d", index)
 	}
 }

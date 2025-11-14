@@ -108,7 +108,7 @@ func TestUnpackMintNativeCoinInput(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, test.expectedAddr, unpackedAddress)
-				require.True(t, test.expectedAmount.Cmp(unpackedAmount) == 0, "expected %s, got %s", test.expectedAmount.String(), unpackedAmount.String())
+				require.Equal(t, test.expectedAmount, unpackedAmount, "expected %s, got %s", test.expectedAmount.String(), unpackedAmount.String())
 			}
 			oldUnpackedAddress, oldUnpackedAmount, oldErr := OldUnpackMintNativeCoinInput(test.input)
 			if test.expectedOldErr != "" {
@@ -116,7 +116,7 @@ func TestUnpackMintNativeCoinInput(t *testing.T) {
 			} else {
 				require.NoError(t, oldErr)
 				require.Equal(t, test.expectedAddr, oldUnpackedAddress)
-				require.True(t, test.expectedAmount.Cmp(oldUnpackedAmount) == 0, "expected %s, got %s", test.expectedAmount.String(), oldUnpackedAmount.String())
+				require.Equal(t, test.expectedAmount, oldUnpackedAmount, "expected %s, got %s", test.expectedAmount.String(), oldUnpackedAmount.String())
 			}
 		})
 	}

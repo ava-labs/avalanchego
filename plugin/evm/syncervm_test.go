@@ -160,8 +160,8 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 		t.Fatalf("Unexpected last accepted height: %d", height)
 	}
 
-	enabled, err := syncDisabledVM.Client.StateSyncEnabled(context.Background())
-	assert.NoError(t, err)
+	enabled, err := syncDisabledVM.StateSyncEnabled(context.Background())
+	require.NoError(t, err)
 	assert.False(t, enabled, "sync should be disabled")
 
 	// Process the first 10 blocks from the serverVM
@@ -226,14 +226,14 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	}
 
 	// connect peer to [syncerVM]
-	assert.NoError(t, syncReEnabledVM.Connected(
+	require.NoError(t, syncReEnabledVM.Connected(
 		context.Background(),
 		vmSetup.serverVM.ctx.NodeID,
 		statesyncclient.StateSyncVersion,
 	))
 
 	enabled, err = syncReEnabledVM.StateSyncEnabled(context.Background())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, enabled, "sync should be enabled")
 
 	vmSetup.syncerVM = syncReEnabledVM
@@ -435,7 +435,7 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 
 	msg, err := syncerVM.WaitForEvent(context.Background())
 	require.NoError(err)
-	require.Equal(msg, commonEng.StateSyncDone)
+	require.Equal(commonEng.StateSyncDone, msg)
 
 	// If the test is expected to error, assert the correct error is returned and finish the test.
 	err = syncerVM.Client.Error()

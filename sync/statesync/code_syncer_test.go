@@ -14,6 +14,7 @@ import (
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb/memorydb"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
@@ -62,11 +63,7 @@ func testCodeSyncer(t *testing.T, test codeSyncerTest) {
 
 	for _, codeHashes := range test.codeRequestHashes {
 		if err := codeSyncer.addCode(codeHashes); err != nil {
-			if test.err == nil {
-				t.Fatal(err)
-			} else {
-				assert.ErrorIs(t, err, test.err)
-			}
+			require.ErrorIs(t, err, test.err)
 		}
 	}
 	codeSyncer.notifyAccountTrieCompleted()

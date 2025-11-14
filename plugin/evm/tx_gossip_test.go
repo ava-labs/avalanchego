@@ -133,7 +133,7 @@ func TestEthTxGossip(t *testing.T) {
 
 	errs := vm.txPool.Add([]*types.Transaction{signedTx}, true, true)
 	require.Len(errs, 1)
-	require.Nil(errs[0])
+	require.NoError(errs[0])
 
 	// wait so we aren't throttled by the vm
 	time.Sleep(5 * time.Second)

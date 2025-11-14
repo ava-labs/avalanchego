@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb/memorydb"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/subnet-evm/plugin/evm/message"
 	"github.com/ava-labs/subnet-evm/sync/handlers/stats"
@@ -30,8 +30,8 @@ func TestCodeRequestHandler(t *testing.T) {
 
 	maxSizeCodeBytes := make([]byte, ethparams.MaxCodeSize)
 	n, err := rand.Read(maxSizeCodeBytes)
-	assert.NoError(t, err)
-	assert.Equal(t, ethparams.MaxCodeSize, n)
+	require.NoError(t, err)
+	require.Equal(t, ethparams.MaxCodeSize, n)
 	maxSizeCodeHash := crypto.Keccak256Hash(maxSizeCodeBytes)
 	rawdb.WriteCode(database, maxSizeCodeHash, maxSizeCodeBytes)
 
@@ -49,8 +49,8 @@ func TestCodeRequestHandler(t *testing.T) {
 				}, [][]byte{codeBytes}
 			},
 			verifyStats: func(t *testing.T) {
-				assert.EqualValues(t, 1, mockHandlerStats.CodeRequestCount)
-				assert.EqualValues(t, len(codeBytes), mockHandlerStats.CodeBytesReturnedSum)
+				require.Equal(t, uint32(1), mockHandlerStats.CodeRequestCount)
+				require.Equal(t, uint32(len(codeBytes)), mockHandlerStats.CodeBytesReturnedSum)
 			},
 		},
 		"duplicate hashes": {
@@ -60,7 +60,7 @@ func TestCodeRequestHandler(t *testing.T) {
 				}, nil
 			},
 			verifyStats: func(t *testing.T) {
-				assert.EqualValues(t, 1, mockHandlerStats.DuplicateHashesRequested)
+				require.Equal(t, uint32(1), mockHandlerStats.DuplicateHashesRequested)
 			},
 		},
 		"too many hashes": {
@@ -70,7 +70,7 @@ func TestCodeRequestHandler(t *testing.T) {
 				}, nil
 			},
 			verifyStats: func(t *testing.T) {
-				assert.EqualValues(t, 1, mockHandlerStats.TooManyHashesRequested)
+				require.Equal(t, uint32(1), mockHandlerStats.TooManyHashesRequested)
 			},
 		},
 		"max size code handled": {
@@ -80,8 +80,8 @@ func TestCodeRequestHandler(t *testing.T) {
 				}, [][]byte{maxSizeCodeBytes}
 			},
 			verifyStats: func(t *testing.T) {
-				assert.EqualValues(t, 1, mockHandlerStats.CodeRequestCount)
-				assert.EqualValues(t, ethparams.MaxCodeSize, mockHandlerStats.CodeBytesReturnedSum)
+				require.Equal(t, uint32(1), mockHandlerStats.CodeRequestCount)
+				require.Equal(t, uint32(ethparams.MaxCodeSize), mockHandlerStats.CodeBytesReturnedSum)
 			},
 		},
 	}
@@ -93,11 +93,11 @@ func TestCodeRequestHandler(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			request, expectedResponse := test.setup()
 			responseBytes, err := codeRequestHandler.OnCodeRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
-			// If the expected response is empty, assert that the handler returns an empty response and return early.
+			// If the expected response is empty, require that the handler returns an empty response and return early.
 			if len(expectedResponse) == 0 {
-				assert.Len(t, responseBytes, 0, "expected response to be empty")
+				require.Empty(t, responseBytes, "expected response to be empty")
 				return
 			}
 			var response message.CodeResponse
@@ -108,8 +108,7 @@ func TestCodeRequestHandler(t *testing.T) {
 				t.Fatalf("Unexpected length of code data expected %d != %d", len(expectedResponse), len(response.Data))
 			}
 			for i, code := range expectedResponse {
-				// assert.True(t, bytes.Equal(code, response.Data[i]), "code bytes mismatch at index %d", i)
-				assert.Equal(t, code, response.Data[i], "code bytes mismatch at index %d", i)
+				require.Equal(t, code, response.Data[i], "code bytes mismatch at index %d", i)
 			}
 			test.verifyStats(t)
 		})
