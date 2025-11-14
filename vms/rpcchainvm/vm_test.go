@@ -26,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blocktest"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/rpcchainvm/grpcutils"
@@ -254,4 +255,40 @@ func TestNewHTTPHandler(t *testing.T) {
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/", nil))
 	require.Equal(http.StatusOK, w.Code)
+}
+
+// TestConvertNetworkUpgrades_AllFieldsHandled ensures that all fields in
+// upgrade.Config are properly handled when converting from the gRPC protobuf message.
+func TestConvertNetworkUpgrades_AllFieldsHandled(t *testing.T) {
+	wantConfig := upgrade.Default
+
+	// convert to protobuf
+	pbUpgrades := &vmpb.NetworkUpgrades{
+		ApricotPhase_1Time:            grpcutils.TimestampFromTime(wantConfig.ApricotPhase1Time),
+		ApricotPhase_2Time:            grpcutils.TimestampFromTime(wantConfig.ApricotPhase2Time),
+		ApricotPhase_3Time:            grpcutils.TimestampFromTime(wantConfig.ApricotPhase3Time),
+		ApricotPhase_4Time:            grpcutils.TimestampFromTime(wantConfig.ApricotPhase4Time),
+		ApricotPhase_4MinPChainHeight: wantConfig.ApricotPhase4MinPChainHeight, // not passed through the RPC protocol
+		ApricotPhase_5Time:            grpcutils.TimestampFromTime(wantConfig.ApricotPhase5Time),
+		ApricotPhasePre_6Time:         grpcutils.TimestampFromTime(wantConfig.ApricotPhasePre6Time),
+		ApricotPhase_6Time:            grpcutils.TimestampFromTime(wantConfig.ApricotPhase6Time),
+		ApricotPhasePost_6Time:        grpcutils.TimestampFromTime(wantConfig.ApricotPhasePost6Time),
+		BanffTime:                     grpcutils.TimestampFromTime(wantConfig.BanffTime),
+		CortinaTime:                   grpcutils.TimestampFromTime(wantConfig.CortinaTime),
+		CortinaXChainStopVertexId:     wantConfig.CortinaXChainStopVertexID[:], // not passed through the RPC protocol
+		DurangoTime:                   grpcutils.TimestampFromTime(wantConfig.DurangoTime),
+		EtnaTime:                      grpcutils.TimestampFromTime(wantConfig.EtnaTime),
+		FortunaTime:                   grpcutils.TimestampFromTime(wantConfig.FortunaTime),
+		GraniteTime:                   grpcutils.TimestampFromTime(wantConfig.GraniteTime),
+		HeliconTime:                   grpcutils.TimestampFromTime(wantConfig.HeliconTime),
+	}
+
+	gotConfig, err := convertNetworkUpgrades(pbUpgrades)
+	require.NoError(t, err)
+
+	// not passed through the RPC protocol, but we need to set it to match the
+	// expected value for comparison.
+	// TODO(JonathanOppenheimer): this should definitely be removed from the config
+	gotConfig.GraniteEpochDuration = wantConfig.GraniteEpochDuration
+	require.Equal(t, wantConfig, gotConfig, "convertNetworkUpgrades did not return expected config. Update grpcutils! (convertNetworkUpgrades and vm_client.go)")
 }

@@ -36,6 +36,7 @@ func TestValidDefaultUpgrades(t *testing.T) {
 }
 
 func TestInvalidUpgrade(t *testing.T) {
+	require := require.New(t)
 	firstUpgradeTime := time.Now()
 	invalidSecondUpgradeTime := firstUpgradeTime.Add(-1 * time.Second)
 	upgrade := Config{
@@ -43,5 +44,5 @@ func TestInvalidUpgrade(t *testing.T) {
 		ApricotPhase2Time: invalidSecondUpgradeTime,
 	}
 	err := upgrade.Validate()
-	require.ErrorIs(t, err, ErrInvalidUpgradeTimes)
+	require.ErrorIs(err, ErrInvalidUpgradeTimes)
 }
