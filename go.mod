@@ -21,7 +21,7 @@ require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/StephenButtolph/canoto v0.17.3
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.16.1-0.20251113223530-6f79a9ffa8a5
+	github.com/ava-labs/coreth v0.16.1-0.20251113234945-84b5d4cf25bb
 	github.com/ava-labs/libevm v1.13.15-0.20251113215524-d0d2e6e207df
 	github.com/ava-labs/subnet-evm v0.8.1-db-metrics-fix
 	github.com/btcsuite/btcd/btcutil v1.1.3
