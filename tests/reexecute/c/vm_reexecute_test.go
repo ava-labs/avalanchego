@@ -78,7 +78,9 @@ var (
 	configKey         = "config"
 	defaultConfigKey  = "default"
 	predefinedConfigs = map[string]string{
-		defaultConfigKey: `{}`,
+		defaultConfigKey: `{
+			"allow-missing-tries": true
+		}`,
 		"archive": `{
 			"pruning-enabled": false
 		}`,
