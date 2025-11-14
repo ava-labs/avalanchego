@@ -22,9 +22,18 @@ on:
       task:
         description: 'Taskfile task to execute (e.g., c-chain-reexecution-hashdb-101-250k)'
         default: ''
-      runner:
-        description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
-        required: true
+      runner-preset:
+        description: 'Select a predefined runner (ignored if custom-runner is provided)'
+        type: choice
+        options:
+          - ubuntu-latest
+          - avalanche-avalanchego-runner-2ti
+          - avago-runner-m6i-4xlarge-ebs-fast
+          - avago-runner-i4i-4xlarge-local-ssd
+        default: ubuntu-latest
+      custom-runner:
+        description: 'Custom runner name (overrides runner-preset if provided)'
+        default: ''
       push-post-state:
         description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
         default: ''
@@ -49,11 +58,20 @@ jobs:
         shell: bash -x {0}
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # Use custom-runner if provided (after trimming whitespace), otherwise use runner-preset
+            CUSTOM_RUNNER=$(echo "${{ github.event.inputs.custom-runner }}" | xargs)
+            
+            if [[ -n "$CUSTOM_RUNNER" ]]; then
+              RUNNER="$CUSTOM_RUNNER"
+            else
+              RUNNER="${{ github.event.inputs.runner-preset }}"
+            fi
+            
             {
               echo "matrix<<EOF"
               printf '{ "include": [{ "task": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
                 "${{ github.event.inputs.task }}" \
-                "${{ github.event.inputs.runner }}" \
+                "$RUNNER" \
                 "${{ github.event.inputs.timeout-minutes }}"
               echo EOF
             } >> "$GITHUB_OUTPUT"
