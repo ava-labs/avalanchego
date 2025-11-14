@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/rand"
 	"slices"
 	"sync"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/libevm/log"
 )
 
 const (
@@ -60,6 +62,9 @@ const (
 	// levelDBByteOverhead is the number of bytes of constant overhead that
 	// should be added to a batch size per operation.
 	levelDBByteOverhead = 8
+
+	// compactionInterval is the duration between automatic compactions.
+	compactionInterval = 2 * time.Hour
 )
 
 var (
@@ -266,6 +271,9 @@ func New(file string, configBytes []byte, log logging.Logger, reg prometheus.Reg
 			}
 		}()
 	}
+
+	wrappedDB.startCompactions()
+
 	return wrappedDB, nil
 }
 
@@ -350,6 +358,41 @@ func (db *Database) NewIteratorWithStartAndPrefix(start, prefix []byte) database
 // Therefore if both are nil then it will compact entire DB.
 func (db *Database) Compact(start []byte, limit []byte) error {
 	return updateError(db.DB.CompactRange(util.Range{Start: start, Limit: limit}))
+}
+
+func (db *Database) startCompactions() {
+	db.closeWg.Add(1)
+	go func() {
+		defer db.closeWg.Done()
+
+		// Pick a random time <= compactionInterval for the first compaction
+		firstDelay := time.Duration(rand.Int63n(int64(compactionInterval))) // #nosec G404
+		select {
+		case <-time.After(firstDelay):
+		case <-db.closeCh:
+			return
+		}
+
+		// All remaining compactions occur at fixed intervals
+		t := time.NewTicker(compactionInterval)
+		defer func() {
+			t.Stop()
+		}()
+
+		for {
+			if err := db.Compact(nil, nil); err != nil {
+				log.Error("failed to compact leveldb",
+					zap.Error(err),
+				)
+			}
+
+			select {
+			case <-t.C:
+			case <-db.closeCh:
+				return
+			}
+		}
+	}()
 }
 
 func (db *Database) Close() error {
