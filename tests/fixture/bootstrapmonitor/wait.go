@@ -114,25 +114,25 @@ func WaitForCompletion(
 		ctx, cancel := context.WithTimeout(context.Background(), contextDuration)
 		defer cancel()
 
-		log.Info("Starting pod to get the image id for the `latest` tag")
-		latestImageDetails, err := getLatestImageDetails(ctx, log, clientset, namespace, testConfig.Image, nodeContainerName)
+		log.Info("Starting pod to get the image id for the `master` tag")
+		masterImageDetails, err := getMasterImageDetails(ctx, log, clientset, namespace, testConfig.Image, nodeContainerName)
 		if err != nil {
-			log.Error("failed to get latest image id", zap.Error(err))
+			log.Error("failed to get master image id", zap.Error(err))
 			return false, nil
 		}
 
-		if latestImageDetails.Image == testConfig.Image {
+		if masterImageDetails.Image == testConfig.Image {
 			log.Info(ImageUnchanged)
 			return false, nil
 		}
 
 		log.Info("Found updated image",
-			zap.String("image", latestImageDetails.Image),
-			zap.Reflect("versions", latestImageDetails.Versions),
+			zap.String("image", masterImageDetails.Image),
+			zap.Reflect("versions", masterImageDetails.Versions),
 		)
 
 		log.Info("Updating StatefulSet to trigger a new test")
-		if err := setImageDetails(ctx, log, clientset, namespace, podName, latestImageDetails); err != nil {
+		if err := setImageDetails(ctx, log, clientset, namespace, podName, masterImageDetails); err != nil {
 			log.Error("failed to set container image", zap.Error(err))
 			return false, nil
 		}
