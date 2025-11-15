@@ -1457,6 +1457,7 @@ func (n *Node) initHealthAPI() error {
 		// if there is too little disk space remaining, first report unhealthy and then shutdown the node
 
 		availableDiskBytes := n.resourceTracker.DiskTracker().AvailableDiskBytes()
+		availableDiskPercentage := n.resourceTracker.DiskTracker().AvailableDiskPercentage()
 
 		var err error
 		if availableDiskBytes < n.Config.RequiredAvailableDiskSpace {
@@ -1469,8 +1470,13 @@ func (n *Node) initHealthAPI() error {
 			err = fmt.Errorf("remaining available disk space (%d) is below the warning threshold of disk space (%d)", availableDiskBytes, n.Config.WarningThresholdAvailableDiskSpace)
 		}
 
+		if availableDiskPercentage < n.Config.WarningThresholdAvailableDiskSpacePercentage {
+			err = fmt.Errorf("remaining available disk space percentage (%d%%) is below minimum required available space percentage (%d%%)", availableDiskPercentage, n.Config.WarningThresholdAvailableDiskSpacePercentage)
+		}
+
 		return map[string]interface{}{
-			"availableDiskBytes": availableDiskBytes,
+			"availableDiskBytes":      availableDiskBytes,
+			"availableDiskPercentage": availableDiskPercentage,
 		}, err
 	})
 
