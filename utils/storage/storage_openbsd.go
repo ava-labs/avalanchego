@@ -6,14 +6,23 @@
 
 package storage
 
-import "syscall"
+import (
+	"errors"
+	"syscall"
+)
 
-func AvailableBytes(storagePath string) (uint64, error) {
+var errZeroAvailableBytes = errors.New("available blocks is reported as 0")
+
+func AvailableBytes(storagePath string) (uint64, uint64, error) {
 	var stat syscall.Statfs_t
 	err := syscall.Statfs(storagePath, &stat)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
-	avail := uint64(stat.F_bavail) * uint64(stat.F_bsize)
-	return avail, nil
+	if stat.F_blocks == 0 {
+		return 0, 0, errZeroAvailableBytes
+	}
+	avail := stat.F_bavail * uint64(stat.F_bsize)
+	percentage := stat.F_bavail * 100 / stat.F_blocks
+	return avail, percentage, nil
 }

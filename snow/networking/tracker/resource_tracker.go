@@ -36,6 +36,7 @@ type Tracker interface {
 type DiskTracker interface {
 	Tracker
 	AvailableDiskBytes() uint64
+	AvailableDiskPercentage() uint64
 }
 
 // ResourceTracker is an interface for tracking peers' usage of resources
@@ -148,6 +149,16 @@ func (t *diskResourceTracker) AvailableDiskBytes() uint64 {
 	bytesAvailable := rt.resources.AvailableDiskBytes()
 	rt.metrics.diskSpaceAvailable.Set(float64(bytesAvailable))
 	return bytesAvailable
+}
+
+func (t *diskResourceTracker) AvailableDiskPercentage() uint64 {
+	rt := t.t
+	rt.lock.Lock()
+	defer rt.lock.Unlock()
+
+	percentageAvailable := rt.resources.AvailableDiskPercentage()
+	rt.metrics.diskPercentageAvailable.Set(float64(percentageAvailable))
+	return percentageAvailable
 }
 
 func (t *diskResourceTracker) TotalUsage() float64 {
@@ -286,11 +297,12 @@ func (rt *resourceTracker) prune(now time.Time) {
 }
 
 type trackerMetrics struct {
-	processingTimeMetric prometheus.Gauge
-	cpuMetric            prometheus.Gauge
-	diskReadsMetric      prometheus.Gauge
-	diskWritesMetric     prometheus.Gauge
-	diskSpaceAvailable   prometheus.Gauge
+	processingTimeMetric    prometheus.Gauge
+	cpuMetric               prometheus.Gauge
+	diskReadsMetric         prometheus.Gauge
+	diskWritesMetric        prometheus.Gauge
+	diskSpaceAvailable      prometheus.Gauge
+	diskPercentageAvailable prometheus.Gauge
 }
 
 func newCPUTrackerMetrics(reg prometheus.Registerer) (*trackerMetrics, error) {
@@ -315,6 +327,10 @@ func newCPUTrackerMetrics(reg prometheus.Registerer) (*trackerMetrics, error) {
 			Name: "disk_available_space",
 			Help: "Available space remaining (bytes) on the database volume",
 		}),
+		diskPercentageAvailable: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "disk_available_percentage",
+			Help: "Percentage of database volume available",
+		}),
 	}
 	err := errors.Join(
 		reg.Register(m.processingTimeMetric),
@@ -322,6 +338,7 @@ func newCPUTrackerMetrics(reg prometheus.Registerer) (*trackerMetrics, error) {
 		reg.Register(m.diskReadsMetric),
 		reg.Register(m.diskWritesMetric),
 		reg.Register(m.diskSpaceAvailable),
+		reg.Register(m.diskPercentageAvailable),
 	)
 	return m, err
 }
