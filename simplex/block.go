@@ -24,9 +24,10 @@ var (
 	_ simplex.Block             = (*Block)(nil)
 	_ simplex.VerifiedBlock     = (*Block)(nil)
 
-	errDigestNotFound       = errors.New("digest not found in block tracker")
-	errMismatchedPrevDigest = errors.New("prev digest does not match block parent")
-	errGenesisVerification  = errors.New("genesis block should not be verified")
+	errDigestNotFound        = errors.New("digest not found in block tracker")
+	errMismatchedPrevDigest  = errors.New("prev digest does not match block parent")
+	errFailedToParseMetadata = errors.New("failed to parse protocol metadata")
+	errGenesisVerification   = errors.New("genesis block should not be verified")
 )
 
 type Block struct {
@@ -96,6 +97,11 @@ func (b *Block) Verify(ctx context.Context) (simplex.VerifiedBlock, error) {
 		return nil, fmt.Errorf("failed to verify block: %w", err)
 	}
 
+	err := b.blockTracker.vm.SetPreference(ctx, b.vmBlock.ID())
+	if err != nil {
+		return nil, fmt.Errorf("failed to set preference: %w", err)
+	}
+
 	return b, nil
 }
 
@@ -132,7 +138,7 @@ func (d *blockDeserializer) DeserializeBlock(ctx context.Context, bytes []byte) 
 
 	md, err := simplex.ProtocolMetadataFromBytes(canotoBlock.Metadata)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse protocol metadata: %w", err)
+		return nil, fmt.Errorf("%w: %w", errFailedToParseMetadata, err)
 	}
 
 	vmblock, err := d.parser.ParseBlock(ctx, canotoBlock.InnerBlock)
@@ -152,14 +158,18 @@ type blockTracker struct {
 
 	// handles block acceptance and rejection of inner blocks
 	tree tree.Tree
+
+	// the underlying VM
+	vm block.ChainVM
 }
 
-func newBlockTracker(latestBlock *Block) *blockTracker {
+func newBlockTracker(latestBlock *Block, vm block.ChainVM) *blockTracker {
 	return &blockTracker{
 		tree: tree.New(),
 		simplexDigestsToBlock: map[simplex.Digest]*Block{
 			latestBlock.digest: latestBlock,
 		},
+		vm: vm,
 	}
 }
 
