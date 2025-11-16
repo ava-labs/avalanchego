@@ -115,42 +115,40 @@ func TestAddAndGetUnknownMessage(t *testing.T) {
 }
 
 func TestGetBlockSignature(t *testing.T) {
-	require := require.New(t)
-
 	blkID := ids.GenerateTestID()
 	blockStore := makeBlockStore(blkID)
 	db := memdb.New()
 
 	sk, err := localsigner.New()
-	require.NoError(err)
+	require.NoError(t, err)
 	warpSigner := warp.NewSigner(sk, networkID, sourceChainID)
 
 	messageDB := NewDB(db)
 	verifier := NewVerifier(messageDB, blockStore, nil)
 
 	blockHashPayload, err := payload.NewHash(blkID)
-	require.NoError(err)
+	require.NoError(t, err)
 	unsignedMessage, err := warp.NewUnsignedMessage(networkID, sourceChainID, blockHashPayload.Bytes())
-	require.NoError(err)
+	require.NoError(t, err)
 	expectedSig, err := warpSigner.Sign(unsignedMessage)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	// Verify the block message
 	appErr := verifier.Verify(t.Context(), unsignedMessage)
-	require.Nil(appErr)
+	require.Nil(t, appErr)
 
 	// Then sign it
 	signature, err := warpSigner.Sign(unsignedMessage)
-	require.NoError(err)
-	require.Equal(expectedSig, signature)
+	require.NoError(t, err)
+	require.Equal(t, expectedSig, signature)
 
 	// Test that an unknown block fails verification
 	unknownBlockHashPayload, err := payload.NewHash(ids.GenerateTestID())
-	require.NoError(err)
+	require.NoError(t, err)
 	unknownUnsignedMessage, err := warp.NewUnsignedMessage(networkID, sourceChainID, unknownBlockHashPayload.Bytes())
-	require.NoError(err)
+	require.NoError(t, err)
 	unknownAppErr := verifier.Verify(t.Context(), unknownUnsignedMessage)
-	require.ErrorIs(unknownAppErr, &common.AppError{Code: VerifyErrCode})
+	require.ErrorIs(t, unknownAppErr, &common.AppError{Code: VerifyErrCode})
 }
 
 func TestVerifierKnownMessage(t *testing.T) {
