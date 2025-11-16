@@ -41,6 +41,9 @@ type DiskUser interface {
 
 	// returns number of bytes available in the db volume
 	AvailableDiskBytes() uint64
+
+	// returns percentage free in the db volume
+	AvailableDiskPercentage() uint64
 }
 
 type User interface {
@@ -81,6 +84,8 @@ type manager struct {
 	writeUsage float64
 
 	availableDiskBytes uint64
+
+	availableDiskPercent uint64
 
 	closeOnce sync.Once
 	onClose   chan struct{}
@@ -132,6 +137,13 @@ func (m *manager) AvailableDiskBytes() uint64 {
 	return m.availableDiskBytes
 }
 
+func (m *manager) AvailableDiskPercentage() uint64 {
+	m.usageLock.RLock()
+	defer m.usageLock.RUnlock()
+
+	return m.availableDiskPercent
+}
+
 func (m *manager) TrackProcess(pid int) {
 	p, err := process.NewProcess(int32(pid))
 	if err != nil {
@@ -174,7 +186,7 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 		currentScaledReadUsage := newDiskWeight * currentReadUsage
 		currentScaledWriteUsage := newDiskWeight * currentWriteUsage
 
-		availableBytes, getBytesErr := storage.AvailableBytes(diskPath)
+		availableBytes, availablePercentage, getBytesErr := storage.AvailableBytes(diskPath)
 		if getBytesErr != nil {
 			m.log.Verbo("failed to lookup resource",
 				zap.String("resource", "system disk"),
@@ -190,6 +202,7 @@ func (m *manager) update(diskPath string, frequency, cpuHalflife, diskHalflife t
 
 		if getBytesErr == nil {
 			m.availableDiskBytes = availableBytes
+			m.availableDiskPercent = availablePercentage
 		}
 
 		m.usageLock.Unlock()
