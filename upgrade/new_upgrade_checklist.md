@@ -22,7 +22,7 @@ This checklist ists all the required steps when when adding a new network upgrad
 
 ### [`vms/rpcchainvm/vm_client.go`](../vms/rpcchainvm/vm_client.go)
 
-- [ ] Add new time field to `NetworkUpgrades` struct
+- [ ] Add new time field to `NetworkUpgrades` struct in `getNetworkUpgrades()`
 
 ### [`vms/rpcchainvm/vm_server.go`](../vms/rpcchainvm/vm_server.go)
 

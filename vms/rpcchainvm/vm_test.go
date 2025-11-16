@@ -288,7 +288,6 @@ func TestConvertNetworkUpgrades_AllFieldsHandled(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
 			wantConfig := upgrade.GetConfig(test.networkID)
 			networkUpgrades := getNetworkUpgrades(&snow.Context{
 				NetworkUpgrades: wantConfig,
