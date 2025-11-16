@@ -11,13 +11,22 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-func newTestDatabase(t *testing.T, opts DatabaseConfig) (*Database, func()) {
+func newDatabase(t *testing.T, config DatabaseConfig) *Database {
 	t.Helper()
+
+	db := newHeightIndexDatabase(t, config.WithBlockCacheSize(0))
+	require.IsType(t, &Database{}, db)
+	return db.(*Database)
+}
+
+func newHeightIndexDatabase(t *testing.T, config DatabaseConfig) database.HeightIndex {
+	t.Helper()
+
 	dir := t.TempDir()
-	config := opts
 	if config.IndexDir == "" {
 		config = config.WithIndexDir(dir)
 	}
@@ -25,12 +34,16 @@ func newTestDatabase(t *testing.T, opts DatabaseConfig) (*Database, func()) {
 		config = config.WithDataDir(dir)
 	}
 	db, err := New(config, logging.NoLog{})
-	require.NoError(t, err, "failed to create database")
+	require.NoError(t, err)
+	return db
+}
 
-	cleanup := func() {
-		db.Close()
-	}
-	return db, cleanup
+func newCacheDatabase(t *testing.T, config DatabaseConfig) *cacheDB {
+	t.Helper()
+
+	db := newHeightIndexDatabase(t, config)
+	require.IsType(t, &cacheDB{}, db)
+	return db.(*cacheDB)
 }
 
 // randomBlock generates a random block of size 1KB-50KB.
