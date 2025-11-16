@@ -675,28 +675,29 @@ curl -X POST --data '{
 }' -H 'content-type:application/json;' 127.0.0.1:9650/ext/info
 ```
 
-**Example Response**:
+**Example Response (Mainnet)**:
 
 ```json
 {
   "jsonrpc": "2.0",
   "result": {
-    "apricotPhase1Time": "2020-12-05T05:00:00Z",
-    "apricotPhase2Time": "2020-12-05T05:00:00Z",
-    "apricotPhase3Time": "2020-12-05T05:00:00Z",
-    "apricotPhase4Time": "2020-12-05T05:00:00Z",
-    "apricotPhase4MinPChainHeight": 0,
-    "apricotPhase5Time": "2020-12-05T05:00:00Z",
-    "apricotPhasePre6Time": "2020-12-05T05:00:00Z",
-    "apricotPhase6Time": "2020-12-05T05:00:00Z",
-    "apricotPhasePost6Time": "2020-12-05T05:00:00Z",
-    "banffTime": "2020-12-05T05:00:00Z",
-    "cortinaTime": "2020-12-05T05:00:00Z",
-    "cortinaXChainStopVertexID": "11111111111111111111111111111111LpoYY",
-    "durangoTime": "2020-12-05T05:00:00Z",
-    "etnaTime": "2024-10-09T20:00:00Z",
-    "fortunaTime": "9999-12-01T05:00:00Z",
-    "graniteTime": "9999-12-01T05:00:00Z"
+    "apricotPhase1Time": "2021-03-31T14:00:00Z",
+    "apricotPhase2Time": "2021-05-10T11:00:00Z",
+    "apricotPhase3Time": "2021-08-24T14:00:00Z",
+    "apricotPhase4Time": "2021-09-22T21:00:00Z",
+    "apricotPhase4MinPChainHeight": 793005,
+    "apricotPhase5Time": "2021-12-02T18:00:00Z",
+    "apricotPhasePre6Time": "2022-09-05T01:30:00Z",
+    "apricotPhase6Time": "2022-09-06T20:00:00Z",
+    "apricotPhasePost6Time": "2022-09-07T03:00:00Z",
+    "banffTime": "2022-10-18T16:00:00Z",
+    "cortinaTime": "2023-04-25T15:00:00Z",
+    "cortinaXChainStopVertexID": "jrGWDh5Po9FMj54depyunNixpia5PN4aAYxfmNzU8n752Rjga",
+    "durangoTime": "2024-03-06T16:00:00Z",
+    "etnaTime": "2024-12-16T17:00:00Z",
+    "fortunaTime": "2025-04-08T15:00:00Z",
+    "graniteTime": "2025-11-19T16:00:00Z",
+    "heliconTime": "9999-12-01T00:00:00Z"
   },
   "id": 1
 }
