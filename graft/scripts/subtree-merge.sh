@@ -17,10 +17,6 @@ set -euo pipefail
 # The target path is automatically derived as graft/[repo-name] where repo-name
 # is the last component of the module path.
 #
-# Prerequisites:
-#   - Must be run from a git repository
-#   - Target path must not already exist
-#
 # What this script does:
 #   1. Constructs repository URL from module path
 #   2. Discovers version from go.mod if not provided
