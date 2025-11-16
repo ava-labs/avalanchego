@@ -28,8 +28,15 @@ in a piecemeal fashion:
    - A subsequent task would use the previous task's branch as its base
    - Mark each PR as draft to avoid premature merge
  - Request review in order from the initial PR but do not merge yet
- - Once all PRs in the series have been approved, merge from the top down
-   - Avoids cascading rebases and merge conflicts
+ - Once all PRs in the series have been approved
+   - Freeze develoment on the origin repo
+   - Merge from the top down into the subtree merge PR
+     - Avoids cascading rebases and merge conflicts
+ - Once only the subtree merge PR is left, manually merge the branch
+   - Merging the PR with squash enabled would discard the history that
+     we want to retain
+ - Close the subtree merge PR
+ - Archive the original repo
 
 Tooling such as
 [git-machete](https://github.com/VirtusLab/git-machete) or
