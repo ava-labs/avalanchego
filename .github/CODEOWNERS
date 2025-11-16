@@ -20,6 +20,8 @@
 /Taskfile.yml @joshua-kim @maru-ava
 /flake.lock @joshua-kim @maru-ava
 /flake.nix @joshua-kim @maru-ava
+/graft/coreth @ava-labs/platform-evm
+/graft/coreth/triedb/firewood/ @alarso16 @ava-labs/platform-evm
 /network/p2p/ @joshua-kim
 /network/p2p/*.md @joshua-kim @meaghanfitzgerald
 /nix/* @joshua-kim @maru-ava

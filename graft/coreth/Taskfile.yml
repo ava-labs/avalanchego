@@ -18,10 +18,6 @@ tasks:
     desc: Compile Coreth binary with git commit and static linking flags
     cmd: ./scripts/build.sh # ci.yml
 
-  build-avalanchego-with-coreth:
-    desc: Build AvalancheGo binary with Coreth dependency pointing to local Coreth path
-    cmd: ./scripts/build_avalanchego_with_coreth.sh # ci.yml
-
   build-test:
     desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
     cmd: ./scripts/build_test.sh # ci.yml
@@ -111,7 +107,7 @@ tasks:
       - task: check-generate-codec
       - task: check-generate-mocks
       - task: check-generate-rlp
-  
+
   lint-fix:
     desc: Run golangci-lint with auto-fix where possible
     cmd: ./scripts/lint_fix.sh
@@ -132,14 +128,22 @@ tasks:
 
   test-e2e-warp:
     desc: Run end-to-end warp tests using Ginkgo test framework
-    cmd: bash -x ./scripts/run_ginkgo_warp.sh # ci.yml
+    dir: ../../
+    env:
+      E2E_TARGET: ./graft/coreth/tests/warp
+    cmds:
+      - cmd: ./scripts/run_task.sh build
+      - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
 
   test-e2e-warp-ci: # consolidated test-e2e-warp
     desc: Run E2E warp tests with CI setup
+    dir: ../../
+    env:
+      E2E_TARGET: ./graft/coreth/tests/warp
+      E2E_SERIAL: 1
     cmds:
-      - task: build-avalanchego-with-coreth
-      - task: build
-      - task: test-e2e-warp
+      - cmd: ./scripts/run_task.sh build-race
+      - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
 
   update-avalanchego-version:
     desc: Update AvalancheGo version in go.mod and sync GitHub Actions workflow custom action version
