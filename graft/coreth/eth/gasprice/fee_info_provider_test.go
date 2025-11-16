@@ -11,7 +11,7 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/coreth/core"
+	"github.com/ava-labs/avalanchego/graft/coreth/core"
 )
 
 func TestFeeInfoProvider(t *testing.T) {

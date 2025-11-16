@@ -14,7 +14,7 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/stretchr/testify/require"
 
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap5"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap5"
 )
 
 func TestEffectiveGasPrice(t *testing.T) {

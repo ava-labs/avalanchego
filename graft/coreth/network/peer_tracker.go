@@ -13,7 +13,7 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/metrics"
 
-	"github.com/ava-labs/coreth/utils/rand"
+	"github.com/ava-labs/avalanchego/graft/coreth/utils/rand"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )

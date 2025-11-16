@@ -12,10 +12,10 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/triedb"
 
-	"github.com/ava-labs/coreth/plugin/evm/message"
-	"github.com/ava-labs/coreth/sync/handlers/stats"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/handlers/stats"
 
-	syncHandlers "github.com/ava-labs/coreth/sync/handlers"
+	syncHandlers "github.com/ava-labs/avalanchego/graft/coreth/sync/handlers"
 )
 
 var _ message.RequestHandler = (*networkHandler)(nil)

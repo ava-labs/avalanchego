@@ -37,7 +37,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/ava-labs/coreth/internal/flags"
+	"github.com/ava-labs/avalanchego/graft/coreth/internal/flags"
 	"github.com/ava-labs/libevm/log"
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"

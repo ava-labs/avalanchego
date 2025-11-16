@@ -11,9 +11,9 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/ava-labs/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 
-	synccommon "github.com/ava-labs/coreth/sync"
+	synccommon "github.com/ava-labs/avalanchego/graft/coreth/sync"
 )
 
 var errSyncerAlreadyRegistered = errors.New("syncer already registered")

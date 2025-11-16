@@ -22,9 +22,9 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/ava-labs/libevm/trie"
 
-	"github.com/ava-labs/coreth/network"
-	"github.com/ava-labs/coreth/plugin/evm/message"
-	"github.com/ava-labs/coreth/sync/client/stats"
+	"github.com/ava-labs/avalanchego/graft/coreth/network"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/client/stats"
 
 	ethparams "github.com/ava-labs/libevm/params"
 )

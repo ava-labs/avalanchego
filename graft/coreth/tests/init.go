@@ -34,9 +34,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/params/extras"
-	"github.com/ava-labs/coreth/utils"
+	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/extras"
+	"github.com/ava-labs/avalanchego/graft/coreth/utils"
 	"github.com/ava-labs/libevm/libevm"
 )
 
