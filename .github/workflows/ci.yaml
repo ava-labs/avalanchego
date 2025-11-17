@@ -245,7 +245,6 @@ jobs:
         run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=firewood go test -race ./...
 
   ffi-nix:
-    if: false   # TODO(marun) Re-enable once non-determinism is rooted out
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

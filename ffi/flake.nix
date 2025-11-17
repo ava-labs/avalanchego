@@ -58,14 +58,9 @@
           pkg-config
         ];
 
-        # Force sequential build of vendored jemalloc to avoid race conditions
-        # that cause non-deterministic symbol generation on x86_64
-        # MAKEFLAGS only affects make invocations (jemalloc), not cargo parallelism
-        # See: https://github.com/NixOS/nixpkgs/issues/380852
-        MAKEFLAGS = "-j1";
       } // lib.optionalAttrs pkgs.stdenv.isDarwin {
         # Set macOS deployment target for Darwin builds
-        MACOSX_DEPLOYMENT_TARGET = "13.0";
+        MACOSX_DEPLOYMENT_TARGET = "15.0";
       };
 
       cargoArtifacts = craneLib.buildDepsOnly (commonArgs // {
