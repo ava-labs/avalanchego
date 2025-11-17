@@ -11,7 +11,7 @@ var NoUsage User = noUsage{}
 type noUsage struct{}
 
 func (noUsage) AvailableDiskPercentage() uint64 {
-	return math.MaxUint64
+	return 100
 }
 
 func (noUsage) CPUUsage() float64 {
@@ -23,5 +23,5 @@ func (noUsage) DiskUsage() (float64, float64) {
 }
 
 func (noUsage) AvailableDiskBytes() uint64 {
-	return 100
+	return math.MaxUint64
 }
