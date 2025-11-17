@@ -260,14 +260,14 @@ func getNetworkUpgrades(u upgrade.Config) *vmpb.NetworkUpgrades {
 		ApricotPhase_2Time:            grpcutils.TimestampFromTime(u.ApricotPhase2Time),
 		ApricotPhase_3Time:            grpcutils.TimestampFromTime(u.ApricotPhase3Time),
 		ApricotPhase_4Time:            grpcutils.TimestampFromTime(u.ApricotPhase4Time),
-		ApricotPhase_4MinPChainHeight: u.ApricotPhase4MinPChainHeight, // not passed through the RPC protocol
+		ApricotPhase_4MinPChainHeight: u.ApricotPhase4MinPChainHeight,
 		ApricotPhase_5Time:            grpcutils.TimestampFromTime(u.ApricotPhase5Time),
 		ApricotPhasePre_6Time:         grpcutils.TimestampFromTime(u.ApricotPhasePre6Time),
 		ApricotPhase_6Time:            grpcutils.TimestampFromTime(u.ApricotPhase6Time),
 		ApricotPhasePost_6Time:        grpcutils.TimestampFromTime(u.ApricotPhasePost6Time),
 		BanffTime:                     grpcutils.TimestampFromTime(u.BanffTime),
 		CortinaTime:                   grpcutils.TimestampFromTime(u.CortinaTime),
-		CortinaXChainStopVertexId:     u.CortinaXChainStopVertexID[:], // not passed through the RPC protocol
+		CortinaXChainStopVertexId:     u.CortinaXChainStopVertexID[:],
 		DurangoTime:                   grpcutils.TimestampFromTime(u.DurangoTime),
 		EtnaTime:                      grpcutils.TimestampFromTime(u.EtnaTime),
 		FortunaTime:                   grpcutils.TimestampFromTime(u.FortunaTime),
