@@ -74,6 +74,10 @@ as well as carefully managing the free list during the creation and expiration o
 - `Commit` - The operation of applying one or more `Proposal`s to the most recent
   `Revision`.
 
+## Metrics
+
+Firewood provides comprehensive metrics for monitoring database performance, resource utilization, and operational characteristics. For detailed information about all available metrics, how to enable them, and how to interpret them, see [METRICS.md](METRICS.md).
+
 ## Build
 
 In order to build firewood, the following dependencies must be installed:
