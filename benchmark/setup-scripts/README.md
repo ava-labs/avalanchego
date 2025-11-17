@@ -8,6 +8,14 @@ sudo bash build-environment.sh
 
 This script sets up the build environment, including installing the firewood build dependencies.
 
+By default, it sets the bytes-per-inode to 2097152 (2MB) when creating the ext4 filesystem. This default works well for workloads that create many small files (such as LevelDB with AvalancheGo).
+
+If you're not using LevelDB (for example, just using Firewood without AvalancheGo), you don't need as many inodes, which gives you more room for the database itself. In this case, you can and should use a larger value with the `--bytes-per-inode` option:
+
+```bash
+sudo bash build-environment.sh --bytes-per-inode 6291456
+```
+
 ```bash
 sudo bash install-grafana.sh
 ```

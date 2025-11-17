@@ -7,6 +7,36 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# Default bytes-per-inode for ext4 filesystem (2MB)
+BYTES_PER_INODE=2097152
+
+# Parse command line arguments
+show_usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --bytes-per-inode BYTES  Set bytes-per-inode for ext4 filesystem (default: 2097152)"
+    echo "  --help                   Show this help message"
+}
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --bytes-per-inode)
+            BYTES_PER_INODE="$2"
+            shift 2
+            ;;
+        --help)
+            show_usage
+            exit 0
+            ;;
+        *)
+            echo "Error: Unknown option $1" >&2
+            show_usage
+            exit 1
+            ;;
+    esac
+done
+
 apt upgrade -y
 
 # install the build dependency packages
@@ -62,7 +92,7 @@ if [ "${#NVME_DEVS[@]}" -gt 0 ]; then
   fi
 
   # Format and mount the device
-  mkfs.ext4 -E nodiscard -i 6291456 "$DEVICE_TO_USE"
+  mkfs.ext4 -E nodiscard -i "$BYTES_PER_INODE" "$DEVICE_TO_USE"
   NVME_MOUNT=/mnt/nvme
   mkdir -p "$NVME_MOUNT"
   mount -o noatime "$DEVICE_TO_USE" "$NVME_MOUNT"
