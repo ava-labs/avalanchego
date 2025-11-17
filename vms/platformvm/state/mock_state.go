@@ -149,6 +149,34 @@ func (mr *MockStateMockRecorder) AddUTXO(utxo any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddUTXO", reflect.TypeOf((*MockState)(nil).AddUTXO), utxo)
 }
 
+// ApplyAllValidatorPublicKeyDiffs mocks base method.
+func (m *MockState) ApplyAllValidatorPublicKeyDiffs(ctx context.Context, validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, startHeight, endHeight uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ApplyAllValidatorPublicKeyDiffs", ctx, validators, startHeight, endHeight)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ApplyAllValidatorPublicKeyDiffs indicates an expected call of ApplyAllValidatorPublicKeyDiffs.
+func (mr *MockStateMockRecorder) ApplyAllValidatorPublicKeyDiffs(ctx, validators, startHeight, endHeight any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyAllValidatorPublicKeyDiffs", reflect.TypeOf((*MockState)(nil).ApplyAllValidatorPublicKeyDiffs), ctx, validators, startHeight, endHeight)
+}
+
+// ApplyAllValidatorWeightDiffs mocks base method.
+func (m *MockState) ApplyAllValidatorWeightDiffs(ctx context.Context, validators map[ids.ID]map[ids.NodeID]*validators.GetValidatorOutput, startHeight, endHeight uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ApplyAllValidatorWeightDiffs", ctx, validators, startHeight, endHeight)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ApplyAllValidatorWeightDiffs indicates an expected call of ApplyAllValidatorWeightDiffs.
+func (mr *MockStateMockRecorder) ApplyAllValidatorWeightDiffs(ctx, validators, startHeight, endHeight any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ApplyAllValidatorWeightDiffs", reflect.TypeOf((*MockState)(nil).ApplyAllValidatorWeightDiffs), ctx, validators, startHeight, endHeight)
+}
+
 // ApplyValidatorPublicKeyDiffs mocks base method.
 func (m *MockState) ApplyValidatorPublicKeyDiffs(ctx context.Context, validators map[ids.NodeID]*validators.GetValidatorOutput, startHeight, endHeight uint64, subnetID ids.ID) error {
 	m.ctrl.T.Helper()

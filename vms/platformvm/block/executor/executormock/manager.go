@@ -14,8 +14,9 @@ import (
 
 	ids "github.com/ava-labs/avalanchego/ids"
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
+	block "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	set "github.com/ava-labs/avalanchego/utils/set"
-	block "github.com/ava-labs/avalanchego/vms/platformvm/block"
+	block0 "github.com/ava-labs/avalanchego/vms/platformvm/block"
 	state "github.com/ava-labs/avalanchego/vms/platformvm/state"
 	txs "github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	gomock "go.uber.org/mock/gomock"
@@ -76,10 +77,10 @@ func (mr *ManagerMockRecorder) GetState(blkID any) *gomock.Call {
 }
 
 // GetStatelessBlock mocks base method.
-func (m *Manager) GetStatelessBlock(blkID ids.ID) (block.Block, error) {
+func (m *Manager) GetStatelessBlock(blkID ids.ID) (block0.Block, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetStatelessBlock", blkID)
-	ret0, _ := ret[0].(block.Block)
+	ret0, _ := ret[0].(block0.Block)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -105,7 +106,7 @@ func (mr *ManagerMockRecorder) LastAccepted() *gomock.Call {
 }
 
 // NewBlock mocks base method.
-func (m *Manager) NewBlock(arg0 block.Block) snowman.Block {
+func (m *Manager) NewBlock(arg0 block0.Block) snowman.Block {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewBlock", arg0)
 	ret0, _ := ret[0].(snowman.Block)
@@ -133,15 +134,15 @@ func (mr *ManagerMockRecorder) Preferred() *gomock.Call {
 }
 
 // SetPreference mocks base method.
-func (m *Manager) SetPreference(blkID ids.ID) {
+func (m *Manager) SetPreference(blkID ids.ID, blockCtx *block.Context) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetPreference", blkID)
+	m.ctrl.Call(m, "SetPreference", blkID, blockCtx)
 }
 
 // SetPreference indicates an expected call of SetPreference.
-func (mr *ManagerMockRecorder) SetPreference(blkID any) *gomock.Call {
+func (mr *ManagerMockRecorder) SetPreference(blkID, blockCtx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPreference", reflect.TypeOf((*Manager)(nil).SetPreference), blkID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetPreference", reflect.TypeOf((*Manager)(nil).SetPreference), blkID, blockCtx)
 }
 
 // VerifyTx mocks base method.

@@ -2,11 +2,12 @@
 
 set -euo pipefail
 
-go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.1 "${@}"
+AVALANCHE_PATH="$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )"
+"${AVALANCHE_PATH}"/scripts/run_tool.sh actionlint "${@}"
 
 echo "Checking use of scripts/* in GitHub Actions workflows..."
 SCRIPT_USAGE=
-for file in .github/workflows/*.{yml,yaml}; do
+for file in "${AVALANCHE_PATH}"/.github/workflows/*.{yml,yaml}; do
   # Skip if no matches found (in case one of the extensions doesn't exist)
   [[ -f "$file" ]] || continue
 

@@ -27,6 +27,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common"
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/gvalidators"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils"
@@ -237,7 +238,9 @@ func (vm *VMServer) Initialize(ctx context.Context, req *vmpb.InitializeRequest)
 		// Signs warp messages
 		WarpSigner: warpSignerClient,
 
-		ValidatorState: validatorStateClient,
+		// The validator state is cached to avoid the gRPC overhead after
+		// epoching is activated.
+		ValidatorState: validators.NewCachedState(validatorStateClient, networkUpgrades.GraniteTime),
 		// TODO: support remaining snowman++ fields
 
 		ChainDataDir: req.ChainDataDir,

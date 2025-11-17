@@ -60,7 +60,7 @@ func (r *router) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 
 	// Request specified the routing header key but did not provide a
 	// corresponding value
-	if len(route) != 1 {
+	if len(route) < 1 {
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}

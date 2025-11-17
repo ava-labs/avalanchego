@@ -4,7 +4,6 @@
 package throttling
 
 import (
-	"context"
 	"sync"
 	"testing"
 
@@ -46,14 +45,14 @@ func TestBandwidthThrottler(t *testing.T) {
 	require.Len(throttler.limiters, 1)
 
 	// Should be able to acquire 8
-	throttler.Acquire(context.Background(), 8, nodeID1)
+	throttler.Acquire(t.Context(), 8, nodeID1)
 
 	// Make several goroutines that acquire bytes.
 	wg := sync.WaitGroup{}
 	wg.Add(int(config.MaxBurstSize) + 5)
 	for i := uint64(0); i < config.MaxBurstSize+5; i++ {
 		go func() {
-			throttler.Acquire(context.Background(), 1, nodeID1)
+			throttler.Acquire(t.Context(), 1, nodeID1)
 			wg.Done()
 		}()
 	}

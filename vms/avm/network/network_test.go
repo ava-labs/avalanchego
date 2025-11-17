@@ -251,7 +251,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 			err = n.IssueTxFromRPC(tt.tx)
 			require.ErrorIs(err, tt.expectedErr)
 
-			require.NoError(n.txPushGossiper.Gossip(context.Background()))
+			require.NoError(n.txPushGossiper.Gossip(t.Context()))
 		})
 	}
 }
@@ -325,7 +325,7 @@ func TestNetworkIssueTxFromRPCWithoutVerification(t *testing.T) {
 			err = n.IssueTxFromRPCWithoutVerification(&txs.Tx{Unsigned: &txs.BaseTx{}})
 			require.ErrorIs(err, tt.expectedErr)
 
-			require.NoError(n.txPushGossiper.Gossip(context.Background()))
+			require.NoError(n.txPushGossiper.Gossip(t.Context()))
 		})
 	}
 }

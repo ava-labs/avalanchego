@@ -9,10 +9,12 @@
   # Flake inputs
   inputs = {
     nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.2505.*.tar.gz";
+    go-flake.url = "path:./nix/go";
+    go-flake.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   # Flake outputs
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, go-flake }:
     let
       # Systems supported
       allSystems = [
@@ -38,6 +40,9 @@
 
             # Task runner
             go-task
+
+            # Local Go package from nested flake
+            go-flake.packages.${pkgs.system}.default
 
             # Monitoring tools
             promtail                                   # Loki log shipper
@@ -71,6 +76,12 @@
           # Add scripts/ directory to PATH so kind-with-registry.sh is accessible
           shellHook = ''
             export PATH="$PWD/scripts:$PATH"
+
+            # Ensure golang bin is in the path
+            GOBIN="$(go env GOPATH)/bin"
+            if [[ ":$PATH:" != *":$GOBIN:"* ]]; then
+              export PATH="$GOBIN:$PATH"
+            fi
           '';
         };
       });

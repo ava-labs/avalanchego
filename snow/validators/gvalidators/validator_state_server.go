@@ -48,6 +48,40 @@ func (s *Server) GetSubnetID(ctx context.Context, req *pb.GetSubnetIDRequest) (*
 	}, err
 }
 
+func (s *Server) GetWarpValidatorSets(ctx context.Context, req *pb.GetWarpValidatorSetsRequest) (*pb.GetWarpValidatorSetsResponse, error) {
+	validatorSets, err := s.state.GetWarpValidatorSets(ctx, req.Height)
+	if err != nil {
+		return nil, err
+	}
+
+	proto := make([]*pb.WarpValidatorSet, 0, len(validatorSets))
+	for subnetID, vdrs := range validatorSets {
+		proto = append(proto, &pb.WarpValidatorSet{
+			SubnetId:    subnetID[:],
+			TotalWeight: vdrs.TotalWeight,
+			Validators:  warpValidatorsToProto(vdrs.Validators),
+		})
+	}
+	return &pb.GetWarpValidatorSetsResponse{
+		ValidatorSets: proto,
+	}, nil
+}
+
+func (s *Server) GetWarpValidatorSet(ctx context.Context, req *pb.GetWarpValidatorSetRequest) (*pb.GetWarpValidatorSetResponse, error) {
+	subnetID, err := ids.ToID(req.SubnetId)
+	if err != nil {
+		return nil, err
+	}
+	validatorSet, err := s.state.GetWarpValidatorSet(ctx, req.Height, subnetID)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.GetWarpValidatorSetResponse{
+		TotalWeight: validatorSet.TotalWeight,
+		Validators:  warpValidatorsToProto(validatorSet.Validators),
+	}, nil
+}
+
 func (s *Server) GetValidatorSet(ctx context.Context, req *pb.GetValidatorSetRequest) (*pb.GetValidatorSetResponse, error) {
 	subnetID, err := ids.ToID(req.SubnetId)
 	if err != nil {
@@ -118,4 +152,20 @@ func (s *Server) GetCurrentValidatorSet(ctx context.Context, req *pb.GetCurrentV
 		i++
 	}
 	return resp, nil
+}
+
+func warpValidatorsToProto(vdrs []*validators.Warp) []*pb.WarpValidator {
+	proto := make([]*pb.WarpValidator, len(vdrs))
+	for i, vdr := range vdrs {
+		nodeIDs := make([][]byte, len(vdr.NodeIDs))
+		for j, nodeID := range vdr.NodeIDs {
+			nodeIDs[j] = nodeID.Bytes()
+		}
+		proto[i] = &pb.WarpValidator{
+			PublicKey: vdr.PublicKeyBytes,
+			Weight:    vdr.Weight,
+			NodeIds:   nodeIDs,
+		}
+	}
+	return proto
 }

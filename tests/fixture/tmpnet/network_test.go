@@ -4,7 +4,6 @@
 package tmpnet
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,7 +16,7 @@ func TestNetworkSerialization(t *testing.T) {
 
 	tmpDir := t.TempDir()
 
-	ctx := context.Background()
+	ctx := t.Context()
 
 	network := NewDefaultNetwork("testnet")
 	// Runtime configuration is required

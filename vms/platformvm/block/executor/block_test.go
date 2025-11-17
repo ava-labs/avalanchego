@@ -4,7 +4,6 @@
 package executor
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -505,7 +504,7 @@ func TestBlockOptions(t *testing.T) {
 			require := require.New(t)
 
 			blk := tt.blkF(ctrl)
-			options, err := blk.Options(context.Background())
+			options, err := blk.Options(t.Context())
 			require.NoError(err)
 			require.IsType(tt.expectedPreferenceType, options[0].(*Block).Block)
 		})

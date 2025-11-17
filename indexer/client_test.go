@@ -40,7 +40,7 @@ func TestIndexClient(t *testing.T) {
 				return nil
 			},
 		}
-		index, err := client.GetIndex(context.Background(), ids.Empty)
+		index, err := client.GetIndex(t.Context(), ids.Empty)
 		require.NoError(err)
 		require.Equal(uint64(5), index)
 	}
@@ -62,7 +62,7 @@ func TestIndexClient(t *testing.T) {
 				return nil
 			},
 		}
-		container, index, err := client.GetLastAccepted(context.Background())
+		container, index, err := client.GetLastAccepted(t.Context())
 		require.NoError(err)
 		require.Equal(id, container.ID)
 		require.Equal(bytes, container.Bytes)
@@ -85,7 +85,7 @@ func TestIndexClient(t *testing.T) {
 				return nil
 			},
 		}
-		containers, err := client.GetContainerRange(context.Background(), 1, 10)
+		containers, err := client.GetContainerRange(t.Context(), 1, 10)
 		require.NoError(err)
 		require.Len(containers, 1)
 		require.Equal(id, containers[0].ID)
@@ -101,7 +101,7 @@ func TestIndexClient(t *testing.T) {
 				return nil
 			},
 		}
-		isAccepted, err := client.IsAccepted(context.Background(), ids.Empty)
+		isAccepted, err := client.IsAccepted(t.Context(), ids.Empty)
 		require.NoError(err)
 		require.True(isAccepted)
 	}
@@ -123,7 +123,7 @@ func TestIndexClient(t *testing.T) {
 				return nil
 			},
 		}
-		container, index, err := client.GetContainerByID(context.Background(), id)
+		container, index, err := client.GetContainerByID(t.Context(), id)
 		require.NoError(err)
 		require.Equal(id, container.ID)
 		require.Equal(bytes, container.Bytes)

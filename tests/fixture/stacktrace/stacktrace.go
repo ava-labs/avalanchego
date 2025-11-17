@@ -65,7 +65,7 @@ func Errorf(format string, args ...any) error {
 		return fmt.Errorf(format, args...)
 	}
 
-	// Assume the last argument is an error requring a stack trace if it is of type error
+	// Assume the last argument is an error requiring a stack trace if it is of type error
 	err, ok := args[len(args)-1].(error)
 	if !ok {
 		return fmt.Errorf(format, args...)

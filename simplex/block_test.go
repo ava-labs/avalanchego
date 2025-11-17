@@ -23,7 +23,7 @@ import (
 
 func TestBlockSerialization(t *testing.T) {
 	unexpectedBlockBytes := errors.New("unexpected block bytes")
-	ctx := context.Background()
+	ctx := t.Context()
 	genesisBlock := newTestBlock(t, newBlockConfig{})
 	testBlock := snowmantest.BuildChild(snowmantest.Genesis)
 
@@ -106,7 +106,7 @@ func TestBlockSerialization(t *testing.T) {
 
 // TestVerifyPrevNotFound attempts to verify a block with a prev digest that is not valid.
 func TestVerifyPrevNotFound(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	genesis := newTestBlock(t, newBlockConfig{})
 	b := newTestBlock(t, newBlockConfig{
@@ -121,7 +121,7 @@ func TestVerifyPrevNotFound(t *testing.T) {
 // TestVerifyTwice tests that a block the same vmBlock will only
 // have its Verify method called once, even if Verify is called multiple times.
 func TestVerifyTwice(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	genesis := newTestBlock(t, newBlockConfig{})
 	b := newTestBlock(t, newBlockConfig{
@@ -140,7 +140,7 @@ func TestVerifyTwice(t *testing.T) {
 
 // TestVerifyGenesis tests that a block with a sequence number of 0 cannot be verified.
 func TestVerifyGenesis(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	genesis := newTestBlock(t, newBlockConfig{})
 	_, err := genesis.Verify(ctx)
@@ -148,7 +148,7 @@ func TestVerifyGenesis(t *testing.T) {
 }
 
 func TestVerify(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	genesis := newTestBlock(t, newBlockConfig{})
 	b := newTestBlock(t, newBlockConfig{
@@ -170,7 +170,7 @@ func TestVerify(t *testing.T) {
 // TestVerifyParentAccepted tests that a block, whose parent has been verified
 // and indexed, can also be verified and indexed successfully.
 func TestVerifyParentAccepted(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	genesis := newTestBlock(t, newBlockConfig{})
 	seq1Block := newTestBlock(t, newBlockConfig{
@@ -196,7 +196,7 @@ func TestVerifyParentAccepted(t *testing.T) {
 }
 
 func TestVerifyBlockRejectsSiblings(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	genesis := newTestBlock(t, newBlockConfig{})
 	// genesisChild0 and genesisChild1 are siblings, both children of genesis.
@@ -227,7 +227,7 @@ func TestVerifyBlockRejectsSiblings(t *testing.T) {
 }
 
 func TestVerifyInnerBlockBreaksHashChain(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	genesis := newTestBlock(t, newBlockConfig{})
 	b := newTestBlock(t, newBlockConfig{
@@ -243,7 +243,7 @@ func TestVerifyInnerBlockBreaksHashChain(t *testing.T) {
 }
 
 func TestIndexBlockDigestNotFound(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
 	genesis := newTestBlock(t, newBlockConfig{})
 

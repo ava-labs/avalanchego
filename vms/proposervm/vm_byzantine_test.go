@@ -8,7 +8,6 @@ import (
 	"context"
 	"encoding/hex"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	"github.com/ava-labs/avalanchego/snow/consensus/snowman/snowmantest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/proposervm/block"
 )
 
@@ -32,13 +32,9 @@ import (
 func TestInvalidByzantineProposerParent(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	xBlock := snowmantest.BuildChild(snowmantest.Genesis)
@@ -46,13 +42,13 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 		return xBlock, nil
 	}
 
-	aBlock, err := proVM.BuildBlock(context.Background())
+	aBlock, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 
 	coreVM.BuildBlockF = nil
 
-	require.NoError(aBlock.Verify(context.Background()))
-	require.NoError(aBlock.Accept(context.Background()))
+	require.NoError(aBlock.Verify(t.Context()))
+	require.NoError(aBlock.Accept(t.Context()))
 
 	yBlock := snowmantest.BuildChild(xBlock)
 	coreVM.ParseBlockF = func(_ context.Context, blockBytes []byte) (snowman.Block, error) {
@@ -62,14 +58,14 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 		return yBlock, nil
 	}
 
-	parsedBlock, err := proVM.ParseBlock(context.Background(), yBlock.Bytes())
+	parsedBlock, err := proVM.ParseBlock(t.Context(), yBlock.Bytes())
 	if err != nil {
 		// If there was an error parsing, then this is fine.
 		return
 	}
 
 	// If there wasn't an error parsing - verify must return an error
-	err = parsedBlock.Verify(context.Background())
+	err = parsedBlock.Verify(t.Context())
 	require.ErrorIs(err, errUnknownBlock)
 }
 
@@ -85,14 +81,10 @@ func TestInvalidByzantineProposerParent(t *testing.T) {
 func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	proVM.Set(snowmantest.GenesisTimestamp)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	xTestBlock := snowmantest.BuildChild(snowmantest.Genesis)
@@ -136,24 +128,24 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 		}
 	}
 
-	aBlockIntf, err := proVM.BuildBlock(context.Background())
+	aBlockIntf, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 
 	require.IsType(&postForkBlock{}, aBlockIntf)
 	aBlock := aBlockIntf.(*postForkBlock)
-	opts, err := aBlock.Options(context.Background())
+	opts, err := aBlock.Options(t.Context())
 	require.NoError(err)
 
-	require.NoError(aBlock.Verify(context.Background()))
-	require.NoError(opts[0].Verify(context.Background()))
-	require.NoError(opts[1].Verify(context.Background()))
+	require.NoError(aBlock.Verify(t.Context()))
+	require.NoError(opts[0].Verify(t.Context()))
+	require.NoError(opts[1].Verify(t.Context()))
 
-	wrappedXBlock, err := proVM.ParseBlock(context.Background(), xBlock.Bytes())
+	wrappedXBlock, err := proVM.ParseBlock(t.Context(), xBlock.Bytes())
 	require.NoError(err)
 
 	// This should never be invoked by the consensus engine. However, it is
 	// enforced to fail verification as a failsafe.
-	err = wrappedXBlock.Verify(context.Background())
+	err = wrappedXBlock.Verify(t.Context())
 	require.ErrorIs(err, errUnexpectedBlockType)
 }
 
@@ -169,13 +161,9 @@ func TestInvalidByzantineProposerOracleParent(t *testing.T) {
 func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	xBlock := snowmantest.BuildChild(snowmantest.Genesis)
@@ -209,18 +197,18 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 		}
 	}
 
-	aBlock, err := proVM.BuildBlock(context.Background())
+	aBlock, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 	coreVM.BuildBlockF = nil
 
-	require.NoError(aBlock.Verify(context.Background()))
+	require.NoError(aBlock.Verify(t.Context()))
 
-	wrappedXBlock, err := proVM.ParseBlock(context.Background(), xBlock.Bytes())
+	wrappedXBlock, err := proVM.ParseBlock(t.Context(), xBlock.Bytes())
 	require.NoError(err)
 
 	// This should never be invoked by the consensus engine. However, it is
 	// enforced to fail verification as a failsafe.
-	err = wrappedXBlock.Verify(context.Background())
+	err = wrappedXBlock.Verify(t.Context())
 	require.ErrorIs(err, errUnexpectedBlockType)
 }
 
@@ -236,14 +224,10 @@ func TestInvalidByzantineProposerPreForkParent(t *testing.T) {
 func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	proVM.Set(snowmantest.GenesisTimestamp)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	xBlock := &TestOptionsBlock{
@@ -286,18 +270,18 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 		}
 	}
 
-	aBlockIntf, err := proVM.BuildBlock(context.Background())
+	aBlockIntf, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 
 	require.IsType(&postForkBlock{}, aBlockIntf)
 	aBlock := aBlockIntf.(*postForkBlock)
-	opts, err := aBlock.Options(context.Background())
+	opts, err := aBlock.Options(t.Context())
 	require.NoError(err)
 
-	require.NoError(aBlock.Verify(context.Background()))
-	err = opts[0].Verify(context.Background())
+	require.NoError(aBlock.Verify(t.Context()))
+	err = opts[0].Verify(t.Context())
 	require.ErrorIs(err, errInnerParentMismatch)
-	err = opts[1].Verify(context.Background())
+	err = opts[1].Verify(t.Context())
 	require.ErrorIs(err, errInnerParentMismatch)
 }
 
@@ -315,14 +299,10 @@ func TestBlockVerify_PostForkOption_FaultyParent(t *testing.T) {
 func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-	)
-	coreVM, _, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, _, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	proVM.Set(snowmantest.GenesisTimestamp)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	// create an Oracle pre-fork block X
@@ -335,7 +315,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	xInnerOptions, err := xBlock.Options(context.Background())
+	xInnerOptions, err := xBlock.Options(t.Context())
 	require.NoError(err)
 	xInnerOption := xInnerOptions[0]
 
@@ -345,6 +325,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		snowmantest.GenesisID,
 		snowmantest.GenesisTimestamp,
 		uint64(2000),
+		block.Epoch{},
 		yBlock.Bytes(),
 	)
 	require.NoError(err)
@@ -358,7 +339,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	require.NoError(bBlock.Verify(context.Background()))
+	require.NoError(bBlock.Verify(t.Context()))
 
 	// generate O1
 	statelessOuterOption, err := block.BuildOption(
@@ -375,17 +356,17 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	err = outerOption.Verify(context.Background())
+	err = outerOption.Verify(t.Context())
 	require.ErrorIs(err, errUnexpectedBlockType)
 
 	// generate A from X and O2
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return xBlock, nil
 	}
-	aBlock, err := proVM.BuildBlock(context.Background())
+	aBlock, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 	coreVM.BuildBlockF = nil
-	require.NoError(aBlock.Verify(context.Background()))
+	require.NoError(aBlock.Verify(t.Context()))
 
 	statelessOuterOption, err = block.BuildOption(
 		aBlock.ID(),
@@ -401,7 +382,7 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	require.NoError(outerOption.Verify(context.Background()))
+	require.NoError(outerOption.Verify(t.Context()))
 
 	// create an Oracle pre-fork block Z
 	// create post-fork block B from Y
@@ -417,10 +398,10 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 	coreVM.BuildBlockF = func(context.Context) (snowman.Block, error) {
 		return zBlock, nil
 	}
-	cBlock, err := proVM.BuildBlock(context.Background())
+	cBlock, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 	coreVM.BuildBlockF = nil
-	require.NoError(cBlock.Verify(context.Background()))
+	require.NoError(cBlock.Verify(t.Context()))
 
 	// generate O3
 	statelessOuterOption, err = block.BuildOption(
@@ -437,20 +418,16 @@ func TestBlockVerify_InvalidPostForkOption(t *testing.T) {
 		},
 	}
 
-	err = outerOption.Verify(context.Background())
+	err = outerOption.Verify(t.Context())
 	require.ErrorIs(err, errInnerParentMismatch)
 }
 
 func TestGetBlock_MutatedSignature(t *testing.T) {
 	require := require.New(t)
 
-	var (
-		activationTime = time.Unix(0, 0)
-		durangoTime    = activationTime
-	)
-	coreVM, valState, proVM, _ := initTestProposerVM(t, activationTime, durangoTime, 0)
+	coreVM, valState, proVM, _ := initTestProposerVM(t, upgradetest.Latest, 0)
 	defer func() {
-		require.NoError(proVM.Shutdown(context.Background()))
+		require.NoError(proVM.Shutdown(t.Context()))
 	}()
 
 	// Make sure that we will be sampled to perform the proposals.
@@ -498,12 +475,12 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 		return coreBlk0, nil
 	}
 
-	builtBlk0, err := proVM.BuildBlock(context.Background())
+	builtBlk0, err := proVM.BuildBlock(t.Context())
 	require.NoError(err)
 
-	require.NoError(builtBlk0.Verify(context.Background()))
+	require.NoError(builtBlk0.Verify(t.Context()))
 
-	require.NoError(proVM.SetPreference(context.Background(), builtBlk0.ID()))
+	require.NoError(proVM.SetPreference(t.Context(), builtBlk0.ID()))
 
 	// The second proposal block will need to be signed because the timestamp
 	// hasn't moved forward
@@ -516,13 +493,13 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	invalidBlkBytes, err := hex.DecodeString(invalidBlkBytesHex)
 	require.NoError(err)
 
-	invalidBlk, err := proVM.ParseBlock(context.Background(), invalidBlkBytes)
+	invalidBlk, err := proVM.ParseBlock(t.Context(), invalidBlkBytes)
 	if err != nil {
 		// Not being able to parse an invalid block is fine.
 		t.Skip(err)
 	}
 
-	err = invalidBlk.Verify(context.Background())
+	err = invalidBlk.Verify(t.Context())
 	require.ErrorIs(err, database.ErrNotFound)
 
 	// Note that the invalidBlk.ID() is the same as the correct blk ID because
@@ -534,12 +511,12 @@ func TestGetBlock_MutatedSignature(t *testing.T) {
 	// GetBlock shouldn't really be able to succeed, as we don't have a valid
 	// representation of [blkID]
 	proVM.innerBlkCache.Flush() // So we don't get from the cache
-	fetchedBlk, err := proVM.GetBlock(context.Background(), blkID)
+	fetchedBlk, err := proVM.GetBlock(t.Context(), blkID)
 	if err != nil {
 		t.Skip(err)
 	}
 
 	// GetBlock returned, so it must have somehow gotten a valid representation
 	// of [blkID].
-	require.NoError(fetchedBlk.Verify(context.Background()))
+	require.NoError(fetchedBlk.Verify(t.Context()))
 }

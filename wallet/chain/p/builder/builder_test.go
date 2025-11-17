@@ -52,7 +52,7 @@ func generateUTXOs(random *rand.Rand, assetID ids.ID, locktime uint64) []*avax.U
 func TestSplitByLocktime(t *testing.T) {
 	seed := time.Now().UnixNano()
 	t.Logf("Seed: %d", seed)
-	random := rand.New(rand.NewSource(seed)) // #nosec G404
+	random := rand.New(rand.NewSource(seed))
 
 	var (
 		require = require.New(t)
@@ -84,7 +84,7 @@ func TestSplitByLocktime(t *testing.T) {
 func TestByAssetID(t *testing.T) {
 	seed := time.Now().UnixNano()
 	t.Logf("Seed: %d", seed)
-	random := rand.New(rand.NewSource(seed)) // #nosec G404
+	random := rand.New(rand.NewSource(seed))
 
 	var (
 		require = require.New(t)

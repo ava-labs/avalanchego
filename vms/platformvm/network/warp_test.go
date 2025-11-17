@@ -4,7 +4,6 @@
 package network
 
 import (
-	"context"
 	"encoding/hex"
 	"math"
 	"strings"
@@ -90,7 +89,7 @@ func TestSignatureRequestVerify(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			s := signatureRequestVerifier{}
 			err := s.Verify(
-				context.Background(),
+				t.Context(),
 				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
 					constants.UnitTestID,
 					constants.PlatformChainID,
@@ -159,7 +158,7 @@ func TestSignatureRequestVerifySubnetToL1Conversion(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			err := s.Verify(
-				context.Background(),
+				t.Context(),
 				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
 					constants.UnitTestID,
 					constants.PlatformChainID,
@@ -218,7 +217,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationRegistered(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			err := s.Verify(
-				context.Background(),
+				t.Context(),
 				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
 					constants.UnitTestID,
 					constants.PlatformChainID,
@@ -519,7 +518,7 @@ func TestSignatureRequestVerifyL1ValidatorRegistrationNotRegistered(t *testing.T
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			err := s.Verify(
-				context.Background(),
+				t.Context(),
 				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
 					constants.UnitTestID,
 					constants.PlatformChainID,
@@ -620,7 +619,7 @@ func TestSignatureRequestVerifyL1ValidatorWeight(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			err := s.Verify(
-				context.Background(),
+				t.Context(),
 				must[*warp.UnsignedMessage](t)(warp.NewUnsignedMessage(
 					constants.UnitTestID,
 					constants.PlatformChainID,

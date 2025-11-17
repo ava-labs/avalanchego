@@ -57,7 +57,7 @@ func BenchmarkEncodings(b *testing.B) {
 	}
 	for _, benchmark := range benchmarks {
 		bytes := make([]byte, benchmark.size)
-		_, _ = rand.Read(bytes) // #nosec G404
+		_, _ = rand.Read(bytes)
 		b.Run(fmt.Sprintf("%s-%d bytes", benchmark.encoding, benchmark.size), func(b *testing.B) {
 			for n := 0; n < b.N; n++ {
 				_, err := Encode(benchmark.encoding, bytes)

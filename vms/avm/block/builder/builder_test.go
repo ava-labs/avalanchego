@@ -4,7 +4,6 @@
 package builder
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -475,7 +474,7 @@ func TestBuilderBuildBlock(t *testing.T) {
 			ctrl := gomock.NewController(t)
 
 			builder := tt.builderFunc(ctrl)
-			_, err := builder.BuildBlock(context.Background())
+			_, err := builder.BuildBlock(t.Context())
 			require.ErrorIs(t, err, tt.expectedErr)
 		})
 	}
@@ -539,7 +538,7 @@ func TestBlockBuilderAddLocalTx(t *testing.T) {
 	builder := New(backend, manager, clk, mempool)
 
 	// show that build block fails if tx is invalid
-	_, err = builder.BuildBlock(context.Background())
+	_, err = builder.BuildBlock(t.Context())
 	require.ErrorIs(err, ErrNoTransactions)
 }
 

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/set"
 )
@@ -37,7 +38,7 @@ type Signature interface {
 	Verify(
 		msg *UnsignedMessage,
 		networkID uint32,
-		validators CanonicalValidatorSet,
+		validators validators.WarpSet,
 		quorumNum uint64,
 		quorumDen uint64,
 	) error
@@ -66,7 +67,7 @@ func (s *BitSetSignature) NumSigners() (int, error) {
 func (s *BitSetSignature) Verify(
 	msg *UnsignedMessage,
 	networkID uint32,
-	validators CanonicalValidatorSet,
+	validators validators.WarpSet,
 	quorumNum uint64,
 	quorumDen uint64,
 ) error {

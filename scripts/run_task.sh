@@ -6,5 +6,6 @@ set -euo pipefail
 if command -v task > /dev/null 2>&1; then
   exec task "${@}"
 else
-  go run github.com/go-task/task/v3/cmd/task@v3.39.2 "${@}"
+  AVALANCHE_PATH="$(cd "$( dirname "${BASH_SOURCE[0]}" )"; cd .. && pwd )"
+  "${AVALANCHE_PATH}"/scripts/run_tool.sh task "${@}"
 fi

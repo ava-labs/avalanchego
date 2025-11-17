@@ -1603,9 +1603,9 @@ func (b *builder) spend(
 		// Initialize the return values with empty slices to preserve backward
 		// compatibility of the json representation of transactions with no
 		// inputs or outputs.
-		inputs:        make([]*avax.TransferableInput, 0),
-		changeOutputs: make([]*avax.TransferableOutput, 0),
-		stakeOutputs:  make([]*avax.TransferableOutput, 0),
+		inputs:        []*avax.TransferableInput{},
+		changeOutputs: []*avax.TransferableOutput{},
+		stakeOutputs:  []*avax.TransferableOutput{},
 	}
 
 	utxosByLocktime := splitByLocktime(utxos, minIssuanceTime)

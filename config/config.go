@@ -1103,6 +1103,13 @@ func getSubnetConfigsFromDir(v *viper.Viper, subnetIDs []ids.ID) (map[ids.ID]sub
 }
 
 func getDefaultSubnetConfig(v *viper.Viper) subnets.Config {
+	subnetDefaults := getPrimaryNetworkConfig(v)
+	// Allow L1s (other than Primary Network) to use their own throttling mechanisms.
+	subnetDefaults.ProposerMinBlockDelay = 0
+	return subnetDefaults
+}
+
+func getPrimaryNetworkConfig(v *viper.Viper) subnets.Config {
 	return subnets.Config{
 		ConsensusParameters:         getConsensusConfig(v),
 		ValidatorOnly:               false,
@@ -1326,7 +1333,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 		return node.Config{}, fmt.Errorf("couldn't read subnet configs: %w", err)
 	}
 
-	primaryNetworkConfig := getDefaultSubnetConfig(v)
+	primaryNetworkConfig := getPrimaryNetworkConfig(v)
 	if err := primaryNetworkConfig.Valid(); err != nil {
 		return node.Config{}, fmt.Errorf("invalid consensus parameters: %w", err)
 	}

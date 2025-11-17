@@ -60,7 +60,7 @@ func TestUnknownUniqueVertexErrors(t *testing.T) {
 	_, err = uVtx.Height()
 	require.ErrorIs(err, errGetHeight)
 
-	_, err = uVtx.Txs(context.Background())
+	_, err = uVtx.Txs(t.Context())
 	require.ErrorIs(err, errGetTxs)
 }
 
@@ -92,7 +92,7 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 		id:         id,
 		serializer: s,
 	}
-	require.NoError(uVtx.setVertex(context.Background(), vtx))
+	require.NoError(uVtx.setVertex(t.Context(), vtx))
 
 	newUVtx := &uniqueVertex{
 		id:         id,
@@ -108,7 +108,7 @@ func TestUniqueVertexCacheHit(t *testing.T) {
 	require.NoError(err)
 	require.Equal(height, newHeight)
 
-	txs, err := newUVtx.Txs(context.Background())
+	txs, err := newUVtx.Txs(t.Context())
 	require.NoError(err)
 	require.Len(txs, 1)
 	require.Equal(testTx, txs[0])
@@ -149,7 +149,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	s := newTestSerializer(t, parseTx)
 
 	uvtxParent := newTestUniqueVertex(t, s, nil, [][]byte{txBytesParent}, false)
-	require.NoError(uvtxParent.Accept(context.Background()))
+	require.NoError(uvtxParent.Accept(t.Context()))
 
 	parentID := uvtxParent.ID()
 	parentIDs := []ids.ID{parentID}
@@ -174,7 +174,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	require.Equal(choices.Unknown, uVtx.Status())
 
 	// Register cache hit
-	vtx, err := newUniqueVertex(context.Background(), s, vtxBytes)
+	vtx, err := newUniqueVertex(t.Context(), s, vtxBytes)
 	require.NoError(err)
 
 	require.Equal(choices.Processing, vtx.Status())
@@ -196,7 +196,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 		require.NoError(err)
 		require.Equal(height, vtxHeight)
 
-		vtxTxs, err := vtx.Txs(context.Background())
+		vtxTxs, err := vtx.Txs(t.Context())
 		require.NoError(err)
 		require.Len(vtxTxs, 1)
 		require.Equal(txBytes, vtxTxs[0].Bytes())
@@ -212,7 +212,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	validateVertex(vtx, choices.Processing)
 
 	// Check that a newly parsed vertex refreshed from the cache is valid
-	vtx, err = newUniqueVertex(context.Background(), s, vtxBytes)
+	vtx, err = newUniqueVertex(t.Context(), s, vtxBytes)
 	require.NoError(err)
 	validateVertex(vtx, choices.Processing)
 
@@ -227,7 +227,7 @@ func TestUniqueVertexCacheMiss(t *testing.T) {
 	validateVertex(vtx, choices.Processing)
 
 	s.state.uniqueVtx.Flush()
-	vtx, err = newUniqueVertex(context.Background(), s, vtxBytes)
+	vtx, err = newUniqueVertex(t.Context(), s, vtxBytes)
 	require.NoError(err)
 	validateVertex(vtx, choices.Processing)
 }
@@ -251,7 +251,7 @@ func TestParseVertexWithIncorrectChainID(t *testing.T) {
 		return nil, errUnknownTx
 	})
 
-	_, err = s.ParseVtx(context.Background(), vtxBytes)
+	_, err = s.ParseVtx(t.Context(), vtxBytes)
 	require.ErrorIs(err, errWrongChainID)
 }
 
@@ -276,14 +276,14 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 	require.NoError(err)
 	vtxBytes := statelessVertex.Bytes()
 
-	_, err = s.ParseVtx(context.Background(), vtxBytes)
+	_, err = s.ParseVtx(t.Context(), vtxBytes)
 	require.ErrorIs(err, errUnknownTx)
 
-	_, err = s.ParseVtx(context.Background(), vtxBytes)
+	_, err = s.ParseVtx(t.Context(), vtxBytes)
 	require.ErrorIs(err, errUnknownTx)
 
 	id := hashing.ComputeHash256Array(vtxBytes)
-	_, err = s.GetVtx(context.Background(), id)
+	_, err = s.GetVtx(t.Context(), id)
 	require.ErrorIs(err, errUnknownVertex)
 
 	childStatelessVertex, err := vertex.Build( // regular, non-stop vertex
@@ -295,7 +295,7 @@ func TestParseVertexWithInvalidTxs(t *testing.T) {
 	require.NoError(err)
 	childVtxBytes := childStatelessVertex.Bytes()
 
-	childVtx, err := s.ParseVtx(context.Background(), childVtxBytes)
+	childVtx, err := s.ParseVtx(t.Context(), childVtxBytes)
 	require.NoError(err)
 
 	parents, err := childVtx.Parents()
@@ -334,7 +334,7 @@ func newTestUniqueVertex(
 		)
 	}
 	require.NoError(err)
-	uvtx, err := newUniqueVertex(context.Background(), s, vtx.Bytes())
+	uvtx, err := newUniqueVertex(t.Context(), s, vtx.Bytes())
 	require.NoError(err)
 	return uvtx
 }

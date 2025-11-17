@@ -4,7 +4,6 @@
 package grpcutils
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -95,7 +94,7 @@ func TestWaitForReadyCallOption(t *testing.T) {
 	_ = listener.Close()
 
 	db := pb.NewDatabaseClient(conn)
-	_, err = db.Put(context.Background(), &pb.PutRequest{Key: []byte("foo"), Value: []byte("bar")}, grpc.WaitForReady(false))
+	_, err = db.Put(t.Context(), &pb.PutRequest{Key: []byte("foo"), Value: []byte("bar")}, grpc.WaitForReady(false))
 	s, ok := status.FromError(err)
 	fmt.Printf("status: %v\n", s)
 	require.True(ok)

@@ -11,6 +11,9 @@ const DefaultMaxDataFileSize = 500 * 1024 * 1024 * 1024
 // DefaultMaxDataFiles is the default maximum number of data files descriptors cached.
 const DefaultMaxDataFiles = 10
 
+// DefaultBlockCacheSize is the default size of the block cache.
+const DefaultBlockCacheSize uint16 = 256
+
 // DatabaseConfig contains configuration parameters for BlockDB.
 type DatabaseConfig struct {
 	// IndexDir is the directory where the index file is stored.
@@ -28,6 +31,9 @@ type DatabaseConfig struct {
 	// MaxDataFiles is the maximum number of data files descriptors cached.
 	MaxDataFiles int
 
+	// BlockCacheSize is the size of the block cache (default: 256).
+	BlockCacheSize uint16
+
 	// CheckpointInterval defines how frequently (in blocks) the index file header is updated (default: 1024).
 	CheckpointInterval uint64
 
@@ -43,6 +49,7 @@ func DefaultConfig() DatabaseConfig {
 		MinimumHeight:      0,
 		MaxDataFileSize:    DefaultMaxDataFileSize,
 		MaxDataFiles:       DefaultMaxDataFiles,
+		BlockCacheSize:     DefaultBlockCacheSize,
 		CheckpointInterval: 1024,
 		SyncToDisk:         true,
 	}
@@ -88,6 +95,12 @@ func (c DatabaseConfig) WithMaxDataFileSize(maxSize uint64) DatabaseConfig {
 // WithMaxDataFiles returns a copy of the config with MaxDataFiles set to the given value.
 func (c DatabaseConfig) WithMaxDataFiles(maxFiles int) DatabaseConfig {
 	c.MaxDataFiles = maxFiles
+	return c
+}
+
+// WithBlockCacheSize returns a copy of the config with BlockCacheSize set to the given value.
+func (c DatabaseConfig) WithBlockCacheSize(size uint16) DatabaseConfig {
+	c.BlockCacheSize = size
 	return c
 }
 

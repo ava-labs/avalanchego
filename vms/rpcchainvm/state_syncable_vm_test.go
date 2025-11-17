@@ -303,28 +303,28 @@ func TestStateSyncEnabled(t *testing.T) {
 
 	// Create and start the plugin
 	vm := buildClientHelper(require, testKey)
-	defer vm.runtime.Stop(context.Background())
+	defer vm.runtime.Stop(t.Context())
 
 	// test state sync not implemented
 	// Note that enabled == false is returned rather than
 	// common.ErrStateSyncableVMNotImplemented
-	enabled, err := vm.StateSyncEnabled(context.Background())
+	enabled, err := vm.StateSyncEnabled(t.Context())
 	require.NoError(err)
 	require.False(enabled)
 
 	// test state sync disabled
-	enabled, err = vm.StateSyncEnabled(context.Background())
+	enabled, err = vm.StateSyncEnabled(t.Context())
 	require.NoError(err)
 	require.False(enabled)
 
 	// test state sync enabled
-	enabled, err = vm.StateSyncEnabled(context.Background())
+	enabled, err = vm.StateSyncEnabled(t.Context())
 	require.NoError(err)
 	require.True(enabled)
 
 	// test a non-special error.
 	// TODO: retrieve exact error
-	_, err = vm.StateSyncEnabled(context.Background())
+	_, err = vm.StateSyncEnabled(t.Context())
 	require.Error(err) //nolint:forbidigo // currently returns grpc errors
 }
 
@@ -334,14 +334,14 @@ func TestGetOngoingSyncStateSummary(t *testing.T) {
 
 	// Create and start the plugin
 	vm := buildClientHelper(require, testKey)
-	defer vm.runtime.Stop(context.Background())
+	defer vm.runtime.Stop(t.Context())
 
 	// test unimplemented case; this is just a guard
-	_, err := vm.GetOngoingSyncStateSummary(context.Background())
+	_, err := vm.GetOngoingSyncStateSummary(t.Context())
 	require.Equal(block.ErrStateSyncableVMNotImplemented, err)
 
 	// test successful retrieval
-	summary, err := vm.GetOngoingSyncStateSummary(context.Background())
+	summary, err := vm.GetOngoingSyncStateSummary(t.Context())
 	require.NoError(err)
 	require.Equal(mockedSummary.ID(), summary.ID())
 	require.Equal(mockedSummary.Height(), summary.Height())
@@ -349,7 +349,7 @@ func TestGetOngoingSyncStateSummary(t *testing.T) {
 
 	// test a non-special error.
 	// TODO: retrieve exact error
-	_, err = vm.GetOngoingSyncStateSummary(context.Background())
+	_, err = vm.GetOngoingSyncStateSummary(t.Context())
 	require.Error(err) //nolint:forbidigo // currently returns grpc errors
 }
 
@@ -359,14 +359,14 @@ func TestGetLastStateSummary(t *testing.T) {
 
 	// Create and start the plugin
 	vm := buildClientHelper(require, testKey)
-	defer vm.runtime.Stop(context.Background())
+	defer vm.runtime.Stop(t.Context())
 
 	// test unimplemented case; this is just a guard
-	_, err := vm.GetLastStateSummary(context.Background())
+	_, err := vm.GetLastStateSummary(t.Context())
 	require.Equal(block.ErrStateSyncableVMNotImplemented, err)
 
 	// test successful retrieval
-	summary, err := vm.GetLastStateSummary(context.Background())
+	summary, err := vm.GetLastStateSummary(t.Context())
 	require.NoError(err)
 	require.Equal(mockedSummary.ID(), summary.ID())
 	require.Equal(mockedSummary.Height(), summary.Height())
@@ -374,7 +374,7 @@ func TestGetLastStateSummary(t *testing.T) {
 
 	// test a non-special error.
 	// TODO: retrieve exact error
-	_, err = vm.GetLastStateSummary(context.Background())
+	_, err = vm.GetLastStateSummary(t.Context())
 	require.Error(err) //nolint:forbidigo // currently returns grpc errors
 }
 
@@ -384,26 +384,26 @@ func TestParseStateSummary(t *testing.T) {
 
 	// Create and start the plugin
 	vm := buildClientHelper(require, testKey)
-	defer vm.runtime.Stop(context.Background())
+	defer vm.runtime.Stop(t.Context())
 
 	// test unimplemented case; this is just a guard
-	_, err := vm.ParseStateSummary(context.Background(), mockedSummary.Bytes())
+	_, err := vm.ParseStateSummary(t.Context(), mockedSummary.Bytes())
 	require.Equal(block.ErrStateSyncableVMNotImplemented, err)
 
 	// test successful parsing
-	summary, err := vm.ParseStateSummary(context.Background(), mockedSummary.Bytes())
+	summary, err := vm.ParseStateSummary(t.Context(), mockedSummary.Bytes())
 	require.NoError(err)
 	require.Equal(mockedSummary.ID(), summary.ID())
 	require.Equal(mockedSummary.Height(), summary.Height())
 	require.Equal(mockedSummary.Bytes(), summary.Bytes())
 
 	// test parsing nil summary
-	_, err = vm.ParseStateSummary(context.Background(), nil)
+	_, err = vm.ParseStateSummary(t.Context(), nil)
 	require.Error(err) //nolint:forbidigo // currently returns grpc errors
 
 	// test a non-special error.
 	// TODO: retrieve exact error
-	_, err = vm.ParseStateSummary(context.Background(), mockedSummary.Bytes())
+	_, err = vm.ParseStateSummary(t.Context(), mockedSummary.Bytes())
 	require.Error(err) //nolint:forbidigo // currently returns grpc errors
 }
 
@@ -413,14 +413,14 @@ func TestGetStateSummary(t *testing.T) {
 
 	// Create and start the plugin
 	vm := buildClientHelper(require, testKey)
-	defer vm.runtime.Stop(context.Background())
+	defer vm.runtime.Stop(t.Context())
 
 	// test unimplemented case; this is just a guard
-	_, err := vm.GetStateSummary(context.Background(), mockedSummary.Height())
+	_, err := vm.GetStateSummary(t.Context(), mockedSummary.Height())
 	require.Equal(block.ErrStateSyncableVMNotImplemented, err)
 
 	// test successful retrieval
-	summary, err := vm.GetStateSummary(context.Background(), mockedSummary.Height())
+	summary, err := vm.GetStateSummary(t.Context(), mockedSummary.Height())
 	require.NoError(err)
 	require.Equal(mockedSummary.ID(), summary.ID())
 	require.Equal(mockedSummary.Height(), summary.Height())
@@ -428,7 +428,7 @@ func TestGetStateSummary(t *testing.T) {
 
 	// test a non-special error.
 	// TODO: retrieve exact error
-	_, err = vm.GetStateSummary(context.Background(), mockedSummary.Height())
+	_, err = vm.GetStateSummary(t.Context(), mockedSummary.Height())
 	require.Error(err) //nolint:forbidigo // currently returns grpc errors
 }
 
@@ -438,25 +438,25 @@ func TestAcceptStateSummary(t *testing.T) {
 
 	// Create and start the plugin
 	vm := buildClientHelper(require, testKey)
-	defer vm.runtime.Stop(context.Background())
+	defer vm.runtime.Stop(t.Context())
 
 	// retrieve the summary first
-	summary, err := vm.GetStateSummary(context.Background(), mockedSummary.Height())
+	summary, err := vm.GetStateSummary(t.Context(), mockedSummary.Height())
 	require.NoError(err)
 
 	// test status Summary
-	status, err := summary.Accept(context.Background())
+	status, err := summary.Accept(t.Context())
 	require.NoError(err)
 	require.Equal(block.StateSyncStatic, status)
 
 	// test skipped Summary
-	status, err = summary.Accept(context.Background())
+	status, err = summary.Accept(t.Context())
 	require.NoError(err)
 	require.Equal(block.StateSyncSkipped, status)
 
 	// test a non-special error.
 	// TODO: retrieve exact error
-	_, err = summary.Accept(context.Background())
+	_, err = summary.Accept(t.Context())
 	require.Error(err) //nolint:forbidigo // currently returns grpc errors
 }
 
@@ -468,45 +468,45 @@ func TestLastAcceptedBlockPostStateSummaryAccept(t *testing.T) {
 
 	// Create and start the plugin
 	vm := buildClientHelper(require, testKey)
-	defer vm.runtime.Stop(context.Background())
+	defer vm.runtime.Stop(t.Context())
 
 	// Step 1: initialize VM and check initial LastAcceptedBlock
 	ctx := snowtest.Context(t, snowtest.CChainID)
 
-	require.NoError(vm.Initialize(context.Background(), ctx, prefixdb.New([]byte{}, memdb.New()), nil, nil, nil, nil, nil))
+	require.NoError(vm.Initialize(t.Context(), ctx, prefixdb.New([]byte{}, memdb.New()), nil, nil, nil, nil, nil))
 
-	blkID, err := vm.LastAccepted(context.Background())
+	blkID, err := vm.LastAccepted(t.Context())
 	require.NoError(err)
 	require.Equal(preSummaryBlk.ID(), blkID)
 
-	lastBlk, err := vm.GetBlock(context.Background(), blkID)
+	lastBlk, err := vm.GetBlock(t.Context(), blkID)
 	require.NoError(err)
 	require.Equal(preSummaryBlk.Height(), lastBlk.Height())
 
 	// Step 2: pick a state summary to an higher height and accept it
-	summary, err := vm.ParseStateSummary(context.Background(), mockedSummary.Bytes())
+	summary, err := vm.ParseStateSummary(t.Context(), mockedSummary.Bytes())
 	require.NoError(err)
 
-	status, err := summary.Accept(context.Background())
+	status, err := summary.Accept(t.Context())
 	require.NoError(err)
 	require.Equal(block.StateSyncStatic, status)
 
 	// State Sync accept does not duly update LastAccepted block information
 	// since state sync can complete asynchronously
-	blkID, err = vm.LastAccepted(context.Background())
+	blkID, err = vm.LastAccepted(t.Context())
 	require.NoError(err)
 
-	lastBlk, err = vm.GetBlock(context.Background(), blkID)
+	lastBlk, err = vm.GetBlock(t.Context(), blkID)
 	require.NoError(err)
 	require.Equal(preSummaryBlk.Height(), lastBlk.Height())
 
 	// Setting state to bootstrapping duly update last accepted block
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(t.Context(), snow.Bootstrapping))
 
-	blkID, err = vm.LastAccepted(context.Background())
+	blkID, err = vm.LastAccepted(t.Context())
 	require.NoError(err)
 
-	lastBlk, err = vm.GetBlock(context.Background(), blkID)
+	lastBlk, err = vm.GetBlock(t.Context(), blkID)
 	require.NoError(err)
 	require.Equal(summary.Height(), lastBlk.Height())
 }

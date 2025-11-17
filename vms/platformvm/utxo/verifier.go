@@ -22,7 +22,7 @@ import (
 var (
 	_ Verifier = (*verifier)(nil)
 
-	ErrInsufficientFunds            = errors.New("insufficient funds")
+	ErrUnsupportedTxType            = errors.New("unsupported tx type")
 	ErrInsufficientUnlockedFunds    = errors.New("insufficient unlocked funds")
 	ErrInsufficientLockedFunds      = errors.New("insufficient locked funds")
 	errWrongNumberCredentials       = errors.New("wrong number of credentials")
@@ -330,4 +330,189 @@ func (h *verifier) VerifySpendUTXOs(
 		}
 	}
 	return nil
+}
+
+// GetInputOutputs returns the input/output utxos and any AVAX that is produced
+// as part of the execution of the tx
+func GetInputOutputs(tx txs.UnsignedTx) (
+	[]*avax.TransferableInput,
+	[]*avax.TransferableOutput,
+	uint64,
+	error,
+) {
+	getter := &inputOutputGetter{}
+	if err := tx.Visit(getter); err != nil {
+		return nil, nil, 0, fmt.Errorf("getting utxos %w", err)
+	}
+
+	return getter.InputUTXOs, getter.OutputUTXOs, getter.ProducedAVAX, nil
+}
+
+// inputOutputGetter gets the utxos and AVAX produced for each tx type
+type inputOutputGetter struct {
+	// InputUTXOs is the utxos consumed by the tx
+	InputUTXOs []*avax.TransferableInput
+	// OutputUTXOs is the utxos produced by the tx
+	OutputUTXOs []*avax.TransferableOutput
+	// ProducedAVAX is produced by the execution of this tx that does not have a
+	// corresponding UTXO
+	ProducedAVAX uint64
+}
+
+func (i *inputOutputGetter) AddValidatorTx(tx *txs.AddValidatorTx) error {
+	i.getUTXOs(tx.BaseTx)
+	i.OutputUTXOs = append(i.OutputUTXOs, tx.StakeOuts...)
+
+	return nil
+}
+
+func (i *inputOutputGetter) AddSubnetValidatorTx(tx *txs.AddSubnetValidatorTx) error {
+	i.getUTXOs(tx.BaseTx)
+
+	return nil
+}
+
+func (i *inputOutputGetter) AddDelegatorTx(tx *txs.AddDelegatorTx) error {
+	i.getUTXOs(tx.BaseTx)
+	i.OutputUTXOs = append(i.OutputUTXOs, tx.StakeOuts...)
+
+	return nil
+}
+
+func (i *inputOutputGetter) CreateChainTx(tx *txs.CreateChainTx) error {
+	i.getUTXOs(tx.BaseTx)
+
+	return nil
+}
+
+func (i *inputOutputGetter) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
+	i.getUTXOs(tx.BaseTx)
+
+	return nil
+}
+
+func (i *inputOutputGetter) ImportTx(tx *txs.ImportTx) error {
+	i.getUTXOs(tx.BaseTx)
+	i.InputUTXOs = append(i.InputUTXOs, tx.ImportedInputs...)
+
+	return nil
+}
+
+func (i *inputOutputGetter) ExportTx(tx *txs.ExportTx) error {
+	i.getUTXOs(tx.BaseTx)
+	i.OutputUTXOs = append(i.OutputUTXOs, tx.ExportedOutputs...)
+
+	return nil
+}
+
+func (*inputOutputGetter) AdvanceTimeTx(*txs.AdvanceTimeTx) error {
+	return fmt.Errorf("%w: AdvanceTimeTx", ErrUnsupportedTxType)
+}
+
+func (*inputOutputGetter) RewardValidatorTx(*txs.RewardValidatorTx) error {
+	return fmt.Errorf("%w: RewardValidatorTx", ErrUnsupportedTxType)
+}
+
+func (i *inputOutputGetter) RemoveSubnetValidatorTx(tx *txs.RemoveSubnetValidatorTx) error {
+	i.getUTXOs(tx.BaseTx)
+
+	return nil
+}
+
+func (i *inputOutputGetter) TransformSubnetTx(tx *txs.TransformSubnetTx) error {
+	i.getUTXOs(tx.BaseTx)
+
+	return nil
+}
+
+func (i *inputOutputGetter) AddPermissionlessValidatorTx(tx *txs.AddPermissionlessValidatorTx) error {
+	i.getUTXOs(tx.BaseTx)
+	i.OutputUTXOs = append(i.OutputUTXOs, tx.StakeOuts...)
+
+	return nil
+}
+
+func (i *inputOutputGetter) AddPermissionlessDelegatorTx(tx *txs.AddPermissionlessDelegatorTx) error {
+	i.getUTXOs(tx.BaseTx)
+	i.OutputUTXOs = append(i.OutputUTXOs, tx.StakeOuts...)
+
+	return nil
+}
+
+func (i *inputOutputGetter) TransferSubnetOwnershipTx(tx *txs.TransferSubnetOwnershipTx) error {
+	i.getUTXOs(tx.BaseTx)
+
+	return nil
+}
+
+func (i *inputOutputGetter) BaseTx(tx *txs.BaseTx) error {
+	i.getUTXOs(*tx)
+
+	return nil
+}
+
+// ConvertSubnetToL1Tx treats validator balances like produced AVAX because
+// the fee payer must have enough input AVAX to cover the initial state of the
+// L1 validators
+func (i *inputOutputGetter) ConvertSubnetToL1Tx(tx *txs.ConvertSubnetToL1Tx) error {
+	i.getUTXOs(tx.BaseTx)
+
+	for _, v := range tx.Validators {
+		producedAVAX, err := math.Add(i.ProducedAVAX, v.Balance)
+		if err != nil {
+			return fmt.Errorf("failed to add validator balance: %w", err)
+		}
+
+		i.ProducedAVAX = producedAVAX
+	}
+
+	return nil
+}
+
+// RegisterL1ValidatorTx treats the validator balance like produced AVAX because
+// the fee payer must have enough input AVAX to cover the initial state of the
+// validator
+func (i *inputOutputGetter) RegisterL1ValidatorTx(tx *txs.RegisterL1ValidatorTx) error {
+	i.getUTXOs(tx.BaseTx)
+
+	producedAVAX, err := math.Add(i.ProducedAVAX, tx.Balance)
+	if err != nil {
+		return fmt.Errorf("failed to add validator balance: %w", err)
+	}
+
+	i.ProducedAVAX = producedAVAX
+
+	return nil
+}
+
+func (i *inputOutputGetter) SetL1ValidatorWeightTx(tx *txs.SetL1ValidatorWeightTx) error {
+	i.getUTXOs(tx.BaseTx)
+
+	return nil
+}
+
+// RegisterL1ValidatorTx treats the validator balance like produced AVAX because
+// the fee payer must have enough input AVAX to cover the increase in balance
+func (i *inputOutputGetter) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1ValidatorBalanceTx) error {
+	i.getUTXOs(tx.BaseTx)
+
+	producedAVAX, err := math.Add(i.ProducedAVAX, tx.Balance)
+	if err != nil {
+		return fmt.Errorf("failed to add validator balance: %w", err)
+	}
+
+	i.ProducedAVAX = producedAVAX
+
+	return nil
+}
+
+func (i *inputOutputGetter) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) error {
+	i.getUTXOs(tx.BaseTx)
+
+	return nil
+}
+
+func (i *inputOutputGetter) getUTXOs(tx txs.BaseTx) {
+	i.InputUTXOs = append(i.InputUTXOs, tx.Ins...)
+	i.OutputUTXOs = append(i.OutputUTXOs, tx.Outs...)
 }

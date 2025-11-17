@@ -4,6 +4,8 @@
 package simplex
 
 import (
+	"fmt"
+
 	"github.com/ava-labs/simplex"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -12,14 +14,19 @@ import (
 
 func newBlockProposal(
 	chainID ids.ID,
-	block []byte,
-	vote simplex.Vote,
-) *p2p.Simplex {
+	msg *simplex.VerifiedBlockMessage,
+) (*p2p.Simplex, error) {
+	bytes, err := msg.VerifiedBlock.Bytes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize block: %w", err)
+	}
+	vote := msg.Vote
+
 	return &p2p.Simplex{
 		ChainId: chainID[:],
 		Message: &p2p.Simplex_BlockProposal{
 			BlockProposal: &p2p.BlockProposal{
-				Block: block,
+				Block: bytes,
 				Vote: &p2p.Vote{
 					BlockHeader: blockHeaderToP2P(vote.Vote.BlockHeader),
 					Signature: &p2p.Signature{
@@ -29,7 +36,7 @@ func newBlockProposal(
 				},
 			},
 		},
-	}
+	}, nil
 }
 
 func newVote(
@@ -162,9 +169,13 @@ func newReplicationResponse(
 		qrs = append(qrs, p2pQR)
 	}
 
-	latestQR, err := quorumRoundToP2P(latestRound)
-	if err != nil {
-		return nil, err
+	var latestQR *p2p.QuorumRound
+	if latestRound != nil {
+		qr, err := quorumRoundToP2P(latestRound)
+		if err != nil {
+			return nil, err
+		}
+		latestQR = qr
 	}
 
 	return &p2p.Simplex{

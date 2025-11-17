@@ -88,7 +88,7 @@ func TestPushAndExecute(t *testing.T) {
 	require.NoError(err)
 	require.False(has)
 
-	pushed, err := jobs.Push(context.Background(), job)
+	pushed, err := jobs.Push(t.Context(), job)
 	require.True(pushed)
 	require.NoError(err)
 
@@ -116,7 +116,7 @@ func TestPushAndExecute(t *testing.T) {
 	}
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	count, err := jobs.ExecuteAll(context.Background(), snowtest.ConsensusContext(snowCtx), &common.Halter{}, false)
+	count, err := jobs.ExecuteAll(t.Context(), snowtest.ConsensusContext(snowCtx), &common.Halter{}, false)
 	require.NoError(err)
 	require.Equal(1, count)
 
@@ -154,7 +154,7 @@ func TestRemoveDependency(t *testing.T) {
 		return []byte{1}
 	}
 
-	pushed, err := jobs.Push(context.Background(), job1)
+	pushed, err := jobs.Push(t.Context(), job1)
 	require.True(pushed)
 	require.NoError(err)
 
@@ -162,7 +162,7 @@ func TestRemoveDependency(t *testing.T) {
 	require.NoError(err)
 	require.False(hasNext)
 
-	pushed, err = jobs.Push(context.Background(), job0)
+	pushed, err = jobs.Push(t.Context(), job0)
 	require.True(pushed)
 	require.NoError(err)
 
@@ -183,7 +183,7 @@ func TestRemoveDependency(t *testing.T) {
 	}
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	count, err := jobs.ExecuteAll(context.Background(), snowtest.ConsensusContext(snowCtx), &common.Halter{}, false)
+	count, err := jobs.ExecuteAll(t.Context(), snowtest.ConsensusContext(snowCtx), &common.Halter{}, false)
 	require.NoError(err)
 	require.Equal(2, count)
 	require.True(executed0)
@@ -210,11 +210,11 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 	jobID := ids.GenerateTestID()
 	job := testJob(t, jobID, nil, ids.Empty, nil)
 
-	pushed, err := jobs.Push(context.Background(), job)
+	pushed, err := jobs.Push(t.Context(), job)
 	require.True(pushed)
 	require.NoError(err)
 
-	pushed, err = jobs.Push(context.Background(), job)
+	pushed, err = jobs.Push(t.Context(), job)
 	require.False(pushed)
 	require.NoError(err)
 
@@ -223,7 +223,7 @@ func TestDuplicatedExecutablePush(t *testing.T) {
 	jobs, err = New(db, "", prometheus.NewRegistry())
 	require.NoError(err)
 
-	pushed, err = jobs.Push(context.Background(), job)
+	pushed, err = jobs.Push(t.Context(), job)
 	require.False(pushed)
 	require.NoError(err)
 }
@@ -241,11 +241,11 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 	job1ID := ids.GenerateTestID()
 	job1 := testJob(t, job1ID, nil, job0ID, &executed0)
 
-	pushed, err := jobs.Push(context.Background(), job1)
+	pushed, err := jobs.Push(t.Context(), job1)
 	require.True(pushed)
 	require.NoError(err)
 
-	pushed, err = jobs.Push(context.Background(), job1)
+	pushed, err = jobs.Push(t.Context(), job1)
 	require.False(pushed)
 	require.NoError(err)
 
@@ -254,7 +254,7 @@ func TestDuplicatedNotExecutablePush(t *testing.T) {
 	jobs, err = New(db, "", prometheus.NewRegistry())
 	require.NoError(err)
 
-	pushed, err = jobs.Push(context.Background(), job1)
+	pushed, err = jobs.Push(t.Context(), job1)
 	require.False(pushed)
 	require.NoError(err)
 }
@@ -267,7 +267,7 @@ func TestMissingJobs(t *testing.T) {
 
 	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
 	require.NoError(err)
-	require.NoError(jobs.SetParser(context.Background(), parser))
+	require.NoError(jobs.SetParser(t.Context(), parser))
 
 	job0ID := ids.GenerateTestID()
 	job1ID := ids.GenerateTestID()
@@ -294,7 +294,7 @@ func TestMissingJobs(t *testing.T) {
 
 	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
 	require.NoError(err)
-	require.NoError(jobs.SetParser(context.Background(), parser))
+	require.NoError(jobs.SetParser(t.Context(), parser))
 
 	missingIDSet = set.Of(jobs.MissingIDs()...)
 
@@ -313,7 +313,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 
 	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
 	require.NoError(err)
-	require.NoError(jobs.SetParser(context.Background(), parser))
+	require.NoError(jobs.SetParser(t.Context(), parser))
 
 	job0ID, executed0 := ids.GenerateTestID(), false
 	job1ID, executed1 := ids.GenerateTestID(), false
@@ -328,7 +328,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 		return []byte{1}
 	}
 
-	pushed, err := jobs.Push(context.Background(), job1)
+	pushed, err := jobs.Push(t.Context(), job1)
 	require.True(pushed)
 	require.NoError(err)
 
@@ -336,7 +336,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	require.NoError(err)
 	require.False(hasNext)
 
-	pushed, err = jobs.Push(context.Background(), job0)
+	pushed, err = jobs.Push(t.Context(), job0)
 	require.True(pushed)
 	require.NoError(err)
 
@@ -357,7 +357,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	}
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
-	_, err = jobs.ExecuteAll(context.Background(), snowtest.ConsensusContext(snowCtx), &common.Halter{}, false)
+	_, err = jobs.ExecuteAll(t.Context(), snowtest.ConsensusContext(snowCtx), &common.Halter{}, false)
 	// Assert that the database closed error on job1 causes ExecuteAll
 	// to fail in the middle of execution.
 	require.ErrorIs(err, database.ErrClosed)
@@ -374,14 +374,14 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	// recovers correctly.
 	jobs, err = NewWithMissing(db, "", prometheus.NewRegistry())
 	require.NoError(err)
-	require.NoError(jobs.SetParser(context.Background(), parser))
+	require.NoError(jobs.SetParser(t.Context(), parser))
 
 	missingIDs := jobs.MissingIDs()
 	require.Len(missingIDs, 1)
 
 	require.Equal(missingIDs[0], job0.ID())
 
-	pushed, err = jobs.Push(context.Background(), job0)
+	pushed, err = jobs.Push(t.Context(), job0)
 	require.NoError(err)
 	require.True(pushed)
 
@@ -389,7 +389,7 @@ func TestHandleJobWithMissingDependencyOnRunnableStack(t *testing.T) {
 	require.NoError(err)
 	require.True(hasNext)
 
-	count, err := jobs.ExecuteAll(context.Background(), snowtest.ConsensusContext(snowCtx), &common.Halter{}, false)
+	count, err := jobs.ExecuteAll(t.Context(), snowtest.ConsensusContext(snowCtx), &common.Halter{}, false)
 	require.NoError(err)
 	require.Equal(2, count)
 	require.True(executed1)
@@ -403,7 +403,7 @@ func TestInitializeNumJobs(t *testing.T) {
 
 	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
 	require.NoError(err)
-	require.NoError(jobs.SetParser(context.Background(), parser))
+	require.NoError(jobs.SetParser(t.Context(), parser))
 
 	job0ID := ids.GenerateTestID()
 	job1ID := ids.GenerateTestID()
@@ -441,12 +441,12 @@ func TestInitializeNumJobs(t *testing.T) {
 		},
 	}
 
-	pushed, err := jobs.Push(context.Background(), job0)
+	pushed, err := jobs.Push(t.Context(), job0)
 	require.True(pushed)
 	require.NoError(err)
 	require.Equal(uint64(1), jobs.state.numJobs)
 
-	pushed, err = jobs.Push(context.Background(), job1)
+	pushed, err = jobs.Push(t.Context(), job1)
 	require.True(pushed)
 	require.NoError(err)
 	require.Equal(uint64(2), jobs.state.numJobs)
@@ -468,7 +468,7 @@ func TestClearAll(t *testing.T) {
 
 	jobs, err := NewWithMissing(db, "", prometheus.NewRegistry())
 	require.NoError(err)
-	require.NoError(jobs.SetParser(context.Background(), parser))
+	require.NoError(jobs.SetParser(t.Context(), parser))
 	job0ID, executed0 := ids.GenerateTestID(), false
 	job1ID, executed1 := ids.GenerateTestID(), false
 	job0 := testJob(t, job0ID, &executed0, ids.Empty, nil)
@@ -477,11 +477,11 @@ func TestClearAll(t *testing.T) {
 		return []byte{1}
 	}
 
-	pushed, err := jobs.Push(context.Background(), job0)
+	pushed, err := jobs.Push(t.Context(), job0)
 	require.NoError(err)
 	require.True(pushed)
 
-	pushed, err = jobs.Push(context.Background(), job1)
+	pushed, err = jobs.Push(t.Context(), job1)
 	require.True(pushed)
 	require.NoError(err)
 

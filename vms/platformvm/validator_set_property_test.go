@@ -78,7 +78,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			}
 			vm.ctx.Lock.Lock()
 			defer func() {
-				_ = vm.Shutdown(context.Background())
+				_ = vm.Shutdown(t.Context())
 				vm.ctx.Lock.Unlock()
 			}()
 			nodeID := ids.GenerateTestNodeID()
@@ -155,7 +155,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 			snapshotHeights := maps.Keys(validatorSetByHeightAndSubnet)
 			slices.Sort(snapshotHeights)
 			for idx, snapShotHeight := range snapshotHeights {
-				lastAcceptedHeight, err := vm.GetCurrentHeight(context.Background())
+				lastAcceptedHeight, err := vm.GetCurrentHeight(t.Context())
 				if err != nil {
 					return err.Error()
 				}
@@ -169,7 +169,7 @@ func TestGetValidatorsSetProperty(t *testing.T) {
 				// does not change and must be equal to snapshot at [snapShotHeight]
 				for height := snapShotHeight; height < nextSnapShotHeight; height++ {
 					for subnetID, validatorsSet := range validatorSetByHeightAndSubnet[snapShotHeight] {
-						res, err := vm.GetValidatorSet(context.Background(), height, subnetID)
+						res, err := vm.GetValidatorSet(t.Context(), height, subnetID)
 						if err != nil {
 							return fmt.Sprintf("failed GetValidatorSet at height %v: %v", height, err)
 						}
@@ -476,7 +476,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			}
 
 			// nil out non subnet validators
-			subnetIndexes := make([]int, 0)
+			subnetIndexes := make([]int, 0, len(validatorsTimes))
 			for idx, ev := range validatorsTimes {
 				if ev.eventType == startSubnetValidator {
 					subnetIndexes = append(subnetIndexes, idx)
@@ -527,7 +527,7 @@ func TestTimestampListGenerator(t *testing.T) {
 			}
 
 			// nil out non subnet validators
-			nonSubnetIndexes := make([]int, 0)
+			nonSubnetIndexes := make([]int, 0, len(validatorsTimes))
 			for idx, ev := range validatorsTimes {
 				if ev.eventType != startSubnetValidator {
 					nonSubnetIndexes = append(nonSubnetIndexes, idx)
@@ -612,6 +612,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		UptimeLockedCalculator: uptime.NewLockedCalculator(),
 		SybilProtectionEnabled: true,
 		Validators:             validators.NewManager(),
+		DynamicFeeConfig:       defaultDynamicFeeConfig,
 		MinValidatorStake:      defaultMinValidatorStake,
 		MaxValidatorStake:      defaultMaxValidatorStake,
 		MinDelegatorStake:      defaultMinDelegatorStake,
@@ -640,7 +641,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 	}
 
 	err := vm.Initialize(
-		context.Background(),
+		t.Context(),
 		ctx,
 		chainDB,
 		genesistest.NewBytes(t, genesistest.Config{
@@ -658,7 +659,7 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		return nil, ids.Empty, err
 	}
 
-	err = vm.SetState(context.Background(), snow.NormalOp)
+	err = vm.SetState(t.Context(), snow.NormalOp)
 	if err != nil {
 		return nil, ids.Empty, err
 	}
@@ -686,17 +687,17 @@ func buildVM(t *testing.T) (*VM, ids.ID, error) {
 		return nil, ids.Empty, err
 	}
 
-	blk, err := vm.Builder.BuildBlock(context.Background())
+	blk, err := vm.Builder.BuildBlock(t.Context())
 	if err != nil {
 		return nil, ids.Empty, err
 	}
-	if err := blk.Verify(context.Background()); err != nil {
+	if err := blk.Verify(t.Context()); err != nil {
 		return nil, ids.Empty, err
 	}
-	if err := blk.Accept(context.Background()); err != nil {
+	if err := blk.Accept(t.Context()); err != nil {
 		return nil, ids.Empty, err
 	}
-	if err := vm.SetPreference(context.Background(), vm.manager.LastAccepted()); err != nil {
+	if err := vm.SetPreference(t.Context(), vm.manager.LastAccepted()); err != nil {
 		return nil, ids.Empty, err
 	}
 
