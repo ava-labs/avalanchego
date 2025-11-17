@@ -253,7 +253,7 @@ func (vm *VMClient) Initialize(
 	return err
 }
 
-func getNetworkUpgrades(chainCtx *snow.Context) *vmpb.NetworkUpgrades {
+func getNetworkUpgrades(u upgrade.Config) *vmpb.NetworkUpgrades {
 	return &vmpb.NetworkUpgrades{
 		ApricotPhase_1Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase1Time),
 		ApricotPhase_2Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase2Time),
