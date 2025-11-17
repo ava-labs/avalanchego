@@ -4,15 +4,13 @@
 
 This checklist ists all the required steps when when adding a new network upgrade/fork to AvalancheGo. Note that this list is not exhaustive nor future-proof.
 
-**Example:** Adding upgrade "Ionosphere" after "Helicon"
-
 ---
 
 ## 1. Core Configuration Files
 
 ### [`upgrade/upgrade.go`](./upgrade.go)
 
-- [ ] Add new time field to `Config` struct (e.g., `IonoTime time.Time`)
+- [ ] Add new time field to `Config` struct
 - [ ] Add `UnscheduledActivationTime` activation time to all configs:
   - `Mainnet` config
   - `Fuji` config
