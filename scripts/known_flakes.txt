@@ -1,7 +1,6 @@
 TestChainIndexerWithChildren
 TestClientCancelWebsocket
 TestClientWebsocketLargeMessage
-TestGolangBindings
 TestMempoolEthTxsAppGossipHandling
 TestResumeSyncAccountsTrieInterrupted
 TestResyncNewRootAfterDeletes
