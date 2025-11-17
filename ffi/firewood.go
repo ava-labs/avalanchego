@@ -31,7 +31,6 @@ import (
 	"fmt"
 	"runtime"
 	"sync"
-	"time"
 )
 
 const RootLength = C.sizeof_HashKey
@@ -246,18 +245,14 @@ func (db *Database) Revision(root Hash) (*Revision, error) {
 	return rev, nil
 }
 
-// defaultCloseTimeout is the duration by which the [context.Context] passed to
-// [Database.Close] is limited. A minute is arbitrary but well above what is
-// reasonably required, and is chosen simply to avoid permanently blocking.
-var defaultCloseTimeout = time.Minute
-
 // Close releases the memory associated with the Database.
 //
-// This blocks until all outstanding keep-alive handles are disowned. That is,
-// until all Revisions and Proposals created from this Database are either
-// unreachable or one of [Proposal.Commit], [Proposal.Drop], or [Revision.Drop]
-// has been called on them. Unreachable objects will be automatically dropped
-// before Close returns, unless an alternate GC finalizer is set on them.
+// This blocks until all outstanding keep-alive handles are disowned or the
+// [context.Context] is cancelled. That is, until all Revisions and Proposals
+// created from this Database are either unreachable or one of
+// [Proposal.Commit], [Proposal.Drop], or [Revision.Drop] has been called on
+// them. Unreachable objects will be automatically dropped before Close returns,
+// unless an alternate GC finalizer is set on them.
 //
 // This is safe to call if the handle pointer is nil, in which case it does
 // nothing. The pointer will be set to nil after freeing to prevent double free.
@@ -276,12 +271,10 @@ func (db *Database) Close(ctx context.Context) error {
 		close(done)
 	}()
 
-	ctx, cancel := context.WithTimeout(ctx, defaultCloseTimeout)
-	defer cancel()
 	select {
 	case <-done:
 	case <-ctx.Done():
-		return ErrActiveKeepAliveHandles
+		return fmt.Errorf("%w: %w", ctx.Err(), ErrActiveKeepAliveHandles)
 	}
 
 	if err := getErrorFromVoidResult(C.fwd_close_db(db.handle)); err != nil {
