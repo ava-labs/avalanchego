@@ -22,7 +22,6 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
-	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block/blockmock"
@@ -289,10 +288,7 @@ func TestConvertNetworkUpgrades_AllFieldsHandled(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			wantConfig := upgrade.GetConfig(test.networkID)
-			networkUpgrades := getNetworkUpgrades(&snow.Context{
-				NetworkUpgrades: wantConfig,
-			})
-
+			networkUpgrades := getNetworkUpgrades(wantConfig)
 			gotConfig, err := convertNetworkUpgrades(networkUpgrades)
 			require.NoError(t, err)
 			require.Equal(t, wantConfig, gotConfig, "convertNetworkUpgrades did not return expected config. Update grpcutils! (convertNetworkUpgrades and vm_client.go)")

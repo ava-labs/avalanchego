@@ -30,6 +30,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/common/appsender"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/snow/validators/gvalidators"
+	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/resource"
@@ -183,7 +184,7 @@ func (vm *VMClient) Initialize(
 		zap.String("address", serverAddr),
 	)
 
-	networkUpgrades := getNetworkUpgrades(chainCtx)
+	networkUpgrades := getNetworkUpgrades(chainCtx.NetworkUpgrades)
 
 	resp, err := vm.client.Initialize(ctx, &vmpb.InitializeRequest{
 		NetworkId:       chainCtx.NetworkID,
@@ -255,24 +256,24 @@ func (vm *VMClient) Initialize(
 
 func getNetworkUpgrades(u upgrade.Config) *vmpb.NetworkUpgrades {
 	return &vmpb.NetworkUpgrades{
-		ApricotPhase_1Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase1Time),
-		ApricotPhase_2Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase2Time),
-		ApricotPhase_3Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase3Time),
-		ApricotPhase_4Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase4Time),
-		ApricotPhase_4MinPChainHeight: chainCtx.NetworkUpgrades.ApricotPhase4MinPChainHeight, // not passed through the RPC protocol
-		ApricotPhase_5Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase5Time),
-		ApricotPhasePre_6Time:         grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhasePre6Time),
-		ApricotPhase_6Time:            grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhase6Time),
-		ApricotPhasePost_6Time:        grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.ApricotPhasePost6Time),
-		BanffTime:                     grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.BanffTime),
-		CortinaTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.CortinaTime),
-		CortinaXChainStopVertexId:     chainCtx.NetworkUpgrades.CortinaXChainStopVertexID[:], // not passed through the RPC protocol
-		DurangoTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.DurangoTime),
-		EtnaTime:                      grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.EtnaTime),
-		FortunaTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.FortunaTime),
-		GraniteTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.GraniteTime),
-		GraniteEpochDuration:          durationpb.New(chainCtx.NetworkUpgrades.GraniteEpochDuration),
-		HeliconTime:                   grpcutils.TimestampFromTime(chainCtx.NetworkUpgrades.HeliconTime),
+		ApricotPhase_1Time:            grpcutils.TimestampFromTime(u.ApricotPhase1Time),
+		ApricotPhase_2Time:            grpcutils.TimestampFromTime(u.ApricotPhase2Time),
+		ApricotPhase_3Time:            grpcutils.TimestampFromTime(u.ApricotPhase3Time),
+		ApricotPhase_4Time:            grpcutils.TimestampFromTime(u.ApricotPhase4Time),
+		ApricotPhase_4MinPChainHeight: u.ApricotPhase4MinPChainHeight, // not passed through the RPC protocol
+		ApricotPhase_5Time:            grpcutils.TimestampFromTime(u.ApricotPhase5Time),
+		ApricotPhasePre_6Time:         grpcutils.TimestampFromTime(u.ApricotPhasePre6Time),
+		ApricotPhase_6Time:            grpcutils.TimestampFromTime(u.ApricotPhase6Time),
+		ApricotPhasePost_6Time:        grpcutils.TimestampFromTime(u.ApricotPhasePost6Time),
+		BanffTime:                     grpcutils.TimestampFromTime(u.BanffTime),
+		CortinaTime:                   grpcutils.TimestampFromTime(u.CortinaTime),
+		CortinaXChainStopVertexId:     u.CortinaXChainStopVertexID[:], // not passed through the RPC protocol
+		DurangoTime:                   grpcutils.TimestampFromTime(u.DurangoTime),
+		EtnaTime:                      grpcutils.TimestampFromTime(u.EtnaTime),
+		FortunaTime:                   grpcutils.TimestampFromTime(u.FortunaTime),
+		GraniteTime:                   grpcutils.TimestampFromTime(u.GraniteTime),
+		GraniteEpochDuration:          durationpb.New(u.GraniteEpochDuration),
+		HeliconTime:                   grpcutils.TimestampFromTime(u.HeliconTime),
 	}
 }
 
