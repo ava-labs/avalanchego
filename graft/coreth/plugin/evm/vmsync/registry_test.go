@@ -149,7 +149,7 @@ func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
 				}
 			},
 		}, {
-			name: "error returned and wrapped",
+			name: "error returned",
 			syncers: []syncerConfig{
 				{"Syncer1", errFoo},
 				{"Syncer2", nil},
@@ -332,19 +332,7 @@ func TestSyncerRegistry_ContextCancellationErrors(t *testing.T) {
 
 			startedWG := registerCancelAwareSyncers(t, registry, tt.numSyncers, tt.syncerTimeout)
 
-<<<<<<< HEAD
 			ctx, cancel := newTestContext(t, tt.wantErr, tt.timeout)
-=======
-			var (
-				ctx    context.Context
-				cancel context.CancelFunc
-			)
-			if tt.wantErr == context.DeadlineExceeded {
-				ctx, cancel = context.WithTimeout(t.Context(), tt.timeout)
-			} else {
-				ctx, cancel = context.WithCancel(t.Context())
-			}
->>>>>>> 3b38cf0708 (fix(vmsync): improve on remarks)
 			t.Cleanup(cancel)
 
 			doneCh := startSyncersAsync(registry, ctx, newTestClientSummary(t))
