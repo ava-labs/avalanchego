@@ -149,7 +149,7 @@ func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
 				}
 			},
 		}, {
-			name: "error returned",
+			name: "error returned and wrapped",
 			syncers: []syncerConfig{
 				{"Syncer1", errFoo},
 				{"Syncer2", nil},
@@ -181,6 +181,12 @@ func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
 			err := registry.RunSyncerTasks(ctx, newTestClientSummary(t))
 
 			require.ErrorIs(t, err, tt.expectedError)
+
+			// Verify error wrapping for real errors (not cancellation).
+			if tt.expectedError != nil {
+				require.NotEqual(t, tt.expectedError, err, "error should be wrapped")
+				require.Contains(t, err.Error(), "Syncer1 failed", "error message should include syncer name")
+			}
 
 			// Use custom assertion function for each test case.
 			tt.assertState(t, mockSyncers)
