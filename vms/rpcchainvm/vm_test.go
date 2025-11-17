@@ -273,16 +273,16 @@ func TestConvertNetworkUpgrades_AllFieldsHandled(t *testing.T) {
 			networkID: constants.MainnetID,
 		},
 		{
-			name:      "Testnet",
-			networkID: constants.TestnetID,
-		},
-		{
 			name:      "Fuji",
 			networkID: constants.FujiID,
 		},
 		{
 			name:      "Local",
 			networkID: constants.LocalID,
+		},
+		{
+			name:      "UnitTest",
+			networkID: constants.UnitTestID,
 		},
 	}
 
