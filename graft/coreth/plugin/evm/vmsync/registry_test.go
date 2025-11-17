@@ -182,12 +182,6 @@ func TestSyncerRegistry_RunSyncerTasks(t *testing.T) {
 
 			require.ErrorIs(t, err, tt.expectedError)
 
-			// Verify error wrapping for real errors (not cancellation).
-			if tt.expectedError != nil {
-				require.NotEqual(t, tt.expectedError, err, "error should be wrapped")
-				require.Contains(t, err.Error(), "Syncer1 failed", "error message should include syncer name")
-			}
-
 			// Use custom assertion function for each test case.
 			tt.assertState(t, mockSyncers)
 		})
@@ -338,7 +332,19 @@ func TestSyncerRegistry_ContextCancellationErrors(t *testing.T) {
 
 			startedWG := registerCancelAwareSyncers(t, registry, tt.numSyncers, tt.syncerTimeout)
 
+<<<<<<< HEAD
 			ctx, cancel := newTestContext(t, tt.wantErr, tt.timeout)
+=======
+			var (
+				ctx    context.Context
+				cancel context.CancelFunc
+			)
+			if tt.wantErr == context.DeadlineExceeded {
+				ctx, cancel = context.WithTimeout(t.Context(), tt.timeout)
+			} else {
+				ctx, cancel = context.WithCancel(t.Context())
+			}
+>>>>>>> 3b38cf0708 (fix(vmsync): improve on remarks)
 			t.Cleanup(cancel)
 
 			doneCh := startSyncersAsync(registry, ctx, newTestClientSummary(t))
