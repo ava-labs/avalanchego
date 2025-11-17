@@ -140,12 +140,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "arc-swap"
-version = "1.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
-
-[[package]]
 name = "arrayvec"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1143,7 +1137,6 @@ name = "firewood-storage"
 version = "0.0.14"
 dependencies = [
  "aquamarine",
- "arc-swap",
  "bitfield",
  "bitflags 2.10.0",
  "bumpalo",

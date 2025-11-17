@@ -32,7 +32,6 @@ sha2.workspace = true
 smallvec.workspace = true
 thiserror.workspace = true
 # Regular dependencies
-arc-swap = "1.7.1"
 bitfield = "0.19.3"
 bitflags = "2.10.0"
 derive-where = "1.6.0"
