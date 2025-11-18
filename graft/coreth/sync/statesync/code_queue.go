@@ -144,6 +144,12 @@ func (q *CodeQueue) AddCode(ctx context.Context, codeHashes []common.Hash) error
 	}
 
 	for _, h := range codeHashes {
+		// Check context cancellation before attempting to send to avoid blocking
+		// on a full channel when shutdown occurs.
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		select {
 		case q.in <- h: // guaranteed to be open or nil, but never closed
 		case <-q.quit:

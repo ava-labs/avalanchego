@@ -78,6 +78,11 @@ func (s *BlockSyncer) Sync(ctx context.Context) error {
 	// first, check for blocks already available on disk so we don't
 	// request them from peers.
 	for blocksToFetch > 0 {
+		// Check for context cancellation before checking each block.
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		blk := rawdb.ReadBlock(s.db, nextHash, nextHeight)
 		if blk == nil {
 			// block was not found
