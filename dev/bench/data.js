@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1763393286723,
+  "lastUpdate": 1763469689223,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -1902,6 +1902,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
             "value": 41.79,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "yacovm",
+            "username": "yacovm",
+            "email": "yacovm@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "2a10c52709cf1384b4b1a39955f324c5ff11e0d9",
+          "message": "Remove windows files (#4522)\n\nSigned-off-by: Yacov Manevich <yacov.manevich@avalabs.org>\nCo-authored-by: Stephen Buttolph <stephen@avalabs.org>",
+          "timestamp": "2025-11-17T23:45:48Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/2a10c52709cf1384b4b1a39955f324c5ff11e0d9"
+        },
+        "date": 1763469688753,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
+            "value": 72.1,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
