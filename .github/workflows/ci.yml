@@ -22,7 +22,6 @@ jobs:
           cache-dependency-path: |
             go.sum
             tools/go.sum
-            tools/legacy-golangci-lint.sum
       - name: Run all lint checks
         run: ./scripts/run_task.sh lint-all-ci
       - name: Check go.mod and go.sum are up-to-date

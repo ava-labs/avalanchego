@@ -73,8 +73,6 @@ tasks:
       - task: check-clean-branch
       - cmd: cd tools && go mod tidy
       - task: check-clean-branch
-      - cmd: cd tools && go mod tidy -modfile=legacy-golangci-lint.mod
-      - task: check-clean-branch
 
   coverage:
     desc: Display test coverage statistics from coverage.out file
@@ -125,6 +123,12 @@ tasks:
       - task: check-generate-codec
       - task: check-generate-mocks
       - task: check-generate-rlp
+  
+  lint-fix:
+    desc: Run golangci-lint with auto-fix where possible
+    # TODO(alarso16): Create a script to run the avalanchego linter as well.
+    # See https://github.com/ava-labs/coreth/issues/1374
+    cmd: go tool -modfile=tools/go.mod golangci-lint run --config .golangci.yml --fix
 
   setup-contracts:
     desc: Set up contracts by compiling Solidity contracts and generating Go bindings
