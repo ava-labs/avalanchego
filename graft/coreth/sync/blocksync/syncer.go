@@ -94,6 +94,11 @@ func (s *BlockSyncer) Sync(ctx context.Context) error {
 	// them to disk.
 	batch := s.db.NewBatch()
 	for fetched := uint64(0); fetched < blocksToFetch && (nextHash != common.Hash{}); {
+		// Check for context cancellation before making network requests.
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		log.Info("fetching blocks from peer", "fetched", fetched, "total", blocksToFetch)
 		blocks, err := s.client.GetBlocks(ctx, nextHash, nextHeight, blocksPerRequest)
 		if err != nil {
