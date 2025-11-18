@@ -1,9 +1,6 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-// Package ffi provides a Go wrapper around the [Firewood] database.
-//
-// [Firewood]: https://github.com/ava-labs/firewood
 package ffi
 
 // #include <stdlib.h>
@@ -29,6 +26,10 @@ var errDroppedProposal = errors.New("proposal already dropped")
 // when the Proposal is garbage collected, but relying on finalizers is not
 // recommended. Failing to commit or drop a proposal before the database is
 // closed will cause it to block or fail.
+//
+// All operations on a Proposal are thread-safe with respect to each other,
+// except for [Proposal.Commit] and [Proposal.Drop], which are not safe to
+// call concurrently with any other operations.
 type Proposal struct {
 	// handle is an opaque pointer to the proposal within Firewood. It should be
 	// passed to the C FFI functions that operate on proposals
@@ -49,14 +50,12 @@ type Proposal struct {
 }
 
 // Root retrieves the root hash of the proposal.
-// If the proposal is empty (i.e. no keys in database),
-// it returns nil, nil.
 func (p *Proposal) Root() (Hash, error) {
 	return p.root, nil
 }
 
 // Get retrieves the value for the given key.
-// If the key does not exist, it returns (nil, nil).
+// If the key does not exist, it returns nil.
 func (p *Proposal) Get(key []byte) ([]byte, error) {
 	if p.handle == nil {
 		return nil, errDroppedProposal
@@ -69,7 +68,7 @@ func (p *Proposal) Get(key []byte) ([]byte, error) {
 }
 
 // Iter creates and iterator starting from the provided key on proposal.
-// pass empty slice to start from beginning
+// pass empty slice to start from beginning.
 func (p *Proposal) Iter(key []byte) (*Iterator, error) {
 	if p.handle == nil {
 		return nil, errDBClosed
@@ -85,6 +84,8 @@ func (p *Proposal) Iter(key []byte) (*Iterator, error) {
 
 // Propose is equivalent to [Database.Propose] except that the new proposal is
 // based on `p`.
+// The returned proposal cannot be committed until the parent proposal `p` has been
+// committed. Additionally, it must be committed or dropped before the [Database] is closed.
 //
 // Value Semantics:
 //   - nil value (vals[i] == nil): Performs a DeleteRange operation using the key as a prefix
@@ -107,7 +108,7 @@ func (p *Proposal) Propose(keys, vals [][]byte) (*Proposal, error) {
 
 // Commit commits the proposal and returns any errors.
 //
-// The proposal handle is no longer valid after this call, but the root
+// The underlying data is no longer available after this call, but the root
 // hash can still be retrieved using [Proposal.Root].
 func (p *Proposal) Commit() error {
 	return p.keepAliveHandle.disown(true /* evenOnError */, func() error {
@@ -117,17 +118,18 @@ func (p *Proposal) Commit() error {
 
 		_, err := getHashKeyFromHashResult(C.fwd_commit_proposal(p.handle))
 
+		// Prevent double free
 		p.handle = nil
 
 		return err
 	})
 }
 
-// Drop releases the memory associated with the Proposal.
+// Drop releases the memory associated with the Proposal. All child proposals
+// created from this proposal can no longer be committed.
 //
-// This is safe to call if the pointer is nil, in which case it does nothing.
-//
-// The pointer will be set to nil after freeing to prevent double free.
+// This is safe to call if the memory has already been released, in which case
+// it does nothing.
 func (p *Proposal) Drop() error {
 	return p.keepAliveHandle.disown(false /* evenOnError */, func() error {
 		if p.handle == nil {
@@ -138,6 +140,7 @@ func (p *Proposal) Drop() error {
 			return fmt.Errorf("%w: %w", errFreeingValue, err)
 		}
 
+		// Prevent double free
 		p.handle = nil
 
 		return nil

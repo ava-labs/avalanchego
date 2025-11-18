@@ -49,6 +49,7 @@ func (Gatherer) Gather() ([]*dto.MetricFamily, error) {
 // This function only needs to be called once.
 // An error is returned if this method is called a second time, or if it is
 // called after StartMetricsWithExporter.
+// This is best used in conjunction with the [Gatherer] type to collect metrics.
 func StartMetrics() error {
 	return getErrorFromVoidResult(C.fwd_start_metrics())
 }

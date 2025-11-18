@@ -1,9 +1,6 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-// Package ffi provides a Go wrapper around the [Firewood] database.
-//
-// [Firewood]: https://github.com/ava-labs/firewood
 package ffi
 
 // #include <stdlib.h>
@@ -19,11 +16,11 @@ import (
 )
 
 var (
+	ErrDroppedRevision  = errors.New("revision already dropped")
 	errRevisionNotFound = errors.New("revision not found")
-	errDroppedRevision  = errors.New("revision already dropped")
 )
 
-// Revision is an immutable view over the database at a specific root hash.
+// Revision is an immutable view over the state at a specific root hash.
 // Instances are created via [Database.Revision], provide read-only access to
 // the revision, and must be released with [Revision.Drop] when no longer needed.
 //
@@ -31,6 +28,13 @@ var (
 // is set on each Revision to ensure that Drop is called when the Revision is
 // garbage collected, but relying on finalizers is not recommended. Failing to
 // drop a revision before the database is closed will cause it to block or fail.
+//
+// Additionally, Revisions should be dropped when no longer needed to allow the
+// database to free any associated resources. Firewood ensures that the state
+// associated with a Revision is retained until all Revisions based on that state
+// have been dropped.
+//
+// All operations on a Revision are thread-safe with respect to each other.
 type Revision struct {
 	// handle is an opaque pointer to the revision within Firewood. It should be
 	// passed to the C FFI functions that operate on revisions
@@ -51,12 +55,12 @@ type Revision struct {
 }
 
 // Get reads the value stored at the provided key within the revision.
+// If the key does not exist, it returns nil.
 //
-// It returns errDroppedRevision if Drop has already been called and the underlying
-// handle is no longer available.
+// It returns ErrDroppedRevision if Drop has already been called.
 func (r *Revision) Get(key []byte) ([]byte, error) {
 	if r.handle == nil {
-		return nil, errDroppedRevision
+		return nil, ErrDroppedRevision
 	}
 
 	var pinner runtime.Pinner
@@ -70,9 +74,10 @@ func (r *Revision) Get(key []byte) ([]byte, error) {
 
 // Iter creates an iterator starting from the provided key on revision.
 // pass empty slice to start from beginning
+// It returns ErrDroppedRevision if Drop has already been called.
 func (r *Revision) Iter(key []byte) (*Iterator, error) {
 	if r.handle == nil {
-		return nil, errDroppedRevision
+		return nil, ErrDroppedRevision
 	}
 
 	var pinner runtime.Pinner
@@ -101,6 +106,7 @@ func (r *Revision) Drop() error {
 	})
 }
 
+// Root returns the root hash of the revision.
 func (r *Revision) Root() Hash {
 	return r.root
 }

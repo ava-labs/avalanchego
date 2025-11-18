@@ -33,18 +33,35 @@ import (
 	"sync"
 )
 
+// RootLength is the hash length for all Firewood hashes.
 const RootLength = C.sizeof_HashKey
 
+// Hash is the type used for all firewood hashes.
 type Hash [RootLength]byte
 
 var (
-	EmptyRoot                 Hash
-	errDBClosed               = errors.New("firewood database already closed")
+	// EmptyRoot is the zero value for [Hash]
+	EmptyRoot Hash
+	// ErrActiveKeepAliveHandles is returned when attempting to close a database with unfreed memory.
 	ErrActiveKeepAliveHandles = errors.New("cannot close database with active keep-alive handles")
+
+	errDBClosed = errors.New("firewood database already closed")
 )
 
-// A Database is a handle to a Firewood database.
-// It is not safe to call these methods with a nil handle.
+// Database is an FFI wrapper for the Rust Firewood database.
+// All functions rely on CGO to call into the underlying Rust implementation.
+// Instances are created via [New] and must be closed with [Database.Close]
+// when no longer needed.
+//
+// A Database can have outstanding [Revision] and [Proposal], which
+// access the database's memory. These must be released before closing the
+// database. See [Database.Close] for more details.
+//
+// Database supports two hashing modes: Firewood hashing and Ethereum-compatible
+// hashing. Ethereum-compatible hashing is distributed, but you can use the more efficient
+// Firewood hashing by compiling from source. See the Firewood repository for more details.
+//
+// For concurrent use cases, see each type and method's documentation for thread-safety.
 type Database struct {
 	// handle is returned and accepted by cgo functions. It MUST be treated as
 	// an opaque value without special meaning.
@@ -53,17 +70,32 @@ type Database struct {
 	outstandingHandles sync.WaitGroup
 }
 
-// Config configures the opening of a [Database].
+// Config defines the configuration parameters used when opening a [Database].
 type Config struct {
-	Truncate             bool
-	NodeCacheEntries     uint
+	// Truncate indicates whether to clear the database file if it already exists.
+	Truncate bool
+	// NodeCacheEntries is the number of entries in the cache.
+	// Must be non-zero.
+	NodeCacheEntries uint
+	// FreeListCacheEntries is the number of entries in the freelist cache.
+	// Must be non-zero.
 	FreeListCacheEntries uint
-	Revisions            uint
-	ReadCacheStrategy    CacheStrategy
-	RootStoreDir         string
+	// Revisions is the maximum number of historical revisions to keep in memory.
+	// If RootStoreDir is set, then any revisions removed from memory will still be kept on disk.
+	// Otherwise, any revisions removed from memory will no longer be kept on disk.
+	// Must be >= 2.
+	Revisions uint
+	// ReadCacheStrategy is the caching strategy used for the node cache.
+	ReadCacheStrategy CacheStrategy
+	// RootStoreDir defines a path to store all historical roots on disk.
+	RootStoreDir string
 }
 
-// DefaultConfig returns a sensible default Config.
+// DefaultConfig returns a [*Config] with sensible defaults:
+//   - NodeCacheEntries:     1_000_000
+//   - FreeListCacheEntries: 40_000
+//   - Revisions:            100
+//   - ReadCacheStrategy:    OnlyCacheWrites
 func DefaultConfig() *Config {
 	return &Config{
 		NodeCacheEntries:     1_000_000,
@@ -77,8 +109,11 @@ func DefaultConfig() *Config {
 type CacheStrategy uint8
 
 const (
+	// OnlyCacheWrites caches only writes.
 	OnlyCacheWrites CacheStrategy = iota
+	// CacheBranchReads caches intermediate reads and writes.
 	CacheBranchReads
+	// CacheAllReads caches all reads and writes.
 	CacheAllReads
 
 	// invalidCacheStrategy MUST be the final value in the iota block to make it
@@ -87,7 +122,13 @@ const (
 )
 
 // New opens or creates a new Firewood database with the given configuration. If
-// a nil `Config` is provided [DefaultConfig] will be used instead.
+// a nil config is provided, [DefaultConfig] will be used instead.
+// The database file will be created at the provided file path if it does not
+// already exist.
+//
+// It is the caller's responsibility to call [Database.Close] when the database
+// is no longer needed. No other [Database] in this process should be opened with
+// the same file path until the database is closed.
 func New(filePath string, conf *Config) (*Database, error) {
 	if conf == nil {
 		conf = DefaultConfig()
@@ -122,7 +163,8 @@ func New(filePath string, conf *Config) (*Database, error) {
 }
 
 // Update applies a batch of updates to the database, returning the hash of the
-// root node after the batch is applied.
+// root node after the batch is applied. This is equilalent to creating a proposal
+// with [Database.Propose], then committing it with [Proposal.Commit].
 //
 // Value Semantics:
 //   - nil value (vals[i] == nil): Performs a DeleteRange operation using the key as a prefix
@@ -131,6 +173,9 @@ func New(filePath string, conf *Config) (*Database, error) {
 //
 // WARNING: Calling Update with an empty key and nil value will delete the entire database
 // due to prefix deletion semantics.
+//
+// This function is not thread-safe with respect to other calls that reference the latest
+// state of the database, nor any calls that mutate the state of the database.
 func (db *Database) Update(keys, vals [][]byte) (Hash, error) {
 	if db.handle == nil {
 		return EmptyRoot, errDBClosed
@@ -148,13 +193,16 @@ func (db *Database) Update(keys, vals [][]byte) (Hash, error) {
 }
 
 // Propose creates a new proposal with the given keys and values. The proposal
-// is not committed until [Proposal.Commit] is called. See [Database.Close] re
-// freeing proposals.
+// is not committed until [Proposal.Commit] is called. See [Database.Close] regarding
+// freeing proposals. All proposals should be freed before closing the database.
 //
 // Value Semantics:
 //   - nil value (vals[i] == nil): Performs a DeleteRange operation using the key as a prefix
 //   - empty slice (vals[i] != nil && len(vals[i]) == 0): Inserts/updates the key with an empty value
 //   - non-empty value: Inserts/updates the key with the provided value
+//
+// This function is not thread-safe with respect to other calls that reference the latest
+// state of the database, nor any calls that mutate the latest state of the database.
 func (db *Database) Propose(keys, vals [][]byte) (*Proposal, error) {
 	if db.handle == nil {
 		return nil, errDBClosed
@@ -170,8 +218,11 @@ func (db *Database) Propose(keys, vals [][]byte) (*Proposal, error) {
 	return getProposalFromProposalResult(C.fwd_propose_on_db(db.handle, kvp), &db.outstandingHandles)
 }
 
-// Get retrieves the value for the given key. It always returns a nil error.
-// If the key is not found, the return value will be (nil, nil).
+// Get retrieves the value for the given key from the most recent revision.
+// If the key is not found, the return value will be nil.
+//
+// This function is thread-safe with all other read operations, but is not thread-safe
+// with respect to other calls that mutate the latest state of the database.
 func (db *Database) Get(key []byte) ([]byte, error) {
 	if db.handle == nil {
 		return nil, errDBClosed
@@ -192,7 +243,12 @@ func (db *Database) Get(key []byte) ([]byte, error) {
 
 // GetFromRoot retrieves the value for the given key from a specific root hash.
 // If the root is not found, it returns an error.
-// If key is not found, it returns (nil, nil).
+// If key is not found, it returns nil.
+//
+// GetFromRoot caches a handle to the revision associated with the provided root hash, allowing
+// subsequent calls with the same root to be more efficient.
+//
+// This function is thread-safe with all other operations.
 func (db *Database) GetFromRoot(root Hash, key []byte) ([]byte, error) {
 	if db.handle == nil {
 		return nil, errDBClosed
@@ -214,7 +270,10 @@ func (db *Database) GetFromRoot(root Hash, key []byte) ([]byte, error) {
 }
 
 // Root returns the current root hash of the trie.
-// Empty trie must return common.EmptyRoot.
+// With Firewood hashing, the empty trie must return [EmptyRoot].
+//
+// This function is thread-safe with all other operations, except those that mutate
+// the latest state of the database.
 func (db *Database) Root() (Hash, error) {
 	if db.handle == nil {
 		return EmptyRoot, errDBClosed
@@ -223,6 +282,12 @@ func (db *Database) Root() (Hash, error) {
 	return getHashKeyFromHashResult(C.fwd_root_hash(db.handle))
 }
 
+// LatestRevision returns a [Revision] representing the latest state of the database.
+// If the latest revision has root [EmptyRoot], it returns an error. The [Revision] must
+// be dropped prior to closing the database.
+//
+// This function is thread-safe with all other operations, except those that mutate
+// the latest state of the database.
 func (db *Database) LatestRevision() (*Revision, error) {
 	root, err := db.Root()
 	if err != nil {
@@ -235,6 +300,10 @@ func (db *Database) LatestRevision() (*Revision, error) {
 }
 
 // Revision returns a historical revision of the database.
+// If the provided root does not exist (or is the [EmptyRoot]), it returns an error.
+// The [Revision] must be dropped prior to closing the database.
+//
+// This function is thread-safe with all other operations.
 func (db *Database) Revision(root Hash) (*Revision, error) {
 	rev, err := getRevisionFromResult(C.fwd_get_revision(
 		db.handle,
@@ -256,9 +325,8 @@ func (db *Database) Revision(root Hash) (*Revision, error) {
 // them. Unreachable objects will be automatically dropped before Close returns,
 // unless an alternate GC finalizer is set on them.
 //
-// This is safe to call if the handle pointer is nil, in which case it does
-// nothing. The pointer will be set to nil after freeing to prevent double free.
-// However, it is not safe to call this method concurrently from multiple
+// This is safe to call multiple times; subsequent calls after the first will do
+// nothing. However, it is not safe to call this method concurrently from multiple
 // goroutines.
 func (db *Database) Close(ctx context.Context) error {
 	if db.handle == nil {
