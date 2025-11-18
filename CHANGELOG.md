@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.0.15] - 2025-11-18
+
+### 🚀 Features
+
+- Merge key-value range into trie ([#1427](https://github.com/ava-labs/firewood/pull/1427))
+- *(storage)* Replace `ArcSwap` with `Mutex` for better performance ([#1447](https://github.com/ava-labs/firewood/pull/1447))
+- *(ffi)* [**breaking**] Remove unused kvBackend interface ([#1448](https://github.com/ava-labs/firewood/pull/1448))
+- *(ffi)* Add keepalive struct to own waitgroup logic ([#1437](https://github.com/ava-labs/firewood/pull/1437))
+- Remove the last bits of arc-swap ([#1464](https://github.com/ava-labs/firewood/pull/1464))
+- *(ffi)* Fill in ffi methods for range proofs ([#1429](https://github.com/ava-labs/firewood/pull/1429))
+- *(firewood/ffi)* Add `FjallStore` ([#1395](https://github.com/ava-labs/firewood/pull/1395))
+
+### 🚜 Refactor
+
+- *(rootstore)* Replace RootStoreError with boxed error ([#1446](https://github.com/ava-labs/firewood/pull/1446))
+- Remove default 1-minute timeout on `Database.Close()` and set 1-sec in tests ([#1458](https://github.com/ava-labs/firewood/pull/1458))
+
+### 📚 Documentation
+
+- Add agent instructions ([#1445](https://github.com/ava-labs/firewood/pull/1445))
+- *(firewood)* Clean up commit steps ([#1453](https://github.com/ava-labs/firewood/pull/1453))
+- Merge code review process into CONTRIBUTING.md ([#1397](https://github.com/ava-labs/firewood/pull/1397))
+- Add comprehensive metrics documentation in METRICS.md ([#1402](https://github.com/ava-labs/firewood/pull/1402))
+
+### ⚡ Performance
+
+- *(ffi)* [**breaking**] Use fixed size Hash ([#1449](https://github.com/ava-labs/firewood/pull/1449))
+
+### 🧪 Testing
+
+- Fix `giant_node` test ([#1465](https://github.com/ava-labs/firewood/pull/1465))
+
+### ⚙️ Miscellaneous Tasks
+
+- *(ci)* Re-enable ffi-nix job ([#1450](https://github.com/ava-labs/firewood/pull/1450))
+- Relegate build equivalent check to post-merge job ([#1469](https://github.com/ava-labs/firewood/pull/1469))
+
 ## [0.0.14] - 2025-11-07
 
 ### 🚀 Features

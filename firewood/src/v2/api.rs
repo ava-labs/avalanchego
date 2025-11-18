@@ -479,7 +479,6 @@ mod tests {
 
     #[test]
     #[cfg(feature = "ethhash")]
-    #[expect(deprecated, reason = "transitive dependency on generic-array")]
     fn test_ethhash_compat_default_root_hash_equals_empty_rlp_hash() {
         use sha3::Digest as _;
 

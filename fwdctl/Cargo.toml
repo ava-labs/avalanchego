@@ -33,7 +33,7 @@ log.workspace = true
 nonzero_ext.workspace = true
 # Regular dependencies
 csv = "1.4.0"
-indicatif = "0.18.2"
+indicatif = "0.18.3"
 askama = "0.14.0"
 num-format = "0.4.4"
 

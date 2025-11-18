@@ -114,7 +114,6 @@ impl<T: Hashable> Preimage for T {
             if is_account {
                 // we are a leaf that is at depth 32
                 match self.value_digest() {
-                    #[expect(deprecated, reason = "transitive dependency on generic-array")]
                     Some(ValueDigest::Value(bytes)) => {
                         let new_hash = Keccak256::digest(rlp::NULL_RLP).as_slice().to_vec();
                         let bytes_mut = BytesMut::from(bytes);
@@ -225,7 +224,6 @@ impl<T: Hashable> Preimage for T {
                 final_bytes.append(&&*nibbles_to_eth_compact(partial_path, is_account));
                 // if the RLP is short enough, we can use it as-is, otherwise we hash it
                 // to make the maximum length 32 bytes
-                #[expect(deprecated, reason = "transitive dependency on generic-array")]
                 if updated_bytes.len() > 31 && !is_account {
                     let hashed_bytes = Keccak256::digest(updated_bytes);
                     final_bytes.append(&hashed_bytes.as_slice());

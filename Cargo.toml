@@ -13,7 +13,7 @@ resolver = "2"
 [workspace.package]
 # NOTE: when bumping to 0.1.0, this will be removed and each crate will have its
 # version set independently.
-version = "0.0.14"
+version = "0.0.15"
 edition = "2024"
 license-file = "LICENSE.md"
 homepage = "https://avalabs.org"
@@ -56,17 +56,17 @@ cast_possible_truncation = "allow"
 
 [workspace.dependencies]
 # workspace local packages
-firewood = { path = "firewood", version = "0.0.14" }
-firewood-macros = { path = "firewood-macros", version = "0.0.14" }
-firewood-storage = { path = "storage", version = "0.0.14" }
-firewood-ffi = { path = "ffi", version = "0.0.14" }
-firewood-triehash = { path = "triehash", version = "0.0.14" }
+firewood = { path = "firewood", version = "0.0.15" }
+firewood-macros = { path = "firewood-macros", version = "0.0.15" }
+firewood-storage = { path = "storage", version = "0.0.15" }
+firewood-ffi = { path = "ffi", version = "0.0.15" }
+firewood-triehash = { path = "triehash", version = "0.0.15" }
 
 # common dependencies
 aquamarine = "0.6.0"
 bytemuck = "1.24.0"
 bytemuck_derive = "1.10.2"
-clap = { version = "4.5.51", features = ["derive"] }
+clap = { version = "4.5.52", features = ["derive"] }
 coarsetime = "0.1.36"
 env_logger = "0.11.8"
 fastrace = "0.7.14"

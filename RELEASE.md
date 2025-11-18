@@ -20,9 +20,9 @@ Before making changes, create a new branch (if not already on one):
 
 ```console
 $ git fetch
-$ git switch -c release/v0.0.15 origin/main
-branch 'release/v0.0.15' set up to track 'origin/main'.
-Switched to a new branch 'release/v0.0.15'
+$ git switch -c release/v0.0.16 origin/main
+branch 'release/v0.0.16' set up to track 'origin/main'.
+Switched to a new branch 'release/v0.0.16'
 ```
 
 If already on a new branch, ensure `HEAD` is the same as the remote's `main`.
@@ -75,7 +75,7 @@ table to define the version for all subpackages.
 
 ```toml
 [workspace.package]
-version = "0.0.15"
+version = "0.0.16"
 ```
 
 Each package inherits this version by setting `package.version.workspace = true`.
@@ -99,7 +99,7 @@ table. E.g.,:
 ```toml
 [workspace.dependencies]
 # workspace local packages
-firewood = { path = "firewood", version = "0.0.15" }
+firewood = { path = "firewood", version = "0.0.16" }
 ```
 
 This allows packages within the workspace to inherit the dependency,
@@ -130,7 +130,7 @@ is correct and reflects the new package versions.
 To build the changelog, see git-cliff.org. Short version:
 
 ```sh
-git cliff --tag v0.0.15 -o CHANGELOG.md
+git cliff --tag v0.0.16 -o CHANGELOG.md
 ```
 
 ## Commit
@@ -160,11 +160,11 @@ To trigger a release, push a tag to the main branch matching the new version,
 # be sure to switch back to the main branch before tagging
 git checkout main
 git pull --prune
-git tag -s -a v0.0.15 -m 'Release v0.0.15'
-git push origin v0.0.15
+git tag -s -a v0.0.16 -m 'Release v0.0.16'
+git push origin v0.0.16
 ```
 
-for `v0.0.15` for the merged version change. The CI will automatically publish a
+for `v0.0.16` for the merged version change. The CI will automatically publish a
 draft release which consists of release notes and changes (see
 [.github/workflows/release.yaml](.github/workflows/release.yaml)).
 

@@ -32,16 +32,16 @@ sha2.workspace = true
 smallvec.workspace = true
 thiserror.workspace = true
 # Regular dependencies
-bitfield = "0.19.3"
+bitfield = "0.19.4"
 bitflags = "2.10.0"
 derive-where = "1.6.0"
 enum-as-inner = "0.6.1"
-indicatif = "0.18.2"
+indicatif = "0.18.3"
 lru = "0.16.2"
 semver = "1.0.27"
 triomphe = "0.1.15"
 # Optional dependencies
-bytes = { version = "1.10.1", optional = true }
+bytes = { version = "1.11.0", optional = true }
 io-uring = { version = "0.7.11", optional = true }
 log = { version = "0.4.28", optional = true }
 rlp = { version = "0.6.1", optional = true }

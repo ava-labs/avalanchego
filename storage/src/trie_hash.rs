@@ -3,7 +3,6 @@
 
 use crate::node::ExtendableBytes;
 use crate::node::branch::Serializable;
-#[expect(deprecated, reason = "transitive dependency on generic-array")]
 use sha2::digest::generic_array::GenericArray;
 use sha2::digest::typenum;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -90,7 +89,6 @@ impl TryFrom<&[u8]> for TrieHash {
     }
 }
 
-#[expect(deprecated, reason = "transitive dependency on generic-array")]
 impl From<GenericArray<u8, typenum::U32>> for TrieHash {
     fn from(value: GenericArray<u8, typenum::U32>) -> Self {
         TrieHash(value.into())
