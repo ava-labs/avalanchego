@@ -130,6 +130,15 @@ impl<T: Ord> Ord for BorrowedSlice<'_, T> {
     }
 }
 
+impl<'a, T> IntoIterator for BorrowedSlice<'a, T> {
+    type Item = &'a T;
+    type IntoIter = std::slice::Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter()
+    }
+}
+
 impl fmt::Display for BorrowedBytes<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let precision = f.precision().unwrap_or(64);

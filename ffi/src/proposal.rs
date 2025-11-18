@@ -1,9 +1,7 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use firewood::v2::api::{self, BoxKeyValueIter, DbView, HashKey, Proposal as _};
-
-use crate::value::KeyValuePair;
+use firewood::v2::api::{self, BoxKeyValueIter, DbView, HashKey, IntoBatchIter, Proposal as _};
 
 use crate::iterator::CreateIteratorResult;
 use metrics::counter;
@@ -115,6 +113,30 @@ pub struct CreateProposalResult<'db> {
     pub start_time: coarsetime::Instant,
 }
 
+impl<'db> CreateProposalResult<'db> {
+    pub(crate) fn new(
+        handle: &'db crate::DatabaseHandle,
+        f: impl FnOnce() -> Result<firewood::db::Proposal<'db>, api::Error>,
+    ) -> Result<Self, api::Error> {
+        let start_time = coarsetime::Instant::now();
+        let proposal = f()?;
+        let propose_time = start_time.elapsed();
+        counter!("firewood.ffi.propose_ms").increment(propose_time.as_millis());
+        counter!("firewood.ffi.propose").increment(1);
+
+        let hash_key = proposal.root_hash()?;
+
+        Ok(CreateProposalResult {
+            handle: ProposalHandle {
+                hash_key,
+                proposal,
+                handle,
+            },
+            start_time,
+        })
+    }
+}
+
 /// A trait that abstracts over database handles and proposal handles for creating proposals.
 ///
 /// This trait allows functions to work with both [`DatabaseHandle`] and [`ProposalHandle`]
@@ -140,9 +162,9 @@ pub trait CView<'db> {
     ///
     /// This function will return a database error if the proposal could not be
     /// created.
-    fn create_proposal<'kvp>(
+    fn create_proposal(
         self,
-        values: impl AsRef<[KeyValuePair<'kvp>]> + 'kvp,
+        values: impl IntoBatchIter,
     ) -> Result<firewood::db::Proposal<'db>, api::Error>;
 
     /// Create a [`ProposalHandle`] from the values and return it with timing
@@ -152,31 +174,15 @@ pub trait CView<'db> {
     ///
     /// This function will return a database error if the proposal could not be
     /// created or if the proposal is empty.
-    fn create_proposal_handle<'kvp>(
+    fn create_proposal_handle(
         self,
-        values: impl AsRef<[KeyValuePair<'kvp>]> + 'kvp,
+        values: impl IntoBatchIter,
     ) -> Result<CreateProposalResult<'db>, api::Error>
     where
         Self: Sized,
     {
         let handle = self.handle();
-
-        let start_time = coarsetime::Instant::now();
-        let proposal = self.create_proposal(values)?;
-        let propose_time = start_time.elapsed();
-        counter!("firewood.ffi.propose_ms").increment(propose_time.as_millis());
-        counter!("firewood.ffi.propose").increment(1);
-
-        let hash_key = proposal.root_hash()?;
-
-        Ok(CreateProposalResult {
-            handle: ProposalHandle {
-                hash_key,
-                proposal,
-                handle,
-            },
-            start_time,
-        })
+        CreateProposalResult::new(handle, || self.create_proposal(values))
     }
 }
 
@@ -185,10 +191,10 @@ impl<'db> CView<'db> for &ProposalHandle<'db> {
         self.handle
     }
 
-    fn create_proposal<'kvp>(
+    fn create_proposal(
         self,
-        values: impl AsRef<[KeyValuePair<'kvp>]> + 'kvp,
+        values: impl IntoBatchIter,
     ) -> Result<firewood::db::Proposal<'db>, api::Error> {
-        self.proposal.propose(values.as_ref())
+        self.proposal.propose(values)
     }
 }

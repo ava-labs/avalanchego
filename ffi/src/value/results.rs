@@ -190,7 +190,7 @@ impl<E: fmt::Display> From<Result<Option<api::HashKey>, E>> for HashResult {
 /// [`fwd_free_range_proof`]: crate::fwd_free_range_proof
 #[derive(Debug)]
 #[repr(C)]
-pub enum RangeProofResult {
+pub enum RangeProofResult<'db> {
     /// The caller provided a null pointer to the input handle.
     NullHandlePointer,
     /// The provided root was not found in the database.
@@ -202,7 +202,7 @@ pub enum RangeProofResult {
     /// If the value was parsed from a serialized proof, this does not imply that
     /// the proof is valid, only that it is well-formed. The verify method must
     /// be called to ensure the proof is cryptographically valid.
-    Ok(Box<RangeProofContext>),
+    Ok(Box<RangeProofContext<'db>>),
     /// An error occurred and the message is returned as an [`OwnedBytes`]. If
     /// value is guaranteed to contain only valid UTF-8.
     ///
@@ -213,7 +213,7 @@ pub enum RangeProofResult {
     Err(OwnedBytes),
 }
 
-impl From<Result<api::FrozenRangeProof, api::Error>> for RangeProofResult {
+impl From<Result<api::FrozenRangeProof, api::Error>> for RangeProofResult<'_> {
     fn from(value: Result<api::FrozenRangeProof, api::Error>) -> Self {
         match value {
             Ok(proof) => RangeProofResult::Ok(Box::new(proof.into())),
@@ -538,7 +538,7 @@ impl_null_handle_result!(
     VoidResult,
     ValueResult,
     HashResult,
-    RangeProofResult,
+    RangeProofResult<'_>,
     ChangeProofResult,
     NextKeyRangeResult,
     ProposalResult<'_>,
@@ -553,7 +553,7 @@ impl_cresult!(
     ValueResult,
     HashResult,
     HandleResult,
-    RangeProofResult,
+    RangeProofResult<'_>,
     ChangeProofResult,
     NextKeyRangeResult,
     ProposalResult<'_>,

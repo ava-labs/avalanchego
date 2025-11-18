@@ -4,7 +4,7 @@
 use firewood::{
     db::{Db, DbConfig},
     manager::RevisionManagerConfig,
-    v2::api::{self, ArcDynDbView, Db as _, DbView, HashKey, HashKeyExt, KeyType},
+    v2::api::{self, ArcDynDbView, Db as _, DbView, HashKey, HashKeyExt, IntoBatchIter, KeyType},
 };
 
 use crate::{BorrowedBytes, CView, CreateProposalResult, KeyValuePair, arc_cache::ArcCache};
@@ -211,6 +211,18 @@ impl DatabaseHandle {
     pub(crate) fn clear_cached_view(&self) {
         self.cached_view.clear();
     }
+
+    pub(crate) fn merge_key_value_range(
+        &self,
+        first_key: Option<impl KeyType>,
+        last_key: Option<impl KeyType>,
+        key_values: impl IntoIterator<Item: api::KeyValuePair>,
+    ) -> Result<CreateProposalResult<'_>, api::Error> {
+        CreateProposalResult::new(self, || {
+            self.db
+                .merge_key_value_range(first_key, last_key, key_values)
+        })
+    }
 }
 
 impl From<Db> for DatabaseHandle {
@@ -227,11 +239,11 @@ impl<'db> CView<'db> for &'db crate::DatabaseHandle {
         self
     }
 
-    fn create_proposal<'kvp>(
+    fn create_proposal(
         self,
-        values: impl AsRef<[KeyValuePair<'kvp>]> + 'kvp,
+        values: impl IntoBatchIter,
     ) -> Result<firewood::db::Proposal<'db>, api::Error> {
-        self.db.propose(values.as_ref().iter())
+        self.db.propose(values)
     }
 }
 
