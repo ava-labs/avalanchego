@@ -213,21 +213,14 @@ impl<'a, S: ReadableStorage> NodeAllocator<'a, S> {
         area_index_and_size(self.storage, addr)
     }
 
-    /// Attempts to allocate `n` bytes from the free lists.
-    /// If successful returns the address of the newly allocated area
-    /// and the index of the free list that was used.
-    /// If there are no free areas big enough for `n` bytes, returns None.
-    /// TODO Consider splitting the area if we return a larger area than requested.
+    /// Attempts to allocate from the free lists for `index`.
+    ///
+    /// If successful returns the address of the newly allocated area;
+    /// otherwise, returns None.
     fn allocate_from_freed(
         &mut self,
-        n: u64,
-    ) -> Result<Option<(LinearAddress, AreaIndex)>, FileIoError> {
-        // Find the smallest free list that can fit this size.
-        let index = AreaIndex::from_size(n).map_err(|e| {
-            self.storage
-                .file_io_error(e, 0, Some("allocate_from_freed".to_string()))
-        })?;
-
+        index: AreaIndex,
+    ) -> Result<Option<LinearAddress>, FileIoError> {
         let free_stored_area_addr = self
             .header
             .free_lists_mut()
@@ -235,7 +228,6 @@ impl<'a, S: ReadableStorage> NodeAllocator<'a, S> {
             .expect("index is less than AreaIndex::NUM_AREA_SIZES");
         if let Some(address) = free_stored_area_addr {
             let address = *address;
-            // Get the first free block of sufficient size.
             if let Some(free_head) = self.storage.free_list_cache(address) {
                 trace!("free_head@{address}(cached): {free_head:?} size:{index}");
                 *free_stored_area_addr = free_head;
@@ -253,16 +245,10 @@ impl<'a, S: ReadableStorage> NodeAllocator<'a, S> {
                 "index" => index_name(index)
             )
             .increment(index.size());
-            firewood_counter!(
-                "firewood.space.wasted",
-                "Bytes wasted from free list by index",
-                "index" => index_name(index)
-            )
-            .increment(index.size().saturating_sub(n));
 
             // Return the address of the newly allocated block.
             trace!("Allocating from free list: addr: {address:?}, size: {index}");
-            return Ok(Some((address, index)));
+            return Ok(Some(address));
         }
 
         trace!("No free blocks of sufficient size {index} found");
@@ -275,18 +261,14 @@ impl<'a, S: ReadableStorage> NodeAllocator<'a, S> {
         Ok(None)
     }
 
-    fn allocate_from_end(&mut self, n: u64) -> Result<(LinearAddress, AreaIndex), FileIoError> {
-        let index = AreaIndex::from_size(n).map_err(|e| {
-            self.storage
-                .file_io_error(e, 0, Some("allocate_from_end".to_string()))
-        })?;
+    fn allocate_from_end(&mut self, index: AreaIndex) -> Result<LinearAddress, FileIoError> {
         let area_size = index.size();
         let addr = LinearAddress::new(self.header.size()).expect("node store size can't be 0");
         self.header
             .set_size(self.header.size().saturating_add(area_size));
         debug_assert!(addr.is_aligned());
         trace!("Allocating from end: addr: {addr:?}, size: {index}");
-        Ok((addr, index))
+        Ok(addr)
     }
 
     /// Returns an address that can be used to store the given `node` and updates
@@ -301,16 +283,20 @@ impl<'a, S: ReadableStorage> NodeAllocator<'a, S> {
         node: &[u8],
     ) -> Result<(LinearAddress, AreaIndex), FileIoError> {
         let stored_area_size = node.len() as u64;
+        let area_index = AreaIndex::from_size(stored_area_size).map_err(|e| {
+            self.storage
+                .file_io_error(e, 0, Some("allocate_node".to_owned()))
+        })?;
 
         // Attempt to allocate from a free list.
         // If we can't allocate from a free list, allocate past the existing
         // of the ReadableStorage.
-        let (addr, index) = match self.allocate_from_freed(stored_area_size)? {
-            Some((addr, index)) => (addr, index),
-            None => self.allocate_from_end(stored_area_size)?,
+        let addr = match self.allocate_from_freed(area_index)? {
+            Some(addr) => addr,
+            None => self.allocate_from_end(area_index)?,
         };
 
-        Ok((addr, index))
+        Ok((addr, area_index))
     }
 }
 

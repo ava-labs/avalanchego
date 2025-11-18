@@ -85,6 +85,11 @@ impl FileIoError {
             context,
         }
     }
+
+    #[cfg(test)]
+    pub(crate) fn context(&self) -> Option<&str> {
+        self.context.as_deref()
+    }
 }
 
 impl std::error::Error for FileIoError {

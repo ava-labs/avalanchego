@@ -436,14 +436,11 @@ impl Debug for BranchNode {
             }
         }
 
-        write!(
-            f,
-            " v={}]",
-            match &self.value {
-                Some(v) => hex::encode(&**v),
-                None => "nil".to_string(),
-            }
-        )
+        let value: &dyn std::fmt::Display = match self.value.as_deref() {
+            Some(v) => &super::DisplayTruncatedHex(v),
+            None => &"nil",
+        };
+        write!(f, "v={value}]")
     }
 }
 

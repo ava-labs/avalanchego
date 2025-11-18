@@ -130,10 +130,7 @@ impl AreaIndex {
     /// Returns an error if the size is too large.
     pub fn from_size(n: u64) -> Result<Self, Error> {
         if n > Self::MAX_AREA_SIZE {
-            return Err(Error::new(
-                ErrorKind::InvalidData,
-                format!("Node size {n} is too large"),
-            ));
+            return Err(Error::new(ErrorKind::OutOfMemory, AreaSizeError(n)));
         }
 
         if n <= Self::MIN_AREA_SIZE {
@@ -144,12 +141,7 @@ impl AreaIndex {
             .iter()
             .position(|&size| size >= n)
             .map(|index| AreaIndex(index as u8))
-            .ok_or_else(|| {
-                Error::new(
-                    ErrorKind::InvalidData,
-                    format!("Node size {n} is too large"),
-                )
-            })
+            .ok_or_else(|| Error::new(ErrorKind::OutOfMemory, AreaSizeError(n)))
     }
 
     /// Get the underlying index as u8.
@@ -237,6 +229,10 @@ impl fmt::Display for AreaIndex {
         std::fmt::Display::fmt(&self.get(), f)
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, thiserror::Error)]
+#[error("Node size {_0} is too large")]
+pub(super) struct AreaSizeError(pub(super) u64);
 
 /// A linear address in the nodestore storage.
 ///

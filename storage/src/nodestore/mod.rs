@@ -870,6 +870,7 @@ mod tests {
 
     use super::*;
     use primitives::area_size_iter;
+    use std::error::Error;
 
     #[test]
     fn area_sizes_aligned() {
@@ -942,11 +943,11 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "https://github.com/ava-labs/firewood/issues/1054"]
-    #[should_panic(expected = "Node size 16777225 is too large")]
     fn giant_node() {
-        let memstore = MemStore::new(vec![]);
-        let mut node_store = NodeStore::new_empty_proposal(memstore.into());
+        let memstore = Arc::new(MemStore::new(vec![]));
+        let empty_root = NodeStore::new_empty_committed(Arc::clone(&memstore));
+
+        let mut node_store = NodeStore::new(&empty_root).unwrap();
 
         let huge_value = vec![0u8; AreaIndex::MAX_AREA_SIZE as usize];
 
@@ -957,7 +958,26 @@ mod tests {
 
         node_store.root_mut().replace(giant_leaf);
 
-        let immutable = NodeStore::<Arc<ImmutableProposal>, _>::try_from(node_store).unwrap();
-        println!("{immutable:?}"); // should not be reached, but need to consume immutable to avoid optimization removal
+        let node_store = NodeStore::<Arc<ImmutableProposal>, _>::try_from(node_store).unwrap();
+
+        let mut node_store = node_store.as_committed(&empty_root);
+
+        let err = node_store.persist().unwrap_err();
+        let err_ctx = err.context();
+        assert!(err_ctx == Some("allocate_node"));
+
+        let io_err = err
+            .source()
+            .unwrap()
+            .downcast_ref::<std::io::Error>()
+            .unwrap();
+        assert_eq!(io_err.kind(), std::io::ErrorKind::OutOfMemory);
+
+        let io_err_source = io_err
+            .get_ref()
+            .unwrap()
+            .downcast_ref::<primitives::AreaSizeError>()
+            .unwrap();
+        assert_eq!(io_err_source.0, 16_777_225);
     }
 }

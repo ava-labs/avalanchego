@@ -153,11 +153,6 @@ See the [FFI README](ffi/README.md) for more details on FFI metrics configuratio
   - Labels: `index`: Size index of allocated area
   - Use: Track memory reuse efficiency
 
-- **`firewood.space.wasted`** (counter with `index` label)
-  - Description: Bytes wasted when allocating from free list (allocated more than needed)
-  - Labels: `index`: Size index of allocated area
-  - Use: Monitor allocation efficiency and fragmentation
-
 - **`firewood.space.from_end`** (counter with `index` label)
   - Description: Bytes allocated from end of nodestore when free list was insufficient
   - Labels: `index`: Size index of allocated area
@@ -279,13 +274,13 @@ For Prometheus-based monitoring (note: metric names use underscores in queries):
 rate(firewood_proposal_commit_ms[5m]) / rate(firewood_proposal_commit[5m])
 
 # Cache hit rate
-sum(rate(firewood_cache_node{type="hit"}[5m])) / 
+sum(rate(firewood_cache_node{type="hit"}[5m])) /
 sum(rate(firewood_cache_node[5m]))
 
 # Database growth rate (bytes/sec)
 rate(firewood_space_from_end[5m])
 
 # Failed commit ratio
-rate(firewood_proposal_commit{success="false"}[5m]) / 
+rate(firewood_proposal_commit{success="false"}[5m]) /
 rate(firewood_proposal_commit[5m])
 ```

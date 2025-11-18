@@ -507,6 +507,20 @@ fn read_path_with_provided_length(reader: &mut impl Read, len: usize) -> std::io
     reader.read_fixed_len(len).map(Path::from)
 }
 
+struct DisplayTruncatedHex<'a>(&'a [u8]);
+
+impl std::fmt::Display for DisplayTruncatedHex<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(truncated) = self.0.get(0..256)
+            && truncated.len() < self.0.len()
+        {
+            write!(f, "0x{}... (len={})", hex::encode(truncated), self.0.len())
+        } else {
+            write!(f, "0x{}", hex::encode(self.0))
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     #![expect(clippy::unwrap_used)]

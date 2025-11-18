@@ -21,7 +21,7 @@ impl Debug for LeafNode {
             f,
             "[Leaf {:?} {}]",
             self.partial_path,
-            hex::encode(&*self.value)
+            super::DisplayTruncatedHex(&self.value)
         )
     }
 }
