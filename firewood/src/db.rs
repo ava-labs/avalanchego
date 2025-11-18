@@ -11,14 +11,14 @@ mod tests;
 
 use crate::iter::MerkleKeyValueIter;
 use crate::merkle::{Merkle, Value};
-use crate::root_store::{NoOpStore, RootStore};
+use crate::root_store::{FjallStore, NoOpStore, RootStore};
 pub use crate::v2::api::BatchOp;
 use crate::v2::api::{
     self, ArcDynDbView, FrozenProof, FrozenRangeProof, HashKey, IntoBatchIter, KeyType,
     KeyValuePair, OptionalHashKeyExt,
 };
 
-use crate::manager::{ConfigManager, RevisionManager, RevisionManagerConfig};
+use crate::manager::{ConfigManager, RevisionManager, RevisionManagerConfig, RevisionManagerError};
 use firewood_storage::{
     CheckOpt, CheckerReport, Committed, FileBacked, FileIoError, HashedNodeReader,
     ImmutableProposal, NodeStore, Parentable, ReadableStorage, TrieReader,
@@ -26,7 +26,7 @@ use firewood_storage::{
 use metrics::{counter, describe_counter};
 use std::io::Write;
 use std::num::NonZeroUsize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use thiserror::Error;
 use typed_builder::TypedBuilder;
@@ -125,6 +125,9 @@ pub struct DbConfig {
     // TODO: Experimentally determine the right value for BatchSize.
     #[builder(default = UseParallel::BatchSize(8))]
     pub use_parallel: UseParallel,
+    /// `RootStore` directory path
+    #[builder(default = None)]
+    pub root_store_dir: Option<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -164,7 +167,14 @@ impl api::Db for Db {
 impl Db {
     /// Create a new database instance.
     pub fn new<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, api::Error> {
-        Self::with_root_store(db_path, cfg, Box::new(NoOpStore {}))
+        let root_store: Box<dyn RootStore + Send + Sync> = match &cfg.root_store_dir {
+            Some(path) => {
+                Box::new(FjallStore::new(path).map_err(RevisionManagerError::RootStoreError)?)
+            }
+            None => Box::new(NoOpStore {}),
+        };
+
+        Self::with_root_store(db_path, cfg, root_store)
     }
 
     fn with_root_store<P: AsRef<Path>>(
@@ -384,6 +394,7 @@ mod test {
     #![expect(clippy::unwrap_used)]
 
     use core::iter::Take;
+    use std::collections::HashMap;
     use std::iter::Peekable;
     use std::num::NonZeroUsize;
     use std::ops::{Deref, DerefMut};
@@ -394,6 +405,7 @@ mod test {
     };
 
     use crate::db::{Db, Proposal, UseParallel};
+    use crate::manager::RevisionManagerConfig;
     use crate::root_store::{MockStore, RootStore};
     use crate::v2::api::{Db as _, DbView, Proposal as _};
 
@@ -1078,6 +1090,27 @@ mod test {
         let mock_store = MockStore::default();
         let db = TestDb::with_mockstore(mock_store);
 
+        test_root_store_helper(db);
+    }
+
+    #[test]
+    fn test_fjall_store() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
+            .iter()
+            .collect();
+        let root_store_path = tmpdir.as_ref().join("fjall_store");
+        let dbconfig = DbConfig::builder()
+            .root_store_dir(Some(root_store_path))
+            .build();
+        let db = Db::new(dbpath, dbconfig).unwrap();
+        let db = TestDb { db, tmpdir };
+
+        test_root_store_helper(db);
+    }
+
+    /// Verifies that persisted revisions are still accessible when reopening the database.
+    fn test_root_store_helper(db: TestDb) {
         // First, create a revision to retrieve
         let key = b"key";
         let value = b"value";
@@ -1128,6 +1161,55 @@ mod test {
         let db = TestDb::with_mockstore(mock_store);
 
         db.reopen();
+    }
+
+    /// Verifies that revisions exceeding the in-memory limit can still be retrieved.
+    #[test]
+    fn test_fjall_store_with_capped_max_revisions() {
+        const NUM_REVISIONS: usize = 10;
+
+        let tmpdir = tempfile::tempdir().unwrap();
+        let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
+            .iter()
+            .collect();
+        let root_store_path = tmpdir.as_ref().join("fjall_store");
+        let dbconfig = DbConfig::builder()
+            .root_store_dir(Some(root_store_path))
+            .manager(RevisionManagerConfig::builder().max_revisions(5).build())
+            .build();
+        let db = Db::new(dbpath, dbconfig).unwrap();
+        let db = TestDb { db, tmpdir };
+
+        // Create and commit 10 proposals
+        let key = b"root_store";
+        let revisions: HashMap<TrieHash, _> = (0..NUM_REVISIONS)
+            .map(|i| {
+                let value = i.to_be_bytes();
+                let batch = vec![BatchOp::Put { key, value }];
+                let proposal = db.propose(batch).unwrap();
+                let root_hash = proposal.root_hash().unwrap().unwrap();
+                proposal.commit().unwrap();
+
+                (root_hash, value)
+            })
+            .collect();
+
+        // Verify that we can access all revisions with their correct values
+        for (root_hash, value) in &revisions {
+            let revision = db.revision(root_hash.clone()).unwrap();
+            let retrieved_value = revision.val(key).unwrap().unwrap();
+            assert_eq!(value.as_slice(), retrieved_value.as_ref());
+        }
+
+        let db = db.reopen();
+
+        // Verify that we can access all revisions with their correct values
+        // after reopening
+        for (root_hash, value) in &revisions {
+            let revision = db.revision(root_hash.clone()).unwrap();
+            let retrieved_value = revision.val(key).unwrap().unwrap();
+            assert_eq!(value.as_slice(), retrieved_value.as_ref());
+        }
     }
 
     // Testdb is a helper struct for testing the Db. Once it's dropped, the directory and file disappear

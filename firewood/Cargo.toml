@@ -36,6 +36,9 @@ thiserror.workspace = true
 # Regular dependencies
 typed-builder = "0.23.0"
 rayon = "1.11.0"
+fjall = "2.11.2"
+derive-where = "1.6.0"
+weak-table = "0.3.2"
 
 [features]
 default = []

@@ -1256,6 +1256,62 @@ func TestHandlesFreeImplicitly(t *testing.T) {
 	}
 }
 
+func TestFjallStore(t *testing.T) {
+	r := require.New(t)
+
+	var (
+		tmpdir       = t.TempDir()
+		dbFile       = filepath.Join(tmpdir, "test.db")
+		rootStoreDir = filepath.Join(tmpdir, "root_store_dir")
+	)
+
+	// Create a new database with RootStore enabled
+	config := DefaultConfig()
+	config.RootStoreDir = rootStoreDir
+	// Setting the number of in-memory revisions to 5 tests that revision nodes
+	// are not reaped prior to closing the database.
+	config.Revisions = 5
+
+	db, err := New(dbFile, config)
+	r.NoError(err)
+
+	// Create and commit 10 proposals
+	numRevisions := 10
+	key := []byte("root_store")
+	_, vals := kvForTest(numRevisions)
+	revisionRoots := make([]Hash, numRevisions)
+	for i := range numRevisions {
+		proposal, err := db.Propose([][]byte{key}, [][]byte{vals[i]})
+		r.NoError(err)
+		r.NoError(proposal.Commit())
+
+		revisionRoots[i], err = proposal.Root()
+		r.NoError(err)
+	}
+
+	// Close and reopen the database
+	r.NoError(db.Close(t.Context()))
+
+	db, err = New(dbFile, config)
+	r.NoError(err)
+
+	// Verify that we can access all revisions
+	for i := range numRevisions {
+		revision, err := db.Revision(revisionRoots[i])
+		r.NoError(err)
+
+		defer func() {
+			r.NoError(revision.Drop())
+		}()
+
+		v, err := revision.Get(key)
+		r.NoError(err)
+
+		r.Equal(vals[i], v)
+		r.NoError(revision.Drop())
+	}
+}
+
 type kvIter interface {
 	SetBatchSize(int)
 	Next() bool

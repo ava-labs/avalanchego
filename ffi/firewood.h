@@ -911,6 +911,18 @@ typedef struct DatabaseHandleArgs {
    */
   BorrowedBytes path;
   /**
+   * The path to the `RootStore` directory.
+   *
+   * This must be a valid UTF-8 string, even on Windows.
+   *
+   * If this is empty, then the archival feature is disabled.
+   *
+   * Note: Setting this directory will only track new revisions going forward
+   * and will not contain revisions from a prior database instance that didn't
+   * set a `root_store_path`.
+   */
+  BorrowedBytes root_store_path;
+  /**
    * The size of the node cache.
    *
    * Opening returns an error if this is zero.
