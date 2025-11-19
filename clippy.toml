@@ -16,4 +16,9 @@ disallowed-methods = [
 disallowed-types = [
   { path = "rand::SeedableRng", replacement = "firewood_storage::SeededRng", reason = "use a prng with a user-defined seed instead", allow-invalid = true },
   { path = "rand::rngs::StdRng", replacement = "firewood_storage::SeededRng", reason = "use a prng with a user-defined seed instead", allow-invalid = true },
+  { path = "std::sync::Mutex", replacement = "parking_lot::Mutex", reason = "prefer parking_lot locking primitives for consistency and performance", allow-invalid = true },
+  { path = "std::sync::MutexGuard", replacement = "parking_lot::MutexGuard", reason = "prefer parking_lot locking primitives for consistency and performance", allow-invalid = true },
+  { path = "std::sync::RwLock", replacement = "parking_lot::RwLock", reason = "prefer parking_lot locking primitives for consistency and performance", allow-invalid = true },
+  { path = "std::sync::RwLockReadGuard", replacement = "parking_lot::RwLockReadGuard", reason = "prefer parking_lot locking primitives for consistency and performance", allow-invalid = true },
+  { path = "std::sync::RwLockWriteGuard", replacement = "parking_lot::RwLockWriteGuard", reason = "prefer parking_lot locking primitives for consistency and performance", allow-invalid = true },
 ]

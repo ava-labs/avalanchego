@@ -120,7 +120,7 @@ impl NodeStore<Committed, FileBacked> {
         &self,
         allocated_objects: Vec<(&[u8], LinearAddress, MaybePersistedNode)>,
     ) -> Result<(), FileIoError> {
-        let mut ring = self.storage.ring.lock().expect("poisoned lock");
+        let mut ring = self.storage.ring.lock();
 
         let mut saved_pinned_buffers =
             vec![Option::<BufferEntry<'_>>::None; FileBacked::RINGSIZE as usize];

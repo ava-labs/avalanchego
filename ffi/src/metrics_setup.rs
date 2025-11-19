@@ -1,15 +1,16 @@
 // Copyright (C) 2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
+use parking_lot::Mutex;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fmt::Write;
 use std::net::Ipv6Addr;
 use std::ops::Deref;
+use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::Ordering;
-use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 use oxhttp::Server;
@@ -122,7 +123,7 @@ impl TextRecorder {
             .saturating_add(u64::from(epoch_duration.subsec_millis()));
         writeln!(output, "# {utc_now}").expect("write to string cannot fail");
 
-        let help_guard = self.inner.help.lock().expect("poisoned lock");
+        let help_guard = self.inner.help.lock();
 
         let counters = self.registry.get_counter_handles();
         let mut seen_counters = HashSet::new();
@@ -228,7 +229,6 @@ impl metrics::Recorder for TextRecorder {
         self.inner
             .help
             .lock()
-            .expect("poisoned lock")
             .insert(key.as_str().to_string(), description.to_string());
     }
 
@@ -241,7 +241,6 @@ impl metrics::Recorder for TextRecorder {
         self.inner
             .help
             .lock()
-            .expect("poisoned lock")
             .insert(key.as_str().to_string(), description.to_string());
     }
 

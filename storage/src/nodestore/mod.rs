@@ -457,7 +457,7 @@ pub struct ImmutableProposal {
     /// Nodes that have been deleted in this proposal.
     deleted: Box<[MaybePersistedNode]>,
     /// The parent of this proposal.
-    parent: Arc<std::sync::Mutex<NodeStoreParent>>,
+    parent: Arc<parking_lot::Mutex<NodeStoreParent>>,
     /// The root of the trie in this proposal.
     root: Option<Child>,
 }
@@ -466,14 +466,14 @@ impl ImmutableProposal {
     /// Returns true if the parent of this proposal is committed and has the given hash.
     #[must_use]
     fn parent_hash_is(&self, hash: Option<TrieHash>) -> bool {
-        match &*self.parent.lock().expect("poisoned lock") {
+        match &*self.parent.lock() {
             NodeStoreParent::Committed(root_hash) => *root_hash == hash,
             NodeStoreParent::Proposed(_) => false,
         }
     }
 
     fn commit_reparent(self: &Arc<Self>, committing: &Arc<Self>) {
-        let mut guard = self.parent.lock().expect("poisoned lock");
+        let mut guard = self.parent.lock();
         if let NodeStoreParent::Proposed(ref parent) = *guard
             && Arc::ptr_eq(parent, committing)
         {
@@ -598,7 +598,7 @@ impl<S: ReadableStorage> TryFrom<NodeStore<MutableProposal, S>>
             header,
             kind: Arc::new(ImmutableProposal {
                 deleted: kind.deleted.into(),
-                parent: Arc::new(std::sync::Mutex::new(kind.parent)),
+                parent: Arc::new(parking_lot::Mutex::new(kind.parent)),
                 root: None,
             }),
             storage,
@@ -917,7 +917,7 @@ mod tests {
         let r1 = NodeStore::new(&base).unwrap();
         let r1: NodeStore<Arc<ImmutableProposal>, _> = r1.try_into().unwrap();
         {
-            let parent = r1.kind.parent.lock().expect("poisoned lock");
+            let parent = r1.kind.parent.lock();
             assert!(matches!(*parent, NodeStoreParent::Committed(None)));
         }
 
@@ -925,7 +925,7 @@ mod tests {
         let r2: NodeStore<MutableProposal, _> = NodeStore::new(&r1).unwrap();
         let r2: NodeStore<Arc<ImmutableProposal>, _> = r2.try_into().unwrap();
         {
-            let parent = r2.kind.parent.lock().expect("poisoned lock");
+            let parent = r2.kind.parent.lock();
             assert!(matches!(*parent, NodeStoreParent::Proposed(_)));
         }
 
@@ -933,7 +933,7 @@ mod tests {
         r1.commit_reparent(&r2);
 
         // now check r2's parent, should match the hash of r1 (which is still None)
-        let parent = r2.kind.parent.lock().expect("poisoned lock");
+        let parent = r2.kind.parent.lock();
         if let NodeStoreParent::Committed(hash) = &*parent {
             assert_eq!(*hash, r1.root_hash());
             assert_eq!(*hash, None);

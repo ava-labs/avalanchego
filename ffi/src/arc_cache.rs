@@ -8,7 +8,8 @@
 //! layer to improve performance by avoiding repeated view creation for the same
 //! root hash during database operations.
 
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use parking_lot::{Mutex, MutexGuard};
+use std::sync::Arc;
 
 /// A thread-safe single-item cache that stores key-value pairs as `Arc<V>`.
 ///
@@ -79,7 +80,7 @@ impl<K: PartialEq, V: ?Sized> ArcCache<K, V> {
     }
 
     fn lock(&self) -> MutexGuard<'_, Option<(K, Arc<V>)>> {
-        self.cache.lock().unwrap_or_else(PoisonError::into_inner)
+        self.cache.lock()
     }
 }
 

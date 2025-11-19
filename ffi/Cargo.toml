@@ -26,6 +26,7 @@ firewood.workspace = true
 firewood-storage.workspace = true
 metrics.workspace = true
 metrics-util.workspace = true
+parking_lot.workspace = true
 # Regular dependencies
 chrono = "0.4.42"
 oxhttp = "0.3.1"

@@ -1097,6 +1097,7 @@ dependencies = [
  "hex-literal",
  "integer-encoding",
  "metrics",
+ "parking_lot",
  "plain_hasher",
  "pprof",
  "rand 0.9.2",
@@ -1151,6 +1152,7 @@ dependencies = [
  "metrics",
  "metrics-util",
  "oxhttp",
+ "parking_lot",
  "test-case",
  "tikv-jemallocator",
 ]
@@ -1213,6 +1215,7 @@ dependencies = [
  "lru",
  "metrics",
  "nonzero_ext",
+ "parking_lot",
  "pprof",
  "rand 0.9.2",
  "rlp",

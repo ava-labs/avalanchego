@@ -1,7 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-use std::sync::{Mutex, TryLockError};
+use parking_lot::Mutex;
 use std::{fmt::Display, sync::Arc};
 
 use crate::{FileIoError, LinearAddress, NodeReader, SharedNode};
@@ -42,7 +42,7 @@ impl PartialEq<MaybePersistedNode> for MaybePersistedNode {
         if Arc::ptr_eq(&self.0, &other.0) {
             return true;
         }
-        *self.0.lock().expect("poisoned lock") == *other.0.lock().expect("poisoned lock")
+        *self.0.lock() == *other.0.lock()
     }
 }
 
@@ -62,7 +62,7 @@ impl From<LinearAddress> for MaybePersistedNode {
 
 impl From<&MaybePersistedNode> for Option<LinearAddress> {
     fn from(node: &MaybePersistedNode) -> Option<LinearAddress> {
-        match &*node.0.lock().expect("poisoned lock") {
+        match &*node.0.lock() {
             MaybePersisted::Unpersisted(_) => None,
             MaybePersisted::Allocated(address, _) | MaybePersisted::Persisted(address) => {
                 Some(*address)
@@ -87,7 +87,7 @@ impl MaybePersistedNode {
     /// - `Ok(SharedNode)` contains the node if successfully retrieved
     /// - `Err(FileIoError)` if there was an error reading from storage
     pub fn as_shared_node<S: NodeReader>(&self, storage: &S) -> Result<SharedNode, FileIoError> {
-        match &*self.0.lock().expect("poisoned lock") {
+        match &*self.0.lock() {
             MaybePersisted::Allocated(_, node) | MaybePersisted::Unpersisted(node) => {
                 Ok(node.clone())
             }
@@ -102,7 +102,7 @@ impl MaybePersistedNode {
     /// Returns `Some(LinearAddress)` if the node is persisted on disk, otherwise `None`.
     #[must_use]
     pub fn as_linear_address(&self) -> Option<LinearAddress> {
-        match &*self.0.lock().expect("poisoned lock") {
+        match &*self.0.lock() {
             MaybePersisted::Unpersisted(_) => None,
             MaybePersisted::Allocated(address, _) | MaybePersisted::Persisted(address) => {
                 Some(*address)
@@ -117,7 +117,7 @@ impl MaybePersistedNode {
     /// Returns `Some(&Self)` if the node is unpersisted, otherwise `None`.
     #[must_use]
     pub fn unpersisted(&self) -> Option<&Self> {
-        match &*self.0.lock().expect("poisoned lock") {
+        match &*self.0.lock() {
             MaybePersisted::Allocated(_, _) | MaybePersisted::Unpersisted(_) => Some(self),
             MaybePersisted::Persisted(_) => None,
         }
@@ -134,7 +134,7 @@ impl MaybePersistedNode {
     ///
     /// * `addr` - The `LinearAddress` where the node has been persisted on disk
     pub fn persist_at(&self, addr: LinearAddress) {
-        *self.0.lock().expect("poisoned lock") = MaybePersisted::Persisted(addr);
+        *self.0.lock() = MaybePersisted::Persisted(addr);
     }
 
     /// Updates the internal state to indicate this node is allocated at the specified disk address.
@@ -148,7 +148,7 @@ impl MaybePersistedNode {
     ///
     /// * `addr` - The `LinearAddress` where the node has been allocated on disk
     pub fn allocate_at(&self, addr: LinearAddress) {
-        let mut guard = self.0.lock().expect("poisoned lock");
+        let mut guard = self.0.lock();
         let node = {
             match &*guard {
                 MaybePersisted::Unpersisted(node) | MaybePersisted::Allocated(_, node) => {
@@ -170,7 +170,7 @@ impl MaybePersistedNode {
     /// otherwise `None`.
     #[must_use]
     pub fn allocated_info(&self) -> Option<(LinearAddress, SharedNode)> {
-        match &*self.0.lock().expect("poisoned lock") {
+        match &*self.0.lock() {
             MaybePersisted::Allocated(addr, node) => Some((*addr, node.clone())),
             _ => None,
         }
@@ -189,19 +189,14 @@ impl MaybePersistedNode {
 impl Display for MaybePersistedNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.0.try_lock() {
-            Ok(guard) => match &*guard {
+            Some(guard) => match &*guard {
                 MaybePersisted::Unpersisted(node) => write!(f, "M{:p}", (*node).as_ptr()),
                 MaybePersisted::Allocated(addr, node) => {
                     write!(f, "A{:p}@{addr}", (*node).as_ptr())
                 }
                 MaybePersisted::Persisted(addr) => write!(f, "{addr}"),
             },
-            Err(TryLockError::WouldBlock) => {
-                write!(f, "<locked>")
-            }
-            Err(TryLockError::Poisoned(_)) => {
-                panic!("poisoned lock")
-            }
+            None => write!(f, "<locked>"),
         }
     }
 }

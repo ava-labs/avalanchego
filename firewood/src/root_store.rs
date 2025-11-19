@@ -2,10 +2,9 @@
 // See the file LICENSE.md for licensing terms.
 
 #[cfg(test)]
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use parking_lot::Mutex;
+#[cfg(test)]
+use std::{collections::HashMap, sync::Arc};
 use std::{fmt::Debug, path::Path};
 
 use derive_where::derive_where;
@@ -101,10 +100,7 @@ impl RootStore for MockStore {
             return Err("Adding roots should fail".into());
         }
 
-        self.roots
-            .lock()
-            .expect("poisoned lock")
-            .insert(hash.clone(), *address);
+        self.roots.lock().insert(hash.clone(), *address);
         Ok(())
     }
 
@@ -116,7 +112,7 @@ impl RootStore for MockStore {
             return Err("Getting roots should fail".into());
         }
 
-        Ok(self.roots.lock().expect("poisoned lock").get(hash).copied())
+        Ok(self.roots.lock().get(hash).copied())
     }
 
     fn allow_space_reuse(&self) -> bool {

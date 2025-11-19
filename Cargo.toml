@@ -81,6 +81,7 @@ sha2 = "0.10.9"
 smallvec = { version = "1.15.1", features = ["write", "union", "const_new"] }
 test-case = "3.3.1"
 thiserror = "2.0.17"
+parking_lot = "0.12.3"
 
 # common dev dependencies
 criterion = "0.7.0"
