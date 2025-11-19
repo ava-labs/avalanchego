@@ -12,14 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func NewTestContext(t *testing.T) (context.Context, context.CancelFunc) {
-	t.Helper()
-	if d, ok := t.Deadline(); ok {
-		return context.WithDeadline(t.Context(), d)
-	}
-	return context.WithTimeout(t.Context(), 30*time.Second)
-}
-
 func WaitGroupWithContext(t *testing.T, ctx context.Context, wg *sync.WaitGroup) {
 	t.Helper()
 	done := make(chan struct{})

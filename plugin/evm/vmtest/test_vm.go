@@ -21,7 +21,6 @@ import (
 
 	"github.com/ava-labs/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/coreth/plugin/evm/extension"
-	"github.com/ava-labs/coreth/utils/utilstest"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	commoneng "github.com/ava-labs/avalanchego/snow/engine/common"
@@ -74,7 +73,7 @@ func SetupTestVM(t *testing.T, vm commoneng.VM, config TestVMConfig) *TestVMSuit
 	configJSON, err := OverrideSchemeConfig(scheme, config.ConfigJSON)
 	require.NoError(t, err)
 
-	ctx, cancel := utilstest.NewTestContext(t)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	err = vm.Initialize(

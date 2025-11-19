@@ -39,7 +39,7 @@ import (
 
 func TestAtomicTxGossip(t *testing.T) {
 	require := require.New(t)
-	ctx, cancel := utilstest.NewTestContext(t)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
@@ -189,7 +189,7 @@ func TestAtomicTxGossip(t *testing.T) {
 // Tests that a tx is gossiped when it is issued
 func TestAtomicTxPushGossipOutbound(t *testing.T) {
 	require := require.New(t)
-	ctx, cancel := utilstest.NewTestContext(t)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
@@ -259,7 +259,7 @@ func TestAtomicTxPushGossipOutbound(t *testing.T) {
 // Tests that a tx is gossiped when it is issued and valid
 func TestAtomicTxPushGossipInboundValid(t *testing.T) {
 	require := require.New(t)
-	ctx, cancel := utilstest.NewTestContext(t)
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	snowCtx := snowtest.Context(t, snowtest.CChainID)
