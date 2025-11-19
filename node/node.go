@@ -1471,7 +1471,7 @@ func (n *Node) initHealthAPI() error {
 		}
 
 		if availableDiskPercentage < n.Config.WarningThresholdAvailableDiskSpacePercentage {
-			err = fmt.Errorf("remaining available disk space percentage (%d%%) is below minimum required available space percentage (%d%%)", availableDiskPercentage, n.Config.WarningThresholdAvailableDiskSpacePercentage)
+			err = fmt.Errorf("remaining available disk space percentage (%d%%) is below the warning threshold of space percentage (%d%%)", availableDiskPercentage, n.Config.WarningThresholdAvailableDiskSpacePercentage)
 		}
 
 		return map[string]interface{}{
