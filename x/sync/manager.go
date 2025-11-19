@@ -150,6 +150,7 @@ type ManagerConfig[R any, C any] struct {
 	SimultaneousWorkLimit int
 	Log                   logging.Logger
 	TargetRoot            ids.ID
+	EmptyRoot             ids.ID
 	StateSyncNodes        []ids.NodeID
 }
 
@@ -332,7 +333,7 @@ func (m *Manager[_, _]) requestChangeProof(ctx context.Context, work *workItem) 
 		return
 	}
 
-	if targetRootID == ids.Empty {
+	if targetRootID == m.config.EmptyRoot {
 		defer m.finishWorkItem()
 
 		// The trie is empty after this change.
@@ -387,7 +388,7 @@ func (m *Manager[_, _]) requestChangeProof(ctx context.Context, work *workItem) 
 func (m *Manager[_, _]) requestRangeProof(ctx context.Context, work *workItem) {
 	targetRootID := m.getTargetRoot()
 
-	if targetRootID == ids.Empty {
+	if targetRootID == m.config.EmptyRoot {
 		defer m.finishWorkItem()
 
 		if err := m.db.Clear(); err != nil {
