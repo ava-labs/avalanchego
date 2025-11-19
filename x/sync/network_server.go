@@ -36,6 +36,9 @@ const (
 )
 
 var (
+	_ p2p.Handler = (*GetChangeProofHandler[any, any])(nil)
+	_ p2p.Handler = (*GetRangeProofHandler[any, any])(nil)
+
 	ErrMinProofSizeIsTooLarge = errors.New("cannot generate any proof within the requested limit")
 
 	errInvalidBytesLimit    = errors.New("bytes limit must be greater than 0")
