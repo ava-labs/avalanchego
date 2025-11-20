@@ -406,7 +406,7 @@ mod test {
 
     use crate::db::{Db, Proposal, UseParallel};
     use crate::manager::RevisionManagerConfig;
-    use crate::root_store::{MockStore, RootStore};
+    use crate::root_store::RootStore;
     use crate::v2::api::{Db as _, DbView, Proposal as _};
 
     use super::{BatchOp, DbConfig};
@@ -1085,32 +1085,11 @@ mod test {
         assert_eq!(value, retrieved_value.as_ref());
     }
 
-    #[test]
-    fn test_root_store() {
-        let mock_store = MockStore::default();
-        let db = TestDb::with_mockstore(mock_store);
-
-        test_root_store_helper(db);
-    }
-
+    /// Verifies that persisted revisions are still accessible when reopening the database.
     #[test]
     fn test_fjall_store() {
-        let tmpdir = tempfile::tempdir().unwrap();
-        let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
-            .iter()
-            .collect();
-        let root_store_path = tmpdir.as_ref().join("fjall_store");
-        let dbconfig = DbConfig::builder()
-            .root_store_dir(Some(root_store_path))
-            .build();
-        let db = Db::new(dbpath, dbconfig).unwrap();
-        let db = TestDb { db, tmpdir };
+        let db = TestDb::new_with_fjall_store(DbConfig::builder().build());
 
-        test_root_store_helper(db);
-    }
-
-    /// Verifies that persisted revisions are still accessible when reopening the database.
-    fn test_root_store_helper(db: TestDb) {
         // First, create a revision to retrieve
         let key = b"key";
         let value = b"value";
@@ -1139,26 +1118,8 @@ mod test {
     }
 
     #[test]
-    fn test_root_store_errs() {
-        let mock_store = MockStore::with_failures();
-        let db = TestDb::with_mockstore(mock_store);
-
-        let view = db.view(TrieHash::empty());
-        assert!(view.is_err());
-
-        let batch = vec![BatchOp::Put {
-            key: b"k",
-            value: b"v",
-        }];
-
-        let proposal = db.propose(batch).unwrap();
-        assert!(proposal.commit().is_err());
-    }
-
-    #[test]
     fn test_rootstore_empty_db_reopen() {
-        let mock_store = MockStore::default();
-        let db = TestDb::with_mockstore(mock_store);
+        let db = TestDb::new_with_fjall_store(DbConfig::builder().build());
 
         db.reopen();
     }
@@ -1168,17 +1129,10 @@ mod test {
     fn test_fjall_store_with_capped_max_revisions() {
         const NUM_REVISIONS: usize = 10;
 
-        let tmpdir = tempfile::tempdir().unwrap();
-        let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
-            .iter()
-            .collect();
-        let root_store_path = tmpdir.as_ref().join("fjall_store");
         let dbconfig = DbConfig::builder()
-            .root_store_dir(Some(root_store_path))
             .manager(RevisionManagerConfig::builder().max_revisions(5).build())
             .build();
-        let db = Db::new(dbpath, dbconfig).unwrap();
-        let db = TestDb { db, tmpdir };
+        let db = TestDb::new_with_fjall_store(dbconfig);
 
         // Create and commit 10 proposals
         let key = b"root_store";
@@ -1243,13 +1197,22 @@ mod test {
             TestDb { db, tmpdir }
         }
 
-        pub fn with_mockstore(mock_store: MockStore) -> Self {
+        /// Creates a new test database with `FjallStore` enabled.
+        ///
+        /// Overrides `root_store_dir` in dbconfig to provide a directory for `FjallStore`.
+        pub fn new_with_fjall_store(dbconfig: DbConfig) -> Self {
             let tmpdir = tempfile::tempdir().unwrap();
             let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
                 .iter()
                 .collect();
-            let dbconfig = DbConfig::builder().build();
-            let db = Db::with_root_store(dbpath, dbconfig, Box::new(mock_store)).unwrap();
+            let root_store_path = tmpdir.as_ref().join("fjall_store");
+
+            let dbconfig = DbConfig {
+                root_store_dir: Some(root_store_path),
+                ..dbconfig
+            };
+
+            let db = Db::new(dbpath, dbconfig).unwrap();
             TestDb { db, tmpdir }
         }
 

@@ -1,10 +1,7 @@
 // Copyright (C) 2023, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE.md for licensing terms.
 
-#[cfg(test)]
-use parking_lot::Mutex;
-#[cfg(test)]
-use std::{collections::HashMap, sync::Arc};
+use fjall::{Config, Keyspace, PartitionCreateOptions, PartitionHandle, PersistMode};
 use std::{fmt::Debug, path::Path};
 
 use derive_where::derive_where;
@@ -69,58 +66,6 @@ impl RootStore for NoOpStore {
         true
     }
 }
-
-#[cfg(test)]
-#[derive(Debug, Default)]
-pub struct MockStore {
-    roots: Arc<Mutex<HashMap<TrieHash, LinearAddress>>>,
-    should_fail: bool,
-}
-
-#[cfg(test)]
-impl MockStore {
-    /// Returns an instance of `MockStore` that fails for all `add_root` and `get` calls.
-    #[must_use]
-    pub fn with_failures() -> Self {
-        Self {
-            should_fail: true,
-            ..Default::default()
-        }
-    }
-}
-
-#[cfg(test)]
-impl RootStore for MockStore {
-    fn add_root(
-        &self,
-        hash: &TrieHash,
-        address: &LinearAddress,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        if self.should_fail {
-            return Err("Adding roots should fail".into());
-        }
-
-        self.roots.lock().insert(hash.clone(), *address);
-        Ok(())
-    }
-
-    fn get(
-        &self,
-        hash: &TrieHash,
-    ) -> Result<Option<LinearAddress>, Box<dyn std::error::Error + Send + Sync>> {
-        if self.should_fail {
-            return Err("Getting roots should fail".into());
-        }
-
-        Ok(self.roots.lock().get(hash).copied())
-    }
-
-    fn allow_space_reuse(&self) -> bool {
-        false
-    }
-}
-
-use fjall::{Config, Keyspace, PartitionCreateOptions, PartitionHandle, PersistMode};
 
 #[derive_where(Debug)]
 #[derive_where(skip_inner)]
