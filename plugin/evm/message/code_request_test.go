@@ -37,6 +37,7 @@ func TestMarshalCodeResponse(t *testing.T) {
 	// generate some random code data
 	// set random seed for deterministic random
 	rand := rand.New(rand.NewSource(1))
+
 	codeData := make([]byte, 50)
 	_, err := rand.Read(codeData)
 	require.NoError(t, err)
@@ -46,7 +47,6 @@ func TestMarshalCodeResponse(t *testing.T) {
 	}
 
 	base64CodeResponse := "AAAAAAABAAAAMlL9/AchgmVPFj9fD5piHXKVZsdNEAN8TXu7BAfR4sZJgYVa2GgdDYbR6R4AFnk5y2aU"
-
 	codeResponseBytes, err := Codec.Marshal(Version, codeResponse)
 	require.NoError(t, err)
 	require.Equal(t, base64CodeResponse, base64.StdEncoding.EncodeToString(codeResponseBytes))

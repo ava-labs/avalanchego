@@ -61,7 +61,7 @@ linters:
     - goconst
     - gocritic
     - goprintffuncname
-    # - gosec
+    - gosec
     - govet
     - importas
     - ineffassign
@@ -235,3 +235,12 @@ linters:
       - common-false-positives
       - legacy
       - std-error-handling
+    rules:
+      # Exclude some linters from running on test files.
+      # 1. Exclude the top level tests/ directory.
+      # 2. Exclude any file prefixed with test_ in any directory.
+      # 3. Exclude any directory suffixed with test.
+      # 4. Exclude any file suffixed with _test.go.
+      - path: "(^tests/)|(^(.*/)*test_[^/]*\\.go$)|(.*test/.*)|(.*_test\\.go$)"
+        linters:
+          - gosec

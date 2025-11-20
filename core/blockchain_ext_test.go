@@ -2072,7 +2072,7 @@ func ReexecCorruptedStateTest(t *testing.T, create ReexecTestFunc) {
 	}
 
 	// Simulate a crash by updating the acceptor tip
-	blockchain.writeBlockAcceptedIndices(chain[1])
+	require.NoError(t, blockchain.writeBlockAcceptedIndices(chain[1]))
 	blockchain.Stop()
 
 	// Restart blockchain with existing state

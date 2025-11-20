@@ -176,7 +176,11 @@ func (n *network) SendAppRequestAny(ctx context.Context, minVersion *version.App
 
 	n.lock.Lock()
 	defer n.lock.Unlock()
-	if nodeID, ok := n.peers.GetAnyPeer(minVersion); ok {
+	nodeID, ok, err := n.peers.GetAnyPeer(minVersion)
+	if err != nil {
+		return ids.EmptyNodeID, err
+	}
+	if ok {
 		return nodeID, n.sendAppRequest(ctx, nodeID, request, handler)
 	}
 

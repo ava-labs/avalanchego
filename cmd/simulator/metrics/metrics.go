@@ -14,6 +14,8 @@ import (
 	"github.com/ava-labs/libevm/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+
+	"github.com/ava-labs/subnet-evm/rpc"
 )
 
 type Metrics struct {
@@ -66,7 +68,8 @@ func (m *Metrics) Serve(ctx context.Context, metricsPort string, metricsEndpoint
 	ctx, cancel := context.WithCancel(ctx)
 	// Create a prometheus server to expose individual tx metrics
 	server := &http.Server{
-		Addr: ":" + metricsPort,
+		Addr:              ":" + metricsPort,
+		ReadHeaderTimeout: rpc.DefaultHTTPTimeouts.ReadHeaderTimeout,
 	}
 
 	// Start up go routine to listen for SIGINT notifications to gracefully shut down server
