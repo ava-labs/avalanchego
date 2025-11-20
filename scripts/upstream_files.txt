@@ -6,7 +6,6 @@
 !core/blockchain_ext.go
 !core/blockchain_ext_test.go
 !core/blockchain_log_test.go
-!core/blockchain_test.go
 !core/bounded_buffer.go
 !core/coretest/*
 !core/extstate/*
