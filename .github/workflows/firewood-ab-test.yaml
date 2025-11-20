@@ -48,6 +48,7 @@ jobs:
           fi
       - name: Checkout AvalancheGo
         uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-go-for-project
       - name: Setup AvalancheGo with Custom Firewood
         uses: ./.github/actions/avalanchego-setup-action
         with:
