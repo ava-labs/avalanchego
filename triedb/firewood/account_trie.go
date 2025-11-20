@@ -167,10 +167,10 @@ func (a *AccountTrie) UpdateStorage(addr common.Address, key []byte, value []byt
 func (a *AccountTrie) DeleteAccount(addr common.Address) error {
 	key := crypto.Keccak256Hash(addr.Bytes()).Bytes()
 	// Queue the key for deletion
-	a.dirtyKeys[string(key)] = []byte{}
+	a.dirtyKeys[string(key)] = nil
 	a.updateKeys = append(a.updateKeys, key)
-	a.updateValues = append(a.updateValues, []byte{}) // Empty value indicates deletion
-	a.hasChanges = true                               // Mark that there are changes to commit
+	a.updateValues = append(a.updateValues, nil) // Nil value indicates deletion
+	a.hasChanges = true                          // Mark that there are changes to commit
 	return nil
 }
 
@@ -183,10 +183,10 @@ func (a *AccountTrie) DeleteStorage(addr common.Address, key []byte) error {
 	copy(combinedKey[common.HashLength:], storageKey)
 
 	// Queue the key for deletion
-	a.dirtyKeys[string(combinedKey[:])] = []byte{}
+	a.dirtyKeys[string(combinedKey[:])] = nil
 	a.updateKeys = append(a.updateKeys, combinedKey[:])
-	a.updateValues = append(a.updateValues, []byte{}) // Empty value indicates deletion
-	a.hasChanges = true                               // Mark that there are changes to commit
+	a.updateValues = append(a.updateValues, nil) // Nil value indicates deletion
+	a.hasChanges = true                          // Mark that there are changes to commit
 	return nil
 }
 
