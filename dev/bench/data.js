@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1763644075650,
+  "lastUpdate": 1763651524690,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -2042,6 +2042,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
             "value": 64.24,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "rodrigo",
+            "username": "RodrigoVillar",
+            "email": "77309055+RodrigoVillar@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "4d07d90e96e51f39b6a3b0a0d0bfc9d41571971d",
+          "message": "feat(reexecution/c): add back metervm metrics (#4511)",
+          "timestamp": "2025-11-19T19:02:22Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/4d07d90e96e51f39b6a3b0a0d0bfc9d41571971d"
+        },
+        "date": 1763651522696,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
+            "value": 43.44,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
