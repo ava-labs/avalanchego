@@ -35,6 +35,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/coreth/rpc"
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
@@ -45,8 +46,6 @@ import (
 // Client defines typed wrappers for the Ethereum RPC API.
 type Client struct {
 	c *rpc.Client
-	// blockHook is called when a block is decoded.
-	blockHook BlockHook
 }
 
 // Dial connects a client to the given URL.
@@ -132,10 +131,12 @@ func (ec *Client) BlockReceipts(ctx context.Context, blockNrOrHash rpc.BlockNumb
 }
 
 type rpcBlock struct {
-	Hash         common.Hash         `json:"hash"`
-	Transactions []rpcTransaction    `json:"transactions"`
-	UncleHashes  []common.Hash       `json:"uncles"`
-	Withdrawals  []*types.Withdrawal `json:"withdrawals,omitempty"`
+	Hash           common.Hash         `json:"hash"`
+	Transactions   []rpcTransaction    `json:"transactions"`
+	UncleHashes    []common.Hash       `json:"uncles"`
+	Withdrawals    []*types.Withdrawal `json:"withdrawals,omitempty"`
+	Version        uint32              `json:"version"`
+	BlockExtraData *hexutil.Bytes      `json:"blockExtraData"`
 }
 
 func (ec *Client) getBlock(ctx context.Context, method string, args ...interface{}) (*types.Block, error) {
@@ -204,16 +205,18 @@ func (ec *Client) getBlock(ctx context.Context, method string, args ...interface
 		}
 		txs[i] = tx.tx
 	}
-	block := types.NewBlockWithHeader(head).WithBody(types.Body{
-		Transactions: txs,
-		Uncles:       uncles,
-	})
-	// Fill the block with the extra data. BlockHook can modify the block.
-	if ec.blockHook != nil {
-		if err := ec.blockHook.OnBlockDecoded(raw, block); err != nil {
-			return nil, err
-		}
+
+	block := types.NewBlockWithHeader(head).WithBody(
+		types.Body{
+			Transactions: txs,
+			Uncles:       uncles,
+			Withdrawals:  body.Withdrawals,
+		})
+	extra := &customtypes.BlockBodyExtra{
+		Version: body.Version,
+		ExtData: (*[]byte)(body.BlockExtraData),
 	}
+	customtypes.SetBlockExtra(block, extra)
 	return block, nil
 }
 

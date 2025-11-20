@@ -5,19 +5,16 @@ package ethclient
 
 import (
 	"context"
-	"encoding/json"
 	"math/big"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/common/hexutil"
-	"github.com/ava-labs/libevm/core/types"
 
 	// Force-load precompiles to trigger registration
 	_ "github.com/ava-labs/coreth/precompile/registry"
 
 	"github.com/ava-labs/coreth/accounts/abi/bind"
 	"github.com/ava-labs/coreth/interfaces"
-	"github.com/ava-labs/coreth/rpc"
 
 	ethereum "github.com/ava-labs/libevm"
 )
@@ -41,23 +38,6 @@ var (
 	_ interfaces.AcceptedStateReader    = (*Client)(nil)
 	_ interfaces.AcceptedContractCaller = (*Client)(nil)
 )
-
-// NewClientWithHook creates a client that uses the given RPC client and block hook.
-func NewClientWithHook(c *rpc.Client, hook BlockHook) *Client {
-	return &Client{
-		c:         c,
-		blockHook: hook,
-	}
-}
-
-// BlockHook is an interface that can be implemented to modify the block
-// after it has been decoded. This is useful for plugins that want to
-// modify the block before it is returned to the caller.
-type BlockHook interface {
-	// OnBlockDecoded is called when a block is decoded. It can be used to
-	// modify the block before it is returned to the caller.
-	OnBlockDecoded(raw json.RawMessage, block *types.Block) error
-}
 
 // SubscribeNewAcceptedTransactions subscribes to notifications about the accepted transaction hashes on the given channel.
 func (ec *Client) SubscribeNewAcceptedTransactions(ctx context.Context, ch chan<- *common.Hash) (ethereum.Subscription, error) {
