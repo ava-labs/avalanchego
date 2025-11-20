@@ -50,7 +50,12 @@ func TestChainIndexerSingle(t *testing.T) {
 
 // Runs multiple tests with randomized parameters and different number of
 // chain backends.
+//
+// This test and all its code is unedited from go-ethereum. Since coreth forked
+// go-ethereum, no relevant fixes were made, besides replacing the ChainIndexer's
+// functionality with a different structure.
 func TestChainIndexerWithChildren(t *testing.T) {
+	t.Skip("Flaky test from go-ethereum")
 	for i := 2; i < 8; i++ {
 		testChainIndexer(t, i)
 	}
