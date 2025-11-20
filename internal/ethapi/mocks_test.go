@@ -17,6 +17,7 @@ import (
 
 	accounts "github.com/ava-labs/libevm/accounts"
 	common "github.com/ava-labs/libevm/common"
+	bloombits "github.com/ava-labs/libevm/core/bloombits"
 	state "github.com/ava-labs/libevm/core/state"
 	types "github.com/ava-labs/libevm/core/types"
 	vm "github.com/ava-labs/libevm/core/vm"
@@ -25,7 +26,6 @@ import (
 	commontype "github.com/ava-labs/subnet-evm/commontype"
 	consensus "github.com/ava-labs/subnet-evm/consensus"
 	core "github.com/ava-labs/subnet-evm/core"
-	bloombits "github.com/ava-labs/subnet-evm/core/bloombits"
 	params "github.com/ava-labs/subnet-evm/params"
 	rpc "github.com/ava-labs/subnet-evm/rpc"
 	gomock "go.uber.org/mock/gomock"
