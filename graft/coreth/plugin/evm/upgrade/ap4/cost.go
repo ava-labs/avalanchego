@@ -8,7 +8,7 @@ package ap4
 import (
 	"math"
 
-	"github.com/ava-labs/coreth/utils"
+	"github.com/ava-labs/avalanchego/graft/coreth/utils"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )

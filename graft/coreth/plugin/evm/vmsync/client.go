@@ -18,15 +18,15 @@ import (
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/log"
 
-	"github.com/ava-labs/coreth/core/state/snapshot"
-	"github.com/ava-labs/coreth/eth"
-	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/plugin/evm/message"
-	"github.com/ava-labs/coreth/sync/blocksync"
-	"github.com/ava-labs/coreth/sync/statesync"
+	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
+	"github.com/ava-labs/avalanchego/graft/coreth/eth"
+	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/blocksync"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync"
 
-	syncpkg "github.com/ava-labs/coreth/sync"
-	syncclient "github.com/ava-labs/coreth/sync/client"
+	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
+	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 )
 
 // BlocksToFetch is the number of the block parents the state syncs to.

@@ -23,8 +23,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/sync/semaphore"
 
-	"github.com/ava-labs/coreth/network/stats"
-	"github.com/ava-labs/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/network/stats"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 )
 
 // Minimum amount of time to handle a request

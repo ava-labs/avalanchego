@@ -7,9 +7,9 @@ package registry
 // Force imports of each precompile to ensure each precompile's init function runs and registers itself
 // with the registry.
 import (
-	_ "github.com/ava-labs/coreth/precompile/contracts/warp"
+	_ "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
 	// ADD PRECOMPILES BELOW
-	// _ "github.com/ava-labs/coreth/precompile/contracts/newprecompile"
+	// _ "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/newprecompile"
 )
 
 // This list is kept just for reference. The actual addresses defined in respective packages of precompiles.
