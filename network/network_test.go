@@ -313,7 +313,7 @@ func TestSyncedAppRequestAnyOnCtxCancellation(t *testing.T) {
 		net.Connected(
 			t.Context(),
 			ids.GenerateTestNodeID(),
-			version.CurrentApp,
+			version.Current,
 		),
 	)
 
