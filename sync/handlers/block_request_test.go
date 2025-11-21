@@ -77,7 +77,7 @@ func executeBlockRequestTest(t testing.TB, test blockRequestTest, blocks []*type
 	}
 	blockRequest.Parents = test.requestedParents
 
-	responseBytes, err := blockRequestHandler.OnBlockRequest(context.Background(), ids.GenerateTestNodeID(), 1, blockRequest)
+	responseBytes, err := blockRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, blockRequest)
 	if err != nil {
 		t.Fatal("unexpected error during block request", err)
 	}
@@ -244,7 +244,7 @@ func TestBlockRequestHandlerCtxExpires(t *testing.T) {
 	}
 
 	cancelAfterNumRequests := 2
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	blockRequestCallCount := 0
 	blockProvider := &TestBlockProvider{

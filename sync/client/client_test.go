@@ -102,7 +102,7 @@ func TestGetCode(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			codeHashes, res, expectedCode := test.setupRequest()
 
@@ -196,7 +196,7 @@ func TestGetBlocks(t *testing.T) {
 				Parents: 16,
 			},
 			getResponse: func(t *testing.T, request message.BlockRequest) []byte {
-				response, err := blocksRequestHandler.OnBlockRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+				response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -219,7 +219,7 @@ func TestGetBlocks(t *testing.T) {
 			},
 			getResponse: func(t *testing.T, request message.BlockRequest) []byte {
 				request.Parents -= 5
-				response, err := blocksRequestHandler.OnBlockRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+				response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -253,7 +253,7 @@ func TestGetBlocks(t *testing.T) {
 				Parents: 16,
 			},
 			getResponse: func(t *testing.T, request message.BlockRequest) []byte {
-				response, err := blocksRequestHandler.OnBlockRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+				response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				if err != nil {
 					t.Fatalf("failed to get block response: %s", err)
 				}
@@ -279,7 +279,7 @@ func TestGetBlocks(t *testing.T) {
 				Parents: 16,
 			},
 			getResponse: func(t *testing.T, _ message.BlockRequest) []byte {
-				response, err := blocksRequestHandler.OnBlockRequest(context.Background(), ids.GenerateTestNodeID(), 1, message.BlockRequest{
+				response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, message.BlockRequest{
 					Hash:    blocks[99].Hash(),
 					Height:  99,
 					Parents: 16,
@@ -364,7 +364,7 @@ func TestGetBlocks(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 
 			responseBytes := test.getResponse(t, test.request)
@@ -441,7 +441,7 @@ func TestGetLeafs(t *testing.T) {
 				Limit: leafsLimit,
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-				response, err := handler.OnLeafsRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				if err != nil {
 					t.Fatal("unexpected error in calling leafs request handler", err)
 				}
@@ -467,7 +467,7 @@ func TestGetLeafs(t *testing.T) {
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
 				modifiedRequest := request
 				modifiedRequest.Limit = leafsLimit
-				response, err := handler.OnLeafsRequest(context.Background(), ids.GenerateTestNodeID(), 1, modifiedRequest)
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, modifiedRequest)
 				if err != nil {
 					t.Fatal("unexpected error in calling leafs request handler", err)
 				}
@@ -487,7 +487,7 @@ func TestGetLeafs(t *testing.T) {
 				Limit: leafsLimit,
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-				response, err := handler.OnLeafsRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				if err != nil {
 					t.Fatal("unexpected error in calling leafs request handler", err)
 				}
@@ -511,7 +511,7 @@ func TestGetLeafs(t *testing.T) {
 				Limit: leafsLimit,
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-				response, err := handler.OnLeafsRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				if err != nil {
 					t.Fatal("unexpected error in calling leafs request handler", err)
 				}
@@ -535,7 +535,7 @@ func TestGetLeafs(t *testing.T) {
 				Limit: leafsLimit,
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-				response, err := handler.OnLeafsRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				if err != nil {
 					t.Fatal("unexpected error in calling leafs request handler", err)
 				}
@@ -558,7 +558,7 @@ func TestGetLeafs(t *testing.T) {
 				Limit: leafsLimit,
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-				response, err := handler.OnLeafsRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				if err != nil {
 					t.Fatal("unexpected error in calling leafs request handler", err)
 				}
@@ -582,7 +582,7 @@ func TestGetLeafs(t *testing.T) {
 				Limit: leafsLimit,
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-				response, err := handler.OnLeafsRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				if err != nil {
 					t.Fatal("unexpected error in calling leafs request handler", err)
 				}
@@ -612,7 +612,7 @@ func TestGetLeafs(t *testing.T) {
 				Limit: leafsLimit,
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-				response, err := handler.OnLeafsRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				if err != nil {
 					t.Fatal("unexpected error in calling leafs request handler", err)
 				}
@@ -625,7 +625,7 @@ func TestGetLeafs(t *testing.T) {
 				}
 				modifiedRequest := request
 				modifiedRequest.Start = leafResponse.Keys[1]
-				modifiedResponse, err := handler.OnLeafsRequest(context.Background(), ids.GenerateTestNodeID(), 2, modifiedRequest)
+				modifiedResponse, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 2, modifiedRequest)
 				if err != nil {
 					t.Fatal("unexpected error in calling leafs request handler", err)
 				}
@@ -641,7 +641,7 @@ func TestGetLeafs(t *testing.T) {
 				Limit: leafsLimit,
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-				response, err := handler.OnLeafsRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				if err != nil {
 					t.Fatal("unexpected error in calling leafs request handler", err)
 				}
@@ -671,7 +671,7 @@ func TestGetLeafs(t *testing.T) {
 				Limit: leafsLimit,
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-				response, err := handler.OnLeafsRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				if err != nil {
 					t.Fatal("unexpected error in calling leafs request handler", err)
 				}
@@ -702,7 +702,7 @@ func TestGetLeafs(t *testing.T) {
 				Limit: leafsLimit,
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-				response, err := handler.OnLeafsRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				if err != nil {
 					t.Fatal("unexpected error in calling leafs request handler", err)
 				}
@@ -732,7 +732,7 @@ func TestGetLeafs(t *testing.T) {
 				Limit: leafsLimit,
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
-				response, err := handler.OnLeafsRequest(context.Background(), ids.GenerateTestNodeID(), 1, request)
+				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
 				if err != nil {
 					t.Fatal("unexpected error in calling leafs request handler", err)
 				}
@@ -799,7 +799,7 @@ func TestGetLeafsRetries(t *testing.T) {
 		Limit: 1024,
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	goodResponse, responseErr := handler.OnLeafsRequest(ctx, ids.GenerateTestNodeID(), 1, request)
 	require.NoError(t, responseErr)
@@ -851,7 +851,7 @@ func TestStateSyncNodes(t *testing.T) {
 		StateSyncNodeIDs: stateSyncNodes,
 		BlockParser:      mockBlockParser,
 	})
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	attempt := 0
 	responses := [][]byte{{1}, {2}, {3}, {4}}

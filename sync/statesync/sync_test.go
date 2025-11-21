@@ -46,7 +46,7 @@ type syncTest struct {
 
 func testSync(t *testing.T, test syncTest) {
 	t.Helper()
-	ctx := context.Background()
+	ctx := t.Context()
 	if test.ctx != nil {
 		ctx = test.ctx
 	}
@@ -71,7 +71,7 @@ func testSync(t *testing.T, test syncTest) {
 	require.NoError(t, err, "failed to create state syncer")
 	// begin sync
 	s.Start(ctx)
-	waitFor(t, context.Background(), s.Wait, test.expectedError, testSyncTimeout)
+	waitFor(t, t.Context(), s.Wait, test.expectedError, testSyncTimeout)
 	if test.expectedError != nil {
 		return
 	}
@@ -209,7 +209,7 @@ func TestCancelSync(t *testing.T) {
 	serverTrieDB := triedb.NewDatabase(serverDB, nil)
 	// Create trie with 2000 accounts (more than one leaf request)
 	root := statesynctest.FillAccountsWithStorage(t, r, serverDB, serverTrieDB, common.Hash{}, 2000)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	testSync(t, syncTest{
 		ctx: ctx,
@@ -553,8 +553,8 @@ func TestDifferentWaitContext(t *testing.T) {
 	}
 
 	// Create two different contexts
-	startCtx := context.Background() // Never cancelled
-	waitCtx, waitCancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	startCtx := t.Context() // Never cancelled
+	waitCtx, waitCancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer waitCancel()
 
 	// Start with one context

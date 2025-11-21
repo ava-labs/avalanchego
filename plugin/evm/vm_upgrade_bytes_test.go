@@ -4,7 +4,6 @@
 package evm
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -58,7 +57,7 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 		upgradeJSON: string(upgradeBytesJSON),
 	})
 	defer func() {
-		if err := tvm.vm.Shutdown(context.Background()); err != nil {
+		if err := tvm.vm.Shutdown(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -105,20 +104,20 @@ func TestVMUpgradeBytesPrecompile(t *testing.T) {
 	// restart the vm with the same stateful params
 	newVM := &VM{}
 	if err := newVM.Initialize(
-		context.Background(), tvm.vm.ctx, tvm.db, []byte(genesisJSONSubnetEVM), upgradeBytesJSON, []byte{}, []*commonEng.Fx{}, tvm.appSender,
+		t.Context(), tvm.vm.ctx, tvm.db, []byte(genesisJSONSubnetEVM), upgradeBytesJSON, []byte{}, []*commonEng.Fx{}, tvm.appSender,
 	); err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		if err := newVM.Shutdown(context.Background()); err != nil {
+		if err := newVM.Shutdown(t.Context()); err != nil {
 			t.Fatal(err)
 		}
 	}()
 	// Set the VM's state to NormalOp to initialize the tx pool.
-	if err := newVM.SetState(context.Background(), snow.Bootstrapping); err != nil {
+	if err := newVM.SetState(t.Context(), snow.Bootstrapping); err != nil {
 		t.Fatal(err)
 	}
-	if err := newVM.SetState(context.Background(), snow.NormalOp); err != nil {
+	if err := newVM.SetState(t.Context(), snow.NormalOp); err != nil {
 		t.Fatal(err)
 	}
 	newTxPoolHeadChan := make(chan core.NewTxPoolReorgEvent, 1)
@@ -315,7 +314,7 @@ func TestVMStateUpgrade(t *testing.T) {
 		upgradeJSON: upgradeBytesJSON,
 	})
 
-	defer func() { require.NoError(t, tvm.vm.Shutdown(context.Background())) }()
+	defer func() { require.NoError(t, tvm.vm.Shutdown(t.Context())) }()
 
 	// Verify the new account doesn't exist yet
 	genesisState, err := tvm.vm.blockChain.State()
@@ -406,7 +405,7 @@ func TestVMEtnaActivatesCancun(t *testing.T) {
 				upgradeJSON: test.upgradeJSON,
 			})
 
-			defer func() { require.NoError(t, tvm.vm.Shutdown(context.Background())) }()
+			defer func() { require.NoError(t, tvm.vm.Shutdown(t.Context())) }()
 			test.check(t, tvm.vm)
 		})
 	}

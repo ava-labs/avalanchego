@@ -53,7 +53,7 @@ func TestUptimeTracker(t *testing.T) {
 
 	vm := &VM{}
 	require.NoError(vm.Initialize(
-		context.Background(),
+		t.Context(),
 		ctx,
 		dbManager,
 		genesisBytes,
@@ -62,20 +62,20 @@ func TestUptimeTracker(t *testing.T) {
 		[]*commonEng.Fx{},
 		appSender,
 	))
-	defer vm.Shutdown(context.Background())
+	defer vm.Shutdown(t.Context())
 
 	// Mock the clock to control time progression
 	clock := vm.clock
 	clock.Set(baseTime)
 
-	require.NoError(vm.SetState(context.Background(), snow.Bootstrapping))
+	require.NoError(vm.SetState(t.Context(), snow.Bootstrapping))
 
 	// After bootstrapping but before NormalOp, uptimeTracker hasn't started syncing yet
 	// so GetUptime should not be able to find the validation ID
 	_, _, err := vm.uptimeTracker.GetUptime(testValidationID)
 	require.ErrorIs(err, uptimetracker.ErrValidationIDNotFound)
 
-	require.NoError(vm.SetState(context.Background(), snow.NormalOp))
+	require.NoError(vm.SetState(t.Context(), snow.NormalOp))
 
 	// After transitioning to NormalOp, Sync() is called automatically to populate uptime
 	// from validator state, so GetUptime should work now

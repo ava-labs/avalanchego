@@ -4,7 +4,6 @@
 package tracers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -132,7 +131,7 @@ func testTraceBlockPrecompileActivation(t *testing.T, scheme string) {
 		},
 	}
 	for i, tc := range testSuite {
-		result, err := api.TraceBlockByNumber(context.Background(), tc.blockNumber, tc.config)
+		result, err := api.TraceBlockByNumber(t.Context(), tc.blockNumber, tc.config)
 		if tc.expectErr != nil {
 			if err == nil {
 				t.Errorf("test %d, want error %v", i, tc.expectErr)
@@ -210,7 +209,7 @@ func testTraceTransactionPrecompileActivation(t *testing.T, scheme string) {
 	api := NewAPI(backend)
 	for i, target := range blockNoTxMap {
 		t.Run(fmt.Sprintf("blockNumber %d", i), func(t *testing.T) {
-			result, err := api.TraceTransaction(context.Background(), target, nil)
+			result, err := api.TraceTransaction(t.Context(), target, nil)
 			require := require.New(t)
 			require.NoError(err)
 			var have *logger.ExecutionResult
@@ -300,8 +299,8 @@ func testTraceChainPrecompileActivation(t *testing.T, scheme string) {
 		ref.Store(0)
 		rel.Store(0)
 
-		from, _ := api.blockByNumber(context.Background(), rpc.BlockNumber(c.start))
-		to, _ := api.blockByNumber(context.Background(), rpc.BlockNumber(c.end))
+		from, _ := api.blockByNumber(t.Context(), rpc.BlockNumber(c.start))
+		to, _ := api.blockByNumber(t.Context(), rpc.BlockNumber(c.end))
 		resCh := api.traceChain(from, to, c.config, nil)
 
 		next := c.start + 1
@@ -443,7 +442,7 @@ func testTraceCallWithOverridesStateUpgrade(t *testing.T, scheme string) {
 		},
 	}
 	for i, testspec := range testSuite {
-		result, err := api.TraceCall(context.Background(), testspec.call, rpc.BlockNumberOrHash{BlockNumber: &testspec.blockNumber}, testspec.config)
+		result, err := api.TraceCall(t.Context(), testspec.call, rpc.BlockNumberOrHash{BlockNumber: &testspec.blockNumber}, testspec.config)
 		if testspec.expectErr != nil {
 			require.ErrorIs(t, err, testspec.expectErr, "test %d", i)
 			continue

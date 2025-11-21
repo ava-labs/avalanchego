@@ -15,7 +15,7 @@ import (
 
 func TestE2E(t *testing.T) {
 	if basePath := os.Getenv("TEST_SOURCE_ROOT"); basePath != "" {
-		os.Chdir(basePath)
+		t.Chdir(basePath)
 	}
 	solidity.RegisterAsyncTests()
 	ginkgo.RunSpecs(t, "subnet-evm precompile ginkgo test suite")
