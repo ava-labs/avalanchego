@@ -4,9 +4,8 @@
 package atomictest
 
 import (
-	"github.com/ava-labs/avalanchego/ids"
-
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
+	"github.com/ava-labs/avalanchego/ids"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )

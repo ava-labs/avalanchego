@@ -6,8 +6,9 @@ package network
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/ids"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestPeerTracker(t *testing.T) {
