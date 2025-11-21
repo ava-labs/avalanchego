@@ -36,17 +36,6 @@ import (
 	"github.com/ava-labs/libevm/log"
 )
 
-// TxIndexProgress is the struct describing the progress for transaction indexing.
-type TxIndexProgress struct {
-	Indexed   uint64 // number of blocks whose transactions are indexed
-	Remaining uint64 // number of blocks whose transactions are not indexed yet
-}
-
-// Done returns an indicator if the transaction indexing is finished.
-func (progress TxIndexProgress) Done() bool {
-	return progress.Remaining == 0
-}
-
 // txIndexer is the module responsible for maintaining transaction indexes
 // according to the configured indexing range by users.
 type txIndexer struct {
@@ -55,11 +44,10 @@ type txIndexer struct {
 	//  * 0: means the entire chain should be indexed
 	//  * N: means the latest N blocks [HEAD-N+1, HEAD] should be indexed
 	//       and all others shouldn't.
-	limit    uint64
-	db       ethdb.Database
-	progress chan chan TxIndexProgress
-	term     chan chan struct{}
-	closed   chan struct{}
+	limit  uint64
+	db     ethdb.Database
+	term   chan chan struct{}
+	closed chan struct{}
 
 	chain *BlockChain
 }
@@ -67,12 +55,11 @@ type txIndexer struct {
 // newTxIndexer initializes the transaction indexer.
 func newTxIndexer(limit uint64, chain *BlockChain) *txIndexer {
 	indexer := &txIndexer{
-		limit:    limit,
-		db:       chain.db,
-		progress: make(chan chan TxIndexProgress),
-		term:     make(chan chan struct{}),
-		closed:   make(chan struct{}),
-		chain:    chain,
+		limit:  limit,
+		db:     chain.db,
+		term:   make(chan chan struct{}),
+		closed: make(chan struct{}),
+		chain:  chain,
 	}
 	chain.wg.Add(1)
 	go func() {
@@ -125,9 +112,10 @@ func (indexer *txIndexer) loop(chain *BlockChain) {
 	defer close(indexer.closed)
 	// Listening to chain events and manipulate the transaction indexes.
 	var (
-		stop     chan struct{} // Non-nil if background routine is active.
-		done     chan struct{} // Non-nil if background routine is active.
-		lastHead uint64        // The latest announced chain head (whose tx indexes are assumed created)
+		stop        chan struct{} // Non-nil if background routine is active.
+		done        chan struct{} // Non-nil if background routine is active.
+		lastHead    uint64        // The latest announced chain head (whose tx indexes are assumed created)
+		runningHead uint64        // The head number being processed in background.
 
 		headCh = make(chan ChainEvent)
 		sub    = chain.SubscribeChainAcceptedEvent(headCh)
@@ -138,18 +126,21 @@ func (indexer *txIndexer) loop(chain *BlockChain) {
 	}
 	defer sub.Unsubscribe()
 
+	// startRun launches the background unindexing task.
+	startRun := func(newHead uint64) {
+		stop = make(chan struct{})
+		done = make(chan struct{})
+		runningHead = newHead
+		indexer.chain.wg.Add(1)
+		go indexer.lockedRun(runningHead, stop, done)
+	}
+
 	log.Info("Initialized transaction unindexer", "limit", indexer.limit)
 
 	// Launch the initial processing if chain is not empty (head != genesis).
 	// This step is useful in these scenarios that chain has no progress.
 	if head := indexer.chain.CurrentBlock(); head != nil && head.Number.Uint64() > indexer.limit {
-		stop = make(chan struct{})
-		done = make(chan struct{})
-		lastHead = head.Number.Uint64()
-		indexer.chain.wg.Add(1)
-		go func() {
-			indexer.lockedRun(head.Number.Uint64(), stop, done)
-		}()
+		startRun(head.Number.Uint64())
 	}
 	for {
 		select {
@@ -159,20 +150,20 @@ func (indexer *txIndexer) loop(chain *BlockChain) {
 				break
 			}
 
+			// If no background task is running, start a new one.
+			// We cannot block on the subscription channel because it can
+			// cause a fatal error.
 			if done == nil {
-				stop = make(chan struct{})
-				done = make(chan struct{})
-				indexer.chain.wg.Add(1)
-				go func() {
-					indexer.lockedRun(headNum, stop, done)
-				}()
+				startRun(headNum)
 			}
-			lastHead = head.Block.NumberU64()
+			lastHead = headNum
 		case <-done:
 			stop = nil
 			done = nil
-		case ch := <-indexer.progress:
-			ch <- indexer.report(lastHead, rawdb.ReadTxIndexTail(indexer.db))
+			// If there is a new head arrived during the last run, start a new one.
+			if runningHead < lastHead {
+				startRun(lastHead)
+			}
 		case ch := <-indexer.term:
 			if stop != nil {
 				close(stop)
@@ -184,28 +175,6 @@ func (indexer *txIndexer) loop(chain *BlockChain) {
 			close(ch)
 			return
 		}
-	}
-}
-
-// report returns the tx indexing progress.
-func (indexer *txIndexer) report(head uint64, tail *uint64) TxIndexProgress {
-	total := indexer.limit
-	if indexer.limit == 0 || total > head {
-		total = head + 1 // genesis included
-	}
-	var indexed uint64
-	if tail != nil {
-		indexed = head - *tail + 1
-	}
-	// The value of indexed might be larger than total if some blocks need
-	// to be unindexed, avoiding a negative remaining.
-	var remaining uint64
-	if indexed < total {
-		remaining = total - indexed
-	}
-	return TxIndexProgress{
-		Indexed:   indexed,
-		Remaining: remaining,
 	}
 }
 
