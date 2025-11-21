@@ -59,7 +59,8 @@ type PrecompileTest struct {
 	// ChainConfigFn returns the chain config to use for the precompile's block context
 	// If nil, the default chain config will be used.
 	ChainConfigFn func(*gomock.Controller) precompileconfig.ChainConfig
-	// Rules is the rules to use for the precompile's block context
+	// Rules is the rules to use for the precompile's block context.
+	// If not set (zero-value), will be derived from ChainConfig.
 	Rules extras.AvalancheRules
 }
 
@@ -191,12 +192,19 @@ func (test PrecompileTest) setup(t testing.TB, module modules.Module, state *tes
 	}
 	snowContext := utilstest.NewTestSnowContext(t)
 
+	// If Rules is explicitly set, use it; otherwise derive from ChainConfig
+	rules := test.Rules
+	if (rules == extras.AvalancheRules{}) {
+		rules = extras.AvalancheRules{
+			IsDurango: chainConfig.IsDurango(blockContext.Timestamp()),
+		}
+	}
+
 	accessibleState := contract.NewMockAccessibleState(ctrl)
 	accessibleState.EXPECT().GetStateDB().Return(state).AnyTimes()
 	accessibleState.EXPECT().GetBlockContext().Return(blockContext).AnyTimes()
 	accessibleState.EXPECT().GetSnowContext().Return(snowContext).AnyTimes()
-	accessibleState.EXPECT().GetChainConfig().Return(chainConfig).AnyTimes()
-	accessibleState.EXPECT().GetRules().Return(test.Rules).AnyTimes()
+	accessibleState.EXPECT().GetRules().Return(rules).AnyTimes()
 
 	if test.Config != nil {
 		require.NoError(t, module.Configure(chainConfig, test.Config, state, blockContext))

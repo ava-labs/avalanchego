@@ -217,7 +217,8 @@ func setFeeConfig(accessibleState contract.AccessibleState, caller common.Addres
 	}
 
 	// do not use strict mode after Durango
-	useStrictMode := !contract.IsDurangoActivated(accessibleState)
+	rules := accessibleState.GetRules()
+	useStrictMode := !rules.IsDurangoActivated()
 	feeConfig, err := UnpackSetFeeConfigInput(input, useStrictMode)
 	if err != nil {
 		return nil, remainingGas, err
@@ -230,7 +231,7 @@ func setFeeConfig(accessibleState contract.AccessibleState, caller common.Addres
 		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotChangeFee, caller)
 	}
 
-	if contract.IsDurangoActivated(accessibleState) {
+	if rules.IsDurangoActivated() {
 		if remainingGas, err = contract.DeductGas(remainingGas, FeeConfigChangedEventGasCost); err != nil {
 			return nil, 0, err
 		}

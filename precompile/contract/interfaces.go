@@ -57,7 +57,6 @@ type AccessibleState interface {
 	GetStateDB() StateDB
 	GetBlockContext() BlockContext
 	GetSnowContext() *snow.Context
-	GetChainConfig() precompileconfig.ChainConfig
 	GetRules() precompileconfig.Rules
 }
 

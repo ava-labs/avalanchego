@@ -128,20 +128,6 @@ func (mr *MockAccessibleStateMockRecorder) GetBlockContext() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBlockContext", reflect.TypeOf((*MockAccessibleState)(nil).GetBlockContext))
 }
 
-// GetChainConfig mocks base method.
-func (m *MockAccessibleState) GetChainConfig() precompileconfig.ChainConfig {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetChainConfig")
-	ret0, _ := ret[0].(precompileconfig.ChainConfig)
-	return ret0
-}
-
-// GetChainConfig indicates an expected call of GetChainConfig.
-func (mr *MockAccessibleStateMockRecorder) GetChainConfig() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChainConfig", reflect.TypeOf((*MockAccessibleState)(nil).GetChainConfig))
-}
-
 // GetRules mocks base method.
 func (m *MockAccessibleState) GetRules() precompileconfig.Rules {
 	m.ctrl.T.Helper()

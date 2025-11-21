@@ -98,7 +98,7 @@ func allowFeeRecipients(accessibleState contract.AccessibleState, caller common.
 	}
 	// allow list code ends here.
 
-	if contract.IsDurangoActivated(accessibleState) {
+	if accessibleState.GetRules().IsDurangoActivated() {
 		if remainingGas, err = contract.DeductGas(remainingGas, FeeRecipientsAllowedEventGasCost); err != nil {
 			return nil, 0, err
 		}
@@ -199,10 +199,11 @@ func setRewardAddress(accessibleState contract.AccessibleState, caller common.Ad
 	if readOnly {
 		return nil, remainingGas, vm.ErrWriteProtection
 	}
+	rules := accessibleState.GetRules()
 	// attempts to unpack [input] into the arguments to the SetRewardAddressInput.
 	// Assumes that [input] does not include selector
 	// do not use strict mode after Durango
-	useStrictMode := !contract.IsDurangoActivated(accessibleState)
+	useStrictMode := !rules.IsDurangoActivated()
 	rewardAddress, err := UnpackSetRewardAddressInput(input, useStrictMode)
 	if err != nil {
 		return nil, remainingGas, err
@@ -225,7 +226,7 @@ func setRewardAddress(accessibleState contract.AccessibleState, caller common.Ad
 	}
 
 	// Add a log to be handled if this action is finalized.
-	if contract.IsDurangoActivated(accessibleState) {
+	if rules.IsDurangoActivated() {
 		if remainingGas, err = contract.DeductGas(remainingGas, RewardAddressChangedEventGasCost); err != nil {
 			return nil, 0, err
 		}
@@ -289,7 +290,7 @@ func disableRewards(accessibleState contract.AccessibleState, caller common.Addr
 	}
 	// allow list code ends here.
 
-	if contract.IsDurangoActivated(accessibleState) {
+	if accessibleState.GetRules().IsDurangoActivated() {
 		if remainingGas, err = contract.DeductGas(remainingGas, RewardsDisabledEventGasCost); err != nil {
 			return nil, 0, err
 		}

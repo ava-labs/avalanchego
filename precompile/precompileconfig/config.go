@@ -88,4 +88,5 @@ type ChainConfig interface {
 // Rules defines the interface that provides information about the current rules of the chain.
 type Rules interface {
 	IsGraniteActivated() bool
+	IsDurangoActivated() bool
 }

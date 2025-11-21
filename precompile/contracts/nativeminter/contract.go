@@ -88,7 +88,8 @@ func mintNativeCoin(accessibleState contract.AccessibleState, caller common.Addr
 		return nil, remainingGas, vm.ErrWriteProtection
 	}
 
-	useStrictMode := !contract.IsDurangoActivated(accessibleState)
+	rules := accessibleState.GetRules()
+	useStrictMode := !rules.IsDurangoActivated()
 	to, amount, err := UnpackMintNativeCoinInput(input, useStrictMode)
 	if err != nil {
 		return nil, remainingGas, err
@@ -101,7 +102,7 @@ func mintNativeCoin(accessibleState contract.AccessibleState, caller common.Addr
 		return nil, remainingGas, fmt.Errorf("%w: %s", ErrCannotMint, caller)
 	}
 
-	if contract.IsDurangoActivated(accessibleState) {
+	if rules.IsDurangoActivated() {
 		if remainingGas, err = contract.DeductGas(remainingGas, NativeCoinMintedEventGasCost); err != nil {
 			return nil, 0, err
 		}

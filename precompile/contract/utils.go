@@ -59,7 +59,3 @@ func ParseABI(rawABI string) abi.ABI {
 
 	return parsed
 }
-
-func IsDurangoActivated(evm AccessibleState) bool {
-	return evm.GetChainConfig().IsDurango(evm.GetBlockContext().Timestamp())
-}

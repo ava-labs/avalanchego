@@ -193,6 +193,11 @@ func (a AvalancheRules) IsGraniteActivated() bool {
 	return a.IsGranite
 }
 
+// IsDurangoActivated is used by the warp precompile to determine which gas costs to use.
+func (a AvalancheRules) IsDurangoActivated() bool {
+	return a.IsDurango
+}
+
 func (n *NetworkUpgrades) GetAvalancheRules(time uint64) AvalancheRules {
 	return AvalancheRules{
 		IsSubnetEVM: n.IsSubnetEVM(time),
