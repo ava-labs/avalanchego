@@ -891,6 +891,8 @@ func (vm *VM) onNormalOperationsStarted() error {
 	// NOTE: gossip network must be initialized first otherwise ETH tx gossip will not work.
 	vm.builderLock.Lock()
 	vm.builder = vm.NewBlockBuilder()
+	vm.builder.setChainHeadHash(vm.blockChain.CurrentBlock().Hash())
+	vm.builder.setMempoolHeadHash(vm.blockChain.CurrentBlock().Hash())
 	vm.builder.awaitSubmittedTxs()
 	vm.builderLock.Unlock()
 
@@ -1130,7 +1132,14 @@ func (vm *VM) SetPreference(ctx context.Context, blkID ids.ID) error {
 		return fmt.Errorf("failed to set preference to %s: %w", blkID, err)
 	}
 
-	return vm.blockChain.SetPreference(block.(*wrappedBlock).ethBlock)
+	wb, isWrappedBlock := block.(*wrappedBlock)
+	if !isWrappedBlock {
+		return fmt.Errorf("expected block %s to be of type *wrappedBlock but got %T", blkID, block)
+	}
+
+	vm.setPendingBlock(wb.GetEthBlock().Hash())
+
+	return vm.blockChain.SetPreference(wb.ethBlock)
 }
 
 // GetBlockIDAtHeight returns the canonical block at [height].
@@ -1368,6 +1377,17 @@ func attachEthService(handler *rpc.Server, apis []rpc.API, names []string) error
 	}
 
 	return nil
+}
+
+func (vm *VM) setPendingBlock(hash common.Hash) {
+	vm.builderLock.Lock()
+	defer vm.builderLock.Unlock()
+
+	if vm.builder == nil {
+		return
+	}
+
+	vm.builder.setChainHeadHash(hash)
 }
 
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {

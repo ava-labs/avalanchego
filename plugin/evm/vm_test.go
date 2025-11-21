@@ -13,7 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -3565,6 +3564,11 @@ func restartVM(tvm *testVM, tvmConfig testVMConfig) (*testVM, error) {
 }
 
 func TestWaitForEvent(t *testing.T) {
+	type result struct {
+		msg commonEng.Message
+		err error
+	}
+
 	fortunaFork := upgradetest.Fortuna
 	for _, testCase := range []struct {
 		name     string
@@ -3574,34 +3578,27 @@ func TestWaitForEvent(t *testing.T) {
 		{
 			name: "WaitForEvent with context cancelled returns 0",
 			testCase: func(t *testing.T, vm *VM) {
+				t.Parallel()
 				ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*100)
 				defer cancel()
 
-				var wg sync.WaitGroup
-				wg.Add(1)
-
-				// We run WaitForEvent in a goroutine to ensure it can be safely called concurrently.
-				go func() {
-					defer wg.Done()
-					msg, err := vm.WaitForEvent(ctx)
-					assert.ErrorIs(t, err, context.DeadlineExceeded)
-					assert.Zero(t, msg)
-				}()
-
-				wg.Wait()
+				msg, err := vm.WaitForEvent(ctx)
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+				require.Zero(t, msg)
 			},
 		},
 		{
 			name: "WaitForEvent returns when a transaction is added to the mempool",
 			testCase: func(t *testing.T, vm *VM) {
-				var wg sync.WaitGroup
-				wg.Add(1)
+				t.Parallel()
 
+				results := make(chan result)
 				go func() {
-					defer wg.Done()
 					msg, err := vm.WaitForEvent(t.Context())
-					assert.NoError(t, err)
-					assert.Equal(t, commonEng.PendingTxs, msg)
+					results <- result{
+						msg: msg,
+						err: err,
+					}
 				}()
 
 				tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
@@ -3612,34 +3609,158 @@ func TestWaitForEvent(t *testing.T) {
 					require.NoError(t, err)
 				}
 
-				wg.Wait()
+				r := <-results
+				require.NoError(t, r.err)
+				require.Equal(t, commonEng.PendingTxs, r.msg)
 			},
 		},
 		{
-			name: "WaitForEvent doesn't return if mempool is empty",
+			name: "WaitForEvent build block after re-org",
 			testCase: func(t *testing.T, vm *VM) {
+				t.Parallel()
+
+				tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
+				require.NoError(t, err)
+
+				err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
+				require.NoError(t, err)
+
+				ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+
+				msg, err := vm.WaitForEvent(ctx)
+				require.NoError(t, err)
+				require.Equal(t, commonEng.PendingTxs, msg)
+
+				cancel()
+
+				blk, err := vm.BuildBlock(t.Context())
+				require.NoError(t, err)
+
+				require.NoError(t, blk.Verify(t.Context()))
+
+				require.NoError(t, vm.SetPreference(t.Context(), blk.ID()))
+
+				tx = types.NewTransaction(uint64(1), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+				signedTx, err = types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
+				require.NoError(t, err)
+
+				err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
+				require.NoError(t, err)
+
+				ctx, cancel = context.WithTimeout(t.Context(), time.Second*2)
+				defer cancel()
+
+				msg, err = vm.WaitForEvent(ctx)
+				require.NoError(t, err)
+				require.Equal(t, commonEng.PendingTxs, msg)
+
+				blk2, err := vm.BuildBlock(t.Context())
+				require.NoError(t, err)
+
+				require.NoError(t, blk2.Verify(t.Context()))
+
+				require.NoError(t, blk.Accept(t.Context()))
+				require.NoError(t, blk2.Accept(t.Context()))
+			},
+		},
+		{
+			name: "WaitForEvent doesn't return once a block is built and accepted",
+			testCase: func(t *testing.T, vm *VM) {
+				t.Parallel()
 				ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*100)
 				defer cancel()
 
-				var wg sync.WaitGroup
-				wg.Add(1)
+				msg, err := vm.WaitForEvent(ctx)
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+				require.Zero(t, msg)
 
-				// We run WaitForEvent in a goroutine to ensure it can be safely called concurrently.
-				go func() {
-					defer wg.Done()
-					msg, err := vm.WaitForEvent(ctx)
-					assert.ErrorIs(t, err, context.DeadlineExceeded)
-					assert.Zero(t, msg)
-				}()
+				tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
+				require.NoError(t, err)
 
-				wg.Wait()
+				err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
+				require.NoError(t, err)
+
+				blk, err := vm.BuildBlock(t.Context())
+				require.NoError(t, err)
+
+				require.NoError(t, blk.Verify(t.Context()))
+
+				require.NoError(t, vm.SetPreference(t.Context(), blk.ID()))
+
+				require.NoError(t, blk.Accept(t.Context()))
+
+				ctx, cancel = context.WithTimeout(t.Context(), time.Millisecond*100)
+				defer cancel()
+
+				msg, err = vm.WaitForEvent(ctx)
+				require.ErrorIs(t, err, context.DeadlineExceeded)
+				require.Zero(t, msg)
 			},
 		},
-		// TODO (ceyonur): remove this test after Granite is activated.
+		{
+			name: "WaitForEvent for two accepted blocks in a row",
+			testCase: func(t *testing.T, vm *VM) {
+				t.Parallel()
+
+				tx := types.NewTransaction(uint64(0), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+				signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
+				require.NoError(t, err)
+
+				err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
+				require.NoError(t, err)
+
+				blk, err := vm.BuildBlock(t.Context())
+				require.NoError(t, err)
+
+				require.NoError(t, blk.Verify(t.Context()))
+				require.NoError(t, vm.SetPreference(t.Context(), blk.ID()))
+
+				tx = types.NewTransaction(uint64(1), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+				signedTx, err = types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
+				require.NoError(t, err)
+				err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
+				require.NoError(t, err)
+
+				time.Sleep(time.Second * 2)
+				blk2, err := vm.BuildBlock(t.Context())
+				require.NoError(t, err)
+
+				require.NoError(t, blk2.Verify(t.Context()))
+
+				tx = types.NewTransaction(uint64(2), testEthAddrs[1], firstTxAmount, 21000, big.NewInt(testMinGasPrice), nil)
+				signedTx, err = types.SignTx(tx, types.NewEIP155Signer(vm.chainConfig.ChainID), testKeys[0].ToECDSA())
+				require.NoError(t, err)
+				err = errors.Join(vm.txPool.AddRemotesSync([]*types.Transaction{signedTx})...)
+				require.NoError(t, err)
+
+				results := make(chan result)
+				// We run WaitForEvent in a goroutine to ensure it can be safely called concurrently.
+				go func() {
+					msg, err := vm.WaitForEvent(t.Context())
+					results <- result{
+						msg: msg,
+						err: err,
+					}
+				}()
+				err = blk.Accept(t.Context())
+				require.NoError(t, err)
+				err = blk2.Accept(t.Context())
+				require.NoError(t, err)
+				require.NoError(t, vm.SetPreference(t.Context(), blk2.ID()))
+				res := <-results
+				require.NoError(t, res.err)
+				require.Equal(t, commonEng.PendingTxs, res.msg)
+			},
+		},
+		// TODO (ceyonur): remove this test after Granite is activated. (See https://github.com/ava-labs/coreth/issues/1318)
 		{
 			name: "WaitForEvent does not wait for new block to be built in fortuna",
 			Fork: &fortunaFork,
 			testCase: func(t *testing.T, vm *VM) {
+				t.Parallel()
+
 				signedTx := newSignedLegacyTx(t, vm.chainConfig, testKeys[0].ToECDSA(), 0, &testEthAddrs[1], big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
 				blk, err := IssueTxsAndSetPreference([]*types.Transaction{signedTx}, vm)
 				require.NoError(t, err)
@@ -3650,21 +3771,12 @@ func TestWaitForEvent(t *testing.T) {
 					require.NoError(t, err)
 				}
 
-				ctx, cancel := context.WithTimeout(t.Context(), time.Millisecond*100)
-				defer cancel()
-
-				var wg sync.WaitGroup
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					msg, err := vm.WaitForEvent(ctx)
-					assert.NoError(t, err)
-					assert.Equal(t, commonEng.PendingTxs, msg)
-				}()
-				wg.Wait()
+				msg, err := vm.WaitForEvent(t.Context())
+				require.NoError(t, err)
+				require.Equal(t, commonEng.PendingTxs, msg)
 			},
 		},
-		// TODO (ceyonur): remove this test after Granite is activated.
+		// TODO (ceyonur): remove this test after Granite is activated. (See https://github.com/ava-labs/coreth/issues/1318)
 		{
 			name: "WaitForEvent waits for a delay with a retry in fortuna",
 			Fork: &fortunaFork,
@@ -3682,16 +3794,10 @@ func TestWaitForEvent(t *testing.T) {
 					require.NoError(t, err)
 				}
 
-				var wg sync.WaitGroup
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					msg, err := vm.WaitForEvent(t.Context())
-					assert.NoError(t, err)
-					assert.Equal(t, commonEng.PendingTxs, msg)
-					assert.GreaterOrEqual(t, time.Since(lastBuildBlockTime), RetryDelay)
-				}()
-				wg.Wait()
+				msg, err := vm.WaitForEvent(t.Context())
+				require.NoError(t, err)
+				require.Equal(t, commonEng.PendingTxs, msg)
+				require.GreaterOrEqual(t, time.Since(lastBuildBlockTime), RetryDelay)
 			},
 		},
 	} {
