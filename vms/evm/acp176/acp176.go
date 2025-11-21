@@ -11,12 +11,12 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"sort"
 
 	"github.com/holiman/uint256"
 
 	"github.com/ava-labs/avalanchego/utils/wrappers"
 	"github.com/ava-labs/avalanchego/vms/components/gas"
+	"github.com/ava-labs/avalanchego/vms/evm/excess"
 
 	safemath "github.com/ava-labs/avalanchego/utils/math"
 )
@@ -41,7 +41,16 @@ const (
 	maxTargetExcess = 1_024_950_627 // TargetConversion * ln(MaxUint64 / MinTargetPerSecond) + 1
 )
 
-var ErrStateInsufficientLength = errors.New("insufficient length for fee state")
+var (
+	ErrStateInsufficientLength = errors.New("insufficient length for fee state")
+
+	acp176Params = excess.Params{
+		MinValue:       MinTargetPerSecond,  // P
+		ConversionRate: TargetConversion,    // D
+		MaxExcessDiff:  MaxTargetExcessDiff, // Q
+		MaxExcess:      maxTargetExcess,
+	}
+)
 
 // State represents the current state of the gas pricing and constraints.
 type State struct {
@@ -74,11 +83,7 @@ func ParseState(bytes []byte) (State, error) {
 //
 // Target = MinTargetPerSecond * e^(TargetExcess / TargetConversion)
 func (s *State) Target() gas.Gas {
-	return gas.Gas(gas.CalculatePrice(
-		MinTargetPerSecond,
-		s.TargetExcess,
-		TargetConversion,
-	))
+	return gas.Gas(acp176Params.CalculateValue(uint64(s.TargetExcess)))
 }
 
 // MaxCapacity returns the maximum possible accrued gas capacity, `C`.
@@ -163,7 +168,7 @@ func (s *State) ConsumeGas(
 // desiredTargetExcess without exceeding the maximum targetExcess change.
 func (s *State) UpdateTargetExcess(desiredTargetExcess gas.Gas) {
 	previousTargetPerSecond := s.Target()
-	s.TargetExcess = targetExcess(s.TargetExcess, desiredTargetExcess)
+	s.TargetExcess = gas.Gas(acp176Params.AdjustExcess(uint64(s.TargetExcess), uint64(desiredTargetExcess)))
 	newTargetPerSecond := s.Target()
 	s.Gas.Excess = scaleExcess(
 		s.Gas.Excess,
@@ -188,26 +193,7 @@ func (s *State) Bytes() []byte {
 // DesiredTargetExcess calculates the optimal desiredTargetExcess given the
 // desired target.
 func DesiredTargetExcess(desiredTarget gas.Gas) gas.Gas {
-	// This could be solved directly by calculating D * ln(desiredTarget / P)
-	// using floating point math. However, it introduces inaccuracies. So, we
-	// use a binary search to find the closest integer solution.
-	return gas.Gas(sort.Search(maxTargetExcess, func(targetExcessGuess int) bool {
-		state := State{
-			TargetExcess: gas.Gas(targetExcessGuess),
-		}
-		return state.Target() >= desiredTarget
-	}))
-}
-
-// targetExcess calculates the optimal new targetExcess for a block proposer to
-// include given the current and desired excess values.
-func targetExcess(excess, desired gas.Gas) gas.Gas {
-	change := safemath.AbsDiff(excess, desired)
-	change = min(change, MaxTargetExcessDiff)
-	if excess < desired {
-		return excess + change
-	}
-	return excess - change
+	return gas.Gas(acp176Params.DesiredExcess(uint64(desiredTarget)))
 }
 
 // scaleExcess scales the excess during gas target modifications to keep the
