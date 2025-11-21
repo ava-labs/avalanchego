@@ -40,6 +40,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/extstate"
 	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
@@ -1835,7 +1836,11 @@ func (bc *BlockChain) initSnapshot(b *types.Header) {
 func (bc *BlockChain) reprocessState(current *types.Block, reexec uint64) error {
 	origin := current.NumberU64()
 	acceptorTip, err := customrawdb.ReadAcceptorTip(bc.db)
-	if err != nil {
+	// If no acceptor tip exists, treat it as empty hash (not initialized).
+	switch {
+	case errors.Is(err, database.ErrNotFound):
+		acceptorTip = common.Hash{}
+	case err != nil:
 		return fmt.Errorf("%w: unable to get Acceptor tip", err)
 	}
 	log.Info("Loaded Acceptor tip", "hash", acceptorTip)
