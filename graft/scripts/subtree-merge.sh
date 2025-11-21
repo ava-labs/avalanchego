@@ -60,12 +60,12 @@ fi
 REPO_URL="https://${MODULE_PATH}"
 
 # Use graft/[repo-name] as target path, unless one is provided
+REPO_BASENAME="$(basename "${MODULE_PATH}")"
 if [ $# -eq 3 ]; then
-  GRAFT_PATH="$3"
+  TARGET_PATH="$3"
 else
   # Extract repository name from module path
   # Example: github.com/ava-labs/coreth -> coreth
-  REPO_BASENAME="$(basename "${MODULE_PATH}")"
   TARGET_PATH="graft/${REPO_BASENAME}" 
 fi
 
