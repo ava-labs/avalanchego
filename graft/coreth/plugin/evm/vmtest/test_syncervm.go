@@ -497,7 +497,7 @@ func testSyncerVM(t *testing.T, testSyncVMSetup *testSyncVMSetup, test SyncTestP
 		// TODO: this avoids circular dependencies but is not ideal.
 		ethDBPrefix := []byte("ethdb")
 		chaindb := database.New(prefixdb.NewNested(ethDBPrefix, testSyncVMSetup.syncerVM.DB))
-		requireSyncPerformedHeights(t, chaindb, map[uint64]struct{}{})
+		requireSyncPerformedHeight(t, chaindb, nil)
 		return
 	}
 	require.NoError(err, "state sync failed")
@@ -508,7 +508,8 @@ func testSyncerVM(t *testing.T, testSyncVMSetup *testSyncVMSetup, test SyncTestP
 	require.Equal(serverVM.LastAcceptedExtendedBlock().Height(), syncerVM.LastAcceptedExtendedBlock().Height(), "block height mismatch between syncer and server")
 	require.Equal(serverVM.LastAcceptedExtendedBlock().ID(), syncerVM.LastAcceptedExtendedBlock().ID(), "blockID mismatch between syncer and server")
 	require.True(syncerVM.Ethereum().BlockChain().HasState(syncerVM.Ethereum().BlockChain().LastAcceptedBlock().Root()), "unavailable state for last accepted block")
-	requireSyncPerformedHeights(t, syncerVM.Ethereum().ChainDb(), map[uint64]struct{}{retrievedSummary.Height(): {}})
+	expectedHeight := retrievedSummary.Height()
+	requireSyncPerformedHeight(t, syncerVM.Ethereum().ChainDb(), &expectedHeight)
 
 	lastNumber := syncerVM.Ethereum().BlockChain().LastAcceptedBlock().NumberU64()
 	// check the last block is indexed
