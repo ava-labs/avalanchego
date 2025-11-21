@@ -48,7 +48,7 @@ func TestAcceptorVisitProposalBlock(t *testing.T) {
 	blkID := blk.ID()
 
 	s := state.NewMockState(ctrl)
-	s.EXPECT().Checksum().Return(ids.Empty).Times(1)
+	s.EXPECT().Checksum().Return(ids.Empty, nil).Times(1)
 
 	acceptor := &acceptor{
 		backend: &backend{
@@ -149,7 +149,7 @@ func TestAcceptorVisitAtomicBlock(t *testing.T) {
 	s.EXPECT().Abort().Times(1)
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
-	s.EXPECT().Checksum().Return(ids.Empty).Times(1)
+	s.EXPECT().Checksum().Return(ids.Empty, nil).Times(1)
 
 	require.NoError(acceptor.ApricotAtomicBlock(blk))
 }
@@ -235,7 +235,7 @@ func TestAcceptorVisitStandardBlock(t *testing.T) {
 	s.EXPECT().Abort().Times(1)
 	onAcceptState.EXPECT().Apply(s).Times(1)
 	sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1)
-	s.EXPECT().Checksum().Return(ids.Empty).Times(1)
+	s.EXPECT().Checksum().Return(ids.Empty, nil).Times(1)
 
 	require.NoError(acceptor.BanffStandardBlock(blk))
 	require.True(calledOnAcceptFunc)
@@ -342,7 +342,7 @@ func TestAcceptorVisitCommitBlock(t *testing.T) {
 		parentOnCommitState.EXPECT().Apply(s).Times(1),
 		s.EXPECT().CommitBatch().Return(batch, nil).Times(1),
 		sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1),
-		s.EXPECT().Checksum().Return(ids.Empty).Times(1),
+		s.EXPECT().Checksum().Return(ids.Empty, nil).Times(1),
 		s.EXPECT().Abort().Times(1),
 	)
 
@@ -451,7 +451,7 @@ func TestAcceptorVisitAbortBlock(t *testing.T) {
 		parentOnAbortState.EXPECT().Apply(s).Times(1),
 		s.EXPECT().CommitBatch().Return(batch, nil).Times(1),
 		sharedMemory.EXPECT().Apply(atomicRequests, batch).Return(nil).Times(1),
-		s.EXPECT().Checksum().Return(ids.Empty).Times(1),
+		s.EXPECT().Checksum().Return(ids.Empty, nil).Times(1),
 		s.EXPECT().Abort().Times(1),
 	)
 

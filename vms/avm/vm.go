@@ -16,7 +16,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/api/metrics"
+	"github.com/ava-labs/avalanchego/chains/atomic"
 	"github.com/ava-labs/avalanchego/database"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
@@ -51,6 +53,7 @@ var (
 	errGenesisAssetMustHaveState = errors.New("genesis asset must have non-empty state")
 
 	_ vertex.LinearizableVMWithEngine = (*VM)(nil)
+	_ state.VM                        = (*VM)(nil)
 )
 
 type VM struct {
@@ -80,12 +83,13 @@ type VM struct {
 
 	// State management
 	state state.State
+	// Granite state
+	graniteState state.State
 
 	// asset id that will be used for fees
 	feeAssetID ids.ID
 
-	baseDB database.Database
-	db     *versiondb.Database
+	db *versiondb.Database
 
 	typeToFxIndex map[reflect.Type]int
 	fxs           []*extensions.ParsedFx
@@ -105,6 +109,15 @@ type VM struct {
 	blockbuilder.Builder
 	chainManager blockexecutor.Manager
 	network      *network.Network
+
+	StateMigration state.Migration
+
+	utxoDB      database.Database
+	indexDB     database.Database
+	txDB        database.Database
+	blockIDDB   database.Database
+	blockDB     database.Database
+	singletonDB database.Database
 }
 
 func (vm *VM) Connected(ctx context.Context, nodeID ids.NodeID, version *version.Application) error {
@@ -172,8 +185,6 @@ func (vm *VM) Initialize(
 
 	vm.ctx = ctx
 	vm.appSender = appSender
-	vm.baseDB = db
-	vm.db = versiondb.New(db)
 
 	typedFxs := make([]extensions.Fx, len(fxs))
 	vm.fxs = make([]*extensions.ParsedFx, len(fxs))
@@ -206,8 +217,26 @@ func (vm *VM) Initialize(
 	codec := vm.parser.Codec()
 	vm.Spender = utxo.NewSpender(&vm.clock, codec)
 
-	state, err := state.New(
+	vm.db = versiondb.New(db)
+	vm.utxoDB = prefixdb.New(state.UTXOPrefix, vm.db)
+	vm.indexDB = prefixdb.New(state.IndexPrefix, vm.db)
+	vm.txDB = prefixdb.New(state.TxPrefix, vm.db)
+	vm.blockIDDB = prefixdb.New(state.BlockIDPrefix, vm.db)
+	vm.blockDB = prefixdb.New(state.BlockPrefix, vm.db)
+	vm.singletonDB = prefixdb.New(state.SingletonPrefix, vm.db)
+	chainDB := &state.NoChainDB{}
+
+	vm.graniteState, err = state.NewWithFormat(
+		"state",
+		chainDB,
+		db,
 		vm.db,
+		vm.indexDB,
+		vm.txDB,
+		vm.blockIDDB,
+		vm.blockDB,
+		vm.singletonDB,
+		avax.NewUTXODatabase(vm.utxoDB),
 		vm.parser,
 		vm.registerer,
 		avmConfig.ChecksumsEnabled,
@@ -216,7 +245,7 @@ func (vm *VM) Initialize(
 		return err
 	}
 
-	vm.state = state
+	vm.state = vm.graniteState
 
 	if err := vm.initGenesis(genesisBytes); err != nil {
 		return err
@@ -280,10 +309,7 @@ func (vm *VM) Shutdown(context.Context) error {
 	vm.onShutdownCtxCancel()
 	vm.awaitShutdown.Wait()
 
-	return errors.Join(
-		vm.state.Close(),
-		vm.baseDB.Close(),
-	)
+	return vm.state.Close()
 }
 
 func (*VM) Version(context.Context) (string, error) {
@@ -336,7 +362,7 @@ func (vm *VM) ParseBlock(_ context.Context, blkBytes []byte) (snowman.Block, err
 	if err != nil {
 		return nil, err
 	}
-	return vm.chainManager.NewBlock(blk), nil
+	return vm.chainManager.NewBlock(blk, vm.ctx.SharedMemory), nil
 }
 
 func (vm *VM) SetPreference(_ context.Context, blkID ids.ID) error {
@@ -358,8 +384,66 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
  ******************************************************************************
  */
 
+func (vm *VM) Replay(b block.Block) error {
+	if b.Height() == 0 {
+		// Genesis block should skip verification and just be written to state.
+		// TODO do we even need this
+		vm.state.AddBlock(b)
+		vm.state.SetTimestamp(b.Timestamp())
+		vm.state.SetLastAccepted(b.ID())
+
+		vm.chainManager.SetLastAccepted(b.ID())
+		vm.chainManager.SetPreference(b.ID())
+		return nil
+	}
+
+	// Avoid writing to shared memory because we already wrote to it when we first
+	// accepted the block.
+	blk := vm.chainManager.NewBlock(
+		b,
+		atomic.NewReadOnlySharedMemory(vm.ctx.SharedMemory),
+	)
+
+	if err := blk.Verify(context.TODO()); err != nil {
+		return fmt.Errorf("verifying block %s: %w", blk.ID(), err)
+	}
+
+	if err := blk.Accept(context.TODO()); err != nil {
+		return fmt.Errorf("verifying block %s: %w", blk.ID(), err)
+	}
+
+	return nil
+}
+
 func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 	time := vm.Config.Upgrades.CortinaTime
+
+	if err := vm.graniteState.InitializeChainState(
+		stopVertexID,
+		time,
+	); err != nil {
+		return fmt.Errorf("failed to initialize legacy chain state: %w", err)
+	}
+
+	state, chainDB, err := vm.StateMigration.Migrate(
+		vm.ctx.Log,
+		vm.parser,
+		vm.registerer,
+		vm.state,
+		vm.db,
+		vm.utxoDB,
+		vm.txDB,
+		vm.blockIDDB,
+		vm.blockDB,
+		vm.singletonDB,
+		vm.ctx.ChainDataDir,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to migrate state: %w", err)
+	}
+
+	vm.state = state
+
 	if err := vm.state.InitializeChainState(stopVertexID, time); err != nil {
 		return fmt.Errorf("failed to initialize chain state: %w", err)
 	}
@@ -377,6 +461,10 @@ func (vm *VM) Linearize(ctx context.Context, stopVertexID ids.ID) error {
 		&vm.clock,
 		vm.onAccept,
 	)
+
+	if err := chainDB.Repair(vm, vm.state); err != nil {
+		return fmt.Errorf("repairing chain state: %w", err)
+	}
 
 	vm.Builder = blockbuilder.New(
 		vm.txBackend,
@@ -453,6 +541,14 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 		vm: vm,
 		tx: tx,
 	}, nil
+}
+
+func (vm *VM) GetTx(txID ids.ID) (*txs.Tx, error) {
+	return vm.state.GetTx(txID)
+}
+
+func (vm *VM) GetUTXO(utxoID ids.ID) (*avax.UTXO, error) {
+	return vm.state.GetUTXO(utxoID)
 }
 
 /*
