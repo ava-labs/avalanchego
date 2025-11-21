@@ -47,7 +47,7 @@ REPO_ROOT=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
 cd "${REPO_ROOT}"
 
 # Discover version from go.mod if not provided
-if [ $# -eq 2 ]; then
+if [ $# -ge 2 ]; then
   VERSION="$2"
   echo "using provided version: ${VERSION}"
 else

@@ -29,7 +29,7 @@ in a piecemeal fashion:
    - Mark each PR as draft to avoid premature merge
  - Request review in order from the initial PR but do not merge yet
  - Once all PRs in the series have been approved
-   - Freeze develoment on the origin repo
+   - Freeze development on the origin repo
    - Merge from the top down into the subtree merge PR
      - Avoids cascading rebases and merge conflicts
  - Once only the subtree merge PR is left, manually merge the branch

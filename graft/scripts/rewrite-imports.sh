@@ -13,7 +13,7 @@ set -euo pipefail
 #
 
 if [ $# -lt 1 ] || [ $# -gt 2 ]; then
-  echo "Error: exactly one argument required"
+  echo "Error: one or two arguments required"
   echo "Usage: $0 <original-module-import-path> [new-module-import-path]"
   echo "Example: $0 github.com/ava-labs/coreth"
   echo "Example: $0 github.com/ava-labs/coreth github.com/ava-labs/avalanchego/coreth"
