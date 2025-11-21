@@ -50,7 +50,7 @@ echo "staging changes..."
 git add -u '*.go'
 
 echo "committing changes..."
-git commit -m "Rewrite ${ORIGINAL_IMPORT} imports to ${TARGET_IMPORT}
+git commit -S -m "Rewrite ${ORIGINAL_IMPORT} imports to ${TARGET_IMPORT}
 
 Rewrites all Go import statements from external package ${ORIGINAL_IMPORT}
 to internal graft subdirectory ${TARGET_IMPORT}."
