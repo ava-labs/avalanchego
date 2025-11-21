@@ -78,11 +78,6 @@ func (s *BlockSyncer) Sync(ctx context.Context) error {
 	// first, check for blocks already available on disk so we don't
 	// request them from peers.
 	for blocksToFetch > 0 {
-		// Check for context cancellation before checking each block.
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
 		blk := rawdb.ReadBlock(s.db, nextHash, nextHeight)
 		if blk == nil {
 			// block was not found
@@ -99,11 +94,6 @@ func (s *BlockSyncer) Sync(ctx context.Context) error {
 	// them to disk.
 	batch := s.db.NewBatch()
 	for fetched := uint64(0); fetched < blocksToFetch && (nextHash != common.Hash{}); {
-		// Check for context cancellation before making network requests.
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
 		log.Info("fetching blocks from peer", "fetched", fetched, "total", blocksToFetch)
 		blocks, err := s.client.GetBlocks(ctx, nextHash, nextHeight, blocksPerRequest)
 		if err != nil {

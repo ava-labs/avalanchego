@@ -15,11 +15,14 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
+	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
 )
 
 const defaultQueueCapacity = 5000
 
 var (
+	_ syncpkg.Finalizer = (*CodeQueue)(nil)
+
 	errFailedToAddCodeHashesToQueue = errors.New("failed to add code hashes to queue")
 	errFailedToFinalizeCodeQueue    = errors.New("failed to finalize code queue")
 )

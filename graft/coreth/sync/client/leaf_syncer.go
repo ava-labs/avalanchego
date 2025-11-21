@@ -37,7 +37,6 @@ type LeafSyncTask interface {
 type LeafSyncerConfig struct {
 	RequestSize uint16 // Number of leafs to request from a peer at a time
 	NumWorkers  int    // Number of workers to process leaf sync tasks
-	OnFailure   func() // Callback for handling errors during sync
 }
 
 type CallbackLeafSyncer struct {
@@ -159,9 +158,9 @@ func (c *CallbackLeafSyncer) Sync(ctx context.Context) error {
 		})
 	}
 
-	err := eg.Wait()
-	if err != nil {
-		c.config.OnFailure()
+	if err := eg.Wait(); err != nil {
+		return err
 	}
-	return err
+
+	return nil
 }
