@@ -11,14 +11,13 @@ mod tests;
 
 use crate::iter::MerkleKeyValueIter;
 use crate::merkle::{Merkle, Value};
-use crate::root_store::{FjallStore, NoOpStore, RootStore};
 pub use crate::v2::api::BatchOp;
 use crate::v2::api::{
     self, ArcDynDbView, FrozenProof, FrozenRangeProof, HashKey, IntoBatchIter, KeyType,
     KeyValuePair, OptionalHashKeyExt,
 };
 
-use crate::manager::{ConfigManager, RevisionManager, RevisionManagerConfig, RevisionManagerError};
+use crate::manager::{ConfigManager, RevisionManager, RevisionManagerConfig};
 use firewood_storage::{
     CheckOpt, CheckerReport, Committed, FileBacked, FileIoError, HashedNodeReader,
     ImmutableProposal, NodeStore, Parentable, ReadableStorage, TrieReader,
@@ -167,21 +166,6 @@ impl api::Db for Db {
 impl Db {
     /// Create a new database instance.
     pub fn new<P: AsRef<Path>>(db_path: P, cfg: DbConfig) -> Result<Self, api::Error> {
-        let root_store: Box<dyn RootStore + Send + Sync> = match &cfg.root_store_dir {
-            Some(path) => {
-                Box::new(FjallStore::new(path).map_err(RevisionManagerError::RootStoreError)?)
-            }
-            None => Box::new(NoOpStore {}),
-        };
-
-        Self::with_root_store(db_path, cfg, root_store)
-    }
-
-    fn with_root_store<P: AsRef<Path>>(
-        db_path: P,
-        cfg: DbConfig,
-        root_store: Box<dyn RootStore + Send + Sync>,
-    ) -> Result<Self, api::Error> {
         let metrics = Arc::new(DbMetrics {
             proposals: counter!("firewood.proposals"),
         });
@@ -189,11 +173,11 @@ impl Db {
         let config_manager = ConfigManager::builder()
             .create(cfg.create_if_missing)
             .truncate(cfg.truncate)
+            .root_store_dir(cfg.root_store_dir)
             .manager(cfg.manager)
             .build();
 
-        let manager =
-            RevisionManager::new(db_path.as_ref().to_path_buf(), config_manager, root_store)?;
+        let manager = RevisionManager::new(db_path.as_ref().to_path_buf(), config_manager)?;
         let db = Self {
             metrics,
             manager,

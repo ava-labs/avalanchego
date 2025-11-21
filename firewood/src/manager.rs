@@ -23,7 +23,7 @@ use typed_builder::TypedBuilder;
 use weak_table::WeakValueHashMap;
 
 use crate::merkle::Merkle;
-use crate::root_store::RootStore;
+use crate::root_store::{FjallStore, NoOpStore, RootStore};
 use crate::v2::api::{ArcDynDbView, HashKey, OptionalHashKeyExt};
 
 pub use firewood_storage::CacheReadStrategy;
@@ -61,6 +61,9 @@ pub struct ConfigManager {
     /// existing contents will be lost.
     #[builder(default = false)]
     pub truncate: bool,
+    /// `RootStore` directory path
+    #[builder(default = None)]
+    pub root_store_dir: Option<PathBuf>,
     /// Revision manager configuration.
     #[builder(default = RevisionManagerConfig::builder().build())]
     pub manager: RevisionManagerConfig,
@@ -105,11 +108,7 @@ pub(crate) enum RevisionManagerError {
 }
 
 impl RevisionManager {
-    pub fn new(
-        filename: PathBuf,
-        config: ConfigManager,
-        root_store: Box<dyn RootStore + Send + Sync>,
-    ) -> Result<Self, RevisionManagerError> {
+    pub fn new(filename: PathBuf, config: ConfigManager) -> Result<Self, RevisionManagerError> {
         let fb = FileBacked::new(
             filename,
             config.manager.node_cache_size,
@@ -122,6 +121,13 @@ impl RevisionManager {
         // Acquire an advisory lock on the database file to prevent multiple processes
         // from opening the same database simultaneously
         fb.lock()?;
+
+        let root_store: Box<dyn RootStore + Send + Sync> = match config.root_store_dir {
+            Some(path) => {
+                Box::new(FjallStore::new(path).map_err(RevisionManagerError::RootStoreError)?)
+            }
+            None => Box::new(NoOpStore {}),
+        };
 
         let storage = Arc::new(fb);
         let nodestore = Arc::new(NodeStore::open(storage.clone())?);
@@ -386,7 +392,6 @@ impl RevisionManager {
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
-    use crate::root_store::NoOpStore;
     use tempfile::NamedTempFile;
 
     #[test]
@@ -401,16 +406,14 @@ mod tests {
             .build();
 
         // First database instance should open successfully
-        let first_manager =
-            RevisionManager::new(db_path.clone(), config.clone(), Box::new(NoOpStore {}));
+        let first_manager = RevisionManager::new(db_path.clone(), config.clone());
         assert!(
             first_manager.is_ok(),
             "First database should open successfully"
         );
 
         // Second database instance should fail to open due to file locking
-        let second_manager =
-            RevisionManager::new(db_path.clone(), config.clone(), Box::new(NoOpStore {}));
+        let second_manager = RevisionManager::new(db_path.clone(), config.clone());
         assert!(
             second_manager.is_err(),
             "Second database should fail to open"
@@ -430,7 +433,7 @@ mod tests {
         drop(first_manager.unwrap());
 
         // Now the second database should open successfully
-        let third_manager = RevisionManager::new(db_path, config, Box::new(NoOpStore {}));
+        let third_manager = RevisionManager::new(db_path, config);
         assert!(
             third_manager.is_ok(),
             "Database should open after first instance is dropped"
