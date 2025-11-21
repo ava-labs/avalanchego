@@ -1,0 +1,19 @@
+# https://taskfile.dev
+# To run on a system without task installed, `../scripts/run_task.sh` will execute it with `go run`.
+# If in the nix dev shell, `task` is available.
+
+version: '3'
+
+vars:
+  CORETH_MODULE: github.com/ava-labs/coreth
+
+tasks:
+  default: ../scripts/run_task.sh --list
+
+  coreth-rewrite-imports:
+    desc: Rewrite imports of out-of-tree coreth to in-tree coreth
+    cmd: bash ./scripts/rewrite-imports.sh {{.CORETH_MODULE}}
+
+  coreth-subtree-merge:
+    desc: Perform git subtree merge of coreth into graft/coreth (commits)
+    cmd: bash ./scripts/subtree-merge.sh {{.CORETH_MODULE}} master

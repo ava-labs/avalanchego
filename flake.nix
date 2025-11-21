@@ -63,6 +63,9 @@
             protoc-gen-go-grpc
             protoc-gen-connect-go
 
+            # Line-oriented search tool
+            ripgrep
+
             # Solidity compiler
             solc
 
