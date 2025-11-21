@@ -8,11 +8,15 @@ set -euo pipefail
 # Usage: rewrite-imports.sh <original-module-import-path>
 # Example: rewrite-imports.sh github.com/ava-labs/coreth
 #   Will rewrite: github.com/ava-labs/coreth -> github.com/ava-labs/avalanchego/graft/coreth
+# Example: rewrite-imports.sh github.com/ava-labs/coreth github.com/ava-labs/avalanchego/coreth
+#   Will rewrite: github.com/ava-labs/coreth -> github.com/ava-labs/avalanchego/coreth
+#
 
-if [ $# -ne 1 ]; then
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
   echo "Error: exactly one argument required"
-  echo "Usage: $0 <original-module-import-path>"
+  echo "Usage: $0 <original-module-import-path> [new-module-import-path]"
   echo "Example: $0 github.com/ava-labs/coreth"
+  echo "Example: $0 github.com/ava-labs/coreth github.com/ava-labs/avalanchego/coreth"
   exit 1
 fi
 
@@ -22,7 +26,12 @@ ORIGINAL_IMPORT="$1"
 # e.g., github.com/ava-labs/coreth -> coreth
 PACKAGE_NAME="${ORIGINAL_IMPORT##*/}"
 
-TARGET_IMPORT="github.com/ava-labs/avalanchego/graft/${PACKAGE_NAME}"
+# Determine target import path
+if [ $# -eq 2 ]; then
+  TARGET_IMPORT="$2"
+else
+  TARGET_IMPORT="github.com/ava-labs/avalanchego/graft/${PACKAGE_NAME}"
+fi
 
 REPO_ROOT=$( cd "$( dirname "${BASH_SOURCE[0]}" )"; cd ../.. && pwd )
 cd "${REPO_ROOT}"

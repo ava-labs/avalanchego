@@ -7,19 +7,19 @@ set -euo pipefail
 # Usage: subtree-merge.sh <module-path> [version]
 # Example: subtree-merge.sh github.com/ava-labs/coreth
 # Example: subtree-merge.sh github.com/ava-labs/coreth 1a498175
-# Example: subtree-merge.sh github.com/ava-labs/coreth v0.9.5 graft
-# Example: subtree-merge.sh github.com/ava-labs/coreth master vms/evm
+# Example: subtree-merge.sh github.com/ava-labs/coreth master evm
 #
 # Arguments:
 #   module-path: The Go module path (e.g., github.com/ava-labs/coreth)
 #   version: (Optional) The version/tag/SHA to merge (can be a tag, branch, or commit SHA)
 #            If not provided, the version will be discovered from go.mod
 #   target-path: (Optional) The target path within the repository to merge into, relative to the repo root.
-#                If not provided, defaults to graft
+#                If not provided, defaults to graft/[repo-name]
+#                Cannot be provided without providing version.
 #
 # The repository URL is constructed by prepending https:// to the module path.
 # The target path is automatically derived as graft/[repo-name] where repo-name
-# is the last component of the module path.
+# is the last component of the module path, unless provided.
 #
 # What this script does:
 #   1. Constructs repository URL from module path
@@ -33,10 +33,11 @@ set -euo pipefail
 #   9. Removes the temporary remote
 
 if [ $# -lt 1 ] || [ $# -gt 3 ]; then
-  echo "Error: one or two arguments required" >&2
-  echo "Usage: $0 <module-path> [version]" >&2
+  echo "Error:  one to three arguments required" >&2
+  echo "Usage: $0 <module-path> [version] [target-path]" >&2
   echo "Example: $0 github.com/ava-labs/coreth" >&2
   echo "Example: $0 github.com/ava-labs/coreth 1a498175" >&2
+  echo "Example: $0 github.com/ava-labs/coreth master evm" >&2
   exit 1
 fi
 
@@ -62,13 +63,11 @@ REPO_URL="https://${MODULE_PATH}"
 if [ $# -eq 3 ]; then
   GRAFT_PATH="$3"
 else
-  GRAFT_PATH="graft"
+  # Extract repository name from module path
+  # Example: github.com/ava-labs/coreth -> coreth
+  REPO_BASENAME="$(basename "${MODULE_PATH}")"
+  TARGET_PATH="graft/${REPO_BASENAME}" 
 fi
-
-# Extract repository name from module path
-# Example: github.com/ava-labs/coreth -> coreth
-REPO_BASENAME="$(basename "${MODULE_PATH}")"
-TARGET_PATH="${GRAFT_PATH}/${REPO_BASENAME}"
 
 # Check if target path already exists
 if [ -d "${REPO_ROOT}/${TARGET_PATH}" ]; then
