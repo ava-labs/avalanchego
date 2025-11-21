@@ -5,7 +5,9 @@ package evm
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"math/big"
+	"strings"
 	"testing"
 	"time"
 
@@ -109,4 +111,27 @@ func setupPoolWithConfig(t *testing.T, config *params.ChainConfig, fundedAddress
 	require.NoError(t, err)
 
 	return txPool
+}
+
+func getValidEthTxs(key *ecdsa.PrivateKey, count int, gasPrice *big.Int) []*types.Transaction {
+	res := make([]*types.Transaction, count)
+
+	to := common.Address{}
+	amount := big.NewInt(0)
+	gasLimit := uint64(37000)
+
+	for i := 0; i < count; i++ {
+		tx, _ := types.SignTx(
+			types.NewTransaction(
+				uint64(i),
+				to,
+				amount,
+				gasLimit,
+				gasPrice,
+				[]byte(strings.Repeat("aaaaaaaaaa", 100))),
+			types.HomesteadSigner{}, key)
+		tx.SetTime(time.Now().Add(-1 * time.Minute))
+		res[i] = tx
+	}
+	return res
 }

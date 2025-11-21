@@ -1,7 +1,6 @@
 TestChainIndexerWithChildren
 TestClientCancelWebsocket
 TestClientWebsocketLargeMessage
-TestMempoolEthTxsAppGossipHandling
 TestTransactionSkipIndexing
 TestVMShutdownWhileSyncing
 TestWebsocketLargeRead
