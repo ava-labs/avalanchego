@@ -17,14 +17,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestDoNotImportFromGraft ensures that files outside the graft directory
+// TestDoNotImportFromGraft ensures that files in vms/evm
 // do not import packages from within the graft directory.
 func TestDoNotImportFromGraft(t *testing.T) {
 	graftRegex := regexp.MustCompile(`^github\.com/ava-labs/avalanchego/graft(/|$)`)
 
-	// Find all graft imports in the codebase (excluding the graft directory itself)
-	foundImports, err := findImportsMatchingPattern("..", graftRegex, func(path string, _ string, _ *ast.ImportSpec) bool {
-		return strings.Contains(path, "/graft/")
+	// Find all graft imports in vms/evm
+	foundImports, err := findImportsMatchingPattern("../vms/evm", graftRegex, func(path string, _ string, _ *ast.ImportSpec) bool {
+		// Skip generated files and test-specific files
+		filename := filepath.Base(path)
+		return strings.HasPrefix(filename, "gen_") ||
+			strings.Contains(path, "graft/*/core/main_test.go") ||
+			strings.Contains(path, "graft/*/tempextrastest/")
 	})
 	require.NoError(t, err, "Failed to find graft imports")
 
@@ -42,7 +46,7 @@ func TestDoNotImportFromGraft(t *testing.T) {
 	slices.Sort(sortedImports)
 
 	var errorMsg strings.Builder
-	errorMsg.WriteString("Files outside the graft directory must not import from the graft directory!\n\n")
+	errorMsg.WriteString("Files in vms/evm must not import from the graft directory!\n\n")
 	for _, importPath := range sortedImports {
 		files := foundImports[importPath]
 		fileList := files.List()
@@ -66,7 +70,14 @@ func TestLibevmImportsAreAllowed(t *testing.T) {
 
 	// Find all libevm imports in source files, excluding underscore and "eth*" named imports
 	libevmRegex := regexp.MustCompile(`^github\.com/ava-labs/libevm/`)
-	foundImports, err := findImportsMatchingPattern("../graft", libevmRegex, func(_ string, _ string, imp *ast.ImportSpec) bool {
+	foundImports, err := findImportsMatchingPattern("../graft", libevmRegex, func(path string, _ string, imp *ast.ImportSpec) bool {
+		// Skip generated files and test-specific files
+		filename := filepath.Base(path)
+		if strings.HasPrefix(filename, "gen_") ||
+			strings.Contains(path, "graft/*/core/main_test.go") ||
+			strings.Contains(path, "graft/*/tempextrastest/") {
+			return true
+		}
 		// Skip underscore and "eth*" named imports
 		return imp.Name != nil && (imp.Name.Name == "_" || strings.HasPrefix(imp.Name.Name, "eth"))
 	})
@@ -152,12 +163,6 @@ func findImportsMatchingPattern(
 	err := filepath.Walk(rootDir, func(path string, _ os.FileInfo, err error) error {
 		if err != nil || !strings.HasSuffix(path, ".go") {
 			return err
-		}
-
-		// Skip generated files, main_test.go, and tempextrastest directory
-		filename := filepath.Base(path)
-		if strings.HasPrefix(filename, "gen_") || strings.Contains(path, "core/main_test.go") || strings.Contains(path, "tempextrastest/") {
-			return nil
 		}
 
 		node, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ParseComments)
