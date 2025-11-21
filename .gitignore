@@ -63,5 +63,8 @@ vendor
 # Personal extension to .envrc
 .envrc.local
 
+# Personal agent file for Claude Code
+CLAUDE.local.md
+
 # debug files
 __debug_*
