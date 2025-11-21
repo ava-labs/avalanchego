@@ -4,6 +4,7 @@
 package state
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,7 +13,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
+	"github.com/ava-labs/avalanchego/firewood"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/upgrade"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
@@ -306,7 +309,7 @@ func TestInitializeChainState(t *testing.T) {
 	require.NoError(err)
 
 	s.AddBlock(childBlock)
-	s.SetLastAccepted(childBlock.ID())
+	s.SetLastAccepted(childBlock.ID(), childBlock.Hght)
 	require.NoError(s.Commit())
 
 	require.NoError(s.InitializeChainState(stopVertexID, genesisTimestamp))
@@ -315,4 +318,119 @@ func TestInitializeChainState(t *testing.T) {
 	lastAccepted, err := s.GetBlock(lastAcceptedID)
 	require.NoError(err)
 	require.Equal(genesis.ID(), lastAccepted.Parent())
+}
+
+// Tests that trying to call State.Commit will error if it causes firewood to
+// have a height inconsistent with the rest of State.
+func TestFirewoodInconsistentHeight(t *testing.T) {
+	db := memdb.New()
+	vdb := versiondb.New(db)
+
+	firewood, err := firewood.New(filepath.Join(t.TempDir(), "state"))
+	require.NoError(t, err)
+
+	s, err := NewWithFormat(
+		"foobar",
+		&firewoodDB{db: firewood, versionDB: vdb},
+		db,
+		vdb,
+		prefixdb.New([]byte("utxo_index"), vdb),
+		prefixdb.New([]byte("tx"), vdb),
+		prefixdb.New([]byte("block_id"), vdb),
+		prefixdb.New([]byte("block_db"), vdb),
+		prefixdb.New([]byte("singleton"), vdb),
+		avax.NewFirewoodUTXODB(firewood, parser.Codec()),
+		parser,
+		prometheus.NewRegistry(),
+	)
+	require.NoError(t, err)
+
+	stopVertexID := ids.GenerateTestID()
+	genesisTimestamp := upgrade.InitiallyActiveTime
+	require.NoError(t, s.InitializeChainState(stopVertexID, genesisTimestamp))
+
+	err = s.Commit()
+	require.ErrorIs(t, err, errDBsOutOfSync)
+}
+
+// TestFirewoodRootUpdate tests that the state root is updated. The state root
+// is always expected to be updated because even when no state is updated, we
+// include the block height as part of state.
+func TestFirewoodRootUpdate(t *testing.T) {
+	tests := []struct {
+		name  string
+		block block.Block
+		tx    *txs.Tx
+		utxo  *avax.UTXO
+	}{
+		{
+			name:  "block added",
+			block: &block.StandardBlock{},
+		},
+		{
+			name: "non-atomic tx added",
+			tx:   &txs.Tx{Unsigned: &txs.BaseTx{}},
+		},
+		{
+			name: "atomic tx added",
+			tx:   &txs.Tx{Unsigned: &txs.ExportTx{}},
+		},
+		{
+			name: "utxo added",
+			utxo: &avax.UTXO{Out: &secp256k1fx.TransferOutput{}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := memdb.New()
+			vdb := versiondb.New(db)
+
+			firewood, err := firewood.New(filepath.Join(t.TempDir(), "state"))
+			require.NoError(t, err)
+
+			s, err := NewWithFormat(
+				"foobar",
+				&firewoodDB{db: firewood, versionDB: vdb},
+				db,
+				vdb,
+				prefixdb.New([]byte("utxo_index"), vdb),
+				prefixdb.New([]byte("tx"), vdb),
+				prefixdb.New([]byte("block_id"), vdb),
+				prefixdb.New([]byte("block_db"), vdb),
+				prefixdb.New([]byte("singleton"), vdb),
+				avax.NewFirewoodUTXODB(firewood, parser.Codec()),
+				parser,
+				prometheus.NewRegistry(),
+			)
+			require.NoError(t, err)
+
+			stopVertexID := ids.GenerateTestID()
+			genesisTimestamp := upgrade.InitiallyActiveTime
+			require.NoError(t, s.InitializeChainState(stopVertexID, genesisTimestamp))
+
+			if tt.block != nil {
+				s.AddBlock(tt.block)
+			}
+
+			if tt.tx != nil {
+				s.AddTx(tt.tx)
+			}
+
+			if tt.utxo != nil {
+				s.AddUTXO(tt.utxo)
+			}
+
+			s.SetLastAccepted(ids.GenerateTestID(), 1)
+
+			prev, err := s.Checksum(t.Context())
+			require.NoError(t, err)
+
+			require.NoError(t, s.Commit())
+
+			next, err := s.Checksum(t.Context())
+			require.NoError(t, err)
+			require.NotEqual(t, prev, next)
+		})
+	}
 }

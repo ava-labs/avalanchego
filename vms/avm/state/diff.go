@@ -38,8 +38,9 @@ type diff struct {
 	addedBlockIDs map[uint64]ids.ID      // map of height -> blockID
 	addedBlocks   map[ids.ID]block.Block // map of blockID -> block
 
-	lastAccepted ids.ID
-	timestamp    time.Time
+	lastAccepted       ids.ID
+	lastAcceptedHeight uint64
+	timestamp          time.Time
 }
 
 func NewDiff(
@@ -149,8 +150,9 @@ func (d *diff) GetLastAccepted() ids.ID {
 	return d.lastAccepted
 }
 
-func (d *diff) SetLastAccepted(lastAccepted ids.ID) {
+func (d *diff) SetLastAccepted(lastAccepted ids.ID, height uint64) {
 	d.lastAccepted = lastAccepted
+	d.lastAcceptedHeight = height
 }
 
 func (d *diff) GetTimestamp() time.Time {
@@ -178,6 +180,6 @@ func (d *diff) Apply(state Chain) {
 		state.AddBlock(blk)
 	}
 
-	state.SetLastAccepted(d.lastAccepted)
+	state.SetLastAccepted(d.lastAccepted, d.lastAcceptedHeight)
 	state.SetTimestamp(d.timestamp)
 }

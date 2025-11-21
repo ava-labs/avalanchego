@@ -31,13 +31,14 @@ type Manager interface {
 
 	// Returns the ID of the most recently accepted block.
 	LastAccepted() ids.ID
+	SetLastAccepted(id ids.ID)
 
 	SetPreference(blkID ids.ID)
 	Preferred() ids.ID
 
 	GetBlock(blkID ids.ID) (snowman.Block, error)
 	GetStatelessBlock(blkID ids.ID) (block.Block, error)
-	NewBlock(block.Block) snowman.Block
+	NewBlock(blk block.Block, sm atomic.SharedMemory) snowman.Block
 
 	// VerifyTx verifies that the transaction can be issued based on the currently
 	// preferred state. This should *not* be used to verify transactions in a block.
@@ -109,6 +110,10 @@ func (m *manager) LastAccepted() ids.ID {
 	return m.lastAccepted
 }
 
+func (m *manager) SetLastAccepted(blkID ids.ID) {
+	m.lastAccepted = blkID
+}
+
 func (m *manager) SetPreference(blockID ids.ID) {
 	m.preferred = blockID
 }
@@ -122,7 +127,7 @@ func (m *manager) GetBlock(blkID ids.ID) (snowman.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	return m.NewBlock(blk), nil
+	return m.NewBlock(blk, m.backend.Ctx.SharedMemory), nil
 }
 
 func (m *manager) GetStatelessBlock(blkID ids.ID) (block.Block, error) {
@@ -134,10 +139,14 @@ func (m *manager) GetStatelessBlock(blkID ids.ID) (block.Block, error) {
 	return m.state.GetBlock(blkID)
 }
 
-func (m *manager) NewBlock(blk block.Block) snowman.Block {
+func (m *manager) NewBlock(
+	blk block.Block,
+	sm atomic.SharedMemory,
+) snowman.Block {
 	return &Block{
-		Block:   blk,
-		manager: m,
+		Block:        blk,
+		manager:      m,
+		sharedMemory: sm,
 	}
 }
 

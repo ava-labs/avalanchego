@@ -683,6 +683,7 @@ func TestBlockAccept(t *testing.T) {
 							},
 						},
 					},
+					sharedMemory: mockSharedMemory,
 				}
 			},
 			expectedErr: errTest,
@@ -726,6 +727,7 @@ func TestBlockAccept(t *testing.T) {
 							},
 						},
 					},
+					sharedMemory: mockSharedMemory,
 				}
 			},
 			expectedErr: errTest,
@@ -748,7 +750,7 @@ func TestBlockAccept(t *testing.T) {
 				// because we mock the call to shared memory
 				mockManagerState.EXPECT().CommitBatch().Return(nil, nil)
 				mockManagerState.EXPECT().Abort()
-				mockManagerState.EXPECT().Checksum().Return(ids.Empty)
+				mockManagerState.EXPECT().Checksum(gomock.Any()).Return(ids.Empty, nil)
 
 				mockSharedMemory := atomicmock.NewSharedMemory(ctrl)
 				mockSharedMemory.EXPECT().Apply(gomock.Any(), gomock.Any()).Return(nil)
@@ -772,6 +774,7 @@ func TestBlockAccept(t *testing.T) {
 							},
 						},
 					},
+					sharedMemory: mockSharedMemory,
 				}
 			},
 			expectedErr: nil,
