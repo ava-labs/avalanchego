@@ -406,7 +406,6 @@ mod test {
 
     use crate::db::{Db, Proposal, UseParallel};
     use crate::manager::RevisionManagerConfig;
-    use crate::root_store::RootStore;
     use crate::v2::api::{Db as _, DbView, Proposal as _};
 
     use super::{BatchOp, DbConfig};
@@ -446,15 +445,6 @@ mod test {
     }
 
     impl<T: Iterator> IterExt for T {}
-
-    #[cfg(test)]
-    impl Db {
-        /// Extract the root store by consuming the database instance.
-        /// This is primarily used for reopening or replacing the database with the same root store.
-        pub fn into_root_store(self) -> Box<dyn RootStore + Send + Sync> {
-            self.manager.into_root_store()
-        }
-    }
 
     #[test]
     fn test_proposal_reads() {
@@ -667,12 +657,7 @@ mod test {
                 .build(),
         );
         insert_commit(&db, 1);
-        let db = db.reopen_with_config(
-            DbConfig::builder()
-                .truncate(false)
-                .use_parallel(UseParallel::Always)
-                .build(),
-        );
+        let db = db.reopen();
         insert_commit(&db, 2);
         // Check that the keys are still there after the commits
         let committed = db.revision(db.root_hash().unwrap().unwrap()).unwrap();
@@ -1170,6 +1155,7 @@ mod test {
     pub(super) struct TestDb {
         db: Db,
         tmpdir: tempfile::TempDir,
+        dbconfig: DbConfig,
     }
     impl Deref for TestDb {
         type Target = Db;
@@ -1193,8 +1179,12 @@ mod test {
             let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
                 .iter()
                 .collect();
-            let db = Db::new(dbpath, dbconfig).unwrap();
-            TestDb { db, tmpdir }
+            let db = Db::new(dbpath, dbconfig.clone()).unwrap();
+            TestDb {
+                db,
+                tmpdir,
+                dbconfig,
+            }
         }
 
         /// Creates a new test database with `FjallStore` enabled.
@@ -1205,40 +1195,69 @@ mod test {
             let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
                 .iter()
                 .collect();
-            let root_store_path = tmpdir.as_ref().join("fjall_store");
+            let root_store_dir = tmpdir.as_ref().join("fjall_store");
 
             let dbconfig = DbConfig {
-                root_store_dir: Some(root_store_path),
+                root_store_dir: Some(root_store_dir),
                 ..dbconfig
             };
 
-            let db = Db::new(dbpath, dbconfig).unwrap();
-            TestDb { db, tmpdir }
+            let db = Db::new(dbpath, dbconfig.clone()).unwrap();
+            TestDb {
+                db,
+                tmpdir,
+                dbconfig,
+            }
         }
 
+        /// Reopens the database at the same path, preserving existing data.
+        ///
+        /// This method closes the current database instance (releasing the advisory lock),
+        /// then opens it again at the same path while keeping the same configuration.
         pub fn reopen(self) -> Self {
-            self.reopen_with_config(DbConfig::builder().truncate(false).build())
-        }
-
-        pub fn reopen_with_config(self, dbconfig: DbConfig) -> Self {
             let path = self.path();
-            let TestDb { db, tmpdir } = self;
+            let TestDb {
+                db,
+                tmpdir,
+                dbconfig,
+            } = self;
 
-            let root_store = db.into_root_store();
+            drop(db);
 
-            let db = Db::with_root_store(path, dbconfig, root_store).unwrap();
-            TestDb { db, tmpdir }
+            let db = Db::new(path, dbconfig.clone()).unwrap();
+            TestDb {
+                db,
+                tmpdir,
+                dbconfig,
+            }
         }
 
+        /// Replaces the database with a fresh instance at the same path.
+        ///
+        /// This method closes the current database instance (releasing the advisory lock),
+        /// and creates a new database. This completely resets the database, removing all
+        /// existing data and starting fresh. The new database instance will use the default
+        /// configuration with truncation enabled.
+        ///
+        /// This is useful for testing scenarios where you want to start with a clean slate
+        /// while maintaining the same temporary directory structure.
         pub fn replace(self) -> Self {
             let path = self.path();
-            let TestDb { db, tmpdir } = self;
+            let TestDb {
+                db,
+                tmpdir,
+                dbconfig: _,
+            } = self;
 
-            let root_store = db.into_root_store();
+            drop(db);
 
             let dbconfig = DbConfig::builder().truncate(true).build();
-            let db = Db::with_root_store(path, dbconfig, root_store).unwrap();
-            TestDb { db, tmpdir }
+            let db = Db::new(path, dbconfig.clone()).unwrap();
+            TestDb {
+                db,
+                tmpdir,
+                dbconfig,
+            }
         }
 
         pub fn path(&self) -> PathBuf {
