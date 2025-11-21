@@ -19,6 +19,11 @@ on:
         default: latest
         required: true
         type: string
+      random_seed:
+        description: 'Random seed for genesis randomization (leave empty for default config)'
+        default: ''
+        required: false
+        type: string
 
 jobs:
   antithesis_avalanchego:
@@ -39,3 +44,4 @@ jobs:
           additional_parameters: |-
             custom.duration=${{ github.event.inputs.duration || '7.5' }}
             custom.workload=avalanchego
+            ${{ github.event.inputs.random_seed && format('custom.antithesis_random_seed={0}', github.event.inputs.random_seed) || '' }}
