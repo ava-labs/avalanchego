@@ -22,6 +22,11 @@ jobs:
           cache-dependency-path: |
             go.sum
             tools/go.sum
+            tools/legacy-golangci-lint.sum
+      - name: Set up solc
+        uses: ARR4N/setup-solc@v0.2.0
+        with:
+          versions: '0.8.30'
       - name: Run all lint checks
         run: ./scripts/run_task.sh lint-all-ci
       - name: Check go.mod and go.sum are up-to-date

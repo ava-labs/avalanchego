@@ -52,14 +52,6 @@ func RegisterAsyncTests() {
 			runDefaultHardhatTests(ctx, blockchainID, "tx_allow_list")
 		})
 
-		ginkgo.It("contract deployer allow list", ginkgo.Label("Precompile"), ginkgo.Label("ContractDeployerAllowList"), func() {
-			ctx, cancel := context.WithTimeout(context.Background(), timeout)
-			defer cancel()
-
-			blockchainID := subnetsSuite.GetBlockchainID("contract_deployer_allow_list")
-			runDefaultHardhatTests(ctx, blockchainID, "contract_deployer_allow_list")
-		})
-
 		ginkgo.It("fee manager", ginkgo.Label("Precompile"), ginkgo.Label("FeeManager"), func() {
 			ctx, cancel := context.WithTimeout(context.Background(), timeout)
 			defer cancel()

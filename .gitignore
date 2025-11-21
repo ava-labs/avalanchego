@@ -64,3 +64,6 @@ avalanchego/
 
 # Contract compilation artifacts (binary files are not committed)
 contracts/artifacts/
+
+# solc downloads from setup-solc GitHub Action
+setup-solc_downloads/
