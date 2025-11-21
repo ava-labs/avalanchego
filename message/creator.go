@@ -8,7 +8,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 
-	"github.com/ava-labs/avalanchego/graft"
 	"github.com/ava-labs/avalanchego/utils/compression"
 )
 
@@ -29,8 +28,6 @@ func NewCreator(
 	compressionType compression.Type,
 	maxMessageTimeout time.Duration,
 ) (Creator, error) {
-	graft.Bad()
-
 	builder, err := newMsgBuilder(
 		metrics,
 		maxMessageTimeout,
