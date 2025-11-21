@@ -9,5 +9,5 @@ fi
 
 source ./scripts/lint_setup.sh
 setup_lint
-go tool -modfile=tools/go.mod golangci-lint run --config .golangci.yml --fix
-go tool -modfile=tools/go.mod golangci-lint run --config "$AVALANCHE_LINT_FILE" --fix
+go tool -modfile=../../tools/go.mod golangci-lint run --config .golangci.yml --fix
+go tool -modfile=../../tools/go.mod golangci-lint run --config "$AVALANCHE_LINT_FILE" --fix

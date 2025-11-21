@@ -8,9 +8,10 @@ import (
 	"slices"
 	"time"
 
-	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/rlp"
+
+	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 
 	ethtypes "github.com/ava-labs/libevm/core/types"
 )

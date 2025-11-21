@@ -29,6 +29,24 @@ issues:
   # Maximum count of issues with the same text.
   max-same-issues: 0
 
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - blank
+        - prefix(github.com/ava-labs/avalanchego)
+        - alias
+        - dot
+      custom-order: true
+  exclusions:
+    generated: lax
+
 linters:
   default: none
   enable:
@@ -240,20 +258,3 @@ linters:
         linters:
           - gosec
           - prealloc
-formatters:
-  enable:
-    - gci
-    - gofmt
-    - gofumpt
-  settings:
-    gci:
-      sections:
-        - standard
-        - default
-        - blank
-        - prefix(github.com/ava-labs/avalanchego)
-        - alias
-        - dot
-      custom-order: true
-  exclusions:
-    generated: lax
