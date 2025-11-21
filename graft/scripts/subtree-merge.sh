@@ -7,11 +7,15 @@ set -euo pipefail
 # Usage: subtree-merge.sh <module-path> [version]
 # Example: subtree-merge.sh github.com/ava-labs/coreth
 # Example: subtree-merge.sh github.com/ava-labs/coreth 1a498175
+# Example: subtree-merge.sh github.com/ava-labs/coreth v0.9.5 graft
+# Example: subtree-merge.sh github.com/ava-labs/coreth master vms/evm
 #
 # Arguments:
 #   module-path: The Go module path (e.g., github.com/ava-labs/coreth)
 #   version: (Optional) The version/tag/SHA to merge (can be a tag, branch, or commit SHA)
 #            If not provided, the version will be discovered from go.mod
+#   target-path: (Optional) The target path within the repository to merge into, relative to the repo root.
+#                If not provided, defaults to graft
 #
 # The repository URL is constructed by prepending https:// to the module path.
 # The target path is automatically derived as graft/[repo-name] where repo-name
@@ -28,7 +32,7 @@ set -euo pipefail
 #   8. Commits the merge with a descriptive message
 #   9. Removes the temporary remote
 
-if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+if [ $# -lt 1 ] || [ $# -gt 3 ]; then
   echo "Error: one or two arguments required" >&2
   echo "Usage: $0 <module-path> [version]" >&2
   echo "Example: $0 github.com/ava-labs/coreth" >&2
@@ -54,10 +58,17 @@ fi
 # Construct repository URL from module path
 REPO_URL="https://${MODULE_PATH}"
 
+# Use graft/[repo-name] as target path, unless one is provided
+if [ $# -eq 3 ]; then
+  GRAFT_PATH="$3"
+else
+  GRAFT_PATH="graft"
+fi
+
 # Extract repository name from module path
 # Example: github.com/ava-labs/coreth -> coreth
 REPO_BASENAME="$(basename "${MODULE_PATH}")"
-TARGET_PATH="graft/${REPO_BASENAME}"
+TARGET_PATH="${GRAFT_PATH}/${REPO_BASENAME}"
 
 # Check if target path already exists
 if [ -d "${REPO_ROOT}/${TARGET_PATH}" ]; then
