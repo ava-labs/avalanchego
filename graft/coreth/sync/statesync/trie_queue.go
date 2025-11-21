@@ -4,6 +4,9 @@
 package statesync
 
 import (
+	"errors"
+
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
@@ -28,7 +31,11 @@ func NewTrieQueue(db ethdb.Database) *trieQueue {
 func (t *trieQueue) clearIfRootDoesNotMatch(root common.Hash) error {
 	persistedRoot, err := customrawdb.ReadSyncRoot(t.db)
 	if err != nil {
-		return err
+		// If no sync root exists, treat it as empty hash (no previous sync).
+		if !errors.Is(err, database.ErrNotFound) {
+			return err
+		}
+		persistedRoot = common.Hash{}
 	}
 	if persistedRoot != (common.Hash{}) && persistedRoot != root {
 		// if not resuming, clear all progress markers
