@@ -23,7 +23,7 @@ use typed_builder::TypedBuilder;
 use weak_table::WeakValueHashMap;
 
 use crate::merkle::Merkle;
-use crate::root_store::{FjallStore, NoOpStore, RootStore};
+use crate::root_store::RootStore;
 use crate::v2::api::{ArcDynDbView, HashKey, OptionalHashKeyExt};
 
 pub use firewood_storage::CacheReadStrategy;
@@ -85,7 +85,7 @@ pub(crate) struct RevisionManager {
     by_hash: RwLock<HashMap<TrieHash, CommittedRevision>>,
     by_rootstore: Mutex<WeakValueHashMap<TrieHash, Weak<NodeStore<Committed, FileBacked>>>>,
     threadpool: OnceLock<ThreadPool>,
-    root_store: Box<dyn RootStore + Send + Sync>,
+    root_store: Option<RootStore>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -122,11 +122,9 @@ impl RevisionManager {
         // from opening the same database simultaneously
         fb.lock()?;
 
-        let root_store: Box<dyn RootStore + Send + Sync> = match config.root_store_dir {
-            Some(path) => {
-                Box::new(FjallStore::new(path).map_err(RevisionManagerError::RootStoreError)?)
-            }
-            None => Box::new(NoOpStore {}),
+        let root_store: Option<RootStore> = match config.root_store_dir {
+            Some(path) => Some(RootStore::new(path).map_err(RevisionManagerError::RootStoreError)?),
+            None => None,
         };
 
         let storage = Arc::new(fb);
@@ -158,10 +156,11 @@ impl RevisionManager {
                 },
             )?;
 
-            manager
-                .root_store
-                .add_root(&root_hash, &root_address)
-                .map_err(RevisionManagerError::RootStoreError)?;
+            if let Some(store) = &manager.root_store {
+                store
+                    .add_root(&root_hash, &root_address)
+                    .map_err(RevisionManagerError::RootStoreError)?;
+            }
         }
 
         Ok(manager)
@@ -174,8 +173,8 @@ impl RevisionManager {
     ///    It only contains the address of the nodes that are deleted, which should be very small.
     /// 2. Revision reaping.
     ///    If more than the maximum number of revisions are kept in memory, the
-    ///    oldest revision is removed from memory. If `RootStore` allows space
-    ///    reuse, the oldest revision's nodes are added to the free list for space reuse.
+    ///    oldest revision is removed from memory. If `RootStore` does not exist,
+    ///    the oldest revision's nodes are added to the free list for space reuse.
     ///    Otherwise, the oldest revision's nodes are preserved on disk, which
     ///    is useful for historical queries.
     /// 3. Persist to disk. This includes flushing everything to disk.
@@ -200,7 +199,7 @@ impl RevisionManager {
 
         // 2. Revision reaping
         // When we exceed max_revisions, remove the oldest revision from memory.
-        // If `RootStore` allows space reuse, add the oldest revision's nodes to the free list.
+        // If `RootStore` does not exist, add the oldest revision's nodes to the free list.
         // If you crash after freeing some of these, then the free list will point to nodes that are not actually free.
         // TODO: Handle the case where we get something off the free list that is not free
         while self.historical.read().len() >= self.max_revisions {
@@ -214,8 +213,8 @@ impl RevisionManager {
                 self.by_hash.write().remove(hash);
             }
 
-            // We reap the revision's nodes only if `RootStore` allows space reuse.
-            if self.root_store.allow_space_reuse() {
+            // We reap the revision's nodes only if `RootStore` does not exist.
+            if self.root_store.is_none() {
                 // This `try_unwrap` is safe because nobody else will call `try_unwrap` on this Arc
                 // in a different thread, so we don't have to worry about the race condition where
                 // the Arc we get back is not usable as indicated in the docs for `try_unwrap`.
@@ -240,8 +239,10 @@ impl RevisionManager {
         committed.persist()?;
 
         // 4. Persist revision to root store
-        if let (Some(hash), Some(address)) = (committed.root_hash(), committed.root_address()) {
-            self.root_store
+        if let Some(store) = &self.root_store
+            && let (Some(hash), Some(address)) = (committed.root_hash(), committed.root_address())
+        {
+            store
                 .add_root(&hash, &address)
                 .map_err(RevisionManagerError::RootStoreError)?;
         }
@@ -338,13 +339,19 @@ impl RevisionManager {
 
         // 3. Check the persistent `RootStore`.
         // If the revision exists, get its root address and construct a NodeStore for it.
-        let root_address = self
-            .root_store
-            .get(&root_hash)
-            .map_err(RevisionManagerError::RootStoreError)?
-            .ok_or(RevisionManagerError::RevisionNotFound {
-                provided: root_hash.clone(),
-            })?;
+        let root_address = match &self.root_store {
+            Some(store) => store
+                .get(&root_hash)
+                .map_err(RevisionManagerError::RootStoreError)?
+                .ok_or(RevisionManagerError::RevisionNotFound {
+                    provided: root_hash.clone(),
+                })?,
+            None => {
+                return Err(RevisionManagerError::RevisionNotFound {
+                    provided: root_hash.clone(),
+                });
+            }
+        };
 
         let nodestore = Arc::new(NodeStore::with_root(
             root_hash.clone().into_hash_type(),

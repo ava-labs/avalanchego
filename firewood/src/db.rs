@@ -1056,8 +1056,8 @@ mod test {
 
     /// Verifies that persisted revisions are still accessible when reopening the database.
     #[test]
-    fn test_fjall_store() {
-        let db = TestDb::new_with_fjall_store(DbConfig::builder().build());
+    fn test_root_store() {
+        let db = TestDb::new_with_root_store(DbConfig::builder().build());
 
         // First, create a revision to retrieve
         let key = b"key";
@@ -1088,20 +1088,20 @@ mod test {
 
     #[test]
     fn test_rootstore_empty_db_reopen() {
-        let db = TestDb::new_with_fjall_store(DbConfig::builder().build());
+        let db = TestDb::new_with_root_store(DbConfig::builder().build());
 
         db.reopen();
     }
 
     /// Verifies that revisions exceeding the in-memory limit can still be retrieved.
     #[test]
-    fn test_fjall_store_with_capped_max_revisions() {
+    fn test_root_store_with_capped_max_revisions() {
         const NUM_REVISIONS: usize = 10;
 
         let dbconfig = DbConfig::builder()
             .manager(RevisionManagerConfig::builder().max_revisions(5).build())
             .build();
-        let db = TestDb::new_with_fjall_store(dbconfig);
+        let db = TestDb::new_with_root_store(dbconfig);
 
         // Create and commit 10 proposals
         let key = b"root_store";
@@ -1171,15 +1171,15 @@ mod test {
             }
         }
 
-        /// Creates a new test database with `FjallStore` enabled.
+        /// Creates a new test database with `RootStore` enabled.
         ///
-        /// Overrides `root_store_dir` in dbconfig to provide a directory for `FjallStore`.
-        pub fn new_with_fjall_store(dbconfig: DbConfig) -> Self {
+        /// Overrides `root_store_dir` in dbconfig to provide a directory for `RootStore`.
+        pub fn new_with_root_store(dbconfig: DbConfig) -> Self {
             let tmpdir = tempfile::tempdir().unwrap();
             let dbpath: PathBuf = [tmpdir.path().to_path_buf(), PathBuf::from("testdb")]
                 .iter()
                 .collect();
-            let root_store_dir = tmpdir.as_ref().join("fjall_store");
+            let root_store_dir = tmpdir.as_ref().join("root_store");
 
             let dbconfig = DbConfig {
                 root_store_dir: Some(root_store_dir),
