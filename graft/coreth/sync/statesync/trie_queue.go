@@ -30,13 +30,14 @@ func NewTrieQueue(db ethdb.Database) *trieQueue {
 // the persisted root does not match the root we are syncing to.
 func (t *trieQueue) clearIfRootDoesNotMatch(root common.Hash) error {
 	persistedRoot, err := customrawdb.ReadSyncRoot(t.db)
-	if err != nil {
-		// If no sync root exists, treat it as empty hash (no previous sync).
-		if !errors.Is(err, database.ErrNotFound) {
-			return err
-		}
+	// If no sync root exists, treat it as empty hash (no previous sync).
+	switch {
+	case errors.Is(err, database.ErrNotFound):
 		persistedRoot = common.Hash{}
+	case err != nil:
+		return err
 	}
+
 	if persistedRoot != (common.Hash{}) && persistedRoot != root {
 		// if not resuming, clear all progress markers
 		if err := customrawdb.ClearAllSyncStorageTries(t.db); err != nil {
