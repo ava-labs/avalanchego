@@ -28,9 +28,11 @@
 package snapshot
 
 import (
+	"errors"
 	"math/rand"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
@@ -40,7 +42,7 @@ import (
 // Tests that given a database with random data content, all parts of a snapshot
 // can be crrectly wiped without touching anything else.
 func TestWipe(t *testing.T) {
-	// Create a database with some random snapshot data
+	// Create a database with some random snapshot data.
 	db := memorydb.New()
 	for i := 0; i < 128; i++ {
 		rawdb.WriteAccountSnapshot(db, randomHash(), randomHash().Bytes())
@@ -48,9 +50,9 @@ func TestWipe(t *testing.T) {
 	customrawdb.WriteSnapshotBlockHash(db, randomHash())
 	rawdb.WriteSnapshotRoot(db, randomHash())
 
-	// Add some random non-snapshot data too to make wiping harder
+	// Add some random non-snapshot data too to make wiping harder.
 	for i := 0; i < 500; i++ {
-		// Generate keys with wrong length for a state snapshot item
+		// Generate keys with wrong length for a state snapshot item.
 		keysuffix := make([]byte, 31)
 		rand.Read(keysuffix)
 		db.Put(append(rawdb.SnapshotAccountPrefix, keysuffix...), randomHash().Bytes())
@@ -68,25 +70,29 @@ func TestWipe(t *testing.T) {
 		}
 		return items
 	}
-	// Sanity check that all the keys are present
+	// Verify snapshot data exists before wipe.
 	if items := count(); items != 128 {
-		t.Fatalf("snapshot size mismatch: have %d, want %d", items, 128)
+		t.Fatalf("snapshot size mismatch before wipe: have %d, want %d", items, 128)
 	}
-	hash, err := customrawdb.ReadSnapshotBlockHash(db)
-	if err != nil || hash == (common.Hash{}) {
-		t.Errorf("snapshot block hash marker mismatch: have %#x, want <not-nil>", hash)
+	blockHash, err := customrawdb.ReadSnapshotBlockHash(db)
+	switch {
+	case err != nil:
+		t.Fatalf("failed to read snapshot block hash before wipe: %v", err)
+	case blockHash == (common.Hash{}):
+		t.Fatalf("snapshot block hash is empty before wipe")
 	}
-	if hash := rawdb.ReadSnapshotRoot(db); hash == (common.Hash{}) {
-		t.Errorf("snapshot block root marker mismatch: have %#x, want <not-nil>", hash)
+	if root := rawdb.ReadSnapshotRoot(db); root == (common.Hash{}) {
+		t.Fatalf("snapshot root is empty before wipe")
 	}
-	// Wipe all snapshot entries from the database
+
+	// Wipe all snapshot entries from the database.
 	<-WipeSnapshot(db, true)
 
-	// Iterate over the database end ensure no snapshot information remains
+	// Verify snapshot data is removed.
 	if items := count(); items != 0 {
-		t.Fatalf("snapshot size mismatch: have %d, want %d", items, 0)
+		t.Fatalf("snapshot size mismatch after wipe: have %d, want %d", items, 0)
 	}
-	// Iterate over the database and ensure miscellaneous items are present
+	// Verify miscellaneous items are preserved.
 	items := 0
 	it := db.NewIterator(nil, nil)
 	defer it.Release()
@@ -94,14 +100,19 @@ func TestWipe(t *testing.T) {
 		items++
 	}
 	if items != 1000 {
-		t.Fatalf("misc item count mismatch: have %d, want %d", items, 1000)
+		t.Fatalf("misc item count mismatch after wipe: have %d, want %d", items, 1000)
 	}
 
-	hash, err := customrawdb.ReadSnapshotBlockHash(db)
-	if err == nil && hash != (common.Hash{}) {
-		t.Errorf("snapshot block hash marker remained after wipe: %#x", hash)
+	// Verify snapshot markers are removed.
+	blockHash, err = customrawdb.ReadSnapshotBlockHash(db)
+	switch {
+	case errors.Is(err, database.ErrNotFound): // Expected: marker was deleted.
+	case err != nil:
+		t.Errorf("unexpected error reading snapshot block hash after wipe: %v", err)
+	case blockHash != (common.Hash{}):
+		t.Errorf("snapshot block hash marker remained after wipe: %#x", blockHash)
 	}
-	if hash := rawdb.ReadSnapshotRoot(db); hash != (common.Hash{}) {
-		t.Errorf("snapshot block root marker remained after wipe: %#x", hash)
+	if root := rawdb.ReadSnapshotRoot(db); root != (common.Hash{}) {
+		t.Errorf("snapshot root marker remained after wipe: %#x", root)
 	}
 }
