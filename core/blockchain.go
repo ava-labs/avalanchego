@@ -127,6 +127,9 @@ var (
 	latestGasCapacityGauge = metrics.NewRegisteredGauge("chain/latest/gas/capacity", nil)
 	latestGasTargetGauge   = metrics.NewRegisteredGauge("chain/latest/gas/target", nil)
 
+	latestMinDelayGauge       = metrics.NewRegisteredGauge("chain/latest/mindelay", nil)
+	latestMinDelayExcessGauge = metrics.NewRegisteredGauge("chain/latest/mindelay/excess", nil)
+
 	ErrRefuseToCorruptArchiver = errors.New("node has operated with pruning disabled, shutting down to prevent missing tries")
 
 	errFutureBlockUnsupported  = errors.New("future block insertion not supported")
@@ -1129,6 +1132,14 @@ func (bc *BlockChain) Accept(block *types.Block) error {
 		latestGasExcessGauge.Update(int64(s.Gas.Excess))
 		latestGasCapacityGauge.Update(int64(s.Gas.Capacity))
 		latestGasTargetGauge.Update(int64(s.Target()))
+	}
+	if extraConfig.IsGranite(block.Time()) {
+		extraHeader := customtypes.GetHeaderExtra(block.Header())
+		if extraHeader.MinDelayExcess != nil {
+			delayExcess := *extraHeader.MinDelayExcess
+			latestMinDelayGauge.Update(int64(delayExcess.Delay()))
+			latestMinDelayExcessGauge.Update(int64(delayExcess))
+		}
 	}
 	return nil
 }
