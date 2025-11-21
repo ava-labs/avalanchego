@@ -42,7 +42,7 @@ func TestDoNotImportFromGraft(t *testing.T) {
 	slices.Sort(sortedImports)
 
 	var errorMsg strings.Builder
-	errorMsg.WriteString("Files outside the graft directory must not import from the graft directory:\n\n")
+	errorMsg.WriteString("Files outside the graft directory must not import from the graft directory!\n\n")
 	for _, importPath := range sortedImports {
 		files := foundImports[importPath]
 		fileList := files.List()
@@ -90,7 +90,7 @@ func TestLibevmImportsAreAllowed(t *testing.T) {
 	slices.Sort(sortedDisallowed)
 
 	var errorMsg strings.Builder
-	errorMsg.WriteString("New libevm imports should be added to ./scripts/libevm-allowed-packages.txt to prevent accidental imports:\n\n")
+	errorMsg.WriteString("Files inside the graft directory must not import forbidden libevm packages!\nIf a package is safe to import, add it to ./scripts/libevm-allowed-packages.txt.\n\n")
 	for _, importPath := range sortedDisallowed {
 		files := foundImports[importPath]
 		fileList := files.List()
