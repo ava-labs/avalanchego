@@ -10,10 +10,6 @@ env:
 tasks:
   default: ./scripts/run_task.sh --list
 
-  actionlint:
-    desc: Validate GitHub Actions workflows and ensure scripts use run_task.sh for reproducibility
-    cmd: ./scripts/actionlint.sh # ci.yml
-
   build:
     desc: Compile Coreth binary with git commit and static linking flags
     cmd: ./scripts/build.sh # ci.yml
@@ -21,12 +17,6 @@ tasks:
   build-test:
     desc: Run all Go tests with retry logic for flaky tests, race detection, and coverage reporting
     cmd: ./scripts/build_test.sh # ci.yml
-
-  check-avalanchego-version:
-    desc: Ensure consistent avalanchego version by updating and checking for changes
-    cmds:
-      - task: update-avalanchego-version
-      - cmd: git diff --exit-code
 
   check-clean-branch:
     desc: Checks that the git working tree is clean
@@ -59,8 +49,6 @@ tasks:
     cmds:
       - cmd: go mod tidy
       - task: check-clean-branch
-      - cmd: cd tools && go mod tidy
-      - task: check-clean-branch
 
   coverage:
     desc: Display test coverage statistics from coverage.out file
@@ -92,7 +80,6 @@ tasks:
     desc: Runs all lint checks in parallel
     deps:
       - lint
-      - actionlint
       - shellcheck
       - check-generate-codec
       - check-generate-mocks
@@ -102,7 +89,6 @@ tasks:
     desc: Runs all lint checks one-by-one
     cmds:
       - task: lint
-      - task: actionlint
       - task: shellcheck
       - task: check-generate-codec
       - task: check-generate-mocks
@@ -115,16 +101,6 @@ tasks:
   shellcheck:
     desc: Run shellcheck static analysis on all shell scripts with version management
     cmd: ./scripts/shellcheck.sh # ci.yml
-
-  test-e2e:
-    desc: Run AvalancheGo e2e tests from target version against current state of coreth
-    cmd: ./scripts/tests.e2e.sh # ci.yml
-
-  test-e2e-ci:
-    desc: Run AvalancheGo e2e tests from target version against current state of coreth, cloning and building avalanchego if necessary
-    cmds:
-      - task: build-avalanchego-with-coreth
-      - task: test-e2e
 
   test-e2e-warp:
     desc: Run end-to-end warp tests using Ginkgo test framework
@@ -144,7 +120,3 @@ tasks:
     cmds:
       - cmd: ./scripts/run_task.sh build-race
       - cmd: bash -x ./scripts/tests.e2e.sh {{.CLI_ARGS}}
-
-  update-avalanchego-version:
-    desc: Update AvalancheGo version in go.mod and sync GitHub Actions workflow custom action version
-    cmd: bash -x ./scripts/update_avalanchego_version.sh # ci.yml

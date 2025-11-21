@@ -50,7 +50,7 @@ function test_license_header {
     echo "Running license tool on upstream files with header for upstream..."
     # shellcheck disable=SC2086
     go tool -modfile=../../tools/go.mod go-license \
-      --config=./license_header_for_upstream.yml \
+      --config=../../header_upstream.yml \
       ${_addlicense_flags} \
       "${UPSTREAM_FILES[@]}" \
       || return 1
@@ -60,7 +60,7 @@ function test_license_header {
     echo "Running license tool on remaining files with default header..."
     # shellcheck disable=SC2086
     go tool -modfile=../../tools/go.mod go-license \
-      --config=./license_header.yml \
+      --config=../../header.yml \
       ${_addlicense_flags} \
       "${AVALANCHE_FILES[@]}" \
       || return 1
