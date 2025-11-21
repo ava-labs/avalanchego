@@ -4,5 +4,4 @@ TestClientWebsocketLargeMessage
 TestMempoolEthTxsAppGossipHandling
 TestTransactionSkipIndexing
 TestVMShutdownWhileSyncing
-TestWaitDeployedCornerCases
 TestWebsocketLargeRead
