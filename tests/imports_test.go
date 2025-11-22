@@ -13,8 +13,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 // TestDoNotImportFromGraft ensures proper import rules for graft packages:
