@@ -102,13 +102,13 @@ type HeightIndex interface {
 	// If value is nil or an empty slice, then when it's retrieved it may be nil
 	// or an empty slice.
 	//
-	// value is safe to read and modify after calling Put.
+	// The provided value is not safe to modify after calling Put.
 	Put(height uint64, value []byte) error
 
 	// Get retrieves a value by its height.
 	// Returns [ErrNotFound] if the key is not present in the database.
 	//
-	// Returned []byte is safe to read and modify after calling Get.
+	// The returned byte slice is not safe to modify.
 	Get(height uint64) ([]byte, error)
 
 	// Has checks if a value exists at the given height.
