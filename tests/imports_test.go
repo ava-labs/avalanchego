@@ -45,12 +45,12 @@ func TestEnforceGraftImportBoundaries(t *testing.T) {
 
 		// graft/coreth: blocked in vms/evm except vms/evm/emulate
 		if isCoreth && isInVmsEvm && !isInEmulate {
-			return false // Don't skip - this is a violation
+			return false
 		}
 
 		// graft/subnet-evm: blocked everywhere except vms/evm/emulate
 		if isSubnetEVM && !isInEmulate {
-			return false // Don't skip - this is a violation
+			return false
 		}
 
 		return true
@@ -58,10 +58,10 @@ func TestEnforceGraftImportBoundaries(t *testing.T) {
 	require.NoError(t, err, "Failed to find graft imports")
 
 	if len(foundImports) == 0 {
-		return
+		return // no violations found
 	}
 
-	// After this point, there are imports from the graft directory, and the test will fail.
+	// After this point, there are illegal imports from the graft directory, and the test will fail.
 	// The remaining code is just necessary to pretty-print the error message,
 	// to make it easier to find and fix the disallowed imports.
 	sortedImports := make([]string, 0, len(foundImports))
@@ -108,6 +108,7 @@ func TestLibevmImportsAreAllowed(t *testing.T) {
 			strings.Contains(path, "graft/*/tempextrastest/") {
 			return true
 		}
+
 		// Skip underscore and "eth*" named imports
 		return imp.Name != nil && (imp.Name.Name == "_" || strings.HasPrefix(imp.Name.Name, "eth"))
 	})
@@ -121,7 +122,7 @@ func TestLibevmImportsAreAllowed(t *testing.T) {
 	}
 
 	if len(disallowedImports) == 0 {
-		return
+		return // no violations found
 	}
 
 	// After this point, there are disallowed imports, and the test will fail.
