@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -29,11 +31,12 @@ const (
 )
 
 var (
-	utxoPrefix      = []byte("utxo")
-	txPrefix        = []byte("tx")
-	blockIDPrefix   = []byte("blockID")
-	blockPrefix     = []byte("block")
-	singletonPrefix = []byte("singleton")
+	UTXOPrefix      = []byte("utxo")
+	IndexPrefix     = []byte("index")
+	TxPrefix        = []byte("tx")
+	BlockIDPrefix   = []byte("blockID")
+	BlockPrefix     = []byte("block")
+	SingletonPrefix = []byte("singleton")
 
 	isInitializedKey = []byte{0x00}
 	timestampKey     = []byte{0x01}
@@ -41,6 +44,10 @@ var (
 
 	_ State = (*state)(nil)
 )
+
+type VM interface {
+	Replay(b block.Block) error
+}
 
 type ReadOnlyChain interface {
 	avax.UTXOGetter
@@ -91,7 +98,7 @@ type State interface {
 	CommitBatch() (database.Batch, error)
 
 	// Checksum returns the current state checksum.
-	Checksum() ids.ID
+	Checksum(ctx context.Context) (ids.ID, error)
 
 	Close() error
 }
@@ -112,11 +119,12 @@ type State interface {
  *   '-- lastAcceptedKey -> lastAccepted
  */
 type state struct {
-	parser block.Parser
-	db     *versiondb.Database
+	parser      block.Parser
+	chainDB     ChainDB
+	baseLocalDB database.Database
+	vdb         *versiondb.Database
 
 	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
-	utxoDB        database.Database
 	utxoState     avax.UTXOState
 
 	addedTxs map[ids.ID]*txs.Tx            // map of txID -> *txs.Tx
@@ -138,19 +146,51 @@ type state struct {
 }
 
 func New(
-	db *versiondb.Database,
+	baseDB database.Database,
 	parser block.Parser,
 	metrics prometheus.Registerer,
 	trackChecksums bool,
-) (State, error) {
-	utxoDB := prefixdb.New(utxoPrefix, db)
-	txDB := prefixdb.New(txPrefix, db)
-	blockIDDB := prefixdb.New(blockIDPrefix, db)
-	blockDB := prefixdb.New(blockPrefix, db)
-	singletonDB := prefixdb.New(singletonPrefix, db)
+) (*state, error) {
+	vdb := versiondb.New(baseDB)
 
+	blockDB := prefixdb.New(BlockPrefix, vdb)
+	singletonDB := prefixdb.New(SingletonPrefix, vdb)
+	chainDB := &NoChainDB{}
+
+	return NewWithFormat(
+		"state",
+		chainDB,
+		baseDB,
+		vdb,
+		prefixdb.New(IndexPrefix, vdb),
+		prefixdb.New(TxPrefix, vdb),
+		prefixdb.New(BlockIDPrefix, vdb),
+		blockDB,
+		singletonDB,
+		avax.NewUTXODatabase(prefixdb.New(UTXOPrefix, vdb)),
+		parser,
+		metrics,
+		trackChecksums,
+	)
+}
+
+func NewWithFormat(
+	namespace string,
+	chainDB ChainDB,
+	localBaseDB database.Database,
+	vdb *versiondb.Database,
+	utxoIndexDB database.Database,
+	txDB database.Database,
+	blockIDDB database.Database,
+	blockDB database.Database,
+	singletonDB database.Database,
+	utxoDB avax.UTXODB,
+	parser block.Parser,
+	metrics prometheus.Registerer,
+	trackChecksums bool,
+) (*state, error) {
 	txCache, err := metercacher.New[ids.ID, *txs.Tx](
-		"tx_cache",
+		metric.AppendNamespace(namespace, "tx_cache"),
 		metrics,
 		lru.NewCache[ids.ID, *txs.Tx](txCacheSize),
 	)
@@ -159,7 +199,7 @@ func New(
 	}
 
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
-		"block_id_cache",
+		metric.AppendNamespace(namespace, "block_id_cache"),
 		metrics,
 		lru.NewCache[uint64, ids.ID](blockIDCacheSize),
 	)
@@ -168,7 +208,7 @@ func New(
 	}
 
 	blockCache, err := metercacher.New[ids.ID, block.Block](
-		"block_cache",
+		metric.AppendNamespace(namespace, "block_cache"),
 		metrics,
 		lru.NewCache[ids.ID, block.Block](blockCacheSize),
 	)
@@ -176,17 +216,25 @@ func New(
 		return nil, err
 	}
 
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, parser.Codec(), metrics, trackChecksums)
+	utxoState, err := avax.NewMeteredUTXOState(
+		namespace,
+		utxoDB,
+		utxoIndexDB,
+		parser.Codec(),
+		metrics,
+		trackChecksums,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	return &state{
-		parser: parser,
-		db:     db,
+		parser:      parser,
+		chainDB:     chainDB,
+		baseLocalDB: localBaseDB,
+		vdb:         vdb,
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
-		utxoDB:        utxoDB,
 		utxoState:     utxoState,
 
 		addedTxs: make(map[ids.ID]*txs.Tx),
@@ -403,24 +451,28 @@ func (s *state) Commit() error {
 }
 
 func (s *state) Abort() {
-	s.db.Abort()
+	s.vdb.Abort()
+	s.chainDB.Abort()
 }
 
 func (s *state) CommitBatch() (database.Batch, error) {
 	if err := s.write(); err != nil {
 		return nil, err
 	}
-	return s.db.CommitBatch()
+
+	return s.vdb.CommitBatch()
 }
 
 func (s *state) Close() error {
 	return errors.Join(
-		s.utxoDB.Close(),
+		s.utxoState.Close(),
 		s.txDB.Close(),
 		s.blockIDDB.Close(),
 		s.blockDB.Close(),
 		s.singletonDB.Close(),
-		s.db.Close(),
+		s.vdb.Close(),
+		s.baseLocalDB.Close(),
+		s.chainDB.Close(),
 	)
 }
 
@@ -454,6 +506,12 @@ func (s *state) writeUTXOs() error {
 func (s *state) writeTxs() error {
 	for txID, tx := range s.addedTxs {
 		txBytes := tx.Bytes()
+
+		switch s.addedTxs[txID].Unsigned.(type) {
+		case *txs.ExportTx, *txs.ImportTx:
+			s.chainDB.AddAtomicTx(txID)
+		default:
+		}
 
 		delete(s.addedTxs, txID)
 		s.txCache.Put(txID, tx)
@@ -506,6 +564,6 @@ func (s *state) writeMetadata() error {
 	return nil
 }
 
-func (s *state) Checksum() ids.ID {
+func (s *state) Checksum(context.Context) (ids.ID, error) {
 	return s.utxoState.Checksum()
 }

@@ -206,11 +206,12 @@ func (mr *MockStateMockRecorder) ApplyValidatorWeightDiffs(ctx, validators, star
 }
 
 // Checksum mocks base method.
-func (m *MockState) Checksum() ids.ID {
+func (m *MockState) Checksum() (ids.ID, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Checksum")
 	ret0, _ := ret[0].(ids.ID)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // Checksum indicates an expected call of Checksum.

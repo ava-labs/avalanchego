@@ -12,6 +12,7 @@ package executormock
 import (
 	reflect "reflect"
 
+	atomic "github.com/ava-labs/avalanchego/chains/atomic"
 	ids "github.com/ava-labs/avalanchego/ids"
 	snowman "github.com/ava-labs/avalanchego/snow/consensus/snowman"
 	set "github.com/ava-labs/avalanchego/utils/set"
@@ -105,17 +106,17 @@ func (mr *ManagerMockRecorder) LastAccepted() *gomock.Call {
 }
 
 // NewBlock mocks base method.
-func (m *Manager) NewBlock(arg0 block.Block) snowman.Block {
+func (m *Manager) NewBlock(blk block.Block, sm atomic.SharedMemory) snowman.Block {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewBlock", arg0)
+	ret := m.ctrl.Call(m, "NewBlock", blk, sm)
 	ret0, _ := ret[0].(snowman.Block)
 	return ret0
 }
 
 // NewBlock indicates an expected call of NewBlock.
-func (mr *ManagerMockRecorder) NewBlock(arg0 any) *gomock.Call {
+func (mr *ManagerMockRecorder) NewBlock(blk, sm any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewBlock", reflect.TypeOf((*Manager)(nil).NewBlock), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewBlock", reflect.TypeOf((*Manager)(nil).NewBlock), blk, sm)
 }
 
 // Preferred mocks base method.
@@ -130,6 +131,18 @@ func (m *Manager) Preferred() ids.ID {
 func (mr *ManagerMockRecorder) Preferred() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Preferred", reflect.TypeOf((*Manager)(nil).Preferred))
+}
+
+// SetLastAccepted mocks base method.
+func (m *Manager) SetLastAccepted(id ids.ID) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetLastAccepted", id)
+}
+
+// SetLastAccepted indicates an expected call of SetLastAccepted.
+func (mr *ManagerMockRecorder) SetLastAccepted(id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*Manager)(nil).SetLastAccepted), id)
 }
 
 // SetPreference mocks base method.

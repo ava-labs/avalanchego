@@ -174,5 +174,5 @@ func (b *builder) BuildBlock(context.Context) (snowman.Block, error) {
 		return nil, err
 	}
 
-	return b.manager.NewBlock(statelessBlk), nil
+	return b.manager.NewBlock(statelessBlk, b.backend.Ctx.SharedMemory), nil
 }

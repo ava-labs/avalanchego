@@ -39,8 +39,7 @@ func (a *acceptor) BanffCommitBlock(b *block.BanffCommitBlock) error {
 }
 
 func (a *acceptor) BanffProposalBlock(b *block.BanffProposalBlock) error {
-	a.proposalBlock(b, "banff proposal")
-	return nil
+	return a.proposalBlock(b, "banff proposal")
 }
 
 func (a *acceptor) BanffStandardBlock(b *block.BanffStandardBlock) error {
@@ -56,8 +55,7 @@ func (a *acceptor) ApricotCommitBlock(b *block.ApricotCommitBlock) error {
 }
 
 func (a *acceptor) ApricotProposalBlock(b *block.ApricotProposalBlock) error {
-	a.proposalBlock(b, "apricot proposal")
-	return nil
+	return a.proposalBlock(b, "apricot proposal")
 }
 
 func (a *acceptor) ApricotStandardBlock(b *block.ApricotStandardBlock) error {
@@ -102,13 +100,18 @@ func (a *acceptor) ApricotAtomicBlock(b *block.ApricotAtomicBlock) error {
 		)
 	}
 
+	checksum, err := a.state.Checksum()
+	if err != nil {
+		return fmt.Errorf("getting checksum: %w", err)
+	}
+
 	a.ctx.Log.Trace(
 		"accepted block",
 		zap.String("blockType", "apricot atomic"),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
-		zap.Stringer("checksum", a.state.Checksum()),
+		zap.Stringer("checksum", checksum),
 	)
 
 	return nil
@@ -172,19 +175,24 @@ func (a *acceptor) optionBlock(b block.Block, blockType string) error {
 		onAcceptFunc()
 	}
 
+	checksum, err := a.state.Checksum()
+	if err != nil {
+		return fmt.Errorf("getting checksum: %w", err)
+	}
+
 	a.ctx.Log.Trace(
 		"accepted block",
 		zap.String("blockType", blockType),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", parentID),
-		zap.Stringer("checksum", a.state.Checksum()),
+		zap.Stringer("checksum", checksum),
 	)
 
 	return nil
 }
 
-func (a *acceptor) proposalBlock(b block.Block, blockType string) {
+func (a *acceptor) proposalBlock(b block.Block, blockType string) error {
 	// Note that:
 	//
 	// * We don't free the proposal block in this method.
@@ -204,14 +212,21 @@ func (a *acceptor) proposalBlock(b block.Block, blockType string) {
 	blkID := b.ID()
 	a.backend.lastAccepted = blkID
 
+	checksum, err := a.state.Checksum()
+	if err != nil {
+		return fmt.Errorf("getting checksum: %w", err)
+	}
+
 	a.ctx.Log.Trace(
 		"accepted block",
 		zap.String("blockType", blockType),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
-		zap.Stringer("checksum", a.state.Checksum()),
+		zap.Stringer("checksum", checksum),
 	)
+
+	return nil
 }
 
 func (a *acceptor) standardBlock(b block.Block, blockType string) error {
@@ -251,13 +266,18 @@ func (a *acceptor) standardBlock(b block.Block, blockType string) error {
 		onAcceptFunc()
 	}
 
+	checksum, err := a.state.Checksum()
+	if err != nil {
+		return fmt.Errorf("getting checksum: %w", err)
+	}
+
 	a.ctx.Log.Trace(
 		"accepted block",
 		zap.String("blockType", blockType),
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
-		zap.Stringer("checksum", a.state.Checksum()),
+		zap.Stringer("checksum", checksum),
 	)
 
 	return nil

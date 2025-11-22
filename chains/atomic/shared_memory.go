@@ -10,7 +10,10 @@ import (
 	"github.com/ava-labs/avalanchego/utils"
 )
 
-var _ SharedMemory = (*sharedMemory)(nil)
+var (
+	_ SharedMemory = (*sharedMemory)(nil)
+	_ SharedMemory = (*ReadOnlySharedMemory)(nil)
+)
 
 type Requests struct {
 	RemoveRequests [][]byte   `serialize:"true"`
@@ -162,4 +165,45 @@ func (sm *sharedMemory) Apply(requests map[ids.ID]*Requests, batches ...database
 	}
 
 	return WriteAll(batch, batches...)
+}
+
+type ReadOnlySharedMemory struct {
+	sm SharedMemory
+}
+
+func NewReadOnlySharedMemory(sharedMemory SharedMemory) ReadOnlySharedMemory {
+	return ReadOnlySharedMemory{sm: sharedMemory}
+}
+
+func (r ReadOnlySharedMemory) Get(
+	peerChainID ids.ID,
+	keys [][]byte,
+) (
+	[][]byte,
+	error,
+) {
+	return r.sm.Get(peerChainID, keys)
+}
+
+func (r ReadOnlySharedMemory) Indexed(
+	peerChainID ids.ID,
+	traits [][]byte,
+	startTrait,
+	startKey []byte,
+	limit int,
+) ([][]byte, []byte, []byte, error) {
+	return r.sm.Indexed(
+		peerChainID,
+		traits,
+		startTrait,
+		startKey,
+		limit,
+	)
+}
+
+func (ReadOnlySharedMemory) Apply(
+	map[ids.ID]*Requests,
+	...database.Batch,
+) error {
+	return nil
 }
