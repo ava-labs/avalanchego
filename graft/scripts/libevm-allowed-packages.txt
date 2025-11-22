@@ -1,3 +1,7 @@
+# Allowed libevm packages that can be imported in the graft directory.
+# Lines with a "!" prefix are forbidden.
+# Lines without a "!" prefix are allowed (exceptions to the forbidden patterns).
+
 "github.com/ava-labs/libevm/accounts"
 "github.com/ava-labs/libevm/accounts/external"
 "github.com/ava-labs/libevm/accounts/keystore"

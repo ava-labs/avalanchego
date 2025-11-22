@@ -1,3 +1,6 @@
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
 package tests
 
 import (
@@ -17,6 +20,64 @@ import (
 
 	"github.com/ava-labs/avalanchego/utils/set"
 )
+
+// TestEnforceLicensingImportBoundaries ensures that upstream files (listed in
+// graft/scripts/forbidden-geth-files.txt) cannot be imported outside the graft directory,
+// except for explicitly allowed exceptions (lines without !).
+func TestEnforceLicensingImportBoundaries(t *testing.T) {
+	forbiddenPatterns, allowedExceptions, err := loadPatternFile("../graft/scripts/forbidden-geth-files.txt")
+	require.NoError(t, err, "Failed to load forbidden geth files patterns")
+
+	// Find all graft/coreth and graft/subnet-evm imports outside the graft directory
+	graftRegex := regexp.MustCompile(`^github\.com/ava-labs/avalanchego/graft/(coreth|subnet-evm)/`)
+	foundImports, err := findImportsMatchingPattern("..", graftRegex, func(path string, _ string, _ *ast.ImportSpec) bool {
+		// Skip files within the graft directory - they can import anything from graft
+		return strings.Contains(path, "/graft/")
+	})
+	require.NoError(t, err, "Failed to find graft imports")
+
+	violations := make(map[string]set.Set[string])
+	for importPath, files := range foundImports {
+		// Convert import path to pattern-compatible format
+		// e.g., "github.com/ava-labs/avalanchego/graft/coreth/core/state" -> "graft/coreth/core/state"
+		pathForMatching := strings.TrimPrefix(importPath, "github.com/ava-labs/avalanchego/")
+
+		// Check if this path matches any allowed exception
+		isAllowed := false
+		for _, allowed := range allowedExceptions {
+			if matched, _ := filepath.Match(allowed, pathForMatching); matched {
+				isAllowed = true
+				break
+			}
+		}
+
+		if isAllowed {
+			continue
+		}
+
+		// Check if this path matches any forbidden pattern
+		isForbidden := false
+		for _, forbidden := range forbiddenPatterns {
+			if matched, _ := filepath.Match(forbidden, pathForMatching); matched {
+				isForbidden = true
+				break
+			}
+		}
+
+		if isForbidden {
+			violations[importPath] = files
+		}
+	}
+
+	if len(violations) == 0 {
+		return // no violations found
+	}
+
+	header := "Upstream file import rules violated!\n" +
+		"Upstream files (from graft/coreth or graft/subnet-evm) cannot be imported outside the graft directory,\n" +
+		"except for explicitly allowed exceptions in graft/scripts/forbidden-geth-files.txt (lines without !).\n\n"
+	require.Fail(t, formatImportViolations(violations, header))
+}
 
 // TestDoNotImportFromGraft ensures proper import rules for graft packages:
 // - graft/coreth can be imported anywhere EXCEPT vms/evm (but vms/evm/emulate is an exception)
@@ -62,42 +123,24 @@ func TestEnforceGraftImportBoundaries(t *testing.T) {
 		return // no violations found
 	}
 
-	// After this point, there are illegal imports from the graft directory, and the test will fail.
-	// The remaining code is just necessary to pretty-print the error message,
-	// to make it easier to find and fix the disallowed imports.
-	sortedImports := make([]string, 0, len(foundImports))
-	for importPath := range foundImports {
-		sortedImports = append(sortedImports, importPath)
-	}
-	slices.Sort(sortedImports)
-
-	var errorMsg strings.Builder
-	errorMsg.WriteString("Graft import rules violated!\n")
-	errorMsg.WriteString("Rules:\n")
-	errorMsg.WriteString("  - graft/coreth can be imported anywhere EXCEPT vms/evm (but vms/evm/emulate is an exception)\n")
-	errorMsg.WriteString("  - graft/subnet-evm cannot be imported anywhere EXCEPT vms/evm/emulate\n\n")
-	errorMsg.WriteString("Violations:\n\n")
-
-	for _, importPath := range sortedImports {
-		files := foundImports[importPath]
-		fileList := files.List()
-		slices.Sort(fileList)
-
-		errorMsg.WriteString(fmt.Sprintf("- %s\n", importPath))
-		errorMsg.WriteString(fmt.Sprintf("   Used in %d file(s):\n", len(fileList)))
-		for _, file := range fileList {
-			errorMsg.WriteString(fmt.Sprintf("   • %s\n", file))
-		}
-		errorMsg.WriteString("\n")
-	}
-	require.Fail(t, errorMsg.String())
+	header := "Graft import rules violated!\n" +
+		"Rules:\n" +
+		"  - graft/coreth can be imported anywhere EXCEPT vms/evm (but vms/evm/emulate is an exception)\n" +
+		"  - graft/subnet-evm cannot be imported anywhere EXCEPT vms/evm/emulate\n\n"
+	require.Fail(t, formatImportViolations(foundImports, header))
 }
 
 // TestLibevmImportsAreAllowed ensures that all libevm imports in the graft directory
 // are explicitly allowed via the libevm-allowed-packages.txt file.
 func TestLibevmImportsAreAllowed(t *testing.T) {
-	allowedPackages, err := loadAllowedPackages("../scripts/libevm-allowed-packages.txt")
+	_, allowedPackages, err := loadPatternFile("../graft/scripts/libevm-allowed-packages.txt")
 	require.NoError(t, err, "Failed to load allowed packages")
+
+	// Convert allowed packages to a set for faster lookup
+	allowedSet := set.Set[string]{}
+	for _, pkg := range allowedPackages {
+		allowedSet.Add(pkg)
+	}
 
 	// Find all libevm imports in source files, excluding underscore and "eth*" named imports
 	libevmRegex := regexp.MustCompile(`^github\.com/ava-labs/libevm/`)
@@ -115,27 +158,36 @@ func TestLibevmImportsAreAllowed(t *testing.T) {
 	})
 	require.NoError(t, err, "Failed to find libevm imports")
 
-	var disallowedImports set.Set[string]
-	for importPath := range foundImports {
-		if !allowedPackages.Contains(importPath) {
-			disallowedImports.Add(importPath)
+	violations := make(map[string]set.Set[string])
+	for importPath, files := range foundImports {
+		if !allowedSet.Contains(importPath) {
+			violations[importPath] = files
 		}
 	}
 
-	if len(disallowedImports) == 0 {
+	if len(violations) == 0 {
 		return // no violations found
 	}
 
-	// After this point, there are disallowed imports, and the test will fail.
-	// The remaining code is just necessary to pretty-print the error message,
-	// to make it easier to find and fix the disallowed imports.
-	sortedDisallowed := disallowedImports.List()
-	slices.Sort(sortedDisallowed)
+	header := "Files inside the graft directory must not import forbidden libevm packages!\n" +
+		"If a package is safe to import, add it to graft/scripts/libevm-allowed-packages.txt.\n\n"
+	require.Fail(t, formatImportViolations(violations, header))
+}
+
+// formatImportViolations formats a map of import violations into an error message
+func formatImportViolations(violations map[string]set.Set[string], header string) string {
+	sortedViolations := make([]string, 0, len(violations))
+	for importPath := range violations {
+		sortedViolations = append(sortedViolations, importPath)
+	}
+	slices.Sort(sortedViolations)
 
 	var errorMsg strings.Builder
-	errorMsg.WriteString("Files inside the graft directory must not import forbidden libevm packages!\nIf a package is safe to import, add it to ./scripts/libevm-allowed-packages.txt.\n\n")
-	for _, importPath := range sortedDisallowed {
-		files := foundImports[importPath]
+	errorMsg.WriteString(header)
+	errorMsg.WriteString("Violations:\n\n")
+
+	for _, importPath := range sortedViolations {
+		files := violations[importPath]
 		fileList := files.List()
 		slices.Sort(fileList)
 
@@ -146,34 +198,47 @@ func TestLibevmImportsAreAllowed(t *testing.T) {
 		}
 		errorMsg.WriteString("\n")
 	}
-	require.Fail(t, errorMsg.String())
+
+	return errorMsg.String()
 }
 
-// loadAllowedPackages reads the allowed packages from the specified file
-func loadAllowedPackages(filename string) (set.Set[string], error) {
+// loadPatternFile reads patterns from a file and separates them into forbidden and allowed.
+// Lines with a ! prefix are forbidden patterns.
+// Lines without a ! prefix are allowed patterns (exceptions).
+// Returns: (forbidden patterns, allowed patterns, error)
+func loadPatternFile(filename string) ([]string, []string, error) {
 	file, err := os.Open(filename)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open allowed packages file: %w", err)
+		return nil, nil, fmt.Errorf("failed to open pattern file: %w", err)
 	}
 	defer file.Close()
 
-	allowed := set.Set[string]{}
+	var forbidden []string
+	var allowed []string
+
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
+		// Skip empty lines and comments
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 
+		// Remove quotes if present
 		line = strings.Trim(line, `"`)
-		allowed.Add(line)
+
+		if strings.HasPrefix(line, "!") {
+			forbidden = append(forbidden, strings.TrimPrefix(line, "!"))
+		} else {
+			allowed = append(allowed, line)
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("failed to read allowed packages file: %w", err)
+		return nil, nil, fmt.Errorf("failed to read pattern file: %w", err)
 	}
 
-	return allowed, nil
+	return forbidden, allowed, nil
 }
 
 // importFilter is a function that can filter imports based on the file path,
