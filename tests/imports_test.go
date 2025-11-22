@@ -17,18 +17,43 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestDoNotImportFromGraft ensures that files in vms/evm
-// do not import packages from within the graft directory.
+// TestDoNotImportFromGraft ensures proper import rules for graft packages:
+// - graft/coreth can be imported anywhere EXCEPT vms/evm (but vms/evm/emulate is an exception)
+// - graft/subnet-evm cannot be imported anywhere EXCEPT vms/evm/emulate
 func TestDoNotImportFromGraft(t *testing.T) {
 	graftRegex := regexp.MustCompile(`^github\.com/ava-labs/avalanchego/graft(/|$)`)
 
-	// Find all graft imports in vms/evm
-	foundImports, err := findImportsMatchingPattern("../vms/evm", graftRegex, func(path string, _ string, _ *ast.ImportSpec) bool {
+	// Find all graft imports in the entire repository
+	foundImports, err := findImportsMatchingPattern("..", graftRegex, func(path string, importPath string, _ *ast.ImportSpec) bool {
 		// Skip generated files and test-specific files
 		filename := filepath.Base(path)
-		return strings.HasPrefix(filename, "gen_") ||
+		if strings.HasPrefix(filename, "gen_") ||
 			strings.Contains(path, "graft/*/core/main_test.go") ||
-			strings.Contains(path, "graft/*/tempextrastest/")
+			strings.Contains(path, "graft/*/tempextrastest/") {
+			return true
+		}
+
+		// Skip files in the graft directory itself - they can import from graft
+		if strings.Contains(path, "/graft/") {
+			return true
+		}
+
+		isInEmulate := strings.Contains(path, "/vms/evm/emulate/")
+		isInVmsEvm := strings.Contains(path, "/vms/evm/")
+		isCoreth := strings.Contains(importPath, "/graft/coreth")
+		isSubnetEVM := strings.Contains(importPath, "/graft/subnet-evm")
+
+		// graft/coreth: blocked in vms/evm except vms/evm/emulate
+		if isCoreth && isInVmsEvm && !isInEmulate {
+			return false // Don't skip - this is a violation
+		}
+
+		// graft/subnet-evm: blocked everywhere except vms/evm/emulate
+		if isSubnetEVM && !isInEmulate {
+			return false // Don't skip - this is a violation
+		}
+
+		return true
 	})
 	require.NoError(t, err, "Failed to find graft imports")
 
@@ -46,7 +71,12 @@ func TestDoNotImportFromGraft(t *testing.T) {
 	slices.Sort(sortedImports)
 
 	var errorMsg strings.Builder
-	errorMsg.WriteString("Files in vms/evm must not import from the graft directory!\n\n")
+	errorMsg.WriteString("Graft import rules violated!\n")
+	errorMsg.WriteString("Rules:\n")
+	errorMsg.WriteString("  - graft/coreth can be imported anywhere EXCEPT vms/evm (but vms/evm/emulate is an exception)\n")
+	errorMsg.WriteString("  - graft/subnet-evm cannot be imported anywhere EXCEPT vms/evm/emulate\n\n")
+	errorMsg.WriteString("Violations:\n\n")
+
 	for _, importPath := range sortedImports {
 		files := foundImports[importPath]
 		fileList := files.List()
