@@ -105,12 +105,12 @@ func TestEnforceGraftImportBoundaries(t *testing.T) {
 		isCoreth := strings.Contains(importPath, "/graft/coreth")
 		isSubnetEVM := strings.Contains(importPath, "/graft/subnet-evm")
 
-		// graft/coreth: blocked in vms/evm except vms/evm/emulate
+		// graft/coreth: illegal in vms/evm except vms/evm/emulate
 		if isCoreth && isInVmsEvm && !isInEmulate {
 			return false
 		}
 
-		// graft/subnet-evm: blocked everywhere except vms/evm/emulate
+		// graft/subnet-evm: illegal everywhere except vms/evm/emulate
 		if isSubnetEVM && !isInEmulate {
 			return false
 		}
@@ -219,14 +219,11 @@ func loadPatternFile(filename string) ([]string, []string, error) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		// Skip empty lines and comments
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 
-		// Remove quotes if present
 		line = strings.Trim(line, `"`)
-
 		if strings.HasPrefix(line, "!") {
 			forbidden = append(forbidden, strings.TrimPrefix(line, "!"))
 		} else {
@@ -241,11 +238,6 @@ func loadPatternFile(filename string) ([]string, []string, error) {
 	return forbidden, allowed, nil
 }
 
-// importFilter is a function that can filter imports based on the file path,
-// import path, and AST import spec (which contains the import name).
-// Return true to skip this import.
-type importFilter func(filePath string, importPath string, importSpec *ast.ImportSpec) bool
-
 // findImportsMatchingPattern is a generalized function that finds all imports
 // matching a given regex pattern in the specified directory.
 // The filterFunc can be used to skip certain files or imports (return true to skip).
@@ -253,7 +245,7 @@ type importFilter func(filePath string, importPath string, importSpec *ast.Impor
 func findImportsMatchingPattern(
 	rootDir string,
 	importRegex *regexp.Regexp,
-	filterFunc importFilter,
+	filterFunc func(filePath string, importPath string, importSpec *ast.ImportSpec) bool,
 ) (map[string]set.Set[string], error) {
 	imports := make(map[string]set.Set[string])
 
