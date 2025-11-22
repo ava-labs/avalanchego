@@ -226,6 +226,17 @@ jobs:
       - name: Run e2e tests
         shell: bash
         run: nix develop --command ./scripts/run_task.sh test-bootstrap-monitor-e2e
+      - name: Export kind logs
+        if: always()
+        shell: bash
+        run: kind export logs /tmp/kind-logs
+      - name: Upload kind logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bootstrap-monitor-kind-logs
+          path: /tmp/kind-logs
+          if-no-files-found: error
   load:
     name: Run process-based load test
     runs-on: ubuntu-latest
