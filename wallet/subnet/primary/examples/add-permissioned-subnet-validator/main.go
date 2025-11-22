@@ -21,7 +21,7 @@ func main() {
 	key := genesis.EWOQKey
 	uri := primary.LocalAPIURI
 	kc := secp256k1fx.NewKeychain(key)
-	subnetIDStr := "29uVeLPJB1eQJkzRemU8g8wZDw5uJRqpab5U2mX9euieVwiEbL"
+	subnetIDStr := "BKBZ6xXTnT86B4L5fp8rvtcmNSpvtNz8En9jG61ywV2uWyeHy"
 	startTime := time.Now().Add(time.Minute)
 	duration := 2 * 7 * 24 * time.Hour // 2 weeks
 	weight := units.Schmeckle

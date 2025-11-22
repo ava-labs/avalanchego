@@ -21,8 +21,8 @@ require (
 	github.com/DataDog/zstd v1.5.2
 	github.com/StephenButtolph/canoto v0.17.3
 	github.com/antithesishq/antithesis-sdk-go v0.3.8
-	github.com/ava-labs/coreth v0.16.0-rc.0
-	github.com/ava-labs/libevm v1.13.15-0.20251016142715-1bccf4f2ddb2
+	github.com/ava-labs/coreth v0.16.1-0.20251114233600-7b5fd1ab025a
+	github.com/ava-labs/libevm v1.13.15-0.20251114170401-749b6cefda28
 	github.com/ava-labs/subnet-evm v0.8.1-db-metrics-fix
 	github.com/btcsuite/btcd/btcutil v1.1.3
 	github.com/cespare/xxhash/v2 v2.3.0
@@ -84,6 +84,13 @@ require (
 	k8s.io/apimachinery v0.29.0
 	k8s.io/client-go v0.29.0
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
+)
+
+require (
+	github.com/arr4n/sink v0.0.0-20250610120507-bd1b0fbb19fa // indirect
+	github.com/ava-labs/strevm v0.0.0-20251114233539-0a61685c723b // indirect
+	github.com/dustin/go-humanize v1.0.0 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 )
 
 require (
