@@ -20,7 +20,7 @@ import (
 // TestDoNotImportFromGraft ensures proper import rules for graft packages:
 // - graft/coreth can be imported anywhere EXCEPT vms/evm (but vms/evm/emulate is an exception)
 // - graft/subnet-evm cannot be imported anywhere EXCEPT vms/evm/emulate
-func TestDoNotImportFromGraft(t *testing.T) {
+func TestEnforceGraftImportBoundaries(t *testing.T) {
 	graftRegex := regexp.MustCompile(`^github\.com/ava-labs/avalanchego/graft(/|$)`)
 
 	// Find all graft imports in the entire repository
