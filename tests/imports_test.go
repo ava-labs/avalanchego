@@ -130,9 +130,9 @@ func TestEnforceGraftImportBoundaries(t *testing.T) {
 	require.Fail(t, formatImportViolations(foundImports, header))
 }
 
-// TestEncorceLibevmImportsAllowlist ensures that all libevm imports in the graft directory
+// TestEnforceLibevmImportsAllowlist ensures that all libevm imports in the graft directory
 // are explicitly allowed via the libevm-allowed-packages.txt file.
-func TestEncorceLibevmImportsAllowlist(t *testing.T) {
+func TestEnforceLibevmImportsAllowlist(t *testing.T) {
 	_, allowedPackages, err := loadPatternFile("../graft/scripts/libevm-allowed-packages.txt")
 	require.NoError(t, err, "Failed to load allowed packages")
 
