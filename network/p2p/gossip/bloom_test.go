@@ -108,7 +108,7 @@ func TestBloomFilterRefresh(t *testing.T) {
 	}
 }
 
-func TesetBloomFilterClobber(t *testing.T) {
+func TestBloomFilterClobber(t *testing.T) {
 	b, err := NewBloomFilter(prometheus.NewRegistry(), "", 1, 0.5, 0.5)
 	require.NoError(t, err, "NewBloomFilter()")
 
