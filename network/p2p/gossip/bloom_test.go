@@ -5,6 +5,7 @@ package gossip
 
 import (
 	"slices"
+	"sync"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -105,4 +106,34 @@ func TestBloomFilterRefresh(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TesetBloomFilterClobber(t *testing.T) {
+	b, err := NewBloomFilter(prometheus.NewRegistry(), "", 1, 0.5, 0.5)
+	require.NoError(t, err, "NewBloomFilter()")
+
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+
+	for _, fn := range []func(){
+		func() { b.Add(&testTx{}) },
+		func() { b.Has(&testTx{}) },
+		func() { b.Marshal() },
+		func() {
+			_, err := b.ResetIfNeeded(1)
+			require.NoErrorf(t, err, "%T.ResetIfNeeded()", b)
+		},
+	} {
+		for range 10_000 {
+			wg.Add(1)
+			go func() {
+				<-start
+				fn()
+				wg.Done()
+			}()
+		}
+	}
+
+	close(start)
+	wg.Wait()
 }

@@ -5,6 +5,7 @@ package gossip
 
 import (
 	"crypto/rand"
+	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -16,8 +17,7 @@ import (
 // anticipated at any moment, and a false positive probability of [targetFalsePositiveProbability]. If the
 // false positive probability exceeds [resetFalsePositiveProbability], the bloom filter will be reset.
 //
-// Invariant: The returned bloom filter is not safe to reset concurrently with
-// other operations. However, it is otherwise safe to access concurrently.
+// The returned bloom filter is safe for concurrent usage.
 func NewBloomFilter(
 	registerer prometheus.Registerer,
 	namespace string,
@@ -36,12 +36,8 @@ func NewBloomFilter(
 
 		metrics: metrics,
 	}
-	err = resetBloomFilter(
-		filter,
-		minTargetElements,
-		targetFalsePositiveProbability,
-		resetFalsePositiveProbability,
-	)
+	// A lock is unnecessary as no other goroutine could have access.
+	err = filter.resetWhenLocked(minTargetElements)
 	return filter, err
 }
 
@@ -52,6 +48,11 @@ type BloomFilter struct {
 
 	metrics *bloom.Metrics
 
+	// [bloom.Filter] itself is threadsafe, but resetting requires replacing it
+	// entirely. This mutex protects the [BloomFilter] fields, not the
+	// [bloom.Filter], so resetting is a write while everything else is a read.
+	resetMu sync.RWMutex
+
 	maxCount int
 	bloom    *bloom.Filter
 	// salt is provided to eventually unblock collisions in Bloom. It's possible
@@ -61,17 +62,26 @@ type BloomFilter struct {
 }
 
 func (b *BloomFilter) Add(gossipable Gossipable) {
+	b.resetMu.RLock()
+	defer b.resetMu.RUnlock()
+
 	h := gossipable.GossipID()
 	bloom.Add(b.bloom, h[:], b.salt[:])
 	b.metrics.Count.Inc()
 }
 
 func (b *BloomFilter) Has(gossipable Gossipable) bool {
+	b.resetMu.RLock()
+	defer b.resetMu.RUnlock()
+
 	h := gossipable.GossipID()
 	return bloom.Contains(b.bloom, h[:], b.salt[:])
 }
 
 func (b *BloomFilter) Marshal() ([]byte, []byte) {
+	b.resetMu.RLock()
+	defer b.resetMu.RUnlock()
+
 	bloomBytes := b.bloom.Marshal()
 	// salt must be copied here to ensure the bytes aren't overwritten if salt
 	// is later modified.
@@ -81,37 +91,52 @@ func (b *BloomFilter) Marshal() ([]byte, []byte) {
 
 // ResetBloomFilterIfNeeded resets a bloom filter if it breaches [targetFalsePositiveProbability].
 //
-// If [targetElements] exceeds [minTargetElements], the size of the bloom filter will grow to maintain
-// the same [targetFalsePositiveProbability].
-//
-// Returns true if the bloom filter was reset.
+// Deprecated: use [BloomFilter.ResetIfNeeded].
 func ResetBloomFilterIfNeeded(
 	bloomFilter *BloomFilter,
 	targetElements int,
 ) (bool, error) {
-	if bloomFilter.bloom.Count() <= bloomFilter.maxCount {
+	return bloomFilter.ResetIfNeeded(targetElements)
+}
+
+// ResetIfNeeded resets the bloom filter if it breaches [targetFalsePositiveProbability].
+//
+// If [targetElements] exceeds [minTargetElements], the size of the bloom filter will grow to maintain
+// the same [targetFalsePositiveProbability].
+//
+// Returns true if the bloom filter was reset.
+func (b *BloomFilter) ResetIfNeeded(targetElements int) (bool, error) {
+	mu := &b.resetMu
+
+	// Although this pattern requires a double checking of the same property,
+	// it's cheap and avoids unnecessarily locking out all other goroutines on
+	// every call to this method.
+	isResetNeeded := func() bool {
+		return b.bloom.Count() > b.maxCount
+	}
+	mu.RLock()
+	reset := isResetNeeded()
+	mu.RUnlock()
+	if !reset {
 		return false, nil
 	}
 
-	targetElements = max(bloomFilter.minTargetElements, targetElements)
-	err := resetBloomFilter(
-		bloomFilter,
-		targetElements,
-		bloomFilter.targetFalsePositiveProbability,
-		bloomFilter.resetFalsePositiveProbability,
-	)
+	mu.Lock()
+	defer mu.Unlock()
+	// Another thread may have beaten us to acquire the write lock.
+	if !isResetNeeded() {
+		return false, nil
+	}
+
+	targetElements = max(b.minTargetElements, targetElements)
+	err := b.resetWhenLocked(targetElements)
 	return err == nil, err
 }
 
-func resetBloomFilter(
-	bloomFilter *BloomFilter,
-	targetElements int,
-	targetFalsePositiveProbability,
-	resetFalsePositiveProbability float64,
-) error {
+func (b *BloomFilter) resetWhenLocked(targetElements int) error {
 	numHashes, numEntries := bloom.OptimalParameters(
 		targetElements,
-		targetFalsePositiveProbability,
+		b.targetFalsePositiveProbability,
 	)
 	newBloom, err := bloom.New(numHashes, numEntries)
 	if err != nil {
@@ -122,10 +147,10 @@ func resetBloomFilter(
 		return err
 	}
 
-	bloomFilter.maxCount = bloom.EstimateCount(numHashes, numEntries, resetFalsePositiveProbability)
-	bloomFilter.bloom = newBloom
-	bloomFilter.salt = newSalt
+	b.maxCount = bloom.EstimateCount(numHashes, numEntries, b.resetFalsePositiveProbability)
+	b.bloom = newBloom
+	b.salt = newSalt
 
-	bloomFilter.metrics.Reset(newBloom, bloomFilter.maxCount)
+	b.metrics.Reset(newBloom, b.maxCount)
 	return nil
 }
