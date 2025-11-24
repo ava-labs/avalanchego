@@ -75,7 +75,7 @@ func TestEnforceGraftImportBoundaries(t *testing.T) {
 // TestEnforceLibevmImportsAllowlist ensures that all libevm imports by EVM code
 // are explicitly allowed via the libevm-allowed-packages.txt file.
 func TestEnforceLibevmImportsAllowlist(t *testing.T) {
-	_, allowedPackages, err := loadPatternFile("../graft/scripts/libevm-allowed-packages.txt")
+	_, allowedPackages, err := loadPatternFile("./scripts/libevm-allowed-packages.txt")
 	require.NoError(t, err, "Failed to load allowed packages")
 
 	// Convert allowed packages to a set for faster lookup
@@ -100,10 +100,10 @@ func TestEnforceLibevmImportsAllowlist(t *testing.T) {
 	}
 
 	// TODO(jonathanoppenheimer): remove when graft is removed
-	foundImports, err := findImportsMatchingPattern("../graft", libevmRegex, filterFunc)
+	foundImports, err := findImportsMatchingPattern("../../graft", libevmRegex, filterFunc)
 	require.NoError(t, err, "Failed to find libevm imports in graft")
 
-	evmImports, err := findImportsMatchingPattern("../vms/evm", libevmRegex, filterFunc)
+	evmImports, err := findImportsMatchingPattern("./", libevmRegex, filterFunc)
 	require.NoError(t, err, "Failed to find libevm imports in vms/evm")
 
 	// merge libevm imports from graft and vms/evm
