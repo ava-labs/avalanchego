@@ -32,7 +32,6 @@ import (
 	_ "embed"
 	"fmt"
 	"math/big"
-	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -307,7 +306,7 @@ func newDbConfig(t *testing.T, scheme string) *triedb.Config {
 	case customrawdb.FirewoodScheme:
 		fwCfg := firewood.Defaults
 		// Create a unique temporary directory for each test
-		fwCfg.FilePath = filepath.Join(t.TempDir(), "firewood_state") // matches blockchain.go
+		fwCfg.ChainDataDir = t.TempDir()
 		return &triedb.Config{DBOverride: fwCfg.BackendConstructor}
 	default:
 		t.Fatalf("unknown scheme %s", scheme)

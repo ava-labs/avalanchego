@@ -29,7 +29,6 @@ package tests
 
 import (
 	"os"
-	"path/filepath"
 
 	"github.com/ava-labs/coreth/core/extstate"
 	"github.com/ava-labs/coreth/core/state/snapshot"
@@ -70,7 +69,7 @@ func MakePreState(db ethdb.Database, accounts types.GenesisAlloc, snapshotter bo
 		tconf.DBOverride = pathdb.Defaults.BackendConstructor
 	case customrawdb.FirewoodScheme:
 		cfg := firewood.Defaults
-		cfg.FilePath = filepath.Join(tempdir, "firewood")
+		cfg.ChainDataDir = tempdir
 		tconf.DBOverride = cfg.BackendConstructor
 	default:
 		panic("unknown trie database scheme" + scheme)

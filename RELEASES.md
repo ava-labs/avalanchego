@@ -5,6 +5,8 @@
 - Removes `avax.version` API
 - Removes `customethclient` package in favor of `ethclient` package and temporary type registrations (`WithTempRegisteredLibEVMExtras`)
   - Also removes blockHook extension in `ethclient` package.
+- Enables Firewood to run with pruning disabled.
+  - This change modifies the filepath of Firewood and any nodes using Firewood will need to resync.
 
 ## [v0.16.0](https://github.com/ava-labs/coreth/releases/tag/v0.16.0)
 

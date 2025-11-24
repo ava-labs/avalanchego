@@ -34,7 +34,6 @@ import (
 	"fmt"
 	"io"
 	"math/big"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -177,8 +176,6 @@ const (
 	// trieCleanCacheStatsNamespace is the namespace to surface stats from the trie
 	// clean cache's underlying fastcache.
 	trieCleanCacheStatsNamespace = "hashdb/memcache/clean/fastcache"
-
-	firewoodFileName = "firewood.db"
 )
 
 // CacheConfig contains the configuration values for the trie database
@@ -231,12 +228,14 @@ func (c *CacheConfig) triedbConfig() *triedb.Config {
 		if c.ChainDataDir == "" {
 			log.Crit("Chain data directory must be specified for Firewood")
 		}
+
 		config.DBOverride = firewood.Config{
-			FilePath:             filepath.Join(c.ChainDataDir, firewoodFileName),
+			ChainDataDir:         c.ChainDataDir,
 			CleanCacheSize:       c.TrieCleanLimit * 1024 * 1024,
 			FreeListCacheEntries: firewood.Defaults.FreeListCacheEntries,
 			Revisions:            uint(c.StateHistory), // must be at least 2
 			ReadCacheStrategy:    ffi.CacheAllReads,
+			ArchiveMode:          !c.Pruning,
 		}.BackendConstructor
 	}
 	return config
