@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1763987855581,
+  "lastUpdate": 1763997827403,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -2266,6 +2266,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
             "value": 74.1,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "maru",
+            "username": "maru-ava",
+            "email": "maru.newby@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "9f0f11df2a6c3bc9106a8b069f4e169931837e53",
+          "message": "[migrate-coreth][1] Add tooling enabling repo migration (#4531)\n\nCo-authored-by: Austin Larson <78000745+alarso16@users.noreply.github.com>\nCo-authored-by: Austin Larson <austin.larson@avalabs.org>",
+          "timestamp": "2025-11-21T21:17:17Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/9f0f11df2a6c3bc9106a8b069f4e169931837e53"
+        },
+        "date": 1763997825362,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
+            "value": 42.22,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
