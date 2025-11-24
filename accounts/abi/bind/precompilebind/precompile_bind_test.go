@@ -628,9 +628,7 @@ func TestPrecompileBind(t *testing.T) {
 	ws := t.TempDir()
 
 	pkg := filepath.Join(ws, "precompilebindtest")
-	if err := os.MkdirAll(pkg, 0o700); err != nil {
-		t.Fatalf("failed to create package: %v", err)
-	}
+	require.NoError(t, os.MkdirAll(pkg, 0o700), "failed to create package")
 	// Generate the test suite for all the contracts
 	for i, tt := range bindTests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -642,14 +640,10 @@ func TestPrecompileBind(t *testing.T) {
 				require.ErrorContains(t, err, tt.errMsg)
 				return
 			}
-			if err != nil {
-				t.Fatalf("test %d: failed to generate binding: %v", i, err)
-			}
+			require.NoError(t, err, "test %d: failed to generate binding: %v", i, err)
 
 			precompilePath := filepath.Join(pkg, tt.name)
-			if err := os.MkdirAll(precompilePath, 0o700); err != nil {
-				t.Fatalf("failed to create package: %v", err)
-			}
+			require.NoError(t, os.MkdirAll(precompilePath, 0o700), "failed to create package")
 			for _, file := range bindedFiles {
 				switch file.FileName {
 				case ContractFileName:
@@ -663,13 +657,9 @@ func TestPrecompileBind(t *testing.T) {
 					// change address to a suitable one for testing
 					file.Content = strings.Replace(file.Content, `common.HexToAddress("{ASUITABLEHEXADDRESS}")`, `common.HexToAddress("0x03000000000000000000000000000000000000ff")`, 1)
 				}
-				if err = os.WriteFile(filepath.Join(precompilePath, file.FileName), []byte(file.Content), 0o600); err != nil {
-					t.Fatalf("test %d: failed to write binding: %v", i, err)
-				}
+				require.NoError(t, os.WriteFile(filepath.Join(precompilePath, file.FileName), []byte(file.Content), 0o600), "test %d: failed to write binding", i)
 			}
-			if err = os.WriteFile(filepath.Join(precompilePath, "contract.abi"), []byte(tt.abi), 0o600); err != nil {
-				t.Fatalf("test %d: failed to write binding: %v", i, err)
-			}
+			require.NoError(t, os.WriteFile(filepath.Join(precompilePath, "contract.abi"), []byte(tt.abi), 0o600), "test %d: failed to write binding", i)
 
 			// Generate the test file with the injected test code
 			code := fmt.Sprintf(`
@@ -684,32 +674,29 @@ func TestPrecompileBind(t *testing.T) {
 				%s
 			}
 		`, tt.name, tt.imports, tt.name, tt.tester)
-			if err := os.WriteFile(filepath.Join(precompilePath, strings.ToLower(tt.name)+"_test.go"), []byte(code), 0o600); err != nil {
-				t.Fatalf("test %d: failed to write tests: %v", i, err)
-			}
+			require.NoError(t, os.WriteFile(filepath.Join(precompilePath, strings.ToLower(tt.name)+"_test.go"), []byte(code), 0o600), "test %d: failed to write tests", i)
 		})
 	}
 
 	moder := exec.Command(gocmd, "mod", "init", "precompilebindtest")
 	moder.Dir = pkg
-	if out, err := moder.CombinedOutput(); err != nil {
-		t.Fatalf("failed to convert binding test to modules: %v\n%s", err, out)
-	}
+	out, err := moder.CombinedOutput()
+	require.NoError(t, err, "failed to convert binding test to modules: %v\n%s", err, out)
+
 	pwd, _ := os.Getwd()
 	replacer := exec.Command(gocmd, "mod", "edit", "-x", "-require", "github.com/ava-labs/subnet-evm@v0.0.0", "-replace", "github.com/ava-labs/subnet-evm="+filepath.Join(pwd, "..", "..", "..", "..")) // Repo root
 	replacer.Dir = pkg
-	if out, err := replacer.CombinedOutput(); err != nil {
-		t.Fatalf("failed to replace binding test dependency to current source tree: %v\n%s", err, out)
-	}
+	out, err = replacer.CombinedOutput()
+	require.NoError(t, err, "failed to replace binding test dependency to current source tree: %v\n%s", err, out)
+
 	tidier := exec.Command(gocmd, "mod", "tidy", "-compat=1.24")
 	tidier.Dir = pkg
-	if out, err := tidier.CombinedOutput(); err != nil {
-		t.Fatalf("failed to tidy Go module file: %v\n%s", err, out)
-	}
+	out, err = tidier.CombinedOutput()
+	require.NoError(t, err, "failed to tidy Go module file: %v\n%s", err, out)
+
 	// Test the entire package and report any failures
 	cmd := exec.Command(gocmd, "test", "./...", "-v", "-count", "1")
 	cmd.Dir = pkg
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("failed to run binding test: %v\n%s", err, out)
-	}
+	out, err = cmd.CombinedOutput()
+	require.NoError(t, err, "failed to run binding test: %v\n%s", err, out)
 }

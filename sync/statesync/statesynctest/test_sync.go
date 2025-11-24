@@ -35,9 +35,7 @@ func AssertDBConsistency(t testing.TB, root common.Hash, clientDB ethdb.Database
 		}
 		numSnapshotAccounts++
 	}
-	if err := accountIt.Error(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, accountIt.Error())
 	trieAccountLeaves := 0
 
 	AssertTrieConsistency(t, root, serverTrieDB, clientTrieDB, func(key, val []byte) error {
@@ -94,9 +92,7 @@ func FillAccountsWithStorage(t *testing.T, r *rand.Rand, serverDB ethdb.Database
 	newRoot, _ := FillAccounts(t, r, serverTrieDB, root, numAccounts, func(t *testing.T, _ int, account types.StateAccount) types.StateAccount {
 		codeBytes := make([]byte, 256)
 		_, err := r.Read(codeBytes)
-		if err != nil {
-			t.Fatalf("error reading random code bytes: %v", err)
-		}
+		require.NoError(t, err, "error reading random code bytes")
 
 		codeHash := crypto.Keccak256Hash(codeBytes)
 		rawdb.WriteCode(serverDB, codeHash, codeBytes)

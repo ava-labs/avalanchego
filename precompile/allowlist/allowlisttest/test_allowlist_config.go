@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/ava-labs/libevm/common"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
@@ -211,9 +212,7 @@ func VerifyPrecompileWithAllowListTests(t *testing.T, module modules.Module, ver
 	tests := AllowListConfigVerifyTests(t, module)
 	// Add the contract specific tests to the map of tests to run.
 	for name, test := range verifyTests {
-		if _, exists := tests[name]; exists {
-			t.Fatalf("duplicate test name: %s", name)
-		}
+		require.NotContains(t, tests, name, "duplicate test name: %s", name)
 		tests[name] = test
 	}
 
@@ -225,9 +224,7 @@ func EqualPrecompileWithAllowListTests(t *testing.T, module modules.Module, equa
 	tests := AllowListConfigEqualTests(t, module)
 	// Add the contract specific tests to the map of tests to run.
 	for name, test := range equalTests {
-		if _, exists := tests[name]; exists {
-			t.Fatalf("duplicate test name: %s", name)
-		}
+		require.NotContains(t, tests, name, "duplicate test name: %s", name)
 		tests[name] = test
 	}
 

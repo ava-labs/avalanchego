@@ -107,9 +107,7 @@ func TestGetCode(t *testing.T) {
 			codeHashes, res, expectedCode := test.setupRequest()
 
 			responseBytes, err := message.Codec.Marshal(message.Version, res)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			// Dirty hack required because the client will re-request if it encounters
 			// an error.
 			attempted := false
@@ -152,9 +150,7 @@ func TestGetBlocks(t *testing.T) {
 	engine := dummy.NewETHFaker()
 	numBlocks := 110
 	blocks, _, err := core.GenerateChain(params.TestChainConfig, genesis, engine, memdb, numBlocks, 0, func(_ int, _ *core.BlockGen) {})
-	if err != nil {
-		t.Fatal("unexpected error when generating test blockchain", err)
-	}
+	require.NoError(t, err)
 	require.Len(t, blocks, numBlocks)
 
 	// Construct client
@@ -175,9 +171,7 @@ func TestGetBlocks(t *testing.T) {
 		blockBytes := make([][]byte, 0, len(blocks))
 		for i := len(blocks) - 1; i >= 0; i-- {
 			buf := new(bytes.Buffer)
-			if err := blocks[i].EncodeRLP(buf); err != nil {
-				t.Fatalf("failed to generate expected response %s", err)
-			}
+			require.NoError(t, blocks[i].EncodeRLP(buf))
 			blockBytes = append(blockBytes, buf.Bytes())
 		}
 
@@ -197,13 +191,8 @@ func TestGetBlocks(t *testing.T) {
 			},
 			getResponse: func(t *testing.T, request message.BlockRequest) []byte {
 				response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				if len(response) == 0 {
-					t.Fatal("Failed to generate valid response")
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, response, "Failed to generate valid response")
 
 				return response
 			},
@@ -220,13 +209,8 @@ func TestGetBlocks(t *testing.T) {
 			getResponse: func(t *testing.T, request message.BlockRequest) []byte {
 				request.Parents -= 5
 				response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				if len(response) == 0 {
-					t.Fatal("Failed to generate valid response")
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 
 				return response
 			},
@@ -254,19 +238,14 @@ func TestGetBlocks(t *testing.T) {
 			},
 			getResponse: func(t *testing.T, request message.BlockRequest) []byte {
 				response, err := blocksRequestHandler.OnBlockRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-				if err != nil {
-					t.Fatalf("failed to get block response: %s", err)
-				}
+				require.NoError(t, err)
 				var blockResponse message.BlockResponse
-				if _, err = message.Codec.Unmarshal(response, &blockResponse); err != nil {
-					t.Fatalf("failed to marshal block response: %s", err)
-				}
+				_, err = message.Codec.Unmarshal(response, &blockResponse)
+				require.NoError(t, err)
 				// Replace middle value with garbage data
 				blockResponse.Blocks[10] = []byte("invalid value replacing block bytes")
 				responseBytes, err := message.Codec.Marshal(message.Version, blockResponse)
-				if err != nil {
-					t.Fatalf("failed to marshal block response: %s", err)
-				}
+				require.NoError(t, err)
 
 				return responseBytes
 			},
@@ -284,13 +263,8 @@ func TestGetBlocks(t *testing.T) {
 					Height:  99,
 					Parents: 16,
 				})
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				if len(response) == 0 {
-					t.Fatal("Failed to generate valid response")
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 
 				return response
 			},
@@ -313,9 +287,7 @@ func TestGetBlocks(t *testing.T) {
 					Blocks: blockBytes,
 				}
 				responseBytes, err := message.Codec.Marshal(message.Version, blockResponse)
-				if err != nil {
-					t.Fatalf("failed to marshal block response: %s", err)
-				}
+				require.NoError(t, err)
 
 				return responseBytes
 			},
@@ -332,9 +304,7 @@ func TestGetBlocks(t *testing.T) {
 					Blocks: nil,
 				}
 				responseBytes, err := message.Codec.Marshal(message.Version, blockResponse)
-				if err != nil {
-					t.Fatalf("failed to marshal block response: %s", err)
-				}
+				require.NoError(t, err)
 
 				return responseBytes
 			},
@@ -353,9 +323,7 @@ func TestGetBlocks(t *testing.T) {
 					Blocks: blockBytes,
 				}
 				responseBytes, err := message.Codec.Marshal(message.Version, blockResponse)
-				if err != nil {
-					t.Fatalf("failed to marshal block response: %s", err)
-				}
+				require.NoError(t, err)
 
 				return responseBytes
 			},
@@ -382,15 +350,10 @@ func TestGetBlocks(t *testing.T) {
 
 			blockResponse, err := stateSyncClient.GetBlocks(ctx, test.request.Hash, test.request.Height, test.request.Parents)
 			if len(test.expectedErr) != 0 {
-				if err == nil {
-					t.Fatalf("Expected error: %s, but found no error", test.expectedErr)
-				}
 				require.ErrorContains(t, err, test.expectedErr)
 				return
 			}
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
 			test.assertResponse(t, blockResponse)
 		})
@@ -442,12 +405,8 @@ func TestGetLeafs(t *testing.T) {
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-				if err != nil {
-					t.Fatal("unexpected error in calling leafs request handler", err)
-				}
-				if len(response) == 0 {
-					t.Fatal("Failed to create valid response")
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 
 				return response
 			},
@@ -468,12 +427,8 @@ func TestGetLeafs(t *testing.T) {
 				modifiedRequest := request
 				modifiedRequest.Limit = leafsLimit
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, modifiedRequest)
-				if err != nil {
-					t.Fatal("unexpected error in calling leafs request handler", err)
-				}
-				if len(response) == 0 {
-					t.Fatal("Failed to create valid response")
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 
 				return response
 			},
@@ -488,12 +443,8 @@ func TestGetLeafs(t *testing.T) {
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-				if err != nil {
-					t.Fatal("unexpected error in calling leafs request handler", err)
-				}
-				if len(response) == 0 {
-					t.Fatal("Failed to create valid response")
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 
 				return response
 			},
@@ -512,13 +463,9 @@ func TestGetLeafs(t *testing.T) {
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-				if err != nil {
-					t.Fatal("unexpected error in calling leafs request handler", err)
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 
-				if len(response) == 0 {
-					t.Fatal("Failed to create valid response")
-				}
 				return response
 			},
 			requireResponse: func(t *testing.T, response message.LeafsResponse) {
@@ -536,12 +483,9 @@ func TestGetLeafs(t *testing.T) {
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-				if err != nil {
-					t.Fatal("unexpected error in calling leafs request handler", err)
-				}
-				if len(response) == 0 {
-					t.Fatal("Failed to create valid response")
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
+
 				return response
 			},
 			requireResponse: func(t *testing.T, response message.LeafsResponse) {
@@ -559,12 +503,8 @@ func TestGetLeafs(t *testing.T) {
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-				if err != nil {
-					t.Fatal("unexpected error in calling leafs request handler", err)
-				}
-				if len(response) == 0 {
-					t.Fatal("Failed to create valid response")
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 
 				return response
 			},
@@ -583,23 +523,17 @@ func TestGetLeafs(t *testing.T) {
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-				if err != nil {
-					t.Fatal("unexpected error in calling leafs request handler", err)
-				}
-				if len(response) == 0 {
-					t.Fatal("Failed to create valid response")
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
+
 				var leafResponse message.LeafsResponse
-				if _, err := message.Codec.Unmarshal(response, &leafResponse); err != nil {
-					t.Fatal(err)
-				}
+				_, err = message.Codec.Unmarshal(response, &leafResponse)
+				require.NoError(t, err)
 				leafResponse.Keys = leafResponse.Keys[1:]
 				leafResponse.Vals = leafResponse.Vals[1:]
 
 				modifiedResponse, err := message.Codec.Marshal(message.Version, leafResponse)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				return modifiedResponse
 			},
 			expectedErr: errInvalidRangeProof,
@@ -613,22 +547,15 @@ func TestGetLeafs(t *testing.T) {
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-				if err != nil {
-					t.Fatal("unexpected error in calling leafs request handler", err)
-				}
-				if len(response) == 0 {
-					t.Fatal("Failed to create valid response")
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 				var leafResponse message.LeafsResponse
-				if _, err := message.Codec.Unmarshal(response, &leafResponse); err != nil {
-					t.Fatal(err)
-				}
+				_, err = message.Codec.Unmarshal(response, &leafResponse)
+				require.NoError(t, err)
 				modifiedRequest := request
 				modifiedRequest.Start = leafResponse.Keys[1]
 				modifiedResponse, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 2, modifiedRequest)
-				if err != nil {
-					t.Fatal("unexpected error in calling leafs request handler", err)
-				}
+				require.NoError(t, err)
 				return modifiedResponse
 			},
 			expectedErr: errInvalidRangeProof,
@@ -642,23 +569,16 @@ func TestGetLeafs(t *testing.T) {
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-				if err != nil {
-					t.Fatal("unexpected error in calling leafs request handler", err)
-				}
-				if len(response) == 0 {
-					t.Fatal("Failed to create valid response")
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 				var leafResponse message.LeafsResponse
-				if _, err := message.Codec.Unmarshal(response, &leafResponse); err != nil {
-					t.Fatal(err)
-				}
-				leafResponse.Keys = leafResponse.Keys[:len(leafResponse.Keys)-2]
-				leafResponse.Vals = leafResponse.Vals[:len(leafResponse.Vals)-2]
+				_, err = message.Codec.Unmarshal(response, &leafResponse)
+				require.NoError(t, err)
+				leafResponse.Keys = leafResponse.Keys[:len(leafResponse.Keys)-1]
+				leafResponse.Vals = leafResponse.Vals[:len(leafResponse.Vals)-1]
 
 				modifiedResponse, err := message.Codec.Marshal(message.Version, leafResponse)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				return modifiedResponse
 			},
 			expectedErr: errInvalidRangeProof,
@@ -672,24 +592,17 @@ func TestGetLeafs(t *testing.T) {
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-				if err != nil {
-					t.Fatal("unexpected error in calling leafs request handler", err)
-				}
-				if len(response) == 0 {
-					t.Fatal("Failed to create valid response")
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 				var leafResponse message.LeafsResponse
-				if _, err := message.Codec.Unmarshal(response, &leafResponse); err != nil {
-					t.Fatal(err)
-				}
+				_, err = message.Codec.Unmarshal(response, &leafResponse)
+				require.NoError(t, err)
 				// Remove middle key-value pair response
 				leafResponse.Keys = append(leafResponse.Keys[:100], leafResponse.Keys[101:]...)
 				leafResponse.Vals = append(leafResponse.Vals[:100], leafResponse.Vals[101:]...)
 
 				modifiedResponse, err := message.Codec.Marshal(message.Version, leafResponse)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				return modifiedResponse
 			},
 			expectedErr: errInvalidRangeProof,
@@ -703,23 +616,16 @@ func TestGetLeafs(t *testing.T) {
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-				if err != nil {
-					t.Fatal("unexpected error in calling leafs request handler", err)
-				}
-				if len(response) == 0 {
-					t.Fatal("Failed to create valid response")
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 				var leafResponse message.LeafsResponse
-				if _, err := message.Codec.Unmarshal(response, &leafResponse); err != nil {
-					t.Fatal(err)
-				}
+				_, err = message.Codec.Unmarshal(response, &leafResponse)
+				require.NoError(t, err)
 				// Remove middle key-value pair response
 				leafResponse.Vals[100] = []byte("garbage value data")
 
 				modifiedResponse, err := message.Codec.Marshal(message.Version, leafResponse)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				return modifiedResponse
 			},
 			expectedErr: errInvalidRangeProof,
@@ -733,24 +639,17 @@ func TestGetLeafs(t *testing.T) {
 			},
 			getResponse: func(t *testing.T, request message.LeafsRequest) []byte {
 				response, err := handler.OnLeafsRequest(t.Context(), ids.GenerateTestNodeID(), 1, request)
-				if err != nil {
-					t.Fatal("unexpected error in calling leafs request handler", err)
-				}
-				if len(response) == 0 {
-					t.Fatal("Failed to create valid response")
-				}
+				require.NoError(t, err)
+				require.NotEmpty(t, response)
 
 				var leafResponse message.LeafsResponse
-				if _, err := message.Codec.Unmarshal(response, &leafResponse); err != nil {
-					t.Fatal(err)
-				}
+				_, err = message.Codec.Unmarshal(response, &leafResponse)
+				require.NoError(t, err)
 				// Remove the proof
 				leafResponse.ProofVals = nil
 
 				modifiedResponse, err := message.Codec.Marshal(message.Version, leafResponse)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				return modifiedResponse
 			},
 			expectedErr: errInvalidRangeProof,
@@ -766,10 +665,8 @@ func TestGetLeafs(t *testing.T) {
 				return
 			}
 
-			leafsResponse, ok := response.(message.LeafsResponse)
-			if !ok {
-				t.Fatalf("parseLeafsResponse returned incorrect type %T", response)
-			}
+			leafsResponse := response.(message.LeafsResponse)
+			require.IsType(t, message.LeafsResponse{}, leafsResponse, "parseLeafsResponse returned incorrect type %T", leafsResponse)
 			test.requireResponse(t, leafsResponse)
 		})
 	}
@@ -806,9 +703,7 @@ func TestGetLeafsRetries(t *testing.T) {
 	mockNetClient.mockResponse(1, nil, goodResponse)
 
 	res, err := client.GetLeafs(ctx, request)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	require.Len(t, res.Keys, 1024)
 	require.Len(t, res.Vals, 1024)
 
@@ -817,9 +712,7 @@ func TestGetLeafsRetries(t *testing.T) {
 	mockNetClient.mockResponses(nil, invalidResponse, invalidResponse, goodResponse)
 
 	res, err = client.GetLeafs(ctx, request)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	require.Len(t, res.Keys, 1024)
 	require.Len(t, res.Vals, 1024)
 

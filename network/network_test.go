@@ -241,9 +241,7 @@ func TestRequestRequestsRoutingAndResponse(t *testing.T) {
 	senderWg.Wait()
 	require.Equal(t, totalCalls, int(atomic.LoadUint32(&callNum)))
 	for _, nodeID := range nodes {
-		if _, exists := contactedNodes[nodeID]; !exists {
-			t.Fatalf("expected nodeID %s to be contacted but was not", nodeID)
-		}
+		require.Contains(t, contactedNodes, nodeID, "node %s was not contacted", nodeID)
 	}
 
 	// ensure empty nodeID is not allowed
@@ -438,9 +436,8 @@ func TestRequestMinVersion(t *testing.T) {
 	require.NoError(t, err)
 
 	var response TestMessage
-	if _, err = codecManager.Unmarshal(responseBytes, &response); err != nil {
-		t.Fatal("unexpected error during unmarshal", err)
-	}
+	_, err = codecManager.Unmarshal(responseBytes, &response)
+	require.NoError(t, err)
 	require.Equal(t, "this is a response", response.Message)
 }
 

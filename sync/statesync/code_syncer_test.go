@@ -12,7 +12,6 @@ import (
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
 	"github.com/ava-labs/libevm/ethdb/memorydb"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
@@ -61,27 +60,20 @@ func testCodeSyncer(t *testing.T, test codeSyncerTest) {
 	codeSyncer.start(t.Context())
 
 	for _, codeHashes := range test.codeRequestHashes {
-		if err := codeSyncer.addCode(codeHashes); err != nil {
-			require.ErrorIs(t, err, test.err)
-		}
+		require.NoError(t, codeSyncer.addCode(codeHashes))
 	}
 	codeSyncer.notifyAccountTrieCompleted()
 
 	err := <-codeSyncer.Done()
+	require.ErrorIs(t, err, test.err)
 	if test.err != nil {
-		if err == nil {
-			t.Fatal(t, "expected non-nil error: %s", test.err)
-		}
-		assert.ErrorIs(t, err, test.err)
 		return
-	} else if err != nil {
-		t.Fatal(err)
 	}
 
 	// Assert that the client synced the code correctly.
 	for i, codeHash := range codeHashes {
 		codeBytes := rawdb.ReadCode(clientDB, codeHash)
-		assert.Equal(t, test.codeByteSlices[i], codeBytes)
+		require.Equal(t, test.codeByteSlices[i], codeBytes)
 	}
 }
 

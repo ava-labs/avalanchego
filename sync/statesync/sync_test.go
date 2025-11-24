@@ -100,7 +100,7 @@ func waitFor(t *testing.T, ctx context.Context, resultFunc func(context.Context)
 		pprof.Lookup("goroutine").WriteTo(&stackBuf, 2)
 		t.Log(stackBuf.String())
 		// fail the test
-		t.Fatal("unexpected timeout waiting for sync result")
+		require.Fail(t, "unexpected timeout waiting for sync result")
 	}
 
 	require.ErrorIs(t, err, expected, "result of sync did not match expected error")
@@ -548,9 +548,7 @@ func TestDifferentWaitContext(t *testing.T) {
 		MaxOutstandingCodeHashes: DefaultMaxOutstandingCodeHashes,
 		RequestSize:              1024,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	// Create two different contexts
 	startCtx := t.Context() // Never cancelled

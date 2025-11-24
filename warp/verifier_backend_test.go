@@ -159,15 +159,9 @@ func TestBlockSignatures(t *testing.T) {
 
 	toMessageBytes := func(id ids.ID) []byte {
 		idPayload, err := payload.NewHash(id)
-		if err != nil {
-			panic(err)
-		}
-
+		require.NoError(t, err)
 		msg, err := avalancheWarp.NewUnsignedMessage(snowCtx.NetworkID, snowCtx.ChainID, idPayload.Bytes())
-		if err != nil {
-			panic(err)
-		}
-
+		require.NoError(t, err)
 		return msg.Bytes()
 	}
 

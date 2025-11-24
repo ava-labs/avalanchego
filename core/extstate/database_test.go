@@ -352,7 +352,7 @@ func FuzzTree(f *testing.F) {
 					fuzzState.deleteStorage(rand.Intn(len(fuzzState.currentAddrs)), rand.Uint64())
 				}
 			default:
-				t.Fatalf("unknown step: %d", step)
+				require.Failf(t, "unknown step", "got: %d", step)
 			}
 		}
 	})

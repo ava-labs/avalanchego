@@ -12,10 +12,12 @@ import (
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/core/vm"
 	"github.com/ava-labs/libevm/crypto"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/subnet-evm/consensus/dummy"
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
+	"github.com/ava-labs/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/txallowlist"
 	"github.com/ava-labs/subnet-evm/utils"
 
@@ -87,22 +89,17 @@ func TestBadTxAllowListBlock(t *testing.T) {
 	defer blockchain.Stop()
 	for i, tt := range []struct {
 		txs  []*types.Transaction
-		want string
+		want error
 	}{
 		{ // Nonwhitelisted address
 			txs: []*types.Transaction{
 				mkDynamicTx(0, common.Address{}, ethparams.TxGas, big.NewInt(0), big.NewInt(225000000000)),
 			},
-			want: "could not apply tx 0 [0xc5725e8baac950b2925dd4fea446ccddead1cc0affdae18b31a7d910629d9225]: cannot issue transaction from non-allow listed address: 0x71562b71999873DB5b286dF957af199Ec94617F7",
+			want: vmerrors.ErrSenderAddressNotAllowListed,
 		},
 	} {
 		block := GenerateBadBlock(gspec.ToBlock(), dummy.NewCoinbaseFaker(), tt.txs, gspec.Config)
 		_, err := blockchain.InsertChain(types.Blocks{block})
-		if err == nil {
-			t.Fatal("block imported without errors")
-		}
-		if have, want := err.Error(), tt.want; have != want {
-			t.Errorf("test %d:\nhave \"%v\"\nwant \"%v\"\n", i, have, want)
-		}
+		require.ErrorIs(t, err, tt.want, "test %d", i)
 	}
 }

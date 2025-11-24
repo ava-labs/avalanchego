@@ -12,6 +12,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/subnet-evm/internal/blocktest"
 	"github.com/ava-labs/subnet-evm/utils"
@@ -139,7 +140,7 @@ func exportedFieldsPointToDifferentMemory[T interface {
 			case []uint8:
 				assertDifferentPointers(t, unsafe.SliceData(f), unsafe.SliceData(fieldCp.([]uint8)))
 			default:
-				t.Errorf("field %q type %T needs to be added to switch cases of exportedFieldsDeepCopied", field.Name, f)
+				require.Failf(t, "invalid type", "field %q type %T needs to be added to switch cases of exportedFieldsDeepCopied", field.Name, f)
 			}
 		})
 	}
@@ -149,14 +150,9 @@ func exportedFieldsPointToDifferentMemory[T interface {
 // pointers pointing to different memory locations.
 func assertDifferentPointers[T any](t *testing.T, a *T, b any) {
 	t.Helper()
-	switch {
-	case a == nil:
-		t.Errorf("a (%T) cannot be nil", a)
-	case b == nil:
-		t.Errorf("b (%T) cannot be nil", b)
-	case a == b:
-		t.Errorf("pointers to same memory")
-	}
+	require.NotNil(t, a, "a (%T) cannot be nil", a)
+	require.NotNil(t, b, "b (%T) cannot be nil", b)
+	require.NotSame(t, a, b, "pointers to same memory")
 	// Note: no need to check `b` is of the same type as `a`, otherwise
 	// the memory address would be different as well.
 }

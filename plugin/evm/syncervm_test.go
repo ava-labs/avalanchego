@@ -102,12 +102,8 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 			reqCount++
 			// Fail all requests after number 50 to interrupt the sync
 			if reqCount > 50 {
-				if err := syncerVM.AppRequestFailed(t.Context(), nodeID, requestID, commonEng.ErrTimeout); err != nil {
-					panic(err)
-				}
-				if err := syncerVM.Client.Shutdown(); err != nil {
-					panic(err)
-				}
+				require.NoError(t, syncerVM.AppRequestFailed(t.Context(), nodeID, requestID, commonEng.ErrTimeout))
+				require.NoError(t, syncerVM.Client.Shutdown())
 			} else {
 				syncerVM.AppResponse(t.Context(), nodeID, requestID, response)
 			}
@@ -128,16 +124,14 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	appSender.SendAppGossipF = func(context.Context, commonEng.SendConfig, []byte) error { return nil }
 	appSender.SendAppRequestF = func(ctx context.Context, nodeSet set.Set[ids.NodeID], requestID uint32, request []byte) error {
 		nodeID, hasItem := nodeSet.Pop()
-		if !hasItem {
-			t.Fatal("expected nodeSet to contain at least 1 nodeID")
-		}
+		require.True(t, hasItem, "expected nodeSet to contain at least 1 nodeID")
 		go vmSetup.serverVM.AppRequest(ctx, nodeID, requestID, time.Now().Add(1*time.Second), request)
 		return nil
 	}
 	// Reset metrics to allow re-initialization
 	vmSetup.syncerVM.ctx.Metrics = metrics.NewPrefixGatherer()
 	stateSyncDisabledConfigJSON := `{"state-sync-enabled":false}`
-	if err := syncDisabledVM.Initialize(
+	require.NoError(t, syncDisabledVM.Initialize(
 		t.Context(),
 		vmSetup.syncerVM.ctx,
 		vmSetup.syncerDB,
@@ -146,19 +140,14 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 		[]byte(stateSyncDisabledConfigJSON),
 		[]*commonEng.Fx{},
 		appSender,
-	); err != nil {
-		t.Fatal(err)
-	}
+	))
 
 	defer func() {
-		if err := syncDisabledVM.Shutdown(t.Context()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, syncDisabledVM.Shutdown(t.Context()))
 	}()
 
-	if height := syncDisabledVM.LastAcceptedBlockInternal().Height(); height != 0 {
-		t.Fatalf("Unexpected last accepted height: %d", height)
-	}
+	height := syncDisabledVM.LastAcceptedBlockInternal().Height()
+	require.Zero(t, height, "Unexpected last accepted height: %d", height)
 
 	enabled, err := syncDisabledVM.StateSyncEnabled(t.Context())
 	require.NoError(t, err)
@@ -167,29 +156,17 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	// Process the first 10 blocks from the serverVM
 	for i := uint64(1); i < 10; i++ {
 		ethBlock := vmSetup.serverVM.blockChain.GetBlockByNumber(i)
-		if ethBlock == nil {
-			t.Fatalf("VM Server did not have a block available at height %d", i)
-		}
+		require.NotNil(t, ethBlock, "VM Server did not have a block available at height %d", i)
 		b, err := rlp.EncodeToBytes(ethBlock)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		blk, err := syncDisabledVM.ParseBlock(t.Context(), b)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := blk.Verify(t.Context()); err != nil {
-			t.Fatal(err)
-		}
-		if err := blk.Accept(t.Context()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, blk.Verify(t.Context()))
+		require.NoError(t, blk.Accept(t.Context()))
 	}
 	// Verify the snapshot disk layer matches the last block root
 	lastRoot := syncDisabledVM.blockChain.CurrentBlock().Root
-	if err := syncDisabledVM.blockChain.Snapshots().Verify(lastRoot); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, syncDisabledVM.blockChain.Snapshots().Verify(lastRoot))
 	syncDisabledVM.blockChain.DrainAcceptorQueue()
 
 	// Create a new VM from the same database with state sync enabled.
@@ -201,7 +178,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 	)
 	// Reset metrics to allow re-initialization
 	vmSetup.syncerVM.ctx.Metrics = metrics.NewPrefixGatherer()
-	if err := syncReEnabledVM.Initialize(
+	require.NoError(t, syncReEnabledVM.Initialize(
 		t.Context(),
 		vmSetup.syncerVM.ctx,
 		vmSetup.syncerDB,
@@ -210,9 +187,7 @@ func TestStateSyncToggleEnabledToDisabled(t *testing.T) {
 		[]byte(configJSON),
 		[]*commonEng.Fx{},
 		appSender,
-	); err != nil {
-		t.Fatal(err)
-	}
+	))
 
 	// override [serverVM]'s SendAppResponse function to trigger AppResponse on [syncerVM]
 	vmSetup.serverAppSender.SendAppResponseF = func(ctx context.Context, nodeID ids.NodeID, requestID uint32, response []byte) error {
@@ -290,14 +265,12 @@ func createSyncServerAndClientVMs(t *testing.T, test syncTest, numBlocks int) *s
 	generateAndAcceptBlocks(t, serverVM.vm, numBlocks, func(_ int, gen *core.BlockGen) {
 		br := predicate.BlockResults{}
 		b, err := br.Bytes()
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 		gen.AppendExtra(b)
 
 		tx := types.NewTransaction(gen.TxNonce(testEthAddrs[0]), testEthAddrs[1], common.Big1, ethparams.TxGas, big.NewInt(testMinGasPrice), nil)
 		signedTx, err := types.SignTx(tx, types.NewEIP155Signer(serverVM.vm.chainConfig.ChainID), testKeys[0].ToECDSA())
-		require.NoError(err)
+		require.NoError(err, "failed to sign transaction")
 		gen.AddTx(signedTx)
 	}, nil)
 
@@ -477,15 +450,13 @@ func testSyncerVM(t *testing.T, vmSetup *syncVMSetup, test syncTest) {
 	generateAndAcceptBlocks(t, syncerVM, blocksToBuild, func(_ int, gen *core.BlockGen) {
 		br := predicate.BlockResults{}
 		b, err := br.Bytes()
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(err)
 		gen.AppendExtra(b)
 		i := 0
 		for k := range fundedAccounts {
 			tx := types.NewTransaction(gen.TxNonce(k.Address), toAddress, big.NewInt(1), 21000, big.NewInt(testMinGasPrice), nil)
 			signedTx, err := types.SignTx(tx, types.NewEIP155Signer(serverVM.chainConfig.ChainID), k.PrivateKey)
-			require.NoError(err)
+			require.NoError(err, "failed to sign transaction")
 			gen.AddTx(signedTx)
 			i++
 			if i >= txsPerBlock {
@@ -567,19 +538,11 @@ func generateAndAcceptBlocks(t *testing.T, vm *VM, numBlocks int, gen func(int, 
 	// generated by GenerateChain
 	acceptExternalBlock := func(block *types.Block) {
 		bytes, err := rlp.EncodeToBytes(block)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		vmBlock, err := vm.ParseBlock(t.Context(), bytes)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := vmBlock.Verify(t.Context()); err != nil {
-			t.Fatal(err)
-		}
-		if err := vmBlock.Accept(t.Context()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		require.NoError(t, vmBlock.Verify(t.Context()))
+		require.NoError(t, vmBlock.Accept(t.Context()))
 
 		if accepted != nil {
 			accepted(block)
@@ -598,9 +561,7 @@ func generateAndAcceptBlocks(t *testing.T, vm *VM, numBlocks int, gen func(int, 
 			gen(i, g)
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	vm.blockChain.DrainAcceptorQueue()
 }
 
