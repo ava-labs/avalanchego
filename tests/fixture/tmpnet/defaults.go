@@ -38,11 +38,13 @@ const (
 // Flags suggested for temporary networks. Applied by default.
 func DefaultTmpnetFlags() FlagsMap {
 	return FlagsMap{
-		config.NetworkPeerListPullGossipFreqKey: "250ms",
-		config.NetworkMaxReconnectDelayKey:      "1s",
-		config.HealthCheckFreqKey:               "2s",
-		config.AdminAPIEnabledKey:               "true",
-		config.IndexEnabledKey:                  "true",
+		config.SystemTrackerRequiredAvailableDiskSpaceKey:         "1GB",
+		config.SystemTrackerWarningThresholdAvailableDiskSpaceKey: "3GB",
+		config.NetworkPeerListPullGossipFreqKey:                   "250ms",
+		config.NetworkMaxReconnectDelayKey:                        "1s",
+		config.HealthCheckFreqKey:                                 "2s",
+		config.AdminAPIEnabledKey:                                 "true",
+		config.IndexEnabledKey:                                    "true",
 	}
 }
 

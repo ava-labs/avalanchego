@@ -1138,14 +1138,17 @@ func getCPUTargeterConfig(v *viper.Viper) (tracker.TargeterConfig, error) {
 	}
 }
 
-func getDiskSpaceConfig(v *viper.Viper) (requiredAvailableDiskSpace uint64, warningThresholdAvailableDiskSpace uint64, err error) {
+func getDiskSpaceConfig(v *viper.Viper) (requiredAvailableDiskSpace uint64, warningThresholdAvailableDiskSpace uint64, warningThresholdAvailableDiskSpacePercentage uint64, err error) {
 	requiredAvailableDiskSpace = v.GetUint64(SystemTrackerRequiredAvailableDiskSpaceKey)
 	warningThresholdAvailableDiskSpace = v.GetUint64(SystemTrackerWarningThresholdAvailableDiskSpaceKey)
+	warningThresholdAvailableDiskSpacePercentage = v.GetUint64(SystemTrackerWarnThreshAvailDiskSpacePercentageKey)
 	switch {
+	case warningThresholdAvailableDiskSpacePercentage > 50:
+		return 0, 0, 0, fmt.Errorf("%q (%d) must be in [0, 50]", SystemTrackerWarnThreshAvailDiskSpacePercentageKey, warningThresholdAvailableDiskSpacePercentage)
 	case warningThresholdAvailableDiskSpace < requiredAvailableDiskSpace:
-		return 0, 0, fmt.Errorf("%q (%d) < %q (%d)", SystemTrackerWarningThresholdAvailableDiskSpaceKey, warningThresholdAvailableDiskSpace, SystemTrackerRequiredAvailableDiskSpaceKey, requiredAvailableDiskSpace)
+		return 0, 0, 0, fmt.Errorf("%q (%d) < %q (%d)", SystemTrackerWarningThresholdAvailableDiskSpaceKey, warningThresholdAvailableDiskSpace, SystemTrackerRequiredAvailableDiskSpaceKey, requiredAvailableDiskSpace)
 	default:
-		return requiredAvailableDiskSpace, warningThresholdAvailableDiskSpace, nil
+		return requiredAvailableDiskSpace, warningThresholdAvailableDiskSpace, warningThresholdAvailableDiskSpacePercentage, nil
 	}
 }
 
@@ -1400,7 +1403,7 @@ func GetNodeConfig(v *viper.Viper) (node.Config, error) {
 	nodeConfig.SystemTrackerCPUHalflife = v.GetDuration(SystemTrackerCPUHalflifeKey)
 	nodeConfig.SystemTrackerDiskHalflife = v.GetDuration(SystemTrackerDiskHalflifeKey)
 
-	nodeConfig.RequiredAvailableDiskSpace, nodeConfig.WarningThresholdAvailableDiskSpace, err = getDiskSpaceConfig(v)
+	nodeConfig.RequiredAvailableDiskSpace, nodeConfig.WarningThresholdAvailableDiskSpace, nodeConfig.WarningThresholdAvailableDiskSpacePercentage, err = getDiskSpaceConfig(v)
 	if err != nil {
 		return node.Config{}, err
 	}
