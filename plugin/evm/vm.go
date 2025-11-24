@@ -137,21 +137,21 @@ var (
 )
 
 var (
-	errEmptyBlock                        = errors.New("empty block")
-	errUnsupportedFXs                    = errors.New("unsupported feature extensions")
-	errNilBaseFeeSubnetEVM               = errors.New("nil base fee is invalid after subnetEVM")
-	errNilBlockGasCostSubnetEVM          = errors.New("nil blockGasCost is invalid after subnetEVM")
-	errInvalidBlock                      = errors.New("invalid block")
-	errInvalidNonce                      = errors.New("invalid nonce")
-	errUnclesUnsupported                 = errors.New("uncles unsupported")
-	errInvalidHeaderPredicateResults     = errors.New("invalid header predicate results")
-	errInitializingLogger                = errors.New("failed to initialize logger")
-	errShuttingDownVM                    = errors.New("shutting down VM")
-	errFirewoodPruningRequired           = errors.New("pruning must be enabled for Firewood")
-	errFirewoodSnapshotCacheDisabled     = errors.New("snapshot cache must be disabled for Firewood")
-	errFirewoodOfflinePruningUnsupported = errors.New("offline pruning is not supported for Firewood")
-	errFirewoodStateSyncUnsupported      = errors.New("state sync is not yet supported for Firewood")
-	errPathStateUnsupported              = errors.New("path state scheme is not supported")
+	errEmptyBlock                                 = errors.New("empty block")
+	errUnsupportedFXs                             = errors.New("unsupported feature extensions")
+	errNilBaseFeeSubnetEVM                        = errors.New("nil base fee is invalid after subnetEVM")
+	errNilBlockGasCostSubnetEVM                   = errors.New("nil blockGasCost is invalid after subnetEVM")
+	errInvalidBlock                               = errors.New("invalid block")
+	errInvalidNonce                               = errors.New("invalid nonce")
+	errUnclesUnsupported                          = errors.New("uncles unsupported")
+	errInvalidHeaderPredicateResults              = errors.New("invalid header predicate results")
+	errInitializingLogger                         = errors.New("failed to initialize logger")
+	errShuttingDownVM                             = errors.New("shutting down VM")
+	errPathStateUnsupported                       = errors.New("path state scheme is not supported")
+	errFirewoodSnapshotCacheDisabled              = errors.New("snapshot cache must be disabled for Firewood")
+	errFirewoodOfflinePruningUnsupported          = errors.New("offline pruning is not supported for Firewood")
+	errFirewoodStateSyncUnsupported               = errors.New("state sync is not yet supported for Firewood")
+	errFirewoodMissingTrieRepopulationUnsupported = errors.New("missing trie repopulation is not supported for Firewood")
 )
 
 // legacyApiNames maps pre geth v1.10.20 api names to their updated counterparts.
@@ -401,10 +401,6 @@ func (vm *VM) Initialize(
 	if vm.ethConfig.StateScheme == customrawdb.FirewoodScheme {
 		log.Warn("Firewood state scheme is enabled")
 		log.Warn("This is untested in production, use at your own risk")
-		// Firewood only supports pruning for now.
-		if !vm.config.Pruning {
-			return errFirewoodPruningRequired
-		}
 		// Firewood does not support iterators, so the snapshot cannot be constructed
 		if vm.config.SnapshotCache > 0 {
 			return errFirewoodSnapshotCacheDisabled
@@ -414,6 +410,9 @@ func (vm *VM) Initialize(
 		}
 		if vm.config.StateSyncEnabled {
 			return errFirewoodStateSyncUnsupported
+		}
+		if vm.config.PopulateMissingTries != nil {
+			return errFirewoodMissingTrieRepopulationUnsupported
 		}
 	}
 	if vm.ethConfig.StateScheme == rawdb.PathScheme {

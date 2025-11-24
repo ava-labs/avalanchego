@@ -32,8 +32,8 @@ github.com/ava-labs/avalanchego v1.14.1-0.20251111165133-29b4e6bc541b h1:0bvt1wO
 github.com/ava-labs/avalanchego v1.14.1-0.20251111165133-29b4e6bc541b/go.mod h1:Q5f/x4BxM8r4vQE/aZPkQyT8l/HS12/oNrfxjRd8uZU=
 github.com/ava-labs/coreth v0.16.0-rc.0 h1:nPvkDbxaH8N9f/wQe7B+IGMhPISMuW5CU0cDYuU8iCw=
 github.com/ava-labs/coreth v0.16.0-rc.0/go.mod h1:uGr1C7BP0+dWhvsIouhuH0yCyI8YDgS6sfEFIExs0iI=
-github.com/ava-labs/firewood-go-ethhash/ffi v0.0.14 h1:Be+LO61hwmo7XKNm57Yoqx7ld8SgBapjVBEPjUcgI8o=
-github.com/ava-labs/firewood-go-ethhash/ffi v0.0.14/go.mod h1:hR/JSGXxST9B9olwu/NpLXHAykfAyNGfyKnYQqiiOeE=
+github.com/ava-labs/firewood-go-ethhash/ffi v0.0.15 h1:NAVjEu508HwdgbxH/xQxMQoBUgYUn9RQf0VeCrhtYMY=
+github.com/ava-labs/firewood-go-ethhash/ffi v0.0.15/go.mod h1:hR/JSGXxST9B9olwu/NpLXHAykfAyNGfyKnYQqiiOeE=
 github.com/ava-labs/libevm v1.13.15-0.20251016142715-1bccf4f2ddb2 h1:hQ15IJxY7WOKqeJqCXawsiXh0NZTzmoQOemkWHz7rr4=
 github.com/ava-labs/libevm v1.13.15-0.20251016142715-1bccf4f2ddb2/go.mod h1:DqSotSn4Dx/UJV+d3svfW8raR+cH7+Ohl9BpsQ5HlGU=
 github.com/aymerick/raymond v2.0.3-0.20180322193309-b565731e1464+incompatible/go.mod h1:osfaiScAUVup+UC9Nfq76eWqDhXlp+4UYaA8uhTBO6g=

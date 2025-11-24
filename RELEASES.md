@@ -2,7 +2,8 @@
 
 ## [v0.8.1](https://github.com/ava-labs/subnet-evm/releases/tag/v0.8.1)
 
-- Add pending releases here
+- Enables Firewood to run with pruning disabled.
+  - This change modifies the filepath of Firewood and any nodes using Firewood will need to resync.
 
 ## [v0.8.0](https://github.com/ava-labs/subnet-evm/releases/tag/v0.8.0)
 

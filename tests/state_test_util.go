@@ -34,7 +34,6 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -482,7 +481,7 @@ func MakePreState(db ethdb.Database, accounts types.GenesisAlloc, snapshotter bo
 		tconf.DBOverride = pathdb.Defaults.BackendConstructor
 	case customrawdb.FirewoodScheme:
 		cfg := firewood.Defaults
-		cfg.FilePath = filepath.Join(tempdir, "firewood")
+		cfg.ChainDataDir = tempdir
 		tconf.DBOverride = cfg.BackendConstructor
 	default:
 		panic("unknown trie database scheme" + scheme)

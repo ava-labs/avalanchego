@@ -236,7 +236,7 @@ Configuration is provided as a JSON object. All fields are optional unless other
 
 > **WARNING**: `firewood` and `path` schemes are untested in production. Using `path` is strongly discouraged. To use `firewood`, you must also set the following config options:
 >
-> - `pruning-enabled: true` (enabled by default)
+> - `populate-missing-tries: nil`
 > - `state-sync-enabled: false`
 > - `snapshot-cache: 0`
 

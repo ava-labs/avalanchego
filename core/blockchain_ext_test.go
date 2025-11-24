@@ -141,27 +141,47 @@ func copyMemDB(db ethdb.Database) (ethdb.Database, error) {
 	return newDB, nil
 }
 
-// This copies all files from a flat directory [src] to a new temporary directory and returns
-// the path to the new directory.
-func copyFlatDir(t *testing.T, src string) string {
+// copyDir recursively copies all files and folders from a directory [src] to a
+// new temporary directory and returns the path to the new directory.
+func copyDir(t *testing.T, src string) string {
 	t.Helper()
+
 	if src == "" {
 		return ""
 	}
 
 	dst := t.TempDir()
-	ents, err := os.ReadDir(src)
-	require.NoError(t, err)
+	err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 
-	for _, e := range ents {
-		require.False(t, e.IsDir(), "expected flat directory")
-		name := e.Name()
-		data, err := os.ReadFile(filepath.Join(src, name))
-		require.NoError(t, err)
-		info, err := e.Info()
-		require.NoError(t, err)
-		require.NoError(t, os.WriteFile(filepath.Join(dst, name), data, info.Mode().Perm()))
-	}
+		// Calculate the relative path from src
+		relPath, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+
+		// Skip the root directory itself
+		if relPath == "." {
+			return nil
+		}
+
+		dstPath := filepath.Join(dst, relPath)
+
+		if info.IsDir() {
+			return os.MkdirAll(dstPath, info.Mode().Perm())
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		return os.WriteFile(dstPath, data, info.Mode().Perm())
+	})
+
+	require.NoError(t, err)
 	return dst
 }
 
@@ -212,7 +232,7 @@ func checkBlockChainState(
 	// Copy the database over to prevent any issues when re-using [originalDB] after this call.
 	originalDB, err = copyMemDB(originalDB)
 	require.NoError(err)
-	newChainDataDir := copyFlatDir(t, oldChainDataDir)
+	newChainDataDir := copyDir(t, oldChainDataDir)
 	restartedChain, err := create(originalDB, gspec, lastAcceptedBlock.Hash(), newChainDataDir)
 	require.NoError(err)
 	defer restartedChain.Stop()
@@ -1818,7 +1838,7 @@ func ReexecCorruptedStateTest(t *testing.T, create ReexecTestFunc) {
 	blockchain.Stop()
 
 	// Restart blockchain with existing state
-	newDir := copyFlatDir(t, tempDir) // avoid file lock
+	newDir := copyDir(t, tempDir) // avoid file lock
 	restartedBlockchain, err := create(chainDB, gspec, chain[1].Hash(), newDir, 4096)
 	require.NoError(t, err)
 	defer restartedBlockchain.Stop()
