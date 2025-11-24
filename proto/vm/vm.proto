@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package vm;
 
+import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 import "io/prometheus/client/metrics.proto";
@@ -136,6 +137,8 @@ message NetworkUpgrades {
   google.protobuf.Timestamp etna_time = 14;
   google.protobuf.Timestamp fortuna_time = 15;
   google.protobuf.Timestamp granite_time = 16;
+  google.protobuf.Duration granite_epoch_duration = 17;
+  google.protobuf.Timestamp helicon_time = 18;
 }
 
 message InitializeResponse {
