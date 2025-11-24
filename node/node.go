@@ -1459,20 +1459,25 @@ func (n *Node) initHealthAPI() error {
 		availableDiskBytes := n.resourceTracker.DiskTracker().AvailableDiskBytes()
 		availableDiskPercentage := n.resourceTracker.DiskTracker().AvailableDiskPercentage()
 
-		var err error
+		var diskSpaceErrors []error
 		if availableDiskBytes < n.Config.RequiredAvailableDiskSpace {
 			n.Log.Fatal("low on disk space. Shutting down...",
 				zap.Uint64("remainingDiskBytes", availableDiskBytes),
 			)
 			go n.Shutdown(1)
-			err = fmt.Errorf("remaining available disk space (%d) is below minimum required available space (%d)", availableDiskBytes, n.Config.RequiredAvailableDiskSpace)
+			err := fmt.Errorf("remaining available disk space (%d) is below minimum required available space (%d)", availableDiskBytes, n.Config.RequiredAvailableDiskSpace)
+			diskSpaceErrors = append(diskSpaceErrors, err)
 		} else if availableDiskBytes < n.Config.WarningThresholdAvailableDiskSpace {
-			err = fmt.Errorf("remaining available disk space (%d) is below the warning threshold of disk space (%d)", availableDiskBytes, n.Config.WarningThresholdAvailableDiskSpace)
+			err := fmt.Errorf("remaining available disk space (%d) is below the warning threshold of disk space (%d)", availableDiskBytes, n.Config.WarningThresholdAvailableDiskSpace)
+			diskSpaceErrors = append(diskSpaceErrors, err)
 		}
 
 		if availableDiskPercentage < n.Config.WarningThresholdAvailableDiskSpacePercentage {
-			err = fmt.Errorf("remaining available disk space percentage (%d%%) is below the warning threshold of space percentage (%d%%)", availableDiskPercentage, n.Config.WarningThresholdAvailableDiskSpacePercentage)
+			err := fmt.Errorf("remaining available disk space percentage (%d%%) is below minimum required available space percentage (%d%%)", availableDiskPercentage, n.Config.WarningThresholdAvailableDiskSpacePercentage)
+			diskSpaceErrors = append(diskSpaceErrors, err)
 		}
+
+		err = errors.Join(diskSpaceErrors...)
 
 		return map[string]interface{}{
 			"availableDiskBytes":      availableDiskBytes,

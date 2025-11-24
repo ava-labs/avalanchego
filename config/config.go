@@ -1143,8 +1143,8 @@ func getDiskSpaceConfig(v *viper.Viper) (requiredAvailableDiskSpace uint64, warn
 	warningThresholdAvailableDiskSpace = v.GetUint64(SystemTrackerWarningThresholdAvailableDiskSpaceKey)
 	warningThresholdAvailableDiskSpacePercentage = v.GetUint64(SystemTrackerWarnThreshAvailDiskSpacePercentageKey)
 	switch {
-	case warningThresholdAvailableDiskSpacePercentage > 50 || warningThresholdAvailableDiskSpacePercentage == 0:
-		return 0, 0, 0, fmt.Errorf("%q (%d) must be in [1, 50]", SystemTrackerWarnThreshAvailDiskSpacePercentageKey, warningThresholdAvailableDiskSpacePercentage)
+	case warningThresholdAvailableDiskSpacePercentage > 50:
+		return 0, 0, 0, fmt.Errorf("%q (%d) must be in [0, 50]", SystemTrackerWarnThreshAvailDiskSpacePercentageKey, warningThresholdAvailableDiskSpacePercentage)
 	case warningThresholdAvailableDiskSpace < requiredAvailableDiskSpace:
 		return 0, 0, 0, fmt.Errorf("%q (%d) < %q (%d)", SystemTrackerWarningThresholdAvailableDiskSpaceKey, warningThresholdAvailableDiskSpace, SystemTrackerRequiredAvailableDiskSpaceKey, requiredAvailableDiskSpace)
 	default:
