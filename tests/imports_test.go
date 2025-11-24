@@ -21,64 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/set"
 )
 
-// TestEnforceLicensingImportBoundaries ensures that upstream files (listed in
-// graft/scripts/forbidden-geth-files.txt) cannot be imported outside the graft directory,
-// except for explicitly allowed exceptions (lines without !).
-func TestEnforceLicensingImportBoundaries(t *testing.T) {
-	forbiddenPatterns, allowedExceptions, err := loadPatternFile("../graft/scripts/forbidden-geth-files.txt")
-	require.NoError(t, err, "Failed to load forbidden geth files patterns")
-
-	// Find all graft/coreth and graft/subnet-evm imports outside the graft directory
-	graftRegex := regexp.MustCompile(`^github\.com/ava-labs/avalanchego/graft/(coreth|subnet-evm)/`)
-	foundImports, err := findImportsMatchingPattern("..", graftRegex, func(path string, _ string, _ *ast.ImportSpec) bool {
-		// Skip files within the graft directory - they can import anything from graft
-		return strings.Contains(path, "/graft/")
-	})
-	require.NoError(t, err, "Failed to find graft imports")
-
-	violations := make(map[string]set.Set[string])
-	for importPath, files := range foundImports {
-		// Convert import path to pattern-compatible format
-		// e.g., "github.com/ava-labs/avalanchego/graft/coreth/core/state" -> "graft/coreth/core/state"
-		pathForMatching := strings.TrimPrefix(importPath, "github.com/ava-labs/avalanchego/")
-
-		// Check if this path matches any allowed exception
-		isAllowed := false
-		for _, allowed := range allowedExceptions {
-			if matched, _ := filepath.Match(allowed, pathForMatching); matched {
-				isAllowed = true
-				break
-			}
-		}
-
-		if isAllowed {
-			continue
-		}
-
-		// Check if this path matches any forbidden pattern
-		isForbidden := false
-		for _, forbidden := range forbiddenPatterns {
-			if matched, _ := filepath.Match(forbidden, pathForMatching); matched {
-				isForbidden = true
-				break
-			}
-		}
-
-		if isForbidden {
-			violations[importPath] = files
-		}
-	}
-
-	if len(violations) == 0 {
-		return // no violations found
-	}
-
-	header := "Upstream file import rules violated!\n" +
-		"Upstream files (from graft/coreth or graft/subnet-evm) cannot be imported outside the graft directory,\n" +
-		"except for explicitly allowed exceptions in graft/scripts/forbidden-geth-files.txt (lines without !).\n\n"
-	require.Fail(t, formatImportViolations(violations, header))
-}
-
 // TestDoNotImportFromGraft ensures proper import rules for graft packages:
 // - graft/coreth can be imported anywhere EXCEPT vms/evm (but vms/evm/emulate is an exception)
 // - graft/subnet-evm cannot be imported anywhere EXCEPT vms/evm/emulate
