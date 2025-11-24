@@ -140,11 +140,16 @@ func (t *trieToSync) loadSegments() error {
 	return it.Error()
 }
 
-// startSyncing adds the trieToSync's segments to the work queue
-func (t *trieToSync) startSyncing() {
+// startSyncing adds the trieToSync's segments to the work queue.
+func (t *trieToSync) startSyncing(ctx context.Context) error {
 	for _, segment := range t.segments {
-		t.sync.segments <- segment // this will queue the segment for syncing
+		select {
+		case t.sync.segments <- segment:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
+	return nil
 }
 
 // addSegment appends a newly created segment specified by [start] and
@@ -244,12 +249,12 @@ func (t *trieToSync) segmentFinished(ctx context.Context, idx int) error {
 // createSegmentsIfNeeded is called from the leaf handler. In case the trie syncing only has
 // one segment but a large number of leafs ([t.estimateSize() > segmentThreshold], it will
 // create [numSegments-1] additional segments to sync the trie.
-func (t *trieToSync) createSegmentsIfNeeded(numSegments int) error {
+func (t *trieToSync) createSegmentsIfNeeded(ctx context.Context, numSegments int) error {
 	if !t.shouldSegment() {
 		return nil
 	}
 
-	return t.createSegments(numSegments)
+	return t.createSegments(ctx, numSegments)
 }
 
 // shouldSegment returns true if a trie should be separated into segments.
@@ -276,7 +281,7 @@ func (t *trieToSync) shouldSegment() bool {
 // key of consecutive segments.
 // createSegments should only be called once when there is only one
 // thread accessing this trie, such that there is no need to hold a lock.
-func (t *trieToSync) createSegments(numSegments int) error {
+func (t *trieToSync) createSegments(ctx context.Context, numSegments int) error {
 	segment := t.segments[0]
 
 	segmentStep := 0x10000 / numSegments
@@ -313,7 +318,11 @@ func (t *trieToSync) createSegments(numSegments int) error {
 	// is already syncing.
 	// this avoids concurrent access to [t.segments].
 	for i := 1; i < len(t.segments); i++ {
-		t.sync.segments <- t.segments[i]
+		select {
+		case t.sync.segments <- t.segments[i]:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
 	t.sync.stats.incTriesSegmented()
 	log.Debug("statesync: trie segmented for parallel sync", "root", t.root, "account", t.account, "segments", len(t.segments))
@@ -359,9 +368,9 @@ func (t *trieSegment) Start() []byte {
 	return t.start
 }
 
-func (t *trieSegment) OnLeafs(keys, vals [][]byte) error {
+func (t *trieSegment) OnLeafs(ctx context.Context, keys, vals [][]byte) error {
 	// invoke the onLeafs callback
-	if err := t.trie.task.OnLeafs(t.batch, keys, vals); err != nil {
+	if err := t.trie.task.OnLeafs(ctx, t.batch, keys, vals); err != nil {
 		return err
 	}
 	// cap the segment's batch
@@ -381,9 +390,9 @@ func (t *trieSegment) OnLeafs(keys, vals [][]byte) error {
 	t.trie.sync.stats.incLeafs(t, uint64(len(keys)), t.estimateSize())
 
 	if t.trie.root == t.trie.sync.root {
-		return t.trie.createSegmentsIfNeeded(numMainTrieSegments)
+		return t.trie.createSegmentsIfNeeded(ctx, numMainTrieSegments)
 	} else {
-		return t.trie.createSegmentsIfNeeded(numStorageTrieSegments)
+		return t.trie.createSegmentsIfNeeded(ctx, numStorageTrieSegments)
 	}
 }
 

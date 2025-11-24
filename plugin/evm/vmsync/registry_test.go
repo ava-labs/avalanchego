@@ -209,8 +209,7 @@ func TestSyncerRegistry_ConcurrentStart(t *testing.T) {
 		require.NoError(t, registry.Register(s))
 	}
 
-	doneCh := make(chan error, 1)
-	go func() { doneCh <- registry.RunSyncerTasks(ctx, newTestClientSummary(t)) }()
+	doneCh := startSyncersAsync(registry, ctx, newTestClientSummary(t))
 
 	utilstest.WaitGroupWithTimeout(t, &allStartedWG, 2*time.Second, "timed out waiting for barrier syncers to start")
 	close(releaseCh)
@@ -229,38 +228,25 @@ func TestSyncerRegistry_ErrorPropagatesAndCancelsOthers(t *testing.T) {
 	// Error syncer
 	trigger := make(chan struct{})
 	errFirst := errors.New("test error")
-	require.NoError(t, registry.Register(&namedSyncer{name: "ErrorSyncer-0", syncer: NewErrorSyncer(trigger, errFirst)}))
+	var errorSyncerStartedWG sync.WaitGroup
+	errorSyncerStartedWG.Add(1)
+	errorSyncer := &namedSyncer{name: "ErrorSyncer-0", syncer: NewErrorSyncer(&errorSyncerStartedWG, trigger, errFirst)}
+	require.NoError(t, registry.Register(errorSyncer))
 
-	// Cancel-aware syncers to verify cancellation propagation
+	// Cancel-aware syncers to verify cancellation propagation.
 	const numCancelSyncers = 2
-	var cancelChans []chan struct{}
-	var startedChans []chan struct{}
+	startedWG := registerCancelAwareSyncers(t, registry, numCancelSyncers, 4*time.Second)
 
-	for i := 0; i < numCancelSyncers; i++ {
-		startedCh := make(chan struct{})
-		canceledCh := make(chan struct{})
-		cancelChans = append(cancelChans, canceledCh)
-		startedChans = append(startedChans, startedCh)
-		name := fmt.Sprintf("CancelSyncer-%d", i)
-		require.NoError(t, registry.Register(&namedSyncer{name: name, syncer: NewCancelAwareSyncer(startedCh, canceledCh, 4*time.Second)}))
-	}
+	doneCh := startSyncersAsync(registry, ctx, newTestClientSummary(t))
 
-	doneCh := make(chan error, 1)
-	go func() { doneCh <- registry.RunSyncerTasks(ctx, newTestClientSummary(t)) }()
-
-	// Ensure cancel-aware syncers are running before triggering the error
-	for i, started := range startedChans {
-		utilstest.WaitSignalWithTimeout(t, started, 2*time.Second, fmt.Sprintf("cancel-aware syncer %d did not start", i))
-	}
+	// Ensure all syncers (error syncer and cancel-aware syncers) are running before triggering the error.
+	utilstest.WaitGroupWithTimeout(t, &errorSyncerStartedWG, 2*time.Second, "timed out waiting for error syncer to start")
+	utilstest.WaitGroupWithTimeout(t, startedWG, 2*time.Second, "timed out waiting for cancel-aware syncers to start")
 
 	close(trigger)
 
 	err := utilstest.WaitErrWithTimeout(t, doneCh, 4*time.Second)
 	require.ErrorIs(t, err, errFirst)
-
-	for i, cancelCh := range cancelChans {
-		utilstest.WaitSignalWithTimeout(t, cancelCh, 2*time.Second, fmt.Sprintf("cancellation was not propagated to cancel syncer %d", i))
-	}
 }
 
 func TestSyncerRegistry_FirstErrorWinsAcrossMany(t *testing.T) {
@@ -273,8 +259,12 @@ func TestSyncerRegistry_FirstErrorWinsAcrossMany(t *testing.T) {
 
 	const numErrorSyncers = 3
 
-	var triggers []chan struct{}
-	var errFirst error
+	var (
+		triggers                 []chan struct{}
+		errFirst                 error
+		allErrorSyncersStartedWG sync.WaitGroup
+	)
+	allErrorSyncersStartedWG.Add(numErrorSyncers)
 
 	for i := 0; i < numErrorSyncers; i++ {
 		trigger := make(chan struct{})
@@ -284,13 +274,15 @@ func TestSyncerRegistry_FirstErrorWinsAcrossMany(t *testing.T) {
 			errFirst = errInstance
 		}
 		name := fmt.Sprintf("ErrorSyncer-%d", i)
-		require.NoError(t, registry.Register(&namedSyncer{name: name, syncer: NewErrorSyncer(trigger, errInstance)}))
+		require.NoError(t, registry.Register(&namedSyncer{name: name, syncer: NewErrorSyncer(&allErrorSyncersStartedWG, trigger, errInstance)}))
 	}
 
-	doneCh := make(chan error, 1)
-	go func() { doneCh <- registry.RunSyncerTasks(ctx, newTestClientSummary(t)) }()
+	doneCh := startSyncersAsync(registry, ctx, newTestClientSummary(t))
 
-	// Trigger only the first error; others should return due to cancellation
+	// Wait for all error syncers to start before triggering the error.
+	utilstest.WaitGroupWithTimeout(t, &allErrorSyncersStartedWG, 2*time.Second, "timed out waiting for error syncers to start")
+
+	// Trigger only the first error - others should return due to cancellation.
 	close(triggers[0])
 
 	err := utilstest.WaitErrWithTimeout(t, doneCh, 4*time.Second)
@@ -305,6 +297,164 @@ func TestSyncerRegistry_NoSyncersRegistered(t *testing.T) {
 	t.Cleanup(cancel)
 
 	require.NoError(t, registry.RunSyncerTasks(ctx, newTestClientSummary(t)))
+}
+
+func TestSyncerRegistry_ContextCancellationErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		wantErr       error
+		numSyncers    int
+		syncerTimeout time.Duration
+		timeout       time.Duration // Timeout duration (only used when wantErr is DeadlineExceeded)
+	}{
+		{
+			name:          "context canceled during active sync",
+			wantErr:       context.Canceled,
+			numSyncers:    3,
+			syncerTimeout: 5 * time.Second,
+		},
+		{
+			name:          "context deadline exceeded",
+			wantErr:       context.DeadlineExceeded,
+			numSyncers:    1,
+			syncerTimeout: 500 * time.Millisecond,
+			timeout:       200 * time.Millisecond,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			registry := NewSyncerRegistry()
+
+			startedWG := registerCancelAwareSyncers(t, registry, tt.numSyncers, tt.syncerTimeout)
+
+			ctx, cancel := newTestContext(t, tt.wantErr, tt.timeout)
+			t.Cleanup(cancel)
+
+			doneCh := startSyncersAsync(registry, ctx, newTestClientSummary(t))
+
+			// Wait for syncers to start.
+			waitTimeout := 2 * time.Second
+			if tt.wantErr == context.DeadlineExceeded {
+				// For deadline exceeded, use shorter timeout since deadline is tight.
+				waitTimeout = 100 * time.Millisecond
+			}
+			utilstest.WaitGroupWithTimeout(t, startedWG, waitTimeout, "timed out waiting for syncers to start")
+
+			// Trigger cancellation for Canceled test (DeadlineExceeded will expire naturally).
+			if tt.wantErr == context.Canceled {
+				cancel()
+			}
+
+			err := utilstest.WaitErrWithTimeout(t, doneCh, 4*time.Second)
+
+			// Verify error propagates correctly.
+			require.ErrorIs(t, err, tt.wantErr)
+		})
+	}
+}
+
+func TestSyncerRegistry_EarlyReturnOnAlreadyCancelledContext(t *testing.T) {
+	t.Parallel()
+
+	registry := NewSyncerRegistry()
+
+	// Create and immediately cancel context.
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel() // Cancel before starting syncers to test early return.
+
+	// Register syncers (they should never start).
+	const numSyncers = 2
+	mockSyncers := make([]*mockSyncer, numSyncers)
+	for i := 0; i < numSyncers; i++ {
+		name := fmt.Sprintf("Syncer-%d", i)
+		mockSyncer := newMockSyncer(name, nil)
+		mockSyncers[i] = mockSyncer
+		require.NoError(t, registry.Register(mockSyncer))
+	}
+
+	// RunSyncerTasks should return immediately with context.Canceled.
+	err := registry.RunSyncerTasks(ctx, newTestClientSummary(t))
+
+	// Verify that context.Canceled is returned immediately.
+	require.ErrorIs(t, err, context.Canceled)
+
+	// Verify that syncers were never started (early return optimization).
+	for i, mockSyncer := range mockSyncers {
+		require.False(t, mockSyncer.started, "Syncer %d should not have been started due to early return", i)
+	}
+}
+
+func TestSyncerRegistry_MixedCancellationAndSuccess(t *testing.T) {
+	t.Parallel()
+
+	registry := NewSyncerRegistry()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	// Create a syncer that will succeed quickly.
+	releaseCh := make(chan struct{})
+	var successWG sync.WaitGroup
+	successWG.Add(1)
+	require.NoError(t, registry.Register(&namedSyncer{
+		name:   "SuccessSyncer",
+		syncer: NewBarrierSyncer(&successWG, releaseCh),
+	}))
+
+	// Create syncers that will be cancelled.
+	const numCancelSyncers = 2
+	startedWG := registerCancelAwareSyncers(t, registry, numCancelSyncers, 5*time.Second)
+
+	doneCh := startSyncersAsync(registry, ctx, newTestClientSummary(t))
+
+	utilstest.WaitGroupWithTimeout(t, &successWG, 2*time.Second, "success syncer did not start")
+	utilstest.WaitGroupWithTimeout(t, startedWG, 2*time.Second, "timed out waiting for syncers to start")
+
+	// Cancel context, this should cancel all syncers, even the one that could succeed.
+	cancel()
+
+	err := utilstest.WaitErrWithTimeout(t, doneCh, 4*time.Second)
+
+	// Verify that the cancellation error is returned.
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+// startSyncersAsync starts the syncers asynchronously using StartAsync and returns a channel to receive the error.
+func startSyncersAsync(registry *SyncerRegistry, ctx context.Context, summary message.Syncable) <-chan error {
+	doneCh := make(chan error, 1)
+	g := registry.StartAsync(ctx, summary)
+	go func() {
+		doneCh <- g.Wait()
+	}()
+	return doneCh
+}
+
+// registerCancelAwareSyncers registers [numSyncers] cancel-aware syncers with the registry
+// and returns a WaitGroup to coordinate when syncers have started.
+func registerCancelAwareSyncers(t *testing.T, registry *SyncerRegistry, numSyncers int, timeout time.Duration) *sync.WaitGroup {
+	t.Helper()
+	var startedWG sync.WaitGroup
+	startedWG.Add(numSyncers)
+	for i := 0; i < numSyncers; i++ {
+		require.NoError(t, registry.Register(&namedSyncer{
+			name:   fmt.Sprintf("Syncer-%d", i),
+			syncer: NewCancelAwareSyncer(&startedWG, timeout),
+		}))
+	}
+	return &startedWG
+}
+
+func newTestContext(t *testing.T, wantErr error, timeout time.Duration) (context.Context, context.CancelFunc) {
+	t.Helper()
+	if wantErr == context.DeadlineExceeded {
+		return context.WithTimeout(t.Context(), timeout)
+	}
+	return context.WithCancel(t.Context())
 }
 
 func newTestClientSummary(t *testing.T) message.Syncable {

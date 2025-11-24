@@ -24,14 +24,14 @@ var ErrFailedToFetchLeafs = errors.New("failed to fetch leafs")
 // the same value for Root, Account, Start, and NodeType throughout the sync.
 // The value returned by End can change between calls to OnLeafs.
 type LeafSyncTask interface {
-	Root() common.Hash                  // Root of the trie to sync
-	Account() common.Hash               // Account hash of the trie to sync (only applicable to storage tries)
-	Start() []byte                      // Starting key to request new leaves
-	End() []byte                        // End key to request new leaves
-	NodeType() message.NodeType         // Specifies the message type (atomic/state trie) for the leaf syncer to send
-	OnStart() (bool, error)             // Callback when tasks begins, returns true if work can be skipped
-	OnLeafs(keys, vals [][]byte) error  // Callback when new leaves are received from the network
-	OnFinish(ctx context.Context) error // Callback when there are no more leaves in the trie to sync or when we reach End()
+	Root() common.Hash                                      // Root of the trie to sync
+	Account() common.Hash                                   // Account hash of the trie to sync (only applicable to storage tries)
+	Start() []byte                                          // Starting key to request new leaves
+	End() []byte                                            // End key to request new leaves
+	NodeType() message.NodeType                             // Specifies the message type (atomic/state trie) for the leaf syncer to send
+	OnStart() (bool, error)                                 // Callback when tasks begins, returns true if work can be skipped
+	OnLeafs(ctx context.Context, keys, vals [][]byte) error // Callback when new leaves are received from the network
+	OnFinish(ctx context.Context) error                     // Callback when there are no more leaves in the trie to sync or when we reach End()
 }
 
 type LeafSyncerConfig struct {
@@ -128,7 +128,7 @@ func (c *CallbackLeafSyncer) syncTask(ctx context.Context, task LeafSyncTask) er
 			leafsResponse.Vals = leafsResponse.Vals[:i+1]
 		}
 
-		if err := task.OnLeafs(leafsResponse.Keys, leafsResponse.Vals); err != nil {
+		if err := task.OnLeafs(ctx, leafsResponse.Keys, leafsResponse.Vals); err != nil {
 			return err
 		}
 

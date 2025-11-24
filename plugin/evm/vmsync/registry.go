@@ -13,7 +13,7 @@ import (
 
 	"github.com/ava-labs/coreth/plugin/evm/message"
 
-	synccommon "github.com/ava-labs/coreth/sync"
+	syncpkg "github.com/ava-labs/coreth/sync"
 )
 
 var errSyncerAlreadyRegistered = errors.New("syncer already registered")
@@ -21,7 +21,7 @@ var errSyncerAlreadyRegistered = errors.New("syncer already registered")
 // SyncerTask represents a single syncer with its name for identification.
 type SyncerTask struct {
 	name   string
-	syncer synccommon.Syncer
+	syncer syncpkg.Syncer
 }
 
 // SyncerRegistry manages a collection of syncers for sequential execution.
@@ -39,7 +39,7 @@ func NewSyncerRegistry() *SyncerRegistry {
 
 // Register adds a syncer to the registry.
 // Returns an error if a syncer with the same name is already registered.
-func (r *SyncerRegistry) Register(syncer synccommon.Syncer) error {
+func (r *SyncerRegistry) Register(syncer syncpkg.Syncer) error {
 	id := syncer.ID()
 	if r.registeredNames[id] {
 		return fmt.Errorf("%w with id '%s'", errSyncerAlreadyRegistered, id)
@@ -51,22 +51,46 @@ func (r *SyncerRegistry) Register(syncer synccommon.Syncer) error {
 	return nil
 }
 
-// RunSyncerTasks executes all registered syncers.
-// The provided summary is used only for logging to decouple from concrete client types.
+// RunSyncerTasks executes all registered syncers synchronously.
 func (r *SyncerRegistry) RunSyncerTasks(ctx context.Context, summary message.Syncable) error {
+	// Early return if context is already canceled (e.g., during shutdown).
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	g := r.StartAsync(ctx, summary)
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
+	log.Info("all syncers completed successfully", "count", len(r.syncers), "summary", summary.GetBlockHash().Hex())
+
+	return nil
+}
+
+// StartAsync launches all registered syncers and returns an [errgroup.Group]
+// whose Wait() completes when all syncers exit. The context returned will be
+// cancelled when any syncer fails, propagating shutdown to the others.
+func (r *SyncerRegistry) StartAsync(ctx context.Context, summary message.Syncable) *errgroup.Group {
+	g, egCtx := errgroup.WithContext(ctx)
+
 	if len(r.syncers) == 0 {
-		return nil
+		return g
 	}
 
 	summaryBlockHashHex := summary.GetBlockHash().Hex()
 	blockHeight := summary.Height()
 
-	g, ctx := errgroup.WithContext(ctx)
-
 	for _, task := range r.syncers {
 		g.Go(func() error {
 			log.Info("starting syncer", "name", task.name, "summary", summaryBlockHashHex, "height", blockHeight)
-			if err := task.syncer.Sync(ctx); err != nil {
+			if err := task.syncer.Sync(egCtx); err != nil {
+				// Context cancellation during shutdown is expected.
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					log.Info("syncer cancelled", "name", task.name, "summary", summaryBlockHashHex, "height", blockHeight)
+					return err
+				}
 				log.Error("failed syncing", "name", task.name, "summary", summaryBlockHashHex, "height", blockHeight, "err", err)
 				return fmt.Errorf("%s failed: %w", task.name, err)
 			}
@@ -76,11 +100,5 @@ func (r *SyncerRegistry) RunSyncerTasks(ctx context.Context, summary message.Syn
 		})
 	}
 
-	if err := g.Wait(); err != nil {
-		return err
-	}
-
-	log.Info("all syncers completed successfully", "count", len(r.syncers), "summary", summaryBlockHashHex)
-
-	return nil
+	return g
 }

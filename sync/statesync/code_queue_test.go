@@ -96,13 +96,14 @@ func TestCodeQueue(t *testing.T) {
 			recvDone := make(chan struct{})
 			go func() {
 				for _, add := range tt.addCode {
-					require.NoErrorf(t, q.AddCode(add), "%T.AddCode(%v)", q, add)
+					require.NoErrorf(t, q.AddCode(t.Context(), add), "%T.AddCode(%v)", q, add)
 				}
 
 				if tt.quitInsteadOfFinalize {
 					close(quit)
 					<-recvDone
-					require.ErrorIsf(t, q.AddCode(tt.addCodeAfter), errFailedToAddCodeHashesToQueue, "%T.AddCode() after `quit` channel closed", q)
+					err := q.AddCode(t.Context(), tt.addCodeAfter)
+					require.ErrorIsf(t, err, errFailedToAddCodeHashesToQueue, "%T.AddCode() after `quit` channel closed", q)
 				} else {
 					require.NoErrorf(t, q.Finalize(), "%T.Finalize()", q)
 					// Avoid leaking the internal goroutine
@@ -165,7 +166,7 @@ func TestCodeQueue_FinalizeWaitsForInflightAddCodeCalls(t *testing.T) {
 
 	addDone := make(chan error, 1)
 	go func() {
-		addDone <- q.AddCode(hashes)
+		addDone <- q.AddCode(t.Context(), hashes)
 	}()
 
 	// Read the first enqueued hash to ensure AddCode is actively enqueuing and will block on the next send.
@@ -238,7 +239,7 @@ func TestQuitAndAddCodeRace(t *testing.T) {
 				<-start
 				// Due to the race condition, AddCode may either succeed or fail
 				// depending on whether the quit channel is closed first
-				_ = q.AddCode(in)
+				_ = q.AddCode(t.Context(), in)
 			}()
 
 			ready.Wait()

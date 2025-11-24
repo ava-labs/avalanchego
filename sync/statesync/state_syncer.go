@@ -127,7 +127,12 @@ func NewSyncer(client syncclient.Client, db ethdb.Database, root common.Hash, co
 		return nil, err
 	}
 	ss.addTrieInProgress(ss.root, ss.mainTrie)
-	ss.mainTrie.startSyncing() // start syncing after tracking the trie as in progress
+
+	// Use context.Background() for initialization since we don't have a sync context yet.
+	// This is safe because startSyncing is called before Sync() starts.
+	if err := ss.mainTrie.startSyncing(context.Background()); err != nil {
+		return nil, err
+	}
 	return ss, nil
 }
 
@@ -264,7 +269,9 @@ func (t *stateSync) storageTrieProducer(ctx context.Context) error {
 			close(t.storageTriesDone)
 		}
 		// start syncing after tracking the trie as in progress
-		storageTrie.startSyncing()
+		if err := storageTrie.startSyncing(ctx); err != nil {
+			return err
+		}
 
 		if !more {
 			return nil

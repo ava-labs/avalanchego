@@ -4,6 +4,7 @@
 package statesync
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ava-labs/libevm/common"
@@ -31,7 +32,7 @@ type syncTask interface {
 
 	// callbacks used to form a LeafSyncTask
 	OnStart() (bool, error)
-	OnLeafs(db ethdb.KeyValueWriter, keys, vals [][]byte) error
+	OnLeafs(ctx context.Context, db ethdb.KeyValueWriter, keys, vals [][]byte) error
 	OnFinish() error
 }
 
@@ -59,7 +60,7 @@ func (m *mainTrieTask) OnFinish() error {
 	return m.sync.onMainTrieFinished()
 }
 
-func (m *mainTrieTask) OnLeafs(db ethdb.KeyValueWriter, keys, vals [][]byte) error {
+func (m *mainTrieTask) OnLeafs(ctx context.Context, db ethdb.KeyValueWriter, keys, vals [][]byte) error {
 	codeHashes := make([]common.Hash, 0)
 	// loop over the keys, decode them as accounts, then check for any
 	// storage or code we need to sync as well.
@@ -88,7 +89,7 @@ func (m *mainTrieTask) OnLeafs(db ethdb.KeyValueWriter, keys, vals [][]byte) err
 		}
 	}
 	// Add collected code hashes to the code fetcher.
-	return m.sync.codeQueue.AddCode(codeHashes)
+	return m.sync.codeQueue.AddCode(ctx, codeHashes)
 }
 
 type storageTrieTask struct {
@@ -142,9 +143,13 @@ func (s *storageTrieTask) OnFinish() error {
 	return s.sync.onStorageTrieFinished(s.root)
 }
 
-func (s *storageTrieTask) OnLeafs(db ethdb.KeyValueWriter, keys, vals [][]byte) error {
+func (s *storageTrieTask) OnLeafs(ctx context.Context, db ethdb.KeyValueWriter, keys, vals [][]byte) error {
 	// persists the trie leafs to the snapshot for all accounts associated with this root
 	for _, account := range s.accounts {
+		// Check context cancellation before processing each account to allow early exit during shutdown.
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		for i, key := range keys {
 			rawdb.WriteStorageSnapshot(db, account, common.BytesToHash(key), vals[i])
 		}

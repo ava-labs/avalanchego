@@ -156,7 +156,11 @@ func addZeroes(height uint64) []byte {
 }
 
 // onLeafs is the callback for the leaf syncer, which will insert the key-value pairs into the trie.
-func (s *Syncer) onLeafs(keys [][]byte, values [][]byte) error {
+func (s *Syncer) onLeafs(ctx context.Context, keys [][]byte, values [][]byte) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	for i, key := range keys {
 		if len(key) != atomicstate.TrieKeyLength {
 			return fmt.Errorf("unexpected key len (%d) in atomic trie sync", len(key))
@@ -239,6 +243,6 @@ func (a *syncerLeafTask) OnFinish(context.Context) error { return a.syncer.onFin
 func (*syncerLeafTask) OnStart() (bool, error)           { return false, nil }
 func (a *syncerLeafTask) Root() common.Hash              { return a.syncer.targetRoot }
 func (*syncerLeafTask) Account() common.Hash             { return common.Hash{} }
-func (a *syncerLeafTask) OnLeafs(keys, vals [][]byte) error {
-	return a.syncer.onLeafs(keys, vals)
+func (a *syncerLeafTask) OnLeafs(ctx context.Context, keys, vals [][]byte) error {
+	return a.syncer.onLeafs(ctx, keys, vals)
 }

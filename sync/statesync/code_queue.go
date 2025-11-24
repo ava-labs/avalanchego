@@ -4,6 +4,7 @@
 package statesync
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -113,7 +114,7 @@ func (q *CodeQueue) closeChannelOnce() bool {
 // AddCode persists and enqueues new code hashes.
 // Persists idempotent "to-fetch" markers for all inputs and enqueues them as-is.
 // Returns errAddCodeAfterFinalize after a clean finalize and errFailedToAddCodeHashesToQueue on early quit.
-func (q *CodeQueue) AddCode(codeHashes []common.Hash) error {
+func (q *CodeQueue) AddCode(ctx context.Context, codeHashes []common.Hash) error {
 	if len(codeHashes) == 0 {
 		return nil
 	}
@@ -147,6 +148,8 @@ func (q *CodeQueue) AddCode(codeHashes []common.Hash) error {
 		case q.in <- h: // guaranteed to be open or nil, but never closed
 		case <-q.quit:
 			return errFailedToAddCodeHashesToQueue
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
 	return nil
@@ -172,7 +175,9 @@ func (q *CodeQueue) init() error {
 	if err != nil {
 		return fmt.Errorf("unable to recover previous sync state: %w", err)
 	}
-	if err := q.AddCode(dbCodeHashes); err != nil {
+	// Use context.Background() since init() runs during construction before sync starts.
+	// The channel is empty, so sends won't block. Shutdown is handled via q.quit in AddCode.
+	if err := q.AddCode(context.Background(), dbCodeHashes); err != nil {
 		return fmt.Errorf("unable to resume previous sync: %w", err)
 	}
 
