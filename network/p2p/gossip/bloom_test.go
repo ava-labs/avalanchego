@@ -120,8 +120,13 @@ func TestBloomFilterClobber(t *testing.T) {
 		func() { b.Has(&testTx{}) },
 		func() { b.Marshal() },
 		func() {
-			_, err := b.ResetIfNeeded(1)
+			var called bool
+			reset, err := b.ResetIfNeeded(1, func() error {
+				called = true
+				return nil
+			})
 			require.NoErrorf(t, err, "%T.ResetIfNeeded()", b)
+			require.Equalf(t, reset, called, "%T.ResetIfNeeded(..., [callback]) callback called i.f.f. reset", b)
 		},
 	} {
 		for range 10_000 {

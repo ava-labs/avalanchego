@@ -96,7 +96,7 @@ func ResetBloomFilterIfNeeded(
 	bloomFilter *BloomFilter,
 	targetElements int,
 ) (bool, error) {
-	return bloomFilter.ResetIfNeeded(targetElements)
+	return bloomFilter.ResetIfNeeded(targetElements, nil)
 }
 
 // ResetIfNeeded resets the bloom filter if it breaches [targetFalsePositiveProbability].
@@ -104,8 +104,11 @@ func ResetBloomFilterIfNeeded(
 // If [targetElements] exceeds [minTargetElements], the size of the bloom filter will grow to maintain
 // the same [targetFalsePositiveProbability].
 //
-// Returns true if the bloom filter was reset.
-func (b *BloomFilter) ResetIfNeeded(targetElements int) (bool, error) {
+// Returns true if the bloom filter was reset, in which case the `afterReset`
+// function is also called (if non-nil) while still holding a mutex excluding
+// all other access. This callback is typically used to refill the Bloom filter
+// with known elements.
+func (b *BloomFilter) ResetIfNeeded(targetElements int, afterReset func() error) (bool, error) {
 	mu := &b.resetMu
 
 	// Although this pattern requires a double checking of the same property,
@@ -129,8 +132,13 @@ func (b *BloomFilter) ResetIfNeeded(targetElements int) (bool, error) {
 	}
 
 	targetElements = max(b.minTargetElements, targetElements)
-	err := b.resetWhenLocked(targetElements)
-	return err == nil, err
+	if err := b.resetWhenLocked(targetElements); err != nil {
+		return false, err
+	}
+	if afterReset == nil {
+		return true, nil
+	}
+	return true, afterReset()
 }
 
 func (b *BloomFilter) resetWhenLocked(targetElements int) error {
