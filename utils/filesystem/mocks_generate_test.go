@@ -3,4 +3,4 @@
 
 package filesystem
 
-//go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/reader.go -mock_names=Reader=Reader . Reader
+//go:generate go tool mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/reader.go -mock_names=Reader=Reader . Reader

@@ -24,6 +24,7 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/stacktrace"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
+	"github.com/ava-labs/avalanchego/utils/rpc"
 	"github.com/ava-labs/avalanchego/vms/platformvm/signer"
 )
 
@@ -220,11 +221,13 @@ func (n *Node) SaveMetricsSnapshot(ctx context.Context) error {
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
+	//nolint:bodyclose // body is closed via rpc.CleanlyCloseBody
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return stacktrace.Wrap(err)
 	}
-	defer resp.Body.Close()
+	defer rpc.CleanlyCloseBody(resp.Body)
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return stacktrace.Wrap(err)

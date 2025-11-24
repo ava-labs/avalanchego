@@ -3,4 +3,4 @@
 
 package vertex
 
-//go:generate go run go.uber.org/mock/mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/linearizable_vm.go -mock_names=LinearizableVM=LinearizableVM . LinearizableVM
+//go:generate go tool mockgen -package=${GOPACKAGE}mock -destination=${GOPACKAGE}mock/linearizable_vm.go -mock_names=LinearizableVM=LinearizableVM . LinearizableVM
