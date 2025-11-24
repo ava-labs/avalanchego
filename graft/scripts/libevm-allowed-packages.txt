@@ -1,4 +1,4 @@
-# Allowed libevm packages that can be imported in the graft directory.
+# Allowed libevm packages can be imported by EVM code 
 # Lines with a "!" prefix are forbidden.
 # Lines without a "!" prefix are allowed (exceptions to the forbidden patterns).
 
@@ -29,6 +29,7 @@
 "github.com/ava-labs/libevm/eth/tracers/logger"
 "github.com/ava-labs/libevm/eth/tracers/native"
 "github.com/ava-labs/libevm/ethdb"
+"github.com/ava-labs/libevm/ethdb/dbtest"
 "github.com/ava-labs/libevm/ethdb/leveldb"
 "github.com/ava-labs/libevm/ethdb/memorydb"
 "github.com/ava-labs/libevm/ethdb/pebble"
@@ -39,6 +40,7 @@
 "github.com/ava-labs/libevm/libevm/stateconf"
 "github.com/ava-labs/libevm/log"
 "github.com/ava-labs/libevm/metrics"
+"github.com/ava-labs/libevm/params"
 "github.com/ava-labs/libevm/rlp"
 "github.com/ava-labs/libevm/trie"
 "github.com/ava-labs/libevm/trie/testutil"

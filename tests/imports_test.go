@@ -72,7 +72,7 @@ func TestEnforceGraftImportBoundaries(t *testing.T) {
 	require.Fail(t, formatImportViolations(foundImports, header))
 }
 
-// TestEnforceLibevmImportsAllowlist ensures that all libevm imports in the graft directory
+// TestEnforceLibevmImportsAllowlist ensures that all libevm imports by EVM code
 // are explicitly allowed via the libevm-allowed-packages.txt file.
 func TestEnforceLibevmImportsAllowlist(t *testing.T) {
 	_, allowedPackages, err := loadPatternFile("../graft/scripts/libevm-allowed-packages.txt")
@@ -84,9 +84,9 @@ func TestEnforceLibevmImportsAllowlist(t *testing.T) {
 		allowedSet.Add(pkg)
 	}
 
-	// Find all libevm imports in source files, excluding underscore and "eth*" named imports
+	// Find all libevm imports in graft and vms/evm, excluding underscore and "eth*" named imports
 	libevmRegex := regexp.MustCompile(`^github\.com/ava-labs/libevm/`)
-	foundImports, err := findImportsMatchingPattern("../graft", libevmRegex, func(path string, _ string, imp *ast.ImportSpec) bool {
+	filterFunc := func(path string, _ string, imp *ast.ImportSpec) bool {
 		// Skip generated files and test-specific files
 		filename := filepath.Base(path)
 		if strings.HasPrefix(filename, "gen_") ||
@@ -97,8 +97,25 @@ func TestEnforceLibevmImportsAllowlist(t *testing.T) {
 
 		// Skip underscore and "eth*" named imports
 		return imp.Name != nil && (imp.Name.Name == "_" || strings.HasPrefix(imp.Name.Name, "eth"))
-	})
-	require.NoError(t, err, "Failed to find libevm imports")
+	}
+
+	// TODO(jonathanoppenheimer): remove when graft is removed
+	foundImports, err := findImportsMatchingPattern("../graft", libevmRegex, filterFunc)
+	require.NoError(t, err, "Failed to find libevm imports in graft")
+
+	evmImports, err := findImportsMatchingPattern("../vms/evm", libevmRegex, filterFunc)
+	require.NoError(t, err, "Failed to find libevm imports in vms/evm")
+
+	// merge libevm imports from graft and vms/evm
+	for importPath, files := range evmImports {
+		if existingFiles, exists := foundImports[importPath]; exists {
+			for file := range files {
+				existingFiles.Add(file)
+			}
+		} else {
+			foundImports[importPath] = files
+		}
+	}
 
 	violations := make(map[string]set.Set[string])
 	for importPath, files := range foundImports {
@@ -111,7 +128,7 @@ func TestEnforceLibevmImportsAllowlist(t *testing.T) {
 		return // no violations found
 	}
 
-	header := "Files inside the graft directory must not import forbidden libevm packages!\n" +
+	header := "EVM files must not import forbidden libevm packages!\n" +
 		"If a package is safe to import, add it to graft/scripts/libevm-allowed-packages.txt.\n\n"
 	require.Fail(t, formatImportViolations(violations, header))
 }
