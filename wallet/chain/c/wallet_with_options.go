@@ -5,7 +5,6 @@ package c
 
 import (
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
 	"github.com/ava-labs/avalanchego/wallet/subnet/primary/common"

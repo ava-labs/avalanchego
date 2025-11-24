@@ -6,7 +6,6 @@ package extstate
 import (
 	"math/big"
 
-	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/state"
 	"github.com/ava-labs/libevm/core/types"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
+	"github.com/ava-labs/avalanchego/vms/evm/predicate"
 )
 
 // RegisterExtras registers hooks with libevm to achieve Avalanche state
