@@ -43,7 +43,7 @@ import (
 	"github.com/ava-labs/libevm/trie"
 	"github.com/ava-labs/libevm/triedb"
 
-	mrand "math/rand"
+	"math/rand"
 )
 
 func TestDeriveSha(t *testing.T) {
@@ -117,7 +117,7 @@ func BenchmarkDeriveSha200(b *testing.B) {
 
 func TestFuzzDeriveSha(t *testing.T) {
 	// increase this for longer runs -- it's set to quite low for travis
-	rndSeed := mrand.Int()
+	rndSeed := rand.Int()
 	for i := 0; i < 10; i++ {
 		seed := rndSeed + i
 		exp := types.DeriveSha(newDummy(i), trie.NewEmpty(triedb.NewDatabase(rawdb.NewMemoryDatabase(), nil)))
@@ -186,7 +186,7 @@ type dummyDerivableList struct {
 
 func newDummy(seed int) *dummyDerivableList {
 	d := &dummyDerivableList{}
-	src := mrand.NewSource(int64(seed))
+	src := rand.NewSource(int64(seed))
 	// don't use lists longer than 4K items
 	d.len = int(src.Int63() & 0x0FFF)
 	d.seed = seed
@@ -198,10 +198,10 @@ func (d *dummyDerivableList) Len() int {
 }
 
 func (d *dummyDerivableList) EncodeIndex(i int, w *bytes.Buffer) {
-	src := mrand.NewSource(int64(d.seed + i))
+	src := rand.NewSource(int64(d.seed + i))
 	// max item size 256, at least 1 byte per item
 	size := 1 + src.Int63()&0x00FF
-	io.CopyN(w, mrand.New(src), size)
+	io.CopyN(w, rand.New(src), size)
 }
 
 func printList(l types.DerivableList) {
