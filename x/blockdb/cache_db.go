@@ -4,7 +4,6 @@
 package blockdb
 
 import (
-	"slices"
 	"sync/atomic"
 
 	"go.uber.org/zap"
@@ -41,13 +40,13 @@ func (c *cacheDB) Get(height BlockHeight) (BlockData, error) {
 	}
 
 	if cached, ok := c.cache.Get(height); ok {
-		return slices.Clone(cached), nil
+		return cached, nil
 	}
 	data, err := c.db.Get(height)
 	if err != nil {
 		return nil, err
 	}
-	c.cache.Put(height, slices.Clone(data))
+	c.cache.Put(height, data)
 	return data, nil
 }
 
@@ -61,7 +60,7 @@ func (c *cacheDB) Put(height BlockHeight, data BlockData) error {
 		return err
 	}
 
-	c.cache.Put(height, slices.Clone(data))
+	c.cache.Put(height, data)
 	return nil
 }
 

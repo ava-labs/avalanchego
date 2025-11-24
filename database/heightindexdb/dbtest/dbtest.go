@@ -99,23 +99,10 @@ func TestPutGet(t *testing.T, newDB func() database.HeightIndex) {
 				require.NoError(t, db.Put(write.height, write.data))
 			}
 
-			// modify the original value of the put data to ensure the saved
-			// value won't be changed after Get
-			if len(tt.puts) > int(tt.queryHeight) && tt.puts[tt.queryHeight].data != nil {
-				copy(tt.puts[tt.queryHeight].data, []byte("modified data"))
-			}
-
 			// Query the specific height
 			retrievedData, err := db.Get(tt.queryHeight)
 			require.ErrorIs(t, err, tt.wantErr)
 			require.True(t, bytes.Equal(tt.want, retrievedData))
-
-			// modify the data returned from Get and ensure it won't change the
-			// data from a second Get
-			copy(retrievedData, []byte("modified data"))
-			newData, err := db.Get(tt.queryHeight)
-			require.ErrorIs(t, err, tt.wantErr)
-			require.True(t, bytes.Equal(tt.want, newData))
 		})
 	}
 }
