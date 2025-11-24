@@ -4,7 +4,6 @@
 package tests
 
 import (
-	"bufio"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -72,65 +71,21 @@ func TestEnforceGraftImportBoundaries(t *testing.T) {
 	require.Fail(t, formatImportViolations(foundImports, header))
 }
 
-// TestEnforceLibevmImportsAllowlist ensures that all libevm imports by EVM code
-// are explicitly allowed via the libevm-allowed-packages.txt file.
-func TestEnforceLibevmImportsAllowlist(t *testing.T) {
-	_, allowedPackages, err := loadPatternFile("./scripts/libevm-allowed-packages.txt")
-	require.NoError(t, err, "Failed to load allowed packages")
+// TestDoNotImportLibevmPseudo ensures that no code in the repository imports
+// the libevm/pseudo package, which is for internal libevm use only.
+func TestDoNotImportLibevmPseudo(t *testing.T) {
+	// Find imports from the forbidden libevm/pseudo package
+	pseudoRegex := regexp.MustCompile(`^github\.com/ava-labs/libevm/libevm/pseudo`)
+	foundImports, err := findImportsMatchingPattern("../..", pseudoRegex, nil)
+	require.NoError(t, err, "Failed to scan for libevm/pseudo imports")
 
-	// Convert allowed packages to a set for faster lookup
-	allowedSet := set.Set[string]{}
-	for _, pkg := range allowedPackages {
-		allowedSet.Add(pkg)
-	}
-
-	// Find all libevm imports in graft and vms/evm, excluding underscore and "eth*" named imports
-	libevmRegex := regexp.MustCompile(`^github\.com/ava-labs/libevm/`)
-	filterFunc := func(path string, _ string, imp *ast.ImportSpec) bool {
-		// Skip generated files and test-specific files
-		filename := filepath.Base(path)
-		if strings.HasPrefix(filename, "gen_") ||
-			strings.Contains(path, "graft/*/core/main_test.go") ||
-			strings.Contains(path, "graft/*/tempextrastest/") {
-			return true
-		}
-
-		// Skip underscore and "eth*" named imports
-		return imp.Name != nil && (imp.Name.Name == "_" || strings.HasPrefix(imp.Name.Name, "eth"))
-	}
-
-	// TODO(jonathanoppenheimer): remove when graft is removed
-	foundImports, err := findImportsMatchingPattern("../../graft", libevmRegex, filterFunc)
-	require.NoError(t, err, "Failed to find libevm imports in graft")
-
-	evmImports, err := findImportsMatchingPattern("./", libevmRegex, filterFunc)
-	require.NoError(t, err, "Failed to find libevm imports in vms/evm")
-
-	// merge libevm imports from graft and vms/evm
-	for importPath, files := range evmImports {
-		if existingFiles, exists := foundImports[importPath]; exists {
-			for file := range files {
-				existingFiles.Add(file)
-			}
-		} else {
-			foundImports[importPath] = files
-		}
-	}
-
-	violations := make(map[string]set.Set[string])
-	for importPath, files := range foundImports {
-		if !allowedSet.Contains(importPath) {
-			violations[importPath] = files
-		}
-	}
-
-	if len(violations) == 0 {
+	if len(foundImports) == 0 {
 		return // no violations found
 	}
 
-	header := "EVM files must not import forbidden libevm packages!\n" +
-		"If a package is safe to import, add it to graft/scripts/libevm-allowed-packages.txt.\n\n"
-	require.Fail(t, formatImportViolations(violations, header))
+	header := "Files must not import libevm/pseudo!\n" +
+		"The pseudo package is for internal libevm use only.\n\n"
+	require.Fail(t, formatImportViolations(foundImports, header))
 }
 
 // formatImportViolations formats a map of import violations into an error message
@@ -159,42 +114,6 @@ func formatImportViolations(violations map[string]set.Set[string], header string
 	}
 
 	return errorMsg.String()
-}
-
-// loadPatternFile reads patterns from a file and separates them into forbidden and allowed.
-// Lines with a ! prefix are forbidden patterns.
-// Lines without a ! prefix are allowed patterns (exceptions).
-// Returns: (forbidden patterns, allowed patterns, error)
-func loadPatternFile(filename string) ([]string, []string, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to open pattern file: %w", err)
-	}
-	defer file.Close()
-
-	var forbidden []string
-	var allowed []string
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		line = strings.Trim(line, `"`)
-		if strings.HasPrefix(line, "!") {
-			forbidden = append(forbidden, strings.TrimPrefix(line, "!"))
-		} else {
-			allowed = append(allowed, line)
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, nil, fmt.Errorf("failed to read pattern file: %w", err)
-	}
-
-	return forbidden, allowed, nil
 }
 
 // findImportsMatchingPattern is a generalized function that finds all imports
