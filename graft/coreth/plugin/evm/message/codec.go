@@ -35,7 +35,7 @@ func init() {
 	)
 
 	// Deprecated Warp request/responde types are skipped
-	// See https://github.com/ava-labs/coreth/pull/999
+	// See https://github.com/ava-labs/avalanchego/graft/coreth/pull/999
 	c.SkipRegistrations(3)
 
 	errs.Add(Codec.RegisterCodec(Version, c))

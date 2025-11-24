@@ -19,10 +19,10 @@ import (
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/types"
 
-	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/params/paramstest"
-	"github.com/ava-labs/coreth/plugin/evm/upgrade/ap3"
+	"github.com/ava-labs/avalanchego/graft/coreth/core"
+	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )

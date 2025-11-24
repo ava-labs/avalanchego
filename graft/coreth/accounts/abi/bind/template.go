@@ -27,7 +27,7 @@
 
 package bind
 
-import "github.com/ava-labs/coreth/accounts/abi"
+import "github.com/ava-labs/avalanchego/graft/coreth/accounts/abi"
 
 // tmplData is the data structure required to fill the binding template.
 type tmplData struct {
@@ -102,8 +102,8 @@ import (
 	"strings"
 	"errors"
 
-	"github.com/ava-labs/coreth/accounts/abi"
-	"github.com/ava-labs/coreth/accounts/abi/bind"
+	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi"
+	"github.com/ava-labs/avalanchego/graft/coreth/accounts/abi/bind"
 	"github.com/ava-labs/libevm/core/types"
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
