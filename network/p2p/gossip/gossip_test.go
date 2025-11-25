@@ -171,9 +171,8 @@ func TestGossiperGossip(t *testing.T) {
 			)
 			require.NoError(err)
 
-			var responseSet setDouble
 			responseSetWithBloom, err := NewSetWithBloomFilter(
-				&responseSet,
+				&setDouble{},
 				prometheus.NewRegistry(),
 				"",
 				1000,
