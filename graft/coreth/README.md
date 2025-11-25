@@ -92,6 +92,6 @@ To support these changes, there have been a number of changes to the C-Chain blo
 - `ExtDataGasUsed`: amount of gas consumed by the atomic transactions in the block
 - `BlockGasCost`: surcharge for producing a block faster than the target rate
 
-## Releasing
+## Licensing
 
-See [docs/releasing/README.md](docs/releasing/README.md) for the release process.
+As opposed to `avalanchego` (see the project's [README](../../README.md)), this module is licensed under LGPL, unless otherwise stated in each file header.
