@@ -462,10 +462,10 @@ func TestPushGossiperNew(t *testing.T) {
 	}
 }
 
-type hasFunc func(h ids.ID) bool
+type hasFunc func(id ids.ID) bool
 
-func (f hasFunc) Has(h ids.ID) bool {
-	return f(h)
+func (h hasFunc) Has(id ids.ID) bool {
+	return h(id)
 }
 
 // Tests that the outgoing gossip is equivalent to what was accumulated
