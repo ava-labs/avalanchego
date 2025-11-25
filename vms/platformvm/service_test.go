@@ -639,7 +639,7 @@ func TestGetCurrentValidators(t *testing.T) {
 	for _, validatorTx := range genesis.Validators[:len(genesis.Validators)-1] {
 		validator := validatorTx.Unsigned.(*txs.AddValidatorTx)
 		connectedIDs.Add(validator.NodeID())
-		require.NoError(service.vm.Connected(t.Context(), validator.NodeID(), version.CurrentApp))
+		require.NoError(service.vm.Connected(t.Context(), validator.NodeID(), version.Current))
 	}
 
 	require.NoError(service.GetCurrentValidators(nil, &args, &response))

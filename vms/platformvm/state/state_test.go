@@ -1463,7 +1463,6 @@ func TestPutAndGetFeeState(t *testing.T) {
 	require.NoError(err)
 	require.Equal(gas.State{}, defaultFeeState)
 
-	//nolint:gosec // This does not require a secure random number generator
 	expectedFeeState := gas.State{
 		Capacity: gas.Gas(rand.Uint64()),
 		Excess:   gas.Gas(rand.Uint64()),
