@@ -460,10 +460,6 @@ func TestPushGossiperNew(t *testing.T) {
 
 type fullSet[T Gossipable] struct{}
 
-func (fullSet[_]) Gossip(context.Context) error {
-	return nil
-}
-
 func (fullSet[T]) Add(T) error {
 	return nil
 }
