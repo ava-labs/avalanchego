@@ -390,7 +390,7 @@ func (vm *VM) Replay(b block.Block) error {
 		// TODO do we even need this
 		vm.state.AddBlock(b)
 		vm.state.SetTimestamp(b.Timestamp())
-		vm.state.SetLastAccepted(b.ID())
+		vm.state.SetLastAccepted(b.ID(), b.Height())
 
 		vm.chainManager.SetLastAccepted(b.ID())
 		vm.chainManager.SetPreference(b.ID())

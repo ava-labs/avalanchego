@@ -11,9 +11,11 @@ import (
 
 var _ ChainDB = (*NoChainDB)(nil)
 
-type NoChainDB struct{}
-
-func (*NoChainDB) Abort() {}
+// NoChainDB is used before the Firewood migration when chain state was kept in
+// the same database as the rest of the state.
+type NoChainDB struct {
+	State State
+}
 
 // AddAtomicTx is a no-op because atomic txs are not a part of chain state
 func (*NoChainDB) AddAtomicTx(ids.ID) {}
@@ -22,6 +24,16 @@ func (*NoChainDB) AddAtomicTx(ids.ID) {}
 // rest of the State.
 func (*NoChainDB) Repair(VM, State) error {
 	return nil
+}
+
+func (*NoChainDB) Abort() {}
+
+func (*NoChainDB) Commit() error {
+	return nil
+}
+
+func (d *NoChainDB) Height() (uint64, bool) {
+	return d.State.GetLastAcceptedHeight(), true
 }
 
 func (*NoChainDB) Close(context.Context) error {

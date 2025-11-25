@@ -31,6 +31,8 @@ const (
 )
 
 var (
+	errDBsOutOfSync = errors.New("dbs are out of sync")
+
 	UTXOPrefix      = []byte("utxo")
 	IndexPrefix     = []byte("index")
 	TxPrefix        = []byte("tx")
@@ -66,8 +68,9 @@ type Chain interface {
 
 	AddTx(tx *txs.Tx)
 	AddBlock(block block.Block)
-	SetLastAccepted(blkID ids.ID)
+	SetLastAccepted(blkID ids.ID, height uint64)
 	SetTimestamp(t time.Time)
+	GetLastAcceptedHeight() uint64
 }
 
 // State persistently maintains a set of UTXOs, transaction, statuses, and
@@ -141,6 +144,7 @@ type state struct {
 
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
+	lastAcceptedHeight uint64
 	timestamp, persistedTimestamp       time.Time
 	singletonDB                         database.Database
 }
@@ -406,7 +410,7 @@ func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 		return fmt.Errorf("failed to initialize genesis block: %w", err)
 	}
 
-	s.SetLastAccepted(genesis.ID())
+	s.SetLastAccepted(genesis.ID(), genesis.Height())
 	s.SetTimestamp(genesis.Timestamp())
 	s.AddBlock(genesis)
 
@@ -425,12 +429,17 @@ func (s *state) SetInitialized() error {
 	return s.singletonDB.Put(isInitializedKey, nil)
 }
 
+func (s *state) GetLastAcceptedHeight() uint64 {
+	return s.lastAcceptedHeight
+}
+
 func (s *state) GetLastAccepted() ids.ID {
 	return s.lastAccepted
 }
 
-func (s *state) SetLastAccepted(lastAccepted ids.ID) {
+func (s *state) SetLastAccepted(lastAccepted ids.ID, height uint64) {
 	s.lastAccepted = lastAccepted
+	s.lastAcceptedHeight = height
 }
 
 func (s *state) GetTimestamp() time.Time {
@@ -460,7 +469,12 @@ func (s *state) CommitBatch() (database.Batch, error) {
 		return nil, err
 	}
 
-	return s.vdb.CommitBatch()
+	b, err := s.vdb.CommitBatch()
+	if err != nil {
+		return nil, err
+	}
+
+	return &batch{Batch: b, state: s, chainDB: s.chainDB}, nil
 }
 
 func (s *state) Close(ctx context.Context) error {
@@ -566,4 +580,41 @@ func (s *state) writeMetadata() error {
 
 func (s *state) Checksum(context.Context) (ids.ID, error) {
 	return s.utxoState.Checksum()
+}
+
+type batch struct {
+	database.Batch
+	state   State
+	chainDB ChainDB
+}
+
+// Write guarantees that after a versiondb batch is written, data in the ChainDB
+// is also flushed to disk. This is to support firewood where the database is
+// not shared, and we must guarantee that firewood is written to after
+// versiondb.
+func (b *batch) Write() error {
+	chainDBHeight, ok := b.chainDB.Height()
+	if !ok && b.state.GetLastAcceptedHeight() > 0 {
+		// This should not be possible because we repair the chain db as part of
+		// initialization
+		return fmt.Errorf("chain db was not initialized")
+	}
+
+	if b.state.GetLastAcceptedHeight() != chainDBHeight {
+		// Avoid writing state if heights are out of sync because it might be hiding
+		// a bug that we're calling Commit more than once-per-block which would
+		// create more than one state revision per block.
+		return fmt.Errorf(
+			"%w: state is at %d but chain db is at %d",
+			errDBsOutOfSync,
+			b.state.GetLastAcceptedHeight(),
+			chainDBHeight,
+		)
+	}
+
+	if err := b.Batch.Write(); err != nil {
+		return fmt.Errorf("writing versiondb batch: %w", err)
+	}
+
+	return b.chainDB.Commit()
 }

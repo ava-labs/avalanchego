@@ -62,6 +62,8 @@ type ChainDB interface {
 	AddAtomicTx(txID ids.ID)
 	Repair(vm VM, s State) error
 	Abort()
+	Commit() error
+	Height() (uint64, bool)
 	Close(ctx context.Context) error
 }
 
@@ -111,6 +113,14 @@ func (f *firewoodDB) Repair(vm VM, s State) error {
 
 func (f *firewoodDB) Abort() {
 	f.db.Abort()
+}
+
+func (f *firewoodDB) Commit() error {
+	return f.db.Flush()
+}
+
+func (f *firewoodDB) Height() (uint64, bool) {
+	return f.db.Height()
 }
 
 func (f *firewoodDB) Close(ctx context.Context) error {

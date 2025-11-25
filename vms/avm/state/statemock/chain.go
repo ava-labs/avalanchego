@@ -136,6 +136,20 @@ func (mr *ChainMockRecorder) GetLastAccepted() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastAccepted", reflect.TypeOf((*Chain)(nil).GetLastAccepted))
 }
 
+// GetLastAcceptedHeight mocks base method.
+func (m *Chain) GetLastAcceptedHeight() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastAcceptedHeight")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetLastAcceptedHeight indicates an expected call of GetLastAcceptedHeight.
+func (mr *ChainMockRecorder) GetLastAcceptedHeight() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastAcceptedHeight", reflect.TypeOf((*Chain)(nil).GetLastAcceptedHeight))
+}
+
 // GetTimestamp mocks base method.
 func (m *Chain) GetTimestamp() time.Time {
 	m.ctrl.T.Helper()
@@ -181,15 +195,15 @@ func (mr *ChainMockRecorder) GetUTXO(utxoID any) *gomock.Call {
 }
 
 // SetLastAccepted mocks base method.
-func (m *Chain) SetLastAccepted(blkID ids.ID) {
+func (m *Chain) SetLastAccepted(blkID ids.ID, height uint64) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetLastAccepted", blkID)
+	m.ctrl.Call(m, "SetLastAccepted", blkID, height)
 }
 
 // SetLastAccepted indicates an expected call of SetLastAccepted.
-func (mr *ChainMockRecorder) SetLastAccepted(blkID any) *gomock.Call {
+func (mr *ChainMockRecorder) SetLastAccepted(blkID, height any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*Chain)(nil).SetLastAccepted), blkID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*Chain)(nil).SetLastAccepted), blkID, height)
 }
 
 // SetTimestamp mocks base method.

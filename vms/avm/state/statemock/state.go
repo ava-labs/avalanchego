@@ -208,6 +208,20 @@ func (mr *StateMockRecorder) GetLastAccepted() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastAccepted", reflect.TypeOf((*State)(nil).GetLastAccepted))
 }
 
+// GetLastAcceptedHeight mocks base method.
+func (m *State) GetLastAcceptedHeight() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLastAcceptedHeight")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetLastAcceptedHeight indicates an expected call of GetLastAcceptedHeight.
+func (mr *StateMockRecorder) GetLastAcceptedHeight() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLastAcceptedHeight", reflect.TypeOf((*State)(nil).GetLastAcceptedHeight))
+}
+
 // GetTimestamp mocks base method.
 func (m *State) GetTimestamp() time.Time {
 	m.ctrl.T.Helper()
@@ -296,15 +310,15 @@ func (mr *StateMockRecorder) SetInitialized() *gomock.Call {
 }
 
 // SetLastAccepted mocks base method.
-func (m *State) SetLastAccepted(blkID ids.ID) {
+func (m *State) SetLastAccepted(blkID ids.ID, height uint64) {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "SetLastAccepted", blkID)
+	m.ctrl.Call(m, "SetLastAccepted", blkID, height)
 }
 
 // SetLastAccepted indicates an expected call of SetLastAccepted.
-func (mr *StateMockRecorder) SetLastAccepted(blkID any) *gomock.Call {
+func (mr *StateMockRecorder) SetLastAccepted(blkID, height any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*State)(nil).SetLastAccepted), blkID)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetLastAccepted", reflect.TypeOf((*State)(nil).SetLastAccepted), blkID, height)
 }
 
 // SetTimestamp mocks base method.
