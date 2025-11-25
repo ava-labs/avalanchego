@@ -11,8 +11,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/log"
 	"github.com/prometheus/client_golang/prometheus"
@@ -21,6 +19,8 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core/txpool"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 
 	ethcommon "github.com/ava-labs/libevm/common"
 )

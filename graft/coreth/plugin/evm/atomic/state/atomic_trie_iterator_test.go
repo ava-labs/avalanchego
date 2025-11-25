@@ -6,14 +6,14 @@ package state
 import (
 	"testing"
 
-	"github.com/ava-labs/avalanchego/database/memdb"
-	"github.com/ava-labs/avalanchego/database/versiondb"
-	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/libevm/common"
 	"github.com/stretchr/testify/require"
 
+	"github.com/ava-labs/avalanchego/database/memdb"
+	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/atomictest"
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 )

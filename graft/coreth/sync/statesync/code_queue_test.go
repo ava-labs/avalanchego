@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/crypto"
@@ -18,6 +17,7 @@ import (
 	"go.uber.org/goleak"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 func TestCodeQueue(t *testing.T) {
@@ -170,7 +170,7 @@ func TestCodeQueue_FinalizeWaitsForInflightAddCodeCalls(t *testing.T) {
 	}()
 
 	// Read the first enqueued hash to ensure AddCode is actively enqueuing and will block on the next send.
-	var got []common.Hash //nolint:prealloc
+	var got []common.Hash
 	got = append(got, <-q.CodeHashes())
 
 	// Call Finalize concurrently - it should block until AddCode returns.
