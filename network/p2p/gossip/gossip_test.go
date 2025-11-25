@@ -20,6 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -405,6 +406,26 @@ func TestPushGossiperNew(t *testing.T) {
 	}
 }
 
+type fullSet[T Gossipable] struct{}
+
+func (fullSet[_]) Gossip(context.Context) error {
+	return nil
+}
+
+func (fullSet[T]) Add(T) error {
+	return nil
+}
+
+func (fullSet[T]) Has(ids.ID) bool {
+	return true
+}
+
+func (fullSet[T]) Iterate(func(gossipable T) bool) {}
+
+func (fullSet[_]) GetFilter() ([]byte, []byte) {
+	return bloom.FullFilter.Marshal(), ids.Empty[:]
+}
+
 // Tests that the outgoing gossip is equivalent to what was accumulated
 func TestPushGossiper(t *testing.T) {
 	type cycle struct {
@@ -576,7 +597,7 @@ func TestPushGossiper(t *testing.T) {
 
 			gossiper, err := NewPushGossiper[*testTx](
 				marshaller,
-				FullSet[*testTx]{},
+				fullSet[*testTx]{},
 				validators,
 				client,
 				metrics,
