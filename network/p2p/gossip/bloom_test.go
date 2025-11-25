@@ -10,8 +10,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
-
-	"github.com/ava-labs/avalanchego/ids"
 )
 
 func TestBloomFilterRefresh(t *testing.T) {
@@ -21,8 +19,8 @@ func TestBloomFilterRefresh(t *testing.T) {
 		targetFalsePositiveProbability float64
 		resetFalsePositiveProbability  float64
 		resetCount                     uint64
-		add                            []*testTx
-		expected                       []*testTx
+		add                            []tx
+		expected                       []tx
 	}{
 		{
 			name:                           "no refresh",
@@ -30,15 +28,15 @@ func TestBloomFilterRefresh(t *testing.T) {
 			targetFalsePositiveProbability: 0.01,
 			resetFalsePositiveProbability:  1,
 			resetCount:                     0, // maxCount = 9223372036854775807
-			add: []*testTx{
-				{id: ids.ID{0}},
-				{id: ids.ID{1}},
-				{id: ids.ID{2}},
+			add: []tx{
+				{0},
+				{1},
+				{2},
 			},
-			expected: []*testTx{
-				{id: ids.ID{0}},
-				{id: ids.ID{1}},
-				{id: ids.ID{2}},
+			expected: []tx{
+				{0},
+				{1},
+				{2},
 			},
 		},
 		{
@@ -47,13 +45,13 @@ func TestBloomFilterRefresh(t *testing.T) {
 			targetFalsePositiveProbability: 0.01,
 			resetFalsePositiveProbability:  0.0000000000000001, // maxCount = 1
 			resetCount:                     1,
-			add: []*testTx{
-				{id: ids.ID{0}},
-				{id: ids.ID{1}},
-				{id: ids.ID{2}},
+			add: []tx{
+				{0},
+				{1},
+				{2},
 			},
-			expected: []*testTx{
-				{id: ids.ID{2}},
+			expected: []tx{
+				{2},
 			},
 		},
 		{
@@ -62,15 +60,15 @@ func TestBloomFilterRefresh(t *testing.T) {
 			targetFalsePositiveProbability: 0.01,
 			resetFalsePositiveProbability:  0.0000000000000001, // maxCount = 1
 			resetCount:                     2,
-			add: []*testTx{
-				{id: ids.ID{0}},
-				{id: ids.ID{1}},
-				{id: ids.ID{2}},
-				{id: ids.ID{3}},
-				{id: ids.ID{4}},
+			add: []tx{
+				{0},
+				{1},
+				{2},
+				{3},
+				{4},
 			},
-			expected: []*testTx{
-				{id: ids.ID{4}},
+			expected: []tx{
+				{4},
 			},
 		},
 	}
