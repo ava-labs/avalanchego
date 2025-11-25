@@ -285,7 +285,7 @@ func newMigrationState(
 	chainDataDir string,
 ) (*migrationState, ChainDB, error) {
 	// The state db is used for state agreed upon by consensus
-	stateDB, err := firewood.NewDB(filepath.Join(chainDataDir, "state"))
+	stateDB, err := firewood.New(filepath.Join(chainDataDir, "state"))
 	if err != nil {
 		return nil, nil, fmt.Errorf("initializing state db: %w", err)
 	}

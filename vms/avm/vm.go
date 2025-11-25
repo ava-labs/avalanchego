@@ -301,7 +301,7 @@ func (vm *VM) SetState(_ context.Context, state snow.State) error {
 	}
 }
 
-func (vm *VM) Shutdown(context.Context) error {
+func (vm *VM) Shutdown(ctx context.Context) error {
 	if vm.state == nil {
 		return nil
 	}
@@ -309,7 +309,7 @@ func (vm *VM) Shutdown(context.Context) error {
 	vm.onShutdownCtxCancel()
 	vm.awaitShutdown.Wait()
 
-	return vm.state.Close()
+	return vm.state.Close(ctx)
 }
 
 func (*VM) Version(context.Context) (string, error) {

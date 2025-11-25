@@ -4,6 +4,7 @@
 package firewood
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
@@ -15,6 +16,7 @@ import (
 const PrefixDelimiter = '/'
 
 var (
+	// TODO test prefix clobber
 	consensusPrefix = []byte("consensus")
 	heightKey       = []byte("height")
 	appPrefix       = []byte("app")
@@ -28,11 +30,11 @@ type changes struct {
 }
 
 func (c *changes) Put(key []byte, val []byte) {
-	c.put(Prefix(appPrefix, key), val, false)
+	c.put(key, val, false)
 }
 
 func (c *changes) Delete(key []byte) {
-	c.put(Prefix(appPrefix, key), nil, true)
+	c.put(key, nil, true)
 }
 
 // del is true if this is a deletion
@@ -54,19 +56,20 @@ func (c *changes) put(key []byte, val []byte, del bool) {
 }
 
 func (c *changes) Get(key []byte) ([]byte, bool) {
-	v, ok := c.kv[string(Prefix(appPrefix, key))]
+	v, ok := c.kv[string(key)]
 	return v, ok
 }
 
 type DB struct {
-	db     *ffi.Database
-	height uint64
+	db                *ffi.Database
+	height            uint64
+	heightInitialized bool
 	// invariant: pending always has a length > 0 due to the inclusion of the
 	// block height
 	pending changes
 }
 
-func NewDB(path string) (*DB, error) {
+func New(path string) (*DB, error) {
 	db, err := ffi.New(path, ffi.DefaultConfig())
 	if err != nil {
 		return nil, fmt.Errorf("opening firewood db: %w", err)
@@ -87,13 +90,22 @@ func NewDB(path string) (*DB, error) {
 	}
 
 	return &DB{
-		db:     db,
-		height: height,
+		db:                db,
+		height:            height,
+		heightInitialized: heightBytes != nil,
 	}, nil
 }
 
+// Get returns a key value pair or database.ErrNotFound if `key` is not in the
+// DB.
 func (db *DB) Get(key []byte) ([]byte, error) {
+	key = Prefix(appPrefix, key)
+
 	if val, ok := db.pending.Get(key); ok {
+		if val == nil {
+			return nil, database.ErrNotFound
+		}
+
 		return val, nil
 	}
 
@@ -105,34 +117,49 @@ func (db *DB) Get(key []byte) ([]byte, error) {
 	return val, err
 }
 
+// Put inserts a key value pair into DB.
 func (db *DB) Put(key []byte, val []byte) {
+	key = Prefix(appPrefix, key)
+
 	db.pending.Put(key, val)
 }
 
 func (db *DB) Delete(key []byte) {
+	key = Prefix(appPrefix, key)
+
 	db.pending.Delete(key)
 }
 
-func (db *DB) Height() uint64 {
-	return db.height
+// Height returns the last height of DB.
+func (db *DB) Height() (uint64, bool) {
+	return db.height, db.heightInitialized
 }
 
+// Root returns the merkle root of the state on disk ignoring pending writes.
 func (db *DB) Root() (ids.ID, error) {
 	root, err := db.db.Root()
 	if err != nil {
 		return ids.ID{}, err
 	}
 
-	return ids.ID(root), nil
+	return ids.ID(root[:]), nil
 }
 
+// Abort cancels all pending writes.
+// TODO test
 func (db *DB) Abort() {
 	db.pending = changes{}
 }
 
+// Flush flushes all pending writes to disk and increments Height.
 // TODO single flush per block height
 func (db *DB) Flush() error {
-	db.height++
+	if db.heightInitialized {
+		db.height++
+	} else {
+		db.heightInitialized = true
+	}
+
 	db.pending.Put(
 		Prefix(consensusPrefix, heightKey),
 		database.PackUInt64(db.height),
@@ -148,19 +175,17 @@ func (db *DB) Flush() error {
 	}
 
 	db.pending = changes{}
+
 	return nil
 }
 
-func (db *DB) Close() error {
-	return db.db.Close()
+func (db *DB) Close(ctx context.Context) error {
+	return db.db.Close(ctx)
 }
 
-// TODO test prefixing
-//
-// Prefix adds a prefix + delimiter
-// prefix must not contain the delimiter
+// Prefix prefixes `key` with `prefix` + PrefixDelimiter.
 func Prefix(prefix []byte, key []byte) []byte {
-	k := make([]byte, len(prefix)+len(key))
+	k := make([]byte, len(prefix)+1+len(key))
 
 	copy(k, prefix)
 	k[len(prefix)] = PrefixDelimiter

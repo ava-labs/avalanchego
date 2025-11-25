@@ -100,7 +100,7 @@ type State interface {
 	// Checksum returns the current state checksum.
 	Checksum(ctx context.Context) (ids.ID, error)
 
-	Close() error
+	Close(ctx context.Context) error
 }
 
 /*
@@ -463,7 +463,7 @@ func (s *state) CommitBatch() (database.Batch, error) {
 	return s.vdb.CommitBatch()
 }
 
-func (s *state) Close() error {
+func (s *state) Close(ctx context.Context) error {
 	return errors.Join(
 		s.utxoState.Close(),
 		s.txDB.Close(),
@@ -472,7 +472,7 @@ func (s *state) Close() error {
 		s.singletonDB.Close(),
 		s.vdb.Close(),
 		s.baseLocalDB.Close(),
-		s.chainDB.Close(),
+		s.chainDB.Close(ctx),
 	)
 }
 

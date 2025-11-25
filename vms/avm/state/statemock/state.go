@@ -110,17 +110,17 @@ func (mr *StateMockRecorder) Checksum(ctx any) *gomock.Call {
 }
 
 // Close mocks base method.
-func (m *State) Close() error {
+func (m *State) Close(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Close")
+	ret := m.ctrl.Call(m, "Close", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Close indicates an expected call of Close.
-func (mr *StateMockRecorder) Close() *gomock.Call {
+func (mr *StateMockRecorder) Close(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*State)(nil).Close))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*State)(nil).Close), ctx)
 }
 
 // Commit mocks base method.

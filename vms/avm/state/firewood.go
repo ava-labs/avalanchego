@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/ava-labs/avalanchego/firewood"
@@ -61,7 +62,7 @@ type ChainDB interface {
 	AddAtomicTx(txID ids.ID)
 	Repair(vm VM, s State) error
 	Abort()
-	Close() error
+	Close(ctx context.Context) error
 }
 
 type firewoodDB struct {
@@ -78,17 +79,19 @@ func (f *firewoodDB) Repair(vm VM, s State) error {
 		return fmt.Errorf("getting last accepted block: %w", err)
 	}
 
-	// Replay any blocks until the last accepted height to synchronize the chain
-	// and local dbs.
-	lastAcceptedHeight := lastAcceptedBlk.Height()
-	lastStateRootHeight := f.db.Height()
+	replayStartHeight := 0
 
-	if lastStateRootHeight == lastAcceptedHeight {
-		return nil
+	firewoodHeight, ok := f.db.Height()
+	if !ok {
+		replayStartHeight = -1
+	} else {
+		replayStartHeight = int(firewoodHeight)
 	}
 
-	for i := lastStateRootHeight; i <= lastAcceptedHeight; i++ {
-		blkID, err := s.GetBlockIDAtHeight(i)
+	// Replay any blocks until the last accepted height to synchronize the chain
+	// and local dbs.
+	for i := replayStartHeight; i < int(lastAcceptedBlk.Height()); i++ {
+		blkID, err := s.GetBlockIDAtHeight(uint64(i + 1))
 		if err != nil {
 			return fmt.Errorf("getting block id: %w", err)
 		}
@@ -110,6 +113,6 @@ func (f *firewoodDB) Abort() {
 	f.db.Abort()
 }
 
-func (f *firewoodDB) Close() error {
-	return f.db.Close()
+func (f *firewoodDB) Close(ctx context.Context) error {
+	return f.db.Close(ctx)
 }
