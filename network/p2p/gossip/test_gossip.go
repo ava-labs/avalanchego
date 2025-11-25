@@ -10,9 +10,8 @@ import (
 )
 
 var (
-	_ Gossipable          = (*testTx)(nil)
-	_ Set[*testTx]        = (*testSet)(nil)
-	_ Marshaller[*testTx] = (*testMarshaller)(nil)
+	_ Gossipable   = (*testTx)(nil)
+	_ Set[*testTx] = (*testSet)(nil)
 )
 
 type testTx struct {
@@ -21,19 +20,6 @@ type testTx struct {
 
 func (t *testTx) GossipID() ids.ID {
 	return t.id
-}
-
-type testMarshaller struct{}
-
-func (testMarshaller) MarshalGossip(tx *testTx) ([]byte, error) {
-	return tx.id[:], nil
-}
-
-func (testMarshaller) UnmarshalGossip(bytes []byte) (*testTx, error) {
-	id, err := ids.ToID(bytes)
-	return &testTx{
-		id: id,
-	}, err
 }
 
 type testSet struct {

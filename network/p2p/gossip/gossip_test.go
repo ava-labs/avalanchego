@@ -50,6 +50,19 @@ func TestGossiperShutdown(t *testing.T) {
 	wg.Wait()
 }
 
+type marshaller struct{}
+
+func (marshaller) MarshalGossip(tx *testTx) ([]byte, error) {
+	return tx.id[:], nil
+}
+
+func (marshaller) UnmarshalGossip(bytes []byte) (*testTx, error) {
+	id, err := ids.ToID(bytes)
+	return &testTx{
+		id: id,
+	}, err
+}
+
 func TestGossiperGossip(t *testing.T) {
 	tests := []struct {
 		name                   string
@@ -140,7 +153,7 @@ func TestGossiperGossip(t *testing.T) {
 			}
 			metrics.bloomFilterHitRate = testHistogram
 
-			marshaller := testMarshaller{}
+			marshaller := marshaller{}
 			handler := NewHandler[*testTx](
 				logging.NoLog{},
 				marshaller,
@@ -588,7 +601,7 @@ func TestPushGossiper(t *testing.T) {
 			client := network.NewClient(0, p2p.PeerSampler{Peers: &p2p.Peers{}})
 			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
 			require.NoError(err)
-			marshaller := testMarshaller{}
+			marshaller := marshaller{}
 
 			regossipTime := time.Hour
 			if tt.shouldRegossip {
