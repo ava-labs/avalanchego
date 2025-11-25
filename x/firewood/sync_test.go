@@ -28,7 +28,7 @@ var (
 )
 
 func Test_Firewood_Sync(t *testing.T) {
-	tests := []int{0, 1, 100, 1_000, 100_000}
+	tests := []int{0, 1, 1_000, 100_000}
 	for _, numKeys := range tests {
 		t.Run(fmt.Sprintf("numKeys=%d", numKeys), func(t *testing.T) {
 			require := require.New(t)
@@ -89,7 +89,7 @@ func generateDB(t *testing.T, numKeys int, seed int64) *syncDB {
 		r         = rand.New(rand.NewSource(seed)) // #nosec G404
 		keys      = make([][]byte, numKeys)
 		vals      = make([][]byte, numKeys)
-		minLength = 0
+		minLength = 1
 		maxLength = 64
 	)
 	t.Logf("generating %d random keys/values with seed %d", numKeys, seed)

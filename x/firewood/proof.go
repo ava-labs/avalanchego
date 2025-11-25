@@ -4,12 +4,11 @@
 package firewood
 
 import (
-	"runtime"
+	"errors"
 
 	"github.com/ava-labs/firewood-go-ethhash/ffi"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/maybe"
 
 	xsync "github.com/ava-labs/avalanchego/x/sync"
 )
@@ -54,84 +53,14 @@ func newRangeProof(proof *ffi.RangeProof) *RangeProof {
 	}
 }
 
-func (r *RangeProof) FindNextKey() (maybe.Maybe[[]byte], error) {
-	// We can now get the FindNextKey iterator.
-	nextKeyRange, err := r.ffi.FindNextKey()
-	if err != nil {
-		return maybe.Nothing[[]byte](), err
-	}
-
-	// TODO: this panics
-	startKey := maybe.Some(nextKeyRange.StartKey())
-
-	// Done using nextKeyRange
-	if err := nextKeyRange.Free(); err != nil {
-		return maybe.Nothing[[]byte](), err
-	}
-
-	return startKey, nil
-}
-
 type ChangeProofMarshaler struct{}
 
 func (ChangeProofMarshaler) Marshal(r *ChangeProof) ([]byte, error) {
-	if r == nil {
-		return nil, errNilProof
-	}
-	if r.proof == nil {
-		return nil, nil
-	}
-
-	data, err := r.proof.MarshalBinary()
-	return data, err
+	return nil, errors.New("not implemented")
 }
 
 func (ChangeProofMarshaler) Unmarshal(data []byte) (*ChangeProof, error) {
-	proof := new(ffi.ChangeProof)
-	if err := proof.UnmarshalBinary(data); err != nil {
-		return nil, err
-	}
-	return newChangeProof(proof), nil
+	return nil, errors.New("not implemented")
 }
 
-type ChangeProof struct {
-	proof     *ffi.ChangeProof
-	startRoot ids.ID
-	endRoot   ids.ID
-	startKey  maybe.Maybe[[]byte]
-	maxLength int
-}
-
-// Wrap the ffi proof in our proof type.
-func newChangeProof(proof *ffi.ChangeProof) *ChangeProof {
-	changeProof := &ChangeProof{
-		proof: proof,
-	}
-
-	// Once this struct is out of scope, free the underlying proof.
-	runtime.AddCleanup(changeProof, func(ffiProof *ffi.ChangeProof) {
-		if ffiProof != nil {
-			_ = ffiProof.Free()
-		}
-	}, changeProof.proof)
-
-	return changeProof
-}
-
-func (c *ChangeProof) FindNextKey() (maybe.Maybe[[]byte], error) {
-	// We can now get the FindNextKey iterator.
-	nextKeyRange, err := c.proof.FindNextKey()
-	if err != nil {
-		return maybe.Nothing[[]byte](), err
-	}
-
-	// TODO: this panics
-	startKey := maybe.Some(nextKeyRange.StartKey())
-
-	// Done using nextKeyRange
-	if err := nextKeyRange.Free(); err != nil {
-		return maybe.Nothing[[]byte](), err
-	}
-
-	return startKey, nil
-}
+type ChangeProof struct{}

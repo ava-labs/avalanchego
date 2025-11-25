@@ -4,6 +4,7 @@
 package firewood
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"sync"
@@ -39,39 +40,30 @@ func (db *syncDB) GetMerkleRoot(context.Context) (ids.ID, error) {
 	return ids.ID(root), nil
 }
 
-// TODO: implement
-func (db *syncDB) CommitChangeProof(_ context.Context, end maybe.Maybe[[]byte], proof *ChangeProof) (nextKey maybe.Maybe[[]byte], err error) {
-	// Set up cleanup.
-	var nextKeyRange *ffi.NextKeyRange
-	defer func() {
-		// If we got a nextKeyRange, free it too.
-		if nextKeyRange != nil {
-			err = errors.Join(err, nextKeyRange.Free())
-		}
-	}()
-
-	// Verify and commit the proof in a single step (TODO: separate these steps).
-	// CommitRangeProof will verify the proof as part of committing it.
-	db.lock.Lock()
-	defer db.lock.Unlock()
-	newRoot, err := db.fw.VerifyAndCommitChangeProof(proof.proof, ffi.Hash(proof.startRoot), ffi.Hash(proof.endRoot), proof.startKey, end, uint32(proof.maxLength))
+// GetRangeProof returns a range proof for x/sync between [start, end].
+func (db *syncDB) GetRangeProofAtRoot(_ context.Context, rootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error) {
+	proof, err := db.fw.RangeProof(ffi.Hash(rootID), start, end, uint32(maxLength))
 	if err != nil {
-		return maybe.Nothing[[]byte](), err
+		return nil, err
 	}
 
-	// TODO: This case should be handled by `FindNextKey`.
-	if ids.ID(newRoot) == proof.endRoot {
-		return maybe.Nothing[[]byte](), nil
+	return newRangeProof(proof), nil
+}
+
+// VerifyRangeProof ensures the range proof matches the expected parameters.
+func (db *syncDB) VerifyRangeProof(_ context.Context, proof *RangeProof, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
+	if proof.ffi == nil {
+		return errNilProof
 	}
 
-	return proof.FindNextKey()
+	proof.root = expectedEndRootID
+	proof.maxLength = maxLength
+
+	return proof.ffi.Verify(ffi.Hash(expectedEndRootID), start, end, uint32(maxLength))
 }
 
 // Commit the range proof to the database.
-// TODO: This should only commit the range proof, not verify it.
-// This will be resolved once the Firewood supports that.
-// This is the last call to the proof, so it and any resources should be freed.
-func (db *syncDB) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) (nextKey maybe.Maybe[[]byte], err error) {
+func (db *syncDB) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[]byte], proof *RangeProof) (maybe.Maybe[[]byte], error) {
 	// Verify and commit the proof in a single step (TODO: separate these steps).
 	// CommitRangeProof will verify the proof as part of committing it.
 	db.lock.Lock()
@@ -86,69 +78,44 @@ func (db *syncDB) CommitRangeProof(_ context.Context, start, end maybe.Maybe[[]b
 		return maybe.Nothing[[]byte](), nil
 	}
 
-	return proof.FindNextKey()
+	// We can now get the FindNextKey iterator.
+	nextKeyRange, err := proof.ffi.FindNextKey()
+	if err != nil || nextKeyRange == nil {
+		// Indicates the range is complete.
+		return maybe.Nothing[[]byte](), err
+	}
+
+	byteSlice := nextKeyRange.StartKey()
+	newSlice := make([]byte, len(byteSlice))
+	copy(newSlice, byteSlice)
+
+	// Done using nextKeyRange
+	if err := nextKeyRange.Free(); err != nil {
+		return maybe.Nothing[[]byte](), err
+	}
+
+	if start.HasValue() && bytes.Equal(newSlice, start.Value()) {
+		// There is no next key.
+		return maybe.Nothing[[]byte](), nil
+	}
+
+	return maybe.Some(newSlice), nil
 }
 
-// TODO: implement
 func (db *syncDB) GetChangeProof(_ context.Context, startRootID ids.ID, endRootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*ChangeProof, error) {
-	proof, err := db.fw.ChangeProof(ffi.Hash(startRootID), ffi.Hash(endRootID), start, end, uint32(maxLength))
-	if err != nil {
-		return nil, err
-	}
-
-	return newChangeProof(proof), nil
+	return nil, errors.New("change proofs are not implemented")
 }
 
-// Get the range proof between [start, end].
-// The returned proof must be freed when no longer needed.
-// Since this method is only called prior to marshalling the proof for sending over the
-// network, the proof will be freed when marshalled.
-func (db *syncDB) GetRangeProofAtRoot(_ context.Context, rootID ids.ID, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], maxLength int) (*RangeProof, error) {
-	proof, err := db.fw.RangeProof(ffi.Hash(rootID), start, end, uint32(maxLength))
-	if err != nil {
-		return nil, err
-	}
-
-	return newRangeProof(proof), nil
+func (db *syncDB) VerifyChangeProof(context.Context, *ChangeProof, maybe.Maybe[[]byte], maybe.Maybe[[]byte], ids.ID, int) error {
+	return errors.New("change proofs are not implemented")
 }
 
-// TODO: implement
-// Right now, we verify the proof as part of committing it, making this function a no-op.
-// We must only pass the necessary data to CommitChangeProof so it can verify the proof.
-//
-//nolint:revive
-func (db *syncDB) VerifyChangeProof(_ context.Context, proof *ChangeProof, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
-	if proof.proof == nil {
-		return errNilProof
-	}
-
-	// TODO: once firewood can verify separately from committing, do that here.
-	// For now, pass any necessary data to be done in CommitChangeProof.
-	// Namely, the start root, end root, and max length.
-	proof.startRoot = expectedEndRootID
-	proof.endRoot = expectedEndRootID
-	proof.maxLength = maxLength
-	return nil
+func (db *syncDB) CommitChangeProof(context.Context, maybe.Maybe[[]byte], *ChangeProof) (maybe.Maybe[[]byte], error) {
+	return maybe.Nothing[[]byte](), errors.New("change proofs are not implemented")
 }
 
-// TODO: implement
-// Right now, we verify the proof as part of committing it, making this function a no-op.
-// We must only pass the necessary data to CommitRangeProof so it can verify the proof.
-func (db *syncDB) VerifyRangeProof(_ context.Context, proof *RangeProof, start maybe.Maybe[[]byte], end maybe.Maybe[[]byte], expectedEndRootID ids.ID, maxLength int) error {
-	if proof.ffi == nil {
-		return errNilProof
-	}
-
-	proof.root = expectedEndRootID
-	proof.maxLength = maxLength
-
-	return proof.ffi.Verify(ffi.Hash(expectedEndRootID), start, end, uint32(maxLength))
-}
-
-// TODO: implement
-// No error is returned to ensure some tests pass.
-//
-//nolint:revive
+// Clear the database.
+// TODO: implement this method. It is left nil to allow empty DBs to be used in tests.
 func (db *syncDB) Clear() error {
 	return nil
 }

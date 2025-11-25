@@ -512,8 +512,8 @@ func (m *Manager[R, _]) handleRangeProofResponse(
 	if err := m.db.VerifyRangeProof(
 		ctx,
 		rangeProof,
-		protoutils.ProtoToMaybe(request.StartKey),
-		protoutils.ProtoToMaybe(request.EndKey),
+		work.start,
+		work.end,
 		root,
 		int(request.KeyLimit),
 	); err != nil {
