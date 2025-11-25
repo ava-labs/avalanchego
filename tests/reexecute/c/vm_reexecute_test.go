@@ -89,7 +89,7 @@ var (
 			"pruning-enabled": true,
 			"state-sync-enabled": false
 		}`,
-		"firewood-with-archive": `{
+		"firewood-archive": `{
 			"state-scheme": "firewood",
 			"snapshot-cache": 0,
 			"pruning-enabled": false,
