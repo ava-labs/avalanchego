@@ -83,8 +83,8 @@ func (s *setDouble) Add(t tx) error {
 	return nil
 }
 
-func (s *setDouble) Has(id ids.ID) bool {
-	return s.txs.Contains(tx(id))
+func (s *setDouble) Has(h ids.ID) bool {
+	return s.txs.Contains(tx(h))
 }
 
 func (s *setDouble) Iterate(f func(t tx) bool) {
@@ -171,9 +171,9 @@ func TestGossiperGossip(t *testing.T) {
 			)
 			require.NoError(err)
 
-			var serverSet setDouble
-			serverMempool, err := NewSetWithBloomFilter(
-				&serverSet,
+			var responseSet setDouble
+			responseSetWithBloom, err := NewSetWithBloomFilter(
+				&responseSet,
 				prometheus.NewRegistry(),
 				"",
 				1000,
@@ -182,7 +182,7 @@ func TestGossiperGossip(t *testing.T) {
 			)
 			require.NoError(err)
 			for _, item := range tt.responder {
-				require.NoError(serverMempool.Add(item))
+				require.NoError(responseSetWithBloom.Add(item))
 			}
 
 			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
@@ -197,7 +197,7 @@ func TestGossiperGossip(t *testing.T) {
 			handler := NewHandler[tx](
 				logging.NoLog{},
 				marshaller,
-				serverMempool,
+				responseSetWithBloom,
 				metrics,
 				tt.targetResponseSize,
 			)
@@ -220,7 +220,7 @@ func TestGossiperGossip(t *testing.T) {
 			require.NoError(requestNetwork.Connected(t.Context(), ids.EmptyNodeID, nil))
 
 			var requestSet setDouble
-			clientMempool, err := NewSetWithBloomFilter(
+			requestSetWithBloom, err := NewSetWithBloomFilter(
 				&requestSet,
 				prometheus.NewRegistry(),
 				"",
@@ -230,7 +230,7 @@ func TestGossiperGossip(t *testing.T) {
 			)
 			require.NoError(err)
 			for _, item := range tt.requester {
-				require.NoError(clientMempool.Add(item))
+				require.NoError(requestSetWithBloom.Add(item))
 			}
 
 			requestClient := requestNetwork.NewClient(
@@ -242,7 +242,7 @@ func TestGossiperGossip(t *testing.T) {
 			gossiper := NewPullGossiper[tx](
 				logging.NoLog{},
 				marshaller,
-				clientMempool,
+				requestSetWithBloom,
 				requestClient,
 				metrics,
 				1,
