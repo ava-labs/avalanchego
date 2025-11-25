@@ -1,0 +1,16 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "gossip",
+    srcs = ["handler.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/gossip",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//network/p2p",
+        "//network/p2p/gossip",
+        "//snow/engine/common",
+        "//utils/logging",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)

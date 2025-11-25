@@ -1,0 +1,39 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "uptime",
+    srcs = [
+        "locked_calculator.go",
+        "manager.go",
+        "no_op_calculator.go",
+        "state.go",
+        "test_state.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/uptime",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//utils",
+        "//utils/timer/mockable",
+    ],
+)
+
+go_test(
+    name = "uptime_test",
+    srcs = [
+        "locked_calculator_test.go",
+        "manager_test.go",
+        "mocks_generate_test.go",
+    ],
+    embed = [":uptime"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow/uptime/uptimemock",
+        "//utils",
+        "//utils/timer/mockable",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

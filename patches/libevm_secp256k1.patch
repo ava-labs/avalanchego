@@ -1,0 +1,32 @@
+--- a/crypto/secp256k1/BUILD.bazel
++++ b/crypto/secp256k1/BUILD.bazel
+@@ -1,5 +1,16 @@
+ load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
++# The secp256k1 Go package uses cgo and #includes C source files directly.
++# These files must be available as textual headers (not compiled separately).
++cc_library(
++    name = "libsecp256k1_hdrs",
++    textual_hdrs = glob([
++        "libsecp256k1/**/*.c",
++        "libsecp256k1/**/*.h",
++    ]),
++    visibility = ["//visibility:private"],
++)
++
+ go_library(
+     name = "secp256k1",
+     srcs = [
+@@ -10,11 +21,8 @@
+         "scalar_mult_nocgo.go",
+         "secp256.go",
+     ],
++    cdeps = [":libsecp256k1_hdrs"],
+     cgo = True,
+-    copts = [
+-        "-Icrypto/secp256k1/libsecp256k1",
+-        "-Icrypto/secp256k1/libsecp256k1/src",
+-    ],
+     importpath = "github.com/ava-labs/libevm/crypto/secp256k1",
+     visibility = ["//visibility:public"],
+ )

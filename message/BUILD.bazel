@@ -1,0 +1,50 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "message",
+    srcs = [
+        "creator.go",
+        "fields.go",
+        "inbound_msg_builder.go",
+        "internal_msg_builder.go",
+        "messages.go",
+        "ops.go",
+        "outbound_msg_builder.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/message",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//proto/pb/p2p",
+        "//utils/compression",
+        "//utils/constants",
+        "//utils/ips",
+        "//utils/set",
+        "//utils/timer/mockable",
+        "//version",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_golang_google_protobuf//proto",
+    ],
+)
+
+go_test(
+    name = "message_test",
+    srcs = [
+        "inbound_msg_builder_test.go",
+        "messages_benchmark_test.go",
+        "messages_test.go",
+        "mocks_generate_test.go",
+        "outbound_msg_builder_test.go",
+    ],
+    embed = [":message"],
+    deps = [
+        "//ids",
+        "//proto/pb/p2p",
+        "//staking",
+        "//utils/compression",
+        "//utils/timer/mockable",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
+    ],
+)

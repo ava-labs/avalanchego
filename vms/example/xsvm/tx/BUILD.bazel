@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "tx",
+    srcs = [
+        "codec.go",
+        "export.go",
+        "import.go",
+        "payload.go",
+        "transfer.go",
+        "tx.go",
+        "unsigned.go",
+        "visitor.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/tx",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//codec/linearcodec",
+        "//ids",
+        "//utils/crypto/secp256k1",
+        "//utils/hashing",
+    ],
+)

@@ -1,0 +1,7 @@
+# Directories to exclude from Bazel's file watching
+.git
+node_modules
+.avalanchego
+build
+.direnv
+result

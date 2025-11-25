@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "greader",
+    srcs = [
+        "reader_client.go",
+        "reader_server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/greader",
+    visibility = ["//visibility:public"],
+    deps = ["//proto/pb/io/reader"],
+)
+
+go_test(
+    name = "greader_test",
+    srcs = ["greader_test.go"],
+    embed = [":greader"],
+    deps = [
+        "//proto/pb/io/reader",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//test/bufconn",
+    ],
+)

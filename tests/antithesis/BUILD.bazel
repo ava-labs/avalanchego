@@ -1,0 +1,29 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "antithesis",
+    srcs = [
+        "compose.go",
+        "config.go",
+        "context.go",
+        "init_db.go",
+        "node_health.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/tests/antithesis",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/health",
+        "//config",
+        "//tests",
+        "//tests/fixture/e2e",
+        "//tests/fixture/tmpnet",
+        "//utils/constants",
+        "//utils/logging",
+        "//utils/perms",
+        "@com_github_antithesishq_antithesis_sdk_go//assert",
+        "@com_github_compose_spec_compose_go//types",
+        "@com_github_stretchr_testify//require",
+        "@in_gopkg_yaml_v3//:yaml_v3",
+        "@org_uber_go_zap//:zap",
+    ],
+)

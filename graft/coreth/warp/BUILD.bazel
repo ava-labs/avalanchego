@@ -1,0 +1,59 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "warp",
+    srcs = [
+        "backend.go",
+        "client.go",
+        "service.go",
+        "verifier_backend.go",
+        "verifier_stats.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/warp",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache",
+        "//cache/lru",
+        "//database",
+        "//graft/coreth/precompile/contracts/warp",
+        "//graft/coreth/rpc",
+        "//ids",
+        "//network/p2p/acp118",
+        "//snow",
+        "//snow/consensus/snowman",
+        "//snow/engine/common",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//metrics",
+    ],
+)
+
+go_test(
+    name = "warp_test",
+    srcs = [
+        "backend_test.go",
+        "verifier_backend_test.go",
+    ],
+    embed = [":warp"],
+    deps = [
+        "//cache",
+        "//cache/lru",
+        "//database",
+        "//database/memdb",
+        "//graft/coreth/warp/warptest",
+        "//ids",
+        "//network/p2p/acp118",
+        "//proto/pb/sdk",
+        "//snow/engine/common",
+        "//snow/snowtest",
+        "//utils",
+        "//utils/crypto/bls/signer/localsigner",
+        "//vms/evm/metrics/metricstest",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/payload",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
+    ],
+)

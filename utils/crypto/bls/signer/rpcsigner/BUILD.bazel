@@ -1,0 +1,28 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "rpcsigner",
+    srcs = ["client.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/crypto/bls/signer/rpcsigner",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//proto/pb/signer",
+        "//utils/crypto/bls",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//backoff",
+        "@org_golang_google_grpc//credentials/insecure",
+    ],
+)
+
+go_test(
+    name = "rpcsigner_test",
+    srcs = ["client_test.go"],
+    embed = [":rpcsigner"],
+    deps = [
+        "//proto/pb/signer",
+        "//utils/crypto/bls",
+        "//utils/crypto/bls/signer/localsigner",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_grpc//:grpc",
+    ],
+)

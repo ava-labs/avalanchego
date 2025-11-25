@@ -1,0 +1,35 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "staking",
+    srcs = [
+        "asn1.go",
+        "certificate.go",
+        "parse.go",
+        "tls.go",
+        "verify.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/staking",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/perms",
+        "//utils/units",
+        "@org_golang_x_crypto//cryptobyte",
+        "@org_golang_x_crypto//cryptobyte/asn1",
+    ],
+)
+
+go_test(
+    name = "staking_test",
+    srcs = [
+        "parse_test.go",
+        "tls_test.go",
+        "verify_test.go",
+    ],
+    embed = [":staking"],
+    embedsrcs = ["large_rsa_key.cert"],
+    deps = [
+        "//utils/hashing",
+        "@com_github_stretchr_testify//require",
+    ],
+)

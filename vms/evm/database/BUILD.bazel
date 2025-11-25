@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "database",
+    srcs = ["database.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/database",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "@com_github_ava_labs_libevm//ethdb",
+    ],
+)
+
+go_test(
+    name = "database_test",
+    srcs = ["database_test.go"],
+    embed = [":database"],
+    deps = [
+        "//database/memdb",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//ethdb/dbtest",
+        "@com_github_stretchr_testify//require",
+    ],
+)

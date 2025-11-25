@@ -1,0 +1,12 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "cache",
+    srcs = [
+        "cache.go",
+        "empty.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/cache",
+    visibility = ["//visibility:public"],
+    deps = ["//utils"],
+)

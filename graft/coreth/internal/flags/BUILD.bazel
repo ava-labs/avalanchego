@@ -1,0 +1,17 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "flags",
+    srcs = [
+        "categories.go",
+        "helpers.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/internal/flags",
+    visibility = ["//graft/coreth:__subpackages__"],
+    deps = [
+        "//graft/coreth/internal/version",
+        "//graft/coreth/params",
+        "@com_github_mattn_go_isatty//:go-isatty",
+        "@com_github_urfave_cli_v2//:cli",
+    ],
+)

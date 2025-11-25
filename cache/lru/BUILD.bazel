@@ -1,0 +1,32 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "lru",
+    srcs = [
+        "cache.go",
+        "deduplicator.go",
+        "sized_cache.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/cache/lru",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache",
+        "//utils",
+        "//utils/linked",
+    ],
+)
+
+go_test(
+    name = "lru_test",
+    srcs = [
+        "cache_test.go",
+        "deduplicator_test.go",
+        "sized_cache_test.go",
+    ],
+    embed = [":lru"],
+    deps = [
+        "//cache/cachetest",
+        "//ids",
+        "@com_github_stretchr_testify//require",
+    ],
+)

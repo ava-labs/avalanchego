@@ -1,0 +1,34 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "math",
+    srcs = [
+        "averager.go",
+        "averager_heap.go",
+        "continuous_averager.go",
+        "safe_math.go",
+        "sync_averager.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/math",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/heap",
+        "@org_golang_x_exp//constraints",
+    ],
+)
+
+go_test(
+    name = "math_test",
+    srcs = [
+        "averager_heap_test.go",
+        "continuous_averager_benchmark_test.go",
+        "continuous_averager_test.go",
+        "safe_math_test.go",
+    ],
+    embed = [":math"],
+    deps = [
+        "//ids",
+        "@com_github_stretchr_testify//require",
+    ],
+)

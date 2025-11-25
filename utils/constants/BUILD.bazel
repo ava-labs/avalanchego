@@ -1,0 +1,29 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "constants",
+    srcs = [
+        "acps.go",
+        "aliases.go",
+        "application.go",
+        "memory.go",
+        "network_ids.go",
+        "networking.go",
+        "vm_ids.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/constants",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/compression",
+        "//utils/set",
+        "//utils/units",
+    ],
+)
+
+go_test(
+    name = "constants_test",
+    srcs = ["network_ids_test.go"],
+    embed = [":constants"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

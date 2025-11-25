@@ -1,0 +1,9 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "verifymock",
+    srcs = ["verifiable.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/components/verify/verifymock",
+    visibility = ["//visibility:public"],
+    deps = ["@org_uber_go_mock//gomock"],
+)

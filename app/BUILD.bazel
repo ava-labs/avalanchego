@@ -1,0 +1,17 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "app",
+    srcs = ["app.go"],
+    importpath = "github.com/ava-labs/avalanchego/app",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//config/node",
+        "//node",
+        "//utils",
+        "//utils/logging",
+        "//utils/perms",
+        "//utils/ulimit",
+        "@org_uber_go_zap//:zap",
+    ],
+)
