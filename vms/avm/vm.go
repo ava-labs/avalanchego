@@ -386,8 +386,8 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 
 func (vm *VM) Replay(b block.Block) error {
 	if b.Height() == 0 {
-		// Genesis block should skip verification and just be written to state.
-		// TODO do we even need this
+		// The genesis block is special-cased and cannot be verified, so add this to
+		// state directly.
 		vm.state.AddBlock(b)
 		vm.state.SetTimestamp(b.Timestamp())
 		vm.state.SetLastAccepted(b.ID(), b.Height())
