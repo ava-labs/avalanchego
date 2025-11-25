@@ -66,7 +66,7 @@ func TestGossipSubscribe(t *testing.T) {
 	go gossipTxPool.Subscribe(ctx)
 
 	require.Eventually(func() bool {
-		return gossipTxPool.IsSubscribed()
+		return gossipTxPool.subscribed.Load()
 	}, 10*time.Second, 500*time.Millisecond, "expected gossipTxPool to be subscribed")
 
 	// create eth txs

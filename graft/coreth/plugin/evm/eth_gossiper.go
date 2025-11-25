@@ -66,11 +66,6 @@ type GossipEthTxPool struct {
 	subscribed atomic.Bool
 }
 
-// IsSubscribed returns whether or not the gossip subscription is active.
-func (g *GossipEthTxPool) IsSubscribed() bool {
-	return g.subscribed.Load()
-}
-
 func (g *GossipEthTxPool) Subscribe(ctx context.Context) {
 	sub := g.mempool.SubscribeTransactions(g.pendingTxs, false)
 	if sub == nil {
