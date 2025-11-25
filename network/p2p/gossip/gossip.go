@@ -41,7 +41,6 @@ const (
 var (
 	_ Gossiper = (*ValidatorGossiper)(nil)
 	_ Gossiper = (*PullGossiper[*testTx])(nil)
-	_ Gossiper = (*NoOpGossiper)(nil)
 
 	_ Set[*testTx] = (*FullSet[*testTx])(nil)
 
@@ -596,12 +595,6 @@ func Every(ctx context.Context, log logging.Logger, gossiper Gossiper, frequency
 			return
 		}
 	}
-}
-
-type NoOpGossiper struct{}
-
-func (NoOpGossiper) Gossip(context.Context) error {
-	return nil
 }
 
 type TestGossiper struct {
