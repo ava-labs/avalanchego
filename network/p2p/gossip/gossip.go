@@ -39,7 +39,7 @@ const (
 
 var (
 	_ Gossiper = (*ValidatorGossiper)(nil)
-	_ Gossiper = (*PullGossiper[*testTx])(nil)
+	_ Gossiper = (*PullGossiper[Gossipable])(nil)
 
 	ioTypeLabels   = []string{ioLabel, typeLabel}
 	sentPushLabels = prometheus.Labels{
