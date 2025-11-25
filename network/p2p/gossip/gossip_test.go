@@ -12,7 +12,6 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/maps"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -253,7 +252,7 @@ func TestGossiperGossip(t *testing.T) {
 			require.NoError(requestNetwork.AppResponse(ctx, ids.EmptyNodeID, 1, <-responseSender.SentAppResponse))
 
 			require.Len(requestSet.txs, tt.expectedLen)
-			require.Subset(tt.expectedPossibleValues, maps.Values(requestSet.txs))
+			require.Subset(tt.expectedPossibleValues, requestSet.txs)
 			require.Equal(len(tt.responder) > 0, testHistogram.observed)
 			require.Equal(tt.expectedHitRate, testHistogram.observedVal)
 
