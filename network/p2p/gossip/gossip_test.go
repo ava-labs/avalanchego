@@ -74,34 +74,34 @@ type setDouble struct {
 	onAdd func(tx tx)
 }
 
-func (t *setDouble) Add(gossipable tx) error {
-	if t.txs.Contains(gossipable) {
+func (s *setDouble) Add(gossipable tx) error {
+	if s.txs.Contains(gossipable) {
 		return fmt.Errorf("%s already present", ids.ID(gossipable))
 	}
 
-	t.txs.Add(gossipable)
-	t.bloom.Add(gossipable)
-	if t.onAdd != nil {
-		t.onAdd(gossipable)
+	s.txs.Add(gossipable)
+	s.bloom.Add(gossipable)
+	if s.onAdd != nil {
+		s.onAdd(gossipable)
 	}
 
 	return nil
 }
 
-func (t *setDouble) Has(gossipID ids.ID) bool {
-	return t.txs.Contains(tx(gossipID))
+func (s *setDouble) Has(gossipID ids.ID) bool {
+	return s.txs.Contains(tx(gossipID))
 }
 
-func (t *setDouble) Iterate(f func(gossipable tx) bool) {
-	for tx := range t.txs {
+func (s *setDouble) Iterate(f func(gossipable tx) bool) {
+	for tx := range s.txs {
 		if !f(tx) {
 			return
 		}
 	}
 }
 
-func (t *setDouble) GetFilter() ([]byte, []byte) {
-	return t.bloom.Marshal()
+func (s *setDouble) GetFilter() ([]byte, []byte) {
+	return s.bloom.Marshal()
 }
 
 func TestGossiperGossip(t *testing.T) {
