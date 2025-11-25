@@ -196,7 +196,7 @@ func (w *wallet) baseFee(options []common.Option) (*big.Int, error) {
 	}
 
 	ctx := ops.Context()
-	return w.ethClient.EstimateBaseFee(ctx)
+	return w.ethClient.SuggestGasPrice(ctx)
 }
 
 // TODO: Upstream this function into coreth.
