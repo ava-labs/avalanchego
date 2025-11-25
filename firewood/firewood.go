@@ -146,13 +146,11 @@ func (db *DB) Root() (ids.ID, error) {
 }
 
 // Abort cancels all pending writes.
-// TODO test
 func (db *DB) Abort() {
 	db.pending = changes{}
 }
 
 // Flush flushes all pending writes to disk and increments Height.
-// TODO single flush per block height
 func (db *DB) Flush() error {
 	if db.heightInitialized {
 		db.height++
