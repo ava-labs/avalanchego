@@ -146,7 +146,7 @@ func (service *AvaxAPI) IssueTx(_ *http.Request, args *api.FormattedTx, response
 	service.vm.Ctx.Lock.Lock()
 	defer service.vm.Ctx.Lock.Unlock()
 
-	err = service.vm.AtomicMempool.AddLocalTx(tx)
+	err = service.vm.atomicMempool.AddLocalTx(tx)
 	if err != nil && !errors.Is(err, txpool.ErrAlreadyKnown) {
 		return err
 	}
@@ -155,7 +155,7 @@ func (service *AvaxAPI) IssueTx(_ *http.Request, args *api.FormattedTx, response
 	// we push it to the network for inclusion. If the tx was previously added
 	// to the mempool through p2p gossip, this will ensure this node also pushes
 	// it to the network.
-	service.vm.AtomicTxPushGossiper.Add(tx)
+	service.vm.atomicTxPushGossiper.Add(tx)
 	return nil
 }
 

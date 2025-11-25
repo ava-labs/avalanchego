@@ -158,7 +158,7 @@ func TestAtomicTxGossip(t *testing.T) {
 	require.NoError(err)
 	tx, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.clock.Unix(), vm.Ctx.XChainID, address, vmtest.InitialBaseFee, secp256k1fx.NewKeychain(pk), []*avax.UTXO{utxo})
 	require.NoError(err)
-	require.NoError(vm.AtomicMempool.AddLocalTx(tx))
+	require.NoError(vm.atomicMempool.AddLocalTx(tx))
 
 	// wait so we aren't throttled by the vm
 	utilstest.SleepWithContext(ctx, 5*time.Second)
@@ -240,8 +240,8 @@ func TestAtomicTxPushGossipOutbound(t *testing.T) {
 	require.NoError(err)
 	tx, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.clock.Unix(), vm.Ctx.XChainID, address, vmtest.InitialBaseFee, secp256k1fx.NewKeychain(pk), []*avax.UTXO{utxo})
 	require.NoError(err)
-	require.NoError(vm.AtomicMempool.AddLocalTx(tx))
-	vm.AtomicTxPushGossiper.Add(tx)
+	require.NoError(vm.atomicMempool.AddLocalTx(tx))
+	vm.atomicTxPushGossiper.Add(tx)
 
 	gossipedBytes := <-sender.SentAppGossip
 	require.Equal(byte(p2p.AtomicTxGossipHandlerID), gossipedBytes[0])
@@ -308,11 +308,11 @@ func TestAtomicTxPushGossipInboundValid(t *testing.T) {
 	require.NoError(err)
 	tx, err := atomic.NewImportTx(vm.Ctx, vm.CurrentRules(), vm.clock.Unix(), vm.Ctx.XChainID, address, vmtest.InitialBaseFee, secp256k1fx.NewKeychain(pk), []*avax.UTXO{utxo})
 	require.NoError(err)
-	require.NoError(vm.AtomicMempool.AddLocalTx(tx))
+	require.NoError(vm.atomicMempool.AddLocalTx(tx))
 
 	inboundGossipMsg := buildAtomicPushGossip(t, tx)
 	require.NoError(vm.AppGossip(ctx, ids.EmptyNodeID, inboundGossipMsg))
-	require.True(vm.AtomicMempool.Has(tx.ID()))
+	require.True(vm.atomicMempool.Has(tx.ID()))
 }
 
 // Tests that conflicting txs are handled, based on whether the original tx is
@@ -337,22 +337,22 @@ func TestAtomicTxPushGossipInboundConflicting(t *testing.T) {
 
 	// show that no txID is requested
 	require.NoError(vm.AppGossip(t.Context(), nodeID, msgBytes))
-	require.True(vm.AtomicMempool.Has(tx.ID()))
+	require.True(vm.atomicMempool.Has(tx.ID()))
 
 	// Try to add a conflicting tx
 	msgBytes = buildAtomicPushGossip(t, conflictingTx)
 	require.NoError(vm.AppGossip(t.Context(), nodeID, msgBytes))
-	require.False(vm.AtomicMempool.Has(conflictingTx.ID()), "conflicting tx should not be in the atomic mempool")
+	require.False(vm.atomicMempool.Has(conflictingTx.ID()), "conflicting tx should not be in the atomic mempool")
 
 	// Now, show tx as discarded.
-	vm.AtomicMempool.NextTx()
-	vm.AtomicMempool.DiscardCurrentTx(tx.ID())
-	require.False(vm.AtomicMempool.Has(tx.ID()))
+	vm.atomicMempool.NextTx()
+	vm.atomicMempool.DiscardCurrentTx(tx.ID())
+	require.False(vm.atomicMempool.Has(tx.ID()))
 
 	// A conflicting tx can now be added to the mempool
 	msgBytes = buildAtomicPushGossip(t, overridingTx)
 	require.NoError(vm.AppGossip(t.Context(), nodeID, msgBytes))
-	require.True(vm.AtomicMempool.Has(overridingTx.ID()), "overriding tx should be in the atomic mempool")
+	require.True(vm.atomicMempool.Has(overridingTx.ID()), "overriding tx should be in the atomic mempool")
 }
 
 func buildAtomicPushGossip(t *testing.T, tx *atomic.Tx) []byte {
