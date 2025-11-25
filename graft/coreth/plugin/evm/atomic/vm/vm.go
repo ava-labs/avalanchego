@@ -87,7 +87,7 @@ type VM struct {
 	baseCodec codec.Registry
 
 	atomicMempool        *txpool.Mempool
-	atomicGossipSet      avalanchegossip.SetWithBloomFilter[*atomic.Tx]
+	atomicGossipSet      *avalanchegossip.SetWithBloomFilter[*atomic.Tx]
 	atomicTxPushGossiper *avalanchegossip.PushGossiper[*atomic.Tx]
 
 	// AtomicTxRepository maintains two indexes on accepted atomic txs.
@@ -178,11 +178,19 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to initialize inner VM: %w", err)
 	}
 
-	atomicMempool, err := txpool.NewMempool(atomicTxs, vm.InnerVM.MetricRegistry(), vm.verifyTxAtTip)
+	vm.atomicMempool = txpool.NewMempool(atomicTxs, vm.verifyTxAtTip)
+	atomicGossipSet, err := avalanchegossip.NewSetWithBloomFilter[*atomic.Tx](
+		vm.atomicMempool,
+		vm.InnerVM.MetricRegistry(),
+		"atomic_mempool_bloom_filter",
+		config.TxGossipBloomMinTargetElements,
+		config.TxGossipBloomTargetFalsePositiveRate,
+		config.TxGossipBloomResetFalsePositiveRate,
+	)
 	if err != nil {
-		return fmt.Errorf("failed to initialize mempool: %w", err)
+		return fmt.Errorf("failed to initialize atomic gossip set: %w", err)
 	}
-	vm.atomicMempool = atomicMempool
+	vm.atomicGossipSet = atomicGossipSet
 
 	// initialize bonus blocks on mainnet
 	var (
@@ -281,7 +289,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 
 	vm.atomicTxPushGossiper, err = avalanchegossip.NewPushGossiper[*atomic.Tx](
 		&atomicTxGossipMarshaller,
-		vm.atomicMempool,
+		vm.atomicGossipSet,
 		vm.InnerVM.P2PValidators(),
 		atomicTxGossipClient,
 		atomicTxGossipMetrics,
@@ -298,7 +306,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	atomicTxGossipHandler, err := gossip.NewTxGossipHandler[*atomic.Tx](
 		vm.Ctx.Log,
 		&atomicTxGossipMarshaller,
-		vm.atomicMempool,
+		vm.atomicGossipSet,
 		atomicTxGossipMetrics,
 		config.TxGossipTargetMessageSize,
 		config.TxGossipThrottlingPeriod,
@@ -318,7 +326,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	atomicTxPullGossiper := avalanchegossip.NewPullGossiper[*atomic.Tx](
 		vm.Ctx.Log,
 		&atomicTxGossipMarshaller,
-		vm.atomicMempool,
+		vm.atomicGossipSet,
 		atomicTxGossipClient,
 		atomicTxGossipMetrics,
 		config.TxGossipPollSize,
