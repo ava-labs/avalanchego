@@ -6,23 +6,19 @@ package network
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
-
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 var (
 	_ p2p.Handler                = (*txGossipHandler)(nil)
-	_ gossip.Set[*txs.Tx]        = (*gossipMempool)(nil)
+	_ gossip.Set[*txs.Tx]        = (*mempoolWithVerification)(nil)
 	_ gossip.Marshaller[*txs.Tx] = (*txParser)(nil)
 )
 
@@ -66,38 +62,26 @@ func (g *txParser) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
 	return g.parser.ParseTx(bytes)
 }
 
-func newGossipMempool(
+func newMempoolWithVerification(
 	mempool mempool.Mempool[*txs.Tx],
-	registerer prometheus.Registerer,
-	log logging.Logger,
 	txVerifier TxVerifier,
-	minTargetElements int,
-	targetFalsePositiveProbability,
-	resetFalsePositiveProbability float64,
-) (*gossipMempool, error) {
-	bloom, err := gossip.NewBloomFilter(registerer, "mempool_bloom_filter", minTargetElements, targetFalsePositiveProbability, resetFalsePositiveProbability)
-	return &gossipMempool{
+) *mempoolWithVerification {
+	return &mempoolWithVerification{
 		Mempool:    mempool,
-		log:        log,
 		txVerifier: txVerifier,
-		bloom:      bloom,
-	}, err
+	}
 }
 
-type gossipMempool struct {
+type mempoolWithVerification struct {
 	mempool.Mempool[*txs.Tx]
-	log        logging.Logger
 	txVerifier TxVerifier
-
-	lock  sync.RWMutex
-	bloom *gossip.BloomFilter
 }
 
 // Add is called by the p2p SDK when handling transactions that were pushed to
 // us and when handling transactions that were pulled from a peer. If this
 // returns a nil error while handling push gossip, the p2p SDK will queue the
 // transaction to push gossip as well.
-func (g *gossipMempool) Add(tx *txs.Tx) error {
+func (g *mempoolWithVerification) Add(tx *txs.Tx) error {
 	txID := tx.ID()
 	if _, ok := g.Mempool.Get(txID); ok {
 		return fmt.Errorf("attempted to issue %w: %s ", mempool.ErrDuplicateTx, txID)
@@ -120,43 +104,15 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 	return g.AddWithoutVerification(tx)
 }
 
-func (g *gossipMempool) Has(txID ids.ID) bool {
+func (g *mempoolWithVerification) Has(txID ids.ID) bool {
 	_, ok := g.Mempool.Get(txID)
 	return ok
 }
 
-func (g *gossipMempool) AddWithoutVerification(tx *txs.Tx) error {
+func (g *mempoolWithVerification) AddWithoutVerification(tx *txs.Tx) error {
 	if err := g.Mempool.Add(tx); err != nil {
 		g.Mempool.MarkDropped(tx.ID(), err)
 		return err
 	}
-
-	g.lock.Lock()
-	defer g.lock.Unlock()
-
-	g.bloom.Add(tx)
-	reset, err := gossip.ResetBloomFilterIfNeeded(g.bloom, g.Mempool.Len()*bloomChurnMultiplier)
-	if err != nil {
-		return err
-	}
-
-	if reset {
-		g.log.Debug("resetting bloom filter")
-		g.Mempool.Iterate(func(tx *txs.Tx) bool {
-			g.bloom.Add(tx)
-			return true
-		})
-	}
 	return nil
-}
-
-func (g *gossipMempool) Iterate(f func(*txs.Tx) bool) {
-	g.Mempool.Iterate(f)
-}
-
-func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {
-	g.lock.RLock()
-	defer g.lock.RUnlock()
-
-	return g.bloom.Marshal()
 }
