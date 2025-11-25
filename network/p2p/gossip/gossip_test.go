@@ -213,20 +213,24 @@ func TestGossiperGossip(t *testing.T) {
 	}
 }
 
+type gossiperFunc func(ctx context.Context) error
+
+func (f gossiperFunc) Gossip(ctx context.Context) error {
+	return f(ctx)
+}
+
 func TestEvery(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	calls := 0
-	gossiper := &TestGossiper{
-		GossipF: func(context.Context) error {
-			if calls >= 10 {
-				cancel()
-				return nil
-			}
-
-			calls++
+	gossiper := gossiperFunc(func(context.Context) error {
+		if calls >= 10 {
+			cancel()
 			return nil
-		},
-	}
+		}
+
+		calls++
+		return nil
+	})
 
 	go Every(ctx, logging.NoLog{}, gossiper, time.Millisecond)
 	<-ctx.Done()
@@ -243,12 +247,10 @@ func TestValidatorGossiper(t *testing.T) {
 
 	calls := 0
 	gossiper := ValidatorGossiper{
-		Gossiper: &TestGossiper{
-			GossipF: func(context.Context) error {
-				calls++
-				return nil
-			},
-		},
+		Gossiper: gossiperFunc(func(context.Context) error {
+			calls++
+			return nil
+		}),
 		NodeID:     nodeID,
 		Validators: validators,
 	}

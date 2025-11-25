@@ -597,14 +597,6 @@ func Every(ctx context.Context, log logging.Logger, gossiper Gossiper, frequency
 	}
 }
 
-type TestGossiper struct {
-	GossipF func(ctx context.Context) error
-}
-
-func (t *TestGossiper) Gossip(ctx context.Context) error {
-	return t.GossipF(ctx)
-}
-
 type FullSet[T Gossipable] struct{}
 
 func (FullSet[_]) Gossip(context.Context) error {
