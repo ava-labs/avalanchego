@@ -8,11 +8,11 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/versiondb"
 
-	"github.com/ava-labs/coreth/plugin/evm/atomic/state"
-	"github.com/ava-labs/coreth/plugin/evm/message"
-	"github.com/ava-labs/coreth/sync"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/state"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync"
 
-	syncclient "github.com/ava-labs/coreth/sync/client"
+	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
 )
 
 // Extender is the sync extender for the atomic VM.

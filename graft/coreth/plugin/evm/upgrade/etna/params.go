@@ -4,7 +4,7 @@
 // Etna defines constants used after the Etna upgrade.
 package etna
 
-import "github.com/ava-labs/coreth/utils"
+import "github.com/ava-labs/avalanchego/graft/coreth/utils"
 
 // MinBaseFee is the minimum base fee specified in ACP-125 that is allowed after
 // the Etna upgrade.
