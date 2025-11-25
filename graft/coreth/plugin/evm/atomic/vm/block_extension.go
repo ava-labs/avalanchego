@@ -214,8 +214,21 @@ func (be *blockExtension) Reject() error {
 	for _, tx := range be.atomicTxs {
 		// Re-issue the transaction in the mempool, continue even if it fails
 		vm.atomicMempool.RemoveTx(tx)
+
+		txID := tx.ID()
 		if err := vm.atomicMempool.AddRemoteTx(tx); err != nil {
-			log.Debug("Failed to re-issue transaction in rejected block", "txID", tx.ID(), "err", err)
+			log.Debug("Failed to re-issue transaction in rejected block",
+				"txID", txID,
+				"err", err,
+			)
+			continue
+		}
+
+		if err := vm.atomicGossipSet.AddToBloom(txID); err != nil {
+			log.Debug("Failed to add transaction to gossip bloom in rejected block",
+				"txID", txID,
+				"err", err,
+			)
 		}
 	}
 	atomicState, err := vm.AtomicBackend.GetVerifiedAtomicState(common.Hash(be.block.ID()))
