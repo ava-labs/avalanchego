@@ -120,13 +120,8 @@ func TestBloomFilterClobber(t *testing.T) {
 		func() { b.Has(&testTx{}) },
 		func() { b.Marshal() },
 		func() {
-			var called bool
-			reset, err := b.ResetIfNeeded(1, func() error {
-				called = true
-				return nil
-			})
+			_, err := b.ResetIfNeeded(1, nil)
 			require.NoErrorf(t, err, "%T.ResetIfNeeded()", b)
-			require.Equalf(t, reset, called, "%T.ResetIfNeeded(..., [callback]) callback called i.f.f. reset", b)
 		},
 	} {
 		for range 10_000 {
@@ -141,4 +136,55 @@ func TestBloomFilterClobber(t *testing.T) {
 
 	close(start)
 	wg.Wait()
+}
+
+func TestBloomFilterRefillAfterReset(t *testing.T) {
+	b, err := NewBloomFilter(prometheus.NewRegistry(), "", 1, 0.5, 0.5)
+	require.NoError(t, err, "NewBloomFilter()")
+
+	var before []*testTx
+	for i := range byte(10) {
+		before = append(before, &testTx{ids.ID{1, i}})
+	}
+
+	after := &testTx{ids.ID{2, 0}}
+	refill := func(yield func(Gossipable) bool) {
+		yield(after)
+	}
+
+	steps := []struct {
+		setup     func()
+		targetEls int
+		// Although we assert if resetting occurred, this is just to confirm
+		// proper test setup. The real test is via [BloomFilter.Has] of the
+		// before / after elements.
+		wantReset bool
+	}{
+		{
+			setup: func() {
+				b.Add(before[0])
+			},
+			targetEls: 1e6,
+			wantReset: false,
+		},
+		{
+			setup: func() {
+				for _, g := range before {
+					b.Add(g)
+				}
+			},
+			targetEls: 1,
+			wantReset: true,
+		},
+	}
+
+	for _, s := range steps {
+		s.setup()
+		reset, err := b.ResetIfNeeded(s.targetEls, refill)
+		require.NoError(t, err, "ResetIfNeeded()")
+		require.Equal(t, s.wantReset, reset, "ResetIfNeeded()")
+
+		require.Equalf(t, !reset, b.Has(before[0]), "Has([existing element]) when ResetIfNeeded() returned %t", reset)
+		require.Equalf(t, reset, b.Has(after), "Has([iterator element]) when ResetIfNeeded() returned %t", reset)
+	}
 }

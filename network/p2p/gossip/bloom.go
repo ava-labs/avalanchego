@@ -5,6 +5,7 @@ package gossip
 
 import (
 	"crypto/rand"
+	"iter"
 	"sync"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -63,8 +64,11 @@ type BloomFilter struct {
 
 func (b *BloomFilter) Add(gossipable Gossipable) {
 	b.resetMu.RLock()
-	defer b.resetMu.RUnlock()
+	b.addWhenLocked(gossipable)
+	b.resetMu.RUnlock()
+}
 
+func (b *BloomFilter) addWhenLocked(gossipable Gossipable) {
 	h := gossipable.GossipID()
 	bloom.Add(b.bloom, h[:], b.salt[:])
 	b.metrics.Count.Inc()
@@ -104,11 +108,9 @@ func ResetBloomFilterIfNeeded(
 // If [targetElements] exceeds [minTargetElements], the size of the bloom filter will grow to maintain
 // the same [targetFalsePositiveProbability].
 //
-// Returns true if the bloom filter was reset, in which case the `afterReset`
-// function is also called (if non-nil) while still holding a mutex excluding
-// all other access. This callback is typically used to refill the Bloom filter
-// with known elements.
-func (b *BloomFilter) ResetIfNeeded(targetElements int, afterReset func() error) (bool, error) {
+// Returns true if the bloom filter was reset, in which case the elements
+// yielded by `refillWith` are added to the filter.
+func (b *BloomFilter) ResetIfNeeded(targetElements int, refillWith iter.Seq[Gossipable]) (bool, error) {
 	mu := &b.resetMu
 
 	// Although this pattern requires a double checking of the same property,
@@ -135,10 +137,13 @@ func (b *BloomFilter) ResetIfNeeded(targetElements int, afterReset func() error)
 	if err := b.resetWhenLocked(targetElements); err != nil {
 		return false, err
 	}
-	if afterReset == nil {
-		return true, nil
+
+	if refillWith != nil {
+		for g := range refillWith {
+			b.addWhenLocked(g)
+		}
 	}
-	return true, afterReset()
+	return true, nil
 }
 
 func (b *BloomFilter) resetWhenLocked(targetElements int) error {
