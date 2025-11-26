@@ -66,7 +66,7 @@ func createExportTxOptions(t *testing.T, vm *VM, sharedMemory *avalancheatomic.M
 	importTx, err := vm.newImportTx(vm.Ctx.XChainID, ethAddr, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{key})
 	require.NoError(t, err)
 
-	require.NoError(t, vm.atomicMempool.AddLocalTx(importTx))
+	require.NoError(t, vm.AtomicMempool.AddLocalTx(importTx))
 
 	msg, err := vm.WaitForEvent(t.Context())
 	require.NoError(t, err)
@@ -363,7 +363,7 @@ func TestExportTxEVMStateTransfer(t *testing.T) {
 			tx, err := vm.newImportTx(vm.Ctx.XChainID, ethAddr, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{key})
 			require.NoError(t, err)
 
-			require.NoError(t, vm.atomicMempool.AddLocalTx(tx))
+			require.NoError(t, vm.AtomicMempool.AddLocalTx(tx))
 
 			msg, err := tvm.VM.WaitForEvent(t.Context())
 			require.NoError(t, err)
@@ -1609,7 +1609,7 @@ func TestNewExportTx(t *testing.T) {
 			tx, err := vm.newImportTx(vm.Ctx.XChainID, ethAddress, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{key})
 			require.NoError(t, err)
 
-			require.NoError(t, vm.atomicMempool.AddLocalTx(tx))
+			require.NoError(t, vm.AtomicMempool.AddLocalTx(tx))
 
 			msg, err := tvm.VM.WaitForEvent(t.Context())
 			require.NoError(t, err)
@@ -1760,7 +1760,7 @@ func TestNewExportTxMulticoin(t *testing.T) {
 			tx, err := vm.newImportTx(vm.Ctx.XChainID, ethAddress, vmtest.InitialBaseFee, []*secp256k1.PrivateKey{key})
 			require.NoError(t, err)
 
-			require.NoError(t, vm.atomicMempool.AddRemoteTx(tx))
+			require.NoError(t, vm.AtomicMempool.AddRemoteTx(tx))
 
 			msg, err := tvm.VM.WaitForEvent(t.Context())
 			require.NoError(t, err)

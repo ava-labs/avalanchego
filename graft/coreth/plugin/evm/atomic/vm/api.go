@@ -147,7 +147,7 @@ func (service *AvaxAPI) IssueTx(_ *http.Request, args *api.FormattedTx, response
 	service.vm.Ctx.Lock.Lock()
 	defer service.vm.Ctx.Lock.Unlock()
 
-	err = service.vm.atomicMempool.AddLocalTx(tx)
+	err = service.vm.AtomicMempool.AddLocalTx(tx)
 	if err != nil && !errors.Is(err, txpool.ErrAlreadyKnown) {
 		return err
 	}

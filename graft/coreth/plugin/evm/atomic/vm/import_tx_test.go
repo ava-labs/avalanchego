@@ -1233,7 +1233,7 @@ func executeTxTest(t *testing.T, test atomicTxTest) {
 		return
 	}
 
-	require.NoError(t, vm.atomicMempool.AddLocalTx(tx))
+	require.NoError(t, vm.AtomicMempool.AddLocalTx(tx))
 
 	if test.bootstrapping {
 		return

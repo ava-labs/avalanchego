@@ -86,7 +86,7 @@ type VM struct {
 	Fx        secp256k1fx.Fx
 	baseCodec codec.Registry
 
-	atomicMempool        *txpool.Mempool
+	AtomicMempool        *txpool.Mempool
 	atomicGossipSet      *avalanchegossip.SetWithBloomFilter[*atomic.Tx]
 	atomicTxPushGossiper *avalanchegossip.PushGossiper[*atomic.Tx]
 
@@ -178,9 +178,9 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to initialize inner VM: %w", err)
 	}
 
-	vm.atomicMempool = txpool.NewMempool(atomicTxs, vm.verifyTxAtTip)
+	vm.AtomicMempool = txpool.NewMempool(atomicTxs, vm.verifyTxAtTip)
 	atomicGossipSet, err := avalanchegossip.NewSetWithBloomFilter[*atomic.Tx](
-		vm.atomicMempool,
+		vm.AtomicMempool,
 		vm.InnerVM.MetricRegistry(),
 		"atomic_mempool_bloom_filter",
 		config.TxGossipBloomMinTargetElements,
@@ -495,7 +495,7 @@ func (vm *VM) createConsensusCallbacks() dummy.ConsensusCallbacks {
 
 func (vm *VM) preBatchOnFinalizeAndAssemble(header *types.Header, state *state.StateDB, txs []*types.Transaction) ([]byte, *big.Int, *big.Int, error) {
 	for {
-		tx, exists := vm.atomicMempool.NextTx()
+		tx, exists := vm.AtomicMempool.NextTx()
 		if !exists {
 			break
 		}
@@ -508,7 +508,7 @@ func (vm *VM) preBatchOnFinalizeAndAssemble(header *types.Header, state *state.S
 		if err := vm.verifyTx(tx, header.ParentHash, header.BaseFee, state, rules); err != nil {
 			// Discard the transaction from the mempool on failed verification.
 			log.Debug("discarding tx from mempool on failed verification", "txID", tx.ID(), "err", err)
-			vm.atomicMempool.DiscardCurrentTx(tx.ID())
+			vm.AtomicMempool.DiscardCurrentTx(tx.ID())
 			state.RevertToSnapshot(snapshot)
 			continue
 		}
@@ -518,7 +518,7 @@ func (vm *VM) preBatchOnFinalizeAndAssemble(header *types.Header, state *state.S
 			// Discard the transaction from the mempool and error if the transaction
 			// cannot be marshalled. This should never happen.
 			log.Debug("discarding tx due to unmarshal err", "txID", tx.ID(), "err", err)
-			vm.atomicMempool.DiscardCurrentTx(tx.ID())
+			vm.AtomicMempool.DiscardCurrentTx(tx.ID())
 			return nil, nil, nil, fmt.Errorf("failed to marshal atomic transaction %s due to %w", tx.ID(), err)
 		}
 		var contribution, gasUsed *big.Int
@@ -561,7 +561,7 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(
 	}
 
 	for {
-		tx, exists := vm.atomicMempool.NextTx()
+		tx, exists := vm.AtomicMempool.NextTx()
 		if !exists {
 			break
 		}
@@ -569,7 +569,7 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(
 		// Ensure that adding [tx] to the block will not exceed the block size soft limit.
 		txSize := len(tx.SignedBytes())
 		if size+txSize > targetAtomicTxsSize {
-			vm.atomicMempool.CancelCurrentTx(tx.ID())
+			vm.AtomicMempool.CancelCurrentTx(tx.ID())
 			break
 		}
 
@@ -588,7 +588,7 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(
 		// ensure `gasUsed + batchGasUsed` doesn't exceed `atomicGasLimit`
 		if totalGasUsed := new(big.Int).Add(batchGasUsed, txGasUsed); !utils.BigLessOrEqualUint64(totalGasUsed, atomicGasLimit) {
 			// Send [tx] back to the mempool's tx heap.
-			vm.atomicMempool.CancelCurrentTx(tx.ID())
+			vm.AtomicMempool.CancelCurrentTx(tx.ID())
 			break
 		}
 
@@ -600,7 +600,7 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(
 			// block will most likely be accepted.
 			// Discard the transaction from the mempool on failed verification.
 			log.Debug("discarding tx due to overlapping input utxos", "txID", tx.ID())
-			vm.atomicMempool.DiscardCurrentTx(tx.ID())
+			vm.AtomicMempool.DiscardCurrentTx(tx.ID())
 			continue
 		}
 
@@ -611,7 +611,7 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(
 			// Note: prior to this point, we have not modified [state] so there is no need to
 			// revert to a snapshot if we discard the transaction prior to this point.
 			log.Debug("discarding tx from mempool due to failed verification", "txID", tx.ID(), "err", err)
-			vm.atomicMempool.DiscardCurrentTx(tx.ID())
+			vm.AtomicMempool.DiscardCurrentTx(tx.ID())
 			state.RevertToSnapshot(snapshot)
 			continue
 		}
@@ -632,7 +632,7 @@ func (vm *VM) postBatchOnFinalizeAndAssemble(
 			// If we fail to marshal the batch of atomic transactions for any reason,
 			// discard the entire set of current transactions.
 			log.Debug("discarding txs due to error marshaling atomic transactions", "err", err)
-			vm.atomicMempool.DiscardCurrentTxs()
+			vm.AtomicMempool.DiscardCurrentTxs()
 			return nil, nil, nil, fmt.Errorf("failed to marshal batch of atomic transactions due to %w", err)
 		}
 		return atomicTxBytes, batchContribution, batchGasUsed, nil
@@ -748,13 +748,13 @@ func (vm *VM) BuildBlockWithContext(ctx context.Context, proposerVMBlockCtx *blo
 	case err == nil:
 		// Marks the current transactions from the mempool as being successfully issued
 		// into a block.
-		vm.atomicMempool.IssueCurrentTxs()
+		vm.AtomicMempool.IssueCurrentTxs()
 	case errors.Is(err, vmerrors.ErrGenerateBlockFailed), errors.Is(err, vmerrors.ErrBlockVerificationFailed):
 		log.Debug("cancelling txs due to error generating block", "err", err)
-		vm.atomicMempool.CancelCurrentTxs()
+		vm.AtomicMempool.CancelCurrentTxs()
 	case errors.Is(err, vmerrors.ErrWrapBlockFailed):
 		log.Debug("discarding txs due to error making new block", "err", err)
-		vm.atomicMempool.DiscardCurrentTxs()
+		vm.AtomicMempool.DiscardCurrentTxs()
 	}
 	return blk, err
 }
@@ -784,7 +784,7 @@ func (vm *VM) GetAtomicTx(txID ids.ID) (*atomic.Tx, atomic.Status, uint64, error
 	} else if err != avalanchedatabase.ErrNotFound {
 		return nil, atomic.Unknown, 0, err
 	}
-	tx, dropped, found := vm.atomicMempool.GetTx(txID)
+	tx, dropped, found := vm.AtomicMempool.GetTx(txID)
 	switch {
 	case found && dropped:
 		return tx, atomic.Dropped, 0, nil
