@@ -202,7 +202,7 @@ type VM struct {
 
 	gossipClient  *p2p.Client
 	gossipMetrics avalanchegossip.Metrics
-	gossipSet     *avalanchegossip.SetWithBloomFilter[*gossipTx]
+	gossipSet     *avalanchegossip.SetWithBloomFilter[*gossipTx] // gossipSet must be initialized before gossipPusher
 	gossipPusher  avalancheUtils.Atomic[*avalanchegossip.PushGossiper[*gossipTx]]
 
 	// [versiondb] is the VM's current versioned database
