@@ -88,7 +88,7 @@ type VM struct {
 
 	AtomicMempool        *txpool.Mempool
 	atomicGossipSet      *avalanchegossip.SetWithBloomFilter[*atomic.Tx]
-	atomicTxPushGossiper *avalanchegossip.PushGossiper[*atomic.Tx]
+	AtomicTxPushGossiper *avalanchegossip.PushGossiper[*atomic.Tx]
 
 	// AtomicTxRepository maintains two indexes on accepted atomic txs.
 	// - txID to accepted atomic tx
@@ -287,7 +287,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 		Peers:      vm.InnerVM.Config().PushRegossipNumPeers,
 	}
 
-	vm.atomicTxPushGossiper, err = avalanchegossip.NewPushGossiper[*atomic.Tx](
+	vm.AtomicTxPushGossiper, err = avalanchegossip.NewPushGossiper[*atomic.Tx](
 		&atomicTxGossipMarshaller,
 		vm.atomicGossipSet,
 		vm.InnerVM.P2PValidators(),
@@ -340,7 +340,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 
 	vm.shutdownWg.Add(1)
 	go func() {
-		avalanchegossip.Every(ctx, vm.Ctx.Log, vm.atomicTxPushGossiper, vm.InnerVM.Config().PushGossipFrequency.Duration)
+		avalanchegossip.Every(ctx, vm.Ctx.Log, vm.AtomicTxPushGossiper, vm.InnerVM.Config().PushGossipFrequency.Duration)
 		vm.shutdownWg.Done()
 	}()
 
