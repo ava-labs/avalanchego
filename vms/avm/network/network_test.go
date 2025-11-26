@@ -66,17 +66,6 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 
 	tests := []test{
 		{
-			name: "mempool has transaction",
-			mempool: func() mempool.Mempool[*txs.Tx] {
-				mempool, err := xmempool.New("", prometheus.NewRegistry())
-				require.NoError(t, err)
-				require.NoError(t, mempool.Add(&txs.Tx{Unsigned: &txs.BaseTx{}}))
-				return mempool
-			}(),
-			tx:          &txs.Tx{Unsigned: &txs.BaseTx{}},
-			expectedErr: nil,
-		},
-		{
 			name: "transaction marked as dropped in mempool",
 			mempool: func() mempool.Mempool[*txs.Tx] {
 				mempool, err := xmempool.New("", prometheus.NewRegistry())
@@ -190,6 +179,22 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				txVerifier.EXPECT().VerifyTx(gomock.Any()).Return(nil)
 				return txVerifier
 			},
+			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
+				appSender := commonmock.NewSender(ctrl)
+				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+				return appSender
+			},
+			tx:          &txs.Tx{Unsigned: &txs.BaseTx{}},
+			expectedErr: nil,
+		},
+		{
+			name: "mempool has transaction",
+			mempool: func() mempool.Mempool[*txs.Tx] {
+				mempool, err := xmempool.New("", prometheus.NewRegistry())
+				require.NoError(t, err)
+				require.NoError(t, mempool.Add(&txs.Tx{Unsigned: &txs.BaseTx{}}))
+				return mempool
+			}(),
 			appSenderFunc: func(ctrl *gomock.Controller) common.AppSender {
 				appSender := commonmock.NewSender(ctrl)
 				appSender.EXPECT().SendAppGossip(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)

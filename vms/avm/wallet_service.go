@@ -36,19 +36,19 @@ func (w *WalletService) decided(txID ids.ID) {
 			return
 		}
 
-		if err := w.vm.network.IssueTxFromRPCWithoutVerification(tx); err != nil {
-			w.pendingTxs.Delete(txID)
-			w.vm.ctx.Log.Warn("dropping tx issued over wallet API",
+		err := w.vm.network.IssueTxFromRPCWithoutVerification(tx)
+		if err == nil {
+			w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
 				zap.Stringer("txID", txID),
-				zap.Error(err),
 			)
-			continue
+			return
 		}
 
-		w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
+		w.pendingTxs.Delete(txID)
+		w.vm.ctx.Log.Warn("dropping tx issued over wallet API",
 			zap.Stringer("txID", txID),
+			zap.Error(err),
 		)
-		return
 	}
 }
 
