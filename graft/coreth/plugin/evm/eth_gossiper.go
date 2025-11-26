@@ -60,7 +60,7 @@ func NewGossipEthTxPool(mempool *txpool.TxPool, registerer prometheus.Registerer
 
 	return &GossipEthTxPool{
 		mempool:    mempool,
-		pendingTxs: make(chan core.NewTxsEvent, pendingTxsBuffer),
+		pendingTxs: pendingTxs,
 		sub:        sub,
 		bloom:      bloom,
 	}, nil
