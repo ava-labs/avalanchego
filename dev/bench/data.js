@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1764160563221,
+  "lastUpdate": 1764170210011,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -2378,6 +2378,34 @@ window.BENCHMARK_DATA = {
           {
             "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-i4i-4xlarge-local-ssd",
             "value": 74.48,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Stephen Buttolph",
+            "username": "StephenButtolph",
+            "email": "stephen@avalabs.org"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "5950ba355645f3c96fa3e812525cc8b5e5f0c4d6",
+          "message": "Simplify gossip tests (#4547)",
+          "timestamp": "2025-11-25T19:51:49Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/5950ba355645f3c96fa3e812525cc8b5e5f0c4d6"
+        },
+        "date": 1764170208140,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
+            "value": 42.97,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
           }
