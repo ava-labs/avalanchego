@@ -1,7 +1,7 @@
 name: C-Chain Re-Execution Benchmark w/ Container
 
 on:
-  pull_request:
+  # pull_request:
   workflow_dispatch:
     inputs:
       config:
@@ -53,13 +53,13 @@ jobs:
               echo "matrix<<EOF"
               printf '{ "include": [{ "task": "%s", "config": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
                 "${{ github.event.inputs.task }}" \
-                "${{ github.event.inputs.runner }}" \
-                "${{ github.event.inputs.timeout-minutes }}" \
                 "${{ github.event.inputs.config }}" \
                 "${{ github.event.inputs.start-block }}" \
                 "${{ github.event.inputs.end-block }}" \
                 "${{ github.event.inputs.block-dir-src }}" \
                 "${{ github.event.inputs.current-state-dir-src }}" \
+                "${{ github.event.inputs.runner }}" \
+                "${{ github.event.inputs.timeout-minutes }}"
               echo EOF
             } >> "$GITHUB_OUTPUT"
           else
