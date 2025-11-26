@@ -9,10 +9,8 @@ import (
 
 	"github.com/ava-labs/libevm/log"
 	"github.com/holiman/uint256"
-	"github.com/prometheus/client_golang/prometheus"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p/gossip"
 )
@@ -39,30 +37,17 @@ var (
 // Mempool is a simple mempool for atomic transactions
 type Mempool struct {
 	*Txs
-	// bloom is a bloom filter containing the txs in the mempool
-	bloom  *gossip.BloomFilter
 	verify func(tx *atomic.Tx) error
 }
 
 func NewMempool(
 	txs *Txs,
-	registerer prometheus.Registerer,
 	verify func(tx *atomic.Tx) error,
-) (*Mempool, error) {
-	bloom, err := gossip.NewBloomFilter(registerer, "atomic_mempool_bloom_filter",
-		config.TxGossipBloomMinTargetElements,
-		config.TxGossipBloomTargetFalsePositiveRate,
-		config.TxGossipBloomResetFalsePositiveRate,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize bloom filter: %w", err)
-	}
-
+) *Mempool {
 	return &Mempool{
 		Txs:    txs,
-		bloom:  bloom,
 		verify: verify,
-	}, nil
+	}
 }
 
 // Add attempts to add tx to the mempool as a Remote transaction. It is assumed
@@ -269,26 +254,6 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 		m.utxoSpenders[utxoID] = tx
 	}
 
-	m.bloom.Add(tx)
-	reset, err := gossip.ResetBloomFilterIfNeeded(m.bloom, m.length()*config.TxGossipBloomChurnMultiplier)
-	if err != nil {
-		return err
-	}
-
-	if reset {
-		log.Debug("resetting bloom filter", "reason", "reached max filled ratio")
-
-		for _, pendingTx := range m.pendingTxs.minHeap.items {
-			m.bloom.Add(pendingTx.tx)
-		}
-		// Current transactions must be added to the bloom filter as well
-		// because they could be added back into the pending set without going
-		// through addTx again.
-		for _, currentTx := range m.currentTxs {
-			m.bloom.Add(currentTx)
-		}
-	}
-
 	// When adding a transaction to the mempool, we make sure that there is an
 	// item in Pending to signal the VM to produce a block.
 	select {
@@ -296,11 +261,4 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 	default:
 	}
 	return nil
-}
-
-func (m *Mempool) GetFilter() ([]byte, []byte) {
-	m.lock.RLock()
-	defer m.lock.RUnlock()
-
-	return m.bloom.Marshal()
 }

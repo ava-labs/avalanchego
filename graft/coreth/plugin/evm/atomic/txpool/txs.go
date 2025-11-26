@@ -75,7 +75,7 @@ func NewTxs(ctx *snow.Context, maxSize int) *Txs {
 	}
 }
 
-// PendingLen returns the number of pending transactions.
+// PendingLen returns the number of Pending transactions.
 func (t *Txs) PendingLen() int {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
@@ -83,14 +83,27 @@ func (t *Txs) PendingLen() int {
 	return t.pendingTxs.Len()
 }
 
-// Iterate applies f to all Pending transactions. If f returns false, the
-// iteration stops early.
+// Len returns the number of Current and Pending transactions.
+func (t *Txs) Len() int {
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+
+	return len(t.currentTxs) + t.pendingTxs.Len()
+}
+
+// Iterate applies f to all Current and Pending transactions. If f returns
+// false, the iteration stops early.
 func (t *Txs) Iterate(f func(tx *atomic.Tx) bool) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
 	for _, item := range t.pendingTxs.maxHeap.items {
 		if !f(item.tx) {
+			return
+		}
+	}
+	for _, tx := range t.currentTxs {
+		if !f(tx) {
 			return
 		}
 	}

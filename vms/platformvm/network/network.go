@@ -30,7 +30,7 @@ type Network struct {
 	*p2p.Network
 
 	log                       logging.Logger
-	mempool                   *gossipMempool
+	gossipMempool             *gossip.SetWithBloomFilter[*txs.Tx]
 	partialSyncPrimaryNetwork bool
 
 	txPushGossiper        *gossip.PushGossiper[*txs.Tx]
@@ -81,11 +81,16 @@ func New(
 		return nil, err
 	}
 
-	gossipMempool, err := newGossipMempool(
+	mempoolWithVerification := newMempoolWithVerification(
 		mempool,
-		registerer,
 		log,
 		txVerifier,
+	)
+
+	gossipMempool, err := gossip.NewSetWithBloomFilter(
+		mempoolWithVerification,
+		registerer,
+		"mempool_bloom_filter",
 		config.ExpectedBloomFilterElements,
 		config.ExpectedBloomFilterFalsePositiveProbability,
 		config.MaxBloomFilterFalsePositiveProbability,
@@ -185,7 +190,7 @@ func New(
 	return &Network{
 		Network:                   p2pNetwork,
 		log:                       log,
-		mempool:                   gossipMempool,
+		gossipMempool:             gossipMempool,
 		partialSyncPrimaryNetwork: partialSyncPrimaryNetwork,
 		txPushGossiper:            txPushGossiper,
 		txPushGossipFrequency:     config.PushGossipFrequency,
@@ -221,7 +226,7 @@ func (n *Network) AppGossip(ctx context.Context, nodeID ids.NodeID, msgBytes []b
 }
 
 func (n *Network) IssueTxFromRPC(tx *txs.Tx) error {
-	if err := n.mempool.Add(tx); err != nil {
+	if err := n.gossipMempool.Add(tx); err != nil {
 		return err
 	}
 	n.txPushGossiper.Add(tx)

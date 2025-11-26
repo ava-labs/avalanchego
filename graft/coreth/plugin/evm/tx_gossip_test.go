@@ -151,7 +151,7 @@ func TestEthTxGossip(t *testing.T) {
 	// wait so we aren't throttled by the vm
 	time.Sleep(5 * time.Second)
 
-	marshaller := GossipEthTxMarshaller{}
+	marshaller := gossipTxMarshaller{}
 	// Ask the VM for new transactions. We should get the newly issued tx.
 	wg.Add(1)
 	onResponse = func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
@@ -163,7 +163,7 @@ func TestEthTxGossip(t *testing.T) {
 
 		gotTx, err := marshaller.UnmarshalGossip(response.Gossip[0])
 		require.NoError(err)
-		require.Equal(signedTx.Hash(), gotTx.Tx.Hash())
+		require.Equal(signedTx.Hash(), gotTx.tx.Hash())
 
 		wg.Done()
 	}
@@ -213,7 +213,7 @@ func TestEthTxPushGossipOutbound(t *testing.T) {
 
 	// issue a tx
 	require.NoError(vm.txPool.Add([]*types.Transaction{signedTx}, true, true)[0])
-	vm.ethTxPushGossiper.Get().Add(&GossipEthTx{signedTx})
+	vm.gossipPusher.Get().Add(&gossipTx{signedTx})
 
 	sent := <-sender.SentAppGossip
 	got := &sdk.PushGossip{}
@@ -223,7 +223,7 @@ func TestEthTxPushGossipOutbound(t *testing.T) {
 	require.Equal(byte(p2p.TxGossipHandlerID), sent[0])
 	require.NoError(proto.Unmarshal(sent[1:], got))
 
-	marshaller := GossipEthTxMarshaller{}
+	marshaller := gossipTxMarshaller{}
 	require.Len(got.Gossip, 1)
 	gossipedTx, err := marshaller.UnmarshalGossip(got.Gossip[0])
 	require.NoError(err)
@@ -266,9 +266,9 @@ func TestEthTxPushGossipInbound(t *testing.T) {
 	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(vm.chainID), pk.ToECDSA())
 	require.NoError(err)
 
-	marshaller := GossipEthTxMarshaller{}
-	gossipedTx := &GossipEthTx{
-		Tx: signedTx,
+	marshaller := gossipTxMarshaller{}
+	gossipedTx := &gossipTx{
+		tx: signedTx,
 	}
 	gossipedTxBytes, err := marshaller.MarshalGossip(gossipedTx)
 	require.NoError(err)

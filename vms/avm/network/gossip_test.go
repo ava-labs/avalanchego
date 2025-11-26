@@ -4,13 +4,13 @@
 package network
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/ids"
-	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/fxs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/txs/mempool"
@@ -53,7 +53,7 @@ func TestMarshaller(t *testing.T) {
 	require.Equal(want.GossipID(), got.GossipID())
 }
 
-func TestGossipMempoolAdd(t *testing.T) {
+func TestMempoolWithVerificationAdd(t *testing.T) {
 	require := require.New(t)
 
 	metrics := prometheus.NewRegistry()
@@ -61,17 +61,7 @@ func TestGossipMempoolAdd(t *testing.T) {
 	baseMempool, err := mempool.New("", metrics)
 	require.NoError(err)
 
-	mempool, err := newGossipMempool(
-		baseMempool,
-		metrics,
-		logging.NoLog{},
-		testVerifier{},
-		DefaultConfig.ExpectedBloomFilterElements,
-		DefaultConfig.ExpectedBloomFilterFalsePositiveProbability,
-		DefaultConfig.MaxBloomFilterFalsePositiveProbability,
-	)
-	require.NoError(err)
-
+	mempool := newMempoolWithVerification(baseMempool, testVerifier{})
 	tx := &txs.Tx{
 		Unsigned: &txs.BaseTx{
 			BaseTx: avax.BaseTx{
@@ -82,10 +72,10 @@ func TestGossipMempoolAdd(t *testing.T) {
 	}
 
 	require.NoError(mempool.Add(tx))
-	require.True(mempool.bloom.Has(tx))
+	require.True(mempool.Has(tx.ID()))
 }
 
-func TestGossipMempoolAddVerified(t *testing.T) {
+func TestMempoolWithVerificationAddWithoutVerification(t *testing.T) {
 	require := require.New(t)
 
 	metrics := prometheus.NewRegistry()
@@ -93,19 +83,9 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 	baseMempool, err := mempool.New("", metrics)
 	require.NoError(err)
 
-	mempool, err := newGossipMempool(
-		baseMempool,
-		metrics,
-		logging.NoLog{},
-		testVerifier{
-			err: errTest, // We shouldn't be attempting to verify the tx in this flow
-		},
-		DefaultConfig.ExpectedBloomFilterElements,
-		DefaultConfig.ExpectedBloomFilterFalsePositiveProbability,
-		DefaultConfig.MaxBloomFilterFalsePositiveProbability,
-	)
-	require.NoError(err)
-
+	mempool := newMempoolWithVerification(baseMempool, testVerifier{
+		err: errors.New("verification failed"),
+	})
 	tx := &txs.Tx{
 		Unsigned: &txs.BaseTx{
 			BaseTx: avax.BaseTx{
@@ -116,5 +96,5 @@ func TestGossipMempoolAddVerified(t *testing.T) {
 	}
 
 	require.NoError(mempool.AddWithoutVerification(tx))
-	require.True(mempool.bloom.Has(tx))
+	require.True(mempool.Has(tx.ID()))
 }

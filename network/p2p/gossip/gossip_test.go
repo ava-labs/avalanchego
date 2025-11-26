@@ -20,7 +20,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/validators"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
-	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -69,29 +68,26 @@ func (marshaller) UnmarshalGossip(bytes []byte) (tx, error) {
 
 type setDouble struct {
 	txs   set.Set[tx]
-	bloom *BloomFilter
 	onAdd func(tx tx)
 }
 
-func (s *setDouble) Add(gossipable tx) error {
-	if s.txs.Contains(gossipable) {
-		return fmt.Errorf("%s already present", ids.ID(gossipable))
+func (s *setDouble) Add(t tx) error {
+	if s.txs.Contains(t) {
+		return fmt.Errorf("%s already present", t)
 	}
 
-	s.txs.Add(gossipable)
-	s.bloom.Add(gossipable)
+	s.txs.Add(t)
 	if s.onAdd != nil {
-		s.onAdd(gossipable)
+		s.onAdd(t)
 	}
-
 	return nil
 }
 
-func (s *setDouble) Has(gossipID ids.ID) bool {
-	return s.txs.Contains(tx(gossipID))
+func (s *setDouble) Has(h ids.ID) bool {
+	return s.txs.Contains(tx(h))
 }
 
-func (s *setDouble) Iterate(f func(gossipable tx) bool) {
+func (s *setDouble) Iterate(f func(t tx) bool) {
 	for tx := range s.txs {
 		if !f(tx) {
 			return
@@ -99,8 +95,8 @@ func (s *setDouble) Iterate(f func(gossipable tx) bool) {
 	}
 }
 
-func (s *setDouble) GetFilter() ([]byte, []byte) {
-	return s.bloom.Marshal()
+func (s *setDouble) Len() int {
+	return s.txs.Len()
 }
 
 func TestGossiperGossip(t *testing.T) {
@@ -175,13 +171,17 @@ func TestGossiperGossip(t *testing.T) {
 			)
 			require.NoError(err)
 
-			responseBloom, err := NewBloomFilter(prometheus.NewRegistry(), "", 1000, 0.01, 0.05)
+			responseSetWithBloom, err := NewSetWithBloomFilter(
+				&setDouble{},
+				prometheus.NewRegistry(),
+				"",
+				1000,
+				0.01,
+				0.05,
+			)
 			require.NoError(err)
-			responseSet := &setDouble{
-				bloom: responseBloom,
-			}
 			for _, item := range tt.responder {
-				require.NoError(responseSet.Add(item))
+				require.NoError(responseSetWithBloom.Add(item))
 			}
 
 			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
@@ -196,7 +196,7 @@ func TestGossiperGossip(t *testing.T) {
 			handler := NewHandler[tx](
 				logging.NoLog{},
 				marshaller,
-				responseSet,
+				responseSetWithBloom,
 				metrics,
 				tt.targetResponseSize,
 			)
@@ -218,13 +218,18 @@ func TestGossiperGossip(t *testing.T) {
 			require.NoError(err)
 			require.NoError(requestNetwork.Connected(t.Context(), ids.EmptyNodeID, nil))
 
-			bloom, err := NewBloomFilter(prometheus.NewRegistry(), "", 1000, 0.01, 0.05)
+			var requestSet setDouble
+			requestSetWithBloom, err := NewSetWithBloomFilter(
+				&requestSet,
+				prometheus.NewRegistry(),
+				"",
+				1000,
+				0.01,
+				0.05,
+			)
 			require.NoError(err)
-			requestSet := &setDouble{
-				bloom: bloom,
-			}
 			for _, item := range tt.requester {
-				require.NoError(requestSet.Add(item))
+				require.NoError(requestSetWithBloom.Add(item))
 			}
 
 			requestClient := requestNetwork.NewClient(
@@ -236,7 +241,7 @@ func TestGossiperGossip(t *testing.T) {
 			gossiper := NewPullGossiper[tx](
 				logging.NoLog{},
 				marshaller,
-				requestSet,
+				requestSetWithBloom,
 				requestClient,
 				metrics,
 				1,
@@ -457,20 +462,10 @@ func TestPushGossiperNew(t *testing.T) {
 	}
 }
 
-type fullSet[T Gossipable] struct{}
+type hasFunc func(id ids.ID) bool
 
-func (fullSet[T]) Add(T) error {
-	return nil
-}
-
-func (fullSet[T]) Has(ids.ID) bool {
-	return true
-}
-
-func (fullSet[T]) Iterate(func(gossipable T) bool) {}
-
-func (fullSet[_]) GetFilter() ([]byte, []byte) {
-	return bloom.FullFilter.Marshal(), ids.Empty[:]
+func (h hasFunc) Has(id ids.ID) bool {
+	return h(id)
 }
 
 // Tests that the outgoing gossip is equivalent to what was accumulated
@@ -593,7 +588,9 @@ func TestPushGossiper(t *testing.T) {
 
 			gossiper, err := NewPushGossiper[tx](
 				marshaller,
-				fullSet[tx]{},
+				hasFunc(func(ids.ID) bool {
+					return true // Never remove the items from the set
+				}),
 				validators,
 				client,
 				metrics,

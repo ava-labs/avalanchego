@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
@@ -28,8 +29,10 @@ var (
 type Network struct {
 	*p2p.Network
 
-	log     logging.Logger
-	mempool *gossipMempool
+	log logging.Logger
+
+	mempoolWithVerification *mempoolWithVerification
+	set                     *gossip.SetWithBloomFilter[*txs.Tx]
 
 	txPushGossiper        *gossip.PushGossiper[*txs.Tx]
 	txPushGossipFrequency time.Duration
@@ -76,11 +79,11 @@ func New(
 		return nil, err
 	}
 
-	gossipMempool, err := newGossipMempool(
-		mempool,
+	mempoolWithVerification := newMempoolWithVerification(mempool, txVerifier)
+	set, err := gossip.NewSetWithBloomFilter(
+		mempoolWithVerification,
 		registerer,
-		log,
-		txVerifier,
+		"mempool_bloom_filter",
 		config.ExpectedBloomFilterElements,
 		config.ExpectedBloomFilterFalsePositiveProbability,
 		config.MaxBloomFilterFalsePositiveProbability,
@@ -91,7 +94,7 @@ func New(
 
 	txPushGossiper, err := gossip.NewPushGossiper[*txs.Tx](
 		marshaller,
-		gossipMempool,
+		set,
 		validators,
 		txGossipClient,
 		txGossipMetrics,
@@ -115,7 +118,7 @@ func New(
 	var txPullGossiper gossip.Gossiper = gossip.NewPullGossiper[*txs.Tx](
 		log,
 		marshaller,
-		gossipMempool,
+		set,
 		txGossipClient,
 		txGossipMetrics,
 		config.PullGossipPollSize,
@@ -131,7 +134,7 @@ func New(
 	handler := gossip.NewHandler[*txs.Tx](
 		log,
 		marshaller,
-		gossipMempool,
+		set,
 		txGossipMetrics,
 		config.TargetGossipSize,
 	)
@@ -167,13 +170,14 @@ func New(
 	}
 
 	return &Network{
-		Network:               p2pNetwork,
-		log:                   log,
-		mempool:               gossipMempool,
-		txPushGossiper:        txPushGossiper,
-		txPushGossipFrequency: config.PushGossipFrequency,
-		txPullGossiper:        txPullGossiper,
-		txPullGossipFrequency: config.PullGossipFrequency,
+		Network:                 p2pNetwork,
+		log:                     log,
+		mempoolWithVerification: mempoolWithVerification,
+		set:                     set,
+		txPushGossiper:          txPushGossiper,
+		txPushGossipFrequency:   config.PushGossipFrequency,
+		txPullGossiper:          txPullGossiper,
+		txPullGossipFrequency:   config.PullGossipFrequency,
 	}, nil
 }
 
@@ -193,7 +197,7 @@ func (n *Network) PullGossip(ctx context.Context) {
 // returned.
 // If the tx is not added to the mempool, an error will be returned.
 func (n *Network) IssueTxFromRPC(tx *txs.Tx) error {
-	if err := n.mempool.Add(tx); err != nil {
+	if err := n.set.Add(tx); err != nil {
 		return err
 	}
 	n.txPushGossiper.Add(tx)
@@ -208,8 +212,13 @@ func (n *Network) IssueTxFromRPC(tx *txs.Tx) error {
 // returned.
 // If the tx is not added to the mempool, an error will be returned.
 func (n *Network) IssueTxFromRPCWithoutVerification(tx *txs.Tx) error {
-	if err := n.mempool.AddWithoutVerification(tx); err != nil {
+	if err := n.mempoolWithVerification.AddWithoutVerification(tx); err != nil {
 		return err
+	}
+	if err := n.set.AddToBloom(tx.ID()); err != nil {
+		n.log.Warn("adding tx to bloom filter",
+			zap.Error(err),
+		)
 	}
 	n.txPushGossiper.Add(tx)
 	return nil
