@@ -84,8 +84,7 @@ fn handle_completion_queue(
                 Some("write failure".to_string()),
             ));
         }
-        // I/O completed successfully - mark node as persisted and cache it
-        pbe_entry.node.allocate_at(pbe_entry.address);
+        // I/O completed successfully - enqueue node for caching at the end
         cached_nodes.push(pbe_entry.node);
     }
     Ok(())

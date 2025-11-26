@@ -237,6 +237,7 @@ where
     F: FnMut(Vec<(&[u8], crate::LinearAddress, MaybePersistedNode)>) -> Result<(), FileIoError>,
 {
     let mut allocated_objects = Vec::new();
+    let mut allocated_len = 0_usize;
 
     // Process each unpersisted node directly from the iterator
     for node in UnPersistedNodeIterator::new(node_store) {
@@ -248,18 +249,23 @@ where
         let (slice, persisted_address, idx_size) =
             serialize_node_to_bump(bump, &shared_node, node_allocator)?;
 
+        // NOTE(#1488): we need to set the address so that the parent node can
+        // reference it when they are serialized within the same batch.
+        node.allocate_at(persisted_address);
+        allocated_len = allocated_len.saturating_add(idx_size);
         allocated_objects.push((slice, persisted_address, node));
 
         // we pause if we can't allocate another node of the same size as the last one
         // This isn't a guarantee that we won't exceed bump_size_limit
         // but it's a good enough approximation
-        let might_overflow = bump.allocated_bytes() > bump_size_limit.saturating_sub(idx_size);
+        let might_overflow = allocated_len > bump_size_limit.saturating_sub(idx_size);
         if might_overflow {
             // must persist freelist before writing anything
             node_allocator.flush_freelist()?;
             write_fn(allocated_objects)?;
             allocated_objects = Vec::new();
             bump.reset();
+            allocated_len = 0;
         }
     }
     if !allocated_objects.is_empty() {
@@ -343,8 +349,7 @@ impl<S: WritableStorage + 'static> NodeStore<Committed, S> {
         for (serialized, persisted_address, node) in allocated_objects {
             self.storage.write(persisted_address.get(), serialized)?;
 
-            // Allocate the node to store the address, then collect for caching and persistence
-            node.allocate_at(persisted_address);
+            // I/O completed successfully - enqueue node for caching at the end
             cached_nodes.push(node);
         }
 
