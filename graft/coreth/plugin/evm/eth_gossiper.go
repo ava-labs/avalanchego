@@ -7,6 +7,7 @@ package evm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -34,7 +35,7 @@ var (
 
 	_ eth.PushGossiper = (*EthPushGossiper)(nil)
 
-	errSubscribing = fmt.Errorf("subscribing to the mempool failed")
+	errSubscribing = errors.New("subscribing to the mempool failed")
 )
 
 // NewGossipEthTxPool creates a new GossipEthTxPool.
