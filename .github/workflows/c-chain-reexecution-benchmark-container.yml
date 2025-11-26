@@ -51,13 +51,13 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             {
               echo "matrix<<EOF"
-              printf '{ "include": [{ "task": "%s", "config": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
+              printf '{ "include": [{ "task": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
                 "${{ github.event.inputs.task }}" \
-                "${{ github.event.inputs.config }}" \
                 "${{ github.event.inputs.start-block }}" \
                 "${{ github.event.inputs.end-block }}" \
                 "${{ github.event.inputs.block-dir-src }}" \
                 "${{ github.event.inputs.current-state-dir-src }}" \
+                "${{ github.event.inputs.config }}" \
                 "${{ github.event.inputs.runner }}" \
                 "${{ github.event.inputs.timeout-minutes }}"
               echo EOF
@@ -89,8 +89,11 @@ jobs:
       - name: Install ARC Dependencies
         shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y xz-utils
+          # xz-utils might be present on some containers. Install if not present.
+          if ! command -v xz &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y xz-utils
+          fi
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
@@ -99,7 +102,7 @@ jobs:
           start-block: ${{ matrix.start-block || inputs.start-block }}
           end-block: ${{ matrix.end-block || inputs.end-block }}
           block-dir-src: ${{ matrix.block-dir-src || inputs.block-dir-src }}
-          current-state-dir-src: ${{ matrix.current-state-dir-src || || inputs.current-state-dir-src }}
+          current-state-dir-src: ${{ matrix.current-state-dir-src || inputs.current-state-dir-src }}
           prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
@@ -109,4 +112,4 @@ jobs:
           aws-region: 'us-east-2'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ${{ github.event.inputs.push-post-state }}
-          runner_name: ${{ matrix.runner || inputs.runner }}
+          runner_name: ${{ matrix.runner }}
