@@ -22,9 +22,6 @@ on:
       current-state-dir-src:
         description: 'The current state directory. Supports S3 directory/zip and local directories.'
         default: ''
-      task:
-        description: 'Taskfile task to execute (e.g., c-chain-reexecution-hashdb-101-250k)'
-        default: ''
       runner:
         description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
         required: true
