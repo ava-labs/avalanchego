@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/coreth/plugin/evm"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -23,10 +22,11 @@ import (
 	_ "github.com/ava-labs/avalanchego/tests/e2e/x/transfer"
 
 	"github.com/ava-labs/avalanchego/config"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
 	"github.com/ava-labs/avalanchego/tests/e2e/vms"
 	"github.com/ava-labs/avalanchego/tests/fixture/e2e"
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
-	"github.com/ava-labs/avalanchego/upgrade"
+	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 )
 
 func TestE2E(t *testing.T) {
@@ -50,13 +50,12 @@ var _ = ginkgo.SynchronizedBeforeSuite(func() []byte {
 	nodes := tmpnet.NewNodesOrPanic(nodeCount)
 	subnets := vms.XSVMSubnetsOrPanic(nodes...)
 
-	upgrades := upgrade.Default
-	if flagVars.ActivateGranite() {
-		upgrades.GraniteTime = upgrade.InitiallyActiveTime
-		upgrades.GraniteEpochDuration = 4 * time.Second
-	} else {
-		upgrades.GraniteTime = upgrade.UnscheduledActivationTime
+	upgradeToActivate := upgradetest.Latest
+	if !flagVars.ActivateLatest() {
+		upgradeToActivate--
 	}
+	upgrades := upgradetest.GetConfig(upgradeToActivate)
+	upgrades.GraniteEpochDuration = 4 * time.Second
 	tc.Log().Info("setting upgrades",
 		zap.Reflect("upgrades", upgrades),
 	)

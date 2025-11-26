@@ -10,6 +10,10 @@ var NoUsage User = noUsage{}
 
 type noUsage struct{}
 
+func (noUsage) AvailableDiskPercentage() uint64 {
+	return 100
+}
+
 func (noUsage) CPUUsage() float64 {
 	return 0
 }
