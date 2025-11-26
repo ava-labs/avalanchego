@@ -353,7 +353,14 @@ func (b *EthAPIBackend) SendTx(ctx context.Context, signedTx *types.Transaction)
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return b.eth.gossiper.Add(signedTx)
+	if err := b.eth.txPool.Add([]*types.Transaction{signedTx}, true, false)[0]; err != nil {
+		return err
+	}
+
+	// We only enqueue transactions for push gossip if they were submitted over the RPC and
+	// added to the mempool.
+	b.eth.gossiper.Add(signedTx)
+	return nil
 }
 
 func (b *EthAPIBackend) GetPoolTransactions() (types.Transactions, error) {

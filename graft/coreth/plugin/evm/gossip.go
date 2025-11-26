@@ -6,8 +6,6 @@
 package evm
 
 import (
-	"errors"
-
 	"github.com/ava-labs/libevm/core/types"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/core/txpool"
@@ -86,19 +84,16 @@ func (tx *gossipTx) GossipID() ids.ID {
 // over the RPC and added to the mempool to peers.
 type atomicPushGossiper struct {
 	pusher *utils.Atomic[*gossip.PushGossiper[*gossipTx]]
-	txPool **txpool.TxPool
+	set    **gossip.SetWithBloomFilter[*gossipTx]
 }
 
-func (e *atomicPushGossiper) Add(tx *types.Transaction) error {
+func (e *atomicPushGossiper) Add(tx *types.Transaction) {
 	// eth.Backend is initialized before the pusher is created, so we just
 	// ignore any gossip requests until it is set.
 	pusher := e.pusher.Get()
 	if pusher == nil {
-		return errors.New("tx pool not set")
+		return
 	}
-	if err := (*e.txPool).Add([]*types.Transaction{tx}, true, false)[0]; err != nil {
-		return err
-	}
+	_ = (*e.set).AddToBloom(ids.ID(tx.Hash()))
 	pusher.Add(&gossipTx{tx})
-	return nil
 }

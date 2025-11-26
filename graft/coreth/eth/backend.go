@@ -76,7 +76,7 @@ type Settings struct {
 // PushGossiper sends pushes pending transactions to peers until they are
 // removed from the mempool.
 type PushGossiper interface {
-	Add(*types.Transaction) error
+	Add(*types.Transaction)
 }
 
 // Ethereum implements the Ethereum full node service.

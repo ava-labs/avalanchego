@@ -605,6 +605,7 @@ func (vm *VM) initializeChain(lastAcceptedHash common.Hash) error {
 		&vm.ethConfig,
 		&atomicPushGossiper{
 			pusher: &vm.gossipPusher,
+			set:    &vm.gossipSet,
 		},
 		vm.chaindb,
 		eth.Settings{MaxBlocksPerRequest: vm.config.MaxBlocksPerRequest},
