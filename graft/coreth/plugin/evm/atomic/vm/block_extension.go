@@ -212,7 +212,9 @@ func (be *blockExtension) Accept(acceptedBatch database.Batch) error {
 func (be *blockExtension) Reject() error {
 	vm := be.blockExtender.vm
 	for _, tx := range be.atomicTxs {
-		// Re-issue the transaction in the mempool, continue even if it fails
+		// We must remove the rejected transaction first to allow any
+		// transactions marked as Issued to be moved back into the Pending
+		// state.
 		vm.AtomicMempool.RemoveTx(tx)
 		if err := vm.AtomicMempool.AddRemoteTx(tx); err != nil {
 			log.Debug("Failed to re-issue transaction in rejected block", "txID", tx.ID(), "err", err)

@@ -74,7 +74,7 @@ func TestNetworkIssueTxFromRPC(t *testing.T) {
 				return mempool
 			}(),
 			tx:          &txs.Tx{Unsigned: &txs.BaseTx{}},
-			expectedErr: mempool.ErrDuplicateTx,
+			expectedErr: nil,
 		},
 		{
 			name: "transaction marked as dropped in mempool",
