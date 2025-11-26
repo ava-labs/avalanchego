@@ -6,7 +6,7 @@ on:
     inputs:
       task:
         description: 'Taskfile task to execute (e.g., c-chain-reexecution-hashdb-101-250k)'
-        default: 'c-chain-reexecution-hashdb-101-250k'
+        default: ''
       config:
         description: 'The config to pass to the VM for the benchmark. See BenchmarkReexecuteRange for details.'
         default: ''

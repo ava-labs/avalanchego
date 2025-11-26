@@ -4,6 +4,9 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      task:
+        description: 'Taskfile task to execute (e.g., c-chain-reexecution-hashdb-101-250k)'
+        default: ''
       config:
         description: 'The config to pass to the VM for the benchmark. See BenchmarkReexecuteRange for details.'
         default: ''
@@ -18,9 +21,6 @@ on:
         default: ''
       current-state-dir-src:
         description: 'The current state directory. Supports S3 directory/zip and local directories.'
-        default: ''
-      task:
-        description: 'Taskfile task to execute (e.g., c-chain-reexecution-hashdb-101-250k)'
         default: ''
       runner:
         description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
@@ -51,19 +51,19 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             {
               echo "matrix<<EOF"
-              printf '{ "include": [{ "task": "%s", "config": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
+              printf '{ "include": [{ "task": "%s", "start-block": "%s", "end-block": "%s", "block-dir-src": "%s", "current-state-dir-src": "%s", "config": "%s", "runner": "%s", "timeout-minutes": %s }] }\n' \
                 "${{ github.event.inputs.task }}" \
-                "${{ github.event.inputs.config }}" \
                 "${{ github.event.inputs.start-block }}" \
                 "${{ github.event.inputs.end-block }}" \
                 "${{ github.event.inputs.block-dir-src }}" \
                 "${{ github.event.inputs.current-state-dir-src }}" \
+                "${{ github.event.inputs.config }}" \
                 "${{ github.event.inputs.runner }}" \
                 "${{ github.event.inputs.timeout-minutes }}"
               echo EOF
             } >> "$GITHUB_OUTPUT"
           else
-            json_string=$(jq -r ".\"${{ github.event_name }}\"" .github/workflows/c-chain-reexecution-benchmark-container.json)
+            json_string=$(jq -r ".\"${{ github.event_name }}\"" .github/workflows/c-chain-reexecution-benchmark-gh-native.json)
             {
               echo "matrix<<EOF"
               echo "$json_string"
