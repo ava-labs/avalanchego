@@ -40,7 +40,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/utxo"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	snowmanblock "github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	blockbuilder "github.com/ava-labs/avalanchego/vms/platformvm/block/builder"
@@ -504,13 +503,11 @@ func (vm *VM) GetBlockIDAtHeight(_ context.Context, height uint64) (ids.ID, erro
 
 func (vm *VM) issueTxFromRPC(tx *txs.Tx) error {
 	err := vm.Network.IssueTxFromRPC(tx)
-	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
+	if err != nil {
 		vm.ctx.Log.Debug("failed to add tx to mempool",
 			zap.Stringer("txID", tx.ID()),
 			zap.Error(err),
 		)
-		return err
 	}
-
-	return nil
+	return err
 }

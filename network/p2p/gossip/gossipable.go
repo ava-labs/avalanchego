@@ -18,8 +18,9 @@ type Marshaller[T Gossipable] interface {
 
 // Set holds a set of known Gossipable items
 type Set[T Gossipable] interface {
-	// Add adds a Gossipable to the set. Returns an error if gossipable was not
-	// added.
+	// Add adds a Gossipable to the set. If the Gossipable is already in the
+	// set, no error should be returned. Otherwise, if the Gossipable was not
+	// added to the set, an error should be returned.
 	Add(gossipable T) error
 	// Has returns true if the gossipable is in the set.
 	Has(gossipID ids.ID) bool

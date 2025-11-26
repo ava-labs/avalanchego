@@ -32,7 +32,6 @@ const (
 )
 
 var (
-	ErrDuplicateTx          = errors.New("duplicate tx")
 	ErrTxTooLarge           = errors.New("tx too large")
 	ErrMempoolFull          = errors.New("mempool is full")
 	ErrConflictsWithOtherTx = errors.New("tx conflicts with other tx")
@@ -110,7 +109,7 @@ func (m *mempool[T]) Add(tx T) error {
 	defer m.lock.Unlock()
 
 	if _, ok := m.unissuedTxs.Get(txID); ok {
-		return fmt.Errorf("%w: %s", ErrDuplicateTx, txID)
+		return nil
 	}
 
 	txSize := tx.Size()

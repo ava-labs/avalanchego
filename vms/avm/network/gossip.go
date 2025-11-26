@@ -5,7 +5,6 @@ package network
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -93,14 +92,12 @@ type gossipMempool struct {
 	bloom *gossip.BloomFilter
 }
 
-// Add is called by the p2p SDK when handling transactions that were pushed to
-// us and when handling transactions that were pulled from a peer. If this
-// returns a nil error while handling push gossip, the p2p SDK will queue the
-// transaction to push gossip as well.
+// Add is called by the p2p SDK when handling transactions that sent pushed to
+// us and when handling transactions that were pulled from a peer.
 func (g *gossipMempool) Add(tx *txs.Tx) error {
 	txID := tx.ID()
 	if _, ok := g.Mempool.Get(txID); ok {
-		return fmt.Errorf("attempted to issue %w: %s ", mempool.ErrDuplicateTx, txID)
+		return nil
 	}
 
 	if reason := g.Mempool.GetDropReason(txID); reason != nil {

@@ -35,7 +35,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/avm/utxo"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
-	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	blockbuilder "github.com/ava-labs/avalanchego/vms/avm/block/builder"
 	blockexecutor "github.com/ava-labs/avalanchego/vms/avm/block/executor"
@@ -468,14 +467,13 @@ func (vm *VM) ParseTx(_ context.Context, bytes []byte) (snowstorm.Tx, error) {
 func (vm *VM) issueTxFromRPC(tx *txs.Tx) (ids.ID, error) {
 	txID := tx.ID()
 	err := vm.network.IssueTxFromRPC(tx)
-	if err != nil && !errors.Is(err, mempool.ErrDuplicateTx) {
+	if err != nil {
 		vm.ctx.Log.Debug("failed to add tx to mempool",
 			zap.Stringer("txID", txID),
 			zap.Error(err),
 		)
-		return txID, err
 	}
-	return txID, nil
+	return txID, err
 }
 
 /*

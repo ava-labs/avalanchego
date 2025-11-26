@@ -7,6 +7,7 @@ package evm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -117,7 +118,11 @@ func (g *GossipEthTxPool) Subscribe(ctx context.Context) {
 // Add enqueues the transaction to the mempool. Subscribe should be called
 // to receive an event if tx is actually added to the mempool or not.
 func (g *GossipEthTxPool) Add(tx *GossipEthTx) error {
-	return g.mempool.Add([]*types.Transaction{tx.Tx}, false, false)[0]
+	err := g.mempool.Add([]*types.Transaction{tx.Tx}, false, false)[0]
+	if errors.Is(err, txpool.ErrAlreadyKnown) {
+		return nil
+	}
+	return err
 }
 
 // Has should just return whether or not the [txID] is still in the mempool,

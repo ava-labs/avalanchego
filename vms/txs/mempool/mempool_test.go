@@ -61,10 +61,10 @@ func TestAdd(t *testing.T) {
 			dropReason: nil,
 		},
 		{
-			name:       "attempt adding duplicate tx",
+			name:       "add duplicate tx",
 			initialTxs: []*dummyTx{tx0},
 			tx:         tx0,
-			err:        ErrDuplicateTx,
+			err:        nil,
 			dropReason: nil,
 		},
 		{

@@ -20,18 +20,14 @@ import (
 var (
 	_ gossip.Set[*atomic.Tx] = (*Mempool)(nil)
 
-	ErrAlreadyKnown    = errors.New("already known")
+	ErrDiscarded       = errors.New("previously discarded")
 	ErrConflict        = errors.New("conflict present")
 	ErrInsufficientFee = errors.New("insufficient fee")
 	ErrMempoolFull     = errors.New("mempool full")
 
-	// If the transaction is already in the mempool, marking it as Discarded,
-	// could unexpectedly cause the transaction to have multiple statuses.
-	//
 	// If the mempool is full, that is not the transaction's fault, so we should
 	// not prevent adding the transaction to the mempool later.
 	errsNotToDiscard = []error{
-		ErrAlreadyKnown,
 		ErrMempoolFull,
 	}
 )
@@ -174,17 +170,17 @@ func (m *Mempool) addTx(tx *atomic.Tx, local bool, force bool) error {
 	// add it again.
 	txID := tx.ID()
 	if _, exists := m.issuedTxs[txID]; exists {
-		return fmt.Errorf("%w: tx %s was issued previously", ErrAlreadyKnown, txID)
+		return nil
 	}
 	if _, exists := m.currentTxs[txID]; exists {
-		return fmt.Errorf("%w: tx %s is being built into a block", ErrAlreadyKnown, txID)
+		return nil
 	}
 	if _, exists := m.pendingTxs.Get(txID); exists {
-		return fmt.Errorf("%w: tx %s is pending", ErrAlreadyKnown, txID)
+		return nil
 	}
 	if !local {
 		if _, exists := m.discardedTxs.Get(txID); exists {
-			return fmt.Errorf("%w: tx %s was discarded", ErrAlreadyKnown, txID)
+			return fmt.Errorf("tx %s was %w", txID, ErrDiscarded)
 		}
 	}
 	if !force && m.verify != nil {

@@ -4,7 +4,6 @@
 package avm
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -16,7 +15,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/linked"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
-	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 type WalletService struct {
@@ -45,9 +43,6 @@ func (w *WalletService) decided(txID ids.ID) {
 			)
 			return
 		}
-		if errors.Is(err, mempool.ErrDuplicateTx) {
-			return
-		}
 
 		w.pendingTxs.Delete(txID)
 		w.vm.ctx.Log.Warn("dropping tx issued over wallet API",
@@ -71,17 +66,16 @@ func (w *WalletService) issue(tx *txs.Tx) (ids.ID, error) {
 	}
 
 	if w.pendingTxs.Len() == 0 {
-		if err := w.vm.network.IssueTxFromRPCWithoutVerification(tx); err == nil {
-			w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
-				zap.Stringer("txID", txID),
-			)
-		} else if !errors.Is(err, mempool.ErrDuplicateTx) {
+		if err := w.vm.network.IssueTxFromRPCWithoutVerification(tx); err != nil {
 			w.vm.ctx.Log.Warn("failed to issue tx over wallet API",
 				zap.Stringer("txID", txID),
 				zap.Error(err),
 			)
 			return ids.Empty, err
 		}
+		w.vm.ctx.Log.Info("issued tx to mempool over wallet API",
+			zap.Stringer("txID", txID),
+		)
 	} else {
 		w.vm.ctx.Log.Info("enqueueing tx over wallet API",
 			zap.Stringer("txID", txID),

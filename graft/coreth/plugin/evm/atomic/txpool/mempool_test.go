@@ -40,7 +40,7 @@ func TestMempoolAddTx(t *testing.T) {
 	}
 }
 
-// Add should return an error if a tx is already known
+// Add should not return an error if a tx is already known
 func TestMempoolAdd(t *testing.T) {
 	require := require.New(t)
 
@@ -54,8 +54,7 @@ func TestMempoolAdd(t *testing.T) {
 
 	tx := atomictest.GenerateTestImportTxWithGas(1, 1)
 	require.NoError(m.Add(tx))
-	err = m.Add(tx)
-	require.ErrorIs(err, ErrAlreadyKnown)
+	require.NoError(m.Add(tx))
 }
 
 // Add should return an error if a tx doesn't consume any gas
