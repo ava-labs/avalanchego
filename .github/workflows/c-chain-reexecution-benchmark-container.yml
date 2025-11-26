@@ -1,7 +1,7 @@
 name: C-Chain Re-Execution Benchmark w/ Container
 
 on:
-  # pull_request:
+  pull_request:
   workflow_dispatch:
     inputs:
       config:
