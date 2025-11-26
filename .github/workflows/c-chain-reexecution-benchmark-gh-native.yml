@@ -24,7 +24,7 @@ on:
         default: ''
       runner:
         description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
-        required: truew
+        required: true
       push-post-state:
         description: 'S3 location to push post-execution state directory. Skips this step if left unpopulated.'
         default: ''
