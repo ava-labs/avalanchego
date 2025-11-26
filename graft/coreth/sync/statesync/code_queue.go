@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
 	"github.com/ava-labs/libevm/libevm/options"
 
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
 	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
 )
 
