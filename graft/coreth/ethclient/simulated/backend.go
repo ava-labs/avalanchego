@@ -35,6 +35,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
 	"github.com/ava-labs/avalanchego/graft/coreth/constants"
 	"github.com/ava-labs/avalanchego/graft/coreth/core"
+	"github.com/ava-labs/avalanchego/graft/coreth/core/txpool"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth/ethconfig"
 	"github.com/ava-labs/avalanchego/graft/coreth/ethclient"
@@ -42,6 +43,7 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/node"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/rpc"
+	"github.com/ava-labs/avalanchego/utils"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
 	ethereum "github.com/ava-labs/libevm"
 	"github.com/ava-labs/libevm/common"
@@ -51,9 +53,16 @@ import (
 
 var _ eth.PushGossiper = (*fakePushGossiper)(nil)
 
-type fakePushGossiper struct{}
+type fakePushGossiper struct {
+	txpool utils.Atomic[*txpool.TxPool]
+}
 
-func (*fakePushGossiper) Add(*types.Transaction) {}
+func (f *fakePushGossiper) Add(tx *types.Transaction) error {
+	if pool := f.txpool.Get(); pool != nil {
+		return pool.Add([]*types.Transaction{tx}, true, false)[0]
+	}
+	return errors.New("tx pool not set")
+}
 
 // Client exposes the methods provided by the Ethereum RPC client.
 type Client interface {
@@ -134,13 +143,16 @@ func newWithNode(stack *node.Node, conf *eth.Config, blockPeriod uint64) (*Backe
 
 	engine := dummy.NewCoinbaseFaker()
 
+	gossiper := &fakePushGossiper{}
 	backend, err := eth.New(
-		stack, conf, &fakePushGossiper{}, chaindb, eth.Settings{}, common.Hash{},
+		stack, conf, gossiper, chaindb, eth.Settings{}, common.Hash{},
 		engine, clock,
 	)
 	if err != nil {
 		return nil, err
 	}
+	gossiper.txpool.Set(backend.TxPool())
+
 	server := rpc.NewServer(0)
 	for _, api := range backend.APIs() {
 		if err := server.RegisterName(api.Namespace, api.Service); err != nil {

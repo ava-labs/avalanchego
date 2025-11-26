@@ -13,7 +13,6 @@ const (
 	TxGossipBloomMinTargetElements       = 8 * 1024
 	TxGossipBloomTargetFalsePositiveRate = 0.01
 	TxGossipBloomResetFalsePositiveRate  = 0.05
-	TxGossipBloomChurnMultiplier         = 3
 	PushGossipDiscardedElements          = 16_384
 	TxGossipTargetMessageSize            = 20 * units.KiB
 	TxGossipThrottlingPeriod             = time.Hour
