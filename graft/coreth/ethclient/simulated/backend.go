@@ -53,7 +53,7 @@ var _ eth.PushGossiper = (*fakePushGossiper)(nil)
 
 type fakePushGossiper struct{}
 
-func (fakePushGossiper) Add(*types.Transaction) {}
+func (*fakePushGossiper) Add(*types.Transaction) {}
 
 // Client exposes the methods provided by the Ethereum RPC client.
 type Client interface {
@@ -135,13 +135,12 @@ func newWithNode(stack *node.Node, conf *eth.Config, blockPeriod uint64) (*Backe
 	engine := dummy.NewCoinbaseFaker()
 
 	backend, err := eth.New(
-		stack, conf, fakePushGossiper{}, chaindb, eth.Settings{}, common.Hash{},
+		stack, conf, &fakePushGossiper{}, chaindb, eth.Settings{}, common.Hash{},
 		engine, clock,
 	)
 	if err != nil {
 		return nil, err
 	}
-
 	server := rpc.NewServer(0)
 	for _, api := range backend.APIs() {
 		if err := server.RegisterName(api.Namespace, api.Service); err != nil {
