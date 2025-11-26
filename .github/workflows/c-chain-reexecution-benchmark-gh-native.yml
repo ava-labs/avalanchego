@@ -88,11 +88,11 @@ jobs:
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
           task: ${{ matrix.task }}
-          config: ${{ matrix.config || inputs.config }}
-          start-block: ${{ matrix.start-block || inputs.start-block }}
-          end-block: ${{ matrix.end-block || inputs.end-block }}
-          block-dir-src: ${{ matrix.block-dir-src || inputs.block-dir-src }}
-          current-state-dir-src: ${{ matrix.current-state-dir-src || inputs.current-state-dir-src }}
+          config: ${{ matrix.config }}
+          start-block: ${{ matrix.start-block }}
+          end-block: ${{ matrix.end-block }}
+          block-dir-src: ${{ matrix.block-dir-src }}
+          current-state-dir-src: ${{ matrix.current-state-dir-src }}
           prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
