@@ -17,8 +17,6 @@ import (
 	ethcommon "github.com/ava-labs/libevm/common"
 )
 
-const pendingTxsBuffer = 10
-
 var (
 	_ gossip.Gossipable            = (*gossipTx)(nil)
 	_ gossip.Marshaller[*gossipTx] = (*gossipTxMarshaller)(nil)
