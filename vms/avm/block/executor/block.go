@@ -36,7 +36,8 @@ var (
 // Exported for testing in avm package.
 type Block struct {
 	block.Block
-	manager *manager
+	manager      *manager
+	sharedMemory atomic.SharedMemory
 }
 
 func (b *Block) Verify(context.Context) error {
@@ -201,7 +202,7 @@ func (b *Block) Verify(context.Context) error {
 
 	// Now that the block has been executed, we can add the block data to the
 	// state diff.
-	stateDiff.SetLastAccepted(blkID)
+	stateDiff.SetLastAccepted(blkID, b.Height())
 	stateDiff.AddBlock(b.Block)
 
 	b.manager.blkIDToState[blkID] = blockState
@@ -209,7 +210,7 @@ func (b *Block) Verify(context.Context) error {
 	return nil
 }
 
-func (b *Block) Accept(context.Context) error {
+func (b *Block) Accept(ctx context.Context) error {
 	blkID := b.ID()
 	defer b.manager.free(blkID)
 
@@ -240,12 +241,23 @@ func (b *Block) Accept(context.Context) error {
 	}
 
 	// Note that this method writes [batch] to the database.
-	if err := b.manager.backend.Ctx.SharedMemory.Apply(blkState.atomicRequests, batch); err != nil {
+	if err := b.sharedMemory.Apply(blkState.atomicRequests, batch); err != nil {
 		return fmt.Errorf("failed to apply state diff to shared memory: %w", err)
+	}
+
+	// We need to commit after committing the shared batch because merkle state
+	// does not share the same database as shared memory
+	if err := b.manager.state.Commit(); err != nil {
+		return fmt.Errorf("failed to commit state diff: %w", err)
 	}
 
 	if err := b.manager.metrics.MarkBlockAccepted(b); err != nil {
 		return err
+	}
+
+	checksum, err := b.manager.state.Checksum(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get checksum: %w", err)
 	}
 
 	b.manager.backend.Ctx.Log.Trace(
@@ -253,7 +265,7 @@ func (b *Block) Accept(context.Context) error {
 		zap.Stringer("blkID", blkID),
 		zap.Uint64("height", b.Height()),
 		zap.Stringer("parentID", b.Parent()),
-		zap.Stringer("checksum", b.manager.state.Checksum()),
+		zap.Stringer("checksum", checksum),
 	)
 	return nil
 }

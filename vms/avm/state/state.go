@@ -4,6 +4,7 @@
 package state
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -17,6 +18,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/metric"
 	"github.com/ava-labs/avalanchego/vms/avm/block"
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
@@ -29,11 +31,14 @@ const (
 )
 
 var (
-	utxoPrefix      = []byte("utxo")
-	txPrefix        = []byte("tx")
-	blockIDPrefix   = []byte("blockID")
-	blockPrefix     = []byte("block")
-	singletonPrefix = []byte("singleton")
+	errDBsOutOfSync = errors.New("dbs are out of sync")
+
+	UTXOPrefix      = []byte("utxo")
+	IndexPrefix     = []byte("index")
+	TxPrefix        = []byte("tx")
+	BlockIDPrefix   = []byte("blockID")
+	BlockPrefix     = []byte("block")
+	SingletonPrefix = []byte("singleton")
 
 	isInitializedKey = []byte{0x00}
 	timestampKey     = []byte{0x01}
@@ -41,6 +46,10 @@ var (
 
 	_ State = (*state)(nil)
 )
+
+type VM interface {
+	Replay(b block.Block) error
+}
 
 type ReadOnlyChain interface {
 	avax.UTXOGetter
@@ -59,8 +68,9 @@ type Chain interface {
 
 	AddTx(tx *txs.Tx)
 	AddBlock(block block.Block)
-	SetLastAccepted(blkID ids.ID)
+	SetLastAccepted(blkID ids.ID, height uint64)
 	SetTimestamp(t time.Time)
+	GetLastAcceptedHeight() uint64
 }
 
 // State persistently maintains a set of UTXOs, transaction, statuses, and
@@ -91,9 +101,9 @@ type State interface {
 	CommitBatch() (database.Batch, error)
 
 	// Checksum returns the current state checksum.
-	Checksum() ids.ID
+	Checksum(ctx context.Context) (ids.ID, error)
 
-	Close() error
+	Close(ctx context.Context) error
 }
 
 /*
@@ -112,11 +122,12 @@ type State interface {
  *   '-- lastAcceptedKey -> lastAccepted
  */
 type state struct {
-	parser block.Parser
-	db     *versiondb.Database
+	parser      block.Parser
+	chainDB     ChainDB
+	baseLocalDB database.Database
+	vdb         *versiondb.Database
 
 	modifiedUTXOs map[ids.ID]*avax.UTXO // map of modified UTXOID -> *UTXO if the UTXO is nil, it has been removed
-	utxoDB        database.Database
 	utxoState     avax.UTXOState
 
 	addedTxs map[ids.ID]*txs.Tx            // map of txID -> *txs.Tx
@@ -133,24 +144,57 @@ type state struct {
 
 	// [lastAccepted] is the most recently accepted block.
 	lastAccepted, persistedLastAccepted ids.ID
+	lastAcceptedHeight uint64
 	timestamp, persistedTimestamp       time.Time
 	singletonDB                         database.Database
 }
 
 func New(
-	db *versiondb.Database,
+	baseDB database.Database,
 	parser block.Parser,
 	metrics prometheus.Registerer,
 	trackChecksums bool,
-) (State, error) {
-	utxoDB := prefixdb.New(utxoPrefix, db)
-	txDB := prefixdb.New(txPrefix, db)
-	blockIDDB := prefixdb.New(blockIDPrefix, db)
-	blockDB := prefixdb.New(blockPrefix, db)
-	singletonDB := prefixdb.New(singletonPrefix, db)
+) (*state, error) {
+	vdb := versiondb.New(baseDB)
 
+	blockDB := prefixdb.New(BlockPrefix, vdb)
+	singletonDB := prefixdb.New(SingletonPrefix, vdb)
+	chainDB := &NoChainDB{}
+
+	return NewWithFormat(
+		"state",
+		chainDB,
+		baseDB,
+		vdb,
+		prefixdb.New(IndexPrefix, vdb),
+		prefixdb.New(TxPrefix, vdb),
+		prefixdb.New(BlockIDPrefix, vdb),
+		blockDB,
+		singletonDB,
+		avax.NewUTXODatabase(prefixdb.New(UTXOPrefix, vdb)),
+		parser,
+		metrics,
+		trackChecksums,
+	)
+}
+
+func NewWithFormat(
+	namespace string,
+	chainDB ChainDB,
+	localBaseDB database.Database,
+	vdb *versiondb.Database,
+	utxoIndexDB database.Database,
+	txDB database.Database,
+	blockIDDB database.Database,
+	blockDB database.Database,
+	singletonDB database.Database,
+	utxoDB avax.UTXODB,
+	parser block.Parser,
+	metrics prometheus.Registerer,
+	trackChecksums bool,
+) (*state, error) {
 	txCache, err := metercacher.New[ids.ID, *txs.Tx](
-		"tx_cache",
+		metric.AppendNamespace(namespace, "tx_cache"),
 		metrics,
 		lru.NewCache[ids.ID, *txs.Tx](txCacheSize),
 	)
@@ -159,7 +203,7 @@ func New(
 	}
 
 	blockIDCache, err := metercacher.New[uint64, ids.ID](
-		"block_id_cache",
+		metric.AppendNamespace(namespace, "block_id_cache"),
 		metrics,
 		lru.NewCache[uint64, ids.ID](blockIDCacheSize),
 	)
@@ -168,7 +212,7 @@ func New(
 	}
 
 	blockCache, err := metercacher.New[ids.ID, block.Block](
-		"block_cache",
+		metric.AppendNamespace(namespace, "block_cache"),
 		metrics,
 		lru.NewCache[ids.ID, block.Block](blockCacheSize),
 	)
@@ -176,17 +220,25 @@ func New(
 		return nil, err
 	}
 
-	utxoState, err := avax.NewMeteredUTXOState(utxoDB, parser.Codec(), metrics, trackChecksums)
+	utxoState, err := avax.NewMeteredUTXOState(
+		namespace,
+		utxoDB,
+		utxoIndexDB,
+		parser.Codec(),
+		metrics,
+		trackChecksums,
+	)
 	if err != nil {
 		return nil, err
 	}
 
 	return &state{
-		parser: parser,
-		db:     db,
+		parser:      parser,
+		chainDB:     chainDB,
+		baseLocalDB: localBaseDB,
+		vdb:         vdb,
 
 		modifiedUTXOs: make(map[ids.ID]*avax.UTXO),
-		utxoDB:        utxoDB,
 		utxoState:     utxoState,
 
 		addedTxs: make(map[ids.ID]*txs.Tx),
@@ -358,7 +410,7 @@ func (s *state) initializeChainState(stopVertexID ids.ID, genesisTimestamp time.
 		return fmt.Errorf("failed to initialize genesis block: %w", err)
 	}
 
-	s.SetLastAccepted(genesis.ID())
+	s.SetLastAccepted(genesis.ID(), genesis.Height())
 	s.SetTimestamp(genesis.Timestamp())
 	s.AddBlock(genesis)
 
@@ -377,12 +429,17 @@ func (s *state) SetInitialized() error {
 	return s.singletonDB.Put(isInitializedKey, nil)
 }
 
+func (s *state) GetLastAcceptedHeight() uint64 {
+	return s.lastAcceptedHeight
+}
+
 func (s *state) GetLastAccepted() ids.ID {
 	return s.lastAccepted
 }
 
-func (s *state) SetLastAccepted(lastAccepted ids.ID) {
+func (s *state) SetLastAccepted(lastAccepted ids.ID, height uint64) {
 	s.lastAccepted = lastAccepted
+	s.lastAcceptedHeight = height
 }
 
 func (s *state) GetTimestamp() time.Time {
@@ -403,24 +460,33 @@ func (s *state) Commit() error {
 }
 
 func (s *state) Abort() {
-	s.db.Abort()
+	s.vdb.Abort()
+	s.chainDB.Abort()
 }
 
 func (s *state) CommitBatch() (database.Batch, error) {
 	if err := s.write(); err != nil {
 		return nil, err
 	}
-	return s.db.CommitBatch()
+
+	b, err := s.vdb.CommitBatch()
+	if err != nil {
+		return nil, err
+	}
+
+	return &batch{Batch: b, state: s, chainDB: s.chainDB}, nil
 }
 
-func (s *state) Close() error {
+func (s *state) Close(ctx context.Context) error {
 	return errors.Join(
-		s.utxoDB.Close(),
+		s.utxoState.Close(),
 		s.txDB.Close(),
 		s.blockIDDB.Close(),
 		s.blockDB.Close(),
 		s.singletonDB.Close(),
-		s.db.Close(),
+		s.vdb.Close(),
+		s.baseLocalDB.Close(),
+		s.chainDB.Close(ctx),
 	)
 }
 
@@ -454,6 +520,12 @@ func (s *state) writeUTXOs() error {
 func (s *state) writeTxs() error {
 	for txID, tx := range s.addedTxs {
 		txBytes := tx.Bytes()
+
+		switch s.addedTxs[txID].Unsigned.(type) {
+		case *txs.ExportTx, *txs.ImportTx:
+			s.chainDB.AddAtomicTx(txID)
+		default:
+		}
 
 		delete(s.addedTxs, txID)
 		s.txCache.Put(txID, tx)
@@ -506,6 +578,43 @@ func (s *state) writeMetadata() error {
 	return nil
 }
 
-func (s *state) Checksum() ids.ID {
+func (s *state) Checksum(context.Context) (ids.ID, error) {
 	return s.utxoState.Checksum()
+}
+
+type batch struct {
+	database.Batch
+	state   State
+	chainDB ChainDB
+}
+
+// Write guarantees that after a versiondb batch is written, data in the ChainDB
+// is also flushed to disk. This is to support firewood where the database is
+// not shared, and we must guarantee that firewood is written to after
+// versiondb.
+func (b *batch) Write() error {
+	chainDBHeight, ok := b.chainDB.Height()
+	if !ok && b.state.GetLastAcceptedHeight() > 0 {
+		// This should not be possible because we repair the chain db as part of
+		// initialization
+		return fmt.Errorf("chain db was not initialized")
+	}
+
+	if b.state.GetLastAcceptedHeight() != chainDBHeight {
+		// Avoid writing state if heights are out of sync because it might be hiding
+		// a bug that we're calling Commit more than once-per-block which would
+		// create more than one state revision per block.
+		return fmt.Errorf(
+			"%w: state is at %d but chain db is at %d",
+			errDBsOutOfSync,
+			b.state.GetLastAcceptedHeight(),
+			chainDBHeight,
+		)
+	}
+
+	if err := b.Batch.Write(); err != nil {
+		return fmt.Errorf("writing versiondb batch: %w", err)
+	}
+
+	return b.chainDB.Commit()
 }

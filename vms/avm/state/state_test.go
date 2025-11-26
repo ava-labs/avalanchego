@@ -20,6 +20,9 @@ import (
 	"github.com/ava-labs/avalanchego/vms/avm/txs"
 	"github.com/ava-labs/avalanchego/vms/components/avax"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
+	"github.com/ava-labs/avalanchego/firewood"
+	"path/filepath"
+	"github.com/ava-labs/avalanchego/database/prefixdb"
 )
 
 const trackChecksums = false
@@ -306,7 +309,7 @@ func TestInitializeChainState(t *testing.T) {
 	require.NoError(err)
 
 	s.AddBlock(childBlock)
-	s.SetLastAccepted(childBlock.ID())
+	s.SetLastAccepted(childBlock.ID(), childBlock.Hght)
 	require.NoError(s.Commit())
 
 	require.NoError(s.InitializeChainState(stopVertexID, genesisTimestamp))
@@ -315,4 +318,43 @@ func TestInitializeChainState(t *testing.T) {
 	lastAccepted, err := s.GetBlock(lastAcceptedID)
 	require.NoError(err)
 	require.Equal(genesis.ID(), lastAccepted.Parent())
+}
+
+// Tests that trying to call State.Commit will error if it causes firewood to
+// have a height inconsistent with the rest of State.
+func TestFirewoodInconsistentHeight(t *testing.T) {
+	require := require.New(t)
+
+	db := memdb.New()
+	vdb := versiondb.New(db)
+
+	firewood, err := firewood.New(filepath.Join(t.TempDir(), "state"))
+	require.NoError(err)
+
+	chainDB := &firewoodDB{db: firewood}
+	s, err := NewWithFormat(
+		"foobar",
+		chainDB,
+		db,
+		vdb,
+		prefixdb.New([]byte("utxo_index"), vdb),
+		prefixdb.New([]byte("tx"), vdb),
+		prefixdb.New([]byte("block_id"), vdb),
+		prefixdb.New([]byte("block_db"), vdb),
+		prefixdb.New([]byte("singleton"), vdb),
+		&firewoodUTXODB{db: firewood},
+		parser,
+		prometheus.NewRegistry(),
+		trackChecksums,
+	)
+	require.NoError(err)
+
+	stopVertexID := ids.GenerateTestID()
+	genesisTimestamp := upgrade.InitiallyActiveTime
+	require.NoError(s.InitializeChainState(stopVertexID, genesisTimestamp))
+
+	require.NoError(s.Commit())
+
+	err = s.Commit()
+	require.ErrorIs(err, errDBsOutOfSync)
 }
