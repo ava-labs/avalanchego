@@ -1,6 +1,8 @@
 name: Firewood Reexecution Benchmark
 
 on:
+  pull_request:
+  push:
   workflow_dispatch:
     inputs:
       firewood-commit:
