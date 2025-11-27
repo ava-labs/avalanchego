@@ -106,7 +106,6 @@ func NewSyncer(client syncclient.Client, db ethdb.Database, root common.Hash, co
 	ss.syncer = syncclient.NewCallbackLeafSyncer(client, ss.segments, &syncclient.LeafSyncerConfig{
 		RequestSize: leafsRequestSize,
 		NumWorkers:  defaultNumWorkers,
-		OnFailure:   ss.onSyncFailure,
 	})
 
 	if codeQueue == nil {
@@ -301,19 +300,19 @@ func (t *stateSync) removeTrieInProgress(root common.Hash) (int, error) {
 	return len(t.triesInProgress), nil
 }
 
-// onSyncFailure is called if the sync fails, this writes all
-// batches of in-progress trie segments to disk to have maximum
-// progress to restore.
-func (t *stateSync) onSyncFailure() {
+// Finalize checks if there are any in-progress tries and flushes their batches to disk
+// to preserve progress. This is called by the syncer registry on sync failure or cancellation.
+func (t *stateSync) Finalize() error {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 
 	for _, trie := range t.triesInProgress {
 		for _, segment := range trie.segments {
 			if err := segment.batch.Write(); err != nil {
-				log.Error("failed to write segment batch on sync failure", "err", err)
-				return
+				log.Error("failed to write segment batch on finalize", "err", err)
+				return err
 			}
 		}
 	}
+	return nil
 }

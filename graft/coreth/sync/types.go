@@ -31,6 +31,13 @@ type Syncer interface {
 	ID() string
 }
 
+// Finalizer provides a mechanism to perform cleanup operations after a sync operation.
+// This is useful for handling inflight requests, flushing to disk, or other cleanup tasks.
+type Finalizer interface {
+	// Finalize performs any necessary cleanup operations.
+	Finalize() error
+}
+
 // SummaryProvider is an interface for providing state summaries.
 type SummaryProvider interface {
 	StateSummaryAtBlock(ethBlock *types.Block) (block.StateSummary, error)
