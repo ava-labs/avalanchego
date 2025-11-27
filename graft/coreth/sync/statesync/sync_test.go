@@ -526,7 +526,7 @@ func testSyncerSyncsToNewRoot(t *testing.T, deleteBetweenSyncs func(*testing.T, 
 // Also verifies any code referenced by the EVM state is present in [clientTrieDB] and the hash is correct.
 func assertDBConsistency(t testing.TB, root common.Hash, clientDB ethdb.Database, serverTrieDB, clientTrieDB *triedb.Database) {
 	numSnapshotAccounts := 0
-	accountIt := customrawdb.IterateAccountSnapshots(clientDB)
+	accountIt := customrawdb.NewAccountSnapshotsIterator(clientDB)
 	defer accountIt.Release()
 	for accountIt.Next() {
 		if !bytes.HasPrefix(accountIt.Key(), rawdb.SnapshotAccountPrefix) || len(accountIt.Key()) != len(rawdb.SnapshotAccountPrefix)+common.HashLength {

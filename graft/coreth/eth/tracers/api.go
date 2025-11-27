@@ -961,23 +961,21 @@ func (api *API) TraceCall(ctx context.Context, args ethapi.TransactionArgs, bloc
 	defer release()
 
 	h := block.Header()
-	// Apply block number override fix before creating block context so GetHashFn
-	// can correctly resolve blockhash(n) when block number is overridden to n+1.
-	if config != nil && config.BlockOverrides != nil && config.BlockOverrides.Number.ToInt().Uint64() == h.Number.Uint64()+1 {
-		// Overriding the block number to n+1 is a common way for wallets to
-		// simulate transactions, however without the following fix, a contract
-		// can assert it is being simulated by checking if blockhash(n) == 0x0 and
-		// can behave differently during the simulation. (#32175 for more info)
-		// --
-		// Modify the parent hash and number so that downstream, blockContext's
-		// GetHash function can correctly return n.
-		h.ParentHash = h.Hash()
-		h.Number.Add(h.Number, big.NewInt(1))
-	}
 	blockContext := core.NewEVMBlockContext(h, api.chainContext(ctx), nil)
 
 	// Apply the customization rules if required.
 	if config != nil {
+		if config.BlockOverrides != nil && config.BlockOverrides.Number.ToInt().Uint64() == h.Number.Uint64()+1 {
+			// Overriding the block number to n+1 is a common way for wallets to
+			// simulate transactions, however without the following fix, a contract
+			// can assert it is being simulated by checking if blockhash(n) == 0x0 and
+			// can behave differently during the simulation. (#32175 for more info)
+			// --
+			// Modify the parent hash and number so that downstream, blockContext's
+			// GetHash function can correctly return n.
+			h.ParentHash = h.Hash()
+			h.Number.Add(h.Number, big.NewInt(1))
+		}
 		originalTime := block.Time()
 		config.BlockOverrides.Apply(&blockContext)
 		// Apply all relevant upgrades from [originalTime] to the block time set in the override.

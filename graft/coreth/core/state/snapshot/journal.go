@@ -43,12 +43,9 @@ import (
 )
 
 var (
-	errSnapshotNotFound          = errors.New("snapshot not found")
-	errSnapshotBlockHashEmpty    = errors.New("missing or corrupted snapshot, no snapshot block hash")
-	errSnapshotBlockHashMismatch = errors.New("snapshot block hash mismatch")
-	errSnapshotRootEmpty         = errors.New("missing or corrupted snapshot, no snapshot root")
-	errSnapshotRootMismatch      = errors.New("snapshot root mismatch")
-	errSnapshotGeneratorMissing  = errors.New("missing snapshot generator")
+	errSnapshotRootEmpty        = errors.New("missing or corrupted snapshot, no snapshot root")
+	errSnapshotRootMismatch     = errors.New("snapshot root mismatch")
+	errSnapshotGeneratorMissing = errors.New("missing snapshot generator")
 )
 
 // journalGenerator is a disk layer entry containing the generator progress marker.
