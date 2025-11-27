@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/libevm/libevm/options"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
+
 	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
 )
 
