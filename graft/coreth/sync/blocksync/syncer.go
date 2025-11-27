@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/ava-labs/avalanchego/vms/evm/database/blockdb"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/ethdb"
@@ -75,10 +76,21 @@ func (s *BlockSyncer) Sync(ctx context.Context) error {
 	nextHeight := s.fromHeight
 	blocksToFetch := s.blocksToFetch
 
+	// Init blockdb with the first block we will be fetching
+	firstBlockToFetch := nextHeight - blocksToFetch + 1
+	if db, ok := s.db.(*blockdb.Database); ok {
+		log.Info(
+			"Initializing block databases on block syncer",
+			"nextHeight", nextHeight,
+			"minHeight", firstBlockToFetch,
+		)
+		db.InitBlockDBs(firstBlockToFetch)
+	}
+
 	// first, check for blocks already available on disk so we don't
 	// request them from peers.
 	for blocksToFetch > 0 {
-		blk := rawdb.ReadBlock(s.db, nextHash, nextHeight)
+		blk := blockdb.ReadBlock(s.db, nextHash, nextHeight)
 		if blk == nil {
 			// block was not found
 			break
