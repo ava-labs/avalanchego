@@ -2,14 +2,16 @@ name: Firewood Reexecution Benchmark
 
 on:
   pull_request:
+    types: [labeled, synchronize]
   push:
   workflow_dispatch:
     inputs:
       firewood-commit:
-        required: true
+        description: 'Firewood commit/branch/tag to build (defaults to main for auto-triggers)'
+        default: 'main'
       task:
         description: 'Taskfile task to execute (e.g., c-chain-reexecution-firewood-101-250k, if present custom inputs below are ignored)'
-        default: ''
+        default: 'c-chain-reexecution-firewood-101-250k'
       config:
         default: ''
       start-block:
@@ -21,7 +23,8 @@ on:
       current-state-dir-src:
         default: ''
       runner:
-        required: true
+        description: 'Runner to use (defaults to ubuntu-latest for auto-triggers)'
+        default: 'avalanche-avalanchego-runner-2ti'
       push-post-state:
         default: ''
       timeout-minutes:
