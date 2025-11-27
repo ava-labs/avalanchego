@@ -24,12 +24,9 @@ on:
         required: true
       push-post-state:
         default: ''
-      timeout-minutes:
-        default: '30'
 
 jobs:
   c-chain-reexecution:
-    timeout-minutes: ${{ inputs.timeout-minutes }}
     permissions:
       id-token: write
       contents: write
