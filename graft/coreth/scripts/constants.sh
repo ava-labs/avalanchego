@@ -24,7 +24,7 @@ echo "Using branch: ${CURRENT_BRANCH}"
 # Use an abbreviated version of the full commit to tag the image.
 
 # WARNING: this will use the most recent commit even if there are un-committed changes present
-CORETH_COMMIT="$(git --git-dir="$CORETH_PATH/.git" rev-parse HEAD)"
+CORETH_COMMIT="$(git --git-dir="$GOPATH/src/github.com/ava-labs/avalanchego/.git" rev-parse HEAD)"
 
 # Set the CGO flags to use the portable version of BLST
 #

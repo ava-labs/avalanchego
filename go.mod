@@ -10,6 +10,7 @@ module github.com/ava-labs/avalanchego
 //   - go.mod (here)
 //   - nix/go/default.nix (update version and sha256 for supported arches)
 //   - tools/go.mod
+//   - graft/**/go.mod (e.g. coreth)
 //
 // - If updating between minor versions (e.g. 1.24.x -> 1.25.x):
 //   - Consider updating the version of golangci-lint (see tools/go.mod)

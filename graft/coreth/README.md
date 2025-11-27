@@ -8,19 +8,7 @@ This chain implements the Ethereum Virtual Machine and supports Solidity smart c
 
 ## Building
 
-Coreth is a dependency of AvalancheGo which is used to implement the EVM based Virtual Machine for the Avalanche C-Chain. In order to run with a local version of Coreth, users must update their Coreth dependency within AvalancheGo to point to their local Coreth directory. If Coreth and AvalancheGo are at the standard location within your GOPATH, this will look like the following:
-
-```bash
-cd $GOPATH/src/github.com/ava-labs/avalanchego
-go mod edit -replace github.com/ava-labs/coreth=../coreth
-```
-
-Now that AvalancheGo depends on the local version of Coreth, we can build with the normal build script:
-
-```bash
-./scripts/build.sh
-./build/avalanchego
-```
+Coreth is a dependency of AvalancheGo which is used to implement the EVM based Virtual Machine for the Avalanche C-Chain. In order to run with a local version of Coreth, users can simply build AvalancheGo from source.
 
 Note: the C-Chain originally ran in a separate process from the main AvalancheGo process and communicated with it over a local gRPC connection. When this was the case, AvalancheGo's build script would download Coreth, compile it, and place the binary into the `avalanchego/build/plugins` directory.
 
@@ -29,13 +17,7 @@ Note: the C-Chain originally ran in a separate process from the main AvalancheGo
 Some activities, such as collecting metrics and logs from the nodes targeted by an e2e
 test run, require binary dependencies. One way of making these dependencies available is
 to use a nix shell which will give access to the dependencies expected by the test
-tooling:
-
-- Install [nix](https://nixos.org/). The [determinate systems
-  installer](https://github.com/DeterminateSystems/nix-installer?tab=readme-ov-file#install-nix)
-  is recommended.
-- Use `./scripts/dev_shell.sh` to start a nix shell
-- Execute the dependency-requiring command (e.g. `./scripts/tests.e2e.sh --start-collectors`)
+tooling. See [flake.nix](../../flake.nix) for how to start.
 
 This repo also defines a `.envrc` file to configure [devenv](https://direnv.net/). With
 `devenv` and `nix` installed, a shell at the root of the repo will automatically start a nix
