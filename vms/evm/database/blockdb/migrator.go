@@ -197,7 +197,7 @@ func (m *migrator) run(ctx context.Context) error {
 
 		// Iterate over block bodies instead of headers since there are keys
 		// under the header prefix that we are not migrating (e.g., hash mappings).
-		iter = m.evmDB.NewIterator(evmBlockBodyPrefix, nil)
+		iter = m.evmDB.NewIterator([]byte{evmBlockBodyPrefix}, nil)
 	)
 
 	defer func() {
@@ -243,9 +243,9 @@ func (m *migrator) run(ctx context.Context) error {
 			continue
 		}
 
-		blockNum, hash, err := parseBlockKey(key)
-		if err != nil {
-			return err
+		blockNum, hash, ok := parseBlockKey(key)
+		if !ok {
+			return errUnexpectedKey
 		}
 
 		if etaTarget == 0 && m.endHeight > 0 && blockNum < m.endHeight {
@@ -294,7 +294,7 @@ func (m *migrator) run(ctx context.Context) error {
 			iter.Release()
 			m.compactBlockRange(startBlockNum, endBlockNum)
 			startKey := encodeBlockNumber(blockNum + 1)
-			newIter := m.evmDB.NewIterator(evmBlockBodyPrefix, startKey)
+			newIter := m.evmDB.NewIterator([]byte{evmBlockBodyPrefix}, startKey)
 			iter = newIter
 			lastCompact = processed
 			canCompact = false
@@ -447,11 +447,11 @@ func writeTargetBlockHeight(db database.KeyValueWriter, endHeight uint64) error 
 }
 
 func isMigratableKey(db ethdb.Reader, key []byte) bool {
-	if !isBodyKey(key) {
+	if key[0] != evmBlockBodyPrefix {
 		return false
 	}
-	num, hash, err := parseBlockKey(key)
-	if err != nil {
+	num, hash, ok := parseBlockKey(key)
+	if !ok {
 		return false
 	}
 
@@ -466,19 +466,19 @@ func isMigratableKey(db ethdb.Reader, key []byte) bool {
 }
 
 func blockHeaderKey(num uint64, hash common.Hash) []byte {
-	return slices.Concat(evmHeaderPrefix, encodeBlockNumber(num), hash.Bytes())
+	return slices.Concat([]byte{evmHeaderPrefix}, encodeBlockNumber(num), hash.Bytes())
 }
 
 func blockBodyKey(num uint64, hash common.Hash) []byte {
-	return slices.Concat(evmBlockBodyPrefix, encodeBlockNumber(num), hash.Bytes())
+	return slices.Concat([]byte{evmBlockBodyPrefix}, encodeBlockNumber(num), hash.Bytes())
 }
 
 func receiptsKey(num uint64, hash common.Hash) []byte {
-	return slices.Concat(evmReceiptsPrefix, encodeBlockNumber(num), hash.Bytes())
+	return slices.Concat([]byte{evmReceiptsPrefix}, encodeBlockNumber(num), hash.Bytes())
 }
 
 func minBlockHeightToMigrate(db ethdb.Database) (uint64, bool, error) {
-	iter := db.NewIterator(evmBlockBodyPrefix, nil)
+	iter := db.NewIterator([]byte{evmBlockBodyPrefix}, nil)
 	defer iter.Release()
 
 	for iter.Next() {
@@ -486,9 +486,9 @@ func minBlockHeightToMigrate(db ethdb.Database) (uint64, bool, error) {
 		if !isMigratableKey(db, key) {
 			continue
 		}
-		num, _, err := parseBlockKey(key)
-		if err != nil {
-			return 0, false, err
+		num, _, ok := parseBlockKey(key)
+		if !ok {
+			return 0, false, errUnexpectedKey
 		}
 		return num, true, nil
 	}

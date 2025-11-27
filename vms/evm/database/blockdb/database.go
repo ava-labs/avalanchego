@@ -4,11 +4,11 @@
 package blockdb
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
@@ -20,8 +20,7 @@ import (
 	"github.com/ava-labs/avalanchego/database/heightindexdb/meterdb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/utils/logging"
-
-	heightindexdb "github.com/ava-labs/avalanchego/x/blockdb"
+	"github.com/ava-labs/avalanchego/x/blockdb"
 )
 
 var (
@@ -46,10 +45,10 @@ var (
 // This is copied from libevm because they are not exported.
 // Since the prefixes should never be changed, we can avoid libevm changes by
 // duplicating them here.
-var (
-	evmHeaderPrefix    = []byte("h")
-	evmBlockBodyPrefix = []byte("b")
-	evmReceiptsPrefix  = []byte("r")
+const (
+	evmHeaderPrefix    = 'h'
+	evmBlockBodyPrefix = 'b'
+	evmReceiptsPrefix  = 'r'
 )
 
 const (
@@ -75,7 +74,7 @@ type Database struct {
 	receiptsDB database.HeightIndex
 
 	// Configuration
-	config    heightindexdb.DatabaseConfig
+	config    blockdb.DatabaseConfig
 	dbPath    string
 	minHeight uint64
 
@@ -99,7 +98,7 @@ func New(
 	evmDB ethdb.Database,
 	dbPath string,
 	allowDeferredInit bool,
-	config heightindexdb.DatabaseConfig,
+	config blockdb.DatabaseConfig,
 	logger logging.Logger,
 	reg prometheus.Registerer,
 ) (*Database, bool, error) {
@@ -112,34 +111,28 @@ func New(
 		logger:   logger,
 	}
 
-	minHeight, ok, err := databaseMinHeight(db.stateDB)
-	if err != nil {
-		return nil, false, err
+	minHeightSrcs := [](func() (uint64, bool, error)){
+		func() (uint64, bool, error) {
+			// If databases already exist, load with existing min height.
+			return databaseMinHeight(db.stateDB)
+		},
+		func() (uint64, bool, error) {
+			// Initialize using the minimum block height of existing blocks to migrate.
+			return minBlockHeightToMigrate(evmDB)
+		},
+		func() (uint64, bool, error) {
+			return 1, !allowDeferredInit, nil
+		},
 	}
-
-	// Databases already exist, load with existing min height.
-	if ok {
-		if err := db.InitBlockDBs(minHeight); err != nil {
+	for _, fn := range minHeightSrcs {
+		h, ok, err := fn()
+		if err != nil {
 			return nil, false, err
 		}
-		return db, true, nil
-	}
-
-	// Initialize using the minimum block height of existing blocks to migrate.
-	minHeight, ok, err = minBlockHeightToMigrate(evmDB)
-	if err != nil {
-		return nil, false, err
-	}
-	if ok {
-		if err := db.InitBlockDBs(minHeight); err != nil {
-			return nil, false, err
+		if !ok {
+			continue
 		}
-		return db, true, nil
-	}
-
-	// Initialize with min height 1 if deferred initialization is not allowed.
-	if !allowDeferredInit {
-		if err := db.InitBlockDBs(1); err != nil {
+		if err := db.InitBlockDBs(h); err != nil {
 			return nil, false, err
 		}
 		return db, true, nil
@@ -215,43 +208,31 @@ func (db *Database) StartMigration() error {
 }
 
 func (db *Database) Put(key []byte, value []byte) error {
-	if !db.useHeightIndexedDB(key) {
+	p, ok := db.parseBlockKey(key)
+	if !ok {
 		return db.Database.Put(key, value)
 	}
-
-	heightDB, err := db.heightDBForKey(key)
-	if err != nil {
-		return err
-	}
-	num, hash, err := parseBlockKey(key)
-	if err != nil {
-		return err
-	}
-	return writeHashAndData(heightDB, num, hash, value)
+	return p.writeHashAndData(value)
 }
 
 func (db *Database) Get(key []byte) ([]byte, error) {
-	if !db.useHeightIndexedDB(key) {
+	p, ok := db.parseBlockKey(key)
+	if !ok {
 		return db.Database.Get(key)
 	}
-
-	heightDB, err := db.heightDBForKey(key)
-	if err != nil {
-		return nil, err
-	}
-	return readHashAndData(heightDB, db.Database, key, db.migrator)
+	return db.readHashAndData(p)
 }
 
 func (db *Database) Has(key []byte) (bool, error) {
-	if !db.useHeightIndexedDB(key) {
+	p, ok := db.parseBlockKey(key)
+	if !ok {
 		return db.Database.Has(key)
 	}
 
-	_, err := db.Get(key)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return false, nil
-		}
+	switch _, err := db.readHashAndData(p); {
+	case errors.Is(err, database.ErrNotFound):
+		return false, nil
+	case err != nil:
 		return false, err
 	}
 	return true, nil
@@ -260,18 +241,14 @@ func (db *Database) Has(key []byte) (bool, error) {
 // Delete removes the key from the underlying database for non-block data.
 // Block data deletion is a no-op because [database.HeightIndex] does not support deletion.
 func (db *Database) Delete(key []byte) error {
-	if !db.useHeightIndexedDB(key) {
+	p, ok := db.parseBlockKey(key)
+	if !ok {
 		return db.Database.Delete(key)
-	}
-
-	num, hash, err := parseBlockKey(key)
-	if err != nil {
-		return err
 	}
 	db.logger.Warn(
 		"Deleting block data is a no-op",
-		zap.Uint64("height", num),
-		zap.Stringer("hash", hash),
+		zap.Uint64("height", p.blockNum),
+		zap.Stringer("hash", p.blockHash),
 	)
 	return nil
 }
@@ -319,7 +296,7 @@ func (db *Database) newMeteredHeightDB(
 ) (database.HeightIndex, error) {
 	path := filepath.Join(db.dbPath, namespace)
 	config := db.config.WithDir(path).WithMinimumHeight(minHeight)
-	ndb, err := heightindexdb.New(config, db.logger)
+	ndb, err := blockdb.New(config, db.logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create %s database at %s: %w", namespace, path, err)
 	}
@@ -333,39 +310,6 @@ func (db *Database) newMeteredHeightDB(
 	}
 
 	return mdb, nil
-}
-
-func (db *Database) heightDBForKey(key []byte) (database.HeightIndex, error) {
-	switch {
-	case isHeaderKey(key):
-		return db.headerDB, nil
-	case isBodyKey(key):
-		return db.bodyDB, nil
-	case isReceiptsKey(key):
-		return db.receiptsDB, nil
-	default:
-		return nil, errUnexpectedKey
-	}
-}
-
-func (db *Database) useHeightIndexedDB(key []byte) bool {
-	if !db.heightDBsReady {
-		return false
-	}
-
-	var n int
-	switch {
-	case isBodyKey(key):
-		n = len(evmBlockBodyPrefix)
-	case isHeaderKey(key):
-		n = len(evmHeaderPrefix)
-	case isReceiptsKey(key):
-		n = len(evmReceiptsPrefix)
-	default:
-		return false
-	}
-	num := binary.BigEndian.Uint64(key[n : n+blockNumberSize])
-	return num >= db.minHeight
 }
 
 type batch struct {
@@ -388,65 +332,75 @@ func (db *Database) NewBatchWithSize(size int) ethdb.Batch {
 }
 
 func (b *batch) Put(key []byte, value []byte) error {
-	if b.db.useHeightIndexedDB(key) {
-		return b.db.Put(key, value)
+	if p, ok := b.db.parseBlockKey(key); ok {
+		return p.writeHashAndData(value)
 	}
 	return b.Batch.Put(key, value)
 }
 
 func (b *batch) Delete(key []byte) error {
-	if b.db.useHeightIndexedDB(key) {
+	if _, ok := b.db.parseBlockKey(key); ok {
 		return b.db.Delete(key)
 	}
 	return b.Batch.Delete(key)
 }
 
-func parseBlockKey(key []byte) (num uint64, hash common.Hash, err error) {
-	var n int
-	switch {
-	case isBodyKey(key):
-		n = len(evmBlockBodyPrefix)
-	case isHeaderKey(key):
-		n = len(evmHeaderPrefix)
-	case isReceiptsKey(key):
-		n = len(evmReceiptsPrefix)
-	default:
-		return 0, common.Hash{}, errUnexpectedKey
+func parseBlockKey(key []byte) (num uint64, hash common.Hash, ok bool) {
+	// All valid prefixes have length 1.
+	if len(key) != 1+blockNumberSize+blockHashSize {
+		return 0, hash, false
 	}
-	num = binary.BigEndian.Uint64(key[n : n+blockNumberSize])
-	bytes := key[n+blockNumberSize:]
-	if len(bytes) != blockHashSize {
-		return 0, common.Hash{}, fmt.Errorf("invalid hash length: %d", len(bytes))
+	if !slices.Contains([]byte{evmBlockBodyPrefix, evmHeaderPrefix, evmReceiptsPrefix}, key[0]) {
+		return 0, common.Hash{}, false
 	}
+	num = binary.BigEndian.Uint64(key[1 : 1+blockNumberSize])
+	bytes := key[1+blockNumberSize:]
 	hash = common.BytesToHash(bytes)
-	return num, hash, nil
+	return num, hash, true
+}
+
+type parsedBlockKey struct {
+	key       []byte
+	heightDB  database.HeightIndex
+	blockNum  uint64
+	blockHash common.Hash
+}
+
+func (db *Database) parseBlockKey(key []byte) (*parsedBlockKey, bool) {
+	if !db.heightDBsReady {
+		return nil, false
+	}
+	num, hash, ok := parseBlockKey(key)
+	if !ok {
+		return nil, false
+	}
+	if num < db.minHeight {
+		return nil, false
+	}
+	p := &parsedBlockKey{
+		key:       key,
+		blockNum:  num,
+		blockHash: hash,
+	}
+
+	switch key[0] {
+	case evmBlockBodyPrefix:
+		p.heightDB = db.bodyDB
+	case evmHeaderPrefix:
+		p.heightDB = db.headerDB
+	case evmReceiptsPrefix:
+		p.heightDB = db.receiptsDB
+	default:
+		return nil, false
+	}
+
+	return p, true
 }
 
 func encodeBlockNumber(number uint64) []byte {
 	enc := make([]byte, blockNumberSize)
 	binary.BigEndian.PutUint64(enc, number)
 	return enc
-}
-
-func isBodyKey(key []byte) bool {
-	if len(key) != len(evmBlockBodyPrefix)+blockNumberSize+blockHashSize {
-		return false
-	}
-	return bytes.HasPrefix(key, evmBlockBodyPrefix)
-}
-
-func isHeaderKey(key []byte) bool {
-	if len(key) != len(evmHeaderPrefix)+blockNumberSize+blockHashSize {
-		return false
-	}
-	return bytes.HasPrefix(key, evmHeaderPrefix)
-}
-
-func isReceiptsKey(key []byte) bool {
-	if len(key) != len(evmReceiptsPrefix)+blockNumberSize+blockHashSize {
-		return false
-	}
-	return bytes.HasPrefix(key, evmReceiptsPrefix)
 }
 
 func databaseMinHeight(db database.KeyValueReader) (uint64, bool, error) {
@@ -461,6 +415,10 @@ func databaseMinHeight(db database.KeyValueReader) (uint64, bool, error) {
 		return 0, false, fmt.Errorf("%w: min height expected %d bytes, got %d", errInvalidEncodedLength, blockNumberSize, len(minBytes))
 	}
 	return binary.BigEndian.Uint64(minBytes), true, nil
+}
+
+func (p *parsedBlockKey) writeHashAndData(data []byte) error {
+	return writeHashAndData(p.heightDB, p.blockNum, p.blockHash, data)
 }
 
 func writeHashAndData(
@@ -478,20 +436,11 @@ func writeHashAndData(
 
 // readHashAndData reads data from [database.HeightIndex] and falls back
 // to the [ethdb.Database] if the data is not found and migration is not complete.
-func readHashAndData(
-	heightDB database.HeightIndex,
-	evmDB ethdb.KeyValueReader,
-	key []byte,
-	migrator *migrator,
-) ([]byte, error) {
-	num, hash, err := parseBlockKey(key)
+func (db *Database) readHashAndData(p *parsedBlockKey) ([]byte, error) {
+	data, err := p.heightDB.Get(p.blockNum)
 	if err != nil {
-		return nil, err
-	}
-	data, err := heightDB.Get(num)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) && !migrator.isCompleted() {
-			return evmDB.Get(key)
+		if errors.Is(err, database.ErrNotFound) && !db.migrator.isCompleted() {
+			return db.Database.Get(p.key)
 		}
 		return nil, err
 	}
@@ -508,7 +457,7 @@ func readHashAndData(
 		)
 		return nil, err
 	}
-	if common.BytesToHash(elems[0]) != hash {
+	if common.BytesToHash(elems[0]) != p.blockHash {
 		// Hash mismatch means we are trying to read a different block at this height.
 		return nil, database.ErrNotFound
 	}
