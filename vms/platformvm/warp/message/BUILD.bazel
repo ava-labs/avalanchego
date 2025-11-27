@@ -1,0 +1,48 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "message",
+    srcs = [
+        "codec.go",
+        "l1_validator_registration.go",
+        "l1_validator_weight.go",
+        "payload.go",
+        "register_l1_validator.go",
+        "subnet_to_l1_conversion.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/warp/message",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//codec/linearcodec",
+        "//ids",
+        "//utils/constants",
+        "//utils/crypto/bls",
+        "//utils/hashing",
+        "//vms/components/verify",
+        "//vms/secp256k1fx",
+        "//vms/types",
+    ],
+)
+
+go_test(
+    name = "message_test",
+    srcs = [
+        "l1_validator_registration_test.go",
+        "l1_validator_weight_test.go",
+        "payload_test.go",
+        "register_l1_validator_test.go",
+        "subnet_to_l1_conversion_test.go",
+    ],
+    embed = [":message"],
+    deps = [
+        "//codec",
+        "//ids",
+        "//utils/constants",
+        "//utils/crypto/bls",
+        "//utils/crypto/bls/signer/localsigner",
+        "//utils/hashing",
+        "//vms/types",
+        "@com_github_stretchr_testify//require",
+    ],
+)

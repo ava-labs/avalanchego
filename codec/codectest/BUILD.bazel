@@ -1,0 +1,13 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "codectest",
+    srcs = ["codectest.go"],
+    importpath = "github.com/ava-labs/avalanchego/codec/codectest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//utils/wrappers",
+        "@com_github_stretchr_testify//require",
+    ],
+)

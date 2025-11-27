@@ -1,0 +1,12 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "protoutils",
+    srcs = ["utils.go"],
+    importpath = "github.com/ava-labs/avalanchego/x/sync/protoutils",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//proto/pb/sync",
+        "//utils/maybe",
+    ],
+)

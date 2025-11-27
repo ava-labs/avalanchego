@@ -1,0 +1,9 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "metricstest",
+    srcs = ["metrics.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/metrics/metricstest",
+    visibility = ["//visibility:public"],
+    deps = ["@com_github_ava_labs_libevm//metrics"],
+)

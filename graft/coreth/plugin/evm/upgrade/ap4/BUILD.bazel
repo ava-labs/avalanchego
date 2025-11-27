@@ -1,0 +1,19 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ap4",
+    srcs = ["cost.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap4",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/utils",
+        "//utils/math",
+    ],
+)
+
+go_test(
+    name = "ap4_test",
+    srcs = ["cost_test.go"],
+    embed = [":ap4"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

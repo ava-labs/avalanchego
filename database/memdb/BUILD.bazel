@@ -1,0 +1,16 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "memdb",
+    srcs = ["db.go"],
+    importpath = "github.com/ava-labs/avalanchego/database/memdb",
+    visibility = ["//visibility:public"],
+    deps = ["//database"],
+)
+
+go_test(
+    name = "memdb_test",
+    srcs = ["db_test.go"],
+    embed = [":memdb"],
+    deps = ["//database/dbtest"],
+)

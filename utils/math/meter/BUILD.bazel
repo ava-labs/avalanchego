@@ -1,0 +1,22 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "meter",
+    srcs = [
+        "continuous_meter.go",
+        "factory.go",
+        "meter.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/math/meter",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "meter_test",
+    srcs = [
+        "meter_benchmark_test.go",
+        "meter_test.go",
+    ],
+    embed = [":meter"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

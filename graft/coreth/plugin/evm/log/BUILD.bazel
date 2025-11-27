@@ -1,0 +1,20 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "log",
+    srcs = ["log.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/log",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/log",
+        "@com_github_ava_labs_libevm//log",
+        "@org_golang_x_exp//slog",
+    ],
+)
+
+go_test(
+    name = "log_test",
+    srcs = ["log_test.go"],
+    embed = [":log"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

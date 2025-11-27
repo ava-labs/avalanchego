@@ -1,0 +1,26 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "tests",
+    srcs = [
+        "context_helpers.go",
+        "log.go",
+        "metrics.go",
+        "notify_context.go",
+        "prometheus_server.go",
+        "simple_test_context.go",
+        "test_context.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/tests",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/metrics",
+        "//utils/logging",
+        "//wallet/subnet/primary/common",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_golang//prometheus/promhttp",
+        "@com_github_prometheus_client_model//go",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_zap//:zap",
+    ],
+)

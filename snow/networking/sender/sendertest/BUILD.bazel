@@ -1,0 +1,16 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "sendertest",
+    srcs = ["external.go"],
+    importpath = "github.com/ava-labs/avalanchego/snow/networking/sender/sendertest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//message",
+        "//snow/engine/common",
+        "//snow/networking/sender",
+        "//subnets",
+        "//utils/set",
+    ],
+)

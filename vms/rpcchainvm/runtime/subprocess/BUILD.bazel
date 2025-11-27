@@ -1,0 +1,31 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "subprocess",
+    srcs = [
+        "initializer.go",
+        "linux_stopper.go",
+        "non_linux_stopper.go",
+        "runtime.go",
+        "stopper.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/rpcchainvm/runtime/subprocess",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//proto/pb/vm/runtime",
+        "//utils/logging",
+        "//version",
+        "//vms/rpcchainvm/grpcutils",
+        "//vms/rpcchainvm/gruntime",
+        "//vms/rpcchainvm/runtime",
+        "@org_uber_go_zap//:zap",
+    ] + select({
+        "@rules_go//go/platform:android": [
+            "//utils/wrappers",
+        ],
+        "@rules_go//go/platform:linux": [
+            "//utils/wrappers",
+        ],
+        "//conditions:default": [],
+    }),
+)

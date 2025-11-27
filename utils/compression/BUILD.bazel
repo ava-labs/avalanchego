@@ -1,0 +1,31 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "compression",
+    srcs = [
+        "compressor.go",
+        "no_compressor.go",
+        "type.go",
+        "zstd_compressor.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/compression",
+    visibility = ["//visibility:public"],
+    deps = ["@com_github_datadog_zstd//:zstd"],
+)
+
+go_test(
+    name = "compression_test",
+    srcs = [
+        "compressor_test.go",
+        "no_compressor_test.go",
+        "type_test.go",
+    ],
+    embed = [":compression"],
+    embedsrcs = ["zstd_zip_bomb.bin"],
+    deps = [
+        "//utils",
+        "//utils/units",
+        "@com_github_datadog_zstd//:zstd",
+        "@com_github_stretchr_testify//require",
+    ],
+)

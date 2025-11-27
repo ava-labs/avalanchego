@@ -1,0 +1,61 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "tracers",
+    srcs = [
+        "api.go",
+        "tracers.go",
+        "tracker.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/eth/tracers",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/consensus",
+        "//graft/coreth/core",
+        "//graft/coreth/internal/ethapi",
+        "//graft/coreth/params",
+        "//graft/coreth/rpc",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//eth/tracers",
+        "@com_github_ava_labs_libevm//eth/tracers/logger",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//rlp",
+    ],
+)
+
+go_test(
+    name = "tracers_test",
+    srcs = [
+        "api_test.go",
+        "tracers_test.go",
+        "tracker_test.go",
+    ],
+    embed = [":tracers"],
+    deps = [
+        "//graft/coreth/consensus",
+        "//graft/coreth/consensus/dummy",
+        "//graft/coreth/core",
+        "//graft/coreth/internal/ethapi",
+        "//graft/coreth/params",
+        "//graft/coreth/plugin/evm/customrawdb",
+        "//graft/coreth/plugin/evm/customtypes",
+        "//graft/coreth/rpc",
+        "//graft/coreth/tests",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//common/hexutil",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//eth/tracers/logger",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//params",
+        "@org_golang_x_exp//slices",
+    ],
+)

@@ -1,0 +1,21 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "ethconfig",
+    srcs = [
+        "config.go",
+        "gen_config.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/eth/ethconfig",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/core",
+        "//graft/coreth/core/txpool/blobpool",
+        "//graft/coreth/core/txpool/legacypool",
+        "//graft/coreth/eth/gasprice",
+        "//graft/coreth/internal/ethapi",
+        "//graft/coreth/miner",
+        "//graft/coreth/params",
+        "@com_github_ava_labs_libevm//common",
+    ],
+)

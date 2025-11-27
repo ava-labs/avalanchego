@@ -1,0 +1,13 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "validatorstest",
+    srcs = ["manager.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/validators/validatorstest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/validators",
+        "//vms/platformvm/validators",
+    ],
+)

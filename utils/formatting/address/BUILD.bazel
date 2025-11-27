@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "address",
+    srcs = [
+        "address.go",
+        "converter.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/formatting/address",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "@com_github_btcsuite_btcd_btcutil//bech32",
+    ],
+)

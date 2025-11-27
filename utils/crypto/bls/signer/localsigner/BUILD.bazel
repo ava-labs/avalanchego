@@ -1,0 +1,30 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "localsigner",
+    srcs = ["localsigner.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/crypto/bls",
+        "//utils/perms",
+        "@com_github_supranational_blst//bindings/go",
+    ],
+)
+
+go_test(
+    name = "localsigner_test",
+    srcs = [
+        "benchmark_test.go",
+        "bls_test.go",
+        "serialization_test.go",
+    ],
+    embed = [":localsigner"],
+    deps = [
+        "//utils",
+        "//utils/crypto/bls",
+        "//utils/crypto/bls/blstest",
+        "@com_github_stretchr_testify//require",
+        "@com_github_supranational_blst//bindings/go",
+    ],
+)

@@ -1,0 +1,58 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "common",
+    srcs = [
+        "bootstrap_tracker.go",
+        "bootstrapable.go",
+        "engine.go",
+        "error.go",
+        "fx.go",
+        "halter.go",
+        "message.go",
+        "no_ops_handlers.go",
+        "notifier.go",
+        "request.go",
+        "sender.go",
+        "state_syncer.go",
+        "timer.go",
+        "traced_bootstrapable_engine.go",
+        "traced_engine.go",
+        "traced_state_syncer.go",
+        "vm.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/common",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/health",
+        "//database",
+        "//ids",
+        "//message",
+        "//snow",
+        "//snow/validators",
+        "//trace",
+        "//utils/logging",
+        "//utils/set",
+        "//version",
+        "@io_opentelemetry_go_otel//attribute",
+        "@io_opentelemetry_go_otel_trace//:trace",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "common_test",
+    srcs = [
+        "error_test.go",
+        "mocks_generate_test.go",
+        "notifier_test.go",
+        "request_test.go",
+        "timer_test.go",
+    ],
+    embed = [":common"],
+    deps = [
+        "//ids",
+        "//utils/logging",
+        "@com_github_stretchr_testify//require",
+    ],
+)

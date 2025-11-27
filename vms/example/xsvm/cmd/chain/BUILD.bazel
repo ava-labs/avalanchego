@@ -1,0 +1,13 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "chain",
+    srcs = ["cmd.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/chain",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//vms/example/xsvm/cmd/chain/create",
+        "//vms/example/xsvm/cmd/chain/genesis",
+        "@com_github_spf13_cobra//:cobra",
+    ],
+)

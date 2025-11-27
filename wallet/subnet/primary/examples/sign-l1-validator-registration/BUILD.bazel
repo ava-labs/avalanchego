@@ -1,0 +1,31 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "sign-l1-validator-registration_lib",
+    srcs = ["main.go"],
+    importpath = "github.com/ava-labs/avalanchego/wallet/subnet/primary/examples/sign-l1-validator-registration",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//api/info",
+        "//ids",
+        "//message",
+        "//network/p2p",
+        "//network/peer",
+        "//proto/pb/sdk",
+        "//snow/networking/router",
+        "//utils/compression",
+        "//utils/constants",
+        "//vms/platformvm/warp",
+        "//vms/platformvm/warp/message",
+        "//vms/platformvm/warp/payload",
+        "//wallet/subnet/primary",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_golang_google_protobuf//proto",
+    ],
+)
+
+go_binary(
+    name = "sign-l1-validator-registration",
+    embed = [":sign-l1-validator-registration_lib"],
+    visibility = ["//visibility:public"],
+)

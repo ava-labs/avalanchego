@@ -1,0 +1,9 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "filesystemmock",
+    srcs = ["reader.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/filesystem/filesystemmock",
+    visibility = ["//visibility:public"],
+    deps = ["@org_uber_go_mock//gomock"],
+)

@@ -1,0 +1,48 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "state",
+    srcs = [
+        "diff.go",
+        "state.go",
+        "versions.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/avm/state",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache",
+        "//cache/lru",
+        "//cache/metercacher",
+        "//database",
+        "//database/prefixdb",
+        "//database/versiondb",
+        "//ids",
+        "//vms/avm/block",
+        "//vms/avm/txs",
+        "//vms/components/avax",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)
+
+go_test(
+    name = "state_test",
+    srcs = [
+        "mocks_generate_test.go",
+        "state_test.go",
+    ],
+    embed = [":state"],
+    deps = [
+        "//database",
+        "//database/memdb",
+        "//database/versiondb",
+        "//ids",
+        "//upgrade",
+        "//vms/avm/block",
+        "//vms/avm/fxs",
+        "//vms/avm/txs",
+        "//vms/components/avax",
+        "//vms/secp256k1fx",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)
