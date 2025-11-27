@@ -38,6 +38,10 @@ func (*backendVisitor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrUnsupportedTxType
 }
 
+func (*backendVisitor) RewardContinuousValidatorTx(tx *txs.RewardContinuousValidatorTx) error {
+	return ErrUnsupportedTxType
+}
+
 func (b *backendVisitor) AddValidatorTx(tx *txs.AddValidatorTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
@@ -59,6 +63,7 @@ func (b *backendVisitor) CreateSubnetTx(tx *txs.CreateSubnetTx) error {
 		b.txID,
 		tx.Owner,
 	)
+
 	return b.baseTx(&tx.BaseTx)
 }
 
@@ -169,6 +174,14 @@ func (b *backendVisitor) IncreaseL1ValidatorBalanceTx(tx *txs.IncreaseL1Validato
 }
 
 func (b *backendVisitor) DisableL1ValidatorTx(tx *txs.DisableL1ValidatorTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+	return b.baseTx(&tx.BaseTx)
+}
+
+func (b *backendVisitor) StopContinuousValidatorTx(tx *txs.StopContinuousValidatorTx) error {
 	return b.baseTx(&tx.BaseTx)
 }
 

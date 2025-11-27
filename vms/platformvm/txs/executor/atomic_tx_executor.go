@@ -84,6 +84,10 @@ func (*atomicTxExecutor) RewardValidatorTx(*txs.RewardValidatorTx) error {
 	return ErrWrongTxType
 }
 
+func (*atomicTxExecutor) RewardContinuousValidatorTx(tx *txs.RewardContinuousValidatorTx) error {
+	return ErrWrongTxType
+}
+
 func (*atomicTxExecutor) RemoveSubnetValidatorTx(*txs.RemoveSubnetValidatorTx) error {
 	return ErrWrongTxType
 }
@@ -125,6 +129,14 @@ func (*atomicTxExecutor) IncreaseL1ValidatorBalanceTx(*txs.IncreaseL1ValidatorBa
 }
 
 func (*atomicTxExecutor) DisableL1ValidatorTx(*txs.DisableL1ValidatorTx) error {
+	return ErrWrongTxType
+}
+
+func (e *atomicTxExecutor) AddContinuousValidatorTx(tx *txs.AddContinuousValidatorTx) error {
+	return ErrWrongTxType
+}
+
+func (e *atomicTxExecutor) StopContinuousValidatorTx(tx *txs.StopContinuousValidatorTx) error {
 	return ErrWrongTxType
 }
 
