@@ -1,14 +1,11 @@
 name: Firewood Reexecution Benchmark
 
 on:
-  pull_request:
-    types: [labeled, synchronize]
-  push:
   workflow_dispatch:
     inputs:
       firewood-commit:
-        description: 'Firewood commit/branch/tag to build (defaults to main for auto-triggers)'
-        default: 'main'
+        description: 'Firewood commit/branch/tag to build and test'
+        required: true
       task:
         description: 'Taskfile task to execute (e.g., c-chain-reexecution-firewood-101-250k, if present custom inputs below are ignored)'
         default: 'c-chain-reexecution-firewood-101-250k'
@@ -23,18 +20,17 @@ on:
       current-state-dir-src:
         default: ''
       runner:
-        description: 'Runner to use (defaults to ubuntu-latest for auto-triggers)'
-        default: 'avalanche-avalanchego-runner-2ti'
+        description: 'Runner to execute the benchmark. Input to the runs-on field of the job.'
+        required: true
       push-post-state:
         default: ''
       timeout-minutes:
-        default: '30'
+        type: number
+        default: 30
 
 jobs:
   c-chain-reexecution:
-    # Only run on push or workflow_dispatch, or if PR has 'run-benchmark' label
-    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'run-benchmark') }}
-    timeout-minutes: ${{ fromJSON(inputs.timeout-minutes) }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
     permissions:
       id-token: write
       contents: write
