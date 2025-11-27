@@ -47,7 +47,7 @@ const (
 	repoRelativePath = "tests/fixture/bootstrapmonitor/e2e"
 
 	avalanchegoImage       = "localhost:5001/avalanchego"
-	latestAvalanchegoImage = avalanchegoImage + ":latest"
+	masterAvalanchegoImage = avalanchegoImage + ":master"
 	monitorImage           = "localhost:5001/bootstrap-monitor"
 	latestMonitorImage     = monitorImage + ":latest"
 
@@ -257,7 +257,7 @@ func buildImage(tc tests.TestContext, imageName string, forceNewHash bool, scrip
 	) // #nosec G204
 	cmd.Env = append(os.Environ(),
 		"DOCKER_IMAGE="+imageName,
-		"FORCE_TAG_LATEST=1",
+		"FORCE_TAG_MASTER=1",
 		"SKIP_BUILD_RACE=1",
 	)
 	output, err := cmd.CombinedOutput()
@@ -268,7 +268,7 @@ func newNodeStatefulSet(name string, flags tmpnet.FlagsMap) *appsv1.StatefulSet 
 	statefulSet := tmpnet.NewNodeStatefulSet(
 		name,
 		true, // generateName
-		latestAvalanchegoImage,
+		masterAvalanchegoImage,
 		nodeContainerName,
 		volumeName,
 		volumeSize,
