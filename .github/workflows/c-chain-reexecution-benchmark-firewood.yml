@@ -1,0 +1,82 @@
+name: Firewood Reexecution Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      firewood-commit:
+        required: true
+      task:
+        description: 'Taskfile task to execute (e.g., c-chain-reexecution-firewood-101-250k, if present custom inputs below are ignored)'
+        default: ''
+      config:
+        default: ''
+      start-block:
+        default: ''
+      end-block:
+        default: ''
+      block-dir-src:
+        default: ''
+      current-state-dir-src:
+        default: ''
+      runner:
+        required: true
+      push-post-state:
+        default: ''
+      timeout-minutes:
+        default: '30'
+
+jobs:
+  c-chain-reexecution:
+    timeout-minutes: ${{ fromJSON(inputs.timeout-minutes) }}
+    permissions:
+      id-token: write
+      contents: write
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ARC Dependencies
+        shell: bash
+        run: |
+          # xz-utils might be present on some containers. Install if not present.
+          if ! command -v xz &> /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y xz-utils
+          fi
+      - name: Install Nix
+        uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
+        with:
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Firewood from source
+        shell: bash
+        run: |
+          cd graft/coreth
+          echo "Building Firewood from: ${{ inputs.firewood-commit }}"
+          # The script updates go.mod automatically
+          ./scripts/build_firewood.sh "${{ inputs.firewood-commit }}" --update
+      - name: Run C-Chain Re-Execution Benchmark
+        uses: ./.github/actions/c-chain-reexecution-benchmark
+        with:
+          task: ${{ inputs.task }}
+          config: ${{ inputs.config }}
+          start-block: ${{ inputs.start-block }}
+          end-block: ${{ inputs.end-block }}
+          block-dir-src: ${{ inputs.block-dir-src }}
+          current-state-dir-src: ${{ inputs.current-state-dir-src }}
+          prometheus-url: ${{ secrets.PROMETHEUS_URL || '' }}
+          prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
+          prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
+          prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
+          push-github-action-benchmark: false
+          aws-role: ${{ inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
+          aws-region: 'us-east-2'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          push-post-state: ${{ inputs.push-post-state }}
+          runner_name: ${{ inputs.runner }}
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-output
+          path: ${{ github.workspace }}/benchmark-output.txt
+          retention-days: 30
+          if-no-files-found: error
+
