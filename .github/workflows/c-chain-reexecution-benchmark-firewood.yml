@@ -32,6 +32,8 @@ on:
 
 jobs:
   c-chain-reexecution:
+    # Only run on push or workflow_dispatch, or if PR has 'run-benchmark' label
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'run-benchmark') }}
     timeout-minutes: ${{ fromJSON(inputs.timeout-minutes) }}
     permissions:
       id-token: write
