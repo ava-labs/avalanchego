@@ -33,6 +33,8 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
+      - name: Setup Go
+        uses: ./.github/actions/setup-go-for-project
       - name: Install Nix Dependencies
         shell: bash
         run: |
@@ -52,6 +54,9 @@ jobs:
           echo "Building Firewood from: ${{ inputs.firewood-commit }}"
           # The script updates go.mod automatically
           ./scripts/build_firewood.sh "${{ inputs.firewood-commit }}" --update
+        env:
+          TMPDIR: /tmp 
+          NIX_BUILD_TOP: /tmp # Updated default Nix build from /home/runner/_work/_temp/ which is a restricted volume on self-hosted runners.
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
