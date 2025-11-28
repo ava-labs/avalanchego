@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1764339667142,
+  "lastUpdate": 1764343438038,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -2520,6 +2520,34 @@ window.BENCHMARK_DATA = {
             "value": 84.19,
             "unit": "mgas/s",
             "extra": "1 times\n32 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "yacovm",
+            "username": "yacovm",
+            "email": "yacovm@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "ee44f6856445429c0a3358b6c51b3add376b8751",
+          "message": "Increase stack trace size when outputting it to stderr (#4618)\n\nSigned-off-by: Yacov Manevich <yacov.manevich@avalabs.org>",
+          "timestamp": "2025-11-26T15:52:31Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/ee44f6856445429c0a3358b6c51b3add376b8751"
+        },
+        "date": 1764343435393,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[33000001,33500000]-Config-default-Runner-avago-runner-m6i-4xlarge-ebs-fast",
+            "value": 42.09,
+            "unit": "mgas/s",
+            "extra": "1 times\n16 procs"
           }
         ]
       }
