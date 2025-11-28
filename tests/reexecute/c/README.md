@@ -42,7 +42,7 @@ export AWS_REGION=us-east-2
 
 ### Metrics Collection
 
-If running locally, metrics collection can be customized via the following parameters:
+If running locally, metrics collection can be customized via the following **environment variables**:
 
 - `METRICS_SERVER_ENABLED`: starts a Prometheus server exporting VM metrics.
 - `METRICS_SERVER_PORT`: if set, determines the port the Prometheus server will listen to (set to `0` by default).
@@ -50,13 +50,26 @@ If running locally, metrics collection can be customized via the following param
 
 When utilizing the metrics collector feature, follow the instructions in the e2e [README](../../e2e/README.md#monitoring) to set the required Prometheus environment variables.
 
-Running the re-execution test in CI will always set `METRICS_SERVER_ENABLED=true` and `METRICS_COLLECTOR_ENABLED=true`.
+Running the re-execution test in CI will implicitly set `METRICS_COLLECTOR_ENABLED: ${{ inputs.prometheus-username != '' }}` if Prometheus credentials are provided.
 
 ## Quick Start
 
 Let's run the default benchmark to get started. Make sure that you have completed the [Prerequisites](#prerequisites) section because it is required to copy the data from S3.
 
-Decide what directory you want to use as a working directory and set the parameter `EXECUTION_DATA_DIR`. To re-execute a range of blocks, we need to copy the blocks themselves and the initial state of the chain, so these will be copied into `EXECUTION_DATA_DIR`.
+### Using Predefined Tasks
+
+You can run `./scripts/run_task.sh --list | grep "c-chain-reexecution"` to list predefined tasks for common re-execution scenarios.
+
+To run a predefined task:
+```bash
+./scripts/run_task.sh c-chain-reexecution-hashdb-101-250k
+```
+
+These tasks automatically download the required data from S3 and run the benchmark with the appropriate configuration.
+
+### Using Custom Parameters
+
+For custom benchmark runs:
 
 [Taskfile](https://taskfile.dev/) supports reading arguments via both environment variables and named arguments on the command line, so we'll set `EXECUTION_DATA_DIR` and use the defaults for the remainder of the parameters:
 
@@ -238,11 +251,24 @@ The `CONFIG` parameter currently only supports pre-defined configs and not passi
 
 The C-Chain benchmarks export VM metrics to the same Grafana instance as AvalancheGo CI: https://grafana-poc.avax-dev.network/.
 
-To export metrics for a local run, simply set the Taskfile variables `METRICS_SERVER_ENABLED=true` and `METRICS_COLLECTOR_ENABLED=true` either via environment variable or passing it at the command line.
+To export metrics for a local run, set the environment variables `METRICS_COLLECTOR_ENABLED=true`:
 
-You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).
+```bash
+export METRICS_COLLECTOR_ENABLED=true
+./scripts/run_task.sh c-chain-reexecution-hashdb-101-250k
+```
 
-To attach additional labels to the metrics from a local run, set the Taskfile variable `LABELS` to a comma separated list of key value pairs (ex. `LABELS=user=alice,os=ubuntu`).
+You can view granular C-Chain processing metrics with the label attached to this job (job="c-chain-reexecution") [here](https://grafana-poc.avax-dev.network/d/Gl1I20mnk/c-chain?orgId=1&from=now-5m&to=now&timezone=browser&var-datasource=P1809F7CD0C75ACF3&var-filter=job%7C%3D%7Cc-chain-reexecution&var-chain=C&refresh=10s).  
+
+**NOTE: Prometheus credentials are required for collection**  
+
+---
+
+To attach additional labels to the metrics from a local run, set the `LABELS` environment variable to a comma separated list of key value pairs:
+
+```bash
+export LABELS=user=alice,os=ubuntu
+```
 
 Note: to ensure Prometheus gets a final scrape at the end of a run, the test will sleep for 2s greater than the 10s Prometheus scrape interval, which will cause short-running tests to appear to take much longer than expected. Additionally, the linked dashboard displays most metrics using a 1min rate, which means that very short running tests will not produce a very useful visualization.
 
@@ -267,46 +293,43 @@ Both workflows provide three triggers:
 
 The manual workflow takes in all parameters specified by the user. To more easily specify a CI matrix and avoid GitHub's pain inducing matrix syntax, we define simple JSON files with the exact set of configs to run for each `pull_request` and `schedule` trigger. To add a new job for either of these triggers, simply define the entry in JSON and add it to run on the desired workflow.
 
-For example, to add a new Firewood benchmark to execute the block range [30m, 40m] on a daily basis, follow the instructions above to generate the Firewood state as of block height 30m, export it to S3, and add the following entry under the `schedule` include array in the [GH Native JSON file](../../../.github/workflows/c-chain-reexecution-benchmark-gh-native.json).
+The workflows support two approaches:
+1. **Task-based**: Specify a predefined `task` name (e.g., `"task": "c-chain-reexecution-firewood-101-250k"`)
+2. **Custom parameters**: Specify individual parameters with `"task": ""` and provide `config`, `start-block`, `end-block`, `block-dir-src`, `current-state-dir-src`
+
+For example, to add a new task-based Firewood benchmark to execute the block range [101, 250K] on a daily basis, add the following entry under the `schedule` include array in the [GH Native JSON file](../../../.github/workflows/c-chain-reexecution-benchmark-gh-native.json).
 
 ```json
 {
     "runner": "blacksmith-4vcpu-ubuntu-2404",
-    "config": "firewood",
-    "start-block": 30000001,
-    "end-block": 40000000,
-    "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-50m-ldb/**",
-    "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-30m/**",
-    "timeout-minutes": 1440
+    "task": "c-chain-reexecution-firewood-101-250k",
+    "timeout-minutes": 30
 }
 ```
 
 ## Trigger Workflow Dispatch with GitHub CLI
 
-To triggers runs conveniently, you can use the [GitHub CLI](https://cli.github.com/manual/gh_workflow_run) to trigger workflows.
+To trigger runs conveniently, you can use the [GitHub CLI](https://cli.github.com/manual/gh_workflow_run) to trigger workflows.
 
-Note: passing JSON to the GitHub CLI requires all key/value pairs as strings, so ensure that any number parameters are quoted as strings or you will see the error:
-
-```bash
-could not parse provided JSON: json: cannot unmarshal number into Go value of type string
-```
-
-Copy your desired parameters as JSON into a file or write it out on the command line:
-
-```json
-{
-    "runner": "blacksmith-4vcpu-ubuntu-2404",
-    "config": "firewood",
-    "start-block": "101",
-    "end-block": "200",
-    "block-dir-src": "s3://avalanchego-bootstrap-testing/cchain-mainnet-blocks-10k-ldb/**",
-    "current-state-dir-src": "s3://avalanchego-bootstrap-testing/cchain-current-state-firewood-100/**",
-    "timeout-minutes": "5"
-}
-```
-
-Then pass it to the GitHub CLI:
+### Using a Predefined Task
 
 ```bash
-cat input.json | gh workflow run .github/workflows/c-chain-reexecution-benchmark-gh-native.yml --json
+gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
+  -f task=c-chain-reexecution-firewood-101-250k \
+  -f runner=blacksmith-4vcpu-ubuntu-2404 \
+  -f timeout-minutes=60
+```
+
+### Using Custom Parameters
+
+```bash
+gh workflow run "C-Chain Re-Execution Benchmark GH Native" \
+  -f task="" \
+  -f block-dir-src=cchain-mainnet-blocks-1m-ldb \
+  -f current-state-dir-src=cchain-current-state-hashdb-full-100 \
+  -f start-block=101 \
+  -f end-block=250000 \
+  -f config=default \
+  -f runner=ubuntu-latest \
+  -f timeout-minutes=360
 ```
