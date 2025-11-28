@@ -33,7 +33,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install ARC Dependencies
+      - name: Install Nix Dependencies
         shell: bash
         run: |
           # xz-utils might be present on some containers. Install if not present.
@@ -51,7 +51,7 @@ jobs:
           cd graft/coreth
           echo "Building Firewood from: ${{ inputs.firewood-commit }}"
           # The script updates go.mod automatically
-          ./scripts/build_firewood.sh "${{ inputs.firewood-commit }}" --update --no-sandbox
+          ./scripts/build_firewood.sh "${{ inputs.firewood-commit }}" --update
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
