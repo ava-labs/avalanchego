@@ -70,8 +70,6 @@ else
 fi
 
 cd "${FIREWOOD_DIR}/ffi"
-export TMPDIR=/tmp
-export NIX_BUILD_TOP=/tmp
 nix build 2>&1
 
 FIREWOOD_FFI_PATH="${FIREWOOD_DIR}/ffi/result/ffi"
