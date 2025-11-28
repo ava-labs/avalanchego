@@ -3,7 +3,7 @@
 set -euo pipefail
 
 print_usage() {
-  printf "Usage: build_firewood.sh [FIREWOOD_COMMIT] [--update]
+  printf "Usage: build_firewood.sh [FIREWOOD_COMMIT] [--update] [--no-sandbox]
 
   Build Firewood FFI from source for testing with Coreth.
 
@@ -13,6 +13,8 @@ print_usage() {
   Options:
     --update          Update go.mod after building
                       (default: only print path)
+    --no-sandbox      Disable Nix sandbox (for containerized environments
+                      with permission issues)
 
   Examples:
     # Build from commit and capture FFI path
@@ -21,12 +23,16 @@ print_usage() {
     # Build from main and update go.mod automatically
     ./scripts/build_firewood.sh main --update
 
+    # Build with sandbox disabled (for containers)
+    ./scripts/build_firewood.sh main --no-sandbox --update
+
   Note: To use a published Firewood version (e.g., v0.0.15) run go get -u github.com/ava-labs/firewood-go-ethhash/ffi@{version}
 "
 }
 
 FIREWOOD_COMMIT="main"
 UPDATE_GO_MOD=false
+NO_SANDBOX=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -36,6 +42,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --update)
       UPDATE_GO_MOD=true
+      shift
+      ;;
+    --no-sandbox)
+      NO_SANDBOX=true
       shift
       ;;
     *)
@@ -70,7 +80,12 @@ else
 fi
 
 cd "${FIREWOOD_DIR}/ffi"
-nix build 2>&1
+if [ "${NO_SANDBOX}" = true ]; then
+  echo "Building with sandbox disabled..." >&2
+  nix build --option sandbox false 2>&1
+else
+  nix build 2>&1
+fi
 
 FIREWOOD_FFI_PATH="${FIREWOOD_DIR}/ffi/result/ffi"
 export FIREWOOD_FFI_PATH
