@@ -57,6 +57,10 @@ jobs:
         env:
           TMPDIR: /tmp 
           NIX_BUILD_TOP: /tmp # Updated default Nix build from /home/runner/_work/_temp/ which is a restricted volume on self-hosted runners.
+      - name: Mark go.mod changes as assumed unchanged
+        shell: bash
+        run: |
+          git update-index --assume-unchanged graft/coreth/go.mod graft/coreth/go.sum
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
@@ -76,10 +80,6 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ${{ inputs.push-post-state }}
           runner_name: ${{ inputs.runner }}
-      - name: Clean up go.mod changes
-        shell: bash
-        run: |
-          git restore graft/coreth/go.mod graft/coreth/go.sum
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
