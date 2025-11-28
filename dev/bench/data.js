@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1764333485432,
+  "lastUpdate": 1764339667142,
   "repoUrl": "https://github.com/ava-labs/avalanchego",
   "entries": {
     "Benchmark": [
@@ -2492,6 +2492,34 @@ window.BENCHMARK_DATA = {
             "value": 73.53,
             "unit": "mgas/s",
             "extra": "1 times\n16 procs"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Elvis S.",
+            "username": "Elvis339",
+            "email": "elvissabanovic3@gmail.com"
+          },
+          "committer": {
+            "name": "Elvis S.",
+            "username": "Elvis339",
+            "email": "elvissabanovic3@gmail.com"
+          },
+          "id": "d6ee997b29bb544a925af7edbdcb5ce253fca89f",
+          "message": "ci: push github action bench",
+          "timestamp": "2025-11-28T14:10:21Z",
+          "url": "https://github.com/ava-labs/avalanchego/commit/d6ee997b29bb544a925af7edbdcb5ce253fca89f"
+        },
+        "date": 1764339666814,
+        "tool": "go",
+        "benches": [
+          {
+            "name": "BenchmarkReexecuteRange/[101,250000]-Config-firewood-Runner-avalanche-avalanchego-runner-2ti-z284t-runner-qx75c",
+            "value": 84.19,
+            "unit": "mgas/s",
+            "extra": "1 times\n32 procs"
           }
         ]
       }
