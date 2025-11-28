@@ -44,6 +44,7 @@ import (
 
 var (
 	errSnapshotRootEmpty        = errors.New("missing or corrupted snapshot, no snapshot root")
+	errSnapshotBlockHashEmpty   = errors.New("missing or corrupted snapshot, no snapshot block hash")
 	errSnapshotRootMismatch     = errors.New("snapshot root mismatch")
 	errSnapshotGeneratorMissing = errors.New("missing snapshot generator")
 )
@@ -68,7 +69,7 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *triedb.Database, cache int
 	// Retrieve the block hash of the snapshot, failing if no snapshot is present.
 	baseBlockHash, err := customrawdb.ReadSnapshotBlockHash(diskdb)
 	if err != nil {
-		return nil, false, errors.New("missing or corrupted snapshot, no snapshot block hash")
+		return nil, false, errSnapshotBlockHashEmpty
 	}
 
 	// Retrieve and validate the snapshot root.
