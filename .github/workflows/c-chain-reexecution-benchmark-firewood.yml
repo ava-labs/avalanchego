@@ -76,6 +76,10 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           push-post-state: ${{ inputs.push-post-state }}
           runner_name: ${{ inputs.runner }}
+      - name: Clean up go.mod changes
+        shell: bash
+        run: |
+          git restore graft/coreth/go.mod graft/coreth/go.sum
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
