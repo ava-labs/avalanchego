@@ -57,10 +57,13 @@ jobs:
         env:
           TMPDIR: /tmp 
           NIX_BUILD_TOP: /tmp # Updated default Nix build from /home/runner/_work/_temp/ which is a restricted volume on self-hosted runners.
-      - name: Mark go.mod changes as assumed unchanged
+      - name: Hanlde go.mod
         shell: bash
         run: |
-          git update-index --assume-unchanged graft/coreth/go.mod graft/coreth/go.sum
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add graft/coreth/go.mod graft/coreth/go.sum
+          git commit -m "temp: use local Firewood build"
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
