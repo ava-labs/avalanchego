@@ -9,6 +9,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ava-labs/libevm/core/rawdb"
+	"github.com/ava-labs/libevm/core/types"
+	"github.com/stretchr/testify/require"
+
 	"github.com/ava-labs/avalanchego/api/metrics"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
@@ -17,9 +21,6 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
 	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
-	"github.com/ava-labs/libevm/core/rawdb"
-	"github.com/ava-labs/libevm/core/types"
-	"github.com/stretchr/testify/require"
 
 	avalancheatomic "github.com/ava-labs/avalanchego/chains/atomic"
 	commoneng "github.com/ava-labs/avalanchego/snow/engine/common"
