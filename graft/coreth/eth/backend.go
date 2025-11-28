@@ -49,9 +49,9 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/miner"
 	"github.com/ava-labs/avalanchego/graft/coreth/node"
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/rpc"
 	"github.com/ava-labs/avalanchego/utils/timer/mockable"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/libevm/accounts"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/bloombits"
@@ -151,7 +151,7 @@ func New(
 		"snapshot clean", common.StorageSize(config.SnapshotCache)*1024*1024,
 	)
 
-	scheme, err := customrawdb.ParseStateSchemeExt(config.StateScheme, chainDb)
+	scheme, err := customrawdb.ParseStateScheme(config.StateScheme, chainDb)
 	if err != nil {
 		return nil, err
 	}

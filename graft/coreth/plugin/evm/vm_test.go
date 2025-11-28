@@ -36,7 +36,6 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/graft/coreth/params/paramstest"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customheader"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customrawdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/extension"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
@@ -56,6 +55,7 @@ import (
 	"github.com/ava-labs/avalanchego/vms/evm/acp176"
 	"github.com/ava-labs/avalanchego/vms/evm/acp226"
 	"github.com/ava-labs/avalanchego/vms/evm/predicate"
+	"github.com/ava-labs/avalanchego/vms/evm/sync/customrawdb"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp/payload"
 
 	warpcontract "github.com/ava-labs/avalanchego/graft/coreth/precompile/contracts/warp"
