@@ -10,9 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/coreth/consensus/dummy"
-	"github.com/ava-labs/coreth/core"
-	"github.com/ava-labs/coreth/params"
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
@@ -24,6 +21,9 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy"
+	"github.com/ava-labs/avalanchego/graft/coreth/core"
+	"github.com/ava-labs/avalanchego/graft/coreth/params"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
@@ -161,7 +161,7 @@ func startMigration(t *testing.T, db *Database, waitForCompletion bool) {
 	t.Helper()
 
 	db.migrator.completed.Store(false)
-	require.NoError(t, db.StartMigration())
+	require.NoError(t, db.StartMigration(t.Context()))
 
 	if waitForCompletion {
 		timeout := 5 * time.Second

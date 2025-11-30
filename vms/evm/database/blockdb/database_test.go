@@ -8,8 +8,6 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/ava-labs/coreth/params"
-	"github.com/ava-labs/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/libevm/core/rawdb"
 	"github.com/ava-labs/libevm/core/types"
 	"github.com/ava-labs/libevm/ethdb"
@@ -18,6 +16,8 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
+	"github.com/ava-labs/avalanchego/graft/coreth/params"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/customtypes"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	evmdb "github.com/ava-labs/avalanchego/vms/evm/database"
@@ -315,7 +315,7 @@ func TestDatabaseInitialization(t *testing.T) {
 			// create block databases with existing min height if needed
 			if tc.dbMinHeight > 0 {
 				db := Database{
-					stateDB:  base,
+					metaDB:   base,
 					Database: evmDB,
 					dbPath:   dataDir,
 					config:   heightindexdb.DefaultConfig(),

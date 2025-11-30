@@ -4,11 +4,11 @@
 package blockdb
 
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"path/filepath"
+	"slices"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
@@ -18,49 +18,19 @@ import (
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/heightindexdb/meterdb"
-	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/utils/logging"
 
 	heightindexdb "github.com/ava-labs/avalanchego/x/blockdb"
 )
 
 var (
-	_ ethdb.Database = (*Database)(nil)
-	_ ethdb.Batch    = (*batch)(nil)
-
-	migratorDBPrefix = []byte("migrator")
-
-	// blockDBMinHeightKey stores the minimum block height of the
-	// height-indexed block databases.
-	// It is set at initialization and cannot be changed without
-	// recreating the databases.
-	blockDBMinHeightKey = []byte("blockdb_min_height")
-
 	errUnexpectedKey        = errors.New("unexpected database key")
 	errNotInitialized       = errors.New("database not initialized")
 	errAlreadyInitialized   = errors.New("database already initialized")
 	errInvalidEncodedLength = errors.New("invalid encoded length")
 )
 
-// Key prefixes for block data in [ethdb.Database].
-// This is copied from libevm because they are not exported.
-// Since the prefixes should never be changed, we can avoid libevm changes by
-// duplicating them here.
-var (
-	evmHeaderPrefix    = []byte("h")
-	evmBlockBodyPrefix = []byte("b")
-	evmReceiptsPrefix  = []byte("r")
-)
-
-const (
-	hashDataElements = 2
-	blockNumberSize  = 8
-	blockHashSize    = 32
-
-	headerDBName   = "headerdb"
-	bodyDBName     = "bodydb"
-	receiptsDBName = "receiptsdb"
-)
+var _ ethdb.Database = (*Database)(nil)
 
 // Database wraps an [ethdb.Database] and routes block headers, bodies, and receipts
 // to separate [database.HeightIndex] databases for blocks at or above the minimum height.
@@ -69,7 +39,7 @@ type Database struct {
 	ethdb.Database
 
 	// Databases
-	stateDB    database.Database
+	metaDB     database.Database
 	headerDB   database.HeightIndex
 	bodyDB     database.HeightIndex
 	receiptsDB database.HeightIndex
@@ -86,6 +56,67 @@ type Database struct {
 	logger logging.Logger
 }
 
+const blockNumberSize = 8
+
+func encodeBlockNumber(number uint64) []byte {
+	enc := make([]byte, blockNumberSize)
+	binary.BigEndian.PutUint64(enc, number)
+	return enc
+}
+
+// blockDBMinHeightKey stores the minimum block height of the
+// height-indexed block databases.
+// It is set at initialization and cannot be changed without
+// recreating the databases.
+var blockDBMinHeightKey = []byte("blockdb_min_height")
+
+func databaseMinHeight(db database.KeyValueReader) (uint64, bool, error) {
+	minBytes, err := db.Get(blockDBMinHeightKey)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return 0, false, nil
+		}
+		return 0, false, err
+	}
+	if len(minBytes) != blockNumberSize {
+		return 0, false, fmt.Errorf("%w: min height expected %d bytes, got %d", errInvalidEncodedLength, blockNumberSize, len(minBytes))
+	}
+	return binary.BigEndian.Uint64(minBytes), true, nil
+}
+
+// IsEnabled checks if blockdb has ever been initialized.
+// It returns true if the minimum block height key exists, indicating the
+// block databases have been created and initialized with a minimum height.
+func IsEnabled(db database.KeyValueReader) (bool, error) {
+	has, err := db.Has(blockDBMinHeightKey)
+	if err != nil {
+		return false, err
+	}
+	return has, nil
+}
+
+func (db *Database) newMeteredHeightDB(
+	namespace string,
+	minHeight uint64,
+) (database.HeightIndex, error) {
+	path := filepath.Join(db.dbPath, namespace)
+	config := db.config.WithDir(path).WithMinimumHeight(minHeight)
+	ndb, err := heightindexdb.New(config, db.logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create %s database at %s: %w", namespace, path, err)
+	}
+
+	mdb, err := meterdb.New(db.reg, namespace, ndb)
+	if err != nil {
+		return nil, errors.Join(
+			fmt.Errorf("failed to create metered %s database: %w", namespace, err),
+			ndb.Close(),
+		)
+	}
+
+	return mdb, nil
+}
+
 // New creates a new [Database] over the provided [ethdb.Database].
 //
 // If allowDeferredInit is true and no minimum block height is known,
@@ -95,7 +126,7 @@ type Database struct {
 // The bool result is true if the block databases were initialized immediately,
 // and false if initialization was deferred.
 func New(
-	stateDB database.Database,
+	metaDB database.Database,
 	evmDB ethdb.Database,
 	dbPath string,
 	allowDeferredInit bool,
@@ -104,7 +135,7 @@ func New(
 	reg prometheus.Registerer,
 ) (*Database, bool, error) {
 	db := &Database{
-		stateDB:  stateDB,
+		metaDB:   metaDB,
 		Database: evmDB,
 		dbPath:   dbPath,
 		config:   config,
@@ -112,34 +143,29 @@ func New(
 		logger:   logger,
 	}
 
-	minHeight, ok, err := databaseMinHeight(db.stateDB)
-	if err != nil {
-		return nil, false, err
+	minHeightFn := [](func() (uint64, bool, error)){
+		func() (uint64, bool, error) {
+			// Load existing database min height.
+			return databaseMinHeight(db.metaDB)
+		},
+		func() (uint64, bool, error) {
+			// Use the minimum block height of existing blocks to migrate.
+			return minBlockHeightToMigrate(evmDB)
+		},
+		func() (uint64, bool, error) {
+			// Use min height 1 unless deferring initialization.
+			return 1, !allowDeferredInit, nil
+		},
 	}
-
-	// Databases already exist, load with existing min height.
-	if ok {
-		if err := db.InitBlockDBs(minHeight); err != nil {
+	for _, fn := range minHeightFn {
+		h, ok, err := fn()
+		if err != nil {
 			return nil, false, err
 		}
-		return db, true, nil
-	}
-
-	// Initialize using the minimum block height of existing blocks to migrate.
-	minHeight, ok, err = minBlockHeightToMigrate(evmDB)
-	if err != nil {
-		return nil, false, err
-	}
-	if ok {
-		if err := db.InitBlockDBs(minHeight); err != nil {
-			return nil, false, err
+		if !ok {
+			continue
 		}
-		return db, true, nil
-	}
-
-	// Initialize with min height 1 if deferred initialization is not allowed.
-	if !allowDeferredInit {
-		if err := db.InitBlockDBs(1); err != nil {
+		if err := db.InitBlockDBs(h); err != nil {
 			return nil, false, err
 		}
 		return db, true, nil
@@ -162,18 +188,18 @@ func (db *Database) InitBlockDBs(minHeight uint64) error {
 		return errAlreadyInitialized
 	}
 
-	if err := db.stateDB.Put(blockDBMinHeightKey, encodeBlockNumber(minHeight)); err != nil {
+	if err := db.metaDB.Put(blockDBMinHeightKey, encodeBlockNumber(minHeight)); err != nil {
 		return err
 	}
-	headerDB, err := db.newMeteredHeightDB(headerDBName, minHeight)
+	headerDB, err := db.newMeteredHeightDB("headerdb", minHeight)
 	if err != nil {
 		return err
 	}
-	bodyDB, err := db.newMeteredHeightDB(bodyDBName, minHeight)
+	bodyDB, err := db.newMeteredHeightDB("bodydb", minHeight)
 	if err != nil {
 		return errors.Join(err, headerDB.Close())
 	}
-	receiptsDB, err := db.newMeteredHeightDB(receiptsDBName, minHeight)
+	receiptsDB, err := db.newMeteredHeightDB("receiptsdb", minHeight)
 	if err != nil {
 		return errors.Join(err, headerDB.Close(), bodyDB.Close())
 	}
@@ -201,54 +227,143 @@ func (db *Database) InitBlockDBs(minHeight uint64) error {
 	return nil
 }
 
-// StartMigration begins the background migration of block data from the
-// [ethdb.Database] to the height-indexed block databases.
-//
-// Returns an error if the databases are not initialized.
-// No error if already running.
-func (db *Database) StartMigration() error {
-	if !db.heightDBsReady {
-		return errNotInitialized
+// Key prefixes for block data in [ethdb.Database].
+// This is copied from libevm because they are not exported.
+// Since the prefixes should never be changed, we can avoid libevm changes by
+// duplicating them here.
+const (
+	evmHeaderPrefix    = 'h'
+	evmBlockBodyPrefix = 'b'
+	evmReceiptsPrefix  = 'r'
+)
+
+var blockPrefixes = []byte{evmBlockBodyPrefix, evmHeaderPrefix, evmReceiptsPrefix}
+
+func parseBlockKey(key []byte) (num uint64, hash common.Hash, ok bool) {
+	// Block keys should have 1 byte prefix + blockNumberSize + 32 bytes for the hash
+	if len(key) != 1+blockNumberSize+32 {
+		return 0, common.Hash{}, false
 	}
-	db.migrator.start()
-	return nil
+	if !slices.Contains(blockPrefixes, key[0]) {
+		return 0, common.Hash{}, false
+	}
+	num = binary.BigEndian.Uint64(key[1 : 1+blockNumberSize])
+	bytes := key[1+blockNumberSize:]
+	hash = common.BytesToHash(bytes)
+	return num, hash, true
 }
 
-func (db *Database) Put(key []byte, value []byte) error {
-	if !db.useHeightIndexedDB(key) {
-		return db.Database.Put(key, value)
+type parsedBlockKey struct {
+	key  []byte
+	db   database.HeightIndex
+	num  uint64
+	hash common.Hash
+}
+
+func (p *parsedBlockKey) writeHashAndData(data []byte) error {
+	return writeHashAndData(p.db, p.num, p.hash, data)
+}
+
+func writeHashAndData(
+	db database.HeightIndex,
+	height uint64,
+	hash common.Hash,
+	data []byte,
+) error {
+	encoded, err := rlp.EncodeToBytes([][]byte{hash.Bytes(), data})
+	if err != nil {
+		return err
+	}
+	return db.Put(height, encoded)
+}
+
+// parseKey parses a block key into a parsedBlockKey.
+// It returns false if no block databases for the key prefix exist.
+func (db *Database) parseKey(key []byte) (*parsedBlockKey, bool) {
+	if !db.heightDBsReady {
+		return nil, false
 	}
 
-	heightDB, err := db.heightDBForKey(key)
-	if err != nil {
-		return err
+	var hdb database.HeightIndex
+	switch key[0] {
+	case evmBlockBodyPrefix:
+		hdb = db.bodyDB
+	case evmHeaderPrefix:
+		hdb = db.headerDB
+	case evmReceiptsPrefix:
+		hdb = db.receiptsDB
+	default:
+		return nil, false
 	}
-	num, hash, err := parseBlockKey(key)
-	if err != nil {
-		return err
+
+	num, hash, ok := parseBlockKey(key)
+	if !ok {
+		return nil, false
 	}
-	return writeHashAndData(heightDB, num, hash, value)
+
+	if num < db.minHeight {
+		return nil, false
+	}
+
+	return &parsedBlockKey{
+		key:  key,
+		db:   hdb,
+		num:  num,
+		hash: hash,
+	}, true
+}
+
+// readBlock reads data from [database.HeightIndex] and falls back
+// to the [ethdb.Database] if the data is not found and migration is not complete.
+func (db *Database) readBlock(p *parsedBlockKey) ([]byte, error) {
+	data, err := p.db.Get(p.num)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) && !db.migrator.isCompleted() {
+			return db.Database.Get(p.key)
+		}
+		return nil, err
+	}
+
+	var elems [][]byte
+	if err := rlp.DecodeBytes(data, &elems); err != nil {
+		return nil, err
+	}
+	if len(elems) != 2 {
+		err := fmt.Errorf(
+			"invalid hash+data format: expected 2 elements, got %d", len(elems),
+		)
+		return nil, err
+	}
+
+	// Hash mismatch means we are trying to read a different block at this height.
+	if common.BytesToHash(elems[0]) != p.hash {
+		return nil, database.ErrNotFound
+	}
+
+	return elems[1], nil
 }
 
 func (db *Database) Get(key []byte) ([]byte, error) {
-	if !db.useHeightIndexedDB(key) {
-		return db.Database.Get(key)
+	if p, ok := db.parseKey(key); ok {
+		return db.readBlock(p)
 	}
+	return db.Database.Get(key)
+}
 
-	heightDB, err := db.heightDBForKey(key)
-	if err != nil {
-		return nil, err
+func (db *Database) Put(key []byte, value []byte) error {
+	if p, ok := db.parseKey(key); ok {
+		return p.writeHashAndData(value)
 	}
-	return readHashAndData(heightDB, db.Database, key, db.migrator)
+	return db.Database.Put(key, value)
 }
 
 func (db *Database) Has(key []byte) (bool, error) {
-	if !db.useHeightIndexedDB(key) {
+	p, ok := db.parseKey(key)
+	if !ok {
 		return db.Database.Has(key)
 	}
 
-	_, err := db.Get(key)
-	if err != nil {
+	if _, err := db.readBlock(p); err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			return false, nil
 		}
@@ -260,31 +375,24 @@ func (db *Database) Has(key []byte) (bool, error) {
 // Delete removes the key from the underlying database for non-block data.
 // Block data deletion is a no-op because [database.HeightIndex] does not support deletion.
 func (db *Database) Delete(key []byte) error {
-	if !db.useHeightIndexedDB(key) {
-		return db.Database.Delete(key)
+	if p, ok := db.parseKey(key); ok {
+		db.logger.Warn(
+			"Deleting block data is a no-op",
+			zap.Uint64("height", p.num),
+			zap.Stringer("hash", p.hash),
+		)
+		return nil
 	}
-
-	num, hash, err := parseBlockKey(key)
-	if err != nil {
-		return err
-	}
-	db.logger.Warn(
-		"Deleting block data is a no-op",
-		zap.Uint64("height", num),
-		zap.Stringer("hash", hash),
-	)
-	return nil
+	return db.Database.Delete(key)
 }
 
 func (db *Database) Close() error {
-	if db.migrator != nil {
-		db.migrator.stop()
-	}
+	db.migrator.stop()
 	if !db.heightDBsReady {
 		return db.Database.Close()
 	}
 
-	// Don't close stateDB since the caller should be managing it.
+	// Don't close metaDB since the caller should be managing it.
 	return errors.Join(
 		db.headerDB.Close(),
 		db.bodyDB.Close(),
@@ -293,80 +401,7 @@ func (db *Database) Close() error {
 	)
 }
 
-func (db *Database) initMigrator() error {
-	if db.migrator != nil {
-		return nil
-	}
-	mdb := prefixdb.New(migratorDBPrefix, db.stateDB)
-	migrator, err := newMigrator(
-		mdb,
-		db.headerDB,
-		db.bodyDB,
-		db.receiptsDB,
-		db.Database,
-		db.logger,
-	)
-	if err != nil {
-		return err
-	}
-	db.migrator = migrator
-	return nil
-}
-
-func (db *Database) newMeteredHeightDB(
-	namespace string,
-	minHeight uint64,
-) (database.HeightIndex, error) {
-	path := filepath.Join(db.dbPath, namespace)
-	config := db.config.WithDir(path).WithMinimumHeight(minHeight)
-	ndb, err := heightindexdb.New(config, db.logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create %s database at %s: %w", namespace, path, err)
-	}
-
-	mdb, err := meterdb.New(db.reg, namespace, ndb)
-	if err != nil {
-		return nil, errors.Join(
-			fmt.Errorf("failed to create metered %s database: %w", namespace, err),
-			ndb.Close(),
-		)
-	}
-
-	return mdb, nil
-}
-
-func (db *Database) heightDBForKey(key []byte) (database.HeightIndex, error) {
-	switch {
-	case isHeaderKey(key):
-		return db.headerDB, nil
-	case isBodyKey(key):
-		return db.bodyDB, nil
-	case isReceiptsKey(key):
-		return db.receiptsDB, nil
-	default:
-		return nil, errUnexpectedKey
-	}
-}
-
-func (db *Database) useHeightIndexedDB(key []byte) bool {
-	if !db.heightDBsReady {
-		return false
-	}
-
-	var n int
-	switch {
-	case isBodyKey(key):
-		n = len(evmBlockBodyPrefix)
-	case isHeaderKey(key):
-		n = len(evmHeaderPrefix)
-	case isReceiptsKey(key):
-		n = len(evmReceiptsPrefix)
-	default:
-		return false
-	}
-	num := binary.BigEndian.Uint64(key[n : n+blockNumberSize])
-	return num >= db.minHeight
-}
+var _ ethdb.Batch = (*batch)(nil)
 
 type batch struct {
 	ethdb.Batch
@@ -388,141 +423,15 @@ func (db *Database) NewBatchWithSize(size int) ethdb.Batch {
 }
 
 func (b *batch) Put(key []byte, value []byte) error {
-	if b.db.useHeightIndexedDB(key) {
-		return b.db.Put(key, value)
+	if p, ok := b.db.parseKey(key); ok {
+		return p.writeHashAndData(value)
 	}
 	return b.Batch.Put(key, value)
 }
 
 func (b *batch) Delete(key []byte) error {
-	if b.db.useHeightIndexedDB(key) {
+	if _, ok := b.db.parseKey(key); ok {
 		return b.db.Delete(key)
 	}
 	return b.Batch.Delete(key)
-}
-
-func parseBlockKey(key []byte) (num uint64, hash common.Hash, err error) {
-	var n int
-	switch {
-	case isBodyKey(key):
-		n = len(evmBlockBodyPrefix)
-	case isHeaderKey(key):
-		n = len(evmHeaderPrefix)
-	case isReceiptsKey(key):
-		n = len(evmReceiptsPrefix)
-	default:
-		return 0, common.Hash{}, errUnexpectedKey
-	}
-	num = binary.BigEndian.Uint64(key[n : n+blockNumberSize])
-	bytes := key[n+blockNumberSize:]
-	if len(bytes) != blockHashSize {
-		return 0, common.Hash{}, fmt.Errorf("invalid hash length: %d", len(bytes))
-	}
-	hash = common.BytesToHash(bytes)
-	return num, hash, nil
-}
-
-func encodeBlockNumber(number uint64) []byte {
-	enc := make([]byte, blockNumberSize)
-	binary.BigEndian.PutUint64(enc, number)
-	return enc
-}
-
-func isBodyKey(key []byte) bool {
-	if len(key) != len(evmBlockBodyPrefix)+blockNumberSize+blockHashSize {
-		return false
-	}
-	return bytes.HasPrefix(key, evmBlockBodyPrefix)
-}
-
-func isHeaderKey(key []byte) bool {
-	if len(key) != len(evmHeaderPrefix)+blockNumberSize+blockHashSize {
-		return false
-	}
-	return bytes.HasPrefix(key, evmHeaderPrefix)
-}
-
-func isReceiptsKey(key []byte) bool {
-	if len(key) != len(evmReceiptsPrefix)+blockNumberSize+blockHashSize {
-		return false
-	}
-	return bytes.HasPrefix(key, evmReceiptsPrefix)
-}
-
-func databaseMinHeight(db database.KeyValueReader) (uint64, bool, error) {
-	minBytes, err := db.Get(blockDBMinHeightKey)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			return 0, false, nil
-		}
-		return 0, false, err
-	}
-	if len(minBytes) != blockNumberSize {
-		return 0, false, fmt.Errorf("%w: min height expected %d bytes, got %d", errInvalidEncodedLength, blockNumberSize, len(minBytes))
-	}
-	return binary.BigEndian.Uint64(minBytes), true, nil
-}
-
-func writeHashAndData(
-	db database.HeightIndex,
-	height uint64,
-	hash common.Hash,
-	data []byte,
-) error {
-	encoded, err := rlp.EncodeToBytes([][]byte{hash.Bytes(), data})
-	if err != nil {
-		return err
-	}
-	return db.Put(height, encoded)
-}
-
-// readHashAndData reads data from [database.HeightIndex] and falls back
-// to the [ethdb.Database] if the data is not found and migration is not complete.
-func readHashAndData(
-	heightDB database.HeightIndex,
-	evmDB ethdb.KeyValueReader,
-	key []byte,
-	migrator *migrator,
-) ([]byte, error) {
-	num, hash, err := parseBlockKey(key)
-	if err != nil {
-		return nil, err
-	}
-	data, err := heightDB.Get(num)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) && !migrator.isCompleted() {
-			return evmDB.Get(key)
-		}
-		return nil, err
-	}
-
-	var elems [][]byte
-	if err := rlp.DecodeBytes(data, &elems); err != nil {
-		return nil, err
-	}
-	if len(elems) != hashDataElements {
-		err := fmt.Errorf(
-			"invalid hash+data format: expected %d elements, got %d",
-			hashDataElements,
-			len(elems),
-		)
-		return nil, err
-	}
-	if common.BytesToHash(elems[0]) != hash {
-		// Hash mismatch means we are trying to read a different block at this height.
-		return nil, database.ErrNotFound
-	}
-
-	return elems[1], nil
-}
-
-// IsEnabled checks if blockdb has ever been initialized.
-// It returns true if the minimum block height key exists, indicating the
-// block database has been created and initialized with a minimum height.
-func IsEnabled(db database.KeyValueReader) (bool, error) {
-	has, err := db.Has(blockDBMinHeightKey)
-	if err != nil {
-		return false, err
-	}
-	return has, nil
 }
