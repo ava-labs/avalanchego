@@ -143,7 +143,9 @@ func (basic *snapshotTestBasic) prepare(t *testing.T) (*BlockChain, []*types.Blo
 func (basic *snapshotTestBasic) verify(t *testing.T, chain *BlockChain, blocks []*types.Block) {
 	// Iterate over all the remaining blocks and ensure there are no gaps
 	verifyNoGaps(t, chain, true, blocks)
-	verifyCutoff(t, chain, true, blocks, basic.expCanonicalBlocks)
+	// Only accepted blocks are persisted after restart.
+	acceptedHead := int(chain.LastAcceptedBlock().NumberU64())
+	verifyCutoff(t, chain, true, blocks, acceptedHead)
 
 	if head := chain.CurrentHeader(); head.Number.Uint64() != basic.expHeadBlock {
 		t.Errorf("Head header mismatch: have %d, want %d", head.Number, basic.expHeadBlock)
