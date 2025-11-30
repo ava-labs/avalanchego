@@ -638,8 +638,11 @@ func testRepairWithScheme(t *testing.T, tt *rewindTest, snapshots bool, scheme s
 	// Iterate over all the remaining blocks and ensure there are no gaps
 	verifyNoGaps(t, newChain, true, canonblocks)
 	verifyNoGaps(t, newChain, false, sideblocks)
-	verifyCutoff(t, newChain, true, canonblocks, tt.expCanonicalBlocks)
-	verifyCutoff(t, newChain, false, sideblocks, tt.expSidechainBlocks)
+	// Only accepted blocks are persisted after restart.
+	cutoffHead := int(newChain.LastAcceptedBlock().NumberU64())
+	verifyCutoff(t, newChain, true, canonblocks, cutoffHead)
+	// Sidechain blocks are not persisted after restart; expect absence.
+	verifyCutoff(t, newChain, false, sideblocks, 0)
 
 	if head := newChain.CurrentHeader(); head.Number.Uint64() != tt.expHeadBlock {
 		t.Errorf("Head header mismatch: have %d, want %d", head.Number, tt.expHeadBlock)

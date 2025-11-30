@@ -273,6 +273,16 @@ func TestFilters(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Persist headers/bodies/receipts for testBackend lookups.
+	// The filter testBackend resolves headers directly from the database via
+	// hash->number and header reads, and our insert path does not write headers
+	// for unaccepted blocks.
+	for _, block := range chain {
+		rawdb.WriteBlock(db, block)
+		receipts := bc.GetReceiptsByHash(block.Hash())
+		rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), receipts)
+	}
+
 	// Set block 998 as Finalized (-3)
 	// bc.SetFinalized(chain[998].Header())
 	err = customrawdb.WriteAcceptorTip(db, chain[998].Hash())
