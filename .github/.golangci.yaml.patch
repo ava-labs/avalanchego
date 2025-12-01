@@ -1,6 +1,15 @@
---- .github/.golangci.yaml	2025-11-07 11:52:50
-+++ ffi/.golangci.yaml	2025-11-07 11:52:50
-@@ -75,8 +75,6 @@
+--- .github/.golangci.yaml	2025-11-26 17:52:36.814736814 +0000
++++ ffi/.golangci.yaml	2025-11-26 17:52:31.624079933 +0000
+@@ -40,7 +40,7 @@
+         - standard
+         - default
+         - blank
+-        - prefix(github.com/ava-labs/avalanchego)
++        - prefix(github.com/ava-labs/firewood/ffi)
+         - alias
+         - dot
+       custom-order: true
+@@ -93,8 +93,6 @@
        rules:
          packages:
            deny:
@@ -9,7 +18,7 @@
              - pkg: github.com/golang/mock/gomock
                desc: go.uber.org/mock/gomock should be used instead.
              - pkg: github.com/stretchr/testify/assert
-@@ -91,29 +89,10 @@
+@@ -109,29 +107,10 @@
      forbidigo:
        # Forbid the following identifiers (list of regexp).
        forbid:
@@ -39,7 +48,7 @@
      revive:
        rules:
          # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#bool-literal-in-expr
-@@ -177,17 +156,6 @@
+@@ -195,17 +174,6 @@
          # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#useless-break
          - name: useless-break
            disabled: false
@@ -57,12 +66,3 @@
      tagalign:
        align: true
        sort: true
-@@ -251,7 +219,7 @@
-         - standard
-         - default
-         - blank
--        - prefix(github.com/ava-labs/avalanchego)
-+        - prefix(github.com/ava-labs/firewood/ffi)
-         - alias
-         - dot
-       custom-order: true
