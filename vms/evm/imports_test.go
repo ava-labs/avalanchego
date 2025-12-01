@@ -22,6 +22,26 @@ const root = ".."
 // - graft/coreth can be imported anywhere EXCEPT vms/evm (but vms/evm/emulate is an exception)
 // - graft/subnet-evm cannot be imported anywhere EXCEPT vms/evm/emulate (but vms/evm/emulate is an exception)
 // - github.com/ava-labs/libevm/libevm/pseudo cannot be imported anywhere
+//
+// The rationale for these rules are as follows:
+//
+// coreth can be imported in AvalancheGo, because it was already imported by Avalanche prior to
+// grafting
+//
+// coreth can NOT be imported in the vms/evm package, because the goal is that vms/evm should
+// only contain the 'clean' properly uplifted code, that meets AvalancheGo quality standards.
+//
+// subnet-evm can NOT be imported anywhere in AvalancheGo besides /graft, because it must
+// not become a direct dependency of AvalancheGo.
+//
+// both coreth and subnet-evm can be imported in the vms/evm/emulate package, because it is a
+// temporary package that allows consumers to import both coreth and subnet-evm at the same time.
+//
+// github.com/ava-labs/libevm/libevm/pseudo cannot be imported anywhere, because it requires so
+// much care to avoid catastrophic misuse and there are so few reasons to ever use it anyway
+//
+// TODO(jonathanoppenheimer): remove the emulate functionality once the emulate package is removed.
+// TODO(jonathanoppenheimer): remove the graft functionality once the graft package will be removed.
 func TestImportViolations(t *testing.T) {
 	var violations []string
 
@@ -51,23 +71,6 @@ func TestImportViolations(t *testing.T) {
 			importsCoreth := isPackageIn(imp, "github.com/ava-labs/avalanchego/graft/coreth")
 			importsSubnetEVM := isPackageIn(imp, "github.com/ava-labs/avalanchego/graft/subnet-evm")
 
-			// coreth can be imported in AvalancheGo, because it was already imported by Avalanche prior to
-			// grafting
-			//
-			// coreth can NOT be imported in the vms/evm package, because the goal is that vms/evm should
-			// only contain the 'clean' properly uplifted code, that meets AvalancheGo quality standards.
-			//
-			// subnet-evm can NOT be imported anywhere in AvalancheGo besides /graft, because it must
-			// not become a direct dependency of AvalancheGo.
-			//
-			// both coreth and subnet-evm can be imported in the vms/evm/emulate package, because it is a
-			// temporary package that allows consumers to import both coreth and subnet-evm at the same time.
-			//
-			// github.com/ava-labs/libevm/libevm/pseudo cannot be imported anywhere, because it requires so
-			// much care to avoid catastrophic misuse and there are so few reasons to ever use it anyway
-			//
-			// TODO(jonathanoppenheimer): remove the emulate functionality once the emulate package is removed.
-			// TODO(jonathanoppenheimer): remove the graft functionality once the graft package will be removed.
 			hasViolation := []bool{
 				importsPseudo,
 				!inGraft && importsCoreth && inVMsEVM && !inEmulate,
