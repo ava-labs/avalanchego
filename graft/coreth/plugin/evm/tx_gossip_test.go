@@ -150,9 +150,12 @@ func TestEthTxGossip(t *testing.T) {
 
 		txBytes, err := signedTx.MarshalBinary()
 		require.NoError(err)
-		require.Equal(response, [][]byte{
-			txBytes,
-		})
+		require.Equal(
+			response,
+			[][]byte{
+				txBytes,
+			},
+		)
 
 		wg.Done()
 	}

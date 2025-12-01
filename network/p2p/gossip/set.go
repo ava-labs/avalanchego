@@ -22,6 +22,9 @@ type Set[T Gossipable] interface {
 	HandlerSet[T]
 	PushGossiperSet
 	// Len returns the number of items in the set.
+	//
+	// This value should always be at least as large as the number of items that
+	// can be iterated over with a call to Iterate.
 	Len() int
 }
 
@@ -74,20 +77,20 @@ func (s *SetWithBloomFilter[T]) Add(v T) error {
 	if err := s.set.Add(v); err != nil {
 		return err
 	}
-	return s.AddToBloom(v.GossipID())
+	return s.addToBloom(v.GossipID())
 }
 
-// AddToBloom adds the provided ID to the bloom filter. This function is exposed
-// to allow modifications to the inner set without going through Add.
+// addToBloom adds the provided ID to the bloom filter.
 //
 // Even if an error is returned, the ID has still been added to the bloom
 // filter.
-func (s *SetWithBloomFilter[T]) AddToBloom(h ids.ID) error {
+func (s *SetWithBloomFilter[T]) addToBloom(h ids.ID) error {
 	s.l.RLock()
-	bloom.Add(s.bloom, h[:], s.salt[:])
+	if bloom.Add(s.bloom, h[:], s.salt[:]) {
+		s.metrics.Count.Inc()
+	}
 	shouldReset := s.shouldReset()
 	s.l.RUnlock()
-	s.metrics.Count.Inc()
 
 	if !shouldReset {
 		return nil
