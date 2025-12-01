@@ -13,6 +13,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/validators/validatorstest"
 	"github.com/ava-labs/avalanchego/upgrade/upgradetest"
+	"github.com/ava-labs/avalanchego/version"
 	"github.com/ava-labs/avalanchego/vms/evm/uptimetracker"
 	"github.com/stretchr/testify/require"
 
@@ -86,7 +87,7 @@ func TestUptimeTracker(t *testing.T) {
 	require.Equal(baseTime, initialLastUpdated, "Initial lastUpdated should be baseTime")
 
 	// connect, time passes
-	require.NoError(vm.uptimeTracker.Connect(testNodeID))
+	require.NoError(vm.Connected(t.Context(), testNodeID, version.Current))
 	clock.Set(baseTime.Add(1 * time.Hour))
 
 	// get uptime after 1 hour of being connected - uptime should have increased by 1 hour
@@ -96,7 +97,7 @@ func TestUptimeTracker(t *testing.T) {
 	require.Equal(baseTime.Add(1*time.Hour), lastUpdated, "lastUpdated should reflect new clock time")
 
 	// disconnect, time passes another 2 hours
-	require.NoError(vm.uptimeTracker.Disconnect(testNodeID))
+	require.NoError(vm.Disconnected(t.Context(), testNodeID))
 	clock.Set(baseTime.Add(2 * time.Hour))
 
 	// get uptime - should not have increased since we were disconnected
@@ -106,7 +107,7 @@ func TestUptimeTracker(t *testing.T) {
 	require.Equal(baseTime.Add(2*time.Hour), lastUpdated, "lastUpdated should still advance")
 
 	// reconnect, time passes another 30 minutes
-	require.NoError(vm.uptimeTracker.Connect(testNodeID))
+	require.NoError(vm.Connected(t.Context(), testNodeID, version.Current))
 	clock.Set(baseTime.Add(2*time.Hour + 30*time.Minute))
 
 	// get uptime - total uptime should be 1h30m
