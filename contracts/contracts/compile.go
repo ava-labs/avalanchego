@@ -4,7 +4,7 @@
 package contracts
 
 // Step 1: Compile Solidity contracts to generate ABI and bin files
-//go:generate solc-v0.8.30 -o ../artifacts --overwrite --abi --bin --base-path . @openzeppelin/contracts/=../node_modules/@openzeppelin/contracts/ AllowList.sol ERC20NativeMinter.sol ExampleFeeManager.sol ExampleRewardManager.sol ExampleTxAllowList.sol ExampleWarp.sol
+//go:generate solc-v0.8.30 --evm-version cancun -o ../artifacts --overwrite --abi --bin --base-path . @openzeppelin/contracts/=../node_modules/@openzeppelin/contracts/ AllowList.sol ERC20NativeMinter.sol ExampleFeeManager.sol ExampleRewardManager.sol ExampleTxAllowList.sol ExampleWarp.sol
 
 // Step 2: Generate Go bindings from the compiled artifacts
 //go:generate go run github.com/ava-labs/libevm/cmd/abigen --pkg bindings --type AllowList --abi ../artifacts/AllowList.abi --bin ../artifacts/AllowList.bin --out ../bindings/gen_allowlist.go

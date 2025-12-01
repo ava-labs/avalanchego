@@ -10,9 +10,9 @@ export default {
   solidity: {
     compilers: [
       {
-        version: "0.8.24",
+        version: "0.8.30",
         settings: {
-          evmVersion: "shanghai",
+          evmVersion: "cancun",
         },
       },
     ]
