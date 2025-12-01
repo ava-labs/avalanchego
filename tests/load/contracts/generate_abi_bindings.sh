@@ -13,7 +13,7 @@ CONTRACTS_DIR="$(dirname "$0")"
 TEMPDIR=$(mktemp -d)
 
 cleanup() {
-  rm -r "${TEMPDIR}"   
+  rm -r "${TEMPDIR}"
 }
 
 trap cleanup EXIT
@@ -25,7 +25,7 @@ should_skip() {
   local file="$1"
   for helper_file in "${HELPER_FILES[@]}"; do
     if [[ "$file" == "$helper_file" ]]; then
-      return 0 
+      return 0
     fi
   done
   return 1
@@ -47,6 +47,7 @@ for FILE in "${CONTRACTS_DIR}"/*.sol; do
     --abi="${TEMPDIR}/${CONTRACT_NAME}.abi" \
     --type "$CONTRACT_NAME" \
     --pkg=contracts \
-    --out="${CONTRACTS_DIR}/${CONTRACT_NAME}.bindings.go"
+    --out="${CONTRACTS_DIR}/${CONTRACT_NAME}.bindings.go" \
+    --evm-version="cancun"
   echo "Generated ${CONTRACT_NAME}.bindings.go"
 done
