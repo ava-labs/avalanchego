@@ -89,6 +89,12 @@ var (
 			"pruning-enabled": true,
 			"state-sync-enabled": false
 		}`,
+		"firewood-archive": `{
+			"state-scheme": "firewood",
+			"snapshot-cache": 0,
+			"pruning-enabled": false,
+			"state-sync-enabled": false
+		}`,
 	}
 
 	configNameArg  string
@@ -212,6 +218,12 @@ func benchmarkReexecuteRange(
 	)
 
 	log.Info("re-executing block range with params",
+		zap.String("runner", runnerNameArg),
+		zap.String("config", configNameArg),
+		zap.String("labels", labelsArg),
+		zap.String("metrics-server-enabled", strconv.FormatBool(metricsServerEnabled)),
+		zap.Uint64("metrics-server-port", metricsPort),
+		zap.String("metrics-collector-enabled", strconv.FormatBool(metricsCollectorEnabled)),
 		zap.String("block-dir", blockDir),
 		zap.String("vm-db-dir", vmDBDir),
 		zap.String("chain-data-dir", chainDataDir),
