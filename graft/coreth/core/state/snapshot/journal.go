@@ -62,7 +62,7 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *triedb.Database, cache int
 	// Retrieve the block hash of the snapshot, failing if no snapshot is present.
 	baseBlockHash, err := customrawdb.ReadSnapshotBlockHash(diskdb)
 	if err != nil {
-		return nil, false, errors.New("missing or corrupted snapshot, no snapshot block hash")
+		return nil, false, fmt.Errorf("missing or corrupted snapshot, no snapshot block hash: %v", err)
 	}
 	if baseBlockHash != blockHash {
 		return nil, false, fmt.Errorf("block hash stored on disk (%#x) does not match last accepted (%#x)", baseBlockHash, blockHash)
