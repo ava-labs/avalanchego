@@ -67,11 +67,15 @@ func (marshaller) UnmarshalGossip(bytes []byte) (tx, error) {
 }
 
 type setDouble struct {
+	l     sync.RWMutex
 	txs   set.Set[tx]
 	onAdd func(tx tx)
 }
 
 func (s *setDouble) Add(t tx) error {
+	s.l.Lock()
+	defer s.l.Unlock()
+
 	if s.txs.Contains(t) {
 		return fmt.Errorf("%s already present", t)
 	}
@@ -83,11 +87,24 @@ func (s *setDouble) Add(t tx) error {
 	return nil
 }
 
+func (s *setDouble) Remove(t tx) {
+	s.l.Lock()
+	defer s.l.Unlock()
+
+	s.txs.Remove(t)
+}
+
 func (s *setDouble) Has(h ids.ID) bool {
+	s.l.RLock()
+	defer s.l.RUnlock()
+
 	return s.txs.Contains(tx(h))
 }
 
 func (s *setDouble) Iterate(f func(t tx) bool) {
+	s.l.RLock()
+	defer s.l.RUnlock()
+
 	for tx := range s.txs {
 		if !f(tx) {
 			return
@@ -96,6 +113,9 @@ func (s *setDouble) Iterate(f func(t tx) bool) {
 }
 
 func (s *setDouble) Len() int {
+	s.l.RLock()
+	defer s.l.RUnlock()
+
 	return s.txs.Len()
 }
 

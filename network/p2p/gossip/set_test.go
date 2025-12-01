@@ -4,12 +4,15 @@
 package gossip
 
 import (
+	"fmt"
 	"testing"
 
+	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestSetWithBloomFilter_Refresh(t *testing.T) {
@@ -127,4 +130,48 @@ func TestSetWithBloomFilter_Refresh(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestSetWithBloomFilter_Concurrent tests that SetWithBloomFilter is ensures
+// that the returned bloom filter is a super set of the items in the Set at the
+// time it is called, even under concurrent resets.
+func TestSetWithBloomFilter_Concurrent(t *testing.T) {
+	require := require.New(t)
+
+	const (
+		minTargetElements              = 1
+		targetFalsePositiveProbability = 0.01
+		resetFalsePositiveProbability  = 0.0000000001 // Forces frequent resets
+	)
+	var s setDouble
+	bs, err := NewSetWithBloomFilter(
+		&s,
+		prometheus.NewRegistry(),
+		"",
+		minTargetElements,
+		targetFalsePositiveProbability,
+		resetFalsePositiveProbability,
+	)
+	require.NoError(err)
+
+	var eg errgroup.Group
+	for range 10 {
+		eg.Go(func() error {
+			for range 1000 {
+				tx := tx(ids.GenerateTestID())
+				if err := bs.Add(tx); err != nil {
+					return err
+				}
+
+				bf, salt := bs.BloomFilter()
+				if !bloom.Contains(bf, tx[:], salt[:]) {
+					return fmt.Errorf("expected to find %s in bloom filter", tx)
+				}
+
+				s.Remove(tx)
+			}
+			return nil
+		})
+	}
+	require.NoError(eg.Wait())
 }
