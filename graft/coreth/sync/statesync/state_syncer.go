@@ -301,10 +301,18 @@ func (t *stateSync) removeTrieInProgress(root common.Hash) (int, error) {
 }
 
 // Finalize checks if there are any in-progress tries and flushes their batches to disk
-// to preserve progress. This is called by the syncer registry on sync failure or cancellation.
+// to preserve progress. On successful sync completion, triesInProgress will be empty
+// and this is effectively a no-op. This is called by the syncer registry regardless
+// of sync success or failure.
 func (t *stateSync) Finalize() error {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
+
+	// Nothing to flush if no tries are in progress.
+	// This is the case after a successful sync.
+	if len(t.triesInProgress) == 0 {
+		return nil
+	}
 
 	for _, trie := range t.triesInProgress {
 		for _, segment := range trie.segments {
