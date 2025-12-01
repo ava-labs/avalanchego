@@ -150,9 +150,6 @@ func (s *Syncer) Sync(ctx context.Context) error {
 // This ensures that even if the sync is cancelled or fails, we preserve
 // the progress up to the last fully synced height.
 func (s *Syncer) Finalize() error {
-	if s.db == nil {
-		return nil
-	}
 	return s.db.Commit()
 }
 
