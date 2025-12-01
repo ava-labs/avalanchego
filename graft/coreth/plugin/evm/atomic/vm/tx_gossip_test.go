@@ -161,10 +161,10 @@ func TestAtomicTxGossip(t *testing.T) {
 		responseGossip, err := gossip.ParseAppResponse(responseBytes)
 		require.NoError(err)
 		require.Equal(
-			responseGossip,
 			[][]byte{
-				tx.Bytes(),
+				tx.SignedBytes(),
 			},
+			responseGossip,
 		)
 		wg.Done()
 	}
