@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 var (
