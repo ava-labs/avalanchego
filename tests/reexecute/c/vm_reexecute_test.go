@@ -17,8 +17,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ava-labs/coreth/plugin/evm"
-	"github.com/ava-labs/coreth/plugin/factory"
 	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/require"
@@ -30,6 +28,8 @@ import (
 	"github.com/ava-labs/avalanchego/database/leveldb"
 	"github.com/ava-labs/avalanchego/database/prefixdb"
 	"github.com/ava-labs/avalanchego/genesis"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm"
+	"github.com/ava-labs/avalanchego/graft/coreth/plugin/factory"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow"
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
@@ -87,6 +87,12 @@ var (
 			"state-scheme": "firewood",
 			"snapshot-cache": 0,
 			"pruning-enabled": true,
+			"state-sync-enabled": false
+		}`,
+		"firewood-archive": `{
+			"state-scheme": "firewood",
+			"snapshot-cache": 0,
+			"pruning-enabled": false,
 			"state-sync-enabled": false
 		}`,
 	}
@@ -212,6 +218,12 @@ func benchmarkReexecuteRange(
 	)
 
 	log.Info("re-executing block range with params",
+		zap.String("runner", runnerNameArg),
+		zap.String("config", configNameArg),
+		zap.String("labels", labelsArg),
+		zap.String("metrics-server-enabled", strconv.FormatBool(metricsServerEnabled)),
+		zap.Uint64("metrics-server-port", metricsPort),
+		zap.String("metrics-collector-enabled", strconv.FormatBool(metricsCollectorEnabled)),
 		zap.String("block-dir", blockDir),
 		zap.String("vm-db-dir", vmDBDir),
 		zap.String("chain-data-dir", chainDataDir),
