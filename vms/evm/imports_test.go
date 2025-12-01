@@ -62,14 +62,14 @@ func TestImportViolations(t *testing.T) {
 			if spec.Path == nil {
 				continue
 			}
-			imp := strings.Trim(spec.Path.Value, `"`)
+			importPath := strings.Trim(spec.Path.Value, `"`)
 
 			inGraft := strings.Contains(file, "/graft")
 			inEmulate := strings.Contains(file, "/vms/evm/emulate")
 			inVMsEVM := strings.Contains(file, "/vms/evm")
-			importsPseudo := isPackageIn(imp, "github.com/ava-labs/libevm/libevm/pseudo")
-			importsCoreth := isPackageIn(imp, "github.com/ava-labs/avalanchego/graft/coreth")
-			importsSubnetEVM := isPackageIn(imp, "github.com/ava-labs/avalanchego/graft/subnet-evm")
+			importsPseudo := isImportIn(importPath, "github.com/ava-labs/libevm/libevm/pseudo")
+			importsCoreth := isImportIn(importPath, "github.com/ava-labs/avalanchego/graft/coreth")
+			importsSubnetEVM := isImportIn(importPath, "github.com/ava-labs/avalanchego/graft/subnet-evm")
 
 			hasViolation := []bool{
 				importsPseudo,
@@ -77,7 +77,7 @@ func TestImportViolations(t *testing.T) {
 				!inGraft && importsSubnetEVM && !inEmulate,
 			}
 			if slices.Contains(hasViolation, true) {
-				violations = append(violations, fmt.Sprintf("File %q imports %q", file, imp))
+				violations = append(violations, fmt.Sprintf("File %q imports %q", file, importPath))
 			}
 		}
 		return nil
@@ -87,12 +87,19 @@ func TestImportViolations(t *testing.T) {
 	require.Empty(t, violations, "import violations found:\n%s", strings.Join(violations, "\n"))
 }
 
-func isPackageIn(importPath, root string) bool {
-	if importPath == root {
+func isImportIn(importPath, targetedImport string) bool {
+	if importPath == targetedImport {
 		return true
 	}
-	if len(importPath) < len(root)+1 {
+
+	// importPath must be at least len(targetedImport) + 1 to be a subpackage
+	// (e.g., "github.com/foo/x" is len("github.com/foo") + 2, minimum subpackage length)
+	if len(importPath) < len(targetedImport)+1 {
 		return false
 	}
-	return strings.HasPrefix(importPath, root) && importPath[len(root)] == '/'
+
+	// Check if importPath is a subpackage by ensuring it has the targetedImport prefix
+	// AND the next character is '/'. This is to prevent false positives where one
+	// package name is a prefix of another like "github.com/foo" vs "github.com/foobar".
+	return strings.HasPrefix(importPath, targetedImport) && importPath[len(targetedImport)] == '/'
 }
