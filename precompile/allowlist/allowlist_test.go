@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package allowlisttest
+package allowlist_test
 
 import (
 	"testing"
@@ -9,6 +9,7 @@ import (
 	"github.com/ava-labs/libevm/common"
 
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
+	"github.com/ava-labs/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
 	"github.com/ava-labs/subnet-evm/precompile/modules"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
@@ -63,5 +64,5 @@ func TestAllowListRun(t *testing.T) {
 		Configurator: &dummyConfigurator{},
 		ConfigKey:    "dummy",
 	}
-	RunPrecompileWithAllowListTests(t, dummyModule, nil)
+	allowlisttest.RunPrecompileWithAllowListTests(t, dummyModule, nil)
 }

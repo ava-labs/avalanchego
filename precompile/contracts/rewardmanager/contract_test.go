@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package rewardmanager
+package rewardmanager_test
 
 import (
 	"testing"
@@ -15,6 +15,7 @@ import (
 	"github.com/ava-labs/subnet-evm/constants"
 	"github.com/ava-labs/subnet-evm/core/extstate"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist/allowlisttest"
+	"github.com/ava-labs/subnet-evm/precompile/contracts/rewardmanager"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/precompiletest"
 
@@ -27,60 +28,60 @@ var (
 		{
 			Name:       "set_allow_fee_recipients_from_no_role_fails",
 			Caller:     allowlisttest.TestNoRoleAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackAllowFeeRecipients()
+				input, err := rewardmanager.PackAllowFeeRecipients()
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: AllowFeeRecipientsGasCost,
+			SuppliedGas: rewardmanager.AllowFeeRecipientsGasCost,
 			ReadOnly:    false,
-			ExpectedErr: ErrCannotAllowFeeRecipients.Error(),
+			ExpectedErr: rewardmanager.ErrCannotAllowFeeRecipients.Error(),
 		},
 		{
 			Name:       "set_reward_address_from_no_role_fails",
 			Caller:     allowlisttest.TestNoRoleAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetRewardAddress(rewardAddress)
+				input, err := rewardmanager.PackSetRewardAddress(rewardAddress)
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: SetRewardAddressGasCost,
+			SuppliedGas: rewardmanager.SetRewardAddressGasCost,
 			ReadOnly:    false,
-			ExpectedErr: ErrCannotSetRewardAddress.Error(),
+			ExpectedErr: rewardmanager.ErrCannotSetRewardAddress.Error(),
 		},
 		{
 			Name:       "disable_rewards_from_no_role_fails",
 			Caller:     allowlisttest.TestNoRoleAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackDisableRewards()
+				input, err := rewardmanager.PackDisableRewards()
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: DisableRewardsGasCost,
+			SuppliedGas: rewardmanager.DisableRewardsGasCost,
 			ReadOnly:    false,
-			ExpectedErr: ErrCannotDisableRewards.Error(),
+			ExpectedErr: rewardmanager.ErrCannotDisableRewards.Error(),
 		},
 		{
 			Name:       "set_allow_fee_recipients_from_enabled_succeeds",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackAllowFeeRecipients()
+				input, err := rewardmanager.PackAllowFeeRecipients()
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: AllowFeeRecipientsGasCost + FeeRecipientsAllowedEventGasCost,
+			SuppliedGas: rewardmanager.AllowFeeRecipientsGasCost + rewardmanager.FeeRecipientsAllowedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				_, isFeeRecipients := GetStoredRewardAddress(state)
+				_, isFeeRecipients := rewardmanager.GetStoredRewardAddress(state)
 				require.True(t, isFeeRecipients)
 
 				logs := state.Logs()
@@ -90,9 +91,9 @@ var (
 		{
 			Name:       "set_fee_recipients_should_not_emit_events_pre_Durango",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackAllowFeeRecipients()
+				input, err := rewardmanager.PackAllowFeeRecipients()
 				require.NoError(t, err)
 
 				return input
@@ -104,7 +105,7 @@ var (
 				mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(false)
 				return mockChainConfig
 			},
-			SuppliedGas: AllowFeeRecipientsGasCost,
+			SuppliedGas: rewardmanager.AllowFeeRecipientsGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, stateDB *extstate.StateDB) {
@@ -116,18 +117,18 @@ var (
 		{
 			Name:       "set_reward_address_from_enabled_succeeds",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetRewardAddress(rewardAddress)
+				input, err := rewardmanager.PackSetRewardAddress(rewardAddress)
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: SetRewardAddressGasCost + RewardAddressChangedEventGasCost,
+			SuppliedGas: rewardmanager.SetRewardAddressGasCost + rewardmanager.RewardAddressChangedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				address, isFeeRecipients := GetStoredRewardAddress(state)
+				address, isFeeRecipients := rewardmanager.GetStoredRewardAddress(state)
 				require.Equal(t, rewardAddress, address)
 				require.False(t, isFeeRecipients)
 
@@ -138,18 +139,18 @@ var (
 		{
 			Name:       "set_allow_fee_recipients_from_manager_succeeds",
 			Caller:     allowlisttest.TestManagerAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackAllowFeeRecipients()
+				input, err := rewardmanager.PackAllowFeeRecipients()
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: AllowFeeRecipientsGasCost + FeeRecipientsAllowedEventGasCost,
+			SuppliedGas: rewardmanager.AllowFeeRecipientsGasCost + rewardmanager.FeeRecipientsAllowedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				_, isFeeRecipients := GetStoredRewardAddress(state)
+				_, isFeeRecipients := rewardmanager.GetStoredRewardAddress(state)
 				require.True(t, isFeeRecipients)
 
 				logs := state.Logs()
@@ -159,18 +160,18 @@ var (
 		{
 			Name:       "set_reward_address_from_manager_succeeds",
 			Caller:     allowlisttest.TestManagerAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetRewardAddress(rewardAddress)
+				input, err := rewardmanager.PackSetRewardAddress(rewardAddress)
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: SetRewardAddressGasCost + RewardAddressChangedEventGasCost,
+			SuppliedGas: rewardmanager.SetRewardAddressGasCost + rewardmanager.RewardAddressChangedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				address, isFeeRecipients := GetStoredRewardAddress(state)
+				address, isFeeRecipients := rewardmanager.GetStoredRewardAddress(state)
 				require.Equal(t, rewardAddress, address)
 				require.False(t, isFeeRecipients)
 
@@ -181,9 +182,9 @@ var (
 		{
 			Name:       "change_reward_address_should_not_emit_events_pre_Durango",
 			Caller:     allowlisttest.TestManagerAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetRewardAddress(rewardAddress)
+				input, err := rewardmanager.PackSetRewardAddress(rewardAddress)
 				require.NoError(t, err)
 
 				return input
@@ -195,7 +196,7 @@ var (
 				mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(false)
 				return mockChainConfig
 			},
-			SuppliedGas: SetRewardAddressGasCost,
+			SuppliedGas: rewardmanager.SetRewardAddressGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, stateDB *extstate.StateDB) {
@@ -207,18 +208,18 @@ var (
 		{
 			Name:       "disable_rewards_from_manager_succeeds",
 			Caller:     allowlisttest.TestManagerAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackDisableRewards()
+				input, err := rewardmanager.PackDisableRewards()
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: DisableRewardsGasCost + RewardsDisabledEventGasCost,
+			SuppliedGas: rewardmanager.DisableRewardsGasCost + rewardmanager.RewardsDisabledEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				address, isFeeRecipients := GetStoredRewardAddress(state)
+				address, isFeeRecipients := rewardmanager.GetStoredRewardAddress(state)
 				require.False(t, isFeeRecipients)
 				require.Equal(t, constants.BlackholeAddr, address)
 
@@ -229,18 +230,18 @@ var (
 		{
 			Name:       "disable_rewards_from_enabled_succeeds",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackDisableRewards()
+				input, err := rewardmanager.PackDisableRewards()
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: DisableRewardsGasCost + RewardsDisabledEventGasCost,
+			SuppliedGas: rewardmanager.DisableRewardsGasCost + rewardmanager.RewardsDisabledEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				address, isFeeRecipients := GetStoredRewardAddress(state)
+				address, isFeeRecipients := rewardmanager.GetStoredRewardAddress(state)
 				require.False(t, isFeeRecipients)
 				require.Equal(t, constants.BlackholeAddr, address)
 
@@ -251,9 +252,9 @@ var (
 		{
 			Name:       "disable_rewards_should_not_emit_event_pre_Durango",
 			Caller:     allowlisttest.TestManagerAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackDisableRewards()
+				input, err := rewardmanager.PackDisableRewards()
 				require.NoError(t, err)
 
 				return input
@@ -265,7 +266,7 @@ var (
 				mockChainConfig.EXPECT().IsDurango(gomock.Any()).AnyTimes().Return(false)
 				return mockChainConfig
 			},
-			SuppliedGas: SetRewardAddressGasCost,
+			SuppliedGas: rewardmanager.SetRewardAddressGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, stateDB *extstate.StateDB) {
@@ -278,19 +279,19 @@ var (
 			Name:   "get_current_reward_address_from_no_role_succeeds",
 			Caller: allowlisttest.TestNoRoleAddr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
-				allowlisttest.SetDefaultRoles(Module.Address)(t, state)
-				StoreRewardAddress(state, rewardAddress)
+				allowlisttest.SetDefaultRoles(rewardmanager.Module.Address)(t, state)
+				rewardmanager.StoreRewardAddress(state, rewardAddress)
 			},
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackCurrentRewardAddress()
+				input, err := rewardmanager.PackCurrentRewardAddress()
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: CurrentRewardAddressGasCost,
+			SuppliedGas: rewardmanager.CurrentRewardAddressGasCost,
 			ReadOnly:    false,
 			ExpectedRes: func() []byte {
-				res, err := PackCurrentRewardAddressOutput(rewardAddress)
+				res, err := rewardmanager.PackCurrentRewardAddressOutput(rewardAddress)
 				if err != nil {
 					panic(err)
 				}
@@ -301,18 +302,18 @@ var (
 			Name:   "get_are_fee_recipients_allowed_from_no_role_succeeds",
 			Caller: allowlisttest.TestNoRoleAddr,
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
-				allowlisttest.SetDefaultRoles(Module.Address)(t, state)
-				EnableAllowFeeRecipients(state)
+				allowlisttest.SetDefaultRoles(rewardmanager.Module.Address)(t, state)
+				rewardmanager.EnableAllowFeeRecipients(state)
 			},
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackAreFeeRecipientsAllowed()
+				input, err := rewardmanager.PackAreFeeRecipientsAllowed()
 				require.NoError(t, err)
 				return input
 			},
-			SuppliedGas: AreFeeRecipientsAllowedGasCost,
+			SuppliedGas: rewardmanager.AreFeeRecipientsAllowedGasCost,
 			ReadOnly:    false,
 			ExpectedRes: func() []byte {
-				res, err := PackAreFeeRecipientsAllowedOutput(true)
+				res, err := rewardmanager.PackAreFeeRecipientsAllowedOutput(true)
 				if err != nil {
 					panic(err)
 				}
@@ -322,21 +323,21 @@ var (
 		{
 			Name:       "get_initial_config_with_address",
 			Caller:     allowlisttest.TestNoRoleAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackCurrentRewardAddress()
+				input, err := rewardmanager.PackCurrentRewardAddress()
 				require.NoError(t, err)
 				return input
 			},
-			SuppliedGas: CurrentRewardAddressGasCost,
-			Config: &Config{
-				InitialRewardConfig: &InitialRewardConfig{
+			SuppliedGas: rewardmanager.CurrentRewardAddressGasCost,
+			Config: &rewardmanager.Config{
+				InitialRewardConfig: &rewardmanager.InitialRewardConfig{
 					RewardAddress: rewardAddress,
 				},
 			},
 			ReadOnly: false,
 			ExpectedRes: func() []byte {
-				res, err := PackCurrentRewardAddressOutput(rewardAddress)
+				res, err := rewardmanager.PackCurrentRewardAddressOutput(rewardAddress)
 				if err != nil {
 					panic(err)
 				}
@@ -346,21 +347,21 @@ var (
 		{
 			Name:       "get_initial_config_with_allow_fee_recipients_enabled",
 			Caller:     allowlisttest.TestNoRoleAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackAreFeeRecipientsAllowed()
+				input, err := rewardmanager.PackAreFeeRecipientsAllowed()
 				require.NoError(t, err)
 				return input
 			},
-			SuppliedGas: AreFeeRecipientsAllowedGasCost,
-			Config: &Config{
-				InitialRewardConfig: &InitialRewardConfig{
+			SuppliedGas: rewardmanager.AreFeeRecipientsAllowedGasCost,
+			Config: &rewardmanager.Config{
+				InitialRewardConfig: &rewardmanager.InitialRewardConfig{
 					AllowFeeRecipients: true,
 				},
 			},
 			ReadOnly: false,
 			ExpectedRes: func() []byte {
-				res, err := PackAreFeeRecipientsAllowedOutput(true)
+				res, err := rewardmanager.PackAreFeeRecipientsAllowedOutput(true)
 				if err != nil {
 					panic(err)
 				}
@@ -370,84 +371,84 @@ var (
 		{
 			Name:       "readOnly_allow_fee_recipients_with_allowed_role_fails",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackAllowFeeRecipients()
+				input, err := rewardmanager.PackAllowFeeRecipients()
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: AllowFeeRecipientsGasCost,
+			SuppliedGas: rewardmanager.AllowFeeRecipientsGasCost,
 			ReadOnly:    true,
 			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
 		{
 			Name:       "readOnly_set_reward_address_with_allowed_role_fails",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetRewardAddress(rewardAddress)
+				input, err := rewardmanager.PackSetRewardAddress(rewardAddress)
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: SetRewardAddressGasCost,
+			SuppliedGas: rewardmanager.SetRewardAddressGasCost,
 			ReadOnly:    true,
 			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
 		{
 			Name:       "insufficient_gas_set_reward_address_from_allowed_role",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetRewardAddress(rewardAddress)
+				input, err := rewardmanager.PackSetRewardAddress(rewardAddress)
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: SetRewardAddressGasCost + RewardAddressChangedEventGasCost - 1,
+			SuppliedGas: rewardmanager.SetRewardAddressGasCost + rewardmanager.RewardAddressChangedEventGasCost - 1,
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
 		{
 			Name:       "insufficient_gas_allow_fee_recipients_from_allowed_role",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackAllowFeeRecipients()
+				input, err := rewardmanager.PackAllowFeeRecipients()
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: AllowFeeRecipientsGasCost + FeeRecipientsAllowedEventGasCost - 1,
+			SuppliedGas: rewardmanager.AllowFeeRecipientsGasCost + rewardmanager.FeeRecipientsAllowedEventGasCost - 1,
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
 		{
 			Name:       "insufficient_gas_read_current_reward_address_from_allowed_role",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackCurrentRewardAddress()
+				input, err := rewardmanager.PackCurrentRewardAddress()
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: CurrentRewardAddressGasCost - 1,
+			SuppliedGas: rewardmanager.CurrentRewardAddressGasCost - 1,
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
 		{
 			Name:       "insufficient_gas_are_fee_recipients_allowed_from_allowed_role",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(rewardmanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackAreFeeRecipientsAllowed()
+				input, err := rewardmanager.PackAreFeeRecipientsAllowed()
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: AreFeeRecipientsAllowedGasCost - 1,
+			SuppliedGas: rewardmanager.AreFeeRecipientsAllowedGasCost - 1,
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
@@ -455,7 +456,7 @@ var (
 )
 
 func TestRewardManagerRun(t *testing.T) {
-	allowlisttest.RunPrecompileWithAllowListTests(t, Module, tests)
+	allowlisttest.RunPrecompileWithAllowListTests(t, rewardmanager.Module, tests)
 }
 
 func assertRewardAddressChanged(
@@ -470,7 +471,7 @@ func assertRewardAddressChanged(
 	require.Equal(
 		t,
 		[]common.Hash{
-			RewardManagerABI.Events["RewardAddressChanged"].ID,
+			rewardmanager.RewardManagerABI.Events["RewardAddressChanged"].ID,
 			common.BytesToHash(caller[:]),
 			common.BytesToHash(oldAddress[:]),
 			common.BytesToHash(newAddress[:]),
@@ -490,7 +491,7 @@ func assertRewardsDisabled(
 	require.Equal(
 		t,
 		[]common.Hash{
-			RewardManagerABI.Events["RewardsDisabled"].ID,
+			rewardmanager.RewardManagerABI.Events["RewardsDisabled"].ID,
 			common.BytesToHash(caller[:]),
 		},
 		log.Topics,
@@ -508,7 +509,7 @@ func assertFeeRecipientsAllowed(
 	require.Equal(
 		t,
 		[]common.Hash{
-			RewardManagerABI.Events["FeeRecipientsAllowed"].ID,
+			rewardmanager.RewardManagerABI.Events["FeeRecipientsAllowed"].ID,
 			common.BytesToHash(caller[:]),
 		},
 		log.Topics,

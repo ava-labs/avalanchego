@@ -21,6 +21,7 @@ var (
 	setFeeConfigSignature              = contract.CalculateFunctionSelector("setFeeConfig(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256)")
 	getFeeConfigSignature              = contract.CalculateFunctionSelector("getFeeConfig()")
 	getFeeConfigLastChangedAtSignature = contract.CalculateFunctionSelector("getFeeConfigLastChangedAt()")
+	testFeeConfig                      = commontype.ValidTestFeeConfig
 )
 
 func FuzzPackGetFeeConfigOutputEqualTest(f *testing.F) {

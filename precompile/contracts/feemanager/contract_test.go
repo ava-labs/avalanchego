@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package feemanager
+package feemanager_test
 
 import (
 	"math/big"
@@ -16,6 +16,7 @@ import (
 	"github.com/ava-labs/subnet-evm/core/extstate"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist/allowlisttest"
 	"github.com/ava-labs/subnet-evm/precompile/contract"
+	"github.com/ava-labs/subnet-evm/precompile/contracts/feemanager"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/precompiletest"
 
@@ -34,18 +35,7 @@ var (
 		MaxBlockGasCost:          big.NewInt(2000000000000000000),
 		BlockGasCostStep:         big.NewInt(1000000000000000000),
 	}
-	testFeeConfig = commontype.FeeConfig{
-		GasLimit:        big.NewInt(8_000_000),
-		TargetBlockRate: 2, // in seconds
-
-		MinBaseFee:               big.NewInt(25_000_000_000),
-		TargetGas:                big.NewInt(15_000_000),
-		BaseFeeChangeDenominator: big.NewInt(36),
-
-		MinBlockGasCost:  big.NewInt(0),
-		MaxBlockGasCost:  big.NewInt(1_000_000),
-		BlockGasCostStep: big.NewInt(200_000),
-	}
+	testFeeConfig = commontype.ValidTestFeeConfig
 	zeroFeeConfig = commontype.FeeConfig{
 		GasLimit:                 new(big.Int),
 		MinBaseFee:               new(big.Int),
@@ -61,32 +51,32 @@ var (
 		{
 			Name:       "set_config_from_no_role_fails",
 			Caller:     allowlisttest.TestNoRoleAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(feemanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetFeeConfig(testFeeConfig)
+				input, err := feemanager.PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: SetFeeConfigGasCost,
+			SuppliedGas: feemanager.SetFeeConfigGasCost,
 			ReadOnly:    false,
-			ExpectedErr: ErrCannotChangeFee.Error(),
+			ExpectedErr: feemanager.ErrCannotChangeFee.Error(),
 		},
 		{
 			Name:       "set_config_from_enabled_address_succeeds_and_emits_logs",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(feemanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetFeeConfig(testFeeConfig)
+				input, err := feemanager.PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: SetFeeConfigGasCost + FeeConfigChangedEventGasCost,
+			SuppliedGas: feemanager.SetFeeConfigGasCost + feemanager.FeeConfigChangedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := GetStoredFeeConfig(state)
+				feeConfig := feemanager.GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
 
 				logs := state.Logs()
@@ -96,18 +86,18 @@ var (
 		{
 			Name:       "set_config_from_manager_succeeds",
 			Caller:     allowlisttest.TestManagerAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(feemanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetFeeConfig(testFeeConfig)
+				input, err := feemanager.PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: SetFeeConfigGasCost + FeeConfigChangedEventGasCost,
+			SuppliedGas: feemanager.SetFeeConfigGasCost + feemanager.FeeConfigChangedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := GetStoredFeeConfig(state)
+				feeConfig := feemanager.GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
 
 				logs := state.Logs()
@@ -117,37 +107,37 @@ var (
 		{
 			Name:       "set_invalid_config_from_enabled_address",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(feemanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
 				feeConfig := testFeeConfig
 				feeConfig.MinBlockGasCost = new(big.Int).Mul(feeConfig.MaxBlockGasCost, common.Big2)
-				input, err := PackSetFeeConfig(feeConfig)
+				input, err := feemanager.PackSetFeeConfig(feeConfig)
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: SetFeeConfigGasCost + FeeConfigChangedEventGasCost,
+			SuppliedGas: feemanager.SetFeeConfigGasCost + feemanager.FeeConfigChangedEventGasCost,
 			ReadOnly:    false,
-			Config: &Config{
+			Config: &feemanager.Config{
 				InitialFeeConfig: &testFeeConfig,
 			},
 			ExpectedErr: "cannot be greater than maxBlockGasCost",
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := GetStoredFeeConfig(state)
+				feeConfig := feemanager.GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
 			},
 		},
 		{
 			Name:       "set_config_from_admin_address",
 			Caller:     allowlisttest.TestAdminAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(feemanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetFeeConfig(testFeeConfig)
+				input, err := feemanager.PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: SetFeeConfigGasCost + FeeConfigChangedEventGasCost,
+			SuppliedGas: feemanager.SetFeeConfigGasCost + feemanager.FeeConfigChangedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			SetupBlockContext: func(mbc *contract.MockBlockContext) {
@@ -155,9 +145,9 @@ var (
 				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
 			},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := GetStoredFeeConfig(state)
+				feeConfig := feemanager.GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
-				lastChangedAt := GetFeeConfigLastChangedAt(state)
+				lastChangedAt := feemanager.GetFeeConfigLastChangedAt(state)
 				require.Equal(t, testBlockNumber, lastChangedAt)
 
 				logs := state.Logs()
@@ -170,27 +160,27 @@ var (
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
 				blockContext := contract.NewMockBlockContext(gomock.NewController(t))
 				blockContext.EXPECT().Number().Return(big.NewInt(6)).Times(1)
-				allowlisttest.SetDefaultRoles(Module.Address)(t, state)
-				require.NoError(t, StoreFeeConfig(state, testFeeConfig, blockContext))
+				allowlisttest.SetDefaultRoles(feemanager.Module.Address)(t, state)
+				require.NoError(t, feemanager.StoreFeeConfig(state, testFeeConfig, blockContext))
 			},
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackGetFeeConfig()
+				input, err := feemanager.PackGetFeeConfig()
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: GetFeeConfigGasCost,
+			SuppliedGas: feemanager.GetFeeConfigGasCost,
 			ReadOnly:    true,
 			ExpectedRes: func() []byte {
-				res, err := PackGetFeeConfigOutput(testFeeConfig)
+				res, err := feemanager.PackGetFeeConfigOutput(testFeeConfig)
 				if err != nil {
 					panic(err)
 				}
 				return res
 			}(),
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := GetStoredFeeConfig(state)
-				lastChangedAt := GetFeeConfigLastChangedAt(state)
+				feeConfig := feemanager.GetStoredFeeConfig(state)
+				lastChangedAt := feemanager.GetFeeConfigLastChangedAt(state)
 				require.Equal(t, testFeeConfig, feeConfig)
 				require.Equal(t, big.NewInt(6), lastChangedAt)
 			},
@@ -198,20 +188,20 @@ var (
 		{
 			Name:       "get_initial_fee_config",
 			Caller:     allowlisttest.TestNoRoleAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(feemanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackGetFeeConfig()
+				input, err := feemanager.PackGetFeeConfig()
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: GetFeeConfigGasCost,
+			SuppliedGas: feemanager.GetFeeConfigGasCost,
 			ReadOnly:    true,
-			Config: &Config{
+			Config: &feemanager.Config{
 				InitialFeeConfig: &testFeeConfig,
 			},
 			ExpectedRes: func() []byte {
-				res, err := PackGetFeeConfigOutput(testFeeConfig)
+				res, err := feemanager.PackGetFeeConfigOutput(testFeeConfig)
 				if err != nil {
 					panic(err)
 				}
@@ -221,8 +211,8 @@ var (
 				mbc.EXPECT().Number().Return(testBlockNumber)
 			},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := GetStoredFeeConfig(state)
-				lastChangedAt := GetFeeConfigLastChangedAt(state)
+				feeConfig := feemanager.GetStoredFeeConfig(state)
+				lastChangedAt := feemanager.GetFeeConfigLastChangedAt(state)
 				require.Equal(t, testFeeConfig, feeConfig)
 				require.Equal(t, testBlockNumber, lastChangedAt)
 			},
@@ -233,27 +223,27 @@ var (
 			BeforeHook: func(t testing.TB, state *extstate.StateDB) {
 				blockContext := contract.NewMockBlockContext(gomock.NewController(t))
 				blockContext.EXPECT().Number().Return(testBlockNumber).Times(1)
-				allowlisttest.SetDefaultRoles(Module.Address)(t, state)
-				require.NoError(t, StoreFeeConfig(state, testFeeConfig, blockContext))
+				allowlisttest.SetDefaultRoles(feemanager.Module.Address)(t, state)
+				require.NoError(t, feemanager.StoreFeeConfig(state, testFeeConfig, blockContext))
 			},
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackGetFeeConfigLastChangedAt()
+				input, err := feemanager.PackGetFeeConfigLastChangedAt()
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: GetLastChangedAtGasCost,
+			SuppliedGas: feemanager.GetLastChangedAtGasCost,
 			ReadOnly:    true,
 			ExpectedRes: func() []byte {
-				res, err := PackGetFeeConfigLastChangedAtOutput(testBlockNumber)
+				res, err := feemanager.PackGetFeeConfigLastChangedAtOutput(testBlockNumber)
 				if err != nil {
 					panic(err)
 				}
 				return res
 			}(),
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := GetStoredFeeConfig(state)
-				lastChangedAt := GetFeeConfigLastChangedAt(state)
+				feeConfig := feemanager.GetStoredFeeConfig(state)
+				lastChangedAt := feemanager.GetFeeConfigLastChangedAt(state)
 				require.Equal(t, testFeeConfig, feeConfig)
 				require.Equal(t, testBlockNumber, lastChangedAt)
 			},
@@ -261,65 +251,65 @@ var (
 		{
 			Name:       "readOnly_setFeeConfig_with_noRole_fails",
 			Caller:     allowlisttest.TestNoRoleAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(feemanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetFeeConfig(testFeeConfig)
+				input, err := feemanager.PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: SetFeeConfigGasCost,
+			SuppliedGas: feemanager.SetFeeConfigGasCost,
 			ReadOnly:    true,
 			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
 		{
 			Name:       "readOnly_setFeeConfig_with_allow_role_fails",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(feemanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetFeeConfig(testFeeConfig)
+				input, err := feemanager.PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: SetFeeConfigGasCost,
+			SuppliedGas: feemanager.SetFeeConfigGasCost,
 			ReadOnly:    true,
 			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
 		{
 			Name:       "readOnly_setFeeConfig_with_admin_role_fails",
 			Caller:     allowlisttest.TestAdminAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(feemanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetFeeConfig(testFeeConfig)
+				input, err := feemanager.PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: SetFeeConfigGasCost,
+			SuppliedGas: feemanager.SetFeeConfigGasCost,
 			ReadOnly:    true,
 			ExpectedErr: vm.ErrWriteProtection.Error(),
 		},
 		{
 			Name:       "insufficient_gas_setFeeConfig_from_admin",
 			Caller:     allowlisttest.TestAdminAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(feemanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetFeeConfig(testFeeConfig)
+				input, err := feemanager.PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
 				return input
 			},
-			SuppliedGas: SetFeeConfigGasCost - 1,
+			SuppliedGas: feemanager.SetFeeConfigGasCost - 1,
 			ReadOnly:    false,
 			ExpectedErr: vm.ErrOutOfGas.Error(),
 		},
 		{
 			Name:       "set_config_with_extra_padded_bytes_should_fail_before_Durango",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(feemanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetFeeConfig(testFeeConfig)
+				input, err := feemanager.PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
 				input = append(input, make([]byte, 32)...)
@@ -330,9 +320,9 @@ var (
 				config.EXPECT().IsDurango(gomock.Any()).Return(false).AnyTimes()
 				return config
 			},
-			SuppliedGas: SetFeeConfigGasCost,
+			SuppliedGas: feemanager.SetFeeConfigGasCost,
 			ReadOnly:    false,
-			ExpectedErr: ErrInvalidLen.Error(),
+			ExpectedErr: feemanager.ErrInvalidLen.Error(),
 			SetupBlockContext: func(mbc *contract.MockBlockContext) {
 				mbc.EXPECT().Number().Return(testBlockNumber).AnyTimes()
 				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
@@ -341,9 +331,9 @@ var (
 		{
 			Name:       "set_config_with_extra_padded_bytes_should_succeed_with_Durango",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(feemanager.Module.Address),
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetFeeConfig(testFeeConfig)
+				input, err := feemanager.PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 
 				input = append(input, make([]byte, 32)...)
@@ -354,7 +344,7 @@ var (
 				config.EXPECT().IsDurango(gomock.Any()).Return(true).AnyTimes()
 				return config
 			},
-			SuppliedGas: SetFeeConfigGasCost + FeeConfigChangedEventGasCost,
+			SuppliedGas: feemanager.SetFeeConfigGasCost + feemanager.FeeConfigChangedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			SetupBlockContext: func(mbc *contract.MockBlockContext) {
@@ -362,9 +352,9 @@ var (
 				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
 			},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := GetStoredFeeConfig(state)
+				feeConfig := feemanager.GetStoredFeeConfig(state)
 				require.Equal(t, testFeeConfig, feeConfig)
-				lastChangedAt := GetFeeConfigLastChangedAt(state)
+				lastChangedAt := feemanager.GetFeeConfigLastChangedAt(state)
 				require.Equal(t, testBlockNumber, lastChangedAt)
 
 				logs := state.Logs()
@@ -375,15 +365,15 @@ var (
 		{
 			Name:       "setFeeConfig_regression_test_should_fail_before_Durango",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(feemanager.Module.Address),
 			Input:      common.Hex2Bytes(regressionBytes),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(ctrl)
 				config.EXPECT().IsDurango(gomock.Any()).Return(false).AnyTimes()
 				return config
 			},
-			SuppliedGas: SetFeeConfigGasCost,
-			ExpectedErr: ErrInvalidLen.Error(),
+			SuppliedGas: feemanager.SetFeeConfigGasCost,
+			ExpectedErr: feemanager.ErrInvalidLen.Error(),
 			ReadOnly:    false,
 			SetupBlockContext: func(mbc *contract.MockBlockContext) {
 				mbc.EXPECT().Number().Return(testBlockNumber).AnyTimes()
@@ -393,14 +383,14 @@ var (
 		{
 			Name:       "setFeeConfig_regression_test_should_succeed_after_Durango",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(feemanager.Module.Address),
 			Input:      common.Hex2Bytes(regressionBytes),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(ctrl)
 				config.EXPECT().IsDurango(gomock.Any()).Return(true).AnyTimes()
 				return config
 			},
-			SuppliedGas: SetFeeConfigGasCost + FeeConfigChangedEventGasCost,
+			SuppliedGas: feemanager.SetFeeConfigGasCost + feemanager.FeeConfigChangedEventGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			SetupBlockContext: func(mbc *contract.MockBlockContext) {
@@ -408,9 +398,9 @@ var (
 				mbc.EXPECT().Timestamp().Return(uint64(0)).AnyTimes()
 			},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
-				feeConfig := GetStoredFeeConfig(state)
+				feeConfig := feemanager.GetStoredFeeConfig(state)
 				require.Equal(t, regressionFeeConfig, feeConfig)
-				lastChangedAt := GetFeeConfigLastChangedAt(state)
+				lastChangedAt := feemanager.GetFeeConfigLastChangedAt(state)
 				require.Equal(t, testBlockNumber, lastChangedAt)
 
 				logs := state.Logs()
@@ -420,18 +410,18 @@ var (
 		{
 			Name:       "set_config_should_not_emit_event_before_Durango",
 			Caller:     allowlisttest.TestEnabledAddr,
-			BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+			BeforeHook: allowlisttest.SetDefaultRoles(feemanager.Module.Address),
 			ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 				config := precompileconfig.NewMockChainConfig(ctrl)
 				config.EXPECT().IsDurango(gomock.Any()).Return(false).AnyTimes()
 				return config
 			},
 			InputFn: func(t testing.TB) []byte {
-				input, err := PackSetFeeConfig(testFeeConfig)
+				input, err := feemanager.PackSetFeeConfig(testFeeConfig)
 				require.NoError(t, err)
 				return input
 			},
-			SuppliedGas: SetFeeConfigGasCost,
+			SuppliedGas: feemanager.SetFeeConfigGasCost,
 			ReadOnly:    false,
 			ExpectedRes: []byte{},
 			AfterHook: func(t testing.TB, state *extstate.StateDB) {
@@ -443,7 +433,7 @@ var (
 )
 
 func TestFeeManager(t *testing.T) {
-	allowlisttest.RunPrecompileWithAllowListTests(t, Module, tests)
+	allowlisttest.RunPrecompileWithAllowListTests(t, feemanager.Module, tests)
 }
 
 func assertFeeEvent(
@@ -458,13 +448,13 @@ func assertFeeEvent(
 	require.Equal(
 		t,
 		[]common.Hash{
-			FeeManagerABI.Events["FeeConfigChanged"].ID,
+			feemanager.FeeManagerABI.Events["FeeConfigChanged"].ID,
 			common.BytesToHash(sender[:]),
 		},
 		log.Topics,
 	)
 
-	oldFeeConfig, resFeeConfig, err := UnpackFeeConfigChangedEventData(log.Data)
+	oldFeeConfig, resFeeConfig, err := feemanager.UnpackFeeConfigChangedEventData(log.Data)
 	require.NoError(t, err)
 	require.True(t, expectedOldFeeConfig.Equal(&oldFeeConfig), "expected %v, got %v", expectedOldFeeConfig, oldFeeConfig)
 	require.True(t, expectedNewFeeConfig.Equal(&resFeeConfig), "expected %v, got %v", expectedNewFeeConfig, resFeeConfig)

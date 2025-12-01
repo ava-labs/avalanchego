@@ -5,11 +5,13 @@ set -euo pipefail
 VERSION="v0.9.0"
 
 # Scripts that are sourced from upstream and not maintained in this repo will not be shellchecked.
-# Also ignore the local avalanchego clone.
+# Also ignore the local avalanchego clone, git submodules, and node_modules.
 IGNORED_FILES="
   cmd/evm/transition-test.sh
   metrics/validate.sh
   avalanchego/*
+  contracts/lib/*
+  contracts/node_modules/*
 "
 
 function get_version {

@@ -147,16 +147,14 @@ tasks:
     desc: Run golangci-lint with auto-fix where possible
     cmd: ./scripts/lint_fix.sh
 
+  # todo(JonathanOppenheimer): remove this task once we have migrated to the new contract testing framework
   setup-contracts:
     desc: Set up contracts by compiling Solidity contracts and generating Go bindings
     dir: ./contracts
     cmds:
-      # Keep npm/Hardhat compilation for existing TypeScript tests (Phase 2-3 migration)
       - cmd: npm ci
       - cmd: npx hardhat clean
       - cmd: npx hardhat compile
-      # New: Compile contracts with solc and generate Go bindings
-      - cmd: go generate ./...
 
   shellcheck:
     desc: Run shellcheck static analysis on all shell scripts with version management

@@ -1,7 +1,7 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package nativeminter
+package nativeminter_test
 
 import (
 	"math/big"
@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/core/extstate"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist/allowlisttest"
+	"github.com/ava-labs/subnet-evm/precompile/contracts/nativeminter"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 	"github.com/ava-labs/subnet-evm/precompile/precompiletest"
 
@@ -26,28 +27,28 @@ var tests = []precompiletest.PrecompileTest{
 	{
 		Name:       "calling_mintNativeCoin_from_NoRole_should_fail",
 		Caller:     allowlisttest.TestNoRoleAddr,
-		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+		BeforeHook: allowlisttest.SetDefaultRoles(nativeminter.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			input, err := PackMintNativeCoin(allowlisttest.TestNoRoleAddr, common.Big1)
+			input, err := nativeminter.PackMintNativeCoin(allowlisttest.TestNoRoleAddr, common.Big1)
 			require.NoError(t, err)
 
 			return input
 		},
-		SuppliedGas: MintGasCost,
+		SuppliedGas: nativeminter.MintGasCost,
 		ReadOnly:    false,
-		ExpectedErr: ErrCannotMint.Error(),
+		ExpectedErr: nativeminter.ErrCannotMint.Error(),
 	},
 	{
 		Name:       "calling_mintNativeCoin_from_Enabled_should_succeed",
 		Caller:     allowlisttest.TestEnabledAddr,
-		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+		BeforeHook: allowlisttest.SetDefaultRoles(nativeminter.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			input, err := PackMintNativeCoin(allowlisttest.TestEnabledAddr, common.Big1)
+			input, err := nativeminter.PackMintNativeCoin(allowlisttest.TestEnabledAddr, common.Big1)
 			require.NoError(t, err)
 
 			return input
 		},
-		SuppliedGas: MintGasCost + NativeCoinMintedEventGasCost,
+		SuppliedGas: nativeminter.MintGasCost + nativeminter.NativeCoinMintedEventGasCost,
 		ReadOnly:    false,
 		ExpectedRes: []byte{},
 		AfterHook: func(t testing.TB, stateDB *extstate.StateDB) {
@@ -61,8 +62,8 @@ var tests = []precompiletest.PrecompileTest{
 	{
 		Name:       "initial_mint_funds",
 		Caller:     allowlisttest.TestEnabledAddr,
-		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
-		Config: &Config{
+		BeforeHook: allowlisttest.SetDefaultRoles(nativeminter.Module.Address),
+		Config: &nativeminter.Config{
 			InitialMint: map[common.Address]*math.HexOrDecimal256{
 				allowlisttest.TestEnabledAddr: math.NewHexOrDecimal256(2),
 			},
@@ -75,14 +76,14 @@ var tests = []precompiletest.PrecompileTest{
 	{
 		Name:       "calling_mintNativeCoin_from_Manager_should_succeed",
 		Caller:     allowlisttest.TestManagerAddr,
-		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+		BeforeHook: allowlisttest.SetDefaultRoles(nativeminter.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			input, err := PackMintNativeCoin(allowlisttest.TestEnabledAddr, common.Big1)
+			input, err := nativeminter.PackMintNativeCoin(allowlisttest.TestEnabledAddr, common.Big1)
 			require.NoError(t, err)
 
 			return input
 		},
-		SuppliedGas: MintGasCost + NativeCoinMintedEventGasCost,
+		SuppliedGas: nativeminter.MintGasCost + nativeminter.NativeCoinMintedEventGasCost,
 		ReadOnly:    false,
 		ExpectedRes: []byte{},
 		AfterHook: func(t testing.TB, stateDB *extstate.StateDB) {
@@ -96,14 +97,14 @@ var tests = []precompiletest.PrecompileTest{
 	{
 		Name:       "mint_funds_from_admin_address",
 		Caller:     allowlisttest.TestAdminAddr,
-		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+		BeforeHook: allowlisttest.SetDefaultRoles(nativeminter.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			input, err := PackMintNativeCoin(allowlisttest.TestAdminAddr, common.Big1)
+			input, err := nativeminter.PackMintNativeCoin(allowlisttest.TestAdminAddr, common.Big1)
 			require.NoError(t, err)
 
 			return input
 		},
-		SuppliedGas: MintGasCost + NativeCoinMintedEventGasCost,
+		SuppliedGas: nativeminter.MintGasCost + nativeminter.NativeCoinMintedEventGasCost,
 		ReadOnly:    false,
 		ExpectedRes: []byte{},
 		AfterHook: func(t testing.TB, stateDB *extstate.StateDB) {
@@ -117,14 +118,14 @@ var tests = []precompiletest.PrecompileTest{
 	{
 		Name:       "mint_max_big_funds",
 		Caller:     allowlisttest.TestAdminAddr,
-		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+		BeforeHook: allowlisttest.SetDefaultRoles(nativeminter.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			input, err := PackMintNativeCoin(allowlisttest.TestAdminAddr, math.MaxBig256)
+			input, err := nativeminter.PackMintNativeCoin(allowlisttest.TestAdminAddr, math.MaxBig256)
 			require.NoError(t, err)
 
 			return input
 		},
-		SuppliedGas: MintGasCost + NativeCoinMintedEventGasCost,
+		SuppliedGas: nativeminter.MintGasCost + nativeminter.NativeCoinMintedEventGasCost,
 		ReadOnly:    false,
 		ExpectedRes: []byte{},
 		AfterHook: func(t testing.TB, stateDB *extstate.StateDB) {
@@ -138,74 +139,74 @@ var tests = []precompiletest.PrecompileTest{
 	{
 		Name:       "readOnly_mint_with_noRole_fails",
 		Caller:     allowlisttest.TestNoRoleAddr,
-		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+		BeforeHook: allowlisttest.SetDefaultRoles(nativeminter.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			input, err := PackMintNativeCoin(allowlisttest.TestAdminAddr, common.Big1)
+			input, err := nativeminter.PackMintNativeCoin(allowlisttest.TestAdminAddr, common.Big1)
 			require.NoError(t, err)
 
 			return input
 		},
-		SuppliedGas: MintGasCost,
+		SuppliedGas: nativeminter.MintGasCost,
 		ReadOnly:    true,
 		ExpectedErr: vm.ErrWriteProtection.Error(),
 	},
 	{
 		Name:       "readOnly_mint_with_allow_role_fails",
 		Caller:     allowlisttest.TestEnabledAddr,
-		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+		BeforeHook: allowlisttest.SetDefaultRoles(nativeminter.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			input, err := PackMintNativeCoin(allowlisttest.TestEnabledAddr, common.Big1)
+			input, err := nativeminter.PackMintNativeCoin(allowlisttest.TestEnabledAddr, common.Big1)
 			require.NoError(t, err)
 
 			return input
 		},
-		SuppliedGas: MintGasCost,
+		SuppliedGas: nativeminter.MintGasCost,
 		ReadOnly:    true,
 		ExpectedErr: vm.ErrWriteProtection.Error(),
 	},
 	{
 		Name:       "readOnly_mint_with_admin_role_fails",
 		Caller:     allowlisttest.TestAdminAddr,
-		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+		BeforeHook: allowlisttest.SetDefaultRoles(nativeminter.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			input, err := PackMintNativeCoin(allowlisttest.TestAdminAddr, common.Big1)
+			input, err := nativeminter.PackMintNativeCoin(allowlisttest.TestAdminAddr, common.Big1)
 			require.NoError(t, err)
 
 			return input
 		},
-		SuppliedGas: MintGasCost,
+		SuppliedGas: nativeminter.MintGasCost,
 		ReadOnly:    true,
 		ExpectedErr: vm.ErrWriteProtection.Error(),
 	},
 	{
 		Name:       "insufficient_gas_mint_from_admin",
 		Caller:     allowlisttest.TestAdminAddr,
-		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+		BeforeHook: allowlisttest.SetDefaultRoles(nativeminter.Module.Address),
 		InputFn: func(t testing.TB) []byte {
-			input, err := PackMintNativeCoin(allowlisttest.TestEnabledAddr, common.Big1)
+			input, err := nativeminter.PackMintNativeCoin(allowlisttest.TestEnabledAddr, common.Big1)
 			require.NoError(t, err)
 
 			return input
 		},
-		SuppliedGas: MintGasCost + NativeCoinMintedEventGasCost - 1,
+		SuppliedGas: nativeminter.MintGasCost + nativeminter.NativeCoinMintedEventGasCost - 1,
 		ReadOnly:    false,
 		ExpectedErr: vm.ErrOutOfGas.Error(),
 	},
 	{
 		Name:       "mint_does_not_log_pre_Durango",
 		Caller:     allowlisttest.TestEnabledAddr,
-		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+		BeforeHook: allowlisttest.SetDefaultRoles(nativeminter.Module.Address),
 		ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 			config := precompileconfig.NewMockChainConfig(ctrl)
 			config.EXPECT().IsDurango(gomock.Any()).Return(false).AnyTimes()
 			return config
 		},
 		InputFn: func(t testing.TB) []byte {
-			input, err := PackMintNativeCoin(allowlisttest.TestEnabledAddr, common.Big1)
+			input, err := nativeminter.PackMintNativeCoin(allowlisttest.TestEnabledAddr, common.Big1)
 			require.NoError(t, err)
 			return input
 		},
-		SuppliedGas: MintGasCost,
+		SuppliedGas: nativeminter.MintGasCost,
 		ReadOnly:    false,
 		ExpectedRes: []byte{},
 		AfterHook: func(t testing.TB, stateDB *extstate.StateDB) {
@@ -217,14 +218,14 @@ var tests = []precompiletest.PrecompileTest{
 	{
 		Name:       "mint_with_extra_padded_bytes_should_fail_pre_Durango",
 		Caller:     allowlisttest.TestEnabledAddr,
-		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+		BeforeHook: allowlisttest.SetDefaultRoles(nativeminter.Module.Address),
 		ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 			config := precompileconfig.NewMockChainConfig(ctrl)
 			config.EXPECT().IsDurango(gomock.Any()).Return(false).AnyTimes()
 			return config
 		},
 		InputFn: func(t testing.TB) []byte {
-			input, err := PackMintNativeCoin(allowlisttest.TestEnabledAddr, common.Big1)
+			input, err := nativeminter.PackMintNativeCoin(allowlisttest.TestEnabledAddr, common.Big1)
 			require.NoError(t, err)
 
 			// Add extra bytes to the end of the input
@@ -232,21 +233,21 @@ var tests = []precompiletest.PrecompileTest{
 
 			return input
 		},
-		SuppliedGas: MintGasCost,
+		SuppliedGas: nativeminter.MintGasCost,
 		ReadOnly:    false,
-		ExpectedErr: ErrInvalidLen.Error(),
+		ExpectedErr: nativeminter.ErrInvalidLen.Error(),
 	},
 	{
 		Name:       "mint_with_extra_padded_bytes_should_succeed_with_Durango",
 		Caller:     allowlisttest.TestEnabledAddr,
-		BeforeHook: allowlisttest.SetDefaultRoles(Module.Address),
+		BeforeHook: allowlisttest.SetDefaultRoles(nativeminter.Module.Address),
 		ChainConfigFn: func(ctrl *gomock.Controller) precompileconfig.ChainConfig {
 			config := precompileconfig.NewMockChainConfig(ctrl)
 			config.EXPECT().IsDurango(gomock.Any()).Return(true).AnyTimes()
 			return config
 		},
 		InputFn: func(t testing.TB) []byte {
-			input, err := PackMintNativeCoin(allowlisttest.TestEnabledAddr, common.Big1)
+			input, err := nativeminter.PackMintNativeCoin(allowlisttest.TestEnabledAddr, common.Big1)
 			require.NoError(t, err)
 
 			// Add extra bytes to the end of the input
@@ -255,7 +256,7 @@ var tests = []precompiletest.PrecompileTest{
 			return input
 		},
 		ExpectedRes: []byte{},
-		SuppliedGas: MintGasCost + NativeCoinMintedEventGasCost,
+		SuppliedGas: nativeminter.MintGasCost + nativeminter.NativeCoinMintedEventGasCost,
 		ReadOnly:    false,
 		AfterHook: func(t testing.TB, state *extstate.StateDB) {
 			expected := uint256.MustFromBig(common.Big1)
@@ -268,7 +269,7 @@ var tests = []precompiletest.PrecompileTest{
 }
 
 func TestContractNativeMinterRun(t *testing.T) {
-	allowlisttest.RunPrecompileWithAllowListTests(t, Module, tests)
+	allowlisttest.RunPrecompileWithAllowListTests(t, nativeminter.Module, tests)
 }
 
 func assertNativeCoinMintedEvent(t testing.TB,
@@ -282,14 +283,14 @@ func assertNativeCoinMintedEvent(t testing.TB,
 	require.Equal(
 		t,
 		[]common.Hash{
-			NativeMinterABI.Events["NativeCoinMinted"].ID,
+			nativeminter.NativeMinterABI.Events["NativeCoinMinted"].ID,
 			common.BytesToHash(expectedSender[:]),
 			common.BytesToHash(expectedRecipient[:]),
 		},
 		log.Topics,
 	)
 	require.NotEmpty(t, log.Data)
-	amount, err := UnpackNativeCoinMintedEventData(log.Data)
+	amount, err := nativeminter.UnpackNativeCoinMintedEventData(log.Data)
 	require.NoError(t, err)
 	require.Zero(t, expectedAmount.Cmp(amount), "expected", expectedAmount, "got", amount)
 }
