@@ -74,6 +74,10 @@ type SetWithBloomFilter[T Gossipable] struct {
 	salt ids.ID
 }
 
+// Add adds v to the set and bloom filter.
+//
+// If adding to the bloom filter fails after successfully adding to the set, the
+// value remains in the set and is still added to the bloom filter.
 func (s *SetWithBloomFilter[T]) Add(v T) error {
 	if err := s.set.Add(v); err != nil {
 		return err
