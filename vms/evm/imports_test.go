@@ -26,7 +26,7 @@ func TestImportViolations(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if strings.ToLower(filepath.Ext(file)) != "go" {
+		if strings.ToLower(filepath.Ext(file)) != ".go" {
 			return nil
 		}
 
