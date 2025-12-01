@@ -38,11 +38,13 @@ const (
 // Flags suggested for temporary networks. Applied by default.
 func DefaultTmpnetFlags() FlagsMap {
 	return FlagsMap{
-		config.NetworkPeerListPullGossipFreqKey: "250ms",
-		config.NetworkMaxReconnectDelayKey:      "1s",
-		config.HealthCheckFreqKey:               "2s",
-		config.AdminAPIEnabledKey:               "true",
-		config.IndexEnabledKey:                  "true",
+		config.SystemTrackerRequiredAvailableDiskSpaceKey:         "1GB",
+		config.SystemTrackerWarningThresholdAvailableDiskSpaceKey: "3GB",
+		config.NetworkPeerListPullGossipFreqKey:                   "250ms",
+		config.NetworkMaxReconnectDelayKey:                        "1s",
+		config.HealthCheckFreqKey:                                 "2s",
+		config.AdminAPIEnabledKey:                                 "true",
+		config.IndexEnabledKey:                                    "true",
 	}
 }
 
@@ -61,7 +63,7 @@ func DefaultChainConfigs() map[string]ConfigMap {
 	return map[string]ConfigMap{
 		// Supply only non-default configuration to ensure that default
 		// values will be used. Available C-Chain configuration options are
-		// defined in the `github.com/ava-labs/coreth/evm` package.
+		// defined in the `github.com/ava-labs/avalanchego/graft/coreth/evm` package.
 		"C": {
 			"warp-api-enabled": true,
 			"log-level":        logging.Trace.String(),

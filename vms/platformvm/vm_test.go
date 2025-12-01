@@ -443,12 +443,20 @@ func TestAddValidatorReject(t *testing.T) {
 	)
 	require.NoError(err)
 
-	// trigger block creation
-	vm.ctx.Lock.Unlock()
-	require.NoError(vm.issueTxFromRPC(tx))
-	vm.ctx.Lock.Lock()
+	lastAcceptedID, err := vm.LastAccepted(t.Context())
+	require.NoError(err)
+	lastAccepted, err := vm.GetBlock(t.Context(), lastAcceptedID)
+	require.NoError(err)
 
-	blk, err := vm.Builder.BuildBlock(t.Context())
+	statelessBlk, err := block.NewBanffStandardBlock(
+		lastAccepted.Timestamp().Add(time.Second),
+		lastAccepted.ID(),
+		lastAccepted.Height()+1,
+		[]*txs.Tx{tx},
+	)
+	require.NoError(err)
+
+	blk, err := vm.ParseBlock(t.Context(), statelessBlk.Bytes())
 	require.NoError(err)
 
 	require.NoError(blk.Verify(t.Context()))
@@ -1389,8 +1397,8 @@ func TestBootstrapPartiallyAccepted(t *testing.T) {
 		return config.NodeIDs
 	}
 
-	peerTracker.Connected(vdrID, version.CurrentApp)
-	require.NoError(bootstrapper.Connected(t.Context(), vdrID, version.CurrentApp))
+	peerTracker.Connected(vdrID, version.Current)
+	require.NoError(bootstrapper.Connected(t.Context(), vdrID, version.Current))
 
 	// Create a valid block to remove the first genesis validator that is not
 	// related to the VM.

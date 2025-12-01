@@ -224,11 +224,11 @@ AvalancheGo support tiers:
 | :----------: | :--------------: | :-----------: |
 |    amd64     |      Linux       |       1       |
 |    arm64     |      Linux       |       2       |
-|    amd64     |      Darwin      |       2       |
+|    arm64     |      Darwin      |       2       |
+|    amd64     |      Darwin      | Not supported |
 |    amd64     |     Windows      | Not supported |
 |     arm      |      Linux       | Not supported |
 |     i386     |      Linux       | Not supported |
-|    arm64     |      Darwin      | Not supported |
 
 To officially support a new platform, one must satisfy the following requirements:
 
@@ -243,3 +243,8 @@ To officially support a new platform, one must satisfy the following requirement
 **We and our community welcome responsible disclosures.**
 
 Please refer to our [Security Policy](SECURITY.md) and [Security Advisories](https://github.com/ava-labs/avalanchego/security/advisories).
+
+## Licenses
+
+Unless otherwise stated, all code in this repository is licensed under BSD-3. See our [licensing](LICENSE) for more details. Specifically, [grafted repositories](graft/) may use
+a different license, and one must refer to that project's README and LICENSE for more details

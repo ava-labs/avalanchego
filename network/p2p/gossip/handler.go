@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 )
 
-var _ p2p.Handler = (*Handler[*testTx])(nil)
+var _ p2p.Handler = (*Handler[Gossipable])(nil)
 
 func NewHandler[T Gossipable](
 	log logging.Logger,

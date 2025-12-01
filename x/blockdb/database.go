@@ -197,7 +197,7 @@ type Database struct {
 // Parameters:
 //   - config: Configuration parameters
 //   - log: Logger instance for structured logging
-func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
+func New(config DatabaseConfig, log logging.Logger) (database.HeightIndex, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
@@ -231,6 +231,7 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 		zap.String("dataDir", config.DataDir),
 		zap.Uint64("maxDataFileSize", config.MaxDataFileSize),
 		zap.Int("maxDataFiles", config.MaxDataFiles),
+		zap.Uint16("blockCacheSize", config.BlockCacheSize),
 	)
 
 	if err := s.openAndInitializeIndex(); err != nil {
@@ -256,6 +257,9 @@ func New(config DatabaseConfig, log logging.Logger) (*Database, error) {
 		zap.Uint64("maxBlockHeight", maxHeight),
 	)
 
+	if config.BlockCacheSize > 0 {
+		return newCacheDB(s, config.BlockCacheSize), nil
+	}
 	return s, nil
 }
 
@@ -286,9 +290,7 @@ func (s *Database) Put(height BlockHeight, block BlockData) error {
 	defer s.closeMu.RUnlock()
 
 	if s.closed {
-		s.log.Error("Failed to write block: database is closed",
-			zap.Uint64("height", height),
-		)
+		s.log.Error("Failed Put: database closed", zap.Uint64("height", height))
 		return database.ErrClosed
 	}
 
@@ -385,12 +387,6 @@ func (s *Database) Put(height BlockHeight, block BlockData) error {
 // It returns database.ErrNotFound if the block does not exist.
 func (s *Database) readBlockIndex(height BlockHeight) (indexEntry, error) {
 	var entry indexEntry
-	if s.closed {
-		s.log.Error("Failed to read block index: database is closed",
-			zap.Uint64("height", height),
-		)
-		return entry, database.ErrClosed
-	}
 
 	// Skip the index entry read if we know the block is past the max height.
 	maxHeight := s.maxBlockHeight.Load()
@@ -435,6 +431,11 @@ func (s *Database) readBlockIndex(height BlockHeight) (indexEntry, error) {
 func (s *Database) Get(height BlockHeight) (BlockData, error) {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
+
+	if s.closed {
+		s.log.Error("Failed Get: database closed", zap.Uint64("height", height))
+		return nil, database.ErrClosed
+	}
 
 	indexEntry, err := s.readBlockIndex(height)
 	if err != nil {
@@ -494,6 +495,15 @@ func (s *Database) Has(height BlockHeight) (bool, error) {
 	s.closeMu.RLock()
 	defer s.closeMu.RUnlock()
 
+	if s.closed {
+		s.log.Error("Failed Has: database closed", zap.Uint64("height", height))
+		return false, database.ErrClosed
+	}
+
+	return s.hasWithoutLock(height)
+}
+
+func (s *Database) hasWithoutLock(height BlockHeight) (bool, error) {
 	_, err := s.readBlockIndex(height)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) || errors.Is(err, ErrInvalidBlockHeight) {

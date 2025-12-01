@@ -29,23 +29,45 @@ issues:
   # Maximum count of issues with the same text.
   max-same-issues: 0
 
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - blank
+        - prefix(github.com/ava-labs/avalanchego)
+        - alias
+        - dot
+      custom-order: true
+  exclusions:
+    generated: lax
+
 linters:
   default: none
   enable:
     - asciicheck
+    - bidichk
     - bodyclose
     - copyloopvar
     - depguard
+    - durationcheck
     - errcheck
     - errorlint
     - forbidigo
     - goconst
+    - gocheckcompilerdirectives
     - gocritic
     - goprintffuncname
     - gosec
     - govet
     - importas
     - ineffassign
+    - mirror 
     - misspell
     - nakedret
     - nilerr
@@ -54,6 +76,7 @@ linters:
     - perfsprint
     - prealloc
     - predeclared
+    - reassign
     - revive
     - spancheck
     - staticcheck
@@ -233,21 +256,5 @@ linters:
       # 4. Exclude any file suffixed with _test.go.
       - path: "(^tests/)|(^(.*/)*test_[^/]*\\.go$)|(.*test/.*)|(.*_test\\.go$)"
         linters:
+          - gosec
           - prealloc
-formatters:
-  enable:
-    - gci
-    - gofmt
-    - gofumpt
-  settings:
-    gci:
-      sections:
-        - standard
-        - default
-        - blank
-        - prefix(github.com/ava-labs/avalanchego)
-        - alias
-        - dot
-      custom-order: true
-  exclusions:
-    generated: lax

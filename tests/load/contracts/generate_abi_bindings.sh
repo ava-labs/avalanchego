@@ -13,7 +13,7 @@ CONTRACTS_DIR="$(dirname "$0")"
 TEMPDIR=$(mktemp -d)
 
 cleanup() {
-  rm -r "${TEMPDIR}"   
+  rm -r "${TEMPDIR}"
 }
 
 trap cleanup EXIT
@@ -25,7 +25,7 @@ should_skip() {
   local file="$1"
   for helper_file in "${HELPER_FILES[@]}"; do
     if [[ "$file" == "$helper_file" ]]; then
-      return 0 
+      return 0
     fi
   done
   return 1
@@ -41,7 +41,7 @@ for FILE in "${CONTRACTS_DIR}"/*.sol; do
 
   echo "Generating Go bindings from Solidity contract $FILE..."
   CONTRACT_NAME=$(basename "$FILE" .sol)
-  solc --abi --bin --overwrite -o "$TEMPDIR" "${CONTRACTS_DIR}/${CONTRACT_NAME}.sol"
+  solc --evm-version="cancun" --abi --bin --overwrite -o "$TEMPDIR" "${CONTRACTS_DIR}/${CONTRACT_NAME}.sol"
   go run github.com/ava-labs/libevm/cmd/abigen@v1.13.14-0.2.0.release \
     --bin="${TEMPDIR}/${CONTRACT_NAME}.bin" \
     --abi="${TEMPDIR}/${CONTRACT_NAME}.abi" \
