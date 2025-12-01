@@ -82,10 +82,13 @@ type VM struct {
 	Ctx *snow.Context
 
 	// TODO: unexport these fields
-	SecpCache     *secp256k1.RecoverCache
-	Fx            secp256k1fx.Fx
-	baseCodec     codec.Registry
-	AtomicMempool *txpool.Mempool
+	SecpCache *secp256k1.RecoverCache
+	Fx        secp256k1fx.Fx
+	baseCodec codec.Registry
+
+	AtomicMempool        *txpool.Mempool
+	atomicGossipSet      *avalanchegossip.SetWithBloomFilter[*atomic.Tx]
+	AtomicTxPushGossiper *avalanchegossip.PushGossiper[*atomic.Tx]
 
 	// AtomicTxRepository maintains two indexes on accepted atomic txs.
 	// - txID to accepted atomic tx
@@ -94,8 +97,6 @@ type VM struct {
 	AtomicTxRepository *atomicstate.AtomicRepository
 	// AtomicBackend abstracts verification and processing of atomic transactions
 	AtomicBackend *atomicstate.AtomicBackend
-
-	AtomicTxPushGossiper *avalanchegossip.PushGossiper[*atomic.Tx]
 
 	// cancel may be nil until [snow.NormalOp] starts
 	cancel     context.CancelFunc
@@ -177,11 +178,19 @@ func (vm *VM) Initialize(
 		return fmt.Errorf("failed to initialize inner VM: %w", err)
 	}
 
-	atomicMempool, err := txpool.NewMempool(atomicTxs, vm.InnerVM.MetricRegistry(), vm.verifyTxAtTip)
+	vm.AtomicMempool = txpool.NewMempool(atomicTxs, vm.verifyTxAtTip)
+	atomicGossipSet, err := avalanchegossip.NewSetWithBloomFilter[*atomic.Tx](
+		vm.AtomicMempool,
+		vm.InnerVM.MetricRegistry(),
+		"atomic_mempool_bloom_filter",
+		config.TxGossipBloomMinTargetElements,
+		config.TxGossipBloomTargetFalsePositiveRate,
+		config.TxGossipBloomResetFalsePositiveRate,
+	)
 	if err != nil {
-		return fmt.Errorf("failed to initialize mempool: %w", err)
+		return fmt.Errorf("failed to initialize atomic gossip set: %w", err)
 	}
-	vm.AtomicMempool = atomicMempool
+	vm.atomicGossipSet = atomicGossipSet
 
 	// initialize bonus blocks on mainnet
 	var (
@@ -280,7 +289,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 
 	vm.AtomicTxPushGossiper, err = avalanchegossip.NewPushGossiper[*atomic.Tx](
 		&atomicTxGossipMarshaller,
-		vm.AtomicMempool,
+		vm.atomicGossipSet,
 		vm.InnerVM.P2PValidators(),
 		atomicTxGossipClient,
 		atomicTxGossipMetrics,
@@ -297,7 +306,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	atomicTxGossipHandler, err := gossip.NewTxGossipHandler[*atomic.Tx](
 		vm.Ctx.Log,
 		&atomicTxGossipMarshaller,
-		vm.AtomicMempool,
+		vm.atomicGossipSet,
 		atomicTxGossipMetrics,
 		config.TxGossipTargetMessageSize,
 		config.TxGossipThrottlingPeriod,
@@ -317,7 +326,7 @@ func (vm *VM) onNormalOperationsStarted() error {
 	atomicTxPullGossiper := avalanchegossip.NewPullGossiper[*atomic.Tx](
 		vm.Ctx.Log,
 		&atomicTxGossipMarshaller,
-		vm.AtomicMempool,
+		vm.atomicGossipSet,
 		atomicTxGossipClient,
 		atomicTxGossipMetrics,
 		config.TxGossipPollSize,

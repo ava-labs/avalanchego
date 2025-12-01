@@ -141,7 +141,8 @@ func (service *AvaxAPI) IssueTx(_ *http.Request, args *api.FormattedTx, response
 		return fmt.Errorf("problem initializing transaction: %w", err)
 	}
 
-	response.TxID = tx.ID()
+	txID := tx.ID()
+	response.TxID = txID
 
 	service.vm.Ctx.Lock.Lock()
 	defer service.vm.Ctx.Lock.Unlock()
@@ -156,7 +157,13 @@ func (service *AvaxAPI) IssueTx(_ *http.Request, args *api.FormattedTx, response
 	// to the mempool through p2p gossip, this will ensure this node also pushes
 	// it to the network.
 	service.vm.AtomicTxPushGossiper.Add(tx)
-	return nil
+	if err != nil {
+		return nil
+	}
+
+	// If we just added the tx to the mempool, add it to the gossip bloom
+	// filter.
+	return service.vm.atomicGossipSet.AddToBloom(txID)
 }
 
 // GetAtomicTxStatus returns the status of the specified transaction

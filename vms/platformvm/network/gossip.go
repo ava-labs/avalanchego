@@ -6,10 +6,8 @@ package network
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 
 	"github.com/ava-labs/avalanchego/ids"
@@ -27,6 +25,7 @@ var (
 	_ p2p.Handler                = (*txGossipHandler)(nil)
 	_ gossip.Marshaller[*txs.Tx] = (*txMarshaller)(nil)
 	_ gossip.Gossipable          = (*txs.Tx)(nil)
+	_ gossip.Set[*txs.Tx]        = (*mempoolWithVerification)(nil)
 )
 
 // bloomChurnMultiplier is the number used to multiply the size of the mempool
@@ -67,34 +66,25 @@ func (txMarshaller) UnmarshalGossip(bytes []byte) (*txs.Tx, error) {
 	return txs.Parse(txs.Codec, bytes)
 }
 
-func newGossipMempool(
+func newMempoolWithVerification(
 	mempool *mempool.Mempool,
-	registerer prometheus.Registerer,
 	log logging.Logger,
 	txVerifier TxVerifier,
-	minTargetElements int,
-	targetFalsePositiveProbability,
-	resetFalsePositiveProbability float64,
-) (*gossipMempool, error) {
-	bloom, err := gossip.NewBloomFilter(registerer, "mempool_bloom_filter", minTargetElements, targetFalsePositiveProbability, resetFalsePositiveProbability)
-	return &gossipMempool{
+) *mempoolWithVerification {
+	return &mempoolWithVerification{
 		Mempool:    mempool,
 		log:        log,
 		txVerifier: txVerifier,
-		bloom:      bloom,
-	}, err
+	}
 }
 
-type gossipMempool struct {
+type mempoolWithVerification struct {
 	*mempool.Mempool
 	log        logging.Logger
 	txVerifier TxVerifier
-
-	lock  sync.RWMutex
-	bloom *gossip.BloomFilter
 }
 
-func (g *gossipMempool) Add(tx *txs.Tx) error {
+func (g *mempoolWithVerification) Add(tx *txs.Tx) error {
 	txID := tx.ID()
 	if _, ok := g.Mempool.Get(txID); ok {
 		return fmt.Errorf("tx %s dropped: %w", txID, txmempool.ErrDuplicateTx)
@@ -122,37 +112,10 @@ func (g *gossipMempool) Add(tx *txs.Tx) error {
 		g.Mempool.MarkDropped(txID, err)
 		return err
 	}
-
-	g.lock.Lock()
-	defer g.lock.Unlock()
-
-	g.bloom.Add(tx)
-	reset, err := gossip.ResetBloomFilterIfNeeded(
-		g.bloom,
-		g.Mempool.Len()*bloomChurnMultiplier,
-	)
-	if err != nil {
-		return err
-	}
-
-	if reset {
-		g.log.Debug("resetting bloom filter")
-		g.Mempool.Iterate(func(tx *txs.Tx) bool {
-			g.bloom.Add(tx)
-			return true
-		})
-	}
 	return nil
 }
 
-func (g *gossipMempool) Has(txID ids.ID) bool {
+func (g *mempoolWithVerification) Has(txID ids.ID) bool {
 	_, ok := g.Mempool.Get(txID)
 	return ok
-}
-
-func (g *gossipMempool) GetFilter() (bloom []byte, salt []byte) {
-	g.lock.RLock()
-	defer g.lock.RUnlock()
-
-	return g.bloom.Marshal()
 }
