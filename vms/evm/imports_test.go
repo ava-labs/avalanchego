@@ -16,13 +16,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const root = ".."
+
 // TestImportViolations ensures proper import rules:
 // - graft/coreth can be imported anywhere EXCEPT vms/evm (but vms/evm/emulate is an exception)
 // - graft/subnet-evm cannot be imported anywhere EXCEPT vms/evm/emulate (but vms/evm/emulate is an exception)
 // - github.com/ava-labs/libevm/libevm/pseudo cannot be imported anywhere
 func TestImportViolations(t *testing.T) {
-	const root = ".."
-	err := filepath.Walk(root, func(file string, info fs.FileInfo, err error) error {
+	var violations []string
+
+	err := filepath.Walk(root, func(file string, _ fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -32,7 +35,7 @@ func TestImportViolations(t *testing.T) {
 
 		node, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly)
 		if err != nil {
-			return fmt.Errorf("parser.ParseFile(..., %q, ...): %v", file, err)
+			return fmt.Errorf("parser.ParseFile(..., %q, ...): %w", file, err)
 		}
 
 		for _, spec := range node.Imports {
@@ -65,19 +68,20 @@ func TestImportViolations(t *testing.T) {
 			//
 			// TODO(jonathanoppenheimer): remove the emulate functionality once the emulate package is removed.
 			// TODO(jonathanoppenheimer): remove the graft functionality once the graft package will be removed.
-			violations := []bool{
+			hasViolation := []bool{
 				importsPseudo,
 				!inGraft && importsCoreth && inVMsEVM && !inEmulate,
 				!inGraft && importsSubnetEVM && !inEmulate,
 			}
-			if slices.Contains(violations, true) {
-				t.Errorf("File %q imports %q", file, imp)
+			if slices.Contains(hasViolation, true) {
+				violations = append(violations, fmt.Sprintf("File %q imports %q", file, imp))
 			}
 		}
 		return nil
 	})
 
 	require.NoErrorf(t, err, "filepath.Walk(%q)", root)
+	require.Empty(t, violations, "import violations found:\n%s", strings.Join(violations, "\n"))
 }
 
 func isPackageIn(importPath, root string) bool {
