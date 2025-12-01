@@ -64,6 +64,9 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *triedb.Database, cache int
 	if err != nil {
 		return nil, false, errors.New("missing or corrupted snapshot, no snapshot block hash")
 	}
+	if baseBlockHash != blockHash {
+		return nil, false, fmt.Errorf("block hash stored on disk (%#x) does not match last accepted (%#x)", baseBlockHash, blockHash)
+	}
 	baseRoot := rawdb.ReadSnapshotRoot(diskdb)
 	switch {
 	case baseRoot == (common.Hash{}):
