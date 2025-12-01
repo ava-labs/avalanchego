@@ -18,6 +18,8 @@ import (
 //
 // Invariant: The returned bloom filter is not safe to reset concurrently with
 // other operations. However, it is otherwise safe to access concurrently.
+//
+// Deprecated: [SetWithBloomFilter] should be used to manage bloom filters.
 func NewBloomFilter(
 	registerer prometheus.Registerer,
 	namespace string,
@@ -45,6 +47,7 @@ func NewBloomFilter(
 	return filter, err
 }
 
+// Deprecated: [SetWithBloomFilter] should be used to manage bloom filters.
 type BloomFilter struct {
 	minTargetElements              int
 	targetFalsePositiveProbability float64
@@ -72,12 +75,8 @@ func (b *BloomFilter) Has(gossipable Gossipable) bool {
 	return bloom.Contains(b.bloom, h[:], b.salt[:])
 }
 
-func (b *BloomFilter) Marshal() ([]byte, []byte) {
-	bloomBytes := b.bloom.Marshal()
-	// salt must be copied here to ensure the bytes aren't overwritten if salt
-	// is later modified.
-	salt := b.salt
-	return bloomBytes, salt[:]
+func (b *BloomFilter) BloomFilter() (*bloom.Filter, ids.ID) {
+	return b.bloom, b.salt
 }
 
 // ResetBloomFilterIfNeeded resets a bloom filter if it breaches [targetFalsePositiveProbability].
@@ -86,6 +85,8 @@ func (b *BloomFilter) Marshal() ([]byte, []byte) {
 // the same [targetFalsePositiveProbability].
 //
 // Returns true if the bloom filter was reset.
+//
+// Deprecated: [SetWithBloomFilter] should be used to manage bloom filters.
 func ResetBloomFilterIfNeeded(
 	bloomFilter *BloomFilter,
 	targetElements int,

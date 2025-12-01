@@ -1,0 +1,130 @@
+// Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
+// See the file LICENSE for licensing terms.
+
+package gossip
+
+import (
+	"testing"
+
+	"github.com/ava-labs/avalanchego/utils/bloom"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/testutil"
+	"github.com/stretchr/testify/require"
+)
+
+func TestSetWithBloomFilter_Refresh(t *testing.T) {
+	type (
+		op struct {
+			add    *tx
+			remove *tx
+		}
+		test struct {
+			name                          string
+			resetFalsePositiveProbability float64
+			ops                           []op
+			expected                      []tx
+			expectedResetCount            float64
+		}
+	)
+	tests := []test{
+		{
+			name:                          "no refresh",
+			resetFalsePositiveProbability: 1, // maxCount = 9223372036854775807
+			ops: []op{
+				{add: &tx{0}},
+				{add: &tx{1}},
+				{add: &tx{2}},
+			},
+			expected: []tx{
+				{0},
+				{1},
+				{2},
+			},
+			expectedResetCount: 0,
+		},
+		{
+			name:                          "no refresh - with removals",
+			resetFalsePositiveProbability: 1, // maxCount = 9223372036854775807
+			ops: []op{
+				{add: &tx{0}},
+				{add: &tx{1}},
+				{add: &tx{2}},
+				{remove: &tx{0}},
+				{remove: &tx{1}},
+				{remove: &tx{2}},
+			},
+			expected: []tx{
+				{0},
+				{1},
+				{2},
+			},
+			expectedResetCount: 0,
+		},
+		{
+			name:                          "refresh",
+			resetFalsePositiveProbability: 0.0000000000000001, // maxCount = 1
+			ops: []op{
+				{add: &tx{0}}, // no reset
+				{remove: &tx{0}},
+				{add: &tx{1}}, // reset
+			},
+			expected: []tx{
+				{1},
+			},
+			expectedResetCount: 1,
+		},
+		{
+			name:                          "multiple refresh",
+			resetFalsePositiveProbability: 0.0000000000000001, // maxCount = 1
+			ops: []op{
+				{add: &tx{0}}, // no reset
+				{remove: &tx{0}},
+				{add: &tx{1}}, // reset
+				{remove: &tx{1}},
+				{add: &tx{2}}, // reset
+			},
+			expected: []tx{
+				{2},
+			},
+			expectedResetCount: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require := require.New(t)
+
+			const (
+				minTargetElements              = 1
+				targetFalsePositiveProbability = 0.0001
+			)
+			var s setDouble
+			bs, err := NewSetWithBloomFilter(
+				&s,
+				prometheus.NewRegistry(),
+				"",
+				minTargetElements,
+				targetFalsePositiveProbability,
+				tt.resetFalsePositiveProbability,
+			)
+			require.NoError(err)
+
+			for _, op := range tt.ops {
+				if op.add != nil {
+					require.NoError(bs.Add(*op.add))
+				}
+				if op.remove != nil {
+					s.txs.Remove(*op.remove)
+				}
+			}
+
+			// Add one to expectedResetCount to account for the initial creation
+			// of the bloom filter.
+			require.Equal(tt.expectedResetCount+1, testutil.ToFloat64(bs.metrics.ResetCount))
+			b, h := bs.BloomFilter()
+			for _, expected := range tt.expected {
+				require.True(bloom.Contains(b, expected[:], h[:]))
+			}
+		})
+	}
+}

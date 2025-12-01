@@ -16,7 +16,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/database/memdb"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/config"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmtest"
 	"github.com/ava-labs/avalanchego/graft/coreth/utils/utilstest"
 	"github.com/ava-labs/avalanchego/ids"
@@ -27,6 +26,7 @@ import (
 	"github.com/ava-labs/avalanchego/snow/engine/enginetest"
 	"github.com/ava-labs/avalanchego/snow/snowtest"
 	"github.com/ava-labs/avalanchego/snow/validators"
+	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -113,21 +113,10 @@ func TestAtomicTxGossip(t *testing.T) {
 	}
 
 	// Ask the VM for any new transactions. We should get nothing at first.
-	emptyBloomFilter, err := gossip.NewBloomFilter(
-		prometheus.NewRegistry(),
-		"",
-		config.TxGossipBloomMinTargetElements,
-		config.TxGossipBloomTargetFalsePositiveRate,
-		config.TxGossipBloomResetFalsePositiveRate,
+	requestBytes, err := gossip.MarshalAppRequest(
+		bloom.EmptyFilter.Marshal(),
+		agoUtils.RandomBytes(32),
 	)
-	require.NoError(err)
-	emptyBloomFilterBytes, _ := emptyBloomFilter.Marshal()
-	request := &sdk.PullGossipRequest{
-		Filter: emptyBloomFilterBytes,
-		Salt:   agoUtils.RandomBytes(32),
-	}
-
-	requestBytes, err := proto.Marshal(request)
 	require.NoError(err)
 
 	wg := &sync.WaitGroup{}
@@ -135,9 +124,9 @@ func TestAtomicTxGossip(t *testing.T) {
 	onResponse := func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
 		require.NoError(err)
 
-		response := &sdk.PullGossipResponse{}
-		require.NoError(proto.Unmarshal(responseBytes, response))
-		require.Empty(response.Gossip)
+		responseGossip, err := gossip.ParseAppResponse(responseBytes)
+		require.NoError(err)
+		require.Empty(responseGossip)
 		wg.Done()
 	}
 	require.NoError(client.AppRequest(ctx, set.Of(vm.Ctx.NodeID), requestBytes, onResponse))
@@ -166,18 +155,14 @@ func TestAtomicTxGossip(t *testing.T) {
 	// Ask the VM for new transactions. We should get the newly issued tx.
 	wg.Add(1)
 
-	marshaller := atomic.TxMarshaller{}
 	onResponse = func(_ context.Context, _ ids.NodeID, responseBytes []byte, err error) {
 		require.NoError(err)
 
-		response := &sdk.PullGossipResponse{}
-		require.NoError(proto.Unmarshal(responseBytes, response))
-		require.Len(response.Gossip, 1)
-
-		gotTx, err := marshaller.UnmarshalGossip(response.Gossip[0])
+		responseGossip, err := gossip.ParseAppResponse(responseBytes)
 		require.NoError(err)
-		require.Equal(tx.ID(), gotTx.GossipID())
-
+		require.Equal(responseGossip, [][]byte{
+			tx.Bytes(),
+		})
 		wg.Done()
 	}
 	require.NoError(client.AppRequest(ctx, set.Of(vm.Ctx.NodeID), requestBytes, onResponse))
