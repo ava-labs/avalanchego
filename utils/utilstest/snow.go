@@ -69,15 +69,13 @@ func NewTestValidatorState() *validatorstest.State {
 // This function ensures that the snow context has a properly configured validator state
 // that includes the GetValidatorSetF function, which is required by many tests.
 func NewTestSnowContext(t testing.TB) *snow.Context {
-	snowCtx := snowtest.Context(t, SubnetEVMTestChainID)
-	snowCtx.ValidatorState = NewTestValidatorState()
-	return snowCtx
+	return NewTestSnowContextWithValidatorState(t, NewTestValidatorState())
 }
 
-// NewTestSnowContextWithChainID returns a snow.Context with validator state properly configured for testing
-// with a specific chain ID. This is provided for backward compatibility when a specific chain ID is needed.
-func NewTestSnowContextWithChainID(t testing.TB, chainID ids.ID) *snow.Context {
-	snowCtx := snowtest.Context(t, chainID)
-	snowCtx.ValidatorState = NewTestValidatorState()
+// NewTestSnowContextWithValidatorState returns a snow.Context with the provided validator state.
+// This is useful when you need to customize the validator state behavior for specific tests.
+func NewTestSnowContextWithValidatorState(t testing.TB, validatorState validators.State) *snow.Context {
+	snowCtx := snowtest.Context(t, SubnetEVMTestChainID)
+	snowCtx.ValidatorState = validatorState
 	return snowCtx
 }
