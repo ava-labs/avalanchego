@@ -42,13 +42,6 @@ import (
 	"github.com/ava-labs/libevm/triedb"
 )
 
-var (
-	errSnapshotRootEmpty        = errors.New("missing or corrupted snapshot, no snapshot root")
-	errSnapshotBlockHashEmpty   = errors.New("missing or corrupted snapshot, no snapshot block hash")
-	errSnapshotRootMismatch     = errors.New("snapshot root mismatch")
-	errSnapshotGeneratorMissing = errors.New("missing snapshot generator")
-)
-
 // journalGenerator is a disk layer entry containing the generator progress marker.
 type journalGenerator struct {
 	// Indicator that whether the database was in progress of being wiped.
@@ -69,16 +62,14 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *triedb.Database, cache int
 	// Retrieve the block hash of the snapshot, failing if no snapshot is present.
 	baseBlockHash, err := customrawdb.ReadSnapshotBlockHash(diskdb)
 	if err != nil {
-		return nil, false, errSnapshotBlockHashEmpty
+		return nil, false, errors.New("missing or corrupted snapshot, no snapshot block hash")
 	}
-
-	// Retrieve and validate the snapshot root.
 	baseRoot := rawdb.ReadSnapshotRoot(diskdb)
 	switch {
 	case baseRoot == (common.Hash{}):
-		return nil, false, errSnapshotRootEmpty
+		return nil, false, errors.New("missing or corrupted snapshot, no snapshot root")
 	case baseRoot != root:
-		return nil, false, fmt.Errorf("%w: stored %#x, expected %#x", errSnapshotRootMismatch, baseRoot, root)
+		return nil, false, fmt.Errorf("root stored on disk (%#x) does not match last accepted (%#x)", baseRoot, root)
 	}
 
 	// Retrieve the disk layer generator. It must exist, no matter the
@@ -86,7 +77,7 @@ func loadSnapshot(diskdb ethdb.KeyValueStore, triedb *triedb.Database, cache int
 	// layer is invalid.
 	generatorBlob := rawdb.ReadSnapshotGenerator(diskdb)
 	if len(generatorBlob) == 0 {
-		return nil, false, errSnapshotGeneratorMissing
+		return nil, false, errors.New("missing snapshot generator")
 	}
 	var generator journalGenerator
 	if err := rlp.DecodeBytes(generatorBlob, &generator); err != nil {
