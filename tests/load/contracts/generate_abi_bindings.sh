@@ -41,13 +41,12 @@ for FILE in "${CONTRACTS_DIR}"/*.sol; do
 
   echo "Generating Go bindings from Solidity contract $FILE..."
   CONTRACT_NAME=$(basename "$FILE" .sol)
-  solc --abi --bin --overwrite -o "$TEMPDIR" "${CONTRACTS_DIR}/${CONTRACT_NAME}.sol"
+  solc --evm-version="cancun" --abi --bin --overwrite -o "$TEMPDIR" "${CONTRACTS_DIR}/${CONTRACT_NAME}.sol"
   go run github.com/ava-labs/libevm/cmd/abigen@v1.13.14-0.2.0.release \
     --bin="${TEMPDIR}/${CONTRACT_NAME}.bin" \
     --abi="${TEMPDIR}/${CONTRACT_NAME}.abi" \
     --type "$CONTRACT_NAME" \
     --pkg=contracts \
-    --out="${CONTRACTS_DIR}/${CONTRACT_NAME}.bindings.go" \
-    --evm-version="cancun"
+    --out="${CONTRACTS_DIR}/${CONTRACT_NAME}.bindings.go"
   echo "Generated ${CONTRACT_NAME}.bindings.go"
 done
