@@ -41,7 +41,6 @@ const root = ".."
 // @StephenButtolph, @ARR4N, or @joshua-kim. There is almost certainly a better option, and it exists
 // only because libevm can't pollute the code base with generic type parameters.
 //
-// TODO(jonathanoppenheimer): remove the emulate functionality once the emulate package is removed.
 // TODO(jonathanoppenheimer): remove the graft functionality once the graft package will be removed.
 func TestImportViolations(t *testing.T) {
 	var violations []string
