@@ -203,6 +203,7 @@ tasks:
   reexecute-cchain-range:
     desc: Re-execute a range of C-Chain blocks.
     vars:
+      TASK_NAME: '{{.TASK_NAME | default .TASK}}'
       CURRENT_STATE_DIR: '{{.CURRENT_STATE_DIR}}'
       BLOCK_DIR: '{{.BLOCK_DIR}}'
       CONFIG: '{{.CONFIG | default ""}}'
@@ -211,7 +212,7 @@ tasks:
       LABELS: '{{.LABELS | default ""}}'
       BENCHMARK_OUTPUT_FILE: '{{.BENCHMARK_OUTPUT_FILE | default ""}}'
       TIMESTAMP: '{{.TIMESTAMP | default (now | date "20060102-150405")}}'
-      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/%s-%s" .TASK .TIMESTAMP)}}'
+      EXECUTION_DATA_DIR: '{{.EXECUTION_DATA_DIR | default (printf "/tmp/%s-%s" .TASK_NAME .TIMESTAMP)}}'
     cmd: |
       CURRENT_STATE_DIR={{.CURRENT_STATE_DIR}} \
       BLOCK_DIR={{.BLOCK_DIR}} \
