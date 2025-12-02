@@ -18,7 +18,6 @@ import (
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/network/p2p"
 	"github.com/ava-labs/avalanchego/snow/engine/common"
-	"github.com/ava-labs/avalanchego/utils/bloom"
 	"github.com/ava-labs/avalanchego/utils/buffer"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/set"
@@ -40,10 +39,7 @@ const (
 
 var (
 	_ Gossiper = (*ValidatorGossiper)(nil)
-	_ Gossiper = (*PullGossiper[*testTx])(nil)
-	_ Gossiper = (*NoOpGossiper)(nil)
-
-	_ Set[*testTx] = (*FullSet[*testTx])(nil)
+	_ Gossiper = (*PullGossiper[Gossipable])(nil)
 
 	ioTypeLabels   = []string{ioLabel, typeLabel}
 	sentPushLabels = prometheus.Labels{
@@ -596,38 +592,4 @@ func Every(ctx context.Context, log logging.Logger, gossiper Gossiper, frequency
 			return
 		}
 	}
-}
-
-type NoOpGossiper struct{}
-
-func (NoOpGossiper) Gossip(context.Context) error {
-	return nil
-}
-
-type TestGossiper struct {
-	GossipF func(ctx context.Context) error
-}
-
-func (t *TestGossiper) Gossip(ctx context.Context) error {
-	return t.GossipF(ctx)
-}
-
-type FullSet[T Gossipable] struct{}
-
-func (FullSet[_]) Gossip(context.Context) error {
-	return nil
-}
-
-func (FullSet[T]) Add(T) error {
-	return nil
-}
-
-func (FullSet[T]) Has(ids.ID) bool {
-	return true
-}
-
-func (FullSet[T]) Iterate(func(gossipable T) bool) {}
-
-func (FullSet[_]) GetFilter() ([]byte, []byte) {
-	return bloom.FullFilter.Marshal(), ids.Empty[:]
 }

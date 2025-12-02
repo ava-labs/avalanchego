@@ -910,7 +910,7 @@ func Test_Trie_MultipleStates(t *testing.T) {
 		t.Run(commitApproach, func(t *testing.T) {
 			require := require.New(t)
 
-			r := rand.New(rand.NewSource(randCount)) // #nosec G404
+			r := rand.New(rand.NewSource(randCount))
 			randCount++
 			rdb := memdb.New()
 			defer rdb.Close()

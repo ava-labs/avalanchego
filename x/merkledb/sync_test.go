@@ -66,7 +66,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now)) // #nosec G404
+	r := rand.New(rand.NewSource(now))
 
 	tests := []struct {
 		name              string
@@ -124,7 +124,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			name: "range proof bad response - removed key from middle of response",
 			rangeProofClient: func(db MerkleDB) *p2p.Client {
 				handler := newFlakyRangeProofHandler(t, db, func(response *RangeProof) {
-					i := rand.Intn(max(1, len(response.KeyChanges)-1)) // #nosec G404
+					i := rand.Intn(max(1, len(response.KeyChanges)-1))
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
 
@@ -197,7 +197,7 @@ func Test_Sync_Result_Correct_Root(t *testing.T) {
 			name: "change proof bad response - removed key from middle of response",
 			changeProofClient: func(db MerkleDB) *p2p.Client {
 				handler := newFlakyChangeProofHandler(t, db, func(response *ChangeProof) {
-					i := rand.Intn(max(1, len(response.KeyChanges)-1)) // #nosec G404
+					i := rand.Intn(max(1, len(response.KeyChanges)-1))
 					_ = slices.Delete(response.KeyChanges, i, min(len(response.KeyChanges), i+1))
 				})
 
@@ -323,7 +323,7 @@ func Test_Sync_Result_Correct_Root_With_Sync_Restart(t *testing.T) {
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now)) // #nosec G404
+	r := rand.New(rand.NewSource(now))
 	dbToSync, err := generateTrie(t, r, 3*xsync.MaxKeyValuesLimit)
 	require.NoError(err)
 	syncRoot, err := dbToSync.GetMerkleRoot(t.Context())
@@ -394,7 +394,7 @@ func Test_Sync_Result_Correct_Root_Update_Root_During(t *testing.T) {
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now)) // #nosec G404
+	r := rand.New(rand.NewSource(now))
 
 	dbToSync, err := generateTrie(t, r, 3*xsync.MaxKeyValuesLimit)
 	require.NoError(err)
@@ -486,7 +486,7 @@ func Test_Sync_UpdateSyncTarget(t *testing.T) {
 
 	now := time.Now().UnixNano()
 	t.Logf("seed: %d", now)
-	r := rand.New(rand.NewSource(now)) // #nosec G404
+	r := rand.New(rand.NewSource(now))
 
 	// Generate a source DB with two roots
 	dbToSync, err := generateTrie(t, r, 1000)

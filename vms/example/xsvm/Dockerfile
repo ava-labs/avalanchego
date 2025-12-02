@@ -13,6 +13,7 @@ WORKDIR /build
 # Copy and download avalanche dependencies using go mod
 COPY go.mod .
 COPY go.sum .
+COPY graft/coreth ./graft/coreth
 RUN go mod download
 
 # Copy the code into the container

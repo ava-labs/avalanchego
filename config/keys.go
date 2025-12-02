@@ -195,6 +195,7 @@ const (
 	SystemTrackerDiskHalflifeKey                       = "system-tracker-disk-halflife"
 	SystemTrackerRequiredAvailableDiskSpaceKey         = "system-tracker-disk-required-available-space"
 	SystemTrackerWarningThresholdAvailableDiskSpaceKey = "system-tracker-disk-warning-threshold-available-space"
+	SystemTrackerWarnThreshAvailDiskSpacePercentageKey = "system-tracker-disk-warning-threshold-available-space-percentage"
 	DiskVdrAllocKey                                    = "throttler-inbound-disk-validator-alloc"
 	DiskMaxNonVdrUsageKey                              = "throttler-inbound-disk-max-non-validator-usage"
 	DiskMaxNonVdrNodeUsageKey                          = "throttler-inbound-disk-max-non-validator-node-usage"

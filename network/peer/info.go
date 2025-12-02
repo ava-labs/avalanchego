@@ -17,6 +17,7 @@ type Info struct {
 	PublicIP       netip.AddrPort  `json:"publicIP,omitempty"`
 	ID             ids.NodeID      `json:"nodeID"`
 	Version        string          `json:"version"`
+	UpgradeTime    uint64          `json:"upgradeTime"`
 	LastSent       time.Time       `json:"lastSent"`
 	LastReceived   time.Time       `json:"lastReceived"`
 	ObservedUptime json.Uint32     `json:"observedUptime"`

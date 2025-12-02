@@ -97,11 +97,11 @@ func newConfig(t *testing.T) (Config, ids.NodeID, *enginetest.Sender, *vertextes
 		"",
 		prometheus.NewRegistry(),
 		nil,
-		version.CurrentApp,
+		version.Current,
 	)
 	require.NoError(err)
 
-	p2pTracker.Connected(peer, version.CurrentApp)
+	p2pTracker.Connected(peer, version.Current)
 
 	return Config{
 		AllGetsServer:                  avaGetHandler,
