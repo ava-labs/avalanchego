@@ -16,11 +16,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const root = ".."
-
 // TestImportViolations ensures proper import rules:
 // - graft/coreth can be imported anywhere EXCEPT vms/evm (but vms/evm/emulate is an exception)
-// - graft/subnet-evm cannot be imported anywhere EXCEPT vms/evm/emulate (but vms/evm/emulate is an exception)
+// - graft/subnet-evm can only be imported within graft/subnet-evm itself and vms/evm/emulate
 // - github.com/ava-labs/libevm/libevm/pseudo cannot be imported anywhere
 //
 // The rationale for these rules are as follows:
@@ -31,8 +29,8 @@ const root = ".."
 // coreth can NOT be imported in the vms/evm package, because the goal is that vms/evm should
 // only contain the 'clean' properly uplifted code, that meets AvalancheGo quality standards.
 //
-// subnet-evm can NOT be imported anywhere in AvalancheGo besides /graft, because it must
-// not become a direct dependency of AvalancheGo.
+// subnet-evm can NOT be imported anywhere in AvalancheGo besides graft/subnet-evm itself,
+// because it must not become a direct dependency of AvalancheGo or mix directly with coreth.
 //
 // both coreth and subnet-evm can be imported in the vms/evm/emulate package, because it
 // allows consumers to use both coreth and subnet-evm registration at the same time.
@@ -43,14 +41,28 @@ const root = ".."
 //
 // TODO(jonathanoppenheimer): remove the graft functionality once the graft package will be removed.
 func TestImportViolations(t *testing.T) {
+	const root = ".."
+	repoRoot, err := filepath.Abs(root)
+	require.NoError(t, err)
+
+	graftDir := filepath.Join(repoRoot, "graft")
+	graftSubnetEVMDir := filepath.Join(repoRoot, "graft", "subnet-evm")
+	emulateDir := filepath.Join(repoRoot, "vms", "evm", "emulate")
+	vmsEVMDir := filepath.Join(repoRoot, "vms", "evm")
+
 	var violations []string
 
-	err := filepath.Walk(root, func(file string, _ fs.FileInfo, err error) error {
+	err = filepath.Walk(root, func(file string, _ fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 		if strings.ToLower(filepath.Ext(file)) != ".go" {
 			return nil
+		}
+
+		absFile, err := filepath.Abs(file)
+		if err != nil {
+			return err
 		}
 
 		node, err := parser.ParseFile(token.NewFileSet(), file, nil, parser.ImportsOnly)
@@ -64,9 +76,10 @@ func TestImportViolations(t *testing.T) {
 			}
 			importPath := strings.Trim(spec.Path.Value, `"`)
 
-			inGraft := strings.Contains(file, "/graft")
-			inEmulate := strings.Contains(file, "/vms/evm/emulate")
-			inVMsEVM := strings.Contains(file, "/vms/evm")
+			inGraft := strings.HasPrefix(absFile, graftDir)
+			inGraftSubnetEVM := strings.HasPrefix(absFile, graftSubnetEVMDir)
+			inEmulate := strings.HasPrefix(absFile, emulateDir)
+			inVMsEVM := strings.HasPrefix(absFile, vmsEVMDir)
 			importsPseudo := isImportIn(importPath, "github.com/ava-labs/libevm/libevm/pseudo")
 			importsCoreth := isImportIn(importPath, "github.com/ava-labs/avalanchego/graft/coreth")
 			importsSubnetEVM := isImportIn(importPath, "github.com/ava-labs/avalanchego/graft/subnet-evm")
@@ -74,7 +87,7 @@ func TestImportViolations(t *testing.T) {
 			hasViolation := []bool{
 				importsPseudo,
 				!inGraft && importsCoreth && inVMsEVM && !inEmulate,
-				!inGraft && importsSubnetEVM && !inEmulate,
+				!inGraftSubnetEVM && importsSubnetEVM && !inEmulate,
 			}
 			if slices.Contains(hasViolation, true) {
 				violations = append(violations, fmt.Sprintf("File %q imports %q", file, importPath))
@@ -84,7 +97,7 @@ func TestImportViolations(t *testing.T) {
 	})
 
 	require.NoErrorf(t, err, "filepath.Walk(%q)", root)
-	require.Empty(t, violations, "import violations found:\n%s", strings.Join(violations, "\n"))
+	require.Empty(t, violations, "import violations found")
 }
 
 func isImportIn(importPath, targetedImport string) bool {
