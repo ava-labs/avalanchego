@@ -42,7 +42,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/utils/timer"
-	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
 )
@@ -55,8 +54,6 @@ var (
 
 var (
 	blockDirArg        string
-	blockDirSrcArg     string
-	blockDirDstArg     string
 	currentStateDirArg string
 	startBlockArg      uint64
 	endBlockArg        uint64
@@ -121,10 +118,6 @@ func TestMain(m *testing.M) {
 	predefinedConfigOptionsStr := fmt.Sprintf("[%s]", strings.Join(predefinedConfigKeys, ", "))
 	flag.StringVar(&configNameArg, configKey, defaultConfigKey, fmt.Sprintf("Specifies the predefined config to use for the VM. Options include %s.", predefinedConfigOptionsStr))
 	flag.StringVar(&runnerNameArg, "runner", "dev", "Name of the runner executing this test. Added as a metric label and to the sub-benchmark's name to differentiate results on the runner key.")
-
-	// Flags specific to TestExportBlockRange.
-	flag.StringVar(&blockDirSrcArg, "block-dir-src", blockDirSrcArg, "Source block directory to copy from when running TestExportBlockRange.")
-	flag.StringVar(&blockDirDstArg, "block-dir-dst", blockDirDstArg, "Destination block directory to write blocks into when executing TestExportBlockRange.")
 
 	flag.Parse()
 
@@ -232,7 +225,7 @@ func benchmarkReexecuteRange(
 		zap.Int("chan-size", chanSize),
 	)
 
-	blockChan, err := reexecute.CreateBlockChanFromLevelDB(b, blockDir, startBlock, endBlock, chanSize)
+	blockChan, err := reexecute.CreateBlockChanFromLevelDB(blockDir, startBlock, endBlock, chanSize, b.Cleanup)
 	r.NoError(err)
 
 	dbLogger := tests.NewDefaultLogger("db")
@@ -475,34 +468,6 @@ func (e *vmExecutor) executeSequence(ctx context.Context, blkChan <-chan reexecu
 	e.config.Log.Info("finished executing sequence")
 
 	return nil
-}
-
-func TestExportBlockRange(t *testing.T) {
-	exportBlockRange(t, blockDirSrcArg, blockDirDstArg, startBlockArg, endBlockArg, chanSizeArg)
-}
-
-func exportBlockRange(tb testing.TB, blockDirSrc string, blockDirDst string, startBlock, endBlock uint64, chanSize int) {
-	r := require.New(tb)
-	blockChan, err := reexecute.CreateBlockChanFromLevelDB(tb, blockDirSrc, startBlock, endBlock, chanSize)
-	r.NoError(err)
-
-	db, err := leveldb.New(blockDirDst, nil, logging.NoLog{}, prometheus.NewRegistry())
-	r.NoError(err)
-	tb.Cleanup(func() {
-		r.NoError(db.Close())
-	})
-
-	batch := db.NewBatch()
-	for blkResult := range blockChan {
-		r.NoError(batch.Put(reexecute.BlockKey(blkResult.Height), blkResult.BlockBytes))
-
-		if batch.Size() > 10*units.MiB {
-			r.NoError(batch.Write())
-			batch = db.NewBatch()
-		}
-	}
-
-	r.NoError(batch.Write())
 }
 
 type consensusMetrics struct {
