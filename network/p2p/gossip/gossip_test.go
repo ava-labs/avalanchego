@@ -5,7 +5,6 @@ package gossip
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -74,16 +73,11 @@ type setDouble struct {
 }
 
 func (s *setDouble) Add(gossipable tx) error {
-	if s.txs.Contains(gossipable) {
-		return fmt.Errorf("%s already present", ids.ID(gossipable))
-	}
-
 	s.txs.Add(gossipable)
 	s.bloom.Add(gossipable)
 	if s.onAdd != nil {
 		s.onAdd(gossipable)
 	}
-
 	return nil
 }
 

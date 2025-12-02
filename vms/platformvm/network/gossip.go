@@ -19,8 +19,6 @@ import (
 	"github.com/ava-labs/avalanchego/utils/logging"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
-
-	txmempool "github.com/ava-labs/avalanchego/vms/txs/mempool"
 )
 
 var (
@@ -97,7 +95,7 @@ type gossipMempool struct {
 func (g *gossipMempool) Add(tx *txs.Tx) error {
 	txID := tx.ID()
 	if _, ok := g.Mempool.Get(txID); ok {
-		return fmt.Errorf("tx %s dropped: %w", txID, txmempool.ErrDuplicateTx)
+		return nil
 	}
 
 	if reason := g.Mempool.GetDropReason(txID); reason != nil {

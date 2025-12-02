@@ -17,7 +17,6 @@ import (
 	"github.com/ava-labs/avalanchego/vms/components/gas"
 	"github.com/ava-labs/avalanchego/vms/platformvm/txs"
 	"github.com/ava-labs/avalanchego/vms/secp256k1fx"
-	"github.com/ava-labs/avalanchego/vms/txs/mempool"
 
 	pmempool "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool"
 )
@@ -59,7 +58,7 @@ func TestGossipMempoolAddVerificationError(t *testing.T) {
 	require.False(gossipMempool.bloom.Has(tx))
 }
 
-// Adding a duplicate to the mempool should return an error
+// Adding a duplicate to the mempool should not return an error
 func TestMempoolDuplicate(t *testing.T) {
 	require := require.New(t)
 
@@ -95,7 +94,6 @@ func TestMempoolDuplicate(t *testing.T) {
 		TxID: txID,
 	}
 
-	require.NoError(testMempool.Add(tx))
 	gossipMempool, err := newGossipMempool(
 		testMempool,
 		prometheus.NewRegistry(),
@@ -107,9 +105,11 @@ func TestMempoolDuplicate(t *testing.T) {
 	)
 	require.NoError(err)
 
-	err = gossipMempool.Add(tx)
-	require.ErrorIs(err, mempool.ErrDuplicateTx)
-	require.False(gossipMempool.bloom.Has(tx))
+	require.NoError(gossipMempool.Add(tx))
+	require.True(gossipMempool.bloom.Has(tx))
+
+	require.NoError(gossipMempool.Add(tx))
+	require.True(gossipMempool.bloom.Has(tx))
 }
 
 // Adding a tx to the mempool should add it to the bloom filter

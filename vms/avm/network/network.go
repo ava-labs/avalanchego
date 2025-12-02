@@ -189,9 +189,8 @@ func (n *Network) PullGossip(ctx context.Context) {
 // the tx is added to the mempool, it will attempt to push gossip the tx to
 // random peers in the network.
 //
-// If the tx is already in the mempool, mempool.ErrDuplicateTx will be
-// returned.
-// If the tx is not added to the mempool, an error will be returned.
+// If the tx is already in the mempool, no error will be returned.
+// If the tx is otherwise not added to the mempool, an error will be returned.
 func (n *Network) IssueTxFromRPC(tx *txs.Tx) error {
 	if err := n.mempool.Add(tx); err != nil {
 		return err

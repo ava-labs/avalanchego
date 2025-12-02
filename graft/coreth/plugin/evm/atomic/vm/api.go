@@ -12,7 +12,6 @@ import (
 
 	"github.com/ava-labs/avalanchego/api"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic"
-	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/atomic/txpool"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/client"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/formatting"
@@ -146,8 +145,7 @@ func (service *AvaxAPI) IssueTx(_ *http.Request, args *api.FormattedTx, response
 	service.vm.Ctx.Lock.Lock()
 	defer service.vm.Ctx.Lock.Unlock()
 
-	err = service.vm.AtomicMempool.AddLocalTx(tx)
-	if err != nil && !errors.Is(err, txpool.ErrAlreadyKnown) {
+	if err := service.vm.AtomicMempool.AddLocalTx(tx); err != nil {
 		return err
 	}
 
