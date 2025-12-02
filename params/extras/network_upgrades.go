@@ -37,8 +37,10 @@ type NetworkUpgrades struct {
 	EtnaTimestamp *uint64 `json:"etnaTimestamp,omitempty"`
 	// Fortuna has no effect on Subnet-EVM by itself, but is included for completeness.
 	FortunaTimestamp *uint64 `json:"fortunaTimestamp,omitempty"`
-	// Granite is a placeholder for the next upgrade.
+	// Granite adds a millisecond timestamp, precompile updates, and P-Chain epochs
 	GraniteTimestamp *uint64 `json:"graniteTimestamp,omitempty"`
+	// Helicon is a placeholder for the next upgrade
+	HeliconTimestamp *uint64 `json:"heliconTimestamp,omitempty"`
 }
 
 func (n *NetworkUpgrades) Equal(other *NetworkUpgrades) bool {
@@ -61,6 +63,9 @@ func (n *NetworkUpgrades) checkNetworkUpgradesCompatible(newcfg *NetworkUpgrades
 	if isForkTimestampIncompatible(n.GraniteTimestamp, newcfg.GraniteTimestamp, time) {
 		return ethparams.NewTimestampCompatError("Granite fork block timestamp", n.GraniteTimestamp, newcfg.GraniteTimestamp)
 	}
+	if isForkTimestampIncompatible(n.HeliconTimestamp, newcfg.HeliconTimestamp, time) {
+		return ethparams.NewTimestampCompatError("Helicon fork block timestamp", n.HeliconTimestamp, newcfg.HeliconTimestamp)
+	}
 
 	return nil
 }
@@ -72,6 +77,7 @@ func (n *NetworkUpgrades) forkOrder() []fork {
 		{name: "etnaTimestamp", timestamp: n.EtnaTimestamp},
 		{name: "fortunaTimestamp", timestamp: n.FortunaTimestamp, optional: true},
 		{name: "graniteTimestamp", timestamp: n.GraniteTimestamp},
+		{name: "heliconTimestamp", timestamp: n.HeliconTimestamp},
 	}
 }
 
@@ -99,6 +105,9 @@ func (n *NetworkUpgrades) SetDefaults(agoUpgrades upgrade.Config) {
 	if n.GraniteTimestamp == nil || *n.GraniteTimestamp == 0 {
 		n.GraniteTimestamp = defaults.GraniteTimestamp
 	}
+	if n.HeliconTimestamp == nil || *n.HeliconTimestamp == 0 {
+		n.HeliconTimestamp = defaults.HeliconTimestamp
+	}
 }
 
 // verifyNetworkUpgrades checks that the network upgrades are well formed.
@@ -119,6 +128,9 @@ func (n *NetworkUpgrades) verifyNetworkUpgrades(agoUpgrades upgrade.Config) erro
 	if err := verifyWithDefault(n.GraniteTimestamp, defaults.GraniteTimestamp); err != nil {
 		return fmt.Errorf("granite fork block timestamp is invalid: %w", err)
 	}
+	if err := verifyWithDefault(n.HeliconTimestamp, defaults.HeliconTimestamp); err != nil {
+		return fmt.Errorf("helicon fork block timestamp is invalid: %w", err)
+	}
 	return nil
 }
 
@@ -137,6 +149,9 @@ func (n *NetworkUpgrades) Override(o *NetworkUpgrades) {
 	}
 	if o.GraniteTimestamp != nil {
 		n.GraniteTimestamp = o.GraniteTimestamp
+	}
+	if o.HeliconTimestamp != nil {
+		n.HeliconTimestamp = o.HeliconTimestamp
 	}
 }
 
@@ -170,6 +185,12 @@ func (n *NetworkUpgrades) IsGranite(time uint64) bool {
 	return isTimestampForked(n.GraniteTimestamp, time)
 }
 
+// IsHelicon returns whether [time] represents a block
+// with a timestamp after the Helicon upgrade time.
+func (n *NetworkUpgrades) IsHelicon(time uint64) bool {
+	return isTimestampForked(n.HeliconTimestamp, time)
+}
+
 func (n *NetworkUpgrades) Description() string {
 	var banner string
 	banner += fmt.Sprintf(" - SubnetEVM Timestamp:          @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.10.0)\n", ptrToString(n.SubnetEVMTimestamp))
@@ -177,6 +198,7 @@ func (n *NetworkUpgrades) Description() string {
 	banner += fmt.Sprintf(" - Etna Timestamp:               @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.12.0)\n", ptrToString(n.EtnaTimestamp))
 	banner += fmt.Sprintf(" - Fortuna Timestamp:            @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.13.0)\n", ptrToString(n.FortunaTimestamp))
 	banner += fmt.Sprintf(" - Granite Timestamp:            @%-10v (https://github.com/ava-labs/avalanchego/releases/tag/v1.14.0)\n", ptrToString(n.GraniteTimestamp))
+	banner += fmt.Sprintf(" - Helicon Timestamp:            @%-10v (Unscheduled)\n", ptrToString(n.HeliconTimestamp))
 	return banner
 }
 
@@ -186,6 +208,7 @@ type AvalancheRules struct {
 	IsEtna      bool
 	IsFortuna   bool
 	IsGranite   bool
+	IsHelicon   bool
 }
 
 // IsGraniteActivated is used by the warp precompile to determine which gas costs to use.
@@ -205,6 +228,7 @@ func (n *NetworkUpgrades) GetAvalancheRules(time uint64) AvalancheRules {
 		IsEtna:      n.IsEtna(time),
 		IsFortuna:   n.IsFortuna(time),
 		IsGranite:   n.IsGranite(time),
+		IsHelicon:   n.IsHelicon(time),
 	}
 }
 
@@ -217,6 +241,7 @@ func GetNetworkUpgrades(agoUpgrade upgrade.Config) NetworkUpgrades {
 		EtnaTimestamp:      utils.TimeToNewUint64(agoUpgrade.EtnaTime),
 		FortunaTimestamp:   nil, // Fortuna is optional and has no effect on Subnet-EVM
 		GraniteTimestamp:   utils.TimeToNewUint64(agoUpgrade.GraniteTime),
+		HeliconTimestamp:   utils.TimeToNewUint64(agoUpgrade.HeliconTime),
 	}
 }
 

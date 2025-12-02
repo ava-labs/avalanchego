@@ -88,7 +88,9 @@ func TestGenesisToBlockDecoding(t *testing.T) {
 		upgradetest.Etna:          common.HexToHash("0xa5de01cb7e5c6d721be62ab4b37878e863d65e0c1fe308e5df1f4c5b148650f9"),
 		upgradetest.Fortuna:       common.HexToHash("0xa5de01cb7e5c6d721be62ab4b37878e863d65e0c1fe308e5df1f4c5b148650f9"),
 		upgradetest.Granite:       common.HexToHash("0x4d5ff1b8509d30c6b7842b784a6cf8be78e34c78bc5de8559ea6f15ad18d6a10"),
+		upgradetest.Helicon:       common.HexToHash("0x4d5ff1b8509d30c6b7842b784a6cf8be78e34c78bc5de8559ea6f15ad18d6a10"),
 	}
+	require.Contains(t, previousHashes, upgradetest.Latest)
 	for fork, chainConfig := range paramstest.ForkToChainConfig {
 		t.Run(fork.String(), func(t *testing.T) {
 			db := rawdb.NewMemoryDatabase()
