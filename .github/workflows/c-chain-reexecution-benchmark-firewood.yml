@@ -114,7 +114,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add go.mod go.sum graft/coreth/go.mod graft/coreth/go.sum
-          git commit -m "temp: Firewood/libevm for benchmark"
+          git diff --staged --quiet || git commit -m "temp: Firewood/libevm for benchmark"
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
