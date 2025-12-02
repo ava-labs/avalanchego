@@ -62,8 +62,9 @@ type BloomFilter struct {
 
 func (b *BloomFilter) Add(gossipable Gossipable) {
 	h := gossipable.GossipID()
-	bloom.Add(b.bloom, h[:], b.salt[:])
-	b.metrics.Count.Inc()
+	if bloom.Add(b.bloom, h[:], b.salt[:]) {
+		b.metrics.Count.Inc()
+	}
 }
 
 func (b *BloomFilter) Has(gossipable Gossipable) bool {
