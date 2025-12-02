@@ -6,13 +6,38 @@ package vmsync
 import (
 	"context"
 	"errors"
+	"math/big"
 	"sync"
 	"time"
+
+	"github.com/ava-labs/libevm/core/types"
 
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
 
 	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
 )
+
+// mockEthBlockWrapper implements EthBlockWrapper for testing.
+type mockEthBlockWrapper struct {
+	ethBlock  *types.Block
+	acceptErr error
+	rejectErr error
+	verifyErr error
+}
+
+func newMockBlock(height uint64) *mockEthBlockWrapper {
+	header := &types.Header{Number: new(big.Int).SetUint64(height)}
+	return &mockEthBlockWrapper{
+		ethBlock: types.NewBlockWithHeader(header),
+	}
+}
+
+func (m *mockEthBlockWrapper) GetEthBlock() *types.Block    { return m.ethBlock }
+func (m *mockEthBlockWrapper) Accept(context.Context) error { return m.acceptErr }
+func (m *mockEthBlockWrapper) Reject(context.Context) error { return m.rejectErr }
+func (m *mockEthBlockWrapper) Verify(context.Context) error { return m.verifyErr }
+
+var _ EthBlockWrapper = (*mockEthBlockWrapper)(nil)
 
 // FuncSyncer adapts a function to the simple Syncer shape used in tests. It is
 // useful for defining small, behavior-driven syncers inline.

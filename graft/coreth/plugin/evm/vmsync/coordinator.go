@@ -56,10 +56,9 @@ type Coordinator struct {
 	// doneOnce ensures [Callbacks.OnDone] is invoked at most once.
 	doneOnce sync.Once
 
-	// pivot policy to throttle [Coordinator.UpdateSyncTarget] calls.
-	pivot *pivotPolicy
-
+	// pivotInterval configures the pivot policy throttling. 0 disables throttling.
 	pivotInterval uint64
+	pivot         *pivotPolicy
 }
 
 // CoordinatorOption follows the functional options pattern for Coordinator.
@@ -79,10 +78,7 @@ func NewCoordinator(syncerRegistry *SyncerRegistry, cbs Callbacks, opts ...Coord
 		syncerRegistry: syncerRegistry,
 		callbacks:      cbs,
 	}
-
 	options.ApplyTo(co, opts...)
-
-	co.pivot = newPivotPolicy(co.pivotInterval)
 	co.state.Store(int32(StateIdle))
 
 	return co
@@ -93,6 +89,7 @@ func NewCoordinator(syncerRegistry *SyncerRegistry, cbs Callbacks, opts ...Coord
 func (co *Coordinator) Start(ctx context.Context, initial message.Syncable) {
 	co.state.Store(int32(StateInitializing))
 	co.target.Store(initial)
+	co.pivot = newPivotPolicy(co.pivotInterval)
 
 	cctx, cancel := context.WithCancelCause(ctx)
 	g := co.syncerRegistry.StartAsync(cctx, initial)
