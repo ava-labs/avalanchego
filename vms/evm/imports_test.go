@@ -37,8 +37,9 @@ const root = ".."
 // both coreth and subnet-evm can be imported in the vms/evm/emulate package, because it is a
 // temporary package that allows consumers to import both coreth and subnet-evm at the same time.
 //
-// github.com/ava-labs/libevm/libevm/pseudo cannot be imported anywhere, because it requires so
-// much care to avoid catastrophic misuse and there are so few reasons to ever use it anyway
+// github.com/ava-labs/libevm/libevm/pseudo cannot be imported anywhere, without review from any of
+// @StephenButtolph, @ARR4N, or @joshua-kim. There is almost certainly a better option, and it exists
+// only because libevm can't pollute the code base with generic type parameters.
 //
 // TODO(jonathanoppenheimer): remove the emulate functionality once the emulate package is removed.
 // TODO(jonathanoppenheimer): remove the graft functionality once the graft package will be removed.
