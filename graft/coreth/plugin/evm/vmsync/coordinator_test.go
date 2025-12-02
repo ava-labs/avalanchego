@@ -24,7 +24,8 @@ func TestCoordinator_StateValidation(t *testing.T) {
 	for _, state := range []State{StateIdle, StateInitializing, StateFinalizing, StateCompleted, StateAborted} {
 		co.state.Store(int32(state))
 		require.False(t, co.AddBlockOperation(block, OpAccept), "state %d should reject block", state)
-		require.ErrorIs(t, co.UpdateSyncTarget(target), errInvalidState, "state %d should reject target update", state)
+		err := co.UpdateSyncTarget(target)
+		require.ErrorIs(t, err, errInvalidState, "state %d should reject target update", state)
 	}
 
 	// Running: accepts both.
@@ -35,7 +36,8 @@ func TestCoordinator_StateValidation(t *testing.T) {
 	// ExecutingBatch: accepts blocks, rejects target updates.
 	co.state.Store(int32(StateExecutingBatch))
 	require.True(t, co.AddBlockOperation(block, OpAccept))
-	require.ErrorIs(t, co.UpdateSyncTarget(target), errInvalidState)
+	err := co.UpdateSyncTarget(target)
+	require.ErrorIs(t, err, errInvalidState)
 
 	// Nil block is always rejected.
 	co.state.Store(int32(StateRunning))
