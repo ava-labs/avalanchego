@@ -34,8 +34,8 @@ const root = ".."
 // subnet-evm can NOT be imported anywhere in AvalancheGo besides /graft, because it must
 // not become a direct dependency of AvalancheGo.
 //
-// both coreth and subnet-evm can be imported in the vms/evm/emulate package, because it is a
-// temporary package that allows consumers to import both coreth and subnet-evm at the same time.
+// both coreth and subnet-evm can be imported in the vms/evm/emulate package, because it
+// allows consumers to use both coreth and subnet-evm registration at the same time.
 //
 // github.com/ava-labs/libevm/libevm/pseudo cannot be imported anywhere, without review from any of
 // @StephenButtolph, @ARR4N, or @joshua-kim. There is almost certainly a better option, and it exists
