@@ -183,7 +183,7 @@ runs:
     - name: Compare Benchmark Results
       uses: benchmark-action/github-action-benchmark@v1
       with:
-        tool: 'go'
+        tool: 'customBiggerIsBetter'
         output-file-path: ${{ env.BENCHMARK_OUTPUT_FILE }}
         summary-always: true
         github-token: ${{ inputs.github-token }}
