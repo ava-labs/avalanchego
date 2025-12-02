@@ -187,6 +187,7 @@ type VM struct {
 
 	config config.Config
 
+	chainID     *big.Int
 	genesisHash common.Hash
 	chainConfig *params.ChainConfig
 	ethConfig   ethconfig.Config
@@ -279,7 +280,7 @@ func (vm *VM) Initialize(
 	appSender commonEng.AppSender,
 ) error {
 	vm.ctx = chainCtx
-	vm.stateSyncDone = make(chan struct{})
+
 	cfg, deprecateMsg, err := config.GetConfig(configBytes, vm.ctx.NetworkID)
 	if err != nil {
 		return fmt.Errorf("failed to get config: %w", err)
@@ -341,14 +342,22 @@ func (vm *VM) Initialize(
 		return err
 	}
 
+	// vm.ChainConfig() should be available for wrapping VMs before vm.initializeChain()
+	vm.chainConfig = g.Config
+	vm.chainID = g.Config.ChainID
+
 	vm.ethConfig = ethconfig.NewDefaultConfig()
 	vm.ethConfig.Genesis = g
-	// NetworkID here is different than Avalanche's NetworkID.
-	// Avalanche's NetworkID represents the Avalanche network is running on
-	// like Fuji, Mainnet, Local, etc.
-	// The NetworkId here is kept same as ChainID to be compatible with
-	// Ethereum tooling.
-	vm.ethConfig.NetworkId = g.Config.ChainID.Uint64()
+	vm.ethConfig.NetworkId = vm.chainID.Uint64()
+	vm.genesisHash = vm.ethConfig.Genesis.ToBlock().Hash() // must create genesis hash before [vm.ReadLastAccepted]
+	lastAcceptedHash, lastAcceptedHeight, err := vm.ReadLastAccepted()
+	if err != nil {
+		return err
+	}
+	log.Info("read last accepted",
+		"hash", lastAcceptedHash,
+		"height", lastAcceptedHeight,
+	)
 
 	// Set minimum price for mining and default gas price oracle value to the min
 	// gas price to prevent so transactions and blocks all use the correct fees
@@ -438,20 +447,6 @@ func (vm *VM) Initialize(
 		vm.ethConfig.Miner.Etherbase = constants.BlackholeAddr
 	}
 
-	vm.chainConfig = g.Config
-
-	// create genesisHash after applying upgradeBytes in case
-	// upgradeBytes modifies genesis.
-	vm.genesisHash = vm.ethConfig.Genesis.ToBlock().Hash() // must create genesis hash before [vm.readLastAccepted]
-	lastAcceptedHash, lastAcceptedHeight, err := vm.readLastAccepted()
-	if err != nil {
-		return err
-	}
-	log.Info("read last accepted",
-		"hash", lastAcceptedHash,
-		"height", lastAcceptedHeight,
-	)
-
 	vm.networkCodec = message.Codec
 	vm.Network, err = network.NewNetwork(vm.ctx, appSender, vm.networkCodec, vm.config.MaxOutboundActiveRequests, vm.sdkMetrics)
 	if err != nil {
@@ -494,7 +489,6 @@ func (vm *VM) Initialize(
 	if err != nil {
 		return err
 	}
-
 	if err := vm.initializeChain(lastAcceptedHash, vm.ethConfig); err != nil {
 		return err
 	}
@@ -730,6 +724,7 @@ func (vm *VM) initializeStateSync(lastAcceptedHeight uint64) error {
 		MetadataDB:         vm.metadataDB,
 		Acceptor:           vm,
 		Parser:             vm.extensionConfig.SyncableParser,
+		Extender:           nil,
 	})
 
 	// If StateSync is disabled, clear any ongoing summary so that we will not attempt to resume
@@ -803,7 +798,6 @@ func (vm *VM) onBootstrapStarted() error {
 	// Ensure snapshots are initialized before bootstrapping (i.e., if state sync is skipped).
 	// Note calling this function has no effect if snapshots are already initialized.
 	vm.blockChain.InitializeSnapshots()
-
 	return nil
 }
 
@@ -1310,7 +1304,7 @@ func (vm *VM) startContinuousProfiler() {
 // last accepted block hash and height by reading directly from [vm.chaindb] instead of relying
 // on [chain].
 // Note: assumes [vm.chaindb] and [vm.genesisHash] have been initialized.
-func (vm *VM) readLastAccepted() (common.Hash, uint64, error) {
+func (vm *VM) ReadLastAccepted() (common.Hash, uint64, error) {
 	// Attempt to load last accepted block to determine if it is necessary to
 	// initialize state with the genesis block.
 	lastAcceptedBytes, lastAcceptedErr := vm.acceptedBlockDB.Get(lastAcceptedKey)

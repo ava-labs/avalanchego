@@ -93,7 +93,6 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 		lrh.stats.IncInvalidLeafsRequest()
 		return nil, nil
 	}
-
 	// TODO: We should know the state root that accounts correspond to,
 	// as this information will be necessary to access storage tries when
 	// the trie is path based.
@@ -109,7 +108,6 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 	if limit > maxLeavesLimit {
 		limit = maxLeavesLimit
 	}
-
 	var leafsResponse message.LeafsResponse
 	leafsResponse.Keys = make([][]byte, 0, limit)
 	leafsResponse.Vals = make([][]byte, 0, limit)
@@ -127,7 +125,6 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 		responseBuilder.snap = lrh.snapshotProvider.Snapshots()
 	}
 	err = responseBuilder.handleRequest(ctx)
-
 	// ensure metrics are captured properly on all return paths
 	defer func() {
 		lrh.stats.UpdateLeafsRequestProcessingTime(time.Since(startTime))
@@ -144,13 +141,11 @@ func (lrh *leafsRequestHandler) OnLeafsRequest(ctx context.Context, nodeID ids.N
 		log.Debug("context err set before any leafs were iterated", "nodeID", nodeID, "requestID", requestID, "request", leafsRequest, "ctxErr", ctx.Err())
 		return nil, nil
 	}
-
 	responseBytes, err := lrh.codec.Marshal(message.Version, leafsResponse)
 	if err != nil {
 		log.Debug("failed to marshal LeafsResponse, dropping request", "nodeID", nodeID, "requestID", requestID, "request", leafsRequest, "err", err)
 		return nil, nil
 	}
-
 	log.Debug("handled leafsRequest", "time", time.Since(startTime), "leafs", len(leafsResponse.Keys), "proofLen", len(leafsResponse.ProofVals))
 	return responseBytes, nil
 }

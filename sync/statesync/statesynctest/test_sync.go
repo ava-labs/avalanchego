@@ -88,24 +88,6 @@ func AssertDBConsistency(t testing.TB, root common.Hash, clientDB ethdb.Database
 	assert.Equal(t, trieAccountLeaves, numSnapshotAccounts)
 }
 
-func FillAccountsWithStorage(t *testing.T, r *rand.Rand, serverDB ethdb.Database, serverTrieDB *triedb.Database, root common.Hash, numAccounts int) common.Hash {
-	newRoot, _ := FillAccounts(t, r, serverTrieDB, root, numAccounts, func(t *testing.T, _ int, account types.StateAccount) types.StateAccount {
-		codeBytes := make([]byte, 256)
-		_, err := r.Read(codeBytes)
-		require.NoError(t, err, "error reading random code bytes")
-
-		codeHash := crypto.Keccak256Hash(codeBytes)
-		rawdb.WriteCode(serverDB, codeHash, codeBytes)
-		account.CodeHash = codeHash[:]
-
-		// now create state trie
-		numKeys := 16
-		account.Root, _, _ = GenerateTrie(t, r, serverTrieDB, numKeys, common.HashLength)
-		return account
-	})
-	return newRoot
-}
-
 // FillAccountsWithOverlappingStorage adds [numAccounts] randomly generated accounts to the secure trie at [root]
 // and commits it to [trieDB]. For each 3 accounts created:
 // - One does not have a storage trie,

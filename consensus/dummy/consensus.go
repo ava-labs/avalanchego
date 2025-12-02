@@ -34,10 +34,39 @@ type Mode struct {
 	ModeSkipCoinbase bool
 }
 
-type DummyEngine struct {
-	consensusMode      Mode
-	desiredDelayExcess *acp226.DelayExcess
-}
+type (
+	OnFinalizeAndAssembleCallbackType = func(
+		header *types.Header,
+		parent *types.Header,
+		state *state.StateDB,
+		txs []*types.Transaction,
+	) (
+		extraData []byte,
+		blockFeeContribution *big.Int,
+		extDataGasUsed *big.Int,
+		err error,
+	)
+
+	OnExtraStateChangeType = func(
+		block *types.Block,
+		parent *types.Header,
+		statedb *state.StateDB,
+	) (
+		blockFeeContribution *big.Int,
+		extDataGasUsed *big.Int,
+		err error,
+	)
+
+	ConsensusCallbacks struct {
+		OnFinalizeAndAssemble OnFinalizeAndAssembleCallbackType
+		OnExtraStateChange    OnExtraStateChangeType
+	}
+
+	DummyEngine struct {
+		consensusMode      Mode
+		desiredDelayExcess *acp226.DelayExcess
+	}
+)
 
 func NewDummyEngine(
 	mode Mode,

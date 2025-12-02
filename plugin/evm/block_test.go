@@ -16,6 +16,7 @@ import (
 
 	"github.com/ava-labs/subnet-evm/params"
 	"github.com/ava-labs/subnet-evm/params/extras"
+	"github.com/ava-labs/subnet-evm/plugin/evm/extension"
 	"github.com/ava-labs/subnet-evm/precompile/precompileconfig"
 )
 
@@ -26,8 +27,9 @@ func TestHandlePrecompileAccept(t *testing.T) {
 
 	db := rawdb.NewMemoryDatabase()
 	vm := &VM{
-		chaindb:     db,
-		chainConfig: params.TestChainConfig,
+		chaindb:         db,
+		chainConfig:     params.TestChainConfig,
+		extensionConfig: &extension.Config{},
 	}
 
 	precompileAddr := common.Address{0x05}

@@ -57,6 +57,7 @@ import (
 	"github.com/ava-labs/subnet-evm/plugin/evm/customheader"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customrawdb"
 	"github.com/ava-labs/subnet-evm/plugin/evm/customtypes"
+	"github.com/ava-labs/subnet-evm/plugin/evm/extension"
 	"github.com/ava-labs/subnet-evm/plugin/evm/vmerrors"
 	"github.com/ava-labs/subnet-evm/precompile/allowlist"
 	"github.com/ava-labs/subnet-evm/precompile/contracts/deployerallowlist"
@@ -1288,7 +1289,7 @@ func testEmptyBlock(t *testing.T, scheme string) {
 	require.NoError(t, err, "Failed to build block with import transaction")
 
 	// Create empty block from blkA
-	ethBlock := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	ethBlock := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 
 	emptyEthBlock := types.NewBlock(
 		types.CopyHeader(ethBlock.Header()),
@@ -1660,7 +1661,7 @@ func testLastAcceptedBlockNumberAllow(t *testing.T, scheme string) {
 	require.NoError(t, tvm.vm.SetPreference(t.Context(), blk.ID()))
 
 	blkHeight := blk.Height()
-	blkHash := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock.Hash()
+	blkHash := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock().Hash()
 
 	tvm.vm.eth.APIBackend.SetAllowUnfinalizedQueries(true)
 
@@ -1822,7 +1823,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 
 	// Verify that the constructed block only has the whitelisted tx
-	block := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	block := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 
 	txs := block.Transactions()
 
@@ -1844,7 +1845,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	blk = issueAndAccept(t, tvm.vm)
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
-	block = blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	block = blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 
 	blkState, err := tvm.vm.blockChain.StateAt(block.Root())
 	require.NoError(t, err)
@@ -1870,7 +1871,7 @@ func TestTxAllowListSuccessfulTx(t *testing.T) {
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 
 	// Verify that the constructed block only has the whitelisted tx
-	block = blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	block = blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 	txs = block.Transactions()
 
 	require.Len(t, txs, 1)
@@ -2007,7 +2008,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	blk := issueAndAccept(t, tvm.vm)
 
 	// Verify that the constructed block only has the whitelisted tx
-	block := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	block := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 	txs := block.Transactions()
 	require.Len(t, txs, 1, "Expected number of txs to be %d, but found %d", 1, txs.Len())
 	require.Equal(t, signedTx0.Hash(), txs[0].Hash())
@@ -2025,7 +2026,7 @@ func TestTxAllowListDisablePrecompile(t *testing.T) {
 	blk = issueAndAccept(t, tvm.vm)
 
 	// Verify that the constructed block only has the previously rejected tx
-	block = blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	block = blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 	txs = block.Transactions()
 	require.Equal(t, 1, txs.Len(), "Expected number of txs to be %d, but found %d", 1, txs.Len())
 	require.Equal(t, signedTx1.Hash(), txs[0].Hash())
@@ -2111,7 +2112,7 @@ func TestFeeManagerChangeFee(t *testing.T) {
 	newHead := <-newTxPoolHeadChan
 	require.Equal(t, common.Hash(blk.ID()), newHead.Head.Hash(), "Expected new block to match")
 
-	block := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	block := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 
 	feeConfig, lastChangedAt, err = tvm.vm.blockChain.GetFeeConfigAt(block.Header())
 	require.NoError(t, err)
@@ -2181,16 +2182,16 @@ func testAllowFeeRecipientDisabled(t *testing.T, scheme string) {
 	blk, err := tvm.vm.BuildBlock(t.Context())
 	require.NoError(t, err) // this won't return an error since miner will set the etherbase to blackhole address
 
-	ethBlock := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	ethBlock := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 	require.Equal(t, constants.BlackholeAddr, ethBlock.Coinbase())
 
 	// Create empty block from blk
-	internalBlk := blk.(*chain.BlockWrapper).Block.(*wrappedBlock)
-	modifiedHeader := types.CopyHeader(internalBlk.ethBlock.Header())
+	internalBlk := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock)
+	modifiedHeader := types.CopyHeader(internalBlk.GetEthBlock().Header())
 	modifiedHeader.Coinbase = common.HexToAddress("0x0123456789") // set non-blackhole address by force
 	modifiedBlock := types.NewBlock(
 		modifiedHeader,
-		internalBlk.ethBlock.Transactions(),
+		internalBlk.GetEthBlock().Transactions(),
 		nil,
 		nil,
 		trie.NewStackTrie(nil),
@@ -2316,7 +2317,7 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	blk := issueAndAccept(t, tvm.vm)
 	newHead := <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
-	ethBlock := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	ethBlock := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 	require.Equal(t, etherBase, ethBlock.Coinbase()) // reward address is activated at this block so this is fine
 
 	tx1 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice*3), nil)
@@ -2331,7 +2332,7 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	blk = issueAndAccept(t, tvm.vm)
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
-	ethBlock = blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	ethBlock = blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 	require.Equal(t, testAddr, ethBlock.Coinbase()) // reward address was activated at previous block
 	// Verify that etherBase has received fees
 	blkState, err := tvm.vm.blockChain.StateAt(ethBlock.Root())
@@ -2358,7 +2359,7 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	blk = issueAndAccept(t, tvm.vm)
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
-	ethBlock = blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	ethBlock = blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 	// Reward manager deactivated at this block, so we expect the parent state
 	// to determine the coinbase for this block before full deactivation in the
 	// next block.
@@ -2379,7 +2380,7 @@ func TestRewardManagerPrecompileSetRewardAddress(t *testing.T) {
 	blk = issueAndAccept(t, tvm.vm)
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
-	ethBlock = blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	ethBlock = blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 	// reward manager was disabled at previous block
 	// so this block should revert back to enabling fee recipients
 	require.Equal(t, etherBase, ethBlock.Coinbase())
@@ -2457,7 +2458,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	blk := issueAndAccept(t, tvm.vm)
 	newHead := <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
-	ethBlock := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	ethBlock := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 	require.Equal(t, constants.BlackholeAddr, ethBlock.Coinbase()) // reward address is activated at this block so this is fine
 
 	tx1 := types.NewTransaction(uint64(0), testEthAddrs[0], big.NewInt(2), 21000, big.NewInt(testMinGasPrice*3), nil)
@@ -2472,7 +2473,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	blk = issueAndAccept(t, tvm.vm)
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
-	ethBlock = blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	ethBlock = blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 	require.Equal(t, etherBase, ethBlock.Coinbase()) // reward address was activated at previous block
 	// Verify that etherBase has received fees
 	blkState, err := tvm.vm.blockChain.StateAt(ethBlock.Root())
@@ -2498,7 +2499,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	blk = issueAndAccept(t, tvm.vm)
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
-	ethBlock = blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	ethBlock = blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 	require.Equal(t, etherBase, ethBlock.Coinbase()) // reward address was activated at previous block
 	require.GreaterOrEqual(t, int64(ethBlock.Time()), disableTime.Unix())
 
@@ -2515,7 +2516,7 @@ func TestRewardManagerPrecompileAllowFeeRecipients(t *testing.T) {
 	blk = issueAndAccept(t, tvm.vm)
 	newHead = <-newTxPoolHeadChan
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
-	ethBlock = blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	ethBlock = blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 	require.Equal(t, constants.BlackholeAddr, ethBlock.Coinbase()) // reward address was activated at previous block
 	require.Greater(t, int64(ethBlock.Time()), disableTime.Unix())
 
@@ -2659,7 +2660,7 @@ func TestParentBeaconRootBlock(t *testing.T) {
 			require.NoError(t, err, "Failed to build block with import transaction")
 
 			// Modify the block to have a parent beacon root
-			ethBlock := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+			ethBlock := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 			header := types.CopyHeader(ethBlock.Header())
 			header.ParentBeaconRoot = test.beaconRoot
 			parentBeaconEthBlock := ethBlock.WithSeal(header)
@@ -2852,7 +2853,7 @@ func TestFeeManagerRegressionMempoolMinFeeAfterRestart(t *testing.T) {
 	require.Equal(t, newHead.Head.Hash(), common.Hash(blk.ID()))
 
 	// check that the fee config is updated
-	block := blk.(*chain.BlockWrapper).Block.(*wrappedBlock).ethBlock
+	block := blk.(*chain.BlockWrapper).Block.(extension.ExtendedBlock).GetEthBlock()
 	feeConfig, lastChangedAt, err = restartedVM.blockChain.GetFeeConfigAt(block.Header())
 	require.NoError(t, err)
 	require.Equal(t, restartedVM.blockChain.CurrentBlock().Number, lastChangedAt)

@@ -19,12 +19,11 @@ import (
 )
 
 var (
-	_               Client         = &MockClient{}
-	mockBlockParser EthBlockParser = &testBlockParser{}
+	_ Client         = (*TestClient)(nil)
+	_ EthBlockParser = (*testBlockParser)(nil)
 )
 
-// TODO replace with gomock library
-type MockClient struct {
+type TestClient struct {
 	codec          codec.Manager
 	leafsHandler   handlers.LeafRequestHandler
 	leavesReceived int32
@@ -33,23 +32,23 @@ type MockClient struct {
 	blocksHandler  *handlers.BlockRequestHandler
 	blocksReceived int32
 	// GetLeafsIntercept is called on every GetLeafs request if set to a non-nil callback.
-	// The returned response will be returned by MockClient to the caller.
+	// The returned response will be returned by TestClient to the caller.
 	GetLeafsIntercept func(req message.LeafsRequest, res message.LeafsResponse) (message.LeafsResponse, error)
 	// GetCodesIntercept is called on every GetCode request if set to a non-nil callback.
-	// The returned response will be returned by MockClient to the caller.
+	// The returned response will be returned by TestClient to the caller.
 	GetCodeIntercept func(hashes []common.Hash, codeBytes [][]byte) ([][]byte, error)
 	// GetBlocksIntercept is called on every GetBlocks request if set to a non-nil callback.
-	// The returned response will be returned by MockClient to the caller.
+	// The returned response will be returned by TestClient to the caller.
 	GetBlocksIntercept func(blockReq message.BlockRequest, blocks types.Blocks) (types.Blocks, error)
 }
 
-func NewMockClient(
+func NewTestClient(
 	codec codec.Manager,
 	leafsHandler handlers.LeafRequestHandler,
 	codesHandler *handlers.CodeRequestHandler,
 	blocksHandler *handlers.BlockRequestHandler,
-) *MockClient {
-	return &MockClient{
+) *TestClient {
+	return &TestClient{
 		codec:         codec,
 		leafsHandler:  leafsHandler,
 		codesHandler:  codesHandler,
@@ -57,7 +56,7 @@ func NewMockClient(
 	}
 }
 
-func (ml *MockClient) GetLeafs(ctx context.Context, request message.LeafsRequest) (message.LeafsResponse, error) {
+func (ml *TestClient) GetLeafs(ctx context.Context, request message.LeafsRequest) (message.LeafsResponse, error) {
 	response, err := ml.leafsHandler.OnLeafsRequest(ctx, ids.GenerateTestNodeID(), 1, request)
 	if err != nil {
 		return message.LeafsResponse{}, err
@@ -71,18 +70,18 @@ func (ml *MockClient) GetLeafs(ctx context.Context, request message.LeafsRequest
 	if ml.GetLeafsIntercept != nil {
 		leafsResponse, err = ml.GetLeafsIntercept(request, leafsResponse)
 	}
-	// Increment the number of leaves received by the mock client
+	// Increment the number of leaves received by the test client
 	atomic.AddInt32(&ml.leavesReceived, int32(numLeaves))
 	return leafsResponse, err
 }
 
-func (ml *MockClient) LeavesReceived() int32 {
+func (ml *TestClient) LeavesReceived() int32 {
 	return atomic.LoadInt32(&ml.leavesReceived)
 }
 
-func (ml *MockClient) GetCode(ctx context.Context, hashes []common.Hash) ([][]byte, error) {
+func (ml *TestClient) GetCode(ctx context.Context, hashes []common.Hash) ([][]byte, error) {
 	if ml.codesHandler == nil {
-		panic("no code handler for mock client")
+		panic("no code handler for test client")
 	}
 	request := message.CodeRequest{Hashes: hashes}
 	response, err := ml.codesHandler.OnCodeRequest(ctx, ids.GenerateTestNodeID(), 1, request)
@@ -104,13 +103,13 @@ func (ml *MockClient) GetCode(ctx context.Context, hashes []common.Hash) ([][]by
 	return code, err
 }
 
-func (ml *MockClient) CodeReceived() int32 {
+func (ml *TestClient) CodeReceived() int32 {
 	return atomic.LoadInt32(&ml.codeReceived)
 }
 
-func (ml *MockClient) GetBlocks(ctx context.Context, blockHash common.Hash, height uint64, numParents uint16) ([]*types.Block, error) {
+func (ml *TestClient) GetBlocks(ctx context.Context, blockHash common.Hash, height uint64, numParents uint16) ([]*types.Block, error) {
 	if ml.blocksHandler == nil {
-		panic("no blocks handler for mock client")
+		panic("no blocks handler for test client")
 	}
 	request := message.BlockRequest{
 		Hash:    blockHash,
@@ -122,7 +121,7 @@ func (ml *MockClient) GetBlocks(ctx context.Context, blockHash common.Hash, heig
 		return nil, err
 	}
 
-	client := &client{blockParser: mockBlockParser} // Hack to avoid duplicate code
+	client := &client{blockParser: newTestBlockParser()} // Hack to avoid duplicate code
 	blocksRes, numBlocks, err := client.parseBlocks(ml.codec, request, response)
 	if err != nil {
 		return nil, err
@@ -135,11 +134,15 @@ func (ml *MockClient) GetBlocks(ctx context.Context, blockHash common.Hash, heig
 	return blocks, err
 }
 
-func (ml *MockClient) BlocksReceived() int32 {
+func (ml *TestClient) BlocksReceived() int32 {
 	return atomic.LoadInt32(&ml.blocksReceived)
 }
 
 type testBlockParser struct{}
+
+func newTestBlockParser() *testBlockParser {
+	return &testBlockParser{}
+}
 
 func (*testBlockParser) ParseEthBlock(b []byte) (*types.Block, error) {
 	block := new(types.Block)

@@ -43,7 +43,7 @@ func testCodeSyncer(t *testing.T, test codeSyncerTest) {
 
 	// Set up mockClient
 	codeRequestHandler := handlers.NewCodeRequestHandler(serverDB, message.Codec, handlerstats.NewNoopHandlerStats())
-	mockClient := statesyncclient.NewMockClient(message.Codec, nil, codeRequestHandler, nil)
+	mockClient := statesyncclient.NewTestClient(message.Codec, nil, codeRequestHandler, nil)
 	mockClient.GetCodeIntercept = test.getCodeIntercept
 
 	clientDB := rawdb.NewMemoryDatabase()
