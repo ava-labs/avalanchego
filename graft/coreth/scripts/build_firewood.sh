@@ -3,7 +3,7 @@
 set -euo pipefail
 
 print_usage() {
-  printf "Usage: build_firewood.sh [FIREWOOD_COMMIT] [--update]
+  printf "Usage: build_firewood.sh [FIREWOOD_COMMIT] [--dirty]
 
   Build Firewood FFI from source for testing with Coreth.
 
@@ -11,15 +11,15 @@ print_usage() {
     FIREWOOD_COMMIT   Git commit or branch to build (default: main)
 
   Options:
-    --update          Update go.mod after building
+    --dirty           Update go.mod after building (dirties working tree)
                       (default: only print path)
 
   Examples:
     # Build from commit and capture FFI path
     FIREWOOD_FFI_PATH=\$(./scripts/build_firewood.sh abc123def)
 
-    # Build from main and update go.mod automatically
-    ./scripts/build_firewood.sh main --update
+    # Build from main and update go.mod (dirties tree)
+    ./scripts/build_firewood.sh main --dirty
 
   Note: To use a published Firewood version (e.g., v0.0.15) run go get -u github.com/ava-labs/firewood-go-ethhash/ffi@{version}
 "
@@ -34,7 +34,7 @@ while [[ $# -gt 0 ]]; do
       print_usage
       exit 0
       ;;
-    --update)
+    --dirty)
       UPDATE_GO_MOD=true
       shift
       ;;

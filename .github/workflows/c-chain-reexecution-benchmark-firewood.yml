@@ -1,11 +1,26 @@
+# Firewood Reexecution Benchmark
+#
+# This workflow runs C-Chain reexecution benchmarks with custom Firewood builds.
+# It's designed to be triggered by the Firewood repository to track performance.
+#
+# Firewood input modes:
+#   - Versioned (v0.0.15): Uses `go get` to fetch published version (fast)
+#   - Branch/commit (main, abc123): Builds from source using Nix (slower)
+#
+# Results are uploaded as artifacts for Firewood to download and publish
+# to their own GitHub Pages dashboard.
+
 name: Firewood Reexecution Benchmark
 
 on:
   workflow_dispatch:
     inputs:
-      firewood-commit:
+      firewood:
         description: 'Firewood commit/branch/tag to build and test'
         required: true
+      libevm:
+        description: 'libevm commit/branch/tag (optional)'
+        default: ''
       task:
         description: 'Taskfile task to execute (e.g., c-chain-reexecution-firewood-101-250k, if present custom inputs below are ignored)'
         default: 'c-chain-reexecution-firewood-101-250k'
@@ -26,7 +41,25 @@ on:
         default: ''
 
 jobs:
+  determine-build-type:
+    runs-on: ubuntu-latest
+    outputs:
+      from-source: ${{ steps.check.outputs.from-source }}
+    steps:
+      - name: Check Firewood input
+        id: check
+        run: |
+          # Semantic versions (vX.Y.Z) are published to Go module registry
+          # Branches/commits need to be built from source using Nix
+          if [[ "${{ inputs.firewood }}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "from-source=false" >> "$GITHUB_OUTPUT"
+            echo "Firewood version detected: ${{ inputs.firewood }}"
+          else
+            echo "from-source=true" >> "$GITHUB_OUTPUT"
+            echo "Firewood branch/commit detected: ${{ inputs.firewood }}"
+          fi
   c-chain-reexecution:
+    needs: determine-build-type
     permissions:
       id-token: write
       contents: write
@@ -36,34 +69,52 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go-for-project
       - name: Install Nix Dependencies
+        if: needs.determine-build-type.outputs.from-source == 'true'
         shell: bash
         run: |
-          # xz-utils might be present on some containers. Install if not present.
           if ! command -v xz &> /dev/null; then
             sudo apt-get update
             sudo apt-get install -y xz-utils
           fi
       - name: Install Nix
+        if: needs.determine-build-type.outputs.from-source == 'true'
         uses: cachix/install-nix-action@02a151ada4993995686f9ed4f1be7cfbb229e56f # v31
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build Firewood from source
+      - name: Update libevm
+        if: inputs.libevm != ''
+        shell: bash
+        run: |
+          echo "Updating libevm to: ${{ inputs.libevm }}"
+          go get github.com/ava-labs/libevm@${{ inputs.libevm }}
+          cd graft/coreth
+          go get github.com/ava-labs/libevm@${{ inputs.libevm }}
+      - name: Fetch Firewood (versioned)
+        if: needs.determine-build-type.outputs.from-source == 'false'
         shell: bash
         run: |
           cd graft/coreth
-          echo "Building Firewood from: ${{ inputs.firewood-commit }}"
-          # The script updates go.mod automatically
-          ./scripts/build_firewood.sh "${{ inputs.firewood-commit }}" --update
+          echo "Fetching published Firewood: ${{ inputs.firewood }}"
+          go get github.com/ava-labs/firewood-go-ethhash/ffi@${{ inputs.firewood }}
+      - name: Build Firewood (from source)
+        if: needs.determine-build-type.outputs.from-source == 'true'
+        shell: bash
+        run: |
+          cd graft/coreth
+          echo "Building Firewood from source: ${{ inputs.firewood }}"
+          ./scripts/build_firewood.sh "${{ inputs.firewood }}" --dirty
         env:
-          TMPDIR: /tmp 
-          NIX_BUILD_TOP: /tmp # Updated default Nix build from /home/runner/_work/_temp/ which is a restricted volume on self-hosted runners.
-      - name: Hanlde go.mod
+          TMPDIR: /tmp
+          NIX_BUILD_TOP: /tmp
+      # Commit go.mod changes locally to keep working tree clean
+      # (required for github-action-benchmark branch switching)
+      - name: Commit go.mod changes
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add graft/coreth/go.mod graft/coreth/go.sum
-          git commit -m "temp: use local Firewood build"
+          git add go.mod go.sum graft/coreth/go.mod graft/coreth/go.sum
+          git commit -m "temp: Firewood/libevm for benchmark"
       - name: Run C-Chain Re-Execution Benchmark
         uses: ./.github/actions/c-chain-reexecution-benchmark
         with:
@@ -77,7 +128,7 @@ jobs:
           prometheus-push-url: ${{ secrets.PROMETHEUS_PUSH_URL || '' }}
           prometheus-username: ${{ secrets.PROMETHEUS_USERNAME || '' }}
           prometheus-password: ${{ secrets.PROMETHEUS_PASSWORD || '' }}
-          push-github-action-benchmark: false
+          push-github-action-benchmark: false # Firewood downloads artifact and publishes to their gh-pages
           aws-role: ${{ inputs.push-post-state != '' && secrets.AWS_S3_RW_ROLE || secrets.AWS_S3_READ_ONLY_ROLE }}
           aws-region: 'us-east-2'
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -90,4 +141,3 @@ jobs:
           path: ${{ github.workspace }}/benchmark-output.txt
           retention-days: 30
           if-no-files-found: error
-
