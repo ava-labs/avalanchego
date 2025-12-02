@@ -68,8 +68,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Setup Go
         uses: ./.github/actions/setup-go-for-project
-      - name: Install Nix Dependencies
-        if: needs.determine-build-type.outputs.from-source == 'true'
+      - name: Install Nix dependencies
         shell: bash
         run: |
           if ! command -v xz &> /dev/null; then
