@@ -1,10 +1,11 @@
 // Copyright (C) 2019-2025, Ava Labs, Inc. All rights reserved.
 // See the file LICENSE for licensing terms.
 
-package vm
+package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"maps"
@@ -13,7 +14,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-	"testing"
 	"time"
 
 	"github.com/google/uuid"
@@ -41,6 +41,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/bls/signer/localsigner"
 	"github.com/ava-labs/avalanchego/utils/logging"
+	"github.com/ava-labs/avalanchego/utils/perms"
 	"github.com/ava-labs/avalanchego/utils/timer"
 	"github.com/ava-labs/avalanchego/vms/metervm"
 	"github.com/ava-labs/avalanchego/vms/platformvm/warp"
@@ -97,9 +98,11 @@ var (
 	configNameArg  string
 	runnerNameArg  string
 	configBytesArg []byte
+
+	benchmarkOutputFileArg string
 )
 
-func TestMain(m *testing.M) {
+func init() {
 	evm.RegisterAllLibEVMExtras()
 
 	flag.StringVar(&blockDirArg, "block-dir", blockDirArg, "Block DB directory to read from during re-execution.")
@@ -118,6 +121,8 @@ func TestMain(m *testing.M) {
 	predefinedConfigOptionsStr := fmt.Sprintf("[%s]", strings.Join(predefinedConfigKeys, ", "))
 	flag.StringVar(&configNameArg, configKey, defaultConfigKey, fmt.Sprintf("Specifies the predefined config to use for the VM. Options include %s.", predefinedConfigOptionsStr))
 	flag.StringVar(&runnerNameArg, "runner", "dev", "Name of the runner executing this test. Added as a metric label and to the sub-benchmark's name to differentiate results on the runner key.")
+
+	flag.StringVar(&benchmarkOutputFileArg, "benchmark-output-file", benchmarkOutputFileArg, "The filepath where benchmark results should be written to.")
 
 	flag.Parse()
 
@@ -143,30 +148,40 @@ func TestMain(m *testing.M) {
 
 	// Set the runner name label on the metrics.
 	labels["runner"] = runnerNameArg
-
-	m.Run()
 }
 
-func BenchmarkReexecuteRange(b *testing.B) {
-	require.Equalf(b, 1, b.N, "BenchmarkReexecuteRange expects to run a single iteration because it overwrites the input current-state, but found (b.N=%d)", b.N)
-	b.Run(fmt.Sprintf("[%d,%d]-Config-%s-Runner-%s", startBlockArg, endBlockArg, configNameArg, runnerNameArg), func(b *testing.B) {
-		benchmarkReexecuteRange(
-			b,
-			blockDirArg,
-			currentStateDirArg,
-			configBytesArg,
-			startBlockArg,
-			endBlockArg,
-			chanSizeArg,
-			metricsServerEnabledArg,
-			metricsServerPortArg,
-			metricsCollectorEnabledArg,
-		)
-	})
+func main() {
+	tc := tests.NewTestContext(tests.NewDefaultLogger("c-chain-reexecution"))
+	tc.SetDefaultContextParent(context.Background())
+	defer tc.RecoverAndExit()
+
+	benchmarkName := fmt.Sprintf(
+		"BenchmarkReexecuteRange/[%d,%d]-Config-%s-Runner-%s",
+		startBlockArg,
+		endBlockArg,
+		configNameArg,
+		runnerNameArg,
+	)
+
+	benchmarkReexecuteRange(
+		tc,
+		benchmarkName,
+		blockDirArg,
+		currentStateDirArg,
+		configBytesArg,
+		startBlockArg,
+		endBlockArg,
+		chanSizeArg,
+		metricsServerEnabledArg,
+		metricsServerPortArg,
+		metricsCollectorEnabledArg,
+		benchmarkOutputFileArg,
+	)
 }
 
 func benchmarkReexecuteRange(
-	b *testing.B,
+	tc tests.TestContext,
+	benchmarkName string,
 	blockDir string,
 	currentStateDir string,
 	configBytes []byte,
@@ -176,9 +191,10 @@ func benchmarkReexecuteRange(
 	metricsServerEnabled bool,
 	metricsPort uint64,
 	metricsCollectorEnabled bool,
+	benchmarkOutputFile string,
 ) {
-	r := require.New(b)
-	ctx := b.Context()
+	r := require.New(tc)
+	ctx := tc.GetDefaultContextParent()
 
 	// Create the prefix gatherer passed to the VM and register it with the top-level,
 	// labeled gatherer.
@@ -198,10 +214,10 @@ func benchmarkReexecuteRange(
 	log := tests.NewDefaultLogger("c-chain-reexecution")
 
 	if metricsServerEnabled {
-		serverAddr := startServer(b, log, prefixGatherer, metricsPort)
+		serverAddr := startServer(tc, log, prefixGatherer, metricsPort)
 
 		if metricsCollectorEnabled {
-			startCollector(b, log, "c-chain-reexecution", labels, serverAddr)
+			startCollector(tc, log, "c-chain-reexecution", labels, serverAddr)
 		}
 	}
 
@@ -225,7 +241,7 @@ func benchmarkReexecuteRange(
 		zap.Int("chan-size", chanSize),
 	)
 
-	blockChan, err := reexecute.CreateBlockChanFromLevelDB(b, blockDir, startBlock, endBlock, chanSize, b.Cleanup)
+	blockChan, err := reexecute.CreateBlockChanFromLevelDB(tc, blockDir, startBlock, endBlock, chanSize)
 	r.NoError(err)
 
 	dbLogger := tests.NewDefaultLogger("db")
@@ -265,8 +281,11 @@ func benchmarkReexecuteRange(
 	r.NoError(executor.executeSequence(ctx, blockChan))
 	elapsed := time.Since(start)
 
-	b.ReportMetric(0, "ns/op")                     // Set default ns/op to 0 to hide from the output
-	getTopLevelMetrics(b, prefixGatherer, elapsed) // Report the desired top-level metrics
+	benchmarkTool := newBenchmarkTool(benchmarkName)
+	getTopLevelMetrics(tc, benchmarkTool, prefixGatherer, elapsed) // Report the desired top-level metrics
+	if len(benchmarkOutputFile) != 0 {
+		r.NoError(benchmarkTool.saveToFile(benchmarkOutputFile))
+	}
 }
 
 func newMainnetCChainVM(
@@ -496,12 +515,12 @@ func newConsensusMetrics(registry prometheus.Registerer) (*consensusMetrics, err
 // startServer starts a Prometheus server for the provided gatherer and returns
 // the server address.
 func startServer(
-	tb testing.TB,
+	tc tests.TestContext,
 	log logging.Logger,
 	gatherer prometheus.Gatherer,
 	port uint64,
 ) string {
-	r := require.New(tb)
+	r := require.New(tc)
 
 	server, err := tests.NewPrometheusServerWithPort(gatherer, port)
 	r.NoError(err)
@@ -510,7 +529,7 @@ func startServer(
 		zap.String("url", fmt.Sprintf("http://%s/ext/metrics", server.Address())),
 	)
 
-	tb.Cleanup(func() {
+	tc.DeferCleanup(func() {
 		r.NoError(server.Stop())
 	})
 
@@ -520,17 +539,17 @@ func startServer(
 // startCollector starts a Prometheus collector configured to scrape the server
 // listening on serverAddr. startCollector also attaches the provided labels +
 // Github labels if available to the collected metrics.
-func startCollector(tb testing.TB, log logging.Logger, name string, labels map[string]string, serverAddr string) {
-	r := require.New(tb)
+func startCollector(tc tests.TestContext, log logging.Logger, name string, labels map[string]string, serverAddr string) {
+	r := require.New(tc)
 
-	startPromCtx, cancel := context.WithTimeout(tb.Context(), tests.DefaultTimeout)
+	startPromCtx, cancel := context.WithTimeout(tc.GetDefaultContextParent(), tests.DefaultTimeout)
 	defer cancel()
 
 	logger := tests.NewDefaultLogger("prometheus")
 	r.NoError(tmpnet.StartPrometheus(startPromCtx, logger))
 
 	var sdConfigFilePath string
-	tb.Cleanup(func() {
+	tc.DeferCleanup(func() {
 		// Ensure a final metrics scrape.
 		// This default delay is set above the default scrape interval used by StartPrometheus.
 		time.Sleep(tmpnet.NetworkShutdownDelay)
@@ -543,10 +562,7 @@ func startCollector(tb testing.TB, log logging.Logger, name string, labels map[s
 		}(),
 		)
 
-		//nolint:usetesting // t.Context() is already canceled inside the cleanup function
-		checkMetricsCtx, cancel := context.WithTimeout(context.Background(), tests.DefaultTimeout)
-		defer cancel()
-		r.NoError(tmpnet.CheckMetricsExist(checkMetricsCtx, logger, networkUUID))
+		r.NoError(tmpnet.CheckMetricsExist(tc.DefaultContext(), logger, networkUUID))
 	})
 
 	sdConfigFilePath, err := tmpnet.WritePrometheusSDConfig(name, tmpnet.SDConfig{
@@ -569,6 +585,42 @@ func startCollector(tb testing.TB, log logging.Logger, name string, labels map[s
 	)
 }
 
+type benchmarkResult struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+	Unit  string `json:"unit"`
+}
+
+type benchmarkTool struct {
+	name             string
+	benchmarkResults []benchmarkResult
+}
+
+func newBenchmarkTool(name string) *benchmarkTool {
+	return &benchmarkTool{
+		name:             name,
+		benchmarkResults: make([]benchmarkResult, 0),
+	}
+}
+
+func (b *benchmarkTool) addResult(value float64, unit string) {
+	result := benchmarkResult{
+		Name:  b.name,
+		Value: strconv.FormatFloat(value, 'f', -1, 64),
+		Unit:  unit,
+	}
+	b.benchmarkResults = append(b.benchmarkResults, result)
+}
+
+func (b *benchmarkTool) saveToFile(filePath string) error {
+	output, err := json.MarshalIndent(b.benchmarkResults, "", "  ")
+	if err != nil {
+		return err
+	}
+
+	return os.WriteFile(filePath, output, perms.ReadWrite)
+}
+
 // parseCustomLabels parses a comma-separated list of key-value pairs into a map
 // of custom labels.
 func parseCustomLabels(labelsStr string) (map[string]string, error) {
@@ -586,13 +638,15 @@ func parseCustomLabels(labelsStr string) (map[string]string, error) {
 	return labels, nil
 }
 
-func getTopLevelMetrics(b *testing.B, registry prometheus.Gatherer, elapsed time.Duration) {
-	r := require.New(b)
+func getTopLevelMetrics(tc tests.TestContext, tool *benchmarkTool, registry prometheus.Gatherer, elapsed time.Duration) {
+	r := require.New(tc)
 
 	gasUsed, err := getCounterMetricValue(registry, "avalanche_evm_eth_chain_block_gas_used_processed")
 	r.NoError(err)
 	mgasPerSecond := gasUsed / 1_000_000 / elapsed.Seconds()
-	b.ReportMetric(mgasPerSecond, "mgas/s")
+
+	tool.addResult(mgasPerSecond, "mgas/s")
+	tc.Log().Info("block processing", zap.Float64("mgas/s", mgasPerSecond))
 }
 
 func getCounterMetricValue(registry prometheus.Gatherer, query string) (float64, error) {

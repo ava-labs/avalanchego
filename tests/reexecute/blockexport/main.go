@@ -45,7 +45,6 @@ func main() {
 		startBlockArg,
 		endBlockArg,
 		chanSizeArg,
-		tc.DeferCleanup,
 	)
 	r.NoError(err)
 
