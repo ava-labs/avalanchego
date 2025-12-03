@@ -17,22 +17,20 @@ var _ SyncStrategy = (*staticStrategy)(nil)
 type staticStrategy struct {
 	registry  *SyncerRegistry
 	finalizer *finalizer
-	summary   message.Syncable
 }
 
-func newStaticStrategy(registry *SyncerRegistry, finalizer *finalizer, summary message.Syncable) *staticStrategy {
+func newStaticStrategy(registry *SyncerRegistry, finalizer *finalizer) *staticStrategy {
 	return &staticStrategy{
 		registry:  registry,
 		finalizer: finalizer,
-		summary:   summary,
 	}
 }
 
 // Start begins the sync process and blocks until completion or error.
 // For static sync, this runs all syncers and then finalizes the VM state.
-func (s *staticStrategy) Start(ctx context.Context) error {
-	if err := s.registry.RunSyncerTasks(ctx, s.summary); err != nil {
+func (s *staticStrategy) Start(ctx context.Context, summary message.Syncable) error {
+	if err := s.registry.RunSyncerTasks(ctx, summary); err != nil {
 		return err
 	}
-	return s.finalizer.finalize(ctx, s.summary)
+	return s.finalizer.finalize(ctx, summary)
 }

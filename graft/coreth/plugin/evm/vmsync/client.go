@@ -17,14 +17,14 @@ import (
 	"github.com/ava-labs/avalanchego/graft/coreth/core/state/snapshot"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"
 	"github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/message"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/blocksync"
+	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync"
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/snow/engine/snowman/block"
 	"github.com/ava-labs/avalanchego/vms/components/chain"
 
 	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/blocksync"
 	syncclient "github.com/ava-labs/avalanchego/graft/coreth/sync/client"
-	"github.com/ava-labs/avalanchego/graft/coreth/sync/statesync"
 )
 
 // BlocksToFetch is the number of the block parents the state syncs to.
@@ -32,7 +32,7 @@ import (
 const BlocksToFetch = 256
 
 var (
-	errSkipSync         = fmt.Errorf("skip sync")
+	errSkipSync         = errors.New("skip sync")
 	stateSyncSummaryKey = []byte("stateSyncSummary")
 )
 
@@ -47,7 +47,7 @@ type BlockAcceptor interface {
 // Implementations handle the sync lifecycle differently based on sync mode.
 type SyncStrategy interface {
 	// Start begins the sync process and blocks until completion or error.
-	Start(ctx context.Context) error
+	Start(ctx context.Context, summary message.Syncable) error
 }
 
 type ClientConfig struct {
@@ -170,7 +170,7 @@ func (c *client) acceptSyncSummary(summary message.Syncable) (block.StateSyncMod
 		c.config.LastAcceptedHeight,
 	)
 
-	strategy := newStaticStrategy(registry, finalizer, summary)
+	strategy := newStaticStrategy(registry, finalizer)
 
 	return c.startAsync(strategy), nil
 }
@@ -228,7 +228,7 @@ func (c *client) startAsync(strategy SyncStrategy) block.StateSyncMode {
 		defer c.wg.Done()
 		defer cancel()
 
-		if err := strategy.Start(ctx); err != nil {
+		if err := strategy.Start(ctx, c.resumableSummary); err != nil {
 			c.err = err
 		}
 		// notify engine regardless of whether err == nil,
