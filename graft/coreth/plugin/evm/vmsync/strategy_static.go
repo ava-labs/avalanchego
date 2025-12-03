@@ -34,3 +34,18 @@ func (s *staticStrategy) Start(ctx context.Context, summary message.Syncable) er
 	}
 	return s.finalizer.finalize(ctx, summary)
 }
+
+// OnBlockAccepted is a no-op for static sync since blocks are not queued.
+func (*staticStrategy) OnBlockAccepted(EthBlockWrapper) (bool, error) {
+	return false, nil
+}
+
+// OnBlockRejected is a no-op for static sync since blocks are not queued.
+func (*staticStrategy) OnBlockRejected(EthBlockWrapper) (bool, error) {
+	return false, nil
+}
+
+// OnBlockVerified is a no-op for static sync since blocks are not queued.
+func (*staticStrategy) OnBlockVerified(EthBlockWrapper) (bool, error) {
+	return false, nil
+}

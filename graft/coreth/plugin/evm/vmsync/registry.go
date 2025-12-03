@@ -102,3 +102,30 @@ func (r *SyncerRegistry) StartAsync(ctx context.Context, summary message.Syncabl
 
 	return g
 }
+
+// UpdateSyncTarget updates the sync target for all syncers.
+// Note: Syncers manage cancellation themselves through their Sync() contexts.
+func (r *SyncerRegistry) UpdateSyncTarget(newTarget message.Syncable) error {
+	for _, task := range r.syncers {
+		if err := task.syncer.UpdateTarget(newTarget); err != nil {
+			log.Error("failed updating sync target", "name", task.name, "err", err)
+			return err
+		}
+		log.Info("updated sync target", "name", task.name, "new_target", newTarget.GetBlockHash().Hex(), "height", newTarget.Height())
+	}
+	return nil
+}
+
+// FinalizeAll calls Finalize on all registered syncers.
+// This should be called after all syncers have completed their Sync() operations
+// and before finalizing the VM state.
+func (r *SyncerRegistry) FinalizeAll(ctx context.Context) error {
+	for _, task := range r.syncers {
+		if err := task.syncer.Finalize(ctx); err != nil {
+			log.Error("failed finalizing syncer", "name", task.name, "err", err)
+			return fmt.Errorf("%s finalize failed: %w", task.name, err)
+		}
+		log.Info("finalized syncer", "name", task.name)
+	}
+	return nil
+}

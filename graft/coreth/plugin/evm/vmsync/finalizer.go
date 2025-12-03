@@ -8,8 +8,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ava-labs/libevm/core/types"
-
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/versiondb"
 	"github.com/ava-labs/avalanchego/graft/coreth/eth"
@@ -20,13 +18,6 @@ import (
 
 	syncpkg "github.com/ava-labs/avalanchego/graft/coreth/sync"
 )
-
-// EthBlockWrapper can be implemented by a concrete block wrapper type to
-// return *types.Block, which is needed to update chain pointers at the
-// end of the sync operation.
-type EthBlockWrapper interface {
-	GetEthBlock() *types.Block
-}
 
 var (
 	errBlockNotFound       = errors.New("block not found in state")
