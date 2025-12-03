@@ -75,7 +75,6 @@ func TestNativeMinter(t *testing.T) {
 	chainID := params.TestChainConfig.ChainID
 	admin := testutils.NewAuth(t, adminKey, chainID)
 	unprivileged := testutils.NewAuth(t, unprivilegedKey, chainID)
-
 	amount := big.NewInt(100)
 
 	type testCase struct {

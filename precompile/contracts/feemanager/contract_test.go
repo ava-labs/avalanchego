@@ -432,7 +432,7 @@ var (
 	}
 )
 
-func TestFeeManager(t *testing.T) {
+func TestContractFeeManagerRun(t *testing.T) {
 	allowlisttest.RunPrecompileWithAllowListTests(t, feemanager.Module, tests)
 }
 

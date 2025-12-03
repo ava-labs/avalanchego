@@ -1,6 +1,6 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
-import "./IAllowList.sol";
+import "precompile/allowlist/allowlisttest/bindings/IAllowList.sol";
 
 interface IFeeManager is IAllowList {
   struct FeeConfig {
