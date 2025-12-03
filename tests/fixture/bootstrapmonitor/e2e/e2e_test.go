@@ -48,8 +48,8 @@ const (
 
 	avalanchegoImage       = "localhost:5001/avalanchego"
 	masterAvalanchegoImage = avalanchegoImage + ":master"
-	monitorImage       = "localhost:5001/bootstrap-monitor"
-	masterMonitorImage = monitorImage + ":master"
+	monitorImage           = "localhost:5001/bootstrap-monitor"
+	masterMonitorImage     = monitorImage + ":master"
 
 	initContainerName    = "init"
 	monitorContainerName = "monitor"
