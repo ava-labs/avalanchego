@@ -1,0 +1,72 @@
+[package]
+name = "firewood-storage"
+version.workspace = true
+edition.workspace = true
+authors = [
+     "Aaron Buchwald <aaron.buchwald56@gmail.com>",
+     "Ron Kuris <ron.kuris@avalabs.org>",
+     "Suyan Qu <36519575+qusuyan@users.noreply.github.com>",
+]
+description = "Storage layer for Firewood, an embedded key-value store optimized for blockchain state."
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# Workspace dependencies
+aquamarine.workspace = true
+bytemuck.workspace = true
+bytemuck_derive.workspace = true
+coarsetime.workspace = true
+fastrace.workspace = true
+hex.workspace = true
+integer-encoding.workspace = true
+metrics.workspace = true
+nonzero_ext.workspace = true
+rand = { workspace = true, optional = true }
+sha2.workspace = true
+smallvec.workspace = true
+thiserror.workspace = true
+# Regular dependencies
+bitfield = "0.19.4"
+bitflags = "2.10.0"
+derive-where = "1.6.0"
+enum-as-inner = "0.6.1"
+indicatif = "0.18.3"
+lru = "0.16.2"
+semver = "1.0.27"
+triomphe = "0.1.15"
+parking_lot.workspace = true
+# Optional dependencies
+bytes = { version = "1.11.0", optional = true }
+io-uring = { version = "0.7.11", optional = true }
+log = { version = "0.4.28", optional = true }
+rlp = { version = "0.6.1", optional = true }
+sha3 = { version = "0.10.8", optional = true }
+bumpalo = { version = "3.19.0", features = ["collections", "std"] }
+
+[dev-dependencies]
+# Workspace dependencies
+criterion = { workspace = true, features = ["html_reports"] }
+pprof = { workspace = true, features = ["flamegraph"] }
+rand.workspace = true
+tempfile.workspace = true
+test-case.workspace = true
+
+[features]
+logger = ["log"]
+branch_factor_256 = []
+io-uring = ["dep:io-uring"]
+ethhash = ["dep:rlp", "dep:sha3", "dep:bytes"]
+test_utils = ["dep:rand"]
+
+[[bench]]
+name = "serializer"
+harness = false
+
+[lints]
+workspace = true

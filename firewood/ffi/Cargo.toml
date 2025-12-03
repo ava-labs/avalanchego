@@ -1,0 +1,55 @@
+[package]
+name = "firewood-ffi"
+version.workspace = true
+edition.workspace = true
+authors = [
+     "Aaron Buchwald <aaron.buchwald56@gmail.com>",
+     "Arran Schlosberg <519948+ARR4N@users.noreply.github.com>",
+     "Austin Larson <78000745+alarso16@users.noreply.github.com>",
+     "Darioush Jalali <darioush.jalali@avalabs.org>",
+     "Ron Kuris <ron.kuris@avalabs.org>",
+]
+description = "C FFI bindings for Firewood, an embedded key-value store optimized for blockchain state."
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+# Workspace dependencies
+coarsetime.workspace = true
+firewood.workspace = true
+firewood-storage.workspace = true
+metrics.workspace = true
+metrics-util.workspace = true
+parking_lot.workspace = true
+# Regular dependencies
+chrono = "0.4.42"
+oxhttp = "0.3.1"
+# Optional dependencies
+env_logger = { workspace = true, optional = true }
+derive-where = "1.6.0"
+
+[target.'cfg(unix)'.dependencies]
+tikv-jemallocator = "0.6.1"
+
+[dev-dependencies]
+# Workspace dependencies
+test-case.workspace = true
+
+[features]
+logger = ["dep:env_logger", "firewood/logger"]
+ethhash = ["firewood/ethhash"]
+
+[build-dependencies]
+cbindgen = "0.29.2"
+
+[lints]
+workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["cbindgen"]

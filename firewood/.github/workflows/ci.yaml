@@ -1,0 +1,334 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: full
+
+jobs:
+  build:
+    # To optimize cargo performance and caching throughout the CI pipeline, we use Swatinem/rust-cache
+    # and set up an initial build job that writes the cache for a matrix of joint build profiles and
+    # feature sets.
+    # Future jobs specify the job they "need" (block to ensure the cache has been populated), the shared-key
+    # to read the cache and can set save-if: "false" to skip an expensive and unnecessary cache write.
+    #
+    # GitHub Actions does not provide easy support to define and re-use a matrix across multiple jobs
+    # and later jobs may also want to execute with only a subset of this matrix. Therefore, we define
+    # the matrix here and later jobs must re-specify the full matrix, a subset, or declare a single
+    # shared-key to read the cache.
+    strategy:
+      # do not cancel concurrent jobs if one fails for exhaustive failure reasons
+      fail-fast: false
+      matrix:
+        include:
+          - profile-key: debug-no-default-features
+            profile-args: "--no-default-features"
+          - profile-key: debug-no-features
+            profile-args: ""
+          - profile-key: debug-no-features
+            profile-args: ""
+            os: macos-latest
+          - profile-key: debug-ethhash-logger
+            profile-args: "--features ethhash,logger"
+          - profile-key: maxperf-ethhash-logger
+            profile-args: "--profile maxperf --features ethhash,logger"
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ matrix.profile-key }}
+          cache-all-crates: true
+          cache-workspace-crates: true
+      # Require Cargo.lock to be up to date and ensure the registry cache is populated
+      - name: Cargo Fetch (run `cargo generate-lockfile` if this fails)
+        run: cargo fetch --locked --verbose
+      - name: Check
+        run: cargo check --frozen ${{ matrix.profile-args }} --workspace --all-targets
+      - name: Build
+        run: cargo build --frozen ${{ matrix.profile-args }} --workspace --all-targets
+
+  no-rust-cache-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Check license headers
+        uses: viperproject/check-license-header@v2
+        with:
+          path: .
+          config: .github/check-license-headers.yaml
+          strict: true
+      - name: Format
+        run: cargo fmt -- --check
+
+  rust-lint-pr-comments:
+    # caveat emptor: actions-rs/clippy-check can only write comments on pull requests
+    # not originating from a fork.
+    if: github.event_name == 'pull_request' && github.repository == github.event.pull_request.head.repo.full_name
+    needs: build
+    strategy:
+      matrix:
+        include:
+          - profile-key: debug-no-default-features
+            profile-args: "--no-default-features"
+          - profile-key: debug-no-features
+            profile-args: ""
+          - profile-key: debug-no-features
+            profile-args: ""
+            os: macos-latest
+          - profile-key: debug-ethhash-logger
+            profile-args: "--features ethhash,logger"
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: "false"
+          shared-key: ${{ matrix.profile-key }}
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          name: ${{ matrix.profile-key }}
+          args: --locked ${{ matrix.profile-args }} --workspace --all-targets
+
+  rust-lint:
+    needs: build
+    strategy:
+      # do not cancel concurrent jobs if one fails for exhaustive failure reasons
+      fail-fast: false
+      matrix:
+        include:
+          - profile-key: debug-no-default-features
+            profile-args: "--no-default-features"
+          - profile-key: debug-no-features
+            profile-args: ""
+          - profile-key: debug-no-features
+            profile-args: ""
+            os: macos-latest
+          - profile-key: debug-ethhash-logger
+            profile-args: "--features ethhash,logger"
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: "false"
+          shared-key: ${{ matrix.profile-key }}
+      - name: Clippy
+        run: cargo clippy --locked ${{ matrix.profile-args }} --workspace --all-targets -- -D warnings
+
+  test:
+    needs: build
+    strategy:
+      # do not cancel concurrent jobs if one fails for exhaustive failure reasons
+      fail-fast: false
+      matrix:
+        include:
+          - profile-key: debug-no-default-features
+            profile-args: "--no-default-features"
+          - profile-key: debug-no-features
+            profile-args: ""
+          - profile-key: debug-no-features
+            profile-args: ""
+            os: macos-latest
+          - profile-key: debug-ethhash-logger
+            profile-args: "--features ethhash,logger"
+          - profile-key: maxperf-ethhash-logger
+            profile-args: "--profile maxperf --features ethhash,logger"
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: "false"
+          shared-key: ${{ matrix.profile-key }}
+      - name: Run tests with features enabled
+        run: cargo test --locked --verbose ${{ matrix.profile-args }}
+
+  examples:
+    needs: build
+    strategy:
+      matrix:
+        include:
+          - profile-key: debug-no-default-features
+            profile-args: "--no-default-features"
+          - profile-key: debug-no-features
+            profile-args: ""
+          - profile-key: debug-no-features
+            profile-args: ""
+            os: macos-latest
+          - profile-key: debug-ethhash-logger
+            profile-args: "--features ethhash,logger"
+          - profile-key: maxperf-ethhash-logger
+            profile-args: "--profile maxperf --features ethhash,logger"
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: "false"
+          shared-key: ${{ matrix.profile-key }}
+      - name: Run benchmark example
+        run: cargo run --locked ${{ matrix.profile-args }} --bin benchmark -- --number-of-batches 100 --batch-size 1000 create
+      - name: Run insert example
+        run: cargo run --locked ${{ matrix.profile-args }} --example insert
+
+  docs:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: "false"
+          shared-key: "debug-no-features"
+      - name: md check
+        uses: DavidAnson/markdownlint-cli2-action@v20
+        with:
+          globs: |
+            *.md
+            **/*.md
+            !CHANGELOG.md
+            !target/**
+      - name: doc generation
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --locked --document-private-items --no-deps
+
+  ffi:
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: "false"
+          shared-key: "debug-no-features"
+      - name: Build Firewood FFI
+        working-directory: ffi
+        run: cargo build --locked --release
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "ffi/go.mod"
+          cache-dependency-path: "ffi/go.sum"
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v7.0.1
+        with:
+          version: latest
+          working-directory: ffi
+      - name: Test Go FFI bindings
+        working-directory: ffi
+        # cgocheck2 is expensive but provides complete pointer checks
+        run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=firewood go test -race ./...
+
+  firewood-ethhash-differential-fuzz:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: "false"
+          shared-key: "debug-ethhash-logger"
+      - name: Build Firewood FFI (with ethhash)
+        run: cargo build --features ethhash,logger
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "ffi/tests/eth/go.mod"
+          cache-dependency-path: "ffi/tests/eth/go.sum"
+      - name: Test Go FFI bindings
+        working-directory: ffi
+        # cgocheck2 is expensive but provides complete pointer checks
+        run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=ethhash go test -race ./...
+      - name: Test Firewood <> Ethereum Differential Fuzz
+        working-directory: ffi/tests/eth
+        run: |
+          # Set memlock to unlimited for the shell invoking the fuzz tests
+          ulimit -Sa
+          ulimit -Ha
+          sudo prlimit --pid $$ --memlock=-1:-1 || echo "prlimit not available, locking kernel memory may fail when setting up io-uring"
+          ulimit -Sa
+          ulimit -Ha
+          go test -fuzz=. -fuzztime=1m
+      - name: Upload Fuzz testdata
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ethhash-differential-fuzz-testdata
+          path: ffi/tests/eth/testdata
+          retention-days: 30
+
+  firewood-merkle-differential-fuzz:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: "false"
+          shared-key: "debug-no-features"
+      - name: Build Firewood FFI
+        run: cargo build -p firewood-ffi
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "ffi/tests/firewood/go.mod"
+          cache-dependency-path: "ffi/tests/firewood/go.sum"
+      - name: Test Firewood <> MerkleDB Differential fuzz
+        working-directory: ffi/tests/firewood
+        run: |
+          # Set memlock to unlimited for the shell invoking the fuzz tests
+          ulimit -Sa
+          ulimit -Ha
+          sudo prlimit --pid $$ --memlock=-1:-1 || echo "prlimit not available, locking kernel memory may fail when setting up io-uring"
+          ulimit -Sa
+          ulimit -Ha
+          go test -fuzz=. -fuzztime=1m
+      - name: Upload Fuzz testdata
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firewood-merkle-differential-fuzz-testdata
+          path: ffi/tests/firewood/testdata
+          retention-days: 30
+
+  stale-deps:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: "false"
+          shared-key: "debug-no-features"
+      - name: Install cargo-machete
+        run: cargo install cargo-machete
+      - name: Check for stale dependencies
+        run: cargo machete --with-metadata

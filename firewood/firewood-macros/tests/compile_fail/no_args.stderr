@@ -1,0 +1,7 @@
+error: Expected string literal for metric prefix, e.g., #[metrics("my.operation")] or #[metrics("my.operation", "description")]
+ --> tests/compile_fail/no_args.rs:5:1
+  |
+5 | / fn function_without_args() -> Result<(), &'static str> {
+6 | |     Ok(())
+7 | | }
+  | |_^

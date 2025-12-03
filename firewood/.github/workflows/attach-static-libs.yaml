@@ -1,0 +1,226 @@
+name: attach-static-libs
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_branch_name:
+        description: "Name of the new branch to create and attach static libs"
+        required: true
+  push:
+    tags:
+      - "*"
+    branches:
+      - "main"
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: full
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Build, upload, and collect static libraries for each target architecture,
+# so that golang projects can import the FFI package without needing to
+# recompile Firewood locally.
+# Supported architectures are:
+# - x86_64-unknown-linux-gnu
+# - aarch64-unknown-linux-gnu
+# - x86_64-apple-darwin
+# - aarch64-apple-darwin
+jobs:
+  # Build the static libraries for each target architecture and upload
+  # them as artifacts to collect and attach in the next job.
+  build-firewood-ffi-libs:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            pre-build-cmd: echo "MACOSX_DEPLOYMENT_TARGET=15.0" >> "$GITHUB_ENV"
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            pre-build-cmd: echo "MACOSX_DEPLOYMENT_TARGET=15.0" >> "$GITHUB_ENV"
+    outputs:
+      has_secrets: ${{ steps.check_secrets.outputs.has_secrets }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ${{ matrix.target }}
+
+      - name: Add target for cross-compilation
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Run pre-build command
+        if: matrix.pre-build-cmd != ''
+        run: ${{ matrix.pre-build-cmd }}
+
+      # Require Cargo.lock to be up to date and ensure the registry cache is populated
+      - name: Cargo Fetch (run `cargo generate-lockfile` if this fails)
+        run: cargo fetch --locked --verbose
+
+      - name: Build for ${{ matrix.target }}
+        run: cargo build-static-ffi --target ${{ matrix.target }}
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: target/${{ matrix.target }}/maxperf/libfirewood_ffi.a
+          if-no-files-found: error
+
+      - name: Check if FIREWOOD_GO_GITHUB_TOKEN is set
+        id: check_secrets
+        run: |
+          if [ -z "${{ secrets.FIREWOOD_GO_GITHUB_TOKEN }}" ]; then
+            echo "FIREWOOD_GO_GITHUB_TOKEN is not set"
+            echo "has_secrets=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "FIREWOOD_GO_GITHUB_TOKEN is set"
+            echo "has_secrets=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Collect all the static libraries built on the previous matrix of jobs
+  # and add them into ffi/libs directory.
+  # We commit and push this as a new branch with "--force" to overwrite
+  # the previous static libs that will not be on our branch.
+  push-firewood-ffi-libs:
+    needs: build-firewood-ffi-libs
+    if: needs.build-firewood-ffi-libs.outputs.has_secrets == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      target_branch: ${{ steps.determine_branch.outputs.target_branch }}
+    steps:
+      - name: Determine branch name
+        id: determine_branch
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.create_branch_name }}" ]]; then
+            export target_branch="${{ github.event.inputs.create_branch_name }}"
+            echo "Using workflow input as target branch: $target_branch"
+            echo "target_branch=$target_branch" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref_type }}" == "tag" ]]; then
+            export target_branch="${GITHUB_REF#refs/tags/}"
+            echo "Using tag name as target_branch: $target_branch"
+            echo "target_branch=$target_branch" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref_name }}" == "main" ]]; then
+            export target_branch="main-ci" # Avoid pushing to main branch of firewood-go-ethhash repo
+            echo "Using main-ci as target branch for push to main: $target_branch"
+            echo "target_branch=$target_branch" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            export target_branch="${{ github.event.pull_request.head.ref }}"
+            echo "Using PR head name as target branch: $target_branch"
+            echo "target_branch=$target_branch" >> "$GITHUB_OUTPUT"
+          else
+            echo "No valid input or tag found."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          path: firewood
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ava-labs/firewood-go-ethhash
+          token: ${{ secrets.FIREWOOD_GO_GITHUB_TOKEN }}
+          path: firewood-go-ethhash
+
+      - name: Copy FFI Source Code
+        run: cp -r firewood/ffi firewood-go-ethhash
+
+      - name: Switch to Static Libs CGO Mode
+        working-directory: firewood-go-ethhash/ffi
+        run: FIREWOOD_LD_MODE=STATIC_LIBS go generate
+
+      - name: Download binaries into libs directory
+        uses: actions/download-artifact@v4
+        with:
+          path: firewood-go-ethhash/ffi/libs
+
+      - name: List downloaded target directory
+        run: find firewood-go-ethhash -type f | sort
+
+      - name: Push static libs to branch
+        working-directory: firewood-go-ethhash
+        # GITHUB_TOKEN is configured in the last actions/checkout step
+        # to have read/write permissions to the firewood-go-ethhash repo.
+        run: |
+          git config --global user.name "FirewoodCI"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b ${{ steps.determine_branch.outputs.target_branch }}
+          echo "Updating ffi module path before pushing to alternative remote"
+          pushd ffi
+          go mod edit -module github.com/ava-labs/firewood-go-ethhash/ffi
+          popd
+          git add .
+          git commit -m "firewood ci ${{ github.sha }}: attach firewood static libs"
+          git push -u origin ${{ steps.determine_branch.outputs.target_branch }} --force
+
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            # If the tag is a semantic version, prefix it with "ffi/" to ensure go get correctly
+            # fetches the submodule. Otherwise, use the tag name as is.
+            # Note: we explicitly ignore semantic versions with suffixes ie. v1.1.1-beta because
+            # go get treats them as non-semantic version tags.
+            # Ref: https://github.com/ava-labs/firewood/pull/991
+            if [[ "${{ github.ref_name }}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              tag_name="ffi/${GITHUB_REF#refs/tags/}"
+            else
+              tag_name="${GITHUB_REF#refs/tags/}"
+            fi
+            git tag -a "$tag_name" -m "firewood ci ${{ github.sha }}: attach firewood static libs"
+            git push origin "refs/tags/$tag_name"
+          fi
+
+  # Check out the branch created in the previous job on a matrix of
+  # our target architectures and test the FFI package on a fresh
+  # machine without re-compiling Firewood locally.
+  # This tests that the Firewood FFI package passes tests on the target
+  # architecture when it is forced to depend on the attached static libs.
+  test-firewood-ffi-libs:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-22.04-arm, macos-latest]
+    needs: push-firewood-ffi-libs
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ava-labs/firewood-go-ethhash
+          token: ${{ secrets.FIREWOOD_GO_GITHUB_TOKEN }}
+          ref: ${{ needs.push-firewood-ffi-libs.outputs.target_branch }}
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "ffi/go.mod"
+          cache-dependency-path: "ffi/go.sum"
+      - name: Test Go FFI bindings
+        working-directory: ffi
+        # cgocheck2 is expensive but provides complete pointer checks
+        run: GOEXPERIMENT=cgocheck2 TEST_FIREWOOD_HASH_MODE=ethhash go test ./...
+
+  remove-if-pr-only:
+    runs-on: ubuntu-latest
+    needs: [push-firewood-ffi-libs, test-firewood-ffi-libs]
+    if: needs.push-firewood-ffi-libs.result == 'success' && github.event_name == 'pull_request'
+    permissions:
+      # Give the GITHUB_TOKEN write permission to delete the
+      # branch created by the previous job if it is a pull request.
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ava-labs/firewood-go-ethhash
+          token: ${{ secrets.FIREWOOD_GO_GITHUB_TOKEN }}
+          ref: ${{ needs.push-firewood-ffi-libs.outputs.target_branch }}
+      - name: Delete branch
+        run: |
+          git push origin --delete ${{ needs.push-firewood-ffi-libs.outputs.target_branch }}

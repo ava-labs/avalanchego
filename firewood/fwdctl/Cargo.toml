@@ -1,0 +1,55 @@
+[package]
+name = "firewood-fwdctl"
+version.workspace = true
+edition.workspace = true
+authors = [
+     "Dan Laine <daniel.laine@avalabs.org>",
+     "Dan Sover <dan.sover@avalabs.org>",
+     "Hao Hao <hao.hao@avalabs.org>",
+     "Richard Pringle <rpring9@gmail.com>",
+     "Ron Kuris <ron.kuris@avalabs.org>",
+     "Sam Batschelet <sam.batschelet@avalabs.org>",
+     "xinifinity <113067541+xinifinity@users.noreply.github.com>",
+     "zdf <orientzh1230@gmail.com>",
+]
+description = "Command-line tool for Firewood, an embedded key-value store optimized for blockchain state."
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "fwdctl"
+path = "src/main.rs"
+
+[dependencies]
+# Workspace dependencies
+clap = { workspace = true, features = ["cargo", "string"] }
+env_logger.workspace = true
+firewood.workspace = true
+firewood-storage.workspace = true
+hex.workspace = true
+log.workspace = true
+nonzero_ext.workspace = true
+# Regular dependencies
+csv = "1.4.0"
+indicatif = "0.18.3"
+askama = "0.14.0"
+num-format = "0.4.4"
+
+[features]
+ethhash = ["firewood/ethhash"]
+logger = ["firewood/logger"]
+
+[dev-dependencies]
+# Workspace dependencies
+firewood-storage = { workspace = true, features = ["test_utils"] }
+rand.workspace = true
+# Regular dependencies
+anyhow = "1.0.100"
+assert_cmd = "2.1.1"
+predicates = "3.1.3"
+serial_test = "3.2.0"
+
+[lints]
+workspace = true

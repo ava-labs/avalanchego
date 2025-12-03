@@ -1,0 +1,5 @@
+error: Function must return a Result<T, E> to use #[metrics] attribute
+ --> tests/compile_fail/non_result_return.rs:5:33
+  |
+5 | fn function_without_result() -> i32 {
+  |                                 ^^^

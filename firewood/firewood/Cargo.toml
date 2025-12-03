@@ -1,0 +1,86 @@
+[package]
+name = "firewood"
+version.workspace = true
+edition.workspace = true
+authors = [
+     "Angel Leon <gubatron@gmail.com>",
+     "Austin Larson <78000745+alarso16@users.noreply.github.com>",
+     "Cesar <137245636+nytzuga@users.noreply.github.com>",
+     "Dan Laine <daniel.laine@avalabs.org>",
+     "Dan Sover <dan.sover@avalabs.org>",
+     "Hao Hao <hao.hao@avalabs.org>",
+     "Patrick O'Grady <prohb125@gmail.com>",
+     "Richard Pringle <rpring9@gmail.com>",
+     "Ron Kuris <ron.kuris@avalabs.org>",
+     "Sam Batschelet <sam.batschelet@avalabs.org>",
+     "xinifinity <113067541+xinifinity@users.noreply.github.com>",
+]
+description = "Firewood is an embedded key-value store, optimized to store blockchain state."
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+# Workspace dependencies
+bytemuck_derive.workspace = true
+bytemuck.workspace = true
+coarsetime.workspace = true
+fastrace.workspace = true
+firewood-macros.workspace = true
+hex.workspace = true
+integer-encoding.workspace = true
+metrics.workspace = true
+thiserror.workspace = true
+# Regular dependencies
+typed-builder = "0.23.1"
+rayon = "1.11.0"
+parking_lot.workspace = true
+fjall = "2.11.2"
+derive-where = "1.6.0"
+weak-table = "0.3.2"
+
+[features]
+default = []
+nightly = []
+io-uring = ["firewood-storage/io-uring"]
+logger = ["firewood-storage/logger"]
+branch_factor_256 = ["firewood-storage/branch_factor_256"]
+ethhash = ["firewood-storage/ethhash"]
+
+[dev-dependencies]
+# Workspace dependencies
+clap = { workspace = true, features = ['derive'] }
+criterion.workspace = true
+env_logger.workspace = true
+ethereum-types.workspace = true
+firewood-storage = { workspace = true, features = ["test_utils"] }
+firewood-triehash.workspace = true
+hex-literal.workspace = true
+pprof = { workspace = true, features = ["flamegraph"] }
+rand.workspace = true
+tempfile.workspace = true
+test-case.workspace = true
+# Regular dependencies
+ctor = "0.6.1"
+hash-db = "0.16.0"
+plain_hasher = "0.2.3"
+rlp = "0.6.1"
+sha3 = "0.10.8"
+
+[[bench]]
+name = "hashops"
+harness = false
+
+[target.'cfg(target_os = "linux")'.dependencies]
+firewood-storage = { workspace = true, features = ["io-uring"] }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+firewood-storage.workspace = true
+
+[lints]
+workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["coarsetime", "hex-literal"]

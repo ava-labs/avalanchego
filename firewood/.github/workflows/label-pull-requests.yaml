@@ -1,0 +1,52 @@
+name: Label pull requests
+
+on: pull_request_target
+
+jobs:
+  add_label:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Check if pull request is from a fork
+        id: check_is_form
+        run: |
+          if [[ "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]]; then
+            echo "is_fork=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_fork=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Add label to third-party pull request
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const label = '3rd party contributor';
+            const isFork = ${{ steps.check_is_form.outputs.is_fork }};
+            const { data: issue } = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const isLabeled = issue.labels.some(l => l.name === label);
+            // add the label if a fork (and not already labeled),
+            // remove if not a fork and is labeled
+            if (isFork && !isLabeled) {
+              console.log(`Adding label: ${label}`);
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                labels: [label],
+              });
+            } else if (!isFork && isLabeled) {
+              console.log(`Removing label: ${label}`);
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: label,
+              });
+            }
+            console.log(`Label ${isFork ? 'added' : 'removed'}: ${label}`);

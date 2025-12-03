@@ -1,0 +1,52 @@
+name: publish
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  publish-firewood-crate:
+    name: firewood-lib
+    runs-on: ubuntu-latest
+    if: startsWith(github.event.release.tag_name, 'v')
+    steps:
+      - uses: actions/checkout@v1
+      - uses: dtolnay/rust-toolchain@stable
+      ## NOTE: keep these packages sorted in reverse topological order!
+      ## cargo tree --workspace -e all | grep firewood
+      - name: publish firewood-macros crate
+        continue-on-error: false
+        run: |
+          cargo login ${{ secrets.CARGO_TOKEN }}
+          cargo publish -p firewood-macros
+      - name: publish firewood-triehash crate
+        continue-on-error: false
+        run: |
+          cargo login ${{ secrets.CARGO_TOKEN }}
+          cargo publish -p firewood-triehash
+      - name: publish firewood-storage crate
+        continue-on-error: false
+        run: |
+          cargo login ${{ secrets.CARGO_TOKEN }}
+          cargo publish -p firewood-storage
+      - name: publish firewood crate
+        continue-on-error: false
+        run: |
+          cargo login ${{ secrets.CARGO_TOKEN }}
+          cargo publish -p firewood
+      - name: publish firewood-ffi crate
+        continue-on-error: false
+        run: |
+          cargo login ${{ secrets.CARGO_TOKEN }}
+          cargo publish -p firewood-ffi
+      - name: publish firewood-fwdctl crate
+        continue-on-error: false
+        run: |
+          cargo login ${{ secrets.CARGO_TOKEN }}
+          cargo publish -p firewood-fwdctl
+      - name: publish firewood-benchmark crate
+        continue-on-error: false
+        run: |
+          cargo login ${{ secrets.CARGO_TOKEN }}
+          cargo publish -p firewood-benchmark
