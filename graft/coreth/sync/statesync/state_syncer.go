@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 
 	"github.com/ava-labs/libevm/common"
 	"github.com/ava-labs/libevm/ethdb"
@@ -59,6 +60,10 @@ type stateSync struct {
 	storageTriesDone   chan struct{}
 	triesInProgressSem chan struct{}
 	stats              *trieSyncStats
+
+	// syncCompleted is set to true when the sync completes successfully.
+	// This provides an explicit success signal for Finalize().
+	syncCompleted atomic.Bool
 }
 
 // SyncerOption configures the state syncer via functional options.
@@ -213,7 +218,11 @@ func (t *stateSync) onMainTrieFinished() error {
 // [mainTrie]'s batch last to avoid persisting the state
 // root before all storage tries are done syncing.
 func (t *stateSync) onSyncComplete() error {
-	return t.mainTrie.batch.Write()
+	if err := t.mainTrie.batch.Write(); err != nil {
+		return err
+	}
+	t.syncCompleted.Store(true)
+	return nil
 }
 
 // storageTrieProducer waits for the main trie to finish
@@ -300,19 +309,14 @@ func (t *stateSync) removeTrieInProgress(root common.Hash) (int, error) {
 	return len(t.triesInProgress), nil
 }
 
-// Finalize checks if there are any in-progress tries and flushes their batches to disk
-// to preserve progress. On successful sync completion, triesInProgress will be empty
-// and this is effectively a no-op. This is called by the syncer registry regardless
-// of sync success or failure.
+// Finalize flushes in-progress trie batches to disk to preserve progress on failure.
 func (t *stateSync) Finalize() error {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-
-	// Nothing to flush if no tries are in progress.
-	// This is the case after a successful sync.
-	if len(t.triesInProgress) == 0 {
+	if t.syncCompleted.Load() {
 		return nil
 	}
+
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 
 	for _, trie := range t.triesInProgress {
 		for _, segment := range trie.segments {
