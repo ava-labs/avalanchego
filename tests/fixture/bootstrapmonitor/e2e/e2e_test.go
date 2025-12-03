@@ -48,8 +48,8 @@ const (
 
 	avalanchegoImage       = "localhost:5001/avalanchego"
 	masterAvalanchegoImage = avalanchegoImage + ":master"
-	monitorImage           = "localhost:5001/bootstrap-monitor"
-	latestMonitorImage     = monitorImage + ":latest"
+	monitorImage       = "localhost:5001/bootstrap-monitor"
+	masterMonitorImage = monitorImage + ":master"
 
 	initContainerName    = "init"
 	monitorContainerName = "monitor"
@@ -269,6 +269,7 @@ func newNodeStatefulSet(name string, flags tmpnet.FlagsMap) *appsv1.StatefulSet 
 		name,
 		true, // generateName
 		masterAvalanchegoImage,
+		corev1.PullAlways, // Ensure the :master image is always pulled
 		nodeContainerName,
 		volumeName,
 		volumeSize,
@@ -371,10 +372,11 @@ func createBootstrapTester(tc tests.TestContext, clientset *kubernetes.Clientset
 // getMonitorContainer retrieves the common container definition for bootstrap-monitor containers.
 func getMonitorContainer(name string, args []string) corev1.Container {
 	return corev1.Container{
-		Name:    name,
-		Image:   latestMonitorImage,
-		Command: []string{"./bootstrap-monitor"},
-		Args:    args,
+		Name:            name,
+		Image:           masterMonitorImage,
+		ImagePullPolicy: corev1.PullAlways, // Ensure the :master image is always pulled
+		Command:         []string{"./bootstrap-monitor"},
+		Args:            args,
 		Env: []corev1.EnvVar{
 			{
 				Name: "POD_NAME",

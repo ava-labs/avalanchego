@@ -153,6 +153,8 @@ func getMasterImageDetails(
 					Command: []string{"./avalanchego"},
 					Args:    []string{"--version-json"},
 					Image:   baseImageName + ":master",
+					// Ensure the latest image is always pulled for a tag other than `latest`
+					ImagePullPolicy: corev1.PullAlways,
 				},
 			},
 			RestartPolicy: corev1.RestartPolicyNever,
