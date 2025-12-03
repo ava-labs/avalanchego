@@ -20,6 +20,9 @@ var _ p2p.Handler = (*Handler[Gossipable])(nil)
 
 // HandlerSet exposes the ability to add new values to the set in response to
 // pushed information and for responding to pull requests.
+//
+// TODO: Consider naming this interface based on what it provides rather than
+// how its used.
 type HandlerSet[T Gossipable] interface {
 	// Add adds a value to the set. Returns an error if v was not added.
 	Add(v T) error

@@ -221,6 +221,9 @@ func NewPullGossiper[T Gossipable](
 
 // PullGossiperSet exposes the current bloom filter and allows adding new items
 // that were not included in the filter.
+//
+// TODO: Consider naming this interface based on what it provides rather than
+// how its used.
 type PullGossiperSet[T Gossipable] interface {
 	// Add adds a value to the set. Returns an error if v was not added.
 	Add(v T) error
@@ -360,6 +363,9 @@ func NewPushGossiper[T Gossipable](
 }
 
 // PushGossiperSet exposes whether hashes are still included in a set.
+//
+// TODO: Consider naming this interface based on what it provides rather than
+// how its used.
 type PushGossiperSet interface {
 	// Has returns true if the hash is in the set.
 	Has(h ids.ID) bool
