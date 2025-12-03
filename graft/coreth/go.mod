@@ -190,3 +190,5 @@ tool (
 )
 
 replace github.com/ava-labs/avalanchego => ../../
+
+replace github.com/ava-labs/firewood-go-ethhash/ffi => ../../firewood/ffi

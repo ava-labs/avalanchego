@@ -1,0 +1,45 @@
+load("@rules_rust//rust:defs.bzl", "rust_library")
+
+exports_files(["Cargo.toml"])
+
+rust_library(
+    name = "firewood-storage",
+    srcs = glob(["src/**/*.rs"]),
+    crate_features = [
+        "ethhash",
+        "logger",
+    ],
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    proc_macro_deps = [
+        "@firewood_crates//:aquamarine",
+        "@firewood_crates//:bytemuck_derive",
+        "@firewood_crates//:derive-where",
+        "@firewood_crates//:enum-as-inner",
+    ],
+    visibility = ["//firewood:__subpackages__"],
+    deps = [
+        "@firewood_crates//:bitfield",
+        "@firewood_crates//:bitflags",
+        "@firewood_crates//:bumpalo",
+        "@firewood_crates//:bytemuck",
+        "@firewood_crates//:bytes",
+        "@firewood_crates//:coarsetime",
+        "@firewood_crates//:fastrace",
+        "@firewood_crates//:hex",
+        "@firewood_crates//:indicatif",
+        "@firewood_crates//:integer-encoding",
+        "@firewood_crates//:log",
+        "@firewood_crates//:lru",
+        "@firewood_crates//:metrics",
+        "@firewood_crates//:nonzero_ext",
+        "@firewood_crates//:parking_lot",
+        "@firewood_crates//:rlp",
+        "@firewood_crates//:semver",
+        "@firewood_crates//:sha2",
+        "@firewood_crates//:sha3",
+        "@firewood_crates//:smallvec",
+        "@firewood_crates//:thiserror",
+        "@firewood_crates//:triomphe",
+    ],
+)

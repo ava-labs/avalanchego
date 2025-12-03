@@ -1,0 +1,16 @@
+load("@rules_rust//rust:defs.bzl", "rust_proc_macro")
+
+exports_files(["Cargo.toml"])
+
+rust_proc_macro(
+    name = "firewood-macros",
+    srcs = glob(["src/**/*.rs"]),
+    crate_root = "src/lib.rs",
+    edition = "2024",
+    visibility = ["//firewood:__subpackages__"],
+    deps = [
+        "@firewood_crates//:proc-macro2",
+        "@firewood_crates//:quote",
+        "@firewood_crates//:syn",
+    ],
+)

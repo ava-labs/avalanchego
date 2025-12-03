@@ -23,7 +23,7 @@ go_library(
         "@com_github_ava_labs_libevm//crypto",
         "@com_github_ava_labs_libevm//log",
         "@com_github_ava_labs_libevm//params",
-        "@com_github_go_cmd_cmd//:go_default_library",
+        "@com_github_go_cmd_cmd//:cmd",
         "@com_github_onsi_ginkgo_v2//:ginkgo",
         "@com_github_stretchr_testify//require",
     ],

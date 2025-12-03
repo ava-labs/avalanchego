@@ -10,6 +10,38 @@ bazel_dep(name = "bazel_skylib", version = "1.7.1")
 bazel_dep(name = "platforms", version = "1.0.0")
 bazel_dep(name = "rules_go", version = "0.59.0")
 bazel_dep(name = "gazelle", version = "0.47.0")
+bazel_dep(name = "rules_rust", version = "0.67.0")
+
+# Rust toolchain for firewood
+rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
+rust.toolchain(
+    edition = "2024",
+    versions = ["1.91.0"],
+)
+use_repo(rust, "rust_toolchains")
+register_toolchains("@rust_toolchains//:all")
+
+# Crate universe for firewood Rust dependencies
+crate = use_extension("@rules_rust//crate_universe:extensions.bzl", "crate")
+crate.from_cargo(
+    name = "firewood_crates",
+    cargo_lockfile = "//firewood:Cargo.lock",
+    manifests = [
+        "//firewood:Cargo.toml",
+        "//firewood/ffi:Cargo.toml",
+        "//firewood/firewood:Cargo.toml",
+        "//firewood/storage:Cargo.toml",
+        "//firewood/firewood-macros:Cargo.toml",
+        "//firewood/triehash:Cargo.toml",
+    ],
+)
+
+# Add extra crates needed for ethhash feature that aren't auto-detected
+crate.spec(
+    package = "bytes",
+    version = "1.11.0",
+)
+use_repo(crate, "firewood_crates")
 
 # Go SDK registration
 # Uses same SHA256 checksums as nix/go/default.nix for identical binaries
@@ -62,24 +94,7 @@ go_deps.gazelle_override(
     path = "github.com/consensys/gnark-crypto",
 )
 
-# Fix firewood-go-ethhash FFI to use cc_import for pre-built static libraries
-# The gazelle-generated BUILD uses -L paths that don't work in Bazel sandbox
-go_deps.gazelle_override(
-    build_file_generation = "off",
-    path = "github.com/ava-labs/firewood-go-ethhash/ffi",
-)
-go_deps.module_override(
-    patch_strip = 1,
-    patches = ["//patches:firewood_ffi.patch"],
-    path = "github.com/ava-labs/firewood-go-ethhash/ffi",
-)
-
 # Additional dependencies from graft/coreth/go.mod that aren't in the main go.mod
-go_deps.module(
-    path = "github.com/ava-labs/firewood-go-ethhash/ffi",
-    sum = "h1:NAVjEu508HwdgbxH/xQxMQoBUgYUn9RQf0VeCrhtYMY=",
-    version = "v0.0.15",
-)
 go_deps.module(
     path = "github.com/go-cmd/cmd",
     sum = "h1:6y3G+3UqPerXvPcXvj+5QNPHT02BUw7p6PsqRxLNA7Y=",
@@ -96,7 +111,6 @@ use_repo(
     "com_connectrpc_grpcreflect",
     "com_github_antithesishq_antithesis_sdk_go",
     "com_github_ava_labs_avalanchego_graft_coreth",
-    "com_github_ava_labs_firewood_go_ethhash_ffi",
     "com_github_ava_labs_libevm",
     "com_github_ava_labs_simplex",
     "com_github_ava_labs_subnet_evm",

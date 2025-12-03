@@ -10,7 +10,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/triedb/firewood",
     visibility = ["//visibility:public"],
     deps = [
-        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
+        "//firewood/ffi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//core/rawdb",
         "@com_github_ava_labs_libevm//core/types",

@@ -32,6 +32,7 @@ go_library(
     importpath = "github.com/ava-labs/avalanchego/graft/coreth/core",
     visibility = ["//visibility:public"],
     deps = [
+        "//firewood/ffi",
         "//graft/coreth/consensus",
         "//graft/coreth/core/extstate",
         "//graft/coreth/core/state/snapshot",
@@ -53,7 +54,6 @@ go_library(
         "//vms/evm/acp176",
         "//vms/evm/acp226",
         "//vms/evm/predicate",
-        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
         "@com_github_ava_labs_libevm//common",
         "@com_github_ava_labs_libevm//common/bitutil",
         "@com_github_ava_labs_libevm//common/hexutil",

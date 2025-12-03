@@ -31,6 +31,10 @@ load("@gazelle//:def.bzl", "gazelle")
 # gazelle:resolve go github.com/ava-labs/avalanchego/connectproto/pb/proposervm //connectproto/pb/proposervm
 # gazelle:resolve go github.com/ava-labs/avalanchego/connectproto/pb/xsvm //connectproto/pb/xsvm
 
+# Resolve firewood imports to local build (handle both module names)
+# gazelle:resolve go github.com/ava-labs/firewood-go-ethhash/ffi //firewood/ffi:ffi
+# gazelle:resolve go github.com/ava-labs/firewood/ffi //firewood/ffi:ffi
+
 gazelle(name = "gazelle")
 
 # Target to update external Go dependencies

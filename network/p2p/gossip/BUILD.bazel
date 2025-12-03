@@ -8,7 +8,6 @@ go_library(
         "gossipable.go",
         "handler.go",
         "message.go",
-        "test_gossip.go",
     ],
     importpath = "github.com/ava-labs/avalanchego/network/p2p/gossip",
     visibility = ["//visibility:public"],
@@ -43,6 +42,7 @@ go_test(
         "//snow/engine/enginetest",
         "//snow/validators",
         "//snow/validators/validatorstest",
+        "//utils/bloom",
         "//utils/constants",
         "//utils/logging",
         "//utils/set",
@@ -51,6 +51,5 @@ go_test(
         "@com_github_prometheus_client_golang//prometheus/testutil",
         "@com_github_stretchr_testify//require",
         "@org_golang_google_protobuf//proto",
-        "@org_golang_x_exp//maps",
     ],
 )
