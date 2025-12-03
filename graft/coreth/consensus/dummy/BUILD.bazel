@@ -1,0 +1,22 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "dummy",
+    srcs = ["consensus.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/consensus/dummy",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/consensus",
+        "//graft/coreth/params",
+        "//graft/coreth/params/extras",
+        "//graft/coreth/plugin/evm/customheader",
+        "//graft/coreth/plugin/evm/customtypes",
+        "//graft/coreth/utils",
+        "//vms/components/gas",
+        "//vms/evm/acp226",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//trie",
+    ],
+)

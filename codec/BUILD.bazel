@@ -1,0 +1,23 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "codec",
+    srcs = [
+        "codec.go",
+        "general_codec.go",
+        "manager.go",
+        "registry.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/codec",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/units",
+        "//utils/wrappers",
+    ],
+)
+
+go_test(
+    name = "codec_test",
+    srcs = ["mocks_generate_test.go"],
+    embed = [":codec"],
+)

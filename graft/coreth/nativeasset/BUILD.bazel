@@ -1,0 +1,35 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "nativeasset",
+    srcs = ["contract.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/nativeasset",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/precompile/contract",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)
+
+go_test(
+    name = "nativeasset_test",
+    srcs = ["contract_test.go"],
+    deps = [
+        ":nativeasset",
+        "//graft/coreth/core",
+        "//graft/coreth/core/extstate",
+        "//graft/coreth/params",
+        "//graft/coreth/plugin/evm/customtypes",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//require",
+    ],
+)

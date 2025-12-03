@@ -1,0 +1,27 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "version",
+    srcs = [
+        "application.go",
+        "compatibility.go",
+        "constants.go",
+        "string.go",
+    ],
+    embedsrcs = ["compatibility.json"],
+    importpath = "github.com/ava-labs/avalanchego/version",
+    visibility = ["//visibility:public"],
+    deps = ["//utils/timer/mockable"],
+)
+
+go_test(
+    name = "version_test",
+    srcs = [
+        "application_test.go",
+        "compatibility_test.go",
+        "constants_test.go",
+        "string_test.go",
+    ],
+    embed = [":version"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

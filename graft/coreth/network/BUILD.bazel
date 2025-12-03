@@ -1,0 +1,55 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "network",
+    srcs = [
+        "network.go",
+        "peer_tracker.go",
+        "waiting_handler.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/network",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//graft/coreth/network/stats",
+        "//graft/coreth/plugin/evm/message",
+        "//graft/coreth/utils/rand",
+        "//ids",
+        "//network/p2p",
+        "//snow",
+        "//snow/engine/common",
+        "//snow/validators",
+        "//utils",
+        "//utils/math",
+        "//utils/set",
+        "//version",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//metrics",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_golang_x_sync//semaphore",
+    ],
+)
+
+go_test(
+    name = "network_test",
+    srcs = [
+        "network_test.go",
+        "peer_tracker_test.go",
+    ],
+    embed = [":network"],
+    deps = [
+        "//codec",
+        "//codec/linearcodec",
+        "//graft/coreth/plugin/evm/message",
+        "//ids",
+        "//network/p2p",
+        "//snow/engine/common",
+        "//snow/engine/enginetest",
+        "//snow/snowtest",
+        "//utils/set",
+        "//version",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_x_sync//errgroup",
+    ],
+)

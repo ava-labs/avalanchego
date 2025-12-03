@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "warptest",
+    srcs = ["block_client.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/warp/warptest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow/consensus/snowman",
+        "//snow/consensus/snowman/snowmantest",
+        "//snow/snowtest",
+    ],
+)

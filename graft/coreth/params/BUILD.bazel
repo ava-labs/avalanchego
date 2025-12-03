@@ -1,0 +1,53 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "params",
+    srcs = [
+        "config.go",
+        "config_extra.go",
+        "config_libevm.go",
+        "denomination.go",
+        "hooks_libevm.go",
+        "network_params.go",
+        "protocol_params_ext.go",
+        "version.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/params",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/nativeasset",
+        "//graft/coreth/params/extras",
+        "//graft/coreth/plugin/evm/customheader",
+        "//graft/coreth/precompile/contract",
+        "//graft/coreth/precompile/modules",
+        "//graft/coreth/precompile/precompileconfig",
+        "//graft/coreth/utils",
+        "//snow",
+        "//upgrade",
+        "//utils/set",
+        "//vms/evm/predicate",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/vm",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//libevm/legacy",
+        "@com_github_ava_labs_libevm//params",
+    ],
+)
+
+go_test(
+    name = "params_test",
+    srcs = [
+        "config_extra_test.go",
+        "config_test.go",
+        "protocol_params_test.go",
+    ],
+    embed = [":params"],
+    deps = [
+        "//graft/coreth/params/extras",
+        "//graft/coreth/utils",
+        "//upgrade/upgradetest",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//params",
+        "@com_github_stretchr_testify//require",
+    ],
+)

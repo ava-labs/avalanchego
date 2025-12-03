@@ -1,0 +1,33 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "set",
+    srcs = [
+        "bits.go",
+        "bits_64.go",
+        "sampleable_set.go",
+        "set.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/set",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils",
+        "//utils/json",
+        "//utils/sampler",
+        "//utils/wrappers",
+        "@org_golang_x_exp//maps",
+    ],
+)
+
+go_test(
+    name = "set_test",
+    srcs = [
+        "bits_64_test.go",
+        "bits_test.go",
+        "sampleable_set_test.go",
+        "set_benchmark_test.go",
+        "set_test.go",
+    ],
+    embed = [":set"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

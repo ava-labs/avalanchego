@@ -1,0 +1,35 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "dynamicip",
+    srcs = [
+        "ifconfig_resolver.go",
+        "no_updater.go",
+        "opendns_resolver.go",
+        "resolver.go",
+        "updater.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/dynamicip",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils",
+        "//utils/ips",
+        "//utils/logging",
+        "//utils/rpc",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "dynamicip_test",
+    srcs = [
+        "resolver_test.go",
+        "updater_test.go",
+    ],
+    embed = [":dynamicip"],
+    deps = [
+        "//utils",
+        "//utils/logging",
+        "@com_github_stretchr_testify//require",
+    ],
+)

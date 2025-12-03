@@ -1,0 +1,23 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "transfer",
+    srcs = [
+        "cmd.go",
+        "flags.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/cmd/issue/transfer",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//genesis",
+        "//ids",
+        "//utils/crypto/secp256k1",
+        "//utils/units",
+        "//vms/example/xsvm/api",
+        "//vms/example/xsvm/cmd/issue/status",
+        "//vms/example/xsvm/tx",
+        "//wallet/subnet/primary",
+        "@com_github_spf13_cobra//:cobra",
+        "@com_github_spf13_pflag//:pflag",
+    ],
+)

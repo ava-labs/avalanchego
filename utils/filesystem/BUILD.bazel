@@ -1,0 +1,22 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "filesystem",
+    srcs = [
+        "io.go",
+        "mock_file.go",
+        "rename.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils/filesystem",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "filesystem_test",
+    srcs = [
+        "mocks_generate_test.go",
+        "rename_test.go",
+    ],
+    embed = [":filesystem"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

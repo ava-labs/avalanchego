@@ -1,0 +1,12 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "packages",
+    srcs = ["dependencies.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/packages",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/set",
+        "@org_golang_x_tools//go/packages",
+    ],
+)

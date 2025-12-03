@@ -1,0 +1,51 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "acp118",
+    srcs = [
+        "aggregator.go",
+        "handler.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/network/p2p/acp118",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache",
+        "//ids",
+        "//network/p2p",
+        "//proto/pb/sdk",
+        "//snow/engine/common",
+        "//snow/validators",
+        "//utils/crypto/bls",
+        "//utils/logging",
+        "//utils/set",
+        "//vms/platformvm/warp",
+        "@org_golang_google_protobuf//proto",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "acp118_test",
+    srcs = [
+        "aggregator_test.go",
+        "handler_test.go",
+    ],
+    embed = [":acp118"],
+    deps = [
+        "//cache",
+        "//cache/lru",
+        "//ids",
+        "//network/p2p",
+        "//network/p2p/p2ptest",
+        "//proto/pb/sdk",
+        "//snow/engine/common",
+        "//snow/validators",
+        "//utils/crypto/bls",
+        "//utils/crypto/bls/signer/localsigner",
+        "//utils/logging",
+        "//utils/set",
+        "//vms/platformvm/warp",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
+    ],
+)

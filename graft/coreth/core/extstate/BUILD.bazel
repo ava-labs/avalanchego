@@ -1,0 +1,54 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "extstate",
+    srcs = [
+        "database.go",
+        "firewood_database.go",
+        "options.go",
+        "statedb.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/core/extstate",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/params",
+        "//graft/coreth/plugin/evm/customtypes",
+        "//graft/coreth/triedb/firewood",
+        "//graft/coreth/utils",
+        "//vms/evm/predicate",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//libevm",
+        "@com_github_ava_labs_libevm//libevm/stateconf",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_holiman_uint256//:uint256",
+    ],
+)
+
+go_test(
+    name = "extstate_test",
+    srcs = [
+        "database_test.go",
+        "state_object_test.go",
+        "statedb_multicoin_test.go",
+    ],
+    embed = [":extstate"],
+    deps = [
+        "//graft/coreth/core/state/snapshot",
+        "//graft/coreth/plugin/evm/customtypes",
+        "//graft/coreth/triedb/firewood",
+        "//graft/coreth/triedb/hashdb",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/state",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//libevm/stateconf",
+        "@com_github_ava_labs_libevm//trie/trienode",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_holiman_uint256//:uint256",
+        "@com_github_stretchr_testify//require",
+    ],
+)

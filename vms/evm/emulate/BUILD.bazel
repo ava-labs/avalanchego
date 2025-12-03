@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "emulate",
+    srcs = ["emulate.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/emulate",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/plugin/evm",
+        "@com_github_ava_labs_subnet_evm//plugin/evm",
+    ],
+)
+
+go_test(
+    name = "emulate_test",
+    srcs = ["emulate_test.go"],
+    embed = [":emulate"],
+    deps = [
+        "//graft/coreth/plugin/evm/customtypes",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_subnet_evm//plugin/evm/customtypes",
+        "@com_github_stretchr_testify//require",
+    ],
+)

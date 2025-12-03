@@ -1,0 +1,23 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "window",
+    srcs = ["window.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/window",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils",
+        "//utils/buffer",
+        "//utils/timer/mockable",
+    ],
+)
+
+go_test(
+    name = "window_test",
+    srcs = ["window_test.go"],
+    embed = [":window"],
+    deps = [
+        "//utils/timer/mockable",
+        "@com_github_stretchr_testify//require",
+    ],
+)

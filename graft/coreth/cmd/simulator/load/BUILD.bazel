@@ -1,0 +1,26 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "load",
+    srcs = [
+        "funder.go",
+        "loader.go",
+        "worker.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/cmd/simulator/load",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/cmd/simulator/config",
+        "//graft/coreth/cmd/simulator/key",
+        "//graft/coreth/cmd/simulator/metrics",
+        "//graft/coreth/cmd/simulator/txs",
+        "//graft/coreth/ethclient",
+        "//graft/coreth/params",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//params",
+        "@org_golang_x_sync//errgroup",
+    ],
+)

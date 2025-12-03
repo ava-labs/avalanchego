@@ -1,0 +1,31 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "api",
+    srcs = [
+        "client.go",
+        "ping.go",
+        "server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/api",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//connectproto/pb/xsvm",
+        "//connectproto/pb/xsvm/xsvmconnect",
+        "//database",
+        "//ids",
+        "//snow",
+        "//utils/constants",
+        "//utils/logging",
+        "//utils/rpc",
+        "//vms/example/xsvm/block",
+        "//vms/example/xsvm/builder",
+        "//vms/example/xsvm/chain",
+        "//vms/example/xsvm/genesis",
+        "//vms/example/xsvm/state",
+        "//vms/example/xsvm/tx",
+        "//vms/platformvm/warp",
+        "@com_connectrpc_connect//:connect",
+        "@org_uber_go_zap//:zap",
+    ],
+)

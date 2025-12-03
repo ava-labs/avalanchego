@@ -53,5 +53,7 @@ pkgs.stdenv.mkDerivation {
     tar xzf $src -C $out --strip-components=1 --no-same-owner --no-same-permissions
     # Ensure go binary is executable
     chmod +x $out/bin/go
+    # ROOT marker required by rules_go/rules_nixpkgs for SDK identification
+    touch $out/ROOT
   '';
 }

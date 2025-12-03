@@ -1,0 +1,45 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "mempool",
+    srcs = ["mempool.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/txs/mempool",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache/lru",
+        "//ids",
+        "//snow/engine/common",
+        "//utils/lock",
+        "//utils/math",
+        "//utils/set",
+        "//utils/setmap",
+        "//vms/components/gas",
+        "//vms/platformvm/txs",
+        "//vms/platformvm/txs/fee",
+        "//vms/platformvm/utxo",
+        "//vms/txs/mempool",
+        "@com_github_google_btree//:btree",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)
+
+go_test(
+    name = "mempool_test",
+    srcs = ["mempool_test.go"],
+    embed = [":mempool"],
+    deps = [
+        "//ids",
+        "//snow/engine/common",
+        "//snow/snowtest",
+        "//utils/set",
+        "//vms/components/avax",
+        "//vms/components/gas",
+        "//vms/platformvm/txs",
+        "//vms/platformvm/utxo",
+        "//vms/secp256k1fx",
+        "//vms/txs/mempool",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_x_sync//errgroup",
+    ],
+)

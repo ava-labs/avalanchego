@@ -1,0 +1,35 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "predicate",
+    srcs = [
+        "predicate.go",
+        "results.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/predicate",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//codec/linearcodec",
+        "//utils/set",
+        "//utils/units",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+    ],
+)
+
+go_test(
+    name = "predicate_test",
+    srcs = [
+        "predicate_test.go",
+        "results_test.go",
+    ],
+    embed = [":predicate"],
+    deps = [
+        "//codec",
+        "//utils/set",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_stretchr_testify//require",
+    ],
+)

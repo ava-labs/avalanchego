@@ -1,0 +1,9 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "registry",
+    srcs = ["registry.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/precompile/registry",
+    visibility = ["//visibility:public"],
+    deps = ["//graft/coreth/precompile/contracts/warp"],
+)

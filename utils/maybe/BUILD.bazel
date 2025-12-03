@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "maybe",
+    srcs = ["maybe.go"],
+    importpath = "github.com/ava-labs/avalanchego/utils/maybe",
+    visibility = ["//visibility:public"],
+)
+
+go_test(
+    name = "maybe_test",
+    srcs = ["maybe_test.go"],
+    embed = [":maybe"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

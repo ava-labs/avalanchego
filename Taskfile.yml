@@ -461,3 +461,47 @@ tasks:
     cmds:
       - task: build
       - cmd: bash -x ./scripts/tests.upgrade.sh {{.CLI_ARGS}}
+
+  # ============================================================================
+  # Bazel build tasks
+  # ============================================================================
+
+  bazel-build:
+    desc: Build avalanchego with Bazel
+    cmds:
+      - bazel build //main:avalanchego
+
+  bazel-build-opt:
+    desc: Build avalanchego with Bazel (optimized)
+    cmds:
+      - bazel build --compilation_mode=opt //main:avalanchego
+
+  bazel-test:
+    desc: Run all tests with Bazel
+    cmds:
+      - bazel test //...
+
+  bazel-clean:
+    desc: Clean Bazel build outputs
+    cmds:
+      - bazel clean
+
+  bazel-clean-all:
+    desc: Clean all Bazel caches (full clean)
+    cmds:
+      - bazel clean --expunge
+
+  bazel-gazelle:
+    desc: Run gazelle to update BUILD files
+    cmds:
+      - bazel run //:gazelle
+
+  bazel-fmt:
+    desc: Format BUILD files with buildifier
+    cmds:
+      - buildifier -r .
+
+  bazel-mod-tidy:
+    desc: Tidy MODULE.bazel use_repo calls
+    cmds:
+      - bazel mod tidy

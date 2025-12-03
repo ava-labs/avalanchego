@@ -1,0 +1,28 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "utils",
+    srcs = [
+        "atomic.go",
+        "bytes.go",
+        "slice.go",
+        "sorting.go",
+        "stacktrace.go",
+        "zero.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/utils",
+    visibility = ["//visibility:public"],
+    deps = ["//utils/hashing"],
+)
+
+go_test(
+    name = "utils_test",
+    srcs = [
+        "atomic_test.go",
+        "bytes_test.go",
+        "slice_test.go",
+        "sorting_test.go",
+    ],
+    embed = [":utils"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

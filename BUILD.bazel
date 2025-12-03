@@ -1,0 +1,45 @@
+load("@gazelle//:def.bzl", "gazelle")
+
+# Gazelle configuration
+# gazelle:prefix github.com/ava-labs/avalanchego
+# gazelle:exclude .git
+# gazelle:exclude build
+# gazelle:exclude .direnv
+
+# Resolve coreth imports to local packages (handle replace directive)
+# gazelle:resolve go github.com/ava-labs/avalanchego/graft/coreth //graft/coreth
+# gazelle:resolve go github.com/ava-labs/avalanchego/graft/coreth/plugin/evm //graft/coreth/plugin/evm
+
+# Resolve proto pb imports - prefer the pb versions
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/p2p //proto/pb/p2p
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/rpcdb //proto/pb/rpcdb
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/sharedmemory //proto/pb/sharedmemory
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/aliasreader //proto/pb/aliasreader
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/appsender //proto/pb/appsender
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/validatorstate //proto/pb/validatorstate
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/sdk //proto/pb/sdk
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/platformvm //proto/pb/platformvm
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/warp //proto/pb/warp
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/sync //proto/pb/sync
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/vm //proto/pb/vm
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/http //proto/pb/http
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/http/responsewriter //proto/pb/http/responsewriter
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/io/reader //proto/pb/io/reader
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/io/writer //proto/pb/io/writer
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/net/conn //proto/pb/net/conn
+# gazelle:resolve go github.com/ava-labs/avalanchego/proto/pb/signer //proto/pb/signer
+# gazelle:resolve go github.com/ava-labs/avalanchego/connectproto/pb/proposervm //connectproto/pb/proposervm
+# gazelle:resolve go github.com/ava-labs/avalanchego/connectproto/pb/xsvm //connectproto/pb/xsvm
+
+gazelle(name = "gazelle")
+
+# Target to update external Go dependencies
+gazelle(
+    name = "gazelle-update-repos",
+    args = [
+        "-from_file=go.mod",
+        "-to_macro=deps.bzl%go_dependencies",
+        "-prune",
+    ],
+    command = "update-repos",
+)

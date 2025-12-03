@@ -1,0 +1,19 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "acp226",
+    srcs = ["acp226.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/acp226",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//utils/math",
+        "//vms/components/gas",
+    ],
+)
+
+go_test(
+    name = "acp226_test",
+    srcs = ["acp226_test.go"],
+    embed = [":acp226"],
+    deps = ["@com_github_stretchr_testify//require"],
+)

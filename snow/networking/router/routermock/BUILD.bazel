@@ -1,0 +1,21 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "routermock",
+    srcs = ["router.go"],
+    importpath = "github.com/ava-labs/avalanchego/snow/networking/router/routermock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//message",
+        "//proto/pb/p2p",
+        "//snow/networking/handler",
+        "//snow/networking/router",
+        "//snow/networking/timeout",
+        "//utils/logging",
+        "//utils/set",
+        "//version",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@org_uber_go_mock//gomock",
+    ],
+)

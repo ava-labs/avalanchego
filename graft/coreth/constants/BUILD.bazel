@@ -1,0 +1,9 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "constants",
+    srcs = ["constants.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/constants",
+    visibility = ["//visibility:public"],
+    deps = ["@com_github_ava_labs_libevm//common"],
+)

@@ -1,0 +1,42 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "bootstrapmonitor",
+    srcs = [
+        "bootstrap_test_config.go",
+        "common.go",
+        "init.go",
+        "wait.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/tests/fixture/bootstrapmonitor",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//chains",
+        "//config",
+        "//tests/fixture/tmpnet",
+        "//tests/fixture/tmpnet/flags",
+        "//utils/logging",
+        "//utils/perms",
+        "//version",
+        "@com_github_spf13_cast//:cast",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+        "@io_k8s_apimachinery//pkg/types",
+        "@io_k8s_apimachinery//pkg/util/wait",
+        "@io_k8s_client_go//kubernetes",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "bootstrapmonitor_test",
+    srcs = ["bootstrap_test_config_test.go"],
+    embed = [":bootstrapmonitor"],
+    deps = [
+        "//chains",
+        "//version",
+        "@com_github_stretchr_testify//require",
+        "@io_k8s_api//core/v1:core",
+        "@io_k8s_apimachinery//pkg/apis/meta/v1:meta",
+    ],
+)

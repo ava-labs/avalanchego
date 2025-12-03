@@ -1,0 +1,25 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "reward",
+    srcs = [
+        "calculator.go",
+        "config.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/reward",
+    visibility = ["//visibility:public"],
+    deps = ["//utils/math"],
+)
+
+go_test(
+    name = "reward_test",
+    srcs = [
+        "calculator_test.go",
+        "example_test.go",
+    ],
+    embed = [":reward"],
+    deps = [
+        "//utils/units",
+        "@com_github_stretchr_testify//require",
+    ],
+)

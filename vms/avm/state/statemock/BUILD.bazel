@@ -1,0 +1,21 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "statemock",
+    srcs = [
+        "chain.go",
+        "diff.go",
+        "state.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/avm/state/statemock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//vms/avm/block",
+        "//vms/avm/state",
+        "//vms/avm/txs",
+        "//vms/components/avax",
+        "@org_uber_go_mock//gomock",
+    ],
+)

@@ -1,0 +1,23 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "debug",
+    srcs = [
+        "api.go",
+        "flags.go",
+        "loudpanic.go",
+        "trace.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/internal/debug",
+    visibility = ["//graft/coreth:__subpackages__"],
+    deps = [
+        "//graft/coreth/internal/flags",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_hashicorp_go_bexpr//:go-bexpr",
+        "@com_github_mattn_go_colorable//:go-colorable",
+        "@com_github_mattn_go_isatty//:go-isatty",
+        "@com_github_urfave_cli_v2//:cli",
+        "@in_gopkg_natefinch_lumberjack_v2//:lumberjack_v2",
+        "@org_golang_x_exp//slog",
+    ],
+)

@@ -1,0 +1,49 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "vmsync",
+    srcs = [
+        "client.go",
+        "registry.go",
+        "server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/vmsync",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//database/versiondb",
+        "//graft/coreth/core",
+        "//graft/coreth/core/state/snapshot",
+        "//graft/coreth/eth",
+        "//graft/coreth/params",
+        "//graft/coreth/plugin/evm/message",
+        "//graft/coreth/sync",
+        "//graft/coreth/sync/blocksync",
+        "//graft/coreth/sync/client",
+        "//graft/coreth/sync/statesync",
+        "//ids",
+        "//snow/engine/snowman/block",
+        "//vms/components/chain",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//log",
+        "@org_golang_x_sync//errgroup",
+    ],
+)
+
+go_test(
+    name = "vmsync_test",
+    srcs = [
+        "doubles_test.go",
+        "registry_test.go",
+    ],
+    embed = [":vmsync"],
+    deps = [
+        "//graft/coreth/plugin/evm/message",
+        "//graft/coreth/sync",
+        "//graft/coreth/utils/utilstest",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_stretchr_testify//require",
+    ],
+)

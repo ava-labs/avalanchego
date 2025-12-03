@@ -1,0 +1,32 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "verify",
+    srcs = [
+        "subnet.go",
+        "verification.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/components/verify",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow",
+    ],
+)
+
+go_test(
+    name = "verify_test",
+    srcs = [
+        "mocks_generate_test.go",
+        "subnet_test.go",
+        "verification_test.go",
+    ],
+    embed = [":verify"],
+    deps = [
+        "//ids",
+        "//snow",
+        "//snow/validators/validatorsmock",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

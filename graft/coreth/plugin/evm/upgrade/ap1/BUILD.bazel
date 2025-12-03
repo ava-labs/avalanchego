@@ -1,0 +1,9 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "ap1",
+    srcs = ["params.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap1",
+    visibility = ["//visibility:public"],
+    deps = ["//graft/coreth/utils"],
+)

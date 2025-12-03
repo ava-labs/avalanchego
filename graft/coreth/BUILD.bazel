@@ -1,0 +1,7 @@
+# Gazelle configuration for coreth submodule
+# gazelle:prefix github.com/ava-labs/avalanchego/graft/coreth
+
+exports_files([
+    "go.mod",
+    "go.sum",
+])

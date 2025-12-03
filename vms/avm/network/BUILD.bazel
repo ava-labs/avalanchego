@@ -1,0 +1,56 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "network",
+    srcs = [
+        "atomic.go",
+        "config.go",
+        "gossip.go",
+        "network.go",
+        "tx_verifier.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/avm/network",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//network/p2p",
+        "//network/p2p/gossip",
+        "//snow/engine/common",
+        "//snow/validators",
+        "//utils",
+        "//utils/logging",
+        "//utils/units",
+        "//vms/avm/txs",
+        "//vms/txs/mempool",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)
+
+go_test(
+    name = "network_test",
+    srcs = [
+        "gossip_test.go",
+        "network_test.go",
+    ],
+    embed = [":network"],
+    deps = [
+        "//ids",
+        "//snow/engine/common",
+        "//snow/engine/common/commonmock",
+        "//snow/validators",
+        "//snow/validators/validatorstest",
+        "//utils/logging",
+        "//vms/avm/block/executor/executormock",
+        "//vms/avm/fxs",
+        "//vms/avm/txs",
+        "//vms/avm/txs/mempool",
+        "//vms/components/avax",
+        "//vms/nftfx",
+        "//vms/propertyfx",
+        "//vms/secp256k1fx",
+        "//vms/txs/mempool",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

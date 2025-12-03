@@ -1,0 +1,52 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "state",
+    srcs = [
+        "block_height_index.go",
+        "block_state.go",
+        "chain_state.go",
+        "codec.go",
+        "state.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/proposervm/state",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cache",
+        "//cache/lru",
+        "//cache/metercacher",
+        "//codec",
+        "//codec/linearcodec",
+        "//database",
+        "//database/prefixdb",
+        "//database/versiondb",
+        "//ids",
+        "//snow/choices",
+        "//utils/constants",
+        "//utils/metric",
+        "//utils/units",
+        "//utils/wrappers",
+        "//vms/proposervm/block",
+        "@com_github_prometheus_client_golang//prometheus",
+    ],
+)
+
+go_test(
+    name = "state_test",
+    srcs = [
+        "block_state_test.go",
+        "chain_state_test.go",
+        "state_test.go",
+    ],
+    embed = [":state"],
+    deps = [
+        "//database",
+        "//database/memdb",
+        "//database/versiondb",
+        "//ids",
+        "//staking",
+        "//vms/proposervm/block",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+    ],
+)

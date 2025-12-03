@@ -1,0 +1,20 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "x",
+    srcs = ["interchain_workflow.go"],
+    importpath = "github.com/ava-labs/avalanchego/tests/e2e/x",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//tests/fixture/e2e",
+        "//utils/constants",
+        "//utils/set",
+        "//utils/units",
+        "//vms/components/avax",
+        "//vms/secp256k1fx",
+        "//wallet/subnet/primary/common",
+        "@com_github_onsi_ginkgo_v2//:ginkgo",
+        "@com_github_stretchr_testify//require",
+    ],
+)

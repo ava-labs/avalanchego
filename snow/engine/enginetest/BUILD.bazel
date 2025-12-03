@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "enginetest",
+    srcs = [
+        "bootstrap_tracker.go",
+        "bootstrapper.go",
+        "engine.go",
+        "sender.go",
+        "timer.go",
+        "vm.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/engine/enginetest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//ids",
+        "//snow",
+        "//snow/engine/common",
+        "//utils/set",
+        "//version",
+        "@com_github_stretchr_testify//require",
+    ],
+)

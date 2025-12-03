@@ -1,0 +1,12 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "dbtest",
+    srcs = ["dbtest.go"],
+    importpath = "github.com/ava-labs/avalanchego/database/heightindexdb/dbtest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "@com_github_stretchr_testify//require",
+    ],
+)

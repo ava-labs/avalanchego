@@ -1,0 +1,12 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "proposermock",
+    srcs = ["windower.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/proposervm/proposer/proposermock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "@org_uber_go_mock//gomock",
+    ],
+)

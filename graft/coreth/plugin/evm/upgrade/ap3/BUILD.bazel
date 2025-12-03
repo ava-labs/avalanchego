@@ -1,0 +1,23 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ap3",
+    srcs = ["window.go"],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/plugin/evm/upgrade/ap3",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/utils",
+        "//utils/wrappers",
+        "@com_github_ava_labs_libevm//common/math",
+    ],
+)
+
+go_test(
+    name = "ap3_test",
+    srcs = ["window_test.go"],
+    embed = [":ap3"],
+    deps = [
+        "@com_github_ava_labs_libevm//common/math",
+        "@com_github_stretchr_testify//require",
+    ],
+)

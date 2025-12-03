@@ -1,0 +1,29 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "firewood",
+    srcs = [
+        "account_trie.go",
+        "database.go",
+        "storage_trie.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/triedb/firewood",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_ava_labs_firewood_go_ethhash_ffi//:ffi",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//crypto",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//libevm/stateconf",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//metrics",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_ava_labs_libevm//trie",
+        "@com_github_ava_labs_libevm//trie/trienode",
+        "@com_github_ava_labs_libevm//trie/triestate",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_ava_labs_libevm//triedb/database",
+    ],
+)

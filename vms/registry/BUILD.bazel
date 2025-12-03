@@ -1,0 +1,43 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "registry",
+    srcs = [
+        "vm_getter.go",
+        "vm_registry.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/registry",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//api/metrics",
+        "//ids",
+        "//utils/filesystem",
+        "//utils/resource",
+        "//vms",
+        "//vms/rpcchainvm",
+        "//vms/rpcchainvm/runtime",
+    ],
+)
+
+go_test(
+    name = "registry_test",
+    srcs = [
+        "mocks_generate_test.go",
+        "vm_getter_test.go",
+        "vm_registry_test.go",
+    ],
+    embed = [":registry"],
+    deps = [
+        "//ids",
+        "//utils/filesystem",
+        "//utils/filesystem/filesystemmock",
+        "//utils/logging",
+        "//utils/resource",
+        "//vms",
+        "//vms/registry/registrymock",
+        "//vms/vmsmock",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)

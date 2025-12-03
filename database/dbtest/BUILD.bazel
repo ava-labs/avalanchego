@@ -1,0 +1,21 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "dbtest",
+    srcs = [
+        "benchmark.go",
+        "dbtest.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/database/dbtest",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//database/databasemock",
+        "//utils",
+        "//utils/units",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_x_exp//maps",
+        "@org_golang_x_sync//errgroup",
+        "@org_uber_go_mock//gomock",
+    ],
+)

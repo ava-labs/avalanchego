@@ -1,0 +1,179 @@
+"""Bazel module definition for avalanchego."""
+
+module(
+    name = "avalanchego",
+    version = "0.0.0",
+)
+
+# Core dependencies from Bazel Central Registry
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "rules_go", version = "0.59.0")
+bazel_dep(name = "gazelle", version = "0.47.0")
+
+# Go SDK registration
+# Uses same SHA256 checksums as nix/go/default.nix for identical binaries
+go_sdk = use_extension("@rules_go//go:extensions.bzl", "go_sdk")
+go_sdk.download(
+    name = "go_sdk",
+    sdks = {
+        # SHA256s from nix/go/default.nix lines 24-29
+        "linux_amd64": ("go1.24.9.linux-amd64.tar.gz", "5b7899591c2dd6e9da1809fde4a2fad842c45d3f6b9deb235ba82216e31e34a6"),
+        "linux_arm64": ("go1.24.9.linux-arm64.tar.gz", "9aa1243d51d41e2f93e895c89c0a2daf7166768c4a4c3ac79db81029d295a540"),
+        "darwin_amd64": ("go1.24.9.darwin-amd64.tar.gz", "961aa2ae2b97e428d6d8991367e7c98cb403bac54276b8259aead42a0081591c"),
+        "darwin_arm64": ("go1.24.9.darwin-arm64.tar.gz", "af451b40651d7fb36db1bbbd9c66ddbed28b96d7da48abea50a19f82c6e9d1d6"),
+    },
+    version = "1.24.9",
+)
+use_repo(go_sdk, "go_sdk")
+
+# Go dependencies from go.mod
+go_deps = use_extension("@gazelle//:extensions.bzl", "go_deps")
+go_deps.from_file(go_mod = "//:go.mod")
+
+# Override libevm's secp256k1 BUILD file to include C source files for CGO
+# The gazelle-generated BUILD file doesn't include the libsecp256k1 C sources
+go_deps.module_override(
+    patch_strip = 1,
+    patches = ["//patches:libevm_secp256k1.patch"],
+    path = "github.com/ava-labs/libevm",
+)
+
+# Disable gazelle for blst and use custom BUILD file via patch
+# blst has complex CGO with assembly that gazelle cannot handle automatically
+# The patch creates BUILD.bazel from /dev/null (new file) based on Prysm's blst.BUILD
+go_deps.gazelle_override(
+    build_file_generation = "off",
+    path = "github.com/supranational/blst",
+)
+go_deps.module_override(
+    patch_strip = 1,
+    patches = ["//patches:blst_build.patch"],
+    path = "github.com/supranational/blst",
+)
+
+# Use purego build tag for gnark-crypto to avoid assembly include path issues
+# gnark-crypto's assembly files use cross-package #include which Bazel doesn't support
+# The purego implementation is slower but avoids the complex assembly setup
+go_deps.gazelle_override(
+    directives = [
+        "gazelle:build_tags purego",
+    ],
+    path = "github.com/consensys/gnark-crypto",
+)
+
+# Fix firewood-go-ethhash FFI to use cc_import for pre-built static libraries
+# The gazelle-generated BUILD uses -L paths that don't work in Bazel sandbox
+go_deps.gazelle_override(
+    build_file_generation = "off",
+    path = "github.com/ava-labs/firewood-go-ethhash/ffi",
+)
+go_deps.module_override(
+    patch_strip = 1,
+    patches = ["//patches:firewood_ffi.patch"],
+    path = "github.com/ava-labs/firewood-go-ethhash/ffi",
+)
+
+# Additional dependencies from graft/coreth/go.mod that aren't in the main go.mod
+go_deps.module(
+    path = "github.com/ava-labs/firewood-go-ethhash/ffi",
+    sum = "h1:NAVjEu508HwdgbxH/xQxMQoBUgYUn9RQf0VeCrhtYMY=",
+    version = "v0.0.15",
+)
+go_deps.module(
+    path = "github.com/go-cmd/cmd",
+    sum = "h1:6y3G+3UqPerXvPcXvj+5QNPHT02BUw7p6PsqRxLNA7Y=",
+    version = "v1.4.3",
+)
+go_deps.module(
+    path = "github.com/google/go-cmp",
+    sum = "h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=",
+    version = "v0.7.0",
+)
+use_repo(
+    go_deps,
+    "com_connectrpc_connect",
+    "com_connectrpc_grpcreflect",
+    "com_github_antithesishq_antithesis_sdk_go",
+    "com_github_ava_labs_avalanchego_graft_coreth",
+    "com_github_ava_labs_firewood_go_ethhash_ffi",
+    "com_github_ava_labs_libevm",
+    "com_github_ava_labs_simplex",
+    "com_github_ava_labs_subnet_evm",
+    "com_github_btcsuite_btcd_btcutil",
+    "com_github_cespare_xxhash_v2",
+    "com_github_cockroachdb_pebble",
+    "com_github_compose_spec_compose_go",
+    "com_github_datadog_zstd",
+    "com_github_davecgh_go_spew",
+    "com_github_deckarep_golang_set_v2",
+    "com_github_decred_dcrd_dcrec_secp256k1_v4",
+    "com_github_go_cmd_cmd",
+    "com_github_google_btree",
+    "com_github_google_go_cmp",
+    "com_github_google_renameio_v2",
+    "com_github_google_uuid",
+    "com_github_gorilla_mux",
+    "com_github_gorilla_rpc",
+    "com_github_gorilla_websocket",
+    "com_github_grpc_ecosystem_go_grpc_prometheus",
+    "com_github_hashicorp_go_bexpr",
+    "com_github_hashicorp_golang_lru",
+    "com_github_holiman_billy",
+    "com_github_holiman_bloomfilter_v2",
+    "com_github_holiman_uint256",
+    "com_github_huin_goupnp",
+    "com_github_jackpal_gateway",
+    "com_github_jackpal_go_nat_pmp",
+    "com_github_leanovate_gopter",
+    "com_github_mattn_go_colorable",
+    "com_github_mattn_go_isatty",
+    "com_github_mitchellh_mapstructure",
+    "com_github_mr_tron_base58",
+    "com_github_nbutton23_zxcvbn_go",
+    "com_github_onsi_ginkgo_v2",
+    "com_github_pires_go_proxyproto",
+    "com_github_prometheus_client_golang",
+    "com_github_prometheus_client_model",
+    "com_github_prometheus_common",
+    "com_github_rs_cors",
+    "com_github_shirou_gopsutil",
+    "com_github_spf13_cast",
+    "com_github_spf13_cobra",
+    "com_github_spf13_pflag",
+    "com_github_spf13_viper",
+    "com_github_stephenbuttolph_canoto",
+    "com_github_stretchr_testify",
+    "com_github_supranational_blst",
+    "com_github_syndtr_goleveldb",
+    "com_github_thepudds_fzgen",
+    "com_github_tyler_smith_go_bip39",
+    "com_github_urfave_cli_v2",
+    "com_github_victoriametrics_fastcache",
+    "in_gopkg_natefinch_lumberjack_v2",
+    "in_gopkg_yaml_v3",
+    "io_k8s_api",
+    "io_k8s_apimachinery",
+    "io_k8s_client_go",
+    "io_k8s_utils",
+    "io_opentelemetry_go_otel",
+    "io_opentelemetry_go_otel_exporters_otlp_otlptrace",
+    "io_opentelemetry_go_otel_exporters_otlp_otlptrace_otlptracegrpc",
+    "io_opentelemetry_go_otel_exporters_otlp_otlptrace_otlptracehttp",
+    "io_opentelemetry_go_otel_sdk",
+    "io_opentelemetry_go_otel_trace",
+    "org_golang_google_genproto_googleapis_rpc",
+    "org_golang_google_grpc",
+    "org_golang_google_protobuf",
+    "org_golang_x_crypto",
+    "org_golang_x_exp",
+    "org_golang_x_net",
+    "org_golang_x_sync",
+    "org_golang_x_term",
+    "org_golang_x_time",
+    "org_golang_x_tools",
+    "org_gonum_v1_gonum",
+    "org_uber_go_goleak",
+    "org_uber_go_mock",
+    "org_uber_go_zap",
+)

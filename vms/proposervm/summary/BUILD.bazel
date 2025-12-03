@@ -1,0 +1,32 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "summary",
+    srcs = [
+        "build.go",
+        "codec.go",
+        "parse.go",
+        "state_summary.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/proposervm/summary",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//codec/linearcodec",
+        "//ids",
+        "//utils/hashing",
+    ],
+)
+
+go_test(
+    name = "summary_test",
+    srcs = [
+        "build_test.go",
+        "parse_test.go",
+    ],
+    embed = [":summary"],
+    deps = [
+        "//codec",
+        "@com_github_stretchr_testify//require",
+    ],
+)

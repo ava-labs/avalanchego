@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "versiondb",
+    srcs = ["db.go"],
+    importpath = "github.com/ava-labs/avalanchego/database/versiondb",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database",
+        "//database/memdb",
+    ],
+)
+
+go_test(
+    name = "versiondb_test",
+    srcs = ["db_test.go"],
+    embed = [":versiondb"],
+    deps = [
+        "//database",
+        "//database/dbtest",
+        "//database/memdb",
+        "@com_github_stretchr_testify//require",
+    ],
+)

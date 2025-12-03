@@ -1,0 +1,31 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "prometheus",
+    srcs = [
+        "interfaces.go",
+        "prometheus.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/evm/metrics/prometheus",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_ava_labs_libevm//metrics",
+        "@com_github_prometheus_client_golang//prometheus",
+        "@com_github_prometheus_client_model//go",
+    ],
+)
+
+go_test(
+    name = "prometheus_test",
+    srcs = [
+        "enabled_test.go",
+        "prometheus_test.go",
+    ],
+    embed = [":prometheus"],
+    deps = [
+        "//vms/evm/metrics/metricstest",
+        "@com_github_ava_labs_libevm//metrics",
+        "@com_github_prometheus_client_golang//prometheus/testutil",
+        "@com_github_stretchr_testify//require",
+    ],
+)

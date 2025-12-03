@@ -1,0 +1,42 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "utxo",
+    srcs = ["verifier.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/platformvm/utxo",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow",
+        "//utils/hashing",
+        "//utils/math",
+        "//utils/timer/mockable",
+        "//vms/components/avax",
+        "//vms/components/verify",
+        "//vms/platformvm/fx",
+        "//vms/platformvm/stakeable",
+        "//vms/platformvm/txs",
+    ],
+)
+
+go_test(
+    name = "utxo_test",
+    srcs = [
+        "mocks_generate_test.go",
+        "verifier_test.go",
+    ],
+    embed = [":utxo"],
+    deps = [
+        "//ids",
+        "//snow/snowtest",
+        "//utils/crypto/secp256k1",
+        "//utils/math",
+        "//utils/timer/mockable",
+        "//vms/components/avax",
+        "//vms/components/verify",
+        "//vms/platformvm/stakeable",
+        "//vms/platformvm/txs",
+        "//vms/secp256k1fx",
+        "@com_github_stretchr_testify//require",
+    ],
+)

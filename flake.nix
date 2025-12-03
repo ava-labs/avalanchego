@@ -41,6 +41,10 @@
             # Task runner
             go-task
 
+            # Bazel build system
+            bazel_7
+            buildifier
+
             # Local Go package from nested flake
             go-flake.packages.${pkgs.system}.default
 

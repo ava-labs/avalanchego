@@ -1,0 +1,30 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "gconn",
+    srcs = [
+        "conn_client.go",
+        "conn_server.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/vms/rpcchainvm/ghttp/gconn",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//proto/pb/net/conn",
+        "//utils/wrappers",
+        "//vms/rpcchainvm/grpcutils",
+        "@org_golang_google_protobuf//types/known/emptypb",
+    ],
+)
+
+go_test(
+    name = "gconn_test",
+    srcs = ["gconn_test.go"],
+    embed = [":gconn"],
+    deps = [
+        "//proto/pb/net/conn",
+        "//vms/rpcchainvm/grpcutils",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_grpc//:grpc",
+        "@org_golang_google_grpc//test/bufconn",
+    ],
+)

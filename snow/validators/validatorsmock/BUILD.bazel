@@ -1,0 +1,13 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "validatorsmock",
+    srcs = ["state.go"],
+    importpath = "github.com/ava-labs/avalanchego/snow/validators/validatorsmock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//snow/validators",
+        "@org_uber_go_mock//gomock",
+    ],
+)

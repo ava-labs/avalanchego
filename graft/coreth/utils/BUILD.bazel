@@ -1,0 +1,34 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "utils",
+    srcs = [
+        "address_range.go",
+        "bounded_workers.go",
+        "bytes.go",
+        "denomination.go",
+        "metered_cache.go",
+        "numbers.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/utils",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//metrics",
+        "@com_github_victoriametrics_fastcache//:fastcache",
+    ],
+)
+
+go_test(
+    name = "utils_test",
+    srcs = [
+        "bytes_test.go",
+        "numbers_test.go",
+    ],
+    embed = [":utils"],
+    deps = [
+        "//utils",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_stretchr_testify//require",
+    ],
+)

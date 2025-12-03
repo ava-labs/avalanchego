@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "pruner",
+    srcs = [
+        "bloom.go",
+        "pruner.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/graft/coreth/core/state/pruner",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//graft/coreth/core/state/snapshot",
+        "//graft/coreth/plugin/evm/customrawdb",
+        "@com_github_ava_labs_libevm//common",
+        "@com_github_ava_labs_libevm//core/rawdb",
+        "@com_github_ava_labs_libevm//core/types",
+        "@com_github_ava_labs_libevm//ethdb",
+        "@com_github_ava_labs_libevm//log",
+        "@com_github_ava_labs_libevm//rlp",
+        "@com_github_ava_labs_libevm//trie",
+        "@com_github_ava_labs_libevm//triedb",
+        "@com_github_holiman_bloomfilter_v2//:bloomfilter",
+    ],
+)

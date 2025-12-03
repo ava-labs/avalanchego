@@ -1,0 +1,21 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "builder",
+    srcs = ["builder.go"],
+    importpath = "github.com/ava-labs/avalanchego/vms/example/xsvm/builder",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//database/versiondb",
+        "//ids",
+        "//snow",
+        "//snow/engine/common",
+        "//snow/engine/snowman/block",
+        "//utils/linked",
+        "//utils/lock",
+        "//vms/example/xsvm/block",
+        "//vms/example/xsvm/chain",
+        "//vms/example/xsvm/execute",
+        "//vms/example/xsvm/tx",
+    ],
+)

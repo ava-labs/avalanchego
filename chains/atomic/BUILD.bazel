@@ -1,0 +1,44 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "atomic",
+    srcs = [
+        "codec.go",
+        "memory.go",
+        "prefixes.go",
+        "shared_memory.go",
+        "state.go",
+        "writer.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/chains/atomic",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//codec",
+        "//codec/linearcodec",
+        "//database",
+        "//database/linkeddb",
+        "//database/prefixdb",
+        "//database/versiondb",
+        "//ids",
+        "//utils",
+        "//utils/hashing",
+        "//utils/set",
+    ],
+)
+
+go_test(
+    name = "atomic_test",
+    srcs = [
+        "memory_test.go",
+        "mocks_generate_test.go",
+        "shared_memory_test.go",
+    ],
+    embed = [":atomic"],
+    deps = [
+        "//chains/atomic/atomictest",
+        "//database/memdb",
+        "//database/prefixdb",
+        "//ids",
+        "@com_github_stretchr_testify//require",
+    ],
+)

@@ -1,0 +1,43 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "bootstrapper",
+    srcs = [
+        "majority.go",
+        "minority.go",
+        "noop.go",
+        "poll.go",
+        "requests.go",
+        "sampler.go",
+    ],
+    importpath = "github.com/ava-labs/avalanchego/snow/consensus/snowman/bootstrapper",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//ids",
+        "//utils/logging",
+        "//utils/math",
+        "//utils/sampler",
+        "//utils/set",
+        "@org_golang_x_exp//maps",
+        "@org_uber_go_zap//:zap",
+    ],
+)
+
+go_test(
+    name = "bootstrapper_test",
+    srcs = [
+        "majority_test.go",
+        "minority_test.go",
+        "noop_test.go",
+        "poll_test.go",
+        "sampler_test.go",
+    ],
+    embed = [":bootstrapper"],
+    deps = [
+        "//ids",
+        "//utils/logging",
+        "//utils/math",
+        "//utils/set",
+        "@com_github_stretchr_testify//require",
+    ],
+)
