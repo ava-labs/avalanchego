@@ -5,6 +5,7 @@ package gossip
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -22,7 +23,7 @@ var (
 	_ Set[Gossipable]             = (*BloomSet[Gossipable])(nil)
 	_ PullGossiperSet[Gossipable] = (*BloomSet[Gossipable])(nil)
 
-	ErrBloomReset = fmt.Errorf("bloom reset")
+	ErrBloomReset = errors.New("bloom reset")
 )
 
 type BloomSetConfig struct {
