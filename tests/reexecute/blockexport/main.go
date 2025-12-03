@@ -39,7 +39,14 @@ func main() {
 	defer tc.RecoverAndExit()
 
 	r := require.New(tc)
-	blockChan, err := reexecute.CreateBlockChanFromLevelDB(blockDirSrcArg, startBlockArg, endBlockArg, chanSizeArg, tc.DeferCleanup)
+	blockChan, err := reexecute.CreateBlockChanFromLevelDB(
+		tc,
+		blockDirSrcArg,
+		startBlockArg,
+		endBlockArg,
+		chanSizeArg,
+		tc.DeferCleanup,
+	)
 	r.NoError(err)
 
 	db, err := leveldb.New(blockDirDstArg, nil, logging.NoLog{}, prometheus.NewRegistry())

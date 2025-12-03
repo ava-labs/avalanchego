@@ -225,7 +225,7 @@ func benchmarkReexecuteRange(
 		zap.Int("chan-size", chanSize),
 	)
 
-	blockChan, err := reexecute.CreateBlockChanFromLevelDB(blockDir, startBlock, endBlock, chanSize, b.Cleanup)
+	blockChan, err := reexecute.CreateBlockChanFromLevelDB(b, blockDir, startBlock, endBlock, chanSize, b.Cleanup)
 	r.NoError(err)
 
 	dbLogger := tests.NewDefaultLogger("db")

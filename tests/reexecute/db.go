@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ava-labs/avalanchego/database"
 	"github.com/ava-labs/avalanchego/database/leveldb"
@@ -27,7 +28,8 @@ type BlockResult struct {
 // Blocks are read sequentially and sent to the returned channel as BlockResult values.
 //
 // Any validation errors or iteration errors are sent as BlockResult with Err set, then the channel is closed.
-func CreateBlockChanFromLevelDB(sourceDir string, startBlock, endBlock uint64, chanSize int, cleanup func(func())) (<-chan BlockResult, error) {
+func CreateBlockChanFromLevelDB(t require.TestingT, sourceDir string, startBlock, endBlock uint64, chanSize int, cleanup func(func())) (<-chan BlockResult, error) {
+	r := require.New(t)
 	ch := make(chan BlockResult, chanSize)
 
 	db, err := leveldb.New(sourceDir, nil, logging.NoLog{}, prometheus.NewRegistry())
@@ -35,7 +37,7 @@ func CreateBlockChanFromLevelDB(sourceDir string, startBlock, endBlock uint64, c
 		return nil, fmt.Errorf("failed to create leveldb database from %q: %w", sourceDir, err)
 	}
 	cleanup(func() {
-		db.Close()
+		r.NoError(db.Close())
 	})
 
 	go func() {
