@@ -172,7 +172,7 @@ func (c *client) acceptSyncSummary(summary message.Syncable) (block.StateSyncMod
 
 	strategy := newStaticStrategy(registry, finalizer)
 
-	return c.startAsync(strategy), nil
+	return c.startAsync(strategy, summary), nil
 }
 
 // prepareForSync handles resume check and snapshot wipe before sync starts.
@@ -219,7 +219,7 @@ func (c *client) prepareForSync(summary message.Syncable) error {
 }
 
 // startAsync launches the sync strategy in a background goroutine.
-func (c *client) startAsync(strategy SyncStrategy) block.StateSyncMode {
+func (c *client) startAsync(strategy SyncStrategy, summary message.Syncable) block.StateSyncMode {
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel
 
@@ -228,7 +228,7 @@ func (c *client) startAsync(strategy SyncStrategy) block.StateSyncMode {
 		defer c.wg.Done()
 		defer cancel()
 
-		if err := strategy.Start(ctx, c.resumableSummary); err != nil {
+		if err := strategy.Start(ctx, summary); err != nil {
 			c.err = err
 		}
 		// notify engine regardless of whether err == nil,
