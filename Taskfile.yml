@@ -327,6 +327,14 @@ tasks:
           CURRENT_STATE_DIR_SRC: 'cchain-current-state-firewood-100'
           CONFIG: firewood
 
+  build-firewood:
+    desc: Build Firewood FFI from source for testing with Coreth
+    dir: graft/coreth
+    vars:
+      FIREWOOD_REF: '{{.FIREWOOD_REF | default "main"}}'
+      DIRTY_FLAG: '{{if eq .DIRTY "true"}}--dirty{{end}}'
+    cmd: ./scripts/build_firewood.sh {{.FIREWOOD_REF}} {{.DIRTY_FLAG}}
+
   test-bootstrap-monitor-e2e:
     desc: Runs bootstrap monitor e2e tests
     cmd: bash -x ./scripts/tests.e2e.bootstrap_monitor.sh

@@ -98,10 +98,7 @@ jobs:
       - name: Build Firewood (from source)
         if: needs.determine-build-type.outputs.from-source == 'true'
         shell: bash
-        run: |
-          cd graft/coreth
-          echo "Building Firewood from source: ${{ inputs.firewood }}"
-          ./scripts/build_firewood.sh "${{ inputs.firewood }}" --dirty
+        run: ./scripts/run_task.sh build-firewood FIREWOOD_REF="${{ inputs.firewood }}" DIRTY=true
         env:
           TMPDIR: /tmp
           NIX_BUILD_TOP: /tmp
