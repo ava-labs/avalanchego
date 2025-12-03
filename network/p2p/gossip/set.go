@@ -59,8 +59,8 @@ type Set[T Gossipable] interface {
 	PushGossiperSet
 	// Len returns the number of items in the set.
 	//
-	// This value should mast the number of items that can be iterated over with
-	// a call to Iterate.
+	// This value should match the number of items that can be iterated over
+	// with a call to Iterate.
 	Len() int
 }
 
