@@ -94,7 +94,8 @@ func TestBloomFilterRefresh(t *testing.T) {
 				require.Equal(initialSaltBytes, salt[:])
 
 				// If the bloom filter wasn't reset, adding an item may modify
-				// the returned bloom filter.
+				// the returned bloom filter, so this must be done after the
+				// checks.
 				bloom.Add(item)
 			}
 

@@ -67,14 +67,14 @@ func (marshaller) UnmarshalGossip(bytes []byte) (tx, error) {
 }
 
 type setDouble struct {
-	l     sync.RWMutex
+	lock  sync.RWMutex
 	txs   set.Set[tx]
 	onAdd func(tx tx)
 }
 
 func (s *setDouble) Add(t tx) error {
-	s.l.Lock()
-	defer s.l.Unlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
 	if s.txs.Contains(t) {
 		return fmt.Errorf("%s already present", t)
@@ -88,22 +88,22 @@ func (s *setDouble) Add(t tx) error {
 }
 
 func (s *setDouble) Remove(t tx) {
-	s.l.Lock()
-	defer s.l.Unlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
 	s.txs.Remove(t)
 }
 
 func (s *setDouble) Has(h ids.ID) bool {
-	s.l.RLock()
-	defer s.l.RUnlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	return s.txs.Contains(tx(h))
 }
 
 func (s *setDouble) Iterate(f func(t tx) bool) {
-	s.l.RLock()
-	defer s.l.RUnlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	for tx := range s.txs {
 		if !f(tx) {
@@ -113,8 +113,8 @@ func (s *setDouble) Iterate(f func(t tx) bool) {
 }
 
 func (s *setDouble) Len() int {
-	s.l.RLock()
-	defer s.l.RUnlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	return s.txs.Len()
 }
@@ -191,17 +191,10 @@ func TestGossiperGossip(t *testing.T) {
 			)
 			require.NoError(err)
 
-			responseSetWithBloom, err := NewSetWithBloomFilter(
-				&setDouble{},
-				prometheus.NewRegistry(),
-				"",
-				1000,
-				0.01,
-				0.05,
-			)
+			responseBloomSet, err := NewBloomSet(&setDouble{}, BloomSetConfig{})
 			require.NoError(err)
 			for _, item := range tt.responder {
-				require.NoError(responseSetWithBloom.Add(item))
+				require.NoError(responseBloomSet.Add(item))
 			}
 
 			metrics, err := NewMetrics(prometheus.NewRegistry(), "")
@@ -216,7 +209,7 @@ func TestGossiperGossip(t *testing.T) {
 			handler := NewHandler[tx](
 				logging.NoLog{},
 				marshaller,
-				responseSetWithBloom,
+				responseBloomSet,
 				metrics,
 				tt.targetResponseSize,
 			)
@@ -239,17 +232,10 @@ func TestGossiperGossip(t *testing.T) {
 			require.NoError(requestNetwork.Connected(t.Context(), ids.EmptyNodeID, nil))
 
 			var requestSet setDouble
-			requestSetWithBloom, err := NewSetWithBloomFilter(
-				&requestSet,
-				prometheus.NewRegistry(),
-				"",
-				1000,
-				0.01,
-				0.05,
-			)
+			requestBloomSet, err := NewBloomSet(&requestSet, BloomSetConfig{})
 			require.NoError(err)
 			for _, item := range tt.requester {
-				require.NoError(requestSetWithBloom.Add(item))
+				require.NoError(requestBloomSet.Add(item))
 			}
 
 			requestClient := requestNetwork.NewClient(
@@ -261,7 +247,7 @@ func TestGossiperGossip(t *testing.T) {
 			gossiper := NewPullGossiper[tx](
 				logging.NoLog{},
 				marshaller,
-				requestSetWithBloom,
+				requestBloomSet,
 				requestClient,
 				metrics,
 				1,

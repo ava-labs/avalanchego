@@ -16,7 +16,7 @@ import (
 	"github.com/ava-labs/avalanchego/utils/bloom"
 )
 
-func TestSetWithBloomFilter_Refresh(t *testing.T) {
+func TestBloomSet_Refresh(t *testing.T) {
 	type (
 		op struct {
 			add    *tx
@@ -26,7 +26,7 @@ func TestSetWithBloomFilter_Refresh(t *testing.T) {
 			name                          string
 			resetFalsePositiveProbability float64
 			ops                           []op
-			expected                      []tx
+			expectedInFilter              []tx
 			expectedResetCount            float64
 		}
 	)
@@ -39,7 +39,7 @@ func TestSetWithBloomFilter_Refresh(t *testing.T) {
 				{add: &tx{1}},
 				{add: &tx{2}},
 			},
-			expected: []tx{
+			expectedInFilter: []tx{
 				{0},
 				{1},
 				{2},
@@ -57,7 +57,7 @@ func TestSetWithBloomFilter_Refresh(t *testing.T) {
 				{remove: &tx{1}},
 				{remove: &tx{2}},
 			},
-			expected: []tx{
+			expectedInFilter: []tx{
 				{0},
 				{1},
 				{2},
@@ -72,7 +72,7 @@ func TestSetWithBloomFilter_Refresh(t *testing.T) {
 				{remove: &tx{0}},
 				{add: &tx{1}}, // reset
 			},
-			expected: []tx{
+			expectedInFilter: []tx{
 				{1},
 			},
 			expectedResetCount: 1,
@@ -87,7 +87,7 @@ func TestSetWithBloomFilter_Refresh(t *testing.T) {
 				{remove: &tx{1}},
 				{add: &tx{2}}, // reset
 			},
-			expected: []tx{
+			expectedInFilter: []tx{
 				{2},
 			},
 			expectedResetCount: 2,
@@ -100,22 +100,25 @@ func TestSetWithBloomFilter_Refresh(t *testing.T) {
 
 			const (
 				minTargetElements              = 1
-				targetFalsePositiveProbability = 0.0001
+				targetFalsePositiveProbability = 0.000001
 			)
 			var s setDouble
-			bs, err := NewSetWithBloomFilter(
+			m, err := bloom.NewMetrics("", prometheus.NewRegistry())
+			require.NoError(err, "NewMetrics()")
+			bs, err := NewBloomSet(
 				&s,
-				prometheus.NewRegistry(),
-				"",
-				minTargetElements,
-				targetFalsePositiveProbability,
-				tt.resetFalsePositiveProbability,
+				BloomSetConfig{
+					Metrics:                        m,
+					MinTargetElements:              minTargetElements,
+					TargetFalsePositiveProbability: targetFalsePositiveProbability,
+					ResetFalsePositiveProbability:  tt.resetFalsePositiveProbability,
+				},
 			)
-			require.NoError(err)
+			require.NoError(err, "NewBloomSet()")
 
 			for _, op := range tt.ops {
 				if op.add != nil {
-					require.NoError(bs.Add(*op.add))
+					require.NoErrorf(bs.Add(*op.add), "%T.Add(...)", bs)
 				}
 				if op.remove != nil {
 					s.txs.Remove(*op.remove)
@@ -124,34 +127,30 @@ func TestSetWithBloomFilter_Refresh(t *testing.T) {
 
 			// Add one to expectedResetCount to account for the initial creation
 			// of the bloom filter.
-			require.Equal(tt.expectedResetCount+1, testutil.ToFloat64(bs.metrics.ResetCount))
+			require.Equal(tt.expectedResetCount+1, testutil.ToFloat64(m.ResetCount), "number of resets")
 			b, h := bs.BloomFilter()
-			for _, expected := range tt.expected {
-				require.True(bloom.Contains(b, expected[:], h[:]))
+			for _, expected := range tt.expectedInFilter {
+				require.Truef(bloom.Contains(b, expected[:], h[:]), "%T.Contains(%s)", b, expected.GossipID())
 			}
 		})
 	}
 }
 
-// TestSetWithBloomFilter_Concurrent tests that SetWithBloomFilter is ensures
-// that the returned bloom filter is a super set of the items in the Set at the
-// time it is called, even under concurrent resets.
-func TestSetWithBloomFilter_Concurrent(t *testing.T) {
+// TestBloomSet_Concurrent tests that BloomSet ensures that the returned bloom
+// filter is a super set of the items in the Set at the time it is called, even
+// under concurrent resets, because resets of the filter are accompanied by
+// refilling from the Set.
+func TestBloomSet_Concurrent(t *testing.T) {
 	require := require.New(t)
 
-	const (
-		minTargetElements              = 1
-		targetFalsePositiveProbability = 0.01
-		resetFalsePositiveProbability  = 0.0000000001 // Forces frequent resets
-	)
 	var s setDouble
-	bs, err := NewSetWithBloomFilter(
+	bs, err := NewBloomSet(
 		&s,
-		prometheus.NewRegistry(),
-		"",
-		minTargetElements,
-		targetFalsePositiveProbability,
-		resetFalsePositiveProbability,
+		BloomSetConfig{
+			MinTargetElements:              1,
+			TargetFalsePositiveProbability: 0.01,
+			ResetFalsePositiveProbability:  0.0000000001, // Forces frequent resets
+		},
 	)
 	require.NoError(err)
 

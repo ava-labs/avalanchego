@@ -8,64 +8,81 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/prometheus/client_golang/prometheus"
-
 	"github.com/ava-labs/avalanchego/ids"
 	"github.com/ava-labs/avalanchego/utils/bloom"
 )
 
-var (
-	_ Set[Gossipable]             = (*SetWithBloomFilter[Gossipable])(nil)
-	_ PullGossiperSet[Gossipable] = (*SetWithBloomFilter[Gossipable])(nil)
+const (
+	DefaultMinTargetElements              = 1000
+	DefaultTargetFalsePositiveProbability = .01
+	DefaultResetFalsePositiveProbability  = .05
 )
+
+var (
+	_ Set[Gossipable]             = (*BloomSet[Gossipable])(nil)
+	_ PullGossiperSet[Gossipable] = (*BloomSet[Gossipable])(nil)
+
+	ErrBloomReset = fmt.Errorf("bloom reset")
+)
+
+type BloomSetConfig struct {
+	// Metrics allows exposing the current state of the bloom filter across
+	// additions and resets. If nil, no metrics are recorded.
+	Metrics *bloom.Metrics
+	// MinTargetElements is the minimum number of elements to target when
+	// creating a new bloom filter. If zero, [DefaultMinTargetElements] is used.
+	MinTargetElements int
+	// TargetFalsePositiveProbability is the target false positive probability
+	// when creating a new bloom filter. If zero,
+	// [DefaultTargetFalsePositiveProbability] is used.
+	TargetFalsePositiveProbability float64
+	// ResetFalsePositiveProbability is the false positive probability at
+	// which the bloom filter is reset. If zero,
+	// [DefaultResetFalsePositiveProbability] is used.
+	ResetFalsePositiveProbability float64
+}
+
+func (c *BloomSetConfig) fillDefaults() {
+	if c.MinTargetElements == 0 {
+		c.MinTargetElements = DefaultMinTargetElements
+	}
+	if c.TargetFalsePositiveProbability == 0 {
+		c.TargetFalsePositiveProbability = DefaultTargetFalsePositiveProbability
+	}
+	if c.ResetFalsePositiveProbability == 0 {
+		c.ResetFalsePositiveProbability = DefaultResetFalsePositiveProbability
+	}
+}
 
 type Set[T Gossipable] interface {
 	HandlerSet[T]
 	PushGossiperSet
 	// Len returns the number of items in the set.
 	//
-	// This value should always be at least as large as the number of items that
-	// can be iterated over with a call to Iterate.
+	// This value should mast the number of items that can be iterated over with
+	// a call to Iterate.
 	Len() int
 }
 
-// NewSetWithBloomFilter wraps set with a bloom filter. It is expected for all
-// future additions to the provided set to go through the returned set, or be
-// followed by a call to AddToBloom.
-func NewSetWithBloomFilter[T Gossipable](
+// NewBloomSet wraps the [Set] with a bloom filter. It is expected for all
+// future additions to the provided set to go through the returned [BloomSet].
+func NewBloomSet[T Gossipable](
 	set Set[T],
-	registerer prometheus.Registerer,
-	namespace string,
-	minTargetElements int,
-	targetFalsePositiveProbability,
-	resetFalsePositiveProbability float64,
-) (*SetWithBloomFilter[T], error) {
-	metrics, err := bloom.NewMetrics(namespace, registerer)
-	if err != nil {
-		return nil, err
-	}
-	m := &SetWithBloomFilter[T]{
+	c BloomSetConfig,
+) (*BloomSet[T], error) {
+	c.fillDefaults()
+	m := &BloomSet[T]{
 		set: set,
-
-		minTargetElements:              minTargetElements,
-		targetFalsePositiveProbability: targetFalsePositiveProbability,
-		resetFalsePositiveProbability:  resetFalsePositiveProbability,
-
-		metrics: metrics,
+		c:   c,
 	}
-	return m, m.resetBloomFilter()
+	return m, m.resetBloom()
 }
 
-type SetWithBloomFilter[T Gossipable] struct {
+type BloomSet[T Gossipable] struct {
 	set Set[T]
+	c   BloomSetConfig
 
-	minTargetElements              int
-	targetFalsePositiveProbability float64
-	resetFalsePositiveProbability  float64
-
-	metrics *bloom.Metrics
-
-	l        sync.RWMutex
+	lock     sync.RWMutex
 	maxCount int
 	bloom    *bloom.Filter
 	// salt is provided to eventually unblock collisions in Bloom. It's possible
@@ -76,9 +93,10 @@ type SetWithBloomFilter[T Gossipable] struct {
 
 // Add adds v to the set and bloom filter.
 //
-// If adding to the bloom filter fails after successfully adding to the set, the
-// value remains in the set and is still added to the bloom filter.
-func (s *SetWithBloomFilter[T]) Add(v T) error {
+// If adding the inner set succeeds and resetting the bloom filter fails,
+// [ErrBloomReset] is returned. However, it is still guaranteed that v has
+// been added to the bloom filter.
+func (s *BloomSet[T]) Add(v T) error {
 	if err := s.set.Add(v); err != nil {
 		return err
 	}
@@ -89,49 +107,52 @@ func (s *SetWithBloomFilter[T]) Add(v T) error {
 //
 // Even if an error is returned, the ID has still been added to the bloom
 // filter.
-func (s *SetWithBloomFilter[T]) addToBloom(h ids.ID) error {
-	s.l.RLock()
-	if bloom.Add(s.bloom, h[:], s.salt[:]) {
-		s.metrics.Count.Inc()
+func (s *BloomSet[T]) addToBloom(h ids.ID) error {
+	s.lock.RLock()
+	if bloom.Add(s.bloom, h[:], s.salt[:]) && s.c.Metrics != nil {
+		s.c.Metrics.Count.Inc()
 	}
 	shouldReset := s.shouldReset()
-	s.l.RUnlock()
+	s.lock.RUnlock()
 
 	if !shouldReset {
 		return nil
 	}
 
-	s.l.Lock()
-	defer s.l.Unlock()
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
 	// Bloom filter was already reset by another thread
 	if !s.shouldReset() {
 		return nil
 	}
-	return s.resetBloomFilter()
+	return s.resetBloom()
 }
 
-func (s *SetWithBloomFilter[T]) shouldReset() bool {
+// shouldReset expects either a read lock or a write lock to be held.
+func (s *BloomSet[T]) shouldReset() bool {
 	return s.bloom.Count() > s.maxCount
 }
 
-// resetBloomFilter attempts to generate a new bloom filter and fill it with the
+// resetBloom attempts to generate a new bloom filter and fill it with the
 // current entries in the set.
 //
 // If an error is returned, the bloom filter and salt are unchanged.
-func (s *SetWithBloomFilter[T]) resetBloomFilter() error {
-	targetElements := max(2*s.set.Len(), s.minTargetElements)
+//
+// resetBloom expects a write lock to be held.
+func (s *BloomSet[T]) resetBloom() error {
+	targetElements := max(2*s.set.Len(), s.c.MinTargetElements)
 	numHashes, numEntries := bloom.OptimalParameters(
 		targetElements,
-		s.targetFalsePositiveProbability,
+		s.c.TargetFalsePositiveProbability,
 	)
 	newBloom, err := bloom.New(numHashes, numEntries)
 	if err != nil {
-		return fmt.Errorf("creating new bloom: %w", err)
+		return fmt.Errorf("%w: creating new bloom: %w", ErrBloomReset, err)
 	}
 	var newSalt ids.ID
 	if _, err := rand.Read(newSalt[:]); err != nil {
-		return fmt.Errorf("generating new salt: %w", err)
+		return fmt.Errorf("%w: generating new salt: %w", ErrBloomReset, err)
 	}
 	s.set.Iterate(func(v T) bool {
 		h := v.GossipID()
@@ -139,29 +160,31 @@ func (s *SetWithBloomFilter[T]) resetBloomFilter() error {
 		return true
 	})
 
-	s.maxCount = bloom.EstimateCount(numHashes, numEntries, s.resetFalsePositiveProbability)
+	s.maxCount = bloom.EstimateCount(numHashes, numEntries, s.c.ResetFalsePositiveProbability)
 	s.bloom = newBloom
 	s.salt = newSalt
 
-	s.metrics.Reset(newBloom, s.maxCount)
+	if s.c.Metrics != nil {
+		s.c.Metrics.Reset(newBloom, s.maxCount)
+	}
 	return nil
 }
 
-func (s *SetWithBloomFilter[T]) Has(h ids.ID) bool {
+func (s *BloomSet[T]) Has(h ids.ID) bool {
 	return s.set.Has(h)
 }
 
-func (s *SetWithBloomFilter[T]) Iterate(f func(T) bool) {
+func (s *BloomSet[T]) Iterate(f func(T) bool) {
 	s.set.Iterate(f)
 }
 
-func (s *SetWithBloomFilter[T]) Len() int {
+func (s *BloomSet[T]) Len() int {
 	return s.set.Len()
 }
 
-func (s *SetWithBloomFilter[_]) BloomFilter() (*bloom.Filter, ids.ID) {
-	s.l.RLock()
-	defer s.l.RUnlock()
+func (s *BloomSet[_]) BloomFilter() (*bloom.Filter, ids.ID) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	return s.bloom, s.salt
 }
