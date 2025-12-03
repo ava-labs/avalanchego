@@ -96,15 +96,13 @@ func TestBloomSet_Refresh(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require := require.New(t)
-
 			const (
 				minTargetElements              = 1
 				targetFalsePositiveProbability = 0.000001
 			)
 			var s setDouble
 			m, err := bloom.NewMetrics("", prometheus.NewRegistry())
-			require.NoError(err, "NewMetrics()")
+			require.NoError(t, err, "NewMetrics()")
 			bs, err := NewBloomSet(
 				&s,
 				BloomSetConfig{
@@ -114,11 +112,11 @@ func TestBloomSet_Refresh(t *testing.T) {
 					ResetFalsePositiveProbability:  tt.resetFalsePositiveProbability,
 				},
 			)
-			require.NoError(err, "NewBloomSet()")
+			require.NoError(t, err, "NewBloomSet()")
 
 			for _, op := range tt.ops {
 				if op.add != nil {
-					require.NoErrorf(bs.Add(*op.add), "%T.Add(...)", bs)
+					require.NoErrorf(t, bs.Add(*op.add), "%T.Add(...)", bs)
 				}
 				if op.remove != nil {
 					s.txs.Remove(*op.remove)
@@ -127,10 +125,10 @@ func TestBloomSet_Refresh(t *testing.T) {
 
 			// Add one to expectedResetCount to account for the initial creation
 			// of the bloom filter.
-			require.Equal(tt.expectedResetCount+1, testutil.ToFloat64(m.ResetCount), "number of resets")
+			require.Equal(t, tt.expectedResetCount+1, testutil.ToFloat64(m.ResetCount), "number of resets")
 			b, h := bs.BloomFilter()
 			for _, expected := range tt.expectedInFilter {
-				require.Truef(bloom.Contains(b, expected[:], h[:]), "%T.Contains(%s)", b, expected.GossipID())
+				require.Truef(t, bloom.Contains(b, expected[:], h[:]), "%T.Contains(%s)", b, expected.GossipID())
 			}
 		})
 	}
@@ -141,8 +139,6 @@ func TestBloomSet_Refresh(t *testing.T) {
 // under concurrent resets, because resets of the filter are accompanied by
 // refilling from the Set.
 func TestBloomSet_Concurrent(t *testing.T) {
-	require := require.New(t)
-
 	var s setDouble
 	bs, err := NewBloomSet(
 		&s,
@@ -152,7 +148,7 @@ func TestBloomSet_Concurrent(t *testing.T) {
 			ResetFalsePositiveProbability:  0.0000000001, // Forces frequent resets
 		},
 	)
-	require.NoError(err)
+	require.NoError(t, err)
 
 	var eg errgroup.Group
 	for range 10 {
@@ -173,5 +169,5 @@ func TestBloomSet_Concurrent(t *testing.T) {
 			return nil
 		})
 	}
-	require.NoError(eg.Wait())
+	require.NoError(t, eg.Wait())
 }
