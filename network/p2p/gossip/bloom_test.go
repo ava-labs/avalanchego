@@ -77,19 +77,22 @@ func TestBloomFilterRefresh(t *testing.T) {
 
 			var resetCount uint64
 			for _, item := range tt.add {
-				bloomBytes, saltBytes := bloom.Marshal()
-				initialBloomBytes := slices.Clone(bloomBytes)
-				initialSaltBytes := slices.Clone(saltBytes)
+				bloomFilter, salt := bloom.BloomFilter()
+				initialBloomBytes := slices.Clone(bloomFilter.Marshal())
+				initialSaltBytes := slices.Clone(salt[:])
 
 				reset, err := ResetBloomFilterIfNeeded(bloom, len(tt.add))
 				require.NoError(err)
 				if reset {
 					resetCount++
 				}
-				bloom.Add(item)
+				require.Equal(initialBloomBytes, bloomFilter.Marshal())
+				require.Equal(initialSaltBytes, salt[:])
 
-				require.Equal(initialBloomBytes, bloomBytes)
-				require.Equal(initialSaltBytes, saltBytes)
+				// If the bloom filter wasn't reset, adding an item may modify
+				// the returned bloom filter, so this must be done after the
+				// checks.
+				bloom.Add(item)
 			}
 
 			require.Equal(tt.resetCount, resetCount)

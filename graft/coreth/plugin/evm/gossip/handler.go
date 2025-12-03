@@ -22,7 +22,7 @@ var _ p2p.Handler = (*txGossipHandler)(nil)
 func NewTxGossipHandler[T gossip.Gossipable](
 	log logging.Logger,
 	marshaller gossip.Marshaller[T],
-	mempool gossip.Set[T],
+	mempool gossip.HandlerSet[T],
 	metrics gossip.Metrics,
 	maxMessageSize int,
 	throttlingPeriod time.Duration,
