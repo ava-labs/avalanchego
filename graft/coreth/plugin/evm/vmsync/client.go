@@ -97,25 +97,17 @@ type ClientConfig struct {
 }
 
 type client struct {
-	*ClientConfig
-
+	config           *ClientConfig
 	resumableSummary message.Syncable
-
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
-
-	// State Sync results
-	err           error
-	stateSyncOnce sync.Once
-
-	// strategy manages sync execution (static or dynamic)
-	strategy SyncStrategy
+	cancel           context.CancelFunc
+	wg               sync.WaitGroup
+	err              error
+	stateSyncOnce    sync.Once    // ensures only one state sync can be in progress at a time
+	strategy         SyncStrategy // strategy manages sync execution (static or dynamic)
 }
 
 func NewClient(config *ClientConfig) Client {
-	return &client{
-		ClientConfig: config,
-	}
+	return &client{config: config}
 }
 
 type Client interface {
@@ -141,23 +133,23 @@ type Client interface {
 
 // StateSyncEnabled returns [client.enabled], which is set in the chain's config file.
 func (c *client) StateSyncEnabled(context.Context) (bool, error) {
-	return c.Enabled, nil
+	return c.config.Enabled, nil
 }
 
 // GetOngoingSyncStateSummary returns a state summary that was previously started
 // and not finished, and sets [resumableSummary] if one was found.
 // Returns [database.ErrNotFound] if no ongoing summary is found or if [client.skipResume] is true.
 func (c *client) GetOngoingSyncStateSummary(context.Context) (block.StateSummary, error) {
-	if c.SkipResume {
+	if c.config.SkipResume {
 		return nil, database.ErrNotFound
 	}
 
-	summaryBytes, err := c.MetadataDB.Get(stateSyncSummaryKey)
+	summaryBytes, err := c.config.MetadataDB.Get(stateSyncSummaryKey)
 	if err != nil {
 		return nil, err // includes the [database.ErrNotFound] case
 	}
 
-	summary, err := c.Parser.Parse(summaryBytes, c.acceptSyncSummary)
+	summary, err := c.config.Parser.Parse(summaryBytes, c.acceptSyncSummary)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse saved state sync summary to SyncSummary: %w", err)
 	}
@@ -167,10 +159,10 @@ func (c *client) GetOngoingSyncStateSummary(context.Context) (block.StateSummary
 
 // ClearOngoingSummary clears any marker of an ongoing state sync summary
 func (c *client) ClearOngoingSummary() error {
-	if err := c.MetadataDB.Delete(stateSyncSummaryKey); err != nil {
+	if err := c.config.MetadataDB.Delete(stateSyncSummaryKey); err != nil {
 		return fmt.Errorf("failed to clear ongoing summary: %w", err)
 	}
-	if err := c.VerDB.Commit(); err != nil {
+	if err := c.config.VerDB.Commit(); err != nil {
 		return fmt.Errorf("failed to commit db while clearing ongoing summary: %w", err)
 	}
 
@@ -179,7 +171,7 @@ func (c *client) ClearOngoingSummary() error {
 
 // ParseStateSummary parses [summaryBytes] to [commonEng.Summary]
 func (c *client) ParseStateSummary(_ context.Context, summaryBytes []byte) (block.StateSummary, error) {
-	return c.Parser.Parse(summaryBytes, c.acceptSyncSummary)
+	return c.config.Parser.Parse(summaryBytes, c.acceptSyncSummary)
 }
 
 // OnEngineAccept delegates to the strategy if active.
@@ -233,10 +225,10 @@ func (c *client) acceptSyncSummary(proposedSummary message.Syncable) (block.Stat
 	if !isResume {
 		// Skip syncing if the blockchain is not significantly ahead of local state,
 		// since bootstrapping would be faster.
-		if c.LastAcceptedHeight+c.MinBlocks > proposedSummary.Height() {
+		if c.config.LastAcceptedHeight+c.config.MinBlocks > proposedSummary.Height() {
 			log.Info(
 				"last accepted too close to most recent syncable block, skipping state sync",
-				"lastAccepted", c.LastAcceptedHeight,
+				"lastAccepted", c.config.LastAcceptedHeight,
 				"syncableHeight", proposedSummary.Height(),
 			)
 			return block.StateSyncSkipped, nil
@@ -248,18 +240,18 @@ func (c *client) acceptSyncSummary(proposedSummary message.Syncable) (block.Stat
 		// sync marker will be wiped, so we do not accidentally resume progress from an incorrect version
 		// of the snapshot. (if switching between versions that come before this change and back this could
 		// lead to the snapshot not being cleaned up correctly)
-		<-snapshot.WipeSnapshot(c.ChainDB, true)
+		<-snapshot.WipeSnapshot(c.config.ChainDB, true)
 		// Reset the snapshot generator here so that when state sync completes, snapshots will not attempt to read an
 		// invalid generator.
 		// Note: this must be called after WipeSnapshot is called so that we do not invalidate a partially generated snapshot.
-		snapshot.ResetSnapshotGeneration(c.ChainDB)
+		snapshot.ResetSnapshotGeneration(c.config.ChainDB)
 	}
 
 	// Update the current state sync summary key in the database.
-	if err := c.MetadataDB.Put(stateSyncSummaryKey, proposedSummary.Bytes()); err != nil {
+	if err := c.config.MetadataDB.Put(stateSyncSummaryKey, proposedSummary.Bytes()); err != nil {
 		return block.StateSyncSkipped, fmt.Errorf("failed to write state sync summary key to disk: %w", err)
 	}
-	if err := c.VerDB.Commit(); err != nil {
+	if err := c.config.VerDB.Commit(); err != nil {
 		return block.StateSyncSkipped, fmt.Errorf("failed to commit db: %w", err)
 	}
 
@@ -267,27 +259,27 @@ func (c *client) acceptSyncSummary(proposedSummary message.Syncable) (block.Stat
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel
 
-	registry, err := newSyncerRegistry(c.ClientConfig, proposedSummary)
+	registry, err := c.newSyncerRegistry(proposedSummary)
 	if err != nil {
 		return block.StateSyncSkipped, err
 	}
 
 	finalizer := newFinalizer(
-		c.Chain,
-		c.State,
-		c.Acceptor,
-		c.VerDB,
-		c.MetadataDB,
-		c.Extender,
-		c.LastAcceptedHeight,
+		c.config.Chain,
+		c.config.State,
+		c.config.Acceptor,
+		c.config.VerDB,
+		c.config.MetadataDB,
+		c.config.Extender,
+		c.config.LastAcceptedHeight,
 	)
 
 	var (
 		strategy SyncStrategy
 		mode     block.StateSyncMode
 	)
-	if c.DynamicStateSyncEnabled {
-		strategy = newDynamicStrategy(registry, finalizer, c.PivotInterval)
+	if c.config.DynamicStateSyncEnabled {
+		strategy = newDynamicStrategy(registry, finalizer, c.config.PivotInterval)
 		mode = block.StateSyncDynamic
 	} else {
 		strategy = newStaticStrategy(registry, finalizer)
@@ -313,16 +305,16 @@ func (c *client) signalDone(err error) {
 		if c.cancel != nil {
 			c.cancel()
 		}
-		close(c.StateSyncDone)
+		close(c.config.StateSyncDone)
 	})
 }
 
 // newSyncerRegistry creates a registry with all required syncers for the given summary.
-func newSyncerRegistry(cfg *ClientConfig, summary message.Syncable) (*SyncerRegistry, error) {
+func (c *client) newSyncerRegistry(summary message.Syncable) (*SyncerRegistry, error) {
 	registry := NewSyncerRegistry()
 
 	blockSyncer, err := blocksync.NewSyncer(
-		cfg.Client, cfg.ChainDB,
+		c.config.Client, c.config.ChainDB,
 		summary.GetBlockHash(), summary.Height(),
 		BlocksToFetch,
 	)
@@ -330,20 +322,20 @@ func newSyncerRegistry(cfg *ClientConfig, summary message.Syncable) (*SyncerRegi
 		return nil, fmt.Errorf("failed to create block syncer: %w", err)
 	}
 
-	codeQueue, err := statesync.NewCodeQueue(cfg.ChainDB, cfg.StateSyncDone)
+	codeQueue, err := statesync.NewCodeQueue(c.config.ChainDB, c.config.StateSyncDone)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create code queue: %w", err)
 	}
 
-	codeSyncer, err := statesync.NewCodeSyncer(cfg.Client, cfg.ChainDB, codeQueue.CodeHashes())
+	codeSyncer, err := statesync.NewCodeSyncer(c.config.Client, c.config.ChainDB, codeQueue.CodeHashes())
 	if err != nil {
 		return nil, fmt.Errorf("failed to create code syncer: %w", err)
 	}
 
 	stateSyncer, err := statesync.NewSyncer(
-		cfg.Client, cfg.ChainDB,
+		c.config.Client, c.config.ChainDB,
 		summary.GetBlockRoot(),
-		codeQueue, cfg.RequestSize,
+		codeQueue, c.config.RequestSize,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create EVM state syncer: %w", err)
@@ -351,8 +343,8 @@ func newSyncerRegistry(cfg *ClientConfig, summary message.Syncable) (*SyncerRegi
 
 	syncers := []syncpkg.Syncer{blockSyncer, codeSyncer, stateSyncer}
 
-	if cfg.Extender != nil {
-		atomicSyncer, err := cfg.Extender.CreateSyncer(cfg.Client, cfg.VerDB, summary)
+	if c.config.Extender != nil {
+		atomicSyncer, err := c.config.Extender.CreateSyncer(c.config.Client, c.config.VerDB, summary)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create atomic syncer: %w", err)
 		}
