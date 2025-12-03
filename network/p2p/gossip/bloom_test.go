@@ -13,21 +13,21 @@ import (
 )
 
 func TestBloomFilterRefresh(t *testing.T) {
+	const (
+		minTargetElements              = 1
+		targetFalsePositiveProbability = 0.000001
+	)
 	tests := []struct {
-		name                           string
-		minTargetElements              int
-		targetFalsePositiveProbability float64
-		resetFalsePositiveProbability  float64
-		resetCount                     uint64
-		add                            []tx
-		expected                       []tx
+		name                          string
+		resetFalsePositiveProbability float64
+		resetCount                    uint64
+		add                           []tx
+		expected                      []tx
 	}{
 		{
-			name:                           "no refresh",
-			minTargetElements:              1,
-			targetFalsePositiveProbability: 0.01,
-			resetFalsePositiveProbability:  1,
-			resetCount:                     0, // maxCount = 9223372036854775807
+			name:                          "no refresh",
+			resetFalsePositiveProbability: 1,
+			resetCount:                    0, // maxCount = 9223372036854775807
 			add: []tx{
 				{0},
 				{1},
@@ -40,11 +40,9 @@ func TestBloomFilterRefresh(t *testing.T) {
 			},
 		},
 		{
-			name:                           "refresh",
-			minTargetElements:              1,
-			targetFalsePositiveProbability: 0.01,
-			resetFalsePositiveProbability:  0.0000000000000001, // maxCount = 1
-			resetCount:                     1,
+			name:                          "refresh",
+			resetFalsePositiveProbability: 0.0000000000000001, // maxCount = 1
+			resetCount:                    1,
 			add: []tx{
 				{0},
 				{1},
@@ -55,11 +53,9 @@ func TestBloomFilterRefresh(t *testing.T) {
 			},
 		},
 		{
-			name:                           "multiple refresh",
-			minTargetElements:              1,
-			targetFalsePositiveProbability: 0.01,
-			resetFalsePositiveProbability:  0.0000000000000001, // maxCount = 1
-			resetCount:                     2,
+			name:                          "multiple refresh",
+			resetFalsePositiveProbability: 0.0000000000000001, // maxCount = 1
+			resetCount:                    2,
 			add: []tx{
 				{0},
 				{1},
@@ -76,7 +72,7 @@ func TestBloomFilterRefresh(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			require := require.New(t)
-			bloom, err := NewBloomFilter(prometheus.NewRegistry(), "", tt.minTargetElements, tt.targetFalsePositiveProbability, tt.resetFalsePositiveProbability)
+			bloom, err := NewBloomFilter(prometheus.NewRegistry(), "", minTargetElements, targetFalsePositiveProbability, tt.resetFalsePositiveProbability)
 			require.NoError(err)
 
 			var resetCount uint64
