@@ -113,11 +113,9 @@ func newTestSubnets(t *testing.T, subnetID ids.ID) *Subnets {
 	config := map[ids.ID]subnets.Config{
 		constants.PrimaryNetworkID: {},
 		subnetID: {
-			ConsensusParameters: subnets.ConsensusParameters{
-				SimplexParams: &simplex.Parameters{
-					MaxProposalWait:    10 * time.Second,
-					MaxRebroadcastWait: 5 * time.Second,
-				},
+			SimplexParameters: &simplex.Parameters{
+				MaxProposalWait:    10 * time.Second,
+				MaxRebroadcastWait: 5 * time.Second,
 			},
 		},
 	}

@@ -567,7 +567,7 @@ func (m *manager) buildChain(chainParams ChainParameters, sb subnets.Subnet) (*c
 		}
 	case block.ChainVM:
 		// handle simplex engine based off parameters
-		if sb.Config().ConsensusParameters.SimplexParams != nil {
+		if sb.Config().SimplexParameters != nil {
 			chain, err = m.createSimplexChain(ctx, vm, sb, chainParams.GenesisData, chainFxs)
 			if err != nil {
 				return nil, fmt.Errorf("error while creating simplex chain %w", err)
@@ -848,11 +848,11 @@ func (m *manager) createAvalancheChain(
 		return nil, fmt.Errorf("error while fetching weight for subnet %s: %w", ctx.SubnetID, err)
 	}
 
-	// sanity check as this should be set by default
-	if sb.Config().ConsensusParameters.SnowballParams == nil {
+	// sanity check
+	if sb.Config().SnowParameters == nil {
 		return nil, fmt.Errorf("snowball parameters not specified for subnet %s", ctx.SubnetID)
 	}
-	consensusParams := *sb.Config().ConsensusParameters.SnowballParams
+	consensusParams := *sb.Config().SnowParameters
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)
@@ -1254,11 +1254,11 @@ func (m *manager) createSnowmanChain(
 		return nil, fmt.Errorf("error while fetching weight for subnet %s: %w", ctx.SubnetID, err)
 	}
 
-	// sanity check as this should be set by default
-	if sb.Config().ConsensusParameters.SnowballParams == nil {
+	// sanity check
+	if sb.Config().SnowParameters == nil {
 		return nil, fmt.Errorf("snowball parameters not specified for subnet %s", ctx.SubnetID)
 	}
-	consensusParams := *sb.Config().ConsensusParameters.SnowballParams
+	consensusParams := *sb.Config().SnowParameters
 	sampleK := consensusParams.K
 	if uint64(sampleK) > bootstrapWeight {
 		sampleK = int(bootstrapWeight)
@@ -1776,7 +1776,7 @@ func (m *manager) createSimplexChain(ctx *snow.ConsensusContext, vm block.ChainV
 		WAL:                wal,
 		SignBLS:            m.ManagerConfig.StakingBLSKey.Sign,
 		DB:                 simplexDB,
-		Params:             sb.Config().ConsensusParameters.SimplexParams,
+		Params:             sb.Config().SimplexParameters,
 	}
 
 	engine, err := simplex.NewEngine(ctx, context.TODO(), config)

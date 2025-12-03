@@ -7,13 +7,17 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/ava-labs/avalanchego/ids"
+	"github.com/ava-labs/avalanchego/utils/set"
 )
 
 var ErrInvalidParameters = errors.New("simplex parameters must be valid")
 
 type Parameters struct {
-	MaxProposalWait    time.Duration `json:"maxProposalWait"    yaml:"maxProposalWait"`
-	MaxRebroadcastWait time.Duration `json:"maxRebroadcastWait" yaml:"maxRebroadcastWait"`
+	MaxProposalWait    time.Duration       `json:"maxProposalWait"    yaml:"maxProposalWait"`
+	MaxRebroadcastWait time.Duration       `json:"maxRebroadcastWait" yaml:"maxRebroadcastWait"`
+	InitialValidators  set.Set[ids.NodeID] `json:"initialValidators"        yaml:"initialValidators"`
 }
 
 var DefaultParameters = Parameters{
@@ -27,6 +31,9 @@ func (p Parameters) Verify() error {
 	}
 	if p.MaxRebroadcastWait <= 0 {
 		return fmt.Errorf("%w: maxRebroadcastWait must be positive", ErrInvalidParameters)
+	}
+	if len(p.InitialValidators) == 0 {
+		return fmt.Errorf("%w: initialValidators must be non-empty", ErrInvalidParameters)
 	}
 	return nil
 }

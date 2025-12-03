@@ -70,9 +70,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 			sb := subnets.New(
 				ctx.NodeID,
 				subnets.Config{
-					ConsensusParameters: subnets.ConsensusParameters{
-						SnowballParams: test.consensusParams,
-					},
+					SnowParameters: test.consensusParams,
 				},
 			)
 
@@ -149,7 +147,7 @@ func TestHealthCheckSubnet(t *testing.T) {
 				details, err := handlerIntf.HealthCheck(t.Context())
 				expectedPercentConnected := float64(index+1) / float64(testVdrCount)
 				conf := sb.Config()
-				minPercentConnected := conf.ConsensusParameters.SnowballParams.MinPercentConnectedHealthy()
+				minPercentConnected := conf.SnowParameters.MinPercentConnectedHealthy()
 				if expectedPercentConnected >= minPercentConnected {
 					require.NoError(err)
 					continue

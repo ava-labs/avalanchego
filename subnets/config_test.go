@@ -33,13 +33,21 @@ func TestValid(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			name: "invalid snowball consensus parameters",
+			name: "deprecated consensus parameters set",
 			s: Config{
-				ConsensusParameters: ConsensusParameters{
-					SnowballParams: &snowball.Parameters{
-						K:               2,
-						AlphaPreference: 1,
-					},
+				ConsensusParameters: &snowball.Parameters{
+					K:               2,
+					AlphaPreference: 1,
+				},
+			},
+			expectedErr: ErrDeprecatedConsensusParameters,
+		},
+		{
+			name: "invalid snow consensus parameters",
+			s: Config{
+				SnowParameters: &snowball.Parameters{
+					K:               2,
+					AlphaPreference: 1,
 				},
 			},
 			expectedErr: snowball.ErrParametersInvalid,
@@ -47,62 +55,51 @@ func TestValid(t *testing.T) {
 		{
 			name: "invalid allowed node IDs",
 			s: Config{
-				AllowedNodes:  set.Of(ids.GenerateTestNodeID()),
-				ValidatorOnly: false,
-				ConsensusParameters: ConsensusParameters{
-					SnowballParams: &validParameters,
-				},
+				AllowedNodes:   set.Of(ids.GenerateTestNodeID()),
+				ValidatorOnly:  false,
+				SnowParameters: &validParameters,
 			},
 			expectedErr: errAllowedNodesWhenNotValidatorOnly,
 		},
 		{
 			name: "valid snowball parameters",
 			s: Config{
-				ConsensusParameters: ConsensusParameters{
-					SnowballParams: &validParameters,
-				},
-				ValidatorOnly: false,
+				SnowParameters: &validParameters,
+				ValidatorOnly:  false,
 			},
 			expectedErr: nil,
 		},
 		{
 			name: "valid simplex parameters",
 			s: Config{
-				ConsensusParameters: ConsensusParameters{
-					SimplexParams: &simplex.Parameters{
-						MaxProposalWait:    1 * time.Second,
-						MaxRebroadcastWait: 1 * time.Second,
-					},
+				SimplexParameters: &simplex.Parameters{
+					MaxProposalWait:    1 * time.Second,
+					MaxRebroadcastWait: 1 * time.Second,
+					InitialValidators:  set.Of(ids.GenerateTestNodeID()),
 				},
 				ValidatorOnly: false,
 			},
 			expectedErr: nil,
 		},
 		{
-			name: "no consensus parameters",
-			s: Config{
-				ConsensusParameters: ConsensusParameters{},
-			},
-			expectedErr: errMissingConsensusParameters,
+			name:        "no consensus parameters",
+			s:           Config{},
+			expectedErr: errInvalidConsensusConfiguration,
 		},
 		{
 			name: "both consensus parameters set",
 			s: Config{
-				ConsensusParameters: ConsensusParameters{
-					SnowballParams: &validParameters,
-					SimplexParams:  &simplex.Parameters{},
-				},
+				SnowParameters:    &validParameters,
+				SimplexParameters: &simplex.Parameters{},
 			},
-			expectedErr: errTwoConfigs,
+			expectedErr: errInvalidConsensusConfiguration,
 		},
 		{
 			name: "invalid simplex parameters",
 			s: Config{
-				ConsensusParameters: ConsensusParameters{
-					SimplexParams: &simplex.Parameters{
-						MaxProposalWait:    -1,
-						MaxRebroadcastWait: -10,
-					},
+				SimplexParameters: &simplex.Parameters{
+					MaxProposalWait:    -1,
+					MaxRebroadcastWait: -10,
 				},
 			},
 			expectedErr: simplex.ErrInvalidParameters,
@@ -110,11 +107,9 @@ func TestValid(t *testing.T) {
 		{
 			name: "empty simplex parameters",
 			s: Config{
-				ConsensusParameters: ConsensusParameters{
-					SimplexParams: &simplex.Parameters{
-						MaxProposalWait:    0,
-						MaxRebroadcastWait: 0,
-					},
+				SimplexParameters: &simplex.Parameters{
+					MaxProposalWait:    0,
+					MaxRebroadcastWait: 0,
 				},
 			},
 			expectedErr: simplex.ErrInvalidParameters,

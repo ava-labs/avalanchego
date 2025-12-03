@@ -16,13 +16,14 @@ import (
 	"github.com/ava-labs/avalanchego/tests/fixture/tmpnet"
 	"github.com/ava-labs/avalanchego/utils/constants"
 	"github.com/ava-labs/avalanchego/utils/crypto/secp256k1"
+	"github.com/ava-labs/avalanchego/utils/set"
 	"github.com/ava-labs/avalanchego/utils/units"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/api"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/genesis"
 	"github.com/ava-labs/avalanchego/vms/example/xsvm/tx"
 )
 
-var simplexSubnetName = "simplex-a"
+var simplexSubnetName = "simplex"
 
 func NewSimplexSubnetOrPanic(name string, key *secp256k1.PrivateKey, nodes ...*tmpnet.Node) *tmpnet.Subnet {
 	if len(nodes) == 0 {
@@ -42,11 +43,16 @@ func NewSimplexSubnetOrPanic(name string, key *secp256k1.PrivateKey, nodes ...*t
 		panic(err)
 	}
 
+	initialValidators := set.NewSet[ids.NodeID](len(nodes))
+	for _, node := range nodes {
+		initialValidators.Add(node.NodeID)
+	}
+
 	return &tmpnet.Subnet{
 		Name: name,
 		Config: tmpnet.ConfigMap{
-			"consensusParameters": map[string]interface{}{
-				"simplexParameters": map[string]interface{}{},
+			"simplexParameters": map[string]interface{}{
+				"initialValidators": initialValidators,
 			},
 		},
 		Chains: []*tmpnet.Chain{
