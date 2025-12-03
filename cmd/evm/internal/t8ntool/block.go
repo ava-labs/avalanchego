@@ -44,7 +44,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-//go:generate go run github.com/fjl/gencodec -type header -field-override headerMarshaling -out gen_header.go
+//go:generate go tool -modfile=../../../../tools/go.mod gencodec -type header -field-override headerMarshaling -out gen_header.go
 type header struct {
 	ParentHash            common.Hash       `json:"parentHash"`
 	OmmerHash             *common.Hash      `json:"sha3Uncles"`
